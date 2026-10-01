@@ -26,7 +26,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { Game } from '../src/engine/Game';
-import { buildSavePayload, decodeBase64ToBytes } from '../src/engine/SaveGamePayload';
+import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { newGame, processTimersAt } from './lib/game';
@@ -107,7 +107,7 @@ function main(): void {
   applyCsbwinSave(saved, new Uint8Array(readFileSync(resolve('static/gamefiles/saves/csbgame4-door-opening.dat'))));
   const fromSave = saved.ctx.party.state.lastMonsterAttackTime;
   const own = makeGame();
-  applyCsbwinSave(own, decodeBase64ToBytes(buildSavePayload(game).raw));
+  applyCsbwinSave(own, buildSaveFile(game));
   const fromOwn = own.ctx.party.state.lastMonsterAttackTime;
   console.log(`csbgame4-door-opening.dat: d.Time ${saved.ctx.state.tickCount}, lastMonsterAttackTime ${fromSave}; ` +
     `the port's own file: ${fromOwn}`);

@@ -1,22 +1,21 @@
 /**
- * Prove the quick-save carries the world, not just the party.
+ * Prove the runtime state (`RuntimeSave.ts`) carries the world, not just the party.
  *
- * The quick-save used to serialize the party, the tick count, the `ITEM16` pool, the
- * timers and the missile records — and nothing else. Every mutation to the *dungeon*
- * was silently dropped on load: doors closed again, objects the party had moved
- * snapped back to their `dungeon.dat` cells, fired actuators re-armed, wounded
- * creatures came back whole. The party kept its inventory throughout, so a door
- * opened with a consumed key became permanently unopenable and the save was dead.
+ * Every game read is restored through it, a save's and a new game's. A state that held
+ * the party, the tick count, the `ITEM16` pool, the timers and the missile records, and
+ * nothing else, would drop every mutation to the *dungeon*: doors closed again, objects
+ * the party had moved back in their `dungeon.dat` cells, fired actuators re-armed,
+ * wounded creatures whole. The party would keep its inventory throughout, so a door
+ * opened with a consumed key would be unopenable for good.
  *
  * None of that is visible to `tools/check-frames.sh`, and none of it is visible in a
- * single session either — it only shows up across a reload. So this tool builds two
- * independent worlds from the real `dungeon.dat`: it mutates one, snapshots it, and
- * restores that snapshot into the other, which is exactly what a page reload does.
+ * single session either. So this tool builds two independent worlds from the real
+ * `dungeon.dat`: it mutates one, snapshots it, and restores that snapshot into the
+ * other.
  *
  * What to look for: every "restored" column matching the "mutated" column, and the
  * "fresh" column *differing* from both. That last one is the point — a fresh world
- * whose door is already open would make the whole test vacuous, and the fresh column
- * is what the old code produced after a load.
+ * whose door is already open would make the whole test vacuous.
  *
  * Run: `npx tsx tools/dump-savegame.ts [level]`
  */

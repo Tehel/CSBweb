@@ -1,9 +1,8 @@
 /**
  * Prove the binary save blocks are laid out the way CSBWin lays them out.
  *
- * `tools/dump-savegame.ts` covers the *runtime* half of a quick-save — the JSON that
- * carries the world. It never touches the other half: the CSBWin-shaped byte blocks
- * that `SaveGameLoader` writes and reads, which until now had no test at all.
+ * `tools/dump-savegame.ts` covers the runtime state a read restores. It never touches
+ * the file: the CSBWin-shaped byte blocks that `SaveGameLoader` writes and reads.
  *
  * Two things are pinned here, and only one of them can be pinned by a round trip.
  *

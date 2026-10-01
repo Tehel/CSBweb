@@ -1,29 +1,20 @@
 /**
- * Prove that **our own** save file gives the game back unchanged.
+ * Prove that **our own** save file gives the game back.
  *
- * Nothing exercised `buildSavePayload` / `applySavePayload` at all. `dump-savegame.ts`
- * drives `getRuntimeSaveState` directly and `dump-csbwin-*.ts` drive the CSBWin reader,
- * so the layer in between — the JSON payload that F5, F9 and both stores of the disk
- * menu actually write and read — had no evidence of any kind behind it. It is also the
- * layer where a field is easiest to lose: the payload is built from a live `Game`,
- * `JSON.stringify`d and rebuilt in a fresh one, so anything that is not a plain value on
- * the snapshot (a `Uint8Array`, a `Map`, a getter) silently becomes something else.
+ * A save is the CSBWin file `buildSaveFile` writes, and nothing beside it: what F5, F9
+ * and the disk menu write to a store and read back (`src/engine/GameSaves.ts`). So the
+ * file has to hold the whole game, and this tool is where that is held to account.
  *
- * The scenario is deliberately the hard one: start from a **genuine CSBWin save**, not
- * from a game this port set up. A party this engine created carries `portraitGraphic`, a
- * graphic-26 index, and would round-trip as a single number; a party out of a file
- * carries 928 bytes of `CHARDESC.portrait` pixels instead
- * (`doc/PROVEN_FACTS.md` → "`CHARDESC` carries the champion's portrait as pixels"), and
- * that is the case a JSON round trip can actually break.
- *
- * Three things are asserted, in rising order of how much they cost to get wrong:
+ * Most scenarios start from a **genuine CSBWin save**, not from a game this port set up:
+ * a party out of a file carries 928 bytes of `CHARDESC.portrait` pixels, an `EXPOOL`, a
+ * full timer table and live monsters, none of which a fresh game has.
  *
  *  1. **Equality.** Party, world snapshot, ITEM16, missiles, the timer table and its
  *     queue, and every champion's portrait, possessions and `charFlags`.
  *  2. **The world still moves.** `csbgame4-door-{opening,closing}.dat` are two fresh
- *     games whose door timers differ in one byte. Restored through the payload and given
- *     40 ticks, one door must open and the other shut, exactly as
- *     `dump-csbwin-timers.ts` shows them doing when loaded straight from the file.
+ *     games whose door timers differ in one byte. Written, read back and given 40 ticks,
+ *     one door must open and the other shut, exactly as `dump-csbwin-timers.ts` shows
+ *     them doing when loaded straight from the file.
  *  3. **The table does not grow.** Five save/load cycles in a row on a save with live
  *     monsters must leave the timer table its 467 slots, with the live timers still in
  *     the lowest ones. `LoadGame` is followed by `reloadAfterSaveGame`, whose
@@ -33,31 +24,37 @@
  *     restored ones would abandon two slots a cycle on `csbgame7.dat`.
  *     3b. A table filled to `SetTimer`'s jump (`Timer.cpp:999-1008`) is written with its
  *     new size and its cursor, and read back with both.
- *
- * And a save carries its world: one of CSB's eleven levels, loaded into a game built over
- * DM's fourteen, installs the world of its `raw` file (`applySavePayload`), and the game
- * saved and the game loaded play on alike.
- * A save from an older build, whose `runtime` this build does not read, loads through
- * `raw` as a genuine CSBWin save of it does.
+ *  4. `GAMEBLOCK2`'s wiring, and 5. the busy bit, out of a live game and back.
+ *  6. **Playing on after a save, beside a load of it.** The save does to the game it
+ *     leaves what a load does, once the file is closed
+ *     (`doc/CSBwin-src/SaveGame.cpp:1237-1245`, `Game.saveWritten`), so the two never part.
+ *  7. **A save carries its world**: one of CSB's eleven levels, loaded into a game built
+ *     over DM's fourteen, installs the file's world.
+ *  8. **A `.dmweb.json`**, which earlier builds wrote, loads the CSBWin file it wraps.
+ *  9. **The file alone.** A game played from `dungeon.dat`, one played on from
+ *     `csbgame7.dat` and one on CSB's `mini.dat` are saved and loaded, and the **whole**
+ *     state of the game left and the game loaded is compared, field by field. Every field that differs must be on
+ *     the list `NOT_CARRIED`, which is `src/engine/CsbwinSaveGame.ts` → "What is not
+ *     restored" as a table: what no CSBWin file holds, and what comes back in the file's
+ *     form. Each entry says what the loaded value must be, and each must turn up, so the
+ *     list can neither hide a loss nor go stale. Then both games play on, and nothing
+ *     more may part them.
  *
  * What is deliberately **not** asserted, because CSBWin does it too: that load is a
  * no-op. `processMonstersOnLevel` really does create new timers, so their `sequence`
  * numbers advance and the random stream moves on; `NextMonsterUpdateTime` really does
  * re-roll each member's `singleMonsterStatus` walk offsets
  * (`doc/CSBwin-src/CSBCode.cpp:5842`), so a monster's sprite may sit a pixel further
- * left after a load. Those are the three fields excluded below, one at a time and by
- * name, rather than by comparing less.
- *
- * The save does the same to the game it leaves, once the file is closed
- * (`doc/CSBwin-src/SaveGame.cpp:1237-1245`, `Game.saveWritten`), so section 6 plays on
- * after a save beside a load of it and asserts that the two never part.
+ * left after a load. Sections 1 to 5 leave those out by name; 6, 7 and 9 compare with
+ * the game the save left, which has been through the same.
  *
  * Run: `npx tsx tools/dump-save-roundtrip.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { Position } from '../src/core/types';
+import { OBJECT_ID_NULL, Position, type Direction, type ObjectID } from '../src/core/types';
+import { sw } from '../src/core/intCast';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/engine/CsbwinSaveGame';
@@ -65,10 +62,10 @@ import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { Game } from '../src/engine/Game';
 import type { RuntimeSaveState } from '../src/engine/RuntimeSave';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { buildSavePayload, decodeBase64ToBytes, encodeSavePayload, applySaveBytes, SAVE_PAYLOAD_VERSION } from '../src/engine/SaveGamePayload';
+import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
-import { CHARFLAG_ATTACK_DISABLE, type Champion } from '../src/engine/gameTypes';
+import { CHARFLAG_ATTACK_DISABLE, MovementAction, type Champion } from '../src/engine/gameTypes';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
@@ -96,9 +93,9 @@ function fromCsbwinSave(file: string): Game {
   return game;
 }
 
-/** Write the payload the disk menu and F5 write, and read it back into a fresh game. */
+/** Write the file the disk menu and F5 write, and read it back into a fresh game. */
 function roundTrip(game: Game): { next: Game; bytes: Uint8Array } {
-  const bytes = encodeSavePayload(buildSavePayload(game));
+  const bytes = buildSaveFile(game);
   const next = loadWorld();
   applySaveBytes(next, bytes);
   return { next, bytes };
@@ -119,7 +116,7 @@ function doorState(game: Game): number {
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * Everything the payload must carry unchanged. The timer table is compared without its
+ * Everything the file must carry unchanged. The timer table is compared without its
  * `sequence` stamps, for the reason in the header: the two monster movement timers
  * `processMonstersOnLevel` re-creates on load are new timers, and CSBWin stamps new
  * timers with a fresh sequence.
@@ -171,8 +168,8 @@ function compareChampions(label: string, before: Champion[], after: Champion[]):
  * The four fields that are not runtime state and had to join the snapshot anyway.
  *
  * They are the converted form of an image (`src/data/CsbwinDungeonConversions.ts`), and
- * a restored game is a *fresh* `Game` built on `dungeon.dat` — so before the snapshot
- * carried them, a world restored from a save's payload kept `dungeon.dat`'s. The TEXT
+ * a restored game is a *fresh* `Game` built on `dungeon.dat` — so without them in the
+ * snapshot, a restored world would keep `dungeon.dat`'s. The TEXT
  * records came back from the save holding entry numbers into an index the save did not
  * write, and `expool`, which no code here can regenerate, was simply the wrong bytes.
  *
@@ -196,7 +193,7 @@ function compareConvertedImage(label: string, source: Game, restored: Game): voi
   check((fresh.expool?.length ?? 0) !== (from.expool?.length ?? 0),
     `${label}: a fresh dungeon.dat game does not have it, so the check can fail`);
   check(same(Array.from(to.expool ?? []), Array.from(from.expool ?? [])),
-    `${label}: EXPOOL survives our own payload byte for byte`);
+    `${label}: EXPOOL survives our own file byte for byte`);
 
   check(same(to.indirectTextIndex, from.indirectTextIndex),
     `${label}: the indirect text index survives`);
@@ -210,6 +207,289 @@ function compareConvertedImage(label: string, source: Game, restored: Game): voi
   const live = records.filter((r) => r.nextObject !== 0xffff);
   check(live.length > 0 && live.every((r) => index[r.textOffset] !== undefined),
     `${label}: all ${live.length} live TEXT records address an entry the index has`);
+}
+
+/**
+ * A timer table as a file holds it. `TIMER` bytes 6-7 and 8-9 are each one pair, read as
+ * two bytes or as a word by the timer's function (`doc/CSBwin-src/CSB.h:1818-1860`). A
+ * live entry carries the reading its creator set and a loaded one both, so the game a
+ * save left and a load of it are compared on the bytes, which are the file's. Section 9
+ * checks that a word never says more than its bytes.
+ */
+function fileForm(records: RuntimeSaveState['dungeon']['timers']): unknown[] {
+  return (records ?? []).map(({ timerWord6, timerWord8, ...bytes }) => { void timerWord6; void timerWord8; return bytes; });
+}
+
+/* ------------------------------------------------------ 9. the file alone --- */
+
+interface Difference {
+  /** The field, with every array index as `[]`. */
+  pattern: string;
+  path: Array<string | number>;
+  was: unknown;
+  now: unknown;
+}
+
+/** Every leaf at which two plain values differ. */
+function differences(was: unknown, now: unknown, path: Array<string | number> = [], out: Difference[] = []): Difference[] {
+  if (was === now) return out;
+  if (was && now && typeof was === 'object' && typeof now === 'object') {
+    const a = was as Record<string, unknown>;
+    const b = now as Record<string, unknown>;
+    for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      differences(a[key], b[key], [...path, Array.isArray(was) ? Number(key) : key], out);
+    }
+    return out;
+  }
+  out.push({ pattern: path.map((p) => (typeof p === 'number' ? '[]' : `.${p}`)).join(''), path, was, now });
+  return out;
+}
+
+/** The runtime state as plain values: what `JSON` makes of it. */
+const plain = (game: Game): RuntimeSaveState => JSON.parse(JSON.stringify(game.getRuntimeSaveState()));
+
+/**
+ * The portrait the test's `portraitOf` resolves for a champion the engine created, who
+ * carries a graphic-26 index: in the page it is `GameScreen.portraitPixelsFor`.
+ */
+const resolvedPortrait = (graphic: number): number[] =>
+  Array.from({ length: PORTRAIT_PIXELS }, (_, pixel) => (pixel + graphic) & 15);
+
+interface Sides { live: Game; loaded: Game; now: RuntimeSaveState }
+
+/** DM's dungeon and CSB's graphics: the game section 7 and 9 load CSB's world into. */
+function csbOverDm(): Game {
+  const graphics = new GraphicsLoader();
+  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(CSB, 'graphics.dat'))));
+  return newGame(new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON)))), graphics);
+}
+
+/**
+ * Everything a save and a load of it may change, and what the loaded value must be.
+ * `src/engine/CsbwinSaveGame.ts` → "What is not restored" is this list in prose.
+ */
+const NOT_CARRIED: Array<{ pattern: string; why: string; holds: (d: Difference, sides: Sides) => boolean }> = [
+  // What no CSBWin file holds.
+  {
+    pattern: '.party.selectedCharacterIndex',
+    why: 'd.SelectedCharacterOrdinal: a game read opens on the dungeon view',
+    holds: (d) => d.now === -1,
+  },
+  {
+    pattern: '.party.pendingDamage[]',
+    why: 'd.PendingDamage: a blow not yet taken off the HP is never taken off',
+    holds: (d) => d.now === 0,
+  },
+  {
+    pattern: '.party.pendingOuches[]',
+    why: 'd.PendingOuches: nor its wounds',
+    holds: (d) => d.now === 0,
+  },
+  // What comes back in the file's form.
+  {
+    pattern: '.party.champions[].portraitGraphic',
+    why: 'CHARDESC holds the portrait as pixels, not as an index',
+    holds: (d) => d.now === undefined,
+  },
+  {
+    pattern: '.party.champions[].portrait',
+    why: 'and they are the pixels the writer was given for that index',
+    holds: (d, { live }) =>
+      same(d.now, resolvedPortrait(live.ctx.party.state.champions[d.path[2] as number]!.portraitGraphic ?? -1)),
+  },
+  {
+    pattern: '.party.champions[].load',
+    why: 'CHARDESC.load is the sum the writer computes; the live field is what a file said',
+    holds: (d, { live }) =>
+      d.now === live.systems.characterStats.characterLoad(live.ctx.party.state.champions[d.path[2] as number]!),
+  },
+  {
+    pattern: '.game.footprints.prints[]',
+    why: 'the ring is the file\'s twenty-four entries, zero where nobody has walked yet',
+    holds: (d) => d.was === undefined && d.now === 0,
+  },
+  {
+    pattern: '.game.footprints.ages[]',
+    why: 'and so are their ages',
+    holds: (d) => d.was === undefined && d.now === 0,
+  },
+  {
+    pattern: '.dungeon.timers[].timerWord6',
+    why: 'TIMER bytes 6-7 come back as the bytes and as the word; the live entry had the bytes alone',
+    holds: (d, { now }) => {
+      const record = now.dungeon.timers![d.path[2] as number]!;
+      return d.was === 0 && d.now === sw((record.uByte6 << 8) | record.uByte7);
+    },
+  },
+  {
+    pattern: '.dungeon.timers[].timerWord8',
+    why: 'and so do bytes 8-9',
+    holds: (d, { now }) => {
+      const record = now.dungeon.timers![d.path[2] as number]!;
+      return d.was === 0 && d.now === ((record.uByte8 << 8) | record.uByte9);
+    },
+  },
+  {
+    pattern: '.dungeon.snapshot.dsaLevelIndex',
+    why: 'the Extended Features block\'s DSA index, written out: no DSA on any level',
+    holds: (d, { loaded }) => d.was == null
+      && (loaded.ctx.state.dungeon.dsaLevelIndex ?? [[0]]).every((level) => level.every((word) => word === 0xff || word === 0xffff)),
+  },
+  {
+    pattern: '.dungeon.snapshot.extendedWallDecorations',
+    why: 'the block\'s flag, written out',
+    holds: (d) => d.was == null && d.now === false,
+  },
+  {
+    pattern: '.dungeon.snapshot.spellFilterLocation',
+    why: 'the block\'s spell filter location, written out: none',
+    holds: (d) => d.was == null && d.now === 0,
+  },
+  {
+    pattern: '.dungeon.snapshot.databases.scrolls[].textReference',
+    why: 'a free record keeps only its link (data.cpp:993-1015)',
+    holds: (d, { live }) => isFree(live, 'scrolls', d),
+  },
+  {
+    pattern: '.dungeon.snapshot.databases.scrolls[].textObject',
+    why: 'so the object a deleted scroll named is not written',
+    holds: (d, { live }) => isFree(live, 'scrolls', d),
+  },
+  {
+    pattern: '.dungeon.snapshot.databases.creatures[].possession',
+    why: 'nor what a deleted monster carried',
+    holds: (d, { live }) => isFree(live, 'creatures', d) && d.now === OBJECT_ID_NULL,
+  },
+  {
+    pattern: '.dungeon.snapshot.databases.containers[].containedObject',
+    why: 'nor what a deleted chest held',
+    holds: (d, { live }) => isFree(live, 'containers', d) && d.now === OBJECT_ID_NULL,
+  },
+];
+
+/** Whether the record a difference is in is a free one: its link is `RNnul`. */
+function isFree(live: Game, database: 'scrolls' | 'creatures' | 'containers', d: Difference): boolean {
+  return live.ctx.state.dungeon.databases[database].records[d.path[4] as number]?.nextObject === OBJECT_ID_NULL;
+}
+
+/**
+ * A game from `dungeon.dat`, as a player leaves it at a save: two champions off their
+ * mirrors, a walk, a thrown object in flight, another on the cursor, a blow from a monster
+ * not yet taken off the HP, and an inventory open, which is where the disk icon is.
+ */
+function playFromDungeonDat(): Game {
+  const game = loadWorld();
+  game.setRandomSeed(0x12345678);
+  const party = game.ctx.party.state;
+  const DELTA_X = [0, 1, 0, -1];
+  const DELTA_Y = [-1, 0, 1, 0];
+  for (const name of ['HALK', 'TIGGY']) {
+    const hero = (game.ctx.dungeon.getData().presetHeroes ?? []).find((h) => h.name === name);
+    if (!hero) { check(false, `${name} has a mirror`); continue; }
+    const facing = (hero.location.wall + 2) & 3;
+    party.position = new Position(hero.location.x - DELTA_X[facing]!, hero.location.y - DELTA_Y[facing]!, hero.location.map);
+    party.facing = facing as Direction;
+    game.systems.mouse.handleWallClick();
+    // `_ResurrectReincarnateCancel`'s Resurrect (`doc/CSBwin-src/CSBCode.cpp:6615`).
+    game.systems.hallOfChampions.resurrectReincarnateCancel(160);
+  }
+  for (const action of [
+    MovementAction.TURN_RIGHT, MovementAction.TURN_RIGHT, MovementAction.MOVE_FORWARD,
+    MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT, MovementAction.MOVE_FORWARD,
+    MovementAction.STRAFE_RIGHT, MovementAction.MOVE_FORWARD,
+  ]) {
+    game.move(action);
+    advance(game, 4);
+  }
+  const take = (chIdx: number): ObjectID => {
+    const possessions = party.champions[chIdx]!.possessions;
+    const slot = possessions.findIndex((p) => p !== OBJECT_ID_NULL);
+    const object = possessions[slot]!;
+    possessions[slot] = OBJECT_ID_NULL;
+    party.objectInHand = object;
+    party.cursorOwner = chIdx;
+    return object;
+  };
+  take(0);
+  game.systems.mouse.throwObjectFromCursor(0);
+  advance(game, 2);
+  take(1);
+  game.systems.monsterAttack.damageCharacter(0, 200, 0x3f, 4);
+  party.selectedCharacterIndex = 1;
+  return game;
+}
+
+function checkTheFileAlone(): void {
+  console.log('\n=== the file alone: a game saved and loaded, and everything that differs ===');
+  const seen = new Set<string>();
+  const scenarios: Array<[string, () => Game, () => Game]> = [
+    ['dungeon.dat, played', playFromDungeonDat, loadWorld],
+    ['csbgame7.dat, played on', () => { const game = fromCsbwinSave('csbgame7.dat'); advance(game, 40); return game; }, loadWorld],
+    // Another dungeon's world: CSB's eleven levels, in a game built over DM's fourteen.
+    ['CSB\'s mini.dat, played on', () => {
+      const game = csbOverDm();
+      applyCsbwinSave(game, new Uint8Array(readFileSync(resolve(CSB, 'mini.dat'))));
+      advance(game, 30);
+      return game;
+    }, csbOverDm],
+  ];
+  for (const [label, play, fresh] of scenarios) {
+    const live = play();
+    const party = live.ctx.party.state;
+    if (label.startsWith('dungeon.dat')) {
+      // The staging, or the list below would be met by a game with nothing to lose.
+      check(party.champions.length === 2 && party.champions.every((c) => c.portraitGraphic !== undefined && c.portrait === undefined),
+        `${label}: two champions the engine created, who carry a portrait index`);
+      check(party.objectInHand !== OBJECT_ID_NULL && live.ctx.state.dungeon.databases.missiles.records.length > 0,
+        `${label}: an object on the cursor and a missile in flight`);
+      check(party.pendingDamage.some((n) => n > 0) && party.pendingOuches.some((n) => n !== 0),
+        `${label}: a blow and a wound not yet taken (${party.pendingDamage}; ${party.pendingOuches})`);
+      check(party.lastMonsterAttackTime === -200, `${label}: no monster has attacked (${party.lastMonsterAttackTime})`);
+    }
+    // Before the save, on the live records: a word says nothing its bytes do not, so the
+    // file, which has the bytes alone, loses nothing of a timer.
+    const loud = (live.getRuntimeSaveState().dungeon.timers ?? []).filter((r) =>
+      (r.timerWord6 !== 0 && (r.timerWord6 & 0xffff) !== ((r.uByte6 << 8) | r.uByte7))
+      || (r.timerWord8 !== 0 && r.timerWord8 !== ((r.uByte8 << 8) | r.uByte9)));
+    check(loud.length === 0, `${label}: no timer's word says more than its bytes (${loud.length} do)`);
+
+    const bytes = buildSaveFile(live, {
+      portraitOf: (champion) => (champion.portraitGraphic === undefined ? undefined : resolvedPortrait(champion.portraitGraphic)),
+    });
+    live.saveWritten();
+    const loaded = fresh();
+    applySaveBytes(loaded, bytes);
+
+    const now = plain(loaded);
+    const found = differences(plain(live), now);
+    const byPattern = new Map<string, Difference[]>();
+    for (const d of found) byPattern.set(d.pattern, [...(byPattern.get(d.pattern) ?? []), d]);
+    console.log(`${label}: ${bytes.length} bytes; ${found.length} values differ, in ${byPattern.size} fields`);
+    console.log(['field', 'values', 'e.g.', 'why'].join('\t'));
+    for (const [pattern, each] of byPattern) {
+      const entry = NOT_CARRIED.find((e) => e.pattern === pattern);
+      const show = (v: unknown): string => { const text = JSON.stringify(v) ?? 'undefined'; return text.length > 24 ? `${text.slice(0, 24)}…` : text; };
+      console.log([pattern, each.length, `${show(each[0]!.was)} -> ${show(each[0]!.now)}`, entry?.why ?? '?'].join('\t'));
+      check(entry !== undefined, `${label}: ${pattern} may differ after a load`);
+      if (!entry) continue;
+      seen.add(pattern);
+      const wrong = each.filter((d) => !entry.holds(d, { live, loaded, now }));
+      check(wrong.length === 0, `${label}: ${pattern} comes back as the file has it (${wrong.length} of ${each.length} do not)`);
+    }
+
+    // And nothing more parts them in play.
+    let firstNew = '';
+    let tick = 0;
+    for (; tick < 300 && !firstNew; tick++) {
+      advance(live, 1);
+      advance(loaded, 1);
+      firstNew = differences(plain(live), plain(loaded)).find((d) => !byPattern.has(d.pattern))?.pattern ?? '';
+    }
+    console.log(`${label}: played on ${tick} ticks side by side: ${firstNew ? `${firstNew} parts them` : 'nothing more differs'}`);
+    check(!firstNew, `${label}: the game saved and the game loaded differ in nothing more for 300 ticks`);
+  }
+  const unseen = NOT_CARRIED.filter((e) => !seen.has(e.pattern)).map((e) => e.pattern);
+  check(unseen.length === 0, `every field on the list turned up in one scenario or another${unseen.length ? ` (not ${unseen.join(', ')})` : ''}`);
 }
 
 function main(): void {
@@ -232,8 +512,8 @@ function main(): void {
 
   /* ---- 2. the world still moves after a round trip ---- */
 
-  console.log('\n=== the door, restored through our own payload ===');
-  console.log(['file', 'before', 'direct', 'via payload'].join('\t'));
+  console.log('\n=== the door, restored through our own file ===');
+  console.log(['file', 'before', 'direct', 'via our file'].join('\t'));
   for (const { file, expected } of [
     { file: 'csbgame4-door-opening.dat', expected: 'open' },
     { file: 'csbgame4-door-closing.dat', expected: 'shut' },
@@ -298,7 +578,7 @@ function main(): void {
     const skipped = [1, 2, 3, 4, 5].map((i) => q.getTimer(firstMax - i));
     const cursor = q.getFirstAvailTimer();
     const max = q.getMaxTimers();
-    const raw = decodeBase64ToBytes(buildSavePayload(filled).raw);
+    const raw = buildSaveFile(filled);
     const block2 = loadSaveGameState(raw).block2!;
     // The restore re-creates the monster timers of the party's level
     // (`reloadAfterSaveGame`), and their deletes lower the cursor into the skipped slots,
@@ -328,9 +608,7 @@ function main(): void {
   for (const file of ['csbgame7.dat', 'csbgame4-door-opening.dat']) {
     const live = fromCsbwinSave(file);
     const state = live.getRuntimeSaveState();
-    const block2 = loadSaveGameState(
-      decodeBase64ToBytes(buildSavePayload(live).raw),
-    ).block2;
+    const block2 = loadSaveGameState(buildSaveFile(live)).block2;
     if (!block2) { check(false, `${file}: the written prefix should carry a block 2`); continue; }
 
     const party = state.party;
@@ -379,7 +657,7 @@ function main(): void {
     const champion = (g: Game): Champion => g.ctx.party.state.champions[0]!;
     /** Champion 0 as the block 4 of a save written now has them. */
     const written = (g: Game): Champion => readCsbwinCharacter(
-      loadSaveGameState(decodeBase64ToBytes(buildSavePayload(g).raw)).characterBlock!, 0).champion;
+      loadSaveGameState(buildSaveFile(g)).characterBlock!, 0).champion;
     const busy = (c: Champion): boolean => (c.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0;
     const hex = (n: number): string => `0x${(n & 0xffff).toString(16).padStart(4, '0')}`;
     const report = (label: string, g: Game): void => {
@@ -403,7 +681,7 @@ function main(): void {
 
     const { next } = roundTrip(game);
     check(busy(champion(next)) && champion(next).busyTimerIndex === timer,
-      'and so does our own payload, read back into a fresh game');
+      'and so does a fresh game that reads it back');
 
     // Busied again while busy, the timer is replaced by a later one (`Magic.cpp:517-525`):
     // due at d.Time + 8 + 8/2. The bit is already set and stays.
@@ -466,13 +744,13 @@ function main(): void {
     .filter((t) => t && t.function >= 29 && t.function <= 41 && t.level === g.ctx.party.state.position.z).length;
   const monstersOf = (g: Game): string => {
     const { dungeon, game } = g.getRuntimeSaveState();
-    return JSON.stringify([dungeon.item16, dungeon.timers, dungeon.timerQueue, dungeon.timerSequence,
+    return JSON.stringify([dungeon.item16, fileForm(dungeon.timers), dungeon.timerQueue, dungeon.timerSequence,
       dungeon.missiles, dungeon.snapshot, game.randomSeed, game.tickCount]);
   };
   for (const withTail of [true, false]) {
     const live = fromCsbwinSave('csbgame7.dat');
     advance(live, 30);
-    const bytes = encodeSavePayload(buildSavePayload(live));
+    const bytes = buildSaveFile(live);
     if (withTail) live.saveWritten();
     const loaded = loadWorld();
     applySaveBytes(loaded, bytes);
@@ -498,22 +776,19 @@ function main(): void {
 
   /* ---- 7. a save of another dungeon's world, into a game built over DM's ---- */
 
-  // `raw` carries the whole world, structure and all, and a load installs it in place of
-  // the one the game was running (`applySavePayload`), as `_ReadEntireGame` reads a
+  // The file carries the whole world, structure and all, and a load installs it in place
+  // of the one the game was running (`applyCsbwinSave`), as `_ReadEntireGame` reads a
   // save's (`doc/CSBwin-src/SaveGame.cpp:2324`). CSB's `mini.dat`, eleven levels, is
   // played 30 ticks in a game built over DM's fourteen, saved, and loaded into another
-  // game built over DM's; then the two play on side by side.
+  // game built over DM's. Section 9 plays the two on side by side.
   console.log('\n=== a save of CSB\'s world, into a game built over DM\'s ===');
   {
-    const csbGraphics = new GraphicsLoader();
-    csbGraphics.loadFromArray(new Uint8Array(readFileSync(resolve(CSB, 'graphics.dat'))));
-    const overDm = (): Game => newGame(new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON)))), csbGraphics);
-    const live = overDm();
+    const live = csbOverDm();
     applyCsbwinSave(live, new Uint8Array(readFileSync(resolve(CSB, 'mini.dat'))));
     advance(live, 30);
-    const bytes = encodeSavePayload(buildSavePayload(live));
+    const bytes = buildSaveFile(live);
     live.saveWritten();
-    const loaded = overDm();
+    const loaded = csbOverDm();
     const builtOver = loaded.ctx.dungeon.getMapCount();
     let error = '';
     try {
@@ -530,59 +805,51 @@ function main(): void {
         from.maps.map((m) => [m.descriptor, m.monsterTypes, m.wallDecorationTOC, m.floorDecorationTOC, m.doorDecorationTOC]))
       && same(world.levelIndex, from.levelIndex) && same(world.header, from.header) && same(world.presetHeroes, from.presetHeroes),
       'the levels\' descriptors and tables, levelIndex, the header and the preset heroes are the saved world\'s');
-    let firstDiff = -1;
-    if (!error) {
-      for (let tick = 0; tick <= 100; tick++) {
-        if (tick > 0) { advance(live, 1); advance(loaded, 1); }
-        const agree = monstersOf(live) === monstersOf(loaded) && same(live.ctx.party.state, loaded.ctx.party.state);
-        if (!agree && firstDiff < 0) firstDiff = tick;
-      }
-    }
-    console.log(`played on 100 ticks side by side: ${firstDiff < 0 ? 'agree throughout' : `differ from tick ${firstDiff}`}`);
-    check(!error && firstDiff < 0, 'the game saved and the game loaded from it agree for 100 ticks');
   }
 
-  /* ---- 8. a save from an older build loads through its raw file ---- */
+  /* ---- 8. a .dmweb.json loads the file it wraps ---- */
 
-  // `runtime` changes shape with the build and is refused at another version; `raw` is a
-  // whole CSBWin file, whose format does not change, so `applySaveBytes` loads it as a
-  // genuine save. Proved against a load of the same file straight through
-  // `applyCsbwinSave`. A `raw` that will not load leaves the version refusal.
-  console.log('\n=== a save from an older build ===');
+  // Earlier builds wrote a save as JSON: a header for the listing, the state of the build
+  // that wrote it, and `raw`, a whole CSBWin file in base64. Only `raw` is read
+  // (`applySaveBytes`), so such a save loads whatever build wrote it. Proved against a
+  // load of the same file straight through `applyCsbwinSave`.
+  console.log('\n=== a .dmweb.json ===');
   {
     const source = fromCsbwinSave('csbgame7.dat');
     advance(source, 30);
-    const payload = buildSavePayload(source);
-    const stale = { ...payload, runtime: { ...payload.runtime, version: SAVE_PAYLOAD_VERSION - 1 } };
-    // Not a `SavePayload`, whose version is this build's: the file is written as a store writes it.
-    const encodeJson = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));
-    const viaStale = loadWorld();
+    const file = buildSaveFile(source);
+    const json = (raw: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify({
+      header: { format: 'dmweb-save', version: 13, savedAt: 0, level: 0, champions: [] },
+      runtime: { version: 13 },
+      raw,
+    }));
+    const viaJson = loadWorld();
     let error = '';
     try {
-      applySaveBytes(viaStale, encodeJson(stale));
+      applySaveBytes(viaJson, json(Buffer.from(file).toString('base64')));
     } catch (e) {
       error = (e as Error).message;
     }
     const direct = loadWorld();
-    applyCsbwinSave(direct, decodeBase64ToBytes(payload.raw));
+    applyCsbwinSave(direct, file);
     direct.savedGameRead();
-    const state = (g: Game): string => {
-      const { party, dungeon, game } = g.getRuntimeSaveState();
-      return JSON.stringify([party, dungeon, game.tickCount, game.randomSeed, game.block1]);
-    };
-    console.log(`v${SAVE_PAYLOAD_VERSION - 1} with a raw file: ${error || `loaded, level ${viaStale.ctx.party.state.position.z}`}`);
-    check(!error && state(viaStale) === state(direct),
-      'a save of an older format loads its raw file, as a genuine CSBWin save of it does');
+    const state = (g: Game): string => JSON.stringify(g.getRuntimeSaveState());
+    console.log(`with a raw file: ${error || `loaded, level ${viaJson.ctx.party.state.position.z}`}`);
+    check(!error && state(viaJson) === state(direct) && viaJson.canRestartFromSavegame(),
+      'a .dmweb.json loads its raw file, as the file itself does');
     let refused = '';
     try {
-      applySaveBytes(loadWorld(), encodeJson({ ...stale, raw: '' }));
+      applySaveBytes(loadWorld(), json(undefined));
     } catch (e) {
       refused = (e as Error).message;
     }
-    console.log(`v${SAVE_PAYLOAD_VERSION - 1} with no usable raw file: ${refused}`);
-    check(refused === `SAVE IS FORMAT V${SAVE_PAYLOAD_VERSION - 1}, THIS BUILD READS V${SAVE_PAYLOAD_VERSION}`,
-      'one whose raw file will not load is refused by its version');
+    console.log(`with none: ${refused}`);
+    check(refused === 'SAVE IS MISSING ITS BLOCK DATA', 'one with no raw file is refused');
   }
+
+  /* ---- 9. the file alone ---- */
+
+  checkTheFileAlone();
 
   finish();
 }

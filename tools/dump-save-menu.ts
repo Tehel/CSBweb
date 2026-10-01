@@ -20,9 +20,10 @@
  *    after the midpoint) and which this port reproduces rather than fixes.
  * 4. **The list logic** — ordering, the date format, what fits in 33 characters, when
  *    LOAD is inert. None of it is on screen until there are saves to list.
- * 5. **The metadata path.** A row's level and roster come either from our own header,
- *    read out of the first 8 KB of the file, or from blocks 2 and 4 of a genuine CSBWin
- *    save. Both are asserted against the real files.
+ * 5. **The metadata path.** A row's level and roster come from blocks 2 and 4 of the
+ *    CSBWin file a save is, the port's or a genuine one, or, for a `.dmweb.json` an
+ *    earlier build wrote, from its header, read out of the first 8 KB of the file. Both
+ *    are asserted against real files.
  * 6. **Entering and leaving.** The disk menu is bracketed by `TAG02076e` and `TAG0207cc`
  *    (`doc/CSBwin-src/SaveGame.cpp:860`, `:1274`). The first repacks a chest open in the
  *    inventory, which is what puts its objects in the save; the second shows the
@@ -62,12 +63,9 @@ import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { GameSaves, makeSaveFileName } from '../src/engine/GameSaves';
-import {
-  applySaveBytes,
-  buildSavePayload,
-  decodeSavePayload,
-  encodeSavePayload,
-} from '../src/engine/SaveGamePayload';
+import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
+import { loadSaveGameState } from '../src/data/SaveGameLoader';
+import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import {
@@ -479,37 +477,43 @@ async function loadGame(): Promise<Game> {
 }
 
 /**
- * A real save, built from a real engine, then read back the way the file store reads it:
- * out of the first few kilobytes only.
+ * A real save, built from a real engine, then listed the way a store lists a `.dat`: from
+ * blocks 2 and 4. And a `.dmweb.json`, which earlier builds wrote: listed from its header,
+ * read out of the first few kilobytes only, and loaded from the file it wraps.
  */
-async function checkPayload(): Promise<void> {
+async function checkSaveFile(): Promise<void> {
   console.log('');
-  console.log('=== a real save, and the header a directory listing reads back ===');
+  console.log('=== a real save, and the row a listing reads back ===');
 
   const game = await loadGame();
   game.ctx.party.state.position = new Position(7, 11, 9);
   game.ctx.party.state.champions = [healthyChampion('DAROO'), healthyChampion('LEYLA')];
 
-  const payload = buildSavePayload(game);
-  const bytes = encodeSavePayload(payload);
-  console.log(`  payload         : ${bytes.length} bytes`);
-  console.log(`  header          : level ${payload.header.level}, ${payload.header.champions.join('/')}`);
-  check(payload.header.level === 9, `the header records the party's level (got ${payload.header.level})`);
+  const bytes = buildSaveFile(game);
+  const info = readCsbwinSaveInfo(bytes);
+  console.log(`  file            : ${bytes.length} bytes`);
+  console.log(`  listed          : ${info ? `level ${info.level}, ${info.champions.join('/')}` : 'NOT A SAVE'}`);
+  check(info?.level === 9, `the file's GAMEBLOCK2 gives the party's level (got ${info?.level})`);
   check(
-    payload.header.champions.join('/') === 'DAROO/LEYLA',
-    `the header records the roster (got ${payload.header.champions.join('/')})`,
+    info?.champions.join('/') === 'DAROO/LEYLA',
+    `and its block 4 the roster (got ${info?.champions.join('/')})`,
   );
-  check(payload.header.savedAt > 0, 'the header carries a wall-clock date');
 
-  // The whole point of putting `header` first: a listing must never have to read the
-  // runtime state. 8192 is what `FileSaveStore` slices.
-  const prefix = new TextDecoder().decode(bytes.subarray(0, 8192));
+  // A `.dmweb.json`: the header first, then the state of the build that wrote it, then
+  // the file as `raw`. 8192 is what `FileSaveStore` slices.
+  const json = new TextEncoder().encode(JSON.stringify({
+    header: { format: 'dmweb-save', version: 14, savedAt: 1, level: 9, champions: ['DAROO', 'LEYLA'] },
+    runtime: { version: 14 },
+    raw: Buffer.from(bytes).toString('base64'),
+  }));
+  const prefix = new TextDecoder().decode(json.subarray(0, 8192));
   const recovered = extractHeaderFromPrefix(prefix) as { level: number; champions: string[] } | null;
-  console.log(`  from 8 KB prefix: ${recovered ? `level ${recovered.level}, ${recovered.champions.join('/')}` : 'NOT FOUND'}`);
+  console.log(`  a .dmweb.json   : ${json.length} bytes; from its 8 KB prefix: ` +
+    `${recovered ? `level ${recovered.level}, ${recovered.champions.join('/')}` : 'NOT FOUND'}`);
   check(recovered !== null, 'the header is inside the first 8 KB of the file');
   check(recovered?.level === 9, 'the level read from the prefix matches the save');
   check(recovered?.champions.join('/') === 'DAROO/LEYLA', 'the roster read from the prefix matches the save');
-  check(bytes.length > 8192, 'the save is bigger than the prefix, so the shortcut is doing real work');
+  check(json.length > 8192, 'the save is bigger than the prefix, so the shortcut is doing real work');
 
   // A brace inside a champion name must not end the scan early.
   const tricky = extractHeaderFromPrefix('{"header":{"champions":["A}B","C\\"D"],"level":3},"runtime":{') as
@@ -518,20 +522,29 @@ async function checkPayload(): Promise<void> {
   check(tricky?.level === 3, 'the header scan is string-aware');
   check(extractHeaderFromPrefix('{"runtime":{}}') === null, 'a file with no header yields null, not a throw');
 
-  const round = decodeSavePayload(bytes);
-  check(round.header.level === 9, 'the payload round-trips through encode/decode');
-  check(round.runtime.party.champions.length === 2, 'the runtime half survives the round trip');
+  // It loads the file it wraps, whatever else it holds.
+  const fresh = await loadGame();
+  applySaveBytes(fresh, json);
+  const loaded = fresh.ctx.party.state;
+  console.log(`  loaded          : level ${loaded.position.z}, ${loaded.champions.map((c) => c.name).join('/')}`);
+  check(loaded.position.z === 9 && loaded.champions.map((c) => c.name).join('/') === 'DAROO/LEYLA',
+    'a .dmweb.json loads the CSBWin file it carries as raw');
 
-  // An older format is refused outright, never half-restored.
-  const stale = new TextEncoder().encode(JSON.stringify({ runtime: { version: 1 }, raw: '' }));
-  let refused = '';
-  try {
-    decodeSavePayload(stale);
-  } catch (error) {
-    refused = error instanceof Error ? error.message : String(error);
+  // And one with no file to load is refused in a line the menu can show.
+  for (const [what, text, expected] of [
+    ['not JSON', '{oops', 'NOT A DMWEB SAVE'],
+    ['no raw', '{"runtime":{"version":1}}', 'SAVE IS MISSING ITS BLOCK DATA'],
+    ['an empty raw', '{"runtime":{"version":1},"raw":""}', 'CSBWIN SAVE:'],
+  ] as const) {
+    let refused = '';
+    try {
+      applySaveBytes(await loadGame(), new TextEncoder().encode(text));
+    } catch (error) {
+      refused = error instanceof Error ? error.message : String(error);
+    }
+    console.log(`  ${what.padEnd(16)}: ${refused}`);
+    check(refused.startsWith(expected), `a .dmweb.json with ${what} is refused: ${expected}`);
   }
-  console.log(`  a v1 save       : ${refused}`);
-  check(refused.includes('V1'), 'a save from an older format is refused by version');
 }
 
 /** The genuine CSBWin saves in the repository, listed the way the menu would list them. */
@@ -646,7 +659,7 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
     'TAG02076e repacks it (Character.cpp:5116-5125): the chest holds its objects again');
 
   const fresh = await loadGame();
-  applySaveBytes(fresh, encodeSavePayload(buildSavePayload(game)));
+  applySaveBytes(fresh, buildSaveFile(game));
   const saved = chestContents(fresh, chest);
   console.log(`  a save taken now, restored into a fresh game: the chest holds ${saved}`);
   check(saved === packed, 'so a save taken with the menu up keeps the chest\'s objects');
@@ -868,7 +881,7 @@ async function checkSaveCall(): Promise<void> {
     check(menu.store.files.size === 3, 'so three saves in one second are three files');
     const listed = (await menu.store.list()).find((e) => e.name === first.name);
     check(listed?.level === first.level && listed?.champions.join() === 'DAROO' && first.savedAt === Date.now(),
-      'the row is the payload\'s header: its date, level and party');
+      'the row is the file\'s level and party, and the date of the save');
 
     const menuFails = await stage(true);
     const refused = await attempt(menuFails.saves.save(menuFails.store, 'stopped', new Set()));
@@ -879,20 +892,20 @@ async function checkSaveCall(): Promise<void> {
     const quick = await stage(false);
     await quick.saves.save(quick.store, 'running');
     console.log(`  clock running: tail run at the write ${quick.tailAtWrite()}`);
-    check(quick.tailAtWrite() === true, 'F5\'s save runs its tail before the write, on the world the payload holds');
+    check(quick.tailAtWrite() === true, 'F5\'s save runs its tail before the write, on the world the file holds');
 
     const quickFails = await stage(true);
     const refusedQuick = await attempt(quickFails.saves.save(quickFails.store, 'running'));
     console.log(`  clock running, the write fails: ${refusedQuick}, tail run ${quickFails.game.canRestartFromSavegame()}`);
     check(refusedQuick !== 'written' && quickFails.game.canRestartFromSavegame(), 'and has run it when the write fails');
 
-    // F5 lists the store while the game runs on, and the payload's party is the live one.
+    // F5 lists the store while the game runs on, and the file is made before that.
     const hurt = await stage(false);
     const champion = hurt.game.ctx.party.state.champions[0]!;
     const atTheKey = champion.attributes.health;
     const slow = memoryStore(() => {}, false, () => { champion.attributes.health = 1; });
     const late = await hurt.saves.save(slow, 'running');
-    const held = decodeSavePayload(await slow.read(late.name)).runtime.party.champions[0]!.attributes.health;
+    const held = readCsbwinCharacter(loadSaveGameState(await slow.read(late.name)).characterBlock!, 0).champion.attributes.health;
     console.log(`  clock running, a champion hurt while the store is listed: health ${atTheKey} at the key, ${held} in the file`);
     check(held === atTheKey, 'F5\'s file holds the party as it stood at the key, with the dungeon it was saved with');
 
@@ -909,6 +922,20 @@ async function checkSaveCall(): Promise<void> {
     check(afterFailure === 'damaged' && reader.saves.consumeSavedGameRead() === 'cancelled',
       'a failed one is \'damaged\', and each is forgotten once asked for');
     check(reports.length === 0, 'none of it is reported: only F5 and F9 are');
+
+    // F5 where the disk icon does nothing (`doc/CSBwin-src/Mouse.cpp:1716-1718`): a
+    // champion still being chosen, whom a file would bring back as a member, or no party.
+    const choosing = await stage(false);
+    choosing.game.ctx.party.state.potentialChampionIndex = 0;
+    await choosing.saves.quickSave();
+    const nobody = await stage(false);
+    nobody.game.ctx.party.state.champions = [];
+    await nobody.saves.quickSave();
+    console.log(`  F5 with a champion being chosen, then with no party: ${reports.join(' | ')}`);
+    check(reports.length === 2 && reports.every((report) => report.startsWith('Quick-save refused')),
+      'F5 saves nothing while a champion is being chosen, nor with no party');
+    check(!choosing.game.canRestartFromSavegame() && !nobody.game.canRestartFromSavegame(),
+      'and the save\'s tail has not run');
   } finally {
     Date.now = realNow;
   }
@@ -922,7 +949,7 @@ async function main(): Promise<void> {
   checkLayout(graphics);
   checkSplitLongLine();
   checkListLogic();
-  await checkPayload();
+  await checkSaveFile();
   checkCsbwinListing();
   await checkEnterAndLeave(graphics);
   await checkQuickSaveOverOpenChest(graphics);

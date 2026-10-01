@@ -11,7 +11,7 @@
  * - `_ShowPrisonDoor` forces `DM_rules` on from `DMRulesDesignOption` alone
  *   (`CSBCode.cpp:10672-10676`).
  * - `SaveGame` writes both back (`SaveGame.cpp:950-955`), and the port's own save carries
- *   them in its block through a JSON load.
+ *   them in its block through a load.
  * - `_ResurrectReincarnateCancel` charges the reincarnation penalties only
  *   `if (!DM_rules)` (`CSBCode.cpp:6740`, `:6761`); `dump-hall-of-champions.ts` shows
  *   both sides at a mirror.
@@ -26,7 +26,7 @@ import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { Game } from '../src/engine/Game';
-import { applySaveBytes, buildSavePayload, decodeBase64ToBytes, encodeSavePayload } from '../src/engine/SaveGamePayload';
+import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 
@@ -125,13 +125,13 @@ check(booted.ctx.rules.dmRules, 'DMRules forces DM_rules on (CSBCode.cpp:10672-1
 /* ------------------------------------------------- written and read back ----- */
 
 console.log('');
-console.log('=== a written save carries both bits, and a JSON load reads them ===');
+console.log('=== a written save carries both bits, and a load reads them ===');
 for (const [dmRules, dmRulesDesignOption] of [[false, false], [true, false], [false, true], [true, true]]) {
   const source = dmGame();
   source.ctx.rules.dmRules = dmRules;
   source.ctx.rules.dmRulesDesignOption = dmRulesDesignOption;
-  const payload = buildSavePayload(source);
-  const header = quiet(() => loadCsbwinWorld(decodeBase64ToBytes(payload.raw))).save.extendedFeatures;
+  const file = buildSaveFile(source);
+  const header = quiet(() => loadCsbwinWorld(file)).save.extendedFeatures;
   const flags = header?.flags ?? -1;
   const extendedFlags = header?.extendedFlags ?? -1;
   console.log(`  DM_rules ${dmRules}, design ${dmRulesDesignOption}: ` +
@@ -142,7 +142,7 @@ for (const [dmRules, dmRulesDesignOption] of [[false, false], [true, false], [fa
   const target = dmGame();
   target.ctx.rules.dmRules = !dmRules;
   target.ctx.rules.dmRulesDesignOption = !dmRulesDesignOption;
-  quiet(() => applySaveBytes(target, encodeSavePayload(payload)));
+  quiet(() => applySaveBytes(target, file));
   check(target.ctx.rules.dmRules === dmRules && target.ctx.rules.dmRulesDesignOption === dmRulesDesignOption,
     '  the port\'s own save loads them back');
 }

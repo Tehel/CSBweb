@@ -3,7 +3,7 @@
  *
  * `tools/dump-save-file-roundtrip.ts` drives the same sixteen blocks from a **parsed
  * save** — bytes CSBWin wrote, re-serialised. This one starts where the game does: a
- * real `Game` on `dungeon.dat`, played, with `buildSavePayload` writing the file the
+ * real `Game` on `dungeon.dat`, played, with `buildSaveFile` writing the file the
  * disk menu and F5 write. Until the three load-time conversions were ported that was
  * impossible, and `saveSaveGameState` emitted a blocks 0-6 prefix no reader can load.
  *
@@ -35,7 +35,7 @@
  * The thrown object is not decoration. A missile in flight is a `MISSILE` record plus a
  * **timer carrying an object RN in bytes 6-7**, and a timer's object is the one
  * reference nothing else in the writer reaches — `TIMER` bytes 6-9 are plain numbers to
- * every other timer function, so `buildSavePayload` has to translate them by hand
+ * every other timer function, so `buildSaveFile` has to translate them by hand
  * (`doc/PROVEN_FACTS.md` → "Everything CSBWin converts to slot numbers, and in what
  * order"). Get it wrong and the sword lands on whatever record our slot of the same
  * number happens to be.
@@ -72,7 +72,7 @@ import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import type { Databases, DungeonData, PresetHero } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import { MovementAction } from '../src/engine/gameTypes';
-import { buildSavePayload, decodeBase64ToBytes } from '../src/engine/SaveGamePayload';
+import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 
@@ -324,7 +324,7 @@ function compareChains(label: string, before: Game, after: Game): void {
  * silently.
  */
 function writeAndReload(label: string, game: Game): Game | null {
-  const bytes = decodeBase64ToBytes(buildSavePayload(game).raw);
+  const bytes = buildSaveFile(game);
   console.log(`  ${label}: ${bytes.length} bytes written`);
 
   let parsed;

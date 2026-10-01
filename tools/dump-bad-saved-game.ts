@@ -30,7 +30,7 @@ import { resolve } from 'node:path';
 
 import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
-import { applySaveBytes } from '../src/engine/SaveGamePayload';
+import { applySaveBytes } from '../src/engine/SaveGameFile';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { PALETTE_11914, type IntroEvent, type IntroHost } from '../src/renderer/intro/IntroHost';

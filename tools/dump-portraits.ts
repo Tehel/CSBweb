@@ -6,9 +6,8 @@
  * of basic graphic 26 into the character record once
  * (`doc/CSBwin-src/Character.cpp:486-508`), and every later draw copies those 464 bytes
  * back out with `CharacterPortraitToStatusBox` (`:4644`). A champion restored from a
- * save therefore has pixels and no index at all — which is why a loaded party used to
- * show four empty boxes while a quick-saved one, whose champions still carried this
- * port's `portraitGraphic`, drew correctly.
+ * save therefore has pixels and no index at all, where a champion this engine created
+ * carries the port's `portraitGraphic` until a save writes the pixels.
  *
  * **Why this is a tool and not a golden frame.** The frames capture a party this port
  * injected, never one read from `csbgame*.dat`, so they cover only the index path; the

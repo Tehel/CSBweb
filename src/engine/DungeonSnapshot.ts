@@ -1,8 +1,8 @@
 /**
- * A snapshot of everything in the dungeon that play can change. The quick-save
- * (`RuntimeSave.ts`) carries it, and a CSBWin load restores its world through it
- * (`src/engine/CsbwinSaveGame.ts`). It only has to round-trip through itself: writing a
- * byte-compatible CSBWin file is Phase 10.
+ * A snapshot of everything in the dungeon that play can change. The state a read
+ * restores (`RuntimeSave.ts`) carries it, and a save's load restores its world through
+ * it (`src/engine/CsbwinSaveGame.ts`). It is never written: a save is the CSBWin file
+ * (`src/engine/SaveGameFile.ts`).
  *
  * `DUNGEON_DATA_SOURCES` is the list of what it holds: every field of `DungeonData`, and
  * where a restore takes it from. It is typed over every key, so a field added to
@@ -25,7 +25,7 @@
  *   depends on the file it came from (`src/data/CsbwinDungeonConversions.ts`). Without
  *   them a restored world is a hybrid: TEXT records from the snapshot, carrying entry
  *   numbers into the index `dungeon.dat` was converted into. Carrying them makes a
- *   quick-load self-consistent, and lets the binary writer take blocks 11-13 from a world
+ *   restore self-consistent, and lets the binary writer take blocks 11-13 from a world
  *   whatever its provenance.
  * - `expool` is database 11, which play writes: a death puts the bones' record there
  *   (`src/data/CsbwinExpool.ts`). The rest of it is the file's, and this port cannot

@@ -13,7 +13,7 @@
  * and 2047), all due on the same tick with the same function, so only the stamp orders
  * them. The repack must give 5, 40, 72, 95 and 126, the timer queued at 0xffff must keep
  * it, and the two after it must take 0 and 1 and go to the front. Then the same queue is
- * saved, as the quick-save and as a CSBWin file, and loaded into a fresh game: the stamps,
+ * restored, as the runtime state and from a save file, into a fresh game: the stamps,
  * the order and the counter must come back, so the next timer lands where it would have.
  *
  * Run: `npx tsx tools/dump-timer-sequence.ts`
@@ -25,7 +25,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import type { Game } from '../src/engine/Game';
-import { buildSavePayload, decodeBase64ToBytes } from '../src/engine/SaveGamePayload';
+import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { TimerFunction, TimerQueue, timerLess } from '../src/engine/TimerQueue';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
@@ -120,11 +120,11 @@ console.log(`3. before the save: next ${nextBefore}; queue ${labelled(source.ctx
 const quick = loadWorld();
 quick.applyRuntimeSaveState(JSON.parse(JSON.stringify(source.getRuntimeSaveState())));
 const file = loadWorld();
-applyCsbwinSave(file, decodeBase64ToBytes(buildSavePayload(source).raw));
+applyCsbwinSave(file, buildSaveFile(source));
 
 label(source.ctx.timers, 9);
 const expected = labelled(source.ctx.timers);
-for (const [name, game] of [['quick-save', quick], ['CSBWin file', file]] as const) {
+for (const [name, game] of [['runtime state', quick], ['save file', file]] as const) {
   check(queueOf(game) === before, `3/${name}: every timer's slot, stamp and place come back (${labelled(game.ctx.timers)})`);
   check(game.ctx.timers.getNextSequence() === nextBefore,
     `3/${name}: so does the counter (${game.ctx.timers.getNextSequence()}; expected ${nextBefore})`);

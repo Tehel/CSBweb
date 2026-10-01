@@ -24,9 +24,9 @@
  *   what proves the world and the party were restored into the same place;
  * - the random stream continues from `gb2.ranseed` rather than the host clock;
  * - the live world is the save's own, `state.dungeon` and `DungeonState` both;
- * - a quick-save of the loaded world, restored into a game built over `dungeon.dat`,
+ * - the runtime state of the loaded world, restored into a game built over `dungeon.dat`,
  *   gives back every field `DUNGEON_DATA_SOURCES` marks `snapshot`. The `loaded` ones
- *   are the file's a world was read from, and a quick-save carries none of them.
+ *   are the file's a world was read from, and the runtime state carries none of them.
  *
  * And the vacuity guard: for a played save, the loaded world must **differ** from the
  * `dungeon.dat` the game started on. A load that quietly did nothing would otherwise
@@ -321,22 +321,22 @@ function main(): void {
       `${name}: the save's world is the running one, in state and DungeonState both`,
     );
 
-    // And the round trip that a player actually performs: load a CSBWin save, then
-    // quick-save and reload. The quick-save carries only the fields `DungeonSnapshot`'s
-    // `DUNGEON_DATA_SOURCES` marks `snapshot` — so a CSBWin load that put something into
-    // a field it does not carry would be lost at the next F5/F9. The walk asks that of
-    // every such field, the checks after it of the party.
+    // And the runtime state of the loaded game, restored into another. It carries only
+    // the fields `DungeonSnapshot`'s `DUNGEON_DATA_SOURCES` marks `snapshot`, so a CSBWin
+    // load that put something into a field it does not carry would be lost to the save
+    // writer, which takes the world from it. The walk asks that of every such field, the
+    // checks after it of the party.
     const second = loadWorld();
     second.applyRuntimeSaveState(JSON.parse(JSON.stringify(game.getRuntimeSaveState())));
     const lost = differingFields(SOURCES, live, second.ctx.state.dungeon);
     check(
       lost.length === 0,
-      `${name}: every snapshot field of the loaded world survives a quick-save round trip` +
+      `${name}: every snapshot field of the loaded world survives a runtime-state round trip` +
         (lost.length ? ` (lost: ${lost.slice(0, 6).join(', ')}${lost.length > 6 ? ', ...' : ''})` : ''),
     );
     check(
       countFlagDifferences(snapshotCellFlags(second.ctx.state.dungeon), loadedFlags) === 0,
-      `${name}: the loaded world survives a quick-save round trip`,
+      `${name}: the loaded world survives a runtime-state round trip`,
     );
     check(
       second.ctx.party.state.champions.map((c) => c.name).join('|') ===

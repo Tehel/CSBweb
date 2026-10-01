@@ -1,9 +1,11 @@
 /**
- * The port's own quick-save: the whole mutable world as one JSON-able snapshot, and its
- * restore. It has no CSBWin home — CSBWin's save is `SaveGame.cpp`'s binary file, which
- * `SaveGamePayload` writes beside this — so it is a module over the context rather than
- * a system. Which fields of the dungeon it carries, and which it leaves to the file the
- * world was built from, is `DUNGEON_DATA_SOURCES` (`DungeonSnapshot.ts`).
+ * The state a read restores: the whole mutable world as one plain snapshot, and its
+ * restore. Every game read comes through it, a save's (`CsbwinSaveGame.ts` builds one
+ * from the file) and a new game's (`Game.readNewGame`), and the save writer takes the
+ * running game's as what to write (`SaveGameFile.ts`). It is never a file: a save is
+ * `SaveGame.cpp`'s binary one. It has no CSBWin home, so it is a module over the context
+ * rather than a system. Which fields of the dungeon it carries, and which it leaves to
+ * the file the world was built from, is `DUNGEON_DATA_SOURCES` (`DungeonSnapshot.ts`).
  */
 import type { DungeonData, Item16Record, MissileRecord, TimerRecord } from '../data/dungeonTypes';
 import { DBType, type ObjectID } from '../core/types';
@@ -16,19 +18,7 @@ import { ensureHandOwner } from './Party';
 import type { FootprintsSnapshot } from './PartyFootprints';
 import type { TimerEntry } from './TimerQueue';
 
-/**
- * The quick-save payload.
- *
- * `RUNTIME_SAVE_VERSION` moves whenever this structure changes shape, or the binary half
- * beside it does (`SaveGameLoader`'s blocks). No bump has an upgrade path: a payload of
- * another version is never restored as a half-state, and `applySaveBytes` loads its `raw`
- * CSBWin file instead, when it has one. `git log` on this line is the list of shapes.
- */
-export const RUNTIME_SAVE_VERSION = 14;
-
 export interface RuntimeSaveState {
-    version: typeof RUNTIME_SAVE_VERSION;
-    savedAt: number;
     party: PartyState;
     game: {
         tickCount: number;
@@ -40,11 +30,8 @@ export interface RuntimeSaveState {
         footprints: FootprintsSnapshot;
         /** The DSA global variables, where a dungeon keeps its puzzle progress. */
         dsaGlobals: number[];
-        /**
-         * What `GAMEBLOCK1` carries (`GameState.block1`). Optional, so a payload written
-         * before it loads without a version bump; the running game's values stay then.
-         */
-        block1?: Block1State;
+        /** What `GAMEBLOCK1` carries (`GameState.block1`). */
+        block1: Block1State;
     };
     dungeon: {
         item16?: Item16Record[];
@@ -62,7 +49,7 @@ export interface RuntimeSaveState {
     };
 }
 
-/** Snapshot the runtime state for the quick-save. */
+/** Snapshot the runtime state. */
 export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
     const item16 = ctx.state.dungeon.item16
         ? ctx.state.dungeon.item16.map((r) => ({
@@ -79,8 +66,6 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
         timerIndex: rec.timerIndex,
     }));
     return {
-        version: RUNTIME_SAVE_VERSION,
-        savedAt: Date.now(),
         party: ctx.party.state,
         game: {
             tickCount: ctx.state.tickCount,
@@ -103,7 +88,7 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
 }
 
 /**
- * Restore the runtime state from a quick-save. The caller owes the loop's own reset:
+ * Restore the runtime state. The caller owes the loop's own reset:
  * `HandleMouseEvents`' `lastTime = 0` (`Game.applyRuntimeSaveState`).
  */
 export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState): void {
@@ -129,9 +114,7 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     if (wasSleeping) ctx.host.messages.setNewSpeed(0, VBL_PER_TICK, ctx.state.tickCount);
     ctx.random.setSeed(save.game.randomSeed);
     ctx.state.gameWon = save.game.gameWon;
-    if (save.game.block1) {
-        ctx.state.block1 = { ...save.game.block1, byte22808: [...save.game.block1.byte22808] };
-    }
+    ctx.state.block1 = { ...save.game.block1, byte22808: [...save.game.block1.byte22808] };
     ctx.systems.dsa.setGlobalVariables(save.game.dsaGlobals);
 
     // The world first: cell flags, object chains and every database record. This

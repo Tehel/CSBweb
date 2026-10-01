@@ -101,8 +101,7 @@ async function main(): Promise<void> {
   row('setHandOwner(-1)', party.state);
   check(owner(party.state) === -1, 'setHandOwner(-1) should clear the owner');
 
-  // ---- 3. `ensureHandOwner` repairs a state that has champions but no owner — what a
-  //         quick-save written before any of this existed restores.
+  // ---- 3. `ensureHandOwner` repairs a state that has champions but no owner.
   ensureHandOwner(party.state, game.ctx.host);
   row('restore repair', party.state);
   check(owner(party.state) === 0, 'a restored party with champions must end up with an owner');

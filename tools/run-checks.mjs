@@ -116,7 +116,7 @@ const CHECKS = [
   // Level 1 is the argument the assertions were written for: it has a closed door,
   // a movable object with an open neighbour, and creatures.
   { tool: 'dump-savegame.ts', args: ['1'] },
-  // The other half of a quick-save: the CSBWin-shaped binary blocks. Needs no
+  // The save file's side of that: the CSBWin-shaped binary blocks. Needs no
   // dungeon and no arguments — it builds its own records.
   { tool: 'dump-savegame-blocks.ts' },
   // Genuine CSBWin save files from static/gamefiles/saves. The only check in the
@@ -184,7 +184,7 @@ const CHECKS = [
   // they still name the right objects after a whole trip through the file format.
   { tool: 'dump-save-file-roundtrip.ts' },
   // And the live half of that: a running game — played from dungeon.dat, and played on
-  // from a genuine save — writes all sixteen blocks through `buildSavePayload`, and the
+  // from a genuine save — writes all sixteen blocks through `buildSaveFile`, and the
   // file loads back into a fresh game with the world, the party, the thrown object in
   // flight and the object on the cursor intact.
   { tool: 'dump-live-save-file.ts' },
@@ -193,11 +193,10 @@ const CHECKS = [
   // (which only ever see an injected party) cover the other path entirely.
   { tool: 'dump-portraits.ts' },
   { tool: 'dump-csbwin-timers.ts' },
-  // Our *own* save file, the JSON payload F5/F9 and both stores of the disk menu write.
-  // Nothing exercised `buildSavePayload`/`applySavePayload` before: `dump-savegame.ts`
-  // drives the runtime snapshot directly and the `dump-csbwin-*` tools drive the reader,
-  // so the layer in between had no evidence behind it — which is how a timer-table leak
-  // of two slots per save/load cycle went unnoticed.
+  // Our *own* save, the CSBWin file F5, F9 and the disk menu write and read: saved and
+  // loaded over genuine saves and over played games, with the whole of what a load
+  // changes held to a named list. `dump-savegame.ts` drives the runtime snapshot directly
+  // and the `dump-csbwin-*` tools the reader; this is the trip through both.
   { tool: 'dump-save-roundtrip.ts' },
   // The save/load screen: the button-table offsets it hangs off, the list panel built
   // out of graphic 0, the row formatting, and the two metadata paths. Nothing here is

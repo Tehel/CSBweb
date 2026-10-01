@@ -17,11 +17,8 @@
  * with those words held out; this tool is what covers the words they hold out, by
  * showing they still name the right things after a full trip through the file format.
  *
- * What it does **not** cover: the live path. `buildSavePayload` still supplies neither an
- * Extended Features block nor an image, so the game's own save button writes a blocks 0-6
- * prefix. The three conversions that stand between a `dungeon.dat`-shaped world and a
- * save-shaped one — `ConvertToIndirectText`, `MakeBigActuators` and `convertScrolls` —
- * are unported, and `PLAN.md` Phase 10 records that.
+ * What it does **not** cover: the live path, a file written from a running game
+ * (`buildSaveFile`). `tools/dump-live-save-file.ts` and `tools/dump-save-roundtrip.ts` do.
  *
  * Run: `npx tsx tools/dump-save-file-roundtrip.ts [path-or-directory]`
  */

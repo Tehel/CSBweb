@@ -152,15 +152,16 @@ boot's chooser and F9). Its scope, and after it the steps, one per commit.
 
 **What a save is**
 
-- **A CSBWin `.dat` file, and the JSON wrapper goes.** A `.dmweb.json`
-  (`src/engine/SaveGamePayload.ts`) pairs `runtime`, the port's own state in the shape of
-  the build that wrote it, with `raw`, the whole CSBWin file the port writes. Only `raw`'s
-  format is stable: `runtime` is refused at any other version, and `applySaveBytes` then
-  loads `raw` as a genuine save. Saving the `.dat` alone ends the version bumps that
-  strand saves. First, whatever only `runtime` carries has to be found a place in the
-  file, or shown to follow from it: `src/engine/CsbwinSaveGame.ts` → "What is not
-  restored" is where to start, and `tools/dump-save-roundtrip.ts` is how to prove the file
-  alone gives the game back.
+- **A CSBWin `.dat` file, and nothing else.** `buildSaveFile`
+  (`src/engine/SaveGameFile.ts`) writes it, all sixteen blocks, and `applySaveBytes` reads
+  it back as a genuine save, so no version of the port strands a save. What a file does
+  not hold, a load does not give back, as in CSBWin: `src/engine/CsbwinSaveGame.ts` →
+  "What is not restored" is the whole list (a blow not yet taken off the HP, the open
+  inventory, and the like), and `tools/dump-save-roundtrip.ts` saves and loads three
+  played games and holds everything that differs to it. F5 saves nothing where the disk
+  icon does nothing: a champion still being chosen has no place in a file. A
+  `.dmweb.json`, the JSON wrapper earlier builds wrote around such a file, still lists and
+  loads, through the file it carries as `raw`.
 - **Every save is a row of IndexedDB**: the file's bytes beside what the list needs. The
   level, the champions' names and the playthrough (below) are read from the file's own
   blocks when the row is written; the data set, the date, whether it is the quick slot,
@@ -235,26 +236,23 @@ boot's chooser and F9). Its scope, and after it the steps, one per commit.
 
 **The steps**
 
-1. ⏳ **The `.dat` alone.** `GameSaves` writes and reads the CSBWin file; `runtime`, the
-   header and `SAVE_PAYLOAD_VERSION` go; `tools/dump-save-roundtrip.ts` proves the file
-   gives the game back. A `.dmweb.json` already in a store still loads, through its
-   `raw`, until step 2.
-2. ⏳ **The row.** Data set, playthrough and quick-slot flag beside the bytes, the list
+1. ⏳ **The row.** Data set, playthrough and quick-slot flag beside the bytes, the list
    filtered by data set, the file store and the source toggle removed. The IndexedDB
    upgrade turns each `.dmweb.json` row into its `raw`, once; after it nothing reads
-   JSON. The author's `.dmweb.json` files on disk are converted by hand, outside the
-   engine.
-3. ⏳ **The playthrough.** F5's slot and F9's choice, SAVE over the selection or new, the
+   JSON (`applySaveBytes`' `rawFileOf`, `extractHeaderFromPrefix` and
+   `JSON_SAVE_FILE_EXTENSION` go). The author's `.dmweb.json` files on disk are converted
+   by hand, outside the engine.
+2. ⏳ **The playthrough.** F5's slot and F9's choice, SAVE over the selection or new, the
    two confirmations, the last save used, the play time, and F5 and F9 reported in the
    message area.
-4. ⏳ **The dialog**: the layout, the folding list, the scrolling, the preview.
-5. ⏳ **Export and import**, with the dungeon check and the catalogue behind it.
-6. ⏳ **"GAME LOADED, READY TO PLAY." removed.** Independent of the others.
+3. ⏳ **The dialog**: the layout, the folding list, the scrolling, the preview.
+4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it.
+5. ⏳ **"GAME LOADED, READY TO PLAY." removed.** Independent of the others.
 
 #### The file
 
 `saveSaveGameState` (`src/data/SaveGameLoader.ts`) writes all sixteen blocks, and
-`buildSavePayload` hands it the Extended Features header (`buildLiveExtendedFeatures`,
+`buildSaveFile` hands it the Extended Features header (`buildLiveExtendedFeatures`,
 `src/data/CsbwinExtendedFeatures.ts`), the object indirect index and the dungeon image, so
 the game's own save writes a whole file. `applyCsbwinSave` (`src/engine/CsbwinSaveGame.ts`)
 reads one back: `loadCsbwinWorld` (`src/data/CsbwinDungeonImage.ts`) parses the image,
@@ -328,15 +326,17 @@ Evidence:
   party is, what it carries and what every cell holds), `tools/dump-csbwin-timers.ts`
   (two saves whose door timers differ in one byte: one door opens, the other shuts),
   `tools/dump-dungeon-conversions.ts` (the conversions against the saves' converted
-  form) and `tools/dump-save-roundtrip.ts` (the JSON payload the stores write, including
-  five save/load cycles that leave the timer table the same size).
+  form) and `tools/dump-save-roundtrip.ts` (the file the stores write, saved and loaded:
+  five cycles that leave the timer table the same size, and three played games whose
+  every difference after a load is on the list of what a file does not hold).
 
 #### The menu
 
 The disk icon opens a menu drawn in the 320×200 buffer (`src/renderer/ui/SaveMenu.ts`
 over `Menu.ts`, a faithful `_DoMenu` / `_WaitForMenuSelect`), listing the saves of the
 browser store or of a directory on disk (`src/data/saves/`), newest first, each row with
-its date, level and party. LOAD acts on the selection; SAVE always makes a new file. Both,
+its date, level and party. LOAD acts on the selection; SAVE always makes a new file, a
+`.dat` named for its date. Both,
 and the two keys, go through `GameSaves` (`src/engine/GameSaves.ts`). F5
 writes one more save to the current source (the browser when the file source is not
 connected, since a key must never raise a folder picker), and F9 loads the newest
@@ -354,15 +354,16 @@ through the game's mouse queue.
 
 #### Deferred
 
-- ⏸️ **DSA programs are not written**, and `buildSavePayload` refuses a dungeon with any
+- ⏸️ **DSA programs are not written**, and `buildSaveFile` refuses a dungeon with any
   (`DEBT.md` G1). The retail DM dungeon defines none: `numDSA` is 0 in every committed
   save, with no special-location records. **The DSA global variables are not read from `EXPOOL`**
   (`doc/CSBwin-src/SaveGame.cpp:1746-1763`); the running game's are kept (G1).
 - ⏸️ **`SimpleEncryption` is neither written nor readable past the header**, and
   **`MakeBigActuators` reads the actuator type after the byte swap, CSBWin before it**
   (`DEBT.md` G4).
-- **`d.Word11694` (`gameWon`) and `d.PartySleeping` are not restored**; neither is in
-  `GAMEBLOCK2` where the reader looks.
+- **What no CSBWin file holds is not restored**: `d.Word11694` (`gameWon`),
+  `d.PartySleeping`, `d.PendingDamage` and `d.PendingOuches`, the open inventory
+  (`src/engine/CsbwinSaveGame.ts` → "What is not restored").
 - **`EXPOOL` holds the bones records and what the file had, no more.** CSBWin's `Setup`
   gives every loaded game the pool's directory block (`doc/CSBwin-src/SaveGame.cpp:2773`),
   and `SaveGame` puts the 24 overlay palette records there at every save (`:1152-1164`).
@@ -382,7 +383,7 @@ through the game's mouse queue.
   an Extended Features block may carry, `SaveGame.cpp:378-379`, could suggest one); a
   `dungeon.dat` for "RESTART THIS GAME", so a lost game can only load a save; and a data
   set to list its saves under, which its signature can stand for. A dungeon with DSAs
-  waits for `DEBT.md` G1: `buildSavePayload` refuses to save one.
+  waits for `DEBT.md` G1: `buildSaveFile` refuses to save one.
 - **The menu:** no delete (`BrowserSaveStore.remove` has no caller), no file picker for
   an import and no `SAVE AND QUIT`, none of them in the rework's scope; and the golden
   frame shows an empty list, since the frame script clears IndexedDB

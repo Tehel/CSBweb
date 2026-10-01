@@ -33,7 +33,7 @@ import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import type { Game } from '../src/engine/Game';
-import { applySaveBytes, buildSavePayload, decodeBase64ToBytes, encodeSavePayload } from '../src/engine/SaveGamePayload';
+import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 
@@ -100,8 +100,8 @@ function scenario(save: string, power: number): void {
   check(count === atCast + route.length, `${label}: each move adds a print (${count})`);
   check(last === count, `${label}: each move while the spell runs raises the range's end to the count`);
 
-  const payload = buildSavePayload(game);
-  const tail = readCsbwinPartyTail(loadSaveGameState(decodeBase64ToBytes(payload.raw)).characterBlock!);
+  const file = buildSaveFile(game);
+  const tail = readCsbwinPartyTail(loadSaveGameState(file).characterBlock!);
   console.log(`${label}: saved tail count=${tail.numFootprintEnt} range=[${tail.indexOfFirstMagicFootprint},` +
     `${tail.indexOfLastMagicFootprint}) active=${tail.magicFootprintsActive}`);
   check(tail.numFootprintEnt === count, `${label}: the save writes the trail's count`);
@@ -109,7 +109,7 @@ function scenario(save: string, power: number): void {
     `${label}: the save writes the range the walk left, [${first},${last})`);
 
   const loaded = loadWorld();
-  applySaveBytes(loaded, encodeSavePayload(payload));
+  applySaveBytes(loaded, file);
   check(loaded.ctx.footprints.getIndexOfFirstMagicFootprint() === first
     && loaded.ctx.footprints.getIndexOfLastMagicFootprint() === last,
   `${label}: a game loaded from the save reads the range back`);

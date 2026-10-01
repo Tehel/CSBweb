@@ -10,7 +10,7 @@
  * The save's world becomes the running game's (`Game.installWorld`), structure and all,
  * as `_ReadEntireGame` reads it (`doc/CSBwin-src/SaveGame.cpp:2324`), so a save of any
  * dungeon loads into any running game. The rest goes through `RuntimeSaveState`, the
- * shape the quick-save restores, whose snapshot then puts back what the world already
+ * shape every read restores, whose snapshot then puts back what the world already
  * holds.
  *
  * What is restored, and from where:
@@ -26,7 +26,9 @@
  * | The timer table and the queue that orders it | blocks 5 and 6, through `Game.restoreTimerQueue` |
  * | `d.RandomGameID`, `totalMoveCount`, `d.Byte22808`, `d.Word22592`-`d.Word22598` | `GAMEBLOCK1` (`buildBlock1State`) |
  *
- * **What is not restored**, all of it recorded in `PLAN.md`:
+ * **What is not restored.** A save is the file alone (`SaveGameFile.ts`), so this is
+ * everything a save and a load lose. `tools/dump-save-roundtrip.ts` plays a game, saves
+ * it, loads it, and holds the whole of what differs to this list.
  *
  * - **The DSA global variables.** CSBWin reads them out of `EXPOOL` under
  *   `(EDT_Database << 24) | (EDBT_GlobalVariables << 16) | i`, sixteen `ui32` per record
@@ -34,9 +36,30 @@
  *   (`src/data/CsbwinExpool.ts`) for them. No committed save needs it: the shipped
  *   DM dungeon defines no DSAs at all — `numDSA` is 0 and there are no special-location
  *   records in any of the twelve — so the live game's globals are kept rather than
- *   cleared.
- * - **`d.Word11694`** (`gameWon`) and `d.PartySleeping`, neither of which `GAMEBLOCK2`
- *   carries where this reader looks.
+ *   cleared. A dungeon with DSAs is not saved at all (`buildSaveFile`).
+ * - **What CSBWin's file does not hold either**, and a game it reads starts without:
+ *   `d.Word11694` (`gameWon`) and `d.PartySleeping`, `d.PendingDamage` and
+ *   `d.PendingOuches` (a blow dealt since the tick's `DisplayCharacterDamage` is never
+ *   taken off the HP), `d.SelectedCharacterOrdinal` (the open inventory),
+ *   `d.PotentialCharacterOrdinal` and `d.GameIsLost` (`buildPartyState`). CSBWin's disk
+ *   menu does not open on a champion who is still being chosen
+ *   (`doc/CSBwin-src/Mouse.cpp:1716-1718`), and the port's quick-save takes the same
+ *   guard (`GameSaves.quickSave`), so the candidate never reaches a file.
+ *
+ * And what comes back in the file's form, the same game told otherwise:
+ *
+ * - A champion the engine created carries `portraitGraphic`; the writer blits the
+ *   portrait into `CHARDESC`, as `AddCharacter` does, and a load gives the pixels.
+ * - `CHARDESC.load` is the sum the writer computes (`DEBT.md` H), where the live field
+ *   carries only what a file said.
+ * - A timer's bytes 6-9 come back under both readings, the bytes and the words, where
+ *   the live entry had the one its creator set (`RuntimeSave.collapseTimerBytes`).
+ * - The footprint ring is the file's twenty-four entries, the ones not yet walked zero.
+ * - `dsaLevelIndex`, `extendedWallDecorations` and `spellFilterLocation` are the
+ *   Extended Features block's, written out where a game from `dungeon.dat` had none.
+ * - A free record keeps only its link: the object a deleted scroll named, what a
+ *   deleted monster carried or a deleted chest held, is not written
+ *   (`doc/CSBwin-src/data.cpp:993-1015`).
  */
 import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
 import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
@@ -45,7 +68,7 @@ import { CheckMonsters } from './CheckMonsters';
 import { captureDungeonSnapshot } from './DungeonSnapshot';
 import { DungeonState } from './DungeonState';
 import type { Game } from './Game';
-import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from './RuntimeSave';
+import type { RuntimeSaveState } from './RuntimeSave';
 import type { TimerRecord } from '../data/dungeonTypes';
 import { OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
@@ -209,8 +232,6 @@ export function buildCsbwinRuntimeState(
     const tail = readCsbwinPartyTail(block);
 
     return {
-        version: RUNTIME_SAVE_VERSION,
-        savedAt: Date.now(),
         party: buildPartyState(world),
         game: {
             // `d.Time = d.Long11732 = b.gb2.Time` (`:1622`) — the game clock, in ticks.
@@ -253,11 +274,10 @@ export function buildCsbwinRuntimeState(
 /**
  * `_ReadEntireGame`'s read of a save's world, installed as the running game's
  * (`Game.installWorld`): the image, structure and all, with the five the save carries
- * beside it, its rules, and `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:1826). A CSBWin
- * save restores its state over it (`applyCsbwinSave`), and a port save its `runtime`
- * (`applySavePayload`), whose `raw` is such a file.
+ * beside it, its rules, and `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:1826). The save
+ * restores its state over it (`applyCsbwinSave`).
  */
-export function installCsbwinWorld(game: Game, world: CsbwinWorld): void {
+function installCsbwinWorld(game: Game, world: CsbwinWorld): void {
     // Before `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
     CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc, (line) => game.ctx.host.trace(line));
     readRulesOptions(game.ctx.rules, world.save.extendedFeatures);

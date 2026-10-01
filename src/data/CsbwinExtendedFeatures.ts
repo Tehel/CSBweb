@@ -680,7 +680,7 @@ export function readRulesOptions(
  * allocated-but-empty one, which `csbgame3.dat` carries.
  *
  * **`numDSA` is 0.** `DSA::Write` is unported, so a world with DSA programs cannot be
- * written; no dungeon this project loads defines one. `buildSavePayload` refuses rather
+ * written; no dungeon this project loads defines one. `buildSaveFile` refuses rather
  * than writing a file that silently lost them.
  */
 export function buildLiveExtendedFeatures(live: LiveExtendedFeatures): ExtendedFeaturesBlock {

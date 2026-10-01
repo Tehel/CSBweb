@@ -19,14 +19,15 @@
  *   documented as gesture-only and why `SaveMenu` routes the click that needs it
  *   straight out of the DOM event instead of through the game's mouse queue.
  *
- * The directory is listed, not just written to: our own `*.dmweb.json` saves and any
- * genuine CSBWin `csbgame*.dat` sitting beside them both become rows.
+ * The directory is listed, not just written to: every CSBWin `.dat` in it, the port's
+ * saves and any genuine `csbgame*.dat` beside them, and the `*.dmweb.json` saves earlier
+ * builds wrote.
  */
 import { readCsbwinSaveInfo } from '../CsbwinSaveInfo';
 import { HANDLES_STORE, idbDelete, idbGet, idbPut } from './idb';
 import {
     extractHeaderFromPrefix,
-    SAVE_FILE_EXTENSION,
+    JSON_SAVE_FILE_EXTENSION,
     sortSaveEntries,
     type SaveEntry,
     type SaveEntryMeta,
@@ -36,7 +37,7 @@ import {
 
 const DIRECTORY_KEY = 'saveDirectory';
 
-/** How much of one of our saves has to be read to find its header. */
+/** How much of a `.dmweb.json` has to be read to find its header. */
 const HEADER_PREFIX_BYTES = 8192;
 
 interface FsPermissionDescriptor {
@@ -84,8 +85,8 @@ function isCsbwinSave(name: string): boolean {
     return name.toLowerCase().endsWith('.dat') && !name.includes(':');
 }
 
-function isDmwebSave(name: string): boolean {
-    return name.toLowerCase().endsWith(SAVE_FILE_EXTENSION);
+function isJsonSave(name: string): boolean {
+    return name.toLowerCase().endsWith(JSON_SAVE_FILE_EXTENSION);
 }
 
 export class FileSaveStore implements SaveStore {
@@ -186,11 +187,11 @@ export class FileSaveStore implements SaveStore {
         for await (const child of dir.values()) {
             if (child.kind !== 'file') continue;
             const name = child.name;
-            if (!isDmwebSave(name) && !isCsbwinSave(name)) continue;
+            if (!isJsonSave(name) && !isCsbwinSave(name)) continue;
             try {
                 const file = await (child as FsFileHandleLike).getFile();
-                const entry = isDmwebSave(name)
-                    ? await readDmwebEntry(file, name)
+                const entry = isJsonSave(name)
+                    ? await readJsonEntry(file, name)
                     : await readCsbwinEntry(file, name);
                 if (entry) entries.push(entry);
             } catch {
@@ -225,11 +226,10 @@ export class FileSaveStore implements SaveStore {
 }
 
 /**
- * One of our own saves. Only the first 8 KB is read: `SavePayload` declares `header`
- * first and `JSON.stringify` keeps insertion order, so the listing never has to pull a
- * megabyte of `runtime` off disk.
+ * A `.dmweb.json`. Only the first 8 KB is read: its `header` comes first, so the listing
+ * never has to pull the megabyte behind it off disk.
  */
-async function readDmwebEntry(file: File, name: string): Promise<SaveEntry | null> {
+async function readJsonEntry(file: File, name: string): Promise<SaveEntry | null> {
     const prefix = await file.slice(0, HEADER_PREFIX_BYTES).text();
     const header = extractHeaderFromPrefix(prefix) as SaveHeader | null;
     return {
@@ -245,8 +245,8 @@ async function readDmwebEntry(file: File, name: string): Promise<SaveEntry | nul
 }
 
 /**
- * A genuine CSBWin save. The level and roster come out of blocks 2 and 4, which read
- * fine; the date has to come from the filesystem, because a CSBWin save carries no
+ * A CSBWin save, the port's or a genuine one. The level and roster come out of blocks 2
+ * and 4; the date has to come from the filesystem, because a CSBWin save carries no
  * wall-clock time at all — only `gb2.Time`, the virtual clock.
  *
  * `applySaveBytes` routes these bytes to `applyCsbwinSave`, and

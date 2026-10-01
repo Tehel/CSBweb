@@ -67,7 +67,7 @@ big-endian except the two fields `swapBlock1` leaves alone (`:435-453`).
 
 This port reads every field into `SaveGameState.block1` and writes them back
 (`src/data/SaveGameLoader.ts`); the game holds the `d.` side in `GameState.block1`, which
-`buildCsbwinRuntimeState` fills as `LoadGame` does and `buildSavePayload` writes with
+`buildCsbwinRuntimeState` fills as `LoadGame` does and `buildSaveFile` writes with
 `SaveOption` 1. The values, the new game's draw and the Atari branch are in
 `doc/PROVEN_FACTS.md` → "`GAMEBLOCK1`: what `SaveGame` writes there, and which two fields
 are little-endian", and how `totalMoveCount` counts in "`totalMoveCount` counts every
@@ -109,18 +109,16 @@ facing, which a load must not do to a state that was already valid.
 
 This port parses **every** field in the table into `SaveGameState.block2` and now writes
 every one of them back: `buildBlock2` in `src/data/SaveGameLoader.ts` is the exact
-inverse of `parseBlock2`, and `buildBlock2FromGame` in `src/engine/SaveGamePayload.ts`
+inverse of `parseBlock2`, and `buildBlock2FromGame` in `src/engine/SaveGameFile.ts`
 fills the struct from the live game — the clock and seed, the party position group,
 `FirstAvailTimer` from `TimerQueue`'s free cursor, `ITEM16QueLen` from `MonsterSystem`,
 and both times, and `partyMoveDisableTimer` (40), `Word11712` (42) and `Word11714` (44)
 from `PartyState`. `ObjectInHand` (8)
-goes out as an indirect slot number, re-encoded through the index `buildSavePayload`
+goes out as an indirect slot number, re-encoded through the index `buildSaveFile`
 builds for the dungeon image beside it — the two have to be one numbering.
 
-The four the *loader* acts on are still 20, 22, 28 and 46; the rest are read so a genuine
-save can be inspected (`tools/dump-csbwin-save.ts` prints the party position, clock, seed
-and timer counters from them) but nothing is restored from them yet — the runtime half of
-a quick-save still carries those values.
+A load restores every one of them (`buildCsbwinRuntimeState`, `src/engine/CsbwinSaveGame.ts`).
+`LastMonsterAttackTime` is read signed: it is -200 until a monster first attacks.
 
 ## What a save file contains, in write order
 
@@ -216,7 +214,7 @@ writes one. Of what it emits:
   of the fourteen committed saves and compares it with the file's own bytes. The thirty
   possession slots go out as indirect slot numbers through `encodeRN` (see "Every object
   reference in a save is an indirect index"), in the same index the dungeon image beside
-  them uses — `buildSavePayload` builds the two together for exactly that reason.
+  them uses — `buildSaveFile` builds the two together for exactly that reason.
   Everything else is CSBWin's layout exactly.
 - block 5 — **complete**. The whole 16-byte `TIMER`, in whichever of the three sizes the
   Extended Features flags select. It used to write `timerWord8` (offset 8) and nothing
@@ -278,7 +276,7 @@ writes one. Of what it emits:
   object's *position* lands in `dataTypeMap`, and `buildCsbwinCharacterBlock` takes an
   `encodeRN` so the thirty possession slots go out as slot numbers.
 
-  **The live path is wired** (September 14th). `buildSavePayload` builds the object
+  **The live path is wired.** `buildSaveFile` (`src/engine/SaveGameFile.ts`) builds the object
   indirect index, the image, the Extended Features header and the character block
   together — they are one numbering — and `tools/dump-live-save-file.ts` writes a file
   from a game played out of `dungeon.dat` and one from a game played on from a genuine
@@ -377,14 +375,14 @@ is `src/data/CsbwinObjectIndex.ts`, threaded into `DungeonLoader` through
 
 **Done.** `src/engine/CsbwinSaveGame.ts` (`applyCsbwinSave`) restores a genuine save into
 a running `Game`: it builds a `RuntimeSaveState` from `GAMEBLOCK2`, block 4 and the
-image, and hands it to `Game.applyRuntimeSaveState` — the same path the quick-save has
-used since format v2 — rather than swapping `Game.state.dungeon`, which half the engine
-holds by reference. `applySaveBytes` in `src/engine/SaveGamePayload.ts` decides between
-the two formats, so the disk menu's LOAD and F9 both act on a `.dat`.
+image, and hands it to `Game.applyRuntimeSaveState`, the path every read takes. The
+port's own save is such a file and loads the same way: `applySaveBytes` in
+`src/engine/SaveGameFile.ts` is what the disk menu's LOAD and F9 call.
 
 `tools/dump-csbwin-load.ts` is the evidence: all twelve committed saves are restored
 into a real `Game` and the *live engine* is then asked where the party is, who it is,
 what its cell holds, and whether every cell flag in all fourteen maps is the save's.
 
-What a load still does **not** carry is listed in `PLAN.md` → Phase 10 → "Deferred": the
-DSA global variables in `EXPOOL`, `d.Word11694` and `d.PartySleeping`.
+What a load does **not** carry is listed in `src/engine/CsbwinSaveGame.ts` → "What is
+not restored": the DSA global variables in `EXPOOL`, and what no CSBWin file holds
+(`d.Word11694`, `d.PartySleeping`, `d.PendingDamage`, the open inventory).

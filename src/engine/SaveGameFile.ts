@@ -1,57 +1,30 @@
 /**
- * What a DMweb save file contains, and how to build one from a live game.
+ * A save file, built from a live game and read back into one.
  *
- * This is **not** the CSBWin binary format, though it carries one: a genuine save loads
- * through `applySaveBytes` below, and `raw` is a whole CSBWin file. What it carries is
- * the pair the quick-save has carried since format v2:
+ * A save is a CSBWin file and nothing else: the scrambled, checksummed sixteen blocks
+ * `saveSaveGameState` writes, which CSBWin itself opens. `buildSaveFile` makes one from
+ * the running game, and `applySaveBytes` reads one back, the port's or a genuine one, as
+ * `_ReadEntireGame` does (`applyCsbwinSave`): the file's world is installed whole,
+ * whatever world the game was running, so a save of any dungeon loads into any running
+ * game.
  *
- * - `raw` — the scrambled, checksummed CSBWin file `saveSaveGameState` writes, all
- *   sixteen blocks, base64'd. A load reads its world as a CSBWin save's, structure and
- *   all, and installs it in place of the running one (`applySavePayload`), so a save of
- *   any dungeon loads into any running game;
- * - `runtime` — `getRuntimeSaveState` (`RuntimeSave.ts`), the whole mutable world
- *   (`src/engine/DungeonSnapshot.ts`), restored over the world `raw` installed.
+ * What a file does not hold, a load does not give back: `src/engine/CsbwinSaveGame.ts` →
+ * "What is not restored", which `tools/dump-save-roundtrip.ts` holds to its list.
  *
- * The `header` is the addition. Listing a directory of saves has to show a date, a level
- * and the party without parsing megabytes of `runtime`, so the three are lifted to the
- * front of the file. They are **derived**, never authoritative: `applySavePayload`
- * ignores the header entirely and restores from `runtime`.
+ * A `.dmweb.json`, which earlier builds wrote, wraps such a file in JSON as `raw`.
+ * `applySaveBytes` loads that file and ignores the rest.
  */
 import { saveSaveGameState, type Block1, type Block2, type SaveGameState } from '../data/SaveGameLoader';
-import { applyCsbwinSave, installCsbwinWorld } from './CsbwinSaveGame';
-import { loadCsbwinWorld } from '../data/CsbwinDungeonImage';
+import { applyCsbwinSave } from './CsbwinSaveGame';
 import { buildCsbwinCharacterBlock } from '../data/CsbwinCharacters';
 import { buildObjectIndirectIndex } from '../data/CsbwinObjectIndex';
 import { buildDungeonImage, cellFlagArraySize } from '../data/CsbwinDungeonImageWriter';
 import { buildLiveExtendedFeatures } from '../data/CsbwinExtendedFeatures';
 import type { DungeonData, TimerRecord } from '../data/dungeonTypes';
-import { SAVE_PAYLOAD_FORMAT, type SaveHeader } from '../data/saves/SaveStore';
 import type { Game } from './Game';
-import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from './RuntimeSave';
+import type { RuntimeSaveState } from './RuntimeSave';
 import type { Champion } from './gameTypes';
 import { OBJECT_ID_NULL } from '../core/types';
-
-/**
- * Bumped with `RUNTIME_SAVE_VERSION`. A `runtime` of another version is never
- * restored; `applySaveBytes` loads such a save's `raw` instead.
- */
-export const SAVE_PAYLOAD_VERSION = RUNTIME_SAVE_VERSION;
-
-export interface SavePayload {
-    header: SaveHeader;
-    runtime: RuntimeSaveState;
-    /** base64 of the whole CSBWin file, all sixteen blocks. */
-    raw: string;
-}
-
-export function encodeBytesToBase64(data: Uint8Array): string {
-    let bin = '';
-    const chunkSize = 0x8000;
-    for (let i = 0; i < data.length; i += chunkSize) {
-        bin += String.fromCharCode(...data.subarray(i, i + chunkSize));
-    }
-    return btoa(bin);
-}
 
 export function decodeBase64ToBytes(data: string): Uint8Array {
     const bin = atob(data);
@@ -60,22 +33,7 @@ export function decodeBase64ToBytes(data: string): Uint8Array {
     return out;
 }
 
-/** Derive the listing header from the runtime state it accompanies. */
-export function makeSaveHeader(runtime: RuntimeSaveState): SaveHeader {
-    return {
-        format: SAVE_PAYLOAD_FORMAT,
-        version: runtime.version,
-        savedAt: runtime.savedAt,
-        level: runtime.party?.position?.z ?? 0,
-        champions: (runtime.party?.champions ?? []).map((c) => (c?.name ?? '').trim()),
-    };
-}
-
-/**
- * Build the save. The `SaveGameState` half mirrors what `LoadGame` reads back out of
- * `GAMEBLOCK2` (`doc/CSBwin-src/SaveGame.cpp:1636-1637`).
- */
-export interface SavePayloadOptions {
+export interface SaveFileOptions {
     /**
      * The portrait pixels of a champion who carries only `portraitGraphic` — every
      * champion this engine created, since the engine holds no graphics to blit from.
@@ -137,7 +95,7 @@ function buildFileBlocks(
     game: Game,
     runtime: RuntimeSaveState,
     timers: TimerRecord[],
-    options: SavePayloadOptions,
+    options: SaveFileOptions,
 ): {
     extendedFeatures: SaveGameState['extendedFeatures'];
     dungeonImage: Uint8Array;
@@ -218,7 +176,12 @@ function buildFileBlocks(
     };
 }
 
-export function buildSavePayload(game: Game, options: SavePayloadOptions = {}): SavePayload {
+/**
+ * The save file of the game as it stands: all sixteen blocks. The `SaveGameState` half
+ * mirrors what `LoadGame` reads back out of `GAMEBLOCK2`
+ * (`doc/CSBwin-src/SaveGame.cpp:1636-1637`).
+ */
+export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8Array {
     const runtime = game.getRuntimeSaveState();
     const item16 = runtime.dungeon.item16 ?? [];
     const timers = runtime.dungeon.timers ?? [];
@@ -251,11 +214,7 @@ export function buildSavePayload(game: Game, options: SavePayloadOptions = {}): 
         dsaLevelIndex: game.ctx.state.dungeon.dsaLevelIndex,
         dungeonImage: file.dungeonImage,
     };
-    return {
-        header: makeSaveHeader(runtime),
-        runtime,
-        raw: encodeBytesToBase64(saveSaveGameState(saveGameState)),
-    };
+    return saveSaveGameState(saveGameState);
 }
 
 /**
@@ -265,7 +224,6 @@ export function buildSavePayload(game: Game, options: SavePayloadOptions = {}): 
  */
 function buildBlock1FromGame(runtime: RuntimeSaveState): Block1 {
     const b = runtime.game.block1;
-    if (!b) throw new Error('the runtime state carries no GAMEBLOCK1 fields');
     return {
         byte22598: b.word22598 & 0xff,
         byte22596: b.word22596 & 0xff,
@@ -289,7 +247,7 @@ function buildBlock1FromGame(runtime: RuntimeSaveState): Block1 {
  *
  * - `ObjectInHand` (8) is an RN, which in a file is a slot number in the object
  *   indirect index (`src/data/CsbwinObjectIndex.ts`). This returns the port's packed
- *   `[pos][db][idx]` id; `buildSavePayload` re-encodes it through the index it builds
+ *   `[pos][db][idx]` id; `buildSaveFile` re-encodes it through the index it builds
  *   for the image, because the two have to be one numbering.
  */
 function buildBlock2FromGame(game: Game, runtime: RuntimeSaveState): Block2 {
@@ -335,7 +293,7 @@ function buildBlock2FromGame(game: Game, runtime: RuntimeSaveState): Block2 {
 function buildCharacterBlock(
     game: Game,
     runtime: RuntimeSaveState,
-    options: SavePayloadOptions,
+    options: SaveFileOptions,
     encodeRN: (rn: number) => number,
 ): Uint8Array {
     const party = runtime.party;
@@ -367,65 +325,15 @@ function buildCharacterBlock(
     );
 }
 
-export class SavePayloadError extends Error {}
+export class SaveFileError extends Error {}
 
 /**
- * Parse a file's bytes. Throws `SavePayloadError` with a message fit for the menu's
- * status line. A `runtime` written by an older build is refused rather than
- * half-restored: its shape is not this build's (a v1 save has no world state at all).
- * `applySaveBytes` falls back on such a save's `raw`.
- */
-export function decodeSavePayload(bytes: Uint8Array): SavePayload {
-    const payload = parsePayloadJson(bytes);
-    const runtime = payload.runtime;
-    if (!runtime || typeof runtime !== 'object') throw new SavePayloadError('NOT A DMWEB SAVE');
-    if (runtime.version !== SAVE_PAYLOAD_VERSION) throw staleFormat(runtime.version);
-    if (typeof payload.raw !== 'string') throw new SavePayloadError('SAVE IS MISSING ITS BLOCK DATA');
-    return {
-        // A quick-save written before the header existed is still perfectly loadable.
-        header: payload.header ?? makeSaveHeader(runtime),
-        runtime,
-        raw: payload.raw,
-    };
-}
-
-function parsePayloadJson(bytes: Uint8Array): Partial<SavePayload> {
-    let parsed: unknown;
-    try {
-        parsed = JSON.parse(new TextDecoder().decode(bytes));
-    } catch {
-        throw new SavePayloadError('NOT A DMWEB SAVE');
-    }
-    if (!parsed || typeof parsed !== 'object') throw new SavePayloadError('NOT A DMWEB SAVE');
-    return parsed as Partial<SavePayload>;
-}
-
-function staleFormat(version: number | undefined): SavePayloadError {
-    return new SavePayloadError(`SAVE IS FORMAT V${version ?? '?'}, THIS BUILD READS V${SAVE_PAYLOAD_VERSION}`);
-}
-
-export function encodeSavePayload(payload: SavePayload): Uint8Array {
-    return new TextEncoder().encode(JSON.stringify(payload));
-}
-
-/**
- * Restore a parsed payload into the running game. `raw` is read as a CSBWin save's world
- * is, and installed whole whatever world the game was running (`installCsbwinWorld`,
- * `_ReadEntireGame`'s read, doc/CSBwin-src/SaveGame.cpp:2324); then `runtime`, the
- * whole mutable state, is restored over it.
- */
-export function applySavePayload(game: Game, payload: SavePayload): void {
-    installCsbwinWorld(game, loadCsbwinWorld(decodeBase64ToBytes(payload.raw)));
-    game.applyRuntimeSaveState(payload.runtime);
-}
-
-/**
- * Is this one of our JSON saves, or a genuine CSBWin binary?
+ * Is this a `.dmweb.json`, or a CSBWin file?
  *
- * A `SavePayload` is `JSON.stringify` output, so its first non-whitespace byte is `{`.
- * A CSBWin save opens with the Extended Features block — and may open with an
- * enciphered one, which is why this asks the cheap, certain question about *our*
- * format rather than trying to recognise theirs.
+ * A `.dmweb.json` is `JSON.stringify` output, so its first non-whitespace byte is `{`.
+ * A CSBWin save opens with the Extended Features block, and may open with an enciphered
+ * one, which is why this asks the cheap, certain question about the wrapper rather than
+ * trying to recognise the file.
  */
 function looksLikeJson(bytes: Uint8Array): boolean {
     for (let i = 0; i < Math.min(bytes.length, 64); i++) {
@@ -436,44 +344,37 @@ function looksLikeJson(bytes: Uint8Array): boolean {
     return false;
 }
 
-/**
- * Restore whatever the store handed back — one of our saves, or a genuine CSBWin one.
- *
- * The two menus and the quick-load all come through here so that the choice is made in
- * one place. A CSBWin file goes to `applyCsbwinSave`, whose failures are turned into
- * `SavePayloadError` because the menu's status line is the only place they can be
- * shown, and it wants a short line rather than a stack. One of our saves from an older
- * build loads through its `raw`, the CSBWin file it carries: what only `runtime` holds
- * is lost with it (`src/engine/CsbwinSaveGame.ts` → "What is not restored").
- */
-export function applySaveBytes(game: Game, bytes: Uint8Array): void {
-    if (!looksLikeJson(bytes)) {
-        applyCsbwinFile(game, bytes);
-    } else {
-        const payload = parsePayloadJson(bytes);
-        const version = payload.runtime?.version;
-        if (version !== undefined && version !== SAVE_PAYLOAD_VERSION && typeof payload.raw === 'string') {
-            // An older build's save. Its `runtime` is in a shape this build does not read,
-            // but its `raw` is a whole CSBWin file, whose format is CSBWin's and does not
-            // change, so it loads as a genuine save would. A save from before `raw` held
-            // the dungeon image cannot, and is refused by its version.
-            try {
-                applyCsbwinSave(game, decodeBase64ToBytes(payload.raw));
-            } catch {
-                throw staleFormat(version);
-            }
-        } else {
-            applySavePayload(game, decodeSavePayload(bytes));
-        }
+/** The CSBWin file a `.dmweb.json` carries as `raw`, in base64. */
+function rawFileOf(bytes: Uint8Array): Uint8Array {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(new TextDecoder().decode(bytes));
+    } catch {
+        throw new SaveFileError('NOT A DMWEB SAVE');
     }
-    game.savedGameRead();
+    const raw = (parsed as { raw?: unknown } | null)?.raw;
+    if (typeof raw !== 'string') throw new SaveFileError('SAVE IS MISSING ITS BLOCK DATA');
+    try {
+        return decodeBase64ToBytes(raw);
+    } catch {
+        throw new SaveFileError('SAVE IS MISSING ITS BLOCK DATA');
+    }
 }
 
-/** A genuine CSBWin file, whose failures become a short line for the menu's status. */
-function applyCsbwinFile(game: Game, bytes: Uint8Array): void {
+/**
+ * Restore whatever the store handed back: a CSBWin file, the port's or a genuine one, or
+ * the one a `.dmweb.json` carries.
+ *
+ * The two menus and the quick-load all come through here. A failure becomes a
+ * `SaveFileError`, because the menu's status line is the only place it can be shown,
+ * and it wants a short line rather than a stack.
+ */
+export function applySaveBytes(game: Game, bytes: Uint8Array): void {
+    const file = looksLikeJson(bytes) ? rawFileOf(bytes) : bytes;
     try {
-        applyCsbwinSave(game, bytes);
+        applyCsbwinSave(game, file);
     } catch (error) {
-        throw new SavePayloadError(`CSBWIN SAVE: ${(error as Error).message}`.toUpperCase());
+        throw new SaveFileError(`CSBWIN SAVE: ${(error as Error).message}`.toUpperCase());
     }
+    game.savedGameRead();
 }

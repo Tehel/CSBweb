@@ -828,7 +828,7 @@ export class Game implements MainLoop {
         return this.systems.dsa.getGlobalVariables();
     }
 
-    /** The quick-save's snapshot (`RuntimeSave.getRuntimeSaveState`). */
+    /** The game's state as a read restores it (`RuntimeSave.getRuntimeSaveState`). */
     getRuntimeSaveState(): RuntimeSaveState {
         return getRuntimeSaveState(this.ctx);
     }
@@ -847,7 +847,7 @@ export class Game implements MainLoop {
     }
 
     /**
-     * Restore a quick-save (`RuntimeSave.applyRuntimeSaveState`), then the loop's own
+     * Restore a read's state (`RuntimeSave.applyRuntimeSaveState`), then the loop's own
      * reset: `HandleMouseEvents(_16_, -999887)` — `lastTime = 0`
      * (doc/CSBwin-src/SaveGame.cpp:1661, `Mouse.cpp:1372-1376`). Every game read comes
      * through here, and `_GameSetup` follows each `ReadEntireGame` with

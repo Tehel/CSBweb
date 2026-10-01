@@ -33,8 +33,8 @@ before answering.
 - **A CSBWin save** (`static/gamefiles/saves/*.dat`): the world as it was saved. It shows
   the party (`@`), the monsters where they really are, and, in `cell`, the square's live
   timers.
-- **A `.dmweb.json`**: the port's own save. Its world is read from its `raw` CSBWin file.
-  The author's saves are untracked but readable. Pass `--graphics` with the matching
+- **A `.dmweb.json`**: a save an earlier build wrote, a CSBWin file wrapped in JSON. Its
+  world is read from its `raw` CSBWin file. The author's saves are untracked but readable. Pass `--graphics` with the matching
   `graphics.dat` for another game (e.g. `static/gamefiles/csb/`).
 
 ## Reading the output honestly

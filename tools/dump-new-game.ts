@@ -11,7 +11,7 @@
  *
  * So a game is played — champions walk, all of them die, which drops their possessions
  * and leaves bones in the dungeon — and rebuilt, and its whole runtime state
- * (`getRuntimeSaveState`, the quick-save's snapshot: the party, the clock, every timer,
+ * (`getRuntimeSaveState`: the party, the clock, every timer,
  * every cell and every database record) is compared with that of a `Game` that was never
  * played. Then both run 600 ticks and are compared again, which catches state the snapshot
  * does not carry but the game reads.
@@ -43,7 +43,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { MovementAction } from '../src/engine/gameTypes';
-import { applySaveBytes, buildSavePayload, encodeSavePayload } from '../src/engine/SaveGamePayload';
+import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
 
@@ -74,10 +74,10 @@ function champion(i: number): Champion {
   };
 }
 
-/** The runtime state, hashed without its wall-clock `savedAt` and `GAMEBLOCK1`. */
+/** The runtime state, hashed without `GAMEBLOCK1`. */
 function stateHash(game: Game): string {
   const json = JSON.stringify(game.getRuntimeSaveState(), (key, value) =>
-    key === 'savedAt' || key === 'block1' ? 0 : value);
+    key === 'block1' ? 0 : value);
   return createHash('sha256').update(json).digest('hex').slice(0, 16);
 }
 
@@ -132,7 +132,7 @@ function main(): void {
   // (doc/CSBwin-src/SaveGame.cpp:1494, :1260, :1883).
   console.log('=== d.CanRestartFromSavegame ===');
   const newAtFirst = played.canRestartFromSavegame();
-  const bytes = encodeSavePayload(buildSavePayload(played));
+  const bytes = buildSaveFile(played);
   played.saveWritten();
   const loaded = newGame(parse(), stockGraphics());
   applySaveBytes(loaded, bytes);

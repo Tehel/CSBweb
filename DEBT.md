@@ -273,8 +273,8 @@ Not taken in order; the author names one to start it (see "Priority").
   the curse change with `AdjustStatsForItemCarried(…, -1, …)` and `(…, +1, …)`, so a curse
   laid on a carried weapon costs 3 Luck at once. Port both together.
 - **Saving a dungeon with DSAs.** `DSA::Write` (`doc/CSBwin-src/Chaos.cpp`) is unported, so
-  `buildSavePayload` refuses a dungeon that defines one rather than write a file without
-  them (`src/engine/SaveGamePayload.ts`), and `saveSaveGameState` writes a loaded save's
+  `buildSaveFile` refuses a dungeon that defines one rather than write a file without
+  them (`src/engine/SaveGameFile.ts`), and `saveSaveGameState` writes a loaded save's
   DSA section back verbatim (`SaveGameState.dsaBlock`), where a DSA whose state has moved
   since the load would be written as it stood.
 - **`ECF_FOOTPRINTS`.** The footprint arm of `SummarizeRoomInfo` also shows prints on any
@@ -541,7 +541,7 @@ fake pits, a refused move into stone with its damage, and a gravity slide ending
 COPYTELEPORTER and GOSUB, and it has no party-move filter. A hand probe ran the 1D
 corridor's chain correctly in the engine (`doc/3D2D1D.md`), but no tool proves it yet.
 Playing the dungeon through also needs saving, which waits on G1's `DSA::Write`:
-`buildSavePayload` refuses any dungeon that defines a DSA.
+`buildSaveFile` refuses any dungeon that defines a DSA.
 `static/gamefiles/3D2D1D/WALKTHROUGH.md` is a full route computed from CSBWin's rules
 by `tools/solve-3d2d1d.ts`, outside the engine. Once both steps are in, a tool that
 replays it through `Game` is the end-to-end proof.

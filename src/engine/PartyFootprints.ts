@@ -222,7 +222,7 @@ export class PartyFootprints {
   }
 
   /**
-   * The whole trail, for the quick-save. Monsters that cannot see the party smell
+   * The whole trail, for the state a read restores. Monsters that cannot see the party smell
    * this, so a restore that dropped it would make every hunting monster lose the
    * scent at exactly the moment the game was reloaded.
    */

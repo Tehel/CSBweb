@@ -6,8 +6,9 @@
  * out what the data holds ("what is on (18,1) of map 11?") before reasoning about
  * behaviour. It is not in `tools/run-checks.mjs`. The `peek-dungeon` skill has the uses.
  *
- * The source is a `dungeon.dat` (plain or compressed), a genuine CSBWin save, or one of
- * the port's `.dmweb.json` saves, whose world is read from its `raw` CSBWin file. A save
+ * The source is a `dungeon.dat` (plain or compressed), a CSBWin save, the port's or a
+ * genuine one, or a `.dmweb.json` an earlier build wrote, whose world is read from its
+ * `raw` CSBWin file. A save
  * shows where monsters actually are, where the party is, and the timers of a square.
  *
  * Run: `npx tsx tools/peek-dungeon.ts [--file F] [--graphics G] <command>`
@@ -42,7 +43,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { DungeonState } from '../src/engine/DungeonState';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { NameIndex } from '../src/engine/objectIndex';
-import { decodeBase64ToBytes } from '../src/engine/SaveGamePayload';
+import { decodeBase64ToBytes } from '../src/engine/SaveGameFile';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { gameTablesOf, graphicsTablesOf } from './lib/game';
 

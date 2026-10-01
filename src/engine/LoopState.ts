@@ -1,8 +1,7 @@
 /**
  * The main loop's `d.` flags that other CSBWin files write, and `WakeUp` and the freeze,
  * which write them (`DEBT.md` E2, "how a system reaches the loop's state"). They live on
- * the context (`ctx.loop`) and not in `GameState`: none is saved, in CSBWin or in the
- * port's quick-save.
+ * the context (`ctx.loop`) and not in `GameState`: none is saved, in CSBWin or here.
  */
 import type { Rect } from '../data/tables/UITables';
 import type { GameContext } from './GameContext';

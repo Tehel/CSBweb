@@ -380,8 +380,8 @@ export class DsaSystem {
   private parameters = new Int32Array(101);
   private adjustSkillsParameters = new Int32Array(5);
   /**
-   * `d.GlobalVariables` — where a dungeon's DSAs keep their puzzle progress, so the
-   * quick-save has to carry them (`getGlobalVariables` / `setGlobalVariables`).
+   * `d.GlobalVariables` — where a dungeon's DSAs keep their puzzle progress, so a read
+   * has to carry them (`getGlobalVariables` / `setGlobalVariables`).
    */
   private globalVariables = new Int32Array(100);
   private warnedOps = new Set<number>();
@@ -726,7 +726,7 @@ export class DsaSystem {
     return this.processTimer6Internal(rn, timer, location, false, vars);
   }
 
-  /** The DSA global variables, for the quick-save. */
+  /** The DSA global variables, for the state a read restores (`RuntimeSave.ts`). */
   getGlobalVariables(): number[] {
     return Array.from(this.globalVariables);
   }

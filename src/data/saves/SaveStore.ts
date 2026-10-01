@@ -30,8 +30,8 @@ export interface SaveEntry {
      * Whether LOAD will act on this row. Genuine CSBWin `.dat` saves were listed with
      * this false while their object references were undecodable; they load now
      * (`src/engine/CsbwinSaveGame.ts`). What still sets it false is a save this build
-     * cannot restore — a `SavePayload` from an older format version, say — and the row
-     * is then marked with a `*` and carries a `note` saying why.
+     * cannot restore, and the row is then marked with a `*` and carries a `note` saying
+     * why.
      */
     loadable: boolean;
     /** Why not, when `loadable` is false. Shown on the detail line. */
@@ -134,15 +134,18 @@ export function formatSaveDetail(entry: SaveEntry | null, maxChars = 33): string
     return text.length > maxChars ? text.slice(0, maxChars) : text;
 }
 
-/** Marks the file as ours, so a stray `.json` in the folder is rejected rather than parsed. */
-export const SAVE_PAYLOAD_FORMAT = 'dmweb-save';
+/** The suffix a save carries on disk: a CSBWin file, which CSBWin opens. */
+export const SAVE_FILE_EXTENSION = '.dat';
 
-/** The suffix a DMweb save carries on disk. */
-export const SAVE_FILE_EXTENSION = '.dmweb.json';
+/**
+ * The suffix of the saves earlier builds wrote: a CSBWin file wrapped in JSON, as `raw`,
+ * behind a `header` for the listing. They still list and load (`applySaveBytes`).
+ */
+export const JSON_SAVE_FILE_EXTENSION = '.dmweb.json';
 
-/** What a DMweb save says of itself at the front of its file (`SavePayload.header`). */
+/** What a `.dmweb.json` says of itself at the front of its file, its `header`. */
 export interface SaveHeader {
-    format: typeof SAVE_PAYLOAD_FORMAT;
+    format: 'dmweb-save';
     version: number;
     /** `Date.now()` at the moment of the save. */
     savedAt: number;
@@ -153,11 +156,11 @@ export interface SaveHeader {
 }
 
 /**
- * Pull the `header` object out of the first few kilobytes of one of our save files.
+ * Pull the `header` object out of the first few kilobytes of a `.dmweb.json`.
  *
- * `JSON.stringify` emits keys in insertion order and `SavePayload` declares `header`
- * first, so it is always at the front of the file. Listing a directory therefore reads a
- * 4 KB prefix per save instead of the whole megabyte-plus of `runtime`. The scan is
+ * `JSON.stringify` emits keys in insertion order and `header` was declared first, so it
+ * is always at the front of the file. Listing a directory therefore reads a prefix per
+ * save instead of the megabyte-plus behind it. The scan is
  * brace-balanced and string-aware so that a champion name full of punctuation could not
  * end the object early.
  */

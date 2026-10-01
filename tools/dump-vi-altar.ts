@@ -57,7 +57,7 @@ import { getActuatorWallGraphicOrdinal } from '../src/data/actuatorHelpers';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { EXPOOL_RECORD_SIZE, Expool } from '../src/data/CsbwinExpool';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
-import { applySavePayload, buildSavePayload, decodeBase64ToBytes } from '../src/engine/SaveGamePayload';
+import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { graphicsTablesOf, newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
@@ -588,12 +588,11 @@ function main(): void {
 
       // A game with no death has no EXPOOL to save, and its save takes away the one a
       // game it is loaded into has.
-      const noDeath = buildSavePayload(g);
+      const noDeath = buildSaveFile(g);
       g.systems.monsterAttack.killCharacter(victim);
       const bones = bonesAt(g, altar.party)[0];
       const fingerprint = g.ctx.party.state.champions[victim]!.fingerprint;
-      const payload = buildSavePayload(g);
-      const file = decodeBase64ToBytes(payload.raw);
+      const file = buildSaveFile(g);
 
       // What the file holds, read from its own bytes.
       const parsed = loadCsbwinWorld(file);
@@ -624,8 +623,7 @@ function main(): void {
         check(filePool.copyChampionBonesRecord(slot) === fingerprint, "and the record is the champion's fingerprint");
 
         const routes: Array<[string, (next: Game) => void]> = [
-          ['the CSBWin file alone', (next) => { applyCsbwinSave(next, file); }],
-          ["the port's save", (next) => { applySavePayload(next, payload); }],
+          ['the save file', (next) => { applyCsbwinSave(next, file); }],
         ];
         console.log('');
         console.log(['loaded from', 'bones records', 'pair', `HERO${victim} alive after the altar`, 'bones records left'].join('\t'));
@@ -658,10 +656,10 @@ function main(): void {
           check(bonesRecords() === 0, `${name}: and their record with them`);
 
           // The same game, taken back to before anyone died.
-          applySavePayload(next, noDeath);
+          applyCsbwinSave(next, noDeath);
           check(next.ctx.state.dungeon.expool === undefined && next.ctx.state.dungeon.header.objectCounts[DBType.EXPOOL] === 0,
             `${name}: a save with no EXPOOL leaves the game none`);
-          check(buildSavePayload(next).raw.length > 0, `${name}: and the game saves again`);
+          check(buildSaveFile(next).length > 0, `${name}: and the game saves again`);
         }
       }
     }

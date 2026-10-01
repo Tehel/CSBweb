@@ -2,8 +2,8 @@
  * The running game's saves: where a save is built from the game and written to a store,
  * and where a store's bytes are read back into it.
  *
- * The file itself is `SaveGamePayload.ts`'s, and a genuine CSBWin one `CsbwinSaveGame.ts`'s.
- * This is what calls them for the page: the disk menu's SAVE and LOAD
+ * The file itself is `SaveGameFile.ts`'s to write and `CsbwinSaveGame.ts`'s to read: a
+ * save is a CSBWin file. This is what calls them for the page: the disk menu's SAVE and LOAD
  * (`src/renderer/ui/SaveMenu.ts`), the boot's chooser (`src/renderer/intro/BootSequence.ts`),
  * and the F5 and F9 keys.
  *
@@ -11,6 +11,7 @@
  * that menu's stores (`src/data/saves/`): one more save to the current source, and the
  * most recent save from wherever it lives, so both mean the same "most recent save".
  */
+import { readCsbwinSaveInfo } from '../data/CsbwinSaveInfo';
 import type { DataSet } from '../data/DataSets';
 import {
     SAVE_FILE_EXTENSION,
@@ -20,7 +21,7 @@ import {
     type SaveStore,
 } from '../data/saves';
 import type { Game } from './Game';
-import { SavePayloadError, applySaveBytes, buildSavePayload, encodeSavePayload } from './SaveGamePayload';
+import { SaveFileError, applySaveBytes, buildSaveFile } from './SaveGameFile';
 import type { Champion } from './gameTypes';
 
 /**
@@ -34,7 +35,7 @@ export type SavedGameRead = 'loaded' | 'cancelled' | 'damaged';
 export interface GameSavesScreen {
     /**
      * The portrait pixels of a champion carrying only `portraitGraphic`, for the save
-     * writer: the screen's, since only it holds graphic 26 (`SavePayloadOptions`).
+     * writer: the screen's, since only it holds graphic 26 (`SaveFileOptions`).
      */
     portraitOf(champion: Champion): number[] | undefined;
     /** `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`), the screen's open chest. */
@@ -95,22 +96,25 @@ export class GameSaves {
      * repacked first, as the disk menu's `TAG02076e` repacks it, and the inventory's next
      * draw opens it again, as after the menu's `TAG0207cc`. The rest of the pair, the
      * shading and the cursor, would last no frame here. And the tail runs before the
-     * write, on the world the payload holds, not once the write comes back: a failed
+     * write, on the world the file holds, not once the write comes back: a failed
      * write keeps the re-attached monsters.
      *
-     * The file's bytes are made at once, before anything is awaited: the payload's
-     * `runtime.party` is the live party (`getRuntimeSaveState`), which a game running on
-     * through the listing would move on from the dungeon saved beside it.
+     * The file's bytes are made at once, before anything is awaited: the game runs on
+     * through the listing. The row beside them is read back from the file's own blocks,
+     * the level from `GAMEBLOCK2` and the names from block 4, as any `.dat` is listed
+     * (`readCsbwinSaveInfo`); the date is the store's, since a CSBWin file has none.
      */
     async save(store: SaveStore, clock: SaveClock, taken?: ReadonlySet<string>): Promise<SaveEntryMeta> {
         if (clock === 'running') this.screen.repackOpenChest();
-        const payload = buildSavePayload(this.game, {
+        const bytes = buildSaveFile(this.game, {
             portraitOf: (champion) => this.screen.portraitOf(champion),
         });
-        const bytes = encodeSavePayload(payload);
+        const savedAt = Date.now();
+        const info = readCsbwinSaveInfo(bytes);
+        if (!info) throw new Error('the save file does not read back');
+        const { level, champions } = info;
         if (clock === 'running') this.game.saveWritten();
         const names = taken ?? new Set((await store.list().catch(() => [])).map((entry) => entry.name));
-        const { savedAt, level, champions } = payload.header;
         const meta: SaveEntryMeta = { name: makeSaveFileName(savedAt, names), savedAt, level, champions };
         await store.write(meta, bytes);
         if (clock === 'stopped') this.game.saveWritten();
@@ -119,7 +123,7 @@ export class GameSaves {
 
     /**
      * Restore a store's bytes into the running game, one of the port's saves or a genuine
-     * CSBWin one (`applySaveBytes`). Throws `SavePayloadError`, whose message is a line
+     * CSBWin one (`applySaveBytes`). Throws `SaveFileError`, whose message is a line
      * for the menu's status.
      *
      * The entrance's Resume needs to know whether a save came back: CSBWin loops on
@@ -143,8 +147,18 @@ export class GameSaves {
         return read;
     }
 
-    /** F5: one more save to the current source. */
+    /**
+     * F5: one more save to the current source. Not with an empty party, nor while a
+     * champion is still being chosen: the disk icon does nothing then
+     * (`doc/CSBwin-src/Mouse.cpp:1716-1718`), and a file has no place for
+     * `d.PotentialCharacterOrdinal`, so the candidate would load as a member.
+     */
     async quickSave(): Promise<void> {
+        const { champions, potentialChampionIndex } = this.game.ctx.party.state;
+        if (champions.length === 0 || potentialChampionIndex >= 0) {
+            this.report('Quick-save refused: no party, or a champion is being chosen');
+            return;
+        }
         try {
             // `writableSaveStore` falls back to the browser when the file source is
             // chosen but not connected: F5 must never raise a folder picker over the game.
@@ -167,7 +181,7 @@ export class GameSaves {
             this.read(await latest.store.read(latest.entry.id));
             this.report(`Quick-loaded ${latest.entry.name}`);
         } catch (error) {
-            if (error instanceof SavePayloadError) this.report(error.message);
+            if (error instanceof SaveFileError) this.report(error.message);
             else this.report('Quick-load failed', error);
         }
     }

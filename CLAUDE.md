@@ -135,7 +135,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             (`SelectPaletteForLightLevel`: `d.CurrentPalette`),
             SmartDiscard (thinning a filling database), MakeMoreRoomInDB (making
             room in a full one),
-            RuntimeSave (the port's own quick-save), GameSaves (a save built and
+            RuntimeSave (the state a read restores), SaveGameFile (the CSBWin file a
+            save is, written from the game and read back), GameSaves (a save built and
             written to a store, or read back: the disk menu's, the boot's and F5/F9's),
             skills, AddCharacter, objectIndex
             (the one DescIndex / GetBasicObjectType / NameIndex)
@@ -230,8 +231,8 @@ clicks share), timers, actuators, DSA scripting, missiles and clouds, skills/exp
 magic casting, light levels, worn-object bonuses, sound, the message area, monsters
 (`Monster.cpp`: AI, movement and combat both ways), the champion lifecycle (the Hall of
 Champions, death, bones, resurrection), sleep, the pre-game screens (title, dungeon
-entrance, doors, credits) and most of the DM UI. Genuine CSBWin save files load, and the
-port writes them as CSBWin does, all sixteen blocks. **The current priority is a complete
+entrance, doors, credits) and most of the DM UI. Genuine CSBWin save files load, and a
+save of the port's is such a file, all sixteen blocks, and nothing else. **The current priority is a complete
 game on the default dungeon**: the rework of the save menu first (Phase 10, `DEBT.md`'s
 `P10` row), then `DEBT.md`'s other active rows, one item per commit (the unported
 features the retail dungeon reaches). DSA extensibility, CSBWin's custom-dungeon and debugging extras, and comparing
