@@ -72,7 +72,8 @@ export interface LoopFlags {
  * `_FusionSequence` does (doc/CSBwin-src/Attack.cpp:2220) and `MainLoop`'s wait after the
  * CSB win (`CSBCode.cpp:627-633`). It yields the length of each `VBLDelay`, in VBLs, and
  * does its work between them. `MainLoop.runScript` starts one, and `Game.runFrame` runs it in
- * place of the loop's pass. A generator rather than the intro's `async` (`IntroHost`) because
+ * place of the loop's pass, and in the VBL it returns goes on with the pass it held, as
+ * CSBWin's does after `_MagicSelection`. A generator rather than the intro's `async` (`IntroHost`) because
  * `runFrame` is stepped by `tools/`, one VBL at a time.
  */
 export type LoopScript = Generator<number, void, void>;

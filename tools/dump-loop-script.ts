@@ -6,12 +6,14 @@
  *    the rest: each `VBLDelay(n)` is `n` VBLs, each with its `vblInterrupt` and the frame
  *    callbacks, and a `VBLDelay(0)` waits for none (doc/CSBwin-src/CSBCode.cpp:1137-1147).
  *    Meanwhile the loop makes no pass: no mouse entry is taken, no tick runs however late
- *    it is, and no print-queue entry is taken (`CSBCode.cpp:714-765`). Once the script
- *    ends, the next frame is a pass again.
+ *    it is, and no print-queue entry is taken (`CSBCode.cpp:714-765`). In the VBL the
+ *    script ends, the pass it held goes on where it stopped: no further mouse entry, then
+ *    the tick if one is due and a print-queue entry (`:747-765`, `:714-721`).
  * 2. **A script started by a mouse handler**, as `atk_FUSE` starts `_FusionSequence`
- *    (`Attack.cpp:1971`, `:259`): the pass that took the click is held inside it, so the
- *    entries behind it stay queued and that pass runs no tick. They are taken once the
- *    script is over and `d.Time` has moved on.
+ *    (`Attack.cpp:1971`, `:259`) and a click on the spell panel `_MagicSelection`
+ *    (`Magic.cpp:545-581`): the pass that took the click is held inside it, so the entries
+ *    behind it stay queued and no tick runs until the script's last VBL, where the pass
+ *    goes on. They are taken in the VBL after, once `d.Time` has moved on.
  * 3. **`_ProcessTimersViewportAndSound`** (`Attack.cpp:2192-2213`): one `ProcessTimers`,
  *    then one `d.Time++` and one `scrollingText.ClockTick()`, and no VBL goes by.
  * 4. **A win inside it** (`:2199-2204`): `VBLDelay(300)`, then `ShowCredits(1)`, which
@@ -113,19 +115,24 @@ function checkWaits(): void {
   game.onMouseClick(20, 100, 100);
   const handled: number[] = [];
   game.setMouseEventHandlers({ button: (num) => handled.push(num), unclick: () => {} });
-  for (let n = 0; n < 33; n++) frame(w);
+  for (let n = 0; n < 32; n++) frame(w);
+  console.log(`  32 VBLs: tick ${tick} -> ${game.ctx.state.tickCount}; print-queue entries ${w.printed - printed}; queued ${game.ctx.mouseQueue.count()}`);
+  check(game.isRunningScript() && game.ctx.state.tickCount === tick && w.printed === printed,
+    'no tick runs while it waits, late as it is, and no print-queue entry is taken');
+  frame(w);
   console.log(`  log ${w.log.join(' ')}; vblInterrupts ${w.vbls - vbls}; frame callbacks ${w.frameCallbacks - callbacks}`);
-  console.log(`  tick ${tick} -> ${game.ctx.state.tickCount}; print-queue entries ${w.printed - printed}; queued ${game.ctx.mouseQueue.count()}`);
+  console.log(`  the 33rd: tick ${game.ctx.state.tickCount}; print-queue entries ${w.printed - printed}; queued ${game.ctx.mouseQueue.count()}`);
   check(w.log.join(' ') === `a@${start} b@${start + 31} c@${start + 31} d@${start + 33}`,
     'it resumes on the 31st VBL, goes through VBLDelay(0) without one, and ends on the 2nd after');
   check(!game.isRunningScript(), 'and holds the loop no longer');
-  check(w.vbls - vbls === 33 && w.frameCallbacks - callbacks === 33, 'each of its 33 VBLs runs vblInterrupt and the frame callbacks');
-  check(game.ctx.state.tickCount === tick && w.printed === printed, 'no tick runs meanwhile, late as it is, and no print-queue entry is taken');
-  check(handled.length === 0 && game.ctx.mouseQueue.count() === 1, 'nor is the click queued meanwhile taken');
+  check(w.vbls - vbls === 33 && w.frameCallbacks - callbacks === 33, 'each of its 33 VBLs runs vblInterrupt and the frame callbacks, once');
+  check(game.ctx.state.tickCount === tick + 1 && w.printed === printed + 1,
+    'the pass it held goes on in the VBL it ends: the due tick runs and a print-queue entry is taken (CSBCode.cpp:747-765)');
+  check(handled.length === 0 && game.ctx.mouseQueue.count() === 1, 'with no further mouse entry: the click queued meanwhile waits');
   frame(w);
   console.log(`  the frame after: tick ${game.ctx.state.tickCount}; handled ${JSON.stringify(handled)}`);
-  check(game.ctx.state.tickCount === tick + 1 && w.printed === printed + 1 && handled.join() === '20',
-    'the frame after is a pass: the click is taken, a tick runs and a print-queue entry is taken');
+  check(game.ctx.state.tickCount === tick + 2 && w.printed === printed + 2 && handled.join() === '20',
+    'the frame after is a whole pass: the click is taken, a tick runs and a print-queue entry is taken');
 }
 
 /* -------------------------------------------- 2. started by a mouse handler ---- */
@@ -159,14 +166,16 @@ function checkFromHandler(): void {
   check(handled.join() === '20' && game.isRunningScript(), 'the click starts the script');
   check(game.ctx.mouseQueue.count() === 2, 'and the button-up and the click behind it stay queued');
   check(game.ctx.state.tickCount === tick && w.printed === printed, 'that pass runs no tick and takes no print-queue entry');
-  for (let n = 0; n < 6; n++) frame(w);
+  for (let n = 0; n < 4; n++) frame(w);
+  check(game.isRunningScript() && game.ctx.state.tickCount === tick, 'nor do the next four VBLs');
+  frame(w);
   console.log(`  log ${w.log.join(' ')}; handled ${JSON.stringify(handled)}; tick ${game.ctx.state.tickCount}`);
-  check(w.log.join(' ') === `resumed@${held + 5}`, 'it resumes 5 VBLs later');
+  check(w.log.join(' ') === `resumed@${held + 5}` && !game.isRunningScript(), 'it resumes 5 VBLs later, and ends');
   check(game.ctx.state.tickCount === tick + 1 && handled.join() === '20',
-    'the pass after it runs a tick, and the entries behind the click wait for d.Time to move (Mouse.cpp:1468-1476)');
+    'the held pass goes on in that VBL: the tick runs, and the entries behind the click stay, its result being 0 (CSBCode.cpp:761)');
   frame(w);
   console.log(`  the frame after: handled ${JSON.stringify(handled)}`);
-  check(handled.join() === `20,${0x0add},21`, 'which the next pass takes: the button-up, and the click it lets follow');
+  check(handled.join() === `20,${0x0add},21`, 'the next pass takes them, d.Time having moved: the button-up, and the click it lets follow');
 }
 
 /* -------------------------------------- 3-4. _ProcessTimersViewportAndSound ---- */

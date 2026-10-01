@@ -8,7 +8,7 @@
  *   VBL, and `WakeUp`'s `d.clockTick = 1` (`CSBCode.cpp:7050`) brings one on at once.
  * - The handler runs on every VBL: frozen, the tick due waits (`:765`) and runs in the
  *   first pass after the thaw; held in a script's `VBLDelay`, the count goes on, and the
- *   loop's first pass after the script ticks.
+ *   pass the script held ticks in the VBL the script ends (`:747-765`).
  * - The page paces VBLs from the wall clock (`Game.gameLoop`): a call runs as many as the
  *   time since the last holds, up to a second's worth, so a timer held to one call a
  *   second, as a background tab's is, keeps the game at its pace, and a longer gap is not
@@ -91,12 +91,12 @@ function checkHeldTicks(): void {
   }
   game.runScript(wait());
   const held = tickingVbls(game, ticks, 30);
-  console.log(`held in a 30-VBL VBLDelay: ${held.length} ticks, d.vblCount ${game.ctx.loop.vblCount}, resumed ${resumed}`);
-  check(held.length === 0 && resumed === 1 && !game.isRunningScript() && game.ctx.loop.vblCount === 30,
-    'the script holds the loop for its 30 VBLs, and they are counted');
+  console.log(`held in a 30-VBL VBLDelay: ticks in VBLs ${held.join(' ')}, d.vblCount ${game.ctx.loop.vblCount}, resumed ${resumed}`);
+  check(held.join() === '30' && resumed === 1 && !game.isRunningScript() && game.ctx.loop.vblCount === 0,
+    'the script holds the loop for its 30 VBLs, which are counted: the pass it held ticks in the last, as the script ends');
   const after = tickingVbls(game, ticks, 15);
   console.log(`after the script: ticks in VBLs ${after.join(' ')}`);
-  check(after.join() === '1', "the loop's first pass after the script ticks");
+  check(after.join() === '15', 'and the count starts again from that tick');
 }
 
 function checkThePace(): void {

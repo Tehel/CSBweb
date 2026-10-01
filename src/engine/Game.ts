@@ -381,17 +381,31 @@ export class Game implements MainLoop {
             // A script's `VBLDelay` (`wvbl`, doc/CSBwin-src/CSBCode.cpp:1137-1147): the VBLs
             // go by, and the loop makes no pass. The last one resumes the script, up to its
             // next delay.
-            for (const callback of this.onFrameCallbacks) callback(this);
             if (--this.scriptDelay === 0) this.resumeScript();
-            return;
+            // `ShowCredits` has the screen, and never returns.
+            if (this.mainLoopReturned) return;
+            if (this.script !== null) {
+                for (const callback of this.onFrameCallbacks) callback(this);
+                return;
+            }
+            // The sequence has returned, and the pass it held goes on where it stopped, in
+            // this VBL. The entry that called it was a button, whose `result` is 0
+            // (doc/CSBwin-src/Mouse.cpp:1369, `:1633-1641`), so `while (intResult & 1)`
+            // takes no other (`CSBCode.cpp:761`), and the rest of the pass is below: a tick
+            // that `_MagicSelection`'s `d.clockTick = CastMagic(0)` (`Magic.cpp:564`) or the
+            // VBL count made due runs now. A panel key's script, started outside a pass
+            // (`DEBT.md` H, "Three inputs bypass the mouse queue"), ends the same way:
+            // CSBWin's key is a click that a pass takes.
+        } else {
+            // `checkVBL` hands the loop its `UIM_VBL` (doc/CSBwin-src/system.cpp:624-630,
+            // CSBUI.cpp:1253-1272), and the pass runs:
+            // `do { HandleMouseEvents(_7_, 1); ... } while (intResult & 1);`
+            // (doc/CSBwin-src/CSBCode.cpp:746-761): again while an entry lets the next follow.
+            while (this.handleMouseEvents(1) & 1 && this.script === null) { /* the next entry, in the same pass */ }
+            // A handler has started a script (the fusion, the spell panel): the pass is held
+            // inside it.
+            if (this.script !== null) return;
         }
-        // `checkVBL` hands the loop its `UIM_VBL` (doc/CSBwin-src/system.cpp:624-630,
-        // CSBUI.cpp:1253-1272), and the pass runs:
-        // `do { HandleMouseEvents(_7_, 1); ... } while (intResult & 1);`
-        // (doc/CSBwin-src/CSBCode.cpp:746-761): again while an entry lets the next follow.
-        while (this.handleMouseEvents(1) & 1 && this.script === null) { /* the next entry, in the same pass */ }
-        // A handler has started a script (the fusion): the pass is held inside it.
-        if (this.script !== null) return;
 
         // `if (d.clockTick == 0) WaitForButtonFlash();` (doc/CSBwin-src/CSBCode.cpp:763).
         if (!this.ctx.loop.clockTick) waitForButtonFlash(this.ctx);
@@ -515,7 +529,8 @@ export class Game implements MainLoop {
     /**
      * Hold the loop in `script`: run it now, up to its first `VBLDelay`, and let `runFrame`
      * run the rest in place of its passes. The caller returns at once, as the pass that
-     * called a `RESTARTABLE` sequence is suspended inside it.
+     * called a `RESTARTABLE` sequence is suspended inside it; in the VBL the script ends,
+     * `runFrame` finishes that pass.
      */
     runScript(script: LoopScript): void {
         this.script = script;

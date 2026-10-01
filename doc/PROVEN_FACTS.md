@@ -4766,8 +4766,16 @@ Its tick is `_ProcessTimersViewportAndSound` (`Attack.cpp:2192-2213`), which onl
 `StartQueuedSound`, `d.Time++` after the timers, the overlay's timeout,
 `parameterMessageSequence = 0` and `scrollingText.ClockTick()`. Nothing else of the main
 loop's tick: no periodic update, no timer countdown.
-The port: `LoopScript`, `Game.runScript` and `Game.processTimersViewportAndSound`.
-Evidence: `tools/dump-loop-script.ts`.
+When the sequence returns, the pass that called it goes on where it stopped, in that VBL.
+`_MagicSelection` is reached through `HandleMouseEvents`' button 100, which stamps
+`lastTime` and returns `result`, 0 (`Mouse.cpp:1369`, `:1633-1641`), so
+`while (intResult & 1)` takes no further entry, and `if (d.clockTick == 0)` and the tick
+follow (`CSBCode.cpp:747-765`): the tick that `d.clockTick = CastMagic(0)` (`Magic.cpp:564`)
+makes due, or one the VBL count made due during a rune's flash, runs in the VBL the
+sequence returns, and the entry queued behind the click is taken in the next.
+The port: `LoopScript`, `Game.runScript` and `Game.processTimersViewportAndSound`;
+`Game.runFrame` finishes the held pass in the VBL the script ends.
+Evidence: `tools/dump-loop-script.ts`, and `tools/dump-mouse-queue.ts` for the cast and the rune.
 
 ## The fusion: a dispell cloud, then Lord Chaos's escape
 

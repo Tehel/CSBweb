@@ -603,52 +603,74 @@ async function main(): Promise<void> {
 
   // The cast button (108), by a champion with every skill mastered, so no cast fails on
   // the dice: a lone power rune names no spell (0), LO FUL is the torch (1), and LO VI is
-  // a potion, which with no flask in hand is `CastSpell`'s 3. `_MagicSelection` holds the
-  // loop through its flash (`magicSelectionScript`), so `d.clockTick` is read as the
-  // script leaves it, not from the next tick: what that tick does with it is `DEBT.md`
-  // C101's (the port finishes the held pass a VBL after the script, where CSBWin finishes
-  // it in the same VBL).
+  // a potion, which with no flask in hand is `CastSpell`'s 3. `_MagicSelection` is
+  // `RESTARTABLE` and holds the pass through its flash (`magicSelectionScript`), three
+  // VBLs for a cast, and in the VBL it returns the pass goes on where it stopped: no further entry
+  // (the click's `result` is 0), then `if (d.clockTick == 0)` and the tick
+  // (CSBCode.cpp:747-765). So a cast's tick runs in the script's last VBL, and so does a
+  // tick that was due while a rune's flash held the pass; the click queued behind is taken
+  // in the VBL after that tick.
   const [castX, castY] = centreOf(buttons.buttons18060, 108);
-  /** One cast, `d.clockTick` standing at `before` when the click is handled: the frames it holds the loop, and `d.clockTick` after. */
-  const castFrom = (runes: number[], before: boolean): { frames: number; after: boolean } => {
+  const [runeX, runeY] = centreOf(buttons.buttons18060, 101);
+  /**
+   * One click on the magic panel at (x, y), with another queued behind it and `d.clockTick`
+   * standing at `due` when it is handled. In VBLs from the click, its own counting 1: how
+   * long the script `held` the loop, the first tick (`toTick`), and the click behind (`next`).
+   */
+  const magicClick = (runes: number[], x: number, y: number, due: boolean): { held: number; toTick: number; next: number } => {
     soloParty();
     const caster = party.champions[0]!;
     caster.skills = ensureSkills([]).map((skill) => ({ ...skill, experience: 1 << 24 }));
     caster.incantation = [...runes];
     castResult = -99;
-    onClick = () => handleMouseButton(ui, 100, castX, castY);
+    const seen = { held: -1, toTick: -1, next: -1 };
+    let vbls = 0;
+    let clicks = 0;
+    onClick = () => {
+      if (clicks++ === 0) handleMouseButton(ui, 100, x, y);
+      else seen.next = vbls;
+    };
     frame(true);
+    const ticksAtClick = game.ctx.state.tickCount;
     game.onMouseClick(80, 100, 100);
-    game.ctx.loop.clockTick = before;
-    let frames = 0;
-    do { vbl(); frames++; } while (game.isRunningScript() && frames < 30);
-    return { frames, after: game.ctx.loop.clockTick };
-  };
-  /**
-   * The cast from both values of `d.clockTick`: `set` if it ends 1 from both, `cleared` if
-   * 0 from both, `untouched` if as it stood.
-   */
-  const castOnce = (runes: number[]): { frames: number; clockTick: string } => {
-    const fromClear = castFrom(runes, false);
-    const fromSet = castFrom(runes, true);
-    const clockTick = fromClear.after && fromSet.after ? 'set'
-      : !fromClear.after && !fromSet.after ? 'cleared'
-        : !fromClear.after && fromSet.after ? 'untouched' : 'inverted';
-    return { frames: fromSet.frames, clockTick };
+    game.onMouseClick(80, 100, 100);
+    game.ctx.loop.clockTick = due;
+    while (++vbls <= 30 && (seen.held < 0 || seen.toTick < 0 || seen.next < 0)) {
+      vbl();
+      if (seen.held < 0 && !game.isRunningScript()) seen.held = vbls;
+      if (seen.toTick < 0 && game.ctx.state.tickCount !== ticksAtClick) seen.toTick = vbls;
+    }
+    return seen;
   };
   const castResults = new Set<number>();
   for (const [name, runes] of [['LO', [0x60]], ['LO FUL', [0x60, 0x69]], ['LO VI', [0x60, 0x67]]] as const) {
-    const { frames, clockTick } = castOnce([...runes]);
+    const fromClear = magicClick([...runes], castX, castY, false);
+    const fromSet = magicClick([...runes], castX, castY, true);
     const result = castResult;
     const tick = result === 3 ? 0 : result;
     castResults.add(result);
-    row(`CastMagic (${name})`, String(result), frames, '-', clockTick);
+    row(`CastMagic (${name})`, String(result), fromClear.toTick, fromSet.toTick === fromSet.held, tick !== 0 ? 'set' : 'cleared');
     check(result !== -99, `the cast button cast ${name}`);
-    check(frames === 3, `the cast of ${name} holds the loop for its flash, three VBLs`);
-    if (tick !== 0) check(clockTick === 'set', `a cast of ${name} that returns ${result} makes a tick due`);
-    else check(clockTick === 'cleared', `a cast of ${name} that returns ${result} puts off a tick that was due`);
+    check(fromClear.held === 3 && fromSet.held === 3, `the cast of ${name} holds the loop for its flash, three VBLs`);
+    if (tick !== 0) {
+      check(fromClear.toTick === 3 && fromSet.toTick === 3,
+        `a cast of ${name} that returns ${result} makes a tick due, which runs in the VBL _MagicSelection returns`);
+      check(fromClear.next === 4, 'and the click queued behind it is taken in the next VBL');
+    } else {
+      check(fromClear.toTick > 3 && fromSet.toTick > 3, `a cast of ${name} that returns ${result} puts off a tick that was due`);
+    }
   }
   check(castResults.has(0) && castResults.has(1) && castResults.has(3), 'the casts return 0, 1 and 3');
+  // A rune (101) leaves `d.clockTick` alone (Magic.cpp:566-581).
+  const runeFromClear = magicClick([], runeX, runeY, false);
+  const runeAdded = party.champions[0]!.incantation.length === 1;
+  const runeFromSet = magicClick([], runeX, runeY, true);
+  row('_MagicSelection (rune 101)', runeAdded ? 'added' : 'refused', runeFromClear.toTick, runeFromSet.toTick === runeFromSet.held, 'untouched');
+  check(runeAdded && runeFromClear.held === 4 && runeFromSet.held === 4,
+    "a rune's flash holds the loop four VBLs, the cast's three and its `wvbl`, and the rune is added");
+  check(runeFromClear.toTick > 4, 'a rune brings no tick on');
+  check(runeFromSet.toTick === 4 && runeFromSet.next === 5,
+    'a tick due while the flash held the pass runs in the VBL _MagicSelection returns, and the click behind is taken in the next');
 
   // `_TurnParty` and `MoveParty` open with `if (extraTicks) d.clockTick = 1;`, and
   // `extraTicks` is on (CSBCode.cpp:7866-7869, :8084-8087, data.cpp:279). A step the

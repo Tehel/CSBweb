@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C101 | The pass a returning script held finishes a VBL after the script | S | ⏳ |
 | C102 | `MainLoop` opens with a tick; the port's first comes 15 VBLs later | S | ⏳ |
 | C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
 | C94 | Clouds in the cells beside and four rows ahead of the party are not drawn | S | ⏳ |
@@ -278,24 +277,6 @@ Paying it means an `EXPOOL` module (`E13`) with CSBWin's `Read`, `Write` and `Lo
 the raw blocks, including `enlarge`, the bones records kept there with the key's RN taken
 through the object index, the `Map` removed, and `tools/dump-vi-altar.ts` run through a
 save and a load. It must be paid before `P10` drops `runtime`.
-
-### C101 ⏳ The pass a returning script held finishes a VBL after the script
-
-`_MagicSelection` is `RESTARTABLE` (`doc/CSBwin-src/Magic.cpp:545-581`): the pass that
-calls it waits inside `HandleMouseEvents` through its flash, and in the VBL the sequence
-returns, the pass goes on where it stopped. The next queue entries follow while
-`intResult & 1`, then `if (d.clockTick == 0)`, and a tick if one is due
-(`doc/CSBwin-src/CSBCode.cpp:747-765`), so `d.clockTick = CastMagic(0)` (`Magic.cpp:564`)
-is read in that VBL. The port runs it as a `LoopScript`: `Game.runFrame`'s script branch
-resumes it and returns (`src/engine/Game.ts:380-386`), and the rest of the pass waits for
-the next VBL's. So a tick due when the script returns, made due by a cast or by the VBL
-count, runs a VBL late, and the next queued click waits a VBL. A cast that returns 0 (a
-failed cast, or `CastSpell`'s 3) is spared: CSBWin's pass skips the tick too, and the next
-VBL sets `d.clockTick` again in both. So are the fusion and the CSB win's wait, which never
-return. `tools/dump-mouse-queue.ts` reads `d.clockTick` as the cast's script leaves it and
-stops there. Paying it means `runFrame` finishing the held pass when the script ends (the
-rest of the `handleMouseEvents` loop, then the tick), with a check in `dump-mouse-queue`
-that the cast's tick runs in the script's last VBL.
 
 ### C102 ⏳ `MainLoop` opens with a tick; the port's first comes 15 VBLs later
 
@@ -796,7 +777,7 @@ Recorded so that nobody "fixes" them.
   callers' tails that anything could still see are skipped (`executeAttack` and
   `handleAttackAreaClick`, `src/renderer/ui/Attack.ts`). `_MagicSelection`'s callers
   (`handleMagicClick`, `handleUIKey`) do nothing after it, and the rest of the pass it
-  holds is `C101`'s. What is left is `HandleMouseEvents`' `lastTime = d.Time`
+  holds runs in the VBL the script ends (`Game.runFrame`). What is left is `HandleMouseEvents`' `lastTime = d.Time`
   (`doc/CSBwin-src/Mouse.cpp:1647-1649`), stamped at the click, which nothing reads after
   the credits.
 - 🚫 **A champion who dies in hand is put down on nobody.** `KillCharacter` does not end a
