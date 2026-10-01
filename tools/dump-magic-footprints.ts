@@ -29,7 +29,7 @@ import { resolve } from 'node:path';
 
 import { RoomType } from '../src/core/types';
 import { readCsbwinPartyTail } from '../src/data/CsbwinCharacters';
-import { applyCsbwinSave } from '../src/data/CsbwinSaveGame';
+import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import type { Game } from '../src/engine/Game';

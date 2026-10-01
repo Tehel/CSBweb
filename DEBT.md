@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step; two steps, in its entry |
+| E13 | Nothing owns the save pipeline | M | ⏳ `P10`'s first step |
 | C96 | Champion bones records live outside `EXPOOL`, so no CSBWin file carries them | M | ⏳ before `P10` drops the JSON |
 | C107 | A damaged Extended Features block is an error, where CSBWin reads the file as one without a block | S | ⏳ |
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
@@ -140,15 +140,13 @@ New state-representation debt goes here, and jumps the queue.
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included.
 
-### E13 ⏳ The save pipeline straddles `data/` and `engine/`, and nothing owns it
+### E13 ⏳ Nothing owns the save pipeline
 
 `P10` rebuilds the save menu and turns a save into a CSBWin `.dat` that knows its dungeon.
-The code it will stand on is spread and knotted:
+`src/data/` holds the codecs, bytes to plain records and back, and imports nothing from
+`src/engine/` but `gameTypes` and `attributes`, the records the character codec packs.
+What builds a save from a game and applies one to it is spread:
 
-- **The layers import each other both ways.** `src/data/CsbwinSaveGame.ts` imports
-  `engine/Game`, `RuntimeSave`, `DungeonSnapshot`, `DungeonState` and `CheckMonsters` to
-  install a world into a running game; `src/engine/SaveGamePayload.ts` imports six
-  `data/Csbwin*` codecs; `src/data/saves/FileSaveStore.ts` imports `engine/SaveGamePayload`.
 - **A save is built in three places**: `main.ts`'s `onCreateSave` (`:324`) and `dev.ts`'s
   quick-save each build the payload and spell out the same `SaveEntryMeta` literal, and
   the save's tail (`saveWritten`) runs before the write in one and after it in the other.
@@ -161,34 +159,21 @@ The code it will stand on is spread and knotted:
   `P10`'s "a save knows its dungeon". The boot's chooser learns whether a save was read
   through another `main.ts` global, `savedGameRead` (`:42`).
 - **A save's name is made unique twice**: `makeSaveFileName(savedAt, taken)`
-  (`src/engine/SaveGamePayload.ts:502`) and `SaveMenu.uniqueName`
+  (`src/engine/SaveGamePayload.ts:486`) and `SaveMenu.uniqueName`
   (`src/renderer/ui/SaveMenu.ts:593`), which cuts the name at its first dot. The two give
   the same name for every name the first makes.
 
-Paying it, as `P10`'s first step: `data/` holds pure codecs, bytes to plain records and
-back; one owner builds a save from a game and applies one to it, knows the data set, and
-is what the menu and F5/F9 call, with one rule for a unique save name.
-
-**The split.** Two steps, one a commit, in this order: each is a refactor, proven as
-"How to work this list", point 3, says. The first step listed is the next one, and a
-step that is done is deleted from this list along with the bullets above that it paid.
-
-1. **Nothing in `data/` installs anything** (M). `CsbwinSaveGame.ts` moves to
-   `src/engine/` (eleven tools import it). `applySaveGameState` moves beside its one
-   caller, `RuntimeSave.applyRuntimeSaveState`, without its `party` arm, which no caller
-   passes. `SAVE_FILE_EXTENSION` and `SaveHeader` move to `src/data/saves/`, which
-   `FileSaveStore` reads them from. What `data/` then imports from `engine/` is
-   `gameTypes` and `attributes`, the records the character codec packs, and nothing else.
-2. **The owner** (M). One module in `src/engine/`, built with the game, the data set
-   (`DataSet`, `src/data/DataSets.ts`) and the two things only the screen has
-   (`portraitOf`, `repackOpenChest`). It holds what `SaveGamePayload.ts` and
-   `CsbwinSaveGame.ts` do, one function that builds a save and writes it to a store (the
-   `SaveEntryMeta`, the one unique-name rule, and `saveWritten`, before the write for F5,
-   whose clock runs, and after it for the menu, whose clock is stopped), F5/F9, and how
-   the last read came out, for the boot's chooser. It reports through a callback, which
-   `main.ts` points at `updateDebug`. `src/dev.ts` goes, its `localStorage` migration
-   with it, and so does the `document` stub in `tools/dump-save-menu.ts` (`F12` names
-   it). `main.ts` keeps the wiring only.
+Paying it, as `P10`'s first step, is one commit, a refactor proven as "How to work this
+list", point 3, says: **the owner**. One module in `src/engine/`, built with the game, the
+data set (`DataSet`, `src/data/DataSets.ts`) and the two things only the screen has
+(`portraitOf`, `repackOpenChest`). It holds what `SaveGamePayload.ts` and
+`CsbwinSaveGame.ts` do, one function that builds a save and writes it to a store (the
+`SaveEntryMeta`, the one unique-name rule, and `saveWritten`, before the write for F5,
+whose clock runs, and after it for the menu, whose clock is stopped), F5/F9, and how
+the last read came out, for the boot's chooser. It reports through a callback, which
+`main.ts` points at `updateDebug`. `src/dev.ts` goes, its `localStorage` migration
+with it, and so does the `document` stub in `tools/dump-save-menu.ts` (`F12` names
+it). `main.ts` keeps the wiring only.
 
 ### E15 ⏳ The page shell
 

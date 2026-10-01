@@ -822,7 +822,7 @@ export class Game implements MainLoop {
     /**
      * The DSA global variables, where a dungeon keeps its puzzle progress. Public so a
      * loader that cannot read a save's own copy of them can keep the ones in play
-     * rather than clear them (`src/data/CsbwinSaveGame.ts`).
+     * rather than clear them (`src/engine/CsbwinSaveGame.ts`).
      */
     getDsaGlobalVariables(): number[] {
         return this.systems.dsa.getGlobalVariables();

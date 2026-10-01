@@ -1,7 +1,7 @@
 /**
  * A snapshot of everything in the dungeon that play can change. The quick-save
  * (`RuntimeSave.ts`) carries it, and a CSBWin load restores its world through it
- * (`src/data/CsbwinSaveGame.ts`). It only has to round-trip through itself: writing a
+ * (`src/engine/CsbwinSaveGame.ts`). It only has to round-trip through itself: writing a
  * byte-compatible CSBWin file is Phase 10.
  *
  * `DUNGEON_DATA_SOURCES` is the list of what it holds: every field of `DungeonData`, and

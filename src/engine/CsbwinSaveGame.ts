@@ -22,7 +22,7 @@
  * | Brightness, the three shields, the footprint ring, `freezeLifeTimer`, invisibility | block 4's 128-byte party tail (`doc/CSBwin-src/Data.h:766-782`) |
  * | The header, every level's descriptor and tables, cell flags, object chains, column index, every database record, the text arrays | the dungeon image, installed |
  * | `dsaLevelIndex`, `dsaIndex`, `specialLocations`, the extended-feature flags | the Extended Features block and `EXPOOL`, added to the same snapshot |
- * | `ITEM16`, missiles | blocks 3 and the image, through `applySaveGameState` |
+ * | `ITEM16`, missiles | blocks 3 and the image, through `RuntimeSave`'s `applySaveGameState` |
  * | The timer table and the queue that orders it | blocks 5 and 6, through `Game.restoreTimerQueue` |
  * | `d.RandomGameID`, `totalMoveCount`, `d.Byte22808`, `d.Word22592`-`d.Word22598` | `GAMEBLOCK1` (`buildBlock1State`) |
  *
@@ -38,18 +38,18 @@
  * - **`d.Word11694`** (`gameWon`) and `d.PartySleeping`, neither of which `GAMEBLOCK2`
  *   carries where this reader looks.
  */
-import { loadCsbwinWorld, type CsbwinWorld } from './CsbwinDungeonImage';
-import { readRulesOptions } from './CsbwinExtendedFeatures';
-import { readCsbwinParty, readCsbwinPartyTail } from './CsbwinCharacters';
-import { CheckMonsters } from '../engine/CheckMonsters';
-import { captureDungeonSnapshot } from '../engine/DungeonSnapshot';
-import { DungeonState } from '../engine/DungeonState';
-import type { Game } from '../engine/Game';
-import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from '../engine/RuntimeSave';
-import type { TimerRecord } from './dungeonTypes';
+import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
+import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
+import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
+import { CheckMonsters } from './CheckMonsters';
+import { captureDungeonSnapshot } from './DungeonSnapshot';
+import { DungeonState } from './DungeonState';
+import type { Game } from './Game';
+import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from './RuntimeSave';
+import type { TimerRecord } from '../data/dungeonTypes';
 import { OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
-import type { Block1State, PartyState } from '../engine/gameTypes';
+import type { Block1State, PartyState } from './gameTypes';
 
 export interface CsbwinRuntimeOptions {
     /**
@@ -279,9 +279,7 @@ export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
         // Keep what the running game has; see the module comment on `EXPOOL`.
         dsaGlobals: game.getDsaGlobalVariables(),
     }));
-    // The image's records are already big-actuator records. Set by hand rather than
-    // through `applySaveGameState`, which would call `applyBigActuators` and re-derive
-    // the word-8 of every type-47 actuator from records that already carry it.
+    // The image's records are already big-actuator records.
     if (world.save.bigActuators) game.ctx.state.dungeon.bigActuators = true;
     return world;
 }

@@ -48,6 +48,7 @@ import {
   formatSaveDate,
   formatSaveRow,
   pickLatestLoadable,
+  SAVE_FILE_EXTENSION,
   sortSaveEntries,
   type SaveEntry,
 } from '../src/data/saves/SaveStore';
@@ -60,7 +61,6 @@ import {
   decodeSavePayload,
   encodeSavePayload,
   makeSaveFileName,
-  SAVE_FILE_EXTENSION,
 } from '../src/engine/SaveGamePayload';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';

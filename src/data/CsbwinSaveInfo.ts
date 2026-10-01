@@ -6,7 +6,7 @@
  * `loadSaveGameState` already unscrambles and checksums — this module only unpacks the
  * champion names out of the raw character block it hands back.
  *
- * **These files load** (`src/data/CsbwinSaveGame.ts`), but listing one must stay far
+ * **These files load** (`src/engine/CsbwinSaveGame.ts`), but listing one must stay far
  * cheaper than loading it: a directory of saves is read on every menu open, and the
  * dungeon image behind each row is the best part of a megabyte. So this stops at blocks
  * 2 and 4 and never touches the image. The consequence is deliberate: a file whose

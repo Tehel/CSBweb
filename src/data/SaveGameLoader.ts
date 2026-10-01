@@ -6,9 +6,8 @@
  * `CsbwinExtendedFeatures.ts`'s.
  */
 
-import type { DungeonData, Item16Record, TimerRecord, DsaIndex, MissileRecord } from './dungeonTypes';
+import type { Item16Record, TimerRecord, DsaIndex, MissileRecord } from './dungeonTypes';
 import { DBType, OBJECT_ID_NULL, type ObjectID } from '../core/types';
-import { MakeBigActuators } from './CsbwinDungeonConversions';
 import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
 import {
   BLOCK1_SIZE,
@@ -22,7 +21,6 @@ import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import { buildExtendedFeaturesPrefix, readExtendedFeatures } from './CsbwinExtendedFeatures';
 import { buildImageChecksum } from './CsbwinDungeonImageWriter';
 import type { ExtendedFeaturesBlock } from './CsbwinExtendedFeatures';
-import type { PartyState } from '../engine/gameTypes';
 import {
   readI16BE,
   readU16BE,
@@ -695,61 +693,6 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     timerQueue,
     timerSequence: block2.timerSequence,
   };
-}
-
-/**
- * Restore a loaded save into the live world.
- *
- * `party` is optional only because the dungeon half of a load is useful on its own
- * (`tools/` restores worlds with no party at all). When it is given, the two
- * `GAMEBLOCK2` fields CSBWin restores at `doc/CSBwin-src/SaveGame.cpp:1636-1637` are
- * applied to it. CSBWin assigns them **straight** to `d.HandChar` and `d.MagicCaster`
- * rather than going through `SetHandOwner`/`SelectMagicCaster`, so this does too: the
- * setters validate the champion and rewrite their facing, and a load is restoring a
- * state that was already valid, not making a new choice.
- */
-export function applySaveGameState(
-  dungeon: DungeonData,
-  save: SaveGameState,
-  party?: PartyState
-): void {
-  dungeon.item16 = save.item16;
-  if (save.missiles) {
-    dungeon.databases.missiles.records = save.missiles.map((rec) => ({
-      nextObject: rec.nextObject,
-      projectileObject: rec.projectileObject,
-      rangeRemaining: rec.rangeRemaining,
-      damageRemaining: rec.damageRemaining,
-      timerIndex: rec.timerIndex,
-    }));
-    dungeon.databases.missiles.count = save.missiles.length & 0xffff;
-    dungeon.header.objectCounts[DBType.MISSILE] = save.missiles.length & 0xffff;
-  }
-  if (save.specialLocations) {
-    dungeon.specialLocations = save.specialLocations;
-  }
-  if (save.dsaLevelIndex) {
-    dungeon.dsaLevelIndex = save.dsaLevelIndex;
-  }
-  if (save.dsaIndex) {
-    dungeon.dsaIndex = save.dsaIndex;
-  }
-  if (save.extendedWallDecorations !== undefined) {
-    dungeon.extendedWallDecorations = save.extendedWallDecorations;
-  }
-  // `MakeBigActuators` now runs at load (`src/data/CsbwinDungeonConversions.ts`), so a
-  // live world is already ten-byte-shaped and this is the no-op CSBWin's own gate makes
-  // it. It stays because a world loaded with `noConvert` is not.
-  if (save.bigActuators && !dungeon.bigActuators) {
-    MakeBigActuators(dungeon);
-  }
-  if (save.spellFilterLocation !== undefined) {
-    dungeon.spellFilterLocation = save.spellFilterLocation;
-  }
-  if (party) {
-    if (save.handChar !== undefined) party.cursorOwner = save.handChar;
-    if (save.magicCaster !== undefined) party.magicCasterIndex = save.magicCaster;
-  }
 }
 
 /**

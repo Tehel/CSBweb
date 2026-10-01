@@ -35,7 +35,7 @@ import { readU16BE } from '../src/core/bytes';
 import { decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL } from '../src/core/types';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { cellFlagArraySize } from '../src/data/CsbwinDungeonImageWriter';
-import { applyCsbwinSave } from '../src/data/CsbwinSaveGame';
+import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';

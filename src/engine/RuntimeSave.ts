@@ -5,9 +5,8 @@
  * a system. Which fields of the dungeon it carries, and which it leaves to the file the
  * world was built from, is `DUNGEON_DATA_SOURCES` (`DungeonSnapshot.ts`).
  */
-import type { Item16Record, MissileRecord, TimerRecord } from '../data/dungeonTypes';
-import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
-import type { ObjectID } from '../core/types';
+import type { DungeonData, Item16Record, MissileRecord, TimerRecord } from '../data/dungeonTypes';
+import { DBType, type ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import type { GameContext } from './GameContext';
@@ -143,8 +142,6 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     const item16 = save.dungeon.item16 ?? [];
     const timers = save.dungeon.timers ?? [];
     const missiles = save.dungeon.missiles ?? [];
-    // The queue before `applySaveGameState`, which reads `timerWord8` back out of
-    // it through `DungeonState`'s lookup.
     restoreTimerQueue(
         ctx,
         timers,
@@ -152,21 +149,29 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
         save.dungeon.timerSequence ?? 0,
         save.dungeon.firstAvailTimer,
     );
-    const saveGameState: SaveGameState = {
-        item16,
-        timers,
-        missiles,
-        maxItem16: item16.length,
-        maxTimers: timers.length,
-        sequencedTimers: false,
-        extendedTimers: false,
-    };
-    applySaveGameState(ctx.state.dungeon, saveGameState);
+    applySaveGameState(ctx.state.dungeon, item16, missiles);
     // The restore replaced the ITEM16 pool wholesale; re-derive which groups are
     // active, as CSBWin's game start does after its own restore
     // (`LoadPartyLevel(d.partyLevel)`, doc/CSBwin-src/CSBCode.cpp:10491).
     ctx.footprints.restore(save.game.footprints);
     ctx.systems.monsters.reloadAfterSaveGame();
+}
+
+/**
+ * The two tables the save carries beside the snapshot, put back into the world: the
+ * `ITEM16` pool and the missile records (`DUNGEON_DATA_SOURCES`' `runtimeSave` fields).
+ */
+function applySaveGameState(dungeon: DungeonData, item16: Item16Record[], missiles: MissileRecord[]): void {
+    dungeon.item16 = item16;
+    dungeon.databases.missiles.records = missiles.map((rec) => ({
+        nextObject: rec.nextObject,
+        projectileObject: rec.projectileObject,
+        rangeRemaining: rec.rangeRemaining,
+        damageRemaining: rec.damageRemaining,
+        timerIndex: rec.timerIndex,
+    }));
+    dungeon.databases.missiles.count = missiles.length & 0xffff;
+    dungeon.header.objectCounts[DBType.MISSILE] = missiles.length & 0xffff;
 }
 
 /**

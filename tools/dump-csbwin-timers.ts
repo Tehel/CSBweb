@@ -44,7 +44,7 @@ import { RN_POISON_CLOUD } from '../src/core/spellRn';
 import { Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { applyCsbwinSave } from '../src/data/CsbwinSaveGame';
+import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { Game } from '../src/engine/Game';
 import { TimerFunction, timerLess, type TimerEntry } from '../src/engine/TimerQueue';

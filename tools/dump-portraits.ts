@@ -38,7 +38,7 @@ import {
   writePortrait,
 } from '../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
-import { buildCsbwinRuntimeState } from '../src/data/CsbwinSaveGame';
+import { buildCsbwinRuntimeState } from '../src/engine/CsbwinSaveGame';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Party } from '../src/engine/Party';

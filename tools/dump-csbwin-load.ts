@@ -41,7 +41,7 @@ import { decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/data/CsbwinSaveGame';
+import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/engine/CsbwinSaveGame';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import { DUNGEON_DATA_SOURCES, type FieldSource } from '../src/engine/DungeonSnapshot';

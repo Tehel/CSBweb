@@ -36,7 +36,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import { applyCsbwinSave } from '../src/data/CsbwinSaveGame';
+import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { TimerFunction, TimerQueue, timerLess, type TimerEntry } from '../src/engine/TimerQueue';
 import { newGame, stockGraphics } from './lib/game';

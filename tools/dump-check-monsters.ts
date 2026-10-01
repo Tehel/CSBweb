@@ -24,7 +24,7 @@ import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, encodeObjectID } from '../src/co
 import type { ObjectID } from '../src/core/types';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { CheckCelltypes } from '../src/data/CsbwinDungeonConversions';
-import { applyCsbwinSave } from '../src/data/CsbwinSaveGame';
+import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { CreatureRecord, DungeonData } from '../src/data/dungeonTypes';

@@ -29,7 +29,7 @@ export interface SaveEntry {
     /**
      * Whether LOAD will act on this row. Genuine CSBWin `.dat` saves were listed with
      * this false while their object references were undecodable; they load now
-     * (`src/data/CsbwinSaveGame.ts`). What still sets it false is a save this build
+     * (`src/engine/CsbwinSaveGame.ts`). What still sets it false is a save this build
      * cannot restore — a `SavePayload` from an older format version, say — and the row
      * is then marked with a `*` and carries a `note` saying why.
      */
@@ -132,6 +132,24 @@ export function formatSaveDetail(entry: SaveEntry | null, maxChars = 33): string
     if (!entry) return '';
     const text = entry.note ?? entry.champions.map((n) => n.trim().toUpperCase()).join(' ');
     return text.length > maxChars ? text.slice(0, maxChars) : text;
+}
+
+/** Marks the file as ours, so a stray `.json` in the folder is rejected rather than parsed. */
+export const SAVE_PAYLOAD_FORMAT = 'dmweb-save';
+
+/** The suffix a DMweb save carries on disk. */
+export const SAVE_FILE_EXTENSION = '.dmweb.json';
+
+/** What a DMweb save says of itself at the front of its file (`SavePayload.header`). */
+export interface SaveHeader {
+    format: typeof SAVE_PAYLOAD_FORMAT;
+    version: number;
+    /** `Date.now()` at the moment of the save. */
+    savedAt: number;
+    /** The dungeon level the party stood on — `position.z`. */
+    level: number;
+    /** Champion names, in party order. */
+    champions: string[];
 }
 
 /**

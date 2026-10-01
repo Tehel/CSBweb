@@ -154,7 +154,7 @@ owner) and C96 (the bones records in `EXPOOL`) come first.
   format is stable: `runtime` is refused at any other version, and `applySaveBytes` then
   loads `raw` as a genuine save. Saving the `.dat` alone ends the version bumps that
   strand saves. First, whatever only `runtime` carries has to be found a place in the
-  file, or shown to follow from it: `src/data/CsbwinSaveGame.ts` → "What is not
+  file, or shown to follow from it: `src/engine/CsbwinSaveGame.ts` → "What is not
   restored" is where to start, and `tools/dump-save-roundtrip.ts` is how to prove the file
   alone gives the game back. Both stores already list a genuine `.dat` from its own blocks
   (`src/data/saves/`).
@@ -175,7 +175,7 @@ owner) and C96 (the bones records in `EXPOOL`) come first.
 `saveSaveGameState` (`src/data/SaveGameLoader.ts`) writes all sixteen blocks, and
 `buildSavePayload` hands it the Extended Features header (`buildLiveExtendedFeatures`,
 `src/data/CsbwinExtendedFeatures.ts`), the object indirect index and the dungeon image, so
-the game's own save writes a whole file. `applyCsbwinSave` (`src/data/CsbwinSaveGame.ts`)
+the game's own save writes a whole file. `applyCsbwinSave` (`src/engine/CsbwinSaveGame.ts`)
 reads one back: `loadCsbwinWorld` (`src/data/CsbwinDungeonImage.ts`) parses the image,
 `src/data/CsbwinCharacters.ts` unpacks `CHARDESC[4]` and the party tail, portraits
 included, and `src/data/CsbwinObjectIndex.ts` translates every RN, which in a save is a

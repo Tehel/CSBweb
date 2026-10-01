@@ -373,7 +373,7 @@ is `src/data/CsbwinObjectIndex.ts`, threaded into `DungeonLoader` through
 
 ## Where the load stands
 
-**Done.** `src/data/CsbwinSaveGame.ts` (`applyCsbwinSave`) restores a genuine save into
+**Done.** `src/engine/CsbwinSaveGame.ts` (`applyCsbwinSave`) restores a genuine save into
 a running `Game`: it builds a `RuntimeSaveState` from `GAMEBLOCK2`, block 4 and the
 image, and hands it to `Game.applyRuntimeSaveState` — the same path the quick-save has
 used since format v2 — rather than swapping `Game.state.dungeon`, which half the engine

@@ -23,13 +23,14 @@
  * genuine CSBWin `csbgame*.dat` sitting beside them both become rows.
  */
 import { readCsbwinSaveInfo } from '../CsbwinSaveInfo';
-import { SAVE_FILE_EXTENSION, type SaveHeader } from '../../engine/SaveGamePayload';
 import { HANDLES_STORE, idbDelete, idbGet, idbPut } from './idb';
 import {
     extractHeaderFromPrefix,
+    SAVE_FILE_EXTENSION,
     sortSaveEntries,
     type SaveEntry,
     type SaveEntryMeta,
+    type SaveHeader,
     type SaveStore,
 } from './SaveStore';
 

@@ -18,40 +18,24 @@
  * ignores the header entirely and restores from `runtime`.
  */
 import { saveSaveGameState, type Block1, type Block2, type SaveGameState } from '../data/SaveGameLoader';
-import { applyCsbwinSave, installCsbwinWorld } from '../data/CsbwinSaveGame';
+import { applyCsbwinSave, installCsbwinWorld } from './CsbwinSaveGame';
 import { loadCsbwinWorld } from '../data/CsbwinDungeonImage';
 import { buildCsbwinCharacterBlock } from '../data/CsbwinCharacters';
 import { buildObjectIndirectIndex } from '../data/CsbwinObjectIndex';
 import { buildDungeonImage, cellFlagArraySize } from '../data/CsbwinDungeonImageWriter';
 import { buildLiveExtendedFeatures } from '../data/CsbwinExtendedFeatures';
 import type { DungeonData, TimerRecord } from '../data/dungeonTypes';
+import { SAVE_FILE_EXTENSION, SAVE_PAYLOAD_FORMAT, type SaveHeader } from '../data/saves/SaveStore';
 import type { Game } from './Game';
 import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from './RuntimeSave';
 import type { Champion } from './gameTypes';
 import { OBJECT_ID_NULL } from '../core/types';
-
-/** Marks the file as ours, so a stray `.json` in the folder is rejected rather than parsed. */
-export const SAVE_PAYLOAD_FORMAT = 'dmweb-save';
 
 /**
  * Bumped with `RUNTIME_SAVE_VERSION`. A `runtime` of another version is never
  * restored; `applySaveBytes` loads such a save's `raw` instead.
  */
 export const SAVE_PAYLOAD_VERSION = RUNTIME_SAVE_VERSION;
-
-/** The suffix a DMweb save carries on disk. */
-export const SAVE_FILE_EXTENSION = '.dmweb.json';
-
-export interface SaveHeader {
-    format: typeof SAVE_PAYLOAD_FORMAT;
-    version: number;
-    /** `Date.now()` at the moment of the save. */
-    savedAt: number;
-    /** The dungeon level the party stood on — `position.z`. */
-    level: number;
-    /** Champion names, in party order. */
-    champions: string[];
-}
 
 export interface SavePayload {
     header: SaveHeader;
@@ -460,7 +444,7 @@ function looksLikeJson(bytes: Uint8Array): boolean {
  * `SavePayloadError` because the menu's status line is the only place they can be
  * shown, and it wants a short line rather than a stack. One of our saves from an older
  * build loads through its `raw`, the CSBWin file it carries: what only `runtime` holds
- * is lost with it (`src/data/CsbwinSaveGame.ts` → "What is not restored").
+ * is lost with it (`src/engine/CsbwinSaveGame.ts` → "What is not restored").
  */
 export function applySaveBytes(game: Game, bytes: Uint8Array): void {
     if (!looksLikeJson(bytes)) {

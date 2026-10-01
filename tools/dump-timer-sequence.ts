@@ -23,7 +23,7 @@ import { resolve } from 'node:path';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { applyCsbwinSave } from '../src/data/CsbwinSaveGame';
+import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import type { Game } from '../src/engine/Game';
 import { buildSavePayload, decodeBase64ToBytes } from '../src/engine/SaveGamePayload';
 import { TimerFunction, TimerQueue, timerLess } from '../src/engine/TimerQueue';
