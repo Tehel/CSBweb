@@ -97,17 +97,22 @@ export class GameSaves {
      * shading and the cursor, would last no frame here. And the tail runs before the
      * write, on the world the payload holds, not once the write comes back: a failed
      * write keeps the re-attached monsters.
+     *
+     * The file's bytes are made at once, before anything is awaited: the payload's
+     * `runtime.party` is the live party (`getRuntimeSaveState`), which a game running on
+     * through the listing would move on from the dungeon saved beside it.
      */
     async save(store: SaveStore, clock: SaveClock, taken?: ReadonlySet<string>): Promise<SaveEntryMeta> {
         if (clock === 'running') this.screen.repackOpenChest();
         const payload = buildSavePayload(this.game, {
             portraitOf: (champion) => this.screen.portraitOf(champion),
         });
+        const bytes = encodeSavePayload(payload);
         if (clock === 'running') this.game.saveWritten();
         const names = taken ?? new Set((await store.list().catch(() => [])).map((entry) => entry.name));
         const { savedAt, level, champions } = payload.header;
         const meta: SaveEntryMeta = { name: makeSaveFileName(savedAt, names), savedAt, level, champions };
-        await store.write(meta, encodeSavePayload(payload));
+        await store.write(meta, bytes);
         if (clock === 'stopped') this.game.saveWritten();
         return meta;
     }

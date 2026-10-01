@@ -672,9 +672,13 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
 
 /**
  * A save store in memory. `onWrite` runs as a write arrives, before it is kept; a store
- * made to `fail` rejects every write.
+ * made to `fail` rejects every write; `onList` runs as the store is listed.
  */
-function memoryStore(onWrite: () => void = () => {}, fail = false): SaveStore & { files: Map<string, Uint8Array> } {
+function memoryStore(
+  onWrite: () => void = () => {},
+  fail = false,
+  onList: () => void = () => {},
+): SaveStore & { files: Map<string, Uint8Array> } {
   const files = new Map<string, Uint8Array>();
   const entries: SaveEntry[] = [];
   return {
@@ -683,7 +687,10 @@ function memoryStore(onWrite: () => void = () => {}, fail = false): SaveStore & 
     isSupported: () => true,
     isReady: () => true,
     connect: async () => true,
-    list: async () => sortSaveEntries(entries),
+    list: async () => {
+      onList();
+      return sortSaveEntries(entries);
+    },
     read: async (id) => {
       const bytes = files.get(id);
       if (!bytes) throw new Error(`no save ${id}`);
@@ -878,6 +885,16 @@ async function checkSaveCall(): Promise<void> {
     const refusedQuick = await attempt(quickFails.saves.save(quickFails.store, 'running'));
     console.log(`  clock running, the write fails: ${refusedQuick}, tail run ${quickFails.game.canRestartFromSavegame()}`);
     check(refusedQuick !== 'written' && quickFails.game.canRestartFromSavegame(), 'and has run it when the write fails');
+
+    // F5 lists the store while the game runs on, and the payload's party is the live one.
+    const hurt = await stage(false);
+    const champion = hurt.game.ctx.party.state.champions[0]!;
+    const atTheKey = champion.attributes.health;
+    const slow = memoryStore(() => {}, false, () => { champion.attributes.health = 1; });
+    const late = await hurt.saves.save(slow, 'running');
+    const held = decodeSavePayload(await slow.read(late.name)).runtime.party.champions[0]!.attributes.health;
+    console.log(`  clock running, a champion hurt while the store is listed: health ${atTheKey} at the key, ${held} in the file`);
+    check(held === atTheKey, 'F5\'s file holds the party as it stood at the key, with the dungeon it was saved with');
 
     // A read through the owner, and what the boot's chooser then learns of it.
     const reader = await stage(false);
