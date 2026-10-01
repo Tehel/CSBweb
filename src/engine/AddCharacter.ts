@@ -11,8 +11,7 @@
 import { DescIndexOfRecord } from './objectIndex';
 import { DBType, OBJECT_ID_NULL, type Direction, type ObjectID } from '../core/types';
 import type { DatabaseRecord, HeroInventoryItem, PresetHero } from '../data/dungeonTypes';
-import { CHARFLAG_MALE } from '../data/CsbwinCharacters';
-import { emptyPossessions, type Champion } from './gameTypes';
+import { CHARFLAG_MALE, emptyPossessions, type Champion } from './gameTypes';
 import { makeAddCharacterAttributes } from './attributes';
 import { createSkillsFromSubskillLevels } from './skills';
 

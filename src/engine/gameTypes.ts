@@ -37,6 +37,15 @@ export function getChampionPossession(champion: Champion, slot: number): ObjectI
 }
 
 /**
+ * `CHARFLAG_attackDisable` (`doc/CSBwin-src/CSB.h:2460`) — the champion is busy.
+ * `DisableCharacterAction` sets it when the champion has no busy timer yet
+ * (`Magic.cpp:528-531`), `EnableCharacterAction` clears it (`Timer.cpp:2646`), and it
+ * shades the attack hand (`Character.cpp:4875`).
+ */
+export const CHARFLAG_ATTACK_DISABLE = 0x0008;
+/** `CHARFLAG_male` — `AddCharacter` ORs it in for an 'M' hero (`Character.cpp:596`). */
+export const CHARFLAG_MALE = 0x10;
+/**
  * `CHARFLAG_cursor` (`doc/CSBwin-src/CSB.h:2462`): `DrawCharacterState` draws the
  * champion's name again, over the box's name rectangle when their inventory is closed
  * (`doc/CSBwin-src/Character.cpp:1310-1356`).

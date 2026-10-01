@@ -26,7 +26,7 @@ import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/en
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import type { Champion, PartyState } from '../src/engine/gameTypes';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
-import { CHARFLAG_ATTACK_DISABLE } from '../src/data/CsbwinCharacters';
+import { CHARFLAG_ATTACK_DISABLE } from '../src/engine/gameTypes';
 import type { LoopScript } from '../src/engine/LoopState';
 import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';

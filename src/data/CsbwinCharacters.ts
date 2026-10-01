@@ -21,23 +21,12 @@
  * - `portrait[1]` at 336 is really 464 bytes — `FILL337[800-337]` is the rest of it —
  *   and holds the champion's portrait **bitmap**. See `readPortrait` below.
  */
-import { getChampionPossession, type Champion, type PartyState, type Skill } from '../engine/gameTypes';
+import { CHARFLAG_MALE, getChampionPossession, type Champion, type PartyState, type Skill } from '../engine/gameTypes';
 import type { Attribute } from '../engine/attributes';
 import { OBJECT_ID_NULL, type i8, type i16, type ui8, type ui16, type ObjectID } from '../core/types';
 import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import { readI16BE, readI32BE, readI8, readU16BE, readU32BE, readU8 } from '../core/bytes';
-
-/**
- * `CHARFLAG_attackDisable` (`doc/CSBwin-src/CSB.h:2460`) — the champion is busy.
- * `DisableCharacterAction` sets it when the champion has no busy timer yet
- * (`Magic.cpp:528-531`), `EnableCharacterAction` clears it (`Timer.cpp:2646`), and it
- * shades the attack hand (`Character.cpp:4875`).
- */
-export const CHARFLAG_ATTACK_DISABLE = 0x0008;
-
-/** `CHARFLAG_male` — `AddCharacter` ORs it in for an 'M' hero (`Character.cpp:596`). */
-export const CHARFLAG_MALE = 0x10;
 
 /** The seven `ATTRIBUTE` triples start here, three bytes each, `FILL91` after them. */
 const ATTRIBUTES_OFFSET = 70;

@@ -67,8 +67,8 @@ import type { RuntimeSaveState } from '../src/engine/RuntimeSave';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { buildSavePayload, decodeBase64ToBytes, encodeSavePayload, applySaveBytes, SAVE_PAYLOAD_VERSION } from '../src/engine/SaveGamePayload';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
-import { CHARFLAG_ATTACK_DISABLE, readCsbwinCharacter } from '../src/data/CsbwinCharacters';
-import type { Champion } from '../src/engine/gameTypes';
+import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
+import { CHARFLAG_ATTACK_DISABLE, type Champion } from '../src/engine/gameTypes';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 

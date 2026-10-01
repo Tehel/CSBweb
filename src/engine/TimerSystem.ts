@@ -3,9 +3,8 @@ import type { CsbRandom } from '../core/random';
 import { sb, sw } from '../core/intCast';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
-import { CHARFLAG_PORTRAIT_CHANGED, getChampionPossession, type PartyState } from './gameTypes';
+import { CHARFLAG_ATTACK_DISABLE, CHARFLAG_PORTRAIT_CHANGED, getChampionPossession, type PartyState } from './gameTypes';
 import { selectPaletteForLightLevel } from './LightLevel';
-import { CHARFLAG_ATTACK_DISABLE } from '../data/CsbwinCharacters';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_MONSTER_DEATH, RN_POISON_CLOUD, RN_FFE4,
   isMagicSpellRn,

@@ -38,9 +38,8 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { AttackType } from '../src/engine/monsterTypes';
 import { graphicsTablesOf, newContext, newGame } from './lib/game';
 import { check, finish } from './lib/check';
-import { emptyPossessions, getChampionPossession } from '../src/engine/gameTypes';
+import { CHARFLAG_ATTACK_DISABLE, emptyPossessions, getChampionPossession } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
-import { CHARFLAG_ATTACK_DISABLE } from '../src/data/CsbwinCharacters';
 
 /** Enough samples that the `random()&15` in the distance formula averages out. */
 const SAMPLES = 400;
