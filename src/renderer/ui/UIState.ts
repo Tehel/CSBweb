@@ -190,11 +190,12 @@ export interface UIState {
   /** A listed save out of the store (`GameSaves.open`). */
   readonly onReadSave: (entry: SaveEntry) => Promise<OpenedSave>;
   /**
-   * Build a save and write it to the store; resolves to the row it was written as
-   * (`GameSaves.save`, `src/engine/GameSaves.ts`). A hook because serializing the world
-   * is the engine's business, not the UI's.
+   * Build a save and write it to the store, over the listed save `over` or as a new row
+   * for `null`; resolves to the row it was written as (`GameSaves.save`,
+   * `src/engine/GameSaves.ts`). A hook because serializing the world is the engine's
+   * business, not the UI's.
    */
-  readonly onSaveGame: () => Promise<SaveEntry>;
+  readonly onSaveGame: (over: SaveEntry | null) => Promise<SaveEntry>;
   /** Restore an opened save into the running game. Throws with a short message on refusal. */
   readonly onRestoreSave: (save: OpenedSave) => void;
   /**

@@ -338,7 +338,10 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    is a stack array and its chooser is a four-button menu; neither survives contact with
    "save as often as you like". The list panel is built by tiling graphic 0's own title
    panel downward over the full-width button frame — the same self-blit technique the
-   1/2/4-option layouts use — so no new art is invented.
+   1/2/4-option layouts use — so no new art is invented. SAVE writes over the selected
+   save, as CSBWin's writes over the slot chosen; with no empty slot to choose, a save of
+   its own is made from the list's first row, "NEW SAVE", which the load-only chooser
+   does not have.
 2. **Per-entry date, level and party**, where CSBWin shows a filename and a rank letter.
    The rank letter is what the date replaces; the ordering rule is the same one
    (`modifiedTime`), only shown directly and newest-first rather than oldest-letter-first.

@@ -305,7 +305,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // engine's, so they come back through these. The menu has stopped the clock.
         onListSaves: () => saves.list(),
         onReadSave: (entry) => saves.open(entry),
-        onSaveGame: () => saves.save('stopped', false),
+        onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
         onRestoreSave: (save) => saves.read(save),
         // The boot's chooser only: its read failed, and `tag01efee` follows.
         onRestoreFailed: (error) => {

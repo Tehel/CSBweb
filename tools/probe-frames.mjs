@@ -185,13 +185,15 @@ await canvasClick(240, 100, 0); await wait(600);
 console.log('state: attack panel');      await shot('05-attack');
 // The disk icon (`buttons17760[1]`, id 140) raises the save/load screen over the
 // viewport. Reopen an inventory first — the attack-panel step backed out of it. The
-// browser store was emptied on boot, so the list is reliably empty and this frame pins
-// the panel itself: graphic 0, the interior band tiled down over the full-width button
-// frame, and the two bottom buttons with LOAD unlabelled because nothing is selected.
+// browser store was emptied on boot, so the list is reliably its "NEW SAVE" row alone
+// and this frame pins the panel itself: graphic 0, the interior band tiled down over the
+// full-width button frame, and the two bottom buttons with LOAD unlabelled because that
+// row holds nothing to load.
 await canvasClick(15, 15, 2);  await wait(600);
 await canvasClick(177, 40, 0); await wait(900);
 console.log('state: save menu');         await shot('06-savemenu');
-// SAVE (id 213, x 123..207, y 138..152), for the resume from the entrance below.
+// SAVE (id 213, x 123..207, y 138..152), a new save from that row, for the resume from
+// the entrance below.
 await canvasClick(165, 145, 0); await wait(1200);
 
 // The dungeon entrance, with the intro left on. The wait has to cover the whole title

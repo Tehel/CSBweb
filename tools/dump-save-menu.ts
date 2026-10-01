@@ -33,12 +33,16 @@
  *    the write for the menu, whose clock is stopped, and before it for F5, whose clock
  *    runs. Run against a store in memory, which two games of two data sets then share:
  *    each lists its own set's saves. F5 writes over its playthrough's quick-save, and
- *    F9 loads its playthrough's newest save. And a file that
+ *    F9 loads its playthrough's newest save. SAVE over a listed save writes that row.
+ *    And a file that
  *    names no playthrough, loaded: its game joins the playthrough of a save of its data
  *    set and party, or draws one.
  * 9. **The store's upgrade.** The rows of the store's first version, a CSBWin file or a
  *    `.dmweb.json` around one, made today's (`src/data/saves/legacyRows.ts`). The page
  *    runs it once, inside IndexedDB's upgrade; here it runs over rows built by hand.
+ * 10. **The selection.** The menu driven by its own clicks and keys over that store:
+ *    the full menu opens on its "new save" row, where LOAD is inert and SAVE makes a
+ *    save; on a save, SAVE writes over it. The load-only chooser has no such row.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -722,7 +726,7 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
     portraitOf: () => undefined,
     repackOpenChest: () => Inventory.repackOpenChest(ui),
   }, () => {});
-  const row = await saves.save('running', true);
+  const row = await saves.save('running', 'quick');
   const fresh = await loadGame();
   applySaveBytes(fresh, await store.read(row.id));
   const saved = chestContents(fresh, chest);
@@ -854,12 +858,12 @@ async function checkSaveCall(): Promise<void> {
   Date.now = () => now;
   try {
     const menu = await stage(false);
-    const first = await menu.saves.save('stopped', false);
+    const first = await menu.saves.save('stopped', 'new');
     console.log(`  clock stopped: tail run at the write ${menu.tailAtWrite()}, after it ${menu.game.canRestartFromSavegame()}`);
     check(menu.tailAtWrite() === false && menu.game.canRestartFromSavegame(),
       'the menu\'s save runs its tail once the file is written (SaveGame.cpp:1245-1260)');
-    const second = await menu.saves.save('stopped', false);
-    const third = await menu.saves.save('running', true);
+    const second = await menu.saves.save('stopped', 'new');
+    const third = await menu.saves.save('running', 'quick');
     console.log(`  names: ${first.name}, ${second.name}, ${third.name}`);
     check(first.name === makeSaveFileName(Date.now()), 'a save in an empty store takes the plain name');
     check(second.name === makeSaveFileName(Date.now(), new Set([first.name]))
@@ -878,7 +882,7 @@ async function checkSaveCall(): Promise<void> {
 
     // A second F5 writes over the first: the playthrough has one slot.
     now += 60_000;
-    const fourth = await menu.saves.save('running', true);
+    const fourth = await menu.saves.save('running', 'quick');
     const afterSlot = await menu.saves.list();
     console.log(`  F5 again, a minute later: ${fourth.id === third.id ? 'the same row' : 'ANOTHER ROW'}, ${menu.store.files.size} files, listed ${afterSlot[0]?.id === third.id ? 'first' : 'NOT FIRST'}`);
     check(fourth.id === third.id && fourth.name === third.name && menu.store.files.size === 3,
@@ -888,23 +892,54 @@ async function checkSaveCall(): Promise<void> {
     check(afterSlot.filter((e) => !e.quick).map((e) => e.id).sort().join() === [first.id, second.id].sort().join()
       && afterSlot.filter((e) => !e.quick).every((e) => e.savedAt < now),
       'and the menu\'s saves are as they were');
-    const fifth = await menu.saves.save('stopped', false);
+    const fifth = await menu.saves.save('stopped', 'new');
     check(fifth.id !== third.id && menu.store.files.size === 4, 'the menu\'s SAVE still makes a row of its own');
-    now -= 60_000;
+
+    // SAVE over a listed save: the row keeps its key and its name, and takes the file.
+    now += 60_000;
+    menu.game.ctx.party.state.champions[0]!.name = 'LATER';
+    const over = await menu.saves.save('stopped', first);
+    const afterOver = await menu.saves.list();
+    const overParty = readCsbwinSaveInfo(await menu.store.read(first.id))?.champions.join('/');
+    console.log(`  SAVE over the first save, the champion renamed: ${over.id === first.id ? 'the same row' : 'ANOTHER ROW'}, ${menu.store.files.size} files, its file's party ${overParty}, listed ${afterOver[0]?.id === first.id ? 'first' : 'NOT FIRST'}`);
+    check(over.id === first.id && over.name === first.name && menu.store.files.size === 4,
+      'SAVE over a listed save writes that row, under its key and its name');
+    check(over.savedAt === now && over.champions.join() === 'LATER' && overParty === 'LATER' && afterOver[0]?.id === first.id,
+      'which takes the new file, its party and its date, and is listed first');
+    check(afterOver.filter((e) => e.id !== first.id).every((e) => e.champions.join() === 'DAROO' && e.savedAt < now),
+      'and the other saves are as they were');
+
+    // Over F5's slot: the row is the menu's save from then on, and F5 makes another.
+    const overQuick = await menu.saves.save('stopped', third);
+    const nextQuick = await menu.saves.save('running', 'quick');
+    console.log(`  SAVE over F5's slot: ${overQuick.id === third.id ? 'the same row' : 'ANOTHER ROW'}, quick ${overQuick.quick}; F5 after it: ${nextQuick.id === third.id ? 'THE SAME ROW' : 'a row of its own'}, ${menu.store.files.size} files`);
+    check(overQuick.id === third.id && !overQuick.quick, 'a quick-save that SAVE writes over is the menu\'s save');
+    check(nextQuick.quick && nextQuick.id !== third.id && menu.store.files.size === 5,
+      'so the next F5 leaves it alone, and makes a slot of its own');
+
+    // Over a save of another playthrough: the row is the saved game's.
+    const other = await stage(false, DEFAULT_DATA_SET, menu.store, 'WUUF');
+    const taken = await other.saves.save('stopped', second);
+    const otherPlaythrough = other.game.ctx.state.block1.randomGameID;
+    console.log(`  SAVE over a save of another playthrough: ${taken.id === second.id ? 'the same row' : 'ANOTHER ROW'}, ${taken.playthrough === otherPlaythrough ? 'the saved game\'s' : 'ANOTHER'} playthrough, party ${taken.champions.join('/')}`);
+    check(second.playthrough === playthrough && otherPlaythrough !== playthrough, 'another game is another playthrough than the save\'s');
+    check(taken.id === second.id && taken.playthrough === otherPlaythrough && taken.champions.join() === 'WUUF' && menu.store.files.size === 5,
+      'its SAVE over that save makes the row its own: its playthrough and its party');
+    now -= 120_000;
 
     const menuFails = await stage(true);
-    const refused = await attempt(menuFails.saves.save('stopped', false));
+    const refused = await attempt(menuFails.saves.save('stopped', 'new'));
     console.log(`  clock stopped, the write fails: ${refused}, tail run ${menuFails.game.canRestartFromSavegame()}`);
     check(refused !== 'written' && !menuFails.game.canRestartFromSavegame(),
       'a failed write skips the tail, as SaveError jumps past it (SaveGame.cpp:1264)');
 
     const quick = await stage(false);
-    await quick.saves.save('running', true);
+    await quick.saves.save('running', 'quick');
     console.log(`  clock running: tail run at the write ${quick.tailAtWrite()}`);
     check(quick.tailAtWrite() === true, 'F5\'s save runs its tail before the write, on the world the file holds');
 
     const quickFails = await stage(true);
-    const refusedQuick = await attempt(quickFails.saves.save('running', true));
+    const refusedQuick = await attempt(quickFails.saves.save('running', 'quick'));
     console.log(`  clock running, the write fails: ${refusedQuick}, tail run ${quickFails.game.canRestartFromSavegame()}`);
     check(refusedQuick !== 'written' && quickFails.game.canRestartFromSavegame(), 'and has run it when the write fails');
 
@@ -915,7 +950,7 @@ async function checkSaveCall(): Promise<void> {
     const atTheKey = champion.attributes.health;
     const slow = memoryStore(() => {}, false, () => { champion.attributes.health = 1; });
     const slowSaves = new GameSaves(slowGame, DEFAULT_DATA_SET, slow, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
-    const late = await slowSaves.save('running', true);
+    const late = await slowSaves.save('running', 'quick');
     const held = readCsbwinCharacter(loadSaveGameState(await slow.read(late.id)).characterBlock!, 0).champion.attributes.health;
     console.log(`  clock running, a champion hurt while the store is listed: health ${atTheKey} at the key, ${held} in the file`);
     check(held === atTheKey, 'F5\'s file holds the party as it stood at the key, with the dungeon it was saved with');
@@ -981,12 +1016,12 @@ async function checkSaveCall(): Promise<void> {
     const csbSet = dataSetFor('csb');
     const dm = await stage(false, DEFAULT_DATA_SET, shared, 'DAROO');
     const csb = await stage(false, csbSet, shared, 'LEYLA');
-    const dmOld = await dm.saves.save('stopped', false);
-    const csbSame = await csb.saves.save('stopped', false);
+    const dmOld = await dm.saves.save('stopped', 'new');
+    const csbSame = await csb.saves.save('stopped', 'new');
     now += 60_000;
     const dmNew = await dm.saves.quickSave().then(async () => (await dm.saves.list())[0]!);
     now += 60_000;
-    const csbNew = await csb.saves.save('stopped', false);
+    const csbNew = await csb.saves.save('stopped', 'new');
     const names = (entries: SaveEntry[]): string => entries.map((e) => e.name).join(', ');
     const dmList = await dm.saves.list();
     const csbList = await csb.saves.list();
@@ -1019,7 +1054,7 @@ async function checkSaveCall(): Promise<void> {
 
     // The menu's save, once it is the newer of the playthrough's.
     now += 60_000;
-    const dmMenu = await dm.saves.save('stopped', false);
+    const dmMenu = await dm.saves.save('stopped', 'new');
     await dm.saves.quickLoad();
     check(reports[reports.length - 1] === `Quick-loaded ${dmMenu.name}`, 'and the menu\'s save when that is the newer');
 
@@ -1036,8 +1071,8 @@ async function checkSaveCall(): Promise<void> {
       'F9 in a playthrough with no save finds none (SaveGame.cpp:1585), whatever the others hold, and loads nothing');
 
     // Each playthrough's F5 has its own slot.
-    const strangerQuick = await stranger.saves.save('running', true);
-    const dmQuick = await dm.saves.save('running', true);
+    const strangerQuick = await stranger.saves.save('running', 'quick');
+    const dmQuick = await dm.saves.save('running', 'quick');
     check(strangerQuick.id !== dmNew.id && dmQuick.id === dmNew.id && shared.files.size === 6,
       'and each playthrough\'s F5 writes its own slot');
 
@@ -1051,7 +1086,7 @@ async function checkSaveCall(): Promise<void> {
       const early = await stage(false, dataSet, kept, name);
       early.game.ctx.state.block1.randomGameID = 0;
       now += 60_000;
-      return early.saves.save('stopped', quick);
+      return early.saves.save('stopped', quick ? 'quick' : 'new');
     };
     const load = async (row: SaveEntry, dataSet = DEFAULT_DATA_SET) => {
       const loaded = await stage(false, dataSet, kept, 'WUUF');
@@ -1072,7 +1107,7 @@ async function checkSaveCall(): Promise<void> {
       'the draw is not the game\'s stream: d.RandomNumber is the file\'s, as after CSBWin\'s load');
 
     now += 60_000;
-    const carried = await alone.saves.save('stopped', false);
+    const carried = await alone.saves.save('stopped', 'new');
     const joiner = await load(old);
     const stillOld = (await kept.list(null)).find((e) => e.id === old.id);
     console.log(`  the loaded game saved, and the file loaded again: ${idOf(joiner) === idOf(alone) ? 'the saved game\'s playthrough' : 'ANOTHER'}; the old row's: ${stillOld?.playthrough}`);
@@ -1105,9 +1140,130 @@ async function checkSaveCall(): Promise<void> {
       'and in the game that saved, loads that save, not the newer file that names none');
 
     // Nor does F5 write over a quick-save that names none.
-    const quickOver = await alone.saves.save('running', true);
+    const quickOver = await alone.saves.save('running', 'quick');
     check(quickOver.id !== newest.id && (await kept.list(null)).find((e) => e.id === newest.id)?.playthrough === 0,
       'F5 makes its own slot beside a quick-save that names no playthrough');
+  } finally {
+    Date.now = realNow;
+  }
+}
+
+/* ------------------------------------------------------------ 10. the selection ---- */
+
+/**
+ * The disk menu driven by its own clicks and keys, its hooks on a `GameSaves` over a
+ * store in memory: what is selected when it opens, and what SAVE writes for it.
+ */
+async function checkSelection(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== the menu\'s selection, and what SAVE writes ===');
+  const game = await loadGame();
+  game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
+  const store = memoryStore();
+  const saves = new GameSaves(game, DEFAULT_DATA_SET, store, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
+  const ui = newUIState(graphics, game.ctx, {
+    onListSaves: () => saves.list(),
+    onReadSave: (listed) => saves.open(listed),
+    onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
+    onRestoreSave: (save) => saves.read(save),
+  });
+
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  const LEFT = 2;
+  /** Wait out a listing, or a press and the save or load behind it. */
+  const settled = async (): Promise<void> => {
+    for (let i = 0; i < 300 && ui.saveMenu && (ui.saveMenu.busy || ui.saveMenu.press); i++) {
+      await new Promise((done) => setTimeout(done, 10));
+    }
+  };
+  const clickRow = (row: number): void =>
+    SaveMenu.saveMenuClick(ui, VIEWPORT_X + g.textX, VIEWPORT_Y + g.rowFirstY + row * g.rowStep, LEFT);
+  const clickButton = (id: number): void => {
+    const rect = menuButtonRect(menuButtonList(ui, 4, false), id);
+    if (!rect) throw new Error(`the four-option set has no button ${id}`);
+    SaveMenu.saveMenuClick(ui, rect.x1 + 1, rect.y1 + 1, LEFT);
+  };
+  const selection = (): string => {
+    const state = ui.saveMenu;
+    if (!state) return 'no menu';
+    const selected = SaveMenu.selectedEntry(state);
+    return `row ${state.selected} of ${state.entries.length} saves, ${selected ? `the save of ${formatSaveDate(selected.savedAt)} ${new Date(selected.savedAt).getUTCMinutes()}'` : 'no save'}`;
+  };
+
+  const realNow = Date.now;
+  let now = Date.UTC(2026, 8, 13, 14, 5, 6);
+  Date.now = () => now;
+  try {
+    SaveMenu.openSaveMenu(ui);
+    await settled();
+    const state = ui.saveMenu!;
+    console.log(`  the full menu, an empty store: ${selection()}`);
+    check(state.selected === 0 && SaveMenu.selectedEntry(state) === null && state.entries.length === 0,
+      'the full menu opens on its "new save" row, the one row of an empty store');
+    clickButton(g.loadButtonId);
+    check(state.press === null && SaveMenu.isSaveMenuOpen(ui), 'where LOAD is inert: the row holds nothing to load');
+
+    clickButton(g.saveButtonId);
+    await settled();
+    const made = SaveMenu.selectedEntry(state);
+    console.log(`  SAVE: ${store.files.size} file, ${selection()}, "${state.message}"`);
+    check(store.files.size === 1 && made !== null && made.savedAt === now && state.message === 'GAME SAVED',
+      'SAVE there makes a save, which is the selection afterwards');
+
+    now += 60_000;
+    clickButton(g.saveButtonId);
+    await settled();
+    console.log(`  SAVE again, a minute later: ${store.files.size} file, ${selection()}`);
+    check(store.files.size === 1 && SaveMenu.selectedEntry(state)?.id === made?.id && SaveMenu.selectedEntry(state)?.savedAt === now,
+      'SAVE on a save writes over it: one file still, with the new date');
+
+    now += 60_000;
+    clickRow(0);
+    check(SaveMenu.selectedEntry(state) === null, 'a click on the first row selects "new save"');
+    clickButton(g.saveButtonId);
+    await settled();
+    const newer = SaveMenu.selectedEntry(state);
+    console.log(`  the first row, then SAVE: ${store.files.size} files, ${selection()}`);
+    check(store.files.size === 2 && newer !== null && newer.id !== made?.id && state.selected === 1,
+      'and SAVE there makes another, the first of the saves');
+
+    // The keys run over the same rows.
+    SaveMenu.saveMenuKey(ui, 'End');
+    const atEnd = SaveMenu.selectedEntry(state)?.id;
+    SaveMenu.saveMenuKey(ui, 'Home');
+    const atHome = SaveMenu.selectedEntry(state);
+    SaveMenu.saveMenuKey(ui, 'Enter');
+    check(atEnd === made?.id && atHome === null && state.selected === 0, 'End is the oldest save, and Home the "new save" row');
+    check(state.press === null, 'where Enter, which is LOAD, does nothing');
+
+    // LOAD takes the selected save.
+    game.ctx.party.state.champions[0]!.name = 'CHANGED';
+    clickRow(2);
+    check(SaveMenu.selectedEntry(state)?.id === made?.id, 'a click on the third row selects the older save');
+    clickButton(g.loadButtonId);
+    await settled();
+    const loadedParty = game.ctx.party.state.champions.map((c) => c.name).join('/');
+    console.log(`  the older save, then LOAD: ${selection()}, party ${loadedParty}`);
+    check(!SaveMenu.isSaveMenuOpen(ui) && loadedParty === 'DAROO', 'LOAD reads it into the game, and the menu closes');
+
+    ui.partyState = game.ctx.party.state;
+    SaveMenu.openSaveMenu(ui);
+    await settled();
+    console.log(`  the full menu again: ${selection()}`);
+    check(ui.saveMenu !== null && SaveMenu.selectedEntry(ui.saveMenu) === null && ui.saveMenu.entries.length === 2,
+      'the full menu opens on "new save" whatever the store holds');
+    SaveMenu.closeSaveMenu(ui);
+
+    // The boot's chooser lists the saves alone.
+    SaveMenu.openSaveMenu(ui, 'loadOnly');
+    await settled();
+    const chooser = ui.saveMenu!;
+    console.log(`  the load-only chooser: ${selection()}`);
+    check(chooser.selected === 0 && SaveMenu.selectedEntry(chooser)?.id === newer?.id,
+      'the load-only chooser has no "new save" row: it opens on the newest save');
+    clickButton(g.saveButtonId);
+    check(chooser.press === null && store.files.size === 2, 'and its SAVE is inert');
+    SaveMenu.closeSaveMenu(ui);
   } finally {
     Date.now = realNow;
   }
@@ -1188,6 +1344,7 @@ async function main(): Promise<void> {
   await checkQuickSaveOverOpenChest(graphics);
   checkPressAnimation(graphics);
   await checkSaveCall();
+  await checkSelection(graphics);
   await checkUpgrade();
   finish();
 }

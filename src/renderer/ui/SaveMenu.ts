@@ -23,6 +23,13 @@
  * empty save slot: `strcpy(fNames[i],"   ")` blanks the name and the button sits there
  * inert (`doc/CSBwin-src/CSBCode.cpp:9772`).
  *
+ * ## The "new save" row
+ *
+ * SAVE writes over the selected save, as CSBWin's writes over the slot chosen
+ * (`_SelectSaveGame`, `:9738`). A save of its own is made from the list's first row,
+ * "NEW SAVE", which only the full menu has and which is its selection when it opens.
+ * With that row selected there is nothing to load, so LOAD is inert.
+ *
  * ## Modality and the clock
  *
  * `_WaitForMenuSelect` nulls `SecondaryButtonList` and both `pKeyXlate`s and replaces
@@ -79,6 +86,9 @@ const LOAD_LABEL_X = 59;
 const SAVE_LABEL_X = 166;
 const BOTTOM_LABEL_Y = 114;
 
+/** The full menu's first row: SAVE with it selected makes a new save. */
+const NEW_SAVE_LABEL = 'NEW SAVE';
+
 /** Ids for the parts of the screen CSBWin has no button for. 210..213 stay CSBWin's. */
 const BTN_LOAD = 212;
 const BTN_SAVE = 213;
@@ -118,7 +128,11 @@ export interface SaveMenuState {
   mode: SaveMenuMode;
   /** The running data set's saves, newest first (`UIState.onListSaves`). */
   entries: SaveEntry[];
-  /** Index into `entries`, or -1. LOAD is inert while it is -1. */
+  /**
+   * Index into the list's rows, or -1: the full menu's "new save" row and then
+   * `entries`, the load-only menu's `entries` alone. LOAD is inert unless it is a save's
+   * (`selectedEntry`).
+   */
   selected: number;
   scrollTop: number;
   /** An async list/read/write is in flight; every button is inert. */
@@ -181,11 +195,11 @@ export async function refreshSaveMenu(ui: UIState): Promise<void> {
   ui.renderLastFrame();
   try {
     state.entries = await ui.onListSaves();
-    state.selected = state.entries.length > 0 ? 0 : -1;
+    state.selected = rowCount(state) > 0 ? 0 : -1;
     state.scrollTop = 0;
   } catch (error) {
     state.entries = [];
-    state.selected = -1;
+    state.selected = rowCount(state) > 0 ? 0 : -1;
     state.message = shortError(error);
   } finally {
     state.busy = false;
@@ -198,9 +212,23 @@ function shortError(error: unknown): string {
   return text.toUpperCase().slice(0, TEXT_MAX_CHARS);
 }
 
-function selectedEntry(state: SaveMenuState): SaveEntry | null {
-  if (state.selected < 0 || state.selected >= state.entries.length) return null;
-  return state.entries[state.selected];
+/** The rows above the saves: the full menu's "new save" row. */
+function newSaveRows(state: SaveMenuState): number {
+  return state.mode === 'full' ? 1 : 0;
+}
+
+function rowCount(state: SaveMenuState): number {
+  return newSaveRows(state) + state.entries.length;
+}
+
+/** The save a row of the list shows, or `null` for the "new save" row and past the end. */
+function entryAt(state: SaveMenuState, row: number): SaveEntry | null {
+  return state.entries[row - newSaveRows(state)] ?? null;
+}
+
+/** The selected save: what LOAD reads and SAVE writes over. `null` on the "new save" row. */
+export function selectedEntry(state: SaveMenuState): SaveEntry | null {
+  return entryAt(state, state.selected);
 }
 
 function canLoad(state: SaveMenuState): boolean {
@@ -212,7 +240,7 @@ function canSave(state: SaveMenuState): boolean {
 }
 
 function clampScroll(state: SaveMenuState): void {
-  const maxTop = Math.max(0, state.entries.length - SAVE_MENU_ROWS);
+  const maxTop = Math.max(0, rowCount(state) - SAVE_MENU_ROWS);
   if (state.scrollTop > maxTop) state.scrollTop = maxTop;
   if (state.scrollTop < 0) state.scrollTop = 0;
   if (state.selected >= 0) {
@@ -270,8 +298,8 @@ export function drawSaveMenu(ui: UIState): void {
   clampScroll(state);
   for (let row = 0; row < SAVE_MENU_ROWS; row++) {
     const index = state.scrollTop + row;
-    if (index >= state.entries.length) break;
-    const entry = state.entries[index];
+    if (index >= rowCount(state)) break;
+    const entry = entryAt(state, index);
     const y = ROW_FIRST_Y + row * ROW_STEP;
     const highlighted = index === state.selected;
     if (highlighted) {
@@ -284,7 +312,7 @@ export function drawSaveMenu(ui: UIState): void {
     }
     text(
       ui,
-      formatSaveRow(entry, TEXT_MAX_CHARS),
+      entry ? formatSaveRow(entry, TEXT_MAX_CHARS) : NEW_SAVE_LABEL,
       TEXT_X,
       y,
       highlighted ? MENU_PANEL_COLOR : MENU_OPTION_COLOR,
@@ -297,9 +325,10 @@ export function drawSaveMenu(ui: UIState): void {
     ? 'WORKING . . .'
     : state.message || formatSaveDetail(selectedEntry(state), TEXT_MAX_CHARS);
   if (status) text(ui, status, TEXT_X, STATUS_Y, MENU_TITLE1_COLOR, MENU_PANEL_COLOR);
-  if (state.entries.length === 0 && !state.busy && !state.message) {
-    // An empty list has to say so; when the store could not be listed, the status line
-    // says why, and repeating that here would only crowd the panel.
+  if (rowCount(state) === 0 && !state.busy && !state.message) {
+    // An empty list has to say so, which the load-only menu's can be; when the store
+    // could not be listed, the status line says why, and repeating that here would only
+    // crowd the panel.
     text(ui, 'NO SAVED GAMES HERE', TEXT_X, ROW_FIRST_Y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
   }
 
@@ -327,7 +356,7 @@ function saveMenuButtons(ui: UIState, state: SaveMenuState): UIButton[] {
 
   push(BTN_CANCEL, labelRect(PANEL_INNER_X2 - 6 * 6, HEADER_Y, 6), 'saveMenu.cancel');
 
-  const visible = Math.min(SAVE_MENU_ROWS, Math.max(0, state.entries.length - state.scrollTop));
+  const visible = Math.min(SAVE_MENU_ROWS, Math.max(0, rowCount(state) - state.scrollTop));
   for (let row = 0; row < visible; row++) {
     const y = ROW_FIRST_Y + row * ROW_STEP;
     push(
@@ -374,7 +403,7 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
   }
   if (id >= BTN_ROW0 && id < BTN_ROW0 + SAVE_MENU_ROWS) {
     const index = state.scrollTop + (id - BTN_ROW0);
-    if (index < state.entries.length) {
+    if (index < rowCount(state)) {
       state.selected = index;
       state.message = '';
       ui.renderLastFrame();
@@ -492,11 +521,13 @@ export function restoreChosenSave(ui: UIState, save: OpenedSave): void {
 
 async function doSave(ui: UIState, state: SaveMenuState): Promise<void> {
   // The clock has been stopped since the menu opened, so the save's tail still runs on
-  // the world the file holds, and before the menu's `tag0207cc`, as in CSBWin.
-  const saved = await ui.onSaveGame();
+  // the world the file holds, and before the menu's `tag0207cc`, as in CSBWin. The save
+  // is written over the selected one, or is a new one from the "new save" row, and is
+  // the selection afterwards.
+  const saved = await ui.onSaveGame(selectedEntry(state));
   await refreshSaveMenu(ui);
   const at = state.entries.findIndex((e) => e.id === saved.id);
-  if (at >= 0) state.selected = at;
+  if (at >= 0) state.selected = newSaveRows(state) + at;
   state.message = 'GAME SAVED';
   ui.renderLastFrame();
 }
@@ -533,10 +564,10 @@ export function saveMenuKey(ui: UIState, key: string): boolean {
       moveSelection(ui, state, SAVE_MENU_ROWS);
       return true;
     case 'Home':
-      moveSelection(ui, state, -state.entries.length);
+      moveSelection(ui, state, -rowCount(state));
       return true;
     case 'End':
-      moveSelection(ui, state, state.entries.length);
+      moveSelection(ui, state, rowCount(state));
       return true;
     case 'Enter':
       if (canLoad(state)) beginPress(ui, state, BTN_LOAD, 'load');
@@ -547,8 +578,8 @@ export function saveMenuKey(ui: UIState, key: string): boolean {
 }
 
 function moveSelection(ui: UIState, state: SaveMenuState, delta: number): void {
-  if (state.entries.length === 0) return;
-  const next = Math.max(0, Math.min(state.entries.length - 1, (state.selected < 0 ? 0 : state.selected) + delta));
+  if (rowCount(state) === 0) return;
+  const next = Math.max(0, Math.min(rowCount(state) - 1, (state.selected < 0 ? 0 : state.selected) + delta));
   state.selected = next;
   state.message = '';
   clampScroll(state);
@@ -559,7 +590,7 @@ function moveSelection(ui: UIState, state: SaveMenuState, delta: number): void {
 export function saveMenuWheel(ui: UIState, delta: number): boolean {
   const state = ui.saveMenu;
   if (!state) return false;
-  const maxTop = Math.max(0, state.entries.length - SAVE_MENU_ROWS);
+  const maxTop = Math.max(0, rowCount(state) - SAVE_MENU_ROWS);
   state.scrollTop = Math.max(0, Math.min(maxTop, state.scrollTop + (delta > 0 ? 1 : -1)));
   ui.renderLastFrame();
   return true;

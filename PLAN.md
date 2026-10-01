@@ -257,7 +257,10 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   gave it. Both are the player's, not debug features, and what they did is printed in
   the message area.
 - **SAVE writes over the selected save**, or makes a new one from the list's "new save"
-  row. **LOAD takes any save.** Either asks first when the save is of another
+  row. The row written over keeps its key and its name and takes the file, its date and
+  the game's playthrough, and is the dialog's save from then on: a quick-save written
+  over is F5's slot no longer, and the next F5 makes another. **LOAD takes any save.**
+  Either asks first when the save is of another
   playthrough than the running game's; the order of two saves of one playthrough is
   never checked, since loading an old save and saving over a newer one is ordinary play.
 - **The last save used**, loaded or written, is remembered per data set and is the
@@ -303,8 +306,13 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      and SAVE does not), "one store, two data sets" (F9 in its playthrough, and in one
      with no save) and "a save that names no playthrough" (neither key takes such a
      file).
-   - c. ⏳ **SAVE over the selection**, or new from the list's "new save" row.
-   - d. ⏳ **The two confirmations.**
+   - c. ✅ **SAVE over the selection**, or new from the list's "new save" row, which
+     the full menu opens on until step 2e. Evidence: `tools/dump-save-menu.ts`, "the
+     one save call" (the row written over, F5's slot written over, another
+     playthrough's save) and "the menu's selection, and what SAVE writes" (the menu's
+     own clicks and keys); the golden frame shows the row.
+   - d. ⏳ **The two confirmations.** Until then SAVE writes over a selected save of
+     another playthrough, and LOAD reads one, without asking.
    - e. ⏳ **The last save used.**
    - f. ⏳ **The play time.**
    - g. ⏳ **A drawn id is no stored row's.** The draw is repeated while a row of the
@@ -409,8 +417,9 @@ Evidence:
 The disk icon opens a menu drawn in the 320×200 buffer (`src/renderer/ui/SaveMenu.ts`
 over `Menu.ts`, a faithful `_DoMenu` / `_WaitForMenuSelect`), listing the running data
 set's saves (`GameSaves.list`, over `src/data/saves/`), newest first, each row with
-its date, level and party. LOAD acts on the selection; SAVE always makes a new row, its
-file a `.dat` named for its date. Both,
+its date, level and party, under a first row, "NEW SAVE", which is the selection when
+the menu opens. LOAD reads the selected save. SAVE writes over it, or from "NEW SAVE"
+makes a new row, its file a `.dat` named for its date. Both,
 and the two keys, go through `GameSaves` (`src/engine/GameSaves.ts`). F5
 writes its playthrough's quick-save, over the last, and F9 loads the newest save of its
 playthrough, F5's or the menu's. Each key says what it
@@ -458,7 +467,7 @@ diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`. Eviden
   waits for `DEBT.md` G1: `buildSaveFile` refuses to save one.
 - **The menu:** no delete (`BrowserSaveStore.remove` has no caller), no file picker for
   an import and no `SAVE AND QUIT`, none of them in the rework's scope; and the golden
-  frame shows an empty list, since the frame script clears IndexedDB
+  frame shows the "NEW SAVE" row alone, since the frame script clears IndexedDB
   (`dump-save-menu.ts` proves the rows).
 
 ### Phase 15 — Verification

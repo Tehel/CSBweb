@@ -13,7 +13,7 @@
  *
  * F5 and F9 do not exist in CSBWin, which has only the disk menu. F5 writes the
  * playthrough's quick-save, one slot written over at each press, and never a save the
- * menu made; F9 loads the playthrough's newest save, the slot or the menu's. Neither
+ * menu made or wrote over; F9 loads the playthrough's newest save, the slot or the menu's. Neither
  * raises a dialog, so what either did, or why it did nothing, is a line in the message
  * area, and one for the console with the save's name.
  */
@@ -52,6 +52,12 @@ export interface GameSavesScreen {
  * has done neither.
  */
 export type SaveClock = 'running' | 'stopped';
+
+/**
+ * Where a save is written: a row of its own, F5's slot, or over a listed save, the one
+ * selected in the disk menu.
+ */
+export type SaveTarget = 'new' | 'quick' | SaveEntry;
 
 /** The colour of F5's and F9's lines in the message area: white, as a wall's text is. */
 const SAVE_MESSAGE_COLOR = 15;
@@ -130,11 +136,14 @@ export class GameSaves {
     }
 
     /**
-     * Build a save and write it to the store, as a row of the game's data set. The
-     * menu's is a new row, under a name no save has in any set: a row's name is its key.
-     * F5's (`quick`) is written over the playthrough's slot (`quickSlot`), which keeps
-     * its key and its name and takes the new file and its date; the first press makes
-     * the slot, as a new row.
+     * Build a save and write it to the store, as a row of the game's data set. A `'new'`
+     * one is a row of its own, under a name no save has in any set: a row's name is its
+     * key. F5's (`'quick'`) is written over the playthrough's slot (`quickSlot`), which
+     * keeps its key and its name and takes the new file and its date; the first press
+     * makes the slot, as a new row. The menu's SAVE over a listed save does the same to
+     * that row, whatever game it held: it is the game's playthrough's from then on, and
+     * the menu's, so a quick-save written over is F5's slot no longer and the next press
+     * makes another.
      *
      * With the clock stopped, the save's tail (`Game.saveWritten`) runs once the file is
      * written, and a write that fails skips it, as CSBWin's `SaveError` jumps past it
@@ -153,7 +162,7 @@ export class GameSaves {
      * the playthrough from `GAMEBLOCK1`, the level from `GAMEBLOCK2` and the names from
      * block 4 (`readSaveFileFields`); the date is the row's, since a CSBWin file has none.
      */
-    async save(clock: SaveClock, quick: boolean): Promise<SaveEntry> {
+    async save(clock: SaveClock, target: SaveTarget): Promise<SaveEntry> {
         if (clock === 'running') this.screen.repackOpenChest();
         const bytes = buildSaveFile(this.game, {
             portraitOf: (champion) => this.screen.portraitOf(champion),
@@ -162,10 +171,12 @@ export class GameSaves {
         const fields = readSaveFileFields(bytes);
         if (!fields) throw new Error('the save file does not read back');
         if (clock === 'running') this.game.saveWritten();
-        const rows = await this.store.list(null);
-        const slot = quick ? quickSlot(rows, this.dataSet.id, fields.playthrough) : undefined;
-        const name = slot ? slot.name : makeSaveFileName(savedAt, new Set(rows.map((row) => row.name)));
-        const id = slot ? slot.id : name;
+        const quick = target === 'quick';
+        const rows = typeof target === 'string' ? await this.store.list(null) : [];
+        const over = typeof target !== 'string' ? target
+            : quick ? quickSlot(rows, this.dataSet.id, fields.playthrough) : undefined;
+        const name = over ? over.name : makeSaveFileName(savedAt, new Set(rows.map((row) => row.name)));
+        const id = over ? over.id : name;
         const entry: SaveEntry = { id, name, dataSet: this.dataSet.id, quick, savedAt, ...fields };
         await this.store.write(entry, bytes);
         if (clock === 'stopped') this.game.saveWritten();
@@ -224,7 +235,7 @@ export class GameSaves {
             return;
         }
         try {
-            const { name } = await this.save('running', true);
+            const { name } = await this.save('running', 'quick');
             this.tell('GAME SAVED');
             this.log(`Quick-saved ${name}`);
         } catch (error) {
