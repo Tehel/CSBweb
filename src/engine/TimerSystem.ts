@@ -976,8 +976,11 @@ export class TimerSystem {
       const target = this.findViAltarBones(bones, location, pos);
       if (target === null) return;
       let chIdx: number | null = null;
-      let consumeBonesRecord = false;
-      const fingerprint = this.dungeon.copyChampionBonesRecord(target);
+      // `expool.GetChampionBonesRecord(objD4, bonesRecord) == 1`
+      // (`doc/CSBwin-src/Timer.cpp:2750`): the record leaves the pool here, before
+      // anything is known of the champion, so bones the altar then refuses stay on
+      // the floor without it.
+      const fingerprint = this.dungeon.getChampionBonesRecord(target);
       if (fingerprint !== null) {
         const found = findChampionByFingerprint(this.ctx.party.state, fingerprint);
         chIdx = found === -1 ? null : found;
@@ -985,14 +988,12 @@ export class TimerSystem {
         // matches nobody in the party is fetched with `CHARDESC::GetFromWings`,
         // healed to `MaxHP/2`, saved back, and the bones deleted with the timer
         // stopping there (`doc/CSBwin-src/Timer.cpp:2769-2782`). This port has no
-        // wings — no store of champions who have left the party — so there is
-        // nothing to look in, and the bones are left on the floor rather than
-        // silently destroyed.
+        // wings (`DEBT.md` G3), so nobody is found there, which is CSBWin's
+        // `if (!character.GetFromWings(…)) break`.
         if (chIdx === null) return;
         if (!this.isChampionDead(this.ctx.party.state.champions[chIdx])) return;
-        consumeBonesRecord = true;
       } else {
-        // `chIndex = DB10A2->value()` (`doc/CSBwin-src/Timer.cpp:2789`). Bones with no
+        // `chIndex = DB10A2->value()` (`doc/CSBwin-src/Timer.cpp:2788`). Bones with no
         // expool record were placed by the dungeon rather than by a death, and their
         // `value` — `DB10`'s bits 14-15, this port's `specialState`
         // (`doc/CSBwin-src/CSB.h:1272`) — *is* the champion index.
@@ -1006,7 +1007,6 @@ export class TimerSystem {
       }
       if (!this.dungeon.removeObjectFromCell(location, target)) return;
       this.dungeon.deleteDBEntry(target);
-      if (consumeBonesRecord) this.dungeon.getChampionBonesRecord(target);
       this.queueViAltarTimer(bones, location, chIdx, 0, (timer.time + 1) >>> 0);
       return;
     }

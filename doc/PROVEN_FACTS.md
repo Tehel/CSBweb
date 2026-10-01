@@ -1355,7 +1355,10 @@ keeps its number when the object moves within its cell, since the position is in
 `dataTypeMap` (`CSBTypes.h:336-342`).
 
 `ProcessTT_ViAltar` takes the record with `GetChampionBonesRecord`, a `Read`
-(`doc/CSBwin-src/Timer.cpp:2750`); `DropObject`, `DescribeObject` and
+(`doc/CSBwin-src/Timer.cpp:2750`), and does so before it looks at the champion: bones it
+then refuses, their champion alive (`:2759`) or in no wings (`:2775`), stay on the
+floor with no record, and a later offering reads their `value` as the champion's index
+(`:2788`). `tools/dump-vi-altar.ts` section 3b stages it. `DropObject`, `DescribeObject` and
 `DrawNameOfHeldObject` copy it with `CopyChampionBonesRecord`, a `Locate`
 (`Mouse.cpp:903`, `Character.cpp:3563`, `Code11f52.cpp:49`). Each wants a record of
 exactly one longword.

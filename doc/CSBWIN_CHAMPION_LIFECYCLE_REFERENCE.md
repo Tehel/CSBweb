@@ -282,7 +282,11 @@ set when the decoration in front is the ornate alcove (`CSBCode.cpp:3301`).
   champion and `value` is the *kind* of bones — 0 inert, 1 named, **2 a dead
   champion's** (`CSB.h:1258-1264`). With no expool record (bones the dungeon author
   placed), `chIndex = DB10A2->value()` — `value` *is* the champion index
-  (`Timer.cpp:2789`, and `Objects.h:192` says so in the enum itself).
+  (`Timer.cpp:2788`, and `Objects.h:192` says so in the enum itself).
+
+  The record is looked for with `GetChampionBonesRecord`, which takes it out of the pool
+  (`Timer.cpp:2750`), before the champion is looked at. Bones the first arm then refuses
+  stay where they are with no record, and a later offering reads them by the second arm.
 
   The drop-into-the-alcove handler that schedules the timer has the **same two arms**
   (`Mouse.cpp:894-960`), and the asymmetry matters there too: the fingerprint arm

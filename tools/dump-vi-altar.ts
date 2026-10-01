@@ -17,7 +17,7 @@
  * an expool record holding the champion's fingerprint, and their `value` is the *kind*
  * of bones — 2, "a dead champion's" (`doc/CSBwin-src/CSB.h:1264`). Bones placed by the
  * **dungeon** carry no record, and there `value` *is* the champion index
- * (`Timer.cpp:2789`, `Mouse.cpp:934`). The port used to have no second arm at all: it
+ * (`Timer.cpp:2788`, `Mouse.cpp:934`). The port used to have no second arm at all: it
  * guessed, resurrecting the single dead champion if there was exactly one and refusing
  * outright if there were two, and the drop handler rejected any bones whose `value`
  * was not 2 — which is every dungeon-authored bones object aimed at a champion other
@@ -389,6 +389,49 @@ function main(): void {
     console.log(`HERO${target} health ${c.attributes.health}, bones still on the floor: ${bonesAt(g, cell).length === 1}`);
     check(c.attributes.health === 200, 'a living champion is untouched');
     check(bonesAt(g, cell).length === 1, 'and the bones stay on the floor');
+  }
+
+  /* ---------------------------------------- 3b. refused bones lose their record -- */
+
+  // `ProcessTT_ViAltar` takes the record out of the pool before it looks at the
+  // champion (`expool.GetChampionBonesRecord`, a `Read`, `Timer.cpp:2750`), so bones it
+  // refuses are left with none, and from then on their `value`, 2, is read as a champion
+  // index. No play reaches it today: the drop refuses a living champion's bones, and
+  // nothing revives one in the altar's five ticks. So the champion is revived by hand.
+  console.log('');
+  console.log("=== a death's bones, refused: the record is taken all the same ===");
+  {
+    const victim = 1;
+    const { game: g } = makeGame();
+    const cell = findOpenCell(g);
+    g.ctx.party.state.position = cell;
+    g.systems.monsters.loadPartyLevel(cell.z);
+    g.systems.monsterAttack.killCharacter(victim);
+    g.systems.monsterAttack.killCharacter(2);
+    const rn = bonesAt(g, cell).find(
+      (b) => g.ctx.dungeon.copyChampionBonesRecord(b) === g.ctx.party.state.champions[victim]!.fingerprint,
+    );
+    if (rn === undefined) {
+      fail('the death left no bones paired with the champion');
+    } else {
+      g.ctx.party.state.champions[victim]!.attributes.health = 50;
+      g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
+      runTicks(g, 8);
+      const record = g.ctx.dungeon.copyChampionBonesRecord(rn);
+      console.log(`HERO${victim} health ${g.ctx.party.state.champions[victim]!.attributes.health}, ` +
+        `their bones on the floor: ${bonesAt(g, cell).includes(rn)}, record: ${record}`);
+      check(g.ctx.party.state.champions[victim]!.attributes.health === 50, 'the living champion is untouched');
+      check(bonesAt(g, cell).includes(rn), 'and the bones stay on the floor');
+      check(record === null, 'but their record is gone');
+
+      // Offered again, they are bones with no record: `chIndex = DB10A2->value()`.
+      g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
+      runTicks(g, 8);
+      const other = g.ctx.party.state.champions[2]!;
+      console.log(`offered again: HERO2 alive ${other.attributes.health !== 0}, the bones on the floor: ${bonesAt(g, cell).includes(rn)}`);
+      check(other.attributes.health !== 0, 'offered again, they raise champion 2, the index their value names');
+      check(!bonesAt(g, cell).includes(rn), 'and are consumed');
+    }
   }
 
   /* ---------------------------------------- 4. the corner search ----------------- */
