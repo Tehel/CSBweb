@@ -304,16 +304,10 @@ part the blow could land on. It combines shields held in either hand — weighte
 body part by `Byte1412`, so a shield covers some parts far better than others — a
 vitality-scaled random term, the champion's shield spell, the party shield, the
 temporary modifier the champion's *own* attack type imposes, and the garment worn on
-the struck part.
-
-Two smaller terms are still missing, both marked in the code:
-
-- `TAG01680a` omits `DetermineThrowingDistance(chIdx, hand)` from each shield's
-  contribution (`:2416`), so a shield held in hand protects slightly less than it
-  should. Worn armour is complete.
-- **Load in `Quickness`.** The `load / maxLoad` term is 0, so a laden champion dodges
-  as well as an empty-handed one. `computeChampionLoad` exists but lives in the
-  renderer's UI layer.
+the struck part. A wounded part then loses `STRandom0_3() + 8`, a sleeping party's
+total is halved, and the result is halved again and held to 0-100 (`:2478-2486`;
+`doc/PROVEN_FACTS.md` → "`TAG01680a`: a wounded part and a sleeping party are less
+protected").
 
 ## Attack tables
 

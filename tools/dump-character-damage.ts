@@ -24,6 +24,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { PotionType } from '../src/core/constants';
+import { CsbRandom } from '../src/core/random';
 import { Direction, Position } from '../src/core/types';
 import { CHARACTER_BLOCK_SIZE, readCsbwinPartyTail, writeCsbwinPartyTail } from '../src/data/CsbwinCharacters';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -32,7 +33,7 @@ import { Game } from '../src/engine/Game';
 import { applyFeedParameters, clearFeedParameters, derivePotionFeeding } from '../src/engine/Feeding';
 import { Party, setHandOwner } from '../src/engine/Party';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
+import { AttributeIndex, attributeCurrent, makeAddCharacterAttributes } from '../src/engine/attributes';
 import { addCharacterDefaults, assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
@@ -344,8 +345,35 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
       return probe.systems.monsterAttack.armourStrength(hero, 2, false);
     });
     console.log(`armour with 80 of the champion's own: ${armour[0]} with the party shield at 0, ${armour[1]} with it at -30`);
-    check(armour[0] === 40 && armour[1] === 25, 'a party shield below zero takes off the armour (Character.cpp:2454-2458, :2486)');
+    check(armour[0] === 40 && armour[1] === 25, 'a party shield below zero takes off the armour (Character.cpp:2453-2457, :2486)');
   }
+
+  // `TAG01680a`'s tail (`Character.cpp:2478-2486`): a wounded part loses
+  // `STRandom0_3() + 8`, a sleeping party's total is halved, and then comes the halving
+  // every total gets. The draws are replayed from the seed: `STRandom` for the Vitality
+  // term, and one more for a wounded part.
+  for (const [wounds, sleeping, what] of [
+    [0, false, 'whole and awake'], [1 << 2, false, 'wounded'], [1 << 3, false, 'another part wounded'],
+    [0, true, 'asleep'], [1 << 2, true, 'wounded and asleep'],
+  ] as const) {
+    const probe = makeGame(1, []);
+    const hero = probe.ctx.party.state.champions[0]!;
+    hero.attackStatModifier = 80;
+    hero.wounds = wounds;
+    probe.ctx.party.state.sleeping = sleeping;
+    const replay = new CsbRandom();
+    replay.setSeed(probe.ctx.random.getSeed());
+    let want = (replay.next() & 0xffff) % (Math.trunc(attributeCurrent(hero.attributes.stats[AttributeIndex.Vitality]) / 8) + 1) + 80;
+    const penalty = (wounds & (1 << 2)) !== 0 ? replay.zeroTo3() + 8 : 0;
+    want -= penalty;
+    if (sleeping) want >>= 1;
+    want >>= 1;
+    const armour = probe.systems.monsterAttack.armourStrength(hero, 2, false);
+    console.log(`armour of part 2, ${what}: ${armour} (expected ${want}, the wound taking ${penalty})`);
+    check(armour === want, `${what}: the armour is CSBWin's`);
+    check(probe.ctx.random.getSeed() === replay.getSeed(), `${what}: ${penalty !== 0 ? 'two draws' : 'one draw'}`);
+  }
+
   party.partyShield = 0;
   party.spellShield = 0;
   party.fireShield = 0;

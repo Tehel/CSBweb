@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C106 | The armour of a body part leaves out its wound and the party's sleep | S | ⏳ |
 | E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step |
 | C96 | Champion bones records live outside `EXPOOL`, so no CSBWin file carries them | M | ⏳ before `P10` drops the JSON |
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
@@ -214,21 +213,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C106 ⏳ The armour of a body part leaves out its wound and the party's sleep
-
-`TAG01680a` ends with two steps the port's `armourStrength` does not have
-(`src/engine/MonsterAttack.ts`). After the garment, a part that is wounded loses
-`STRandom0_3() + 8`, `if (pcA3->ouches & (1 << possessionIndex))`, and a sleeping party's
-total is halved, `if (d.PartySleeping) D7W >>= 1`, before `ApplyLimits(0, D7W >> 1, 100)`
-(`doc/CSBwin-src/Character.cpp:2478-2486`). The port returns the clamp straight after
-the garment. So a wounded part is as well protected as a whole one, a sleeping party as
-an awake one, and the random sequence is one draw short for every wounded part a blow
-could land on. CSBWin also casts each sum to `i16` (`:2454-2458`, `:2469`), where the
-port adds plain numbers. `doc/CSBWIN_MONSTERS_REFERENCE.md` → "Armour" lists two missing
-terms that are no longer missing (`DetermineThrowingDistance`, and the load in
-`Quickness`, to be checked) and not these two. Paying it means the two steps and the
-casts, a check in `tools/dump-character-damage.ts`, and that section rewritten.
 
 ### C96 ⏳ Champion bones records live outside `EXPOOL`, so no CSBWin file carries them
 

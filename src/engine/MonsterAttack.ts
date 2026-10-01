@@ -739,7 +739,8 @@ export class MonsterAttack {
    * 3. **The garment actually worn on that part**, but only for parts above 1 —
    *    i.e. not the two hands, which are covered by (1).
    *
-   * The result is halved and clamped to 0-100 before it reaches the damage scaling.
+   * A wounded part then loses 8 to 11, and a sleeping party's total is halved. The
+   * result is halved and clamped to 0-100 before it reaches the damage scaling.
    *
    * The throwing-distance term in (1) is `DetermineThrowingDistance(chIdx, hand)`
    * (`:2416`) — how well the champion is handling what is in that hand. A shield too
@@ -766,15 +767,17 @@ export class MonsterAttack {
 
     // Zero to roughly 8 × vitality.
     const spread = Math.trunc(attributeCurrent(champ.attributes.stats[AttributeIndex.Vitality]) / 8) + 1;
-    let total = (this.random.next() & 0xffff) % spread;
+    let total = sw((this.random.next() & 0xffff) % spread);
     if (scale) total = Math.trunc(total / 2);
 
     const party = this.ctx.party.state;
-    total +=
+    total = sw(
+      total +
       champ.attackStatModifier +
       champ.shieldStrength +
       party.partyShield +
-      handTotal;
+      handTotal,
+    );
 
     // The garment worn on this part — hands (0 and 1) are the shields handled above.
     if (bodyPart > 1) {
@@ -782,10 +785,14 @@ export class MonsterAttack {
       const rec = obj !== OBJECT_ID_NULL && decodeObjectID(obj).category === DBType.CLOTHING
         ? this.dungeon.getClothingRecord(obj)
         : null;
-      if (rec) total += this.clothingArmourValue(rec.clothingType, scale);
+      if (rec) total = sw(total + this.clothingArmourValue(rec.clothingType, scale));
     }
 
-    return Math.min(100, Math.max(0, total >> 1));
+    // A wounded part is worth less, and a sleeping party's armour half
+    // (`doc/CSBwin-src/Character.cpp:2478-2486`).
+    if ((champ.wounds & (1 << bodyPart)) !== 0) total = sw(total - (this.random.zeroTo3() + 8));
+    if (party.sleeping) total >>= 1;
+    return applyLimits(0, total >> 1, 100);
   }
 
   /**

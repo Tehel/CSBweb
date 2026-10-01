@@ -5069,3 +5069,22 @@ The readers take the value as it stands:
 
 `tools/dump-character-damage.ts` checks the six timers, the wrap at each type's lowest
 value, the save's bytes, and the blow and the armour under a shield below zero.
+
+## `TAG01680a`: a wounded part and a sleeping party are less protected
+
+`TAG01680a(chIdx, possessionIndex)` (`doc/CSBwin-src/Character.cpp:2391`) is the armour
+of one body part, which `DamageCharacter` averages over the parts a blow could land on
+(`:2741`). Every sum in it is cast to `i16`. In order:
+
+1. the shields in the two hands, weighted by `d.Byte1412[possessionIndex]` (`:2403-2431`);
+2. `STRandom() % (Vitality / 8 + 1)`, halved when bit 15 of the index is set (`:2437-2446`);
+3. `+ word64 + shieldStrength + d.PartyShield` and the shields' term (`:2453-2457`);
+4. for a part above 1, the garment worn there (`:2463-2477`);
+5. `if (pcA3->ouches & (1 << possessionIndex)) D7W = sw(D7W - (STRandom0_3() + 8))`
+   (`:2478-2481`): a wounded part loses 8 to 11, at the cost of one more random draw;
+6. `if (d.PartySleeping) D7W >>= 1` (`:2482-2485`);
+7. `ApplyLimits(0, D7W >> 1, 100)` (`:2486`).
+
+`armourStrength` (`src/engine/MonsterAttack.ts`) is its port, and
+`tools/dump-character-damage.ts` replays the draws from the seed for a whole part, a
+wounded one, a sleeping party, and both.
