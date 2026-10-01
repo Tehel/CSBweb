@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C94 | Clouds in the cells beside and four rows ahead of the party are not drawn | S | ⏳ |
 | C103 | A wall-text glyph past the font's 36 draws nothing, where CSBWin's reads on into the next rows | S | ⏳ |
 | E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step |
 | C96 | Champion bones records live outside `EXPOOL`, so no CSBWin file carries them | M | ⏳ before `P10` drops the JSON |
@@ -215,16 +214,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C94 ⏳ Clouds in the cells beside and four rows ahead of the party are not drawn
-
-`DrawRoomObjects` calls `DrawClouds` for every cell it is given
-(`doc/CSBwin-src/Code51a4.cpp:2768-2769`), which reads it as `RelativeCellNumber + 3`: 0-2
-for the row four ahead (cells -3..-1), 13 and 14 for the cells beside the party (10, 11).
-The port's `DrawRoomObjects` (`src/renderer/bytecode/DrawRoomObjects.ts`) returns for
-cells below 0 and draws clouds only in cells 0-9 (`objectsDrawn`). Paying it means checking
-that every table `DrawClouds` reads by `relCell` (`Byte5758`, `d.Word7042`) covers those
-cells, lifting the guard, and extending `tools/dump-cloud-draw.ts`.
 
 ### C103 ⏳ A wall-text glyph past the font's 36 draws nothing, where CSBWin's reads on into the next rows
 

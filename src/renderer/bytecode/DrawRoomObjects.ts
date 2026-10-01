@@ -99,12 +99,12 @@ export function DrawRoomObjects(
     return;
   }
 
-  // Only the cells 0..9 draw objects, and missiles and clouds are left there too; but a
-  // monster is drawn in cells 10 and 11 as well, beside the party
-  // (`ProcessOnePosition`, `doc/CSBwin-src/Code51a4.cpp:2223-2224`, `:2254-2258`).
-  // CSBWin draws the clouds of cells -3..-1, 10 and 11 as well (`:2769`): `DEBT.md` C94.
-  if (relativeCellNumber < 0 || relativeCellNumber > 11) return;
-  const objectsDrawn = relativeCellNumber <= 9;
+  // Only the cells 0..9 draw objects and missiles (`ProcessOnePosition`,
+  // `doc/CSBwin-src/Code51a4.cpp:2223-2224`, `:2301-2302`). A monster is drawn in cells
+  // 10 and 11 as well, beside the party, and in none of -3..-1, the row four ahead
+  // (`:2254-2258`). Clouds are drawn in all of them (`:2768-2773`).
+  if (relativeCellNumber < -3 || relativeCellNumber > 11) return;
+  const objectsDrawn = relativeCellNumber >= 0 && relativeCellNumber <= 9;
 
   // CSBWin encodes door-side metadata in bit 3 (DrawRoomObjects, Code51a4.cpp:2655-2670).
   let positionList = drawingOrder & 0xffff;
@@ -170,6 +170,10 @@ export function DrawRoomObjects(
       drawObjectsAtPosition(draw, dungeon, tables, firstObject, relativeCellNumber, middleLeftRight, relLoc, curAbsPos, currentSmallOffset, false);
     }
 
+    // `if ( (D5W == 4) || (RelativeCellNumber < 0) ) { PositionList = 0; return; }`
+    // (`Code51a4.cpp:2254-2258`): the row four ahead stops at its first position.
+    if (relativeCellNumber < 0) break;
+
     if (monsterRecord && monsterState) {
       DrawMonster(
         draw, monsterRecord, monsterState, facing, relativeCellNumber, curAbsPos, relLoc, sideOfDoor,
@@ -194,7 +198,7 @@ export function DrawRoomObjects(
     }
   }
 
-  if (cloudPresent && objectsDrawn) {
+  if (cloudPresent) {
     const fluxcage = DrawClouds(draw, relativeCellNumber, firstObject, facing, lastAbsPos);
     // `if ((pdb_150!=NULL) && (sideOfDoor!=SOD_FarSideOfDoor) && (d.Word1868==0))`
     // (`doc/CSBwin-src/Code51a4.cpp:2774`).

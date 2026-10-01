@@ -40,21 +40,29 @@
  *     `STRandom0_3() + 87`.
  *  8. a Fluxcage (type 50): no cloud, but the teleporter's shimmer over its cell from cell 4
  *     on, which `d.Word1868` takes away (`Code51a4.cpp:2769-2782`).
+ *  9. an alcove's clouds.
+ * 10. the cells around the ten that hold objects: the row four ahead (`RelativeCellNumber`
+ *     0-2) and the two beside the party (13, 14), whose clouds `DrawRoomObjects` draws
+ *     too (`:2768-2773`) — from the tables, and in whole frames of the real dungeon.
  *
  * Run: `npx tsx tools/dump-cloud-draw.ts`
  */
 import { readFileSync } from 'node:fs';
 
-import { DBType, OBJECT_ID_EOF, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, type ObjectID } from '../src/core/types';
 import { applyLimits } from '../src/core/intCast';
 import { CsbRandom } from '../src/core/random';
+import { RN_POISON_CLOUD } from '../src/core/spellRn';
+import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { DrawTeleporter, graphicRandomState } from '../src/renderer/bytecode/DrawDoor';
 import { DrawClouds, DrawRoomObjects } from '../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw, viewportRandom } from '../src/renderer/bytecode/ViewportDraw';
-import { createPaletteIndexViewportBuffer, shrinkBlt } from '../src/renderer/csbwin/CanvasBlitter';
+import { createPaletteIndexViewportBuffer, shrinkBlt, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
+import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
+import { ViewportRenderer } from '../src/renderer/ViewportRenderer';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync('static/gamefiles/dm-atari/graphics.dat')));
@@ -444,6 +452,146 @@ for (const facing of [0, 1, 2, 3]) {
     const what = `facing ${facing}, type ${cloudType} at position ${pos}`;
     console.log(`  ${what}: ${lit ? 'drawn' : 'nothing'}`);
     check(lit === atCurAbsPos, atCurAbsPos ? `${what}: drawn in the alcove` : `${what}: not drawn, it is not at (facing+2)&3`);
+  }
+}
+
+// 10. The cells that hold no objects. `ProcessOnePosition` notes a cloud in any cell
+// (`Code51a4.cpp:2219-2221`), and `DrawRoomObjects` ends in `DrawClouds` whatever the cell
+// (`:2768-2773`): `RelativeCellNumber` 0-2 are the row four ahead (F4, F4L1, F4R1), 13
+// and 14 the cells beside the party (F0L1, F0R1). A special cloud (type 100 or more) is
+// left out of them (`:111-114`), and a Fluxcage shimmers from cell 4 on, so beside the
+// party and not four rows ahead (`:166-171`, `:2774-2782`).
+console.log('\nthe row four ahead and the cells beside the party (Code51a4.cpp:2768-2773):');
+const OUTER = [[0, 'F4'], [1, 'F4L1'], [2, 'F4R1'], [13, 'F0L1'], [14, 'F0R1']] as const;
+for (const [relCell, name] of OUTER) {
+  // Canary: the tables reach these cells, the far row small and centred, left and right
+  // of it, the side cells off the viewport's edges at full size.
+  const px = realTables.cloudPositions7042[2 * relCell]!;
+  const py = realTables.cloudPositions7042[2 * relCell + 1]!;
+  const byte5758 = realTables.cloudScale[Math.floor(relCell / 3)]!;
+  const scaleIn = Math.max(4, (byte5758 * Math.max(48, 255 + 1)) >> 8) & 0xfffe;
+  const p2 = Math.min(32, scaleIn);
+  const hw = Math.trunc((p2 * realTables.cloudScaleBase[4]! + Math.trunc(p2 / 2)) / 32);
+  const h = Math.trunc((p2 * realTables.cloudScaleBase[5]! + Math.trunc(p2 / 2)) / 32);
+  const rect = expectedRect(px, py, hw, h);
+  const r = drawScene({ relCell, cloudType: 7, value: 255 });
+  const what = `cell ${relCell} (${name}): Word7042 (${px}, ${py}), Byte5758 ${byte5758} → scale ${scaleIn}, x ${rect.x1}..${rect.x2}, y ${rect.y1}..${rect.y2}`;
+  console.log(`  ${what}; drawn ${r.drawn ? `x ${r.drawn.x1}..${r.drawn.x2}, y ${r.drawn.y1}..${r.drawn.y2}` : 'nothing'}`);
+  check(sameRect(r.drawn, rect), `a poison cloud at ${what}`);
+  check(r.requested.every((n) => n === 350), `cell ${relCell}: from graphic 350`);
+  const lightning = drawScene({ relCell, cloudType: 100, value: 0 });
+  const explosion = drawScene({ relCell, cloudType: 101, value: 255 });
+  check(lightning.drawn === null && explosion.drawn === null && lightning.seedAfter === seedFor(false, false),
+    `cell ${relCell}: a special cloud (type 100, 101) is not drawn, and draws nothing from the stream`);
+}
+check(realTables.cloudPositions7042.length === 30 && realTables.cloudPositions7162.length === 60 && realTables.cloudScale.length === 6,
+  'Word7042 has 2·15 words, Word7162 4·15 and Byte5758 6 bytes: every cell 0..14 is inside them');
+check([0, 1, 2].every((c) => realTables.cloudPositions7042[2 * c + 1] === 47) && realTables.cloudScale[0] === 10
+  && realTables.cloudPositions7042[26]! < 0 && realTables.cloudPositions7042[28]! > 223 && realTables.cloudScale[4] === 32,
+  'the far row sits at y 47 at scale 10, and the side cells off the left and right edges at scale 32');
+
+// Whole frames. Level 12's (6,13) has no object within three squares (`dump-fusion.ts`);
+// the squares around it are opened, the party stands at (6,14) facing north, and each
+// frame is the empty one with the cell's `DrawClouds` or shimmer over it, pixel for pixel.
+{
+  const LEVEL = 12;
+  const CX = 6;
+  const CY = 13;
+  const at = new Position(CX, CY + 1, LEVEL);
+  /** [relativeCell, name, x, y]: the square each cell is, facing north. */
+  const CELLS = [[-3, 'F4', CX, CY - 3], [-2, 'F4L1', CX - 1, CY - 3], [-1, 'F4R1', CX + 1, CY - 3],
+    [10, 'F0L1', CX - 1, CY + 1], [11, 'F0R1', CX + 1, CY + 1]] as const;
+
+  // A dungeon of its own each time: a game plays in the data it is given.
+  const arena = () => {
+    const loader = new DungeonLoader();
+    loader.loadFromArray(new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat')));
+    const data = loader.getData();
+    if (!data) throw new Error('dungeon.dat did not load');
+    const game = newGame(data, graphics);
+    const map = game.ctx.dungeon.getMap(LEVEL)!;
+    for (let x = CX - 3; x <= CX + 3; x++) {
+      for (let y = CY - 3; y <= CY + 3; y++) {
+        if (game.ctx.dungeon.findFirstObject(new Position(x, y, LEVEL)) !== OBJECT_ID_EOF) throw new Error(`the arena holds an object at (${x},${y})`);
+        map.cellFlags[x]![y] = RoomType.OPEN << 5;
+      }
+    }
+    game.ctx.party.state.position = at;
+    game.ctx.party.state.facing = 0;
+    game.loadNewPartyLevel();
+    const graphicCache = new Map<string, IndexedBitmap>();
+    const tables = graphicsTablesOf(graphics);
+    const renderer = new ViewportRenderer({
+      graphicsLoader: graphics,
+      dungeonState: game.ctx.dungeon,
+      viewportTables: tables.viewport,
+      objectTables: tables.objects,
+      palette552: tables.ui.graphic232.palette552,
+      graphicCache,
+      getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+    });
+    const frame = (viewportSeed: number, graphicSeed: number): Uint8Array => {
+      viewportRandom.setSeed(viewportSeed);
+      graphicRandomState.r = graphicSeed;
+      renderer.selectLevel(LEVEL);
+      renderer.draw(at, 0, false, false);
+      return renderer.buffer.pixels.slice();
+    };
+    return { game, renderer, frame };
+  };
+  const cloudAt = (dungeon: ReturnType<typeof arena>['game']['ctx']['dungeon'], x: number, y: number): ObjectID => {
+    for (let rn = dungeon.findFirstObject(new Position(x, y, LEVEL)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+      if (decodeObjectID(rn).category === DBType.CLOUD) return rn;
+    }
+    throw new Error(`no cloud at (${x},${y})`);
+  };
+  const GRAPHIC_SEED = 0x2468ace;
+  const differing = (a: Uint8Array, b: Uint8Array): number => a.reduce((n, p, i) => n + (p === b[i] ? 0 : 1), 0);
+
+  for (const [relativeCell, name, x, y] of CELLS) {
+    // A poison cloud, centred in its square (`posInCell` 255, `b7`).
+    {
+      const { game, renderer, frame } = arena();
+      const seed = seedFor(true, true);
+      const empty = frame(seed, GRAPHIC_SEED);
+      game.ctx.systems.missileEncounter.createCloud(RN_POISON_CLOUD, 255, x, y, new Position(x, y, LEVEL), 255);
+      const drawn = frame(seed, GRAPHIC_SEED);
+      const seedAfter = viewportRandom.getSeed();
+      // The same cloud drawn alone over the empty frame, from the stream where the frame took it.
+      const expected = createPaletteIndexViewportBuffer(224, 136, 0);
+      expected.pixels.set(empty);
+      viewportRandom.setSeed(seed);
+      DrawClouds(new ViewportDraw({ ...renderer.context, viewportIndexBuffer: expected }), relativeCell, cloudAt(game.ctx.dungeon, x, y), 0, 0);
+      const changed = differing(empty, drawn);
+      console.log(`  a poison cloud in ${name} (${x},${y}): ${changed} pixels of the frame change`);
+      check(changed > 0, `a poison cloud in ${name} shows in the frame`);
+      check(Buffer.compare(drawn, expected.pixels) === 0 && seedAfter === viewportRandom.getSeed(),
+        `and it is DrawClouds' cell ${relativeCell + 3}, pixel for pixel, with its two draws from the stream`);
+    }
+    // A Fluxcage: the shimmer beside the party, nothing four rows ahead.
+    {
+      const { game, renderer, frame } = arena();
+      const seed = seedFor(false, false);
+      const empty = frame(seed, GRAPHIC_SEED);
+      game.ctx.systems.missileEncounter.createFluxcage(new Position(x, y, LEVEL), 0);
+      const drawn = frame(seed, GRAPHIC_SEED);
+      const graphicAfter = graphicRandomState.r;
+      const changed = differing(empty, drawn);
+      console.log(`  a Fluxcage in ${name}: ${changed} pixels of the frame change`);
+      if (relativeCell < 0) {
+        check(changed === 0 && graphicAfter === GRAPHIC_SEED, `a Fluxcage in ${name} does not shimmer: cell ${relativeCell + 3} is below 4`);
+      } else {
+        const tables = graphicsTablesOf(graphics).viewport;
+        const teleporter = tables.teleporterRectangles[relativeCell]!;
+        const expected = createPaletteIndexViewportBuffer(224, 136, 0);
+        expected.pixels.set(empty);
+        graphicRandomState.r = GRAPHIC_SEED;
+        DrawTeleporter(new ViewportDraw({ ...renderer.context, viewportIndexBuffer: expected }),
+          { ...teleporter, x1: teleporter.x1 + 1 }, tables.wallRectangles[relativeCell]!);
+        check(changed > 0 && Buffer.compare(drawn, expected.pixels) === 0 && graphicAfter === graphicRandomState.r,
+          `a Fluxcage in ${name} shimmers over teleporterRectangles[${relativeCell}] one pixel on, pixel for pixel`);
+      }
+    }
   }
 }
 

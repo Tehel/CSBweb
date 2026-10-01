@@ -3745,8 +3745,21 @@ All in `DrawClouds` (`doc/CSBwin-src/Code51a4.cpp:76-321`) and `TAG005088` (`:21
   bones in the altar's alcove (`Timer.cpp:2730`), and its first `TT_25` turns it into type
   101 (the explosion, drawn as cloud graphic 0, `Code51a4.cpp:116`) for one tick before the
   next removes it (`Timer.cpp:553-557`, `:613-618`).
+- **Clouds are drawn in fifteen cells, objects in ten.** `ProcessOnePosition` notes a
+  cloud in the chain whatever the cell (`Code51a4.cpp:2219-2221`), and `DrawRoomObjects`
+  then calls `DrawClouds` (`:2768-2773`), which counts the cell as `RelativeCellNumber + 3`
+  (`:100`): 0-2 are the row four ahead (F4, F4L1, F4R1, which the bytecode passes as -3,
+  -2, -1: `objectDrawingLocations`, `Viewport.cpp:2419`), 13 and 14 the cells beside the
+  party (F0L1, F0R1; 10 and 11). Objects and missiles are drawn in cells 0-9 only
+  (`:2223-2224`, `:2301-2302`), a monster in 0-11, and the row four ahead stops at its
+  first position (`:2254-2258`). `d.Word7042[30]`, `d.Word7162[60]` and `d.Byte5758[6]`
+  (`Data.h:1114-1115`, `:1138`) hold all fifteen: the far row is at y 47, x 111, 57 and
+  167, at `Byte5758[0]` = 10; the side cells at y 60, x -53 and 276, at `Byte5758[4]` =
+  32, so a full cloud there shows as a strip at the viewport's edge. A Fluxcage's shimmer
+  needs cell 4 or more (`:166-171`), so it is drawn beside the party, from
+  `d.teleporterRectangles[10]` and `[11]`, and not four rows ahead.
 
-Evidence: `tools/dump-cloud-draw.ts` sections 4-7 and 9.
+Evidence: `tools/dump-cloud-draw.ts` sections 4-7, 9 and 10.
 
 ## The teleporter's shimmer is `TAG008c98` over a stream of 16-pixel groups
 
