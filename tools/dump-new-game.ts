@@ -23,7 +23,8 @@
  * share with a fresh one, so the whole-state comparison leaves them out and they are
  * checked on their own: `d.RandomGameID` is drawn again from the new game's stream
  * (`doc/CSBwin-src/SaveGame.cpp:1523-1532`), and `totalMoveCount`, a global outside `d`
- * (`data.cpp:253`), counts on from the lost game.
+ * (`data.cpp:253`), counts on from the lost game. A draw of 0 is drawn again, where
+ * CSBWin keeps it (`DEBT.md` H): checked on a stream whose first pair of draws gives 0.
  *
  * And the page's boot, which builds its `Game` over the empty world and reads `dungeon.dat`
  * into it once ENTER is chosen: the empty world draws nothing from the random stream, so
@@ -35,12 +36,14 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { CsbRandom } from '../src/core/random';
 import { Position } from '../src/core/types';
 import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
+import { drawRandomGameID } from '../src/engine/GameContext';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { MovementAction } from '../src/engine/gameTypes';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
@@ -100,13 +103,55 @@ function differingParts(a: Game, b: Game): string[] {
  * back twice (`0xbb40e62d` is odd, so it has an inverse mod 2^32) and redo them.
  */
 function expectedGameID(seed: number): number {
+  const s0 = lcgBack(lcgBack(seed >>> 0));
+  const s1 = lcgNext(s0);
+  const s2 = lcgNext(s1);
+  return (lowWord(s1) * lowWord(s2)) >>> 0;
+}
+
+/** `d.RandomNumber`'s step (`doc/CSBwin-src/CSBCode.cpp:1182-1217`), and the step back. */
+function lcgNext(seed: number): number {
+  return (Math.imul(seed, 0xbb40e62d) + 11) >>> 0;
+}
+
+function lcgBack(seed: number): number {
   let inverse = 1;
   for (let i = 0; i < 32; i++) inverse = Math.imul(inverse, 2 - Math.imul(0xbb40e62d, inverse));
-  const back = (s: number) => Math.imul((s - 11) >>> 0, inverse) >>> 0;
-  const s0 = back(back(seed >>> 0));
-  const s1 = (Math.imul(s0, 0xbb40e62d) + 11) >>> 0;
-  const s2 = (Math.imul(s1, 0xbb40e62d) + 11) >>> 0;
-  return ((((s1 >>> 8) & 0xffff)) * ((s2 >>> 8) & 0xffff)) >>> 0;
+  return Math.imul((seed - 11) >>> 0, inverse) >>> 0;
+}
+
+/** The word a draw gives `RandomGameID`: `STRandom() & 0xffff`, bits 8-23 of the seed. */
+function lowWord(seed: number): number {
+  return (seed >>> 8) & 0xffff;
+}
+
+/**
+ * A stream whose first pair of draws multiplies to 0: the seed before 0, whose two
+ * draws are the low words of seeds 0 and 11. CSBWin would keep that 0; the port draws
+ * the next pair (`drawRandomGameID`, `DEBT.md` H).
+ */
+function checkZeroDraw(): void {
+  console.log('');
+  console.log('=== a RandomGameID of 0 is drawn again ===');
+  const seed = lcgBack(0);
+  const s1 = lcgNext(seed);
+  const s2 = lcgNext(s1);
+  const s3 = lcgNext(s2);
+  const s4 = lcgNext(s3);
+  const second = (lowWord(s3) * lowWord(s4)) >>> 0;
+  const stream = new CsbRandom(seed);
+  const id = drawRandomGameID(stream);
+  console.log(['seed', seed.toString(16), 'first pair', lowWord(s1), lowWord(s2), 'second pair', lowWord(s3), lowWord(s4),
+    'id', id.toString(16), 'stream at', stream.getSeed().toString(16)].join('\t'));
+  check(lowWord(s1) * lowWord(s2) === 0 && second !== 0, 'the stream\'s first pair of draws gives 0, and its second does not');
+  check(id === second && stream.getSeed() === s4, 'the id is the second pair\'s product, four draws on');
+
+  // And a new game on that stream, the host's `rand()` pinned to its seed.
+  const random = Math.random;
+  Math.random = () => seed / 0x100000000;
+  const game = newGame(parse(), stockGraphics());
+  Math.random = random;
+  check(game.ctx.state.block1.randomGameID === second, 'a new game whose first two draws give 0 takes the next two');
 }
 
 /** `count` VBLs, a tick due in each. */
@@ -217,6 +262,7 @@ function main(): void {
   check(fresh.ctx.state.tickCount === 600 && played.ctx.state.tickCount === 600, `both ran 600 ticks (${fresh.ctx.state.tickCount}, ${played.ctx.state.tickCount})`);
   check(stateHash(fresh) === stateHash(played), 'and are still the same game');
 
+  checkZeroDraw();
   finish();
 }
 

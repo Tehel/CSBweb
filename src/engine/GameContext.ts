@@ -151,11 +151,18 @@ function newGameTimerQueue(dungeonData: DungeonData, tables: GameTables): TimerQ
 /**
  * `d.RandomGameID` as a new game draws it: the product of the low words of two draws
  * (`doc/CSBwin-src/SaveGame.cpp:1523-1532`).
+ *
+ * CSBWin keeps a product of 0, which either word being 0 gives, about one game in
+ * 32768. The port draws again: an id is never 0, the value a file of an earlier build
+ * holds for no playthrough at all (`DEBT.md` H).
  */
 export function drawRandomGameID(random: CsbRandom): number {
-    const d0 = random.next() & 0xffff;
-    const d1 = random.next() & 0xffff;
-    return (d0 * d1) >>> 0;
+    for (;;) {
+        const d0 = random.next() & 0xffff;
+        const d1 = random.next() & 0xffff;
+        const id = (d0 * d1) >>> 0;
+        if (id !== 0) return id;
+    }
 }
 
 /**

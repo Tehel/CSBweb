@@ -75,17 +75,12 @@ export function makeSaveFileName(savedAt: number, taken: ReadonlySet<string> = n
 
 /**
  * A playthrough for a game loaded from a file that names none: drawn as a new game
- * draws its own (`drawRandomGameID`), and never 0, which names none. The stream is
- * this draw's own. The game's is the file's by then (`gb2.ranseed`), so it would give
- * every load of one file the same id, and a load would leave it two draws further on
- * than CSBWin's does.
+ * draws its own (`drawRandomGameID`, never 0), from a stream of this draw's own. The
+ * game's is the file's by then (`gb2.ranseed`), so it would give every load of one file
+ * the same id, and a load would leave it two draws further on than CSBWin's does.
  */
 function drawPlaythrough(): number {
-    const random = new CsbRandom();
-    for (;;) {
-        const id = drawRandomGameID(random);
-        if (id !== 0) return id;
-    }
+    return drawRandomGameID(new CsbRandom());
 }
 
 export class GameSaves {

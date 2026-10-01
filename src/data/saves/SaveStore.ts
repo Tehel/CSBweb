@@ -84,9 +84,9 @@ export function joinedPlaythrough(entry: SaveEntry, rows: SaveEntry[]): number {
  * The newest, where a store holds several: an earlier build made a row at each press,
  * and the older ones stay as they are.
  *
- * Playthrough 0 has no slot. Only a new game whose draw came out 0 runs under it
- * (`GameSaves.read` gives a loaded one another), and the rows that hold 0 are files of
- * an earlier build, of any game, which its F5 must not write over.
+ * Playthrough 0 has no slot. No game with a party runs under it: a new game never draws
+ * 0 (`drawRandomGameID`) and `GameSaves.read` gives a loaded one another. The rows that
+ * hold 0 are files of an earlier build, of any game, which no F5 may write over.
  */
 export function quickSlot(rows: SaveEntry[], dataSet: string, playthrough: number): SaveEntry | undefined {
     if (playthrough === 0) return undefined;

@@ -210,22 +210,35 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   Champions, so it names a game from its first step, whoever is in the party. Two new
   games differ: `CsbRandom` takes its seed from `Math.random` at its first draw
   (`src/core/random.ts`), as CSBWin seeds from the system time (`CSBCode.cpp:350`).
-- **A file that holds 0 names no playthrough**, and a save of an earlier build holds 0, as
-  the author's four `.dmweb.json` files do. The author's decision: a game loaded from
-  such a file is given a playthrough at the load (`GameSaves.read`). It joins the one of
-  an existing save that has an id, of the same dungeon (the row's data set) and the same
-  party (the same champions' names, in the same order), the newest when several do
-  (`joinedPlaythrough`, `src/data/saves/SaveStore.ts`); with none, it draws a new id, as
-  a new game does (`drawRandomGameID`), from a stream of its own, so that `d.RandomNumber`
-  stays the file's, and never 0. So a running game always has a playthrough, and its
-  saves carry it. The row and the file that held 0 keep it. CSBWin takes the file's id
-  as it is (`SaveGame.cpp:1610`), as the port does for any other id.
+  A drawn id is never 0: where CSBWin keeps a product of 0, the port draws again
+  (`drawRandomGameID`, `src/engine/GameContext.ts`; `DEBT.md` H).
+- **No stored save is to hold 0**, which names no playthrough. A save of an earlier
+  build holds it, as the author's four `.dmweb.json` files do. The author's decision, in
+  two stages:
+  - **A file takes its id as it enters the store** (step 4). The import gives a file
+    that holds 0 an id and stamps it into the file, `GAMEBLOCK1`'s `RandomGameID` and
+    nothing else of the game, so the row and its file agree and an export carries it.
+    The id is that of an existing save that has one, of the same dungeon (the row's
+    data set) and the same party (the same champions' names, in the same order), the
+    newest when several do (`joinedPlaythrough`, `src/data/saves/SaveStore.ts`); with
+    none, a new one, drawn as a new game's is. The rows the store already holds are
+    stamped by the same rule in a one-time upgrade of the store, its version 3, one row
+    at a time, so that the rows of one party and data set end up in one playthrough. It
+    needs no export and no import: only the author's browser holds such rows. After it
+    0 is no special value, and what treats it apart is deleted: the load's rule below
+    with `OpenedSave.joins`, and `quickSlot`'s refusal of playthrough 0. The draw still
+    never gives 0.
+  - **Until then the load gives the game its id** (`GameSaves.read`), by the same rule,
+    drawing from a stream of its own so that `d.RandomNumber` stays the file's. So a
+    running game always has a playthrough, and its saves carry it; the row and the file
+    that held 0 keep it. CSBWin takes the file's id as it is (`SaveGame.cpp:1610`), as
+    the port does for any other id.
 - **F5 has a slot of its own**, one per playthrough, written over at each press. It never
   touches a save made from the dialog, which is what is left when a quick-save was made
   at the wrong moment. The slot is the playthrough's newest quick-save in the data set
   (`quickSlot`, `src/data/saves/SaveStore.ts`); a press writes its file and its date
   there, under the row's key and name, and the first press makes the row. Playthrough 0
-  has no slot, so its F5 makes a row at each press: the rows that hold 0 are earlier
+  has no slot: no game with a party runs under it, and the rows that hold 0 are earlier
   builds' files, of any game. **F9 loads the playthrough's newest save**, the quick slot
   or another, and finds none in a playthrough not saved yet: a new game, or a game
   loaded from a file that names no playthrough, which is no save of the one the load
@@ -270,8 +283,9 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
 2. ⏳ **The playthrough**, one commit each:
    - a. ✅ **A game loaded from a file of playthrough 0 is given one**, by the menu's
      LOAD and the boot's chooser, which read through `GameSaves.open` and `read`.
-     Evidence: `tools/dump-save-menu.ts`, "the list" (which save is joined) and "a save
-     that names no playthrough" (the loads).
+     Step 4 moves the rule to the import and deletes it here. Evidence:
+     `tools/dump-save-menu.ts`, "the list" (which save is joined) and "a save that names
+     no playthrough" (the loads).
    - b. ✅ **F5's slot and F9's choice.** Evidence: `tools/dump-save-menu.ts`, "the list"
      (which row is the slot), "the one save call" (a second F5 writes over the first,
      and SAVE does not), "one store, two data sets" (F9 in its playthrough, and in one
@@ -284,7 +298,11 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
 3. ⏳ **The dialog**: the layout, the folding list, the scrolling, the preview.
 4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it. Until
    then a `.dat` on disk has no way into the page, the committed saves included: the
-   store's rows are the only saves it loads.
+   store's rows are the only saves it loads. With it, no stored save holds playthrough
+   0 ("A playthrough"): the import stamps an id into a file that holds none, the
+   store's version-3 upgrade stamps the rows it already holds, and the load's rule
+   (2a) is deleted. The stamp has a tool of its own: the stamped file differs from the
+   original in `GAMEBLOCK1` alone, and reads back with the id.
 5. ⏳ **"GAME LOADED, READY TO PLAY." removed.** Independent of the others.
 
 #### The file
