@@ -28,6 +28,12 @@ export interface SaveEntry {
     quick: boolean;
     /** Milliseconds since the epoch: the row's own, since a CSBWin file holds no date. */
     savedAt: number;
+    /**
+     * Milliseconds since the epoch: when the save was last used, written or read into a
+     * game. The last save used in a data set is the row with the latest (`lastUsedSave`),
+     * so using one save writes nothing to another's row.
+     */
+    usedAt: number;
     /** The dungeon level the party stood on, from the file's `GAMEBLOCK2`. */
     level: number;
     /** Champion names in party order, from the file's block 4. */
@@ -37,6 +43,24 @@ export interface SaveEntry {
 /** A row as the store holds it: the entry, and the CSBWin file. */
 export interface SaveRecord extends SaveEntry {
     bytes: ArrayBuffer;
+}
+
+/**
+ * A stored row's entry, without its bytes. A row written before rows held `usedAt` has
+ * none, and counts as last used when it was saved.
+ */
+export function saveEntryOf(record: Omit<SaveRecord, 'usedAt'> & { usedAt?: number }): SaveEntry {
+    return {
+        id: record.id,
+        name: record.name,
+        dataSet: record.dataSet,
+        playthrough: record.playthrough,
+        quick: record.quick,
+        savedAt: record.savedAt,
+        usedAt: record.usedAt ?? record.savedAt,
+        level: record.level,
+        champions: record.champions,
+    };
 }
 
 /** What a row reads from its file. */
@@ -53,11 +77,12 @@ export function readSaveFileFields(bytes: Uint8Array): SaveFileFields | null {
 }
 
 /**
- * A listed save out of the store, to be read into the game: its file, and the
- * playthrough its game takes when the file names none (`GameSaves.open`), 0 for a file
- * that names its own.
+ * A listed save out of the store, to be read into the game: its row, which a read marks
+ * as used, its file, and the playthrough its game takes when the file names none
+ * (`GameSaves.open`), 0 for a file that names its own.
  */
 export interface OpenedSave {
+    entry: SaveEntry;
     bytes: Uint8Array;
     joins: number;
 }
@@ -96,6 +121,17 @@ export function quickSlot(rows: SaveEntry[], dataSet: string, playthrough: numbe
     );
 }
 
+/**
+ * The last save used among `rows`, written or loaded: the one of the latest `usedAt`,
+ * and of two used at once the one saved last. `undefined` for no row.
+ */
+export function lastUsedSave(rows: SaveEntry[]): SaveEntry | undefined {
+    return sortSaveEntries(rows).reduce<SaveEntry | undefined>(
+        (last, row) => (!last || row.usedAt > last.usedAt ? row : last),
+        undefined,
+    );
+}
+
 export interface SaveStore {
     /** One data set's rows, or every set's for `null`, newest first. */
     list(dataSet: string | null): Promise<SaveEntry[]>;
@@ -103,6 +139,8 @@ export interface SaveStore {
     read(id: string): Promise<Uint8Array>;
     /** Write a row, over the one of the same `id` if there is one. */
     write(entry: SaveEntry, bytes: Uint8Array): Promise<void>;
+    /** Set a row's `usedAt`, and nothing else of it. Nothing for a row that is gone. */
+    markUsed(id: string, usedAt: number): Promise<void>;
 }
 
 /** `YYYY-MM-DD`, in the player's own timezone — the date they would call it. */

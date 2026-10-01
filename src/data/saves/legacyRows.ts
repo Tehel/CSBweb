@@ -67,12 +67,14 @@ function upgradeSaveRecord(old: unknown, dataSet: string): SaveRecord | null {
     const name = row.name.toLowerCase().endsWith(JSON_SAVE_FILE_EXTENSION)
         ? row.name.slice(0, -JSON_SAVE_FILE_EXTENSION.length) + SAVE_FILE_EXTENSION
         : row.name;
+    const savedAt = typeof row.savedAt === 'number' ? row.savedAt : 0;
     return {
         id: name,
         name,
         dataSet,
         quick: false,
-        savedAt: typeof row.savedAt === 'number' ? row.savedAt : 0,
+        savedAt,
+        usedAt: savedAt,
         ...fields,
         // A copy of the file alone, not a view of the JSON's buffer.
         bytes: file.slice().buffer,

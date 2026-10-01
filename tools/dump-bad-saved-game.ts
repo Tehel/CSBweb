@@ -73,7 +73,9 @@ function checkChooser(): void {
     SaveMenu.openSaveMenu(ui, mode);
     let thrown: string | null = null;
     try {
-      SaveMenu.restoreChosenSave(ui, { bytes, joins: 0 });
+      // The row is the hooks' business, and these read none of it.
+      const entry = { id: 'x', name: 'x', dataSet: 'dm-atari', playthrough: 0, quick: false, savedAt: 0, usedAt: 0, level: 0, champions: [] };
+      SaveMenu.restoreChosenSave(ui, { entry, bytes, joins: 0 });
     } catch (error) {
       thrown = (error as Error).message;
     }

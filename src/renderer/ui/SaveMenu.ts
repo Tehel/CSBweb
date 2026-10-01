@@ -27,8 +27,12 @@
  *
  * SAVE writes over the selected save, as CSBWin's writes over the slot chosen
  * (`_SelectSaveGame`, `:9738`). A save of its own is made from the list's first row,
- * "NEW SAVE", which only the full menu has and which is its selection when it opens.
- * With that row selected there is nothing to load, so LOAD is inert.
+ * "NEW SAVE", which only the full menu has. With that row selected there is nothing to
+ * load, so LOAD is inert.
+ *
+ * Either menu opens on the last save used, written or loaded (`lastUsedSave`): SAVE at
+ * once writes over the save the game came from, and LOAD goes back to it. With no save
+ * in the data set, the full menu opens on "NEW SAVE".
  *
  * ## The question
  *
@@ -50,7 +54,7 @@
  * `ctx.state.paused` (`d.Time++` is the main loop's, `doc/CSBwin-src/CSBCode.cpp:660`).
  */
 import type { OpenedSave, SaveEntry } from '../../data/saves';
-import { formatSaveDetail, formatSaveRow } from '../../data/saves';
+import { formatSaveDetail, formatSaveRow, lastUsedSave } from '../../data/saves';
 import { fillRectIndex } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import type { UIButton } from '../../data/tables/UITables';
@@ -218,11 +222,10 @@ export async function refreshSaveMenu(ui: UIState): Promise<void> {
   ui.renderLastFrame();
   try {
     state.entries = await ui.onListSaves();
-    state.selected = rowCount(state) > 0 ? 0 : -1;
-    state.scrollTop = 0;
+    selectLastUsed(state);
   } catch (error) {
     state.entries = [];
-    state.selected = rowCount(state) > 0 ? 0 : -1;
+    selectLastUsed(state);
     state.message = shortError(error);
   } finally {
     state.busy = false;
@@ -275,6 +278,17 @@ export function asksFirst(ui: UIState, state: SaveMenuState): boolean {
   const entry = selectedEntry(state);
   return state.mode === 'full' && entry !== null
     && entry.playthrough !== ui.ctx.state.block1.randomGameID;
+}
+
+/**
+ * The selection of a list just read: the last save used, scrolled into view; with no
+ * save, the list's first row, which is the full menu's "new save".
+ */
+function selectLastUsed(state: SaveMenuState): void {
+  const last = lastUsedSave(state.entries);
+  state.selected = last ? newSaveRows(state) + state.entries.indexOf(last) : rowCount(state) > 0 ? 0 : -1;
+  state.scrollTop = 0;
+  clampScroll(state);
 }
 
 function clampScroll(state: SaveMenuState): void {
@@ -611,6 +625,7 @@ async function doSave(ui: UIState, state: SaveMenuState): Promise<void> {
   await refreshSaveMenu(ui);
   const at = state.entries.findIndex((e) => e.id === saved.id);
   if (at >= 0) state.selected = newSaveRows(state) + at;
+  clampScroll(state);
   state.message = 'GAME SAVED';
   ui.renderLastFrame();
 }

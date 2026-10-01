@@ -169,8 +169,8 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
 - **Every save is a row of IndexedDB** (`SaveRecord`, `src/data/saves/SaveStore.ts`): the
   file's bytes beside what the list needs. The level, the champions' names and the
   playthrough (below) are read from the file's own blocks when the row is written; the
-  data set, the date and whether F5 wrote it are the row's own, and the play time will be
-  (step 2). Nothing is JSON, and no row holds anything a `.dat` could not be listed
+  data set, the date, when the save was last used and whether F5 wrote it are the row's
+  own, and the play time will be (step 2). Nothing is JSON, and no row holds anything a `.dat` could not be listed
   without.
 - **No store on disk.** IndexedDB (`BrowserSaveStore`) is the one store: a directory on
   disk needs `showDirectoryPicker`, which is Chromium's alone. **Export** downloads the
@@ -273,8 +273,14 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   THE SAME GAME" (`doc/CSBwin-src/SaveGame.cpp:1605-1606`), over the action and CANCEL
   (`asksFirst`, `src/renderer/ui/SaveMenu.ts`). The boot's chooser has no game behind
   it and never asks.
-- **The last save used**, loaded or written, is remembered per data set and is the
-  dialog's selection when it opens.
+- **The last save used**, loaded or written, is the dialog's selection when it opens,
+  the boot's chooser's too. The author's decision: each row holds the time it was last
+  used (`SaveEntry.usedAt`), set by a write and by a load that read, and the last save
+  used is the data set's row with the latest (`lastUsedSave`,
+  `src/data/saves/SaveStore.ts`). Nothing is kept beside the rows, and using one save
+  writes nothing to another's row. A load sets that time alone (`SaveStore.markUsed`);
+  a row stored before rows held it counts from its date. With no save in the data set,
+  the dialog opens on "new save".
 
 **The dialog**
 
@@ -316,15 +322,20 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      and SAVE does not), "one store, two data sets" (F9 in its playthrough, and in one
      with no save) and "a save that names no playthrough" (neither key takes such a
      file).
-   - c. ✅ **SAVE over the selection**, or new from the list's "new save" row, which
-     the full menu opens on until step 2e. Evidence: `tools/dump-save-menu.ts`, "the
+   - c. ✅ **SAVE over the selection**, or new from the list's "new save" row.
+     Evidence: `tools/dump-save-menu.ts`, "the
      one save call" (the row written over, F5's slot written over, another
      playthrough's save) and "the menu's selection, and what SAVE writes" (the menu's
      own clicks and keys); the golden frame shows the row.
    - d. ✅ **The two confirmations.** Evidence: `tools/dump-save-menu.ts`, "the
      question before a load or a save across playthroughs" (which LOAD and which SAVE
      ask, that nothing is done before the answer, and what each answer does).
-   - e. ⏳ **The last save used.**
+   - e. ✅ **The last save used.** Evidence: `tools/dump-save-menu.ts`, "the list"
+     (which row it is, and a row from before the field), "one store, two data sets"
+     (F9's load marks its row, in its set alone) and "the menu's selection, and what
+     SAVE writes" (either menu opens on it, scrolled to it; a read that fails marks
+     nothing; a load writes the time alone). `BrowserSaveStore.markUsed` no tool runs,
+     since Node has no IndexedDB.
    - f. ⏳ **The play time.**
    - g. ✅ **A drawn id is no stored row's**: a new game's, and the load's for a file
      that holds none; step 4's import and upgrade draw through the same
@@ -427,8 +438,9 @@ Evidence:
 The disk icon opens a menu drawn in the 320×200 buffer (`src/renderer/ui/SaveMenu.ts`
 over `Menu.ts`, a faithful `_DoMenu` / `_WaitForMenuSelect`), listing the running data
 set's saves (`GameSaves.list`, over `src/data/saves/`), newest first, each row with
-its date, level and party, under a first row, "NEW SAVE", which is the selection when
-the menu opens. LOAD reads the selected save. SAVE writes over it, or from "NEW SAVE"
+its date, level and party, under a first row, "NEW SAVE". The menu opens on the last
+save used, written or loaded, and on "NEW SAVE" when the data set has none. LOAD reads
+the selected save. SAVE writes over it, or from "NEW SAVE"
 makes a new row, its file a `.dat` named for its date; either asks first on a save of
 another playthrough than the running game's. Both,
 and the two keys, go through `GameSaves` (`src/engine/GameSaves.ts`). F5

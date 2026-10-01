@@ -96,6 +96,12 @@ export function drawPlaythrough(random: CsbRandom, rows: SaveEntry[]): number {
 export class GameSaves {
     /** Set by `read` and `readFailed`, read and cleared by `consumeSavedGameRead`. */
     private lastRead: SavedGameRead = 'cancelled';
+    /**
+     * The write behind the last `read`, which marks its save as used. `read` cannot
+     * await it, so the next listing and the next save do: a save written over the row
+     * meanwhile would be lost to it in a store that reads the row to write it back.
+     */
+    private marked: Promise<void> = Promise.resolve();
 
     constructor(
         private readonly game: Game,
@@ -107,7 +113,7 @@ export class GameSaves {
         /**
          * A line for the console on what F5 or F9 did, with the error when one failed:
          * the message area says only that it did. And on a store that could not be
-         * listed for a new game.
+         * listed for a new game, or written to mark a loaded save as used.
          */
         private readonly log: (message: string, error?: unknown) => void,
     ) {}
@@ -123,7 +129,8 @@ export class GameSaves {
     }
 
     /** The data set's saves, newest first: the disk menu's list, and the boot's chooser's. */
-    list(): Promise<SaveEntry[]> {
+    async list(): Promise<SaveEntry[]> {
+        await this.marked;
         return this.store.list(this.dataSet.id);
     }
 
@@ -158,9 +165,9 @@ export class GameSaves {
      */
     async open(entry: SaveEntry): Promise<OpenedSave> {
         const bytes = await this.store.read(entry.id);
-        if (entry.playthrough !== 0) return { bytes, joins: 0 };
+        if (entry.playthrough !== 0) return { entry, bytes, joins: 0 };
         const rows = await this.store.list(entry.dataSet);
-        return { bytes, joins: joinedPlaythrough(entry, rows) || drawPlaythrough(new CsbRandom(), rows) };
+        return { entry, bytes, joins: joinedPlaythrough(entry, rows) || drawPlaythrough(new CsbRandom(), rows) };
     }
 
     /**
@@ -188,7 +195,8 @@ export class GameSaves {
      * The file's bytes are made at once, before anything is awaited: the game runs on
      * through the listing. The row beside them is read back from the file's own blocks,
      * the playthrough from `GAMEBLOCK1`, the level from `GAMEBLOCK2` and the names from
-     * block 4 (`readSaveFileFields`); the date is the row's, since a CSBWin file has none.
+     * block 4 (`readSaveFileFields`); the date is the row's, since a CSBWin file has none,
+     * and is when the save was last used too (`SaveEntry.usedAt`).
      */
     async save(clock: SaveClock, target: SaveTarget): Promise<SaveEntry> {
         if (clock === 'running') this.screen.repackOpenChest();
@@ -199,13 +207,14 @@ export class GameSaves {
         const fields = readSaveFileFields(bytes);
         if (!fields) throw new Error('the save file does not read back');
         if (clock === 'running') this.game.saveWritten();
+        await this.marked;
         const quick = target === 'quick';
         const rows = typeof target === 'string' ? await this.store.list(null) : [];
         const over = typeof target !== 'string' ? target
             : quick ? quickSlot(rows, this.dataSet.id, fields.playthrough) : undefined;
         const name = over ? over.name : makeSaveFileName(savedAt, new Set(rows.map((row) => row.name)));
         const id = over ? over.id : name;
-        const entry: SaveEntry = { id, name, dataSet: this.dataSet.id, quick, savedAt, ...fields };
+        const entry: SaveEntry = { id, name, dataSet: this.dataSet.id, quick, savedAt, usedAt: savedAt, ...fields };
         await this.store.write(entry, bytes);
         if (clock === 'stopped') this.game.saveWritten();
         return entry;
@@ -224,12 +233,17 @@ export class GameSaves {
      * The entrance's Resume needs to know whether a save came back: CSBWin loops on
      * `ReadEntireGame`'s result and shows the door again when it did not
      * (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
+     *
+     * A save that read is the last one used from then on: its row takes the time
+     * (`SaveEntry.usedAt`) and keeps the rest. One that did not read is left as it was.
      */
     read(save: OpenedSave): void {
         applySaveBytes(this.game, save.bytes);
         const { block1 } = this.game.ctx.state;
         if (block1.randomGameID === 0) block1.randomGameID = save.joins;
         this.lastRead = 'loaded';
+        this.marked = this.store.markUsed(save.entry.id, Date.now())
+            .catch((error) => this.log(`${save.entry.name} could not be marked as the last save used`, error));
     }
 
     /** The boot's chooser only: its `read` threw, and `tag01efee` follows. */

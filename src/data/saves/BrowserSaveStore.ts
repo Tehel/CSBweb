@@ -3,27 +3,13 @@
  * picker. The player cannot see, copy or back up what is in it from outside the page.
  */
 import { SAVES_STORE, idbDelete, idbGet, idbGetAll, idbPut } from './idb';
-import { sortSaveEntries, type SaveEntry, type SaveRecord, type SaveStore } from './SaveStore';
-
-/** A record's row, without its bytes. */
-function entryOf(record: SaveRecord): SaveEntry {
-    return {
-        id: record.id,
-        name: record.name,
-        dataSet: record.dataSet,
-        playthrough: record.playthrough,
-        quick: record.quick,
-        savedAt: record.savedAt,
-        level: record.level,
-        champions: record.champions,
-    };
-}
+import { saveEntryOf, sortSaveEntries, type SaveEntry, type SaveRecord, type SaveStore } from './SaveStore';
 
 export class BrowserSaveStore implements SaveStore {
     async list(dataSet: string | null): Promise<SaveEntry[]> {
         const records = await idbGetAll<SaveRecord>(SAVES_STORE);
         return sortSaveEntries(
-            records.filter((record) => dataSet === null || record.dataSet === dataSet).map(entryOf),
+            records.filter((record) => dataSet === null || record.dataSet === dataSet).map(saveEntryOf),
         );
     }
 
@@ -41,6 +27,11 @@ export class BrowserSaveStore implements SaveStore {
             bytes: bytes.slice().buffer,
         };
         await idbPut(SAVES_STORE, record);
+    }
+
+    async markUsed(id: string, usedAt: number): Promise<void> {
+        const record = await idbGet<SaveRecord>(SAVES_STORE, id);
+        if (record) await idbPut(SAVES_STORE, { ...record, usedAt });
     }
 
     async remove(id: string): Promise<void> {

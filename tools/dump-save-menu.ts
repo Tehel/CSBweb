@@ -35,6 +35,7 @@
  *    each lists its own set's saves. F5 writes over its playthrough's quick-save, and
  *    F9 loads its playthrough's newest save. SAVE over a listed save writes that row.
  *    And a file that
+ *    A save read into a game is marked as the last one used. And a file that
  *    names no playthrough, loaded: its game joins the playthrough of a save of its data
  *    set and party, or draws one. And a drawn playthrough, a new game's or such a
  *    file's, is drawn again while a save of the data set holds it.
@@ -42,8 +43,9 @@
  *    `.dmweb.json` around one, made today's (`src/data/saves/legacyRows.ts`). The page
  *    runs it once, inside IndexedDB's upgrade; here it runs over rows built by hand.
  * 10. **The selection.** The menu driven by its own clicks and keys over that store:
- *    the full menu opens on its "new save" row, where LOAD is inert and SAVE makes a
- *    save; on a save, SAVE writes over it. The load-only chooser has no such row.
+ *    the full menu opens on its "new save" row in an empty store, where LOAD is inert
+ *    and SAVE makes a save; on a save, SAVE writes over it. Either menu then opens on
+ *    the last save used, written or loaded. The load-only chooser has no "new save" row.
  * 11. **The question.** LOAD and SAVE on a save of another playthrough than the running
  *    game's ask first, and do nothing until the answer; on a save of the game's own, or
  *    in the load-only chooser, neither asks.
@@ -67,7 +69,9 @@ import {
   formatSaveDate,
   formatSaveRow,
   joinedPlaythrough,
+  lastUsedSave,
   quickSlot,
+  saveEntryOf,
   SAVE_FILE_EXTENSION,
   sortSaveEntries,
   type SaveEntry,
@@ -375,6 +379,8 @@ function entry(over: Partial<SaveEntry>): SaveEntry {
     level: 0,
     champions: [],
     ...over,
+    // A row not used since it was saved, unless the caller says otherwise.
+    usedAt: over.usedAt ?? over.savedAt ?? 0,
   };
 }
 
@@ -481,6 +487,24 @@ function checkListLogic(): void {
     'each playthrough has its own, in its own data set');
   check(slot(DEFAULT_DATA_SET.id, 8) === 'none' && slot(DEFAULT_DATA_SET.id, 0) === 'none',
     'a playthrough not quick-saved yet has none, and playthrough 0 never has one');
+
+  // The last save used: the latest `usedAt`, which a write and a load both set.
+  const used = [
+    entry({ name: 'saved last', savedAt: 300 }),
+    entry({ name: 'loaded since', savedAt: 100, usedAt: 400 }),
+    entry({ name: 'saved first', savedAt: 50 }),
+  ];
+  const last = (rows: SaveEntry[]): string => lastUsedSave(rows)?.name ?? 'none';
+  const tie = [entry({ name: 'older, loaded', savedAt: 100, usedAt: 300 }), entry({ name: 'newer', savedAt: 300 })];
+  console.log(`  the last save used: "${last(used)}"; without it "${last(used.filter((e) => e.name !== 'loaded since'))}"; of two used at once "${last(tie)}"; of none "${last([])}"`);
+  check(last(used) === 'loaded since' && last([...used].reverse()) === 'loaded since',
+    'the last save used is the one of the latest use, a load counting as a save does');
+  check(last(used.filter((e) => e.name !== 'loaded since')) === 'saved last', 'with no load since, the save written last');
+  check(last(tie) === 'newer' && last([...tie].reverse()) === 'newer' && last([]) === 'none',
+    'of two used at once the one saved last, and of no save none');
+  const { usedAt: _none, ...before } = { ...entry({ name: 'before', savedAt: 250 }), bytes: new ArrayBuffer(0) };
+  check(saveEntryOf(before).usedAt === 250 && saveEntryOf({ ...before, usedAt: 900 }).usedAt === 900,
+    'a stored row from before rows held the time counts as used when it was saved');
 }
 
 /* ------------------------------------------------------------- 5. the metadata ---- */
@@ -703,6 +727,10 @@ function memoryStore(
       files.set(written.id, bytes);
       entries.set(written.id, written);
     },
+    markUsed: async (id, usedAt) => {
+      const held = entries.get(id);
+      if (held) entries.set(id, { ...held, usedAt });
+    },
   };
 }
 
@@ -885,6 +913,7 @@ async function checkSaveCall(): Promise<void> {
     const listed = (await menu.saves.list()).find((e) => e.id === first.id);
     check(listed?.level === first.level && listed?.champions.join() === 'DAROO' && first.savedAt === Date.now(),
       'the row is the file\'s level and party, and the date of the save');
+    check([first, second, third].every((e) => e.usedAt === e.savedAt), 'which is when it was last used');
     const playthrough = menu.game.ctx.state.block1.randomGameID;
     console.log(`  the row: data set ${first.dataSet}, ${first.playthrough === playthrough ? 'the game\'s' : 'ANOTHER'} playthrough, quick ${first.quick}; F5's: quick ${third.quick}`);
     check(first.dataSet === DEFAULT_DATA_SET.id, 'the row names the game\'s data set');
@@ -1063,6 +1092,12 @@ async function checkSaveCall(): Promise<void> {
     check(toldSince(beforeLoad) === '/15:GAME LOADED' && loadedParty === 'DAROO'
       && reports[reports.length - 1] === `Quick-loaded ${dmNew.name}`,
       'F9 loads the newest save of the game\'s playthrough, F5\'s here, and says so');
+    const afterF9 = await dm.saves.list();
+    const f9Row = afterF9.find((e) => e.id === dmNew.id);
+    console.log(`  the save F9 loaded: saved ${(now - (f9Row?.savedAt ?? 0)) / 60_000} minute ago, used ${(now - (f9Row?.usedAt ?? 0)) / 60_000}; the last used of ${DEFAULT_DATA_SET.id}: ${lastUsedSave(afterF9)?.id === dmNew.id ? 'that one' : 'ANOTHER'}`);
+    check(f9Row?.usedAt === now && f9Row.savedAt === dmNew.savedAt && f9Row.savedAt < now && lastUsedSave(afterF9)?.id === dmNew.id,
+      'the save it loaded is marked as used then, its date kept: the last save used of its data set');
+    check((await csb.saves.list()).every((e) => e.usedAt === e.savedAt), 'and the other set\'s rows are untouched');
 
     // The menu's save, once it is the newer of the playthrough's.
     now += 60_000;
@@ -1345,6 +1380,7 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
       'End is the oldest save, and Home the "new save" row');
 
     // LOAD takes the selected save.
+    now += 60_000;
     game.ctx.party.state.champions[0]!.name = 'CHANGED';
     rig.clickRow(2);
     check(SaveMenu.selectedEntry(state)?.id === made?.id, 'a click on the third row selects the older save');
@@ -1352,19 +1388,58 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
     console.log(`  the older save, then LOAD: ${selection()}, party ${rig.party()}`);
     check(!SaveMenu.isSaveMenuOpen(ui) && rig.party() === 'DAROO', 'LOAD reads it into the game, and the menu closes');
 
+    // The menu opens on the last save used, and the save just loaded is that.
     const again = await rig.open();
+    const reopened = SaveMenu.selectedEntry(again);
     console.log(`  the full menu again: ${selection()}`);
-    check(SaveMenu.selectedEntry(again) === null && again.entries.length === 2,
-      'the full menu opens on "new save" whatever the store holds');
+    check(reopened?.id === made?.id && again.selected === 2 && reopened?.usedAt === now && reopened.savedAt < now,
+      'the full menu opens on the last save used: the one loaded, though the other was saved later');
     SaveMenu.closeSaveMenu(ui);
+
+    // A read that fails marks nothing.
+    let refused = false;
+    try {
+      rig.saves.read({ entry: newer!, bytes: new Uint8Array(64), joins: 0 });
+    } catch {
+      refused = true;
+    }
+    check(refused && lastUsedSave(await rig.saves.list())?.id === made?.id, 'a save that does not read is not the last one used');
 
     // The boot's chooser lists the saves alone.
     const chooser = await rig.open('loadOnly');
     console.log(`  the load-only chooser: ${selection()}`);
-    check(chooser.selected === 0 && SaveMenu.selectedEntry(chooser)?.id === newer?.id,
-      'the load-only chooser has no "new save" row: it opens on the newest save');
+    check(chooser.entries.length === 2 && chooser.selected === 1 && SaveMenu.selectedEntry(chooser)?.id === made?.id,
+      'the load-only chooser has no "new save" row, and opens on the last save used too');
     await rig.click(g.saveButtonId);
     check(store.files.size === 2 && SaveMenu.isSaveMenuOpen(ui), 'and its SAVE is inert');
+    SaveMenu.closeSaveMenu(ui);
+
+    // Saved over, the other save is the last one used.
+    now += 60_000;
+    const third = await rig.open();
+    rig.clickRow(1);
+    await rig.click(g.saveButtonId);
+    SaveMenu.closeSaveMenu(ui);
+    const fourth = await rig.open();
+    console.log(`  the newer save written over, and the full menu again: ${selection()}`);
+    check(third.entries.length === 2 && SaveMenu.selectedEntry(fourth)?.id === newer?.id && store.files.size === 2,
+      'and the full menu then opens on the save written last');
+    SaveMenu.closeSaveMenu(ui);
+
+    // A list longer than the panel is scrolled to it. The save is loaded through the row
+    // as it was first listed: only the time is the load's to write.
+    for (let n = 0; n < SaveMenu.SAVE_MENU_ROWS; n++) {
+      now += 60_000;
+      await rig.saves.save('stopped', 'new');
+    }
+    now += 60_000;
+    rig.saves.read(await rig.saves.open(made!));
+    const long = await rig.open();
+    console.log(`  ${long.entries.length} saves, the oldest loaded: ${selection()}, the list scrolled to row ${long.scrollTop}`);
+    check(SaveMenu.selectedEntry(long)?.id === made?.id && long.selected === long.entries.length
+      && long.scrollTop === long.selected - SaveMenu.SAVE_MENU_ROWS + 1, 'the list opens scrolled to the last save used');
+    check(made?.savedAt !== reopened?.savedAt && SaveMenu.selectedEntry(long)?.savedAt === reopened?.savedAt && SaveMenu.selectedEntry(long)?.usedAt === now,
+      'a load sets the time of its row and nothing else: the date is the store\'s, not that of the row the load was handed');
     SaveMenu.closeSaveMenu(ui);
   } finally {
     Date.now = realNow;
@@ -1495,8 +1570,8 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
     check(SaveMenu.selectedEntry(chooser)?.playthrough !== idOf(stranger) && SaveMenu.asksFirst(stranger.ui, chooser) === false,
       'the load-only chooser asks about no save');
     await stranger.click(g.loadButtonId);
-    console.log(`  the load-only chooser, LOAD on its newest save: ${SaveMenu.isSaveMenuOpen(stranger.ui) ? 'THE MENU' : 'the menu gone'}, party ${stranger.party()}`);
-    check(!SaveMenu.isSaveMenuOpen(stranger.ui) && stranger.party() === 'DAROO', 'and loads it at once');
+    console.log(`  the load-only chooser, LOAD on the last save used: ${SaveMenu.isSaveMenuOpen(stranger.ui) ? 'THE MENU' : 'the menu gone'}, party ${stranger.party()}`);
+    check(!SaveMenu.isSaveMenuOpen(stranger.ui) && stranger.party() === 'WUUF', 'and loads it at once');
   } finally {
     Date.now = realNow;
   }
@@ -1555,6 +1630,7 @@ async function checkUpgrade(): Promise<void> {
     'the level, the party and the playthrough are read from the file, not kept from the old row');
   check(rows.every((r) => r.dataSet === DEFAULT_DATA_SET.id && !r.quick), 'every row is the default data set\'s, and none is a quick save');
   check(rows.map((r) => r.savedAt).join() === '100,200,300', 'the date is the old row\'s, and of two rows that come to one name the newer is kept');
+  check(rows.every((r) => r.usedAt === r.savedAt), 'and is when the row was last used');
   for (const row of rows) {
     const fresh = await loadGame();
     applySaveBytes(fresh, new Uint8Array(row.bytes));
