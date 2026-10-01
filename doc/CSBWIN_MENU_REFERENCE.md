@@ -349,6 +349,13 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    player leaves one (`PLAN.md` → Phase 10).
 4. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
    addition, not a changed behaviour.
+5. **A question before a load or a save across playthroughs.** CSBWin's four slots are
+   one directory's, and it tests `d.RandomGameID` only when a lost game is read again,
+   where it refuses the save: "THAT'S NOT THE SAME GAME" (`SaveGame.cpp:1604-1606`). The
+   port's list holds every playthrough of the data set, so LOAD and SAVE on a save of
+   another playthrough than the running game's put that line up as a two-option
+   `_DoMenu` menu, the action over CANCEL, and act on the first. Esc and a right-click
+   there cancel the question alone. The load-only chooser never asks.
 
 The faithful `_DoMenu` / `_WaitForMenuSelect` port lives in `src/renderer/ui/Menu.ts` and
 is used unchanged for the title-only and one-button menus (`"SAVING GAME . . ."`,

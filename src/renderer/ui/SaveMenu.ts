@@ -30,6 +30,16 @@
  * "NEW SAVE", which only the full menu has and which is its selection when it opens.
  * With that row selected there is nothing to load, so LOAD is inert.
  *
+ * ## The question
+ *
+ * LOAD and SAVE ask first when the selected save is of another playthrough than the
+ * running game's (`asksFirst`): the one would leave the game being played for another,
+ * the other would write this game over a save of another. The question is `_DoMenu`'s
+ * two-option menu in the list's place, under CSBWin's own line for a save of another
+ * `d.RandomGameID`, "THAT'S NOT THE SAME GAME" (`doc/CSBwin-src/SaveGame.cpp:1605-1606`,
+ * where it refuses the save outright), with the action and CANCEL. The load-only chooser
+ * has no game to leave and never asks.
+ *
  * ## Modality and the clock
  *
  * `_WaitForMenuSelect` nulls `SecondaryButtonList` and both `pKeyXlate`s and replaces
@@ -53,10 +63,12 @@ import {
   MENU_TITLE1_COLOR,
   centeredText,
   copyMenuRegion,
+  doMenu,
   drawMenuBitmap,
   drawMenuPress,
   menuButtonList,
   menuButtonRect,
+  menuHitTest,
   menuPressFinished,
   type MenuPress,
 } from './Menu';
@@ -88,6 +100,11 @@ const BOTTOM_LABEL_Y = 114;
 
 /** The full menu's first row: SAVE with it selected makes a new save. */
 const NEW_SAVE_LABEL = 'NEW SAVE';
+
+/** The question's title, and its two options: the action asked about, then this. */
+export const SAVE_MENU_QUESTION = 'THAT\'S NOT THE SAME GAME';
+const QUESTION_CANCEL_LABEL = 'CANCEL';
+const ACTION_LABELS = { load: 'LOAD', save: 'SAVE' } as const;
 
 /** Ids for the parts of the screen CSBWin has no button for. 210..213 stay CSBWin's. */
 const BTN_LOAD = 212;
@@ -124,6 +141,9 @@ export const SAVE_MENU_GEOMETRY = {
 
 export type SaveMenuMode = 'full' | 'loadOnly';
 
+/** What the bottom pair of buttons does. */
+export type SaveMenuAction = 'load' | 'save';
+
 export interface SaveMenuState {
   mode: SaveMenuMode;
   /** The running data set's saves, newest first (`UIState.onListSaves`). */
@@ -141,7 +161,9 @@ export interface SaveMenuState {
   message: string;
   press: MenuPress | null;
   /** What the press animation will do when it finishes. */
-  pending: 'load' | 'save' | null;
+  pending: (() => void) | null;
+  /** The action the question on screen asks about, in the list's place, or `null`. */
+  confirm: SaveMenuAction | null;
   frameHandle: number | null;
 }
 
@@ -170,6 +192,7 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
     message: '',
     press: null,
     pending: null,
+    confirm: null,
     frameHandle: null,
   };
   void refreshSaveMenu(ui);
@@ -239,6 +262,21 @@ function canSave(state: SaveMenuState): boolean {
   return !state.busy && state.mode === 'full';
 }
 
+/**
+ * Whether LOAD or SAVE asks before it acts: in the full menu, on a save of another
+ * playthrough than the running game's (`d.RandomGameID`). The order of two saves of one
+ * playthrough is never checked, and the "new save" row writes over nothing. The
+ * load-only chooser never asks: no game is being played behind it, at the entrance or
+ * after a lost one, where CSBWin's own test cannot fire either
+ * (`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` → ""THAT'S NOT THE SAME GAME" cannot happen
+ * after a restart").
+ */
+export function asksFirst(ui: UIState, state: SaveMenuState): boolean {
+  const entry = selectedEntry(state);
+  return state.mode === 'full' && entry !== null
+    && entry.playthrough !== ui.ctx.state.block1.randomGameID;
+}
+
 function clampScroll(state: SaveMenuState): void {
   const maxTop = Math.max(0, rowCount(state) - SAVE_MENU_ROWS);
   if (state.scrollTop > maxTop) state.scrollTop = maxTop;
@@ -286,6 +324,12 @@ function labelRect(x: number, y: number, chars: number): { x1: number; y1: numbe
 export function drawSaveMenu(ui: UIState): void {
   const state = ui.saveMenu;
   if (!state) return;
+
+  if (state.confirm) {
+    doMenu(ui, SAVE_MENU_QUESTION, null, [ACTION_LABELS[state.confirm], QUESTION_CANCEL_LABEL], false);
+    if (state.press) drawMenuPress(ui, state.press, nowMs());
+    return;
+  }
 
   drawMenuBitmap(ui, false);
   extendListPanel(ui);
@@ -387,12 +431,19 @@ function saveMenuButtons(ui: UIState, state: SaveMenuState): UIButton[] {
 export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number): void {
   const state = ui.saveMenu;
   if (!state) return;
-  // Right-click cancels. CSBWin has no such thing; see the divergence list.
+  // Right-click cancels, the question when one is up. CSBWin has no such thing; see the
+  // divergence list.
   if ((buttons & 1) !== 0) {
-    closeSaveMenu(ui);
+    if (state.confirm && !state.press) cancelQuestion(ui, state);
+    else closeSaveMenu(ui);
     return;
   }
   if (state.busy || state.press) return;
+
+  if (state.confirm) {
+    answerQuestion(ui, state, state.confirm, menuHitTest(menuButtonList(ui, 2, false), x, y, buttons));
+    return;
+  }
 
   const id = searchButtonList(saveMenuButtons(ui, state), x, y, buttons);
   if (id === 0) return;
@@ -410,8 +461,40 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
     }
     return;
   }
-  if (id === BTN_LOAD && canLoad(state)) beginPress(ui, state, BTN_LOAD, 'load');
-  if (id === BTN_SAVE && canSave(state)) beginPress(ui, state, BTN_SAVE, 'save');
+  if (id === BTN_LOAD && canLoad(state)) pressAction(ui, state, 'load');
+  if (id === BTN_SAVE && canSave(state)) pressAction(ui, state, 'save');
+}
+
+/** LOAD or SAVE pressed: once the press has played, the question, or the action at once. */
+function pressAction(ui: UIState, state: SaveMenuState, action: SaveMenuAction): void {
+  beginPress(ui, state, menuButtonList(ui, 4, false), action === 'load' ? BTN_LOAD : BTN_SAVE, () => {
+    if (asksFirst(ui, state)) {
+      state.confirm = action;
+      ui.renderLastFrame();
+    } else {
+      void runPending(ui, action);
+    }
+  });
+}
+
+/**
+ * A click on the question, `choice` being `_WaitForMenuSelect`'s: 1 is the action, 2 is
+ * CANCEL, and 0 neither button. Either button flashes as any menu's does, with the
+ * question still up; then the list is back, and the action runs from it.
+ */
+function answerQuestion(ui: UIState, state: SaveMenuState, action: SaveMenuAction, choice: number): void {
+  if (choice !== 1 && choice !== 2) return;
+  beginPress(ui, state, menuButtonList(ui, 2, false), 209 + choice, () => {
+    state.confirm = null;
+    if (choice === 1) void runPending(ui, action);
+    else ui.renderLastFrame();
+  });
+}
+
+/** Esc or a right-click on the question: CANCEL, without the press. */
+function cancelQuestion(ui: UIState, state: SaveMenuState): void {
+  state.confirm = null;
+  ui.renderLastFrame();
 }
 
 /* ------------------------------------------------------ the press animation ---- */
@@ -432,17 +515,17 @@ function cancelFrame(handle: number): void {
  * after the animation here too. The game clock is stopped, so the frames come from
  * `requestAnimationFrame` rather than from the tick.
  */
-function beginPress(ui: UIState, state: SaveMenuState, buttonId: number, action: 'load' | 'save'): void {
-  const rect = menuButtonRect(menuButtonList(ui, 4, false), buttonId);
+function beginPress(ui: UIState, state: SaveMenuState, buttons: UIButton[], buttonId: number, then: () => void): void {
+  const rect = menuButtonRect(buttons, buttonId);
   if (!rect) {
-    void runPending(ui, action);
+    then();
     return;
   }
   // The rectangle is passed exactly as the table holds it: `_WaitForMenuSelect` MemMoves
   // the button's four words straight into its own rect and grows them from there
   // (`doc/CSBwin-src/Menu.cpp:99-104`), exclusive `xMax`/`yMax` and all.
   state.press = { buttonId, rect, startedMs: nowMs() };
-  state.pending = action;
+  state.pending = then;
 
   const tick = (): void => {
     const live = ui.saveMenu;
@@ -453,7 +536,7 @@ function beginPress(ui: UIState, state: SaveMenuState, buttonId: number, action:
       const pending = live.pending;
       live.pending = null;
       ui.renderLastFrame();
-      if (pending) void runPending(ui, pending);
+      if (pending) pending();
       return;
     }
     ui.renderLastFrame();
@@ -468,7 +551,7 @@ export const SAVE_MENU_PRESS_MS = MENU_PRESS_PHASE_MS * 2;
 
 /* -------------------------------------------------------------- the actions ---- */
 
-async function runPending(ui: UIState, action: 'load' | 'save'): Promise<void> {
+async function runPending(ui: UIState, action: SaveMenuAction): Promise<void> {
   const state = ui.saveMenu;
   if (!state) return;
   state.busy = true;
@@ -546,6 +629,11 @@ export function saveMenuKey(ui: UIState, key: string): boolean {
   const state = ui.saveMenu;
   if (!state) return false;
   if (state.busy || state.press) return true;
+  // The question takes no key but its cancel.
+  if (state.confirm) {
+    if (key === 'Escape') cancelQuestion(ui, state);
+    return true;
+  }
 
   switch (key) {
     case 'Escape':
@@ -570,7 +658,7 @@ export function saveMenuKey(ui: UIState, key: string): boolean {
       moveSelection(ui, state, rowCount(state));
       return true;
     case 'Enter':
-      if (canLoad(state)) beginPress(ui, state, BTN_LOAD, 'load');
+      if (canLoad(state)) pressAction(ui, state, 'load');
       return true;
     default:
       return true;
@@ -590,6 +678,7 @@ function moveSelection(ui: UIState, state: SaveMenuState, delta: number): void {
 export function saveMenuWheel(ui: UIState, delta: number): boolean {
   const state = ui.saveMenu;
   if (!state) return false;
+  if (state.confirm) return true;
   const maxTop = Math.max(0, rowCount(state) - SAVE_MENU_ROWS);
   state.scrollTop = Math.max(0, Math.min(maxTop, state.scrollTop + (delta > 0 ? 1 : -1)));
   ui.renderLastFrame();

@@ -43,6 +43,9 @@
  * 10. **The selection.** The menu driven by its own clicks and keys over that store:
  *    the full menu opens on its "new save" row, where LOAD is inert and SAVE makes a
  *    save; on a save, SAVE writes over it. The load-only chooser has no such row.
+ * 11. **The question.** LOAD and SAVE on a save of another playthrough than the running
+ *    game's ask first, and do nothing until the answer; on a save of the game's own, or
+ *    in the load-only chooser, neither asks.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -86,6 +89,7 @@ import {
   MENU_PANEL_COLOR,
   MENU_PRESS_PHASE_MS,
   MENU_WIDTH,
+  doMenu,
   drawMenuBitmap,
   drawMenuPress,
   menuButtonList,
@@ -115,22 +119,27 @@ function loadGraphics(): GraphicsLoader {
   return graphics;
 }
 
+/** A graphic of `graphics` as the bitmap the menu's drawing blits. */
+function graphicBitmaps(graphics: GraphicsLoader): (graphicNum: number) => IndexedBitmap | null {
+  const bitmaps = new Map<number, IndexedBitmap>();
+  return (graphicNum) => {
+    let bitmap = bitmaps.get(graphicNum);
+    if (!bitmap) {
+      const image = graphics.getImage(graphicNum);
+      bitmap = { width: image.width, height: image.height, pixels: Uint8Array.from(image.pixels) };
+      bitmaps.set(graphicNum, bitmap);
+    }
+    return bitmap;
+  };
+}
+
 /** Enough of a `UIState` to run the menu's drawing into a buffer. */
 function makeDrawingUI(graphics: GraphicsLoader): UIState {
-  const bitmaps = new Map<number, IndexedBitmap>();
   const ui = {
     screenIndexBuffer: createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0),
     fontData: loadFontData(graphics),
     uiTables: graphicsTablesOf(graphics).ui,
-    getGraphicBitmap(graphicNum: number): IndexedBitmap | null {
-      let bitmap = bitmaps.get(graphicNum);
-      if (!bitmap) {
-        const image = graphics.getImage(graphicNum);
-        bitmap = { width: image.width, height: image.height, pixels: Uint8Array.from(image.pixels) };
-        bitmaps.set(graphicNum, bitmap);
-      }
-      return bitmap;
-    },
+    getGraphicBitmap: graphicBitmaps(graphics),
     renderLastFrame(): void {
       /* nothing to present in a tool */
     },
@@ -1150,6 +1159,64 @@ async function checkSaveCall(): Promise<void> {
 
 /* ------------------------------------------------------------ 10. the selection ---- */
 
+/** The menu's buttons answer the left button (`UIButton.button` 2), and a right-click is 1. */
+const LEFT = 2;
+const RIGHT = 1;
+
+/**
+ * A game of one champion and its disk menu, the menu's hooks on a `GameSaves` over
+ * `store`, with the clicks a tool makes on it.
+ */
+async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: string) {
+  const game = await loadGame();
+  game.systems.hallOfChampions.addChampion(healthyChampion(champion));
+  const saves = new GameSaves(game, DEFAULT_DATA_SET, store, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
+  const ui = newUIState(graphics, game.ctx, {
+    getGraphicBitmap: graphicBitmaps(graphics),
+    onListSaves: () => saves.list(),
+    onReadSave: (listed) => saves.open(listed),
+    onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
+    onRestoreSave: (save) => saves.read(save),
+  });
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  return {
+    game,
+    saves,
+    ui,
+    /** Raise the menu, and wait for its list. */
+    async open(mode: SaveMenu.SaveMenuMode = 'full'): Promise<SaveMenu.SaveMenuState> {
+      ui.partyState = game.ctx.party.state;
+      SaveMenu.openSaveMenu(ui, mode);
+      await this.settled();
+      return ui.saveMenu!;
+    },
+    /** Wait out a listing, or a press and the save or load behind it. */
+    async settled(): Promise<void> {
+      for (let i = 0; i < 300 && ui.saveMenu && (ui.saveMenu.busy || ui.saveMenu.press); i++) {
+        await new Promise((done) => setTimeout(done, 10));
+      }
+    },
+    clickRow(row: number): void {
+      SaveMenu.saveMenuClick(ui, VIEWPORT_X + g.textX, VIEWPORT_Y + g.rowFirstY + row * g.rowStep, LEFT);
+    },
+    /** A click on button `id` of `_DoMenu`'s `options`-button set, and the wait for what it does. */
+    async click(id: number, options = 4): Promise<void> {
+      const rect = menuButtonRect(menuButtonList(ui, options, false), id);
+      if (!rect) throw new Error(`the ${options}-option set has no button ${id}`);
+      SaveMenu.saveMenuClick(ui, rect.x1 + 1, rect.y1 + 1, LEFT);
+      await this.settled();
+    },
+    /** The row of the list that shows the save `id`, as the menu lists it now. */
+    rowOf(id: string): number {
+      const state = ui.saveMenu!;
+      return state.entries.findIndex((e) => e.id === id) + (state.mode === 'full' ? 1 : 0);
+    },
+    party(): string {
+      return game.ctx.party.state.champions.map((c) => c.name).join('/');
+    },
+  };
+}
+
 /**
  * The disk menu driven by its own clicks and keys, its hooks on a `GameSaves` over a
  * store in memory: what is selected when it opens, and what SAVE writes for it.
@@ -1157,32 +1224,10 @@ async function checkSaveCall(): Promise<void> {
 async function checkSelection(graphics: GraphicsLoader): Promise<void> {
   console.log('');
   console.log('=== the menu\'s selection, and what SAVE writes ===');
-  const game = await loadGame();
-  game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
   const store = memoryStore();
-  const saves = new GameSaves(game, DEFAULT_DATA_SET, store, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
-  const ui = newUIState(graphics, game.ctx, {
-    onListSaves: () => saves.list(),
-    onReadSave: (listed) => saves.open(listed),
-    onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
-    onRestoreSave: (save) => saves.read(save),
-  });
-
+  const rig = await menuRig(graphics, store, 'DAROO');
+  const { game, ui } = rig;
   const g = SaveMenu.SAVE_MENU_GEOMETRY;
-  const LEFT = 2;
-  /** Wait out a listing, or a press and the save or load behind it. */
-  const settled = async (): Promise<void> => {
-    for (let i = 0; i < 300 && ui.saveMenu && (ui.saveMenu.busy || ui.saveMenu.press); i++) {
-      await new Promise((done) => setTimeout(done, 10));
-    }
-  };
-  const clickRow = (row: number): void =>
-    SaveMenu.saveMenuClick(ui, VIEWPORT_X + g.textX, VIEWPORT_Y + g.rowFirstY + row * g.rowStep, LEFT);
-  const clickButton = (id: number): void => {
-    const rect = menuButtonRect(menuButtonList(ui, 4, false), id);
-    if (!rect) throw new Error(`the four-option set has no button ${id}`);
-    SaveMenu.saveMenuClick(ui, rect.x1 + 1, rect.y1 + 1, LEFT);
-  };
   const selection = (): string => {
     const state = ui.saveMenu;
     if (!state) return 'no menu';
@@ -1194,34 +1239,32 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
   let now = Date.UTC(2026, 8, 13, 14, 5, 6);
   Date.now = () => now;
   try {
-    SaveMenu.openSaveMenu(ui);
-    await settled();
-    const state = ui.saveMenu!;
+    const state = await rig.open();
     console.log(`  the full menu, an empty store: ${selection()}`);
     check(state.selected === 0 && SaveMenu.selectedEntry(state) === null && state.entries.length === 0,
       'the full menu opens on its "new save" row, the one row of an empty store');
-    clickButton(g.loadButtonId);
-    check(state.press === null && SaveMenu.isSaveMenuOpen(ui), 'where LOAD is inert: the row holds nothing to load');
+    SaveMenu.saveMenuKey(ui, 'Enter');
+    const pressAtEnter = state.press;
+    await rig.click(g.loadButtonId);
+    check(pressAtEnter === null && SaveMenu.isSaveMenuOpen(ui) && game.ctx.party.state.champions.length === 1,
+      'where LOAD is inert, and Enter, which is LOAD: the row holds nothing to load');
 
-    clickButton(g.saveButtonId);
-    await settled();
+    await rig.click(g.saveButtonId);
     const made = SaveMenu.selectedEntry(state);
     console.log(`  SAVE: ${store.files.size} file, ${selection()}, "${state.message}"`);
     check(store.files.size === 1 && made !== null && made.savedAt === now && state.message === 'GAME SAVED',
       'SAVE there makes a save, which is the selection afterwards');
 
     now += 60_000;
-    clickButton(g.saveButtonId);
-    await settled();
+    await rig.click(g.saveButtonId);
     console.log(`  SAVE again, a minute later: ${store.files.size} file, ${selection()}`);
     check(store.files.size === 1 && SaveMenu.selectedEntry(state)?.id === made?.id && SaveMenu.selectedEntry(state)?.savedAt === now,
       'SAVE on a save writes over it: one file still, with the new date');
 
     now += 60_000;
-    clickRow(0);
+    rig.clickRow(0);
     check(SaveMenu.selectedEntry(state) === null, 'a click on the first row selects "new save"');
-    clickButton(g.saveButtonId);
-    await settled();
+    await rig.click(g.saveButtonId);
     const newer = SaveMenu.selectedEntry(state);
     console.log(`  the first row, then SAVE: ${store.files.size} files, ${selection()}`);
     check(store.files.size === 2 && newer !== null && newer.id !== made?.id && state.selected === 1,
@@ -1231,39 +1274,162 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
     SaveMenu.saveMenuKey(ui, 'End');
     const atEnd = SaveMenu.selectedEntry(state)?.id;
     SaveMenu.saveMenuKey(ui, 'Home');
-    const atHome = SaveMenu.selectedEntry(state);
-    SaveMenu.saveMenuKey(ui, 'Enter');
-    check(atEnd === made?.id && atHome === null && state.selected === 0, 'End is the oldest save, and Home the "new save" row');
-    check(state.press === null, 'where Enter, which is LOAD, does nothing');
+    check(atEnd === made?.id && SaveMenu.selectedEntry(state) === null && state.selected === 0,
+      'End is the oldest save, and Home the "new save" row');
 
     // LOAD takes the selected save.
     game.ctx.party.state.champions[0]!.name = 'CHANGED';
-    clickRow(2);
+    rig.clickRow(2);
     check(SaveMenu.selectedEntry(state)?.id === made?.id, 'a click on the third row selects the older save');
-    clickButton(g.loadButtonId);
-    await settled();
-    const loadedParty = game.ctx.party.state.champions.map((c) => c.name).join('/');
-    console.log(`  the older save, then LOAD: ${selection()}, party ${loadedParty}`);
-    check(!SaveMenu.isSaveMenuOpen(ui) && loadedParty === 'DAROO', 'LOAD reads it into the game, and the menu closes');
+    await rig.click(g.loadButtonId);
+    console.log(`  the older save, then LOAD: ${selection()}, party ${rig.party()}`);
+    check(!SaveMenu.isSaveMenuOpen(ui) && rig.party() === 'DAROO', 'LOAD reads it into the game, and the menu closes');
 
-    ui.partyState = game.ctx.party.state;
-    SaveMenu.openSaveMenu(ui);
-    await settled();
+    const again = await rig.open();
     console.log(`  the full menu again: ${selection()}`);
-    check(ui.saveMenu !== null && SaveMenu.selectedEntry(ui.saveMenu) === null && ui.saveMenu.entries.length === 2,
+    check(SaveMenu.selectedEntry(again) === null && again.entries.length === 2,
       'the full menu opens on "new save" whatever the store holds');
     SaveMenu.closeSaveMenu(ui);
 
     // The boot's chooser lists the saves alone.
-    SaveMenu.openSaveMenu(ui, 'loadOnly');
-    await settled();
-    const chooser = ui.saveMenu!;
+    const chooser = await rig.open('loadOnly');
     console.log(`  the load-only chooser: ${selection()}`);
     check(chooser.selected === 0 && SaveMenu.selectedEntry(chooser)?.id === newer?.id,
       'the load-only chooser has no "new save" row: it opens on the newest save');
-    clickButton(g.saveButtonId);
-    check(chooser.press === null && store.files.size === 2, 'and its SAVE is inert');
+    await rig.click(g.saveButtonId);
+    check(store.files.size === 2 && SaveMenu.isSaveMenuOpen(ui), 'and its SAVE is inert');
     SaveMenu.closeSaveMenu(ui);
+  } finally {
+    Date.now = realNow;
+  }
+}
+
+/* ------------------------------------------------------------- 11. the question ---- */
+
+/**
+ * One store, the saves of two games and a file that names no playthrough, and the first
+ * game's menu over them: which LOAD and which SAVE ask first, and what each answer does.
+ */
+async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== the question before a load or a save across playthroughs ===');
+  const store = memoryStore();
+  const mine = await menuRig(graphics, store, 'DAROO');
+  const theirs = await menuRig(graphics, store, 'WUUF');
+  const early = await menuRig(graphics, store, 'LEYLA');
+  early.game.ctx.state.block1.randomGameID = 0;
+  const idOf = (rig: { game: Game }): number => rig.game.ctx.state.block1.randomGameID;
+  const { ui } = mine;
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  const rowOfStore = async (id: string): Promise<SaveEntry | undefined> => (await store.list(null)).find((e) => e.id === id);
+  /** Select a save and press LOAD or SAVE; what is up once the press has played. */
+  const press = async (save: SaveEntry, button: number): Promise<string> => {
+    mine.clickRow(mine.rowOf(save.id));
+    await mine.click(button);
+    const state = ui.saveMenu;
+    return !state ? 'no menu' : state.confirm ? `asks (${state.confirm})` : `no question, "${state.message}"`;
+  };
+
+  const realNow = Date.now;
+  let now = Date.UTC(2026, 8, 13, 14, 5, 6);
+  Date.now = () => now;
+  const later = (): void => { now += 60_000; };
+  try {
+    const theirOlder = await theirs.saves.save('stopped', 'new');
+    later();
+    const theirNewer = await theirs.saves.save('stopped', 'new');
+    later();
+    const own = await mine.saves.save('stopped', 'new');
+    later();
+    const nameless = await early.saves.save('stopped', 'new');
+    later();
+    check(idOf(mine) !== idOf(theirs) && nameless.playthrough === 0, 'two games are two playthroughs, and the third file names none');
+
+    const state = await mine.open();
+    const files = store.files.size;
+
+    // The game's own save: neither asks.
+    const ownSave = await press(own, g.saveButtonId);
+    console.log(`  SAVE on the game's own save: ${ownSave}`);
+    check(ownSave === 'no question, "GAME SAVED"' && (await rowOfStore(own.id))?.savedAt === now && store.files.size === files,
+      'SAVE over a save of the running game\'s playthrough does not ask');
+    later();
+
+    // Another playthrough's: SAVE asks, and writes nothing until the answer.
+    const held = store.files.get(theirNewer.id);
+    const asked = await press(theirNewer, g.saveButtonId);
+    console.log(`  SAVE on another playthrough's save: ${asked}`);
+    check(asked === 'asks (save)' && store.files.get(theirNewer.id) === held,
+      'SAVE over a save of another playthrough asks first, and has written nothing');
+
+    // The question is `_DoMenu`'s two-option menu, in the list's place.
+    SaveMenu.drawSaveMenu(ui);
+    const drawn = ui.screenIndexBuffer!.pixels.slice();
+    doMenu(ui, SaveMenu.SAVE_MENU_QUESTION, null, ['SAVE', 'CANCEL'], false);
+    check(drawn.every((p, i) => p === ui.screenIndexBuffer!.pixels[i]),
+      `it is _DoMenu's two-option menu: "${SaveMenu.SAVE_MENU_QUESTION}", SAVE, CANCEL`);
+
+    SaveMenu.saveMenuClick(ui, VIEWPORT_X + 4, VIEWPORT_Y + 4, LEFT);
+    SaveMenu.saveMenuKey(ui, 'Enter');
+    SaveMenu.saveMenuWheel(ui, 1);
+    await mine.settled();
+    check(state.confirm === 'save' && state.press === null && state.scrollTop === 0,
+      'a click off its buttons, Enter and the wheel leave it up');
+
+    await mine.click(211, 2);
+    console.log(`  CANCEL: ${state.confirm ? 'STILL ASKING' : 'the list'}, the selection ${SaveMenu.selectedEntry(state)?.id === theirNewer.id ? 'kept' : 'LOST'}`);
+    check(state.confirm === null && SaveMenu.isSaveMenuOpen(ui) && SaveMenu.selectedEntry(state)?.id === theirNewer.id
+      && store.files.get(theirNewer.id) === held, 'CANCEL brings the list back, the save selected and unwritten');
+
+    await mine.click(g.saveButtonId);
+    SaveMenu.saveMenuKey(ui, 'Escape');
+    const afterEscape = state.confirm;
+    await mine.click(g.saveButtonId);
+    SaveMenu.saveMenuClick(ui, VIEWPORT_X + 4, VIEWPORT_Y + 4, RIGHT);
+    check(afterEscape === null && state.confirm === null && SaveMenu.isSaveMenuOpen(ui) && store.files.get(theirNewer.id) === held,
+      'Esc and a right-click cancel the question, not the menu');
+
+    await mine.click(g.saveButtonId);
+    await mine.click(210, 2);
+    const written = await rowOfStore(theirNewer.id);
+    console.log(`  SAVE, then its first button: "${state.message}", the row ${written?.playthrough === idOf(mine) ? 'the running game\'s' : 'NOT WRITTEN'}, party ${written?.champions.join('/')}`);
+    check(state.confirm === null && state.message === 'GAME SAVED' && written?.playthrough === idOf(mine)
+      && written.champions.join() === 'DAROO' && store.files.size === files, 'its first button saves over it');
+    later();
+
+    // The "new save" row writes over nothing.
+    mine.clickRow(0);
+    await mine.click(g.saveButtonId);
+    check(state.confirm === null && store.files.size === files + 1, 'SAVE from the "new save" row does not ask');
+    later();
+
+    // LOAD asks the same, of a file that names no playthrough too.
+    const askedNameless = await press(nameless, g.loadButtonId);
+    await mine.click(211, 2);
+    const askedLoad = await press(theirOlder, g.loadButtonId);
+    console.log(`  LOAD on a file that names no playthrough: ${askedNameless}; on another playthrough's save: ${askedLoad}, party ${mine.party()}`);
+    check(askedNameless === 'asks (load)', 'LOAD of a file that names no playthrough asks first');
+    check(askedLoad === 'asks (load)' && mine.party() === 'DAROO' && idOf(mine) !== idOf(theirs),
+      'LOAD of a save of another playthrough asks first, and has loaded nothing');
+    await mine.click(210, 2);
+    console.log(`  LOAD, then its first button: ${SaveMenu.isSaveMenuOpen(ui) ? 'THE MENU' : 'the menu gone'}, party ${mine.party()}`);
+    check(!SaveMenu.isSaveMenuOpen(ui) && mine.party() === 'WUUF' && idOf(mine) === idOf(theirs),
+      'its first button loads it: the game is that playthrough\'s');
+
+    // The loaded game is of that playthrough now, and its saves are its own.
+    await mine.open();
+    const sameNow = await press(theirOlder, g.loadButtonId);
+    console.log(`  LOAD on the same save, from the game it loaded: ${sameNow}`);
+    check(sameNow === 'no menu' && mine.party() === 'WUUF', 'which that save is now of: LOAD does not ask again');
+
+    // The load-only chooser has no game behind it.
+    const stranger = await menuRig(graphics, store, 'HALK');
+    const chooser = await stranger.open('loadOnly');
+    check(SaveMenu.selectedEntry(chooser)?.playthrough !== idOf(stranger) && SaveMenu.asksFirst(stranger.ui, chooser) === false,
+      'the load-only chooser asks about no save');
+    await stranger.click(g.loadButtonId);
+    console.log(`  the load-only chooser, LOAD on its newest save: ${SaveMenu.isSaveMenuOpen(stranger.ui) ? 'THE MENU' : 'the menu gone'}, party ${stranger.party()}`);
+    check(!SaveMenu.isSaveMenuOpen(stranger.ui) && stranger.party() === 'DAROO', 'and loads it at once');
   } finally {
     Date.now = realNow;
   }
@@ -1345,6 +1511,7 @@ async function main(): Promise<void> {
   checkPressAnimation(graphics);
   await checkSaveCall();
   await checkSelection(graphics);
+  await checkQuestion(graphics);
   await checkUpgrade();
   finish();
 }

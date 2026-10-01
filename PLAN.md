@@ -261,8 +261,13 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   the game's playthrough, and is the dialog's save from then on: a quick-save written
   over is F5's slot no longer, and the next F5 makes another. **LOAD takes any save.**
   Either asks first when the save is of another
-  playthrough than the running game's; the order of two saves of one playthrough is
-  never checked, since loading an old save and saving over a newer one is ordinary play.
+  playthrough than the running game's, a file that names none included; the order of
+  two saves of one playthrough is never checked, since loading an old save and saving
+  over a newer one is ordinary play. The question is `_DoMenu`'s two-option menu in the
+  list's place: CSBWin's own line for a save of another `d.RandomGameID`, "THAT'S NOT
+  THE SAME GAME" (`doc/CSBwin-src/SaveGame.cpp:1605-1606`), over the action and CANCEL
+  (`asksFirst`, `src/renderer/ui/SaveMenu.ts`). The boot's chooser has no game behind
+  it and never asks.
 - **The last save used**, loaded or written, is remembered per data set and is the
   dialog's selection when it opens.
 
@@ -311,8 +316,9 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      one save call" (the row written over, F5's slot written over, another
      playthrough's save) and "the menu's selection, and what SAVE writes" (the menu's
      own clicks and keys); the golden frame shows the row.
-   - d. ⏳ **The two confirmations.** Until then SAVE writes over a selected save of
-     another playthrough, and LOAD reads one, without asking.
+   - d. ✅ **The two confirmations.** Evidence: `tools/dump-save-menu.ts`, "the
+     question before a load or a save across playthroughs" (which LOAD and which SAVE
+     ask, that nothing is done before the answer, and what each answer does).
    - e. ⏳ **The last save used.**
    - f. ⏳ **The play time.**
    - g. ⏳ **A drawn id is no stored row's.** The draw is repeated while a row of the
@@ -419,7 +425,8 @@ over `Menu.ts`, a faithful `_DoMenu` / `_WaitForMenuSelect`), listing the runnin
 set's saves (`GameSaves.list`, over `src/data/saves/`), newest first, each row with
 its date, level and party, under a first row, "NEW SAVE", which is the selection when
 the menu opens. LOAD reads the selected save. SAVE writes over it, or from "NEW SAVE"
-makes a new row, its file a `.dat` named for its date. Both,
+makes a new row, its file a `.dat` named for its date; either asks first on a save of
+another playthrough than the running game's. Both,
 and the two keys, go through `GameSaves` (`src/engine/GameSaves.ts`). F5
 writes its playthrough's quick-save, over the last, and F9 loads the newest save of its
 playthrough, F5's or the menu's. Each key says what it
@@ -429,7 +436,7 @@ and "CANNOT LOAD NOW" for that last; CSBWin's own "UNABLE TO SAVE GAME!"
 (`doc/CSBwin-src/SaveGame.cpp:1266`) and "CAN'T FIND SAVED GAME!" (`:1585`) for a write
 that failed and for no save at all; a file that does not read gives the line the menu's
 status would show. Each outcome is also a line for the console, with the save's name,
-and with the error behind a failure. The four places it
+and with the error behind a failure. The five places it
 diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`. Evidence:
 `tools/dump-save-menu.ts` and the golden frame `tools/frames/06-savemenu.png`.
 
