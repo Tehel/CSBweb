@@ -853,7 +853,7 @@ async function checkSaveCall(): Promise<void> {
   console.log('');
   console.log('=== the one save call (`GameSaves.save`) ===');
   // What F5 and F9 leave behind: a line in the message area, each after a linefeed, and
-  // the error of one that failed.
+  // one for the console.
   const told: string[] = [];
   const reports: string[] = [];
   const messages: MessageSink = {
@@ -967,14 +967,16 @@ async function checkSaveCall(): Promise<void> {
     check(scripted.game.isRunningScript() && toldSince(beforeScript) === '/15:CANNOT SAVE NOW/15:CANNOT LOAD NOW',
       'neither key does anything while a script holds the loop, and each says so');
     check(!scripted.game.canRestartFromSavegame(), 'and the save\'s tail has not run');
-    check(reports.length === 0, 'a key that is refused has no error to report');
+    console.log(`  and for the console: ${reports.join(' | ')}`);
+    check(reports.length === 4 && reports.slice(0, 3).every((report) => report.startsWith('Quick-save refused'))
+      && reports[3]!.startsWith('Quick-load refused'), 'each refusal is a line for the console too');
 
     // F5 with a party, where the page's store cannot be written: Node has no IndexedDB.
     const unwritable = await stage(false);
     const beforeFailure = told.length;
     await unwritable.saves.quickSave();
-    console.log(`  F5 where the store cannot be written: ${toldSince(beforeFailure)} (${reports.join(' | ')})`);
-    check(toldSince(beforeFailure) === '/15:UNABLE TO SAVE GAME!' && reports.join() === 'Quick-save failed',
+    console.log(`  F5 where the store cannot be written: ${toldSince(beforeFailure)} (${reports[4]})`);
+    check(toldSince(beforeFailure) === '/15:UNABLE TO SAVE GAME!' && reports.length === 5 && reports[4] === 'Quick-save failed',
       'a write that fails is SaveError\'s line (SaveGame.cpp:1266), and its error is reported');
   } finally {
     Date.now = realNow;

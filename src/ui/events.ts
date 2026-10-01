@@ -1,6 +1,5 @@
 import { GameInput } from '../renderer/GameInput';
 import { getUIContext, isDebugFeaturesEnabled, setDebugFeaturesEnabled } from './context';
-import { updateDebug } from './messages';
 import { handleMapCanvasClick } from './mapPreview';
 import { updateChampionPanel } from './championPanel';
 import { applyUISettings, loadUISettings, readUISettings, saveUISettings } from './settings';
@@ -11,8 +10,6 @@ let uiBound = false;
 const mapCanvasEl = document.getElementById('map-canvas') as HTMLCanvasElement | null;
 const debugButton = document.getElementById('btn-debug') as HTMLButtonElement | null;
 const mapButton = document.getElementById('btn-map') as HTMLButtonElement | null;
-const logButton = document.getElementById('btn-log') as HTMLButtonElement | null;
-const hoverButton = document.getElementById('btn-hover') as HTMLButtonElement | null;
 const championsButton = document.getElementById('btn-champions') as HTMLButtonElement | null;
 const smoothButton = document.getElementById('btn-smooth') as HTMLButtonElement | null;
 const crtButton = document.getElementById('btn-crt') as HTMLButtonElement | null;
@@ -75,8 +72,8 @@ export function bindUIEvents(): void {
             const next = !ctx.isCrtEnabled();
             const enabled = ctx.setCrtEnabled(next);
             crtButton.classList.toggle('is-pressed', enabled);
-            if (next && !enabled) updateDebug('CRT effect unavailable');
-            else updateDebug(enabled ? 'CRT effect enabled' : 'CRT effect disabled');
+            if (next && !enabled) console.warn('CRT effect unavailable');
+            else console.info(enabled ? 'CRT effect enabled' : 'CRT effect disabled');
             saveUISettings(readUISettings());
         });
 
@@ -84,7 +81,7 @@ export function bindUIEvents(): void {
             const next = !ctx.isSoundEnabled();
             ctx.setSoundEnabled(next);
             soundButton.classList.toggle('is-pressed', next);
-            updateDebug(next ? 'Sound enabled' : 'Sound disabled');
+            console.info(next ? 'Sound enabled' : 'Sound disabled');
             saveUISettings(readUISettings());
         });
 
@@ -98,7 +95,7 @@ export function bindUIEvents(): void {
             const next = !isDebugFeaturesEnabled();
             setDebugFeaturesEnabled(next);
             debugButton.classList.toggle('is-pressed', next);
-            updateDebug(next ? 'Debug features enabled' : 'Debug features disabled');
+            console.info(next ? 'Debug features enabled' : 'Debug features disabled');
             saveUISettings(readUISettings());
         });
 
@@ -108,24 +105,6 @@ export function bindUIEvents(): void {
             const visible = mapEl.style.display !== 'none';
             mapEl.style.display = visible ? 'none' : 'block';
             mapButton.classList.toggle('is-pressed', !visible);
-            saveUISettings(readUISettings());
-        });
-
-        logButton?.addEventListener('click', () => {
-            const logEl = document.getElementById('log');
-            if (!logEl) return;
-            const visible = logEl.style.display !== 'none';
-            logEl.style.display = visible ? 'none' : 'block';
-            logButton.classList.toggle('is-pressed', !visible);
-            saveUISettings(readUISettings());
-        });
-
-        hoverButton?.addEventListener('click', () => {
-            const hoverEl = document.getElementById('hover');
-            if (!hoverEl) return;
-            const visible = hoverEl.style.display !== 'none';
-            hoverEl.style.display = visible ? 'none' : 'block';
-            hoverButton.classList.toggle('is-pressed', !visible);
             saveUISettings(readUISettings());
         });
 
@@ -151,7 +130,7 @@ export function bindUIEvents(): void {
         dmRulesButton?.addEventListener('click', () => {
             ctx.game.ctx.rules.dmRules = !ctx.game.ctx.rules.dmRules;
             showDMRules();
-            updateDebug(ctx.game.ctx.rules.dmRules ? 'DM Rules on' : 'DM Rules off');
+            console.info(ctx.game.ctx.rules.dmRules ? 'DM Rules on' : 'DM Rules off');
         });
         ctx.game.onTick(showDMRules);
 

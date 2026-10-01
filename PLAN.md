@@ -74,8 +74,11 @@ Back** are not postponed: it is the next dungeon to try.
   the credits scroll. The game's `dungeon.dat` is read after ENTER, as CSBWin reads it.
 - Three data sets (`src/data/DataSets.ts`: `dm-atari`, the default, `dm-windows` and
   `csb`), one chosen before the boot by `?dungeon=<id>`, and the DM Rules toggle.
-- Debug scaffolding is the chrome beside the canvas (`src/ui/`) and the newest save
-  loaded at the boot, both behind `isDebugFeaturesEnabled()`.
+- Debug scaffolding is the chrome beside the canvas (`src/ui/`): the settings, the map
+  preview and the champion panel. Its teleport by a click on the map and its cursor
+  filter trace are behind `isDebugFeaturesEnabled()`. It has no log of its own: what
+  the page reports goes to the console, a move's position at debug level, what F5 or
+  F9 did at info level.
 
 **Incomplete:**
 - ⚠️ **The save menu.** Save files are done: the reader, and the game's own save button,
@@ -346,8 +349,8 @@ NOW" with no party, with a champion still being chosen, or while a script holds 
 and "CANNOT LOAD NOW" for that last; CSBWin's own "UNABLE TO SAVE GAME!"
 (`doc/CSBwin-src/SaveGame.cpp:1266`) and "CAN'T FIND SAVED GAME!" (`:1585`) for a write
 that failed and for no save at all; a file that does not read gives the line the menu's
-status would show. The error behind a failure goes to the console. The page's restore of
-the last save at boot, a Debug convenience, is an F9 and reports as one. The five places it
+status would show. Each outcome is also a line for the console, with the save's name,
+and with the error behind a failure. The five places it
 diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`. Evidence:
 `tools/dump-save-menu.ts` and the golden frame `tools/frames/06-savemenu.png`.
 

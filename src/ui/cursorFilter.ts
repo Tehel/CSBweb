@@ -1,7 +1,6 @@
 import { DBType, decodeObjectID } from '../core/types';
 import { CursorFilterType, type CursorFilterPacket } from '../engine/GameHost';
 import { isDebugFeaturesEnabled } from './context';
-import { updateDebug } from './messages';
 
 const DB_TYPE_LABELS: Record<number, string> = {
   [DBType.DOOR]: 'Door',
@@ -37,6 +36,6 @@ export function handleCursorFilter(packet: CursorFilterPacket): boolean {
   const decoded = decodeObjectID(packet.object);
   const categoryLabel = DB_TYPE_LABELS[decoded.category] ?? `DB${decoded.category}`;
   const actionLabel = FILTER_LABELS[packet.type] ?? packet.type;
-  updateDebug(`[CursorFilter] ${actionLabel}: ${categoryLabel} ${packet.object.toString(16).padStart(4, '0')} at L${packet.level} (${packet.x},${packet.y}) pos ${packet.pos}`);
+  console.debug(`[CursorFilter] ${actionLabel}: ${categoryLabel} ${packet.object.toString(16).padStart(4, '0')} at L${packet.level} (${packet.x},${packet.y}) pos ${packet.pos}`);
   return true;
 }

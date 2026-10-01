@@ -1,6 +1,5 @@
 import { Position, RoomType, getRoomType } from '../core/types';
 import { getUIContext, isDebugFeaturesEnabled } from './context';
-import { updateDebug } from './messages';
 import { getEventPosition, getMapPreviewLayout } from './utils';
 
 const mapCanvasEl = document.getElementById('map-canvas') as HTMLCanvasElement | null;
@@ -69,5 +68,5 @@ export function handleMapCanvasClick(e: MouseEvent): void {
     });
     ctx.refreshScreen();
     drawMapPreview(state.position.z);
-    updateDebug(`Teleported to (${gx}, ${gy}, ${state.position.z})`);
+    console.debug(`Teleported to (${gx}, ${gy}, ${state.position.z})`);
 }

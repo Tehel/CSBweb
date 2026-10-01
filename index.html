@@ -69,27 +69,8 @@
         #map {
             background-color: #888;
         }
-        /* Developer/debug output only. Gameplay messages render inside the canvas,
-           in CSBWin's 4-row scrolling message area. */
-        #log {
-            background-color: #999;
-            height: 220px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-size: 11px;
-            line-height: 1.25;
-            padding: 2px 4px;
-        }
-        /* Fixed height, not max-height: the hover report changes length on every mouse
-           move, and a panel that resizes reflows the canvas beside it. */
-        #hover {
-            background-color: #aaa;
-            height: 150px;
-            overflow-y: scroll;
-        }
-
-        /* Fixed width, for the reason #hover has a fixed height: the table is always four
-           champion columns, and a panel that changed width would reflow the canvas. */
+        /* Fixed width: the table is always four champion columns, and a panel that
+           changed width would reflow the canvas beside it. */
         #champions {
             --bar: #7a9a6a;
             background-color: #bbb;
@@ -203,16 +184,12 @@
                 <input id="sound-volume" type="range" min="0" max="100" value="80">
                 <br>
                 <button id="btn-map" class="toggle-button is-pressed">Map</button>
-                <button id="btn-log" class="toggle-button">Log</button>
-                <button id="btn-hover" class="toggle-button">Hover</button>
                 <button id="btn-champions" class="toggle-button">Champions</button>
                 <button id="btn-debug" class="toggle-button">Debug</button>
             </div>
             <div id="map">
                 <canvas id="map-canvas" width="360" height="360"></canvas>
             </div>
-            <div id="log"></div>
-            <div id="hover">...hover...</div>
             <div id="champions" style="display: none"></div>
         </div>
     </div>

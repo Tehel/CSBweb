@@ -12,7 +12,7 @@ import { decodeCursorBitmap } from '../../data/tables/UITables';
 import { canPlaceInSlot, drawPositionSquare } from './Character';
 import { objectIconBitmap } from './Draw';
 import { handleMouthPress } from './Feeding';
-import { pointInRect, searchButtonList } from './HitTest';
+import { searchButtonList } from './HitTest';
 import { getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
 import { drawLegalAttackTypes, handleAttackAreaClick } from './Attack';
@@ -723,24 +723,4 @@ export function drawCursorBitmap(ui: UIState, bitmap: IndexedBitmap, x: number, 
       dst.pixels[dstRow + dx] = pixel;
     }
   }
-}
-
-/**
- * The debug chrome's hover report: every `graphics.dat` 0x231 button under the pointer,
- * one per line, or null with no pointer over the screen.
- */
-export function describeHoveredButtons(ui: UIState): string | null {
-  if (!ui.hoverPoint) return null;
-  const { x, y } = ui.hoverPoint;
-
-  const hovered: string[] = [];
-  const buttonGroups = Object.values(ui.uiTables.graphic231.buttons);
-  for (const group of buttonGroups) {
-    for (const btn of group) {
-      if (pointInRect(x, y, btn)) {
-        hovered.push(`231: ${btn.name ?? '?'} - ${btn.button} - ${btn.word0}`);
-      }
-    }
-  }
-  return hovered.join("<br>");
 }

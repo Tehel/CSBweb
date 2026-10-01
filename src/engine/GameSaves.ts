@@ -11,7 +11,7 @@
  * that menu's stores (`src/data/saves/`): one more save to the current source, and the
  * most recent save from wherever it lives, so both mean the same "most recent save".
  * Neither raises a dialog, so what either did, or why it did nothing, is a line in the
- * message area.
+ * message area, and one for the console with the save's name.
  */
 import { readCsbwinSaveInfo } from '../data/CsbwinSaveInfo';
 import type { DataSet } from '../data/DataSets';
@@ -81,10 +81,10 @@ export class GameSaves {
         readonly dataSet: DataSet,
         private readonly screen: GameSavesScreen,
         /**
-         * The error behind an F5 or an F9 that failed, for the console: the message area
-         * says only that it did.
+         * A line for the console on what F5 or F9 did, with the error when one failed:
+         * the message area says only that it did.
          */
-        private readonly reportError: (what: string, error: unknown) => void,
+        private readonly log: (message: string, error?: unknown) => void,
     ) {}
 
     /**
@@ -177,16 +177,19 @@ export class GameSaves {
         const { champions, potentialChampionIndex } = this.game.ctx.party.state;
         if (champions.length === 0 || potentialChampionIndex >= 0 || this.game.isRunningScript()) {
             this.tell('CANNOT SAVE NOW');
+            this.log('Quick-save refused: no party, a champion being chosen, or a script running');
             return;
         }
         try {
             // `writableSaveStore` falls back to the browser when the file source is
             // chosen but not connected: F5 must never raise a folder picker over the game.
-            await this.save(writableSaveStore(), 'running');
+            const store = writableSaveStore();
+            const { name } = await this.save(store, 'running');
             this.tell('GAME SAVED');
+            this.log(`Quick-saved ${name} (${store.kind === 'file' ? 'disk' : 'browser'})`);
         } catch (error) {
             this.tell('UNABLE TO SAVE GAME!');
-            this.reportError('Quick-save failed', error);
+            this.log('Quick-save failed', error);
         }
     }
 
@@ -201,23 +204,22 @@ export class GameSaves {
     async quickLoad(): Promise<void> {
         if (this.game.isRunningScript()) {
             this.tell('CANNOT LOAD NOW');
+            this.log('Quick-load refused: a script running');
             return;
         }
         try {
             const latest = await findLatestSave();
             if (!latest) {
                 this.tell('CAN\'T FIND SAVED GAME!');
+                this.log('Quick-load: no saved game found');
                 return;
             }
             this.read(await latest.store.read(latest.entry.id));
             this.tell('GAME LOADED');
+            this.log(`Quick-loaded ${latest.entry.name}`);
         } catch (error) {
-            if (error instanceof SaveFileError) {
-                this.tell(error.message);
-                return;
-            }
-            this.tell('UNABLE TO LOAD GAME!');
-            this.reportError('Quick-load failed', error);
+            this.tell(error instanceof SaveFileError ? error.message : 'UNABLE TO LOAD GAME!');
+            this.log('Quick-load failed', error);
         }
     }
 }

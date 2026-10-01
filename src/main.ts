@@ -14,7 +14,7 @@ import { extractGraphicsTables, type GraphicsTables } from './data/tables/Graphi
 import { GameSaves } from './engine/GameSaves';
 import { loadGlfx } from './lib/glfx-loader';
 import { GameScreen } from './renderer/GameScreen';
-import { bindDataSetChooser, bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabled, updateDebug, updateHover } from './ui';
+import { bindDataSetChooser, bindUIContext, drawMapPreview, handleCursorFilter } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { Die, runBootSequence, runShowCredits } from './renderer/intro/BootSequence';
@@ -182,7 +182,7 @@ interface GameFiles {
 }
 
 async function loadGameFiles(): Promise<GameFiles> {
-    updateDebug(`Loading ${dataSet.name}: graphics.dat...`);
+    console.log(`Loading ${dataSet.name}: graphics.dat...`);
     const graphicsLoader = new GraphicsLoader();
     await graphicsLoader.load(`${dataSet.dir}/graphics.dat`);
     console.log(`✓ Loaded graphics: ${graphicsLoader.getItemCount()} items`);
@@ -287,7 +287,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // carry only a portrait index.
         portraitOf: (champion) => screen?.portraitPixelsFor(champion),
         repackOpenChest: () => screen?.repackChest(),
-    }, reportSaveError);
+    }, logSave);
 
     screen = new GameScreen(gameCanvasEl, {
         graphicsLoader: files.graphicsLoader,
@@ -309,7 +309,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             console.error('Saved game damaged:', error);
             saves.readFailed();
         },
-        reportHover: updateHover,
     });
     return { game, screen, saves, messages };
 }
@@ -394,7 +393,6 @@ async function runIntro(game: Game, screen: GameScreen, saves: GameSaves, sound:
         consumeSavedGameRead: () => saves.consumeSavedGameRead(),
         readNewGame: () => readNewGame(game),
         skip: skipIntro,
-        reportDebug: updateDebug,
     });
 }
 
@@ -418,7 +416,7 @@ function wire(game: Game, screen: GameScreen, saves: GameSaves, sound: SoundMana
     });
 
     game.onMove((success) => {
-        if (success) updateDebug(game.getPositionInfo() || 'Moved');
+        if (success) console.debug(game.getPositionInfo() || 'Moved');
     });
 
     // A move draws nothing: it brings a tick on at once (`d.clockTick = 1`), and CSBWin
@@ -450,14 +448,10 @@ function wire(game: Game, screen: GameScreen, saves: GameSaves, sound: SoundMana
     });
 }
 
-function start(game: Game, saves: GameSaves): void {
+function start(game: Game): void {
     game.start();
     console.log('✓ Game engine started');
     console.log('✓ Starting position:', game.getPositionInfo());
-
-    // Dev convenience only: restore the previous session's quick-save so a reload
-    // lands back where you were. With Debug off, boot into a fresh dungeon.
-    if (isDebugFeaturesEnabled()) void saves.quickLoad();
     // The game is read, new or resumed: where CSBWin's boot forces DM rules.
     game.forceDMRulesAtBoot();
 
@@ -467,7 +461,6 @@ function start(game: Game, saves: GameSaves): void {
 async function init() {
     try {
         bindDataSetChooser(dataSet);
-        updateDebug('Loading Phase 1: Core modules...');
         const files = await loadGameFiles();
         // Every graphics.dat table, read once: the engine's set is built from it, and the
         // screen is handed the same object.
@@ -497,21 +490,21 @@ async function init() {
         }
         await runIntro(built.game, built.screen, built.saves, sound);
         wire(built.game, built.screen, built.saves, sound, built.messages);
-        start(built.game, built.saves);
+        start(built.game);
     } catch (error) {
         reportError(error);
     }
 }
 
-/** The error behind an F5 or an F9 that failed (`GameSaves`): the message area has said so. */
-function reportSaveError(what: string, error: unknown): void {
-    console.warn(`${what}:`, error);
+/** What F5 or F9 did, for the console (`GameSaves`), with the error of one that failed. */
+function logSave(message: string, error?: unknown): void {
+    if (error === undefined) console.info(message);
+    else console.warn(`${message}:`, error);
 }
 
 /** An error that ends the page's game: `init`'s, or `die`'s (`Die`) wherever it comes from. */
 function reportError(error: unknown): void {
     console.error(error);
-    updateDebug(`Error: ${error}`);
 }
 
 

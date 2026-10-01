@@ -137,7 +137,7 @@ const boot = async () => {
     try {
       localStorage.clear();
       localStorage.setItem('dmweb_ui_settings_v1', JSON.stringify({
-        mapVisible: true, logVisible: true, hoverVisible: true, smooth: false,
+        mapVisible: true, smooth: false,
         debug: true, crt: false, soundEnabled: false, soundVolume: 0.8 }));
     } catch (e) {}
     let seed = 0x2545f491;

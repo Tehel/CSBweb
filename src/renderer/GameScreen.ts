@@ -46,7 +46,6 @@ import { drawStaticUIFrame } from './ui/Draw';
 import {
   drawCursorItem,
   marchingOrderPointerMoved,
-  describeHoveredButtons,
   handleMouseButton,
   handleInventoryToggle,
   handleMouseUnclick,
@@ -83,20 +82,14 @@ import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectInd
 
 /**
  * What the interface asks of the page. Each is one of `UIState`'s hooks out, documented
- * there, except `reportHover`. The engine the interface reaches through `ui.ctx`.
+ * there. The engine the interface reaches through `ui.ctx`.
  */
-export interface GameScreenHooks extends Pick<UIState,
+export type GameScreenHooks = Pick<UIState,
   | 'onReincarnated'
   | 'onSaveGame'
   | 'onRestoreSave'
   | 'onRestoreFailed'
-> {
-  /**
-   * The debug chrome's hover report, once per frame the pointer is over the screen: the
-   * buttons under it (`describeHoveredButtons`).
-   */
-  reportHover(html: string): void;
-}
+>;
 
 /** What the screen reads: the graphics, and the game it shows. */
 export interface GameScreenDeps {
@@ -127,7 +120,6 @@ export class GameScreen {
   /** `d.LogicalScreenBase`, the whole screen as palette indices. */
   private readonly screen: ScreenIndexBuffer;
   private readonly uiPalette: number[];
-  private readonly reportHover: (html: string) => void;
   private readonly messages: ScrollingText;
   /** A dungeon view has been drawn, so there is an adventure frame to compose again. */
   private viewportDrawn = false;
@@ -135,7 +127,6 @@ export class GameScreen {
 
   constructor(canvas: HTMLCanvasElement, deps: GameScreenDeps, hooks: GameScreenHooks) {
     const { graphicsLoader } = deps;
-    this.reportHover = hooks.reportHover;
     this.messages = deps.messages;
 
     this.canvas = canvas;
@@ -490,8 +481,6 @@ export class GameScreen {
       // `I1 == 0`.
       drawSaveMenu(this.ui);
     }
-    const hovered = describeHoveredButtons(this.ui);
-    if (hovered !== null) this.reportHover(hovered);
     // The button flash's inversion (`vblFlashButn`), for as long as `d.Word11776` says it
     // stands. The cursor goes over it: the VBL takes the cursor off before a flash right
     // of `x = 192`, where every flashed button is (doc/CSBwin-src/CSBCode.cpp:883-884),

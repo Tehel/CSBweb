@@ -155,7 +155,7 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
   ui/       The DM interface, one module per CSBWin file — Mouse, Inventory, Character,
             MagicPanel, Feeding, Objects, Draw, HitTest, ViewportPicking, all over
             a shared UIState. See doc/UI_MODULE_MAP.md.
-ui/         DOM-side debug chrome (settings, map preview, log)
+ui/         DOM-side debug chrome (settings, map preview, champion panel)
 lib/        glfx (the CRT effect's WebGL) and its loader
 main.ts     Bootstrap and wiring
 ```
