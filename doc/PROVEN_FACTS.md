@@ -3033,12 +3033,12 @@ preparation is from RC4" (`doc/CSBwin-src/RC4.cpp:1-3`), and it is so:
 
 A file is behind it when `SimpleEncryption` (`EF_FLAGS` 0x04) is in its Extended
 Features block. The key is `simple[0] = 1; simple[1] = 0; RC4_prepare_key(simple, 1)`:
-one byte, the second never read (`doc/CSBwin-src/SaveGame.cpp:325-329`, and `SaveGame`'s
+one byte, the second never read (`doc/CSBwin-src/SaveGame.cpp:326-329`, and `SaveGame`'s
 at `:915-918`). `ReadExtendedFeatures` deciphers the 512 bytes it has read at position 0
 when they do not open with the sentinel, and marks the file enciphered if they then do
-and carry the flag (`:323-338`); from there `READ` deciphers every buffer by its position
-in the file (`doc/CSBwin-src/system.cpp:303-313`), and `WRITE` enciphers the same way
-(`:316-329`). The whole file is enciphered, the block included.
+and carry the flag (`:324-338`); from there `READ` deciphers every buffer by its position
+in the file (`doc/CSBwin-src/system.cpp:301-313`), and `WRITE` enciphers the same way
+(`:315-329`). The whole file is enciphered, the block included.
 
 `rc4PrepareKey` and `rc4Encipher` (`src/data/CsbwinExtendedFeatures.ts`) are the two
 functions. `tools/dump-extended-features-read.ts` checks the stream against `RC4.cpp`
@@ -3046,6 +3046,34 @@ compiled as it stands, and against Conflux 3.5's `dungeon.dat`
 (`static/gamefiles/conflux-3.5-b8/`), which is such a file: deciphered, it opens with the
 sentinel, its `flags` are 0xff, the block's checksum matches, and so do the two object
 maps' behind it, 59775 bytes read by their position.
+
+## A block `ReadExtendedFeatures` gives up on is no block
+
+`ReadExtendedFeatures` notes the file position, reads 512 bytes, and in four cases seeks
+back to that position and returns 0 (`doc/CSBwin-src/SaveGame.cpp:320-353`):
+
+- fewer than 512 bytes were read (`:323`);
+- `strcmp(efb.sentinel, " Extended Features ") != 0`, and deciphered under the simple key
+  the same test still fails (`:324-343`). `strcmp` wants the terminator, so `sentinel[19]`
+  must be 0;
+- the sentinel is there once deciphered, but `flags` has no `SimpleEncryption`
+  (`:333-343`);
+- `FormChecksum` over the 512 bytes, with `extendedFeaturesChecksum` zeroed, is not the
+  stored value (`:345-353`).
+
+Its two callers take the 0 as `ExtendedFeaturesSize` and read on from the file's first
+byte: `LoadGame` reads GAMEBLOCK1 there (`:1599-1601`), and `ReadDatabases` the dungeon's
+first eight bytes (`:2348-2350`). A damaged block is therefore never an error of its own.
+The file fails, or not, by what its first bytes are when read as something else: a save
+whose block has one byte changed fails `ReadUnscrambleBlock`, which is `tag01efee`.
+
+`ExtendedFeaturesVersion` is `'@'` and every flag false from the function's first lines
+(`:305-315`), so a file given up on is read in the original shapes. The two errors the
+function does raise come later, once the block is believed: the object maps' checksums
+and lengths, "Extended features damaged" and `die(0xe3ee17)` (`:367-376`).
+
+`readExtendedFeatures` (`src/data/CsbwinExtendedFeatures.ts`) returns its no-block
+result in the four cases, checked by `tools/dump-extended-features-read.ts`.
 
 ## `CheckMonsters` overwrites a save's attached groups, and the game's start puts them back
 

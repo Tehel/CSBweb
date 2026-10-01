@@ -196,18 +196,19 @@ export function rc4Encipher(state: Uint8Array, buffer: Uint8Array, position: num
 /**
  * The stream of the "simple" encipherment: `simple[0] = 1; simple[1] = 0;
  * RC4_prepare_key(simple, 1)`, a key of one byte
- * (`doc/CSBwin-src/SaveGame.cpp:325-329`, `:915-918`).
+ * (`doc/CSBwin-src/SaveGame.cpp:326-329`, `:915-918`).
  */
 export function simpleEncipherKey(): Uint8Array {
     return rc4PrepareKey(new Uint8Array([1, 0]), 1);
 }
 
+/** `strcmp(efb.sentinel, " Extended Features ") == 0`: the nineteen characters and the terminator. */
 function hasExtendedSentinel(buf: Uint8Array): boolean {
-    if (buf.length < EXTENDED_SENTINEL.length) return false;
+    if (buf.length <= EXTENDED_SENTINEL.length) return false;
     for (let i = 0; i < EXTENDED_SENTINEL.length; i++) {
         if (buf[i] !== EXTENDED_SENTINEL.charCodeAt(i)) return false;
     }
-    return true;
+    return buf[EXTENDED_SENTINEL.length] === 0;
 }
 
 class RcsReader {
@@ -331,7 +332,9 @@ function readDsa(rcs: RcsReader): DsaDefinition {
  * `ReadExtendedFeatures` (`doc/CSBwin-src/SaveGame.cpp:298-432`) over the front of a file,
  * a save's or a `dungeon.dat`'s: the block, the object maps, the DSAs, the game
  * information and the DSA level index. `offset` is `ExtendedFeaturesSize`, 0 when the
- * file opens with no block.
+ * file opens with no block: one shorter than 512 bytes, one without the sentinel plain or
+ * enciphered, or one whose block fails its checksum (`:320-353`). The file is then read
+ * from its first byte.
  */
 export function readExtendedFeatures(data: Uint8Array): {
     offset: number;
@@ -366,26 +369,27 @@ export function readExtendedFeatures(data: Uint8Array): {
     const block = data.subarray(0, EXTENDED_FEATURES_SIZE);
     let parsed = block;
 
+    // Without the sentinel the block may be an enciphered one: deciphered, it must open
+    // with the sentinel and carry `SimpleEncryption` in its `flags`
+    // (`doc/CSBwin-src/SaveGame.cpp:324-343`).
     if (!hasExtendedSentinel(block)) {
-        // ⚠️ CSBWin also wants `SimpleEncryption` in the deciphered `flags` (`DEBT.md` C107).
         const decoded = block.slice();
         rc4Encipher(simpleEncipherKey(), decoded, 0);
-        if (!hasExtendedSentinel(decoded)) return noBlock;
+        if (!hasExtendedSentinel(decoded) || ((decoded[37] ?? 0) & EF_FLAGS.SimpleEncryption) === 0) {
+            return noBlock;
+        }
         parsed = decoded;
     }
 
     // `ReadExtendedFeatures` verifies the block against its own checksum before it
     // believes a single field of it (`doc/CSBwin-src/SaveGame.cpp:345-353`): the stored
     // value is lifted out, the field zeroed, and `FormChecksum` run over all 512 bytes.
-    // Worth doing here for the same reason CSBWin does it — the offsets below are only
-    // as trustworthy as the block they are read from.
-    // ⚠️ CSBWin then reads the file as one with no block, where this throws (`DEBT.md` C107).
+    // A block that fails is no block: CSBWin seeks back and returns 0, and its caller
+    // reads GAMEBLOCK1, or the dungeon's header, from the file's first byte.
     const checked = parsed.slice();
     const storedChecksum = readU32LE(checked, 32);
     checked[32] = checked[33] = checked[34] = checked[35] = 0;
-    if (formChecksum(checked) !== (storedChecksum >>> 0)) {
-        throw new Error('extended features block checksum mismatch');
-    }
+    if (formChecksum(checked) !== (storedChecksum >>> 0)) return noBlock;
 
     const header = parseExtendedFeaturesBlock(parsed);
     // The three fields `ExtendedFeaturesBlock` leaves out, which describe the two maps

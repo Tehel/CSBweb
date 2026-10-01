@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C107 | A damaged Extended Features block is an error, where CSBWin reads the file as one without a block | S | ⏳ |
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
@@ -165,25 +164,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C107 ⏳ A damaged Extended Features block is an error, where CSBWin reads the file as one without a block
-
-`ReadExtendedFeatures` gives up on the block in two cases the port does not, seeking back
-and returning 0, so that the file is then read from its first byte as one with no block
-(`doc/CSBwin-src/SaveGame.cpp:323-353`):
-
-- **The block's checksum is wrong** (`:345-353`). `readExtendedFeatures`
-  (`src/data/CsbwinExtendedFeatures.ts`) throws "extended features block checksum
-  mismatch".
-- **The sentinel appears only after the RC4 pass, and `flags` has no
-  `SimpleEncryption`** (`:333-343`). The port takes the deciphered block on its sentinel
-  alone.
-
-In both, CSBWin goes on to read GAMEBLOCK1, or the dungeon's header, at byte 0, and fails
-or not by those bytes; the port fails at once for the first and reads a block for the
-second. Paying it: both return what a file with no block does, and a `tools/` check
-gives a save with one byte of its block changed and reads what `LoadGame` then makes of
-it (`tag01efee`'s "SAVED GAME DAMAGED!", if GAMEBLOCK1's checksum is what refuses it).
 
 ---
 
@@ -379,7 +359,7 @@ No shipped DM hero touches any of these.
 a `dungeon.dat`, behind `RC4.cpp`'s cipher (`doc/PROVEN_FACTS.md` → "The "simple"
 encipherment is `RC4.cpp`'s own cipher"), and CSBWin sets it only when it reads a file
 already enciphered (`doc/CSBwin-src/SaveGame.cpp:326-338`); `readExtendedFeatures`
-deciphers the 512-byte header and no more (`C107` has its test of the flag), so an
+deciphers the 512-byte header and no more, so an
 enciphered file fails at the object maps, and the writer never sets it. Conflux 3.5's
 `dungeon.dat` is such a file, and the canary for reading one
 (`tools/dump-extended-features-read.ts`). And `MakeBigActuators` reads each actuator's type before
