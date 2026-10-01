@@ -47,8 +47,8 @@
  *
  * Run: `npx tsx tools/dump-dungeon-image-blocks.ts [path-or-directory]`
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
@@ -71,8 +71,8 @@ import type { CsbwinObjectIndex } from '../src/data/CsbwinObjectIndex';
 import { DBType, OBJECT_ID_NULL } from '../src/core/types';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { check, finish } from './lib/check';
+import { genuineSaves } from './lib/saves';
 
-const DEFAULT_DIR = 'static/gamefiles/saves';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 
 /** Everything from here up is an `RNVAL` literal, not a slot (`CSBTypes.h:236-250`). */
@@ -425,7 +425,7 @@ function resolveOrNull(index: CsbwinObjectIndex | null, raw: number): number {
  * `DeleteDBEntry` writes `RNnul` over a record's link and frees the indirect slot that
  * named it, but leaves the rest of the record alone (`doc/CSBwin-src/data.cpp:993-1015`),
  * so a deleted record routinely still points its possession or contents chain at a slot
- * that has since been freed or reused — `csbgame2.dat`'s `monster[158]` is exactly that.
+ * that has since been freed or reused.
  * `DungeonLoader.readRNOfRecord` reads those and drops them, because resolving one is
  * meaningless and refusing one would make a perfectly good save unreadable, so the writer
  * has nothing to put back but `RNnul`. CSBWin never looks at them: a free record is
@@ -525,18 +525,6 @@ function recordRnValues(dungeon: DungeonData, db: number): Array<Record<number, 
 
 /* --------------------------------------------------------------------------- main --- */
 
-function collect(target: string): string[] {
-  const path = resolve(target);
-  if (!existsSync(path)) return [];
-  if (statSync(path).isDirectory()) {
-    return readdirSync(path)
-      .filter((n) => n.toLowerCase().endsWith('.dat') && !n.includes(':'))
-      .sort()
-      .map((n) => join(path, n));
-  }
-  return [path];
-}
-
 function main(): void {
   /* ---- dungeon.dat, whose header differs from a save's in two words ---- */
 
@@ -567,7 +555,7 @@ function main(): void {
 
   /* ---- and every committed save ---- */
 
-  const saves = collect(process.argv[2] ?? DEFAULT_DIR);
+  const saves = genuineSaves(process.argv[2]);
   check(saves.length > 0, 'there should be save files to read');
   for (const path of saves) {
     const name = path.split('/').pop() ?? path;

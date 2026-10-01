@@ -18,31 +18,19 @@
  *
  * Run: `npx tsx tools/dump-csbwin-world.ts [path-or-directory]`
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL } from '../src/core/types';
 import type { ContainerRecord, CreatureRecord, DungeonData } from '../src/data/dungeonTypes';
 import { check, finish } from './lib/check';
+import { genuineSaves } from './lib/saves';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const DEFAULT_DIR = 'static/gamefiles/saves';
 /** The saves made at the first possible moment; their world is still the pristine one. */
 const EARLY = /^csbgame-early-/;
-
-function collectSaves(target: string): string[] {
-  const path = resolve(target);
-  if (!existsSync(path)) return [];
-  if (statSync(path).isDirectory()) {
-    return readdirSync(path)
-      .filter((n) => n.toLowerCase().endsWith('.dat') && !n.includes(':'))
-      .sort()
-      .map((n) => join(path, n));
-  }
-  return [path];
-}
 
 const DB_OF_CATEGORY: Record<number, keyof DungeonData['databases']> = {
   0: 'doors', 1: 'teleporters', 2: 'texts', 3: 'actuators', 4: 'creatures',
@@ -126,7 +114,7 @@ function main(): void {
     `dungeon.dat's own chains walk clean — ${pristineChains.problems.slice(0, 3).join('; ')}`,
   );
 
-  const saves = collectSaves(process.argv[2] ?? DEFAULT_DIR);
+  const saves = genuineSaves(process.argv[2]);
   check(saves.length > 0, 'there should be save files to read');
 
   let earlySeen = 0;

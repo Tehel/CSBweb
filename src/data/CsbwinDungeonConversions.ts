@@ -166,13 +166,13 @@ export function MakeBigActuators(data: DungeonData): void {
  *
  * `AllocateIndirectIndex` writes the database number alone into `dataTypeMap`
  * (`:2141`), leaving the slot's position bits at zero, which is why the RN is built at
- * position 0. Measured: every scroll in `csbgame4.dat` resolves to `RN(0, dbTEXT, n)`
+ * position 0. Measured: every scroll in a committed save resolves to `RN(0, dbTEXT, n)`
  * where `n` is `dungeon.dat`'s own 10-bit index for the same scroll.
  *
  * **`m_word4`'s upper bits cannot be reproduced and are written as zero.**
  * `pScroll->open(...)` writes bit 0 over whatever the record already held, and the two
  * bytes the record grew by were never initialised, so a genuine save carries allocation
- * debris there — 3585, 530, 5132, 32767 in the first four records of `csbgame4.dat`.
+ * debris there — 3585, 530, 5132 and 532 in the first four records of every committed save.
  * A converted world writes 0, which is the only honest value.
  */
 export function convertScrolls(data: DungeonData): void {

@@ -1339,10 +1339,11 @@ link, always `RNeof`, over its `size`.
 `SaveGame` `Read`s and `Write`s 24 palette records of 16 longwords, keys
 `(EDT_Palette << 24) + i`, into the pool at every save (`SaveGame.cpp:1152-1164`), so
 every CSBWin save has them. `src/data/CsbwinExpool.ts` is the port, over the file's bytes.
-Evidence: `tools/dump-expool.ts`. Seven of the fourteen committed saves hold those 24
+Evidence: `tools/dump-expool.ts`. Seven of the eight committed saves hold those 24
 records and nothing else, and 24 writes into an empty pool give their 2304 bytes exactly:
-the directory, the eight blocks of three records, every link and chain. Twelve hold them
-among others, and CSBWin's loop run over each leaves its bytes as they were.
+the directory, the eight blocks of three records, every link and chain. `csbgame7.dat`
+holds them among others, and CSBWin's loop run over each of the eight leaves its bytes as
+they were.
 
 ## A champion bones record is keyed by the bones' slot in the object indirect index
 
@@ -1961,11 +1962,9 @@ The block is a plain, naturally-aligned 512-byte struct
 | 38 | `numDSA` | 72.. | `overlayP1..P4` |
 | 40 | `editingOptions` | 92 | `CSBgraphicsSignature1` |
 
-This port read `spellFilterLocation` at 64 and `extendedFlags` at 68 — both one field
-too far — until three genuine saves were read. It went unnoticed because in the two
-older ones every word from 52 to 72 is zero. The third has
-`extendedFlags = 0xe0` (`SequencedTimers | DefaultDirectX | ExtendedTimers`), which
-at the wrong offset read as 0 and chose a 10-byte `TIMER` where the file has 16.
+Read one field too far — `spellFilterLocation` at 64 and `extendedFlags` at 68 — a
+committed save's `extendedFlags`, 0xf8 with `SequencedTimers` and `ExtendedTimers` in it,
+comes out as its `overlayOrdinal`, 0, and chooses a 10-byte `TIMER` where the file has 16.
 
 **`gameInfoSize` is declared `ui32` but is signed everywhere it is used.** The global
 is `i32` (`doc/CSBwin-src/Data.h:118`, `doc/CSBwin-src/data.cpp:271`), `ReadGameInfo`
@@ -1978,14 +1977,9 @@ and `WriteGameInfo` both take `i32 size`, and the writer sets
 
 (`doc/CSBwin-src/SaveGame.cpp:977-978`), so an allocated-but-empty game info writes
 **-1**, i.e. `0xffffffff`. `WriteGameInfo` then writes nothing for it, so the field
-occupies **no bytes in the file** and the read head must not advance.
-`static/gamefiles/saves/csbgame3.dat` is exactly this case; read unsigned, the
-4294967295 walks past the end of the file and GAMEBLOCK1 never parses.
-
-Proved arithmetically as well as by checksum: across the three saves the distance from
-the end of the data maps to GAMEBLOCK1 is 3185, 3185 and 3153 bytes, and the DSA level
-index is 3153 bytes in all three — the 32-byte difference is precisely the two files
-whose `gameInfoSize` is 32. The one with `-1` contributes zero.
+occupies **no bytes in the file** and the read head must not advance. Read unsigned, the
+4294967295 walks past the end of the file and GAMEBLOCK1 never parses. The eight
+committed saves all hold a `gameInfoSize` of 32.
 
 Covered by `tools/dump-csbwin-save.ts`.
 
@@ -2036,7 +2030,7 @@ how those older files were produced. Do not "fix" the reader for it.
 ## The dungeon image layout in a save file, and the two record sizes that change
 
 Blocks 7-14 of a save (the dungeon image) are plain and uncompressed. This is the
-layout, all of it now verified: for **sixteen genuine save files** (fourteen of DM, and
+layout, all of it now verified: for **ten genuine save files** (eight of DM, and
 Chaos Strikes Back's `mini.dat` and `csbgame2.dat`) the sum of every
 section length from the 44-byte header to the end of the cell flags lands exactly on
 `EOF - 2`, the byte before `WriteAndChecksum`'s final word
@@ -2103,7 +2097,7 @@ Covered by `tools/dump-csbwin-save.ts`.
 ## A thrown object keeps its id: `ObjectInHand` and `MISSILE.projectileObject`
 
 Two saves taken either side of a throw settle both fields at once. In
-`static/gamefiles/saves/csbgame-item-on-cursor.dat` a sword sits on the cursor and
+`tools/fixtures/csbgame-item-on-cursor.dat` a sword sits on the cursor and
 `gb2.ObjectInHand` is `0x4d`; in `csbgame-flying-sword.dat`, the same session moments
 later, the cursor is empty (`0xffff`) and the one live MISSILE record carries
 `projectileObject = 0x4d`, `rangeRemaining = 77`, `damageRemaining = 20`,
@@ -2114,9 +2108,9 @@ free slot** in the MISSILE pool. The writer is `gb2.ObjectInHand =
 d.objectInHand.ConvertToInteger()` (`doc/CSBwin-src/SaveGame.cpp:1033`), and the loader
 takes the word back with `NonExtendedInteger` (`:1649`) and converts it unless it is
 `RNnul` (`:2753-2760`) — so an empty hand must be written as `RNnul`, never `RNempty`
-(0, `CSBTypes.h:249`), which would come back as an object in hand. All thirteen
+(0, `CSBTypes.h:249`), which would come back as an object in hand. All seven
 committed saves with an empty hand hold `0xffff`. The pool is allocated at full size regardless of what
-is happening: all twelve sample saves carry 60 missile and 50 cloud records, so a
+is happening: all eight committed saves carry 60 missile and 50 cloud records, so a
 record count says nothing about how many missiles are in flight — only a live
 `timerIndex` does.
 
@@ -2213,9 +2207,10 @@ numbers; `RN::CreateSpell` writes `0xff80 + n` straight into the field
 **A freed slot is `dataTypeMap[i] == 0xff`, `dataIndexMap[i] == 0xffff`.**
 `DeleteDBEntry` writes both, together with `RNnul` over the record's own link
 (`doc/CSBwin-src/data.cpp:993-1015`); `AllocateIndirectIndex` and `RN::RN(DBTYPE, idx)`
-reuse such slots. Three of the twelve committed saves reference one — `csbgame2.dat`'s
-`monster[158]` still points its possession chain at slot 361 — and in every case the
-referring record is itself free, its link `RNnul`. CSBWin never looks: a free record is
+reuse such slots. A free record can go on naming one: `DeleteDBEntry` leaves the rest of
+the record as it was, so its possession or contents chain still points at a slot that may
+have been freed since, and the referring record is itself free, its link `RNnul`. CSBWin
+never looks: a free record is
 reached only by the allocator, which clears it before handing it out. So a free record's
 other RNs are read and dropped rather than resolved; refusing them would make a
 perfectly good save unreadable.
@@ -2228,8 +2223,8 @@ same applies to two slots naming the same `(db, idx)`, which `ConvertListOfObjec
 permits only for a missile's flying object (`DuplicateOK`, `:1918`): `countAliases`
 reports it, and the shipped dungeon has none.
 
-Evidence: `tools/dump-csbwin-world.ts` walks every object chain in all twelve saves —
-1783 to 1908 objects each, chains up to 31 deep, through chests and monster possessions
+Evidence: `tools/dump-csbwin-world.ts` walks every object chain in all eight saves —
+1893 to 1908 objects each, chains up to 31 deep, through chests and monster possessions
 — and finds no reference to a free record, no index past a database, no category without
 a database and no cycle. The early saves hold `dungeon.dat`'s 1911 objects less exactly
 what the chosen heroes carried out of their mirrors. `tools/dump-csbwin-party.ts` asserts
@@ -2433,7 +2428,7 @@ is the format `TAG0088b2` reads, four consecutive `LE16(*puwA0++)` per group
 (`doc/CSBwin-src/Graphics.cpp:764-779`).
 
 Verified, not inferred: decoded that way, the portrait of **every champion in every
-committed save** in `static/gamefiles/saves/` reproduces a cell of basic graphic 26
+committed save** in `tools/fixtures/` reproduces a cell of basic graphic 26
 pixel for pixel, 928 of 928 (`tools/dump-csbwin-load.ts`). A wrong offset, a reversed
 plane order or a byte swap each still yield a plausible 32x29 block, and none of them
 match.
@@ -2461,12 +2456,11 @@ into it, wrapping at four.
 ```
 
 (`doc/CSBwin-src/Magic.cpp:951-952`), so the symbols after it stay in the record. Real
-saves hold exactly that: `00 69 6f 00` and `00 66 00 76` are both in the committed
-files. To CSBWin those are an *empty* incantation — `StrLen` stops at byte 0 — with two
-dead bytes trailing.
+saves hold exactly that: `00 66 00 76` is in `csbgame7.dat`. To CSBWin that is an *empty*
+incantation — `StrLen` stops at byte 0 — with dead bytes trailing.
 
 This port read the field as "the non-zero bytes", which resurrected them: a champion
-restored from `csbgame4.dat` had two runes pending that the real game does not show.
+restored with that field had two runes pending that the real game does not show.
 Fixed by reading the terminated prefix, as CSBWin does. The dead tail is kept separately
 (`Champion.incantationField`) only so the save writer can put the record back byte for
 byte; it is used only while it still agrees with the live prefix, so a rune typed after
@@ -2478,7 +2472,7 @@ five writers, and each keeps it there: the add stores `(D7W + 1) & 3` after writ
 stores `(byte33 + 3) & 3` and zeroes that byte (`Magic.cpp:814-817`); the cast
 (`:951-952`, above) and the two champion resets (`Character.cpp:2648-2649`, `:5293-5294`)
 store 0 with `incantation[0] = 0`. After four runes it wraps to 0 while `StrLen` is 4.
-`tools/dump-character-block.ts` packs all fourteen committed saves with the derived value
+`tools/dump-character-block.ts` packs all eight committed saves with the derived value
 byte for byte. This port used to carry the file's `byte33` instead, which went stale as
 soon as a rune was typed after the load.
 
@@ -2490,8 +2484,8 @@ this port writes zero there.</sub>
 
 Writing block 4 needs the whole 800-byte record, including what the game never reads
 back. Everything below is verified by `tools/dump-character-block.ts`, which packs the
-block again for each of the fourteen committed saves and compares with the file's own
-bytes — all fourteen are byte-identical, empty slots, dead incantation tails and all.
+block again for each of the eight committed saves and compares with the file's own
+bytes — all eight are byte-identical, empty slots, dead incantation tails and all.
 
 | Offset | Field | What to write |
 | --- | --- | --- |
@@ -2521,7 +2515,7 @@ been hit saves the party's facing there. It is the way the portrait turns on the
 
 CSBWin keeps `load` (offset 272) incrementally, adjusting it at each of its eight
 possession writers; this port re-sums it from the object weights instead
-(`src/engine/CharacterStats.ts`). For all **42 champions of the fourteen committed
+(`src/engine/CharacterStats.ts`). For all **18 champions of the eight committed
 saves** the two agree exactly (`tools/dump-csbwin-load.ts`). That is the only outside
 check the weight system has: `WEAPONDESC`, the clothing and misc weight arrays, the
 water-flask rule and the recursion into chests all have to be right for it to hold.
@@ -2630,7 +2624,7 @@ Two places put bytes there:
   copy; `unused13` is not.
 
 So the field is a high-water mark of slot allocation: 0xcd below the highest slot the
-game has ever taken, 0 above it. Measured on the twelve committed saves that carry
+game has ever taken, 0 above it. Measured on the eight committed saves, which all carry
 16-byte timers, and the split is exact — no slot holds a third value, and the boundary
 sits at or above `FirstAvailTimer` in every one:
 
@@ -2638,8 +2632,6 @@ sits at or above `FirstAvailTimer` in every one:
 | --- | --- | --- | --- | --- |
 | `csbgame-early-1hero.dat` | 1 | 1 | 1 | 1 |
 | `csbgame4-door-opening.dat` | 2 | 2 | 2 | 2 |
-| `csbgame3.dat` | 4 | 20 | 20 | 3 |
-| `csbgame5.dat` | 26 | 41 | 41 | 25 |
 | `csbgame7.dat` | 76 | 110 | 110 | 76 |
 
 This port keeps no such mark, so `saveSaveGameState` writes 0xcd for a slot that is live
@@ -2650,7 +2642,7 @@ file and exempts these three in freed slots by name.
 **The timer queue past `NumTimer` is the same kind of debris.** CSBWin writes all
 `MaxTimer` words of `m_timerQueue` (`doc/CSBwin-src/SaveGame.cpp:1136`) and `LoadGame`
 believes only the first `NumTimer` of them; the rest are what a longer queue left behind
-— 34 stale indices in `csbgame7.dat`, 50 in `csbgame4.dat`. The writer zeroes them.
+— 34 stale indices in `csbgame7.dat`. The writer zeroes them.
 
 ## Three fields of the dungeon image header no reader here was keeping
 
@@ -2669,7 +2661,7 @@ model that does not hold it, and `DungeonLoader` was reading past all three.
   `numMonsterType` for 4-7 and `experienceMultiplier` for 12-15, and nothing at all for
   8-11 (`doc/CSBwin-src/CSB.h:2104-2126`).
 
-The first two are zero in `dungeon.dat` and in all fourteen committed saves. **The third
+The first two are zero in `dungeon.dat` and in all eight committed saves. **The third
 is not**: across the fourteen DM levels bits 8-11 take the values 0, 1, 3 and 4. So it is
 real data with no known meaning, and dropping it would have made every level descriptor
 this port writes differ from the one it read.
@@ -2679,7 +2671,7 @@ All three now live on `DungeonHeader.word4Low` and `MapDescriptor.fill2` /
 documented as unread. `tools/dump-dungeon-image-blocks.ts` is the check: blocks 7, 8, 9 and
 14 written again from a parsed world and compared with the file's own bytes, for
 `dungeon.dat` and for every save. Blanking `word12Bits8_11` in the writer fails it on
-levels 3, 5 and 12 of every one of the fifteen files.
+levels 3, 5 and 12 of every one of the nine files.
 
 ### The cell flag array's length is derivable, and lands on the declared value
 
@@ -2693,8 +2685,8 @@ exactly `dungeon.dat`'s `LegacyCellFlagArraySize` (`word2`) and the saves'
 
 The two are not interchangeable, which is why `word2` is carried rather than recomputed:
 `ReadDatabases` prefers `cellflagArraySize` and falls back to `LegacyCellFlagArraySize`
-only when that is 0 (`doc/CSBwin-src/SaveGame.cpp:2412-2415`), and the saves differ on
-which they fill — `word2` is 0 in most of them and 12366 in `csbgame3.dat`.
+only when that is 0 (`doc/CSBwin-src/SaveGame.cpp:2412-2415`), and the committed saves
+fill only the block's — `word2` is 0 in all eight.
 
 ## Ten more fields the record parsers were dropping, and the whole of `EXPOOL`
 
@@ -2717,7 +2709,7 @@ original bytes to preserve.
 | `DB9` chest | all of `m_word4` but bits 1-2, and `m_uByte6[2]` (`:1236-1250`) | **yes** — bits 0 and 3-7 of `m_word4` |
 | `DB10` misc | `cursed()` bit 8 and `subType()` bits 9-13 (`:1300-1305`) | no |
 
-"Set in the data?" is measured over `dungeon.dat` and all fourteen committed saves, and it
+"Set in the data?" is measured over `dungeon.dat` and the eight committed saves, and it
 is the difference between a field a canary can prove and one it cannot: blanking any of
 the six that are set fails `tools/dump-dungeon-image-blocks.ts`, and blanking the rest
 cannot, because they are already zero. They are carried anyway, for the reason `FILL2` is:
@@ -2735,8 +2727,8 @@ write the file back byte for byte is to carry it.
 **`EXPOOL` — database 11 — had no parser at all.** `getDatabaseRecordSize` returned 256 so
 the layout would close, and the bytes were then skipped and discarded; the one consumer,
 `parseSpecialLocationsFromSaveData`, hashes its own copy straight out of the save file.
-`DungeonData.expool` now keeps the whole section as bytes (3 records in `csbgame.dat`, 13
-in `csbgame7.dat`), which is what lets a save be written back carrying the EXPOOL it was
+`DungeonData.expool` now keeps the whole section as bytes (9 records in the seven
+made-to-order saves, 13 in `csbgame7.dat`), which is what lets a save be written back carrying the EXPOOL it was
 read with. Note that `SaveGame` deposits the 100 DSA global variables and the 24 overlay
 palette records into EXPOOL immediately before the image
 (`doc/CSBwin-src/SaveGame.cpp:1141-1162`); this port maintains neither, so the carried
@@ -2767,8 +2759,8 @@ the world. Nothing outside the file refers to a slot number: `ReadExtendedFeatur
 the maps back before anything resolves an RN through them
 (`doc/CSBwin-src/SaveGame.cpp:355-376`), so a save only has to agree with itself.
 
-Measured on `csbgame.dat`: 787 of the object list's 1982 words happen to match CSBWin's
-anyway, and 1195 do not. On `dungeon.dat`, which stores packed RNs and has no indirect
+Measured on `csbgame7.dat`: 843 of the object list's 1982 words happen to match CSBWin's
+anyway, and 1139 do not. On `dungeon.dat`, which stores packed RNs and has no indirect
 index at all, every one of the 1682 matches — which is why that file is kept in the tool
 as the case where blocks 10 and 13 *are* byte-compared.
 
@@ -2782,9 +2774,9 @@ One class of word is neither compared nor resolvable: **the second RN of a free 
 `DeleteDBEntry` writes `RNnul` over a record's link and frees the indirect slot that named
 it, but leaves the rest of the record alone (`doc/CSBwin-src/data.cpp:993-1015`), so a
 deleted record routinely still points its possession or contents chain at a slot that has
-since been freed — `csbgame2.dat`'s `monster[158]` at slot 361 is the case. The reader
+since been freed. The reader
 drops those (`readRNOfRecord`), so the writer has nothing to put back but `RNnul`. There
-are 135 to 269 of them per committed save; the tool counts and reports them, exactly as
+are 135 to 256 of them per committed save; the tool counts and reports them, exactly as
 `tools/dump-save-blocks-vs-file.ts` exempts `TIMER.unused13`.
 
 ## Everything CSBWin converts to slot numbers, and in what order
@@ -2805,7 +2797,7 @@ the slot, which matters because an object a champion is carrying is in no cell c
 all: leave it out and its slot keeps position 0, so the possession comes back naming the
 same record in the wrong corner of its cell. `buildObjectIndirectIndex` takes those extra
 references as `heldReferences` for exactly that reason, and
-`tools/dump-save-file-roundtrip.ts` fails on all fourteen saves when they are withheld.
+`tools/dump-save-file-roundtrip.ts` fails on all eight saves when they are withheld.
 
 The order is the one above, and CSBWin's rule is **first writer wins** — a second
 reference to an already-converted object reuses the slot without touching it
@@ -2846,11 +2838,10 @@ this port uses the same ones (`src/data/CsbwinDungeonConversions.ts`;
 happens to be idempotent, because it rebuilds the RN from a field it never overwrites.
 
 **The evidence is exact, because every committed save holds this same dungeon
-converted.** Three were started from `static/gamefiles/dm-atari/dungeon.dat` and
-converted at load. The other eleven were started from the DM Windows package's
+converted.** All eight were started from the DM Windows package's
 `dungeon.dat`, which is the same dungeon that CSBWin had already converted (see "DM's two
-`dungeon.dat` files"). Either way the converted form is in the files: converting here and
-comparing gives 0 differences in the
+`dungeon.dat` files"). So the converted form is in the files: converting
+`static/gamefiles/dm-atari/dungeon.dat` here and comparing gives 0 differences in the
 125-entry indirect text index, 0 in all 1749 words of compressed text, 0 in every TEXT
 record's rewritten index word, 0 in every scroll's new text RN and `open` bit, and 0 in
 every actuator's `word8`.
@@ -2897,10 +2888,10 @@ The one flag that changes play is `DMRules`: `_ShowPrisonDoor` then forces `DM_r
 (`doc/CSBwin-src/CSBCode.cpp:10672-10676`), which a game started from `dm-atari` never
 gets from its file.
 
-The committed saves show which file each game was started from. The three with `flags`
-0xa9 (`csbgame.dat`, `csbgame2.dat`, `csbgame3.dat`) hold mirrors with `word6` entirely
-zero: `dm-atari`, cleaned by today's `ExtendPortraits`. The eleven with 0xe9 keep
-`Position` on 18 mirrors and carry `DMRules`: the Windows package's file.
+The committed saves show which file their games were started from. All eight have `flags`
+0xe9, keep `Position` on 15 to 17 of the mirrors they still hold and carry `DMRules`: the
+Windows package's file. A game started from `dm-atari`, cleaned by `ExtendPortraits`,
+holds mirrors with `word6` entirely zero.
 
 ## A compressed `dungeon.dat`: CSB's prison
 
@@ -3098,9 +3089,9 @@ from the slot (`CSBCode.cpp:6127-6131`), not from the record. Only a cut `numMon
 
 Measured (`tools/dump-check-monsters.ts`): `dm-atari/dungeon.dat` has no room type above 6
 and no group `CheckMonsters` changes. The committed saves and CSB's `mini.dat` and
-`csbgame2.dat` need no cut either; what it touches in them is 17 attached size-2 groups
-(demons, Lord Chaos, black flames, golems, a dragon, scorpions), and in `csbgame6.dat` and
-`csbgame7.dat` their slots' facings (2 and 3) come back after the restore where the check
+`csbgame2.dat` need no cut either; what it touches in them is 12 attached size-2 groups
+(two in `csbgame7.dat` and five in each of CSB's, of monster types 9 and 0), and in
+`csbgame7.dat` their slots' facing (2) comes back after the restore where the check
 wrote 0. CSB's `graphics.dat` gives the 27 monster types the same sizes as DM's.
 
 ## `DM_rules` and `DMRulesDesignOption` are process-wide, and only a block sets them
@@ -3127,15 +3118,15 @@ They are assigned in four places:
   (`WM_INITMENUPOPUP`, `CSBwin.cpp:1116`, `:1162-1166`).
 - Playback of a recording (`Recording.cpp:285`, `:291`).
 
-`SaveGame` writes both back (`SaveGame.cpp:950-955`). Eleven of the fourteen committed
-saves carry both bits.
+`SaveGame` writes both back (`SaveGame.cpp:950-955`). All eight committed saves carry
+both bits.
 
 ## `NumWordsInTextArray` means two different things either side of the conversion
 
 `DUNGEONDATINDEX::word6` sizes the raw text array in a `dungeon.dat` — 1749 words for DM
 — and `ConvertToIndirectText` overwrites it with the **length of the indirect index**,
 `NumWordsInTextArray((ui16)indirectIndexLen)` (`doc/CSBwin-src/SaveGame.cpp:2274`). All
-fourteen committed saves declare 125, which is exactly the number of TEXT records with a
+eight committed saves declare 125, which is exactly the number of TEXT records with a
 non-null link. A writer that carried the loaded value through would declare 1749 in a
 save and send its reader 3248 bytes past the end of the text section.
 
@@ -3178,7 +3169,7 @@ project holds has a DSA actuator, so nothing here can tell which was intended.
 whatever the two bytes the record just grew by happened to contain, and nothing
 initialises them (`doc/CSBwin-src/SaveGame.cpp:2144-2166`;
 `readOldScrollDatabase` allocates the six-byte form and fills four). Measured in
-`csbgame4.dat`, records 0-5 carry 3585, 530, 5132, 532, 3587 and 536 in bits 1-15, and 28
+every committed save, records 0-5 carry 3585, 530, 5132, 532, 3587 and 536 in bits 1-15, and 28
 of the 35 scrolls are non-zero. The port carries them verbatim when it reads a save
 (`ScrollRecord.word4Bits1_15`) and writes 0 for a scroll it converts itself, which is the
 only honest value; `tools/dump-dungeon-conversions.ts` reports the count rather than
@@ -3194,31 +3185,28 @@ is exempt from the comparison by name.
 
 `SaveGame` builds it from `memset(&efb,0,512)` and assigns fourteen things
 (`doc/CSBwin-src/SaveGame.cpp:915-980`); everything it does not assign is genuinely zero
-rather than merely unknown. Measured across all fourteen committed saves, the eight that
+rather than merely unknown. Measured across the committed saves, the eight fields that
 are always zero are `editingOptions`, `graphicsSignature1/2`, `csbGraphicsSignature1/2`,
 `spellFilterLocation`, `hintKey[8]` and `overlayOrdinal` with its four parameters.
 
 `flags` gets four bits unconditionally — `LevelDSAInfoPresent` (`:940`), `IndirectText`,
-`ExpandedPortraits` and `BigActuators` (`:961-963`) — which is 0xa9, exactly what
-`csbgame.dat`, `csbgame2.dat` and `csbgame3.dat` carry. The other eleven carry 0xe9,
-the same four plus `DMRules`, written from `DMRulesDesignOption` (`:952-953`).
+`ExpandedPortraits` and `BigActuators` (`:961-963`) — which is 0xa9. The committed saves
+carry 0xe9, the same four plus `DMRules`, written from `DMRulesDesignOption` (`:952-953`).
 `SimpleEncryption` and `AutoRecord` are the other two, both conditional and both off
 everywhere.
 
 `extendedFlags` gets three unconditionally (`:964-966`): `SequencedTimers`,
 `ExtendedTimers` — which together select the 16-byte `TIMER` — and `DefaultDirectX`,
-which is 0xe0 and exactly what `csbgame3.dat` carries. The newest saves add
-`ExtendedWallDecorations` and `DMRulesOption`, written from `DM_rules` (`:950-951`), for 0xf8. `csbgame.dat` and `csbgame2.dat`
-carry **0**, an older CSBWin that wrote 10-byte timers, which is the case that proves the
-field is read rather than assumed.
+which is 0xe0. The committed saves add
+`ExtendedWallDecorations` and `DMRulesOption`, written from `DM_rules` (`:950-951`), for 0xf8.
 
 `LevelDSAInfoPresent` is not decorative: `ReadExtendedFeatures` reads the DSA level index
 back only when that bit is set (`:387-390`), and the index is always written — so a
 header without the bit leaves three bytes of terminator for GAMEBLOCK1 to eat.
 
 `gameInfoSize` is 0 for "no game information at all" and `gameInfoSize - 1` when there is
-some (`:977-978`), which makes **-1** an allocated-but-empty string; `csbgame3.dat` is
-that case. A port with no game information writes 0.
+some (`:977-978`), which makes **-1** an allocated-but-empty string. A port with no game
+information writes 0.
 
 ## A live timer keeps its object in three places, and a file has one
 
@@ -3580,7 +3568,7 @@ words are saved in `GAMEBLOCK2` (`SaveGame.cpp:1029-1031`, `:1645-1647`). Eviden
 set (`doc/CSBwin-src/CSBCode.cpp:8224-8261`); `roomSTAIRS` is handled before it
 (`:8206-8221`). Every other room type — open, pit, teleporter, and type 7, which
 `ROOMTYPE` does not even name (`CSB.h:560-566`) — is entered. Neither the Atari
-`dungeon.dat` nor any save in `static/gamefiles/saves/` has a type-7 cell. Evidence:
+`dungeon.dat` nor any committed save has a type-7 cell. Evidence:
 `tools/dump-party-collision.ts` case 11.
 
 ## A tick falls due every `d.Speed` VBLs, counted on every VBL
@@ -4214,7 +4202,7 @@ and skills 4 and up earn double when it is less than 25 ticks old)
 and the per-champion facing reset in the tick (`Code17818.cpp:420-428`: a champion turned away
 from the party's facing turns back once 60 ticks pass without one). A save carries it as
 an `i32` (`GAMEBLOCK2`, `SaveGame.cpp:125`), so a game no monster has attacked writes -200 as
-`ff ff ff 38`: seven of the fourteen committed saves and CSB's `mini.dat` hold it. Evidence:
+`ff ff ff 38`: the seven made-to-order saves and CSB's two hold it. Evidence:
 `tools/dump-last-monster-attack.ts`.
 
 ## `TIMER_SEARCH` walks the queue backwards, and `SetTimer` mostly keeps the old timer
@@ -4824,7 +4812,7 @@ Evidence: `tools/dump-viewport-click.ts`.
   due when the old one was. Every replacement's `timerUByte6`, the slot a throw refills, is
   0 (`:512`). The callers guard it themselves: an attack disables only for a non-zero time
   (`Attack.cpp:2149-2152`). Evidence: `tools/dump-throwing.ts` section 9.
-- IAIDO is saved busy in `csbgame6.dat` and `csbgame-flying-sword.dat`: `charFlags` 0x0018,
+- IAIDO is saved busy in `csbgame-flying-sword.dat`: `charFlags` 0x0018,
   with a `TT_11` as his `busyTimer`.
 - `_ExecuteAttack` records the attack in `attackType` after running it
   (`Character.cpp:4974`), and `EnableCharacterAction` forgets it, ending with
@@ -4872,8 +4860,8 @@ section 8.
 array. Evidence: `tools/dump-timer-heap.ts`. Every committed save's queue is a heap under
 `timerLess`, and each of three comparators with one rule broken fails on some save;
 `csbgame7.dat`'s queue drains in `timerLess` order; hand-worked arrays after each insertion
-and deletion; and a loaded game runs every timer due by its first tick, `csbgame6.dat`'s
-IAIDO `TT_11` among them.
+and deletion; and a loaded game runs every timer due by its first tick,
+`csbgame-flying-sword.dat`'s IAIDO `TT_11` among them.
 
 
 ## A lost game ends on the tick of death, with the palette switching off
@@ -5075,8 +5063,8 @@ QUIT" (`:893`, `:1058`), then `Byte22808[132]` (380), `RandomGameID` (308), `Byt
 (`:1067-1072`), and the five checksums (`:1091-1107`). `swapBlock1` byte-swaps
 `RandomGameID`, the hashes, the checksums, `Word22594` and `Word22592` and nothing else
 (`:435-453`), so on the little-endian build **`SaveOption` and `totalMoveCount` are
-little-endian in the file**. Measured on all fourteen committed saves: `SaveOption` reads
-`01 00` in thirteen and `00 00` in `csbgame3.dat`, and `totalMoveCount` is a small
+little-endian in the file**. Measured on all eight committed saves: `SaveOption` reads
+`01 00`, and `totalMoveCount` is a small
 little-endian count (`35 00 00 00`, 53 moves, in `csbgame-early-1hero.dat`).
 
 `ScrambleAndWrite` zeroes words 0-126, folds them into `D6` by turns of add, xor, subtract
@@ -5084,8 +5072,7 @@ and xor, writes word 127 as `D6 ^ D5`, `D5` being the sum of the second half's w
 scrambles the second half with word 29, which is 0, as its hash (`:706-750`). The reader's
 fold over all 128 words therefore ends at `D5` (`ReadUnscrambleBlock`,
 `doc/CSBwin-src/CSBCode.cpp:9083-9098`). Bytes 256-299 of `Byte740`, `FILL438` (302) and
-`Checksum354`…`374` are never assigned. They are zero in twelve of the saves, and 0xba in
-`csbgame.dat` and `csbgame2.dat`, whose writer did not clear the block.
+`Checksum354`…`374` are never assigned. They are zero in every committed save.
 
 `_ReadEntireGame` sets `d.Word22596 = 2`, `d.Word22598 = 1`, `d.Word22594 = 1`,
 `d.Word22592 = 13` before anything else (`SaveGame.cpp:1467-1470`); only a compressed

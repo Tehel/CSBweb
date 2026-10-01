@@ -19,7 +19,7 @@
  *    with the array `AdjustTimerQueue` leaves after each step, worked from the C++; then
  *    six thousand seeded random operations, the heap checked after each.
  * 4. **A loaded game runs what is due.** Each save is loaded into a real `Game` and given
- *    one tick. No timer due by then is left, and `csbgame6.dat`'s `TT_11`, the end of
+ *    one tick. No timer due by then is left, and `csbgame-flying-sword.dat`'s `TT_11`, the end of
  *    IAIDO's action, due at the saved `d.Time`, is gone.
  * 5. **The table's size.** A new game's table is 100 slots, and one per record of the
  *    monster database and of the missile and cloud ones, each the file's count plus
@@ -32,8 +32,8 @@
  *
  * Run: `npx tsx tools/dump-timer-heap.ts`
  */
-import { readdirSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { basename, resolve } from 'node:path';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
@@ -41,9 +41,9 @@ import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { TimerFunction, TimerQueue, timerLess, type TimerEntry } from '../src/engine/TimerQueue';
 import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
+import { genuineSaves, savePath } from './lib/saves';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const SAVES = 'static/gamefiles/saves';
 
 const json = (v: unknown): string => JSON.stringify(v);
 
@@ -63,7 +63,7 @@ function heapFault(queue: readonly TimerEntry[], less: Less): number {
 function savedEntries(file: string): {
   entries: TimerEntry[]; sequence: number; time: number; maxTimers: number; firstAvailTimer: number;
 } {
-  const save = loadSaveGameState(new Uint8Array(readFileSync(resolve(SAVES, file))));
+  const save = loadSaveGameState(new Uint8Array(readFileSync(savePath(file))));
   const entries = (save.timerQueue ?? []).map((index): TimerEntry => {
     const t = save.timers![index];
     return {
@@ -116,7 +116,7 @@ function checkSavedHeaps(files: string[]): void {
     console.log([file, entries.length, late, fault < 0 ? 'holds' : `fails at ${fault}`, ...canaries].join('\t'));
     check(fault < 0, `${file}: the saved queue is a heap under timerLess`);
   }
-  check(unsorted >= 5, `the saved queues are heaps, not sorted lists (${unsorted} files are out of time order)`);
+  check(unsorted >= 2, `the saved queues are heaps, not sorted lists (${unsorted} files are out of time order)`);
   CANARIES.forEach((c, i) => check(canaryFailed[i], `canary: with ${c.name}, some saved queue is not a heap`));
 }
 
@@ -241,10 +241,10 @@ function checkLoadedGames(files: string[]): void {
   let firedSome = 0;
   for (const file of files) {
     const game = newGame(data, graphics);
-    applyCsbwinSave(game, new Uint8Array(readFileSync(resolve(SAVES, file))));
+    applyCsbwinSave(game, new Uint8Array(readFileSync(savePath(file))));
     const saved = game.ctx.state.tickCount;
     const before = game.ctx.timers.getTimers().slice();
-    const iaido = file === 'csbgame6.dat'
+    const iaido = file === 'csbgame-flying-sword.dat'
       ? before.find((t) => t.function === TimerFunction.TT_11 && t.time === saved)
       : undefined;
     // The first tick runs its timers on the saved `d.Time`, then turns the clock
@@ -257,20 +257,20 @@ function checkLoadedGames(files: string[]): void {
     if (due > 0) firedSome++;
     console.log(`  ${file}: ${before.length} timers, ${due} due by tick ${now}, ${left.length} of them left`);
     check(left.length === 0, `${file}: no timer due by the first tick is left after it`);
-    if (file === 'csbgame6.dat') {
-      check(iaido !== undefined, 'csbgame6.dat: a TT_11 is due at the saved d.Time');
+    if (file === 'csbgame-flying-sword.dat') {
+      check(iaido !== undefined, 'csbgame-flying-sword.dat: a TT_11 is due at the saved d.Time');
       check(iaido !== undefined && !game.ctx.timers.getTimers().includes(iaido),
-        'csbgame6.dat: and the first tick runs it');
+        'csbgame-flying-sword.dat: and the first tick runs it');
     }
   }
-  check(firedSome >= 5, `timers were due in ${firedSome} of the loads`);
+  check(firedSome >= 2, `timers were due in ${firedSome} of the loads`);
 }
 
 function checkTableSize(files: string[]): void {
   console.log('\n=== 5. the table\'s size ===');
   const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
   const size = newGame(data, stockGraphics()).ctx.timers.getMaxTimers();
-  const saved = files.map((file) => loadSaveGameState(new Uint8Array(readFileSync(resolve(SAVES, file)))).maxTimers);
+  const saved = files.map((file) => loadSaveGameState(new Uint8Array(readFileSync(savePath(file)))).maxTimers);
   console.log(`  a new game: ${size} slots; the saves: ${[...new Set(saved)].join(', ')}`);
   check(size === 467, `a new game's table is 100 + (182 + 75) + (0 + 60) + (0 + 50) = 467 slots, not ${size}`);
   check(saved.every((n) => n === size), 'and every committed save carries that gb2.MaxTimers');
@@ -300,7 +300,7 @@ function checkTableSize(files: string[]): void {
 }
 
 function main(): void {
-  const files = readdirSync(resolve(SAVES)).filter((f) => f.endsWith('.dat')).sort();
+  const files = genuineSaves().map((path) => basename(path));
   checkSavedHeaps(files);
   checkDrain();
   checkByHand();

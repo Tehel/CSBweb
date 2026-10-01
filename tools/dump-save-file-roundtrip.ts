@@ -22,8 +22,7 @@
  *
  * Run: `npx tsx tools/dump-save-file-roundtrip.ts [path-or-directory]`
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 import { saveSaveGameState } from '../src/data/SaveGameLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
@@ -38,25 +37,12 @@ import type { DungeonData, Databases, TimerRecord } from '../src/data/dungeonTyp
 import type { CsbwinObjectIndex } from '../src/data/CsbwinObjectIndex';
 import { check, finish } from './lib/check';
 import { OBJECT_ID_NULL } from '../src/core/types';
-
-const DEFAULT_DIR = 'static/gamefiles/saves';
+import { genuineSaves } from './lib/saves';
 
 const DATABASE_KEYS: Array<keyof Databases> = [
   'doors', 'teleporters', 'texts', 'actuators', 'creatures', 'weapons', 'clothing',
   'scrolls', 'potions', 'containers', 'misc', 'missiles', 'clouds',
 ];
-
-function collect(target: string): string[] {
-  const path = resolve(target);
-  if (!existsSync(path)) return [];
-  if (statSync(path).isDirectory()) {
-    return readdirSync(path)
-      .filter((n) => n.toLowerCase().endsWith('.dat') && !n.includes(':'))
-      .sort()
-      .map((n) => join(path, n));
-  }
-  return [path];
-}
 
 /**
  * Build a complete file out of a parsed one.
@@ -212,7 +198,7 @@ function compareWorlds(label: string, before: DungeonData, after: DungeonData): 
 }
 
 function main(): void {
-  const saves = collect(process.argv[2] ?? DEFAULT_DIR);
+  const saves = genuineSaves(process.argv[2]);
   check(saves.length > 0, 'there should be save files to read');
   let carriedTimers = 0;
 

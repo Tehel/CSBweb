@@ -119,7 +119,7 @@ const CHECKS = [
   // The save file's side of that: the CSBWin-shaped binary blocks. Needs no
   // dungeon and no arguments — it builds its own records.
   { tool: 'dump-savegame-blocks.ts' },
-  // Genuine CSBWin save files from static/gamefiles/saves. The only check in the
+  // Genuine CSBWin save files from tools/fixtures. The only check in the
   // suite that reads bytes this project did not write, so the only one a bug
   // symmetrical between our reader and our writer cannot satisfy.
   { tool: 'dump-csbwin-save.ts' },
@@ -149,7 +149,7 @@ const CHECKS = [
   { tool: 'dump-dungeon-image-blocks.ts' },
   // The three conversions `ReadDatabases` runs over an original dungeon, measured
   // against a dungeon CSBWin converted itself: every committed save was made from this
-  // same dungeon.dat, so its converted form is sitting in fourteen files. Without them a
+  // same dungeon.dat, so its converted form is sitting in eight files. Without them a
   // game started from dungeon.dat holds a world no save file can express.
   { tool: 'dump-dungeon-conversions.ts' },
   // `ExtendPortraits`, run after the read: dungeon.dat's 24 mirrors cleaned and nothing

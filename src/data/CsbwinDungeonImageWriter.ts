@@ -52,11 +52,11 @@ const bit = (b: boolean | undefined): number => (b ? 1 : 0);
  * names), `word6` (`NumWordsInTextArray`), `word8` (the starting party position) and
  * `word10` (`ObjectListLength`). Then `dbSizes[16]`.
  *
- * `word2` is carried rather than recomputed. In a save it is usually **0** — the real
+ * `word2` is carried rather than recomputed. In the committed saves it is **0** — the real
  * length lives in the Extended Features block's `cellFlagArraySize`, and `ReadDatabases`
  * falls back to `LegacyCellFlagArraySize` only when that is zero
- * (`doc/CSBwin-src/SaveGame.cpp:2412-2415`) — but `csbgame3.dat` holds 12366 in both, so
- * neither value can be derived from the other.
+ * (`doc/CSBwin-src/SaveGame.cpp:2412-2415`) — but a file may fill both, so neither value
+ * can be derived from the other.
  */
 export function buildDungeonImageHeader(header: DungeonHeader): Uint8Array {
     const buf = new Uint8Array(DUNGEON_IMAGE_HEADER_SIZE);

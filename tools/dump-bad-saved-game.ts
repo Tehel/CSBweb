@@ -40,10 +40,11 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
+import { savePath } from './lib/saves';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
 import * as Boot from '../src/renderer/intro/BootSequence';
 
-const SAVE = 'static/gamefiles/saves/csbgame.dat';
+const SAVE = savePath('csbgame7.dat');
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const PRISON = 'static/gamefiles/csb/dungeon.dat';
 

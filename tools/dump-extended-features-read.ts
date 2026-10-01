@@ -46,9 +46,10 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { readU32LE, writeU32LE } from '../src/core/bytes';
 import { check, finish } from './lib/check';
+import { savePath } from './lib/saves';
 
 const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
-const SAVE = 'static/gamefiles/saves/csbgame.dat';
+const SAVE = 'csbgame7.dat';
 const DM_WINDOWS = 'static/gamefiles/dm-windows/dungeon.dat';
 
 const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));
@@ -150,7 +151,7 @@ const blockOf = (file: Uint8Array): string => outcome(() => {
 function checkGivenUp(): void {
   console.log('');
   console.log('=== a block ReadExtendedFeatures gives up on is no block ===');
-  const save = read(SAVE);
+  const save = read(savePath(SAVE));
   const intact = readExtendedFeatures(save);
   console.log(`  ${SAVE}, intact: offset ${intact.offset}`);
   check(intact.header !== undefined && intact.offset > EXTENDED_FEATURES_SIZE, 'the intact save opens with a block');

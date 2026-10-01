@@ -18,8 +18,8 @@
  *
  * Run: `npx tsx tools/dump-dm-rules.ts`
  */
-import { readdirSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { basename, resolve } from 'node:path';
 
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
@@ -29,8 +29,7 @@ import type { Game } from '../src/engine/Game';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
-
-const SAVES = 'static/gamefiles/saves';
+import { genuineSaves } from './lib/saves';
 
 const DM_DUNGEON = new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat')));
 
@@ -75,10 +74,10 @@ check(!fresh.ctx.rules.dmRules, 'and the boot forces nothing without the design 
 
 console.log('');
 console.log('=== every committed CSBWin save, loaded over the opposite flags ===');
-const saves = readdirSync(resolve(SAVES)).filter((f) => f.endsWith('.dat')).sort();
 let withBoth = 0;
-for (const file of saves) {
-  const bytes = new Uint8Array(readFileSync(resolve(SAVES, file)));
+for (const path of genuineSaves()) {
+  const file = basename(path);
+  const bytes = new Uint8Array(readFileSync(path));
   const header = quiet(() => loadCsbwinWorld(bytes)).save.extendedFeatures;
   if (!header) { check(false, `${file}: carries an Extended Features block`); continue; }
   const design = (header.flags & 0x40) !== 0;
@@ -93,7 +92,7 @@ for (const file of saves) {
   check(game.ctx.rules.dmRules === option && game.ctx.rules.dmRulesDesignOption === design,
     `${file}: loads its own two bits`);
 }
-check(withBoth === 11, `eleven committed saves carry both DMRules and DMRulesOption (${withBoth})`);
+check(withBoth === 8, `all eight committed saves carry both DMRules and DMRulesOption (${withBoth})`);
 
 /* ------------------------------------------------------ a file with no block ----- */
 

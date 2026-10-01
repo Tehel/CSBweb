@@ -11,8 +11,8 @@
  *
  * Run: `npx tsx tools/dump-image-checksum.ts`
  */
-import { readFileSync, readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { basename, resolve } from 'node:path';
 
 import { readU16BE, readU32BE } from '../src/core/bytes';
 import { ExpandData } from '../src/core/compression';
@@ -20,6 +20,7 @@ import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { buildImageChecksum } from '../src/data/CsbwinDungeonImageWriter';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { check, finish } from './lib/check';
+import { genuineSaves } from './lib/saves';
 
 /** Whether `read` throws, and with what. */
 function failure(read: () => unknown): string | null {
@@ -86,11 +87,11 @@ function main(): void {
     'one stray byte is not a word: StreamInput fails and nothing is compared');
 
   console.log('== saves ==');
-  const dir = resolve('static/gamefiles/saves');
-  const saves = readdirSync(dir).filter(f => f.endsWith('.dat')).sort();
+  const saves = genuineSaves();
   check(saves.length > 0, 'there are committed saves');
-  for (const name of saves) {
-    const bytes = new Uint8Array(readFileSync(resolve(dir, name)));
+  for (const path of saves) {
+    const name = basename(path);
+    const bytes = new Uint8Array(readFileSync(path));
     const stored = readU16BE(bytes, bytes.length - 2);
     const intact = failure(() => loadCsbwinWorld(bytes));
     const damaged = failure(() => loadCsbwinWorld(flipped(bytes, bytes.length - 3)));

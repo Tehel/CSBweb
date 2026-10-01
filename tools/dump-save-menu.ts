@@ -44,7 +44,7 @@
  * Run: `npx tsx tools/dump-save-menu.ts`
  */
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -88,6 +88,7 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/rend
 import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
+import { SAVE_DIR, genuineSaves } from './lib/saves';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
@@ -95,7 +96,6 @@ import * as Inventory from '../src/renderer/ui/Inventory';
 
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const SAVES = 'static/gamefiles/saves';
 
 
 /* ------------------------------------------------------------------------------- */
@@ -489,18 +489,13 @@ async function checkSaveFile(): Promise<void> {
 function checkCsbwinListing(): void {
   console.log('');
   console.log('=== genuine CSBWin saves, as the menu would list them ===');
-  const dir = resolve(SAVES);
-  const { readdirSync, existsSync, statSync } = require('node:fs') as typeof import('node:fs');
-  if (!existsSync(dir)) {
-    check(false, `${SAVES} should hold the genuine saves the reader is proven against`);
-    return;
-  }
-  const files = readdirSync(dir).filter((n) => n.toLowerCase().endsWith('.dat') && !n.includes(':')).sort();
-  check(files.length > 0, `${SAVES} holds at least one genuine save`);
+  const { statSync } = require('node:fs') as typeof import('node:fs');
+  const paths = genuineSaves();
+  check(paths.length > 0, `${SAVE_DIR} holds at least one genuine save`);
 
   console.log(['file', 'row'].join('\t'));
-  for (const file of files) {
-    const path = resolve(dir, file);
+  for (const path of paths) {
+    const file = basename(path);
     const info = readCsbwinSaveInfo(new Uint8Array(readFileSync(path)));
     check(info !== null, `${file}: blocks 2 and 4 read`);
     if (!info) continue;

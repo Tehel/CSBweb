@@ -67,10 +67,10 @@ import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import { CHARFLAG_ATTACK_DISABLE, MovementAction, type Champion } from '../src/engine/gameTypes';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
+import { savePath } from './lib/saves';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
-const SAVES = 'static/gamefiles/saves';
 const CSB = 'static/gamefiles/csb';
 
 /** `CHARDESC.portrait` unpacked: 32x29 palette indices, one byte each. */
@@ -88,7 +88,7 @@ function loadWorld(): Game {
 
 function fromCsbwinSave(file: string): Game {
   const game = loadWorld();
-  applyCsbwinSave(game, new Uint8Array(readFileSync(resolve(SAVES, file))));
+  applyCsbwinSave(game, new Uint8Array(readFileSync(savePath(file))));
   return game;
 }
 
@@ -705,25 +705,25 @@ function main(): void {
         `${label}: the other flags, the gender among them, are untouched`);
     }
 
-    // A genuine CSBWin save of a busy champion: IAIDO, champion 0 of `csbgame6.dat`, has
+    // A genuine CSBWin save of a busy champion: IAIDO, champion 0 of `csbgame-flying-sword.dat`, has
     // bit 3 and a busy timer. The bit is the file's, and only his TT_11 clears it. The
     // timer is due at the saved d.Time, so the first tick after the load fires it.
-    const saved = fromCsbwinSave('csbgame6.dat');
-    report('csbgame6.dat', saved);
+    const saved = fromCsbwinSave('csbgame-flying-sword.dat');
+    report('csbgame-flying-sword.dat', saved);
     check(busy(champion(saved)) && saved.ctx.timers.getTimer(champion(saved).busyTimerIndex)?.function === 11,
-      'csbgame6.dat: champion 0 is saved busy, with bit 3 and a TT_11');
+      'csbgame-flying-sword.dat: champion 0 is saved busy, with bit 3 and a TT_11');
     let heldUntilTimer = true;
     let steps = 0;
     for (; steps < 100 && champion(saved).busyTimerIndex >= 0; steps++) {
       heldUntilTimer &&= busy(champion(saved));
       advance(saved, 1);
     }
-    report('csbgame6.dat, freed', saved);
-    check(heldUntilTimer, 'csbgame6.dat: the bit holds for as long as his TT_11 is queued');
-    check(steps === 1, `csbgame6.dat: his TT_11 fires on the first tick after the load (${steps})`);
+    report('csbgame-flying-sword.dat, freed', saved);
+    check(heldUntilTimer, 'csbgame-flying-sword.dat: the bit holds for as long as his TT_11 is queued');
+    check(steps === 1, `csbgame-flying-sword.dat: his TT_11 fires on the first tick after the load (${steps})`);
     check(!busy(champion(saved)) && champion(saved).busyTimerIndex === -1,
-      'csbgame6.dat: his TT_11 clears the bit the file set, and the busy timer');
-    check(!busy(written(saved)), 'csbgame6.dat: a save written after carries no bit 3');
+      'csbgame-flying-sword.dat: his TT_11 clears the bit the file set, and the busy timer');
+    check(!busy(written(saved)), 'csbgame-flying-sword.dat: a save written after carries no bit 3');
   }
 
   /* ---- 6. playing on after a save, beside a load of it ---- */

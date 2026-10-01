@@ -506,10 +506,8 @@ export class DungeonLoader {
      * indirect slot that named it in the same breath (`DeleteDBEntry`,
      * `doc/CSBwin-src/data.cpp:993-1015`); everything else in the record is left as it
      * was. So a free record routinely still holds a reference to a slot that has since
-     * been freed or reused, and three of the twelve committed saves contain exactly
-     * that — `csbgame2.dat`'s `monster[158]` still points its possession chain at slot
-     * 361, long after both were deleted. CSBWin never looks: a free record is reached
-     * only by the allocator, which clears it before handing it out.
+     * been freed or reused. CSBWin never looks: a free record is reached only by the
+     * allocator, which clears it before handing it out.
      *
      * Resolving such a reference is meaningless, and *refusing* it would make a
      * perfectly good save unreadable, so a free record's other RNs are read and

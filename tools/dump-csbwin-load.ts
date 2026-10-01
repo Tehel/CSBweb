@@ -34,8 +34,8 @@
  *
  * Run: `npx tsx tools/dump-csbwin-load.ts [path-or-directory]`
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
@@ -49,13 +49,13 @@ import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../src/data/CsbwinCharacters';
 import { ImageFormat } from '../src/core/imageDecoder';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
+import { genuineSaves } from './lib/saves';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
-const DEFAULT_DIR = 'static/gamefiles/saves';
 /**
- * The saves made by playing: `csbgame.dat`, `csbgame2.dat` and up. The hyphenated ones
- * beside them were made to order at the first moment the game allows a save, so their
+ * The saves made by playing: `csbgame7.dat`, and any `csbgame<n>.dat` given by path. The
+ * hyphenated ones beside it were made to order at the first moment the game allows a save, so their
  * world is still `dungeon.dat`'s and the "did the load change anything" guard below
  * would fail on them for the right reason.
  */
@@ -174,20 +174,8 @@ function objectsAt(game: Game, position: Position): ObjectID[] {
   return out;
 }
 
-function collectSaves(target: string): string[] {
-  const path = resolve(target);
-  if (!existsSync(path)) return [];
-  if (statSync(path).isDirectory()) {
-    return readdirSync(path)
-      .filter((n) => n.toLowerCase().endsWith('.dat') && !n.includes(':'))
-      .sort()
-      .map((n) => join(path, n));
-  }
-  return [path];
-}
-
 function main(): void {
-  const saves = collectSaves(process.argv[2] ?? DEFAULT_DIR);
+  const saves = genuineSaves(process.argv[2]);
   check(saves.length > 0, 'there should be save files to read');
 
   const cells = portraitCells();

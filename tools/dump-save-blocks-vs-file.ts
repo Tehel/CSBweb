@@ -24,9 +24,8 @@
  *   `Checksum354…374`. `SaveGame` memsets the block before filling it
  *   (`doc/CSBwin-src/SaveGame.cpp:864-865`) and `ScrambleAndWrite` writes only words
  *   0-127 of `Byte740` (`:706-750`), so a CSBWin build of this source writes zeros there
- *   and so does this port — twelve of the saves agree — but `csbgame.dat` and
- *   `csbgame2.dat` carry 0xba in all three, so whatever wrote those two did not clear the
- *   block. Every field of the block is asserted, bar the checksum words of a block whose
+ *   and so does this port. The committed saves agree, and a file some other build wrote
+ *   need not. Every field of the block is asserted, bar the checksum words of a block whose
  *   own exempt bytes differ (below) and word 127, which sums them.
  * - **`TIMER.unused13[3]`** in a slot that is *not* live. The three padding bytes hold
  *   0xcd in every slot CSBWin has ever put a timer in and 0 in every slot it has not
@@ -39,16 +38,14 @@
  *
  * Run: `npx tsx tools/dump-save-blocks-vs-file.ts [path-or-directory]`
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 import { loadSaveGameState, saveSaveGameState } from '../src/data/SaveGameLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { buildObjectIndirectIndex, formChecksum, readObjectIndirectIndex } from '../src/data/CsbwinObjectIndex';
 import { OBJECT_ID_NULL } from '../src/core/types';
 import { check, finish } from './lib/check';
-
-const DEFAULT_DIR = 'static/gamefiles/saves';
+import { genuineSaves } from './lib/saves';
 
 const BLOCK1_SIZE = 512;
 const BLOCK2_SIZE = 128;
@@ -100,18 +97,6 @@ function block2Field(offset: number): string {
   return BLOCK2_FIELDS.find(([from, to]) => offset >= from && offset < to)?.[2] ?? `+${offset}`;
 }
 
-function collectSaves(target: string): string[] {
-  const path = resolve(target);
-  if (!existsSync(path)) return [];
-  if (statSync(path).isDirectory()) {
-    return readdirSync(path)
-      .filter((n) => n.toLowerCase().endsWith('.dat') && !n.includes(':'))
-      .sort()
-      .map((n) => join(path, n));
-  }
-  return [path];
-}
-
 interface Region {
   name: string;
   size: number;
@@ -135,7 +120,7 @@ function summarize(diffs: Map<string, number>): string {
 }
 
 function main(): void {
-  const saves = collectSaves(process.argv[2] ?? DEFAULT_DIR);
+  const saves = genuineSaves(process.argv[2]);
   check(saves.length > 0, 'there should be save files to read');
 
   for (const path of saves) {

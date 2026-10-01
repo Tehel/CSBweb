@@ -23,16 +23,16 @@
  *
  * Run: `npx tsx tools/dump-expool.ts`
  */
-import { readdirSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { basename, resolve } from 'node:path';
 
 import { readU32BE } from '../src/core/bytes';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { EXPOOL_RECORD_SIZE, Expool, type ExpoolDatabase } from '../src/data/CsbwinExpool';
 import { check, finish } from './lib/check';
+import { genuineSaves, savePath } from './lib/saves';
 
-const SAVES = 'static/gamefiles/saves';
 /** `EDT_Palette` (`doc/CSBwin-src/CSB.h:1564`). */
 const EDT_PALETTE = 7;
 /** `EDT_ChampionBones` (`doc/CSBwin-src/CSB.h:1571`). */
@@ -83,8 +83,9 @@ function main(): void {
   console.log(['save', 'blocks', 'block sizes', 'records by type', 'free lists', 'rebuilt', 'saved again'].join('\t'));
   let rebuilt = 0;
   let resaved = 0;
-  for (const file of readdirSync(resolve(SAVES)).filter((name) => name.endsWith('.dat')).sort()) {
-    const { dungeon } = loadCsbwinWorld(new Uint8Array(readFileSync(resolve(SAVES, file))));
+  for (const path of genuineSaves()) {
+    const file = basename(path);
+    const { dungeon } = loadCsbwinWorld(new Uint8Array(readFileSync(path)));
     const bytes = dungeon.expool ?? new Uint8Array(0);
     const keys = new Expool(copyOf(bytes)).keys();
     const sizes = blockSizes(bytes);
@@ -130,7 +131,7 @@ function main(): void {
     console.log([file, sizes.length, sizes.join(','), countByType(keys), freeLists(bytes), rebuiltVerdict, resavedVerdict].join('\t'));
   }
   check(rebuilt >= 5, `at least five pools are the palette records alone (${rebuilt})`);
-  check(resaved >= 10, `and at least ten carry them (${resaved})`);
+  check(resaved >= 8, `and at least eight carry them (${resaved})`);
 
   /* ------------------------------------------ 2. the bones records --------------- */
 
@@ -188,7 +189,7 @@ function main(): void {
   console.log('');
   console.log("=== a pool's bones keys between a file's numbering and the port's ===");
   {
-    const { dungeon } = loadCsbwinWorld(new Uint8Array(readFileSync(resolve(SAVES, 'csbgame7.dat'))));
+    const { dungeon } = loadCsbwinWorld(new Uint8Array(readFileSync(savePath('csbgame7.dat'))));
     const db = copyOf(dungeon.expool ?? new Uint8Array(0));
     const pool = new Expool(db);
     const others = pool.keys().filter((key) => key >>> 24 !== EDT_CHAMPION_BONES);

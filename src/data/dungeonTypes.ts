@@ -113,7 +113,7 @@ export interface DoorRecord {
     doorType: ui8;              // bit 0: 0 or 1
     /**
      * `word2` bits 9-15, which `DB0` marks `????` and declares no accessor for
-     * (`doc/CSBwin-src/CSB.h:822-829`). Zero in `dungeon.dat` and in all fourteen
+     * (`doc/CSBwin-src/CSB.h:822-829`). Zero in `dungeon.dat` and in all eight
      * committed saves, but not derivable from anything else, so it is carried rather
      * than assumed. Absent on a record this engine created.
      */

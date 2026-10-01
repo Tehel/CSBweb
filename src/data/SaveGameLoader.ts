@@ -414,7 +414,7 @@ function parseMissileRecordsFromSaveData(
     // flying object may also be a spell literal, which `resolve` passes through.
     // A free record — link `RNnul` — keeps a stale flying object whose slot may have
     // been freed since, so it is dropped rather than resolved, exactly as in
-    // `DungeonLoader.readRNOfRecord`. `csbgame3.dat` has one.
+    // `DungeonLoader.readRNOfRecord`.
     const nextObject = resolveRN(objectIndex, readU16BE(data, base));
     records.push({
       nextObject,
@@ -821,7 +821,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
       // stack `TIMER` whose constructor sets every trailing byte to **0xcd**
       // (`doc/CSBwin-src/CSB.h:1805-1816`, `Timer.cpp:1132`). So a slot that has ever
       // held a timer carries 0xcd there and one that never has carries 0 — measured on
-      // all twelve committed 16-byte saves, with no third value.
+      // all eight committed saves, with no third value.
       //
       // This port keeps no high-water mark of slot use, so it writes 0xcd for a slot
       // that is live *now* and 0 otherwise. Nothing reads the field.

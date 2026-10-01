@@ -16,7 +16,7 @@ npx tsx tools/peek-dungeon.ts cell 11 18 1            # neighbourhood, flag byte
 npx tsx tools/peek-dungeon.ts cell 11 18 1 6          # …with a radius-6 neighbourhood
 npx tsx tools/peek-dungeon.ts find "dragon"           # items, monsters (and what they carry), texts
 npx tsx tools/peek-dungeon.ts dump 11                 # every object of every square: actuators, texts, doors too
-npx tsx tools/peek-dungeon.ts --file static/gamefiles/saves/csbgame7.dat cell 6 26 23
+npx tsx tools/peek-dungeon.ts --file tools/fixtures/csbgame7.dat cell 6 26 23
 ```
 
 ## Coordinates
@@ -30,7 +30,7 @@ before answering.
 
 - **`dungeon.dat`** (the default is `static/gamefiles/dm-atari/`): the world as a new game
   starts it. It has no timers, and monsters sit where the designer put them.
-- **A CSBWin save** (`static/gamefiles/saves/*.dat`): the world as it was saved. It shows
+- **A CSBWin save** (`tools/fixtures/*.dat`, or any other by path): the world as it was saved. It shows
   the party (`@`), the monsters where they really are, and, in `cell`, the square's live
   timers.
 - **A `.dmweb.json`**: a save an earlier build wrote, a CSBWin file wrapped in JSON. Its

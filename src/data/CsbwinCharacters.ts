@@ -462,8 +462,8 @@ export function writeCsbwinCharacter(
   }
 
   for (let i = 0; i < 30; i++) {
-    // An empty slot is `RNnul`, which is what every empty slot holds in all twelve
-    // committed saves.
+    // An empty slot is `RNnul`, which is what every empty slot holds in every
+    // committed save.
     const rn = getChampionPossession(champion, i);
     setU16BE(block, base + POSSESSIONS_OFFSET + i * 2, options.encodeRN ? options.encodeRN(rn) : rn);
   }

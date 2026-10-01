@@ -8,7 +8,7 @@
  *
  * **The oracle is exact, and that is the point of this tool.** Every committed save was
  * made by CSBWin from this same `dungeon.dat`, so CSBWin's converted form of it is
- * sitting in fourteen files. This converts `dungeon.dat` here and compares:
+ * sitting in eight files. This converts `dungeon.dat` here and compares:
  *
  * - `ConvertToIndirectText` — the whole `indirectTextIndex`, the whole `compressedText`,
  *   the rewritten index word of every TEXT record, and `NumWordsInTextArray`, which
@@ -27,9 +27,9 @@
  *
  * - the new scroll's `m_word4` bits 1-15, which `convertScrolls` never initialises, so a
  *   genuine save carries allocation debris there and this port writes zero;
- * - the two CSBWin builds among the fourteen. `csbgame.dat` and `csbgame2.dat` were
- *   written by an older one whose `extendedFlags` is 0; nothing in this tool depends on
- *   that, but the roll prints it so a future reader does not mistake it for a defect.
+ * - each save's `extendedFlags`, which differ between CSBWin builds; nothing in this tool
+ *   depends on them, but the roll prints them so a future reader does not mistake a
+ *   difference for a defect.
  *
  * The gate gets its own section. Running a conversion twice does not fail — it produces
  * a corrupt world — so "a save is not converted again" is the load-bearing claim, and it
@@ -38,8 +38,8 @@
  *
  * Run: `npx tsx tools/dump-dungeon-conversions.ts [path-or-directory]`
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
@@ -53,21 +53,9 @@ import { getActuatorType } from '../src/data/actuatorHelpers';
 import { DBType, OBJECT_ID_NULL, encodeObjectID } from '../src/core/types';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { check, fail, finish } from './lib/check';
+import { SAVE_DIR, genuineSaves } from './lib/saves';
 
-const DEFAULT_DIR = 'static/gamefiles/saves';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-
-function collect(target: string): string[] {
-  const path = resolve(target);
-  if (!existsSync(path)) return [];
-  if (statSync(path).isDirectory()) {
-    return readdirSync(path)
-      .filter((n) => n.toLowerCase().endsWith('.dat') && !n.includes(':'))
-      .sort()
-      .map((n) => join(path, n));
-  }
-  return [path];
-}
 
 /** How many entries of two arrays differ, over the length they share. */
 function diffs(a: readonly number[], b: readonly number[]): number {
@@ -337,10 +325,9 @@ function checkTheGate(saves: Map<string, DungeonData>, converted: DungeonData): 
 /* ------------------------------------------------------------------------- the run --- */
 
 function main(): void {
-  const target = process.argv[2] ?? DEFAULT_DIR;
-  const files = collect(target);
+  const files = genuineSaves(process.argv[2]);
   if (files.length === 0) {
-    console.error(`no save files under ${target}`);
+    console.error(`no save files under ${process.argv[2] ?? SAVE_DIR}`);
     process.exitCode = 1;
     return;
   }

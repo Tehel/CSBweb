@@ -95,7 +95,8 @@ There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is 
   runs every tool **listed** in `tools/run-checks.mjs` — there is no discovery, so a new
   tool is not evidence until it is added there. Run one on its own with
   `npx tsx tools/<name>.ts`. A tool builds its `Game` (or a bare `GameContext`) through
-  `tools/lib/game.ts`, so it gets every table `main.ts` does.
+  `tools/lib/game.ts`, so it gets every table `main.ts` does, and finds a genuine CSBWin
+  save through `tools/lib/saves.ts`, in `tools/fixtures/`.
 
 When porting behaviour that is invisible on screen, write the tool in the same commit.
 The `verification-tools` skill in `.claude/skills/` has the pattern, the gotchas, and

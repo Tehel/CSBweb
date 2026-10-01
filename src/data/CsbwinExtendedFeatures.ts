@@ -95,8 +95,8 @@ export interface ExtendedFeaturesBlock {
      * written: `SaveGame` stores 0 when there is no game information at all and
      * `gameInfoSize - 1` when there is (`doc/CSBwin-src/SaveGame.cpp:977-978`), so an
      * allocated-but-empty one stores **-1** and `WriteGameInfo` then writes nothing
-     * (`:265-270`). `csbgame3.dat` is exactly that case, and it is why this is carried
-     * rather than derived from the bytes — the two are indistinguishable at zero.
+     * (`:265-270`). That is why this is carried rather than derived from the bytes — the
+     * two are indistinguishable at zero.
      */
     gameInfoSize: number;
     /** `efb.cellFlagArraySize` — the length of block 14. */
@@ -643,7 +643,7 @@ export function readRulesOptions(
  * (`doc/CSBwin-src/SaveGame.cpp:915-980`).
  *
  * Nothing here is a guess. Each field is either assigned by that function from something
- * this port holds, or measured to be zero in all fourteen committed saves and named
+ * this port holds, or measured to be zero in all eight committed saves and named
  * below as such — `memset(&efb,0,512)` runs first, so a field `SaveGame` never touches
  * is genuinely zero rather than merely unknown.
  *
@@ -654,18 +654,16 @@ export function readRulesOptions(
  * They must agree with the image actually written, which is what
  * `convertOriginalDungeon` guarantees. `DMRules` is `DMRulesDesignOption` (`:952-953`).
  * The other two are options this port does not model and writes off: `SimpleEncryption`
- * (the whole file behind RC4) and `AutoRecord`. Measured: eleven saves carry 0xe9 — the
- * four plus `DMRules` — and the three older ones 0xa9, which is exactly the four alone.
+ * (the whole file behind RC4) and `AutoRecord`. Measured: every committed save carries
+ * 0xe9, the four (0xa9) plus `DMRules`.
  *
  * **`extendedFlags`.** Three unconditional (`:964-966`): `SequencedTimers` and
  * `ExtendedTimers`, which together select the 16-byte `TIMER` this port writes, and
  * `DefaultDirectX`, which is a UI preference CSBWin sets on every save. Plus
  * `ExtendedWallDecorations` from the world and `DMRulesOption` from `DM_rules`
  * (`:950-951`). `InvisibleMonsters` and `DrawAsSize4Monsters` are global design options
- * with no equivalent here. Measured: 0xe0
- * in `csbgame3.dat`, which is the three unconditional ones; 0xf8 in the newest saves,
- * adding the wall decorations and DM rules; and **0** in `csbgame.dat` and
- * `csbgame2.dat`, which an older CSBWin wrote with 10-byte timers.
+ * with no equivalent here. Measured: 0xf8 in every committed save, which is the three
+ * unconditional ones (0xe0) plus the wall decorations and DM rules.
  *
  * **Zero, and measured zero rather than assumed.** `editingOptions` is never assigned by
  * `SaveGame` at all. `graphicsSignature1/2` and `csbGraphicsSignature1/2` are
@@ -677,7 +675,7 @@ export function readRulesOptions(
  *
  * **`gameInfoSize` is 0**, meaning `gameInfo == NULL` (`:977-978`) — this port has no
  * game-information string. Note that 0 and -1 are different things here; -1 is an
- * allocated-but-empty one, which `csbgame3.dat` carries.
+ * allocated-but-empty one.
  *
  * **`numDSA` is 0.** `DSA::Write` is unported, so a world with DSA programs cannot be
  * written; no dungeon this project loads defines one. `buildSaveFile` refuses rather

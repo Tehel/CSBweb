@@ -51,7 +51,7 @@ import { newUIState } from './lib/ui';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
-const DEFAULT_SAVE = 'static/gamefiles/saves/csbgame.dat';
+const DEFAULT_SAVE = 'tools/fixtures/csbgame7.dat';
 
 const SCREEN_W = 320;
 const SCREEN_H = 200;

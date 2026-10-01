@@ -21,8 +21,8 @@
  *
  * Run: `npx tsx tools/dump-character-block.ts [path-or-directory]`
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import {
   CHARACTER_BLOCK_SIZE,
@@ -34,10 +34,10 @@ import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { loadSaveGameState, saveSaveGameState } from '../src/data/SaveGameLoader';
 import type { Champion } from '../src/engine/gameTypes';
 import { check, finish } from './lib/check';
+import { genuineSaves, savePath } from './lib/saves';
 
-const DEFAULT_DIR = 'static/gamefiles/saves';
-/** The one save the live-game cases below are built from: four champions, two mages. */
-const FIXTURE = 'static/gamefiles/saves/csbgame.dat';
+/** The one save the live-game cases below are built from. */
+const FIXTURE = savePath('csbgame7.dat');
 
 /** Which `CHARDESC` field an offset falls in, for a diff a human can read. */
 const FIELDS: Array<[number, number, string]> = [
@@ -69,20 +69,8 @@ function fieldAt(offset: number): string {
   return `champion ${champion} ${field ? field[2] : `+${within}`}`;
 }
 
-function collectSaves(target: string): string[] {
-  const path = resolve(target);
-  if (!existsSync(path)) return [];
-  if (statSync(path).isDirectory()) {
-    return readdirSync(path)
-      .filter((n) => n.toLowerCase().endsWith('.dat') && !n.includes(':'))
-      .sort()
-      .map((n) => join(path, n));
-  }
-  return [path];
-}
-
 function main(): void {
-  const saves = collectSaves(process.argv[2] ?? DEFAULT_DIR);
+  const saves = genuineSaves(process.argv[2]);
   check(saves.length > 0, 'there should be save files to read');
 
   for (const path of saves) {

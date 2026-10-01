@@ -18,8 +18,8 @@
  *
  * Run: `npx tsx tools/dump-extend-portraits.ts`
  */
-import { readdirSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { basename, resolve } from 'node:path';
 
 import { OBJECT_ID_NULL } from '../src/core/types';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
@@ -27,9 +27,9 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { getActuatorPosition, getActuatorState, getActuatorType } from '../src/data/actuatorHelpers';
 import type { ActuatorRecord, DungeonData } from '../src/data/dungeonTypes';
 import { check, finish } from './lib/check';
+import { genuineSaves } from './lib/saves';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const SAVES = 'static/gamefiles/saves';
 const ATARI_SAVES = ['static/gamefiles/csb/mini.dat', 'static/gamefiles/csb/csbgame2.dat'];
 /** Champion 20's mirror, level 0 at (17,10): the one whose leftover bits hide its frame. */
 const MIRROR_286 = 286;
@@ -98,9 +98,9 @@ for (const [name, db] of Object.entries(kept.databases)) {
 
 console.log('\ncommitted saves (all carry ExpandedPortraits):');
 let keptPositions = 0;
-const saveFiles = readdirSync(SAVES).filter((n) => n.toLowerCase().endsWith('.dat')).sort();
-for (const name of saveFiles) {
-  const world = loadCsbwinWorld(new Uint8Array(readFileSync(join(SAVES, name))));
+for (const path of genuineSaves()) {
+  const name = basename(path);
+  const world = loadCsbwinWorld(new Uint8Array(readFileSync(path)));
   const found = mirrors(world.dungeon);
   const positioned = found.filter((i) => getActuatorPosition(world.dungeon.databases.actuators.records[i]) !== 0);
   keptPositions += positioned.length;

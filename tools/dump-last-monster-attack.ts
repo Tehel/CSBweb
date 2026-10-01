@@ -31,6 +31,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
+import { savePath } from './lib/saves';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { RN_FIREBALL } from '../src/core/spellRn';
@@ -104,7 +105,7 @@ function main(): void {
   // A genuine CSBWin save of a game no monster has attacked, and the port's own file of
   // one: both hold -200, and both read it back.
   const saved = makeGame();
-  applyCsbwinSave(saved, new Uint8Array(readFileSync(resolve('static/gamefiles/saves/csbgame4-door-opening.dat'))));
+  applyCsbwinSave(saved, new Uint8Array(readFileSync(savePath('csbgame4-door-opening.dat'))));
   const fromSave = saved.ctx.party.state.lastMonsterAttackTime;
   const own = makeGame();
   applyCsbwinSave(own, buildSaveFile(game));

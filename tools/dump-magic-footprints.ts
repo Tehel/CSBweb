@@ -36,8 +36,7 @@ import type { Game } from '../src/engine/Game';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
-
-const SAVES = 'static/gamefiles/saves';
+import { savePath } from './lib/saves';
 
 /** YA BRO ROS: element YA (0x66), form BRO (0x70), class ROS (0x73), after a power rune. */
 const YA_BRO_ROS = [0x66, 0x70, 0x73];
@@ -66,7 +65,7 @@ function openNeighbour(game: Game): { x: number; y: number } {
 function scenario(save: string, power: number): void {
   const label = `${save}, power ${power}`;
   const game = loadWorld();
-  applyCsbwinSave(game, new Uint8Array(readFileSync(resolve(SAVES, save))));
+  applyCsbwinSave(game, new Uint8Array(readFileSync(savePath(save))));
   const prints = game.ctx.footprints;
   const party = game.ctx.party.state;
 

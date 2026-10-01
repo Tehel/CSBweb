@@ -50,10 +50,10 @@ import { Game } from '../src/engine/Game';
 import { TimerFunction, timerLess, type TimerEntry } from '../src/engine/TimerQueue';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
+import { savePath } from './lib/saves';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
-const SAVES = 'static/gamefiles/saves';
 
 /** The door these two saves were made around, and the cell the party faces. */
 const DOOR = { x: 1, y: 14, level: 0 };
@@ -95,7 +95,7 @@ function main(): void {
   const seen: Array<{ label: string; action: number; before: number }> = [];
 
   for (const { file, action, label } of cases) {
-    const bytes = new Uint8Array(readFileSync(resolve(SAVES, file)));
+    const bytes = new Uint8Array(readFileSync(savePath(file)));
     const save = loadSaveGameState(bytes);
     const queue = save.timerQueue ?? [];
     const gb2 = save.block2;
@@ -205,7 +205,7 @@ function main(): void {
   // (`CSBCode.cpp:7228-7235`), a Ya potion's shield (`Character.cpp:4386-4391`), a
   // cloud's first turn (`Code11f52.cpp:1428`, one tick on).
   const loaded = loadWorld();
-  applyCsbwinSave(loaded, new Uint8Array(readFileSync(resolve(SAVES, cases[0].file))));
+  applyCsbwinSave(loaded, new Uint8Array(readFileSync(savePath(cases[0].file))));
   const clock = loaded.ctx.state.tickCount;
   const at = new Position(DOOR.x, DOOR.y + 1, DOOR.level);
   loaded.systems.timer.schedulePoison(0, 3, at.z);

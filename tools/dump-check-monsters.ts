@@ -17,8 +17,8 @@
  *
  * Run: `npx tsx tools/dump-check-monsters.ts`
  */
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, encodeObjectID } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
@@ -33,9 +33,9 @@ import { DungeonState } from '../src/engine/DungeonState';
 import { monsterHorizontalSize } from '../src/data/tables/MonsterDesc';
 import { check, finish } from './lib/check';
 import { gameTablesOf, newGame, stockGraphics } from './lib/game';
+import { genuineSaves } from './lib/saves';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const SAVES = 'static/gamefiles/saves';
 const CSB = 'static/gamefiles/csb';
 const ATARI_SAVES = ['mini.dat', 'csbgame2.dat'];
 
@@ -96,7 +96,7 @@ const dungeonChanged = measure('dm-atari/dungeon.dat', new DungeonLoader().loadF
 check(dungeonChanged.size === 0, 'dm-atari/dungeon.dat: CheckMonsters changes nothing');
 
 const saveFiles = [
-  ...readdirSync(SAVES).filter((n) => n.toLowerCase().endsWith('.dat')).sort().map((n) => join(SAVES, n)),
+  ...genuineSaves().map((path) => relative('.', path)),
   ...ATARI_SAVES.map((n) => join(CSB, n)),
 ];
 const withChanges: { file: string; changed: Map<number, [Fields, Fields]> }[] = [];

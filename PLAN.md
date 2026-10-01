@@ -281,7 +281,7 @@ wrong turned out to be three (`doc/PROVEN_FACTS.md` → "The dungeon image layou
 file").
 
 Against the write order in `doc/CSBWIN_SAVEGAME_REFERENCE.md`, over `dungeon.dat` and the
-fourteen committed saves:
+eight committed saves:
 
 | Block | What it holds | State |
 | --- | --- | --- |

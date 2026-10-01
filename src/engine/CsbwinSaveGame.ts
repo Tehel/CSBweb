@@ -35,7 +35,7 @@
  *   (`doc/CSBwin-src/SaveGame.cpp:1746-1763`), and nothing here asks `Expool.locate`
  *   (`src/data/CsbwinExpool.ts`) for them. No committed save needs it: the shipped
  *   DM dungeon defines no DSAs at all — `numDSA` is 0 and there are no special-location
- *   records in any of the twelve — so the live game's globals are kept rather than
+ *   records in any of them — so the live game's globals are kept rather than
  *   cleared. A dungeon with DSAs is not saved at all (`buildSaveFile`).
  * - **What CSBWin's file does not hold either**, and a game it reads starts without:
  *   `d.Word11694` (`gameWon`) and `d.PartySleeping`, `d.PendingDamage` and

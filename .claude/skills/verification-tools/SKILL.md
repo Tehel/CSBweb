@@ -162,6 +162,14 @@ needs a *different* table builds its game over a copy:
 extraction its `GameTables` came from, rather than calling an extractor itself. Never
 mutate the shared set.
 
+**Find a genuine save through `tools/lib/saves.ts`.** The CSBWin saves are in
+`tools/fixtures/`, beside the golden frames: seven made to order for a check (a party
+one step in, a door in motion, a sword in flight) and `csbgame7.dat`, the one save of
+real play, for whatever needs live monsters on the party's level. `genuineSaves()` lists
+them in file-name order, `genuineSaves(process.argv[2])` takes a tool's optional path
+instead, and `savePath('csbgame7.dat')` finds one by name. Use `csbgame7.dat` when any
+valid save will do, and put a new save made for a check in `tools/fixtures/`.
+
 **Seed fixed, always.** `new CsbRandom(0x12345678)` (or `game.setRandomSeed(…)`). An
 unseeded run is not a test, and it spoils the refactor check below (`DEBT.md` F4).
 
@@ -172,7 +180,7 @@ A passing check can hide a changed number the check does not look at. Run a diff
 tool twice on the old tree (a `git worktree` of `HEAD` in the scratchpad, with
 `node_modules` and `static/gamefiles` symlinked in) to tell a real change from a tool that
 varies on its own.
-The other half is the saves: for every file in `static/gamefiles/saves`, a seeded
+The other half is the saves: for every file of `genuineSaves()`, a seeded
 `newGame` with `applyCsbwinSave`, then `getRuntimeSaveState()` hashed as JSON after the load
 and again after 600 VBLs of `runVbl(game, TICK_DUE)`, a tick each, on both trees. Zero `savedAt` in the hash
 (a `JSON.stringify` replacer): it is wall-clock, and with it two runs of the same tree

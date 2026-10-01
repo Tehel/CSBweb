@@ -42,13 +42,14 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
+import { savePath } from './lib/saves';
 
 const CSB = 'static/gamefiles/csb';
 /** DM's `dungeon.dat`, fourteen levels: the world each game is built over before its load. */
 const DM_DUNGEON = new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat')));
 const ATARI_SAVES = ['mini.dat', 'csbgame2.dat'];
 /** A save CSBWin wrote of DM, with an Extended Features block. */
-const CONTROL = 'static/gamefiles/saves/csbgame7.dat';
+const CONTROL = 'csbgame7.dat';
 const TICKS = 600;
 
 const DB_OF_CATEGORY: Record<number, keyof DungeonData['databases']> = {
@@ -154,7 +155,7 @@ for (const name of ATARI_SAVES) {
 }
 
 // The control: the block's own size stands.
-const control = loadSaveGameState(new Uint8Array(readFileSync(resolve(CONTROL))));
+const control = loadSaveGameState(new Uint8Array(readFileSync(savePath(CONTROL))));
 const declared = control.extendedFeatures?.cellFlagArraySize ?? 0;
 console.log(`\ncontrol ${CONTROL}: block declares ${declared}, taken ${control.cellFlagArraySize}`);
 check(declared > 0 && control.cellFlagArraySize === declared, 'a CSBWin save keeps its block\'s cell flag size');

@@ -19,13 +19,13 @@
  * block offset and size are all right. A single wrong byte anywhere in a block fails
  * its checksum and throws.
  *
- * The files live in `static/gamefiles/saves/`, with Chaos Strikes Back's two in its own
- * folder, and are read-only inputs — the tool never writes to them.
+ * The files live in `tools/fixtures/` (`tools/lib/saves.ts`), with Chaos Strikes Back's
+ * two in its own folder, and are read-only inputs — the tool never writes to them.
  *
  * Run: `npx tsx tools/dump-csbwin-save.ts [path-or-directory]`
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 // The CHARDESC offsets and the name decode are shared with the save/load menu, which
@@ -39,44 +39,27 @@ import {
   decodeCharField,
 } from '../src/data/CsbwinSaveInfo';
 import { check, finish } from './lib/check';
+import { SAVE_DIR, collectSaves, genuineSaves } from './lib/saves';
 import { readU16BE } from '../src/core/bytes';
 import { OBJECT_ID_NULL } from '../src/core/types';
 
 const DB_NAMES = ['door', 'telep', 'text', 'actuator', 'creature', 'weapon', 'clothing',
   'scroll', 'potion', 'container', 'misc', 'EXPOOL', 'db12', 'db13', 'missile', 'cloud'];
 
-const DEFAULT_DIR = 'static/gamefiles/saves';
 /**
  * Chaos Strikes Back's own files, read beside DM's by default: Atari-era saves with no
  * Extended Features block (`tools/dump-atari-saves.ts`).
  */
 const CSB_SAVES = ['mini.dat', 'csbgame2.dat'].map((n) => `static/gamefiles/csb/${n}`);
 
-/** The `:Zone.Identifier` files are Windows alternate-data-stream droppings, not saves. */
-function isSaveFile(name: string): boolean {
-  return name.toLowerCase().endsWith('.dat') && !name.includes(':');
-}
-
-function collectSaves(target: string): string[] {
-  const path = resolve(target);
-  if (!existsSync(path)) return [];
-  if (statSync(path).isDirectory()) {
-    return readdirSync(path)
-      .filter(isSaveFile)
-      .sort()
-      .map((name) => join(path, name));
-  }
-  return [path];
-}
-
 function main(): void {
   const saves = process.argv[2]
     ? collectSaves(process.argv[2])
-    : [...collectSaves(DEFAULT_DIR), ...CSB_SAVES.flatMap(collectSaves)];
+    : [...genuineSaves(), ...CSB_SAVES.flatMap(collectSaves)];
   if (saves.length === 0) {
     // The fixtures are committed, so this should not happen; if someone strips the
     // game files it must say so rather than pass silently on nothing.
-    check(false, `no save files found in ${process.argv[2] ?? DEFAULT_DIR}`);
+    check(false, `no save files found in ${process.argv[2] ?? SAVE_DIR}`);
     finish();
     return;
   }

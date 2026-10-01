@@ -75,10 +75,10 @@ import { MovementAction } from '../src/engine/gameTypes';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
+import { savePath } from './lib/saves';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
-const SAVES = 'static/gamefiles/saves';
 
 const DELTA_X = [0, 1, 0, -1];
 const DELTA_Y = [-1, 0, 1, 0];
@@ -443,7 +443,7 @@ function playFromDungeonDat(): Game {
 /** Scenario 2 — a genuine save, restored and played on. */
 function playFromCsbwinSave(file: string): Game {
   const game = makeGame();
-  applyCsbwinSave(game, new Uint8Array(readFileSync(resolve(SAVES, file))));
+  applyCsbwinSave(game, new Uint8Array(readFileSync(savePath(file))));
   const before = game.getRuntimeSaveState().dungeon.timerQueue?.length ?? 0;
   advance(game, 40);
   const after = game.getRuntimeSaveState().dungeon.timerQueue?.length ?? 0;
@@ -538,7 +538,7 @@ function main(): void {
   // (doc/CSBwin-src/SaveGame.cpp:1467-1470, :1861-1877). DM's image has fourteen levels
   // and a sentinel of 99, which is the 10.
   console.log('\n=== 3. GAMEBLOCK1 of an Atari DM save ===');
-  const world = loadCsbwinWorld(new Uint8Array(readFileSync(resolve(SAVES, 'csbgame7.dat'))));
+  const world = loadCsbwinWorld(new Uint8Array(readFileSync(savePath('csbgame7.dat'))));
   const own = buildCsbwinRuntimeState(world).game.block1;
   world.save.block1!.byte22596 = 1;
   const atari = buildCsbwinRuntimeState(world).game.block1;
