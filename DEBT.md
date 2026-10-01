@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step |
+| E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step; six steps, in its entry |
 | C96 | Champion bones records live outside `EXPOOL`, so no CSBWin file carries them | M | ⏳ before `P10` drops the JSON |
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
@@ -148,7 +148,7 @@ The code it will stand on is spread and knotted:
   `engine/Game`, `RuntimeSave`, `DungeonSnapshot`, `DungeonState` and `CheckMonsters` to
   install a world into a running game; `src/engine/SaveGamePayload.ts` imports six
   `data/Csbwin*` codecs; `src/data/saves/FileSaveStore.ts` imports `engine/SaveGamePayload`.
-- **`SaveGameLoader.ts` is four modules.** 1498 lines whose header still says "Minimal
+- **`SaveGameLoader.ts` is four modules.** 1479 lines whose header still says "Minimal
   save-game loader focused on Item16 and timer tables": the scramble, checksum and RC4
   stream, the Extended Features prefix reader (whose writer and struct parser are in
   `CsbwinExtendedFeatures.ts`), the `EXPOOL` lookups, and the block codecs of all sixteen
@@ -161,7 +161,7 @@ The code it will stand on is spread and knotted:
   chrome's log through `src/ui/`, which looks its elements up as it loads, so a tool
   that imports it stubs `document` first (`tools/dump-save-menu.ts`).
 - **Nothing below the page knows which game it runs.** The data set is a `main.ts`
-  module variable (`:63`), so neither a save nor the stores can say "DM" or "CSB", which is
+  module variable (`:62`), so neither a save nor the stores can say "DM" or "CSB", which is
   `P10`'s "a save knows its dungeon". The boot's chooser learns whether a save was read
   through another `main.ts` global, `savedGameRead` (`:42`).
 - **Some of it is written twice.** `EXTENDEDFEATURESBLOCK` is read by
@@ -171,9 +171,10 @@ The code it will stand on is spread and knotted:
   `EF_EXTENDED_FLAGS`. `EXTENDED_SENTINEL` is declared twice (`SaveGameLoader.ts:255`,
   `CsbwinExtendedFeatures.ts:37`) and `EXPOOL_RECORD_SIZE` three times
   (`SaveGameLoader.ts:277`, `DungeonLoader.ts:57`, `CsbwinDungeonImageWriter.ts:45`). A
-  save's name is made unique twice, with different suffix rules:
-  `makeSaveFileName(savedAt, taken)` (`src/engine/SaveGamePayload.ts:502`) and
-  `SaveMenu.uniqueName` (`src/renderer/ui/SaveMenu.ts:594`).
+  save's name is made unique twice: `makeSaveFileName(savedAt, taken)`
+  (`src/engine/SaveGamePayload.ts:502`) and `SaveMenu.uniqueName`
+  (`src/renderer/ui/SaveMenu.ts:593`), which cuts the name at its first dot. The two give
+  the same name for every name the first makes.
 - **CHARDESC's flag constants** (`CHARFLAG_ATTACK_DISABLE`, `CHARFLAG_MALE`) live in the
   save codec (`src/data/CsbwinCharacters.ts:37-40`), and the engine and the UI import them
   from there.
@@ -185,6 +186,47 @@ needs, declaring its constants once); one owner builds a save
 from a game and applies one to it, knows the data set, and is what the menu and F5/F9
 call, with one rule for a unique save name; the flag constants go beside
 `Champion.charFlags`.
+
+**The split.** Six steps, one a commit, in this order: each is a refactor, proven as
+"How to work this list", point 3, says. The first step listed is the next one, and a
+step that is done is deleted from this list along with the bullets above that it paid.
+
+1. **The flag constants** (S). `CHARFLAG_ATTACK_DISABLE` and `CHARFLAG_MALE` move to
+   `src/engine/gameTypes.ts`, beside `Champion.charFlags` and the two redraw flags
+   already there. The codec's `isMale` imports from there, as it already imports
+   `getChampionPossession`. Seven importers: three in the engine, `renderer/ui/Attack.ts`
+   (so the frames run), and three tools.
+2. **`src/data/CsbwinExpool.ts`** (S). `EXPOOL_RECORD_SIZE`, declared once and imported
+   by `DungeonLoader`, `CsbwinDungeonImageWriter` and `tools/dump-dungeon-image-blocks.ts`;
+   `EXPOOL_WORDS_PER_BLOCK`, `EDT_SPECIAL_LOCATIONS` and `ESL_SPECIAL_LOCATION_MAX`;
+   `locateExpoolRecord` and `specialLocationsFromExpool`, out of `SaveGameLoader.ts`. It
+   is the module `C96` grows `Read`, `Write` and `enlarge` in.
+3. **`src/data/CsbwinSaveStream.ts`** (S). What the file is wrapped in, with no knowledge
+   of a block's fields: `genChecksum`, `scramble`, `unscramble`, `unscrambleStream`,
+   `readUnscrambleBlock`, and `ScrambleAndWrite`'s fold over `GAMEBLOCK1`, which
+   `saveSaveGameState` spells inline (`SaveGameLoader.ts:1400-1428`).
+4. **The prefix has one reader** (S). `readExtendedFeatures` moves into
+   `CsbwinExtendedFeatures.ts` with `rc4Simple`, `RcsReader` and `readDsa`, takes every
+   field from `parseExtendedFeaturesBlock` and every flag from `EF_FLAGS` and
+   `EF_EXTENDED_FLAGS`, and `EXTENDED_SENTINEL` is declared once. `DungeonLoader` imports
+   it from there. `SaveGameLoader.ts` is then the block codecs alone, and its header
+   says so.
+5. **Nothing in `data/` installs anything** (M). `CsbwinSaveGame.ts` moves to
+   `src/engine/` (eleven tools import it). `applySaveGameState` moves beside its one
+   caller, `RuntimeSave.applyRuntimeSaveState`, without its `party` arm, which no caller
+   passes. `SAVE_FILE_EXTENSION` and `SaveHeader` move to `src/data/saves/`, which
+   `FileSaveStore` reads them from. What `data/` then imports from `engine/` is
+   `gameTypes` and `attributes`, the records the character codec packs, and nothing else.
+6. **The owner** (M). One module in `src/engine/`, built with the game, the data set
+   (`DataSet`, `src/data/DataSets.ts`) and the two things only the screen has
+   (`portraitOf`, `repackOpenChest`). It holds what `SaveGamePayload.ts` and
+   `CsbwinSaveGame.ts` do, one function that builds a save and writes it to a store (the
+   `SaveEntryMeta`, the one unique-name rule, and `saveWritten`, before the write for F5,
+   whose clock runs, and after it for the menu, whose clock is stopped), F5/F9, and how
+   the last read came out, for the boot's chooser. It reports through a callback, which
+   `main.ts` points at `updateDebug`. `src/dev.ts` goes, its `localStorage` migration
+   with it, and so does the `document` stub in `tools/dump-save-menu.ts` (`F12` names
+   it). `main.ts` keeps the wiring only.
 
 ### E15 ⏳ The page shell
 
