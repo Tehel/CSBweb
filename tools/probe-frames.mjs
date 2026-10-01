@@ -100,6 +100,15 @@ const canvasClick = (x, y, button = 0) => evaluate(`(()=>{const c=document.getEl
   const sx=r.left+${x}*r.width/320, sy=r.top+${y}*r.height/200;
   for (const t of ['mousedown','mouseup']) c.dispatchEvent(new MouseEvent(t,{clientX:sx,clientY:sy,button:${button},buttons:${button===2?2:1},bubbles:true}));
   return 1;})()`);
+// A click as a player makes it: CDP's own mouse events at a point of the page, which the
+// browser hit-tests, where `canvasClick` hands its events to the game canvas whatever lies
+// over it.
+const realClick = async (x, y) => {
+  const p = await evaluate(`(()=>{const r=document.getElementById('game-canvas').getBoundingClientRect();
+    return {x:r.left+(${x}+0.5)*r.width/320, y:r.top+(${y}+0.5)*r.height/200};})()`);
+  for (const type of ['mousePressed', 'mouseReleased'])
+    await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
+};
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
 await send('Runtime.enable');
@@ -195,10 +204,12 @@ await canvasClick(165, 145, 0); await wait(1200);
 // the compositing but not the pixels the bytecode programs produce.
 await send('Page.navigate', { url: `${APP}?keepsaves` });
 await wait(7000);
-console.log('state: entrance');          await shot('07-entrance');
+console.log('state: entrance');
+const entrance = await shot('07-entrance');
 // The scroll at the bottom of the button column (button id 202).
 await canvasClick(270, 192, 0); await wait(1500);
-console.log('state: credits');           await shot('08-credits');
+console.log('state: credits');
+const credits = await shot('08-credits');
 // Back to the entrance, "resume" (id 201), the one save the chooser lists, LOAD (id 212):
 // `_TAG021028` puts up "GAME LOADED, READY TO PLAY." on a cleared screen.
 await canvasClick(160, 100, 0); await wait(1000);
@@ -256,6 +267,22 @@ await evaluate(FACE(17, 9, 0, 0)); await wait(500);
 console.log('state: F2 front-left wall'); await shot('13-edge-decoration-left');
 await evaluate(FACE(15, 9, 0, 0)); await wait(500);
 console.log('state: F2 front-right wall'); await shot('14-edge-decoration-right');
+
+// The CRT effect's input surface. The effect's canvas is shown over the game canvas, and
+// the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,
+// `src/renderer/intro/BootSequence.ts`), so it must let a click through. Boot with the
+// effect in the saved settings: the intro is drawn through it, and a real click on the
+// entrance's scroll brings up the credits, as the click for frame 08 did.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: `
+  try { localStorage.setItem('dmweb_ui_settings_v1', JSON.stringify({ crt: true })); } catch (e) {}
+` });
+await send('Page.navigate', { url: `${APP}?keepsaves` });
+await wait(7000);
+console.log('state: entrance, CRT effect saved on');
+check(await crtEffect() === 'on', 'the effect is on at the entrance');
+check(await canvasPixels() === entrance, 'the entrance is frame 07');
+await realClick(270, 192); await wait(1500);
+check(await canvasPixels() === credits, 'a real click on the scroll brings up frame 08, the credits');
 
 console.log('--- console errors ---');
 console.log(logs.length ? logs.join('\n') : '(none)');

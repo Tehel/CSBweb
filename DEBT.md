@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C100 | With the CRT effect on, the end-of-game screens take no click | M | ⏳ |
 | C101 | The pass a returning script held finishes a VBL after the script | S | ⏳ |
 | C102 | `MainLoop` opens with a tick; the port's first comes 15 VBLs later | S | ⏳ |
 | C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
@@ -159,7 +158,7 @@ The code it will stand on is spread and knotted:
   stream, the Extended Features prefix reader (whose writer and struct parser are in
   `CsbwinExtendedFeatures.ts`), the `EXPOOL` lookups, and the block codecs of all sixteen
   blocks, reader and writer.
-- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:323`) and `dev.ts`'s
+- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:324`) and `dev.ts`'s
   quick-save each build the payload and spell out the same `SaveEntryMeta` literal, and
   the save's tail (`saveWritten`) runs before the write in one and after it in the other.
   `dev.ts` is not development scaffolding any more: it is the F5/F9 feature, with a
@@ -200,7 +199,7 @@ What the redesign will replace, and what it should not carry across:
   to know what to save (`src/ui/settings.ts`), and the element lookups are written twice
   (`events.ts:11-21`, `settings.ts:63-75`). A `UIContext` module singleton
   (`src/ui/context.ts`) is how the panels reach the game.
-- **`main.ts` holds the page's features**: the 100-line CRT controller (`:68-177`), the
+- **`main.ts` holds the page's features**: the 100-line CRT controller (`:68-178`), the
   end-of-game flow, and the save wiring (`E13`).
 - **`static/` is Vite's `publicDir`** (`vite.config.mts`), so a build copies all of it:
   `CSBwin.exe` and the three zips, Conflux, the author's saves, the manuals and the
@@ -308,28 +307,6 @@ count reaches `d.Speed`, a quarter of a second later, and the page draws the gam
 view itself instead (`renderView` in `start`, `showEndOfGame` and the loads,
 `src/main.ts`). Paying it means `d.clockTick` set when the loop starts (`Game.start`,
 `resumeMainLoop`), so that its first pass ticks, and those three first views going.
-
-### C100 ⏳ With the CRT effect on, the end-of-game screens take no click
-
-`setCrtEnabled(true)` hides the game canvas and shows the WebGL one in its place
-(`src/main.ts:154-161`). `bindUIEvents` binds the adventure's handlers to both canvases,
-but the pre-game and end-of-game screens listen on the game canvas alone
-(`createIntroHost`, `src/renderer/intro/BootSequence.ts:138-143`, handed `gameCanvasEl` by
-`showEndOfGame`). With the effect on, the credits' menu and the restart's chooser and
-entrance see no click, only keys. The boot is spared by accident: the saved settings, CRT
-included, are applied in `wire`, after the intro. Paying it means one input surface for
-both canvases (the WebGL canvas over the game one with `pointer-events: none`, or every
-listener on their container), and the intro drawn with the effect when it is on.
-
-The fix is small (the first way is CSS on `#game` and the GL canvas, and
-`bindCanvasEvents(glCanvasEl, …)` going); the check that fails before it is the work. The
-frames harness cannot see the bug: `canvasClick` (`tools/probe-frames.mjs`) dispatches its
-events on `#game-canvas` itself, past hit-testing. A check needs a real hit-test with the
-effect on: `document.elementFromPoint` over the canvas, or CDP's `Input.dispatchMouseEvent`.
-And the effect exists only when glfx gets a WebGL context (`createCrtController`), which
-headless Chrome on the author's machine is not known to give: its GPU process fails
-("GPU state invalid after WaitForGetOffsetInRange"), and whether `--use-angle=swiftshader
---enable-unsafe-swiftshader` helps is untried in the harness. Settle that first.
 
 ---
 

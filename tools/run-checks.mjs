@@ -11,7 +11,7 @@
 //
 // Usage:
 //   npm test                # gates 1 and 2   (~80s, one tool at a time: DEBT.md F13)
-//   npm test -- --frames    # all three       (adds ~30s and needs google-chrome)
+//   npm test -- --frames    # all three       (adds ~40s and needs google-chrome)
 //   npm test -- --only=ai   # just the tools whose name contains "ai"
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';

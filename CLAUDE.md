@@ -69,7 +69,7 @@ does. The HTML controls beside the canvas are dev/debug affordances only.
 npm run dev            # Vite dev server on :9000
 npm run build          # tsc && vite build
 npm test               # the gate: tsc + every asserting tool  (~80s, DEBT.md F13)
-npm test -- --frames   # …and the golden frames               (~30s more)
+npm test -- --frames   # …and the golden frames               (~40s more)
 ```
 
 **Build hygiene (non-negotiable):** `npm test` must pass before any commit. It runs
@@ -85,7 +85,7 @@ There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is 
   cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
   server and headless Chrome, so it needs no setup (on Node 20 it turns on
   `--experimental-websocket` itself; `probe-ui.mjs` needs that flag, or Node 22). It is
-  out of the default run only because it costs a browser and ~30s. Run it before any renderer or UI commit. A frame is
+  out of the default run only because it costs a browser and ~40s. Run it before any renderer or UI commit. A frame is
   the 320x200 canvas read back as pixels, and the comparison is pixel-wise, so a baseline
   captured on one machine is checkable on another. The probe also asserts on the spot what
   no frame shows, the CRT effect, which needs a Chrome that gives WebGL.

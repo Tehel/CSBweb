@@ -54,9 +54,7 @@ export function bindUIEvents(): void {
 
     const input = new GameInput(ctx);
     const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement | null;
-    const glCanvasEl = document.getElementById('game-canvas_gl') as HTMLCanvasElement | null;
     bindCanvasEvents(gameCanvasEl, input);
-    bindCanvasEvents(glCanvasEl, input);
 
     if (!uiBound) {
         uiBound = true;

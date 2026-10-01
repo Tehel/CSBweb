@@ -151,14 +151,15 @@ function createCrtController(canvas: HTMLCanvasElement): CrtController {
         setEnabled: (next: boolean) => {
             if (next === enabled) return enabled;
             if (!glcanvas) return false;
+            // The effect's canvas lies over the game canvas and takes no input
+            // (`#game-canvas_gl`, index.html): the game canvas is the one input surface,
+            // with the effect or without.
             if (next) {
                 start();
-                canvas.style.display = 'none';
                 glcanvas.style.display = '';
             } else {
                 stop();
                 glcanvas.style.display = 'none';
-                canvas.style.display = '';
             }
             enabled = next;
             return enabled;
@@ -523,6 +524,9 @@ async function init() {
         game = built.game;
         screen = built.screen;
         await createCrt();
+        // The saved effect before the intro, which is drawn through it; `wire` applies
+        // the rest of the settings once the intro is over.
+        setCrtEnabled(loadUISettings().crt);
         console.log('✓ Game engine and screen constructed');
         // Dev-only debug handle. `tools/probe-ui.mjs` drives the live app through this
         // over CDP — see the `probe-app` skill. Module scope is invisible to the

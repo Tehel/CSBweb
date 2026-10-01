@@ -36,6 +36,15 @@
         #game {
             /* text-align: center; */
             background-color: #222;
+            position: relative;
+        }
+        /* The CRT effect's canvas (`createCrtController`, src/main.ts) lies over the game
+           canvas and lets every click and move through to it. */
+        #game-canvas_gl {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
         }
         /* Scale the full screen canvas using CSS to get the original 4/3 ratio (rectangular pixels)
            Internal resolution: 320×200, external 960×720 */
