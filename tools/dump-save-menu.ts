@@ -28,6 +28,10 @@
  *    inventory, which is what puts its objects in the save; the second shows the
  *    inventory again and brings the attack buttons back. Run over a real chest, with a
  *    real save restored into a fresh game. The port's quick-save repacks the chest too.
+ * 8. **The one save call.** The disk menu's SAVE and F5 both go through `GameSaves.save`
+ *    (`src/engine/GameSaves.ts`), which names the save and runs `SaveGame`'s tail: after
+ *    the write for the menu, whose clock is stopped, and before it for F5, whose clock
+ *    runs. Run against a store in memory.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -51,16 +55,18 @@ import {
   SAVE_FILE_EXTENSION,
   sortSaveEntries,
   type SaveEntry,
+  type SaveStore,
 } from '../src/data/saves/SaveStore';
+import { DEFAULT_DATA_SET } from '../src/data/DataSets';
 import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
+import { GameSaves, makeSaveFileName } from '../src/engine/GameSaves';
 import {
   applySaveBytes,
   buildSavePayload,
   decodeSavePayload,
   encodeSavePayload,
-  makeSaveFileName,
 } from '../src/engine/SaveGamePayload';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
@@ -665,18 +671,41 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
 }
 
 /**
- * The quick-save (`src/dev.ts`), which CSBWin does not have, over the same open chest: it
- * must repack it as the disk menu does, or the save restores the chest empty.
+ * A save store in memory. `onWrite` runs as a write arrives, before it is kept; a store
+ * made to `fail` rejects every write.
+ */
+function memoryStore(onWrite: () => void = () => {}, fail = false): SaveStore & { files: Map<string, Uint8Array> } {
+  const files = new Map<string, Uint8Array>();
+  const entries: SaveEntry[] = [];
+  return {
+    kind: 'browser',
+    files,
+    isSupported: () => true,
+    isReady: () => true,
+    connect: async () => true,
+    list: async () => sortSaveEntries(entries),
+    read: async (id) => {
+      const bytes = files.get(id);
+      if (!bytes) throw new Error(`no save ${id}`);
+      return bytes;
+    },
+    write: async (meta, bytes) => {
+      onWrite();
+      if (fail) throw new Error('the store is full');
+      files.set(meta.name, bytes);
+      entries.push({ id: meta.name, ...meta, loadable: true });
+    },
+    describe: () => 'MEMORY',
+  };
+}
+
+/**
+ * The quick-save (`GameSaves.quickSave`), which CSBWin does not have, over the same open
+ * chest: it must repack it as the disk menu does, or the save restores the chest empty.
  */
 async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<void> {
   console.log('');
   console.log('=== the quick-save over an open chest ===');
-  // `src/dev.ts` is the page's, and reaches the debug chrome in `src/ui/`, whose modules look
-  // their elements up as they load: stub the two accessors those lines use first.
-  const g = globalThis as Record<string, unknown>;
-  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
-  if (!g.window) g.window = g;
-  const { buildQuickSavePayload } = await import('../src/dev');
   const game = await loadGame();
   game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
   const party = game.ctx.party.state;
@@ -696,10 +725,15 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
   draw();
   check(ui.openChestId === chest && chestContents(game, chest) === 0, 'the open chest\'s objects are out of its chain');
 
-  // Wired as `main.ts` wires it.
-  const payload = buildQuickSavePayload(game, { game, repackOpenChest: () => Inventory.repackOpenChest(ui) });
+  // F5's save, to a store in memory instead of the page's.
+  const store = memoryStore();
+  const saves = new GameSaves(game, DEFAULT_DATA_SET, {
+    portraitOf: () => undefined,
+    repackOpenChest: () => Inventory.repackOpenChest(ui),
+  }, () => {});
+  const meta = await saves.save(store, 'running');
   const fresh = await loadGame();
-  applySaveBytes(fresh, encodeSavePayload(payload));
+  applySaveBytes(fresh, await store.read(meta.name));
   const saved = chestContents(fresh, chest);
   console.log(`  quick-saved with the chest open, restored into a fresh game: the chest holds ${saved} of ${packed}`);
   check(saved === packed, 'the quick-save repacks the chest: the restored chest holds its objects');
@@ -785,6 +819,84 @@ function checkPressAnimation(graphics: GraphicsLoader): void {
   check(changed(after) === 0, 'after both passes nothing is painted: the saved screen is back (:170-179)');
 }
 
+/* ------------------------------------------------------ 8. the one save call ---- */
+
+/**
+ * `GameSaves.save` as the disk menu calls it (the clock stopped, the menu's own listing)
+ * and as F5 does (the clock running, the store listed by the call). The tail is seen
+ * through `d.CanRestartFromSavegame`, which a new game has at 0 and `SaveGame`'s tail
+ * sets (`doc/CSBwin-src/SaveGame.cpp:1260`).
+ */
+async function checkSaveCall(): Promise<void> {
+  console.log('');
+  console.log('=== the one save call (`GameSaves.save`) ===');
+  const reports: string[] = [];
+  const stage = async (fail: boolean) => {
+    const game = await loadGame();
+    game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
+    let tailAtWrite: boolean | null = null;
+    const store = memoryStore(() => { tailAtWrite = game.canRestartFromSavegame(); }, fail);
+    const saves = new GameSaves(game, DEFAULT_DATA_SET, { portraitOf: () => undefined, repackOpenChest: () => {} },
+      (message) => { reports.push(message); });
+    return { game, store, saves, tailAtWrite: (): boolean | null => tailAtWrite };
+  };
+  const attempt = async (save: Promise<unknown>): Promise<string> => save.then(() => 'written', (error: Error) => `refused (${error.message})`);
+
+  // Every save here is made in the same second, so only the rule tells their names apart.
+  const realNow = Date.now;
+  Date.now = () => Date.UTC(2026, 8, 13, 14, 5, 6);
+  try {
+    const menu = await stage(false);
+    const first = await menu.saves.save(menu.store, 'stopped', new Set());
+    console.log(`  clock stopped: tail run at the write ${menu.tailAtWrite()}, after it ${menu.game.canRestartFromSavegame()}`);
+    check(menu.tailAtWrite() === false && menu.game.canRestartFromSavegame(),
+      'the menu\'s save runs its tail once the file is written (SaveGame.cpp:1245-1260)');
+    const second = await menu.saves.save(menu.store, 'stopped', new Set([first.name]));
+    const third = await menu.saves.save(menu.store, 'running');
+    console.log(`  names: ${first.name}, ${second.name}, ${third.name}`);
+    check(first.name === makeSaveFileName(Date.now()), 'a save in an empty store takes the plain name');
+    check(second.name === makeSaveFileName(Date.now(), new Set([first.name])), 'the names the menu lists are not taken again');
+    check(third.name === makeSaveFileName(Date.now(), new Set([first.name, second.name])),
+      'without a listing the store is listed, and its names are not taken again');
+    check(menu.store.files.size === 3, 'so three saves in one second are three files');
+    const listed = (await menu.store.list()).find((e) => e.name === first.name);
+    check(listed?.level === first.level && listed?.champions.join() === 'DAROO' && first.savedAt === Date.now(),
+      'the row is the payload\'s header: its date, level and party');
+
+    const menuFails = await stage(true);
+    const refused = await attempt(menuFails.saves.save(menuFails.store, 'stopped', new Set()));
+    console.log(`  clock stopped, the write fails: ${refused}, tail run ${menuFails.game.canRestartFromSavegame()}`);
+    check(refused !== 'written' && !menuFails.game.canRestartFromSavegame(),
+      'a failed write skips the tail, as SaveError jumps past it (SaveGame.cpp:1264)');
+
+    const quick = await stage(false);
+    await quick.saves.save(quick.store, 'running');
+    console.log(`  clock running: tail run at the write ${quick.tailAtWrite()}`);
+    check(quick.tailAtWrite() === true, 'F5\'s save runs its tail before the write, on the world the payload holds');
+
+    const quickFails = await stage(true);
+    const refusedQuick = await attempt(quickFails.saves.save(quickFails.store, 'running'));
+    console.log(`  clock running, the write fails: ${refusedQuick}, tail run ${quickFails.game.canRestartFromSavegame()}`);
+    check(refusedQuick !== 'written' && quickFails.game.canRestartFromSavegame(), 'and has run it when the write fails');
+
+    // A read through the owner, and what the boot's chooser then learns of it.
+    const reader = await stage(false);
+    check(reader.saves.consumeSavedGameRead() === 'cancelled', 'no read yet: the chooser was cancelled');
+    reader.saves.read(await menu.store.read(first.name));
+    const afterRead = reader.saves.consumeSavedGameRead();
+    reader.saves.readFailed();
+    const afterFailure = reader.saves.consumeSavedGameRead();
+    console.log(`  the chooser's read: ${afterRead}, then ${afterFailure}, then ${reader.saves.consumeSavedGameRead()}; d.CanRestartFromSavegame ${reader.game.canRestartFromSavegame()}`);
+    check(afterRead === 'loaded' && reader.game.canRestartFromSavegame(),
+      'a read restores the save into the game (SaveGame.cpp:1883) and is \'loaded\'');
+    check(afterFailure === 'damaged' && reader.saves.consumeSavedGameRead() === 'cancelled',
+      'a failed one is \'damaged\', and each is forgotten once asked for');
+    check(reports.length === 0, 'none of it is reported: only F5 and F9 are');
+  } finally {
+    Date.now = realNow;
+  }
+}
+
 /* ------------------------------------------------------------------------------- */
 
 async function main(): Promise<void> {
@@ -798,6 +910,7 @@ async function main(): Promise<void> {
   await checkEnterAndLeave(graphics);
   await checkQuickSaveOverOpenChest(graphics);
   checkPressAnimation(graphics);
+  await checkSaveCall();
   finish();
 }
 

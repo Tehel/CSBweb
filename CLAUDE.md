@@ -135,7 +135,9 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             (`SelectPaletteForLightLevel`: `d.CurrentPalette`),
             SmartDiscard (thinning a filling database), MakeMoreRoomInDB (making
             room in a full one),
-            RuntimeSave (the port's own quick-save), skills, AddCharacter, objectIndex
+            RuntimeSave (the port's own quick-save), GameSaves (a save built and
+            written to a store, or read back: the disk menu's, the boot's and F5/F9's),
+            skills, AddCharacter, objectIndex
             (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
             GameInput (where a click or a key goes once the page has read it),
@@ -154,7 +156,6 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
             a shared UIState. See doc/UI_MODULE_MAP.md.
 ui/         DOM-side debug chrome (settings, map preview, log)
 lib/        glfx (the CRT effect's WebGL) and its loader
-dev.ts      F5/F9: one more save to the current store, and the newest save loaded
 main.ts     Bootstrap and wiring
 ```
 

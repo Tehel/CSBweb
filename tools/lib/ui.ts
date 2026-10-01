@@ -6,7 +6,7 @@
  * drawn no view yet (no room summary, no object buttons: what the screen has before its
  * first frame). A tool replaces the screen or the context afterwards to draw into a
  * buffer of its own or to stage a view. The hooks do nothing unless the tool passes its
- * own; `onCreateSave` throws, as there is no world to serialize.
+ * own; `onSaveGame` throws, as there is no world to serialize.
  */
 import type { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import type { GameContext } from '../../src/engine/GameContext';
@@ -43,8 +43,7 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
   }, {
     renderLastFrame: () => {},
     onReincarnated: () => {},
-    onCreateSave: () => { throw new Error('no world to save in this tool'); },
-    onSaveWritten: () => {},
+    onSaveGame: () => { throw new Error('no world to save in this tool'); },
     onRestoreSave: () => {},
     onRestoreFailed: () => {},
     ...hooks,

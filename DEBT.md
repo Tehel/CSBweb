@@ -18,8 +18,8 @@ Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not sta
 unported features it needs come next, and whatever it does not need waits. Three pieces
 of work follow it, the author's next challenges: a redesigned page, the save menu rework
 (`P10`), and a second dungeon (Chaos Strikes Back first). Tiers D and E hold what the
-code needs before them: a base solid enough to build them on. `E13` is `P10`'s first step,
-and `E15` the page redesign's.
+code needs before them: a base solid enough to build them on. `E15` is the page
+redesign's first step.
 
 The order, then:
 
@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E13 | Nothing owns the save pipeline | M | ⏳ `P10`'s first step |
 | C96 | Champion bones records live outside `EXPOOL`, so no CSBWin file carries them | M | ⏳ before `P10` drops the JSON |
 | C107 | A damaged Extended Features block is an error, where CSBWin reads the file as one without a block | S | ⏳ |
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
@@ -116,8 +115,8 @@ In payoff order: the first row is the next item.
 
 The rows above G1 are the active list. `P10` and `F3` are phases, whose status is
 `PLAN.md`'s; a session that takes `P10` works there, one step at a time. Two rows sit
-out of their tier's place on purpose: `E13` and `C96` just above `P10`, because `P10`
-builds on both, and `E15` below `G17`, because it waits for the page redesign to start: a
+out of their tier's place on purpose: `C96` just above `P10`, because `P10` builds on
+it, and `E15` below `G17`, because it waits for the page redesign to start: a
 session that reaches it first asks the author, and takes the next row meanwhile. The F
 rows are independent of the rest ("Priority", point 5), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
@@ -140,41 +139,6 @@ New state-representation debt goes here, and jumps the queue.
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included.
 
-### E13 ⏳ Nothing owns the save pipeline
-
-`P10` rebuilds the save menu and turns a save into a CSBWin `.dat` that knows its dungeon.
-`src/data/` holds the codecs, bytes to plain records and back, and imports nothing from
-`src/engine/` but `gameTypes` and `attributes`, the records the character codec packs.
-What builds a save from a game and applies one to it is spread:
-
-- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:324`) and `dev.ts`'s
-  quick-save each build the payload and spell out the same `SaveEntryMeta` literal, and
-  the save's tail (`saveWritten`) runs before the write in one and after it in the other.
-  `dev.ts` is not development scaffolding any more: it is the F5/F9 feature, with a
-  migration from a `localStorage` key no build writes, and it reports to the debug
-  chrome's log through `src/ui/`, which looks its elements up as it loads, so a tool
-  that imports it stubs `document` first (`tools/dump-save-menu.ts`).
-- **Nothing below the page knows which game it runs.** The data set is a `main.ts`
-  module variable (`:62`), so neither a save nor the stores can say "DM" or "CSB", which is
-  `P10`'s "a save knows its dungeon". The boot's chooser learns whether a save was read
-  through another `main.ts` global, `savedGameRead` (`:42`).
-- **A save's name is made unique twice**: `makeSaveFileName(savedAt, taken)`
-  (`src/engine/SaveGamePayload.ts:486`) and `SaveMenu.uniqueName`
-  (`src/renderer/ui/SaveMenu.ts:593`), which cuts the name at its first dot. The two give
-  the same name for every name the first makes.
-
-Paying it, as `P10`'s first step, is one commit, a refactor proven as "How to work this
-list", point 3, says: **the owner**. One module in `src/engine/`, built with the game, the
-data set (`DataSet`, `src/data/DataSets.ts`) and the two things only the screen has
-(`portraitOf`, `repackOpenChest`). It holds what `SaveGamePayload.ts` and
-`CsbwinSaveGame.ts` do, one function that builds a save and writes it to a store (the
-`SaveEntryMeta`, the one unique-name rule, and `saveWritten`, before the write for F5,
-whose clock runs, and after it for the menu, whose clock is stopped), F5/F9, and how
-the last read came out, for the boot's chooser. It reports through a callback, which
-`main.ts` points at `updateDebug`. `src/dev.ts` goes, its `localStorage` migration
-with it, and so does the `document` stub in `tools/dump-save-menu.ts` (`F12` names
-it). `main.ts` keeps the wiring only.
-
 ### E15 ⏳ The page shell
 
 What the redesign will replace, and what it should not carry across:
@@ -183,8 +147,8 @@ What the redesign will replace, and what it should not carry across:
   to know what to save (`src/ui/settings.ts`), and the element lookups are written twice
   (`events.ts:11-21`, `settings.ts:63-75`). A `UIContext` module singleton
   (`src/ui/context.ts`) is how the panels reach the game.
-- **`main.ts` holds the page's features**: the 100-line CRT controller (`:68-178`), the
-  end-of-game flow, and the save wiring (`E13`).
+- **`main.ts` holds the page's features**: the 100-line CRT controller (`:42-150`) and
+  the end-of-game flow.
 - **`static/` is Vite's `publicDir`** (`vite.config.mts`), so a build copies all of it:
   `CSBwin.exe` and the three zips, Conflux, the author's saves, the manuals and the
   backstory, and assets the page does not load (`static/glfx.js`,
@@ -271,7 +235,7 @@ builds around them is its own:
   (`executeAttack`, `castSpellFromUi`, `consumeAttackDamageToDisplay`), which nothing
   types as a stand-in or puts back; 28 extract the UI tables again
   (`graphicsTablesOf(…).ui`) beside the `UIState` that `tools/lib/ui.ts` builds them
-  into; `dump-save-menu` stubs `document` and `window` to import `src/dev.ts` (`E13`).
+  into.
 - 33 tools make 72 `as unknown as` casts: into `Game`'s private members (`lastInputTime`,
   5; `gameTick`, 6), into other systems' (`DsaSystem`'s
   `teleportParty` and `findCharacterSource`, `wiggleEverything`, `stepOrDefer`,

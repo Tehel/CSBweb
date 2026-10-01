@@ -20,8 +20,8 @@ builds it whole, from its data sources and every hook, so none of them is ever m
   the chew-animation clock, the two button lists, `reincarnate` (non-null while the
   name-entry screen is modal)
 - **bitmap caches**: `graphicCache`, cursor bitmaps, the portrait sheet
-- **hooks out to the page** (`GameScreenHooks`): the save stores' four (`onCreateSave`,
-  `onSaveWritten`, `onRestoreSave`, `onRestoreFailed`), `onReincarnated`, the page's
+- **hooks out to the page** (`GameScreenHooks`): the save menu's three (`onSaveGame`,
+  `onRestoreSave`, `onRestoreFailed`, which the page points at `GameSaves`), `onReincarnated`, the page's
   redraw once the name-entry screen is answered, and `reportHover`, the debug chrome's
   report of the buttons under the pointer. Everything the interface does to the
   game it does as CSBWin's does to `d.`, through `ctx`: the systems (casting, attacking,

@@ -25,7 +25,7 @@ import { buildObjectIndirectIndex } from '../data/CsbwinObjectIndex';
 import { buildDungeonImage, cellFlagArraySize } from '../data/CsbwinDungeonImageWriter';
 import { buildLiveExtendedFeatures } from '../data/CsbwinExtendedFeatures';
 import type { DungeonData, TimerRecord } from '../data/dungeonTypes';
-import { SAVE_FILE_EXTENSION, SAVE_PAYLOAD_FORMAT, type SaveHeader } from '../data/saves/SaveStore';
+import { SAVE_PAYLOAD_FORMAT, type SaveHeader } from '../data/saves/SaveStore';
 import type { Game } from './Game';
 import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from './RuntimeSave';
 import type { Champion } from './gameTypes';
@@ -476,21 +476,4 @@ function applyCsbwinFile(game: Game, bytes: Uint8Array): void {
     } catch (error) {
         throw new SavePayloadError(`CSBWIN SAVE: ${(error as Error).message}`.toUpperCase());
     }
-}
-
-/**
- * The name a new save gets. CSBWin has four fixed filenames and rotates a `.BAK`
- * (`doc/CSBwin-src/CSBCode.cpp:9744-9761`); this port saves as often as asked, so the
- * name has to be unique instead. Sortable, and readable in a file manager.
- */
-export function makeSaveFileName(savedAt: number, taken: ReadonlySet<string> = new Set()): string {
-    const d = new Date(savedAt);
-    const p = (n: number, w = 2) => String(n).padStart(w, '0');
-    const stem =
-        `dmweb-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}` +
-        `-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-    let name = `${stem}${SAVE_FILE_EXTENSION}`;
-    let n = 2;
-    while (taken.has(name)) name = `${stem}-${n++}${SAVE_FILE_EXTENSION}`;
-    return name;
 }

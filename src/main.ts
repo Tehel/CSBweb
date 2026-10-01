@@ -11,19 +11,13 @@ import { GraphicsLoader } from './data/GraphicsLoader';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
 import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
-import {
-    applySaveBytes,
-    buildSavePayload,
-    encodeSavePayload,
-    makeSaveFileName,
-} from './engine/SaveGamePayload';
+import { GameSaves } from './engine/GameSaves';
 import { loadGlfx } from './lib/glfx-loader';
 import { GameScreen } from './renderer/GameScreen';
 import { bindDataSetChooser, bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabled, updateDebug, updateHover } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
-import { createDevTools } from './dev';
-import { Die, runBootSequence, runShowCredits, type SavedGameRead } from './renderer/intro/BootSequence';
+import { Die, runBootSequence, runShowCredits } from './renderer/intro/BootSequence';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
@@ -35,27 +29,6 @@ console.log('Dungeon Master Web - Initializing...');
 let game: Game | null = null;
 let screen: GameScreen | null = null;
 let crtController: CrtController | null = null;
-/**
- * Set by `onRestoreSave` and `onRestoreFailed`, read and cleared by the boot's save
- * chooser (`consumeSavedGameRead`).
- */
-let savedGameRead: SavedGameRead = 'cancelled';
-
-/** How the chooser's last read came out, and forget it. */
-function consumeSavedGameRead(): SavedGameRead {
-    const read = savedGameRead;
-    savedGameRead = 'cancelled';
-    return read;
-}
-
-// F5 and F9, the quick-save keys (`dev.ts`).
-const dev = createDevTools({
-    get game() { return game; },
-    // F5 packs a `CHARDESC` like any other save, and that needs graphic 26 for the
-    // champions who carry only a portrait index.
-    portraitOf: (champion) => screen?.portraitPixelsFor(champion),
-    repackOpenChest: () => screen?.repackChest(),
-});
 
 /** The game this page plays, chosen before anything is loaded (`?dungeon=<id>`). */
 const dataSetId = new URLSearchParams(window.location.search).get('dungeon');
@@ -258,7 +231,7 @@ function createSoundManager(graphicsLoader: GraphicsLoader, tables: GameTables):
  * `GameHost`, the screen its `GameScreenHooks`. Both are handed the one message area,
  * which the engine writes and the screen draws.
  */
-function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager): { game: Game; screen: GameScreen; messages: ScrollingText } {
+function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager): { game: Game; screen: GameScreen; saves: GameSaves; messages: ScrollingText } {
     const messages = new ScrollingText();
     const playSound = (soundId: number, rateIdx?: number, highVolume?: number) => sound.playSound(soundId, rateIdx, highVolume);
     // The screen is built second, over the engine's dungeon, so the engine→UI notices
@@ -294,7 +267,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // A frame threw: CSBWin's `die`, the loop stopped.
         die: reportError,
         showCredits: (word11694) => {
-            if (screen) showEndOfGame(game, screen, sound, messages, word11694).catch(reportError);
+            if (screen) showEndOfGame(game, screen, saves, sound, messages, word11694).catch(reportError);
         },
         // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself.
         drawViewport: () => renderView(),
@@ -308,6 +281,14 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         drawCharacterState: (chIdx, charFlags) => screen?.drawCharacterState(chIdx, charFlags),
     });
 
+    // The game's saves: the disk menu's, the boot's chooser's, and F5 and F9's.
+    const saves = new GameSaves(game, dataSet, {
+        // A save packs a `CHARDESC`, and that needs graphic 26 for the champions who
+        // carry only a portrait index.
+        portraitOf: (champion) => screen?.portraitPixelsFor(champion),
+        repackOpenChest: () => screen?.repackChest(),
+    }, reportSave);
+
     screen = new GameScreen(gameCanvasEl, {
         graphicsLoader: files.graphicsLoader,
         tables: graphicsTables,
@@ -320,40 +301,17 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         onReincarnated: () => refreshScreen(),
         // The save/load screen behind the disk icon. The UI owns the list and the
         // buttons; serializing and restoring the world is the engine's, so it comes
-        // back through these three.
-        onCreateSave: () => {
-            // The portrait pixels for champions created in play come from the
-            // screen: `CHARDESC` holds the picture, and only this side has
-            // graphic 26 to cut it from.
-            const payload = buildSavePayload(game, {
-                portraitOf: (champion) => screen?.portraitPixelsFor(champion),
-            });
-            return {
-                meta: {
-                    name: makeSaveFileName(payload.header.savedAt),
-                    savedAt: payload.header.savedAt,
-                    level: payload.header.level,
-                    champions: payload.header.champions,
-                },
-                bytes: encodeSavePayload(payload),
-            };
-        },
-        onSaveWritten: () => game.saveWritten(),
-        onRestoreSave: (bytes) => {
-            applySaveBytes(game, bytes);
-            // The entrance screen's "Resume" needs to know whether a save actually
-            // came back: CSBWin loops on `ReadEntireGame`'s result and re-shows the
-            // door when it did not (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
-            savedGameRead = 'loaded';
-        },
+        // back through these three. The menu has stopped the clock.
+        onSaveGame: (store, taken) => saves.save(store, 'stopped', taken),
+        onRestoreSave: (bytes) => saves.read(bytes),
         // The boot's chooser only: its read failed, and `tag01efee` follows.
         onRestoreFailed: (error) => {
             console.error('Saved game damaged:', error);
-            savedGameRead = 'damaged';
+            saves.readFailed();
         },
         reportHover: updateHover,
     });
-    return { game, screen, messages };
+    return { game, screen, saves, messages };
 }
 
 /**
@@ -365,7 +323,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
  * entrance has set up the next game, and `_StartCSB` runs `MainLoop` again
  * (doc/CSBwin-src/CSBCode.cpp:11320-11327), on the same `Game` and the same screen.
  */
-async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager, messages: ScrollingText, word11694: boolean): Promise<void> {
+async function showEndOfGame(game: Game, screen: GameScreen, saves: GameSaves, sound: SoundManager, messages: ScrollingText, word11694: boolean): Promise<void> {
     screen.setHoverPoint(null);
     screen.refreshOverlay();
     const { x, y, z } = game.ctx.party.state.position;
@@ -374,7 +332,7 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
             canvas: gameCanvasEl,
             gameScreen: screen,
             playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
-            consumeSavedGameRead,
+            consumeSavedGameRead: () => saves.consumeSavedGameRead(),
             readNewGame: () => readNewGame(game),
         },
         {
@@ -425,7 +383,7 @@ async function createCrt(): Promise<void> {
  * saved game, where an entrance screen would only be in the way. The golden-frame
  * probe passes the query parameter.
  */
-async function runIntro(game: Game, screen: GameScreen, sound: SoundManager): Promise<PrisonDoorChoice> {
+async function runIntro(game: Game, screen: GameScreen, saves: GameSaves, sound: SoundManager): Promise<PrisonDoorChoice> {
     const skipIntro =
         new URLSearchParams(window.location.search).get('intro') === '0'
         || loadUISettings().debug;
@@ -433,7 +391,7 @@ async function runIntro(game: Game, screen: GameScreen, sound: SoundManager): Pr
         canvas: gameCanvasEl,
         gameScreen: screen,
         playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
-        consumeSavedGameRead,
+        consumeSavedGameRead: () => saves.consumeSavedGameRead(),
         readNewGame: () => readNewGame(game),
         skip: skipIntro,
         reportDebug: updateDebug,
@@ -441,13 +399,13 @@ async function runIntro(game: Game, screen: GameScreen, sound: SoundManager): Pr
 }
 
 /** The page's side of play: its input and debug chrome, and a redraw per move and per tick. */
-function wire(game: Game, screen: GameScreen, sound: SoundManager, messages: ScrollingText): void {
+function wire(game: Game, screen: GameScreen, saves: GameSaves, sound: SoundManager, messages: ScrollingText): void {
     bindUIContext({
         screen,
         game,
         refreshScreen,
-        onQuickSave: dev.quickSave,
-        onQuickLoad: dev.quickLoad,
+        onQuickSave: () => { void saves.quickSave(); },
+        onQuickLoad: () => { void saves.quickLoad(); },
         setCrtEnabled,
         isCrtEnabled,
         setSoundEnabled: (enabled) => {
@@ -492,14 +450,14 @@ function wire(game: Game, screen: GameScreen, sound: SoundManager, messages: Scr
     });
 }
 
-function start(game: Game): void {
+function start(game: Game, saves: GameSaves): void {
     game.start();
     console.log('✓ Game engine started');
     console.log('✓ Starting position:', game.getPositionInfo());
 
     // Dev convenience only: restore the previous session's quick-save so a reload
     // lands back where you were. With Debug off, boot into a fresh dungeon.
-    if (isDebugFeaturesEnabled()) dev.quickLoad();
+    if (isDebugFeaturesEnabled()) void saves.quickLoad();
     // The game is read, new or resumed: where CSBWin's boot forces DM rules.
     game.forceDMRulesAtBoot();
 
@@ -537,12 +495,25 @@ async function init() {
         if (import.meta.env.DEV) {
             (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView };
         }
-        await runIntro(built.game, built.screen, sound);
-        wire(built.game, built.screen, sound, built.messages);
-        start(built.game);
+        await runIntro(built.game, built.screen, built.saves, sound);
+        wire(built.game, built.screen, built.saves, sound, built.messages);
+        start(built.game, built.saves);
     } catch (error) {
         reportError(error);
     }
+}
+
+/**
+ * What F5 or F9 did, for the debug chrome's log (`GameSaves`). One that failed leaves
+ * its error in the console.
+ */
+function reportSave(message: string, error?: unknown): void {
+    if (error === undefined) {
+        updateDebug(message);
+        return;
+    }
+    console.warn(`${message}:`, error);
+    updateDebug(`${message} (see console)`);
 }
 
 /** An error that ends the page's game: `init`'s, or `die`'s (`Die`) wherever it comes from. */

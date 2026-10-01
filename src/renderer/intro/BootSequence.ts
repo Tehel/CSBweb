@@ -24,6 +24,7 @@
  * The launcher menu is deliberately absent. CSBWin needs it because one binary runs the
  * dungeon, the utility and the hint oracle; this one runs the dungeon.
  */
+import type { SavedGameRead } from '../../engine/GameSaves';
 import type { GameScreen } from '../GameScreen';
 import { decodeCursorBitmap, type UIButton } from '../../data/tables/UITables';
 import { MENU_PRESS_PHASE_MS, menuButtonRect, menuHitTest } from '../ui/Menu';
@@ -205,13 +206,6 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
 }
 
 /* ------------------------------------------------------------------ Resume ---- */
-
-/**
- * How `_ReadEntireGame` came out on the chooser's path: 1 once a save is in, -1 when the
- * chooser was cancelled (`tag01ec56`, `doc/CSBwin-src/SaveGame.cpp:1556-1559`), or a
- * failed read, which ends at `tag01efee` (`:1895`).
- */
-export type SavedGameRead = 'loaded' | 'cancelled' | 'damaged';
 
 /**
  * Button 201: the save/load screen, with no SAVE.

@@ -1,10 +1,9 @@
 /**
  * The smallest IndexedDB wrapper that serves the two save stores.
  *
- * IndexedDB rather than `localStorage`, which is where the quick-save lives: a v5
- * runtime snapshot carries the whole object list, every database and the cell flags, so
- * one save is comfortably past a megabyte and `localStorage` is a synchronous ~5 MB
- * budget for the whole origin. The same database also holds the directory handle the
+ * IndexedDB rather than `localStorage`: a save carries the whole object list, every
+ * database and the cell flags, so one is comfortably past a megabyte, and `localStorage`
+ * is a synchronous ~5 MB budget for the whole origin. The same database also holds the directory handle the
  * file store remembers, because a `FileSystemDirectoryHandle` is structured-cloneable
  * and so can be stored but not stringified.
  */

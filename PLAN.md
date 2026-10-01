@@ -74,8 +74,8 @@ Back** are not postponed: it is the next dungeon to try.
   the credits scroll. The game's `dungeon.dat` is read after ENTER, as CSBWin reads it.
 - Three data sets (`src/data/DataSets.ts`: `dm-atari`, the default, `dm-windows` and
   `csb`), one chosen before the boot by `?dungeon=<id>`, and the DM Rules toggle.
-- Debug scaffolding is confined to `src/dev.ts`, reached only through
-  `isDebugFeaturesEnabled()`.
+- Debug scaffolding is the chrome beside the canvas (`src/ui/`) and the newest save
+  loaded at the boot, both behind `isDebugFeaturesEnabled()`.
 
 **Incomplete:**
 - ⚠️ **The save menu.** Save files are done: the reader, and the game's own save button,
@@ -145,8 +145,11 @@ DSAs or an enciphered file is postponed with them (`DEBT.md` G1, G4).
 
 #### The rework: what is already decided
 
-The author sets the rest of its scope when it starts. `DEBT.md` E13 (the save pipeline's
-owner) and C96 (the bones records in `EXPOOL`) come first.
+The author sets the rest of its scope when it starts. `DEBT.md` C96 (the bones records in
+`EXPOOL`) comes first. The rework stands on `GameSaves` (`src/engine/GameSaves.ts`), which
+is built with the game and its data set, and is where every save is built and written to
+a store (the disk menu's SAVE and F5, under one rule for a unique name) and where a
+store's bytes are read back into the game (LOAD, the boot's chooser and F9).
 
 - **A save is a CSBWin `.dat` file, and the JSON wrapper goes.** A `.dmweb.json`
   (`src/engine/SaveGamePayload.ts`) pairs `runtime`, the port's own state in the shape of
@@ -159,14 +162,14 @@ owner) and C96 (the bones records in `EXPOOL`) come first.
   alone gives the game back. Both stores already list a genuine `.dat` from its own blocks
   (`src/data/saves/`).
 - **A save knows its dungeon.** A save's header names its date, level and party, not its
-  game (`SaveHeader`, `src/engine/SaveGamePayload.ts`), and both stores list every save
+  game (`SaveHeader`, `src/data/saves/SaveStore.ts`), and both stores list every save
   together, so a DM save could be offered to a CSB game and restored into the wrong
   tables. CSBWin keeps a game's saves in that game's directory (`CSBGAME.DAT` to
   `CSBGAME4.DAT`, `doc/CSBwin-src/CSBCode.cpp:9747-9756`), and guards against the wrong
   graphics with the signatures an Extended Features block may carry
   (`expectedGraphicSignature1/2`, `SaveGame.cpp:378-379`, checked at
   `Graphics.cpp:1784-1815`), which the port neither checks nor writes. Needed: saves
-  stored and listed per data set (`src/data/DataSets.ts`), a genuine `.dat` accepted in
+  stored and listed per data set (`GameSaves.dataSet` is the running game's), a genuine `.dat` accepted in
   the set whose files it was made from, and `DEBT.md` G17's source save picked across sets
   (a DM save feeds a CSB game).
 
@@ -255,7 +258,8 @@ Evidence:
 The disk icon opens a menu drawn in the 320×200 buffer (`src/renderer/ui/SaveMenu.ts`
 over `Menu.ts`, a faithful `_DoMenu` / `_WaitForMenuSelect`), listing the saves of the
 browser store or of a directory on disk (`src/data/saves/`), newest first, each row with
-its date, level and party. LOAD acts on the selection; SAVE always makes a new file. F5
+its date, level and party. LOAD acts on the selection; SAVE always makes a new file. Both,
+and the two keys, go through `GameSaves` (`src/engine/GameSaves.ts`). F5
 writes one more save to the current source (the browser when the file source is not
 connected, since a key must never raise a folder picker), and F9 loads the newest
 loadable save of every store that can be listed without prompting. The five places it

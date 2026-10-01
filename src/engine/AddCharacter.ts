@@ -189,9 +189,9 @@ export function assignAddCharacterPossessions(
 }
 
 /**
- * The same slot choice over a `PresetHero`'s pre-scanned inventory, for the debug
- * random party in `src/dev.ts` and for the tools. The real Hall of Champions flow goes
- * through `assignAddCharacterPossessions` over the live cell.
+ * The same slot choice over a `PresetHero`'s pre-scanned inventory, for the tools. The
+ * real Hall of Champions flow goes through `assignAddCharacterPossessions` over the live
+ * cell.
  */
 export function assignPresetHeroPossessions(
   items: HeroInventoryItem[],

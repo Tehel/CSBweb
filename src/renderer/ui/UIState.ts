@@ -7,6 +7,7 @@
  * translation of its C++ counterpart instead of another method on a god object.
  */
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
+import type { SaveEntryMeta, SaveStore } from '../../data/saves';
 import type { GameContext } from '../../engine/GameContext';
 import type { PartyState } from '../../engine/gameTypes';
 import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
@@ -185,13 +186,12 @@ export interface UIState {
    */
   readonly onReincarnated: () => void;
   /**
-   * Build the bytes of a new save and the row it will be listed as
-   * (`src/engine/SaveGamePayload.ts`). A hook because serializing the world is the
-   * engine's business, not the UI's.
+   * Build a save and write it to `store`, under a name that is none of `taken`, the
+   * names the menu lists there; resolves to the row it was written as
+   * (`GameSaves.save`, `src/engine/GameSaves.ts`). A hook because serializing the world
+   * is the engine's business, not the UI's.
    */
-  readonly onCreateSave: () => { meta: { name: string; savedAt: number; level: number; champions: string[] }; bytes: Uint8Array };
-  /** The save `onCreateSave` built is written: `Game.saveWritten`. */
-  readonly onSaveWritten: () => void;
+  readonly onSaveGame: (store: SaveStore, taken: ReadonlySet<string>) => Promise<SaveEntryMeta>;
   /** Restore a save's bytes into the running game. Throws with a short message on refusal. */
   readonly onRestoreSave: (bytes: Uint8Array) => void;
   /**
@@ -266,7 +266,7 @@ export type UISources = Pick<UIState,
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
-  | 'onReincarnated' | 'onCreateSave' | 'onSaveWritten' | 'onRestoreSave' | 'onRestoreFailed'>;
+  | 'onReincarnated' | 'onSaveGame' | 'onRestoreSave' | 'onRestoreFailed'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {

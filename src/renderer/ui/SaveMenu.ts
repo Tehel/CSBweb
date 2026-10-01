@@ -35,7 +35,7 @@
  * explicitly, with `ctx.state.paused` (`d.Time++` is the main loop's,
  * `doc/CSBwin-src/CSBCode.cpp:660`).
  */
-import type { SaveEntry, SaveEntryMeta, SaveStore, SaveStoreKind } from '../../data/saves';
+import type { SaveEntry, SaveStore, SaveStoreKind } from '../../data/saves';
 import {
   FileSaveStore,
   formatSaveDetail,
@@ -575,29 +575,14 @@ export function restoreChosenSave(ui: UIState, bytes: Uint8Array): void {
 }
 
 async function doSave(ui: UIState, state: SaveMenuState): Promise<void> {
-  const built = ui.onCreateSave();
-  const taken = new Set(state.entries.map((e) => e.name));
-  const meta: SaveEntryMeta = { ...built.meta, name: uniqueName(built.meta.name, taken) };
-  await currentStore(state).write(meta, built.bytes);
-  // The clock has been stopped since the menu opened, so this still runs on the world
-  // the bytes hold, and before the menu's `tag0207cc`, as in CSBWin.
-  ui.onSaveWritten();
+  // The clock has been stopped since the menu opened, so the save's tail still runs on
+  // the world the file holds, and before the menu's `tag0207cc`, as in CSBWin.
+  const meta = await ui.onSaveGame(currentStore(state), new Set(state.entries.map((e) => e.name)));
   await refreshSaveMenu(ui);
   const at = state.entries.findIndex((e) => e.name === meta.name);
   if (at >= 0) state.selected = at;
   state.message = 'GAME SAVED';
   ui.renderLastFrame();
-}
-
-/** The store may already hold a save made in the same second. */
-function uniqueName(name: string, taken: ReadonlySet<string>): string {
-  if (!taken.has(name)) return name;
-  const dot = name.indexOf('.');
-  const stem = dot < 0 ? name : name.slice(0, dot);
-  const ext = dot < 0 ? '' : name.slice(dot);
-  let n = 2;
-  while (taken.has(`${stem}-${n}${ext}`)) n++;
-  return `${stem}-${n}${ext}`;
 }
 
 /* ------------------------------------------------------------------- keyboard ---- */

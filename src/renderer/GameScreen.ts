@@ -87,8 +87,7 @@ import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectInd
  */
 export interface GameScreenHooks extends Pick<UIState,
   | 'onReincarnated'
-  | 'onCreateSave'
-  | 'onSaveWritten'
+  | 'onSaveGame'
   | 'onRestoreSave'
   | 'onRestoreFailed'
 > {
@@ -174,8 +173,7 @@ export class GameScreen {
       getGraphicBitmap: (graphicNum, format) => this.getGraphicBitmap(graphicNum, format),
       renderLastFrame: () => this.renderLastFrame(),
       onReincarnated: hooks.onReincarnated,
-      onCreateSave: hooks.onCreateSave,
-      onSaveWritten: hooks.onSaveWritten,
+      onSaveGame: hooks.onSaveGame,
       onRestoreSave: hooks.onRestoreSave,
       onRestoreFailed: hooks.onRestoreFailed,
     });
