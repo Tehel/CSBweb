@@ -182,6 +182,11 @@ What the engine does with it:
   tick count (`applyRuntimeSaveState`).
 - A restart calls `restart()` (`showEndOfGame`, `src/main.ts`).
 
+One emitter is the port's own. F5 and F9, which CSBWin does not have, say what they did
+through the same pair, a linefeed and one fragment in colour 15 (`GameSaves.tell`,
+`src/engine/GameSaves.ts`): "GAME SAVED", "CANNOT SAVE NOW", and the like
+(`PLAN.md` → Phase 10, "The menu").
+
 The port redraws the strip every frame from its row model: `draw` offsets the rows by the
 scroll count and keeps the row scrolling out until it has gone, and `main.ts` redraws the
 screen after any frame in which the strip changed. CSBWin's loop also makes a pass for a

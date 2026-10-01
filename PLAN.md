@@ -159,7 +159,8 @@ boot's chooser and F9). Its scope, and after it the steps, one per commit.
   "What is not restored" is the whole list (a blow not yet taken off the HP, the open
   inventory, and the like), and `tools/dump-save-roundtrip.ts` saves and loads three
   played games and holds everything that differs to it. F5 saves nothing where the disk
-  icon does nothing: a champion still being chosen has no place in a file. A
+  icon does nothing: a champion still being chosen has no place in a file, and the key
+  answers "CANNOT SAVE NOW". A
   `.dmweb.json`, the JSON wrapper earlier builds wrote around such a file, still lists and
   loads, through the file it carries as `raw`.
 - **Every save is a row of IndexedDB**: the file's bytes beside what the list needs. The
@@ -243,8 +244,7 @@ boot's chooser and F9). Its scope, and after it the steps, one per commit.
    `JSON_SAVE_FILE_EXTENSION` go). The author's `.dmweb.json` files on disk are converted
    by hand, outside the engine.
 2. ⏳ **The playthrough.** F5's slot and F9's choice, SAVE over the selection or new, the
-   two confirmations, the last save used, the play time, and F5 and F9 reported in the
-   message area.
+   two confirmations, the last save used, and the play time.
 3. ⏳ **The dialog**: the layout, the folding list, the scrolling, the preview.
 4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it.
 5. ⏳ **"GAME LOADED, READY TO PLAY." removed.** Independent of the others.
@@ -340,7 +340,14 @@ its date, level and party. LOAD acts on the selection; SAVE always makes a new f
 and the two keys, go through `GameSaves` (`src/engine/GameSaves.ts`). F5
 writes one more save to the current source (the browser when the file source is not
 connected, since a key must never raise a folder picker), and F9 loads the newest
-loadable save of every store that can be listed without prompting. The five places it
+loadable save of every store that can be listed without prompting. Each key says what it
+did on a line of the message area, in white: "GAME SAVED" or "GAME LOADED"; "CANNOT SAVE
+NOW" with no party, with a champion still being chosen, or while a script holds the loop,
+and "CANNOT LOAD NOW" for that last; CSBWin's own "UNABLE TO SAVE GAME!"
+(`doc/CSBwin-src/SaveGame.cpp:1266`) and "CAN'T FIND SAVED GAME!" (`:1585`) for a write
+that failed and for no save at all; a file that does not read gives the line the menu's
+status would show. The error behind a failure goes to the console. The page's restore of
+the last save at boot, a Debug convenience, is an F9 and reports as one. The five places it
 diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`. Evidence:
 `tools/dump-save-menu.ts` and the golden frame `tools/frames/06-savemenu.png`.
 

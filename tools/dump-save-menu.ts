@@ -60,6 +60,8 @@ import {
 } from '../src/data/saves/SaveStore';
 import { DEFAULT_DATA_SET } from '../src/data/DataSets';
 import { Game } from '../src/engine/Game';
+import type { GameHost, MessageSink } from '../src/engine/GameHost';
+import type { LoopScript } from '../src/engine/LoopState';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { GameSaves, makeSaveFileName } from '../src/engine/GameSaves';
@@ -465,7 +467,7 @@ function healthyChampion(name: string): Champion {
   };
 }
 
-async function loadGame(): Promise<Game> {
+async function loadGame(host?: Partial<GameHost>): Promise<Game> {
   const loader = new DungeonLoader();
   await loader.loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
   const data = loader.getData();
@@ -473,7 +475,7 @@ async function loadGame(): Promise<Game> {
 
   const graphics = loadGraphics();
 
-  return newGame(data, graphics);
+  return newGame(data, graphics, host);
 }
 
 /**
@@ -850,9 +852,23 @@ function checkPressAnimation(graphics: GraphicsLoader): void {
 async function checkSaveCall(): Promise<void> {
   console.log('');
   console.log('=== the one save call (`GameSaves.save`) ===');
+  // What F5 and F9 leave behind: a line in the message area, each after a linefeed, and
+  // the error of one that failed.
+  const told: string[] = [];
   const reports: string[] = [];
+  const messages: MessageSink = {
+    printLinefeed: () => { told.push('\n'); },
+    quePrintLines: (color, text) => { told.push(`${color}:${text}`); },
+    printLines: () => {},
+    setNewSpeed: () => {},
+    resetTime: () => {},
+    clockTick: () => {},
+    printNextQueued: () => {},
+    vblInterrupt: () => {},
+  };
+  const toldSince = (from: number): string => told.slice(from).join('').replace(/\n/g, '/');
   const stage = async (fail: boolean) => {
-    const game = await loadGame();
+    const game = await loadGame({ messages });
     game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
     let tailAtWrite: boolean | null = null;
     const store = memoryStore(() => { tailAtWrite = game.canRestartFromSavegame(); }, fail);
@@ -921,21 +937,45 @@ async function checkSaveCall(): Promise<void> {
       'a read restores the save into the game (SaveGame.cpp:1883) and is \'loaded\'');
     check(afterFailure === 'damaged' && reader.saves.consumeSavedGameRead() === 'cancelled',
       'a failed one is \'damaged\', and each is forgotten once asked for');
-    check(reports.length === 0, 'none of it is reported: only F5 and F9 are');
+    check(told.length === 0 && reports.length === 0, 'none of it is told in the message area: only F5 and F9 are');
 
     // F5 where the disk icon does nothing (`doc/CSBwin-src/Mouse.cpp:1716-1718`): a
     // champion still being chosen, whom a file would bring back as a member, or no party.
+    // And F5 and F9 while a script holds the loop. Each says so in the message area.
     const choosing = await stage(false);
     choosing.game.ctx.party.state.potentialChampionIndex = 0;
     await choosing.saves.quickSave();
     const nobody = await stage(false);
     nobody.game.ctx.party.state.champions = [];
     await nobody.saves.quickSave();
-    console.log(`  F5 with a champion being chosen, then with no party: ${reports.join(' | ')}`);
-    check(reports.length === 2 && reports.every((report) => report.startsWith('Quick-save refused')),
-      'F5 saves nothing while a champion is being chosen, nor with no party');
+    const refusals = toldSince(0);
+    console.log(`  F5 with a champion being chosen, then with no party: ${refusals}`);
+    check(refusals === '/15:CANNOT SAVE NOW/15:CANNOT SAVE NOW',
+      'F5 saves nothing while a champion is being chosen, nor with no party, and says so on a line of its own');
     check(!choosing.game.canRestartFromSavegame() && !nobody.game.canRestartFromSavegame(),
       'and the save\'s tail has not run');
+
+    const scripted = await stage(false);
+    function* hold(): LoopScript {
+      for (;;) yield 1;
+    }
+    scripted.game.runScript(hold());
+    const beforeScript = told.length;
+    await scripted.saves.quickSave();
+    await scripted.saves.quickLoad();
+    console.log(`  F5, then F9, while a script holds the loop: ${toldSince(beforeScript)}`);
+    check(scripted.game.isRunningScript() && toldSince(beforeScript) === '/15:CANNOT SAVE NOW/15:CANNOT LOAD NOW',
+      'neither key does anything while a script holds the loop, and each says so');
+    check(!scripted.game.canRestartFromSavegame(), 'and the save\'s tail has not run');
+    check(reports.length === 0, 'a key that is refused has no error to report');
+
+    // F5 with a party, where the page's store cannot be written: Node has no IndexedDB.
+    const unwritable = await stage(false);
+    const beforeFailure = told.length;
+    await unwritable.saves.quickSave();
+    console.log(`  F5 where the store cannot be written: ${toldSince(beforeFailure)} (${reports.join(' | ')})`);
+    check(toldSince(beforeFailure) === '/15:UNABLE TO SAVE GAME!' && reports.join() === 'Quick-save failed',
+      'a write that fails is SaveError\'s line (SaveGame.cpp:1266), and its error is reported');
   } finally {
     Date.now = realNow;
   }

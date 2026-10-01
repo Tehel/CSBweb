@@ -10,6 +10,8 @@
  * F5 and F9 do not exist in CSBWin, which has only the disk menu. They are a shortcut onto
  * that menu's stores (`src/data/saves/`): one more save to the current source, and the
  * most recent save from wherever it lives, so both mean the same "most recent save".
+ * Neither raises a dialog, so what either did, or why it did nothing, is a line in the
+ * message area.
  */
 import { readCsbwinSaveInfo } from '../data/CsbwinSaveInfo';
 import type { DataSet } from '../data/DataSets';
@@ -49,6 +51,9 @@ export interface GameSavesScreen {
  */
 export type SaveClock = 'running' | 'stopped';
 
+/** The colour of F5's and F9's lines in the message area: white, as a wall's text is. */
+const SAVE_MESSAGE_COLOR = 15;
+
 /**
  * The name a new save gets. CSBWin has four fixed filenames and rotates a `.BAK`
  * (`doc/CSBwin-src/CSBCode.cpp:9744-9761`); this port saves as often as asked, so the
@@ -76,11 +81,21 @@ export class GameSaves {
         readonly dataSet: DataSet,
         private readonly screen: GameSavesScreen,
         /**
-         * A line for the player on what F5 or F9 did, with the error when one failed.
-         * Both keys are awaited by nobody, so this is the only place their outcome goes.
+         * The error behind an F5 or an F9 that failed, for the console: the message area
+         * says only that it did.
          */
-        private readonly report: (message: string, error?: unknown) => void,
+        private readonly reportError: (what: string, error: unknown) => void,
     ) {}
+
+    /**
+     * A line in the message area on what F5 or F9 did. Both keys are awaited by nobody,
+     * so this is where their outcome goes.
+     */
+    private tell(text: string): void {
+        const { messages } = this.game.ctx.host;
+        messages.printLinefeed();
+        messages.quePrintLines(SAVE_MESSAGE_COLOR, text);
+    }
 
     /**
      * Build a save and write it to `store`, under a name no save there has. `taken` is
@@ -151,38 +166,58 @@ export class GameSaves {
      * F5: one more save to the current source. Not with an empty party, nor while a
      * champion is still being chosen: the disk icon does nothing then
      * (`doc/CSBwin-src/Mouse.cpp:1716-1718`), and a file has no place for
-     * `d.PotentialCharacterOrdinal`, so the candidate would load as a member.
+     * `d.PotentialCharacterOrdinal`, so the candidate would load as a member. Nor while a
+     * script holds the loop, which a save could not resume. The icon is silent then; a
+     * key that saved nothing says so.
+     *
+     * A write that fails is `SaveError`'s "UNABLE TO SAVE GAME!"
+     * (`doc/CSBwin-src/SaveGame.cpp:1266`).
      */
     async quickSave(): Promise<void> {
         const { champions, potentialChampionIndex } = this.game.ctx.party.state;
-        if (champions.length === 0 || potentialChampionIndex >= 0) {
-            this.report('Quick-save refused: no party, or a champion is being chosen');
+        if (champions.length === 0 || potentialChampionIndex >= 0 || this.game.isRunningScript()) {
+            this.tell('CANNOT SAVE NOW');
             return;
         }
         try {
             // `writableSaveStore` falls back to the browser when the file source is
             // chosen but not connected: F5 must never raise a folder picker over the game.
-            const store = writableSaveStore();
-            await this.save(store, 'running');
-            this.report(`Quick-saved (${store.kind === 'file' ? 'disk' : 'browser'})`);
+            await this.save(writableSaveStore(), 'running');
+            this.tell('GAME SAVED');
         } catch (error) {
-            this.report('Quick-save failed', error);
+            this.tell('UNABLE TO SAVE GAME!');
+            this.reportError('Quick-save failed', error);
         }
     }
 
-    /** F9: the most recent save, from wherever it lives. */
+    /**
+     * F9: the most recent save, from wherever it lives. Not while a script holds the
+     * loop: it would run on in the loaded world.
+     *
+     * No save at all is `_ReadEntireGame`'s "CAN'T FIND SAVED GAME!"
+     * (`doc/CSBwin-src/SaveGame.cpp:1585`), and a file that does not read is its
+     * `SaveFileError`'s line, the one the disk menu shows.
+     */
     async quickLoad(): Promise<void> {
+        if (this.game.isRunningScript()) {
+            this.tell('CANNOT LOAD NOW');
+            return;
+        }
         try {
             const latest = await findLatestSave();
             if (!latest) {
-                this.report('No saved game found');
+                this.tell('CAN\'T FIND SAVED GAME!');
                 return;
             }
             this.read(await latest.store.read(latest.entry.id));
-            this.report(`Quick-loaded ${latest.entry.name}`);
+            this.tell('GAME LOADED');
         } catch (error) {
-            if (error instanceof SaveFileError) this.report(error.message);
-            else this.report('Quick-load failed', error);
+            if (error instanceof SaveFileError) {
+                this.tell(error.message);
+                return;
+            }
+            this.tell('UNABLE TO LOAD GAME!');
+            this.reportError('Quick-load failed', error);
         }
     }
 }

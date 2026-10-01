@@ -167,12 +167,10 @@ export class GameInput {
     }
     const action = portKeyAction(key);
     if (action === null) return false;
-    // Not while a script holds the loop: the save could not resume it, and a load
-    // would run it on in the loaded world.
     if (action === 'quickSave') {
-      if (!game.isRunningScript()) this.host.onQuickSave();
+      this.host.onQuickSave();
     } else if (action === 'quickLoad') {
-      if (!game.isRunningScript()) this.host.onQuickLoad();
+      this.host.onQuickLoad();
     } else {
       game.enqueueMovement(action);
     }

@@ -287,7 +287,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // carry only a portrait index.
         portraitOf: (champion) => screen?.portraitPixelsFor(champion),
         repackOpenChest: () => screen?.repackChest(),
-    }, reportSave);
+    }, reportSaveError);
 
     screen = new GameScreen(gameCanvasEl, {
         graphicsLoader: files.graphicsLoader,
@@ -503,17 +503,9 @@ async function init() {
     }
 }
 
-/**
- * What F5 or F9 did, for the debug chrome's log (`GameSaves`). One that failed leaves
- * its error in the console.
- */
-function reportSave(message: string, error?: unknown): void {
-    if (error === undefined) {
-        updateDebug(message);
-        return;
-    }
-    console.warn(`${message}:`, error);
-    updateDebug(`${message} (see console)`);
+/** The error behind an F5 or an F9 that failed (`GameSaves`): the message area has said so. */
+function reportSaveError(what: string, error: unknown): void {
+    console.warn(`${what}:`, error);
 }
 
 /** An error that ends the page's game: `init`'s, or `die`'s (`Die`) wherever it comes from. */
