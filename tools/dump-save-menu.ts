@@ -69,6 +69,9 @@
  * 16. **The double click.** A second click on a save soon after the first is LOAD: its
  *    press, its question across playthroughs, and its load. Not after the delay, not on
  *    another save, a heading or "NEW SAVE".
+ * 17. **EXPORT.** The selected save's file handed to the page, the store's bytes as they
+ *    are: its label and its press on a save alone, no question across playthroughs, the
+ *    store and the game left as they were, a read that fails, and the load-only chooser.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -1368,12 +1371,15 @@ async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: str
   game.systems.hallOfChampions.addChampion(healthyChampion(champion));
   const saves = new GameSaves(game, DEFAULT_DATA_SET, store, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
   let drawsWithNoMenu = 0;
+  const exported: { name: string; bytes: Uint8Array }[] = [];
   const ui: UIState = newUIState(graphics, game.ctx, {
     getGraphicBitmap: graphicBitmaps(graphics),
     renderLastFrame: () => { if (!ui.saveMenu) drawsWithNoMenu++; },
     onListSaves: () => saves.list(),
     onReadSave: (listed) => saves.open(listed),
     onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
+    // As the page's, with the download kept instead of made.
+    onExportSave: async (listed) => { exported.push({ name: listed.name, bytes: (await saves.open(listed)).bytes }); },
     onRestoreSave: (save) => saves.read(save),
   });
   const g = SaveMenu.SAVE_MENU_GEOMETRY;
@@ -1381,6 +1387,8 @@ async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: str
     game,
     saves,
     ui,
+    /** What EXPORT handed the page, in order: a file's name and its bytes. */
+    exported,
     /** Raise the menu, and wait for its list. */
     async open(mode: SaveMenu.SaveMenuMode = 'full'): Promise<SaveMenu.SaveMenuState> {
       ui.partyState = game.ctx.party.state;
@@ -1468,9 +1476,9 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
     await rig.click(g.loadButtonId);
     check(pressAtEnter === null && SaveMenu.isSaveMenuOpen(ui) && game.ctx.party.state.champions.length === 1,
       'where LOAD is inert, and Enter, which is LOAD: the row holds nothing to load');
-    const exportRect = SaveMenu.buttonRect(g.buttonFrames.export);
-    SaveMenu.saveMenuClick(ui, exportRect.x1, exportRect.y1, LEFT);
-    check(state.press === null && SaveMenu.isSaveMenuOpen(ui), 'EXPORT\'s frame, which has no label, takes no click');
+    await rig.click(g.exportButtonId);
+    check(state.press === null && SaveMenu.isSaveMenuOpen(ui) && rig.exported.length === 0 && state.message === '',
+      'nor EXPORT: "new save" is no save');
 
     await rig.click(g.saveButtonId);
     const made = SaveMenu.selectedEntry(state);
@@ -1732,6 +1740,13 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
  * One store, the saves of three games, and the menus over them: what is listed, folded
  * and selected, and what LOAD and SAVE do from a heading.
  */
+/** How many pixels of a button's label are up: none on a button that can do nothing. */
+function labelOf(ui: UIState, frame: { x1: number; y1: number; x2: number; y2: number }): number {
+  SaveMenu.drawSaveMenu(ui);
+  const at = SaveMenu.buttonLabelAt(frame);
+  return countNot(ui, at.x - 18, at.x + 17, at.y - 4, at.y + 1, MENU_PANEL_COLOR);
+}
+
 async function checkTwoLevels(graphics: GraphicsLoader): Promise<void> {
   console.log('');
   console.log('=== the two-level list ===');
@@ -1746,13 +1761,6 @@ async function checkTwoLevels(graphics: GraphicsLoader): Promise<void> {
   const headings = (state: SaveMenu.SaveMenuState): string => state.rows
     .flatMap((row) => row.kind === 'heading' ? [`${row.playthrough.saves[0].champions[0]}${state.unfolded.has(row.playthrough.id) ? ' unfolded' : ''}`] : [])
     .join(', ');
-  /** How many pixels of a button's label are up: none on a button that can do nothing. */
-  const labelOf = (ui: UIState, frame: { x1: number; y1: number; x2: number; y2: number }): number => {
-    SaveMenu.drawSaveMenu(ui);
-    const at = SaveMenu.buttonLabelAt(frame);
-    return countNot(ui, at.x - 18, at.x + 17, at.y - 4, at.y + 1, MENU_PANEL_COLOR);
-  };
-
   const realNow = Date.now;
   let now = new Date(2026, 8, 13, 14, 5, 6).getTime();
   Date.now = () => now;
@@ -2292,6 +2300,114 @@ async function checkDoubleClick(graphics: GraphicsLoader): Promise<void> {
   }
 }
 
+/* ---------------------------------------------------------------- 17. EXPORT ---- */
+
+/**
+ * EXPORT by the menu's own clicks, its hook the page's with the download kept instead of
+ * made (`menuRig`): which rows it works on, and that the file handed over is the
+ * store's, byte for byte, with nothing else moved.
+ */
+async function checkExport(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== EXPORT ===');
+  const store = memoryStore();
+  const daroo = await menuRig(graphics, store, 'DAROO');
+  const wuuf = await menuRig(graphics, store, 'WUUF');
+  const { ui } = daroo;
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  const idOf = (rig: { game: Game }): number => rig.game.ctx.state.block1.randomGameID;
+  const same = (a: Uint8Array | undefined, b: Uint8Array | undefined): boolean =>
+    a !== undefined && b !== undefined && a.length === b.length && a.every((byte, i) => byte === b[i]);
+  const rowsOf = async (): Promise<string> => JSON.stringify(await store.list(null));
+
+  const realNow = Date.now;
+  let now = new Date(2026, 8, 13, 14, 5, 6).getTime();
+  Date.now = () => now;
+  try {
+    const theirs = await wuuf.saves.save('stopped', 'new');
+    now += 60_000;
+    const older = await daroo.saves.save('stopped', 'new');
+    now += 60_000;
+    // A file holds no date: the game has to have moved for the next to differ.
+    daroo.game.ctx.party.state.champions[0]!.attributes.health = 1;
+    const newer = await daroo.saves.save('stopped', 'new');
+    now += 60_000;
+    const state = await daroo.open();
+    console.log(daroo.list());
+
+    // A heading has no save selected.
+    daroo.clickRow(daroo.headingOf(idOf(wuuf)));
+    const onHeading = labelOf(ui, g.buttonFrames.export);
+    await daroo.click(g.exportButtonId);
+    daroo.clickRow(daroo.headingOf(idOf(wuuf)));
+    daroo.select(newer.id);
+    const onSave = labelOf(ui, g.buttonFrames.export);
+    console.log(`  EXPORT's label: ${onHeading} pixels on a heading, ${onSave} on a save`);
+    check(onHeading === 0 && SaveMenu.loadTarget(state) !== null && daroo.exported.length === 0,
+      'on a heading EXPORT has no label and takes no click, though LOAD has a save to read there');
+    check(onSave > 0, 'on a save it has its label');
+
+    // The selected save, as the store holds it.
+    const rows = await rowsOf();
+    const rect = menuButtonRect(SaveMenu.saveMenuButtons(state), g.exportButtonId)!;
+    SaveMenu.saveMenuClick(ui, rect.x1 + 1, rect.y1 + 1, LEFT);
+    const pressed = state.press?.buttonId;
+    const atPress = daroo.exported.length;
+    await daroo.settled();
+    const first = daroo.exported[0];
+    const fields = first ? readSaveFileFields(first.bytes) : null;
+    console.log(`  EXPORT on the newer save: button ${pressed} pressed, then ${first?.name} of ${first?.bytes.length} bytes, "${state.message}"`);
+    check(pressed === g.exportButtonId && atPress === 0, 'a click presses EXPORT, and nothing is handed over before the press has played');
+    check(daroo.exported.length === 1 && first.name === newer.name && first.name.endsWith(SAVE_FILE_EXTENSION),
+      'then the page is handed one file, under the selected save\'s name, a .dat');
+    check(same(first?.bytes, store.files.get(newer.id)), 'whose bytes are the store\'s, byte for byte');
+    check(fields !== null && fields.playthrough === idOf(daroo) && fields.champions.join('/') === 'DAROO',
+      'and read as a CSBWin save of the game\'s playthrough and party');
+    check(SaveMenu.isSaveMenuOpen(ui) && !state.busy && state.message === SaveMenu.SAVE_MENU_EXPORTED && SaveMenu.selectedEntry(state)?.id === newer.id,
+      `the menu stays up, on the same save, and says "${SaveMenu.SAVE_MENU_EXPORTED}"`);
+    check((await rowsOf()) === rows && store.files.size === 3 && daroo.party() === 'DAROO',
+      'no row is written, the last save used included, and the game is left alone');
+
+    // The older one, and another playthrough's: no question.
+    daroo.select(older.id);
+    await daroo.click(g.exportButtonId);
+    daroo.select(theirs.id);
+    await daroo.click(g.exportButtonId);
+    console.log(`  then the older save and WUUF's: ${daroo.exported.slice(1).map((file) => file.name).join(', ')}; ${state.confirm ? 'ASKS' : 'no question'}`);
+    check(daroo.exported.length === 3 && same(daroo.exported[1].bytes, store.files.get(older.id)) && !same(daroo.exported[1].bytes, first.bytes),
+      'each save is its own file');
+    check(state.confirm === null && same(daroo.exported[2]?.bytes, store.files.get(theirs.id))
+      && readSaveFileFields(daroo.exported[2].bytes)?.playthrough === idOf(wuuf),
+      'a save of another playthrough is exported without a question: the game is not left');
+
+    // A file the store cannot read.
+    const kept = store.files.get(older.id)!;
+    store.files.delete(older.id);
+    daroo.select(older.id);
+    await daroo.click(g.exportButtonId);
+    console.log(`  a save the store cannot read: "${state.message}"`);
+    check(daroo.exported.length === 3 && !state.busy && SaveMenu.isSaveMenuOpen(ui) && state.message === `NO SAVE ${older.id}`.toUpperCase(),
+      'a read that fails hands nothing over, and its error is the dialog\'s message');
+    store.files.set(older.id, kept);
+    SaveMenu.closeSaveMenu(ui);
+
+    // The load-only chooser has it too.
+    const leyla = await menuRig(graphics, store, 'LEYLA');
+    const chooser = await leyla.open('loadOnly');
+    leyla.select(theirs.id);
+    const labels = [labelOf(leyla.ui, g.buttonFrames.save), labelOf(leyla.ui, g.buttonFrames.export)];
+    await leyla.click(g.exportButtonId);
+    console.log(`  the load-only chooser, WUUF's save: SAVE's label ${labels[0]} pixels, EXPORT's ${labels[1]}; exported ${leyla.exported.map((file) => file.name).join(', ')}`);
+    check(labels[0] === 0 && labels[1] > 0 && leyla.exported.length === 1 && same(leyla.exported[0].bytes, store.files.get(theirs.id)),
+      'the load-only chooser exports as the disk menu does');
+    check(SaveMenu.isSaveMenuOpen(leyla.ui) && chooser.message === SaveMenu.SAVE_MENU_EXPORTED && leyla.party() === 'LEYLA',
+      'and stays up, with nothing loaded');
+    SaveMenu.closeSaveMenu(leyla.ui);
+  } finally {
+    Date.now = realNow;
+  }
+}
+
 /* ------------------------------------------------------------ 12. the play time ---- */
 
 /**
@@ -2592,6 +2708,7 @@ async function main(): Promise<void> {
   await checkPreview(graphics);
   await checkScrolling(graphics);
   await checkDoubleClick(graphics);
+  await checkExport(graphics);
   await checkPlayTime(graphics);
   await checkUpgrade();
   finish();

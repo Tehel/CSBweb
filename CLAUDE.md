@@ -88,8 +88,9 @@ There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is 
   out of the default run only because it costs a browser and ~40s. Run it before any renderer or UI commit. A frame is
   the 320x200 canvas read back as pixels, and the comparison is pixel-wise, so a baseline
   captured on one machine is checkable on another. The probe also asserts on the spot what
-  no frame shows: the CRT effect, which needs a Chrome that gives WebGL, and the wheel
-  and the keys reaching a save menu, at the entrance as in play.
+  no frame shows: the CRT effect, which needs a Chrome that gives WebGL, the wheel
+  and the keys reaching a save menu, at the entrance as in play, and the download its
+  EXPORT starts.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`
@@ -122,7 +123,8 @@ data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, He
             HintOracleLoader (CSB's `hcsb.hct`)
   saves/    The saves behind the disk icon: SaveStore (a save's row, the CSBWin file
             beside what a list needs), BrowserSaveStore (IndexedDB, the one store),
-            legacyRows (the store's upgrade from its first version)
+            legacyRows (the store's upgrade from its first version), downloadSaveFile
+            (the save menu's EXPORT)
   tables/   Runtime table extraction from graphics.dat: ObjectTables, UITables,
             ViewportTables, MonsterDesc, and GraphicsTables (all of them, read once)
 engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameHost (what

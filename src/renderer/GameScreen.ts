@@ -89,6 +89,7 @@ export type GameScreenHooks = Pick<UIState,
   | 'onListSaves'
   | 'onReadSave'
   | 'onSaveGame'
+  | 'onExportSave'
   | 'onRestoreSave'
   | 'onRestoreFailed'
 >;
@@ -169,6 +170,7 @@ export class GameScreen {
       onListSaves: hooks.onListSaves,
       onReadSave: hooks.onReadSave,
       onSaveGame: hooks.onSaveGame,
+      onExportSave: hooks.onExportSave,
       onRestoreSave: hooks.onRestoreSave,
       onRestoreFailed: hooks.onRestoreFailed,
     });

@@ -1,6 +1,7 @@
 /**
  * The page's saves, in IndexedDB: the one store, which needs no permission and no
- * picker. The player cannot see, copy or back up what is in it from outside the page.
+ * picker. The player cannot see, copy or back up what is in it from outside the page:
+ * the save menu's EXPORT is the way out, a save's file downloaded (`downloadSaveFile`).
  */
 import { SAVES_STORE, idbDelete, idbGet, idbGetAll, idbPut, openSaveDatabase } from './idb';
 import {

@@ -9,7 +9,7 @@ import { CSBGraphicsLoader } from './data/CSBGraphicsLoader';
 import { dataSetFor } from './data/DataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
-import { BrowserSaveStore } from './data/saves';
+import { BrowserSaveStore, downloadSaveFile } from './data/saves';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
 import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
@@ -315,6 +315,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         onListSaves: () => saves.list(),
         onReadSave: (entry) => saves.open(entry),
         onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
+        // EXPORT: the row's file as the store holds it, downloaded under the row's name.
+        onExportSave: async (entry) => downloadSaveFile(entry.name, (await saves.open(entry)).bytes),
         onRestoreSave: (save) => saves.read(save),
         // The boot's chooser only: its read failed, and `tag01efee` follows.
         onRestoreFailed: (error) => {

@@ -196,6 +196,11 @@ export interface UIState {
    * business, not the UI's.
    */
   readonly onSaveGame: (over: SaveEntry | null) => Promise<SaveEntry>;
+  /**
+   * Hand the player a listed save's file, the bare `.dat` out of the store: the page
+   * downloads it (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`).
+   */
+  readonly onExportSave: (entry: SaveEntry) => Promise<void>;
   /** Restore an opened save into the running game. Throws with a short message on refusal. */
   readonly onRestoreSave: (save: OpenedSave) => void;
   /**
@@ -270,7 +275,7 @@ export type UISources = Pick<UIState,
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
-  | 'onReincarnated' | 'onListSaves' | 'onReadSave' | 'onSaveGame' | 'onRestoreSave' | 'onRestoreFailed'>;
+  | 'onReincarnated' | 'onListSaves' | 'onReadSave' | 'onSaveGame' | 'onExportSave' | 'onRestoreSave' | 'onRestoreFailed'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {

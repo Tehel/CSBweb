@@ -174,8 +174,11 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   listed without.
 - **No store on disk.** IndexedDB (`BrowserSaveStore`) is the one store: a directory on
   disk needs `showDirectoryPicker`, which is Chromium's alone. **Export** downloads the
-  selected save's bare `.dat`, which CSBWin opens. **Import** is a `.dat` dropped on the
-  canvas while the dialog is up; there is no file picker.
+  selected save's bare `.dat`, which CSBWin opens: the row's bytes as the store holds
+  them, under the row's name (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`).
+  What the row alone holds, its date, its play time and whether F5 wrote it, stays
+  behind. **Import** is a `.dat` dropped on the canvas while the dialog is up; there is
+  no file picker.
 - **A save knows its dungeon.** A row carries its data set's id, and the list shows the
   running data set's saves only (`GameSaves.dataSet`). The filter is the list's
   parameter, not its rule: `DEBT.md` G17's source save is picked across sets (a DM save
@@ -324,7 +327,12 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   (`wrapMessage`, `src/renderer/ui/SaveMenu.ts`), five lines at most, over whatever
   lines of the preview it needs. A move of the selection takes it down.
 - **LOAD, SAVE, EXPORT**, and a drop for the import. No delete, no quit and no "SAVE AND
-  QUIT": loading another playthrough's save is how a player leaves a game. **A double
+  QUIT": loading another playthrough's save is how a player leaves a game. **EXPORT is
+  for the selected save**, and has no label on a heading or on "NEW SAVE", where none
+  is: a heading's preview is of the save LOAD would read, and EXPORT does not take it.
+  It leaves the game alone, so it never asks, whatever the save's playthrough, and the
+  save is no more the last one used for it; the dialog stays up and says "SAVE
+  EXPORTED". **A double
   click on a save is LOAD**: a second click on it within half a second of the first
   (`SAVE_MENU_DOUBLE_CLICK_MS`, `src/renderer/ui/SaveMenu.ts`), with the button's press
   and its question. Not on a heading, which a click folds. Evidence:
@@ -389,13 +397,11 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
    - a. ✅ **The frame**: the dialog in its rectangle on the cleared screen, drawn from
      graphic 0's pieces (`drawPiece`, `src/renderer/ui/SaveMenu.ts`). The list is
      fifteen rows, which fill its panel with two pixels of it above and below; LOAD,
-     SAVE and CANCEL are buttons, and EXPORT's frame has no label until step 4; the
-     question is
-     centred. Evidence: `tools/dump-save-menu.ts`, "the dialog's pieces of graphic 0"
+     SAVE, EXPORT and CANCEL are buttons; the question is centred. Evidence: `tools/dump-save-menu.ts`, "the dialog's pieces of graphic 0"
      (each piece at its own size is the art), "the dialog" (the margins, and clean
      panel under every row and label), "the menu button sets" (a frame's rectangle and
-     label against CSBWin's table) and "the menu's selection" (CANCEL, and EXPORT's
-     frame); the golden frame `tools/frames/06-savemenu.png`.
+     label against CSBWin's table) and "the menu's selection" (CANCEL); the golden
+     frame `tools/frames/06-savemenu.png`.
    - b. ✅ **The two-level list**: a heading row for each playthrough over its saves,
      folded or not (`layoutRows`, `src/renderer/ui/SaveMenu.ts`). A save's row gives up
      the party, which is its heading's, for the time of day and F5's "QUICKSAVE". Evidence:
@@ -447,7 +453,16 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      game writes under that id, and loading; version-1 rows through both upgrades; a
      row that holds no CSBWin file dropped). The IndexedDB half (`upgradeRows`) no
      tool runs, since Node has no IndexedDB.
-   - b. ⏳ **EXPORT**: the selected save's bare `.dat`, downloaded.
+   - b. ✅ **EXPORT**: the selected save's bare `.dat`, downloaded (`doExport`,
+     `src/renderer/ui/SaveMenu.ts`, through `UIState.onExportSave` to the page's
+     `downloadSaveFile`). Evidence: `tools/dump-save-menu.ts`, "EXPORT" (no label and no
+     click on a heading, and on "NEW SAVE" in "the menu's selection"; on a save, the
+     press, then one file under the row's name, the store's bytes byte for byte, which
+     read as a CSBWin save; no row written and the game left alone; another
+     playthrough's save without a question; a read that fails; the load-only chooser).
+     The download itself no Node tool runs: the frames probe clicks EXPORT in the
+     entrance's chooser, in a Chrome told to announce a download and keep none, and
+     checks that one starts, a `.dat` under the save's name.
    - c. ⏳ **A dungeon's signature, and the catalogue** of the known dungeons', with the
      tool that shows each committed save matching its own dungeon and no other.
    - d. ⏳ **The import**: a `.dat` dropped on the canvas while the dialog is up,
@@ -552,7 +567,8 @@ save used, written or loaded, its playthrough alone unfolded, and on "NEW SAVE" 
 data set has none. LOAD reads the selected save, or from a heading its playthrough's
 last save used. SAVE writes over the selected save, or from the game's own heading or
 "NEW SAVE" makes a new row, its file a `.dat` named for its date. Either asks first on a
-save of another playthrough than the running game's. Both,
+save of another playthrough than the running game's. EXPORT downloads the selected
+save's file, and asks nothing. All three,
 and the two keys, go through `GameSaves` (`src/engine/GameSaves.ts`). F5
 writes its playthrough's quick-save, over the last, and F9 loads the newest save of its
 playthrough, F5's or the menu's. Each key says what it
@@ -563,9 +579,8 @@ and "CANNOT LOAD NOW" for that last; CSBWin's own "UNABLE TO SAVE GAME!"
 that failed and for no save at all; a file that does not read gives the line the menu's
 message would be. Each outcome is also a line for the console, with the save's name,
 and with the error behind a failure. CANCEL, Esc and a right-click close the menu. The
-five places it
-diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`, with the menu
-the boot leaves out after a load. Evidence:
+six places it diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`,
+with the menu the boot leaves out after a load. Evidence:
 `tools/dump-save-menu.ts` and the golden frame `tools/frames/06-savemenu.png`.
 
 #### Deferred

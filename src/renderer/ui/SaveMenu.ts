@@ -8,8 +8,8 @@
  * `doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port". In short: a
  * dialog of its own over the screen, an unbounded scrolling list of the data set's saves
  * under their playthroughs' headings, a date per save and a roster per playthrough
- * instead of a filename and a recency letter, a preview of the save beside the list, no
- * "save and quit", and Esc/right-click to cancel.
+ * instead of a filename and a recency letter, a preview of the save beside the list, an
+ * export of a save's file, no "save and quit", and Esc/right-click to cancel.
  *
  * ## The dialog
  *
@@ -27,8 +27,7 @@
  * animation take the rectangle CSBWin's table gives a frame (`buttonRect`,
  * `buttonLabelAt`). A button that can do nothing is drawn with **no label at all**, which
  * is what CSBWin does to an empty save slot: `strcpy(fNames[i],"   ")` blanks the name
- * and the button sits there inert (`doc/CSBwin-src/CSBCode.cpp:9772`). EXPORT's frame is
- * such a button.
+ * and the button sits there inert (`doc/CSBwin-src/CSBCode.cpp:9772`).
  *
  * ## The list
  *
@@ -70,6 +69,15 @@
  * panel's last lines are the dialog's message, when it has one: what went wrong, what was
  * done, or that it is working, wrapped at the panel's width (`wrapMessage`) and drawn
  * over whatever lines of the preview it needs.
+ *
+ * ## EXPORT
+ *
+ * EXPORT hands the player the selected save's file, the bare `.dat` the store holds,
+ * which CSBWin opens (`UIState.onExportSave`: the page downloads it under the row's
+ * name). On a heading and on "NEW SAVE" no save is selected, and it is inert. It reads
+ * the store and nothing else: the game is left alone, so it never asks, whatever the
+ * save's playthrough, and the save is no more the last one used for it. The load-only
+ * chooser has it as the disk menu does.
  *
  * ## The question
  *
@@ -208,6 +216,9 @@ const NEW_SAVE_LABEL = 'NEW SAVE';
 export const SAVE_MENU_QUESTION = 'THAT\'S NOT THE SAME GAME';
 const CANCEL_LABEL = 'CANCEL';
 const ACTION_LABELS = { load: 'LOAD', save: 'SAVE' } as const;
+const EXPORT_LABEL = 'EXPORT';
+/** The dialog's message once a save's file has been handed to the player. */
+export const SAVE_MENU_EXPORTED = 'SAVE EXPORTED';
 
 /** The dialog's own buttons; the question's are CSBWin's 210 and 211. */
 const BTN_LOAD = 900;
@@ -215,6 +226,7 @@ const BTN_SAVE = 901;
 const BTN_CANCEL = 902;
 const BTN_SCROLL_UP = 903;
 const BTN_SCROLL_DOWN = 904;
+const BTN_EXPORT = 905;
 const BTN_ROW0 = 910;
 
 /**
@@ -260,6 +272,7 @@ export const SAVE_MENU_GEOMETRY = {
   sliderMin: SLIDER_MIN,
   loadButtonId: BTN_LOAD,
   saveButtonId: BTN_SAVE,
+  exportButtonId: BTN_EXPORT,
   cancelButtonId: BTN_CANCEL,
 } as const;
 
@@ -446,6 +459,11 @@ function canSave(ui: UIState, state: SaveMenuState): boolean {
   const row = selectedRow(state);
   return !state.busy && state.mode === 'full' && row !== null
     && (row.kind !== 'heading' || row.playthrough.id === runningPlaythrough(ui));
+}
+
+/** EXPORT hands out the selected save's file; a heading and "new save" have none. */
+function canExport(state: SaveMenuState): boolean {
+  return !state.busy && selectedEntry(state) !== null;
 }
 
 /**
@@ -694,6 +712,7 @@ export function drawSaveMenu(ui: UIState): void {
   // slot unlabelled.
   if (canLoad(state)) drawLabel(ui, ACTION_LABELS.load, BUTTON_FRAMES.load);
   if (canSave(ui, state)) drawLabel(ui, ACTION_LABELS.save, BUTTON_FRAMES.save);
+  if (canExport(state)) drawLabel(ui, EXPORT_LABEL, BUTTON_FRAMES.export);
   if (!state.busy) drawLabel(ui, CANCEL_LABEL, BUTTON_FRAMES.cancel);
 
   if (state.press) drawMenuPress(ui, state.press, nowMs());
@@ -703,13 +722,14 @@ export function drawSaveMenu(ui: UIState): void {
 
 /**
  * The dialog's own button list, in the form of CSBWin's (`x2` and `y2` exclusive): the
- * three buttons that have a label, the scrollbar's two arrows, and the rows shown. Built
+ * four buttons, the scrollbar's two arrows, and the rows shown. Built
  * fresh on each click because the rows follow the scroll position.
  */
 export function saveMenuButtons(state: SaveMenuState): UIButton[] {
   const buttons: UIButton[] = [
     { word0: BTN_LOAD, ...buttonRect(BUTTON_FRAMES.load), button: 2, name: 'saveMenu.load' },
     { word0: BTN_SAVE, ...buttonRect(BUTTON_FRAMES.save), button: 2, name: 'saveMenu.save' },
+    { word0: BTN_EXPORT, ...buttonRect(BUTTON_FRAMES.export), button: 2, name: 'saveMenu.export' },
     { word0: BTN_CANCEL, ...buttonRect(BUTTON_FRAMES.cancel), button: 2, name: 'saveMenu.cancel' },
   ];
   const arrow = (id: number, y1: number, name: string): UIButton => (
@@ -783,6 +803,9 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
   }
   if (id === BTN_LOAD && canLoad(state)) pressAction(ui, state, 'load');
   if (id === BTN_SAVE && canSave(ui, state)) pressAction(ui, state, 'save');
+  if (id === BTN_EXPORT && canExport(state)) {
+    beginPress(ui, state, saveMenuButtons(state), BTN_EXPORT, () => void runPending(ui, 'export'));
+  }
 }
 
 /** LOAD or SAVE pressed: once the press has played, the question, or the action at once. */
@@ -871,7 +894,7 @@ export const SAVE_MENU_PRESS_MS = MENU_PRESS_PHASE_MS * 2;
 
 /* -------------------------------------------------------------- the actions ---- */
 
-async function runPending(ui: UIState, action: SaveMenuAction): Promise<void> {
+async function runPending(ui: UIState, action: SaveMenuAction | 'export'): Promise<void> {
   const state = ui.saveMenu;
   if (!state) return;
   state.busy = true;
@@ -879,7 +902,8 @@ async function runPending(ui: UIState, action: SaveMenuAction): Promise<void> {
   ui.renderLastFrame();
   try {
     if (action === 'load') await doLoad(ui, state);
-    else await doSave(ui, state);
+    else if (action === 'save') await doSave(ui, state);
+    else await doExport(ui, state);
   } catch (error) {
     state.busy = false;
     state.message = shortError(error);
@@ -931,6 +955,17 @@ async function doSave(ui: UIState, state: SaveMenuState): Promise<void> {
   await refreshSaveMenu(ui);
   selectSave(ui, state, saved);
   state.message = 'GAME SAVED';
+  ui.renderLastFrame();
+}
+
+/** The selected save's file, handed to the player. The store and the game stay as they are. */
+async function doExport(ui: UIState, state: SaveMenuState): Promise<void> {
+  const entry = selectedEntry(state);
+  if (entry) {
+    await ui.onExportSave(entry);
+    state.message = SAVE_MENU_EXPORTED;
+  }
+  state.busy = false;
   ui.renderLastFrame();
 }
 

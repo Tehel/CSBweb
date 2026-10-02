@@ -373,11 +373,15 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    slot's contents.
 3. **No "SAVE AND QUIT"**: a page does not quit, and loading another game's save is how a
    player leaves one (`PLAN.md` → Phase 10).
-4. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
+4. **EXPORT**, which has no counterpart. CSBWin's saves are files of its directory,
+   there to be copied; the port's are rows of the browser's IndexedDB, which nothing
+   outside the page reads. EXPORT downloads the selected save's file as the store holds
+   it, the bare `.dat`, which CSBWin opens (`doExport`, `src/renderer/ui/SaveMenu.ts`).
+5. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
    addition, not a changed behaviour, as are the list's other keys (the arrows, Home
    and End, Page Up and Down, Enter for LOAD), the wheel, and a double click on a save,
    which is LOAD. The entrance's chooser takes them as the disk menu does.
-5. **A question before a load or a save across playthroughs.** CSBWin's four slots are
+6. **A question before a load or a save across playthroughs.** CSBWin's four slots are
    one directory's, and it tests `d.RandomGameID` only when a lost game is read again,
    where it refuses the save: "THAT'S NOT THE SAME GAME" (`SaveGame.cpp:1604-1606`). The
    port's list holds every playthrough of the data set, so LOAD and SAVE on a save of
@@ -386,7 +390,7 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    `_DoMenu` menu, centred, in the dialog's place, the action over CANCEL, and act on
    the first. Esc and a right-click there cancel the question alone. The load-only
    chooser never asks.
-6. **No "GAME LOADED, READY TO PLAY."** After a load at the entrance, CSBWin's
+7. **No "GAME LOADED, READY TO PLAY."** After a load at the entrance, CSBWin's
    `_TAG021028` loops on that menu, PLAY GAME over ASCII DUMP (`CSBCode.cpp:10493-10515`).
    The port puts none up: a loaded game is played at once, and `AsciiDump` is unported
    (`DEBT.md` G14). What the menu did to the chooser's picture is kept, the fade to

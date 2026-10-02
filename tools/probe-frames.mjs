@@ -19,8 +19,8 @@
 // identical run to run.
 //
 // A few things are asserted on the spot rather than compared as frames, since no frame
-// shows them: the CRT effect, which screens take the mouse wheel, and the keys of the
-// entrance's chooser. See `check` below.
+// shows them: the CRT effect, which screens take the mouse wheel, the keys of the
+// entrance's chooser, and the download its EXPORT starts. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -51,8 +51,10 @@ const ws = new WebSocket(page.webSocketDebuggerUrl);
 let id = 0;
 const pending = new Map();
 const logs = [];
+const downloads = [];
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
+  if (m.method === 'Browser.downloadWillBegin') downloads.push(m.params.suggestedFilename);
   if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
   if (m.method === 'Runtime.consoleAPICalled' && ['error','warning'].includes(m.params.type))
     logs.push(m.params.type + ': ' + m.params.args.map(a => a.value ?? a.description).join(' '));
@@ -120,6 +122,9 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
 await send('Runtime.enable');
 await send('Page.enable');
+// The save menu's EXPORT downloads a file. Chrome is told to announce a download and keep
+// none, so the run leaves nothing on the disk.
+await send('Browser.setDownloadBehavior', { behavior: 'deny', eventsEnabled: true });
 // Pin the viewport. The frames no longer depend on it — they are the canvas, not the page —
 // but the click helper maps game coordinates through the canvas's bounding rect, so a
 // window too small to lay the page out as intended would send clicks somewhere else.
@@ -194,8 +199,8 @@ console.log('state: attack panel');      await shot('05-attack');
 // screen, cleared. Reopen an inventory first — the attack-panel step backed out of it.
 // The browser store was emptied on boot, so the list is reliably its "NEW SAVE" row alone
 // and this frame pins the dialog itself: the frame, the two panels and the four buttons,
-// all pieces of graphic 0, with LOAD unlabelled because that row holds nothing to load
-// and EXPORT because it does nothing yet.
+// all pieces of graphic 0, with LOAD and EXPORT unlabelled because that row holds no save
+// to load or to export.
 await canvasClick(15, 15, 2);  await wait(600);
 await canvasClick(177, 40, 0); await wait(900);
 console.log('state: save menu');         await shot('06-savemenu');
@@ -236,6 +241,13 @@ const onHeading = await canvasPixels();
 await key('ArrowDown'); await wait(200);
 check(onHeading !== chooserUp && onHeading !== entrance && (await canvasPixels()) === chooserUp,
   'the entrance\'s chooser takes the arrow keys, and stays up');
+// EXPORT (x 170..220, y 161..174) on that save: the page's own download
+// (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`), which no Node tool can run.
+// What the file holds is `tools/dump-save-menu.ts`'s to show.
+await canvasClick(195, 168, 0); await wait(1000);
+console.log('  downloads:', downloads.join(', ') || 'none');
+check(downloads.length === 1 && /^dmweb-\d{8}-\d{6}\.dat$/.test(downloads[0]),
+  'EXPORT in the chooser starts one download, a .dat under the save\'s name');
 await canvasClick(100, 27, 0);  await wait(300);
 await canvasClick(48, 168, 0);  await wait(1500);
 console.log('state: game loaded');       await shot('12-game-loaded');
