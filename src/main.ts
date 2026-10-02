@@ -456,12 +456,15 @@ function wire(game: Game, screen: GameScreen, saves: GameSaves, sound: SoundMana
     // The engine drives the message strip (`GameHost.messages`), a scanline of its scroll
     // a VBL; CSBWin's `vblInterrupt` invalidates the window after each
     // (doc/CSBwin-src/CSBCode.cpp:1003). A VBL that inverted a flashed button is drawn too,
-    // unless its tick holds the paint until the put-back (`Game.paintHeld`).
+    // unless its tick holds the paint until the put-back (`Game.paintHeld`). And so is one
+    // the pointer has moved before: the VBL handler alone draws the cursor (`:1040-1043`),
+    // and a move of the pointer draws nothing itself (`GameInput.mouseMove`).
     game.onFrame(() => {
         if (game.paintHeld()) return;
         const scrolled = messages.takeChanged();
         const flashed = game.takeFlashChanged();
-        if (scrolled || flashed) refreshScreen();
+        const moved = screen.takeCursorMoved();
+        if (scrolled || flashed || moved) refreshScreen();
     });
 }
 

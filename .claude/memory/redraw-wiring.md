@@ -20,6 +20,12 @@ Everything else — clicks, keys, the message scroll, the button flash, the tick
 after `TAG01b29a` (`GameHost.paint`) — is `refreshScreen`, which composes the screen over
 the viewport as it stands (`GameScreen.refreshOverlay`).
 
+A move of the pointer draws nothing: it records the place (`GameScreen.setHoverPoint`),
+and the VBL's frame (`game.onFrame` in `wire()`) composes the screen when the pointer has
+moved (`takeCursorMoved`), as CSBWin's VBL handler alone draws the cursor. A redraw per
+`mousemove` saturates the page: a mouse reports every 8 ms or faster, and composing the
+screen takes about as long.
+
 `Game.gameTick` runs `onTickCallbacks` where CSBWin's tick calls `DrawViewport`
 (`doc/CSBwin-src/CSBCode.cpp:638`): after the timers and after `loadNewPartyLevel`,
 before the game-lost check.

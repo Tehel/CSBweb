@@ -88,6 +88,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| C113 | The entrance's chooser redraws without its cursor | S | ⏳ |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
@@ -119,7 +120,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C112 · D16 · E21 · F14 · G23 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C114 · D16 · E21 · F14 · G23 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -162,6 +163,21 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C113 ⏳ The entrance's chooser redraws without its cursor
+
+In the load-only chooser (`openLoadMenu`, `src/renderer/intro/BootSequence.ts`) the dialog
+is drawn by `GameScreen.presentSaveMenuOnly`, which presents the screen with no cursor on
+it; the cursor is composed only by `host.present()`, which a move of the pointer calls. So
+every redraw of the dialog takes the cursor off until the pointer next moves to another
+pixel: a notch of the wheel, a click on a row, each frame of a button's press. CSBWin's
+cursor stays up from `STShowCursor(HC33)` to `STHideCursor(HC33)`
+(`doc/CSBwin-src/SaveGame.cpp:1562-1564`), and the disk menu in play draws it with every
+frame (`GameScreen.presentViewport`).
+
+Fix: the chooser's `draw` puts the dialog into the screen and presents it through
+`host.present()`. A check for `tools/probe-frames.mjs`: the pixels under the pointer are
+the cursor's after a notch of the wheel in the chooser.
 
 ---
 

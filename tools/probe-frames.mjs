@@ -19,9 +19,9 @@
 // identical run to run.
 //
 // A few things are asserted on the spot rather than compared as frames, since no frame
-// shows them: the CRT effect, which screens take the mouse wheel, the keys of the
-// entrance's chooser, the download its EXPORT starts, and a file dropped on it. See
-// `check` below.
+// shows them: the CRT effect, which screens take the mouse wheel, a move of the pointer
+// left to the VBL's frame to paint, the keys of the entrance's chooser, the download its
+// EXPORT starts, and a file dropped on it. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -206,6 +206,21 @@ await canvasClick(15, 15, 2);  await wait(600);
 await canvasClick(177, 40, 0); await wait(900);
 console.log('state: save menu');         await shot('06-savemenu');
 check(await wheelTaken(), 'the disk menu takes the wheel, for its list');
+// A move of the pointer paints nothing: the VBL's frame draws the cursor where the mouse
+// is by then, as CSBWin's VBL handler does. A mouse reports faster than the screen is
+// composed, and a paint for each move kept the browser from showing any. The pointer
+// leaves again, so that no later frame holds a cursor.
+const moves = await evaluate(`(async()=>{const {screen}=window.__probe;const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
+  let paints=0; const own=screen.presentViewport; screen.presentViewport=function(){paints++; return own.call(this);};
+  for (let i=0;i<50;i++) c.dispatchEvent(new MouseEvent('mousemove',{clientX:r.left+(100.5+i)*r.width/320,clientY:r.top+100.5*r.height/200,bubbles:true}));
+  const during=paints; await new Promise(r=>setTimeout(r,200));
+  const at=screen.ui.hoverPoint; delete screen.presentViewport;
+  c.dispatchEvent(new MouseEvent('mouseleave')); await new Promise(r=>setTimeout(r,200));
+  return {during, after:paints, at, left:screen.ui.hoverPoint===null};})()`);
+console.log('  fifty moves of the pointer:', JSON.stringify(moves));
+check(moves.during === 0, 'a move of the pointer paints nothing itself');
+check(moves.after >= 1 && moves.after < 50 && moves.at.x === 149 && moves.at.y === 100, 'the VBL\'s frame draws the cursor where the pointer last was');
+check(moves.left, 'the pointer gone, no cursor is left for the frames that follow');
 // SAVE (x 95..143, y 161..174), a new save from that row, for the resume from the
 // entrance below.
 await canvasClick(120, 168, 0); await wait(1200);

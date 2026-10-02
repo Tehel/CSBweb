@@ -4655,6 +4655,25 @@ That is a byte of `d.unused20262` (`Data.h:621-622`), which nothing in the tree 
 it is 0 and the PASS goes through to `TAG01b1c0`. The port skips the test for -1
 (`executeAttack`, `src/renderer/ui/Attack.ts`), with the same result.
 
+## The cursor is drawn by the VBL handler, and by nothing else
+
+`checkVBL` reads the pointer with `UI_GetCursorPos`, and when it is on the 320x200 screen
+writes it to `d.NewMouseX`/`d.NewMouseY` and `d.CurMouseX`/`d.CurMouseY`, and sets
+`d.Word23130` if `d.Word23134` is set (`doc/CSBwin-src/system.cpp:596-616`). It draws
+nothing. The VBL handler, on `d.Word23130`, clears it, sets `d.Word23132` and calls
+`CreateCursorBitmap` (`CSBCode.cpp:1044-1052`), which takes `d.NewCursorX`/`d.NewCursorY`
+from `d.CurMouseX`/`d.CurMouseY` (`:2228-2233`). A VBL that finds `d.Word23132` set passes
+it to `TAG000bb0`, which takes the cursor off the screen (`:947-948`, `:957`, `:863`,
+`:887-889`), and then calls `DrawCursor` (`:1040-1043`), which draws at
+`d.NewCursorX`/`d.NewCursorY` and makes them `d.CurCursorX`/`d.CurCursorY` (`:2407-2413`).
+`DrawCursor` has two callers, both in the VBL handler (`:968`, `:1042`).
+
+So the cursor moves once a VBL at most. The port's `GameInput.mouseMove` records the
+pointer and draws nothing, and the page's frame, a VBL's, composes the screen when the
+pointer has moved (`GameScreen.takeCursorMoved`, `wire` in `src/main.ts`).
+`tools/probe-frames.mjs` checks that fifty moves between two VBLs paint nothing
+themselves, and that the next VBL's frame has the cursor where the pointer last was.
+
 ## The key tables: CSBWin's own keys
 
 - **What a key is.** `UIM_KEYDOWN` turns a PC key into an Atari key through `config.txt`'s

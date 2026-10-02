@@ -129,6 +129,8 @@ export class GameScreen {
   private readonly messages: ScrollingText;
   /** A dungeon view has been drawn, so there is an adventure frame to compose again. */
   private viewportDrawn = false;
+  /** The pointer has moved since the cursor was last drawn (`takeCursorMoved`). */
+  private cursorMoved = false;
   private bootFrameRenderer: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, deps: GameScreenDeps, hooks: GameScreenHooks) {
@@ -341,9 +343,28 @@ export class GameScreen {
     syncInventoryButtons(this.ui);
   }
 
+  /**
+   * Where the pointer is, `d.CurMouseX` and `d.CurMouseY`. Nothing is drawn from here:
+   * the cursor is the VBL's to draw (`takeCursorMoved`).
+   */
   setHoverPoint(point: { x: number; y: number } | null): void {
+    const at = this.ui.hoverPoint;
+    if (point?.x !== at?.x || point?.y !== at?.y) this.cursorMoved = true;
     this.ui.hoverPoint = point;
     if (point) marchingOrderPointerMoved(this.ui, Math.floor(point.x), Math.floor(point.y));
+  }
+
+  /**
+   * Whether the pointer has moved since the cursor was last drawn: a redraw is due.
+   * CSBWin's cursor is drawn by the VBL handler and by nothing else
+   * (`doc/CSBwin-src/CSBCode.cpp:1040-1043`), where `checkVBL` last found the mouse
+   * (`system.cpp:596-616`), so it moves once a VBL at most, however many moves the mouse
+   * reports in between.
+   */
+  takeCursorMoved(): boolean {
+    const moved = this.cursorMoved;
+    this.cursorMoved = false;
+    return moved;
   }
 
   /**
@@ -501,6 +522,7 @@ export class GameScreen {
     const flashed = flashedButton(this.ui.ctx);
     if (flashed) vblFlashButn(this.screen, flashed);
     drawCursorItem(this.ui, !inventoryOpen);
+    this.cursorMoved = false;
 
     const uiPalette = this.uiPalette;
     const viewportPalette = inventoryOpen ? uiPalette : (this.getViewportPalette() ?? uiPalette);

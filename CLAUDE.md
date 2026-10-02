@@ -90,8 +90,9 @@ There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is 
   the 320x200 canvas read back as pixels, and the comparison is pixel-wise, so a baseline
   captured on one machine is checkable on another. The probe also asserts on the spot what
   no frame shows: the CRT effect, which needs a Chrome that gives WebGL, the wheel
-  and the keys reaching a save menu, at the entrance as in play, the download its
-  EXPORT starts, and a file dropped on it.
+  and the keys reaching a save menu, at the entrance as in play, a move of the pointer
+  painting nothing until the VBL's frame, the download its EXPORT starts, and a file
+  dropped on it.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`

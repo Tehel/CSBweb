@@ -60,12 +60,16 @@ export class GameInput {
     });
   }
 
+  /**
+   * The pointer's place, and no redraw: CSBWin's `checkVBL` notes where the mouse is
+   * (`doc/CSBwin-src/system.cpp:596-616`) and its VBL handler draws the cursor, so the
+   * page's frame paints it (`GameScreen.takeCursorMoved`). A mouse reports its moves
+   * faster than the screen is composed, and a redraw for each leaves the browser no time
+   * to show any.
+   */
   mouseMove(x: number, y: number): void {
     if (this.ended()) return;
-    const screen = this.host.screen;
-    screen.setHoverPoint({ x, y });
-    // Cursor tracking only: CSBWin's cursor moves independently of the dungeon view.
-    screen.refreshOverlay();
+    this.host.screen.setHoverPoint({ x, y });
   }
 
   /** A button pressed: `button` is `MouseEvent.button`'s number. */
@@ -104,10 +108,10 @@ export class GameInput {
     return true;
   }
 
+  /** The pointer gone from the canvas: no cursor, from the next VBL's frame, as a move's. */
   mouseLeave(): void {
     if (this.ended()) return;
     this.host.screen.setHoverPoint(null);
-    this.host.refreshScreen();
   }
 
   /** A key pressed: `key` is `KeyboardEvent.key`. Says whether the game took it. */
