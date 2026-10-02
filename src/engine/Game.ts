@@ -136,6 +136,11 @@ export class Game implements MainLoop {
      * (`ShowCredits.ts`).
      */
     private canRestart = false;
+    /**
+     * The player's time in this game, in VBLs: every VBL of the loop but the frozen
+     * game's and the save menu's (`playTime`).
+     */
+    private playedVbls = 0;
 
     // Event callbacks
     private onTickCallbacks: GameEventCallback[] = [];
@@ -238,6 +243,7 @@ export class Game implements MainLoop {
         this.ctx.state.block1.totalMoveCount = totalMoveCount;
         this.readNewGameRules(data);
         this.canRestart = false;
+        this.playedVbls = 0;
     }
 
     /**
@@ -309,6 +315,26 @@ export class Game implements MainLoop {
     }
 
     /**
+     * The player's time in this game, in milliseconds: the VBLs the loop has run, sixty
+     * a second, the frozen game's and the save menu's left out. The wall clock paces the
+     * VBLs (`gameLoop`), so this is the time the player spent in the game, asleep or
+     * not, where `d.Time` counts ticks, which sleep runs fast; and a machine asleep, whose
+     * VBLs are not made up, counts nothing.
+     *
+     * Not CSBWin's, and no file holds it. A save's row does (`SaveEntry.playTime`), a
+     * load sets it from that row (`GameSaves.read`), and a new game starts at 0
+     * (`readNewGame`).
+     */
+    playTime(): number {
+        return Math.round(this.playedVbls * 1000 / VBL_FREQUENCY);
+    }
+
+    /** The play time of the save a game was read from (`playTime`). */
+    setPlayTime(milliseconds: number): void {
+        this.playedVbls = Math.round(milliseconds * VBL_FREQUENCY / 1000);
+    }
+
+    /**
      * `_StartCSB` calls `MainLoop` again once `ShowCredits` returns from a restart
      * (doc/CSBwin-src/CSBCode.cpp:11320-11327). The loop's state is `d`'s, which
      * `d.Initialize()` has reset (`Code1f9e6.cpp:309`), and the input goes
@@ -375,6 +401,9 @@ export class Game implements MainLoop {
     runFrame(): void {
         // Nothing of the loop runs once `MainLoop` has returned: `ShowCredits` has the screen.
         if (this.mainLoopReturned) return;
+        // The player's time in the game (`playTime`): not the frozen game's VBLs, nor the
+        // save menu's.
+        if (!this.ctx.loop.gameFrozen && !this.ctx.state.paused) this.playedVbls++;
         this.paintIsHeld = false;
         // The VBL handler runs on every VBL, held in a script or not (`vblInterrupt`,
         // doc/CSBwin-src/CSBCode.cpp:1003-1077): the message strip's scroll moves on

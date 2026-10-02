@@ -49,6 +49,9 @@
  * 11. **The question.** LOAD and SAVE on a save of another playthrough than the running
  *    game's ask first, and do nothing until the answer; on a save of the game's own, or
  *    in the load-only chooser, neither asks.
+ * 12. **The play time.** The player's time in a game is the VBLs its loop runs, the
+ *    frozen game's and the save menu's left out. No file holds it: a save's row does,
+ *    and a load takes it back from the row.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -81,7 +84,7 @@ import { upgradeSaveRecords } from '../src/data/saves/legacyRows';
 import { DEFAULT_DATA_SET, dataSetFor } from '../src/data/DataSets';
 import { Game } from '../src/engine/Game';
 import type { GameHost, MessageSink } from '../src/engine/GameHost';
-import type { LoopScript } from '../src/engine/LoopState';
+import { freeze, thaw, type LoopScript } from '../src/engine/LoopState';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { drawRandomGameID } from '../src/engine/GameContext';
@@ -376,6 +379,7 @@ function entry(over: Partial<SaveEntry>): SaveEntry {
     playthrough: 0,
     quick: false,
     savedAt: 0,
+    playTime: 0,
     level: 0,
     champions: [],
     ...over,
@@ -1577,6 +1581,118 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
   }
 }
 
+/* ------------------------------------------------------------ 12. the play time ---- */
+
+/**
+ * `Game.playTime` under the loop's VBLs, sixty a second, and through the saves: the
+ * menu's SAVE and LOAD, by its own clicks, and F5 and F9.
+ */
+async function checkPlayTime(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== the play time ===');
+  const store = memoryStore();
+  const rig = await menuRig(graphics, store, 'DAROO');
+  const { game, saves, ui } = rig;
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  const play = (vbls: number): void => {
+    for (let n = 0; n < vbls; n++) game.runFrame();
+  };
+  const seconds = (milliseconds: number | undefined): string => `${(milliseconds ?? NaN) / 1000} s`;
+  const rowOfStore = async (id: string): Promise<SaveEntry | undefined> => (await store.list(null)).find((e) => e.id === id);
+
+  const realNow = Date.now;
+  let now = Date.UTC(2026, 8, 13, 14, 5, 6);
+  Date.now = () => now;
+  try {
+    const atStart = game.playTime();
+    play(600);
+    const played = game.playTime();
+    freeze(game.ctx);
+    play(120);
+    const frozen = game.playTime();
+    thaw(game.ctx);
+    console.log(`  a new game: ${seconds(atStart)}; after 600 VBLs: ${seconds(played)}; after 120 more, frozen: ${seconds(frozen)}`);
+    check(atStart === 0 && played === 10_000, 'a new game has played no time, and counts its VBLs, sixty a second');
+    check(frozen === played, 'the frozen game\'s VBLs are not counted');
+
+    // The disk menu holds the clock, and SAVE writes the count into the row.
+    const state = await rig.open();
+    play(180);
+    const underMenu = game.playTime();
+    await rig.click(g.saveButtonId);
+    const made = SaveMenu.selectedEntry(state);
+    SaveMenu.closeSaveMenu(ui);
+    console.log(`  after 180 more under the disk menu: ${seconds(underMenu)}; its SAVE's row: ${seconds(made?.playTime)}`);
+    check(underMenu === played, 'nor are the VBLs under the disk menu');
+    check(made !== null && made.playTime === played && (await rowOfStore(made.id))?.playTime === played,
+      'SAVE writes the game\'s play time into the save\'s row');
+
+    // F5 writes its own, and leaves the menu's save's alone.
+    now += 60_000;
+    play(90);
+    await saves.quickSave();
+    const quick = (await saves.list())[0]!;
+    console.log(`  after 90 more VBLs, F5: its row ${seconds(quick.playTime)}, the menu's ${seconds((await rowOfStore(made!.id))?.playTime)}`);
+    check(quick.quick && quick.playTime === 11_500 && (await rowOfStore(made!.id))?.playTime === played,
+      'F5 writes the count of its own moment, and another save\'s row keeps its own');
+
+    // LOAD takes the row's, whatever the game had counted.
+    now += 60_000;
+    play(300);
+    const beforeLoad = game.playTime();
+    await rig.open();
+    rig.clickRow(rig.rowOf(made!.id));
+    await rig.click(g.loadButtonId);
+    const afterLoad = game.playTime();
+    console.log(`  after 300 more: ${seconds(beforeLoad)}; the menu's save loaded: ${seconds(afterLoad)}`);
+    check(beforeLoad === 16_500 && !SaveMenu.isSaveMenuOpen(ui) && afterLoad === played,
+      'LOAD gives the game the play time of the save\'s row');
+    check((await rowOfStore(made!.id))?.playTime === played, 'and a load leaves the row\'s as it was');
+
+    // F9 loads the playthrough's newest save, F5's, and takes its row's.
+    play(60);
+    const beforeF9 = game.playTime();
+    await saves.quickLoad();
+    console.log(`  after 60 more: ${seconds(beforeF9)}; F9: ${seconds(game.playTime())}`);
+    check(beforeF9 === 11_000 && game.playTime() === quick.playTime, 'F9 takes the play time of the save it loads');
+
+    // The count is in VBLs, so a save and a load lose nothing of it: three VBLs are
+    // 50 ms, where three times one VBL's 17 would be 51.
+    play(1);
+    const one = game.playTime();
+    now += 60_000;
+    const exact = await saves.save('stopped', 'new');
+    saves.read(await saves.open(exact));
+    play(2);
+    console.log(`  one VBL on: ${one - quick.playTime} ms more; saved, loaded and two VBLs on: ${game.playTime() - quick.playTime} ms more`);
+    check(one === quick.playTime + 17 && exact.playTime === one && game.playTime() === quick.playTime + 50,
+      'a save and a load keep the count to the VBL');
+
+    // A read that fails leaves the game, and its count.
+    const counted = game.playTime();
+    let refused = false;
+    try {
+      saves.read({ entry: { ...exact, playTime: 1 }, bytes: new Uint8Array(64), joins: 0 });
+    } catch {
+      refused = true;
+    }
+    check(refused && game.playTime() === counted, 'a file that does not read leaves the game\'s play time as it was');
+
+    // A row from before rows held it, and a new game.
+    const { playTime: _none, ...before } = { ...exact, bytes: new ArrayBuffer(0) };
+    saves.read({ entry: saveEntryOf(before), bytes: await store.read(exact.id), joins: 0 });
+    const fromOldRow = game.playTime();
+    play(30);
+    const read = game.readDungeonDat(new Uint8Array(readFileSync(resolve(DUNGEON))));
+    console.log(`  a save whose row holds no play time, loaded: ${seconds(fromOldRow)}; a new game read after 30 VBLs: ${seconds(game.playTime())}`);
+    check(saveEntryOf(before).playTime === 0 && fromOldRow === 0,
+      'a stored row from before rows held the play time counts none, and its game starts from 0');
+    check(read && game.playTime() === 0, 'a new game read into the running one has played no time');
+  } finally {
+    Date.now = realNow;
+  }
+}
+
 /* ------------------------------------------------------- 9. the store's upgrade ---- */
 
 /**
@@ -1631,6 +1747,7 @@ async function checkUpgrade(): Promise<void> {
   check(rows.every((r) => r.dataSet === DEFAULT_DATA_SET.id && !r.quick), 'every row is the default data set\'s, and none is a quick save');
   check(rows.map((r) => r.savedAt).join() === '100,200,300', 'the date is the old row\'s, and of two rows that come to one name the newer is kept');
   check(rows.every((r) => r.usedAt === r.savedAt), 'and is when the row was last used');
+  check(rows.every((r) => r.playTime === 0), 'and a row counts no time played: no earlier build kept any');
   for (const row of rows) {
     const fresh = await loadGame();
     applySaveBytes(fresh, new Uint8Array(row.bytes));
@@ -1655,6 +1772,7 @@ async function main(): Promise<void> {
   await checkSaveCall();
   await checkSelection(graphics);
   await checkQuestion(graphics);
+  await checkPlayTime(graphics);
   await checkUpgrade();
   finish();
 }

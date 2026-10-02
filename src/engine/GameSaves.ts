@@ -196,7 +196,8 @@ export class GameSaves {
      * through the listing. The row beside them is read back from the file's own blocks,
      * the playthrough from `GAMEBLOCK1`, the level from `GAMEBLOCK2` and the names from
      * block 4 (`readSaveFileFields`); the date is the row's, since a CSBWin file has none,
-     * and is when the save was last used too (`SaveEntry.usedAt`).
+     * and is when the save was last used too (`SaveEntry.usedAt`). The play time is the
+     * row's as well, the game's count as the file is made (`Game.playTime`).
      */
     async save(clock: SaveClock, target: SaveTarget): Promise<SaveEntry> {
         if (clock === 'running') this.screen.repackOpenChest();
@@ -204,6 +205,7 @@ export class GameSaves {
             portraitOf: (champion) => this.screen.portraitOf(champion),
         });
         const savedAt = Date.now();
+        const playTime = this.game.playTime();
         const fields = readSaveFileFields(bytes);
         if (!fields) throw new Error('the save file does not read back');
         if (clock === 'running') this.game.saveWritten();
@@ -214,7 +216,9 @@ export class GameSaves {
             : quick ? quickSlot(rows, this.dataSet.id, fields.playthrough) : undefined;
         const name = over ? over.name : makeSaveFileName(savedAt, new Set(rows.map((row) => row.name)));
         const id = over ? over.id : name;
-        const entry: SaveEntry = { id, name, dataSet: this.dataSet.id, quick, savedAt, usedAt: savedAt, ...fields };
+        const entry: SaveEntry = {
+            id, name, dataSet: this.dataSet.id, quick, savedAt, usedAt: savedAt, playTime, ...fields,
+        };
         await this.store.write(entry, bytes);
         if (clock === 'stopped') this.game.saveWritten();
         return entry;
@@ -234,13 +238,18 @@ export class GameSaves {
      * `ReadEntireGame`'s result and shows the door again when it did not
      * (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
      *
+     * The game's play time is the row's (`SaveEntry.playTime`), which no file holds: the
+     * player's count goes on from where the save left it.
+     *
      * A save that read is the last one used from then on: its row takes the time
-     * (`SaveEntry.usedAt`) and keeps the rest. One that did not read is left as it was.
+     * (`SaveEntry.usedAt`) and keeps the rest. One that did not read is left as it was,
+     * and so is the play time of the game it did not replace.
      */
     read(save: OpenedSave): void {
         applySaveBytes(this.game, save.bytes);
         const { block1 } = this.game.ctx.state;
         if (block1.randomGameID === 0) block1.randomGameID = save.joins;
+        this.game.setPlayTime(save.entry.playTime);
         this.lastRead = 'loaded';
         this.marked = this.store.markUsed(save.entry.id, Date.now())
             .catch((error) => this.log(`${save.entry.name} could not be marked as the last save used`, error));

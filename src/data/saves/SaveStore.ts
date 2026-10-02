@@ -34,6 +34,12 @@ export interface SaveEntry {
      * so using one save writes nothing to another's row.
      */
     usedAt: number;
+    /**
+     * Milliseconds the player had spent in the game when it was saved (`Game.playTime`):
+     * the row's own, since a CSBWin file holds `d.Time`, which sleep runs fast, and
+     * nothing of the player's clock. A load gives the game this count back.
+     */
+    playTime: number;
     /** The dungeon level the party stood on, from the file's `GAMEBLOCK2`. */
     level: number;
     /** Champion names in party order, from the file's block 4. */
@@ -47,9 +53,12 @@ export interface SaveRecord extends SaveEntry {
 
 /**
  * A stored row's entry, without its bytes. A row written before rows held `usedAt` has
- * none, and counts as last used when it was saved.
+ * none, and counts as last used when it was saved; one written before they held
+ * `playTime` counts no time played.
  */
-export function saveEntryOf(record: Omit<SaveRecord, 'usedAt'> & { usedAt?: number }): SaveEntry {
+export function saveEntryOf(
+    record: Omit<SaveRecord, 'usedAt' | 'playTime'> & { usedAt?: number; playTime?: number },
+): SaveEntry {
     return {
         id: record.id,
         name: record.name,
@@ -58,6 +67,7 @@ export function saveEntryOf(record: Omit<SaveRecord, 'usedAt'> & { usedAt?: numb
         quick: record.quick,
         savedAt: record.savedAt,
         usedAt: record.usedAt ?? record.savedAt,
+        playTime: record.playTime ?? 0,
         level: record.level,
         champions: record.champions,
     };

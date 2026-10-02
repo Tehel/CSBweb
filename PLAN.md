@@ -169,9 +169,9 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
 - **Every save is a row of IndexedDB** (`SaveRecord`, `src/data/saves/SaveStore.ts`): the
   file's bytes beside what the list needs. The level, the champions' names and the
   playthrough (below) are read from the file's own blocks when the row is written; the
-  data set, the date, when the save was last used and whether F5 wrote it are the row's
-  own, and the play time will be (step 2). Nothing is JSON, and no row holds anything a `.dat` could not be listed
-  without.
+  data set, the date, when the save was last used, the play time and whether F5 wrote it
+  are the row's own. Nothing is JSON, and no row holds anything a `.dat` could not be
+  listed without.
 - **No store on disk.** IndexedDB (`BrowserSaveStore`) is the one store: a directory on
   disk needs `showDirectoryPicker`, which is Chromium's alone. **Export** downloads the
   selected save's bare `.dat`, which CSBWin opens. **Import** is a `.dat` dropped on the
@@ -197,9 +197,13 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   shows each committed save, early and late ones, matching its own dungeon and no
   other.
 - **Play time is the player's**: wall-clock time in the game, the frozen game and the
-  open dialog left out. The file's `d.Time` is not it (sleep runs it fast). The page
-  counts it and the row carries it: a load takes the row's, a save writes the count. An
-  export loses it and an import starts at 0.
+  open dialog left out. The file's `d.Time` is not it (sleep runs it fast). The game
+  counts it in VBLs, sixty a second (`Game.playTime`, `src/engine/Game.ts`): the wall
+  clock paces them, and a gap the loop does not make up, a machine asleep, counts
+  nothing. The row carries it, in milliseconds (`SaveEntry.playTime`): a save writes
+  the count, a load takes the row's, and a new game starts at 0. A row stored before
+  rows held it counts none. An export loses it and an import starts at 0. Nothing shows
+  it before the dialog's preview (step 3).
 
 **A playthrough**
 
@@ -311,7 +315,7 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
    IndexedDB half of the upgrade (`upgradeFromVersion1`) no tool runs, since Node has no
    IndexedDB. The author's `.dmweb.json` files on disk are converted by hand, outside
    the engine; `tools/peek-dungeon.ts` reads one meanwhile.
-2. ⏳ **The playthrough**, one commit each:
+2. ✅ **The playthrough**, one commit each:
    - a. ✅ **A game loaded from a file of playthrough 0 is given one**, by the menu's
      LOAD and the boot's chooser, which read through `GameSaves.open` and `read`.
      Step 4 moves the rule to the import and deletes it here. Evidence:
@@ -336,7 +340,11 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      SAVE writes" (either menu opens on it, scrolled to it; a read that fails marks
      nothing; a load writes the time alone). `BrowserSaveStore.markUsed` no tool runs,
      since Node has no IndexedDB.
-   - f. ⏳ **The play time.**
+   - f. ✅ **The play time.** Evidence: `tools/dump-save-menu.ts`, "the play time" (the
+     VBLs counted, and those of the frozen game and of the disk menu left out; SAVE's
+     and F5's rows; LOAD and F9 taking the row's; a save and a load exact to the VBL; a
+     read that fails; a row from before the field; a new game) and "the store's
+     upgrade" (an upgraded row counts none).
    - g. ✅ **A drawn id is no stored row's**: a new game's, and the load's for a file
      that holds none; step 4's import and upgrade draw through the same
      `drawPlaythrough`. Evidence: `tools/dump-save-menu.ts`, "a drawn playthrough is no
