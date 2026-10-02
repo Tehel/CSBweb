@@ -432,13 +432,23 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      panel, and a draw not scrolling back; the track and the slider taking no click; a
      key bringing the list back; a list that fits having the whole track for a
      slider); the golden frame shows that last case.
-4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it. Until
-   then a `.dat` on disk has no way into the page, the committed saves included: the
-   store's rows are the only saves it loads. With it, no stored save holds playthrough
-   0 ("A playthrough"): the import stamps an id into a file that holds none, the
-   store's version-3 upgrade stamps the rows it already holds, and the load's rule
-   (2a) is deleted. The stamp has a tool of its own: the stamped file differs from the
-   original in `GAMEBLOCK1` alone, and reads back with the id.
+4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it, one
+   commit each. Until the import a `.dat` on disk has no way into the page, the
+   committed saves included: the store's rows are the only saves it loads.
+   - a. ⏳ **No stored save holds playthrough 0** ("A playthrough"). The stamp: an id
+     written into a file that holds none, `GAMEBLOCK1`'s `RandomGameID` and nothing
+     else, with a tool of its own (the stamped file differs from the original in
+     `GAMEBLOCK1` alone, and reads back with the id). The store's version-3 upgrade
+     stamps the rows it already holds. The load's rule (2a) is deleted, with
+     `OpenedSave.joins` and `quickSlot`'s refusal of playthrough 0. It comes first
+     because, until it, a game loaded from a row that holds 0 runs under an id its row
+     does not have, so the saves made from it are listed under another heading than
+     the save it was loaded from.
+   - b. ⏳ **EXPORT**: the selected save's bare `.dat`, downloaded.
+   - c. ⏳ **A dungeon's signature, and the catalogue** of the known dungeons', with the
+     tool that shows each committed save matching its own dungeon and no other.
+   - d. ⏳ **The import**: a `.dat` dropped on the canvas while the dialog is up,
+     checked against the dungeon, stamped when it holds no id, and stored.
 5. ✅ **No "GAME LOADED, READY TO PLAY."** Evidence: `tools/dump-bad-saved-game.ts`, "a
    save read" (the hand-off after a load is one fade and four VBLs on a cleared screen,
    and waits for no click), and the golden frame `tools/frames/12-game-loaded.png`: the
