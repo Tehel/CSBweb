@@ -306,7 +306,7 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   a load or a save is `_DoMenu`'s centred menu, alone on the cleared screen.
 - **A two-level list**: a heading for each playthrough, named by the champions of its
   newest save, and under it, folded or not, its saves, newest first, each with its day,
-  its time, its level and F5's mark. The playthroughs are in the order of their last
+  its time, its level and, on F5's, "QUICKSAVE". The playthroughs are in the order of their last
   use, a playthrough's being that of the save of its own last used
   (`playthroughsOf`, `src/data/saves/SaveStore.ts`). The dialog opens with the first
   unfolded, the last save used selected under it, and the others folded; a click on a
@@ -394,7 +394,7 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      frame); the golden frame `tools/frames/06-savemenu.png`.
    - b. ✅ **The two-level list**: a heading row for each playthrough over its saves,
      folded or not (`layoutRows`, `src/renderer/ui/SaveMenu.ts`). A save's row gives up
-     the party, which is its heading's, for the time of day and F5's mark. Evidence:
+     the party, which is its heading's, for the time of day and F5's "QUICKSAVE". Evidence:
      `tools/dump-save-menu.ts`, "the list" (the playthroughs and their order, a
      heading's and a save's row) and "the two-level list" (three games' saves in one
      store: which heading is first and unfolded and which save selected; a click

@@ -510,20 +510,20 @@ function checkListLogic(): void {
   check(formatSaveTime(night) === '03:07' && formatSaveTime(Number.NaN) === '??:??',
     'the time is HH:MM with both fields padded, and an unreadable one is not "Invalid Date"');
 
-  // A save's row is its own alone: the day, the time, the level and F5's mark. The party
+  // A save's row is its own alone: the day, the time, the level and F5's word. The party
   // is its heading's.
   const max = SaveMenu.SAVE_MENU_GEOMETRY.textMaxChars;
   const afternoon = new Date(2026, 8, 13, 14, 5).getTime();
   const rows: Array<[SaveEntry, string]> = [
     [entry({ savedAt: afternoon, level: 14, champions: ['DAROO', 'SONJA', 'LEYLA', 'ESMARDA'] }), '  2026-09-13 14:05 L14'],
-    [entry({ savedAt: afternoon, level: 5, quick: true, champions: ['HALK'] }), '  2026-09-13 14:05 L5 F5'],
+    [entry({ savedAt: afternoon, level: 14, quick: true, champions: ['HALK'] }), '  2026-09-13 14:05 L14 QUICKSAVE'],
   ];
   console.log('');
   console.log(['row', 'chars'].join('\t'));
   for (const [row, expected] of rows) {
     const text = formatSaveRow(row);
     console.log([JSON.stringify(text), text.length].join('\t'));
-    check(text === expected && text.length <= max, `a save's row is "${expected}": the day, the time, the level, and F5 on a quick-save`);
+    check(text === expected && text.length <= max, `a save's row is "${expected}": the day, the time, the level, and QUICKSAVE on F5's`);
   }
 
   // A heading is its playthrough's party, the champions of its newest save.
@@ -1854,7 +1854,7 @@ async function checkTwoLevels(graphics: GraphicsLoader): Promise<void> {
     check(headings(state) === 'WUUF unfolded, DAROO unfolded, HALK' && state.selected === 3 && SaveMenu.selectedEntry(state) === null
       && daroo.rowOf(darooQuick.id) === 4 && daroo.rowOf(darooFirst.id) === 5,
       'a click on a folded heading selects it and lists its saves under it, newest first');
-    check(SaveMenu.rowText(state, state.rows[4]) === '  2026-09-13 14:09 L0 F5', 'F5\'s save is marked');
+    check(SaveMenu.rowText(state, state.rows[4]) === '  2026-09-13 14:09 L0 QUICKSAVE', 'F5\'s save is marked');
     daroo.clickRow(0);
     check(headings(state) === 'WUUF, DAROO unfolded, HALK' && state.selected === 0 && daroo.headingOf(idOf(daroo)) === 1,
       'a click on an unfolded one folds it, and the rows below move up');

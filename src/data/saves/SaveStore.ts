@@ -230,13 +230,13 @@ export function formatPlaythroughRow(playthrough: Playthrough, folded: boolean, 
 }
 
 /**
- * A save's row under its playthrough's heading: `  2026-09-13 14:05 L14 F5`, the day
- * and the time it was saved, the level, and `F5` on a quick-save. The party is the
+ * A save's row under its playthrough's heading: `  2026-09-13 14:05 L14 QUICKSAVE`, the
+ * day and the time it was saved, the level, and `QUICKSAVE` on F5's. The party is the
  * heading's.
  */
 export function formatSaveRow(entry: SaveEntry, maxChars = 33): string {
     const level = `L${Math.max(0, entry.level | 0)}`;
-    const row = `  ${formatSaveDate(entry.savedAt)} ${formatSaveTime(entry.savedAt)} ${level}${entry.quick ? ' F5' : ''}`;
+    const row = `  ${formatSaveDate(entry.savedAt)} ${formatSaveTime(entry.savedAt)} ${level}${entry.quick ? ' QUICKSAVE' : ''}`;
     return row.length > maxChars ? row.slice(0, maxChars) : row;
 }
 
