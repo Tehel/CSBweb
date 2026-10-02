@@ -19,11 +19,13 @@
  * This module is the two ends of that: it builds the `IntroHost` the screens draw through —
  * the screen buffer, the colour registers, the VBL clock, the sound and the input queue —
  * and it runs `displayChaosStrikesBack` then `showPrisonDoor`. The screens themselves are
- * `TitleSequence.ts` and `PrisonDoor.ts`.
+ * `TitleSequence.ts` and `PrisonDoor.ts`. Before them, as an extra, the Atari ST disk's FTL
+ * logo (`Swoosh.ts`), which is not CSBWin's.
  *
  * The launcher menu is deliberately absent. CSBWin needs it because one binary runs the
  * dungeon, the utility and the hint oracle; this one runs the dungeon.
  */
+import type { Swoosh } from '../../data/SwooshLoader';
 import type { SavedGameRead } from '../../engine/GameSaves';
 import type { GameScreen } from '../GameScreen';
 import { decodeCursorBitmap, type UIButton } from '../../data/tables/UITables';
@@ -31,6 +33,7 @@ import { MENU_PRESS_PHASE_MS, menuButtonRect, menuHitTest } from '../ui/Menu';
 import { fadeToPalette, PALETTE_11914, withCursor, type IntroEvent, type IntroHost } from './IntroHost';
 import { MISSING_PRISON_DOOR_BUTTONS, showPrisonDoor, type PrisonDoorChoice } from './PrisonDoor';
 import { showCredits, type ShowCreditsHooks } from './ShowCredits';
+import { showSwoosh } from './Swoosh';
 import { displayChaosStrikesBack } from './TitleSequence';
 
 /** 60 Hz. `wvbl()` is one of these; `VBLDelay(n)` is n. */
@@ -52,7 +55,12 @@ export interface BootSequenceDeps {
    * `tag01efee`; a file that will not open throws `Die` (`:1480-1486`).
    */
   readNewGame: () => Promise<boolean>;
-  /** Skip the title animation and the entrance and boot straight into the dungeon. */
+  /**
+   * The FTL logo to show before the title, with its sound: the extra, when it is on and
+   * `swoosh.img` is served. Absent, the boot is CSBWin's.
+   */
+  swoosh?: { image: Swoosh; startSound: () => void } | null;
+  /** Skip the logo, the title animation and the entrance and boot straight into the dungeon. */
   skip: boolean;
 }
 
@@ -489,6 +497,8 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
   let read: PrisonDoorChoice | null = null;
   const readGame = readEntireGame(host, deps, false);
   try {
+    // The disk's boot, not the game program's: once, and not again after `BadSavedGame`.
+    if (deps.swoosh) await showSwoosh(host, deps.swoosh.image, deps.swoosh.startSound);
     for (;;) {
       try {
         await displayChaosStrikesBack(host);

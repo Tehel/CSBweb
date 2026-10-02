@@ -151,7 +151,10 @@ export function createIndexedBitmap(width: number, height: number): IndexedBitma
  * set the target and call it twice, and the ones that want "just delay"
  * (`doc/CSBwin-src/CSBCode.cpp:9342`) pass a palette that is already current.
  */
-export async function fadeToPalette(host: IntroHost, target: readonly number[]): Promise<void> {
+export async function fadeToPalette(
+  host: Pick<IntroHost, 'globalPalette' | 'vbl' | 'present'>,
+  target: readonly number[],
+): Promise<void> {
   const palette = host.globalPalette;
   for (let step = 0; step < 8; step++) {
     await host.vbl(1);

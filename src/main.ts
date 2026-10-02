@@ -14,6 +14,7 @@ import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
 import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
+import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import { loadGlfx } from './lib/glfx-loader';
 import { GameScreen } from './renderer/GameScreen';
 import { bindDataSetChooser, bindSaveDrop, bindUIContext, drawMapPreview, handleCursorFilter } from './ui';
@@ -23,7 +24,7 @@ import { Die, runBootSequence, runShowCredits } from './renderer/intro/BootSeque
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
-import { loadUISettings } from './ui/settings';
+import { loadUISettings, type UISettings } from './ui/settings';
 
 console.log('Dungeon Master Web - Initializing...');
 
@@ -232,6 +233,35 @@ function createSoundManager(graphicsLoader: GraphicsLoader, tables: GameTables):
     return sound;
 }
 
+/** The Atari ST disk's FTL logo and the recording of its sound, which every data set shares. */
+const SWOOSH_DIR = '/gamefiles/swoosh';
+const SWOOSH_RECORDING = 'swoosh';
+
+/**
+ * The FTL logo for the boot, read from `swoosh.img` as any game file is, or `null`
+ * without it: the logo is an extra (`DEBT.md` X), so the boot shows none with the setting
+ * off, and none where the file is not served. Its sound is `swoosh.wav`; the logo is shown
+ * silent without that file.
+ */
+async function loadSwooshFiles(sound: SoundManager, settings: UISettings): Promise<{ image: Swoosh; startSound: () => void } | null> {
+    if (!settings.extras) return null;
+    const fetchFile = async (name: string): Promise<ArrayBuffer | null> => {
+        const response = await fetch(`${SWOOSH_DIR}/${name}`).catch(() => null);
+        return response?.ok ? response.arrayBuffer() : null;
+    };
+    const [img, wav] = await Promise.all([fetchFile('swoosh.img'), fetchFile('swoosh.wav')]);
+    if (!img) return null;
+    let image: Swoosh;
+    try {
+        image = loadSwoosh(new Uint8Array(img));
+    } catch (error) {
+        console.warn('No FTL logo:', error);
+        return null;
+    }
+    if (wav) await sound.loadRecording(SWOOSH_RECORDING, wav).catch(() => console.warn('No swoosh: swoosh.wav is not a sound'));
+    return { image, startSound: () => sound.playRecording(SWOOSH_RECORDING) };
+}
+
 /**
  * The engine and the screen, each handed what it asks of the other: the engine its
  * `GameHost`, the screen its `GameScreenHooks`. Both are handed the one message area,
@@ -398,17 +428,21 @@ async function createCrt(): Promise<void> {
  * `?intro=0` skips it, and so does Debug: that mode quick-loads straight into a
  * saved game, where an entrance screen would only be in the way. The golden-frame
  * probe passes the query parameter.
+ *
+ * With the extras on, the FTL logo comes first (`loadSwooshFiles`).
  */
 async function runIntro(game: Game, screen: GameScreen, saves: GameSaves, sound: SoundManager): Promise<PrisonDoorChoice> {
+    const settings = loadUISettings();
     const skipIntro =
         new URLSearchParams(window.location.search).get('intro') === '0'
-        || loadUISettings().debug;
+        || settings.debug;
     return runBootSequence({
         canvas: gameCanvasEl,
         gameScreen: screen,
         playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
         consumeSavedGameRead: () => saves.consumeSavedGameRead(),
         readNewGame: () => readNewGame(game, saves),
+        swoosh: skipIntro ? null : await loadSwooshFiles(sound, settings),
         skip: skipIntro,
     });
 }
@@ -491,9 +525,13 @@ async function init() {
         game = built.game;
         screen = built.screen;
         await createCrt();
-        // The saved effect before the intro, which is drawn through it; `wire` applies
-        // the rest of the settings once the intro is over.
-        setCrtEnabled(loadUISettings().crt);
+        // The saved effect and sound before the intro, which is drawn through one and
+        // heard through the other; `wire` applies the rest of the settings once the
+        // intro is over.
+        const settings = loadUISettings();
+        setCrtEnabled(settings.crt);
+        sound.setEnabled(settings.soundEnabled);
+        sound.setVolume(settings.soundVolume);
         console.log('✓ Game engine and screen constructed');
         // Dev-only debug handle. `tools/probe-ui.mjs` drives the live app through this
         // over CDP — see the `probe-app` skill. Module scope is invisible to the

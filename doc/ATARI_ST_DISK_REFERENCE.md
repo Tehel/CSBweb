@@ -76,7 +76,6 @@ Position-independent 68000 code with its data, 3016 (`$0bc8`) bytes:
 | `$0258` | 2306 | The compressed picture, to `$0b59` |
 | `$0b5a` | 56 | The `Dosound` data |
 | `$0b92` | 54 | The palette script, to `$0bc7` |
-| `$0bc8` | 128 | Past the end of the file: two mask tables the code builds at run time |
 
 ### The picture
 
@@ -90,8 +89,11 @@ plus 32000. The routine has a line stride in `d7` (160) and logic to step `a3` a
 time (`$0164`–`$016e`), but with `a3` at the end of the screen that branch is never taken:
 the whole screen is one stream of groups. The first group is cleared. `d0`, the bit
 position in the current group, starts at 15 (the leftmost pixel). Two tables of 16 longs
-are built at `$0bc8` (`a4`) and `$0c08` (`a5`); each long holds the same mask in both of
-its words:
+are built at run time (`$00b0`–`$00c6`), at `a4` and at `a5`, 64 bytes on; each long holds
+the same mask in both of its words. `lea $0bc8(pc),a6` (`$009e`) points just past the end
+of the file, but `movea.w a6,a4` and `movea.w a6,a5` (`$00a2`, `$00a4`) keep only the low
+word of that address, sign-extended: with the file loaded at `$40000`, the tables are at
+the absolute addresses `$0bc8` and `$0c08`, in low memory, not after the file.
 
 - `a4[i]` = `(1 << (i+1)) - 1`, bits `i`..0: from bit `i` to the group's right edge.
 - `a5[i]` = `(0xffff << (i+1)) & 0xffff`, bits 15..`i+1`: everything left of bit `i`.
@@ -209,6 +211,28 @@ The reveal takes 0.56 s, and the sound starts with it, as `$0002` calls `Dosound
 before the script. After the glint the logo stays up until the title's dark blue comes in
 at 20.80 s, with two grey screens in between (17.60–18.28 s and 19.56–20.52 s). What causes
 them is not established, so the recording does not give a hold time the port could copy.
+
+### The logo in the port
+
+An extra (`DEBT.md` X): with `UISettings.extras` on, the page's Extras button, the boot
+shows the logo before the title animation, and with it off the boot is CSBWin's.
+
+- `main.ts` fetches `/gamefiles/swoosh/swoosh.img` and `swoosh.wav` as it does a game's
+  files. Without the first there is no logo; without the second it is silent.
+- `loadSwoosh` (`src/data/SwooshLoader.ts`) reads the picture, the colour patterns and the
+  palette script from the file. Only the decoder is code of the port's, a transcription of
+  `$0070`–`$01d4`.
+- `showSwoosh` (`src/renderer/intro/Swoosh.ts`) is the script's interpreter, on the intro
+  host: black registers, the picture, the sound, then each word a `Setcolor` or a wait, at
+  the host's 60 Hz. `runBootSequence` calls it once, before `displayChaosStrikesBack`.
+- **The hold is the author's choice**, as nothing above gives one: 60 VBLs
+  (`SWOOSH_HOLD_VBLS`), then a `fadeToPalette` to black and a cleared screen, which the
+  title's own first fade starts from.
+- The sound is `SoundManager.playRecording`. A browser that still holds the page's audio
+  until a first click gives a silent logo: the recording is not kept for later.
+
+`tools/dump-swoosh.ts` checks the decode (2306 bytes read, 64000 pixels, the code counts
+above, and `swoosh-index.png` pixel for pixel) and the script's timing on a headless host.
 
 ## The 1.2 data files against CSBWin's
 

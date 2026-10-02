@@ -16,6 +16,7 @@ export class SoundManager {
   private enabled = true;
   private volume = 0.8;
   private soundCatalog: Record<number, SoundInfo> = buildSoundCatalog();
+  private recordings = new Map<string, AudioBuffer>();
 
   constructor(private graphics: GraphicsLoader) {
     const hasAudio = typeof globalThis !== 'undefined' && 'AudioContext' in globalThis;
@@ -126,6 +127,30 @@ export class SoundManager {
     gain.gain.value = highVolume === 0 ? 1 / 18 : 1;
     source.connect(gain);
     gain.connect(this.gainNode);
+    source.start();
+  }
+
+  /**
+   * A sound that is no `graphics.dat` sample but a recording, an audio file's bytes: the
+   * FTL logo's swoosh, which the Atari played on its sound chip
+   * (`doc/ATARI_ST_DISK_REFERENCE.md` → "The sound as PCM, and a recording of the logo").
+   */
+  async loadRecording(name: string, file: ArrayBuffer): Promise<void> {
+    if (!this.audioContext) return;
+    this.recordings.set(name, await this.audioContext.decodeAudioData(file));
+  }
+
+  /**
+   * Play a recording now, or not at all: a context the browser still holds suspended
+   * would keep the sound until the first click resumed it, and play it then.
+   */
+  playRecording(name: string): void {
+    const buffer = this.recordings.get(name);
+    if (!this.audioContext || !this.gainNode || !this.enabled || !buffer) return;
+    if (this.audioContext.state !== 'running') return;
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.gainNode);
     source.start();
   }
 

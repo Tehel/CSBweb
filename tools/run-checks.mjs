@@ -213,6 +213,10 @@ const CHECKS = [
   // graphics.dat forces, the synthetic 5x5 level behind the doors, the 31-frame slide and
   // ShrinkBLT's fixed point are all invisible to them.
   { tool: 'dump-intro.ts' },
+  // The FTL logo before the title, an extra: `swoosh.img`'s picture decoded (2306 bytes
+  // for 64000 pixels, and a reference picture pixel for pixel) and its palette script run
+  // on a headless host, each colour at its VBL.
+  { tool: 'dump-swoosh.ts' },
   // `ExpandGraphic`, the codec every picture in the game goes through, against a real
   // CSBWin screen capture plus a hand-built stream per opcode. Three opcodes were wrong
   // and only one image in the data used them, so nothing else could have caught it.

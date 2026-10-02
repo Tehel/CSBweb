@@ -1,5 +1,5 @@
 import { GameInput } from '../renderer/GameInput';
-import { getUIContext, isDebugFeaturesEnabled, setDebugFeaturesEnabled } from './context';
+import { getUIContext, isDebugFeaturesEnabled, isExtrasEnabled, setDebugFeaturesEnabled, setExtrasEnabled } from './context';
 import { handleMapCanvasClick } from './mapPreview';
 import { updateChampionPanel } from './championPanel';
 import { applyUISettings, loadUISettings, readUISettings, saveUISettings } from './settings';
@@ -15,6 +15,7 @@ const smoothButton = document.getElementById('btn-smooth') as HTMLButtonElement 
 const crtButton = document.getElementById('btn-crt') as HTMLButtonElement | null;
 const soundButton = document.getElementById('btn-sound') as HTMLButtonElement | null;
 const soundVolume = document.getElementById('sound-volume') as HTMLInputElement | null;
+const extrasButton = document.getElementById('btn-extras') as HTMLButtonElement | null;
 const dmRulesButton = document.getElementById('btn-dm-rules') as HTMLButtonElement | null;
 
 function bindCanvasEvents(canvas: HTMLCanvasElement | null, input: GameInput): void {
@@ -96,6 +97,15 @@ export function bindUIEvents(): void {
             setDebugFeaturesEnabled(next);
             debugButton.classList.toggle('is-pressed', next);
             console.info(next ? 'Debug features enabled' : 'Debug features disabled');
+            saveUISettings(readUISettings());
+        });
+
+        // The one extra so far is the FTL logo, which the boot shows: the next load has it.
+        extrasButton?.addEventListener('click', () => {
+            const next = !isExtrasEnabled();
+            setExtrasEnabled(next);
+            extrasButton.classList.toggle('is-pressed', next);
+            console.info(next ? 'Extras enabled' : 'Extras disabled');
             saveUISettings(readUISettings());
         });
 

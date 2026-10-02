@@ -122,7 +122,7 @@ core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             (LZW/RLE/SND), imageDecoder (IMG1/IMG2), types (incl. withObjectPosition =
             RN::pos), intCast (sw, div, ApplyLimits), objectNameIndex (OBJNI_* constants)
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor,
-            HintOracleLoader (CSB's `hcsb.hct`)
+            HintOracleLoader (CSB's `hcsb.hct`), SwooshLoader (the Atari disk's `swoosh.img`)
   saves/    The saves behind the disk icon: SaveStore (a save's row, the CSBWin file
             beside what a list needs), BrowserSaveStore (IndexedDB, the one store),
             legacyRows (the store's upgrade from its first version), downloadSaveFile
@@ -158,7 +158,8 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
   intro/    Everything before the party is in the dungeon: the title animation, the
             dungeon entrance, the door animation, the credits scroll. And the end of
             the game (`ShowCredits`), on the same host. See
-            doc/CSBWIN_TITLE_SCREEN_REFERENCE.md.
+            doc/CSBWIN_TITLE_SCREEN_REFERENCE.md. Before the title, as an extra, the
+            Atari disk's FTL logo (`Swoosh`, doc/ATARI_ST_DISK_REFERENCE.md).
   ui/       The DM interface, one module per CSBWin file — Mouse, Inventory, Character,
             MagicPanel, Feeding, Objects, Draw, HitTest, ViewportPicking, all over
             a shared UIState. See doc/UI_MODULE_MAP.md.

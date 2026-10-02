@@ -1,4 +1,4 @@
-import { getUIContext, isDebugFeaturesEnabled, setDebugFeaturesEnabled } from './context';
+import { getUIContext, isDebugFeaturesEnabled, isExtrasEnabled, setDebugFeaturesEnabled, setExtrasEnabled } from './context';
 import { isChampionPanelVisible, updateChampionPanel } from './championPanel';
 
 const UI_SETTINGS_KEY = 'dmweb_ui_settings_v1';
@@ -11,6 +11,8 @@ export interface UISettings {
     crt: boolean;
     soundEnabled: boolean;
     soundVolume: number;
+    /** The extras (`DEBT.md` X): with it off, the game is CSBWin's. */
+    extras: boolean;
 }
 
 export function loadUISettings(): UISettings {
@@ -26,6 +28,7 @@ export function loadUISettings(): UISettings {
             crt: parsed.crt ?? false,
             soundEnabled: parsed.soundEnabled ?? true,
             soundVolume: parsed.soundVolume ?? 0.8,
+            extras: parsed.extras ?? false,
         };
     } catch {
         return defaultUISettings();
@@ -48,6 +51,7 @@ export function readUISettings(): UISettings {
         crt: getUIContext()?.isCrtEnabled() ?? false,
         soundEnabled: getUIContext()?.isSoundEnabled() ?? true,
         soundVolume: getUIContext()?.getSoundVolume() ?? 0.8,
+        extras: isExtrasEnabled(),
     };
 }
 
@@ -62,12 +66,15 @@ export function applyUISettings(settings: UISettings): void {
     const crtButton = document.getElementById('btn-crt') as HTMLButtonElement | null;
     const soundButton = document.getElementById('btn-sound') as HTMLButtonElement | null;
     const soundVolume = document.getElementById('sound-volume') as HTMLInputElement | null;
+    const extrasButton = document.getElementById('btn-extras') as HTMLButtonElement | null;
 
     mapEl && (mapEl.style.display = settings.mapVisible ? 'block' : 'none');
     championsEl && (championsEl.style.display = settings.championsVisible ? 'block' : 'none');
 
     setDebugFeaturesEnabled(settings.debug);
     debugButton?.classList.toggle('is-pressed', settings.debug);
+    setExtrasEnabled(settings.extras);
+    extrasButton?.classList.toggle('is-pressed', settings.extras);
     mapButton?.classList.toggle('is-pressed', settings.mapVisible);
     championsButton?.classList.toggle('is-pressed', settings.championsVisible);
     updateChampionPanel();
@@ -95,5 +102,6 @@ function defaultUISettings(): UISettings {
         crt: false,
         soundEnabled: true,
         soundVolume: 0.8,
+        extras: false,
     };
 }

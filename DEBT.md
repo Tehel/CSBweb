@@ -107,7 +107,6 @@ In payoff order: the first row is the next item.
 | X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
 | X5 | Extra: 3D2D1D's vertical moves and gravity | L | ⏸️ |
 | X6 | Extra: the Hint Oracle's hints in the game, as the party moves | M | ⏸️ |
-| X7 | Extra: the FTL logo before the title | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G1 are the active list. `F3` is a phase, whose status is
@@ -471,9 +470,10 @@ taken only when the author names one.
 
 Rules for all of them:
 
-- **One setting, off by default**, a `UISettings` flag (`src/ui/settings.ts`) that the
-  first extra paid adds and the others share. With it off, the game is CSBWin's: every
-  tool's output and every golden frame stay the same. The coloured object cursor is the
+- **One setting, off by default**: `UISettings.extras` (`src/ui/settings.ts`), the page's
+  Extras button, which they all share. With it off, the game is CSBWin's: every
+  tool's output and every golden frame stay the same. The FTL logo before the title
+  (`src/renderer/intro/Swoosh.ts`) is behind it. The coloured object cursor is the
   exception: the author wants it on by default, so it is recorded under H.
 - **None of them is saved.** What an extra keeps in memory is lost on a save and a load,
   in the port's runtime save as in a CSBWin file, and that is acceptable: no save format
@@ -621,28 +621,6 @@ A `tools/` check with the setting on: walk a CSB party onto a square with hints 
 and down a pit, and check what the extra offers after each move.
 
 ---
-
-### X7 ⏸️ The FTL logo before the title
-
-The Atari ST disk booted into `SWOOSH.IMG`, which drew the FTL logo with a palette reveal
-and a noise "swoosh" before the game's own title animation. CSBWin never had it: it lives
-in the boot chain, not in the game program. Everything about it is in
-`doc/ATARI_ST_DISK_REFERENCE.md` → "`SWOOSH.IMG`", and `static/gamefiles/swoosh/`, which
-every version shares, holds the file and a recording of its sound.
-
-To do:
-
-- Read `swoosh.img` and decode its picture: a transcription of `swoosh.img:$0070`–`$01d4`
-  (the RLE codes, the run masks, the copy from the line above), with a `tools/` check that
-  it consumes exactly 2306 bytes and ends on the 64000th pixel.
-- Run its palette script from `$0b92` on the intro host (`src/renderer/intro/IntroHost.ts`),
-  30 VBLs, before `TitleSequence`, starting the sound at VBL 0.
-- The sound: `swoosh.wav`, a recording of the real one, through `SoundManager`.
-- **The hold after VBL 30 is the author's arbitrary choice**, since neither the disk nor
-  the recording gives one. The code marks it as such. Initial value will be to stay still 1s
-  after the end of the animation, then quickly fade to black and start the title animation.
-- Behind the extras' setting, off by default, so the boot and the golden frames are
-  unchanged with it off.
 
 ## H — Deliberate divergences (not debt)
 
