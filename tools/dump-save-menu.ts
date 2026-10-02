@@ -19,7 +19,7 @@
  * 3. **`SplitLongLine`**, which has an edge case CSBWin does not guard (no space at or
  *    after the midpoint) and which this port reproduces rather than fixes.
  * 4. **The list logic** — ordering, the playthroughs the saves are listed under, the
- *    date format, what fits in 33 characters, when LOAD is inert. None of it is on
+ *    date format, what fits in 32 characters, when LOAD is inert. None of it is on
  *    screen until there are saves to list.
  * 5. **The metadata path.** A row's playthrough, level and roster come from blocks 1, 2
  *    and 4 of the CSBWin file a save is, the port's or a genuine one. Asserted against
@@ -64,10 +64,10 @@
  *    lines are drawn for real and the panel read back: which rows hold ink, that none
  *    leaves the panel's interior, that a heading shows its last save used and "NEW
  *    SAVE" nothing, and that the dialog's message takes the panel's last lines.
- * 15. **The scrolling.** A list longer than the panel: the marks on its first and last
- *    rows shown where rows lie beyond them, a click on one scrolling by a page less a
- *    row, the wheel by a row, and neither moving the selection, which a key brings the
- *    list back to.
+ * 15. **The scrolling.** A list longer than the panel, and its scrollbar read back from
+ *    the screen: the slider's place and height, the dither of the track around it, the
+ *    two arrows. A click on an arrow and a notch of the wheel scroll a row, neither
+ *    moving the selection, which a key brings the list back to.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -374,7 +374,11 @@ function checkLayout(graphics: GraphicsLoader): void {
   ui.screenIndexBuffer!.pixels.fill(7);
   SaveMenu.drawDialog(ui);
   console.log(`  list panel ${size(g.listPanel)} at (${g.listPanel.x1},${g.listPanel.y1}), preview panel ${size(g.previewPanel)} at (${g.previewPanel.x1},${g.previewPanel.y1})`);
-  check(size(g.listPanel).startsWith(`${g.panelPiece.x2 - g.panelPiece.x1 + 1}x`), 'the list\'s panel is as wide as graphic 0\'s own');
+  const bar = g.scrollbar;
+  console.log(`  scrollbar ${size(bar)} at (${bar.x1},${bar.y1}), its arrows' boxes ${g.arrowBox} rows each`);
+  check(bar.x2 === g.listPanel.x2 - 1 && bar.y1 === g.listPanel.y1 + 2 && bar.y2 === g.listPanel.y2 - 1,
+    'the scrollbar stands against the right edge of the list\'s panel, over the whole height of its interior');
+  check(g.listInnerX2 === bar.x1 - 1 && g.arrowBox === bar.x2 - bar.x1 + 1, 'the rows reach as far as it, and an arrow\'s box is as tall as it is wide');
 
   // Graphic 0's own margins: ten pixels of frame, ten rows from a panel to the buttons,
   // nine columns between two frames.
@@ -406,14 +410,14 @@ function checkLayout(graphics: GraphicsLoader): void {
   const below = g.listPanel.y2 - 1 - (g.rowFirstY + (g.rows - 1) * g.rowStep + 2);
   console.log(`  ${g.rows} rows of ${g.rowStep}: ${above} pixels of panel above the first, ${below} below the last`);
   check(above === 2 && below === above, 'the rows fill the panel, the same two pixels of it above the first and below the last');
-  check(pixelAt(ui, g.listInnerX1 - 1, g.rowFirstY) !== MENU_PANEL_COLOR && pixelAt(ui, g.listInnerX2 + 1, g.rowFirstY) !== MENU_PANEL_COLOR,
-    'and the highlight runs from one edge of the panel to the other');
+  check(pixelAt(ui, g.listInnerX1 - 1, g.rowFirstY) !== MENU_PANEL_COLOR && pixelAt(ui, g.listPanel.x2, g.rowFirstY) !== MENU_PANEL_COLOR
+    && countNot(ui, bar.x1, bar.x2, bar.y1, bar.y2, MENU_PANEL_COLOR) === 0,
+    'the highlight runs from the panel\'s left edge, and the scrollbar stands on clean panel as far as its right one');
 
-  // A row is 33 characters of a six-pixel cell; it has to stop at the panel's inner right
-  // edge, not run into the border.
+  // A row is 32 characters of a six-pixel cell; it has to stop short of the scrollbar.
   const rowRight = g.textX + g.textMaxChars * 6 - 1;
-  console.log(`  a full row runs x ${g.textX}..${rowRight}, the panel's interior ends at ${g.listInnerX2}`);
-  check(rowRight <= g.listInnerX2, `a full-width row fits inside the panel (${rowRight} <= ${g.listInnerX2})`);
+  console.log(`  a full row runs x ${g.textX}..${rowRight}, the rows' interior ends at ${g.listInnerX2}`);
+  check(rowRight <= g.listInnerX2, `a full-width row stops short of the scrollbar (${rowRight} <= ${g.listInnerX2})`);
 
   const previewDirty = countNot(ui, g.previewPanel.x1 + 2, g.previewPanel.x2 - 1, g.previewPanel.y1 + 2, g.previewPanel.y2 - 1, MENU_PANEL_COLOR);
   check(previewDirty === 0, `the preview's panel is clean inside its edges (${previewDirty} stray pixels)`);
@@ -539,7 +543,8 @@ function checkListLogic(): void {
   }
   check(heading(['DAROO', 'SONJA', 'LEYLA', 'ESMARDA'], true) === '+ DAROO SONJA LEYLA ESMARDA' && heading(['Halk '], false) === '- HALK',
     'a heading is "+" folded and "-" unfolded, then the champions\' names in full');
-  check(longest.length === max && longest.endsWith('ABCDEFG'), `four names of seven characters are the row's ${max}`);
+  check(longest.length === max && longest.endsWith('ABCDEF'), `four names of seven characters are one more than the row's ${max}, and the last loses a letter`);
+  check(heading(['GOTHMOG', 'HISSSSA', 'LINFLAS', 'DAROOU'], true).endsWith('DAROOU'), 'three of seven and one of six, the longest party of the Hall\'s own names, fit');
   check(heading([], true) === '+ ', 'and an empty party leaves the mark alone');
 
   // The preview: a line of its panel each.
@@ -563,8 +568,8 @@ function checkListLogic(): void {
     'a smaller party leaves its lines empty, so the rest stands where it does for four');
   check(full.length <= SaveMenu.SAVE_MENU_ROWS && full.every((line) => line.length <= wide),
     `it is no more lines than the list has rows, none longer than the panel's ${wide} characters`);
-  check(formatSavePreview(entry({ playTime: hours(99_999, 59, 59) }))[8].length === wide,
-    'a play time under a hundred thousand hours fits');
+  check(formatSavePreview(entry({ playTime: hours(9_999, 59, 59) }))[8].length === wide,
+    'a play time under ten thousand hours fits');
 
   // A message is wrapped at the preview's width.
   const wraps: Array<[string, string]> = [
@@ -572,7 +577,7 @@ function checkListLogic(): void {
     ['WORKING...', 'WORKING...'],
     ['UNABLE TO SAVE GAME!', 'UNABLE TO|SAVE GAME!'],
     ['THE SAVE FILE DOES NOT READ BACK', 'THE SAVE|FILE DOES|NOT READ|BACK'],
-    ['QUOTAEXCEEDEDERROR: FULL', 'QUOTAEXCEED|EDERROR:|FULL'],
+    ['QUOTAEXCEEDEDERROR: FULL', 'QUOTAEXCEE|DEDERROR:|FULL'],
     ['  TWO  SPACES ', 'TWO SPACES'],
     ['', ''],
   ];
@@ -2099,7 +2104,7 @@ async function checkPreview(graphics: GraphicsLoader): Promise<void> {
 
 /**
  * One playthrough of twenty saves, twenty-one rows under its heading for a panel of
- * fourteen: the marks, the clicks on them, the wheel and the keys.
+ * fifteen: the scrollbar as it is drawn, the clicks on its arrows, the wheel and the keys.
  */
 async function checkScrolling(graphics: GraphicsLoader): Promise<void> {
   console.log('');
@@ -2108,20 +2113,57 @@ async function checkScrolling(graphics: GraphicsLoader): Promise<void> {
   const rig = await menuRig(graphics, store, 'DAROO');
   const { ui } = rig;
   const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  const bar = g.scrollbar;
   const last = g.rows - 1;
-  const baseline = (row: number): number => g.rowFirstY + row * g.rowStep;
-  /** The pixels of a shown row's last character that are not its background's colour. */
-  const markInk = (row: number): number => {
-    SaveMenu.drawSaveMenu(ui);
-    return countNot(ui, g.markX, g.markX + 4, baseline(row) - 4, baseline(row) + 1, pixelAt(ui, g.markX + 5, baseline(row)));
+  /** The track: from the up arrow's inner outline to the down arrow's. */
+  const trackTop = bar.y1 + g.arrowBox - 1;
+  const trackBottom = bar.y2 - g.arrowBox + 1;
+  /** A row of the bar between its side outlines, as drawn: `outline`, `plain`, or `dither`. */
+  const rowKind = (y: number): string => {
+    let ink = 0;
+    for (let x = bar.x1 + 1; x < bar.x2; x++) if (pixelAt(ui, x, y) === MENU_OPTION_COLOR) ink++;
+    return ink === 0 ? 'plain' : ink === bar.x2 - bar.x1 - 1 ? 'outline' : 'dither';
   };
-  const marks = (): string => `${markInk(0) > 0 ? '^' : '.'}${markInk(last) > 0 ? 'V' : '.'}`;
-  const scrollButtons = (): string => SaveMenu.saveMenuButtons(ui.saveMenu!).map((b) => b.name ?? '').filter((name) => name.includes('scroll')).join();
-  const clickMark = (row: number): void => SaveMenu.saveMenuClick(ui, g.markX + 2, baseline(row), LEFT);
+  /** The slider as the pixels show it: the first and the last row of the track that are not dithered. */
+  const sliderDrawn = (): { y1: number; y2: number } => {
+    SaveMenu.drawSaveMenu(ui);
+    let y1 = trackTop;
+    while (y1 < trackBottom && rowKind(y1 + 1) === 'dither') y1++;
+    while (y1 < trackBottom && rowKind(y1) === 'dither') y1++;
+    let y2 = trackBottom;
+    while (y2 > y1 && rowKind(y2 - 1) === 'dither') y2--;
+    if (y2 < trackBottom) y2--;
+    return { y1, y2 };
+  };
+  const sliderText = (): string => {
+    const drawn = sliderDrawn();
+    return `slider ${drawn.y1}..${drawn.y2} of ${trackTop}..${trackBottom}`;
+  };
+  /** The pixels of the track, outside the slider, that a checkerboard of the two colours would not have. */
+  const ditherFaults = (): number => {
+    const slider = sliderDrawn();
+    let faults = 0;
+    for (let y = trackTop + 1; y < trackBottom; y++) {
+      if (y >= slider.y1 && y <= slider.y2) continue;
+      for (let x = bar.x1 + 1; x < bar.x2; x++) {
+        const here = pixelAt(ui, x, y);
+        if (here !== MENU_OPTION_COLOR && here !== MENU_PANEL_COLOR) faults++;
+        if (x + 1 < bar.x2 && pixelAt(ui, x + 1, y) === here) faults++;
+        if (y + 1 < trackBottom && (y + 1 < slider.y1 || y + 1 > slider.y2) && pixelAt(ui, x, y + 1) === here) faults++;
+      }
+    }
+    return faults;
+  };
+  const buttonOf = (name: string) => SaveMenu.saveMenuButtons(ui.saveMenu!).find((b) => b.name === name)!;
+  const clickArrow = (name: string): void => {
+    const b = buttonOf(name);
+    SaveMenu.saveMenuClick(ui, (b.x1 + b.x2) >> 1, (b.y1 + b.y2) >> 1, LEFT);
+  };
   const where = (): string => {
     const state = ui.saveMenu!;
-    return `rows ${state.scrollTop}..${state.scrollTop + last} of ${state.rows.length}, row ${state.selected} selected, marks ${marks()}`;
+    return `rows ${state.scrollTop}..${state.scrollTop + last} of ${state.rows.length}, row ${state.selected} selected, ${sliderText()}`;
   };
+  const same = (a: { y1: number; y2: number }, b: { y1: number; y2: number }): boolean => a.y1 === b.y1 && a.y2 === b.y2;
 
   const realNow = Date.now;
   let now = new Date(2026, 8, 13, 14, 5, 6).getTime();
@@ -2134,63 +2176,102 @@ async function checkScrolling(graphics: GraphicsLoader): Promise<void> {
     const state = await rig.open();
     const rows = state.rows.length;
     const maxTop = rows - g.rows;
+    const track = trackBottom - trackTop + 1;
     console.log(`  the menu opens: ${where()}`);
     check(rows === 21 && state.scrollTop === 0 && state.selected === 1, 'twenty saves under their heading are twenty-one rows, the newest selected');
-    check(marks() === '.V' && scrollButtons() === 'saveMenu.scrollDown',
-      'rows lie below the last one shown, which has the mark and its button; the first has neither');
-    const buttons = SaveMenu.saveMenuButtons(state);
-    const down = buttons.find((b) => b.name === 'saveMenu.scrollDown')!;
-    const lastRow = buttons.find((b) => b.name === `saveMenu.row${last}`)!;
-    check(down.x1 === g.markX && down.x2 === g.listInnerX2 + 1 && down.y1 === lastRow.y1 && down.y2 === lastRow.y2
-      && buttons.indexOf(down) < buttons.indexOf(lastRow),
-      'the mark\'s button is its row\'s last character, as far as the panel\'s edge, and comes before the row\'s');
 
-    // The wheel: a row at a time, and the selection may leave the panel.
+    // The bar as it is drawn.
+    const atTop = sliderDrawn();
+    const height = atTop.y2 - atTop.y1 + 1;
+    check(same(atTop, SaveMenu.scrollSlider(state)) && atTop.y1 === trackTop && rowKind(atTop.y1) === 'outline' && rowKind(atTop.y2) === 'outline'
+      && rowKind(atTop.y1 + 1) === 'plain' && rowKind(atTop.y2 - 1) === 'plain',
+      'at the first row the slider starts on the up arrow\'s outline: two outlines and plain panel between them');
+    check(height === Math.round((track * g.rows) / rows), `its height is to the track's as the rows shown are to the list's (${height} of ${track}, ${g.rows} of ${rows})`);
+    check(rowKind(atTop.y2 + 1) === 'dither' && rowKind(trackBottom - 1) === 'dither' && ditherFaults() === 0,
+      'and the track below it is dithered, a checkerboard of the outline\'s colour and the panel\'s');
+    let outline = 0;
+    for (let y = bar.y1; y <= bar.y2; y++) outline += (pixelAt(ui, bar.x1, y) === MENU_OPTION_COLOR ? 0 : 1) + (pixelAt(ui, bar.x2, y) === MENU_OPTION_COLOR ? 0 : 1);
+    for (const y of [bar.y1, trackTop, trackBottom, bar.y2]) if (rowKind(y) !== 'outline') outline++;
+    check(outline === 0, 'the bar and its two boxes are outlined');
+    const box = (top: number): string[] => Array.from({ length: g.arrowBox - 2 }, (_, dy) =>
+      Array.from({ length: g.arrowBox - 2 }, (_, dx) => (pixelAt(ui, bar.x1 + 1 + dx, top + 1 + dy) === MENU_OPTION_COLOR ? '#' : '.')).join(''));
+    const up = box(bar.y1);
+    const down = box(trackBottom);
+    console.log('  the arrows:');
+    for (let row = 0; row < up.length; row++) console.log(`    ${up[row]}  ${down[row]}`);
+    check(up.join('|') === [...down].reverse().join('|') && up.every((row) => row === [...row].reverse().join(''))
+      && up.join('').includes('#') && !up[0].includes('#') && !up[up.length - 1].includes('#') && up.every((row) => row[0] === '.' && row[row.length - 1] === '.'),
+      'the down arrow is the up arrow upside down, each the same from left and from right, and clear of its box');
+    const inkedRows = up.filter((row) => row.includes('#'));
+    check(inkedRows[0].split('#').length === 2 && inkedRows[inkedRows.length - 1].includes('###') && inkedRows.some((row) => row.includes('#.#')),
+      'the up arrow comes to a point at its top, is hollow, and stands on a stem');
+
+    // The buttons: the two arrows, and rows that stop short of the bar.
+    const upButton = buttonOf('saveMenu.scrollUp');
+    const downButton = buttonOf('saveMenu.scrollDown');
+    const firstRow = buttonOf('saveMenu.row0');
+    check(upButton.x1 === bar.x1 && upButton.x2 === bar.x2 + 1 && upButton.y1 === bar.y1 && upButton.y2 === trackTop + 1
+      && downButton.x1 === bar.x1 && downButton.x2 === bar.x2 + 1 && downButton.y1 === trackBottom && downButton.y2 === bar.y2 + 1,
+      'each arrow\'s button is its box');
+    check(firstRow.x2 === bar.x1, 'and a row\'s button ends where the bar begins');
+
+    // An arrow: a row a click, and the selection is left.
     const previewed = SaveMenu.loadTarget(state)?.id;
+    clickArrow('saveMenu.scrollDown');
+    const afterOne = sliderDrawn();
+    console.log(`  a click on the down arrow: ${where()}`);
+    check(state.scrollTop === 1 && state.selected === 1 && SaveMenu.loadTarget(state)?.id === previewed,
+      'a click on the down arrow scrolls a row, and leaves the selection and the preview');
+    check(same(afterOne, SaveMenu.scrollSlider(state)) && afterOne.y1 === trackTop + Math.round((track - height) / maxTop) && afterOne.y2 - afterOne.y1 + 1 === height
+      && rowKind(afterOne.y1 - 1) === 'dither' && ditherFaults() === 0,
+      'the slider moves down by its share of the track, the same height, and the track above it is dithered too');
+
+    // The wheel: a row a notch, and the selection may leave the panel.
     for (let n = 0; n < 3; n++) SaveMenu.saveMenuWheel(ui, 1);
     console.log(`  the wheel, three notches down: ${where()}`);
-    check(state.scrollTop === 3 && state.selected === 1 && SaveMenu.loadTarget(state)?.id === previewed,
-      'the wheel scrolls a row a notch and leaves the selection, which is out of the panel, and the preview');
-    check(marks() === '^V' && scrollButtons() === 'saveMenu.scrollUp,saveMenu.scrollDown' && state.scrollTop === 3,
-      'rows lie both ways, and both marks are up; drawing the list does not scroll it back');
+    check(state.scrollTop === 4 && state.selected === 1 && same(sliderDrawn(), SaveMenu.scrollSlider(state)) && state.scrollTop === 4,
+      'the wheel scrolls a row a notch; the selection is out of the panel, and drawing the list does not scroll it back');
 
-    // A click on a mark: a page less a row.
-    clickMark(last);
-    console.log(`  a click on the mark below: ${where()}`);
-    check(state.scrollTop === maxTop && state.selected === 1 && marks() === '^.' && scrollButtons() === 'saveMenu.scrollUp',
-      'a click on the mark below scrolls to the list\'s end, where no row lies below, and selects nothing');
-    clickMark(last);
-    check(state.selected === maxTop + last && state.scrollTop === maxTop, 'the same click with no mark up is the row\'s, and selects it');
-    clickMark(0);
-    console.log(`  a click on the mark above: ${where()}`);
-    check(state.scrollTop === 0 && state.selected === maxTop + last && marks() === '.V', 'a click on the mark above scrolls back to the first row');
-    check(g.pageRows === last && maxTop < g.pageRows, 'either way by a page less a row, which is more than this list has beyond its panel');
+    // The track and the slider take no click.
+    const slider = sliderDrawn();
+    SaveMenu.saveMenuClick(ui, bar.x1 + 5, slider.y1 - 3, LEFT);
+    SaveMenu.saveMenuClick(ui, bar.x1 + 5, slider.y1 + 3, LEFT);
+    SaveMenu.saveMenuClick(ui, bar.x1 + 5, slider.y2 + 3, LEFT);
+    check(state.scrollTop === 4 && state.selected === 1, 'a click on the track or on the slider does nothing: it neither scrolls nor selects a row');
+
+    // To the end, and no further.
+    for (let n = 0; n < 5; n++) clickArrow('saveMenu.scrollDown');
+    const atEnd = sliderDrawn();
+    console.log(`  the down arrow, five times more: ${where()}`);
+    check(state.scrollTop === maxTop && atEnd.y2 === trackBottom && atEnd.y2 - atEnd.y1 + 1 === height && rowKind(trackBottom - 1) === 'plain' && ditherFaults() === 0,
+      'the list stops at its last page, where the slider ends on the down arrow\'s outline');
+    clickArrow('saveMenu.scrollUp');
+    console.log(`  a click on the up arrow: ${where()}`);
+    check(state.scrollTop === maxTop - 1 && state.selected === 1, 'a click on the up arrow scrolls a row back');
 
     // A key moves the selection, and the list back to it.
-    SaveMenu.saveMenuKey(ui, 'ArrowUp');
-    console.log(`  the up arrow: ${where()}`);
-    check(state.selected === maxTop + last - 1 && state.scrollTop === state.selected - last, 'a move of the selection scrolls the list to it, by as little as shows it');
+    SaveMenu.saveMenuKey(ui, 'ArrowDown');
+    console.log(`  the down arrow key: ${where()}`);
+    check(state.selected === 2 && state.scrollTop === 2, 'a move of the selection scrolls the list to it, by as little as shows it');
+    SaveMenu.saveMenuKey(ui, 'End');
+    check(state.selected === rows - 1 && state.scrollTop === maxTop, 'End is the last row, and the last page');
 
-    // The mark on the selected row is in the highlight's colours.
+    // A list that fits has the whole track for a slider.
     SaveMenu.saveMenuKey(ui, 'Home');
-    SaveMenu.saveMenuWheel(ui, 1);
-    rig.clickRow(1);
-    console.log(`  the first row shown selected, one row down: ${where()}`);
-    check(state.scrollTop === 1 && state.selected === 1 && marks() === '^V', 'a selected row has its mark all the same');
-
-    // A list that fits has no mark.
-    SaveMenu.saveMenuWheel(ui, -1);
     rig.clickRow(0);
+    const whole = sliderDrawn();
     console.log(`  the heading folded: ${where()}`);
-    check(state.rows.length === 1 && marks() === '..' && scrollButtons() === '', 'a list that fits its panel has no mark');
+    check(state.rows.length === 1 && whole.y1 === trackTop && whole.y2 === trackBottom && rowKind(trackTop + 1) === 'plain' && rowKind(trackBottom - 1) === 'plain'
+      && same(whole, SaveMenu.scrollSlider(state)), 'a list that fits its panel has the whole track for a slider, and no dither');
+    clickArrow('saveMenu.scrollDown');
     SaveMenu.saveMenuWheel(ui, 1);
-    check(state.scrollTop === 0, 'and the wheel scrolls it nowhere');
-    rig.clickRow(0);
-    for (let n = 0; n < 30; n++) SaveMenu.saveMenuWheel(ui, 1);
-    check(state.scrollTop === maxTop, 'unfolded again, the wheel stops at the last page');
-    rig.clickRow(maxTop);
-    check(state.rows.length === 21 && state.selected === maxTop, 'where a row of it is the one clicked');
+    check(state.scrollTop === 0, 'and neither the arrow nor the wheel scrolls it');
     SaveMenu.closeSaveMenu(ui);
+
+    // A list far longer than its panel keeps a slider one can see.
+    const longState = { ...state, rows: Array.from({ length: 2000 }, () => state.rows[0]), scrollTop: 2000 - g.rows };
+    const small = SaveMenu.scrollSlider(longState);
+    check(small.y2 - small.y1 + 1 === g.sliderMin && small.y2 === trackBottom, `a slider is never less than ${g.sliderMin} rows tall, and still ends on the down arrow at the last page`);
   } finally {
     Date.now = realNow;
   }

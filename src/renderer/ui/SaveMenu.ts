@@ -20,7 +20,8 @@
  * frame, the sunken title panel and a button frame. A piece drawn at another size keeps
  * its corners and repeats the column and the row just inside them, so no art is
  * invented. Two panels, the list's and the preview's, stand over a row of four button
- * frames: LOAD, SAVE and EXPORT under the list, CANCEL under the preview.
+ * frames: LOAD, SAVE and EXPORT under the list, CANCEL under the preview. The list's is
+ * 32 characters and its scrollbar wide, and the preview's ten characters.
  *
  * A label sits in its frame where `_DoMenu` puts one, and a click and the press
  * animation take the rectangle CSBWin's table gives a frame (`buttonRect`,
@@ -50,10 +51,11 @@
  * LOAD reads the selected save, and from a heading the last save used of its playthrough.
  * On "NEW SAVE" there is nothing to load, so it is inert.
  *
- * The panel shows fifteen rows, which fill it. Where rows lie above the first one shown, that row's
- * last character is a mark, `^`, and where rows lie below the last, that one's is `V`
- * (`rowsBeyond`). A click on a mark scrolls the list by a page less one row, so the row
- * at the edge stays in view, and the wheel scrolls it a row at a time. Neither moves the
+ * The panel shows fifteen rows, which fill it, beside a scrollbar in the manner of a GEM
+ * window's, in the dialog's two colours (`drawScrollbar`): a boxed arrow at each end, and
+ * between them a slider, plain, for the rows shown, in a track that is dithered where
+ * rows lie beyond them. A click on an arrow scrolls the list by a row, as a notch of the
+ * wheel does; the slider and the track take no click. Scrolling does not move the
  * selection, which may leave the panel; a move of the selection brings the list back to
  * it (`showSelection`).
  *
@@ -61,7 +63,7 @@
  *
  * The panel beside the list shows the save LOAD would read (`loadTarget`): the selected
  * save, or from a heading the last save used of its playthrough, and nothing on "NEW
- * SAVE". Its lines are the list's rows, eleven characters each (`formatSavePreview`): the
+ * SAVE". Its lines are the list's rows, ten characters each (`formatSavePreview`): the
  * champions' names, the level, the play time, and the day and the time it was saved. The
  * panel's last lines are the dialog's message, when it has one: what went wrong, what was
  * done, or that it is working, wrapped at the panel's width (`wrapMessage`) and drawn
@@ -138,42 +140,61 @@ const BUTTON_PIECE: DialogPiece = { x1: 10, y1: 99, x2: 107, y2: 125, left: 6, t
  * between the frames of its bottom pair.
  */
 const DIALOG: Rect = { x1: 8, y1: 8, x2: 311, y2: 191 };
-/** As wide as graphic 0's panel, for the 33 characters of a row. */
-const LIST_PANEL: Rect = { x1: 18, y1: 18, x2: 221, y2: 144 };
-const PREVIEW_PANEL: Rect = { x1: 231, y1: 18, x2: 301, y2: 144 };
+/** For the 32 characters of a row and the scrollbar beside them. */
+const LIST_PANEL: Rect = { x1: 18, y1: 18, x2: 227, y2: 144 };
+/** For the ten characters of a line of the preview. */
+const PREVIEW_PANEL: Rect = { x1: 237, y1: 18, x2: 301, y2: 144 };
 const BUTTON_Y1 = 155;
 const BUTTON_Y2 = 181;
 const BUTTON_FRAMES = {
-  load: { x1: 18, y1: BUTTON_Y1, x2: 79, y2: BUTTON_Y2 },
-  save: { x1: 89, y1: BUTTON_Y1, x2: 150, y2: BUTTON_Y2 },
-  export: { x1: 160, y1: BUTTON_Y1, x2: 221, y2: BUTTON_Y2 },
-  cancel: { x1: 231, y1: BUTTON_Y1, x2: 301, y2: BUTTON_Y2 },
+  load: { x1: 18, y1: BUTTON_Y1, x2: 81, y2: BUTTON_Y2 },
+  save: { x1: 91, y1: BUTTON_Y1, x2: 154, y2: BUTTON_Y2 },
+  export: { x1: 164, y1: BUTTON_Y1, x2: 227, y2: BUTTON_Y2 },
+  cancel: { x1: 237, y1: BUTTON_Y1, x2: 301, y2: BUTTON_Y2 },
 } as const;
 
-/** The list panel's clean interior: past its two columns of edge, and short of its one. */
+/**
+ * The scrollbar: eleven columns against the list panel's right edge, from the top of its
+ * clean interior, past its two rows of edge, to the bottom, short of its one.
+ */
+const SCROLLBAR: Rect = { x1: LIST_PANEL.x2 - 11, y1: LIST_PANEL.y1 + 2, x2: LIST_PANEL.x2 - 1, y2: LIST_PANEL.y2 - 1 };
+/** An arrow's box is as tall as the bar is wide, its outline included. */
+const ARROW_BOX = SCROLLBAR.x2 - SCROLLBAR.x1 + 1;
+/**
+ * The up arrow, hollow and on a stem as a GEM window's is, in the nine columns and rows
+ * inside its box; the down arrow is the same rows from the last to the first.
+ */
+const ARROW_UP = [
+  '.........',
+  '....#....',
+  '...#.#...',
+  '..#...#..',
+  '.###.###.',
+  '...#.#...',
+  '...#.#...',
+  '...###...',
+  '.........',
+];
+/** The least a slider is tall, its two outlines included. */
+const SLIDER_MIN = 7;
+
+/** The rows' clean interior: past the panel's two columns of edge, as far as the scrollbar. */
 const LIST_INNER_X1 = LIST_PANEL.x1 + 2;
-const LIST_INNER_X2 = LIST_PANEL.x2 - 1;
+const LIST_INNER_X2 = SCROLLBAR.x1 - 1;
 
 const TEXT_X = LIST_PANEL.x1 + 4;
-const TEXT_MAX_CHARS = 33;
+const TEXT_MAX_CHARS = 32;
 const ROW_FIRST_Y = LIST_PANEL.y1 + 9;
 const ROW_STEP = 8;
 /** The rows fill the panel: two pixels of it above the first, and two below the last. */
 export const SAVE_MENU_ROWS = 15;
 
-/** The preview's lines are on the list's rows: eleven characters between its panel's edges. */
+/** The preview's lines are on the list's rows: ten characters between its panel's edges. */
 const PREVIEW_TEXT_X = PREVIEW_PANEL.x1 + 4;
-const PREVIEW_MAX_CHARS = 11;
+const PREVIEW_MAX_CHARS = 10;
 /** The most lines a message takes at the foot of the preview's panel. */
 const MESSAGE_MAX_LINES = 5;
 const WORKING_MESSAGE = 'WORKING...';
-
-/** The marks' place in a row: its last character, which only a heading of four long names reaches. */
-const MARK_X = TEXT_X + (TEXT_MAX_CHARS - 1) * 6;
-const MARK_ABOVE = '^';
-const MARK_BELOW = 'V';
-/** What a click on a mark scrolls by: a page, less the row at the edge. */
-const PAGE_ROWS = SAVE_MENU_ROWS - 1;
 
 /** The full menu's first row, for a game with no save yet: SAVE there makes its first. */
 const NEW_SAVE_LABEL = 'NEW SAVE';
@@ -229,8 +250,9 @@ export const SAVE_MENU_GEOMETRY = {
   rows: SAVE_MENU_ROWS,
   previewTextX: PREVIEW_TEXT_X,
   previewMaxChars: PREVIEW_MAX_CHARS,
-  markX: MARK_X,
-  pageRows: PAGE_ROWS,
+  scrollbar: SCROLLBAR,
+  arrowBox: ARROW_BOX,
+  sliderMin: SLIDER_MIN,
   loadButtonId: BTN_LOAD,
   saveButtonId: BTN_SAVE,
   cancelButtonId: BTN_CANCEL,
@@ -482,9 +504,21 @@ function showSelection(state: SaveMenuState): void {
   }
 }
 
-/** Whether rows of the list lie above the first one shown, and below the last. */
-export function rowsBeyond(state: SaveMenuState): { above: boolean; below: boolean } {
-  return { above: state.scrollTop > 0, below: state.scrollTop + SAVE_MENU_ROWS < state.rows.length };
+/**
+ * The scrollbar's slider, its first and last rows on screen, which are its outlines. It
+ * moves in the track between the arrows' boxes, whose inner outlines its own lie on at
+ * either end. Its height is to the track's as the rows shown are to the list's, and its
+ * place as the first row shown is to the last it can be; a list that fits its panel
+ * has the whole track for a slider.
+ */
+export function scrollSlider(state: SaveMenuState): { y1: number; y2: number } {
+  const top = SCROLLBAR.y1 + ARROW_BOX - 1;
+  const track = SCROLLBAR.y2 - ARROW_BOX + 1 - top + 1;
+  const maxTop = state.rows.length - SAVE_MENU_ROWS;
+  if (maxTop <= 0) return { y1: top, y2: top + track - 1 };
+  const height = Math.max(SLIDER_MIN, Math.round((track * SAVE_MENU_ROWS) / state.rows.length));
+  const y1 = top + Math.round(((track - height) * Math.min(state.scrollTop, maxTop)) / maxTop);
+  return { y1, y2: y1 + height - 1 };
 }
 
 /** Scroll the list by `rows`, the selection left where it is, in the panel or out of it. */
@@ -559,6 +593,41 @@ function rowRect(row: number): Rect {
 }
 
 /**
+ * The list's scrollbar: an outline, the two arrows in their boxes, and between them the
+ * slider (`scrollSlider`), plain between its two outlines, in a track dithered of the
+ * outline's colour and the panel's.
+ */
+function drawScrollbar(ui: UIState, state: SaveMenuState): void {
+  const buf = ui.screenIndexBuffer;
+  const { x1, y1, x2, y2 } = SCROLLBAR;
+  const line = (y: number): void => fillRectIndex(buf, { x1, y1: y, x2, y2: y }, MENU_OPTION_COLOR);
+  fillRectIndex(buf, SCROLLBAR, MENU_PANEL_COLOR);
+  fillRectIndex(buf, { x1, y1, x2: x1, y2 }, MENU_OPTION_COLOR);
+  fillRectIndex(buf, { x1: x2, y1, x2, y2 }, MENU_OPTION_COLOR);
+  for (const y of [y1, y1 + ARROW_BOX - 1, y2 - ARROW_BOX + 1, y2]) line(y);
+
+  const arrow = (top: number, rows: string[]): void => {
+    rows.forEach((row, dy) => {
+      for (let dx = 0; dx < row.length; dx++) {
+        if (row[dx] === '#') buf.pixels[(top + dy) * buf.width + x1 + 1 + dx] = MENU_OPTION_COLOR;
+      }
+    });
+  };
+  arrow(y1 + 1, ARROW_UP);
+  arrow(y2 - ARROW_BOX + 2, [...ARROW_UP].reverse());
+
+  const slider = scrollSlider(state);
+  for (let y = y1 + ARROW_BOX; y <= y2 - ARROW_BOX; y++) {
+    if (y >= slider.y1 && y <= slider.y2) continue;
+    for (let x = x1 + 1; x < x2; x++) {
+      if (((x + y) & 1) === 0) buf.pixels[y * buf.width + x] = MENU_OPTION_COLOR;
+    }
+  }
+  line(slider.y1);
+  line(slider.y2);
+}
+
+/**
  * The whole screen: the dialog, or the question in its place, on black. `_DoMenu` clears
  * the screen under a menu its caller asks it to (`ClearOldScreen`,
  * `doc/CSBwin-src/Menu.cpp:285-291`), as the entrance's chooser does; the disk menu's
@@ -578,9 +647,9 @@ export function drawSaveMenu(ui: UIState): void {
 
   drawDialog(ui);
 
-  // The rows, and on the first and the last the mark of rows beyond it.
+  // The rows, and their scrollbar.
   clampScroll(state);
-  const beyond = rowsBeyond(state);
+  drawScrollbar(ui, state);
   for (let row = 0; row < SAVE_MENU_ROWS; row++) {
     const index = state.scrollTop + row;
     if (index >= state.rows.length) break;
@@ -590,8 +659,6 @@ export function drawSaveMenu(ui: UIState): void {
     const y = ROW_FIRST_Y + row * ROW_STEP;
     if (highlighted) fillRectIndex(ui.screenIndexBuffer, rowRect(row), MENU_OPTION_COLOR);
     text(ui, rowText(state, state.rows[index]), TEXT_X, y, color, background);
-    if (row === 0 && beyond.above) text(ui, MARK_ABOVE, MARK_X, y, color, background);
-    if (row === SAVE_MENU_ROWS - 1 && beyond.below) text(ui, MARK_BELOW, MARK_X, y, color, background);
   }
 
   if (state.rows.length === 0 && !state.busy && !state.message) {
@@ -628,9 +695,8 @@ export function drawSaveMenu(ui: UIState): void {
 
 /**
  * The dialog's own button list, in the form of CSBWin's (`x2` and `y2` exclusive): the
- * three buttons that have a label, the marks that are up, and the rows shown. A mark
- * comes before the row it is drawn on, so its cell is the mark's. Built fresh on each
- * click because the rows follow the scroll position.
+ * three buttons that have a label, the scrollbar's two arrows, and the rows shown. Built
+ * fresh on each click because the rows follow the scroll position.
  */
 export function saveMenuButtons(state: SaveMenuState): UIButton[] {
   const buttons: UIButton[] = [
@@ -638,13 +704,11 @@ export function saveMenuButtons(state: SaveMenuState): UIButton[] {
     { word0: BTN_SAVE, ...buttonRect(BUTTON_FRAMES.save), button: 2, name: 'saveMenu.save' },
     { word0: BTN_CANCEL, ...buttonRect(BUTTON_FRAMES.cancel), button: 2, name: 'saveMenu.cancel' },
   ];
-  const beyond = rowsBeyond(state);
-  const mark = (id: number, row: number, name: string): UIButton => {
-    const r = rowRect(row);
-    return { word0: id, x1: MARK_X, x2: r.x2 + 1, y1: r.y1, y2: r.y2 + 1, button: 2, name };
-  };
-  if (beyond.above) buttons.push(mark(BTN_SCROLL_UP, 0, 'saveMenu.scrollUp'));
-  if (beyond.below) buttons.push(mark(BTN_SCROLL_DOWN, SAVE_MENU_ROWS - 1, 'saveMenu.scrollDown'));
+  const arrow = (id: number, y1: number, name: string): UIButton => (
+    { word0: id, x1: SCROLLBAR.x1, x2: SCROLLBAR.x2 + 1, y1, y2: y1 + ARROW_BOX, button: 2, name }
+  );
+  buttons.push(arrow(BTN_SCROLL_UP, SCROLLBAR.y1, 'saveMenu.scrollUp'));
+  buttons.push(arrow(BTN_SCROLL_DOWN, SCROLLBAR.y2 - ARROW_BOX + 1, 'saveMenu.scrollDown'));
   const visible = Math.min(SAVE_MENU_ROWS, Math.max(0, state.rows.length - state.scrollTop));
   for (let row = 0; row < visible; row++) {
     const r = rowRect(row);
@@ -688,7 +752,7 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
     return;
   }
   if (id === BTN_SCROLL_UP || id === BTN_SCROLL_DOWN) {
-    scrollBy(ui, state, id === BTN_SCROLL_UP ? -PAGE_ROWS : PAGE_ROWS);
+    scrollBy(ui, state, id === BTN_SCROLL_UP ? -1 : 1);
     return;
   }
   if (id >= BTN_ROW0 && id < BTN_ROW0 + SAVE_MENU_ROWS) {

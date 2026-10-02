@@ -298,8 +298,8 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   entrance: an 8-pixel ring of the game's picture would show nothing whole. Three pieces
   of graphic 0 make it, each drawn at the size wanted by keeping its corners and
   repeating its middle: the grey frame, the sunken panel and a button frame. Two panels
-  side by side, the list's (204 wide, graphic 0's own width, 33 characters a row) and
-  the preview's (71 wide, 11 characters), over one row of four buttons: LOAD, SAVE and
+  side by side, the list's (210 wide: 32 characters a row and the scrollbar) and
+  the preview's (65 wide, 10 characters), over one row of four buttons: LOAD, SAVE and
   EXPORT under the list, CANCEL under the preview. A button that can do nothing has no
   label, as CSBWin's empty slot has none. The labels' places in their frames, the
   rectangle a click takes and the press animation are `_DoMenu`'s. The question before
@@ -313,11 +313,16 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   heading folds or unfolds it, and so do the left and right arrows. A game with no save
   yet has no heading, and the full menu a first row, "NEW SAVE", in its place. The
   files that name no playthrough are listed as one, until step 4 leaves none.
-- **The list scrolls** under its fifteen rows. Where rows lie above the first one
-  shown, that row's last character is a mark, `^`, and where rows lie below the last,
-  that one's is `V`: the font has no arrow. A click on a mark scrolls by a page less a
-  row, the wheel by a row, and neither moves the selection, which may leave the panel;
-  a key that moves the selection scrolls the list back to it.
+- **The list scrolls** under its fifteen rows, beside a scrollbar in the manner of a
+  GEM window's, in the dialog's two colours, the option's orange on the panel's brown
+  (`drawScrollbar`, `src/renderer/ui/SaveMenu.ts`): eleven columns against the panel's
+  right edge, outlined; a hollow arrow on a stem in a box at each end; between them a
+  slider, plain, whose height is to the track's as the rows shown are to the list's,
+  in a track dithered of the two colours where rows lie beyond the panel. A list that
+  fits has the whole track for a slider. A click on an arrow scrolls a row, as a notch
+  of the wheel does; the slider is not dragged, and the track takes no click. Scrolling
+  does not move the selection, which may leave the panel; a key that moves the
+  selection scrolls the list back to it.
 - **A preview** beside the list, of the save LOAD would read: the selected save, or
   from a heading its playthrough's last save used, and nothing on "NEW SAVE". A line of
   the panel each, on the list's rows (`formatSavePreview`,
@@ -410,20 +415,23 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
    - c. ✅ **The preview**, in its panel (`drawSaveMenu`, `src/renderer/ui/SaveMenu.ts`);
      the dialog's message, what went wrong, what was done or "WORKING...", is the
      panel's last lines.
-     Evidence: `tools/dump-save-menu.ts`, "the dialog" (eleven characters fit the
+     Evidence: `tools/dump-save-menu.ts`, "the dialog" (ten characters fit the
      panel), "the list" (a play time's format, and a preview's lines) and "the preview"
      (the panel read back: which rows hold ink and that none leaves the lines' cells;
      "NEW SAVE" showing nothing, a heading its last save used, and the load-only
      chooser the same; a message on the panel's last lines, as many as it wraps to,
      and taken down by a move of the selection).
      The golden frame shows the "NEW SAVE" row, whose preview is empty.
-   - d. ✅ **The scrolling**: the marks, a click on one and the wheel (`rowsBeyond`,
-     `scrollBy` and `showSelection`, `src/renderer/ui/SaveMenu.ts`). Evidence:
-     `tools/dump-save-menu.ts`, "the scrolling" (twenty-one rows: which marks are up
-     and which buttons, at each end and between; the wheel leaving the selection out
-     of the panel, and a draw not scrolling back; a click on a mark scrolling a page
-     less a row, and the same click with no mark up selecting the row; a key bringing
-     the list back; a list that fits having no mark).
+   - d. ✅ **The scrolling**: the scrollbar, its arrows and the wheel (`drawScrollbar`,
+     `scrollSlider`, `scrollBy` and `showSelection`, `src/renderer/ui/SaveMenu.ts`).
+     Evidence: `tools/dump-save-menu.ts`, "the dialog" (the bar against the panel's
+     edge, on clean panel) and "the scrolling" (twenty-one rows, the bar read back
+     from the screen: the slider's place and height at the first row, between and at
+     the last page, the checkerboard around it, the outlines, the two arrows; an
+     arrow's click and the wheel scrolling a row and leaving the selection out of the
+     panel, and a draw not scrolling back; the track and the slider taking no click; a
+     key bringing the list back; a list that fits having the whole track for a
+     slider); the golden frame shows that last case.
 4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it. Until
    then a `.dat` on disk has no way into the page, the committed saves included: the
    store's rows are the only saves it loads. With it, no stored save holds playthrough
@@ -525,9 +533,8 @@ set's saves (`GameSaves.list`, over `src/data/saves/`) under a heading for each
 playthrough, the last one used first: the party of its newest save, and when unfolded
 its saves, newest first, each row with its day, time and level. A game with no save yet
 has a first row, "NEW SAVE", for a heading. Beside the list, a panel previews the save
-LOAD would read: its party, its level, its play time and its date. A list longer than
-its panel has a mark on its first or last row shown, which a click scrolls by, as the
-wheel does. The menu opens on the last
+LOAD would read: its party, its level, its play time and its date. The list has a
+scrollbar, whose arrows scroll it a row a click, as the wheel does. The menu opens on the last
 save used, written or loaded, its playthrough alone unfolded, and on "NEW SAVE" when the
 data set has none. LOAD reads the selected save, or from a heading its playthrough's
 last save used. SAVE writes over the selected save, or from the game's own heading or

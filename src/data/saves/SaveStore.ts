@@ -222,9 +222,10 @@ function formatChampions(champions: string[]): string {
 /**
  * A playthrough's heading: `- DAROO SONJA LEYLA ESMARDA`, the champions of its newest
  * save after `+` when its saves are folded away and `-` when they are listed. Four
- * names of seven characters, the longest a champion has, are the panel's 33 characters.
+ * names of seven characters, the longest a champion has, are one more than the panel's
+ * 32, and the last then loses its last letter.
  */
-export function formatPlaythroughRow(playthrough: Playthrough, folded: boolean, maxChars = 33): string {
+export function formatPlaythroughRow(playthrough: Playthrough, folded: boolean, maxChars = 32): string {
     const row = `${folded ? '+' : '-'} ${formatChampions(playthrough.saves[0].champions)}`;
     return row.length > maxChars ? row.slice(0, maxChars) : row;
 }
@@ -234,7 +235,7 @@ export function formatPlaythroughRow(playthrough: Playthrough, folded: boolean, 
  * day and the time it was saved, the level, and `QUICKSAVE` on F5's. The party is the
  * heading's.
  */
-export function formatSaveRow(entry: SaveEntry, maxChars = 33): string {
+export function formatSaveRow(entry: SaveEntry, maxChars = 32): string {
     const level = `L${Math.max(0, entry.level | 0)}`;
     const row = `  ${formatSaveDate(entry.savedAt)} ${formatSaveTime(entry.savedAt)} ${level}${entry.quick ? ' QUICKSAVE' : ''}`;
     return row.length > maxChars ? row.slice(0, maxChars) : row;
@@ -254,10 +255,9 @@ const PARTY_SIZE = 4;
  * A save's preview, a line of the panel each: the champions' names, one a line; the
  * level; the play time; the day and the time it was saved. A party of fewer than four
  * leaves its other lines empty, so that every save shows the rest in the same place.
- * A day is ten characters and a name seven at most, so every line fits the panel's
- * eleven.
+ * A day is ten characters and a name seven at most, so every line fits the panel's ten.
  */
-export function formatSavePreview(entry: SaveEntry, maxChars = 11): string[] {
+export function formatSavePreview(entry: SaveEntry, maxChars = 10): string[] {
     const names = entry.champions.map((n) => n.trim().toUpperCase()).filter((n) => n.length > 0).slice(0, PARTY_SIZE);
     while (names.length < PARTY_SIZE) names.push('');
     return [
