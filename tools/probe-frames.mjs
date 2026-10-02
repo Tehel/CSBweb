@@ -19,7 +19,8 @@
 // identical run to run.
 //
 // A few things are asserted on the spot rather than compared as frames, since no frame
-// shows them: the CRT effect, and which screens take the mouse wheel. See `check` below.
+// shows them: the CRT effect, which screens take the mouse wheel, and the keys of the
+// entrance's chooser. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -227,6 +228,14 @@ await canvasClick(160, 100, 0); await wait(1000);
 check(!(await wheelTaken()), 'the entrance leaves the wheel to the page');
 await canvasClick(270, 84, 0);  await wait(1500);
 check(await wheelTaken(), 'the entrance\'s chooser takes the wheel, for its list');
+// And the keys the list takes in play. The one save is selected under its heading: the up
+// arrow moves the selection to the heading, and the down arrow back to the save.
+const chooserUp = await canvasPixels();
+await key('ArrowUp');   await wait(200);
+const onHeading = await canvasPixels();
+await key('ArrowDown'); await wait(200);
+check(onHeading !== chooserUp && onHeading !== entrance && (await canvasPixels()) === chooserUp,
+  'the entrance\'s chooser takes the arrow keys, and stays up');
 await canvasClick(100, 27, 0);  await wait(300);
 await canvasClick(48, 168, 0);  await wait(1500);
 console.log('state: game loaded');       await shot('12-game-loaded');

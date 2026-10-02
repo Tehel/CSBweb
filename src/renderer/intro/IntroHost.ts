@@ -26,6 +26,13 @@ export interface IntroEvent {
   x: number;
   y: number;
   buttons: number;
+  /**
+   * Which key, `KeyboardEvent.key`, for the one screen that tells keys apart: the
+   * chooser, whose list takes the keys it takes in play. Empty with Ctrl, Meta or Alt
+   * held, which the game leaves to the browser there too (`GameInput.keyDown`). To
+   * every other screen a key is a key.
+   */
+  key?: string;
 }
 
 export interface IntroHost {

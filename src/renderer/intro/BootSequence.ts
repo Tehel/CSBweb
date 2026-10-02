@@ -132,7 +132,13 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     if (cursorVisible) host.present();
   };
   const onContextMenu = (e: Event): void => e.preventDefault();
-  const onKeyDown = (): void => push({ kind: 'key', x: 0, y: 0, buttons: 0 });
+  const onKeyDown = (e: KeyboardEvent): void => {
+    const key = e.ctrlKey || e.metaKey || e.altKey ? '' : e.key;
+    // The chooser's keys are its own, as the disk menu's are in play: an arrow moves
+    // its selection, and does not scroll the page as well.
+    if (key && gameScreen.isSaveMenuOpen()) e.preventDefault();
+    push({ kind: 'key', x: 0, y: 0, buttons: 0, key });
+  };
   // The wheel is the chooser's list's, as it is the disk menu's in play
   // (`GameInput.wheel`), and no other pre-game screen's. It is no event of the queue,
   // where a screen waiting for a click or a key would take it for one.
@@ -268,7 +274,7 @@ async function openLoadMenu(
     const event = await Promise.race([host.nextEvent(), closed]);
     if (!event) break;
     if (event.kind === 'click') gameScreen.handleSaveMenuClick(event.x, event.y, event.buttons);
-    else gameScreen.handleSaveMenuKey('Escape');
+    else if (event.key) gameScreen.handleSaveMenuKey(event.key);
     draw();
   }
 
