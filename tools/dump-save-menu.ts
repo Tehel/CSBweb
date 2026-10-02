@@ -72,6 +72,12 @@
  * 17. **EXPORT.** The selected save's file handed to the page, the store's bytes as they
  *    are: its label and its press on a save alone, no question across playthroughs, the
  *    store and the game left as they were, a read that fails, and the load-only chooser.
+ * 18. **The import.** A file from outside taken into the store (`GameSaves.importSave`):
+ *    the data set's own dungeon stored under the file's name, date and playthrough, and
+ *    a file that names none joined to its party's playthrough or given a new one; a
+ *    modified dungeon stored only once confirmed, as an unofficial row, which the saves
+ *    of a game read from it are too; another dungeon's, an unknown one's and a file that
+ *    does not read never stored.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -114,9 +120,9 @@ import { freeze, thaw, type LoopScript } from '../src/engine/LoopState';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { drawRandomGameID } from '../src/engine/GameContext';
-import { GameSaves, drawPlaythrough, makeSaveFileName } from '../src/engine/GameSaves';
+import { GameSaves, SAVED_GAME_DAMAGED, drawPlaythrough, importedFileName, makeSaveFileName } from '../src/engine/GameSaves';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
-import { loadSaveGameState } from '../src/data/SaveGameLoader';
+import { loadSaveGameState, stampRandomGameID } from '../src/data/SaveGameLoader';
 import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
@@ -138,7 +144,7 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/rend
 import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
-import { SAVE_DIR, genuineSaves } from './lib/saves';
+import { SAVE_DIR, genuineSaves, savePath } from './lib/saves';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
@@ -485,6 +491,7 @@ function entry(over: Partial<SaveEntry>): SaveEntry {
     playTime: 0,
     level: 0,
     champions: [],
+    unofficial: false,
     ...over,
     // A row not used since it was saved, unless the caller says otherwise.
     usedAt: over.usedAt ?? over.savedAt ?? 0,
@@ -2408,6 +2415,218 @@ async function checkExport(graphics: GraphicsLoader): Promise<void> {
   }
 }
 
+/* ---------------------------------------------------------------- 18. the import ---- */
+
+/** A save of Chaos Strikes Back, and the save its game starts from (`DEBT.md` G17). */
+const CSB_SAVE = 'static/gamefiles/csb/csbgame2.dat';
+const CSB_MINI = 'static/gamefiles/csb/mini.dat';
+
+/**
+ * The port's save of a new game of `champion`, playthrough `id`, in a dungeon whose cell
+ * flags have been put through `change`, level by level.
+ */
+async function saveOfDungeon(champion: string, id: number, change: (level: number, cellFlags: number[][]) => void): Promise<Uint8Array> {
+  const game = await loadGame();
+  game.systems.hallOfChampions.addChampion(healthyChampion(champion));
+  game.ctx.state.block1.randomGameID = id;
+  game.ctx.dungeon.getData().maps.forEach((map, level) => change(level, map.cellFlags));
+  return buildSaveFile(game);
+}
+
+/** Make the first stone cell of a level a plain floor: one wall opened. */
+function openAWall(cellFlags: number[][]): void {
+  for (const column of cellFlags) {
+    const y = column.findIndex((flag) => flag >> 5 === 0);
+    if (y >= 0) {
+      column[y] = 0x20;
+      return;
+    }
+  }
+}
+
+/**
+ * Files from outside into a store in memory, through `GameSaves.importSave`: which are
+ * stored and as what row, which wait for the player's word, and which never are.
+ */
+async function checkImport(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== the import ===');
+  const store = memoryStore();
+  const logged: string[] = [];
+  const log = (message: string, error?: unknown): void => { logged.push(error ? `${message}: ${(error as Error).message}` : message); };
+  const SEED = 0x1d2c3b4a;
+  const game = await loadGame();
+  game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
+  // The games' playthroughs are given, so that every line printed is the same at each run.
+  game.ctx.state.block1.randomGameID = 0x0da200;
+  const screen = { portraitOf: () => undefined, repackOpenChest: () => {} };
+  const saves = new GameSaves(game, DEFAULT_DATA_SET, store, screen, log, new CsbRandom(SEED));
+  const csbSaves = new GameSaves(game, dataSetFor('csb'), store, screen, log, new CsbRandom(SEED));
+  const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));
+  const same = (a: Uint8Array | undefined, b: Uint8Array | undefined): boolean =>
+    a !== undefined && b !== undefined && a.length === b.length && a.every((byte, i) => byte === b[i]);
+  const rowsOf = async (): Promise<string> => JSON.stringify(await store.list(null));
+  const idIn = (bytes: Uint8Array | undefined): number | undefined => (bytes ? readSaveFileFields(bytes)?.playthrough : undefined);
+  const show = (what: string, row: SaveEntry): void => {
+    console.log(`  ${what}: ${row.name}, set ${row.dataSet}, playthrough ${row.playthrough}, L${row.level} ${row.champions.join('/')}, `
+      + `saved ${formatSaveDate(row.savedAt)} ${formatSaveTime(row.savedAt)}, played ${formatPlayTime(row.playTime)}${row.quick ? ', quick' : ''}${row.unofficial ? ', unofficial' : ''}`);
+  };
+  /** What an import that stored nothing came back with. */
+  const refusal = (result: Awaited<ReturnType<GameSaves['importSave']>>): string =>
+    result.kind === 'stored' ? `STORED ${result.entry.name}`
+      : result.kind === 'unknown' ? 'unknown'
+        : `${result.kind} (${result.dungeon.name}; sets ${result.dungeon.dataSets.join(' ')})`;
+
+  // The name a file is stored under.
+  check(importedFileName('CSBGAME.DAT', new Set()) === 'CSBGAME.DAT', 'a file keeps its name, in its own case');
+  check(importedFileName('CSBGAME.DAT', new Set(['CSBGAME.DAT'])) === 'CSBGAME-2.DAT'
+    && importedFileName('a.dat', new Set(['a.dat', 'a-2.dat'])) === 'a-3.dat', 'with a number after it while a save has that name');
+  check(importedFileName('csbgame.bak', new Set()) === 'csbgame.bak.dat', 'and a .dat after one that is not a .dat');
+
+  const realNow = Date.now;
+  let now = new Date(2026, 9, 2, 10, 0, 0).getTime();
+  Date.now = () => now;
+  try {
+    const gameId = game.ctx.state.block1.randomGameID;
+    const gameSeed = game.ctx.random.getSeed();
+    const mine = await saves.save('stopped', 'new');
+    now += 60_000;
+
+    // The data set's own dungeon: a genuine CSBWin save of Dungeon Master.
+    const genuine = read(savePath('csbgame7.dat'));
+    const written = new Date(2024, 0, 5, 9, 30, 0).getTime();
+    const own = await saves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine, modifiedAt: written });
+    if (own.kind !== 'stored') throw new Error(`csbgame7.dat was not stored: ${refusal(own)}`);
+    show('a genuine save of Dungeon Master', own.entry);
+    const info = readCsbwinSaveInfo(genuine)!;
+    check(own.entry.id === 'CSBGAME7.DAT' && own.entry.name === 'CSBGAME7.DAT' && own.entry.dataSet === DEFAULT_DATA_SET.id,
+      'a save of the data set\'s own dungeon is stored, under the file\'s name, as a row of the data set');
+    check(own.entry.playthrough === info.randomGameID && info.randomGameID !== 0 && own.entry.level === info.level
+      && own.entry.champions.join('/') === info.champions.join('/'), 'its playthrough, level and champions are the file\'s');
+    check(own.entry.savedAt === written && own.entry.usedAt === now && own.entry.playTime === 0 && !own.entry.quick && !own.entry.unofficial,
+      'its date is the file\'s; it is the last save used, counts no time played, and is neither F5\'s nor unofficial');
+    check(same(store.files.get('CSBGAME7.DAT'), genuine), 'the stored file is the file, byte for byte');
+    check((await store.list(DEFAULT_DATA_SET.id)).some((row) => row.id === 'CSBGAME7.DAT') && lastUsedSave(await saves.list())?.id === 'CSBGAME7.DAT',
+      'the game\'s list has it, as the last save used');
+    now += 60_000;
+
+    // The same file again, and with no date: a row of its own.
+    const again = await saves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine }, true);
+    if (again.kind !== 'stored') throw new Error('the second csbgame7.dat was not stored');
+    show('the same file again, with no date', again.entry);
+    check(again.entry.id === 'CSBGAME7-2.DAT' && again.entry.savedAt === now && same(store.files.get('CSBGAME7.DAT'), genuine),
+      'a name a save has is numbered, the first row left as it was; a file with no date is saved now');
+    check(again.entry.playthrough === own.entry.playthrough && !again.entry.unofficial,
+      'a file that names a playthrough keeps it, a stored save\'s or not; confirming a whole dungeon marks nothing');
+    now += 60_000;
+
+    // A file that names no playthrough: its party's, or a new one.
+    const joined = await saves.importSave({ name: 'old-build.dat', bytes: stampRandomGameID(store.files.get(mine.id)!, 0) });
+    if (joined.kind !== 'stored') throw new Error('old-build.dat was not stored');
+    show('the game\'s save with RandomGameID 0', joined.entry);
+    check(joined.entry.playthrough === gameId && idIn(store.files.get('old-build.dat')) === gameId
+      && same(store.files.get('old-build.dat'), store.files.get(mine.id)),
+      'a file that names none joins the playthrough of the save of its party, and is stamped: the file that save is');
+    now += 60_000;
+    const early = stampRandomGameID(read(savePath('csbgame-early-1hero.dat')), 0);
+    const drawn = await saves.importSave({ name: 'early.dat', bytes: early });
+    if (drawn.kind !== 'stored') throw new Error('early.dat was not stored');
+    show('a genuine save of another party, RandomGameID 0', drawn.entry);
+    const expected = drawPlaythrough(new CsbRandom(SEED), []);
+    check(drawn.entry.playthrough === expected && expected !== 0 && idIn(store.files.get('early.dat')) === expected,
+      `with no save of its party, it takes a new one, the first its stream draws (${expected}), stamped into the file`);
+    check((await store.list(null)).filter((row) => row.playthrough === expected).length === 1 && idIn(early) === 0,
+      'which no other save holds; the file handed in is left as it was');
+    now += 60_000;
+    const later = await saves.importSave({ name: 'early-2.dat', bytes: stampRandomGameID(read(savePath('csbgame4-door-opening.dat')), 0) });
+    check(later.kind === 'stored' && later.entry.playthrough === expected, 'a second file of that party, naming none, joins it');
+    check(game.ctx.random.getSeed() === gameSeed && game.ctx.state.block1.randomGameID === gameId
+      && game.ctx.party.state.champions.map((c) => c.name).join() === 'DAROO', 'the game is left alone, its random stream included');
+    now += 60_000;
+
+    // Most of the data set's dungeon and not the whole: a modified version of it.
+    const modified = await saveOfDungeon('WUUF', 0x00f00f, (level, cellFlags) => { if (level === 3) openAWall(cellFlags); });
+    const before = await rowsOf();
+    const asked = await saves.importSave({ name: 'modified.dat', bytes: modified });
+    console.log(`  a save of Dungeon Master with a wall of level 3 opened: ${refusal(asked)}`);
+    check(asked.kind === 'modified' && asked.dungeon.name === 'Dungeon Master' && (await rowsOf()) === before,
+      'most of the data set\'s dungeon and not the whole is a modified version of it: nothing is stored');
+    const confirmed = await saves.importSave({ name: 'modified.dat', bytes: modified }, true);
+    if (confirmed.kind !== 'stored') throw new Error('modified.dat was not stored');
+    show('the same, confirmed', confirmed.entry);
+    check(confirmed.entry.unofficial && confirmed.entry.dataSet === DEFAULT_DATA_SET.id && same(store.files.get('modified.dat'), modified),
+      'confirmed, it is stored as a row of the data set, marked unofficial');
+    now += 60_000;
+
+    // The mark follows the game read from such a row.
+    const halk = await menuRig(graphics, store, 'HALK');
+    const fresh = await halk.saves.save('stopped', 'new');
+    now += 60_000;
+    halk.saves.read(await halk.saves.open(confirmed.entry));
+    const fromModified = await halk.saves.save('stopped', 'new');
+    now += 60_000;
+    const quick = await halk.saves.save('running', 'quick');
+    now += 60_000;
+    show('a save of the game read from it', fromModified);
+    check(!fresh.unofficial && !mine.unofficial, 'a save of a new game is not unofficial');
+    check(halk.party() === 'WUUF' && fromModified.unofficial && quick.unofficial,
+      'the saves of a game read from an unofficial row are unofficial, SAVE\'s and F5\'s');
+    halk.saves.read(await halk.saves.open(own.entry));
+    const fromOwn = await halk.saves.save('stopped', confirmed.entry);
+    now += 60_000;
+    check(!fromOwn.unofficial && fromOwn.id === confirmed.entry.id && (await store.list(null)).find((row) => row.id === confirmed.entry.id)?.unofficial === false,
+      'a game read from another row is not, and its save written over the unofficial row leaves it official');
+    halk.saves.read(await halk.saves.open(fromModified));
+    await halk.saves.newGameRead();
+    check(!(await halk.saves.save('stopped', 'new')).unofficial, 'nor is a new game read after an unofficial one');
+    now += 60_000;
+
+    // Another dungeon's, and an unknown one's.
+    const stored = await rowsOf();
+    const csb = read(CSB_SAVE);
+    const other = [await saves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }), await saves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }, true)];
+    console.log(`  a save of Chaos Strikes Back, in Dungeon Master: ${refusal(other[0])}`);
+    check(other.every((result) => result.kind === 'other' && result.dungeon.name === 'Chaos Strikes Back' && result.dungeon.dataSets.includes('csb')),
+      'a save of another dungeon is not stored, confirmed or not: the dungeon it is comes back, with the sets that play it');
+    const unknown = await saveOfDungeon('BORIS', 0x0b0215, (_level, cellFlags) => openAWall(cellFlags));
+    const none = await saves.importSave({ name: 'unknown.dat', bytes: unknown }, true);
+    console.log(`  a save with a wall of every level opened: ${refusal(none)}`);
+    check(none.kind === 'unknown', 'a save no level of which is a known dungeon\'s is not stored either');
+    check((await rowsOf()) === stored, 'none of them has written a row');
+
+    // What does not read.
+    const flipped = genuine.slice();
+    flipped[flipped.length - 100] ^= 0x01;
+    const unread: Array<[string, Uint8Array]> = [
+      ['a save with one bit of its dungeon image flipped', flipped],
+      ['the first 1000 bytes of a save', genuine.slice(0, 1000)],
+      ['a JSON text', new TextEncoder().encode('{"raw":"AAAA"}')],
+      ['an empty file', new Uint8Array(0)],
+    ];
+    for (const [what, bytes] of unread) {
+      const at = logged.length;
+      const outcome = await saves.importSave({ name: 'damaged.dat', bytes }, true).then(refusal, (error: Error) => `throws "${error.message}"`);
+      console.log(`  ${what}: ${outcome}; logged "${logged.slice(at).join(' | ')}"`);
+      check(outcome === `throws "${SAVED_GAME_DAMAGED}"` && logged.length === at + 1, `${what} is CSBWin's "${SAVED_GAME_DAMAGED}", its reason logged`);
+    }
+    check((await rowsOf()) === stored, 'and none of them is stored');
+
+    // The other way round: the `csb` set, whose dungeons are two.
+    const inCsb = [await csbSaves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }), await csbSaves.importSave({ name: 'MINI.DAT', bytes: read(CSB_MINI) })];
+    for (const result of inCsb) if (result.kind === 'stored') show('in the csb set', result.entry);
+    check(inCsb.every((result) => result.kind === 'stored' && result.entry.dataSet === 'csb' && !result.entry.unofficial),
+      'in the csb set, a save of Chaos Strikes Back and mini.dat are stored, rows of that set');
+    const dmInCsb = await csbSaves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine }, true);
+    console.log(`  a save of Dungeon Master, in the csb set: ${refusal(dmInCsb)}`);
+    check(dmInCsb.kind === 'other' && dmInCsb.dungeon.name === 'Dungeon Master' && dmInCsb.dungeon.dataSets.includes(DEFAULT_DATA_SET.id),
+      'and a save of Dungeon Master is another dungeon\'s there');
+    check((await saves.list()).every((row) => row.dataSet === DEFAULT_DATA_SET.id) && (await csbSaves.list()).length === 2,
+      'each game lists its own set\'s');
+  } finally {
+    Date.now = realNow;
+  }
+}
+
 /* ------------------------------------------------------------ 12. the play time ---- */
 
 /**
@@ -2709,6 +2928,7 @@ async function main(): Promise<void> {
   await checkScrolling(graphics);
   await checkDoubleClick(graphics);
   await checkExport(graphics);
+  await checkImport(graphics);
   await checkPlayTime(graphics);
   await checkUpgrade();
   finish();

@@ -44,6 +44,13 @@ export interface SaveEntry {
     level: number;
     /** Champion names in party order, from the file's block 4. */
     champions: string[];
+    /**
+     * Whether the save is of a modified version of its data set's dungeon: a file that was
+     * most of that dungeon and not the whole, imported once the player had confirmed it,
+     * or a save of a game read from such a row (`GameSaves.importSave`,
+     * `src/engine/GameSaves.ts`). Nothing reads it yet.
+     */
+    unofficial: boolean;
 }
 
 /** A row as the store holds it: the entry, and the CSBWin file. */
@@ -52,15 +59,17 @@ export interface SaveRecord extends SaveEntry {
 }
 
 /**
- * A row as a store may hold it: one written before rows held `usedAt` or `playTime` has
- * neither.
+ * A row as a store may hold it: one written before rows held `usedAt`, `playTime` or
+ * `unofficial` has none of them.
  */
-export type StoredSaveRecord = Omit<SaveRecord, 'usedAt' | 'playTime'> & { usedAt?: number; playTime?: number };
+export type StoredSaveRecord = Omit<SaveRecord, 'usedAt' | 'playTime' | 'unofficial'>
+    & { usedAt?: number; playTime?: number; unofficial?: boolean };
 
 /**
  * A stored row's entry, without its bytes. A row written before rows held `usedAt` has
  * none, and counts as last used when it was saved; one written before they held
- * `playTime` counts no time played.
+ * `playTime` counts no time played; one written before they held `unofficial` is of its
+ * data set's own dungeon, since no file came in from outside then.
  */
 export function saveEntryOf(record: StoredSaveRecord): SaveEntry {
     return {
@@ -74,6 +83,7 @@ export function saveEntryOf(record: StoredSaveRecord): SaveEntry {
         playTime: record.playTime ?? 0,
         level: record.level,
         champions: record.champions,
+        unofficial: record.unofficial ?? false,
     };
 }
 

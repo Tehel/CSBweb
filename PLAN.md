@@ -178,7 +178,11 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   them, under the row's name (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`).
   What the row alone holds, its date, its play time and whether F5 wrote it, stays
   behind. **Import** is a `.dat` dropped on the canvas while the dialog is up; there is
-  no file picker.
+  no file picker. The row keeps the file's name, numbered while a save has it, and
+  the file's date, as CSBWin ranks its slots by their files' `MODIFIEDTIME`
+  (`doc/CSBwin-src/CSBCode.cpp:9766-9800`); it counts no time played, and is the last
+  save used (`GameSaves.importSave`, `src/engine/GameSaves.ts`). A file that does not
+  read is CSBWin's "SAVED GAME DAMAGED!" (`SaveGame.cpp:1906`).
 - **A save knows its dungeon.** A row carries its data set's id, and the list shows the
   running data set's saves only (`GameSaves.dataSet`). The filter is the list's
   parameter, not its rule: `DEBT.md` G17's source save is picked across sets (a DM save
@@ -207,7 +211,8 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   LOOKS LIKE A SAVE FROM A MODIFIED VERSION OF" and the dungeon's name, over CONFIRM
   and CANCEL. Confirmed, it is stored as a row of the running data set, the set of the
   dungeon it looks like, and the row is marked unofficial (`SaveEntry.unofficial`),
-  which nothing reads yet; cancelled, nothing is stored. So "switch to it" never names
+  as are the saves of a game read from such a row; nothing reads the mark yet.
+  Cancelled, nothing is stored. So "switch to it" never names
   the dungeon a save is refused in. That takes a catalogue of
   known dungeons' signatures (`KNOWN_DUNGEONS`), each with the data sets that play it,
   which may list dungeons the port cannot play: so the digests are committed, not read
@@ -248,8 +253,9 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   and an export carries it. The store's upgrade to its version 3 stamps the rows of an
   earlier version by that rule (`stampSaveRecords`, `src/data/saves/legacyRows.ts`),
   one row at a time, so that the rows of one party and data set are one playthrough;
-  the page gives it a stream of its own to draw from (`src/main.ts`). The import
-  (step 4d) is the other way in. So 0 is no special value to the game: a load takes the
+  the page gives it a stream of its own to draw from (`src/main.ts`). The import is
+  the other way in, by the same rule and from the same stream
+  (`GameSaves.importSave`). So 0 is no special value to the game: a load takes the
   file's id as it is, as CSBWin does (`doc/CSBwin-src/SaveGame.cpp:1610`), and the
   game's saves carry it. The draw still never gives 0.
 - **No id drawn here is a stored save's.** CSBWin's draw is the
@@ -406,7 +412,7 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      read that fails; a row from before the field; a new game) and "the store's
      upgrade" (an upgraded row counts none).
    - g. ✅ **A drawn id is no stored row's**: a new game's, and the store's upgrade's
-     for a row that names none; step 4d's import draws through the same
+     for a row that names none; the import draws through the same
      `drawPlaythrough`. Evidence: `tools/dump-save-menu.ts`, "a drawn playthrough is no
      stored save's" (a store holding the ids a pinned stream draws first, and each
      game taking the next; another data set's saves; a store that cannot be listed)
@@ -494,13 +500,26 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      digest, and a save of thirteen levels of the fourteen being most of Dungeon
      Master and not the whole). With a path, the tool prints that file's digests as
      the catalogue lists them, which is how a dungeon is added.
-   - d. ⏳ **The import's check and its row**: a file checked against the dungeon,
-     stamped when it holds no id, and stored (`GameSaves`). The file's
+   - d. ✅ **The import's check and its row**: a file checked against the dungeon,
+     stamped when it holds no id, and stored (`GameSaves.importSave`). The file's
      signature is read from its world (`loadCsbwinWorld`), so a file whose image is
      damaged is refused there. It is the running set's when `identifyDungeon` gives a
      whole dungeon that lists `GameSaves.dataSet`; the `csb` set has two. Most of such
      a dungeon and not the whole, it is a modified dungeon's, stored only once
-     confirmed, as an unofficial row; anything else is refused.
+     confirmed, as an unofficial row; anything else is refused (`checkDungeon`,
+     `src/data/DungeonSignature.ts`). Nothing in the page calls it yet. Evidence:
+     `tools/dump-save-menu.ts`, "the import" (a genuine save stored under its file's
+     name, date and playthrough, byte for byte, and again under a numbered name; a
+     file that names no playthrough joined to its party's or given the first its
+     stream draws, stamped, the game's stream left alone; a save with one wall opened
+     stored only once confirmed, unofficial, and the saves of a game read from it
+     unofficial too, SAVE's and F5's, but not a new game's nor one written over the
+     row by another game; a Chaos Strikes Back save, a save with a wall of every
+     level opened, and four files that do not read, none stored; the `csb` set
+     taking its two saves and refusing Dungeon Master's) and
+     `tools/dump-dungeon-signature.ts`, section 6 (`checkDungeon` in each of the four
+     Dungeon Master sets and in `csb`, one level of fourteen being a modified
+     version, and a known dungeon no data set plays).
    - e. ⏳ **The drop and the dialog's answers**: a `.dat` dropped on the canvas while
      the dialog is up, in play and at the entrance; the question for a modified
      dungeon, the refusal with the dungeon named, and the imported save selected.

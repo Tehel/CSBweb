@@ -16,11 +16,19 @@
  * menu made or wrote over; F9 loads the playthrough's newest save, the slot or the menu's. Neither
  * raises a dialog, so what either did, or why it did nothing, is a line in the message
  * area, and one for the console with the save's name.
+ *
+ * A file from outside, CSBWin's or another browser's export, comes into the store through
+ * `importSave`, once its dungeon has been held against the data set's
+ * (`src/data/DungeonSignature.ts`). CSBWin has no such thing: a file put in the game's
+ * directory under one of its four names is a save of that game.
  */
-import type { CsbRandom } from '../core/random';
+import { CsbRandom } from '../core/random';
+import { loadCsbwinWorld } from '../data/CsbwinDungeonImage';
 import type { DataSet } from '../data/DataSets';
+import { checkDungeon, dungeonSignature, type DungeonCheck } from '../data/DungeonSignature';
+import { stampRandomGameID } from '../data/SaveGameLoader';
 import {
-    SAVE_FILE_EXTENSION, quickSlot, readSaveFileFields,
+    SAVE_FILE_EXTENSION, joinedPlaythrough, quickSlot, readSaveFileFields,
     type OpenedSave, type SaveEntry, type SaveStore,
 } from '../data/saves';
 import type { Game } from './Game';
@@ -59,6 +67,33 @@ export type SaveClock = 'running' | 'stopped';
  */
 export type SaveTarget = 'new' | 'quick' | SaveEntry;
 
+/** A file on its way into the store (`GameSaves.importSave`). */
+export interface ImportedFile {
+    /** The file's name, which its row keeps (`importedFileName`). */
+    name: string;
+    bytes: Uint8Array;
+    /**
+     * Milliseconds since the epoch: when the file was last written, where the page knows
+     * it. It is the row's date, as CSBWin ranks its slots by their files' `MODIFIEDTIME`
+     * (`doc/CSBwin-src/CSBCode.cpp:9766-9800`).
+     */
+    modifiedAt?: number;
+}
+
+/**
+ * How an import came out: the row the file was stored as, or what its dungeon is to the
+ * data set's, and nothing stored.
+ */
+export type ImportResult =
+    | { kind: 'stored'; entry: SaveEntry }
+    | Exclude<DungeonCheck, { kind: 'own' }>;
+
+/**
+ * The line for a file that does not read as a save: CSBWin's own for a failed read
+ * (`doc/CSBwin-src/SaveGame.cpp:1906`).
+ */
+export const SAVED_GAME_DAMAGED = 'SAVED GAME DAMAGED!';
+
 /** The colour of F5's and F9's lines in the message area: white, as a wall's text is. */
 const SAVE_MESSAGE_COLOR = 15;
 
@@ -77,6 +112,19 @@ export function makeSaveFileName(savedAt: number, taken: ReadonlySet<string> = n
     let n = 2;
     while (taken.has(name)) name = `${stem}-${n++}${SAVE_FILE_EXTENSION}`;
     return name;
+}
+
+/**
+ * The name an imported file is stored under: its own, a `.dat`, with a number after it
+ * while a save among `taken` has it, since a row's name is its key.
+ */
+export function importedFileName(name: string, taken: ReadonlySet<string>): string {
+    const dot = name.toLowerCase().endsWith(SAVE_FILE_EXTENSION) ? name.length - SAVE_FILE_EXTENSION.length : name.length;
+    const stem = name.slice(0, dot);
+    const extension = name.slice(dot) || SAVE_FILE_EXTENSION;
+    let unique = `${stem}${extension}`;
+    for (let n = 2; taken.has(unique); n++) unique = `${stem}-${n}${extension}`;
+    return unique;
 }
 
 /**
@@ -103,6 +151,12 @@ export class GameSaves {
      * meanwhile would be lost to it in a store that reads the row to write it back.
      */
     private marked: Promise<void> = Promise.resolve();
+    /**
+     * Whether the running game's world is a modified version of the data set's dungeon:
+     * the row's of the save it was read from (`SaveEntry.unofficial`), which its own
+     * saves then carry. A new game's is the data set's own.
+     */
+    private unofficial = false;
 
     constructor(
         private readonly game: Game,
@@ -117,6 +171,12 @@ export class GameSaves {
          * listed for a new game, or written to mark a loaded save as used.
          */
         private readonly log: (message: string, error?: unknown) => void,
+        /**
+         * The stream a playthrough is drawn from for an imported file that names none:
+         * not the game's, whose draws are the game's. The page gives the store's
+         * (`src/main.ts`).
+         */
+        private readonly fileRandom: CsbRandom = new CsbRandom(),
     ) {}
 
     /**
@@ -145,6 +205,7 @@ export class GameSaves {
      */
     async newGameRead(): Promise<void> {
         const { block1 } = this.game.ctx.state;
+        this.unofficial = false;
         try {
             const rows = await this.list();
             if (rows.some((row) => row.playthrough === block1.randomGameID)) {
@@ -187,7 +248,9 @@ export class GameSaves {
      * the playthrough from `GAMEBLOCK1`, the level from `GAMEBLOCK2` and the names from
      * block 4 (`readSaveFileFields`); the date is the row's, since a CSBWin file has none,
      * and is when the save was last used too (`SaveEntry.usedAt`). The play time is the
-     * row's as well, the game's count as the file is made (`Game.playTime`).
+     * row's as well, the game's count as the file is made (`Game.playTime`), and so is
+     * whether the world is a modified dungeon's (`SaveEntry.unofficial`), which the game
+     * has from the save it was read from.
      */
     async save(clock: SaveClock, target: SaveTarget): Promise<SaveEntry> {
         if (clock === 'running') this.screen.repackOpenChest();
@@ -207,7 +270,8 @@ export class GameSaves {
         const name = over ? over.name : makeSaveFileName(savedAt, new Set(rows.map((row) => row.name)));
         const id = over ? over.id : name;
         const entry: SaveEntry = {
-            id, name, dataSet: this.dataSet.id, quick, savedAt, usedAt: savedAt, playTime, ...fields,
+            id, name, dataSet: this.dataSet.id, quick, savedAt, usedAt: savedAt, playTime,
+            unofficial: this.unofficial, ...fields,
         };
         await this.store.write(entry, bytes);
         if (clock === 'stopped') this.game.saveWritten();
@@ -232,13 +296,78 @@ export class GameSaves {
      * A save that read is the last one used from then on: its row takes the time
      * (`SaveEntry.usedAt`) and keeps the rest. One that did not read is left as it was,
      * and so is the play time of the game it did not replace.
+     *
+     * The game's world is the file's, a modified dungeon's when the row says so
+     * (`SaveEntry.unofficial`).
      */
     read(save: OpenedSave): void {
         applySaveBytes(this.game, save.bytes);
         this.game.setPlayTime(save.entry.playTime);
+        this.unofficial = save.entry.unofficial;
         this.lastRead = 'loaded';
         this.marked = this.store.markUsed(save.entry.id, Date.now())
             .catch((error) => this.log(`${save.entry.name} could not be marked as the last save used`, error));
+    }
+
+    /**
+     * Take a file from outside into the store, as a row of the game's data set: a CSBWin
+     * save, which the list then shows and LOAD reads as any other. The game is left alone.
+     *
+     * The file names no dungeon but holds one, and its walls are held against the known
+     * dungeons' (`checkDungeon` over the signature of the file's world, `PLAN.md` →
+     * Phase 10, "An import is checked against the dungeon"):
+     *
+     * - the data set's own dungeon, whole: stored;
+     * - most of the data set's own and not the whole, a modified version of it: stored
+     *   only once the player has `confirmed` it, and then marked `unofficial`;
+     * - another dungeon's, or an unknown one's: never stored.
+     *
+     * What is not stored comes back as the check, for the dialog to say. A file whose
+     * blocks or dungeon image do not read has no signature, and throws a `SaveFileError`
+     * with CSBWin's line for a failed read.
+     *
+     * The row keeps the file's name, made unique in the store, and its date where the
+     * page has one (`ImportedFile.modifiedAt`), today's otherwise; it counts no time
+     * played, which no file holds, and is the last save used, being the last written.
+     * Its level, champions and playthrough are the file's (`readSaveFileFields`). A file
+     * that names no playthrough, an earlier build's, takes one as it enters the store:
+     * that of the newest save of the same data set and party (`joinedPlaythrough`), or a
+     * new one that no save of the data set holds (`drawPlaythrough`), stamped into the
+     * file so that the row and its file agree (`stampRandomGameID`). A file that names
+     * one keeps it, a local playthrough's or not: nothing tells a save of this game from
+     * a save of another that drew the same id.
+     */
+    async importSave(file: ImportedFile, confirmed = false): Promise<ImportResult> {
+        let signature: string[];
+        try {
+            signature = await dungeonSignature(loadCsbwinWorld(file.bytes).dungeon);
+        } catch (error) {
+            this.log(`${file.name} does not read as a saved game`, error);
+            throw new SaveFileError(SAVED_GAME_DAMAGED);
+        }
+        const fields = readSaveFileFields(file.bytes);
+        if (!fields) throw new SaveFileError(SAVED_GAME_DAMAGED);
+        const check = checkDungeon(signature, this.dataSet.id);
+        if (check.kind === 'other' || check.kind === 'unknown') return check;
+        if (check.kind === 'modified' && !confirmed) return check;
+
+        await this.marked;
+        const rows = await this.store.list(null);
+        const name = importedFileName(file.name, new Set(rows.flatMap((row) => [row.id, row.name])));
+        const now = Date.now();
+        const entry: SaveEntry = {
+            id: name, name, dataSet: this.dataSet.id, quick: false,
+            savedAt: file.modifiedAt ?? now, usedAt: now, playTime: 0,
+            unofficial: check.kind === 'modified', ...fields,
+        };
+        let { bytes } = file;
+        if (entry.playthrough === 0) {
+            entry.playthrough = joinedPlaythrough(entry, rows)
+                || drawPlaythrough(this.fileRandom, rows.filter((row) => row.dataSet === entry.dataSet));
+            bytes = stampRandomGameID(bytes, entry.playthrough);
+        }
+        await this.store.write(entry, bytes);
+        return { kind: 'stored', entry };
     }
 
     /** The boot's chooser only: its `read` threw, and `tag01efee` follows. */

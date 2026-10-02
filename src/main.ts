@@ -289,7 +289,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
 
     // The game's saves: the disk menu's, the boot's chooser's, and F5 and F9's. The store
     // draws from a stream of its own for a row of an earlier version that names no
-    // playthrough: the game's stream is the game's.
+    // playthrough, and so does an import for a file that names none: the game's stream
+    // is the game's.
     const storeRandom = new CsbRandom();
     const saveStore = new BrowserSaveStore((rows) => drawPlaythrough(storeRandom, rows));
     const saves = new GameSaves(game, dataSet, saveStore, {
@@ -297,7 +298,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // carry only a portrait index.
         portraitOf: (champion) => screen?.portraitPixelsFor(champion),
         repackOpenChest: () => screen?.repackChest(),
-    }, logSave);
+    }, logSave, storeRandom);
 
     screen = new GameScreen(gameCanvasEl, {
         graphicsLoader: files.graphicsLoader,

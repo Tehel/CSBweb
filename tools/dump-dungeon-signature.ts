@@ -18,6 +18,8 @@
  *    attributes and objects, and its type among those that are not stone, change
  *    nothing; a wall opened or a cell walled changes its level's digest alone, and the
  *    save is then most of Dungeon Master, not the whole of it.
+ * 6. What a signature is to a data set (`checkDungeon`): the set's own dungeon, a
+ *    modified version of it, another dungeon's, one the port cannot play, or none.
  *
  * With a path, the digests of that file, a `dungeon.dat` or a save, are printed first,
  * as the catalogue lists them: that is how a dungeon is added to it.
@@ -33,7 +35,7 @@ import { readCsbwinSaveInfo } from '../src/data/CsbwinSaveInfo';
 import { DATA_SETS } from '../src/data/DataSets';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import {
-  dungeonSignature, identifyDungeon, KNOWN_DUNGEONS, levelWalls, type KnownDungeon,
+  checkDungeon, dungeonSignature, identifyDungeon, KNOWN_DUNGEONS, levelWalls, type KnownDungeon,
 } from '../src/data/DungeonSignature';
 import type { DungeonData, MapData } from '../src/data/dungeonTypes';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
@@ -262,6 +264,40 @@ async function checkCoarseness(): Promise<void> {
   check(only?.dungeon === longer && only.levels === 14 && !only.whole, 'which alone is what it looks like, and not its dungeon');
 }
 
+/* ------------------------------------------- 6. a signature and a data set --- */
+
+async function checkAgainstDataSet(): Promise<void> {
+  console.log('\n=== 6. what a signature is to a data set (`checkDungeon`) ===');
+  const dm = known(DM);
+  const own = await dungeonSignature(loadCsbwinWorld(read(savePath('csbgame7.dat'))).dungeon);
+  const mini = await dungeonSignature(loadCsbwinWorld(read(MINI)).dungeon);
+  const prison = await dungeonSignature(dungeonDat('static/gamefiles/csb/dungeon.dat'));
+  const most = [...own.slice(0, 13), own[0]];
+  const say = (what: string, signature: readonly string[], set: string, known?: readonly KnownDungeon[]): string => {
+    const result = checkDungeon(signature, set, known);
+    const line = result.kind === 'unknown' ? 'unknown' : `${result.kind}, ${result.dungeon.name}`;
+    console.log(`  ${what}, in ${set}: ${line}`);
+    return line;
+  };
+  for (const set of dm.dataSets) {
+    check(say('a save of Dungeon Master', own, set) === `own, ${DM}`, `in ${set}, a save of ${DM} is the set's own`);
+  }
+  check(say('thirteen of its levels and one that is not', most, 'dm-atari') === `modified, ${DM}`,
+    'most of the set\'s dungeon and not the whole is a modified version of it');
+  check(say('one level of it', own.slice(0, 1), 'dm-atari') === `modified, ${DM}`, 'and so is one level of it: the player is asked');
+  check(say('a save of Dungeon Master', own, 'csb') === `other, ${DM}` && say('thirteen of its levels', most, 'csb') === `other, ${DM}`,
+    'in another set, the whole of it or most of it is another dungeon\'s');
+  check(say('mini.dat', mini, 'csb') === `own, ${CSB}` && say('the prison', prison, 'csb') === `own, ${CSB}, the prison`,
+    'the csb set has two dungeons of its own');
+  check(say('mini.dat', mini, 'dm-atari') === `other, ${CSB}`, `and in Dungeon Master ${CSB} is another dungeon's`);
+  check(say('each level one further down', [own[13], ...own.slice(0, 13)], 'dm-atari') === 'unknown', 'a signature no known dungeon has a level of is unknown');
+  const unplayed: KnownDungeon = { name: 'unplayed', dataSets: [], signature: own };
+  const result = checkDungeon(own, 'dm-atari', [unplayed]);
+  check(say('a dungeon no data set plays', own, 'dm-atari', [unplayed]) === 'other, unplayed'
+    && result.kind === 'other' && result.dungeon.dataSets.length === 0,
+    'a known dungeon no data set plays is another dungeon\'s, with no set to switch to');
+}
+
 async function printFile(path: string): Promise<void> {
   const bytes = read(path);
   let dungeon: DungeonData;
@@ -285,6 +321,7 @@ async function main(): Promise<void> {
   await checkSaves();
   await checkOwnSave();
   await checkCoarseness();
+  await checkAgainstDataSet();
   finish();
 }
 

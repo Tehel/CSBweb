@@ -172,3 +172,27 @@ export function identifyDungeon(
     }
     return best;
 }
+
+/**
+ * What a file's dungeon is to a data set, by its signature: the set's `own`, whole; a
+ * `modified` version of the set's own, most of it and not the whole; an `other` known
+ * dungeon's, the whole or most of one; or of an `unknown` dungeon, no level of any.
+ */
+export type DungeonCheck =
+    | { kind: 'own' | 'modified' | 'other'; dungeon: KnownDungeon }
+    | { kind: 'unknown' };
+
+/**
+ * `signature` against the data set `dataSet`, its `DataSet.id`: the dungeon it looks like
+ * (`identifyDungeon`) is the set's when it lists the set, and a set may have two.
+ */
+export function checkDungeon(
+    signature: DungeonSignature,
+    dataSet: string,
+    known: readonly KnownDungeon[] = KNOWN_DUNGEONS,
+): DungeonCheck {
+    const match = identifyDungeon(signature, known);
+    if (!match) return { kind: 'unknown' };
+    if (!match.dungeon.dataSets.includes(dataSet)) return { kind: 'other', dungeon: match.dungeon };
+    return { kind: match.whole ? 'own' : 'modified', dungeon: match.dungeon };
+}
