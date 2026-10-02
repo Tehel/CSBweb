@@ -5071,7 +5071,13 @@ little-endian count (`35 00 00 00`, 53 moves, in `csbgame-early-1hero.dat`).
 and xor, writes word 127 as `D6 ^ D5`, `D5` being the sum of the second half's words, and
 scrambles the second half with word 29, which is 0, as its hash (`:706-750`). The reader's
 fold over all 128 words therefore ends at `D5` (`ReadUnscrambleBlock`,
-`doc/CSBwin-src/CSBCode.cpp:9083-9098`). Bytes 256-299 of `Byte740`, `FILL438` (302) and
+`doc/CSBwin-src/CSBCode.cpp:9167-9196`). The reader takes any words 0-126 that fold so:
+each zero is written in place of a commented-out `STRandom()` (`SaveGame.cpp:725-738`),
+and `static/gamefiles/csb/mini.dat` holds 127 words that are not zero there. No other
+block's hash or checksum covers a field of `GAMEBLOCK1`, so a field of its second half
+is rewritten by changing that field and word 127 alone: `stampRandomGameID`
+(`src/data/SaveGameLoader.ts`) writes `RandomGameID` so, six bytes of the file
+(`tools/dump-save-stamp.ts`). Bytes 256-299 of `Byte740`, `FILL438` (302) and
 `Checksum354`…`374` are never assigned. They are zero in every committed save.
 
 `_ReadEntireGame` sets `d.Word22596 = 2`, `d.Word22598 = 1`, `d.Word22594 = 1`,

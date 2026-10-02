@@ -72,12 +72,11 @@ function unscramble(buf: Uint8Array, initialHash: number, numWords: number): num
     return d5 & 0xffff;
 }
 
-/** `ReadUnscrambleBlock` (`doc/CSBwin-src/CSBCode.cpp:9167-9196`): `GAMEBLOCK1`, checked and plain. */
-export function readUnscrambleBlock(data: Uint8Array, offset: number): { buf: Uint8Array; next: number } {
-    const end = offset + BLOCK1_SIZE;
-    if (end > data.length) throw new Error('savegame block1 truncated');
-    const buf = data.slice(offset, end);
-
+/**
+ * `GAMEBLOCK1`'s first half folded as `ReadUnscrambleBlock` folds it, its 128 words by
+ * turns of add, xor, subtract and xor (`doc/CSBwin-src/CSBCode.cpp:9167-9196`).
+ */
+function foldBlock1(buf: Uint8Array): number {
     let d6 = 0;
     let pos = 0;
     for (let i = 0; i < 32; i++) {
@@ -90,22 +89,48 @@ export function readUnscrambleBlock(data: Uint8Array, offset: number): { buf: Ui
         d6 ^= readU16BE(buf, pos);
         pos += 2;
     }
+    return d6 & 0xffff;
+}
+
+/** The sum of `GAMEBLOCK1`'s second half, plain, word by word: what the fold must end at. */
+function sumBlock1(buf: Uint8Array): number {
+    let d5 = 0;
+    for (let pos = 256; pos < BLOCK1_SIZE; pos += 2) d5 = (d5 + readU16BE(buf, pos)) & 0xffff;
+    return d5;
+}
+
+/** `ReadUnscrambleBlock` (`doc/CSBwin-src/CSBCode.cpp:9167-9196`): `GAMEBLOCK1`, checked and plain. */
+export function readUnscrambleBlock(data: Uint8Array, offset: number): { buf: Uint8Array; next: number } {
+    const end = offset + BLOCK1_SIZE;
+    if (end > data.length) throw new Error('savegame block1 truncated');
+    const buf = data.slice(offset, end);
+
+    const d6 = foldBlock1(buf);
 
     const hash = readU16BE(buf, 58);
     unscramble(buf.subarray(256), hash, 128);
 
-    let d5 = 0;
-    pos = 256;
-    for (let i = 0; i < 128; i++) {
-        d5 = (d5 + readU16BE(buf, pos)) & 0xffff;
-        pos += 2;
-    }
-
-    if ((d6 & 0xffff) !== (d5 & 0xffff)) {
+    if (d6 !== sumBlock1(buf)) {
         throw new Error('savegame block1 checksum mismatch');
     }
 
     return { buf, next: end };
+}
+
+/**
+ * `GAMEBLOCK1` as `readUnscrambleBlock` gives it, put back as its file holds it, in
+ * place, once a field of its second half has been written. Word 127 takes what makes
+ * the fold of the first half end at the second half's new sum, and the second half is
+ * scrambled again with word 29.
+ *
+ * The other 127 words of the first half stay the file's own, where `scrambleAndWrite`
+ * zeroes them: this rewrites a file, and changes of it only what the field changed.
+ */
+export function rescrambleBlock1(block1: Uint8Array): void {
+    writeU16BE(block1, 254, 0);
+    // The fold ends on an xor with word 127, so with that word 0 it is the fold of the rest.
+    writeU16BE(block1, 254, sumBlock1(block1) ^ foldBlock1(block1));
+    scramble(block1.subarray(256), readU16BE(block1, 58), 128);
 }
 
 /** `UnscrambleStream` (`doc/CSBwin-src/CSBCode.cpp:9070-9079`): one of blocks 2 to 6, checked and plain. */

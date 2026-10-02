@@ -4,6 +4,7 @@
  */
 
 import { SoundManager } from './audio/SoundManager';
+import { CsbRandom } from './core/random';
 import { CSBGraphicsLoader } from './data/CSBGraphicsLoader';
 import { dataSetFor } from './data/DataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
@@ -12,7 +13,7 @@ import { BrowserSaveStore } from './data/saves';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
 import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
-import { GameSaves } from './engine/GameSaves';
+import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadGlfx } from './lib/glfx-loader';
 import { GameScreen } from './renderer/GameScreen';
 import { bindDataSetChooser, bindUIContext, drawMapPreview, handleCursorFilter } from './ui';
@@ -286,8 +287,12 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         drawCharacterState: (chIdx, charFlags) => screen?.drawCharacterState(chIdx, charFlags),
     });
 
-    // The game's saves: the disk menu's, the boot's chooser's, and F5 and F9's.
-    const saves = new GameSaves(game, dataSet, new BrowserSaveStore(), {
+    // The game's saves: the disk menu's, the boot's chooser's, and F5 and F9's. The store
+    // draws from a stream of its own for a row of an earlier version that names no
+    // playthrough: the game's stream is the game's.
+    const storeRandom = new CsbRandom();
+    const saveStore = new BrowserSaveStore((rows) => drawPlaythrough(storeRandom, rows));
+    const saves = new GameSaves(game, dataSet, saveStore, {
         // A save packs a `CHARDESC`, and that needs graphic 26 for the champions who
         // carry only a portrait index.
         portraitOf: (champion) => screen?.portraitPixelsFor(champion),

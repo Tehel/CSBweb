@@ -13,6 +13,7 @@ import {
   BLOCK1_SIZE,
   genChecksum,
   readUnscrambleBlock,
+  rescrambleBlock1,
   scramble,
   scrambleAndWrite,
   unscrambleStream,
@@ -924,5 +925,23 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   out.set(image, offset);
   offset += image.length;
   out.set(checksum, offset);
+  return out;
+}
+
+/**
+ * A copy of a save file with `randomGameID` for its `d.RandomGameID`, and nothing else
+ * of the game changed: `GAMEBLOCK1`'s field (`doc/CSBwin-src/SaveGame.cpp:1060`), and
+ * the word of the block's first half that is its checksum (`rescrambleBlock1`). No other
+ * block's hash or checksum covers the field, nor does the word that closes the file.
+ *
+ * Throws on a file whose `GAMEBLOCK1` does not read.
+ */
+export function stampRandomGameID(saveData: Uint8Array, randomGameID: number): Uint8Array<ArrayBuffer> {
+  const { offset } = readExtendedFeatures(saveData);
+  const { buf } = readUnscrambleBlock(saveData, offset);
+  writeU32BE(buf, 308, randomGameID >>> 0);
+  rescrambleBlock1(buf);
+  const out = new Uint8Array(saveData);
+  out.set(buf, offset);
   return out;
 }

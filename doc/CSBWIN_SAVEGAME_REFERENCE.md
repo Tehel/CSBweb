@@ -25,7 +25,7 @@ by construction, all of which assume the Atari's big-endian words:
 - `Unscramble` runs its hash arithmetic on `LE16(wordGear(A3))` and XORs with
   `LE16(D7W)` (`doc/CSBwin-src/CSBCode.cpp:9057-9061`).
 - `ReadUnscrambleBlock` sums the block-1 header the same way, through `LE16`
-  (`doc/CSBwin-src/CSBCode.cpp:9083-9098`).
+  (`doc/CSBwin-src/CSBCode.cpp:9176-9192`).
 - `swapBlock1` / `swapBlock2` / `swapCharacter` / `swapITEM16s` then `BO()` every field
   (`doc/CSBwin-src/SaveGame.cpp:455-500`), and `BO` is `LE16`/`LE32`.
 

@@ -206,7 +206,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 132 checks sequentially (`spawnSync`, `:253`), each a
+`tools/run-checks.mjs` spawns its 133 checks sequentially (`spawnSync`, `:255`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and
@@ -755,8 +755,9 @@ Recorded so that nobody "fixes" them.
   it is 0 when either low word is, about one new game in 32768. The author's decision:
   the port draws the next pair instead (`drawRandomGameID`, `src/engine/GameContext.ts`),
   which in that case leaves the stream two draws further on than CSBWin's. 0 is what a
-  save of an earlier build holds for no playthrough at all (`PLAN.md` → Phase 10, "A
-  playthrough"), and the rule stays once no stored save holds it. `tools/dump-new-game.ts`
+  file of an earlier build holds, which names no playthrough, and the store stamps an
+  id into such a file as it takes it (`PLAN.md` → Phase 10, "A playthrough"): a game
+  that drew 0 would write files the store takes for those. `tools/dump-new-game.ts`
   checks it on a stream whose first pair gives 0. The same goes for an id a save of the
   data set already holds, about one pair of games in 16 million: the page draws the next
   pair once the new game is read (`GameSaves.newGameRead`, `src/engine/GameSaves.ts`),

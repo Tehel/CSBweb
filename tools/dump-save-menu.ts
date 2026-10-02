@@ -35,13 +35,11 @@
  *    runs. Run against a store in memory, which two games of two data sets then share:
  *    each lists its own set's saves. F5 writes over its playthrough's quick-save, and
  *    F9 loads its playthrough's newest save. SAVE over a listed save writes that row.
- *    And a file that
- *    A save read into a game is marked as the last one used. And a file that
- *    names no playthrough, loaded: its game joins the playthrough of a save of its data
- *    set and party, or draws one. And a drawn playthrough, a new game's or such a
- *    file's, is drawn again while a save of the data set holds it.
+ *    A save read into a game is marked as the last one used. And a new game's
+ *    playthrough is drawn again while a save of the data set holds it.
  * 9. **The store's upgrade.** The rows of the store's first version, a CSBWin file or a
- *    `.dmweb.json` around one, made today's (`src/data/saves/legacyRows.ts`). The page
+ *    `.dmweb.json` around one, made today's (`src/data/saves/legacyRows.ts`), and the
+ *    rows that name no playthrough each given one, stamped into its file. The page
  *    runs it once, inside IndexedDB's upgrade; here it runs over rows built by hand.
  * 10. **The selection.** The menu driven by its own clicks and keys over that store:
  *    the full menu opens on its "new save" row in an empty store, where LOAD is inert
@@ -97,13 +95,15 @@ import {
   lastUsedSave,
   playthroughsOf,
   quickSlot,
+  readSaveFileFields,
   saveEntryOf,
   SAVE_FILE_EXTENSION,
   sortSaveEntries,
   type SaveEntry,
   type SaveStore,
+  type StoredSaveRecord,
 } from '../src/data/saves/SaveStore';
-import { upgradeSaveRecords } from '../src/data/saves/legacyRows';
+import { stampSaveRecords, upgradeSaveRecords } from '../src/data/saves/legacyRows';
 import { DEFAULT_DATA_SET, dataSetFor } from '../src/data/DataSets';
 import { Game } from '../src/engine/Game';
 import type { GameHost, MessageSink } from '../src/engine/GameHost';
@@ -111,7 +111,7 @@ import { freeze, thaw, type LoopScript } from '../src/engine/LoopState';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { drawRandomGameID } from '../src/engine/GameContext';
-import { GameSaves, makeSaveFileName } from '../src/engine/GameSaves';
+import { GameSaves, drawPlaythrough, makeSaveFileName } from '../src/engine/GameSaves';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
@@ -594,14 +594,14 @@ function checkListLogic(): void {
     entry({ name: 'a2', playthrough: 7, savedAt: 400, champions: ['DAROO'] }),
     entry({ name: 'b1', playthrough: 9, savedAt: 200, usedAt: 500, champions: ['WUUF'] }),
     entry({ name: 'b2', playthrough: 9, savedAt: 300, champions: ['WUUF', 'HALK'] }),
-    entry({ name: 'c1', playthrough: 0, savedAt: 50, champions: ['LEYLA'] }),
-    entry({ name: 'c2', playthrough: 0, savedAt: 60, champions: ['SONJA'] }),
+    entry({ name: 'c1', playthrough: 3, savedAt: 50, champions: ['LEYLA'] }),
+    entry({ name: 'c2', playthrough: 3, savedAt: 60, champions: ['SONJA'] }),
   ];
   const describe = (list: SaveEntry[]): string => playthroughsOf(list)
     .map((game) => `${game.id}: ${game.saves.map((e) => e.name).join(' ')} (last used ${game.lastUsed.name})`).join('; ');
   console.log('');
   console.log(`  playthroughs: ${describe(games)}`);
-  check(describe(games) === '9: b2 b1 (last used b1); 7: a2 a1 (last used a2); 0: c2 c1 (last used c2)',
+  check(describe(games) === '9: b2 b1 (last used b1); 7: a2 a1 (last used a2); 3: c2 c1 (last used c2)',
     'the saves are grouped by playthrough, each group\'s newest first, and the groups by their last use: a load counts as a save does');
   check(describe([...games].reverse()) === describe(games), 'in whatever order the rows come');
   check(playthroughsOf(games)[0].lastUsed === lastUsedSave(games), 'so the first playthrough holds the last save used of all');
@@ -621,7 +621,8 @@ function checkListLogic(): void {
   check(first !== second && second !== third, 'two saves in the same second get different names');
 
   // A save that names no playthrough joins the newest save of its data set and its
-  // party that names one.
+  // party that names one: the rule the store's upgrade stamps its rows by
+  // (`tools/dump-save-stamp.ts`).
   const party = ['DAROO', 'LEYLA'];
   const nameless = entry({ name: 'nameless', champions: party });
   const named = [
@@ -651,15 +652,13 @@ function checkListLogic(): void {
     entry({ name: 'quick, newer', playthrough: 7, quick: true, savedAt: 200 }),
     entry({ name: 'quick, another playthrough', playthrough: 9, quick: true, savedAt: 300 }),
     entry({ name: 'quick, another set', playthrough: 7, quick: true, dataSet: 'csb', savedAt: 400 }),
-    entry({ name: 'quick, no playthrough', playthrough: 0, quick: true, savedAt: 500 }),
   ];
   const slot = (dataSet: string, playthrough: number): string => quickSlot(slots, dataSet, playthrough)?.name ?? 'none';
-  console.log(`  F5's slot: playthrough 7 "${slot(DEFAULT_DATA_SET.id, 7)}", 9 "${slot(DEFAULT_DATA_SET.id, 9)}", 7 in csb "${slot('csb', 7)}", 8 "${slot(DEFAULT_DATA_SET.id, 8)}", 0 "${slot(DEFAULT_DATA_SET.id, 0)}"`);
+  console.log(`  F5's slot: playthrough 7 "${slot(DEFAULT_DATA_SET.id, 7)}", 9 "${slot(DEFAULT_DATA_SET.id, 9)}", 7 in csb "${slot('csb', 7)}", 8 "${slot(DEFAULT_DATA_SET.id, 8)}"`);
   check(slot(DEFAULT_DATA_SET.id, 7) === 'quick, newer', 'F5\'s slot is the playthrough\'s newest quick-save, never the menu\'s save');
   check(slot(DEFAULT_DATA_SET.id, 9) === 'quick, another playthrough' && slot('csb', 7) === 'quick, another set',
     'each playthrough has its own, in its own data set');
-  check(slot(DEFAULT_DATA_SET.id, 8) === 'none' && slot(DEFAULT_DATA_SET.id, 0) === 'none',
-    'a playthrough not quick-saved yet has none, and playthrough 0 never has one');
+  check(slot(DEFAULT_DATA_SET.id, 8) === 'none', 'a playthrough not quick-saved yet has none');
 
   // The last save used: the latest `usedAt`, which a write and a load both set.
   const used = [
@@ -1295,73 +1294,7 @@ async function checkSaveCall(): Promise<void> {
     check(strangerQuick.id !== dmNew.id && dmQuick.id === dmNew.id && shared.files.size === 6,
       'and each playthrough\'s F5 writes its own slot');
 
-    // A file whose RandomGameID is 0, as an earlier build of the port wrote them: its
-    // game is given a playthrough at the load.
-    console.log('');
-    console.log('=== a save that names no playthrough ===');
-    const kept = memoryStore();
     const idOf = (of: { game: Game }): number => of.game.ctx.state.block1.randomGameID;
-    const nameless = async (dataSet = DEFAULT_DATA_SET, name = 'DAROO', quick = false): Promise<SaveEntry> => {
-      const early = await stage(false, dataSet, kept, name);
-      early.game.ctx.state.block1.randomGameID = 0;
-      now += 60_000;
-      return early.saves.save('stopped', quick ? 'quick' : 'new');
-    };
-    const load = async (row: SaveEntry, dataSet = DEFAULT_DATA_SET) => {
-      const loaded = await stage(false, dataSet, kept, 'WUUF');
-      loaded.saves.read(await loaded.saves.open(row));
-      return loaded;
-    };
-    const old = await nameless();
-    check(old.playthrough === 0, 'a file whose RandomGameID is 0 is a row of playthrough 0');
-
-    const alone = await load(old);
-    const again = await load(old);
-    const plain = await loadGame();
-    applySaveBytes(plain, await kept.read(old.id));
-    console.log(`  loaded with no save to join: ${idOf(alone) !== 0 ? 'a playthrough' : 'NONE'}; loaded again: ${idOf(again) !== 0 && idOf(again) !== idOf(alone) ? 'another' : 'THE SAME'}`);
-    check(plain.ctx.state.block1.randomGameID === 0 && idOf(alone) !== 0, 'with no save to join, the loaded game draws a playthrough, where the file alone gives 0');
-    check(idOf(again) !== 0 && idOf(again) !== idOf(alone), 'and a second load of the file draws another');
-    check(alone.game.ctx.random.getSeed() === plain.ctx.random.getSeed(),
-      'the draw is not the game\'s stream: d.RandomNumber is the file\'s, as after CSBWin\'s load');
-
-    now += 60_000;
-    const carried = await alone.saves.save('stopped', 'new');
-    const joiner = await load(old);
-    const stillOld = (await kept.list(null)).find((e) => e.id === old.id);
-    console.log(`  the loaded game saved, and the file loaded again: ${idOf(joiner) === idOf(alone) ? 'the saved game\'s playthrough' : 'ANOTHER'}; the old row's: ${stillOld?.playthrough}`);
-    check(carried.playthrough === idOf(alone), 'the loaded game\'s save carries the playthrough it was given');
-    check(idOf(joiner) === idOf(alone), 'and the file loaded again joins it: a save of the same data set and party names it');
-    check(stillOld?.playthrough === 0 && readCsbwinSaveInfo(await kept.read(old.id))?.randomGameID === 0,
-      'the old row and its file keep 0');
-    const named = await load(carried);
-    check(idOf(named) === carried.playthrough, 'a file that names a playthrough gives its own');
-
-    const otherParty = await load(await nameless(DEFAULT_DATA_SET, 'LEYLA'));
-    const csbRow = await nameless(csbSet);
-    const otherSet = await load(csbRow, csbSet);
-    console.log(`  another party's: ${idOf(otherParty) !== 0 && idOf(otherParty) !== idOf(alone) ? 'another playthrough' : 'THE SAME'}; `
-      + `the same party's in ${csbSet.id}: ${idOf(otherSet) !== 0 && idOf(otherSet) !== idOf(alone) ? 'another playthrough' : 'THE SAME'}`);
-    check(idOf(otherParty) !== 0 && idOf(otherParty) !== idOf(alone), 'a file of another party does not join it');
-    check(csbRow.champions.join() === 'DAROO' && idOf(otherSet) !== 0 && idOf(otherSet) !== idOf(alone),
-      'nor does the same party\'s in another data set');
-
-    // F9 is the playthrough's, so it takes no file that names none: not the one its
-    // game was loaded from, nor a newer one.
-    const newest = await nameless(DEFAULT_DATA_SET, 'DAROO', true);
-    const beforeAgain = told.length;
-    await again.saves.quickLoad();
-    await alone.saves.quickLoad();
-    console.log(`  F9 in a game loaded from it and not saved: ${toldSince(beforeAgain).split('/')[1]}; in the one that saved: ${reports[reports.length - 1] === `Quick-loaded ${carried.name}` ? 'its save' : 'ANOTHER'}`);
-    check(toldSince(beforeAgain) === '/15:CAN\'T FIND SAVED GAME!/15:GAME LOADED',
-      'F9 in a game loaded from such a file and not saved since finds no save of its playthrough');
-    check(newest.quick && newest.savedAt > carried.savedAt && reports[reports.length - 1] === `Quick-loaded ${carried.name}`,
-      'and in the game that saved, loads that save, not the newer file that names none');
-
-    // Nor does F5 write over a quick-save that names none.
-    const quickOver = await alone.saves.save('running', 'quick');
-    check(quickOver.id !== newest.id && (await kept.list(null)).find((e) => e.id === newest.id)?.playthrough === 0,
-      'F5 makes its own slot beside a quick-save that names no playthrough');
 
     // A drawn id is no stored save's. With the host's `rand()` pinned, every stream is
     // the same one, so every draw gives the same first id.
@@ -1412,17 +1345,6 @@ async function checkSaveCall(): Promise<void> {
       const unlisted = await fresh(memoryStore(() => {}, false, () => { throw new Error('no store'); }));
       check(idOf(unlisted) === firstId && reports.length === reportsBefore + 1 && reports[reports.length - 1]!.startsWith('New game:'),
         'a store that cannot be listed leaves the id as drawn, and says so on the console');
-
-      // A file that names no playthrough, of a party no save is of: its draw is held to
-      // the same rows.
-      const earlier = await fresh(drawn);
-      earlier.game.ctx.state.block1.randomGameID = 0;
-      const unnamed = await saved(earlier, 'LEYLA');
-      const loaded = await fresh(memoryStore());
-      loaded.saves.read(await earlier.saves.open(unnamed));
-      console.log(`  a file of no playthrough and of another party, loaded: ${hex(idOf(loaded))}`);
-      check(unnamed.playthrough === 0 && idOf(loaded) === thirdId,
-        'a file that names no playthrough is given the first id its stream draws that no save holds');
     } finally {
       Math.random = random;
     }
@@ -1624,7 +1546,7 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
     // A read that fails marks nothing.
     let refused = false;
     try {
-      rig.saves.read({ entry: newer!, bytes: new Uint8Array(64), joins: 0 });
+      rig.saves.read({ entry: newer!, bytes: new Uint8Array(64) });
     } catch {
       refused = true;
     }
@@ -1683,8 +1605,7 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
 /* ------------------------------------------------------------- 11. the question ---- */
 
 /**
- * One store, the saves of two games and a file that names no playthrough, and the first
- * game's menu over them: which LOAD and which SAVE ask first, and what each answer does.
+ * One store, the saves of two games, and the first game's menu over them: which LOAD and which SAVE ask first, and what each answer does.
  */
 async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
   console.log('');
@@ -1692,8 +1613,6 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
   const store = memoryStore();
   const mine = await menuRig(graphics, store, 'DAROO');
   const theirs = await menuRig(graphics, store, 'WUUF');
-  const early = await menuRig(graphics, store, 'LEYLA');
-  early.game.ctx.state.block1.randomGameID = 0;
   const idOf = (rig: { game: Game }): number => rig.game.ctx.state.block1.randomGameID;
   const { ui } = mine;
   const g = SaveMenu.SAVE_MENU_GEOMETRY;
@@ -1717,9 +1636,7 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
     later();
     const own = await mine.saves.save('stopped', 'new');
     later();
-    const nameless = await early.saves.save('stopped', 'new');
-    later();
-    check(idOf(mine) !== idOf(theirs) && nameless.playthrough === 0, 'two games are two playthroughs, and the third file names none');
+    check(idOf(mine) !== idOf(theirs), 'two games are two playthroughs');
 
     const state = await mine.open();
     const files = store.files.size;
@@ -1780,12 +1697,9 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
     check(state.confirm === null && store.files.size === files + 1, 'SAVE from the game\'s own heading does not ask');
     later();
 
-    // LOAD asks the same, of a file that names no playthrough too.
-    const askedNameless = await press(nameless, g.loadButtonId);
-    await mine.click(211, 2);
+    // LOAD asks the same.
     const askedLoad = await press(theirOlder, g.loadButtonId);
-    console.log(`  LOAD on a file that names no playthrough: ${askedNameless}; on another playthrough's save: ${askedLoad}, party ${mine.party()}`);
-    check(askedNameless === 'asks (load)', 'LOAD of a file that names no playthrough asks first');
+    console.log(`  LOAD on another playthrough's save: ${askedLoad}, party ${mine.party()}`);
     check(askedLoad === 'asks (load)' && mine.party() === 'DAROO' && idOf(mine) !== idOf(theirs),
       'LOAD of a save of another playthrough asks first, and has loaded nothing');
     await mine.click(210, 2);
@@ -2469,7 +2383,7 @@ async function checkPlayTime(graphics: GraphicsLoader): Promise<void> {
     const counted = game.playTime();
     let refused = false;
     try {
-      saves.read({ entry: { ...exact, playTime: 1 }, bytes: new Uint8Array(64), joins: 0 });
+      saves.read({ entry: { ...exact, playTime: 1 }, bytes: new Uint8Array(64) });
     } catch {
       refused = true;
     }
@@ -2477,7 +2391,7 @@ async function checkPlayTime(graphics: GraphicsLoader): Promise<void> {
 
     // A row from before rows held it, and a new game.
     const { playTime: _none, ...before } = { ...exact, bytes: new ArrayBuffer(0) };
-    saves.read({ entry: saveEntryOf(before), bytes: await store.read(exact.id), joins: 0 });
+    saves.read({ entry: saveEntryOf(before), bytes: await store.read(exact.id) });
     const fromOldRow = game.playTime();
     play(30);
     const read = game.readDungeonDat(new Uint8Array(readFileSync(resolve(DUNGEON))));
@@ -2551,6 +2465,111 @@ async function checkUpgrade(): Promise<void> {
     check(fresh.ctx.party.state.position.z === 9 && fresh.ctx.party.state.champions.length === 2, `${row.id} loads`);
   }
   check(upgradeSaveRecords([null, 'x', {}], DEFAULT_DATA_SET.id).length === 0, 'what is not a row is dropped, not thrown on');
+
+  // Version 3: a row that names no playthrough is given one, stamped into its file.
+  console.log('');
+  console.log('=== the store\'s upgrade: no row holds playthrough 0 (`stampSaveRecords`) ===');
+  const SEED = 0x2468ace0;
+  const ids = new CsbRandom(SEED);
+  const [firstId, secondId, thirdId] = [drawRandomGameID(ids), drawRandomGameID(ids), drawRandomGameID(ids)];
+  const hex = (id: number): string => id.toString(16);
+  /** The upgrade's draw as the page gives it: one stream, held to the data set's rows. */
+  const drawFrom = (seed: number) => {
+    const stream = new CsbRandom(seed);
+    return (held: SaveEntry[]): number => drawPlaythrough(stream, held);
+  };
+  /** The game's save with `names` for a party, under `id`: 0 for a file that names none. */
+  const fileOf = (names: string[], id: number): Uint8Array => {
+    game.ctx.party.state.champions = names.map(healthyChampion);
+    game.ctx.state.block1.randomGameID = id;
+    return buildSaveFile(game);
+  };
+  const csbSet = dataSetFor('csb');
+  const v2 = (name: string, dataSet: string, names: string[], id: number, savedAt: number, more: Partial<StoredSaveRecord> = {}): StoredSaveRecord => {
+    const bytes = fileOf(names, id);
+    return { id: name, name, dataSet, quick: false, savedAt, ...readSaveFileFields(bytes)!, bytes: buffer(bytes), ...more };
+  };
+  const pair = ['DAROO', 'LEYLA'];
+  const held = [
+    v2('pair, named, older', DEFAULT_DATA_SET.id, pair, 0x700, 100),
+    v2('pair, named, newer', DEFAULT_DATA_SET.id, pair, 0x900, 200),
+    v2('pair, nameless, oldest', DEFAULT_DATA_SET.id, pair, 0, 50),
+    v2('pair, nameless, newest', DEFAULT_DATA_SET.id, pair, 0, 300, { quick: true, usedAt: 400, playTime: 5000 }),
+    v2('wuuf, nameless, older', DEFAULT_DATA_SET.id, ['WUUF'], 0, 150),
+    v2('wuuf, nameless, newer', DEFAULT_DATA_SET.id, ['WUUF'], 0, 250),
+    v2('wuuf, nameless, csb', csbSet.id, ['WUUF'], 0, 260),
+    // The ids the stream draws first, held already: one in each data set.
+    v2('halk, named', DEFAULT_DATA_SET.id, ['HALK'], firstId, 10),
+    v2('halk, named, csb', csbSet.id, ['HALK'], secondId, 20),
+  ];
+  const stamped = stampSaveRecords(held, drawFrom(SEED));
+  const after = (list: StoredSaveRecord[], name: string): number | undefined => list.find((r) => r.name === name)?.playthrough;
+  console.log(`  the stream of seed ${hex(SEED)} draws ${hex(firstId)}, ${hex(secondId)}, ${hex(thirdId)}`);
+  console.log(['name', 'data set', 'party', 'playthrough', 'stamped', 'its file\'s'].join('\t'));
+  for (const row of held) {
+    const now = stamped.find((r) => r.name === row.name);
+    console.log([row.name, row.dataSet, row.champions.join('/'), hex(row.playthrough), now ? hex(now.playthrough) : 'DROPPED',
+      now ? hex(readSaveFileFields(new Uint8Array(now.bytes))?.playthrough ?? 0) : ''].join('\t'));
+  }
+  check(stamped.length === held.length && stamped.every((r, i) => r.name === held[i]!.name), 'every row is kept, in its place');
+  check(stamped.every((r) => r.playthrough !== 0), 'and none names no playthrough');
+  check(stamped.every((r) => readSaveFileFields(new Uint8Array(r.bytes))?.playthrough === r.playthrough),
+    'a row\'s file holds the row\'s playthrough: the id is stamped into it');
+  check(stamped.every((r, i) => (held[i]!.playthrough === 0) !== (r === held[i])), 'a row that named a playthrough is returned as it was, its file untouched');
+  check(after(stamped, 'pair, nameless, oldest') === 0x900 && after(stamped, 'pair, nameless, newest') === 0x900,
+    'a row that named none joins the newest save of its data set and party that names one');
+  check(after(stamped, 'wuuf, nameless, older') === secondId && after(stamped, 'wuuf, nameless, newer') === secondId,
+    'with none to join, the first such row of a party draws an id no row of its data set holds, and the next joins it: one party, one playthrough');
+  check(after(stamped, 'wuuf, nameless, csb') === thirdId, 'the same party\'s in another data set does not join it, and draws its own');
+  const newest = stamped.find((r) => r.name === 'pair, nameless, newest')!;
+  const oldest = stamped.find((r) => r.name === 'pair, nameless, oldest')!;
+  check(newest.id === newest.name && newest.quick && newest.savedAt === 300 && newest.usedAt === 400 && newest.playTime === 5000
+    && newest.level === 9 && newest.champions.join('/') === 'DAROO/LEYLA' && newest.dataSet === DEFAULT_DATA_SET.id,
+    'a stamped row keeps the rest of what it held');
+  check(!('usedAt' in oldest) && !('playTime' in oldest), 'and a row from before rows held a last use or a play time is given neither');
+
+  // The stamp is the writer's: the same game saved under the id.
+  const wuufStamped = new Uint8Array(stamped.find((r) => r.name === 'wuuf, nameless, older')!.bytes);
+  const wuufWritten = fileOf(['WUUF'], secondId);
+  const wuufNameless = new Uint8Array(held.find((r) => r.name === 'wuuf, nameless, older')!.bytes);
+  const differ = wuufNameless.reduce((n, byte, i) => n + (byte === wuufStamped[i] ? 0 : 1), 0);
+  console.log(`  a stamped file against the same game saved under the id: ${wuufStamped.length} bytes, ${wuufStamped.every((b, i) => b === wuufWritten[i]) ? 'the same' : 'DIFFERENT'}; against the file that named none: ${differ} bytes differ`);
+  check(wuufStamped.length === wuufWritten.length && wuufStamped.every((b, i) => b === wuufWritten[i]),
+    'a stamped file is, byte for byte, the file the game writes under that id');
+  check(differ > 0 && differ <= 6, 'which differs from the file that named none in six bytes at most');
+  const loaded = await loadGame();
+  applySaveBytes(loaded, wuufStamped);
+  check(loaded.ctx.state.block1.randomGameID === secondId && loaded.ctx.party.state.champions.map((c) => c.name).join() === 'WUUF',
+    'and loads: the game is of that playthrough');
+
+  // The order the store hands its rows in changes which id a new playthrough draws, not
+  // which rows share one.
+  const groups = (list: StoredSaveRecord[]): string => held.map((row) => {
+    const id = after(list, row.name);
+    return held.findIndex((other) => other.dataSet === row.dataSet && after(list, other.name) === id);
+  }).join();
+  const reversed = stampSaveRecords([...held].reverse(), drawFrom(SEED));
+  console.log(`  the rows in reverse: wuuf ${hex(after(reversed, 'wuuf, nameless, older') ?? 0)}, in csb ${hex(after(reversed, 'wuuf, nameless, csb') ?? 0)}; the rows that share a playthrough: ${groups(reversed) === groups(stamped) ? 'the same' : 'OTHERS'}`);
+  check(groups(reversed) === groups(stamped) && after(reversed, 'pair, nameless, oldest') === 0x900,
+    'in whatever order the rows come, the same rows share a playthrough');
+  check(after(reversed, 'wuuf, nameless, csb') === firstId && after(reversed, 'wuuf, nameless, older') === secondId,
+    'another data set\'s rows do not hold an id against a draw: every comparison is a data set\'s');
+  check(stampSaveRecords(stamped, drawFrom(SEED)).every((r, i) => r === stamped[i]), 'a store already stamped is left as it is');
+
+  // A version-1 row goes through both: the `.dmweb.json` of an earlier build, whose file names none.
+  const earlyFile = fileOf(pair, 0);
+  const early = stampSaveRecords(upgradeSaveRecords([
+    v1('early.dmweb.json', 100, json({ ...wrapped, raw: Buffer.from(earlyFile).toString('base64') })),
+    v1('early-too.dat', 200, buffer(earlyFile)),
+  ], DEFAULT_DATA_SET.id), drawFrom(SEED));
+  console.log(`  two version-1 rows of one party, their files naming none: ${early.map((r) => `${r.name} ${hex(r.playthrough)}`).join(', ')}`);
+  check(early.length === 2 && early.every((r) => r.playthrough === firstId && readSaveFileFields(new Uint8Array(r.bytes))?.playthrough === firstId),
+    'version-1 rows whose files name no playthrough come out of both upgrades in one, stamped');
+
+  // What takes no stamp is no CSBWin file.
+  const broken: StoredSaveRecord = { ...held[2]!, bytes: buffer(new Uint8Array(64)) };
+  check(stampSaveRecords([broken, held[0]!], drawFrom(SEED)).map((r) => r.name).join() === 'pair, named, older',
+    'a row that names no playthrough and holds no CSBWin file is dropped, as the first upgrade drops one');
 }
 
 /* ------------------------------------------------------------------------------- */

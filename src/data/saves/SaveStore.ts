@@ -52,13 +52,17 @@ export interface SaveRecord extends SaveEntry {
 }
 
 /**
+ * A row as a store may hold it: one written before rows held `usedAt` or `playTime` has
+ * neither.
+ */
+export type StoredSaveRecord = Omit<SaveRecord, 'usedAt' | 'playTime'> & { usedAt?: number; playTime?: number };
+
+/**
  * A stored row's entry, without its bytes. A row written before rows held `usedAt` has
  * none, and counts as last used when it was saved; one written before they held
  * `playTime` counts no time played.
  */
-export function saveEntryOf(
-    record: Omit<SaveRecord, 'usedAt' | 'playTime'> & { usedAt?: number; playTime?: number },
-): SaveEntry {
+export function saveEntryOf(record: StoredSaveRecord): SaveEntry {
     return {
         id: record.id,
         name: record.name,
@@ -88,22 +92,24 @@ export function readSaveFileFields(bytes: Uint8Array): SaveFileFields | null {
 
 /**
  * A listed save out of the store, to be read into the game: its row, which a read marks
- * as used, its file, and the playthrough its game takes when the file names none
- * (`GameSaves.open`), 0 for a file that names its own.
+ * as used, and its file.
  */
 export interface OpenedSave {
     entry: SaveEntry;
     bytes: Uint8Array;
-    joins: number;
 }
+
+/** A playthrough that no save among `rows` holds, for a file that names none. */
+export type DrawPlaythrough = (rows: SaveEntry[]) => number;
 
 /**
  * The playthrough a save that names none belongs to: that of the newest of `rows` that
  * names one and is of the same data set and the same party, the same champions' names
  * in the same order. 0 when no row is.
  *
- * A file holds `RandomGameID` 0 when an earlier build of the port wrote it, and a game
- * loaded from it is given this playthrough, or a new one (`GameSaves.open`).
+ * A file holds `RandomGameID` 0 when an earlier build of the port wrote it, and names no
+ * playthrough. No stored row holds one: the store's upgrade gave each this playthrough,
+ * or a new one, and stamped it into the file (`stampSaveRecords`, `legacyRows.ts`).
  */
 export function joinedPlaythrough(entry: SaveEntry, rows: SaveEntry[]): number {
     const sameParty = (row: SaveEntry): boolean =>
@@ -119,13 +125,8 @@ export function joinedPlaythrough(entry: SaveEntry, rows: SaveEntry[]): number {
  * F5's slot: the quick-save of a playthrough in a data set, which the key writes over.
  * The newest, where a store holds several: an earlier build made a row at each press,
  * and the older ones stay as they are.
- *
- * Playthrough 0 has no slot. No game with a party runs under it: a new game never draws
- * 0 (`drawRandomGameID`) and `GameSaves.open` gives a loaded one another. The rows that
- * hold 0 are files of an earlier build, of any game, which no F5 may write over.
  */
 export function quickSlot(rows: SaveEntry[], dataSet: string, playthrough: number): SaveEntry | undefined {
-    if (playthrough === 0) return undefined;
     return sortSaveEntries(rows).find(
         (row) => row.quick && row.dataSet === dataSet && row.playthrough === playthrough,
     );
@@ -146,8 +147,7 @@ export function lastUsedSave(rows: SaveEntry[]): SaveEntry | undefined {
 
 /**
  * A playthrough as the list shows one, under a heading: the saves of one data set that
- * share a `d.RandomGameID`. The files that name none (0) are one such group, whatever
- * games they are of.
+ * share a `d.RandomGameID`.
  */
 export interface Playthrough {
     /** The `RandomGameID` its saves share (`SaveEntry.playthrough`). */

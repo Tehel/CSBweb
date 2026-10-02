@@ -202,6 +202,9 @@ const CHECKS = [
   // of graphic 0's pieces, the row formatting, and the two metadata paths. Nothing here is
   // visible to the golden frames until there are saves to list.
   { tool: 'dump-save-menu.ts' },
+  // A playthrough stamped into a save file that names none: six bytes of GAMEBLOCK1, in a
+  // block that is scrambled and folded, over every genuine save.
+  { tool: 'dump-save-stamp.ts' },
   // The title animation and the dungeon entrance. The golden frames can see the entrance
   // once it is up; the nine 0x232 rectangles it hangs off, the hardcoded button list DM's
   // graphics.dat forces, the synthetic 5x5 level behind the doors, the 31-frame slide and

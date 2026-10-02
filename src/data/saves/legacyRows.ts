@@ -1,7 +1,7 @@
 /**
- * The rows of the store's first version, turned into today's (`SaveRecord`).
+ * The rows of the store's earlier versions, turned into today's (`SaveRecord`).
  *
- * A version-1 row is `{ id, name, savedAt, level, champions, bytes }`, and its bytes are
+ * **Version 1** (`upgradeSaveRecords`). A version-1 row is `{ id, name, savedAt, level, champions, bytes }`, and its bytes are
  * a CSBWin file or a `.dmweb.json`: JSON around such a file, carried in base64 as `raw`.
  * The upgrade keeps the file alone, names it a `.dat`, and reads the row's level,
  * champions and playthrough from it, as a row written today has them. The data set is the
@@ -10,9 +10,19 @@
  * A row that holds no CSBWin file is dropped: no build could load it, and it has no row
  * here (`readSaveFileFields`).
  *
- * Pure, so `tools/dump-save-menu.ts` runs it; `idb.ts` calls it once, in the upgrade.
+ * **Version 2** (`stampSaveRecords`). A version-2 row is today's, but its file may name
+ * no playthrough: an earlier build wrote `RandomGameID` 0. The upgrade gives each such
+ * row a playthrough and stamps it into the file, so that no stored save holds 0
+ * (`PLAN.md` → Phase 10, "A playthrough").
+ *
+ * Both are pure, so the tools run them (`tools/dump-save-menu.ts`,
+ * `tools/dump-save-stamp.ts`); `idb.ts` calls them once, in the upgrade.
  */
-import { SAVE_FILE_EXTENSION, readSaveFileFields, type SaveRecord } from './SaveStore';
+import { stampRandomGameID } from '../SaveGameLoader';
+import {
+    SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields, saveEntryOf,
+    type DrawPlaythrough, type SaveRecord, type StoredSaveRecord,
+} from './SaveStore';
 
 /** The suffix of a JSON save's name. */
 const JSON_SAVE_FILE_EXTENSION = '.dmweb.json';
@@ -95,4 +105,35 @@ export function upgradeSaveRecords(old: readonly unknown[], dataSet: string): Sa
         if (!held || held.savedAt < record.savedAt) byId.set(record.id, record);
     }
     return [...byId.values()];
+}
+
+/**
+ * Every version-2 row as today's: each names a playthrough, its file's own.
+ *
+ * A row that names none takes the playthrough of the newest row of its data set and its
+ * party that names one (`joinedPlaythrough`), and with none a new one, which `draw`
+ * gives against its data set's rows. The id is stamped into the row's file, `GAMEBLOCK1`'s
+ * `RandomGameID` and nothing else of the game (`stampRandomGameID`), so the row and its
+ * file agree. One row at a time, each seeing the ones stamped before it: the rows of one
+ * party and data set that named none end up in one playthrough, in whatever order they
+ * come.
+ *
+ * A row that names a playthrough is returned as it is. One whose file does not take the
+ * stamp holds no CSBWin file, and is dropped as the first upgrade drops one.
+ */
+export function stampSaveRecords(rows: readonly StoredSaveRecord[], draw: DrawPlaythrough): StoredSaveRecord[] {
+    const kept: Array<StoredSaveRecord | null> = [...rows];
+    for (let i = 0; i < kept.length; i++) {
+        const row = kept[i];
+        if (!row || row.playthrough !== 0) continue;
+        const others = kept.filter((other) => other !== null).map(saveEntryOf);
+        const playthrough = joinedPlaythrough(saveEntryOf(row), others)
+            || draw(others.filter((other) => other.dataSet === row.dataSet));
+        try {
+            kept[i] = { ...row, playthrough, bytes: stampRandomGameID(new Uint8Array(row.bytes), playthrough).buffer };
+        } catch {
+            kept[i] = null;
+        }
+    }
+    return kept.filter((row) => row !== null);
 }

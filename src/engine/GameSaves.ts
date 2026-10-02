@@ -17,10 +17,10 @@
  * raises a dialog, so what either did, or why it did nothing, is a line in the message
  * area, and one for the console with the save's name.
  */
-import { CsbRandom } from '../core/random';
+import type { CsbRandom } from '../core/random';
 import type { DataSet } from '../data/DataSets';
 import {
-    SAVE_FILE_EXTENSION, joinedPlaythrough, quickSlot, readSaveFileFields,
+    SAVE_FILE_EXTENSION, quickSlot, readSaveFileFields,
     type OpenedSave, type SaveEntry, type SaveStore,
 } from '../data/saves';
 import type { Game } from './Game';
@@ -80,8 +80,9 @@ export function makeSaveFileName(savedAt: number, taken: ReadonlySet<string> = n
 }
 
 /**
- * A playthrough that is no save's among `rows`: drawn as a new game draws its own
- * (`drawRandomGameID`, never 0), and again while a row holds the id. Two games draw the
+ * A playthrough that is no save's among `rows`, for a new game or for a file that names
+ * none: drawn as a new game draws its own (`drawRandomGameID`, never 0), and again
+ * while a row holds the id. Two games draw the
  * same id about once in 16 million pairs, and two playthroughs of one data set that
  * shared it would share F5's slot, F9's choice and the menu's question (`PLAN.md` →
  * Phase 10, "A playthrough").
@@ -154,20 +155,9 @@ export class GameSaves {
         }
     }
 
-    /**
-     * A listed save out of the store, to be read into the game (`read`). A row that
-     * names no playthrough is given one here, while the store can still be awaited: the
-     * one it joins among its data set's saves (`joinedPlaythrough`), or one that none of
-     * them holds (`drawPlaythrough`), from a stream of this draw's own. The game's is
-     * the file's once it is read (`gb2.ranseed`), so it would give every load of one
-     * file the same id, and a load would leave it two draws further on than CSBWin's
-     * does.
-     */
+    /** A listed save out of the store, to be read into the game (`read`). */
     async open(entry: SaveEntry): Promise<OpenedSave> {
-        const bytes = await this.store.read(entry.id);
-        if (entry.playthrough !== 0) return { entry, bytes, joins: 0 };
-        const rows = await this.store.list(entry.dataSet);
-        return { entry, bytes, joins: joinedPlaythrough(entry, rows) || drawPlaythrough(new CsbRandom(), rows) };
+        return { entry, bytes: await this.store.read(entry.id) };
     }
 
     /**
@@ -229,10 +219,8 @@ export class GameSaves {
      * CSBWin one (`applySaveBytes`). Throws `SaveFileError`, whose message is a line
      * for the menu's status.
      *
-     * A file whose `RandomGameID` is 0 names no playthrough, so its game is given one
-     * here, which its saves then carry: the one `open` found for it
-     * (`OpenedSave.joins`). CSBWin takes the file's id as it is
-     * (`doc/CSBwin-src/SaveGame.cpp:1610`), and so does this for any other id.
+     * The game's playthrough is the file's `RandomGameID` as it is, as in CSBWin
+     * (`doc/CSBwin-src/SaveGame.cpp:1610`).
      *
      * The entrance's Resume needs to know whether a save came back: CSBWin loops on
      * `ReadEntireGame`'s result and shows the door again when it did not
@@ -247,8 +235,6 @@ export class GameSaves {
      */
     read(save: OpenedSave): void {
         applySaveBytes(this.game, save.bytes);
-        const { block1 } = this.game.ctx.state;
-        if (block1.randomGameID === 0) block1.randomGameID = save.joins;
         this.game.setPlayTime(save.entry.playTime);
         this.lastRead = 'loaded';
         this.marked = this.store.markUsed(save.entry.id, Date.now())
@@ -301,9 +287,8 @@ export class GameSaves {
      *
      * A playthrough with no save is `_ReadEntireGame`'s "CAN'T FIND SAVED GAME!"
      * (`doc/CSBwin-src/SaveGame.cpp:1585`), whatever the data set's other playthroughs
-     * hold: a new game not saved yet, or a game loaded from a file that names no
-     * playthrough, which is no save of the one the load gave it. A file that does not
-     * read is its `SaveFileError`'s line, the one the disk menu shows.
+     * hold: a new game not saved yet. A file that does not read is its `SaveFileError`'s
+     * line, the one the disk menu shows.
      */
     async quickLoad(): Promise<void> {
         if (this.game.isRunningScript()) {

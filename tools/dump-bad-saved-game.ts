@@ -80,7 +80,7 @@ function checkChooser(): void {
     try {
       // The row is the hooks' business, and these read none of it.
       const entry = { id: 'x', name: 'x', dataSet: 'dm-atari', playthrough: 0, quick: false, savedAt: 0, usedAt: 0, playTime: 0, level: 0, champions: [] };
-      SaveMenu.restoreChosenSave(ui, { entry, bytes, joins: 0 });
+      SaveMenu.restoreChosenSave(ui, { entry, bytes });
     } catch (error) {
       thrown = (error as Error).message;
     }

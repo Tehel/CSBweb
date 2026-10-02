@@ -2,19 +2,32 @@
  * The page's saves, in IndexedDB: the one store, which needs no permission and no
  * picker. The player cannot see, copy or back up what is in it from outside the page.
  */
-import { SAVES_STORE, idbDelete, idbGet, idbGetAll, idbPut } from './idb';
-import { saveEntryOf, sortSaveEntries, type SaveEntry, type SaveRecord, type SaveStore } from './SaveStore';
+import { SAVES_STORE, idbDelete, idbGet, idbGetAll, idbPut, openSaveDatabase } from './idb';
+import {
+    saveEntryOf, sortSaveEntries,
+    type DrawPlaythrough, type SaveEntry, type SaveRecord, type SaveStore, type StoredSaveRecord,
+} from './SaveStore';
 
 export class BrowserSaveStore implements SaveStore {
+    /**
+     * `drawPlaythrough` is for the store's upgrade, which gives a playthrough to each row
+     * of an earlier version that names none (`stampSaveRecords`, `legacyRows.ts`).
+     */
+    constructor(private readonly drawPlaythrough: DrawPlaythrough) {}
+
+    private db(): Promise<IDBDatabase> {
+        return openSaveDatabase(this.drawPlaythrough);
+    }
+
     async list(dataSet: string | null): Promise<SaveEntry[]> {
-        const records = await idbGetAll<SaveRecord>(SAVES_STORE);
+        const records = await idbGetAll<StoredSaveRecord>(await this.db(), SAVES_STORE);
         return sortSaveEntries(
             records.filter((record) => dataSet === null || record.dataSet === dataSet).map(saveEntryOf),
         );
     }
 
     async read(id: string): Promise<Uint8Array> {
-        const record = await idbGet<SaveRecord>(SAVES_STORE, id);
+        const record = await idbGet<StoredSaveRecord>(await this.db(), SAVES_STORE, id);
         if (!record) throw new Error('SAVE NOT FOUND');
         return new Uint8Array(record.bytes);
     }
@@ -26,15 +39,16 @@ export class BrowserSaveStore implements SaveStore {
             // would otherwise be cloned whole.
             bytes: bytes.slice().buffer,
         };
-        await idbPut(SAVES_STORE, record);
+        await idbPut(await this.db(), SAVES_STORE, record);
     }
 
     async markUsed(id: string, usedAt: number): Promise<void> {
-        const record = await idbGet<SaveRecord>(SAVES_STORE, id);
-        if (record) await idbPut(SAVES_STORE, { ...record, usedAt });
+        const db = await this.db();
+        const record = await idbGet<StoredSaveRecord>(db, SAVES_STORE, id);
+        if (record) await idbPut(db, SAVES_STORE, { ...record, usedAt });
     }
 
     async remove(id: string): Promise<void> {
-        await idbDelete(SAVES_STORE, id);
+        await idbDelete(await this.db(), SAVES_STORE, id);
     }
 }
