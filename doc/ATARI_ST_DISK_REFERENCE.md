@@ -187,17 +187,22 @@ the envelope period's fine byte, is never written, so its value is whatever the 
 
 The port plays sampled sound only (`SoundManager` builds an `AudioBuffer` per sample), so
 the swoosh ships as a recording, not as a chip. The source is the YouTube video
-"DungeonMaster DMAA MSTE" by MrPetari (`https://www.youtube.com/watch?v=Iojq4NVtdHU`), an
-Atari Mega STE booting the game. Its audio track (Opus, 48 kHz) is silent from 12.75 s
-until the swoosh starts at 16.845 s.
+"Dungeon Master - Atari ST (1987)" by Wasabim
+(`https://www.youtube.com/watch?v=DGLkPY22pkg`). In its audio track (AAC, 44.1 kHz, stereo
+with both channels alike) the swoosh's noise starts at 23.270 s and peaks at 23.666 s: a
+rise of 0.396 s, the script's 20 ticks. It has decayed to nothing by 24.1 s. Under the
+noise the signal's level drifts below zero, as far as −22 dBFS at 23.93 s, and comes back
+by 25.5 s, where the track is digital silence.
 
-`static/gamefiles/swoosh/swoosh.wav` (md5 `53ca1660791d0d9e1f6cf15b818d7932`) is
-16.835–17.845 s of that track: mono, 16-bit, 48 kHz, 1.01 s, the last 150 ms faded out and
-the peak scaled to −1 dBFS. It swells for about 0.4 s, rising in pitch as the noise period
-falls, and decays to near silence by 0.8 s.
+`static/gamefiles/swoosh/swoosh.wav` (md5 `05e3dae57e71ac8d7ecbdc5575cba1d0`) is
+23.260–25.500 s of that track, the two channels averaged: mono, 16-bit, 44.1 kHz, 2.24 s,
+the first 5 ms faded in and the peak scaled to −1 dBFS. Nothing is filtered, so the drift
+is in it; what is heard is the first 0.85 s.
 
-The video, decoded frame by frame from the start (25 fps; seeking into it gives times up
-to a second off), agrees with the palette script:
+The picture's timing is read from another video, "DungeonMaster DMAA MSTE" by MrPetari
+(`https://www.youtube.com/watch?v=Iojq4NVtdHU`), an Atari Mega STE booting the game, where
+the swoosh starts at 16.845 s. Decoded frame by frame from the start (25 fps; seeking into
+it gives times up to a second off), it agrees with the palette script:
 
 | Video | Screen | Script |
 | --- | --- | --- |
@@ -210,7 +215,7 @@ to a second off), agrees with the palette script:
 The reveal takes 0.56 s, and the sound starts with it, as `$0002` calls `Dosound` just
 before the script. After the glint the logo stays up until the title's dark blue comes in
 at 20.80 s, with two grey screens in between (17.60–18.28 s and 19.56–20.52 s). What causes
-them is not established, so the recording does not give a hold time the port could copy.
+them is not established, so that video does not give a hold time the port could copy.
 
 ### The logo in the port
 
@@ -234,7 +239,8 @@ the next load follows it.
   until a first click gives a silent logo: the recording is not kept for later.
 
 `tools/dump-swoosh.ts` checks the decode (2306 bytes read, 64000 pixels, the code counts
-above, and `swoosh-index.png` pixel for pixel) and the script's timing on a headless host.
+above, and `tools/fixtures/swoosh-index.png` pixel for pixel) and the script's timing on a
+headless host.
 
 ## The 1.2 data files against CSBWin's
 

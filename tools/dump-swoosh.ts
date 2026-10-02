@@ -12,7 +12,7 @@
  *    2306 bytes, `$0258`-`$0b59`. The codes are walked here a second time, without
  *    drawing, for what `doc/ATARI_ST_DISK_REFERENCE.md` states of them: 1089 short runs,
  *    495 long ones (53 with a two-byte count), 87 copies, the first on row 53.
- * 3. **The picture.** `static/gamefiles/swoosh/swoosh-index.png` is the picture from a
+ * 3. **The picture.** `tools/fixtures/swoosh-index.png` is the picture from a
  *    decoder that is not this one, in false colours: the two must agree pixel for pixel,
  *    one colour an index.
  * 4. **The script.** `showSwoosh` on a headless host that counts VBLs: each colour at the
@@ -32,6 +32,7 @@ import { showSwoosh, SWOOSH_HOLD_VBLS } from '../src/renderer/intro/Swoosh';
 import { check, finish } from './lib/check';
 
 const DIR = 'static/gamefiles/swoosh';
+const FIXTURES = 'tools/fixtures';
 const PATTERNS_OFFSET = 0x01d8;
 const PICTURE_OFFSET = 0x0258;
 const PICTURE_END = 0x0b5a;
@@ -160,7 +161,7 @@ function readPng(path: string): { width: number; height: number; colours: Uint32
 
 function checkAgainstReference(swoosh: Swoosh): void {
   console.log('=== against swoosh-index.png ===');
-  const png = readPng(`${DIR}/swoosh-index.png`);
+  const png = readPng(`${FIXTURES}/swoosh-index.png`);
   check(png.width === SWOOSH_WIDTH && png.height === SWOOSH_HEIGHT, 'the reference picture is 320x200');
   const colourOf = new Map<number, number>();
   const indexOf = new Map<number, number>();
