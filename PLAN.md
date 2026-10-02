@@ -312,8 +312,12 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   unfolded, the last save used selected under it, and the others folded; a click on a
   heading folds or unfolds it, and so do the left and right arrows. A game with no save
   yet has no heading, and the full menu a first row, "NEW SAVE", in its place. The
-  files that name no playthrough are listed as one, until step 4 leaves none. The list
-  scrolls.
+  files that name no playthrough are listed as one, until step 4 leaves none.
+- **The list scrolls** under its fourteen rows. Where rows lie above the first one
+  shown, that row's last character is a mark, `^`, and where rows lie below the last,
+  that one's is `V`: the font has no arrow. A click on a mark scrolls by a page less a
+  row, the wheel by a row, and neither moves the selection, which may leave the panel;
+  a key that moves the selection scrolls the list back to it.
 - **A preview** beside the list, of the save LOAD would read: the selected save, or
   from a heading its playthrough's last save used, and nothing on "NEW SAVE". A line of
   the panel each, on the list's rows (`formatSavePreview`,
@@ -379,7 +383,7 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      `drawPlaythrough`. Evidence: `tools/dump-save-menu.ts`, "a drawn playthrough is no
      stored save's" (a store holding the ids a pinned stream draws first, and each
      game taking the next; another data set's saves; a store that cannot be listed).
-3. ⏳ **The dialog**, one commit each:
+3. ✅ **The dialog**, one commit each:
    - a. ✅ **The frame**: the dialog in its rectangle on the cleared screen, drawn from
      graphic 0's pieces (`drawPiece`, `src/renderer/ui/SaveMenu.ts`). The list is
      fourteen rows over its status line; LOAD, SAVE and CANCEL are buttons, and EXPORT's frame has no label until step 4; the question is
@@ -406,8 +410,13 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      "NEW SAVE" showing nothing, a heading its last save used, and the load-only
      chooser the same; the line under the list empty on a save with nothing to report).
      The golden frame shows the "NEW SAVE" row, whose preview is empty.
-   - d. ⏳ **The scrolling**: the wheel and the keys scroll the list already. A mark at
-     the panel's edge where rows lie beyond it, which a click scrolls by.
+   - d. ✅ **The scrolling**: the marks, a click on one and the wheel (`rowsBeyond`,
+     `scrollBy` and `showSelection`, `src/renderer/ui/SaveMenu.ts`). Evidence:
+     `tools/dump-save-menu.ts`, "the scrolling" (twenty-one rows: which marks are up
+     and which buttons, at each end and between; the wheel leaving the selection out
+     of the panel, and a draw not scrolling back; a click on a mark scrolling a page
+     less a row, and the same click with no mark up selecting the row; a key bringing
+     the list back; a list that fits having no mark).
 4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it. Until
    then a `.dat` on disk has no way into the page, the committed saves included: the
    store's rows are the only saves it loads. With it, no stored save holds playthrough
@@ -509,7 +518,9 @@ set's saves (`GameSaves.list`, over `src/data/saves/`) under a heading for each
 playthrough, the last one used first: the party of its newest save, and when unfolded
 its saves, newest first, each row with its day, time and level. A game with no save yet
 has a first row, "NEW SAVE", for a heading. Beside the list, a panel previews the save
-LOAD would read: its party, its level, its play time and its date. The menu opens on the last
+LOAD would read: its party, its level, its play time and its date. A list longer than
+its panel has a mark on its first or last row shown, which a click scrolls by, as the
+wheel does. The menu opens on the last
 save used, written or loaded, its playthrough alone unfolded, and on "NEW SAVE" when the
 data set has none. LOAD reads the selected save, or from a heading its playthrough's
 last save used. SAVE writes over the selected save, or from the game's own heading or

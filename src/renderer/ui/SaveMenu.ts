@@ -50,6 +50,13 @@
  * LOAD reads the selected save, and from a heading the last save used of its playthrough.
  * On "NEW SAVE" there is nothing to load, so it is inert.
  *
+ * The panel shows fourteen rows. Where rows lie above the first one shown, that row's
+ * last character is a mark, `^`, and where rows lie below the last, that one's is `V`
+ * (`rowsBeyond`). A click on a mark scrolls the list by a page less one row, so the row
+ * at the edge stays in view, and the wheel scrolls it a row at a time. Neither moves the
+ * selection, which may leave the panel; a move of the selection brings the list back to
+ * it (`showSelection`).
+ *
  * ## The preview
  *
  * The panel beside the list shows the save LOAD would read (`loadTarget`): the selected
@@ -156,6 +163,13 @@ const STATUS_Y = ROW_FIRST_Y + SAVE_MENU_ROWS * ROW_STEP + 1;
 const PREVIEW_TEXT_X = PREVIEW_PANEL.x1 + 4;
 const PREVIEW_MAX_CHARS = 11;
 
+/** The marks' place in a row: its last character, which only a heading of four long names reaches. */
+const MARK_X = TEXT_X + (TEXT_MAX_CHARS - 1) * 6;
+const MARK_ABOVE = '^';
+const MARK_BELOW = 'V';
+/** What a click on a mark scrolls by: a page, less the row at the edge. */
+const PAGE_ROWS = SAVE_MENU_ROWS - 1;
+
 /** The full menu's first row, for a game with no save yet: SAVE there makes its first. */
 const NEW_SAVE_LABEL = 'NEW SAVE';
 
@@ -168,6 +182,8 @@ const ACTION_LABELS = { load: 'LOAD', save: 'SAVE' } as const;
 const BTN_LOAD = 900;
 const BTN_SAVE = 901;
 const BTN_CANCEL = 902;
+const BTN_SCROLL_UP = 903;
+const BTN_SCROLL_DOWN = 904;
 const BTN_ROW0 = 910;
 
 /**
@@ -209,6 +225,8 @@ export const SAVE_MENU_GEOMETRY = {
   statusY: STATUS_Y,
   previewTextX: PREVIEW_TEXT_X,
   previewMaxChars: PREVIEW_MAX_CHARS,
+  markX: MARK_X,
+  pageRows: PAGE_ROWS,
   loadButtonId: BTN_LOAD,
   saveButtonId: BTN_SAVE,
   cancelButtonId: BTN_CANCEL,
@@ -396,7 +414,7 @@ function selectSave(ui: UIState, state: SaveMenuState, entry: SaveEntry): void {
   state.unfolded.add(entry.playthrough);
   layoutRows(ui, state);
   state.selected = state.rows.findIndex((row) => row.kind === 'save' && row.entry.id === entry.id);
-  clampScroll(state);
+  showSelection(state);
 }
 
 /**
@@ -413,7 +431,7 @@ function selectLastUsed(ui: UIState, state: SaveMenuState): void {
   }
   layoutRows(ui, state);
   state.selected = state.rows.length > 0 ? 0 : -1;
-  clampScroll(state);
+  showSelection(state);
 }
 
 /** Fold a playthrough's saves away under its heading, or list them again. */
@@ -423,16 +441,34 @@ function setFolded(ui: UIState, state: SaveMenuState, playthrough: Playthrough, 
   layoutRows(ui, state);
 }
 
+/** Keep the list on its rows: no further down than its last page. */
 function clampScroll(state: SaveMenuState): void {
   const maxTop = Math.max(0, state.rows.length - SAVE_MENU_ROWS);
   if (state.scrollTop > maxTop) state.scrollTop = maxTop;
   if (state.scrollTop < 0) state.scrollTop = 0;
+}
+
+/** Scroll the list to the selection, by as little as shows it: what a move of it does. */
+function showSelection(state: SaveMenuState): void {
+  clampScroll(state);
   if (state.selected >= 0) {
     if (state.selected < state.scrollTop) state.scrollTop = state.selected;
     else if (state.selected >= state.scrollTop + SAVE_MENU_ROWS) {
       state.scrollTop = state.selected - SAVE_MENU_ROWS + 1;
     }
   }
+}
+
+/** Whether rows of the list lie above the first one shown, and below the last. */
+export function rowsBeyond(state: SaveMenuState): { above: boolean; below: boolean } {
+  return { above: state.scrollTop > 0, below: state.scrollTop + SAVE_MENU_ROWS < state.rows.length };
+}
+
+/** Scroll the list by `rows`, the selection left where it is, in the panel or out of it. */
+function scrollBy(ui: UIState, state: SaveMenuState, rows: number): void {
+  state.scrollTop += rows;
+  clampScroll(state);
+  ui.renderLastFrame();
 }
 
 /* ------------------------------------------------------------------ drawing ---- */
@@ -519,21 +555,20 @@ export function drawSaveMenu(ui: UIState): void {
 
   drawDialog(ui);
 
-  // The rows.
+  // The rows, and on the first and the last the mark of rows beyond it.
   clampScroll(state);
+  const beyond = rowsBeyond(state);
   for (let row = 0; row < SAVE_MENU_ROWS; row++) {
     const index = state.scrollTop + row;
     if (index >= state.rows.length) break;
     const highlighted = index === state.selected;
+    const color = highlighted ? MENU_PANEL_COLOR : MENU_OPTION_COLOR;
+    const background = highlighted ? MENU_OPTION_COLOR : MENU_PANEL_COLOR;
+    const y = ROW_FIRST_Y + row * ROW_STEP;
     if (highlighted) fillRectIndex(ui.screenIndexBuffer, rowRect(row), MENU_OPTION_COLOR);
-    text(
-      ui,
-      rowText(state, state.rows[index]),
-      TEXT_X,
-      ROW_FIRST_Y + row * ROW_STEP,
-      highlighted ? MENU_PANEL_COLOR : MENU_OPTION_COLOR,
-      highlighted ? MENU_OPTION_COLOR : MENU_PANEL_COLOR,
-    );
+    text(ui, rowText(state, state.rows[index]), TEXT_X, y, color, background);
+    if (row === 0 && beyond.above) text(ui, MARK_ABOVE, MARK_X, y, color, background);
+    if (row === SAVE_MENU_ROWS - 1 && beyond.below) text(ui, MARK_BELOW, MARK_X, y, color, background);
   }
 
   // The status line: whatever went wrong, or what was done.
@@ -567,8 +602,9 @@ export function drawSaveMenu(ui: UIState): void {
 
 /**
  * The dialog's own button list, in the form of CSBWin's (`x2` and `y2` exclusive): the
- * three buttons that have a label, and the rows shown. Built fresh on each click because
- * the rows follow the scroll position.
+ * three buttons that have a label, the marks that are up, and the rows shown. A mark
+ * comes before the row it is drawn on, so its cell is the mark's. Built fresh on each
+ * click because the rows follow the scroll position.
  */
 export function saveMenuButtons(state: SaveMenuState): UIButton[] {
   const buttons: UIButton[] = [
@@ -576,6 +612,13 @@ export function saveMenuButtons(state: SaveMenuState): UIButton[] {
     { word0: BTN_SAVE, ...buttonRect(BUTTON_FRAMES.save), button: 2, name: 'saveMenu.save' },
     { word0: BTN_CANCEL, ...buttonRect(BUTTON_FRAMES.cancel), button: 2, name: 'saveMenu.cancel' },
   ];
+  const beyond = rowsBeyond(state);
+  const mark = (id: number, row: number, name: string): UIButton => {
+    const r = rowRect(row);
+    return { word0: id, x1: MARK_X, x2: r.x2 + 1, y1: r.y1, y2: r.y2 + 1, button: 2, name };
+  };
+  if (beyond.above) buttons.push(mark(BTN_SCROLL_UP, 0, 'saveMenu.scrollUp'));
+  if (beyond.below) buttons.push(mark(BTN_SCROLL_DOWN, SAVE_MENU_ROWS - 1, 'saveMenu.scrollDown'));
   const visible = Math.min(SAVE_MENU_ROWS, Math.max(0, state.rows.length - state.scrollTop));
   for (let row = 0; row < visible; row++) {
     const r = rowRect(row);
@@ -616,6 +659,10 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
       closeSaveMenu(ui);
       ui.renderLastFrame();
     });
+    return;
+  }
+  if (id === BTN_SCROLL_UP || id === BTN_SCROLL_DOWN) {
+    scrollBy(ui, state, id === BTN_SCROLL_UP ? -PAGE_ROWS : PAGE_ROWS);
     return;
   }
   if (id >= BTN_ROW0 && id < BTN_ROW0 + SAVE_MENU_ROWS) {
@@ -845,7 +892,7 @@ function moveSelection(ui: UIState, state: SaveMenuState, delta: number): void {
   const next = Math.max(0, Math.min(state.rows.length - 1, (state.selected < 0 ? 0 : state.selected) + delta));
   state.selected = next;
   state.message = '';
-  clampScroll(state);
+  showSelection(state);
   ui.renderLastFrame();
 }
 
@@ -860,17 +907,15 @@ function foldSelection(ui: UIState, state: SaveMenuState, folded: boolean): void
     return;
   }
   state.message = '';
-  clampScroll(state);
+  showSelection(state);
   ui.renderLastFrame();
 }
 
-/** The wheel scrolls the list without moving the selection. */
+/** The wheel scrolls the list a row at a time, without moving the selection. */
 export function saveMenuWheel(ui: UIState, delta: number): boolean {
   const state = ui.saveMenu;
   if (!state) return false;
   if (state.confirm) return true;
-  const maxTop = Math.max(0, state.rows.length - SAVE_MENU_ROWS);
-  state.scrollTop = Math.max(0, Math.min(maxTop, state.scrollTop + (delta > 0 ? 1 : -1)));
-  ui.renderLastFrame();
+  scrollBy(ui, state, delta > 0 ? 1 : -1);
   return true;
 }

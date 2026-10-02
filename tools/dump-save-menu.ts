@@ -64,6 +64,10 @@
  *    lines are drawn for real and the panel read back: which rows hold ink, that none
  *    leaves the panel's interior, that a heading shows its last save used and "NEW
  *    SAVE" nothing, and that the line under the list no longer names the party.
+ * 15. **The scrolling.** A list longer than the panel: the marks on its first and last
+ *    rows shown where rows lie beyond them, a click on one scrolling by a page less a
+ *    row, the wheel by a row, and neither moving the selection, which a key brings the
+ *    list back to.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -2051,6 +2055,107 @@ async function checkPreview(graphics: GraphicsLoader): Promise<void> {
   }
 }
 
+/* ------------------------------------------------------------ 15. the scrolling ---- */
+
+/**
+ * One playthrough of twenty saves, twenty-one rows under its heading for a panel of
+ * fourteen: the marks, the clicks on them, the wheel and the keys.
+ */
+async function checkScrolling(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== the scrolling ===');
+  const store = memoryStore();
+  const rig = await menuRig(graphics, store, 'DAROO');
+  const { ui } = rig;
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  const last = g.rows - 1;
+  const baseline = (row: number): number => g.rowFirstY + row * g.rowStep;
+  /** The pixels of a shown row's last character that are not its background's colour. */
+  const markInk = (row: number): number => {
+    SaveMenu.drawSaveMenu(ui);
+    return countNot(ui, g.markX, g.markX + 4, baseline(row) - 4, baseline(row) + 1, pixelAt(ui, g.markX + 5, baseline(row)));
+  };
+  const marks = (): string => `${markInk(0) > 0 ? '^' : '.'}${markInk(last) > 0 ? 'V' : '.'}`;
+  const scrollButtons = (): string => SaveMenu.saveMenuButtons(ui.saveMenu!).map((b) => b.name ?? '').filter((name) => name.includes('scroll')).join();
+  const clickMark = (row: number): void => SaveMenu.saveMenuClick(ui, g.markX + 2, baseline(row), LEFT);
+  const where = (): string => {
+    const state = ui.saveMenu!;
+    return `rows ${state.scrollTop}..${state.scrollTop + last} of ${state.rows.length}, row ${state.selected} selected, marks ${marks()}`;
+  };
+
+  const realNow = Date.now;
+  let now = new Date(2026, 8, 13, 14, 5, 6).getTime();
+  Date.now = () => now;
+  try {
+    for (let n = 0; n < 20; n++) {
+      now += 60_000;
+      await rig.saves.save('stopped', 'new');
+    }
+    const state = await rig.open();
+    const rows = state.rows.length;
+    const maxTop = rows - g.rows;
+    console.log(`  the menu opens: ${where()}`);
+    check(rows === 21 && state.scrollTop === 0 && state.selected === 1, 'twenty saves under their heading are twenty-one rows, the newest selected');
+    check(marks() === '.V' && scrollButtons() === 'saveMenu.scrollDown',
+      'rows lie below the last one shown, which has the mark and its button; the first has neither');
+    const buttons = SaveMenu.saveMenuButtons(state);
+    const down = buttons.find((b) => b.name === 'saveMenu.scrollDown')!;
+    const lastRow = buttons.find((b) => b.name === `saveMenu.row${last}`)!;
+    check(down.x1 === g.markX && down.x2 === g.listInnerX2 + 1 && down.y1 === lastRow.y1 && down.y2 === lastRow.y2
+      && buttons.indexOf(down) < buttons.indexOf(lastRow),
+      'the mark\'s button is its row\'s last character, as far as the panel\'s edge, and comes before the row\'s');
+
+    // The wheel: a row at a time, and the selection may leave the panel.
+    const previewed = SaveMenu.loadTarget(state)?.id;
+    for (let n = 0; n < 3; n++) SaveMenu.saveMenuWheel(ui, 1);
+    console.log(`  the wheel, three notches down: ${where()}`);
+    check(state.scrollTop === 3 && state.selected === 1 && SaveMenu.loadTarget(state)?.id === previewed,
+      'the wheel scrolls a row a notch and leaves the selection, which is out of the panel, and the preview');
+    check(marks() === '^V' && scrollButtons() === 'saveMenu.scrollUp,saveMenu.scrollDown' && state.scrollTop === 3,
+      'rows lie both ways, and both marks are up; drawing the list does not scroll it back');
+
+    // A click on a mark: a page less a row.
+    clickMark(last);
+    console.log(`  a click on the mark below: ${where()}`);
+    check(state.scrollTop === maxTop && state.selected === 1 && marks() === '^.' && scrollButtons() === 'saveMenu.scrollUp',
+      'a click on the mark below scrolls to the list\'s end, where no row lies below, and selects nothing');
+    clickMark(last);
+    check(state.selected === maxTop + last && state.scrollTop === maxTop, 'the same click with no mark up is the row\'s, and selects it');
+    clickMark(0);
+    console.log(`  a click on the mark above: ${where()}`);
+    check(state.scrollTop === 0 && state.selected === maxTop + last && marks() === '.V', 'a click on the mark above scrolls back to the first row');
+    check(g.pageRows === last && maxTop < g.pageRows, 'either way by a page less a row, which is more than this list has beyond its panel');
+
+    // A key moves the selection, and the list back to it.
+    SaveMenu.saveMenuKey(ui, 'ArrowUp');
+    console.log(`  the up arrow: ${where()}`);
+    check(state.selected === maxTop + last - 1 && state.scrollTop === state.selected - last, 'a move of the selection scrolls the list to it, by as little as shows it');
+
+    // The mark on the selected row is in the highlight's colours.
+    SaveMenu.saveMenuKey(ui, 'Home');
+    SaveMenu.saveMenuWheel(ui, 1);
+    rig.clickRow(1);
+    console.log(`  the first row shown selected, one row down: ${where()}`);
+    check(state.scrollTop === 1 && state.selected === 1 && marks() === '^V', 'a selected row has its mark all the same');
+
+    // A list that fits has no mark.
+    SaveMenu.saveMenuWheel(ui, -1);
+    rig.clickRow(0);
+    console.log(`  the heading folded: ${where()}`);
+    check(state.rows.length === 1 && marks() === '..' && scrollButtons() === '', 'a list that fits its panel has no mark');
+    SaveMenu.saveMenuWheel(ui, 1);
+    check(state.scrollTop === 0, 'and the wheel scrolls it nowhere');
+    rig.clickRow(0);
+    for (let n = 0; n < 30; n++) SaveMenu.saveMenuWheel(ui, 1);
+    check(state.scrollTop === maxTop, 'unfolded again, the wheel stops at the last page');
+    rig.clickRow(maxTop);
+    check(state.rows.length === 21 && state.selected === maxTop, 'where a row of it is the one clicked');
+    SaveMenu.closeSaveMenu(ui);
+  } finally {
+    Date.now = realNow;
+  }
+}
+
 /* ------------------------------------------------------------ 12. the play time ---- */
 
 /**
@@ -2244,6 +2349,7 @@ async function main(): Promise<void> {
   await checkQuestion(graphics);
   await checkTwoLevels(graphics);
   await checkPreview(graphics);
+  await checkScrolling(graphics);
   await checkPlayTime(graphics);
   await checkUpgrade();
   finish();
