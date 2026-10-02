@@ -35,7 +35,8 @@ export const DATA_SETS: readonly DataSet[] = [
     { id: 'csb', name: 'Chaos Strikes Back', dir: '/gamefiles/csb', csbGraphics: false },
     // Conflux (`static/gamefiles/conflux-3.5-b8/`) is not a set: its `dungeon.dat` is an
     // enciphered file, which the port reads the Extended Features block of and no more
-    // (`DEBT.md` G4).
+    // (`DEBT.md` G23), and its databases run past the 1024 records an `ObjectID` can name
+    // here (D16). The rest of what it needs is `DEBT.md` G26's.
     { id: '3d2d1d', name: '3D2D1D', dir: '/gamefiles/3D2D1D', csbGraphics: false },
 ];
 

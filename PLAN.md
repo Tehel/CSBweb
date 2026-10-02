@@ -25,14 +25,15 @@ any verified fact into `doc/`; then delete the phase's body and add its line to
 The goal is a complete, faithful game on `dm-atari`. The work, in order:
 
 1. **`DEBT.md`'s active rows**: the unported CSBWin features the default dungeon and
-   Chaos Strikes Back reach. `DEBT.md` says how
+   Chaos Strikes Back reach, and those Conflux 3.5 needs: the indirect `ObjectID`, full
+   DSA support, and `CSBgraphics.dat`'s other sections (`DEBT.md` → "Priority"). `DEBT.md` says how
    to work an item. **One item per commit, a few per session**, then `/clear`. Its index is
    the live status; its first row is the next item.
 2. Phase 15 step 4 interleaves anywhere.
 
-⏸️ **Postponed until the default dungeon is validated**: DSA extensibility and CSBWin's
-custom-dungeon extensions (`DEBT.md` G1-G4), its debugging features (G14, the ASCII dump),
-and Phase 15 step 5. The retail dungeon uses none of them. Features of **Chaos Strikes
+⏸️ **Postponed until the default dungeon is validated**: a save of a dungeon the port does
+not know (`DEBT.md` G22), CSBWin's debugging features (G14, the ASCII dump), and Phase 15
+step 5. The retail dungeon uses none of them. Features of **Chaos Strikes
 Back** are not postponed: it is the next dungeon to try.
 
 ## Ground rules

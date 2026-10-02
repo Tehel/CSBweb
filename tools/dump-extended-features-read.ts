@@ -14,7 +14,7 @@
  *    `READ` deciphers by the position in the file (`doc/CSBwin-src/system.cpp:301-313`):
  *    the two object maps behind the block, deciphered from byte 512 on, match the
  *    checksums the block declares, which takes the stream round its 8192 bytes.
- * 3. **The port reads the block and no more** (`DEBT.md` G4): `readExtendedFeatures`
+ * 3. **The port reads the block and no more** (`DEBT.md` G23): `readExtendedFeatures`
  *    deciphers the 512 bytes, and stops at the maps, which it reads as they stand.
  * 4. **A block it gives up on is no block.** CSBWin seeks back and returns 0 in three
  *    cases, and its caller reads the file from the first byte (`:320-353`):

@@ -245,7 +245,8 @@ save of the port's is such a file, all sixteen blocks, and nothing else; the dia
 behind the disk icon lists them by playthrough, and exports and imports them
 (`doc/SAVES.md`). **The current priority is a complete
 game on the default dungeon**: `DEBT.md`'s active rows, one item per commit (the unported
-features the retail dungeon reaches). DSA extensibility, CSBWin's custom-dungeon and debugging extras, and comparing
+features the retail dungeon reaches, then what Conflux 3.5 needs: the indirect `ObjectID`
+and full DSA support). CSBWin's debugging extras, a save of an unknown dungeon, and comparing
 frames with CSBWin's are postponed until the default dungeon is validated; Chaos Strikes
 Back's own features are not. The first row of `DEBT.md`'s index is the next item, and
 `/pay-debt` starts a session on it.

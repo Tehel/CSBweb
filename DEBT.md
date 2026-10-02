@@ -21,6 +21,14 @@ of work follow it, the author's next challenges: a redesigned page, and a second
 code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
+**Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, and the work it
+needs is in the active list: D16, G23, G1 to G4, G24, G25, G27 and G26. D16 is structural and
+comes first, as tier D does: until it is paid the port cannot read Conflux's object
+references, so nothing else on that path can be checked against the dungeon. The rest
+follow G17. Each entry says what Conflux uses of it, measured on the deciphered file.
+DSA support is aimed at whole, not at Conflux's share of it: G1 is every operation CSBWin
+has, so G27 is on the path though Conflux's programs never call `&GETSKIN`.
+
 The order, then:
 
 1. **D and E.** New structural debt still goes into D or E and jumps the queue.
@@ -32,11 +40,7 @@ The order, then:
 **Postponed (⏸️) until the default dungeon is validated.** These are not taken in order,
 and no session picks one up unless the author names it:
 
-- **DSA extensibility.** The retail dungeon defines no DSA (G1), so
-  nothing it does could be verified: the missing opcodes, the DSA filters, and what only a
-  DSA reaches (the wings, `talents`).
-- **CSBWin's extensions for custom dungeons**: malformed heroes, external portraits, the
-  monster design options, a save of a dungeon the port does not know.
+- **A save of a dungeon the port does not know** (G22).
 - **CSBWin's debugging features** that are not part of the game (the ASCII dump).
 - **Comparing frames against CSBWin's own screenshots** (`PLAN.md` → Phase 15, step 5):
   staging the same scene in CSBWin, without cheats, costs more than it proves.
@@ -88,16 +92,22 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| D16 | `ObjectID` is CSBWin's indirect slot, and a database holds more than 1024 records | L | ⏳ |
 | C113 | The entrance's chooser redraws without its cursor | S | ⏳ |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
+| G23 | Enciphered files: the whole of a `dungeon.dat`, and the saves of its game | S | ⏳ |
+| G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
+| G2 | Thirteen DSA filters | L | ⏳ |
+| G3 | The wings | M | ⏳ |
+| G4 | Custom-dungeon extensions: `talents`, malformed heroes, external portraits, the monster design options | M | ⏳ |
+| G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | M | ⏳ |
+| G25 | Viewport overlays and overlay palettes | M | ⏳ |
+| G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
+| G26 | Conflux 3.5 as a data set | M | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
 | F13 | `npm test` runs its tools one at a time | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
-| G1 | DSA gaps | — | ⏸️ |
-| G2 | Eleven DSA filters | — | ⏸️ |
-| G3 | The wings | — | ⏸️ |
-| G4 | Custom-dungeon extensions: `talents`, malformed heroes, external portraits, the monster design options | — | ⏸️ |
 | G14 | `AsciiDump`: the resumed game's "ASCII DUMP" | — | ⏸️ |
 | G20 | The hint oracle | — | ⏸️ |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
@@ -109,17 +119,17 @@ In payoff order: the first row is the next item.
 | X6 | Extra: the Hint Oracle's hints in the game, as the party moves | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G1 are the active list. `F3` is a phase, whose status is
+The rows above G14 are the active list. `F3` is a phase, whose status is
 `PLAN.md`'s. One row sits
-out of its tier's place on purpose: `E15` below `G17`, because it waits for the page
+out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
-row meanwhile. The F
+row meanwhile. The G rows from G23 on are Conflux's (see "Priority"). The F
 rows are independent of the rest ("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C114 · D16 · E21 · F14 · G23 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C114 · D17 · E21 · F14 · G28 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -127,6 +137,48 @@ entry here, only its commit, so take the next ID from this line and move it on.
 ## D — State representation
 
 New state-representation debt goes here, and jumps the queue.
+
+### D16 ⏳ `ObjectID` is CSBWin's indirect slot, and a database holds more than 1024 records
+
+The port keeps an object reference packed, `[position:2][category:4][index:10]`, so a
+database ends at record 1023. CSBWin's `RN` is a slot in two maps: `dataTypeMap` holds the
+category and the position, and `dataIndexMap` a 16-bit index
+(`doc/CSBwin-src/CSBTypes.h:268-370`). So a CSBWin database holds up to 64000 records.
+`CsbwinObjectIndex.resolve` translates a file's slots back to packed RNs, and throws on an
+index past 1023 (`src/data/CsbwinObjectIndex.ts`). The port's databases also stop at 1024
+records (`doc/PROVEN_FACTS.md` → "`SmartDiscard`", the sentence before "A full database").
+
+Conflux 3.5's `dungeon.dat`, deciphered (G23), fails right there. Its index has 19925
+slots, and five of its databases run past record 1023:
+
+| Database | Records | Slots past 1023 |
+| --- | --- | --- |
+| actuators | 10318 | 9287 |
+| texts | 2243 | 1197 |
+| misc | 1631 | 592 |
+| teleporters | 1613 | 575 |
+| creatures | 1257 | 228 |
+
+The others hold fewer than 1024. The actuators alone would not fit the packed form with
+any other field width, so the fix is CSBWin's model: `ObjectID` becomes the slot, and the
+category, position and index are read through the maps (`dbType()`, `pos()`, `idx()`).
+`decodeObjectID` has 158 calls in 31 files, most in `DsaSystem` (39), `TimerSystem` (18),
+`DungeonState` (18) and `ActuatorSystem` (13). The steps:
+
+1. **The maps in `GameContext`, and the accessors behind every call site.** A plain
+   `dungeon.dat` is numbered by `ConvertListOfObjects`, `ConvertTimers` and
+   `ConvertCharacters` (`doc/CSBwin-src/SaveGame.cpp:1916-2018`, `:2021`, `:2046`). A save's
+   slots are kept as they are, and the writer writes the maps the game holds instead of
+   building them (`buildObjectIndirectIndex`). A refactor, under tier D's rules. Where a
+   tool's output moves, the commit says why.
+2. **Slots allocated and freed** where records are created and deleted
+   (`AllocateIndirectIndex`, `SaveGame.cpp:2100-2140`). `withObjectPosition` becomes
+   `RN::pos`'s setter, which writes the map and keeps the RN (`CSBTypes.h:336-342`). Two
+   RNs that one packed value stands for today become two, a missile's flying object among
+   them (`DuplicateOK`, `SaveGame.cpp:1918`).
+3. **Databases past 1024 records**: the record arrays, `FindEmptyDBEntry` and `Enlarge`
+   as CSBWin bounds them (`CSBCode.cpp:4942-5084`, `Character.cpp:182-358`). The check is
+   Conflux read to its end, which also takes G23.
 
 ---
 
@@ -265,15 +317,76 @@ checks and `TAG002724`'s copy, and run them from the page or the save menu on a 
 source save, writing a new save. The utility's screen is not ported, and step 2 is not
 run automatically when the prison's party is saved.
 
-### Postponed until the default dungeon is validated
+### G23 ⏳ Enciphered files: the whole of a `dungeon.dat`, and the saves of its game
 
-Not taken in order; the author names one to start it (see "Priority").
+`SimpleEncryption` (`EF_FLAGS` 0x04) puts the whole file, a save or a `dungeon.dat`, behind
+`RC4.cpp`'s cipher (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is `RC4.cpp`'s own
+cipher"). `readExtendedFeatures` deciphers the 512-byte block and no more, so an
+enciphered file fails at its object maps. CSBWin's `READ` deciphers every buffer by its
+position in the file (`doc/CSBwin-src/system.cpp:301-313`), and `WRITE` enciphers the same
+way (`:315-329`). CSBWin sets the flag only when the file it read was enciphered
+(`SaveGame.cpp:326-338`), and `SaveGame` keys the same cipher (`:915-918`), so a save of
+such a game is enciphered too. The port's writer never sets the flag.
 
-### G1 ⏸️ DSA gaps
+Paying it: decipher the whole file once the block says so, and write a save enciphered
+when its game's file was. Conflux 3.5's `dungeon.dat` is the canary
+(`tools/dump-extended-features-read.ts`). Deciphered whole, it reads up to D16's limit.
 
-- **Opcodes.** Unimplemented DSA opcodes and `&` subcodes are traced once each through
-  `warnedOps` (`src/engine/DsaSystem.ts:1257`, `:1864`). Those warnings are the list.
-  Slave DSAs are not implemented (`findMaster`, `:1896-1905`).
+### G1 ⏳ Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs
+
+The goal is the whole of CSBWin's DSA, not what one dungeon calls. Every command is
+ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter either. Of
+CSBWin's 138 `&` operations (`STKOP_*`, `doc/CSBwin-src/Data.h:1723`), the port has 55,
+so 83 are left.
+
+Conflux, the dungeon that will check them, defines 131 DSAs, with 4646 programs, behind
+1591 type-47 actuators. A static census of its programs decodes each word with the
+operand layout `DsaSystem.execute` reads, and every program decodes to its exact length.
+It uses 118 `&` operations, 73 of the 83. With Conflux's count of each:
+
+- **Characters**: `CharFetch` 67, `CharStore` 24, `I_CharStore` 4, `ChPoss` 107, `Mastery`
+  71, `ExperiencePlus` 33, `WhereIsChar` 61, `IsCarried` 35, `PartyFetch` 36,
+  `CharNameFetch` 3, `CountInjury` 1, `CausePoison` 1, `I_CausePoison` 6. `SwapCharacter` 7
+  and `I_SwapCharacter` 4 need G3, and `WhoHasTalent` 5, `TalentsFetch` 2 and
+  `TalentsStore` 2 need G4's `talents`.
+- **Objects**: `GetCharges` 32, `SetCharges` 45, `GetCurse` 6, `SetCurse` 3, `GetBroken` 3,
+  `SetBroken` 3, `GetPoisoned` 4, `GetSubType` 24, `SetSubType` 11, `MissileInfoFetch` 2,
+  `MissileInfoStore` 2, `Throw` 1, `I_Throw` 14, `Cast` 2, `I_Cast` 2, `FilteredCast` 3,
+  `CreateCloud` 10, `I_CreateCloud` 59.
+- **Monsters**: `MonsterFetch` 27, `MonsterStore` 12, `I_MonsterStore` 6, `MonPoss` 3,
+  `MonBlk` 1, `MonLandD` 1, `I_DelMon` 2, `I_InsMon` 2.
+- **Text and sound**: `Message` 62, `Say` 121, `TextFetch` 7, `GlobalTextStore` 16,
+  `DiscardText` 1, `Sound` 308 (whose samples are G24's).
+- **The dungeon and the program**: `I_Del` 42, `I_Add` 41, `I_Move` 17, `I_CellStore` 4,
+  `I_Indirect` 1, `I_Delay` 22, `FetchExCellFlg` 2, `StoreExCellFlg` 1, `ThisCell` 11,
+  `Neighbors` 4, `Loc2AbsCoord` 51, `PartyDistance` 5, `JumpGear` 8, `GosubGear` 8,
+  `ThisDSAId` 4, `DSAInfoFetch` 3, `BitCount` 3, `MultiplierFetch` 1, `VSET` 1, `Jitter` 7,
+  `DisableSaves` 2.
+- **The display**: `Overlay` 25 and `Palette` 5, which need G25.
+
+The ten Conflux never calls: `Noop` (0: the port's `StkOp` names it but has no case, so it
+traces as unimplemented), `2Dup` (23), `SetPoisoned` (75), `I_Copy` (87), `DelMon` (95),
+`InsMon` (96), `TextSay` (104), `I_FilteredCast` (120), and `GetSkin` (131) and `SetSkin`
+(132), which need G27. No dungeon here checks these against play, so each is ported with
+a tool of its own.
+
+Every `I_` operation but two is CSBWin's `Indirect`: it packs the operation and its
+operands into a record and sends it to the DSA at `ESL_INDIRECTACTIONS`, whose `I_Indirect`
+unpacks and runs it (`doc/CSBwin-src/DSA.cpp:2093-2130`, `:2346-2364`, `:4957-4971`). That
+filter is G2's. `I_Delay` sets the delay of the next one (`:4972`), and `I_Indirect` is the
+unpacking.
+
+The steps: first the census as a tool. It prints, against CSBWin's `STKOP` list, every
+operation the port lacks, with a dungeon's count of each when given one, and fails while
+any is left. Then one family per commit, in the order above, the ten with their nearest
+family. Last, `DSA::Write` and the `EXPOOL` records, so that a game with DSAs can be
+saved (below). Until D16 is paid, no operation can be checked against Conflux.
+
+The rest of the item, with two operations that need care when ported:
+
+- **Slave DSAs** are not implemented (`findMaster`, `src/engine/DsaSystem.ts`).
+- **Unported opcodes are traced** once each through `warnedOps` (`DsaSystem.ts`), for a
+  dungeon the census has not seen.
 - **`STKOP_Throw`** (`DSA.cpp:4558`) is one of the missing opcodes, so
   `TimerSystem.throwMissile` (`ThrowMissile`, `Timer.cpp:2016`) has no caller. When the
   opcode is ported, re-port the function's missile-type switch first. CSBWin throws a spell
@@ -310,10 +423,23 @@ Not taken in order; the author names one to start it (see "Priority").
   DSA or a custom dungeon sets extended cell flags. The magic footprints are drawn
   (`src/renderer/csbwin/SummarizeRoomInfo.ts`, beside a comment naming this item).
 
-### G2 ⏸️ Eleven DSA filters
+### G2 ⏳ Thirteen DSA filters
 
-No dungeon we load defines any of them, so none could be verified if written. Each place
-uses CSBWin's defaults.
+The port runs five filters: the viewing filter, the party attack filter, the adjust
+skills filter, the missile encounter filter, and the spell filter at
+`spellFilterLocation`. Each place below uses CSBWin's defaults instead. Conflux's `EXPOOL`
+names a location for all sixteen special locations, `ESL_MONSTERATTACKFILTER` (0) to
+`ESL_DAMAGECHARFILTER` (15, `doc/CSBwin-src/CSB.h:1535-1550`), and a spell filter, so it
+reaches every filter here but the portrait one. Whether a DSA actuator stands at each
+location waits for D16, as the chains cannot be read before it.
+
+- `ESL_MONSTERMOVEFILTER` (`doc/CSBwin-src/Monster.cpp:3080-3130`), which a level can
+  have its own of: the key with `(level + 1) << 8` is tried first, then the dungeon's.
+- `ESL_INDIRECTACTIONS`, the DSA every `I_` operation is sent to (`DSA.cpp:2093-2130`,
+  G1). The port's `I_TELEPORT_PARTY` teleports at once, as `TeleportParty` does
+  (`DsaSystem.ts`, `case StkOp.I_TELEPORT_PARTY`), where CSBWin's sends a record to that
+  DSA (`DSA.cpp:4963`). It is corrected with this filter: no dungeon the port plays
+  reaches it.
 
 - `ESL_CHARDEATHFILTER` (actuator type 47, `Character.cpp:2535-2589`).
 - `ESL_DAMAGECHARFILTER` (actuator type 47, `Character.cpp:2829-2893`), which may rewrite
@@ -355,7 +481,7 @@ uses CSBWin's defaults.
   calls once it has the volume, and which may play the sound through a DSA instead
   (`CSBCode.cpp:1877`). `SoundQueue.queueSound` plays straight on.
 
-### G3 ⏸️ The wings
+### G3 ⏳ The wings
 
 CSBWin keeps champions who have left the party in a store that `CHARDESC::GetFromWings` /
 `SaveToWings` reach (`doc/CSBwin-src/Character.cpp:5239`). Two things consult it, and
@@ -369,9 +495,9 @@ cannot here:
 fills the wings: `STKOP_SwapCharacter` (`DSA.cpp:4413-4419`) is the one caller of
 `SwapCharacter` (`Character.cpp:5472`), and through it of `CharacterDelete` / `CharacterAdd`
 and every `SaveToWings`. Nothing in the retail game removes a living champion from the
-party.
+party. Conflux does: `SwapCharacter` 7 times and `I_SwapCharacter` 4 (G1).
 
-### G4 ⏸️ Custom-dungeon extensions: `talents`, malformed heroes, external portraits, the monster design options
+### G4 ⏳ Custom-dungeon extensions: `talents`, malformed heroes, external portraits, the monster design options
 
 - `pcA3->talents`, which `Champion` has no field for. `AddCharacter` decodes it from the
   hero text (`Character.cpp:688`), and only a DSA reads it (`DSA.cpp:4220`, `:4287`,
@@ -381,20 +507,17 @@ party.
   outright;
 - external portraits for `charID > 23`.
 
-No shipped DM hero touches any of these.
+No shipped DM hero touches any of these. Conflux does: its DSAs read and write `talents`
+(G1), and three of the 22 heroes `HeroExtractor` reads from it have portraits 274, 275 and
+276, which come from `CSBgraphics.dat` (G24). Whether it rejected a malformed one is not
+checked.
 
-**Two file matters.** `SimpleEncryption` (`EF_FLAGS` 0x04) puts the whole file, a save or
-a `dungeon.dat`, behind `RC4.cpp`'s cipher (`doc/PROVEN_FACTS.md` → "The "simple"
-encipherment is `RC4.cpp`'s own cipher"), and CSBWin sets it only when it reads a file
-already enciphered (`doc/CSBwin-src/SaveGame.cpp:326-338`); `readExtendedFeatures`
-deciphers the 512-byte header and no more, so an
-enciphered file fails at the object maps, and the writer never sets it. Conflux 3.5's
-`dungeon.dat` is such a file, and the canary for reading one
-(`tools/dump-extended-features-read.ts`). And `MakeBigActuators` reads each actuator's type before
+**A file matter, off Conflux's path.** `MakeBigActuators` reads each actuator's type before
 the byte swap, so CSBWin takes bits 8-14 of `word2` for it where the port takes the type
 (`doc/PROVEN_FACTS.md` → "`MakeBigActuators` runs before the byte swap");
 `tools/dump-dungeon-conversions.ts` fails if a dungeon has a type-47 actuator under either
-reading, and DM has none.
+reading, and DM has none. The conversion runs only on a file without the `BigActuators`
+flag (`doc/CSBwin-src/SaveGame.cpp:2604`), and Conflux's has it.
 
 **The monster design options.** `DB4::invisible()` is gated on `invisibleMonsters`, and
 `drawAsSize4()`, `Unique()` and `Poisoned()` on `drawAsSize4Monsters`
@@ -404,9 +527,75 @@ holds the raw bits, the renderer's `DrawRoomObjects` / `DrawMonster` take both o
 false (every creature drawn, never `DrawSize4Index`), and `monster.drawAsSize4` is read ungated in
 `MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:373`) and in `MonsterDamage`
 (`:504`, `:540`). Only `monsterUnique` (`MonsterSystem.ts:70`) applies a gate, as a
-constant `false`. Harmless for now, because no creature in `dm-atari/dungeon.dat` sets any
-of bits 11-14. Modelling it means reading `EF_EXTENDED_FLAGS.InvisibleMonsters` and
+constant `false`. Harmless on DM, because no creature in `dm-atari/dungeon.dat` sets any
+of bits 11-14. Conflux sets both options (`extendedFlags` 0x76), and of its 1257 creature
+groups 3 are invisible, 372 drawn as size 4 and 194 unique. Modelling it means reading `EF_EXTENDED_FLAGS.InvisibleMonsters` and
 `DrawAsSize4Monsters` in `readExtendedFeatures` and gating every accessor.
+
+### G24 ⏳ `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics
+
+CSBWin reads eight kinds of section from `CSBgraphics.dat` (`CGT_*`,
+`doc/CSBwin-src/CSB.h:289-296`). The port reads two, the wall and the floor decorations
+(`src/data/CSBGraphicsLoader.ts`). Conflux's file holds 156 portraits, 611 sounds, 123
+alternate monster graphics, 90 backgrounds, 112 viewport overlays, 51 overlay palettes, 36
+wall and 72 floor decorations. Of the six kinds the port does not read, Conflux reaches:
+
+- **Portraits** (`doc/CSBwin-src/Bitmaps.cpp:287`): its heroes with portraits past 23 (G4).
+- **Sounds** (`Sound.cpp:996`): what its 308 `&SOUND`s play (G1).
+- **Alternate monster graphics** (`Code51a4.cpp:1097`): 598 of its creature groups have
+  `alternateGraphics` 1 to 3.
+
+The overlays and their palettes are G25, and the backgrounds, which are what a skin
+draws, G27.
+CSBWin also checks the file's signature against the one the dungeon's Extended Features
+block names (`SaveGame.cpp:380`, `Graphics.cpp:1865-1881`).
+
+### G25 ⏳ Viewport overlays and overlay palettes
+
+A DSA lays an image over the viewport with `&OVERLAY` (`SelectOverlay`,
+`doc/CSBwin-src/Bitmaps.cpp:687`, read by `OVERLAYDATA::ReadOverlay`, `:572`), and tints it
+with `&PALETTE` (`SetOverlayPalette`, `:651`; `OVERLAYDATA::CreateOverlayTable`,
+`Graphics.cpp:2978`). `WinScreen.cpp` composes the result. Both read their data from
+`CSBgraphics.dat`. The overlay in force travels in the Extended Features block
+(`OverlayActive`, `overlayOrdinal`, `overlayP1`-`P3`, `CSB.h:491-505`), and the overlay
+palette in `EXPOOL`, as 24 records (G1, "What a DSA keeps in a save's `EXPOOL`"). The port
+models neither. Conflux's DSAs call `&OVERLAY` 25 times and `&PALETTE` 5 times.
+
+### G27 ⏳ Skins: a cell's own wall, floor and ceiling graphics
+
+A CSBWin cell has a skin number, which the viewport's drawing programs read
+(`CurrentSkin`, `SkinNumber`, `doc/CSBwin-src/Viewport.cpp:3028-3032`). Through
+`BACKGROUND_LIB` they turn it into the IDs of the wall, floor, middle and ceiling graphics
+and their masks, and of a skin's wall decoration (`:3035-3061`). Those are read from
+`CSBgraphics.dat`'s background sections (`CGT_Backgrounds`, `BACKGROUND_LIB::FindGraphicInCache`,
+`:5801-5830`). A DSA reads and sets a cell's skin with `&GETSKIN` and `&SETSKIN`
+(`DSA.cpp:3107`, through `skinCache`). The port has none of it: `DrawViewport` gives every
+cell skin 0 (`src/renderer/DrawViewport.ts`, "Default skin for prototype"), and its
+interpreter has none of the background opcodes. Where a cell's skin is kept between DSA
+calls and in a file is not yet traced. Conflux's file holds 90 background sections, and
+its programs never call `&GETSKIN` or `&SETSKIN`. Whether its cells carry skins is part of
+the tracing.
+
+### G26 ⏳ Conflux 3.5 as a data set
+
+Once the items above are paid, what is left is the page's side:
+
+- a `DATA_SETS` entry with `csbGraphics` (`src/data/DataSets.ts`), and a `KNOWN_DUNGEONS`
+  signature from `tools/dump-dungeon-signature.ts` (`src/data/DungeonSignature.ts`). The
+  comments in both that say why Conflux is missing go with them;
+- **its `graphics.dat`**, 456953 bytes where DM's is 271921. Its tables extract without an
+  error, and nothing has looked at them further. Its levels name graphics past DM's: wall
+  decorations up to 192, floor decorations up to 108, door decorations up to 56, and
+  monster types up to 40 (DM's: 59, 8, 11 and 26). Its creature records use types 0 to
+  26 only. What CSBWin does with a level's monster type past 26 is not traced;
+- a golden frame at Conflux's start, and a tool that plays its first ticks.
+
+Its `AutoRecord` flag (0x10) asks CSBWin to record the game for playback, which is not
+the game; whether to model it is the author's call.
+
+### Postponed until the default dungeon is validated
+
+Not taken in order; the author names one to start it (see "Priority").
 
 ### G14 ⏸️ `AsciiDump`: the resumed game's "ASCII DUMP"
 
