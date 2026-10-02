@@ -3,7 +3,7 @@
  *
  * A CSBWin save holds no name of its dungeon, but it holds the dungeon (blocks 7-14),
  * and a file on its way into the store is checked against the running one by it
- * (`PLAN.md` → Phase 10, "An import is checked against the dungeon"). CSBWin has no such
+ * (`doc/SAVES.md` → "An import is checked against the dungeon"). CSBWin has no such
  * check: it keeps a game's saves in that game's directory
  * (`doc/CSBwin-src/CSBCode.cpp:9747-9756`).
  *

@@ -132,8 +132,8 @@ export function importedFileName(name: string, taken: ReadonlySet<string>): stri
  * none: drawn as a new game draws its own (`drawRandomGameID`, never 0), and again
  * while a row holds the id. Two games draw the
  * same id about once in 16 million pairs, and two playthroughs of one data set that
- * shared it would share F5's slot, F9's choice and the menu's question (`PLAN.md` →
- * Phase 10, "A playthrough").
+ * shared it would share F5's slot, F9's choice and the menu's question (`doc/SAVES.md`
+ * → "A playthrough").
  */
 export function drawPlaythrough(random: CsbRandom, rows: SaveEntry[]): number {
     for (;;) {
@@ -314,8 +314,8 @@ export class GameSaves {
      * save, which the list then shows and LOAD reads as any other. The game is left alone.
      *
      * The file names no dungeon but holds one, and its walls are held against the known
-     * dungeons' (`checkDungeon` over the signature of the file's world, `PLAN.md` →
-     * Phase 10, "An import is checked against the dungeon"):
+     * dungeons' (`checkDungeon` over the signature of the file's world, `doc/SAVES.md`
+     * → "An import is checked against the dungeon"):
      *
      * - the data set's own dungeon, whole: stored;
      * - most of the data set's own and not the whole, a modified version of it: stored

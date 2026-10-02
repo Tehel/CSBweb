@@ -497,7 +497,7 @@ export interface ExtendedFeaturesPrefix {
      * read with. A DSA whose state machine has moved since is therefore written back
      * where it stood, which is wrong — but no dungeon this project loads defines a DSA
      * at all (`numDSA` is 0 in every committed save), so nothing exercises it. Recorded
-     * in `PLAN.md` Phase 10.
+     * in `DEBT.md` G1.
      */
     dsaBlock?: Uint8Array;
     /**

@@ -36,6 +36,7 @@ Corollaries:
 | `doc/PLAN_ARCHIVE.md` | Working notes of the phases and debt items closed up to 2026-09-26. **Frozen**, reference only — read on demand. |
 | `doc/CSBWIN_REFERENCE_INDEX.md` | Index of the per-topic CSBWin reference docs. |
 | `doc/PROVEN_FACTS.md` | Verified facts with `File.cpp:line` citations. |
+| `doc/SAVES.md` | The port's own save design: the store, the playthrough, the dialog, F5 and F9. |
 | `doc/CSBWIN_SYMBOL_INDEX.tsv` | Every CSBWin symbol → `File.cpp:line`. Grep this before grepping the tree. |
 | `NOTES.md` | The author's personal scratchpad. **Do not edit.** Flag problems instead. |
 | `doc/CSBwin-src/` | The C++ reference (gitignored, not ours). |
@@ -238,9 +239,10 @@ magic casting, light levels, worn-object bonuses, sound, the message area, monst
 (`Monster.cpp`: AI, movement and combat both ways), the champion lifecycle (the Hall of
 Champions, death, bones, resurrection), sleep, the pre-game screens (title, dungeon
 entrance, doors, credits) and most of the DM UI. Genuine CSBWin save files load, and a
-save of the port's is such a file, all sixteen blocks, and nothing else. **The current priority is a complete
-game on the default dungeon**: the rework of the save menu first (Phase 10, `DEBT.md`'s
-`P10` row), then `DEBT.md`'s other active rows, one item per commit (the unported
+save of the port's is such a file, all sixteen blocks, and nothing else; the dialog
+behind the disk icon lists them by playthrough, and exports and imports them
+(`doc/SAVES.md`). **The current priority is a complete
+game on the default dungeon**: `DEBT.md`'s active rows, one item per commit (the unported
 features the retail dungeon reaches). DSA extensibility, CSBWin's custom-dungeon and debugging extras, and comparing
 frames with CSBWin's are postponed until the default dungeon is validated; Chaos Strikes
 Back's own features are not. The first row of `DEBT.md`'s index is the next item, and

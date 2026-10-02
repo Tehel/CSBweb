@@ -13,7 +13,7 @@
  * **Version 2** (`stampSaveRecords`). A version-2 row is today's, but its file may name
  * no playthrough: an earlier build wrote `RandomGameID` 0. The upgrade gives each such
  * row a playthrough and stamps it into the file, so that no stored save holds 0
- * (`PLAN.md` → Phase 10, "A playthrough").
+ * (`doc/SAVES.md` → "A playthrough").
  *
  * Both are pure, so the tools run them (`tools/dump-save-menu.ts`,
  * `tools/dump-save-stamp.ts`); `idb.ts` calls them once, in the upgrade.

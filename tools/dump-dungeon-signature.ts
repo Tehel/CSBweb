@@ -2,8 +2,8 @@
  * A dungeon's signature, and the catalogue of the known dungeons' (`DungeonSignature.ts`).
  *
  * A save names no dungeon, so a file on its way into the store is told by its walls: a
- * digest per level of the width, the height and a bit per cell, stone or not (`PLAN.md`
- * → Phase 10, "An import is checked against the dungeon"). Nothing of it shows until a
+ * digest per level of the width, the height and a bit per cell, stone or not
+ * (`doc/SAVES.md` → "An import is checked against the dungeon"). Nothing of it shows until a
  * save is refused in its own dungeon, or taken into another's. So:
  *
  * 1. The digest's input, on a level made by hand: the bytes, written out here, and the

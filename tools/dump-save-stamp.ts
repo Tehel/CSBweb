@@ -3,7 +3,7 @@
  *
  * A file an earlier build of the port wrote holds `RandomGameID` 0, which names no
  * playthrough, and the store gives such a file an id and writes it into the file
- * (`PLAN.md` → Phase 10, "A playthrough"). The id is in `GAMEBLOCK1`, whose second half
+ * (`doc/SAVES.md` → "A playthrough"). The id is in `GAMEBLOCK1`, whose second half
  * is scrambled and whose first half folds to the sum of the second. A stamp that got
  * either wrong gives a file that no longer reads, or one that reads with something else
  * of the game changed, and neither shows until the save is loaded.

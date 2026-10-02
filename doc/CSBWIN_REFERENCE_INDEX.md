@@ -19,7 +19,7 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 - `doc/CSBWIN_CHAMPION_LIFECYCLE_REFERENCE.md` - The champion from creation to resurrection: the ATTRIBUTE (maximum, current, minimum) triple, AddCharacter and the Hall of Champions, KillCharacter and bones, the Vi altar, reincarnation, potions, pit falls.
 - `doc/CSBWIN_DSA_REFERENCE.md` - DSA loading, timers, and STKOP behaviors.
 - `doc/CSBWIN_DECORATIONS_REFERENCE.md` - Wall/floor decoration eligibility and rendering rules.
-- `doc/CSBWIN_SAVEGAME_REFERENCE.md` - Extended features and save/load structures.
+- `doc/CSBWIN_SAVEGAME_REFERENCE.md` - Extended features and save/load structures: the sixteen blocks in write order, how much of each the port writes and reads, and the tools that prove it.
 - `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` - Everything before the party is in the dungeon: the title animation and `ShrinkBLT`, the dungeon entrance and the synthetic 5x5 level behind its doors, the 31-frame door animation, the credits scroll, and how "Resume" differs from the in-game disk icon.
 - `doc/CSBWIN_MENU_REFERENCE.md` - The disk icon and the menu system behind it: graphic 0, the four button layouts, text metrics, the modal loop and its press animation, the four save slots, and this port's deliberate divergences.
 - `doc/CSBWIN_HINT_ORACLE_REFERENCE.md` - Chaos Strikes Back's Hint Oracle: the `hcsb.hct` format (location table, hint records, compressed pages), which hints apply to a square, and the menu's limits.
@@ -30,6 +30,7 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 - `doc/GRAPHICS_MAPPINGS.md` - Wall/door bitmap indices and rectangle mappings.
 - `doc/VIEWPORT_RENDERING.md` - Narrative rendering overview tied to CSBWin behavior.
 - `doc/PROVEN_FACTS.md` - Specific verified facts with source references.
+- `doc/SAVES.md` - Not CSBWin-sourced: the port's saves. A save as a CSBWin `.dat` in a row of IndexedDB, the dungeon check on an import, the playthrough (`d.RandomGameID`), F5 and F9, the dialog behind the disk icon, and the evidence for each.
 - `doc/UI_MODULE_MAP.md` - Which `src/renderer/ui/` module ports which CSBWin UI file.
 - `doc/ATARI_ST_DISK_REFERENCE.md` - Not CSBWin-sourced: the English 1.2 Atari ST disk. The boot chain, the FTL logo (`SWOOSH.IMG`: its picture codec, palette script and sound), and how the 1.2 `graphics.dat` and `dungeon.dat` differ from the ones we ship (the Crack Switch (In) among them).
 - `doc/3D2D1D.md` - The 3D2D1D dungeon: the vertical moves and gravity our CSBWin source hardwires off, the two `extendedFlags` bits the 2019 exe reads them from, and the two keys (`DEBT.md` X5).

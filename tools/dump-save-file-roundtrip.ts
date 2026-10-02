@@ -2,7 +2,7 @@
  * Write a whole CSBWin save file — all sixteen blocks — and load it back.
  *
  * Every other tool in this group compares one block with the bytes CSBWin wrote.
- * This one is the other half of Phase 10 step 10: it takes a genuine save, parses it
+ * This one is the other half: it takes a genuine save, parses it
  * completely, **re-serialises the entire file** through `saveSaveGameState` with a
  * dungeon image and a closing checksum, and then hands the result to this port's own
  * reader. If anything the writer emits disagrees with what the reader expects, the file
@@ -92,7 +92,7 @@ function rewrite(bytes: Uint8Array): {
   // the file makes that the caller's problem: the word has to be read through the file's
   // index and written through ours, or a thrown object in flight would land on whatever
   // record our slot of the same number happens to be. `csbgame-flying-sword.dat` is the
-  // save made to exercise it; recorded in `PLAN.md` Phase 10.
+  // save made to exercise it.
   const timers = (save.timers ?? []).map((t) => ({ ...t }));
   for (const { slot, at, rn } of timerObjects) {
     const word = encode(resolveOf(save.objectIndex, rn)) & 0xffff;

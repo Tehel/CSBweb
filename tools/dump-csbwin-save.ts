@@ -4,10 +4,10 @@
  * Every other save-game tool in this directory tests the port against itself:
  * `dump-savegame.ts` round-trips the runtime JSON snapshot, and
  * `dump-savegame-blocks.ts` round-trips our own binary writer through our own binary
- * reader. Neither can catch the failure that matters for Phase 10 — a self-consistent
- * format that no CSBWin would recognise. That is not hypothetical: the blocks were
- * once written little-endian, round-tripped perfectly, and were wrong (see the header
- * of `dump-savegame-blocks.ts`).
+ * reader. Neither can catch the failure that matters for a save CSBWin must open — a
+ * self-consistent format that no CSBWin would recognise. That is not hypothetical: the
+ * blocks were once written little-endian, round-tripped perfectly, and were wrong (see
+ * the header of `dump-savegame-blocks.ts`).
  *
  * This tool is the other kind of evidence. It reads real files, produced by the real
  * program, that this project did not write. It cannot be satisfied by a bug that is

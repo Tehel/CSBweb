@@ -15,9 +15,9 @@ Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not sta
 ## Priority: a working game on the default dungeon
 
 **The goal now is a complete, faithful game on the default dungeon** (`dm-atari`), so the
-unported features it needs come next, and whatever it does not need waits. Three pieces
-of work follow it, the author's next challenges: a redesigned page, the save menu rework
-(`P10`), and a second dungeon (Chaos Strikes Back first). Tiers D and E hold what the
+unported features it needs come next, and whatever it does not need waits. Two pieces
+of work follow it, the author's next challenges: a redesigned page, and a second dungeon
+(Chaos Strikes Back first). Tiers D and E hold what the
 code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
@@ -26,19 +26,17 @@ The order, then:
 1. **D and E.** New structural debt still goes into D or E and jumps the queue.
 2. **C — Known divergences from CSBWin.** A divergence found along the way goes here and is
    taken before the G items: a known bug outranks a missing feature.
-3. **The save menu rework** (`PLAN.md` → Phase 10, the index's `P10` row), saves that
-   know their dungeon with it. The author's order puts it before the G rows.
-4. **G — Unported CSBWin features the default dungeon reaches**, in the index's order.
-5. **F — Verification debt** is independent of the rest. Interleave it anywhere.
+3. **G — Unported CSBWin features the default dungeon reaches**, in the index's order.
+4. **F — Verification debt** is independent of the rest. Interleave it anywhere.
 
 **Postponed (⏸️) until the default dungeon is validated.** These are not taken in order,
 and no session picks one up unless the author names it:
 
-- **DSA extensibility.** The retail dungeon defines no DSA (`PLAN.md` → Phase 10), so
+- **DSA extensibility.** The retail dungeon defines no DSA (G1), so
   nothing it does could be verified: the missing opcodes, the DSA filters, and what only a
   DSA reaches (the wings, `talents`).
 - **CSBWin's extensions for custom dungeons**: malformed heroes, external portraits, the
-  monster design options.
+  monster design options, a save of a dungeon the port does not know.
 - **CSBWin's debugging features** that are not part of the game (the ASCII dump).
 - **Comparing frames against CSBWin's own screenshots** (`PLAN.md` → Phase 15, step 5):
   staging the same scene in CSBWin, without cheats, costs more than it proves.
@@ -90,7 +88,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
@@ -103,6 +100,7 @@ In payoff order: the first row is the next item.
 | G14 | `AsciiDump`: the resumed game's "ASCII DUMP" | — | ⏸️ |
 | G20 | The hint oracle | — | ⏸️ |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
+| G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X1 | Extra: drinking from a fountain with an empty hand | S | ⏸️ |
 | X2 | Extra: a mastery just gained shown in green | S | ⏸️ |
 | X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
@@ -111,17 +109,17 @@ In payoff order: the first row is the next item.
 | X7 | Extra: the FTL logo before the title | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G1 are the active list. `P10` and `F3` are phases, whose status is
-`PLAN.md`'s; a session that takes `P10` works there, one step at a time. One row sits
+The rows above G1 are the active list. `F3` is a phase, whose status is
+`PLAN.md`'s. One row sits
 out of its tier's place on purpose: `E15` below `G17`, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
 row meanwhile. The F
-rows are independent of the rest ("Priority", point 5), so they can be taken anywhere.
+rows are independent of the rest ("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C112 · D16 · E21 · F14 · G22 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C112 · D16 · E21 · F14 · G23 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -276,7 +274,22 @@ Not taken in order; the author names one to start it (see "Priority").
   `buildSaveFile` refuses a dungeon that defines one rather than write a file without
   them (`src/engine/SaveGameFile.ts`), and `saveSaveGameState` writes a loaded save's
   DSA section back verbatim (`SaveGameState.dsaBlock`), where a DSA whose state has moved
-  since the load would be written as it stood.
+  since the load would be written as it stood. The retail DM dungeon defines none:
+  `numDSA` is 0 in every save of `tools/fixtures/`, with no special-location records.
+- **What a DSA keeps in a save's `EXPOOL`.** `SaveGame` writes the DSA global variables
+  there, sixteen to a record (`doc/CSBwin-src/SaveGame.cpp:1141-1148`), and `LoadGame`
+  reads them back (`:1746-1763`); the port does neither, and a load keeps the running
+  game's (`src/engine/CsbwinSaveGame.ts` → "What is not restored"). `SaveGame` also
+  writes the overlay palette there at every save, as 24 records (`:1152-1164`), which
+  `LoadGame` takes when all 24 are found (`:1763-1789`). Only a DSA changes that
+  palette: `SetOverlayPalette` has one caller (`DSA.cpp:2942`), and it is the identity
+  otherwise (`ClearOverlayPalette`, `data.cpp:117`, at `CSBCode.cpp:482`). The port
+  models no overlay palette and writes no such record. And CSBWin's `Setup` gives every
+  loaded game the pool's directory block (`SaveGame.cpp:2773`), where the port makes it
+  at the first record it writes, a death's bones (`src/data/CsbwinExpool.ts`). So the
+  port's save of a game started on `dungeon.dat` has no `EXPOOL`, or the bones' alone,
+  where CSBWin's has the block and 24 identity records. CSBWin loads either: `Setup`
+  makes the block, and with no palette record it keeps the palette it has.
 - **`ECF_FOOTPRINTS`.** The footprint arm of `SummarizeRoomInfo` also shows prints on any
   cell with this extended cell flag once `d.Time > 0` (`Codea59a.cpp:419-425`). Only a
   DSA or a custom dungeon sets extended cell flags. The magic footprints are drawn
@@ -416,6 +429,21 @@ prints the English literals. A translated `graphics.dat` and `dungeon.dat` (the 
 set) therefore play with English messages. Paying it means porting the two functions and
 reading the file from the data set's folder; the French set would still need a
 `Translation.txt`, which no file here provides.
+
+### G22 ⏸️ An unknown dungeon played from its save
+
+CSBWin resumes any save its directory holds, with that directory's `graphics.dat`. The
+port's import refuses a save of a dungeon it does not know, and of a known one no data
+set plays (`doc/SAVES.md` → "An import is checked against the dungeon"). Playing one
+would be a further answer on that refusal, of use to someone working on a dungeon of
+their own. A save is its dungeon's whole world and already loads into any running game
+(`installCsbwinWorld`), so what is missing is what the file does not hold: the graphics
+and the tables read from `graphics.dat`, which the player would pick from the known
+dungeons' (the signatures an Extended Features block may carry,
+`doc/CSBwin-src/SaveGame.cpp:378-379`, could suggest one); a `dungeon.dat` for "RESTART
+THIS GAME", so a lost game can only load a save; and a data set to list its saves under,
+which its signature can stand for. A dungeon with DSAs waits for G1: `buildSaveFile`
+refuses to save one.
 
 ---
 
@@ -749,14 +777,17 @@ Recorded so that nobody "fixes" them.
   (`:995-1016`), and loading builds the map from the file's packed words. Porting it
   means every `decodeObjectID` / `encodeObjectID` / `withObjectPosition` and hand-written
   mask reading the map instead (about 240 places in 37 files), and working out how
-  CSBWin's saves store the words.
+  CSBWin's saves store the words. A save is where the limit can be met from outside: its
+  `dataIndexMap` is 16 bits, and one that names a record past 1023 is not read
+  (`CsbwinObjectIndex.resolve` throws rather than alias). The largest index in any save
+  of `tools/fixtures/` is 682.
 - 🚫 **A drawn `RandomGameID` is never 0, nor a stored save's.** CSBWin keeps the
   product of its two draws whatever it is (`doc/CSBwin-src/SaveGame.cpp:1523-1532`), and
   it is 0 when either low word is, about one new game in 32768. The author's decision:
   the port draws the next pair instead (`drawRandomGameID`, `src/engine/GameContext.ts`),
   which in that case leaves the stream two draws further on than CSBWin's. 0 is what a
   file of an earlier build holds, which names no playthrough, and the store stamps an
-  id into such a file as it takes it (`PLAN.md` → Phase 10, "A playthrough"): a game
+  id into such a file as it takes it (`doc/SAVES.md` → "A playthrough"): a game
   that drew 0 would write files the store takes for those. `tools/dump-new-game.ts`
   checks it on a stream whose first pair gives 0. The same goes for an id a save of the
   data set already holds, about one pair of games in 16 million: the page draws the next

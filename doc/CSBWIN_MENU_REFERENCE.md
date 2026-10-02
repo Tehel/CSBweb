@@ -372,7 +372,7 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    (`formatSavePreview`, `src/data/saves/SaveStore.ts`). CSBWin shows nothing of a
    slot's contents.
 3. **No "SAVE AND QUIT"**: a page does not quit, and loading another game's save is how a
-   player leaves one (`PLAN.md` → Phase 10).
+   player leaves one (`doc/SAVES.md` → "The dialog").
 4. **EXPORT**, which has no counterpart. CSBWin's saves are files of its directory,
    there to be copied; the port's are rows of the browser's IndexedDB, which nothing
    outside the page reads. EXPORT downloads the selected save's file as the store holds
