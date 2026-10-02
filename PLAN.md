@@ -290,6 +290,16 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
 
 - Its own layout over nearly the whole 320×200 buffer, in the game's style (graphic 0's
   pieces, `_DoMenu`'s colours and font): not one of `_DoMenu`'s four layouts.
+- **The layout**: 304×184 at (8,8), on a screen cleared to black, in the game as at the
+  entrance: an 8-pixel ring of the game's picture would show nothing whole. Three pieces
+  of graphic 0 make it, each drawn at the size wanted by keeping its corners and
+  repeating its middle: the grey frame, the sunken panel and a button frame. Two panels
+  side by side, the list's (204 wide, graphic 0's own width, 33 characters a row) and
+  the preview's (71 wide, 11 characters), over one row of four buttons: LOAD, SAVE and
+  EXPORT under the list, CANCEL under the preview. A button that can do nothing has no
+  label, as CSBWin's empty slot has none. The labels' places in their frames, the
+  rectangle a click takes and the press animation are `_DoMenu`'s. The question before
+  a load or a save is `_DoMenu`'s centred menu, alone on the cleared screen.
 - **A two-level list**: a playthrough, named by the champions of its newest save, and
   under it, folded or not, its saves. The running playthrough is first and unfolded;
   playthroughs and saves are newest first; the list scrolls.
@@ -352,7 +362,19 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      `drawPlaythrough`. Evidence: `tools/dump-save-menu.ts`, "a drawn playthrough is no
      stored save's" (a store holding the ids a pinned stream draws first, and each
      game taking the next; another data set's saves; a store that cannot be listed).
-3. ⏳ **The dialog**: the layout, the folding list, the scrolling, the preview.
+3. ⏳ **The dialog**, one commit each:
+   - a. ⏳ **The frame**: the dialog in its rectangle on the cleared screen, drawn from
+     graphic 0's pieces. The list stays as it is, flat, in the list's panel, with its
+     status line; the preview's panel is empty; LOAD, SAVE and CANCEL are buttons, and
+     EXPORT's frame has no label until step 4; the question is centred.
+   - b. ⏳ **The two-level list**: a heading row for each playthrough over its saves,
+     folded or not. A save's row gives up the party, which is its heading's, for the
+     time of day and F5's mark. What LOAD and SAVE do with a heading selected is
+     written with it.
+   - c. ⏳ **The preview**, in its panel; the status line keeps what went wrong and
+     "WORKING . . ." alone.
+   - d. ⏳ **The scrolling**: the wheel and the keys scroll the list already. A mark at
+     the panel's edge where rows lie beyond it, which a click scrolls by.
 4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it. Until
    then a `.dat` on disk has no way into the page, the committed saves included: the
    store's rows are the only saves it loads. With it, no stored save holds playthrough
