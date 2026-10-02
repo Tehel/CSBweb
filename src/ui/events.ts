@@ -46,6 +46,26 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, input: GameInput): v
     canvas.addEventListener('mouseleave', () => input.mouseLeave());
 }
 
+/**
+ * The Extras button, bound before the intro and not with the rest in `bindUIEvents`: the
+ * one extra so far is the FTL logo, which the boot shows, so the entrance is where it is
+ * switched, for the next load. Until the game is wired the other settings are only the
+ * saved ones, which `readUISettings` cannot read off the page: the saved set is written
+ * back with this one flag changed.
+ */
+export function bindExtrasToggle(): void {
+    if (!extrasButton) return;
+    setExtrasEnabled(loadUISettings().extras);
+    extrasButton.classList.toggle('is-pressed', isExtrasEnabled());
+    extrasButton.addEventListener('click', () => {
+        const next = !isExtrasEnabled();
+        setExtrasEnabled(next);
+        extrasButton.classList.toggle('is-pressed', next);
+        console.info(next ? 'Extras enabled' : 'Extras disabled');
+        saveUISettings({ ...loadUISettings(), extras: next });
+    });
+}
+
 export function bindUIEvents(): void {
     const ctx = getUIContext();
     if (!ctx) return;
@@ -97,15 +117,6 @@ export function bindUIEvents(): void {
             setDebugFeaturesEnabled(next);
             debugButton.classList.toggle('is-pressed', next);
             console.info(next ? 'Debug features enabled' : 'Debug features disabled');
-            saveUISettings(readUISettings());
-        });
-
-        // The one extra so far is the FTL logo, which the boot shows: the next load has it.
-        extrasButton?.addEventListener('click', () => {
-            const next = !isExtrasEnabled();
-            setExtrasEnabled(next);
-            extrasButton.classList.toggle('is-pressed', next);
-            console.info(next ? 'Extras enabled' : 'Extras disabled');
             saveUISettings(readUISettings());
         });
 
