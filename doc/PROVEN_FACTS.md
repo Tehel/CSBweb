@@ -860,8 +860,26 @@ void AddFootprintEntry(i32 /*newX*/,i32 /*newY*/, ui16 deltaTime)
 It is nonetheless the only writer of `d.Byte13220`, the age bytes that
 `GetBestMonsterFacingP1` reads to decide whether a footprint is fresh enough to follow
 (`doc/CSBwin-src/Monster.cpp:617-620`). Its loop overwrites every entry it walks past with one
-value, and `DeleteFootprintEntry`'s `MemMove` shifts the tail *up* rather than down
-(`doc/CSBwin-src/Code11f52.cpp:4328-4329`). Both are ported as written.
+value, and never reaches entry 0 (`while (index-- != 1)`, `:4354`). It is ported as written.
+
+## A full trail is the last 24 squares walked: `MemMove` takes its source first
+
+`MemMove(ui8 *src, ui8 *dest, i32 byteCount)` is `memmove(dest, src, byteCount)`
+(`doc/CSBwin-src/CSBCode.cpp:824-827`): the source is the **first** argument. So
+`DeleteFootprintEntry`'s
+
+```cpp
+MemMove((ui8 *)&d.PartyFootprints[D7W+1],(ui8 *)&d.PartyFootprints[D7W],2*D6W);
+MemMove((ui8 *)&d.Byte13220[D7W+1],(ui8 *)&d.Byte13220[D7W],D6W);
+```
+
+(`doc/CSBwin-src/Code11f52.cpp:4328-4329`) copies the entries above `P1` down one, prints
+and ages alike: an ordinary removal. `MoveObject` deletes entry 0 while the count is 24 or
+more, then appends (`:3228-3246`), so the trail is always the last 24 squares the party
+walked, oldest first, and the magic range slides down with them (`:4331-4337`). The
+ten-second update's drop of the oldest print (`doc/CSBwin-src/Code17818.cpp:181-195`)
+leaves the rest in order. Evidence: `tools/dump-magic-footprints.ts`, and
+`tools/dump-footprint-decoration.ts` for a print drawn from a trail that has been round.
 
 ## The party's trail grows from empty
 

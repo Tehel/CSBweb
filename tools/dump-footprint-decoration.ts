@@ -19,7 +19,8 @@
  * `ReadTablesFromGraphicsFile` sets it once to graphic 241 and rectangle set 1
  * (`:10270-10273`). The canary for both numbers: graphics 241-246 are the sizes of set 1's
  * nine rectangles and of no other set's. And a frame of the real renderer with a magic
- * print on the cell ahead differs from the frame without it, inside that cell's rectangle.
+ * print on the cell ahead differs from the frame without it, inside that cell's rectangle,
+ * the trail having been round its ring of 24 and the party having walked on from the print.
  *
  * Run: `npx tsx tools/dump-footprint-decoration.ts`
  */
@@ -168,6 +169,8 @@ function drawing(): void {
     renderer.draw(at!, 0, false, false);
     return renderer.buffer.pixels.slice();
   };
+  // The trail as a game has it: round its ring of 24 already, on squares of another level.
+  for (let i = 0; i < 30; i++) footprints.recordPartyMove(10 + i, 5, i, 1, false);
   const without = frame();
   const slots = renderer.context.loadedFloorDecorations!;
   const toc = map.floorDecorationTOC ?? [];
@@ -175,8 +178,10 @@ function drawing(): void {
   check(slots.length === 16 && slots[15]![0] === 241 && slots[15]![1] === 1, 'slot 15 is graphic 241 in set 1');
   check(toc.length > 0 && toc.length < 16 && toc.every((d, i) => slots[i]![0] === 247 + 6 * d && slots[i]![1] === tables.objects.floorDecorationRectSetIndex[d]),
     `the level's ${toc.length} slots are 247 + 6 * its FloorDecorationTOC, in Byte4110's set`);
+  // The party casts, steps on the cell ahead, then back to where the frame is seen from.
   footprints.markMagicFootprints(4);
   footprints.recordPartyMove(100, 0, at.x, at.y - 1, true);
+  footprints.recordPartyMove(105, 0, at.x, at.y, true);
   const withPrint = frame();
 
   // The cell ahead is relative cell 7, the middle of the nearest row.

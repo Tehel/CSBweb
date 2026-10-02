@@ -375,9 +375,8 @@ corroboration across thirty years.
 **The footprint trail is acknowledged broken and still load-bearing.** The routine that
 writes trail staleness gets Stevens' bluntest comment: "I think this is much hogwash.
 Does nothing useful. Is full of errors. Perhaps an old, abandoned debug trace." He is
-right that it is wrong — it overwrites every entry it walks past with a single value,
-and the routine that *deletes* an entry shifts the tail the wrong way. But it is the
-only thing that writes the staleness values that smelling reads. Whatever it does, the
+right that it is wrong — it overwrites every entry it walks past with a single value.
+But it is the only thing that writes the staleness values that smelling reads. Whatever it does, the
 game's tracking behaviour depends on it, and it cannot simply be repaired without
 changing how monsters hunt.
 

@@ -129,20 +129,18 @@ export class PartyFootprints {
   }
 
   /**
-   * `DeleteFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4319`).
-   *
-   * ⚠️ CSBWin's `MemMove` here copies **forwards**, from `[P1]` to `[P1+1]` — i.e. it
-   * shifts the tail *up*, not down, which is not what removing an entry would
-   * normally do. Reproduced exactly; the trail is cosmetic plus a smell hint, and
-   * diverging would desynchronise the age bytes from CSBWin's.
+   * `DeleteFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4319`): the entries above `at`
+   * move down one, prints and ages alike. CSBWin's `MemMove` takes its source first
+   * (`MemMove(src, dest, byteCount)`, `doc/CSBwin-src/CSBCode.cpp:824`), so
+   * `MemMove(&d.PartyFootprints[P1+1], &d.PartyFootprints[P1], …)` copies `[P1+1]` onto `[P1]`.
    */
   private deleteFootprintEntry(at: number): void {
     this.count--;
     const n = this.count - at;
     if (n > 0) {
-      for (let i = n - 1; i >= 0; i--) {
-        this.prints[at + 1 + i] = this.prints[at + i] ?? 0;
-        this.ages[at + 1 + i] = this.ages[at + i] ?? 0;
+      for (let i = 0; i < n; i++) {
+        this.prints[at + i] = this.prints[at + 1 + i] ?? 0;
+        this.ages[at + i] = this.ages[at + 1 + i] ?? 0;
       }
     }
     if (at < this.indexOfFirstMagic) this.indexOfFirstMagic--;

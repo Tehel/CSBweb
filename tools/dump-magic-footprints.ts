@@ -22,6 +22,12 @@
  *   move still counts and stores its own, so the trail grows from nothing, as CSBWin's
  *   `csbgame-early-2hero-renamed.dat`, one move later, shows with its one print.
  *
+ * And the ring itself, on a bare `PartyFootprints`. `DeleteFootprintEntry`
+ * (`Code11f52.cpp:4318-4338`) drops an entry by moving the ones above it down one:
+ * `MemMove` takes its source first (`CSBCode.cpp:824`). So a full trail is always the last
+ * 24 squares walked, in order, the magic range slides down with them, and the ten-second
+ * update's drop of the oldest print (`Code17818.cpp:181-195`) leaves the rest in place.
+ *
  * Run: `npx tsx tools/dump-magic-footprints.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -33,6 +39,7 @@ import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import type { Game } from '../src/engine/Game';
+import { PartyFootprints } from '../src/engine/PartyFootprints';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
@@ -114,6 +121,52 @@ function scenario(save: string, power: number): void {
   `${label}: a game loaded from the save reads the range back`);
 }
 
+/** The ring past its 24 entries: what a delete keeps, and where the magic range lands. */
+function ring(): void {
+  // Square `i` of a walk of distinct squares, packed as the trail packs it.
+  const cell = (i: number): { x: number; y: number } => ({ x: i & 31, y: i >> 5 });
+  const packed = (i: number): number => (3 << 10) | (cell(i).y << 5) | cell(i).x;
+  const trail = new PartyFootprints();
+  const walk = (from: number, to: number, magic: boolean): void => {
+    for (let i = from; i < to; i++) trail.recordPartyMove(100 + 5 * i, 3, cell(i).x, cell(i).y, magic);
+  };
+  const held = (): number[] => Array.from({ length: trail.getCount() }, (_, i) => trail.getPrint(i));
+  const lastOf = (end: number, n: number): number[] => Array.from({ length: n }, (_, i) => packed(end - n + i));
+
+  walk(0, 40, false);
+  console.log(`ring: after 40 moves count=${trail.getCount()} x of each print: ${held().map((p) => p & 31).join(' ')}`);
+  check(trail.getCount() === 24 && held().join() === lastOf(40, 24).join(),
+    'ring: a full trail is the last 24 squares walked, oldest first');
+
+  trail.markMagicFootprints(4);
+  walk(40, 45, true);
+  const first = trail.getIndexOfFirstMagicFootprint();
+  const last = trail.getIndexOfLastMagicFootprint();
+  console.log(`ring: cast at move 40, 5 moves on: range=[${first},${last})`);
+  check(held().join() === lastOf(45, 24).join(), 'ring: and still is after the cast');
+  check(first === 19 && last === 24, 'ring: the range slid down to the five prints since the cast');
+  const inRange = (i: number): boolean => {
+    const found = trail.searchFootprints(3, cell(i).x, cell(i).y) - 1;
+    return found >= first && found < last;
+  };
+  check([40, 41, 42, 43, 44].every(inRange) && !inRange(39) && !inRange(21),
+    'ring: the five squares walked since the cast are magic, the one before it and the oldest are not');
+
+  // Every age but the newest falls by one a call, and the oldest print goes at zero.
+  const before = held();
+  let calls = 0;
+  while (trail.getCount() === 24 && calls < 100) {
+    trail.ageFootprints();
+    calls++;
+  }
+  console.log(`ring: ${calls} ten-second updates drop the oldest print, count=${trail.getCount()}`);
+  check(trail.getCount() === 23 && held().join() === before.slice(1).join(),
+    'ring: the ten-second update drops the oldest print and keeps the rest in order');
+  check(trail.getIndexOfFirstMagicFootprint() === 18 && trail.getIndexOfLastMagicFootprint() === 23,
+    'ring: and the magic range follows them down');
+}
+
+ring();
 scenario('csbgame-early-3hero-nospace.dat', 2);
 scenario('csbgame-early-3hero-nospace.dat', 4);
 scenario('csbgame-early-1hero.dat', 4);

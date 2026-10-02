@@ -13,3 +13,4 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Text records, three readers](text-records-three-readers.md) — a TEXT is a wall's only on a stone square; scrolls and floor messages use the main font
 - [Probe gotchas](probe-gotchas.md) — mutate `Position` in place; picking rects are viewport-relative, button lists are screen coordinates
 - [The live tree is served](live-tree-is-served.md) — the author's browser hot-reloads every edit: mutate in a scratch worktree, bump `DB_VERSION` last
+- [MemMove takes its source first](memmove-source-first.md) — `MemMove(src, dest, n)`: check a helper's signature before recording a CSBWin "bug", and run a ring past its wrap
