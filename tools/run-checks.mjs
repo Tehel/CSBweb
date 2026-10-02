@@ -205,6 +205,9 @@ const CHECKS = [
   // A playthrough stamped into a save file that names none: six bytes of GAMEBLOCK1, in a
   // block that is scrambled and folded, over every genuine save.
   { tool: 'dump-save-stamp.ts' },
+  // A dungeon's signature, the walls of each level, and the catalogue of the known
+  // dungeons' digests, which is committed: held here to every `dungeon.dat` and save.
+  { tool: 'dump-dungeon-signature.ts' },
   // The title animation and the dungeon entrance. The golden frames can see the entrance
   // once it is up; the nine 0x232 rectangles it hangs off, the hardcoded button list DM's
   // graphics.dat forces, the synthetic 5x5 level behind the doors, the 31-frame slide and

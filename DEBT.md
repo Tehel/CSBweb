@@ -206,7 +206,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 133 checks sequentially (`spawnSync`, `:255`), each a
+`tools/run-checks.mjs` spawns its 134 checks sequentially (`spawnSync`, `:258`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and

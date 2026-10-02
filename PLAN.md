@@ -189,14 +189,26 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   `Graphics.cpp:1784-1815`), which the port neither checks nor writes.
 - **An import is checked against the dungeon.** A `.dat` holds no name of its dungeon,
   but it holds the dungeon (blocks 7-14). A dungeon's signature is one digest per level, of
-  its walls: the level's width and height, and one bit per cell, stone or anything else.
+  its walls: the level's width and height, and one bit per cell, stone or anything else
+  (`dungeonSignature` over `levelWalls`, `src/data/DungeonSignature.ts`).
   Nothing finer: a teleporter a release moved, or a cell whose type play changed, leaves
-  the signature alone, and a player seldom knows which release a save came from. The
-  digest is SHA-256, the one a browser and Node both have built in. A save is its
-  dungeon's when every level matches. A save of another dungeon is refused, with the
+  the signature alone, and a player seldom knows which release a save came from. So the
+  four Dungeon Master sets are one dungeon, and a save of one is a save of any. The
+  digest is SHA-256, through `crypto.subtle`, which a browser and Node both have built
+  in, a browser in a secure context alone. The author's decision: the page is served
+  from localhost and will be hosted over https, so it is always there, and nothing
+  stands in for it. A save is its
+  dungeon's when every level matches, and the dungeon has no other level. A save of
+  another dungeon is refused, with the
   dungeon it looks like named when the port knows it ("switch to it", or "not supported
-  yet"), which is the known dungeon most of its levels match: that takes a catalogue of
-  known dungeons' signatures, which may list dungeons the port cannot play. The evidence is a tool that
+  yet"), which is the known dungeon most of its levels match (`identifyDungeon`), each
+  level against the level of its own number. That takes a catalogue of
+  known dungeons' signatures (`KNOWN_DUNGEONS`), each with the data sets that play it,
+  which may list dungeons the port cannot play: so the digests are committed, not read
+  from the page's files, and a tool holds each to the file here. It lists five: Dungeon
+  Master; Chaos Strikes Back, which is `mini.dat`'s, and its prison, the set's
+  `dungeon.dat`, both the `csb` set's; Kids dungeon 24; and 3D2D1D. Conflux's enciphered
+  `dungeon.dat` is not read, so it has no signature. The evidence is a tool that
   shows each committed save, early and late ones, matching its own dungeon and no
   other.
 - **Play time is the player's**: wall-clock time in the game, the frozen game and the
@@ -463,10 +475,27 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      The download itself no Node tool runs: the frames probe clicks EXPORT in the
      entrance's chooser, in a Chrome told to announce a download and keep none, and
      checks that one starts, a `.dat` under the save's name.
-   - c. ⏳ **A dungeon's signature, and the catalogue** of the known dungeons', with the
-     tool that shows each committed save matching its own dungeon and no other.
+   - c. ✅ **A dungeon's signature, and the catalogue** of the known dungeons'
+     (`src/data/DungeonSignature.ts`). Nothing in the page calls it yet. Evidence:
+     `tools/dump-dungeon-signature.ts` (the digest's input on a level made by hand, and
+     the digest against `node:crypto`'s; every data set's `dungeon.dat` and CSB's
+     `mini.dat` a catalogue dungeon that lists the set, whole, no entry without its
+     file and no digest listed twice; the eight genuine saves, from `d.Time` 70 to
+     127290, and the two of `static/gamefiles/csb`, each its own dungeon's and
+     matching no level of another; the port's own save; on the late save's world, a
+     cell's attributes, objects and type among those not stone changing nothing, a
+     wall opened or a cell walled changing its level's digest alone, the size in the
+     digest, and a save of thirteen levels of the fourteen being most of Dungeon
+     Master and not the whole). With a path, the tool prints that file's digests as
+     the catalogue lists them, which is how a dungeon is added.
    - d. ⏳ **The import**: a `.dat` dropped on the canvas while the dialog is up,
-     checked against the dungeon, stamped when it holds no id, and stored.
+     checked against the dungeon, stamped when it holds no id, and stored. The file's
+     signature is read from its world (`loadCsbwinWorld`), so a file whose image is
+     damaged is refused there. It is the running set's when `identifyDungeon` gives a
+     whole dungeon that lists `GameSaves.dataSet`; the `csb` set has two. To settle
+     with it: what the refusal says of a save that is most of the running set's own
+     dungeon and not the whole, where "switch to it" names the dungeon it is refused
+     in.
 5. ✅ **No "GAME LOADED, READY TO PLAY."** Evidence: `tools/dump-bad-saved-game.ts`, "a
    save read" (the hand-off after a load is one fade and four VBLs on a cleared screen,
    and waits for no click), and the golden frame `tools/frames/12-game-loaded.png`: the
