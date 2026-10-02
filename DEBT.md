@@ -385,9 +385,10 @@ of bits 11-14. Modelling it means reading `EF_EXTENDED_FLAGS.InvisibleMonsters` 
 `AsciiDump` (`doc/CSBwin-src/AsciiDump.cpp:2137`) writes the whole dungeon as text to
 `ASCIIDUMP.TXT`, starting with the game's and the levels' information, every cell, the
 objects, and the monsters (`:2152-2160`). The one route to it is the second button of the
-"GAME LOADED, READY TO PLAY." menu (`CSBCode.cpp:10497-10515`), which in the port only puts
-the menu up again (`tag021028`, `src/renderer/intro/BootSequence.ts`). In a page it would be
-a download.
+"GAME LOADED, READY TO PLAY." menu (`CSBCode.cpp:10497-10515`), which the port does not
+put up (`tag021028`, `src/renderer/intro/BootSequence.ts`;
+`doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port"), so it would need
+a route of its own. In a page it would be a download.
 
 ### G20 ⏸️ The hint oracle
 

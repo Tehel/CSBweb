@@ -13,7 +13,7 @@
  *        │  ├ _TAG01f746 :9459             the entrance screen
  *        │  └ _ReadEntireGame               dungeon.dat, or the chosen save
  *        │     └ tag01efee                  a failed read
- *        └ _TAG021028    :10460            "GAME LOADED, READY TO PLAY." after a load
+ *        └ _TAG021028    :10460            the hand-off to the adventure
  * ```
  *
  * This module is the two ends of that: it builds the `IntroHost` the screens draw through —
@@ -220,8 +220,8 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
  *
  * A load closes the chooser once the save is read, which is after the click, so the wait
  * for input also ends when the chooser closes. What the chooser last showed stays on the
- * screen: `onRestoreSave` has drawn the adventure into the screen by then, which CSBWin
- * does not draw before `_TAG021028`.
+ * screen for `tag021028`'s fade: `onRestoreSave` has drawn the adventure into the screen
+ * by then, which CSBWin does not draw before `_TAG021028`.
  */
 async function openLoadMenu(
   host: IntroHost,
@@ -367,25 +367,23 @@ function palette11978(host: IntroHost): readonly number[] {
 export type MenuScreen = Pick<GameScreen, 'doMenu' | 'menuButtonList' | 'drawMenuPress'>;
 
 /**
- * `_TAG021028`'s menu, when the game was loaded (`doc/CSBwin-src/CSBCode.cpp:10493-10537`):
+ * `_TAG021028`'s screen when the game was loaded (`doc/CSBwin-src/CSBCode.cpp:10493-10537`):
  * both `_ShowPrisonDoor` (`:10677`) and the restart (`Code1f9e6.cpp:318`) call it once
  * `_GameSetup` has returned. The rest of `_TAG021028`, the adventure's state and its first
  * frame, is the page's.
  *
- * "ASCII DUMP" runs `AsciiDump`, which is unported (`DEBT.md` G14): here the button only
- * puts the menu up again, which is what the loop does after the dump.
+ * CSBWin loops there on a menu, "GAME LOADED, READY TO PLAY." over PLAY GAME and ASCII
+ * DUMP (`:10497-10515`). The port puts none up: a loaded game is played at once
+ * (`doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port"). It keeps what
+ * that menu's `_DoMenu` did to the chooser's picture, `FadeOldScreen` and `ClearOldScreen`
+ * (`Menu.cpp:285-292`), a fade to black and a cleared screen, and then `wvbl(_4_)` and the
+ * cleared screen the adventure opens on (`CSBCode.cpp:10535-10536`).
  */
-async function tag021028(host: IntroHost, gameScreen: GameScreen, choice: PrisonDoorChoice): Promise<void> {
+export async function tag021028(host: IntroHost, choice: PrisonDoorChoice): Promise<void> {
   if (choice !== 'resume') return;
-  for (;;) {
-    await doMenuCentred(host, gameScreen, null, 'GAME LOADED, READY TO PLAY.', ['PLAY GAME', 'ASCII DUMP']);
-    host.setCursorVisible(true);        // `STShowCursor(HC33)` (`:10510`)
-    const selected = await waitForMenuSelect(host, gameScreen, 2);
-    host.setCursorVisible(false);       // `STHideCursor(HC33)` (`:10512`)
-    if (selected === 1) break;
-  }
-  await host.vbl(4);
+  await fadeToPalette(host, PALETTE_11914);
   host.screen.pixels.fill(0);
+  await host.vbl(4);
   host.present();
 }
 
@@ -483,7 +481,7 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
           read = c;
           return true;
         });
-        await tag021028(host, deps.gameScreen, choice);
+        await tag021028(host, choice);
         return choice;
       } catch (error) {
         if (!(error instanceof BadSavedGame)) throw error;
@@ -543,6 +541,6 @@ export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks
 async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDeps, 'skip'>): Promise<PrisonDoorChoice> {
   const readGame = readEntireGame(host, deps, true);
   const choice = (await readGame('resume')) ? 'resume' : await showPrisonDoor(host, prisonDoorButtons(host), readGame);
-  await tag021028(host, deps.gameScreen, choice);
+  await tag021028(host, choice);
   return choice;
 }

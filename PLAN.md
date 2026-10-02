@@ -297,10 +297,12 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   titles, the level, the play time, the date.
 - **LOAD, SAVE, EXPORT**, and a drop for the import. No delete, no quit and no "SAVE AND
   QUIT": loading another playthrough's save is how a player leaves a game.
-- **"GAME LOADED, READY TO PLAY." goes**, and "ASCII DUMP" with it (`DEBT.md` G14): a
+- **No "GAME LOADED, READY TO PLAY."**, nor its "ASCII DUMP" (`DEBT.md` G14): a
   loaded game is played at once. It is CSBWin's `_TAG021028` menu
-  (`doc/CSBwin-src/CSBCode.cpp:10493-10537`), so its absence is one more entry of
-  `doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port".
+  (`doc/CSBwin-src/CSBCode.cpp:10493-10537`), so its absence is an entry of
+  `doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port". The boot's
+  hand-off keeps the fade to black and the cleared screen that menu gave the chooser's
+  picture (`tag021028`, `src/renderer/intro/BootSequence.ts`).
 
 **The steps**
 
@@ -358,7 +360,10 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
    store's version-3 upgrade stamps the rows it already holds, and the load's rule
    (2a) is deleted. The stamp has a tool of its own: the stamped file differs from the
    original in `GAMEBLOCK1` alone, and reads back with the id.
-5. ⏳ **"GAME LOADED, READY TO PLAY." removed.** Independent of the others.
+5. ✅ **No "GAME LOADED, READY TO PLAY."** Evidence: `tools/dump-bad-saved-game.ts`, "a
+   save read" (the hand-off after a load is one fade and four VBLs on a cleared screen,
+   and waits for no click), and the golden frame `tools/frames/12-game-loaded.png`: the
+   loaded game's first view, straight from the chooser's LOAD.
 
 #### The file
 
@@ -461,7 +466,8 @@ and "CANNOT LOAD NOW" for that last; CSBWin's own "UNABLE TO SAVE GAME!"
 that failed and for no save at all; a file that does not read gives the line the menu's
 status would show. Each outcome is also a line for the console, with the save's name,
 and with the error behind a failure. The five places it
-diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`. Evidence:
+diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`, with the menu
+the boot leaves out after a load. Evidence:
 `tools/dump-save-menu.ts` and the golden frame `tools/frames/06-savemenu.png`.
 
 #### Deferred

@@ -356,9 +356,14 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    another playthrough than the running game's put that line up as a two-option
    `_DoMenu` menu, the action over CANCEL, and act on the first. Esc and a right-click
    there cancel the question alone. The load-only chooser never asks.
+6. **No "GAME LOADED, READY TO PLAY."** After a load at the entrance, CSBWin's
+   `_TAG021028` loops on that menu, PLAY GAME over ASCII DUMP (`CSBCode.cpp:10493-10515`).
+   The port puts none up: a loaded game is played at once, and `AsciiDump` is unported
+   (`DEBT.md` G14). What the menu did to the chooser's picture is kept, the fade to
+   black and the cleared screen (`tag021028`, `src/renderer/intro/BootSequence.ts`).
 
 The faithful `_DoMenu` / `_WaitForMenuSelect` port lives in `src/renderer/ui/Menu.ts` and
 is used unchanged for the title-only and one-button menus (`"SAVING GAME . . ."`,
-`"UNABLE TO SAVE GAME!"`), and for "GAME LOADED, READY TO PLAY.", whose `_WaitForMenuSelect`
+`"UNABLE TO SAVE GAME!"`), and for the boot's "SAVED GAME DAMAGED!", whose `_WaitForMenuSelect`
 runs on the intro host (`waitForMenuSelect`, `src/renderer/intro/BootSequence.ts`). The
 extension lives in `src/renderer/ui/SaveMenu.ts`.

@@ -500,13 +500,20 @@ then `wvbl(_4_)` and a cleared screen (`:10535-10536`) before the adventure's pa
 first frame. The restart after a lost game calls `_TAG021028` too (`Code1f9e6.cpp:318`), so
 its chooser ends in the same menu. `DoMenu`'s three 1s are the chooser's own: a fade to black,
 a cleared screen, the menu centred at (47, 33), and a fade up to `d.Palette11978`
-(`doc/CSBWIN_MENU_REFERENCE.md`). The port: `tag021028` in
-`src/renderer/intro/BootSequence.ts`, after `showPrisonDoor` and after the restart's chooser,
-on the intro host. `AsciiDump` is unported (`DEBT.md` G14), so "ASCII DUMP" only puts the
-menu up again. Evidence: the golden frame `tools/frames/12-game-loaded.png`.
+(`doc/CSBWIN_MENU_REFERENCE.md`).
+
+**The port puts no menu up**: a loaded game is played at once, a deliberate divergence
+(`doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port"), and `AsciiDump`
+is unported (`DEBT.md` G14). `tag021028` in `src/renderer/intro/BootSequence.ts`, after
+`showPrisonDoor` and after the restart's chooser, on the intro host, keeps the rest: the
+fade to black and the cleared screen that `DoMenu` gave the chooser's picture, then
+`wvbl(_4_)` and the cleared screen. Evidence: `tools/dump-bad-saved-game.ts`, "a save
+read" (one fade, four VBLs, no wait for a click), and the golden frame
+`tools/frames/12-game-loaded.png`, the loaded game's first view, a click on LOAD after
+the entrance.
 
 The chooser closes once the save is read, after the click, so the port's wait for input also
-ends when it closes, and the chooser's last picture stays up for the menu's fade.
+ends when it closes, and the chooser's last picture stays up for that fade.
 
 One CSBWin behaviour deliberately not reproduced: choosing an empty slot there falls back to
 `DUNGEON.FTL` and sets `GAMESTATE_EnterPrison` (`SaveGame.cpp:1572-1586`), so "Resume" on

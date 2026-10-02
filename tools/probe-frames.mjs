@@ -213,7 +213,8 @@ await canvasClick(270, 192, 0); await wait(1500);
 console.log('state: credits');
 const credits = await shot('08-credits');
 // Back to the entrance, "resume" (id 201), the one save the chooser lists, LOAD (id 212):
-// `_TAG021028` puts up "GAME LOADED, READY TO PLAY." on a cleared screen.
+// the loaded game is played at once, with no "GAME LOADED, READY TO PLAY." before it, so
+// this is the adventure's first view of the save made above.
 await canvasClick(160, 100, 0); await wait(1000);
 await canvasClick(270, 84, 0);  await wait(1500);
 await canvasClick(100, 60, 0);  await wait(300);

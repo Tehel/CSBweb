@@ -22,6 +22,11 @@
  *    first eight bytes fails `ReadDatabases`' first `READ`; either leaves the empty world as
  *    it was. The failure reaches `tag01efee`, whose menu or `BadSavedGame` follows as for a
  *    save, and a read that succeeds puts up no menu.
+ * 5. **A save that read** goes on to `_TAG021028`'s hand-off
+ *    (`doc/CSBwin-src/CSBCode.cpp:10493-10537`), where CSBWin puts up "GAME LOADED, READY
+ *    TO PLAY." and the port, deliberately, nothing: the chooser's picture fades to black,
+ *    the screen is cleared, and no click is waited for. A new game's hand-off draws
+ *    nothing there.
  *
  * Run: `npx tsx tools/dump-bad-saved-game.ts`
  */
@@ -286,6 +291,28 @@ async function checkNewGameRead(): Promise<void> {
   check(boot.result instanceof Boot.BadSavedGame, 'and at the boot BadSavedGame, back to the title');
 }
 
+/* ------------------------------------------- 5. the hand-off after a load ---- */
+
+async function checkHandOff(): Promise<void> {
+  console.log('');
+  console.log('=== a save read: the hand-off to the adventure, with no menu ===');
+  // No event is scripted: a wait for input would throw.
+  const loaded = scriptedHost([]);
+  await Boot.tag021028(loaded.host, 'resume');
+  const black = loaded.host.globalPalette.every((c) => c === PALETTE_11914[0]);
+  const cleared = loaded.host.screen.pixels.every((p) => p === 0);
+  console.log(`  resume: ${compact(loaded.log)}; colour registers ${black ? 'black' : 'NOT BLACK'}, screen ${cleared ? 'cleared' : 'NOT CLEARED'}`);
+  check(compact(loaded.log) === '1x8, 4',
+    'one fade and wvbl(4) (CSBCode.cpp:10535): no cursor, and no wait for a click on a menu');
+  check(black && cleared, 'the chooser\'s picture is faded to black, Palette11914, and the screen cleared (:10536)');
+
+  const entered = scriptedHost([]);
+  await Boot.tag021028(entered.host, 'enter');
+  console.log(`  enter: ${entered.log.length} host calls, the screen ${entered.host.screen.pixels.every((p) => p === 3) ? 'as it was' : 'CHANGED'}`);
+  check(entered.log.length === 0 && entered.host.screen.pixels.every((p) => p === 3),
+    'a new game\'s hand-off leaves the opened doors\' picture to the page');
+}
+
 /** The centre of the centred one-button set's OK. */
 function okCentre(): { x: number; y: number } {
   const ok = menuButtonList({ uiTables: graphicsTablesOf(graphics).ui } as unknown as UIState, 1, true)[0]!;
@@ -296,6 +323,7 @@ async function main(): Promise<void> {
   checkChooser();
   await checkTag01efee();
   await checkNewGameRead();
+  await checkHandOff();
   finish();
 }
 
