@@ -88,7 +88,8 @@ There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is 
   out of the default run only because it costs a browser and ~40s. Run it before any renderer or UI commit. A frame is
   the 320x200 canvas read back as pixels, and the comparison is pixel-wise, so a baseline
   captured on one machine is checkable on another. The probe also asserts on the spot what
-  no frame shows, the CRT effect, which needs a Chrome that gives WebGL.
+  no frame shows: the CRT effect, which needs a Chrome that gives WebGL, and which
+  screens take the mouse wheel.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`

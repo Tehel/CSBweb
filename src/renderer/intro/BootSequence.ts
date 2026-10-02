@@ -133,12 +133,21 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
   };
   const onContextMenu = (e: Event): void => e.preventDefault();
   const onKeyDown = (): void => push({ kind: 'key', x: 0, y: 0, buttons: 0 });
+  // The wheel is the chooser's list's, as it is the disk menu's in play
+  // (`GameInput.wheel`), and no other pre-game screen's. It is no event of the queue,
+  // where a screen waiting for a click or a key would take it for one.
+  const onWheel = (e: WheelEvent): void => {
+    if (!gameScreen.isSaveMenuOpen()) return;
+    gameScreen.handleSaveMenuWheel(e.deltaY);
+    e.preventDefault();
+  };
 
   canvas.addEventListener('mousedown', onMouseDown);
   window.addEventListener('mouseup', onMouseUp);
   canvas.addEventListener('mousemove', onMouseMove);
   canvas.addEventListener('mouseleave', onMouseLeave);
   canvas.addEventListener('contextmenu', onContextMenu);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
   window.addEventListener('keydown', onKeyDown);
 
   const host: IntroHost = {
@@ -196,6 +205,7 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
       canvas.removeEventListener('mousemove', onMouseMove);
       canvas.removeEventListener('mouseleave', onMouseLeave);
       canvas.removeEventListener('contextmenu', onContextMenu);
+      canvas.removeEventListener('wheel', onWheel);
       window.removeEventListener('keydown', onKeyDown);
       queue = [];
       waiting = null;

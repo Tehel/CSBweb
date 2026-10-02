@@ -431,7 +431,10 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      arrow's click and the wheel scrolling a row and leaving the selection out of the
      panel, and a draw not scrolling back; the track and the slider taking no click; a
      key bringing the list back; a list that fits having the whole track for a
-     slider); the golden frame shows that last case.
+     slider); the golden frame shows that last case. The wheel reaches the list in
+     play and at the entrance, whose chooser is up before the page's own listeners are
+     bound (`createIntroHost`, `src/renderer/intro/BootSequence.ts`): the frames probe
+     checks that either menu takes a notch, and the entrance none.
 4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it, one
    commit each. Until the import a `.dat` on disk has no way into the page, the
    committed saves included: the store's rows are the only saves it loads.

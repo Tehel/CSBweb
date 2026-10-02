@@ -18,8 +18,9 @@
 // `Math.random` is seeded and localStorage cleared on every load, so the frames are
 // identical run to run.
 //
-// A few things are asserted on the spot rather than compared as frames, all about the CRT
-// effect, which no frame shows: see `check` below. A failure there exits 1.
+// A few things are asserted on the spot rather than compared as frames, since no frame
+// shows them: the CRT effect, and which screens take the mouse wheel. See `check` below.
+// A failure there exits 1.
 //
 // Usage:
 //   bash tools/check-frames.sh                     # normally: it starts both daemons
@@ -95,6 +96,11 @@ const crtEffect = () => evaluate(`(()=>{const gl=document.getElementById('game-c
   return !gl ? 'unavailable' : getComputedStyle(gl).display === 'none' ? 'off' : 'on';})()`);
 const key = (k) => evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},bubbles:true})),1`);
 const click = (sel) => evaluate(`document.querySelector(${JSON.stringify(sel)}).click(),1`);
+// Whether the game takes a notch of the wheel over the canvas, rather than leave it to the
+// page: a save menu's list does, the disk menu's and the entrance's chooser's, and nothing
+// else. That it scrolls the list is `tools/dump-save-menu.ts`'s to show.
+const wheelTaken = () => evaluate(`(()=>{const e=new WheelEvent('wheel',{deltaY:100,cancelable:true,bubbles:true});
+  document.getElementById('game-canvas').dispatchEvent(e); return e.defaultPrevented;})()`);
 // button: 0 = left (DM mask 2), 2 = right (DM mask 1)
 const canvasClick = (x, y, button = 0) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   const sx=r.left+${x}*r.width/320, sy=r.top+${y}*r.height/200;
@@ -192,6 +198,7 @@ console.log('state: attack panel');      await shot('05-attack');
 await canvasClick(15, 15, 2);  await wait(600);
 await canvasClick(177, 40, 0); await wait(900);
 console.log('state: save menu');         await shot('06-savemenu');
+check(await wheelTaken(), 'the disk menu takes the wheel, for its list');
 // SAVE (x 95..143, y 161..174), a new save from that row, for the resume from the
 // entrance below.
 await canvasClick(120, 168, 0); await wait(1200);
@@ -213,11 +220,13 @@ await canvasClick(270, 192, 0); await wait(1500);
 console.log('state: credits');
 const credits = await shot('08-credits');
 // Back to the entrance, "resume" (id 201), the one save the chooser lists, its first
-// row, and LOAD (x 24..72, y 161..174):
+// row, and LOAD (x 24..74, y 161..174):
 // the loaded game is played at once, with no "GAME LOADED, READY TO PLAY." before it, so
 // this is the adventure's first view of the save made above.
 await canvasClick(160, 100, 0); await wait(1000);
+check(!(await wheelTaken()), 'the entrance leaves the wheel to the page');
 await canvasClick(270, 84, 0);  await wait(1500);
+check(await wheelTaken(), 'the entrance\'s chooser takes the wheel, for its list');
 await canvasClick(100, 27, 0);  await wait(300);
 await canvasClick(48, 168, 0);  await wait(1500);
 console.log('state: game loaded');       await shot('12-game-loaded');
