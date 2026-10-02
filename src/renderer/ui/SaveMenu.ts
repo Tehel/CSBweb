@@ -6,9 +6,10 @@
  * `char fNames[4][20]` on the stack shown as a four-button menu
  * (`doc/CSBwin-src/CSBCode.cpp:9744-9816`). Every divergence is listed in
  * `doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port". In short: a
- * dialog of its own over the screen, an unbounded scrolling list of the data set's saves,
- * a date and roster per row instead of a filename and a recency letter, no "save and
- * quit", and Esc/right-click to cancel.
+ * dialog of its own over the screen, an unbounded scrolling list of the data set's saves
+ * under their playthroughs' headings, a date per save and a roster per playthrough
+ * instead of a filename and a recency letter, no "save and quit", and Esc/right-click to
+ * cancel.
  *
  * ## The dialog
  *
@@ -28,21 +29,31 @@
  * and the button sits there inert (`doc/CSBwin-src/CSBCode.cpp:9772`). EXPORT's frame is
  * such a button.
  *
- * ## The "new save" row
+ * ## The list
  *
- * SAVE writes over the selected save, as CSBWin's writes over the slot chosen
- * (`_SelectSaveGame`, `:9738`). A save of its own is made from the list's first row,
- * "NEW SAVE", which only the full menu has. With that row selected there is nothing to
- * load, so LOAD is inert.
+ * Two levels (`layoutRows`): a heading for each playthrough of the data set
+ * (`playthroughsOf`), the last one used first, and under it its saves, newest first,
+ * when it is unfolded. A click on a heading selects it, and folds or unfolds it; the
+ * right and left arrows do the same to the heading selected.
  *
  * Either menu opens on the last save used, written or loaded (`lastUsedSave`): SAVE at
- * once writes over the save the game came from, and LOAD goes back to it. With no save
- * in the data set, the full menu opens on "NEW SAVE".
+ * once writes over the save the game came from, and LOAD goes back to it. Its
+ * playthrough, the first, is the one unfolded; the others are folded.
+ *
+ * SAVE writes over the selected save, as CSBWin's writes over the slot chosen
+ * (`_SelectSaveGame`, `:9738`). A save of its own is made from the heading of the
+ * running game's playthrough. A game with no save yet has no heading: the full menu then
+ * has a first row, "NEW SAVE", for it, and opens on it when the data set has no save at
+ * all. On another playthrough's heading SAVE is inert: a file holds the running game's
+ * `d.RandomGameID`, so a new save is never another playthrough's.
+ *
+ * LOAD reads the selected save, and from a heading the last save used of its playthrough.
+ * On "NEW SAVE" there is nothing to load, so it is inert.
  *
  * ## The question
  *
- * LOAD and SAVE ask first when the selected save is of another playthrough than the
- * running game's (`asksFirst`): the one would leave the game being played for another,
+ * LOAD and SAVE ask first when the save one would read, or the other write over, is of
+ * another playthrough than the running game's (`asksFirst`): the one would leave the game being played for another,
  * the other would write this game over a save of another. The question is `_DoMenu`'s
  * two-option menu, centred, in the dialog's place, under CSBWin's own line for a save of
  * another `d.RandomGameID`, "THAT'S NOT THE SAME GAME"
@@ -58,8 +69,8 @@
  * This port's loop keeps running, so the clock is stopped explicitly, with
  * `ctx.state.paused` (`d.Time++` is the main loop's, `doc/CSBwin-src/CSBCode.cpp:660`).
  */
-import type { OpenedSave, SaveEntry } from '../../data/saves';
-import { formatSaveDetail, formatSaveRow, lastUsedSave } from '../../data/saves';
+import type { OpenedSave, Playthrough, SaveEntry } from '../../data/saves';
+import { formatPlaythroughRow, formatSaveDetail, formatSaveRow, lastUsedSave, playthroughsOf } from '../../data/saves';
 import { clearIndex, fillRectIndex } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import type { Rect, UIButton } from '../../data/tables/UITables';
@@ -133,7 +144,7 @@ const ROW_STEP = 8;
 export const SAVE_MENU_ROWS = 14;
 const STATUS_Y = ROW_FIRST_Y + SAVE_MENU_ROWS * ROW_STEP + 1;
 
-/** The full menu's first row: SAVE with it selected makes a new save. */
+/** The full menu's first row, for a game with no save yet: SAVE there makes its first. */
 const NEW_SAVE_LABEL = 'NEW SAVE';
 
 /** The question's title, and its two options: the action asked about, then this. */
@@ -196,15 +207,21 @@ export type SaveMenuMode = 'full' | 'loadOnly';
 /** What the bottom pair of buttons does. */
 export type SaveMenuAction = 'load' | 'save';
 
+/** A row of the list: the full menu's "new save", a playthrough's heading, or a save under one. */
+export type SaveMenuRow =
+  | { kind: 'new' }
+  | { kind: 'heading'; playthrough: Playthrough }
+  | { kind: 'save'; entry: SaveEntry };
+
 export interface SaveMenuState {
   mode: SaveMenuMode;
   /** The running data set's saves, newest first (`UIState.onListSaves`). */
   entries: SaveEntry[];
-  /**
-   * Index into the list's rows, or -1: the full menu's "new save" row and then
-   * `entries`, the load-only menu's `entries` alone. LOAD is inert unless it is a save's
-   * (`selectedEntry`).
-   */
+  /** The playthroughs whose saves are listed under their heading; the others are folded. */
+  unfolded: Set<number>;
+  /** The list as it is shown: `layoutRows`, run whenever `entries` or `unfolded` change. */
+  rows: SaveMenuRow[];
+  /** Index into `rows`, or -1 in a list with none. */
   selected: number;
   scrollTop: number;
   /** An async list/read/write is in flight; every button is inert. */
@@ -238,6 +255,8 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
   ui.saveMenu = {
     mode,
     entries: [],
+    unfolded: new Set(),
+    rows: [],
     selected: -1,
     scrollTop: 0,
     busy: true,
@@ -270,10 +289,10 @@ export async function refreshSaveMenu(ui: UIState): Promise<void> {
   ui.renderLastFrame();
   try {
     state.entries = await ui.onListSaves();
-    selectLastUsed(state);
+    selectLastUsed(ui, state);
   } catch (error) {
     state.entries = [];
-    selectLastUsed(state);
+    selectLastUsed(ui, state);
     state.message = shortError(error);
   } finally {
     state.busy = false;
@@ -286,61 +305,112 @@ function shortError(error: unknown): string {
   return text.toUpperCase().slice(0, TEXT_MAX_CHARS);
 }
 
-/** The rows above the saves: the full menu's "new save" row. */
-function newSaveRows(state: SaveMenuState): number {
-  return state.mode === 'full' ? 1 : 0;
+/** The running game's playthrough, `d.RandomGameID`: never 0 (`drawRandomGameID`). */
+function runningPlaythrough(ui: UIState): number {
+  return ui.ctx.state.block1.randomGameID;
 }
 
-function rowCount(state: SaveMenuState): number {
-  return newSaveRows(state) + state.entries.length;
+/**
+ * The list's rows, from the saves and the folds: each playthrough's heading, the last
+ * one used first, with its saves under it when it is unfolded. The full menu has
+ * "NEW SAVE" above them while the running game's playthrough has no save, hence no
+ * heading to make one from.
+ */
+function layoutRows(ui: UIState, state: SaveMenuState): void {
+  const playthroughs = playthroughsOf(state.entries);
+  const rows: SaveMenuRow[] = [];
+  if (state.mode === 'full' && !playthroughs.some((p) => p.id === runningPlaythrough(ui))) rows.push({ kind: 'new' });
+  for (const playthrough of playthroughs) {
+    rows.push({ kind: 'heading', playthrough });
+    if (state.unfolded.has(playthrough.id)) {
+      for (const entry of playthrough.saves) rows.push({ kind: 'save', entry });
+    }
+  }
+  state.rows = rows;
 }
 
-/** The save a row of the list shows, or `null` for the "new save" row and past the end. */
-function entryAt(state: SaveMenuState, row: number): SaveEntry | null {
-  return state.entries[row - newSaveRows(state)] ?? null;
+function selectedRow(state: SaveMenuState): SaveMenuRow | null {
+  return state.rows[state.selected] ?? null;
 }
 
-/** The selected save: what LOAD reads and SAVE writes over. `null` on the "new save" row. */
+/** The selected save: what SAVE writes over. `null` on a heading and on "new save". */
 export function selectedEntry(state: SaveMenuState): SaveEntry | null {
-  return entryAt(state, state.selected);
+  const row = selectedRow(state);
+  return row?.kind === 'save' ? row.entry : null;
+}
+
+/**
+ * What LOAD reads: the selected save, or from a heading the last save used of its
+ * playthrough. `null` on "new save".
+ */
+export function loadTarget(state: SaveMenuState): SaveEntry | null {
+  const row = selectedRow(state);
+  return row?.kind === 'save' ? row.entry : row?.kind === 'heading' ? row.playthrough.lastUsed : null;
 }
 
 function canLoad(state: SaveMenuState): boolean {
-  return !state.busy && selectedEntry(state) !== null;
-}
-
-function canSave(state: SaveMenuState): boolean {
-  return !state.busy && state.mode === 'full';
+  return !state.busy && loadTarget(state) !== null;
 }
 
 /**
- * Whether LOAD or SAVE asks before it acts: in the full menu, on a save of another
- * playthrough than the running game's (`d.RandomGameID`). The order of two saves of one
- * playthrough is never checked, and the "new save" row writes over nothing. The
- * load-only chooser never asks: no game is being played behind it, at the entrance or
- * after a lost one, where CSBWin's own test cannot fire either
- * (`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` → ""THAT'S NOT THE SAME GAME" cannot happen
- * after a restart").
+ * SAVE writes over a save, any playthrough's, and makes a new one from "new save" and
+ * from the heading of the running game's playthrough. Another playthrough's heading
+ * has nothing to write over, and a new save is never its own.
  */
-export function asksFirst(ui: UIState, state: SaveMenuState): boolean {
-  const entry = selectedEntry(state);
-  return state.mode === 'full' && entry !== null
-    && entry.playthrough !== ui.ctx.state.block1.randomGameID;
+function canSave(ui: UIState, state: SaveMenuState): boolean {
+  const row = selectedRow(state);
+  return !state.busy && state.mode === 'full' && row !== null
+    && (row.kind !== 'heading' || row.playthrough.id === runningPlaythrough(ui));
 }
 
 /**
- * The selection of a list just read: the last save used, scrolled into view; with no
- * save, the list's first row, which is the full menu's "new save".
+ * Whether LOAD or SAVE asks before it acts: in the full menu, when the save LOAD would
+ * read, or SAVE write over, is of another playthrough than the running game's
+ * (`d.RandomGameID`). The order of two saves of one playthrough is never checked, and a
+ * new save writes over nothing. The load-only chooser never asks: no game is being
+ * played behind it, at the entrance or after a lost one, where CSBWin's own test cannot
+ * fire either (`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` → ""THAT'S NOT THE SAME GAME"
+ * cannot happen after a restart").
  */
-function selectLastUsed(state: SaveMenuState): void {
-  const last = lastUsedSave(state.entries);
-  state.selected = last ? newSaveRows(state) + state.entries.indexOf(last) : rowCount(state) > 0 ? 0 : -1;
-  state.scrollTop = 0;
+export function asksFirst(ui: UIState, state: SaveMenuState, action: SaveMenuAction): boolean {
+  const entry = action === 'load' ? loadTarget(state) : selectedEntry(state);
+  return state.mode === 'full' && entry !== null && entry.playthrough !== runningPlaythrough(ui);
+}
+
+/** Select a listed save, its playthrough unfolded and the list scrolled to it. */
+function selectSave(ui: UIState, state: SaveMenuState, entry: SaveEntry): void {
+  state.unfolded.add(entry.playthrough);
+  layoutRows(ui, state);
+  state.selected = state.rows.findIndex((row) => row.kind === 'save' && row.entry.id === entry.id);
   clampScroll(state);
 }
 
+/**
+ * The selection of a list just read: the last save used, its playthrough unfolded
+ * beside those that already were; with no save, the list's first row, which is the full
+ * menu's "new save".
+ */
+function selectLastUsed(ui: UIState, state: SaveMenuState): void {
+  state.scrollTop = 0;
+  const last = lastUsedSave(state.entries);
+  if (last) {
+    selectSave(ui, state, last);
+    return;
+  }
+  layoutRows(ui, state);
+  state.selected = state.rows.length > 0 ? 0 : -1;
+  clampScroll(state);
+}
+
+/** Fold a playthrough's saves away under its heading, or list them again. */
+function setFolded(ui: UIState, state: SaveMenuState, playthrough: Playthrough, folded: boolean): void {
+  if (folded) state.unfolded.delete(playthrough.id);
+  else state.unfolded.add(playthrough.id);
+  layoutRows(ui, state);
+}
+
 function clampScroll(state: SaveMenuState): void {
-  const maxTop = Math.max(0, rowCount(state) - SAVE_MENU_ROWS);
+  const maxTop = Math.max(0, state.rows.length - SAVE_MENU_ROWS);
   if (state.scrollTop > maxTop) state.scrollTop = maxTop;
   if (state.scrollTop < 0) state.scrollTop = 0;
   if (state.selected >= 0) {
@@ -397,6 +467,18 @@ function drawLabel(ui: UIState, s: string, frame: Rect): void {
   text(ui, s, at.x - 3 * s.length, at.y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
 }
 
+/** A row as the list shows it. */
+export function rowText(state: SaveMenuState, row: SaveMenuRow): string {
+  switch (row.kind) {
+    case 'new':
+      return NEW_SAVE_LABEL;
+    case 'heading':
+      return formatPlaythroughRow(row.playthrough, !state.unfolded.has(row.playthrough.id), TEXT_MAX_CHARS);
+    case 'save':
+      return formatSaveRow(row.entry, TEXT_MAX_CHARS);
+  }
+}
+
 /** The rectangle of the list's row `row`, counted from the first one shown. */
 function rowRect(row: number): Rect {
   const y = ROW_FIRST_Y + row * ROW_STEP;
@@ -427,13 +509,12 @@ export function drawSaveMenu(ui: UIState): void {
   clampScroll(state);
   for (let row = 0; row < SAVE_MENU_ROWS; row++) {
     const index = state.scrollTop + row;
-    if (index >= rowCount(state)) break;
-    const entry = entryAt(state, index);
+    if (index >= state.rows.length) break;
     const highlighted = index === state.selected;
     if (highlighted) fillRectIndex(ui.screenIndexBuffer, rowRect(row), MENU_OPTION_COLOR);
     text(
       ui,
-      entry ? formatSaveRow(entry, TEXT_MAX_CHARS) : NEW_SAVE_LABEL,
+      rowText(state, state.rows[index]),
       TEXT_X,
       ROW_FIRST_Y + row * ROW_STEP,
       highlighted ? MENU_PANEL_COLOR : MENU_OPTION_COLOR,
@@ -446,7 +527,7 @@ export function drawSaveMenu(ui: UIState): void {
     ? 'WORKING . . .'
     : state.message || formatSaveDetail(selectedEntry(state), TEXT_MAX_CHARS);
   if (status) text(ui, status, TEXT_X, STATUS_Y, MENU_TITLE1_COLOR, MENU_PANEL_COLOR);
-  if (rowCount(state) === 0 && !state.busy && !state.message) {
+  if (state.rows.length === 0 && !state.busy && !state.message) {
     // An empty list has to say so, which the load-only menu's can be; when the store
     // could not be listed, the status line says why, and repeating that here would only
     // crowd the panel.
@@ -456,7 +537,7 @@ export function drawSaveMenu(ui: UIState): void {
   // A button that can do nothing is left unlabelled, as CSBWin leaves an empty save
   // slot unlabelled.
   if (canLoad(state)) drawLabel(ui, ACTION_LABELS.load, BUTTON_FRAMES.load);
-  if (canSave(state)) drawLabel(ui, ACTION_LABELS.save, BUTTON_FRAMES.save);
+  if (canSave(ui, state)) drawLabel(ui, ACTION_LABELS.save, BUTTON_FRAMES.save);
   if (!state.busy) drawLabel(ui, CANCEL_LABEL, BUTTON_FRAMES.cancel);
 
   if (state.press) drawMenuPress(ui, state.press, nowMs());
@@ -475,7 +556,7 @@ export function saveMenuButtons(state: SaveMenuState): UIButton[] {
     { word0: BTN_SAVE, ...buttonRect(BUTTON_FRAMES.save), button: 2, name: 'saveMenu.save' },
     { word0: BTN_CANCEL, ...buttonRect(BUTTON_FRAMES.cancel), button: 2, name: 'saveMenu.cancel' },
   ];
-  const visible = Math.min(SAVE_MENU_ROWS, Math.max(0, rowCount(state) - state.scrollTop));
+  const visible = Math.min(SAVE_MENU_ROWS, Math.max(0, state.rows.length - state.scrollTop));
   for (let row = 0; row < visible; row++) {
     const r = rowRect(row);
     buttons.push({ word0: BTN_ROW0 + row, x1: r.x1, x2: r.x2 + 1, y1: r.y1, y2: r.y2 + 1, button: 2, name: `saveMenu.row${row}` });
@@ -519,21 +600,24 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
   }
   if (id >= BTN_ROW0 && id < BTN_ROW0 + SAVE_MENU_ROWS) {
     const index = state.scrollTop + (id - BTN_ROW0);
-    if (index < rowCount(state)) {
+    const row = state.rows[index];
+    if (row) {
+      // A heading keeps its place in the list whichever way its saves go.
       state.selected = index;
+      if (row.kind === 'heading') setFolded(ui, state, row.playthrough, state.unfolded.has(row.playthrough.id));
       state.message = '';
       ui.renderLastFrame();
     }
     return;
   }
   if (id === BTN_LOAD && canLoad(state)) pressAction(ui, state, 'load');
-  if (id === BTN_SAVE && canSave(state)) pressAction(ui, state, 'save');
+  if (id === BTN_SAVE && canSave(ui, state)) pressAction(ui, state, 'save');
 }
 
 /** LOAD or SAVE pressed: once the press has played, the question, or the action at once. */
 function pressAction(ui: UIState, state: SaveMenuState, action: SaveMenuAction): void {
   beginPress(ui, state, saveMenuButtons(state), action === 'load' ? BTN_LOAD : BTN_SAVE, () => {
-    if (asksFirst(ui, state)) {
+    if (asksFirst(ui, state, action)) {
       state.confirm = action;
       ui.renderLastFrame();
     } else {
@@ -633,7 +717,7 @@ async function runPending(ui: UIState, action: SaveMenuAction): Promise<void> {
 }
 
 async function doLoad(ui: UIState, state: SaveMenuState): Promise<void> {
-  const entry = selectedEntry(state);
+  const entry = loadTarget(state);
   if (!entry) {
     state.busy = false;
     return;
@@ -670,13 +754,11 @@ export function restoreChosenSave(ui: UIState, save: OpenedSave): void {
 async function doSave(ui: UIState, state: SaveMenuState): Promise<void> {
   // The clock has been stopped since the menu opened, so the save's tail still runs on
   // the world the file holds, and before the menu's `tag0207cc`, as in CSBWin. The save
-  // is written over the selected one, or is a new one from the "new save" row, and is
-  // the selection afterwards.
+  // is written over the selected one, or is a new one from "new save" or the game's own
+  // heading, and is the selection afterwards.
   const saved = await ui.onSaveGame(selectedEntry(state));
   await refreshSaveMenu(ui);
-  const at = state.entries.findIndex((e) => e.id === saved.id);
-  if (at >= 0) state.selected = newSaveRows(state) + at;
-  clampScroll(state);
+  selectSave(ui, state, saved);
   state.message = 'GAME SAVED';
   ui.renderLastFrame();
 }
@@ -686,7 +768,8 @@ async function doSave(ui: UIState, state: SaveMenuState): Promise<void> {
 /**
  * CSBWin's menus take no key (`doc/PROVEN_FACTS.md` → "A one-button menu takes no key").
  * A list needs arrows, and Esc is the cancel every player will try; both are additions,
- * recorded as such.
+ * recorded as such. Up and down move the selection over the rows shown; right unfolds
+ * the heading selected and left folds it, and from a save left goes to its heading.
  *
  * Returns whether the key was taken, so the host can stop it reaching the movement keys
  * exactly as it does for the Reincarnate screen.
@@ -711,6 +794,12 @@ export function saveMenuKey(ui: UIState, key: string): boolean {
     case 'ArrowDown':
       moveSelection(ui, state, 1);
       return true;
+    case 'ArrowRight':
+      foldSelection(ui, state, false);
+      return true;
+    case 'ArrowLeft':
+      foldSelection(ui, state, true);
+      return true;
     case 'PageUp':
       moveSelection(ui, state, -SAVE_MENU_ROWS);
       return true;
@@ -718,10 +807,10 @@ export function saveMenuKey(ui: UIState, key: string): boolean {
       moveSelection(ui, state, SAVE_MENU_ROWS);
       return true;
     case 'Home':
-      moveSelection(ui, state, -rowCount(state));
+      moveSelection(ui, state, -state.rows.length);
       return true;
     case 'End':
-      moveSelection(ui, state, rowCount(state));
+      moveSelection(ui, state, state.rows.length);
       return true;
     case 'Enter':
       if (canLoad(state)) pressAction(ui, state, 'load');
@@ -732,9 +821,24 @@ export function saveMenuKey(ui: UIState, key: string): boolean {
 }
 
 function moveSelection(ui: UIState, state: SaveMenuState, delta: number): void {
-  if (rowCount(state) === 0) return;
-  const next = Math.max(0, Math.min(rowCount(state) - 1, (state.selected < 0 ? 0 : state.selected) + delta));
+  if (state.rows.length === 0) return;
+  const next = Math.max(0, Math.min(state.rows.length - 1, (state.selected < 0 ? 0 : state.selected) + delta));
   state.selected = next;
+  state.message = '';
+  clampScroll(state);
+  ui.renderLastFrame();
+}
+
+/** The right arrow (`folded` false) and the left one, on the row selected. */
+function foldSelection(ui: UIState, state: SaveMenuState, folded: boolean): void {
+  const row = selectedRow(state);
+  if (row?.kind === 'heading') {
+    setFolded(ui, state, row.playthrough, folded);
+  } else if (row?.kind === 'save' && folded) {
+    state.selected = state.rows.findIndex((r) => r.kind === 'heading' && r.playthrough.id === row.entry.playthrough);
+  } else {
+    return;
+  }
   state.message = '';
   clampScroll(state);
   ui.renderLastFrame();
@@ -745,7 +849,7 @@ export function saveMenuWheel(ui: UIState, delta: number): boolean {
   const state = ui.saveMenu;
   if (!state) return false;
   if (state.confirm) return true;
-  const maxTop = Math.max(0, rowCount(state) - SAVE_MENU_ROWS);
+  const maxTop = Math.max(0, state.rows.length - SAVE_MENU_ROWS);
   state.scrollTop = Math.max(0, Math.min(maxTop, state.scrollTop + (delta > 0 ? 1 : -1)));
   ui.renderLastFrame();
   return true;

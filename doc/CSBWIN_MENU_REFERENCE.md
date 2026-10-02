@@ -336,9 +336,13 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
 
 1. **An unbounded, scrolling list of saves** instead of four fixed slots. CSBWin's limit
    is a stack array and its chooser is a four-button menu; neither survives contact with
-   "save as often as you like". SAVE writes over the selected save, as CSBWin's writes
-   over the slot chosen; with no empty slot to choose, a save of its own is made from
-   the list's first row, "NEW SAVE", which the load-only chooser does not have.
+   "save as often as you like". The list has two levels: a heading for each playthrough
+   (`d.RandomGameID`), the last one used first, and under it its saves, newest first,
+   which a click on the heading folds away and brings back. SAVE writes over the
+   selected save, as CSBWin's writes over the slot chosen; with no empty slot to choose,
+   a save of its own is made from the heading of the running game's playthrough, or,
+   for a game with no save yet, from a first row, "NEW SAVE", which the load-only
+   chooser does not have. LOAD on a heading reads the last save used of its playthrough.
 
    **The list is in a dialog of its own**, 304×184 at (8,8), not in one of `_DoMenu`'s
    four layouts of graphic 0 in the viewport's place. It is drawn from three pieces of
@@ -355,9 +359,10 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    **The screen under it is cleared**, in the game too. The disk menu's `_DoMenu` gets 0
    for `ClearOldScreen` and leaves the picture around the viewport
    (`SaveGame.cpp:870-877`); the dialog would leave an 8-pixel ring of it.
-2. **Per-entry date, level and party**, where CSBWin shows a filename and a rank letter.
-   The rank letter is what the date replaces; the ordering rule is the same one
-   (`modifiedTime`), only shown directly and newest-first rather than oldest-letter-first.
+2. **Per-save day, time and level, under its playthrough's party**, where CSBWin shows a
+   filename and a rank letter. The rank letter is what the date replaces; the ordering
+   rule within a playthrough is the same one (`modifiedTime`), only shown directly and
+   newest-first rather than oldest-letter-first.
 3. **No "SAVE AND QUIT"**: a page does not quit, and loading another game's save is how a
    player leaves one (`PLAN.md` → Phase 10).
 4. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
@@ -366,7 +371,8 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    one directory's, and it tests `d.RandomGameID` only when a lost game is read again,
    where it refuses the save: "THAT'S NOT THE SAME GAME" (`SaveGame.cpp:1604-1606`). The
    port's list holds every playthrough of the data set, so LOAD and SAVE on a save of
-   another playthrough than the running game's put that line up as a two-option
+   another playthrough than the running game's, and LOAD on its heading, put that line
+   up as a two-option
    `_DoMenu` menu, centred, in the dialog's place, the action over CANCEL, and act on
    the first. Esc and a right-click there cancel the question alone. The load-only
    chooser never asks.

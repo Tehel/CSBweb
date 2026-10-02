@@ -18,8 +18,9 @@
  *    for real into a buffer and the result is inspected pixel by pixel.
  * 3. **`SplitLongLine`**, which has an edge case CSBWin does not guard (no space at or
  *    after the midpoint) and which this port reproduces rather than fixes.
- * 4. **The list logic** — ordering, the date format, what fits in 33 characters, when
- *    LOAD is inert. None of it is on screen until there are saves to list.
+ * 4. **The list logic** — ordering, the playthroughs the saves are listed under, the
+ *    date format, what fits in 33 characters, when LOAD is inert. None of it is on
+ *    screen until there are saves to list.
  * 5. **The metadata path.** A row's playthrough, level and roster come from blocks 1, 2
  *    and 4 of the CSBWin file a save is, the port's or a genuine one. Asserted against
  *    real files.
@@ -44,11 +45,17 @@
  *    runs it once, inside IndexedDB's upgrade; here it runs over rows built by hand.
  * 10. **The selection.** The menu driven by its own clicks and keys over that store:
  *    the full menu opens on its "new save" row in an empty store, where LOAD is inert
- *    and SAVE makes a save; on a save, SAVE writes over it. Either menu then opens on
- *    the last save used, written or loaded. The load-only chooser has no "new save" row.
+ *    and SAVE makes a save; on a save, SAVE writes over it, and on the game's heading it
+ *    makes another. Either menu then opens on the last save used, written or loaded.
+ *    The load-only chooser has no "new save" row.
  * 11. **The question.** LOAD and SAVE on a save of another playthrough than the running
  *    game's ask first, and do nothing until the answer; on a save of the game's own, or
  *    in the load-only chooser, neither asks.
+ * 13. **The two-level list.** The saves of three games in one store: a heading for each
+ *    playthrough, the last one used first and alone unfolded, and the last save used
+ *    selected. A click on a heading folds and unfolds it. From a heading LOAD reads its
+ *    playthrough's last save used, and SAVE makes a new save on the running game's own
+ *    and is inert on another's. "NEW SAVE" is listed for a game with no save alone.
  * 12. **The play time.** The player's time in a game is the VBLs its loop runs, the
  *    frozen game's and the save menu's left out. No file holds it: a save's row does,
  *    and a load takes it back from the row.
@@ -68,11 +75,13 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { readCsbwinSaveInfo } from '../src/data/CsbwinSaveInfo';
 import {
-  abbreviateChampions,
+  formatPlaythroughRow,
   formatSaveDate,
   formatSaveRow,
+  formatSaveTime,
   joinedPlaythrough,
   lastUsedSave,
+  playthroughsOf,
   quickSlot,
   saveEntryOf,
   SAVE_FILE_EXTENSION,
@@ -331,7 +340,7 @@ function checkLayout(graphics: GraphicsLoader): void {
   /* ---- the dialog, drawn for real and then measured ---- */
 
   const blank: SaveMenu.SaveMenuState = {
-    mode: 'full', entries: [], selected: -1, scrollTop: 0, busy: true, message: '',
+    mode: 'full', entries: [], unfolded: new Set(), rows: [], selected: -1, scrollTop: 0, busy: true, message: '',
     press: null, pending: null, confirm: null, frameHandle: null,
   };
   ui.saveMenu = blank;
@@ -481,28 +490,58 @@ function checkListLogic(): void {
   check(formatSaveDate(local.getTime()) === '2026-01-09', 'the date is YYYY-MM-DD with both fields padded');
   check(formatSaveDate(Number.NaN) === '????-??-??', 'an unreadable date does not produce "Invalid Date"');
 
-  check(abbreviateChampions(['DAROO', 'SONJA', 'LEYLA', 'ESMARDA']) === 'DAR SON LEY ESM', 'four champions abbreviate to three letters each');
-  check(abbreviateChampions(['HALK']) === 'HAL', 'a lone champion still abbreviates');
-  check(abbreviateChampions([]) === '', 'an empty party abbreviates to nothing');
-  check(abbreviateChampions(['A', 'B', 'C', 'D', 'E']) === 'A B C D', 'only four champions are ever shown');
+  const night = new Date(2026, 0, 9, 3, 7).getTime();
+  check(formatSaveTime(night) === '03:07' && formatSaveTime(Number.NaN) === '??:??',
+    'the time is HH:MM with both fields padded, and an unreadable one is not "Invalid Date"');
 
+  // A save's row is its own alone: the day, the time, the level and F5's mark. The party
+  // is its heading's.
+  const max = SaveMenu.SAVE_MENU_GEOMETRY.textMaxChars;
+  const afternoon = new Date(2026, 8, 13, 14, 5).getTime();
+  const rows: Array<[SaveEntry, string]> = [
+    [entry({ savedAt: afternoon, level: 14, champions: ['DAROO', 'SONJA', 'LEYLA', 'ESMARDA'] }), '  2026-09-13 14:05 L14'],
+    [entry({ savedAt: afternoon, level: 5, quick: true, champions: ['HALK'] }), '  2026-09-13 14:05 L5 F5'],
+  ];
   console.log('');
   console.log(['row', 'chars'].join('\t'));
-  const rows: SaveEntry[] = [
-    entry({ savedAt: Date.UTC(2026, 8, 13, 12), level: 14, champions: ['DAROO', 'SONJA', 'LEYLA', 'ESMARDA'] }),
-    entry({ savedAt: Date.UTC(2026, 8, 13, 12), level: 5, champions: ['HALK'] }),
-    entry({
-      savedAt: Date.UTC(2026, 8, 13, 12),
-      level: 2,
-      champions: ['HISSSSA', 'GOTHMOG', 'WUUF', 'ELIJA'],
-    }),
-  ];
-  for (const row of rows) {
+  for (const [row, expected] of rows) {
     const text = formatSaveRow(row);
     console.log([JSON.stringify(text), text.length].join('\t'));
-    check(text.length <= SaveMenu.SAVE_MENU_GEOMETRY.textMaxChars, `"${text}" fits in ${SaveMenu.SAVE_MENU_GEOMETRY.textMaxChars} characters`);
+    check(text === expected && text.length <= max, `a save's row is "${expected}": the day, the time, the level, and F5 on a quick-save`);
   }
-  check(formatSaveRow(rows[0]).startsWith('2026-09-13 L14 '), 'a row leads with the date and the level');
+
+  // A heading is its playthrough's party, the champions of its newest save.
+  const heading = (champions: string[], folded: boolean): string =>
+    formatPlaythroughRow(playthroughsOf([entry({ champions })])[0], folded);
+  const longest = heading(['HISSSSA', 'GOTHMOG', 'LINFLAS', 'ABCDEFG'], true);
+  for (const text of [heading(['DAROO', 'SONJA', 'LEYLA', 'ESMARDA'], true), heading(['Halk '], false), longest, heading([], true)]) {
+    console.log([JSON.stringify(text), text.length].join('\t'));
+  }
+  check(heading(['DAROO', 'SONJA', 'LEYLA', 'ESMARDA'], true) === '+ DAROO SONJA LEYLA ESMARDA' && heading(['Halk '], false) === '- HALK',
+    'a heading is "+" folded and "-" unfolded, then the champions\' names in full');
+  check(longest.length === max && longest.endsWith('ABCDEFG'), `four names of seven characters are the row's ${max}`);
+  check(heading([], true) === '+ ', 'and an empty party leaves the mark alone');
+
+  // The playthroughs: the saves of one id, the last one used first.
+  const games = [
+    entry({ name: 'a1', playthrough: 7, savedAt: 100, champions: ['OLD'] }),
+    entry({ name: 'a2', playthrough: 7, savedAt: 400, champions: ['DAROO'] }),
+    entry({ name: 'b1', playthrough: 9, savedAt: 200, usedAt: 500, champions: ['WUUF'] }),
+    entry({ name: 'b2', playthrough: 9, savedAt: 300, champions: ['WUUF', 'HALK'] }),
+    entry({ name: 'c1', playthrough: 0, savedAt: 50, champions: ['LEYLA'] }),
+    entry({ name: 'c2', playthrough: 0, savedAt: 60, champions: ['SONJA'] }),
+  ];
+  const describe = (list: SaveEntry[]): string => playthroughsOf(list)
+    .map((game) => `${game.id}: ${game.saves.map((e) => e.name).join(' ')} (last used ${game.lastUsed.name})`).join('; ');
+  console.log('');
+  console.log(`  playthroughs: ${describe(games)}`);
+  check(describe(games) === '9: b2 b1 (last used b1); 7: a2 a1 (last used a2); 0: c2 c1 (last used c2)',
+    'the saves are grouped by playthrough, each group\'s newest first, and the groups by their last use: a load counts as a save does');
+  check(describe([...games].reverse()) === describe(games), 'in whatever order the rows come');
+  check(playthroughsOf(games)[0].lastUsed === lastUsedSave(games), 'so the first playthrough holds the last save used of all');
+  check(formatPlaythroughRow(playthroughsOf(games)[0], true) === '+ WUUF HALK' && formatPlaythroughRow(playthroughsOf(games)[1], true) === '+ DAROO',
+    'a playthrough is named by its newest save\'s party, not the one last used nor the oldest');
+  check(playthroughsOf([]).length === 0, 'and no save is no playthrough');
 
   // The file name has to be unique, because unlike CSBWin this port does not overwrite
   // one of four fixed slots.
@@ -1367,8 +1406,24 @@ async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: str
         await new Promise((done) => setTimeout(done, 10));
       }
     },
+    /** A click on row `row` of the list, which is in view. */
     clickRow(row: number): void {
-      SaveMenu.saveMenuClick(ui, g.textX, g.rowFirstY + row * g.rowStep, LEFT);
+      SaveMenu.saveMenuClick(ui, g.textX, g.rowFirstY + (row - ui.saveMenu!.scrollTop) * g.rowStep, LEFT);
+    },
+    /** The row of a playthrough's heading, as the menu lists it now. */
+    headingOf(playthrough: number): number {
+      return ui.saveMenu!.rows.findIndex((row) => row.kind === 'heading' && row.playthrough.id === playthrough);
+    },
+    /** A click on the save `id`, after one on its heading when its playthrough is folded. */
+    select(id: string): void {
+      const state = ui.saveMenu!;
+      if (this.rowOf(id) < 0) this.clickRow(this.headingOf(state.entries.find((e) => e.id === id)!.playthrough));
+      this.clickRow(this.rowOf(id));
+    },
+    /** The list as the dialog shows it, the selected row marked. */
+    list(): string {
+      const state = ui.saveMenu!;
+      return state.rows.map((row, i) => `    ${i === state.selected ? '>' : ' '} ${SaveMenu.rowText(state, row)}`).join('\n');
     },
     /**
      * A click on button `id`, and the wait for what it does: one of the dialog's own, or
@@ -1380,10 +1435,9 @@ async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: str
       SaveMenu.saveMenuClick(ui, rect.x1 + 1, rect.y1 + 1, LEFT);
       await this.settled();
     },
-    /** The row of the list that shows the save `id`, as the menu lists it now. */
+    /** The row of the list that shows the save `id`, as the menu lists it now: -1 under a folded heading. */
     rowOf(id: string): number {
-      const state = ui.saveMenu!;
-      return state.entries.findIndex((e) => e.id === id) + (state.mode === 'full' ? 1 : 0);
+      return ui.saveMenu!.rows.findIndex((row) => row.kind === 'save' && row.entry.id === id);
     },
     party(): string {
       return game.ctx.party.state.champions.map((c) => c.name).join('/');
@@ -1410,7 +1464,7 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
     const state = ui.saveMenu;
     if (!state) return 'no menu';
     const selected = SaveMenu.selectedEntry(state);
-    return `row ${state.selected} of ${state.entries.length} saves, ${selected ? `the save of ${formatSaveDate(selected.savedAt)} ${new Date(selected.savedAt).getUTCMinutes()}'` : 'no save'}`;
+    return `row ${state.selected} of ${state.rows.length}, ${state.entries.length} saves, ${selected ? `the save of ${formatSaveDate(selected.savedAt)} ${new Date(selected.savedAt).getUTCMinutes()}'` : 'no save'}`;
   };
 
   const realNow = Date.now;
@@ -1435,6 +1489,8 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
     console.log(`  SAVE: ${store.files.size} file, ${selection()}, "${state.message}"`);
     check(store.files.size === 1 && made !== null && made.savedAt === now && state.message === 'GAME SAVED',
       'SAVE there makes a save, which is the selection afterwards');
+    check(state.rows.length === 2 && state.rows[0].kind === 'heading' && state.selected === 1,
+      'under its playthrough\'s heading, which has taken the place of "new save"');
 
     now += 60_000;
     await rig.click(g.saveButtonId);
@@ -1444,19 +1500,33 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
 
     now += 60_000;
     rig.clickRow(0);
-    check(SaveMenu.selectedEntry(state) === null, 'a click on the first row selects "new save"');
+    check(SaveMenu.selectedEntry(state) === null && state.selected === 0 && state.rows.length === 1,
+      'a click on the heading selects it, and folds its save away');
     await rig.click(g.saveButtonId);
     const newer = SaveMenu.selectedEntry(state);
-    console.log(`  the first row, then SAVE: ${store.files.size} files, ${selection()}`);
-    check(store.files.size === 2 && newer !== null && newer.id !== made?.id && state.selected === 1,
-      'and SAVE there makes another, the first of the saves');
+    console.log(`  the heading, then SAVE: ${store.files.size} files, ${selection()}`);
+    check(store.files.size === 2 && newer !== null && newer.id !== made?.id && state.selected === 1 && state.rows.length === 3,
+      'and SAVE there makes another, the first of the saves, its playthrough unfolded again');
 
     // The keys run over the same rows.
     SaveMenu.saveMenuKey(ui, 'End');
     const atEnd = SaveMenu.selectedEntry(state)?.id;
+    SaveMenu.saveMenuKey(ui, 'ArrowRight');
+    SaveMenu.saveMenuKey(ui, 'ArrowLeft');
+    const fromSave = [state.selected, state.rows.length].join();
+    SaveMenu.saveMenuKey(ui, 'ArrowLeft');
+    const folded = state.rows.length;
+    SaveMenu.saveMenuKey(ui, 'ArrowLeft');
+    SaveMenu.saveMenuKey(ui, 'End');
+    const endFolded = state.selected;
+    SaveMenu.saveMenuKey(ui, 'ArrowRight');
+    SaveMenu.saveMenuKey(ui, 'ArrowRight');
+    SaveMenu.saveMenuKey(ui, 'End');
     SaveMenu.saveMenuKey(ui, 'Home');
     check(atEnd === made?.id && SaveMenu.selectedEntry(state) === null && state.selected === 0,
-      'End is the oldest save, and Home the "new save" row');
+      'End is the oldest save, and Home the heading');
+    check(fromSave === '0,3' && folded === 1 && endFolded === 0 && state.rows.length === 3,
+      'the left arrow goes from a save to its heading, and there folds it; the right one unfolds it; neither does it twice');
 
     // LOAD takes the selected save.
     now += 60_000;
@@ -1473,7 +1543,17 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
     console.log(`  the full menu again: ${selection()}`);
     check(reopened?.id === made?.id && again.selected === 2 && reopened?.usedAt === now && reopened.savedAt < now,
       'the full menu opens on the last save used: the one loaded, though the other was saved later');
-    SaveMenu.closeSaveMenu(ui);
+
+    // LOAD from the heading takes the last save used of the playthrough, not its newest.
+    now += 60_000;
+    game.ctx.party.state.champions[0]!.name = 'CHANGED';
+    rig.clickRow(0);
+    const fromHeading = SaveMenu.loadTarget(again)?.id;
+    await rig.click(g.loadButtonId);
+    const usedThen = (await rig.saves.list()).map((e) => `${e.id === made?.id ? 'older' : 'newer'} ${e.usedAt === now ? 'now' : 'before'}`).join(', ');
+    console.log(`  the heading, then LOAD: ${selection()}, party ${rig.party()}, used: ${usedThen}`);
+    check(fromHeading === made?.id && !SaveMenu.isSaveMenuOpen(ui) && rig.party() === 'DAROO' && usedThen === 'newer before, older now',
+      'LOAD on the heading reads the playthrough\'s last save used, though the other is its newest');
 
     // A read that fails marks nothing.
     let refused = false;
@@ -1487,8 +1567,8 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
     // The boot's chooser lists the saves alone.
     const chooser = await rig.open('loadOnly');
     console.log(`  the load-only chooser: ${selection()}`);
-    check(chooser.entries.length === 2 && chooser.selected === 1 && SaveMenu.selectedEntry(chooser)?.id === made?.id,
-      'the load-only chooser has no "new save" row, and opens on the last save used too');
+    check(chooser.entries.length === 2 && chooser.rows.length === 3 && chooser.selected === 2 && SaveMenu.selectedEntry(chooser)?.id === made?.id,
+      'the load-only chooser lists the same rows, and opens on the last save used too');
     await rig.click(g.saveButtonId);
     check(store.files.size === 2 && SaveMenu.isSaveMenuOpen(ui), 'and its SAVE is inert');
 
@@ -1554,7 +1634,7 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
   const rowOfStore = async (id: string): Promise<SaveEntry | undefined> => (await store.list(null)).find((e) => e.id === id);
   /** Select a save and press LOAD or SAVE; what is up once the press has played. */
   const press = async (save: SaveEntry, button: number): Promise<string> => {
-    mine.clickRow(mine.rowOf(save.id));
+    mine.select(save.id);
     await mine.click(button);
     const state = ui.saveMenu;
     return !state ? 'no menu' : state.confirm ? `asks (${state.confirm})` : `no question, "${state.message}"`;
@@ -1628,10 +1708,10 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
       && written.champions.join() === 'DAROO' && store.files.size === files, 'its first button saves over it');
     later();
 
-    // The "new save" row writes over nothing.
-    mine.clickRow(0);
+    // A new save writes over nothing.
+    mine.clickRow(mine.headingOf(idOf(mine)));
     await mine.click(g.saveButtonId);
-    check(state.confirm === null && store.files.size === files + 1, 'SAVE from the "new save" row does not ask');
+    check(state.confirm === null && store.files.size === files + 1, 'SAVE from the game\'s own heading does not ask');
     later();
 
     // LOAD asks the same, of a file that names no playthrough too.
@@ -1656,11 +1736,162 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
     // The load-only chooser has no game behind it.
     const stranger = await menuRig(graphics, store, 'HALK');
     const chooser = await stranger.open('loadOnly');
-    check(SaveMenu.selectedEntry(chooser)?.playthrough !== idOf(stranger) && SaveMenu.asksFirst(stranger.ui, chooser) === false,
+    check(SaveMenu.selectedEntry(chooser)?.playthrough !== idOf(stranger) && !SaveMenu.asksFirst(stranger.ui, chooser, 'load'),
       'the load-only chooser asks about no save');
     await stranger.click(g.loadButtonId);
     console.log(`  the load-only chooser, LOAD on the last save used: ${SaveMenu.isSaveMenuOpen(stranger.ui) ? 'THE MENU' : 'the menu gone'}, party ${stranger.party()}`);
     check(!SaveMenu.isSaveMenuOpen(stranger.ui) && stranger.party() === 'WUUF', 'and loads it at once');
+  } finally {
+    Date.now = realNow;
+  }
+}
+
+/* ------------------------------------------------------ 13. the two-level list ---- */
+
+/**
+ * One store, the saves of three games, and the menus over them: what is listed, folded
+ * and selected, and what LOAD and SAVE do from a heading.
+ */
+async function checkTwoLevels(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== the two-level list ===');
+  const store = memoryStore();
+  const daroo = await menuRig(graphics, store, 'DAROO');
+  const wuuf = await menuRig(graphics, store, 'WUUF');
+  const halk = await menuRig(graphics, store, 'HALK');
+  const idOf = (rig: { game: Game }): number => rig.game.ctx.state.block1.randomGameID;
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  const usedAt = async (id: string): Promise<number | undefined> => (await store.list(null)).find((e) => e.id === id)?.usedAt;
+  /** The list's headings, in order, each by its game's champion and folded or not. */
+  const headings = (state: SaveMenu.SaveMenuState): string => state.rows
+    .flatMap((row) => row.kind === 'heading' ? [`${row.playthrough.saves[0].champions[0]}${state.unfolded.has(row.playthrough.id) ? ' unfolded' : ''}`] : [])
+    .join(', ');
+  /** How many pixels of a button's label are up: none on a button that can do nothing. */
+  const labelOf = (ui: UIState, frame: { x1: number; y1: number; x2: number; y2: number }): number => {
+    SaveMenu.drawSaveMenu(ui);
+    const at = SaveMenu.buttonLabelAt(frame);
+    return countNot(ui, at.x - 18, at.x + 17, at.y - 4, at.y + 1, MENU_PANEL_COLOR);
+  };
+
+  const realNow = Date.now;
+  let now = new Date(2026, 8, 13, 14, 5, 6).getTime();
+  Date.now = () => now;
+  const later = (): void => { now += 60_000; };
+  try {
+    const darooFirst = await daroo.saves.save('stopped', 'new');
+    later();
+    const wuufOlder = await wuuf.saves.save('stopped', 'new');
+    later();
+    const halkOnly = await halk.saves.save('stopped', 'new');
+    later();
+    const wuufNewer = await wuuf.saves.save('stopped', 'new');
+    later();
+    await daroo.saves.quickSave();
+    const darooQuick = (await store.list(null)).find((e) => e.quick)!;
+    later();
+    wuuf.saves.read(await wuuf.saves.open(wuufOlder));
+    later();
+
+    // DAROO's menu: his own save is the newest, and WUUF's playthrough the last one used.
+    const { ui } = daroo;
+    const state = await daroo.open();
+    console.log('  DAROO\'s menu, WUUF\'s older save the last one used:');
+    console.log(daroo.list());
+    check(headings(state) === 'WUUF unfolded, DAROO, HALK',
+      'a heading for each playthrough, the last one used first, and that one alone unfolded');
+    check(state.rows.length === 5 && state.rows.every((row) => row.kind !== 'new'),
+      'no "new save" row: the running game\'s playthrough has a heading');
+    check(SaveMenu.selectedEntry(state)?.id === wuufOlder.id && state.selected === 2 && daroo.rowOf(wuufNewer.id) === 1,
+      'the last save used is selected, under its playthrough\'s newest');
+    check(SaveMenu.rowText(state, state.rows[0]) === '- WUUF' && SaveMenu.rowText(state, state.rows[3]) === '+ DAROO'
+      && SaveMenu.rowText(state, state.rows[1]) === '  2026-09-13 14:08 L0',
+      'a heading shows its party behind its fold mark, and a save its day, time and level');
+
+    // A click on a heading selects it, and unfolds it or folds it.
+    daroo.clickRow(daroo.headingOf(idOf(daroo)));
+    console.log('  a click on DAROO\'s heading:');
+    console.log(daroo.list());
+    check(headings(state) === 'WUUF unfolded, DAROO unfolded, HALK' && state.selected === 3 && SaveMenu.selectedEntry(state) === null
+      && daroo.rowOf(darooQuick.id) === 4 && daroo.rowOf(darooFirst.id) === 5,
+      'a click on a folded heading selects it and lists its saves under it, newest first');
+    check(SaveMenu.rowText(state, state.rows[4]) === '  2026-09-13 14:09 L0 F5', 'F5\'s save is marked');
+    daroo.clickRow(0);
+    check(headings(state) === 'WUUF, DAROO unfolded, HALK' && state.selected === 0 && daroo.headingOf(idOf(daroo)) === 1,
+      'a click on an unfolded one folds it, and the rows below move up');
+
+    // Another playthrough's heading: SAVE is inert, and LOAD asks.
+    const files = store.files.size;
+    const labels = [labelOf(ui, g.buttonFrames.load), labelOf(ui, g.buttonFrames.save)];
+    await daroo.click(g.saveButtonId);
+    console.log(`  WUUF's heading selected: LOAD's label ${labels[0]} pixels, SAVE's ${labels[1]}; SAVE clicked: ${store.files.size - files} file(s) more, ${state.confirm ? 'ASKS' : 'no question'}, "${state.message}"`);
+    check(labels[0] > 0 && labels[1] === 0 && store.files.size === files && state.confirm === null && state.message === '',
+      'on another playthrough\'s heading SAVE has no label and takes no click');
+    check(SaveMenu.loadTarget(state)?.id === wuufOlder.id, 'and LOAD is for its last save used, not its newest');
+    await daroo.click(g.loadButtonId);
+    const asked = state.confirm;
+    await daroo.click(211, 2);
+    check(asked === 'load' && state.confirm === null && daroo.party() === 'DAROO', 'LOAD there asks first, as on a save of that playthrough');
+
+    // The running game's own heading: SAVE makes a new save, and LOAD reads the last one used.
+    daroo.clickRow(daroo.headingOf(idOf(halk)));
+    daroo.clickRow(daroo.headingOf(idOf(daroo)));
+    const ownLabels = [labelOf(ui, g.buttonFrames.load), labelOf(ui, g.buttonFrames.save)];
+    await daroo.click(g.saveButtonId);
+    const darooNew = SaveMenu.selectedEntry(state);
+    console.log('  DAROO\'s own heading, then SAVE:');
+    console.log(daroo.list());
+    check(ownLabels.every((n) => n > 0) && store.files.size === files + 1 && state.confirm === null && state.message === 'GAME SAVED'
+      && darooNew !== null && darooNew.playthrough === idOf(daroo) && !darooNew.quick && darooNew.savedAt === now,
+      'on the running game\'s own heading SAVE makes a new save of its playthrough, and does not ask');
+    check(headings(state) === 'DAROO unfolded, WUUF, HALK unfolded' && state.selected === 1,
+      'which is selected, its playthrough now the first; a heading the player unfolded stays so');
+    later();
+
+    daroo.game.ctx.party.state.champions[0]!.name = 'CHANGED';
+    daroo.select(darooFirst.id);
+    await daroo.click(g.loadButtonId);
+    later();
+    await daroo.open();
+    const reopened = SaveMenu.selectedEntry(ui.saveMenu!)?.id;
+    daroo.clickRow(0);
+    daroo.game.ctx.party.state.champions[0]!.name = 'CHANGED';
+    await daroo.click(g.loadButtonId);
+    console.log(`  DAROO's oldest save loaded, then LOAD from his heading: ${SaveMenu.isSaveMenuOpen(ui) ? 'THE MENU' : 'the menu gone'}, party ${daroo.party()}`);
+    check(reopened === darooFirst.id && !SaveMenu.isSaveMenuOpen(ui) && daroo.party() === 'DAROO'
+      && await usedAt(darooFirst.id) === now && await usedAt(darooNew!.id) === darooNew!.savedAt,
+      'LOAD on the game\'s own heading reads its last save used at once, though two are newer');
+    later();
+
+    // A game with no save yet has no heading, and a "new save" row in its place.
+    const leyla = await menuRig(graphics, store, 'LEYLA');
+    const fresh = await leyla.open();
+    console.log('  the menu of a game not saved yet:');
+    console.log(leyla.list());
+    check(fresh.rows[0].kind === 'new' && headings(fresh) === 'DAROO unfolded, WUUF, HALK' && SaveMenu.selectedEntry(fresh)?.id === darooFirst.id,
+      'a game with no save has the "new save" row over the headings, and its menu opens on the last save used all the same');
+    leyla.clickRow(leyla.headingOf(idOf(wuuf)));
+    await leyla.click(g.saveButtonId);
+    check(store.files.size === files + 1 && fresh.confirm === null, 'where every heading is another playthrough\'s, and SAVE inert on each');
+    leyla.clickRow(0);
+    await leyla.click(g.saveButtonId);
+    console.log('  "NEW SAVE", then SAVE:');
+    console.log(leyla.list());
+    check(store.files.size === files + 2 && fresh.rows.every((row) => row.kind !== 'new') && headings(fresh) === 'LEYLA unfolded, DAROO unfolded, WUUF unfolded, HALK'
+      && fresh.selected === 1, 'its first save gives it a heading, the first, and takes the "new save" row away');
+    SaveMenu.closeSaveMenu(leyla.ui);
+    later();
+
+    // The load-only chooser: the same list, and no question from a heading either.
+    const stranger = await menuRig(graphics, store, 'SONJA');
+    const chooser = await stranger.open('loadOnly');
+    check(headings(chooser) === 'LEYLA unfolded, DAROO, WUUF, HALK' && chooser.rows.every((row) => row.kind !== 'new') && chooser.selected === 1,
+      'the load-only chooser lists the playthroughs the same way, with no "new save" row');
+    stranger.clickRow(stranger.headingOf(idOf(wuuf)));
+    await stranger.click(g.loadButtonId);
+    console.log(`  the load-only chooser, LOAD on WUUF's heading: ${SaveMenu.isSaveMenuOpen(stranger.ui) ? 'THE MENU' : 'the menu gone'}, party ${stranger.party()}`);
+    check(!SaveMenu.isSaveMenuOpen(stranger.ui) && stranger.party() === 'WUUF' && await usedAt(wuufOlder.id) === now && idOf(stranger) === idOf(wuuf)
+      && halkOnly.playthrough === idOf(halk),
+      'and LOAD on a heading reads its last save used at once');
   } finally {
     Date.now = realNow;
   }
@@ -1726,7 +1957,7 @@ async function checkPlayTime(graphics: GraphicsLoader): Promise<void> {
     play(300);
     const beforeLoad = game.playTime();
     await rig.open();
-    rig.clickRow(rig.rowOf(made!.id));
+    rig.select(made!.id);
     await rig.click(g.loadButtonId);
     const afterLoad = game.playTime();
     console.log(`  after 300 more: ${seconds(beforeLoad)}; the menu's save loaded: ${seconds(afterLoad)}`);
@@ -1857,6 +2088,7 @@ async function main(): Promise<void> {
   await checkSaveCall();
   await checkSelection(graphics);
   await checkQuestion(graphics);
+  await checkTwoLevels(graphics);
   await checkPlayTime(graphics);
   await checkUpgrade();
   finish();

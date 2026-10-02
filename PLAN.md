@@ -265,11 +265,15 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   loaded from a file that names no playthrough, which is no save of the one the load
   gave it. Both are the player's, not debug features, and what they did is printed in
   the message area.
-- **SAVE writes over the selected save**, or makes a new one from the list's "new save"
-  row. The row written over keeps its key and its name and takes the file, its date and
-  the game's playthrough, and is the dialog's save from then on: a quick-save written
-  over is F5's slot no longer, and the next F5 makes another. **LOAD takes any save.**
-  Either asks first when the save is of another
+- **SAVE writes over the selected save**, or makes a new one from the heading of the
+  running game's playthrough; a game with no save yet has no heading, and makes its
+  first from the list's "new save" row. The row written over keeps its key and its name
+  and takes the file, its date and the game's playthrough, and is the dialog's save from
+  then on: a quick-save written over is F5's slot no longer, and the next F5 makes
+  another. On another playthrough's heading SAVE does nothing, the author's decision: a
+  file holds the running game's id, so a new save is never another playthrough's.
+  **LOAD takes any save**, and from a heading the last save used of its playthrough.
+  Either asks first when the save, the one read or the one written over, is of another
   playthrough than the running game's, a file that names none included; the order of
   two saves of one playthrough is never checked, since loading an old save and saving
   over a newer one is ordinary play. The question is `_DoMenu`'s two-option menu in the
@@ -300,9 +304,16 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   label, as CSBWin's empty slot has none. The labels' places in their frames, the
   rectangle a click takes and the press animation are `_DoMenu`'s. The question before
   a load or a save is `_DoMenu`'s centred menu, alone on the cleared screen.
-- **A two-level list**: a playthrough, named by the champions of its newest save, and
-  under it, folded or not, its saves. The running playthrough is first and unfolded;
-  playthroughs and saves are newest first; the list scrolls.
+- **A two-level list**: a heading for each playthrough, named by the champions of its
+  newest save, and under it, folded or not, its saves, newest first, each with its day,
+  its time, its level and F5's mark. The playthroughs are in the order of their last
+  use, a playthrough's being that of the save of its own last used
+  (`playthroughsOf`, `src/data/saves/SaveStore.ts`). The dialog opens with the first
+  unfolded, the last save used selected under it, and the others folded; a click on a
+  heading folds or unfolds it, and so do the left and right arrows. A game with no save
+  yet has no heading, and the full menu a first row, "NEW SAVE", in its place. The
+  files that name no playthrough are listed as one, until step 4 leaves none. The list
+  scrolls.
 - **A preview** of the selected save beside the list: the champions' names without their
   titles, the level, the play time, the date.
 - **LOAD, SAVE, EXPORT**, and a drop for the import. No delete, no quit and no "SAVE AND
@@ -338,7 +349,8 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      and SAVE does not), "one store, two data sets" (F9 in its playthrough, and in one
      with no save) and "a save that names no playthrough" (neither key takes such a
      file).
-   - c. ✅ **SAVE over the selection**, or new from the list's "new save" row.
+   - c. ✅ **SAVE over the selection**, or new from the game's heading or the list's
+     "new save" row.
      Evidence: `tools/dump-save-menu.ts`, "the
      one save call" (the row written over, F5's slot written over, another
      playthrough's save) and "the menu's selection, and what SAVE writes" (the menu's
@@ -364,7 +376,7 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      game taking the next; another data set's saves; a store that cannot be listed).
 3. ⏳ **The dialog**, one commit each:
    - a. ✅ **The frame**: the dialog in its rectangle on the cleared screen, drawn from
-     graphic 0's pieces (`drawPiece`, `src/renderer/ui/SaveMenu.ts`). The list is flat,
+     graphic 0's pieces (`drawPiece`, `src/renderer/ui/SaveMenu.ts`). The list is
      fourteen rows over its status line; the preview's panel is empty; LOAD, SAVE and
      CANCEL are buttons, and EXPORT's frame has no label until step 4; the question is
      centred. Evidence: `tools/dump-save-menu.ts`, "the dialog's pieces of graphic 0"
@@ -372,10 +384,16 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      panel under every row and label), "the menu button sets" (a frame's rectangle and
      label against CSBWin's table) and "the menu's selection" (CANCEL, and EXPORT's
      frame); the golden frame `tools/frames/06-savemenu.png`.
-   - b. ⏳ **The two-level list**: a heading row for each playthrough over its saves,
-     folded or not. A save's row gives up the party, which is its heading's, for the
-     time of day and F5's mark. What LOAD and SAVE do with a heading selected is
-     written with it.
+   - b. ✅ **The two-level list**: a heading row for each playthrough over its saves,
+     folded or not (`layoutRows`, `src/renderer/ui/SaveMenu.ts`). A save's row gives up
+     the party, which is its heading's, for the time of day and F5's mark. Evidence:
+     `tools/dump-save-menu.ts`, "the list" (the playthroughs and their order, a
+     heading's and a save's row) and "the two-level list" (three games' saves in one
+     store: which heading is first and unfolded and which save selected; a click
+     folding and unfolding; from a heading, LOAD reading the last save used, asking
+     across playthroughs, and SAVE making a new save on the game's own and inert on
+     another's; the "new save" row of a game with no save; the load-only chooser), and
+     "the menu's selection" (the arrows).
    - c. ⏳ **The preview**, in its panel; the status line keeps what went wrong and
      "WORKING . . ." alone.
    - d. ⏳ **The scrolling**: the wheel and the keys scroll the list already. A mark at
@@ -477,12 +495,15 @@ Evidence:
 
 The disk icon opens a dialog over the 320×200 buffer (`src/renderer/ui/SaveMenu.ts`
 over `Menu.ts`, a faithful `_DoMenu` / `_WaitForMenuSelect`), listing the running data
-set's saves (`GameSaves.list`, over `src/data/saves/`), newest first, each row with
-its date, level and party, under a first row, "NEW SAVE". The menu opens on the last
-save used, written or loaded, and on "NEW SAVE" when the data set has none. LOAD reads
-the selected save. SAVE writes over it, or from "NEW SAVE"
-makes a new row, its file a `.dat` named for its date; either asks first on a save of
-another playthrough than the running game's. Both,
+set's saves (`GameSaves.list`, over `src/data/saves/`) under a heading for each
+playthrough, the last one used first: the party of its newest save, and when unfolded
+its saves, newest first, each row with its day, time and level. A game with no save yet
+has a first row, "NEW SAVE", for a heading. The menu opens on the last
+save used, written or loaded, its playthrough alone unfolded, and on "NEW SAVE" when the
+data set has none. LOAD reads the selected save, or from a heading its playthrough's
+last save used. SAVE writes over the selected save, or from the game's own heading or
+"NEW SAVE" makes a new row, its file a `.dat` named for its date. Either asks first on a
+save of another playthrough than the running game's. Both,
 and the two keys, go through `GameSaves` (`src/engine/GameSaves.ts`). F5
 writes its playthrough's quick-save, over the last, and F9 loads the newest save of its
 playthrough, F5's or the menu's. Each key says what it

@@ -131,15 +131,47 @@ export function quickSlot(rows: SaveEntry[], dataSet: string, playthrough: numbe
     );
 }
 
+/** The order of use: the latest `usedAt` first, and of two used at once the one saved last. */
+function byLastUse(a: SaveEntry, b: SaveEntry): number {
+    return b.usedAt - a.usedAt || b.savedAt - a.savedAt || a.name.localeCompare(b.name);
+}
+
 /**
  * The last save used among `rows`, written or loaded: the one of the latest `usedAt`,
  * and of two used at once the one saved last. `undefined` for no row.
  */
 export function lastUsedSave(rows: SaveEntry[]): SaveEntry | undefined {
-    return sortSaveEntries(rows).reduce<SaveEntry | undefined>(
-        (last, row) => (!last || row.usedAt > last.usedAt ? row : last),
-        undefined,
-    );
+    return [...rows].sort(byLastUse)[0];
+}
+
+/**
+ * A playthrough as the list shows one, under a heading: the saves of one data set that
+ * share a `d.RandomGameID`. The files that name none (0) are one such group, whatever
+ * games they are of.
+ */
+export interface Playthrough {
+    /** The `RandomGameID` its saves share (`SaveEntry.playthrough`). */
+    id: number;
+    /** Its saves, newest first. */
+    saves: SaveEntry[];
+    /** The last of them used (`lastUsedSave`): what LOAD reads from the heading. */
+    lastUsed: SaveEntry;
+}
+
+/**
+ * The playthroughs of `rows`, the last one used first: each is as recent as the last
+ * use of one of its saves, so the first holds the last save used of them all.
+ */
+export function playthroughsOf(rows: SaveEntry[]): Playthrough[] {
+    const saves = new Map<number, SaveEntry[]>();
+    for (const row of sortSaveEntries(rows)) {
+        const held = saves.get(row.playthrough);
+        if (held) held.push(row);
+        else saves.set(row.playthrough, [row]);
+    }
+    return [...saves]
+        .map(([id, own]): Playthrough => ({ id, saves: own, lastUsed: lastUsedSave(own)! }))
+        .sort((a, b) => byLastUse(a.lastUsed, b.lastUsed));
 }
 
 export interface SaveStore {
@@ -171,26 +203,47 @@ export function sortSaveEntries(entries: SaveEntry[]): SaveEntry[] {
     return [...entries].sort((a, b) => b.savedAt - a.savedAt || a.name.localeCompare(b.name));
 }
 
-/** Champion names cut to three characters, which is what fits four of them on a row. */
-export function abbreviateChampions(champions: string[], width = 3): string {
+/** `HH:MM`, in the player's own timezone, as the date is. */
+export function formatSaveTime(savedAt: number): string {
+    const d = new Date(savedAt);
+    if (Number.isNaN(d.getTime())) return '??:??';
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** A party's names as a row shows them: `DAROO SONJA LEYLA ESMARDA`. */
+function formatChampions(champions: string[]): string {
     return champions
-        .slice(0, 4)
-        .map((n) => n.trim().toUpperCase().slice(0, width))
+        .map((n) => n.trim().toUpperCase())
         .filter((n) => n.length > 0)
         .join(' ');
 }
 
-/** One list row: `2026-09-13 L14 DAR SON LEY ESM`, clipped to the panel's 33 characters. */
-export function formatSaveRow(entry: SaveEntry, maxChars = 33): string {
-    const level = `L${Math.max(0, entry.level | 0)}`;
-    const row = `${formatSaveDate(entry.savedAt)} ${level} ${abbreviateChampions(entry.champions)}`;
+/**
+ * A playthrough's heading: `- DAROO SONJA LEYLA ESMARDA`, the champions of its newest
+ * save after `+` when its saves are folded away and `-` when they are listed. Four
+ * names of seven characters, the longest a champion has, are the panel's 33 characters.
+ */
+export function formatPlaythroughRow(playthrough: Playthrough, folded: boolean, maxChars = 33): string {
+    const row = `${folded ? '+' : '-'} ${formatChampions(playthrough.saves[0].champions)}`;
     return row.length > maxChars ? row.slice(0, maxChars) : row;
 }
 
-/** The detail line above the list: the selected save's full roster. */
+/**
+ * A save's row under its playthrough's heading: `  2026-09-13 14:05 L14 F5`, the day
+ * and the time it was saved, the level, and `F5` on a quick-save. The party is the
+ * heading's.
+ */
+export function formatSaveRow(entry: SaveEntry, maxChars = 33): string {
+    const level = `L${Math.max(0, entry.level | 0)}`;
+    const row = `  ${formatSaveDate(entry.savedAt)} ${formatSaveTime(entry.savedAt)} ${level}${entry.quick ? ' F5' : ''}`;
+    return row.length > maxChars ? row.slice(0, maxChars) : row;
+}
+
+/** The detail line under the list: the selected save's full roster. */
 export function formatSaveDetail(entry: SaveEntry | null, maxChars = 33): string {
     if (!entry) return '';
-    const text = entry.champions.map((n) => n.trim().toUpperCase()).join(' ');
+    const text = formatChampions(entry.champions);
     return text.length > maxChars ? text.slice(0, maxChars) : text;
 }
 
