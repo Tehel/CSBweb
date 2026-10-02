@@ -240,11 +240,38 @@ export function formatSaveRow(entry: SaveEntry, maxChars = 33): string {
     return row.length > maxChars ? row.slice(0, maxChars) : row;
 }
 
-/** The detail line under the list: the selected save's full roster. */
-export function formatSaveDetail(entry: SaveEntry | null, maxChars = 33): string {
-    if (!entry) return '';
-    const text = formatChampions(entry.champions);
-    return text.length > maxChars ? text.slice(0, maxChars) : text;
+/** A play time as `H:MM:SS`, the hours as long as they are: `0:00:10`, `123:04:05`. */
+export function formatPlayTime(playTime: number): string {
+    const seconds = Number.isFinite(playTime) ? Math.max(0, Math.floor(playTime / 1000)) : 0;
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${Math.floor(seconds / 3600)}:${p(Math.floor(seconds / 60) % 60)}:${p(seconds % 60)}`;
+}
+
+/** How many champions a party holds, and so how many lines a preview keeps for them. */
+const PARTY_SIZE = 4;
+
+/**
+ * A save's preview, a line of the panel each: the champions' names, one a line; the
+ * level; the play time; the day and the time it was saved. A party of fewer than four
+ * leaves its other lines empty, so that every save shows the rest in the same place.
+ * A day is ten characters and a name seven at most, so every line fits the panel's
+ * eleven.
+ */
+export function formatSavePreview(entry: SaveEntry, maxChars = 11): string[] {
+    const names = entry.champions.map((n) => n.trim().toUpperCase()).filter((n) => n.length > 0).slice(0, PARTY_SIZE);
+    while (names.length < PARTY_SIZE) names.push('');
+    return [
+        ...names,
+        '',
+        `LEVEL ${Math.max(0, entry.level | 0)}`,
+        '',
+        'PLAYED',
+        formatPlayTime(entry.playTime),
+        '',
+        'SAVED',
+        formatSaveDate(entry.savedAt),
+        formatSaveTime(entry.savedAt),
+    ].map((line) => line.slice(0, maxChars));
 }
 
 /** The suffix of a save's name: a CSBWin file, which CSBWin opens. */

@@ -202,8 +202,8 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   clock paces them, and a gap the loop does not make up, a machine asleep, counts
   nothing. The row carries it, in milliseconds (`SaveEntry.playTime`): a save writes
   the count, a load takes the row's, and a new game starts at 0. A row stored before
-  rows held it counts none. An export loses it and an import starts at 0. Nothing shows
-  it before the dialog's preview (step 3).
+  rows held it counts none. An export loses it and an import starts at 0. The dialog's
+  preview shows it.
 
 **A playthrough**
 
@@ -314,8 +314,13 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   yet has no heading, and the full menu a first row, "NEW SAVE", in its place. The
   files that name no playthrough are listed as one, until step 4 leaves none. The list
   scrolls.
-- **A preview** of the selected save beside the list: the champions' names without their
-  titles, the level, the play time, the date.
+- **A preview** beside the list, of the save LOAD would read: the selected save, or
+  from a heading its playthrough's last save used, and nothing on "NEW SAVE". A line of
+  the panel each, on the list's rows (`formatSavePreview`,
+  `src/data/saves/SaveStore.ts`): the champions' names without their titles, the level,
+  the play time as `H:MM:SS`, and the day and the time it was saved. A party of fewer
+  than four leaves its lines empty, so the rest stands in one place for every save. The
+  line under the list is left to what went wrong, what was done and "WORKING . . .".
 - **LOAD, SAVE, EXPORT**, and a drop for the import. No delete, no quit and no "SAVE AND
   QUIT": loading another playthrough's save is how a player leaves a game.
 - **No "GAME LOADED, READY TO PLAY."**, nor its "ASCII DUMP" (`DEBT.md` G14): a
@@ -377,8 +382,7 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
 3. ⏳ **The dialog**, one commit each:
    - a. ✅ **The frame**: the dialog in its rectangle on the cleared screen, drawn from
      graphic 0's pieces (`drawPiece`, `src/renderer/ui/SaveMenu.ts`). The list is
-     fourteen rows over its status line; the preview's panel is empty; LOAD, SAVE and
-     CANCEL are buttons, and EXPORT's frame has no label until step 4; the question is
+     fourteen rows over its status line; LOAD, SAVE and CANCEL are buttons, and EXPORT's frame has no label until step 4; the question is
      centred. Evidence: `tools/dump-save-menu.ts`, "the dialog's pieces of graphic 0"
      (each piece at its own size is the art), "the dialog" (the margins, and clean
      panel under every row and label), "the menu button sets" (a frame's rectangle and
@@ -394,8 +398,14 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      across playthroughs, and SAVE making a new save on the game's own and inert on
      another's; the "new save" row of a game with no save; the load-only chooser), and
      "the menu's selection" (the arrows).
-   - c. ⏳ **The preview**, in its panel; the status line keeps what went wrong and
-     "WORKING . . ." alone.
+   - c. ✅ **The preview**, in its panel (`drawSaveMenu`, `src/renderer/ui/SaveMenu.ts`);
+     the status line keeps what went wrong, what was done and "WORKING . . ." alone.
+     Evidence: `tools/dump-save-menu.ts`, "the dialog" (eleven characters fit the
+     panel), "the list" (a play time's format, and a preview's lines) and "the preview"
+     (the panel read back: which rows hold ink and that none leaves the lines' cells;
+     "NEW SAVE" showing nothing, a heading its last save used, and the load-only
+     chooser the same; the line under the list empty on a save with nothing to report).
+     The golden frame shows the "NEW SAVE" row, whose preview is empty.
    - d. ⏳ **The scrolling**: the wheel and the keys scroll the list already. A mark at
      the panel's edge where rows lie beyond it, which a click scrolls by.
 4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it. Until
@@ -498,7 +508,8 @@ over `Menu.ts`, a faithful `_DoMenu` / `_WaitForMenuSelect`), listing the runnin
 set's saves (`GameSaves.list`, over `src/data/saves/`) under a heading for each
 playthrough, the last one used first: the party of its newest save, and when unfolded
 its saves, newest first, each row with its day, time and level. A game with no save yet
-has a first row, "NEW SAVE", for a heading. The menu opens on the last
+has a first row, "NEW SAVE", for a heading. Beside the list, a panel previews the save
+LOAD would read: its party, its level, its play time and its date. The menu opens on the last
 save used, written or loaded, its playthrough alone unfolded, and on "NEW SAVE" when the
 data set has none. LOAD reads the selected save, or from a heading its playthrough's
 last save used. SAVE writes over the selected save, or from the game's own heading or

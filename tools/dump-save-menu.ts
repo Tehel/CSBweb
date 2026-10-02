@@ -59,6 +59,11 @@
  * 12. **The play time.** The player's time in a game is the VBLs its loop runs, the
  *    frozen game's and the save menu's left out. No file holds it: a save's row does,
  *    and a load takes it back from the row.
+ * 14. **The preview.** The panel beside the list shows the save LOAD would read: its
+ *    party, its level, its play time and its date, a line each on the list's rows. The
+ *    lines are drawn for real and the panel read back: which rows hold ink, that none
+ *    leaves the panel's interior, that a heading shows its last save used and "NEW
+ *    SAVE" nothing, and that the line under the list no longer names the party.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -76,7 +81,9 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { readCsbwinSaveInfo } from '../src/data/CsbwinSaveInfo';
 import {
   formatPlaythroughRow,
+  formatPlayTime,
   formatSaveDate,
+  formatSavePreview,
   formatSaveRow,
   formatSaveTime,
   joinedPlaythrough,
@@ -402,6 +409,11 @@ function checkLayout(graphics: GraphicsLoader): void {
 
   const previewDirty = countNot(ui, g.previewPanel.x1 + 2, g.previewPanel.x2 - 1, g.previewPanel.y1 + 2, g.previewPanel.y2 - 1, MENU_PANEL_COLOR);
   check(previewDirty === 0, `the preview's panel is clean inside its edges (${previewDirty} stray pixels)`);
+  const previewRight = g.previewTextX + g.previewMaxChars * 6 - 1;
+  console.log(`  a full line of the preview runs x ${g.previewTextX}..${previewRight}, its panel's interior x ${g.previewPanel.x1 + 2}..${g.previewPanel.x2 - 1}`);
+  check(g.previewTextX >= g.previewPanel.x1 + 2 && previewRight <= g.previewPanel.x2 - 1,
+    `${g.previewMaxChars} characters fit inside the preview's panel (${previewRight} <= ${g.previewPanel.x2 - 1})`);
+  check(g.previewTextX - g.previewPanel.x1 === g.textX - g.listPanel.x1, 'which start as far from its edge as a row does from the list\'s');
 
   // A label is six characters at most, and its cell has to lie on the button's face.
   let labelDirty = 0;
@@ -521,6 +533,30 @@ function checkListLogic(): void {
     'a heading is "+" folded and "-" unfolded, then the champions\' names in full');
   check(longest.length === max && longest.endsWith('ABCDEFG'), `four names of seven characters are the row's ${max}`);
   check(heading([], true) === '+ ', 'and an empty party leaves the mark alone');
+
+  // The preview: a line of its panel each.
+  const hours = (h: number, m: number, sec: number): number => ((h * 60 + m) * 60 + sec) * 1000;
+  const times: Array<[number, string]> = [
+    [0, '0:00:00'], [999, '0:00:00'], [10_000, '0:00:10'], [hours(1, 2, 3), '1:02:03'], [hours(123, 59, 59) + 999, '123:59:59'],
+    [-5, '0:00:00'], [Number.NaN, '0:00:00'],
+  ];
+  console.log('');
+  console.log(`  play times: ${times.map(([ms]) => `${ms} ms -> ${formatPlayTime(ms)}`).join(', ')}`);
+  check(times.every(([ms, expected]) => formatPlayTime(ms) === expected),
+    'a play time is H:MM:SS, the seconds cut and not rounded, and what is no time is none');
+  const wide = SaveMenu.SAVE_MENU_GEOMETRY.previewMaxChars;
+  const full = formatSavePreview(entry({ savedAt: afternoon, level: 14, playTime: hours(12, 34, 56), champions: ['HISSSSA', 'Gothmog ', 'LINFLAS', 'ABCDEFG'] }));
+  const alone = formatSavePreview(entry({ savedAt: afternoon, level: 5, quick: true, champions: ['HALK'] }));
+  console.log(`  a preview: ${JSON.stringify(full)}`);
+  console.log(`  of one champion: ${JSON.stringify(alone)}`);
+  check(full.join('|') === 'HISSSSA|GOTHMOG|LINFLAS|ABCDEFG||LEVEL 14||PLAYED|12:34:56||SAVED|2026-09-13|14:05',
+    'a preview is the champions\' names, the level, the play time, and the day and the time of the save');
+  check(alone.join('|') === 'HALK|||||LEVEL 5||PLAYED|0:00:00||SAVED|2026-09-13|14:05',
+    'a smaller party leaves its lines empty, so the rest stands where it does for four');
+  check(full.length <= SaveMenu.SAVE_MENU_ROWS && full.every((line) => line.length <= wide),
+    `it is no more lines than the list has rows, none longer than the panel's ${wide} characters`);
+  check(formatSavePreview(entry({ playTime: hours(99_999, 59, 59) }))[8].length === wide,
+    'a play time under a hundred thousand hours fits');
 
   // The playthroughs: the saves of one id, the last one used first.
   const games = [
@@ -1897,6 +1933,124 @@ async function checkTwoLevels(graphics: GraphicsLoader): Promise<void> {
   }
 }
 
+/* -------------------------------------------------------------- 14. the preview ---- */
+
+/**
+ * The preview's panel, drawn by the menu and read back: two saves of one game, of
+ * another party and another day, and a second game's.
+ */
+async function checkPreview(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== the preview ===');
+  const store = memoryStore();
+  const rig = await menuRig(graphics, store, 'DAROO');
+  const { game, ui } = rig;
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  const panel = g.previewPanel;
+  const baseline = (row: number): number => g.rowFirstY + row * g.rowStep;
+  /** The panel's interior as the menu draws it now, a row of pixels after another. */
+  const drawn = (): string => {
+    SaveMenu.drawSaveMenu(ui);
+    let pixels = '';
+    for (let y = panel.y1 + 2; y <= panel.y2 - 1; y++) {
+      for (let x = panel.x1 + 2; x <= panel.x2 - 1; x++) pixels += pixelAt(ui, x, y).toString(16);
+    }
+    return pixels;
+  };
+  /** The lines of the panel that hold ink, `#` for one that does: a glyph's cell is `y-4` to `y+1`. */
+  const inked = (): string => {
+    SaveMenu.drawSaveMenu(ui);
+    let lines = '';
+    for (let row = 0; row < g.rows; row++) {
+      lines += countNot(ui, g.previewTextX, g.previewTextX + g.previewMaxChars * 6 - 1, baseline(row) - 4, baseline(row) + 1, MENU_PANEL_COLOR) > 0 ? '#' : '.';
+    }
+    return lines;
+  };
+  /** The pixels of the panel's interior that are not background, and not in a line's cells. */
+  const stray = (): number => {
+    SaveMenu.drawSaveMenu(ui);
+    let count = 0;
+    for (let y = panel.y1 + 2; y <= panel.y2 - 1; y++) {
+      const row = (y + 4 - g.rowFirstY) / g.rowStep;
+      const inLine = row >= 0 && row < g.rows && (y + 4 - g.rowFirstY) % g.rowStep <= 5;
+      for (let x = panel.x1 + 2; x <= panel.x2 - 1; x++) {
+        const inCells = inLine && x >= g.previewTextX && x < g.previewTextX + g.previewMaxChars * 6;
+        if (!inCells && pixelAt(ui, x, y) !== MENU_PANEL_COLOR) count++;
+      }
+    }
+    return count;
+  };
+  const statusInk = (): number => {
+    SaveMenu.drawSaveMenu(ui);
+    return countNot(ui, g.listInnerX1, g.listInnerX2, g.statusY - 4, g.statusY + 1, MENU_PANEL_COLOR);
+  };
+  const expected = (lines: string[]): string => Array.from({ length: g.rows }, (_, row) => (lines[row] ? '#' : '.')).join('');
+
+  const realNow = Date.now;
+  let now = new Date(2026, 8, 13, 14, 5, 6).getTime();
+  Date.now = () => now;
+  try {
+    // "NEW SAVE" holds no save, and shows none.
+    const state = await rig.open();
+    console.log(`  "NEW SAVE": lines ${inked()}`);
+    check(SaveMenu.loadTarget(state) === null && inked() === '.'.repeat(g.rows) && stray() === 0,
+      'on "NEW SAVE" the preview\'s panel is empty');
+
+    // A save of one champion, ten seconds played.
+    SaveMenu.closeSaveMenu(ui);
+    for (let n = 0; n < 600; n++) game.runFrame();
+    await rig.open();
+    await rig.click(g.saveButtonId);
+    const first = SaveMenu.selectedEntry(ui.saveMenu!)!;
+    const firstLines = formatSavePreview(first);
+    const saved = statusInk();
+    console.log(`  a save of DAROO alone: ${JSON.stringify(firstLines)}`);
+    console.log(`    lines ${inked()}, ${stray()} stray pixels, the line under the list "${ui.saveMenu!.message}" (${saved} pixels)`);
+    check(firstLines.join('|') === 'DAROO|||||LEVEL 0||PLAYED|0:00:10||SAVED|2026-09-13|14:05',
+      'the save\'s row gives the preview its party, its level, its play time and its date');
+    check(inked() === expected(firstLines), 'each line is drawn on the row of its number, and an empty one draws nothing');
+    check(stray() === 0, 'and nothing is drawn outside the lines\' cells: the panel\'s edges are left whole');
+    check(saved > 0, 'the line under the list says what was done');
+    const firstDrawn = drawn();
+
+    // A second save: another champion in the party, a minute on.
+    now += 60_000;
+    game.systems.hallOfChampions.addChampion(healthyChampion('LEYLA'));
+    rig.clickRow(0);
+    const fromHeading = drawn();
+    const onHeading = statusInk();
+    check(SaveMenu.selectedEntry(ui.saveMenu!) === null && fromHeading === firstDrawn,
+      'a heading shows the save LOAD reads from it, its playthrough\'s last save used');
+    check(onHeading === 0, 'and a move of the selection leaves the line under the list empty');
+    await rig.click(g.saveButtonId);
+    const second = SaveMenu.selectedEntry(ui.saveMenu!)!;
+    const secondLines = formatSavePreview(second);
+    console.log(`  a save of DAROO and LEYLA, a minute on: ${JSON.stringify(secondLines)}`);
+    console.log(`    lines ${inked()}`);
+    const secondDrawn = drawn();
+    check(secondLines[1] === 'LEYLA' && secondLines[12] === '14:06' && inked() === expected(secondLines) && secondDrawn !== firstDrawn,
+      'another save shows its own party and its own time');
+    rig.select(first.id);
+    const back = drawn();
+    const onSave = statusInk();
+    check(back === firstDrawn, 'and the first, selected again, its own as before');
+    check(onSave === 0, 'with a save selected and nothing to report, the line under the list is empty: the party is the preview\'s');
+
+    // The heading again: the last save used is now the second.
+    rig.clickRow(0);
+    check(SaveMenu.loadTarget(ui.saveMenu!)?.id === second.id && drawn() === secondDrawn,
+      'the heading now shows the second save, the last one used');
+    SaveMenu.closeSaveMenu(ui);
+
+    // The load-only chooser shows the same.
+    await rig.open('loadOnly');
+    check(SaveMenu.selectedEntry(ui.saveMenu!)?.id === second.id && drawn() === secondDrawn, 'the load-only chooser previews its selection the same way');
+    SaveMenu.closeSaveMenu(ui);
+  } finally {
+    Date.now = realNow;
+  }
+}
+
 /* ------------------------------------------------------------ 12. the play time ---- */
 
 /**
@@ -2089,6 +2243,7 @@ async function main(): Promise<void> {
   await checkSelection(graphics);
   await checkQuestion(graphics);
   await checkTwoLevels(graphics);
+  await checkPreview(graphics);
   await checkPlayTime(graphics);
   await checkUpgrade();
   finish();

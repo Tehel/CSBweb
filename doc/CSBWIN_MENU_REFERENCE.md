@@ -362,7 +362,11 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
 2. **Per-save day, time and level, under its playthrough's party**, where CSBWin shows a
    filename and a rank letter. The rank letter is what the date replaces; the ordering
    rule within a playthrough is the same one (`modifiedTime`), only shown directly and
-   newest-first rather than oldest-letter-first.
+   newest-first rather than oldest-letter-first. **A panel beside the list previews the
+   save LOAD would read**, the selected one or a heading's last save used: its
+   champions' names, its level, its play time and the day and time it was saved
+   (`formatSavePreview`, `src/data/saves/SaveStore.ts`). CSBWin shows nothing of a
+   slot's contents.
 3. **No "SAVE AND QUIT"**: a page does not quit, and loading another game's save is how a
    player leaves one (`PLAN.md` → Phase 10).
 4. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an

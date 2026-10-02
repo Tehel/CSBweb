@@ -8,8 +8,8 @@
  * `doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port". In short: a
  * dialog of its own over the screen, an unbounded scrolling list of the data set's saves
  * under their playthroughs' headings, a date per save and a roster per playthrough
- * instead of a filename and a recency letter, no "save and quit", and Esc/right-click to
- * cancel.
+ * instead of a filename and a recency letter, a preview of the save beside the list, no
+ * "save and quit", and Esc/right-click to cancel.
  *
  * ## The dialog
  *
@@ -50,6 +50,14 @@
  * LOAD reads the selected save, and from a heading the last save used of its playthrough.
  * On "NEW SAVE" there is nothing to load, so it is inert.
  *
+ * ## The preview
+ *
+ * The panel beside the list shows the save LOAD would read (`loadTarget`): the selected
+ * save, or from a heading the last save used of its playthrough, and nothing on "NEW
+ * SAVE". Its lines are the list's rows, eleven characters each (`formatSavePreview`): the
+ * champions' names, the level, the play time, and the day and the time it was saved. The
+ * line under the list is left to what went wrong, what was done, and "WORKING . . .".
+ *
  * ## The question
  *
  * LOAD and SAVE ask first when the save one would read, or the other write over, is of
@@ -70,7 +78,7 @@
  * `ctx.state.paused` (`d.Time++` is the main loop's, `doc/CSBwin-src/CSBCode.cpp:660`).
  */
 import type { OpenedSave, Playthrough, SaveEntry } from '../../data/saves';
-import { formatPlaythroughRow, formatSaveDetail, formatSaveRow, lastUsedSave, playthroughsOf } from '../../data/saves';
+import { formatPlaythroughRow, formatSavePreview, formatSaveRow, lastUsedSave, playthroughsOf } from '../../data/saves';
 import { clearIndex, fillRectIndex } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import type { Rect, UIButton } from '../../data/tables/UITables';
@@ -144,6 +152,10 @@ const ROW_STEP = 8;
 export const SAVE_MENU_ROWS = 14;
 const STATUS_Y = ROW_FIRST_Y + SAVE_MENU_ROWS * ROW_STEP + 1;
 
+/** The preview's lines are on the list's rows: eleven characters between its panel's edges. */
+const PREVIEW_TEXT_X = PREVIEW_PANEL.x1 + 4;
+const PREVIEW_MAX_CHARS = 11;
+
 /** The full menu's first row, for a game with no save yet: SAVE there makes its first. */
 const NEW_SAVE_LABEL = 'NEW SAVE';
 
@@ -195,6 +207,8 @@ export const SAVE_MENU_GEOMETRY = {
   rowStep: ROW_STEP,
   rows: SAVE_MENU_ROWS,
   statusY: STATUS_Y,
+  previewTextX: PREVIEW_TEXT_X,
+  previewMaxChars: PREVIEW_MAX_CHARS,
   loadButtonId: BTN_LOAD,
   saveButtonId: BTN_SAVE,
   cancelButtonId: BTN_CANCEL,
@@ -226,7 +240,7 @@ export interface SaveMenuState {
   scrollTop: number;
   /** An async list/read/write is in flight; every button is inert. */
   busy: boolean;
-  /** The status line: an error, or what the last action did. */
+  /** The line under the list: an error, or what the last action did. */
   message: string;
   press: MenuPress | null;
   /** What the press animation will do when it finishes. */
@@ -522,16 +536,22 @@ export function drawSaveMenu(ui: UIState): void {
     );
   }
 
-  // The status line: whatever went wrong, else the selected save's full roster.
-  const status = state.busy
-    ? 'WORKING . . .'
-    : state.message || formatSaveDetail(selectedEntry(state), TEXT_MAX_CHARS);
+  // The status line: whatever went wrong, or what was done.
+  const status = state.busy ? 'WORKING . . .' : state.message;
   if (status) text(ui, status, TEXT_X, STATUS_Y, MENU_TITLE1_COLOR, MENU_PANEL_COLOR);
   if (state.rows.length === 0 && !state.busy && !state.message) {
     // An empty list has to say so, which the load-only menu's can be; when the store
     // could not be listed, the status line says why, and repeating that here would only
     // crowd the panel.
     text(ui, 'NO SAVED GAMES HERE', TEXT_X, ROW_FIRST_Y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
+  }
+
+  // The preview: the save LOAD would read.
+  const previewed = loadTarget(state);
+  if (previewed) {
+    formatSavePreview(previewed, PREVIEW_MAX_CHARS).forEach((line, row) => {
+      if (line) text(ui, line, PREVIEW_TEXT_X, ROW_FIRST_Y + row * ROW_STEP, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
+    });
   }
 
   // A button that can do nothing is left unlabelled, as CSBWin leaves an empty save
