@@ -68,6 +68,9 @@
  *    the screen: the slider's place and height, the dither of the track around it, the
  *    two arrows. A click on an arrow and a notch of the wheel scroll a row, neither
  *    moving the selection, which a key brings the list back to.
+ * 16. **The double click.** A second click on a save soon after the first is LOAD: its
+ *    press, its question across playthroughs, and its load. Not after the delay, not on
+ *    another save, a heading or "NEW SAVE".
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -354,7 +357,7 @@ function checkLayout(graphics: GraphicsLoader): void {
 
   const blank: SaveMenu.SaveMenuState = {
     mode: 'full', entries: [], unfolded: new Set(), rows: [], selected: -1, scrollTop: 0, busy: true, message: '',
-    press: null, pending: null, confirm: null, frameHandle: null,
+    press: null, pending: null, confirm: null, frameHandle: null, lastSaveClick: null,
   };
   ui.saveMenu = blank;
   ui.screenIndexBuffer!.pixels.fill(7);
@@ -2277,6 +2280,104 @@ async function checkScrolling(graphics: GraphicsLoader): Promise<void> {
   }
 }
 
+/* --------------------------------------------------------- 16. the double click ---- */
+
+/**
+ * Two saves of one game and one of another, and the first game's menu over them: which
+ * pairs of clicks are LOAD.
+ */
+async function checkDoubleClick(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== the double click ===');
+  const store = memoryStore();
+  const daroo = await menuRig(graphics, store, 'DAROO');
+  const wuuf = await menuRig(graphics, store, 'WUUF');
+  const { ui } = daroo;
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  const idOf = (rig: { game: Game }): number => rig.game.ctx.state.block1.randomGameID;
+  const pause = (): Promise<void> => new Promise((done) => setTimeout(done, SaveMenu.SAVE_MENU_DOUBLE_CLICK_MS + 60));
+  const what = (): string => {
+    const state = ui.saveMenu;
+    return !state ? 'the menu gone' : state.press ? `button ${state.press.buttonId} pressed` : state.confirm ? `asks (${state.confirm})` : `row ${state.selected} selected`;
+  };
+
+  const realNow = Date.now;
+  let now = new Date(2026, 8, 13, 14, 5, 6).getTime();
+  Date.now = () => now;
+  try {
+    await wuuf.saves.save('stopped', 'new');
+    now += 60_000;
+    const older = await daroo.saves.save('stopped', 'new');
+    now += 60_000;
+    await daroo.saves.save('stopped', 'new');
+    now += 60_000;
+    const state = await daroo.open();
+    console.log(daroo.list());
+    check(state.rows.length === 4 && state.selected === 1 && daroo.rowOf(older.id) === 2, 'DAROO\'s two saves under his heading, the newer selected, over WUUF\'s folded one');
+
+    // Clicks that are no double click.
+    daroo.clickRow(2);
+    const afterOne = what();
+    await pause();
+    daroo.clickRow(2);
+    const afterSlow = what();
+    daroo.clickRow(1);
+    daroo.clickRow(2);
+    console.log(`  a click on the older save: ${afterOne}; another after the delay: ${afterSlow}; then the newer and the older at once: ${what()}`);
+    check(afterOne === 'row 2 selected' && afterSlow === 'row 2 selected', `a click selects, and a second one more than ${SaveMenu.SAVE_MENU_DOUBLE_CLICK_MS} ms later selects again`);
+    check(what() === 'row 2 selected' && daroo.party() === 'DAROO', 'two clicks at once on two saves select the second');
+    await pause();
+    daroo.clickRow(0);
+    daroo.clickRow(0);
+    console.log(`  two clicks at once on the heading: ${what()}, ${state.rows.length} rows`);
+    check(what() === 'row 0 selected' && state.rows.length === 4, 'two clicks at once on a heading fold it and unfold it, and load nothing');
+
+    // The double click.
+    daroo.game.ctx.party.state.champions[0]!.name = 'CHANGED';
+    daroo.clickRow(2);
+    daroo.clickRow(2);
+    const pressed = what();
+    await daroo.settled();
+    const used = (await store.list(null)).find((e) => e.id === older.id)?.usedAt;
+    console.log(`  two clicks at once on the older save: ${pressed}, then ${what()}, party ${daroo.party()}`);
+    check(pressed === `button ${g.loadButtonId} pressed`, 'a second click on a save, at once, presses LOAD');
+    check(!SaveMenu.isSaveMenuOpen(ui) && daroo.party() === 'DAROO' && used === now, 'and the save is loaded, as LOAD loads it');
+
+    // Across playthroughs it asks, as LOAD does.
+    now += 60_000;
+    await daroo.open();
+    daroo.clickRow(daroo.headingOf(idOf(wuuf)));
+    const theirs = ui.saveMenu!.rows.findIndex((row) => row.kind === 'save' && row.entry.playthrough === idOf(wuuf));
+    daroo.clickRow(theirs);
+    daroo.clickRow(theirs);
+    await daroo.settled();
+    console.log(`  two clicks at once on WUUF's save: ${what()}, party ${daroo.party()}`);
+    check(ui.saveMenu?.confirm === 'load' && daroo.party() === 'DAROO', 'on a save of another playthrough the double click asks first, as LOAD does');
+    await daroo.click(211, 2);
+    SaveMenu.closeSaveMenu(ui);
+
+    // "NEW SAVE" has nothing to load.
+    const leyla = await menuRig(graphics, store, 'LEYLA');
+    const fresh = await leyla.open();
+    leyla.clickRow(0);
+    leyla.clickRow(0);
+    check(fresh.rows[0].kind === 'new' && fresh.press === null && SaveMenu.isSaveMenuOpen(leyla.ui), 'two clicks at once on "NEW SAVE" load nothing');
+    SaveMenu.closeSaveMenu(leyla.ui);
+
+    // The load-only chooser: the same shortcut, and no question.
+    const chooser = await leyla.open('loadOnly');
+    leyla.clickRow(leyla.headingOf(idOf(wuuf)));
+    const row = chooser.rows.findIndex((r) => r.kind === 'save' && r.entry.playthrough === idOf(wuuf));
+    leyla.clickRow(row);
+    leyla.clickRow(row);
+    await leyla.settled();
+    console.log(`  the load-only chooser, two clicks at once on WUUF's save: ${SaveMenu.isSaveMenuOpen(leyla.ui) ? 'THE MENU' : 'the menu gone'}, party ${leyla.party()}`);
+    check(!SaveMenu.isSaveMenuOpen(leyla.ui) && leyla.party() === 'WUUF', 'in the load-only chooser the double click loads at once');
+  } finally {
+    Date.now = realNow;
+  }
+}
+
 /* ------------------------------------------------------------ 12. the play time ---- */
 
 /**
@@ -2471,6 +2572,7 @@ async function main(): Promise<void> {
   await checkTwoLevels(graphics);
   await checkPreview(graphics);
   await checkScrolling(graphics);
+  await checkDoubleClick(graphics);
   await checkPlayTime(graphics);
   await checkUpgrade();
   finish();

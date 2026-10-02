@@ -49,7 +49,9 @@
  * `d.RandomGameID`, so a new save is never another playthrough's.
  *
  * LOAD reads the selected save, and from a heading the last save used of its playthrough.
- * On "NEW SAVE" there is nothing to load, so it is inert.
+ * On "NEW SAVE" there is nothing to load, so it is inert. A second click on a save
+ * within half a second of the first is LOAD too, its button's press and its question
+ * included; a heading has no such shortcut, since a click folds it.
  *
  * The panel shows fifteen rows, which fill it, beside a scrollbar in the manner of a GEM
  * window's, in the dialog's two colours (`drawScrollbar`): a boxed arrow at each end, and
@@ -196,6 +198,9 @@ const PREVIEW_MAX_CHARS = 10;
 const MESSAGE_MAX_LINES = 5;
 const WORKING_MESSAGE = 'WORKING...';
 
+/** How long after a click on a save a second one on it is LOAD, in milliseconds. */
+export const SAVE_MENU_DOUBLE_CLICK_MS = 500;
+
 /** The full menu's first row, for a game with no save yet: SAVE there makes its first. */
 const NEW_SAVE_LABEL = 'NEW SAVE';
 
@@ -292,6 +297,8 @@ export interface SaveMenuState {
   /** The action the question on screen asks about, in the dialog's place, or `null`. */
   confirm: SaveMenuAction | null;
   frameHandle: number | null;
+  /** The save a click last selected, and when (`nowMs`): a second click on it soon after is LOAD. */
+  lastSaveClick: { id: string; atMs: number } | null;
 }
 
 export function isSaveMenuOpen(ui: UIState): boolean {
@@ -323,6 +330,7 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
     pending: null,
     confirm: null,
     frameHandle: null,
+    lastSaveClick: null,
   };
   void refreshSaveMenu(ui);
 }
@@ -759,11 +767,17 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
     const index = state.scrollTop + (id - BTN_ROW0);
     const row = state.rows[index];
     if (row) {
+      // A second click on a save, soon after the first, is LOAD; a third starts again.
+      const now = nowMs();
+      const last = state.lastSaveClick;
+      const second = row.kind === 'save' && last !== null && last.id === row.entry.id && now - last.atMs <= SAVE_MENU_DOUBLE_CLICK_MS;
+      state.lastSaveClick = row.kind === 'save' && !second ? { id: row.entry.id, atMs: now } : null;
       // A heading keeps its place in the list whichever way its saves go.
       state.selected = index;
       if (row.kind === 'heading') setFolded(ui, state, row.playthrough, state.unfolded.has(row.playthrough.id));
       state.message = '';
-      ui.renderLastFrame();
+      if (second && canLoad(state)) pressAction(ui, state, 'load');
+      else ui.renderLastFrame();
     }
     return;
   }

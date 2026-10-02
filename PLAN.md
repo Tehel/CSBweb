@@ -334,7 +334,13 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   (`wrapMessage`, `src/renderer/ui/SaveMenu.ts`), five lines at most, over whatever
   lines of the preview it needs. A move of the selection takes it down.
 - **LOAD, SAVE, EXPORT**, and a drop for the import. No delete, no quit and no "SAVE AND
-  QUIT": loading another playthrough's save is how a player leaves a game.
+  QUIT": loading another playthrough's save is how a player leaves a game. **A double
+  click on a save is LOAD**: a second click on it within half a second of the first
+  (`SAVE_MENU_DOUBLE_CLICK_MS`, `src/renderer/ui/SaveMenu.ts`), with the button's press
+  and its question. Not on a heading, which a click folds. Evidence:
+  `tools/dump-save-menu.ts`, "the double click".
+- **The same dialog at the entrance and in play**: the chooser takes the clicks, the
+  wheel and the keys the disk menu takes, less SAVE and the question.
 - **No "GAME LOADED, READY TO PLAY."**, nor its "ASCII DUMP" (`DEBT.md` G14): a
   loaded game is played at once. It is CSBWin's `_TAG021028` menu
   (`doc/CSBwin-src/CSBCode.cpp:10493-10537`), so its absence is an entry of

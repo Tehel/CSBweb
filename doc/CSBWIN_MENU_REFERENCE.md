@@ -374,7 +374,9 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
 3. **No "SAVE AND QUIT"**: a page does not quit, and loading another game's save is how a
    player leaves one (`PLAN.md` → Phase 10).
 4. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
-   addition, not a changed behaviour.
+   addition, not a changed behaviour, as are the list's other keys (the arrows, Home
+   and End, Page Up and Down, Enter for LOAD), the wheel, and a double click on a save,
+   which is LOAD. The entrance's chooser takes them as the disk menu does.
 5. **A question before a load or a save across playthroughs.** CSBWin's four slots are
    one directory's, and it tests `d.RandomGameID` only when a lost game is read again,
    where it refuses the save: "THAT'S NOT THE SAME GAME" (`SaveGame.cpp:1604-1606`). The
