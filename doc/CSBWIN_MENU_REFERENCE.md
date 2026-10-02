@@ -343,7 +343,7 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    a save of its own is made from the heading of the running game's playthrough, or,
    for a game with no save yet, from a first row, "NEW SAVE", which the load-only
    chooser does not have. LOAD on a heading reads the last save used of its playthrough.
-   The panel shows fourteen rows: where rows lie beyond them, the first or the last row
+   The panel shows fifteen rows: where rows lie beyond them, the first or the last row
    shown ends in a mark, `^` or `V`, which a click scrolls by a page less a row; the
    wheel scrolls by a row, and neither moves the selection.
 

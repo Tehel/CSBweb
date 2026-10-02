@@ -63,7 +63,7 @@
  *    party, its level, its play time and its date, a line each on the list's rows. The
  *    lines are drawn for real and the panel read back: which rows hold ink, that none
  *    leaves the panel's interior, that a heading shows its last save used and "NEW
- *    SAVE" nothing, and that the line under the list no longer names the party.
+ *    SAVE" nothing, and that the dialog's message takes the panel's last lines.
  * 15. **The scrolling.** A list longer than the panel: the marks on its first and last
  *    rows shown where rows lie beyond them, a click on one scrolling by a page less a
  *    row, the wheel by a row, and neither moving the selection, which a key brings the
@@ -116,7 +116,9 @@ import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/ren
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import {
   MENU_HEIGHT,
+  MENU_OPTION_COLOR,
   MENU_PANEL_COLOR,
+  MENU_TITLE1_COLOR,
   MENU_PRESS_PHASE_MS,
   MENU_WIDTH,
   doMenu,
@@ -392,7 +394,6 @@ function checkLayout(graphics: GraphicsLoader): void {
   let dirtyTotal = 0;
   const bands: Array<[string, number]> = [];
   for (let row = 0; row < g.rows; row++) bands.push([`row ${row}`, g.rowFirstY + row * g.rowStep]);
-  bands.push(['status', g.statusY]);
   for (const [name, y] of bands) {
     // A row's highlight runs from `y-5` to `y+2`, across the panel's interior; the glyph
     // cell `drawTextLineIndex` fills is inside it.
@@ -400,8 +401,11 @@ function checkLayout(graphics: GraphicsLoader): void {
     dirtyTotal += dirty;
     console.log([name, y, dirty].join('\t'));
   }
-  check(dirtyTotal === 0, `every row and the status line sit on clean panel background (${dirtyTotal} stray pixels)`);
-  check(g.statusY - 4 > g.rowFirstY + (g.rows - 1) * g.rowStep + 2, 'the status line is clear of the last row\'s highlight');
+  check(dirtyTotal === 0, `every row sits on clean panel background (${dirtyTotal} stray pixels)`);
+  const above = g.rowFirstY - 5 - (g.listPanel.y1 + 2);
+  const below = g.listPanel.y2 - 1 - (g.rowFirstY + (g.rows - 1) * g.rowStep + 2);
+  console.log(`  ${g.rows} rows of ${g.rowStep}: ${above} pixels of panel above the first, ${below} below the last`);
+  check(above === 2 && below === above, 'the rows fill the panel, the same two pixels of it above the first and below the last');
   check(pixelAt(ui, g.listInnerX1 - 1, g.rowFirstY) !== MENU_PANEL_COLOR && pixelAt(ui, g.listInnerX2 + 1, g.rowFirstY) !== MENU_PANEL_COLOR,
     'and the highlight runs from one edge of the panel to the other');
 
@@ -561,6 +565,20 @@ function checkListLogic(): void {
     `it is no more lines than the list has rows, none longer than the panel's ${wide} characters`);
   check(formatSavePreview(entry({ playTime: hours(99_999, 59, 59) }))[8].length === wide,
     'a play time under a hundred thousand hours fits');
+
+  // A message is wrapped at the preview's width.
+  const wraps: Array<[string, string]> = [
+    ['GAME SAVED', 'GAME SAVED'],
+    ['WORKING...', 'WORKING...'],
+    ['UNABLE TO SAVE GAME!', 'UNABLE TO|SAVE GAME!'],
+    ['THE SAVE FILE DOES NOT READ BACK', 'THE SAVE|FILE DOES|NOT READ|BACK'],
+    ['QUOTAEXCEEDEDERROR: FULL', 'QUOTAEXCEED|EDERROR:|FULL'],
+    ['  TWO  SPACES ', 'TWO SPACES'],
+    ['', ''],
+  ];
+  for (const [message] of wraps) console.log(`  ${JSON.stringify(message)} -> ${JSON.stringify(SaveMenu.wrapMessage(message, wide))}`);
+  check(wraps.every(([message, expected]) => SaveMenu.wrapMessage(message, wide).join('|') === expected),
+    'a message is broken at its spaces into lines of the panel\'s width, a longer word cut at the line\'s end, and no message is no line');
 
   // The playthroughs: the saves of one id, the last one used first.
   const games = [
@@ -1984,11 +2002,22 @@ async function checkPreview(graphics: GraphicsLoader): Promise<void> {
     }
     return count;
   };
-  const statusInk = (): number => {
+  /** The pixels of `color` in the panel's lines `from` to `to`. */
+  const inkOf = (color: number, from: number, to: number): number => {
     SaveMenu.drawSaveMenu(ui);
-    return countNot(ui, g.listInnerX1, g.listInnerX2, g.statusY - 4, g.statusY + 1, MENU_PANEL_COLOR);
+    let count = 0;
+    for (let y = baseline(from) - 4; y <= baseline(to) + 1; y++) {
+      for (let x = g.previewTextX; x < g.previewTextX + g.previewMaxChars * 6; x++) if (pixelAt(ui, x, y) === color) count++;
+    }
+    return count;
   };
-  const expected = (lines: string[]): string => Array.from({ length: g.rows }, (_, row) => (lines[row] ? '#' : '.')).join('');
+  /** The lines a preview and a message of `message` lines ink: the message has the last ones. */
+  const expected = (lines: string[], message = 0): string => Array.from({ length: g.rows }, (_, row) => (row >= g.rows - message || lines[row] ? '#' : '.')).join('');
+  /** Move the selection off its row and back, which takes the message down. */
+  const reselect = (): void => {
+    SaveMenu.saveMenuKey(ui, 'ArrowUp');
+    SaveMenu.saveMenuKey(ui, 'ArrowDown');
+  };
 
   const realNow = Date.now;
   let now = new Date(2026, 8, 13, 14, 5, 6).getTime();
@@ -2007,14 +2036,15 @@ async function checkPreview(graphics: GraphicsLoader): Promise<void> {
     await rig.click(g.saveButtonId);
     const first = SaveMenu.selectedEntry(ui.saveMenu!)!;
     const firstLines = formatSavePreview(first);
-    const saved = statusInk();
     console.log(`  a save of DAROO alone: ${JSON.stringify(firstLines)}`);
-    console.log(`    lines ${inked()}, ${stray()} stray pixels, the line under the list "${ui.saveMenu!.message}" (${saved} pixels)`);
+    console.log(`    lines ${inked()}, ${stray()} stray pixels, the message "${ui.saveMenu!.message}"`);
     check(firstLines.join('|') === 'DAROO|||||LEVEL 0||PLAYED|0:00:10||SAVED|2026-09-13|14:05',
       'the save\'s row gives the preview its party, its level, its play time and its date');
-    check(inked() === expected(firstLines), 'each line is drawn on the row of its number, and an empty one draws nothing');
+    check(inked() === expected(firstLines, 1) && inkOf(MENU_TITLE1_COLOR, g.rows - 1, g.rows - 1) > 0 && inkOf(MENU_TITLE1_COLOR, 0, g.rows - 2) === 0,
+      'each line is drawn on the row of its number, an empty one draws nothing, and the panel\'s last line says what was done, in the title\'s colour');
     check(stray() === 0, 'and nothing is drawn outside the lines\' cells: the panel\'s edges are left whole');
-    check(saved > 0, 'the line under the list says what was done');
+    reselect();
+    check(ui.saveMenu!.message === '' && inked() === expected(firstLines), 'a move of the selection takes the message down');
     const firstDrawn = drawn();
 
     // A second save: another champion in the party, a minute on.
@@ -2022,23 +2052,33 @@ async function checkPreview(graphics: GraphicsLoader): Promise<void> {
     game.systems.hallOfChampions.addChampion(healthyChampion('LEYLA'));
     rig.clickRow(0);
     const fromHeading = drawn();
-    const onHeading = statusInk();
     check(SaveMenu.selectedEntry(ui.saveMenu!) === null && fromHeading === firstDrawn,
       'a heading shows the save LOAD reads from it, its playthrough\'s last save used');
-    check(onHeading === 0, 'and a move of the selection leaves the line under the list empty');
     await rig.click(g.saveButtonId);
     const second = SaveMenu.selectedEntry(ui.saveMenu!)!;
     const secondLines = formatSavePreview(second);
+    reselect();
     console.log(`  a save of DAROO and LEYLA, a minute on: ${JSON.stringify(secondLines)}`);
     console.log(`    lines ${inked()}`);
     const secondDrawn = drawn();
     check(secondLines[1] === 'LEYLA' && secondLines[12] === '14:06' && inked() === expected(secondLines) && secondDrawn !== firstDrawn,
       'another save shows its own party and its own time');
     rig.select(first.id);
-    const back = drawn();
-    const onSave = statusInk();
-    check(back === firstDrawn, 'and the first, selected again, its own as before');
-    check(onSave === 0, 'with a save selected and nothing to report, the line under the list is empty: the party is the preview\'s');
+    check(drawn() === firstDrawn, 'and the first, selected again, its own as before');
+
+    // A message longer than a line takes the lines it needs, over the preview's.
+    const state2 = ui.saveMenu!;
+    state2.message = 'THE SAVE FILE DOES NOT READ BACK';
+    const wrapped = SaveMenu.wrapMessage(state2.message, g.previewMaxChars);
+    const over = g.rows - wrapped.length;
+    console.log(`  a message of ${wrapped.length} lines, ${JSON.stringify(wrapped)}: lines ${inked()}`);
+    check(wrapped.length === 4 && inked() === expected(firstLines, wrapped.length)
+      && inkOf(MENU_TITLE1_COLOR, 0, over - 1) === 0 && inkOf(MENU_OPTION_COLOR, over, g.rows - 1) === 0 && stray() === 0,
+      'a longer message takes the panel\'s last lines, as many as it wraps to, and the preview\'s lines there are not drawn');
+    state2.message = 'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z';
+    check(inkOf(MENU_TITLE1_COLOR, 0, g.rows - 6) === 0 && inkOf(MENU_TITLE1_COLOR, g.rows - 5, g.rows - 5) > 0,
+      'and five lines at most, whatever its length');
+    state2.message = '';
 
     // The heading again: the last save used is now the second.
     rig.clickRow(0);

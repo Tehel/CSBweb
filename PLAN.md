@@ -313,7 +313,7 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   heading folds or unfolds it, and so do the left and right arrows. A game with no save
   yet has no heading, and the full menu a first row, "NEW SAVE", in its place. The
   files that name no playthrough are listed as one, until step 4 leaves none.
-- **The list scrolls** under its fourteen rows. Where rows lie above the first one
+- **The list scrolls** under its fifteen rows. Where rows lie above the first one
   shown, that row's last character is a mark, `^`, and where rows lie below the last,
   that one's is `V`: the font has no arrow. A click on a mark scrolls by a page less a
   row, the wheel by a row, and neither moves the selection, which may leave the panel;
@@ -323,8 +323,11 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   the panel each, on the list's rows (`formatSavePreview`,
   `src/data/saves/SaveStore.ts`): the champions' names without their titles, the level,
   the play time as `H:MM:SS`, and the day and the time it was saved. A party of fewer
-  than four leaves its lines empty, so the rest stands in one place for every save. The
-  line under the list is left to what went wrong, what was done and "WORKING . . .".
+  than four leaves its lines empty, so the rest stands in one place for every save.
+- **The dialog's message**, what went wrong, what was done or "WORKING...", is the last
+  lines of the preview's panel, in the title's colour: wrapped at the panel's width
+  (`wrapMessage`, `src/renderer/ui/SaveMenu.ts`), five lines at most, over whatever
+  lines of the preview it needs. A move of the selection takes it down.
 - **LOAD, SAVE, EXPORT**, and a drop for the import. No delete, no quit and no "SAVE AND
   QUIT": loading another playthrough's save is how a player leaves a game.
 - **No "GAME LOADED, READY TO PLAY."**, nor its "ASCII DUMP" (`DEBT.md` G14): a
@@ -386,7 +389,9 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
 3. ✅ **The dialog**, one commit each:
    - a. ✅ **The frame**: the dialog in its rectangle on the cleared screen, drawn from
      graphic 0's pieces (`drawPiece`, `src/renderer/ui/SaveMenu.ts`). The list is
-     fourteen rows over its status line; LOAD, SAVE and CANCEL are buttons, and EXPORT's frame has no label until step 4; the question is
+     fifteen rows, which fill its panel with two pixels of it above and below; LOAD,
+     SAVE and CANCEL are buttons, and EXPORT's frame has no label until step 4; the
+     question is
      centred. Evidence: `tools/dump-save-menu.ts`, "the dialog's pieces of graphic 0"
      (each piece at its own size is the art), "the dialog" (the margins, and clean
      panel under every row and label), "the menu button sets" (a frame's rectangle and
@@ -403,12 +408,14 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      another's; the "new save" row of a game with no save; the load-only chooser), and
      "the menu's selection" (the arrows).
    - c. ✅ **The preview**, in its panel (`drawSaveMenu`, `src/renderer/ui/SaveMenu.ts`);
-     the status line keeps what went wrong, what was done and "WORKING . . ." alone.
+     the dialog's message, what went wrong, what was done or "WORKING...", is the
+     panel's last lines.
      Evidence: `tools/dump-save-menu.ts`, "the dialog" (eleven characters fit the
      panel), "the list" (a play time's format, and a preview's lines) and "the preview"
      (the panel read back: which rows hold ink and that none leaves the lines' cells;
      "NEW SAVE" showing nothing, a heading its last save used, and the load-only
-     chooser the same; the line under the list empty on a save with nothing to report).
+     chooser the same; a message on the panel's last lines, as many as it wraps to,
+     and taken down by a move of the selection).
      The golden frame shows the "NEW SAVE" row, whose preview is empty.
    - d. ✅ **The scrolling**: the marks, a click on one and the wheel (`rowsBeyond`,
      `scrollBy` and `showSelection`, `src/renderer/ui/SaveMenu.ts`). Evidence:
@@ -534,7 +541,7 @@ NOW" with no party, with a champion still being chosen, or while a script holds 
 and "CANNOT LOAD NOW" for that last; CSBWin's own "UNABLE TO SAVE GAME!"
 (`doc/CSBwin-src/SaveGame.cpp:1266`) and "CAN'T FIND SAVED GAME!" (`:1585`) for a write
 that failed and for no save at all; a file that does not read gives the line the menu's
-status would show. Each outcome is also a line for the console, with the save's name,
+message would be. Each outcome is also a line for the console, with the save's name,
 and with the error behind a failure. CANCEL, Esc and a right-click close the menu. The
 five places it
 diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`, with the menu

@@ -50,7 +50,7 @@
  * LOAD reads the selected save, and from a heading the last save used of its playthrough.
  * On "NEW SAVE" there is nothing to load, so it is inert.
  *
- * The panel shows fourteen rows. Where rows lie above the first one shown, that row's
+ * The panel shows fifteen rows, which fill it. Where rows lie above the first one shown, that row's
  * last character is a mark, `^`, and where rows lie below the last, that one's is `V`
  * (`rowsBeyond`). A click on a mark scrolls the list by a page less one row, so the row
  * at the edge stays in view, and the wheel scrolls it a row at a time. Neither moves the
@@ -63,7 +63,9 @@
  * save, or from a heading the last save used of its playthrough, and nothing on "NEW
  * SAVE". Its lines are the list's rows, eleven characters each (`formatSavePreview`): the
  * champions' names, the level, the play time, and the day and the time it was saved. The
- * line under the list is left to what went wrong, what was done, and "WORKING . . .".
+ * panel's last lines are the dialog's message, when it has one: what went wrong, what was
+ * done, or that it is working, wrapped at the panel's width (`wrapMessage`) and drawn
+ * over whatever lines of the preview it needs.
  *
  * ## The question
  *
@@ -156,12 +158,15 @@ const TEXT_X = LIST_PANEL.x1 + 4;
 const TEXT_MAX_CHARS = 33;
 const ROW_FIRST_Y = LIST_PANEL.y1 + 9;
 const ROW_STEP = 8;
-export const SAVE_MENU_ROWS = 14;
-const STATUS_Y = ROW_FIRST_Y + SAVE_MENU_ROWS * ROW_STEP + 1;
+/** The rows fill the panel: two pixels of it above the first, and two below the last. */
+export const SAVE_MENU_ROWS = 15;
 
 /** The preview's lines are on the list's rows: eleven characters between its panel's edges. */
 const PREVIEW_TEXT_X = PREVIEW_PANEL.x1 + 4;
 const PREVIEW_MAX_CHARS = 11;
+/** The most lines a message takes at the foot of the preview's panel. */
+const MESSAGE_MAX_LINES = 5;
+const WORKING_MESSAGE = 'WORKING...';
 
 /** The marks' place in a row: its last character, which only a heading of four long names reaches. */
 const MARK_X = TEXT_X + (TEXT_MAX_CHARS - 1) * 6;
@@ -222,7 +227,6 @@ export const SAVE_MENU_GEOMETRY = {
   rowFirstY: ROW_FIRST_Y,
   rowStep: ROW_STEP,
   rows: SAVE_MENU_ROWS,
-  statusY: STATUS_Y,
   previewTextX: PREVIEW_TEXT_X,
   previewMaxChars: PREVIEW_MAX_CHARS,
   markX: MARK_X,
@@ -258,7 +262,7 @@ export interface SaveMenuState {
   scrollTop: number;
   /** An async list/read/write is in flight; every button is inert. */
   busy: boolean;
-  /** The line under the list: an error, or what the last action did. */
+  /** The dialog's message, at the foot of the preview's panel: an error, or what the last action did. */
   message: string;
   press: MenuPress | null;
   /** What the press animation will do when it finishes. */
@@ -312,7 +316,7 @@ export function closeSaveMenu(ui: UIState): void {
 
 /* ------------------------------------------------------------------ the list ---- */
 
-/** List the saves again. Never throws — the failure becomes the status line. */
+/** List the saves again. Never throws — the failure becomes the dialog's message. */
 export async function refreshSaveMenu(ui: UIState): Promise<void> {
   const state = ui.saveMenu;
   if (!state) return;
@@ -334,7 +338,26 @@ export async function refreshSaveMenu(ui: UIState): Promise<void> {
 
 function shortError(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error);
-  return text.toUpperCase().slice(0, TEXT_MAX_CHARS);
+  return text.toUpperCase();
+}
+
+/**
+ * A message as lines of `maxChars` at most, broken at its spaces; a word longer than a
+ * line is cut at the line's end.
+ */
+export function wrapMessage(message: string, maxChars: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  for (let word of message.split(' ').filter((w) => w.length > 0)) {
+    if (line && line.length + 1 + word.length > maxChars) {
+      lines.push(line);
+      line = '';
+    }
+    for (; word.length > maxChars; word = word.slice(maxChars)) lines.push(word.slice(0, maxChars));
+    line = line ? `${line} ${word}` : word;
+  }
+  if (line) lines.push(line);
+  return lines;
 }
 
 /** The running game's playthrough, `d.RandomGameID`: never 0 (`drawRandomGameID`). */
@@ -571,23 +594,26 @@ export function drawSaveMenu(ui: UIState): void {
     if (row === SAVE_MENU_ROWS - 1 && beyond.below) text(ui, MARK_BELOW, MARK_X, y, color, background);
   }
 
-  // The status line: whatever went wrong, or what was done.
-  const status = state.busy ? 'WORKING . . .' : state.message;
-  if (status) text(ui, status, TEXT_X, STATUS_Y, MENU_TITLE1_COLOR, MENU_PANEL_COLOR);
   if (state.rows.length === 0 && !state.busy && !state.message) {
     // An empty list has to say so, which the load-only menu's can be; when the store
-    // could not be listed, the status line says why, and repeating that here would only
+    // could not be listed, the message says why, and repeating that here would only
     // crowd the panel.
     text(ui, 'NO SAVED GAMES HERE', TEXT_X, ROW_FIRST_Y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
   }
 
-  // The preview: the save LOAD would read.
+  // The preview's panel: the save LOAD would read, and on its last lines the message,
+  // whatever went wrong or what was done.
+  const message = wrapMessage(state.busy ? WORKING_MESSAGE : state.message, PREVIEW_MAX_CHARS).slice(0, MESSAGE_MAX_LINES);
+  const messageRow = SAVE_MENU_ROWS - message.length;
   const previewed = loadTarget(state);
   if (previewed) {
     formatSavePreview(previewed, PREVIEW_MAX_CHARS).forEach((line, row) => {
-      if (line) text(ui, line, PREVIEW_TEXT_X, ROW_FIRST_Y + row * ROW_STEP, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
+      if (line && row < messageRow) text(ui, line, PREVIEW_TEXT_X, ROW_FIRST_Y + row * ROW_STEP, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
     });
   }
+  message.forEach((line, i) => {
+    text(ui, line, PREVIEW_TEXT_X, ROW_FIRST_Y + (messageRow + i) * ROW_STEP, MENU_TITLE1_COLOR, MENU_PANEL_COLOR);
+  });
 
   // A button that can do nothing is left unlabelled, as CSBWin leaves an empty save
   // slot unlabelled.
@@ -796,7 +822,7 @@ async function doLoad(ui: UIState, state: SaveMenuState): Promise<void> {
  * Restore the save the player chose, and close the menu: after a load the world it was
  * listing is gone.
  *
- * A read that fails in the full menu throws, and its message goes on the status line
+ * A read that fails in the full menu throws, and its message is the dialog's
  * (`runPending`). The load-only chooser is `_ReadEntireGame`'s, where every failed read
  * ends at `tag01efee` instead (`doc/CSBwin-src/SaveGame.cpp:1741-1742`, `:1895`): it
  * closes, and `onRestoreFailed` hands the failure to its caller
