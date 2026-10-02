@@ -142,9 +142,13 @@ Only the phases with work left in them.
 
 ### Phase 10 — CSBWin-Compatible Save/Load
 
-Goal: read and write a save file CSBWin itself can load. **Reading and writing are done**;
-what is left is the rework of the save menu. What the file cannot carry for a dungeon with
-DSAs or an enciphered file is postponed with them (`DEBT.md` G1, G4).
+Goal: read and write a save file CSBWin itself can load. **Reading and writing are done,
+and so is every step of the save menu's rework**; what is left is closing the phase (the
+head of this file says how): "Deferred" below lifted into `DEBT.md`, what "The rework"
+settles written into `doc/` (`doc/CSBWIN_MENU_REFERENCE.md` has the menu's divergences
+already), this body deleted, and `DEBT.md`'s `P10` row with it. What the file cannot
+carry for a dungeon with DSAs or an enciphered file is postponed with them (`DEBT.md`
+G1, G4).
 
 #### The rework
 
@@ -177,7 +181,10 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   selected save's bare `.dat`, which CSBWin opens: the row's bytes as the store holds
   them, under the row's name (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`).
   What the row alone holds, its date, its play time and whether F5 wrote it, stays
-  behind. **Import** is a `.dat` dropped on the canvas while the dialog is up; there is
+  behind. **Import** is a `.dat` dropped on the page while the dialog is up, the disk
+  menu's or the entrance's chooser (`bindSaveDrop`, `src/ui/saveDrop.ts`): the whole
+  page, since the CRT effect shows a canvas of its own over the game's, and a file
+  dropped with no dialog up is swallowed rather than opened by the browser. There is
   no file picker. The row keeps the file's name, numbered while a save has it, and
   the file's date, as CSBWin ranks its slots by their files' `MODIFIEDTIME`
   (`doc/CSBwin-src/CSBCode.cpp:9766-9800`); it counts no time played, and is the last
@@ -351,7 +358,17 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   (`wrapMessage`, `src/renderer/ui/SaveMenu.ts`), five lines at most, over whatever
   lines of the preview it needs. A move of the selection takes it down.
 - **LOAD, SAVE, EXPORT**, and a drop for the import. No delete, no quit and no "SAVE AND
-  QUIT": loading another playthrough's save is how a player leaves a game. **EXPORT is
+  QUIT": loading another playthrough's save is how a player leaves a game. **A dropped
+  save of the dungeon is listed at once**, selected, under "SAVE IMPORTED", and nothing
+  is loaded (`saveMenuDrop`, `src/renderer/ui/SaveMenu.ts`). The dialog takes no drop
+  while it is working, pressing a button or asking. What is not stored is said in
+  `_DoMenu`'s centred menu in the dialog's place (`importMenu`): the question for a
+  modified dungeon, "THIS LOOKS LIKE A SAVE FROM A MODIFIED VERSION OF" over the
+  dungeon's name, with CONFIRM and CANCEL; and under OK alone, "THIS LOOKS LIKE A SAVE
+  OF" the other dungeon, with "SWITCH TO IT TO IMPORT IT" or, for a dungeon no data set
+  plays, "NOT SUPPORTED YET", or "THIS IS A SAVE OF AN UNKNOWN DUNGEON". Esc and a
+  right-click dismiss either. A file that does not read is the dialog's message.
+  **EXPORT is
   for the selected save**, and has no label on a heading or on "NEW SAVE", where none
   is: a heading's preview is of the save LOAD would read, and EXPORT does not take it.
   It leaves the game alone, so it never asks, whatever the save's playthrough, and the
@@ -460,9 +477,8 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      listeners are bound (`createIntroHost`, `src/renderer/intro/BootSequence.ts`):
      the frames probe checks that either menu takes a notch and the entrance none,
      and that the chooser's selection follows the arrow keys.
-4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it, one
-   commit each. Until the import a `.dat` on disk has no way into the page, the
-   committed saves included: the store's rows are the only saves it loads.
+4. ✅ **Export and import**, with the dungeon check and the catalogue behind it, one
+   commit each.
    - a. ✅ **No stored save holds playthrough 0** ("A playthrough"): the stamp
      (`stampRandomGameID`), and the store's version-3 upgrade, which stamps the rows of
      an earlier version (`stampSaveRecords`, run by `idb.ts`). Evidence:
@@ -488,7 +504,7 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      entrance's chooser, in a Chrome told to announce a download and keep none, and
      checks that one starts, a `.dat` under the save's name.
    - c. ✅ **A dungeon's signature, and the catalogue** of the known dungeons'
-     (`src/data/DungeonSignature.ts`). Nothing in the page calls it yet. Evidence:
+     (`src/data/DungeonSignature.ts`). Evidence:
      `tools/dump-dungeon-signature.ts` (the digest's input on a level made by hand, and
      the digest against `node:crypto`'s; every data set's `dungeon.dat` and CSB's
      `mini.dat` a catalogue dungeon that lists the set, whole, no entry without its
@@ -507,7 +523,7 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      whole dungeon that lists `GameSaves.dataSet`; the `csb` set has two. Most of such
      a dungeon and not the whole, it is a modified dungeon's, stored only once
      confirmed, as an unofficial row; anything else is refused (`checkDungeon`,
-     `src/data/DungeonSignature.ts`). Nothing in the page calls it yet. Evidence:
+     `src/data/DungeonSignature.ts`). Evidence:
      `tools/dump-save-menu.ts`, "the import" (a genuine save stored under its file's
      name, date and playthrough, byte for byte, and again under a numbered name; a
      file that names no playthrough joined to its party's or given the first its
@@ -520,9 +536,22 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      `tools/dump-dungeon-signature.ts`, section 6 (`checkDungeon` in each of the four
      Dungeon Master sets and in `csb`, one level of fourteen being a modified
      version, and a known dungeon no data set plays).
-   - e. ⏳ **The drop and the dialog's answers**: a `.dat` dropped on the canvas while
+   - e. ✅ **The drop and the dialog's answers**: a `.dat` dropped on the page while
      the dialog is up, in play and at the entrance; the question for a modified
      dungeon, the refusal with the dungeon named, and the imported save selected.
+     Evidence: `tools/dump-save-menu.ts`, "the drop" (every known dungeon's two menus
+     within the title panel's four lines of 33 characters; no drop taken with no
+     dialog up; a genuine save listed, selected and previewed under "SAVE IMPORTED",
+     nothing loaded; a save with one wall opened asked about, the screen `_DoMenu`'s
+     own drawing of the question, which a click off its buttons, Enter, the wheel and
+     another drop leave up, CANCEL, Esc and a right-click take down with nothing
+     stored, and CONFIRM answers with an unofficial row; a Chaos Strikes Back save
+     and one of an unknown dungeon refused under OK; a text file as the dialog's
+     message; no drop taken during a press; the load-only chooser importing a
+     genuine save, which LOAD then plays). The page's listener no Node tool runs:
+     the frames probe drops the `csb` set's save on the entrance's chooser, and
+     checks that the page takes it, that a menu comes up, and that its OK brings the
+     chooser back with nothing more listed.
 5. ✅ **No "GAME LOADED, READY TO PLAY."** Evidence: `tools/dump-bad-saved-game.ts`, "a
    save read" (the hand-off after a load is one fade and four VBLs on a cleared screen,
    and waits for no click), and the golden frame `tools/frames/12-game-loaded.png`: the
@@ -624,7 +653,9 @@ data set has none. LOAD reads the selected save, or from a heading its playthrou
 last save used. SAVE writes over the selected save, or from the game's own heading or
 "NEW SAVE" makes a new row, its file a `.dat` named for its date. Either asks first on a
 save of another playthrough than the running game's. EXPORT downloads the selected
-save's file, and asks nothing. All three,
+save's file, and asks nothing. A save file dropped on the page while the menu is up is
+imported: stored and selected when it is of the data set's dungeon, asked about when it
+is of a modified version of it, and refused when it is of another. All four,
 and the two keys, go through `GameSaves` (`src/engine/GameSaves.ts`). F5
 writes its playthrough's quick-save, over the last, and F9 loads the newest save of its
 playthrough, F5's or the menu's. Each key says what it
@@ -635,7 +666,7 @@ and "CANNOT LOAD NOW" for that last; CSBWin's own "UNABLE TO SAVE GAME!"
 that failed and for no save at all; a file that does not read gives the line the menu's
 message would be. Each outcome is also a line for the console, with the save's name,
 and with the error behind a failure. CANCEL, Esc and a right-click close the menu. The
-six places it diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`,
+seven places it diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`,
 with the menu the boot leaves out after a load. Evidence:
 `tools/dump-save-menu.ts` and the golden frame `tools/frames/06-savemenu.png`.
 

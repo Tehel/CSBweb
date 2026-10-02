@@ -71,11 +71,13 @@ import {
   isSaveMenuOpen,
   openSaveMenu,
   saveMenuClick,
+  saveMenuDrop,
   saveMenuKey,
   saveMenuWheel,
   type SaveMenuMode,
 } from './ui/SaveMenu';
 import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
+import type { ImportedFile } from '../engine/GameSaves';
 import { drawInventoryBackground, drawInventoryScreen, repackOpenChest, syncOpenChest } from './ui/Inventory';
 import { drawCharacterState, drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
 import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
@@ -90,6 +92,7 @@ export type GameScreenHooks = Pick<UIState,
   | 'onReadSave'
   | 'onSaveGame'
   | 'onExportSave'
+  | 'onImportSave'
   | 'onRestoreSave'
   | 'onRestoreFailed'
 >;
@@ -171,6 +174,7 @@ export class GameScreen {
       onReadSave: hooks.onReadSave,
       onSaveGame: hooks.onSaveGame,
       onExportSave: hooks.onExportSave,
+      onImportSave: hooks.onImportSave,
       onRestoreSave: hooks.onRestoreSave,
       onRestoreFailed: hooks.onRestoreFailed,
     });
@@ -298,6 +302,11 @@ export class GameScreen {
 
   handleSaveMenuWheel(delta: number): boolean {
     return saveMenuWheel(this.ui, delta);
+  }
+
+  /** A file dropped on the page while the save screen is up: its import. Says whether it was taken. */
+  handleSaveMenuDrop(file: ImportedFile): boolean {
+    return saveMenuDrop(this.ui, file);
   }
 
   /** `CHARDESC.portrait`, as the status box draws it; the won screen draws it too. */

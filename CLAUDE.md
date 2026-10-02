@@ -89,8 +89,8 @@ There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is 
   the 320x200 canvas read back as pixels, and the comparison is pixel-wise, so a baseline
   captured on one machine is checkable on another. The probe also asserts on the spot what
   no frame shows: the CRT effect, which needs a Chrome that gives WebGL, the wheel
-  and the keys reaching a save menu, at the entrance as in play, and the download its
-  EXPORT starts.
+  and the keys reaching a save menu, at the entrance as in play, the download its
+  EXPORT starts, and a file dropped on it.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`
@@ -160,7 +160,8 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
   ui/       The DM interface, one module per CSBWin file — Mouse, Inventory, Character,
             MagicPanel, Feeding, Objects, Draw, HitTest, ViewportPicking, all over
             a shared UIState. See doc/UI_MODULE_MAP.md.
-ui/         DOM-side debug chrome (settings, map preview, champion panel)
+ui/         DOM-side debug chrome (settings, map preview, champion panel), and saveDrop
+            (the save menu's import: a file dropped on the page)
 lib/        glfx (the CRT effect's WebGL) and its loader
 main.ts     Bootstrap and wiring
 ```

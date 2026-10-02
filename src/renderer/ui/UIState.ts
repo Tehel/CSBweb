@@ -8,6 +8,7 @@
  */
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
 import type { OpenedSave, SaveEntry } from '../../data/saves';
+import type { ImportResult, ImportedFile } from '../../engine/GameSaves';
 import type { GameContext } from '../../engine/GameContext';
 import type { PartyState } from '../../engine/gameTypes';
 import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
@@ -201,6 +202,13 @@ export interface UIState {
    * downloads it (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`).
    */
   readonly onExportSave: (entry: SaveEntry) => Promise<void>;
+  /**
+   * Take a file dropped on the save/load screen into the store, a modified dungeon's
+   * once `confirmed`; resolves to the row it was stored as, or to why it was not
+   * (`GameSaves.importSave`, `src/engine/GameSaves.ts`). Throws with a short message on a
+   * file that does not read.
+   */
+  readonly onImportSave: (file: ImportedFile, confirmed: boolean) => Promise<ImportResult>;
   /** Restore an opened save into the running game. Throws with a short message on refusal. */
   readonly onRestoreSave: (save: OpenedSave) => void;
   /**
@@ -275,7 +283,7 @@ export type UISources = Pick<UIState,
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
-  | 'onReincarnated' | 'onListSaves' | 'onReadSave' | 'onSaveGame' | 'onExportSave' | 'onRestoreSave' | 'onRestoreFailed'>;
+  | 'onReincarnated' | 'onListSaves' | 'onReadSave' | 'onSaveGame' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {

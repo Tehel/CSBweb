@@ -78,6 +78,11 @@
  *    modified dungeon stored only once confirmed, as an unofficial row, which the saves
  *    of a game read from it are too; another dungeon's, an unknown one's and a file that
  *    does not read never stored.
+ * 19. **The drop.** A file dropped on the dialog, by the menu's own entry and clicks: a
+ *    save of the dungeon listed and selected with nothing loaded; a modified dungeon's
+ *    asked about in `_DoMenu`'s two-option menu and stored on CONFIRM alone; another
+ *    dungeon's and an unknown one's refused under OK; a file that does not read in the
+ *    dialog's message; and the load-only chooser taking a drop as the disk menu does.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -114,6 +119,7 @@ import {
 } from '../src/data/saves/SaveStore';
 import { stampSaveRecords, upgradeSaveRecords } from '../src/data/saves/legacyRows';
 import { DEFAULT_DATA_SET, dataSetFor } from '../src/data/DataSets';
+import { KNOWN_DUNGEONS } from '../src/data/DungeonSignature';
 import { Game } from '../src/engine/Game';
 import type { GameHost, MessageSink } from '../src/engine/GameHost';
 import { freeze, thaw, type LoopScript } from '../src/engine/LoopState';
@@ -366,7 +372,7 @@ function checkLayout(graphics: GraphicsLoader): void {
 
   const blank: SaveMenu.SaveMenuState = {
     mode: 'full', entries: [], unfolded: new Set(), rows: [], selected: -1, scrollTop: 0, busy: true, message: '',
-    press: null, pending: null, confirm: null, frameHandle: null, lastSaveClick: null,
+    press: null, pending: null, confirm: null, dropped: null, frameHandle: null, lastSaveClick: null,
   };
   ui.saveMenu = blank;
   ui.screenIndexBuffer!.pixels.fill(7);
@@ -1387,6 +1393,7 @@ async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: str
     onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
     // As the page's, with the download kept instead of made.
     onExportSave: async (listed) => { exported.push({ name: listed.name, bytes: (await saves.open(listed)).bytes }); },
+    onImportSave: (file, confirmed) => saves.importSave(file, confirmed),
     onRestoreSave: (save) => saves.read(save),
   });
   const g = SaveMenu.SAVE_MENU_GEOMETRY;
@@ -1408,6 +1415,12 @@ async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: str
       for (let i = 0; i < 300 && ui.saveMenu && (ui.saveMenu.busy || ui.saveMenu.press); i++) {
         await new Promise((done) => setTimeout(done, 10));
       }
+    },
+    /** A file dropped on the dialog, and the wait for its import; whether the dialog took it. */
+    async drop(name: string, bytes: Uint8Array): Promise<boolean> {
+      const taken = SaveMenu.saveMenuDrop(ui, { name, bytes });
+      await this.settled();
+      return taken;
     },
     /** A click on row `row` of the list, which is in view. */
     clickRow(row: number): void {
@@ -2627,6 +2640,158 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
   }
 }
 
+/* ------------------------------------------------------------------ 19. the drop ---- */
+
+/** The most characters a line of `_DoMenu`'s title panel holds, inside its edges: 200 pixels of six. */
+const TITLE_MAX_CHARS = 33;
+
+/**
+ * Files dropped on the dialog (`saveMenuDrop`), its hook the page's (`menuRig`): what is
+ * listed, what is asked and what is refused, each menu against `_DoMenu`'s own drawing.
+ */
+async function checkDrop(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== the drop ===');
+  const store = memoryStore();
+  const daroo = await menuRig(graphics, store, 'DAROO');
+  const { ui } = daroo;
+  const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));
+  const rowsOf = async (): Promise<string> => JSON.stringify(await store.list(null));
+  /** Whether the screen is `_DoMenu`'s centred menu of these titles and options, on the cleared screen. */
+  const isMenu = (title1: string, title2: string | null, options: string[]): boolean => {
+    SaveMenu.drawSaveMenu(ui);
+    const drawn = ui.screenIndexBuffer!.pixels.slice();
+    ui.screenIndexBuffer!.pixels.fill(0);
+    doMenu(ui, title1, title2, options, true);
+    return drawn.every((p, i) => p === ui.screenIndexBuffer!.pixels[i]);
+  };
+  /** The lines `_DoMenu` draws a menu's titles as. */
+  const linesOf = (menu: { title1: string; title2: string | null }): string[] =>
+    [menu.title1, menu.title2].flatMap((title) => (title === null ? [] : splitLongLine(title) ?? [title]));
+
+  // Every menu a known dungeon can bring up fits the title panel.
+  for (const dungeon of KNOWN_DUNGEONS) {
+    const menus = [SaveMenu.importMenu({ kind: 'modified', dungeon }), SaveMenu.importMenu({ kind: 'other', dungeon })];
+    for (const menu of menus) console.log(`  ${dungeon.name}: ${linesOf(menu).join(' / ')}  [${menu.options.join(', ')}]`);
+    check(menus.every((menu) => linesOf(menu).length <= 4 && linesOf(menu).every((line) => line.length > 0 && line.length <= TITLE_MAX_CHARS)),
+      `${dungeon.name}: both its menus are four lines at most, none wider than the title panel`);
+  }
+  const unknownMenu = SaveMenu.importMenu({ kind: 'unknown' });
+  console.log(`  an unknown dungeon: ${linesOf(unknownMenu).join(' / ')}  [${unknownMenu.options.join(', ')}]`);
+  check(linesOf(unknownMenu).every((line) => line.length <= TITLE_MAX_CHARS) && unknownMenu.options.join() === 'OK', 'nor is the unknown dungeon\'s');
+  const unplayed = SaveMenu.importMenu({ kind: 'other', dungeon: { name: 'Elsewhere', dataSets: [], signature: [] } });
+  check(unplayed.title1 === 'THIS LOOKS LIKE A SAVE OF ELSEWHERE' && unplayed.title2 === 'NOT SUPPORTED YET' && unplayed.options.join() === 'OK',
+    'a known dungeon no data set plays is "NOT SUPPORTED YET", where one that a set plays is "SWITCH TO IT TO IMPORT IT"');
+  check(SaveMenu.importMenu({ kind: 'other', dungeon: KNOWN_DUNGEONS[1] }).title2 === 'SWITCH TO IT TO IMPORT IT', 'as Chaos Strikes Back is');
+
+  const realNow = Date.now;
+  let now = new Date(2026, 9, 2, 10, 0, 0).getTime();
+  Date.now = () => now;
+  try {
+    check(!(await daroo.drop('CSBGAME7.DAT', read(savePath('csbgame7.dat')))) && store.files.size === 0, 'with no dialog up a drop is not taken');
+    const own = await daroo.saves.save('stopped', 'new');
+    now += 60_000;
+    const state = await daroo.open();
+
+    // A save of the data set's dungeon.
+    const genuine = read(savePath('csbgame7.dat'));
+    const taken = await daroo.drop('CSBGAME7.DAT', genuine);
+    console.log(`  csbgame7.dat dropped: "${state.message}"`);
+    console.log(daroo.list());
+    check(taken && store.files.size === 2 && state.message === SaveMenu.SAVE_MENU_IMPORTED && !state.busy && SaveMenu.isSaveMenuOpen(ui),
+      `a save of the data set's dungeon is stored at once: the dialog stays up and says "${SaveMenu.SAVE_MENU_IMPORTED}"`);
+    check(SaveMenu.selectedEntry(state)?.id === 'CSBGAME7.DAT' && SaveMenu.loadTarget(state)?.champions.join('/') === 'HISSSSA/SONJA/GOTHMOG/WUUF'
+      && daroo.rowOf(own.id) >= 0, 'it is listed and selected, its playthrough unfolded beside the game\'s, and previewed');
+    check(daroo.party() === 'DAROO' && state.dropped === null && SaveMenu.asksFirst(ui, state, 'load'),
+      'nothing is loaded; LOAD on it asks, as on any save of another playthrough');
+    check(wrapMessageFits(SaveMenu.SAVE_MENU_IMPORTED), 'the message fits the preview\'s panel');
+    now += 60_000;
+
+    // A save of a modified version of it: the question.
+    const modified = await saveOfDungeon('WUUF', 0x00f00f, (level, cellFlags) => { if (level === 3) openAWall(cellFlags); });
+    const before = await rowsOf();
+    await daroo.drop('modified.dat', modified);
+    console.log(`  a save with a wall of level 3 opened, dropped: ${state.dropped ? `asks (${state.dropped.refusal.kind})` : 'NO QUESTION'}`);
+    check(state.dropped?.refusal.kind === 'modified' && !state.busy && (await rowsOf()) === before,
+      'a save of a modified version of the dungeon is asked about, and nothing is stored');
+    check(isMenu(SaveMenu.SAVE_MENU_MODIFIED, 'DUNGEON MASTER', ['CONFIRM', 'CANCEL']),
+      `the question is _DoMenu's two-option menu, centred on the cleared screen: "${SaveMenu.SAVE_MENU_MODIFIED}" over "DUNGEON MASTER", CONFIRM, CANCEL`);
+    SaveMenu.saveMenuClick(ui, VIEWPORT_X + 4, VIEWPORT_Y + 4, LEFT);
+    SaveMenu.saveMenuKey(ui, 'Enter');
+    SaveMenu.saveMenuWheel(ui, 1);
+    const second = await daroo.drop('CSBGAME7.DAT', genuine);
+    check(state.dropped?.refusal.kind === 'modified' && state.press === null && state.scrollTop === 0 && !second && (await rowsOf()) === before,
+      'a click off its buttons, Enter, the wheel and another drop leave it up');
+    await daroo.click(211, 2);
+    check(state.dropped === null && SaveMenu.isSaveMenuOpen(ui) && state.message === '' && (await rowsOf()) === before
+      && SaveMenu.selectedEntry(state)?.id === 'CSBGAME7.DAT', 'CANCEL brings the list back as it was, and stores nothing');
+    await daroo.drop('modified.dat', modified);
+    SaveMenu.saveMenuKey(ui, 'Escape');
+    const afterEscape = state.dropped;
+    await daroo.drop('modified.dat', modified);
+    SaveMenu.saveMenuClick(ui, VIEWPORT_X + 4, VIEWPORT_Y + 4, RIGHT);
+    check(afterEscape === null && state.dropped === null && SaveMenu.isSaveMenuOpen(ui) && (await rowsOf()) === before,
+      'Esc and a right-click cancel the question, not the dialog');
+    await daroo.drop('modified.dat', modified);
+    await daroo.click(210, 2);
+    const stored = (await store.list(null)).find((row) => row.id === 'modified.dat');
+    console.log(`  CONFIRM: "${state.message}", the row ${stored ? `of set ${stored.dataSet}${stored.unofficial ? ', unofficial' : ', OFFICIAL'}` : 'NOT STORED'}`);
+    console.log(daroo.list());
+    check(state.dropped === null && state.message === SaveMenu.SAVE_MENU_IMPORTED && stored?.unofficial === true && stored.dataSet === DEFAULT_DATA_SET.id,
+      'CONFIRM stores it, a row of the running data set, unofficial');
+    check(SaveMenu.selectedEntry(state)?.id === 'modified.dat' && store.files.size === 3, 'and it is listed and selected');
+    now += 60_000;
+
+    // Another dungeon's, and an unknown one's: refused.
+    const held = await rowsOf();
+    await daroo.drop('CSBGAME2.DAT', read(CSB_SAVE));
+    console.log(`  a Chaos Strikes Back save dropped: ${state.dropped ? `refused (${state.dropped.refusal.kind})` : 'NO MENU'}`);
+    check(state.dropped?.refusal.kind === 'other'
+      && isMenu('THIS LOOKS LIKE A SAVE OF CHAOS STRIKES BACK', 'SWITCH TO IT TO IMPORT IT', ['OK']),
+      'a save of another dungeon is refused in _DoMenu\'s one-option menu: the dungeon named, "SWITCH TO IT TO IMPORT IT", OK');
+    await daroo.click(210, 1);
+    check(state.dropped === null && SaveMenu.isSaveMenuOpen(ui) && (await rowsOf()) === held && SaveMenu.selectedEntry(state)?.id === 'modified.dat',
+      'OK brings the list back as it was');
+    await daroo.drop('unknown.dat', await saveOfDungeon('BORIS', 0x0b0215, (_level, cellFlags) => openAWall(cellFlags)));
+    check(state.dropped?.refusal.kind === 'unknown' && isMenu('THIS IS A SAVE OF AN UNKNOWN DUNGEON', 'NOT SUPPORTED YET', ['OK']),
+      'a save of an unknown dungeon the same: "THIS IS A SAVE OF AN UNKNOWN DUNGEON", "NOT SUPPORTED YET", OK');
+    SaveMenu.saveMenuKey(ui, 'Escape');
+    check(state.dropped === null && (await rowsOf()) === held, 'which Esc dismisses too');
+
+    // A file that does not read, and a drop while the dialog is at something else.
+    await daroo.drop('notes.txt', new TextEncoder().encode('not a save'));
+    console.log(`  a text file dropped: "${state.message}"`);
+    check(state.message === SAVED_GAME_DAMAGED && !state.busy && state.dropped === null && SaveMenu.isSaveMenuOpen(ui) && (await rowsOf()) === held,
+      `a file that does not read is the dialog's message, CSBWin's "${SAVED_GAME_DAMAGED}", and the list stays`);
+    check(wrapMessageFits(SAVED_GAME_DAMAGED), 'which fits the preview\'s panel');
+    const rect = menuButtonRect(SaveMenu.saveMenuButtons(state), SaveMenu.SAVE_MENU_GEOMETRY.exportButtonId)!;
+    SaveMenu.saveMenuClick(ui, rect.x1 + 1, rect.y1 + 1, LEFT);
+    const pressing = state.press !== null;
+    const duringPress = await daroo.drop('CSBGAME7.DAT', genuine);
+    check(pressing && !duringPress && (await rowsOf()) === held, 'a drop while a button is pressed is not taken');
+    SaveMenu.closeSaveMenu(ui);
+
+    // The load-only chooser takes a drop as the disk menu does.
+    const leyla = await menuRig(graphics, store, 'LEYLA');
+    const chooser = await leyla.open('loadOnly');
+    await leyla.drop('EARLY.DAT', read(savePath('csbgame-early-1hero.dat')));
+    console.log(`  the load-only chooser, a genuine save dropped: "${chooser.message}", selected ${SaveMenu.selectedEntry(chooser)?.name}`);
+    check(chooser.message === SaveMenu.SAVE_MENU_IMPORTED && SaveMenu.selectedEntry(chooser)?.id === 'EARLY.DAT' && leyla.party() === 'LEYLA',
+      'the load-only chooser imports a dropped save and selects it, with nothing loaded');
+    await leyla.click(SaveMenu.SAVE_MENU_GEOMETRY.loadButtonId);
+    console.log(`  then LOAD: ${SaveMenu.isSaveMenuOpen(leyla.ui) ? 'THE MENU' : 'the menu gone'}, party ${leyla.party()}`);
+    check(!SaveMenu.isSaveMenuOpen(leyla.ui) && leyla.party() === 'IAIDO', 'and LOAD then reads it: a genuine CSBWin save, played');
+  } finally {
+    Date.now = realNow;
+  }
+}
+
+/** Whether a message is drawn whole at the foot of the preview's panel. */
+function wrapMessageFits(message: string): boolean {
+  const lines = SaveMenu.wrapMessage(message, SaveMenu.SAVE_MENU_GEOMETRY.previewMaxChars);
+  return lines.length <= 5 && lines.join(' ') === message;
+}
+
 /* ------------------------------------------------------------ 12. the play time ---- */
 
 /**
@@ -2929,6 +3094,7 @@ async function main(): Promise<void> {
   await checkDoubleClick(graphics);
   await checkExport(graphics);
   await checkImport(graphics);
+  await checkDrop(graphics);
   await checkPlayTime(graphics);
   await checkUpgrade();
   finish();

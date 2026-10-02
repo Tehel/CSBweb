@@ -9,7 +9,8 @@
  * dialog of its own over the screen, an unbounded scrolling list of the data set's saves
  * under their playthroughs' headings, a date per save and a roster per playthrough
  * instead of a filename and a recency letter, a preview of the save beside the list, an
- * export of a save's file, no "save and quit", and Esc/right-click to cancel.
+ * export of a save's file and an import of one, no "save and quit", and Esc/right-click
+ * to cancel.
  *
  * ## The dialog
  *
@@ -79,6 +80,20 @@
  * save's playthrough, and the save is no more the last one used for it. The load-only
  * chooser has it as the disk menu does.
  *
+ * ## The import
+ *
+ * A file dropped on the page while the dialog is up is taken into the store
+ * (`saveMenuDrop`, through `UIState.onImportSave` to `GameSaves.importSave`), in the disk
+ * menu and in the load-only chooser alike. A save of the data set's dungeon is listed at
+ * once, selected, and the dialog says "SAVE IMPORTED"; nothing is loaded. One that is
+ * most of that dungeon and not the whole is asked about first, in `_DoMenu`'s two-option
+ * menu in the dialog's place: "THIS LOOKS LIKE A SAVE FROM A MODIFIED VERSION OF" over
+ * the dungeon's name, with CONFIRM and CANCEL (`importMenu`). A save of another dungeon,
+ * or of none the port knows, is refused in `_DoMenu`'s one-option menu, under OK, with
+ * the dungeon named and whether a data set plays it. A file that does not read is the
+ * dialog's message, CSBWin's "SAVED GAME DAMAGED!". CSBWin has no import: a file put in
+ * the game's directory under one of its four names is a save of that game.
+ *
  * ## The question
  *
  * LOAD and SAVE ask first when the save one would read, or the other write over, is of
@@ -99,6 +114,7 @@
  * `ctx.state.paused` (`d.Time++` is the main loop's, `doc/CSBwin-src/CSBCode.cpp:660`).
  */
 import type { OpenedSave, Playthrough, SaveEntry } from '../../data/saves';
+import type { ImportResult, ImportedFile } from '../../engine/GameSaves';
 import { formatPlaythroughRow, formatSavePreview, formatSaveRow, lastUsedSave, playthroughsOf } from '../../data/saves';
 import { clearIndex, fillRectIndex } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
@@ -219,6 +235,37 @@ const ACTION_LABELS = { load: 'LOAD', save: 'SAVE' } as const;
 const EXPORT_LABEL = 'EXPORT';
 /** The dialog's message once a save's file has been handed to the player. */
 export const SAVE_MENU_EXPORTED = 'SAVE EXPORTED';
+/** The dialog's message once a dropped file is a save of the store. */
+export const SAVE_MENU_IMPORTED = 'SAVE IMPORTED';
+
+/** The question about a dropped save of a modified dungeon, over the dungeon's name. */
+export const SAVE_MENU_MODIFIED = 'THIS LOOKS LIKE A SAVE FROM A MODIFIED VERSION OF';
+const CONFIRM_LABEL = 'CONFIRM';
+const OK_LABEL = 'OK';
+
+/** A dropped file that was not stored: what its dungeon is to the data set's. */
+export type ImportRefusal = Exclude<ImportResult, { kind: 'stored' }>;
+
+/**
+ * The menu about a dropped file that was not stored, `_DoMenu`'s: the question for a
+ * save of a modified version of the data set's dungeon, whose first option stores it, or
+ * the refusal of another dungeon's save, which names the dungeon and says whether a data
+ * set plays it, and of an unknown one's, under one option.
+ */
+export function importMenu(refusal: ImportRefusal): { title1: string; title2: string | null; options: string[] } {
+  switch (refusal.kind) {
+    case 'modified':
+      return { title1: SAVE_MENU_MODIFIED, title2: refusal.dungeon.name.toUpperCase(), options: [CONFIRM_LABEL, CANCEL_LABEL] };
+    case 'other':
+      return {
+        title1: `THIS LOOKS LIKE A SAVE OF ${refusal.dungeon.name.toUpperCase()}`,
+        title2: refusal.dungeon.dataSets.length > 0 ? 'SWITCH TO IT TO IMPORT IT' : 'NOT SUPPORTED YET',
+        options: [OK_LABEL],
+      };
+    case 'unknown':
+      return { title1: 'THIS IS A SAVE OF AN UNKNOWN DUNGEON', title2: 'NOT SUPPORTED YET', options: [OK_LABEL] };
+  }
+}
 
 /** The dialog's own buttons; the question's are CSBWin's 210 and 211. */
 const BTN_LOAD = 900;
@@ -309,6 +356,11 @@ export interface SaveMenuState {
   pending: (() => void) | null;
   /** The action the question on screen asks about, in the dialog's place, or `null`. */
   confirm: SaveMenuAction | null;
+  /**
+   * The dropped file that was not stored, while the menu about it is up in the dialog's
+   * place (`importMenu`), or `null`.
+   */
+  dropped: { file: ImportedFile; refusal: ImportRefusal } | null;
   frameHandle: number | null;
   /** The save a click last selected, and when (`nowMs`): a second click on it soon after is LOAD. */
   lastSaveClick: { id: string; atMs: number } | null;
@@ -342,6 +394,7 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
     press: null,
     pending: null,
     confirm: null,
+    dropped: null,
     frameHandle: null,
     lastSaveClick: null,
   };
@@ -670,6 +723,12 @@ export function drawSaveMenu(ui: UIState): void {
     if (state.press) drawMenuPress(ui, state.press, nowMs());
     return;
   }
+  if (state.dropped) {
+    const menu = importMenu(state.dropped.refusal);
+    doMenu(ui, menu.title1, menu.title2, menu.options, true);
+    if (state.press) drawMenuPress(ui, state.press, nowMs());
+    return;
+  }
 
   drawDialog(ui);
 
@@ -756,11 +815,17 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
   // Right-click cancels, the question when one is up. CSBWin has no such thing; see the
   // divergence list.
   if ((buttons & 1) !== 0) {
-    if (state.confirm && !state.press) cancelQuestion(ui, state);
+    if ((state.confirm || state.dropped) && !state.press) cancelQuestion(ui, state);
     else closeSaveMenu(ui);
     return;
   }
   if (state.busy || state.press) return;
+
+  if (state.dropped) {
+    const options = importMenu(state.dropped.refusal).options.length;
+    answerDropped(ui, state, state.dropped, options, menuHitTest(menuButtonList(ui, options, true), x, y, buttons));
+    return;
+  }
 
   if (state.confirm) {
     answerQuestion(ui, state, state.confirm, menuHitTest(menuButtonList(ui, 2, true), x, y, buttons));
@@ -834,9 +899,24 @@ function answerQuestion(ui: UIState, state: SaveMenuState, action: SaveMenuActio
   });
 }
 
-/** Esc or a right-click on the question: CANCEL, without the press. */
+/**
+ * A click on the menu about a dropped file, `choice` being `_WaitForMenuSelect`'s among
+ * its `options`. The button flashes with the menu still up; then the list is back, and
+ * the first of two options, CONFIRM, stores the file.
+ */
+function answerDropped(ui: UIState, state: SaveMenuState, dropped: NonNullable<SaveMenuState['dropped']>, options: number, choice: number): void {
+  if (choice < 1 || choice > options) return;
+  beginPress(ui, state, menuButtonList(ui, options, true), 209 + choice, () => {
+    state.dropped = null;
+    if (dropped.refusal.kind === 'modified' && choice === 1) void runImport(ui, dropped.file, true);
+    else ui.renderLastFrame();
+  });
+}
+
+/** Esc or a right-click on the question, or on the menu about a dropped file: CANCEL, without the press. */
 function cancelQuestion(ui: UIState, state: SaveMenuState): void {
   state.confirm = null;
+  state.dropped = null;
   ui.renderLastFrame();
 }
 
@@ -969,6 +1049,48 @@ async function doExport(ui: UIState, state: SaveMenuState): Promise<void> {
   ui.renderLastFrame();
 }
 
+/**
+ * A file dropped on the page while the dialog is up: the import. Says whether the dialog
+ * took it, which it does not while it is working, pressing a button or asking.
+ */
+export function saveMenuDrop(ui: UIState, file: ImportedFile): boolean {
+  const state = ui.saveMenu;
+  if (!state || state.busy || state.press || state.confirm || state.dropped) return false;
+  void runImport(ui, file, false);
+  return true;
+}
+
+/**
+ * Take a dropped file into the store, `confirmed` once the player has answered CONFIRM
+ * for a modified dungeon. Stored, it is listed and selected; not stored, the menu about
+ * it comes up (`importMenu`). A file that does not read throws, and its line is the
+ * dialog's message. Never throws.
+ */
+async function runImport(ui: UIState, file: ImportedFile, confirmed: boolean): Promise<void> {
+  const state = ui.saveMenu;
+  if (!state) return;
+  state.busy = true;
+  state.message = '';
+  ui.renderLastFrame();
+  try {
+    const result = await ui.onImportSave(file, confirmed);
+    // A right-click closes the dialog whatever it is doing: the file is stored all the same.
+    if (ui.saveMenu !== state) return;
+    if (result.kind === 'stored') {
+      await refreshSaveMenu(ui);
+      selectSave(ui, state, result.entry);
+      state.message = SAVE_MENU_IMPORTED;
+    } else {
+      state.busy = false;
+      state.dropped = { file, refusal: result };
+    }
+  } catch (error) {
+    state.busy = false;
+    state.message = shortError(error);
+  }
+  ui.renderLastFrame();
+}
+
 /* ------------------------------------------------------------------- keyboard ---- */
 
 /**
@@ -984,8 +1106,8 @@ export function saveMenuKey(ui: UIState, key: string): boolean {
   const state = ui.saveMenu;
   if (!state) return false;
   if (state.busy || state.press) return true;
-  // The question takes no key but its cancel.
-  if (state.confirm) {
+  // The question takes no key but its cancel, nor does the menu about a dropped file.
+  if (state.confirm || state.dropped) {
     if (key === 'Escape') cancelQuestion(ui, state);
     return true;
   }
@@ -1054,7 +1176,7 @@ function foldSelection(ui: UIState, state: SaveMenuState, folded: boolean): void
 export function saveMenuWheel(ui: UIState, delta: number): boolean {
   const state = ui.saveMenu;
   if (!state) return false;
-  if (state.confirm) return true;
+  if (state.confirm || state.dropped) return true;
   scrollBy(ui, state, delta > 0 ? 1 : -1);
   return true;
 }

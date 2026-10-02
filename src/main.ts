@@ -16,7 +16,7 @@ import { extractGraphicsTables, type GraphicsTables } from './data/tables/Graphi
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadGlfx } from './lib/glfx-loader';
 import { GameScreen } from './renderer/GameScreen';
-import { bindDataSetChooser, bindUIContext, drawMapPreview, handleCursorFilter } from './ui';
+import { bindDataSetChooser, bindSaveDrop, bindUIContext, drawMapPreview, handleCursorFilter } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { Die, runBootSequence, runShowCredits } from './renderer/intro/BootSequence';
@@ -318,6 +318,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
         // EXPORT: the row's file as the store holds it, downloaded under the row's name.
         onExportSave: async (entry) => downloadSaveFile(entry.name, (await saves.open(entry)).bytes),
+        // The import: a file dropped on the page (`bindSaveDrop`), held against the dungeon.
+        onImportSave: (file, confirmed) => saves.importSave(file, confirmed),
         onRestoreSave: (save) => saves.read(save),
         // The boot's chooser only: its read failed, and `tag01efee` follows.
         onRestoreFailed: (error) => {
@@ -503,6 +505,8 @@ async function init() {
         if (import.meta.env.DEV) {
             (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView };
         }
+        // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
+        bindSaveDrop(built.screen);
         await runIntro(built.game, built.screen, built.saves, sound);
         wire(built.game, built.screen, built.saves, sound, built.messages);
         start(built.game);

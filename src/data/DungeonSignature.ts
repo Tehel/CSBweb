@@ -179,7 +179,9 @@ export function identifyDungeon(
  * dungeon's, the whole or most of one; or of an `unknown` dungeon, no level of any.
  */
 export type DungeonCheck =
-    | { kind: 'own' | 'modified' | 'other'; dungeon: KnownDungeon }
+    | { kind: 'own'; dungeon: KnownDungeon }
+    | { kind: 'modified'; dungeon: KnownDungeon }
+    | { kind: 'other'; dungeon: KnownDungeon }
     | { kind: 'unknown' };
 
 /**

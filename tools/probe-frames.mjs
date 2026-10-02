@@ -20,7 +20,8 @@
 //
 // A few things are asserted on the spot rather than compared as frames, since no frame
 // shows them: the CRT effect, which screens take the mouse wheel, the keys of the
-// entrance's chooser, and the download its EXPORT starts. See `check` below.
+// entrance's chooser, the download its EXPORT starts, and a file dropped on it. See
+// `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -248,6 +249,26 @@ await canvasClick(195, 168, 0); await wait(1000);
 console.log('  downloads:', downloads.join(', ') || 'none');
 check(downloads.length === 1 && /^dmweb-\d{8}-\d{6}\.dat$/.test(downloads[0]),
   'EXPORT in the chooser starts one download, a .dat under the save\'s name');
+// A file dropped on the page while the chooser is up: the page's own listener
+// (`bindSaveDrop`, `src/ui/saveDrop.ts`), which no Node tool can run either. The file is
+// the csb set's save, another dungeon's here, so it is refused in a one-option menu and
+// nothing is stored; OK (the centred menu's one button, around (159,147)) brings the
+// chooser back, its message gone. What is stored and what is asked is
+// `tools/dump-save-menu.ts`'s to show.
+const dropTaken = await evaluate(`(async()=>{
+  const bytes = await (await fetch('/gamefiles/csb/csbgame2.dat')).arrayBuffer();
+  const data = new DataTransfer();
+  data.items.add(new File([bytes], 'CSBGAME2.DAT'));
+  const drop = new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true });
+  document.getElementById('game-canvas').dispatchEvent(drop);
+  return drop.defaultPrevented;
+})()`);
+await wait(1000);
+const refusal = await canvasPixels();
+check(dropTaken && refusal !== chooserUp && refusal !== entrance,
+  'a save of another dungeon dropped on the chooser is taken by the page, and a menu comes up');
+await canvasClick(159, 147, 0); await wait(600);
+check((await canvasPixels()) === chooserUp, 'its OK brings the chooser back, with nothing more listed');
 await canvasClick(100, 27, 0);  await wait(300);
 await canvasClick(48, 168, 0);  await wait(1500);
 console.log('state: game loaded');       await shot('12-game-loaded');
