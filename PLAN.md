@@ -202,7 +202,13 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   another dungeon is refused, with the
   dungeon it looks like named when the port knows it ("switch to it", or "not supported
   yet"), which is the known dungeon most of its levels match (`identifyDungeon`), each
-  level against the level of its own number. That takes a catalogue of
+  level against the level of its own number. **A save that is most of the running
+  set's own dungeon and not the whole is asked about**, the author's decision: "THIS
+  LOOKS LIKE A SAVE FROM A MODIFIED VERSION OF" and the dungeon's name, over CONFIRM
+  and CANCEL. Confirmed, it is stored as a row of the running data set, the set of the
+  dungeon it looks like, and the row is marked unofficial (`SaveEntry.unofficial`),
+  which nothing reads yet; cancelled, nothing is stored. So "switch to it" never names
+  the dungeon a save is refused in. That takes a catalogue of
   known dungeons' signatures (`KNOWN_DUNGEONS`), each with the data sets that play it,
   which may list dungeons the port cannot play: so the digests are committed, not read
   from the page's files, and a tool holds each to the file here. It lists five: Dungeon
@@ -488,14 +494,16 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      digest, and a save of thirteen levels of the fourteen being most of Dungeon
      Master and not the whole). With a path, the tool prints that file's digests as
      the catalogue lists them, which is how a dungeon is added.
-   - d. ⏳ **The import**: a `.dat` dropped on the canvas while the dialog is up,
-     checked against the dungeon, stamped when it holds no id, and stored. The file's
+   - d. ⏳ **The import's check and its row**: a file checked against the dungeon,
+     stamped when it holds no id, and stored (`GameSaves`). The file's
      signature is read from its world (`loadCsbwinWorld`), so a file whose image is
      damaged is refused there. It is the running set's when `identifyDungeon` gives a
-     whole dungeon that lists `GameSaves.dataSet`; the `csb` set has two. To settle
-     with it: what the refusal says of a save that is most of the running set's own
-     dungeon and not the whole, where "switch to it" names the dungeon it is refused
-     in.
+     whole dungeon that lists `GameSaves.dataSet`; the `csb` set has two. Most of such
+     a dungeon and not the whole, it is a modified dungeon's, stored only once
+     confirmed, as an unofficial row; anything else is refused.
+   - e. ⏳ **The drop and the dialog's answers**: a `.dat` dropped on the canvas while
+     the dialog is up, in play and at the entrance; the question for a modified
+     dungeon, the refusal with the dungeon named, and the imported save selected.
 5. ✅ **No "GAME LOADED, READY TO PLAY."** Evidence: `tools/dump-bad-saved-game.ts`, "a
    save read" (the hand-off after a load is one fade and four VBLs on a cleared screen,
    and waits for no click), and the golden frame `tools/frames/12-game-loaded.png`: the
