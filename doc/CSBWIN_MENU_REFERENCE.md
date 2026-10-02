@@ -331,17 +331,30 @@ the filename and that letter. `P1` doubles as `I1`, `ClearOldScreen`, `FadeOldSc
 ## Deliberate divergences in this port
 
 The save/load screen this port puts behind the disk icon is **not** `_DisplayDiskMenu`.
-It keeps `_DoMenu`'s bitmap, colours, text metrics and press animation, and replaces the
+It keeps `_DoMenu`'s art, colours, text metrics and press animation, and replaces the
 four-slot chooser. Recorded here so the difference is never mistaken for a porting error:
 
 1. **An unbounded, scrolling list of saves** instead of four fixed slots. CSBWin's limit
    is a stack array and its chooser is a four-button menu; neither survives contact with
-   "save as often as you like". The list panel is built by tiling graphic 0's own title
-   panel downward over the full-width button frame — the same self-blit technique the
-   1/2/4-option layouts use — so no new art is invented. SAVE writes over the selected
-   save, as CSBWin's writes over the slot chosen; with no empty slot to choose, a save of
-   its own is made from the list's first row, "NEW SAVE", which the load-only chooser
-   does not have.
+   "save as often as you like". SAVE writes over the selected save, as CSBWin's writes
+   over the slot chosen; with no empty slot to choose, a save of its own is made from
+   the list's first row, "NEW SAVE", which the load-only chooser does not have.
+
+   **The list is in a dialog of its own**, 304×184 at (8,8), not in one of `_DoMenu`'s
+   four layouts of graphic 0 in the viewport's place. It is drawn from three pieces of
+   that graphic, each at the size wanted by keeping its corners and repeating the column
+   and the row just inside them, so no new art is invented: the grey frame (the whole
+   bitmap, nine pixels kept a side), the title panel ((10,10)-(213,51), two kept) and the
+   left frame of the bottom pair ((10,99)-(107,125), six columns kept a side and every
+   row). Two panels, the list's and the preview's, stand over four button frames: LOAD,
+   SAVE, EXPORT and CANCEL. A frame takes the rectangle CSBWin's table gives graphic 0's
+   own, the frame less six pixels a side, and its label where `_DoMenu` centres one
+   (`buttonRect` and `buttonLabelAt`, `src/renderer/ui/SaveMenu.ts`); a button that can
+   do nothing has no label, as CSBWin's empty slot has none (`CSBCode.cpp:9772`).
+
+   **The screen under it is cleared**, in the game too. The disk menu's `_DoMenu` gets 0
+   for `ClearOldScreen` and leaves the picture around the viewport
+   (`SaveGame.cpp:870-877`); the dialog would leave an 8-pixel ring of it.
 2. **Per-entry date, level and party**, where CSBWin shows a filename and a rank letter.
    The rank letter is what the date replaces; the ordering rule is the same one
    (`modifiedTime`), only shown directly and newest-first rather than oldest-letter-first.
@@ -354,8 +367,9 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    where it refuses the save: "THAT'S NOT THE SAME GAME" (`SaveGame.cpp:1604-1606`). The
    port's list holds every playthrough of the data set, so LOAD and SAVE on a save of
    another playthrough than the running game's put that line up as a two-option
-   `_DoMenu` menu, the action over CANCEL, and act on the first. Esc and a right-click
-   there cancel the question alone. The load-only chooser never asks.
+   `_DoMenu` menu, centred, in the dialog's place, the action over CANCEL, and act on
+   the first. Esc and a right-click there cancel the question alone. The load-only
+   chooser never asks.
 6. **No "GAME LOADED, READY TO PLAY."** After a load at the entrance, CSBWin's
    `_TAG021028` loops on that menu, PLAY GAME over ASCII DUMP (`CSBCode.cpp:10493-10515`).
    The port puts none up: a loaded game is played at once, and `AsciiDump` is unported

@@ -11,11 +11,11 @@
  *    by one field would hand back plausible-looking rectangles in the wrong place, and
  *    the only symptom would be a click that does nothing. So the extracted values are
  *    asserted against the ones transcribed from CSBWin — the canary technique.
- * 2. **The layout the list panel rests on.** The panel is made by tiling graphic 0's own
- *    interior band downward over the full-width button frame. Whether that actually
- *    leaves a clean background under every row is a property of the *art*, not of the
- *    code, so the draw is run for real into a buffer and the result is inspected pixel by
- *    pixel.
+ * 2. **The art the dialog is made of.** The dialog is drawn from three pieces of graphic
+ *    0, each stretched by repeating the column and the row inside its corners. Whether a
+ *    piece is plain there, and whether that leaves a clean background under every row
+ *    and every label, is a property of the *art*, not of the code, so the draw is run
+ *    for real into a buffer and the result is inspected pixel by pixel.
  * 3. **`SplitLongLine`**, which has an edge case CSBWin does not guard (no space at or
  *    after the midpoint) and which this port reproduces rather than fixes.
  * 4. **The list logic** — ordering, the date format, what fits in 33 characters, when
@@ -100,7 +100,6 @@ import {
   MENU_PRESS_PHASE_MS,
   MENU_WIDTH,
   doMenu,
-  drawMenuBitmap,
   drawMenuPress,
   menuButtonList,
   menuButtonRect,
@@ -235,10 +234,24 @@ function checkButtonTables(graphics: GraphicsLoader): void {
   const four = viewport[3].filter((e) => e.word0 !== 0);
   check(four[0].y1 === 101 && four[0].y2 === 115, 'the four-option top row is y 101..115');
   check(four[2].y1 === 138 && four[2].y2 === 152, 'the four-option bottom row is y 138..152');
-  check(
-    four[2].word0 === SaveMenu.SAVE_MENU_GEOMETRY.loadButtonId && four[3].word0 === SaveMenu.SAVE_MENU_GEOMETRY.saveButtonId,
-    'LOAD and SAVE take the bottom row, ids 212 and 213',
-  );
+
+  // The dialog's buttons are graphic 0's frame drawn elsewhere, and take the rectangle
+  // and the label CSBWin gives the frame where it stands: its bottom pair, at (10,99) and
+  // (117,99) in the bitmap, ids 212 and 213 of this set.
+  const pair = [
+    { frame: { x1: 10, y1: 99, x2: 107, y2: 125 }, table: four[2], label: [59, 114] },
+    { frame: { x1: 117, y1: 99, x2: 213, y2: 125 }, table: four[3], label: [166, 114] },
+  ];
+  for (const { frame, table, label } of pair) {
+    const onScreen = { x1: frame.x1 + VIEWPORT_X, y1: frame.y1 + VIEWPORT_Y, x2: frame.x2 + VIEWPORT_X, y2: frame.y2 + VIEWPORT_Y };
+    const rect = SaveMenu.buttonRect(onScreen);
+    const at = SaveMenu.buttonLabelAt(frame);
+    check(
+      rect.x1 === table.x1 && rect.x2 === table.x2 && rect.y1 === table.y1 && rect.y2 === table.y2,
+      `button ${table.word0}'s rectangle is its frame less six pixels a side (${rect.x1}..${rect.x2}/${rect.y1}..${rect.y2})`,
+    );
+    check(at.x === label[0] && at.y === label[1], `and _DoMenu centres its label on (${label[0]},${label[1]}) (Menu.cpp:339-346)`);
+  }
 }
 
 /* -------------------------------------------------------------- 2. the layout ---- */
@@ -274,69 +287,120 @@ function checkLayout(graphics: GraphicsLoader): void {
     );
   }
 
-  /* ---- the panel the list is drawn on, built for real and then measured ---- */
-
-  const ui = makeDrawingUI(graphics);
-  drawMenuBitmap(ui, false);
+  /* ---- the pieces, each drawn at its own size: the art itself ---- */
 
   const g = SaveMenu.SAVE_MENU_GEOMETRY;
-  // Before the extension, the full-width button frame is in the way: the art is *not*
-  // panel colour where the list's lower rows will go. If this ever stops being true the
-  // extension has become unnecessary, and this tool should say so rather than pass.
-  const lowerRowY = VIEWPORT_Y + g.rowFirstY + 7 * g.rowStep;
-  const dirtyBefore = countNot(ui, VIEWPORT_X + g.panelInnerX1, VIEWPORT_X + g.panelInnerX2, lowerRowY - 4, lowerRowY + 1, MENU_PANEL_COLOR);
-  check(dirtyBefore > 0, `the unpatched art is not clean under the last row (${dirtyBefore} pixels differ)`);
-
-  SaveMenu.extendListPanel(ui);
-
+  const ui = makeDrawingUI(graphics);
+  const size = (r: { x1: number; y1: number; x2: number; y2: number }): string => `${r.x2 - r.x1 + 1}x${r.y2 - r.y1 + 1}`;
+  /** How many pixels of `piece`, drawn at its own size and place, are not graphic 0's. */
+  const ownSize = (piece: SaveMenu.DialogPiece, within: (x: number, y: number) => boolean): number => {
+    ui.screenIndexBuffer!.pixels.fill(7);
+    SaveMenu.drawPiece(ui, piece, piece);
+    let wrong = 0;
+    for (let y = piece.y1; y <= piece.y2; y++) {
+      for (let x = piece.x1; x <= piece.x2; x++) {
+        if (within(x, y) && pixelAt(ui, x, y) !== image.pixels[y * MENU_WIDTH + x]) wrong++;
+      }
+    }
+    return wrong;
+  };
   console.log('');
-  console.log('=== the list panel, after tiling graphic 0\'s own interior band down ===');
-  console.log(['row', 'baseline y (screen)', 'non-panel pixels'].join('\t'));
-  let dirtyTotal = 0;
-  const bands: Array<[string, number]> = [['header', g.headerY], ['status', g.statusY]];
-  for (let row = 0; row < g.rows; row++) bands.push([`row ${row}`, g.rowFirstY + row * g.rowStep]);
-  for (const [name, y] of bands) {
-    const screenY = VIEWPORT_Y + y;
-    // `drawTextLineIndex` puts the glyph cell at `y-4` and it is six rows tall.
-    const dirty = countNot(
-      ui,
-      VIEWPORT_X + g.textX,
-      VIEWPORT_X + g.panelInnerX2,
-      screenY - 4,
-      screenY + 1,
-      MENU_PANEL_COLOR,
-    );
-    dirtyTotal += dirty;
-    console.log([name, screenY, dirty].join('\t'));
+  console.log('=== the dialog\'s pieces of graphic 0, each drawn at its own size ===');
+  // The frame's middle holds graphic 0's panels, so only its ring can be the art's.
+  const f = g.framePiece;
+  const ring = ownSize(f, (x, y) => x < f.left || x > f.x2 - f.right || y < f.top || y > f.y2 - f.bottom);
+  const panel = ownSize(g.panelPiece, () => true);
+  const button = ownSize(g.buttonPiece, () => true);
+  console.log(['piece', 'in graphic 0', 'kept l/t/r/b', 'pixels that differ'].join('\t'));
+  for (const [name, piece, wrong] of [['frame (its ring)', f, ring], ['panel', g.panelPiece, panel], ['button', g.buttonPiece, button]] as const) {
+    console.log([name, `(${piece.x1},${piece.y1})-(${piece.x2},${piece.y2})`, `${piece.left}/${piece.top}/${piece.right}/${piece.bottom}`, wrong].join('\t'));
   }
-  check(dirtyTotal === 0, `every text row sits on clean panel background (${dirtyTotal} stray pixels)`);
+  check(ring === 0, `the frame at its own size is graphic 0's ring: its edges are plain between the corners (${ring} differ)`);
+  check(panel === 0, `the panel at its own size is graphic 0's panel: plain between its corners (${panel} differ)`);
+  check(button === 0, `the button at its own size is graphic 0's frame: its rows are plain between the bevels (${button} differ)`);
+  // One column less on a side and a bevel would be repeated: the art, not the code, sets
+  // the six.
+  const narrow = { ...g.buttonPiece, left: g.buttonPiece.left - 1, right: g.buttonPiece.right - 1 };
+  check(ownSize(narrow, () => true) > 0, 'a button kept five columns a side would not be: the bevels are six columns');
+  check(g.buttonPiece.top + g.buttonPiece.bottom === g.buttonPiece.y2 - g.buttonPiece.y1 + 1,
+    'every row of the button is kept: it is drawn at its own height alone');
+  const frames = Object.entries(g.buttonFrames);
+  check(frames.every(([, frame]) => frame.y2 - frame.y1 === g.buttonPiece.y2 - g.buttonPiece.y1),
+    'and every button frame of the dialog has that height');
 
-  // The new bottom edge has to be the panel's own border, not a torn copy of the middle.
-  const borderSrcY = VIEWPORT_Y + g.panelBottomBorderSrcY;
-  const borderDstY = VIEWPORT_Y + g.panelExtendedBottomY;
-  let borderMismatch = 0;
-  for (let x = 0; x < MENU_WIDTH; x++) {
-    if (pixelAt(ui, VIEWPORT_X + x, borderDstY) !== pixelAt(ui, VIEWPORT_X + x, borderSrcY)) borderMismatch++;
-  }
-  check(borderMismatch === 0, `the extended panel's bottom border matches the original (${borderMismatch} differ)`);
+  /* ---- the dialog, drawn for real and then measured ---- */
 
-  // The bottom button frames must survive the tiling untouched — they are what LOAD and
-  // SAVE are drawn in, and the extension stops one pixel short of them on purpose.
-  const untouched = graphics.getImage(0);
-  let frameDamage = 0;
-  for (let y = 100; y <= 125; y++) {
-    for (let x = 0; x < MENU_WIDTH; x++) {
-      if (pixelAt(ui, VIEWPORT_X + x, VIEWPORT_Y + y) !== untouched.pixels[y * MENU_WIDTH + x]) frameDamage++;
+  const blank: SaveMenu.SaveMenuState = {
+    mode: 'full', entries: [], selected: -1, scrollTop: 0, busy: true, message: '',
+    press: null, pending: null, confirm: null, frameHandle: null,
+  };
+  ui.saveMenu = blank;
+  ui.screenIndexBuffer!.pixels.fill(7);
+  SaveMenu.drawSaveMenu(ui);
+  ui.saveMenu = null;
+  let outside = 0;
+  for (let y = 0; y < SCREEN_HEIGHT; y++) {
+    for (let x = 0; x < SCREEN_WIDTH; x++) {
+      const inDialog = x >= g.dialog.x1 && x <= g.dialog.x2 && y >= g.dialog.y1 && y <= g.dialog.y2;
+      if (!inDialog && pixelAt(ui, x, y) !== 0) outside++;
     }
   }
-  check(frameDamage === 0, `the bottom button frames are untouched by the extension (${frameDamage} pixels changed)`);
-
-  // A row is 33 characters of a six-pixel cell starting at x 14; it has to stop at the
-  // panel's inner right edge, not run into the border.
-  const rowRight = g.textX + g.textMaxChars * 6 - 1;
   console.log('');
-  console.log(`  a full row runs x ${g.textX}..${rowRight}, panel interior ends at ${g.panelInnerX2}`);
-  check(rowRight <= g.panelInnerX2, `a full-width row fits inside the panel (${rowRight} <= ${g.panelInnerX2})`);
+  console.log(`=== the dialog, ${size(g.dialog)} at (${g.dialog.x1},${g.dialog.y1}) ===`);
+  check(outside === 0, `the screen around the dialog is cleared to colour 0 (${outside} pixels are not)`);
+
+  ui.screenIndexBuffer!.pixels.fill(7);
+  SaveMenu.drawDialog(ui);
+  console.log(`  list panel ${size(g.listPanel)} at (${g.listPanel.x1},${g.listPanel.y1}), preview panel ${size(g.previewPanel)} at (${g.previewPanel.x1},${g.previewPanel.y1})`);
+  check(size(g.listPanel).startsWith(`${g.panelPiece.x2 - g.panelPiece.x1 + 1}x`), 'the list\'s panel is as wide as graphic 0\'s own');
+
+  // Graphic 0's own margins: ten pixels of frame, ten rows from a panel to the buttons,
+  // nine columns between two frames.
+  const border = [g.listPanel.x1 - g.dialog.x1, g.listPanel.y1 - g.dialog.y1, g.dialog.x2 - g.previewPanel.x2, g.dialog.y2 - frames[0][1].y2];
+  check(border.every((n) => n === 10), `ten pixels of frame on every side (${border.join(', ')})`);
+  check(frames[0][1].y1 - g.listPanel.y2 - 1 === 10 && g.previewPanel.y2 === g.listPanel.y2 && g.previewPanel.y1 === g.listPanel.y1,
+    'ten rows between the panels and the buttons, as between graphic 0\'s panel and its frame');
+  const gaps = frames.slice(1).map(([, frame], i) => frame.x1 - frames[i][1].x2 - 1);
+  console.log(`  buttons: ${frames.map(([name, frame]) => `${name} x ${frame.x1}..${frame.x2}`).join(', ')}`);
+  check(gaps.every((n) => n === 9) && g.previewPanel.x1 - g.listPanel.x2 - 1 === 9,
+    `nine columns between two buttons and between the panels, as between graphic 0's bottom pair (${gaps.join(', ')})`);
+  check(frames[0][1].x1 === g.listPanel.x1 && frames[2][1].x2 === g.listPanel.x2
+    && frames[3][1].x1 === g.previewPanel.x1 && frames[3][1].x2 === g.previewPanel.x2,
+    'three buttons span the list\'s panel, and the fourth the preview\'s');
+
+  console.log(['row', 'baseline y', 'non-panel pixels'].join('\t'));
+  let dirtyTotal = 0;
+  const bands: Array<[string, number]> = [];
+  for (let row = 0; row < g.rows; row++) bands.push([`row ${row}`, g.rowFirstY + row * g.rowStep]);
+  bands.push(['status', g.statusY]);
+  for (const [name, y] of bands) {
+    // A row's highlight runs from `y-5` to `y+2`, across the panel's interior; the glyph
+    // cell `drawTextLineIndex` fills is inside it.
+    const dirty = countNot(ui, g.listInnerX1, g.listInnerX2, y - 5, y + 2, MENU_PANEL_COLOR);
+    dirtyTotal += dirty;
+    console.log([name, y, dirty].join('\t'));
+  }
+  check(dirtyTotal === 0, `every row and the status line sit on clean panel background (${dirtyTotal} stray pixels)`);
+  check(g.statusY - 4 > g.rowFirstY + (g.rows - 1) * g.rowStep + 2, 'the status line is clear of the last row\'s highlight');
+  check(pixelAt(ui, g.listInnerX1 - 1, g.rowFirstY) !== MENU_PANEL_COLOR && pixelAt(ui, g.listInnerX2 + 1, g.rowFirstY) !== MENU_PANEL_COLOR,
+    'and the highlight runs from one edge of the panel to the other');
+
+  // A row is 33 characters of a six-pixel cell; it has to stop at the panel's inner right
+  // edge, not run into the border.
+  const rowRight = g.textX + g.textMaxChars * 6 - 1;
+  console.log(`  a full row runs x ${g.textX}..${rowRight}, the panel's interior ends at ${g.listInnerX2}`);
+  check(rowRight <= g.listInnerX2, `a full-width row fits inside the panel (${rowRight} <= ${g.listInnerX2})`);
+
+  const previewDirty = countNot(ui, g.previewPanel.x1 + 2, g.previewPanel.x2 - 1, g.previewPanel.y1 + 2, g.previewPanel.y2 - 1, MENU_PANEL_COLOR);
+  check(previewDirty === 0, `the preview's panel is clean inside its edges (${previewDirty} stray pixels)`);
+
+  // A label is six characters at most, and its cell has to lie on the button's face.
+  let labelDirty = 0;
+  for (const [, frame] of frames) {
+    const at = SaveMenu.buttonLabelAt(frame);
+    labelDirty += countNot(ui, at.x - 18, at.x + 17, at.y - 4, at.y + 1, MENU_PANEL_COLOR);
+  }
+  check(labelDirty === 0, `a six-character label lies on the face of every button (${labelDirty} stray pixels)`);
 }
 
 function countNot(ui: UIState, x1: number, x2: number, y1: number, y2: number, color: number): number {
@@ -791,8 +855,7 @@ function checkPressAnimation(graphics: GraphicsLoader): void {
   console.log('=== the press animation (`doc/CSBwin-src/Menu.cpp:100-180`) ===');
   const ui = makeDrawingUI(graphics);
   const saveId = SaveMenu.SAVE_MENU_GEOMETRY.saveButtonId;
-  const rect = menuButtonRect(menuButtonList(ui, 4, false), saveId);
-  if (!rect) { check(false, `the four-option set has button ${saveId}`); return; }
+  const rect = SaveMenu.buttonRect(SaveMenu.SAVE_MENU_GEOMETRY.buttonFrames.save);
   const press = { buttonId: saveId, rect, startedMs: 0 };
   const SCREEN = 7;
   const frame = (elapsed: number): Uint8Array => {
@@ -1277,8 +1340,10 @@ async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: str
   const game = await loadGame();
   game.systems.hallOfChampions.addChampion(healthyChampion(champion));
   const saves = new GameSaves(game, DEFAULT_DATA_SET, store, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
-  const ui = newUIState(graphics, game.ctx, {
+  let drawsWithNoMenu = 0;
+  const ui: UIState = newUIState(graphics, game.ctx, {
     getGraphicBitmap: graphicBitmaps(graphics),
+    renderLastFrame: () => { if (!ui.saveMenu) drawsWithNoMenu++; },
     onListSaves: () => saves.list(),
     onReadSave: (listed) => saves.open(listed),
     onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
@@ -1303,12 +1368,15 @@ async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: str
       }
     },
     clickRow(row: number): void {
-      SaveMenu.saveMenuClick(ui, VIEWPORT_X + g.textX, VIEWPORT_Y + g.rowFirstY + row * g.rowStep, LEFT);
+      SaveMenu.saveMenuClick(ui, g.textX, g.rowFirstY + row * g.rowStep, LEFT);
     },
-    /** A click on button `id` of `_DoMenu`'s `options`-button set, and the wait for what it does. */
-    async click(id: number, options = 4): Promise<void> {
-      const rect = menuButtonRect(menuButtonList(ui, options, false), id);
-      if (!rect) throw new Error(`the ${options}-option set has no button ${id}`);
+    /**
+     * A click on button `id`, and the wait for what it does: one of the dialog's own, or
+     * with `options` one of the question's, `_DoMenu`'s centred set of that many.
+     */
+    async click(id: number, options?: number): Promise<void> {
+      const rect = menuButtonRect(options ? menuButtonList(ui, options, true) : SaveMenu.saveMenuButtons(ui.saveMenu!), id);
+      if (!rect) throw new Error(`the menu has no button ${id}`);
       SaveMenu.saveMenuClick(ui, rect.x1 + 1, rect.y1 + 1, LEFT);
       await this.settled();
     },
@@ -1319,6 +1387,10 @@ async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: str
     },
     party(): string {
       return game.ctx.party.state.champions.map((c) => c.name).join('/');
+    },
+    /** How many times the screen has been drawn with no menu up. */
+    drawsWithNoMenu(): number {
+      return drawsWithNoMenu;
     },
   };
 }
@@ -1354,6 +1426,9 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
     await rig.click(g.loadButtonId);
     check(pressAtEnter === null && SaveMenu.isSaveMenuOpen(ui) && game.ctx.party.state.champions.length === 1,
       'where LOAD is inert, and Enter, which is LOAD: the row holds nothing to load');
+    const exportRect = SaveMenu.buttonRect(g.buttonFrames.export);
+    SaveMenu.saveMenuClick(ui, exportRect.x1, exportRect.y1, LEFT);
+    check(state.press === null && SaveMenu.isSaveMenuOpen(ui), 'EXPORT\'s frame, which has no label, takes no click');
 
     await rig.click(g.saveButtonId);
     const made = SaveMenu.selectedEntry(state);
@@ -1416,7 +1491,16 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
       'the load-only chooser has no "new save" row, and opens on the last save used too');
     await rig.click(g.saveButtonId);
     check(store.files.size === 2 && SaveMenu.isSaveMenuOpen(ui), 'and its SAVE is inert');
-    SaveMenu.closeSaveMenu(ui);
+
+    // CANCEL is a button like the others: its press plays first.
+    const cancel = SaveMenu.buttonRect(g.buttonFrames.cancel);
+    SaveMenu.saveMenuClick(ui, cancel.x1, cancel.y1, LEFT);
+    const pressed = chooser.press?.buttonId === g.cancelButtonId && SaveMenu.isSaveMenuOpen(ui);
+    const drawsThen = rig.drawsWithNoMenu();
+    await rig.settled();
+    console.log(`  CANCEL: ${pressed ? 'pressed' : 'NOT PRESSED'}, then ${SaveMenu.isSaveMenuOpen(ui) ? 'THE MENU' : 'the menu gone'}, the screen drawn ${rig.drawsWithNoMenu() - drawsThen} time(s) after it, party ${rig.party()}`);
+    check(pressed && !SaveMenu.isSaveMenuOpen(ui) && rig.party() === 'DAROO', 'CANCEL plays its press, then closes the chooser, and nothing is loaded');
+    check(rig.drawsWithNoMenu() === drawsThen + 1, 'and the screen is drawn once more with the chooser gone, which the entrance waits on');
 
     // Saved over, the other save is the last one used.
     now += 60_000;
@@ -1508,12 +1592,13 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
     check(asked === 'asks (save)' && store.files.get(theirNewer.id) === held,
       'SAVE over a save of another playthrough asks first, and has written nothing');
 
-    // The question is `_DoMenu`'s two-option menu, in the list's place.
+    // The question is `_DoMenu`'s two-option menu, centred, in the dialog's place.
     SaveMenu.drawSaveMenu(ui);
     const drawn = ui.screenIndexBuffer!.pixels.slice();
-    doMenu(ui, SaveMenu.SAVE_MENU_QUESTION, null, ['SAVE', 'CANCEL'], false);
+    ui.screenIndexBuffer!.pixels.fill(0);
+    doMenu(ui, SaveMenu.SAVE_MENU_QUESTION, null, ['SAVE', 'CANCEL'], true);
     check(drawn.every((p, i) => p === ui.screenIndexBuffer!.pixels[i]),
-      `it is _DoMenu's two-option menu: "${SaveMenu.SAVE_MENU_QUESTION}", SAVE, CANCEL`);
+      `it is _DoMenu's two-option menu, centred on the cleared screen: "${SaveMenu.SAVE_MENU_QUESTION}", SAVE, CANCEL`);
 
     SaveMenu.saveMenuClick(ui, VIEWPORT_X + 4, VIEWPORT_Y + 4, LEFT);
     SaveMenu.saveMenuKey(ui, 'Enter');

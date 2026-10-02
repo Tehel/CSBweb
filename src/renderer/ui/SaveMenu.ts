@@ -1,27 +1,32 @@
 /**
  * The save/load screen behind the inventory's disk icon.
  *
- * This is **not** a port of `_DisplayDiskMenu`. It keeps `_DoMenu`'s bitmap, colours,
- * text metrics and press animation — all of that is `Menu.ts` — and replaces CSBWin's
- * four-slot chooser, which is a `char fNames[4][20]` on the stack shown as a four-button
- * menu (`doc/CSBwin-src/CSBCode.cpp:9744-9816`). Every divergence is listed in
- * `doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port". In short: an
- * unbounded scrolling list of the data set's saves, a date and roster per row instead of
- * a filename and a recency letter, no "save and quit", and Esc/right-click to cancel.
+ * This is **not** a port of `_DisplayDiskMenu`. It keeps `_DoMenu`'s art, colours, text
+ * metrics and press animation, and replaces CSBWin's four-slot chooser, which is a
+ * `char fNames[4][20]` on the stack shown as a four-button menu
+ * (`doc/CSBwin-src/CSBCode.cpp:9744-9816`). Every divergence is listed in
+ * `doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port". In short: a
+ * dialog of its own over the screen, an unbounded scrolling list of the data set's saves,
+ * a date and roster per row instead of a filename and a recency letter, no "save and
+ * quit", and Esc/right-click to cancel.
  *
- * ## The list panel
+ * ## The dialog
  *
- * Graphic 0 carries a title panel (viewport y 10..51) above a full-width button frame
- * (y 62..89) and a split pair below it (y 100..125). A list needs one tall clean area,
- * so the panel's own interior band is tiled downward over the full-width frame and its
- * bottom border copied to the new bottom edge — the same self-blit technique the 1-, 2-
- * and 4-option layouts use, so no art is invented. That leaves the bottom pair for LOAD
- * and SAVE, hit-tested and animated through CSBWin's own rectangles (ids 212 and 213 of
- * the four-option set).
+ * `_DoMenu` draws graphic 0, 224x136, in the viewport's place, and each of its four
+ * layouts is that bitmap blitted over itself (`Menu.ts`). A list of saves beside a
+ * preview needs more room than the bitmap has, so the dialog is 304x184 on a screen
+ * cleared to black, and is drawn from three pieces of graphic 0 (`drawPiece`): the grey
+ * frame, the sunken title panel and a button frame. A piece drawn at another size keeps
+ * its corners and repeats the column and the row just inside them, so no art is
+ * invented. Two panels, the list's and the preview's, stand over a row of four button
+ * frames: LOAD, SAVE and EXPORT under the list, CANCEL under the preview.
  *
- * An unavailable LOAD is drawn with **no label at all**, which is what CSBWin does to an
- * empty save slot: `strcpy(fNames[i],"   ")` blanks the name and the button sits there
- * inert (`doc/CSBwin-src/CSBCode.cpp:9772`).
+ * A label sits in its frame where `_DoMenu` puts one, and a click and the press
+ * animation take the rectangle CSBWin's table gives a frame (`buttonRect`,
+ * `buttonLabelAt`). A button that can do nothing is drawn with **no label at all**, which
+ * is what CSBWin does to an empty save slot: `strcpy(fNames[i],"   ")` blanks the name
+ * and the button sits there inert (`doc/CSBwin-src/CSBCode.cpp:9772`). EXPORT's frame is
+ * such a button.
  *
  * ## The "new save" row
  *
@@ -39,10 +44,10 @@
  * LOAD and SAVE ask first when the selected save is of another playthrough than the
  * running game's (`asksFirst`): the one would leave the game being played for another,
  * the other would write this game over a save of another. The question is `_DoMenu`'s
- * two-option menu in the list's place, under CSBWin's own line for a save of another
- * `d.RandomGameID`, "THAT'S NOT THE SAME GAME" (`doc/CSBwin-src/SaveGame.cpp:1605-1606`,
- * where it refuses the save outright), with the action and CANCEL. The load-only chooser
- * has no game to leave and never asks.
+ * two-option menu, centred, in the dialog's place, under CSBWin's own line for a save of
+ * another `d.RandomGameID`, "THAT'S NOT THE SAME GAME"
+ * (`doc/CSBwin-src/SaveGame.cpp:1605-1606`, where it refuses the save outright), with the
+ * action and CANCEL. The load-only chooser has no game to leave and never asks.
  *
  * ## Modality and the clock
  *
@@ -55,20 +60,17 @@
  */
 import type { OpenedSave, SaveEntry } from '../../data/saves';
 import { formatSaveDetail, formatSaveRow, lastUsedSave } from '../../data/saves';
-import { fillRectIndex } from '../csbwin/CanvasBlitter';
+import { clearIndex, fillRectIndex } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
-import type { UIButton } from '../../data/tables/UITables';
-import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
+import type { Rect, UIButton } from '../../data/tables/UITables';
 import { searchButtonList } from './HitTest';
 import {
+  MENU_GRAPHIC,
   MENU_OPTION_COLOR,
   MENU_PANEL_COLOR,
   MENU_PRESS_PHASE_MS,
   MENU_TITLE1_COLOR,
-  centeredText,
-  copyMenuRegion,
   doMenu,
-  drawMenuBitmap,
   drawMenuPress,
   menuButtonList,
   menuButtonRect,
@@ -81,64 +83,110 @@ import { nowMs, type UIState } from './UIState';
 
 /* ------------------------------------------------------------------ geometry ---- */
 
-/** All in graphic 0's own coordinates; `+VIEWPORT_X/Y` puts them on screen. */
-const PANEL_BAND_Y = 44;
-const PANEL_BAND_H = 7;
-const PANEL_BOTTOM_BORDER_SRC_Y = 51;
-const PANEL_EXTENDED_BOTTOM_Y = 95;
-const PANEL_INNER_X1 = 12;
-const PANEL_INNER_X2 = 212;
+/**
+ * A rectangle of graphic 0, and how much of each side is kept as it is when the piece is
+ * drawn at another size (`drawPiece`).
+ */
+export interface DialogPiece extends Rect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
 
-const TEXT_X = 14;
+/** The grey frame: graphic 0 whole, whose edges are plain as far as its panel, at 10. */
+const FRAME_PIECE: DialogPiece = { x1: 0, y1: 0, x2: 223, y2: 135, left: 9, top: 9, right: 9, bottom: 9 };
+/** The title panel: two rows and two columns of edge around the panel colour. */
+const PANEL_PIECE: DialogPiece = { x1: 10, y1: 10, x2: 213, y2: 51, left: 2, top: 2, right: 2, bottom: 2 };
+/**
+ * The left frame of the bottom pair. Its bevels are six columns each; its rows are all
+ * kept, so it is drawn at its own height alone.
+ */
+const BUTTON_PIECE: DialogPiece = { x1: 10, y1: 99, x2: 107, y2: 125, left: 6, top: 13, right: 6, bottom: 14 };
+
+/**
+ * All in screen coordinates. The margins are graphic 0's own: ten pixels of frame around
+ * what it holds, ten rows between its panel and the button frame below, nine columns
+ * between the frames of its bottom pair.
+ */
+const DIALOG: Rect = { x1: 8, y1: 8, x2: 311, y2: 191 };
+/** As wide as graphic 0's panel, for the 33 characters of a row. */
+const LIST_PANEL: Rect = { x1: 18, y1: 18, x2: 221, y2: 144 };
+const PREVIEW_PANEL: Rect = { x1: 231, y1: 18, x2: 301, y2: 144 };
+const BUTTON_Y1 = 155;
+const BUTTON_Y2 = 181;
+const BUTTON_FRAMES = {
+  load: { x1: 18, y1: BUTTON_Y1, x2: 79, y2: BUTTON_Y2 },
+  save: { x1: 89, y1: BUTTON_Y1, x2: 150, y2: BUTTON_Y2 },
+  export: { x1: 160, y1: BUTTON_Y1, x2: 221, y2: BUTTON_Y2 },
+  cancel: { x1: 231, y1: BUTTON_Y1, x2: 301, y2: BUTTON_Y2 },
+} as const;
+
+/** The list panel's clean interior: past its two columns of edge, and short of its one. */
+const LIST_INNER_X1 = LIST_PANEL.x1 + 2;
+const LIST_INNER_X2 = LIST_PANEL.x2 - 1;
+
+const TEXT_X = LIST_PANEL.x1 + 4;
 const TEXT_MAX_CHARS = 33;
-const HEADER_Y = 17;
-const ROW_FIRST_Y = 25;
+const ROW_FIRST_Y = LIST_PANEL.y1 + 9;
 const ROW_STEP = 8;
-export const SAVE_MENU_ROWS = 8;
-const STATUS_Y = 89;
-
-/** The option-label positions of the four-option layout's bottom row (`Menu.cpp:339`). */
-const LOAD_LABEL_X = 59;
-const SAVE_LABEL_X = 166;
-const BOTTOM_LABEL_Y = 114;
+export const SAVE_MENU_ROWS = 14;
+const STATUS_Y = ROW_FIRST_Y + SAVE_MENU_ROWS * ROW_STEP + 1;
 
 /** The full menu's first row: SAVE with it selected makes a new save. */
 const NEW_SAVE_LABEL = 'NEW SAVE';
 
 /** The question's title, and its two options: the action asked about, then this. */
 export const SAVE_MENU_QUESTION = 'THAT\'S NOT THE SAME GAME';
-const QUESTION_CANCEL_LABEL = 'CANCEL';
+const CANCEL_LABEL = 'CANCEL';
 const ACTION_LABELS = { load: 'LOAD', save: 'SAVE' } as const;
 
-/** Ids for the parts of the screen CSBWin has no button for. 210..213 stay CSBWin's. */
-const BTN_LOAD = 212;
-const BTN_SAVE = 213;
+/** The dialog's own buttons; the question's are CSBWin's 210 and 211. */
+const BTN_LOAD = 900;
+const BTN_SAVE = 901;
 const BTN_CANCEL = 902;
 const BTN_ROW0 = 910;
+
+/**
+ * The rectangle a click on a button frame takes, and its press animation grows from, as
+ * the table holds one: the frame less six pixels a side, `x2` and `y2` exclusive, which
+ * is what `d.pButn18970` gives graphic 0's own frames.
+ */
+export function buttonRect(frame: Rect): Rect {
+  return { x1: frame.x1 + 6, y1: frame.y1 + 6, x2: frame.x2 - 6, y2: frame.y2 - 6 };
+}
+
+/**
+ * Where a label is centred in a button frame: where `_DoMenu` centres one in graphic 0's
+ * own, (59,114) and (166,114) in its bottom pair (`doc/CSBwin-src/Menu.cpp:339-346`).
+ */
+export function buttonLabelAt(frame: Rect): { x: number; y: number } {
+  return { x: ((frame.x1 + frame.x2) >> 1) + 1, y: frame.y1 + 15 };
+}
 
 /**
  * Everything the layout depends on, in one place, so `tools/dump-save-menu.ts` can
  * check it against the art instead of against a copy of these numbers.
  */
 export const SAVE_MENU_GEOMETRY = {
-  panelBandY: PANEL_BAND_Y,
-  panelBandHeight: PANEL_BAND_H,
-  panelBottomBorderSrcY: PANEL_BOTTOM_BORDER_SRC_Y,
-  panelExtendedBottomY: PANEL_EXTENDED_BOTTOM_Y,
-  panelInnerX1: PANEL_INNER_X1,
-  panelInnerX2: PANEL_INNER_X2,
+  framePiece: FRAME_PIECE,
+  panelPiece: PANEL_PIECE,
+  buttonPiece: BUTTON_PIECE,
+  dialog: DIALOG,
+  listPanel: LIST_PANEL,
+  previewPanel: PREVIEW_PANEL,
+  buttonFrames: BUTTON_FRAMES,
+  listInnerX1: LIST_INNER_X1,
+  listInnerX2: LIST_INNER_X2,
   textX: TEXT_X,
   textMaxChars: TEXT_MAX_CHARS,
-  headerY: HEADER_Y,
   rowFirstY: ROW_FIRST_Y,
   rowStep: ROW_STEP,
   rows: SAVE_MENU_ROWS,
   statusY: STATUS_Y,
-  loadLabelX: LOAD_LABEL_X,
-  saveLabelX: SAVE_LABEL_X,
-  bottomLabelY: BOTTOM_LABEL_Y,
   loadButtonId: BTN_LOAD,
   saveButtonId: BTN_SAVE,
+  cancelButtonId: BTN_CANCEL,
 } as const;
 
 /* --------------------------------------------------------------------- state ---- */
@@ -166,7 +214,7 @@ export interface SaveMenuState {
   press: MenuPress | null;
   /** What the press animation will do when it finishes. */
   pending: (() => void) | null;
-  /** The action the question on screen asks about, in the list's place, or `null`. */
+  /** The action the question on screen asks about, in the dialog's place, or `null`. */
   confirm: SaveMenuAction | null;
   frameHandle: number | null;
 }
@@ -306,51 +354,74 @@ function clampScroll(state: SaveMenuState): void {
 /* ------------------------------------------------------------------ drawing ---- */
 
 /**
- * Tile the title panel's interior band down over the full-width button frame, then put
- * its bottom border back at the new edge. `Menu.cpp` patches its own layouts exactly
- * this way (`rect18576`/`rect18592`/`rect18600`); this is one more patch in the same
- * idiom, and it is the only reason the list has room.
+ * Draw a piece of graphic 0 into `box`, at the box's size. The piece's corners are kept,
+ * `left` by `top` and so on; between them every row repeats the column just inside the
+ * left corner, and every column the row just inside the top one. `Menu.cpp` makes its
+ * layouts out of graphic 0 blitted over itself (`rect18576` to `rect18600`); this makes
+ * a larger one out of the same art.
  */
-export function extendListPanel(ui: UIState): void {
-  const ox = VIEWPORT_X;
-  const oy = VIEWPORT_Y;
-  for (let y = PANEL_BAND_Y + PANEL_BAND_H; y < PANEL_EXTENDED_BOTTOM_Y; y += PANEL_BAND_H) {
-    const height = Math.min(PANEL_BAND_H, PANEL_EXTENDED_BOTTOM_Y - y);
-    copyMenuRegion(ui, ox, oy + PANEL_BAND_Y, 224, height, ox, oy + y);
+export function drawPiece(ui: UIState, piece: DialogPiece, box: Rect): void {
+  const graphic = ui.getGraphicBitmap(MENU_GRAPHIC);
+  if (!graphic) return;
+  const buf = ui.screenIndexBuffer;
+  const width = box.x2 - box.x1 + 1;
+  const height = box.y2 - box.y1 + 1;
+  const pieceWidth = piece.x2 - piece.x1 + 1;
+  const pieceHeight = piece.y2 - piece.y1 + 1;
+  const along = (at: number, size: number, pieceSize: number, lead: number, trail: number): number =>
+    at < lead ? at : at >= size - trail ? pieceSize - (size - at) : lead;
+  for (let y = 0; y < height; y++) {
+    const srcRow = (piece.y1 + along(y, height, pieceHeight, piece.top, piece.bottom)) * graphic.width;
+    const dstRow = (box.y1 + y) * buf.width + box.x1;
+    for (let x = 0; x < width; x++) {
+      buf.pixels[dstRow + x] = graphic.pixels[srcRow + piece.x1 + along(x, width, pieceWidth, piece.left, piece.right)];
+    }
   }
-  copyMenuRegion(ui, ox, oy + PANEL_BOTTOM_BORDER_SRC_Y, 224, 1, ox, oy + PANEL_EXTENDED_BOTTOM_Y);
+}
+
+/** The dialog with nothing in it: the frame, the two panels and the four button frames. */
+export function drawDialog(ui: UIState): void {
+  drawPiece(ui, FRAME_PIECE, DIALOG);
+  drawPiece(ui, PANEL_PIECE, LIST_PANEL);
+  drawPiece(ui, PANEL_PIECE, PREVIEW_PANEL);
+  for (const frame of Object.values(BUTTON_FRAMES)) drawPiece(ui, BUTTON_PIECE, frame);
 }
 
 function text(ui: UIState, s: string, x: number, y: number, color: number, background: number): void {
-  drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, x + VIEWPORT_X, y + VIEWPORT_Y, color, background, s);
+  drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, x, y, color, background, s);
 }
 
-/** The clickable rectangle of a text label, in screen coordinates. */
-function labelRect(x: number, y: number, chars: number): { x1: number; y1: number; x2: number; y2: number } {
-  return {
-    x1: x + VIEWPORT_X,
-    y1: y + VIEWPORT_Y - 5,
-    x2: x + VIEWPORT_X + chars * 6 - 1,
-    y2: y + VIEWPORT_Y + 2,
-  };
+/** A button's label, `CenteredText`'s way (`doc/CSBwin-src/Menu.cpp:192`). */
+function drawLabel(ui: UIState, s: string, frame: Rect): void {
+  const at = buttonLabelAt(frame);
+  text(ui, s, at.x - 3 * s.length, at.y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
 }
 
+/** The rectangle of the list's row `row`, counted from the first one shown. */
+function rowRect(row: number): Rect {
+  const y = ROW_FIRST_Y + row * ROW_STEP;
+  return { x1: LIST_INNER_X1, y1: y - 5, x2: LIST_INNER_X2, y2: y + 2 };
+}
+
+/**
+ * The whole screen: the dialog, or the question in its place, on black. `_DoMenu` clears
+ * the screen under a menu its caller asks it to (`ClearOldScreen`,
+ * `doc/CSBwin-src/Menu.cpp:285-291`), as the entrance's chooser does; the disk menu's
+ * does not, and this one is cleared there too, since the dialog leaves no part of the
+ * game's picture whole.
+ */
 export function drawSaveMenu(ui: UIState): void {
   const state = ui.saveMenu;
   if (!state) return;
+  clearIndex(ui.screenIndexBuffer, 0);
 
   if (state.confirm) {
-    doMenu(ui, SAVE_MENU_QUESTION, null, [ACTION_LABELS[state.confirm], QUESTION_CANCEL_LABEL], false);
+    doMenu(ui, SAVE_MENU_QUESTION, null, [ACTION_LABELS[state.confirm], CANCEL_LABEL], true);
     if (state.press) drawMenuPress(ui, state.press, nowMs());
     return;
   }
 
-  drawMenuBitmap(ui, false);
-  extendListPanel(ui);
-
-  // Header: CANCEL on the right.
-  const cancelX = PANEL_INNER_X2 - 6 * 6;
-  text(ui, 'CANCEL', cancelX, HEADER_Y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
+  drawDialog(ui);
 
   // The rows.
   clampScroll(state);
@@ -358,21 +429,13 @@ export function drawSaveMenu(ui: UIState): void {
     const index = state.scrollTop + row;
     if (index >= rowCount(state)) break;
     const entry = entryAt(state, index);
-    const y = ROW_FIRST_Y + row * ROW_STEP;
     const highlighted = index === state.selected;
-    if (highlighted) {
-      fillRectIndex(ui.screenIndexBuffer, {
-        x1: PANEL_INNER_X1 + VIEWPORT_X,
-        y1: y + VIEWPORT_Y - 5,
-        x2: PANEL_INNER_X2 + VIEWPORT_X,
-        y2: y + VIEWPORT_Y + 2,
-      }, MENU_OPTION_COLOR);
-    }
+    if (highlighted) fillRectIndex(ui.screenIndexBuffer, rowRect(row), MENU_OPTION_COLOR);
     text(
       ui,
       entry ? formatSaveRow(entry, TEXT_MAX_CHARS) : NEW_SAVE_LABEL,
       TEXT_X,
-      y,
+      ROW_FIRST_Y + row * ROW_STEP,
       highlighted ? MENU_PANEL_COLOR : MENU_OPTION_COLOR,
       highlighted ? MENU_OPTION_COLOR : MENU_PANEL_COLOR,
     );
@@ -390,10 +453,11 @@ export function drawSaveMenu(ui: UIState): void {
     text(ui, 'NO SAVED GAMES HERE', TEXT_X, ROW_FIRST_Y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
   }
 
-  // The two real buttons. An unavailable one is left unlabelled, as CSBWin leaves an
-  // empty save slot unlabelled.
-  if (canLoad(state)) centeredText(ui, 'LOAD', LOAD_LABEL_X, BOTTOM_LABEL_Y, false);
-  if (canSave(state)) centeredText(ui, 'SAVE', SAVE_LABEL_X, BOTTOM_LABEL_Y, false);
+  // A button that can do nothing is left unlabelled, as CSBWin leaves an empty save
+  // slot unlabelled.
+  if (canLoad(state)) drawLabel(ui, ACTION_LABELS.load, BUTTON_FRAMES.load);
+  if (canSave(state)) drawLabel(ui, ACTION_LABELS.save, BUTTON_FRAMES.save);
+  if (!state.busy) drawLabel(ui, CANCEL_LABEL, BUTTON_FRAMES.cancel);
 
   if (state.press) drawMenuPress(ui, state.press, nowMs());
 }
@@ -401,38 +465,20 @@ export function drawSaveMenu(ui: UIState): void {
 /* ------------------------------------------------------------------ hit test ---- */
 
 /**
- * The menu's own button list — CSBWin's rectangles for LOAD and SAVE, ours for
- * everything it has no equivalent of. Built fresh on each click because the row
- * rectangles follow the scroll position.
+ * The dialog's own button list, in the form of CSBWin's (`x2` and `y2` exclusive): the
+ * three buttons that have a label, and the rows shown. Built fresh on each click because
+ * the rows follow the scroll position.
  */
-function saveMenuButtons(ui: UIState, state: SaveMenuState): UIButton[] {
-  const csbwin = menuButtonList(ui, 4, false);
-  const buttons: UIButton[] = [];
-  const push = (word0: number, r: { x1: number; y1: number; x2: number; y2: number }, name: string): void => {
-    buttons.push({ word0, x1: r.x1, x2: r.x2 + 1, y1: r.y1, y2: r.y2 + 1, button: 2, name });
-  };
-
-  push(BTN_CANCEL, labelRect(PANEL_INNER_X2 - 6 * 6, HEADER_Y, 6), 'saveMenu.cancel');
-
+export function saveMenuButtons(state: SaveMenuState): UIButton[] {
+  const buttons: UIButton[] = [
+    { word0: BTN_LOAD, ...buttonRect(BUTTON_FRAMES.load), button: 2, name: 'saveMenu.load' },
+    { word0: BTN_SAVE, ...buttonRect(BUTTON_FRAMES.save), button: 2, name: 'saveMenu.save' },
+    { word0: BTN_CANCEL, ...buttonRect(BUTTON_FRAMES.cancel), button: 2, name: 'saveMenu.cancel' },
+  ];
   const visible = Math.min(SAVE_MENU_ROWS, Math.max(0, rowCount(state) - state.scrollTop));
   for (let row = 0; row < visible; row++) {
-    const y = ROW_FIRST_Y + row * ROW_STEP;
-    push(
-      BTN_ROW0 + row,
-      {
-        x1: PANEL_INNER_X1 + VIEWPORT_X,
-        y1: y + VIEWPORT_Y - 5,
-        x2: PANEL_INNER_X2 + VIEWPORT_X,
-        y2: y + VIEWPORT_Y + 2,
-      },
-      `saveMenu.row${row}`,
-    );
-  }
-
-  // CSBWin's own two, straight out of `graphics.dat` — `x2`/`y2` are already exclusive
-  // there, so they are pushed unmodified rather than through `push`.
-  for (const entry of csbwin) {
-    if (entry.word0 === BTN_LOAD || entry.word0 === BTN_SAVE) buttons.push(entry);
+    const r = rowRect(row);
+    buttons.push({ word0: BTN_ROW0 + row, x1: r.x1, x2: r.x2 + 1, y1: r.y1, y2: r.y2 + 1, button: 2, name: `saveMenu.row${row}` });
   }
   return buttons;
 }
@@ -455,15 +501,20 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
   if (state.busy || state.press) return;
 
   if (state.confirm) {
-    answerQuestion(ui, state, state.confirm, menuHitTest(menuButtonList(ui, 2, false), x, y, buttons));
+    answerQuestion(ui, state, state.confirm, menuHitTest(menuButtonList(ui, 2, true), x, y, buttons));
     return;
   }
 
-  const id = searchButtonList(saveMenuButtons(ui, state), x, y, buttons);
+  const id = searchButtonList(saveMenuButtons(state), x, y, buttons);
   if (id === 0) return;
 
   if (id === BTN_CANCEL) {
-    closeSaveMenu(ui);
+    // The screen is drawn again once the dialog is gone: the entrance's chooser waits on
+    // that draw to know it has closed (`openLoadMenu`, `src/renderer/intro/BootSequence.ts`).
+    beginPress(ui, state, saveMenuButtons(state), BTN_CANCEL, () => {
+      closeSaveMenu(ui);
+      ui.renderLastFrame();
+    });
     return;
   }
   if (id >= BTN_ROW0 && id < BTN_ROW0 + SAVE_MENU_ROWS) {
@@ -481,7 +532,7 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
 
 /** LOAD or SAVE pressed: once the press has played, the question, or the action at once. */
 function pressAction(ui: UIState, state: SaveMenuState, action: SaveMenuAction): void {
-  beginPress(ui, state, menuButtonList(ui, 4, false), action === 'load' ? BTN_LOAD : BTN_SAVE, () => {
+  beginPress(ui, state, saveMenuButtons(state), action === 'load' ? BTN_LOAD : BTN_SAVE, () => {
     if (asksFirst(ui, state)) {
       state.confirm = action;
       ui.renderLastFrame();
@@ -498,7 +549,7 @@ function pressAction(ui: UIState, state: SaveMenuState, action: SaveMenuAction):
  */
 function answerQuestion(ui: UIState, state: SaveMenuState, action: SaveMenuAction, choice: number): void {
   if (choice !== 1 && choice !== 2) return;
-  beginPress(ui, state, menuButtonList(ui, 2, false), 209 + choice, () => {
+  beginPress(ui, state, menuButtonList(ui, 2, true), 209 + choice, () => {
     state.confirm = null;
     if (choice === 1) void runPending(ui, action);
     else ui.renderLastFrame();

@@ -183,18 +183,18 @@ await canvasClick(15, 15, 2);  await wait(500);   // back out
 // placeholder panel; the panel is now `ui/Attack.ts` driven by `word20252`.
 await canvasClick(240, 100, 0); await wait(600);
 console.log('state: attack panel');      await shot('05-attack');
-// The disk icon (`buttons17760[1]`, id 140) raises the save/load screen over the
-// viewport. Reopen an inventory first — the attack-panel step backed out of it. The
-// browser store was emptied on boot, so the list is reliably its "NEW SAVE" row alone
-// and this frame pins the panel itself: graphic 0, the interior band tiled down over the
-// full-width button frame, and the two bottom buttons with LOAD unlabelled because that
-// row holds nothing to load.
+// The disk icon (`buttons17760[1]`, id 140) raises the save/load dialog over the whole
+// screen, cleared. Reopen an inventory first — the attack-panel step backed out of it.
+// The browser store was emptied on boot, so the list is reliably its "NEW SAVE" row alone
+// and this frame pins the dialog itself: the frame, the two panels and the four buttons,
+// all pieces of graphic 0, with LOAD unlabelled because that row holds nothing to load
+// and EXPORT because it does nothing yet.
 await canvasClick(15, 15, 2);  await wait(600);
 await canvasClick(177, 40, 0); await wait(900);
 console.log('state: save menu');         await shot('06-savemenu');
-// SAVE (id 213, x 123..207, y 138..152), a new save from that row, for the resume from
-// the entrance below.
-await canvasClick(165, 145, 0); await wait(1200);
+// SAVE (x 95..143, y 161..174), a new save from that row, for the resume from the
+// entrance below.
+await canvasClick(120, 168, 0); await wait(1200);
 
 // The dungeon entrance, with the intro left on. The wait has to cover the whole title
 // animation — about 116 vertical blanks — plus the entrance's own fade; once that fade
@@ -212,13 +212,14 @@ const entrance = await shot('07-entrance');
 await canvasClick(270, 192, 0); await wait(1500);
 console.log('state: credits');
 const credits = await shot('08-credits');
-// Back to the entrance, "resume" (id 201), the one save the chooser lists, LOAD (id 212):
+// Back to the entrance, "resume" (id 201), the one save the chooser lists, its first
+// row, and LOAD (x 24..72, y 161..174):
 // the loaded game is played at once, with no "GAME LOADED, READY TO PLAY." before it, so
 // this is the adventure's first view of the save made above.
 await canvasClick(160, 100, 0); await wait(1000);
 await canvasClick(270, 84, 0);  await wait(1500);
-await canvasClick(100, 60, 0);  await wait(300);
-await canvasClick(58, 145, 0);  await wait(1500);
+await canvasClick(100, 27, 0);  await wait(300);
+await canvasClick(48, 168, 0);  await wait(1500);
 console.log('state: game loaded');       await shot('12-game-loaded');
 
 // A pressed crack switch (`doc/PROVEN_FACTS.md`, "Crack Switch (In) placement"): level 4,

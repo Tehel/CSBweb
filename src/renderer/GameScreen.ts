@@ -470,18 +470,17 @@ export class GameScreen {
     drawSpellControls(this.ui);
     drawHeldObjectName(this.ui);
     drawMessageLines(this.ui, this.messages);
-    if (this.ui.shadedByTag02076e || isSaveMenuOpen(this.ui)) {
+    if (this.ui.shadedByTag02076e) {
       // `TAG02076e` shades the movement-arrow area, unless an inventory is open, then the
       // magic and weapon-ready areas (`doc/CSBwin-src/Character.cpp:5118-5132`), until
-      // `TAG0207cc` redraws them (`tag02076e` lists the callers). The load-only save
-      // screen, which calls no `TAG02076e`, draws over the same interface and shades it too.
+      // `TAG0207cc` redraws them (`tag02076e` lists the callers).
       if (!inventoryOpen) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
       shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
       shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word20, 0);
     }
     if (isSaveMenuOpen(this.ui)) {
-      // The screen goes over the viewport, which is where `_DoMenu` leaves it when
-      // `I1 == 0`.
+      // The dialog takes the whole screen, cleared, where `_DoMenu` with `I1 == 0`
+      // would leave the picture around the viewport.
       drawSaveMenu(this.ui);
     }
     // The button flash's inversion (`vblFlashButn`), for as long as `d.Word11776` says it
@@ -596,11 +595,10 @@ export class GameScreen {
    *
    * `_ReadEntireGame` reaches the chooser through `SelectSaveGame(_9_, 1, 1, 1)`
    * (`doc/CSBwin-src/SaveGame.cpp:1563`), whose leading 1 is `_DoMenu`'s `FadeOldScreen` /
-   * `ClearOldScreen` pair (`doc/CSBwin-src/Menu.cpp:285-291`) — so unlike the in-game disk
-   * icon, this one does not sit over the picture behind it.
+   * `ClearOldScreen` pair (`doc/CSBwin-src/Menu.cpp:285-291`): the screen under the chooser
+   * is cleared, which `drawSaveMenu` does for either menu.
    */
   presentSaveMenuOnly(palette: number[]): void {
-    clearIndex(this.screen, 0);
     drawSaveMenu(this.ui);
     this.presentScreen(palette);
   }

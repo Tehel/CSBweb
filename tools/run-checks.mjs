@@ -198,8 +198,8 @@ const CHECKS = [
   // changes held to a named list. `dump-savegame.ts` drives the runtime snapshot directly
   // and the `dump-csbwin-*` tools the reader; this is the trip through both.
   { tool: 'dump-save-roundtrip.ts' },
-  // The save/load screen: the button-table offsets it hangs off, the list panel built
-  // out of graphic 0, the row formatting, and the two metadata paths. Nothing here is
+  // The save/load screen: the button-table offsets it hangs off, the dialog built out
+  // of graphic 0's pieces, the row formatting, and the two metadata paths. Nothing here is
   // visible to the golden frames until there are saves to list.
   { tool: 'dump-save-menu.ts' },
   // The title animation and the dungeon entrance. The golden frames can see the entrance

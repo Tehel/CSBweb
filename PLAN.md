@@ -273,7 +273,7 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   playthrough than the running game's, a file that names none included; the order of
   two saves of one playthrough is never checked, since loading an old save and saving
   over a newer one is ordinary play. The question is `_DoMenu`'s two-option menu in the
-  list's place: CSBWin's own line for a save of another `d.RandomGameID`, "THAT'S NOT
+  dialog's place: CSBWin's own line for a save of another `d.RandomGameID`, "THAT'S NOT
   THE SAME GAME" (`doc/CSBwin-src/SaveGame.cpp:1605-1606`), over the action and CANCEL
   (`asksFirst`, `src/renderer/ui/SaveMenu.ts`). The boot's chooser has no game behind
   it and never asks.
@@ -363,10 +363,15 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
      stored save's" (a store holding the ids a pinned stream draws first, and each
      game taking the next; another data set's saves; a store that cannot be listed).
 3. ⏳ **The dialog**, one commit each:
-   - a. ⏳ **The frame**: the dialog in its rectangle on the cleared screen, drawn from
-     graphic 0's pieces. The list stays as it is, flat, in the list's panel, with its
-     status line; the preview's panel is empty; LOAD, SAVE and CANCEL are buttons, and
-     EXPORT's frame has no label until step 4; the question is centred.
+   - a. ✅ **The frame**: the dialog in its rectangle on the cleared screen, drawn from
+     graphic 0's pieces (`drawPiece`, `src/renderer/ui/SaveMenu.ts`). The list is flat,
+     fourteen rows over its status line; the preview's panel is empty; LOAD, SAVE and
+     CANCEL are buttons, and EXPORT's frame has no label until step 4; the question is
+     centred. Evidence: `tools/dump-save-menu.ts`, "the dialog's pieces of graphic 0"
+     (each piece at its own size is the art), "the dialog" (the margins, and clean
+     panel under every row and label), "the menu button sets" (a frame's rectangle and
+     label against CSBWin's table) and "the menu's selection" (CANCEL, and EXPORT's
+     frame); the golden frame `tools/frames/06-savemenu.png`.
    - b. ⏳ **The two-level list**: a heading row for each playthrough over its saves,
      folded or not. A save's row gives up the party, which is its heading's, for the
      time of day and F5's mark. What LOAD and SAVE do with a heading selected is
@@ -470,7 +475,7 @@ Evidence:
 
 #### The menu
 
-The disk icon opens a menu drawn in the 320×200 buffer (`src/renderer/ui/SaveMenu.ts`
+The disk icon opens a dialog over the 320×200 buffer (`src/renderer/ui/SaveMenu.ts`
 over `Menu.ts`, a faithful `_DoMenu` / `_WaitForMenuSelect`), listing the running data
 set's saves (`GameSaves.list`, over `src/data/saves/`), newest first, each row with
 its date, level and party, under a first row, "NEW SAVE". The menu opens on the last
@@ -487,7 +492,8 @@ and "CANNOT LOAD NOW" for that last; CSBWin's own "UNABLE TO SAVE GAME!"
 (`doc/CSBwin-src/SaveGame.cpp:1266`) and "CAN'T FIND SAVED GAME!" (`:1585`) for a write
 that failed and for no save at all; a file that does not read gives the line the menu's
 status would show. Each outcome is also a line for the console, with the save's name,
-and with the error behind a failure. The five places it
+and with the error behind a failure. CANCEL, Esc and a right-click close the menu. The
+five places it
 diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`, with the menu
 the boot leaves out after a load. Evidence:
 `tools/dump-save-menu.ts` and the golden frame `tools/frames/06-savemenu.png`.
