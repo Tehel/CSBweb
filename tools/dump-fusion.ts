@@ -25,7 +25,12 @@
  *    the level deleted, the four texts of cell (0, 0) printed in the order of their letters
  *    780 VBLs apart, "THE END.", and `ShowCredits(1)` after its 4713 VBLs. A third run takes
  *    the "B" text off the cell, and only "A" is printed
- *    (`doc/PROVEN_FACTS.md` → "`_FusionSequence`: the end of the game").
+ *    (`doc/PROVEN_FACTS.md` → "`_FusionSequence`: the end of the game"). Two more runs
+ *    print onto a real `ScrollingText`, one that has printed nothing (`d.PrintRow` 0) and
+ *    one that has scrolled and whose rows have timed out (`d.PrintRow` 3): every text is
+ *    whole on the strip within three scrolls and stays until the next is printed, and
+ *    "THE END." is there when the credits come, which is the port's own
+ *    (`DEBT.md` H, "The ending's speech is shown whole").
  * 7. **A wall next door** blocks the square two away in that direction, open as it is.
  *
  * Run: `npx tsx tools/dump-fusion.ts`
@@ -40,11 +45,12 @@ import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { CloudType } from '../src/engine/cloudTypes';
 import type { Game } from '../src/engine/Game';
-import { createGameHost } from '../src/engine/GameHost';
+import { createGameHost, type MessageSink } from '../src/engine/GameHost';
 import { CHARFLAG_PORTRAIT_CHANGED, emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { DELTA_X, DELTA_Y } from '../src/engine/MonsterPerception';
 import { AttackType, MonsterType } from '../src/engine/monsterTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
+import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
@@ -78,8 +84,8 @@ interface Arena {
   inventory: Array<{ chIdx: number; views: number }>;
   /** `drawCharacterState` with `CHARFLAG_portraitChanged`: the champion, and the views drawn before. */
   portraits: Array<{ chIdx: number; views: number }>;
-  /** `PrintLines` as the host was asked it, and the VBL it came in. */
-  printed: Array<{ color: number; text: string; frame: number }>;
+  /** `PrintLines` as the host was asked it, the VBL it came in, and the strip as it found it. */
+  printed: Array<{ color: number; text: string; frame: number; strip: string }>;
   /** The views drawn so far (`drawViewport`). */
   views: number;
   /** Called on each `drawViewport`, the host's share of `_ProcessTimersViewportAndSound`. */
@@ -94,12 +100,41 @@ function setRoom(game: Game, x: number, y: number, roomType: RoomType): void {
   map.cellFlags[x]![y] = (roomType << 5) | (map.cellFlags[x]![y]! & 0x10);
 }
 
-function arena(withLordChaos: boolean): Arena {
+/** What the strip shows, as one line: its rows end to end, a space between two. */
+function shown(strip: ScrollingText | null): string {
+  if (!strip) return '';
+  return strip.snapshot().map((row) => row.trim()).filter((row) => row !== '').join(' ').replace(/ +/g, ' ');
+}
+
+/** The VBLs of one scroll: seven scanlines, and the VBL that clears `d.PushTextUp`. */
+const SCROLL_VBLS = 8;
+
+/**
+ * A strip as a game that has printed leaves it: five lines printed, so the fifth scrolled
+ * (`d.PrintRow` 3), and every row timed out since.
+ */
+function scrolledStrip(): ScrollingText {
+  const strip = new ScrollingText();
+  for (let line = 0; line < 5; line++) {
+    strip.printLines(15, `\nLINE ${line}`, 0);
+    for (let vbl = 0; vbl < SCROLL_VBLS; vbl++) {
+      strip.vblInterrupt();
+      strip.clockTick(0);
+    }
+  }
+  if (shown(strip) !== 'LINE 1 LINE 2 LINE 3 LINE 4') throw new Error(`the strip did not scroll: ${shown(strip)}`);
+  strip.clockTick(71);
+  if (strip.hasText()) throw new Error('the strip\'s rows did not time out');
+  return strip;
+}
+
+function arena(withLordChaos: boolean, strip: ScrollingText | null = null): Arena {
   const loader = new DungeonLoader();
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
   if (!data) throw new Error('dungeon.dat did not load');
   const hooks = { credits: [] as boolean[], drawn: (): void => {} };
+  const sink: MessageSink = strip ?? createGameHost().messages;
   const game = newGame(data, stockGraphics(), {
     showCredits: (word11694) => hooks.credits.push(word11694),
     drawCharacterState: (chIdx, charFlags) => {
@@ -107,8 +142,17 @@ function arena(withLordChaos: boolean): Arena {
     },
     showHideInventory: (chIdx) => a.inventory.push({ chIdx, views: a.views }),
     messages: {
-      ...createGameHost().messages,
-      printLines: (color, text) => a.printed.push({ color, text, frame: a.frames }),
+      printLinefeed: () => sink.printLinefeed(),
+      quePrintLines: (color, text) => sink.quePrintLines(color, text),
+      printLines: (color, text, time) => {
+        a.printed.push({ color, text, frame: a.frames, strip: shown(strip) });
+        sink.printLines(color, text, time);
+      },
+      setNewSpeed: (oldSpeed, newSpeed, time) => sink.setNewSpeed(oldSpeed, newSpeed, time),
+      resetTime: (newTime, time) => sink.resetTime(newTime, time),
+      clockTick: (time) => sink.clockTick(time),
+      printNextQueued: (time) => sink.printNextQueued(time),
+      vblInterrupt: () => sink.vblInterrupt(),
     },
     drawViewport: () => {
       a.views++;
@@ -303,11 +347,13 @@ const ENDING_TEXTS: Record<string, { rn: ObjectID; text: string }> = {
   D: { rn: 0x877 as ObjectID, text: 'YOUR NAMES WILL BE RECORDED IN THE GREAT HALL AND REMEMBERED BY THE FUTURE GENERATIONS YOU HAVE MADE POSSIBLE.' },
 };
 
-function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
+function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fresh' | 'scrolled' | null = null): void {
   console.log('');
   console.log('=== 6. boxed in: toast (Attack.cpp:213), and _FusionSequence (:2220) to the credits,'
-    + ` ${inventoryOpen ? 'the inventory open' : 'no inventory open'}${withoutB ? ', the "B" text taken off cell (0, 0)' : ''} ===`);
-  const a = arena(true);
+    + ` ${inventoryOpen ? 'the inventory open' : 'no inventory open'}${withoutB ? ', the "B" text taken off cell (0, 0)' : ''}`
+    + `${stripState === null ? '' : `, onto a strip that has ${stripState === 'fresh' ? 'printed nothing' : 'scrolled, its rows timed out'}`} ===`);
+  const strip = stripState === null ? null : stripState === 'fresh' ? new ScrollingText() : scrolledStrip();
+  const a = arena(true, strip);
   const game = a.game;
   if (withoutB) game.ctx.dungeon.removeObjectFromCell(new Position(0, 0, LEVEL), ENDING_TEXTS.B!.rn);
   const letters = withoutB ? ['A'] : ['A', 'B', 'C', 'D'];
@@ -367,9 +413,12 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
 
   let creditsAt = 0;
   const wantCredits = SEQUENCE_VBLS + letters.length * TEXT_VBLS;
+  /** What the strip shows after each VBL, by its number. */
+  const strips: string[] = [''];
   for (let n = 1; n <= wantCredits + 20; n++) {
     a.frames++;
     runVbl(game, TICK_DUE);
+    strips.push(shown(strip));
     if (a.credits.length > 0 && creditsAt === 0) creditsAt = n;
   }
   const want = expectedTypes(letters.length);
@@ -385,6 +434,7 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
   check(sounds.filter((n) => n === 17).length === 13, 'sound 17 once before the dispells and once for each of the twelve flickers');
   check(others > 0 && monstersOnLevel(game) === 1 && greyLordAt(game, CX, CY), 'every other monster on the level is deleted');
   for (const p of a.printed) console.log(`  printed at VBL ${p.frame}, colour ${p.color}: ${JSON.stringify(p.text)}`);
+  if (strip) checkStrip(a, strips, letters, creditsAt, stripState === 'fresh');
   const wantPrinted = [
     ...letters.map((l) => ({ color: 15, text: `\n${ENDING_TEXTS[l]!.text}` })),
     { color: 0, text: '\n' }, { color: 15, text: 'THE END.' }, { color: 0, text: '\n' },
@@ -401,6 +451,43 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
   check(creditsAt === wantCredits && creditsAt - endAt === 600, 'ShowCredits(1) after the VBLs the sequence waits, 600 of them after "THE END."');
   check(a.credits.join() === 'true', 'once, with d.Word11694 set');
   check(!game.canRestartFromSavegame() && game.mainLoopHasReturned(), 'd.CanRestartFromSavegame is cleared, and MainLoop is over');
+}
+
+/**
+ * What the strip showed of the ending, which is the port's own (`DEBT.md` H, "The ending's
+ * speech is shown whole"): each text whole within three scrolls of its `PrintLines`, a scroll
+ * for each of the three rows the longest wraps into, and still whole when the next line is
+ * printed, and "THE END." there when the credits come.
+ * `strips[n]` is the strip after VBL `n`.
+ */
+function checkStrip(a: Arena, strips: string[], letters: string[], creditsAt: number, fresh: boolean): void {
+  const within = 3 * SCROLL_VBLS;
+  const first = a.printed[0]!.frame;
+  console.log(`  the strip after the first text's VBL: ${JSON.stringify(strips[first])}`);
+  check(fresh ? strips[first]!.includes(ENDING_TEXTS.A!.text.replace(/ +/g, ' ')) : strips[first] === '',
+    fresh
+      ? 'd.PrintRow 0: the first text needs no scroll, and is whole in the VBL it is printed'
+      : 'd.PrintRow 3: every row of the first text is a scroll, and none is placed in the VBL it is printed');
+  letters.forEach((letter, i) => {
+    const text = ENDING_TEXTS[letter]!.text.replace(/ +/g, ' ');
+    const from = a.printed[i]!.frame;
+    const next = a.printed[i + 1]!;
+    let whole = -1;
+    for (let n = from; n < next.frame && whole < 0; n++) {
+      if (strips[n]!.includes(text)) whole = n - from;
+    }
+    console.log(`  "${letter}" whole ${whole < 0 ? 'never' : `${whole} VBLs after its PrintLines`}; when the next line is printed the strip holds ${JSON.stringify(next.strip)}`);
+    check(whole >= 0 && whole <= within, `"${letter}" is whole on the strip within ${within} VBLs, three scrolls, of its PrintLines`);
+    check(next.strip.includes(text), `"${letter}" is still whole when the next line is printed`);
+  });
+  const end = a.printed[letters.length]!.frame;
+  let seen = -1;
+  for (let n = end; n < creditsAt && seen < 0; n++) {
+    if (strips[n]!.endsWith('THE END.')) seen = n - end;
+  }
+  console.log(`  "THE END." on the strip ${seen < 0 ? 'never' : `${seen} VBLs after its PrintLines`}; the VBL before the credits the strip holds ${JSON.stringify(strips[creditsAt - 1])}`);
+  check(seen >= 0 && seen <= within, `"THE END." is on the strip within ${within} VBLs of its PrintLines`);
+  check(creditsAt > 0 && strips[creditsAt - 1]!.endsWith('THE END.'), 'and is its last line when the credits come');
 }
 
 function monstersOnLevel(game: Game): number {
@@ -443,6 +530,8 @@ function main(): void {
   checkBoxedIn(false);
   checkBoxedIn(true);
   checkBoxedIn(false, true);
+  checkBoxedIn(false, false, 'fresh');
+  checkBoxedIn(false, false, 'scrolled');
   checkWall();
   finish();
 }

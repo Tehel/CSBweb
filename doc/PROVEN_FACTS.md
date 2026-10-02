@@ -5121,8 +5121,15 @@ BY LEARNING THE TRUTH …" the last one shown. On a strip that has printed nothi
 and the credits come with "BY YOUR BRAVE DEEDS …" complete and "YOUR NAMES WILL BE
 RECORDED …" never shown. `RemoveTimedOutText` and `PrintLines` still carry the waits
 (`wvbl`, `RESTART`) CSBWin commented out when it made the strip a queue (`:1498-1502`,
-`:1682-1685`). The port calls the strip's clock at the same three places
-(`AttackSystem.fusionSequence`, `Game.processTimersViewportAndSound`) and shows the same.
+`:1682-1685`).
+
+The port does not show the speech this way. Its waits after a text and after "THE END."
+are CSBWin's VBLs, 780 and 600, with the strip's clock run on each of them
+(`vblDelayPlacingText`, `src/engine/AttackSystem.ts`), so a row is placed in the VBL its
+scroll ends: every text is whole within 24 VBLs of its `PrintLines` and stays until the
+next is printed, and "THE END." is on the strip when the credits come, from either
+`d.PrintRow` (`DEBT.md` H, "The ending's speech is shown whole"). Evidence:
+`tools/dump-fusion.ts`.
 
 ## `AddObjectToRoom` clears the new object's link before either arm
 

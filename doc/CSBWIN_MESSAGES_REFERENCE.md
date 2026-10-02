@@ -176,7 +176,12 @@ What the engine does with it:
 
 - `Game.runFrame` is one VBL: `vblInterrupt()` first, then the loop's pass, which ends
   with `printNextQueued()`, one entry, unless the save menu has the clock stopped.
-- The tick calls `clockTick()` after the timers.
+- `clockTick()` has CSBWin's three callers and one of the port's own: the tick, after the
+  timers (`Game.runFrame`); the end of `printLines()`; a script's tick
+  (`Game.processTimersViewportAndSound`); and every VBL of the ending's waits after a text
+  and after "THE END." (`vblDelayPlacingText`, `src/engine/AttackSystem.ts`), which CSBWin's
+  `_VBLDelay` does not call, so that the Grey Lord's speech is shown whole
+  (`DEBT.md` → H). No other script's wait runs the clock.
 - Sleep and `WakeUp` call `setNewSpeed` with `d.Speed` (`speed` in
   `src/engine/LoopState.ts`), and every load calls `resetTime` just before it replaces the
   tick count (`applyRuntimeSaveState`).

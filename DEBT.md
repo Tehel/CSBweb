@@ -674,6 +674,24 @@ Recorded so that nobody "fixes" them.
   so `tableKeyButton` (`src/renderer/ui/Keyboard.ts`) leaves F1-F4 to `handleUIKey`. Every
   other table key keeps CSBWin's role. A rebinding screen, if players ever disagree, would
   make this a default rather than a divergence.
+- 🚫 **The ending's speech is shown whole.** CSBWin runs the strip's clock at a tick, at
+  the end of `PrintLines` and in `_ProcessTimersViewportAndSound`, and never in
+  `_VBLDelay`. So in `_FusionSequence` each text gets one scroll in its thirteen seconds,
+  and the credits come with most of the Grey Lord's speech, and "THE END.", never shown
+  (`doc/PROVEN_FACTS.md` → "The Grey Lord's speech reaches the strip one row per text once
+  the strip scrolls"). The author's decision: the port runs the clock on every VBL of the
+  waits after a text and after "THE END." (`vblDelayPlacingText`,
+  `src/engine/AttackSystem.ts`), so a row is placed in the VBL its scroll ends. Every text
+  is whole within 24 VBLs of its `PrintLines` and stays until the next is printed, and
+  "THE END." is on the strip when the credits come. The delays are CSBWin's: 780 VBLs a
+  text, 600 after "THE END.", 4713 in all on the shipped dungeon. The reason: what CSBWin
+  shows is a side effect of its making the strip a queue. `RemoveTimedOutText` and
+  `PrintLines` still carry, commented out, the waits that held the caller until a scroll
+  was over (`doc/CSBwin-src/CSBCode.cpp:1498-1502`, `:1682-1685`). That the Atari
+  original, with those waits, showed every text is an inference, not a verified fact. No
+  other script's wait runs the clock, and no other message is placed sooner than
+  CSBWin's. `tools/dump-fusion.ts` checks it from a strip that has printed nothing and
+  from one that has scrolled.
 - 🚫 **A script's caller finishes at once.** `Game.runScript` returns as soon as the script
   reaches its first `VBLDelay`, so what CSBWin's suspended caller would do after the script
   ends, the port's does before it. The fusion and the CSB win's wait end the game, and the

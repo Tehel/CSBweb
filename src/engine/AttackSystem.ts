@@ -963,7 +963,9 @@ export class AttackSystem {
    * "THE END.", and after `VBLDelay(600)` the credits, with `d.CanRestartFromSavegame`
    * cleared. Each step shows through `_ProcessTimersViewportAndSound`, which also runs the
    * timers. An open inventory is hidden first, and once the Grey Lord stands there
-   * `d.Word1868` takes the shimmer off the Fluxcages still around him.
+   * `d.Word1868` takes the shimmer off the Fluxcages still around him. The waits after a
+   * text and after "THE END." run the strip's clock, which CSBWin's do not
+   * (`vblDelayPlacingText`).
    */
   private *fusionSequence(): LoopScript {
     const mainLoop = this.ctx.systems.mainLoop;
@@ -1062,7 +1064,7 @@ export class AttackSystem {
         // state, which only the oracle reads.
         messages.printLines(15, '\n' + text.slice(2), this.ctx.state.tickCount);
         yield* mainLoop.processTimersViewportAndSound();
-        yield 780;
+        yield* this.vblDelayPlacingText(780);
         letter++;
         break;
       }
@@ -1070,9 +1072,27 @@ export class AttackSystem {
     messages.printLines(0, '\n', this.ctx.state.tickCount);
     messages.printLines(15, 'THE END.', this.ctx.state.tickCount);
     messages.printLines(0, '\n', this.ctx.state.tickCount);
-    yield 600;
+    yield* this.vblDelayPlacingText(600);
     mainLoop.clearCanRestartFromSavegame();
     yield* mainLoop.showCreditsAndEnd();
+  }
+
+  /**
+   * `VBLDelay(vbls)` after a line of the ending, with `scrollingText.ClockTick()` on each
+   * of its VBLs. That call is the port's own (`DEBT.md` H, "The ending's speech is shown
+   * whole"): CSBWin's `_VBLDelay` only waits (`doc/CSBwin-src/CSBCode.cpp:1137-1147`), so
+   * a row held back by a scroll is placed when the next text is printed, one row per
+   * text, and the credits come with most of the speech never shown
+   * (`doc/PROVEN_FACTS.md` → "The Grey Lord's speech reaches the strip one row per text
+   * once the strip scrolls"). Here a row is placed in the VBL its scroll ends. The VBLs
+   * waited are CSBWin's, and `d.Time` stands still through them, so no row times out.
+   */
+  private *vblDelayPlacingText(vbls: number): LoopScript {
+    const messages = this.ctx.host.messages;
+    for (let n = vbls; n !== 0; n--) {
+      yield 1;
+      messages.clockTick(this.ctx.state.tickCount);
+    }
   }
 
   /**
