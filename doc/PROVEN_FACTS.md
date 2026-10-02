@@ -5099,6 +5099,31 @@ keys in `handleUIKey`. Evidence: `tools/dump-fusion.ts`,
 `tools/dump-key-bindings.ts` for the menu and the keys, and `tools/dump-cloud-draw.ts` for
 the shimmer.
 
+## The Grey Lord's speech reaches the strip one row per text once the strip scrolls
+
+Each of the four texts is one long line, which `PrintLines` wraps at 53 columns into two or
+three rows (`doc/CSBwin-src/CSBCode.cpp:1723-1732`). A row past the strip's fourth is a
+scroll: `ClockTick` starts it and returns, and places nothing more until a later
+`ClockTick` finds the scroll over (`:1526-1538`). `ClockTick` has three callers, the tick
+(`:677`), the end of `PrintLines` (`:1736`) and `_ProcessTimersViewportAndSound`
+(`doc/CSBwin-src/Attack.cpp:2211`), and `_VBLDelay` is none of them: it only waits
+(`CSBCode.cpp:1137-1147`). In `_FusionSequence` a text's `PrintLines` and its view follow
+each other with no VBL between them, then come 780 VBLs (`Attack.cpp:2412-2415`), so each
+text gets one scroll, and the row that scroll opened is filled when the next text is
+printed, thirteen seconds later. "THE END." and its two linefeeds are three `PrintLines`
+in a row (`:2424-2426`), one scroll more at most.
+
+So what is read depends on `d.PrintRow` when the fusion starts. On a strip that has
+scrolled before, `d.PrintRow` is 3 and every row is a scroll: nothing shows for the first
+thirteen seconds, then one row per text, and the credits come with the second row of "ONLY
+BY LEARNING THE TRUTH …" the last one shown. On a strip that has printed nothing,
+`d.PrintRow` is 0: "THANK YOU MY FRIENDS. …" and two rows of the second text show at once,
+and the credits come with "BY YOUR BRAVE DEEDS …" complete and "YOUR NAMES WILL BE
+RECORDED …" never shown. `RemoveTimedOutText` and `PrintLines` still carry the waits
+(`wvbl`, `RESTART`) CSBWin commented out when it made the strip a queue (`:1498-1502`,
+`:1682-1685`). The port calls the strip's clock at the same three places
+(`AttackSystem.fusionSequence`, `Game.processTimersViewportAndSound`) and shows the same.
+
 ## `AddObjectToRoom` clears the new object's link before either arm
 
 `AddObjectToRoom(newObj, prevObj, mapX, mapY, pmmr)` (`doc/CSBwin-src/Code11f52.cpp:392`)
