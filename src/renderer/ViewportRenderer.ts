@@ -135,6 +135,7 @@ export class ViewportRenderer {
       seeThroughWalls: false,
       roomData: [],
       doorOrnaments: Array.from({ length: 17 }, (_, i): [number, number] => (i >= 15 ? [i + 286, 1] : [0, 0])),
+      loadedFloorDecorations: Array.from({ length: 16 }, (_, i): [number, number] => (i === 15 ? [241, 1] : [0, 0])),
     };
   }
 
@@ -260,6 +261,15 @@ export class ViewportRenderer {
     for (let i = 0; i < doorDecorationTOC.length; i++) {
       const decoration = doorDecorationTOC[i];
       doorOrnaments[i] = [303 + decoration, this.objectTables.doorOrnamentRectSetIndex[decoration]];
+    }
+
+    // `d.LoadedFloorDecorations[i] = { 247 + 6 * FloorDecorationTOC[i], Byte4110[FloorDecorationTOC[i]] }`
+    // (`doc/CSBwin-src/Code390e.cpp:263-274`).
+    const loadedFloorDecorations = this.context.loadedFloorDecorations!;
+    const floorDecorationTOC = map?.floorDecorationTOC ?? [];
+    for (let i = 0; i < floorDecorationTOC.length; i++) {
+      const decoration = floorDecorationTOC[i];
+      loadedFloorDecorations[i] = [247 + 6 * decoration, this.objectTables.floorDecorationRectSetIndex[decoration]];
     }
 
     // `d.DoorTOC[2] = d.DoorCharacteristics[doorType0Index/doorType1Index]`

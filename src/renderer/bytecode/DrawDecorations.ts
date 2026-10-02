@@ -394,14 +394,11 @@ export function drawWallText(draw: ViewportDraw, textRN: ObjectID, relativePosit
 
 export function DrawFloorDecorations(draw: ViewportDraw, graphicOrdinal: number, relativeCell: number): void {
   const tables = draw.context.objectTables;
-  const dungeon = draw.context.dungeonState;
   const viewport = draw.context.viewportIndexBuffer;
   const getGraphic = draw.context.getGraphicBitmap;
   const csbGraphics = draw.context.csbGraphics;
-  if (!tables || !dungeon || !viewport || !getGraphic) return;
-
-  const map = dungeon.getMap(draw.context.frameMapIndex ?? 0);
-  if (!map?.floorDecorationTOC) return;
+  const loaded = draw.context.loadedFloorDecorations;
+  if (!tables || !viewport || !getGraphic || !loaded) return;
 
   const drawFootprints = (graphicOrdinal & 0x8000) !== 0;
   const extFloorDecoration = (graphicOrdinal & 0x4000) !== 0;
@@ -424,16 +421,16 @@ export function DrawFloorDecorations(draw: ViewportDraw, graphicOrdinal: number,
   const drawSingle = (ord: number) => {
     if (ord === 0) return;
     const graphicIndex = (ord - 1) | 0;
-    if (graphicIndex < 0 || graphicIndex >= map.floorDecorationTOC!.length) return;
+    // `d.LoadedFloorDecorations[graphicIndex]` (`doc/CSBwin-src/CSBCode.cpp:3871-3892`).
+    const slot = loaded[graphicIndex];
+    if (!slot) return;
     if (relativeCell < 0 || relativeCell >= tables.floorDecorationDescSets[0].length) return;
 
-    const tocValue = map.floorDecorationTOC![graphicIndex] ?? 0;
-    const rectSetIndex = tables.floorDecorationRectSetIndex[tocValue] ?? 0;
+    const [baseGraphic, rectSetIndex] = slot;
     const rectSet = tables.floorDecorationDescSets[rectSetIndex];
     const desc = rectSet?.[relativeCell];
     if (!desc) return;
 
-    const baseGraphic = 247 + 6 * tocValue;
     const cellIncrement = tables.relativeCellGraphicIncrement[relativeCell] ?? 0;
     const graphicNum = baseGraphic + cellIncrement;
     const bitmap = getGraphic(graphicNum);

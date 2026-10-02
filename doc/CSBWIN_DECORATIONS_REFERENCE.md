@@ -22,7 +22,8 @@ This document captures verified decoration behavior from the CSBWin C++ source u
 ## Floor decoration rendering
 
 - `Viewport.cpp` defines `floorDrawingLocations[21]` as `{0,0,0,0,0,0,0,0,2,1,0,0,3,5,4,6,8,7,0,0,9}` for mapping relative cell indices to floor-decoration positions before calling `DrawFloorDecorations` (`doc/CSBwin-src/Viewport.cpp`).
-- `DrawFloorDecorations` converts a floor decoration ordinal to a graphic number via `base = 247 + 6 * FloorDecorationTOC[index]` and `graphicNumber = base + RelativeCellGraphicIncrement[relativeCell]`, then uses `floorDecorDesc[set][relativeCell]` where `set = Byte4110[FloorDecorationTOC[index]]` (`doc/CSBwin-src/CSBCode.cpp`).
+- `DrawFloorDecorations` converts a floor decoration ordinal to a graphic number through `d.LoadedFloorDecorations[index]`, a `{base, set}` pair: `graphicNumber = base + RelativeCellGraphicIncrement[relativeCell]`, drawn in `floorDecorDesc[set][relativeCell]` (`doc/CSBwin-src/CSBCode.cpp:3871-3892`). A level load fills the level's slots with `base = 247 + 6 * FloorDecorationTOC[index]` and `set = Byte4110[FloorDecorationTOC[index]]` (`doc/CSBwin-src/Code390e.cpp:263-274`).
+- Slot 15 is the magic footprints', graphic 241 in set 1, set once (`doc/CSBwin-src/CSBCode.cpp:10270-10273`). Bit 15 of the ordinal (`SummarizeRoomInfo`'s footprint bit) draws it as ordinal 16 on top of the cell's own decoration (`:3984-3987`).
 
 ## Decoration draw positions, and cropping at the screen edges
 

@@ -93,6 +93,13 @@ export interface InterpreterContext {
    * the level's count as the last level to fill it left it.
    */
   doorOrnaments?: Array<[number, number]>;
+  /**
+   * `d.LoadedFloorDecorations[16][2]`: per floor decoration, its first graphic and its
+   * rectangle set (`d.Byte4110`). Slot 15, the footprints (graphic 241, set 1), is set
+   * once (`doc/CSBwin-src/CSBCode.cpp:10270-10273`), and the level's own from its
+   * `FloorDecorationTOC` (`Code390e.cpp:263-274`), at most fifteen of them.
+   */
+  loadedFloorDecorations?: Array<[number, number]>;
   numWallDecoration?: number; // d.NumWallDecoration (CSBCode.cpp:5798)
   useMirrorImages?: boolean; // d.UseMirrorImages (Viewport.cpp:6740)
 

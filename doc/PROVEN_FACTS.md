@@ -903,6 +903,28 @@ one, and sets bit 15 of `decorations[2]` (`:402-416`), the floor decoration. The
 `summarizeRoomInfoCsbwin` with the `PartyFootprints` `DrawViewport` hands it. Evidence:
 `tools/dump-footprint-decoration.ts`.
 
+## The footprint graphic is slot 15 of `d.LoadedFloorDecorations`, which no level fills
+
+`DrawFloorDecorations` draws a floor decoration from `d.LoadedFloorDecorations[16][2]`, a
+first graphic and a rectangle set per slot (`doc/CSBwin-src/CSBCode.cpp:3871-3892`), and
+never from the level's `FloorDecorationTOC`. A level load fills the level's own slots,
+`{247 + 6 * FloorDecorationTOC[i], d.Byte4110[FloorDecorationTOC[i]]}`
+(`doc/CSBwin-src/Code390e.cpp:263-274`), and `NumFloorDecorations()` is four bits
+(`doc/CSBwin-src/CSB.h:2119`), so it reaches slot 14 at most. Slot 15 is the footprints',
+set once by `ReadTablesFromGraphicsFile` (`doc/CSBwin-src/CSBCode.cpp:10270-10273`):
+
+```cpp
+d.LoadedFloorDecorations[15][0] = 241;
+d.LoadedFloorDecorations[15][1] = 1;
+```
+
+Bit 15 of the ordinal draws it, as ordinal 16, after the cell's own decoration
+(`:3984-3987`), and alone when the ordinal is otherwise 0 (`:3812-3818`). The canary for
+both numbers: graphics 241-246 are the sizes of set 1's nine rectangles, each at
+`241 + d.RelativeCellGraphicIncrement[cell]`, and of neither other set's. The port:
+`InterpreterContext.loadedFloorDecorations`, which `ViewportRenderer` fills.
+Evidence: `tools/dump-footprint-decoration.ts`.
+
 ## A monster follows staler footprints the keener its nose
 
 `doc/CSBwin-src/Monster.cpp:615-620`:
