@@ -98,7 +98,9 @@ const cloudBitmap = {
 // overridden here so the test places the cloud where it wants.
 const RELATIVE_CELL = 0;
 const REL_CELL = RELATIVE_CELL + 3;
-const cloudRn = ((DBType.CLOUD << 10) | 0) as ObjectID;
+// The cloud's RN, the one slot of maps whose only record is the cloud.
+const rnMaps = new RnMaps(() => undefined);
+const cloudRn = rnMaps.rn(DBType.CLOUD, 0);
 const cloud = { nextObject: OBJECT_ID_EOF, value: 0, cloudType: 0, bit7: true };
 
 interface Drawn { x1: number; y1: number; x2: number; y2: number; rows: number[][] }
@@ -113,7 +115,7 @@ function drawCloudAt(px: number, py: number, viewportSeed: number): Drawn {
     objectTables: { ...realTables, cloudPositions7042, cloudScaleBase, cloudScale },
     getGraphicBitmap: () => cloudBitmap,
     dungeonState: {
-      rnMaps: new RnMaps(),
+      rnMaps,
       getDBRecordLink: () => OBJECT_ID_EOF,
       getCloudRecord: () => cloud,
     },
@@ -282,7 +284,7 @@ function drawScene(sc: Scene): SceneResult {
     viewportIndexBuffer,
     objectTables: { ...realTables, cloudPositions7042 },
     getGraphicBitmap: (n: number) => { requested.push(n); return fakeGraphic(n); },
-    dungeonState: { rnMaps: new RnMaps(), getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
+    dungeonState: { rnMaps, getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
   };
   viewportRandom.setSeed(sc.seed ?? seedFor(false, false));
   DrawClouds(new ViewportDraw(context), sc.relCell - 3, cloudRn, 0, 0);
@@ -402,7 +404,7 @@ for (const word1868 of [false, true]) {
       wallRectangles: viewportTables.wallRectangles,
       teleporterRectangles: viewportTables.teleporterRectangles,
       getGraphicBitmap: (n: number) => fakeGraphic(n),
-      dungeonState: { rnMaps: new RnMaps(), getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
+      dungeonState: { rnMaps, getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
       word1868,
     };
     const seed = 0x2468ace;
@@ -444,9 +446,9 @@ for (const facing of [0, 1, 2, 3]) {
       viewportIndexBuffer,
       objectTables: realTables,
       getGraphicBitmap: (n: number) => fakeGraphic(n),
-      dungeonState: { rnMaps: new RnMaps(), getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
+      dungeonState: { rnMaps, getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
     };
-    const rn = ((pos << 14) | (DBType.CLOUD << 10)) as ObjectID;
+    const rn = rnMaps.setPos(cloudRn, pos);
     // Relative cell 6 is CSBWin's 9: the wall straight ahead, where the altar stands.
     DrawRoomObjects(new ViewportDraw(context), rn, facing, 0, 0, 6, 0);
     const lit = viewportIndexBuffer.pixels.some((p) => p !== 0);

@@ -389,7 +389,7 @@ function main(): void {
     const { game } = s;
     const potions = game.ctx.dungeon.getData().databases.potions.records;
     const index = potions.findIndex((r) => r.nextObject !== OBJECT_ID_NULL && r.potionType !== PotionType.EMPTY_FLASK);
-    const potion = ((DBType.POTION << 10) | index) as ObjectID;
+    const potion = game.ctx.dungeon.rnMaps.rn(DBType.POTION, index);
     const ui = newUIState(graphics, game.ctx);
     ui.partyState = game.ctx.party.state;
     const at = new Position(3, 3, 1);

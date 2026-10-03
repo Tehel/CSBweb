@@ -32,10 +32,11 @@ import type {
 import { ExpandData } from '../core/compression';
 import { readU16BE, readU32BE } from '../core/bytes';
 import { extractPresetHeroes } from './HeroExtractor';
-import { EXPOOL_RECORD_SIZE, Expool, specialLocationsFromExpool } from './CsbwinExpool';
+import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
 import { readExtendedFeatures } from './CsbwinExtendedFeatures';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
-import { RnMaps } from '../core/RnMaps';
+import { rnMapsOf } from './CsbwinObjectIndex';
+import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import {
     DUNGEON_HEADER_SIZE,
     MAP_DESCRIPTOR_SIZE
@@ -87,15 +88,14 @@ export interface DungeonImageOptions {
      */
     cellFlagArraySize?: number;
     /**
-     * Translate one stored object reference into a packed RN.
+     * The image's object indirect index, which its Extended Features block carries.
      *
-     * A `dungeon.dat` stores RNs as `[position:2][category:4][index:10]` and needs no
-     * translation, which is why this is optional. A CSBWin **save** stores every RN as
-     * a slot number in its object indirect index instead — see
-     * `src/data/CsbwinObjectIndex.ts` — and hands that index's `resolve` in here, so
-     * the records this loader produces are in the port's own form either way.
+     * A `dungeon.dat` stores RNs as `[position:2][category:4][index:10]`, and the load
+     * numbers them into slots (`convertObjectReferences`). A CSBWin **save** stores every
+     * RN as a slot of this index already (`src/data/CsbwinObjectIndex.ts`), and the world
+     * keeps the index as its `RnMaps`.
      */
-    resolveRN?: (raw: ui16) => ObjectID;
+    objectIndex?: CsbwinObjectIndex;
 }
 
 /**
@@ -106,7 +106,7 @@ export interface DungeonImageOptions {
  */
 export function emptyDungeonData(): DungeonData {
     const database = () => ({ records: [], count: 0 });
-    return {
+    const data: DungeonData = {
         header: {
             randomSeed: 0,
             mapDataSize: 0,
@@ -126,10 +126,11 @@ export function emptyDungeonData(): DungeonData {
             clouds: database(),
         },
         objectList: [],
-        rnMaps: new RnMaps(),
+        rnMaps: rnMapsOf(() => data.databases),
         columnIndex: [],
         levelIndex: [],
     };
+    return data;
 }
 
 export class DungeonLoader {
@@ -175,7 +176,7 @@ export class DungeonLoader {
             expandedPortraits: ef.expandedPortraits,
             expool: true,
             cellFlagArraySize: ef.cellFlagArraySize || undefined,
-            resolveRN: ef.objectIndex ? (raw) => ef.objectIndex!.resolve(raw) : undefined,
+            objectIndex: ef.objectIndex,
         } : {};
         let data: DungeonData;
         if (readU16BE(bytes, size) !== DUNGEON_COMPRESSED_SIGNATURE) {
@@ -251,7 +252,7 @@ export class DungeonLoader {
             databases,
             textWords,
             objectList,
-            rnMaps: new RnMaps(),
+            rnMaps: rnMapsOf(() => data.databases, this.options.objectIndex),
             columnIndex,
             levelIndex,
             item16: [],
@@ -274,6 +275,7 @@ export class DungeonLoader {
                 bigActuators: data.bigActuators,
                 indirectText: data.indirectText,
                 newScrolls: data.newScrolls,
+                indirectObjects: this.options.objectIndex !== undefined,
             });
             // Not part of `ReadDatabases`: `_ReadEntireGame` runs these once the whole
             // file is read (`doc/CSBwin-src/SaveGame.cpp:1825-1827`), a save's as a new
@@ -284,8 +286,8 @@ export class DungeonLoader {
         }
 
         // After the conversion, so a preset hero's text is looked up the same way every
-        // other text record's is.
-        data.presetHeroes = extractPresetHeroes(data);
+        // other text record's is, and its objects are slots.
+        if (!this.options.noConvert) data.presetHeroes = extractPresetHeroes(data);
 
         this.data = data;
 
@@ -490,15 +492,12 @@ export class DungeonLoader {
     }
 
     /**
-     * Read one object reference, translating it when the image is a save.
-     *
-     * Every RN in the image goes through here: the object list, each record's link,
-     * a chest's contents, a monster's possessions, a missile's flying object.
+     * Read one object reference: the object list, each record's link, a chest's
+     * contents, a monster's possessions, a missile's flying object. A `dungeon.dat`'s is
+     * packed until `convertObjectReferences` numbers it; a save's is a slot already.
      */
     private readRN(): ObjectID {
-        const raw = this.file.readU16();
-        // A dungeon's own words are this port's RNs already: `RN(RNVAL)`.
-        return this.options.resolveRN ? this.options.resolveRN(raw) : raw as ObjectID;
+        return this.file.readU16() as ObjectID;
     }
 
     /**
@@ -508,46 +507,27 @@ export class DungeonLoader {
      * CSBWin marks a record deleted by writing `RNnul` over its link and frees the
      * indirect slot that named it in the same breath (`DeleteDBEntry`,
      * `doc/CSBwin-src/data.cpp:993-1015`); everything else in the record is left as it
-     * was. So a free record routinely still holds a reference to a slot that has since
-     * been freed or reused. CSBWin never looks: a free record is reached only by the
-     * allocator, which clears it before handing it out.
-     *
-     * Resolving such a reference is meaningless, and *refusing* it would make a
-     * perfectly good save unreadable, so a free record's other RNs are read and
-     * dropped. They become `RNnul`, which is what the record means. A live record's
-     * reference is still resolved strictly, so a genuinely wrong offset still fails.
+     * was. So in a save a free record routinely still holds a reference to a slot that
+     * has since been freed or reused. CSBWin never looks: a free record is reached only
+     * by the allocator, which clears it before handing it out. A free record's other RNs
+     * are read as `RNnul`, which is what the record means.
      */
     private readRNOfRecord(link: ObjectID): ObjectID {
         const raw = this.file.readU16();
-        if (!this.options.resolveRN) return raw as ObjectID;
-        if (link === OBJECT_ID_NULL) return OBJECT_ID_NULL;
-        return this.options.resolveRN(raw);
+        if (this.options.objectIndex && link === OBJECT_ID_NULL) return OBJECT_ID_NULL;
+        return raw as ObjectID;
     }
 
     /**
-     * Database 11 — `EXPOOL` — as its blocks (`src/data/CsbwinExpool.ts`).
-     *
-     * They are kept as the file has them, with one translation. A champion bones record
-     * is keyed by the bones' RN, which in an image with an object indirect index is a slot
-     * of it like every other RN, so the key is resolved as they are. A record whose slot
-     * names no object is dropped: the port numbers the slots afresh when it writes, and
-     * such a key could be given none.
+     * Database 11 — `EXPOOL` — as its blocks (`src/data/CsbwinExpool.ts`), as the file
+     * has them. A champion bones record is keyed by the bones' RN, a slot like every
+     * other RN of the image.
      */
     private readExpool(offset: number, count: ui16): Uint8Array | null {
         if (!this.options.expool || count <= 0) return null;
         const bytes = new Uint8Array(count * EXPOOL_RECORD_SIZE);
         this.file.seek(offset);
         for (let i = 0; i < bytes.length; i++) bytes[i] = this.file.readU8();
-        const resolveRN = this.options.resolveRN;
-        if (resolveRN) {
-            new Expool({ expool: bytes, header: { objectCounts: [] } }).translateChampionBonesKeys((slot) => {
-                try {
-                    return resolveRN(slot) & 0x3fff;
-                } catch {
-                    return null;
-                }
-            });
-        }
         return bytes;
     }
 
@@ -825,15 +805,16 @@ export class DungeonLoader {
             const nextObject = this.readRN();
             if (this.options.newScrolls) {
                 // `DB7` (`doc/CSBwin-src/CSB.h:1195-1216`): link, then an RN to the text
-                // record, then a word whose bit 0 is "open". The RN's low ten bits are
-                // its record index, which is exactly what the old 10-bit field held, so
-                // storing that keeps every reader of `textReference` unchanged.
+                // record, then a word whose bit 0 is "open". The RN's record index is
+                // exactly what the old 10-bit field held, so storing that keeps every
+                // reader of `textReference` unchanged.
                 const textRn = this.readRNOfRecord(nextObject);
                 const flags = this.file.readU16();
+                const index = this.options.objectIndex;
                 records.push({
                     nextObject,
                     open: (flags & 0x1) !== 0,
-                    textReference: textRn & 0x3FF,
+                    textReference: index && textRn < index.length ? index.indexMap[textRn] : textRn & 0x3FF,
                     textObject: textRn,
                     word4Bits1_15: (flags >> 1) & 0x7fff
                 });

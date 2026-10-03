@@ -609,17 +609,19 @@ function main(): void {
         });
         const slots = filePool.keys().filter((key) => key >>> 24 === EDT_CHAMPION_BONES).map((key) => key & 0xffff);
         const slot = slots[0] ?? 0;
-        const named = slots.length === 1 ? index.resolve(slot) : OBJECT_ID_EOF;
+        const named = slots.length === 1 && slot < index.length
+          ? `${index.typeMap[slot] & 15}:${index.indexMap[slot]}` : 'none';
+        const rnMaps = g.ctx.dungeon.rnMaps;
         console.log(['', 'value'].join('\t'));
         console.log(['EXPOOL blocks in the file', blocks].join('\t'));
-        console.log(["the bones' RN in the game", `0x${(bones & 0x3fff).toString(16)}`].join('\t'));
+        console.log(["the bones' RN in the game", bones].join('\t'));
         console.log(["the record's key in the file", slot].join('\t'));
-        console.log(['which the file resolves to', `0x${(named & 0x3fff).toString(16)}`].join('\t'));
+        console.log(["which the file's index names (db:idx)", named].join('\t'));
         console.log(["the record, and the champion's fingerprint", `${filePool.copyChampionBonesRecord(slot)}, ${fingerprint}`].join('\t'));
         check(blocks === 2, 'the file has an EXPOOL: the directory and a block of bones records');
         check(slots.length === 1, 'holding one bones record');
-        check(slot !== (bones & 0x3fff), "whose key is not the port's RN");
-        check((named & 0x3fff) === (bones & 0x3fff), "but the bones' slot in the file's object index");
+        check(slot === bones, "keyed by the bones' RN, a slot of the object index");
+        check(named === `${rnMaps.dbType(bones)}:${rnMaps.idx(bones)}`, "which the file's index names as the bones' record");
         check(filePool.copyChampionBonesRecord(slot) === fingerprint, "and the record is the champion's fingerprint");
 
         const routes: Array<[string, (next: Game) => void]> = [

@@ -164,7 +164,7 @@ async function main(): Promise<void> {
     nextObject: OBJECT_ID_EOF, broken: false, charges: 0, cursed: false, important: false, clothingType: 30,
   });
   data.databases.clothing.count++;
-  const encode = (i: number) => ((6 << 10) | i) as ObjectID;
+  const encode = (i: number) => game.ctx.dungeon.rnMaps.rn(DBType.CLOTHING, i);
   armoured.possessions![3] = encode(plate);  // body
   armoured.possessions![0] = encode(shield); // shield hand
   const partial = measure();

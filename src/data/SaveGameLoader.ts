@@ -124,7 +124,8 @@ export interface SaveGameState {
    * The object indirect index. Every RN in this file — the object list, every record's
    * link, a chest's contents, a monster's possessions, a champion's thirty slots — is a
    * slot number in it rather than a packed RN, so nothing that reads an object out of
-   * the file is meaningful without it (`src/data/CsbwinObjectIndex.ts`).
+   * the file is meaningful without it. The world keeps it as its `RnMaps`
+   * (`src/data/CsbwinObjectIndex.ts`).
    */
   objectIndex?: CsbwinObjectIndex;
   /**
@@ -381,11 +382,6 @@ function computeDungeonImageLayout(
   };
 }
 
-/** Translate one stored RN, or leave it alone when the file carries no indirect index. */
-function resolveRN(objectIndex: CsbwinObjectIndex | undefined, raw: number): ObjectID {
-  return objectIndex ? objectIndex.resolve(raw) : raw as ObjectID;
-}
-
 function parseSpecialLocationsFromSaveData(
   data: Uint8Array,
   layout: DungeonImageLayout,
@@ -400,7 +396,6 @@ function parseSpecialLocationsFromSaveData(
 function parseMissileRecordsFromSaveData(
   data: Uint8Array,
   layout: DungeonImageLayout,
-  objectIndex?: CsbwinObjectIndex,
 ): MissileRecord[] | null {
   const missileCount = layout.objectCounts[DBType.MISSILE] ?? 0;
   if (missileCount <= 0) return null;
@@ -412,17 +407,16 @@ function parseMissileRecordsFromSaveData(
   for (let i = 0; i < missileCount; i++) {
     const base = start + i * size;
     // Both are RNs, so both are indirect-index slot numbers in a save; a missile's
-    // flying object may also be a spell literal, which `resolve` passes through.
-    // A free record — link `RNnul` — keeps a stale flying object whose slot may have
-    // been freed since, so it is dropped rather than resolved, exactly as in
-    // `DungeonLoader.readRNOfRecord`.
-    const nextObject = resolveRN(objectIndex, readU16BE(data, base));
+    // flying object may also be a spell literal. A free record — link `RNnul` — keeps a
+    // stale flying object whose slot may have been freed since, so it is read as
+    // `RNnul`, exactly as in `DungeonLoader.readRNOfRecord`.
+    const nextObject = readU16BE(data, base) as ObjectID;
     records.push({
       nextObject,
       projectileObject:
         nextObject === OBJECT_ID_NULL
           ? OBJECT_ID_NULL
-          : resolveRN(objectIndex, readU16BE(data, base + 2)),
+          : readU16BE(data, base + 2) as ObjectID,
       rangeRemaining: data[base + 4] ?? 0,
       damageRemaining: data[base + 5] ?? 0,
       timerIndex: readU16BE(data, base + 6),
@@ -661,7 +655,7 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
   });
   const specialLocations = layout ? parseSpecialLocationsFromSaveData(saveData, layout) : null;
   const missiles = layout
-    ? parseMissileRecordsFromSaveData(saveData, layout, extended.objectIndex)
+    ? parseMissileRecordsFromSaveData(saveData, layout)
     : null;
 
   return {

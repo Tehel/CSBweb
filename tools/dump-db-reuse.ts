@@ -100,16 +100,22 @@ async function main(): Promise<void> {
       dungeon.removeObjectFromCell(at, rn);
       dungeon.deleteDBEntry(rn);
     };
+    // Each index is read as the record is handed out: a slot whose record is freed is
+    // the one `RN(DBTYPE, dbIndex)` reuses (`doc/CSBwin-src/data.cpp:476-480`), so a
+    // freed missile's RN may name another record afterwards.
     const m0 = launch();
+    const i0 = index(dungeon, m0);
     const m1 = launch();
+    const i1 = index(dungeon, m1);
     const m2 = launch();
+    const i2 = index(dungeon, m2);
     free(m1);
     const again1 = launch();
     free(m0);
     const after0 = launch();
-    console.log(`2. missiles ${index(dungeon, m0)}, ${index(dungeon, m1)}, ${index(dungeon, m2)}; free ${index(dungeon, m1)} -> next ${index(dungeon, again1)}; `
-      + `free ${index(dungeon, m0)} -> next ${index(dungeon, after0)}`);
-    check(index(dungeon, m0) === 0 && index(dungeon, m1) === 1 && index(dungeon, m2) === 2, 'an empty database hands out 0, 1, 2');
+    console.log(`2. missiles ${i0}, ${i1}, ${i2}; free ${i1} -> next ${index(dungeon, again1)}; `
+      + `free ${i0} -> next ${index(dungeon, after0)}`);
+    check(i0 === 0 && i1 === 1 && i2 === 2, 'an empty database hands out 0, 1, 2');
     check(index(dungeon, again1) === 1, 'a freed record is taken again');
     check(index(dungeon, after0) === 3, 'but record 0 is not: the search starts at 1');
   }

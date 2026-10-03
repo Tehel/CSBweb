@@ -200,17 +200,16 @@ reaches the status box.
 `saveSaveGameState` (`src/data/SaveGameLoader.ts`) writes all sixteen blocks, scrambled
 and checksummed as CSBWin's are, and `buildSaveFile` (`src/engine/SaveGameFile.ts`) hands
 it the Extended Features header (`buildLiveExtendedFeatures`,
-`src/data/CsbwinExtendedFeatures.ts`), the object indirect index, the character block and
-the dungeon image, built together because they are one numbering, so
-the game's own save writes a whole file. `applyCsbwinSave` (`src/engine/CsbwinSaveGame.ts`)
+`src/data/CsbwinExtendedFeatures.ts`), the world's object indirect index as it holds it,
+the character block and the dungeon image, so the game's own save writes a whole file. `applyCsbwinSave` (`src/engine/CsbwinSaveGame.ts`)
 reads one back: `loadCsbwinWorld` (`src/data/CsbwinDungeonImage.ts`) parses the image,
 `src/data/CsbwinCharacters.ts` unpacks `CHARDESC[4]` and the party tail, portraits
-included, and `src/data/CsbwinObjectIndex.ts` translates every RN, which in a save is a
-slot of the object indirect index, not a packed RN ("Every object reference in a save is
-an indirect index"). An original dungeon is converted on load as CSBWin
-converts it (`src/data/CsbwinDungeonConversions.ts`: `ConvertToIndirectText`,
-`MakeBigActuators`, `convertScrolls`, each behind CSBWin's own gate), so the world in
-memory is always save-shaped, never `dungeon.dat`-shaped.
+included, and the world keeps the file's object indirect index, of which every RN in a
+save is a slot, not a packed RN ("Every object reference in a save is an indirect
+index"). An original dungeon is converted on load as CSBWin converts it
+(`src/data/CsbwinDungeonConversions.ts`: `ConvertToIndirectText`, `MakeBigActuators`,
+`ConvertListOfObjects` over the cell chains, `convertScrolls`, each behind CSBWin's own
+gate), so the world in memory is always save-shaped, never `dungeon.dat`-shaped.
 When a layout does not close, save files made to order give the anchors: a fresh game
 diffed against `dungeon.dat` is how the image was solved, and the section that seemed
 wrong turned out to be three (`doc/PROVEN_FACTS.md` → "The dungeon image layout in a save
@@ -231,10 +230,10 @@ Against the write order above, over `dungeon.dat` and the eight saves of
 | 7 | image header (`DUNGEONDATINDEX`, 44 b) | ✅ byte-identical |
 | 8 | level descriptors (16 b x `NumLevel`) | ✅ byte-identical |
 | 9 | column index (`objectListIndex`) | ✅ byte-identical |
-| 10 | object list (`d.objectList`) | ✅ checked by resolving (below) |
+| 10 | object list (`d.objectList`) | ✅ byte-identical |
 | 11 | indirect text index | ✅ byte-identical. Little-endian longwords |
 | 12 | `sizeOfCompressedText` + the text | ✅ byte-identical. Little-endian size word, big-endian text |
-| 13 | the sixteen databases | ✅ every byte that is not an RN is the file's own; the RNs are resolved |
+| 13 | the sixteen databases | ✅ byte-identical bar a free record's second RN (below) |
 | 14 | cell flags (`cellFlagArray`) | ✅ byte-identical; `cellFlagArraySize` computes the 12366 every file declares |
 | 15 | final checksum word | ✅ `buildImageChecksum`, proved against each save's own closing word |
 
@@ -257,22 +256,11 @@ derived, and the whole of `EXPOOL` (`doc/PROVEN_FACTS.md` → "Three fields of t
 image header no reader here was keeping" and "Ten more fields the record parsers were
 dropping").
 
-**Two sections cannot be byte-identical.** Every word of block 10 and the link word of
-every record in block 13 is an RN, which in a save is a slot number, and
-`buildObjectIndirectIndex` numbers the slots its own way: CSBWin's order cannot be
-reproduced and nothing outside the file refers to a slot number. It gives every record of
-every database a slot in `DBType` then index order, leaves slot 0 free as
-`ConvertListOfObjects` does, and carries each object's position in `dataTypeMap` rather
-than in the slot, because `RN::pos(p)` writes that byte in place
-(`doc/CSBwin-src/CSBTypes.h:336-342`); it takes the references CSBWin's `ConvertTimers`,
-`ConvertCharacters` and `objectInHand` passes convert, so a carried object's position
-lands in `dataTypeMap` too. Those words are
-resolved instead of compared: written, read back through `readObjectIndirectIndex` (both
-`FormChecksum`s verified), and each must name the object the reader got out of CSBWin's
-word. That argument would survive a bug our encode and our resolve shared, and
-`tools/dump-dungeon-image-blocks.ts` says so where it makes it; `dungeon.dat`, which
-stores packed RNs, is the compensating case, where those 1682 words are byte-compared.
-<sub>`doc/PROVEN_FACTS.md` → "An RN in block 10 or block 13 cannot be byte-identical".</sub>
+**A free record's second RN** — a deleted monster's possessions, a chest's contents, a
+missile's flying object, a scroll's text — is read as `RNnul` and written so, where the
+file holds whatever slot it named when the record was freed. Every other RN of blocks 10
+and 13 is the file's own word, since the port keeps a save's slots and maps as read.
+<sub>`doc/PROVEN_FACTS.md` → "An RN in block 10 or block 13 is the file's own word".</sub>
 
 **Reported rather than asserted**, each for a sourced reason: `TIMER.unused13` in a freed
 slot and the timer queue past `NumTimer`, both CSBWin allocation debris
@@ -289,9 +277,9 @@ and the port writes as zero.
   DSA.
 - `SimpleEncryption`, neither written nor read past the header, and `MakeBigActuators`'
   read of the actuator type before the byte swap (`DEBT.md` G4).
-- A record index above 1023: `dataIndexMap` is 16 bits and the port's RN index field is
-  10, where CSBWin allows 64000. The largest index in any save of `tools/fixtures/` is
-  682, and `CsbwinObjectIndex.resolve` throws rather than alias (`DEBT.md` D16).
+- A database of more than 1024 records: CSBWin's grow to `db.Max`, 8000 and more, and the
+  port's stop at 1024 (`DEBT.md` D16). The largest index in any save of
+  `tools/fixtures/` is 682.
 
 ### Evidence
 
@@ -362,10 +350,11 @@ by 82 to 733 cells, rising with how far into the game they were taken.
 through two global arrays, `dataTypeMap` and `dataIndexMap`, which travel in the save's
 Extended Features block immediately after the 512-byte header
 (`ReadExtendedFeatures`, `doc/CSBwin-src/SaveGame.cpp:355-376`). The full account, with
-the byte order, the free-slot marker and the two ways it can legitimately fail, is
-`doc/PROVEN_FACTS.md` → "An RN in a save file is an indirect index"; the implementation
-is `src/data/CsbwinObjectIndex.ts`, threaded into `DungeonLoader` through
-`DungeonImageOptions.resolveRN` so that every RN is translated as it is read.
+the byte order, the free-slot marker and the slots that alias, is `doc/PROVEN_FACTS.md`
+→ "An RN in a save file is an indirect index". The port's RN is the same slot: the
+world keeps the file's maps as its `RnMaps` (`src/core/RnMaps.ts`,
+`src/data/CsbwinObjectIndex.ts`, handed to `DungeonLoader` as
+`DungeonImageOptions.objectIndex`), and every RN is read as the slot it is.
 
 
 ## The load

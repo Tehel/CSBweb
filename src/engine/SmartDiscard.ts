@@ -42,10 +42,9 @@ export const enum SmartDiscardMode {
 
 /**
  * `SDOBJ` (`doc/CSBwin-src/SmartDiscard.cpp:41-72`). CSBWin packs level, x, y and the
- * `RN` into `m_object`; its `RN` is an indirect index that keeps the object's corner
- * beside the record, so `m_object` names the object wherever it lies in the cell. The
- * port's ID carries the corner, so `key` packs it without (`rnEquals`), and `object`
- * is the ID as the scan found it.
+ * `RN` into `m_object`; the `RN` is a slot of the object indirect index, which keeps the
+ * object's corner beside the record, so `m_object` names the object wherever it lies in
+ * the cell. `object` is the RN as the scan found it.
  */
 export interface SDObj {
     key: number;
@@ -54,7 +53,7 @@ export interface SDObj {
 }
 
 function sdObj(level: number, x: number, y: number, object: ObjectID, priority: number): SDObj {
-    return { key: (((((level << 5) + x) << 5) + y) * 0x10000 + (object & 0x3fff)) >>> 0, object, priority };
+    return { key: (((((level << 5) + x) << 5) + y) * 0x10000 + object) >>> 0, object, priority };
 }
 
 /** `SDOBJ::Get` (`:65-71`). */

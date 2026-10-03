@@ -26,9 +26,10 @@
  * would decode the index it built last time as if it were text — so the gates are the
  * whole safety argument, and they are the same gates CSBWin uses.
  */
-import { DBType, OBJECT_ID_NULL, RoomType, encodeObjectID } from '../core/types';
-import type { ui16, ui32 } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType } from '../core/types';
+import type { ObjectID, ui16, ui32 } from '../core/types';
 import { getActuatorType } from './actuatorHelpers';
+import { databaseRecords } from './CsbwinObjectIndex';
 import type { DungeonData } from './dungeonTypes';
 
 /** Which of the three shapes a world is in. `true` means "already converted". */
@@ -39,6 +40,8 @@ export interface DungeonImageShape {
     indirectText: boolean;
     /** SCROLL records are six bytes with an RN (`ExtendedFeaturesVersion >= 'B'`). */
     newScrolls: boolean;
+    /** Every RN is a slot of the file's maps (`ExtendedFeaturesVersion >= 'A'`). */
+    indirectObjects: boolean;
 }
 
 /**
@@ -153,21 +156,11 @@ export function MakeBigActuators(data: DungeonData): void {
  *
  * The four-byte scroll holds a 10-bit index into the TEXT **database** and a six-bit
  * flag above it; the six-byte scroll holds an RN to that text record and a word whose
- * bit 0 is `open`. The conversion is the obvious one plus one subtlety about slots:
- *
- * CSBWin calls `AllocateIndirectIndex(dbTEXT, index)` (`:2153`), which mints a **new**
- * slot in the object indirect index rather than reusing the one `ConvertListOfObjects`
- * may already have given that record — so in a genuine save a text record a scroll names
- * can have two slots. This port has no live index at all: `buildObjectIndirectIndex`
- * builds one at write time with a single slot per `(database, record)`, so the two
- * collapse into one. That is invisible outside the file — nothing but the file refers to
- * a slot number, and both slots resolve to the same record — and `countAliases` is where
- * the collapse is documented.
- *
- * `AllocateIndirectIndex` writes the database number alone into `dataTypeMap`
- * (`:2141`), leaving the slot's position bits at zero, which is why the RN is built at
- * position 0. Measured: every scroll in a committed save resolves to `RN(0, dbTEXT, n)`
- * where `n` is `dungeon.dat`'s own 10-bit index for the same scroll.
+ * bit 0 is `open`. The RN is `AllocateIndirectIndex(dbTEXT, index)` (`:2153`), which
+ * mints a **new** slot rather than look for the one `ConvertListOfObjects` may already
+ * have given the record, so a text record a scroll names can have two slots. The slot's
+ * position bits are 0: `AllocateIndirectIndex` writes the database number alone into
+ * `dataTypeMap` (`:2141`).
  *
  * **`m_word4`'s upper bits cannot be reproduced and are written as zero.**
  * `pScroll->open(...)` writes bit 0 over whatever the record already held, and the two
@@ -180,7 +173,7 @@ export function convertScrolls(data: DungeonData): void {
         // `openFlag = pWord[1] >> 10` — the six bits above the index, before they are
         // overwritten; `open` is `openFlag == 0`.
         const openFlag = record.word2Bits10_15 ?? (record.open ? 0 : 1);
-        record.textObject = encodeObjectID(0, DBType.TEXT, record.textReference & 0x3ff);
+        record.textObject = data.rnMaps.AllocateIndirectIndex(DBType.TEXT, record.textReference & 0x3ff) as ObjectID;
         record.open = openFlag === 0;
         record.word4Bits1_15 = 0;
         record.word2Bits10_15 = undefined;
@@ -189,18 +182,95 @@ export function convertScrolls(data: DungeonData): void {
 }
 
 /**
- * Run whichever of the three the image's declared shape says have not run yet, in
+ * Run whichever of the four the image's declared shape says have not run yet, in
  * CSBWin's own order.
  *
- * The order is not cosmetic: `convertScrolls` runs **after** `ConvertToIndirectText`
- * (`:2770` against `:2648`), so the text record index a scroll's new RN names is the
- * post-conversion one. Running the scrolls first would build RNs against the raw
- * word offsets.
+ * The order is not cosmetic: the object references are numbered after the text
+ * conversion (`:2714-2746`, after `:2648`) and before `convertScrolls` (`:2770`), whose
+ * `AllocateIndirectIndex` takes the slots after theirs; and `convertScrolls` runs after
+ * `ConvertToIndirectText`, so the text record index a scroll's new RN names is the
+ * post-conversion one.
  */
 export function convertOriginalDungeon(data: DungeonData, shape: Partial<DungeonImageShape>): void {
     if (!shape.bigActuators) MakeBigActuators(data);
     if (!shape.indirectText) ConvertToIndirectText(data);
+    if (!shape.indirectObjects) convertObjectReferences(data);
     if (!shape.newScrolls) convertScrolls(data);
+}
+
+/**
+ * `ConvertListOfObjects` (`doc/CSBwin-src/SaveGame.cpp:1916-2018`): number one chain's
+ * packed RNs into slots, and the chains its chests, monsters and missiles hold.
+ *
+ * `at` reads and writes the word that holds the chain's first RN. A reference to a record
+ * past its database ends the chain there (`*pRN = RNeof`, `:1936-1944`), and an empty
+ * or spell reference in a chain is a corrupt file (`:1925-1930`). A record is converted
+ * once: a second reference to it, which only a missile's flying object may be
+ * (`duplicateOK`), takes the slot already made, corner and all.
+ */
+export function ConvertListOfObjects(
+    data: DungeonData,
+    at: { get(): ObjectID; set(rn: ObjectID): void },
+    duplicateOK: boolean,
+): void {
+    let pRN = at;
+    while (pRN.get() !== OBJECT_ID_EOF) {
+        const packed = pRN.get();
+        if (packed === OBJECT_ID_NULL || packed >= 0xff80) throw new Error('Illegal object');
+        const dbNum = ((packed >> 10) & 15) as DBType;
+        const records = databaseRecords(data.databases, dbNum);
+        const record = records[packed & 0x3ff];
+        if (!record) {
+            pRN.set(OBJECT_ID_EOF);
+            return;
+        }
+        const { slot, duplicate } = data.rnMaps.convertPacked(packed, duplicateOK);
+        pRN.set(slot);
+        if (!duplicate) {
+            const sub = record as { containedObject?: ObjectID; possession?: ObjectID; projectileObject?: ObjectID };
+            if (dbNum === DBType.CHEST && sub.containedObject !== OBJECT_ID_EOF) {
+                ConvertListOfObjects(data, field(sub, 'containedObject'), false);
+            } else if (dbNum === DBType.CREATURE && sub.possession !== OBJECT_ID_EOF) {
+                ConvertListOfObjects(data, field(sub, 'possession'), false);
+            } else if (
+                dbNum === DBType.MISSILE
+                && sub.projectileObject !== OBJECT_ID_EOF
+                && (sub.projectileObject ?? 0) < 0xff80
+            ) {
+                ConvertListOfObjects(data, field(sub, 'projectileObject'), true);
+            }
+        }
+        pRN = field(record, 'nextObject');
+    }
+}
+
+function field<K extends string>(record: { [key in K]?: ObjectID }, key: K): { get(): ObjectID; set(rn: ObjectID): void } {
+    return { get: () => record[key] as ObjectID, set: (rn) => { record[key] = rn; } };
+}
+
+/**
+ * The object references of an original dungeon, numbered into slots: every cell's chain
+ * in level, column and row order (`doc/CSBwin-src/SaveGame.cpp:2714-2744`). CSBWin goes
+ * on to the timers and the champions' possessions (`:2745-2746`) and the object in hand
+ * (`:2753-2761`), which a `dungeon.dat` does not hold.
+ */
+export function convertObjectReferences(data: DungeonData): void {
+    for (let level = 0; level < data.maps.length; level++) {
+        const map = data.maps[level];
+        const { width, height } = map.descriptor;
+        for (let x = 0; x < width; x++) {
+            let column = data.columnIndex[data.levelIndex[level] + x];
+            for (let y = 0; y < height; y++) {
+                if ((map.cellFlags[x][y] & 0x10) === 0) continue;
+                const at = column;
+                ConvertListOfObjects(data, {
+                    get: () => data.objectList[at],
+                    set: (rn) => { data.objectList[at] = rn; },
+                }, false);
+                column++;
+            }
+        }
+    }
 }
 
 /**

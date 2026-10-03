@@ -159,8 +159,8 @@ function checkScrollConversion(raw: DungeonData, converted: DungeonData, saves: 
 
   let built = 0;
   for (let i = 0; i < mine.length; i++) {
-    const want = converted.rnMaps.rn(DBType.TEXT, before[i].textReference & 0x3ff);
-    if (mine[i].textObject === want) built++;
+    const text = converted.rnMaps.decode(mine[i].textObject!);
+    if (text.category === DBType.TEXT && text.index === (before[i].textReference & 0x3ff) && text.position === 0) built++;
     // `open` is `b10_15 == 0`, and the six bits it came from are gone afterwards.
     if (mine[i].open !== ((before[i].word2Bits10_15 ?? 0) === 0)) {
       fail(`scroll ${i}: open does not follow b10_15`);
@@ -190,7 +190,11 @@ function checkScrollConversion(raw: DungeonData, converted: DungeonData, saves: 
       // the one such record. The same exemption `tools/dump-dungeon-image-blocks.ts`
       // makes, by name.
       if (theirs[i].nextObject === OBJECT_ID_NULL) { free++; continue; }
-      if (mine[i].textObject !== theirs[i].textObject) badRn++;
+      // The slot each names: a save's numbering is its own CSBWin's, and the slot
+      // numbers need not agree.
+      const ours = converted.rnMaps.decode(mine[i].textObject!);
+      const its = save.rnMaps.decode(theirs[i].textObject!);
+      if (ours.category !== its.category || ours.index !== its.index || ours.position !== its.position) badRn++;
       if (mine[i].open !== theirs[i].open) badOpen++;
       if ((theirs[i].word4Bits1_15 ?? 0) !== 0) debris++;
     }
@@ -299,15 +303,20 @@ function checkTheGate(saves: Map<string, DungeonData>, converted: DungeonData): 
   check(secondText !== firstText || firstIndex === 0,
     'converting twice really does corrupt the text — the gate is load-bearing, not tidiness');
 
-  // `convertScrolls` happens to be harmless a second time — it rebuilds the RN from
-  // `textReference`, which it never overwrites — and saying so is worth as much as the
-  // failures above, because it means the scroll gate is tidiness where the text gate is
-  // not. `MakeBigActuators` is the opposite, and the probe below shows it.
+  // `convertScrolls` a second time names the same text records, from `textReference`,
+  // which it never overwrites, but in new slots: `AllocateIndirectIndex` mints one per
+  // scroll (`doc/CSBwin-src/SaveGame.cpp:2153`), so each run grows the maps by the
+  // database's size. `MakeBigActuators` is worse, and the probe below shows it.
   const twice = readConverted();
+  const slotsBefore = twice.rnMaps.length;
   convertScrolls(twice);
-  check(twice.databases.scrolls.records.every((r, i) =>
-    r.textObject === converted.databases.scrolls.records[i].textObject),
-    'convertScrolls is idempotent on its own — the scroll RN is rebuilt from textReference');
+  const scrolls = twice.databases.scrolls.records;
+  check(scrolls.every((r, i) => {
+    const again = twice.rnMaps.decode(r.textObject!);
+    const first = converted.rnMaps.decode(converted.databases.scrolls.records[i].textObject!);
+    return again.category === first.category && again.index === first.index;
+  }) && twice.rnMaps.length === slotsBefore + scrolls.length,
+    `convertScrolls run twice names the same texts, in ${scrolls.length} new slots`);
 
   const dsa = readConverted();
   dsa.databases.actuators.records = [

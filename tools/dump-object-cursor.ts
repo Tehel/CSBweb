@@ -23,7 +23,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { Direction, Position, type ObjectID } from '../src/core/types';
+import { Direction, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Party } from '../src/engine/Party';
@@ -73,8 +73,10 @@ async function main(): Promise<void> {
   // ---- A copper coin from the dungeon, in hand.
   check(objectTables.objectNames[COPPER_COIN] === 'COPPER COIN', `name index ${COPPER_COIN} should be the copper coin`);
   let coin = -1;
-  for (let i = 0; i < 1024 && coin < 0; i++) {
-    const rn = ((CATEGORY_JUNK << 10) | i) as ObjectID;
+  const junk = data.databases.misc.records;
+  for (let i = 0; i < junk.length && coin < 0; i++) {
+    if (junk[i]!.nextObject === OBJECT_ID_NULL) continue;
+    const rn = data.rnMaps.rn(CATEGORY_JUNK, i);
     if (resolveObjectNameIndex(ui, rn) === COPPER_COIN) coin = rn;
   }
   check(coin >= 0, 'dungeon.dat should hold a copper coin');

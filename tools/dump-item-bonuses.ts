@@ -383,7 +383,7 @@ async function main(): Promise<void> {
     // A torch refilled into an empty hand from the backpack (`TAG011594`,
     // `CSBCode.cpp:6246-6247`) is lit: `NameIndex == Torch_a` (`Character.cpp:1988`).
     const torch = newObject(g, NI.OBJNI_TORCH_A, { charges: 15 });
-    const torchIndex = torch & 0x3ff;
+    const torchIndex = g.ctx.dungeon.rnMaps.idx(torch);
     party.champions[1]!.possessions[7] = torch;
     g.ctx.systems.character.refillPossessionSlot(1, 0);
     const refilled = party.champions[1]!.possessions[0] === torch;
@@ -418,9 +418,9 @@ async function main(): Promise<void> {
     const illumulet = newObject(g, NI.OBJNI_ILLUMULET_A);
     party.objectInHand = illumulet;
     handleClothingClick(ui, 8 + 10);
-    const lit = `${party.brightness} ${misc[illumulet & 0x3ff]!.specialState} ${gNameIndex(illumulet)}`;
+    const lit = `${party.brightness} ${misc[g.ctx.dungeon.rnMaps.idx(illumulet)]!.specialState} ${gNameIndex(illumulet)}`;
     handleClothingClick(ui, 8 + 10);
-    const unlit = `${party.brightness} ${misc[illumulet & 0x3ff]!.specialState} ${gNameIndex(illumulet)}`;
+    const unlit = `${party.brightness} ${misc[g.ctx.dungeon.rnMaps.idx(illumulet)]!.specialState} ${gNameIndex(illumulet)}`;
     console.log(`an Illumulet round the neck (Word1074[2] = ${step}): brightness/value/name ${brightness} -> ${lit} -> ${unlit}`);
     check(step !== 0 && lit === `${brightness + step} 1 ${NI.OBJNI_ILLUMULET_B}`,
       'a worn Illumulet lights the party and reads as its _b');
@@ -477,10 +477,10 @@ async function main(): Promise<void> {
     g.systems.mouse.handleWallClick();
     const recruit = party.champions[0];
     const slot = recruit?.possessions.findIndex((rn) => rn !== OBJECT_ID_NULL
-      && game.ctx.dungeon.rnMaps.dbType(rn) === DBType.WEAPON && typeNamed(NI.OBJNI_TORCH_A)?.type
-        === data.databases.weapons.records[rn & 0x3ff]!.weaponType) ?? -1;
+      && g.ctx.dungeon.rnMaps.dbType(rn) === DBType.WEAPON && typeNamed(NI.OBJNI_TORCH_A)?.type
+        === data.databases.weapons.records[g.ctx.dungeon.rnMaps.idx(rn)]!.weaponType) ?? -1;
     const torch = slot >= 0 ? recruit!.possessions[slot]! : OBJECT_ID_NULL;
-    const lit = slot >= 0 && data.databases.weapons.records[torch & 0x3ff]!.litTorch;
+    const lit = slot >= 0 && data.databases.weapons.records[g.ctx.dungeon.rnMaps.idx(torch)]!.litTorch;
     console.log(`ZED recruited: the torch is in slot ${slot}, lit ${lit}`);
     check(slot === 1 && lit, 'a recruit\'s torch, put in the weapon hand, is lit');
   }

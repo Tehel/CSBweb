@@ -187,6 +187,16 @@ and again after 600 VBLs of `runVbl(game, TICK_DUE)`, a tick each, on both trees
 never agree. A change that drops a field from the runtime save's shape drops it from the
 old tree's hash too, with the same replacer.
 
+**An RN means something only in its own world.** It is a slot of that world's
+`RnMaps`, not a packed `[pos][db][idx]`. Make one with `game.ctx.dungeon.rnMaps.rn(db,
+index)` of the game it goes into (`setPos` for a corner), never by shifting bits, and
+read it through that same game's maps: a tool with two games that decodes one's RN
+through the other's reads a different object, silently. Compare two RNs with `===`;
+the slot is the object whatever its corner. A record freed and handed out again can
+take the freed object's slot, so read an RN's index when it is handed out, not after.
+When the RNs themselves move in a refactor, diff a dump that decodes every RN through
+its world (each chain, record, possession and timer object) instead of the raw output.
+
 **Never perturb `Math.random` at construction time.** `tools/probe-frames.mjs`
 overrides `Math.random` to make the golden frames reproducible; anything that draws
 from it during setup shifts every frame. `CsbRandom` seeds lazily for exactly this

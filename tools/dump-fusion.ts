@@ -340,11 +340,11 @@ const TEXT_VBLS = 780;
  * The texts on cell (0, 0) of level 12, chained D, C, B, A, as `DecodeText(…, 0x8001)` gives
  * them: a linefeed, the letter, the text. "THANK YOU MY FRIENDS." holds two spaces.
  */
-const ENDING_TEXTS: Record<string, { rn: ObjectID; text: string }> = {
-  A: { rn: 0x866 as ObjectID, text: 'THANK YOU MY FRIENDS.  YOU HAVE BANISHED CHAOS AND REJECTED THE FALSE PATH OF UNCOMPROMISING ORDER.' },
-  B: { rn: 0x868 as ObjectID, text: 'ONLY BY LEARNING THE TRUTH AND SEEKING THE PATH OF BALANCE DID YOU GUESS THE TRUE NATURE OF THE FIRESTAFF.' },
-  C: { rn: 0x85d as ObjectID, text: 'BY YOUR BRAVE DEEDS I AM MADE WHOLE AGAIN AND HARMONY IS RESTORED TO THE WORLD.' },
-  D: { rn: 0x877 as ObjectID, text: 'YOUR NAMES WILL BE RECORDED IN THE GREAT HALL AND REMEMBERED BY THE FUTURE GENERATIONS YOU HAVE MADE POSSIBLE.' },
+const ENDING_TEXTS: Record<string, { idx: number; text: string }> = {
+  A: { idx: 0x66, text: 'THANK YOU MY FRIENDS.  YOU HAVE BANISHED CHAOS AND REJECTED THE FALSE PATH OF UNCOMPROMISING ORDER.' },
+  B: { idx: 0x68, text: 'ONLY BY LEARNING THE TRUTH AND SEEKING THE PATH OF BALANCE DID YOU GUESS THE TRUE NATURE OF THE FIRESTAFF.' },
+  C: { idx: 0x5d, text: 'BY YOUR BRAVE DEEDS I AM MADE WHOLE AGAIN AND HARMONY IS RESTORED TO THE WORLD.' },
+  D: { idx: 0x77, text: 'YOUR NAMES WILL BE RECORDED IN THE GREAT HALL AND REMEMBERED BY THE FUTURE GENERATIONS YOU HAVE MADE POSSIBLE.' },
 };
 
 function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fresh' | 'scrolled' | null = null): void {
@@ -355,7 +355,7 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fre
   const strip = stripState === null ? null : stripState === 'fresh' ? new ScrollingText() : scrolledStrip();
   const a = arena(true, strip);
   const game = a.game;
-  if (withoutB) game.ctx.dungeon.removeObjectFromCell(new Position(0, 0, LEVEL), ENDING_TEXTS.B!.rn);
+  if (withoutB) game.ctx.dungeon.removeObjectFromCell(new Position(0, 0, LEVEL), game.ctx.dungeon.rnMaps.rn(DBType.TEXT, ENDING_TEXTS.B!.idx));
   const letters = withoutB ? ['A'] : ['A', 'B', 'C', 'D'];
   cage(game, CX, CY - 1);
   cage(game, CX + 1, CY);

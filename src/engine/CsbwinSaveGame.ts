@@ -3,7 +3,8 @@
  *
  * The pieces were all in place separately: `loadCsbwinWorld` parses the dungeon image
  * into a real `DungeonData`, `readCsbwinParty` unpacks `CHARDESC[4]`, and
- * `CsbwinObjectIndex` makes every object reference in either of them mean something.
+ * the save's object indirect index, which the world keeps as its `RnMaps`, makes every
+ * object reference in either of them mean something.
  * What was missing is this — turning the three into the `RuntimeSaveState` the engine
  * already knows how to restore.
  *
@@ -69,7 +70,6 @@ import { captureDungeonSnapshot } from './DungeonSnapshot';
 import { DungeonState } from './DungeonState';
 import type { Game } from './Game';
 import type { RuntimeSaveState } from './RuntimeSave';
-import type { TimerRecord } from '../data/dungeonTypes';
 import { OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
 import type { Block1State, PartyState } from './gameTypes';
@@ -97,7 +97,7 @@ function buildPartyState(world: CsbwinWorld, dsaGlobalsUnused?: never): PartySta
     const gb2 = world.save.block2;
     if (!block || !gb2) throw new Error('save has no character block or GAMEBLOCK2');
 
-    const party = readCsbwinParty(block, gb2.numCharacter, world.save.objectIndex);
+    const party = readCsbwinParty(block, gb2.numCharacter);
     const tail = readCsbwinPartyTail(block);
 
     // `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`:1642`) — the cursor's
@@ -107,7 +107,7 @@ function buildPartyState(world: CsbwinWorld, dsaGlobalsUnused?: never): PartySta
     const objectInHand =
         rawInHand === 0 || rawInHand === 0xffff || rawInHand === 0xfffe
             ? OBJECT_ID_NULL
-            : ((world.save.objectIndex ? world.save.objectIndex.resolve(rawInHand) : rawInHand) as ObjectID);
+            : rawInHand as ObjectID;
 
     const position = new Position(gb2.partyX, gb2.partyY, gb2.partyLevel);
 
@@ -143,42 +143,6 @@ function buildPartyState(world: CsbwinWorld, dsaGlobalsUnused?: never): PartySta
         word11712: gb2.word11712,
         word11714: gb2.word11714,
     };
-}
-
-/**
- * Turn the object a live timer is carrying from a slot number into a packed RN.
- *
- * `parseTimers` keeps `TIMER` bytes 6-9 as it finds them, because to every other timer
- * function they are plain numbers — a map square, an action code. For the six functions
- * `ConvertTimers` names they are an object reference, and in a save file that means a
- * slot in the object indirect index (`doc/PROVEN_FACTS.md` → "An RN in a save file is an
- * indirect index"). Nothing here consumed one until the engine started restoring a
- * timer's object at all, which is why this is only now a defect rather than a gap: a
- * missile restored with an unresolved slot number names whatever record our numbering
- * happens to put there, and the thrown sword lands somewhere else entirely.
- *
- * 48 and 49 keep it in bytes 6-7, 24, 25, 60 and 61 in bytes 8-9
- * (`doc/CSBwin-src/SaveGame.cpp:2027-2050`). Only a timer the queue names is live.
- */
-function resolveTimerObjects(world: CsbwinWorld): TimerRecord[] | undefined {
-    const timers = world.save.timers;
-    if (!timers) return undefined;
-    const index = world.save.objectIndex;
-    if (!index) return timers;
-    const live = new Set(world.save.timerQueue ?? []);
-    return timers.map((timer, slot) => {
-        if (!live.has(slot)) return timer;
-        const fn = timer.function;
-        if (fn === 48 || fn === 49) {
-            const rn = index.resolve(timer.timerWord6 & 0xffff);
-            return { ...timer, timerWord6: rn, uByte6: (rn >> 8) & 0xff, uByte7: rn & 0xff };
-        }
-        if (fn === 24 || fn === 25 || fn === 60 || fn === 61) {
-            const rn = index.resolve(timer.timerWord8 & 0xffff);
-            return { ...timer, timerWord8: rn, uByte8: (rn >> 8) & 0xff, uByte9: rn & 0xff };
-        }
-        return timer;
-    });
 }
 
 /**
@@ -253,7 +217,7 @@ export function buildCsbwinRuntimeState(
         },
         dungeon: {
             item16: world.save.item16,
-            timers: resolveTimerObjects(world),
+            timers: world.save.timers,
             timerQueue: world.save.timerQueue,
             timerSequence: world.save.timerSequence,
             firstAvailTimer: gb2.firstAvailTimer,

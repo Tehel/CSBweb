@@ -14,14 +14,13 @@
 import { saveSaveGameState, type Block1, type Block2, type SaveGameState } from '../data/SaveGameLoader';
 import { applyCsbwinSave } from './CsbwinSaveGame';
 import { buildCsbwinCharacterBlock } from '../data/CsbwinCharacters';
-import { buildObjectIndirectIndex } from '../data/CsbwinObjectIndex';
+import { objectIndexOf } from '../data/CsbwinObjectIndex';
 import { buildDungeonImage, cellFlagArraySize } from '../data/CsbwinDungeonImageWriter';
 import { buildLiveExtendedFeatures } from '../data/CsbwinExtendedFeatures';
 import type { DungeonData, TimerRecord } from '../data/dungeonTypes';
 import type { Game } from './Game';
 import type { RuntimeSaveState } from './RuntimeSave';
 import type { Champion } from './gameTypes';
-import { OBJECT_ID_NULL } from '../core/types';
 
 export interface SaveFileOptions {
     /**
@@ -34,52 +33,13 @@ export interface SaveFileOptions {
 }
 
 /**
- * The live timers that carry an object reference, and where in the record it sits.
+ * Blocks 0 and 7-15 of the file.
  *
- * `ConvertTimers` switches on the timer function
- * (`doc/CSBwin-src/SaveGame.cpp:2027-2050`): 48 and 49 carry `timerObj6` — bytes 6-7,
- * the missile in flight — and 24, 25, 60 and 61 carry `timerObj8`, bytes 8-9. Every
- * other function reads those bytes as plain numbers (a map square, an action code) and
- * must not be touched.
- *
- * A slot not named by the queue is not a live timer and holds nothing worth converting.
- */
-function objectCarryingTimers(
-    timers: readonly TimerRecord[],
-    queue: readonly number[],
-): Array<{ slot: number; at: 6 | 8; rn: number }> {
-    const live = new Set(queue);
-    const out: Array<{ slot: number; at: 6 | 8; rn: number }> = [];
-    timers.forEach((timer, slot) => {
-        if (!live.has(slot)) return;
-        if (timer.function === 48 || timer.function === 49) {
-            out.push({ slot, at: 6, rn: timer.timerWord6 & 0xffff });
-        } else if (timer.function === 24 || timer.function === 25 ||
-                   timer.function === 60 || timer.function === 61) {
-            out.push({ slot, at: 8, rn: timer.timerWord8 & 0xffff });
-        }
-    });
-    return out;
-}
-
-/**
- * Blocks 0 and 7-15 of the file, and the one numbering they and blocks 2 and 4 share.
- *
- * Every RN that leaves this port has to be a slot in the **same** object indirect index:
- * the two maps block 0 carries, the object list, every record link, the thirty
- * possession slots of every champion, `GAMEBLOCK2.ObjectInHand` and the object a timer
- * is carrying. That is why the index, the image and the character block are built here
- * together rather than each where it belongs — `tools/dump-save-file-roundtrip.ts` makes
- * the same argument for a parsed save, and this is the live half of it.
- *
- * `buildObjectIndirectIndex` takes the references that are in no cell chain as
- * `heldReferences`, in CSBWin's own order — the object-carrying timers
- * (`ConvertTimers`, `:2745`), the possession slots (`ConvertCharacters`, `:2746`), then
- * `d.objectInHand` (`:2753-2760`) — because each of those calls fixes the referenced
- * record's *position* in `dataTypeMap`, and an object a champion is carrying would
- * otherwise keep position 0 and come back in the wrong corner of its cell
- * (`doc/PROVEN_FACTS.md` → "Everything CSBWin converts to slot numbers, and in what
- * order").
+ * Every RN in them — the object list, every record link, the thirty possession slots of
+ * every champion, `GAMEBLOCK2.ObjectInHand` and the object a timer is carrying — is a
+ * slot of the world's object indirect index, and block 0 carries the index's two maps
+ * as the world holds them (`objectIndexOf`), as CSBWin writes `dataTypeMap` and
+ * `dataIndexMap` (`doc/CSBwin-src/SaveGame.cpp:927-933`, `:985-986`).
  */
 function buildFileBlocks(
     game: Game,
@@ -116,34 +76,9 @@ function buildFileBlocks(
     }
 
     const party = runtime.party;
-    const champions = party.champions ?? [];
     // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`doc/CSBwin-src/SaveGame.cpp:1033`):
     // an empty cursor is `RNnul`, never `RNempty` (0), which CSBWin would load as an object.
     const objectInHand = party.objectInHand & 0xffff;
-
-    const held: number[] = [];
-    const carried = objectCarryingTimers(timers, runtime.dungeon.timerQueue ?? []);
-    for (const { rn } of carried) held.push(rn);
-    for (const champion of champions) {
-        for (const slot of champion.possessions) {
-            if (slot !== OBJECT_ID_NULL) held.push(slot);
-        }
-    }
-    held.push(objectInHand);
-
-    const index = buildObjectIndirectIndex(dungeon, held);
-    const encode = (rn: number) => index.encode(rn);
-
-    // The timers are the one place a reference is not already a field of something the
-    // writers reach: `TIMER` bytes 6-9 are plain numbers to every other function, so the
-    // translation has to be done by hand, on a copy.
-    const written = timers.map((t) => ({ ...t }));
-    for (const { slot, at, rn } of carried) {
-        const word = encode(rn) & 0xffff;
-        const timer = written[slot];
-        if (at === 6) { timer.timerWord6 = word; timer.uByte6 = word >> 8; timer.uByte7 = word & 0xff; }
-        else { timer.timerWord8 = word; timer.uByte8 = word >> 8; timer.uByte9 = word & 0xff; }
-    }
 
     return {
         extendedFeatures: buildLiveExtendedFeatures({
@@ -157,12 +92,11 @@ function buildFileBlocks(
             indirectText: true,
             bigActuators: true,
             newScrolls: true,
-            encode,
         }),
-        characterBlock: buildCharacterBlock(game, runtime, options, encode),
-        objectIndex: index,
-        objectInHand: encode(objectInHand),
-        timers: written,
+        characterBlock: buildCharacterBlock(game, runtime, options),
+        objectIndex: objectIndexOf(dungeon.rnMaps),
+        objectInHand,
+        timers,
     };
 }
 
@@ -233,12 +167,8 @@ function buildBlock1FromGame(runtime: RuntimeSaveState): Block1 {
  * the block (`doc/CSBwin-src/SaveGame.cpp:1010-1031`); this is the same list in the same
  * order, against this port's equivalents.
  *
- * One is written in this port's own terms rather than the file's:
- *
- * - `ObjectInHand` (8) is an RN, which in a file is a slot number in the object
- *   indirect index (`src/data/CsbwinObjectIndex.ts`). This returns the port's packed
- *   `[pos][db][idx]` id; `buildSaveFile` re-encodes it through the index it builds
- *   for the image, because the two have to be one numbering.
+ * `ObjectInHand` (8) is an RN, a slot of the object indirect index block 0 carries
+ * (`src/data/CsbwinObjectIndex.ts`).
  */
 function buildBlock2FromGame(game: Game, runtime: RuntimeSaveState): Block2 {
     const party = runtime.party;
@@ -284,7 +214,6 @@ function buildCharacterBlock(
     game: Game,
     runtime: RuntimeSaveState,
     options: SaveFileOptions,
-    encodeRN: (rn: number) => number,
 ): Uint8Array {
     const party = runtime.party;
     const footprints = runtime.game.footprints;
@@ -308,9 +237,6 @@ function buildCharacterBlock(
         {
             load: (champion) => game.systems.characterStats?.characterLoad(champion) ?? champion.load,
             portraitOf: (champion) => options.portraitOf?.(champion),
-            // The thirty possession slots are RNs like any other and go out as slot
-            // numbers in the same index the image uses.
-            encodeRN,
         },
     );
 }

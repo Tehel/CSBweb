@@ -18,8 +18,7 @@
  *     `Write` takes them from.
  *
  * Then the champion bones records, which are the ones play writes: one longword under
- * the bones' RN, two records under one key, and the keys of a pool translated between a
- * file's numbering and the port's.
+ * the bones' RN, and two records under one key.
  *
  * Run: `npx tsx tools/dump-expool.ts`
  */
@@ -31,12 +30,10 @@ import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { EXPOOL_RECORD_SIZE, Expool, type ExpoolDatabase } from '../src/data/CsbwinExpool';
 import { check, finish } from './lib/check';
-import { genuineSaves, savePath } from './lib/saves';
+import { genuineSaves } from './lib/saves';
 
 /** `EDT_Palette` (`doc/CSBwin-src/CSB.h:1564`). */
 const EDT_PALETTE = 7;
-/** `EDT_ChampionBones` (`doc/CSBwin-src/CSB.h:1571`). */
-const EDT_CHAMPION_BONES = 9;
 
 const same = (a: Uint8Array, b: Uint8Array): boolean =>
   a.length === b.length && a.every((v, i) => v === b[i]);
@@ -182,43 +179,6 @@ function main(): void {
     check(data.header.objectCounts[11] === 3, 'the 22nd record makes a second block of them');
     check(Array.from({ length: 21 }, (_, i) => pool.copyChampionBonesRecord(0x2900 + i)).every((v, i) => v === i),
       'and all of them are found');
-  }
-
-  /* ------------------------------------------ 3. the keys translated ------------- */
-
-  console.log('');
-  console.log("=== a pool's bones keys between a file's numbering and the port's ===");
-  {
-    const { dungeon } = loadCsbwinWorld(new Uint8Array(readFileSync(savePath('csbgame7.dat'))));
-    const db = copyOf(dungeon.expool ?? new Uint8Array(0));
-    const pool = new Expool(db);
-    const others = pool.keys().filter((key) => key >>> 24 !== EDT_CHAMPION_BONES);
-    const before = others.map((key) => pool.locate(key));
-
-    pool.addChampionBonesRecord(700, 0x1111);  // the older of two under one key
-    pool.addChampionBonesRecord(700, 0x2222);
-    pool.addChampionBonesRecord(701, 0x3333);
-    pool.addChampionBonesRecord(702, 0x4444);  // a slot that names nothing
-    pool.addChampionBonesRecord(0x2a00, 0x5555); // a key the translation does not change
-    const staged = (db.expool ?? new Uint8Array(0)).slice();
-
-    pool.translateChampionBonesKeys((rn) => rn);
-    check(same(db.expool ?? new Uint8Array(0), staged), 'a translation that changes no key changes no byte');
-
-    const packed = new Map([[700, 0x2805], [701, 0x2806], [0x2a00, 0x2a00]]);
-    pool.translateChampionBonesKeys((slot) => packed.get(slot) ?? null);
-    const bones = pool.keys().filter((key) => key >>> 24 === EDT_CHAMPION_BONES).map((key) => (key & 0xffff).toString(16));
-    console.log(`bones keys after: ${bones.sort().join(' ')}`);
-    check(bones.length === 4, 'the record whose slot names nothing is dropped, and the other four kept');
-    check(pool.copyChampionBonesRecord(700) === null && pool.copyChampionBonesRecord(701) === null,
-      'no record is left under a slot number');
-    check(pool.copyChampionBonesRecord(0x2806) === 0x3333, 'a record is found under its new key');
-    check(pool.copyChampionBonesRecord(0x2a00) === 0x5555, 'the unchanged one under its own');
-    check(pool.getChampionBonesRecord(0x2805) === 0x2222 && pool.getChampionBonesRecord(0x2805) === 0x1111,
-      'two records of one key keep their order');
-    check((db.expool ?? new Uint8Array(0)).length === staged.length, 'the pool does not grow');
-    check(others.every((key, i) => JSON.stringify(pool.locate(key)) === JSON.stringify(before[i])),
-      `and the ${others.length} records of the other types are as they were`);
   }
 
   finish();

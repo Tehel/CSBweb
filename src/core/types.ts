@@ -102,14 +102,11 @@ export interface PositionOriented extends Position {
 }
 
 /**
- * Object ID (Record Name)
+ * Object ID (Record Name): CSBWin's `RN`, a slot of the world's object indirect index
+ * (`src/core/RnMaps.ts`), whose maps say the object's database, record and corner.
+ * `dungeon.dat` stores one packed, `[pos:2][db:4][idx:10]`, until its reader numbers it.
  *
- * Encoding (16 bits):
- * - Bits 15-14: Position on tile (TilePosition)
- * - Bits 13-10: Category (DBType)
- * - Bits 9-0:   Index within category (0-1023)
- *
- * Special values:
+ * Special values, `RNVAL`s rather than slots:
  * - 0xFFFE: End of linked list
  * - 0xFFFF: Null/empty
  *
@@ -124,46 +121,11 @@ export const OBJECT_ID_EOF = 0xFFFE as ObjectID;
 export const OBJECT_ID_NULL = 0xFFFF as ObjectID;
 
 /**
- * Decode an Object ID into its components
- */
-export function decodeObjectID(id: number): {
-    position: TilePosition;
-    category: DBType;
-    index: ui16;
-} {
-    return {
-        position: (id >> 14) & 0x03,
-        category: (id >> 10) & 0x0F,
-        index: id & 0x3FF
-    };
-}
-
-/**
- * Encode an Object ID from its components
- */
-export function encodeObjectID(position: TilePosition, category: DBType, index: ui16): ObjectID {
-    return (((position & 0x03) << 14) |
-            ((category & 0x0F) << 10) |
-            (index & 0x3FF)) as ObjectID;
-}
-
-/**
- * `RN::pos(p)` (doc/CSBwin-src/CSBTypes.h:336) — the same object, moved to corner `p`.
- */
-export function withObjectPosition(rn: ObjectID, position: number): ObjectID {
-    return (((position & 0x03) << 14) | (rn & 0x3FFF)) as ObjectID;
-}
-
-/**
  * `RN ==` (doc/CSBwin-src/CSBTypes.h:349-356), and `IsSameObjectAs` (`:362`): the same
- * object, whatever corner each ID names. CSBWin's `RN` is an indirect index and keeps the
- * corner beside the record (`pos`, `:331-341`); the port's ID carries it, so a chain
- * walker compares the rest. An `RNVAL` (`:235-250`, `>= 0xff00` for `==`, `:357-361`) is
- * compared whole.
+ * slot, so the same object whatever corner it is in.
  */
 export function rnEquals(a: ObjectID, b: ObjectID): boolean {
-    if (a >= 0xFF00 || b >= 0xFF00) return a === b;
-    return (a & 0x3FFF) === (b & 0x3FFF);
+    return a === b;
 }
 
 /**

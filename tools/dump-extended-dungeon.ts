@@ -93,8 +93,17 @@ function main(): void {
         return json(rest) !== json(restA);
       });
       console.log(`    beyond m_word4's debris: record(s) ${debrisOnly.join(', ') || 'none'}`);
-      check(debrisOnly.length === 1 && debrisOnly[0] === 33 && windows.databases.scrolls.records[33]!.textObject === 0xffff,
-        'scrolls: all but the free record 33, whose text is RNnul, differ in m_word4 bits 1-15 alone');
+      // The CSBWin that wrote the file left the free record 33 unconverted, so 34's text
+      // took the slot `convertScrolls` gives 33's here (doc/PROVEN_FACTS.md → "A free
+      // scroll's text in a CSBWin file").
+      const text34 = (w: DungeonData) => {
+        const { category, index, position } = w.rnMaps.decode(w.databases.scrolls.records[34]!.textObject!);
+        return `${category}:${index}@${position}`;
+      };
+      check(debrisOnly.join() === '33,34' && windows.databases.scrolls.records[33]!.textObject === 0xffff
+        && text34(windows) === text34(atari),
+        'scrolls: all but the free record 33, whose text is RNnul, and 34, whose text is the same in another '
+        + 'slot, differ in m_word4 bits 1-15 alone');
     } else {
       check(diff.length === 0, `${key}: identical`);
     }

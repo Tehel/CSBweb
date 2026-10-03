@@ -64,7 +64,7 @@ function rockAt(game: Game, at: Position): ObjectID {
 
 function inCell(game: Game, at: Position, rn: ObjectID): boolean {
   for (let o = game.ctx.dungeon.findFirstObject(at); o !== OBJECT_ID_EOF; o = game.ctx.dungeon.getDBRecordLink(o)) {
-    if ((o & 0x3fff) === (rn & 0x3fff)) return true;
+    if (o === rn) return true;
   }
   return false;
 }

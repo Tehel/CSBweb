@@ -141,7 +141,7 @@ function main(): void {
     console.log(`Firestaff: fired ${swapped}, hand ${basicType(game, hand)}, square ${square(game).map((rn) => `${DBType[game.ctx.dungeon.rnMaps.dbType(rn)]}#${game.ctx.dungeon.rnMaps.idx(rn)}`).join(',')}`);
     check(swapped, 'the empty Firestaff fires #146');
     check(hand === gem && basicType(game, hand) === OBJNI_THE_FIRESTAFF_B, 'the hand now holds the complete Firestaff');
-    check(square(game).some((rn) => (rn & 0x3fff) === (staff & 0x3fff)), 'the empty Firestaff is left in the wall');
+    check(square(game).some((rn) => rn === staff), 'the empty Firestaff is left in the wall');
   }
 
   // --- 3: the staff before the spell --------------------------------------------------

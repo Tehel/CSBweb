@@ -195,7 +195,7 @@ function whereIs(game: Game, rn: ObjectID): Position[] {
       for (let y = 0; y < map.descriptor.height; y++) {
         if ((map.cellFlags[x]![y]! & 0x10) === 0) continue;
         const cell = new Position(x, y, z);
-        if (chainAt(game, cell).some((o) => (o & 0x3fff) === (rn & 0x3fff))) found.push(cell);
+        if (chainAt(game, cell).some((o) => o === rn)) found.push(cell);
       }
     }
   }
@@ -495,12 +495,12 @@ function main(): void {
     for (const slot of armed) {
       const rn = newDagger(g);
       champ.possessions[slot] = rn;
-      slotOf.set(rn & 0x3fff, slot);
+      slotOf.set(rn, slot);
     }
     g.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
     g.systems.monsterAttack.displayCharacterDamage();
-    const dropped = chainAt(g, cell).filter((rn) => slotOf.has(rn & 0x3fff));
-    const got = dropped.map((rn) => slotOf.get(rn & 0x3fff)!);
+    const dropped = chainAt(g, cell).filter((rn) => slotOf.has(rn));
+    const got = dropped.map((rn) => slotOf.get(rn)!);
     const want = dropOrder.filter((slot) => armed.includes(slot));
     console.log(`slots ${armed.join(',')} land in the order ${got.join(',')} (DropOrder says ${want.join(',')})`);
     check(got.join(',') === want.join(','), 'the dropped objects are chained in DropOrder order');

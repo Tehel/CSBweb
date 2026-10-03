@@ -109,8 +109,8 @@ export const DUNGEON_DATA_SOURCES = {
     indirectTextIndex: 'snapshot',
     compressedText: 'snapshot',
     objectList: 'snapshot',
-    // Holds nothing yet: this port's RN is still packed (`DEBT.md` D16).
-    rnMaps: 'loaded',
+    // Every RN is a slot of these, so they travel with the object list.
+    rnMaps: 'snapshot',
     columnIndex: 'snapshot',
     levelIndex: 'loaded',
     item16: 'runtimeSave',
@@ -148,6 +148,11 @@ export interface DungeonSnapshot {
     /** One base64 string per map: the cell flags in `[x][y]` order, row-major over x. */
     cellFlags: string[];
     objectList: ObjectID[];
+    /**
+     * `data.rnMaps`: `dataTypeMap` as base64, `dataIndexMap` as base64 of big-endian
+     * words. Every RN of the snapshot is a slot of these.
+     */
+    rnMaps: { typeMap: string; indexMap: string };
     /** `data.columnIndex` — the per-column offset into `objectList`. */
     columnIndex: ui16[];
     /** `data.header.objectListSize`. */
@@ -306,6 +311,7 @@ export function captureDungeonSnapshot(data: DungeonData): DungeonSnapshot {
     const snapshot: DungeonSnapshot = {
         cellFlags: data.maps.map((map) => encodeCellFlags(map.cellFlags)),
         objectList: [...data.objectList],
+        rnMaps: { typeMap: encodeBytes(data.rnMaps.typeMapBytes()), indexMap: encodeWords(data.rnMaps.indexMapWords()) },
         columnIndex: [...data.columnIndex],
         objectListSize: data.header.objectListSize,
         objectCounts: [...data.header.objectCounts],
@@ -347,6 +353,7 @@ export function applyDungeonSnapshot(data: DungeonData, snapshot: DungeonSnapsho
 
     data.objectList.length = 0;
     data.objectList.push(...snapshot.objectList);
+    data.rnMaps.restore(decodeBytes(snapshot.rnMaps.typeMap), decodeWords(snapshot.rnMaps.indexMap));
 
     // The column index has to land with the object list it indexes: the two are one
     // structure, and half of it is worse than none.

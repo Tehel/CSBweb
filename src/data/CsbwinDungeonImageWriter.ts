@@ -28,8 +28,8 @@
  * flags are bytes and have no order at all.
  */
 import { writeU16BE, writeU32LE } from '../core/bytes';
-import { EXPOOL_RECORD_SIZE, Expool } from './CsbwinExpool';
-import { DBType, encodeObjectID, OBJECT_ID_NULL } from '../core/types';
+import { EXPOOL_RECORD_SIZE } from './CsbwinExpool';
+import { DBType, OBJECT_ID_NULL } from '../core/types';
 import type {
     ActuatorRecord, ClothingRecord, CloudRecord, ContainerRecord, CreatureRecord, DatabaseRecord,
     DoorRecord, DungeonData, DungeonHeader, MapData, MapDescriptor, MiscRecord,
@@ -194,17 +194,13 @@ export function buildCellFlagArray(maps: readonly MapData[], size: number): Uint
  * through block 9's column index, and each entry either names an object or is one of the
  * `RNVAL` literals (`RNeof` 0xfffe closes a chain, `RNnul` 0xffff is nothing).
  *
- * `encode` turns this port's packed `[pos:2][db:4][idx:10]` back into the slot number a
- * file wants — `buildObjectIndirectIndex(dungeon).encode`, whose numbering is its own
- * (see `src/data/CsbwinObjectIndex.ts`). Pass the identity for a `dungeon.dat`, which
- * stores packed RNs and has no indirect index at all.
+ * An RN is written as the world holds it: a slot of its object indirect index
+ * (`src/data/CsbwinObjectIndex.ts`), or a packed RN for a world read without its
+ * conversions (`DungeonImageOptions.noConvert`).
  */
-export function buildObjectList(
-    objectList: readonly number[],
-    encode: (rn: number) => number,
-): Uint8Array {
+export function buildObjectList(objectList: readonly number[]): Uint8Array {
     const buf = new Uint8Array(objectList.length * 2);
-    for (let i = 0; i < objectList.length; i++) writeU16BE(buf, i * 2, encode(objectList[i]) & 0xffff);
+    for (let i = 0; i < objectList.length; i++) writeU16BE(buf, i * 2, objectList[i] & 0xffff);
     return buf;
 }
 
@@ -291,24 +287,19 @@ export function databaseRecordSize(db: number, options: DatabaseWriteOptions = {
  *
  * Three of the sixteen have no record parser:
  *
- * - **11, `EXPOOL`.** Written from `dungeon.expool`, the blocks the world holds, with
- *   the key of each champion bones record put through `encode`: it is the bones' RN
- *   (`src/data/CsbwinExpool.ts`). Note that `SaveGame` deposits the 100 DSA global
+ * - **11, `EXPOOL`.** Written from `dungeon.expool`, the blocks the world holds. The key
+ *   of each champion bones record is the bones' RN (`src/data/CsbwinExpool.ts`). Note that `SaveGame` deposits the 100 DSA global
  *   variables and the 24 overlay palette records into EXPOOL immediately before the
  *   image (`:1141-1162`); this port maintains neither, so a save it writes carries the
  *   ones it read.
  * - **12 and 13**, which `CSB.h` marks `//Not used`. Empty in every file here.
- *
- * `encode` is the same translation block 10 takes; every `link`, and every secondary RN
- * inside a record, goes through it.
  */
 export function buildDatabases(
     dungeon: DungeonData,
-    encode: (rn: number) => number,
     options: DatabaseWriteOptions = {},
 ): Uint8Array {
     const sections: Uint8Array[] = [];
-    for (let db = 0; db < 16; db++) sections.push(buildDatabase(dungeon, db, encode, options));
+    for (let db = 0; db < 16; db++) sections.push(buildDatabase(dungeon, db, options));
     const total = sections.reduce((n, s) => n + s.length, 0);
     const buf = new Uint8Array(total);
     let at = 0;
@@ -320,7 +311,6 @@ export function buildDatabases(
 export function buildDatabase(
     dungeon: DungeonData,
     db: number,
-    encode: (rn: number) => number,
     options: DatabaseWriteOptions = {},
 ): Uint8Array {
     const size = databaseRecordSize(db, options);
@@ -334,16 +324,7 @@ export function buildDatabase(
                 `${declared} records (${declared * EXPOOL_RECORD_SIZE} bytes)`,
             );
         }
-        const written = { expool: expool.slice(), header: { objectCounts: [] } };
-        new Expool(written).translateChampionBonesKeys((rn) => {
-            try {
-                return encode(rn);
-            } catch {
-                // A record left by bones whose database no longer holds them.
-                return null;
-            }
-        });
-        return written.expool;
+        return expool.slice();
     }
     if (size === 0 || declared === 0) {
         if (declared !== 0) {
@@ -361,7 +342,7 @@ export function buildDatabase(
 
     const buf = new Uint8Array(declared * size);
     for (let i = 0; i < declared; i++) {
-        writeRecord(buf, i * size, db, records[i], encode, options);
+        writeRecord(buf, i * size, db, records[i], options);
     }
     return buf;
 }
@@ -405,11 +386,10 @@ function writeRecord(
     at: number,
     db: number,
     record: DatabaseRecord,
-    encode: (rn: number) => number,
     options: DatabaseWriteOptions,
 ): void {
     const link = (record as { nextObject: number }).nextObject;
-    writeU16BE(buf, at, encode(link) & 0xffff);
+    writeU16BE(buf, at, link & 0xffff);
 
     switch (db) {
         case DBType.DOOR: {
@@ -450,7 +430,7 @@ function writeRecord(
         case DBType.CREATURE: {
             const r = record as CreatureRecord;
             // `DB4` (`doc/CSBwin-src/CSB.h:1075-1139`).
-            writeU16BE(buf, at + 2, encodeSecondary(r.possession, link, encode));
+            writeU16BE(buf, at + 2, writtenSecondary(r.possession, link));
             buf[at + 4] = ((r.alternateGraphics & 7) << 5) | (r.creatureType & 0x1f);
             buf[at + 5] = r.groupIndex & 0xff;
             for (let h = 0; h < 4; h++) writeU16BE(buf, at + 6 + h * 2, (r.hp[h] ?? 0) & 0xffff);
@@ -484,8 +464,9 @@ function writeRecord(
                 // `DB7` in its six-byte form: link, an RN to the text record, then a word
                 // whose bit 0 is `open` (`doc/CSBwin-src/CSB.h:1195-1216`). The text RN
                 // is a secondary reference and follows the free-record rule above.
-                const text = r.textObject ?? encodeObjectID(0, DBType.TEXT, r.textReference & 0x3ff);
-                writeU16BE(buf, at + 2, encodeSecondary(text, link, encode));
+                const text = r.textObject;
+                if (text === undefined) throw new Error('a four-byte scroll cannot be written as a six-byte one');
+                writeU16BE(buf, at + 2, writtenSecondary(text, link));
                 writeU16BE(buf, at + 4, ((r.word4Bits1_15 ?? 0) << 1) | bit(r.open));
                 return;
             }
@@ -507,7 +488,7 @@ function writeRecord(
             // `DB9` (`doc/CSBwin-src/CSB.h:1236-1250`): link, contents, `m_word4`,
             // `m_uByte6[2]`. `containerType` is bits 1-2 of `m_word4`; the rest of that
             // word is carried, because it is not zero and CSBWin names none of it.
-            writeU16BE(buf, at + 2, encodeSecondary(r.containedObject, link, encode));
+            writeU16BE(buf, at + 2, writtenSecondary(r.containedObject, link));
             writeU16BE(buf, at + 4, (r.word4 ?? ((r.containerType & 3) << 1)) & 0xffff);
             buf[at + 6] = (r.uByte6?.[0] ?? 0) & 0xff;
             buf[at + 7] = (r.uByte6?.[1] ?? 0) & 0xff;
@@ -524,7 +505,7 @@ function writeRecord(
         case DBType.MISSILE: {
             const r = record as MissileRecord;
             // `DB14` (`doc/CSBwin-src/CSB.h:1317-1328`).
-            writeU16BE(buf, at + 2, encodeSecondary(r.projectileObject, link, encode));
+            writeU16BE(buf, at + 2, writtenSecondary(r.projectileObject, link));
             buf[at + 4] = r.rangeRemaining & 0xff;
             buf[at + 5] = r.damageRemaining & 0xff;
             writeU16BE(buf, at + 6, r.timerIndex & 0xffff);
@@ -544,11 +525,11 @@ function writeRecord(
 
 /**
  * A record's second RN. `RNnul` when the record is free, for the reason `writeRecord`
- * gives — the reader dropped whatever the file held there and there is nothing to encode.
+ * gives — the reader dropped whatever the file held there.
  */
-function encodeSecondary(rn: number, link: number, encode: (rn: number) => number): number {
+function writtenSecondary(rn: number, link: number): number {
     if (link === OBJECT_ID_NULL) return OBJECT_ID_NULL;
-    return encode(rn) & 0xffff;
+    return rn & 0xffff;
 }
 
 /** Every section of the image, in file order. Blocks 7-14. */
@@ -578,12 +559,6 @@ export interface DungeonImageSections {
 export interface DungeonImageWriteOptions extends DatabaseWriteOptions {
     /** The text section is an indirect index plus compressed text. Saves only. */
     indirectText?: boolean;
-    /**
-     * One packed RN as the number the file wants. A save's RNs are slot numbers in the
-     * object indirect index — pass `buildObjectIndirectIndex(dungeon).encode`. A
-     * `dungeon.dat` stores packed RNs, so the default identity is right for it.
-     */
-    encode?: (rn: number) => number;
 }
 
 /** Blocks 7-14 of one dungeon, each as its own byte range. */
@@ -592,19 +567,18 @@ export function buildDungeonImageSections(
     options: DungeonImageWriteOptions = {},
 ): DungeonImageSections {
     const size = cellFlagArraySize(dungeon.maps);
-    const encode = options.encode ?? ((rn: number) => rn);
     return {
         header: buildDungeonImageHeader(dungeon.header),
         levelDescriptors: buildLevelDescriptors(dungeon.maps.map((m) => m.descriptor)),
         columnIndex: buildColumnIndex(dungeon.columnIndex),
-        objectList: buildObjectList(dungeon.objectList, encode),
+        objectList: buildObjectList(dungeon.objectList),
         indirectTextIndex: options.indirectText
             ? buildIndirectTextIndex(dungeon.indirectTextIndex ?? [])
             : new Uint8Array(0),
         text: options.indirectText
             ? buildCompressedText(dungeon.compressedText ?? [])
             : buildTextWords(dungeon.textWords ?? []),
-        databases: buildDatabases(dungeon, encode, options),
+        databases: buildDatabases(dungeon, options),
         cellFlags: buildCellFlagArray(dungeon.maps, size),
     };
 }

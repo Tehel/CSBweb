@@ -9,22 +9,13 @@
  * the bytes — so a field packed at the wrong offset, in the wrong width, in the wrong
  * byte order, or one the reader silently drops on the way through, all show up as a diff.
  *
- * **Two of the eight sections cannot be byte-identical, and the reason is not a defect.**
- * An RN in a save file is a slot number in the object indirect index, and that index's
- * numbering is ours rather than CSBWin's (`src/data/CsbwinObjectIndex.ts`:
- * `buildObjectIndirectIndex` gives every record a slot in `DBType` then index order,
- * where CSBWin allocates in the order `ConvertListOfObjects` happens to walk the world).
- * Nothing outside the file refers to a slot number, so a save only has to agree with
- * itself — but it does mean block 10, which is nothing *but* RNs, and the link word of
- * every record in block 13, come out with different numbers in them.
- *
- * So those words are checked a different way, and the check is weaker in kind. For each
- * of them the tool writes the two maps, reads them back through `readObjectIndirectIndex`
- * — which verifies both `FormChecksum`s, so the maps are known to be well-formed — and
- * resolves our word through them. The result must equal what the reader got by resolving
- * *CSBWin's* word through *CSBWin's* maps. That proves the reference still names the same
- * object, and no more: unlike the byte comparisons it would survive a bug that our own
- * encode and resolve share. Every byte that is not an RN is still compared with the file.
+ * **The RN words.** An RN in a save file is a slot of the object indirect index, and the
+ * world keeps the file's index and its slots (`src/data/CsbwinObjectIndex.ts`), so block
+ * 10, which is nothing but RNs, and every RN word of block 13 are byte-compared like the
+ * rest, and each must also be the RN the reader produced. The tool writes the world's
+ * two maps, reads them back through `readObjectIndirectIndex` — which verifies both
+ * `FormChecksum`s — and checks they are the file's, slot for slot. A free record's second
+ * RN is the one exception (`compareDatabases`).
  *
  * Block 15 needs no such caveat and gets the strongest check of the lot: the final
  * checksum is computed over the **file's own** image bytes and compared with the word the
@@ -33,9 +24,8 @@
  * `dungeon.dat` is checked too, and it is the sharper case twice over. For block 7 a save
  * writes 0 in `LegacyCellFlagArraySize` and 125 in `NumWordsInTextArray` where
  * `dungeon.dat` writes 12366 and 1749, so a writer that hardcoded either would pass on
- * one and fail on the other. And `dungeon.dat` stores **packed** RNs, needing no indirect
- * index at all — so for it every word of blocks 10 and 13 is byte-compared as well, which
- * is the check the saves cannot have.
+ * one and fail on the other. And `dungeon.dat` stores **packed** RNs, which a world read
+ * without its conversions keeps, so its blocks 10 and 13 are its own words too.
  *
  * What writing it found, all of it in the record parsers rather than in the writer: the
  * door's `word2` bits 9-15, the teleporter's low `word4` byte, the text record's `word2`
@@ -63,7 +53,7 @@ import {
   dungeonImageSectionList,
 } from '../src/data/CsbwinDungeonImageWriter';
 import {
-  buildObjectIndirectIndex,
+  objectIndexOf,
   formChecksum,
   readObjectIndirectIndex,
 } from '../src/data/CsbwinObjectIndex';
@@ -263,7 +253,6 @@ interface Subject {
   layout: ImageLayout;
   /** Null for `dungeon.dat`, which stores packed RNs and has no indirect index. */
   index: CsbwinObjectIndex | null;
-  encode: (rn: number) => number;
   options: { indirectText: boolean; bigActuators: boolean; newScrolls: boolean };
   declaredCellFlagSize: number;
   /** Whether the file ends with `WriteAndChecksum`'s word. `dungeon.dat` does not. */
@@ -271,13 +260,12 @@ interface Subject {
 }
 
 /**
- * Build the two maps for this world, serialise them exactly as the Extended Features
- * block carries them, and read them back through `readObjectIndirectIndex` — which dies
- * unless both `FormChecksum`s agree, so what comes back is known to be well-formed.
- * Every RN this run writes is resolved through *that*, not through the builder.
+ * The world's two maps, serialised exactly as the Extended Features block carries them
+ * and read back through `readObjectIndirectIndex` — which dies unless both
+ * `FormChecksum`s agree.
  */
-function roundTripIndex(dungeon: DungeonData): { encode: (rn: number) => number; index: CsbwinObjectIndex } {
-  const writer = buildObjectIndirectIndex(dungeon);
+function roundTripIndex(dungeon: DungeonData): CsbwinObjectIndex {
+  const writer = objectIndexOf(dungeon.rnMaps);
   const length = writer.length;
   const indexBytes = new Uint8Array(length * 2);
   for (let i = 0; i < length; i++) {
@@ -287,14 +275,11 @@ function roundTripIndex(dungeon: DungeonData): { encode: (rn: number) => number;
   const blob = new Uint8Array(length * 3);
   blob.set(writer.typeMap, 0);
   blob.set(indexBytes, length);
-  const index = readObjectIndirectIndex(
-    blob, 0, length, formChecksum(writer.typeMap), formChecksum(indexBytes),
-  );
-  return { encode: (rn: number) => writer.encode(rn), index };
+  return readObjectIndirectIndex(blob, 0, length, formChecksum(writer.typeMap), formChecksum(indexBytes));
 }
 
 function compare(s: Subject): void {
-  const built = buildDungeonImageSections(s.dungeon, { ...s.options, encode: s.encode });
+  const built = buildDungeonImageSections(s.dungeon, s.options);
 
   // The length the Extended Features block declares — a check in its own right, since
   // getting it wrong moves nothing in *this* file but would truncate or overrun ours.
@@ -379,12 +364,7 @@ function hex(b: Uint8Array): string {
   return [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 
-/**
- * Block 10. Our slot numbering is our own, so the words differ from the file's and there
- * is nothing to byte-compare; what must hold is that each of our words resolves — through
- * maps that have been serialised and read back — to the object the reader got out of
- * CSBWin's word. Weaker than the sections above, and unavoidably so.
- */
+/** Block 10: the object list the reader got, and the file's own words. */
 function compareObjectList(s: Subject, mine: Uint8Array): void {
   const list = s.dungeon.objectList;
   check(mine.length === list.length * 2,
@@ -398,23 +378,14 @@ function compareObjectList(s: Subject, mine: Uint8Array): void {
     const our = (mine[i * 2] << 8) | mine[i * 2 + 1];
     const their = (theirs[i * 2] << 8) | theirs[i * 2 + 1];
     if (our === their) sameBytes++;
-    // A literal must stay a literal: an encode that mapped a real object onto `RNeof`
-    // would resolve back correctly and still corrupt every chain that ends on it.
     if ((our >= RN_LITERAL_FLOOR) !== (their >= RN_LITERAL_FLOOR)) shape++;
-    if (resolveOrNull(s.index, our) !== list[i]) wrong++;
+    if (our !== list[i]) wrong++;
   }
   console.log(`    ${'block 10 object list'.padEnd(28)} ${String(mine.length).padStart(6)} b  ` +
     `${list.length} RNs, ${wrong} mis-resolved, ${sameBytes} identical to the file`);
-  check(wrong === 0, `${s.label}: block 10 resolves back to the object list, entry for entry (${wrong} wrong)`);
+  check(wrong === 0, `${s.label}: block 10 is the object list, entry for entry (${wrong} wrong)`);
   check(shape === 0, `${s.label}: block 10 writes a literal RNVAL exactly where the file does (${shape} wrong)`);
-  if (!s.index) {
-    check(sameBytes === list.length,
-      `${s.label}: block 10 is the file's own bytes — a packed-RN image needs no index`);
-  }
-}
-
-function resolveOrNull(index: CsbwinObjectIndex | null, raw: number): number {
-  return index ? index.resolve(raw) : raw;
+  check(sameBytes === list.length, `${s.label}: block 10 is the file's own bytes`);
 }
 
 /**
@@ -440,6 +411,7 @@ function compareDatabases(s: Subject, mine: Uint8Array): void {
   const diffs = new Map<string, number>();
   let rnChecked = 0;
   let rnWrong = 0;
+  let rnNotFile = 0;
   let staleFree = 0;
   let at = 0;
 
@@ -464,10 +436,12 @@ function compareDatabases(s: Subject, mine: Uint8Array): void {
         const expected = rnFields[i]?.[off];
         if (expected === undefined) continue;
         rnChecked++;
-        if (resolveOrNull(s.index, our) !== expected) rnWrong++;
+        if (our !== expected) rnWrong++;
+        const their = (theirs[rec + off] << 8) | theirs[rec + off + 1];
         if (off !== 0 && expected === OBJECT_ID_NULL) {
-          const their = (theirs[rec + off] << 8) | theirs[rec + off + 1];
           if (their !== our) staleFree++;
+        } else if (their !== our) {
+          rnNotFile++;
         }
       }
 
@@ -487,9 +461,10 @@ function compareDatabases(s: Subject, mine: Uint8Array): void {
   const summary = all.length > 8 ? `${all.slice(0, 8).join(', ')}, +${all.length - 8} more` : all.join(', ');
   console.log(`    ${'block 13 databases'.padEnd(28)} ${String(mine.length).padStart(6)} b  ` +
     (diffs.size === 0 ? 'identical bar the RNs' : `DIFFERS: ${summary}`) +
-    `  [${rnChecked} RNs resolved, ${staleFree} stale refs in freed records]`);
+    `  [${rnChecked} RNs checked, ${staleFree} stale refs in freed records]`);
   check(diffs.size === 0, `${s.label}: block 13's non-RN bytes are the file's own${summary ? ` — ${summary}` : ''}`);
-  check(rnWrong === 0, `${s.label}: every RN in block 13 resolves back to the record's own reference (${rnWrong} wrong)`);
+  check(rnWrong === 0, `${s.label}: every RN in block 13 is the record's own reference (${rnWrong} wrong)`);
+  check(rnNotFile === 0, `${s.label}: every RN in block 13 but a free record's second is the file's word (${rnNotFile} differ)`);
   check(rnChecked > 0, `${s.label}: block 13 has RNs to check`);
 }
 
@@ -542,8 +517,8 @@ function main(): void {
   console.log(`dungeon.dat  (${dungeon.maps.length} levels, cell flags at ${layout.cellFlags})`);
   compare({
     label: 'dungeon.dat', bytes: raw, dungeon, base: 0, layout,
-    // `dungeon.dat` stores packed RNs: no indirect index, and the identity for `encode`.
-    index: null, encode: (rn) => rn,
+    // `dungeon.dat` stores packed RNs: no indirect index.
+    index: null,
     options: { indirectText: false, bigActuators: false, newScrolls: false },
     // It has no Extended Features block, so its own header is the authority:
     // `ReadDatabases` falls back to `LegacyCellFlagArraySize` when `cellflagArraySize`
@@ -569,10 +544,14 @@ function main(): void {
       bigActuators: save.bigActuators ?? false,
       newScrolls: (save.version ?? 0) >= 0x42,
     };
-    const { encode, index } = roundTripIndex(world);
+    const index = roundTripIndex(world);
+    check(
+      !!save.objectIndex && index.typeMap.join() === save.objectIndex.typeMap.join()
+        && index.indexMap.join() === save.objectIndex.indexMap.join(),
+      `${name}: the object indirect index is written as the file has it`);
     console.log(`${name}  (image at ${base}, cell flags at ${parsed.cellFlags}, index ${index.length} slots)`);
     compare({
-      label: name, bytes, dungeon: world, base, index, encode, options,
+      label: name, bytes, dungeon: world, base, index, options,
       layout: {
         header: 0,
         levelDescriptors: DUNGEON_IMAGE_HEADER_SIZE,

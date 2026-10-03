@@ -42,7 +42,7 @@ import { readFileSync } from 'node:fs';
 
 import { loadSaveGameState, saveSaveGameState } from '../src/data/SaveGameLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
-import { buildObjectIndirectIndex, formChecksum, readObjectIndirectIndex } from '../src/data/CsbwinObjectIndex';
+import { formChecksum, objectIndexOf, readObjectIndirectIndex } from '../src/data/CsbwinObjectIndex';
 import { OBJECT_ID_NULL } from '../src/core/types';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
@@ -215,24 +215,19 @@ function main(): void {
     for (const line of lines) console.log(line);
   }
 
-  /* ---- block 0's maps, built from a world rather than read from a file ---- */
+  /* ---- block 0's maps, written from a world ---- */
 
-  // Writing blocks 10-13 needs the *other* direction: an object index built for a world
-  // this port holds, so that every RN in the image can be written as a slot number. Its
-  // numbering is this port's own and cannot be compared with the file's, so what is
-  // asserted instead is that it is internally sound — which is the only property a save
-  // needs, since nothing outside the file refers to a slot.
-  console.log('\n=== the object index, built from a world ===');
-  console.log(['save', 'file slots', 'built slots', 'references'].join('\t'));
+  // A save's world keeps the file's object index as its `RnMaps`, and the writer puts it
+  // back (`objectIndexOf`). The canary: write the maps out as the prefix would, read them
+  // back through the *reader* with both `FormChecksum`s verified, and compare with the
+  // file's. A map written at the wrong width, in the wrong byte order or one slot out
+  // fails here.
+  console.log('\n=== the object index, written from a world ===');
+  console.log(['save', 'file slots', 'written slots', 'references'].join('\t'));
   for (const path of saves) {
     const name = path.split('/').pop() ?? path;
     const { dungeon, save } = loadCsbwinWorld(new Uint8Array(readFileSync(path)));
-    const index = buildObjectIndirectIndex(dungeon);
-
-    // The canary: write the maps out as the prefix would, read them back through the
-    // *reader* with both `FormChecksum`s verified, and resolve through that. A map
-    // written at the wrong width, in the wrong byte order or one slot out fails here
-    // rather than producing a plausible wrong object.
+    const index = objectIndexOf(dungeon.rnMaps);
     const indexBytes = new Uint8Array(index.length * 2);
     for (let i = 0; i < index.length; i++) {
       indexBytes[i * 2] = index.indexMap[i] & 0xff;
@@ -245,41 +240,38 @@ function main(): void {
       wire, 0, index.length, formChecksum(index.typeMap), formChecksum(indexBytes),
     );
 
-    // Every reference the world actually holds: the object list and every record's link.
+    // Every reference the world holds — the object list and every live record's links —
+    // names a live slot of the maps.
     let references = 0;
-    const roundTrips = (rn: number): boolean => {
-      references++;
-      return reread.resolve(index.encode(rn)) === rn;
-    };
     let broken = 0;
+    const live = (rn: number): void => {
+      references++;
+      if (!dungeon.rnMaps.checkIndirectIndex(rn) || reread.indexMap[rn] === 0xffff) broken++;
+    };
     for (const rn of dungeon.objectList) {
       if (rn === OBJECT_ID_NULL || rn === 0xfffe) continue;
-      if (!roundTrips(rn)) broken++;
+      live(rn);
     }
     for (const db of Object.values(dungeon.databases)) {
       for (const record of db.records as Array<Record<string, unknown>>) {
         const link = record.nextObject as number | undefined;
-        if (link === undefined || link === OBJECT_ID_NULL || link === 0xfffe) continue;
-        if (!roundTrips(link)) broken++;
+        if (link === undefined || link === OBJECT_ID_NULL) continue;
+        if (link !== 0xfffe) live(link);
         for (const field of ['containedObject', 'possession', 'projectileObject'] as const) {
           const other = record[field] as number | undefined;
-          if (other === undefined || other === OBJECT_ID_NULL || other === 0xfffe) continue;
-          if (!roundTrips(other)) broken++;
+          if (other === undefined || other === OBJECT_ID_NULL || other >= 0xff00) continue;
+          live(other);
         }
       }
     }
 
-    console.log([name, save.objectIndex?.length ?? 0, index.length, references].join('\t'));
+    console.log([name, save.objectIndex?.length ?? 0, reread.length, references].join('\t'));
     check(references > 1000, `${name}: the world holds references worth checking (${references})`);
-    check(broken === 0,
-      `${name}: every reference survives encode → maps → resolve (${broken} did not)`);
-    check(index.typeMap[0] === 0xff && index.indexMap[0] === 0xffff,
-      `${name}: slot 0 is left free, as ConvertListOfObjects leaves it`);
-    check(index.countAliases() === 0,
-      `${name}: no two slots name the same record`);
-    // `RNVAL`s and `RNempty` are literals on the way out as well as on the way in.
-    check(index.encode(0) === 0 && index.encode(0xffff) === 0xffff && index.encode(0xff80) === 0xff80,
-      `${name}: RNempty, RNnul and a spell literal pass through encode untouched`);
+    check(broken === 0, `${name}: every reference names a live slot of the maps (${broken} do not)`);
+    check(
+      !!save.objectIndex && reread.typeMap.join() === save.objectIndex.typeMap.join()
+        && reread.indexMap.join() === save.objectIndex.indexMap.join(),
+      `${name}: the maps written are the file's, slot for slot`);
   }
 
   finish();

@@ -224,33 +224,6 @@ export class Expool {
         const record = this.read(championBonesKey(bonesObject));
         return record?.length === 1 ? record[0] : null;
     }
-
-    /**
-     * Give every bones record's key the RN `translate` makes of its own, and drop the
-     * record where it makes none.
-     *
-     * The key holds `bonesObject.ConvertToInteger()`, the RN as CSBWin keeps it: a slot of
-     * the object indirect index, which is the save's own numbering
-     * (`src/data/CsbwinObjectIndex.ts`). So a pool read from a file has its keys resolved
-     * as every other RN of the image is, and a pool being written has them encoded.
-     *
-     * A record whose key does not change is not touched. The others are taken out and
-     * written back oldest first, so each returns to the longwords it left and two records
-     * of one key keep their order.
-     */
-    translateChampionBonesKeys(translate: (rn: number) => number | null): void {
-        const moved: Array<{ rn: number | null; record: number[] }> = [];
-        for (const key of this.keys()) {
-            if (key >>> 24 !== EDT_CHAMPION_BONES) continue;
-            const rn = translate(key & 0xffff);
-            if (rn === (key & 0xffff)) continue;
-            const record = this.read(key);
-            if (record) moved.push({ rn, record });
-        }
-        for (const { rn, record } of moved.reverse()) {
-            if (rn !== null) this.write(championBonesKey(rn), record);
-        }
-    }
 }
 
 /** The `EDT_SpecialLocations` entries of an `EXPOOL` database, given as its raw blocks. */

@@ -92,7 +92,7 @@ async function main(): Promise<void> {
   if (!door) throw new Error(`no door on level ${level}`);
 
   const doorRn = dungeon.findFirstDoor(new Position(door.x, door.y, level));
-  const doorRecord = doorRn === OBJECT_ID_EOF ? null : dungeon.getDoorRecordByIndex(doorRn & 0x3ff);
+  const doorRecord = doorRn === OBJECT_ID_EOF ? null : dungeon.getDoorRecordByIndex(dungeon.rnMaps.idx(doorRn));
   console.log(`level ${level}: door at (${door.x},${door.y}), mode=${doorRecord?.vertical ? 'up-down' : 'sideways'}\n`);
 
   // A closing door is CSBWin's `TT_1` — `TimerFunction.TT_DOOR_STEP` here — with

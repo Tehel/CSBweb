@@ -114,7 +114,8 @@ async function main(): Promise<void> {
     (actuators as any).performLocalAction = (_type: number, _x: number, _y: number, _z: number, mapPos: number) => seen.push(mapPos);
     // Wall actuator type 1 (any object), local-action only, local type 10, action SET.
     const rec = { nextObject: 0xfffe, word2: 1, word4: 0x800, word6: 10 << 4 };
-    const rn = (2 << 14) | (DBType.ACTUATOR << 10);
+    const rnMaps = (actuators as any).dungeon.rnMaps;
+    const rn = rnMaps.setPos(rnMaps.rn(DBType.ACTUATOR, 0), 2);
     const context = {
       objectDB5To13Present: false, monstersPresent: false, sameTypeObjectPresent: false,
       differentTypeObjectPresent: false, movedObjectDBNum: DBType.WEAPON, movedObjectNameIndex: 0,

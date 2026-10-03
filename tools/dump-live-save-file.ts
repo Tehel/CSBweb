@@ -7,13 +7,10 @@
  * disk menu and F5 write. Until the three load-time conversions were ported that was
  * impossible, and `saveSaveGameState` emitted a blocks 0-6 prefix no reader can load.
  *
- * **Why it is a round trip and not a byte comparison, in either direction.** There is
- * nothing to compare against: no CSBWin file exists for a game this port played, and
- * our own file cannot be compared with itself usefully, because the object indirect
- * index is ours — `buildObjectIndirectIndex` numbers slots its own way (see
- * `src/data/CsbwinObjectIndex.ts`), so the same world written twice from two different
- * numberings is two different byte strings that both mean the same thing. So the claim
- * this tool makes is: **the file parses as a whole**, and **the world comes back**. The
+ * **Why it is a round trip and not a byte comparison.** There is nothing to compare
+ * against: no CSBWin file exists for a game this port played. So the claim this tool
+ * makes is: **the file parses as a whole**, block 0 carries the game's object indirect
+ * index slot for slot, and **the world comes back**. The
  * closure check in `loadCsbwinWorld` is what makes the first half sharp — the cell flag
  * array has to end exactly two bytes before the file does, which it only can if every
  * one of the eight image sections was written at the length the header declares.
@@ -35,21 +32,14 @@
  * The thrown object is not decoration. A missile in flight is a `MISSILE` record plus a
  * **timer carrying an object RN in bytes 6-7**, and a timer's object is the one
  * reference nothing else in the writer reaches — `TIMER` bytes 6-9 are plain numbers to
- * every other timer function, so `buildSaveFile` has to translate them by hand
- * (`doc/PROVEN_FACTS.md` → "Everything CSBWin converts to slot numbers, and in what
- * order"). Get it wrong and the sword lands on whatever record our slot of the same
- * number happens to be.
+ * every other timer function (`doc/PROVEN_FACTS.md` → "Everything CSBWin converts to
+ * slot numbers, and in what order"). The slot goes out as the game holds it, and the
+ * sword must come back in flight.
  *
- * **What can be canaried, and what cannot.** Blanking any of these fails this tool: the
- * possession pass over `heldReferences`, `sequencedTimers`/`extendedTimers` (the header
- * then declares a 16-byte `TIMER` over a 10-byte block and the file will not parse),
- * `cellFlagArraySize`, the `BigActuators` flag, `GAMEBLOCK2.ObjectInHand`, and resolving
- * a timer's object RN on the way back in. Withholding the **timer** pass over
- * `heldReferences` fails nothing, and the reason is worth writing down rather than
- * leaving as a hole: a missile in flight is linked into a cell by `addObjectToCell`, so
- * the chain pass has already recorded its position, and `buildObjectIndirectIndex` gives
- * every record of every database a slot whether anything references it or not. The pass
- * is CSBWin's and is kept because CSBWin has it, not because this dungeon needs it.
+ * **What can be canaried.** Blanking any of these fails this tool:
+ * `sequencedTimers`/`extendedTimers` (the header then declares a 16-byte `TIMER` over a
+ * 10-byte block and the file will not parse), `cellFlagArraySize`, the `BigActuators`
+ * flag and `GAMEBLOCK2.ObjectInHand`.
  *
  * `GAMEBLOCK1` travels too: `d.RandomGameID`, `totalMoveCount`, `d.Word22592`-`22598`
  * and `d.Byte22808` come back, `SaveOption` is SAVE AND PLAY's 1, and a third section
@@ -69,6 +59,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/engine/CsbwinSaveGame';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
+import { objectIndexOf } from '../src/data/CsbwinObjectIndex';
 import type { Databases, DungeonData, PresetHero } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import { MovementAction } from '../src/engine/gameTypes';
@@ -348,8 +339,10 @@ function writeAndReload(label: string, game: Game): Game | null {
     `(${parsed.save.cellFlagArraySize})`);
   check(parsed.dungeon.header.textDataSize === (parsed.dungeon.indirectTextIndex ?? []).length,
     `${label}: NumWordsInTextArray is the index length the conversion wrote`);
-  check((parsed.save.objectIndex?.countAliases() ?? -1) === 0,
-    `${label}: no two slots of the object indirect index name the same record`);
+  const held = objectIndexOf(game.ctx.dungeon.rnMaps);
+  check(!!parsed.save.objectIndex && parsed.save.objectIndex.typeMap.join() === held.typeMap.join()
+    && parsed.save.objectIndex.indexMap.join() === held.indexMap.join(),
+    `${label}: block 0 carries the game's object indirect index, slot for slot (${held.length} slots)`);
   // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`SaveGame.cpp:1033`): an
   // empty cursor is `RNnul`, as in every committed save that has one. `RNempty` (0)
   // would load in CSBWin as an object in hand (`:1649`, `:2753`).

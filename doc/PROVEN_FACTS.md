@@ -1404,13 +1404,10 @@ floor with no record, and a later offering reads their `value` as the champion's
 (`Mouse.cpp:903`, `Character.cpp:3563`, `Code11f52.cpp:49`). Each wants a record of
 exactly one longword.
 
-The port keys the record by the bones' packed RN without its position, which is what a
-slot is here. `DungeonLoader.readExpool` resolves each bones key through the file's index
-as it does every RN of the image, and drops a record whose slot the file has freed;
-`buildDatabase` encodes each through the index the file is written with
-(`Expool.translateChampionBonesKeys`). Evidence: `tools/dump-vi-altar.ts` section 7 saves
-a game with bones on the floor, finds the record in the file's own pool under the bones'
-slot (1679, where the port's RN is `0x2808`), and resurrects from it in a game that loads
+The port keys the record by the bones' RN, its slot, and reads and writes `EXPOOL` as
+the file has it. Evidence: `tools/dump-vi-altar.ts` section 7 saves a game with bones on
+the floor, finds the record in the file's own pool under the bones' slot (1947), which
+the file's index names as the bones' record, and resurrects from it in a game that loads
 the file. Four of the committed saves (`csbgame3`, `4`, `6` and `7`) have a block of
 three-longword records, the length of a bones record, with every record free.
 
@@ -2185,11 +2182,9 @@ its old form in comments beside the new one:
 
 So the 6-byte record is link, then a **full RN** to the text record, then a word whose
 bit 0 is "open" — where the 4-byte record packed both into one word, with "open" read
-from the high bits. Once that RN has been put back into packed form its low ten bits are
-the text record's index, so `rn & 0x3ff` recovers precisely what the old field held and
-every existing reader of `textReference` keeps working. *Put back into packed form* is
-not a formality: in a save file the stored RN is a slot number in the object indirect
-index, not a packed RN — see "An RN in a save file is an indirect index" below.
+from the high bits. The RN is a slot of the object indirect index (see "An RN in a save
+file is an indirect index" below), and the record index it names is what the old field
+held, so the reader keeps that as `textReference` and every reader of it keeps working.
 
 `readNewScrollDatabase` reads the whole database flat at `dbEntrySizes[dbSCROLL]` per
 record (`doc/CSBwin-src/SaveGame.cpp:2168-2187`); the old-format branch beside it is
@@ -2207,10 +2202,9 @@ latest. CSBWin grows it while loading. Compare cell flags, never object-list len
 
 ## An RN in a save file is an indirect index, not a packed `[pos][db][idx]`
 
-This is the fact that made every object reference inside a genuine CSBWin save read as
-nonsense, and it is not a quirk of the file format — it is how `RN` works in CSBWin at
-all. `dungeon.dat` stores an object reference as the Atari ST bitfield this port uses
-everywhere, `[position:2][category:4][index:10]`. CSBWin does not keep them that way.
+It is not a quirk of the file format — it is how `RN` works in CSBWin at all, and in
+this port (`src/core/RnMaps.ts`). `dungeon.dat` stores an object reference as the Atari
+ST bitfield, `[position:2][category:4][index:10]`. CSBWin does not keep them that way.
 `class RN` holds one `ui16 indirectIndex` and nothing else
 (`doc/CSBwin-src/CSBTypes.h:268-370`); every accessor goes through two global arrays:
 
@@ -2251,17 +2245,14 @@ reuse such slots. A free record can go on naming one: `DeleteDBEntry` leaves the
 the record as it was, so its possession or contents chain still points at a slot that may
 have been freed since, and the referring record is itself free, its link `RNnul`. CSBWin
 never looks: a free record is
-reached only by the allocator, which clears it before handing it out. So a free record's
-other RNs are read and dropped rather than resolved; refusing them would make a
-perfectly good save unreadable.
+reached only by the allocator, which clears it before handing it out. So the port reads a
+free record's other RNs as `RNnul`.
 
-**Where this port draws the line.** `dataIndexMap` is 16 bits wide and a packed RN's
-index field is 10, so a database of more than 1024 records cannot be expressed here.
-CSBWin allows 64000. No shipped DM dungeon comes close — the largest index in any
-committed save is 682 — but `CsbwinObjectIndex.resolve` throws rather than alias. The
-same applies to two slots naming the same `(db, idx)`, which `ConvertListOfObjects`
-permits only for a missile's flying object (`DuplicateOK`, `:1918`): `countAliases`
-reports it, and the shipped dungeon has none.
+**Two slots may name the same `(db, idx)`.** `ConvertListOfObjects` reuses a record's slot
+only for a missile's flying object (`DuplicateOK`, `:1918`), but `convertScrolls` gives
+every scroll's text a slot of its own (`AllocateIndirectIndex`, `:2153`) beside any the
+chains gave it. In DM's `dungeon.dat` the free scroll 33 names text 123, which is a wall's
+text in a chain, so the port's conversion of it holds one such pair, slots 1779 and 1945.
 
 Evidence: `tools/dump-csbwin-world.ts` walks every object chain in all eight saves —
 1893 to 1908 objects each, chains up to 31 deep, through chests and monster possessions
@@ -2789,40 +2780,28 @@ sum over each committed save's **own** image bytes and compares it with the word
 ends with. All fourteen agree, so the formula is measured against CSBWin's arithmetic
 rather than against ours.
 
-## An RN in block 10 or block 13 cannot be byte-identical, and need not be
+## An RN in block 10 or block 13 is the file's own word
 
-Every word of the object list, and the link word of every database record, is an RN — a
-slot number in the object indirect index. `buildObjectIndirectIndex` numbers those slots
-its own way (every record of every database, in `DBType` then index order, slot 0 left
-free), where CSBWin numbers them in whatever order `ConvertListOfObjects` happened to walk
-the world. Nothing outside the file refers to a slot number: `ReadExtendedFeatures` reads
-the maps back before anything resolves an RN through them
-(`doc/CSBwin-src/SaveGame.cpp:355-376`), so a save only has to agree with itself.
+Every word of the object list, and every RN of a database record, is a slot of the object
+indirect index. The port keeps a save's slots and its maps as they were read, and writes
+them back so: blocks 10 and 13 are the file's own bytes, RNs included
+(`tools/dump-dungeon-image-blocks.ts`), and block 0 carries the file's maps slot for slot
+(`tools/dump-save-blocks-vs-file.ts`).
 
-Measured on `csbgame7.dat`: 843 of the object list's 1982 words happen to match CSBWin's
-anyway, and 1139 do not. On `dungeon.dat`, which stores packed RNs and has no indirect
-index at all, every one of the 1682 matches — which is why that file is kept in the tool
-as the case where blocks 10 and 13 *are* byte-compared.
-
-For a save, those words are checked by resolving instead: the maps are written, read back
-through `readObjectIndirectIndex` (which verifies both `FormChecksum`s), and each word
-resolved through them must equal what the reader got by resolving CSBWin's word through
-CSBWin's maps. That is a weaker argument than the byte comparisons around it — it would
-survive a bug our encode and our resolve shared — and the tool says so where it makes it.
-
-One class of word is neither compared nor resolvable: **the second RN of a free record**.
+One class of word is the exception: **the second RN of a free record**.
 `DeleteDBEntry` writes `RNnul` over a record's link and frees the indirect slot that named
 it, but leaves the rest of the record alone (`doc/CSBwin-src/data.cpp:993-1015`), so a
 deleted record routinely still points its possession or contents chain at a slot that has
 since been freed. The reader
-drops those (`readRNOfRecord`), so the writer has nothing to put back but `RNnul`. There
-are 135 to 256 of them per committed save; the tool counts and reports them, exactly as
-`tools/dump-save-blocks-vs-file.ts` exempts `TIMER.unused13`.
+reads those as `RNnul` (`readRNOfRecord`), and the writer puts `RNnul` back. There are 135
+to 256 of them per committed save; the tool counts and reports them, exactly as
+`tools/dump-save-blocks-vs-file.ts` exempts `TIMER.unused13`. In `csbgame-early-1hero.dat`
+they are 136 words, and they and the closing checksum are the 274 bytes by which the file
+written back differs from the file (`tools/dump-save-file-roundtrip.ts`).
 
 ## Everything CSBWin converts to slot numbers, and in what order
 
-`ConvertListOfObjects` is called from five places, and a writer that renumbers the index
-has to reach all five or it will write a file whose references point at the wrong records
+`ConvertListOfObjects` is called from these places, when an original dungeon is read
 (`doc/CSBwin-src/SaveGame.cpp`):
 
 1. **Every cell chain** — one call per column pointer, `:2736`.
@@ -2834,22 +2813,20 @@ has to reach all five or it will write a file whose references point at the wron
 
 Each call records the reference's **position** into `dataTypeMap` as well as allocating
 the slot, which matters because an object a champion is carrying is in no cell chain at
-all: leave it out and its slot keeps position 0, so the possession comes back naming the
-same record in the wrong corner of its cell. `buildObjectIndirectIndex` takes those extra
-references as `heldReferences` for exactly that reason, and
-`tools/dump-save-file-roundtrip.ts` fails on all eight saves when they are withheld.
+all.
 
 The order is the one above, and CSBWin's rule is **first writer wins** — a second
 reference to an already-converted object reuses the slot without touching it
-(`duplicate >= 0`, `:1958-1964`). This port's pre-pass is last-writer-wins in the same
-order, which agrees because no object is reachable from two of the five; the one case
-CSBWin itself allows a duplicate for is a missile's flying object (`DuplicateOK`, `:1918`).
+(`duplicate >= 0`, `:1958-1964`); the one case CSBWin allows a duplicate for is a
+missile's flying object (`DuplicateOK`, `:1918`).
 
-**This port's reader leaves a timer's object RN unresolved.** Nothing here consumes one,
-so `parseTimers` keeps the raw word — which is harmless while a file is only read, and a
-defect the moment one is rewritten with a new numbering. `csbgame-flying-sword.dat` is the
-save made to order for it: one live timer, function 49, `timerObj6 = 0x79a`. The
-translation is done by whoever renumbers, because only that caller holds both indexes.
+The port numbers a `dungeon.dat` the same way (`convertObjectReferences`,
+`src/data/CsbwinDungeonConversions.ts`). A `dungeon.dat` holds no timer, champion or
+object in hand, so only the cell chains apply, and the numbering comes out as CSBWin's
+(see "DM's two `dungeon.dat` files"). A save's RNs are slots already, a timer's object
+among them: `parseTimers` keeps the raw word, as every other RN of the file is kept.
+`csbgame-flying-sword.dat` is the save made to order for it: one live timer, function 49,
+`timerObj6 = 0x79a`.
 
 ## `ReadDatabases` converts an original dungeon once, and a save is written only converted
 
@@ -2863,10 +2840,12 @@ dungeon, where the flags are false, and not for a save, where they are true
 | --- | --- | --- | --- |
 | `MakeBigActuators` (`:2287-2314`) | `!bigActuators` | `:2604-2607`, inside the ACTUATOR read | ACTUATOR 8 bytes → 10 |
 | `ConvertToIndirectText` (`:2221-2276`) | `!indirectText` | `:2645-2648`, after the last database | raw text array → index + compressed text |
+| `ConvertListOfObjects` over every cell chain (`:1916-2018`) | `ExtendedFeaturesVersion == '@'` | `:2714-2746`, after the last database | packed RNs → slots of the object indirect index |
 | `convertScrolls` (`:2144-2166`) | `ExtendedFeaturesVersion < 'B'` | `:2768-2772`, last of all | SCROLL 4 bytes → 6, 10-bit index → RN |
 
 The **order** is not cosmetic: `convertScrolls` runs after `ConvertToIndirectText`, so the
-TEXT record index a scroll's new RN names is the post-conversion one.
+TEXT record index a scroll's new RN names is the post-conversion one, and after the
+chains are numbered, so its `AllocateIndirectIndex` takes the slots after theirs.
 
 Running one twice does not raise an error, it produces a corrupt world — a second
 `ConvertToIndirectText` decodes the index it built last time as if it were text, and DM's
@@ -2874,8 +2853,8 @@ Running one twice does not raise an error, it produces a corrupt world — a sec
 this port uses the same ones (`src/data/CsbwinDungeonConversions.ts`;
 `tools/dump-dungeon-conversions.ts` measures the corruption rather than describing it).
 `MakeBigActuators` is likewise destructive twice over — the second pass zeroes the
-`word8` the first one lifted out of a DSA actuator's parameters. `convertScrolls` alone
-happens to be idempotent, because it rebuilds the RN from a field it never overwrites.
+`word8` the first one lifted out of a DSA actuator's parameters. `convertScrolls` twice
+names the same texts, rebuilt from a field it never overwrites, in a new slot each.
 
 **The evidence is exact, because every committed save holds this same dungeon
 converted.** All eight were started from the DM Windows package's
@@ -2883,8 +2862,20 @@ converted.** All eight were started from the DM Windows package's
 `dungeon.dat` files"). So the converted form is in the files: converting
 `static/gamefiles/dm-atari/dungeon.dat` here and comparing gives 0 differences in the
 125-entry indirect text index, 0 in all 1749 words of compressed text, 0 in every TEXT
-record's rewritten index word, 0 in every scroll's new text RN and `open` bit, and 0 in
-every actuator's `word8`.
+record's rewritten index word, 0 in the text record every scroll's new RN names and in its
+`open` bit, and 0 in every actuator's `word8`.
+
+## A free scroll's text in a CSBWin file
+
+DM's scroll 33 is a free record. In the DM Windows package's `dungeon.dat` and in every
+save of `tools/fixtures/`, all written by CSBWin, its text word is 0x047B, its four-byte
+form's word (text 123, bit 10 set), where `convertScrolls` would have written a slot,
+and scroll 34's text is slot 1945, the slot after scroll 32's 1944. The CSBWin that wrote
+them gave the free record no slot. `convertScrolls` in `doc/CSBwin-src/` converts every
+record, free or not (`SaveGame.cpp:2151-2163`), and the port follows it: scroll 33's text
+gets slot 1945 and scroll 34's 1946, and a converted DM `dungeon.dat` has 1947 slots
+where those files have 1946. The texts the slots name are the same
+(`tools/dump-extended-dungeon.ts`, `tools/dump-dungeon-conversions.ts`).
 
 ## DM's two `dungeon.dat` files
 
@@ -2895,7 +2886,7 @@ set) is **the same dungeon re-saved by CSBWin** in the shape a save is written i
 Its `graphics.dat` is byte-identical to `dm-atari`'s.
 
 Read through its block by `DungeonLoader.loadDungeonDat` (the image with `bigActuators`,
-`newScrolls`, `indirectText`, `expool` and the file's object map as `resolveRN`), and
+`newScrolls`, `indirectText`, `expool` and the file's object map as its `RnMaps`), and
 compared with `dm-atari` after `convertOriginalDungeon`, the following are identical
 (`tools/dump-extended-dungeon.ts`): the header (seed 99, start (1,3) facing 2, 14 levels), every level
 descriptor, every cell flag and per-level table, the object list, all the text, and
@@ -2909,7 +2900,12 @@ every record of 10 of the 13 databases. The rest differ only as follows:
   position 0.
 - **29 scrolls** carry allocation debris in `m_word4` bits 1-15 (see "A converted
   scroll's `m_word4` upper bits are allocation debris"). The free scroll, record 33,
-  holds `RNnul` for its text.
+  holds `RNnul` for its text, and scroll 34's text is slot 1945, one below the port's
+  (see "A free scroll's text in a CSBWin file").
+
+The object list is identical slot for slot: the port's `ConvertListOfObjects` numbers
+DM's 1911 objects, sub-chains included, into slots 1 to 1911 as the CSBWin that wrote
+the file did.
 - **One EXPOOL record**, empty (`0xfffe`, then zeros).
 
 The 8583 extra bytes are all format: 6385 of prefix (the 512-byte header, a 1946-slot

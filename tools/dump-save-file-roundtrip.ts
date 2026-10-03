@@ -9,13 +9,13 @@
  * either fails to parse at all — the image closure check in `loadCsbwinWorld` is
  * unforgiving — or comes back as a different world.
  *
- * Why it is not a whole-file byte comparison, which would be the stronger claim: the
- * object indirect index. Every RN in the file is a slot number, and
- * `buildObjectIndirectIndex` numbers slots its own way, so blocks 0, 2, 4, 10 and 13 all
- * carry different numbers for the same objects. `tools/dump-dungeon-image-blocks.ts` and
- * `tools/dump-save-blocks-vs-file.ts` make the byte-for-byte argument block by block,
- * with those words held out; this tool is what covers the words they hold out, by
- * showing they still name the right things after a full trip through the file format.
+ * Every RN goes back out as the slot it was read as, with the file's own object indirect
+ * index, so the RN words come back as they were. It is not a whole-file byte comparison:
+ * the reader reads a free record's second RN as `RNnul` (`DungeonLoader.readRNOfRecord`),
+ * 136 words of `csbgame-early-1hero.dat`, and the closing checksum follows them.
+ * `tools/dump-dungeon-image-blocks.ts` and
+ * `tools/dump-save-blocks-vs-file.ts` make the byte-for-byte argument block by block;
+ * this tool shows that the whole file, written and read again, is the same world.
  *
  * What it does **not** cover: the live path, a file written from a running game
  * (`buildSaveFile`). `tools/dump-live-save-file.ts` and `tools/dump-save-roundtrip.ts` do.
@@ -27,16 +27,14 @@ import { readFileSync } from 'node:fs';
 import { saveSaveGameState } from '../src/data/SaveGameLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { buildCsbwinCharacterBlock, readCsbwinParty, readCsbwinPartyTail } from '../src/data/CsbwinCharacters';
-import { buildObjectIndirectIndex } from '../src/data/CsbwinObjectIndex';
+import { objectIndexOf } from '../src/data/CsbwinObjectIndex';
 import {
   buildDungeonImage,
   buildImageChecksum,
   cellFlagArraySize,
 } from '../src/data/CsbwinDungeonImageWriter';
 import type { DungeonData, Databases, TimerRecord } from '../src/data/dungeonTypes';
-import type { CsbwinObjectIndex } from '../src/data/CsbwinObjectIndex';
 import { check, finish } from './lib/check';
-import { OBJECT_ID_NULL } from '../src/core/types';
 import { genuineSaves } from './lib/saves';
 
 const DATABASE_KEYS: Array<keyof Databases> = [
@@ -45,13 +43,8 @@ const DATABASE_KEYS: Array<keyof Databases> = [
 ];
 
 /**
- * Build a complete file out of a parsed one.
- *
- * The one thing that is *not* carried over verbatim is the object indirect index: the
- * file's maps are replaced with ours, and every RN that leaves this port — the thirty
- * possession slots, `GAMEBLOCK2.ObjectInHand`, the object list and every record link —
- * is re-encoded through it. They have to be one numbering, which is the whole reason
- * this function exists rather than each block being written on its own.
+ * Build a complete file out of a parsed one. Every RN goes out as the slot it was read
+ * as, and block 0 carries the maps the world was read with (`objectIndexOf`).
  */
 function rewrite(bytes: Uint8Array): {
   written: Uint8Array; image: Uint8Array; slots: number;
@@ -61,63 +54,25 @@ function rewrite(bytes: Uint8Array): {
   const { dungeon, save } = loadCsbwinWorld(bytes);
 
   const block = save.characterBlock!;
-  const champions = readCsbwinParty(block, 4, save.objectIndex).map((c) => c.champion);
+  const champions = readCsbwinParty(block, 4).map((c) => c.champion);
   const tail = readCsbwinPartyTail(block);
-
-  // Everything CSBWin converts after the cell chains, in its own order — the
-  // object-carrying timers (`ConvertTimers`, `doc/CSBwin-src/SaveGame.cpp:2745`), then
-  // the possession slots (`ConvertCharacters`, `:2746`), then `d.objectInHand` (`:2760`).
-  // Each of those fixes the referenced record's *position* in `dataTypeMap`, and an
-  // object a champion carries is in no chain, so leaving them out gives it position 0.
-  const held: number[] = [];
-  const timerObjects = objectCarryingTimers(save.timers ?? [], save.timerQueue ?? []);
-  for (const { rn } of timerObjects) held.push(resolveOf(save.objectIndex, rn));
-  for (const champion of champions) {
-    for (const slot of champion.possessions) if (slot !== OBJECT_ID_NULL) held.push(slot);
-  }
-  if (save.block2) held.push(resolveOf(save.objectIndex, save.block2.objectInHand & 0xffff));
-
-  const index = buildObjectIndirectIndex(dungeon, held);
-  const encode = (rn: number) => index.encode(rn);
 
   const image = buildDungeonImage(dungeon, {
     indirectText: save.indirectText ?? false,
     bigActuators: save.bigActuators ?? false,
     newScrolls: (save.version ?? 0) >= 0x42,
-    encode,
   });
-
-  // The timers are the one place the reader leaves a slot number unresolved — nothing
-  // here consumes a timer's object RN, so `parseTimers` keeps the raw word. Renumbering
-  // the file makes that the caller's problem: the word has to be read through the file's
-  // index and written through ours, or a thrown object in flight would land on whatever
-  // record our slot of the same number happens to be. `csbgame-flying-sword.dat` is the
-  // save made to exercise it.
-  const timers = (save.timers ?? []).map((t) => ({ ...t }));
-  for (const { slot, at, rn } of timerObjects) {
-    const word = encode(resolveOf(save.objectIndex, rn)) & 0xffff;
-    const timer = timers[slot];
-    if (at === 6) { timer.timerWord6 = word; timer.uByte6 = word >> 8; timer.uByte7 = word & 0xff; }
-    else { timer.timerWord8 = word; timer.uByte8 = word >> 8; timer.uByte9 = word & 0xff; }
-  }
-
+  const index = objectIndexOf(dungeon.rnMaps);
   const written = saveSaveGameState({
     ...save,
     objectIndex: index,
-    timers,
-    characterBlock: buildCsbwinCharacterBlock(champions, tail, { encodeRN: encode }),
-    // `ObjectInHand` is an RN like any other: read through the file's index, written
-    // through ours (`ConvertListOfObjects(&d.objectInHand, ...)`, `:2760`).
-    block2: save.block2 && {
-      ...save.block2,
-      objectInHand: encode(resolveOf(save.objectIndex, save.block2.objectInHand & 0xffff)),
-    },
+    characterBlock: buildCsbwinCharacterBlock(champions, tail),
     dungeonImage: image,
   });
   return {
     written, image, slots: index.length,
-    timerObjects: timerObjects.map(({ slot, at, rn }) => (
-      { slot, at, object: resolveOf(save.objectIndex, rn) }
+    timerObjects: objectCarryingTimers(save.timers ?? [], save.timerQueue ?? []).map(({ slot, at, rn }) => (
+      { slot, at, object: rn }
     )),
   };
 }
@@ -145,10 +100,6 @@ function objectCarryingTimers(
     }
   });
   return out;
-}
-
-function resolveOf(index: CsbwinObjectIndex | undefined, raw: number): number {
-  return index ? index.resolve(raw) : raw;
 }
 
 /** Compare two parsed worlds field by field, counting the mismatches by name. */
@@ -230,8 +181,8 @@ function main(): void {
 
     /* ---- the party, which is where the possession slots are ---- */
 
-    const theirs = readCsbwinParty(save.characterBlock!, 4, save.objectIndex);
-    const ours = readCsbwinParty(round.save.characterBlock!, 4, round.save.objectIndex);
+    const theirs = readCsbwinParty(save.characterBlock!, 4);
+    const ours = readCsbwinParty(round.save.characterBlock!, 4);
     check(theirs.length === ours.length, `${name}: the party is still ${theirs.length} champions`);
     let slotsWrong = 0;
     theirs.forEach((c, i) => {
@@ -250,19 +201,18 @@ function main(): void {
     for (const { slot, at, object } of timerObjects) {
       const timer = round.save.timers?.[slot];
       const word = at === 6 ? timer?.timerWord6 : timer?.timerWord8;
-      check(resolveOf(round.save.objectIndex, (word ?? 0) & 0xffff) === object,
+      check(((word ?? 0) & 0xffff) === object,
         `${name}: timer ${slot} still carries the same flying object`);
     }
 
     const objectInHand = round.save.block2?.objectInHand;
     const expected = save.block2?.objectInHand;
+    check(objectInHand === expected, `${name}: GAMEBLOCK2.ObjectInHand names the same object`);
     check(
-      (round.save.objectIndex && objectInHand !== undefined
-        ? round.save.objectIndex.resolve(objectInHand)
-        : objectInHand) === (save.objectIndex && expected !== undefined
-        ? save.objectIndex.resolve(expected)
-        : expected),
-      `${name}: GAMEBLOCK2.ObjectInHand names the same object`);
+      !!round.save.objectIndex && !!save.objectIndex
+        && round.save.objectIndex.typeMap.join() === save.objectIndex.typeMap.join()
+        && round.save.objectIndex.indexMap.join() === save.objectIndex.indexMap.join(),
+      `${name}: the object indirect index survives slot for slot`);
   }
 
   // The timer translation is only evidence if something exercises it — one save was made

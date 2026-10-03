@@ -218,7 +218,7 @@ function main(): void {
   // the handler returns.
   {
     const game = makeGame();
-    const { party, front } = stage(game, 0);
+    const { party, dest } = stage(game, 0);
     const rn = takeWeapon(game);
     const queue = game.ctx.timers;
     const actuators = game.systems.actuators;
@@ -236,9 +236,10 @@ function main(): void {
     const afterDrop = queued();
 
     padTimer = -1;
-    const lying = find(game, front, game.ctx.dungeon.rnMaps.idx(rn))!;
-    game.ctx.dungeon.removeObjectFromCell(front, lying);
-    game.ctx.systems.mouse.triggerObjectMove(front, lying, false, false, 0);
+    // The front square is the rigged teleporter, so the weapon lies at its destination.
+    const lying = find(game, dest, game.ctx.dungeon.rnMaps.idx(rn))!;
+    game.ctx.dungeon.removeObjectFromCell(dest, lying);
+    game.ctx.systems.mouse.triggerObjectMove(dest, lying, false, false, 0);
     const afterPickUp = queued();
 
     padTimer = queue.createTimer(TimerFunction.TT_DOOR, party.x, party.y, 0, 0, game.ctx.state.tickCount, party.z).index;

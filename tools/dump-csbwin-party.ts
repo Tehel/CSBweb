@@ -78,7 +78,7 @@ function main(): void {
       continue;
     }
 
-    const party = readCsbwinParty(block, gb2.numCharacter, world.save.objectIndex);
+    const party = readCsbwinParty(block, gb2.numCharacter);
     const tail = readCsbwinPartyTail(block);
     console.log(`\n${name} — ${party.length} champions, level ${gb2.partyLevel}`);
     check(

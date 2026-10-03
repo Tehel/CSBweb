@@ -25,7 +25,6 @@ import { CHARFLAG_MALE, getChampionPossession, type Champion, type PartyState, t
 import type { Attribute } from '../engine/attributes';
 import { OBJECT_ID_NULL, type i8, type i16, type ui8, type ui16, type ObjectID } from '../core/types';
 import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';
-import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import { readI16BE, readI32BE, readI8, readU16BE, readU32BE, readU8 } from '../core/bytes';
 
 /** The seven `ATTRIBUTE` triples start here, three bytes each, `FILL91` after them. */
@@ -83,15 +82,10 @@ function readSkills(block: Uint8Array, base: number): Skill[] {
  * Every one of them is an **indirect-index slot number**, not a packed RN:
  * `ConvertCharacters` rewrites all thirty through `ConvertListOfObjects` the moment an
  * original dungeon is read (`doc/CSBwin-src/SaveGame.cpp:2046-2064`), so from then on
- * that is what a champion carries. `objectIndex` translates them back into this port's
- * form; read as packed RNs, the slots would be categories 0 and 1 with indices far past
- * those databases.
+ * that is what a champion carries, as in this port. Read as packed RNs, the slots would
+ * be categories 0 and 1 with indices far past those databases.
  */
-function readPossessions(
-  block: Uint8Array,
-  base: number,
-  objectIndex?: CsbwinObjectIndex,
-): ObjectID[] {
+function readPossessions(block: Uint8Array, base: number): ObjectID[] {
   const slots: ObjectID[] = [];
   for (let i = 0; i < 30; i++) {
     const rn = readU16BE(block, base + POSSESSIONS_OFFSET + i * 2);
@@ -101,7 +95,7 @@ function readPossessions(
       slots.push(OBJECT_ID_NULL);
       continue;
     }
-    slots.push((objectIndex ? objectIndex.resolve(rn) : rn) as ObjectID);
+    slots.push(rn as ObjectID);
   }
   return slots;
 }
@@ -160,14 +154,13 @@ function incantationPrefix(bytes: ui8[]): ui8[] {
 export function readCsbwinCharacter(
   block: Uint8Array,
   index: number,
-  objectIndex?: CsbwinObjectIndex,
 ): CsbwinCharacter {
   const base = index * CHARDESC_SIZE;
   const name = decodeCharField(block.subarray(base, base + 8));
   const title = decodeCharField(block.subarray(base + 8, base + 28));
   const titleBytes = Array.from(block.subarray(base + 8, base + 28)) as ui8[];
   const incantationBytes = Array.from(block.subarray(base + 34, base + 38)) as ui8[];
-  const slots = readPossessions(block, base, objectIndex);
+  const slots = readPossessions(block, base);
   const charFlags = readI16BE(block, base + 48);
   const maxHealth = readI16BE(block, base + 54);
 
@@ -293,11 +286,10 @@ export function readCsbwinPartyTail(block: Uint8Array): CsbwinPartyTail {
 export function readCsbwinParty(
   block: Uint8Array,
   numCharacter: number,
-  objectIndex?: CsbwinObjectIndex,
 ): CsbwinCharacter[] {
   const out: CsbwinCharacter[] = [];
   for (let i = 0; i < Math.min(4, Math.max(0, numCharacter)); i++) {
-    const character = readCsbwinCharacter(block, i, objectIndex);
+    const character = readCsbwinCharacter(block, i);
     if (character.occupied) out.push(character);
   }
   return out;
@@ -360,18 +352,6 @@ export interface CsbwinCharacterWriteOptions {
    * without it such a champion is written with a blank portrait.
    */
   portraitOf?: (champion: Champion) => ui8[] | undefined;
-  /**
-   * One packed RN as the indirect slot number a file wants — the inverse of the
-   * `objectIndex.resolve` the reader applies to the same thirty words
-   * (`doc/PROVEN_FACTS.md` → "An RN in a save file is an indirect index"). A live game
-   * passes `buildObjectIndirectIndex(dungeon).encode`, and it must be the **same** index
-   * whose maps go into block 0 and whose slot numbers go into the dungeon image.
-   *
-   * Without it the slots are written as this port's packed `[pos][db][idx]` ids, which
-   * is what `tools/dump-character-block.ts` compares against a file byte for byte —
-   * that tool reads its champions without an index, so the two forms coincide.
-   */
-  encodeRN?: (rn: number) => number;
 }
 
 /**
@@ -383,14 +363,8 @@ export interface CsbwinCharacterWriteOptions {
  * `pcA3->byte30 = 1; pcA3->byte31 = 2;` (`doc/CSBwin-src/Character.cpp:515-516`) over a
  * record `ClearMemory` has zeroed (`:478`).
  *
- * **Possessions go out through `options.encodeRN`.** In a save the thirty slots are
- * indirect slot numbers resolved through `dataTypeMap`/`dataIndexMap`
- * (`doc/PROVEN_FACTS.md` -> "An RN in a save file is an indirect index"), so a caller
- * writing a real file passes `buildObjectIndirectIndex(dungeon).encode` — the same index
- * whose maps go into block 0 and whose numbering the dungeon image uses. Left out, the
- * slots are written as this port's packed `[pos][db][idx]` ids, which is the right thing
- * for a block whose champions were read without an index: it round-trips byte for byte,
- * and that is what `tools/dump-character-block.ts` proves the packing with.
+ * The possessions are written as the slots they are: the file's RNs are the port's
+ * (`doc/PROVEN_FACTS.md` -> "An RN in a save file is an indirect index").
  */
 export function writeCsbwinCharacter(
   block: Uint8Array,
@@ -465,7 +439,7 @@ export function writeCsbwinCharacter(
     // An empty slot is `RNnul`, which is what every empty slot holds in every
     // committed save.
     const rn = getChampionPossession(champion, i);
-    setU16BE(block, base + POSSESSIONS_OFFSET + i * 2, options.encodeRN ? options.encodeRN(rn) : rn);
+    setU16BE(block, base + POSSESSIONS_OFFSET + i * 2, rn);
   }
 
   setU16BE(block, base + 272, options.load?.(champion) ?? champion.load);

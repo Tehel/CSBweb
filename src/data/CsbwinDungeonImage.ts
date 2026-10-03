@@ -60,9 +60,8 @@ export function loadCsbwinWorld(bytes: Uint8Array): CsbwinWorld {
         expool: true,
         cellFlagArraySize,
         // Every RN in a save's image is a slot number in the object indirect index, not
-        // the packed RN `dungeon.dat` stores. Without this the chains parse into
-        // plausible nonsense — see `src/data/CsbwinObjectIndex.ts`.
-        resolveRN: objectIndex ? (raw) => objectIndex.resolve(raw) : undefined,
+        // the packed RN `dungeon.dat` stores — see `src/data/CsbwinObjectIndex.ts`.
+        objectIndex,
     });
 
     return { dungeon, save };

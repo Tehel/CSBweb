@@ -180,7 +180,7 @@ async function main(): Promise<void> {
   const emptyOpen = (game: Game, p: Position): boolean =>
     roomType(game, p) === RoomType.OPEN && game.ctx.dungeon.findFirstObject(p) === OBJECT_ID_EOF;
   const holding = (game: Game, p: Position, rn: ObjectID): boolean =>
-    inCell(game, p, game.ctx.dungeon.rnMaps.dbType(rn)).some((r) => (r & 0x3fff) === (rn & 0x3fff));
+    inCell(game, p, game.ctx.dungeon.rnMaps.dbType(rn)).some((r) => r === rn);
   /** An item lying on a floor somewhere: the thing the DSA moves. */
   const anItem = (game: Game): { at: Position; rn: ObjectID } => {
     let found: { at: Position; rn: ObjectID } | null = null;

@@ -106,20 +106,19 @@ export class DungeonState {
 
     /**
      * The three below are `expool`'s (`src/data/CsbwinExpool.ts`). The record's key is the
-     * bones' RN without its position: CSBWin's is the RN's slot in the object indirect
-     * index, which a move within the cell does not change (`RN::pos`,
-     * `doc/CSBwin-src/CSBTypes.h:336-342`).
+     * bones' RN, its slot in the object indirect index, which a move within the cell does
+     * not change (`RN::pos`, `doc/CSBwin-src/CSBTypes.h:336-342`).
      */
     addChampionBonesRecord(bones: ObjectID, fingerprint: number): void {
-        new Expool(this.data).addChampionBonesRecord(bones & 0x3fff, fingerprint);
+        new Expool(this.data).addChampionBonesRecord(bones, fingerprint);
     }
 
     copyChampionBonesRecord(bones: ObjectID): number | null {
-        return new Expool(this.data).copyChampionBonesRecord(bones & 0x3fff);
+        return new Expool(this.data).copyChampionBonesRecord(bones);
     }
 
     getChampionBonesRecord(bones: ObjectID): number | null {
-        return new Expool(this.data).getChampionBonesRecord(bones & 0x3fff);
+        return new Expool(this.data).getChampionBonesRecord(bones);
     }
 
     /**

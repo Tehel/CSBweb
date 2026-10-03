@@ -27,7 +27,7 @@
  * Run: `npx tsx tools/dump-monster-draw.ts`
  */
 import { applyLimits } from '../src/core/intCast';
-import { DBType, OBJECT_ID_EOF, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF } from '../src/core/types';
 import { DrawRoomObjects, mapColorValue } from '../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
@@ -49,6 +49,10 @@ check((tables.monsterDesc[MUMMY]!.word2 & 3) === 0 && (tables.monsterDesc[DRAGON
 
 /** `ITEM16.singleMonsterStatus`: member 1 attacking, so its sprite is the attack graphic. */
 const STATUSES = new Uint8Array([0, 0x80, 0, 0]);
+// The monster group's RN, the one slot of maps whose only record is the group.
+const rnMaps = new RnMaps(() => undefined);
+const monsterRn = rnMaps.rn(DBType.CREATURE, 0);
+
 const attackGraphicOf = (type: number): number => {
   const d = tables.monsterDesc[type]!;
   return 446 + tables.monsterGraphics[type]!.word0 + 1 + ((d.word4 & 8) ? 1 : 0) + ((d.word4 & 0x10) ? 1 : 0);
@@ -81,7 +85,7 @@ function draw(group: Group, relativeCell: number, drawOrder: number): Sprite[] {
       return { width: img.width, height: img.height, pixels: new Uint8Array(img.width * img.height).fill(1) };
     },
     dungeonState: {
-      rnMaps: new RnMaps(),
+      rnMaps,
       getDBRecordLink: () => OBJECT_ID_EOF,
       getCreatureRecord: () => record,
       getMonsterRenderState: () => ({ positions, facings, statuses: STATUSES }),
@@ -93,7 +97,7 @@ function draw(group: Group, relativeCell: number, drawOrder: number): Sprite[] {
     blits.push({ x1: rect.x1, x2: rect.x2, y2: rect.y2, w: src.width >> 1, graphic: lastGraphic });
     blit(src, rect, t);
   };
-  DrawRoomObjects(draw, (DBType.CREATURE << 10) as ObjectID, 0, 0, 0, relativeCell, drawOrder);
+  DrawRoomObjects(draw, monsterRn, 0, 0, 0, relativeCell, drawOrder);
 
   // The set entry each sprite was drawn at: x1 = x - w + 1 and x2 = x + w, each within
   // 0..223, and y2 = y, with every status offset zero. The cells beside the party read
@@ -180,7 +184,7 @@ function frontMirrored(type: number, relativeCell: number, status: number): bool
       return { width: img.width, height: img.height, pixels };
     },
     dungeonState: {
-      rnMaps: new RnMaps(),
+      rnMaps,
       getDBRecordLink: () => OBJECT_ID_EOF,
       getCreatureRecord: () => record,
       getMonsterRenderState: () => ({ positions: 255, facings: 0xaa, statuses: new Uint8Array([status, 0, 0, 0]) }),
@@ -189,7 +193,7 @@ function frontMirrored(type: number, relativeCell: number, status: number): bool
   const draw = new ViewportDraw(context);
   const unmirroredFirst = (map: Uint8Array | null) => (map ? mapColorValue(map, left!) : left);
   draw.blitShapeToViewportIndexWithTransparent = (src: any) => { first = src.pixels[0]; };
-  DrawRoomObjects(draw, (DBType.CREATURE << 10) as ObjectID, 0, 0, 0, relativeCell, ORDER_3421);
+  DrawRoomObjects(draw, monsterRn, 0, 0, 0, relativeCell, ORDER_3421);
   if (first === null) return null;
   const map = relativeCell >= 6 ? null : relativeCell >= 3 ? tables.monsterColorMapMedium : tables.monsterColorMapFar;
   return first !== unmirroredFirst(map);

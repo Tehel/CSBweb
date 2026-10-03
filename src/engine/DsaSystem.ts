@@ -2148,42 +2148,11 @@ export class DsaSystem {
     return null;
   }
 
+  /** `RN::checkIndirectIndex(i)` (`doc/CSBwin-src/data.cpp:529-534`): a slot of the maps. */
   private isValidObjectId(objectId: number): objectId is ObjectID {
-    if (objectId < 0) return false;
-    if (objectId === OBJECT_ID_EOF || objectId === OBJECT_ID_NULL) return false;
-    const { category, index } = this.dungeon.rnMaps.decode(objectId as ObjectID);
-    const data = this.dungeon.getData().databases;
-    switch (category) {
-      case DBType.DOOR:
-        return index >= 0 && index < data.doors.records.length;
-      case DBType.TELEPORTER:
-        return index >= 0 && index < data.teleporters.records.length;
-      case DBType.TEXT:
-        return index >= 0 && index < data.texts.records.length;
-      case DBType.ACTUATOR:
-        return index >= 0 && index < data.actuators.records.length;
-      case DBType.CREATURE:
-        return index >= 0 && index < data.creatures.records.length;
-      case DBType.WEAPON:
-        return index >= 0 && index < data.weapons.records.length;
-      case DBType.CLOTHING:
-        return index >= 0 && index < data.clothing.records.length;
-      case DBType.SCROLL:
-        return index >= 0 && index < data.scrolls.records.length;
-      case DBType.POTION:
-        return index >= 0 && index < data.potions.records.length;
-      case DBType.CHEST:
-        return index >= 0 && index < data.containers.records.length;
-      case DBType.MISC:
-        return index >= 0 && index < data.misc.records.length;
-      case DBType.MISSILE:
-        return index >= 0 && index < data.missiles.records.length;
-      case DBType.CLOUD:
-        return index >= 0 && index < data.clouds.records.length;
-      default:
-        return false;
-    }
+    return objectId >= 0 && this.dungeon.rnMaps.checkIndirectIndex(objectId);
   }
+
 
   private canDeleteFromCell(category: DBType): boolean {
     return (
@@ -2222,12 +2191,8 @@ export class DsaSystem {
     if (category !== DBType.SCROLL) return;
     const scroll = this.dungeon.getScrollRecord(rn);
     if (!scroll) return;
-    const raw = scroll.textReference & 0xffff;
-    const decoded = this.dungeon.rnMaps.decode(raw as ObjectID);
-    const textRn = decoded.category === DBType.TEXT
-      ? (raw as ObjectID)
-      : this.dungeon.rnMaps.rn(DBType.TEXT, raw & 0x3ff);
-    this.deleteObject(bank, textRn);
+    // `pScroll->text()`, the six-byte scroll's RN.
+    this.deleteObject(bank, scroll.textObject ?? this.dungeon.rnMaps.rn(DBType.TEXT, scroll.textReference & 0x3ff));
   }
 
 

@@ -173,11 +173,13 @@ main.ts     Bootstrap and wiring
 ## Key technical concepts
 
 - **Big-endian everywhere** (Atari ST heritage).
-- **Object IDs / RN system**: 16-bit `[position:2][category:4][index:10]`. Objects live in
-  per-cell linked chains; all references are indirect through these IDs. An RN is read
-  only through its world's `RnMaps` (`DungeonState.rnMaps`: `dbType`, `pos`, `idx`,
-  `setPos`, `rn`), as CSBWin's is a slot of `dataTypeMap`/`dataIndexMap`; the packed bits
-  (`decodeObjectID`) are for the file readers and writers (`DEBT.md` D16). "No object" is
+- **Object IDs / RN system**: an RN is CSBWin's 16-bit slot of `dataTypeMap`/
+  `dataIndexMap`, its world's `RnMaps` (`DungeonState.rnMaps`: `dbType`, `pos`, `idx`,
+  `setPos`, `rn`), which say its database, record and corner. Objects live in per-cell
+  linked chains of RNs. `setPos` moves the object in the map and keeps the RN, so two
+  RNs are the same object exactly when they are equal. Only `dungeon.dat` stores RNs
+  packed, `[position:2][category:4][index:10]`, and its reader numbers them into slots
+  as CSBWin does; a save's slots and maps are kept as read. "No object" is
   `RNnul` (`OBJECT_ID_NULL`, 0xFFFF) in every stored slot and the cursor, and what every
   possession reader returns for an empty slot, as in CSBWin;
   `RNeof` (0xFFFE) only ends a chain. `tsc` cannot catch a stale `=== null` against a
