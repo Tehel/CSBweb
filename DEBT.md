@@ -92,6 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| C118 | The DSA command decoder's edge cases | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
@@ -126,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C118 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C119 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -170,6 +171,28 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
+### C118 ⏳ The DSA command decoder's edge cases
+
+`DsaSystem.execute` departs from CSBWin's `EX_*` in five places that no dungeon here
+reaches: `tools/dump-dsa-census.ts` decodes all 4646 of Conflux's programs with CSBWin's
+layout, and none of these words occurs in them.
+
+- **The extra state word.** A command's `IsMaxState` compares its relative-state field
+  with `-MAXSTATE` (`doc/CSBwin-src/Data.h:1889-2384`). But for `QUESTION`, whose
+  `MAXSTATE` is 2, that value is out of the signed field's range, so CSBWin never reads
+  the extra word. The port reads one when the field holds `MAXSTATE` itself (-8, -32,
+  -16, -512 or -4), and so would take that command's next word as a state.
+- **`LOAD_INTEGER` (26)** pushes its word unsigned (`DSA.cpp:1099-1106`: `m_PC` is a
+  `ui16 *`, `:250`). The port sign-extends it.
+- **`LOAD` 29 (`LOAD_ABS32`) and 31** reach "Illegal DSA load command" and push nothing
+  (`DSA.cpp:1138-1143`). The port pushes 0.
+- **`STORE` above 25** returns at "Illegal DSA store command" without a pop
+  (`DSA.cpp:1328-1332`). The port pops.
+- **`GLOBALFETCH` past the last variable** pushes `0xcdcdcdcd` (`DSA.cpp:1302-1306`), the
+  port 0. Where the last variable is depends on the dungeon (G1, the `EXPOOL` bullet).
+
+The fix owes a tool that runs each such word through `execute`, beside the census.
+
 ---
 
 ## F — Verification debt
@@ -211,7 +234,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 134 checks sequentially (`spawnSync`, `:258`), each a
+`tools/run-checks.mjs` spawns its 138 checks sequentially (`spawnSync`, `:269`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and
@@ -244,9 +267,13 @@ Paying it needs a file of each form, or the author's decision to port them unche
 ### G1 ⏳ Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs
 
 The goal is the whole of CSBWin's DSA, not what one dungeon calls. Every command is
-ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter either. Of
-CSBWin's 138 `&` operations (`STKOP_*`, `doc/CSBwin-src/Data.h:1723`), the port has 55,
-so 83 are left.
+ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter either.
+`STKOP` (`doc/CSBwin-src/Data.h:1721-1861`, the port's `StkOp`) has 138 values, and 136
+are operations: `Noop` (0) and `2Dup` (23) have no case in `EX_AMPERSAND`, whose default
+says "Illegal subcode" and does nothing (`doc/CSBwin-src/DSA.cpp:4979-4981`), as the
+port's trace does. The port has 55, so 81 are left. `tools/dump-dsa-census.ts` lists
+them: it fails unless what the port lacks is exactly its `LEFT`, so each family's commit
+takes its operations off that list, and this part of the item is done when it is empty.
 
 Conflux, the dungeon that will check them, defines 131 DSAs, with 4646 programs, behind
 1591 type-47 actuators. A static census of its programs decodes each word with the
@@ -274,24 +301,26 @@ It uses 118 `&` operations, 73 of the 83. With Conflux's count of each:
   `DisableSaves` 2.
 - **The display**: `Overlay` 25 and `Palette` 5, which need G25.
 
-The ten Conflux never calls: `Noop` (0: the port's `StkOp` names it but has no case, so it
-traces as unimplemented), `2Dup` (23), `SetPoisoned` (75), `I_Copy` (87), `DelMon` (95),
-`InsMon` (96), `TextSay` (104), `I_FilteredCast` (120), and `GetSkin` (131) and `SetSkin`
-(132), which need G27. No dungeon here checks these against play, so each is ported with
-a tool of its own.
+The eight Conflux never calls: `SetPoisoned` (75), `I_Copy` (87), `DelMon` (95), `InsMon`
+(96), `TextSay` (104), `I_FilteredCast` (120), and `GetSkin` (131) and `SetSkin` (132),
+which need G27. No dungeon here checks these against play, so each is ported with a tool
+of its own.
 
 Every `I_` operation but two is CSBWin's `Indirect`: it packs the operation and its
 operands into a record and sends it to the DSA at `ESL_INDIRECTACTIONS`, whose `I_Indirect`
 unpacks and runs it (`doc/CSBwin-src/DSA.cpp:2093-2130`, `:2346-2364`, `:4957-4971`). That
 filter is G2's. `I_Delay` sets the delay of the next one (`:4972`), and `I_Indirect` is the
-unpacking.
+unpacking. `Indirect` does nothing at all, not even pop, in a dungeon with no such
+location (`:2109-2120`). The port's one `I_` operation, `I_TeleportParty`, shares
+`TeleportParty`'s case and teleports at once where CSBWin's packs it (`:4963`); the
+census counts it as ported, and the `I_` family's commit gives it CSBWin's path.
 
-The steps: first the census as a tool. It prints, against CSBWin's `STKOP` list, every
-operation the port lacks, with a dungeon's count of each when given one, and fails while
-any is left. Then one family per commit, in the order above, the ten with their nearest
-family. Last, `DSA::Write` and the `EXPOOL` records, so that a game with DSAs can be
-saved (below). Conflux's `dungeon.dat` reads, so the census counts from it; an operation
-is checked against Conflux in play once G26 makes it a data set.
+The steps: the census is done (`tools/dump-dsa-census.ts`, Conflux's counts by default,
+another `dungeon.dat` as its argument). Next, one family per commit, in the order above,
+the eight with their nearest family: the characters first. Last, `DSA::Write` and the
+`EXPOOL` records, so that a game with DSAs can be saved (below). An operation is checked
+against Conflux in play once G26 makes it a data set. C118, the decoder's edge cases the
+census found, comes before them all.
 
 The rest of the item, with two operations that need care when ported:
 
@@ -318,7 +347,11 @@ The rest of the item, with two operations that need care when ported:
 - **What a DSA keeps in a save's `EXPOOL`.** `SaveGame` writes the DSA global variables
   there, sixteen to a record (`doc/CSBwin-src/SaveGame.cpp:1141-1148`), and `LoadGame`
   reads them back (`:1746-1763`); the port does neither, and a load keeps the running
-  game's (`src/engine/CsbwinSaveGame.ts` → "What is not restored"). `SaveGame` also
+  game's (`src/engine/CsbwinSaveGame.ts` → "What is not restored"). Those records are
+  also how many global variables there are: `numGlobalVariables` is sixteen a record
+  found, 0 when there is none (`SaveGame.cpp:1747-1758`), and `EX_GLOBALSTORE` and
+  `EX_GLOBALFETCH` refuse an index at or past it (`DSA.cpp:1268`, `:1302`), where the
+  port always has 100 (`DsaSystem.globalVariables`). `SaveGame` also
   writes the overlay palette there at every save, as 24 records (`:1152-1164`), which
   `LoadGame` takes when all 24 are found (`:1763-1789`). Only a DSA changes that
   palette: `SetOverlayPalette` has one caller (`DSA.cpp:2942`), and it is the identity

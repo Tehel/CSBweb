@@ -92,6 +92,7 @@ const CHECKS = [
   { tool: 'dump-does-party-have.ts' },
   { tool: 'dump-dsa-move.ts' },
   { tool: 'dump-dsa-delete.ts' },
+  { tool: 'dump-dsa-census.ts' },
   { tool: 'dump-db-reuse.ts' },
   { tool: 'watch-smart-discard.ts' },
   { tool: 'dump-make-more-room.ts' },
