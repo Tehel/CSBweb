@@ -91,7 +91,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⚠️ the engine done; RISE on the door, then the prison's shortcut |
+| G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⚠️ the engine and RISE done; the prison's shortcut |
 | G23 | Enciphered files: the whole of a `dungeon.dat`, and the saves of its game | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
@@ -254,23 +254,18 @@ The split:
   save's bytes and `mini.dat`'s and returns the new save's, or throws a `UtilityError`
   carrying CSBWin's message (`tools/dump-new-adventure.ts`). Two forms CSBWin's utility
   reads are G28's.
-- **⏳ The page.** Offer it: a source save chosen from the store, of any data set (the
-  list's filter is its parameter, `doc/SAVES.md` → "A save knows its dungeon"), the
-  `csb` set's `mini.dat` fetched, the result stored as a row of the `csb` set, and a
-  refusal's message shown. The new row is named after the source save's, with `-csb`
-  after it (the author's decision; CSBWin names it after the slot the player picks,
-  `CSBGAME.DAT` to `CSBGAME4.DAT`, in `_TAG000ede`, `Chaos.cpp:1467-1541`). The control
-  is the author's decision: a third button on CSB's entrance, under PRISON and RESUME,
-  labelled RISE. It is drawn from the entrance graphic itself (graphic 4 of the `csb`
-  set): the carved R, I and S of PRISON and E of RESUME, and a gem like theirs, on the
-  bare rock below them, and is clicked through one more entry in the door's button list
-  (`MISSING_PRISON_DOOR_BUTTONS`, `src/renderer/intro/PrisonDoor.ts`). Only the `csb`
-  set, which has a `mini.dat`, shows it, so DM's entrance and the golden frames do not
-  move. RISE opens the entrance's chooser over every data set's saves, a prison save
-  or a DM one; a refusal shows CSBWin's message in the entrance's one-button menu; a
-  new adventure is stored and the game starts in it at once, where CSBWin's player
-  goes back to the door and resumes it. The new file's `RandomGameID` is the source's with its first byte one higher (the
-  `LoadLong` slip), so it is a playthrough of its own.
+- **The page: done.** CSB's entrance has RISE, the port's own button, under PRISON
+  and RESUME (`RISE_BUTTON`, `src/renderer/intro/PrisonDoor.ts`): carved from graphic 4
+  itself, RESUME's gem and the R, I and S of PRISON and E of RESUME on the bare rock
+  above the scroll, and shown only by a data set with a `mini.dat` (`DataSet.miniDat`),
+  so DM's entrance and the golden frames do not move. It opens the chooser over every
+  data set's saves (`SaveMenu`'s `rise` mode), whose LOAD makes the new adventure from
+  the chosen one (`GameSaves.makeNewAdventure`): stored as a row of the `csb` set named
+  after the source's with `-csb` (CSBWin's player picks one of four slots, `_TAG000ede`,
+  `Chaos.cpp:1467-1541`), and read, so the game starts in it at once, where CSBWin's
+  player goes back to the door and resumes it. A refusal shows CSBWin's message in the
+  entrance's one-button menu, and OK goes back to the entrance (`tools/dump-rise.ts`,
+  `doc/SAVES.md` → "RISE makes a save of its own").
 - **⏳ The prison's shortcut** (the author's decision). The prison has no way out:
   level 0's four stairs lead down to a level 1 of mummies and rock piles, and the text
   at (9,2) of level 0 says "FIRST CHOOSE YOUR CHAMPIONS...THEN SAVE THE GAME... THEN

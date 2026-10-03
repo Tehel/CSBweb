@@ -13,7 +13,8 @@
  *
  * Three buttons, from `d.Buttons16932` (`:9474`): 200 enters, 201 resumes a saved game,
  * 202 is the scroll. Full spec, geometry and citations:
- * `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`.
+ * `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`. A data set with a `mini.dat` has a fourth, the
+ * port's own: RISE (`RISE_BUTTON`).
  */
 import { tag0088b2Index, type IndexedBitmap } from '../csbwin/CanvasBlitter';
 import type { UIButton } from '../../data/tables/UITables';
@@ -46,6 +47,8 @@ const GAMESTATE_RESUME_SAVED_GAME = 0;
 const GAMESTATE_ENTER_PRISON = 1;
 const GAMESTATE_AT_PRISON_DOOR = 99;
 const GAMESTATE_202 = 202;
+/** The port's own, for RISE: no `d.gameState` of CSBWin's. */
+const GAMESTATE_RISE = 203;
 
 /** The eight 128x161 door buffers `_TAG01f746` pre-shifts (`:9478-9517`). */
 export const DOOR_SLOT_WIDTH = 128;
@@ -80,7 +83,89 @@ export const MISSING_PRISON_DOOR_BUTTONS: UIButton[] = [
 ];
 
 /** What the player chose. `_GameSetup` reads it as `d.gameState` (`:10626-10641`). */
-export type PrisonDoorChoice = 'enter' | 'resume';
+export type PrisonDoorChoice = 'enter' | 'resume' | 'rise';
+
+/* ------------------------------------------------------------------- RISE ---- */
+
+/**
+ * RISE, the port's own button: CSBWin's UTILITY → "MAKE NEW ADVENTURE" on the entrance
+ * (`DEBT.md` G17, `src/engine/Chaos.ts`), shown only by a data set with a `mini.dat`, so
+ * Dungeon Master's entrance is CSBWin's.
+ *
+ * It is carved from the entrance itself: RESUME's gem, the R, I and S of PRISON and the E
+ * of RESUME, each copied without the panel's bare stone around it (`PANEL_STONE`), onto
+ * the bare rock below the two labels. Its letters stand to its gem as RESUME's do, and so
+ * does its rectangle, so it is clicked as the other two are. Positions in graphic 4 of
+ * CSB's `graphics.dat` (`tools/dump-rise.ts`).
+ */
+export const RISE_BUTTON_ID = 0x00cb;
+/** Colour index 10, the stone the labels are carved in. */
+const PANEL_STONE = 10;
+/** RESUME's gem: a 14x14 diamond whose top left corner is here. */
+export const RISE_GEM_SOURCE = { x: 243, y: 78 };
+export const RISE_GEM_SIZE = 14;
+/** The letters' 7x8 cells: PRISON's R, I and S, and RESUME's first E. */
+export const RISE_LETTER_SOURCES = [{ x: 269, y: 48 }, { x: 277, y: 48 }, { x: 285, y: 48 }, { x: 269, y: 81 }];
+export const RISE_LETTER_WIDTH = 7;
+export const RISE_LETTER_HEIGHT = 8;
+/** A label's letters from its gem's corner, and from one another: RESUME's. */
+const RISE_LETTER_DX = 18;
+const RISE_LETTER_DY = 3;
+const RISE_LETTER_PITCH = 8;
+/** Where RISE's gem goes: the corner of the bare rock between RESUME and the scroll. */
+export const RISE_AT = { x: 246, y: 165 };
+
+/** RESUME's rectangle (`MISSING_PRISON_DOOR_BUTTONS[1]`) about its gem, about RISE's. */
+export const RISE_BUTTON: UIButton = {
+  word0: RISE_BUTTON_ID,
+  x1: RISE_AT.x + (0x00f4 - RISE_GEM_SOURCE.x),
+  x2: RISE_AT.x + (0x012a - RISE_GEM_SOURCE.x),
+  y1: RISE_AT.y + (0x004c - RISE_GEM_SOURCE.y),
+  y2: RISE_AT.y + (0x005d - RISE_GEM_SOURCE.y),
+  button: 0x0002,
+  name: 'rise',
+};
+
+/** Whether (x, y) of the gem's 14x14 square is inside its diamond, the square's corners not. */
+function inGem(x: number, y: number): boolean {
+  const half = (RISE_GEM_SIZE - 1) / 2;
+  return Math.abs(x - half) + Math.abs(y - half) <= half + 0.5;
+}
+
+/** Copy the carving of `source`'s w x h at (sx, sy) to (dx, dy) of `target`, the bare stone left out. */
+function carve(
+  source: IndexedBitmap, target: IndexedBitmap,
+  sx: number, sy: number, dx: number, dy: number, w: number, h: number,
+  keep: (x: number, y: number) => boolean = () => true,
+): void {
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!keep(x, y)) continue;
+      const pixel = source.pixels[(sy + y) * source.width + sx + x]!;
+      if (pixel !== PANEL_STONE) target.pixels[(dy + y) * target.width + dx + x] = pixel;
+    }
+  }
+}
+
+/** The entrance with RISE carved into a copy of it. */
+export function carveRise(entrance: IndexedBitmap): IndexedBitmap {
+  const carved = createIndexedBitmap(entrance.width, entrance.height);
+  carved.pixels.set(entrance.pixels);
+  carve(entrance, carved, RISE_GEM_SOURCE.x, RISE_GEM_SOURCE.y, RISE_AT.x, RISE_AT.y, RISE_GEM_SIZE, RISE_GEM_SIZE, inGem);
+  RISE_LETTER_SOURCES.forEach((letter, i) => {
+    carve(entrance, carved, letter.x, letter.y,
+      RISE_AT.x + RISE_LETTER_DX + i * RISE_LETTER_PITCH, RISE_AT.y + RISE_LETTER_DY,
+      RISE_LETTER_WIDTH, RISE_LETTER_HEIGHT);
+  });
+  return carved;
+}
+
+/** The entrance's buttons with RISE among them, before the list's end. */
+export function withRiseButton(buttons: UIButton[]): UIButton[] {
+  const end = buttons.findIndex((button) => button.word0 === 0);
+  const at = end < 0 ? buttons.length : end;
+  return [...buttons.slice(0, at), RISE_BUTTON, ...buttons.slice(at)];
+}
 
 /* --------------------------------------------------------------------- drawing ---- */
 
@@ -101,7 +186,7 @@ export interface PrisonDoorAssets {
  * words: the `D7W & 3` slot supplies the sub-word shift and the source x offset supplies
  * the rest.
  */
-export function loadAssets(host: IntroHost): PrisonDoorAssets {
+export function loadAssets(host: IntroHost, rise = false): PrisonDoorAssets {
   const doorLeft = host.getGraphic(GRAPHIC_DOOR_LEFT);
   const doorRight = host.getGraphic(GRAPHIC_DOOR_RIGHT);
   const slots: IndexedBitmap[] = [];
@@ -122,7 +207,7 @@ export function loadAssets(host: IntroHost): PrisonDoorAssets {
 
   return {
     slots,
-    entrance: host.getGraphic(GRAPHIC_ENTRANCE),
+    entrance: rise ? carveRise(host.getGraphic(GRAPHIC_ENTRANCE)) : host.getGraphic(GRAPHIC_ENTRANCE),
     credits: host.getGraphic(GRAPHIC_CREDITS),
     interior: createIndexedBitmap(INTERIOR_WIDTH, INTERIOR_HEIGHT),
     viewport: null,
@@ -239,8 +324,9 @@ export async function openPrisonDoors(host: IntroHost, assets: PrisonDoorAssets)
 /* ----------------------------------------------------------------- the screen ---- */
 
 /**
- * Run the entrance screen until the player enters or resumes, and `readEntireGame` has
- * read the game that choice names.
+ * Run the entrance screen until the player enters, resumes or rises, and
+ * `readEntireGame` has read the game that choice names. With `rise`, the entrance has
+ * RISE (`RISE_BUTTON`).
  *
  * `_TAG01f746`'s two nested loops: the inner one polls the mouse while `d.gameState` is
  * `GAMESTATE_AtPrisonDoor`, the outer one redraws the whole screen whenever the credits
@@ -256,8 +342,10 @@ export async function showPrisonDoor(
   host: IntroHost,
   buttons: UIButton[],
   readEntireGame: (choice: PrisonDoorChoice) => Promise<boolean>,
+  rise = false,
 ): Promise<PrisonDoorChoice> {
-  const assets = loadAssets(host);
+  const assets = loadAssets(host, rise);
+  const list = rise ? withRiseButton(buttons) : buttons;
   let gameState = GAMESTATE_AT_PRISON_DOOR;
 
   do {
@@ -269,10 +357,11 @@ export async function showPrisonDoor(
     while (gameState === GAMESTATE_AT_PRISON_DOOR) {
       const event = await host.nextEvent();
       if (event.kind !== 'click') continue;
-      const id = searchButtonList(buttons, event.x, event.y, event.buttons);
+      const id = searchButtonList(list, event.x, event.y, event.buttons);
       // `doc/CSBwin-src/Mouse.cpp:1774-1791`.
       if (id === 200) gameState = GAMESTATE_ENTER_PRISON;
       else if (id === 201) gameState = GAMESTATE_RESUME_SAVED_GAME;
+      else if (id === RISE_BUTTON_ID) gameState = GAMESTATE_RISE;
       else if (id === 202) {
         await showCreditsScroll(host, assets);
         gameState = GAMESTATE_202;
@@ -284,12 +373,14 @@ export async function showPrisonDoor(
   await host.vbl(LATCH_TO_DOORS_VBLS);
   host.setCursorVisible(false);         // `STHideCursor(HC33)` (`:9538`)
 
-  const choice: PrisonDoorChoice = gameState === GAMESTATE_RESUME_SAVED_GAME ? 'resume' : 'enter';
+  // RISE goes on as RESUME does: it ends in a save read, through the doors still shut.
+  const choice: PrisonDoorChoice = gameState === GAMESTATE_RESUME_SAVED_GAME ? 'resume'
+    : gameState === GAMESTATE_RISE ? 'rise' : 'enter';
   if (choice === 'enter') await openPrisonDoors(host, assets);
 
   // `_GameSetup`'s `for (;;) { ReadEntireGame(); if (i16Result == 1) break; TAG01f746(); }`
   // (`:10634-10641`): `dungeon.dat` or the chosen save. A read that fails, or a load
   // that is cancelled, puts the entrance back up.
   if (await readEntireGame(choice)) return choice;
-  return showPrisonDoor(host, buttons, readEntireGame);
+  return showPrisonDoor(host, buttons, readEntireGame, rise);
 }

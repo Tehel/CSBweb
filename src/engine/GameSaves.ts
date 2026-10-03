@@ -31,6 +31,7 @@ import {
     SAVE_FILE_EXTENSION, joinedPlaythrough, quickSlot, readSaveFileFields,
     type OpenedSave, type SaveEntry, type SaveStore,
 } from '../data/saves';
+import { UtilityDiskMessages, UtilityError, makeNewAdventure } from './Chaos';
 import type { Game } from './Game';
 import { drawRandomGameID } from './GameContext';
 import { SaveFileError, applySaveBytes, buildSaveFile } from './SaveGameFile';
@@ -39,9 +40,13 @@ import type { Champion } from './gameTypes';
 /**
  * How `_ReadEntireGame` came out on the chooser's path: 1 once a save is in, -1 when the
  * chooser was cancelled (`tag01ec56`, `doc/CSBwin-src/SaveGame.cpp:1556-1559`), or a
- * failed read, which ends at `tag01efee` (`:1895`).
+ * failed read, which ends at `tag01efee` (`:1895`). On RISE's, a new adventure that
+ * `makeNewAdventure` refused, with the `UtilityDiskMessages` text it threw.
  */
-export type SavedGameRead = 'loaded' | 'cancelled' | 'damaged';
+export type SavedGameRead = 'loaded' | 'cancelled' | 'damaged' | { refused: string };
+
+/** What a new adventure's row has after its source's name (`GameSaves.makeNewAdventure`). */
+export const ADVENTURE_SUFFIX = '-csb';
 
 /** The two things a save needs that only the screen has. */
 export interface GameSavesScreen {
@@ -370,9 +375,57 @@ export class GameSaves {
         return { kind: 'stored', entry };
     }
 
-    /** The boot's chooser only: its `read` threw, and `tag01efee` follows. */
-    readFailed(): void {
-        this.lastRead = 'damaged';
+    /**
+     * Every data set's saves, newest first: the entrance's RISE lists them all, since
+     * a new adventure's party comes from any game's save (`doc/SAVES.md` → "A save knows
+     * its dungeon").
+     */
+    async listEverySet(): Promise<SaveEntry[]> {
+        await this.marked;
+        return this.store.list(null);
+    }
+
+    /**
+     * "MAKE NEW ADVENTURE" (`makeNewAdventure`, `src/engine/Chaos.ts`): the listed save
+     * `source`, of any data set, and `mini.dat`, the game's data set's, make a new save
+     * with the source's party in `mini.dat`'s dungeon, stored as a row of the data set
+     * and opened, to be read into the game as any listed save is. A refusal throws the
+     * `UtilityError` CSBWin's utility shows, and nothing is stored.
+     *
+     * The row is named after the source's, `-csb` before its `.dat` and a number after
+     * that while a save has the name (`importedFileName`), where CSBWin's player picks
+     * one of its four slots (`_TAG000ede`, `doc/CSBwin-src/Chaos.cpp:1467-1541`). Its
+     * playthrough is the file's, the source's `RandomGameID` with its first byte one
+     * higher (`TAG002724`), so a source made into an adventure twice makes two saves of
+     * one playthrough, as CSBWin writes the same id twice. It counts no time played: the
+     * adventure is a new game, whose own clock starts. Its food and water are drawn from
+     * the store's stream, as an import's playthrough is: the game's is the game's.
+     */
+    async makeNewAdventure(source: SaveEntry, mini: Uint8Array): Promise<OpenedSave> {
+        const bytes = makeNewAdventure(await this.store.read(source.id), mini, this.fileRandom);
+        const fields = readSaveFileFields(bytes);
+        if (!fields) throw new UtilityError(UtilityDiskMessages[25]);
+        await this.marked;
+        const rows = await this.store.list(null);
+        const stem = source.name.toLowerCase().endsWith(SAVE_FILE_EXTENSION)
+            ? source.name.slice(0, -SAVE_FILE_EXTENSION.length) : source.name;
+        const name = importedFileName(`${stem}${ADVENTURE_SUFFIX}${SAVE_FILE_EXTENSION}`,
+            new Set(rows.flatMap((row) => [row.id, row.name])));
+        const now = Date.now();
+        const entry: SaveEntry = {
+            id: name, name, dataSet: this.dataSet.id, quick: false,
+            savedAt: now, usedAt: now, playTime: 0, unofficial: false, ...fields,
+        };
+        await this.store.write(entry, bytes);
+        return { entry, bytes };
+    }
+
+    /**
+     * The boot's chooser only: its `read` threw, and `tag01efee` follows; or RISE's
+     * `makeNewAdventure` was refused, and the entrance shows why.
+     */
+    readFailed(error?: unknown): void {
+        this.lastRead = error instanceof UtilityError ? { refused: error.message } : 'damaged';
     }
 
     /** How the chooser's last read came out, and forget it. */

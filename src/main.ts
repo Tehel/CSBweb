@@ -13,6 +13,7 @@ import { BrowserSaveStore, downloadSaveFile } from './data/saves';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
 import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
+import { UtilityDiskMessages, UtilityError } from './engine/Chaos';
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import { loadGlfx } from './lib/glfx-loader';
@@ -218,6 +219,16 @@ async function readNewGame(game: Game, saves: GameSaves): Promise<boolean> {
     return read;
 }
 
+/**
+ * The data set's `mini.dat`, for RISE's new adventure. A file that will not open is the
+ * utility's "CAN'T FIND NEW ADVENTURE MINI.DAT" (doc/CSBwin-src/Chaos.cpp:2245-2251).
+ */
+async function readMiniDat(): Promise<Uint8Array> {
+    const response = await fetch(`${dataSet.dir}/mini.dat`).catch(() => null);
+    if (!response?.ok) throw new UtilityError(UtilityDiskMessages[24]);
+    return new Uint8Array(await response.arrayBuffer());
+}
+
 /** The sound manager, unlocked by the first click or key: browsers keep audio locked until then. */
 function createSoundManager(graphicsLoader: GraphicsLoader, tables: GameTables): SoundManager {
     const sound = new SoundManager(graphicsLoader);
@@ -344,17 +355,21 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // buttons; the store, and serializing and restoring the world, are the
         // engine's, so they come back through these. The menu has stopped the clock.
         onListSaves: () => saves.list(),
+        onListEverySave: () => saves.listEverySet(),
         onReadSave: (entry) => saves.open(entry),
+        // RISE, on the entrance: a new adventure from a save of any set.
+        onMakeNewAdventure: async (source) => saves.makeNewAdventure(source, await readMiniDat()),
         onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
         // EXPORT: the row's file as the store holds it, downloaded under the row's name.
         onExportSave: async (entry) => downloadSaveFile(entry.name, (await saves.open(entry)).bytes),
         // The import: a file dropped on the page (`bindSaveDrop`), held against the dungeon.
         onImportSave: (file, confirmed) => saves.importSave(file, confirmed),
         onRestoreSave: (save) => saves.read(save),
-        // The boot's chooser only: its read failed, and `tag01efee` follows.
+        // The boot's chooser only: its read failed, and `tag01efee` follows; or RISE's
+        // new adventure was refused, and the entrance says why.
         onRestoreFailed: (error) => {
-            console.error('Saved game damaged:', error);
-            saves.readFailed();
+            console.error(error instanceof UtilityError ? 'New adventure refused:' : 'Saved game damaged:', error);
+            saves.readFailed(error);
         },
     });
     return { game, screen, saves, messages };
@@ -380,6 +395,7 @@ async function showEndOfGame(game: Game, screen: GameScreen, saves: GameSaves, s
             playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
             consumeSavedGameRead: () => saves.consumeSavedGameRead(),
             readNewGame: () => readNewGame(game, saves),
+            rise: dataSet.miniDat,
         },
         {
             queueDyingSound: () => game.ctx.sounds.queueSound(SOUND_DYING, x, y, 0, z),
@@ -442,6 +458,7 @@ async function runIntro(game: Game, screen: GameScreen, saves: GameSaves, sound:
         playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
         consumeSavedGameRead: () => saves.consumeSavedGameRead(),
         readNewGame: () => readNewGame(game, saves),
+        rise: dataSet.miniDat,
         swoosh: skipIntro ? null : await loadSwooshFiles(sound, settings),
         skip: skipIntro,
     });

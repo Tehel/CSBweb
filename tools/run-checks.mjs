@@ -135,6 +135,9 @@ const CHECKS = [
   // "MAKE NEW ADVENTURE": a saved game's party carried into mini.dat, field by field,
   // and csbgame2.dat, which CSBWin's utility wrote, made again byte for byte.
   { tool: 'dump-new-adventure.ts' },
+  // RISE on CSB's entrance: the button carved from the entrance, the adventure stored
+  // as a csb save, and the chooser over every set's saves that makes it.
+  { tool: 'dump-rise.ts' },
   // Chaos Strikes Back's Hint Oracle data, hcsb.hct, decoded and its limits checked.
   { tool: 'dump-hint-oracle.ts' },
   // Block 4 packed and held up against the real thing: every committed save's

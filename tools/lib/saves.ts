@@ -12,9 +12,13 @@
  *   import { genuineSaves, savePath } from './lib/saves';
  *   for (const path of genuineSaves()) …
  *   readFileSync(savePath('csbgame4-door-opening.dat'))
+ *
+ * And `memoryStore`, a save store in memory, for a tool that runs the page's saves.
  */
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+
+import { sortSaveEntries, type SaveEntry, type SaveStore } from '../../src/data/saves/SaveStore';
 
 export const SAVE_DIR = 'tools/fixtures';
 
@@ -46,4 +50,39 @@ export function savePath(name: string): string {
   const path = resolve(SAVE_DIR, name);
   if (!existsSync(path)) throw new Error(`no save called ${name} in ${SAVE_DIR}`);
   return path;
+}
+
+/**
+ * A save store in memory. `onWrite` runs as a write arrives, before it is kept; a store
+ * made to `fail` rejects every write; `onList` runs as the store is listed.
+ */
+export function memoryStore(
+  onWrite: () => void = () => {},
+  fail = false,
+  onList: () => void = () => {},
+): SaveStore & { files: Map<string, Uint8Array> } {
+  const files = new Map<string, Uint8Array>();
+  const entries = new Map<string, SaveEntry>();
+  return {
+    files,
+    list: async (dataSet) => {
+      onList();
+      return sortSaveEntries([...entries.values()].filter((e) => dataSet === null || e.dataSet === dataSet));
+    },
+    read: async (id) => {
+      const bytes = files.get(id);
+      if (!bytes) throw new Error(`no save ${id}`);
+      return bytes;
+    },
+    write: async (written, bytes) => {
+      onWrite();
+      if (fail) throw new Error('the store is full');
+      files.set(written.id, bytes);
+      entries.set(written.id, written);
+    },
+    markUsed: async (id, usedAt) => {
+      const held = entries.get(id);
+      if (held) entries.set(id, { ...held, usedAt });
+    },
+  };
 }

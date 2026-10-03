@@ -56,6 +56,11 @@ export interface BootSequenceDeps {
    */
   readNewGame: () => Promise<boolean>;
   /**
+   * Whether the entrance has RISE (`src/renderer/intro/PrisonDoor.ts`): the data set
+   * has a `mini.dat` to make a new adventure in.
+   */
+  rise: boolean;
+  /**
    * The FTL logo to show before the title, with its sound: the extra, when it is on and
    * `swoosh.img` is served. Absent, the boot is CSBWin's.
    */
@@ -250,6 +255,7 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
 async function openLoadMenu(
   host: IntroHost,
   deps: Pick<BootSequenceDeps, 'gameScreen' | 'consumeSavedGameRead'>,
+  mode: 'loadOnly' | 'rise' = 'loadOnly',
 ): Promise<SavedGameRead> {
   const { gameScreen } = deps;
 
@@ -277,7 +283,7 @@ async function openLoadMenu(
   gameScreen.setBootFrameRenderer(draw);
   // Forget a load made in play before the game was lost: only this chooser's read counts.
   deps.consumeSavedGameRead();
-  gameScreen.openSaveMenu('loadOnly');
+  gameScreen.openSaveMenu(mode);
   draw();
   await fadeToPalette(host, palette11978(host));
 
@@ -310,6 +316,47 @@ async function readSavedGame(
 }
 
 /**
+ * RISE: the chooser over every data set's saves, whose LOAD makes a new adventure from
+ * the one chosen and reads it (`SaveMenu`'s `rise` mode). A refusal is the utility's
+ * message in a one-button menu (`utilityRefusal`), and a read that fails ends at
+ * `tag01efee`, as RESUME's does. Resolves to whether the adventure is in.
+ */
+async function readNewAdventure(
+  host: IntroHost,
+  deps: Pick<BootSequenceDeps, 'gameScreen' | 'consumeSavedGameRead'>,
+  partyHasDied: boolean,
+): Promise<boolean> {
+  const read = await openLoadMenu(host, deps, 'rise');
+  if (read === 'damaged') await tag01efee(host, deps.gameScreen, partyHasDied);
+  else if (typeof read === 'object') await utilityRefusal(host, deps.gameScreen, read.refused);
+  return read === 'loaded';
+}
+
+/**
+ * A `UtilityDiskMessages` text as the two titles of the boot's menu: its first line,
+ * and the rest on one, which the menu splits once it is 30 characters or more
+ * (`splitLongLine`). CSBWin's utility prints it in a dialog box of its own
+ * (`_UtilityDialogBox`, `doc/CSBwin-src/Chaos.cpp:1091`), which the port does not have.
+ */
+export function utilityMenuTitles(message: string): [string, string | null] {
+  const lines = message.split('\n').filter((line) => line.length > 0);
+  return [lines[0] ?? '', lines.length > 1 ? lines.slice(1).join(' ') : null];
+}
+
+/**
+ * The utility's refusal of a new adventure, and its OK: the button CSBWin's dialog
+ * gives it (`UtilityDiskMessages[32]`, `doc/CSBwin-src/Chaos.cpp:1448`). The click goes
+ * back to the entrance.
+ */
+async function utilityRefusal(host: IntroHost, menus: MenuScreen, message: string): Promise<void> {
+  const [title1, title2] = utilityMenuTitles(message);
+  await doMenuCentred(host, menus, title1, title2, ['OK']);
+  host.setCursorVisible(true);
+  await waitForMenuSelect(host, menus, 1);
+  host.setCursorVisible(false);
+}
+
+/**
  * `_ReadEntireGame` once the entrance's doors have opened on a new game: `dungeon.dat`,
  * then `tag01efee` if the read failed, as a save's does. Resolves to whether the game is in.
  */
@@ -323,13 +370,18 @@ export async function readNewGame(
   return false;
 }
 
-/** `_GameSetup`'s `ReadEntireGame` for the entrance's choice: `dungeon.dat` or a save. */
+/**
+ * `_GameSetup`'s `ReadEntireGame` for the entrance's choice: `dungeon.dat`, a save, or
+ * RISE's new adventure.
+ */
 function readEntireGame(
   host: IntroHost,
   deps: Pick<BootSequenceDeps, 'gameScreen' | 'consumeSavedGameRead' | 'readNewGame'>,
   partyHasDied: boolean,
 ): (choice: PrisonDoorChoice) => Promise<boolean> {
-  return (choice) => (choice === 'enter' ? readNewGame(host, deps, partyHasDied) : readSavedGame(host, deps, partyHasDied));
+  return (choice) => (choice === 'enter' ? readNewGame(host, deps, partyHasDied)
+    : choice === 'rise' ? readNewAdventure(host, deps, partyHasDied)
+    : readSavedGame(host, deps, partyHasDied));
 }
 
 /**
@@ -407,7 +459,7 @@ export type MenuScreen = Pick<GameScreen, 'doMenu' | 'menuButtonList' | 'drawMen
  * cleared screen the adventure opens on (`CSBCode.cpp:10535-10536`).
  */
 export async function tag021028(host: IntroHost, choice: PrisonDoorChoice): Promise<void> {
-  if (choice !== 'resume') return;
+  if (choice === 'enter') return;
   await fadeToPalette(host, PALETTE_11914);
   host.screen.pixels.fill(0);
   await host.vbl(4);
@@ -509,7 +561,7 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
           if (!(await readGame(c))) return false;
           read = c;
           return true;
-        });
+        }, deps.rise);
         await tag021028(host, choice);
         return choice;
       } catch (error) {
@@ -569,7 +621,7 @@ export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks
  */
 async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDeps, 'skip'>): Promise<PrisonDoorChoice> {
   const readGame = readEntireGame(host, deps, true);
-  const choice = (await readGame('resume')) ? 'resume' : await showPrisonDoor(host, prisonDoorButtons(host), readGame);
+  const choice = (await readGame('resume')) ? 'resume' : await showPrisonDoor(host, prisonDoorButtons(host), readGame, deps.rise);
   await tag021028(host, choice);
   return choice;
 }

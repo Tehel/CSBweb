@@ -58,12 +58,23 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   read is CSBWin's "SAVED GAME DAMAGED!" (`SaveGame.cpp:1906`).
 - **A save knows its dungeon.** A row carries its data set's id, and the list shows the
   running data set's saves only (`GameSaves.dataSet`). The filter is the list's
-  parameter, not its rule: `DEBT.md` G17's source save is picked across sets (a DM save
-  feeds a CSB game). CSBWin keeps a game's saves in that game's directory (`CSBGAME.DAT`
+  parameter, not its rule: RISE lists every set's (below), since a DM save feeds a CSB
+  game. CSBWin keeps a game's saves in that game's directory (`CSBGAME.DAT`
   to `CSBGAME4.DAT`, `doc/CSBwin-src/CSBCode.cpp:9747-9756`), and guards against the
   wrong graphics with the signatures an Extended Features block may carry
   (`expectedGraphicSignature1/2`, `SaveGame.cpp:378-379`, checked at
   `Graphics.cpp:1784-1815`), which the port neither checks nor writes.
+- **RISE makes a save of its own.** On an entrance whose data set has a `mini.dat`,
+  CSB's, RISE opens the chooser over every data set's saves (`SaveMenu`'s `rise` mode,
+  `src/renderer/intro/PrisonDoor.ts`), and its LOAD is CSBWin's UTILITY → "MAKE NEW
+  ADVENTURE" on the save chosen (`GameSaves.makeNewAdventure`, `src/engine/Chaos.ts`).
+  The new file is a row of the running set, named after the source's with `-csb` before
+  its `.dat`, and a number after that while a save has the name; its playthrough is the
+  file's, the source's `RandomGameID` with its first byte one higher, so a source raised
+  twice makes two saves of one playthrough, as CSBWin writes the same id twice; it counts
+  no time played. Then it is read, and the game starts in it. A refusal stores nothing,
+  and is the utility's message in the entrance's one-button menu, whose OK goes back to
+  the entrance.
 - **An import is checked against the dungeon.** A `.dat` holds no name of its dungeon,
   but it holds the dungeon (blocks 7-14). A dungeon's signature is one digest per level, of
   its walls: the level's width and height, and one bit per cell, stone or anything else
@@ -295,6 +306,8 @@ sections are named below. Node has no IndexedDB, so no tool runs `BrowserSaveSto
 itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
 `BrowserSaveStore.markUsed`.
 
+- **RISE**: `tools/dump-rise.ts` (the row a new adventure is stored as, again, and a
+  refusal; the chooser's `rise` mode over every set's saves, its LOAD and a refusal).
 - **The row and the store's upgrades**: "the one save call" and "the store's upgrade"
   (version-1 rows through both upgrades; which rows join a named save and which draw, in
   either order of the rows; each row's file holding the row's id; a stamped file being

@@ -3,7 +3,9 @@
  * `mini.dat` and writes a new Chaos Strikes Back save with the saved game's party in it
  * (`doc/CSBwin-src/Chaos.cpp:1-5`).
  *
- * The engine of it and no screen (`DEBT.md` G17): `makeNewAdventure` is button 13 of
+ * The engine of it, and not the utility's screen: the page offers it as RISE on CSB's
+ * entrance (`GameSaves.makeNewAdventure`, `src/renderer/intro/PrisonDoor.ts`).
+ * `makeNewAdventure` is button 13 of
  * `_TAG004518` (`:3949-3973`) on a source save `_ReadSavedGame(0)` has read, from file
  * bytes to file bytes. Like CSBWin's, it works on the blocks as the file holds them, and
  * every field below is read and written at its `GAMEBLOCK1`, `GAMEBLOCK2` or `CHARDESC`
@@ -31,6 +33,8 @@ import { CHARFLAG_MALE } from './gameTypes';
 export const UtilityDiskMessages = {
     14: '\nSAVED GAME ERROR',
     20: '\nEACH CHAMPION MUST\nHAVE A UNIQUE FIRST NAME!',
+    /** `_ReadSavedGame(1)` when `mini.dat` will not open (`:2245-2251`): the page's fetch. */
+    24: 'CAN\'T FIND\nNEW ADVENTURE\nMINI.DAT',
     25: '\nTHE NEW ADVENTURE\nIS DAMAGED',
     29: 'THE NEW ADVENTURE\nCAN ONLY BE MADE AFTER\nA SAVED GAME IS LOADED.',
     30: '\nCAN\'T MAKE NEW ADVENTURE\nFROM THIS SAVED GAME.\nALREADY UTILIZED.',

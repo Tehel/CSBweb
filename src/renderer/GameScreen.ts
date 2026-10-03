@@ -89,7 +89,9 @@ import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectInd
 export type GameScreenHooks = Pick<UIState,
   | 'onReincarnated'
   | 'onListSaves'
+  | 'onListEverySave'
   | 'onReadSave'
+  | 'onMakeNewAdventure'
   | 'onSaveGame'
   | 'onExportSave'
   | 'onImportSave'
@@ -173,7 +175,9 @@ export class GameScreen {
       renderLastFrame: () => this.renderLastFrame(),
       onReincarnated: hooks.onReincarnated,
       onListSaves: hooks.onListSaves,
+      onListEverySave: hooks.onListEverySave,
       onReadSave: hooks.onReadSave,
+      onMakeNewAdventure: hooks.onMakeNewAdventure,
       onSaveGame: hooks.onSaveGame,
       onExportSave: hooks.onExportSave,
       onImportSave: hooks.onImportSave,

@@ -325,7 +325,13 @@ export const SAVE_MENU_GEOMETRY = {
 
 /* --------------------------------------------------------------------- state ---- */
 
-export type SaveMenuMode = 'full' | 'loadOnly';
+/**
+ * The disk menu (`full`), the entrance's RESUME and a lost game's restart (`loadOnly`),
+ * or the entrance's RISE (`rise`): the load-only chooser over every data set's saves,
+ * whose LOAD makes a new adventure from the chosen one and reads that
+ * (`src/renderer/intro/PrisonDoor.ts`).
+ */
+export type SaveMenuMode = 'full' | 'loadOnly' | 'rise';
 
 /** What the bottom pair of buttons does. */
 export type SaveMenuAction = 'load' | 'save';
@@ -338,7 +344,7 @@ export type SaveMenuRow =
 
 export interface SaveMenuState {
   mode: SaveMenuMode;
-  /** The running data set's saves, newest first (`UIState.onListSaves`). */
+  /** The running data set's saves, newest first (`UIState.onListSaves`); RISE's, every set's. */
   entries: SaveEntry[];
   /** The playthroughs whose saves are listed under their heading; the others are folded. */
   unfolded: Set<number>;
@@ -420,7 +426,7 @@ export async function refreshSaveMenu(ui: UIState): Promise<void> {
   state.message = '';
   ui.renderLastFrame();
   try {
-    state.entries = await ui.onListSaves();
+    state.entries = await (state.mode === 'rise' ? ui.onListEverySave() : ui.onListSaves());
     selectLastUsed(ui, state);
   } catch (error) {
     state.entries = [];
@@ -997,7 +1003,22 @@ async function doLoad(ui: UIState, state: SaveMenuState): Promise<void> {
     state.busy = false;
     return;
   }
-  restoreChosenSave(ui, await ui.onReadSave(entry));
+  if (state.mode !== 'rise') {
+    restoreChosenSave(ui, await ui.onReadSave(entry));
+    return;
+  }
+  // RISE: a refusal, or a source that does not read, is the entrance's to show, as a
+  // failed read is the boot's.
+  let adventure: OpenedSave;
+  try {
+    adventure = await ui.onMakeNewAdventure(entry);
+  } catch (error) {
+    ui.onRestoreFailed(error);
+    closeSaveMenu(ui);
+    ui.renderLastFrame();
+    return;
+  }
+  restoreChosenSave(ui, adventure);
 }
 
 /**

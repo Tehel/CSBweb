@@ -150,7 +150,7 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/rend
 import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
-import { SAVE_DIR, genuineSaves, savePath } from './lib/saves';
+import { SAVE_DIR, genuineSaves, memoryStore, savePath } from './lib/saves';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
@@ -885,41 +885,6 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   check(ui.openChestId === chest, 'the load-only screen leaves the chest open');
   SaveMenu.closeSaveMenu(ui);
   check(ui.word20252 === 0 && ui.word20250 === 1, 'and, closing, leaves the attack panel alone');
-}
-
-/**
- * A save store in memory. `onWrite` runs as a write arrives, before it is kept; a store
- * made to `fail` rejects every write; `onList` runs as the store is listed.
- */
-function memoryStore(
-  onWrite: () => void = () => {},
-  fail = false,
-  onList: () => void = () => {},
-): SaveStore & { files: Map<string, Uint8Array> } {
-  const files = new Map<string, Uint8Array>();
-  const entries = new Map<string, SaveEntry>();
-  return {
-    files,
-    list: async (dataSet) => {
-      onList();
-      return sortSaveEntries([...entries.values()].filter((e) => dataSet === null || e.dataSet === dataSet));
-    },
-    read: async (id) => {
-      const bytes = files.get(id);
-      if (!bytes) throw new Error(`no save ${id}`);
-      return bytes;
-    },
-    write: async (written, bytes) => {
-      onWrite();
-      if (fail) throw new Error('the store is full');
-      files.set(written.id, bytes);
-      entries.set(written.id, written);
-    },
-    markUsed: async (id, usedAt) => {
-      const held = entries.get(id);
-      if (held) entries.set(id, { ...held, usedAt });
-    },
-  };
 }
 
 /**

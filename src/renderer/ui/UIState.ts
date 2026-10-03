@@ -188,6 +188,14 @@ export interface UIState {
   readonly onReincarnated: () => void;
   /** The saves the save/load screen lists, newest first (`GameSaves.list`). */
   readonly onListSaves: () => Promise<SaveEntry[]>;
+  /** Every data set's saves, newest first: the entrance's RISE lists them (`GameSaves.listEverySet`). */
+  readonly onListEverySave: () => Promise<SaveEntry[]>;
+  /**
+   * RISE's LOAD: a new adventure made from a listed save, stored and opened, to be
+   * restored as any opened save is (`GameSaves.makeNewAdventure`). Throws the
+   * utility's refusal, which goes to `onRestoreFailed`.
+   */
+  readonly onMakeNewAdventure: (source: SaveEntry) => Promise<OpenedSave>;
   /** A listed save out of the store (`GameSaves.open`). */
   readonly onReadSave: (entry: SaveEntry) => Promise<OpenedSave>;
   /**
@@ -213,7 +221,8 @@ export interface UIState {
   readonly onRestoreSave: (save: OpenedSave) => void;
   /**
    * The load-only chooser's `onRestoreSave` threw: `_ReadEntireGame`'s read failed, and
-   * its caller goes to `tag01efee` (`src/renderer/intro/BootSequence.ts`).
+   * its caller goes to `tag01efee` (`src/renderer/intro/BootSequence.ts`). Or RISE's
+   * `onMakeNewAdventure` did, and the entrance shows why.
    */
   readonly onRestoreFailed: (error: unknown) => void;
 
@@ -283,7 +292,7 @@ export type UISources = Pick<UIState,
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
-  | 'onReincarnated' | 'onListSaves' | 'onReadSave' | 'onSaveGame' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed'>;
+  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onSaveGame' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {
