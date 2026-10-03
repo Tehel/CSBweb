@@ -2238,6 +2238,20 @@ are `RNVAL` literals — the spell RNs, `RNeof` 0xfffe, `RNnul` 0xffff — and a
 numbers; `RN::CreateSpell` writes `0xff80 + n` straight into the field
 (`doc/CSBwin-src/data.cpp:533-537`).
 
+**An `RNVAL` read as a slot is `dbUNKNOWN`, and has no corner or record.** The maps stop
+growing short of slot 0xff00: `RN(DBTYPE, dbIndex)` at 64000 (`doc/CSBwin-src/data.cpp:455-504`),
+`AllocateIndirectIndex` at `0xff00 - 100` (`SaveGame.cpp:2120-2140`), and
+`FindEmptyDBEntry` there too unless the object is `important` (`data.cpp:973-988`). So,
+short of a hundred important objects past that mark, `checkIndirectIndex` refuses every
+`RNVAL`, as it refuses 0 (`data.cpp:518-527`). On a refusal it puts up the message box
+"Illegal object Indirect Index", and a `_DEBUG` build dies. Then `dbType()` returns
+`dbUNKNOWN` (`CSBTypes.h:324-330`), while `pos()`, `pos(p)` and `idx()` go on to read or
+write `dataTypeMap` / `dataIndexMap` past their end (`:331-347`). `RN::DescIndex` asks
+`dbType()` alone, unless the RN is `RNempty` (`data.cpp:568-600`), so for `RNnul` and
+`RNeof` it is -1 without a corner or a record being read. The port's `RnMaps` answers
+`dbUNKNOWN` the same way and throws where CSBWin would read outside the maps
+(`tools/dump-object-index.ts`).
+
 **A freed slot is `dataTypeMap[i] == 0xff`, `dataIndexMap[i] == 0xffff`.**
 `DeleteDBEntry` writes both, together with `RNnul` over the record's own link
 (`doc/CSBwin-src/data.cpp:993-1015`); `AllocateIndirectIndex` and `RN::RN(DBTYPE, idx)`

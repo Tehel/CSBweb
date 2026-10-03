@@ -10,6 +10,9 @@
  * - every record of the six object databases has a row in `d.ObjDesc`, and the RN form
  *   agrees with the record form `AddCharacter` uses;
  * - doors, monsters, `RNeof`, `RNnul` and `RNempty` have none, and are "not an object";
+ * - an RN no slot holds (an `RNVAL`, 0, the maps' length) is `dbUNKNOWN`, and its corner
+ *   and record are refused, not read as its own bits (`doc/PROVEN_FACTS.md` -> "An
+ *   `RNVAL` read as a slot is `dbUNKNOWN`");
  * - the name table (`graphics.dat`) spells the right word for a scroll, a chest, a
  *   compass, a torch and a waterskin — the canary that the offsets are right;
  * - `NameIndex` turns the compass with the party, burns a lit torch through `Byte640`,
@@ -23,6 +26,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import * as OBJNI from '../src/core/objectNameIndex';
+import { RN_FFE4, RN_FIREBALL } from '../src/core/spellRn';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -113,6 +117,24 @@ async function main(): Promise<void> {
     check(basic(rn) === OBJNI.OBJNI_NOT_AN_OBJECT, `${label}: GetBasicObjectType is objNI_NotAnObject`);
     check(nameIndex(rn) === OBJNI.OBJNI_NOT_AN_OBJECT, `${label}: NameIndex is objNI_NotAnObject`);
   }
+
+  // --- an RN no slot of the maps holds -------------------------------------------
+  // `RN::checkIndirectIndex` refuses 0 and anything from `dataMapLength` on, and every
+  // `RNVAL` is past it: `dbType()` answers `dbUNKNOWN`, while `pos()` and `idx()` would
+  // read outside the maps, which the port refuses (`doc/CSBwin-src/CSBTypes.h:324-347`).
+  const throws = (read: () => unknown): boolean => {
+    try { read(); return false; } catch { return true; }
+  };
+  const maps = dungeon.rnMaps;
+  for (const [label, rn] of [
+    ['RNnul', OBJECT_ID_NULL], ['RNeof', OBJECT_ID_EOF], ['RNFireball', RN_FIREBALL], ['RNffe4', RN_FFE4],
+    ['RNempty', 0 as ObjectID], ['dataMapLength', maps.length as ObjectID],
+  ] as const) {
+    check(maps.dbType(rn) === DBType.UNKNOWN, `${label}: dbType is dbUNKNOWN, not ${maps.dbType(rn)}`);
+    check(throws(() => maps.pos(rn)) && throws(() => maps.idx(rn)) && throws(() => maps.setPos(rn, 1)),
+      `${label}: pos, idx and pos(p) refuse it`);
+  }
+  console.log(`dataMapLength ${maps.length}: dbType of RNnul, RNeof, two spells, 0 and the length is dbUNKNOWN`);
 
   // --- canaries: the name each database's first row spells ------------------------
   const firstOf = (category: DBType, pick: (type: number) => boolean): ObjectID | null => {

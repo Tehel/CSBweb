@@ -64,16 +64,25 @@ export interface ObjectIndexTables {
   byte640: ArrayLike<number>;
 }
 
+/** The databases `DescIndex` has a row for. */
+const OBJECT_DATABASES: ReadonlySet<DBType> = new Set([
+  DBType.SCROLL, DBType.CHEST, DBType.MISC, DBType.WEAPON, DBType.CLOTHING, DBType.POTION,
+]);
+
 /**
  * `RN::DescIndex` (`doc/CSBwin-src/data.cpp:568`). -1 for anything that has no row: a
- * door, a monster, `RNeof`, `RNnul`, or `RNempty` (0).
+ * door, a monster, `RNeof`, `RNnul`, or `RNempty` (0). It reads the record's index only
+ * once `dbType()` has named a database with a row, as CSBWin's does, so an `RNVAL` is
+ * `dbUNKNOWN` and never read as a slot.
  *
  * Divergence: CSBWin reads the record without checking it exists. An RN whose index
  * runs past its database also answers -1 here, since there is nothing to read.
  */
 export function DescIndex(dungeon: DungeonState, rn: ObjectID): number {
   if (rn === 0) return -1; // RNempty
-  const { category, index } = dungeon.rnMaps.decode(rn);
+  const category = dungeon.rnMaps.dbType(rn);
+  if (!OBJECT_DATABASES.has(category)) return -1;
+  const index = dungeon.rnMaps.idx(rn);
   const { databases } = dungeon.getData();
   const records: ArrayLike<DatabaseRecord> | undefined =
     category === DBType.SCROLL ? databases.scrolls.records :

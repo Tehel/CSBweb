@@ -12,17 +12,14 @@
  * CSBWin does (`ConvertListOfObjects`, `src/data/CsbwinDungeonConversions.ts`); a save
  * carries its maps, and its slots are kept as they are.
  *
- * An `RNVAL` (0xff00 and up: the spells, `RNeof`, `RNnul`) is a literal, not a slot.
- * CSBWin's accessors would fail `checkIndirectIndex` on one; here one reads as its own
- * bits, `[pos:2][db:4][idx:10]`, as every RN did when the port kept them packed.
+ * An `RNVAL` (0xff00 and up: the spells, `RNeof`, `RNnul`) is a literal, not a slot: the
+ * maps stop growing short of 0xff00 slots, so `checkIndirectIndex` refuses one, as it
+ * refuses 0 (`doc/PROVEN_FACTS.md` -> "An `RNVAL` read as a slot is `dbUNKNOWN`").
+ * For such an RN `dbType()` is `dbUNKNOWN`, as in CSBWin. `pos()` and `idx()` throw,
+ * where CSBWin's read outside the maps once its message box is dismissed, and its debug
+ * build dies (`doc/CSBwin-src/data.cpp:518-527`): a caller asks only for a slot.
  */
-import { OBJECT_ID_NULL, type DBType, type ObjectID, type TilePosition } from './types';
-
-/** `dbUNKNOWN` (`doc/CSBwin-src/CSBTypes.h:231`): what `RN::dbType` says of a free slot. */
-const DB_UNKNOWN = 16 as DBType;
-
-/** The lowest `RNVAL` (`doc/CSBwin-src/CSBTypes.h:236-250`). */
-const RN_LITERAL_FLOOR = 0xff00;
+import { DBType, OBJECT_ID_NULL, type ObjectID, type TilePosition } from './types';
 
 /**
  * A record's link, which `RN(DBTYPE, dbIndex)` reads to tell a free record (`RNnul`) from
@@ -82,24 +79,21 @@ export class RnMaps {
         return i < this.dataMapLength && i > 0;
     }
 
-    /** `RN::dbType` (`CSBTypes.h:324-330`). */
+    /** `RN::dbType` (`CSBTypes.h:324-330`): `dbUNKNOWN` for a free slot or no slot at all. */
     dbType(rn: ObjectID): DBType {
-        if (rn >= RN_LITERAL_FLOOR) return ((rn >> 10) & 0x0f) as DBType;
-        this.check(rn);
-        if (this.indexMap[rn] === 0xffff) return DB_UNKNOWN;
+        if (!this.checkIndirectIndex(rn)) return DBType.UNKNOWN;
+        if (this.indexMap[rn] === 0xffff) return DBType.UNKNOWN;
         return (this.typeMap[rn] & 0x0f) as DBType;
     }
 
     /** `RN::pos()` (`CSBTypes.h:331-335`): the corner of its cell. */
     pos(rn: ObjectID): TilePosition {
-        if (rn >= RN_LITERAL_FLOOR) return ((rn >> 14) & 3) as TilePosition;
         this.check(rn);
         return ((this.typeMap[rn] >> 4) & 3) as TilePosition;
     }
 
     /** `RN::idx` (`CSBTypes.h:343-347`): the record within its database. */
     idx(rn: ObjectID): number {
-        if (rn >= RN_LITERAL_FLOOR) return rn & 0x3ff;
         this.check(rn);
         return this.indexMap[rn];
     }

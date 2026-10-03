@@ -162,20 +162,13 @@ five of its databases run past record 1023:
 | teleporters | 1613 | 575 |
 | creatures | 1257 | 228 |
 
-The steps left:
-
-1. **An `RNVAL` read as a slot.** Read through `RnMaps`' accessors, an `RNVAL` (0xff00 and
-   up: the spells, `RNeof`, `RNnul`) reads as its own bits, `[pos:2][db:4][idx:10]`, where
-   CSBWin's `checkIndirectIndex` fails, `dbType()` is `dbUNKNOWN` and `idx()` reads
-   `dataIndexMap` past its end (`doc/CSBwin-src/data.cpp:518-534`, `CSBTypes.h:324-347`).
-   Which callers ask is to be found, and each answer made CSBWin's.
-2. **Databases past 1024 records**: the record arrays, `FindEmptyDBEntry` and `Enlarge`
-   as CSBWin bounds them (`CSBCode.cpp:4942-5084`, `Character.cpp:182-358`). CSBWin grows
-   a full database 100 records at a time, up to `db.Max`: 8000, 16000 for the actuators,
-   768 for database 15 (`doc/CSBwin-src/data.cpp:813-876`, `:967-972`, `CSB.h:1646`).
-   `DungeonState.findEmptyDBEntry` takes 1024 as `db.Max`, so a full database goes
-   straight to `MakeMoreRoomInDB`, and `SmartDiscard`, which starts at 6000 records in
-   use, never acts. The check is Conflux read to its end, which also takes G23.
+The step left: **databases past 1024 records**, the record arrays, `FindEmptyDBEntry` and
+`Enlarge` as CSBWin bounds them (`CSBCode.cpp:4942-5084`, `Character.cpp:182-358`). CSBWin
+grows a full database 100 records at a time, up to `db.Max`: 8000, 16000 for the
+actuators, 768 for database 15 (`doc/CSBwin-src/data.cpp:813-876`, `:967-972`,
+`CSB.h:1646`). `DungeonState.findEmptyDBEntry` takes 1024 as `db.Max`, so a full database
+goes straight to `MakeMoreRoomInDB`, and `SmartDiscard`, which starts at 6000 records in
+use, never acts. The check is Conflux read to its end, which also takes G23.
 
 ---
 
