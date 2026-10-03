@@ -17,7 +17,7 @@
  * writes `groupIndex` and `facing` back from the slot (`CSBCode.cpp:6127-6131`);
  * `reloadAfterSaveGame` is that call here. What stays is the cut `numMonM1`.
  */
-import { DBType, OBJECT_ID_EOF, Position, decodeObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, Position } from '../core/types';
 import type { ObjectID } from '../core/types';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import { monsterHorizontalSize } from '../data/tables/MonsterDesc';
@@ -33,7 +33,7 @@ let warning2Issued = false;
 /** `FindNextMonster` (`doc/CSBwin-src/Code11f52.cpp:544-550`). */
 function FindNextMonster(dungeon: DungeonState, obj: ObjectID): ObjectID {
   for (obj = dungeon.getDBRecordLink(obj);
-       obj !== OBJECT_ID_EOF && decodeObjectID(obj).category !== DBType.CREATURE;
+       obj !== OBJECT_ID_EOF && dungeon.rnMaps.dbType(obj) !== DBType.CREATURE;
        obj = dungeon.getDBRecordLink(obj));
   return obj;
 }
@@ -87,7 +87,7 @@ export function CheckMonster(
       break;
   }
   for (let poss = pMonster.possession; poss !== OBJECT_ID_EOF; poss = FindNextMonster(dungeon, poss)) {
-    if (decodeObjectID(poss).category !== DBType.CREATURE) continue;
+    if (dungeon.rnMaps.dbType(poss) !== DBType.CREATURE) continue;
     CheckMonster(dungeon, monsterDesc, poss, messageBox);
   }
 }

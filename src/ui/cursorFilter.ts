@@ -1,4 +1,4 @@
-import { DBType, decodeObjectID } from '../core/types';
+import { DBType } from '../core/types';
 import { CursorFilterType, type CursorFilterPacket } from '../engine/GameHost';
 import { isDebugFeaturesEnabled } from './context';
 
@@ -33,8 +33,7 @@ const FILTER_LABELS: Record<CursorFilterType, string> = {
 
 export function handleCursorFilter(packet: CursorFilterPacket): boolean {
   if (!isDebugFeaturesEnabled()) return true;
-  const decoded = decodeObjectID(packet.object);
-  const categoryLabel = DB_TYPE_LABELS[decoded.category] ?? `DB${decoded.category}`;
+  const categoryLabel = DB_TYPE_LABELS[packet.dbType] ?? `DB${packet.dbType}`;
   const actionLabel = FILTER_LABELS[packet.type] ?? packet.type;
   console.debug(`[CursorFilter] ${actionLabel}: ${categoryLabel} ${packet.object.toString(16).padStart(4, '0')} at L${packet.level} (${packet.x},${packet.y}) pos ${packet.pos}`);
   return true;

@@ -18,7 +18,7 @@
  * play and this never gets past counting. `tools/watch-smart-discard.ts` pads one past it.
  */
 import { getActuatorType } from '../data/actuatorHelpers';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import type { Database, DatabaseRecord } from '../data/dungeonTypes';
 import type { GameContext } from './GameContext';
 
@@ -256,7 +256,7 @@ export function scanOneCell(ctx: GameContext, s: SmartDiscardState, list: SDObjL
         obj !== OBJECT_ID_EOF;
         obj = ctx.dungeon.getDBRecordLink(obj)) {
         result++;
-        const { category, position: pos } = decodeObjectID(obj);
+        const { category, position: pos } = ctx.dungeon.rnMaps.decode(obj);
         if (!isTriggered && category === DBType.ACTUATOR) {
             const actuator = ctx.dungeon.getActuatorRecord(obj);
             switch (actuator ? getActuatorType(actuator) : 0) {

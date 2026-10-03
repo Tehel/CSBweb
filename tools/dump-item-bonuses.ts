@@ -28,7 +28,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import * as NI from '../src/core/objectNameIndex';
-import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, encodeObjectID } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import type { GameHost } from '../src/engine/GameHost';
 import type { DatabaseRecord } from '../src/data/dungeonTypes';
@@ -75,7 +75,7 @@ function firstRecord(g: Game, category: DBType.SCROLL | DBType.CHEST): ObjectID 
   const databases = g.ctx.dungeon.getData().databases;
   const db = category === DBType.SCROLL ? databases.scrolls : databases.containers;
   if (db.records.length === 0) throw new Error(`dungeon.dat has no ${DBType[category]} record`);
-  return encodeObjectID(0, category, 0);
+  return g.ctx.dungeon.rnMaps.rn(category, 0);
 }
 
 type DsaCharacterMoves = {
@@ -139,7 +139,7 @@ function newObject(game: Game, objNI: number, extra: { cursed?: boolean; charges
     db.records.push({ ...common, specialState: 0, miscType: found.type });
   }
   db.count++;
-  return encodeObjectID(0, found.category, db.records.length - 1);
+  return game.ctx.dungeon.rnMaps.rn(found.category, db.records.length - 1);
 }
 
 /** Everything the function may move, as one comparable string. */
@@ -477,7 +477,7 @@ async function main(): Promise<void> {
     g.systems.mouse.handleWallClick();
     const recruit = party.champions[0];
     const slot = recruit?.possessions.findIndex((rn) => rn !== OBJECT_ID_NULL
-      && decodeObjectID(rn).category === DBType.WEAPON && typeNamed(NI.OBJNI_TORCH_A)?.type
+      && game.ctx.dungeon.rnMaps.dbType(rn) === DBType.WEAPON && typeNamed(NI.OBJNI_TORCH_A)?.type
         === data.databases.weapons.records[rn & 0x3ff]!.weaponType) ?? -1;
     const torch = slot >= 0 ? recruit!.possessions[slot]! : OBJECT_ID_NULL;
     const lit = slot >= 0 && data.databases.weapons.records[torch & 0x3ff]!.litTorch;

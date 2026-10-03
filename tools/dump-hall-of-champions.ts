@@ -23,7 +23,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import { getActuatorType } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -138,7 +138,7 @@ function possessionList(game: Game, chIdx: number): Array<{ slot: number; rn: Ob
 function portraitActuatorTypes(game: Game, mirror: Position, wall: number): number[] {
   const out: number[] = [];
   for (const rn of cellObjects(game, mirror)) {
-    const decoded = decodeObjectID(rn);
+    const decoded = game.ctx.dungeon.rnMaps.decode(rn);
     if (decoded.category !== DBType.ACTUATOR) continue;
     if (decoded.position !== wall) continue;
     const rec = game.ctx.dungeon.getActuatorRecord(rn);
@@ -246,12 +246,12 @@ function main(): void {
   console.log('=== possessions taken from the mirror cell ===');
   console.log(['slot', 'object', 'category'].join('\t'));
   for (const { slot, rn } of taken) {
-    console.log([slot, `0x${rn.toString(16)}`, DBType[decodeObjectID(rn).category]].join('\t'));
+    console.log([slot, `0x${rn.toString(16)}`, DBType[game.ctx.dungeon.rnMaps.dbType(rn)]].join('\t'));
   }
 
   check(taken.length === halk.inventory.length,
     `all ${halk.inventory.length} objects at the mirror's wall became possessions`);
-  check(taken.every(({ rn }) => decodeObjectID(rn).position === wall),
+  check(taken.every(({ rn }) => game.ctx.dungeon.rnMaps.pos(rn) === wall),
     "every possession came from the mirror's own wall position");
 
   const mirrorDuring = cellObjects(game, mirror);

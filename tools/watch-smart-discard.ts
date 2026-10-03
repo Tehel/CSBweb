@@ -24,7 +24,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import { getActuatorType } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { MiscRecord } from '../src/data/dungeonTypes';
@@ -119,7 +119,7 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
   const party = ctx.party.state.position;
   const newMisc = (type: number, important = false): ObjectID => {
     const rec: MiscRecord = { nextObject: OBJECT_ID_EOF, specialState: 0, important, miscType: type };
-    return encodeObjectID(0, DBType.MISC, dungeon.findEmptyDBEntry('misc', rec)!);
+    return dungeon.rnMaps.rn(DBType.MISC, dungeon.findEmptyDBEntry('misc', rec)!);
   };
   const scan = (at: Position): { index: number; priority: number }[] => {
     const list = new SDObjList();
@@ -130,7 +130,7 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
     while (list.numEntry > 0) {
       const o: { sd?: SDObj } = {};
       list.deleteObjectIncr(o);
-      out.push({ index: decodeObjectID(o.sd!.object).index, priority: o.sd!.priority });
+      out.push({ index: game.ctx.dungeon.rnMaps.idx(o.sd!.object), priority: o.sd!.priority });
     }
     return out;
   };
@@ -155,7 +155,7 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
   // The Nth of the type, the important one included, adds N, and past 20, N-20 more.
   const expected = pile.map((o, i) => {
     const n = i < 11 ? i + 1 : i + 2;
-    return { index: decodeObjectID(o).index, priority: 22 + n + Math.max(0, n - 20) };
+    return { index: game.ctx.dungeon.rnMaps.idx(o), priority: 22 + n + Math.max(0, n - 20) };
   });
   console.log(`2. 22 of a type and an important one, 2 levels off: ${got.map((g) => g.priority).join(' ')}`);
   check(JSON.stringify(got) === JSON.stringify(expected),
@@ -170,19 +170,19 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
       for (let y = 0; y < dim.height && !pad; y++) {
         const at = new Position(x, y, l);
         const first = dungeon.findFirstObject(at);
-        if (first === OBJECT_ID_EOF || decodeObjectID(first).category !== DBType.ACTUATOR) continue;
+        if (first === OBJECT_ID_EOF || game.ctx.dungeon.rnMaps.dbType(first) !== DBType.ACTUATOR) continue;
         const t = getActuatorType(dungeon.getActuatorRecord(first)!);
         if (t >= 1 && t <= 9 && scan(at).length === 0) pad = at;
       }
     }
   }
   const a1 = newMisc(10); const a2 = newMisc(10); const b1 = newMisc(11);
-  const b1Corner = encodeObjectID(1, DBType.MISC, decodeObjectID(b1).index);
-  const a3Corner = encodeObjectID(1, DBType.MISC, decodeObjectID(newMisc(10)).index);
+  const b1Corner = game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.MISC, game.ctx.dungeon.rnMaps.idx(b1)), 1);
+  const a3Corner = game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.MISC, game.ctx.dungeon.rnMaps.idx(newMisc(10))), 1);
   for (const o of [a1, a2, b1Corner, a3Corner]) dungeon.addObjectToCell(pad!, o);
   const onPad = scan(pad!).map((g) => g.index);
-  console.log(`   on an actuator at ${pad!.z}:${pad!.x},${pad!.y}: listed ${onPad.join(', ')} of ${[a1, a2, b1Corner, a3Corner].map((o) => decodeObjectID(o).index).join(', ')}`);
-  check(onPad.length === 1 && onPad[0] === decodeObjectID(a2).index,
+  console.log(`   on an actuator at ${pad!.z}:${pad!.x},${pad!.y}: listed ${onPad.join(', ')} of ${[a1, a2, b1Corner, a3Corner].map((o) => game.ctx.dungeon.rnMaps.idx(o)).join(', ')}`);
+  check(onPad.length === 1 && onPad[0] === game.ctx.dungeon.rnMaps.idx(a2),
     'behind a pressure pad only the second of a type on a corner is listed');
 }
 
@@ -206,7 +206,7 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
   };
   const rocks = (at: Position, n: number): ObjectID[] => Array.from({ length: n }, () => {
     const rec: MiscRecord = { nextObject: OBJECT_ID_EOF, specialState: 0, important: false, miscType: 10 };
-    const rn = encodeObjectID(0, DBType.MISC, dungeon.findEmptyDBEntry('misc', rec)!);
+    const rn = dungeon.rnMaps.rn(DBType.MISC, dungeon.findEmptyDBEntry('misc', rec)!);
     dungeon.addObjectToCell(at, rn);
     return rn;
   });
@@ -241,7 +241,7 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
     'the scan ends in Discard, listing the six rocks and nothing dungeon.dat placed');
   let discardSteps = 0;
   while (s.currentMode === SmartDiscardMode.Discard && discardSteps < 100) { smartDiscard(ctx, false); discardSteps++; }
-  const index = (rn: ObjectID): number => decodeObjectID(rn).index;
+  const index = (rn: ObjectID): number => game.ctx.dungeon.rnMaps.idx(rn);
   console.log(`   discarded ${lifted.map((l) => `misc ${index(l.object)} at ${l.at.z}:${l.at.x},${l.at.y}`).join(', ')}`);
   check(lifted.length === 4 && s.totalCount === 5999 && s.currentMode === SmartDiscardMode.NewDB,
     'four discards bring the count to 5999, and the cycle moves on');

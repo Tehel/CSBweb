@@ -21,7 +21,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, decodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { OBJNI_FIRST_KEY, OBJNI_LAST_KEY } from '../src/core/objectNameIndex';
 import { RN_DISPELL_MISSILE, RN_FIREBALL, RN_ZO_SPELL } from '../src/core/spellRn';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -92,7 +92,7 @@ const fitsPouch = (game: Game, rn: ObjectID): boolean => {
   return di !== -1 && (objectTables.objDescWord4[di] & 0x100) !== 0;
 };
 const isKey = (game: Game, rn: ObjectID): boolean =>
-  decodeObjectID(rn).category === DBType.MISC && objectType(game, rn) >= OBJNI_FIRST_KEY && objectType(game, rn) <= OBJNI_LAST_KEY;
+  game.ctx.dungeon.rnMaps.dbType(rn) === DBType.MISC && objectType(game, rn) >= OBJNI_FIRST_KEY && objectType(game, rn) <= OBJNI_LAST_KEY;
 
 interface Outcome {
   spent: boolean;
@@ -117,7 +117,7 @@ function encounter(
   const map = game.ctx.dungeon.getMap(at.z)!;
   map.cellFlags[at.x][at.y] = (map.cellFlags[at.x][at.y] & 0xf8) | door.state;
   const rn = game.ctx.dungeon.findFirstDoor(at);
-  const record = game.ctx.dungeon.getDoorRecordByIndex(decodeObjectID(rn).index)!;
+  const record = game.ctx.dungeon.getDoorRecordByIndex(game.ctx.dungeon.rnMaps.idx(rn))!;
   record.hasButton = door.button ?? false;
   record.destructibleByChop = door.chop ?? true;
 
@@ -126,7 +126,7 @@ function encounter(
   game.systems.magic.launchThrownMissile(thrown, at, 0, 0, range, 100, 1, 99);
   let missileRn: ObjectID | null = null;
   for (let r = game.ctx.dungeon.findFirstObject(at); r !== OBJECT_ID_EOF; r = game.ctx.dungeon.getDBRecordLink(r)) {
-    if (decodeObjectID(r).category === DBType.MISSILE) missileRn = r;
+    if (game.ctx.dungeon.rnMaps.dbType(r) === DBType.MISSILE) missileRn = r;
   }
   if (missileRn === null) throw new Error('missile not placed');
   const missile = game.ctx.dungeon.getMissileRecord(missileRn)!;
@@ -188,7 +188,7 @@ const STRONG = 0x00ff;      // no thrown blow is
   check(solid.spent, 'without the bit nothing passes');
 
   const pouch = (game: Game): ObjectID =>
-    liftFloorObject(game, (rn) => decodeObjectID(rn).category === DBType.MISC && fitsPouch(game, rn) && !isKey(game, rn));
+    liftFloorObject(game, (rn) => game.ctx.dungeon.rnMaps.dbType(rn) === DBType.MISC && fitsPouch(game, rn) && !isKey(game, rn));
   const coin = encounter(OBJECT_ID_NULL, { toc: GRATE, state: 4 }, 255, pouch);
   show('2d. a pouch-sized object at a grate, range 255', coin);
   check(!coin.spent, 'a thrown object with range, that fits a pouch and is no key, passes');
@@ -202,7 +202,7 @@ const STRONG = 0x00ff;      // no thrown blow is
 
 /* --------------------------------------------------------- 3. HitDoor --------- */
 {
-  const weapon = (game: Game): ObjectID => liftFloorObject(game, (rn) => decodeObjectID(rn).category === DBType.WEAPON);
+  const weapon = (game: Game): ObjectID => liftFloorObject(game, (rn) => game.ctx.dungeon.rnMaps.dbType(rn) === DBType.WEAPON);
   const bash = encounter(OBJECT_ID_NULL, { toc: WEAK, state: 4, chop: true }, 255, weapon);
   show('3a. a thrown weapon at a solid, choppable door', bash);
   check(bash.hits.length === 1 && !bash.hits[0].explosion && bash.hits[0].delay === 0 && bash.hits[0].force >= 1,

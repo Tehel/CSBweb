@@ -31,7 +31,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { getActuatorType } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -79,7 +79,7 @@ async function main(): Promise<void> {
           let pads = 0;
           let other = 0;
           for (let rn = dungeon.findFirstObject(pad); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-            if (decodeObjectID(rn).category !== DBType.ACTUATOR) { other++; continue; }
+            if (game.ctx.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) { other++; continue; }
             if (getActuatorType(dungeon.getActuatorRecord(rn)!) === 1) pads++; else other++;
           }
           if (pads !== 1 || other !== 0) continue;

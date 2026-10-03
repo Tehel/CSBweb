@@ -19,7 +19,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { Game } from '../src/engine/Game';
@@ -57,7 +57,7 @@ function newDagger(game: Game): ObjectID {
     important: false, weaponType: 8, // a dagger
   });
   db.count++;
-  return encodeObjectID(0, DBType.WEAPON, db.records.length - 1);
+  return game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, db.records.length - 1);
 }
 
 function main(): void {
@@ -84,7 +84,7 @@ function main(): void {
     for (let x = 0; x < map.descriptor.width && giggler === null; x++) {
       for (let y = 0; y < map.descriptor.height && giggler === null; y++) {
         for (let rn = dungeon.findFirstObject(new Position(x, y, z)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-          if (decodeObjectID(rn).category !== DBType.CREATURE) continue;
+          if (game.ctx.dungeon.rnMaps.dbType(rn) !== DBType.CREATURE) continue;
           if (dungeon.getCreatureRecord(rn)?.creatureType !== MonsterType.mon_Giggler) continue;
           const beside = [[0, -1], [1, 0], [0, 1], [-1, 0]].find(([dx, dy]) => open(x + dx!, y + dy!));
           if (!beside) continue;

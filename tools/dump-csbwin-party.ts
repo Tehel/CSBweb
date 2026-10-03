@@ -25,7 +25,8 @@ import { readFileSync } from 'node:fs';
 
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { readCsbwinParty, readCsbwinPartyTail, isMale } from '../src/data/CsbwinCharacters';
-import { decodeObjectID, OBJECT_ID_NULL } from '../src/core/types';
+import { OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
+import type { RnMaps } from '../src/core/RnMaps';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
@@ -45,12 +46,12 @@ const DB_OF_CATEGORY: Record<number, keyof DungeonData['databases']> = {
 const CARRYABLE = new Set([5, 6, 7, 8, 9, 10]);
 
 /** A compact, readable line: which slots are full, and with what. */
-function describePossessions(slots: number[]): string {
+function describePossessions(rnMaps: RnMaps, slots: readonly ObjectID[]): string {
   const parts: string[] = [];
   for (let i = 0; i < slots.length; i++) {
     const rn = slots[i]!;
     if (rn === OBJECT_ID_NULL) continue;
-    const { category, index } = decodeObjectID(rn);
+    const { category, index } = rnMaps.decode(rn);
     const key = DB_OF_CATEGORY[category];
     parts.push(`${i}:${key ?? `db${category}`}[${index}]`);
   }
@@ -94,7 +95,7 @@ function main(): void {
       const carried = c.possessions.filter((p) => p !== OBJECT_ID_NULL).length;
       const topSkills = c.skills.slice(0, 4).map((s) => s.experience).join(',');
       console.log(`    carrying ${carried} objects, class experience ${topSkills}`);
-      console.log(`    slots ${describePossessions(c.possessions)}`);
+      console.log(`    slots ${describePossessions(world.dungeon.rnMaps, c.possessions)}`);
 
       // Self-consistency. A misread record fails these long before it looks plausible.
       check(a.maxHealth > 0, `${name}/${c.name}: has a maximum health`);
@@ -135,7 +136,7 @@ function main(): void {
       const bad: string[] = [];
       for (const rn of c.possessions) {
         if (rn === OBJECT_ID_NULL) continue;
-        const { category, index } = decodeObjectID(rn);
+        const { category, index } = world.dungeon.rnMaps.decode(rn);
         const key = DB_OF_CATEGORY[category];
         if (!key || !CARRYABLE.has(category)) { bad.push(`cat ${category}`); continue; }
         const records = world.dungeon.databases[key].records;

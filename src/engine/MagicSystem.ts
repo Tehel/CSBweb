@@ -12,7 +12,7 @@
 import type { SpellDefinition } from '../data/spellTypes';
 import { applyLimits, sb, sw } from '../core/intCast';
 import { OBJNI_EMPTY_FLASK } from '../core/objectNameIndex';
-import { DBType, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import { AttributeIndex, championAttribute } from './attributes';
 import type { DungeonState } from './DungeonState';
@@ -108,7 +108,7 @@ export class MagicSystem {
       damageRemaining: damageRemaining & 0xff,
       timerIndex: timerIndex & 0xffff,
     });
-    return index === null ? null : encodeObjectID(position & 0x3, DBType.MISSILE, index);
+    return index === null ? null : this.dungeon.rnMaps.setPos(this.dungeon.rnMaps.rn(DBType.MISSILE, index), position & 0x3);
   }
 
   /** `SetBrightnessTimer` (`doc/CSBwin-src/Magic.cpp:827-840`). */
@@ -470,7 +470,7 @@ export class MagicSystem {
       important: false,
       miscType: miscType & 0x7f,
     });
-    return newIndex === null ? null : encodeObjectID(0, DBType.MISC, newIndex);
+    return newIndex === null ? null : this.dungeon.rnMaps.rn(DBType.MISC, newIndex);
   }
 
   /**

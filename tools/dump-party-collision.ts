@@ -30,7 +30,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
@@ -778,7 +778,7 @@ async function main(): Promise<void> {
 
   // ---- Assertions ---------------------------------------------------------
 
-  check(decodeObjectID(monsterRn).category === DBType.CREATURE, 'the scene should have found a real creature');
+  check(game.ctx.dungeon.rnMaps.dbType(monsterRn) === DBType.CREATURE, 'the scene should have found a real creature');
   check(roomTypeAt(scene.mx, scene.my) !== RoomType.STONE, 'the monster should not be standing in stone');
 
   // The vacuity guard: without the `d.NumCharacter != 0` gate the block would fire

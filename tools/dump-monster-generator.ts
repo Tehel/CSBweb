@@ -20,7 +20,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { ActuatorAction, getActuatorHitPointMultiplier, getActuatorType, getActuatorValue } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -45,7 +45,7 @@ function scene(): Game {
 function objectsAt(game: Game, p: Position, category: number): ObjectID[] {
   const out: ObjectID[] = [];
   for (let rn = game.ctx.dungeon.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-    if (decodeObjectID(rn).category === category) out.push(rn);
+    if (game.ctx.dungeon.rnMaps.dbType(rn) === category) out.push(rn);
   }
   return out;
 }

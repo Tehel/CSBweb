@@ -37,7 +37,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -241,7 +241,7 @@ function main(): void {
     // The chains the engine walks, not the ones the parser built.
     check(chain.length > 0 || true, `${name}: the party's cell reads without hanging`);
     for (const rn of chain) {
-      const { category, index } = decodeObjectID(rn);
+      const { category, index } = game.ctx.dungeon.rnMaps.decode(rn);
       const key = DB_OF_CATEGORY[category];
       check(
         key !== undefined && index < game.ctx.state.dungeon.databases[key].records.length,
@@ -257,7 +257,7 @@ function main(): void {
       for (const rn of champion.possessions) {
         if (rn === OBJECT_ID_NULL) continue;
         carried++;
-        const { category, index } = decodeObjectID(rn);
+        const { category, index } = game.ctx.dungeon.rnMaps.decode(rn);
         const key = DB_OF_CATEGORY[category];
         const records = key && CARRYABLE.has(category) ? live.databases[key].records : null;
         check(

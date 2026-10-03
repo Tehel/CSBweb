@@ -28,7 +28,7 @@
  * Lord Chaos's endgame is here too: `_Fusion` (`:133`), and `_FusionSequence` (`:2220`),
  * which a boxed-in Lord Chaos starts and which holds the main loop to the credits.
  */
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { div, sb, sw } from '../core/intCast';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion } from './gameTypes';
@@ -757,7 +757,7 @@ export class AttackSystem {
     const obj = champ ? getChampionPossession(champ, 1) : OBJECT_ID_NULL;
     if (obj === OBJECT_ID_NULL) return;
     const dungeon = this.ctx.dungeon;
-    switch (decodeObjectID(obj).category) {
+    switch (this.ctx.dungeon.rnMaps.dbType(obj)) {
       case DBType.WEAPON: {
         const rec = dungeon.getWeaponRecord(obj);
         if (rec && rec.charges !== 0) rec.charges = rec.charges - 1;
@@ -833,7 +833,7 @@ export class AttackSystem {
       rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
       rn = this.ctx.dungeon.getDBRecordLink(rn)
     ) {
-      if (decodeObjectID(rn).category !== DBType.CLOUD) continue;
+      if (this.ctx.dungeon.rnMaps.dbType(rn) !== DBType.CLOUD) continue;
       const cloud = this.ctx.dungeon.getCloudRecord(rn);
       if (cloud && cloud.cloudType === CloudType.CT_FLUXCAGE) return true;
     }
@@ -1050,7 +1050,7 @@ export class AttackSystem {
     const dungeon = this.ctx.dungeon;
     const texts: ObjectID[] = [];
     for (let rn = dungeon.findFirstObject(new Position(0, 0, level)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category === DBType.TEXT) texts.push(rn);
+      if (this.ctx.dungeon.rnMaps.dbType(rn) === DBType.TEXT) texts.push(rn);
     }
     const messages = this.ctx.host.messages;
     let letter = 'A'.charCodeAt(0);
@@ -1105,11 +1105,11 @@ export class AttackSystem {
     const dungeon = this.ctx.dungeon;
     const position = new Position(x, y, level);
     let rn = dungeon.findFirstObject(position);
-    while (rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL && decodeObjectID(rn).category < DBType.CREATURE) {
+    while (rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL && this.ctx.dungeon.rnMaps.dbType(rn) < DBType.CREATURE) {
       rn = dungeon.getDBRecordLink(rn);
     }
     for (; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category !== DBType.CLOUD) continue;
+      if (this.ctx.dungeon.rnMaps.dbType(rn) !== DBType.CLOUD) continue;
       if (dungeon.getCloudRecord(rn)?.cloudType !== CloudType.CT_FLUXCAGE) continue;
       dungeon.removeObjectFromCell(position, rn);
       return true;
@@ -1440,7 +1440,7 @@ export class AttackSystem {
         // charge-spending path; the two boxes differ tenfold.
         let delta = 0;
         const held = getChampionPossession(pChar, 1);
-        const misc = held !== OBJECT_ID_NULL && decodeObjectID(held).category === DBType.MISC
+        const misc = held !== OBJECT_ID_NULL && this.ctx.dungeon.rnMaps.dbType(held) === DBType.MISC
           ? this.ctx.dungeon.getMiscRecord(held)
           : null;
         if (misc) {
@@ -1585,7 +1585,7 @@ export class AttackSystem {
     };
 
     const ammo = getChampionPossession(pChar, 0);
-    if (ammo === OBJECT_ID_NULL || decodeObjectID(ammo).category !== DBType.WEAPON) return needAmmo();
+    if (ammo === OBJECT_ID_NULL || this.ctx.dungeon.rnMaps.dbType(ammo) !== DBType.WEAPON) return needAmmo();
 
     const weapon = getChampionPossession(pChar, 1);
     const launcherDesc = weapon !== OBJECT_ID_NULL ? this.ctx.systems.characterStats.weaponDescFor(weapon) ?? null : null;

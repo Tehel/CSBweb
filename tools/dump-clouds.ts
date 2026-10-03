@@ -29,7 +29,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
@@ -64,7 +64,7 @@ async function main(): Promise<void> {
   const cloudIn = (game: Game, pos: Position): ObjectID | null => {
     const dungeon = game.ctx.dungeon;
     for (let rn = dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category === DBType.CLOUD) return rn;
+      if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.CLOUD) return rn;
     }
     return null;
   };
@@ -195,8 +195,8 @@ async function main(): Promise<void> {
         const pos = new Position(x, y, level);
         const rn = dungeonF.findFirstObject(pos);
         if (rn === OBJECT_ID_EOF) continue;
-        if (decodeObjectID(rn).category !== DBType.DOOR) continue;
-        const door = dungeonF.getDoorRecordByIndex(decodeObjectID(rn).index);
+        if (dungeonF.rnMaps.dbType(rn) !== DBType.DOOR) continue;
+        const door = dungeonF.getDoorRecordByIndex(dungeonF.rnMaps.idx(rn));
         if (!door?.destructibleByFireball) continue;
         doorAt = pos;
         break outer;

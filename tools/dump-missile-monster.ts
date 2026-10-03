@@ -41,7 +41,7 @@ import { resolve } from 'node:path';
 import { PotionType } from '../src/core/constants';
 import { sw } from '../src/core/intCast';
 import { RN_FIREBALL } from '../src/core/spellRn';
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, encodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import type { CreatureRecord } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -228,13 +228,13 @@ function newRecord<T>(game: Game, db: 'weapons' | 'potions', category: number, r
   const database = game.ctx.dungeon.getData().databases[db] as unknown as { records: T[]; count: number };
   database.records.push(record);
   database.count++;
-  return encodeObjectID(0, category, database.records.length - 1);
+  return game.ctx.dungeon.rnMaps.rn(category, database.records.length - 1);
 }
 
 function cloudsIn(game: Game, cell: Position): number {
   let n = 0;
   for (let rn = game.ctx.dungeon.findFirstObject(cell); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-    if (decodeObjectID(rn).category === DBType.CLOUD) n++;
+    if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.CLOUD) n++;
   }
   return n;
 }
@@ -414,7 +414,7 @@ function main(): void {
     const missilesIn = (): number => {
       let n = 0;
       for (let rn = game.ctx.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-        if (decodeObjectID(rn).category === DBType.MISSILE && decodeObjectID(rn).position === 3) n++;
+        if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.MISSILE && game.ctx.dungeon.rnMaps.pos(rn) === 3) n++;
       }
       return n;
     };

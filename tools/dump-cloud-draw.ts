@@ -49,7 +49,7 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { applyLimits } from '../src/core/intCast';
 import { CsbRandom } from '../src/core/random';
 import { RN_POISON_CLOUD } from '../src/core/spellRn';
@@ -63,6 +63,7 @@ import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../src/renderer/ViewportRenderer';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { RnMaps } from '../src/core/RnMaps';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync('static/gamefiles/dm-atari/graphics.dat')));
@@ -112,6 +113,7 @@ function drawCloudAt(px: number, py: number, viewportSeed: number): Drawn {
     objectTables: { ...realTables, cloudPositions7042, cloudScaleBase, cloudScale },
     getGraphicBitmap: () => cloudBitmap,
     dungeonState: {
+      rnMaps: new RnMaps(),
       getDBRecordLink: () => OBJECT_ID_EOF,
       getCloudRecord: () => cloud,
     },
@@ -280,7 +282,7 @@ function drawScene(sc: Scene): SceneResult {
     viewportIndexBuffer,
     objectTables: { ...realTables, cloudPositions7042 },
     getGraphicBitmap: (n: number) => { requested.push(n); return fakeGraphic(n); },
-    dungeonState: { getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
+    dungeonState: { rnMaps: new RnMaps(), getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
   };
   viewportRandom.setSeed(sc.seed ?? seedFor(false, false));
   DrawClouds(new ViewportDraw(context), sc.relCell - 3, cloudRn, 0, 0);
@@ -400,7 +402,7 @@ for (const word1868 of [false, true]) {
       wallRectangles: viewportTables.wallRectangles,
       teleporterRectangles: viewportTables.teleporterRectangles,
       getGraphicBitmap: (n: number) => fakeGraphic(n),
-      dungeonState: { getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
+      dungeonState: { rnMaps: new RnMaps(), getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
       word1868,
     };
     const seed = 0x2468ace;
@@ -442,7 +444,7 @@ for (const facing of [0, 1, 2, 3]) {
       viewportIndexBuffer,
       objectTables: realTables,
       getGraphicBitmap: (n: number) => fakeGraphic(n),
-      dungeonState: { getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
+      dungeonState: { rnMaps: new RnMaps(), getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
     };
     const rn = ((pos << 14) | (DBType.CLOUD << 10)) as ObjectID;
     // Relative cell 6 is CSBWin's 9: the wall straight ahead, where the altar stands.
@@ -541,7 +543,7 @@ check([0, 1, 2].every((c) => realTables.cloudPositions7042[2 * c + 1] === 47) &&
   };
   const cloudAt = (dungeon: ReturnType<typeof arena>['game']['ctx']['dungeon'], x: number, y: number): ObjectID => {
     for (let rn = dungeon.findFirstObject(new Position(x, y, LEVEL)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category === DBType.CLOUD) return rn;
+      if (dungeon.rnMaps.dbType(rn) === DBType.CLOUD) return rn;
     }
     throw new Error(`no cloud at (${x},${y})`);
   };

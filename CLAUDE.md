@@ -119,8 +119,9 @@ item or monster is, read from `dungeon.dat` or a save. The `peek-dungeon` skill 
 ```
 audio/      SoundManager (the samples, played through Web Audio) and soundsIndex
 core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
-            (LZW/RLE/SND), imageDecoder (IMG1/IMG2), types (incl. withObjectPosition =
-            RN::pos), intCast (sw, div, ApplyLimits), objectNameIndex (OBJNI_* constants)
+            (LZW/RLE/SND), imageDecoder (IMG1/IMG2), types, RnMaps (what an RN names:
+            RN::dbType, pos, idx), intCast (sw, div, ApplyLimits), objectNameIndex
+            (OBJNI_* constants)
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor,
             HintOracleLoader (CSB's `hcsb.hct`), SwooshLoader (the Atari disk's `swoosh.img`)
   saves/    The saves behind the disk icon: SaveStore (a save's row, the CSBWin file
@@ -173,7 +174,10 @@ main.ts     Bootstrap and wiring
 
 - **Big-endian everywhere** (Atari ST heritage).
 - **Object IDs / RN system**: 16-bit `[position:2][category:4][index:10]`. Objects live in
-  per-cell linked chains; all references are indirect through these IDs. "No object" is
+  per-cell linked chains; all references are indirect through these IDs. An RN is read
+  only through its world's `RnMaps` (`DungeonState.rnMaps`: `dbType`, `pos`, `idx`,
+  `setPos`, `rn`), as CSBWin's is a slot of `dataTypeMap`/`dataIndexMap`; the packed bits
+  (`decodeObjectID`) are for the file readers and writers (`DEBT.md` D16). "No object" is
   `RNnul` (`OBJECT_ID_NULL`, 0xFFFF) in every stored slot and the cursor, and what every
   possession reader returns for an empty slot, as in CSBWin;
   `RNeof` (0xFFFE) only ends a chain. `tsc` cannot catch a stale `=== null` against a

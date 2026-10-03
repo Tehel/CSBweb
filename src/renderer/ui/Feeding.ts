@@ -8,7 +8,7 @@
 import { OBJNI_APPLE, OBJNI_DRAGON_STEAK, OBJNI_SPECIAL_G, OBJNI_SPECIAL_H, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
 import { PotionType } from '../../core/constants';
 import { applyFeedParameters, clearFeedParameters, derivePotionFeeding, type FeedParameters } from '../../engine/Feeding';
-import { DBType, OBJECT_ID_NULL, ObjectID, decodeObjectID } from '../../core/types';
+import { DBType, OBJECT_ID_NULL, ObjectID } from '../../core/types';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
 import { descIndexForObject, resolveObjectNameIndex } from './Objects';
@@ -35,7 +35,7 @@ export function computeFeedParameters(
 
   const nameIndex = resolveObjectNameIndex(ui, objectId);
   if (nameIndex < 0) return null;
-  const category = decodeObjectID(objectId as ObjectID).category;
+  const category = ui.ctx.dungeon.rnMaps.dbType(objectId as ObjectID);
 
   const fp = clearFeedParameters();
   fp.characterIndex = chIdx;
@@ -116,7 +116,7 @@ export function handleMouthPress(ui: UIState): void {
     startMouthChewAnimation(ui);
   } else if (fp.emptyFlask) {
     // A drained potion becomes an empty flask; a waterskin just loses one gulp.
-    if (decodeObjectID(objectId as ObjectID).category === DBType.POTION) {
+    if (ui.ctx.dungeon.rnMaps.dbType(objectId as ObjectID) === DBType.POTION) {
       const rec = ui.ctx.dungeon.getPotionRecord(objectId as ObjectID);
       if (rec) rec.potionType = PotionType.EMPTY_FLASK;
     }

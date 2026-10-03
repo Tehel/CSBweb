@@ -1,8 +1,6 @@
 import {
   DBType,
   TilePosition,
-  decodeObjectID,
-  encodeObjectID,
   OBJECT_ID_EOF,
   OBJECT_ID_NULL,
   type ObjectID,
@@ -553,7 +551,7 @@ export class DsaSystem {
     let found = false;
 
     for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+      if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
       const rec = this.dungeon.getActuatorRecord(rn);
       if (!rec || getActuatorType(rec) !== 47) continue;
       found = true;
@@ -594,7 +592,7 @@ export class DsaSystem {
     if (!this.dungeon.isValidLocation(locrFilter)) return null;
     const position = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+      if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
       const rec = this.dungeon.getActuatorRecord(rn);
       if (!rec || getActuatorType(rec) !== 47) continue;
       return { position, actuator: rn };
@@ -668,7 +666,7 @@ export class DsaSystem {
     let found = false;
 
     for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+      if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
       const rec = this.dungeon.getActuatorRecord(rn);
       if (!rec || getActuatorType(rec) !== 47) continue;
       found = true;
@@ -759,7 +757,7 @@ export class DsaSystem {
       l: level,
       x: location.x,
       y: location.y,
-      p: decodeObjectID(rn).position & 3,
+      p: this.dungeon.rnMaps.pos(rn) & 3,
     };
     const master = this.findMaster(slaveDsa, rn, timer.uByte6, timer.uByte7, locrSlave);
     const masterRecord = this.dungeon.getActuatorRecord(master.rn);
@@ -1207,7 +1205,7 @@ export class DsaSystem {
             let result = -1;
             const pos = new Position(locr.x, locr.y, locr.l);
             for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-              const decoded = decodeObjectID(rn);
+              const decoded = this.dungeon.rnMaps.decode(rn);
               if (((1 << (decoded.position & 3)) & positionMask) === 0) continue;
               if (((1 << decoded.category) & objMask) === 0) continue;
               if (depth === 0) {
@@ -1318,7 +1316,7 @@ export class DsaSystem {
         const pos = new Position(locr.x, locr.y, locr.l);
         for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
           if (!this.isValidObjectId(objId) || !rnEquals(rn, objId)) continue;
-          const { category } = decodeObjectID(rn);
+          const { category } = this.dungeon.rnMaps.decode(rn);
           if (!this.canDeleteFromCell(category)) break;
           this.dungeon.removeObjectFromCell(pos, rn);
           this.ctx.systems.actuators.triggerObjectMove(pos, rn as ObjectID, false, false, this.ctx.party.state.facing);
@@ -1341,8 +1339,7 @@ export class DsaSystem {
           const locr = locationRelFromInteger(location);
           if (!this.dungeon.isValidLocation(locr)) break;
           const pos = this.choosePositionFromMask(posMask);
-          const { category, index } = decodeObjectID(cloned);
-          const placed = encodeObjectID(pos, category, index);
+          const placed = this.dungeon.rnMaps.setPos(cloned, pos);
           this.ctx.systems.actuators.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed, true, false, this.ctx.party.state.facing);
           this.dungeon.addObjectToCell(new Position(locr.x, locr.y, locr.l), placed);
         } else if (location === -1) {
@@ -1413,7 +1410,7 @@ export class DsaSystem {
         let firstDisabled: ObjectID | null = null;
         const pos = new Position(locr.x, locr.y, locr.l);
         for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-          const decoded = decodeObjectID(rn);
+          const decoded = this.dungeon.rnMaps.decode(rn);
           if (decoded.category !== DBType.ACTUATOR) continue;
           const rec = this.dungeon.getActuatorRecord(rn);
           if (!rec) continue;
@@ -1555,8 +1552,8 @@ export class DsaSystem {
         const dstId = bank.stack.pop();
         const srcId = bank.stack.pop();
         if (!this.isValidObjectId(srcId) || !this.isValidObjectId(dstId)) break;
-        const srcDecoded = decodeObjectID(srcId);
-        const dstDecoded = decodeObjectID(dstId);
+        const srcDecoded = this.dungeon.rnMaps.decode(srcId);
+        const dstDecoded = this.dungeon.rnMaps.decode(dstId);
         if (srcDecoded.category !== dstDecoded.category) break;
         if (srcDecoded.category === DBType.ACTUATOR) {
           const src = this.dungeon.getActuatorRecord(srcId);
@@ -1615,7 +1612,7 @@ export class DsaSystem {
         const pos = new Position(locr.x, locr.y, locr.l);
         let found: ObjectID | null = null;
         for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-          const decoded = decodeObjectID(rn);
+          const decoded = this.dungeon.rnMaps.decode(rn);
           if (decoded.category !== DBType.ACTUATOR) continue;
           const rec = this.dungeon.getActuatorRecord(rn);
           if (!rec) continue;
@@ -2008,7 +2005,7 @@ export class DsaSystem {
     while (slot > 1) {
       rn = this.dungeon.getDBRecordLink(rn);
       if (rn === OBJECT_ID_EOF) break;
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category !== DBType.ACTUATOR) continue;
       const rec = this.getActuator(rn);
       if (!rec || getActuatorType(rec) !== 47) continue;
@@ -2026,7 +2023,7 @@ export class DsaSystem {
     while (slot > 1) {
       rn = this.dungeon.getDBRecordLink(rn);
       if (rn === OBJECT_ID_EOF) break;
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category !== DBType.ACTUATOR) continue;
       const rec = this.getActuator(rn);
       if (!rec || getActuatorType(rec) !== 47) continue;
@@ -2062,14 +2059,14 @@ export class DsaSystem {
 
   private findFirstTeleporter(position: Position): ObjectID {
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category === DBType.TELEPORTER) return rn;
+      if (this.dungeon.rnMaps.dbType(rn) === DBType.TELEPORTER) return rn;
     }
     return OBJECT_ID_EOF;
   }
 
   private findFirstDsaActuator(position: Position): ObjectID {
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+      if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
       const rec = this.dungeon.getActuatorRecord(rn);
       if (!rec) continue;
       if (getActuatorType(rec) === 47) return rn;
@@ -2101,7 +2098,7 @@ export class DsaSystem {
   } | null {
     const rn = this.dungeon.findFirstDoor(position);
     if (rn === OBJECT_ID_EOF) return null;
-    const { index } = decodeObjectID(rn);
+    const { index } = this.dungeon.rnMaps.decode(rn);
     return this.dungeon.getDoorRecordByIndex(index);
   }
 
@@ -2143,7 +2140,7 @@ export class DsaSystem {
   private findTextRecordAtLocation(locr: LocationRel): TextRecord | null {
     const pos = new Position(locr.x, locr.y, locr.l);
     for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category !== DBType.TEXT) continue;
       if ((decoded.position & 0x3) !== (locr.p & 0x3)) continue;
       return this.dungeon.getTextRecord(rn);
@@ -2154,7 +2151,7 @@ export class DsaSystem {
   private isValidObjectId(objectId: number): objectId is ObjectID {
     if (objectId < 0) return false;
     if (objectId === OBJECT_ID_EOF || objectId === OBJECT_ID_NULL) return false;
-    const { category, index } = decodeObjectID(objectId);
+    const { category, index } = this.dungeon.rnMaps.decode(objectId as ObjectID);
     const data = this.dungeon.getData().databases;
     switch (category) {
       case DBType.DOOR:
@@ -2221,15 +2218,15 @@ export class DsaSystem {
   /** `EX_DEL`'s scroll arm (`doc/CSBwin-src/DSA.cpp:1715-1722`): its text goes first. */
   private deleteLinkedScrollText(rn: ObjectID, bank: DsaBank): void {
     if (!this.isValidObjectId(rn)) return;
-    const { category } = decodeObjectID(rn);
+    const { category } = this.dungeon.rnMaps.decode(rn);
     if (category !== DBType.SCROLL) return;
     const scroll = this.dungeon.getScrollRecord(rn);
     if (!scroll) return;
     const raw = scroll.textReference & 0xffff;
-    const decoded = decodeObjectID(raw as ObjectID);
+    const decoded = this.dungeon.rnMaps.decode(raw as ObjectID);
     const textRn = decoded.category === DBType.TEXT
       ? (raw as ObjectID)
-      : encodeObjectID(0, DBType.TEXT, raw & 0x3ff);
+      : this.dungeon.rnMaps.rn(DBType.TEXT, raw & 0x3ff);
     this.deleteObject(bank, textRn);
   }
 
@@ -2270,7 +2267,7 @@ export class DsaSystem {
     if (location > -1000) return null;
     const monsterId = Math.trunc(-location / 1000);
     if (!this.isValidObjectId(monsterId)) return null;
-    const decoded = decodeObjectID(monsterId);
+    const decoded = this.dungeon.rnMaps.decode(monsterId);
     if (decoded.category !== DBType.CREATURE) return null;
     return monsterId;
   }
@@ -2420,7 +2417,7 @@ export class DsaSystem {
     if (!champ) return { error: DsaMoveError.SER_IllegalCharacterIndex, object: OBJECT_ID_EOF };
     const obj = champ.possessions[carryLoc]!;
     if (obj === OBJECT_ID_NULL) return { error: DsaMoveError.SER_NoObjectAtCarryLocation, object: OBJECT_ID_EOF };
-    if (decodeObjectID(obj).category === DBType.CLOUD) {
+    if (this.dungeon.rnMaps.dbType(obj) === DBType.CLOUD) {
       return { error: DsaMoveError.SER_NoCloudsPlease, object: OBJECT_ID_EOF };
     }
     if (doit) this.ctx.systems.character.removeCharacterPossession(chIdx, carryLoc);
@@ -2454,7 +2451,7 @@ export class DsaSystem {
     const pos = new Position(locr.x, locr.y, locr.l);
     let object = OBJECT_ID_EOF;
     for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (((1 << decoded.position) & positionMask) === 0) continue;
       if (((1 << decoded.category) & srcObjMsk) === 0) continue;
       if (depth === 0) {
@@ -2468,12 +2465,12 @@ export class DsaSystem {
       // A monster moved within the party's level is not lifted: `FindCellDestination`
       // moves it square to square (`MoveObject.cpp:203-220`).
       const partyLevel = this.ctx.party.state.position.z;
-      const sameLevelMonsterMove = decodeObjectID(object).category === DBType.CREATURE
+      const sameLevelMonsterMove = this.dungeon.rnMaps.dbType(object) === DBType.CREATURE
         && dstType === 1
         && locationRelFromInteger(dstLoc).l === partyLevel
         && locr.l === partyLevel;
       if (!sameLevelMonsterMove) this.objectMover().moveObject(object as ObjectID, locr.x, locr.y, -1, 0, locr.l);
-    } else if (decodeObjectID(object).category === DBType.CLOUD) {
+    } else if (this.dungeon.rnMaps.dbType(object) === DBType.CLOUD) {
       // The first match in `TIMER_SEARCH` order (`MoveObject.cpp:233-241`).
       for (const entry of this.timers.searchOrder()) {
         if (entry.function !== TimerFunction.TT_25 && entry.function !== TimerFunction.TT_24) continue;
@@ -2494,7 +2491,7 @@ export class DsaSystem {
     if (!this.isValidObjectId(srcLoc)) {
       return { error: DsaMoveError.SER_IllegalMonsterID, object: OBJECT_ID_EOF };
     }
-    const decodedMon = decodeObjectID(srcLoc);
+    const decodedMon = this.dungeon.rnMaps.decode(srcLoc);
     if (decodedMon.category !== DBType.CREATURE) {
       return { error: DsaMoveError.SER_MonsterIsNotMonster, object: OBJECT_ID_EOF };
     }
@@ -2503,7 +2500,7 @@ export class DsaSystem {
     let depth = srcDepth;
     let prev = OBJECT_ID_EOF;
     for (let rn = monster.possession; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (((1 << decoded.category) & srcObjMsk) === 0) {
         prev = rn;
         continue;
@@ -2535,7 +2532,7 @@ export class DsaSystem {
     if (!this.isValidObjectId(srcLoc)) {
       return { error: DsaMoveError.SER_IllegalChestID, object: OBJECT_ID_EOF };
     }
-    const decodedChest = decodeObjectID(srcLoc);
+    const decodedChest = this.dungeon.rnMaps.decode(srcLoc);
     if (decodedChest.category !== DBType.CHEST) {
       return { error: DsaMoveError.SER_ChestIsNotChest, object: OBJECT_ID_EOF };
     }
@@ -2547,7 +2544,7 @@ export class DsaSystem {
     let depth = srcDepth;
     let prev = OBJECT_ID_EOF;
     for (let rn = chest.containedObject; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (((1 << decoded.category) & srcObjMsk) === 0) {
         prev = rn;
         continue;
@@ -2576,7 +2573,7 @@ export class DsaSystem {
     object: ObjectID,
     doit: boolean,
   ): number {
-    if (decodeObjectID(object).category === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
+    if (this.dungeon.rnMaps.dbType(object) === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
     const party = this.ctx.party.state;
     if (!party) return DsaMoveError.DER_IllegalCharacterIndex;
     if (chIdx < 0 || chIdx >= party.champions.length) return DsaMoveError.DER_IllegalCharacterIndex;
@@ -2594,7 +2591,7 @@ export class DsaSystem {
   }
 
   private checkObjectToCursor(object: ObjectID, doit: boolean): number {
-    if (decodeObjectID(object).category === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
+    if (this.dungeon.rnMaps.dbType(object) === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
     const party = this.ctx.party.state;
     if (!party) return DsaMoveError.DER_CursorNotEmpty;
     if (party.objectInHand !== OBJECT_ID_NULL) return DsaMoveError.DER_CursorNotEmpty;
@@ -2631,8 +2628,8 @@ export class DsaSystem {
     if (dstDepth !== 0) return DsaMoveError.DER_IllegalDepth;
     const pos = this.choosePositionFromMask(dstPosMsk, locr.p & 3);
     if (doit) {
-      const decoded = decodeObjectID(object);
-      const placed = encodeObjectID(pos, decoded.category, decoded.index);
+      const decoded = this.dungeon.rnMaps.decode(object);
+      const placed = this.dungeon.rnMaps.setPos(object, pos);
       const partyLevel = this.ctx.party.state.position.z;
       const srcLocr = srcType === 1 ? locationRelFromInteger(srcLoc) : null;
       const sameLevelMonsterMove = decoded.category === DBType.CREATURE
@@ -2729,8 +2726,8 @@ export class DsaSystem {
 
   private findChestDestination(dstLoc: number, dstDepth: number, object: ObjectID, doit: boolean): number {
     if (!this.isValidObjectId(dstLoc)) return DsaMoveError.DER_IllegalChestID;
-    if (decodeObjectID(object).category === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
-    const decodedChest = decodeObjectID(dstLoc);
+    if (this.dungeon.rnMaps.dbType(object) === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
+    const decodedChest = this.dungeon.rnMaps.decode(dstLoc);
     if (decodedChest.category !== DBType.CHEST) return DsaMoveError.DER_ChestIsNotAChest;
     if (dstDepth !== 0) return DsaMoveError.DER_IllegalDepth;
     if (this.isObjectInCharactersOrCursor(dstLoc)) return DsaMoveError.DER_ChestBelongsToCharacter;
@@ -2750,8 +2747,8 @@ export class DsaSystem {
 
   private findMonsterDestination(dstLoc: number, dstDepth: number, object: ObjectID, doit: boolean): number {
     if (!this.isValidObjectId(dstLoc)) return DsaMoveError.DER_IllegalMonsterID;
-    if (decodeObjectID(object).category === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
-    const decoded = decodeObjectID(dstLoc);
+    if (this.dungeon.rnMaps.dbType(object) === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
+    const decoded = this.dungeon.rnMaps.decode(dstLoc);
     if (decoded.category !== DBType.CREATURE) return DsaMoveError.DER_MonsterIsNotAMonster;
     if (dstDepth !== 0) return DsaMoveError.DER_IllegalDepth;
     const monster = this.dungeon.getCreatureRecord(dstLoc);
@@ -2799,7 +2796,7 @@ export class DsaSystem {
       if (rnEquals(rn, target)) return true;
       if (visited.has(rn)) continue;
       visited.add(rn);
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category === DBType.CHEST) {
         const chest = this.dungeon.getContainerRecord(rn);
         if (chest && chest.containedObject !== OBJECT_ID_EOF) {
@@ -2814,7 +2811,7 @@ export class DsaSystem {
 
   private getTypeId(objectId: number): number {
     if (!this.isValidObjectId(objectId)) return -1;
-    const { category, index } = decodeObjectID(objectId);
+    const { category, index } = this.dungeon.rnMaps.decode(objectId);
     const data = this.dungeon.getData().databases;
     let id = 0;
     switch (category) {
@@ -2931,11 +2928,11 @@ export class DsaSystem {
 
   private copyItem(objectId: number): ObjectID | null {
     if (!this.isValidObjectId(objectId)) return null;
-    const { category, index, position } = decodeObjectID(objectId);
+    const { category, index, position } = this.dungeon.rnMaps.decode(objectId);
     const data = this.dungeon.getData();
     // Each copy takes a record through `FindEmptyDB<n>Entry` (`DungeonState.findEmptyDBEntry`).
     const placed = (newIndex: number | null): ObjectID | null =>
-      newIndex === null ? null : encodeObjectID(position, category, newIndex);
+      newIndex === null ? null : this.dungeon.rnMaps.setPos(this.dungeon.rnMaps.rn(category, newIndex), position);
 
     switch (category) {
       case DBType.ACTUATOR: {

@@ -37,7 +37,7 @@ import {
   OBJNI_TORCH_A,
   OBJNI_WATERSKIN,
 } from '../core/objectNameIndex';
-import { DBType, OBJECT_ID_NULL, decodeObjectID, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import type {
   ClothingRecord,
   ContainerRecord,
@@ -73,7 +73,7 @@ export interface ObjectIndexTables {
  */
 export function DescIndex(dungeon: DungeonState, rn: ObjectID): number {
   if (rn === 0) return -1; // RNempty
-  const { category, index } = decodeObjectID(rn);
+  const { category, index } = dungeon.rnMaps.decode(rn);
   const { databases } = dungeon.getData();
   const records: ArrayLike<DatabaseRecord> | undefined =
     category === DBType.SCROLL ? databases.scrolls.records :
@@ -186,7 +186,7 @@ export function IsAKey(
   partyFacing: number,
   rn: ObjectID,
 ): boolean {
-  if (decodeObjectID(rn).category !== DBType.MISC) return false;
+  if (dungeon.rnMaps.dbType(rn) !== DBType.MISC) return false;
   const objNI = NameIndex(dungeon, tables, partyFacing, rn);
   if (objNI < OBJNI_FIRST_KEY) return false;
   if (objNI > OBJNI_LAST_KEY) return false;

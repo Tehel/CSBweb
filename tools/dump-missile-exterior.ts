@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { RN_FIREBALL } from '../src/core/spellRn';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
@@ -56,7 +56,7 @@ function findBorderSquare(game: Game): { at: Position; direction: number } {
 function categoriesAt(game: Game, p: Position): DBType[] {
   const found: DBType[] = [];
   for (let rn = game.ctx.dungeon.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-    found.push(decodeObjectID(rn).category);
+    found.push(game.ctx.dungeon.rnMaps.dbType(rn));
   }
   return found;
 }

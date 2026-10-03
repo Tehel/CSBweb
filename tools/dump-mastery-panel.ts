@@ -46,7 +46,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, Direction, OBJECT_ID_NULL, Position, TilePosition, encodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_NULL, Position, TilePosition, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { initialPartyState } from '../src/engine/Party';
@@ -371,7 +371,7 @@ async function main(): Promise<void> {
   let potionNameIndex = -1;
   const potionRecords = data.databases.potions.records;
   for (let i = 0; i < potionRecords.length; i++) {
-    const id = encodeObjectID(TilePosition.NORTH, DBType.POTION, i);
+    const id = game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.POTION, i), TilePosition.NORTH);
     const nameIndex = resolveObjectNameIndex(ui, id);
     if (nameIndex >= 0 && nameIndex !== OBJNI_WATER_FLASK && nameIndex !== OBJNI_EMPTY_FLASK) {
       potionId = id;

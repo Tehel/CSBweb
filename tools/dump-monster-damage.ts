@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { CsbRandom } from '../src/core/random';
-import { DBType, decodeObjectID, OBJECT_ID_EOF, Position } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { DungeonState } from '../src/engine/DungeonState';
@@ -34,7 +34,7 @@ import { check, finish } from './lib/check';
 function objectsInCell(dungeon: DungeonState, pos: Position): string[] {
   const out: string[] = [];
   for (let rn = dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    out.push(DBType[decodeObjectID(rn).category] ?? String(decodeObjectID(rn).category));
+    out.push(DBType[dungeon.rnMaps.dbType(rn)] ?? String(dungeon.rnMaps.dbType(rn)));
     if (out.length > 40) break;
   }
   return out;
@@ -229,7 +229,7 @@ async function main(): Promise<void> {
     console.log(`  cell after:  [${after}]`);
     const dropped: string[] = [];
     for (let rn = dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-      const { category, index } = decodeObjectID(rn);
+      const { category, index } = ctx.dungeon.rnMaps.decode(rn);
       if (category === DBType.MISC) dropped.push(`misc#${data.databases.misc.records[index]?.miscType}`);
       if (category === DBType.WEAPON) dropped.push(`weapon#${data.databases.weapons.records[index]?.weaponType}`);
       if (category === DBType.CLOTHING) dropped.push(`cloth#${data.databases.clothing.records[index]?.clothingType}`);

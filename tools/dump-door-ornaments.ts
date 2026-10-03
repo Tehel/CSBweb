@@ -21,7 +21,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { OBJECT_ID_EOF, Position, RoomType, decodeObjectID } from '../src/core/types';
+import { OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
@@ -78,7 +78,7 @@ function main(): void {
         if (map.cellFlags[x][y] >> 5 !== RoomType.DOOR) continue;
         const rn = dungeon.findFirstDoor(new Position(x, y, z));
         if (rn === OBJECT_ID_EOF) continue;
-        const door = dungeon.getDoorRecordByIndex(decodeObjectID(rn).index);
+        const door = dungeon.getDoorRecordByIndex(dungeon.rnMaps.idx(rn));
         if (!door || door.ornateNumber === 0) continue;
         ornate++;
         if (door.ornateNumber > count) past++;

@@ -50,7 +50,7 @@ import {
   convertScrolls,
 } from '../src/data/CsbwinDungeonConversions';
 import { getActuatorType } from '../src/data/actuatorHelpers';
-import { DBType, OBJECT_ID_NULL, encodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_NULL } from '../src/core/types';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { check, fail, finish } from './lib/check';
 import { SAVE_DIR, genuineSaves } from './lib/saves';
@@ -159,7 +159,7 @@ function checkScrollConversion(raw: DungeonData, converted: DungeonData, saves: 
 
   let built = 0;
   for (let i = 0; i < mine.length; i++) {
-    const want = encodeObjectID(0, DBType.TEXT, before[i].textReference & 0x3ff);
+    const want = converted.rnMaps.rn(DBType.TEXT, before[i].textReference & 0x3ff);
     if (mine[i].textObject === want) built++;
     // `open` is `b10_15 == 0`, and the six bits it came from are gone afterwards.
     if (mine[i].open !== ((before[i].word2Bits10_15 ?? 0) === 0)) {

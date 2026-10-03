@@ -62,7 +62,7 @@ import {
   showCredits,
 } from '../src/renderer/intro/ShowCredits';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
-import { DBType, decodeObjectID, OBJECT_ID_EOF, RoomType, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, RoomType, type ObjectID } from '../src/core/types';
 import { setActuatorType } from '../src/data/actuatorHelpers';
 import { WON_GAME_VBLS } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
@@ -603,7 +603,7 @@ function checkCsbWin(): void {
       for (let y = 0; y < map.cellFlags[x]!.length && !found; y++) {
         if (((map.cellFlags[x]![y]! >> 5) & 7) !== RoomType.STONE) continue;
         for (let rn = dungeon.findFirstObject(new Position(x, y, z)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-          if (decodeObjectID(rn).category === DBType.ACTUATOR) { found = { rn, x, y, z }; break; }
+          if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.ACTUATOR) { found = { rn, x, y, z }; break; }
         }
       }
     }
@@ -615,11 +615,11 @@ function checkCsbWin(): void {
   // behind it in the queue, both due in the next tick, which runs its timers on the
   // `d.Time` of now (CSBCode.cpp:626, :660).
   const due = game.ctx.state.tickCount;
-  const otherPos = (decodeObjectID(rn).position + 1) & 3;
+  const otherPos = (game.ctx.dungeon.rnMaps.pos(rn) + 1) & 3;
   game.ctx.timers.createTimer(TimerFunction.TT_STONEROOM, x, y, otherPos, 0, due, z);
   game.ctx.timers.createTimer(TimerFunction.TT_OPENROOM, 0, 0, 0, 0, due, z);
   game.savedGameRead();
-  console.log(`actuator ${rn.toString(16)} at (${x},${y}) level ${z}, position ${decodeObjectID(rn).position}; the timer's ${otherPos}`);
+  console.log(`actuator ${rn.toString(16)} at (${x},${y}) level ${z}, position ${game.ctx.dungeon.rnMaps.pos(rn)}; the timer's ${otherPos}`);
 
   const clockTicks = w.clockTicks;
   const f = frame(w);

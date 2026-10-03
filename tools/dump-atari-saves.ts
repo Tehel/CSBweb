@@ -32,7 +32,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { readU16BE } from '../src/core/bytes';
-import { decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL } from '../src/core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL } from '../src/core/types';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { cellFlagArraySize } from '../src/data/CsbwinDungeonImageWriter';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
@@ -97,7 +97,7 @@ for (const name of ATARI_SAVES) {
     let id = head;
     for (let steps = 0; id !== OBJECT_ID_EOF && id !== OBJECT_ID_NULL; steps++) {
       if (steps > 1000) { problems.push(`chain from 0x${head.toString(16)} loops`); break; }
-      const { category, index } = decodeObjectID(id);
+      const { category, index } = d.rnMaps.decode(id);
       const db = DB_OF_CATEGORY[category];
       const record = db ? d.databases[db].records[index] : undefined;
       if (!record) { problems.push(`0x${id.toString(16)} names no record`); break; }

@@ -14,6 +14,7 @@ import type {
     DBType
 } from '../core/types';
 import type { ExtendedFeaturesBlock } from './CsbwinExtendedFeatures';
+import type { RnMaps } from '../core/RnMaps';
 
 /**
  * Dungeon header (44 bytes at offset 0x00)
@@ -522,6 +523,8 @@ export interface DungeonData {
     indirectTextIndex?: ui32[]; // Word offsets into compressedText (CSBWin indirect text)
     compressedText?: ui16[];    // Packed text words after ConvertToIndirectText
     objectList: ObjectID[];     // Object list by tile
+    /** What each RN names: `dataTypeMap` and `dataIndexMap` (`src/core/RnMaps.ts`). */
+    rnMaps: RnMaps;
     columnIndex: ui16[];        // Column index for object lookup
     levelIndex: ui16[];         // Level index for object lookup
     item16?: Item16Record[];    // Save-game runtime monster state

@@ -94,7 +94,7 @@ import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 
 import { CsbRandom } from '../src/core/random';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { readCsbwinSaveInfo } from '../src/data/CsbwinSaveInfo';
@@ -813,7 +813,7 @@ function findChest(game: Game): { chest: ObjectID; cell: Position } | null {
       for (let y = 0; y < map.descriptor.height; y++) {
         const cell = new Position(x, y, level);
         for (let rn = game.ctx.dungeon.findFirstObject(cell); rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-          if (decodeObjectID(rn).category === DBType.CHEST && chestContents(game, rn) >= 2) return { chest: rn, cell };
+          if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.CHEST && chestContents(game, rn) >= 2) return { chest: rn, cell };
         }
       }
     }

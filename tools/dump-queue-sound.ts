@@ -71,7 +71,7 @@ import { resolve } from 'node:path';
 
 import { PotionType } from '../src/core/constants';
 import { RN_FFE4, RN_FIREBALL } from '../src/core/spellRn';
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import {
   ActuatorAction,
   getActuatorAction,
@@ -168,7 +168,7 @@ function* squares(game: Game): Generator<Position> {
 function objectsAt(game: Game, p: Position, category: number): ObjectID[] {
   const out: ObjectID[] = [];
   for (let rn = game.ctx.dungeon.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-    if (decodeObjectID(rn).category === category) out.push(rn);
+    if (game.ctx.dungeon.rnMaps.dbType(rn) === category) out.push(rn);
   }
   return out;
 }
@@ -201,7 +201,7 @@ function main(): void {
       if (at) break;
       if (roomType(game, p) !== RoomType.DOOR) continue;
       const door = game.ctx.dungeon.findFirstDoor(p);
-      if (door === OBJECT_ID_EOF || !game.ctx.dungeon.getDoorRecordByIndex(decodeObjectID(door).index)?.hasButton) continue;
+      if (door === OBJECT_ID_EOF || !game.ctx.dungeon.getDoorRecordByIndex(game.ctx.dungeon.rnMaps.idx(door))?.hasButton) continue;
       // `nsDoor != (facing & 1)` (`Mouse.cpp:1063-1066`): an east-west door is faced from the south.
       const facing = (game.ctx.dungeon.getCellFlag(p) & 0x8) !== 0 ? 0 : 1;
       const party = new Position(p.x - DELTAS[facing][0], p.y - DELTAS[facing][1], p.z);
@@ -228,7 +228,7 @@ function main(): void {
         const rec = game.ctx.dungeon.getActuatorRecord(rn)!;
         if (getActuatorType(rec) !== 1 || getActuatorAction(rec) === ActuatorAction.CONSTPRESSURE || !isActuatorAudible(rec)) continue;
         // The switch is on side `side` of the wall; the party stands on that side, facing it.
-        const side = decodeObjectID(rn).position & 3;
+        const side = game.ctx.dungeon.rnMaps.pos(rn) & 3;
         const party = new Position(p.x + DELTAS[side][0], p.y + DELTAS[side][1], p.z);
         if (!emptyOpen(game, party)) continue;
         at = { party, facing: (side + 2) & 3 };

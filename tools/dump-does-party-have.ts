@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, encodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';
 import { getActuatorType } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -70,7 +70,7 @@ async function main(): Promise<void> {
       for (let y = 0; y < map.descriptor.height && item === null; y++) {
         const at = new Position(x, y, z);
         for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-          if (decodeObjectID(rn).category !== DBType.MISC) continue;
+          if (ctx.dungeon.rnMaps.dbType(rn) !== DBType.MISC) continue;
           const objNI = basic(rn);
           if (carried.has(objNI) || objNI === OBJNI_CHEST) continue;
           item = rn; itemAt = at; break;
@@ -84,7 +84,7 @@ async function main(): Promise<void> {
     finish();
     return;
   }
-  const chest = encodeObjectID(0, DBType.CHEST, chestIndex);
+  const chest = ctx.dungeon.rnMaps.rn(DBType.CHEST, chestIndex);
   check(basic(chest) === OBJNI_CHEST, `the chest record's basic type is objNI_Chest (${basic(chest)})`);
   const value = basic(item);
   console.log(`item 0x${item.toString(16)} (basic type ${value}) from level ${itemAt.z} (${itemAt.x},${itemAt.y}); chest 0x${chest.toString(16)}`);

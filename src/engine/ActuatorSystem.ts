@@ -1,8 +1,6 @@
 import { GetBasicObjectType } from './objectIndex';
 import {
-  decodeObjectID,
   rnEquals,
-  withObjectPosition,
   DBType,
   OBJECT_ID_EOF,
   OBJECT_ID_NULL,
@@ -95,10 +93,10 @@ export class ActuatorSystem {
     const cellFlag = map.cellFlags[position.x]?.[position.y];
     if (cellFlag === undefined) return false;
     const roomType = (cellFlag >> 5) & 0x7;
-    const movedObjectDBType = object === OBJECT_ID_NULL ? -1 : decodeObjectID(object).category;
+    const movedObjectDBType = object === OBJECT_ID_NULL ? -1 : this.dungeon.rnMaps.dbType(object);
     const movedObjectNameIndex = object === OBJECT_ID_NULL ? OBJNI_NOT_AN_OBJECT : this.getBasicObjectType(object);
     const positionOfObject = roomType === RoomType.STONE
-      ? (object === OBJECT_ID_NULL ? 0 : (decodeObjectID(object).position & 0x3))
+      ? (object === OBJECT_ID_NULL ? 0 : (this.dungeon.rnMaps.pos(object) & 0x3))
       : -1;
 
     const context = this.scanObjectMoveContext(
@@ -113,7 +111,7 @@ export class ActuatorSystem {
 
     let triggered = false;
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+      if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
       const rec = this.dungeon.getActuatorRecord(rn);
       if (!rec) continue;
       if (this.pressurePadOrAlcove(
@@ -144,7 +142,7 @@ export class ActuatorSystem {
   touchWall(position: Position, touchedPosition: number): boolean {
     const remainingActuators = [0, 0, 0, 0];
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category === DBType.ACTUATOR) {
         remainingActuators[decoded.position & 0x3] += 1;
       } else if (decoded.category >= DBType.CREATURE) {
@@ -160,7 +158,7 @@ export class ActuatorSystem {
     // CSBWin's `previousListObject`, which a type 17 unlinks itself from.
     const first = this.dungeon.findFirstObject(position);
     for (let rn = first, previous = first; rn !== OBJECT_ID_EOF; previous = rn, rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
 
       if (decoded.category === DBType.ACTUATOR) {
         const actuatorPos = decoded.position & 0x3;
@@ -259,7 +257,7 @@ export class ActuatorSystem {
                 skip = true;
                 break;
               }
-              const placed = withObjectPosition(objectInHand, actuatorPos);
+              const placed = this.dungeon.rnMaps.setPos(objectInHand, actuatorPos);
               this.dungeon.addObjectToCell(position, placed);
               party.objectInHand = OBJECT_ID_NULL;
               objectInHand = OBJECT_ID_NULL;
@@ -296,7 +294,7 @@ export class ActuatorSystem {
               break;
             }
             this.dungeon.removeObjectFromCell(position, firstObject);
-            const placed = withObjectPosition(objectInHand, actuatorPos);
+            const placed = this.dungeon.rnMaps.setPos(objectInHand, actuatorPos);
             this.dungeon.addObjectToCell(position, placed);
             this.applyCursorFilter(CursorFilterType.SwapReplace, firstObject, position, actuatorPos);
             party.objectInHand = firstObject;
@@ -442,7 +440,7 @@ export class ActuatorSystem {
           return false;
       }
     } else {
-      if ((switchPosition & 0x3) !== (decodeObjectID(rn).position & 0x3)) return false;
+      if ((switchPosition & 0x3) !== (this.dungeon.rnMaps.pos(rn) & 0x3)) return false;
       switch (actuatorType) {
         case 1:
           if (context.objectDB5To13Present) return false;
@@ -537,7 +535,7 @@ export class ActuatorSystem {
 
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       if (ignoreObject !== null && rnEquals(rn, ignoreObject)) continue;
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       const dbType = decoded.category;
 
       if (positionOfObject === -1) {
@@ -672,7 +670,7 @@ export class ActuatorSystem {
       let first = this.dungeon.findFirstObject(position);
 
       while (first !== OBJECT_ID_EOF) {
-        const decoded = decodeObjectID(first);
+        const decoded = this.dungeon.rnMaps.decode(first);
         if (
           decoded.category === DBType.ACTUATOR
           && (posFilter === -1 || decoded.position === (posFilter & 3))
@@ -686,7 +684,7 @@ export class ActuatorSystem {
       if (first !== OBJECT_ID_EOF) {
         let second = this.dungeon.getDBRecordLink(first);
         while (second !== OBJECT_ID_EOF) {
-          const decoded = decodeObjectID(second);
+          const decoded = this.dungeon.rnMaps.decode(second);
           if (
             decoded.category === DBType.ACTUATOR
             && (posFilter === -1 || decoded.position === (posFilter & 3))
@@ -699,8 +697,8 @@ export class ActuatorSystem {
         if (second !== OBJECT_ID_EOF) {
           let lastMatch = second;
           let cursor = this.dungeon.getDBRecordLink(second);
-          while (cursor !== OBJECT_ID_EOF && decodeObjectID(cursor).category === DBType.ACTUATOR) {
-            const decoded = decodeObjectID(cursor);
+          while (cursor !== OBJECT_ID_EOF && this.dungeon.rnMaps.dbType(cursor) === DBType.ACTUATOR) {
+            const decoded = this.dungeon.rnMaps.decode(cursor);
             if (posFilter === -1 || decoded.position === (posFilter & 3)) {
               lastMatch = cursor;
             }
@@ -738,6 +736,7 @@ export class ActuatorSystem {
     return this.ctx.host.cursorFilter({
       type,
       object,
+      dbType: this.dungeon.rnMaps.dbType(object),
       level: position.z,
       x: position.x,
       y: position.y,
@@ -747,7 +746,7 @@ export class ActuatorSystem {
 
   private findFirstDrawableObject(position: Position): ObjectID | null {
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category <= DBType.CREATURE) continue;
       if (decoded.category >= DBType.MISSILE) continue;
       return rn;
@@ -757,7 +756,7 @@ export class ActuatorSystem {
 
   private findObjectOfTypeAtPosition(position: Position, pos: number, objectNameIndex: number): ObjectID | null {
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category <= DBType.ACTUATOR) continue;
       if (decoded.category >= DBType.MISSILE) continue;
       if (pos !== -1 && (decoded.position & 0x3) !== (pos & 0x3)) continue;

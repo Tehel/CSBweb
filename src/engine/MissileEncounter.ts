@@ -14,7 +14,7 @@
  * (`Data.h:851`) is here, where three of its four writers are; the fourth,
  * `CheckMonsterVersusMissiles`, is `MonsterAI`'s.
  */
-import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, Direction, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../core/types';
 import { PotionType } from '../core/constants';
 import type { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
@@ -101,7 +101,7 @@ export class MissileEncounter {
         whoLeavesCell[pos] = (pos + 1) & 0xff;
       }
     } else {
-      const decoded = decodeObjectID(movedObject);
+      const decoded = this.dungeon.rnMaps.decode(movedObject);
       if (decoded.category !== DBType.CREATURE) return;
       if (oldPos.z !== party.position.z) return;
       const monster = this.dungeon.getCreatureRecord(movedObject);
@@ -156,7 +156,7 @@ export class MissileEncounter {
           const timer = this.timers.getTimer(missile.timerIndex);
           if (!timer) continue;
           if (timer.function === TimerFunction.TT_MISSILE0) continue;
-          const missilePos = decodeObjectID(missileRn).position & 0x3;
+          const missilePos = this.dungeon.rnMaps.pos(missileRn) & 0x3;
           const leaving = whoLeavesCell[missilePos];
           if (leaving === 0) continue;
 
@@ -246,7 +246,7 @@ export class MissileEncounter {
     const projectile = (missile.projectileObject & 0xffff) as ObjectID;
     const projectileDbType = isMagicSpellRn(projectile)
       ? DBType.CLOUD
-      : decodeObjectID(projectile).category;
+      : this.dungeon.rnMaps.dbType(projectile);
 
     let convertedPotion = false;
     let convertedPower = 0;
@@ -296,7 +296,7 @@ export class MissileEncounter {
         const cellFlag = map.cellFlags[objX]?.[objY] ?? 0;
         const doorState = cellFlag & 0x7;
         const doorRn = this.dungeon.findFirstDoor(new Position(objX, objY, position.z));
-        const door = doorRn !== OBJECT_ID_EOF ? this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index) : null;
+        const door = doorRn !== OBJECT_ID_EOF ? this.dungeon.getDoorRecordByIndex(this.dungeon.rnMaps.idx(doorRn)) : null;
         if (!door) return false;
 
         // A Zo spell at a door that is not broken works its button, if it has one, and
@@ -472,7 +472,7 @@ export class MissileEncounter {
   private findMissilesAt(position: Position): ObjectID[] {
     const missiles: ObjectID[] = [];
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category === DBType.MISSILE) missiles.push(rn);
     }
     return missiles;
@@ -579,7 +579,7 @@ export class MissileEncounter {
    */
   private playMissileImpactSound(projectile: ObjectID, position: Position): void {
     let soundNum: number;
-    if (!isMagicSpellRn(projectile) && decodeObjectID(projectile).category === DBType.WEAPON) {
+    if (!isMagicSpellRn(projectile) && this.dungeon.rnMaps.dbType(projectile) === DBType.WEAPON) {
       soundNum = 0;
     } else if (projectile === RN_POISON_BOLT) {
       soundNum = 13;
@@ -721,7 +721,7 @@ export class MissileEncounter {
       cloudType: cloudType & 0x7f,
       bit7,
     });
-    return index === null ? null : encodeObjectID(bit7 ? 0 : (posInCell & 0x3), DBType.CLOUD, index);
+    return index === null ? null : this.dungeon.rnMaps.setPos(this.dungeon.rnMaps.rn(DBType.CLOUD, index), bit7 ? 0 : (posInCell & 0x3));
   }
 
   /**
@@ -738,7 +738,7 @@ export class MissileEncounter {
   hitDoor(position: Position, force: number, explosion: boolean, delay = 0): boolean {
     const doorRn = this.dungeon.findFirstObject(position);
     if (doorRn === OBJECT_ID_EOF) return false;
-    const door = this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index);
+    const door = this.dungeon.getDoorRecordByIndex(this.dungeon.rnMaps.idx(doorRn));
     if (!door) return false;
 
     if (explosion ? !door.destructibleByFireball : !door.destructibleByChop) return false;
@@ -798,7 +798,7 @@ export class MissileEncounter {
     // `if (object.IsMagicSpell()) dbType = dbCLOUD; else dbType = object.dbType();`
     const dbType = isMagicSpellRn(projectile)
       ? DBType.CLOUD
-      : decodeObjectID(projectile as ObjectID).category;
+      : this.dungeon.rnMaps.dbType(projectile as ObjectID);
 
     let d6: number;
     if (dbType !== DBType.CLOUD) {

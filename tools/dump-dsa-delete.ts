@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
-  DBType, encodeObjectID, locationRelToInteger, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID,
+  DBType, locationRelToInteger, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID,
 } from '../src/core/types';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -84,7 +84,7 @@ async function main(): Promise<void> {
   const addDsaActuator = (game: Game, at: Position, selector: number): ObjectID => {
     const data: DungeonData = game.ctx.dungeon.getData();
     data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47 | (selector << 7), word4: 0, word6: 0 });
-    const rn = encodeObjectID(0, DBType.ACTUATOR, data.databases.actuators.records.length - 1);
+    const rn = game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, data.databases.actuators.records.length - 1);
     game.ctx.dungeon.addObjectToCell(at, rn);
     return rn;
   };
@@ -93,7 +93,7 @@ async function main(): Promise<void> {
   const addWeapon = (game: Game, at: Position): ObjectID => {
     const data: DungeonData = game.ctx.dungeon.getData();
     data.databases.weapons.records.push({ ...data.databases.weapons.records[0], nextObject: OBJECT_ID_EOF });
-    const rn = encodeObjectID(1, DBType.WEAPON, data.databases.weapons.records.length - 1);
+    const rn = game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, data.databases.weapons.records.length - 1), 1);
     game.ctx.dungeon.addObjectToCell(at, rn);
     return rn;
   };

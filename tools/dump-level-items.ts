@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { DungeonState } from '../src/engine/DungeonState';
-import { DBType, decodeObjectID, OBJECT_ID_EOF } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF } from '../src/core/types';
 import { Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import type { ContainerRecord, DatabaseRecord, DungeonData } from '../src/data/dungeonTypes';
@@ -172,7 +172,7 @@ function collectObjectChain(
   for (let rn = start; rn !== OBJECT_ID_EOF; ) {
     if (visited.has(rn)) break;
     visited.add(rn);
-    const decoded = decodeObjectID(rn);
+    const decoded = data.rnMaps.decode(rn);
     const record = getRecordByType(data, decoded.category, decoded.index);
     const objDescIndex = getObjDescIndex(decoded.category, record);
     const objectType = objDescIndex !== null ? objDescObjectType[objDescIndex] ?? null : null;
@@ -237,7 +237,7 @@ function main(): void {
     for (let y = 0; y < map.descriptor.height; y++) {
       const pos = new Position(x, y, mapIndex as number);
       for (let rn = state.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = state.getDBRecordLink(rn)) {
-        const decoded = decodeObjectID(rn);
+        const decoded = data.rnMaps.decode(rn);
         if (!options.all && !isItemCategory(decoded.category)) continue;
 
         const record = getRecordByType(data, decoded.category, decoded.index);

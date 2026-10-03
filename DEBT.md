@@ -161,21 +161,32 @@ slots, and five of its databases run past record 1023:
 
 The others hold fewer than 1024. The actuators alone would not fit the packed form with
 any other field width, so the fix is CSBWin's model: `ObjectID` becomes the slot, and the
-category, position and index are read through the maps (`dbType()`, `pos()`, `idx()`).
-`decodeObjectID` has 158 calls in 31 files, most in `DsaSystem` (39), `TimerSystem` (18),
-`DungeonState` (18) and `ActuatorSystem` (13). The steps:
+category, position and index are read through the maps.
 
-1. **The maps in `GameContext`, and the accessors behind every call site.** A plain
-   `dungeon.dat` is numbered by `ConvertListOfObjects`, `ConvertTimers` and
-   `ConvertCharacters` (`doc/CSBwin-src/SaveGame.cpp:1916-2018`, `:2021`, `:2046`). A save's
-   slots are kept as they are, and the writer writes the maps the game holds instead of
-   building them (`buildObjectIndirectIndex`). A refactor, under tier D's rules. Where a
-   tool's output moves, the commit says why.
+The engine already reads every RN that way: `RnMaps` (`src/core/RnMaps.ts`) carries
+`RN::dbType`, `pos`, `idx`, the `pos(p)` setter (`setPos`) and the `RN(DBTYPE, dbIndex)`
+constructor (`rn`), one per world (`DungeonData.rnMaps`, reached as
+`DungeonState.rnMaps`), and every call site in `src/` and `tools/` goes through it. Its
+accessors still read the packed bits, and the maps are not kept. The steps left:
+
+1. **The maps.** `RnMaps` holds `dataTypeMap` and `dataIndexMap`, and an RN is a slot.
+   A plain `dungeon.dat` is numbered by `ConvertListOfObjects`, `ConvertTimers` and
+   `ConvertCharacters` (`doc/CSBwin-src/SaveGame.cpp:1916-2018`, `:2021`, `:2046`), and
+   `convertScrolls`' text RNs by `AllocateIndirectIndex` (`:2144-2165`). A save's slots are
+   kept as they are, and the writer writes the maps the game holds instead of building
+   them (`buildObjectIndirectIndex`). `DungeonSnapshot` captures the maps. These still
+   know the packed form, and change with it: the file readers and writers
+   (`CsbwinObjectIndex`, `CsbwinDungeonImageWriter`, `CsbwinDungeonConversions`),
+   `rnEquals` (`src/core/types.ts`, CSBWin's `==` compares the slot), the bones keys and
+   `SmartDiscard`'s, which drop the corner with `& 0x3fff` (`DungeonState`'s three
+   `Expool` calls, `DungeonLoader.readExpool`, `sdObj`), `DsaSystem.isValidObjectId`
+   (`checkIndirectIndex`, `doc/CSBwin-src/data.cpp:529-534`), and the tools that compare
+   RNs with `& 0x3fff`. Where a tool's output moves, the commit says why.
 2. **Slots allocated and freed** where records are created and deleted
-   (`AllocateIndirectIndex`, `SaveGame.cpp:2100-2140`). `withObjectPosition` becomes
-   `RN::pos`'s setter, which writes the map and keeps the RN (`CSBTypes.h:336-342`). Two
-   RNs that one packed value stands for today become two, a missile's flying object among
-   them (`DuplicateOK`, `SaveGame.cpp:1918`).
+   (`AllocateIndirectIndex`, `SaveGame.cpp:2100-2140`, and `RN(DBTYPE, dbIndex)`,
+   `data.cpp:455-504`). `setPos` becomes `RN::pos`'s setter, which writes the map and
+   keeps the RN (`CSBTypes.h:336-342`). Two RNs that one packed value stands for today
+   become two, a missile's flying object among them (`DuplicateOK`, `SaveGame.cpp:1918`).
 3. **Databases past 1024 records**: the record arrays, `FindEmptyDBEntry` and `Enlarge`
    as CSBWin bounds them (`CSBCode.cpp:4942-5084`, `Character.cpp:182-358`). The check is
    Conflux read to its end, which also takes G23.
@@ -975,10 +986,9 @@ Recorded so that nobody "fixes" them.
   index into `dataIndexMap` / `dataTypeMap` (`doc/CSBwin-src/CSBTypes.h:265-341`), whose
   entries hold the record's index, its database and its corner; `FindEmptyDBEntry` hands
   out a slot of that map with the record (`data.cpp:919-993`), `DeleteDBEntry` frees both
-  (`:995-1016`), and loading builds the map from the file's packed words. Porting it
-  means every `decodeObjectID` / `encodeObjectID` / `withObjectPosition` and hand-written
-  mask reading the map instead (about 240 places in 37 files), and working out how
-  CSBWin's saves store the words. A save is where the limit can be met from outside: its
+  (`:995-1016`), and loading builds the map from the file's packed words. Every RN is
+  read through `RnMaps` (`src/core/RnMaps.ts`), so porting it is the maps behind it:
+  `D16`. A save is where the limit can be met from outside: its
   `dataIndexMap` is 16 bits, and one that names a record past 1023 is not read
   (`CsbwinObjectIndex.resolve` throws rather than alias). The largest index in any save
   of `tools/fixtures/` is 682.

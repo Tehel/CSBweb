@@ -25,7 +25,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
-  decodeObjectID, DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, TilePosition,
+  DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, TilePosition,
 } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import {
@@ -155,7 +155,7 @@ const DB_NAME: Partial<Record<DBType, keyof DungeonData['databases']>> = {
 };
 
 function recordOf(data: DungeonData, rn: ObjectID): unknown {
-  const { category, index } = decodeObjectID(rn);
+  const { category, index } = data.rnMaps.decode(rn);
   const db = DB_NAME[category as DBType];
   return db ? (data.databases[db].records as unknown[])[index] ?? null : null;
 }
@@ -214,7 +214,7 @@ function actuatorNeeds(a: ActuatorRecord, room: number | undefined, names: Namer
  * the square it lies on, which an actuator's meaning depends on.
  */
 function describe(world: World, names: Namer, rn: ObjectID, indent: string, out: string[], room?: number): void {
-  const { category, index, position } = decodeObjectID(rn);
+  const { category, index, position } = world.dungeon.rnMaps.decode(rn);
   const head = `${indent}${DBType[category]} #${index} corner ${TilePosition[position] ?? position}:`;
   const rec = recordOf(world.data, rn);
   if (!rec) { out.push(`${head} (no record)`); return; }
@@ -336,7 +336,7 @@ function glyph(world: World, m: number, x: number, y: number): string {
   let hasItem = false;
   if (flag & 0x10) {
     for (const rn of squareObjects(world, m, x, y)) {
-      const c = decodeObjectID(rn).category;
+      const c = world.dungeon.rnMaps.dbType(rn);
       if (c === DBType.CREATURE) return 'M';
       if (c >= DBType.WEAPON && c <= DBType.MISC) hasItem = true;
     }
@@ -400,7 +400,7 @@ function cmdMap(world: World, names: Namer, m: number): void {
     if (type === RoomType.STAIRS) features.push(`(${x},${y}) stairs ${flag & 4 ? 'up' : 'down'}`);
     if (type === RoomType.PIT) features.push(`(${x},${y}) ${describeFlag(flag)}`);
     for (const rn of squareObjects(world, m, x, y)) {
-      const { category } = decodeObjectID(rn);
+      const { category } = world.dungeon.rnMaps.decode(rn);
       if (category === DBType.TELEPORTER || category === DBType.CREATURE || (category >= DBType.WEAPON && category <= DBType.MISC)) {
         const lines: string[] = [];
         describe(world, names, rn, `(${x},${y}) `, lines);
@@ -436,7 +436,7 @@ function cmdCell(world: World, names: Namer, m: number, x: number, y: number, ra
   const aimed: string[] = [];
   for (let ay = 0; ay < d.height; ay++) for (let ax = 0; ax < d.width; ax++) {
     for (const rn of squareObjects(world, m, ax, ay)) {
-      if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+      if (world.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
       const a = recordOf(world.data, rn) as ActuatorRecord | null;
       if (!a || isActuatorLocalActionOnly(a) || getActuatorTargetX(a) !== x || getActuatorTargetY(a) !== y) continue;
       const room = (flagAt(world, m, ax, ay) >> 5) & 7;

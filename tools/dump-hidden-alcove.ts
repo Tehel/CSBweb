@@ -26,7 +26,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, encodeObjectID } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { getActuatorValue } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -74,7 +74,7 @@ function square(game: Game, at: Position): ObjectID[] {
 }
 
 const actuatorIndices = (game: Game): number[] =>
-  square(game, HIDDEN).filter((rn) => decodeObjectID(rn).category === DBType.ACTUATOR).map((rn) => decodeObjectID(rn).index);
+  square(game, HIDDEN).filter((rn) => game.ctx.dungeon.rnMaps.dbType(rn) === DBType.ACTUATOR).map((rn) => game.ctx.dungeon.rnMaps.idx(rn));
 
 /** The ornament ordinal of the wall ahead of (12,19) facing east, through `SummarizeRoomInfo`. */
 function ordinalAhead(game: Game): number {
@@ -87,7 +87,7 @@ function ordinalAhead(game: Game): number {
 }
 
 const ordinalOf = (game: Game, at: number, index: number): number =>
-  (game.ctx.dungeon.getActuatorRecord(encodeObjectID(at, DBType.ACTUATOR, index))!.word4 >> 12) & 0xf;
+  (game.ctx.dungeon.getActuatorRecord(game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, index), at))!.word4 >> 12) & 0xf;
 
 /** The first object lying anywhere in the dungeon whose basic type is `wanted`, taken off its square. */
 function takeObject(game: Game, wanted: number): ObjectID {
@@ -97,7 +97,7 @@ function takeObject(game: Game, wanted: number): ObjectID {
     for (let x = 0; x < width; x++) for (let y = 0; y < height; y++) {
       const at = new Position(x, y, z);
       for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-        if (decodeObjectID(rn).category <= DBType.ACTUATOR) continue;
+        if (game.ctx.dungeon.rnMaps.dbType(rn) <= DBType.ACTUATOR) continue;
         if (basicType(game, rn) !== wanted) continue;
         game.ctx.dungeon.removeObjectFromCell(at, rn);
         return rn;
@@ -109,7 +109,7 @@ function takeObject(game: Game, wanted: number): ObjectID {
 
 /** The two counters on (13,23): #616 opens the alcove at zero, #135 aims at the door on (13,20). */
 const counters = (game: Game): string =>
-  [616, 135].map((i) => getActuatorValue(game.ctx.dungeon.getActuatorRecord(encodeObjectID(WEST_FACE, DBType.ACTUATOR, i))!)).join(',');
+  [616, 135].map((i) => getActuatorValue(game.ctx.dungeon.getActuatorRecord(game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, i), WEST_FACE))!)).join(',');
 
 function runTicks(game: Game, ticks: number): void {
   for (let i = 0; i < ticks; i++) {
@@ -121,7 +121,7 @@ function runTicks(game: Game, ticks: number): void {
 function main(): void {
   const game = makeGame();
   const alcove = ordinalOf(game, WEST_FACE, 550);
-  const key = square(game, HIDDEN).find((rn) => decodeObjectID(rn).category === DBType.MISC)!;
+  const key = square(game, HIDDEN).find((rn) => game.ctx.dungeon.rnMaps.dbType(rn) === DBType.MISC)!;
 
   // --- 1: hidden on arrival -----------------------------------------------------------
   console.log(`(13,19) west face: actuators ${actuatorIndices(game).join(',')}; #550 ornament ${alcove}, #549 ornament ${ordinalOf(game, WEST_FACE, 549)}`);
@@ -129,14 +129,14 @@ function main(): void {
   check(actuatorIndices(game).join(',') === '550,549', 'the face holds #550 then #549');
   check(alcove !== 0 && ordinalOf(game, WEST_FACE, 549) === 0, '#550 carries an ornament and #549 none');
   check(ALCOVES.every((a) => ordinalOf(game, (a.facing + 2) & 3, a.actuator) === alcove), 'canary: the four alcoves carry #550\'s ornament');
-  check(key !== undefined && game.ctx.dungeon.getDBRecordLink(encodeObjectID(WEST_FACE, DBType.ACTUATOR, 549)) === key, 'the key lies in the wall after #549');
+  check(key !== undefined && game.ctx.dungeon.getDBRecordLink(game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, 549), WEST_FACE)) === key, 'the key lies in the wall after #549');
   check(ordinalAhead(game) === 0, 'on arrival the face is bare stone: the last actuator, #549, has no ornament');
 
   // --- 2: the four objects open it ----------------------------------------------------
   console.log('');
   console.log(['alcove', 'wants', 'counters #616,#135', 'actuators on (13,19)', 'ornament ahead of (12,19)'].join('\t'));
   for (const a of ALCOVES) {
-    const wanted = getActuatorValue(game.ctx.dungeon.getActuatorRecord(encodeObjectID((a.facing + 2) & 3, DBType.ACTUATOR, a.actuator))!);
+    const wanted = getActuatorValue(game.ctx.dungeon.getActuatorRecord(game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, a.actuator), (a.facing + 2) & 3))!);
     game.ctx.party.state.position = a.party;
     game.ctx.party.state.facing = a.facing;
     game.ctx.party.state.objectInHand = takeObject(game, wanted);

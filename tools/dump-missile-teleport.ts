@@ -20,7 +20,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { RN_FIREBALL } from '../src/core/spellRn';
 import type { TeleporterRecord } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -58,7 +58,7 @@ function findSite(game: Game): Site {
         const at = new Position(x, y, z);
         let teleporter: TeleporterRecord | null = null;
         for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-          if (decodeObjectID(rn).category === DBType.TELEPORTER) { teleporter = dungeon.getTeleporterRecord(rn); break; }
+          if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.TELEPORTER) { teleporter = dungeon.getTeleporterRecord(rn); break; }
         }
         if (!teleporter || (teleporter.scope & 3) === 1) continue;
         let dest: Position | null = null;
@@ -83,7 +83,7 @@ function findSite(game: Game): Site {
 
 function missileIn(game: Game, at: Position, index: number): ObjectID | null {
   for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-    const d = decodeObjectID(rn);
+    const d = game.ctx.dungeon.rnMaps.decode(rn);
     if (d.category === DBType.MISSILE && d.index === index) return rn;
   }
   return null;
@@ -111,10 +111,10 @@ for (const c of cases) {
   }
   let launched: ObjectID | null = null;
   for (let rn = game.ctx.dungeon.findFirstObject(site.from); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-    if (!before.has(rn) && decodeObjectID(rn).category === DBType.MISSILE) launched = rn;
+    if (!before.has(rn) && game.ctx.dungeon.rnMaps.dbType(rn) === DBType.MISSILE) launched = rn;
   }
   if (launched === null) throw new Error('missile not placed');
-  const index = decodeObjectID(launched).index;
+  const index = game.ctx.dungeon.rnMaps.idx(launched);
 
   processTimersAt(game, game.ctx.state.tickCount + 1);
 
@@ -128,7 +128,7 @@ for (const c of cases) {
   const record = game.ctx.dungeon.getMissileRecord(launched)!;
   const timer = tq.getTimer(record.timerIndex);
   const word8 = timer ? decodeMissileTimerWord8(timer.timerWord8) : null;
-  const corner = rn === null ? -1 : decodeObjectID(rn).position;
+  const corner = rn === null ? -1 : game.ctx.dungeon.rnMaps.pos(rn);
   console.log(`${c.label}: corner ${c.corner} enters by ${entering}; at the destination: ${rn === null ? 'absent' : `corner ${corner}`}, `
     + `timer ${word8 ? `(${word8.x},${word8.y}) L${timer!.level} direction ${word8.dir}` : 'none'}; want corner ${wantCorner}, direction ${wantDir}`);
   check(rn !== null, `${c.label}: the fireball is in the destination's chain`);

@@ -23,7 +23,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, encodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, type ObjectID } from '../src/core/types';
 import { RN_FIREBALL, RN_LIGHTNING } from '../src/core/spellRn';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { DungeonState } from '../src/engine/DungeonState';
@@ -44,7 +44,7 @@ async function main(): Promise<void> {
   const tables = graphicsTablesOf(graphics).objects;
 
   // A real weapon record, retyped in memory to each of the 46 weapon types.
-  const weaponRn = encodeObjectID(0, DBType.WEAPON, 0);
+  const weaponRn = dungeon.rnMaps.rn(DBType.WEAPON, 0);
   const weapon = dungeon.getWeaponRecord(weaponRn);
   if (!weapon) throw new Error('dungeon.dat has no weapon 0');
   const savedType = weapon.weaponType;
@@ -72,7 +72,7 @@ async function main(): Promise<void> {
   check(classOf.get('TORCH') !== undefined && (classOf.get('TORCH') ?? -1) >= 0, 'a thrown TORCH flies as its floor graphic');
   check(GetGraphicClass(dungeon, tables, RN_FIREBALL) === -11, 'a fireball is class -11');
   check(GetGraphicClass(dungeon, tables, RN_LIGHTNING) === -4, 'a lightning bolt is class -4');
-  check(GetGraphicClass(dungeon, tables, encodeObjectID(0, DBType.DOOR, 0)) === null, 'a door is not an object, and is not drawn');
+  check(GetGraphicClass(dungeon, tables, dungeon.rnMaps.rn(DBType.DOOR, 0)) === null, 'a door is not an object, and is not drawn');
 
   // --- 2-4. a thrown dagger, drawn ---------------------------------------------------
   let dagger = -1;
@@ -107,7 +107,7 @@ async function main(): Promise<void> {
       },
     };
     drawMissilesAtPosition(
-      new ViewportDraw(context), view, tables, encodeObjectID(relativeLocation, DBType.MISSILE, 0), relativeLocation, 0, 0, 0, relativeCell, relativeLocation, 1,
+      new ViewportDraw(context), view, tables, dungeon.rnMaps.setPos(dungeon.rnMaps.rn(DBType.MISSILE, 0), relativeLocation), relativeLocation, 0, 0, 0, relativeCell, relativeLocation, 1,
     );
     const { width, pixels } = viewportIndexBuffer;
     let x1 = 999, y1 = 999, x2 = -1, y2 = -1;

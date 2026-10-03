@@ -22,7 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, Position, decodeObjectID, encodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
@@ -125,16 +125,16 @@ async function main(): Promise<void> {
   const realTrigger = actuators.triggerObjectMove.bind(actuators);
   const padCalls: string[] = [];
   actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
-    if (decodeObjectID(object).category === DBType.MISC) {
+    if (game.ctx.dungeon.rnMaps.dbType(object) === DBType.MISC) {
       padCalls.push(`(${position.x},${position.y},${position.z}) ${place ? 'place' : 'lift'} unchanged ${unchangedRoom}`);
     }
     return realTrigger(position, object, place, unchangedRoom, facing);
   };
   const party = game.ctx.party.state.position;
-  const miscAtParty = (): number[] => {
-    const found: number[] = [];
+  const miscAtParty = (): ObjectID[] => {
+    const found: ObjectID[] = [];
     for (let rn = game.ctx.dungeon.findFirstObject(party); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category === DBType.MISC) found.push(rn);
+      if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.MISC) found.push(rn);
     }
     return found;
   };
@@ -142,7 +142,7 @@ async function main(): Promise<void> {
     const before = miscAtParty().length;
     padCalls.length = 0;
     const r = cast({ missileType: 7 }, (c) => {
-      for (let slot = 0; slot < hands; slot++) c.possessions[slot] = encodeObjectID(0, DBType.WEAPON, slot);
+      for (let slot = 0; slot < hands; slot++) c.possessions[slot] = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, slot);
     });
     const [hand0, hand1] = game.ctx.party.state.champions[0].possessions;
     const inCell = miscAtParty();
@@ -185,11 +185,11 @@ async function main(): Promise<void> {
     `a filter's abort should print for a dead caster, as CSBWin checks the action first (${JSON.stringify(deadAbort.printed)})`);
   check(silentAbort.result === 0 && silentAbort.printed === '', 'action 1 should abort silently');
   check(unknownAction.result === 1, 'an action with no message (8) should cast normally');
-  check(zokEmpty.result === 1 && decodeObjectID(zokEmpty.hand0).category === DBType.MISC
+  check(zokEmpty.result === 1 && game.ctx.dungeon.rnMaps.dbType(zokEmpty.hand0) === DBType.MISC
     && zokEmpty.dropped === 0 && zokEmpty.pads.length === 0,
     'Zokathra with a hand empty goes into hand 0, and nothing is dropped');
   check(zokFull.result === 1 && zokFull.dropped === 1 && zokFull.last !== undefined
-    && decodeObjectID(zokFull.last).position === 0,
+    && game.ctx.dungeon.rnMaps.pos(zokFull.last) === 0,
     'Zokathra with both hands full lies in the party\'s cell, at corner 0');
   check(zokFull.pads.length === 1 && zokFull.pads[0] === `(${party.x},${party.y},${party.z}) place unchanged true`,
     `Zokathra with both hands full is placed through MoveObject, so the pads see it (Magic.cpp:1380-1387): ${JSON.stringify(zokFull.pads)}`);

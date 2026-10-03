@@ -18,7 +18,7 @@ import {
   getActuatorType,
   setActuatorType,
 } from '../data/actuatorHelpers';
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import {
   assignAddCharacterPossessions,
   computeChampionFingerprint,
@@ -311,7 +311,7 @@ export class HallOfChampions {
       rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
       rn = this.ctx.dungeon.getDBRecordLink(rn)
     ) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.ctx.dungeon.rnMaps.decode(rn);
       if (decoded.category <= DBType.ACTUATOR) continue;
       if (decoded.position !== wall) continue;
       items.push({
@@ -345,7 +345,7 @@ export class HallOfChampions {
       rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
       rn = this.ctx.dungeon.getDBRecordLink(rn)
     ) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.ctx.dungeon.rnMaps.decode(rn);
       if (decoded.category !== DBType.ACTUATOR) continue;
       if (decoded.position !== wall) continue;
       const record = this.ctx.dungeon.getActuatorRecord(rn);
@@ -395,7 +395,7 @@ export class HallOfChampions {
 
   /** The database record behind an object id, for the categories `AddCharacter` sorts on. */
   private getObjectRecord(rn: ObjectID): DatabaseRecord | null {
-    switch (decodeObjectID(rn).category) {
+    switch (this.ctx.dungeon.rnMaps.dbType(rn)) {
       case DBType.WEAPON: return this.ctx.dungeon.getWeaponRecord(rn);
       case DBType.CLOTHING: return this.ctx.dungeon.getClothingRecord(rn);
       case DBType.SCROLL: return this.ctx.dungeon.getScrollRecord(rn);

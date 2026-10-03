@@ -109,6 +109,8 @@ export const DUNGEON_DATA_SOURCES = {
     indirectTextIndex: 'snapshot',
     compressedText: 'snapshot',
     objectList: 'snapshot',
+    // Holds nothing yet: this port's RN is still packed (`DEBT.md` D16).
+    rnMaps: 'loaded',
     columnIndex: 'snapshot',
     levelIndex: 'loaded',
     item16: 'runtimeSave',

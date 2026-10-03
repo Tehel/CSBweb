@@ -17,7 +17,7 @@
  * exists as a struct in CSBWin, so it is kept as one here.
  */
 import { applyLimits, sw } from '../core/intCast';
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, withObjectPosition, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import { MISC_BONES_OF_HERO } from '../core/constants';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
@@ -667,7 +667,7 @@ export class MonsterAttack {
     // the bones are set down like the possessions, so over an open pit they fall.
     const bones = this.createBonesRecord();
     if (bones !== null) {
-      const objD4 = withObjectPosition(bones, champ.partyPosition & 0x3);
+      const objD4 = this.dungeon.rnMaps.setPos(bones, champ.partyPosition & 0x3);
       this.ctx.systems.worldMove.moveObject(objD4, -1, 0, party.position.x, party.position.y, party.position.z);
       // `AddChampionBonesRecord`, whatever the fingerprint (`:2646`): 0 pairs the bones too.
       this.dungeon.addChampionBonesRecord(objD4, champ.fingerprint);
@@ -721,7 +721,7 @@ export class MonsterAttack {
       important: true,
       miscType: MISC_BONES_OF_HERO,
     });
-    return index === null ? null : withObjectPosition(encodeMisc(index), 0);
+    return index === null ? null : this.dungeon.rnMaps.rn(DBType.MISC, index);
   }
 
   /**
@@ -751,7 +751,7 @@ export class MonsterAttack {
     let handTotal = 0;
     for (let hand = 0; hand < 2; hand++) {
       const obj = getChampionPossession(champ, hand);
-      if (obj === OBJECT_ID_NULL || decodeObjectID(obj).category !== DBType.CLOTHING) continue;
+      if (obj === OBJECT_ID_NULL || this.dungeon.rnMaps.dbType(obj) !== DBType.CLOTHING) continue;
       const rec = this.dungeon.getClothingRecord(obj);
       if (!rec) continue;
       const worn = rec.clothingType;
@@ -782,7 +782,7 @@ export class MonsterAttack {
     // The garment worn on this part — hands (0 and 1) are the shields handled above.
     if (bodyPart > 1) {
       const obj = getChampionPossession(champ, bodyPart);
-      const rec = obj !== OBJECT_ID_NULL && decodeObjectID(obj).category === DBType.CLOTHING
+      const rec = obj !== OBJECT_ID_NULL && this.dungeon.rnMaps.dbType(obj) === DBType.CLOTHING
         ? this.dungeon.getClothingRecord(obj)
         : null;
       if (rec) total = sw(total + this.clothingArmourValue(rec.clothingType, scale));
@@ -961,9 +961,4 @@ export class MonsterAttack {
  */
 export function scaledMultiply(value: number, shift: number, factor: number): number {
   return (value * factor) >> shift;
-}
-
-function encodeMisc(index: number): ObjectID {
-  // DBType.MISC is 10; the position bits are set separately.
-  return ((10 << 10) | (index & 0x3ff)) as ObjectID;
 }

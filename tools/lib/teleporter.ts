@@ -3,7 +3,7 @@
  * out of whatever cell holds it, put on `at`, opened to everything (scope 3), silenced,
  * aimed at `to` with no rotation, and `at` becomes an active teleporter square.
  */
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../../src/core/types';
 import type { Game } from '../../src/engine/Game';
 
 export function rigTeleporter(game: Game, at: Position, to: Position): void {
@@ -17,7 +17,7 @@ export function rigTeleporter(game: Game, at: Position, to: Position): void {
       for (let y = 0; y < map.descriptor.height; y++) {
         const p = new Position(x, y, z);
         for (let o = dungeon.findFirstObject(p); o !== OBJECT_ID_EOF; o = dungeon.getDBRecordLink(o)) {
-          if (decodeObjectID(o).category === DBType.TELEPORTER && decodeObjectID(o).index === index) {
+          if (game.ctx.dungeon.rnMaps.dbType(o) === DBType.TELEPORTER && game.ctx.dungeon.rnMaps.idx(o) === index) {
             dungeon.removeObjectFromCell(p, o);
           }
         }

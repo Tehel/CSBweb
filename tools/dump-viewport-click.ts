@@ -32,7 +32,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import { RoomType } from '../src/renderer/bytecode/Types';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
@@ -72,7 +72,7 @@ function makeGame(): Game {
 function itemsAt(game: Game, cell: Position): ObjectID[] {
   const out: ObjectID[] = [];
   for (let rn = game.ctx.dungeon.findFirstObject(cell); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-    if (decodeObjectID(rn).category >= DBType.WEAPON) out.push(rn);
+    if (game.ctx.dungeon.rnMaps.dbType(rn) >= DBType.WEAPON) out.push(rn);
   }
   return out;
 }
@@ -143,13 +143,13 @@ function main(): void {
   const items = itemsAt(game, ALCOVE);
   const rn = items[0];
   console.log(['alcove', 'items', 'face'].join('\t'));
-  console.log([`(${ALCOVE.x},${ALCOVE.y},${ALCOVE.z})`, items.length, rn === undefined ? '-' : decodeObjectID(rn).position].join('\t'));
+  console.log([`(${ALCOVE.x},${ALCOVE.y},${ALCOVE.z})`, items.length, rn === undefined ? '-' : game.ctx.dungeon.rnMaps.pos(rn)].join('\t'));
   if (rn === undefined) {
     fail('the level-2 alcove at (5,17) should hold an item');
     finish();
     return;
   }
-  check(decodeObjectID(rn).position === ((FACING_EAST + 2) & 3), 'on the west face, the one a party facing east sees');
+  check(game.ctx.dungeon.rnMaps.pos(rn) === ((FACING_EAST + 2) & 3), 'on the west face, the one a party facing east sees');
 
   // Why the order matters: the object's button lies wholly inside the wall's.
   check(

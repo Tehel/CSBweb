@@ -25,7 +25,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, encodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { OBJNI_THE_FIRESTAFF_A, OBJNI_THE_FIRESTAFF_B } from '../src/core/objectNameIndex';
 import { getActuatorType } from '../src/data/actuatorHelpers';
@@ -71,7 +71,7 @@ function square(game: Game): ObjectID[] {
 }
 
 const actuatorIndices = (game: Game): number[] =>
-  square(game).filter((rn) => decodeObjectID(rn).category === DBType.ACTUATOR).map((rn) => decodeObjectID(rn).index);
+  square(game).filter((rn) => game.ctx.dungeon.rnMaps.dbType(rn) === DBType.ACTUATOR).map((rn) => game.ctx.dungeon.rnMaps.idx(rn));
 
 /** The wall ornament ordinal (`wallGraphicOrdinal`) the party sees ahead, through `SummarizeRoomInfo`. */
 function ordinalAhead(game: Game): number {
@@ -84,12 +84,12 @@ function ordinalAhead(game: Game): number {
 }
 
 const ordinalOf = (game: Game, index: number): number =>
-  (game.ctx.dungeon.getActuatorRecord(encodeObjectID(SOUTH_FACE, DBType.ACTUATOR, index))!.word4 >> 12) & 0xf;
+  (game.ctx.dungeon.getActuatorRecord(game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, index), SOUTH_FACE))!.word4 >> 12) & 0xf;
 
 function zokathra(game: Game): ObjectID {
   const index = game.ctx.dungeon.findEmptyDBEntry('misc', { nextObject: OBJECT_ID_EOF, specialState: 0, important: false, miscType: MISC_ZOKATHRA });
   if (index === null) throw new Error('no room for a Zokathra spell');
-  return encodeObjectID(0, DBType.MISC, index);
+  return game.ctx.dungeon.rnMaps.rn(DBType.MISC, index);
 }
 
 /** An empty Firestaff lying anywhere in the dungeon, taken off its square. */
@@ -114,7 +114,7 @@ function main(): void {
   {
     const game = makeGame();
     const before = actuatorIndices(game);
-    const gem = square(game).find((rn) => decodeObjectID(rn).category === DBType.WEAPON)!;
+    const gem = square(game).find((rn) => game.ctx.dungeon.rnMaps.dbType(rn) === DBType.WEAPON)!;
     console.log(`square: actuators ${before.join(',')}, ornament ordinal ${ordinalAhead(game)}; in the wall ${basicType(game, gem)}`);
     check(before.join(',') === '147,146,535', 'the south face holds #147, #146, #535 in that order');
     check(basicType(game, gem) === OBJNI_THE_FIRESTAFF_B, 'the wall holds the complete Firestaff');
@@ -125,12 +125,12 @@ function main(): void {
     game.ctx.party.state.objectInHand = spell;
     const fired = game.systems.mouse.handleWallClick();
     const after = actuatorIndices(game);
-    const deleted = encodeObjectID(SOUTH_FACE, DBType.ACTUATOR, 535);
+    const deleted = game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, 535), SOUTH_FACE);
     console.log(`Zokathra: fired ${fired}, actuators ${after.join(',')}, ornament ordinal ${ordinalAhead(game)}, hand ${game.ctx.party.state.objectInHand}`);
     check(fired, 'the spell fires #535');
     check(after.join(',') === '147,146', '#535 is unlinked from the square');
     check(game.ctx.dungeon.getDBRecordLink(deleted) === OBJECT_ID_NULL, '#535 is DeleteDBEntry\'d: its link is RNnul');
-    check(game.ctx.dungeon.getDBRecordLink(encodeObjectID(SOUTH_FACE, DBType.ACTUATOR, 146)) === gem, '#146 now links to the Firestaff in the wall');
+    check(game.ctx.dungeon.getDBRecordLink(game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, 146), SOUTH_FACE)) === gem, '#146 now links to the Firestaff in the wall');
     check(game.ctx.party.state.objectInHand === OBJECT_ID_NULL, 'the spell is taken from the hand');
     check(ordinalAhead(game) === ordinalOf(game, 146), 'the wall now shows #146\'s ornament');
 
@@ -138,7 +138,7 @@ function main(): void {
     game.ctx.party.state.objectInHand = staff;
     const swapped = game.systems.mouse.handleWallClick();
     const hand = game.ctx.party.state.objectInHand;
-    console.log(`Firestaff: fired ${swapped}, hand ${basicType(game, hand)}, square ${square(game).map((rn) => `${DBType[decodeObjectID(rn).category]}#${decodeObjectID(rn).index}`).join(',')}`);
+    console.log(`Firestaff: fired ${swapped}, hand ${basicType(game, hand)}, square ${square(game).map((rn) => `${DBType[game.ctx.dungeon.rnMaps.dbType(rn)]}#${game.ctx.dungeon.rnMaps.idx(rn)}`).join(',')}`);
     check(swapped, 'the empty Firestaff fires #146');
     check(hand === gem && basicType(game, hand) === OBJNI_THE_FIRESTAFF_B, 'the hand now holds the complete Firestaff');
     check(square(game).some((rn) => (rn & 0x3fff) === (staff & 0x3fff)), 'the empty Firestaff is left in the wall');
@@ -158,9 +158,9 @@ function main(): void {
     const game = makeGame();
     // Unlink #147 and #146 so that #535 is first on the square.
     const d = game.ctx.dungeon;
-    const first = encodeObjectID(SOUTH_FACE, DBType.ACTUATOR, 535);
-    d.removeObjectFromCell(WALL, encodeObjectID(SOUTH_FACE, DBType.ACTUATOR, 147));
-    d.removeObjectFromCell(WALL, encodeObjectID(SOUTH_FACE, DBType.ACTUATOR, 146));
+    const first = game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, 535), SOUTH_FACE);
+    d.removeObjectFromCell(WALL, game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, 147), SOUTH_FACE));
+    d.removeObjectFromCell(WALL, game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, 146), SOUTH_FACE));
     check(square(game)[0] === first, 'set-up: #535 is first on the square');
     game.ctx.party.state.objectInHand = zokathra(game);
     const fired = game.systems.mouse.handleWallClick();

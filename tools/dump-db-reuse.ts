@@ -17,7 +17,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
+import type { DungeonState } from '../src/engine/DungeonState';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
@@ -45,7 +46,7 @@ async function main(): Promise<void> {
     return game;
   };
 
-  const index = (rn: ObjectID | null): number => (rn === null ? -1 : decodeObjectID(rn).index);
+  const index = (dungeon: DungeonState, rn: ObjectID | null): number => (rn === null ? -1 : dungeon.rnMaps.idx(rn));
 
   /* --------------------------------------------- 1. the file's free records ---- */
   {
@@ -57,8 +58,8 @@ async function main(): Promise<void> {
     const freeMisc = misc.records.flatMap((r, i) => (r.nextObject === OBJECT_ID_NULL ? [i] : []));
     const weaponCount = weapons.records.length;
     const miscCount = misc.records.length;
-    const arrows = [0, 1].map(() => index(constructPredefinedMissile(dungeon, MISSILE_TYPE_ARROW)));
-    const boulders = [0, 1, 2].map(() => index(constructPredefinedMissile(dungeon, MISSILE_TYPE_BOULDER)));
+    const arrows = [0, 1].map(() => index(dungeon, constructPredefinedMissile(dungeon, MISSILE_TYPE_ARROW)));
+    const boulders = [0, 1, 2].map(() => index(dungeon, constructPredefinedMissile(dungeon, MISSILE_TYPE_BOULDER)));
     console.log(`1. free in dungeon.dat: weapons [${freeWeapons}] of ${weaponCount}, misc [${freeMisc}] of ${miscCount}`);
     console.log(`   two arrows -> weapons ${arrows.join(', ')}; three boulders -> misc ${boulders.join(', ')}`);
     check(freeWeapons.length === 1 && arrows[0] === freeWeapons[0], "the first arrow takes the file's free weapon record");
@@ -82,15 +83,15 @@ async function main(): Promise<void> {
     const missilesHere = (): ObjectID[] => {
       const out: ObjectID[] = [];
       for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-        if (decodeObjectID(rn).category === DBType.MISSILE) out.push(rn);
+        if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.MISSILE) out.push(rn);
       }
       return out;
     };
     /** Launch a poison bolt from the start square; the index of its missile record. */
     const launch = (): ObjectID => {
-      const before = new Set(missilesHere().map(index));
+      const before = new Set(missilesHere().map((rn) => index(dungeon, rn)));
       game.systems.magic.launchThrownMissile(RN_POISON_BOLT, at, 1, 3, 100, 100, 1, 1000);
-      const rn = missilesHere().find((r) => !before.has(index(r)));
+      const rn = missilesHere().find((r) => !before.has(index(dungeon, r)));
       if (rn === undefined) throw new Error('no missile launched');
       return rn;
     };
@@ -106,11 +107,11 @@ async function main(): Promise<void> {
     const again1 = launch();
     free(m0);
     const after0 = launch();
-    console.log(`2. missiles ${index(m0)}, ${index(m1)}, ${index(m2)}; free ${index(m1)} -> next ${index(again1)}; `
-      + `free ${index(m0)} -> next ${index(after0)}`);
-    check(index(m0) === 0 && index(m1) === 1 && index(m2) === 2, 'an empty database hands out 0, 1, 2');
-    check(index(again1) === 1, 'a freed record is taken again');
-    check(index(after0) === 3, 'but record 0 is not: the search starts at 1');
+    console.log(`2. missiles ${index(dungeon, m0)}, ${index(dungeon, m1)}, ${index(dungeon, m2)}; free ${index(dungeon, m1)} -> next ${index(dungeon, again1)}; `
+      + `free ${index(dungeon, m0)} -> next ${index(dungeon, after0)}`);
+    check(index(dungeon, m0) === 0 && index(dungeon, m1) === 1 && index(dungeon, m2) === 2, 'an empty database hands out 0, 1, 2');
+    check(index(dungeon, again1) === 1, 'a freed record is taken again');
+    check(index(dungeon, after0) === 3, 'but record 0 is not: the search starts at 1');
   }
 
   /* --------------------------------------------- 3. the header counts ---------- */
@@ -129,8 +130,8 @@ async function main(): Promise<void> {
       mapX: 0, mapY: 0, level, invisible: false, drawAsSize4: false,
     });
     const header = dungeon.getData().header.objectCounts[DBType.CREATURE];
-    console.log(`3. a monster on L${level}: creature ${index(rn)} of ${creatures.records.length} (was ${before}), header ${header}, count ${creatures.count}`);
-    check(rn !== null && index(rn) === before, 'with no free creature record it is appended');
+    console.log(`3. a monster on L${level}: creature ${index(dungeon, rn)} of ${creatures.records.length} (was ${before}), header ${header}, count ${creatures.count}`);
+    check(rn !== null && index(dungeon, rn) === before, 'with no free creature record it is appended');
     check(header === creatures.records.length && creatures.count === creatures.records.length,
       'and the header declares it, for the image writer');
   }

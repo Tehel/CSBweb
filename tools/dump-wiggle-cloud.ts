@@ -17,7 +17,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { ActuatorAction } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -76,7 +76,7 @@ function findItemTeleporter(game: Game): { at: Position; dest: Position } | null
         if ((flag & 0x08) === 0) continue; // inactive
         const at = new Position(x, y, z);
         for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-          if (decodeObjectID(rn).category !== DBType.TELEPORTER) continue;
+          if (game.ctx.dungeon.rnMaps.dbType(rn) !== DBType.TELEPORTER) continue;
           const rec = dungeon.getTeleporterRecord(rn);
           if (!rec) continue;
           if ((rec.scope & 0x3) === 1) continue; // creatures only
@@ -101,7 +101,7 @@ function findItemTeleporter(game: Game): { at: Position; dest: Position } | null
 function cloudIn(game: Game, at: Position, index: number): ObjectID | null {
   const dungeon = game.ctx.dungeon;
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    const decoded = decodeObjectID(rn);
+    const decoded = game.ctx.dungeon.rnMaps.decode(rn);
     if (decoded.category === DBType.CLOUD && decoded.index === index) return rn;
   }
   return null;
@@ -127,11 +127,11 @@ function main(): void {
   game.systems.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 255, at, 0);
   let born: ObjectID | null = null;
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    if (decodeObjectID(rn).category === DBType.CLOUD) born = rn;
+    if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.CLOUD) born = rn;
   }
   check(born !== null, 'the cloud stands on the switched-off teleporter');
   if (born === null) { finish(); return; }
-  const index = decodeObjectID(born).index;
+  const index = game.ctx.dungeon.rnMaps.idx(born);
   game.ctx.timers.createTimer(TimerFunction.TT_TELEPORTER, at.x, at.y, 0, ActuatorAction.SET, 1, at.z);
 
   processTimersAt(game, 1);
@@ -143,8 +143,8 @@ function main(): void {
 
   // Timer.cpp:2491-2510 — its TT_25 follows: square, level, and the placed ID.
   const timers = game.ctx.timers.getTimers().filter((t) => t.function === TimerFunction.TT_25
-    && t.object !== undefined && decodeObjectID(t.object).category === DBType.CLOUD
-    && decodeObjectID(t.object).index === index);
+    && t.object !== undefined && game.ctx.dungeon.rnMaps.dbType(t.object) === DBType.CLOUD
+    && game.ctx.dungeon.rnMaps.idx(t.object) === index);
   console.log(`TT_25 timers naming it: ${timers.map((t) =>
     `(${t.uByte6},${t.uByte7}) level ${t.level} obj 0x${(t.object ?? 0).toString(16)}`).join(', ')}`);
   check(timers.length === 1, `one TT_25 names the cloud (${timers.length})`);

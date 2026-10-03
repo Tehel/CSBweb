@@ -1,4 +1,4 @@
-import { decodeObjectID, encodeObjectID, DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, rnEquals, type LocationRel, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, rnEquals, type LocationRel, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import { sb, sw } from '../core/intCast';
 import type { DungeonState } from './DungeonState';
@@ -459,7 +459,7 @@ export class TimerSystem {
     if (!map) return;
 
     for (let rn = this.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category === DBType.TEXT) {
         const rec = this.dungeon.getTextRecord(rn);
         if (!rec) continue;
@@ -493,7 +493,7 @@ export class TimerSystem {
 
     for (let rn = this.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       if (action === 3) return false;
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category === DBType.TEXT && decoded.position === targetPos) {
         const rec = this.dungeon.getTextRecord(rn);
         if (!rec) continue;
@@ -546,7 +546,7 @@ export class TimerSystem {
 
     for (let rn = this.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       if (this.getTimerAction(timer) === 3) return;
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category !== DBType.ACTUATOR) continue;
       const rec = this.dungeon.getActuatorRecord(rn);
       if (!rec) continue;
@@ -688,7 +688,7 @@ export class TimerSystem {
       // `vertical`.
       const doorRn = this.dungeon.findFirstDoor(target);
       const doorRecord =
-        doorRn === OBJECT_ID_EOF ? null : this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index);
+        doorRn === OBJECT_ID_EOF ? null : this.dungeon.getDoorRecordByIndex(this.dungeon.rnMaps.idx(doorRn));
       const upDown = doorRecord?.vertical ?? false;
 
       // The party arm. The door springs fully open again, hurts everyone, and only
@@ -922,7 +922,7 @@ export class TimerSystem {
         rn !== OBJECT_ID_EOF;
         rn = this.dungeon.getDBRecordLink(rn)
       ) {
-        const decoded = decodeObjectID(rn);
+        const decoded = this.dungeon.rnMaps.decode(rn);
         if (decoded.category <= DBType.CREATURE || decoded.category > DBType.MISC) continue;
         if ((decoded.position & 0x3) !== (objectLocation.p & 0x3)) continue;
         this.dungeon.removeObjectFromCell(objectPosition, rn);
@@ -1054,7 +1054,7 @@ export class TimerSystem {
   private findViAltarBones(bones: ObjectID, location: Position, posInCell: number): ObjectID | null {
     for (let rn = this.dungeon.findFirstObject(location); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       if (!rnEquals(rn, bones)) continue;
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if ((decoded.position & 0x3) !== (posInCell & 0x3)) continue;
       return rn;
     }
@@ -1084,7 +1084,7 @@ export class TimerSystem {
   private isNonMaterialMonsterAt(position: Position): boolean {
     const table = this.ctx.tables.monsterDesc;
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category !== DBType.CREATURE) continue;
+      if (this.dungeon.rnMaps.dbType(rn) !== DBType.CREATURE) continue;
       const rec = this.dungeon.getCreatureRecord(rn);
       if (!rec) return false;
       const desc = table[rec.creatureType];
@@ -1189,7 +1189,7 @@ export class TimerSystem {
     let match: ObjectID | null = null;
 
     for (let rn = this.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category !== DBType.ACTUATOR) continue;
       const rec = this.dungeon.getActuatorRecord(rn);
       if (!rec) continue;
@@ -1224,7 +1224,7 @@ export class TimerSystem {
     const altPos = (timerPos + 1) & 0x3;
     const takeObject = (): ObjectID => {
       for (let rn = this.dungeon.findFirstObject(source); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-        const decoded = decodeObjectID(rn);
+        const decoded = this.dungeon.rnMaps.decode(rn);
         if (decoded.category <= DBType.ACTUATOR) continue;
         const objPos = decoded.position & 0x3;
         if (objPos !== timerPos && objPos !== altPos) continue;
@@ -1321,7 +1321,7 @@ export class TimerSystem {
     // this missile, and a hit on it deletes no queued timer.
     missile.timerIndex = MISSILE_FILTER_TIMER_INDEX;
 
-    const decoded = decodeObjectID(missileRn);
+    const decoded = this.dungeon.rnMaps.decode(missileRn);
     const word8 = timer.timerWord8 & 0xffff;
     const { x: origMapX, y: origMapY, dir: initialDir, deltaEnergy } = decodeMissileTimerWord8(word8);
     let curMapX = origMapX;
@@ -1369,7 +1369,7 @@ export class TimerSystem {
 
     do {
       missileDir = (timer.timerWord8 >> 10) & 0x3;
-      curPos = decodeObjectID(this.timers.missileFilterObject).position & 0x3;
+      curPos = this.dungeon.rnMaps.pos(this.timers.missileFilterObject) & 0x3;
       leavingThisCell = (missileDir === curPos) || (((missileDir + 1) & 3) === curPos);
       curMapX = origMapX;
       curMapY = origMapY;
@@ -1411,7 +1411,7 @@ export class TimerSystem {
       // (`doc/CSBwin-src/Timer.cpp:382-397`), which reads the direction off the copy, and
       // `d.NewX`, `d.NewY`, `d.NewDir`, `d.NewPos` and `d.NewLevel` back from it. A missile
       // it places always comes back placed: it has no unchanged-room return.
-      this.timers.missileFilterObject = encodeObjectID(curPos, DBType.MISSILE, decoded.index);
+      this.timers.missileFilterObject = this.dungeon.rnMaps.setPos(missileRn, curPos);
       const moved = this.ctx.systems.worldMove.moveObject(
         this.timers.missileFilterObject, origMapX, origMapY, curMapX, curMapY, timer.level,
       );
@@ -1441,7 +1441,7 @@ export class TimerSystem {
       }
 
       const oldPos = new Position(curMapX, curMapY, timer.level);
-      const newRn = encodeObjectID(curPos & 0x3, DBType.MISSILE, decoded.index);
+      const newRn = this.dungeon.rnMaps.setPos(missileRn, curPos & 0x3);
       this.dungeon.removeObjectFromCell(oldPos, missileRn);
       if (!this.dungeon.addObjectToCell(oldPos, newRn)) {
         this.timers.missileFilterObject = OBJECT_ID_NULL;
@@ -1479,7 +1479,7 @@ export class TimerSystem {
     if (!missile) return;
     const projectile = (missile.projectileObject & 0xffff) as ObjectID;
     const projectileIsMagic = isMagicSpellRn(projectile);
-    const projectileDbType = projectileIsMagic ? DBType.CLOUD : decodeObjectID(projectile).category;
+    const projectileDbType = projectileIsMagic ? DBType.CLOUD : this.dungeon.rnMaps.dbType(projectile);
 
     this.dungeon.removeObjectFromCell(position, missileRn);
 
@@ -1495,7 +1495,7 @@ export class TimerSystem {
           this.dungeon.addObjectToChain(projectile, monster.possession);
         }
       } else {
-        this.dropMissileObject(projectile, position, decodeObjectID(missileRn).position & 0x3);
+        this.dropMissileObject(projectile, position, this.dungeon.rnMaps.pos(missileRn) & 0x3);
       }
     }
 
@@ -1662,9 +1662,9 @@ export class TimerSystem {
    */
   private dropMissileObject(projectileObject: ObjectID, position: Position, posInCell: number): void {
     if (projectileObject >= 0xff80) return;
-    const decoded = decodeObjectID(projectileObject);
+    const decoded = this.dungeon.rnMaps.decode(projectileObject);
     if (decoded.category === DBType.CLOUD) return;
-    const dropped = encodeObjectID(posInCell, decoded.category, decoded.index);
+    const dropped = this.dungeon.rnMaps.setPos(projectileObject, posInCell);
     this.ctx.systems.worldMove.moveObject(dropped, -2, 0, position.x, position.y, position.z);
   }
 
@@ -1685,17 +1685,17 @@ export class TimerSystem {
     // lies beyond a monster: that many links are walked, whatever they hold, so an
     // object moved back into this cell is not moved twice (`Timer.cpp:2451-2465`).
     let first = this.dungeon.findFirstObject(position);
-    while (first !== OBJECT_ID_EOF && decodeObjectID(first).category < DBType.CREATURE) {
+    while (first !== OBJECT_ID_EOF && this.dungeon.rnMaps.dbType(first) < DBType.CREATURE) {
       first = this.dungeon.getDBRecordLink(first);
     }
     let count = 0;
     for (let rn = first; rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category > DBType.CREATURE) count++;
+      if (this.dungeon.rnMaps.dbType(rn) > DBType.CREATURE) count++;
     }
     for (let rn = first, next = first; rn !== OBJECT_ID_EOF && count !== 0; rn = next) {
       count--;
       next = this.dungeon.getDBRecordLink(rn);
-      const type = decodeObjectID(rn).category;
+      const type = this.dungeon.rnMaps.dbType(rn);
       if (type <= DBType.CREATURE) continue;
       // `MoveObject(objD4, mapX, mapY, mapX, mapY)`: `placed` / `position` are
       // `d.NewPos` / `d.NewX`, `d.NewY`, `d.NewLevel`, or null when the object stayed.
@@ -1739,7 +1739,7 @@ export class TimerSystem {
   private activateDsa(timer: TimerEntry): void {
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);
     for (let rn = this.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category !== DBType.ACTUATOR) continue;
       const rec = this.dungeon.getActuatorRecord(rn);
       if (!rec || getActuatorType(rec) !== 47) continue;

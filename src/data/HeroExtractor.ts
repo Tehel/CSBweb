@@ -1,6 +1,5 @@
 import {
   DBType,
-  decodeObjectID,
   OBJECT_ID_EOF,
   OBJECT_ID_NULL,
 } from '../core/types';
@@ -35,7 +34,7 @@ export function extractPresetHeroes(data: DungeonData): PresetHero[] {
           rn !== OBJECT_ID_EOF;
           rn = getDBRecordLink(data, rn)
         ) {
-          const decoded = decodeObjectID(rn);
+          const decoded = data.rnMaps.decode(rn);
           if (decoded.category !== DBType.ACTUATOR) continue;
           const actuator = data.databases.actuators.records[decoded.index];
           if (!actuator || getActuatorType(actuator) !== 127) continue;
@@ -102,7 +101,7 @@ function findFirstObject(data: DungeonData, map: MapData, mapIndex: number, x: n
 
 function getDBRecordLink(data: DungeonData, rn: ObjectID): ObjectID {
   if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return OBJECT_ID_EOF;
-  const decoded = decodeObjectID(rn);
+  const decoded = data.rnMaps.decode(rn);
   const index = decoded.index;
 
   switch (decoded.category) {
@@ -151,7 +150,7 @@ function scanTextRecords(
     rn !== OBJECT_ID_EOF;
     rn = getDBRecordLink(data, rn)
   ) {
-    const decoded = decodeObjectID(rn);
+    const decoded = data.rnMaps.decode(rn);
     if (decoded.category !== DBType.TEXT) continue;
     const record = data.databases.texts.records[decoded.index];
     if (!record) continue;
@@ -333,7 +332,7 @@ function collectHeroInventory(
     rn !== OBJECT_ID_EOF;
     rn = getDBRecordLink(data, rn)
   ) {
-    const decoded = decodeObjectID(rn);
+    const decoded = data.rnMaps.decode(rn);
     if (decoded.category < DBType.WEAPON || decoded.category > DBType.MISC) continue;
     if (decoded.position !== position) continue;
     items.push(buildInventoryItem(data, rn, new Set<ObjectID>()));
@@ -342,7 +341,7 @@ function collectHeroInventory(
 }
 
 function buildInventoryItem(data: DungeonData, rn: ObjectID, visited: Set<ObjectID>): HeroInventoryItem {
-  const decoded = decodeObjectID(rn);
+  const decoded = data.rnMaps.decode(rn);
   if (visited.has(rn)) {
     return {
       rn,

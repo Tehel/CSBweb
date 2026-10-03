@@ -18,7 +18,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_POISON, RN_POISON_CLOUD, RN_ZO_SPELL,
 } from '../src/core/spellRn';
@@ -64,7 +64,7 @@ function missilesIn(game: ReturnType<typeof newGame>, at: Position): Map<ObjectI
   const dungeon = game.ctx.dungeon;
   const found = new Map<ObjectID, ObjectID>();
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    if (decodeObjectID(rn).category !== DBType.MISSILE) continue;
+    if (game.ctx.dungeon.rnMaps.dbType(rn) !== DBType.MISSILE) continue;
     const missile = dungeon.getMissileRecord(rn);
     if (missile) found.set(rn, missile.projectileObject);
   }
@@ -98,7 +98,7 @@ function main(): void {
       if (!rec || seen.has(rec.creatureType)) continue;
       seen.add(rec.creatureType);
 
-      const rn = encodeObjectID(0, DBType.CREATURE, slot.word0);
+      const rn = game.ctx.dungeon.rnMaps.rn(DBType.CREATURE, slot.word0);
       const cell = new Position(slot.uByte10, slot.uByte11, level);
       const before = missilesIn(game, cell);
       game.systems.monsterAttack.monsterAttacks(rn, rec, slot.uByte10, slot.uByte11, 0, {

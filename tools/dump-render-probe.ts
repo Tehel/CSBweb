@@ -48,7 +48,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { atariToRGB, OBJECT_ID_EOF, Position, decodeObjectID } from '../src/core/types';
+import { atariToRGB, OBJECT_ID_EOF, Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { BytecodePrograms } from '../src/renderer/bytecode/BytecodePrograms';
@@ -285,7 +285,7 @@ function firstDoorIndex(dungeon: ReturnType<typeof newGame>['ctx']['dungeon'], z
     for (let y = 0; y < map.descriptor.height; y++) {
       if (map.cellFlags[x][y] >> 5 !== RoomType.DOOR) continue;
       const rn = dungeon.findFirstDoor(new Position(x, y, z));
-      if (rn !== OBJECT_ID_EOF) return decodeObjectID(rn).index;
+      if (rn !== OBJECT_ID_EOF) return dungeon.rnMaps.idx(rn);
     }
   }
   throw new Error(`no door on level ${z}`);

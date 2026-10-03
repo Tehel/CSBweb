@@ -17,7 +17,7 @@
  * what it carries, a missile ends where it flies, an item is lifted out of the square.
  * Only floor chains are walked, never chests, possessions or the champions' hands.
  */
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, withObjectPosition, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import { getActuatorType } from '../data/actuatorHelpers';
 import type { GameContext } from './GameContext';
 
@@ -44,7 +44,7 @@ export function makeMoreRoomInDB(ctx: GameContext, dbType: DBType): ObjectID {
                     && ((y - (party.y | 0) + 5) & 0xffff) <= 10) continue;
                 const at = new Position(x, y, level);
                 for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-                    const type = decodeObjectID(rn).category;
+                    const type = ctx.dungeon.rnMaps.dbType(rn);
                     if (type === DBType.ACTUATOR) {
                         if (getActuatorType(dungeon.getActuatorRecord(rn)!) === 0) continue;
                         break;
@@ -89,7 +89,7 @@ export function makeMoreRoomInDB(ctx: GameContext, dbType: DBType): ObjectID {
                             break;
                     }
                     ctx.levelCleared[dbType] = level & 0xff;
-                    return withObjectPosition(rn, 0);
+                    return ctx.dungeon.rnMaps.setPos(rn, 0);
                 }
             }
         }

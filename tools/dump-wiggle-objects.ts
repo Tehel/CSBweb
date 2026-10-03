@@ -26,7 +26,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, encodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { ActuatorAction } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -78,7 +78,7 @@ function findItemTeleporter(game: Game): { at: Position; dest: Position } {
     const flag = dungeon.getCellFlag(at);
     if (((flag >> 5) & 7) !== RoomType.TELEPORTER || (flag & 0x08) === 0) return false;
     for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category !== DBType.TELEPORTER) continue;
+      if (game.ctx.dungeon.rnMaps.dbType(rn) !== DBType.TELEPORTER) continue;
       const rec = dungeon.getTeleporterRecord(rn);
       if (!rec || (rec.scope & 3) === 1) return false;
       for (let dz = 0; dz < dungeon.getMapCount(); dz++) {
@@ -99,7 +99,7 @@ function findItemTeleporter(game: Game): { at: Position; dest: Position } {
 function inCell(game: Game, at: Position, category: DBType, index: number): ObjectID | null {
   const dungeon = game.ctx.dungeon;
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    const decoded = decodeObjectID(rn);
+    const decoded = game.ctx.dungeon.rnMaps.decode(rn);
     if (decoded.category === category && decoded.index === index) return rn;
   }
   return null;
@@ -111,7 +111,7 @@ function spy(game: Game): PadCall[] {
   const actuators = game.systems.actuators;
   const real = actuators.triggerObjectMove.bind(actuators);
   actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
-    calls.push({ at: position, category: decodeObjectID(object).category, place, unchangedRoom });
+    calls.push({ at: position, category: game.ctx.dungeon.rnMaps.dbType(object), place, unchangedRoom });
     return real(position, object, place, unchangedRoom, facing);
   };
   return calls;
@@ -142,12 +142,12 @@ function main(): void {
     switchOn(game, pit, TimerFunction.TT_PIT, () => {
       game.systems.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 255, pit, 0);
       for (let rn = dungeon.findFirstObject(pit); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-        if (decodeObjectID(rn).category === DBType.CLOUD) index = decodeObjectID(rn).index;
+        if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.CLOUD) index = game.ctx.dungeon.rnMaps.idx(rn);
       }
     });
     const landed = inCell(game, below, DBType.CLOUD, index);
     const timer = game.ctx.timers.getTimers().find((t) => t.function === TimerFunction.TT_25
-      && t.object !== undefined && decodeObjectID(t.object).index === index);
+      && t.object !== undefined && game.ctx.dungeon.rnMaps.idx(t.object) === index);
     console.log(`1. cloud ${index} on pit (${pit.x},${pit.y}) L${pit.z} as it opens: on the pit ${inCell(game, pit, DBType.CLOUD, index) !== null}, `
       + `below (${below.x},${below.y}) L${below.z} ${landed !== null}; TT_25 at (${timer?.uByte6},${timer?.uByte7}) L${timer?.level}`);
     check(index >= 0, 'the cloud stands on the closed pit');
@@ -166,7 +166,7 @@ function main(): void {
     switchOn(game, at, TimerFunction.TT_TELEPORTER, () => {
       game.systems.magic.launchThrownMissile(RN_FIREBALL, at, 0, 1, 100, 100, 1, 50);
       for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-        if (decodeObjectID(rn).category === DBType.MISSILE) index = decodeObjectID(rn).index;
+        if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.MISSILE) index = game.ctx.dungeon.rnMaps.idx(rn);
       }
     });
     const landed = inCell(game, dest, DBType.MISSILE, index);
@@ -192,7 +192,7 @@ function main(): void {
     const calls = spy(game);
     // Any weapon record, lifted from wherever it lies.
     const weapons = dungeon.getData().databases.weapons.records.length;
-    const rn = encodeObjectID(0, DBType.WEAPON, weapons - 1);
+    const rn = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, weapons - 1);
     const lying = findSquare(game, (p) => inCell(game, p, DBType.WEAPON, weapons - 1) !== null);
     if (lying) dungeon.removeObjectFromCell(lying, inCell(game, lying, DBType.WEAPON, weapons - 1)!);
     switchOn(game, at, TimerFunction.TT_TELEPORTER, () => {

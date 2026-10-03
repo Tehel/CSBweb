@@ -11,7 +11,7 @@
  * adjusted values, and so does this port's.
  */
 import { sw } from '../core/intCast';
-import { DBType, decodeObjectID, type ObjectID } from '../core/types';
+import { DBType, type ObjectID } from '../core/types';
 import {
   OBJNI_CLOAK_OF_NIGHT,
   OBJNI_CROSS_OF_NETA,
@@ -67,7 +67,7 @@ export function AdjustStatsForItemCarried(
   let whatToAdjust = adjustIllegal;
   const objNI = nameIndex(item);
   let D4W = 0; // Assume no adjustment to Luck
-  const dbType = decodeObjectID(item).category;
+  const dbType = dungeon.rnMaps.dbType(item);
   for (;;) {
     // Fake to avoid 'goto's.
     if (dbType === DBType.WEAPON && possessionIndex >= 0 && possessionIndex <= 12) {

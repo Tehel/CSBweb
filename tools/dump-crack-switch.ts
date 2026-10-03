@@ -22,7 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -60,7 +60,7 @@ function makeGame(): Game {
 function faceActuators(game: Game): ObjectID[] {
   const out: ObjectID[] = [];
   for (let rn = game.ctx.dungeon.findFirstObject(WALL); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-    const d = decodeObjectID(rn);
+    const d = game.ctx.dungeon.rnMaps.decode(rn);
     if (d.category === DBType.ACTUATOR && d.position === EAST_FACE) out.push(rn);
   }
   return out;
@@ -136,8 +136,8 @@ function main(): void {
 
   console.log('');
   console.log(['', 'face actuators', 'ornament seen', 'set'].join('\t'));
-  console.log(['before', before.map((rn) => decodeObjectID(rn).index).join(','), seenBefore, port[seenBefore]].join('\t'));
-  console.log(['after', after.map((rn) => decodeObjectID(rn).index).join(','), seenAfter, port[seenAfter]].join('\t'));
+  console.log(['before', before.map((rn) => game.ctx.dungeon.rnMaps.idx(rn)).join(','), seenBefore, port[seenBefore]].join('\t'));
+  console.log(['after', after.map((rn) => game.ctx.dungeon.rnMaps.idx(rn)).join(','), seenAfter, port[seenAfter]].join('\t'));
 
   check(before.length === 2, 'two actuators on the east face');
   check(seenBefore === WALL_ORNAMENT_CRACK_SWITCH_OUT, 'before the click the party sees Crack Switch (Out)');

@@ -12,8 +12,6 @@ import { MISC_BONES_OF_HERO } from '../core/constants';
 import { applyLimits } from '../core/intCast';
 import {
   DBType,
-  decodeObjectID,
-  encodeObjectID,
   OBJECT_ID_EOF,
   OBJECT_ID_NULL,
   RoomType,
@@ -90,13 +88,12 @@ export class MouseSystem {
     if (!map) return false;
     if (target.x < 0 || target.y < 0 || target.x >= map.descriptor.width || target.y >= map.descriptor.height) return false;
 
-    const decoded = decodeObjectID(obj);
     const newPos = (facing + dropPos) & 0x3;
 
     // `objD4.pos(w_4); MoveObject(objD4, -1, 0, D6W, D5W, NULL, NULL)`
     // (`doc/CSBwin-src/Mouse.cpp:881-882`): a freshly-dropped object still walks
     // through an active teleporter or open pit on the cell it lands on.
-    const dropped = encodeObjectID(newPos, decoded.category, decoded.index);
+    const dropped = this.ctx.dungeon.rnMaps.setPos(obj, newPos);
     party.objectInHand = OBJECT_ID_NULL;
     this.ctx.systems.worldMove.moveObject(dropped, -1, 0, target.x, target.y, target.z);
     if (options?.viAltar) {
@@ -211,7 +208,7 @@ export class MouseSystem {
     // contribution to the distance, which doubles as the damage scale below.
     let experience = 8;
     let weaponBonus = 1;
-    if (decodeObjectID(obj).category === DBType.WEAPON) {
+    if (this.ctx.dungeon.rnMaps.dbType(obj) === DBType.WEAPON) {
       experience += 4;
       const desc = this.ctx.systems.characterStats.weaponDescFor(obj);
       // Above class 12 are the staves and wands, which gain nothing from a throw.
@@ -330,7 +327,7 @@ export class MouseSystem {
 
     const doorRN = this.ctx.dungeon.findFirstDoor(target);
     if (doorRN === OBJECT_ID_EOF) return false;
-    const { index } = decodeObjectID(doorRN);
+    const { index } = this.ctx.dungeon.rnMaps.decode(doorRN);
     const door = this.ctx.dungeon.getDoorRecordByIndex(index);
     if (!door || !door.hasButton) return false;
 

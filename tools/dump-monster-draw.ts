@@ -33,6 +33,7 @@ import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, stockGraphics } from './lib/game';
+import { RnMaps } from '../src/core/RnMaps';
 
 const graphics = stockGraphics();
 const tables = graphicsTablesOf(graphics).objects;
@@ -80,6 +81,7 @@ function draw(group: Group, relativeCell: number, drawOrder: number): Sprite[] {
       return { width: img.width, height: img.height, pixels: new Uint8Array(img.width * img.height).fill(1) };
     },
     dungeonState: {
+      rnMaps: new RnMaps(),
       getDBRecordLink: () => OBJECT_ID_EOF,
       getCreatureRecord: () => record,
       getMonsterRenderState: () => ({ positions, facings, statuses: STATUSES }),
@@ -178,6 +180,7 @@ function frontMirrored(type: number, relativeCell: number, status: number): bool
       return { width: img.width, height: img.height, pixels };
     },
     dungeonState: {
+      rnMaps: new RnMaps(),
       getDBRecordLink: () => OBJECT_ID_EOF,
       getCreatureRecord: () => record,
       getMonsterRenderState: () => ({ positions: 255, facings: 0xaa, statuses: new Uint8Array([status, 0, 0, 0]) }),

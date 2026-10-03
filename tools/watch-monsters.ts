@@ -14,7 +14,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';
@@ -49,7 +49,7 @@ async function main(): Promise<void> {
     for (let x = 0; x < map.descriptor.width; x++) {
       for (let y = 0; y < map.descriptor.height; y++) {
         for (let rn = dungeon.findFirstObject(new Position(x, y, level)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-          const d = decodeObjectID(rn);
+          const d = game.ctx.dungeon.rnMaps.decode(rn);
           if (d.category === DBType.CREATURE && d.index === db4) return { x, y };
         }
       }

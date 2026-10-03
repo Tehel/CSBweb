@@ -38,7 +38,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -205,7 +205,7 @@ function dispellClouds(game: Game, x: number, y: number): number {
   const dungeon = game.ctx.dungeon;
   let n = 0;
   for (let rn = dungeon.findFirstObject(new Position(x, y, LEVEL)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    if (decodeObjectID(rn).category !== DBType.CLOUD) continue;
+    if (game.ctx.dungeon.rnMaps.dbType(rn) !== DBType.CLOUD) continue;
     if (dungeon.getCloudRecord(rn)?.cloudType === CloudType.CT_DISPELL) n++;
   }
   return n;

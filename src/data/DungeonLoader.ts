@@ -35,6 +35,7 @@ import { extractPresetHeroes } from './HeroExtractor';
 import { EXPOOL_RECORD_SIZE, Expool, specialLocationsFromExpool } from './CsbwinExpool';
 import { readExtendedFeatures } from './CsbwinExtendedFeatures';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
+import { RnMaps } from '../core/RnMaps';
 import {
     DUNGEON_HEADER_SIZE,
     MAP_DESCRIPTOR_SIZE
@@ -125,6 +126,7 @@ export function emptyDungeonData(): DungeonData {
             clouds: database(),
         },
         objectList: [],
+        rnMaps: new RnMaps(),
         columnIndex: [],
         levelIndex: [],
     };
@@ -249,6 +251,7 @@ export class DungeonLoader {
             databases,
             textWords,
             objectList,
+            rnMaps: new RnMaps(),
             columnIndex,
             levelIndex,
             item16: [],

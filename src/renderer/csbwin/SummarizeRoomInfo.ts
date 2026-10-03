@@ -1,4 +1,4 @@
-import { decodeObjectID, DBType, OBJECT_ID_EOF, type ObjectID, type ui8, Position } from '../../core/types';
+import { DBType, OBJECT_ID_EOF, type ui8, Position } from '../../core/types';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../bytecode/Types';
 import type { DungeonState } from '../../engine/DungeonState';
 import type { PartyFootprints } from '../../engine/PartyFootprints';
@@ -29,18 +29,6 @@ const graphicRoomTypes: number[] = (() => {
   map[RoomType.STAIR_FACING] = GraphicRoomType.STAIR_FACING;
   return map;
 })();
-
-function dbTypeOf(rn: ObjectID): number {
-  return decodeObjectID(rn).category;
-}
-
-function posOf(rn: ObjectID): number {
-  return decodeObjectID(rn).position;
-}
-
-function idxOf(rn: ObjectID): number {
-  return decodeObjectID(rn).index;
-}
 
 // Port of `GetCellFlags()` boundary behavior used by viewport rendering (CSBCode.cpp:4609-4662).
 function getCellFlagsViewport(dungeon: DungeonState, position: Position): number {
@@ -275,8 +263,8 @@ function summarizeStoneRoom(
   const realDecoration = [false, false, false];
 
   // Detect wall text objects and actuator-driven wall decorations.
-  while (local !== RN_EOF && dbTypeOf(local) <= DBType.ACTUATOR) {
-    const dbType = dbTypeOf(local);
+  while (local !== RN_EOF && dungeon.rnMaps.dbType(local) <= DBType.ACTUATOR) {
+    const dbType = dungeon.rnMaps.dbType(local);
 
     // CSBWin tolerates bad dungeons that put doors/teleporters in stone (Codea59a.cpp:89-93).
     if (dbType === DBType.DOOR || dbType === DBType.TELEPORTER) {
@@ -284,7 +272,7 @@ function summarizeStoneRoom(
       continue;
     }
 
-    const relativePosition = (posOf(local) - (facing & 3)) & 3;
+    const relativePosition = (dungeon.rnMaps.pos(local) - (facing & 3)) & 3;
     if (relativePosition !== 0) {
       if (dbType === DBType.TEXT) {
         const rec = dungeon.getTextRecord(local);
@@ -475,7 +463,7 @@ export function summarizeRoomInfoCsbwin(
         rslt.roomType = RoomType.DOOR_FACING;
         rslt.decorations[0] = cellFlags & 7; // door state
         const doorRN = dungeon.findFirstDoor(new Position(rslt.x, rslt.y, z));
-        rslt.decorations[1] = doorRN === RN_EOF ? 0 : idxOf(doorRN);
+        rslt.decorations[1] = doorRN === RN_EOF ? 0 : dungeon.rnMaps.idx(doorRN);
       }
       cellFlags = 1;
       local = firstObject;
@@ -492,14 +480,14 @@ export function summarizeRoomInfoCsbwin(
   // Codea59a.cpp:394-399: skip db<=ACTUATOR for rn2 only in the "break" path (stairs, etc).
   // For open-like rooms CSBWin sets `rn2` to `firstObject` (tag00a984).
   if (skipLowDbForRn2) {
-    while (local !== RN_EOF && dbTypeOf(local) <= DBType.ACTUATOR) {
+    while (local !== RN_EOF && dungeon.rnMaps.dbType(local) <= DBType.ACTUATOR) {
       local = dungeon.getDBRecordLink(local);
     }
   }
 
   if (scanFloorDecorations && numFloorDecorations > 0) {
     for (let rn = firstObject; rn !== RN_EOF; rn = dungeon.getDBRecordLink(rn)) {
-      if (dbTypeOf(rn) !== DBType.ACTUATOR) continue;
+      if (dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
       const rec = dungeon.getActuatorRecord(rn);
       if (!rec) continue;
       if (getActuatorType(rec) === 47) {

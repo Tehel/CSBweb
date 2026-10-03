@@ -14,7 +14,7 @@
  * The AI itself lives in `MonsterAI.ts`; this module owns only the bookkeeping that
  * decides which groups are *active* and when they next get a turn.
  */
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, Position, RoomType, withObjectPosition, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { ITEM16_FREE, SMS_ATTACKING, SMS_MIRROR } from '../data/dungeonTypes';
@@ -169,7 +169,7 @@ export class MonsterSystem {
 
     const slot = pool[index]!;
     this.item16QueLen++;
-    slot.word0 = decodeObjectID(rn).index;
+    slot.word0 = this.dungeon.rnMaps.idx(rn);
     slot.positions = monster.groupIndex; // the packed positions the DB4 was carrying
     monster.groupIndex = index; // …and from here on the DB4 holds the slot number
     slot.uByte10 = mapX & 0xff;
@@ -543,7 +543,7 @@ export class MonsterSystem {
     const destination = resolved.position;
     const destLevel = destination.z | 0;
     let code = resolved.code;
-    const placed = withObjectPosition(monsterRn, cornerAfter ?? resolved.corner);
+    const placed = this.dungeon.rnMaps.setPos(monsterRn, cornerAfter ?? resolved.corner);
 
     // Killed by the fall, or not allowed where it landed: gone (`:3147-3176`).
     // `ProcessMonsterDeleteFilter` is not ported (DEBT.md G2), so `dropResidue` is its
@@ -658,7 +658,7 @@ export class MonsterSystem {
     }
     if (count >= 31) {
       let delObj = true;
-      if (decodeObjectID(monsterRn).category === DBType.CREATURE) {
+      if (this.dungeon.rnMaps.dbType(monsterRn) === DBType.CREATURE) {
         const monster = this.dungeon.getCreatureRecord(monsterRn);
         if (monster && (monsterUnique(monster) || monster.possession !== OBJECT_ID_EOF)) delObj = false;
       }
@@ -856,7 +856,7 @@ export class MonsterSystem {
       unique: false,
       poisoned: false,
     });
-    return index === null ? null : encodeObjectID(0, DBType.CREATURE, index);
+    return index === null ? null : this.dungeon.rnMaps.rn(DBType.CREATURE, index);
   }
 
   /* ----------------------------------------------------------------- misc ---- */

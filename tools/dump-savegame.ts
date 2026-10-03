@@ -22,7 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -161,7 +161,7 @@ async function main(): Promise<void> {
     for (let y = 0; y < height && !carry; y++) {
       if (roomTypeAt(played, x, y, level) !== RoomType.OPEN) continue;
       const here = objectsAt(played, x, y, level).filter((rn) => {
-        const { category } = decodeObjectID(rn);
+        const { category } = played.ctx.dungeon.rnMaps.decode(rn);
         // Only the object categories a champion can actually pick up and drop.
         return (
           category === DBType.WEAPON ||
@@ -238,7 +238,7 @@ async function main(): Promise<void> {
   // tool had built a state the game cannot reach.
   playedData.databases.misc.count++;
   playedData.header.objectCounts[DBType.MISC] = playedData.databases.misc.records.length;
-  const droppedRn = encodeObjectID(0, DBType.MISC, miscCountBefore);
+  const droppedRn = played.ctx.dungeon.rnMaps.rn(DBType.MISC, miscCountBefore);
   played.ctx.dungeon.addObjectToCell(new Position(carry.toX, carry.toY, level), droppedRn);
 
   // The column-index mutation. A second appended record, dropped into a cell that had
@@ -253,7 +253,7 @@ async function main(): Promise<void> {
     miscType: 34,
   });
   playedData.databases.misc.count++;
-  const loneRn = encodeObjectID(0, DBType.MISC, loneCountBefore);
+  const loneRn = played.ctx.dungeon.rnMaps.rn(DBType.MISC, loneCountBefore);
   const columnIndexBefore = [...playedData.columnIndex];
   played.ctx.dungeon.addObjectToCell(new Position(emptyCell.x, emptyCell.y, level), loneRn);
   const columnIndexAfter = [...playedData.columnIndex];
@@ -442,7 +442,7 @@ async function main(): Promise<void> {
     reloadedData.header.objectCounts[DBType.MISC] = (reloadedData.header.objectCounts[DBType.MISC] + 1) & 0xffff;
     reloaded.ctx.dungeon.addObjectToCell(
       new Position(secondEmpty.x, secondEmpty.y, level),
-      encodeObjectID(0, DBType.MISC, idx),
+      reloaded.ctx.dungeon.rnMaps.rn(DBType.MISC, idx),
     );
     check(
       fingerprint(reloadedData) !== afterFirstLoad,

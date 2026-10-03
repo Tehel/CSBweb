@@ -8,7 +8,7 @@
  * that throws again), so no caller asks whether anybody is listening. Headless, nobody is, and the game plays the
  * same.
  */
-import type { ObjectID } from '../core/types';
+import type { DBType, ObjectID } from '../core/types';
 
 export enum CursorFilterType {
   TakeKey = 'TakeKey',
@@ -22,6 +22,8 @@ export enum CursorFilterType {
 export interface CursorFilterPacket {
   type: CursorFilterType;
   object: ObjectID;
+  /** `object`'s database, which the page has no world to read it from. */
+  dbType: DBType;
   level: number;
   x: number;
   y: number;

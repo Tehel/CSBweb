@@ -20,8 +20,7 @@
 import { readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, encodeObjectID } from '../src/core/types';
-import type { ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL } from '../src/core/types';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { CheckCelltypes } from '../src/data/CsbwinDungeonConversions';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
@@ -179,7 +178,7 @@ function builtWorld(): { data: DungeonData; indices: number[]; carriedIndex: num
   // A group that is in no cell, only in the size-0 group's possessions.
   const carriedIndex = records.length;
   records.push({ ...records[indices[0]], nextObject: OBJECT_ID_EOF, possession: OBJECT_ID_EOF, creatureType: carried.type, ...carried.set });
-  records[indices[cases.length - 1]].possession = encodeObjectID(0, DBType.CREATURE, carriedIndex) as ObjectID;
+  records[indices[cases.length - 1]].possession = data.rnMaps.rn(DBType.CREATURE, carriedIndex);
   return { data, indices, carriedIndex };
 }
 

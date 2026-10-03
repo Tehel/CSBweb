@@ -20,7 +20,7 @@
  * would land on the party — so those are gathered into `MoveProbe` below and handed
  * back explicitly.
  */
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
@@ -172,7 +172,7 @@ export class MonsterPerception {
       const doorPosition = flag & 0x7;
       if (doorPosition === 3 || doorPosition === 4) {
         const doorRn = this.dungeon.findFirstDoor(position);
-        const door = doorRn === OBJECT_ID_EOF ? null : this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index);
+        const door = doorRn === OBJECT_ID_EOF ? null : this.dungeon.getDoorRecordByIndex(this.dungeon.rnMaps.idx(doorRn));
         const toc = door ? this.dungeon.doorTOC(level, door.doorType, this.ctx.tables.doorCharacteristics) : 0;
         return (toc & 0x100) === 0; // blocked unless special
       }
@@ -468,7 +468,7 @@ export class MonsterPerception {
         rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
         rn = this.dungeon.getDBRecordLink(rn)
       ) {
-        if (decodeObjectID(rn).category !== DBType.CLOUD) continue;
+        if (this.dungeon.rnMaps.dbType(rn) !== DBType.CLOUD) continue;
         const cloud = this.dungeon.getCloudRecord(rn);
         if (!cloud || cloud.cloudType !== CloudType.CT_FLUXCAGE) continue;
         state.fluxCages[dir] = 1;
@@ -498,7 +498,7 @@ export class MonsterPerception {
     if (roomType === RoomType.DOOR) {
       const doorPosition = flag & 0x7;
       const doorRn = this.dungeon.findFirstDoor(target);
-      const door = doorRn === OBJECT_ID_EOF ? null : this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index);
+      const door = doorRn === OBJECT_ID_EOF ? null : this.dungeon.getDoorRecordByIndex(this.dungeon.rnMaps.idx(doorRn));
       // A vertical (up-down) door admits a monster up to its `verticalSize`; a
       // sideways one only at position 1 or below.
       const allowance = door && door.vertical ? monsterVerticalSize(desc) : 1;

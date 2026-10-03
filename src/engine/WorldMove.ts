@@ -11,7 +11,7 @@
  * `DsaSystem.moveObjectDsa`. A monster lifted on the party's level first meets the
  * missiles in its way through `CheckMoveFromMissile`, which is `MissileEncounter`'s.
  */
-import { decodeObjectID, encodeObjectID, DBType, Direction, isSamePosition, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, Direction, isSamePosition, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import type { CreatureRecord, Item16Record, TeleporterRecord } from '../data/dungeonTypes';
 import { monsterHorizontalSize, monsterLevitating } from '../data/tables/MonsterDesc';
 import type { DungeonState } from './DungeonState';
@@ -154,7 +154,7 @@ export class WorldMove {
     newY: number,
     level: number,
   ): { removed: boolean; placed: ObjectID | null; position: Position | null; newDir?: number } {
-    const decoded = decodeObjectID(object);
+    const decoded = this.dungeon.rnMaps.decode(object);
     const type = decoded.category;
     if (type === DBType.CREATURE && newX >= 0) {
       throw new Error('moveObject: placing a monster is MonsterSystem.moveMonster');
@@ -188,7 +188,7 @@ export class WorldMove {
       destination = result.position;
       newDir = result.missileDir;
       const corner = result.objectPos & 0x3;
-      moved = encodeObjectID(corner, type, decoded.index);
+      moved = this.dungeon.rnMaps.setPos(object, corner);
       const unchangedRoom = destination.z === level && destination.x === oldX && destination.y === oldY;
       if (unchangedRoom && corner === decoded.position && type !== DBType.MISSILE) {
         return { removed: false, placed: null, position: null };
@@ -238,7 +238,7 @@ export class WorldMove {
     oldY: number,
   ): { position: Position; code: number; audible: boolean; groupDied: boolean; corner: number } {
     const rec = this.dungeon.getCreatureRecord(monsterRn);
-    const decoded = decodeObjectID(monsterRn);
+    const decoded = this.dungeon.rnMaps.decode(monsterRn);
     const canFall = !this.isMonsterLevitating(rec);
     const facing = rec?.facing ?? 0;
     const partyLevel = this.ctx.party.state.position.z;
@@ -411,7 +411,7 @@ export class WorldMove {
     if ((cellFlag & 0x08) === 0) return null;
 
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
+      const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category !== DBType.TELEPORTER) continue;
       return this.dungeon.getTeleporterRecord(rn);
     }

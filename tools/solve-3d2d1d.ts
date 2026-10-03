@@ -35,7 +35,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { decodeObjectID, DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import {
   ActuatorAction, getActuatorAction, getActuatorDsaSelector, getActuatorDsaState, getActuatorParameterA,
@@ -82,7 +82,7 @@ function loadWorld(): World {
           rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL && !seen.has(rn);
           rn = dungeon.getDBRecordLink(rn)) {
           seen.add(rn);
-          const { category, index, position } = decodeObjectID(rn);
+          const { category, index, position } = dungeon.rnMaps.decode(rn);
           const k = key(l, x, y);
           if (category === DBType.TELEPORTER && !world.teleporters.has(k)) {
             const t = data.databases.teleporters.records[index] as TeleporterRecord;

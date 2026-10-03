@@ -7,7 +7,7 @@
  * `repackOpenChest` live next to the slot rectangles.
  */
 import { OBJNI_OPEN_CHEST, OBJNI_SPECIAL_D, OBJNI_SPECIAL_E } from '../../core/objectNameIndex';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, decodeObjectID } from '../../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID } from '../../core/types';
 import { Champion, getChampionPossession } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
@@ -255,14 +255,14 @@ export function getOpenChestIconIndex(ui: UIState): number {
 export function getActiveChestView(ui: UIState, champion: Champion): ChestViewSource | null {
 
   const cursorObject = ui.partyState.objectInHand;
-  if (ui.pressingEye && cursorObject !== OBJECT_ID_NULL && isChestRecord(cursorObject)) {
+  if (ui.pressingEye && cursorObject !== OBJECT_ID_NULL && isChestRecord(ui, cursorObject)) {
     return { id: cursorObject, source: 'cursor' };
   }
 
   if (ui.pressingEye) return null;
   const handSlot = 1; // CSBWin uses weapon hand for chest display.
   const handObject = getChampionPossession(champion, handSlot);
-  if (handObject !== OBJECT_ID_NULL && isChestRecord(handObject)) {
+  if (handObject !== OBJECT_ID_NULL && isChestRecord(ui, handObject)) {
     return { id: handObject, source: 'hand', slot: handSlot };
   }
   return null;
@@ -362,7 +362,7 @@ export function drawInspectArrow(ui: UIState, fromEye: boolean): void {
 }
 
 export function drawObjectInfoPanel(ui: UIState, objectId: ObjectID): void {
-  if (decodeObjectID(objectId).category === DBType.SCROLL) {
+  if (ui.ctx.dungeon.rnMaps.dbType(objectId) === DBType.SCROLL) {
     drawScrollPanel(ui, objectId);
     return;
   }

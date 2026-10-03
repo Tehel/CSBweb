@@ -32,7 +32,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { MISSILE_FILTER_TIMER_INDEX, TimerFunction } from '../src/engine/TimerQueue';
-import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, decodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { RN_FIREBALL } from '../src/core/spellRn';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -98,7 +98,7 @@ function launch(game: Game, at: Position, corner: number, direction: Direction, 
     throw new Error('missile not launched');
   }
   for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-    if (!before.has(rn) && decodeObjectID(rn).category === DBType.MISSILE) return rn;
+    if (!before.has(rn) && game.ctx.dungeon.rnMaps.dbType(rn) === DBType.MISSILE) return rn;
   }
   throw new Error('missile not placed');
 }

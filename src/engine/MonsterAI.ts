@@ -19,7 +19,7 @@
  * `monsterMoveInhibit[]` — and passing them explicitly is the only way to keep the
  * port readable without inventing a global of our own.
  */
-import { decodeObjectID, DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { SMS_ATTACKING } from '../data/dungeonTypes';
@@ -1175,7 +1175,7 @@ export class MonsterAI {
         rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
         rn = this.dungeon.getDBRecordLink(rn)
       ) {
-        const decoded = decodeObjectID(rn);
+        const decoded = this.dungeon.rnMaps.decode(rn);
         if (decoded.category !== DBType.MISSILE) continue;
         // The whole positions byte, as both callers pass it (`Monster.cpp:3882`, `:3960`):
         // a corner is 0-3, so a byte with any of bits 2-7 set meets no missile.

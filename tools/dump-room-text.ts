@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, decodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { newGame } from './lib/game';
@@ -54,7 +54,7 @@ for (let z = 0; z < data.maps.length; z++) {
       const p = new Position(x, y, z);
       if (((map.cellFlags[x]![y]! >> 5) & 0x7) === RoomType.STONE) continue;
       for (let rn = dungeon.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-        if (decodeObjectID(rn).category !== DBType.TEXT) continue;
+        if (game.ctx.dungeon.rnMaps.dbType(rn) !== DBType.TEXT) continue;
         if (dungeon.getTextRecord(rn)!.visible) visible.push(p);
         else hidden++;
       }

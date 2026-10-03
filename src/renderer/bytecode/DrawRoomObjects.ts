@@ -32,7 +32,7 @@ import {
   monsterWord4Bit8,
 } from '../../data/tables/MonsterDesc';
 import { ordinalAtPositionBytes } from '../../engine/monsterPosition';
-import { decodeObjectID, DBType, OBJECT_ID_EOF, type ObjectID } from '../../core/types';
+import { DBType, OBJECT_ID_EOF, type ObjectID } from '../../core/types';
 import { applyLimits } from '../../core/intCast';
 import { viewportRandom, type ViewportDraw } from './ViewportDraw';
 import { DrawTeleporter } from './DrawDoor';
@@ -50,7 +50,7 @@ export function GetGraphicClass(
   tables: Pick<ObjectTables, 'objDescGraphicClass' | 'weaponDesc'>,
   rn: ObjectID,
 ): number | null {
-  const category = isMagicSpellRn(rn) ? DBType.CLOUD : decodeObjectID(rn).category;
+  const category = isMagicSpellRn(rn) ? DBType.CLOUD : dungeon.rnMaps.dbType(rn);
   if (category === DBType.CLOUD) {
     if (rn === RN_FIREBALL) return -11;
     if (rn === RN_POISON) return -13;
@@ -122,7 +122,7 @@ export function DrawRoomObjects(
   let cloudPresent = false;
 
   for (let rn = firstObject; rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    const { category } = decodeObjectID(rn);
+    const { category } = dungeon.rnMaps.decode(rn);
     // The last creature in the chain (`objMonster_54`, `Code51a4.cpp:2204-2210`).
     // `invisible()` is gated on `invisibleMonsters`, false in DM (`DEBT.md`, "The
     // monster design options"), so every creature is drawn.
@@ -228,7 +228,7 @@ function drawObjectsAtPosition(
   const viewportSetCount = tables.viewportPosition.length;
 
   for (let rn = firstObject; rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    const { category, position } = decodeObjectID(rn);
+    const { category, position } = dungeon.rnMaps.decode(rn);
     if (position !== curAbsPos) continue;
 
     if (
@@ -653,7 +653,7 @@ export function drawMissilesAtPosition(
   if (centerX === 0) return;
 
   for (let rn = firstObject; rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    const { category, position } = decodeObjectID(rn);
+    const { category, position } = dungeon.rnMaps.decode(rn);
     if (category !== DBType.MISSILE || position !== curAbsPos) continue;
     const missile = dungeon.getMissileRecord(rn);
     if (!missile) continue;
@@ -791,7 +791,7 @@ export function DrawClouds(draw: ViewportDraw, relativeCellNumber: number, first
   let fluxcage = false;
 
   for (let rn = firstObject; rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    const { category, position } = decodeObjectID(rn);
+    const { category, position } = dungeon.rnMaps.decode(rn);
     if (category !== DBType.CLOUD) continue;
     const cloud = dungeon.getCloudRecord(rn);
     if (!cloud) continue;

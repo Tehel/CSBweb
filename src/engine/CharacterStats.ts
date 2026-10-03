@@ -19,7 +19,7 @@
  * spread across the UI and the engine can. Recorded in PLAN.md.
  */
 import { applyLimits, div, sw } from '../core/intCast';
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion } from './gameTypes';
 import { determineMastery } from './skills';
@@ -55,7 +55,7 @@ export class CharacterStats {
     if (visited.has(rn)) return 0;
     visited.add(rn);
 
-    const { category } = decodeObjectID(rn);
+    const { category } = this.ctx.dungeon.rnMaps.decode(rn);
     switch (category) {
       case DBType.WEAPON: {
         const rec = this.ctx.dungeon.getWeaponRecord(rn);
@@ -191,7 +191,7 @@ export class CharacterStats {
       }
     }
 
-    if (typeof obj === 'number' && decodeObjectID(obj as ObjectID).category === DBType.WEAPON) {
+    if (typeof obj === 'number' && this.ctx.dungeon.rnMaps.dbType(obj as ObjectID) === DBType.WEAPON) {
       const desc = this.weaponDescFor(obj as ObjectID);
       if (desc) {
         d7 = sw(d7 + desc.uByte2);

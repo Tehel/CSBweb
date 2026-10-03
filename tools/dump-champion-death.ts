@@ -37,7 +37,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { MISC_BONES_OF_HERO } from '../src/core/constants';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, decodeObjectID, encodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -131,7 +131,7 @@ function armChampion(game: Game, chIdx: number): void {
       important: false, weaponType: 8, // a dagger
     });
     db.count++;
-    return encodeObjectID(0, DBType.WEAPON, db.records.length - 1);
+    return game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, db.records.length - 1);
   };
   const champ = game.ctx.party.state.champions[chIdx]!;
   const rn = dagger();
@@ -151,7 +151,7 @@ function newDagger(game: Game): ObjectID {
     important: false, weaponType: 8,
   });
   db.count++;
-  return encodeObjectID(0, DBType.WEAPON, db.records.length - 1);
+  return game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, db.records.length - 1);
 }
 
 /** The first weapon or misc type whose `ObjDesc` row names `objNI`. */
@@ -170,7 +170,7 @@ function newRecord(game: Game, category: DBType.WEAPON | DBType.MISC | DBType.SC
     : category === DBType.MISC ? databases.misc : databases.scrolls;
   (db.records as object[]).push({ nextObject: OBJECT_ID_EOF, ...record });
   db.count++;
-  return encodeObjectID(0, category, db.records.length - 1);
+  return game.ctx.dungeon.rnMaps.rn(category, db.records.length - 1);
 }
 
 /** The cell's chain, in order. */
@@ -245,7 +245,7 @@ function bonesAt(game: Game, cell: Position): ObjectID[] {
     rn !== OBJECT_ID_EOF;
     rn = game.ctx.dungeon.getDBRecordLink(rn)
   ) {
-    if (decodeObjectID(rn).category !== DBType.MISC) continue;
+    if (game.ctx.dungeon.rnMaps.dbType(rn) !== DBType.MISC) continue;
     if (game.ctx.dungeon.getMiscRecord(rn)?.miscType === MISC_BONES_OF_HERO) out.push(rn);
     if (out.length > 32) break;
   }
@@ -504,7 +504,7 @@ function main(): void {
     const want = dropOrder.filter((slot) => armed.includes(slot));
     console.log(`slots ${armed.join(',')} land in the order ${got.join(',')} (DropOrder says ${want.join(',')})`);
     check(got.join(',') === want.join(','), 'the dropped objects are chained in DropOrder order');
-    check(dropped.every((rn) => decodeObjectID(rn).position === 2),
+    check(dropped.every((rn) => g.ctx.dungeon.rnMaps.pos(rn) === 2),
       'each is turned to the dying champion\'s corner');
 
     const g2 = makeGame(1);
@@ -533,7 +533,7 @@ function main(): void {
       check(bones.length === 1 && bones[0]!.cell.z > pit.z, 'the bones fall through the pit like the possessions');
       check(bones.length === 1 && g2.ctx.dungeon.copyChampionBonesRecord(bones[0]!.rn) !== null,
         'the fallen bones are still paired in the expool');
-      check(bones.length === 1 && decodeObjectID(bones[0]!.rn).position === (g2.ctx.party.state.champions[0]!.partyPosition & 3),
+      check(bones.length === 1 && g2.ctx.dungeon.rnMaps.pos(bones[0]!.rn) === (g2.ctx.party.state.champions[0]!.partyPosition & 3),
         'and lie in the dead champion\'s corner');
     }
   }

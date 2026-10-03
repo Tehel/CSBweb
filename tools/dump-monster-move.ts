@@ -14,7 +14,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { TimerFunction } from '../src/engine/TimerQueue';
@@ -50,7 +50,7 @@ async function main(): Promise<void> {
   };
   const monsterAt = (x: number, y: number): boolean => {
     for (let rn = dungeon.findFirstObject(new Position(x, y, level)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category === DBType.CREATURE) return true;
+      if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.CREATURE) return true;
     }
     return false;
   };
@@ -157,7 +157,7 @@ async function main(): Promise<void> {
         && t.level === dest.z).length;
     const creatures = data.databases.creatures.records;
     const pick = (i: number) => {
-      const rn = encodeObjectID(0, DBType.CREATURE, i);
+      const rn = game.ctx.dungeon.rnMaps.rn(DBType.CREATURE, i);
       const rec = dungeon.getCreatureRecord(rn)!;
       return { rn, rec };
     };
@@ -166,7 +166,7 @@ async function main(): Promise<void> {
     const carrier = pick(creatures.length - 3);
     plain.rec.possession = OBJECT_ID_EOF;
     plain.rec.unique = true; // bit 13 set, option off: CSBWin's Unique() is false
-    carrier.rec.possession = encodeObjectID(0, DBType.WEAPON, 0);
+    carrier.rec.possession = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, 0);
     carrier.rec.unique = false;
 
     const before = parked();

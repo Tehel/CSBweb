@@ -17,7 +17,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, Direction, OBJECT_ID_NULL, Position, decodeObjectID } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_NULL, Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Party, ensureHandOwner, initialPartyState, setHandOwner } from '../src/engine/Party';
@@ -140,7 +140,7 @@ async function main(): Promise<void> {
   check(slot >= 0, 'the preset hero should be carrying something');
   if (slot >= 0) {
     const object = getChampionPossession(first, slot);
-    const { category, index } = decodeObjectID(object);
+    const { category, index } = game.ctx.dungeon.rnMaps.decode(object);
     console.log(`\nchampion 0 (${first.name}) slot ${slot} holds ${object}`
       + ` = ${DBType[category] ?? category}#${index}`);
     // Canary: this is a real record out of dungeon.dat, not a bare object type. HALK's

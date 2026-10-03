@@ -7,7 +7,7 @@
  */
 import { OBJNI_BONES_A, OBJNI_COMPASS_N, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJNI_SPECIAL_F, OBJNI_SPECIAL_J, OBJNI_SPECIAL_N, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATER, OBJNI_WATERSKIN, OBJNI_WATER_FLASK } from '../../core/objectNameIndex';
 import { DescIndex, GetBasicObjectType, NameIndex } from '../../engine/objectIndex';
-import { DBType, ObjectID, decodeObjectID } from '../../core/types';
+import { DBType, ObjectID } from '../../core/types';
 import { ViewingFilterResult } from '../../engine/DsaSystem';
 import { Champion } from '../../engine/gameTypes';
 import { findChampionByFingerprint } from '../../engine/Party';
@@ -53,8 +53,8 @@ export function descIndexForObject(ui: UIState, rn: ObjectID): number | null {
   return descIndex === -1 ? null : descIndex;
 }
 
-export function isChestRecord(value: ObjectID): boolean {
-  return decodeObjectID(value).category === DBType.CHEST;
+export function isChestRecord(ui: UIState, value: ObjectID): boolean {
+  return ui.ctx.dungeon.rnMaps.dbType(value) === DBType.CHEST;
 }
 
 export function getObjectName(ui: UIState, objectNameIndex: number): string {
@@ -95,7 +95,7 @@ export function getBonesChampion(ui: UIState, objectId: ObjectID, objectNameInde
 export function getObjectDisplayName(ui: UIState, objectId: ObjectID, objectNameIndex: number): string {
   let name = getObjectName(ui, objectNameIndex);
   if (!name) return name;
-  const { category } = decodeObjectID(objectId);
+  const { category } = ui.ctx.dungeon.rnMaps.decode(objectId);
 
   // `StrCpy(descriptiveText, pcA0->name); StrCat(descriptiveText, d.ObjectNames[objNID6])`
   // — no separator, so the two run together exactly as CSBWin prints them.
@@ -135,7 +135,7 @@ export function getObjectWeightForRecord(ui: UIState, rn: ObjectID, visited: Set
 
 export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objectNameIndex: number): ItemDescriptionLine[] {
   const lines: ItemDescriptionLine[] = [];
-  const { category } = decodeObjectID(objectId);
+  const { category } = ui.ctx.dungeon.rnMaps.decode(objectId);
   const phrases = ['CONSUMABLE', 'POISONED', 'BROKEN', 'CURSED', '', '', '', ''];
   const phraseColors = Array.from({ length: 8 }, () => 13);
   let descriptionMask = 0;

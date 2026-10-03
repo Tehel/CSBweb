@@ -29,7 +29,7 @@
  * draws over it.
  */
 import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
-import { DBType, decodeObjectID, OBJECT_ID_NULL, type ObjectID } from '../../core/types';
+import { DBType, OBJECT_ID_NULL, type ObjectID } from '../../core/types';
 import { AttackType, ATTACK_TYPE_NONE, ATTACK_CLASS_EMPTY_HAND } from '../../engine/monsterTypes';
 import { getPartyChampion } from '../../engine/Party';
 import { CHARFLAG_ATTACK_DISABLE, getChampionPossession, SLOT_WEAPON_HAND, type Champion } from '../../engine/gameTypes';
@@ -65,7 +65,7 @@ export function itemHasChargesLeft(ui: UIState, chIdx: number): boolean {
   if (!champ) return true;
   const rn = getChampionPossession(champ, SLOT_WEAPON_HAND);
   if (rn === OBJECT_ID_NULL) return true;
-  switch (decodeObjectID(rn).category) {
+  switch (ui.ctx.dungeon.rnMaps.dbType(rn)) {
     case DBType.WEAPON:
       return (ui.ctx.dungeon.getWeaponRecord(rn)?.charges ?? 0) !== 0;
     case DBType.CLOTHING:

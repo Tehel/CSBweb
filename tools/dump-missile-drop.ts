@@ -49,7 +49,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType, rnEquals } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -107,7 +107,7 @@ function findItemTeleporter(game: Game): { at: Position; dest: Position } | null
         if ((flag & 0x08) === 0) continue; // inactive
         const at = new Position(x, y, z);
         for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-          if (decodeObjectID(rn).category !== DBType.TELEPORTER) continue;
+          if (game.ctx.dungeon.rnMaps.dbType(rn) !== DBType.TELEPORTER) continue;
           const rec = dungeon.getTeleporterRecord(rn);
           if (!rec) continue;
           if ((rec.scope & 0x3) === 1) continue; // creatures only
@@ -145,7 +145,7 @@ function findFloorActuator(game: Game): Position | null {
         const at = new Position(x, y, z);
         let hasActuator = false;
         for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-          if (decodeObjectID(rn).category === DBType.ACTUATOR) hasActuator = true;
+          if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.ACTUATOR) hasActuator = true;
         }
         if (!hasActuator) continue;
         const south = at.south;
@@ -170,7 +170,7 @@ function findFloorItem(game: Game, avoid: Position[]): { rn: ObjectID; at: Posit
         if (avoid.some((p) => p.x === x && p.y === y && p.z === z)) continue;
         const at = new Position(x, y, z);
         for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-          const category = decodeObjectID(rn).category;
+          const category = game.ctx.dungeon.rnMaps.dbType(rn);
           if (category < DBType.WEAPON || category > DBType.MISC) continue;
           return { rn, at };
         }
@@ -216,7 +216,7 @@ function findFloorItemOfCategory(game: Game, category: DBType, avoid: Position[]
         if (avoid.some((p) => p.x === x && p.y === y && p.z === z)) continue;
         const at = new Position(x, y, z);
         for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-          if (decodeObjectID(rn).category !== category) continue;
+          if (game.ctx.dungeon.rnMaps.dbType(rn) !== category) continue;
           return { rn, at };
         }
       }
@@ -226,7 +226,7 @@ function findFloorItemOfCategory(game: Game, category: DBType, avoid: Position[]
 }
 
 function sameObject(a: ObjectID, b: ObjectID): boolean {
-  return decodeObjectID(a).category === decodeObjectID(b).category && decodeObjectID(a).index === decodeObjectID(b).index;
+  return rnEquals(a, b);
 }
 
 function findsObjectAt(game: Game, position: Position, target: ObjectID): boolean {
@@ -342,7 +342,7 @@ function main(): void {
         let restingCorner: number | null = null;
         for (let t = 1; t <= 20; t++) {
           for (let rn = game.ctx.dungeon.findFirstObject(door.at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-            if (decodeObjectID(rn as ObjectID).category === DBType.MISSILE) restingCorner = decodeObjectID(rn as ObjectID).position;
+            if (game.ctx.dungeon.rnMaps.dbType(rn as ObjectID) === DBType.MISSILE) restingCorner = game.ctx.dungeon.rnMaps.pos(rn as ObjectID);
           }
           processTimersAt(game, t);
         }
@@ -352,7 +352,7 @@ function main(): void {
 
         let landedCorner: number | null = null;
         for (let rn = game.ctx.dungeon.findFirstObject(door.at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
-          if (sameObject(rn as ObjectID, item.rn)) landedCorner = decodeObjectID(rn as ObjectID).position;
+          if (sameObject(rn as ObjectID, item.rn)) landedCorner = game.ctx.dungeon.rnMaps.pos(rn as ObjectID);
         }
         check(
           landedCorner === restingCorner,

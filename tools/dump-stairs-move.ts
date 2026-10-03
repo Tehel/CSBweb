@@ -31,7 +31,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
-  DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, encodeObjectID, locationRelToInteger, withObjectPosition,
+  DBType, OBJECT_ID_EOF, Position, RoomType, locationRelToInteger,
 } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -137,13 +137,13 @@ function takeWeapon(game: Game, corner: number): ObjectID {
       }
     }
   }
-  return encodeObjectID(corner, DBType.WEAPON, index);
+  return game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, index), corner);
 }
 
 function findWeapon(game: Game, at: Position, index: number): ObjectID | null {
   const dungeon = game.ctx.dungeon;
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    const decoded = decodeObjectID(rn);
+    const decoded = game.ctx.dungeon.rnMaps.decode(rn);
     if (decoded.category === DBType.WEAPON && decoded.index === index) return rn;
   }
   return null;
@@ -156,16 +156,16 @@ function main(): void {
     const stairs = findStairs(game, down);
     const rn = takeWeapon(game, 1);
     const moved = game.systems.worldMove.moveObject(rn, -1, 0, stairs.at.x, stairs.at.y, stairs.at.z);
-    const landed = findWeapon(game, stairs.exit, decodeObjectID(rn).index);
+    const landed = findWeapon(game, stairs.exit, game.ctx.dungeon.rnMaps.idx(rn));
     const want = turnedCorner(1, stairs.dir);
     const n = down ? 1 : 2;
     console.log(`${n}. item set down on ${down ? 'down' : 'up'} stairs (${stairs.at.x},${stairs.at.y}) L${stairs.at.z}: `
       + `exit ${stairs.dir} to (${stairs.exit.x},${stairs.exit.y}) L${stairs.exit.z}; on the stairs `
-      + `${findWeapon(game, stairs.at, decodeObjectID(rn).index) !== null}, at the exit ${landed !== null}, `
-      + `corner ${landed !== null ? decodeObjectID(landed).position : '-'} (want ${want})`);
+      + `${findWeapon(game, stairs.at, game.ctx.dungeon.rnMaps.idx(rn)) !== null}, at the exit ${landed !== null}, `
+      + `corner ${landed !== null ? game.ctx.dungeon.rnMaps.pos(landed) : '-'} (want ${want})`);
     check(landed !== null && moved.position !== null && same(moved.position, stairs.exit),
       down ? 'it goes down a level and out through ExitStairsDirection' : 'it stays on its level and goes out');
-    check(landed !== null && decodeObjectID(landed).position === want, 'its corner turns to face the stairs');
+    check(landed !== null && game.ctx.dungeon.rnMaps.pos(landed) === want, 'its corner turns to face the stairs');
   }
 
   /* ------------------------------------ 3-4. a monster moved onto stairs ---- */
@@ -191,7 +191,7 @@ function main(): void {
     });
     if (made === null) throw new Error('createMonster failed');
     const corner = (stairs.dir + 2 + 2) & 3;
-    const rn = withObjectPosition(made, corner);
+    const rn = game.ctx.dungeon.rnMaps.setPos(made, corner);
     dungeon.removeObjectFromCell(beside, made);
     dungeon.addObjectToCell(beside, rn);
     return { game, stairs, rn, corner, type };
@@ -207,10 +207,10 @@ function main(): void {
     console.log(`3. type ${type} group (${beside.x},${beside.y}) corner ${corner} -> stairs (${stairs.at.x},${stairs.at.y}) `
       + `L${stairs.at.z}: code ${result.code}, ended (${result.position.x},${result.position.y}) L${result.position.z}, `
       + `on the stairs ${dungeon.findFirstMonster(stairs.at) !== OBJECT_ID_EOF}, at the exit ${there !== OBJECT_ID_EOF}, `
-      + `corner ${there !== OBJECT_ID_EOF ? decodeObjectID(there).position : '-'} (want ${want})`);
+      + `corner ${there !== OBJECT_ID_EOF ? game.ctx.dungeon.rnMaps.pos(there) : '-'} (want ${want})`);
     check(same(result.position, stairs.exit) && there !== OBJECT_ID_EOF
       && dungeon.findFirstMonster(stairs.at) === OBJECT_ID_EOF, 'the group goes down the stairs and out');
-    check(there !== OBJECT_ID_EOF && decodeObjectID(there).position === want, 'its corner turns to face the stairs');
+    check(there !== OBJECT_ID_EOF && game.ctx.dungeon.rnMaps.pos(there) === want, 'its corner turns to face the stairs');
     const lifted = game.systems.monsters.moveMonster(rn, stairs.exit.x, stairs.exit.y, -1, 0, stairs.exit.z);
     console.log(`   lifted with the ID it came with (corner ${corner}): code ${lifted.code}, `
       + `at the exit ${dungeon.findFirstMonster(stairs.exit) !== OBJECT_ID_EOF}`);
@@ -220,7 +220,7 @@ function main(): void {
     const { game, stairs, rn, type } = monsterBesideStairs();
     const dungeon = game.ctx.dungeon;
     const beside = stairs.beside!;
-    const turned = turnedCorner(decodeObjectID(rn).position, stairs.dir);
+    const turned = turnedCorner(game.ctx.dungeon.rnMaps.pos(rn), stairs.dir);
     const p = (turned + 2) & 3;
     const error = (game.systems.dsa as any).moveObjectDsa(
       1, 1 << DBType.CREATURE, 0xf, locationRelToInteger({ l: beside.z, x: beside.x, y: beside.y, p: 0 }), 0,
@@ -228,9 +228,9 @@ function main(): void {
     );
     const there = dungeon.findFirstMonster(stairs.exit);
     console.log(`4. a DSA moves the type ${type} group onto the stairs in corner ${p}: error ${error}, `
-      + `at the exit ${there !== OBJECT_ID_EOF}, corner ${there !== OBJECT_ID_EOF ? decodeObjectID(there).position : '-'} `
+      + `at the exit ${there !== OBJECT_ID_EOF}, corner ${there !== OBJECT_ID_EOF ? game.ctx.dungeon.rnMaps.pos(there) : '-'} `
       + `(the stairs alone: ${turned})`);
-    check(error === 0 && there !== OBJECT_ID_EOF && decodeObjectID(there).position === p,
+    check(error === 0 && there !== OBJECT_ID_EOF && game.ctx.dungeon.rnMaps.pos(there) === p,
       "the DSA's corner, set after the move, overrides the stairs' turn");
   }
 

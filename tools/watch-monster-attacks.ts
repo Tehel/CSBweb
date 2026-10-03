@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
@@ -95,7 +95,7 @@ async function main(): Promise<void> {
   const here = new Position(px, py, level);
   const contents: string[] = [];
   for (let rn = dungeon.findFirstObject(here); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    const { category, index } = decodeObjectID(rn);
+    const { category, index } = game.ctx.dungeon.rnMaps.decode(rn);
     if (category === DBType.MISC) {
       const rec = data.databases.misc.records[index];
       contents.push(`misc#${rec?.miscType}${rec?.specialState === 2 ? ' (champion bones)' : ''}`);

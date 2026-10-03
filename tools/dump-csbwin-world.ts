@@ -23,7 +23,7 @@ import { resolve } from 'node:path';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
-import { decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL } from '../src/core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
 import type { ContainerRecord, CreatureRecord, DungeonData } from '../src/data/dungeonTypes';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
@@ -58,12 +58,12 @@ function walkObjectChains(d: DungeonData): { objects: number; longest: number; p
   let objects = 0;
   let longest = 0;
 
-  const walk = (head: number, what: string): void => {
+  const walk = (head: ObjectID, what: string): void => {
     let rn = head;
     let steps = 0;
     while (rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL) {
       if (++steps > 1000) { problems.push(`${what}: chain does not terminate`); break; }
-      const { category, index } = decodeObjectID(rn);
+      const { category, index } = d.rnMaps.decode(rn);
       const key = DB_OF_CATEGORY[category];
       if (!key) { problems.push(`${what}: category ${category} has no database`); break; }
       const records = d.databases[key].records;

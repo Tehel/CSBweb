@@ -18,7 +18,7 @@
  * status bytes **and the pending AI timers** all have to be renumbered together. Get
  * the timer renumbering wrong and a surviving monster inherits a dead one's turn.
  */
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord } from '../data/dungeonTypes';
 import { ITEM16_FREE } from '../data/dungeonTypes';
@@ -204,7 +204,7 @@ export class MonsterDamage {
         position === 255 || this.random.zeroTo3() === 0 ? this.random.zeroTo3() : position & 0x3;
       const placed = this.dungeon.addObjectToCell(
         new Position(mapX, mapY, level),
-        encodeObjectID(posInCell, category, decodeObjectID(rn).index),
+        this.dungeon.rnMaps.setPos(rn, posInCell),
       );
       if (!placed) this.dungeon.deleteDBEntry(rn);
     }
@@ -235,7 +235,7 @@ export class MonsterDamage {
           important: false,
           weaponType: type & 0x7f,
         });
-        return index === null ? null : encodeObjectID(0, DBType.WEAPON, index);
+        return index === null ? null : this.dungeon.rnMaps.rn(DBType.WEAPON, index);
       }
       case DBType.CLOTHING: {
         const index = this.dungeon.findEmptyDBEntry('clothing', {
@@ -246,7 +246,7 @@ export class MonsterDamage {
           important: false,
           clothingType: type & 0x7f,
         });
-        return index === null ? null : encodeObjectID(0, DBType.CLOTHING, index);
+        return index === null ? null : this.dungeon.rnMaps.rn(DBType.CLOTHING, index);
       }
       case DBType.MISC: {
         const index = this.dungeon.findEmptyDBEntry('misc', {
@@ -255,7 +255,7 @@ export class MonsterDamage {
           important: false,
           miscType: type & 0x7f,
         });
-        return index === null ? null : encodeObjectID(0, DBType.MISC, index);
+        return index === null ? null : this.dungeon.rnMaps.rn(DBType.MISC, index);
       }
       default:
         return null;
@@ -313,9 +313,9 @@ export class MonsterDamage {
     const target = new Position(mapX, mapY, level);
     while (carried !== OBJECT_ID_EOF && carried !== OBJECT_ID_NULL) {
       const next = this.dungeon.getDBRecordLink(carried);
-      const { category, index } = decodeObjectID(carried);
+      const category = this.dungeon.rnMaps.dbType(carried);
       if (category === DBType.WEAPON) droppedWeapon = true;
-      const placed = encodeObjectID(this.random.zeroTo3(), category, index);
+      const placed = this.dungeon.rnMaps.setPos(carried, this.random.zeroTo3());
       this.dungeon.addObjectToCell(target, placed);
       carried = next;
     }

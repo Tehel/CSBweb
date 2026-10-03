@@ -21,7 +21,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, encodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -91,7 +91,7 @@ function stage(game: Game, rotation: number): { party: Position; front: Position
           rigTeleporter(game, front, dest);
           const records = dungeon.getData().databases.teleporters.records;
           for (let rn = dungeon.findFirstObject(front); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-            if (decodeObjectID(rn).category === DBType.TELEPORTER) records[decodeObjectID(rn).index]!.rotation = rotation;
+            if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.TELEPORTER) records[game.ctx.dungeon.rnMaps.idx(rn)]!.rotation = rotation;
           }
           game.ctx.party.state.position = party;
           game.ctx.party.state.facing = 0;
@@ -116,13 +116,13 @@ function takeWeapon(game: Game): ObjectID {
       }
     }
   }
-  return encodeObjectID(0, DBType.WEAPON, index);
+  return game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, index);
 }
 
 function find(game: Game, at: Position, index: number): ObjectID | null {
   const dungeon = game.ctx.dungeon;
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    const decoded = decodeObjectID(rn);
+    const decoded = game.ctx.dungeon.rnMaps.decode(rn);
     if (decoded.category === DBType.WEAPON && decoded.index === index) return rn;
   }
   return null;
@@ -134,7 +134,7 @@ function spy(game: Game): PadCall[] {
   const actuators = game.systems.actuators;
   const real = actuators.triggerObjectMove.bind(actuators);
   actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
-    if (decodeObjectID(object).category === DBType.WEAPON) calls.push({ at: position, place, unchangedRoom });
+    if (game.ctx.dungeon.rnMaps.dbType(object) === DBType.WEAPON) calls.push({ at: position, place, unchangedRoom });
     return real(position, object, place, unchangedRoom, facing);
   };
   return calls;
@@ -154,10 +154,10 @@ function main(): void {
     game.ctx.party.state.cursorOwner = 0;
     game.ctx.party.state.objectInHand = rn;
     const dropped = game.systems.mouse.dropObjectFromCursor(1);
-    const landed = find(game, party, decodeObjectID(rn).index);
+    const landed = find(game, party, game.ctx.dungeon.rnMaps.idx(rn));
     console.log(`1. cursor drop at (${party.x},${party.y}) where the party stands: accepted ${dropped}, `
       + `there ${landed !== null}, pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place, c.unchangedRoom]))}`);
-    check(dropped && landed !== null && decodeObjectID(landed).position === 1, 'the item lies on the party square, corner 1');
+    check(dropped && landed !== null && game.ctx.dungeon.rnMaps.pos(landed) === 1, 'the item lies on the party square, corner 1');
     check(calls.length === 1 && calls[0]!.place && same(calls[0]!.at, party) && calls[0]!.unchangedRoom,
       'it is placed with unchangedRoom = the party stands there (Code11f52.cpp:3433-3448)');
   }
@@ -171,12 +171,12 @@ function main(): void {
     game.ctx.party.state.cursorOwner = 0;
     game.ctx.party.state.objectInHand = rn;
     game.systems.mouse.dropObjectFromCursor(2);
-    const landed = find(game, dest, decodeObjectID(rn).index);
+    const landed = find(game, dest, game.ctx.dungeon.rnMaps.idx(rn));
     console.log(`2. cursor drop onto the teleporter at (${front.x},${front.y}), rotation 1: at (${dest.x},${dest.y}) `
-      + `${landed !== null}, corner ${landed !== null ? decodeObjectID(landed).position : '-'}, `
+      + `${landed !== null}, corner ${landed !== null ? game.ctx.dungeon.rnMaps.pos(landed) : '-'}, `
       + `pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place, c.unchangedRoom]))}`);
     check(landed !== null, 'the item is carried to the destination');
-    check(landed !== null && decodeObjectID(landed).position === 2,
+    check(landed !== null && game.ctx.dungeon.rnMaps.pos(landed) === 2,
       'it keeps the corner it was dropped at: oldX is -1 (Code11f52.cpp:3000-3006)');
     check(calls.length === 1 && same(calls[0]!.at, dest) && !calls[0]!.unchangedRoom,
       'it is placed once, at the destination, with unchangedRoom false');
@@ -189,10 +189,10 @@ function main(): void {
     const rn = takeWeapon(game);
     const calls = spy(game);
     throwLands(game, rn, party, 3);
-    const landed = find(game, party, decodeObjectID(rn).index);
+    const landed = find(game, party, game.ctx.dungeon.rnMaps.idx(rn));
     console.log(`3. thrown item lands at (${party.x},${party.y}) where the party stands: there ${landed !== null}, `
       + `pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place, c.unchangedRoom]))}`);
-    check(landed !== null && decodeObjectID(landed).position === 3, 'the item lies on the party square, corner 3');
+    check(landed !== null && game.ctx.dungeon.rnMaps.pos(landed) === 3, 'the item lies on the party square, corner 3');
     check(calls.length === 1 && calls[0]!.place && calls[0]!.unchangedRoom,
       'it is placed with unchangedRoom = the party stands there (Code11f52.cpp:3433-3448)');
   }
@@ -203,10 +203,10 @@ function main(): void {
     const { front, dest } = stage(game, 1);
     const rn = takeWeapon(game);
     throwLands(game, rn, front, 2);
-    const landed = find(game, dest, decodeObjectID(rn).index);
+    const landed = find(game, dest, game.ctx.dungeon.rnMaps.idx(rn));
     console.log(`4. thrown item lands on the teleporter at (${front.x},${front.y}), rotation 1: at (${dest.x},${dest.y}) `
-      + `${landed !== null}, corner ${landed !== null ? decodeObjectID(landed).position : '-'}`);
-    check(landed !== null && decodeObjectID(landed).position === 3,
+      + `${landed !== null}, corner ${landed !== null ? game.ctx.dungeon.rnMaps.pos(landed) : '-'}`);
+    check(landed !== null && game.ctx.dungeon.rnMaps.pos(landed) === 3,
       'it is carried to the destination and turned: oldX is -2, not -1 (Code11f52.cpp:3000-3006)');
   }
 
@@ -236,7 +236,7 @@ function main(): void {
     const afterDrop = queued();
 
     padTimer = -1;
-    const lying = find(game, front, decodeObjectID(rn).index)!;
+    const lying = find(game, front, game.ctx.dungeon.rnMaps.idx(rn))!;
     game.ctx.dungeon.removeObjectFromCell(front, lying);
     game.ctx.systems.mouse.triggerObjectMove(front, lying, false, false, 0);
     const afterPickUp = queued();

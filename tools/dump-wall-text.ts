@@ -27,7 +27,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, encodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { drawWallText } from '../src/renderer/bytecode/DrawDecorations';
@@ -111,13 +111,13 @@ for (const set of ['dm-atari', 'dm-atari-1.3-fr']) {
       for (let y = 0; y < map.cellFlags[x]!.length; y++) {
         const roomType = (map.cellFlags[x]![y]! >> 5) & 0x7;
         for (let rn = dungeon.findFirstObject(new Position(x, y, z)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-          if (decodeObjectID(rn).category !== DBType.TEXT) continue;
+          if (dungeon.rnMaps.dbType(rn) !== DBType.TEXT) continue;
           const record = dungeon.getTextRecord(rn);
           const bytes = record ? dungeon.decodeWallTextBytes(record, tables.textDecode) : null;
           if (!bytes) continue;
           const lines = linesOf(bytes);
           const past = lines.some((codes) => codes.some((code) => code >= GLYPHS));
-          const name = `TEXT #${decodeObjectID(rn).index} at map ${z} (${x},${y})`;
+          const name = `TEXT #${dungeon.rnMaps.idx(rn)} at map ${z} (${x},${y})`;
           if (roomType !== RoomType.STONE) {
             if (past) pastElsewhere.push(`${name}, room type ${roomType}`);
             continue;
@@ -146,7 +146,7 @@ for (const set of ['dm-atari', 'dm-atari-1.3-fr']) {
     set === 'dm-atari' ? 'and no text on a square' : "the French message of map 0 (9,1) decodes to one as a wall's, and is on a teleporter");
 
   // 3. A code of 50 alone on a line: source x 400, which is x 112 of the row below.
-  const one = draw(Uint8Array.of(50, 129), encodeObjectID(0, DBType.TEXT, 0));
+  const one = draw(Uint8Array.of(50, 129), dungeon.rnMaps.rn(DBType.TEXT, 0));
   const x1 = 112 - 4;
   const y2 = tables.wallTextLineY2[0]!;
   let asGlyph14 = true;

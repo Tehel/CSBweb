@@ -29,7 +29,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { OBJNI_ILLUMULET_A, OBJNI_TORCH_A } from '../src/core/objectNameIndex';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, encodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { monsterCanSeeInDark } from '../src/data/tables/MonsterDesc';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -82,10 +82,10 @@ function copyOf(category: DBType.WEAPON | DBType.MISC, objNI: number): ObjectID 
   const db = category === DBType.WEAPON ? data!.databases.weapons : data!.databases.misc;
   const count = db.records.length;
   for (let i = 0; i < count; i++) {
-    if (GetBasicObjectType(ctx.dungeon, ctx.tables.objDescObjectType, encodeObjectID(0, category, i)) !== objNI) continue;
+    if (GetBasicObjectType(ctx.dungeon, ctx.tables.objDescObjectType, game.ctx.dungeon.rnMaps.rn(category, i)) !== objNI) continue;
     (db.records as object[]).push({ ...db.records[i]!, nextObject: OBJECT_ID_EOF });
     db.count++;
-    return encodeObjectID(0, category, db.records.length - 1);
+    return game.ctx.dungeon.rnMaps.rn(category, db.records.length - 1);
   }
   throw new Error(`no object ${objNI} in the dungeon`);
 }

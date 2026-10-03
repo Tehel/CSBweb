@@ -41,7 +41,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { MISC_BONES_OF_HERO } from '../src/core/constants';
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, encodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -147,7 +147,7 @@ function makeDungeonBones(game: Game, chIdx: number, posInCell: number): ObjectI
     miscType: MISC_BONES_OF_HERO,
   });
   db.count++;
-  return encodeObjectID(posInCell & 0x3, DBType.MISC, db.records.length - 1);
+  return game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.MISC, db.records.length - 1), posInCell & 0x3);
 }
 
 /**
@@ -183,11 +183,11 @@ function findViAltars(game: Game): Array<{ alcove: Position; party: Position; fa
           rn !== OBJECT_ID_EOF;
           rn = dungeon.getDBRecordLink(rn)
         ) {
-          if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+          if (game.ctx.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
           const rec = dungeon.getActuatorRecord(rn);
           if (!rec) continue;
           if (!ornateSlots.has(getActuatorWallGraphicOrdinal(rec) | 0)) continue;
-          const facing = (decodeObjectID(rn).position + 2) & 0x3;
+          const facing = (game.ctx.dungeon.rnMaps.pos(rn) + 2) & 0x3;
           const [dx, dy] = DELTA[facing]!;
           out.push({ alcove, party: new Position(x - dx, y - dy, z), facing });
         }
@@ -204,7 +204,7 @@ function bonesAt(game: Game, cell: Position): ObjectID[] {
     rn !== OBJECT_ID_EOF;
     rn = game.ctx.dungeon.getDBRecordLink(rn)
   ) {
-    if (decodeObjectID(rn).category !== DBType.MISC) continue;
+    if (game.ctx.dungeon.rnMaps.dbType(rn) !== DBType.MISC) continue;
     if (game.ctx.dungeon.getMiscRecord(rn)?.miscType === MISC_BONES_OF_HERO) out.push(rn);
     if (out.length > 32) break;
   }
@@ -218,7 +218,7 @@ function cloudsAt(game: Game, cell: Position): number {
     rn !== OBJECT_ID_EOF;
     rn = game.ctx.dungeon.getDBRecordLink(rn)
   ) {
-    if (decodeObjectID(rn).category === DBType.CLOUD) n++;
+    if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.CLOUD) n++;
     if (n > 32) break;
   }
   return n;
@@ -262,7 +262,7 @@ function main(): void {
     );
 
     // Schedule the altar the way a drop into the alcove does.
-    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
+    g.systems.timer.scheduleViAltar(rn, cell, g.ctx.dungeon.rnMaps.pos(rn) & 0x3, g.ctx.state.tickCount);
 
     console.log('');
     console.log(['tick', 'clouds in cell', 'bones in cell', `HERO${victim} alive`, 'health', 'maxHealth'].join('\t'));
@@ -332,7 +332,7 @@ function main(): void {
     console.log(`bones: ${bones.length}, expool record: ${record}`);
     check(bones.length === 1 && record === 0, 'the death records fingerprint 0 in the expool');
     if (rn !== undefined) {
-      g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
+      g.systems.timer.scheduleViAltar(rn, cell, g.ctx.dungeon.rnMaps.pos(rn) & 0x3, g.ctx.state.tickCount);
       runTicks(g, 7);
       check(g.ctx.party.state.champions[victim]!.attributes.health !== 0, 'and the altar raises the champion');
     }
@@ -360,7 +360,7 @@ function main(): void {
     g.ctx.dungeon.addObjectToCell(cell, rn);
     check(g.ctx.dungeon.copyChampionBonesRecord(rn) === null, 'authored bones have no expool record');
 
-    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
+    g.systems.timer.scheduleViAltar(rn, cell, g.ctx.dungeon.rnMaps.pos(rn) & 0x3, g.ctx.state.tickCount);
     runTicks(g, 8);
 
     const c = g.ctx.party.state.champions[target]!;
@@ -382,7 +382,7 @@ function main(): void {
 
     const rn = makeDungeonBones(g, target, 0);
     g.ctx.dungeon.addObjectToCell(cell, rn);
-    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
+    g.systems.timer.scheduleViAltar(rn, cell, g.ctx.dungeon.rnMaps.pos(rn) & 0x3, g.ctx.state.tickCount);
     runTicks(g, 8);
 
     const c = g.ctx.party.state.champions[target]!;
@@ -415,7 +415,7 @@ function main(): void {
       fail('the death left no bones paired with the champion');
     } else {
       g.ctx.party.state.champions[victim]!.attributes.health = 50;
-      g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
+      g.systems.timer.scheduleViAltar(rn, cell, g.ctx.dungeon.rnMaps.pos(rn) & 0x3, g.ctx.state.tickCount);
       runTicks(g, 8);
       const record = g.ctx.dungeon.copyChampionBonesRecord(rn);
       console.log(`HERO${victim} health ${g.ctx.party.state.champions[victim]!.attributes.health}, ` +
@@ -425,7 +425,7 @@ function main(): void {
       check(record === null, 'but their record is gone');
 
       // Offered again, they are bones with no record: `chIndex = DB10A2->value()`.
-      g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
+      g.systems.timer.scheduleViAltar(rn, cell, g.ctx.dungeon.rnMaps.pos(rn) & 0x3, g.ctx.state.tickCount);
       runTicks(g, 8);
       const other = g.ctx.party.state.champions[2]!;
       console.log(`offered again: HERO2 alive ${other.attributes.health !== 0}, the bones on the floor: ${bonesAt(g, cell).includes(rn)}`);
@@ -454,7 +454,7 @@ function main(): void {
     const cornerBefore = g.ctx.party.state.champions[target]!.partyPosition;
 
     const rn = bonesAt(g, cell)[0]!;
-    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
+    g.systems.timer.scheduleViAltar(rn, cell, g.ctx.dungeon.rnMaps.pos(rn) & 0x3, g.ctx.state.tickCount);
     runTicks(g, 8);
 
     const c = g.ctx.party.state.champions[target]!;

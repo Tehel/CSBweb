@@ -37,7 +37,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, decodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { ActuatorAction, getActuatorAction, getActuatorType } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -334,7 +334,7 @@ async function main(): Promise<void> {
       const cellFlag = dungeon.getCellFlag(at);
       if (((cellFlag >> 5) & 0x7) === RoomType.DOOR && !doorScene) {
         const doorRN = dungeon.findFirstDoor(at);
-        if (doorRN === OBJECT_ID_EOF || !dungeon.getDoorRecordByIndex(decodeObjectID(doorRN).index)?.hasButton) continue;
+        if (doorRN === OBJECT_ID_EOF || !dungeon.getDoorRecordByIndex(game.ctx.dungeon.rnMaps.idx(doorRN))?.hasButton) continue;
         for (let dir = 0; dir < 4 && !doorScene; dir++) {
           // The button is on the faces the door is seen across (`MouseSystem.handleDoorSwitchClick`).
           if (((cellFlag & 0x8) >> 3) === (dir & 1)) continue;
@@ -346,7 +346,7 @@ async function main(): Promise<void> {
       let objects = 0;
       for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
         objects++;
-        const { category, position: side } = decodeObjectID(rn);
+        const { category, position: side } = game.ctx.dungeon.rnMaps.decode(rn);
         const rec = category === DBType.ACTUATOR ? dungeon.getActuatorRecord(rn) : null;
         if (!rec || switchScene || getActuatorType(rec) !== 1) continue;
         if (getActuatorAction(rec) === ActuatorAction.CONSTPRESSURE) continue;
@@ -501,7 +501,7 @@ async function main(): Promise<void> {
       for (let y = 0; y < height; y++) {
         const at = new Position(x, y, level);
         for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-          const { category } = decodeObjectID(rn);
+          const { category } = game.ctx.dungeon.rnMaps.decode(rn);
           if (category < DBType.WEAPON || category === DBType.MISSILE || category === DBType.CLOUD) continue;
           dungeon.removeObjectFromCell(at, rn);
           return rn;
@@ -546,7 +546,7 @@ async function main(): Promise<void> {
   const onFloor = dungeon.findFirstObject(party.position);
   let floorItem: ObjectID = OBJECT_ID_EOF as ObjectID;
   for (let rn = onFloor; rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-    if (decodeObjectID(rn).category >= DBType.WEAPON) floorItem = rn;
+    if (game.ctx.dungeon.rnMaps.dbType(rn) >= DBType.WEAPON) floorItem = rn;
   }
   const unset = { x1: 255, y1: 0, x2: 0, y2: 0 };
   const drawnView = ui.context;

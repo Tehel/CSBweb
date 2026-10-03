@@ -26,7 +26,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, encodeObjectID, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -502,7 +502,7 @@ function giveSword(game: Game, chIdx: number): ObjectID {
     important: false, weaponType: WEAPON_SWORD,
   });
   data.databases.weapons.count++;
-  const rn = encodeObjectID(0, DBType.WEAPON, data.databases.weapons.records.length - 1);
+  const rn = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, data.databases.weapons.records.length - 1);
   const champ = game.ctx.party.state.champions[chIdx]!;
   champ.possessions![1] = rn;
   return rn as ObjectID;

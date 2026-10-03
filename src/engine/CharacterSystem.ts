@@ -22,7 +22,7 @@ import {
   OBJNI_TORCH_A,
   OBJNI_TORCH_D,
 } from '../core/objectNameIndex';
-import { DBType, decodeObjectID, OBJECT_ID_NULL, withObjectPosition, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { characterAtPosition } from './AddCharacter';
 import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
 import { nameIndexOf, type GameContext } from './GameContext';
@@ -147,7 +147,7 @@ export class CharacterSystem {
       const objD5 = this.removeCharacterPossession(chIdx, this.ctx.tables.dropOrder[D4W]!);
       if (objD5 === OBJECT_ID_NULL) continue;
       this.ctx.systems.worldMove.moveObject(
-        withObjectPosition(objD5, D6W), -1, 0, party.position.x, party.position.y, party.position.z,
+        this.ctx.dungeon.rnMaps.setPos(objD5, D6W), -1, 0, party.position.x, party.position.y, party.position.z,
       );
     }
   }
@@ -172,7 +172,7 @@ export class CharacterSystem {
    */
   matchingAmmunition(champion: Champion, slot: number): boolean {
     const launcher = getChampionPossession(champion, 1);
-    if (launcher === OBJECT_ID_NULL || decodeObjectID(launcher).category !== DBType.WEAPON) return false;
+    if (launcher === OBJECT_ID_NULL || this.ctx.dungeon.rnMaps.dbType(launcher) !== DBType.WEAPON) return false;
     const launcherDesc = this.ctx.systems.characterStats.weaponDescFor(launcher);
     if (!launcherDesc) return false;
     let wanted: number;
@@ -181,7 +181,7 @@ export class CharacterSystem {
     else return false;
 
     const candidate = getChampionPossession(champion, slot);
-    if (candidate === OBJECT_ID_NULL || decodeObjectID(candidate).category !== DBType.WEAPON) return false;
+    if (candidate === OBJECT_ID_NULL || this.ctx.dungeon.rnMaps.dbType(candidate) !== DBType.WEAPON) return false;
     const desc = this.ctx.systems.characterStats.weaponDescFor(candidate);
     return !!desc && desc.uByte1 === wanted;
   }
@@ -198,7 +198,7 @@ export class CharacterSystem {
     for (const source of [12, 7, 8, 9]) {
       const obj = getChampionPossession(champion, source);
       if (obj === OBJECT_ID_NULL) continue;
-      if (decodeObjectID(obj).category !== DBType.WEAPON) continue;
+      if (this.ctx.dungeon.rnMaps.dbType(obj) !== DBType.WEAPON) continue;
       this.addCharacterPossession(chIdx, this.removeCharacterPossession(chIdx, source), slot);
       return;
     }

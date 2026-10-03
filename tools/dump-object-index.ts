@@ -23,7 +23,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import * as OBJNI from '../src/core/objectNameIndex';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, encodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { DatabaseRecord, Databases } from '../src/data/dungeonTypes';
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     let firstName = '-';
     let mismatches = 0;
     for (let index = 0; index < records.length; index++) {
-      const rn = encodeObjectID(0, category, index);
+      const rn = dungeon.rnMaps.rn(category, index);
       const descIndex = DescIndex(dungeon, rn);
       if (descIndex !== DescIndexOfRecord(category, records[index] ?? null)) mismatches++;
       if (OBJECT_DBS.has(category)) {
@@ -119,7 +119,7 @@ async function main(): Promise<void> {
     const [, key] = DATABASE_OF.find(([c]) => c === category)!;
     const records = data.databases[key].records;
     for (let index = 0; index < records.length; index++) {
-      const rn = encodeObjectID(0, category, index);
+      const rn = dungeon.rnMaps.rn(category, index);
       if (pick(basic(rn))) return rn;
     }
     return null;

@@ -30,7 +30,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
-  DBType, decodeObjectID, locationRelToInteger, OBJECT_ID_EOF, Position, RoomType, type ObjectID,
+  DBType, locationRelToInteger, OBJECT_ID_EOF, Position, RoomType, type ObjectID,
 } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
     const out: ObjectID[] = [];
     const dungeon = game.ctx.dungeon;
     for (let rn = dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
-      if (decodeObjectID(rn).category === category) out.push(rn);
+      if (game.ctx.dungeon.rnMaps.dbType(rn) === category) out.push(rn);
     }
     return out;
   };
@@ -109,7 +109,7 @@ async function main(): Promise<void> {
       + `now ${moved.map((r) => r.toString(16)).join(',') || 'nowhere'}, timer at (${timer?.uByte6},${timer?.uByte7}) L${timer?.level} obj ${timer?.object?.toString(16)}`);
     check(result === 0, 'a cell source hands a cloud over (result 0, not SER_NoCloudsPlease)');
     check(inCell(game, from, DBType.CLOUD).length === 0 && moved.length === 1, 'the cloud leaves its square for the destination');
-    check(moved.length === 1 && decodeObjectID(moved[0]).position === 2, 'it lands in the corner the position mask names');
+    check(moved.length === 1 && game.ctx.dungeon.rnMaps.pos(moved[0]) === 2, 'it lands in the corner the position mask names');
     check(!!timer && timer.uByte6 === to.x && timer.uByte7 === to.y && timer.level === to.z,
       'FindCellDestination points the TT_25 at the new square and level');
     check(!!timer && moved.length === 1 && timer.object === moved[0], 'the timer names the cloud as it now lies');
@@ -180,7 +180,7 @@ async function main(): Promise<void> {
   const emptyOpen = (game: Game, p: Position): boolean =>
     roomType(game, p) === RoomType.OPEN && game.ctx.dungeon.findFirstObject(p) === OBJECT_ID_EOF;
   const holding = (game: Game, p: Position, rn: ObjectID): boolean =>
-    inCell(game, p, decodeObjectID(rn).category).some((r) => (r & 0x3fff) === (rn & 0x3fff));
+    inCell(game, p, game.ctx.dungeon.rnMaps.dbType(rn)).some((r) => (r & 0x3fff) === (rn & 0x3fff));
   /** An item lying on a floor somewhere: the thing the DSA moves. */
   const anItem = (game: Game): { at: Position; rn: ObjectID } => {
     let found: { at: Position; rn: ObjectID } | null = null;
