@@ -89,7 +89,7 @@ export type PrisonDoorChoice = 'enter' | 'resume' | 'rise';
 
 /**
  * RISE, the port's own button: CSBWin's UTILITY → "MAKE NEW ADVENTURE" on the entrance
- * (`DEBT.md` G17, `src/engine/Chaos.ts`), shown only by a data set with a `mini.dat`, so
+ * (`doc/SAVES.md` → "RISE makes a save of its own", `src/engine/Chaos.ts`), shown only by a data set with a `mini.dat`, so
  * Dungeon Master's entrance is CSBWin's.
  *
  * It is carved from the entrance itself: RESUME's gem, the R, I and S of PRISON and the E

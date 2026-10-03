@@ -67,7 +67,7 @@ export interface KnownDungeon {
  * digests of a dungeon that is to be added.
  *
  * The four Dungeon Master sets are one dungeon. Chaos Strikes Back is two: its
- * `dungeon.dat` is the prison, and the game is `mini.dat`'s (`DEBT.md` G17). Conflux is
+ * `dungeon.dat` is the prison, and the game is `mini.dat`'s (`doc/PROVEN_FACTS.md` → "A compressed `dungeon.dat`: CSB's prison"). Conflux is
  * not listed: its `dungeon.dat` is enciphered, and not read (`DEBT.md` G23, G26).
  */
 export const KNOWN_DUNGEONS: readonly KnownDungeon[] = [

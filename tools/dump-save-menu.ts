@@ -375,7 +375,7 @@ function checkLayout(graphics: GraphicsLoader): void {
 
   const blank: SaveMenu.SaveMenuState = {
     mode: 'full', entries: [], unfolded: new Set(), rows: [], selected: -1, scrollTop: 0, busy: true, message: '',
-    press: null, pending: null, confirm: null, dropped: null, frameHandle: null, lastSaveClick: null,
+    press: null, pending: null, confirm: null, dropped: null, adventure: null, frameHandle: null, lastSaveClick: null,
   };
   ui.saveMenu = blank;
   ui.screenIndexBuffer!.pixels.fill(7);
@@ -2398,7 +2398,7 @@ async function checkExport(graphics: GraphicsLoader): Promise<void> {
 
 /* ---------------------------------------------------------------- 18. the import ---- */
 
-/** A save of Chaos Strikes Back, and the save its game starts from (`DEBT.md` G17). */
+/** A save of Chaos Strikes Back, and the save its game starts from (`doc/SAVES.md` → "RISE makes a save of its own"). */
 const CSB_SAVE = 'static/gamefiles/csb/csbgame2.dat';
 const CSB_MINI = 'static/gamefiles/csb/mini.dat';
 

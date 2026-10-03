@@ -2956,7 +2956,11 @@ byte. Its count is the word `D7W`.
 
 CSB's `dungeon.dat` (`static/gamefiles/csb/`) is compressed: 2098 bytes, 2622 expanded,
 `Word22592` 12. The image is two levels (20x16 and 21x16), sentinel 8, start (9,0) facing
-2, with 4 doors, 26 texts, 30 actuators and 12 groups. Its sections end two bytes short of
+2, with 4 doors, 26 texts, 30 actuators and 12 groups. Level 0 is where the champions are
+chosen: 24 type-127 actuators, the mirrors, values 0 to 23, each facing a square whose
+`TEXT` is the champion's, as DM's Hall of Champions has them, and a text at (9,2):
+"THERE IS ONLY ONE LEVEL HERE. FIRST CHOOSE YOUR CHAMPIONS...THEN SAVE THE GAME... THEN
+RESTART WITH THE UTILITY DISK." (`tools/peek-dungeon.ts`). Its sections end two bytes short of
 2622, and those two bytes are the checksum `ReadDatabases` compares with the byte sum of
 everything `FetchDataBytes` fetched (`SaveGame.cpp:2654-2658`, `CSBCode.cpp:9081-9106`):
 0x939f, which the port's expansion reproduces (`tools/dump-compressed-dungeon.ts`). A

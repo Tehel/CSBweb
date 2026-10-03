@@ -22,7 +22,7 @@ code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, and the work it
-needs is in the active list: G23, G1 to G4, G24, G25, G27 and G26, after G17. G23 comes
+needs is in the active list: G23, G1 to G4, G24, G25, G27 and G26. G23 comes
 first: until the whole file is deciphered, nothing else on that path can be checked
 against the dungeon. Each entry says what Conflux uses of it, measured on the deciphered file.
 DSA support is aimed at whole, not at Conflux's share of it: G1 is every operation CSBWin
@@ -91,7 +91,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⚠️ the engine and RISE done; the prison's shortcut |
+| C116 | Three of the prison's mirrors give no champion | S | ⏳ |
 | G23 | Enciphered files: the whole of a `dungeon.dat`, and the saves of its game | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
@@ -127,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C116 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C117 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -170,6 +170,25 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C116 ⏳ Three of the prison's mirrors give no champion
+
+CSB's prison has 24 mirrors on level 0 (`doc/PROVEN_FACTS.md` → "A compressed
+`dungeon.dat`: CSB's prison"), and `extractPresetHeroes` (`src/data/HeroExtractor.ts`)
+reads a champion for 21 of them. It rejects the texts behind three, so a click on those
+mirrors does nothing: `findHeroForMirror` finds no hero and `addCharacter` returns
+(`src/engine/HallOfChampions.ts`).
+
+| Mirror | Value | Text, at | As `tools/peek-dungeon.ts dump 0` prints it |
+| --- | --- | --- | --- |
+| (13,2), east face | 8 | (14,2) | ` / MANTIA SPELLWEAVER OF KE LT F AAMIAILGAAKN …` |
+| (17,2), west face | 10 | (16,2) | ` / SLOGAR WEBBER OF ARACHNI A F AAPKAKFKAAEG …` |
+| (10,11), north face | 7 | (10,10) | ` / VEN HIGH PRIEST OF SS HA M AAMPAGKEAAJG …` |
+
+In the 21 others the printout shows a line break between the title and the gender letter;
+in these three it shows none. What CSBWin's `AddCharacter` (`doc/CSBwin-src/Character.cpp:456`)
+makes of these texts is not traced yet: trace its reading of the name, the title and the
+gender, then the `legalHero` fallback (`:475`, `G4`), before changing the extractor.
 
 ---
 
@@ -225,65 +244,6 @@ those timings updated.
 Things CSBWin does that the port has not built. These are not defects in existing code;
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
-
-### G17 ⚠️ A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE"
-
-CSBWin makes a CSB game in three steps (the utility's own header,
-`doc/CSBwin-src/Chaos.cpp:1-5`):
-
-1. **DUNGEON → Enter** reads `dungeon.dat`, the prison, and the party is saved from
-   it as `CSBGAMEn.DAT` (`SaveGame.cpp:902-908`). Where the champions are chosen in it is
-   not yet traced. The port reads the compressed prison (`DungeonLoader.loadDungeonDat`,
-   `doc/PROVEN_FACTS.md` → "A compressed `dungeon.dat`: CSB's prison").
-2. **UTILITY → "MAKE NEW ADVENTURE"**: a saved game, CSB's or DM's, and `mini.dat` make
-   a new save with the saved game's party in `mini.dat`'s dungeon (`doc/PROVEN_FACTS.md`
-   → ""MAKE NEW ADVENTURE" copies a saved game's party into `mini.dat`, block by block").
-3. **DUNGEON → Resume** loads that save. An Atari-era save, with no Extended Features
-   block, is a CSBWin file, and installs its own world whatever the running game's
-   (`tools/dump-atari-saves.ts`).
-
-A DM party can therefore be carried into CSB, which is the classic way to play it.
-**How the port offers step 2 (the author's decision): its engine only.** The checks and
-`TAG002724`'s copy run from the page or the save menu on a chosen source save, writing a
-new save. The utility's screen is not ported. Step 2 is not run behind the player's
-back when the prison's party is saved; the prison offers it, with a question (below).
-
-The split:
-
-- **The engine: done.** `makeNewAdventure` (`src/engine/Chaos.ts`) takes the source
-  save's bytes and `mini.dat`'s and returns the new save's, or throws a `UtilityError`
-  carrying CSBWin's message (`tools/dump-new-adventure.ts`). Two forms CSBWin's utility
-  reads are G28's.
-- **The page: done.** CSB's entrance has RISE, the port's own button, under PRISON
-  and RESUME (`RISE_BUTTON`, `src/renderer/intro/PrisonDoor.ts`): carved from graphic 4
-  itself, RESUME's gem and the R, I and S of PRISON and E of RESUME on the bare rock
-  above the scroll, and shown only by a data set with a `mini.dat` (`DataSet.miniDat`),
-  so DM's entrance and the golden frames do not move. It opens the chooser over every
-  data set's saves (`SaveMenu`'s `rise` mode), whose LOAD makes the new adventure from
-  the chosen one (`GameSaves.makeNewAdventure`): stored as a row of the `csb` set named
-  after the source's with `-csb` (CSBWin's player picks one of four slots, `_TAG000ede`,
-  `Chaos.cpp:1467-1541`), and read, so the game starts in it at once, where CSBWin's
-  player goes back to the door and resumes it. A refusal shows CSBWin's message in the
-  entrance's one-button menu, and OK goes back to the entrance (`tools/dump-rise.ts`,
-  `doc/SAVES.md` → "RISE makes a save of its own").
-- **⏳ The prison's shortcut** (the author's decision). The prison has no way out:
-  level 0's four stairs lead down to a level 1 of mummies and rock piles, and the text
-  at (9,2) of level 0 says "FIRST CHOOSE YOUR CHAMPIONS...THEN SAVE THE GAME... THEN
-  RESTART WITH THE UTILITY DISK." A player who has saved there would otherwise have to
-  reload the page to reach RISE. So the game asks "BEGIN THE ADVENTURE?", YES and NOT
-  YET, in the two-button menu the import's confirmation uses, at two moments:
-  - after a save in the prison, from any party size (CSB is often played with fewer
-    than four);
-  - once the fourth champion has joined (the recruitment over), when the party can
-    grow no more. YES saves first, under the name F5 gives its quick save, so the
-    prison save stays and can be raised again from the door.
-
-  YES makes the new adventure from that save, stores it as `<name>-csb` and starts the
-  game in it, as RISE does. A game is the prison's when its `Word22592` is 12, which
-  the compressed `dungeon.dat` sets (`doc/PROVEN_FACTS.md` → "A compressed
-  `dungeon.dat`: CSB's prison"); every adventure's is 13. To trace first: where the
-  prison has the champions chosen, and that its save is one the engine takes (12
-  passes `TAG00260e`).
 
 ### G28 ⏳ The utility's two untried forms: a saved game unscrambled with word 10, and a `mini.dat` with an Extended Features block
 

@@ -46,7 +46,7 @@ import { genuineSaves, savePath } from './lib/saves';
 const DM = 'Dungeon Master';
 const CSB = 'Chaos Strikes Back';
 
-/** CSB's game is not its `dungeon.dat`, the prison, but this save (`DEBT.md` G17). */
+/** CSB's game is not its `dungeon.dat`, the prison, but this save (`doc/PROVEN_FACTS.md` → "A compressed `dungeon.dat`: CSB's prison"). */
 const MINI = 'static/gamefiles/csb/mini.dat';
 const CSB_SAVE = 'static/gamefiles/csb/csbgame2.dat';
 

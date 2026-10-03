@@ -104,6 +104,17 @@
  * (`doc/CSBwin-src/SaveGame.cpp:1605-1606`, where it refuses the save outright), with the
  * action and CANCEL. The load-only chooser has no game to leave and never asks.
  *
+ * ## The prison's question
+ *
+ * CSB's prison has no way out: the party chosen there is saved, and carried into the
+ * adventure by the utility. So in the prison (`UIState.isPrison`) the disk menu's SAVE,
+ * F5 and the fourth champion joining ask "BEGIN THE ADVENTURE?", YES and NOT YET, in
+ * `_DoMenu`'s two-option menu in the dialog's place (`askBeginAdventure`). YES makes the
+ * new adventure from the save just written, or, after the fourth champion, from a
+ * quick-save it writes first, and reads it, as the entrance's RISE does
+ * (`UIState.onMakeNewAdventure`); a refusal is the dialog's message. NOT YET goes back to
+ * the list, or closes the dialog when it was raised for the question alone.
+ *
  * ## Modality and the clock
  *
  * `_WaitForMenuSelect` nulls `SecondaryButtonList` and both `pKeyXlate`s and replaces
@@ -267,6 +278,11 @@ export function importMenu(refusal: ImportRefusal): { title1: string; title2: st
   }
 }
 
+/** The prison's question (`askBeginAdventure`), and its two options. */
+export const BEGIN_ADVENTURE_QUESTION = 'BEGIN THE ADVENTURE?';
+const YES_LABEL = 'YES';
+const NOT_YET_LABEL = 'NOT YET';
+
 /** The dialog's own buttons; the question's are CSBWin's 210 and 211. */
 const BTN_LOAD = 900;
 const BTN_SAVE = 901;
@@ -367,6 +383,12 @@ export interface SaveMenuState {
    * place (`importMenu`), or `null`.
    */
   dropped: { file: ImportedFile; refusal: ImportRefusal } | null;
+  /**
+   * The prison's question while it is up (`askBeginAdventure`): the save YES makes the
+   * adventure from, `null` for a quick-save written first, and whether the dialog was
+   * raised for the question `alone`, so that NOT YET closes it.
+   */
+  adventure: { source: SaveEntry | null; alone: boolean } | null;
   frameHandle: number | null;
   /** The save a click last selected, and when (`nowMs`): a second click on it soon after is LOAD. */
   lastSaveClick: { id: string; atMs: number } | null;
@@ -401,10 +423,23 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
     pending: null,
     confirm: null,
     dropped: null,
+    adventure: null,
     frameHandle: null,
     lastSaveClick: null,
   };
   void refreshSaveMenu(ui);
+}
+
+/**
+ * "BEGIN THE ADVENTURE?", in the prison: over the disk menu, or in a dialog raised for it
+ * alone, as the disk menu is raised, the clock stopped (see "The prison's question").
+ */
+export function askBeginAdventure(ui: UIState, source: SaveEntry | null): void {
+  const alone = !ui.saveMenu;
+  openSaveMenu(ui);
+  if (!ui.saveMenu) return;
+  ui.saveMenu.adventure = { source, alone };
+  ui.renderLastFrame();
 }
 
 export function closeSaveMenu(ui: UIState): void {
@@ -724,6 +759,11 @@ export function drawSaveMenu(ui: UIState): void {
   if (!state) return;
   clearIndex(ui.screenIndexBuffer, 0);
 
+  if (state.adventure) {
+    doMenu(ui, BEGIN_ADVENTURE_QUESTION, null, [YES_LABEL, NOT_YET_LABEL], true);
+    if (state.press) drawMenuPress(ui, state.press, nowMs());
+    return;
+  }
   if (state.confirm) {
     doMenu(ui, SAVE_MENU_QUESTION, null, [ACTION_LABELS[state.confirm], CANCEL_LABEL], true);
     if (state.press) drawMenuPress(ui, state.press, nowMs());
@@ -821,11 +861,16 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
   // Right-click cancels, the question when one is up. CSBWin has no such thing; see the
   // divergence list.
   if ((buttons & 1) !== 0) {
-    if ((state.confirm || state.dropped) && !state.press) cancelQuestion(ui, state);
+    if ((state.confirm || state.dropped || state.adventure) && !state.press) cancelQuestion(ui, state);
     else closeSaveMenu(ui);
     return;
   }
   if (state.busy || state.press) return;
+
+  if (state.adventure) {
+    answerAdventure(ui, state, state.adventure, menuHitTest(menuButtonList(ui, 2, true), x, y, buttons));
+    return;
+  }
 
   if (state.dropped) {
     const options = importMenu(state.dropped.refusal).options.length;
@@ -919,10 +964,34 @@ function answerDropped(ui: UIState, state: SaveMenuState, dropped: NonNullable<S
   });
 }
 
-/** Esc or a right-click on the question, or on the menu about a dropped file: CANCEL, without the press. */
+/**
+ * A click on the prison's question, `choice` being `_WaitForMenuSelect`'s: 1 is YES, 2
+ * is NOT YET, and 0 neither button. The button flashes with the question still up; then
+ * YES begins the adventure, and NOT YET is the list again, or no dialog.
+ */
+function answerAdventure(ui: UIState, state: SaveMenuState, adventure: NonNullable<SaveMenuState['adventure']>, choice: number): void {
+  if (choice !== 1 && choice !== 2) return;
+  beginPress(ui, state, menuButtonList(ui, 2, true), 209 + choice, () => {
+    if (choice === 1) {
+      state.adventure = null;
+      void beginAdventure(ui, state, adventure.source);
+    } else {
+      cancelQuestion(ui, state);
+    }
+  });
+}
+
+/**
+ * Esc or a right-click on a question, or on the menu about a dropped file: CANCEL, or the
+ * prison's NOT YET, without the press. A dialog raised for the prison's question alone
+ * closes.
+ */
 function cancelQuestion(ui: UIState, state: SaveMenuState): void {
+  const alone = state.adventure?.alone ?? false;
   state.confirm = null;
   state.dropped = null;
+  state.adventure = null;
+  if (alone) closeSaveMenu(ui);
   ui.renderLastFrame();
 }
 
@@ -1056,7 +1125,28 @@ async function doSave(ui: UIState, state: SaveMenuState): Promise<void> {
   await refreshSaveMenu(ui);
   selectSave(ui, state, saved);
   state.message = 'GAME SAVED';
+  if (ui.isPrison()) state.adventure = { source: saved, alone: false };
   ui.renderLastFrame();
+}
+
+/**
+ * YES to the prison's question: the new adventure made from `source`, or from F5's
+ * quick-save written first (`UIState.onSaveGame`), stored, and read in the game's place,
+ * as the entrance's RISE reads it (`doLoad`). A refusal, or a write or a read that
+ * fails, is the dialog's message, over the list listed again, the quick-save included.
+ */
+async function beginAdventure(ui: UIState, state: SaveMenuState, source: SaveEntry | null): Promise<void> {
+  state.busy = true;
+  state.message = '';
+  ui.renderLastFrame();
+  try {
+    const saved = source ?? await ui.onSaveGame('quick');
+    restoreChosenSave(ui, await ui.onMakeNewAdventure(saved));
+  } catch (error) {
+    await refreshSaveMenu(ui);
+    state.message = shortError(error);
+    ui.renderLastFrame();
+  }
 }
 
 /** The selected save's file, handed to the player. The store and the game stay as they are. */
@@ -1076,7 +1166,7 @@ async function doExport(ui: UIState, state: SaveMenuState): Promise<void> {
  */
 export function saveMenuDrop(ui: UIState, file: ImportedFile): boolean {
   const state = ui.saveMenu;
-  if (!state || state.busy || state.press || state.confirm || state.dropped) return false;
+  if (!state || state.busy || state.press || state.confirm || state.dropped || state.adventure) return false;
   void runImport(ui, file, false);
   return true;
 }
@@ -1127,8 +1217,8 @@ export function saveMenuKey(ui: UIState, key: string): boolean {
   const state = ui.saveMenu;
   if (!state) return false;
   if (state.busy || state.press) return true;
-  // The question takes no key but its cancel, nor does the menu about a dropped file.
-  if (state.confirm || state.dropped) {
+  // A question takes no key but its cancel, nor does the menu about a dropped file.
+  if (state.confirm || state.dropped || state.adventure) {
     if (key === 'Escape') cancelQuestion(ui, state);
     return true;
   }
@@ -1197,7 +1287,7 @@ function foldSelection(ui: UIState, state: SaveMenuState, folded: boolean): void
 export function saveMenuWheel(ui: UIState, delta: number): boolean {
   const state = ui.saveMenu;
   if (!state) return false;
-  if (state.confirm || state.dropped) return true;
+  if (state.confirm || state.dropped || state.adventure) return true;
   scrollBy(ui, state, delta > 0 ? 1 : -1);
   return true;
 }

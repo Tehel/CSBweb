@@ -218,6 +218,7 @@ export class HallOfChampions {
     party.selectedCharacterIndex = -1;
     setClockTick(this.ctx, 1);
     this.ctx.host.tag0207cc();
+    this.ctx.host.championJoined();
   }
 
   /**

@@ -48,7 +48,14 @@ export type SavedGameRead = 'loaded' | 'cancelled' | 'damaged' | { refused: stri
 /** What a new adventure's row has after its source's name (`GameSaves.makeNewAdventure`). */
 export const ADVENTURE_SUFFIX = '-csb';
 
-/** The two things a save needs that only the screen has. */
+/**
+ * `d.Word22592` of a game CSB's prison began, the compressed `dungeon.dat`'s word 6; a
+ * new adventure's is 13 (`doc/PROVEN_FACTS.md` → "A compressed `dungeon.dat`: CSB's
+ * prison").
+ */
+export const PRISON_WORD22592 = 12;
+
+/** What a save needs that only the screen has, and the prison's question, which is the screen's. */
 export interface GameSavesScreen {
     /**
      * The portrait pixels of a champion carrying only `portraitGraphic`, for the save
@@ -57,6 +64,12 @@ export interface GameSavesScreen {
     portraitOf(champion: Champion): number[] | undefined;
     /** `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`), the screen's open chest. */
     repackOpenChest(): void;
+    /**
+     * Ask "BEGIN THE ADVENTURE?" in the prison (`GameSaves.inPrison`), YES making the new
+     * adventure from `source`, or from a quick-save made first when it is `null`
+     * (`askBeginAdventure`, `src/renderer/ui/SaveMenu.ts`). Left out, nothing is asked.
+     */
+    askBeginAdventure?(source: SaveEntry | null): void;
 }
 
 /**
@@ -436,6 +449,30 @@ export class GameSaves {
     }
 
     /**
+     * Whether the running game is CSB's prison, where a party is chosen to be saved and
+     * carried into the adventure: a game begun from a compressed `dungeon.dat` whose
+     * `Word22592` is the prison's (`PRISON_WORD22592`), in a data set with a `mini.dat`
+     * to make the adventure from. The prison has no way out: its text at (9,2) of level 0
+     * says "FIRST CHOOSE YOUR CHAMPIONS...THEN SAVE THE GAME... THEN RESTART WITH THE
+     * UTILITY DISK.", so the port asks "BEGIN THE ADVENTURE?" after a save there, and once
+     * the fourth champion has joined (`championJoined`).
+     */
+    inPrison(): boolean {
+        return this.dataSet.miniDat && this.game.ctx.state.block1.word22592 === PRISON_WORD22592;
+    }
+
+    /**
+     * A champion has joined (`GameHost.championJoined`). In the prison, the fourth asks
+     * "BEGIN THE ADVENTURE?": the party can grow no more, and YES saves it first, under
+     * F5's name, so the prison's save stays to be raised again from the entrance.
+     */
+    championJoined(): void {
+        if (this.inPrison() && this.game.ctx.party.state.champions.length === 4) {
+            this.screen.askBeginAdventure?.(null);
+        }
+    }
+
+    /**
      * F5: the playthrough's quick-save, written over the last. Not with an empty party,
      * nor while a champion is still being chosen: the disk icon does nothing then
      * (`doc/CSBwin-src/Mouse.cpp:1716-1718`), and a file has no place for
@@ -444,7 +481,8 @@ export class GameSaves {
      * key that saved nothing says so.
      *
      * A write that fails is `SaveError`'s "UNABLE TO SAVE GAME!"
-     * (`doc/CSBwin-src/SaveGame.cpp:1266`).
+     * (`doc/CSBwin-src/SaveGame.cpp:1266`). One that is written in the prison asks
+     * "BEGIN THE ADVENTURE?" (`inPrison`), of any party.
      */
     async quickSave(): Promise<void> {
         const { champions, potentialChampionIndex } = this.game.ctx.party.state;
@@ -454,9 +492,10 @@ export class GameSaves {
             return;
         }
         try {
-            const { name } = await this.save('running', 'quick');
+            const entry = await this.save('running', 'quick');
             this.tell('GAME SAVED');
-            this.log(`Quick-saved ${name}`);
+            this.log(`Quick-saved ${entry.name}`);
+            if (this.inPrison()) this.screen.askBeginAdventure?.(entry);
         } catch (error) {
             this.tell('UNABLE TO SAVE GAME!');
             this.log('Quick-save failed', error);

@@ -309,6 +309,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // `TAG02076e` / `TAG0207cc` from the engine: the Hall of Champions and `WakeUp`.
         tag02076e: () => screen?.tag02076e(),
         tag0207cc: () => screen?.tag0207cc(),
+        // The prison's fourth champion asks whether the adventure begins.
+        championJoined: () => saves.championJoined(),
         // `ShowCredits(1)`: `MainLoop` has returned on a lost game
         // (doc/CSBwin-src/CSBCode.cpp:11325), or has won it (`:631`).
         // A frame threw: CSBWin's `die`, the loop stopped.
@@ -339,6 +341,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // carry only a portrait index.
         portraitOf: (champion) => screen?.portraitPixelsFor(champion),
         repackOpenChest: () => screen?.repackChest(),
+        askBeginAdventure: (source) => screen?.askBeginAdventure(source),
     }, logSave, storeRandom);
 
     screen = new GameScreen(gameCanvasEl, {
@@ -360,6 +363,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // RISE, on the entrance: a new adventure from a save of any set.
         onMakeNewAdventure: async (source) => saves.makeNewAdventure(source, await readMiniDat()),
         onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
+        isPrison: () => saves.inPrison(),
         // EXPORT: the row's file as the store holds it, downloaded under the row's name.
         onExportSave: async (entry) => downloadSaveFile(entry.name, (await saves.open(entry)).bytes),
         // The import: a file dropped on the page (`bindSaveDrop`), held against the dungeon.

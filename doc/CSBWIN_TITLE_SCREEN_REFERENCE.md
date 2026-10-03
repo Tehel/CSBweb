@@ -293,7 +293,7 @@ Hit-testing is **half-open on the maxima** (`SearchButtonList`, `CSBCode.cpp:756
 
 **The port's fourth button, RISE** (`RISE_BUTTON`, `src/renderer/intro/PrisonDoor.ts`), is
 not CSBWin's: it is the UTILITY's "MAKE NEW ADVENTURE" brought to the entrance of a data
-set with a `mini.dat`, CSB's (`DEBT.md` G17). Id 0xcb, x 247..301, y 163..180, left, put
+set with a `mini.dat`, CSB's (`doc/SAVES.md` → "RISE makes a save of its own"). Id 0xcb, x 247..301, y 163..180, left, put
 before the list's terminator; it sets a `d.gameState` of the port's own, 203, and goes on
 as RESUME does, the doors shut. Its picture is carved into a copy of graphic 4: RESUME's
 gem (14x14 at (243,78)) and the 7x8 cells of PRISON's R, I, S and RESUME's first E, each

@@ -66,6 +66,7 @@ import {
   reincarnateKey,
 } from './ui/ReIncarnate';
 import {
+  askBeginAdventure,
   closeSaveMenu,
   drawSaveMenu,
   isSaveMenuOpen,
@@ -77,6 +78,7 @@ import {
   type SaveMenuMode,
 } from './ui/SaveMenu';
 import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
+import type { SaveEntry } from '../data/saves';
 import type { ImportedFile } from '../engine/GameSaves';
 import { drawInventoryBackground, drawInventoryScreen, repackOpenChest, syncOpenChest } from './ui/Inventory';
 import { drawCharacterState, drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
@@ -93,6 +95,7 @@ export type GameScreenHooks = Pick<UIState,
   | 'onReadSave'
   | 'onMakeNewAdventure'
   | 'onSaveGame'
+  | 'isPrison'
   | 'onExportSave'
   | 'onImportSave'
   | 'onRestoreSave'
@@ -179,6 +182,7 @@ export class GameScreen {
       onReadSave: hooks.onReadSave,
       onMakeNewAdventure: hooks.onMakeNewAdventure,
       onSaveGame: hooks.onSaveGame,
+      isPrison: hooks.isPrison,
       onExportSave: hooks.onExportSave,
       onImportSave: hooks.onImportSave,
       onRestoreSave: hooks.onRestoreSave,
@@ -291,6 +295,11 @@ export class GameScreen {
 
   closeSaveMenu(): void {
     closeSaveMenu(this.ui);
+  }
+
+  /** The prison's "BEGIN THE ADVENTURE?" (`GameSavesScreen.askBeginAdventure`). */
+  askBeginAdventure(source: SaveEntry | null): void {
+    askBeginAdventure(this.ui, source);
   }
 
   /**

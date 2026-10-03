@@ -199,12 +199,17 @@ export interface UIState {
   /** A listed save out of the store (`GameSaves.open`). */
   readonly onReadSave: (entry: SaveEntry) => Promise<OpenedSave>;
   /**
-   * Build a save and write it to the store, over the listed save `over` or as a new row
-   * for `null`; resolves to the row it was written as (`GameSaves.save`,
-   * `src/engine/GameSaves.ts`). A hook because serializing the world is the engine's
-   * business, not the UI's.
+   * Build a save and write it to the store, over the listed save `over`, as a new row
+   * for `null`, or over F5's slot for `'quick'`; resolves to the row it was written as
+   * (`GameSaves.save`, `src/engine/GameSaves.ts`). A hook because serializing the world
+   * is the engine's business, not the UI's.
    */
-  readonly onSaveGame: (over: SaveEntry | null) => Promise<SaveEntry>;
+  readonly onSaveGame: (over: SaveEntry | 'quick' | null) => Promise<SaveEntry>;
+  /**
+   * Whether the running game is CSB's prison, where a save asks "BEGIN THE ADVENTURE?"
+   * (`GameSaves.inPrison`).
+   */
+  readonly isPrison: () => boolean;
   /**
    * Hand the player a listed save's file, the bare `.dat` out of the store: the page
    * downloads it (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`).
@@ -292,7 +297,7 @@ export type UISources = Pick<UIState,
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
-  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onSaveGame' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed'>;
+  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {

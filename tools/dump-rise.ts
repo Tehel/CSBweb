@@ -1,6 +1,6 @@
 /**
  * RISE, the port's own button on Chaos Strikes Back's entrance: CSBWin's UTILITY →
- * "MAKE NEW ADVENTURE" (`DEBT.md` G17), a saved game's party carried into `mini.dat`
+ * "MAKE NEW ADVENTURE" (`doc/SAVES.md` → "RISE makes a save of its own"), a saved game's party carried into `mini.dat`
  * and the game started in it (`src/renderer/intro/PrisonDoor.ts`,
  * `GameSaves.makeNewAdventure`, the chooser's `rise` mode).
  *
@@ -23,6 +23,15 @@
  *    the adventure from the chosen save and restores that; a refusal goes to
  *    `onRestoreFailed`, restores nothing, and the chooser closes for the entrance.
  * 5. **The refusal's menu.** A `UtilityDiskMessages` text as the menu's two titles.
+ * 6. **The prison's shortcut.** CSB's `dungeon.dat` is the prison, its `Word22592` 12,
+ *    and the csb set's game in it is the prison, and no other. Four champions recruited
+ *    through its mirrors, the fourth reincarnated: only the fourth asks "BEGIN THE
+ *    ADVENTURE?", with a quick-save to write first, and the save of that party is one
+ *    the utility takes. F5 there asks about its save. In the dialog, NOT YET closes the
+ *    one raised for the question; YES writes F5's save, makes the adventure from it and
+ *    restores that. The disk menu's SAVE asks in the prison, NOT YET goes back to the
+ *    list, and YES makes the adventure from the save just written; outside the prison
+ *    SAVE asks nothing.
  *
  * Run: `npx tsx tools/dump-rise.ts`
  */
@@ -31,12 +40,14 @@ import { resolve } from 'node:path';
 
 import { CsbRandom } from '../src/core/random';
 import { dataSetFor } from '../src/data/DataSets';
-import { emptyDungeonData } from '../src/data/DungeonLoader';
+import { Direction, Position } from '../src/core/types';
+import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { OpenedSave, SaveEntry } from '../src/data/saves';
 import { readSaveFileFields } from '../src/data/saves/SaveStore';
 import { UtilityDiskMessages, UtilityError, makeNewAdventure } from '../src/engine/Chaos';
-import { GameSaves } from '../src/engine/GameSaves';
+import type { Game } from '../src/engine/Game';
+import { GameSaves, PRISON_WORD22592 } from '../src/engine/GameSaves';
 import { utilityMenuTitles } from '../src/renderer/intro/BootSequence';
 import {
   INTERIOR_VISIBLE_WIDTH,
@@ -54,7 +65,7 @@ import {
 } from '../src/renderer/intro/PrisonDoor';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { searchButtonList } from '../src/renderer/ui/HitTest';
-import { menuButtonRect } from '../src/renderer/ui/Menu';
+import { menuButtonList, menuButtonRect } from '../src/renderer/ui/Menu';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
 import type { UIButton } from '../src/data/tables/UITables';
 import { check, finish } from './lib/check';
@@ -314,12 +325,170 @@ function checkTitles(): void {
   }
 }
 
+/* ---------------------------------------------------- 6. the prison's shortcut ---- */
+
+const DELTA_X = [0, 1, 0, -1];
+const DELTA_Y = [-1, 0, 1, 0];
+const RESURRECT = 160;
+const REINCARNATE = 161;
+const PRISON = new DungeonLoader().loadDungeonDat(read(resolve(CSB, 'dungeon.dat')));
+
+/** A save's name as printed: its date is the wall clock's, which would make the output vary. */
+const undated = (text: string): string => text.replace(/dmweb-\d{8}-\d{6}(-\d+)?/g, 'dmweb-<date>');
+
+/** The prison's game, under `dataSet`, its saves in `store`, and what asked the question. */
+function prisonGame(store: ReturnType<typeof memoryStore>, dataSet = 'csb') {
+  const asked: Array<string | null> = [];
+  let saves: GameSaves | null = null;
+  const game: Game = newGame(PRISON, graphics, { championJoined: () => saves?.championJoined() });
+  game.setRandomSeed(SEED);
+  saves = new GameSaves(game, dataSetFor(dataSet), store, {
+    portraitOf: () => undefined,
+    repackOpenChest: () => {},
+    askBeginAdventure: (source) => { asked.push(source?.name ?? null); },
+  }, () => {}, new CsbRandom(SEED));
+  return { game, saves, asked };
+}
+
+/** A champion from the prison's mirror of `hero`, the party stood before it: resurrected, or reincarnated as `name`. */
+function recruit(game: Game, hero: number, name?: string): void {
+  const h = game.ctx.dungeon.getData().presetHeroes![hero]!;
+  const facing = (h.location.wall + 2) & 3;
+  const party = game.ctx.party.state;
+  party.position = new Position(h.location.x - DELTA_X[facing]!, h.location.y - DELTA_Y[facing]!, h.location.map);
+  party.facing = facing as Direction;
+  game.systems.mouse.handleWallClick();
+  if (!name) {
+    game.systems.hallOfChampions.resurrectReincarnateCancel(RESURRECT);
+    return;
+  }
+  game.systems.hallOfChampions.resurrectReincarnateCancel(REINCARNATE);
+  game.systems.hallOfChampions.reincarnateNamed(party.champions.length - 1, name, '');
+}
+
+async function checkPrison(): Promise<void> {
+  console.log('');
+  console.log('=== the prison\'s shortcut ===');
+  const store = memoryStore();
+  const { game, saves, asked } = prisonGame(store);
+  console.log(`  CSB's dungeon.dat: Word22592 ${PRISON.word22592}, ${PRISON.presetHeroes?.length ?? 0} mirrors`);
+  check(PRISON.word22592 === PRISON_WORD22592 && game.ctx.state.block1.word22592 === PRISON_WORD22592,
+    'the prison\'s game has the compressed dungeon.dat\'s Word22592, 12');
+  check(saves.inPrison(), 'and is the prison, in the csb set');
+  check(!prisonGame(memoryStore(), 'dm-atari').saves.inPrison(), 'not in a set with no mini.dat');
+  check(!newSaves(memoryStore()).inPrison(), 'and a game whose Word22592 is 13 is not');
+
+  const joined: number[] = [];
+  for (let i = 0; i < 3; i++) {
+    recruit(game, i);
+    joined.push(asked.length);
+  }
+  recruit(game, 3, 'RISEN');
+  const party = game.ctx.party.state;
+  console.log(`  joined: ${party.champions.map((c) => c.name).join('/')}; asked after each: ${[...joined, asked.length].join(' ')}, with ${JSON.stringify(asked)}`);
+  check(party.champions.length === 4 && party.potentialChampionIndex < 0, 'four champions joined through the mirrors');
+  check(joined.every((n) => n === 0), 'the first three ask nothing');
+  check(asked.length === 1 && asked[0] === null, 'the fourth, reincarnated, asks, with a quick-save to write first');
+
+  const prisonSave = await saves.save('running', 'quick');
+  const adventure = await saves.makeNewAdventure(prisonSave, MINI);
+  const fields = readSaveFileFields(adventure.bytes)!;
+  console.log(undated(`  ${prisonSave.name} (${prisonSave.champions.join('/')}) -> ${adventure.entry.name}, level ${fields.level}, ${fields.champions.join('/')}`));
+  check(adventure.entry.name === prisonSave.name.replace(/\.dat$/, '-csb.dat'), 'the prison\'s save makes an adventure: the utility takes it');
+  check(fields.champions.join('/') === prisonSave.champions.join('/'), 'with the prison\'s party');
+
+  asked.length = 0;
+  await saves.quickSave();
+  console.log(undated(`  F5 in the prison asks with ${JSON.stringify(asked)}`));
+  check(asked.length === 1 && asked[0] === prisonSave.name, 'F5 in the prison asks about the save it wrote');
+
+  // The dialog, over the same game.
+  const log: string[] = [];
+  const ui = newUIState(graphics, game.ctx, {
+    onListSaves: async () => saves.list(),
+    onSaveGame: async (over) => { const e = await saves.save('stopped', over ?? 'new'); log.push(`save ${e.name}`); return e; },
+    isPrison: () => saves.inPrison(),
+    onMakeNewAdventure: async (source) => { log.push(`make ${source.name}`); return saves.makeNewAdventure(source, MINI); },
+    onRestoreSave: (save: OpenedSave) => { log.push(`restore ${save.entry.name}`); },
+  });
+  ui.partyState = game.ctx.party.state;
+  const settled = async (): Promise<void> => {
+    for (let i = 0; i < 300 && ui.saveMenu && (ui.saveMenu.busy || ui.saveMenu.press); i++) {
+      await new Promise((done) => setTimeout(done, 10));
+    }
+  };
+  const answer = async (choice: 1 | 2): Promise<void> => {
+    const rect = menuButtonRect(menuButtonList(ui, 2, true), 209 + choice)!;
+    SaveMenu.saveMenuClick(ui, rect.x1 + 1, rect.y1 + 1, LEFT);
+    await settled();
+  };
+  const pressSave = async (): Promise<void> => {
+    const state = ui.saveMenu!;
+    state.selected = state.rows.findIndex((r) => r.kind === 'heading' && r.playthrough.id === game.ctx.state.block1.randomGameID);
+    const rect = menuButtonRect(SaveMenu.saveMenuButtons(state), SaveMenu.SAVE_MENU_GEOMETRY.saveButtonId)!;
+    SaveMenu.saveMenuClick(ui, rect.x1 + 1, rect.y1 + 1, LEFT);
+    await settled();
+  };
+
+  SaveMenu.askBeginAdventure(ui, null);
+  await settled();
+  const up = ui.saveMenu?.adventure;
+  SaveMenu.drawSaveMenu(ui);
+  await answer(2);
+  console.log(`  alone, NOT YET: the dialog ${SaveMenu.isSaveMenuOpen(ui) ? 'OPEN' : 'closed'}, ${log.length} actions`);
+  check(up?.source === null && up.alone, 'the question raised alone, with a quick-save to write first');
+  check(!SaveMenu.isSaveMenuOpen(ui) && log.length === 0 && !game.ctx.state.paused, 'NOT YET closes it, having done nothing, and the clock runs');
+
+  SaveMenu.askBeginAdventure(ui, null);
+  await settled();
+  await answer(1);
+  console.log(undated(`  alone, YES: ${log.join(', ')}; the dialog ${SaveMenu.isSaveMenuOpen(ui) ? 'OPEN' : 'closed'}`));
+  check(log.join(', ') === `save ${prisonSave.name}, make ${prisonSave.name}, restore ${prisonSave.name.replace(/\.dat$/, '-csb-2.dat')}`
+    && !SaveMenu.isSaveMenuOpen(ui), 'YES writes F5\'s save, makes the adventure from it and restores it');
+
+  log.length = 0;
+  SaveMenu.openSaveMenu(ui);
+  await settled();
+  await pressSave();
+  const saved = log[0]?.slice('save '.length);
+  const asks = ui.saveMenu?.adventure;
+  await answer(2);
+  console.log(undated(`  SAVE: ${log.join(', ')}; NOT YET: the dialog ${SaveMenu.isSaveMenuOpen(ui) ? `open, ${JSON.stringify(ui.saveMenu!.message)}` : 'CLOSED'}`));
+  check(asks?.source?.name === saved && !asks.alone, 'the disk menu\'s SAVE in the prison asks about the save it wrote');
+  check(SaveMenu.isSaveMenuOpen(ui) && !ui.saveMenu!.adventure && ui.saveMenu!.message === 'GAME SAVED', 'NOT YET goes back to the list');
+  log.length = 0;
+  await pressSave();
+  await answer(1);
+  console.log(undated(`  SAVE, YES: ${log.join(', ')}`));
+  const second = log[0]?.slice('save '.length) ?? '';
+  check(log.length === 3 && log[1] === `make ${second}` && log[2] === `restore ${second.replace(/\.dat$/, '-csb.dat')}`
+    && !SaveMenu.isSaveMenuOpen(ui), 'YES makes the adventure from that save and restores it');
+
+  const dm = prisonGame(memoryStore(), 'dm-atari');
+  const dmUi = newUIState(graphics, dm.game.ctx, {
+    onListSaves: async () => dm.saves.list(),
+    onSaveGame: async (over) => dm.saves.save('stopped', over ?? 'new'),
+    isPrison: () => dm.saves.inPrison(),
+  });
+  SaveMenu.openSaveMenu(dmUi);
+  for (let i = 0; i < 300 && dmUi.saveMenu!.busy; i++) await new Promise((done) => setTimeout(done, 10));
+  const newRow = dmUi.saveMenu!.rows.findIndex((r) => r.kind === 'new');
+  dmUi.saveMenu!.selected = newRow;
+  dm.game.ctx.party.state.champions.push(...party.champions.slice(0, 1));
+  const rect = menuButtonRect(SaveMenu.saveMenuButtons(dmUi.saveMenu!), SaveMenu.SAVE_MENU_GEOMETRY.saveButtonId)!;
+  SaveMenu.saveMenuClick(dmUi, rect.x1 + 1, rect.y1 + 1, LEFT);
+  for (let i = 0; i < 300 && (dmUi.saveMenu!.busy || dmUi.saveMenu!.press); i++) await new Promise((done) => setTimeout(done, 10));
+  console.log(`  outside the prison, SAVE: ${JSON.stringify(dmUi.saveMenu!.message)}, ${dmUi.saveMenu!.adventure ? 'ASKS' : 'asks nothing'}`);
+  check(dmUi.saveMenu!.message === 'GAME SAVED' && !dmUi.saveMenu!.adventure, 'outside the prison SAVE asks nothing');
+}
+
 async function main(): Promise<void> {
   checkCarving();
   checkButtons();
   await checkStore();
   await checkChooser();
   checkTitles();
+  await checkPrison();
   finish();
 }
 

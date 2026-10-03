@@ -85,6 +85,13 @@ export interface GameHost {
    */
   openReincarnateScreen(chIdx: number): void;
   /**
+   * A champion has joined for good: RESURRECT or REINCARNATE has run to the end of
+   * `_ResurrectReincarnateCancel` (`doc/CSBwin-src/CSBCode.cpp:6808`), the champion's name
+   * printed and the inventory closed. Not CSBWin's: the page asks there whether the
+   * prison's party, once it is four, begins the adventure (`GameSaves.championJoined`).
+   */
+  championJoined(): void;
+  /**
    * A champion's weapon hand changed (`AddCharacterPossession` /
    * `RemoveCharacterPossession`): `if (d.AttackingCharacterOrdinal == chIdx+1)
    * TAG01b1c0();` (`doc/CSBwin-src/Character.cpp:1888-1891`, `:1977-1980`). The attack
@@ -189,6 +196,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     },
     sleepChanged: host.sleepChanged ?? (() => {}),
     openReincarnateScreen: host.openReincarnateScreen ?? (() => {}),
+    championJoined: host.championJoined ?? (() => {}),
     closeAttackMenuOf: host.closeAttackMenuOf ?? (() => {}),
     showHideInventory: host.showHideInventory ?? (() => {}),
     repackChest: host.repackChest ?? (() => {}),

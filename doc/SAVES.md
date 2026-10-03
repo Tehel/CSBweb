@@ -84,6 +84,28 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   no time played. Then it is read, and the game starts in it. A refusal stores nothing,
   and is the utility's message in the entrance's one-button menu, whose OK goes back to
   the entrance.
+
+  CSBWin makes a CSB game in three steps (`doc/CSBwin-src/Chaos.cpp:1-5`): the prison
+  is played, its party saved as `CSBGAMEn.DAT` (`SaveGame.cpp:902-908`); the utility
+  makes the new adventure from that save; and the door's RESUME loads it. RISE is the
+  second step, and in play the port offers it too, below.
+- **The prison asks "BEGIN THE ADVENTURE?".** The prison has no way out, and its text
+  at (9,2) of level 0 says "FIRST CHOOSE YOUR CHAMPIONS...THEN SAVE THE GAME... THEN
+  RESTART WITH THE UTILITY DISK." So a game is the prison's when its `Word22592` is 12,
+  as the compressed `dungeon.dat` sets it, in a set with a `mini.dat`
+  (`GameSaves.inPrison`), and there the game asks, YES and NOT YET, in `_DoMenu`'s
+  two-option menu in the save dialog's place (`askBeginAdventure`,
+  `src/renderer/ui/SaveMenu.ts`):
+  - after a save, the disk menu's SAVE or F5, whatever the party's size: YES makes the
+    adventure from that save, and NOT YET is the list again, or no dialog after F5;
+  - once the fourth champion has joined, RESURRECT or REINCARNATE run to its end
+    (`GameHost.championJoined`), the party being full: YES first writes F5's quick-save,
+    so the prison's save stays and can be raised again from the entrance, and NOT YET
+    closes the dialog.
+
+  YES stores the adventure as RISE does, named after its source with `-csb`, and reads
+  it, so the game goes on in it. A refusal, or a write or a read that fails, is the
+  dialog's message, over the list.
 - **An import is checked against the dungeon.** A `.dat` holds no name of its dungeon,
   but it holds the dungeon (blocks 7-14). A dungeon's signature is one digest per level, of
   its walls: the level's width and height, and one bit per cell, stone or anything else
@@ -316,7 +338,11 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
 `BrowserSaveStore.markUsed`.
 
 - **RISE**: `tools/dump-rise.ts` (the row a new adventure is stored as, again, and a
-  refusal; the chooser's `rise` mode over every set's saves, its LOAD and a refusal).
+  refusal; the chooser's `rise` mode over every set's saves, its LOAD and a refusal; the
+  prison's question: which game is the prison, four champions recruited at its mirrors
+  of whom only the fourth asks, the prison's save taken by the utility, F5's question,
+  YES and NOT YET in a dialog raised alone and over the disk menu's SAVE, and no question
+  outside the prison).
 - **The row and the store's upgrades**: "the one save call" and "the store's upgrade"
   (version-1 rows through both upgrades; which rows join a named save and which draw, in
   either order of the rows; each row's file holding the row's id; a stamped file being
