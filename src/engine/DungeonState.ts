@@ -134,6 +134,11 @@ export class DungeonState {
         return new Expool(this.data).getChampionBonesRecord(bones);
     }
 
+    /** `expool.Locate(key)`: a copy of `key`'s first record, or null. */
+    locateExpoolRecord(key: number): number[] | null {
+        return new Expool(this.data).locate(key);
+    }
+
     /**
      * Snapshot everything play can change, for the state a read restores (`RuntimeSave.ts`).
      * See `src/engine/DungeonSnapshot.ts` for what counts as mutable and why.

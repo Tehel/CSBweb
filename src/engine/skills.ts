@@ -272,8 +272,8 @@ export function adjustSkills(
 
 /**
  * `AddToSkill` (`doc/CSBwin-src/Magic.cpp:360`): `AdjustSkills` without the time terms, the
- * multiplier or the filter. Its one CSBWin caller is a DSA opcode (`DSA.cpp:4554`), not
- * yet ported (`DEBT.md` G1).
+ * multiplier or the filter. Its one caller is `&EXPERIENCE+` (`DSA.cpp:4542-4557`). The
+ * experience is added as `(UI16)(experience)` (`Magic.cpp:409`, `:425`).
  */
 export function addToSkill(
   ctx: GameContext,
@@ -295,10 +295,10 @@ export function addToSkill(
 
   const skills = ensureSkills(champ.skills ?? []);
   const skillEntry = skills[skillNumber];
-  skillEntry.experience = limitSkillExperience((skillEntry.experience ?? 0) + experience);
+  skillEntry.experience = limitSkillExperience((skillEntry.experience ?? 0) + (experience & 0xffff));
   if (skillNumber >= 4) {
     const base = skills[basicSkill];
-    base.experience = limitSkillExperience((base.experience ?? 0) + experience);
+    base.experience = limitSkillExperience((base.experience ?? 0) + (experience & 0xffff));
   }
   champ.skills = skills;
 

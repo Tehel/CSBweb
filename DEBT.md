@@ -92,6 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| C119 | A DSA operation on a champion slot outside the party | S | ⚠️ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
@@ -126,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C119 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C120 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -170,6 +171,25 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
+### C119 ⚠️ A DSA operation on a champion slot outside the party
+
+Three of the characters' operations check their champion index on one side only, and
+CSBWin then reads or writes a `CHARDESC` outside the live party
+(`doc/CSBwin-src/DSA.cpp`):
+
+- `&CHPOSS` (`:3330-3357`) maps an index above 4 to 0 but reads champions
+  `d.NumCharacter` to 3, slots of `d.CH16482[4]` no champion fills;
+- `&CHAR@` (`:4166-4241`) reads `d.CH16482 + charIdx` for an index of 0x20000 or more
+  without bit 16;
+- `&EXPERIENCE+` (`:4542-4557`) checks only `charnum < d.NumCharacter`, so a negative one
+  reads `HP()` before the array, and may add to its skills.
+
+What such a slot holds is not traced: the port has no `CHARDESC` there, so `&CHPOSS`
+reads `RNnul` (-1), `&CHAR@` zeros, and `&EXPERIENCE+` does nothing (`executeAmpersand`,
+`src/engine/DsaSystem.ts`). Paying it means finding what CSBWin's unused slots hold, from
+`d.`'s initialisation and from what a load writes there, and modelling it if a dungeon
+can see it.
+
 ---
 
 ## F — Verification debt
@@ -211,7 +231,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 139 checks sequentially (`spawnSync`, `:269`), each a
+`tools/run-checks.mjs` spawns its 140 checks sequentially (`spawnSync`, `:269`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and
@@ -248,7 +268,7 @@ ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter 
 `STKOP` (`doc/CSBwin-src/Data.h:1721-1861`, the port's `StkOp`) has 138 values, and 136
 are operations: `Noop` (0) and `2Dup` (23) have no case in `EX_AMPERSAND`, whose default
 says "Illegal subcode" and does nothing (`doc/CSBwin-src/DSA.cpp:4979-4981`), as the
-port's trace does. The port has 55, so 81 are left. `tools/dump-dsa-census.ts` lists
+port's trace does. The port has 68, so 68 are left. `tools/dump-dsa-census.ts` lists
 them: it fails unless what the port lacks is exactly its `LEFT`, so each family's commit
 takes its operations off that list, and this part of the item is done when it is empty.
 
@@ -257,12 +277,11 @@ Conflux, the dungeon that will check them, defines 131 DSAs, with 4646 programs,
 operand layout `DsaSystem.execute` reads, and every program decodes to its exact length.
 It uses 118 `&` operations, 73 of the 83. With Conflux's count of each:
 
-- **Characters**: `CharFetch` 67, `CharStore` 24, `I_CharStore` 4, `ChPoss` 107, `Mastery`
-  71, `ExperiencePlus` 33, `WhereIsChar` 61, `IsCarried` 35, `PartyFetch` 36,
-  `CharNameFetch` 3, `CountInjury` 1, `CausePoison` 1, `I_CausePoison` 6. `SwapCharacter` 7
-  and `I_SwapCharacter` 4 need G3. `WhoHasTalent` 5, `TalentsFetch` 2 and
-  `TalentsStore` 2 read and write `Champion.talents`, which `AddCharacter` reads off the
-  hero text.
+- **Characters**: what is left of them is `CharNameFetch` 3, which writes the bank's
+  text strings (`DSADBANK::SetText`, `DSA.cpp:194`) and so comes with the text family;
+  `I_CharStore` 4 and `I_CausePoison` 6, with the `I_` operations; and `SwapCharacter` 7
+  and `I_SwapCharacter` 4, which need G3. The other thirteen are ported, checked by
+  `tools/dump-dsa-characters.ts`.
 - **Objects**: `GetCharges` 32, `SetCharges` 45, `GetCurse` 6, `SetCurse` 3, `GetBroken` 3,
   `SetBroken` 3, `GetPoisoned` 4, `GetSubType` 24, `SetSubType` 11, `MissileInfoFetch` 2,
   `MissileInfoStore` 2, `Throw` 1, `I_Throw` 14, `Cast` 2, `I_Cast` 2, `FilteredCast` 3,
@@ -293,8 +312,8 @@ location (`:2109-2120`). The port's one `I_` operation, `I_TeleportParty`, share
 census counts it as ported, and the `I_` family's commit gives it CSBWin's path.
 
 The steps: the census is done (`tools/dump-dsa-census.ts`, Conflux's counts by default,
-another `dungeon.dat` as its argument). Next, one family per commit, in the order above,
-the eight with their nearest family: the characters first. Last, `DSA::Write` and the
+another `dungeon.dat` as its argument), and so are the characters. Next, one family per
+commit, in the order above, the eight with their nearest family: the objects next. Last, `DSA::Write` and the
 `EXPOOL` records, so that a game with DSAs can be saved (below). An operation is checked
 against Conflux in play once G26 makes it a data set.
 
@@ -411,7 +430,12 @@ cannot here:
 - `ProcessTT_ViAltar` state 1, which heals such a champion to `MaxHP/2` and saves them
   back (`Timer.cpp:2769-2782`).
 
-`Party.findChampionByFingerprint` is where both would grow their second half. Only a DSA
+`Party.findChampionByFingerprint` is where both would grow their second half. Four DSA
+operations read the wings too, and find nobody there: `&CHAR@`, `&TALENTS@` and
+`&TALENTS!` with bit 16 of their index set, through `GetFromWings`
+(`Character.cpp:5171`), which reads a `CHARDESC` from eight 25-longword `EXPOOL` records,
+and `CharNameFetch` through `LocateInWings` (`:5220`, G1). `&WHEREISCHAR` only tests for
+the first record, and is ported (`DSA.cpp:4399-4407`). Only a DSA
 fills the wings: `STKOP_SwapCharacter` (`DSA.cpp:4413-4419`) is the one caller of
 `SwapCharacter` (`Character.cpp:5472`), and through it of `CharacterDelete` / `CharacterAdd`
 and every `SaveToWings`. Nothing in the retail game removes a living champion from the

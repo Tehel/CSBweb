@@ -11,7 +11,10 @@ import {
   RoomType,
   rnEquals,
 } from '../core/types';
-import { DescIndex } from './objectIndex';
+import { DescIndex, GetBasicObjectType } from './objectIndex';
+import { addToSkill, determineMastery } from './skills';
+import { attributeCurrent, attributeMaximum, attributeMinimum, setAttributeCurrent, setAttributeMaximum, setAttributeMinimum } from './attributes';
+import { sw } from '../core/intCast';
 import type { ActuatorRecord, CreatureRecord, DsaDefinition, DsaState, TeleporterRecord, TextRecord } from '../data/dungeonTypes';
 import type { SpellParameters } from './magicTypes';
 import {
@@ -29,8 +32,8 @@ import {
   setActuatorParameterB,
 } from '../data/actuatorHelpers';
 import type { DungeonState } from './DungeonState';
-import type { GameContext } from './GameContext';
-import type { PartyState, Champion } from './gameTypes';
+import { nameIndexOf, type GameContext } from './GameContext';
+import { getChampionPossession, type PartyState, type Champion } from './gameTypes';
 import { TimerFunction } from './TimerQueue';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { MonsterSystem } from './MonsterSystem';
@@ -456,6 +459,16 @@ function readSignedWord(word: number): number {
   return value & 0x8000 ? value - 0x10000 : value;
 }
 
+/** `bitCounts` (`doc/CSBwin-src/DSA.cpp:45`): the set bits of a nibble. */
+const BIT_COUNTS = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
+
+/** `EDT_Character` (`doc/CSBwin-src/CSB.h:1568`): a champion in the wings, keyed by fingerprint. */
+const EDT_CHARACTER = 8;
+
+/** `LIMIT(min, x, max)` (`doc/CSBwin-src/CSB.h:3109`): `max` is tested first. */
+function limit(min: number, x: number, max: number): number {
+  return x > max ? max : x < min ? min : x;
+}
 
 export class DsaSystem {
   private readonly dungeon: DungeonState;
@@ -1953,6 +1966,201 @@ export class DsaSystem {
       case StkOp.NUM_PARAM:
         bank.stack.push(this.parameters[0] ?? 0);
         break;
+      case StkOp.CH_POSS: {
+        // `doc/CSBwin-src/DSA.cpp:3330-3357`.
+        const party = this.ctx.party.state;
+        let possIndex = bank.stack.pop() >>> 0;
+        let chIndex = bank.stack.pop();
+        if (chIndex > 4) chIndex = 0;
+        if (chIndex === 4) chIndex = party.cursorOwner;
+        if (possIndex > 29) possIndex = 0;
+        let object: ObjectID;
+        if (chIndex >= 0) {
+          // A champion slot past `d.NumCharacter` reads `RNnul` (`DEBT.md` C119).
+          const champ = this.getChampion(party, chIndex);
+          object = champ ? getChampionPossession(champ, possIndex) : OBJECT_ID_NULL;
+        } else {
+          object = party.objectInHand;
+        }
+        bank.stack.push(object === OBJECT_ID_NULL ? -1 : object);
+        break;
+      }
+      case StkOp.MASTERY: {
+        // `DSA.cpp:3389-3410`. The indices are `ui32`, so a negative one is out of range.
+        const party = this.ctx.party.state;
+        const flags = bank.stack.pop();
+        let skillIndex = bank.stack.pop() >>> 0;
+        let chIndex = bank.stack.pop() >>> 0;
+        if (chIndex === 4) chIndex = party.cursorOwner >>> 0;
+        const champ = chIndex < party.champions.length ? party.champions[chIndex] : undefined;
+        if (!champ || skillIndex >= 20) {
+          bank.stack.push(0);
+          break;
+        }
+        if (flags & 1) skillIndex |= 0x4000;
+        if (flags & 2) skillIndex |= 0x8000;
+        bank.stack.push(determineMastery(champ, skillIndex, {
+          partySleeping: party.sleeping,
+          getObjectNameIndex: (rn: ObjectID) => nameIndexOf(this.ctx, rn),
+        }));
+        break;
+      }
+      case StkOp.PARTY_FETCH: {
+        // `DSA.cpp:4127-4165`.
+        const party = this.ctx.party.state;
+        const num = bank.stack.pop() >>> 0;
+        const index = bank.stack.pop() >>> 0;
+        if (((index + num) >>> 0) > 100) break;
+        const result = [
+          party.champions.length,
+          party.position.z,
+          party.position.x,
+          party.position.y,
+          party.facing,
+          party.sleeping ? 1 : 0,
+          party.seeThruWalls,
+          party.magicFootprintsActive,
+          party.cursorOwner,
+          party.invisible,
+          party.fireShield,
+          party.spellShield,
+        ];
+        const n = Math.min(result.length, num);
+        for (let i = 0; i < n; i++) bank.setVar(index + i, result[i]!);
+        break;
+      }
+      case StkOp.CHAR_FETCH: {
+        // `DSA.cpp:4166-4241`.
+        const party = this.ctx.party.state;
+        const num = bank.stack.pop() >>> 0;
+        const index = bank.stack.pop() >>> 0;
+        let charIdx = bank.stack.pop();
+        if (charIdx === 4) charIdx = party.cursorOwner;
+        const result = new Array<number>(59).fill(0);
+        if (((index + num) >>> 0) > 100 || (charIdx < 0x10000 && charIdx >= party.champions.length) || charIdx < 0) {
+          // `memset(result, 0, …)`.
+        } else if (charIdx & 0x10000) {
+          // `GetFromWings` finds nobody, so the record is `memset` to zero (`DEBT.md` G3).
+        } else {
+          // An index of 0x20000 or more without bit 16 reads past `d.CH16482` (C119).
+          const pc = this.getChampion(party, charIdx);
+          if (pc) {
+            result[0] = pc.facing;
+            result[1] = pc.food;
+            result[2] = Math.max(pc.attributes.health - (party.pendingDamage[charIdx] ?? 0), 0);
+            // `pc->load`, which the port sums from the possessions (`DEBT.md` H).
+            result[3] = this.ctx.systems.characterStats.characterLoad(pc);
+            result[4] = pc.attributes.mana;
+            result[5] = pc.wounds;
+            result[6] = pc.partyPosition;
+            result[7] = pc.shieldStrength;
+            result[8] = pc.attributes.stamina;
+            result[9] = pc.water;
+            for (let i = 0; i < 7; i++) {
+              const attr = pc.attributes.stats[i]!;
+              result[10 + i] = (attributeMinimum(attr) << 16) | (attributeMaximum(attr) << 8) | attributeCurrent(attr);
+            }
+            for (let i = 0; i < 40; i += 2) {
+              const skill = pc.skills[i / 2];
+              result[17 + i] = skill?.tempAdjust ?? 0;
+              result[17 + i + 1] = skill?.experience ?? 0;
+            }
+            result[57] = pc.fingerprint;
+            result[58] = pc.talents;
+          }
+        }
+        const n = Math.min(59, num);
+        for (let i = 0; i < n; i++) {
+          if (index + i > 99) break;
+          bank.setVar(index + i, result[i]!);
+        }
+        break;
+      }
+      case StkOp.TALENTS_FETCH: {
+        // `DSA.cpp:4242-4290`. A wings index finds nobody (`DEBT.md` G3).
+        const party = this.ctx.party.state;
+        let charIdx = bank.stack.pop();
+        if (charIdx === 4) charIdx = party.cursorOwner;
+        const pc = charIdx & 0x10000 ? null : this.getChampion(party, charIdx);
+        bank.stack.push(pc ? pc.talents : 0);
+        break;
+      }
+      case StkOp.TALENTS_STORE: {
+        // `DSA.cpp:4291-4347`. A wings index finds nobody (`DEBT.md` G3).
+        const party = this.ctx.party.state;
+        let charIdx = bank.stack.pop();
+        const newTalents = bank.stack.pop() >>> 0;
+        if (charIdx === 4) charIdx = party.cursorOwner;
+        const pc = charIdx & 0x10000 ? null : this.getChampion(party, charIdx);
+        if (pc) pc.talents = newTalents;
+        break;
+      }
+      case StkOp.CAUSE_POISON: {
+        // `DSA.cpp:4348-4362`.
+        const charIdx = bank.stack.pop();
+        const val = bank.stack.pop();
+        this.noFilter(bank);
+        if (charIdx >= this.ctx.party.state.champions.length) break;
+        if (charIdx < 0) break;
+        this.ctx.systems.monsterAttack.poisonCharacter(charIdx, val);
+        break;
+      }
+      case StkOp.WHO_HAS_TALENT: {
+        // `DSA.cpp:4363-4382`.
+        const talents = bank.stack.pop() >>> 0;
+        let val = 0;
+        this.ctx.party.state.champions.forEach((champ, charIdx) => {
+          if (((champ.talents & talents) >>> 0) === talents) val |= 1 << charIdx;
+        });
+        bank.stack.push(val);
+        break;
+      }
+      case StkOp.WHERE_IS_CHAR: {
+        // `DSA.cpp:4383-4412`: the last champion with the fingerprint, else 5 when the
+        // wings hold its first record, else 4.
+        const fingerPrint = bank.stack.pop();
+        let val = 4;
+        this.ctx.party.state.champions.forEach((champ, charIdx) => {
+          if (champ.fingerprint === fingerPrint) val = charIdx;
+        });
+        if (val === 4) {
+          const key = ((EDT_CHARACTER << 24) | (fingerPrint & 0xffff)) >>> 0;
+          if (this.dungeon.locateExpoolRecord(key)?.length === 25) val = 5;
+        }
+        bank.stack.push(val);
+        break;
+      }
+      case StkOp.CHAR_STORE:
+        this.charStore(bank);
+        break;
+      case StkOp.EXPERIENCE_PLUS: {
+        // `DSA.cpp:4542-4557`. A negative index reads before `d.CH16482` (C119).
+        const experience = bank.stack.pop();
+        const skillnum = bank.stack.pop();
+        const charnum = bank.stack.pop();
+        const champ = this.getChampion(this.ctx.party.state, charnum);
+        if (champ && champ.attributes.health > 0) addToSkill(this.ctx, charnum, skillnum, experience);
+        break;
+      }
+      case StkOp.IS_CARRIED:
+        this.isCarried(bank);
+        break;
+      case StkOp.COUNT_INJURY: {
+        // `DSA.cpp:4798-4818`.
+        const injuryMask = bank.stack.pop();
+        let chMask = bank.stack.pop();
+        let count = 0;
+        const champions = this.ctx.party.state.champions;
+        for (let chidx = 0; chidx < champions.length; chidx++, chMask >>= 1) {
+          if ((chMask & 1) === 0) continue;
+          if (champions[chidx]!.attributes.health <= 0) continue;
+          const injuries = champions[chidx]!.wounds & injuryMask;
+          count += BIT_COUNTS[injuries & 15]! + BIT_COUNTS[(injuries >> 4) & 15]!
+            + BIT_COUNTS[(injuries >> 8) & 15]! + BIT_COUNTS[(injuries >> 12) & 15]!;
+        }
+        bank.stack.push(count);
+        break;
+      }
       default:
         if (!this.warnedOps.has(subcode)) {
           this.warnedOps.add(subcode);
@@ -1960,6 +2168,146 @@ export class DsaSystem {
         }
         break;
     }
+  }
+
+  /**
+   * `NOFILTER` (`doc/CSBwin-src/DSA.cpp:457-462`): an operation that changes the dungeon,
+   * run from a filter, warns the dungeon's author.
+   */
+  private noFilter(bank: DsaBank): void {
+    if (bank.filter) this.ctx.host.trace('Filter Modifying Dungeon');
+  }
+
+  /**
+   * `STKOP_CharStore` (`doc/CSBwin-src/DSA.cpp:4426-4541`): the variables from `index` on
+   * written back over the fields `&CHAR@` reads, but for those CSBWin leaves alone.
+   * `CHARFLAG_statsChanged` and `DrawCharacterState` have no counterpart: the panels are
+   * redrawn every frame.
+   */
+  private charStore(bank: DsaBank): void {
+    const party = this.ctx.party.state;
+    const num = bank.stack.pop() >>> 0;
+    const index = bank.stack.pop() >>> 0;
+    let charIdx = bank.stack.pop();
+    if (charIdx === 4) charIdx = party.cursorOwner;
+    this.noFilter(bank);
+    if (((index + num) >>> 0) > 100) return;
+    if (charIdx >= party.champions.length) return;
+    if (charIdx < 0) return;
+    if (party.potentialChampionIndex === charIdx) return;
+    const pc = party.champions[charIdx]!;
+    let n = Math.min(59, num);
+    if (n > 100 - index) n = 100 - index;
+    if (n > 1) pc.food = sw(limit(-1023, bank.getVar(1 + index), 2048));
+    const pending = party.pendingDamage[charIdx] ?? 0;
+    // "Nothing we can do about dead heroes!"
+    if (pc.attributes.health - pending > 0 && n > 2) {
+      if (bank.getVar(2 + index) < 0) bank.setVar(2 + index, 0);
+      if (bank.getVar(2 + index) > pc.attributes.maxHealth) bank.setVar(2 + index, pc.attributes.maxHealth);
+      if (bank.getVar(2 + index) < pc.attributes.health - pending) {
+        party.pendingDamage[charIdx] = sw((pc.attributes.health - bank.getVar(2 + index)) & 0xffff);
+      } else {
+        pc.attributes.health = sw(bank.getVar(2 + index) + pending);
+      }
+    }
+    if (n > 4) pc.attributes.mana = sw(limit(0, bank.getVar(4 + index), pc.attributes.maxMana));
+    if (n > 8) pc.attributes.stamina = sw(limit(0, bank.getVar(8 + index), pc.attributes.maxStamina));
+    if (n > 9) pc.water = sw(limit(-1023, bank.getVar(9 + index), 2048));
+    for (let i = 0; i < 7; i++) {
+      if (n <= i + 10) break;
+      const value = bank.getVar(10 + index + i);
+      const attr = pc.attributes.stats[i]!;
+      setAttributeMinimum(attr, value >> 16);
+      setAttributeMaximum(attr, (value >> 8) & 0xff);
+      setAttributeCurrent(attr, value & 0xff);
+    }
+    if (n > 58) pc.talents = bank.getVar(index + 58) >>> 0;
+  }
+
+  /**
+   * `EX_IsCarried` (`doc/CSBwin-src/DSA.cpp:1613-1641`). An object ID asks where that
+   * object is: `256 * chIdx` plus its slot, 255 for the hand, or -1. A negative one is a
+   * basic object type, -1 for type 0, and asks how many such objects are carried. A chest
+   * is searched, and so is what it holds. Champion 4 is the hand's owner, 5 every
+   * champion.
+   */
+  private isCarried(bank: DsaBank): void {
+    const party = this.ctx.party.state;
+    const objid = bank.stack.pop();
+    const charnum = bank.stack.pop();
+    bank.stack.push(0);
+    for (let chidx = 0; chidx < party.champions.length; chidx++) {
+      if (charnum === chidx || (charnum === 4 && chidx === party.cursorOwner) || charnum === 5) {
+        if (this.forEach(bank, -chidx - 1, objid)) {
+          bank.stack.push(bank.stack.pop() + 256 * chidx);
+          return;
+        }
+      }
+    }
+    if (objid >= 0) {
+      bank.stack.pop();
+      bank.stack.push(-1);
+    }
+  }
+
+  /**
+   * `ForEach` with `IsCarriedCallback` (`doc/CSBwin-src/DSA.cpp:1520-1611`), true to end the
+   * search. `thisObj` below 0 is champion `-thisObj - 1`: a find replaces the count on the
+   * stack with the slot.
+   */
+  private forEach(bank: DsaBank, thisObj: number, srcObj: number): boolean {
+    if (thisObj === OBJECT_ID_NULL) return false;
+    if (thisObj < 0) {
+      const chIdx = -thisObj - 1;
+      const champ = this.ctx.party.state.champions[chIdx]!;
+      for (let i = 0; i < 30; i++) {
+        if (this.forEach(bank, getChampionPossession(champ, i), srcObj)) {
+          bank.stack.pop();
+          bank.stack.push(i);
+          return true;
+        }
+      }
+      if (chIdx === this.ctx.party.state.cursorOwner) {
+        if (this.forEach(bank, this.ctx.party.state.objectInHand, srcObj)) {
+          bank.stack.pop();
+          bank.stack.push(255);
+          return true;
+        }
+      }
+      return false;
+    }
+    const obj = thisObj as ObjectID;
+    // `IsCarriedCallback`.
+    if (srcObj < 0) {
+      const type = -srcObj === 1 ? 0 : -srcObj;
+      if (type === GetBasicObjectType(this.dungeon, this.ctx.tables.objDescObjectType, obj)) {
+        bank.stack.push(bank.stack.pop() + 1);
+      }
+    } else if (srcObj === thisObj) {
+      bank.stack.push(bank.stack.pop() + 1);
+      return true;
+    }
+    switch (this.dungeon.rnMaps.decode(obj).category) {
+      case DBType.SCROLL:
+      case DBType.POTION:
+      case DBType.MISC:
+      case DBType.CLOTHING:
+      case DBType.WEAPON:
+        break;
+      case DBType.CHEST: {
+        const chest = this.dungeon.getContainerRecord(obj);
+        for (let contents = chest?.containedObject ?? OBJECT_ID_EOF; contents !== OBJECT_ID_EOF;
+          contents = this.dungeon.getDBRecordLink(contents)) {
+          if (this.forEach(bank, contents, srcObj)) return true;
+        }
+        break;
+      }
+      default:
+        // `NotImplemented(0xdd6a)`.
+        this.ctx.host.trace('DSA &ISCARRIED: not implemented 0xdd6a');
+        break;
+    }
+    return false;
   }
 
   private getDsa(index: number): DsaDefinition | null {
