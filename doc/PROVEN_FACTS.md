@@ -3017,8 +3017,11 @@ blocks as the file holds them, unscrambled but not byte-swapped.
   set by `wordGear(+376) = 1` (`:2595`), which leaves the bytes `01 00`, 256. And
   `charFlags` is `LE16(LE16(wordGear(+48) & 16))` (`:2644`): the mask falls on the word
   as memory holds it, so of the file's word it keeps 0x1000 and clears 0x10,
-  `CHARFLAG_male`. The `ASSERT`s that flag the first two ("check for LE") are compiled
-  out of the release build (`CSBTypes.h:98-103`).
+  `CHARFLAG_male`. 0x1000 is `CHARFLAG_portraitChanged` (`CSB.h:2471`), and nothing in
+  CSBWin reads `CHARFLAG_male`: `AddCharacter` sets it (`Character.cpp:594`) and that is
+  its only use. The `ASSERT`s that flag the first two ("check for LE") are compiled out
+  of the release build (`CSBTypes.h:98-103`). The port keeps `CHARFLAG_male` instead
+  (`DEBT.md` H).
 - **The file.** `_TAG000fc4` sets `Byte22598` to 2, which `SaveGame` never writes, zeroes
   the sixteen words from 312 (the five hashes and `totalMoveCount`), and writes
   `GAMEBLOCK1` with `WriteFirstBlock` (`:1376-1418`), the fold `ScrambleAndWrite` makes,

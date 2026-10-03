@@ -11,8 +11,9 @@
  *    hashes and `totalMoveCount`, the fold, and the dungeon after them.
  * 2. Every field `TAG002724` writes, on `csbgame7.dat`, a party of four from a Dungeon
  *    Master game CSBWin saved, facing north where `mini.dat`'s faces south: the copy
- *    against the saved game and `mini.dat` field by field, and the three writes that
- *    read a big-endian field as memory holds it on the little-endian build.
+ *    against the saved game and `mini.dat` field by field: the two writes that read a
+ *    big-endian field as memory holds it on the little-endian build, and the champion's
+ *    sex, which the port keeps where CSBWin clears it (`DEBT.md` H).
  * 3. The new adventure loads into a `Game` on CSB's graphics: `mini.dat`'s eleven
  *    levels, the party where `mini.dat` put its own, the saved game's champions.
  * 4. The refusals, each with CSBWin's message: no party, "ALREADY UTILIZED", a name
@@ -149,7 +150,7 @@ function copy(): Uint8Array {
       `${who}: bytes 30-34 are 1, 2, -1, 0, 0`);
     check(c[40] === 0 && c[41] === 0 && c[42] === 0 && c[43] === s[43], `${who}: damage, recent damage and poison cleared`);
     check(readU16BE(c, 44) === 0xffff && readU16BE(c, 46) === 0xffff, `${who}: no timer`);
-    check(readU16BE(c, 48) === (readU16BE(s, 48) & 0x1000), `${who}: charFlags keeps 0x1000 alone, as the double LE16 masks memory's word`);
+    check(readU16BE(c, 48) === (readU16BE(s, 48) & 0x10), `${who}: charFlags keeps CHARFLAG_male alone, where CSBWin's double LE16 keeps 0x1000 (DEBT.md H)`);
     check(readU16BE(c, 50) === 0, `${who}: no wounds`);
     check(readU16BE(c, 52) === readU16BE(s, 54) && readU16BE(c, 56) === readU16BE(s, 58) && readU16BE(c, 60) === readU16BE(s, 62)
       && same(c.subarray(54, 56), s.subarray(54, 56)) && same(c.subarray(58, 60), s.subarray(58, 60)) && same(c.subarray(62, 64), s.subarray(62, 64)),

@@ -25,6 +25,7 @@ import {
 } from '../data/CsbwinSaveStream';
 import { buildImageChecksum } from '../data/CsbwinDungeonImageWriter';
 import { computeDungeonImageLayout } from '../data/SaveGameLoader';
+import { CHARFLAG_MALE } from './gameTypes';
 
 /** `UtilityDiskMessages` (`doc/CSBwin-src/Chaos.cpp:275-318`), the ones this file shows. */
 export const UtilityDiskMessages = {
@@ -215,16 +216,18 @@ export function TAG0026c4(mini: UtilityGame): void {
  * `mini.dat`'s record, in place.
  *
  * Three of its writes read a big-endian field as the little-endian build holds it in
- * memory, and are ported as they run there:
+ * memory. Two are ported as they run there:
  *
  * - `RandomGameID` is `LoadLong(+308) + 1`, and `LoadLong` reads the four bytes
  *   low-first (`:809-821`), so the 1 is added to the file's first byte, the field's
  *   highest.
  * - `Word22594` is set to 1 by `wordGear(+376) = 1` for an Atari save
  *   (`Byte22596` 1), which leaves the bytes `01 00`: 256, read back.
- * - `charFlags` is `LE16(LE16(wordGear(+48) & 16))`: the mask falls on the word as
- *   memory holds it, so of the file's word it keeps 0x1000, and clears bit 4, the
- *   champion's sex (`CHARFLAG_male`).
+ *
+ * The third is not, the author's decision (`DEBT.md` H): `charFlags` is
+ * `LE16(LE16(wordGear(+48) & 16))`, whose mask falls on the word as memory holds it, so
+ * of the file's word CSBWin keeps 0x1000 and clears `CHARFLAG_male`. The port keeps
+ * `CHARFLAG_male` and clears the rest, as the mask reads.
  */
 export function TAG002724(source: UtilityGame, mini: UtilityGame, random: CsbRandom): void {
     const pnt4 = mini.block1;
@@ -260,8 +263,7 @@ export function TAG002724(source: UtilityGame, mini: UtilityGame, random: CsbRan
         a4[42] = 0;
         writeU16BE(a4, 44, 0xffff);
         writeU16BE(a4, 46, 0xffff);
-        a4[48] &= 16;
-        a4[49] = 0;
+        writeU16BE(a4, 48, readU16BE(a4, 48) & CHARFLAG_MALE);
         writeU16BE(a4, 50, 0);
         a4.copyWithin(52, 54, 56);
         a4.copyWithin(56, 58, 60);

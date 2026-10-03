@@ -257,11 +257,10 @@ The split:
 - **⏳ The page.** Offer it: a source save chosen from the store, of any data set (the
   list's filter is its parameter, `doc/SAVES.md` → "A save knows its dungeon"), the
   `csb` set's `mini.dat` fetched, the result stored as a row of the `csb` set, and a
-  refusal's message shown. Where the control lives (the save menu, or the page's
-  controls) and what the new row is called (CSBWin names it after the slot the player
-  picks, `CSBGAME.DAT` to `CSBGAME4.DAT`, in `_TAG000ede`, `Chaos.cpp:1467-1541`) are
-  that step's to settle, with the author if the save menu has to change. The new
-  file's `RandomGameID` is the source's with its first byte one higher (the
+  refusal's message shown. The new row is named after the source save's, with `-csb`
+  after it (the author's decision; CSBWin names it after the slot the player picks,
+  `CSBGAME.DAT` to `CSBGAME4.DAT`, in `_TAG000ede`, `Chaos.cpp:1467-1541`). Where the
+  control lives is still to settle with the author. The new file's `RandomGameID` is the source's with its first byte one higher (the
   `LoadLong` slip), so it is a playthrough of its own.
 - **⏳ Step 1, the prison's party.** Trace where the prison has the champions chosen,
   and that its save is one the engine takes (its `Word22592` is 12, which the check
@@ -866,6 +865,13 @@ Recorded so that nobody "fixes" them.
   holds runs in the VBL the script ends (`Game.runFrame`). What is left is `HandleMouseEvents`' `lastTime = d.Time`
   (`doc/CSBwin-src/Mouse.cpp:1647-1649`), stamped at the click, which nothing reads after
   the credits.
+- 🚫 **A champion carried into a new adventure keeps their sex.** `TAG002724` masks
+  `charFlags` with `LE16(LE16(wordGear(+48) & 16))`, which on the little-endian build
+  keeps 0x1000 of the file's word and clears `CHARFLAG_male`
+  (`doc/CSBwin-src/Chaos.cpp:2644`). Nothing in CSBWin reads the flag, so it shows
+  nowhere; the author's decision is to keep it all the same. The port keeps
+  `CHARFLAG_male` and clears the rest, as the mask reads (`TAG002724`,
+  `src/engine/Chaos.ts`; `tools/dump-new-adventure.ts`).
 - 🚫 **A champion who dies in hand is put down on nobody.** `KillCharacter` does not end a
   change of the marching order, and `TAG0025a6` then writes the dead champion's facing and
   position to `d.CH16482[-1]`, outside the champions (`doc/PROVEN_FACTS.md` → "Changing
