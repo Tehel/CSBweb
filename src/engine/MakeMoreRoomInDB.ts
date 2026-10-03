@@ -7,7 +7,7 @@
  * CSBWin first `Enlarge`s the database up to `db.Max`, 8000 records for most
  * (`data.cpp:813-876`, `CSB.h:1646`), and only a database at that size gets here. The
  * port's databases stop at 1024, the ten-bit index of its `ObjectID`, so its `Enlarge`
- * always fails at this point (`DEBT.md` H, "Databases stop at 1024 records").
+ * always fails at this point (`DEBT.md` D16).
  *
  * The sweep is the Atari original's (`TAG009d9e`). It goes level by level from
  * `d.LevelCleared[db]`, the level it last took from, leaving the party's level for last,

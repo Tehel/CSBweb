@@ -14,8 +14,8 @@
  * are `ctx.smartDiscard` here.
  *
  * The port's databases stop at 1024 records, the ten-bit index of its `ObjectID`
- * (`DEBT.md` H, "Databases stop at 1024 records"), so no database reaches the limit in
- * play and this never gets past counting. `tools/watch-smart-discard.ts` pads one past it.
+ * (`DEBT.md` D16), so no database reaches the limit in play and this never gets past
+ * counting. `tools/watch-smart-discard.ts` pads one past it.
  */
 import { getActuatorType } from '../data/actuatorHelpers';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';

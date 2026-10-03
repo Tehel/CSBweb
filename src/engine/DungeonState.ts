@@ -522,7 +522,7 @@ export class DungeonState {
      *
      * Appending keeps `count` and the header's `objectCounts` — the size the image
      * writer declares — equal to the number of records. At 1024 records, the ten-bit
-     * index and the port's `db.Max` (`DEBT.md` H, "Databases stop at 1024 records"), it
+     * index and the port's `db.Max` (`DEBT.md` D16), it
      * falls back on `MakeMoreRoomInDB` (`makeMoreRoomInDB`), as `FindEmptyDB<n>Entry` does
      * (`CSBCode.cpp:4942-5084`), and stores `record` over the one that frees. `null` when
      * that frees none.

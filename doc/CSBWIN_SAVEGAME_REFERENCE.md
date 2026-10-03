@@ -291,8 +291,7 @@ and the port writes as zero.
   read of the actuator type before the byte swap (`DEBT.md` G4).
 - A record index above 1023: `dataIndexMap` is 16 bits and the port's RN index field is
   10, where CSBWin allows 64000. The largest index in any save of `tools/fixtures/` is
-  682, and `CsbwinObjectIndex.resolve` throws rather than alias (`DEBT.md` H,
-  "Databases stop at 1024 records").
+  682, and `CsbwinObjectIndex.resolve` throws rather than alias (`DEBT.md` D16).
 
 ### Evidence
 

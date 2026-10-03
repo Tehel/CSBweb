@@ -188,8 +188,12 @@ accessors still read the packed bits, and the maps are not kept. The steps left:
    keeps the RN (`CSBTypes.h:336-342`). Two RNs that one packed value stands for today
    become two, a missile's flying object among them (`DuplicateOK`, `SaveGame.cpp:1918`).
 3. **Databases past 1024 records**: the record arrays, `FindEmptyDBEntry` and `Enlarge`
-   as CSBWin bounds them (`CSBCode.cpp:4942-5084`, `Character.cpp:182-358`). The check is
-   Conflux read to its end, which also takes G23.
+   as CSBWin bounds them (`CSBCode.cpp:4942-5084`, `Character.cpp:182-358`). CSBWin grows
+   a full database 100 records at a time, up to `db.Max`: 8000, 16000 for the actuators,
+   768 for database 15 (`doc/CSBwin-src/data.cpp:813-876`, `:967-972`, `CSB.h:1646`).
+   `DungeonState.findEmptyDBEntry` takes 1024 as `db.Max`, so a full database goes
+   straight to `MakeMoreRoomInDB`, and `SmartDiscard`, which starts at 6000 records in
+   use, never acts. The check is Conflux read to its end, which also takes G23.
 
 ---
 
@@ -968,30 +972,9 @@ Recorded so that nobody "fixes" them.
 - 🚫 **`?intro=0`, and Debug in the saved UI settings, skip the whole intro.** This is a
   developer affordance with no CSBWin counterpart, kept deliberately: eleven of the fourteen golden
   frames boot through it.
-- 🚫 **Custom skins / `BACKGROUND_LIB`.** The shipped DM dungeon uses no custom
-  backgrounds. Revisit only if we ever load a third-party CSBWin dungeon.
 - 🚫 **The `d.Word11750` countdown** in `TenSecondUpdate` is not ported. It is a
   cursor-redraw counter set only by `CSBCode.cpp:959-965`, which has no counterpart here, so
   the branch is dead (`src/engine/PeriodicUpdates.ts:90`).
-- 🚫 **Databases stop at 1024 records.** The port's `ObjectID` is the original's packed
-  word, `[corner:2][database:4][index:10]`, so a record past 1023 cannot be named, and
-  `DungeonState.findEmptyDBEntry` treats 1024 as `db.Max`: a full database falls back on
-  `MakeMoreRoomInDB` (`src/engine/MakeMoreRoomInDB.ts`) at once. CSBWin first grows it by
-  100 records at a time, up to 8000 (16000 for the actuators, 768 for database 15)
-  (`doc/CSBwin-src/data.cpp:813-876`, `:967-972`, `CSB.h:1646`), and `SmartDiscard`, which
-  starts at 6000 in use, therefore never acts here. The author's decision: 1024 is already
-  more than the Atari original held (its databases were the file's records plus
-  `Byte7302`'s spares, 420 for misc: `doc/PROVEN_FACTS.md`), and CSBWin's way past it is
-  not wanted. **If it is ever needed:** CSBWin's `RN` is not the packed word but a 16-bit
-  index into `dataIndexMap` / `dataTypeMap` (`doc/CSBwin-src/CSBTypes.h:265-341`), whose
-  entries hold the record's index, its database and its corner; `FindEmptyDBEntry` hands
-  out a slot of that map with the record (`data.cpp:919-993`), `DeleteDBEntry` frees both
-  (`:995-1016`), and loading builds the map from the file's packed words. Every RN is
-  read through `RnMaps` (`src/core/RnMaps.ts`), so porting it is the maps behind it:
-  `D16`. A save is where the limit can be met from outside: its
-  `dataIndexMap` is 16 bits, and one that names a record past 1023 is not read
-  (`CsbwinObjectIndex.resolve` throws rather than alias). The largest index in any save
-  of `tools/fixtures/` is 682.
 - 🚫 **A drawn `RandomGameID` is never 0, nor a stored save's.** CSBWin keeps the
   product of its two draws whatever it is (`doc/CSBwin-src/SaveGame.cpp:1523-1532`), and
   it is 0 when either low word is, about one new game in 32768. The author's decision:
