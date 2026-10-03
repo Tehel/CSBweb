@@ -21,7 +21,9 @@
  * - `portrait[1]` at 336 is really 464 bytes — `FILL337[800-337]` is the rest of it —
  *   and holds the champion's portrait **bitmap**. See `readPortrait` below.
  */
-import { CHARFLAG_MALE, getChampionPossession, type Champion, type PartyState, type Skill } from '../engine/gameTypes';
+import {
+  CHARFLAG_MALE, getChampionPossession, type Champion, type PartyState, type Skill, type VacantCharacter,
+} from '../engine/gameTypes';
 import type { Attribute } from '../engine/attributes';
 import { OBJECT_ID_NULL, type i8, type i16, type ui8, type ui16, type ObjectID } from '../core/types';
 import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';
@@ -473,20 +475,34 @@ export function writeCsbwinPartyTail(block: Uint8Array, tail: CsbwinPartyTail): 
 /**
  * The whole of block 4: `CHARDESC[4]` then the 128-byte party tail, 3328 bytes.
  *
- * Slots past the party are left as `ClearMemory` leaves them — 800 zero bytes — which
- * is what `AddCharacter` guarantees and what every committed save holds.
+ * A slot past the party holds what `PartyState.vacantCharacters` says CSBWin holds
+ * there, and without one the 800 zero bytes `DBank::Initialize` leaves
+ * (`doc/CSBwin-src/CSBCode.cpp:323-330`), which is what every committed save with fewer
+ * than four champions holds.
  */
 export function buildCsbwinCharacterBlock(
   champions: Champion[],
   tail: CsbwinPartyTail,
   options: CsbwinCharacterWriteOptions = {},
+  vacantCharacters: readonly VacantCharacter[] = [],
 ): Uint8Array {
   const block = new Uint8Array(CHARACTER_BLOCK_SIZE);
   for (let i = 0; i < Math.min(4, champions.length); i++) {
     writeCsbwinCharacter(block, i, champions[i], options);
   }
+  for (let i = champions.length; i < 4; i++) {
+    const vacant = vacantCharacters[i];
+    if (vacant instanceof Uint8Array) block.set(vacant.subarray(0, CHARDESC_SIZE), i * CHARDESC_SIZE);
+    else if (vacant) writeCsbwinCharacter(block, i, vacant, options);
+  }
   writeCsbwinPartyTail(block, tail);
   return block;
+}
+
+/** `Possession(index)` of a slot past the party: the record's own word, as CSBWin reads it. */
+export function vacantPossession(vacant: VacantCharacter, index: number): ObjectID {
+  if (vacant instanceof Uint8Array) return readU16BE(vacant, POSSESSIONS_OFFSET + index * 2) as ObjectID;
+  return getChampionPossession(vacant, index);
 }
 
 export type { PartyState };

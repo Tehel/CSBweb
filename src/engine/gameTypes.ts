@@ -295,7 +295,26 @@ export interface PartyState {
      */
     word11712: i16;
     word11714: i16;
+    /**
+     * `d.CH16482[d.NumCharacter..3]` (`doc/CSBwin-src/Data.h:766`): the records in the
+     * slots no champion fills, indexed by slot. `AddCharacter` clears a slot before it
+     * fills it (`doc/CSBwin-src/Character.cpp:481`), so a champion's own slot holds the
+     * zero record here, and `&CHPOSS` is the one reader of the others
+     * (`doc/CSBwin-src/DSA.cpp:3345-3347`). A save writes all four records.
+     */
+    vacantCharacters: VacantCharacter[];
 }
+
+/**
+ * One of `PartyState.vacantCharacters`. Either the 800 bytes CSBWin holds in the slot —
+ * zeros after `DBank::Initialize`'s `memset` at every start
+ * (`doc/CSBwin-src/CSBCode.cpp:323-330`), so the possessions read RN 0, not `RNnul`; a
+ * save's own after a load, which reads all four records (`SaveGame.cpp:1676`) — or the
+ * champion a Cancel in the Hall of Champions leaves there, since
+ * `_ResurrectReincarnateCancel` only takes one off `d.NumCharacter`
+ * (`CSBCode.cpp:6629-6640`).
+ */
+export type VacantCharacter = Uint8Array | Champion;
 
 /**
  * Movement action types

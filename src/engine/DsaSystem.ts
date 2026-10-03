@@ -34,6 +34,7 @@ import {
 import type { DungeonState } from './DungeonState';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type PartyState, type Champion } from './gameTypes';
+import { vacantPossession } from '../data/CsbwinCharacters';
 import { TimerFunction } from './TimerQueue';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { MonsterSystem } from './MonsterSystem';
@@ -1976,9 +1977,10 @@ export class DsaSystem {
         if (possIndex > 29) possIndex = 0;
         let object: ObjectID;
         if (chIndex >= 0) {
-          // A champion slot past `d.NumCharacter` reads `RNnul` (`DEBT.md` C119).
+          // A slot past `d.NumCharacter` is read all the same, from the record left there.
           const champ = this.getChampion(party, chIndex);
-          object = champ ? getChampionPossession(champ, possIndex) : OBJECT_ID_NULL;
+          object = champ ? getChampionPossession(champ, possIndex)
+            : vacantPossession(party.vacantCharacters[chIndex]!, possIndex);
         } else {
           object = party.objectInHand;
         }
@@ -2042,7 +2044,7 @@ export class DsaSystem {
         } else if (charIdx & 0x10000) {
           // `GetFromWings` finds nobody, so the record is `memset` to zero (`DEBT.md` G3).
         } else {
-          // An index of 0x20000 or more without bit 16 reads past `d.CH16482` (C119).
+          // An index of 0x20000 or more without bit 16 reads nobody (`DEBT.md` H).
           const pc = this.getChampion(party, charIdx);
           if (pc) {
             result[0] = pc.facing;
@@ -2134,7 +2136,7 @@ export class DsaSystem {
         this.charStore(bank);
         break;
       case StkOp.EXPERIENCE_PLUS: {
-        // `DSA.cpp:4542-4557`. A negative index reads before `d.CH16482` (C119).
+        // `DSA.cpp:4542-4557`. A negative index reads nobody (`DEBT.md` H).
         const experience = bank.stack.pop();
         const skillnum = bank.stack.pop();
         const charnum = bank.stack.pop();

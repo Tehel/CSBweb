@@ -32,7 +32,12 @@ import {
 } from '../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { loadSaveGameState, saveSaveGameState } from '../src/data/SaveGameLoader';
+import { DungeonLoader } from '../src/data/DungeonLoader';
+import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
+import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/engine/CsbwinSaveGame';
 import type { Champion } from '../src/engine/gameTypes';
+import { buildSaveFile } from '../src/engine/SaveGameFile';
+import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 import { genuineSaves, savePath } from './lib/saves';
 
@@ -193,6 +198,30 @@ function main(): void {
   check(
     JSON.stringify(readCsbwinPartyTail(reread.characterBlock!)) === JSON.stringify(tail),
     'and so does the party state beside them',
+  );
+
+  // 5. The slots past the party, which only `&CHPOSS` reads (`DSA.cpp:3345-3347`). A
+  //    champion left there by a Cancel is packed as a champion is, and a slot read from a
+  //    file goes back as it came, through a game: loaded, played from, saved.
+  const left = buildCsbwinCharacterBlock([], tail, {}, [champion]);
+  check(
+    left.subarray(0, CHARDESC_SIZE).join() === buildCsbwinCharacterBlock([champion], tail).subarray(0, CHARDESC_SIZE).join(),
+    'a champion left past the party is packed as one in it',
+  );
+  const oneHero = new Uint8Array(readFileSync(savePath('csbgame-early-1hero.dat')));
+  const game = newGame(new DungeonLoader().loadDungeonDat(
+    new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'))), stockGraphics());
+  applyCsbwinSave(game, oneHero);
+  // The same file again, with champion 0's record in slot 2 as a Cancel would leave it.
+  const world = loadCsbwinWorld(oneHero);
+  const record = world.save.characterBlock!.slice(0, CHARDESC_SIZE);
+  world.save.characterBlock!.set(record, 2 * CHARDESC_SIZE);
+  game.applyRuntimeSaveState(buildCsbwinRuntimeState(world, { dsaGlobals: game.getDsaGlobalVariables() }));
+  const written = loadSaveGameState(buildSaveFile(game)).characterBlock!;
+  check(
+    written.subarray(2 * CHARDESC_SIZE, 3 * CHARDESC_SIZE).join() === record.join()
+      && written.subarray(CHARDESC_SIZE, 2 * CHARDESC_SIZE).every((b) => b === 0),
+    "a save's slots past the party come back in the game's own save, byte for byte",
   );
 
   finish();

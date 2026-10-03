@@ -65,6 +65,7 @@
 import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
 import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
+import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import { CheckMonsters } from './CheckMonsters';
 import { captureDungeonSnapshot } from './DungeonSnapshot';
 import { DungeonState } from './DungeonState';
@@ -142,6 +143,12 @@ function buildPartyState(world: CsbwinWorld, dsaGlobalsUnused?: never): PartySta
         partyMoveDisableTimer: gb2.partyMoveDisableTimer,
         word11712: gb2.word11712,
         word11714: gb2.word11714,
+        // `UnscrambleStream` reads all four records, the slots past the party with the
+        // rest (doc/CSBwin-src/SaveGame.cpp:1676). A champion's own slot is held as
+        // `AddCharacter` leaves it before filling it, cleared (`Character.cpp:481`).
+        vacantCharacters: Array.from({ length: 4 }, (_, i) => i < party.length
+            ? new Uint8Array(CHARDESC_SIZE)
+            : block.slice(i * CHARDESC_SIZE, (i + 1) * CHARDESC_SIZE)),
     };
 }
 

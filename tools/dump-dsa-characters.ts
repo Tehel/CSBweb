@@ -10,7 +10,9 @@
  *    Champion 4 is the hand's owner; an index past the party, or one in the wings, reads
  *    zeros.
  * 3. **`&CHPOSS`** (`:3330-3357`): an empty slot is -1, a negative champion the hand, a
- *    slot past 29 slot 0.
+ *    slot past 29 slot 0. A champion slot past the party is read too: 0 on
+ *    `csbgame-early-1hero.dat`, whose slots 1 to 3 are the zero bytes `DBank::Initialize`
+ *    leaves, and a cancelled candidate's own possessions.
  * 4. **`&MASTERY`** (`:3389-3410`): flags 1 and 2 are `DetermineMastery`'s 0x4000 and
  *    0x8000; a champion or skill out of range is 0.
  * 5. **`&WHOHASTALENT`, `&WHEREISCHAR`, `&TALENTS@`, `&TALENTS!`** (`:4242-4412`): a
@@ -67,10 +69,10 @@ const graphics = stockGraphics();
 const stock = readFileSync('static/gamefiles/dm-atari/dungeon.dat');
 const save = new Uint8Array(readFileSync(savePath('csbgame7.dat')));
 
-/** A game on `csbgame7.dat`'s world. */
-function freshGame(): Game {
+/** A game on `csbgame7.dat`'s world, or another save's. */
+function freshGame(file: Uint8Array = save): Game {
   const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(stock)), graphics);
-  applyCsbwinSave(game, save);
+  applyCsbwinSave(game, file);
   return game;
 }
 
@@ -78,8 +80,12 @@ function freshGame(): Game {
  * Run `program` as the one program of a test DSA on an empty open square of the party's
  * level, and return the 100 global variables, which start at 0x5a5a.
  */
-function run(program: number[], prepare: (game: Game) => void = () => {}): { game: Game; g: number[] } {
-  const game = freshGame();
+function run(
+  program: number[],
+  prepare: (game: Game) => void = () => {},
+  file: Uint8Array = save,
+): { game: Game; g: number[] } {
+  const game = freshGame(file);
   prepare(game);
   const dungeon = game.ctx.dungeon;
   const z = game.ctx.party.state.position.z;
@@ -192,6 +198,26 @@ function charFetchExpected(game: Game, chIdx: number): number[] {
   check(g[2] === (party.objectInHand === OBJECT_ID_NULL ? -1 : party.objectInHand), 'a negative champion is the hand');
   check(g[3] === (c0.possessions[0] === OBJECT_ID_NULL ? -1 : c0.possessions[0]), 'a slot past 29 is slot 0');
   check(g[4] === g[0], 'a champion past 4 is champion 0');
+}
+{
+  // `d.CH16482[chindex].Possession(possindex)` for any slot up to 3 (`DSA.cpp:3345-3347`).
+  const oneHero = new Uint8Array(readFileSync(savePath('csbgame-early-1hero.dat')));
+  const { g } = run([
+    ...int(1), ...int(0), op(StkOp.CH_POSS), globalStore(0),
+    ...int(3), ...int(29), op(StkOp.CH_POSS), globalStore(1),
+  ], () => {}, oneHero);
+  console.log(`3b. &CHPOSS 1 0, 3 29 on csbgame-early-1hero.dat: ${g.slice(0, 2).join(' ')}`);
+  check(g[0] === 0 && g[1] === 0, 'a slot no champion has filled is zero bytes, so RN 0, not -1');
+
+  const c3 = champions[3]!;
+  const full = c3.possessions.findIndex((p) => p !== OBJECT_ID_NULL);
+  const left = run([...int(3), ...int(full), op(StkOp.CH_POSS), globalStore(0)], (game) => {
+    // What a Cancel leaves: the record in its slot, one fewer champion counted.
+    const p = game.ctx.party.state;
+    p.vacantCharacters[3] = p.champions.pop()!;
+  });
+  console.log(`3c. &CHPOSS 3 ${full} with champion 3 left behind: ${left.g[0]}`);
+  check(left.g[0] === c3.possessions[full], "a slot a champion has left reads that champion's possessions");
 }
 
 /* ---------------------------------------------- 4. &MASTERY --------------------- */

@@ -10,6 +10,7 @@ import type { PartyState, Champion } from './gameTypes';
 import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, MovementAction } from './gameTypes';
 import type { GameHost } from './GameHost';
 import { addCharacterDefaults } from './AddCharacter';
+import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import { Direction as Dir } from '../core/types';
 
 /**
@@ -43,6 +44,7 @@ export function initialPartyState(position: Position, facing: Direction): PartyS
         partyMoveDisableTimer: 0,
         word11712: 0,
         word11714: 0,
+        vacantCharacters: Array.from({ length: 4 }, () => new Uint8Array(CHARDESC_SIZE)),
         sleeping: false,
     };
 }
@@ -64,6 +66,9 @@ export class Party {
         if (this.state.champions.length >= 4) {
             return false; // Party full
         }
+        // `ClearMemory((ui8 *)pcA3, 800)` (doc/CSBwin-src/Character.cpp:481): the slot's
+        // record is the champion's now, and what was left there is gone.
+        this.state.vacantCharacters[this.state.champions.length] = new Uint8Array(CHARDESC_SIZE);
         this.state.champions.push(champion);
         return true;
     }

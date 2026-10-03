@@ -293,6 +293,8 @@ function main(): void {
   check(party.cursorOwner === -1, 'SetHandOwner(-1), because that was the only champion');
   check(party.selectedCharacterIndex === -1, 'the inventory is hidden again');
   check(game.ctx.loop.clockTick, "and ShowHideInventory(4)'s d.clockTick = 1 makes a tick due (CSBCode.cpp:6634, :7441)");
+  check(party.vacantCharacters[0] === champ,
+    "the candidate's record stays in slot 0, which d.NumCharacter-- only stops counting (CSBCode.cpp:6640)");
 
   const mirrorAfterCancel = cellObjects(game, mirror);
   check(mirrorAfterCancel.length === mirrorBefore.length

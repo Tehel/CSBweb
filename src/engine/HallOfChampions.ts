@@ -164,6 +164,8 @@ export class HallOfChampions {
       if (party.champions.length === 1) {
         setHandOwner(party, -1, this.ctx.host);
       }
+      // `d.NumCharacter--` and no more: the record stays in its slot, possessions and all.
+      party.vacantCharacters[party.champions.length - 1] = champion;
       party.champions.pop();
       this.ctx.host.tag0207cc(); // `:6657`
       return true;

@@ -2490,6 +2490,33 @@ champions this engine creates, because the engine holds no graphics to blit from
 is this port's shortcut and not a CSBWin field. A champion out of a genuine save has
 pixels and no index at all, which is why a loaded party once showed four empty boxes.
 
+## A `CHARDESC` slot past the party holds zeros, or the champion who left it
+
+`d.CH16482[4]` is four records whatever `d.NumCharacter` is
+(`doc/CSBwin-src/Data.h:766`). What a slot no champion fills holds:
+
+- **Zeros at every start.** `RN`'s default constructor sets `0xffff`
+  (`doc/CSBwin-src/CSBTypes.h:300`), but `DBank`'s own constructor, which runs after its
+  members', does `memset (this,0,sizeof (*this))` (`doc/CSBwin-src/CSBCode.cpp:314-317`),
+  and so does `DBank::Initialize` (`:323-330`), called at each start and restart
+  (`:11305`, `:11356`, `Code1f9e6.cpp:309`). So a never-filled slot's thirty possessions
+  are RN 0, not `RNnul`. Every committed save with fewer than four champions holds 800
+  zero bytes in each slot past the party.
+- **The candidate a Cancel turned away.** Button 162 of `_ResurrectReincarnateCancel`
+  takes one off `d.NumCharacter` and clears nothing (`CSBCode.cpp:6629-6640`), so the
+  record stays, possessions and all; those objects are still in the mirror's cell.
+- **A save's own after a load**: the file carries all four records, 3328 bytes with the
+  party tail (`SaveGame.cpp:1126`, `:1676`).
+
+`AddCharacter` clears 800 bytes of the slot before it fills it
+(`doc/CSBwin-src/Character.cpp:481`), and every loop over the champions stops at
+`d.NumCharacter`, so the one reader of such a slot is `&CHPOSS`, which bounds its index
+to 0-3 and no further (`DSA.cpp:3342-3347`). On a never-filled slot it pushes 0, since
+it pushes -1 only for `RNnul` (`:3353-3354`). The port keeps the slots as
+`PartyState.vacantCharacters`; `tools/dump-dsa-characters.ts` (3b, 3c),
+`tools/dump-hall-of-champions.ts` (Cancel) and `tools/dump-character-block.ts` (5) check
+the three ways in.
+
 ## `CHARDESC.incantation` is a C string, and a cast leaves the rest of it behind
 
 The four bytes at offset 34 are the spell being composed. Every reader of them measures

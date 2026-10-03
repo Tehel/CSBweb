@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C119 | A DSA operation on a champion slot outside the party | S | ⚠️ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
@@ -170,25 +169,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C119 ⚠️ A DSA operation on a champion slot outside the party
-
-Three of the characters' operations check their champion index on one side only, and
-CSBWin then reads or writes a `CHARDESC` outside the live party
-(`doc/CSBwin-src/DSA.cpp`):
-
-- `&CHPOSS` (`:3330-3357`) maps an index above 4 to 0 but reads champions
-  `d.NumCharacter` to 3, slots of `d.CH16482[4]` no champion fills;
-- `&CHAR@` (`:4166-4241`) reads `d.CH16482 + charIdx` for an index of 0x20000 or more
-  without bit 16;
-- `&EXPERIENCE+` (`:4542-4557`) checks only `charnum < d.NumCharacter`, so a negative one
-  reads `HP()` before the array, and may add to its skills.
-
-What such a slot holds is not traced: the port has no `CHARDESC` there, so `&CHPOSS`
-reads `RNnul` (-1), `&CHAR@` zeros, and `&EXPERIENCE+` does nothing (`executeAmpersand`,
-`src/engine/DsaSystem.ts`). Paying it means finding what CSBWin's unused slots hold, from
-`d.`'s initialisation and from what a load writes there, and modelling it if a dungeon
-can see it.
 
 ---
 
@@ -440,6 +420,11 @@ fills the wings: `STKOP_SwapCharacter` (`DSA.cpp:4413-4419`) is the one caller o
 `SwapCharacter` (`Character.cpp:5472`), and through it of `CharacterDelete` / `CharacterAdd`
 and every `SaveToWings`. Nothing in the retail game removes a living champion from the
 party. Conflux does: `SwapCharacter` 7 times and `I_SwapCharacter` 4 (G1).
+`CharacterDelete` shifts the champions after the one leaving down a slot and sets the
+last slot's HP to 0, so that slot keeps a copy of the last champion, possessions and all
+(`Character.cpp:5366-5388`): it goes into `PartyState.vacantCharacters`, which `&CHPOSS`
+reads (`doc/PROVEN_FACTS.md` → "A `CHARDESC` slot past the party holds zeros, or the
+champion who left it").
 
 ### G4 ⏳ Custom-dungeon extensions: external portraits, the monster design options
 
@@ -944,6 +929,14 @@ Recorded so that nobody "fixes" them.
   encounter's tail calls `ProcessObjectFromMissile` on it again; the port's
   `processObjectFromMissile` finds no record and does nothing
   (`tools/dump-move-from-missile.ts`, section 3).
+- 🚫 **A champion index CSBWin does not bound reads nobody.** `&CHAR@`, `&TALENTS@` and
+  `&TALENTS!` take an index of 0x20000 or more with bit 16 clear as `d.CH16482 + charIdx`
+  (`doc/CSBwin-src/DSA.cpp:4196`, `:4274`, `:4325`), a record over 100 MB past `d`, and
+  `&EXPERIENCE+` reads the HP of a negative one from the `d.` variables before the array,
+  then hands it to `AddToSkill` (`:4552`). The port reads zeros, leaves the talents and
+  adds nothing (`executeAmpersand`, `src/engine/DsaSystem.ts`). A slot from 0 to 3 that no
+  champion fills is a different case, and is read as CSBWin reads it
+  (`PartyState.vacantCharacters`).
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.
