@@ -261,10 +261,13 @@ async function openLoadMenu(
   let shown: Uint8Array | null = null;
   let chooserClosed: () => void = () => {};
   const closed = new Promise<null>((resolve) => { chooserClosed = () => resolve(null); });
+  // Every redraw is presented with the cursor on it, which stays up from `STShowCursor` to
+  // `STHideCursor` (`SaveGame.cpp:1562-1564`), as the VBL handler draws it over each frame.
   const draw = (): void => {
     if (gameScreen.isSaveMenuOpen()) {
-      gameScreen.presentSaveMenuOnly(host.globalPalette);
+      gameScreen.drawSaveMenuOnly();
       shown = host.screen.pixels.slice();
+      host.present();
       return;
     }
     if (shown) host.screen.pixels.set(shown);

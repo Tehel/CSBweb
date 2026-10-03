@@ -249,6 +249,16 @@ await canvasClick(160, 100, 0); await wait(1000);
 check(!(await wheelTaken()), 'the entrance leaves the wheel to the page');
 await canvasClick(270, 84, 0);  await wait(1500);
 check(await wheelTaken(), 'the entrance\'s chooser takes the wheel, for its list');
+// The cursor stays up as the chooser redraws, from `STShowCursor` to `STHideCursor`
+// (`doc/CSBwin-src/SaveGame.cpp:1562-1564`): after a notch of the wheel and two keys, the
+// arrow is still where the click that opened it left it, and the pointer leaving the
+// canvas takes it off. The pointer stays off for the comparisons below.
+const leaveCanvas = () => evaluate(`document.getElementById('game-canvas').dispatchEvent(new MouseEvent('mouseleave')),1`);
+await key('ArrowUp');   await wait(200);
+await key('ArrowDown'); await wait(200);
+const withArrow = await canvasPixels();
+await leaveCanvas(); await wait(200);
+check(withArrow !== (await canvasPixels()), 'the entrance\'s chooser keeps its cursor up as it redraws');
 // And the keys the list takes in play. The one save is selected under its heading: the up
 // arrow moves the selection to the heading, and the down arrow back to the save.
 const chooserUp = await canvasPixels();
@@ -283,6 +293,7 @@ const refusal = await canvasPixels();
 check(dropTaken && refusal !== chooserUp && refusal !== entrance,
   'a save of another dungeon dropped on the chooser is taken by the page, and a menu comes up');
 await canvasClick(159, 147, 0); await wait(600);
+await leaveCanvas(); await wait(200);
 check((await canvasPixels()) === chooserUp, 'its OK brings the chooser back, with nothing more listed');
 await canvasClick(100, 27, 0);  await wait(300);
 await canvasClick(48, 168, 0);  await wait(1500);

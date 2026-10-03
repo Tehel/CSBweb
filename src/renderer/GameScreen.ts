@@ -624,16 +624,16 @@ export class GameScreen {
   }
 
   /**
-   * The save/load screen alone on a cleared screen, for the entrance's "Resume".
+   * The save/load screen alone on a cleared screen, for the entrance's "Resume": drawn into
+   * the screen, which the entrance's host presents with its cursor on it.
    *
    * `_ReadEntireGame` reaches the chooser through `SelectSaveGame(_9_, 1, 1, 1)`
    * (`doc/CSBwin-src/SaveGame.cpp:1563`), whose leading 1 is `_DoMenu`'s `FadeOldScreen` /
    * `ClearOldScreen` pair (`doc/CSBwin-src/Menu.cpp:285-291`): the screen under the chooser
    * is cleared, which `drawSaveMenu` does for either menu.
    */
-  presentSaveMenuOnly(palette: number[]): void {
+  drawSaveMenuOnly(): void {
     drawSaveMenu(this.ui);
-    this.presentScreen(palette);
   }
 
   /** `_DoMenu`'s drawing into the screen (`ui/Menu.ts`), for a menu a pre-game screen raises. */
