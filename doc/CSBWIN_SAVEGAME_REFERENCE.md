@@ -277,9 +277,6 @@ and the port writes as zero.
   DSA.
 - `SimpleEncryption`, neither written nor read past the header, and `MakeBigActuators`'
   read of the actuator type before the byte swap (`DEBT.md` G4).
-- A database of more than 1024 records: CSBWin's grow to `db.Max`, 8000 and more, and the
-  port's stop at 1024 (`DEBT.md` D16). The largest index in any save of
-  `tools/fixtures/` is 682.
 
 ### Evidence
 

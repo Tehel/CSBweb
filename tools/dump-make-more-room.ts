@@ -1,9 +1,14 @@
 /**
  * `MakeMoreRoomInDB` (`doc/CSBwin-src/Character.cpp:182-358`): a new object in a full
- * database takes the record of one thrown out of the dungeon. The port's databases are
- * full at 1024 records (`DEBT.md` D16), so each section pads one to 1024 with records no
+ * database takes the record of one thrown out of the dungeon. A database is full at
+ * `db.Max` records (`CSB.h:1646`), so each section pads one to that with records no
  * object names, then asks `findEmptyDBEntry` for one more.
  *
+ *  0. Short of `db.Max`, a database with no free record `Enlarge`s instead
+ *     (`data.cpp:813-876`): 100 cleared records, link `RNnul` but the first's `RNeof`,
+ *     the header's size with them, and the new object at the old size, past record 1023
+ *     as well. The next new object takes the next cleared record. At `db.Max`, 8000
+ *     records, it grows no more.
  *  1. The sweep starts at `d.LevelCleared[db]`, stepping past the party's level, and takes
  *     the first object of the database that is not `important()`, stopping each square's
  *     chain at an actuator that is not disabled. The item is lifted out of its square,
@@ -29,6 +34,7 @@ import { DBType, getRoomType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType,
 import { getActuatorType } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Databases, MiscRecord } from '../src/data/dungeonTypes';
+import { dbMax } from '../src/engine/DungeonState';
 import type { Game } from '../src/engine/Game';
 import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
@@ -38,10 +44,24 @@ function makeGame(): Game {
   return newGame(data, stockGraphics());
 }
 
-/** Pad database `db` to 1024 records with in-use records no object names. */
+const DB_TYPE: Partial<Record<keyof Databases, DBType>> = {
+  misc: DBType.MISC, creatures: DBType.CREATURE, missiles: DBType.MISSILE, clouds: DBType.CLOUD,
+};
+
+/**
+ * Fill database `db` to `db.Max` records with in-use records no object names: its free
+ * records, the cleared ones an `Enlarge` left among them, then new ones to the end.
+ */
 function fill(game: Game, db: keyof Databases, blank: () => object): void {
-  const records = game.ctx.dungeon.getData().databases[db].records as object[];
-  while (records.length < 1024) records.push({ ...blank(), nextObject: OBJECT_ID_EOF });
+  const data = game.ctx.dungeon.getData();
+  const records = data.databases[db].records as { nextObject: ObjectID }[];
+  const dbType = DB_TYPE[db]!;
+  for (let i = 0; i < records.length; i++) {
+    if (records[i]!.nextObject === OBJECT_ID_NULL) records[i] = { ...blank(), nextObject: OBJECT_ID_EOF };
+  }
+  while (records.length < dbMax(dbType)) records.push({ ...blank(), nextObject: OBJECT_ID_EOF });
+  data.databases[db].count = records.length;
+  data.header.objectCounts[dbType] = records.length;
 }
 
 /** The first floor square on `level` with no object, from `from` on. */
@@ -75,6 +95,50 @@ function inCell(game: Game, at: Position, rn: ObjectID): boolean {
 const index = (game: Game, rn: ObjectID): number => game.ctx.dungeon.rnMaps.idx(rn);
 const where = (p: Position): string => `${p.z}:${p.x},${p.y}`;
 
+/* --------------------------------------------------------- 0. Enlarge ---- */
+{
+  const game = makeGame();
+  const dungeon = game.ctx.dungeon;
+  const data = dungeon.getData();
+  const misc = data.databases.misc.records;
+  // Every free record taken first, then the database is full at its file's size.
+  const taken: ObjectID[] = [];
+  for (const r of [...misc]) if (r.nextObject === OBJECT_ID_NULL) taken.push(dungeon.findEmptyDBEntry('misc', rockRecord()));
+  const size = misc.length;
+  check(misc.every((r) => r.nextObject !== OBJECT_ID_NULL) && data.header.objectCounts[DBType.MISC] === size,
+    `the free misc records taken (${taken.length}), the database full at its ${size}`);
+  const got = dungeon.findEmptyDBEntry('misc', { ...rockRecord(), miscType: 11 });
+  console.log(`0. misc full at ${size}: the next is misc ${index(game, got)}, the database ${misc.length}, the header ${data.header.objectCounts[DBType.MISC]}`);
+  check(index(game, got) === size && misc[size]!.miscType === 11 && misc[size]!.nextObject === OBJECT_ID_EOF,
+    'Enlarge: the new object is the first new record, at the old size');
+  check(misc.length === size + 100 && data.header.objectCounts[DBType.MISC] === size + 100 && data.databases.misc.count === size + 100,
+    '100 records more, and the header declares them');
+  const cleared = misc.slice(size + 1);
+  check(cleared.every((r) => r.nextObject === OBJECT_ID_NULL && r.miscType === 0 && !r.important && r.specialState === 0),
+    'the other 99 are cleared: every field 0, link RNnul');
+  const next = dungeon.findEmptyDBEntry('misc', rockRecord());
+  check(index(game, next) === size + 1 && misc.length === size + 100, 'the next new object takes the next cleared record');
+  // Up to record 1023 and past it.
+  let last: ObjectID = next;
+  while (index(game, last) < 1100) last = dungeon.findEmptyDBEntry('misc', rockRecord());
+  console.log(`   on to misc ${index(game, last)}, slot ${last}: the database ${misc.length}`);
+  check(index(game, last) === 1100 && dungeon.rnMaps.dbType(last) === DBType.MISC && misc.length === 1180,
+    'a record past 1023 is named by its slot like any other');
+  // A cleared creature: its possession is RNnul, as a save gives a free record's back.
+  const creatures = data.databases.creatures.records;
+  for (const r of creatures) if (r.nextObject === OBJECT_ID_NULL) r.nextObject = OBJECT_ID_EOF;
+  const groups = creatures.length;
+  dungeon.findEmptyDBEntry('creatures', { ...creatures[0]!, hp: [...creatures[0]!.hp] });
+  check(creatures.length === groups + 100 && creatures.slice(groups + 1).every((r) => r.nextObject === OBJECT_ID_NULL
+    && r.possession === OBJECT_ID_NULL && r.creatureType === 0 && r.hp.every((h) => h === 0)),
+  "a cleared group's possession is RNnul and the rest 0");
+  // At db.Max it grows no more.
+  fill(game, 'misc', rockRecord);
+  check(dungeon.enlarge(DBType.MISC) === -1 && misc.length === 8000, 'at db.Max, 8000 records, Enlarge gives -1');
+  check(dbMax(DBType.ACTUATOR) === 16000 && dbMax(DBType.CLOUD) === 768 && dbMax(DBType.WEAPON) === 8000,
+    'db.Max is 16000 for the actuators, 768 for the clouds, 8000 for the rest');
+}
+
 /* ------------------------------------------- 1. the sweep and the pad ---- */
 {
   const game = makeGame();
@@ -105,7 +169,7 @@ const where = (p: Position): string => `${p.z}:${p.x},${p.y}`;
   check(got === rock1, "level 1 is swept first, and the rock behind the pad's actuator is passed over");
   check(!inCell(game, free1, rock1) && inCell(game, pad!, padRock), 'the rock is lifted out of its square, the other stays');
   const misc = dungeon.getData().databases.misc.records;
-  check(misc[index(game, got)].miscType === 11 && misc.length === 1024, 'the new record is stored over it; the database stays at 1024');
+  check(misc[index(game, got)].miscType === 11 && misc.length === 8000, 'the new record is stored over it; the database stays at 8000');
   check(ctx.levelCleared[DBType.MISC] === 1, 'LevelCleared is 1');
   const next = dungeon.findEmptyDBEntry('misc', rockRecord());
   console.log(`   the next is misc ${index(game, next)}; LevelCleared ${ctx.levelCleared[DBType.MISC]}`);

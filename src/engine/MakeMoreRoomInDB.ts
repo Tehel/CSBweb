@@ -4,10 +4,10 @@
  * its record over. `FindEmptyDB<n>Entry` calls it when `FindEmptyDBEntry` finds no free
  * record (`CSBCode.cpp:4942-5084`); here, `DungeonState.findEmptyDBEntry` does.
  *
- * CSBWin first `Enlarge`s the database up to `db.Max`, 8000 records for most
- * (`data.cpp:813-876`, `CSB.h:1646`), and only a database at that size gets here. The
- * port's databases stop at 1024, the ten-bit index of its `ObjectID`, so its `Enlarge`
- * always fails at this point (`DEBT.md` D16).
+ * It first `Enlarge`s the database (`DungeonState.enlarge`), which fails once it holds
+ * `db.Max` records, 8000 for most (`data.cpp:813-876`, `CSB.h:1646`). Since
+ * `FindEmptyDBEntry` has tried that already, it succeeds here only when that one had a
+ * free record but no slot to give it.
  *
  * The sweep is the Atari original's (`TAG009d9e`). It goes level by level from
  * `d.LevelCleared[db]`, the level it last took from, leaving the party's level for last,
@@ -38,8 +38,8 @@ function freedRecord(ctx: GameContext, dbType: DBType, rn: ObjectID, index: numb
 /** `MakeMoreRoomInDB(dbType)`: the freed record's ID at corner 0, or `RNnul`. */
 export function makeMoreRoomInDB(ctx: GameContext, dbType: DBType): ObjectID {
     const dungeon = ctx.dungeon;
-    // `index = db.Enlarge(dbType); if (index != -1) return RN(dbType,index);` (`:214-218`):
-    // the port's database is at its 1024 already.
+    const enlarged = dungeon.enlarge(dbType);
+    if (enlarged !== -1) return dungeon.rnMaps.rn(dbType, enlarged);
     if (dbType === DBType.CLOUD) return OBJECT_ID_NULL;
     const party = ctx.party.state.position;
     const partyLevel = party.z | 0;

@@ -27,7 +27,8 @@ import type {
     ContainerRecord,
     MiscRecord,
     MissileRecord,
-    CloudRecord
+    CloudRecord,
+    DatabaseRecord
 } from './dungeonTypes';
 import { ExpandData } from '../core/compression';
 import { readU16BE, readU32BE } from '../core/bytes';
@@ -35,7 +36,7 @@ import { extractPresetHeroes } from './HeroExtractor';
 import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
 import { readExtendedFeatures } from './CsbwinExtendedFeatures';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
-import { rnMapsOf } from './CsbwinObjectIndex';
+import { databaseRecords, rnMapsOf } from './CsbwinObjectIndex';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import {
     DUNGEON_HEADER_SIZE,
@@ -615,6 +616,25 @@ export class DungeonLoader {
             missiles: this.parseMissileDatabase(offsets[DBType.MISSILE], counts[DBType.MISSILE]),
             clouds: this.parseCloudDatabase(offsets[DBType.CLOUD], counts[DBType.CLOUD])
         };
+    }
+
+    /**
+     * `count` records of database `db` as `DATABASES::Enlarge` clears them
+     * (`doc/CSBwin-src/data.cpp:864-875`): every byte 0 and the link `RNnul`, read
+     * through the database's own parser as a save's are, in the record shape
+     * `bigActuators` and `newScrolls` give. So a cleared record is what a save of it
+     * gives back: its other RNs are `RNnul` (`readRNOfRecord`).
+     */
+    clearedRecords(db: DBType, count: number, shape: { bigActuators?: boolean; newScrolls?: boolean }): DatabaseRecord[] {
+        const objectIndex = { length: 0, typeMap: new Uint8Array(0), indexMap: new Uint16Array(0) };
+        this.options = { bigActuators: shape.bigActuators, newScrolls: shape.newScrolls, objectIndex };
+        const size = this.getDatabaseRecordSize(db);
+        const bytes = new Uint8Array(count * size);
+        for (let i = 0; i < count; i++) bytes.fill(0xff, i * size, i * size + 2);
+        this.file.loadFromArray(bytes);
+        const counts = new Array<ui16>(16).fill(0);
+        counts[db] = count;
+        return [...databaseRecords(this.parseDatabases(new Array<number>(16).fill(0), counts), db)];
     }
 
     // Database parsers (to be continued in next message due to length)

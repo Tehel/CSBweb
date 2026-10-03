@@ -31,6 +31,7 @@ import type { TextRecord } from '../data/dungeonTypes';
 import type { TextDecodeTables } from '../data/tables/ObjectTables';
 import { textStart } from '../data/CsbwinDungeonConversions';
 import { Expool } from '../data/CsbwinExpool';
+import { DungeonLoader } from '../data/DungeonLoader';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import { applyDungeonSnapshot, captureDungeonSnapshot } from './DungeonSnapshot';
 import type { RnMaps } from '../core/RnMaps';
@@ -58,6 +59,14 @@ const DATABASE_CATEGORY: Record<keyof Databases, DBType> = {
 /** The `Databases` key of each database the port holds records for. */
 const DATABASE_KEY: Partial<Record<DBType, keyof Databases>> = Object.fromEntries(
     Object.entries(DATABASE_CATEGORY).map(([key, db]) => [db, key])) as Partial<Record<DBType, keyof Databases>>;
+
+/**
+ * `DATABASES::Max` (`doc/CSBwin-src/CSB.h:1646`): the most records `Enlarge` grows
+ * database `dbNum` to.
+ */
+export function dbMax(dbNum: DBType): number {
+    return dbNum === DBType.CLOUD ? 768 : dbNum === DBType.ACTUATOR ? 16000 : 8000;
+}
 
 export class DungeonState {
     private data: DungeonData;
@@ -523,14 +532,10 @@ export class DungeonState {
      * make a new slot when the index is all but full: a DSA's copy and a champion's
      * bones pass it (`DSA.cpp:1773-1868`, `Character.cpp:2625`).
      *
-     * With no free record CSBWin `Enlarge`s the database by 100 cleared records and
-     * names the first, the old length, through `RN(dbType, index)` (`:967-972`,
-     * `data.cpp:813-876`). Appending one gives that index, and the next append is
-     * CSBWin's next free record; `count` and the header's `objectCounts`, the size the
-     * image writer declares, stay the number of records. At 1024 records, the port's
-     * `db.Max` (`DEBT.md` D16), or when `FindEmptyDBEntry` gives `RNnul`, it falls back
-     * on `MakeMoreRoomInDB` (`makeMoreRoomInDB`) and stores `record` over the record of
-     * the RN that gives.
+     * With no free record it `Enlarge`s the database (`enlarge`) and names the first new
+     * record through `RN(dbType, index)` (`:967-972`). When the database is at `db.Max`
+     * already, or `FindEmptyDBEntry` gives `RNnul`, it falls back on `MakeMoreRoomInDB`
+     * (`makeMoreRoomInDB`) and stores `record` over the record of the RN that gives.
      */
     findEmptyDBEntry<K extends keyof Databases>(db: K, record: Databases[K]['records'][number], important = false): ObjectID {
         const database = this.data.databases[db] as Database<DatabaseRecord>;
@@ -545,11 +550,10 @@ export class DungeonState {
         }
         let result: ObjectID = OBJECT_ID_NULL;
         if (emptyDBEntry === -1) {
-            if (database.records.length < 1024) {
-                database.records.push(record);
-                database.count = database.records.length;
-                this.data.header.objectCounts[dbType] = database.records.length & 0xffff;
-                return this.rnMaps.rn(dbType, database.records.length - 1);
+            const index = this.enlarge(dbType);
+            if (index !== -1) {
+                database.records[index] = record;
+                return this.rnMaps.rn(dbType, index);
             }
         } else {
             result = this.rnMaps.assignIndexEntry(emptyIndexEntry, dbType, emptyDBEntry, important);
@@ -562,6 +566,30 @@ export class DungeonState {
         }
         database.records[emptyDBEntry] = record;
         return result;
+    }
+
+    /**
+     * `DATABASES::Enlarge` (`doc/CSBwin-src/data.cpp:813-876`): database `dbType` grows by
+     * 100 cleared records, their link `RNnul` and the first's `RNeof`, and the index of
+     * that first record, the old size, is returned. -1 once the database holds `db.Max`
+     * records (`dbMax`). The header's `DBSize`, `objectCounts` here, becomes the new
+     * size, which a save then declares. CSBWin asks the player first unless
+     * `AutoEnlarge`, which it sets on the line before (`:843`), and nothing sets
+     * `m_noEnlarge`, so it always goes ahead.
+     */
+    enlarge(dbType: DBType): number {
+        const key = DATABASE_KEY[dbType];
+        if (key === undefined) return -1;
+        const database = this.data.databases[key] as Database<DatabaseRecord>;
+        const records = database.records;
+        if (records.length >= dbMax(dbType)) return -1;
+        const iNew = records.length;
+        const newSize = iNew + 100;
+        records.push(...new DungeonLoader().clearedRecords(dbType, 100, this.data));
+        database.count = newSize & 0xffff;
+        this.data.header.objectCounts[dbType] = newSize & 0xffff;
+        records[iNew].nextObject = OBJECT_ID_EOF;
+        return iNew;
     }
 
     /**

@@ -13,23 +13,19 @@
  * The file's statics are CSBWin's module state, not `d.`, and no save carries them: they
  * are `ctx.smartDiscard` here.
  *
- * The port's databases stop at 1024 records, the ten-bit index of its `ObjectID`
- * (`DEBT.md` D16), so no database reaches the limit in play and this never gets past
- * counting. `tools/watch-smart-discard.ts` pads one past it.
+ * `tools/watch-smart-discard.ts` pads a database past the limit.
  */
 import { getActuatorType } from '../data/actuatorHelpers';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import type { Database, DatabaseRecord } from '../data/dungeonTypes';
+import { dbMax } from './DungeonState';
 import type { GameContext } from './GameContext';
 
 /** `SDListSize` (`doc/CSBwin-src/SmartDiscard.cpp:11`). */
 const SD_LIST_SIZE = 200;
 
-/** `db.Max(dbNum)` (`doc/CSBwin-src/CSB.h:1646`) for the three databases this visits. */
-const DB_MAX = 8000;
-
 /** `db.Max(currentDBNum)*FRACTION_LIMIT`, `FRACTION_LIMIT` being `3/4` (`SmartDiscard.cpp:14`). */
-const DISCARD_LIMIT = (DB_MAX * 3) / 4;
+const discardLimit = (dbNum: DBType): number => (dbMax(dbNum) * 3) / 4;
 
 /** The file's `currentMode` enum (`doc/CSBwin-src/SmartDiscard.cpp:22-28`). */
 export const enum SmartDiscardMode {
@@ -400,7 +396,7 @@ export function smartDiscard(ctx: GameContext, initialize: boolean): void {
             const records = databaseOf(ctx, s.currentDBNum).records;
             for (let repeat = 0; repeat < 50; repeat++) {
                 if (s.currentIndex >= records.length) {
-                    if (s.totalCount < DISCARD_LIMIT) {
+                    if (s.totalCount < discardLimit(s.currentDBNum)) {
                         s.currentMode = SmartDiscardMode.NewDB;
                         return;
                     }
@@ -422,7 +418,7 @@ export function smartDiscard(ctx: GameContext, initialize: boolean): void {
             for (let repeat = 50; repeat > 0; repeat -= scanDungeon(ctx, s));
             return;
         case SmartDiscardMode.Discard:
-            if (s.totalCount < DISCARD_LIMIT) {
+            if (s.totalCount < discardLimit(s.currentDBNum)) {
                 s.currentMode = SmartDiscardMode.NewDB;
                 return;
             }

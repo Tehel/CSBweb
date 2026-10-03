@@ -298,6 +298,9 @@ async function main(): Promise<void> {
   party.champions = [champion()];
   party.cursorOwner = 0;
 
+  // The missile records in use: a database grows 100 cleared records at a time
+  // (`DungeonState.enlarge`), so its length is not the number of missiles.
+  const missilesInUse = (): number[] => data2.databases.missiles.records.flatMap((r, i) => (r.nextObject === OBJECT_ID_NULL ? [] : [i]));
   const throwRock = (): { range: number; damage: number } | null => {
     const db = data2.databases.weapons;
     db.records.push({
@@ -307,11 +310,11 @@ async function main(): Promise<void> {
     db.count++;
     party.objectInHand = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, db.records.length - 1);
 
-    const before = data2.databases.missiles.records.length;
+    const before = new Set(missilesInUse());
     const ok = game.systems.mouse.throwObjectFromCursor(0);
-    const after = data2.databases.missiles.records.length;
-    if (!ok || after === before) return null;
-    const rec = data2.databases.missiles.records[after - 1]!;
+    const launched = missilesInUse().filter((i) => !before.has(i));
+    if (!ok || launched.length === 0) return null;
+    const rec = data2.databases.missiles.records[launched[0]!]!;
     return { range: rec.rangeRemaining, damage: rec.damageRemaining };
   };
 
@@ -379,9 +382,9 @@ async function main(): Promise<void> {
   const club = makeWeapon2(WEAPON_CLUB);
   equip(thrower2, 1, club);
 
-  const missilesBeforeThrow = data2.databases.missiles.records.length;
+  const missilesBeforeThrow = missilesInUse().length;
   const threw = game.systems.character.executeAttack(0, AttackType.atk_THROW);
-  const missilesAfterThrow = data2.databases.missiles.records.length;
+  const missilesAfterThrow = missilesInUse().length;
   const handAfterThrow = getChampionPossession(thrower2, 1);
   console.log(`THROW: result ${threw}, missiles ${missilesBeforeThrow} -> ${missilesAfterThrow}, ` +
     `fighting hand reads ${handAfterThrow === OBJECT_ID_NULL ? 'empty' : handAfterThrow}`);
@@ -399,9 +402,9 @@ async function main(): Promise<void> {
   equip(archer, 1, bow);
   equip(archer, 0, arrow);
 
-  const missilesBeforeShot = data2.databases.missiles.records.length;
+  const missilesBeforeShot = missilesInUse().length;
   const shot = game.systems.character.executeAttack(0, AttackType.atk_SHOOT);
-  const missilesAfterShot = data2.databases.missiles.records.length;
+  const missilesAfterShot = missilesInUse().length;
   const ammoAfterShot = getChampionPossession(archer, 0);
   const bowAfterShot = getChampionPossession(archer, 1);
   console.log(`SHOOT: result ${shot}, missiles ${missilesBeforeShot} -> ${missilesAfterShot}, ` +

@@ -6,8 +6,8 @@ metadata:
 ---
 
 The port is past its MVP. A CSBWin feature that a 🚫 entry in `DEBT.md` H calls "not
-wanted" was meant as "not yet", and is wanted now (skins and databases past 1024 records
-were the first two, now G27 and D16).
+wanted" was meant as "not yet", and is wanted now (skins, G27, and databases past 1024
+records were the first two).
 
 **Why:** the author's decision, 2026-10-03: those entries dated from when only the default
 dungeon mattered; custom dungeons (Conflux 3.5) now need the full CSBWin feature set.

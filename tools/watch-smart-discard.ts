@@ -14,8 +14,8 @@
  *     of each type on each corner.
  *  3. `dungeon.dat` sets `important()` on every object it places but three floor weapons,
  *     so what gets discarded is what play creates. Six rocks made on four levels, and
- *     the misc database padded to 6003 records in use — the port's databases stop at
- *     1024, so the padding is records no object names: the scan lists the six, then four
+ *     the misc database padded to 6003 records in use with records no object names, so
+ *     only the six can be listed: the scan lists them, then four
  *     discards bring the count under 6000, highest priority first, each lifted out of
  *     its cell and its record freed.
  *

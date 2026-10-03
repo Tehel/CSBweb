@@ -22,11 +22,9 @@ code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, and the work it
-needs is in the active list: D16, G23, G1 to G4, G24, G25, G27 and G26. D16 is structural and
-comes first, as tier D does: until it is paid a database of the port's holds at most
-1024 records, where five of Conflux's hold more, so nothing else on that path can be
-checked against the dungeon. The rest
-follow G17. Each entry says what Conflux uses of it, measured on the deciphered file.
+needs is in the active list: G23, G1 to G4, G24, G25, G27 and G26, after G17. G23 comes
+first: until the whole file is deciphered, nothing else on that path can be checked
+against the dungeon. Each entry says what Conflux uses of it, measured on the deciphered file.
 DSA support is aimed at whole, not at Conflux's share of it: G1 is every operation CSBWin
 has, so G27 is on the path though Conflux's programs never call `&GETSKIN`.
 
@@ -93,8 +91,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D16 | `ObjectID` is CSBWin's indirect slot, and a database holds more than 1024 records | L | ⏳ |
 | C113 | The entrance's chooser redraws without its cursor | S | ⏳ |
+| C114 | A new game's databases have no spare records | S | ⏳ |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G23 | Enciphered files: the whole of a `dungeon.dat`, and the saves of its game | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
@@ -130,7 +128,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C114 · D17 · E21 · F14 · G28 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C115 · D17 · E21 · F14 · G28 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -138,37 +136,6 @@ entry here, only its commit, so take the next ID from this line and move it on.
 ## D — State representation
 
 New state-representation debt goes here, and jumps the queue.
-
-### D16 ⏳ `ObjectID` is CSBWin's indirect slot, and a database holds more than 1024 records
-
-The port's RN is CSBWin's: a slot of `dataTypeMap` and `dataIndexMap`
-(`doc/CSBwin-src/CSBTypes.h:268-370`), held by each world's `RnMaps` (`src/core/RnMaps.ts`).
-A `dungeon.dat` is numbered on load by `ConvertListOfObjects` and `convertScrolls`, a save
-keeps its slots and maps, the writer writes the maps the game holds, `setPos` writes the
-corner in the map and keeps the RN, and `rn` is CSBWin's `RN(DBTYPE, dbIndex)`. A new
-object's slot and record are `FindEmptyDBEntry`'s, and `DeleteDBEntry` frees the slot with
-the record (`DungeonState.findEmptyDBEntry`, `deleteDBEntry`). So an RN can name a record
-past 1023. The port's databases still stop at 1024 records (`doc/PROVEN_FACTS.md` →
-"`SmartDiscard`", the sentence before "A full database"), and CSBWin's hold up to 64000.
-
-Conflux 3.5's `dungeon.dat`, deciphered (G23), needs them. Its index has 19925 slots, and
-five of its databases run past record 1023:
-
-| Database | Records | Slots past 1023 |
-| --- | --- | --- |
-| actuators | 10318 | 9287 |
-| texts | 2243 | 1197 |
-| misc | 1631 | 592 |
-| teleporters | 1613 | 575 |
-| creatures | 1257 | 228 |
-
-The step left: **databases past 1024 records**, the record arrays, `FindEmptyDBEntry` and
-`Enlarge` as CSBWin bounds them (`CSBCode.cpp:4942-5084`, `Character.cpp:182-358`). CSBWin
-grows a full database 100 records at a time, up to `db.Max`: 8000, 16000 for the
-actuators, 768 for database 15 (`doc/CSBwin-src/data.cpp:813-876`, `:967-972`,
-`CSB.h:1646`). `DungeonState.findEmptyDBEntry` takes 1024 as `db.Max`, so a full database
-goes straight to `MakeMoreRoomInDB`, and `SmartDiscard`, which starts at 6000 records in
-use, never acts. The check is Conflux read to its end, which also takes G23.
 
 ---
 
@@ -219,6 +186,30 @@ frame (`GameScreen.presentViewport`).
 Fix: the chooser's `draw` puts the dialog into the screen and presents it through
 `host.present()`. A check for `tools/probe-frames.mjs`: the pixels under the pointer are
 the cursor's after a notch of the wheel in the chooser.
+
+### C114 ⏳ A new game's databases have no spare records
+
+`ReadDatabases` sizes each database of a new game at the file's record count plus
+`d.Byte7302[db]`, and allocates that many records, cleared to link `RNnul`, before it
+reads the file's into the front (`doc/CSBwin-src/SaveGame.cpp:2556-2564`, `:2587`,
+`data.cpp:773-801`). The stock `Byte7302` makes the misc database 420 records where the
+file has 280 (`doc/PROVEN_FACTS.md` → "A full database throws one object out of the
+dungeon").
+The port reads the file's records and no more (`DungeonLoader.parseDatabases`), and uses
+`Byte7302` only to size the timer queue (`newGameTimerQueue`, `src/engine/GameContext.ts`).
+
+A new object takes the same record either way: the spares follow the file's, and the
+port's `Enlarge` (`DungeonState.enlarge`) appends cleared records at the same index. Two
+things differ. A save of the port's declares and carries fewer records than CSBWin's of
+the same game. And `Enlarge` grows 100 at a time from a different size, so a database
+stops at a different size past `db.Max`: the misc one at 8020 in CSBWin (420 + 7600),
+8080 in the port (280 + 7800), and `MakeMoreRoomInDB` starts later.
+
+Fix: a new game's read pads each database with `Byte7302[db]` cleared records
+(`DungeonLoader.clearedRecords`) and its header's `objectCounts`; `newGameTimerQueue` then
+reads the padded counts. A save game is not padded (`d.gameState` is
+`GAMESTATE_ResumeSavedGame`). The check: a new game's database sizes against the file's
+plus `Byte7302`, and the save it writes declares them.
 
 ---
 
@@ -320,7 +311,17 @@ such a game is enciphered too. The port's writer never sets the flag.
 
 Paying it: decipher the whole file once the block says so, and write a save enciphered
 when its game's file was. Conflux 3.5's `dungeon.dat` is the canary
-(`tools/dump-extended-features-read.ts`). Deciphered whole, its databases run past the 1024 records the port's hold (D16).
+(`tools/dump-extended-features-read.ts`), and the check is that file read to its end. Its
+index has 19925 slots, and five of its databases run past record 1023, which only a
+database that grows to `db.Max` holds (`DungeonState.enlarge`):
+
+| Database | Records | Slots past 1023 |
+| --- | --- | --- |
+| actuators | 10318 | 9287 |
+| texts | 2243 | 1197 |
+| misc | 1631 | 592 |
+| teleporters | 1613 | 575 |
+| creatures | 1257 | 228 |
 
 ### G1 ⏳ Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs
 
@@ -370,7 +371,7 @@ The steps: first the census as a tool. It prints, against CSBWin's `STKOP` list,
 operation the port lacks, with a dungeon's count of each when given one, and fails while
 any is left. Then one family per commit, in the order above, the ten with their nearest
 family. Last, `DSA::Write` and the `EXPOOL` records, so that a game with DSAs can be
-saved (below). Until D16 is paid, no operation can be checked against Conflux.
+saved (below). Until G23 is paid, no operation can be checked against Conflux.
 
 The rest of the item, with two operations that need care when ported:
 
@@ -421,7 +422,7 @@ skills filter, the missile encounter filter, and the spell filter at
 names a location for all sixteen special locations, `ESL_MONSTERATTACKFILTER` (0) to
 `ESL_DAMAGECHARFILTER` (15, `doc/CSBwin-src/CSB.h:1535-1550`), and a spell filter, so it
 reaches every filter here but the portrait one. Whether a DSA actuator stands at each
-location waits for G23 and D16, as the chains cannot be read before them.
+location waits for G23, as the chains cannot be read before it.
 
 - `ESL_MONSTERMOVEFILTER` (`doc/CSBwin-src/Monster.cpp:3080-3130`), which a level can
   have its own of: the key with `(level + 1) << 8` is tried first, then the dungeon's.

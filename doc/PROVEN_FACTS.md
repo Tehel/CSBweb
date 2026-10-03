@@ -4116,6 +4116,13 @@ free slot, or a new one at the end of the maps: refused, `RNnul`, once the maps 
 and a champion's bones do (`DSA.cpp:1773-1868`, `Character.cpp:2625`). The slot names the
 record at corner 0, and the record is cleared, its link `RNeof` (`:986-991`).
 
+`Enlarge` stops at `db.Max`: 8000 records, 16000 for the actuators and 768 for database 15
+(`CSB.h:1646`, `data.cpp:823-827`), and grows by 100 even from within 100 of it. It sets
+the header's `DBSize` to the new size (`:862`), so a save declares the cleared records and
+carries them. It would ask the player first, but sets `AutoEnlarge` on the line before
+(`:843`), and the `m_noEnlarge` bit it checks is never set (the line that set it, `:848`, is
+commented out).
+
 `DeleteDBEntry` is what frees a record: link `RNnul`, and the one slot naming it freed,
 `0xff`/`0xffff` (`data.cpp:993-1015`). Its walk starts at slot 0, and when two slots name
 the record, or its slot carries bit `0x80`, it returns at once, "Cloned!!!", and frees
@@ -4125,7 +4132,7 @@ one for it, so record 0, once freed with its slot, is not taken again.
 
 `dungeon.dat` ships free records: weapon 105 (of 107), scroll 33, potion 37, misc 8 and
 116 (of 280). The first arrow `ConstructPredefinedMissile` (`Mouse.cpp:105`) makes is weapon 105.
-Evidence: `tools/dump-db-reuse.ts`.
+Evidence: `tools/dump-db-reuse.ts`; `Enlarge`, `tools/dump-make-more-room.ts` section 0.
 
 ## `SmartDiscard` thins a database only at 6000 records in use, and never an important object
 
@@ -4154,8 +4161,7 @@ the object is still listed at a priority no lower (`:712-714`, `:345-356`). The 
 `dungeon.dat` sets `important()` (bit 7 of `word2` for `DB5`, `DB6` and `DB10`,
 `CSB.h:1165`, `:1185`, `:1269`) on every weapon, garment and misc object it places, on floors,
 in chests and in monsters' hands, except three floor weapons. So what `SmartDiscard` can take
-is what play creates. The port's databases stop at 1024 records, so it never gets past
-counting. Evidence: `tools/watch-smart-discard.ts`.
+is what play creates. Evidence: `tools/watch-smart-discard.ts`.
 
 ## A full database throws one object out of the dungeon: `MakeMoreRoomInDB`
 
