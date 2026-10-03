@@ -134,8 +134,8 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   which may list dungeons the port cannot play: so the digests are committed, not read
   from the page's files, and a tool holds each to the file here. It lists five: Dungeon
   Master; Chaos Strikes Back, which is `mini.dat`'s, and its prison, the set's
-  `dungeon.dat`, both the `csb` set's; Kids dungeon 24; and 3D2D1D. Conflux's enciphered
-  `dungeon.dat` is not read, so it has no signature. A dungeon is added from what
+  `dungeon.dat`, both the `csb` set's; Kids dungeon 24; and 3D2D1D. Conflux has no
+  signature until it is a data set (`DEBT.md` G26). A dungeon is added from what
   `tools/dump-dungeon-signature.ts` prints when given its file: the digests as the
   catalogue lists them.
 - **Play time is the player's**: wall-clock time in the game, the frozen game and the

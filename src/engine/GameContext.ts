@@ -117,9 +117,9 @@ export interface GameContext {
 }
 
 /**
- * Two of CSBWin's process-wide globals, not `d.`'s: `DM_rules` (`doc/CSBwin-src/data.cpp:251`)
- * and `DMRulesDesignOption` (`CSBUI.cpp:137`), both `false` at start. Only
- * `ReadExtendedFeatures` assigns them from a file (`SaveGame.cpp:392-398`), and only for a
+ * Three of CSBWin's process-wide globals, not `d.`'s: `DM_rules` (`doc/CSBwin-src/data.cpp:251`),
+ * `DMRulesDesignOption` (`CSBUI.cpp:137`) and `simpleEncipher`, all `false` at start. Only
+ * `ReadExtendedFeatures` assigns the first two from a file (`SaveGame.cpp:392-398`), and only for a
  * file whose block is present, so a file without one (`dm-atari/dungeon.dat`, CSB's
  * Atari-era saves) leaves both as they were. A new game and a load therefore keep them:
  * `Game.readNewGame` and the save paths never replace this object.
@@ -129,6 +129,11 @@ export interface RulesOptions {
   dmRules: boolean;
   /** `DMRulesDesignOption`: the dungeon asks for DM rules, forced on at the boot. */
   dmRulesDesignOption: boolean;
+  /**
+   * `simpleEncipher` (`data.cpp:243`): a file read was enciphered, so every save is
+   * (`SaveGame.cpp:914-920`, `:943-946`). Set by an enciphered file, cleared by none.
+   */
+  simpleEncipher: boolean;
 }
 
 /**
@@ -222,7 +227,7 @@ export function createGameContext(
     sounds: new SoundQueue(party, tables.sound1772, host, state, timers),
     smartDiscard: createSmartDiscardState(),
     levelCleared: new Uint8Array(16),
-    rules: { dmRules: false, dmRulesDesignOption: false },
+    rules: { dmRules: false, dmRulesDesignOption: false, simpleEncipher: false },
     tables,
     host,
     // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.

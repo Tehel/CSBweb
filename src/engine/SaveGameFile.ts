@@ -87,6 +87,7 @@ function buildFileBlocks(
             spellFilterLocation: dungeon.spellFilterLocation,
             dmRules: game.ctx.rules.dmRules,
             dmRulesDesignOption: game.ctx.rules.dmRulesDesignOption,
+            simpleEncipher: game.ctx.rules.simpleEncipher,
         }),
         dungeonImage: buildDungeonImage(dungeon, {
             indirectText: true,

@@ -14,8 +14,11 @@
  *    `READ` deciphers by the position in the file (`doc/CSBwin-src/system.cpp:301-313`):
  *    the two object maps behind the block, deciphered from byte 512 on, match the
  *    checksums the block declares, which takes the stream round its 8192 bytes.
- * 3. **The port reads the block and no more** (`DEBT.md` G23): `readExtendedFeatures`
- *    deciphers the 512 bytes, and stops at the maps, which it reads as they stand.
+ * 3. **The port reads the whole file deciphered.** `readExtendedFeatures` says the file
+ *    is enciphered and hands back every byte of it deciphered, and `DungeonLoader` reads
+ *    that to its last byte: the word that closes the image is the sum of every byte
+ *    before it, and a change to the file's last byte fails the read. Five databases run
+ *    past record 1023, and the object index has 19925 slots.
  * 4. **A block it gives up on is no block.** CSBWin seeks back and returns 0 in three
  *    cases, and its caller reads the file from the first byte (`:320-353`):
  *    - the checksum is wrong (`:345-353`): a save with one fill byte of its block changed
@@ -27,6 +30,13 @@
  *    - the sentinel appears only once deciphered and `flags` has no `SimpleEncryption`
  *      (`:333-343`): Conflux's block with the flag cleared.
  *    The last two are given a checksum that matches, so only the test named refuses them.
+ * 5. **A save of an enciphered game is enciphered** (`SaveGame.cpp:914-920`, `:943-946`):
+ *    DM's CSBWin `dungeon.dat` enciphered as CSBWin would, `SimpleEncryption` set, reads
+ *    as the plain file does and sets `simpleEncipher`. The game's save is the save it
+ *    makes with the flag cleared, its flag and checksum aside, enciphered whole; it
+ *    loads, and a load of
+ *    it sets `simpleEncipher` in a game that had not, which a plain load then keeps
+ *    (CSBWin never clears it). A save's `GAMEBLOCK1` stamped again stays enciphered.
  *
  * Run: `npx tsx tools/dump-extended-features-read.ts`
  */
@@ -43,8 +53,13 @@ import {
 } from '../src/data/CsbwinExtendedFeatures';
 import { formChecksum } from '../src/data/CsbwinObjectIndex';
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import { loadSaveGameState } from '../src/data/SaveGameLoader';
-import { readU32LE, writeU32LE } from '../src/core/bytes';
+import { loadSaveGameState, stampRandomGameID } from '../src/data/SaveGameLoader';
+import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
+import type { DungeonData } from '../src/data/dungeonTypes';
+import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
+import { isDeepStrictEqual } from 'node:util';
+import { newGame, stockGraphics } from './lib/game';
+import { readU16BE, readU32LE, writeU32LE } from '../src/core/bytes';
 import { check, finish } from './lib/check';
 import { savePath } from './lib/saves';
 
@@ -115,15 +130,37 @@ function checkConflux(): void {
   check(formChecksum(typeMap) === readU32LE(plain, 24), 'dataTypeMap, deciphered by its position in the file, matches its checksum');
   check(formChecksum(indexMap) === readU32LE(plain, 28), 'and so does dataIndexMap, round the end of the stream');
 
-  let thrown: string | null = null;
-  try {
-    readExtendedFeatures(file);
-  } catch (error) {
-    thrown = (error as Error).message;
+  const ef = readExtendedFeatures(file);
+  console.log(`  readExtendedFeatures: offset ${ef.offset}, simpleEncipher ${ef.simpleEncipher}`);
+  check(ef.simpleEncipher, 'the port marks the file enciphered');
+  check(ef.data.length === file.length && isDeepStrictEqual(ef.data, plain),
+    'and hands back the whole file deciphered, every byte by its position');
+
+  const dungeon = new DungeonLoader().loadDungeonDat(file);
+  const image = plain.subarray(ef.offset);
+  let sum = 0;
+  for (let i = 0; i < image.length - 2; i++) sum = (sum + image[i]!) & 0xffff;
+  const closing = readU16BE(image, image.length - 2);
+  console.log(`  the image: ${image.length} bytes, closed by 0x${closing.toString(16)}, the sum of the rest 0x${sum.toString(16)}`);
+  check(closing === sum, 'the last word of the file is the sum of every byte of the image before it');
+  const cut = file.slice();
+  cut[cut.length - 1] ^= 0x01;
+  const cutRead = outcome(() => `${new DungeonLoader().loadDungeonDat(cut).maps.length} levels`);
+  console.log(`  the file\'s last byte changed: ${cutRead}`);
+  check(cutRead === 'threw "dungeon image checksum mismatch"', 'DungeonLoader compares that word: the file is read to its end');
+  check(dungeon.simpleEncipher === true, 'and the dungeon says it was enciphered');
+
+  const slots = dungeon.rnMaps.length;
+  console.log(`  ${dungeon.maps.length} levels, ${slots} slots in the object index`);
+  check(slots === 19925, 'the object index has 19925 slots');
+  const expected: Array<[keyof DungeonData['databases'], number]> = [
+    ['actuators', 10318], ['texts', 2243], ['misc', 1631], ['teleporters', 1613], ['creatures', 1257],
+  ];
+  for (const [name, count] of expected) {
+    const got = dungeon.databases[name].records.length;
+    console.log(`  ${name.padEnd(12)} ${got} records`);
+    check(got === count, `${name}: ${count} records, past record 1023`);
   }
-  console.log(`  readExtendedFeatures: ${thrown ?? 'read'}`);
-  check(thrown === 'dataTypeMap checksum mismatch',
-    'the port takes the deciphered block, and stops at the maps it reads as they stand (DEBT.md G4)');
 }
 
 /* ------------------------------------------------ 4. the blocks it gives up on ---- */
@@ -191,10 +228,76 @@ function checkGivenUp(): void {
   check(blockOf(unflagged) === 'offset 0, no block', 'a sentinel found by deciphering needs the flag: no block');
 }
 
+/* ---------------------------------------- 5. a save of an enciphered game ---- */
+
+/** `file` as CSBWin would have it enciphered: `SimpleEncryption` set, resealed, every byte through the stream. */
+function encipherAsCsbwin(file: Uint8Array): Uint8Array {
+  const out = file.slice();
+  out[37] = (out[37] ?? 0) | EF_FLAGS.SimpleEncryption;
+  resealBlock(out);
+  rc4Encipher(simpleEncipherKey(), out, 0);
+  return out;
+}
+
+/** `save` with its block's checksum and flags put back to `plain`'s, the bytes those two may differ in. */
+function blockAside(save: Uint8Array, plain: Uint8Array): Uint8Array {
+  const out = save.slice();
+  for (const at of [32, 33, 34, 35, 37]) out[at] = plain[at]!;
+  return out;
+}
+
+function checkEnciphering(): void {
+  console.log('');
+  console.log('=== a save of an enciphered game is enciphered ===');
+  const plainFile = read(DM_WINDOWS);
+  const enciphered = encipherAsCsbwin(plainFile);
+  check(sentinelOf(enciphered) !== EXTENDED_SENTINEL, `${DM_WINDOWS}, enciphered, does not open with the sentinel`);
+  const plainData = new DungeonLoader().loadDungeonDat(plainFile);
+  const encData = new DungeonLoader().loadDungeonDat(enciphered);
+  check(plainData.simpleEncipher === undefined && encData.simpleEncipher === true, 'it reads, and says it was enciphered');
+  check(isDeepStrictEqual(blockAside(readExtendedFeatures(enciphered).data, plainFile), plainFile),
+    'from the bytes of the plain file, its flag and checksum aside');
+
+  // Both games through `readDungeonDat`, the path a new game takes, which reads the rules.
+  const graphics = stockGraphics();
+  const game = newGame(plainData, graphics);
+  check(game.readDungeonDat(enciphered), 'a new game reads it');
+  check(game.ctx.rules.simpleEncipher, 'and has simpleEncipher');
+  const save = buildSaveFile(game);
+  const saved = readExtendedFeatures(save);
+  console.log(`  its save: ${save.length} bytes, opens ${hex(save.subarray(0, 8))}; simpleEncipher ${saved.simpleEncipher}`);
+  check(sentinelOf(save) !== EXTENDED_SENTINEL && saved.simpleEncipher, 'its save is enciphered');
+  check(((saved.header?.flags ?? 0) & EF_FLAGS.SimpleEncryption) !== 0, 'and declares SimpleEncryption');
+  const plainGame = newGame(new DungeonLoader().loadDungeonDat(plainFile), graphics);
+  check(plainGame.readDungeonDat(plainFile) && !plainGame.ctx.rules.simpleEncipher, 'a new game on the plain file has no simpleEncipher');
+  check(readExtendedFeatures(buildSaveFile(plainGame)).simpleEncipher === false, 'and saves a plain file');
+  game.ctx.rules.simpleEncipher = false;
+  const plainSave = buildSaveFile(game);
+  game.ctx.rules.simpleEncipher = true;
+  check(readExtendedFeatures(plainSave).simpleEncipher === false, 'so does the enciphered game, the flag cleared');
+  check(isDeepStrictEqual(blockAside(saved.data, plainSave), plainSave),
+    'and its enciphered save, deciphered, is that file, its flag and checksum aside');
+  const world = outcome(() => `${loadCsbwinWorld(save).dungeon.maps.length} levels`);
+  console.log(`  loadCsbwinWorld: ${world}`);
+  check(world === `${plainData.maps.length} levels`, 'the enciphered save reads, its image closing at the file\'s end');
+
+  const other = plainGame;
+  applySaveBytes(other, save);
+  check(other.ctx.rules.simpleEncipher, 'a load of the enciphered save sets it');
+  applySaveBytes(other, plainSave);
+  check(other.ctx.rules.simpleEncipher, 'and a load of a plain save keeps it');
+  check(readExtendedFeatures(buildSaveFile(other)).simpleEncipher, 'so the game\'s next save is enciphered');
+
+  const stamped = stampRandomGameID(save, 0x12345678);
+  check(sentinelOf(stamped) !== EXTENDED_SENTINEL && loadSaveGameState(stamped).block1?.randomGameID === 0x12345678,
+    'a save stamped with a new game id stays enciphered, and reads with the id');
+}
+
 function main(): void {
   checkStream();
   checkConflux();
   checkGivenUp();
+  checkEnciphering();
   finish();
 }
 

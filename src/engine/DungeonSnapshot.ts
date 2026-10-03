@@ -128,6 +128,8 @@ export const DUNGEON_DATA_SOURCES = {
     // Read into `ctx.rules` when a new game is made (`Game.readNewGameRules`); a save
     // carries the rules itself.
     extendedFeatures: 'loaded',
+    // Read into `ctx.rules` with them; a save of the game is enciphered in its turn.
+    simpleEncipher: 'loaded',
 } as const satisfies SourceTable<DungeonData>;
 
 type DatabaseKey = keyof Databases;

@@ -97,8 +97,11 @@ export function ReadSavedGame(bytes: Uint8Array, P1: 0 | 1): UtilityGame {
     }
 }
 
-function readGame(bytes: Uint8Array): UtilityGame {
-    const extended = readExtendedFeatures(bytes);
+function readGame(file: Uint8Array): UtilityGame {
+    // `ReadExtendedFeatures(e.GameFile)` (`:2354`) marks an enciphered file's handle, so
+    // every read after it is deciphered.
+    const extended = readExtendedFeatures(file);
+    const bytes = extended.data;
     let offset = extended.offset;
     const { buf: block1, next } = readUnscrambleBlock(bytes, offset);
     offset = next;

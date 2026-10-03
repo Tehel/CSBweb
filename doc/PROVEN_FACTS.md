@@ -3140,12 +3140,23 @@ and carry the flag (`:324-338`); from there `READ` deciphers every buffer by its
 in the file (`doc/CSBwin-src/system.cpp:301-313`), and `WRITE` enciphers the same way
 (`:315-329`). The whole file is enciphered, the block included.
 
+`ReadExtendedFeatures` sets the global `simpleEncipher` with the file's mark (`:337`),
+and nothing clears it (`doc/CSBwin-src/data.cpp:243`). `SaveGame` then marks every save
+file enciphered with the same key (`SaveGame.cpp:914-920`) and sets `SimpleEncryption`
+in its block (`:943-946`): once an enciphered file is read, every save is enciphered,
+whatever file is read after it.
+
 `rc4PrepareKey` and `rc4Encipher` (`src/data/CsbwinExtendedFeatures.ts`) are the two
-functions. `tools/dump-extended-features-read.ts` checks the stream against `RC4.cpp`
-compiled as it stands, and against Conflux 3.5's `dungeon.dat`
+functions, and `simpleEncipher` puts a whole file through them. `readExtendedFeatures`
+hands back an enciphered file deciphered whole, which every reader reads on from;
+`ctx.rules.simpleEncipher` is the global, and `saveSaveGameState` enciphers a save whose
+block declares `SimpleEncryption`. `tools/dump-extended-features-read.ts` checks the
+stream against `RC4.cpp` compiled as it stands, and against Conflux 3.5's `dungeon.dat`
 (`static/gamefiles/conflux-3.5-b8/`), which is such a file: deciphered, it opens with the
 sentinel, its `flags` are 0xff, the block's checksum matches, and so do the two object
-maps' behind it, 59775 bytes read by their position.
+maps' behind it, 59775 bytes read by their position. Its image reads to the file's last
+word, the sum of every byte before it. The tool also enciphers DM's CSBWin
+`dungeon.dat` as CSBWin would, and holds a game on it to an enciphered save.
 
 ## A block `ReadExtendedFeatures` gives up on is no block
 

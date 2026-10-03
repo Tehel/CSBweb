@@ -19,7 +19,7 @@ import {
   unscrambleStream,
 } from './CsbwinSaveStream';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
-import { buildExtendedFeaturesPrefix, readExtendedFeatures } from './CsbwinExtendedFeatures';
+import { buildExtendedFeaturesPrefix, EF_FLAGS, readExtendedFeatures, simpleEncipher } from './CsbwinExtendedFeatures';
 import { buildImageChecksum } from './CsbwinDungeonImageWriter';
 import type { ExtendedFeaturesBlock } from './CsbwinExtendedFeatures';
 import {
@@ -88,6 +88,12 @@ export interface SaveGameState {
    * file carries a block 0; `saveSaveGameState` writes the whole prefix back when it is.
    */
   extendedFeatures?: ExtendedFeaturesBlock;
+  /**
+   * The file was enciphered whole (`readExtendedFeatures`' `simpleEncipher`), and read
+   * deciphered. `saveSaveGameState` enciphers what it writes by the header's
+   * `SimpleEncryption` instead, which CSBWin sets exactly when it enciphers.
+   */
+  simpleEncipher?: boolean;
   /**
    * `gameInfo` as the file holds it, without the terminator `ReadGameInfo` appends.
    * Carried verbatim: it is a free-text blob the game only ever shows.
@@ -578,8 +584,9 @@ function parseTimerQueue(buf: Uint8Array, maxTimers: number, numTimer: number): 
   return out;
 }
 
-export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
-  const extended = readExtendedFeatures(saveData);
+export function loadSaveGameState(file: Uint8Array): SaveGameState {
+  const extended = readExtendedFeatures(file);
+  const saveData = extended.data;
   let offset = extended.offset;
   const { buf: block1Buf, next: afterBlock1 } = readUnscrambleBlock(saveData, offset);
   offset = afterBlock1;
@@ -681,6 +688,7 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     block2,
     characterBlock,
     extendedFeatures: extended.header,
+    simpleEncipher: extended.simpleEncipher,
     gameInfo: extended.gameInfo,
     dsaBlock: extended.dsaBlock,
     extendedFeaturesSize: extended.offset,
@@ -919,6 +927,12 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   out.set(image, offset);
   offset += image.length;
   out.set(checksum, offset);
+  // `SaveGame` sets `SimpleEncryption` when it has marked the file enciphered, and every
+  // `WRITE` then enciphers by the position in the file, the block included
+  // (`doc/CSBwin-src/SaveGame.cpp:914-920`, `:943-946`, `system.cpp:315-329`).
+  if (save.extendedFeatures && (save.extendedFeatures.flags & EF_FLAGS.SimpleEncryption) !== 0) {
+    return simpleEncipher(out);
+  }
   return out;
 }
 
@@ -943,9 +957,9 @@ export function stampRandomGameID(saveData: Uint8Array, randomGameID: number): U
  *
  * Throws on a file whose `GAMEBLOCK1` does not read.
  */
-export function holdsNoBlock1Words(saveData: Uint8Array): boolean {
-  const { offset } = readExtendedFeatures(saveData);
-  const { buf } = readUnscrambleBlock(saveData, offset);
+export function holdsNoBlock1Words(file: Uint8Array): boolean {
+  const { offset, data } = readExtendedFeatures(file);
+  const { buf } = readUnscrambleBlock(data, offset);
   return buf[300] === 0 && buf[301] === 0 && readU16BE(buf, 376) === 0 && readU16BE(buf, 378) === 0;
 }
 
@@ -968,13 +982,16 @@ export function stampBlock1Words(saveData: Uint8Array): Uint8Array<ArrayBuffer> 
   });
 }
 
-/** A copy of a save file with its `GAMEBLOCK1` unscrambled, edited, and scrambled again. */
-function restampBlock1(saveData: Uint8Array, edit: (buf: Uint8Array) => void): Uint8Array<ArrayBuffer> {
-  const { offset } = readExtendedFeatures(saveData);
-  const { buf } = readUnscrambleBlock(saveData, offset);
+/**
+ * A copy of a save file with its `GAMEBLOCK1` unscrambled, edited, and scrambled again;
+ * an enciphered file is deciphered for it and enciphered again.
+ */
+function restampBlock1(file: Uint8Array, edit: (buf: Uint8Array) => void): Uint8Array<ArrayBuffer> {
+  const { offset, data, simpleEncipher: enciphered } = readExtendedFeatures(file);
+  const { buf } = readUnscrambleBlock(data, offset);
   edit(buf);
   rescrambleBlock1(buf);
-  const out = new Uint8Array(saveData);
+  const out = new Uint8Array(data);
   out.set(buf, offset);
-  return out;
+  return enciphered ? simpleEncipher(out) : out;
 }

@@ -22,9 +22,10 @@ code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, and the work it
-needs is in the active list: G23, G1 to G4, G24, G25, G27 and G26. G23 comes
-first: until the whole file is deciphered, nothing else on that path can be checked
-against the dungeon. Each entry says what Conflux uses of it, measured on the deciphered file.
+needs is in the active list: G1 to G4, G24, G25, G27 and G26. Its `dungeon.dat` is
+enciphered, and reads whole (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is
+`RC4.cpp`'s own cipher"). Each entry says what Conflux uses of it, measured on the
+deciphered file.
 DSA support is aimed at whole, not at Conflux's share of it: G1 is every operation CSBWin
 has, so G27 is on the path though Conflux's programs never call `&GETSKIN`.
 
@@ -91,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G23 | Enciphered files: the whole of a `dungeon.dat`, and the saves of its game | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
@@ -120,7 +120,7 @@ The rows above G14 are the active list. `F3` is a phase, whose status is
 `PLAN.md`'s. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
-row meanwhile. The G rows from G23 on are Conflux's (see "Priority"). The F
+row meanwhile. The G rows from G1 to G26 are Conflux's (see "Priority"). The F
 rows are independent of the rest ("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
@@ -241,31 +241,6 @@ postponed ones follow, under their own heading (see "Priority").
 
 Paying it needs a file of each form, or the author's decision to port them unchecked.
 
-### G23 ⏳ Enciphered files: the whole of a `dungeon.dat`, and the saves of its game
-
-`SimpleEncryption` (`EF_FLAGS` 0x04) puts the whole file, a save or a `dungeon.dat`, behind
-`RC4.cpp`'s cipher (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is `RC4.cpp`'s own
-cipher"). `readExtendedFeatures` deciphers the 512-byte block and no more, so an
-enciphered file fails at its object maps. CSBWin's `READ` deciphers every buffer by its
-position in the file (`doc/CSBwin-src/system.cpp:301-313`), and `WRITE` enciphers the same
-way (`:315-329`). CSBWin sets the flag only when the file it read was enciphered
-(`SaveGame.cpp:326-338`), and `SaveGame` keys the same cipher (`:915-918`), so a save of
-such a game is enciphered too. The port's writer never sets the flag.
-
-Paying it: decipher the whole file once the block says so, and write a save enciphered
-when its game's file was. Conflux 3.5's `dungeon.dat` is the canary
-(`tools/dump-extended-features-read.ts`), and the check is that file read to its end. Its
-index has 19925 slots, and five of its databases run past record 1023, which only a
-database that grows to `db.Max` holds (`DungeonState.enlarge`):
-
-| Database | Records | Slots past 1023 |
-| --- | --- | --- |
-| actuators | 10318 | 9287 |
-| texts | 2243 | 1197 |
-| misc | 1631 | 592 |
-| teleporters | 1613 | 575 |
-| creatures | 1257 | 228 |
-
 ### G1 ⏳ Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs
 
 The goal is the whole of CSBWin's DSA, not what one dungeon calls. Every command is
@@ -315,7 +290,8 @@ The steps: first the census as a tool. It prints, against CSBWin's `STKOP` list,
 operation the port lacks, with a dungeon's count of each when given one, and fails while
 any is left. Then one family per commit, in the order above, the ten with their nearest
 family. Last, `DSA::Write` and the `EXPOOL` records, so that a game with DSAs can be
-saved (below). Until G23 is paid, no operation can be checked against Conflux.
+saved (below). Conflux's `dungeon.dat` reads, so the census counts from it; an operation
+is checked against Conflux in play once G26 makes it a data set.
 
 The rest of the item, with two operations that need care when ported:
 
@@ -366,7 +342,7 @@ skills filter, the missile encounter filter, and the spell filter at
 names a location for all sixteen special locations, `ESL_MONSTERATTACKFILTER` (0) to
 `ESL_DAMAGECHARFILTER` (15, `doc/CSBwin-src/CSB.h:1535-1550`), and a spell filter, so it
 reaches every filter here but the portrait one. Whether a DSA actuator stands at each
-location waits for G23, as the chains cannot be read before it.
+location is not measured yet: the chains read, and the count is this item's first step.
 
 - `ESL_MONSTERMOVEFILTER` (`doc/CSBwin-src/Monster.cpp:3080-3130`), which a level can
   have its own of: the key with `(level + 1) << 8` is tried first, then the dungeon's.

@@ -283,7 +283,7 @@ export class Game implements MainLoop {
      * `:2347`). A file with no block leaves the rules as they were.
      */
     private readNewGameRules(data: DungeonData): void {
-        readRulesOptions(this.ctx.rules, data.extendedFeatures);
+        readRulesOptions(this.ctx.rules, data.extendedFeatures, data.simpleEncipher);
     }
 
     /**

@@ -164,9 +164,13 @@ export class DungeonLoader {
      * scrolls from version `'B'`, the cell flags' length) and maps its object references,
      * as a save's does, and the loader reads the image with them. The block itself is
      * kept in `extendedFeatures`, whose rule flags a new game takes (`readRulesOptions`).
+     *
+     * An enciphered file is read deciphered, from its first byte to its last
+     * (`readExtendedFeatures`), and says so in `simpleEncipher`.
      */
-    loadDungeonDat(bytes: Uint8Array): DungeonData {
-        const ef = readExtendedFeatures(bytes);
+    loadDungeonDat(file: Uint8Array): DungeonData {
+        const ef = readExtendedFeatures(file);
+        const bytes = ef.data;
         const size = ef.offset;
         if (bytes.length - size < 8) throw new Error('dungeon.dat is shorter than 8 bytes');
         const options: DungeonImageOptions = ef.header ? {
@@ -188,6 +192,7 @@ export class DungeonLoader {
         }
         if (ef.header) {
             data.extendedFeatures = ef.header;
+            if (ef.simpleEncipher) data.simpleEncipher = true;
             data.extendedWallDecorations = ef.extendedWallDecorations;
             data.spellFilterLocation = ef.spellFilterLocation;
             if (ef.dsaLevelIndex) data.dsaLevelIndex = ef.dsaLevelIndex;

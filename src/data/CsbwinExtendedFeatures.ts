@@ -202,6 +202,18 @@ export function simpleEncipherKey(): Uint8Array {
     return rc4PrepareKey(new Uint8Array([1, 0]), 1);
 }
 
+/**
+ * A copy of a whole file put through the "simple" stream, every byte by its position:
+ * what `READ` gives of a file whose table says `Enciphered()`
+ * (`doc/CSBwin-src/system.cpp:301-313`), and what `WRITE` puts in one (`:315-329`). The
+ * cipher is a XOR, so the one function does both.
+ */
+export function simpleEncipher(file: Uint8Array): Uint8Array<ArrayBuffer> {
+    const out = new Uint8Array(file);
+    rc4Encipher(simpleEncipherKey(), out, 0);
+    return out;
+}
+
 /** `strcmp(efb.sentinel, " Extended Features ") == 0`: the nineteen characters and the terminator. */
 function hasExtendedSentinel(buf: Uint8Array): boolean {
     if (buf.length <= EXTENDED_SENTINEL.length) return false;
@@ -335,9 +347,22 @@ function readDsa(rcs: RcsReader): DsaDefinition {
  * file opens with no block: one shorter than 512 bytes, one without the sentinel plain or
  * enciphered, or one whose block fails its checksum (`:320-353`). The file is then read
  * from its first byte.
+ *
+ * A block found only once deciphered, with `SimpleEncryption` in its `flags`, marks the
+ * whole file enciphered (`:324-338`): `simpleEncipher` is then set, and `data` is the
+ * file deciphered, as every later `READ` of it gives it (`simpleEncipher`). The maps and
+ * whatever follows them are read from `data`, and so is the rest of the file by every
+ * caller. For any other file `data` is the file as given.
  */
-export function readExtendedFeatures(data: Uint8Array): {
+export function readExtendedFeatures(file: Uint8Array): {
     offset: number;
+    /** The file as `READ` gives it: deciphered when `simpleEncipher`, else as given. */
+    data: Uint8Array;
+    /**
+     * CSBWin's `simpleEncipher`, set when the block was found by deciphering and carries
+     * `SimpleEncryption` (`doc/CSBwin-src/SaveGame.cpp:333-338`).
+     */
+    simpleEncipher: boolean;
     sequencedTimers: boolean;
     extendedTimers: boolean;
     extendedWallDecorations: boolean;
@@ -363,23 +388,26 @@ export function readExtendedFeatures(data: Uint8Array): {
     /** The DSA section verbatim, when there is one. */
     dsaBlock?: Uint8Array;
 } {
-    const noBlock = { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, expandedPortraits: false, indirectText: false, version: 0, cellFlagArraySize: 0 };
-    if (data.length < EXTENDED_FEATURES_SIZE) return noBlock;
+    const noBlock = { offset: 0, data: file, simpleEncipher: false, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, expandedPortraits: false, indirectText: false, version: 0, cellFlagArraySize: 0 };
+    if (file.length < EXTENDED_FEATURES_SIZE) return noBlock;
 
-    const block = data.subarray(0, EXTENDED_FEATURES_SIZE);
-    let parsed = block;
+    let data = file;
+    let enciphered = false;
 
     // Without the sentinel the block may be an enciphered one: deciphered, it must open
     // with the sentinel and carry `SimpleEncryption` in its `flags`
-    // (`doc/CSBwin-src/SaveGame.cpp:324-343`).
-    if (!hasExtendedSentinel(block)) {
-        const decoded = block.slice();
+    // (`doc/CSBwin-src/SaveGame.cpp:324-343`). The file is then enciphered from its
+    // first byte to its last.
+    if (!hasExtendedSentinel(file)) {
+        const decoded = file.slice(0, EXTENDED_FEATURES_SIZE);
         rc4Encipher(simpleEncipherKey(), decoded, 0);
         if (!hasExtendedSentinel(decoded) || ((decoded[37] ?? 0) & EF_FLAGS.SimpleEncryption) === 0) {
             return noBlock;
         }
-        parsed = decoded;
+        data = simpleEncipher(file);
+        enciphered = true;
     }
+    const parsed = data.subarray(0, EXTENDED_FEATURES_SIZE);
 
     // `ReadExtendedFeatures` verifies the block against its own checksum before it
     // believes a single field of it (`doc/CSBwin-src/SaveGame.cpp:345-353`): the stored
@@ -464,6 +492,8 @@ export function readExtendedFeatures(data: Uint8Array): {
 
     return {
         offset,
+        data,
+        simpleEncipher: enciphered,
         sequencedTimers: (extendedFlags & EF_EXTENDED_FLAGS.SequencedTimers) !== 0,
         extendedTimers: (extendedFlags & EF_EXTENDED_FLAGS.ExtendedTimers) !== 0,
         extendedWallDecorations: (extendedFlags & EF_EXTENDED_FLAGS.ExtendedWallDecorations) !== 0,
@@ -621,6 +651,8 @@ export interface LiveExtendedFeatures {
     dmRules?: boolean;
     /** `DMRulesDesignOption`, written as `DMRules`. */
     dmRulesDesignOption?: boolean;
+    /** `simpleEncipher`, written as `SimpleEncryption`: the file is enciphered whole. */
+    simpleEncipher?: boolean;
 }
 
 /**
@@ -628,12 +660,17 @@ export interface LiveExtendedFeatures {
  * `DMRulesDesignOption` from `flags & DMRules`, `DM_rules` from
  * `extendedFlags & DMRulesOption`. A file with no block (`header` undefined) assigns
  * neither, as CSBWin, which never reaches that function for it.
+ *
+ * And `simpleEncipher`, which the function sets for an enciphered file and nothing ever
+ * clears (`:333-338`): `enciphered` is `readExtendedFeatures`' `simpleEncipher`.
  */
 export function readRulesOptions(
-    rules: { dmRules: boolean; dmRulesDesignOption: boolean },
+    rules: { dmRules: boolean; dmRulesDesignOption: boolean; simpleEncipher: boolean },
     header: ExtendedFeaturesBlock | undefined,
+    enciphered: boolean | undefined,
 ): void {
     if (!header) return;
+    if (enciphered) rules.simpleEncipher = true;
     rules.dmRulesDesignOption = (header.flags & EF_FLAGS.DMRules) !== 0;
     rules.dmRules = (header.extendedFlags & EF_EXTENDED_FLAGS.DMRulesOption) !== 0;
 }
@@ -653,9 +690,10 @@ export function readRulesOptions(
  * `BigActuators` (`:961-963`), which are the shapes of blocks 11-13 and of `CHARDESC`.
  * They must agree with the image actually written, which is what
  * `convertOriginalDungeon` guarantees. `DMRules` is `DMRulesDesignOption` (`:952-953`).
- * The other two are options this port does not model and writes off: `SimpleEncryption`
- * (the whole file behind RC4) and `AutoRecord`. Measured: every committed save carries
- * 0xe9, the four (0xa9) plus `DMRules`.
+ * `SimpleEncryption` is `simpleEncipher` (`:943-946`), and `saveSaveGameState` then
+ * enciphers the whole file (`:914-920`). `AutoRecord` is an option this port does not
+ * model and writes off. Measured: every committed save carries 0xe9, the four (0xa9)
+ * plus `DMRules`.
  *
  * **`extendedFlags`.** Three unconditional (`:964-966`): `SequencedTimers` and
  * `ExtendedTimers`, which together select the 16-byte `TIMER` this port writes, and
@@ -686,6 +724,7 @@ export function buildLiveExtendedFeatures(live: LiveExtendedFeatures): ExtendedF
         EF_FLAGS.LevelDSAInfoPresent | EF_FLAGS.IndirectText |
         EF_FLAGS.ExpandedPortraits | EF_FLAGS.BigActuators;
     if (live.dmRulesDesignOption) flags |= EF_FLAGS.DMRules;
+    if (live.simpleEncipher) flags |= EF_FLAGS.SimpleEncryption;
     let extendedFlags =
         EF_EXTENDED_FLAGS.SequencedTimers | EF_EXTENDED_FLAGS.ExtendedTimers |
         EF_EXTENDED_FLAGS.DefaultDirectX;

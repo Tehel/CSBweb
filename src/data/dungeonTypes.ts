@@ -568,6 +568,8 @@ export interface DungeonData {
      * (`readRulesOptions`, `src/data/CsbwinExtendedFeatures.ts`).
      */
     extendedFeatures?: ExtendedFeaturesBlock;
+    /** The file was enciphered (`readExtendedFeatures`' `simpleEncipher`). */
+    simpleEncipher?: boolean;
 }
 
 export interface HeroInventoryItem {
