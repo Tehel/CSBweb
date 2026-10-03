@@ -91,6 +91,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| C115 | Saves of an early build's playthrough hold zero `GAMEBLOCK1` words, and RISE refuses them | S | ⏳ the author's decision |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⚠️ the engine and RISE done; the prison's shortcut |
 | G23 | Enciphered files: the whole of a `dungeon.dat`, and the saves of its game | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
@@ -127,7 +128,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C115 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C116 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -170,6 +171,35 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C115 ⏳ Saves of an early build's playthrough hold zero `GAMEBLOCK1` words, and RISE refuses them
+
+Before G7 the port's writer left `Byte22596` (301), `Word22594` (376) and `Word22592`
+(378) of `GAMEBLOCK1` at 0. CSBWin never writes that: `_ReadEntireGame` sets
+`d.Word22596`, `Word22594` and `Word22592` to 2, 1 and 13 before either read
+(`doc/CSBwin-src/SaveGame.cpp:1467-1470`), and a load replaces them only with a file's
+own (`:1878-1881`), which the port mirrors (`buildBlock1State`,
+`src/engine/CsbwinSaveGame.ts`). So a playthrough begun on such a build carries the zeros
+from save to load to save. The store's version-3 upgrade stamped `RandomGameID` into
+those files and nothing else (`stampSaveRecords`, `src/data/saves/legacyRows.ts`).
+
+The zeros make the utility's `TAG00260e` read the save as already used: neither an Atari
+save (`Byte22596` 1) nor `Word22594` 1, so RISE shows "CAN'T MAKE NEW ADVENTURE FROM
+THIS SAVED GAME. ALREADY UTILIZED." (`doc/CSBwin-src/Chaos.cpp:2501-2546`). CSBWin's
+utility refuses the same file, so the refusal is faithful to the file; the file is not
+one CSBWin would have written. Met on the author's Halk/Leif/Tiggy/Wu Tse playthrough
+(0x2d431dd2, `archive/saves/dmweb-20261002-165404-tiggy won.dat`). Every genuine save in
+`tools/fixtures/`, `csbgame2.dat` and `mini.dat` holds 2, 1 and 13.
+
+**The author's decision.** The options:
+
+1. **Stamp them, in the store and at import.** A file whose three words are all 0, which
+   only the early writer made, takes CSBWin's 2, 1 and 13, as `stampRandomGameID` gives a
+   file its playthrough: a version-4 upgrade over the stored rows, and `importSave` for a
+   file brought in later (`archive/saves/` holds such files). Once, and for good: the
+   upgrade runs in whichever page opens the store first.
+2. **Stamp them in the store only**, and leave an imported early file as it is.
+3. **Leave them.** Those playthroughs cannot be raised, as in CSBWin.
 
 ---
 
