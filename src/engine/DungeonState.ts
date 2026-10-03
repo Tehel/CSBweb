@@ -40,7 +40,7 @@ import type { RnMaps } from '../core/RnMaps';
  * DungeonState - manages dungeon data and queries
  */
 /** The database each `Databases` key holds. */
-const DATABASE_CATEGORY: Record<keyof Databases, DBType> = {
+export const DATABASE_CATEGORY: Record<keyof Databases, DBType> = {
     doors: DBType.DOOR,
     teleporters: DBType.TELEPORTER,
     texts: DBType.TEXT,
@@ -566,6 +566,27 @@ export class DungeonState {
         }
         database.records[emptyDBEntry] = record;
         return result;
+    }
+
+    /**
+     * `ReadDatabases`' sizes for a new game (`doc/CSBwin-src/SaveGame.cpp:2556-2564`): each
+     * database holds the file's records and `d.Byte7302[db]` more, which
+     * `DATABASES::Allocate` clears to link `RNnul` behind the file's (`data.cpp:773-801`).
+     * The header's `DBSize`, `objectCounts` here, says so, and a save then declares it.
+     * Every `graphics.dat` the port reads gives the expool and the two unused databases
+     * none.
+     */
+    addNewGameSpares(byte7302: ArrayLike<number>): void {
+        for (let db = 0; db < 16; db++) {
+            const spares = byte7302[db] ?? 0;
+            const key = DATABASE_KEY[db as DBType];
+            if (spares === 0) continue;
+            if (key === undefined) throw new Error(`Byte7302 gives database ${db} ${spares} spare records`);
+            const database = this.data.databases[key] as Database<DatabaseRecord>;
+            database.records.push(...new DungeonLoader().clearedRecords(db as DBType, spares, this.data));
+            database.count = database.records.length & 0xffff;
+            this.data.header.objectCounts[db] = database.count;
+        }
     }
 
     /**

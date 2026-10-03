@@ -122,7 +122,9 @@ const where = (p: Position): string => `${p.z}:${p.x},${p.y}`;
   let last: ObjectID = next;
   while (index(game, last) < 1100) last = dungeon.findEmptyDBEntry('misc', rockRecord());
   console.log(`   on to misc ${index(game, last)}, slot ${last}: the database ${misc.length}`);
-  check(index(game, last) === 1100 && dungeon.rnMaps.dbType(last) === DBType.MISC && misc.length === 1180,
+  // A new game's 420 misc records (`ReadDatabases`' 280 and `Byte7302`'s 140), and seven
+  // `Enlarge`s.
+  check(index(game, last) === 1100 && dungeon.rnMaps.dbType(last) === DBType.MISC && misc.length === 1120,
     'a record past 1023 is named by its slot like any other');
   // A cleared creature: its possession is RNnul, as a save gives a free record's back.
   const creatures = data.databases.creatures.records;

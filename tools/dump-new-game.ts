@@ -30,6 +30,9 @@
  * into it once ENTER is chosen: the empty world draws nothing from the random stream, so
  * the booted game is the one a `Game` built straight over the file would be.
  *
+ * And a new game's databases: the file's records and `d.Byte7302`'s spares behind them,
+ * which a save of the game declares and carries.
+ *
  * Run: `npx tsx tools/dump-new-game.ts`
  */
 import { createHash } from 'node:crypto';
@@ -37,18 +40,19 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { CsbRandom } from '../src/core/random';
-import { Position } from '../src/core/types';
+import { OBJECT_ID_NULL, Position } from '../src/core/types';
 import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
+import { DATABASE_CATEGORY } from '../src/engine/DungeonState';
 import { drawRandomGameID } from '../src/engine/GameContext';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { MovementAction } from '../src/engine/gameTypes';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
+import { gameTablesOf, newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
 
 const DUNGEON = readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'));
 const SEED = 0x2468ace0;
@@ -123,6 +127,37 @@ function lcgBack(seed: number): number {
 /** The word a draw gives `RandomGameID`: `STRandom() & 0xffff`, bits 8-23 of the seed. */
 function lowWord(seed: number): number {
   return (seed >>> 8) & 0xffff;
+}
+
+/**
+ * A new game's databases: `ReadDatabases` sizes each at the file's records and
+ * `d.Byte7302[db]` spares, cleared to link `RNnul` behind the file's
+ * (`doc/CSBwin-src/SaveGame.cpp:2556-2564`, `data.cpp:773-801`), and the header says so.
+ * A save of it declares and carries them; a load reads them as they are, with none added.
+ */
+function checkSpares(): void {
+  console.log('=== a new game\'s databases: the file\'s records and Byte7302\'s spares ===');
+  const file = parse().header.objectCounts;
+  const { byte7302 } = gameTablesOf(stockGraphics());
+  const game = newGame(parse(), stockGraphics());
+  const data = game.ctx.dungeon.getData();
+  const loaded = newGame(parse(), stockGraphics());
+  applySaveBytes(loaded, buildSaveFile(game));
+  const reloaded = loaded.ctx.dungeon.getData();
+  for (const [key, database] of Object.entries(data.databases)) {
+    const db = DATABASE_CATEGORY[key as keyof typeof data.databases];
+    const want = file[db] + byte7302[db];
+    const records = database.records as { nextObject: number }[];
+    const spares = records.slice(file[db]);
+    const reread = reloaded.databases[key as keyof typeof data.databases].records.length;
+    console.log([key, 'file', file[db], 'spares', byte7302[db], 'new game', records.length,
+      'header', data.header.objectCounts[db], 'saved and loaded', reread].join('\t'));
+    check(records.length === want && data.header.objectCounts[db] === want && database.count === want,
+      `${key}: ${want} records in the new game and its header`);
+    check(spares.every((record) => record.nextObject === OBJECT_ID_NULL), `${key}: the spares are cleared`);
+    check(reread === want && reloaded.header.objectCounts[db] === want, `${key}: its save declares them all`);
+  }
+  console.log('');
 }
 
 /**
@@ -262,6 +297,7 @@ function main(): void {
   check(fresh.ctx.state.tickCount === 600 && played.ctx.state.tickCount === 600, `both ran 600 ticks (${fresh.ctx.state.tickCount}, ${played.ctx.state.tickCount})`);
   check(stateHash(fresh) === stateHash(played), 'and are still the same game');
 
+  checkSpares();
   checkZeroDraw();
   finish();
 }

@@ -91,7 +91,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C114 | A new game's databases have no spare records | S | ⏳ |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G23 | Enciphered files: the whole of a `dungeon.dat`, and the saves of its game | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
@@ -170,30 +169,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C114 ⏳ A new game's databases have no spare records
-
-`ReadDatabases` sizes each database of a new game at the file's record count plus
-`d.Byte7302[db]`, and allocates that many records, cleared to link `RNnul`, before it
-reads the file's into the front (`doc/CSBwin-src/SaveGame.cpp:2556-2564`, `:2587`,
-`data.cpp:773-801`). The stock `Byte7302` makes the misc database 420 records where the
-file has 280 (`doc/PROVEN_FACTS.md` → "A full database throws one object out of the
-dungeon").
-The port reads the file's records and no more (`DungeonLoader.parseDatabases`), and uses
-`Byte7302` only to size the timer queue (`newGameTimerQueue`, `src/engine/GameContext.ts`).
-
-A new object takes the same record either way: the spares follow the file's, and the
-port's `Enlarge` (`DungeonState.enlarge`) appends cleared records at the same index. Two
-things differ. A save of the port's declares and carries fewer records than CSBWin's of
-the same game. And `Enlarge` grows 100 at a time from a different size, so a database
-stops at a different size past `db.Max`: the misc one at 8020 in CSBWin (420 + 7600),
-8080 in the port (280 + 7800), and `MakeMoreRoomInDB` starts later.
-
-Fix: a new game's read pads each database with `Byte7302[db]` cleared records
-(`DungeonLoader.clearedRecords`) and its header's `objectCounts`; `newGameTimerQueue` then
-reads the padded counts. A save game is not padded (`d.gameState` is
-`GAMESTATE_ResumeSavedGame`). The check: a new game's database sizes against the file's
-plus `Byte7302`, and the save it writes declares them.
 
 ---
 

@@ -161,9 +161,11 @@ async function main(): Promise<void> {
       const rec = dungeon.getCreatureRecord(rn)!;
       return { rn, rec };
     };
-    const filler = pick(creatures.length - 1);
-    const plain = pick(creatures.length - 2);
-    const carrier = pick(creatures.length - 3);
+    // The last three groups the file plants: a new game's spares follow them, cleared.
+    const planted = creatures.length - game.ctx.tables.byte7302[DBType.CREATURE]!;
+    const filler = pick(planted - 1);
+    const plain = pick(planted - 2);
+    const carrier = pick(planted - 3);
     plain.rec.possession = OBJECT_ID_EOF;
     plain.rec.unique = true; // bit 13 set, option off: CSBWin's Unique() is false
     carrier.rec.possession = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, 0);

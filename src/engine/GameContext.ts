@@ -135,15 +135,14 @@ export interface RulesOptions {
  * A new game's timer table, as `ReadDatabases` sizes it (`doc/CSBwin-src/SaveGame.cpp:2549`,
  * `:2556-2564`, `:2612-2616`): 100 slots, and one more per record of the monster
  * database and of each database from the missiles on, a record count being the file's
- * and `d.Byte7302`'s extra ones together.
+ * and `d.Byte7302`'s extra ones together (`DungeonState.addNewGameSpares`).
  */
-function newGameTimerQueue(dungeonData: DungeonData, tables: GameTables): TimerQueue {
+function newGameTimerQueue(dungeonData: DungeonData): TimerQueue {
   const timers = new TimerQueue();
   timers.allocate(100);
   for (let db = 0; db < 16; db++) {
     if (db !== DBType.CREATURE && db < DBType.MISSILE) continue;
-    const dbSize = sw((dungeonData.header.objectCounts[db] ?? 0) + (tables.byte7302[db] ?? 0));
-    timers.allocate(sw(timers.getMaxTimers() + dbSize));
+    timers.allocate(sw(timers.getMaxTimers() + (dungeonData.header.objectCounts[db] ?? 0)));
   }
   return timers;
 }
@@ -198,6 +197,7 @@ export function createGameContext(
   host: GameHost = createGameHost(),
 ): GameContext {
   const dungeon = new DungeonState(dungeonData);
+  dungeon.addNewGameSpares(tables.byte7302);
   const party = new Party(dungeon.getStartPosition(), dungeon.getStartFacing());
   const random = new CsbRandom();
   const state: GameState = {
@@ -209,7 +209,7 @@ export function createGameContext(
     currentPalette: 0,
     block1: newGameBlock1(random, dungeonData),
   };
-  const timers = newGameTimerQueue(dungeonData, tables);
+  const timers = newGameTimerQueue(dungeonData);
   return {
     dungeon,
     party,

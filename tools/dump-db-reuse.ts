@@ -3,14 +3,15 @@
  * `doc/CSBwin-src/data.cpp:919-993`).
  *
  *  1. The lowest record from index 1 whose link is `RNnul` (`:954-966`). `dungeon.dat`
- *     ships a few: weapon 105, misc 8 and 116. The port appended every new record, so
- *     the first arrow a wall shoots was weapon 107 where CSBWin's is 105.
- *  2. The walk of the records starts at 1. An empty database — missiles, clouds — is
- *     `Enlarge`d, which hands out the old length, 0 (`:967-972`, `data.cpp:813-876`);
- *     once freed with its slot, record 0 stays free.
- *  3. Appending keeps `count` and the header's `objectCounts` — what the image writer
- *     declares — equal to the number of records. `MonsterSystem`'s allocator bumped
- *     neither the header nor anything but `count`.
+ *     ships a few: weapon 105, misc 8 and 116, and a new game's spares follow the
+ *     file's records, cleared (`ReadDatabases`, `SaveGame.cpp:2556-2564`): weapons from
+ *     107, misc from 280. So the first arrow a wall shoots is weapon 105, the next 107.
+ *  2. The walk of the records starts at 1. A new game's missiles are all spares, handed
+ *     out from record 1, and record 0, free all along, is never reached.
+ *  3. A new monster group takes the first spare, and the database, already sized for
+ *     it, does not grow: `count` and the header's `objectCounts` — what the image writer
+ *     declares — stay the number of records. A full database's `Enlarge` is
+ *     `tools/dump-make-more-room.ts`'s.
  *  4. The indirect index. `DeleteDBEntry` frees the record's slot with it, `0xff`/`0xffff`
  *     (`:993-1015`), and the next new object, of any database, takes the lowest free
  *     slot (`:933-953`, `:986-988`). A slot that names a free record of the database is
@@ -63,21 +64,25 @@ async function main(): Promise<void> {
     const freeWeapons = weapons.records.flatMap((r, i) => (r.nextObject === OBJECT_ID_NULL ? [i] : []));
     const freeMisc = misc.records.flatMap((r, i) => (r.nextObject === OBJECT_ID_NULL ? [i] : []));
     const weaponCount = weapons.records.length;
-    const miscCount = misc.records.length;
+    const fileWeapons = weaponCount - game.ctx.tables.byte7302[DBType.WEAPON]!;
+    const fileMisc = misc.records.length - game.ctx.tables.byte7302[DBType.MISC]!;
     const arrows = [0, 1].map(() => index(dungeon, constructPredefinedMissile(dungeon, MISSILE_TYPE_ARROW)));
     const boulders = [0, 1, 2].map(() => index(dungeon, constructPredefinedMissile(dungeon, MISSILE_TYPE_BOULDER)));
-    console.log(`1. free in dungeon.dat: weapons [${freeWeapons}] of ${weaponCount}, misc [${freeMisc}] of ${miscCount}`);
+    const below = (free: number[], file: number): number[] => free.filter((i) => i < file);
+    console.log(`1. free in dungeon.dat: weapons [${below(freeWeapons, fileWeapons)}] of ${fileWeapons}, `
+      + `misc [${below(freeMisc, fileMisc)}] of ${fileMisc}; spares from weapon ${fileWeapons}, misc ${fileMisc}`);
     console.log(`   two arrows -> weapons ${arrows.join(', ')}; three boulders -> misc ${boulders.join(', ')}`);
-    check(freeWeapons.length === 1 && arrows[0] === freeWeapons[0], "the first arrow takes the file's free weapon record");
+    check(below(freeWeapons, fileWeapons).length === 1 && arrows[0] === freeWeapons[0],
+      "the first arrow takes the file's free weapon record");
     check(weapons.records[arrows[0]!]?.nextObject === OBJECT_ID_EOF
       && (weapons.records[arrows[0]!] as { weaponType?: number }).weaponType === WEAPON_ARROW,
       'and the record holds the arrow, link RNeof');
-    check(arrows[1] === weaponCount, 'the next one, with none free, is appended');
-    check(freeMisc.length === 2 && boulders[0] === freeMisc[0] && boulders[1] === freeMisc[1],
+    check(arrows[1] === fileWeapons, "the next one takes the first spare, behind the file's records");
+    check(below(freeMisc, fileMisc).length === 2 && boulders[0] === freeMisc[0] && boulders[1] === freeMisc[1],
       'boulders take misc records in index order, lowest first');
-    check(boulders[2] === miscCount, 'then append');
-    check(dungeon.getData().header.objectCounts[DBType.WEAPON] === weapons.records.length
-      && weapons.count === weapons.records.length, 'an append keeps count and the header equal to the records');
+    check(boulders[2] === fileMisc, 'then the first spare');
+    check(weapons.records.length === weaponCount && dungeon.getData().header.objectCounts[DBType.WEAPON] === weaponCount
+      && weapons.count === weaponCount, 'nothing grows: count and the header are the records, spares included');
   }
 
   /* ------------------------------- 2. the walk of the records starts at 1 ---- */
@@ -121,9 +126,11 @@ async function main(): Promise<void> {
     const after0 = launch();
     console.log(`2. missiles ${i0}, ${i1}, ${i2}; free ${i1} -> next ${index(dungeon, again1)}; `
       + `free ${i0} -> next ${index(dungeon, after0)}`);
-    check(i0 === 0 && i1 === 1 && i2 === 2, 'an empty database hands out 0, 1, 2');
-    check(index(dungeon, again1) === 1, 'a freed record is taken again');
-    check(index(dungeon, after0) === 3, 'but record 0 is not: no slot names it, and the walk of the records starts at 1');
+    check(i0 === 1 && i1 === 2 && i2 === 3, "a new game's spare missiles are handed out from 1: the walk of the records starts there");
+    check(index(dungeon, again1) === 2, 'a freed record is taken again');
+    check(index(dungeon, after0) === 1, 'the lowest free one first');
+    check(dungeon.getData().databases.missiles.records[0]!.nextObject === OBJECT_ID_NULL,
+      'and record 0, free all along, is never handed out');
   }
 
   /* --------------------------------------------- 3. the header counts ---------- */
@@ -143,9 +150,10 @@ async function main(): Promise<void> {
     });
     const header = dungeon.getData().header.objectCounts[DBType.CREATURE];
     console.log(`3. a monster on L${level}: creature ${index(dungeon, rn)} of ${creatures.records.length} (was ${before}), header ${header}, count ${creatures.count}`);
-    check(rn !== null && index(dungeon, rn) === before, 'with no free creature record it is appended');
-    check(header === creatures.records.length && creatures.count === creatures.records.length,
-      'and the header declares it, for the image writer');
+    const firstSpare = before - game.ctx.tables.byte7302[DBType.CREATURE]!;
+    check(rn !== null && index(dungeon, rn) === firstSpare && creatures.records.length === before,
+      'the new group takes the first spare, and the database does not grow');
+    check(header === before && creatures.count === before, 'the header declares every record, for the image writer');
   }
 
   /* --------------------------------------------- 4. the indirect index -------- */
@@ -179,7 +187,8 @@ async function main(): Promise<void> {
       'a misc object takes the free slot, and the maps do not grow');
 
     // c. A slot naming a free record is taken with it, ahead of a lower free slot: here
-    //    record 0 of the missiles, which the walk of the records never reaches.
+    //    record 0 of the missiles, which the walk of the records never reaches. The bolt
+    //    takes record 1.
     const at = dungeon.getStartPosition();
     game.systems.magic.launchThrownMissile(RN_POISON_BOLT, at, 1, 3, 100, 100, 1, 1000);
     let bolt: ObjectID = OBJECT_ID_EOF;
@@ -192,10 +201,12 @@ async function main(): Promise<void> {
     const named = maps.rn(DBType.MISSILE, 0);
     dungeon.deleteDBEntry(m);
     const lower = freeSlots();
+    const zeroFree = missiles[0]!.nextObject === OBJECT_ID_NULL;
     const takes = dungeon.findEmptyDBEntry('missiles', { ...missiles[0]!, nextObject: OBJECT_ID_EOF });
     console.log(`4c. bolt: missile ${boltIndex}, freed; slot ${named} made to name it; the boulder's slot freed, free slots [${lower}]; `
       + `the next missile: slot ${takes}, missile ${maps.idx(takes)}`);
-    check(boltIndex === 0 && lower.length === 1 && lower[0]! < named, 'missile 0 is free, a slot names it, and a lower slot is free');
+    check(boltIndex === 1 && zeroFree && lower.length === 1 && lower[0]! < named,
+      'missile 0 is free, a slot names it, and a lower slot is free');
     check(takes === named && maps.idx(takes) === 0, 'the next missile takes the slot naming free record 0, not the lower free slot');
     const blocker = arrow();
     check(blocker === lower[0], 'the next object takes the free slot');
