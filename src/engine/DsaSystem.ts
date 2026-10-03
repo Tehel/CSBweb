@@ -442,6 +442,15 @@ function signExtend(value: number, bits: number): number {
   return (value & (sign - 1)) - (value & sign);
 }
 
+/**
+ * `IsMaxState` (`doc/CSBwin-src/Data.h:1889-2384`): every command compares its
+ * relative-state field with `-MAXSTATE`. For all but `QUESTION`, whose `MAXSTATE` is 2,
+ * that value is out of the signed field's range, so no other command reads the word.
+ */
+function isMaxState(relState: number, maxState: number): boolean {
+  return relState === -maxState;
+}
+
 function readSignedWord(word: number): number {
   const value = word & 0xffff;
   return value & 0x8000 ? value - 0x10000 : value;
@@ -939,10 +948,10 @@ export class DsaSystem {
         switch (opcode) {
           case DsaCommand.NOOP: {
             let relState = signExtend((word >> 6) & 0x3ff, 10);
-            if (relState === -512) {
+            if (isMaxState(relState, -512)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              relState = readSignedWord(next);
+              relState = next;
             }
             nextState = curState + relState;
             break;
@@ -951,10 +960,10 @@ export class DsaSystem {
           case DsaCommand.MESSAGE32:
           case DsaCommand.DESSAGE32: {
             let relState = signExtend((word >> 12) & 0xf, 4);
-            if (relState === -8) {
+            if (isMaxState(relState, -8)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              relState = readSignedWord(next);
+              relState = next;
             }
             nextState = curState + relState;
             const msgType = (word >> 6) & 0x3;
@@ -967,7 +976,7 @@ export class DsaSystem {
             else if (delayType === 3) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              delay = readSignedWord(next);
+              delay = next;
             }
             const target = this.getTarget(targetType, opcode !== DsaCommand.MESSAGE, () => {
               const value = program[pc++] ?? 0;
@@ -984,10 +993,10 @@ export class DsaSystem {
           case DsaCommand.COPYTELEPORTER:
           case DsaCommand.COPYTELEPORTER32: {
             let relState = signExtend((word >> 10) & 0x3f, 6);
-            if (relState === -32) {
+            if (isMaxState(relState, -32)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              relState = readSignedWord(next);
+              relState = next;
             }
             nextState = curState + relState;
             const targetFrom = (word >> 6) & 0x3;
@@ -1007,10 +1016,10 @@ export class DsaSystem {
           }
           case DsaCommand.GOSUB: {
             let relState = signExtend((word >> 13) & 0x7, 3);
-            if (relState === -4) {
+            if (isMaxState(relState, -4)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              relState = readSignedWord(next);
+              relState = next;
             }
             nextState = curState + relState;
             let row = (word >> 6) & 0x3f;
@@ -1036,10 +1045,10 @@ export class DsaSystem {
           }
           case DsaCommand.JUMP: {
             let relState = signExtend((word >> 13) & 0x7, 3);
-            if (relState === -4) {
+            if (isMaxState(relState, -4)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              relState = readSignedWord(next);
+              relState = next;
             }
             nextState = curState + relState;
             let row = (word >> 6) & 0x3f;
@@ -1058,10 +1067,10 @@ export class DsaSystem {
           }
           case DsaCommand.QUESTION: {
             let relState = signExtend((word >> 6) & 0xf, 4);
-            if (relState === -2) {
+            if (isMaxState(relState, 2)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              relState = readSignedWord(next);
+              relState = next;
             }
             nextState = curState + relState;
             const ifColumn = (word >> 10) & 0x1;
@@ -1127,10 +1136,10 @@ export class DsaSystem {
           }
           case DsaCommand.CASE: {
             let relState = signExtend((word >> 6) & 0x3ff, 10);
-            if (relState === -512) {
+            if (isMaxState(relState, -512)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              relState = readSignedWord(next);
+              relState = next;
             }
             nextState = curState + relState;
             const value = bank.stack.pop();
@@ -1155,10 +1164,10 @@ export class DsaSystem {
           }
           case DsaCommand.EQUAL: {
             let relState = signExtend((word >> 6) & 0x3ff, 10);
-            if (relState === -512) {
+            if (isMaxState(relState, -512)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              relState = readSignedWord(next);
+              relState = next;
             }
             const v1 = bank.stack.pop();
             const v2 = bank.stack.pop();
@@ -1168,17 +1177,19 @@ export class DsaSystem {
           }
           case DsaCommand.LOAD: {
             let relState = signExtend((word >> 11) & 0x1f, 5);
-            if (relState === -16) {
+            if (isMaxState(relState, -16)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
               relState = readSignedWord(next);
             }
             nextState = curState + relState;
             const where = (word >> 6) & 0x1f;
+            // `m_PC` is a `ui16 *` (`doc/CSBwin-src/DSA.cpp:250`): LOAD_INTEGER pushes the
+            // word unsigned (`:1099-1106`).
             if (where === 26) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              bank.stack.push(readSignedWord(next));
+              bank.stack.push(next);
             } else if (where === 27) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
@@ -1193,30 +1204,29 @@ export class DsaSystem {
             } else if (where <= 25) {
               const value = this.loadParameter(where, exPkt.rnMaster);
               bank.stack.push(value);
-            } else {
-              bank.stack.push(0);
             }
+            // 29 (`LOAD_ABS32`) and 31 are "Illegal DSA load command", and push nothing
+            // (`:1138-1143`).
             break;
           }
           case DsaCommand.STORE: {
+            // `EX_STORE` (`doc/CSBwin-src/DSA.cpp:1317-1386`): a `where` above 25 is
+            // "Illegal DSA store command", which pops nothing and leaves the next state.
+            const where = (word >> 6) & 0x1f;
+            if (where > 25) break;
+            this.storeParameter(where, exPkt.rnMaster, bank.stack.pop());
             let relState = signExtend((word >> 11) & 0x1f, 5);
-            if (relState === -16) {
+            if (isMaxState(relState, -16)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              relState = readSignedWord(next);
+              relState = next;
             }
             nextState = curState + relState;
-            const where = (word >> 6) & 0x1f;
-            if (where <= 25) {
-              this.storeParameter(where, exPkt.rnMaster, bank.stack.pop());
-            } else {
-              bank.stack.pop();
-            }
             break;
           }
           case DsaCommand.VARIABLESTORE: {
             let relState = signExtend((word >> 13) & 0x7, 3);
-            if (relState === -4) {
+            if (isMaxState(relState, -4)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
               relState = readSignedWord(next);
@@ -1228,7 +1238,7 @@ export class DsaSystem {
           }
           case DsaCommand.VARIABLEFETCH: {
             let relState = signExtend((word >> 13) & 0x7, 3);
-            if (relState === -4) {
+            if (isMaxState(relState, -4)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
               relState = readSignedWord(next);
@@ -1240,7 +1250,7 @@ export class DsaSystem {
           }
           case DsaCommand.GLOBALSTORE: {
             let relState = signExtend((word >> 13) & 0x7, 3);
-            if (relState === -4) {
+            if (isMaxState(relState, -4)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
               relState = readSignedWord(next);
@@ -1255,23 +1265,25 @@ export class DsaSystem {
           }
           case DsaCommand.GLOBALFETCH: {
             let relState = signExtend((word >> 13) & 0x7, 3);
-            if (relState === -4) {
+            if (isMaxState(relState, -4)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
               relState = readSignedWord(next);
             }
             nextState = curState + relState;
             const index = (word >> 6) & 0x7f;
-            const value = index >= 0 && index < this.globalVariables.length ? this.globalVariables[index] : 0;
+            // Past the last variable, "Gloal fetch from non-existent variable" pushes
+            // 0xcdcdcdcd (`doc/CSBwin-src/DSA.cpp:1302-1306`).
+            const value = index < this.globalVariables.length ? this.globalVariables[index] : 0xcdcdcdcd;
             bank.stack.push(value);
             break;
           }
           case DsaCommand.FETCH: {
             let relState = signExtend((word >> 6) & 0x3ff, 10);
-            if (relState === -512) {
+            if (isMaxState(relState, -512)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              relState = readSignedWord(next);
+              relState = next;
             }
             nextState = curState + relState;
             const objMask = bank.stack.pop();
@@ -1303,10 +1315,10 @@ export class DsaSystem {
           case DsaCommand.AMPERSAND:
           case DsaCommand.AMPERSAND2: {
             let relState = signExtend((word >> 13) & 0x7, 3);
-            if (relState === -4) {
+            if (isMaxState(relState, -4)) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
-              relState = readSignedWord(next);
+              relState = next;
             }
             nextState = curState + relState;
             const subcode = ((word >> 6) & 0x7f) + (opcode === DsaCommand.AMPERSAND2 ? 128 : 0);
@@ -1314,24 +1326,25 @@ export class DsaSystem {
             break;
           }
           case DsaCommand.OVERRIDE: {
-            let relState = signExtend((word >> 12) & 0xf, 4);
-            if (relState === -8) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = readSignedWord(next);
-            }
-            nextState = curState + relState;
+            // `EX_OVERRIDE` (`doc/CSBwin-src/DSA.cpp:1037-1072`): any `what` but 1 is
+            // "Illegal DSA override command", which leaves the next state.
             const what = (word >> 6) & 0x7;
             const value = (word >> 9) & 0x7;
-            if (what === 1) {
-              this.overrideP = true;
-              this.overridePos = value;
-              if (value === 7) {
-                const next = program[pc++] ?? 0;
-                wordsRemaining--;
-                this.overridePos = next & 0xff;
-              }
+            if (what !== 1) break;
+            this.overrideP = true;
+            this.overridePos = value;
+            if (value === 7) {
+              const next = program[pc++] ?? 0;
+              wordsRemaining--;
+              this.overridePos = next & 0xff;
             }
+            let relState = signExtend((word >> 12) & 0xf, 4);
+            if (isMaxState(relState, -8)) {
+              const next = program[pc++] ?? 0;
+              wordsRemaining--;
+              relState = next;
+            }
+            nextState = curState + relState;
             break;
           }
           default:

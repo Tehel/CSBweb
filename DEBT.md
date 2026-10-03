@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C118 | The DSA command decoder's edge cases | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
@@ -171,28 +170,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C118 ⏳ The DSA command decoder's edge cases
-
-`DsaSystem.execute` departs from CSBWin's `EX_*` in five places that no dungeon here
-reaches: `tools/dump-dsa-census.ts` decodes all 4646 of Conflux's programs with CSBWin's
-layout, and none of these words occurs in them.
-
-- **The extra state word.** A command's `IsMaxState` compares its relative-state field
-  with `-MAXSTATE` (`doc/CSBwin-src/Data.h:1889-2384`). But for `QUESTION`, whose
-  `MAXSTATE` is 2, that value is out of the signed field's range, so CSBWin never reads
-  the extra word. The port reads one when the field holds `MAXSTATE` itself (-8, -32,
-  -16, -512 or -4), and so would take that command's next word as a state.
-- **`LOAD_INTEGER` (26)** pushes its word unsigned (`DSA.cpp:1099-1106`: `m_PC` is a
-  `ui16 *`, `:250`). The port sign-extends it.
-- **`LOAD` 29 (`LOAD_ABS32`) and 31** reach "Illegal DSA load command" and push nothing
-  (`DSA.cpp:1138-1143`). The port pushes 0.
-- **`STORE` above 25** returns at "Illegal DSA store command" without a pop
-  (`DSA.cpp:1328-1332`). The port pops.
-- **`GLOBALFETCH` past the last variable** pushes `0xcdcdcdcd` (`DSA.cpp:1302-1306`), the
-  port 0. Where the last variable is depends on the dungeon (G1, the `EXPOOL` bullet).
-
-The fix owes a tool that runs each such word through `execute`, beside the census.
-
 ---
 
 ## F — Verification debt
@@ -234,7 +211,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 138 checks sequentially (`spawnSync`, `:269`), each a
+`tools/run-checks.mjs` spawns its 139 checks sequentially (`spawnSync`, `:269`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and
@@ -319,8 +296,7 @@ The steps: the census is done (`tools/dump-dsa-census.ts`, Conflux's counts by d
 another `dungeon.dat` as its argument). Next, one family per commit, in the order above,
 the eight with their nearest family: the characters first. Last, `DSA::Write` and the
 `EXPOOL` records, so that a game with DSAs can be saved (below). An operation is checked
-against Conflux in play once G26 makes it a data set. C118, the decoder's edge cases the
-census found, comes before them all.
+against Conflux in play once G26 makes it a data set.
 
 The rest of the item, with two operations that need care when ported:
 
