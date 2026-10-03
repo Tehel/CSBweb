@@ -91,7 +91,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⚠️ the engine done; the page and the prison next |
+| G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⚠️ the engine done; RISE on the door, then the prison's shortcut |
 | G23 | Enciphered files: the whole of a `dungeon.dat`, and the saves of its game | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
@@ -245,8 +245,8 @@ CSBWin makes a CSB game in three steps (the utility's own header,
 A DM party can therefore be carried into CSB, which is the classic way to play it.
 **How the port offers step 2 (the author's decision): its engine only.** The checks and
 `TAG002724`'s copy run from the page or the save menu on a chosen source save, writing a
-new save. The utility's screen is not ported, and step 2 is not run automatically when
-the prison's party is saved.
+new save. The utility's screen is not ported. Step 2 is not run behind the player's
+back when the prison's party is saved; the prison offers it, with a question (below).
 
 The split:
 
@@ -271,9 +271,24 @@ The split:
   new adventure is stored and the game starts in it at once, where CSBWin's player
   goes back to the door and resumes it. The new file's `RandomGameID` is the source's with its first byte one higher (the
   `LoadLong` slip), so it is a playthrough of its own.
-- **⏳ Step 1, the prison's party.** Trace where the prison has the champions chosen,
-  and that its save is one the engine takes (its `Word22592` is 12, which the check
-  allows).
+- **⏳ The prison's shortcut** (the author's decision). The prison has no way out:
+  level 0's four stairs lead down to a level 1 of mummies and rock piles, and the text
+  at (9,2) of level 0 says "FIRST CHOOSE YOUR CHAMPIONS...THEN SAVE THE GAME... THEN
+  RESTART WITH THE UTILITY DISK." A player who has saved there would otherwise have to
+  reload the page to reach RISE. So the game asks "BEGIN THE ADVENTURE?", YES and NOT
+  YET, in the two-button menu the import's confirmation uses, at two moments:
+  - after a save in the prison, from any party size (CSB is often played with fewer
+    than four);
+  - once the fourth champion has joined (the recruitment over), when the party can
+    grow no more. YES saves first, under the name F5 gives its quick save, so the
+    prison save stays and can be raised again from the door.
+
+  YES makes the new adventure from that save, stores it as `<name>-csb` and starts the
+  game in it, as RISE does. A game is the prison's when its `Word22592` is 12, which
+  the compressed `dungeon.dat` sets (`doc/PROVEN_FACTS.md` → "A compressed
+  `dungeon.dat`: CSB's prison"); every adventure's is 13. To trace first: where the
+  prison has the champions chosen, and that its save is one the engine takes (12
+  passes `TAG00260e`).
 
 ### G28 ⏳ The utility's two untried forms: a saved game unscrambled with word 10, and a `mini.dat` with an Extended Features block
 
