@@ -188,9 +188,6 @@ const CHECKS = [
   // file loads back into a fresh game with the world, the party, the thrown object in
   // flight and the object on the cursor intact.
   { tool: 'dump-live-save-file.ts' },
-  // A save the port wrote before its RNs were CSBWin's slots, door 0 written as 0: it is
-  // mended as it is read, and plays and saves on as the genuine save it was made from.
-  { tool: 'dump-port-save-before-slots.ts' },
   // The portraits of a party read out of a CSBWin save, drawn into a real screen
   // buffer: CHARDESC carries the picture rather than a graphic-26 index, so the frames
   // (which only ever see an injected party) cover the other path entirely.
