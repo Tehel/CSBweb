@@ -14,7 +14,7 @@
  * The AI itself lives in `MonsterAI.ts`; this module owns only the bookkeeping that
  * decides which groups are *active* and when they next get a turn.
  */
-import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { ITEM16_FREE, SMS_ATTACKING, SMS_MIRROR } from '../data/dungeonTypes';
@@ -840,7 +840,7 @@ export class MonsterSystem {
 
   /** `FindEmptyDB4Entry` (`doc/CSBwin-src/CSBCode.cpp:4974`) — a free creature record. */
   private findEmptyCreatureEntry(): ObjectID | null {
-    const index = this.dungeon.findEmptyDBEntry('creatures', {
+    const rn = this.dungeon.findEmptyDBEntry('creatures', {
       nextObject: OBJECT_ID_EOF,
       possession: OBJECT_ID_EOF,
       creatureType: 0,
@@ -856,7 +856,7 @@ export class MonsterSystem {
       unique: false,
       poisoned: false,
     });
-    return index === null ? null : this.dungeon.rnMaps.rn(DBType.CREATURE, index);
+    return rn === OBJECT_ID_NULL ? null : rn;
   }
 
   /* ----------------------------------------------------------------- misc ---- */

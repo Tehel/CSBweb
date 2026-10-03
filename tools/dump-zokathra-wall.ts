@@ -87,9 +87,9 @@ const ordinalOf = (game: Game, index: number): number =>
   (game.ctx.dungeon.getActuatorRecord(game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, index), SOUTH_FACE))!.word4 >> 12) & 0xf;
 
 function zokathra(game: Game): ObjectID {
-  const index = game.ctx.dungeon.findEmptyDBEntry('misc', { nextObject: OBJECT_ID_EOF, specialState: 0, important: false, miscType: MISC_ZOKATHRA });
-  if (index === null) throw new Error('no room for a Zokathra spell');
-  return game.ctx.dungeon.rnMaps.rn(DBType.MISC, index);
+  const rn = game.ctx.dungeon.findEmptyDBEntry('misc', { nextObject: OBJECT_ID_EOF, specialState: 0, important: false, miscType: MISC_ZOKATHRA });
+  if (rn === OBJECT_ID_NULL) throw new Error('no room for a Zokathra spell');
+  return rn;
 }
 
 /** An empty Firestaff lying anywhere in the dungeon, taken off its square. */

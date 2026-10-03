@@ -1,4 +1,4 @@
-import { OBJECT_ID_EOF, type ObjectID, DBType } from '../core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID, DBType } from '../core/types';
 import type { DungeonState } from './DungeonState';
 
 const TORCH_NAME_INDEX = 4;
@@ -75,7 +75,7 @@ export function constructPredefinedMissile(dungeon: DungeonState, missileType: n
   }
 
   if (dbType === DBType.WEAPON && weaponType !== null) {
-    const newIndex = dungeon.findEmptyDBEntry('weapons', {
+    const rn = dungeon.findEmptyDBEntry('weapons', {
       nextObject: OBJECT_ID_EOF,
       broken: false,
       charges: 0,
@@ -85,17 +85,17 @@ export function constructPredefinedMissile(dungeon: DungeonState, missileType: n
       important: false,
       weaponType,
     });
-    return newIndex === null ? null : dungeon.rnMaps.rn(DBType.WEAPON, newIndex);
+    return rn === OBJECT_ID_NULL ? null : rn;
   }
 
   if (dbType === DBType.MISC && miscType !== null) {
-    const newIndex = dungeon.findEmptyDBEntry('misc', {
+    const rn = dungeon.findEmptyDBEntry('misc', {
       nextObject: OBJECT_ID_EOF,
       specialState: 0,
       important: false,
       miscType,
     });
-    return newIndex === null ? null : dungeon.rnMaps.rn(DBType.MISC, newIndex);
+    return rn === OBJECT_ID_NULL ? null : rn;
   }
 
   return null;

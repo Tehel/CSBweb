@@ -14,7 +14,7 @@
  * (`Data.h:851`) is here, where three of its four writers are; the fourth,
  * `CheckMonsterVersusMissiles`, is `MonsterAI`'s.
  */
-import { DBType, Direction, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { PotionType } from '../core/constants';
 import type { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
@@ -358,7 +358,7 @@ export class MissileEncounter {
         }
         // The missile is spent either way: a dispel missile does a champion no damage
         // at all (`DetermineMagicDamage` returns 0 for it) and still lands.
-        return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+        return this.finishMissileEncounter(missileRn, missile, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
       }
       case -1: {
         // The monster arm (`doc/CSBwin-src/Code11f52.cpp:1960-2042`).
@@ -437,13 +437,13 @@ export class MissileEncounter {
             }
           }
         }
-        return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+        return this.finishMissileEncounter(missileRn, missile, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
       }
       default:
         break;
     }
 
-    return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+    return this.finishMissileEncounter(missileRn, missile, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
   }
 
   missileEncounterFilter(
@@ -530,6 +530,7 @@ export class MissileEncounter {
 
   private finishMissileEncounter(
     missileRn: ObjectID,
+    missile: MissileRecord,
     destMonster: ObjectID | null,
     position: Position,
     objectPos: number,
@@ -540,8 +541,8 @@ export class MissileEncounter {
     objX: number,
     objY: number,
   ): boolean {
-    const missile = this.dungeon.getMissileRecord(missileRn);
-    if (!missile) return false;
+    // `pDBmissile`, read before the switch (`doc/CSBwin-src/Code11f52.cpp:1761`): a
+    // filter can delete the missile meanwhile, and the tail goes on with its record.
     const dest: MissileDropTarget = destMonster !== null ? { monster: destMonster } : null;
 
     if (nonPoisonSpell || convertedPotion) {
@@ -715,13 +716,13 @@ export class MissileEncounter {
   private createCloudRecord(cloudType: number, size: number, posInCell: number): ObjectID | null {
     const bit7 = (posInCell & 0xff) === 255;
     // `FindEmptyDB15Entry` (`doc/CSBwin-src/CSBCode.cpp:5073`).
-    const index = this.dungeon.findEmptyDBEntry('clouds', {
+    const rn = this.dungeon.findEmptyDBEntry('clouds', {
       nextObject: OBJECT_ID_EOF,
       value: size & 0xff,
       cloudType: cloudType & 0x7f,
       bit7,
     });
-    return index === null ? null : this.dungeon.rnMaps.setPos(this.dungeon.rnMaps.rn(DBType.CLOUD, index), bit7 ? 0 : (posInCell & 0x3));
+    return rn === OBJECT_ID_NULL ? null : this.dungeon.rnMaps.setPos(rn, bit7 ? 0 : (posInCell & 0x3));
   }
 
   /**

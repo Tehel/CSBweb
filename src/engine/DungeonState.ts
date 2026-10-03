@@ -55,6 +55,10 @@ const DATABASE_CATEGORY: Record<keyof Databases, DBType> = {
     clouds: DBType.CLOUD,
 };
 
+/** The `Databases` key of each database the port holds records for. */
+const DATABASE_KEY: Partial<Record<DBType, keyof Databases>> = Object.fromEntries(
+    Object.entries(DATABASE_CATEGORY).map(([key, db]) => [db, key])) as Partial<Record<DBType, keyof Databases>>;
+
 export class DungeonState {
     private data: DungeonData;
 
@@ -507,137 +511,73 @@ export class DungeonState {
     }
 
     /**
-     * `DATABASES::FindEmptyDBEntry` (`doc/CSBwin-src/data.cpp:919-993`): store `record`
-     * in the record a new object of database `db` goes into, and return that index.
+     * `FindEmptyDB<n>Entry` (`doc/CSBwin-src/CSBCode.cpp:4942-5084`) over
+     * `DATABASES::FindEmptyDBEntry` (`doc/CSBwin-src/data.cpp:918-990`): the RN of a new
+     * object of database `db`, whose record then holds `record`; `RNnul` when there is
+     * no room.
      *
-     * CSBWin takes the lowest record from index 1 whose link is `RNnul` (`:954-966`) —
-     * record 0 is never reused — and only when there is none `Enlarge`s the database by
-     * 100 cleared records and takes the first, the old length (`:967-972`,
-     * `data.cpp:813-876`). Appending gives that index, and the next append is CSBWin's
-     * next free record. The loop over the indirect index before it (`:934-953`) can only
-     * find a slot still naming a record whose link is `RNnul`, and `DeleteDBEntry` frees
-     * the slot with the record (`:1011-1015`); this port has no live indirect index, and
-     * only `deleteDBEntry` writes `RNnul` into a link.
+     * `FindEmptyDBEntry` walks the index for a slot whose record is free, noting the
+     * lowest free slot on the way (`RnMaps.findEmptyIndexEntry`), then the records from
+     * 1 for a free one (`:954-966`), and gives the record that slot, or a new one, at
+     * corner 0 (`RnMaps.assignIndexEntry`). `important`, CSBWin's own argument, lets it
+     * make a new slot when the index is all but full: a DSA's copy and a champion's
+     * bones pass it (`DSA.cpp:1773-1868`, `Character.cpp:2625`).
      *
-     * Appending keeps `count` and the header's `objectCounts` — the size the image
-     * writer declares — equal to the number of records. At 1024 records, the ten-bit
-     * index and the port's `db.Max` (`DEBT.md` D16), it
-     * falls back on `MakeMoreRoomInDB` (`makeMoreRoomInDB`), as `FindEmptyDB<n>Entry` does
-     * (`CSBCode.cpp:4942-5084`), and stores `record` over the one that frees. `null` when
-     * that frees none.
+     * With no free record CSBWin `Enlarge`s the database by 100 cleared records and
+     * names the first, the old length, through `RN(dbType, index)` (`:967-972`,
+     * `data.cpp:813-876`). Appending one gives that index, and the next append is
+     * CSBWin's next free record; `count` and the header's `objectCounts`, the size the
+     * image writer declares, stay the number of records. At 1024 records, the port's
+     * `db.Max` (`DEBT.md` D16), or when `FindEmptyDBEntry` gives `RNnul`, it falls back
+     * on `MakeMoreRoomInDB` (`makeMoreRoomInDB`) and stores `record` over the record of
+     * the RN that gives.
      */
-    findEmptyDBEntry<K extends keyof Databases>(db: K, record: Databases[K]['records'][number]): number | null {
+    findEmptyDBEntry<K extends keyof Databases>(db: K, record: Databases[K]['records'][number], important = false): ObjectID {
         const database = this.data.databases[db] as Database<DatabaseRecord>;
-        for (let i = 1; i < database.records.length; i++) {
-            if (database.records[i].nextObject !== OBJECT_ID_NULL) continue;
-            database.records[i] = record;
-            return i;
+        const dbType = DATABASE_CATEGORY[db];
+        let { emptyIndexEntry, emptyDBEntry } = this.rnMaps.findEmptyIndexEntry(dbType);
+        if (emptyDBEntry === -1) {
+            for (let i = 1; i < database.records.length; i++) {
+                if (database.records[i].nextObject !== OBJECT_ID_NULL) continue;
+                emptyDBEntry = i;
+                break;
+            }
         }
-        if (database.records.length >= 1024) {
-            const freed = this.makeMoreRoomInDB?.(DATABASE_CATEGORY[db]) ?? OBJECT_ID_NULL;
-            if (freed === OBJECT_ID_NULL) return null;
-            const index = this.rnMaps.idx(freed);
-            database.records[index] = record;
-            return index;
+        let result: ObjectID = OBJECT_ID_NULL;
+        if (emptyDBEntry === -1) {
+            if (database.records.length < 1024) {
+                database.records.push(record);
+                database.count = database.records.length;
+                this.data.header.objectCounts[dbType] = database.records.length & 0xffff;
+                return this.rnMaps.rn(dbType, database.records.length - 1);
+            }
+        } else {
+            result = this.rnMaps.assignIndexEntry(emptyIndexEntry, dbType, emptyDBEntry, important);
         }
-        database.records.push(record);
-        database.count = database.records.length;
-        const category = DATABASE_CATEGORY[db];
-        this.data.header.objectCounts[category] = database.records.length & 0xffff;
-        return database.records.length - 1;
+        if (result === OBJECT_ID_NULL) {
+            result = this.makeMoreRoomInDB?.(dbType) ?? OBJECT_ID_NULL;
+            if (result === OBJECT_ID_NULL) return OBJECT_ID_NULL;
+            database.records[this.rnMaps.idx(result)] = record;
+            return result;
+        }
+        database.records[emptyDBEntry] = record;
+        return result;
     }
 
     /**
-     * Delete a database record by marking its link as RNnul (CSBWin DeleteDBEntry).
-     *
-     * Ported from CSBWin `DeleteDBEntry()` (doc/CSBwin-src/data.cpp:995-1017).
+     * `DeleteDBEntry` (`doc/CSBwin-src/data.cpp:993-1015`): the record's link becomes
+     * `RNnul` and the slot naming it is freed (`RnMaps.deleteIndexEntry`), unless it is
+     * "Cloned!!!", when nothing changes. An RN whose slot is free names no record.
      */
-    deleteDBEntry(rn: ObjectID): boolean {
-        if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return false;
+    deleteDBEntry(rn: ObjectID): void {
+        if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return;
         const { category, index } = this.rnMaps.decode(rn);
-
-        switch (category) {
-            case DBType.DOOR: {
-                const rec = this.data.databases.doors.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            case DBType.TELEPORTER: {
-                const rec = this.data.databases.teleporters.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            case DBType.TEXT: {
-                const rec = this.data.databases.texts.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            case DBType.ACTUATOR: {
-                const rec = this.data.databases.actuators.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            case DBType.CREATURE: {
-                const rec = this.data.databases.creatures.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            case DBType.WEAPON: {
-                const rec = this.data.databases.weapons.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            case DBType.CLOTHING: {
-                const rec = this.data.databases.clothing.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            case DBType.SCROLL: {
-                const rec = this.data.databases.scrolls.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            case DBType.POTION: {
-                const rec = this.data.databases.potions.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            case DBType.CHEST: {
-                const rec = this.data.databases.containers.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            case DBType.MISC: {
-                const rec = this.data.databases.misc.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            case DBType.MISSILE: {
-                const rec = this.data.databases.missiles.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            case DBType.CLOUD: {
-                const rec = this.data.databases.clouds.records[index];
-                if (!rec) return false;
-                rec.nextObject = OBJECT_ID_NULL;
-                return true;
-            }
-            default:
-                return false;
-        }
+        const key = DATABASE_KEY[category];
+        if (key === undefined) return;
+        const rec = (this.data.databases[key] as Database<DatabaseRecord>).records[index];
+        if (!rec) return;
+        if (!this.rnMaps.deleteIndexEntry(category, index)) return;
+        rec.nextObject = OBJECT_ID_NULL;
     }
 
     /**

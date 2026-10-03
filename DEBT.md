@@ -145,10 +145,11 @@ The port's RN is CSBWin's: a slot of `dataTypeMap` and `dataIndexMap`
 (`doc/CSBwin-src/CSBTypes.h:268-370`), held by each world's `RnMaps` (`src/core/RnMaps.ts`).
 A `dungeon.dat` is numbered on load by `ConvertListOfObjects` and `convertScrolls`, a save
 keeps its slots and maps, the writer writes the maps the game holds, `setPos` writes the
-corner in the map and keeps the RN, and `rn` is CSBWin's `RN(DBTYPE, dbIndex)`. So an RN
-can name a record past 1023. The port's databases still stop at 1024 records
-(`doc/PROVEN_FACTS.md` → "`SmartDiscard`", the sentence before "A full database"), and
-CSBWin's hold up to 64000.
+corner in the map and keeps the RN, and `rn` is CSBWin's `RN(DBTYPE, dbIndex)`. A new
+object's slot and record are `FindEmptyDBEntry`'s, and `DeleteDBEntry` frees the slot with
+the record (`DungeonState.findEmptyDBEntry`, `deleteDBEntry`). So an RN can name a record
+past 1023. The port's databases still stop at 1024 records (`doc/PROVEN_FACTS.md` →
+"`SmartDiscard`", the sentence before "A full database"), and CSBWin's hold up to 64000.
 
 Conflux 3.5's `dungeon.dat`, deciphered (G23), needs them. Its index has 19925 slots, and
 five of its databases run past record 1023:
@@ -163,16 +164,11 @@ five of its databases run past record 1023:
 
 The steps left:
 
-1. **Slots allocated and freed as CSBWin's databases do.** `FindEmptyDBEntry` returns an
-   RN: it looks first for a slot whose record is free, which can hand out record 0, then
-   for a free record, and gives it a slot (`doc/CSBwin-src/data.cpp:918-990`).
-   `DeleteDBEntry` frees the record's slot, `0xff`/`0xffff`, unless two slots name the
-   record or its slot carries bit `0x80`, "Cloned!!!" (`:993-1015`), which nothing in the
-   source sets. The port's `DungeonState.findEmptyDBEntry` returns an index, which callers turn
-   into an RN through `rn`, and its `deleteDBEntry` leaves the slot naming the free record.
-   With them: an `RNVAL` read through `RnMaps`' accessors reads as its own bits, where
-   CSBWin's `checkIndirectIndex` fails and `dbType` is `dbUNKNOWN`; whether any caller
-   asks is to be found, and the answer made CSBWin's.
+1. **An `RNVAL` read as a slot.** Read through `RnMaps`' accessors, an `RNVAL` (0xff00 and
+   up: the spells, `RNeof`, `RNnul`) reads as its own bits, `[pos:2][db:4][idx:10]`, where
+   CSBWin's `checkIndirectIndex` fails, `dbType()` is `dbUNKNOWN` and `idx()` reads
+   `dataIndexMap` past its end (`doc/CSBwin-src/data.cpp:518-534`, `CSBTypes.h:324-347`).
+   Which callers ask is to be found, and each answer made CSBWin's.
 2. **Databases past 1024 records**: the record arrays, `FindEmptyDBEntry` and `Enlarge`
    as CSBWin bounds them (`CSBCode.cpp:4942-5084`, `Character.cpp:182-358`). CSBWin grows
    a full database 100 records at a time, up to `db.Max`: 8000, 16000 for the actuators,
@@ -992,6 +988,16 @@ Recorded so that nobody "fixes" them.
   for the rest (`drawWallText`, `src/renderer/bytecode/DrawDecorations.ts`). No wall text
   in the data here has such a code: `doc/PROVEN_FACTS.md` → "A wall text's glyph is read
   from graphic 120 with no check of its code".
+- 🚫 **A record read through a slot `DeleteDBEntry` has freed.** Such an RN names no record,
+  and CSBWin reads one anyway in two places. `MakeMoreRoomInDB` hands back the freed slot
+  of the group or missile it threw out, and `FindEmptyDB<n>Entry` reads past the databases
+  through it: `makeMoreRoomInDB` (`src/engine/MakeMoreRoomInDB.ts`) names the freed record
+  anew, `RN(dbType, index)`, as the Atari original's RN still named it
+  (`doc/PROVEN_FACTS.md` → "A full database throws one object out of the dungeon"). A
+  missile whose own wall filter moved the party into it is deleted by that hit, and its
+  encounter's tail calls `ProcessObjectFromMissile` on it again; the port's
+  `processObjectFromMissile` finds no record and does nothing
+  (`tools/dump-move-from-missile.ts`, section 3).
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.

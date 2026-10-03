@@ -110,6 +110,9 @@ async function main(): Promise<void> {
   };
 
   const link = (game: Game, rn: ObjectID): number => game.ctx.dungeon.getDBRecordLink(rn);
+  // `DeleteDBEntry` frees the slot with the record, so a deleted RN names no record.
+  const after = (game: Game, rn: ObjectID): string =>
+    game.ctx.dungeon.rnMaps.dbType(rn) === DBType.UNKNOWN ? 'freed' : after(game, rn);
   const inCell = (game: Game, at: Position): ObjectID[] => {
     const out: ObjectID[] = [];
     for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) out.push(rn);
@@ -144,9 +147,9 @@ async function main(): Promise<void> {
     installDsa(game, at, delProgram(weapon, loc));
     const { result, midRun } = run(game, slave, at, [weapon]);
     console.log(`1. delete weapon ${weapon.toString(16)}: returned ${result}, link during the run ${midRun.map((v) => v.toString(16)).join(',')}, `
-      + `after ${link(game, weapon).toString(16)}; cell now ${inCell(game, at).map((v) => v.toString(16)).join(',')}`);
+      + `after ${after(game, weapon)}; cell now ${inCell(game, at).map((v) => v.toString(16)).join(',')}`);
     check(midRun.length === 1 && midRun[0] !== OBJECT_ID_NULL, '&DEL leaves the record allocated until the run ends (DeleteObject only chains it)');
-    check(link(game, weapon) === OBJECT_ID_NULL, 'ConsumateDeletes frees it after the run');
+    check(after(game, weapon) === 'freed', 'ConsumateDeletes frees it after the run');
     check(inCell(game, at).length === 1 && inCell(game, at)[0] === slave, 'the weapon is gone from the square and the actuator stays');
     check(result === false, 'a DSA that did not delete its own actuator returns false');
   }
@@ -159,10 +162,10 @@ async function main(): Promise<void> {
     const loc = locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 });
     installDsa(game, at, delProgram(slave, loc));
     const { result, midRun } = run(game, slave, at, [slave]);
-    console.log(`2. the DSA deletes its own actuator ${slave.toString(16)}: returned ${result}, link during the run ${midRun.map((v) => v.toString(16)).join(',')}, after ${link(game, slave).toString(16)}`);
+    console.log(`2. the DSA deletes its own actuator ${slave.toString(16)}: returned ${result}, link during the run ${midRun.map((v) => v.toString(16)).join(',')}, after ${after(game, slave)}`);
     check(result === true, 'ProcessDSATimer6 returns deletedSlave, so the timer walk stops');
     check(midRun.length === 1 && midRun[0] !== OBJECT_ID_NULL, 'the slave is still allocated while its own program runs');
-    check(link(game, slave) === OBJECT_ID_NULL, 'and freed once it has finished');
+    check(after(game, slave) === 'freed', 'and freed once it has finished');
   }
 
   /* --------------------------------------- 3. two deletes in one run ------------ */
@@ -180,10 +183,10 @@ async function main(): Promise<void> {
     both.set(p2, p1.length);
     installDsa(game, at, both);
     const { midRun } = run(game, slave, at, [w1, w2]);
-    console.log(`3. two deletes: [w1, w2] links after each &DEL ${midRun.map((v) => v.toString(16)).join(',')}; after the run ${link(game, w1).toString(16)}, ${link(game, w2).toString(16)}`);
+    console.log(`3. two deletes: [w1, w2] links after each &DEL ${midRun.map((v) => v.toString(16)).join(',')}; after the run ${after(game, w1)}, ${after(game, w2)}`);
     check(midRun.length === 4 && midRun[2] === OBJECT_ID_EOF && midRun[3] === w1,
       'the delete list runs through the records\' links: w2 -> w1 -> RNeof');
-    check(link(game, w1) === OBJECT_ID_NULL && link(game, w2) === OBJECT_ID_NULL, 'both are freed after the run');
+    check(after(game, w1) === 'freed' && after(game, w2) === 'freed', 'both are freed after the run');
   }
 
   finish();

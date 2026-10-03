@@ -16,7 +16,7 @@
  * CSBWin's accessors would fail `checkIndirectIndex` on one; here one reads as its own
  * bits, `[pos:2][db:4][idx:10]`, as every RN did when the port kept them packed.
  */
-import type { DBType, ObjectID, TilePosition } from './types';
+import { OBJECT_ID_NULL, type DBType, type ObjectID, type TilePosition } from './types';
 
 /** `dbUNKNOWN` (`doc/CSBwin-src/CSBTypes.h:231`): what `RN::dbType` says of a free slot. */
 const DB_UNKNOWN = 16 as DBType;
@@ -172,6 +172,64 @@ export class RnMaps {
         this.indexMap[emptyIndexEntry] = dbIndex;
         this.typeMap[emptyIndexEntry] = db;
         return emptyIndexEntry;
+    }
+
+    /**
+     * `FindEmptyDBEntry`'s walk of the index (`doc/CSBwin-src/data.cpp:933-953`): the
+     * first slot of database `db` whose record is free, and that record, which may be
+     * record 0; else the lowest free slot, or -1, and -1 for the record.
+     */
+    findEmptyIndexEntry(db: DBType): { emptyIndexEntry: number; emptyDBEntry: number } {
+        let emptyIndexEntry = -1;
+        for (let i = 1; i < this.dataMapLength; i++) {
+            if (this.indexMap[i] === 0xffff) {
+                if (emptyIndexEntry < 0) emptyIndexEntry = i;
+                continue;
+            }
+            if ((this.typeMap[i] & 15) !== db) continue;
+            if (this.link(db, this.indexMap[i]) === 0xffff) {
+                return { emptyIndexEntry: i, emptyDBEntry: this.indexMap[i] };
+            }
+        }
+        return { emptyIndexEntry, emptyDBEntry: -1 };
+    }
+
+    /**
+     * The end of `FindEmptyDBEntry` (`doc/CSBwin-src/data.cpp:973-988`): slot
+     * `emptyIndexEntry`, or a new one when it is -1, names record `dbIndex` of `db` at
+     * corner 0. `RNnul` when a new slot is wanted and the index is all but full, unless
+     * the object is `important`.
+     */
+    assignIndexEntry(emptyIndexEntry: number, db: DBType, dbIndex: number, important: boolean): ObjectID {
+        if (emptyIndexEntry === -1) {
+            if (this.dataMapLength > 0xff00 - 100 && !important) return OBJECT_ID_NULL;
+            emptyIndexEntry = this.append();
+        }
+        this.indexMap[emptyIndexEntry] = dbIndex;
+        this.typeMap[emptyIndexEntry] = db;
+        return emptyIndexEntry as ObjectID;
+    }
+
+    /**
+     * `DeleteDBEntry`'s walk of the index (`doc/CSBwin-src/data.cpp:993-1015`): frees the
+     * slot naming record `dbIndex` of `db`, if one does, and says whether the record is
+     * to be freed. It is not, and no slot is freed, when two slots name it or its slot
+     * carries bit 0x80, "Cloned!!!". The walk starts at slot 0, which names door 0.
+     */
+    deleteIndexEntry(db: DBType, dbIndex: number): boolean {
+        let j = -1;
+        for (let i = 0; i < this.dataMapLength; i++) {
+            if ((this.typeMap[i] & 0xf) !== db) continue;
+            if (this.indexMap[i] !== dbIndex) continue;
+            if (j !== -1) return false; // Cloned!!!
+            j = i;
+            if ((this.typeMap[i] & 0x80) !== 0) return false; // Cloned!!!
+        }
+        if (j !== -1) {
+            this.typeMap[j] = 0xff;
+            this.indexMap[j] = 0xffff;
+        }
+        return true;
     }
 
     /**

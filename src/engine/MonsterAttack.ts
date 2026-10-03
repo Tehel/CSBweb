@@ -714,14 +714,14 @@ export class MonsterAttack {
   }
 
   private createBonesRecord(): ObjectID | null {
-    const index = this.dungeon.findEmptyDBEntry('misc', {
+    const rn = this.dungeon.findEmptyDBEntry('misc', {
       nextObject: OBJECT_ID_EOF,
       // `value(2)` marks these as a dead champion's bones.
       specialState: 2,
       important: true,
       miscType: MISC_BONES_OF_HERO,
-    });
-    return index === null ? null : this.dungeon.rnMaps.rn(DBType.MISC, index);
+    }, true); // `FindEmptyDB10Entry(true)` (`doc/CSBwin-src/Character.cpp:2625`)
+    return rn === OBJECT_ID_NULL ? null : rn;
   }
 
   /**

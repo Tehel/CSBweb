@@ -5,12 +5,18 @@
  *  1. The lowest record from index 1 whose link is `RNnul` (`:954-966`). `dungeon.dat`
  *     ships a few: weapon 105, misc 8 and 116. The port appended every new record, so
  *     the first arrow a wall shoots was weapon 107 where CSBWin's is 105.
- *  2. Record 0 is never reused. An empty database — missiles, clouds — is `Enlarge`d,
- *     which hands out the old length, 0 (`:967-972`, `data.cpp:813-876`); once freed,
- *     that record stays free while the loop starts at 1.
+ *  2. The walk of the records starts at 1. An empty database — missiles, clouds — is
+ *     `Enlarge`d, which hands out the old length, 0 (`:967-972`, `data.cpp:813-876`);
+ *     once freed with its slot, record 0 stays free.
  *  3. Appending keeps `count` and the header's `objectCounts` — what the image writer
  *     declares — equal to the number of records. `MonsterSystem`'s allocator bumped
  *     neither the header nor anything but `count`.
+ *  4. The indirect index. `DeleteDBEntry` frees the record's slot with it, `0xff`/`0xffff`
+ *     (`:993-1015`), and the next new object, of any database, takes the lowest free
+ *     slot (`:933-953`, `:986-988`). A slot that names a free record of the database is
+ *     taken with its record, first, record 0 included. A record two slots name, or
+ *     whose slot carries bit 0x80, is "Cloned!!!": deleting it changes nothing. Slot 0
+ *     names door 0, so door 0 is such a record as soon as a cell's chain holds it.
  *
  * Run: `npx tsx tools/dump-db-reuse.ts`
  */
@@ -74,7 +80,7 @@ async function main(): Promise<void> {
       && weapons.count === weapons.records.length, 'an append keeps count and the header equal to the records');
   }
 
-  /* ------------------------------------------- 2. record 0 is never reused ---- */
+  /* ------------------------------- 2. the walk of the records starts at 1 ---- */
   {
     const game = await makeGame();
     const dungeon = game.ctx.dungeon;
@@ -117,7 +123,7 @@ async function main(): Promise<void> {
       + `free ${i0} -> next ${index(dungeon, after0)}`);
     check(i0 === 0 && i1 === 1 && i2 === 2, 'an empty database hands out 0, 1, 2');
     check(index(dungeon, again1) === 1, 'a freed record is taken again');
-    check(index(dungeon, after0) === 3, 'but record 0 is not: the search starts at 1');
+    check(index(dungeon, after0) === 3, 'but record 0 is not: no slot names it, and the walk of the records starts at 1');
   }
 
   /* --------------------------------------------- 3. the header counts ---------- */
@@ -140,6 +146,85 @@ async function main(): Promise<void> {
     check(rn !== null && index(dungeon, rn) === before, 'with no free creature record it is appended');
     check(header === creatures.records.length && creatures.count === creatures.records.length,
       'and the header declares it, for the image writer');
+  }
+
+  /* --------------------------------------------- 4. the indirect index -------- */
+  {
+    const game = await makeGame();
+    const dungeon = game.ctx.dungeon;
+    const maps = dungeon.rnMaps;
+    const missiles = dungeon.getData().databases.missiles.records;
+    const freeSlots = (): number[] => {
+      const words = maps.indexMapWords();
+      return [...words.keys()].filter((i) => i > 0 && words[i] === 0xffff);
+    };
+    check(freeSlots().length === 0, 'a new game has no free slot');
+    const arrow = (): ObjectID => constructPredefinedMissile(dungeon, MISSILE_TYPE_ARROW)!;
+
+    // a. A deleted object's slot is freed.
+    const a1 = arrow();
+    const a1Index = maps.idx(a1);
+    const length = maps.length;
+    dungeon.deleteDBEntry(a1);
+    console.log(`4a. arrow: slot ${a1}, weapon ${a1Index}; deleted: dbType ${maps.dbType(a1)}, `
+      + `maps ${maps.typeMapBytes()[a1].toString(16)}/${maps.indexMapWords()[a1].toString(16)}, free slots [${freeSlots()}]`);
+    check(maps.dbType(a1) === DBType.UNKNOWN && maps.typeMapBytes()[a1] === 0xff && maps.indexMapWords()[a1] === 0xffff,
+      'DeleteDBEntry frees the slot: 0xff/0xffff, dbUNKNOWN');
+    check(dungeon.getData().databases.weapons.records[a1Index]!.nextObject === OBJECT_ID_NULL, 'and the record, link RNnul');
+
+    // b. The next new object, of another database, takes that slot.
+    const m = constructPredefinedMissile(dungeon, MISSILE_TYPE_BOULDER)!;
+    console.log(`4b. a boulder next: slot ${m}, ${maps.dbType(m) === DBType.MISC ? 'misc' : maps.dbType(m)} ${maps.idx(m)}; maps ${maps.length} long (was ${length})`);
+    check(m === a1 && maps.dbType(m) === DBType.MISC && maps.length === length,
+      'a misc object takes the free slot, and the maps do not grow');
+
+    // c. A slot naming a free record is taken with it, ahead of a lower free slot: here
+    //    record 0 of the missiles, which the walk of the records never reaches.
+    const at = dungeon.getStartPosition();
+    game.systems.magic.launchThrownMissile(RN_POISON_BOLT, at, 1, 3, 100, 100, 1, 1000);
+    let bolt: ObjectID = OBJECT_ID_EOF;
+    for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+      if (maps.dbType(rn) === DBType.MISSILE) bolt = rn;
+    }
+    const boltIndex = maps.idx(bolt);
+    dungeon.removeObjectFromCell(at, bolt);
+    dungeon.deleteDBEntry(bolt);
+    const named = maps.rn(DBType.MISSILE, 0);
+    dungeon.deleteDBEntry(m);
+    const lower = freeSlots();
+    const takes = dungeon.findEmptyDBEntry('missiles', { ...missiles[0]!, nextObject: OBJECT_ID_EOF });
+    console.log(`4c. bolt: missile ${boltIndex}, freed; slot ${named} made to name it; the boulder's slot freed, free slots [${lower}]; `
+      + `the next missile: slot ${takes}, missile ${maps.idx(takes)}`);
+    check(boltIndex === 0 && lower.length === 1 && lower[0]! < named, 'missile 0 is free, a slot names it, and a lower slot is free');
+    check(takes === named && maps.idx(takes) === 0, 'the next missile takes the slot naming free record 0, not the lower free slot');
+    const blocker = arrow();
+    check(blocker === lower[0], 'the next object takes the free slot');
+
+    // d. Two slots naming one record: "Cloned!!!".
+    const typeMap = Array.from(maps.typeMapBytes());
+    const indexMap = Array.from(maps.indexMapWords());
+    const twin = typeMap.length;
+    typeMap.push(typeMap[blocker]!);
+    indexMap.push(indexMap[blocker]!);
+    maps.restore(typeMap, indexMap);
+    const blockerRecord = dungeon.getWeaponRecord(blocker)!;
+    const blockerLink = blockerRecord.nextObject;
+    dungeon.deleteDBEntry(blocker);
+    console.log(`4d. slot ${twin} names weapon ${maps.idx(blocker)} too; deleting slot ${blocker}: link ${blockerRecord.nextObject.toString(16)}, dbType ${maps.dbType(blocker)}`);
+    check(blockerRecord.nextObject === blockerLink && maps.dbType(blocker) === DBType.WEAPON && maps.dbType(twin as ObjectID) === DBType.WEAPON,
+      'a record two slots name is not freed, nor either slot');
+
+    // e. Slot 0 names door 0.
+    let door0: ObjectID = OBJECT_ID_NULL;
+    for (let i = 1; i < maps.length && door0 === OBJECT_ID_NULL; i++) {
+      if (maps.dbType(i as ObjectID) === DBType.DOOR && maps.idx(i as ObjectID) === 0) door0 = i as ObjectID;
+    }
+    const doorRecord = dungeon.getDoorRecordByIndex(0)!;
+    const doorLink = doorRecord.nextObject;
+    dungeon.deleteDBEntry(door0);
+    console.log(`4e. door 0 is slot ${door0}, and slot 0 is ${maps.typeMapBytes()[0]}/${maps.indexMapWords()[0]}; deleted: link ${doorRecord.nextObject.toString(16)}`);
+    check(door0 !== OBJECT_ID_NULL && doorRecord.nextObject === doorLink && maps.dbType(door0) === DBType.DOOR,
+      'deleting door 0 changes nothing: slot 0 names it too');
   }
 
   finish();

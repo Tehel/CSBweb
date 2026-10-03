@@ -116,13 +116,14 @@ async function main(): Promise<void> {
   gameD.systems.missileEncounter.createDeathCloud(RN_MONSTER_DEATH, 255, at, 255);
   const born = cloudIn(gameD, at);
   check(born !== null, 'the cloud is in the cell to begin with');
+  const bornIndex = born === null ? -1 : gameD.ctx.dungeon.rnMaps.idx(born);
   for (let t = 1; t <= 20; t++) processTimersAt(gameD, t);
   check(cloudIn(gameD, at) === null, 'the cloud has left the cell');
   if (born !== null) {
-    // `DeleteDBEntry` marks a DB15 free by setting its link to RNnul.
-    const rec = gameD.ctx.dungeon.getCloudRecord(born);
-    check(rec !== null && rec.nextObject === OBJECT_ID_NULL,
-      `the record was released by DeleteDBEntry (link is 0x${(rec?.nextObject ?? -1).toString(16)})`);
+    // `DeleteDBEntry` marks a DB15 free by setting its link to RNnul, and frees its slot.
+    const rec = gameD.ctx.dungeon.getData().databases.clouds.records[bornIndex];
+    check(rec !== undefined && rec.nextObject === OBJECT_ID_NULL && gameD.ctx.dungeon.rnMaps.dbType(born) === DBType.UNKNOWN,
+      `the record was released by DeleteDBEntry (link is 0x${(rec?.nextObject ?? -1).toString(16)}), its slot with it`);
   }
   console.log(`cloud records: ${cloudsBefore} before, ` +
     `${gameD.ctx.dungeon.getData().databases.clouds.records.length} after`);
@@ -296,13 +297,14 @@ async function main(): Promise<void> {
   const door0Link = door0?.nextObject;
   const cage = gameX.systems.missileEncounter.createFluxcage(at, 0);
   check(cage !== null && cloudIn(gameX, at) === cage, 'the cage stands in the cell');
+  const cageIndex = cage === null ? -1 : dungeonX.rnMaps.idx(cage);
   for (let t = 1; t <= 99; t++) processTimersAt(gameX, t);
   check(cloudIn(gameX, at) === cage, 'it is still there at tick 99');
   processTimersAt(gameX, 100);
   check(cloudIn(gameX, at) === null, 'it leaves the cell at tick 100');
-  const cageRec = cage === null ? null : dungeonX.getCloudRecord(cage);
-  check(cageRec !== null && cageRec.nextObject === OBJECT_ID_NULL,
-    `its record is freed (link 0x${(cageRec?.nextObject ?? -1).toString(16)})`);
+  const cageRec = dungeonX.getData().databases.clouds.records[cageIndex];
+  check(cageRec !== undefined && cageRec.nextObject === OBJECT_ID_NULL && dungeonX.rnMaps.dbType(cage!) === DBType.UNKNOWN,
+    `its record and its slot are freed (link 0x${(cageRec?.nextObject ?? -1).toString(16)})`);
   check(door0?.nextObject === door0Link,
     `door record 0 is untouched (link 0x${(door0Link ?? -1).toString(16)} -> 0x${(door0?.nextObject ?? -1).toString(16)})`);
 

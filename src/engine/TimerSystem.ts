@@ -1475,6 +1475,9 @@ export class TimerSystem {
    * second parameter through every encounter path.
    */
   processObjectFromMissile(missileRn: ObjectID, dest: MissileDropTarget, position: Position): void {
+    // A missile that met the party inside its own wall filter is deleted there, and its
+    // encounter's tail comes back here with the free slot, where CSBWin's
+    // `GetRecordAddressDB14` reads no record (`tools/dump-move-from-missile.ts`, 3).
     const missile = this.dungeon.getMissileRecord(missileRn);
     if (!missile) return;
     const projectile = (missile.projectileObject & 0xffff) as ObjectID;

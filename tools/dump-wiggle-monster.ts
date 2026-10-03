@@ -23,6 +23,7 @@ import { resolve } from 'node:path';
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { ActuatorAction } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
+import type { CreatureRecord } from '../src/data/dungeonTypes';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
@@ -79,7 +80,7 @@ const groupAt = (game: Game, p: Position): boolean => game.ctx.dungeon.findFirst
  * switched off; a group of `type` is made on it, and the teleporter switched on.
  */
 function wiggle(z: number, type: number, to: (game: Game, at: Position) => Position): {
-  game: Game; at: Position; dest: Position; rn: ObjectID; slot: number; calls: number; timersBefore: number;
+  game: Game; at: Position; dest: Position; rn: ObjectID; record: CreatureRecord; slot: number; calls: number; timersBefore: number;
 } {
   const game = makeGame();
   const [at, partyAt] = opens(game, z).filter((p, _, all) => all.some((q) => Math.abs(p.x - q.x) + Math.abs(p.y - q.y) > 4));
@@ -96,7 +97,9 @@ function wiggle(z: number, type: number, to: (game: Game, at: Position) => Posit
     mapX: at.x, mapY: at.y, level: z, invisible: false, drawAsSize4: false,
   });
   if (rn === null) throw new Error(`could not make a type-${type} group on (${at.x},${at.y}) L${z}`);
-  const slot = game.ctx.dungeon.getCreatureRecord(rn)!.groupIndex;
+  // Read now: `DeleteDBEntry` frees the group's slot with its record.
+  const record = game.ctx.dungeon.getCreatureRecord(rn)!;
+  const slot = record.groupIndex;
   const timersBefore = aiTimersAt(game, at);
 
   let calls = 0;
@@ -109,7 +112,7 @@ function wiggle(z: number, type: number, to: (game: Game, at: Position) => Posit
   // At tick 0: the group's first AI timer is due at tick 1, and must not move it first.
   game.ctx.timers.createTimer(TimerFunction.TT_TELEPORTER, at.x, at.y, 0, ActuatorAction.SET, 0, z);
   processTimersAt(game, 0);
-  return { game, at, dest, rn, slot, calls, timersBefore };
+  return { game, at, dest, rn, record, slot, calls, timersBefore };
 }
 
 function main(): void {
@@ -155,8 +158,7 @@ function main(): void {
       if (t < 0) continue;
       for (let j = 0; j < count; j++) if (!probe.ctx.dungeon.monsterAllowedOnLevel(t, j)) { z = i; bad = j; break; }
     }
-    const { game, at, dest, rn } = wiggle(z, typeOn(probe, z), (g) => opens(g, bad)[0]!);
-    const record = game.ctx.dungeon.getCreatureRecord(rn)!;
+    const { game, at, dest, record } = wiggle(z, typeOn(probe, z), (g) => opens(g, bad)[0]!);
     console.log(`3. a group teleported from L${z} to L${bad}, where its type may not live: on the teleporter `
       + `${groupAt(game, at)}, at the destination ${groupAt(game, dest)}, record freed ${record.nextObject === OBJECT_ID_NULL}`);
     check(!groupAt(game, at) && !groupAt(game, dest), 'the group is nowhere');

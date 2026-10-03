@@ -21,6 +21,20 @@ import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '
 import { getActuatorType } from '../data/actuatorHelpers';
 import type { GameContext } from './GameContext';
 
+/**
+ * `rnD5.pos(0)`, for a group or a missile, which `DeleteDBEntry` has thrown out with its
+ * slot: CSBWin returns that free slot, which names no record, and `FindEmptyDB<n>Entry`'s
+ * `GetRecordAddressDB<n>` then reads none (`doc/CSBwin-src/data.cpp:1011-1014`,
+ * `CSBCode.cpp:4847`). The port names the freed record anew, `RN(dbType, index)`, as the
+ * Atari original's RN, the record's own number, still named it (`DEBT.md` H). A record
+ * `DeleteDBEntry` left alone, "Cloned!!!", keeps its slot, and that is returned.
+ */
+function freedRecord(ctx: GameContext, dbType: DBType, rn: ObjectID, index: number): ObjectID {
+    const rnMaps = ctx.dungeon.rnMaps;
+    if (rnMaps.dbType(rn) === dbType) return rnMaps.setPos(rn, 0);
+    return rnMaps.rn(dbType, index);
+}
+
 /** `MakeMoreRoomInDB(dbType)`: the freed record's ID at corner 0, or `RNnul`. */
 export function makeMoreRoomInDB(ctx: GameContext, dbType: DBType): ObjectID {
     const dungeon = ctx.dungeon;
@@ -50,6 +64,7 @@ export function makeMoreRoomInDB(ctx: GameContext, dbType: DBType): ObjectID {
                         break;
                     }
                     if (type !== dbType) continue;
+                    const index = dungeon.rnMaps.idx(rn);
                     switch (dbType) {
                         case DBType.CREATURE: {
                             // Designer-planted monsters stay.
@@ -60,7 +75,8 @@ export function makeMoreRoomInDB(ctx: GameContext, dbType: DBType): ObjectID {
                             const monsterDamage = ctx.systems.monsterDamage;
                             monsterDamage.dropMonsterRemains(level, x, y, rn, -1, level, true);
                             monsterDamage.deleteMonster(level, x, y);
-                            break;
+                            ctx.levelCleared[dbType] = level & 0xff;
+                            return freedRecord(ctx, dbType, rn, index);
                         }
                         case DBType.MISSILE: {
                             // `TAG00e156`: the missile's timer goes (`Code11f52.cpp:1545-1551`),
@@ -68,7 +84,8 @@ export function makeMoreRoomInDB(ctx: GameContext, dbType: DBType): ObjectID {
                             // the port's `processObjectFromMissile` does together.
                             ctx.timers.deleteTimer(dungeon.getMissileRecord(rn)!.timerIndex);
                             ctx.systems.timer.processObjectFromMissile(rn, null, at);
-                            break;
+                            ctx.levelCleared[dbType] = level & 0xff;
+                            return freedRecord(ctx, dbType, rn, index);
                         }
                         case DBType.CLOTHING:
                         case DBType.WEAPON:

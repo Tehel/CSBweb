@@ -119,7 +119,7 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
   const party = ctx.party.state.position;
   const newMisc = (type: number, important = false): ObjectID => {
     const rec: MiscRecord = { nextObject: OBJECT_ID_EOF, specialState: 0, important, miscType: type };
-    return dungeon.rnMaps.rn(DBType.MISC, dungeon.findEmptyDBEntry('misc', rec)!);
+    return dungeon.findEmptyDBEntry('misc', rec);
   };
   const scan = (at: Position): { index: number; priority: number }[] => {
     const list = new SDObjList();
@@ -206,7 +206,7 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
   };
   const rocks = (at: Position, n: number): ObjectID[] => Array.from({ length: n }, () => {
     const rec: MiscRecord = { nextObject: OBJECT_ID_EOF, specialState: 0, important: false, miscType: 10 };
-    const rn = dungeon.rnMaps.rn(DBType.MISC, dungeon.findEmptyDBEntry('misc', rec)!);
+    const rn = dungeon.findEmptyDBEntry('misc', rec);
     dungeon.addObjectToCell(at, rn);
     return rn;
   });
@@ -215,15 +215,16 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
   const [mid] = rocks(emptyCell(z + 3), 1); //         23 + 1
   const [near1, near2] = rocks(emptyCell(z + 1), 2); // 21 + 1, 21 + 2
   rocks(emptyCell(z), 1); //                            the square distance + 1
-  const expected = [far2, far1, mid, near2];
+  const expected = [far2, far1, mid, near2].map((rn) => game.ctx.dungeon.rnMaps.idx(rn));
 
   const inUse = misc.records.filter((r) => r.nextObject !== OBJECT_ID_NULL).length;
   for (let i = inUse; i < 6003; i++) misc.records.push({ nextObject: OBJECT_ID_EOF, specialState: 0, important: false, miscType: 0 });
 
-  const lifted: { object: ObjectID; at: Position }[] = [];
+  // The record's index, read as the object is lifted: `DeleteDBEntry` then frees its slot.
+  const lifted: { object: ObjectID; index: number; at: Position }[] = [];
   const moveObject = ctx.systems.worldMove.moveObject.bind(ctx.systems.worldMove);
   ctx.systems.worldMove.moveObject = (object, oldX, oldY, newX, newY, level) => {
-    if (newX < 0) lifted.push({ object, at: new Position(oldX, oldY, level) });
+    if (newX < 0) lifted.push({ object, index: dungeon.rnMaps.idx(object), at: new Position(oldX, oldY, level) });
     return moveObject(object, oldX, oldY, newX, newY, level);
   };
 
@@ -242,12 +243,12 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
   let discardSteps = 0;
   while (s.currentMode === SmartDiscardMode.Discard && discardSteps < 100) { smartDiscard(ctx, false); discardSteps++; }
   const index = (rn: ObjectID): number => game.ctx.dungeon.rnMaps.idx(rn);
-  console.log(`   discarded ${lifted.map((l) => `misc ${index(l.object)} at ${l.at.z}:${l.at.x},${l.at.y}`).join(', ')}`);
+  console.log(`   discarded ${lifted.map((l) => `misc ${l.index} at ${l.at.z}:${l.at.x},${l.at.y}`).join(', ')}`);
   check(lifted.length === 4 && s.totalCount === 5999 && s.currentMode === SmartDiscardMode.NewDB,
     'four discards bring the count to 5999, and the cycle moves on');
-  check(lifted.map((l) => index(l.object)).join() === expected.map(index).join(),
+  check(lifted.map((l) => l.index).join() === expected.join(),
     'highest priority first: the two five levels off (the second of the pile first), then three off, then the second one level off');
-  check(lifted.every((l) => !chainHas(game, l.at, l.object) && misc.records[index(l.object)].nextObject === OBJECT_ID_NULL),
+  check(lifted.every((l) => !chainHas(game, l.at, l.object) && misc.records[l.index].nextObject === OBJECT_ID_NULL),
     'each is out of its cell, its record freed');
   check(misc.records[index(near1)].nextObject !== OBJECT_ID_NULL, 'the first one level off is kept');
 }

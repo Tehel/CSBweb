@@ -225,7 +225,7 @@ export class MonsterDamage {
   private createDroppedRecord(category: DBType, type: number, cursed: boolean): ObjectID | null {
     switch (category) {
       case DBType.WEAPON: {
-        const index = this.dungeon.findEmptyDBEntry('weapons', {
+        const rn = this.dungeon.findEmptyDBEntry('weapons', {
           nextObject: OBJECT_ID_EOF,
           broken: false,
           charges: 0,
@@ -235,10 +235,10 @@ export class MonsterDamage {
           important: false,
           weaponType: type & 0x7f,
         });
-        return index === null ? null : this.dungeon.rnMaps.rn(DBType.WEAPON, index);
+        return rn === OBJECT_ID_NULL ? null : rn;
       }
       case DBType.CLOTHING: {
-        const index = this.dungeon.findEmptyDBEntry('clothing', {
+        const rn = this.dungeon.findEmptyDBEntry('clothing', {
           nextObject: OBJECT_ID_EOF,
           broken: false,
           charges: 0,
@@ -246,16 +246,16 @@ export class MonsterDamage {
           important: false,
           clothingType: type & 0x7f,
         });
-        return index === null ? null : this.dungeon.rnMaps.rn(DBType.CLOTHING, index);
+        return rn === OBJECT_ID_NULL ? null : rn;
       }
       case DBType.MISC: {
-        const index = this.dungeon.findEmptyDBEntry('misc', {
+        const rn = this.dungeon.findEmptyDBEntry('misc', {
           nextObject: OBJECT_ID_EOF,
           specialState: 0,
           important: false,
           miscType: type & 0x7f,
         });
-        return index === null ? null : this.dungeon.rnMaps.rn(DBType.MISC, index);
+        return rn === OBJECT_ID_NULL ? null : rn;
       }
       default:
         return null;

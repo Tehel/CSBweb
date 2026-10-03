@@ -12,7 +12,7 @@
 import type { SpellDefinition } from '../data/spellTypes';
 import { applyLimits, sb, sw } from '../core/intCast';
 import { OBJNI_EMPTY_FLASK } from '../core/objectNameIndex';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import { AttributeIndex, championAttribute } from './attributes';
 import type { DungeonState } from './DungeonState';
@@ -101,14 +101,14 @@ export class MagicSystem {
     position: number,
   ): ObjectID | null {
     // `FindEmptyDB14Entry` (`doc/CSBwin-src/CSBCode.cpp:5056`).
-    const index = this.dungeon.findEmptyDBEntry('missiles', {
+    const rn = this.dungeon.findEmptyDBEntry('missiles', {
       nextObject: OBJECT_ID_EOF,
       projectileObject: (projectileObject & 0xffff) as ObjectID,
       rangeRemaining: rangeRemaining & 0xff,
       damageRemaining: damageRemaining & 0xff,
       timerIndex: timerIndex & 0xffff,
     });
-    return index === null ? null : this.dungeon.rnMaps.setPos(this.dungeon.rnMaps.rn(DBType.MISSILE, index), position & 0x3);
+    return rn === OBJECT_ID_NULL ? null : this.dungeon.rnMaps.setPos(rn, position & 0x3);
   }
 
   /** `SetBrightnessTimer` (`doc/CSBwin-src/Magic.cpp:827-840`). */
@@ -464,13 +464,13 @@ export class MagicSystem {
   }
 
   private createMiscObject(miscType: number): ObjectID | null {
-    const newIndex = this.dungeon.findEmptyDBEntry('misc', {
+    const rn = this.dungeon.findEmptyDBEntry('misc', {
       nextObject: OBJECT_ID_EOF,
       specialState: 0,
       important: false,
       miscType: miscType & 0x7f,
     });
-    return newIndex === null ? null : this.dungeon.rnMaps.rn(DBType.MISC, newIndex);
+    return rn === OBJECT_ID_NULL ? null : rn;
   }
 
   /**

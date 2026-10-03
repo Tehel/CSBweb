@@ -2895,35 +2895,36 @@ export class DsaSystem {
     if (!this.isValidObjectId(objectId)) return null;
     const { category, index, position } = this.dungeon.rnMaps.decode(objectId);
     const data = this.dungeon.getData();
-    // Each copy takes a record through `FindEmptyDB<n>Entry` (`DungeonState.findEmptyDBEntry`).
-    const placed = (newIndex: number | null): ObjectID | null =>
-      newIndex === null ? null : this.dungeon.rnMaps.setPos(this.dungeon.rnMaps.rn(category, newIndex), position);
+    // Each copy takes a record through `FindEmptyDB<n>Entry(true)` (`DSA.cpp:1773-1868`,
+    // `DungeonState.findEmptyDBEntry`).
+    const placed = (rn: ObjectID): ObjectID | null =>
+      rn === OBJECT_ID_NULL ? null : this.dungeon.rnMaps.setPos(rn, position);
 
     switch (category) {
       case DBType.ACTUATOR: {
         const rec = data.databases.actuators.records[index];
         if (!rec) return null;
-        return placed(this.dungeon.findEmptyDBEntry('actuators', { ...rec, nextObject: OBJECT_ID_EOF }));
+        return placed(this.dungeon.findEmptyDBEntry('actuators', { ...rec, nextObject: OBJECT_ID_EOF }, true));
       }
       case DBType.MISC: {
         const rec = data.databases.misc.records[index];
         if (!rec) return null;
-        return placed(this.dungeon.findEmptyDBEntry('misc', { ...rec, nextObject: OBJECT_ID_EOF }));
+        return placed(this.dungeon.findEmptyDBEntry('misc', { ...rec, nextObject: OBJECT_ID_EOF }, true));
       }
       case DBType.WEAPON: {
         const rec = data.databases.weapons.records[index];
         if (!rec) return null;
-        return placed(this.dungeon.findEmptyDBEntry('weapons', { ...rec, nextObject: OBJECT_ID_EOF }));
+        return placed(this.dungeon.findEmptyDBEntry('weapons', { ...rec, nextObject: OBJECT_ID_EOF }, true));
       }
       case DBType.CLOTHING: {
         const rec = data.databases.clothing.records[index];
         if (!rec) return null;
-        return placed(this.dungeon.findEmptyDBEntry('clothing', { ...rec, nextObject: OBJECT_ID_EOF }));
+        return placed(this.dungeon.findEmptyDBEntry('clothing', { ...rec, nextObject: OBJECT_ID_EOF }, true));
       }
       case DBType.POTION: {
         const rec = data.databases.potions.records[index];
         if (!rec) return null;
-        return placed(this.dungeon.findEmptyDBEntry('potions', { ...rec, nextObject: OBJECT_ID_EOF }));
+        return placed(this.dungeon.findEmptyDBEntry('potions', { ...rec, nextObject: OBJECT_ID_EOF }, true));
       }
       case DBType.CREATURE: {
         const rec = data.databases.creatures.records[index];
@@ -2938,7 +2939,7 @@ export class DsaSystem {
           nextObject: OBJECT_ID_EOF,
           possession: copiedPossessions,
           groupIndex: this.detachedGroupIndex(rec),
-        }));
+        }, true));
       }
       default:
         this.ctx.host.trace(`DSA &ADD unsupported object type ${category}`);

@@ -4085,22 +4085,29 @@ Evidence: `tools/dump-dsa-move.ts`.
 
 Evidence: `tools/dump-dsa-move.ts` sections 4-8.
 
-## A new object takes the lowest freed record from index 1; record 0 is never reused
+## A new object takes a slot naming a free record, else the lowest free record from index 1
 
 Every `FindEmptyDB<n>Entry` (`doc/CSBwin-src/CSBCode.cpp:4942-5084`) calls
-`DATABASES::FindEmptyDBEntry` (`doc/CSBwin-src/data.cpp:919-993`), and only if that returns
-`RNnul` falls back on `MakeMoreRoomInDB`. `FindEmptyDBEntry` takes the record at the
-lowest index **from 1** whose link is `RNnul` (`:954-966`); only when there is none does it
+`DATABASES::FindEmptyDBEntry` (`doc/CSBwin-src/data.cpp:918-990`), and only if that returns
+`RNnul` falls back on `MakeMoreRoomInDB`. `FindEmptyDBEntry` first walks the indirect index
+from slot 1 (`:933-953`): it notes the lowest free slot (`dataIndexMap[i] == 0xffff`), and
+stops at the first slot of the database whose record's link is `RNnul`, taking that slot
+and that record, which may be record 0. Failing that, it takes the record at the lowest
+index **from 1** whose link is `RNnul` (`:954-966`). Only when there is none does it
 `Enlarge` the database (`:967-972`), which grows it by 100 records, clears them to link
-`RNnul`, sets the first to `RNeof` and returns its index — the old length
-(`data.cpp:862-876`). So record 0 of a database is handed out only by `Enlarge` on an
-empty database (the missile and cloud databases of `dungeon.dat` are empty), and once
-freed is never taken again. The record is cleared and its link set to `RNeof` (`:989-991`).
+`RNnul`, sets the first to `RNeof` and returns its index, the old length
+(`data.cpp:862-876`), named through `RN(dbType, index)`. The record goes into the lowest
+free slot, or a new one at the end of the maps: refused, `RNnul`, once the maps are over
+`0xff00 - 100` long, unless the caller passes `important` (`:973-988`), which a DSA's copy
+and a champion's bones do (`DSA.cpp:1773-1868`, `Character.cpp:2625`). The slot names the
+record at corner 0, and the record is cleared, its link `RNeof` (`:986-991`).
 
-`DeleteDBEntry` is what frees a record: link `RNnul`, and its indirect slot freed with it
-(`data.cpp:995-1016`). The loop over the indirect index that comes first (`:934-953`)
-looks for a slot whose record's link is `RNnul`; since `DeleteDBEntry` frees both at once,
-it finds only a free slot, and the record is the second loop's.
+`DeleteDBEntry` is what frees a record: link `RNnul`, and the one slot naming it freed,
+`0xff`/`0xffff` (`data.cpp:993-1015`). Its walk starts at slot 0, and when two slots name
+the record, or its slot carries bit `0x80`, it returns at once, "Cloned!!!", and frees
+neither. Slot 0 is `0`/`0` (`SaveGame.cpp:1968-1973`), which names door 0: deleting door 0
+while a chain holds it changes nothing. A slot names a free record only if something made
+one for it, so record 0, once freed with its slot, is not taken again.
 
 `dungeon.dat` ships free records: weapon 105 (of 107), scroll 33, potion 37, misc 8 and
 116 (of 280). The first arrow `ConstructPredefinedMissile` (`Mouse.cpp:105`) makes is weapon 105.
@@ -4166,6 +4173,14 @@ file's record count plus `d.Byte7302[db]` spares (`SaveGame.cpp:2556-2564`, with
 commented-out cap of 1024, and 768 for database 15). The stock `Byte7302` gives 420 misc
 records (280 + 140), 207 weapons, 241 clothing, 257 monsters, 60 missiles and 50 clouds.
 `dungeon.dat` plants every monster group `important()`, so only a spawned group can go.
+
+A group or a missile is thrown out through `DeleteDBEntry` (`DeleteMonster`,
+`Code11f52.cpp:1040`; `ProcessObjectFromMissile`, `Timer.cpp:167`), which frees its slot, so
+the RN returned names no record. Its `dbType()` is `dbUNKNOWN`, 16, and its `idx()` 0xffff,
+so `FindEmptyDB4Entry`'s `GetRecordAddressDB4` reads `m_Address[16]`, past the sixteen
+databases (`CSBCode.cpp:4845-4849`, `data.cpp:735-743`, `CSB.h:1610`); its `ASSERT` is
+compiled only under `_DEBUG` (`CSBTypes.h:99-103`). The port names the freed record anew
+(`DEBT.md` H).
 Evidence: `tools/dump-make-more-room.ts`.
 
 ## A DSA's `&DEL` frees nothing until the run is over, and tells the caller if it deleted itself
