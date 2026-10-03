@@ -2986,6 +2986,52 @@ mismatch returns 0, and `_ReadEntireGame` goes to `tag01efee` (`:1741-1742`). Th
 throws "dungeon image checksum mismatch" from `DungeonLoader`
 (`tools/dump-image-checksum.ts`).
 
+## "MAKE NEW ADVENTURE" copies a saved game's party into `mini.dat`, block by block
+
+The UTILITY's button 13 (`_TAG004518`, `doc/CSBwin-src/Chaos.cpp:3949-3973`) reads a saved
+game into the first of two 4112-byte records and `mini.dat` into the second
+(`_ReadSavedGame`, `:2207-2496`), copies the party with `TAG002724` (`:2571-2680`) and
+writes the second record as a new file with `_TAG000fc4` (`:1643-1898`). It works on the
+blocks as the file holds them, unscrambled but not byte-swapped.
+
+- **The checks.** The saved game is refused with "ALREADY UTILIZED" unless its
+  `Byte22596` is 1 or its `Word22594` is 1, and also when its `Word22592` is past 13
+  (`_TAG00260e`, `:2501-2546`); a Dungeon Master save CSBWin wrote has 2, 1 and 13, and a
+  prison save 12 for the last ("A compressed `dungeon.dat`: CSB's prison"). With no
+  party it is message 29, and a champion with no name, or two whose names compare
+  equal with `strcmp`, is message 20 (`_CheckChampionNames`, `:1434-1462`). `mini.dat`
+  must have `Byte22596` 2 or more and `Word22592` 13 (`_TAG0026c4`, `:2551-2566`).
+- **The copy.** Into `mini.dat`'s record go `GAMEBLOCK1` bytes 256-295 and `Word22594`
+  of the saved game, its `RandomGameID` plus one, its 3200 bytes of `CHARDESC`s and its
+  champion count (`gb2.numcharacter`); everything else is `mini.dat`'s, the party's
+  place and the 128 bytes of party state after the `CHARDESC`s included. Each champion
+  is turned by `mini.dat`'s facing less the saved game's, facing and corner; bytes 30-34
+  become 1, 2, -1, 0, 0; damage, poison, wounds and word 64 are cleared, and both timer
+  words -1; health, stamina and mana take their maxima; food then water are
+  `1500 + (STRandom() & 255)`; each attribute's current value takes its maximum and its
+  minimum becomes 30, Luck's 10; each skill's temporary adjustment is 0, its experience
+  kept; the thirty possession slots are `RNnul`, and load and shield 0.
+- **Three writes read a big-endian field as the little-endian build holds it.**
+  `LoadLong` and `StoreLong` take the low word first (`:789-821`), so "`RandomGameID` + 1"
+  adds 1 to the file's first byte, the field's highest. An Atari save's `Word22594` is
+  set by `wordGear(+376) = 1` (`:2595`), which leaves the bytes `01 00`, 256. And
+  `charFlags` is `LE16(LE16(wordGear(+48) & 16))` (`:2644`): the mask falls on the word
+  as memory holds it, so of the file's word it keeps 0x1000 and clears 0x10,
+  `CHARFLAG_male`. The `ASSERT`s that flag the first two ("check for LE") are compiled
+  out of the release build (`CSBTypes.h:98-103`).
+- **The file.** `_TAG000fc4` sets `Byte22598` to 2, which `SaveGame` never writes, zeroes
+  the sixteen words from 312 (the five hashes and `totalMoveCount`), and writes
+  `GAMEBLOCK1` with `WriteFirstBlock` (`:1376-1418`), the fold `ScrambleAndWrite` makes,
+  then the other five blocks with hash 0 and the dungeon as `TAG00142e` read it, closed
+  by its byte sum. An Extended Features block is written only when `mini.dat` opened with
+  one; CSB's has none.
+
+`static/gamefiles/csb/csbgame2.dat` is such a file, made from this `mini.dat`: its
+`Byte22598` is 2, and made again from itself and `mini.dat` with its own food, water and
+`RandomGameID` in place of the draws it is the file byte for byte
+(`tools/dump-new-adventure.ts`, which holds the port's `src/engine/Chaos.ts` to every
+field above).
+
 ## A failed read ends at `tag01efee`
 
 Every `goto tag01efee` in `_ReadEntireGame` is a read that failed: a stream's checksum

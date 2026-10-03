@@ -132,6 +132,9 @@ const CHECKS = [
   // Chaos Strikes Back's Atari-era saves, with no Extended Features block: loaded,
   // walked and run in a Game on CSB's graphics.dat.
   { tool: 'dump-atari-saves.ts' },
+  // "MAKE NEW ADVENTURE": a saved game's party carried into mini.dat, field by field,
+  // and csbgame2.dat, which CSBWin's utility wrote, made again byte for byte.
+  { tool: 'dump-new-adventure.ts' },
   // Chaos Strikes Back's Hint Oracle data, hcsb.hct, decoded and its limits checked.
   { tool: 'dump-hint-oracle.ts' },
   // Block 4 packed and held up against the real thing: every committed save's

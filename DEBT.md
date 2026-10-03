@@ -91,7 +91,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
+| G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⚠️ the engine done; the page and the prison next |
 | G23 | Enciphered files: the whole of a `dungeon.dat`, and the saves of its game | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
@@ -101,6 +101,7 @@ In payoff order: the first row is the next item.
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
+| G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
 | F13 | `npm test` runs its tools one at a time | S | ⏳ |
@@ -126,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C115 · D17 · E21 · F14 · G28 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C115 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -225,7 +226,7 @@ Things CSBWin does that the port has not built. These are not defects in existin
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
 
-### G17 — A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE"
+### G17 ⚠️ A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE"
 
 CSBWin makes a CSB game in three steps (the utility's own header,
 `doc/CSBwin-src/Chaos.cpp:1-5`):
@@ -234,28 +235,53 @@ CSBWin makes a CSB game in three steps (the utility's own header,
    it as `CSBGAMEn.DAT` (`SaveGame.cpp:902-908`). Where the champions are chosen in it is
    not yet traced. The port reads the compressed prison (`DungeonLoader.loadDungeonDat`,
    `doc/PROVEN_FACTS.md` → "A compressed `dungeon.dat`: CSB's prison").
-2. **UTILITY → "MAKE NEW ADVENTURE"** (`_StartChaos`, `Chaos.cpp:2686`; the editor screen
-   `_DrawCharacterEditorScreen`, `:3755-3789`, and its dispatcher `_TAG004518`,
-   `:3874-4022`, where only button 13 does real work). It loads the source save
-   (`_ReadSavedGame(0)`, `:2207-2496`, a CSB or a DM save: `DMGAME.DAT` is offered,
-   `:376-377`), refuses one already used (`_TAG00260e`, `:2501-2546`: "ALREADY UTILIZED"
-   unless `Byte22596` or `Word22594` is 1 and `Word22592 <= 13`) or with duplicate names
-   (`CheckChampionNames`, `:1434-1462`), loads `mini.dat` (the eleven-level CSB dungeon,
-   `:2246`), which must have `Word22592` 13 (`_TAG0026c4`, `:2551-2566`), and copies the
-   party in (`TAG002724`, `:2571-2680`): the four `CHARDESC`s with their facing rotated,
-   HP, stamina and mana full, food and water `1500 + (rand & 255)`, every attribute at its
-   maximum with minimum 30 (Luck 10), skills' `tempAdjust` 0 but experience kept, every
-   possession slot empty, `RandomGameID + 1`, and `Word22594`. It writes the result as a
-   new save (`_TAG000fc4`, `:1643-1898`).
+2. **UTILITY → "MAKE NEW ADVENTURE"**: a saved game, CSB's or DM's, and `mini.dat` make
+   a new save with the saved game's party in `mini.dat`'s dungeon (`doc/PROVEN_FACTS.md`
+   → ""MAKE NEW ADVENTURE" copies a saved game's party into `mini.dat`, block by block").
 3. **DUNGEON → Resume** loads that save. An Atari-era save, with no Extended Features
    block, is a CSBWin file, and installs its own world whatever the running game's
    (`tools/dump-atari-saves.ts`).
 
 A DM party can therefore be carried into CSB, which is the classic way to play it.
-**How the port offers step 2 (the author's decision): its engine only.** Port the
-checks and `TAG002724`'s copy, and run them from the page or the save menu on a chosen
-source save, writing a new save. The utility's screen is not ported, and step 2 is not
-run automatically when the prison's party is saved.
+**How the port offers step 2 (the author's decision): its engine only.** The checks and
+`TAG002724`'s copy run from the page or the save menu on a chosen source save, writing a
+new save. The utility's screen is not ported, and step 2 is not run automatically when
+the prison's party is saved.
+
+The split:
+
+- **The engine: done.** `makeNewAdventure` (`src/engine/Chaos.ts`) takes the source
+  save's bytes and `mini.dat`'s and returns the new save's, or throws a `UtilityError`
+  carrying CSBWin's message (`tools/dump-new-adventure.ts`). Two forms CSBWin's utility
+  reads are G28's.
+- **⏳ The page.** Offer it: a source save chosen from the store, of any data set (the
+  list's filter is its parameter, `doc/SAVES.md` → "A save knows its dungeon"), the
+  `csb` set's `mini.dat` fetched, the result stored as a row of the `csb` set, and a
+  refusal's message shown. Where the control lives (the save menu, or the page's
+  controls) and what the new row is called (CSBWin names it after the slot the player
+  picks, `CSBGAME.DAT` to `CSBGAME4.DAT`, in `_TAG000ede`, `Chaos.cpp:1467-1541`) are
+  that step's to settle, with the author if the save menu has to change. The new
+  file's `RandomGameID` is the source's with its first byte one higher (the
+  `LoadLong` slip), so it is a playthrough of its own.
+- **⏳ Step 1, the prison's party.** Trace where the prison has the champions chosen,
+  and that its save is one the engine takes (its `Word22592` is 12, which the check
+  allows).
+
+### G28 ⏳ The utility's two untried forms: a saved game unscrambled with word 10, and a `mini.dat` with an Extended Features block
+
+`src/engine/Chaos.ts` refuses both, so a file of either form makes no adventure:
+
+- `_ReadSavedGame` unscrambles `GAMEBLOCK1` with word 29 and, if that fails, with word
+  10 (`doc/CSBwin-src/Chaos.cpp:2359-2378`), a form whose block keeps the hashes at 310
+  and the checksums at 342, and whose `TAG00260e` and `TAG002724` branches read other
+  offsets (`:2531-2538`, `:2602-2617`). Nothing else in CSBWin reads that form, the
+  port's reader does not, and no file of it is here. `ReadSavedGame` reports it as
+  damaged (message 14).
+- `_TAG000fc4` writes a new Extended Features block when `mini.dat` opened with one
+  (`:1738-1793`), from the globals the read left, with `BigActuators` set whatever the
+  file had and no `cellFlagArraySize`. CSB's `mini.dat` has none. `TAG000fc4` throws.
+
+Paying it needs a file of each form, or the author's decision to port them unchecked.
 
 ### G23 ⏳ Enciphered files: the whole of a `dungeon.dat`, and the saves of its game
 

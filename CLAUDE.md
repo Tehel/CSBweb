@@ -146,7 +146,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             RuntimeSave (the state a read restores), SaveGameFile (the CSBWin file a
             save is, written from the game and read back), GameSaves (a save built and
             written to the store, or read back: the disk menu's, the boot's and F5/F9's),
-            skills, AddCharacter, objectIndex
+            Chaos (the UTILITY's "MAKE NEW ADVENTURE": a saved game's party into
+            `mini.dat`), skills, AddCharacter, objectIndex
             (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
             GameInput (where a click or a key goes once the page has read it),

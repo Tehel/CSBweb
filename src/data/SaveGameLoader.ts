@@ -322,7 +322,7 @@ export interface DungeonImageLayout {
   cellFlags: number;
 }
 
-function computeDungeonImageLayout(
+export function computeDungeonImageLayout(
   data: Uint8Array,
   startOffset: number,
   options: { indirectText: boolean; bigActuators: boolean; newScrolls: boolean },
