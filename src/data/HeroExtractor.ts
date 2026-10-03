@@ -216,7 +216,14 @@ function decodeHeroText(words: readonly ui16[], startWord: number): string | nul
 
 function parseHeroDefinition(text: string): Omit<PresetHero, 'textRecordIndex' | 'textOffset' | 'portraitIndex' | 'location' | 'inventory'> | null {
   const parts = text.split('|');
-  if (parts.length !== 7 || parts[2] !== '') return null;
+  if (parts.length !== 7) return null;
+
+  // `doc/CSBwin-src/Character.cpp:556-590`: the name is the first line, and the title
+  // runs to the *second* line break, its two lines joined with nothing between them
+  // ("SPELLWEAVER OF KE" and "LT" are CSB's "SPELLWEAVER OF KELT"). CSBWin's limits, seven
+  // characters and nineteen, wait for the text to be decoded as `DecodeText` does (C117).
+  const name = parts[0] ?? '';
+  const title = (parts[1] ?? '') + (parts[2] ?? '');
 
   const stats = parts[4] ?? '';
   const attrs = parts[5] ?? '';
@@ -253,8 +260,8 @@ function parseHeroDefinition(text: string): Omit<PresetHero, 'textRecordIndex' |
   }
 
   return {
-    name: parts[0] ?? '',
-    title: parts[1] ?? '',
+    name,
+    title,
     gender: parts[3] ?? '',
     health,
     stamina,

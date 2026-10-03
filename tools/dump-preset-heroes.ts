@@ -39,8 +39,7 @@ function main(): void {
   const options = parseArgs(process.argv.slice(2));
   const filePath = resolve(process.cwd(), options.file);
   const bytes = new Uint8Array(readFileSync(filePath));
-  const loader = new DungeonLoader();
-  const data = loader.loadFromArray(bytes);
+  const data = new DungeonLoader().loadDungeonDat(bytes);
 
   const heroes = extractPresetHeroes(data);
   const payload = { count: heroes.length, heroes };

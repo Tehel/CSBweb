@@ -27,7 +27,7 @@ import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type Object
 import { getActuatorType } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import type { PresetHero } from '../src/data/dungeonTypes';
+import type { DungeonData, PresetHero } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import { attributeCurrent, attributeMaximum, attributeMinimum } from '../src/engine/attributes';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
@@ -64,6 +64,19 @@ function makeGame(): Game {
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
   sharedGraphics = graphics;
+  return gameOn(data, graphics);
+}
+
+/** CSB's prison, the compressed `dungeon.dat` whose level 0 is its 24 mirrors. */
+function makePrisonGame(): Game {
+  const data = new DungeonLoader().loadDungeonDat(
+    new Uint8Array(readFileSync(resolve('static/gamefiles/csb/dungeon.dat'))));
+  const graphics = new GraphicsLoader();
+  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/csb/graphics.dat'))));
+  return gameOn(data, graphics);
+}
+
+function gameOn(data: DungeonData, graphics: GraphicsLoader): Game {
 
   const messages: Array<{ color: number; text: string }> = [];
   const game = newGame(data, graphics, {
@@ -687,6 +700,47 @@ function portraitSection(): void {
     console.log(`${turned.name}: party facing ${at.facing}, facing3 ${added?.damageFromDirection}`);
     check(added !== undefined && added.damageFromDirection === at.facing,
       `${turned.name}'s facing3 starts as the party's facing, ${at.facing} (Character.cpp:531)`);
+  }
+
+  /* ------------------------------------------------ CSB's prison, every mirror ---- */
+
+  // `AddCharacter` reads the title to the *second* line break, its two lines joined
+  // (`doc/CSBwin-src/Character.cpp:568-590`). Three of the prison's texts split the title
+  // over both lines, so the mirrors are found from their actuators, not from the
+  // extractor's list, and each one clicked.
+  console.log('');
+  console.log("=== CSB's prison: a champion at every mirror ===");
+  const prison = makePrisonGame();
+  const level0 = prison.ctx.dungeon.getData().maps[0]!;
+  const joined: string[] = [];
+  let mirrors = 0;
+  for (let x = 0; x < level0.descriptor.width; x++) {
+    for (let y = 0; y < level0.descriptor.height; y++) {
+      const cell = new Position(x, y, 0);
+      for (const rn of cellObjects(prison, cell)) {
+        const decoded = prison.ctx.dungeon.rnMaps.decode(rn);
+        if (decoded.category !== DBType.ACTUATOR) continue;
+        const rec = prison.ctx.dungeon.getActuatorRecord(rn);
+        if (!rec || getActuatorType(rec) !== 127) continue;
+        mirrors++;
+        const facing = (decoded.position + 2) & 3;
+        const party = prison.ctx.party.state;
+        party.position = new Position(x - DELTA_X[facing]!, y - DELTA_Y[facing]!, 0);
+        party.facing = facing as Direction;
+        prison.systems.mouse.handleWallClick();
+        const champ = party.champions[0];
+        const line = `(${x},${y}) wall ${decoded.position}: ${champ ? `${champ.name} / ${champ.title}` : 'nobody'}`;
+        console.log(`  ${line}`);
+        check(party.champions.length === 1, `the mirror at ${line} gives a champion`);
+        if (champ) joined.push(`${champ.name} / ${champ.title}`);
+        prison.systems.hallOfChampions.resurrectReincarnateCancel(CANCEL);
+      }
+    }
+  }
+  check(mirrors === 24, `the prison has 24 mirrors (${mirrors})`);
+  check(new Set(joined).size === mirrors, 'and each gives a champion of its own');
+  for (const title of ['MANTIA / SPELLWEAVER OF KELT', 'SLOGAR / WEBBER OF ARACHNIA', 'VEN / HIGH PRIEST OF SSHA']) {
+    check(joined.includes(title), `${title}: a title on two lines is both, joined`);
   }
 }
 

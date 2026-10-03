@@ -91,7 +91,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C116 | Three of the prison's mirrors give no champion | S | ⏳ |
+| C117 | The hero text is decoded with a guessed escape table, and not checked as `AddCharacter` checks it | M | ⏳ |
 | G23 | Enciphered files: the whole of a `dungeon.dat`, and the saves of its game | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
@@ -127,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C117 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C118 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -171,24 +171,33 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C116 ⏳ Three of the prison's mirrors give no champion
+### C117 ⏳ The hero text is decoded with a guessed escape table, and not checked as `AddCharacter` checks it
 
-CSB's prison has 24 mirrors on level 0 (`doc/PROVEN_FACTS.md` → "A compressed
-`dungeon.dat`: CSB's prison"), and `extractPresetHeroes` (`src/data/HeroExtractor.ts`)
-reads a champion for 21 of them. It rejects the texts behind three, so a click on those
-mirrors does nothing: `findHeroForMirror` finds no hero and `addCharacter` returns
-(`src/engine/HallOfChampions.ts`).
+`AddCharacter` decodes the hero text with `DecodeText(…, 0x8002, 990)`
+(`doc/CSBwin-src/Character.cpp:536-549`), through graphics.dat's escape tables
+(`doc/PROVEN_FACTS.md` → "Text Retrieval and Decode"); `DungeonState.decodeTextString` is that
+port. `extractPresetHeroes` (`src/data/HeroExtractor.ts`) runs in `DungeonLoader`, with no
+graphics.dat, and its `decodeHeroText` guesses instead: `%B` is nothing, `%C` "THE ",
+`%D` "YOU ", any other code-30 escape stays two characters, and a code-29 escape rejects
+the hero. graphics.dat says otherwise: `d.Byte10016`'s B is "!" in `dm-atari` and "y" in
+`dm-atari-1.3-fr` and `csb`, and the French SYRA's title prints "L%HENFANT DE SAUVAGE"
+where CSBWin's is "L}ENFANT DE SAUVAGE", `}` being 1.3-fr's H entry.
 
-| Mirror | Value | Text, at | As `tools/peek-dungeon.ts dump 0` prints it |
-| --- | --- | --- | --- |
-| (13,2), east face | 8 | (14,2) | ` / MANTIA SPELLWEAVER OF KE LT F AAMIAILGAAKN …` |
-| (17,2), west face | 10 | (16,2) | ` / SLOGAR WEBBER OF ARACHNI A F AAPKAKFKAAEG …` |
-| (10,11), north face | 7 | (10,10) | ` / VEN HIGH PRIEST OF SS HA M AAMPAGKEAAJG …` |
+Two more differences sit beside it:
 
-In the 21 others the printout shows a line break between the title and the gender letter;
-in these three it shows none. What CSBWin's `AddCharacter` (`doc/CSBwin-src/Character.cpp:456`)
-makes of these texts is not traced yet: trace its reading of the name, the title and the
-gender, then the `legalHero` fallback (`:475`, `G4`), before changing the extractor.
+- **The limits.** A name longer than seven characters or a title longer than nineteen is
+  an illegal hero (`Character.cpp:558`, `:580`); the extractor applies neither. They
+  are only right on the text as `DecodeText` makes it (SYRA's title is nineteen in
+  CSBWin, twenty in the guess), so they come with the decoding. What an illegal hero
+  then becomes is `G4`'s `legalHero`.
+- **Which text.** CSBWin takes the first `dbTEXT` in the party's own cell, at any
+  position (`Character.cpp:535-541`). `scanTextRecords` prefers the one at the mirror's
+  wall position, and `HallOfChampions.findHeroForMirror` falls back to any hero with the
+  same portrait.
+
+No hero of the shipped dungeons is known to change. Paying it decodes the text where
+CSBWin does, with the game's tables, from the party's cell; a tool shows SYRA's title and
+the limits on a hero text built to exceed them.
 
 ---
 

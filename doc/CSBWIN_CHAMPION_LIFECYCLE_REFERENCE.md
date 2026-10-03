@@ -112,6 +112,16 @@ Reached from a wall click on actuator type **127** whose state lacks `PORTRAIT_I
    the built-in `legalHero` string. `charID` therefore selects **only the portrait
    bitmap**: which champion you get is decided by where the party is standing.
 
+   The text is decoded with `DecodeText(…, 0x8002, 990)`, so each separator is a line
+   break (`CSBCode.cpp:5525`, `:5624-5640`). The name is the first line, at most seven
+   characters (`Character.cpp:556-566`). The title runs to the **second** line break:
+   the first is skipped, so the title's two lines are joined with nothing between them,
+   at most nineteen characters (`:568-590`). DM's heroes leave the second line empty
+   ("HALK", "THE BARBARIAN", ""); three of CSB's prison heroes fill it: "SPELLWEAVER OF
+   KE" and "LT" are MANTIA's "SPELLWEAVER OF KELT", as SLOGAR's is "WEBBER OF
+   ARACHNIA" and VEN's "HIGH PRIEST OF SSHA" (`tools/dump-hall-of-champions.ts`). The
+   gender letter follows, `'M'` or `'F'` (`:591-600`).
+
    Every number in that string is `DecodeCharacterValue` (`:414-431`): one hex nibble
    per character, each of which must be `'A'`..`'P'`. Anything else returns -1 and makes
    the hero illegal. HP, stamina and mana are then clamped to MAXHP 999 / MAXSTAMINA
