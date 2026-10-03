@@ -15,10 +15,17 @@
  * row a playthrough and stamps it into the file, so that no stored save holds 0
  * (`doc/SAVES.md` → "A playthrough").
  *
- * Both are pure, so the tools run them (`tools/dump-save-menu.ts`,
+ * **Version 3** (`stampBlock1Rows`). A version-3 row is today's, but its file may hold 0
+ * in `GAMEBLOCK1`'s `Byte22598`, `Byte22596`, `Word22594` and `Word22592`, which CSBWin
+ * never writes and an earlier build did. The upgrade stamps `_ReadEntireGame`'s 1, 2, 1
+ * and 13 into each such file, the author's decision, so that the utility can make a new
+ * adventure of it (`doc/SAVES.md` → "What a save is"). A file imported later is
+ * left as it is.
+ *
+ * All three are pure, so the tools run them (`tools/dump-save-menu.ts`,
  * `tools/dump-save-stamp.ts`); `idb.ts` calls them once, in the upgrade.
  */
-import { stampRandomGameID } from '../SaveGameLoader';
+import { holdsNoBlock1Words, stampBlock1Words, stampRandomGameID } from '../SaveGameLoader';
 import {
     SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields, saveEntryOf,
     type DrawPlaythrough, type SaveRecord, type StoredSaveRecord,
@@ -137,4 +144,26 @@ export function stampSaveRecords(rows: readonly StoredSaveRecord[], draw: DrawPl
         }
     }
     return kept.filter((row) => row !== null);
+}
+
+/**
+ * Every version-3 row as today's: no file holds 0 in all four of `GAMEBLOCK1`'s
+ * `Byte22598`, `Byte22596`, `Word22594` and `Word22592` (`holdsNoBlock1Words`). Each
+ * that does takes `_ReadEntireGame`'s 1, 2, 1 and 13 (`stampBlock1Words`), and the rest
+ * of the row is kept: the four are none of what the row reads from its file.
+ *
+ * A row whose file holds a word of the four is returned as it is. One whose file does
+ * not read holds no CSBWin file, and is dropped as the first upgrade drops one.
+ */
+export function stampBlock1Rows(rows: readonly StoredSaveRecord[]): StoredSaveRecord[] {
+    const kept: StoredSaveRecord[] = [];
+    for (const row of rows) {
+        try {
+            const bytes = new Uint8Array(row.bytes);
+            kept.push(holdsNoBlock1Words(bytes) ? { ...row, bytes: stampBlock1Words(bytes).buffer } : row);
+        } catch {
+            // No CSBWin file: dropped.
+        }
+    }
+    return kept;
 }

@@ -6,17 +6,18 @@
  * is a synchronous ~5 MB budget for the whole origin.
  */
 import { DEFAULT_DATA_SET } from '../DataSets';
-import { stampSaveRecords, upgradeSaveRecords } from './legacyRows';
+import { stampBlock1Rows, stampSaveRecords, upgradeSaveRecords } from './legacyRows';
 import type { DrawPlaythrough, StoredSaveRecord } from './SaveStore';
 
 const DB_NAME = 'dmweb-saves';
 /**
- * 3: every row names a playthrough, its file's own. 2: a row is a `SaveRecord`, with its
- * data set, its playthrough and its quick flag, and its bytes are a CSBWin file, which
- * may name no playthrough. 1 had neither the three fields nor that rule, and a second
+ * 4: no row's file holds 0 in all four of `GAMEBLOCK1`'s `Byte22598`, `Byte22596`,
+ * `Word22594` and `Word22592`. 3: every row names a playthrough, its file's own. 2: a
+ * row is a `SaveRecord`, with its data set, its playthrough and its quick flag, and its
+ * bytes are a CSBWin file, which may name no playthrough. 1 had neither the three fields nor that rule, and a second
  * store for a directory handle.
  */
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 /** The saves, one `SaveRecord` each, keyed by `id`. */
 export const SAVES_STORE = 'saves';
@@ -31,7 +32,9 @@ let dbPromise: Promise<IDBDatabase> | null = null;
  *
  * Version 1's rows are made version 2's first: a version-1 row names no data set, and
  * every one becomes the default set's. Then each row that names no playthrough is given
- * one, stamped into its file (`stampSaveRecords`), `draw` giving the new ones.
+ * one, stamped into its file (`stampSaveRecords`), `draw` giving the new ones. Last, each
+ * file that holds none of `GAMEBLOCK1`'s four words of `_ReadEntireGame` is given them
+ * (`stampBlock1Rows`).
  */
 function upgradeRows(db: IDBDatabase, tx: IDBTransaction, oldVersion: number, draw: DrawPlaythrough): void {
     if (db.objectStoreNames.contains(HANDLES_STORE)) db.deleteObjectStore(HANDLES_STORE);
@@ -39,7 +42,7 @@ function upgradeRows(db: IDBDatabase, tx: IDBTransaction, oldVersion: number, dr
     const all = saves.getAll();
     all.onsuccess = () => {
         const rows: StoredSaveRecord[] = oldVersion < 2 ? upgradeSaveRecords(all.result, DEFAULT_DATA_SET.id) : all.result;
-        const stamped = stampSaveRecords(rows, draw);
+        const stamped = stampBlock1Rows(stampSaveRecords(rows, draw));
         saves.clear();
         for (const record of stamped) saves.put(record);
     };

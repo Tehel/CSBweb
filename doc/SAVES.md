@@ -39,7 +39,16 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   `.dmweb.json` when it is one, and reads the row again from that file. An older row
   names no data set, so every one becomes the default set's; a row that holds no CSBWin
   file, which no build could load, is dropped. To version 3, it stamps a playthrough
-  into each file that names none ("A playthrough"). Nothing else in `src/` reads JSON. A
+  into each file that names none ("A playthrough"). To version 4, it gives each file
+  that holds 0 in all four of `GAMEBLOCK1`'s `Byte22598`, `Byte22596`, `Word22594` and
+  `Word22592` the 1, 2, 1 and 13 `_ReadEntireGame` sets before a read
+  (`stampBlock1Rows`; `doc/PROVEN_FACTS.md` → "`GAMEBLOCK1`: what `SaveGame` writes
+  there"). CSBWin never writes the zeros, an early build of the port did, and a load
+  carries a file's own words into the game's next save, so every save of a playthrough
+  begun on that build holds them, and the utility's RISE refuses such a file as
+  "ALREADY UTILIZED". The author's decision: the store's rows are stamped, once, and a
+  file imported later is left as it is, refused as CSBWin's utility refuses it.
+  Nothing else in `src/` reads JSON. A
   `.dmweb.json` file on disk is converted by hand, outside the engine;
   `tools/peek-dungeon.ts` reads one.
 - **No store on disk.** IndexedDB (`BrowserSaveStore`) is the one store: a directory on
@@ -313,13 +322,16 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
   either order of the rows; each row's file holding the row's id; a stamped file being
   byte for byte the file the game writes under that id, and loading; a row's draw held
   to its own data set's rows; a row that holds no CSBWin file dropped; an upgraded row
-  counting no play time).
+  counting no play time; a file holding the four `GAMEBLOCK1` words at 0 refused by
+  RISE, then stamped into the file the game writes with CSBWin's, taken by RISE, and
+  loading with them; a file that holds one of them left as it is).
 - **The stamp**: `tools/dump-save-stamp.ts`, over the eight genuine saves and the two of
   `static/gamefiles/csb`. The stamped file differs in six bytes of `GAMEBLOCK1`, the id
   and the word the block's fold ends on; it reads back with the id, the level and the
   party; its own id stamped back gives the file byte for byte; a CSBWin block stamped is
   what `ScrambleAndWrite` writes, and `mini.dat`'s 127 fold words that are not zero are
-  kept.
+  kept. No genuine save holds the four `GAMEBLOCK1` words at 0, and one that holds
+  CSBWin's 1, 2, 1 and 13 stamped with them is the file byte for byte.
 - **The playthrough a file that names none joins**: "the list" (which save is joined).
 - **F5's slot and F9's choice**: "the list" (which row is the slot), "the one save call"
   (a second F5 writes over the first, and SAVE does not) and "one store, two data sets"

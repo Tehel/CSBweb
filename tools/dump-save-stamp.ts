@@ -24,7 +24,11 @@
  *    `ScrambleAndWrite` writes for the block with that id. Where it is not, its words
  *    are kept.
  *
- * The store's upgrade, which stamps the rows it holds, is in `tools/dump-save-menu.ts`,
+ * 6. `_ReadEntireGame`'s four words (`stampBlock1Words`): no genuine save holds 0 in all
+ *    four (`holdsNoBlock1Words`), and one that holds CSBWin's 1, 2, 1 and 13 stamped is
+ *    the file byte for byte, its block's fold and scramble included.
+ *
+ * The store's upgrades, which stamp the rows it holds, are in `tools/dump-save-menu.ts`,
  * "the store's upgrade".
  *
  * Run: `npx tsx tools/dump-save-stamp.ts`
@@ -36,7 +40,7 @@ import { readU16BE, writeU32BE } from '../src/core/bytes';
 import { readExtendedFeatures } from '../src/data/CsbwinExtendedFeatures';
 import { readCsbwinSaveInfo } from '../src/data/CsbwinSaveInfo';
 import { BLOCK1_SIZE, readUnscrambleBlock, scrambleAndWrite } from '../src/data/CsbwinSaveStream';
-import { stampRandomGameID } from '../src/data/SaveGameLoader';
+import { holdsNoBlock1Words, stampBlock1Words, stampRandomGameID } from '../src/data/SaveGameLoader';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
 
@@ -128,6 +132,17 @@ function checkFile(path: string): void {
       `${name}: the stamped block is what ScrambleAndWrite (SaveGame.cpp:706-751) writes for the block with that id`);
   } else {
     check(inBlock.every((at) => at >= FOLD_END_OFFSET), `${name}: the ${foldWords} words of its first half that are not zero are kept`);
+  }
+
+  // 6. `_ReadEntireGame`'s four words.
+  check(!holdsNoBlock1Words(bytes), `${name}: holds a word of GAMEBLOCK1's four that an early build of the port left 0`);
+  const words = [plain[300], plain[301], readU16BE(plain, 376), readU16BE(plain, 378)].join(' ');
+  if (words === '1 2 1 13') {
+    check(sameBytes(stampBlock1Words(bytes), bytes), `${name}: holds CSBWin's 1 2 1 13, and stamped with them is the file byte for byte`);
+  } else {
+    const differs = differing(bytes, stampBlock1Words(bytes)).map((at) => at - offset);
+    check(differs.length > 0 && differs.every((at) => at >= FOLD_END_OFFSET && at < BLOCK1_SIZE),
+      `${name}: holds ${words}, and stamped differs in GAMEBLOCK1's scrambled half and the fold's last word alone`);
   }
 }
 

@@ -931,9 +931,48 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
  * Throws on a file whose `GAMEBLOCK1` does not read.
  */
 export function stampRandomGameID(saveData: Uint8Array, randomGameID: number): Uint8Array<ArrayBuffer> {
+  return restampBlock1(saveData, (buf) => writeU32BE(buf, 308, randomGameID >>> 0));
+}
+
+/**
+ * Does the file hold 0 in all four of `GAMEBLOCK1`'s `Byte22598`, `Byte22596`,
+ * `Word22594` and `Word22592`? CSBWin never writes that: `_ReadEntireGame` sets
+ * `d.Word22596`, `Word22598`, `Word22594` and `Word22592` to 2, 1, 1 and 13 before either
+ * read (`doc/CSBwin-src/SaveGame.cpp:1467-1470`), and a load replaces them only with a
+ * file's own (`:1859-1860`, `:1878-1881`). An early build of the port wrote it.
+ *
+ * Throws on a file whose `GAMEBLOCK1` does not read.
+ */
+export function holdsNoBlock1Words(saveData: Uint8Array): boolean {
   const { offset } = readExtendedFeatures(saveData);
   const { buf } = readUnscrambleBlock(saveData, offset);
-  writeU32BE(buf, 308, randomGameID >>> 0);
+  return buf[300] === 0 && buf[301] === 0 && readU16BE(buf, 376) === 0 && readU16BE(buf, 378) === 0;
+}
+
+/**
+ * A copy of a save file with `_ReadEntireGame`'s 1, 2, 1 and 13 for its `Byte22598`,
+ * `Byte22596`, `Word22594` and `Word22592` (`doc/CSBwin-src/SaveGame.cpp:1467-1470`), the
+ * four words a game read from a file that holds none would carry, and nothing else of
+ * the game changed: the fields, and the word of the block's first half that is its
+ * checksum (`rescrambleBlock1`), as `stampRandomGameID`. `swapBlock1` turns the two
+ * words big-endian (see `Block1`).
+ *
+ * Throws on a file whose `GAMEBLOCK1` does not read.
+ */
+export function stampBlock1Words(saveData: Uint8Array): Uint8Array<ArrayBuffer> {
+  return restampBlock1(saveData, (buf) => {
+    buf[300] = 1;
+    buf[301] = 2;
+    writeU16BE(buf, 376, 1);
+    writeU16BE(buf, 378, 13);
+  });
+}
+
+/** A copy of a save file with its `GAMEBLOCK1` unscrambled, edited, and scrambled again. */
+function restampBlock1(saveData: Uint8Array, edit: (buf: Uint8Array) => void): Uint8Array<ArrayBuffer> {
+  const { offset } = readExtendedFeatures(saveData);
+  const { buf } = readUnscrambleBlock(saveData, offset);
+  edit(buf);
   rescrambleBlock1(buf);
   const out = new Uint8Array(saveData);
   out.set(buf, offset);

@@ -39,8 +39,10 @@
  *    playthrough is drawn again while a save of the data set holds it.
  * 9. **The store's upgrade.** The rows of the store's first version, a CSBWin file or a
  *    `.dmweb.json` around one, made today's (`src/data/saves/legacyRows.ts`), and the
- *    rows that name no playthrough each given one, stamped into its file. The page
- *    runs it once, inside IndexedDB's upgrade; here it runs over rows built by hand.
+ *    rows that name no playthrough each given one, stamped into its file, then the files
+ *    that hold 0 in all four of `GAMEBLOCK1`'s words of `_ReadEntireGame` given them,
+ *    which RISE then takes. The page runs it once, inside IndexedDB's upgrade; here it
+ *    runs over rows built by hand.
  * 10. **The selection.** The menu driven by its own clicks and keys over that store:
  *    the full menu opens on its "new save" row in an empty store, where LOAD is inert
  *    and SAVE makes a save; on a save, SAVE writes over it, and on the game's heading it
@@ -117,7 +119,7 @@ import {
   type SaveStore,
   type StoredSaveRecord,
 } from '../src/data/saves/SaveStore';
-import { stampSaveRecords, upgradeSaveRecords } from '../src/data/saves/legacyRows';
+import { stampBlock1Rows, stampSaveRecords, upgradeSaveRecords } from '../src/data/saves/legacyRows';
 import { DEFAULT_DATA_SET, dataSetFor } from '../src/data/DataSets';
 import { KNOWN_DUNGEONS } from '../src/data/DungeonSignature';
 import { Game } from '../src/engine/Game';
@@ -128,7 +130,8 @@ import type { Champion } from '../src/engine/gameTypes';
 import { drawRandomGameID } from '../src/engine/GameContext';
 import { GameSaves, SAVED_GAME_DAMAGED, drawPlaythrough, importedFileName, makeSaveFileName } from '../src/engine/GameSaves';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
-import { loadSaveGameState, stampRandomGameID } from '../src/data/SaveGameLoader';
+import { holdsNoBlock1Words, loadSaveGameState, stampRandomGameID } from '../src/data/SaveGameLoader';
+import { ReadSavedGame, TAG00260e } from '../src/engine/Chaos';
 import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
@@ -3035,6 +3038,67 @@ async function checkUpgrade(): Promise<void> {
   const broken: StoredSaveRecord = { ...held[2]!, bytes: buffer(new Uint8Array(64)) };
   check(stampSaveRecords([broken, held[0]!], drawFrom(SEED)).map((r) => r.name).join() === 'pair, named, older',
     'a row that names no playthrough and holds no CSBWin file is dropped, as the first upgrade drops one');
+
+  // Version 4: a file that holds none of GAMEBLOCK1's four words of `_ReadEntireGame`
+  // takes them, and RISE then takes it.
+  console.log('');
+  console.log('=== the store\'s upgrade: no file holds GAMEBLOCK1\'s four words at 0 (`stampBlock1Rows`) ===');
+  const block1 = game.ctx.state.block1;
+  /** The game's save under `id`, with `words` for `Word22598`, `Word22596`, `Word22594` and `Word22592`. */
+  const fileWith = (id: number, words: [number, number, number, number]): Uint8Array => {
+    [block1.word22598, block1.word22596, block1.word22594, block1.word22592] = words;
+    const bytes = fileOf(pair, id);
+    [block1.word22598, block1.word22596, block1.word22594, block1.word22592] = [1, 2, 1, 13];
+    return bytes;
+  };
+  const v3 = (name: string, bytes: Uint8Array, more: Partial<StoredSaveRecord> = {}): StoredSaveRecord =>
+    ({ id: name, name, dataSet: DEFAULT_DATA_SET.id, quick: false, savedAt: 100, ...readSaveFileFields(bytes)!, bytes: buffer(bytes), ...more });
+  /** What RISE answers the file: `TAG00260e`'s refusal, or "TAKEN". */
+  const rise = (bytes: Uint8Array): string => {
+    try {
+      TAG00260e(ReadSavedGame(bytes, 0));
+      return 'TAKEN';
+    } catch (error) {
+      return error instanceof Error ? error.message.replace(/\n/g, ' ').trim() : String(error);
+    }
+  };
+  const earlyBytes = fileWith(0x2d431dd2, [0, 0, 0, 0]);
+  const csbwinBytes = fileWith(0x2d431dd2, [1, 2, 1, 13]);
+  const atariBytes = fileWith(0x2d431dd2, [0, 1, 0, 0]);
+  const v3Rows = [
+    v3('early', earlyBytes, { quick: true, usedAt: 400, playTime: 5000 }),
+    v3('csbwin', csbwinBytes),
+    v3('atari', atariBytes),
+  ];
+  const block1Stamped = stampBlock1Rows(v3Rows);
+  console.log(['name', 'holds none', 'RISE before', 'stamped', 'RISE after'].join('\t'));
+  for (const row of v3Rows) {
+    const now = block1Stamped.find((r) => r.name === row.name);
+    console.log([row.name, holdsNoBlock1Words(new Uint8Array(row.bytes)), rise(new Uint8Array(row.bytes)),
+      now === row ? 'as it was' : now ? 'stamped' : 'DROPPED', now ? rise(new Uint8Array(now.bytes)) : ''].join('\t'));
+  }
+  const earlyNow = block1Stamped[0]!;
+  const earlyStamped = new Uint8Array(earlyNow.bytes);
+  check(holdsNoBlock1Words(earlyBytes) && !holdsNoBlock1Words(csbwinBytes) && !holdsNoBlock1Words(atariBytes),
+    'a file holds none of the four only when all four are 0: an Atari save\'s Byte22596 1 is one');
+  check(/ALREADY UTILIZED/.test(rise(earlyBytes)), 'RISE refuses the early file, as CSBWin\'s utility would');
+  check(earlyStamped.length === csbwinBytes.length && earlyStamped.every((b, i) => b === csbwinBytes[i]),
+    'stamped, it is byte for byte the file the game writes with _ReadEntireGame\'s 1, 2, 1 and 13 (SaveGame.cpp:1467-1470)');
+  check(rise(earlyStamped) === 'TAKEN', 'and RISE takes it');
+  check(earlyNow.id === 'early' && earlyNow.quick && earlyNow.usedAt === 400 && earlyNow.playTime === 5000
+    && earlyNow.playthrough === 0x2d431dd2 && earlyNow.champions.join('/') === pair.join('/') && earlyNow.level === 9,
+    'the stamped row keeps the rest of what it held');
+  check(block1Stamped.length === 3 && block1Stamped[1] === v3Rows[1] && block1Stamped[2] === v3Rows[2],
+    'a row whose file holds a word of the four is returned as it is, its file untouched');
+  check(stampBlock1Rows(block1Stamped).every((r, i) => r === block1Stamped[i]), 'a store already stamped is left as it is');
+  const brokenV3: StoredSaveRecord = { ...v3Rows[0]!, bytes: buffer(new Uint8Array(64)) };
+  check(stampBlock1Rows([brokenV3, v3Rows[1]!]).map((r) => r.name).join() === 'csbwin',
+    'a row whose file does not read is dropped, as the first upgrade drops one');
+  const loadedEarly = await loadGame();
+  applySaveBytes(loadedEarly, earlyStamped);
+  const loadedBlock1 = loadedEarly.ctx.state.block1;
+  check(loadedBlock1.word22598 === 1 && loadedBlock1.word22596 === 2 && loadedBlock1.word22594 === 1 && loadedBlock1.word22592 === 13,
+    'and a game read from it carries CSBWin\'s four words into its next save');
 }
 
 /* ------------------------------------------------------------------------------- */
