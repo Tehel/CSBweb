@@ -6,6 +6,7 @@
 import { SoundManager } from './audio/SoundManager';
 import { CsbRandom } from './core/random';
 import { CSBGraphicsLoader } from './data/CSBGraphicsLoader';
+import { extractPresetHeroes } from './data/HeroExtractor';
 import { dataSetFor } from './data/DataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
@@ -566,7 +567,9 @@ async function init() {
         // `import.meta.env.DEV` is constant-folded to false by `vite build`, so the
         // handle cannot reach a production bundle.
         if (import.meta.env.DEV) {
-            (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView };
+            // `presetHeroes`: the heroes behind the dungeon's mirrors, for `tools/lib/buildParty.mjs`.
+            const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode);
+            (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView, presetHeroes };
         }
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen);

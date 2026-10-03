@@ -28,7 +28,7 @@ import type { Champion, PartyState } from '../src/engine/gameTypes';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { CHARFLAG_ATTACK_DISABLE } from '../src/engine/gameTypes';
 import type { LoopScript } from '../src/engine/LoopState';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { handleUIKey, keyScanOf, tableKeyButton, translateKey } from '../src/renderer/ui/Keyboard';
@@ -71,7 +71,7 @@ async function main(): Promise<void> {
   // Real champions out of the Hall of Champions, and the spell keys need someone who
   // can actually cast: `drawSpellControls` gives no tab to a champion with no mana, and
   // `selectCaster` refuses the same champion for the same reason.
-  const heroes = data.presetHeroes ?? [];
+  const heroes = presetHeroesOf(data, graphics);
   const casters = heroes
     .map((hero, index) => ({ hero, index }))
     .filter(({ hero }) => hero.mana > 0)

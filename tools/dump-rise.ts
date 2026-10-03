@@ -69,7 +69,7 @@ import { menuButtonList, menuButtonRect } from '../src/renderer/ui/Menu';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
 import type { UIButton } from '../src/data/tables/UITables';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
 import { memoryStore, savePath } from './lib/saves';
 import { newUIState } from './lib/ui';
 
@@ -332,6 +332,8 @@ const DELTA_Y = [-1, 0, 1, 0];
 const RESURRECT = 160;
 const REINCARNATE = 161;
 const PRISON = new DungeonLoader().loadDungeonDat(read(resolve(CSB, 'dungeon.dat')));
+/** Its mirrors' heroes, read before any game plays on it: a recruit disables a mirror. */
+const PRISON_HEROES = presetHeroesOf(PRISON, graphics);
 
 /** A save's name as printed: its date is the wall clock's, which would make the output vary. */
 const undated = (text: string): string => text.replace(/dmweb-\d{8}-\d{6}(-\d+)?/g, 'dmweb-<date>');
@@ -352,7 +354,7 @@ function prisonGame(store: ReturnType<typeof memoryStore>, dataSet = 'csb') {
 
 /** A champion from the prison's mirror of `hero`, the party stood before it: resurrected, or reincarnated as `name`. */
 function recruit(game: Game, hero: number, name?: string): void {
-  const h = game.ctx.dungeon.getData().presetHeroes![hero]!;
+  const h = PRISON_HEROES[hero]!;
   const facing = (h.location.wall + 2) & 3;
   const party = game.ctx.party.state;
   party.position = new Position(h.location.x - DELTA_X[facing]!, h.location.y - DELTA_Y[facing]!, h.location.map);
@@ -371,7 +373,7 @@ async function checkPrison(): Promise<void> {
   console.log('=== the prison\'s shortcut ===');
   const store = memoryStore();
   const { game, saves, asked } = prisonGame(store);
-  console.log(`  CSB's dungeon.dat: Word22592 ${PRISON.word22592}, ${PRISON.presetHeroes?.length ?? 0} mirrors`);
+  console.log(`  CSB's dungeon.dat: Word22592 ${PRISON.word22592}, ${PRISON_HEROES.length} mirrors`);
   check(PRISON.word22592 === PRISON_WORD22592 && game.ctx.state.block1.word22592 === PRISON_WORD22592,
     'the prison\'s game has the compressed dungeon.dat\'s Word22592, 12');
   check(saves.inPrison(), 'and is the prison, in the csb set');

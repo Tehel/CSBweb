@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import type { DungeonData } from '../../src/data/dungeonTypes';
+import { extractPresetHeroes, type PresetHero } from '../../src/data/HeroExtractor';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { Game } from '../../src/engine/Game';
 import { createGameContext, type GameContext } from '../../src/engine/GameContext';
@@ -50,6 +51,16 @@ export function gameTablesOf(graphics: GraphicsLoader): GameTables {
     built.set(graphics, tables);
   }
   return tables;
+}
+
+/** The heroes behind `data`'s mirrors, read with `graphics`' escape tables. */
+export function presetHeroesOf(data: DungeonData, graphics: GraphicsLoader): PresetHero[] {
+  return extractPresetHeroes(data, gameTablesOf(graphics).textDecode);
+}
+
+/** The heroes behind the mirrors of `game`'s dungeon as it stands, read with its own tables. */
+export function presetHeroesOfGame(game: Game): PresetHero[] {
+  return extractPresetHeroes(game.ctx.dungeon.getData(), game.ctx.tables.textDecode);
 }
 
 /** A `Game` over `data` with every table from `graphics`, and the parts of `host` the tool listens to. */

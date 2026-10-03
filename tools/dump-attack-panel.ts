@@ -32,7 +32,7 @@ import {
 } from '../src/renderer/ui/Attack';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
 import { newUIState } from './lib/ui';
 
 async function main(): Promise<void> {
@@ -46,7 +46,7 @@ async function main(): Promise<void> {
   const uiTables = graphicsTablesOf(graphics).ui;
   const objectTables = graphicsTablesOf(graphics).objects;
 
-  const heroes = (data.presetHeroes ?? []).filter((h) => (h.inventory?.length ?? 0) > 0);
+  const heroes = presetHeroesOf(data, graphics).filter((h) => (h.inventory?.length ?? 0) > 0);
   if (heroes.length < 2) throw new Error('dungeon.dat carries fewer than two equipped preset heroes');
   const party = new Party(new Position(1, 1, 0), Direction.NORTH);
   for (let i = 0; i < 2; i++) {

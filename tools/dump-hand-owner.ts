@@ -25,7 +25,7 @@ import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/en
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { getChampionPossession, type Champion, type PartyState } from '../src/engine/gameTypes';
 import { type UIState } from '../src/renderer/ui/UIState';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { handleClothingClick } from '../src/renderer/ui/Mouse';
@@ -58,7 +58,7 @@ async function main(): Promise<void> {
   // hand them — no synthesised heroes. Not every hero starts with something: DAROOU's
   // inventory is genuinely empty, so take the first two who carry anything, and say
   // who they are so the output can be checked against the manual.
-  const heroes = (data.presetHeroes ?? []).filter((h) => (h.inventory?.length ?? 0) > 0);
+  const heroes = presetHeroesOf(data, graphics).filter((h) => (h.inventory?.length ?? 0) > 0);
   if (heroes.length < 2) throw new Error('dungeon.dat carries no equipped preset heroes');
   console.log(`champions: ${heroes[0].name} and ${heroes[1].name}\n`);
   const makeChampion = (heroIndex: number, partyPosition: number): Champion =>

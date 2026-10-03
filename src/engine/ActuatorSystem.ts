@@ -314,7 +314,7 @@ export class ActuatorSystem {
             }
             // A click on a Hall of Champions mirror (`doc/CSBwin-src/Mouse.cpp:513`).
             if (emptyHanded) {
-              const added = this.ctx.systems.hallOfChampions.addCharacter(getActuatorValue(rec), position, actuatorPos);
+              const added = this.ctx.systems.hallOfChampions.addCharacter(getActuatorValue(rec));
               if (added) characterAdded = true;
             }
             skip = true;

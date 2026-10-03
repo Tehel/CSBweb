@@ -12,9 +12,9 @@
 // An expression for `Runtime.evaluate` against a page with `window.__probe` (Debug on). It
 // returns the champions' names, comma-separated.
 export const BUILD_PARTY = `(()=>{
-  const { game, renderView } = window.__probe;
+  const { game, renderView, presetHeroes } = window.__probe;
   const DELTA_X = [0, 1, 0, -1], DELTA_Y = [-1, 0, 1, 0];
-  const all = game.ctx.dungeon.getData().presetHeroes ?? [];
+  const all = presetHeroes();
   const halk = all.find(h => h.name === 'HALK');
   const heroes = [halk, ...all.filter(h => h !== halk)].filter(Boolean).slice(0, 4);
   for (const hero of heroes) {

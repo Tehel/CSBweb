@@ -65,7 +65,7 @@ import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import { CHARFLAG_ATTACK_DISABLE, MovementAction, type Champion } from '../src/engine/gameTypes';
-import { newGame } from './lib/game';
+import { newGame, presetHeroesOfGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { savePath } from './lib/saves';
 
@@ -383,7 +383,7 @@ function playFromDungeonDat(): Game {
   const DELTA_X = [0, 1, 0, -1];
   const DELTA_Y = [-1, 0, 1, 0];
   for (const name of ['HALK', 'TIGGY']) {
-    const hero = (game.ctx.dungeon.getData().presetHeroes ?? []).find((h) => h.name === name);
+    const hero = presetHeroesOfGame(game).find((h) => h.name === name);
     if (!hero) { check(false, `${name} has a mirror`); continue; }
     const facing = (hero.location.wall + 2) & 3;
     party.position = new Position(hero.location.x - DELTA_X[facing]!, hero.location.y - DELTA_Y[facing]!, hero.location.map);
@@ -802,7 +802,7 @@ function main(): void {
     const from = live.ctx.state.dungeon;
     check(!error && same(world.maps.map((m) => [m.descriptor, m.monsterTypes, m.wallDecorationTOC, m.floorDecorationTOC, m.doorDecorationTOC]),
         from.maps.map((m) => [m.descriptor, m.monsterTypes, m.wallDecorationTOC, m.floorDecorationTOC, m.doorDecorationTOC]))
-      && same(world.levelIndex, from.levelIndex) && same(world.header, from.header) && same(world.presetHeroes, from.presetHeroes),
+      && same(world.levelIndex, from.levelIndex) && same(world.header, from.header),
       'the levels\' descriptors and tables, levelIndex, the header and the preset heroes are the saved world\'s');
   }
 

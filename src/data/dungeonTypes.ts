@@ -568,7 +568,6 @@ export interface DungeonData {
      * (`readRulesOptions`, `src/data/CsbwinExtendedFeatures.ts`).
      */
     extendedFeatures?: ExtendedFeaturesBlock;
-    presetHeroes?: PresetHero[]; // Preset champions extracted from dungeon data
 }
 
 export interface HeroInventoryItem {
@@ -580,37 +579,3 @@ export interface HeroInventoryItem {
     containedItems?: HeroInventoryItem[];
 }
 
-export interface PresetHero {
-    textRecordIndex: ui16;
-    textOffset: ui16;
-    portraitIndex: ui16;
-    name: string;
-    title: string;
-    gender: string;
-    health: ui16;
-    stamina: ui16;
-    mana: ui16;
-    luck: ui8;
-    strength: ui8;
-    dexterity: ui8;
-    wisdom: ui8;
-    vitality: ui8;
-    antiMagic: ui8;
-    antiFire: ui8;
-    fighter: Record<string, ui8>;
-    ninja: Record<string, ui8>;
-    priest: Record<string, ui8>;
-    wizard: Record<string, ui8>;
-    /**
-     * `reincarnateAttributePenalty` / `reincarnateStatPenalty`
-     * (`doc/CSBwin-src/Character.cpp:682-685`) — the two sixteenths the Hall of
-     * Champions' Reincarnate button charges, read from the hero's own text after the
-     * sixteen sub-skill letters. A character outside 'A'..'Z' reads as 0xff, which is
-     * out of range, so CSBWin falls back to 2 and 8 — as the shipped DM heroes, whose
-     * text stops at the skills, all do.
-     */
-    reincarnateAttributePenalty: ui8;
-    reincarnateStatPenalty: ui8;
-    location: { map: ui8; x: ui8; y: ui8; wall: ui8 };
-    inventory: HeroInventoryItem[];
-}

@@ -42,7 +42,7 @@ import {
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { DescIndexOfRecord, NameIndex, OBJDI_CAPE, OBJDI_COMPASS, OBJDI_EYE_OF_TIME } from '../src/engine/objectIndex';
 import { type UIState } from '../src/renderer/ui/UIState';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOfGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -336,13 +336,12 @@ async function main(): Promise<void> {
     // each object with `AddCharacterPossession` (`Character.cpp:789`), so the recruit
     // arrives with the bonuses. BORIS's mirror holds a Rabbit's Foot, +10 Luck anywhere.
     const g = makeGame();
-    const data = g.ctx.dungeon.getData();
-    for (const hero of data.presetHeroes ?? []) {
+    for (const hero of presetHeroesOfGame(g)) {
       const carried = (hero.inventory ?? []).map((item) => nameIndex(item.rn as ObjectID))
         .filter((objNI) => table.some((row) => row.objNI === objNI));
       if (carried.length) console.log(`${hero.name} carries ${carried.map((n) => objectTables.objectNames[n]).join(', ')}`);
     }
-    const boris = (data.presetHeroes ?? []).find((h) => h.name === 'BORIS');
+    const boris = presetHeroesOfGame(g).find((h) => h.name === 'BORIS');
     if (!boris) throw new Error('no BORIS in dungeon.dat');
     const facing = (boris.location.wall + 2) & 3;
     const party = g.ctx.party.state;
@@ -466,7 +465,7 @@ async function main(): Promise<void> {
     // `AddCharacterPossession` (`Character.cpp:789`), so if it lands in a hand it is lit.
     const g = makeGame();
     const data = g.ctx.dungeon.getData();
-    const zed = (data.presetHeroes ?? []).find((h) => h.name === 'ZED');
+    const zed = presetHeroesOfGame(g).find((h) => h.name === 'ZED');
     if (!zed) throw new Error('no ZED in dungeon.dat');
     const facing = (zed.location.wall + 2) & 3;
     const party = g.ctx.party.state;

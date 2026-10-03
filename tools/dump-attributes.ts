@@ -21,7 +21,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import { extractPresetHeroes } from '../src/data/HeroExtractor';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import {
   ADD_CHARACTER_ATTRIBUTE_CAP,
@@ -42,6 +41,7 @@ import { CsbRandom } from '../src/core/random';
 import { levelUp } from '../src/engine/skills';
 import type { Champion } from '../src/engine/gameTypes';
 import { check, finish } from './lib/check';
+import { presetHeroesOf, stockGraphics } from './lib/game';
 
 const NAMES = ['LUCK', 'STRENGTH', 'DEXTERITY', 'WISDOM', 'VITALITY', 'ANTI-MAGIC', 'ANTI-FIRE'];
 
@@ -85,7 +85,7 @@ function main(): void {
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
   if (!data) throw new Error('dungeon.dat did not load');
-  const heroes = extractPresetHeroes(data);
+  const heroes = presetHeroesOf(data, stockGraphics());
   check(heroes.length > 0, `the dungeon defines preset heroes (got ${heroes.length})`);
 
   const tables = { carryLocation: new Array(16).fill(0), objDescWord4: new Array(256).fill(0) };

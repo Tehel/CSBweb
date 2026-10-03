@@ -91,12 +91,11 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C117 | The hero text is decoded with a guessed escape table, and not checked as `AddCharacter` checks it | M | ⏳ |
 | G23 | Enciphered files: the whole of a `dungeon.dat`, and the saves of its game | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
-| G4 | Custom-dungeon extensions: `talents`, malformed heroes, external portraits, the monster design options | M | ⏳ |
+| G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | M | ⏳ |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
@@ -170,34 +169,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C117 ⏳ The hero text is decoded with a guessed escape table, and not checked as `AddCharacter` checks it
-
-`AddCharacter` decodes the hero text with `DecodeText(…, 0x8002, 990)`
-(`doc/CSBwin-src/Character.cpp:536-549`), through graphics.dat's escape tables
-(`doc/PROVEN_FACTS.md` → "Text Retrieval and Decode"); `DungeonState.decodeTextString` is that
-port. `extractPresetHeroes` (`src/data/HeroExtractor.ts`) runs in `DungeonLoader`, with no
-graphics.dat, and its `decodeHeroText` guesses instead: `%B` is nothing, `%C` "THE ",
-`%D` "YOU ", any other code-30 escape stays two characters, and a code-29 escape rejects
-the hero. graphics.dat says otherwise: `d.Byte10016`'s B is "!" in `dm-atari` and "y" in
-`dm-atari-1.3-fr` and `csb`, and the French SYRA's title prints "L%HENFANT DE SAUVAGE"
-where CSBWin's is "L}ENFANT DE SAUVAGE", `}` being 1.3-fr's H entry.
-
-Two more differences sit beside it:
-
-- **The limits.** A name longer than seven characters or a title longer than nineteen is
-  an illegal hero (`Character.cpp:558`, `:580`); the extractor applies neither. They
-  are only right on the text as `DecodeText` makes it (SYRA's title is nineteen in
-  CSBWin, twenty in the guess), so they come with the decoding. What an illegal hero
-  then becomes is `G4`'s `legalHero`.
-- **Which text.** CSBWin takes the first `dbTEXT` in the party's own cell, at any
-  position (`Character.cpp:535-541`). `scanTextRecords` prefers the one at the mirror's
-  wall position, and `HallOfChampions.findHeroForMirror` falls back to any hero with the
-  same portrait.
-
-No hero of the shipped dungeons is known to change. Paying it decodes the text where
-CSBWin does, with the game's tables, from the party's cell; a tool shows SYRA's title and
-the limits on a hero text built to exceed them.
 
 ---
 
@@ -310,8 +281,9 @@ It uses 118 `&` operations, 73 of the 83. With Conflux's count of each:
 - **Characters**: `CharFetch` 67, `CharStore` 24, `I_CharStore` 4, `ChPoss` 107, `Mastery`
   71, `ExperiencePlus` 33, `WhereIsChar` 61, `IsCarried` 35, `PartyFetch` 36,
   `CharNameFetch` 3, `CountInjury` 1, `CausePoison` 1, `I_CausePoison` 6. `SwapCharacter` 7
-  and `I_SwapCharacter` 4 need G3, and `WhoHasTalent` 5, `TalentsFetch` 2 and
-  `TalentsStore` 2 need G4's `talents`.
+  and `I_SwapCharacter` 4 need G3. `WhoHasTalent` 5, `TalentsFetch` 2 and
+  `TalentsStore` 2 read and write `Champion.talents`, which `AddCharacter` reads off the
+  hero text.
 - **Objects**: `GetCharges` 32, `SetCharges` 45, `GetCurse` 6, `SetCurse` 3, `GetBroken` 3,
   `SetBroken` 3, `GetPoisoned` 4, `GetSubType` 24, `SetSubType` 11, `MissileInfoFetch` 2,
   `MissileInfoStore` 2, `Throw` 1, `I_Throw` 14, `Cast` 2, `I_Cast` 2, `FilteredCast` 3,
@@ -460,20 +432,12 @@ fills the wings: `STKOP_SwapCharacter` (`DSA.cpp:4413-4419`) is the one caller o
 and every `SaveToWings`. Nothing in the retail game removes a living champion from the
 party. Conflux does: `SwapCharacter` 7 times and `I_SwapCharacter` 4 (G1).
 
-### G4 ⏳ Custom-dungeon extensions: `talents`, malformed heroes, external portraits, the monster design options
+### G4 ⏳ Custom-dungeon extensions: external portraits, the monster design options
 
-- `pcA3->talents`, which `Champion` has no field for. `AddCharacter` decodes it from the
-  hero text (`Character.cpp:688`), and only a DSA reads it (`DSA.cpp:4220`, `:4287`,
-  `:4337`);
-- the `legalHero` fallback (`Character.cpp:475`), which clamps an out-of-range hero text
-  and retries it against "BOGUS / ILLEGAL HERO", where `HeroExtractor` rejects it
-  outright;
-- external portraits for `charID > 23`.
-
-No shipped DM hero touches any of these. Conflux does: its DSAs read and write `talents`
-(G1), and three of the 22 heroes `HeroExtractor` reads from it have portraits 274, 275 and
-276, which come from `CSBgraphics.dat` (G24). Whether it rejected a malformed one is not
-checked.
+**External portraits** for `charID > 23` (`GetExternalPortraitAddress`,
+`doc/CSBwin-src/Character.cpp:498-508`). No shipped DM hero has one. Conflux does: three
+of the 22 heroes `HeroExtractor` reads from it have portraits 274, 275 and 276, which come
+from `CSBgraphics.dat` (G24).
 
 **A file matter, off Conflux's path.** `MakeBigActuators` reads each actuator's type before
 the byte swap, so CSBWin takes bits 8-14 of `word2` for it where the port takes the type

@@ -130,6 +130,26 @@ Reached from a wall click on actuator type **127** whose state lacks `PORTRAIT_I
    `'Z'` or 0xff): `reincarnateAttributePenalty` (fallback 2 above 16),
    `reincarnateStatPenalty` (fallback 8) and `randomPoints` (fallback 3). All 24
    shipped DM heroes stop at the skills, so all three take their fallbacks.
+
+   Each attribute is two letters, held at 224 above it (`:641-656`). A skill letter
+   `'A'` leaves the skill empty, `'B'`..`'R'` give levels 1 to 17 (`125 << level`), and
+   anything else is illegal (`:661-680`; `neophyteSkills`, which would let `'A'` set
+   125, is only set by a recording's playback, `data.cpp:90`). `talents` is the eight
+   letters after `randomPoints`, read with truncation allowed (`:688`): a NUL ends it
+   early, and since `DecodeCharacterValue` shifts before it tests a letter, "AB" cut
+   short reads 0x10. A text that ends at the skills gives 0.
+
+   An illegal text is read no further in effect: `for (illegalHero=true; illegalHero;
+   A2=legalHero)` reads `legalHero` in its place ("BOGUS", "ILLEGAL HERO", male, 17
+   health, stamina and mana, every attribute 1, every skill at level 2), and that pass
+   writes every field again. The escapes in the text are graphics.dat's (`d.Byte10016`
+   after code 30), so the same `dungeon.dat` text can read differently under another
+   data set's graphics: 1.3-fr's SYRA is "L}ENFANT DE SAUVAGE", nineteen characters.
+
+   The port reads the text at the click, as here: `HallOfChampions.heroTextInPartyCell`
+   and `readHeroText` (`src/engine/AddCharacter.ts`). `extractPresetHeroes`
+   (`src/data/HeroExtractor.ts`) does the same reading ahead of play for the tools,
+   checked by `tools/dump-preset-heroes.ts`.
 7. Sets `d.PotentialCharacterOrdinal = NumCharacter + 1` and increments `NumCharacter`
    (`:704-705`) — the champion is *provisionally* in the party.
 8. Collects every object in the **mirror's** cell (the cell in front, at the opposite

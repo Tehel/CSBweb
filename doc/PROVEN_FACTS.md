@@ -242,6 +242,12 @@ Escape code tables used by `DecodeText()` live in graphics.dat item `0x22f` (Dat
 - `Byte10336[256]`: escape code 2 table for wall texts (`typeOfText == 0`)
 - `Byte10016[256]`: escape code 2 table for non-wall texts
 
+A hero text goes through the same tables: `AddCharacter` decodes it with
+`DecodeText(…, 0x8002, 990)` (`doc/CSBwin-src/Character.cpp:544-547`). In `dm-atari-1.3-fr`
+SYRA's title is "L}ENFANT DE SAUVAGE": its `%H` is that set's `Byte10016` entry H, "}",
+and the title is nineteen characters, the most `AddCharacter` accepts (`:580`). Shown by
+`tools/dump-preset-heroes.ts`, which also recruits SYRA from the mirror in that game.
+
 Every text goes through the escape tables, whatever its type (`CSBCode.cpp:5559-5574`),
 the text the party finds on a square it enters included: `PlaceOrRemoveObjectInRoom`
 decodes it with `DecodeText(text, …, 1, 990)` and queues it with `QuePrintLines(15, text)`

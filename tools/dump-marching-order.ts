@@ -28,7 +28,7 @@ import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/ren
 import { type UIState } from '../src/renderer/ui/UIState';
 import { drawPartyStatus, drawPositionSquare } from '../src/renderer/ui/Character';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
 import { newUIState } from './lib/ui';
 import * as mouse from '../src/renderer/ui/Mouse';
 
@@ -54,7 +54,7 @@ async function main(): Promise<void> {
   // Three of the Hall of Champions' heroes, at positions 0, 1 and 2, all facing west
   // while the party faces north, so a champion put down visibly turns.
   const party = new Party(new Position(1, 1, 0), Direction.NORTH);
-  const heroes = data.presetHeroes ?? [];
+  const heroes = presetHeroesOf(data, graphics);
   for (let i = 0; i < 3; i++) {
     const champion = createChampionFromPreset(heroes[i], i, assignPresetHeroPossessions(heroes[i].inventory, addTables));
     champion.facing = Direction.WEST;

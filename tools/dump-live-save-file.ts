@@ -60,11 +60,12 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/engine/CsbwinSaveGame';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { objectIndexOf } from '../src/data/CsbwinObjectIndex';
-import type { Databases, DungeonData, PresetHero } from '../src/data/dungeonTypes';
+import type { Databases, DungeonData } from '../src/data/dungeonTypes';
+import type { PresetHero } from '../src/data/HeroExtractor';
 import { Game } from '../src/engine/Game';
 import { MovementAction } from '../src/engine/gameTypes';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
-import { newGame } from './lib/game';
+import { newGame, presetHeroesOfGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { savePath } from './lib/saves';
 
@@ -115,7 +116,7 @@ function cellObjects(game: Game, cell: Position): ObjectID[] {
 }
 
 function heroByName(game: Game, name: string): PresetHero | null {
-  return (game.ctx.dungeon.getData().presetHeroes ?? []).find((h) => h.name === name) ?? null;
+  return presetHeroesOfGame(game).find((h) => h.name === name) ?? null;
 }
 
 /** Walk up to a mirror, click it and confirm — a player recruiting a champion. */

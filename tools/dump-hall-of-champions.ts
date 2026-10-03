@@ -27,14 +27,15 @@ import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type Object
 import { getActuatorType } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import type { DungeonData, PresetHero } from '../src/data/dungeonTypes';
+import type { DungeonData } from '../src/data/dungeonTypes';
+import type { PresetHero } from '../src/data/HeroExtractor';
 import { Game } from '../src/engine/Game';
 import { attributeCurrent, attributeMaximum, attributeMinimum } from '../src/engine/attributes';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import { attackButtonRect, drawAttackButton } from '../src/renderer/ui/Attack';
 import { ImageFormat } from '../src/core/imageDecoder';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOfGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, fail, finish } from './lib/check';
 
@@ -181,7 +182,7 @@ function attackHandShaded(game: Game, chIdx: number): boolean {
 }
 
 function heroByName(game: Game, name: string): PresetHero {
-  const hero = (game.ctx.dungeon.getData().presetHeroes ?? []).find((h) => h.name === name);
+  const hero = presetHeroesOfGame(game).find((h) => h.name === name);
   if (!hero) throw new Error(`no preset hero named ${name}`);
   return hero;
 }
@@ -588,6 +589,8 @@ function edgeDecorationSection(): void {
  */
 function portraitSection(): void {
   const probe = makeGame();
+  // Read before the probe recruits: a recruit disables its mirror.
+  const shippedHeroes = presetHeroesOfGame(probe);
   const graphics = sharedGraphics;
   if (!graphics) {
     fail('graphics.dat was not retained; the portrait section cannot run');
@@ -677,7 +680,7 @@ function portraitSection(): void {
   check(decorationAfter !== 0, 'but the picture frame is still drawn — it comes from wallGraphicOrdinal');
 
   // Every shipped hero must be addressable inside the sheet.
-  const heroes = probe.ctx.dungeon.getData().presetHeroes ?? [];
+  const heroes = shippedHeroes;
   const outOfRange = heroes.filter((h) => h.portraitIndex > 23);
   console.log(`shipped heroes: ${heroes.length}, portrait indices ${Math.min(...heroes.map((h) => h.portraitIndex))}..${Math.max(...heroes.map((h) => h.portraitIndex))}`);
   check(outOfRange.length === 0,

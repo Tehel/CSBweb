@@ -29,7 +29,7 @@ import { DsaSystem } from '../src/engine/DsaSystem';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { Party } from '../src/engine/Party';
-import { graphicsTablesOf, newContext } from './lib/game';
+import { graphicsTablesOf, newContext, presetHeroesOf } from './lib/game';
 import { check, finish } from './lib/check';
 
 const SKILL = 8;
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
     carryLocation: uiTables.graphic232.carryLocation,
     objDescWord4: objectTables.objDescWord4,
   };
-  const heroes = data.presetHeroes ?? [];
+  const heroes = presetHeroesOf(data, graphics);
   if (heroes.length < 3) throw new Error('dungeon.dat carries fewer than three preset heroes');
 
   // Three champions whose cells are deliberately not their indices: index 0 stands in

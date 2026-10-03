@@ -32,7 +32,6 @@ import type {
 } from './dungeonTypes';
 import { ExpandData } from '../core/compression';
 import { readU16BE, readU32BE } from '../core/bytes';
-import { extractPresetHeroes } from './HeroExtractor';
 import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
 import { readExtendedFeatures } from './CsbwinExtendedFeatures';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
@@ -285,10 +284,6 @@ export class DungeonLoader {
             CheckCelltypes(data);
             if (!this.options.expandedPortraits) ExtendPortraits(data);
         }
-
-        // After the conversion, so a preset hero's text is looked up the same way every
-        // other text record's is, and its objects are slots.
-        if (!this.options.noConvert) data.presetHeroes = extractPresetHeroes(data);
 
         this.data = data;
 

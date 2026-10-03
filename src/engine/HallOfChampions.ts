@@ -10,7 +10,7 @@
  * Moved out of `Game` by E2; `ActuatorSystem`'s mirror click reaches it as
  * `ctx.systems.hallOfChampions`.
  */
-import type { ActuatorRecord, DatabaseRecord, PresetHero } from '../data/dungeonTypes';
+import type { ActuatorRecord, DatabaseRecord } from '../data/dungeonTypes';
 import {
   PORTRAIT_INACTIVE,
   blocksDisables,
@@ -22,8 +22,10 @@ import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '
 import {
   assignAddCharacterPossessions,
   computeChampionFingerprint,
-  createChampionFromPreset,
+  createChampionFromHeroText,
   findFreeCharPosition,
+  readHeroText,
+  type HeroText,
   type AddCharacterItem,
   type AddCharacterTables,
 } from './AddCharacter';
@@ -49,7 +51,7 @@ export class HallOfChampions {
    * `AddCharacter` fills in while parsing the hero text and
    * `_ResurrectReincarnateCancel` reads back. Same lifetime here.
    */
-  private reincarnationSource: PresetHero | null = null;
+  private reincarnationSource: HeroText | null = null;
 
   constructor(private readonly ctx: GameContext) {
     this.addCharacterTables = { objDescWord4: ctx.tables.objDescWord4, carryLocation: ctx.tables.carryLocation };
@@ -83,7 +85,7 @@ export class HallOfChampions {
    * here — `potentialChampionIndex` marks them, and
    * `resurrectReincarnateCancel` either confirms or undoes it.
    */
-  addCharacter(charID: number, mirrorCell: Position, wall: number): boolean {
+  addCharacter(charID: number): boolean {
     const party = this.ctx.party.state;
     // `if (d.EmptyHanded == 0) return; if (d.NumCharacter == 4) return;` (`:477-479`)
     if (party.objectInHand !== OBJECT_ID_NULL) return false;
@@ -92,13 +94,17 @@ export class HallOfChampions {
     // champion that `_ResurrectReincarnateCancel` can no longer reach.
     if (party.potentialChampionIndex >= 0) return false;
 
-    const hero = this.findHeroForMirror(charID, mirrorCell, wall);
-    if (!hero) return false;
+    // `:535-549`: the first `dbTEXT` in the party's cell, read through `DecodeText`, or
+    // `legalHero` when there is none. The penalties it gives wait for
+    // `_ResurrectReincarnateCancel`, as CSBWin's globals do.
+    const hero = readHeroText(this.heroTextInPartyCell());
+    this.reincarnationSource = hero;
 
     const index = party.champions.length; // LOCAL_2
     const possessions = emptyPossessions();
-    const champion = createChampionFromPreset(
+    const champion = createChampionFromHeroText(
       hero,
+      charID,
       findFreeCharPosition(party.champions, party.facing),
       possessions,
     );
@@ -106,7 +112,6 @@ export class HallOfChampions {
     // the champion stands in is chosen above, but they face the way the party does.
     champion.facing = party.facing;
     champion.damageFromDirection = party.facing;
-    champion.portraitGraphic = charID;
     champion.fingerprint = computeChampionFingerprint(
       party.champions,
       party.position.z,
@@ -116,8 +121,7 @@ export class HallOfChampions {
     // `(STRandom() & 0xff) + 1500` twice (`:533-534`).
     champion.food = (this.ctx.random.next() & 0xff) + 1500;
     champion.water = (this.ctx.random.next() & 0xff) + 1500;
-    // `if (pcA3->HP() == 0) return;` (`:703`) — a hero text that failed every
-    // validation pass, including the `legalHero` fallback.
+    // `if (pcA3->HP() == 0) return;` (`:703`): a text whose health reads zero.
     if (champion.attributes.maxHealth === 0) return false;
 
     if (!this.ctx.party.addChampion(champion)) return false;
@@ -372,26 +376,22 @@ export class HallOfChampions {
   }
 
   /**
-   * The hero whose text `AddCharacter` would read. CSBWin takes the first `dbTEXT` in
-   * the **party's own** cell; `HeroExtractor` has already decoded every one of them at
-   * load time, keyed by the mirror that faces it, so the mirror's cell and wall
-   * identify the same text.
+   * The hero text `AddCharacter` reads (`doc/CSBwin-src/Character.cpp:535-549`): the
+   * first `dbTEXT` in the party's own cell, at any corner, as `DecodeText(…, 0x8002, 990)`
+   * makes it with the game's escape tables. Null when the cell holds none.
    */
-  private findHeroForMirror(charID: number, mirrorCell: Position, wall: number): PresetHero | null {
-    const heroes = this.ctx.state.dungeon.presetHeroes ?? [];
-    const exact = heroes.find((hero) =>
-      hero.location.map === mirrorCell.z
-      && hero.location.x === mirrorCell.x
-      && hero.location.y === mirrorCell.y
-      && hero.location.wall === wall
-    );
-    if (exact) {
-      this.reincarnationSource = exact;
-      return exact;
+  private heroTextInPartyCell(): Uint8Array | null {
+    const dungeon = this.ctx.dungeon;
+    for (
+      let rn = dungeon.findFirstObject(this.ctx.party.state.position);
+      rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
+      rn = dungeon.getDBRecordLink(rn)
+    ) {
+      if (dungeon.rnMaps.dbType(rn) !== DBType.TEXT) continue;
+      const record = dungeon.getTextRecord(rn);
+      return record ? dungeon.decodeTextBytes(record, 0x8002, 990, this.ctx.tables.textDecode) : null;
     }
-    const byPortrait = heroes.find((hero) => hero.portraitIndex === charID) ?? null;
-    this.reincarnationSource = byPortrait;
-    return byPortrait;
+    return null;
   }
 
   /** The database record behind an object id, for the categories `AddCharacter` sorts on. */

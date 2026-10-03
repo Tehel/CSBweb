@@ -34,7 +34,7 @@ import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { getChampionPossession, type Champion, type PartyState } from '../src/engine/gameTypes';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { handleClothingClick } from '../src/renderer/ui/Mouse';
@@ -82,7 +82,7 @@ async function main(): Promise<void> {
   };
 
   // Four real preset heroes, each carrying something, one per box.
-  const heroes = (data.presetHeroes ?? []).filter((h) => (h.inventory?.length ?? 0) > 0);
+  const heroes = presetHeroesOf(data, graphics).filter((h) => (h.inventory?.length ?? 0) > 0);
   if (heroes.length < 4) throw new Error('dungeon.dat carries fewer than four equipped preset heroes');
   // The game's own party, so that the inventory click reaches its systems.
   const game = newGame(data, graphics);

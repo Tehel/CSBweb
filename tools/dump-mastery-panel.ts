@@ -64,7 +64,7 @@ import { drawInventoryScreen, drawObjectInfoPanel } from '../src/renderer/ui/Inv
 import { getObjectDisplayName, getObjectName, resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { OBJNI_EMPTY_FLASK, OBJNI_WATER_FLASK } from '../src/core/objectNameIndex';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 
@@ -161,7 +161,7 @@ async function main(): Promise<void> {
   console.log('');
 
   // ---------------------------------------------------------------- a real champion
-  const heroes = (data.presetHeroes ?? []).filter((h) => (h.inventory?.length ?? 0) > 0);
+  const heroes = presetHeroesOf(data, graphics).filter((h) => (h.inventory?.length ?? 0) > 0);
   if (heroes.length < 1) throw new Error('dungeon.dat carries no equipped preset hero');
   const addTables: AddCharacterTables = {
     carryLocation: uiTables.graphic232.carryLocation,

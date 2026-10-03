@@ -22,7 +22,7 @@ import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { DungeonState } from '../src/engine/DungeonState';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import { Party } from '../src/engine/Party';
-import { graphicsTablesOf, newContext } from './lib/game';
+import { graphicsTablesOf, newContext, presetHeroesOf } from './lib/game';
 import { check, finish } from './lib/check';
 
 const OBJNI_CHEST = 0x90;
@@ -40,7 +40,7 @@ async function main(): Promise<void> {
     carryLocation: uiTables.graphic232.carryLocation,
     objDescWord4: objectTables.objDescWord4,
   };
-  const heroes = data.presetHeroes ?? [];
+  const heroes = presetHeroesOf(data, graphics);
   if (heroes.length < 2) throw new Error('dungeon.dat carries fewer than two preset heroes');
 
   const dungeon = new DungeonState(data);

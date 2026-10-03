@@ -41,7 +41,7 @@ import { determineMastery } from '../src/engine/skills';
 import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
-import { graphicsTablesOf, newGame, runVbl } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOfGame, runVbl } from './lib/game';
 import { newUIState } from './lib/ui';
 import { wakeUp } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
@@ -293,7 +293,7 @@ async function main(): Promise<void> {
     // SYRA: Wisdom 43 and Wizard + Priest mastery 7 awake. Asleep the roll is
     // `random112 < 1 + 1 + 43`, so the r = 48 step (Time 0x180) gives no mana; with her
     // real levels it would (48 < 50). That step is the canary.
-    const syraHero = game.ctx.dungeon.getData().presetHeroes?.find((h) => h.name === 'SYRA');
+    const syraHero = presetHeroesOfGame(game).find((h) => h.name === 'SYRA');
     check(syraHero !== undefined, 'SYRA is a preset hero');
     if (syraHero) {
       wakeUp(game.ctx);
