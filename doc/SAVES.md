@@ -25,6 +25,14 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   answers "CANNOT SAVE NOW". A
   `.dmweb.json`, the JSON wrapper earlier builds wrote around such a file, is not read:
   the store's upgrade kept of each the file it carried as `raw`.
+- **A file the port wrote before its RNs were CSBWin's slots is mended as it is read**
+  (`mendDoorZero`, `src/data/CsbwinDungeonImage.ts`). That writer left slot 0 of the maps
+  free, `0xff`/`0xffff`, where CSBWin's is `0`/`0`, and wrote door 0 in corner 0, the
+  packed RN 0, as 0. Every save of DM's it made holds such a 0 where a chain begins on
+  level 0, and `checkIndirectIndex` refuses it, so CSBWin cannot read the file either.
+  A file with that slot 0 has each 0 that goes on a chain read as door 0's slot, 1, in
+  memory: the stored row and an exported file stay as they were, and the next save of
+  the game is CSBWin's.
 - **Every save is a row of IndexedDB** (`SaveRecord`, `src/data/saves/SaveStore.ts`): the
   file's bytes beside what the list needs. The level, the champions' names and the
   playthrough (below) are read from the file's own blocks when the row is written; the
@@ -304,6 +312,11 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
   party; its own id stamped back gives the file byte for byte; a CSBWin block stamped is
   what `ScrambleAndWrite` writes, and `mini.dat`'s 127 fold words that are not zero are
   kept.
+- **A file of the port's from before its RNs were slots**:
+  `tools/dump-port-save-before-slots.ts`, over `tools/fixtures/port/dmweb-before-slots.dat`,
+  a genuine save loaded and written again by that writer. It carries both marks, and
+  loads with every cell's chain naming the genuine save's records and corners, its party,
+  and a save after 300 ticks that has CSBWin's slot 0 and reads back.
 - **The playthrough a file that names none joins**: "the list" (which save is joined).
 - **F5's slot and F9's choice**: "the list" (which row is the slot), "the one save call"
   (a second F5 writes over the first, and SAVE does not) and "one store, two data sets"
