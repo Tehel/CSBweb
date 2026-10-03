@@ -259,8 +259,17 @@ The split:
   `csb` set's `mini.dat` fetched, the result stored as a row of the `csb` set, and a
   refusal's message shown. The new row is named after the source save's, with `-csb`
   after it (the author's decision; CSBWin names it after the slot the player picks,
-  `CSBGAME.DAT` to `CSBGAME4.DAT`, in `_TAG000ede`, `Chaos.cpp:1467-1541`). Where the
-  control lives is still to settle with the author. The new file's `RandomGameID` is the source's with its first byte one higher (the
+  `CSBGAME.DAT` to `CSBGAME4.DAT`, in `_TAG000ede`, `Chaos.cpp:1467-1541`). The control
+  is the author's decision: a third button on CSB's entrance, under PRISON and RESUME,
+  labelled RISE. It is drawn from the entrance graphic itself (graphic 4 of the `csb`
+  set): the carved R, I and S of PRISON and E of RESUME, and a gem like theirs, on the
+  bare rock below them, and is clicked through one more entry in the door's button list
+  (`MISSING_PRISON_DOOR_BUTTONS`, `src/renderer/intro/PrisonDoor.ts`). Only the `csb`
+  set, which has a `mini.dat`, shows it, so DM's entrance and the golden frames do not
+  move. RISE opens the entrance's chooser over every data set's saves, a prison save
+  or a DM one; a refusal shows CSBWin's message in the entrance's one-button menu; a
+  new adventure is stored and the game starts in it at once, where CSBWin's player
+  goes back to the door and resumes it. The new file's `RandomGameID` is the source's with its first byte one higher (the
   `LoadLong` slip), so it is a playthrough of its own.
 - **⏳ Step 1, the prison's party.** Trace where the prison has the champions chosen,
   and that its save is one the engine takes (its `Word22592` is 12, which the check
