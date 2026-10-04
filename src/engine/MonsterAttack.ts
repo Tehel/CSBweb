@@ -37,7 +37,7 @@ import { TimerFunction } from './TimerQueue';
 
 /**
  * The missile "projectile" RNs a monster can throw (`doc/CSBwin-src/CSBTypes.h`, used
- * at `doc/CSBwin-src/Monster.cpp:1029-1074`). Re-exported for the callers that used to
+ * at `doc/CSBwin-src/Monster.cpp:1041-1076`). Re-exported for the callers that used to
  * take them from here; the values live in `src/core/spellRn.ts`, which says why.
  */
 export {
@@ -62,11 +62,12 @@ const THROWABLE: ReadonlySet<number> = new Set([
 ]);
 
 /**
- * `attackParameters` (`doc/CSBwin-src/Monster.cpp:919-941`).
+ * `ATTACK_PARAMETERES` (`doc/CSBwin-src/Monster.cpp:917-938`), twenty longwords.
  *
  * Kept as one block because the Monster Attack Filter DSA is handed the whole thing
  * and may rewrite any field before it is acted on
- * (`doc/CSBwin-src/Monster.cpp:1160-1166`).
+ * (`doc/CSBwin-src/Monster.cpp:1125-1171`). The two flags are CSBWin's `i32`s, tested
+ * against 0, and `missileType` its `ui32`, so a value the filter writes is kept as written.
  */
 export interface AttackParameters {
   monsterID: number;
@@ -82,9 +83,9 @@ export interface AttackParameters {
   missileDecayRate: number;
   directionToParty: number;
   distanceToParty: number;
-  missileType: ObjectID;
-  monsterShouldLaunchMissile: boolean;
-  monsterShouldSteal: boolean;
+  missileType: number;
+  monsterShouldLaunchMissile: number;
+  monsterShouldSteal: number;
   /** 0-3 a specific champion, 4 the leader, 5 random, 6 closest, -1 none. */
   heroToDamage: number;
   attackSoundOrdinal: number;
@@ -98,10 +99,16 @@ export class MonsterAttack {
   private readonly random: CsbRandom;
 
   /**
-   * `attackParameters`, the file-scope block `MonsterAttacks` fills
-   * (`doc/CSBwin-src/Monster.cpp:917-938`): the last attack's, `null` before the first.
+   * `attackParameters`, the file-scope block `MonsterAttacks` fills in place
+   * (`doc/CSBwin-src/Monster.cpp:917-938`), zeroes before the first attack. An attack
+   * writes every field again but `disableTime`, which no C++ reads.
    */
-  attackParameters: AttackParameters | null = null;
+  readonly attackParameters: AttackParameters = {
+    monsterID: 0, monsterType: 0, monsterIndex: 0, monsterLevel: 0, monsterX: 0, monsterY: 0,
+    monsterPos: 0, missileOriginPosition: 0, missileRange: 0, missileDamage: 0, missileDecayRate: 0,
+    directionToParty: 0, distanceToParty: 0, missileType: 0, monsterShouldLaunchMissile: 0,
+    monsterShouldSteal: 0, heroToDamage: 0, attackSoundOrdinal: 0, disableTime: 0, supressPoison: 0,
+  };
 
   constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
@@ -143,22 +150,22 @@ export class MonsterAttack {
     const desc = this.ctx.tables.monsterDesc[monster.creatureType];
     if (!desc) return false;
 
-    const p = this.buildAttackParameters(
-      monsterRn, monster, slot, desc, mapX, mapY, monsterIndex, context,
-    );
-    this.attackParameters = p;
+    if (!this.fillAttackParameters(monsterRn, monster, slot, desc, mapX, mapY, monsterIndex, context)) {
+      return false;
+    }
 
     // `MonsterAttackFilter`, the DSA that may rewrite the whole block, is not ported
     // (DEBT.md G2).
-    const amended = p;
+    const amended = this.attackParameters;
 
-    if (amended.monsterShouldLaunchMissile) {
+    if (amended.monsterShouldLaunchMissile !== 0) {
       if (THROWABLE.has(amended.missileType)) {
-        // `LaunchMissile` as a monster calls it (`doc/CSBwin-src/Monster.cpp:1194-1203`).
-        // The projectile is the spell RN itself (`RNFireball` and friends): a spell has
-        // no record behind it, so nothing is built for it.
+        // `LaunchMissile` as a monster calls it (`doc/CSBwin-src/Monster.cpp:1194-1203`),
+        // on `(RNVAL)attackParameters.missileType` (`:1188`). The projectile is the spell
+        // RN itself (`RNFireball` and friends): a spell has no record behind it, so
+        // nothing is built for it.
         this.ctx.systems.magic.launchMissile(
-          amended.missileType,
+          amended.missileType as ObjectID,
           amended.monsterX,
           amended.monsterY,
           context.level,
@@ -193,7 +200,7 @@ export class MonsterAttack {
           return false;
       }
 
-      if (amended.monsterShouldSteal) {
+      if (amended.monsterShouldSteal !== 0) {
         this.stealFromCharacter(monster, chIdx);
       } else {
         const dealt = 1 + this.monsterDamagesCharacter(monster, chIdx, amended.supressPoison === 1);
@@ -260,13 +267,17 @@ export class MonsterAttack {
   }
 
   /**
-   * Fill in the attack parameter block (`doc/CSBwin-src/Monster.cpp:980-1160`).
+   * Fill in the attack parameter block (`doc/CSBwin-src/Monster.cpp:986-1122`), field by
+   * field in CSBWin's order, which is the order of its random draws: whether to launch,
+   * then which missile, then whom to hit, then the range. False where CSBWin returns
+   * false (`:1092`): a `word2Bit4` monster that finds no live champion, before the range
+   * is drawn.
    *
    * The one piece of real geometry here is `missileOriginPosition`: which corner of
    * the cell the attack comes from. It is the attacking member's own corner, rotated
    * so that "right-hand side of the group as seen facing the party" comes out right.
    */
-  private buildAttackParameters(
+  private fillAttackParameters(
     monsterRn: ObjectID,
     monster: CreatureRecord,
     slot: Item16Record,
@@ -275,42 +286,33 @@ export class MonsterAttack {
     mapY: number,
     monsterIndex: number,
     context: { level: number; primaryDirectionToParty: number; orthogonalDistanceToParty: number },
-  ): AttackParameters {
-    const positionsByte = slot.positions & 0xff;
-    const monsterPos = (positionsByte >> (2 * monsterIndex)) & 0x3;
-    const directionToParty = context.primaryDirectionToParty;
+  ): boolean {
+    const p = this.attackParameters;
+    p.supressPoison = -1;
+    p.monsterType = monster.creatureType;
+    p.monsterIndex = monsterIndex;
+    p.monsterLevel = context.level;
+    p.monsterID = monsterRn;
+    p.directionToParty = context.primaryDirectionToParty;
+    p.distanceToParty = context.orthogonalDistanceToParty;
 
+    const positionsByte = slot.positions & 0xff;
+    p.monsterPos = (positionsByte >> (2 * monsterIndex)) & 0x3;
     const rightSideMonster =
       positionsByte === 255
         ? this.random.bool()
-        : ((monsterPos + 5 - directionToParty) & 2) / 2;
+        : ((p.monsterPos + 5 - p.directionToParty) & 2) / 2;
+    p.missileOriginPosition = (rightSideMonster + p.directionToParty) & 0x3;
+    p.monsterX = mapX;
+    p.monsterY = mapY;
 
-    const p: AttackParameters = {
-      monsterID: monsterRn,
-      monsterType: monster.creatureType,
-      monsterIndex,
-      monsterLevel: context.level,
-      monsterX: mapX,
-      monsterY: mapY,
-      monsterPos,
-      missileOriginPosition: (rightSideMonster + directionToParty) & 0x3,
-      missileRange: 0,
-      missileDamage: desc.dexterity12,
-      missileDecayRate: 8,
-      directionToParty,
-      distanceToParty: context.orthogonalDistanceToParty,
-      missileType: this.chooseMissile(monster.creatureType),
-      // Only monsters whose `word14_12_15` is above 1 throw anything, and then only
-      // at range or on a coin toss (doc/CSBwin-src/Monster.cpp:1025-1027).
-      monsterShouldLaunchMissile:
-        monsterWord14_12_15(desc) > 1 &&
-        (context.orthogonalDistanceToParty > 1 || this.random.bool() !== 0),
-      monsterShouldSteal: monster.creatureType === MonsterType.mon_Giggler,
-      heroToDamage: -1,
-      attackSoundOrdinal: desc.attackSound,
-      disableTime: 0,
-      supressPoison: -1,
-    };
+    // Only monsters whose `word14_12_15` is above 1 throw anything, and then only
+    // at range or on a coin toss (doc/CSBwin-src/Monster.cpp:1035-1037).
+    p.monsterShouldLaunchMissile =
+      monsterWord14_12_15(desc) > 1 &&
+      (context.orthogonalDistanceToParty > 1 || this.random.bool() !== 0) ? 1 : 0;
+    p.missileType = this.chooseMissile(monster.creatureType);
+    p.monsterShouldSteal = monster.creatureType === MonsterType.mon_Giggler ? 1 : 0;
 
     // `word2Bit4` monsters hit a *random* live champion rather than the nearest.
     if (monsterWord2Bit4(desc)) {
@@ -321,22 +323,25 @@ export class MonsterAttack {
         tries++;
       }
       // CSBWin's own comment: "For four years we didn't increment heroToDamage!"
-      if (tries === 4) p.heroToDamage = -1;
-      else p.heroToDamage = target;
+      p.heroToDamage = target;
+      if (tries === 4) return false;
     } else {
       p.heroToDamage = this.getCharacterToDamage(mapX, mapY, p.missileOriginPosition);
     }
+
+    p.attackSoundOrdinal = desc.attackSound;
 
     // `attack10 / 4 + 1`, then two rounds of `+= Random(range)`.
     let range = Math.trunc(desc.attack10 / 4) + 1;
     range += this.random.below(range);
     range += this.random.below(range);
     p.missileRange = range;
-
-    return p;
+    p.missileDamage = desc.dexterity12;
+    p.missileDecayRate = 8;
+    return true;
   }
 
-  /** Which missile a given monster type throws (`doc/CSBwin-src/Monster.cpp:1029-1058`). */
+  /** Which missile a given monster type throws (`doc/CSBwin-src/Monster.cpp:1041-1076`). */
   private chooseMissile(monsterType: number): ObjectID {
     switch (monsterType) {
       case MonsterType.mon_Vexirk:

@@ -127,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C132 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C133 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -341,12 +341,9 @@ filter, the feeding filter, the character death and damage filters, the equip fi
 the party move filter, are paid. The
 steps left, one commit each:
 
-7. **`ESL_MONSTERATTACKFILTER`** (M). `MonsterAttackFilter`, the DSA at
-   `Monster.cpp:1166`, which may rewrite a monster attack's whole parameter block
-   (`MonsterAttack.ts:146`). CSBWin's block is a file-scope global (`Monster.cpp:917-938`),
-   and `MonsterAttacks` never writes its `disableTime`, which no C++ reads, so a filter
-   sees the value the last filter left there. The port builds a fresh block each attack,
-   with `disableTime` 0.
+7. **`ESL_MONSTERATTACKFILTER`** (M). The DSAs at `Monster.cpp:1125-1171`, which may
+   rewrite a monster attack's whole parameter block (`MonsterAttack.ts:157`), the port's
+   `attackParameters`, kept from one attack to the next as CSBWin's file-scope global is.
 8. **`ESL_DELETEMONSTERFILTER`** (M). `ProcessMonsterDeleteFilter`
    (`Code11f52.cpp:926`, the DSA at `:1013`). It counts each kill in `expool`'s statistics
    and runs its DSA, which may set `deathCloud` and `dropResidue`. CSBWin calls it from

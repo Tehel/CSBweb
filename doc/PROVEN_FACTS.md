@@ -1297,7 +1297,7 @@ stream from CSBWin's even though no state changes. Ported as written.
 `doc/CSBwin-src/Monster.cpp:944` does not deal damage directly. It fills in an
 `attackParameters` block — target, missile or melee, which missile, range, damage, sound —
 hands the whole block to the Monster Attack Filter DSA, which may rewrite any field
-(`:1160-1166`), and only then acts on it. That is why the parameters are a struct rather
+(`:1125-1171`), and only then acts on it. That is why the parameters are a struct rather
 than locals, and why the port keeps them as one object.
 
 Two ways a target is chosen. A `word2Bit4` monster picks a *random* live champion, walking
@@ -1305,12 +1305,19 @@ forward from `STRandom0_3()` until it finds one; everything else uses
 `GetCharacterToDamage`, which only reaches the party when adjacent
 (`doc/CSBwin-src/CSBCode.cpp:6899`) and takes the first live champion in the order
 `Byte586` gives for that side. CSBWin's comment on the random path is worth keeping: "For
-four years we didn't increment heroToDamage!"
+four years we didn't increment heroToDamage!" When the walk finds no live champion,
+`MonsterAttacks` returns false on the spot (`doc/CSBwin-src/Monster.cpp:1092`): no filter,
+no missile, no blow, and the range is never drawn.
+
+The block is filled in one order, which is the order of the random draws
+(`:986-1122`): the side of a group in a heap (`positions` 255), whether to launch, which
+missile, the random champion, then the range's two draws. So a Vexirk next to the party
+tosses for the launch before it tosses for a fireball. `tools/dump-monster-missile-type.ts`.
 
 ## Only some monsters throw, and each type throws its own thing
 
 `monsterShouldLaunchMissile` requires `word14_12_15 > 1` *and* either distance above 1 or a
-coin toss (`doc/CSBwin-src/Monster.cpp:1034-1036`) — so a thrower next to you sometimes
+coin toss (`doc/CSBwin-src/Monster.cpp:1035-1037`) — so a thrower next to you sometimes
 punches instead. The missile is fixed per type (`:1040-1075`): Vexirk and Lord Chaos roll
 between a fireball and one of four spells, Slime Devils spit poison, Flying Eyes throw
 lightning seven times in eight, Zytaz alternate poison cloud and fireball, Demons and

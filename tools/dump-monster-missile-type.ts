@@ -13,6 +13,11 @@
  * the group's cell gains a missile whose projectile is that RN. The same holds for a
  * champion's spell attack, through `LaunchObject` (`doc/CSBwin-src/Magic.cpp:449-462`).
  *
+ * The block is filled in CSBWin's order, which is the order of its random draws
+ * (`doc/CSBwin-src/Monster.cpp:1035-1076`): whether to launch, then which missile. And a
+ * `word2Bit4` monster that finds no live champion gives up there (`:1092`): no missile,
+ * no range drawn, and false.
+ *
  * Run: `npx tsx tools/dump-monster-missile-type.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -23,6 +28,7 @@ import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_POISON, RN_POISON_CLOUD, RN_ZO_SPELL,
 } from '../src/core/spellRn';
 import { DungeonLoader } from '../src/data/DungeonLoader';
+import type { Item16Record } from '../src/data/dungeonTypes';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
@@ -106,7 +112,6 @@ function main(): void {
       });
       const p = game.systems.monsterAttack.attackParameters;
       const name = MonsterType[rec.creatureType] ?? String(rec.creatureType);
-      if (!p) { check(false, `${name} attacked and left a parameter block`); continue; }
       console.log([
         level, rec.creatureType, name, `(${slot.uByte10},${slot.uByte11})`,
         p.monsterShouldLaunchMissile ? 1 : 0, hex(p.missileType),
@@ -144,6 +149,59 @@ function main(): void {
     ok === 1 && launched.length === 1 && launched[0] === RN_FIREBALL,
     `LaunchObject puts a champion's fireball in flight (launched: ${launched.map(hex).join(', ') || 'nothing'})`,
   );
+
+  // A group of the dungeon's made a Vexirk, which throws and hits a random champion
+  // (`word2Bit4`), at corner 0, so no coin toss picks its side.
+  let vexirk: { rn: ObjectID; slot: Item16Record; level: number } | null = null;
+  for (let level = 0; level < data.maps.length && !vexirk; level++) {
+    game.ctx.party.state.position = new Position(0, 0, level);
+    game.systems.monsters.loadPartyLevel(level);
+    const slot = dungeon.getItem16Pool().find((s) => s.word0 >= 0);
+    if (slot) vexirk = { rn: game.ctx.dungeon.rnMaps.rn(DBType.CREATURE, slot.word0), slot, level };
+  }
+  if (!vexirk) throw new Error('no group in the dungeon');
+  const vRec = dungeon.getCreatureRecordByIndex(vexirk.slot.word0)!;
+  vRec.creatureType = MonsterType.mon_Vexirk;
+  vexirk.slot.positions = 0;
+  const vCell = new Position(vexirk.slot.uByte10, vexirk.slot.uByte11, vexirk.level);
+  const random = game.ctx.random;
+  /** `attack` with `STRandomBool` giving `bools`, `STRandom0_3` `quarters`, then 0; the `STRandom(n)` draws. */
+  const scripted = (bools: number[], quarters: number[], attack: () => void): number => {
+    let belowDraws = 0;
+    random.bool = () => bools.shift() ?? 0;
+    random.zeroTo3 = () => quarters.shift() ?? 0;
+    random.below = () => { belowDraws++; return 0; };
+    try {
+      attack();
+    } finally {
+      delete (random as Partial<typeof random>).bool;
+      delete (random as Partial<typeof random>).zeroTo3;
+      delete (random as Partial<typeof random>).below;
+    }
+    return belowDraws;
+  };
+  const vexirkAttacks = (distance: number): boolean =>
+    game.systems.monsterAttack.monsterAttacks(vexirk.rn, vRec, vCell.x, vCell.y, 0, {
+      level: vexirk.level, primaryDirectionToParty: 0, orthogonalDistanceToParty: distance,
+    });
+
+  scripted([1, 0], [1, 0], () => vexirkAttacks(1));
+  const p = game.systems.monsterAttack.attackParameters;
+  console.log(`a Vexirk next to the party, tosses 1, 0 and quarters 1, 0: launch ${p.monsterShouldLaunchMissile}, missile ${hex(p.missileType)}`);
+  check(p.monsterShouldLaunchMissile === 1 && p.missileType === RN_LIGHTNING,
+    'the first toss decides the launch, the second and a quarter the missile: a lightning bolt');
+
+  const champions = game.ctx.party.state.champions;
+  const health = champions.map((c) => c.attributes.health);
+  for (const c of champions) c.attributes.health = 0;
+  const beforeDead = missilesIn(game, vCell);
+  let attacked = true;
+  const rangeDraws = scripted([1], [], () => { attacked = vexirkAttacks(2); });
+  const thrown = [...missilesIn(game, vCell)].filter(([m]) => !beforeDead.has(m)).length;
+  console.log(`a Vexirk at range, no champion alive: ${attacked}, ${thrown} missile(s), ${rangeDraws} range draw(s)`);
+  check(!attacked && thrown === 0 && rangeDraws === 0,
+    'a word2Bit4 monster that finds no live champion gives up: false, no missile, no range drawn');
+  champions.forEach((c, i) => { c.attributes.health = health[i]!; });
   finish();
 }
 
