@@ -256,6 +256,15 @@ level 0 at (9, 1), and three of its pieces are escapes: "IT IS TOO BAD YOU DID N
 THE TRUE SECRET OF THE FIRESTAFF. NOW THAT I HAVE IT I HAVE NO FURTHER NEED FOR YOU!"
 (`tools/dump-room-text.ts`).
 
+A timer shows a text too. `ProcessTT_OPENROOM` sets, clears or toggles a text's `show`
+bit, and when that shows a hidden text on the party's own square it decodes it with
+`DecodeText(…, 1, 990)` and queues it with `QuePrintLines(15, text)`, whatever
+`DecodeText` returns (`Timer.cpp:1712-1743`). A `TT_DESSAGE` or a parameter message
+leaves the square's texts alone (`:1715-1716`), and of its actuators reaches only the
+DSAs (`:1760-1761`). In `dm-atari/dungeon.dat` the floor actuator on level 0 at (1, 4)
+shows the text under it that way, "WELCOME BACK BRAVE ADVENTURERS."
+(`tools/dump-open-room-text.ts`).
+
 Every `DecodeText` ends in `SubstituteCharacterNames` (`CSBCode.cpp:5664-5667`,
 `:5367-5482`), which replaces three escapes written in the text's own letters: `.Q.A` is
 the champion holding the cursor (`d.HandChar`), `.Q.B` to `.Q.E` the first to fourth

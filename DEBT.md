@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C123 | A text a timer shows on the party's square is not printed | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
@@ -171,15 +170,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C123 ⏳ A text a timer shows on the party's square is not printed
-
-`ProcessTT_OPENROOM` sets, clears or toggles a text's `show` bit, and when that shows a
-hidden text on the party's own square, on the loaded level, it decodes it with
-`DecodeText(…, 1, 990)` and queues it with `QuePrintLines(15, text)`
-(`doc/CSBwin-src/Timer.cpp:1714-1743`). It leaves a text alone for `TT_DESSAGE` and
-`TT_ParameterMessage` (`:1715-1716`). The port's `processOpenRoom` only flips the bit
-(`applyTextVisibility`, `src/engine/TimerSystem.ts`), for every timer function. Whether
-the default dungeon shows a text that way is not measured; the fix's tool measures it.
 
 ---
 

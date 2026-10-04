@@ -63,6 +63,7 @@ const CHECKS = [
   { tool: 'dump-vbl-clock.ts' },
   { tool: 'dump-room-text.ts' },
   { tool: 'dump-text-substitution.ts' },
+  { tool: 'dump-open-room-text.ts' },
   { tool: 'dump-ninety-second-update.ts' },
   { tool: 'dump-light-level.ts' },
   { tool: 'dump-hall-of-champions.ts' },

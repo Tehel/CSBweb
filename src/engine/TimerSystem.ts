@@ -42,6 +42,7 @@ import {
 } from '../data/actuatorHelpers';
 import { MISSILE_FILTER_TIMER_INDEX, TimerFunction, type TimerEntry, TimerQueue } from './TimerQueue';
 import { AttackType } from './monsterTypes';
+import { MSG_COLOR_ROOM_TEXT } from './ActuatorSystem';
 import { MonsterDamageResult } from './MonsterDamage';
 import { monsterNonMaterial, monsterVerticalSize } from '../data/tables/MonsterDesc';
 import { constructPredefinedMissile, decodeMissileTimerWord8, encodeMissileTimerWord8, spellObjectId } from './missileHelpers';
@@ -456,19 +457,33 @@ export class TimerSystem {
     party.magicFootprintsActive = sb(party.magicFootprintsActive - 1);
   }
 
+  /**
+   * `ProcessTT_OPENROOM` (`doc/CSBwin-src/Timer.cpp:1688-1829`). A `TT_DESSAGE` or a
+   * parameter message reaches only the square's DSAs (`:1715-1716`, `:1760-1761`).
+   */
   private processOpenRoom(timer: TimerEntry): void {
     const action = this.getTimerAction(timer);
     if (action === 3) return;
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);
     const map = this.dungeon.getMap(timer.level);
     if (!map) return;
+    const message = timer.function === TimerFunction.TT_DESSAGE
+      || timer.function === TimerFunction.TT_PARAMETER_MESSAGE;
 
     for (let rn = this.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       const decoded = this.dungeon.rnMaps.decode(rn);
-      if (decoded.category === DBType.TEXT) {
+      if (decoded.category === DBType.TEXT && !message) {
         const rec = this.dungeon.getTextRecord(rn);
         if (!rec) continue;
+        const shown = rec.visible;
         this.applyTextVisibility(rec, action);
+        // A text shown on the party's own square is read out (`:1735-1743`), whatever
+        // `DecodeText` returns.
+        const party = this.ctx.party.state.position;
+        if (!shown && rec.visible && target.z === party.z && target.x === party.x && target.y === party.y) {
+          const text = this.dungeon.decodeTextString(rec, 1, this.ctx.tables.textDecode);
+          if (text !== null) this.ctx.host.messages.quePrintLines(MSG_COLOR_ROOM_TEXT, text);
+        }
         continue;
       }
       if (decoded.category === DBType.ACTUATOR) {
@@ -480,6 +495,7 @@ export class TimerSystem {
           if (this.ctx.systems.dsa.processTimer5(rn, timer, loc)) break;
           continue;
         }
+        if (message) continue;
         if (type === 48) {
           this.operateCounterActuator(timer, rec, target);
         }
