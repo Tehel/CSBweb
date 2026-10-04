@@ -9,6 +9,7 @@
 import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
 import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
+import { readDisableSaves } from '../data/CsbwinExpool';
 import type { PartyState, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
 import { ensureHandOwner } from './Party';
@@ -248,6 +249,9 @@ export class Game implements MainLoop {
         this.installWorld(data);
         this.applyRuntimeSaveState(fresh.getRuntimeSaveState());
         this.ctx.state.block1.totalMoveCount = totalMoveCount;
+        // A new game reads `disableSaves` as a saved one does, from its world's `EXPOOL`
+        // (`doc/CSBwin-src/SaveGame.cpp:1533`, `:1791-1793`).
+        this.ctx.systems.dsa.disableSaves = readDisableSaves(data);
         this.readNewGameRules(data);
         this.canRestart = false;
         this.playedVbls = 0;

@@ -579,6 +579,12 @@ export class DsaSystem {
    * (`CSBCode.cpp:676`, `Attack.cpp:2210`) and at a load (`SaveGame.cpp:1625`).
    */
   parameterMessageSequence = 0;
+  /**
+   * `disableSaves` (`doc/CSBwin-src/data.cpp:58`), which `&DISABLESAVES` sets: while it
+   * holds, nothing saves the game (`GameSaves`). A read takes it from its `EXPOOL` record
+   * (`readDisableSaves`), and a save writes that record (`Expool.writeDisableSaves`).
+   */
+  disableSaves = false;
   private warnedOps = new Set<number>();
   private overridePos = 0;
   private overrideP = false;
@@ -2616,6 +2622,10 @@ export class DsaSystem {
       }
       case StkOp.VSET:
         this.vset(bank);
+        break;
+      case StkOp.DISABLE_SAVES:
+        // `doc/CSBwin-src/DSA.cpp:2945-2955`.
+        this.disableSaves = bank.stack.pop() !== 0;
         break;
       case StkOp.DSA_INFO_FETCH: {
         // `doc/CSBwin-src/DSA.cpp:2439-2470`: a type-47 actuator's selector, state and

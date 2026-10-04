@@ -274,8 +274,8 @@ and the port writes as zero.
 
 **What a file of the port's does not carry**, or the port does not read:
 
-- The overlay palette records, which only a DSA changes, `&DisableSaves`' record, and
-  the DSA tracing flags `WriteDSAs` puts beside the DSAs (`DEBT.md` G1).
+- The overlay palette records, which only a DSA changes, and the DSA tracing flags
+  `WriteDSAs` puts beside the DSAs (`DEBT.md` G1).
 - `SimpleEncryption`, neither written nor read past the header, and `MakeBigActuators`'
   read of the actuator type before the byte swap (`DEBT.md` G4).
 

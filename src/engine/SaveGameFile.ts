@@ -71,9 +71,12 @@ function buildFileBlocks(
     }
     // The DSA global variables go into their `EXPOOL` records before the databases are
     // written (`doc/CSBwin-src/SaveGame.cpp:1141-1148`), in the running world as CSBWin's.
-    if (!new Expool(dungeon).storeGlobalVariables(runtime.game.dsaGlobals)) {
+    const expool = new Expool(dungeon);
+    if (!expool.storeGlobalVariables(runtime.game.dsaGlobals)) {
         game.ctx.host.trace('Error saving global variables');
     }
+    // And so does the record of `disableSaves` (`:1200-1201`).
+    if (runtime.game.disableSaves) expool.writeDisableSaves();
 
     const party = runtime.party;
     // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`doc/CSBwin-src/SaveGame.cpp:1033`):

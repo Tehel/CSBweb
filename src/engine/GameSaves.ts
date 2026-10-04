@@ -112,6 +112,9 @@ export type ImportResult =
  */
 export const SAVED_GAME_DAMAGED = 'SAVED GAME DAMAGED!';
 
+/** What CSBWin's disk menu says while a DSA has disabled saves (`doc/CSBwin-src/SaveGame.cpp:850`). */
+export const SAVES_ARE_DISABLED = 'SAVES ARE DISABLED';
+
 /** The colour of F5's and F9's lines in the message area: white, as a wall's text is. */
 const SAVE_MESSAGE_COLOR = 15;
 
@@ -478,7 +481,9 @@ export class GameSaves {
      * (`doc/CSBwin-src/Mouse.cpp:1716-1718`), and a file has no place for
      * `d.PotentialCharacterOrdinal`, so the candidate would load as a member. Nor while a
      * script holds the loop, which a save could not resume. The icon is silent then; a
-     * key that saved nothing says so.
+     * key that saved nothing says so. Nor while a DSA has disabled saves
+     * (`DsaSystem.disableSaves`), when the key says what CSBWin's disk menu says
+     * (`doc/CSBwin-src/SaveGame.cpp:848-856`).
      *
      * A write that fails is `SaveError`'s "UNABLE TO SAVE GAME!"
      * (`doc/CSBwin-src/SaveGame.cpp:1266`). One that is written in the prison asks
@@ -489,6 +494,11 @@ export class GameSaves {
         if (champions.length === 0 || potentialChampionIndex >= 0 || this.game.isRunningScript()) {
             this.tell('CANNOT SAVE NOW');
             this.log('Quick-save refused: no party, a champion being chosen, or a script running');
+            return;
+        }
+        if (this.game.ctx.systems.dsa.disableSaves) {
+            this.tell(SAVES_ARE_DISABLED);
+            this.log('Quick-save refused: a DSA has disabled saves');
             return;
         }
         try {

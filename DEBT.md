@@ -248,7 +248,7 @@ ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter 
 `STKOP` (`doc/CSBwin-src/Data.h:1721-1861`, the port's `StkOp`) has 138 values, and 135
 are operations: `Noop` (0), `2Dup` (23) and `I_FilteredCast` (120) have no case in
 `EX_AMPERSAND`, whose default says "Illegal subcode" and does nothing
-(`doc/CSBwin-src/DSA.cpp:4979-4981`), as the port's trace does. The port has 128, so 7
+(`doc/CSBwin-src/DSA.cpp:4979-4981`), as the port's trace does. The port has 129, so 6
 are left. `tools/dump-dsa-census.ts` lists them: it fails unless what the port lacks is
 exactly its `LEFT`, so each family's commit takes its operations off that list, and this
 part of the item is done when it is empty.
@@ -256,7 +256,7 @@ part of the item is done when it is empty.
 Conflux, the dungeon that will check them, defines 131 DSAs, with 4646 programs, behind
 1591 type-47 actuators. A static census of its programs decodes each word with the
 operand layout `DsaSystem.execute` reads, and every program decodes to its exact length.
-It uses 118 `&` operations, 5 of the 7. With Conflux's count of each:
+It uses 118 `&` operations, 4 of the 6. With Conflux's count of each:
 
 - **Characters**: what is left of them is `SwapCharacter` 7, which needs G3. The other
   thirteen are ported, checked by `tools/dump-dsa-characters.ts`, and `CharNameFetch`
@@ -274,11 +274,12 @@ It uses 118 `&` operations, 5 of the 7. With Conflux's count of each:
   `CSBgraphics.dat`, which plays nothing until G24. The texts are ported too: `Say`,
   `TextFetch`, `TextSay`, `GlobalTextStore`, `DiscardText` and `CharNameFetch`, checked by
   `tools/dump-dsa-text.ts`.
-- **The dungeon and the program**: what is left of them is `DisableSaves` 2, the next
-  step (below). The other thirteen, `FetchExCellFlg`, `StoreExCellFlg`,
+- **The dungeon and the program**: none is left. `FetchExCellFlg`, `StoreExCellFlg`,
   `ThisCell`, `Neighbors`, `Loc2AbsCoord`, `PartyDistance`, `JumpGear`, `GosubGear`,
-  `ThisDSAId`, `DSAInfoFetch`, `BitCount`, `MultiplierFetch` and `VSET`, are ported,
-  checked by `tools/dump-dsa-dungeon.ts`.
+  `ThisDSAId`, `DSAInfoFetch`, `BitCount`, `MultiplierFetch` and `VSET` are ported,
+  checked by `tools/dump-dsa-dungeon.ts`; so is `DisableSaves` 2, with its `EXPOOL`
+  record, checked by `tools/dump-dsa-save.ts`. While saves are disabled the port's disk
+  dialog saves nothing and says so, and loads and exports as ever (`doc/SAVES.md`).
 - **The `I_` operations**: none is left. The fifteen that send their operands to the DSA
   at `ESL_INDIRECTACTIONS`, `I_Indirect` 1 that runs them there, and `I_Delay` 22 are
   ported, checked by `tools/dump-dsa-indirect.ts`. Conflux's: `I_Del` 42, `I_Add` 41,
@@ -295,9 +296,9 @@ The steps: the census is done (`tools/dump-dsa-census.ts`, Conflux's counts by d
 another `dungeon.dat` as its argument), and so are the characters, the objects, the
 monsters, the texts, the messages and sounds, the dungeon and the program, and the `I_`
 operations, and the save of a dungeon with DSAs: `WriteDSAs`, and the global variables
-read from their `EXPOOL` records at every read and written back at a save, checked by
-`tools/dump-dsa-save.ts`. A family's tool runs its programs through `tools/lib/dsa.ts`.
-Next, and last, `DisableSaves` and the overlay palette's records (below). What is left
+read from their `EXPOOL` records at every read and written back at a save, and
+`DisableSaves`' record, checked by `tools/dump-dsa-save.ts`. A family's tool runs its
+programs through `tools/lib/dsa.ts`. Next, and last, the overlay palette's records (below). What is left
 after that waits on its own item: `SwapCharacter` on G3, the display's three on G25, `GetSkin` and `SetSkin` on G27. An operation is checked
 against Conflux in play once G26 makes it a data set.
 
@@ -322,10 +323,6 @@ The rest of the item, with an operation that needs care when ported:
   file uses, which a read takes back (`DSAINDEX::ReadTracing`, `DSA.cpp:5553-5576`). The
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
-- **`&DisableSaves`** pops a flag into `disableSaves` (`doc/CSBwin-src/DSA.cpp:2945-2955`).
-  While it is set the save menu says only SAVES ARE DISABLED (`SaveGame.cpp:848-856`), and
-  the save writer adds an `EDBT_DisableSaves` record to the `EXPOOL` (`:1200-1201`), which
-  sets it again at a load (`:1791-1793`).
 - **`ECF_FOOTPRINTS`.** The footprint arm of `SummarizeRoomInfo` also shows prints on any
   cell with this extended cell flag once `d.Time > 0` (`Codea59a.cpp:419-425`). Only a
   DSA's `&ECF!`, which is ported, or a custom dungeon sets extended cell flags, so a flag

@@ -295,6 +295,11 @@ opens the same one, load-only.
   (`SAVE_MENU_DOUBLE_CLICK_MS`, `src/renderer/ui/SaveMenu.ts`), with the button's press
   and its question. Not on a heading, which a click folds.
 - **CANCEL, Esc and a right-click close it.**
+- **While a DSA has disabled saves** (`&DISABLESAVES`, `DsaSystem.disableSaves`), CSBWin's
+  disk menu is only "SAVES ARE DISABLED" and OK (`doc/CSBwin-src/SaveGame.cpp:848-856`),
+  since it did nothing but save. The dialog loads and exports too, so it opens as ever,
+  with that line as its message, and saves nothing: SAVE has no label anywhere, and
+  there is no "NEW SAVE" (`savesDisabled`, `src/renderer/ui/SaveMenu.ts`).
 - **The same dialog at the entrance and in play**: the chooser takes the clicks, the
   wheel and the keys the disk menu takes, less SAVE and the question. The wheel and the
   keys reach the list in play and at the entrance, whose chooser is up before the
@@ -314,6 +319,8 @@ its playthrough, F5's or the dialog's ("A playthrough"). Each key says what it d
 line of the message area, in white (`GameSaves.tell`; `doc/CSBWIN_MESSAGES_REFERENCE.md`):
 "GAME SAVED" or "GAME LOADED"; "CANNOT SAVE NOW" with no party, with a champion still
 being chosen, or while a script holds the loop, and "CANNOT LOAD NOW" for that last;
+CSBWin's disk menu's "SAVES ARE DISABLED" (`doc/CSBwin-src/SaveGame.cpp:848-856`) while a
+DSA has disabled saves (`&DISABLESAVES`);
 CSBWin's own "UNABLE TO SAVE GAME!" (`doc/CSBwin-src/SaveGame.cpp:1266`) and "CAN'T FIND
 SAVED GAME!" (`:1585`) for a write that failed and for no save at all; a file that does
 not read gives the line the dialog's message would be. Each outcome is also a line for

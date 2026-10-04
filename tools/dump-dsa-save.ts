@@ -1,6 +1,6 @@
 /**
- * A save of a dungeon with DSAs (`DEBT.md` G1, that step): the DSAs themselves, and the
- * global variables they keep in `EXPOOL`.
+ * A save of a dungeon with DSAs (`DEBT.md` G1, that step): the DSAs themselves, and what
+ * they keep in `EXPOOL`, the global variables and the record that disables saves.
  *
  * 1. **`WriteDSAs`** (`doc/CSBwin-src/SaveGame.cpp:767-780`, `DSA::Write`,
  *    `doc/CSBwin-src/DSA.cpp:5672-5695`): `buildDsaSection` over the DSAs read from
@@ -18,19 +18,26 @@
  * 5. **3D2D1D**, a dungeon with six DSAs and no globals, saved and loaded.
  * 6. **Conflux 3.5**, saved and loaded: its 64 levels, which `ReadDatabases` reads with no
  *    bound (`doc/CSBwin-src/SaveGame.cpp:2411-2427`), its 131 DSAs and its 32 globals.
+ * 7. **`&DISABLESAVES`** (`doc/CSBwin-src/DSA.cpp:2945-2955`): a program's nonzero sets
+ *    `disableSaves` and its 0 clears it. A save writes the record of no data that says so
+ *    into the running pool (`SaveGame.cpp:1200-1201`), one more at each save, and a load
+ *    sets `disableSaves` from it and reads every such record out of the loaded pool
+ *    (`:1791-1793`); a save with it clear writes none, and loads with it clear.
  *
  * Run: `npx tsx tools/dump-dsa-save.ts`
  */
 import { readFileSync } from 'node:fs';
 
-import { Expool, readGlobalVariables } from '../src/data/CsbwinExpool';
+import { Expool, readDisableSaves, readGlobalVariables } from '../src/data/CsbwinExpool';
 import { buildDsaSection, readExtendedFeatures, EXTENDED_FEATURES_SIZE } from '../src/data/CsbwinExtendedFeatures';
 import type { DsaDefinition } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
+import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
-import { freshGame, globalStore, int } from './lib/dsa';
+import { StkOp } from '../src/engine/DsaSystem';
+import { freshGame, globalStore, int, op, run } from './lib/dsa';
 import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 
@@ -41,6 +48,8 @@ const same = (a: unknown, b: unknown): boolean =>
   JSON.stringify(b, (_k, v) => (v instanceof Uint16Array ? Array.from(v) : v));
 const countOf = (index: { entries: unknown[] } | undefined): number => (index?.entries ?? []).filter((d) => d).length;
 const globalsKey = (i: number): number => ((5 << 24) | (4 << 16) | i) >>> 0;
+/** `(EDT_Database << 24) | (EDBT_DisableSaves << 16)` (`doc/CSBwin-src/CSB.h:1552`, `:1558`). */
+const disableSavesKey = ((5 << 24) | (5 << 16)) >>> 0;
 
 console.log('1. WriteDSAs');
 {
@@ -152,6 +161,41 @@ console.log('6. Conflux 3.5');
   check(error === '' && after.maps.length === 64, 'a save of a Conflux game loads, its 64 levels with it');
   check(same(after.dsaIndex, before) && same(other.systems.dsa.getGlobalVariables(), game.systems.dsa.getGlobalVariables()),
     'and its 131 DSAs and 32 globals');
+}
+
+console.log('7. &DISABLESAVES');
+{
+  const set = run([...int(7), op(StkOp.DISABLE_SAVES)]);
+  const setThen = set.game.systems.dsa.disableSaves;
+  const cleared = run([...int(0), op(StkOp.DISABLE_SAVES)], (game) => { game.systems.dsa.disableSaves = true; });
+  console.log(`  7, then 0: disableSaves ${setThen}, then ${cleared.game.systems.dsa.disableSaves}`);
+  check(setThen && !cleared.game.systems.dsa.disableSaves, 'a nonzero sets disableSaves, and 0 clears it');
+
+  // `run`'s test DSA is not in the header's counts, so the save is of a game of its own.
+  const game = freshGame();
+  game.systems.dsa.disableSaves = true;
+  const records = (data: Parameters<typeof readDisableSaves>[0]): number =>
+    new Expool(data).keys().filter((key) => key === disableSavesKey).length;
+  const first = buildSaveFile(game);
+  const second = buildSaveFile(game);
+  const running = records(game.ctx.state.dungeon);
+  const inFile = records(loadCsbwinWorld(first).dungeon);
+  console.log(`  saved twice: ${running} records in the running pool, ${inFile} in the first file`);
+  check(running === 2 && inFile === 1, 'each save writes one record more into the running pool, and the file holds them');
+
+  const other = freshGame();
+  applyCsbwinSave(other, second);
+  console.log(`  loaded: disableSaves ${other.systems.dsa.disableSaves}, ${records(other.ctx.state.dungeon)} records left`);
+  check(other.systems.dsa.disableSaves && records(other.ctx.state.dungeon) === 0,
+    'a load sets disableSaves from the records, and reads every one out of the pool');
+
+  other.systems.dsa.disableSaves = false;
+  const clear = buildSaveFile(other);
+  const back = freshGame();
+  back.systems.dsa.disableSaves = true;
+  applyCsbwinSave(back, clear);
+  check(records(loadCsbwinWorld(clear).dungeon) === 0 && !back.systems.dsa.disableSaves,
+    'a save with it clear writes no record, and loads with it clear');
 }
 
 finish();

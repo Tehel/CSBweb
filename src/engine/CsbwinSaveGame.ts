@@ -27,6 +27,7 @@
  * | The timer table and the queue that orders it | blocks 5 and 6, through `Game.restoreTimerQueue` |
  * | `d.RandomGameID`, `totalMoveCount`, `d.Byte22808`, `d.Word22592`-`d.Word22598` | `GAMEBLOCK1` (`buildBlock1State`) |
  * | The DSA global variables, and their number | `EXPOOL` (`readGlobalVariables`, `doc/CSBwin-src/SaveGame.cpp:1746-1760`) |
+ * | `disableSaves` | `EXPOOL` (`readDisableSaves`, `doc/CSBwin-src/SaveGame.cpp:1791-1793`) |
  *
  * **What is not restored.** A save is the file alone (`SaveGameFile.ts`), so this is
  * everything a save and a load lose. `tools/dump-save-roundtrip.ts` plays a game, saves
@@ -58,7 +59,7 @@
  */
 import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
 import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
-import { readGlobalVariables } from '../data/CsbwinExpool';
+import { readDisableSaves, readGlobalVariables } from '../data/CsbwinExpool';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import { CheckMonsters } from './CheckMonsters';
@@ -202,6 +203,8 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
                 indexOfLastMagic: tail.indexOfLastMagicFootprint,
             },
             dsaGlobals: readGlobalVariables(world.dungeon),
+            // `disableSaves`'s records leave the pool as they are read (`:1791-1793`).
+            disableSaves: readDisableSaves(world.dungeon),
             block1: buildBlock1State(world),
         },
         dungeon: {

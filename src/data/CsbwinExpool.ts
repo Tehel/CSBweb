@@ -41,6 +41,8 @@ const ESL_SPECIAL_LOCATION_MAX = 15;
 const EDT_DATABASE = 5;
 /** `EDBT_GlobalVariables` (`doc/CSBwin-src/CSB.h:1557`). */
 const EDBT_GLOBAL_VARIABLES = 4;
+/** `EDBT_DisableSaves` (`doc/CSBwin-src/CSB.h:1558`). */
+const EDBT_DISABLE_SAVES = 5;
 /** `EDT_ChampionBones` (`doc/CSBwin-src/CSB.h:1571`). */
 const EDT_CHAMPION_BONES = 9;
 
@@ -66,6 +68,9 @@ function championBonesKey(rn: number): number {
 function globalVariablesKey(i: number): number {
     return ((EDT_DATABASE << 24) | (EDBT_GLOBAL_VARIABLES << 16) | i) >>> 0;
 }
+
+/** `(EDT_Database << 24) | (EDBT_DisableSaves << 16)`, the key of the record that disables saves. */
+const DISABLE_SAVES_KEY = ((EDT_DATABASE << 24) | (EDBT_DISABLE_SAVES << 16)) >>> 0;
 
 /**
  * `(EDT_MessageParameters << 24) + timerID`, the key of the parameters a DSA's `&MESSAGE`
@@ -249,6 +254,15 @@ export class Expool {
         return saved;
     }
 
+    /**
+     * `SaveGame`'s record of `disableSaves`, written while it is set
+     * (`doc/CSBwin-src/SaveGame.cpp:1200-1201`): a record of no data, in the running
+     * world's pool, as every save writes one more.
+     */
+    writeDisableSaves(): void {
+        this.write(DISABLE_SAVES_KEY, []);
+    }
+
     /** `EXPOOL::AddChampionBonesRecord` (`doc/CSBwin-src/data.cpp:1636-1643`). */
     addChampionBonesRecord(bonesObject: number, fingerprint: number): void {
         this.write(championBonesKey(bonesObject), [fingerprint & 0xffff]);
@@ -284,6 +298,17 @@ export function readGlobalVariables(db: ExpoolDatabase): number[] {
         values.push(...record.slice(0, 16));
     }
     return values;
+}
+
+/**
+ * `LoadGame`'s `disableSaves` (`doc/CSBwin-src/SaveGame.cpp:1791-1793`): whether the pool
+ * holds a record that disables saves. Every such record is read, so it leaves the pool.
+ */
+export function readDisableSaves(db: ExpoolDatabase): boolean {
+    const expool = new Expool(db);
+    let disableSaves = false;
+    while (expool.read(DISABLE_SAVES_KEY) !== null) disableSaves = true;
+    return disableSaves;
 }
 
 /** The `EDT_SpecialLocations` entries of an `EXPOOL` database, given as its raw blocks. */

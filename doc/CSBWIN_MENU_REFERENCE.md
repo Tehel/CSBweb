@@ -406,6 +406,12 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    The port puts none up: a loaded game is played at once, and `AsciiDump` is unported
    (`DEBT.md` G14). What the menu did to the chooser's picture is kept, the fade to
    black and the cleared screen (`tag021028`, `src/renderer/intro/BootSequence.ts`).
+9. **The dialog while saves are disabled.** After a DSA's `&DISABLESAVES`, CSBWin's disk
+   menu is only "SAVES ARE DISABLED" over OK (`SaveGame.cpp:848-856`): it did nothing
+   but save. The port's dialog loads and exports too, so it opens as ever with that
+   line as its message, SAVE inert and unlabelled, and no "NEW SAVE" row
+   (`savesDisabled`, `src/renderer/ui/SaveMenu.ts`). F5 says the same line and saves
+   nothing (`GameSaves.quickSave`).
 
 The faithful `_DoMenu` / `_WaitForMenuSelect` port lives in `src/renderer/ui/Menu.ts` and
 is used unchanged for the title-only and one-button menus (`"SAVING GAME . . ."`,

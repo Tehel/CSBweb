@@ -48,6 +48,10 @@
  * all. On another playthrough's heading SAVE is inert: a file holds the running game's
  * `d.RandomGameID`, so a new save is never another playthrough's.
  *
+ * While a DSA has disabled saves (`DsaSystem.disableSaves`), SAVE is inert everywhere and
+ * there is no "NEW SAVE", and the dialog's message is what CSBWin's disk menu says in its
+ * place, "SAVES ARE DISABLED" (`savesDisabled`). LOAD and EXPORT are as ever.
+ *
  * LOAD reads the selected save, and from a heading the last save used of its playthrough.
  * On "NEW SAVE" there is nothing to load, so it is inert. A second click on a save
  * within half a second of the first is LOAD too, its button's press and its question
@@ -125,7 +129,7 @@
  * `ctx.state.paused` (`d.Time++` is the main loop's, `doc/CSBwin-src/CSBCode.cpp:660`).
  */
 import type { OpenedSave, Playthrough, SaveEntry } from '../../data/saves';
-import type { ImportResult, ImportedFile } from '../../engine/GameSaves';
+import { SAVES_ARE_DISABLED, type ImportResult, type ImportedFile } from '../../engine/GameSaves';
 import { formatPlaythroughRow, formatSavePreview, formatSaveRow, lastUsedSave, playthroughsOf } from '../../data/saves';
 import { clearIndex, fillRectIndex } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
@@ -458,7 +462,7 @@ export async function refreshSaveMenu(ui: UIState): Promise<void> {
   const state = ui.saveMenu;
   if (!state) return;
   state.busy = true;
-  state.message = '';
+  state.message = savesDisabled(ui, state) ? SAVES_ARE_DISABLED : '';
   ui.renderLastFrame();
   try {
     state.entries = await (state.mode === 'rise' ? ui.onListEverySave() : ui.onListSaves());
@@ -497,6 +501,15 @@ export function wrapMessage(message: string, maxChars: number): string[] {
   return lines;
 }
 
+/**
+ * Whether the disk menu saves nothing: a DSA has disabled saves, and CSBWin's
+ * `_DisplayDiskMenu` would show "SAVES ARE DISABLED" in its place
+ * (`doc/CSBwin-src/SaveGame.cpp:848-856`).
+ */
+function savesDisabled(ui: UIState, state: SaveMenuState): boolean {
+  return state.mode === 'full' && ui.ctx.systems.dsa.disableSaves;
+}
+
 /** The running game's playthrough, `d.RandomGameID`: never 0 (`drawRandomGameID`). */
 function runningPlaythrough(ui: UIState): number {
   return ui.ctx.state.block1.randomGameID;
@@ -506,12 +519,14 @@ function runningPlaythrough(ui: UIState): number {
  * The list's rows, from the saves and the folds: each playthrough's heading, the last
  * one used first, with its saves under it when it is unfolded. The full menu has
  * "NEW SAVE" above them while the running game's playthrough has no save, hence no
- * heading to make one from.
+ * heading to make one from, and saves are not disabled.
  */
 function layoutRows(ui: UIState, state: SaveMenuState): void {
   const playthroughs = playthroughsOf(state.entries);
   const rows: SaveMenuRow[] = [];
-  if (state.mode === 'full' && !playthroughs.some((p) => p.id === runningPlaythrough(ui))) rows.push({ kind: 'new' });
+  if (state.mode === 'full' && !savesDisabled(ui, state) && !playthroughs.some((p) => p.id === runningPlaythrough(ui))) {
+    rows.push({ kind: 'new' });
+  }
   for (const playthrough of playthroughs) {
     rows.push({ kind: 'heading', playthrough });
     if (state.unfolded.has(playthrough.id)) {
@@ -547,11 +562,12 @@ function canLoad(state: SaveMenuState): boolean {
 /**
  * SAVE writes over a save, any playthrough's, and makes a new one from "new save" and
  * from the heading of the running game's playthrough. Another playthrough's heading
- * has nothing to write over, and a new save is never its own.
+ * has nothing to write over, and a new save is never its own. Nothing is saved while
+ * saves are disabled.
  */
 function canSave(ui: UIState, state: SaveMenuState): boolean {
   const row = selectedRow(state);
-  return !state.busy && state.mode === 'full' && row !== null
+  return !state.busy && state.mode === 'full' && !savesDisabled(ui, state) && row !== null
     && (row.kind !== 'heading' || row.playthrough.id === runningPlaythrough(ui));
 }
 

@@ -30,6 +30,8 @@ export interface RuntimeSaveState {
         footprints: FootprintsSnapshot;
         /** The DSA global variables, where a dungeon keeps its puzzle progress. */
         dsaGlobals: number[];
+        /** `disableSaves`, which a DSA sets (`DsaSystem.disableSaves`). */
+        disableSaves: boolean;
         /** What `GAMEBLOCK1` carries (`GameState.block1`). */
         block1: Block1State;
     };
@@ -73,6 +75,7 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
             gameWon: ctx.state.gameWon,
             footprints: ctx.footprints.capture(),
             dsaGlobals: ctx.systems.dsa.getGlobalVariables(),
+            disableSaves: ctx.systems.dsa.disableSaves,
             block1: { ...ctx.state.block1, byte22808: [...ctx.state.block1.byte22808] },
         },
         dungeon: {
@@ -118,6 +121,7 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     ctx.state.gameWon = save.game.gameWon;
     ctx.state.block1 = { ...save.game.block1, byte22808: [...save.game.block1.byte22808] };
     ctx.systems.dsa.setGlobalVariables(save.game.dsaGlobals);
+    ctx.systems.dsa.disableSaves = save.game.disableSaves;
 
     // The world first: cell flags, object chains and every database record. This
     // has to land before the ITEM16/timer restore below, because the monster pool

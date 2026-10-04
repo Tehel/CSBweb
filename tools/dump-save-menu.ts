@@ -35,6 +35,7 @@
  *    runs. Run against a store in memory, which two games of two data sets then share:
  *    each lists its own set's saves. F5 writes over its playthrough's quick-save, and
  *    F9 loads its playthrough's newest save. SAVE over a listed save writes that row.
+ *    F5 saves nothing while a DSA has disabled saves, and says so.
  *    A save read into a game is marked as the last one used. And a new game's
  *    playthrough is drawn again while a save of the data set holds it.
  * 9. **The store's upgrade.** The rows of the store's first version, a CSBWin file or a
@@ -56,6 +57,7 @@
  *    selected. A click on a heading folds and unfolds it. From a heading LOAD reads its
  *    playthrough's last save used, and SAVE makes a new save on the running game's own
  *    and is inert on another's. "NEW SAVE" is listed for a game with no save alone.
+ *    While a DSA has disabled saves the dialog says so, and SAVE is inert everywhere.
  * 12. **The play time.** The player's time in a game is the VBLs its loop runs, the
  *    frozen game's and the save menu's left out. No file holds it: a save's row does,
  *    and a load takes it back from the row.
@@ -1206,6 +1208,16 @@ async function checkSaveCall(): Promise<void> {
     check(toldSince(beforeFailure) === '/15:UNABLE TO SAVE GAME!' && reports.length === 5 && reports[4] === 'Quick-save failed',
       'a write that fails is SaveError\'s line (SaveGame.cpp:1266), and its error is reported');
 
+    // F5 while a DSA has disabled saves: CSBWin's disk menu's words, and no save.
+    const disabled = await stage(false);
+    disabled.game.systems.dsa.disableSaves = true;
+    const beforeDisabled = told.length;
+    await disabled.saves.quickSave();
+    console.log(`  F5 with saves disabled: ${toldSince(beforeDisabled)}`);
+    check(toldSince(beforeDisabled) === '/15:SAVES ARE DISABLED' && !disabled.game.canRestartFromSavegame(),
+      'F5 saves nothing while a DSA has disabled saves, and says "SAVES ARE DISABLED"');
+    check(reports.length === 6 && reports[5] === 'Quick-save refused: a DSA has disabled saves', 'and that is a line for the console');
+
     // One store, two data sets: a game lists, and F9 loads, its own set's saves.
     console.log('');
     console.log('=== one store, two data sets ===');
@@ -1857,6 +1869,28 @@ async function checkTwoLevels(graphics: GraphicsLoader): Promise<void> {
       && fresh.selected === 1, 'its first save gives it a heading, the first, and takes the "new save" row away');
     SaveMenu.closeSaveMenu(leyla.ui);
     later();
+
+    // A game whose DSA has disabled saves (`&DISABLESAVES`): CSBWin's disk menu says only
+    // "SAVES ARE DISABLED" (`doc/CSBwin-src/SaveGame.cpp:848-856`). The dialog says it,
+    // and saves nothing, with no "new save" row though the game has no save; LOAD loads.
+    const shut = await menuRig(graphics, store, 'TIGGY');
+    shut.game.systems.dsa.disableSaves = true;
+    const disabled = await shut.open();
+    const shutMessage = disabled.message;
+    const shutFiles = store.files.size;
+    shut.select(darooFirst.id);
+    const shutLabels = [labelOf(shut.ui, g.buttonFrames.load), labelOf(shut.ui, g.buttonFrames.save)];
+    await shut.click(g.saveButtonId);
+    console.log(`  saves disabled: "${shutMessage}", ${disabled.rows.filter((row) => row.kind === 'new').length} "new save" row, on a save LOAD's label ${shutLabels[0]} pixels, SAVE's ${shutLabels[1]}; SAVE clicked: ${store.files.size - shutFiles} file(s) more`);
+    check(shutMessage === 'SAVES ARE DISABLED' && disabled.rows.every((row) => row.kind !== 'new'),
+      'with saves disabled the dialog says "SAVES ARE DISABLED", and has no "new save" row');
+    check(shutLabels[0] > 0 && shutLabels[1] === 0 && store.files.size === shutFiles && disabled.confirm === null,
+      'SAVE has no label and takes no click, and LOAD has its label');
+    await shut.click(g.loadButtonId);
+    const shutAsked = disabled.confirm;
+    await shut.click(211, 2);
+    check(shutAsked === 'load', 'and LOAD asks before it reads another playthrough\'s save, as ever');
+    SaveMenu.closeSaveMenu(shut.ui);
 
     // The load-only chooser: the same list, and no question from a heading either.
     const stranger = await menuRig(graphics, store, 'SONJA');
