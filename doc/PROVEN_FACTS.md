@@ -4426,6 +4426,16 @@ chain, not the actuators'. Parameter 1 starts as the scroll being read, a valid 
 a DSA after the first runs only if the first stores an invalid object there. Evidence:
 `tools/dump-viewing-filter.ts`.
 
+`&DESCRIBE` with a location, `ModifyDescription` (`Character.cpp:3816-3830`), sets the phrase
+from every text at the location whose corner matches, with no `IsValid`, so the last such
+text wins, and enables the phrase whatever the text holds, an empty one included. It reads
+each with `GetText` (`doc/CSBwin-src/AsciiDump.cpp:362-456`), not `DecodeText`: the same
+codes and escape tables as `DecodeText` for a text that is not a wall's, but whatever the
+`show` bit, with no line feed in front, `/` for code 28, no length limit and no
+`SubstituteCharacterNames`. On every text in use in `dm-atari` and Conflux, `GetText`
+reads what `DecodeText` at `0x8001` reads before its substitution, but for that line feed
+and code 28. Evidence: `tools/dump-viewing-filter.ts`.
+
 ## A DSA's `I_` operation acts only when its record reaches the `ESL_INDIRECTACTIONS` DSA
 
 `&%TELEPORTPARTY`, `&%DEL` and the thirteen other `I_` operations do not act: `Indirect`

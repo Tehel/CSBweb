@@ -16,15 +16,27 @@
  *    invalid object there; it then sees parameter 0 as 0 (`:3502`), whatever a
  *    `&DESCRIBE` did, and the scroll drawn is the one given.
  * 5. **A scroll a DSA names is the one drawn**, and the loop goes on down its chain.
+ * 6. **`&DESCRIBE` with a location sets the phrase from every text at it** whose corner
+ *    matches (`ModifyDescription`, `:3816-3830`), so the last wins, a hidden one and an
+ *    empty one included, each read by `GetText` (`doc/CSBwin-src/AsciiDump.cpp:362-456`).
+ * 7. **`GetText` is `DecodeText` at type `0x8001`** (`doc/CSBwin-src/CSBCode.cpp:5487-5668`),
+ *    before its substitution, on every text in use in `dm-atari` and Conflux, but for the line
+ *    feed `DecodeText` puts in front and code 28: `/` to `GetText`, a space to
+ *    `DecodeText`, or a line feed in place of that space for a second one in a row.
  *
  * Run: `npx tsx tools/dump-viewing-filter.ts`
  */
-import { DBType, OBJECT_ID_EOF, Position, RoomType, locationRelToInteger, type ObjectID } from '../src/core/types';
+import { readFileSync } from 'node:fs';
+
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, locationRelToInteger, type ObjectID } from '../src/core/types';
+import { DecodeText, GetText } from '../src/data/DecodeText';
+import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';
 import { StkOp, ViewingFilterSite, type ViewingFilterResult } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
 import { freshGame, globalStore, int, op, varFetch, varStore } from './lib/dsa';
 import { check, finish } from './lib/check';
+import { gameTablesOf, stockGraphics } from './lib/game';
 
 /** `(EDT_SpecialLocations << 24) | ESL_VIEWINGFILTER` (`doc/CSBwin-src/CSB.h:1534-1538`). */
 const VIEWING_FILTER_KEY = (3 << 24) | 3;
@@ -153,6 +165,83 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     + `${result?.objectId}, and the second DSA ${g[10] === UNSET ? 'does not run' : 'runs'}`);
   check(result?.objectId === named, 'the scroll a DSA names is the one drawn');
   check(g[10] === UNSET, "the loop goes on down the named scroll's chain, and the second DSA does not run");
+}
+
+/* ------------------------------- 6. &DESCRIBE's custom phrase ------------------- */
+{
+  /** `s` as a text record at corner `p` of `at`: its codes three to a word, ended by 31. */
+  const addText = (game: Game, at: Position, p: number, s: string, visible: boolean): void => {
+    const dungeon = game.ctx.dungeon;
+    const data = dungeon.getData();
+    const words = data.compressedText;
+    const indirect = data.indirectTextIndex;
+    if (!words || !indirect) throw new Error('the save holds no indirect text');
+    const codes = [...s].map((c) => (c === ' ' ? 26 : c === '.' ? 27 : c === '/' ? 28 : c.charCodeAt(0) - 65));
+    codes.push(31);
+    while (codes.length % 3 !== 0) codes.push(31);
+    indirect.push(words.length);
+    for (let i = 0; i < codes.length; i += 3) words.push((codes[i]! << 10) | (codes[i + 1]! << 5) | codes[i + 2]!);
+    const texts = data.databases.texts.records;
+    texts.push({ nextObject: OBJECT_ID_EOF, textOffset: indirect.length - 1, visible });
+    dungeon.addObjectToCell(at, dungeon.rnMaps.setPos(dungeon.rnMaps.rn(DBType.TEXT, texts.length - 1), p));
+  };
+  // The texts go on the last empty open square of the party's level; the filter's is the first.
+  const probe = freshGame();
+  const z = probe.ctx.party.state.position.z;
+  const map = probe.ctx.dungeon.getMap(z)!;
+  let at: Position | null = null;
+  for (let x = map.descriptor.width - 1; x >= 0 && !at; x--) {
+    for (let y = map.descriptor.height - 1; y >= 0 && !at; y--) {
+      const p = new Position(x, y, z);
+      if (((probe.ctx.dungeon.getCellFlag(p) >> 5) & 7) !== RoomType.OPEN) continue;
+      if (probe.ctx.dungeon.findFirstObject(p) !== OBJECT_ID_EOF) continue;
+      at = p;
+    }
+  }
+  if (!at) throw new Error('no empty open square');
+  const locr = (p: number): number => locationRelToInteger({ l: at.z, x: at.x, y: at.y, p });
+  const game = withFilter([[...describe(locr(1), 2, 9), ...describe(locr(2), 3, 9)]]);
+  addText(game, at, 0, 'ANOTHER CORNER', true);
+  addText(game, at, 1, 'FIRST', true);
+  addText(game, at, 2, '', true);
+  addText(game, at, 1, 'HIDDEN/LAST', false);
+  const result = view(game, ViewingFilterSite.DESCRIPTION, 0x43, game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, 0));
+  const phrases = result?.phraseTextOverrides ?? [];
+  console.log(`6. texts at corner 1 "FIRST" then a hidden "HIDDEN/LAST", at corner 2 an empty one: `
+    + `phrase 2 is ${JSON.stringify(phrases[2])}, phrase 3 ${JSON.stringify(phrases[3])}, the mask ${hex(result?.phraseMask ?? -1)}`);
+  check(phrases[2] === 'HIDDEN/LAST', "the corner's last text wins, hidden or not, code 28 read as '/', no line feed in front");
+  check(phrases[3] === '' && ((result?.phraseMask ?? 0) & 0x0c) === 0x0c, 'an empty text enables its phrase, empty');
+}
+
+/* ------------------------------- 7. GetText against DecodeText ------------------ */
+{
+  const tables = gameTablesOf(stockGraphics()).textDecode;
+  for (const name of ['dm-atari', 'conflux-3.5-b8']) {
+    const data = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(`static/gamefiles/${name}/dungeon.dat`)));
+    // A free record, linked to `RNnul`, keeps the index `ConvertToIndirectText` skipped.
+    const records = data.databases.texts.records.filter((r) => r.nextObject !== OBJECT_ID_NULL);
+    let same = 0;
+    let slashes = 0;
+    for (const record of records) {
+      const got = GetText(data, record.textOffset, tables);
+      // What `DecodeText` makes of the same codes: a line feed first, and code 28 a space,
+      // or a line feed in its place for the second in a row.
+      const want: number[] = [10];
+      let run = 0;
+      for (const c of got) {
+        run = c === '/' ? run + 1 : 0;
+        if (c !== '/') want.push(c.charCodeAt(0));
+        else if (run === 2) want[want.length - 1] = 10;
+        else want.push(32);
+      }
+      want.push(0);
+      const decoded = DecodeText(data, record, 0x8001, 990, tables);
+      if (decoded && decoded.join() === want.join()) same++;
+      if (got.includes('/')) slashes++;
+    }
+    console.log(`7. ${name}: ${same} of ${records.length} texts, ${slashes} with code 28, read by GetText as DecodeText reads them`);
+    check(same === records.length && records.length > 0, `every text in use in ${name} reads by GetText as by DecodeText`);
+  }
 }
 
 finish();

@@ -18,7 +18,7 @@ import { sw } from '../core/intCast';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_FLUX_CAGE, RN_MONSTER_DEATH, RN_POISON_CLOUD, RN_ZO_SPELL,
 } from '../core/spellRn';
-import type { ActuatorRecord, CreatureRecord, DsaDefinition, DsaState, TeleporterRecord, TextRecord } from '../data/dungeonTypes';
+import type { ActuatorRecord, CreatureRecord, DsaDefinition, DsaState, TeleporterRecord } from '../data/dungeonTypes';
 import type { SpellParameters } from './magicTypes';
 import {
   getActuatorDsaSelector,
@@ -48,7 +48,7 @@ import { monsterHorizontalSize } from '../data/tables/MonsterDesc';
 import { monsterDrawAsSize4, monsterInvisible, monsterPoisoned, monsterUnique } from './MonsterSystem';
 import { printWithSubstitution } from './PrintWithSubstitution';
 import { findChampionByFingerprint } from './Party';
-import { EDT_GLOBAL_TEXT } from '../data/DecodeText';
+import { EDT_GLOBAL_TEXT, GetText } from '../data/DecodeText';
 import { messageParametersKey, readGlobalVariables } from '../data/CsbwinExpool';
 
 /** Which of CSBWin's viewing-filter sites runs the filter (`doc/CSBwin-src/Character.cpp`). */
@@ -3547,26 +3547,20 @@ export class DsaSystem {
       ctx.phraseMask &= ~(1 << index);
       return;
     }
-    if (locrInt < 0) return;
+    // Every text at the location sets the phrase, so the last wins, and an empty one
+    // enables it too. CSBWin checks no `IsValid`: `FindFirstObject` finds nothing off the
+    // level's cells, and the port nothing on a level that does not exist, where CSBWin
+    // reads past its tables.
     const locr = locationRelFromInteger(locrInt);
-    if (!this.dungeon.isValidLocation(locr)) return;
-    const record = this.findTextRecordAtLocation(locr);
-    if (!record) return;
-    const text = this.dungeon.decodeTextString(record, 0x8001, this.ctx.tables.textDecode);
-    if (!text) return;
-    ctx.phraseTextOverrides[index] = text;
-    ctx.phraseMask |= 1 << index;
-  }
-
-  private findTextRecordAtLocation(locr: LocationRel): TextRecord | null {
     const pos = new Position(locr.x, locr.y, locr.l);
     for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = this.dungeon.rnMaps.decode(rn);
-      if (decoded.category !== DBType.TEXT) continue;
-      if ((decoded.position & 0x3) !== (locr.p & 0x3)) continue;
-      return this.dungeon.getTextRecord(rn);
+      const { category, position } = this.dungeon.rnMaps.decode(rn);
+      if (category !== DBType.TEXT) continue;
+      if (position !== locr.p) continue;
+      const record = this.dungeon.getTextRecord(rn)!;
+      ctx.phraseTextOverrides[index] = GetText(this.dungeon.getData(), record.textOffset, this.ctx.tables.textDecode);
+      ctx.phraseMask |= 1 << index;
     }
-    return null;
   }
 
   /** `RN::checkIndirectIndex(i)` (`doc/CSBwin-src/data.cpp:529-534`): a slot of the maps. */

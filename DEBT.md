@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C131 | `&DESCRIBE`'s custom phrase: CSBWin's `GetText`, every text at the location, an empty one too | S | ⏳ |
 | G2 | Twelve DSA filters, and the viewing filter's third site | L | ⏳ step 1 of 12 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
@@ -171,17 +170,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C131 ⏳ `&DESCRIBE`'s custom phrase: CSBWin's `GetText`, every text at the location, an empty one too
-
-`ModifyDescription` with a location (`doc/CSBwin-src/Character.cpp:3816-3830`) walks every
-text at it whose position matches, with no `IsValid`, and sets the phrase from each in
-turn, so the last wins; it reads each with `GetText` (`AsciiDump.cpp:362`), its own decoder
-of the compressed text, which substitutes `/` for code 28. It enables the phrase whatever
-the text holds, an empty one included. `DsaSystem.modifyDescription` refuses an invalid
-location, takes the first text, decodes it with `decodeTextString(record, 0x8001)`, and
-returns without enabling the phrase when the text is empty. Paying it needs `GetText`
-ported, and checked against `DecodeText` on every text of `dm-atari` and Conflux.
 
 ---
 

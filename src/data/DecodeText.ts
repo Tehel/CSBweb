@@ -111,6 +111,52 @@ function decodeTextFromWords(
     return Uint8Array.from(out);
 }
 
+/**
+ * `GetText` (`doc/CSBwin-src/AsciiDump.cpp:362-456`), the decoder `ModifyDescription` reads
+ * a custom phrase with: `DecodeText`'s codes and escape tables for a text that is not a
+ * wall's, but whatever the text's show bit, with no line feed in front, `/` for code 28,
+ * no length limit, and no `SubstituteCharacterNames`. `index` is the record's
+ * `DB2::index()`.
+ */
+export function GetText(
+    data: Pick<DungeonData, 'textWords' | 'indirectTextIndex' | 'compressedText'>,
+    index: number,
+    tables: TextDecodeTables,
+): string {
+    const start = textStart(data, index);
+    if (!start) return '';
+    const out: number[] = [];
+    let wordIndex = start.at;
+    let bitnum = 10;
+    let escapeCode = 0;
+    for (;;) {
+        if (bitnum < 0) {
+            wordIndex++;
+            bitnum = 10;
+        }
+        // Past the words CSBWin reads whatever memory follows; every text ends with code 31
+        // before them.
+        const word = start.words[wordIndex];
+        if (word === undefined) break;
+        const code = (word >> bitnum) & 0x1f;
+        bitnum -= 5;
+        if (escapeCode !== 0) {
+            if (escapeCode === 30) appendEscapeString(out, tables.byte10016, 8, code, Infinity);
+            else appendEscapeString(out, tables.byte10080, 2, code, Infinity);
+            escapeCode = 0;
+        } else if (code < 28) {
+            out.push(code === 26 ? 32 : code === 27 ? 46 : code + 65);
+        } else if (code === 28) {
+            out.push(0x2f);
+        } else if (code <= 30) {
+            escapeCode = code;
+        } else {
+            break;
+        }
+    }
+    return String.fromCharCode(...out);
+}
+
 function appendEscapeString(out: number[], table: Uint8Array, entrySize: number, index: number, max: number): void {
     const base = index * entrySize;
     for (let i = 0; i < entrySize && base + i < table.length; i++) {
