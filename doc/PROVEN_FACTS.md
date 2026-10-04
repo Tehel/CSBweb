@@ -4356,8 +4356,9 @@ filter (`Code11f52.cpp:928`), the missile-encounter filter (`:1645`), `AdjustSki
 `ActionNameFilter` (`:8653`); and so is the DSA `ActivateDSA` starts, "Ensure
 DSAparameters[0] = 0" (`Timer.cpp:1525`). A filter's count and words are therefore gone
 once it returns, and a DSA run after it, or the program that reached it, finds its own.
-`&PARAM@` reads no word past the count (`DSA.cpp`'s `STKOP_ParamFetch`), so the
-uninitialised words cannot be read. The party attack filter is the exception:
+`&PARAM@` reads no word past a count of 0 or more (`DSA.cpp`'s `STKOP_ParamFetch`), so the
+uninitialised words cannot be read: only a parameter message whose record is gone sets a
+count of -1, and on the outer array (see "`&PARAM@` compares the count unsigned"). The party attack filter is the exception:
 `SetupDSAParam` lays `ATTACKPARAMETERS` over the current array, writes its count as
 `sizeof(ATTACKPARAMETERS)`, 124, and zeroes its 31 words, at every `_Attack` that gets past
 its first two returns, filter or none (`Attack.cpp:1346-1360`, `:1673`). Evidence:
@@ -5538,3 +5539,15 @@ Each site reads `timerTypeModifier[pTimer->timerUByte9()]` when it needs it, not
 
 A `uByte9` past 2, which `&MESSAGE` can queue, reads past the array; the port reads it as
 3, no action. Evidence: `tools/dump-timer-modifier.ts`.
+
+## `&PARAM@` compares the count unsigned, and does nothing past 100
+
+`STKOP_ParamFetch` (`doc/CSBwin-src/DSA.cpp:2956-2998`) pops `i` and `n` as `ui32`. An `n`
+past 100, a negative one included, only says "too many parameters". Otherwise `n` is
+compared with the count, `pDSAparameters[0]`, unsigned: a count of -1, which a parameter
+message whose `EXPOOL` record is gone leaves (`Timer.cpp:1401`, `:1701`, `:2180`), is
+never short, and the `n` words are copied as they stand. Past a short count, the variables
+are marked `DVT_NonParameter` (`:2975-2979`) and keep their values, but any read of a
+variable that is not `DVT_WellDefined` zeroes it (`DSADBANK::Var`, `:141`, `NoValue`,
+`:227-238`), so they read 0, and `&PARAM!` skips them. `STKOP_ParamStore` (`:3000-3020`)
+does nothing past 100 either. Evidence: `tools/dump-dsa-parameters.ts`.

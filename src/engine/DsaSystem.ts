@@ -423,9 +423,13 @@ class DsaBank {
     return this.texts[index >>> 0] ?? '';
   }
 
+  /**
+   * `DSADBANK::Var(i)` (`doc/CSBwin-src/DSA.cpp:141`): a variable not well defined, never
+   * set or past a short `&PARAM@`, is zeroed by the read (`NoValue`, `:227-238`).
+   */
   getVar(index: number): number {
     if (index < 0 || index >= this.vars.values.length) return 0;
-    if (this.vars.definedFlags[index] === DsaVarType.Undefined) {
+    if (this.vars.definedFlags[index] !== DsaVarType.WellDefined) {
       this.vars.values[index] = 0;
       return 0;
     }
@@ -1897,14 +1901,20 @@ export class DsaSystem {
         bank.forceState = bank.stack.pop();
         break;
       case StkOp.PARAM_FETCH: {
-        const index = bank.stack.pop();
-        const count = bank.stack.pop();
-        let n = count;
-        if (n > 100) n = 100;
-        const paramCount = this.parameters[0] ?? 0;
+        // `i`, `n` and `j` are `ui32` (`doc/CSBwin-src/DSA.cpp:2956-2985`), so the count is
+        // compared unsigned: a count of -1, a parameter message whose record is gone, is
+        // never short, and the words are copied as they stand.
+        const index = bank.stack.pop() >>> 0;
+        let n = bank.stack.pop() >>> 0;
+        if (n > 100) {
+          this.ctx.host.trace('DSA &PARAM@ too many parameters');
+          break;
+        }
+        const paramCount = (this.parameters[0] ?? 0) >>> 0;
         if (n > paramCount) {
+          this.ctx.host.trace('DSA &PARAM@ non-existent parameter');
           for (let j = paramCount; j < n; j++) {
-            bank.setVar(index + j, 0);
+            bank.getVar(0); // `pdsaDbank->Var(0)` (`:2977`): a read of variable 0, as written
             bank.setVarState(index + j, DsaVarType.NonParameter);
           }
           n = paramCount;
@@ -1915,10 +1925,13 @@ export class DsaSystem {
         break;
       }
       case StkOp.PARAM_STORE: {
+        // `doc/CSBwin-src/DSA.cpp:3000-3020`, signed.
         const index = bank.stack.pop();
-        const count = bank.stack.pop();
-        let n = count;
-        if (n > 100) n = 100;
+        const n = bank.stack.pop();
+        if (n > 100) {
+          this.ctx.host.trace('DSA &PARAM! too many parameters');
+          break;
+        }
         for (let j = 0; j < n; j++) {
           if (bank.getVarState(index + j) !== DsaVarType.NonParameter) {
             this.parameters[1 + j] = bank.getVar(index + j);

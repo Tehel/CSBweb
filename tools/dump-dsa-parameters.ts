@@ -10,14 +10,22 @@
  *    `doc/CSBwin-src/Attack.cpp:1346-1360`): after an attack, with no party attack filter,
  *    a DSA a timer runs finds the count 124, `sizeof(ATTACKPARAMETERS)`, and the attack's
  *    words, its champion and its type first.
+ * 3. **`&PARAM@` compares the count unsigned** (`doc/CSBwin-src/DSA.cpp:2956-2985`): a
+ *    count of -1, a parameter message whose `EXPOOL` record is gone, copies the words as
+ *    they stand. A count short of `n` copies what there is, and the variables past it
+ *    read 0.
+ * 4. **Past 100, `&PARAM@` and `&PARAM!` do nothing** (`:2965-2968`, `:3009-3012`).
  *
  * Run: `npx tsx tools/dump-dsa-parameters.ts`
  */
+import { messageParametersKey } from '../src/data/CsbwinExpool';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { StkOp } from '../src/engine/DsaSystem';
+import type { Game } from '../src/engine/Game';
 import { AttackType } from '../src/engine/monsterTypes';
+import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { AdjustSkillsWhy, adjustSkills } from '../src/engine/skills';
-import { globalStore, int, op, run, varFetch, varStore } from './lib/dsa';
+import { globalStore, int, op, report, run, varFetch, varStore } from './lib/dsa';
 import { check, finish } from './lib/check';
 
 /** `(EDT_SpecialLocations << 24) | ESL_ADJUSTSKILLSFILTER` (`doc/CSBwin-src/Magic.cpp:259`). */
@@ -55,6 +63,48 @@ const ADJUST_SKILLS_FILTER_KEY = (3 << 24) | 6;
     + `and the words ${g[1]} ${g[2]}`);
   check(before[0] === 0 && g[0] === 124, 'the attack leaves its count, sizeof(ATTACKPARAMETERS), in the array');
   check(g[1] === 1 && g[2] === AttackType.atk_WARCRY, 'and its words, the champion and the attack type first');
+}
+
+/**
+ * The parameters a parameter message brings (`readRoomTimerParameters`): `words`, or,
+ * for null, a count of -1 and the words left as they are.
+ */
+function message(game: Game, words: number[] | null): void {
+  const timer = { function: TimerFunction.TT_PARAMETER_MESSAGE, index: 999 } as TimerEntry;
+  if (words) game.ctx.dungeon.writeExpoolRecord(messageParametersKey(timer.index), words);
+  game.systems.dsa.readRoomTimerParameters(timer);
+}
+
+/* ------------------------------- 3. the count, unsigned ------------------------ */
+{
+  const { game, again } = run([
+    ...int(77), varStore(13), ...int(77), varStore(14),
+    ...int(5), ...int(10), op(StkOp.PARAM_FETCH), ...report(10, 5),
+    op(StkOp.NUM_PARAM), globalStore(5),
+  ]);
+  message(game, [11, 22, 33]);
+  const short = again();
+  message(game, null);
+  const gone = again();
+  console.log(`3. &PARAM@ 5 on a count of ${short[5]}: ${short.slice(0, 5).join(' ')}; `
+    + `on a count of ${gone[5]}: ${gone.slice(0, 5).join(' ')}`);
+  check(short.slice(0, 5).join() === '11,22,33,0,0', 'a count of 3 copies three words, and the two past it read 0');
+  check(gone[5] === -1 && gone.slice(0, 5).join() === '11,22,33,0,0',
+    'a count of -1 is never short: the five words are copied as they stand');
+}
+
+/* ------------------------------- 4. nothing past 100 --------------------------- */
+{
+  const { game, again } = run([
+    ...int(77), varStore(20), ...int(101), ...int(20), op(StkOp.PARAM_FETCH), varFetch(20), globalStore(0),
+    ...int(4444), varStore(0), ...int(101), ...int(0), op(StkOp.PARAM_STORE),
+    ...int(1), ...int(30), op(StkOp.PARAM_FETCH), varFetch(30), globalStore(1),
+  ]);
+  message(game, [11, 22, 33]);
+  const g = again();
+  console.log(`4. &PARAM@ 101 leaves a variable of 77 at ${g[0]}; after &PARAM! 101, word 1 is ${g[1]}`);
+  check(g[0] === 77, '&PARAM@ 101 copies nothing and marks nothing');
+  check(g[1] === 11, '&PARAM! 101 stores nothing');
 }
 
 finish();

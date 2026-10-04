@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C126 | `&PARAM@` and `&PARAM!` go on past 100, and `&PARAM@` compares signed and zeroes | S | ⏳ |
 | C127 | `&MODIFYMESSAGE` masks its actions to two bits instead of capping them at 3 | S | ⏳ |
 | C128 | A door timer tests its square before the square's DSAs run, and tests its room type | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
@@ -173,20 +172,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C126 ⏳ `&PARAM@` and `&PARAM!` go on past 100, and `&PARAM@` compares signed and zeroes
-
-`&PARAM@` pops `i` and `n` as `ui32` (`doc/CSBwin-src/DSA.cpp:2956-2998`). Past 100 it
-only says "too many parameters". It compares `n` with the count unsigned, so a count of
--1, a parameter message whose `EXPOOL` record is gone, is never short of `n`, and the `n`
-words are copied. The variables past a short count are marked `DVT_NonParameter` and keep
-their values: `pdsaDbank->Var(0)` is a read of variable 0 (`:2977`, `DSA.cpp:141`).
-`&PARAM!` (`:3000-3020`) also does nothing past 100.
-
-The port's `PARAM_FETCH` and `PARAM_STORE` (`src/engine/DsaSystem.ts`) cut `n` to 100 and
-go on; `PARAM_FETCH` compares signed, so with a count of -1 it copies nothing, and sets the
-variables past the count to 0. Paying it: CSBWin's three branches, with a case of each in
-`tools/dump-dsa-parameters.ts`.
 
 ### C127 ⏳ `&MODIFYMESSAGE` masks its actions to two bits instead of capping them at 3
 
