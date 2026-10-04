@@ -1,14 +1,16 @@
-# Atari ST Disk Reference: Dungeon Master 1.2 (English) and 1.3 (French)
+# Atari ST Disk Reference: Dungeon Master 1.2 (English) and 1.3 (French), and Chaos Strikes Back's utility disk
 
 What the original Atari ST game disk holds that CSBWin does not: the boot chain, the FTL
 logo animation (`SWOOSH.IMG`) that ran before the title, and how the disk's data files
 differ from the `graphics.dat` and `dungeon.dat` CSBWin ships (`dm-windows/`). The
 English 1.2 disk is the reference throughout; the French 1.3 disk, the same but
-translated, has its own section at the end.
+translated, has its own section. The last section is Chaos Strikes Back's utility disk,
+whose champion portraits CSBWin does not port.
 
 This is not CSBWin-sourced. The authority is the disk itself. A citation `swoosh.img:$0070`
 is a byte offset into that file, and a citation `boot:$003a` is an offset into the boot
-sector, both taken from a 68000 disassembly. What is known about TOS (the XBIOS calls,
+sector, both taken from a 68000 disassembly. A citation `chaos:$4518` is an offset into
+the code of the utility's program, `CHAOS.FTL`. What is known about TOS (the XBIOS calls,
 the `Dosound` byte codes, the YM2149 registers) is the Atari's documented behaviour and
 is marked as such.
 
@@ -343,3 +345,105 @@ Neither is drawn in the wall font: `TEXT #44` is a scroll's (`SCROLL #31`, map 1
 sent when the Firestaff comes back unfused, and is printed in the message area. Both
 show the `2`. No text on a wall, in either file, has a code past the wall font, a line
 over 18 glyphs or more than four lines (`tools/dump-wall-text.ts`).
+
+## The Chaos Strikes Back utility disk
+
+`archive/CSB4S/CSB_UTIL.ST` (md5 `15ca0047d178997133837818576063da`, gitignored) is a raw
+sector image from a 2021 repack, `CSB4S.ZIP`, whose README says the utility disk is
+unchanged but for its copy protection. The filesystem is FAT12: single-sided, 10 sectors
+of 512 bytes a track, 2 sectors a cluster, 16 root entries. Every file is dated
+1989-12-01 except `BOOTER` and `SWOOSH.IMG` (1985-11-20). The root holds thirteen files
+and a folder:
+
+| File | Size | md5 | What it is |
+| --- | --- | --- | --- |
+| `BOOTER` | 1024 | `fdb97f2e…` | Not examined. |
+| `SWOOSH.IMG` | 3016 | `57a685a0…` | The FTL logo, byte-identical to DM 1.2's (`static/gamefiles/swoosh/swoosh.img`). |
+| `START.PRG` | 8102 | `f7fbb342…` | A GEMDOS program. It holds the string `A:\FTLCODE`. Not examined. |
+| `FTLCODE` | 15080 | `4b21e2d5…` | An FTL module (below). It holds the string `A:\SWITCH.DAT`. Not examined. |
+| `SWITCH.DAT` | 7405 | `b1fc60f2…` | Not examined. |
+| `CHAOS.FTL` | 42090 | `2de4a565…` | The utility, `doc/CSBwin-src/Chaos.cpp`'s original (below). |
+| `HINT.FTL` | 49436 | `8dfea415…` | An FTL module. Not examined. |
+| `HCSB.DAT` | 30793 | `708e113c…` | The hint oracle's, byte-identical to `static/gamefiles/csb/hcsb.dat`. |
+| `HCSB.HTC` | 66172 | `8ce69b54…` | Byte-identical to `static/gamefiles/csb/hcsb.hct`. |
+| `ANIMATE.FTL` | 21128 | `e882f1a6…` | An FTL module. Not examined. |
+| `ANIMATE.DAT` | 58683 | `9f8feb26…` | Not examined. |
+| `ANIMATE.SCR` | 1802 | `4174d6de…` | Not examined. |
+| `MINI.DAT` | 42815 | `531ea104…` | The new adventure, byte-identical to `static/gamefiles/csb/mini.dat`. |
+| `PORTRAIT\` | — | — | 24 champion portraits (below). |
+
+### The portraits
+
+`PORTRAIT\` holds one `<NAME>.CMP` file for each of DM's 24 champions, from `ALEX.CMP`
+to `ZED.CMP` (`WUTSE.CMP` for WU TSE). Each is 508 bytes:
+
+| Bytes | What |
+| --- | --- |
+| 0-15 | A header. Word 0 is `0x91a7` in all 24. The rest is `000a 0001 0001 0001 0000 0000 0000` in 15 files and `0000 0000 0001 0001 0000 0000 0000` in 9 (CHANI, IAIDO, LEIF, LEYLA, LINFLAS, MOPHUS, NABI, STAMM, WUUF). What the words mean is not established. |
+| 16-23 | The champion's name, NUL-padded. |
+| 24-43 | The title, NUL-padded. AZIZI, DAROOU, GOTHMOG and LINFLAS have none. |
+| 44-507 | The portrait, 464 bytes in a `CHARDESC`'s layout (`src/data/CsbwinCharacters.ts`): 32x29, four bitplanes, 16 bytes a line. |
+
+Each name is the name of exactly one hero behind DM's mirrors (`dm-atari/dungeon.dat`),
+and so names one cell of DM's portraits, graphic 26. Each portrait is a new drawing of
+that champion: none is any cell of graphic 26, and the nearest cell differs in 130 to
+745 of 928 pixels. Many are armed or armoured: Halk, for one, wears a horned helmet and
+carries a shield.
+
+`static/gamefiles/csb/utility-portraits.dat` holds them for the port. It is a
+`graphics.dat` of one item, stored uncompressed, and `GraphicsLoader` reads it. Item 0 is
+a 256x87 IMG1 picture laid out like graphic 26, so cell `charID` is the drawing of the
+champion whose DM portrait is cell `charID`. `tools/gen-utility-portraits.ts` builds the
+file from the disk image, and checks that every cell decodes to its `.CMP`'s pixels and
+goes back, through `writePortrait`, to its 464 bytes. Graphic 26 is byte-identical in the
+`graphics.dat` of `dm-atari`, `dm-atari-1.2`, `dm-atari-1.3-fr`, `dm-windows` and
+`kids-dungeon-24`. It is not in `3D2D1D`'s or Conflux's.
+
+### The utility, `CHAOS.FTL`
+
+`CHAOS.FTL` is an FTL module, as `FTLCODE`, `HINT.FTL` and `ANIMATE.FTL` are: all four
+open with the word `0x6160`. The header's third segment entry is offset `0x19d0` and
+length `0x8a9a`, which end at the file's end, and that segment is the code. The program
+is neither packed nor enciphered.
+
+**CSBWin's names are addresses in it.** `Chaos.cpp` names its functions after their
+offsets in that code: `_TAG000ede`, `_TAG000fc4`, `_TAG00179c`, `_TAG00260e`,
+`_TAG0026c4`, `TAG002724`, `_StartChaos` (`TAG002a38`), `_TAG004430` and `_TAG004518`
+each begin with `LINK A6` (`4e56`) at their offset. `TAG00439e`, which has no frame,
+begins `move.l d7,-(sp); moveq #0,d7`. `_ReadSavedGame` is `TAG001868`
+(`doc/CSBwin-src/Chaos.cpp:2206`).
+
+**"MAKE NEW ADVENTURE" reads no portrait.** Button 13 of `_TAG004518`
+(`doc/CSBwin-src/Chaos.cpp:3949-3973`) makes the same calls as the original, in the same
+order: `chaos:$491a`-`$4972` calls `$352c` (`InvertButton`), `$260e`, `$1868`, `$26c4`,
+`$439e`, `$2724`, `$439e`, `$0fc4`, `$352c`. A new adventure's portraits are the editor's
+copies, which `TAG00439e` swaps into the champions around `TAG002724`.
+
+**The portraits are the champion editor's, by hand.** Of the buttons CSBWin leaves to
+`DontDoThis`, button 11 (`chaos:$476a`) calls `$2478`, which calls `$20da`, which calls
+`$1fea`. The program's file calls push a GEMDOS number and `jsr $9a(a5)`, and `$1fea` is
+the only function that does so with `0x1a`, `0x4e` and `0x4f` (`Fsetdta`, `Fsfirst`,
+`Fsnext`): it lists a folder. Button 12 (`chaos:$4872`) calls `$1de6`, which calls
+`_TAG000ede` (the slot and "REPLACE …?" prompt) and `_TAG000fc4` (the game's write), and
+calls `0x3c` (`Fcreate`) through `$9a(a5)` as `_TAG000fc4` does. The data holds the paths
+`A:\PORTRAIT\` and `.CMP`, the buttons GAME, PORTRAIT and CANCEL, and these messages,
+which `UtilityDiskMessages` (`doc/CSBwin-src/Chaos.cpp:275-318`) keeps as empty strings.
+Taken in the order they are stored, CSBWin's own messages fall at their own indices, and
+these fall at the empty ones:
+
+| Index | Message |
+| --- | --- |
+| 3 | YOU MAY LOAD EITHER / A SAVED GAME OR / A CHAMPION PORTRAIT |
+| 4 | YOU MAY SAVE EITHER / THE WHOLE GAME OR / $'S PORTRAIT |
+| 5 | SELECT A / CHAMPION / PORTRAIT |
+| 7 | THIS WILL DESTROY ALL / INFORMATION ON THE DISK / IN @ |
+| 11 | PLEASE WAIT . . . / FORMATTING DISK |
+| 13 | THERE ARE NO PORTRAITS / ON THIS DISK! |
+| 16 | ERROR WHILE / FORMATTING DISK |
+| 17 | ERROR WHILE / SAVING CHAMPION |
+| 18 | THIS CHAMPION / IS DAMAGED! |
+| 19 | THIS CHAMPION / CANNOT BE USED WITH / THIS ADVENTURE |
+
+The bodies of `$1de6`, `$1fea`, `$20da` and `$2478` are not disassembled, so it is not
+established what loading a `.CMP` does to a champion's name and title, what the header
+words select, or when message 19 is shown.

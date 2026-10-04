@@ -114,6 +114,7 @@ In payoff order: the first row is the next item.
 | X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
 | X5 | Extra: 3D2D1D's vertical moves and gravity | L | ⏸️ |
 | X6 | Extra: the Hint Oracle's hints in the game, as the party moves | M | ⏸️ |
+| X8 | Extra: RISE's own dialog, and the utility disk's portraits on DM's champions | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G29 are the active list. `F3` is a phase, whose status is
@@ -126,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C125 · D17 · E21 · F14 · G30 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C125 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -747,6 +748,79 @@ The extra offers the same hints live, from the party's position in the running g
 A `tools/` check with the setting on: walk a CSB party onto a square with hints (level 0
 (3,23) offers CREATURES, THE MAZE and FULYA PIT, in that order), across a teleporter
 and down a pit, and check what the extra offers after each move.
+
+### X8 ⏸️ RISE's own dialog, and the utility disk's portraits on DM's champions
+
+RISE (`src/renderer/intro/PrisonDoor.ts`, `doc/SAVES.md` → "RISE makes a save of its own")
+is CSBWin's UTILITY → "MAKE NEW ADVENTURE". The original utility could also give a
+champion one of 24 redrawn portraits of DM's champions, the `.CMP` files of its disk's
+`PORTRAIT\` folder. That was the champion editor's LOAD → PORTRAIT, by hand, one champion at
+a time (`doc/ATARI_ST_DISK_REFERENCE.md` → "The Chaos Strikes Back utility disk"). CSBWin
+does not port the editor, and the port will not: the 68000 binary is its only source. The
+extra does the editor's work for the player: a DM champion raised into CSB gets the
+redrawn portrait of the champion they are.
+
+The X rules' setting does not apply. RISE is the port's own, and the author wants the
+upgrade on by default, so it is a checkbox in RISE's dialog, checked whenever the dialog
+opens, not `UISettings.extras`. Unchecked, RISE makes CSBWin's adventure byte for byte, as
+it does now. The upgrade is saved: the portraits are in the new file, in CSBWin's own
+`CHARDESC` field, so CSBWin shows them too.
+
+Two steps, one commit each:
+
+1. **The dialog.** RISE opens `SaveMenu` in its `rise` mode
+   (`src/renderer/ui/SaveMenu.ts`): the load-only chooser over every data set's saves.
+   Nothing in it says what RISE does, and it offers EXPORT whenever a save is selected
+   (`canExport` does not look at the mode), though exporting has nothing to do with raising
+   a party. In `rise` mode: no EXPORT, and a text saying what LOAD does. It makes a new
+   Chaos Strikes Back adventure with the chosen save's party, a finished DM game's or the
+   prison's. The adventure is stored as a new save (`-csb`), and the source is left as it
+   is. Where the text goes (the title panel, or the preview panel before a save is chosen),
+   and whether LOAD's label should name the action, are the author's to decide before this
+   is taken. `tools/dump-save-menu.ts` checks the mode, and so do the golden frames if one
+   shows the dialog.
+2. **The portraits.**
+   - **The data.** `static/gamefiles/csb/utility-portraits.dat`
+     (`tools/gen-utility-portraits.ts`) is a `graphics.dat` whose item 0 is laid out like
+     DM's graphic 26. Cell `charID` is the redrawn face of the champion whose DM portrait
+     is cell `charID`. The page reads it with `GraphicsLoader` from the running set's
+     folder, beside `mini.dat` (`readMiniDat`, `src/main.ts`). A set without the file
+     shows no checkbox.
+   - **Which champion: by portrait, never by name.** REINCARNATE lets the player give
+     a champion a new name and title, so a name proves nothing. A champion's portrait
+     is a cell of DM's graphic 26, pixel for pixel (`tools/dump-csbwin-load.ts`). The
+     champion whose decoded portrait (`readCsbwinCharacter`) is exactly cell `charID`
+     gets cell `charID` of the new file. A champion that matches no cell keeps their
+     portrait: the prison's champions, whose faces are CSB's own graphic 26, and any
+     portrait drawn in an editor. The reference is DM's graphic 26 from
+     `dm-atari/graphics.dat`, not the source save's set. It is byte-identical in every DM
+     set and in `kids-dungeon-24`, but `3D2D1D` and Conflux have their own faces in those
+     cells.
+   - **Where.** On the source's `CHARDESC`s, with `writePortrait`, before `TAG002724`
+     copies them into `mini.dat` (`makeNewAdventure`, `src/engine/Chaos.ts`). That is
+     where the utility's `TAG00439e` swaps the editor's portraits in
+     (`doc/CSBwin-src/Chaos.cpp:3796-3815`), so the portraits are what the original
+     writes after a LOAD → PORTRAIT of each champion's `.CMP`. Names and titles are never
+     touched, whatever the `.CMP` holds: the author's rule (what the original editor does
+     to them is not established). `Chaos.ts` stays CSBWin's: the portraits come in as an
+     argument, and `GameSaves.makeNewAdventure` passes them only when the box is
+     checked.
+   - **The checkbox.** In `rise` mode only, checked whenever the dialog opens. For
+     example, a two-state button in the EXPORT frame that step 1 frees, reading UPGRADE
+     PORTRAITS or KEEP PORTRAITS; its look is the author's call. The prison's "BEGIN THE
+     ADVENTURE?" (`askBeginAdventure`) needs none: its party is the prison's, whose faces
+     match no DM cell.
+
+   The check, in `tools/dump-rise.ts`:
+   - **`csbgame7.dat`, checked:** every champion has the new file's cell for their DM
+     portrait, with the same name and title; every other byte matches the unchecked
+     adventure.
+   - **`csbgame7.dat`, unchecked:** the same bytes as now.
+   - **`csbgame-early-2hero-renamed.dat`:** the renamed champion is upgraded by portrait,
+     and keeps their new name.
+   - **The prison's four:** their portraits are unchanged either way.
+
+   `doc/SAVES.md`'s RISE paragraph then describes the checkbox.
 
 ---
 
