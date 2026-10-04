@@ -32,13 +32,10 @@ const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
 
 /** What the port lacks, in `STKOP` order. A ported family comes off this list. */
 const LEFT: readonly string[] = [
-  'OVERLAY', 'DISABLE_SAVES', 'FETCH_EX_CELL_FLG', 'STORE_EX_CELL_FLG',
-  'LOC_TO_ABS_COORD', 'PALETTE', 'I_DEL', 'I_ADD', 'I_CREATE_CLOUD', 'I_CAST',
+  'OVERLAY', 'DISABLE_SAVES', 'PALETTE', 'I_DEL', 'I_ADD', 'I_CREATE_CLOUD', 'I_CAST',
   'I_MONSTER_STORE', 'I_CHAR_STORE', 'I_MOVE', 'I_COPY', 'I_CELL_STORE', 'I_THROW',
-  'I_INDIRECT', 'I_DELAY', 'I_DEL_MON', 'I_INS_MON', 'JUMP_GEAR', 'GOSUB_GEAR',
-  'NEIGHBORS', 'BIT_COUNT', 'THIS_CELL', 'I_CAUSE_POISON', 'MULTIPLIER_FETCH',
-  'SWAP_CHARACTER', 'I_FILTERED_CAST', 'I_SWAP_CHARACTER', 'PARTY_DISTANCE',
-  'DSA_INFO_FETCH', 'GET_SKIN', 'SET_SKIN', 'THIS_DSA_ID', 'VSET', 'JITTER',
+  'I_INDIRECT', 'I_DELAY', 'I_DEL_MON', 'I_INS_MON', 'I_CAUSE_POISON',
+  'SWAP_CHARACTER', 'I_FILTERED_CAST', 'I_SWAP_CHARACTER', 'GET_SKIN', 'SET_SKIN', 'JITTER',
 ];
 
 /** `EX_AMPERSAND`'s three labels that are not a `case` of its switch (point 1). */

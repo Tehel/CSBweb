@@ -5554,3 +5554,17 @@ are marked `DVT_NonParameter` (`:2975-2979`) and keep their values, but any read
 variable that is not `DVT_WellDefined` zeroes it (`DSADBANK::Var`, `:141`, `NoValue`,
 `:227-238`), so they read 0, and `&PARAM!` skips them. `STKOP_ParamStore` (`:3000-3020`)
 does nothing past 100 either. Evidence: `tools/dump-dsa-parameters.ts`.
+
+## A DSA's extended cell flags are one `EXPOOL` record a column, and `&ECF!` re-adds it
+
+`&ECF@` and `&ECF!` (`doc/CSBwin-src/DSA.cpp:3270-3327`) key a record on
+`(EDT_ExtendedCellFlags << 24) | (l << 5) | x`: eight longwords, one a flag, holding the
+flag of the column's row `y` in bit `y`, the layout `GetExtendedCellFlag` reads
+(`data.cpp:1679-1690`). `&ECF!` takes the record out with `expool.Read`, zeroes it if it
+is missing or shorter than eight, changes the one cell's bits and writes it back, so the
+column keeps exactly one record and its other rows' flags; only the low eight bits of the
+flags are kept. `ExamineCell`, behind `&THISCELL` and `&NEIGHBORS` (`:2210-2320`), gives a
+door its state's bit with `=` rather than `|=` (`:2276`), which changes nothing since the
+bits are still 0 there, and has no case for room type 7, whose cell matches no mask. `&J*`
+and `&G*` both pop the state first and the column second (`:4738-4739`, `:4749-4750`).
+Evidence: `tools/dump-dsa-dungeon.ts`.

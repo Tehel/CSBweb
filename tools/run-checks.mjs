@@ -103,6 +103,7 @@ const CHECKS = [
   { tool: 'dump-dsa-monsters.ts' },
   { tool: 'dump-dsa-text.ts' },
   { tool: 'dump-dsa-message.ts' },
+  { tool: 'dump-dsa-dungeon.ts' },
   { tool: 'dump-timer-modifier.ts' },
   { tool: 'dump-flip.ts' },
   { tool: 'dump-db-reuse.ts' },

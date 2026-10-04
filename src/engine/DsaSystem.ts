@@ -256,6 +256,8 @@ export enum StkOp {
   NUM_PARAM = 139,
 }
 
+/** `EDT_ExtendedCellFlags` (`doc/CSBwin-src/CSB.h:1532`): eight longwords, a bit a row. */
+const EDT_EXTENDED_CELL_FLAGS = 2;
 const EDT_SPECIAL_LOCATIONS = 3;
 const ESL_MISSILE_ENCOUNTER_FILTER = 13;
 const ESL_ADJUST_SKILLS_FILTER = 6;
@@ -497,6 +499,20 @@ function readSignedWord(word: number): number {
 
 /** `bitCounts` (`doc/CSBwin-src/DSA.cpp:45`): the set bits of a nibble. */
 const BIT_COUNTS = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
+
+/** `teleporterBit` (`doc/CSBwin-src/DSA.cpp:2208`): `ExamineCell`'s bit for a teleporter's `what`. */
+const TELEPORTER_BIT = [11, 15, 13, 17];
+
+/** `(EDT_ExtendedCellFlags << 24) | (l << 5) | x`: a column's record of extended cell flags. */
+function extendedCellFlagsKey(locr: LocationRel): number {
+  return ((EDT_EXTENDED_CELL_FLAGS << 24) | (locr.l << 5) | locr.x) >>> 0;
+}
+
+/** `JUMP*`'s transfer, which `execute` takes as `EX_JUMP`'s (`doc/CSBwin-src/DSA.cpp:4737-4745`). */
+interface GearJump {
+  state: number;
+  col: number;
+}
 
 /** `EDT_Character` (`doc/CSBwin-src/CSB.h:1568`): a champion in the wings, keyed by fingerprint. */
 const EDT_CHARACTER = 8;
@@ -1449,7 +1465,11 @@ export class DsaSystem {
             }
             nextState = curState + relState;
             const subcode = ((word >> 6) & 0x7f) + (opcode === DsaCommand.AMPERSAND2 ? 128 : 0);
-            this.executeAmpersand(subcode, bank);
+            const jump = this.executeAmpersand(subcode, bank, exPkt);
+            if (jump) {
+              transferState = jump.state;
+              transferCol = jump.col;
+            }
             break;
           }
           case DsaCommand.OVERRIDE: {
@@ -1496,7 +1516,7 @@ export class DsaSystem {
     return finalState;
   }
 
-  private executeAmpersand(subcode: number, bank: DsaBank): void {
+  private executeAmpersand(subcode: number, bank: DsaBank, exPkt: ExecutionPacket): GearJump | void {
     switch (subcode) {
       case StkOp.TWO_DROP:
         bank.stack.pop();
@@ -2457,6 +2477,138 @@ export class DsaSystem {
         bank.stack.push(count);
         break;
       }
+      case StkOp.LOC_TO_ABS_COORD: {
+        // `doc/CSBwin-src/DSA.cpp:3253-3269`, `LOCATIONABS::operator =` (`:320-327`): the
+        // level's offsets added, read past the descriptors for a level that is not there.
+        const locr = locationRelFromInteger(bank.stack.pop());
+        const descriptor = this.dungeon.getMap(locr.l)?.descriptor;
+        bank.stack.push(locr.l);
+        bank.stack.push(locr.x + (descriptor?.offsetX ?? 0));
+        bank.stack.push(locr.y + (descriptor?.offsetY ?? 0));
+        bank.stack.push(locr.p);
+        break;
+      }
+      case StkOp.FETCH_EX_CELL_FLG: {
+        // `doc/CSBwin-src/DSA.cpp:3270-3297`: the cell's bit of each of the eight flags,
+        // flag 0 in bit 0, all clear without a record of eight.
+        const locr = locationRelFromInteger(bank.stack.pop());
+        const record = this.dungeon.locateExpoolRecord(extendedCellFlagsKey(locr));
+        let flags = 0;
+        if (record && record.length >= 8) {
+          const mask = (1 << locr.y) >>> 0;
+          for (let i = 0; i < 8; i++) {
+            if (((record[i]! & mask) >>> 0) !== 0) flags |= 0x100;
+            flags >>>= 1;
+          }
+        }
+        bank.stack.push(flags);
+        break;
+      }
+      case StkOp.STORE_EX_CELL_FLG: {
+        // `doc/CSBwin-src/DSA.cpp:3298-3327`: the record is taken out, its cell's bits
+        // set from the low eight of `flags`, and written back; a missing or short record
+        // starts at zero.
+        const loc = bank.stack.pop();
+        let flags = bank.stack.pop() >>> 0;
+        const locr = locationRelFromInteger(loc);
+        const key = extendedCellFlagsKey(locr);
+        const read = this.dungeon.readExpoolRecord(key);
+        const record = read && read.length >= 8 ? read.slice(0, 8) : new Array<number>(8).fill(0);
+        const mask = (1 << locr.y) >>> 0;
+        for (let i = 0; i < 8; i++) {
+          record[i] = (record[i]! & ~mask) >>> 0;
+          if (flags & 1) record[i] = (record[i]! | mask) >>> 0;
+          flags >>>= 1;
+        }
+        this.dungeon.writeExpoolRecord(key, record);
+        break;
+      }
+      case StkOp.MULTIPLIER_FETCH: {
+        // `doc/CSBwin-src/DSA.cpp:3974-3990`: `level` is signed, so a negative one reads
+        // before the descriptors, and 1 past the last.
+        const level = bank.stack.pop();
+        if (level < this.dungeon.getMapCount()) {
+          bank.stack.push(this.dungeon.getMap(level)?.descriptor.difficulty ?? 0);
+        } else {
+          bank.stack.push(1);
+        }
+        break;
+      }
+      case StkOp.PARTY_DISTANCE: {
+        // `doc/CSBwin-src/DSA.cpp:4057-4073`: steps on the party's level, minus the levels
+        // between otherwise.
+        const locr = locationRelFromInteger(bank.stack.pop());
+        const party = this.ctx.party.state.position;
+        if (party.z === locr.l) {
+          bank.stack.push(Math.abs(party.x - locr.x) + Math.abs(party.y - locr.y));
+        } else {
+          bank.stack.push(-Math.abs(party.z - locr.l));
+        }
+        break;
+      }
+      case StkOp.JUMP_GEAR: {
+        // `doc/CSBwin-src/DSA.cpp:4737-4745`: the state, then the column, from the stack.
+        const state = bank.stack.pop();
+        const col = bank.stack.pop();
+        return { state, col };
+      }
+      case StkOp.GOSUB_GEAR: {
+        // `doc/CSBwin-src/DSA.cpp:4746-4767`: `EX_GOSUB`'s call, the master's program.
+        const state = bank.stack.pop();
+        const msg = bank.stack.pop();
+        this.execute({
+          ...exPkt,
+          curState: state,
+          column: msg,
+          subroutineLevel: exPkt.subroutineLevel + 1,
+          slave: exPkt.master,
+        }, bank);
+        break;
+      }
+      case StkOp.THIS_CELL:
+        this.examineCell(4, 4, bank);
+        break;
+      case StkOp.THIS_DSA_ID:
+        // `doc/CSBwin-src/DSA.cpp:4822-4828`: the slave's RN, `ConvertToInteger`.
+        bank.stack.push(exPkt.rnSlave);
+        break;
+      case StkOp.NEIGHBORS:
+        this.examineCell(0, 3, bank);
+        break;
+      case StkOp.BIT_COUNT: {
+        // `doc/CSBwin-src/DSA.cpp:4832-4849`.
+        const v = bank.stack.pop() >>> 0;
+        let count = 0;
+        for (let shift = 0; shift < 32; shift += 4) count += BIT_COUNTS[(v >>> shift) & 0x0f]!;
+        bank.stack.push(count);
+        break;
+      }
+      case StkOp.VSET:
+        this.vset(bank);
+        break;
+      case StkOp.DSA_INFO_FETCH: {
+        // `doc/CSBwin-src/DSA.cpp:2439-2470`: a type-47 actuator's selector, state and
+        // parameters, -1 for each otherwise.
+        let dsaType = -1;
+        let dsaState = -1;
+        let dsaPA = -1;
+        let dsaPB = -1;
+        const n = bank.stack.pop();
+        if (this.isValidObjectId(n) && this.dungeon.rnMaps.dbType(n) === DBType.ACTUATOR) {
+          const rec = this.dungeon.getActuatorRecord(n);
+          if (rec && getActuatorType(rec) === 47) {
+            dsaType = getActuatorDsaSelector(rec);
+            dsaState = getActuatorDsaState(rec);
+            dsaPA = getActuatorParameterA(rec);
+            dsaPB = getActuatorParameterB(rec);
+          }
+        }
+        bank.stack.push(dsaType);
+        bank.stack.push(dsaState);
+        bank.stack.push(dsaPA);
+        bank.stack.push(dsaPB);
+        break;
+      }
       default:
         if (!this.warnedOps.has(subcode)) {
           this.warnedOps.add(subcode);
@@ -2470,6 +2622,113 @@ export class DsaSystem {
    * `NOFILTER` (`doc/CSBwin-src/DSA.cpp:457-462`): an operation that changes the dungeon,
    * run from a filter, warns the dungeon's author.
    */
+  /**
+   * `ExamineCell` (`doc/CSBwin-src/DSA.cpp:2210-2320`), `&THISCELL` and `&NEIGHBORS`:
+   * a result bit for each cell from `first` to `last` (0 to 3 the four neighbours, north
+   * first and clockwise; 4 the cell itself) that has one of the mask's bits of what it is
+   * (0 to 24) and one of what is on it (29 to 31).
+   */
+  private examineCell(first: number, last: number, bank: DsaBank): void {
+    const criteriaMask = bank.stack.pop() >>> 0;
+    const locr = locationRelFromInteger(bank.stack.pop());
+    let resultBit = 1;
+    let result = 0;
+    for (let i = first; i <= last; i++) {
+      const cellLocr = { ...locr };
+      let cellBits = 0;
+      switch (i) {
+        case 0: cellLocr.y--; break;
+        case 1: cellLocr.x++; break;
+        case 2: cellLocr.y++; break;
+        case 3: cellLocr.x--; break;
+      }
+      if (!this.dungeon.isValidLocation(cellLocr)) {
+        cellBits |= (1 << 0) | (1 << 31);
+      } else {
+        const cellPos = new Position(cellLocr.x, cellLocr.y, cellLocr.l);
+        const cf = this.dungeon.getCellFlag(cellPos);
+        switch ((cf >> 5) & 7) {
+          case RoomType.STONE:
+            cellBits |= (1 << 1) | (1 << 31);
+            break;
+          case RoomType.OPEN:
+            cellBits |= 1 << 19;
+            cellBits |= this.cellContents(cellLocr);
+            break;
+          case RoomType.PIT:
+            if (cf & 1) cellBits |= 1 << 4; // a false pit
+            else if (cf & 0x8) cellBits |= 1 << 2; // open
+            else cellBits |= 1 << 3;
+            cellBits |= this.cellContents(cellLocr);
+            break;
+          case RoomType.DOOR:
+            cellBits = 1 << ((cf & 7) > 5 ? 9 : (cf & 7) + 5);
+            cellBits |= this.cellContents(cellLocr);
+            break;
+          case RoomType.TELEPORTER: {
+            const rn = this.findFirstTeleporter(cellPos);
+            if (rn !== OBJECT_ID_EOF) {
+              const what = this.dungeon.getTeleporterRecord(rn)?.scope ?? 0;
+              const bit = TELEPORTER_BIT[what & 3]! + ((cf & 8) !== 0 ? 0 : 1);
+              cellBits |= 1 << bit;
+            }
+            cellBits |= this.cellContents(cellLocr);
+            break;
+          }
+          case RoomType.FALSEWALL:
+            if (cf & 0x04) cellBits |= 1 << 22;
+            else if (cf & 0x01) cellBits |= 1 << 20;
+            else cellBits |= 1 << 21;
+            cellBits |= this.cellContents(cellLocr);
+            break;
+          case RoomType.STAIRS:
+            if (cf & 0x04) cellBits |= 1 << 23;
+            else cellBits |= 1 << 24;
+            cellBits |= this.cellContents(cellLocr);
+            break;
+        }
+      }
+      if ((criteriaMask & cellBits & 0x01ffffff) !== 0 && (criteriaMask & cellBits & 0xe0000000) !== 0) {
+        result |= resultBit;
+      }
+      resultBit <<= 1;
+    }
+    bank.stack.push(result);
+  }
+
+  /** `Contents` (`doc/CSBwin-src/DSA.cpp:2200-2205`): the party, else a monster, else nothing. */
+  private cellContents(locr: LocationRel): number {
+    const party = this.ctx.party.state.position;
+    if (party.z === locr.l && party.x === locr.x && party.y === locr.y) return 1 << 29;
+    if (this.dungeon.findFirstMonster(new Position(locr.x, locr.y, locr.l)) !== OBJECT_ID_EOF) return 1 << 30;
+    return 0x80000000 | 0;
+  }
+
+  /**
+   * `&VSET` (`doc/CSBwin-src/DSA.cpp:4850-4897`): `n` variables from `dst` set to `-src`
+   * for a negative `src`, to `src - 100` past 99, and otherwise copied from the variables
+   * at `src`, their states with them. `n` and `dst` are unsigned, `src` signed. A count
+   * whose sum with `dst` or `src` wraps past 2^32 runs CSBWin past its 100 variables; the
+   * port stops at the last (`DEBT.md` H, "An index CSBWin does not bound reads nobody").
+   */
+  private vset(bank: DsaBank): void {
+    let n = bank.stack.pop() >>> 0;
+    const dst = bank.stack.pop() >>> 0;
+    const src = bank.stack.pop() | 0;
+    if (dst > 99) return;
+    if (dst + n > 100) n = 100 - dst;
+    const { values, definedFlags } = bank.vars;
+    if (src < 0 || src > 99) {
+      const value = src < 0 ? -src : src - 100;
+      for (let i = 0; i < n && dst + i < 100; i++) values[dst + i] = value;
+      definedFlags.fill(DsaVarType.WellDefined, dst, Math.min(100, dst + n));
+    } else {
+      if (src + n > 100) n = 100 - src;
+      values.copyWithin(dst, src, Math.min(100, src + n));
+      definedFlags.copyWithin(dst, src, Math.min(100, src + n));
+    }
+  }
+
   private noFilter(bank: DsaBank): void {
     if (bank.filter) this.ctx.host.trace('Filter Modifying Dungeon');
   }
