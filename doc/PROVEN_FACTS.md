@@ -3597,6 +3597,22 @@ negative adjustment leaves the sum's low 16 bits (`:4366-4374`); and `value(valu
 sets a waterskin's two bits (`CSB.h:1274`), so an empty one emptied again holds 3
 (`:4457-4460`). `tools/dump-feeding-filter.ts`.
 
+## The character death filter and the damage filter run their location's first DSA
+
+`KillCharacter` and `DamageCharacter` each walk the chain at their filter's location,
+`ESL_CHARDEATHFILTER` (11) and `ESL_DAMAGECHARFILTER` (15, `doc/CSBwin-src/CSB.h:1546`,
+`:1550`), and `break` once the first type-47 actuator has run (`Character.cpp:2586`,
+`:2888`), each on parameters of its own (`:2550`, `:2844`). The death filter runs first
+thing, before the champion's HP are set to 0 (`:2535-2596`), with a count of 1 and the
+champion's index; nothing is read back. The damage filter runs once the damage is worked
+out, wounds and wake-up included, and before it is added to `d.PendingDamage`, with a count
+of 7: the champion's index and fingerprint, the damage asked for, the damage worked out,
+the wound mask, the kind (`P4`) and 0 (`:2876-2883`). Its word 3 comes back into `D7L`
+(`:2886`), and the low word is what is added and returned (`:2900-2901`), so a DSA may deal
+0, or a negative amount, which takes damage off what is pending. The `if (D7W <= 0) D7W = 0`
+before it (`:2814-2817`) never fires: every path to it has returned on a damage of 0 or
+less. `tools/dump-char-damage-filter.ts`.
+
 ## The `QueueSound` calls, and the level each is on
 
 | Sound | CSBWin's call | Ordinal → SND item | Level |

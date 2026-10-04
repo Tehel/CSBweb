@@ -281,6 +281,8 @@ const PARTY_ATTACK_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_PARTY_ATTACK
 const ESL_SOUND_FILTER = 8;
 const ESL_ACTION_NAME_FILTER = 10;
 const ESL_FEEDING_FILTER = 1;
+const ESL_CHAR_DEATH_FILTER = 11;
+const ESL_DAMAGE_CHAR_FILTER = 15;
 const ESL_INDIRECT_ACTIONS = 5;
 const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
 
@@ -700,9 +702,11 @@ export class DsaSystem {
    * its square runs in turn, a filter call apiece (`ProcessDSAFilter`), on a timer that
    * names the square with function and position 0, and on the current parameters: a site
    * with a `NEWDSAPARAMETERS` calls this inside `newDsaParameters`. `each` sets a DSA's
-   * parameters, calls `run`, and reads back what it needs. False when none ran.
+   * parameters, calls `run`, and reads back what it needs. False when none ran. A site
+   * that `break`s once its DSA has run (`KillCharacter`'s, `Character.cpp:2586`) passes
+   * `firstOnly`, and only the first runs.
    */
-  private forEachFilterDsa(esl: number, each: (run: () => void) => void): boolean {
+  private forEachFilterDsa(esl: number, each: (run: () => void) => void, firstOnly = false): boolean {
     const special = this.dungeon.getSpecialLocation((EDT_SPECIAL_LOCATIONS << 24) | esl);
     if (special === null) return false;
     const locrFilter = locationRelFromInteger(special);
@@ -716,6 +720,7 @@ export class DsaSystem {
       if (!rec || getActuatorType(rec) !== 47) continue;
       found = true;
       each(() => this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars()));
+      if (firstOnly) break;
     }
     return found;
   }
@@ -773,6 +778,38 @@ export class DsaSystem {
       block = feedParametersFromWords((i) => this.getParameter(i));
     });
     return block;
+  }
+
+  /**
+   * The character death filter (`doc/CSBwin-src/Character.cpp:2535-2589`), which
+   * `KillCharacter` runs before it touches the champion: the first DSA at
+   * `ESL_CHARDEATHFILTER`'s location, on parameters of its own, a count of 1 and the
+   * champion's index. Nothing comes back.
+   */
+  charDeathFilter(chIdx: number): void {
+    this.newDsaParameters(() => this.forEachFilterDsa(ESL_CHAR_DEATH_FILTER, (run) => {
+      this.setParameters(1, [chIdx]);
+      run();
+    }, true));
+  }
+
+  /**
+   * The damage filter (`doc/CSBwin-src/Character.cpp:2829-2893`), which `DamageCharacter`
+   * runs on the damage it is about to add to `d.PendingDamage`: the first DSA at
+   * `ESL_DAMAGECHARFILTER`'s location, on parameters of its own, a count of 7 and the
+   * champion's index and fingerprint, the damage asked for, the damage worked out, the
+   * wound mask, the kind, and 0 (`:2876-2883`). Back comes word 3, the damage worked out,
+   * as a whole longword, of which `DamageCharacter` uses the low word (`:2886`, `:2900`);
+   * `dealt` when no DSA stands there.
+   */
+  damageCharFilter(chIdx: number, fingerprint: number, damage: number, dealt: number, mask: number, kind: number): number {
+    let result = dealt;
+    this.newDsaParameters(() => this.forEachFilterDsa(ESL_DAMAGE_CHAR_FILTER, (run) => {
+      this.setParameters(7, [chIdx, fingerprint, damage, dealt, mask, kind, 0]);
+      run();
+      result = this.getParameter(3);
+    }, true));
+    return result;
   }
 
   /**

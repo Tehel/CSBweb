@@ -573,12 +573,14 @@ export class MonsterAttack {
       if (party.sleeping) wakeUp(this.ctx);
     }
 
-    if (dealt <= 0) return 0;
+    if (dealt <= 0) dealt = 0;
 
-    // `d.PendingDamage[chIdx] += D7W` (`doc/CSBwin-src/Character.cpp:2900`): the HP
-    // stay as they are until the tick's `DisplayCharacterDamage`, which takes the sum
-    // off, kills, and shows it over the portrait. CSBWin's damage filter DSA before it
-    // (`:2829-2893`) is not ported (`DEBT.md` G2).
+    // The damage filter's DSA may set what is dealt, to anything a word holds
+    // (`doc/CSBwin-src/Character.cpp:2829-2893`).
+    dealt = sw(this.ctx.systems.dsa.damageCharFilter(chIdx, champ.fingerprint, damage, dealt, woundMask, kind));
+    // `d.PendingDamage[chIdx] += D7W` (`:2900`): the HP stay as they are until the tick's
+    // `DisplayCharacterDamage`, which takes the sum off, kills, and shows it over the
+    // portrait.
     party.pendingDamage[chIdx] = sw(party.pendingDamage[chIdx]! + dealt);
     return dealt;
   }
@@ -653,6 +655,8 @@ export class MonsterAttack {
    * (`doc/CSBwin-src/Character.cpp:2626-2645`).
    */
   killCharacter(chIdx: number): void {
+    // The character death filter's DSA, before anything changes (`:2535-2589`).
+    this.ctx.systems.dsa.charDeathFilter(chIdx);
     const party = this.ctx.party.state;
     const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return;
