@@ -19,6 +19,7 @@ import {
 } from './intro/PrisonLevel';
 import type { DungeonState } from '../engine/DungeonState';
 import type { PartyFootprints } from '../engine/PartyFootprints';
+import type { GameState } from '../engine/gameTypes';
 import type { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, PaletteIndexViewportBuffer } from './csbwin/CanvasBlitter';
 import { createPaletteIndexViewportBuffer, cropBitmap, mirrorBitmap, tag0088b2Index } from './csbwin/CanvasBlitter';
@@ -54,6 +55,8 @@ export interface ViewportRendererDeps {
   dungeonState: DungeonState;
   /** `d.PartyFootprints`, whose magic prints `SummarizeRoomInfo` shows. */
   footprints?: PartyFootprints;
+  /** The game's state, whose `tickCount` is `d.Time`. */
+  gameState?: GameState;
   csbGraphicsLoader?: CSBGraphicsLoader;
   /** Graphic `0x22e`'s rectangles, from the game's one `GraphicsTables`. */
   viewportTables: ViewportTables;
@@ -131,6 +134,7 @@ export class ViewportRenderer {
       csbGraphics: deps.csbGraphicsLoader,
       dungeonState: this.dungeonState,
       footprints: deps.footprints,
+      gameState: deps.gameState,
       viewportIndexBuffer: this.buffer,
       seeThroughWalls: false,
       roomData: [],

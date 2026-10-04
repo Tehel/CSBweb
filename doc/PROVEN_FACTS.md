@@ -949,9 +949,13 @@ marks nothing either, and the first move makes both the same. The timer's end,
 (`:293-308`), and a pit keeps its flag bit 0 when bit 3 is set, else counts as open floor
 (`:263-275`). Stairs clear it (`:373`), and a stone or closed false wall returns before the
 test. It takes only the newest print on the cell, `SearchFootprints`' 1-based index less
-one, and sets bit 15 of `decorations[2]` (`:402-416`), the floor decoration. The port:
-`summarizeRoomInfoCsbwin` with the `PartyFootprints` `DrawViewport` hands it. Evidence:
-`tools/dump-footprint-decoration.ts`.
+one, and sets bit 15 of `decorations[2]` (`:402-416`), the floor decoration. On the same
+cells, once `d.Time > 0`, the cell's extended cell flag `ECF_FOOTPRINTS` sets that bit too
+(`:419-425`): `GetExtendedCellFlag` reads bit `y` of longword 0 of the column's `EXPOOL`
+record, and finds nothing in a record shorter than eight longwords
+(`doc/CSBwin-src/data.cpp:1679-1689`). Only a DSA's `&ECF!` or a custom dungeon writes one.
+The port: `summarizeRoomInfoCsbwin` with the `PartyFootprints` and the game's `d.Time`
+`DrawViewport` hands it. Evidence: `tools/dump-footprint-decoration.ts`.
 
 ## The footprint graphic is slot 15 of `d.LoadedFloorDecorations`, which no level fills
 

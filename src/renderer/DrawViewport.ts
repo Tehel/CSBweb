@@ -112,7 +112,8 @@ export function DrawViewport(
     };
 
     // Gather room information for this cell
-    summarizeRoomInfoCsbwin(roomData[cellNum], dungeonState, position, facing, context.objectTables, context.footprints);
+    summarizeRoomInfoCsbwin(roomData[cellNum], dungeonState, position, facing, context.objectTables, context.footprints,
+      context.gameState?.tickCount);
   }
 
   // Store room data in context for opcodes to access

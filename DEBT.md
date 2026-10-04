@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Twelve DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
@@ -100,6 +99,7 @@ In payoff order: the first row is the next item.
 | G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | M | ⏳ |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
+| G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G3, G25, G27 |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
 | G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
@@ -120,7 +120,8 @@ The rows above G29 are the active list. `F3` is a phase, whose status is
 `PLAN.md`'s. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
-row meanwhile. The G rows from G1 to G26 are Conflux's (see "Priority"). The F
+row meanwhile. `G1` sits below G3, G25 and G27, whose features its last operations need.
+The G rows down to G26 are Conflux's (see "Priority"). The F
 rows are independent of the rest ("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
@@ -241,7 +242,7 @@ postponed ones follow, under their own heading (see "Priority").
 
 Paying it needs a file of each form, or the author's decision to port them unchecked.
 
-### G1 ⏳ Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs
+### G1 ⏳ Full DSA support: every operation, and a save of a dungeon with DSAs
 
 The goal is the whole of CSBWin's DSA, not what one dungeon calls. Every command is
 ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter either.
@@ -298,15 +299,16 @@ monsters, the texts, the messages and sounds, the dungeon and the program, and t
 operations, and the save of a dungeon with DSAs: `WriteDSAs`, and the global variables
 read from their `EXPOOL` records at every read and written back at a save, and
 `DisableSaves`' record, and the overlay palette's 24 records written at every save and
-read back at every read, checked by `tools/dump-dsa-save.ts`. A family's tool runs its
-programs through `tools/lib/dsa.ts`. Next, slave DSAs, then `ECF_FOOTPRINTS`' prints
-(both below). What is left after those waits on its own item: `SwapCharacter` on G3,
-the display's three on G25, `GetSkin` and `SetSkin` on G27. An operation is checked
-against Conflux in play once G26 makes it a data set.
+read back at every read, checked by `tools/dump-dsa-save.ts`, and the footprints a cell's
+`ECF_FOOTPRINTS` shows, checked by `tools/dump-footprint-decoration.ts`. A family's tool
+runs its programs through `tools/lib/dsa.ts`. Slave DSAs owe nothing: CSBWin has none
+(`doc/CSBWIN_DSA_REFERENCE.md`, `FindMaster`). What is left waits on its own item:
+`SwapCharacter` on G3, the display's three on G25, `GetSkin` and `SetSkin` on G27, so G1's
+row sits below theirs and each of those items finishes its share of G1. An operation is
+checked against Conflux in play once G26 makes it a data set.
 
 The rest of the item, with an operation that needs care when ported:
 
-- **Slave DSAs** are not implemented (`findMaster`, `src/engine/DsaSystem.ts`).
 - **Unported opcodes are traced** once each through `warnedOps` (`DsaSystem.ts`), for a
   dungeon the census has not seen.
 - **The DSA tracing flags.** `WriteDSAs` is followed by `DSAIndex.WriteTracing()`
@@ -314,11 +316,6 @@ The rest of the item, with an operation that needs care when ported:
   file uses, which a read takes back (`DSAINDEX::ReadTracing`, `DSA.cpp:5553-5576`). The
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
-- **`ECF_FOOTPRINTS`.** The footprint arm of `SummarizeRoomInfo` also shows prints on any
-  cell with this extended cell flag once `d.Time > 0` (`Codea59a.cpp:419-425`). Only a
-  DSA's `&ECF!`, which is ported, or a custom dungeon sets extended cell flags, so a flag
-  a DSA sets is kept and not drawn. The magic footprints are drawn
-  (`src/renderer/csbwin/SummarizeRoomInfo.ts`, beside a comment naming this item).
 
 ### G2 ⏳ Twelve DSA filters
 

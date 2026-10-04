@@ -18,6 +18,7 @@ import {
 } from '../csbwin/CanvasBlitter';
 import type { DungeonState } from '../../engine/DungeonState';
 import type { PartyFootprints } from '../../engine/PartyFootprints';
+import type { GameState } from '../../engine/gameTypes';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { RectPos } from '../../data/tables/UITables';
 import type { CSBGraphicsLoader } from '../../data/CSBGraphicsLoader';
@@ -81,6 +82,8 @@ export interface InterpreterContext {
   dungeonState?: DungeonState;
   /** `d.PartyFootprints`, which `SummarizeRoomInfo` searches for the magic prints. */
   footprints?: PartyFootprints;
+  /** The game's state, whose `tickCount` (`d.Time`) `SummarizeRoomInfo` reads. */
+  gameState?: GameState;
   frameFacing?: number;
   frameMapIndex?: number;
   doorGraphics?: number[][]; // d.DoorGraphic[3][2] resolved for current level (Code390e.cpp:180+)

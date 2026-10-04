@@ -1,6 +1,6 @@
 /**
  * The magic footprint decoration: `SummarizeRoomInfo`'s `tag00a984` arm
- * (`doc/CSBwin-src/Codea59a.cpp:401-418`), `summarizeRoomInfoCsbwin`.
+ * (`doc/CSBwin-src/Codea59a.cpp:401-426`), `summarizeRoomInfoCsbwin`.
  *
  * Where `cfD4` is still set by the room-type switch (an open floor, a teleporter, a door,
  * an open false wall, a pit whose flag bit 0 is set: `:263-392`), the newest print on the
@@ -13,6 +13,12 @@
  * The trail is a real `PartyFootprints` walked over real cells of level 0 of
  * `dm-atari/dungeon.dat`: one print before YA BRO ROS's mark (`markMagicFootprints`,
  * `Magic.cpp:1333-1342`), the rest after it, as `MoveObject` records them.
+ *
+ * The same bit is set where prints can show by the cell's extended cell flag
+ * `ECF_FOOTPRINTS` (bit 0), once `d.Time > 0` (`:419-425`): `GetExtendedCellFlag`
+ * (`data.cpp:1679-1689`) reads the cell's row bit of longword 0 of the column's `EXPOOL`
+ * record, `(EDT_ExtendedCellFlags << 24) + (level << 5) + x`, which a DSA's `&ECF!` writes,
+ * and finds nothing in a record shorter than eight longwords.
  *
  * Then the drawing. `DrawFloorDecorations` draws the bit as ordinal 16
  * (`CSBCode.cpp:3984-3987`), slot 15 of `d.LoadedFloorDecorations`, which no level fills:
@@ -29,7 +35,7 @@ import { resolve } from 'node:path';
 
 import { Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import { DungeonState } from '../src/engine/DungeonState';
+import { DungeonState, extendedCellFlagsKey } from '../src/engine/DungeonState';
 import { PartyFootprints } from '../src/engine/PartyFootprints';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
@@ -114,8 +120,47 @@ function main(): void {
   summarizeRoomInfoCsbwin(bare, dungeon, new Position(0, 0, 0), 0);
   check((bare.decorations[2] & 0x8000) === 0, 'no trail, no footprint bit');
 
+  // A record is a column's, so each scenario takes an open cell in a column of its own.
+  const columns = new Set([stair.x]);
+  const fresh = open.filter((p) => !columns.has(p.x) && columns.add(p.x));
+  check(fresh.length >= 3, `level 0 has open cells in three more columns (${fresh.length})`);
+  extendedCellFlags(dungeon, fresh.slice(0, 3) as [Position, Position, Position], stair);
   drawing();
   finish();
+}
+
+/** `ECF_FOOTPRINTS`, on cells no print has reached. */
+function extendedCellFlags(dungeon: DungeonState, [cell, others, short]: [Position, Position, Position], stair: Position): void {
+  const flagged = (p: Position, time: number): boolean => {
+    const rslt: SummarizeRoomData = {
+      x: p.x,
+      y: p.y,
+      relativeCellNumber: 0,
+      skinNumber: 0,
+      roomType: RoomType.STONE,
+      championPortraitOrdinal: 0,
+      graphicRoomType: GraphicRoomType.STONE,
+      rn2: 0xfffe,
+      decorations: [0, 0, 0],
+      text: [0xfffe, 0xfffe, 0xfffe],
+    };
+    summarizeRoomInfoCsbwin(rslt, dungeon, new Position(0, 0, 0), 0, undefined, undefined, time);
+    return (rslt.decorations[2] & 0x8000) !== 0;
+  };
+  const record = (p: Position, flags: number[]): void => {
+    dungeon.writeExpoolRecord(extendedCellFlagsKey({ l: 0, x: p.x, y: p.y, p: 0 }), flags.map((f) => (f << p.y) >>> 0));
+    console.log(`  (${p.x},${p.y}): a record of ${flags.length}, flags ${flags.join('')}`);
+  };
+  check(!flagged(cell, 1), 'open floor without a record: the footprint bit is clear');
+  record(cell, [1, 0, 0, 0, 0, 0, 0, 0]);
+  check(flagged(cell, 1), 'ECF_FOOTPRINTS on open floor, d.Time 1: the footprint bit is set');
+  check(!flagged(cell, 0), 'the same at d.Time 0: clear');
+  record(stair, [1, 0, 0, 0, 0, 0, 0, 0]);
+  check(!flagged(stair, 1), 'ECF_FOOTPRINTS on stairs: clear');
+  record(others, [0, 1, 1, 1, 1, 1, 1, 1]);
+  check(!flagged(others, 1), 'every flag but ECF_FOOTPRINTS: clear');
+  record(short, [1, 0, 0, 0, 0, 0, 0]);
+  check(!flagged(short, 1), 'ECF_FOOTPRINTS in a record of seven longwords: clear');
 }
 
 /** The footprint graphic's slot, and a frame that shows it. */

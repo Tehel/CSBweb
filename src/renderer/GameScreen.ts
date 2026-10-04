@@ -154,6 +154,7 @@ export class GameScreen {
       graphicsLoader,
       dungeonState: deps.ctx.dungeon,
       footprints: deps.ctx.footprints,
+      gameState: deps.ctx.state,
       csbGraphicsLoader: deps.csbGraphicsLoader,
       viewportTables: deps.tables.viewport,
       objectTables: deps.tables.objects,

@@ -34,7 +34,7 @@ import {
   setActuatorParameterA,
   setActuatorParameterB,
 } from '../data/actuatorHelpers';
-import type { DungeonState } from './DungeonState';
+import { extendedCellFlagsKey, type DungeonState } from './DungeonState';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type PartyState, type Champion } from './gameTypes';
 import { vacantPossession } from '../data/CsbwinCharacters';
@@ -256,8 +256,6 @@ export enum StkOp {
   NUM_PARAM = 139,
 }
 
-/** `EDT_ExtendedCellFlags` (`doc/CSBwin-src/CSB.h:1532`): eight longwords, a bit a row. */
-const EDT_EXTENDED_CELL_FLAGS = 2;
 const EDT_SPECIAL_LOCATIONS = 3;
 const ESL_MISSILE_ENCOUNTER_FILTER = 13;
 const ESL_ADJUST_SKILLS_FILTER = 6;
@@ -528,11 +526,6 @@ const BIT_COUNTS = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
 
 /** `teleporterBit` (`doc/CSBwin-src/DSA.cpp:2208`): `ExamineCell`'s bit for a teleporter's `what`. */
 const TELEPORTER_BIT = [11, 15, 13, 17];
-
-/** `(EDT_ExtendedCellFlags << 24) | (l << 5) | x`: a column's record of extended cell flags. */
-function extendedCellFlagsKey(locr: LocationRel): number {
-  return ((EDT_EXTENDED_CELL_FLAGS << 24) | (locr.l << 5) | locr.x) >>> 0;
-}
 
 /** `JUMP*`'s transfer, which `execute` takes as `EX_JUMP`'s (`doc/CSBwin-src/DSA.cpp:4737-4745`). */
 interface GearJump {
@@ -3284,6 +3277,13 @@ export class DsaSystem {
     return idx;
   }
 
+  /**
+   * `FindMaster` (`doc/CSBwin-src/DSA.cpp:534-547`). CSBWin implements no slave DSA: a
+   * DSA is its own master unless its `LocalState()` is 3 (`IsMaster`, `Data.h:2464-2467`),
+   * and for one that is, it warns and runs the slave as its master all the same. The
+   * slave's master coordinates are then left unset, so the port takes the timer's, as
+   * for a master. No dungeon here has a DSA whose local state is 3.
+   */
   private findMaster(slave: DsaDefinition, rnSlave: ObjectID, x: number, y: number, locrSlave: LocationRel): {
     rn: ObjectID;
     locr: LocationRel;
@@ -3291,7 +3291,7 @@ export class DsaSystem {
     if (slave.localState !== 3) {
       return { rn: rnSlave, locr: { l: locrSlave.l, x, y, p: locrSlave.p } };
     }
-    this.ctx.host.trace('Slave DSA not implemented');
+    this.ctx.host.trace('Slave DSA Not Implemented');
     return { rn: rnSlave, locr: { l: locrSlave.l, x, y, p: locrSlave.p } };
   }
 

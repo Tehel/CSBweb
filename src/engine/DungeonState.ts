@@ -64,6 +64,16 @@ const DATABASE_KEY: Partial<Record<DBType, keyof Databases>> = Object.fromEntrie
  * `DATABASES::Max` (`doc/CSBwin-src/CSB.h:1646`): the most records `Enlarge` grows
  * database `dbNum` to.
  */
+/** `EDT_ExtendedCellFlags` (`doc/CSBwin-src/CSB.h:1532`): eight longwords, a bit a row. */
+const EDT_EXTENDED_CELL_FLAGS = 2;
+/** `ECF_FOOTPRINTS` (`doc/CSBwin-src/CSB.h:1533`): the extended cell flag that shows footprints. */
+export const ECF_FOOTPRINTS = 0;
+
+/** `(EDT_ExtendedCellFlags << 24) + (level << 5) + x`: a column's record of extended cell flags. */
+export function extendedCellFlagsKey(locr: LocationRel): number {
+  return ((EDT_EXTENDED_CELL_FLAGS << 24) | (locr.l << 5) | locr.x) >>> 0;
+}
+
 export function dbMax(dbNum: DBType): number {
     return dbNum === DBType.CLOUD ? 768 : dbNum === DBType.ACTUATOR ? 16000 : 8000;
 }
@@ -152,6 +162,16 @@ export class DungeonState {
     /** `expool.Locate(key)`: a copy of `key`'s first record, or null. */
     locateExpoolRecord(key: number): number[] | null {
         return new Expool(this.data).locate(key);
+    }
+
+    /**
+     * `GetExtendedCellFlag` (`doc/CSBwin-src/data.cpp:1679-1689`): the cell's bit of flag
+     * `ftype`, clear without a record of at least eight longwords.
+     */
+    getExtendedCellFlag(level: number, x: number, y: number, ftype: number): boolean {
+        const record = this.locateExpoolRecord(extendedCellFlagsKey({ l: level, x, y, p: 0 }));
+        if (!record || record.length < 8) return false;
+        return ((record[ftype]! & (1 << y)) >>> 0) !== 0;
     }
 
     /**

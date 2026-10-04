@@ -1,6 +1,6 @@
 import { DBType, OBJECT_ID_EOF, type ui8, Position } from '../../core/types';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../bytecode/Types';
-import type { DungeonState } from '../../engine/DungeonState';
+import { ECF_FOOTPRINTS, type DungeonState } from '../../engine/DungeonState';
 import type { PartyFootprints } from '../../engine/PartyFootprints';
 import {
   getActuatorDsaParameters,
@@ -336,6 +336,7 @@ export function summarizeRoomInfoCsbwin(
   facing: number,
   tables?: ObjectTables,
   footprints?: PartyFootprints,
+  time = 0,
 ): void {
   const { z } = position;
   rslt.text = [RN_EOF, RN_EOF, RN_EOF];
@@ -506,17 +507,22 @@ export function summarizeRoomInfoCsbwin(
     }
   }
 
-  // `tag00a984` (Codea59a.cpp:401-418): where footprints can show, the newest print on the
-  // cell, if it is one of the trail's magic ones, sets the footprint bit.
-  // The `ECF_FOOTPRINTS` half (`:419-426`) is not ported (DEBT.md G1).
-  if (cellFlags !== 0 && footprints) {
-    let found = footprints.searchFootprints(z, rslt.x, rslt.y) & 0xff;
-    if (found !== 0) {
-      found = (found - 1) & 0xff;
-      if (found >= (footprints.getIndexOfFirstMagicFootprint() & 0xff)
-        && found < (footprints.getIndexOfLastMagicFootprint() & 0xff)) {
-        rslt.decorations[2] |= 0x8000;
+  // `tag00a984` (Codea59a.cpp:401-426): where footprints can show, the newest print on the
+  // cell, if it is one of the trail's magic ones, sets the footprint bit, and so does the
+  // cell's `ECF_FOOTPRINTS` once `d.Time` is past 0.
+  if (cellFlags !== 0) {
+    if (footprints) {
+      let found = footprints.searchFootprints(z, rslt.x, rslt.y) & 0xff;
+      if (found !== 0) {
+        found = (found - 1) & 0xff;
+        if (found >= (footprints.getIndexOfFirstMagicFootprint() & 0xff)
+          && found < (footprints.getIndexOfLastMagicFootprint() & 0xff)) {
+          rslt.decorations[2] |= 0x8000;
+        }
       }
+    }
+    if (time > 0 && dungeon.getExtendedCellFlag(z, rslt.x, rslt.y, ECF_FOOTPRINTS)) {
+      rslt.decorations[2] |= 0x8000;
     }
   }
   rslt.rn2 = local;
