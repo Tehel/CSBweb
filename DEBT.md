@@ -96,6 +96,7 @@ In payoff order: the first row is the next item.
 | G2 | Twelve DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
+| G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
 | G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | M | ⏳ |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
@@ -106,7 +107,6 @@ In payoff order: the first row is the next item.
 | F13 | `npm test` runs its tools one at a time | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G29 | Recording a game and playing it back | — | ⏸️ |
-| G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏸️ |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X1 | Extra: drinking from a fountain with an empty hand | S | ⏸️ |
@@ -126,7 +126,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C129 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C130 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -508,7 +508,7 @@ the game; whether to model it is the author's call.
 
 Not taken in order; the author names one to start it (see "Priority").
 
-### G20 ⏸️ The Hint Oracle, from the inventory, at the party's square
+### G20 ⏳ The Hint Oracle, from the inventory, at the party's square
 
 Chaos Strikes Back's Hint Oracle is a program of its own: `HINT.FTL` on the utility disk,
 ported by CSBWin as `Hint.cpp` (`_StartHint`, `doc/CSBwin-src/Hint.cpp:6454`). CSBWin

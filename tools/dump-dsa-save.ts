@@ -15,6 +15,8 @@
  *    moved in play, and two records of globals, saved and loaded into another game. The
  *    DSAs and the globals come back as they were.
  * 5. **3D2D1D**, a dungeon with six DSAs and no globals, saved and loaded.
+ * 6. **Conflux 3.5**, saved and loaded: its 64 levels, which `ReadDatabases` reads with no
+ *    bound (`doc/CSBwin-src/SaveGame.cpp:2411-2427`), its 131 DSAs and its 32 globals.
  *
  * Run: `npx tsx tools/dump-dsa-save.ts`
  */
@@ -123,6 +125,24 @@ console.log('5. 3D2D1D');
   const after = other.ctx.state.dungeon.dsaIndex;
   console.log(`  ${after?.entries.filter((d) => d).length} DSAs loaded`);
   check(countOf(before) === 6 && same(after, before), "a 3D2D1D game saves, and loads back with its six DSAs");
+}
+
+console.log('6. Conflux 3.5');
+{
+  const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(conflux)), stockGraphics());
+  const before = game.ctx.state.dungeon.dsaIndex;
+  const other = freshGame();
+  let error = '';
+  try {
+    applyCsbwinSave(other, buildSaveFile(game));
+  } catch (e) {
+    error = String(e);
+  }
+  const after = other.ctx.state.dungeon;
+  console.log(`  ${error || `${after.maps.length} levels, ${countOf(after.dsaIndex)} DSAs, ${other.systems.dsa.getGlobalVariables().length} globals`}`);
+  check(error === '' && after.maps.length === 64, 'a save of a Conflux game loads, its 64 levels with it');
+  check(same(after.dsaIndex, before) && same(other.systems.dsa.getGlobalVariables(), game.systems.dsa.getGlobalVariables()),
+    'and its 131 DSAs and 32 globals');
 }
 
 finish();

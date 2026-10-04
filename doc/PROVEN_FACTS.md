@@ -2142,6 +2142,10 @@ cellFlagArraySize            cell flags        (EXTENDEDFEATURESBLOCK+48, else h
 2                            final checksum
 ```
 
+`numMaps` is the header's byte, and nothing bounds it: `ReadDatabases` reads
+`16 * NumLevel()` bytes of descriptors whatever it says (`doc/CSBwin-src/SaveGame.cpp:2411-2427`).
+Conflux 3.5 has 64 levels, and a save of it reads back (`tools/dump-dsa-save.ts`).
+
 **Two record sizes are not the `dungeon.dat` ones.** This is what defeats the obvious
 arithmetic:
 

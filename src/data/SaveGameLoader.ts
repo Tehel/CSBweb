@@ -334,7 +334,9 @@ export function computeDungeonImageLayout(
   if (startOffset + HEADER_SIZE > data.length) return null;
 
   const numMaps = data[startOffset + 4] ?? 0;
-  if (numMaps < 1 || numMaps > 32) return null;
+  // `ReadDatabases` reads `16 * NumLevel()` bytes of descriptors, whatever the byte says
+  // (`doc/CSBwin-src/SaveGame.cpp:2411-2427`): Conflux 3.5 has 64 levels.
+  if (numMaps < 1) return null;
   const textDataSize = readU16BE(data, startOffset + 6);
   const objectListSize = readU16BE(data, startOffset + 10);
 
