@@ -131,6 +131,12 @@ export interface UIState {
   /** `d.Word20252` — 1 shows the four attack buttons, 0 the option list. */
   word20252: number;
   /**
+   * What the option list's last `DrawLegalAttackTypes` drew: its `numAttackOption`, which
+   * chose the backdrop, and the three names, the action name filter's included.
+   */
+  attackOptionCount: number;
+  attackOptionNames: string[];
+  /**
    * The ordinal `TAG01b1c0` cleared (`doc/CSBwin-src/Character.cpp:4887-4897`), whose menu
    * is still on CSBWin's screen: nothing draws over it until the panel's next
    * `DrawLegalAttackTypes` or `FlashAttackDamage`, which set it back to 0.
@@ -242,7 +248,7 @@ type PlayState = Pick<UIState,
   | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'reincarnate' | 'diskMenuNeeded'
   | 'pressingEye' | 'word23144' | 'pointer23178' | 'pointer23182'
   | 'attackingCharacterOrdinal' | 'possibleAttackTypes' | 'byte20256' | 'word20248'
-  | 'word20250' | 'word20252' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
+  | 'word20250' | 'word20252' | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
   | 'characterDamage'
   | 'displayResurrectChestOrScroll' | 'openChestId' | 'openChestContents' | 'openChestIconIndex'>;
 
@@ -269,6 +275,8 @@ function initialPlayState(): PlayState {
     word20250: 0,
     // The panel starts showing the four attack buttons.
     word20252: 1,
+    attackOptionCount: 0,
+    attackOptionNames: ['', '', ''],
     closedAttackMenuOrdinal: 0,
     attackFlashValue: 0,
     attackFlashUntilMs: 0,

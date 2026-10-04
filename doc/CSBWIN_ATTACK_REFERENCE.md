@@ -141,6 +141,12 @@ whichever button list matches the state: `Buttons17952` (ids 116-119, pick a cha
 `Buttons17892` (id 112 PASS, 113-115 the options). Only the options below `d.Word20248` are
 live.
 
+Each option offered goes through `ActionNameFilter` (`CSBCode.cpp:8634-8713`) as its row is
+drawn: a DSA at `ESL_ACTIONNAMEFILTER`'s location may name it with a global text, and may
+change the attack it is (`doc/PROVEN_FACTS.md` → "The action name filter runs its
+location's first DSA, found once, for each option offered"). The port decides the names in
+`drawLegalAttackTypes`, once per CSBWin drawing, and `drawAttackPanel` draws what it chose.
+
 `_FlashAttackDamage` (`Attack.cpp:949`) draws one of three starburst sizes — over 40, over
 15, the rest — with the number written right-to-left from x=274 in 3-pixel steps, so it
 centres itself whatever its width. The big burst is graphic 14 (96x45) blitted as it is
@@ -152,9 +158,6 @@ centre on x=274, under the digits. Two negative values are messages instead: -1
 
 ## Deliberately not ported
 
-- **`ActionNameFilter`** (`CSBCode.cpp:8680`), the DSA that can rename an attack option in
-  the menu. `ESL_ACTIONNAMEFILTER` is unported; option names come straight from
-  `AttackNames`.
 - **`_FlashAttackDamage`'s `VBLDelay(15)`**, which stops the whole game for a quarter of a
   second. A browser cannot block the frame loop, so the flash is a timed overlay of the
   same duration and the game keeps running underneath — as it already does for the feeding

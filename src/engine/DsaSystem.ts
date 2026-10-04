@@ -278,6 +278,7 @@ const ADJUST_SKILLS_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_ADJUST_SKIL
 const VIEWING_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_VIEWING_FILTER;
 const PARTY_ATTACK_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_PARTY_ATTACK_FILTER;
 const ESL_SOUND_FILTER = 8;
+const ESL_ACTION_NAME_FILTER = 10;
 const ESL_INDIRECT_ACTIONS = 5;
 const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
 
@@ -514,6 +515,27 @@ interface ExecutionPacket {
   subroutineLevel: number;
 }
 
+/**
+ * The timer a filter site hands `ProcessDSAFilter`: the filter's square on its level, with
+ * function and position 0 (`doc/CSBwin-src/CSBCode.cpp:8683-8689`, `Sound.cpp:724-727`).
+ */
+function filterTimer(position: Position): TimerEntry {
+  return {
+    index: -1,
+    time: 0,
+    level: position.z & 0xff,
+    function: 0,
+    uByte5: 0,
+    uByte6: position.x & 0xff,
+    uByte7: position.y & 0xff,
+    uByte8: 0,
+    uByte9: 0,
+    sequence: 0,
+    timerWord8: 0,
+    timerWord6: 0,
+  };
+}
+
 function signExtend(value: number, bits: number): number {
   const sign = 1 << (bits - 1);
   return (value & (sign - 1)) - (value & sign);
@@ -579,6 +601,13 @@ export class DsaSystem {
   monsterMoveFilterActive = false;
   /** `SoundFilter`'s `filterActive` (`doc/CSBwin-src/Sound.cpp:672`): its DSAs are running. */
   private soundFilterActive = false;
+  /**
+   * `actionNameDSA` (`doc/CSBwin-src/CSBCode.cpp:8631`): `OBJECT_ID_NULL` until
+   * `actionNameFilter` first looks, then the filter's DSA, or `OBJECT_ID_EOF` for none, for
+   * as long as the system lives. `actionNameFilterPos` is `actionNameFilterLocr` (`:8630`).
+   */
+  private actionNameDsa: ObjectID = OBJECT_ID_NULL;
+  private actionNameFilterPos: Position | null = null;
   /**
    * `parameterMessageSequence` (`doc/CSBwin-src/data.cpp:88`): the `uByte5` of the next
    * `TT_ParameterMessage` timer, so that two set at one time run in the order they were
@@ -677,20 +706,7 @@ export class DsaSystem {
     const locrFilter = locationRelFromInteger(special);
     if (!this.dungeon.isValidLocation(locrFilter)) return false;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
-    const timer: TimerEntry = {
-      index: -1,
-      time: 0,
-      level: locrFilter.l & 0xff,
-      function: 0,
-      uByte5: 0,
-      uByte6: locrFilter.x & 0xff,
-      uByte7: locrFilter.y & 0xff,
-      uByte8: 0,
-      uByte9: 0,
-      sequence: 0,
-      timerWord8: 0,
-      timerWord6: 0,
-    };
+    const timer = filterTimer(filterPos);
     return this.newDsaParameters(() => {
       let found = false;
       for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
@@ -739,6 +755,50 @@ export class DsaSystem {
     if (!this.soundFilterActive) return 1;
     this.soundFilterActive = false;
     return 0;
+  }
+
+  /**
+   * `ActionNameFilter` (`doc/CSBwin-src/CSBCode.cpp:8634-8713`), which `DrawLegalAttackTypes`
+   * calls for each option it offers (`:8777`): champion `charIndex`'s option
+   * `actionNumber`, of `numAttackOption`, whose attack type is `attackType`. The first
+   * type-47 actuator at `ESL_ACTIONNAMEFILTER`'s location runs, and only it (`:8669-8670`),
+   * found at the first call and kept from then on (`actionNameDsa`).
+   *
+   * Its five parameters (`:8691-8696`): the champion, the option, -1, the option count and
+   * the attack type. Back come parameter 4, the option's attack type from now on, as an
+   * `i8` (`:8699`), and parameter 2, which below 0x10000 names a global text to show
+   * instead of the attack's name, if there is such a record (`:8700-8711`); `name` is null
+   * otherwise. Null when there is no DSA.
+   *
+   * The `NEWDSAPARAMETERS` is in the block that looks for the DSA (`:8653`), and gone when
+   * it runs, so the DSA runs on the caller's parameters and leaves them its own.
+   */
+  actionNameFilter(
+    charIndex: number,
+    actionNumber: number,
+    numAttackOption: number,
+    attackType: number,
+  ): { attackType: number; name: string | null } | null {
+    if (this.actionNameDsa === OBJECT_ID_NULL) {
+      this.actionNameDsa = OBJECT_ID_EOF;
+      const special = this.dungeon.getSpecialLocation((EDT_SPECIAL_LOCATIONS << 24) | ESL_ACTION_NAME_FILTER);
+      if (special !== null) {
+        const locr = locationRelFromInteger(special);
+        if (this.dungeon.isValidLocation(locr)) {
+          this.actionNameFilterPos = new Position(locr.x, locr.y, locr.l);
+          this.actionNameDsa = this.findFirstDsaActuator(this.actionNameFilterPos);
+        }
+      }
+    }
+    const filterPos = this.actionNameFilterPos;
+    if (this.actionNameDsa === OBJECT_ID_EOF || filterPos === null) return null;
+    this.setParameters(5, [charIndex, actionNumber, -1, numAttackOption, attackType]);
+    this.processTimer6Internal(this.actionNameDsa, filterTimer(filterPos), filterPos, true, new DsaVars());
+    const textIndex = this.getParameter(2) >>> 0;
+    return {
+      attackType: (this.getParameter(4) << 24) >> 24,
+      name: textIndex < 0x10000 ? this.globalText(textIndex) : null,
+    };
   }
 
   processMissileEncounterFilter(options: {
@@ -3655,6 +3715,23 @@ export class DsaSystem {
    * bytes past the zero from an uninitialised buffer, the port with zeros. A new record
    * goes in front of the old, which stays in the pool.
    */
+  /**
+   * `(char *)pRecord` of the `EXPOOL`'s global text `index`, as the action name filter reads
+   * it (`doc/CSBwin-src/CSBCode.cpp:8702-8710`): its bytes, in memory order, up to the first
+   * 0. Null when there is no such record, or an empty one.
+   */
+  private globalText(index: number): string | null {
+    const record = this.dungeon.locateExpoolRecord(((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0);
+    if (record === null || record.length === 0) return null;
+    let text = '';
+    for (let b = 0; b < record.length * 4; b++) {
+      const c = ((record[b >> 2] ?? 0) >>> (8 * (b & 3))) & 0xff;
+      if (c === 0) break;
+      text += String.fromCharCode(c);
+    }
+    return text;
+  }
+
   private setGlobalText(text: string, index: number): void {
     const len = Math.min(text.length, 99);
     const record = new Array<number>(Math.floor((len + 4) / 4)).fill(0);

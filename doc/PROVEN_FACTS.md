@@ -3562,6 +3562,23 @@ DSA ran, 1 when none did, and 2 at once while its DSAs run (`filterActive`, `:67
 default, `doc/CSBwin-src/data.cpp:249`, `:277`, `Recording.cpp:321-328`).
 `tools/dump-sound-filter.ts`.
 
+## The action name filter runs its location's first DSA, found once, for each option offered
+
+`DrawLegalAttackTypes` names each of the three rows with `GetAttackTypeName`, whose argument's
+low byte indexes `AttackNames` and is nothing at 255 (`doc/CSBwin-src/CSBCode.cpp:8609-8627`),
+and hands each row below `numAttackOption`, the rows offered, to `ActionNameFilter` with that
+name as its default (`:8772-8778`). `numAttackOption` is 3, 2 when `PossibleAttackTypes[2]` is
+-1, and 1 when `[1]` is (`:8745-8756`). `ActionNameFilter` (`:8634-8713`) looks for its DSA
+the first time only: `actionNameDSA` starts as `RNnul` and becomes the first type-47 actuator
+at `ESL_ACTIONNAMEFILTER`'s location (10, `CSB.h:1545`), with `break`, or `RNeof`, and keeps
+it for the life of the process (`:8631`, `:8638-8675`). It sets five parameters
+(`:8691-8696`): the champion, the option, -1, `numAttackOption` and the option's attack type.
+After the run, parameter 4 becomes the option's attack type, cut to an `i8` (`:8699`), which
+is what `ExecuteAttack` then performs; parameter 2, a `ui32`, names the row with the global
+text `(EDT_GlobalText << 24) | p` read as a `char *` when it is below 0x10000 and the record's
+size is above 0 (`:8700-8711`), so the -1 it starts at leaves the default. The name drawn
+for a retyped row is the type it had. `tools/dump-action-name-filter.ts`.
+
 ## The `QueueSound` calls, and the level each is on
 
 | Sound | CSBWin's call | Ordinal → SND item | Level |
@@ -4406,7 +4423,7 @@ the cell's object chain when it is true, since the slave's link now belongs to t
 list. Filters (`ProcessDSAFilter`, `DSA.cpp:5315-5325`) ignore it. Evidence:
 `tools/dump-dsa-delete.ts`.
 
-## A DSA filter runs on a parameter array of its own; the party attack's alone writes the current one
+## A DSA filter runs on a parameter array of its own; the party attack's and the action name's write the current one
 
 `pDSAparameters` (`doc/CSBwin-src/DSA.cpp:43-44`) points at the array `&NUMPARAM`, `&PARAM@`
 and `&PARAM!` read and write: word 0 is the count, words 1 to 100 the parameters.
@@ -4418,13 +4435,17 @@ called inside one: `KillCharacter`, `DamageCharacter`, `SetPossession`
 filter (`Code11f52.cpp:928`), the missile-encounter filter (`:1645`), `AdjustSkills`
 (`Magic.cpp:196`), `CallSpellFilter` (`:876`), `SoundFilter` (`Sound.cpp:692`),
 `MonsterAttacks` (`Monster.cpp:1153`), the post-monster-move filter (`:3174`),
-`ProcessTimers29to41` (`:3321`), `CallPartyMoveFilter` (`CSBCode.cpp:7805`) and
-`ActionNameFilter` (`:8653`); and so is the DSA `ActivateDSA` starts, "Ensure
+`ProcessTimers29to41` (`:3321`) and `CallPartyMoveFilter` (`CSBCode.cpp:7805`); and so is
+the DSA `ActivateDSA` starts, "Ensure
 DSAparameters[0] = 0" (`Timer.cpp:1525`). A filter's count and words are therefore gone
 once it returns, and a DSA run after it, or the program that reached it, finds its own.
 `&PARAM@` reads no word past a count of 0 or more (`DSA.cpp`'s `STKOP_ParamFetch`), so the
 uninitialised words cannot be read: only a parameter message whose record is gone sets a
-count of -1, and on the outer array (see "`&PARAM@` compares the count unsigned"). The party attack filter is the exception:
+count of -1, and on the outer array (see "`&PARAM@` compares the count unsigned"). Two
+filters are the exception. `ActionNameFilter`'s `NEWDSAPARAMETERS` is declared in the block
+that looks for its DSA (`CSBCode.cpp:8653`), which closes before the DSA runs (`:8675`,
+`:8697`), so it writes its count, 5, and its words into the caller's array, and leaves them
+there. The party attack filter:
 `SetupDSAParam` lays `ATTACKPARAMETERS` over the current array, writes its count as
 `sizeof(ATTACKPARAMETERS)`, 124, and zeroes its 31 words, at every `_Attack` that gets past
 its first two returns, filter or none (`Attack.cpp:1346-1360`, `:1673`). Evidence:

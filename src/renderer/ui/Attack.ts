@@ -155,13 +155,41 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
 /**
  * `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8718`), the state it leaves: the
  * panel shows what `word20252` and the ordinal say, which `drawAttackPanel` composes each
- * frame, so a menu `TAG01b1c0` closed and the damage figure are off the screen.
+ * frame, so a menu `TAG01b1c0` closed and the damage figure are off the screen. The
+ * option list's names are decided here, once, as CSBWin draws them (`:8743-8789`).
  */
 export function drawLegalAttackTypes(ui: UIState): void {
   ui.closedAttackMenuOrdinal = 0;
   ui.attackFlashValue = 0;
   ui.attackFlashUntilMs = 0;
+  if (ui.word20252 === 0 && ui.attackingCharacterOrdinal !== 0) nameAttackOptions(ui);
   ui.word20250 = 0;
+}
+
+/**
+ * `DrawLegalAttackTypes`'s option list (`doc/CSBwin-src/CSBCode.cpp:8745-8789`): one option
+ * unless `PossibleAttackTypes[1]` is set, two unless `[2]` is too, and three rows named by
+ * `GetAttackTypeName`. Each row offered goes through the action name filter after its
+ * default name is read (`ActionNameFilter`, `:8774-8777`), which may name it otherwise and
+ * changes the attack it is.
+ */
+function nameAttackOptions(ui: UIState): void {
+  const chIdx = ui.attackingCharacterOrdinal - 1;
+  let numAttackOption = 3;
+  if (ui.possibleAttackTypes[2] === -1) numAttackOption = 2;
+  if (ui.possibleAttackTypes[1] === -1) numAttackOption = 1;
+  ui.attackOptionCount = numAttackOption;
+  for (let i = 0; i < 3; i++) {
+    let name = attackTypeName(ui, ui.possibleAttackTypes[i]!);
+    if (i < numAttackOption) {
+      const filtered = ui.ctx.systems.dsa.actionNameFilter(chIdx, i, numAttackOption, ui.possibleAttackTypes[i]!);
+      if (filtered) {
+        ui.possibleAttackTypes[i] = filtered.attackType;
+        if (filtered.name !== null) name = filtered.name;
+      }
+    }
+    ui.attackOptionNames[i] = name;
+  }
 }
 
 /**
@@ -386,16 +414,9 @@ export function drawAttackPanel(ui: UIState): void {
   const champ = getPartyChampion(ui.partyState, ordinal - 1);
   if (!champ) return;
 
-  let numAttackOption = 3;
-  let backdrop = ui.uiTables.graphic230.wRectPos20202;
-  if (ui.possibleAttackTypes[2] === -1) {
-    backdrop = ui.uiTables.graphic230.wRectPos20210;
-    numAttackOption = 2;
-  }
-  if (ui.possibleAttackTypes[1] === -1) {
-    backdrop = ui.uiTables.graphic230.wRectPos20218;
-    numAttackOption = 1;
-  }
+  const backdrop = ui.attackOptionCount === 3 ? ui.uiTables.graphic230.wRectPos20202
+    : ui.attackOptionCount === 2 ? ui.uiTables.graphic230.wRectPos20210
+      : ui.uiTables.graphic230.wRectPos20218;
 
   const panelGraphic = ui.getGraphicBitmap(10);
   if (panelGraphic) {
@@ -418,19 +439,21 @@ export function drawAttackPanel(ui: UIState): void {
   }
 
   drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 235, 83, 0, 4, champ.name);
+  // CSBWin draws all three rows regardless; the ones past `numAttackOption` come out
+  // blank because `GetAttackTypeName(-1)` is the empty string.
   for (let i = 0; i < 3; i++) {
-    const name = attackTypeName(ui, ui.possibleAttackTypes[i]);
-    // CSBWin draws all three rows regardless; the ones past `numAttackOption` come out
-    // blank because `GetAttackTypeName(-1)` is the empty string.
-    void numAttackOption;
-    drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 241, 12 * i + 93, 4, 0, name);
+    drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 241, 12 * i + 93, 4, 0, ui.attackOptionNames[i]!);
   }
 }
 
-/** `GetAttackTypeName` — index -1/255 has no name. */
+/**
+ * `GetAttackTypeName` (`doc/CSBwin-src/CSBCode.cpp:8609-8627`): the low byte names the
+ * attack, and 255 (-1) nothing.
+ */
 function attackTypeName(ui: UIState, attackType: number): string {
-  if (attackType < 0 || attackType === ATTACK_TYPE_NONE) return '';
-  return ui.uiTables.graphic230.attackNames[attackType] ?? '';
+  const index = attackType & 0xff;
+  if (index === ATTACK_TYPE_NONE) return '';
+  return ui.uiTables.graphic230.attackNames[index] ?? '';
 }
 
 /**

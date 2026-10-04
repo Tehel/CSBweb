@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | Eleven DSA filters, and the viewing filter's third site | L | ⏳ step 2 of 12 next |
+| G2 | Ten DSA filters, and the viewing filter's third site | L | ⏳ step 3 of 12 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -317,11 +317,11 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G2 ⏳ Eleven DSA filters, and the viewing filter's third site
+### G2 ⏳ Ten DSA filters, and the viewing filter's third site
 
-The port runs six filters: the viewing filter (two of its three sites),
+The port runs seven filters: the viewing filter (two of its three sites),
 the party attack filter, the adjust skills filter, the missile encounter filter, the
-sound filter, and the spell filter at `spellFilterLocation`. Each place below uses
+sound filter, the action name filter, and the spell filter at `spellFilterLocation`. Each place below uses
 CSBWin's defaults instead.
 Conflux reaches every one but the portrait's: its `EXPOOL` names a location for all
 sixteen special locations, `ESL_MONSTERATTACKFILTER` (0) to `ESL_DAMAGECHARFILTER` (15,
@@ -334,12 +334,9 @@ filter's.
 A filter that loops runs each of those DSAs in turn, a filter call apiece; one that
 `break`s runs the first. Each step reads which from its CSBWin site and checks it in a
 `tools/` check through `tools/lib/dsa.ts`: `TestFilter` for one DSA, `withFilterDsas` for
-two on the square where the site loops. Step 1, the sound filter, is paid. The steps left,
-one commit each:
+two on the square where the site loops. Steps 1 and 2, the sound filter and the action
+name filter, are paid. The steps left, one commit each:
 
-2. **`ESL_ACTIONNAMEFILTER`** (S). `ActionNameFilter` (`CSBCode.cpp:8680`, the DSA at
-   `:8697`), which may rename an attack option. The names come straight from
-   `AttackNames`.
 3. **`ESL_FEEDINGFILTER`** (S). `Character.cpp:4288-4344`, the DSA at `:4335`. Its
    insertion point is marked in `src/renderer/ui/Feeding.ts:112`.
 4. **`ESL_CHARDEATHFILTER` and `ESL_DAMAGECHARFILTER`** (M). `Character.cpp:2535-2589` and
@@ -389,7 +386,7 @@ one commit each:
     (`src/renderer/ui/Character.ts:71`) runs none.
 
 The steps share how a filter is reached and run: `DsaSystem.forEachFilterDsa`, which the
-sound filter uses. Moving the other five filters already ported onto it is a refactor, a
+sound filter uses, and `filterTimer`. Moving the other five filters already ported onto it is a refactor, a
 commit of its own.
 
 ### G3 ⏳ The wings
