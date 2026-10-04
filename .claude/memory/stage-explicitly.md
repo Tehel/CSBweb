@@ -1,6 +1,6 @@
 ---
 name: stage-explicitly
-description: Never `git add -A` — NOTES.md is the author's and changes while a session runs
+description: Never `git add -A` — NOTES.md is the author's and changes mid-session; a file holding the author's uncommitted edits is staged without them
 metadata:
   type: feedback
 ---
@@ -14,3 +14,13 @@ path is not enough, because the hazard is whatever the author happens to be edit
 **How to apply:** stage the files the change touched. If the set is large, read
 `git status --short` and pick from it, skipping anything not yours — `NOTES.md` above
 all, and untracked game data under `static/gamefiles/` (e.g. `csbgame*.dat` saves).
+
+**A file the commit needs that already holds the author's uncommitted edits** (DEBT.md,
+which every `/pay-debt` commit touches and the author edits between sessions): `git add`
+would take their edits along, and `git add -p` is interactive, so it cannot run here.
+Before touching the file, save their diff, `git diff DEBT.md > <scratchpad>/author.patch`.
+At commit time, copy the working file, `patch -R <copy> <scratchpad>/author.patch`, and
+stage the copy with
+`git update-index --cacheinfo 100644,$(git hash-object -w <copy>),DEBT.md`. Then check
+that `git diff DEBT.md` is exactly their patch: their edit stays unstaged in the tree.
+Say so in the report.
