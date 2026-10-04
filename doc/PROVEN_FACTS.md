@@ -4656,6 +4656,15 @@ Serpent Staff THE CONDUIT, Side Splitter DELTA, Dragon Fang THE INQUISITOR. In t
 of Champions TIGGY carries a Wand, CHANI a Moonstone, BORIS a Rabbit's Foot, GOTHMOG a
 Cloak of Night and NABI a Staff. Evidence: `tools/dump-item-bonuses.ts`.
 
+`SetCursed` (`doc/CSBwin-src/Character.cpp:1782-1816`), the DSA's `&CURSE!`, finds the
+bearer with two nested loops, `ch` over `d.NumCharacter` and `loc` over 30 slots, and its
+`break` leaves only the inner one. So `pCH` is the bearer, but `loc` is the slot found
+only when the bearer is the last champion; for any other the later champions' loops run
+it to 30, and both `AdjustStatsForItemCarried` calls pass slot 30, which matches no row
+of the table above. A curse laid on the last champion's carried weapon or garment costs 3
+Luck at once and lifting it gives them back; on another champion's, the Luck does not
+move until the object leaves and re-enters a slot. Evidence: `tools/dump-dsa-objects.ts`.
+
 ## The disk menu saves an open chest packed
 
 While a chest is open in the inventory its objects are in `d.rnChestContents` and out of

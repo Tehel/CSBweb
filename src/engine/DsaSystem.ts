@@ -2147,6 +2147,22 @@ export class DsaSystem {
       case StkOp.IS_CARRIED:
         this.isCarried(bank);
         break;
+      case StkOp.GET_CURSE:
+      case StkOp.GET_BROKEN:
+      case StkOp.GET_POISONED:
+      case StkOp.GET_CHARGES:
+      case StkOp.GET_SUB_TYPE:
+        bank.stack.push(this.getObjectField(subcode, bank.stack.pop()));
+        break;
+      case StkOp.SET_CURSE:
+      case StkOp.SET_BROKEN:
+      case StkOp.SET_POISONED:
+      case StkOp.SET_CHARGES:
+      case StkOp.SET_SUB_TYPE: {
+        const value = bank.stack.pop();
+        this.setObjectField(subcode, bank.stack.pop(), value);
+        break;
+      }
       case StkOp.COUNT_INJURY: {
         // `DSA.cpp:4798-4818`.
         const injuryMask = bank.stack.pop();
@@ -2233,6 +2249,103 @@ export class DsaSystem {
    * is searched, and so is what it holds. Champion 4 is the hand's owner, 5 every
    * champion.
    */
+  /**
+   * `&CURSE@`, `&BROKEN@`, `&POISONED@`, `&CHARGES@` and `&SUBTYPE@`
+   * (`doc/CSBwin-src/DSA.cpp:3411-3439`, `:3458-3483`, `:3511-3536`, `:3564-3595`,
+   * `:3629-3651`): the field of the object at slot `objIndex`, 0 for an invalid slot or a
+   * database without it. A potion's charges are its strength, a misc object's its
+   * `value()`; only a weapon has a poison bit, and only a misc object a subtype.
+   */
+  private getObjectField(subcode: number, objIndex: number): number {
+    if (!this.isValidObjectId(objIndex)) return 0;
+    const dbType = this.dungeon.rnMaps.dbType(objIndex);
+    const weapon = dbType === DBType.WEAPON ? this.dungeon.getWeaponRecord(objIndex) : null;
+    const clothing = dbType === DBType.CLOTHING ? this.dungeon.getClothingRecord(objIndex) : null;
+    const potion = dbType === DBType.POTION ? this.dungeon.getPotionRecord(objIndex) : null;
+    const misc = dbType === DBType.MISC ? this.dungeon.getMiscRecord(objIndex) : null;
+    const bit = (b: boolean | undefined): number => (b ? 1 : 0);
+    switch (subcode) {
+      case StkOp.GET_CURSE:
+        return weapon ? bit(weapon.cursed) : clothing ? bit(clothing.cursed) : misc ? bit(misc.cursed) : 0;
+      case StkOp.GET_BROKEN:
+        return weapon ? bit(weapon.broken) : clothing ? bit(clothing.broken) : 0;
+      case StkOp.GET_POISONED:
+        return weapon ? bit(weapon.poisoned) : 0;
+      case StkOp.GET_CHARGES:
+        return weapon ? weapon.charges : clothing ? clothing.charges
+          : potion ? potion.power : misc ? misc.specialState : 0;
+      default:
+        return misc ? misc.subType ?? 0 : 0;
+    }
+  }
+
+  /**
+   * `&CURSE!`, `&BROKEN!`, `&POISONED!`, `&CHARGES!` and `&SUBTYPE!`
+   * (`doc/CSBwin-src/DSA.cpp:3440-3457`, `:3484-3510`, `:3537-3563`, `:3596-3628`,
+   * `:3652-3675`): the setters of `getObjectField`'s fields, each value cut to its
+   * field's width by `SETWBITS` (`CSB.h:746-774`), a flag set by any non-zero value.
+   * A curse goes through `SetCursed`.
+   */
+  private setObjectField(subcode: number, objIndex: number, value: number): void {
+    if (!this.isValidObjectId(objIndex)) return;
+    const dbType = this.dungeon.rnMaps.dbType(objIndex);
+    if (subcode === StkOp.SET_CURSE) {
+      this.setCursed(objIndex, value !== 0);
+      return;
+    }
+    const weapon = dbType === DBType.WEAPON ? this.dungeon.getWeaponRecord(objIndex) : null;
+    const clothing = dbType === DBType.CLOTHING ? this.dungeon.getClothingRecord(objIndex) : null;
+    const potion = dbType === DBType.POTION ? this.dungeon.getPotionRecord(objIndex) : null;
+    const misc = dbType === DBType.MISC ? this.dungeon.getMiscRecord(objIndex) : null;
+    switch (subcode) {
+      case StkOp.SET_BROKEN:
+        if (weapon) weapon.broken = value !== 0;
+        else if (clothing) clothing.broken = value !== 0;
+        break;
+      case StkOp.SET_POISONED:
+        if (weapon) weapon.poisoned = value !== 0;
+        break;
+      case StkOp.SET_CHARGES:
+        if (weapon) weapon.charges = value & 0xf;
+        else if (clothing) clothing.charges = value & 0xf;
+        else if (potion) potion.power = value & 0xff;
+        else if (misc) misc.specialState = value & 3;
+        break;
+      default:
+        if (misc) misc.subType = value & 0x1f;
+    }
+  }
+
+  /**
+   * `SetCursed` (`doc/CSBwin-src/Character.cpp:1782-1816`): the curse bracketed by
+   * `AdjustStatsForItemCarried`'s -1 and +1 on the champion carrying the object. The
+   * search's `break` leaves only the inner loop, so the slot passed is the one found
+   * only when the bearer is the last champion; for any other it is 30, where
+   * `AdjustStatsForItemCarried` changes nothing.
+   */
+  private setCursed(obj: ObjectID, curse: boolean): void {
+    const champions = this.ctx.party.state.champions;
+    let pCH: Champion | null = null;
+    let loc = -1;
+    for (let ch = 0; ch < champions.length; ch++) {
+      for (loc = 0; loc < 30; loc++) {
+        if (obj === getChampionPossession(champions[ch]!, loc)) {
+          pCH = champions[ch]!;
+          break;
+        }
+      }
+    }
+    const character = this.ctx.systems.character;
+    if (pCH) character.adjustStatsForItemCarried(pCH, loc, -1, obj);
+    switch (this.dungeon.rnMaps.dbType(obj)) {
+      case DBType.WEAPON: this.dungeon.getWeaponRecord(obj)!.cursed = curse; break;
+      case DBType.CLOTHING: this.dungeon.getClothingRecord(obj)!.cursed = curse; break;
+      case DBType.MISC: this.dungeon.getMiscRecord(obj)!.cursed = curse; break;
+      default: break;
+    }
+    if (pCH) character.adjustStatsForItemCarried(pCH, loc, +1, obj);
+  }
+
   private isCarried(bank: DsaBank): void {
     const party = this.ctx.party.state;
     const objid = bank.stack.pop();

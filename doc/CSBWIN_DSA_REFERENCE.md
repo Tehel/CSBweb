@@ -22,6 +22,11 @@ This document captures verified DSA behavior from the CSBWin C++ source under `d
 - `&ISCARRIED` with an object ID pushes `256 * chIdx` plus its slot, 255 for the hand, or -1, and searches a chest's contents, which report the chest's slot; with a negative ID, a basic object type (-1 for type 0), it pushes how many are carried (`:1520-1641`).
 - `&EXPERIENCE+` calls `AddToSkill` for a living champion, which adds `(UI16)(experience)` to the skill and to its basic skill (`doc/CSBwin-src/Magic.cpp:360-442`). `&CAUSEPOISON` is `PoisonCharacter` (`DSA.cpp:4348-4362`). `tools/dump-dsa-characters.ts` runs each of these.
 
+## STKOP object operations
+
+- `&CHARGES@`, `&CURSE@`, `&BROKEN@`, `&POISONED@` and `&SUBTYPE@` pop a slot index and push the field of the object there, 0 for an index `checkIndirectIndex` refuses or a database without the field (`doc/CSBwin-src/DSA.cpp:3411-3439`, `:3458-3483`, `:3511-3536`, `:3564-3595`, `:3629-3651`). Charges are a weapon's (`DB5` bits 10-13) and a garment's (`DB6` bits 9-12), a potion's strength (`DB8` bits 0-7) and a misc object's `value()` (`DB10` bits 14-15). A curse is a weapon's, a garment's or a misc object's bit 8; breakage a weapon's bit 14 or a garment's bit 13; poison a weapon's bit 9 alone (the garment arm is commented out); a subtype a misc object's bits 9-13 alone (`doc/CSBwin-src/CSB.h:1141-1310`).
+- The five setters pop the value, then the slot, and write the same fields, cut to the field's width by `SETWBITS` (`CSB.h:746-774`); a flag is set by any non-zero value (`DSA.cpp:3440-3457`, `:3484-3510`, `:3537-3563`, `:3596-3628`, `:3652-3675`). `&CURSE!` is `SetCursed`, which brackets the bit with `AdjustStatsForItemCarried`'s -1 and +1 on the bearer, through a slot that is right only for the last champion (`doc/PROVEN_FACTS.md` → "`AdjustStatsForItemCarried`"). `tools/dump-dsa-objects.ts` runs each.
+
 ## Timers and selector resolution
 
 - `ProcessDSATimer6` resolves the slave DSA by mapping `DB3::DSAselector()` through `DSALevelIndex[level][selector]`, computes `inputMsgType = 3 * timerPosition + timerTypeModifier[timerUByte9]`, executes the DSA, and writes the resulting state back via `GetState`/`PutState` (`doc/CSBwin-src/DSA.cpp`).

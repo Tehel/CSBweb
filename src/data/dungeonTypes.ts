@@ -316,7 +316,7 @@ export interface MiscRecord {
     specialState: ui8;          // +0x02 bits 15-14 (waterskin/compass)
     important: boolean;         // bit 7
     miscType: ui8;              // bits 6-0
-    /** `DB10::cursed()` — bit 8 (`doc/CSBwin-src/CSB.h:1300-1301`). Nothing reads it here. */
+    /** `DB10::cursed()` — bit 8 (`doc/CSBwin-src/CSB.h:1300-1301`), the DSA's `&CURSE@`. */
     cursed?: boolean;
     /** `DB10::subType()` — bits 9-13 (`doc/CSBwin-src/CSB.h:1304-1305`). */
     subType?: ui8;
