@@ -609,7 +609,7 @@ export class Game implements MainLoop {
      * `display` are the host's `drawViewport`. `StartQueuedSound` has no counterpart: it
      * plays nothing, since `d.CurrentSound` stays -1 once `QueueSound`'s assignment is
      * commented out (`doc/CSBwin-src/CSBCode.cpp:1906`) and `QueueSound` calls `StartSound`
-     * itself. Nor have the overlay's timeout and `parameterMessageSequence`, which the port does not model.
+     * itself. Nor has the overlay's timeout, which the port does not model.
      */
     *processTimersViewportAndSound(): LoopScript {
         if (this.systems.timer.processTimers()) {
@@ -622,10 +622,13 @@ export class Game implements MainLoop {
 
     /**
      * `d.Time++`, after the timers, in the main loop's tick (doc/CSBwin-src/CSBCode.cpp:660)
-     * and in `_ProcessTimersViewportAndSound` (`Attack.cpp:2208`).
+     * and in `_ProcessTimersViewportAndSound` (`Attack.cpp:2208`), and the parameter
+     * messages' sequence back to 0 with it.
      */
     private advanceTime(): void {
         this.ctx.state.tickCount++;
+        // `parameterMessageSequence = 0;` (`CSBCode.cpp:676`, `Attack.cpp:2210`).
+        this.ctx.systems.dsa.parameterMessageSequence = 0;
     }
 
     /**

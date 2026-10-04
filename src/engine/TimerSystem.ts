@@ -459,9 +459,11 @@ export class TimerSystem {
 
   /**
    * `ProcessTT_OPENROOM` (`doc/CSBwin-src/Timer.cpp:1688-1829`). A `TT_DESSAGE` or a
-   * parameter message reaches only the square's DSAs (`:1715-1716`, `:1760-1761`).
+   * parameter message reaches only the square's DSAs (`:1715-1716`, `:1760-1761`), and a
+   * parameter message keeps its function (`:1702`).
    */
   private processOpenRoom(timer: TimerEntry): void {
+    this.ctx.systems.dsa.readRoomTimerParameters(timer);
     const action = this.getTimerAction(timer);
     if (action === 3) return;
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);
@@ -508,6 +510,9 @@ export class TimerSystem {
 
   /** `ProcessTT_STONEROOM` (doc/CSBwin-src/Timer.cpp:2165-2384). */
   private processStoneRoom(timer: TimerEntry): boolean {
+    // A parameter message is a `TT_STONEROOM` once its parameters are read (`:2178-2186`).
+    this.ctx.systems.dsa.readRoomTimerParameters(timer);
+    if (timer.function === TimerFunction.TT_PARAMETER_MESSAGE) timer.function = TimerFunction.TT_STONEROOM;
     const action = this.getTimerAction(timer);
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);
     const targetPos = timer.uByte8 & 3;
@@ -558,7 +563,12 @@ export class TimerSystem {
     return false;
   }
 
+  /** `ProcessTT_FALSEWALL` (`doc/CSBwin-src/Timer.cpp:1389-1486`). */
   private processFalseWall(timer: TimerEntry): void {
+    // What `ProcessTimers` hands it is never a parameter message, but its head reads one
+    // as `ProcessTT_STONEROOM`'s does (`:1399-1407`).
+    this.ctx.systems.dsa.readRoomTimerParameters(timer);
+    if (timer.function === TimerFunction.TT_PARAMETER_MESSAGE) timer.function = TimerFunction.TT_STONEROOM;
     const action = this.getTimerAction(timer);
     if (action === 3) return;
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);

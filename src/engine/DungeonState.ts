@@ -144,6 +144,11 @@ export class DungeonState {
         new Expool(this.data).write(key, record);
     }
 
+    /** `expool.Read(key, …)`: `key`'s first record, which leaves the pool, or null. */
+    readExpoolRecord(key: number): number[] | null {
+        return new Expool(this.data).read(key);
+    }
+
     /** `expool.Locate(key)`: a copy of `key`'s first record, or null. */
     locateExpoolRecord(key: number): number[] | null {
         return new Expool(this.data).locate(key);

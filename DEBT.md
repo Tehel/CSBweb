@@ -92,6 +92,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| C125 | The timer-type modifier is never reset, and the room timers do not read it | S | ⏳ |
+| C126 | `&PARAM@` and `&PARAM!` go on past 100, and `&PARAM@` compares signed and zeroes | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
@@ -127,7 +129,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C125 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C127 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -170,6 +172,37 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C125 ⏳ The timer-type modifier is never reset, and the room timers do not read it
+
+CSBWin's `ProcessTimers` sets `timerTypeModifier` back to 0, 1, 2 before every timer
+(`doc/CSBwin-src/CSBCode.cpp:6412-6414`), so a DSA's `&MODIFYMESSAGE`
+(`doc/CSBwin-src/DSA.cpp:4931-4947`) holds for the rest of the timer that ran it. Every
+timer that acts on a square reads its action as `timerTypeModifier[uByte9]`, afresh at
+each object of the square (`doc/CSBwin-src/Timer.cpp:1416`, `:1439`, `:1712`, `:1720`,
+`:2195`, `:2202`, `:2213`, `:2258`, and the other sites a grep of `timerTypeModifier`
+lists), so a modifier a DSA sets changes what the square's later objects do.
+
+The port's `DsaSystem.timerTypeModifier` is never set back, so a `&MODIFYMESSAGE` holds for
+every later timer, and `TimerSystem.getTimerAction` reads `uByte9` itself, once a timer.
+Only the DSA reads the modifier (`processTimer6Internal`). Paying it: the reset at the top
+of each timer in `TimerSystem.processTimers`, and the action read through the modifier at
+each of CSBWin's sites. A `uByte9` past 2, which `&MESSAGE` can set, reads past CSBWin's
+array; the port's 3 for it stays, and is worth a line in `doc/PROVEN_FACTS.md`.
+
+### C126 ⏳ `&PARAM@` and `&PARAM!` go on past 100, and `&PARAM@` compares signed and zeroes
+
+`&PARAM@` pops `i` and `n` as `ui32` (`doc/CSBwin-src/DSA.cpp:2956-2998`). Past 100 it
+only says "too many parameters". It compares `n` with the count unsigned, so a count of
+-1, a parameter message whose `EXPOOL` record is gone, is never short of `n`, and the `n`
+words are copied. The variables past a short count are marked `DVT_NonParameter` and keep
+their values: `pdsaDbank->Var(0)` is a read of variable 0 (`:2977`, `DSA.cpp:141`).
+`&PARAM!` (`:3000-3020`) also does nothing past 100.
+
+The port's `PARAM_FETCH` and `PARAM_STORE` (`src/engine/DsaSystem.ts`) cut `n` to 100 and
+go on; `PARAM_FETCH` compares signed, so with a count of -1 it copies nothing, and sets the
+variables past the count to 0. Paying it: CSBWin's three branches, with a case of each in
+`tools/dump-dsa-parameters.ts`.
 
 
 ---
@@ -250,14 +283,14 @@ ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter 
 `STKOP` (`doc/CSBwin-src/Data.h:1721-1861`, the port's `StkOp`) has 138 values, and 136
 are operations: `Noop` (0) and `2Dup` (23) have no case in `EX_AMPERSAND`, whose default
 says "Illegal subcode" and does nothing (`doc/CSBwin-src/DSA.cpp:4979-4981`), as the
-port's trace does. The port has 97, so 39 are left. `tools/dump-dsa-census.ts` lists
+port's trace does. The port has 99, so 37 are left. `tools/dump-dsa-census.ts` lists
 them: it fails unless what the port lacks is exactly its `LEFT`, so each family's commit
 takes its operations off that list, and this part of the item is done when it is empty.
 
 Conflux, the dungeon that will check them, defines 131 DSAs, with 4646 programs, behind
 1591 type-47 actuators. A static census of its programs decodes each word with the
 operand layout `DsaSystem.execute` reads, and every program decodes to its exact length.
-It uses 118 `&` operations, 35 of the 39. With Conflux's count of each:
+It uses 118 `&` operations, 33 of the 37. With Conflux's count of each:
 
 - **Characters**: what is left of them is `I_CharStore` 4 and `I_CausePoison` 6, with the
   `I_` operations, and `SwapCharacter` 7 and `I_SwapCharacter` 4, which need G3. The
@@ -273,12 +306,11 @@ It uses 118 `&` operations, 35 of the 39. With Conflux's count of each:
   `MonLandD`, `DelMon` and `InsMon` are ported, checked by `tools/dump-dsa-monsters.ts`.
   `MonLandD` acts only in the monster move filter, and `MonBlk` is read only from it:
   both wait on G2's `ESL_MONSTERMOVEFILTER` to matter.
-- **Message and sound**: `Message` 62, which sets a `TT_ParameterMessage` timer and
-  keeps the DSA parameters for it in `EXPOOL` (`DSA.cpp:3045-3089`), read back where the
-  timer runs (`Timer.cpp:1399-1406`, `:1699-1707`, `:2178-2185`); and `Sound` 308, whose
-  samples past the 22 of `graphics.dat` are G24's (`PlayCustomSound`, `Sound.cpp:1039`).
-  The texts are ported: `Say`, `TextFetch`, `TextSay`, `GlobalTextStore`, `DiscardText`
-  and `CharNameFetch`, checked by `tools/dump-dsa-text.ts`.
+- **Messages, sounds and texts**: none is left. `Message` and `Sound` are ported,
+  checked by `tools/dump-dsa-message.ts`; a `Sound` number from 0 up is a sample of
+  `CSBgraphics.dat`, which plays nothing until G24. The texts are ported too: `Say`,
+  `TextFetch`, `TextSay`, `GlobalTextStore`, `DiscardText` and `CharNameFetch`, checked by
+  `tools/dump-dsa-text.ts`.
 - **The dungeon and the program**: `I_Del` 42, `I_Add` 41, `I_Move` 17, `I_CellStore` 4,
   `I_Indirect` 1, `I_Delay` 22, `FetchExCellFlg` 2, `StoreExCellFlg` 1, `ThisCell` 11,
   `Neighbors` 4, `Loc2AbsCoord` 51, `PartyDistance` 5, `JumpGear` 8, `GosubGear` 8,
@@ -300,9 +332,9 @@ location (`:2109-2120`). The port's one `I_` operation, `I_TeleportParty`, share
 census counts it as ported, and the `I_` family's commit gives it CSBWin's path.
 
 The steps: the census is done (`tools/dump-dsa-census.ts`, Conflux's counts by default,
-another `dungeon.dat` as its argument), and so are the characters, the objects and the
-monsters, and the texts. Next, one family per commit, in the order above, the four with
-their nearest family: `Message` and `Sound` next. Every `I_` operation, of whichever family, comes with `I_Indirect` in a
+another `dungeon.dat` as its argument), and so are the characters, the objects, the
+monsters, the texts, and the messages and sounds. Next, one family per commit, in the order
+above, the four with their nearest family: the dungeon and the program next. Every `I_` operation, of whichever family, comes with `I_Indirect` in a
 family of its own. A family's tool runs its programs through `tools/lib/dsa.ts`. Last, `DSA::Write` and the
 `EXPOOL` records, so that a game with DSAs can be saved (below). An operation is checked
 against Conflux in play once G26 makes it a data set.
@@ -465,7 +497,9 @@ alternate monster graphics, 90 backgrounds, 112 viewport overlays, 51 overlay pa
 wall and 72 floor decorations. Of the six kinds the port does not read, Conflux reaches:
 
 - **Portraits** (`doc/CSBwin-src/Bitmaps.cpp:287`): its heroes with portraits past 23 (G4).
-- **Sounds** (`Sound.cpp:996`): what its 308 `&SOUND`s play (G1).
+- **Sounds** (`Sound.cpp:996`): what its 308 `&SOUND`s play with a number from 0 up.
+  `SoundQueue.playCustomSound` plays nothing for those and traces "Cannot find Sound"
+  once, as CSBWin does without the file.
 - **Alternate monster graphics** (`Code51a4.cpp:1097`): 598 of its creature groups have
   `alternateGraphics` 1 to 3.
 

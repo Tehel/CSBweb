@@ -32,8 +32,8 @@ const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
 
 /** What the port lacks, in `STKOP` order. A ported family comes off this list. */
 const LEFT: readonly string[] = [
-  'OVERLAY', 'DISABLE_SAVES', 'MESSAGE', 'FETCH_EX_CELL_FLG', 'STORE_EX_CELL_FLG',
-  'LOC_TO_ABS_COORD', 'SOUND', 'PALETTE', 'I_DEL', 'I_ADD', 'I_CREATE_CLOUD', 'I_CAST',
+  'OVERLAY', 'DISABLE_SAVES', 'FETCH_EX_CELL_FLG', 'STORE_EX_CELL_FLG',
+  'LOC_TO_ABS_COORD', 'PALETTE', 'I_DEL', 'I_ADD', 'I_CREATE_CLOUD', 'I_CAST',
   'I_MONSTER_STORE', 'I_CHAR_STORE', 'I_MOVE', 'I_COPY', 'I_CELL_STORE', 'I_THROW',
   'I_INDIRECT', 'I_DELAY', 'I_DEL_MON', 'I_INS_MON', 'JUMP_GEAR', 'GOSUB_GEAR',
   'NEIGHBORS', 'BIT_COUNT', 'THIS_CELL', 'I_CAUSE_POISON', 'MULTIPLIER_FETCH',

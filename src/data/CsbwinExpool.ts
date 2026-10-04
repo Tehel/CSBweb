@@ -31,6 +31,8 @@ export const EXPOOL_RECORD_SIZE = 256;
 const EXPOOL_WORDS_PER_BLOCK = 64;
 /** `RNeof`, every block's link (`doc/CSBwin-src/data.cpp:1514`, `:1623`). */
 const RN_EOF = 0xfffe;
+/** `EDT_MessageParameters` (`doc/CSBwin-src/CSB.h:1531`). */
+const EDT_MESSAGE_PARAMETERS = 1;
 /** `EDT_SpecialLocations` (`doc/CSBwin-src/CSB.h:1534`). */
 const EDT_SPECIAL_LOCATIONS = 3;
 /** The last `ESL_*`, `ESL_DAMAGECHARFILTER` (`doc/CSBwin-src/CSB.h:1550`). */
@@ -51,6 +53,15 @@ export interface ExpoolDatabase {
 /** `(EDT_ChampionBones << 24) | rn`, the key of a bones object's record. */
 function championBonesKey(rn: number): number {
     return ((EDT_CHAMPION_BONES << 24) | (rn & 0xffff)) >>> 0;
+}
+
+/**
+ * `(EDT_MessageParameters << 24) + timerID`, the key of the parameters a DSA's `&MESSAGE`
+ * gives the timer it sets (`doc/CSBwin-src/DSA.cpp:3087`), which the timer reads back
+ * (`doc/CSBwin-src/Timer.cpp:1401`, `:1701`, `:2180`).
+ */
+export function messageParametersKey(timerIndex: number): number {
+    return ((EDT_MESSAGE_PARAMETERS << 24) + timerIndex) >>> 0;
 }
 
 export class Expool {

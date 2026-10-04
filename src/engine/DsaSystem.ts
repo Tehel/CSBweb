@@ -49,6 +49,7 @@ import { monsterDrawAsSize4, monsterInvisible, monsterPoisoned, monsterUnique } 
 import { printWithSubstitution } from './PrintWithSubstitution';
 import { findChampionByFingerprint } from './Party';
 import { EDT_GLOBAL_TEXT } from '../data/DecodeText';
+import { messageParametersKey } from '../data/CsbwinExpool';
 
 export interface ViewingFilterOptions {
   phraseMask: number;
@@ -524,6 +525,13 @@ export class DsaSystem {
    * `&MONL&D` reads. The port does not run that filter yet (DEBT.md G2).
    */
   monsterMoveFilterActive = false;
+  /**
+   * `parameterMessageSequence` (`doc/CSBwin-src/data.cpp:88`): the `uByte5` of the next
+   * `TT_ParameterMessage` timer, so that two set at one time run in the order they were
+   * set (`TIMER::operator<`, `Timer.cpp:779-791`). Back to 0 at every `d.Time++`
+   * (`CSBCode.cpp:676`, `Attack.cpp:2210`) and at a load (`SaveGame.cpp:1625`).
+   */
+  parameterMessageSequence = 0;
   private warnedOps = new Set<number>();
   private overridePos = 0;
   private overrideP = false;
@@ -546,6 +554,23 @@ export class DsaSystem {
     for (let i = 0; i < n; i++) {
       this.parameters[1 + i] = values[i] ?? 0;
     }
+  }
+
+  /**
+   * What a room timer leaves in the DSA parameters before it reaches its square's DSAs
+   * (`ProcessTT_FALSEWALL`, `doc/CSBwin-src/Timer.cpp:1399-1407`; `ProcessTT_OPENROOM`,
+   * `:1699-1707`; `ProcessTT_STONEROOM`, `:2178-2186`): a parameter message's own, which
+   * leave `EXPOOL`, with a count of -1 when the record is gone (`EXPOOL::Read`'s -1); a
+   * count of 0 for any other timer. The words past the count stay as they were.
+   */
+  readRoomTimerParameters(timer: TimerEntry): void {
+    if (timer.function !== TimerFunction.TT_PARAMETER_MESSAGE) {
+      this.parameters[0] = 0;
+      return;
+    }
+    const record = this.dungeon.readExpoolRecord(messageParametersKey(timer.index));
+    this.parameters[0] = record === null ? -1 : record.length;
+    record?.forEach((value, i) => { this.parameters[1 + i] = value; });
   }
 
   getParameter(index: number): number {
@@ -1646,6 +1671,35 @@ export class DsaSystem {
         const locr = locationRelFromInteger(location);
         if (!this.dungeon.isValidLocation(locr)) break;
         this.teleportParty(locr);
+        break;
+      }
+      case StkOp.MESSAGE: {
+        // `STKOP_Message` (`doc/CSBwin-src/DSA.cpp:3045-3089`): a `TT_ParameterMessage`
+        // timer to the target, and the first `numParam` DSA parameters in `EXPOOL` under
+        // its index, for the DSAs it reaches (`readRoomTimerParameters`).
+        const delay = bank.stack.pop() >>> 0;
+        const numParam = bank.stack.pop() >>> 0;
+        const msgType = bank.stack.pop();
+        const target = locationRelFromInteger(bank.stack.pop());
+        if (numParam > 29) break;
+        if (this.overrideP) {
+          target.p = this.overridePos & 3;
+          this.overrideP = false;
+        }
+        const actionTime = (this.ctx.state.tickCount + delay) >>> 0;
+        const timer = this.timers.createTimerWithUByte5(
+          TimerFunction.TT_PARAMETER_MESSAGE, target.x, target.y, target.p, msgType, actionTime, target.l,
+          this.parameterMessageSequence++,
+        );
+        this.dungeon.writeExpoolRecord(messageParametersKey(timer.index), Array.from(this.parameters.subarray(1, 1 + numParam)));
+        break;
+      }
+      case StkOp.SOUND: {
+        // `STKOP_Sound` (`doc/CSBwin-src/DSA.cpp:4612-4624`).
+        bank.stack.pop(); // flags, which `PlayCustomSound` does not use
+        const volume = bank.stack.pop();
+        const soundNum = bank.stack.pop();
+        this.ctx.sounds.playCustomSound(soundNum, volume);
         break;
       }
       case StkOp.DESCRIBE: {

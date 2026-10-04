@@ -109,6 +109,8 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     // rows on screen stay, their timeouts rebased onto the loaded clock.
     ctx.host.messages.resetTime(save.game.tickCount, ctx.state.tickCount);
     ctx.state.tickCount = save.game.tickCount;
+    // `parameterMessageSequence = 0;` (doc/CSBwin-src/SaveGame.cpp:1625).
+    ctx.systems.dsa.parameterMessageSequence = 0;
     // Asleep, `d.Speed` was 0. Awake again, the top of the next tick puts it back with
     // `SetNewSpeed(d.Speed, …)` (`CSBCode.cpp:612-616`).
     if (wasSleeping) ctx.host.messages.setNewSpeed(0, VBL_PER_TICK, ctx.state.tickCount);

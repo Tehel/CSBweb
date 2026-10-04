@@ -18,6 +18,8 @@
  *
  * `SoundFilter`, which can hand the sound to a DSA instead
  * (`doc/CSBwin-src/Sound.cpp:670`), is **not ported** (`DEBT.md` G2).
+ *
+ * `PlayCustomSound`, a DSA's `&SOUND`, plays here too, at once and at no distance.
  */
 import type { SoundTableEntry } from '../data/tables/UITables';
 import type { GameHost } from './GameHost';
@@ -26,16 +28,20 @@ import type { Party } from './Party';
 import { TimerFunction, type TimerQueue } from './TimerQueue';
 
 export class SoundQueue {
+  /** `ReadSound`'s `firstTime`: "Cannot find Sound" is said once. */
+  private customSoundMissingSaid = false;
+
   /**
    * @param sound1772 `d.sound1772` — the sound table from `graphics.dat` item `0x232`.
-   * @param host where a sample goes (`GameHost.playSound`).
+   * @param host where a sample goes (`GameHost.playSound`), and `PlayCustomSound`'s
+   *   complaint (`trace`).
    * @param state `state.tickCount` is `d.Time`, the clock a delayed sound is due by.
    * @param timers where a delayed sound's `TT_20` goes.
    */
   constructor(
     private readonly party: Party,
     private readonly sound1772: ArrayLike<SoundTableEntry>,
-    private readonly host: Pick<GameHost, 'playSound'>,
+    private readonly host: Pick<GameHost, 'playSound' | 'trace'>,
     private readonly state: Pick<GameState, 'tickCount'>,
     private readonly timers: TimerQueue,
   ) {}
@@ -78,5 +84,27 @@ export class SoundQueue {
     // CSBWin's `byte3` playback rate, which `StartSound` consumes inside the audio
     // layer (doc/CSBwin-src/Sound.cpp:647). Everything else in the port passes 0.
     this.host.playSound(soundId, 0, highVolume);
+  }
+
+  /**
+   * `PlayCustomSound(soundNum, volume, flags)` (`doc/CSBwin-src/Sound.cpp:1039-1062`), a
+   * DSA's `&SOUND`. A negative number is `d.sound1772`'s entry `-soundNum - 1`, none past
+   * the 22nd, played by `StartSound`, loud unless `volume` is 0 (`:647-667`). `flags` is
+   * unused. A number from 0 up is a sound of `CSBgraphics.dat` (`CGT_Sound`,
+   * `SOUNDDATA::ReadSound`, `:989-1027`), which the port does not read (`DEBT.md` G24): it
+   * plays nothing, as CSBWin does without the file, and says so once (`:1003-1008`).
+   */
+  playCustomSound(soundNum: number, volume: number): void {
+    if (soundNum < 0) {
+      const ordinal = -soundNum - 1;
+      if (ordinal > 21) return;
+      const entry = this.sound1772[ordinal];
+      if (!entry) return;
+      this.host.playSound(entry.word0 | 0, 0, volume === 0 ? 0 : 1);
+      return;
+    }
+    if (this.customSoundMissingSaid) return;
+    this.customSoundMissingSaid = true;
+    this.host.trace('Cannot find Sound');
   }
 }

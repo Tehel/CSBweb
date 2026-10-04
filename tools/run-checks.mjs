@@ -102,6 +102,7 @@ const CHECKS = [
   { tool: 'dump-dsa-missiles.ts' },
   { tool: 'dump-dsa-monsters.ts' },
   { tool: 'dump-dsa-text.ts' },
+  { tool: 'dump-dsa-message.ts' },
   { tool: 'dump-flip.ts' },
   { tool: 'dump-db-reuse.ts' },
   { tool: 'watch-smart-discard.ts' },
