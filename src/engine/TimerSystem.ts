@@ -1746,7 +1746,9 @@ export class TimerSystem {
       if (decoded.category !== DBType.ACTUATOR) continue;
       const rec = this.dungeon.getActuatorRecord(rn);
       if (!rec || getActuatorType(rec) !== 47) continue;
-      this.ctx.systems.dsa.processTimer5(rn, timer, target);
+      // "Ensure DSAparameters[0] = 0" (`doc/CSBwin-src/Timer.cpp:1525`).
+      const dsa = this.ctx.systems.dsa;
+      dsa.newDsaParameters(() => dsa.processTimer5(rn, timer, target));
     }
   }
 }

@@ -92,6 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| C121 | The party attack's parameters are not the current DSA parameter array | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
@@ -126,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C120 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C122 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -170,6 +171,20 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
+### C121 ⏳ The party attack's parameters are not the current DSA parameter array
+
+CSBWin's `_Attack` lays its `ATTACKPARAMETERS` over the current `pDSAparameters` array
+(`SetupDSAParam`, `doc/CSBwin-src/Attack.cpp:1346-1360`, called at `:1673`), with no
+`NEWDSAPARAMETERS`: at every attack past its first two returns, filter or none, the array's
+count becomes 124 and its words 1 to 31 the attack's, as the attack writes them. A DSA a
+timer runs afterwards reads them with `&NUMPARAM` and `&PARAM@` (`doc/PROVEN_FACTS.md` →
+"A DSA filter runs on a parameter array of its own"). The port's `AttackSystem.attack`
+keeps them in a `PartyAttackParameters` of its own, and `DsaSystem.callPartyAttackFilter`
+copies them into the array only when a party attack filter exists, after clearing all 100
+words where CSBWin clears 31. Paying it: the array written at `SetupDSAParam`'s point and
+left holding the attack's final words, with or without a filter, checked in
+`tools/dump-dsa-parameters.ts`.
+
 ---
 
 ## F — Verification debt
@@ -211,7 +226,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 140 checks sequentially (`spawnSync`, `:269`), each a
+`tools/run-checks.mjs` spawns its 142 checks sequentially (`spawnSync`, `:273`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and

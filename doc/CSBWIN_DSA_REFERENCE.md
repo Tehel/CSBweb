@@ -12,6 +12,10 @@ This document captures verified DSA behavior from the CSBWin C++ source under `d
 - Every other operand word is unsigned too: `LOAD_INTEGER` (26) pushes its word as it is (`:1099-1106`), and a message's explicit delay is the word (`:662`). `LOAD` 29 (`LOAD_ABS32`) and 31 say "Illegal DSA load command" and push nothing (`:1138-1143`). A `STORE` above 25 (`:1328-1332`) and an `OVERRIDE` whose `what` is not 1 (`:1045-1058`) return before they set the next state, and the `STORE` pops nothing. `GLOBALFETCH` past the last variable pushes `0xcdcdcdcd` (`:1302-1306`). `tools/dump-dsa-decoder.ts` runs each.
 - `STKOP` (`doc/CSBwin-src/Data.h:1721-1861`) has 138 values, 0 to 126 and 129 to 139. `EX_AMPERSAND` has a case for each but three: `STKOP_I_Indirect` is unpacked before the switch (`doc/CSBwin-src/DSA.cpp:2345-2391`) and then runs as the operation it carries; `STKOP_Noop` (0) and `STKOP_2Dup` (23) reach the default, which says "Illegal subcode in EX_AMPERSAND" and returns (`doc/CSBwin-src/DSA.cpp:4979-4981`). So 136 are operations.
 
+## Parameters
+
+- `&NUMPARAM`, `&PARAM@` and `&PARAM!` work on the array `pDSAparameters` points at. Every filter, and the DSA `ActivateDSA` starts, runs on an array of its own whose count is 0, and the caller's is back when it returns (`NEWDSAPARAMETERS`, `doc/CSBwin-src/CSB.h:4220-4235`); the party attack's parameters are laid over the current array instead (`doc/CSBwin-src/Attack.cpp:1346-1360`). `doc/PROVEN_FACTS.md` → "A DSA filter runs on a parameter array of its own" has every site; `tools/dump-dsa-parameters.ts` runs it.
+
 ## STKOP character operations
 
 - An index of 4 is the hand's owner, `d.HandChar`, in `&CHPOSS`, `&MASTERY`, `&CHAR@`, `&CHAR!`, `&TALENTS@` and `&TALENTS!`; in `&ISCARRIED` 4 is the hand's owner and 5 every champion (`doc/CSBwin-src/DSA.cpp:1613-1641`). An index with bit 16 set names a champion in the wings by fingerprint, in `&CHAR@` (zeros when the wings hold nobody), `&TALENTS@` (0) and `&TALENTS!` (nothing) (`:4166-4347`).

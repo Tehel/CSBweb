@@ -4314,6 +4314,29 @@ the cell's object chain when it is true, since the slave's link now belongs to t
 list. Filters (`ProcessDSAFilter`, `DSA.cpp:5315-5325`) ignore it. Evidence:
 `tools/dump-dsa-delete.ts`.
 
+## A DSA filter runs on a parameter array of its own; the party attack's alone writes the current one
+
+`pDSAparameters` (`doc/CSBwin-src/DSA.cpp:43-44`) points at the array `&NUMPARAM`, `&PARAM@`
+and `&PARAM!` read and write: word 0 is the count, words 1 to 100 the parameters.
+`NEWDSAPARAMETERS` (`doc/CSBwin-src/CSB.h:4220-4235`) points it at an array of its own for
+the scope it is declared in, sets that array's count to 0 and leaves its words
+uninitialised, and points it back at the caller's when the scope ends. Every filter is
+called inside one: `KillCharacter`, `DamageCharacter`, `SetPossession`
+(`Character.cpp:2550`, `:2844`, `:2937`), `DescribeObject` (`:3435`), the monster-delete
+filter (`Code11f52.cpp:928`), the missile-encounter filter (`:1645`), `AdjustSkills`
+(`Magic.cpp:196`), `CallSpellFilter` (`:876`), `SoundFilter` (`Sound.cpp:692`),
+`MonsterAttacks` (`Monster.cpp:1153`), the post-monster-move filter (`:3174`),
+`ProcessTimers29to41` (`:3321`), `CallPartyMoveFilter` (`CSBCode.cpp:7805`) and
+`ActionNameFilter` (`:8653`); and so is the DSA `ActivateDSA` starts, "Ensure
+DSAparameters[0] = 0" (`Timer.cpp:1525`). A filter's count and words are therefore gone
+once it returns, and a DSA run after it, or the program that reached it, finds its own.
+`&PARAM@` reads no word past the count (`DSA.cpp`'s `STKOP_ParamFetch`), so the
+uninitialised words cannot be read. The party attack filter is the exception:
+`SetupDSAParam` lays `ATTACKPARAMETERS` over the current array, writes its count as
+`sizeof(ATTACKPARAMETERS)`, 124, and zeroes its 31 words, at every `_Attack` that gets past
+its first two returns, filter or none (`Attack.cpp:1346-1360`, `:1673`). Evidence:
+`tools/dump-dsa-parameters.ts`.
+
 ## A missile at a door: Zo works the button, grates let small things through, the rest hit it
 
 The door arm of `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1844-1935`), in order:

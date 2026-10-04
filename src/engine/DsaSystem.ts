@@ -481,7 +481,7 @@ export class DsaSystem {
   private readonly objDescWord4: ArrayLike<number>;
   private readonly carryLocation: ArrayLike<number>;
   private timerTypeModifier = [0, 1, 2];
-  private parameters = new Int32Array(101);
+  private parameters: Int32Array = new Int32Array(101);
   private adjustSkillsParameters = new Int32Array(5);
   /**
    * `d.GlobalVariables` — where a dungeon's DSAs keep their puzzle progress, so a read
@@ -515,6 +515,25 @@ export class DsaSystem {
   getParameter(index: number): number {
     if (index < 0 || index >= 100) return 0;
     return this.parameters[1 + index] ?? 0;
+  }
+
+  /**
+   * `NEWDSAPARAMETERS` (`doc/CSBwin-src/CSB.h:4220-4235`): `fn` runs on a parameter array
+   * of its own, whose count is 0, and the caller's is back once it returns. Every filter
+   * but the party attack's is called so, and so is a DSA that `ActivateDSA` starts
+   * (`doc/CSBwin-src/Timer.cpp:1525`); a program that runs one, `&EXPERIENCE+` reaching
+   * the adjust-skills filter, finds its own parameters after it. CSBWin leaves the words
+   * past the count uninitialised; `&PARAM@` reads none past the count, so the port's
+   * zeros cannot be told from them.
+   */
+  newDsaParameters<T>(fn: () => T): T {
+    const saved = this.parameters;
+    this.parameters = new Int32Array(101);
+    try {
+      return fn();
+    } finally {
+      this.parameters = saved;
+    }
   }
 
   getAdjustSkillsParameters(): Int32Array {
@@ -560,18 +579,19 @@ export class DsaSystem {
       p: options.posInCell & 0x3,
     });
 
-    this.setParameters(7, [
-      0,
-      options.type | 0,
-      encounterLoc,
-      options.missile | 0,
-      options.projectile | 0,
-      options.direction | 0,
-      options.index | 0,
-    ]);
-
-    this.processTimer6Internal(dsaActuator, timer, filterPos, true, new DsaVars());
-    return this.getParameter(0);
+    return this.newDsaParameters(() => {
+      this.setParameters(7, [
+        0,
+        options.type | 0,
+        encounterLoc,
+        options.missile | 0,
+        options.projectile | 0,
+        options.direction | 0,
+        options.index | 0,
+      ]);
+      this.processTimer6Internal(dsaActuator, timer, filterPos, true, new DsaVars());
+      return this.getParameter(0);
+    });
   }
 
   processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
@@ -598,29 +618,31 @@ export class DsaSystem {
       timerWord6: 0,
     };
 
-    this.setParameters(3, [options.phraseMask | 0, options.objectId | 0, options.selectedCharacter | 0]);
-    this.viewingFilterContext = {
-      phraseMask: options.phraseMask | 0,
-      phraseTextOverrides: Array.from({ length: 8 }, () => null),
-      phraseColorOverrides: Array.from({ length: 8 }, () => null),
-      modified: false,
-    };
+    return this.newDsaParameters(() => {
+      this.setParameters(3, [options.phraseMask | 0, options.objectId | 0, options.selectedCharacter | 0]);
+      this.viewingFilterContext = {
+        phraseMask: options.phraseMask | 0,
+        phraseTextOverrides: Array.from({ length: 8 }, () => null),
+        phraseColorOverrides: Array.from({ length: 8 }, () => null),
+        modified: false,
+      };
 
-    this.processTimer6Internal(dsaActuator, timer, filterPos, true, new DsaVars());
+      this.processTimer6Internal(dsaActuator, timer, filterPos, true, new DsaVars());
 
-    const ctx = this.viewingFilterContext;
-    this.viewingFilterContext = null;
-    if (!ctx) return null;
-    const paramMask = this.getParameter(0);
-    const phraseMask = ctx.modified ? ctx.phraseMask : (paramMask | 0);
-    const objectId = this.getParameter(1);
+      const ctx = this.viewingFilterContext;
+      this.viewingFilterContext = null;
+      if (!ctx) return null;
+      const paramMask = this.getParameter(0);
+      const phraseMask = ctx.modified ? ctx.phraseMask : (paramMask | 0);
+      const objectId = this.getParameter(1);
 
-    return {
-      phraseMask,
-      objectId,
-      phraseTextOverrides: ctx.phraseTextOverrides,
-      phraseColorOverrides: ctx.phraseColorOverrides,
-    };
+      return {
+        phraseMask,
+        objectId,
+        phraseTextOverrides: ctx.phraseTextOverrides,
+        phraseColorOverrides: ctx.phraseColorOverrides,
+      };
+    });
   }
 
   processAdjustSkillsFilter(options: {
@@ -654,30 +676,33 @@ export class DsaSystem {
     let skillNumber = options.skillNumber | 0;
     let experience = options.experience | 0;
     let why = options.why | 0;
-    let found = false;
 
-    for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
-      const rec = this.dungeon.getActuatorRecord(rn);
-      if (!rec || getActuatorType(rec) !== 47) continue;
-      found = true;
-      this.setParameters(9, [
-        chIdx,
-        skillNumber,
-        experience,
-        why,
-        this.adjustSkillsParameters[0] ?? 0,
-        this.adjustSkillsParameters[1] ?? 0,
-        this.adjustSkillsParameters[2] ?? 0,
-        this.adjustSkillsParameters[3] ?? 0,
-        this.adjustSkillsParameters[4] ?? 0,
-      ]);
-      this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars());
-      chIdx = this.getParameter(0);
-      skillNumber = this.getParameter(1);
-      experience = this.getParameter(2);
-      why = this.getParameter(3);
-    }
+    const found = this.newDsaParameters(() => {
+      let found = false;
+      for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+        if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
+        const rec = this.dungeon.getActuatorRecord(rn);
+        if (!rec || getActuatorType(rec) !== 47) continue;
+        found = true;
+        this.setParameters(9, [
+          chIdx,
+          skillNumber,
+          experience,
+          why,
+          this.adjustSkillsParameters[0] ?? 0,
+          this.adjustSkillsParameters[1] ?? 0,
+          this.adjustSkillsParameters[2] ?? 0,
+          this.adjustSkillsParameters[3] ?? 0,
+          this.adjustSkillsParameters[4] ?? 0,
+        ]);
+        this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars());
+        chIdx = this.getParameter(0);
+        skillNumber = this.getParameter(1);
+        experience = this.getParameter(2);
+        why = this.getParameter(3);
+      }
+      return found;
+    });
 
     if (!found) return null;
     return { chIdx, skillNumber, experience };
@@ -769,47 +794,50 @@ export class DsaSystem {
     };
 
     let updated: SpellParameters = { ...params };
-    let found = false;
 
-    for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
-      const rec = this.dungeon.getActuatorRecord(rn);
-      if (!rec || getActuatorType(rec) !== 47) continue;
-      found = true;
-      this.setParameters(14, [
-        updated.action,
-        updated.incantation,
-        updated.chIdx,
-        updated.disableTime,
-        updated.missileType,
-        updated.locationAbs,
-        updated.facing,
-        updated.skillRequired,
-        updated.spellByte5,
-        updated.spellClass,
-        updated.unused1,
-        updated.unused2,
-        updated.unused3,
-        updated.unused4,
-      ]);
-      this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars());
-      updated = {
-        action: this.getParameter(0),
-        incantation: this.getParameter(1),
-        chIdx: this.getParameter(2),
-        disableTime: this.getParameter(3),
-        missileType: this.getParameter(4),
-        locationAbs: this.getParameter(5),
-        facing: this.getParameter(6),
-        skillRequired: this.getParameter(7),
-        spellByte5: this.getParameter(8),
-        spellClass: this.getParameter(9),
-        unused1: this.getParameter(10),
-        unused2: this.getParameter(11),
-        unused3: this.getParameter(12),
-        unused4: this.getParameter(13),
-      };
-    }
+    const found = this.newDsaParameters(() => {
+      let found = false;
+      for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+        if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
+        const rec = this.dungeon.getActuatorRecord(rn);
+        if (!rec || getActuatorType(rec) !== 47) continue;
+        found = true;
+        this.setParameters(14, [
+          updated.action,
+          updated.incantation,
+          updated.chIdx,
+          updated.disableTime,
+          updated.missileType,
+          updated.locationAbs,
+          updated.facing,
+          updated.skillRequired,
+          updated.spellByte5,
+          updated.spellClass,
+          updated.unused1,
+          updated.unused2,
+          updated.unused3,
+          updated.unused4,
+        ]);
+        this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars());
+        updated = {
+          action: this.getParameter(0),
+          incantation: this.getParameter(1),
+          chIdx: this.getParameter(2),
+          disableTime: this.getParameter(3),
+          missileType: this.getParameter(4),
+          locationAbs: this.getParameter(5),
+          facing: this.getParameter(6),
+          skillRequired: this.getParameter(7),
+          spellByte5: this.getParameter(8),
+          spellClass: this.getParameter(9),
+          unused1: this.getParameter(10),
+          unused2: this.getParameter(11),
+          unused3: this.getParameter(12),
+          unused4: this.getParameter(13),
+        };
+      }
+      return found;
+    });
 
     if (!found) return null;
     return updated;

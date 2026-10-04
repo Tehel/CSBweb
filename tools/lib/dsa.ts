@@ -4,7 +4,7 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType, locationRelToInteger, type ObjectID } from '../../src/core/types';
 import type { DsaDefinition, DungeonData } from '../../src/data/dungeonTypes';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
@@ -43,14 +43,26 @@ export function freshGame(file: Uint8Array = save): Game {
 }
 
 /**
+ * A filter for `run`: `program` is the test DSA's column 0, which a filter runs, and
+ * `place` makes the test square, as a `LOCATIONREL` integer, the filter's location.
+ */
+export interface TestFilter {
+  program: number[];
+  place: (game: Game, locr: number) => void;
+}
+
+/**
  * Run `program` as the one program of a test DSA on an empty open square of the party's
- * level, and return the 100 global variables, which start at 0x5a5a.
+ * level, and return the 100 global variables, which start at 0x5a5a. With a `filter`,
+ * the program is column 1, run by a timer whose `uByte9` is 1. `again` runs it once more,
+ * on the globals as they stand.
  */
 export function run(
   program: number[],
   prepare: (game: Game) => void = () => {},
   file: Uint8Array = save,
-): { game: Game; g: number[] } {
+  filter?: TestFilter,
+): { game: Game; g: number[]; again: () => number[] } {
   const game = freshGame(file);
   prepare(game);
   const dungeon = game.ctx.dungeon;
@@ -72,13 +84,23 @@ export function run(
   dungeon.addObjectToCell(at, rn);
   const dsa: DsaDefinition = {
     description: 'test', state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,
-    states: [{ actions: [{ column: 0, program: Uint16Array.from(program) }] }],
+    states: [{
+      actions: filter
+        ? [{ column: 0, program: Uint16Array.from(filter.program) }, { column: 1, program: Uint16Array.from(program) }]
+        : [{ column: 0, program: Uint16Array.from(program) }],
+    }],
   };
   data.dsaIndex = { entries: [dsa] };
   data.dsaLevelIndex = [];
   data.dsaLevelIndex[at.z] = [0];
+  filter?.place(game, locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 }));
   game.systems.dsa.setGlobalVariables(new Array<number>(100).fill(0x5a5a));
-  const timer = { uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: 0, level: at.z, time: 0 } as TimerEntry;
-  game.systems.dsa.processTimer5(rn, timer, at);
-  return { game, g: game.systems.dsa.getGlobalVariables() };
+  const timer = {
+    uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: filter ? 1 : 0, level: at.z, time: 0,
+  } as TimerEntry;
+  const again = (): number[] => {
+    game.systems.dsa.processTimer5(rn, timer, at);
+    return game.systems.dsa.getGlobalVariables();
+  };
+  return { game, g: again(), again };
 }
