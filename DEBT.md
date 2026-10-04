@@ -92,7 +92,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | Twelve DSA filters | L | ⏳ |
+| C130 | The viewing filter runs only the first DSA at its location, and reads its mask back | S | ⏳ |
+| G2 | Twelve DSA filters, and the viewing filter's third site | L | ⏳ step 1 of 12 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -127,7 +128,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C130 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C131 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -170,6 +171,23 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C130 ⏳ The viewing filter runs only the first DSA at its location, and reads its mask back
+
+CSBWin's three viewing-filter sites run every type-47 actuator at `ESL_VIEWINGFILTER`'s
+location in turn: the scroll's and the description's in `DescribeObject`
+(`doc/CSBwin-src/Character.cpp:3506`, `:3766`), the eye click's in `TAG019036` (`:4571`),
+each loop going on with `continue` (`:3518`, `:3770`, `:4575`). The port's
+`DsaSystem.processViewingFilter` runs the first (`findFirstDsaActuator`). Conflux has three
+there. Each run is a filter call of its own, with the same parameters. The scroll's
+reads parameter 2 back into the loop's own `obj` whenever it is a valid object
+(`:3509-3516`), and draws it if it is a scroll: the loop then goes on down that object's
+chain, not the actuators'.
+
+The description reads no parameter back: the phrase mask is the file-scope `phraseMask`
+(`:3398`), which only `&DESCRIBE`'s `ModifyDescription` changes (`:3797-3830`). The port
+takes parameter 0 as the mask when no `&DESCRIBE` ran (`processViewingFilter`'s
+`paramMask`), so a DSA that stores into it changes what CSBWin would not.
 
 ---
 
@@ -317,60 +335,81 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G2 ⏳ Twelve DSA filters
+### G2 ⏳ Twelve DSA filters, and the viewing filter's third site
 
-The port runs five filters: the viewing filter, the party attack filter, the adjust
-skills filter, the missile encounter filter, and the spell filter at
-`spellFilterLocation`. Each place below uses CSBWin's defaults instead. Conflux's `EXPOOL`
-names a location for all sixteen special locations, `ESL_MONSTERATTACKFILTER` (0) to
-`ESL_DAMAGECHARFILTER` (15, `doc/CSBwin-src/CSB.h:1535-1550`), and a spell filter, so it
-reaches every filter here but the portrait one. Whether a DSA actuator stands at each
-location is not measured yet: the chains read, and the count is this item's first step.
+The port runs five filters: the viewing filter (two of its three sites, and see C130),
+the party attack filter, the adjust skills filter, the missile encounter filter, and the
+spell filter at `spellFilterLocation`. Each place below uses CSBWin's defaults instead.
+Conflux reaches every one but the portrait's: its `EXPOOL` names a location for all
+sixteen special locations, `ESL_MONSTERATTACKFILTER` (0) to `ESL_DAMAGECHARFILTER` (15,
+`doc/CSBwin-src/CSB.h:1535-1550`), and the monster move filter's for level 29 too, and a
+type-47 actuator stands at each: 10 at the monster attack filter's, 3 at the feeding's, 5
+at the monster move's, 3 at the delete-monster's, 9 at the action name's, 4 at the
+character death's, 3 at the damage's, one at each of the others, and 39 at the spell
+filter's.
 
-- `ESL_MONSTERMOVEFILTER` (`doc/CSBwin-src/Monster.cpp:3080-3130`), which a level can
-  have its own of: the key with `(level + 1) << 8` is tried first, then the dungeon's.
-  While it runs, `ProcessDSAFilter` sets `monsterMoveFilterActive`
-  (`DsaSystem.monsterMoveFilterActive`), without which `&MONL&D` does nothing; its
-  `&MONBLK` sets the directions the turn then refuses (`MonsterAI.monsterMoveInhibit`).
-- `ESL_CHARDEATHFILTER` (actuator type 47, `Character.cpp:2535-2589`).
-- `ESL_DAMAGECHARFILTER` (actuator type 47, `Character.cpp:2829-2893`), which may rewrite
-  the damage `DamageCharacter` is about to add to `d.PendingDamage`
-  (`MonsterAttack.damageCharacter`).
-- `ESL_FEEDINGFILTER` (`Character.cpp:4288-4344`). Its insertion point is marked in
-  `src/renderer/ui/Feeding.ts:112`.
-- `PortraitTranslateDisable`'s `QueueDSASwitchAction` (`CSBCode.cpp:6540-6612`). It fires
-  only on a `DisableMessage`, which the shipped dungeon never carries
-  (`HallOfChampions.ts:337`).
-- `ProcessMonsterDeleteFilter` (`Code11f52.cpp:926`). It counts each kill in `expool`'s
-  statistics and, when the dungeon has an `ESL_DELETEMONSTERFILTER`, runs its type-47 DSA,
-  which may set `deathCloud` and `dropResidue`. CSBWin calls it from `DamageMonster` with
-  `DMW_Damage` (`Code11f52.cpp:1112`, `:1122`) and from `MoveObject`'s two deletions with
-  `DMW_Movement1` / `DMW_Movement2` (`:3151`, `:3304`). The port's matching places are
-  `MonsterDamage.ts:467` and `MonsterSystem.ts:560`.
-- `MonsterAttackFilter`, which may rewrite a monster attack's whole parameter block
-  (`MonsterAttack.ts:146`). CSBWin's block is a file-scope global
-  (`doc/CSBwin-src/Monster.cpp:917-938`), and `MonsterAttacks` never writes its
-  `disableTime`, which no C++ reads, so a filter sees the value the last filter left there.
-  The port builds a fresh block each attack, with `disableTime` 0.
-- `CallPartyMoveFilter` (`CSBCode.cpp:8119`), which may rewrite the stamina adjustments or
-  refuse the move, with its `PM_SETDELAY` / `PM_ADDDELAY` arms (`:8122-8128`,
-  `:8336-8346`). See `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:255`).
-- `ActionNameFilter` (`ESL_ACTIONNAMEFILTER`, `CSBCode.cpp:8680`), which may rename an
-  attack option. The names come straight from `AttackNames`.
-- `CursorFilter` (`ESL_CURSORFILTER`, `MoveObject.cpp:797`), which may cancel what is
-  about to happen to the object on the cursor. CSBWin sends it a packet from 21 places.
-  The port sends six of the packet types, all from `ActuatorSystem` (the key, the torch
-  holder, the swap, the gift), to `GameHost.cursorFilter`, which `main.ts` answers with a
-  debug trace. None of the other types is sent, among them `HandleClothingClick`'s
-  `PlaceOnCharacter`, which may cancel the click, and `PickFromCharacter`
-  (`CSBCode.cpp:6966-6972`, `:6982-6991`).
-- `ESL_EQUIPFILTER`, which `CHARDESC::SetPossession(…, true)` runs before it writes the
-  slot, once with timer function 1 for the object leaving and once with 0 for the object
-  arriving (`Character.cpp:2917-2998`). Both halves of the pair write through it
-  (`:1850`, `:1962`). The port's pair writes with `CharacterSystem.setPossessionDirect`.
-- `SoundFilter` (`ESL_SOUNDFILTER`, `doc/CSBwin-src/Sound.cpp:670`), which `QueueSound`
-  calls once it has the volume, and which may play the sound through a DSA instead
-  (`CSBCode.cpp:1877`). `SoundQueue.queueSound` plays straight on.
+A filter that loops runs each of those DSAs in turn, a filter call apiece; one that
+`break`s runs the first. Each step reads which from its CSBWin site and checks it in a
+`tools/` check through `tools/lib/dsa.ts`'s `TestFilter`, with two DSAs on the square where
+the site loops. The steps, one commit each:
+
+1. **`ESL_SOUNDFILTER`** (S). `SoundFilter` (`doc/CSBwin-src/Sound.cpp:670`, the DSA at
+   `:742`), which `QueueSound` calls once it has the volume, and which may play the sound
+   through a DSA instead (`CSBCode.cpp:1877`). `SoundQueue.queueSound` plays straight on.
+2. **`ESL_ACTIONNAMEFILTER`** (S). `ActionNameFilter` (`CSBCode.cpp:8680`, the DSA at
+   `:8697`), which may rename an attack option. The names come straight from
+   `AttackNames`.
+3. **`ESL_FEEDINGFILTER`** (S). `Character.cpp:4288-4344`, the DSA at `:4335`. Its
+   insertion point is marked in `src/renderer/ui/Feeding.ts:112`.
+4. **`ESL_CHARDEATHFILTER` and `ESL_DAMAGECHARFILTER`** (M). `Character.cpp:2535-2589` and
+   `:2829-2893`; the second may rewrite the damage `DamageCharacter` is about to add to
+   `d.PendingDamage` (`MonsterAttack.damageCharacter`, `MonsterAttack.ts:581`).
+5. **`ESL_EQUIPFILTER`** (M). `CHARDESC::SetPossession(…, true)` runs it before it writes
+   the slot, once with timer function 1 for the object leaving and once with 0 for the
+   object arriving (`Character.cpp:2917-2998`). Both halves of the pair write through it
+   (`:1850`, `:1962`). The port's pair writes with `CharacterSystem.setPossessionDirect`.
+6. **`ESL_PARTYMOVEFILTER`** (M). `CallPartyMoveFilter` (`CSBCode.cpp:7788`, called at
+   `:8119`), which may rewrite the stamina adjustments or refuse the move, with its
+   `PM_SETDELAY` / `PM_ADDDELAY` arms (`:8122-8128`, `:8336-8346`). See
+   `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:255`) and `Game.ts:792`.
+7. **`ESL_MONSTERATTACKFILTER`** (M). `MonsterAttackFilter`, the DSA at
+   `Monster.cpp:1166`, which may rewrite a monster attack's whole parameter block
+   (`MonsterAttack.ts:146`). CSBWin's block is a file-scope global (`Monster.cpp:917-938`),
+   and `MonsterAttacks` never writes its `disableTime`, which no C++ reads, so a filter
+   sees the value the last filter left there. The port builds a fresh block each attack,
+   with `disableTime` 0.
+8. **`ESL_DELETEMONSTERFILTER`** (M). `ProcessMonsterDeleteFilter`
+   (`Code11f52.cpp:926`, the DSA at `:1013`). It counts each kill in `expool`'s statistics
+   and runs its DSA, which may set `deathCloud` and `dropResidue`. CSBWin calls it from
+   `DamageMonster` with `DMW_Damage` (`:1112`, `:1122`), from `MoveObject`'s two deletions
+   with `DMW_Movement1` / `DMW_Movement2` (`:3151`, `:3304`), and with `DMW_Fusion`. The
+   port's places are `MonsterDamage.ts:467`, `MonsterSystem.ts:561`, `WorldMove.ts:106`,
+   `MakeMoreRoomInDB.ts:73` and `AttackSystem.ts:1043`.
+9. **`ESL_MONSTERMOVEFILTER`** (M). `MONSTERMOVEFILTERCACHE::GetLocation`
+   (`Monster.cpp:3077-3135`) tries the key with `(level + 1) << 8` first, then the
+   dungeon's; the record's bits 0-17 are the location, bit 18 `partyLevelOnly` and bits
+   19-23 `maxDistance`. `specialLocationsFromExpool` reads neither the level keys nor the
+   two fields. The DSA runs at `:3226` and `:3352`, with `monsterMoveFilterActive` set
+   (`DsaSystem.monsterMoveFilterActive`), without which `&MONL&D` does nothing; its
+   `&MONBLK` sets the directions the turn then refuses (`MonsterAI.monsterMoveInhibit`).
+10. **`ESL_CURSORFILTER`** (L, split when taken). `CursorFilter` (`MoveObject.cpp:797`,
+    the DSA at `:846`), which may cancel what is about to happen to the object on the
+    cursor. CSBWin sends it a packet from 21 places. The port sends six of the packet
+    types, all from `ActuatorSystem` (the key, the torch holder, the swap, the gift), to
+    `GameHost.cursorFilter`, which `main.ts` answers with a debug trace. None of the other
+    types is sent, among them `HandleClothingClick`'s `PlaceOnCharacter`, which may cancel
+    the click, and `PickFromCharacter` (`CSBCode.cpp:6966-6972`, `:6982-6991`).
+11. **`PortraitTranslateDisable`'s `QueueDSASwitchAction`** (S, `CSBCode.cpp:6540-6612`).
+    It fires only on a `DisableMessage`, which the shipped dungeon never carries
+    (`HallOfChampions.ts:337`).
+12. **The viewing filter at the eye click** (S, after C130). `TAG019036`
+    (`Character.cpp:4540-4578`) runs it with phrase mask 0 and object -1 before it draws
+    the masteries; the port's `drawAttributePanel` (`src/renderer/ui/Character.ts:71`) runs
+    none.
+
+The steps share how a filter is reached and run: a helper in `DsaSystem`, built with the
+first step. Moving the five filters already ported onto it is a refactor, a commit of its
+own.
 
 ### G3 ⏳ The wings
 
