@@ -77,6 +77,13 @@ export class TimerSystem {
   private readonly dungeon: DungeonState;
   private readonly timers: TimerQueue;
   private readonly random: CsbRandom;
+  /**
+   * `timerTypeModifier` (`doc/CSBwin-src/CSBCode.cpp:21`): the action each of SET, CLEAR
+   * and TOGGLE stands for. `ProcessTimers` makes it 0, 1, 2 again before every timer
+   * (`:6412-6414`), and a DSA's `&MODIFYMESSAGE` changes it for the rest of the timer
+   * that ran it (`DSA.cpp:4931-4947`).
+   */
+  readonly timerTypeModifier = [0, 1, 2];
 
   constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
@@ -98,6 +105,9 @@ export class TimerSystem {
     while (next && next.time <= currentTime) {
       const timer = this.timers.shiftNext();
       if (!timer) break;
+      this.timerTypeModifier[0] = 0;
+      this.timerTypeModifier[1] = 1;
+      this.timerTypeModifier[2] = 2;
       if (this.dispatch(timer)) return true;
 
       processed++;
@@ -464,8 +474,6 @@ export class TimerSystem {
    */
   private processOpenRoom(timer: TimerEntry): void {
     this.ctx.systems.dsa.readRoomTimerParameters(timer);
-    const action = this.getTimerAction(timer);
-    if (action === 3) return;
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);
     const map = this.dungeon.getMap(timer.level);
     if (!map) return;
@@ -473,12 +481,14 @@ export class TimerSystem {
       || timer.function === TimerFunction.TT_PARAMETER_MESSAGE;
 
     for (let rn = this.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+      // The action is read afresh at each object: a DSA before it may have changed it (`:1712`, `:1720`).
+      if (this.getTimerAction(timer) === 3) return;
       const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category === DBType.TEXT && !message) {
         const rec = this.dungeon.getTextRecord(rn);
         if (!rec) continue;
         const shown = rec.visible;
-        this.applyTextVisibility(rec, action);
+        this.applyTextVisibility(rec, this.getTimerAction(timer));
         // A text shown on the party's own square is read out (`:1735-1743`), whatever
         // `DecodeText` returns.
         const party = this.ctx.party.state.position;
@@ -513,17 +523,17 @@ export class TimerSystem {
     // A parameter message is a `TT_STONEROOM` once its parameters are read (`:2178-2186`).
     this.ctx.systems.dsa.readRoomTimerParameters(timer);
     if (timer.function === TimerFunction.TT_PARAMETER_MESSAGE) timer.function = TimerFunction.TT_STONEROOM;
-    const action = this.getTimerAction(timer);
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);
     const targetPos = timer.uByte8 & 3;
 
     for (let rn = this.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (action === 3) return false;
+      // The action is read afresh at each object, as `ProcessTT_OPENROOM` does (`:2195`, `:2202`, `:2258`).
+      if (this.getTimerAction(timer) === 3) return false;
       const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category === DBType.TEXT && decoded.position === targetPos) {
         const rec = this.dungeon.getTextRecord(rn);
         if (!rec) continue;
-        this.applyTextVisibility(rec, action);
+        this.applyTextVisibility(rec, this.getTimerAction(timer));
         continue;
       }
       if (decoded.category !== DBType.ACTUATOR) continue;
@@ -569,8 +579,6 @@ export class TimerSystem {
     // as `ProcessTT_STONEROOM`'s does (`:1399-1407`).
     this.ctx.systems.dsa.readRoomTimerParameters(timer);
     if (timer.function === TimerFunction.TT_PARAMETER_MESSAGE) timer.function = TimerFunction.TT_STONEROOM;
-    const action = this.getTimerAction(timer);
-    if (action === 3) return;
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);
     const map = this.dungeon.getMap(timer.level);
     if (!map) return;
@@ -593,6 +601,9 @@ export class TimerSystem {
       }
     }
 
+    // Read after the square's DSAs (`:1439`). Only CLEAR clears: a 3 that reaches here, on
+    // a square with no objects or past a DSA that ended the loop, sets.
+    const action = this.getTimerAction(timer);
     let nextAction = action;
     if (action === ActuatorAction.TOGGLE) {
       const isSet = (map.cellFlags[target.x][target.y] & 0x04) !== 0;
@@ -612,22 +623,25 @@ export class TimerSystem {
     }
   }
 
+  /**
+   * `ProcessTT_TELEPORTER` (`doc/CSBwin-src/Timer.cpp:2390-2414`). The action is read again
+   * after the square's DSAs, and a TOGGLE writes SET or CLEAR into `uByte9`, which is then
+   * read through the modifier once more.
+   */
   private processTeleporter(timer: TimerEntry): void {
-    const action = this.getTimerAction(timer);
-    if (action === 3) return;
+    if (this.getTimerAction(timer) === 3) return;
     const map = this.dungeon.getMap(timer.level);
     if (!map) return;
 
-    this.activateDsa(timer);
+    this.activateDsa(timer, this.getTimerAction(timer));
 
-    let nextAction = action;
-    if (action === ActuatorAction.TOGGLE) {
+    if (this.getTimerAction(timer) === ActuatorAction.TOGGLE) {
       const isSet = (map.cellFlags[timer.uByte6][timer.uByte7] & 0x08) !== 0;
-      nextAction = isSet ? ActuatorAction.CLEAR : ActuatorAction.SET;
+      timer.uByte9 = isSet ? ActuatorAction.CLEAR : ActuatorAction.SET;
     }
 
     const cellFlag = map.cellFlags[timer.uByte6][timer.uByte7];
-    if (nextAction === ActuatorAction.SET) {
+    if (this.getTimerAction(timer) === ActuatorAction.SET) {
       this.setCellFlag(map, timer.uByte6, timer.uByte7, cellFlag | 0x08);
       this.wiggleEverything(timer.uByte6, timer.uByte7, timer.level);
     } else {
@@ -635,22 +649,25 @@ export class TimerSystem {
     }
   }
 
+  /**
+   * `ProcessTT_PITROOM` (`doc/CSBwin-src/Timer.cpp:2520-2551`). Only a TOGGLE is read
+   * through the modifier after the square's DSAs; otherwise the timer's own `uByte9`
+   * decides.
+   */
   private processPit(timer: TimerEntry): void {
-    const action = this.getTimerAction(timer);
-    if (action === 3) return;
+    if (this.getTimerAction(timer) === 3) return;
     const map = this.dungeon.getMap(timer.level);
     if (!map) return;
 
-    this.activateDsa(timer);
+    this.activateDsa(timer, this.getTimerAction(timer));
 
-    let nextAction = action;
-    if (action === ActuatorAction.TOGGLE) {
+    if (this.getTimerAction(timer) === ActuatorAction.TOGGLE) {
       const isSet = (map.cellFlags[timer.uByte6][timer.uByte7] & 0x08) !== 0;
-      nextAction = isSet ? ActuatorAction.CLEAR : ActuatorAction.SET;
+      timer.uByte9 = isSet ? ActuatorAction.CLEAR : ActuatorAction.SET;
     }
 
     const cellFlag = map.cellFlags[timer.uByte6][timer.uByte7];
-    if (nextAction === ActuatorAction.SET) {
+    if (timer.uByte9 === ActuatorAction.SET) {
       const wasClosed = (cellFlag & 0x08) === 0;
       this.setCellFlag(map, timer.uByte6, timer.uByte7, cellFlag | 0x08);
       if (wasClosed) {
@@ -661,9 +678,13 @@ export class TimerSystem {
     }
   }
 
+  /**
+   * `ProcessTT_DOOR` (`doc/CSBwin-src/Timer.cpp:1556-1586`). Only a TOGGLE is read through
+   * the modifier after the square's DSAs; otherwise the timer's own `uByte9` decides, and
+   * the `TT_1` keeps it.
+   */
   private processDoor(timer: TimerEntry): void {
-    const action = this.getTimerAction(timer);
-    if (action === 3) return;
+    if (this.getTimerAction(timer) === 3) return;
     const map = this.dungeon.getMap(timer.level);
     if (!map) return;
     const cellFlag = map.cellFlags[timer.uByte6][timer.uByte7];
@@ -671,19 +692,17 @@ export class TimerSystem {
     const doorState = cellFlag & 0x7;
     if (doorState === 5) return;
 
-    this.activateDsa(timer);
+    this.activateDsa(timer, this.getTimerAction(timer));
 
-    let nextAction = action;
-    if (action === ActuatorAction.TOGGLE) {
-      nextAction = doorState === 0 ? ActuatorAction.CLEAR : ActuatorAction.SET;
-    } else if (action === ActuatorAction.SET) {
+    if (this.getTimerAction(timer) === ActuatorAction.TOGGLE) {
+      timer.uByte9 = doorState === 0 ? ActuatorAction.CLEAR : ActuatorAction.SET;
+    } else if (timer.uByte9 === ActuatorAction.SET) {
       if (doorState === 0) return;
-    } else if (action === ActuatorAction.CLEAR) {
-      if (doorState === 4) return;
+    } else if (doorState === 4) {
+      return;
     }
 
     timer.function = TimerFunction.TT_DOOR_STEP;
-    timer.uByte9 = nextAction & 0xff;
     this.timers.addTimer(timer);
   }
 
@@ -912,9 +931,13 @@ export class TimerSystem {
     }
   }
 
-  private getTimerAction(timer: TimerEntry): ActuatorAction | 3 {
-    if (timer.uByte9 > 2) return 3;
-    return timer.uByte9 as ActuatorAction;
+  /**
+   * `timerTypeModifier[pTimer->timerUByte9()]`, the action a timer performs, read afresh
+   * at each of CSBWin's sites. A `uByte9` past 2, which `&MESSAGE` can set, reads past
+   * CSBWin's array; here it is 3, no action.
+   */
+  getTimerAction(timer: TimerEntry): ActuatorAction | 3 {
+    return (this.timerTypeModifier[timer.uByte9] ?? 3) as ActuatorAction | 3;
   }
 
   private applyTextVisibility(record: TextRecord, action: ActuatorAction | 3): void {
@@ -1126,9 +1149,10 @@ export class TimerSystem {
     return false;
   }
 
+  /** `ProcessPortraitTimer6` (`doc/CSBwin-src/Timer.cpp:2103-2154`) reads `uByte9` as it is, not through the modifier. */
   private processPortraitTimer(timer: TimerEntry, actuator: ActuatorRecord): void {
-    const action = this.getTimerAction(timer);
-    if (action === 3) return;
+    const action = timer.uByte9;
+    if (action > ActuatorAction.TOGGLE) return;
     let responses = 0;
     if (action === ActuatorAction.SET) responses = getActuatorSetResponses(actuator);
     else if (action === ActuatorAction.CLEAR) responses = getActuatorClearResponses(actuator);
@@ -1771,8 +1795,13 @@ export class TimerSystem {
     this.ctx.systems.worldMove.moveParty(position.x, position.y, position.x, position.y);
   }
 
-  private activateDsa(timer: TimerEntry): void {
+  /**
+   * `ActivateDSA` (`doc/CSBwin-src/Timer.cpp:1500-1538`): each DSA of the square runs on a
+   * timer of its own, whose `uByte9` is the action already read through the modifier.
+   */
+  private activateDsa(timer: TimerEntry, action: number): void {
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);
+    const dsaTimer: TimerEntry = { ...timer, time: 0, uByte9: action & 0xff };
     for (let rn = this.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category !== DBType.ACTUATOR) continue;
@@ -1780,7 +1809,7 @@ export class TimerSystem {
       if (!rec || getActuatorType(rec) !== 47) continue;
       // "Ensure DSAparameters[0] = 0" (`doc/CSBwin-src/Timer.cpp:1525`).
       const dsa = this.ctx.systems.dsa;
-      dsa.newDsaParameters(() => dsa.processTimer5(rn, timer, target));
+      dsa.newDsaParameters(() => dsa.processTimer5(rn, dsaTimer, target));
     }
   }
 }

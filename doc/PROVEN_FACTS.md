@@ -5512,3 +5512,29 @@ of one body part, which `DamageCharacter` averages over the parts a blow could l
 `armourStrength` (`src/engine/MonsterAttack.ts`) is its port, and
 `tools/dump-character-damage.ts` replays the draws from the seed for a whole part, a
 wounded one, a sleeping party, and both.
+
+## The timer-type modifier lasts one timer, and every site reads it afresh
+
+`timerTypeModifier[3]` (`doc/CSBwin-src/CSBCode.cpp:21`) is the action SET, CLEAR and
+TOGGLE stand for. `ProcessTimers` sets it to 0, 1, 2 before every timer (`:6412-6414`); a
+DSA's `&MODIFYMESSAGE` (`DSA.cpp:4931-4947`) changes it for the rest of that timer only.
+Each site reads `timerTypeModifier[pTimer->timerUByte9()]` when it needs it, not once:
+
+- `ProcessTT_OPENROOM` and `ProcessTT_STONEROOM` test it for 3 at each object of the square
+  and read it again for a text, a counter (`OperateCounterActuator`, `Timer.cpp:1609`,
+  `:1624`) and a type 5 (`:2258`), so a DSA early in the chain changes what the objects
+  after it do, and a 3 ends the square (`:1712`, `:2195`). `ProcessTT_FALSEWALL` tests it
+  at each object and reads it once more after the loop (`:1416`, `:1439`), where a 3 sets
+  the wall, being neither TOGGLE nor CLEAR.
+- `ProcessTT_DOOR`, `ProcessTT_PITROOM` and `ProcessTT_TELEPORTER` hand it to
+  `ActivateDSA`, then read it again: a TOGGLE writes SET or CLEAR into `uByte9`
+  (`:1571-1575`, `:2536-2546`, `:2404-2408`). Past that the door and the pit read the raw
+  `uByte9` (`:1578`, `:2548`), the teleporter reads it through the modifier again (`:2409`),
+  so a SET that a DSA made a TOGGLE leaves a closed teleporter closed.
+- `ActivateDSA` (`:1500-1538`) runs each DSA on a timer of its own whose `uByte9` is the
+  action already read through the modifier, which `ProcessDSATimer6` reads through it once
+  more (`DSA.cpp:5351`, `:5383`). A timer just reset reads the same either way.
+- `ProcessPortraitTimer6` reads the raw `uByte9` (`Timer.cpp:2115`).
+
+A `uByte9` past 2, which `&MESSAGE` can queue, reads past the array; the port reads it as
+3, no action. Evidence: `tools/dump-timer-modifier.ts`.

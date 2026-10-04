@@ -92,8 +92,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C125 | The timer-type modifier is never reset, and the room timers do not read it | S | ⏳ |
 | C126 | `&PARAM@` and `&PARAM!` go on past 100, and `&PARAM@` compares signed and zeroes | S | ⏳ |
+| C127 | `&MODIFYMESSAGE` masks its actions to two bits instead of capping them at 3 | S | ⏳ |
+| C128 | A door timer tests its square before the square's DSAs run, and tests its room type | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
@@ -129,7 +130,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C127 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C129 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -173,23 +174,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C125 ⏳ The timer-type modifier is never reset, and the room timers do not read it
-
-CSBWin's `ProcessTimers` sets `timerTypeModifier` back to 0, 1, 2 before every timer
-(`doc/CSBwin-src/CSBCode.cpp:6412-6414`), so a DSA's `&MODIFYMESSAGE`
-(`doc/CSBwin-src/DSA.cpp:4931-4947`) holds for the rest of the timer that ran it. Every
-timer that acts on a square reads its action as `timerTypeModifier[uByte9]`, afresh at
-each object of the square (`doc/CSBwin-src/Timer.cpp:1416`, `:1439`, `:1712`, `:1720`,
-`:2195`, `:2202`, `:2213`, `:2258`, and the other sites a grep of `timerTypeModifier`
-lists), so a modifier a DSA sets changes what the square's later objects do.
-
-The port's `DsaSystem.timerTypeModifier` is never set back, so a `&MODIFYMESSAGE` holds for
-every later timer, and `TimerSystem.getTimerAction` reads `uByte9` itself, once a timer.
-Only the DSA reads the modifier (`processTimer6Internal`). Paying it: the reset at the top
-of each timer in `TimerSystem.processTimers`, and the action read through the modifier at
-each of CSBWin's sites. A `uByte9` past 2, which `&MESSAGE` can set, reads past CSBWin's
-array; the port's 3 for it stays, and is worth a line in `doc/PROVEN_FACTS.md`.
-
 ### C126 ⏳ `&PARAM@` and `&PARAM!` go on past 100, and `&PARAM@` compares signed and zeroes
 
 `&PARAM@` pops `i` and `n` as `ui32` (`doc/CSBwin-src/DSA.cpp:2956-2998`). Past 100 it
@@ -203,6 +187,24 @@ The port's `PARAM_FETCH` and `PARAM_STORE` (`src/engine/DsaSystem.ts`) cut `n` t
 go on; `PARAM_FETCH` compares signed, so with a count of -1 it copies nothing, and sets the
 variables past the count to 0. Paying it: CSBWin's three branches, with a case of each in
 `tools/dump-dsa-parameters.ts`.
+
+### C127 ⏳ `&MODIFYMESSAGE` masks its actions to two bits instead of capping them at 3
+
+`STKOP_ModifyMessage` pops its three actions as `unsigned int` and caps each at 3
+(`doc/CSBwin-src/DSA.cpp:4935-4943`): a 5 or a -1 is 3, no action. The port's
+`MODIFY_MESSAGE` (`src/engine/DsaSystem.ts`) takes `& 0x3`, so a 5 is CLEAR and a 4 is SET;
+only a -1 comes out 3, by the mask. Paying it: the unsigned cap, with a case in
+`tools/dump-timer-modifier.ts`.
+
+### C128 ⏳ A door timer tests its square before the square's DSAs run, and tests its room type
+
+`ProcessTT_DOOR` (`doc/CSBwin-src/Timer.cpp:1556-1586`) calls `ActivateDSA` first, then
+reads the cell's low three bits: a bashed door (5) ends it there, and the state the DSAs
+left decides the rest. It never tests the room type. The port's `processDoor`
+(`src/engine/TimerSystem.ts`) returns before the DSAs on a square that is not a door or
+whose door is bashed, and decides on the state it read before they ran, so a DSA that
+moves the door, or a DSA on a bashed door's square, is not seen. Paying it: CSBWin's order,
+with a case in `tools/dump-timer-modifier.ts`'s door section.
 
 
 ---

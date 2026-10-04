@@ -511,7 +511,6 @@ export class DsaSystem {
   /** `d.ObjDesc[].word4`. */
   private readonly objDescWord4: ArrayLike<number>;
   private readonly carryLocation: ArrayLike<number>;
-  private timerTypeModifier = [0, 1, 2];
   private parameters: Int32Array = new Int32Array(101);
   private adjustSkillsParameters = new Int32Array(5);
   /**
@@ -958,7 +957,7 @@ export class DsaSystem {
     filter: boolean,
     vars: DsaVars,
   ): boolean {
-    const action = this.timerTypeModifier[timer.uByte9] ?? 3;
+    const action = this.ctx.systems.timer.getTimerAction(timer);
     if (action === 3) return false;
     const level = location.z;
     const slaveRecord = this.dungeon.getActuatorRecord(rn);
@@ -2114,9 +2113,10 @@ export class DsaSystem {
         const s = bank.stack.pop() & 0x3;
         const c = bank.stack.pop() & 0x3;
         const t = bank.stack.pop() & 0x3;
-        this.timerTypeModifier[0] = s;
-        this.timerTypeModifier[1] = c;
-        this.timerTypeModifier[2] = t;
+        const modifier = this.ctx.systems.timer.timerTypeModifier;
+        modifier[0] = s;
+        modifier[1] = c;
+        modifier[2] = t;
         break;
       }
       case StkOp.NUM_PARAM:
