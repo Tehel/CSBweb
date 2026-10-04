@@ -5,10 +5,12 @@
  * 1. **CSBWin's list.** `StkOp` (`src/engine/DsaSystem.ts`) is `STKOP`
  *    (`doc/CSBwin-src/Data.h:1721-1861`), 138 values: 0 to 126 and 129 to 139.
  *    `EX_AMPERSAND`'s switch (`doc/CSBwin-src/DSA.cpp:2392-4982`) has a case for every one
- *    but three. `I_Indirect` is unpacked before the switch (`:2345-2391`), so it is an
- *    operation all the same. `Noop` (0) and `2Dup` (23) have no case, and reach the
- *    default's "Illegal subcode in EX_AMPERSAND" (`:4979-4981`): they are not operations,
- *    and the port owes them nothing. That leaves 136.
+ *    but four. `I_Indirect` is unpacked before the switch (`:2345-2391`), so it is an
+ *    operation all the same. `Noop` (0), `2Dup` (23) and `I_FilteredCast` (120) have no
+ *    case, and reach the default's "Illegal subcode in EX_AMPERSAND" (`:4979-4981`): they
+ *    are not operations, and the port owes them nothing. `I_FilteredCast` is only a word
+ *    of a parameter record that `I_Indirect` runs as `FilteredCast` (`:2358`), which no
+ *    operation writes. That leaves 135.
  * 2. **The port's list** is the `case StkOp.…` labels of `executeAmpersand`. What it lacks
  *    is pinned below in `LEFT`, so a port of a family shortens the list here in the same
  *    commit, and the operations of `DEBT.md` G1 are done when it is empty.
@@ -32,14 +34,11 @@ const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
 
 /** What the port lacks, in `STKOP` order. A ported family comes off this list. */
 const LEFT: readonly string[] = [
-  'OVERLAY', 'DISABLE_SAVES', 'PALETTE', 'I_DEL', 'I_ADD', 'I_CREATE_CLOUD', 'I_CAST',
-  'I_MONSTER_STORE', 'I_CHAR_STORE', 'I_MOVE', 'I_COPY', 'I_CELL_STORE', 'I_THROW',
-  'I_INDIRECT', 'I_DELAY', 'I_DEL_MON', 'I_INS_MON', 'I_CAUSE_POISON',
-  'SWAP_CHARACTER', 'I_FILTERED_CAST', 'I_SWAP_CHARACTER', 'GET_SKIN', 'SET_SKIN', 'JITTER',
+  'OVERLAY', 'DISABLE_SAVES', 'PALETTE', 'SWAP_CHARACTER', 'GET_SKIN', 'SET_SKIN', 'JITTER',
 ];
 
-/** `EX_AMPERSAND`'s three labels that are not a `case` of its switch (point 1). */
-const NOT_OPERATIONS = new Set<number>([StkOp.NOOP, StkOp.TWO_DUP]);
+/** The `STKOP` values that are no `case` of `EX_AMPERSAND`'s switch, nor `I_Indirect` (point 1). */
+const NOT_OPERATIONS = new Set<number>([StkOp.NOOP, StkOp.TWO_DUP, StkOp.I_FILTERED_CAST]);
 
 /**
  * `DSACOMMAND` (`Data.h:1695`): each command's relative-state field and its `MAXSTATE`
@@ -152,11 +151,11 @@ function main(): void {
   const expected = [...Array(127).keys(), ...Array.from({ length: 11 }, (_, i) => 129 + i)];
   check(all.join() === expected.join(), 'StkOp is STKOP: 0 to 126 and 129 to 139');
   const owed = all.filter((op) => !NOT_OPERATIONS.has(op));
-  check(owed.length === 136, `CSBWin has 136 operations (${owed.length})`);
+  check(owed.length === 135, `CSBWin has 135 operations (${owed.length})`);
 
   const ported = portedOperations();
   const missing = owed.filter((op) => !ported.has(op));
-  check([...ported].every((op) => !NOT_OPERATIONS.has(op)), 'the port gives no case to Noop or 2Dup');
+  check([...ported].every((op) => !NOT_OPERATIONS.has(op)), 'the port gives no case to Noop, 2Dup or I_FilteredCast');
 
   const commands = new Map<string, number>();
   const operations = new Map<number, number>();

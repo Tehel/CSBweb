@@ -93,7 +93,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
-| G2 | Thirteen DSA filters | L | ⏳ |
+| G2 | Twelve DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | M | ⏳ |
@@ -211,7 +211,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 142 checks sequentially (`spawnSync`, `:273`), each a
+`tools/run-checks.mjs` spawns its 153 checks sequentially (`spawnSync`, `:273`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and
@@ -245,29 +245,27 @@ Paying it needs a file of each form, or the author's decision to port them unche
 
 The goal is the whole of CSBWin's DSA, not what one dungeon calls. Every command is
 ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter either.
-`STKOP` (`doc/CSBwin-src/Data.h:1721-1861`, the port's `StkOp`) has 138 values, and 136
-are operations: `Noop` (0) and `2Dup` (23) have no case in `EX_AMPERSAND`, whose default
-says "Illegal subcode" and does nothing (`doc/CSBwin-src/DSA.cpp:4979-4981`), as the
-port's trace does. The port has 112, so 24 are left. `tools/dump-dsa-census.ts` lists
-them: it fails unless what the port lacks is exactly its `LEFT`, so each family's commit
-takes its operations off that list, and this part of the item is done when it is empty.
+`STKOP` (`doc/CSBwin-src/Data.h:1721-1861`, the port's `StkOp`) has 138 values, and 135
+are operations: `Noop` (0), `2Dup` (23) and `I_FilteredCast` (120) have no case in
+`EX_AMPERSAND`, whose default says "Illegal subcode" and does nothing
+(`doc/CSBwin-src/DSA.cpp:4979-4981`), as the port's trace does. The port has 128, so 7
+are left. `tools/dump-dsa-census.ts` lists them: it fails unless what the port lacks is
+exactly its `LEFT`, so each family's commit takes its operations off that list, and this
+part of the item is done when it is empty.
 
 Conflux, the dungeon that will check them, defines 131 DSAs, with 4646 programs, behind
 1591 type-47 actuators. A static census of its programs decodes each word with the
 operand layout `DsaSystem.execute` reads, and every program decodes to its exact length.
-It uses 118 `&` operations, 33 of the 37. With Conflux's count of each:
+It uses 118 `&` operations, 5 of the 7. With Conflux's count of each:
 
-- **Characters**: what is left of them is `I_CharStore` 4 and `I_CausePoison` 6, with the
-  `I_` operations, and `SwapCharacter` 7 and `I_SwapCharacter` 4, which need G3. The
-  other thirteen are ported, checked by `tools/dump-dsa-characters.ts`, and
-  `CharNameFetch` with the texts.
-- **Objects**: what is left of them is the `I_` forms of the missiles, spells and clouds,
-  `I_Throw` 14, `I_Cast` 2 and `I_CreateCloud` 59, which go with the `I_` operations. The
-  ten field operations, from `GetCharges` to `SetSubType`, are ported, checked by
-  `tools/dump-dsa-objects.ts`; so are `Throw`, `Cast`, `FilteredCast`, `CreateCloud`,
-  `MissileInfoFetch` and `MissileInfoStore`, checked by `tools/dump-dsa-missiles.ts`.
-- **Monsters**: what is left of them is `I_MonsterStore` 6, `I_DelMon` 2 and `I_InsMon` 2,
-  which go with the `I_` operations. `MonsterFetch`, `MonsterStore`, `MonPoss`, `MonBlk`,
+- **Characters**: what is left of them is `SwapCharacter` 7, which needs G3. The other
+  thirteen are ported, checked by `tools/dump-dsa-characters.ts`, and `CharNameFetch`
+  with the texts.
+- **Objects**: none is left. The ten field operations, from `GetCharges` to
+  `SetSubType`, are ported, checked by `tools/dump-dsa-objects.ts`; so are `Throw`,
+  `Cast`, `FilteredCast`, `CreateCloud`, `MissileInfoFetch` and `MissileInfoStore`,
+  checked by `tools/dump-dsa-missiles.ts`.
+- **Monsters**: none is left. `MonsterFetch`, `MonsterStore`, `MonPoss`, `MonBlk`,
   `MonLandD`, `DelMon` and `InsMon` are ported, checked by `tools/dump-dsa-monsters.ts`.
   `MonLandD` acts only in the monster move filter, and `MonBlk` is read only from it:
   both wait on G2's `ESL_MONSTERMOVEFILTER` to matter.
@@ -276,39 +274,31 @@ It uses 118 `&` operations, 33 of the 37. With Conflux's count of each:
   `CSBgraphics.dat`, which plays nothing until G24. The texts are ported too: `Say`,
   `TextFetch`, `TextSay`, `GlobalTextStore`, `DiscardText` and `CharNameFetch`, checked by
   `tools/dump-dsa-text.ts`.
-- **The dungeon and the program**: what is left of them is `I_Del` 42, `I_Add` 41,
-  `I_Move` 17 and `I_CellStore` 4, with the `I_` operations, `I_Indirect` 1 and `I_Delay`
-  22, which are those operations' own, and `DisableSaves` 2, which goes with the save
-  (below). The other thirteen, `FetchExCellFlg`, `StoreExCellFlg`, `ThisCell`, `Neighbors`,
-  `Loc2AbsCoord`, `PartyDistance`, `JumpGear`, `GosubGear`, `ThisDSAId`, `DSAInfoFetch`,
-  `BitCount`, `MultiplierFetch` and `VSET`, are ported, checked by
-  `tools/dump-dsa-dungeon.ts`.
+- **The dungeon and the program**: what is left of them is `DisableSaves` 2, which goes
+  with the save (below). The other thirteen, `FetchExCellFlg`, `StoreExCellFlg`,
+  `ThisCell`, `Neighbors`, `Loc2AbsCoord`, `PartyDistance`, `JumpGear`, `GosubGear`,
+  `ThisDSAId`, `DSAInfoFetch`, `BitCount`, `MultiplierFetch` and `VSET`, are ported,
+  checked by `tools/dump-dsa-dungeon.ts`.
+- **The `I_` operations**: none is left. The fifteen that send their operands to the DSA
+  at `ESL_INDIRECTACTIONS`, `I_Indirect` 1 that runs them there, and `I_Delay` 22 are
+  ported, checked by `tools/dump-dsa-indirect.ts`. Conflux's: `I_Del` 42, `I_Add` 41,
+  `I_CreateCloud` 59, `I_Move` 17, `I_Throw` 14, `I_CausePoison` 6, `I_MonsterStore` 6,
+  `I_CharStore` 4, `I_CellStore` 4, `I_SwapCharacter` 4, `I_Cast` 2, `I_DelMon` 2 and
+  `I_InsMon` 2. `I_SwapCharacter`'s record runs `SwapCharacter`, which waits on G3.
 - **The display**: `Overlay` 25, `Palette` 5 and `Jitter` 7, which need G25. The jitter
   moves the view only while an overlay is in use (`doc/CSBwin-src/WinScreen.cpp:1069-1080`).
 
-The four left that Conflux never calls: `I_Copy` (87), `I_FilteredCast` (120), and
-`GetSkin` (131) and `SetSkin` (132), which need G27. No dungeon here checks
-these against play, so each is ported with a tool of its own.
-
-Every `I_` operation but two is CSBWin's `Indirect`: it packs the operation and its
-operands into a record and sends it to the DSA at `ESL_INDIRECTACTIONS`, whose `I_Indirect`
-unpacks and runs it (`doc/CSBwin-src/DSA.cpp:2093-2130`, `:2346-2364`, `:4957-4971`). That
-filter is G2's. `I_Delay` sets the delay of the next one (`:4972`), and `I_Indirect` is the
-unpacking. `Indirect` does nothing at all, not even pop, in a dungeon with no such
-location (`:2109-2120`). The port's one `I_` operation, `I_TeleportParty`, shares
-`TeleportParty`'s case and teleports at once where CSBWin's packs it (`:4963`); the
-census counts it as ported, and the `I_` family's commit gives it CSBWin's path.
+The two left that Conflux never calls: `GetSkin` (131) and `SetSkin` (132), which need
+G27. No dungeon here checks them against play, so each is ported with a tool of its own.
 
 The steps: the census is done (`tools/dump-dsa-census.ts`, Conflux's counts by default,
 another `dungeon.dat` as its argument), and so are the characters, the objects, the
-monsters, the texts, the messages and sounds, and the dungeon and the program. Next, every
-`I_` operation, of whichever family and `I_Copy` and `I_FilteredCast` among them, with
-`I_Indirect` and `I_Delay`, in a family of its own. A family's tool runs its programs
-through `tools/lib/dsa.ts`. Last, `DSA::Write` and the `EXPOOL` records, with
-`DisableSaves`, so that a game with DSAs can be saved (below). What is left after that
-waits on its own item: `SwapCharacter` and `I_SwapCharacter` on G3, the display's three on
-G25, `GetSkin` and `SetSkin` on G27. An operation is checked against Conflux in play once
-G26 makes it a data set.
+monsters, the texts, the messages and sounds, the dungeon and the program, and the `I_`
+operations. A family's tool runs its programs through `tools/lib/dsa.ts`. Next, and last,
+`DSA::Write` and the `EXPOOL` records, with `DisableSaves`, so that a game with DSAs can
+be saved (below). What is left after that waits on its own item: `SwapCharacter` on G3,
+the display's three on G25, `GetSkin` and `SetSkin` on G27. An operation is checked
+against Conflux in play once G26 makes it a data set.
 
 The rest of the item, with an operation that needs care when ported:
 
@@ -349,7 +339,7 @@ The rest of the item, with an operation that needs care when ported:
   a DSA sets is kept and not drawn. The magic footprints are drawn
   (`src/renderer/csbwin/SummarizeRoomInfo.ts`, beside a comment naming this item).
 
-### G2 ⏳ Thirteen DSA filters
+### G2 ⏳ Twelve DSA filters
 
 The port runs five filters: the viewing filter, the party attack filter, the adjust
 skills filter, the missile encounter filter, and the spell filter at
@@ -364,12 +354,6 @@ location is not measured yet: the chains read, and the count is this item's firs
   While it runs, `ProcessDSAFilter` sets `monsterMoveFilterActive`
   (`DsaSystem.monsterMoveFilterActive`), without which `&MONL&D` does nothing; its
   `&MONBLK` sets the directions the turn then refuses (`MonsterAI.monsterMoveInhibit`).
-- `ESL_INDIRECTACTIONS`, the DSA every `I_` operation is sent to (`DSA.cpp:2093-2130`,
-  G1). The port's `I_TELEPORT_PARTY` teleports at once, as `TeleportParty` does
-  (`DsaSystem.ts`, `case StkOp.I_TELEPORT_PARTY`), where CSBWin's sends a record to that
-  DSA (`DSA.cpp:4963`). It is corrected with this filter: no dungeon the port plays
-  reaches it.
-
 - `ESL_CHARDEATHFILTER` (actuator type 47, `Character.cpp:2535-2589`).
 - `ESL_DAMAGECHARFILTER` (actuator type 47, `Character.cpp:2829-2893`), which may rewrite
   the damage `DamageCharacter` is about to add to `d.PendingDamage`
@@ -429,7 +413,7 @@ the first record, and is ported (`DSA.cpp:4399-4407`). Only a DSA
 fills the wings: `STKOP_SwapCharacter` (`DSA.cpp:4413-4419`) is the one caller of
 `SwapCharacter` (`Character.cpp:5472`), and through it of `CharacterDelete` / `CharacterAdd`
 and every `SaveToWings`. Nothing in the retail game removes a living champion from the
-party. Conflux does: `SwapCharacter` 7 times and `I_SwapCharacter` 4 (G1).
+party. Conflux does: `SwapCharacter` 7 times, and 4 more through `I_SwapCharacter`.
 `CharacterDelete` shifts the champions after the one leaving down a slot and sets the
 last slot's HP to 0, so that slot keeps a copy of the last champion, possessions and all
 (`Character.cpp:5366-5388`): it goes into `PartyState.vacantCharacters`, which `&CHPOSS`

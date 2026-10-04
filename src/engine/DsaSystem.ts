@@ -267,6 +267,32 @@ const MISSILE_ENCOUNTER_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_MISSILE
 const ADJUST_SKILLS_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_ADJUST_SKILLS_FILTER;
 const VIEWING_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_VIEWING_FILTER;
 const PARTY_ATTACK_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_PARTY_ATTACK_FILTER;
+const ESL_INDIRECT_ACTIONS = 5;
+const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
+
+/**
+ * `EX_AMPERSAND`'s unpacking of `I_Indirect` (`doc/CSBwin-src/DSA.cpp:2350-2369`): the
+ * operation a parameter record's first word names, and the one it runs. `I_FilteredCast`
+ * is here though no operation packs it: it has no case of its own in `EX_AMPERSAND`.
+ */
+const INDIRECT_OPERATIONS: ReadonlyMap<number, StkOp> = new Map([
+  [StkOp.I_DEL, StkOp.DEL],
+  [StkOp.I_DEL_MON, StkOp.DEL_MON],
+  [StkOp.I_INS_MON, StkOp.INS_MON],
+  [StkOp.I_ADD, StkOp.ADD],
+  [StkOp.I_CREATE_CLOUD, StkOp.CREATE_CLOUD],
+  [StkOp.I_CAST, StkOp.CAST],
+  [StkOp.I_FILTERED_CAST, StkOp.FILTERED_CAST],
+  [StkOp.I_TELEPORT_PARTY, StkOp.TELEPORT_PARTY],
+  [StkOp.I_MONSTER_STORE, StkOp.MONSTER_STORE],
+  [StkOp.I_CHAR_STORE, StkOp.CHAR_STORE],
+  [StkOp.I_CAUSE_POISON, StkOp.CAUSE_POISON],
+  [StkOp.I_MOVE, StkOp.MOVE],
+  [StkOp.I_COPY, StkOp.COPY],
+  [StkOp.I_CELL_STORE, StkOp.CELL_STORE],
+  [StkOp.I_THROW, StkOp.THROW],
+  [StkOp.I_SWAP_CHARACTER, StkOp.SWAP_CHARACTER],
+]);
 
 /**
  * `sizeof(ATTACKPARAMETERS)` — what `SetupDSAParam` writes into `pDSAparameters[0]`
@@ -1688,8 +1714,7 @@ export class DsaSystem {
         }
         break;
       }
-      case StkOp.TELEPORT_PARTY:
-      case StkOp.I_TELEPORT_PARTY: {
+      case StkOp.TELEPORT_PARTY: {
         const location = bank.stack.pop();
         const locr = locationRelFromInteger(location);
         if (!this.dungeon.isValidLocation(locr)) break;
@@ -2609,6 +2634,50 @@ export class DsaSystem {
         bank.stack.push(dsaPB);
         break;
       }
+      case StkOp.I_INDIRECT: {
+        // `doc/CSBwin-src/DSA.cpp:2345-2391`: the parameter record `indirect` packed, back
+        // on the stack, in the variables and in the parameters, and its operation run. A
+        // record that names none does nothing. A count past the array reads outside
+        // CSBWin's, where the port reads 0 and stops at 100.
+        const operation = INDIRECT_OPERATIONS.get(this.parameters[1] ?? 0);
+        if (operation === undefined) return;
+        const p = this.parameters;
+        const word = (k: number): number => p[1 + k] ?? 0;
+        let r = 1;
+        let n = Math.min(word(r++) >>> 0, 100);
+        r += n;
+        for (let i = 0; i < n; i++) bank.stack.push(word(--r));
+        r += n;
+        if (word(r++) !== 0) {
+          n = Math.min(word(2) >>> 0, 100);
+          let indx = word(3);
+          for (let i = 0; i < n; i++) bank.setVar(indx++, word(r++));
+        }
+        n = Math.min(word(r++) >>> 0, 100);
+        for (let i = 0; i < n; i++) p[1 + i] = word(r++);
+        return this.executeAmpersand(operation, bank, exPkt);
+      }
+      // `DSA.cpp:4957-4971`: each `I_` operation's operands, sent to the DSA at
+      // `ESL_INDIRECTACTIONS` (`indirect`).
+      case StkOp.I_DEL: this.indirect(bank, subcode, false, 2, 0); break;
+      case StkOp.I_DEL_MON: this.indirect(bank, subcode, false, 2, 0); break;
+      case StkOp.I_INS_MON: this.indirect(bank, subcode, false, 2, 0); break;
+      case StkOp.I_ADD: this.indirect(bank, subcode, false, 3, 0); break;
+      case StkOp.I_CREATE_CLOUD: this.indirect(bank, subcode, false, 3, 0); break;
+      case StkOp.I_CAST: this.indirect(bank, subcode, false, 0, 13); break;
+      case StkOp.I_TELEPORT_PARTY: this.indirect(bank, subcode, false, 1, 0); break;
+      case StkOp.I_MONSTER_STORE: this.indirect(bank, subcode, true, 3, 0); break;
+      case StkOp.I_CHAR_STORE: this.indirect(bank, subcode, true, 3, 0); break;
+      case StkOp.I_CAUSE_POISON: this.indirect(bank, subcode, false, 2, 0); break;
+      case StkOp.I_MOVE: this.indirect(bank, subcode, false, 10, 0); break;
+      case StkOp.I_COPY: this.indirect(bank, subcode, false, 2, 0); break;
+      case StkOp.I_CELL_STORE: this.indirect(bank, subcode, true, 3, 0); break;
+      case StkOp.I_THROW: this.indirect(bank, subcode, false, 7, 0); break;
+      case StkOp.I_SWAP_CHARACTER: this.indirect(bank, subcode, false, 2, 0); break;
+      case StkOp.I_DELAY:
+        // `DSA.cpp:4972-4978`: the delay of the next `indirect`, this run only.
+        bank.indirectActionDelay = bank.stack.pop();
+        break;
       default:
         if (!this.warnedOps.has(subcode)) {
           this.warnedOps.add(subcode);
@@ -2616,6 +2685,47 @@ export class DsaSystem {
         }
         break;
     }
+  }
+
+  /**
+   * `Indirect` (`doc/CSBwin-src/DSA.cpp:2093-2192`): an `I_` operation's operands in a
+   * parameter record, `[type, numVar, the numVar popped, array, its variables, numParam,
+   * the first numParam DSA parameters]`, which a `TT_ParameterMessage` timer takes to the
+   * DSA at `ESL_INDIRECTACTIONS`, corner 0, message type 0, due now or `&%DELAY` ticks on.
+   * That DSA's `&%INDIRECT` unpacks and runs it. In a dungeon with no such location it does
+   * nothing, not even pop. An array of `array` is the variables from the second word
+   * popped on, as many as the first, and none past 20; a record of more than 29 words is
+   * sent nowhere, once its operands are popped.
+   *
+   * CSBWin looks the location up at the first call of the process and keeps what it found
+   * (`indirectLocChecked`, a function `static`); the port looks it up in the world each
+   * time, which differs only after a load of another dungeon.
+   */
+  private indirect(bank: DsaBank, type: number, array: boolean, numVar: number, numParam: number): void {
+    const location = this.dungeon.getSpecialLocation(INDIRECT_ACTIONS_KEY);
+    if (location === null) return;
+    const indirectLocr = locationRelFromInteger(location);
+    const record = [type, numVar];
+    for (let i = 0; i < numVar; i++) record.push(bank.stack.pop());
+    record.push(array ? 1 : 0);
+    if (array) {
+      const n = record[2]! >>> 0;
+      if (n > 20) return;
+      for (let j = 0; j < n; j++) record.push(bank.getVar((record[3]! + j) | 0));
+    }
+    record.push(numParam);
+    for (let i = 0; i < numParam; i++) record.push(this.parameters[1 + i] ?? 0);
+    if (record.length > 29) return;
+    let actionTime = this.ctx.state.tickCount;
+    if (bank.indirectActionDelay > 0) {
+      actionTime += bank.indirectActionDelay;
+      bank.indirectActionDelay = -1;
+    }
+    const timer = this.timers.createTimerWithUByte5(
+      TimerFunction.TT_PARAMETER_MESSAGE, indirectLocr.x, indirectLocr.y, 0, 0, actionTime, indirectLocr.l,
+      this.parameterMessageSequence++,
+    );
+    this.dungeon.writeExpoolRecord(messageParametersKey(timer.index), record);
   }
 
   /**

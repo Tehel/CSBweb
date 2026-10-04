@@ -4364,6 +4364,19 @@ count of -1, and on the outer array (see "`&PARAM@` compares the count unsigned"
 its first two returns, filter or none (`Attack.cpp:1346-1360`, `:1673`). Evidence:
 `tools/dump-dsa-parameters.ts`.
 
+## A DSA's `I_` operation acts only when its record reaches the `ESL_INDIRECTACTIONS` DSA
+
+`&%TELEPORTPARTY`, `&%DEL` and the thirteen other `I_` operations do not act: `Indirect`
+(`doc/CSBwin-src/DSA.cpp:2093-2192`) pops their operands into a parameter record and sets a
+`TT_ParameterMessage` timer to the dungeon's `ESL_INDIRECTACTIONS` location, due this tick
+unless `&%DELAY` put it off. The operation runs only when the DSA there executes
+`&%INDIRECT` on that record (`:2345-2391`), with the stack, the array variables and the
+parameters the sender had. With no such location the operation does nothing, and pops
+nothing (`:2109-2120`). `STKOP_I_FilteredCast` has no case in `EX_AMPERSAND`: no operation
+writes such a record, and `&%INDIRECT` alone knows it (`:2358`). The record format and the
+counts are in `doc/CSBWIN_DSA_REFERENCE.md` → "STKOP message and sound operations".
+Evidence: `tools/dump-dsa-indirect.ts`.
+
 ## `&THROW` throws a spell only for the eight words `ThrowMissile` lists
 
 `ThrowMissile` (`doc/CSBwin-src/Timer.cpp:2016-2078`), the DSA's `&THROW`
