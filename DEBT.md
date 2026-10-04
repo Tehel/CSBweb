@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C121 | The party attack's parameters are not the current DSA parameter array | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
@@ -170,20 +169,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C121 ⏳ The party attack's parameters are not the current DSA parameter array
-
-CSBWin's `_Attack` lays its `ATTACKPARAMETERS` over the current `pDSAparameters` array
-(`SetupDSAParam`, `doc/CSBwin-src/Attack.cpp:1346-1360`, called at `:1673`), with no
-`NEWDSAPARAMETERS`: at every attack past its first two returns, filter or none, the array's
-count becomes 124 and its words 1 to 31 the attack's, as the attack writes them. A DSA a
-timer runs afterwards reads them with `&NUMPARAM` and `&PARAM@` (`doc/PROVEN_FACTS.md` →
-"A DSA filter runs on a parameter array of its own"). The port's `AttackSystem.attack`
-keeps them in a `PartyAttackParameters` of its own, and `DsaSystem.callPartyAttackFilter`
-copies them into the array only when a party attack filter exists, after clearing all 100
-words where CSBWin clears 31. Paying it: the array written at `SetupDSAParam`'s point and
-left holding the attack's final words, with or without a filter, checked in
-`tools/dump-dsa-parameters.ts`.
 
 ---
 

@@ -265,6 +265,8 @@ const PARTY_ATTACK_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_PARTY_ATTACK
  * clamps its request to 100 first, an over-large count behaves as "all of them".
  */
 const PARTY_ATTACK_PARAM_SIZEOF = 124;
+/** The `ATTACKPARAMETERS` words, `sizeof(ATTACKPARAMETERS) / 4`. */
+const PARTY_ATTACK_PARAM_WORDS = PARTY_ATTACK_PARAM_SIZEOF / 4;
 
 const enum DsaMoveError {
   SER_OK = 0,
@@ -732,6 +734,26 @@ export class DsaSystem {
   }
 
   /**
+   * `SetupDSAParam`'s part in the DSA parameters (`doc/CSBwin-src/Attack.cpp:1358-1360`):
+   * `_Attack` lays its `ATTACKPARAMETERS` over the current array, with no
+   * `NEWDSAPARAMETERS`, so at every attack, filter or none, the count becomes 124 and
+   * the 31 words 0. The words past them keep what they held.
+   */
+  setupAttackParameters(): void {
+    this.parameters[0] = PARTY_ATTACK_PARAM_SIZEOF;
+    this.parameters.fill(0, 1, 1 + PARTY_ATTACK_PARAM_WORDS);
+  }
+
+  /**
+   * The attack's words, which CSBWin writes into the current array as it goes: the port
+   * keeps them in `AttackSystem`'s `PartyAttackParameters`, and copies them in before a
+   * party attack filter runs and when the attack is over, where a DSA can read them.
+   */
+  storeAttackParameters(words: ArrayLike<number>): void {
+    for (let i = 0; i < PARTY_ATTACK_PARAM_WORDS; i++) this.parameters[1 + i] = words[i] ?? 0;
+  }
+
+  /**
    * `CallAttackFilter` (`doc/CSBwin-src/Attack.cpp:457`).
    *
    * `_Attack` calls this three times for one blow — `msg` 0 before it decides
@@ -759,11 +781,7 @@ export class DsaSystem {
       timerWord6: 0,
     };
 
-    const count = Math.min(words.length, 100);
-    this.parameters.fill(0);
-    this.parameters[0] = PARTY_ATTACK_PARAM_SIZEOF;
-    for (let i = 0; i < count; i++) this.parameters[1 + i] = words[i] ?? 0;
-
+    this.storeAttackParameters(words);
     this.processTimer6Internal(filter.actuator, timer, filter.position, true, new DsaVars());
 
     const out = new Array<number>(words.length);

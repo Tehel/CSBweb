@@ -1188,6 +1188,7 @@ export class AttackSystem {
     if ((pChar.attributes.health | 0) === 0) return 0;
 
     const filter = this.ctx.systems.dsa.findPartyAttackFilter();
+    this.ctx.systems.dsa.setupAttackParameters();
     const params = createAttackParameters();
     params.charIdx = initialChIdx;
     params.attackType = initialAttackType;
@@ -1236,7 +1237,7 @@ export class AttackSystem {
 
     this.callAttackFilter(filter, params, 0);
     // A filter may cancel the whole attack by making the type negative.
-    if (params.attackType < 0) return 0;
+    if (params.attackType < 0) return this.endAttack(params, 0);
 
     switch (params.attackType) {
       case AttackType.atk_LIGHTNING:
@@ -1375,7 +1376,7 @@ export class AttackSystem {
         this.fusion(params.attackX, params.attackY);
         // `_FusionSequence` has started: `Fusion(_8_, …)` never returns in CSBWin
         // (`doc/CSBwin-src/Attack.cpp:1971`), so none of the attack's tail runs.
-        if (this.ctx.systems.mainLoop.isRunningScript()) return successfulAttack;
+        if (this.ctx.systems.mainLoop.isRunningScript()) return this.endAttack(params, successfulAttack);
         break;
 
       case AttackType.atk_HEAL: {
@@ -1539,7 +1540,13 @@ export class AttackSystem {
         timeUntilAlternateUpdate: 0,
       });
     }
-    return successfulAttack;
+    return this.endAttack(params, successfulAttack);
+  }
+
+  /** `_Attack`'s return: its words stay in the DSA parameters (`DsaSystem.storeAttackParameters`). */
+  private endAttack(params: PartyAttackParameters, result: number): number {
+    this.ctx.systems.dsa.storeAttackParameters(marshalParameters(params));
+    return result;
   }
 
   /** The melee tail shared by the two arms of `_Attack`'s fallthrough. */
