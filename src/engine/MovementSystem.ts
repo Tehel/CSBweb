@@ -9,11 +9,72 @@ import type { Party } from './Party';
 import type { DungeonState } from './DungeonState';
 import type { MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
-import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, getRoomType } from '../core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, getRoomType, locationRelToInteger } from '../core/types';
 import { div, sw } from '../core/intCast';
 import type { GameContext } from './GameContext';
 import { flashButton, setClockTick } from './LoopState';
 import { TimerFunction } from './TimerQueue';
+
+/** `PARTYMOVE_CONSTANTS` (doc/CSBwin-src/CSB.h:4250-4259): the move types, then the flags. */
+export const PM_BEGINTURN = 1;
+export const PM_STAIRWAY = 2;
+export const PM_ATTEMPTMOVE = 3;
+export const PM_INHIBITMOVE = 0x0001;
+export const PM_SETDELAY = 0x0002;
+export const PM_ADDDELAY = 0x0004;
+
+/**
+ * `PARTYMOVEDATA` (doc/CSBwin-src/CSB.h:4262-4313), the block the party move filter reads
+ * and may rewrite (`CallPartyMoveFilter`, `DsaSystem.partyMoveFilter`). The locations are
+ * `LOCATIONREL` integers whose position is the party's facing.
+ */
+export interface PartyMoveData {
+    moveType: number;
+    flags: number;
+    delay: number;
+    /** The stamina each champion pays, -1 past the party. */
+    staminaAdjustment: number[];
+    relDirection: number;
+    absDirection: number;
+    fromLocation: number;
+    toLocation: number;
+    fromLocationType: number;
+    toLocationType: number;
+}
+
+/** `sizeof(PARTYMOVEDATA) / 4` (doc/CSBwin-src/CSBCode.cpp:7835): its 13 longwords. */
+export const PARTY_MOVE_DATA_WORDS = 13;
+
+/**
+ * `memcpy(pDSAparameters + 1, pmd, sizeof(*pmd))` (doc/CSBwin-src/CSBCode.cpp:7836): the
+ * block as the filter's DSA sees it, a longword per field in the struct's order.
+ */
+export function partyMoveDataToWords(pmd: PartyMoveData): number[] {
+    return [
+        pmd.moveType, pmd.flags, pmd.delay, ...pmd.staminaAdjustment,
+        pmd.relDirection, pmd.absDirection, pmd.fromLocation, pmd.toLocation,
+        pmd.fromLocationType, pmd.toLocationType,
+    ].map((word) => word | 0);
+}
+
+/**
+ * `memcpy(pmd, pDSAparameters + 1, sizeof(*pmd))` (doc/CSBwin-src/CSBCode.cpp:7839): the
+ * block back from the filter's DSA, `word(i)` its longword `i`.
+ */
+export function partyMoveDataFromWords(word: (index: number) => number): PartyMoveData {
+    const w = (index: number): number => word(index) | 0;
+    return {
+        moveType: w(0), flags: w(1), delay: w(2),
+        staminaAdjustment: [w(3), w(4), w(5), w(6)],
+        relDirection: w(7), absDirection: w(8), fromLocation: w(9), toLocation: w(10),
+        fromLocationType: w(11), toLocationType: w(12),
+    };
+}
+
+/** `locr.Integer()` of the party's `LOCATIONREL`: `position`, with `facing` as its position. */
+function partyLocation(position: Position, facing: number): number {
+    return locationRelToInteger({ l: position.z, x: position.x, y: position.y, p: facing });
+}
 
 
 /**
@@ -77,12 +138,17 @@ export class MovementSystem {
      *   time2move = 1;
      *   for (i = 0; i < d.NumCharacter; i++)
      *     if (pCharacter->HP() != 0) time2move = sw(Larger(time2move, TimeToMove(pCharacter)));
-     *   ...d.partyMoveDisableTimer = time2move;   // unless a party-move filter set a delay
+     *   if (partyMoveData.flags & PM_ADDDELAY)
+     *     d.partyMoveDisableTimer = (i16)(d.partyMoveDisableTimer + partyMoveData.delay);
+     *   else if ((partyMoveData.flags & PM_SETDELAY) == 0)
+     *     d.partyMoveDisableTimer = time2move;
      *   d.Word11712 = 0;
      *
-     * A stairway is not a step: taking one sets neither.
+     * `pmd` is the block the party move filter gave back: a delay it set is already in
+     * place (`handleMovement`), and one it adds goes on top of it. A stairway is not a
+     * step: taking one sets neither.
      */
-    private setPartyMoveDelay(): void {
+    private setPartyMoveDelay(pmd: PartyMoveData): void {
         const party = this.party.state;
         let time2move = 1;
         for (const champ of party.champions) {
@@ -90,32 +156,60 @@ export class MovementSystem {
                 time2move = sw(Math.max(time2move, this.ctx.systems.characterStats.timeToMove(champ)));
             }
         }
-        party.partyMoveDisableTimer = time2move;
+        if ((pmd.flags & PM_ADDDELAY) !== 0) {
+            party.partyMoveDisableTimer = sw(party.partyMoveDisableTimer + pmd.delay);
+        } else if ((pmd.flags & PM_SETDELAY) === 0) {
+            party.partyMoveDisableTimer = time2move;
+        }
         party.word11712 = 0;
     }
 
     /**
-     * Handle turning
+     * `_TurnParty` (doc/CSBwin-src/CSBCode.cpp:7854-7937). The square's flags are read
+     * once, before the party move filter, and decide what follows it.
      */
     private handleTurn(action: MovementAction): MovementResult {
-        // `FlashButton(_2_, 0xea, 0x0105, 0x7d, 0x91)` for a turn left, `(_3_, 0x123,
-        // 0x13e, 0x7d, 0x91)` for a turn right (doc/CSBwin-src/CSBCode.cpp:7896-7903),
-        // once the party-move filter (`DEBT.md` G2) has let the turn through, and before
-        // the stairs.
-        if (action === MovementAction.TURN_LEFT) flashButton(this.ctx, 0xea, 0x0105, 0x7d, 0x91);
-        else flashButton(this.ctx, 0x123, 0x13e, 0x7d, 0x91);
-        const position = this.party.state.position;
-        const cellFlags = this.dungeon.getCellFlag(position);
+        // `_TurnParty`'s `direction`: 1 for a turn left, 2 for a turn right.
+        const direction = action === MovementAction.TURN_LEFT ? 1 : 2;
+        const party = this.party.state;
+        const cellFlags = this.dungeon.getCellFlag(party.position);
         const roomType = (cellFlags >> 5) & 0x7;
 
+        // The party move filter, `PM_BEGINTURN` (doc/CSBwin-src/CSBCode.cpp:7870-7894).
+        // `toLocation` faces `(facing + ((direction == 0) ? 1 : -1)) & 3`, and `direction`
+        // is never 0, so it is the facing to the left for either turn. On stairs both
+        // directions are the stairway's, 3 up and 2 down. CSBWin leaves `delay` and the
+        // stamina adjustments unset; they are 0 here.
+        const stairDirection = (cellFlags & 4) !== 0 ? 3 : 2;
+        const pmd = this.ctx.systems.dsa.partyMoveFilter({
+            moveType: PM_BEGINTURN,
+            flags: 0,
+            delay: 0,
+            staminaAdjustment: [0, 0, 0, 0],
+            relDirection: roomType === RoomType.STAIRS ? stairDirection : direction,
+            absDirection: roomType === RoomType.STAIRS ? stairDirection : direction,
+            fromLocation: partyLocation(party.position, party.facing),
+            toLocation: partyLocation(party.position, (party.facing - 1) & 3),
+            fromLocationType: roomType,
+            toLocationType: roomType,
+        });
+        if ((pmd.flags & PM_INHIBITMOVE) !== 0) return { success: false, refused: true };
+
+        // `FlashButton(_2_, 0xea, 0x0105, 0x7d, 0x91)` for a turn left, `(_3_, 0x123,
+        // 0x13e, 0x7d, 0x91)` for a turn right (doc/CSBwin-src/CSBCode.cpp:7896-7903),
+        // once the filter has let the turn through, and before the stairs.
+        if (action === MovementAction.TURN_LEFT) flashButton(this.ctx, 0xea, 0x0105, 0x7d, 0x91);
+        else flashButton(this.ctx, 0x123, 0x13e, 0x7d, 0x91);
+
         if (roomType === RoomType.STAIRS) {
-            return this.traverseStairway(position, (cellFlags & 0x04) !== 0, null);
+            return this.traverseStairway((cellFlags & 0x04) !== 0);
         }
 
         // `PlaceOrRemoveObjectInRoom(d.partyX, d.partyY, RN(RNnul), true, 0)`, then
         // `SetPartyFacing((d.partyFacing + deltaFacing) & 3)`, then the same with `1`
         // (doc/CSBwin-src/CSBCode.cpp:7912-7934): the pads see the party leave and come
         // back, the room unchanged, facing the new way.
+        const position = party.position;
         const actuators = this.ctx.systems.actuators;
         actuators.triggerObjectMove(position, OBJECT_ID_NULL, false, true, this.party.state.facing);
         const newFacing = this.party.calculateNewFacing(action);
@@ -129,38 +223,68 @@ export class MovementSystem {
     }
 
     /**
-     * Handle movement with collision detection
+     * `MoveParty`'s four moves (doc/CSBwin-src/CSBCode.cpp:7944-8352). The destination and
+     * its flags are read before the party move filter, and decide what follows it.
      */
     private handleMovement(action: MovementAction): MovementResult {
-        const position = this.party.state.position;
+        const party = this.party.state;
+        const position = party.position;
         const cellFlagsFrom = this.dungeon.getCellFlag(position);
         const roomTypeFrom = (cellFlagsFrom >> 5) & 0x7;
         // `move` sends only the four moves here, never a turn.
         const relDirection = this.getRelativeDirection(action)!;
-
-        this.chargeStamina();
-
         const startingInStairwell = roomTypeFrom === RoomType.STAIRS;
+
+        // `rtTo` (doc/CSBwin-src/CSBCode.cpp:8015-8038): the stairs themselves for a step
+        // back out of a stairwell, else the next square's. Off the map, `GetCellFlags`
+        // answers a stone cell (`:4609`), so the party bumps the edge of the map as it
+        // bumps a wall.
+        let newPosition = position;
+        let cellFlagsTo = cellFlagsFrom;
+        let roomTypeTo: number = RoomType.STAIRS;
+        if (!(startingInStairwell && relDirection === 2)) {
+            newPosition = this.party.calculateNewPosition(action);
+            cellFlagsTo = this.dungeon.getCellFlag(newPosition);
+            roomTypeTo = (cellFlagsTo >> 5) & 0x7;
+        }
+
+        // The party move filter, `PM_ATTEMPTMOVE` (doc/CSBwin-src/CSBCode.cpp:8104-8121),
+        // whose `toLocation` is the party's square, as `fromLocation` is: `locr` is not
+        // moved between the two.
+        const location = partyLocation(position, party.facing);
+        const pmd = this.ctx.systems.dsa.partyMoveFilter({
+            moveType: PM_ATTEMPTMOVE,
+            flags: 0,
+            delay: 0,
+            staminaAdjustment: this.staminaAdjustments(),
+            relDirection,
+            absDirection: (relDirection + party.facing) & 3,
+            fromLocation: location,
+            toLocation: location,
+            fromLocationType: roomTypeFrom,
+            toLocationType: roomTypeTo,
+        });
+        if ((pmd.flags & PM_INHIBITMOVE) !== 0) return { success: false, refused: true };
+
+        // A delay the filter set holds whether or not the party moves
+        // (doc/CSBwin-src/CSBCode.cpp:8123-8128).
+        if ((pmd.flags & PM_SETDELAY) !== 0 && (pmd.flags & PM_ADDDELAY) === 0) {
+            party.partyMoveDisableTimer = sw(pmd.delay);
+            party.word11712 = 0;
+        }
+        this.chargeStamina(pmd.staminaAdjustment);
+
         if (startingInStairwell && relDirection === 2) {
-            return this.traverseStairway(position, (cellFlagsFrom & 0x04) !== 0, null);
+            return this.traverseStairway((cellFlagsFrom & 0x04) !== 0);
         }
 
-        const newPosition = this.party.calculateNewPosition(action);
-
-        // Off the map, `GetCellFlags` answers a stone cell (doc/CSBwin-src/CSBCode.cpp:4609),
-        // so the party bumps the edge of the map as it bumps a wall.
-        const dimensions = this.dungeon.getMapDimensions(newPosition.z);
-        if (!dimensions) return this.bumpWall(newPosition, relDirection);
-
-        if (newPosition.x < 0 || newPosition.x >= dimensions.width ||
-            newPosition.y < 0 || newPosition.y >= dimensions.height) {
-            return this.bumpWall(newPosition, relDirection);
-        }
-
-        const cellFlagsTo = this.dungeon.getCellFlag(newPosition);
-        const roomTypeTo = (cellFlagsTo >> 5) & 0x7;
         if (roomTypeTo === RoomType.STAIRS) {
-            return this.traverseStairway(newPosition, (cellFlagsTo & 0x04) !== 0, position);
+            // `MoveObject(RN(RNnul), d.partyX, d.partyY, -1, 0)`, then the party stands on
+            // the stairs, then `TraverseStairway(cellFlagsTo & 0x04, true)`
+            // (doc/CSBwin-src/CSBCode.cpp:8211-8216).
+            this.ctx.systems.worldMove.moveParty(party.position.x, party.position.y, -1, 0);
+            party.position = newPosition;
+            return this.traverseStairway((cellFlagsTo & 0x04) !== 0);
         }
 
         // `D5W` — terrain inhibits the move for stone, a door whose state is not 0, 1 or 5,
@@ -229,9 +353,9 @@ export class MovementSystem {
         // `MoveObject(RN(RNnul), -1, 0, newX, newY)` out of a stairwell, else from the
         // party's square (doc/CSBwin-src/CSBCode.cpp:8316-8325), then the move delay.
         this.ctx.systems.worldMove.moveParty(
-            startingInStairwell ? -1 : position.x, position.y, newPosition.x, newPosition.y,
+            startingInStairwell ? -1 : party.position.x, party.position.y, newPosition.x, newPosition.y,
         );
-        this.setPartyMoveDelay();
+        this.setPartyMoveDelay(pmd);
         return {
             success: true,
             newPosition: this.party.state.position,
@@ -240,32 +364,46 @@ export class MovementSystem {
     }
 
     /**
-     * Every step `MoveParty` attempts costs each champion stamina, before the destination
-     * decides anything — a step into a wall or a monster as much as a step taken, and the
-     * climb out of a stairwell too (doc/CSBwin-src/CSBCode.cpp:8088-8101, `:8129-8135`):
+     * What every step `MoveParty` attempts costs each champion in stamina, worked out
+     * before the destination decides anything (doc/CSBwin-src/CSBCode.cpp:8088-8101):
      *
      *   maxLoad = MaxLoad(pCharacter);
      *   D0W = sw((3*pCharacter->load)/maxLoad + 1);
      *   partyMoveData.staminaAdjustment[charIdx] = D0W;
-     *   ...CallPartyMoveFilter(&partyMoveData)...
+     *
+     * and `(unsigned)-1` for each of the four slots past the party. The party move filter
+     * may rewrite them.
+     */
+    private staminaAdjustments(): number[] {
+        const champions = this.party.state.champions;
+        const staminaAdjustment: number[] = [];
+        for (let charIdx = 0; charIdx < 4; charIdx++) {
+            const champ = champions[charIdx];
+            if (champ) {
+                const maxLoad = this.ctx.systems.characterStats.maxLoad(champ);
+                staminaAdjustment[charIdx] = sw(div(3 * this.ctx.systems.characterStats.characterLoad(champ), maxLoad) + 1);
+            } else {
+                staminaAdjustment[charIdx] = -1;
+            }
+        }
+        return staminaAdjustment;
+    }
+
+    /**
+     * Once the party move filter has let a step through, each champion pays what it left,
+     * a step into a wall or a monster as much as a step taken, and the climb out of a
+     * stairwell too (doc/CSBwin-src/CSBCode.cpp:8129-8135):
+     *
      *   for (charIdx = 0; charIdx < d.NumCharacter; charIdx++)
      *     AdjustStamina(charIdx, partyMoveData.staminaAdjustment[charIdx]);
      *
      * Every champion pays, the dead included (`AdjustStamina` on zero stamina costs a dead
-     * champion nothing more). `CallPartyMoveFilter` is a DSA party-move filter, which can
-     * rewrite the adjustments or refuse the move; no loaded dungeon defines one (DEBT.md
-     * G2). A turn is `TurnParty`, which costs nothing.
+     * champion nothing more). A turn is `TurnParty`, which costs nothing.
      */
-    private chargeStamina(): void {
+    private chargeStamina(staminaAdjustment: readonly number[]): void {
         const champions = this.party.state.champions;
-        const staminaAdjustment: number[] = [];
         for (let charIdx = 0; charIdx < champions.length; charIdx++) {
-            const champ = champions[charIdx];
-            const maxLoad = this.ctx.systems.characterStats.maxLoad(champ);
-            staminaAdjustment[charIdx] = sw(div(3 * this.ctx.systems.characterStats.characterLoad(champ), maxLoad) + 1);
-        }
-        for (let charIdx = 0; charIdx < champions.length; charIdx++) {
-            this.ctx.systems.monsterAttack.adjustStamina(charIdx, staminaAdjustment[charIdx]);
+            this.ctx.systems.monsterAttack.adjustStamina(charIdx, staminaAdjustment[charIdx]!);
         }
     }
 
@@ -317,17 +455,19 @@ export class MovementSystem {
 
     /**
      * `TraverseStairway(UpOrDown, true)` (doc/CSBwin-src/CSBCode.cpp:7733-7782) from the
-     * stairs at `stairs`. For a step into them, `MoveParty` first lifts the party off the
-     * square it leaves, `enteredFrom`, and stands it on the stairs (`:8209-8214`). Then
-     * the party is lifted off the stairs and put on the square below or above facing
-     * `ExitStairsDirection`, still on the level it left: the top of the next tick loads
-     * the new one and places the party there (`d.newPartyLevel`, `Game.loadNewPartyLevel`).
-     * `CallPartyMoveFilter` is not ported (DEBT.md G2).
+     * stairs the party stands on, up when `isUp`. Once the party move filter has let it
+     * through, the party is lifted off the stairs and put on the square below or above
+     * facing `ExitStairsDirection`, still on the level it left: the top of the next tick
+     * loads the new one and places the party there (`d.newPartyLevel`,
+     * `Game.loadNewPartyLevel`). A filter that refuses a step into the stairs leaves the
+     * party on them, lifted off the square it came from and not yet put down.
      *
      * A stairway to no level is a malformed dungeon, where CSBWin would `LoadLevel(-1)`;
      * the party stays where it is.
      */
-    private traverseStairway(stairs: Position, isUp: boolean, enteredFrom: Position | null): MovementResult {
+    private traverseStairway(isUp: boolean): MovementResult {
+        const stairs = this.party.state.position;
+        const facing = this.party.state.facing;
         const next = this.dungeon.incrementLevel(stairs, isUp ? -1 : 1);
         if (!next) {
             return {
@@ -335,14 +475,28 @@ export class MovementSystem {
                 blocked: true,
             };
         }
-        const newFacing = this.dungeon.getExitStairsDirection(next, this.party.state.facing);
+        const newFacing = this.dungeon.getExitStairsDirection(next, facing);
 
-        const worldMove = this.ctx.systems.worldMove;
-        if (enteredFrom) {
-            worldMove.moveParty(enteredFrom.x, enteredFrom.y, -1, 0);
-            this.party.state.position = stairs;
-        }
-        worldMove.moveParty(stairs.x, stairs.y, -1, 0);
+        // The party move filter, `PM_STAIRWAY` (doc/CSBwin-src/CSBCode.cpp:7751-7771). Both
+        // directions are `UpOrDown + 2`, and every caller passes `cellFlags & 4`, so they
+        // are 2 down and 6 up. `toLocation` faces the way the party does. CSBWin leaves
+        // `delay` and the stamina adjustments unset; they are 0 here.
+        const direction = (isUp ? 4 : 0) + 2;
+        const pmd = this.ctx.systems.dsa.partyMoveFilter({
+            moveType: PM_STAIRWAY,
+            flags: 0,
+            delay: 0,
+            staminaAdjustment: [0, 0, 0, 0],
+            relDirection: direction,
+            absDirection: direction,
+            fromLocation: partyLocation(stairs, facing),
+            toLocation: partyLocation(next, facing),
+            fromLocationType: (this.dungeon.getCellFlag(stairs) >> 5) & 0x7,
+            toLocationType: RoomType.STAIRS,
+        });
+        if ((pmd.flags & PM_INHIBITMOVE) !== 0) return { success: false };
+
+        this.ctx.systems.worldMove.moveParty(stairs.x, stairs.y, -1, 0);
         // `d.newPartyLevel = newPartyLevel; d.partyX = sw(x); d.partyY = sw(y);`, then
         // `SetPartyFacing(newPartyFacing)` (doc/CSBwin-src/CSBCode.cpp:7775-7781).
         this.ctx.loop.newPartyLevel = next.z;

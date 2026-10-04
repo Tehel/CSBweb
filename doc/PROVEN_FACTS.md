@@ -3631,6 +3631,48 @@ alone and an addition, to a slot its caller found empty, the arriving half. A ch
 swap of the weapon hand, with `false` (`doc/CSBwin-src/Mouse.cpp:699`, `:706`). Nothing is
 read back. `tools/dump-equip-filter.ts`.
 
+## The party move filter runs its location's first DSA before a turn, a step and a stairway
+
+`CallPartyMoveFilter` (`doc/CSBwin-src/CSBCode.cpp:7788-7848`) walks the chain at
+`ESL_PARTYMOVEFILTER`'s location (14, `doc/CSBwin-src/CSB.h:1549`) and `break`s once the
+first type-47 actuator has run (`CSBCode.cpp:7842`), on parameters of its own (`:7805`): a
+count of 13, `sizeof(PARTYMOVEDATA)/4`, then the block's longwords in the struct's order
+(`:7835-7836`; `CSB.h:4262-4313`): `moveType`, `flags`, `delay`, four
+`staminaAdjustment`s, `relDirection`, `absDirection`, `fromLocation`, `toLocation`,
+`fromLocationType`, `toLocationType`. The whole block comes back (`:7839`). The locations
+are `LOCATIONREL` integers whose position is the party's facing. Three sites call it, and
+each returns at once on `PM_INHIBITMOVE` (1):
+
+- `_TurnParty`, `PM_BEGINTURN` (1, `:7870-7894`), before the arrow flashes. Both
+  directions are `direction`, 1 left and 2 right, or on stairs 3 up and 2 down.
+  `toLocation` faces `(facing + ((direction == 0) ? 1 : -1)) & 3`, and `direction` is never
+  0, so it faces left of the party for either turn. Both room types are the party's
+  square's. The square's flags are read before the filter and decide what follows it.
+- `MoveParty`, `PM_ATTEMPTMOVE` (3, `:8104-8121`), after the stamina each champion would
+  pay is worked out, `(unsigned)-1` for a slot past the party (`:8088-8101`), and before
+  anything else. `relDirection` is the button's 0-3, `absDirection` it plus the facing.
+  `toLocation` is the party's square, as `fromLocation` is: `locr` is not moved between
+  the two. `toLocationType` is the destination's room type, read before the filter: the
+  stairs for a step back out of a stairwell, stone off the map. Once through, a
+  `PM_SETDELAY` (2) without `PM_ADDDELAY` (4) sets `d.partyMoveDisableTimer` to `(i16)delay`
+  and `d.Word11712` to 0 (`:8123-8128`), whether the party moves or not; each champion
+  pays the adjustment the filter left (`:8129-8135`); and a step taken sets the delay to
+  `time2move` only with neither flag, or adds `delay` to the timer with `PM_ADDDELAY`
+  (`:8338-8346`). A refused step returns `NULL`, so `HandleMouseEvents` flashes no arrow;
+  the input is not discarded and `d.clockTick` stays 1.
+- `TraverseStairway`, `PM_STAIRWAY` (2, `:7751-7771`), after the level and the facing past
+  the stairs are worked out. Both directions are `UpOrDown + 2`, and every caller in this
+  source passes `cellFlags & 4`, so they are 2 down and 6 up, not the 0 and 1 the struct's
+  comment says (`CSB.h:4279`). `fromLocation` is the party's square, the stairs;
+  `toLocation` the square past them on the next level, facing the party's way;
+  `fromLocationType` the stairs' room type and `toLocationType` 3. A step into the stairs
+  has already run the filter for `PM_ATTEMPTMOVE`, and lifted the party off its square and
+  set it on the stairs (`:8211-8215`), so a refusal here leaves it there. A turn on the
+  stairs has run it for `PM_BEGINTURN`.
+
+`_TurnParty` and `TraverseStairway` leave `delay` and the stamina adjustments unset; the
+port gives them 0. `tools/dump-party-move-filter.ts`.
+
 ## The `QueueSound` calls, and the level each is on
 
 | Sound | CSBWin's call | Ordinal → SND item | Level |

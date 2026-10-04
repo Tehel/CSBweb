@@ -347,6 +347,12 @@ export interface MovementResult {
      * (doc/CSBwin-src/CSBCode.cpp:8315-8349).
      */
     stepped?: boolean;
+    /**
+     * The party move filter refused a turn or a step (`PM_INHIBITMOVE`): `_TurnParty`
+     * returns before its arrow flashes, and `MoveParty` returns `NULL`, so its caller
+     * flashes none (doc/CSBwin-src/CSBCode.cpp:7890-7894, `:8120`).
+     */
+    refused?: boolean;
 }
 
 /**

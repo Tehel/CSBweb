@@ -51,6 +51,7 @@ import { findChampionByFingerprint } from './Party';
 import { EDT_GLOBAL_TEXT, GetText } from '../data/DecodeText';
 import { messageParametersKey, readGlobalVariables } from '../data/CsbwinExpool';
 import { FEED_PARAMETER_WORDS, feedParametersFromWords, feedParametersToWords, type FeedParameters } from './Feeding';
+import { PARTY_MOVE_DATA_WORDS, partyMoveDataFromWords, partyMoveDataToWords, type PartyMoveData } from './MovementSystem';
 
 /** Which of CSBWin's viewing-filter sites runs the filter (`doc/CSBwin-src/Character.cpp`). */
 export enum ViewingFilterSite {
@@ -284,6 +285,7 @@ const ESL_FEEDING_FILTER = 1;
 const ESL_CHAR_DEATH_FILTER = 11;
 const ESL_DAMAGE_CHAR_FILTER = 15;
 const ESL_EQUIP_FILTER = 12;
+const ESL_PARTY_MOVE_FILTER = 14;
 const ESL_INDIRECT_ACTIONS = 5;
 const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
 
@@ -821,6 +823,23 @@ export class DsaSystem {
         run(0);
       }
     }, true));
+  }
+
+  /**
+   * `CallPartyMoveFilter` (`doc/CSBwin-src/CSBCode.cpp:7788-7848`), which `_TurnParty`,
+   * `MoveParty` and `TraverseStairway` run before the party moves: the first DSA at
+   * `ESL_PARTYMOVEFILTER`'s location, on parameters of its own, a count of 13 and the
+   * block's longwords (`:7835-7836`). Back comes the block, all of it (`:7839`), which
+   * the move then obeys; `pmd` when no DSA stands there.
+   */
+  partyMoveFilter(pmd: PartyMoveData): PartyMoveData {
+    let block = pmd;
+    this.newDsaParameters(() => this.forEachFilterDsa(ESL_PARTY_MOVE_FILTER, (run) => {
+      this.setParameters(PARTY_MOVE_DATA_WORDS, partyMoveDataToWords(block));
+      run();
+      block = partyMoveDataFromWords((i) => this.getParameter(i));
+    }, true));
+    return block;
   }
 
   /**

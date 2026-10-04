@@ -50,12 +50,13 @@ export function freshGame(file: Uint8Array = save, host?: Partial<GameHost>): Ga
 export type FilterDsa = number[] | { columns: number[][] };
 
 /**
- * A game on `csbgame7.dat` whose filter at special location `esl` (`doc/CSBwin-src/CSB.h:1535-1550`)
- * is the first empty open square of the party's level, holding one type-47 actuator per
- * DSA, in order, each with the programs of a DSA of its own. The globals are `UNSET`.
+ * A game on `csbgame7.dat`, or on `file`, whose filter at special location `esl`
+ * (`doc/CSBwin-src/CSB.h:1535-1550`) is the first empty open square of the party's level,
+ * holding one type-47 actuator per DSA, in order, each with the programs of a DSA of its
+ * own. The globals are `UNSET`.
  */
-export function withFilterDsas(esl: number, programs: FilterDsa[], host?: Partial<GameHost>): Game {
-  const game = freshGame(save, host);
+export function withFilterDsas(esl: number, programs: FilterDsa[], host?: Partial<GameHost>, file: Uint8Array = save): Game {
+  const game = freshGame(file, host);
   const dungeon = game.ctx.dungeon;
   const z = game.ctx.party.state.position.z;
   const map = dungeon.getMap(z)!;

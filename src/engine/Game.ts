@@ -682,11 +682,15 @@ export class Game implements MainLoop {
 
     /** `MoveParty` (`MovementSystem.moveParty`), then the move listeners (`onMove`). */
     move(action: MovementAction): boolean {
+        return this.moveParty(action).success;
+    }
+
+    private moveParty(action: MovementAction): MovementResult {
         const result = this.systems.movement.moveParty(action);
         for (const callback of this.onMoveCallbacks) {
             callback(result.success, result);
         }
-        return result.success;
+        return result;
     }
 
     /** `DiscardAllInput` (`MouseQueue.discardAllInput`). */
@@ -787,13 +791,12 @@ export class Game implements MainLoop {
         }
         const action = BUTTON_MOVEMENT[num];
         if (action !== undefined) {
-            this.move(action);
+            const moved = this.moveParty(action);
             // `pButton = MoveParty(D6W); if (pButton != NULL) FlashButton(…)`
             // (doc/CSBwin-src/Mouse.cpp:1556-1567): a step's arrow, `d.MoveButn18496[button
-            // - 3]`, which `MoveParty` returns unless a party-move filter refused the step
-            // (`CSBCode.cpp:8120`, `:8137-8139`; the filter is `DEBT.md` G2). A turn
-            // flashes its own, in `_TurnParty`.
-            if (num >= 3 && num <= 6) {
+            // - 3]`, which `MoveParty` returns unless the party move filter refused the step
+            // (`CSBCode.cpp:8120`, `:8137-8139`). A turn flashes its own, in `_TurnParty`.
+            if (num >= 3 && num <= 6 && !moved.refused) {
                 const button = this.ctx.tables.moveButtons[num - 3]!;
                 flashButton(this.ctx, button.x1, button.x2, button.y1, button.y2);
             }
