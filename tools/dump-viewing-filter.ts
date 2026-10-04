@@ -1,0 +1,158 @@
+/**
+ * The viewing filter at `DescribeObject`'s two sites, with two DSAs on its square, run
+ * through `DsaSystem.processViewingFilter` against a genuine save (`csbgame7.dat`).
+ *
+ * 1. **Every DSA at the location runs** (`doc/CSBwin-src/Character.cpp:3476-3518`,
+ *    `:3736-3770`): each loop goes on with `continue`, a filter call apiece, the second
+ *    DSA after the first.
+ * 2. **The description's parameter 0 is the phrase mask as it stands** (`:3762`): the
+ *    second DSA sees the bit the first one's `&DESCRIBE` cleared (`ModifyDescription`,
+ *    `:3797-3830`).
+ * 3. **No parameter comes back into the mask**: a DSA that stores into parameter 0, with
+ *    no `&DESCRIBE`, leaves the mask as it was (`:3766-3770` read nothing back).
+ * 4. **At the scroll site, an object a DSA leaves in parameter 1 becomes the loop's own**
+ *    (`:3509-3518`), and the loop goes on down that object's chain. The scroll it was
+ *    given is such an object, so a DSA after the first runs only when the first stores an
+ *    invalid object there; it then sees parameter 0 as 0 (`:3502`), whatever a
+ *    `&DESCRIBE` did, and the scroll drawn is the one given.
+ * 5. **A scroll a DSA names is the one drawn**, and the loop goes on down its chain.
+ *
+ * Run: `npx tsx tools/dump-viewing-filter.ts`
+ */
+import { DBType, OBJECT_ID_EOF, Position, RoomType, locationRelToInteger, type ObjectID } from '../src/core/types';
+import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';
+import { StkOp, ViewingFilterSite, type ViewingFilterResult } from '../src/engine/DsaSystem';
+import type { Game } from '../src/engine/Game';
+import { freshGame, globalStore, int, op, varFetch, varStore } from './lib/dsa';
+import { check, finish } from './lib/check';
+
+/** `(EDT_SpecialLocations << 24) | ESL_VIEWINGFILTER` (`doc/CSBwin-src/CSB.h:1534-1538`). */
+const VIEWING_FILTER_KEY = (3 << 24) | 3;
+const UNSET = 0x5a5a;
+
+/** Parameters 0 and 1 into globals `to` and `to + 1`. */
+const params = (to: number): number[] => [
+  ...int(2), ...int(10), op(StkOp.PARAM_FETCH), varFetch(10), globalStore(to), varFetch(11), globalStore(to + 1),
+];
+/** `&DESCRIBE`: phrase `index` enabled (`locr` -1) or disabled (-2), in `color`. */
+const describe = (locr: number, index: number, color: number): number[] =>
+  [...int(locr), ...int(index), ...int(color), op(StkOp.DESCRIBE)];
+/**
+ * `value` into parameter `index`: `&PARAM!` copies variables 0 to `index` into the
+ * parameters from 0 (`doc/CSBwin-src/DSA.cpp:3000-3020`), and the ones left undefined
+ * keep their parameters.
+ */
+const paramStore = (index: number, value: number): number[] =>
+  [...int(value), varStore(index), ...int(index + 1), ...int(0), op(StkOp.PARAM_STORE)];
+
+/**
+ * A game whose viewing filter's square, an empty open one of the party's level, holds one
+ * type-47 actuator per program, in order, each the one program of a DSA of its own.
+ */
+function withFilter(programs: number[][]): Game {
+  const game = freshGame();
+  const dungeon = game.ctx.dungeon;
+  const z = game.ctx.party.state.position.z;
+  const map = dungeon.getMap(z)!;
+  let at: Position | null = null;
+  for (let x = 0; x < map.descriptor.width && !at; x++) {
+    for (let y = 0; y < map.descriptor.height && !at; y++) {
+      const p = new Position(x, y, z);
+      if (((dungeon.getCellFlag(p) >> 5) & 7) !== RoomType.OPEN) continue;
+      if (dungeon.findFirstObject(p) !== OBJECT_ID_EOF) continue;
+      at = p;
+    }
+  }
+  if (!at) throw new Error('no empty open square');
+  const data: DungeonData = dungeon.getData();
+  const entries: DsaDefinition[] = programs.map((program, i) => ({
+    description: `test ${i}`, state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,
+    states: [{ actions: [{ column: 0, program: Uint16Array.from(program) }] }],
+  }));
+  programs.forEach((_, i) => {
+    data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47 | (i << 7), word4: 0, word6: 0 });
+    dungeon.addObjectToCell(at, dungeon.rnMaps.rn(DBType.ACTUATOR, data.databases.actuators.records.length - 1));
+  });
+  data.dsaIndex = { entries };
+  data.dsaLevelIndex = [];
+  data.dsaLevelIndex[z] = programs.map((_, i) => i);
+  data.specialLocations = { [VIEWING_FILTER_KEY]: locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 }) };
+  game.systems.dsa.setGlobalVariables(new Array<number>(100).fill(UNSET));
+  return game;
+}
+
+function view(game: Game, site: ViewingFilterSite, phraseMask: number, objectId: ObjectID): ViewingFilterResult | null {
+  return game.systems.dsa.processViewingFilter({ site, phraseMask, objectId, selectedCharacter: 0 });
+}
+
+const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
+
+/* ------------------------------- 1, 2. the description, two DSAs ---------------- */
+{
+  const game = withFilter([
+    [...params(0), ...describe(-2, 0, 5)],
+    [...params(10)],
+  ]);
+  const object = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, 0);
+  const result = view(game, ViewingFilterSite.DESCRIPTION, 0x4f, object);
+  const g = game.systems.dsa.getGlobalVariables();
+  console.log(`1. the first DSA sees mask ${hex(g[0])} and object ${g[1]}; the second `
+    + `${g[10] === UNSET ? 'does not run' : `sees mask ${hex(g[10])} and object ${g[11]}`}; `
+    + `the mask is ${hex(result?.phraseMask ?? -1)}, phrase 0's colour ${result?.phraseColorOverrides[0]}`);
+  check(g[0] === 0x4f && g[1] === object, 'the first DSA sees the mask and the object given');
+  check(g[10] !== UNSET, 'the second DSA at the location runs too');
+  check(g[10] === 0x4e && g[11] === object, "2. the second sees the mask as the first one's &DESCRIBE left it");
+  check(result?.phraseMask === 0x4e && result.phraseColorOverrides[0] === 5, "the description takes &DESCRIBE's mask and colour");
+}
+
+/* ------------------------------- 3. no parameter comes back --------------------- */
+{
+  const game = withFilter([[...paramStore(0, 0x1234)]]);
+  const result = view(game, ViewingFilterSite.DESCRIPTION, 0x4f, game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, 0));
+  console.log(`3. a DSA stores ${hex(0x1234)} into parameter 0, with no &DESCRIBE: the mask is ${hex(result?.phraseMask ?? -1)}`);
+  check(result?.phraseMask === 0x4f, 'the mask is the one given, parameter 0 read nowhere');
+}
+
+/* ------------------------------- 4, 5. the scroll ------------------------------- */
+{
+  const scrollSite = (first: number[]): { g: number[]; drawn: number | undefined; scroll: ObjectID } => {
+    const game = withFilter([[...params(0), ...first], [...params(10)]]);
+    const scroll = game.ctx.dungeon.rnMaps.rn(DBType.SCROLL, 0);
+    const result = view(game, ViewingFilterSite.SCROLL, 0, scroll);
+    return { g: game.systems.dsa.getGlobalVariables(), drawn: result?.objectId, scroll };
+  };
+  const kept = scrollSite([]);
+  console.log(`4. at the scroll, the first DSA sees parameter 0 ${kept.g[0]} and object ${kept.g[1]}, `
+    + `leaves it, and the second ${kept.g[10] === UNSET ? 'does not run' : 'runs'}`);
+  check(kept.g[0] === 0 && kept.g[1] === kept.scroll, 'the first DSA sees parameter 0 as 0, and the scroll');
+  check(kept.g[10] === UNSET, "the loop goes on down the scroll's chain, and the second DSA does not run");
+  check(kept.drawn === kept.scroll, 'the scroll drawn is the one given');
+  const cleared = scrollSite([...describe(-1, 0, 5), ...paramStore(1, 0)]);
+  console.log(`   when the first stores object 0 and enables phrase 0, the second sees parameter 0 `
+    + `${cleared.g[10]}, and the scroll drawn is ${cleared.drawn} of ${cleared.scroll}`);
+  check(cleared.g[10] === 0, "the second DSA runs, and sees parameter 0 as 0, whatever the first one's &DESCRIBE did");
+  check(cleared.drawn === cleared.scroll, 'with no valid object named, the scroll drawn is the one given');
+}
+{
+  const probe = freshGame();
+  const scrolls = probe.ctx.dungeon.getData().databases.scrolls.records.length;
+  const given = probe.ctx.dungeon.rnMaps.rn(DBType.SCROLL, 0);
+  let named = OBJECT_ID_EOF as ObjectID;
+  for (let i = 1; i < scrolls && named === OBJECT_ID_EOF; i++) {
+    const rn = probe.ctx.dungeon.rnMaps.rn(DBType.SCROLL, i);
+    if (probe.ctx.dungeon.getScrollRecord(rn) && probe.ctx.dungeon.getDBRecordLink(rn) === OBJECT_ID_EOF) named = rn;
+  }
+  if (named === OBJECT_ID_EOF) throw new Error('no scroll that ends its chain');
+  const game = withFilter([
+    [...params(0), ...paramStore(1, named)],
+    [...params(10)],
+  ]);
+  const result = view(game, ViewingFilterSite.SCROLL, 0, given);
+  const g = game.systems.dsa.getGlobalVariables();
+  console.log(`5. the first DSA names scroll ${named}, which ends its chain: the scroll drawn is `
+    + `${result?.objectId}, and the second DSA ${g[10] === UNSET ? 'does not run' : 'runs'}`);
+  check(result?.objectId === named, 'the scroll a DSA names is the one drawn');
+  check(g[10] === UNSET, "the loop goes on down the named scroll's chain, and the second DSA does not run");
+}
+
+finish();

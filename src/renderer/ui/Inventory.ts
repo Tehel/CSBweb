@@ -8,6 +8,7 @@
  */
 import { OBJNI_OPEN_CHEST, OBJNI_SPECIAL_D, OBJNI_SPECIAL_E } from '../../core/objectNameIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID } from '../../core/types';
+import { ViewingFilterSite } from '../../engine/DsaSystem';
 import { Champion, getChampionPossession } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
@@ -422,17 +423,7 @@ export function getEyeRect(ui: UIState): Rect | null {
 }
 
 export function drawScrollPanel(ui: UIState, objectId: ObjectID): void {
-  let scrollId = objectId;
-  const filter = applyViewingFilter(ui, objectId, 0);
-  if (filter) {
-    // `obj.checkIndirectIndex(pDSAparameters[2])`, then `dbType() == dbSCROLL`
-    // (`doc/CSBwin-src/Character.cpp:3510-3514`): the DSA's answer counts only if it
-    // names a scroll that exists.
-    const candidate = filter.objectId | 0;
-    if (candidate >= 0 && ui.ctx.dungeon.getScrollRecord(candidate as ObjectID)) {
-      scrollId = candidate as ObjectID;
-    }
-  }
+  const scrollId = applyViewingFilter(ui, ViewingFilterSite.SCROLL, objectId, 0)?.objectId ?? objectId;
 
   const scroll = ui.ctx.dungeon.getScrollRecord(scrollId);
   if (!scroll) return;

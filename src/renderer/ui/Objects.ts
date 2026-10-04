@@ -8,7 +8,7 @@
 import { OBJNI_BONES_A, OBJNI_COMPASS_N, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJNI_SPECIAL_F, OBJNI_SPECIAL_J, OBJNI_SPECIAL_N, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATER, OBJNI_WATERSKIN, OBJNI_WATER_FLASK } from '../../core/objectNameIndex';
 import { DescIndex, GetBasicObjectType, NameIndex } from '../../engine/objectIndex';
 import { DBType, ObjectID } from '../../core/types';
-import { ViewingFilterResult } from '../../engine/DsaSystem';
+import { ViewingFilterResult, ViewingFilterSite } from '../../engine/DsaSystem';
 import { Champion } from '../../engine/gameTypes';
 import { findChampionByFingerprint } from '../../engine/Party';
 import { determineMastery as determineMasteryEngine } from '../../engine/skills';
@@ -203,7 +203,7 @@ export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objec
   const weight = getObjectWeightForRecord(ui, objectId, new Set<number>());
   phrases[6] = formatWeightText(weight);
 
-  const filter = applyViewingFilter(ui, objectId, phraseMask);
+  const filter = applyViewingFilter(ui, ViewingFilterSite.DESCRIPTION, objectId, phraseMask);
   if (filter) {
     phraseMask = filter.phraseMask;
     for (let i = 0; i < filter.phraseTextOverrides.length; i++) {
@@ -243,12 +243,18 @@ export function buildPhraseSummary(mask: number, phrases: string[], colors: numb
   return { text: `(${chosen.slice(0, -1).join(', ')} AND ${chosen[chosen.length - 1]})`, color };
 }
 
-export function applyViewingFilter(ui: UIState, objectId: ObjectID, phraseMask: number): ViewingFilterResult | null {
+export function applyViewingFilter(
+  ui: UIState,
+  site: ViewingFilterSite,
+  objectId: ObjectID,
+  phraseMask: number,
+): ViewingFilterResult | null {
   const selected = ui.partyState.selectedCharacterIndex;
   if (selected < 0) return null;
   return ui.ctx.systems.dsa.processViewingFilter({
+    site,
     phraseMask,
-    objectId: objectId | 0,
+    objectId,
     selectedCharacter: selected,
   });
 }

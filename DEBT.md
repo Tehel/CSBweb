@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C130 | The viewing filter runs only the first DSA at its location, and reads its mask back | S | ⏳ |
+| C131 | `&DESCRIBE`'s custom phrase: CSBWin's `GetText`, every text at the location, an empty one too | S | ⏳ |
 | G2 | Twelve DSA filters, and the viewing filter's third site | L | ⏳ step 1 of 12 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
@@ -128,7 +128,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C131 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C132 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -172,22 +172,16 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C130 ⏳ The viewing filter runs only the first DSA at its location, and reads its mask back
+### C131 ⏳ `&DESCRIBE`'s custom phrase: CSBWin's `GetText`, every text at the location, an empty one too
 
-CSBWin's three viewing-filter sites run every type-47 actuator at `ESL_VIEWINGFILTER`'s
-location in turn: the scroll's and the description's in `DescribeObject`
-(`doc/CSBwin-src/Character.cpp:3506`, `:3766`), the eye click's in `TAG019036` (`:4571`),
-each loop going on with `continue` (`:3518`, `:3770`, `:4575`). The port's
-`DsaSystem.processViewingFilter` runs the first (`findFirstDsaActuator`). Conflux has three
-there. Each run is a filter call of its own, with the same parameters. The scroll's
-reads parameter 2 back into the loop's own `obj` whenever it is a valid object
-(`:3509-3516`), and draws it if it is a scroll: the loop then goes on down that object's
-chain, not the actuators'.
-
-The description reads no parameter back: the phrase mask is the file-scope `phraseMask`
-(`:3398`), which only `&DESCRIBE`'s `ModifyDescription` changes (`:3797-3830`). The port
-takes parameter 0 as the mask when no `&DESCRIBE` ran (`processViewingFilter`'s
-`paramMask`), so a DSA that stores into it changes what CSBWin would not.
+`ModifyDescription` with a location (`doc/CSBwin-src/Character.cpp:3816-3830`) walks every
+text at it whose position matches, with no `IsValid`, and sets the phrase from each in
+turn, so the last wins; it reads each with `GetText` (`AsciiDump.cpp:362`), its own decoder
+of the compressed text, which substitutes `/` for code 28. It enables the phrase whatever
+the text holds, an empty one included. `DsaSystem.modifyDescription` refuses an invalid
+location, takes the first text, decodes it with `decodeTextString(record, 0x8001)`, and
+returns without enabling the phrase when the text is empty. Paying it needs `GetText`
+ported, and checked against `DecodeText` on every text of `dm-atari` and Conflux.
 
 ---
 
@@ -337,7 +331,7 @@ The rest of the item, with an operation that needs care when ported:
 
 ### G2 ⏳ Twelve DSA filters, and the viewing filter's third site
 
-The port runs five filters: the viewing filter (two of its three sites, and see C130),
+The port runs five filters: the viewing filter (two of its three sites),
 the party attack filter, the adjust skills filter, the missile encounter filter, and the
 spell filter at `spellFilterLocation`. Each place below uses CSBWin's defaults instead.
 Conflux reaches every one but the portrait's: its `EXPOOL` names a location for all
@@ -402,10 +396,10 @@ the site loops. The steps, one commit each:
 11. **`PortraitTranslateDisable`'s `QueueDSASwitchAction`** (S, `CSBCode.cpp:6540-6612`).
     It fires only on a `DisableMessage`, which the shipped dungeon never carries
     (`HallOfChampions.ts:337`).
-12. **The viewing filter at the eye click** (S, after C130). `TAG019036`
+12. **The viewing filter at the eye click** (S). `TAG019036`
     (`Character.cpp:4540-4578`) runs it with phrase mask 0 and object -1 before it draws
-    the masteries; the port's `drawAttributePanel` (`src/renderer/ui/Character.ts:71`) runs
-    none.
+    the masteries, every DSA at the location in turn; the port's `drawAttributePanel`
+    (`src/renderer/ui/Character.ts:71`) runs none.
 
 The steps share how a filter is reached and run: a helper in `DsaSystem`, built with the
 first step. Moving the five filters already ported onto it is a refactor, a commit of its

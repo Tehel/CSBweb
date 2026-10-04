@@ -51,9 +51,18 @@ import { findChampionByFingerprint } from './Party';
 import { EDT_GLOBAL_TEXT } from '../data/DecodeText';
 import { messageParametersKey, readGlobalVariables } from '../data/CsbwinExpool';
 
+/** Which of CSBWin's viewing-filter sites runs the filter (`doc/CSBwin-src/Character.cpp`). */
+export enum ViewingFilterSite {
+  /** `DescribeObject`'s description (`:3766`): parameter 0 is the phrase mask as it stands. */
+  DESCRIPTION,
+  /** `DescribeObject`'s scroll (`:3506`): parameter 0 is 0, and a DSA may name another scroll. */
+  SCROLL,
+}
+
 export interface ViewingFilterOptions {
+  site: ViewingFilterSite;
   phraseMask: number;
-  objectId: number;
+  objectId: ObjectID;
   selectedCharacter: number;
 }
 
@@ -65,7 +74,8 @@ export interface PartyAttackFilter {
 
 export interface ViewingFilterResult {
   phraseMask: number;
-  objectId: number;
+  /** The scroll the scroll site draws: the last one a DSA named, or the object it was given. */
+  objectId: ObjectID;
   phraseTextOverrides: Array<string | null>;
   phraseColorOverrides: Array<number | null>;
 }
@@ -357,7 +367,6 @@ interface ViewingFilterContext {
   phraseMask: number;
   phraseTextOverrides: Array<string | null>;
   phraseColorOverrides: Array<number | null>;
-  modified: boolean;
 }
 
 class DsaStack {
@@ -702,14 +711,21 @@ export class DsaSystem {
     });
   }
 
+  /**
+   * The viewing filter at one of `DescribeObject`'s sites: every type-47 actuator at
+   * `ESL_VIEWINGFILTER`'s location runs in turn, a filter call apiece
+   * (`doc/CSBwin-src/Character.cpp:3476-3518`, `:3736-3770`). No parameter comes back
+   * into the mask, which only `&DESCRIBE` changes (`ModifyDescription`, `:3797-3830`).
+   * At the scroll site, an object a DSA names in parameter 1 becomes the loop's own `obj`,
+   * so the loop goes on down that object's chain, and is drawn if it is a scroll
+   * (`:3509-3518`). Null when no DSA stands there.
+   */
   processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
     const special = this.dungeon.getSpecialLocation(VIEWING_FILTER_KEY);
     if (special === null) return null;
     const locrFilter = locationRelFromInteger(special);
     if (!this.dungeon.isValidLocation(locrFilter)) return null;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
-    const dsaActuator = this.findFirstDsaActuator(filterPos);
-    if (dsaActuator === OBJECT_ID_EOF) return null;
 
     const timer: TimerEntry = {
       index: -1,
@@ -726,27 +742,41 @@ export class DsaSystem {
       timerWord6: 0,
     };
 
+    const scrollSite = options.site === ViewingFilterSite.SCROLL;
     return this.newDsaParameters(() => {
-      this.setParameters(3, [options.phraseMask | 0, options.objectId | 0, options.selectedCharacter | 0]);
-      this.viewingFilterContext = {
+      const ctx: ViewingFilterContext = {
         phraseMask: options.phraseMask | 0,
         phraseTextOverrides: Array.from({ length: 8 }, () => null),
         phraseColorOverrides: Array.from({ length: 8 }, () => null),
-        modified: false,
       };
-
-      this.processTimer6Internal(dsaActuator, timer, filterPos, true, new DsaVars());
-
-      const ctx = this.viewingFilterContext;
-      this.viewingFilterContext = null;
-      if (!ctx) return null;
-      const paramMask = this.getParameter(0);
-      const phraseMask = ctx.modified ? ctx.phraseMask : (paramMask | 0);
-      const objectId = this.getParameter(1);
-
+      this.viewingFilterContext = ctx;
+      let found = false;
+      let scroll = options.objectId;
+      try {
+        for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+          if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
+          const rec = this.dungeon.getActuatorRecord(rn);
+          if (!rec || getActuatorType(rec) !== 47) continue;
+          found = true;
+          this.setParameters(3, [
+            scrollSite ? 0 : ctx.phraseMask,
+            options.objectId | 0,
+            options.selectedCharacter | 0,
+          ]);
+          this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars());
+          if (!scrollSite) continue;
+          const named = this.getParameter(1);
+          if (!this.isValidObjectId(named)) continue;
+          rn = named;
+          if (this.dungeon.rnMaps.dbType(rn) === DBType.SCROLL) scroll = rn;
+        }
+      } finally {
+        this.viewingFilterContext = null;
+      }
+      if (!found) return null;
       return {
-        phraseMask,
-        objectId,
+        phraseMask: ctx.phraseMask,
+        objectId: scroll,
         phraseTextOverrides: ctx.phraseTextOverrides,
         phraseColorOverrides: ctx.phraseColorOverrides,
       };
@@ -3511,12 +3541,10 @@ export class DsaSystem {
     ctx.phraseColorOverrides[index] = color | 0;
     if (locrInt === -1) {
       ctx.phraseMask |= 1 << index;
-      ctx.modified = true;
       return;
     }
     if (locrInt === -2) {
       ctx.phraseMask &= ~(1 << index);
-      ctx.modified = true;
       return;
     }
     if (locrInt < 0) return;
@@ -3528,7 +3556,6 @@ export class DsaSystem {
     if (!text) return;
     ctx.phraseTextOverrides[index] = text;
     ctx.phraseMask |= 1 << index;
-    ctx.modified = true;
   }
 
   private findTextRecordAtLocation(locr: LocationRel): TextRecord | null {

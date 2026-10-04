@@ -4410,6 +4410,22 @@ count of -1, and on the outer array (see "`&PARAM@` compares the count unsigned"
 its first two returns, filter or none (`Attack.cpp:1346-1360`, `:1673`). Evidence:
 `tools/dump-dsa-parameters.ts`.
 
+## The viewing filter runs every DSA at its location, and the scroll's loop follows the object a DSA leaves
+
+`DescribeObject`'s two viewing-filter sites, the scroll's and the description's
+(`doc/CSBwin-src/Character.cpp:3476-3518`, `:3736-3770`), walk the chain at
+`ESL_VIEWINGFILTER`'s location and run every type-47 actuator on it, each a filter call
+with the parameters set afresh, and go on with `continue`; so does `TAG019036`'s, at the
+eye click (`:4571-4575`). The description's parameter 0 is the file-scope `phraseMask` as it
+stands (`:3762`), so a DSA sees what the `&DESCRIBE` of a DSA before it did, and nothing is
+read back: the mask and the phrases change only through `ModifyDescription`
+(`:3797-3830`). The scroll's parameter 0 is 0 (`:3502`). After each run the scroll's site
+reads parameter 1 back into the loop's own `obj` whenever `checkIndirectIndex` takes it,
+and draws it if it is a scroll (`:3509-3516`); `continue` then steps along that object's
+chain, not the actuators'. Parameter 1 starts as the scroll being read, a valid object, so
+a DSA after the first runs only if the first stores an invalid object there. Evidence:
+`tools/dump-viewing-filter.ts`.
+
 ## A DSA's `I_` operation acts only when its record reaches the `ESL_INDIRECTACTIONS` DSA
 
 `&%TELEPORTPARTY`, `&%DEL` and the thirteen other `I_` operations do not act: `Indirect`

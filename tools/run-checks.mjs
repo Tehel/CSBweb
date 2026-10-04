@@ -99,6 +99,7 @@ const CHECKS = [
   { tool: 'dump-dsa-characters.ts' },
   { tool: 'dump-dsa-objects.ts' },
   { tool: 'dump-dsa-parameters.ts' },
+  { tool: 'dump-viewing-filter.ts' },
   { tool: 'dump-dsa-missiles.ts' },
   { tool: 'dump-dsa-monsters.ts' },
   { tool: 'dump-dsa-text.ts' },

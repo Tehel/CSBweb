@@ -105,7 +105,7 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 - `DescribeObject` prints waterskin fullness strings based on `DB10->value()` (`(EMPTY)`, `(ALMOST EMPTY)`, `(ALMOST FULL)`, `(FULL)`), and prints `PARTY FACING {dir}` for compass items (`objNI_Compass_N..objNI_Compass_W`) (`doc/CSBwin-src/Character.cpp`).
 - `DescribeObject` prefixes potion names (except water/empty flasks) with `char(95 + strength/40)` when `DetermineMastery(selectedChampion, 2) > 1` (`doc/CSBwin-src/Character.cpp`).
 - `DescribeObject` builds hero bones names by concatenating the champion name with `ObjectNames[objNI_Bones_a]` when `DB10->value()` is non-zero and `CopyChampionBonesRecord` resolves a valid champion (`doc/CSBwin-src/Character.cpp`).
-- `DescribeObject` invokes the `ESL_VIEWINGFILTER` DSA (special location) with `pDSAparameters[1]=phraseMask`, `pDSAparameters[2]=objectId`, `pDSAparameters[3]=selectedChampion`, and `pDSAparameters[0]=3`, allowing `STKOP_Describe` (`ModifyDescription`) to override phrase text/colors (`doc/CSBwin-src/Character.cpp`).
+- `DescribeObject` invokes every `ESL_VIEWINGFILTER` DSA (special location) in turn with `pDSAparameters[1]=phraseMask`, `pDSAparameters[2]=objectId`, `pDSAparameters[3]=selectedChampion`, and `pDSAparameters[0]=3`, allowing `STKOP_Describe` (`ModifyDescription`) to override phrase text/colors; no parameter is read back (`doc/CSBwin-src/Character.cpp:3736-3770`, and `doc/PROVEN_FACTS.md` → "The viewing filter runs every DSA at its location").
 
 ## Inspection arrow indicator
 
