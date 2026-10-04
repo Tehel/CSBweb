@@ -2318,20 +2318,20 @@ export class DsaSystem {
 
   /**
    * `SetCursed` (`doc/CSBwin-src/Character.cpp:1782-1816`): the curse bracketed by
-   * `AdjustStatsForItemCarried`'s -1 and +1 on the champion carrying the object. The
-   * search's `break` leaves only the inner loop, so the slot passed is the one found
-   * only when the bearer is the last champion; for any other it is 30, where
-   * `AdjustStatsForItemCarried` changes nothing.
+   * `AdjustStatsForItemCarried`'s -1 and +1 on the champion carrying the object, at the
+   * slot it is in. CSBWin's search leaves only its inner loop, so it passes that slot
+   * only when the bearer is the last champion, and slot 30 for any other; the port's
+   * leaves both (`DEBT.md` H).
    */
   private setCursed(obj: ObjectID, curse: boolean): void {
     const champions = this.ctx.party.state.champions;
     let pCH: Champion | null = null;
     let loc = -1;
-    for (let ch = 0; ch < champions.length; ch++) {
+    search: for (let ch = 0; ch < champions.length; ch++) {
       for (loc = 0; loc < 30; loc++) {
         if (obj === getChampionPossession(champions[ch]!, loc)) {
           pCH = champions[ch]!;
-          break;
+          break search;
         }
       }
     }

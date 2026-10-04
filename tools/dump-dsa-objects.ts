@@ -12,9 +12,10 @@
  *    `:3537-3563`, `:3596-3628`, `:3652-3675`) cut the value to the field's width
  *    (`SETWBITS`, `CSB.h:746-774`), and touch neither the other bits nor another
  *    database.
- * 3. **`&CURSE!`** is `SetCursed` (`Character.cpp:1782-1816`): on the last champion's
- *    weapon it costs 3 Luck at once, and gives it back when lifted; on another
- *    champion's, the search leaves the slot at 30, and the Luck does not move.
+ * 3. **`&CURSE!`** is `SetCursed` (`Character.cpp:1782-1816`): on a carried weapon it
+ *    costs 3 Luck at once, and gives it back when lifted. CSBWin does so only for the
+ *    last champion, whose slot its search alone keeps; the port for every champion
+ *    (`DEBT.md` H), so a curse laid and the weapon taken off leaves the Luck as it was.
  *
  * Run: `npx tsx tools/dump-dsa-objects.ts`
  */
@@ -101,15 +102,22 @@ check(dungeon.getWeaponRecord(weapon)?.charges === 14 && dungeon.getPotionRecord
   const last = run(curse(lastWeapon, 1));
   const lifted = run([...curse(lastWeapon, 1), ...curse(lastWeapon, 0)]);
   const first = run(curse(firstWeapon, 1));
+  // The cursed weapon taken out of the first champion's hand, slot 1.
+  const removed = run(curse(firstWeapon, 1));
+  removed.game.ctx.systems.character.removeCharacterPossession(0, 1);
   console.log(`3. Luck of the last champion ${luck(base, 3)}: cursed ${luck(last.game, 3)}, lifted `
-    + `${luck(lifted.game, 3)}; of the first ${luck(base, 0)}: cursed ${luck(first.game, 0)}`);
+    + `${luck(lifted.game, 3)}; of the first ${luck(base, 0)}: cursed ${luck(first.game, 0)}, `
+    + `the weapon then taken off ${luck(removed.game, 0)}`);
   const before = base.ctx.party.state.champions[3]!.attributes.stats[0]!.current;
   check(last.game.ctx.party.state.champions[3]!.attributes.stats[0]!.current === before - 3,
     'a curse on the last champion\'s weapon costs 3 Luck at once');
   check(luck(lifted.game, 3) === luck(base, 3), 'lifting it gives the Luck back');
   check(last.game.ctx.dungeon.getWeaponRecord(lastWeapon)!.cursed
     && first.game.ctx.dungeon.getWeaponRecord(firstWeapon)!.cursed, 'both weapons are cursed');
-  check(luck(first.game, 0) === luck(base, 0), 'another champion\'s Luck does not move: SetCursed passes slot 30');
+  const firstBefore = base.ctx.party.state.champions[0]!.attributes.stats[0]!.current;
+  check(first.game.ctx.party.state.champions[0]!.attributes.stats[0]!.current === firstBefore - 3,
+    'so does a curse on the first champion\'s: the port passes the slot found, not CSBWin\'s 30');
+  check(luck(removed.game, 0) === luck(base, 0), 'the cursed weapon taken off gives the Luck back, and no more');
 }
 
 finish();

@@ -4662,8 +4662,11 @@ bearer with two nested loops, `ch` over `d.NumCharacter` and `loc` over 30 slots
 only when the bearer is the last champion; for any other the later champions' loops run
 it to 30, and both `AdjustStatsForItemCarried` calls pass slot 30, which matches no row
 of the table above. A curse laid on the last champion's carried weapon or garment costs 3
-Luck at once and lifting it gives them back; on another champion's, the Luck does not
-move until the object leaves and re-enters a slot. Evidence: `tools/dump-dsa-objects.ts`.
+Luck at once and lifting it gives them back. On another champion's the Luck does not
+move, but `RemoveCharacterPossession` takes the curse off at the real slot (`:1858`), so
+the object taken off gives 3 Luck that were never taken: a permanent gain. The port
+passes the slot found for every champion (`DEBT.md` H). Evidence:
+`tools/dump-dsa-objects.ts`.
 
 ## The disk menu saves an open chest packed
 

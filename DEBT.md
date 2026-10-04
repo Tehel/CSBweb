@@ -838,6 +838,15 @@ Recorded so that nobody "fixes" them.
   key selects one (`drawSpellControls` and `handleMagicClick`,
   `src/renderer/ui/MagicPanel.ts`; `selectCaster`, `src/renderer/ui/Keyboard.ts`). The tab
   appears once the champion's maximum mana rises above zero.
+- 🚫 **A curse laid by a DSA moves the Luck of any bearer.** `SetCursed`, the DSA's
+  `&CURSE!`, brackets the curse with `AdjustStatsForItemCarried`'s -1 and +1, but its
+  search keeps the slot found only for the last champion and passes 30 for any other
+  (`doc/PROVEN_FACTS.md` → "`AdjustStatsForItemCarried`"). There the curse costs no
+  Luck, and taking the object off gives 3 Luck for good. The author's decision: the
+  port passes the slot found, whoever the bearer (`setCursed`,
+  `src/engine/DsaSystem.ts`), so a curse costs 3 Luck at once on every champion and the
+  object taken off gives them back. No save format changes: the Luck a save carries is
+  the attribute as it stands. `tools/dump-dsa-objects.ts` checks it.
 - 🚫 **Word sizes from the file.** Two of CSBWin's constants are the English words'
   sizes: `AttackNames[300]` in graphic `0x230` and the source widths `DisplayFoodWater`
   blits the food, water and poisoned labels with. The French 1.3 `graphics.dat` has
