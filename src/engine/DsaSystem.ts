@@ -46,6 +46,9 @@ import type { CsbRandom } from '../core/random';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import { monsterHorizontalSize } from '../data/tables/MonsterDesc';
 import { monsterDrawAsSize4, monsterInvisible, monsterPoisoned, monsterUnique } from './MonsterSystem';
+import { printWithSubstitution } from './PrintWithSubstitution';
+import { findChampionByFingerprint } from './Party';
+import { EDT_GLOBAL_TEXT } from '../data/DecodeText';
 
 export interface ViewingFilterOptions {
   phraseMask: number;
@@ -395,8 +398,29 @@ class DsaBank {
    * chained through the records' own links, freed only once the run is over.
    */
   objectDeleteList: ObjectID = OBJECT_ID_EOF;
+  /**
+   * `numText` and `textStrings` (`doc/CSBwin-src/DSA.cpp:126-127`): the run's ten texts,
+   * which `&TEXT@` and `&CHARNAME@` set, none until the first is.
+   */
+  private texts: Array<string | null> | null = null;
 
   constructor(public vars: DsaVars) {}
+
+  /** `DSADBANK::SetText` (`doc/CSBwin-src/DSA.cpp:194-205`): an index past 9 sets nothing. */
+  setText(text: string, index: number): void {
+    if (index > 9) return;
+    this.texts ??= new Array<string | null>(10).fill(null);
+    this.texts[index] = text;
+  }
+
+  /**
+   * `DSADBANK::GetText` (`doc/CSBwin-src/DSA.cpp:207-212`): "" for a text never set. An
+   * index past 9 reads past CSBWin's array once any text is set; here it reads "".
+   */
+  getText(index: number): string {
+    if (!this.texts) return '';
+    return this.texts[index >>> 0] ?? '';
+  }
 
   getVar(index: number): number {
     if (index < 0 || index >= this.vars.values.length) return 0;
@@ -2221,6 +2245,64 @@ export class DsaSystem {
       case StkOp.CHAR_STORE:
         this.charStore(bank);
         break;
+      case StkOp.SAY: {
+        // `DSA.cpp:3137-3160`: the first text of the square, at any corner.
+        const color = bank.stack.pop();
+        const locr = locationRelFromInteger(bank.stack.pop());
+        if (!this.dungeon.isValidLocation(locr)) break;
+        let rn = this.dungeon.findFirstObject(new Position(locr.x, locr.y, locr.l));
+        while (rn !== OBJECT_ID_EOF && this.dungeon.rnMaps.dbType(rn) !== DBType.TEXT) {
+          rn = this.dungeon.getDBRecordLink(rn);
+        }
+        if (rn === OBJECT_ID_EOF) break;
+        const record = this.dungeon.getTextRecord(rn);
+        if (!record) break;
+        const text = this.dungeon.decodeTextString(record, 0x8002, this.ctx.tables.textDecode, 999) ?? '';
+        printWithSubstitution(this.ctx, text, color);
+        break;
+      }
+      case StkOp.DISCARD_TEXT:
+        // `DSA.cpp:3161-3167`.
+        this.ctx.host.messages.discardText();
+        break;
+      case StkOp.TEXT_FETCH: {
+        // `DSA.cpp:3168-3193`.
+        const textIndex = bank.stack.pop() >>> 0;
+        const objIndex = bank.stack.pop();
+        if (textIndex > 9) break;
+        if (!this.isValidObjectId(objIndex)) break;
+        if (this.dungeon.rnMaps.dbType(objIndex) !== DBType.TEXT) break;
+        const record = this.dungeon.getTextRecord(objIndex);
+        if (!record) break;
+        bank.setText(this.dungeon.decodeTextString(record, 0x8002, this.ctx.tables.textDecode, 999) ?? '', textIndex);
+        break;
+      }
+      case StkOp.GLOBAL_TEXT_STORE: {
+        // `DSA.cpp:3194-3202`.
+        const globalIndex = bank.stack.pop();
+        const localIndex = bank.stack.pop();
+        this.setGlobalText(bank.getText(localIndex), globalIndex);
+        break;
+      }
+      case StkOp.CHAR_NAME_FETCH: {
+        // `DSA.cpp:3204-3237`: the first champion with the fingerprint. CSBWin looks in
+        // the wings next (`LocateInWings`), which the port does not have (`DEBT.md` G3).
+        // `SetText(pName, 8, index)` copies nine bytes, the name's eight and a ninth:
+        // only a name of eight letters, which runs on into the title, would show it.
+        const index = bank.stack.pop() & 0xffff;
+        const fingerprint = bank.stack.pop() & 0xffff;
+        const party = this.ctx.party.state;
+        const charIdx = findChampionByFingerprint(party, fingerprint);
+        bank.setText(charIdx >= 0 ? party.champions[charIdx]!.name.slice(0, 8) : '', index);
+        break;
+      }
+      case StkOp.TEXT_SAY: {
+        // `DSA.cpp:3239-3252`.
+        const color = bank.stack.pop();
+        const index = bank.stack.pop();
+        printWithSubstitution(this.ctx, bank.getText(index), color);
+        break;
+      }
       case StkOp.EXPERIENCE_PLUS: {
         // `DSA.cpp:4542-4557`. A negative index reads nobody (`DEBT.md` H).
         const experience = bank.stack.pop();
@@ -3008,6 +3090,20 @@ export class DsaSystem {
   }
 
   /** `RN::checkIndirectIndex(i)` (`doc/CSBwin-src/data.cpp:529-534`): a slot of the maps. */
+  /**
+   * `SetGlobalText` (`doc/CSBwin-src/CSBCode.cpp:5295-5307`): the text, at most 99 bytes
+   * and its zero, as the `EXPOOL` record `(EDT_GlobalText << 24) | index`, four bytes to a
+   * longword in memory order. The record is `(len + 4) / 4` longwords; CSBWin fills the
+   * bytes past the zero from an uninitialised buffer, the port with zeros. A new record
+   * goes in front of the old, which stays in the pool.
+   */
+  private setGlobalText(text: string, index: number): void {
+    const len = Math.min(text.length, 99);
+    const record = new Array<number>(Math.floor((len + 4) / 4)).fill(0);
+    for (let i = 0; i < len; i++) record[i >> 2] = (record[i >> 2]! | ((text.charCodeAt(i) & 0xff) << (8 * (i & 3)))) >>> 0;
+    this.dungeon.writeExpoolRecord(((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0, record);
+  }
+
   private isValidObjectId(objectId: number): objectId is ObjectID {
     return objectId >= 0 && this.dungeon.rnMaps.checkIndirectIndex(objectId);
   }

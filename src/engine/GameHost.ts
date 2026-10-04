@@ -57,6 +57,8 @@ export interface MessageSink {
   printNextQueued(time: number): void;
   /** The message strip's share of `vblInterrupt`: a scroll under way moves on a scanline. */
   vblInterrupt(): void;
+  /** `scrollingText.DiscardText()`, the DSA's `&DISCARDTEXT`: the strip empties. */
+  discardText(): void;
 }
 
 export interface GameHost {
@@ -98,6 +100,11 @@ export interface GameHost {
    * menu is the UI's.
    */
   closeAttackMenuOf(chIdx: number): void;
+  /**
+   * `d.AttackingCharacterOrdinal`: the champion whose attack menu is open, from 1, or 0.
+   * `PrintWithSubstitution`'s `@p` names them. The attack menu is the UI's.
+   */
+  attackingCharacterOrdinal(): number;
   /**
    * `ShowHideInventory(chIdx)` (`doc/CSBwin-src/CSBCode.cpp:7419`), 4 to hide: the
    * inventory is the UI's. `_FusionSequence` hides an open one (`Attack.cpp:2269-2272`).
@@ -193,11 +200,13 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
       clockTick: () => {},
       printNextQueued: () => {},
       vblInterrupt: () => {},
+      discardText: () => {},
     },
     sleepChanged: host.sleepChanged ?? (() => {}),
     openReincarnateScreen: host.openReincarnateScreen ?? (() => {}),
     championJoined: host.championJoined ?? (() => {}),
     closeAttackMenuOf: host.closeAttackMenuOf ?? (() => {}),
+    attackingCharacterOrdinal: host.attackingCharacterOrdinal ?? (() => 0),
     showHideInventory: host.showHideInventory ?? (() => {}),
     repackChest: host.repackChest ?? (() => {}),
     tag02076e: host.tag02076e ?? (() => {}),

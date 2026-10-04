@@ -40,6 +40,7 @@ const game = newGame(data, graphics, {
     clockTick: () => {},
     printNextQueued: () => {},
     vblInterrupt: () => {},
+    discardText: () => {},
   },
 });
 const dungeon = game.ctx.dungeon;

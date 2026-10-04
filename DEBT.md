@@ -249,20 +249,19 @@ ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter 
 `STKOP` (`doc/CSBwin-src/Data.h:1721-1861`, the port's `StkOp`) has 138 values, and 136
 are operations: `Noop` (0) and `2Dup` (23) have no case in `EX_AMPERSAND`, whose default
 says "Illegal subcode" and does nothing (`doc/CSBwin-src/DSA.cpp:4979-4981`), as the
-port's trace does. The port has 91, so 45 are left. `tools/dump-dsa-census.ts` lists
+port's trace does. The port has 97, so 39 are left. `tools/dump-dsa-census.ts` lists
 them: it fails unless what the port lacks is exactly its `LEFT`, so each family's commit
 takes its operations off that list, and this part of the item is done when it is empty.
 
 Conflux, the dungeon that will check them, defines 131 DSAs, with 4646 programs, behind
 1591 type-47 actuators. A static census of its programs decodes each word with the
 operand layout `DsaSystem.execute` reads, and every program decodes to its exact length.
-It uses 118 `&` operations, 40 of the 45. With Conflux's count of each:
+It uses 118 `&` operations, 35 of the 39. With Conflux's count of each:
 
-- **Characters**: what is left of them is `CharNameFetch` 3, which writes the bank's
-  text strings (`DSADBANK::SetText`, `DSA.cpp:194`) and so comes with the text family;
-  `I_CharStore` 4 and `I_CausePoison` 6, with the `I_` operations; and `SwapCharacter` 7
-  and `I_SwapCharacter` 4, which need G3. The other thirteen are ported, checked by
-  `tools/dump-dsa-characters.ts`.
+- **Characters**: what is left of them is `I_CharStore` 4 and `I_CausePoison` 6, with the
+  `I_` operations, and `SwapCharacter` 7 and `I_SwapCharacter` 4, which need G3. The
+  other thirteen are ported, checked by `tools/dump-dsa-characters.ts`, and
+  `CharNameFetch` with the texts.
 - **Objects**: what is left of them is the `I_` forms of the missiles, spells and clouds,
   `I_Throw` 14, `I_Cast` 2 and `I_CreateCloud` 59, which go with the `I_` operations. The
   ten field operations, from `GetCharges` to `SetSubType`, are ported, checked by
@@ -273,8 +272,12 @@ It uses 118 `&` operations, 40 of the 45. With Conflux's count of each:
   `MonLandD`, `DelMon` and `InsMon` are ported, checked by `tools/dump-dsa-monsters.ts`.
   `MonLandD` acts only in the monster move filter, and `MonBlk` is read only from it:
   both wait on G2's `ESL_MONSTERMOVEFILTER` to matter.
-- **Text and sound**: `Message` 62, `Say` 121, `TextFetch` 7, `GlobalTextStore` 16,
-  `DiscardText` 1, `Sound` 308 (whose samples are G24's).
+- **Message and sound**: `Message` 62, which sets a `TT_ParameterMessage` timer and
+  keeps the DSA parameters for it in `EXPOOL` (`DSA.cpp:3045-3089`), read back where the
+  timer runs (`Timer.cpp:1399-1406`, `:1699-1707`, `:2178-2185`); and `Sound` 308, whose
+  samples past the 22 of `graphics.dat` are G24's (`PlayCustomSound`, `Sound.cpp:1039`).
+  The texts are ported: `Say`, `TextFetch`, `TextSay`, `GlobalTextStore`, `DiscardText`
+  and `CharNameFetch`, checked by `tools/dump-dsa-text.ts`.
 - **The dungeon and the program**: `I_Del` 42, `I_Add` 41, `I_Move` 17, `I_CellStore` 4,
   `I_Indirect` 1, `I_Delay` 22, `FetchExCellFlg` 2, `StoreExCellFlg` 1, `ThisCell` 11,
   `Neighbors` 4, `Loc2AbsCoord` 51, `PartyDistance` 5, `JumpGear` 8, `GosubGear` 8,
@@ -282,8 +285,8 @@ It uses 118 `&` operations, 40 of the 45. With Conflux's count of each:
   `DisableSaves` 2.
 - **The display**: `Overlay` 25 and `Palette` 5, which need G25.
 
-The five left that Conflux never calls: `I_Copy` (87), `TextSay` (104), `I_FilteredCast`
-(120), and `GetSkin` (131) and `SetSkin` (132), which need G27. No dungeon here checks
+The four left that Conflux never calls: `I_Copy` (87), `I_FilteredCast` (120), and
+`GetSkin` (131) and `SetSkin` (132), which need G27. No dungeon here checks
 these against play, so each is ported with a tool of its own.
 
 Every `I_` operation but two is CSBWin's `Indirect`: it packs the operation and its
@@ -297,8 +300,8 @@ census counts it as ported, and the `I_` family's commit gives it CSBWin's path.
 
 The steps: the census is done (`tools/dump-dsa-census.ts`, Conflux's counts by default,
 another `dungeon.dat` as its argument), and so are the characters, the objects and the
-monsters. Next, one family per commit, in the order above, the five with their nearest
-family: text and sound next. Every `I_` operation, of whichever family, comes with `I_Indirect` in a
+monsters, and the texts. Next, one family per commit, in the order above, the four with
+their nearest family: `Message` and `Sound` next. Every `I_` operation, of whichever family, comes with `I_Indirect` in a
 family of its own. A family's tool runs its programs through `tools/lib/dsa.ts`. Last, `DSA::Write` and the
 `EXPOOL` records, so that a game with DSAs can be saved (below). An operation is checked
 against Conflux in play once G26 makes it a data set.
@@ -953,14 +956,18 @@ Recorded so that nobody "fixes" them.
   encounter's tail calls `ProcessObjectFromMissile` on it again; the port's
   `processObjectFromMissile` finds no record and does nothing
   (`tools/dump-move-from-missile.ts`, section 3).
-- 🚫 **A champion index CSBWin does not bound reads nobody.** `&CHAR@`, `&TALENTS@` and
+- 🚫 **An index CSBWin does not bound reads nobody.** `&CHAR@`, `&TALENTS@` and
   `&TALENTS!` take an index of 0x20000 or more with bit 16 clear as `d.CH16482 + charIdx`
   (`doc/CSBwin-src/DSA.cpp:4196`, `:4274`, `:4325`), a record over 100 MB past `d`, and
   `&EXPERIENCE+` reads the HP of a negative one from the `d.` variables before the array,
   then hands it to `AddToSkill` (`:4552`). The port reads zeros, leaves the talents and
   adds nothing (`executeAmpersand`, `src/engine/DsaSystem.ts`). A slot from 0 to 3 that no
   champion fills is a different case, and is read as CSBWin reads it
-  (`PartyState.vacantCharacters`).
+  (`PartyState.vacantCharacters`). Two more reads past an array go the same way:
+  `DSADBANK::GetText` takes a text index past 9 once a text is set
+  (`doc/CSBwin-src/DSA.cpp:207-212`), and `PrintWithSubstitution`'s `@p` with no attack
+  menu open names `d.CH16482[-1]` (`Graphics.cpp:1567`); the port reads "" for both
+  (`DsaBank.getText`, `src/engine/PrintWithSubstitution.ts`).
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.

@@ -153,6 +153,7 @@ function arena(withLordChaos: boolean, strip: ScrollingText | null = null): Aren
       clockTick: (time) => sink.clockTick(time),
       printNextQueued: (time) => sink.printNextQueued(time),
       vblInterrupt: () => sink.vblInterrupt(),
+      discardText: () => sink.discardText(),
     },
     drawViewport: () => {
       a.views++;

@@ -90,6 +90,7 @@ function gameOn(data: DungeonData, graphics: GraphicsLoader): Game {
       clockTick: () => {},
       printNextQueued: () => {},
       vblInterrupt: () => {},
+      discardText: () => {},
     },
     openReincarnateScreen: (chIdx) => reincarnateScreen(chIdx),
     tag02076e: () => pairCalls.push(pairCall(game, 'TAG02076e')),

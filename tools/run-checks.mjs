@@ -101,6 +101,7 @@ const CHECKS = [
   { tool: 'dump-dsa-parameters.ts' },
   { tool: 'dump-dsa-missiles.ts' },
   { tool: 'dump-dsa-monsters.ts' },
+  { tool: 'dump-dsa-text.ts' },
   { tool: 'dump-db-reuse.ts' },
   { tool: 'watch-smart-discard.ts' },
   { tool: 'dump-make-more-room.ts' },

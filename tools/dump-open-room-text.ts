@@ -41,6 +41,7 @@ function scene(): Game {
       clockTick: () => {},
       printNextQueued: () => {},
       vblInterrupt: () => {},
+      discardText: () => {},
     },
   });
 }

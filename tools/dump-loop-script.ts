@@ -67,6 +67,7 @@ function watchedGame(): Watched {
     clockTick: () => { w.clockTicks++; },
     printNextQueued: () => { w.printed++; },
     vblInterrupt: () => { w.vbls++; },
+    discardText: () => {},
   };
   w.game = newGame(data, stockGraphics(), { messages, showCredits: (word11694) => w.credits.push(word11694) });
   w.game.setRandomSeed(0x12345678);

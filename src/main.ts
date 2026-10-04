@@ -305,6 +305,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // A weapon hand changed, or a chest left the open inventory's weapon hand:
         // the attack menu, the inventory and the open chest are the screen's.
         closeAttackMenuOf: (chIdx) => screen?.closeAttackMenuOf(chIdx),
+        attackingCharacterOrdinal: () => screen?.attackingCharacterOrdinal() ?? 0,
         showHideInventory: (chIdx) => screen?.showHideInventory(chIdx),
         repackChest: () => screen?.repackChest(),
         // `TAG02076e` / `TAG0207cc` from the engine: the Hall of Champions and `WakeUp`.

@@ -235,6 +235,11 @@ export class GameScreen {
     if (this.ui.attackingCharacterOrdinal === chIdx + 1) closeAttackMenu(this.ui);
   }
 
+  /** `d.AttackingCharacterOrdinal` — the host's `attackingCharacterOrdinal`. */
+  attackingCharacterOrdinal(): number {
+    return this.ui.attackingCharacterOrdinal;
+  }
+
   /** `ShowHideInventory` (`doc/CSBwin-src/CSBCode.cpp:7419`) — the host's `showHideInventory`. */
   showHideInventory(chIdx: number): void {
     handleInventoryToggle(this.ui, chIdx);

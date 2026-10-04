@@ -1033,6 +1033,7 @@ async function checkSaveCall(): Promise<void> {
     clockTick: () => {},
     printNextQueued: () => {},
     vblInterrupt: () => {},
+    discardText: () => {},
   };
   const toldSince = (from: number): string => told.slice(from).join('').replace(/\n/g, '/');
   const stage = async (fail: boolean, dataSet = DEFAULT_DATA_SET, shared?: ReturnType<typeof memoryStore>, name = 'DAROO') => {

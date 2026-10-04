@@ -61,6 +61,7 @@ const messages: MessageSink = {
   clockTick: () => {},
   printNextQueued: () => {},
   vblInterrupt: () => {},
+  discardText: () => {},
 };
 const game = newGame(data, graphics, { messages });
 game.setRandomSeed(0x12345678);

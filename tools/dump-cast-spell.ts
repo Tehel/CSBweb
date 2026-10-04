@@ -76,6 +76,7 @@ async function main(): Promise<void> {
       clockTick: () => {},
       printNextQueued: () => {},
       vblInterrupt: () => {},
+      discardText: () => {},
     },
   });
   game.ctx.party.state.position = new Position(2, 2, 0);
