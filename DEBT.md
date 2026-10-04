@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | Three DSA filters, and the viewing filter's third site | L | ⏳ step 9 of 12 next |
+| G2 | Three DSA filters, and the viewing filter's third site | L | ⏳ step 9a of 12 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -341,13 +341,32 @@ filter, the feeding filter, the character death and damage filters, the equip fi
 party move filter, the monster attack filter, and the delete monster filter, are paid. The
 steps left, one commit each:
 
-9. **`ESL_MONSTERMOVEFILTER`** (M). `MONSTERMOVEFILTERCACHE::GetLocation`
-   (`Monster.cpp:3077-3135`) tries the key with `(level + 1) << 8` first, then the
-   dungeon's; the record's bits 0-17 are the location, bit 18 `partyLevelOnly` and bits
-   19-23 `maxDistance`. `specialLocationsFromExpool` reads neither the level keys nor the
-   two fields. The DSA runs at `:3226` and `:3352`, with `monsterMoveFilterActive` set
-   (`DsaSystem.monsterMoveFilterActive`), without which `&MONL&D` does nothing; its
-   `&MONBLK` sets the directions the turn then refuses (`MonsterAI.monsterMoveInhibit`).
+9. **`ESL_MONSTERMOVEFILTER`** (L), three commits. The filter runs one DSA, the first
+   type-47 actuator at its location, twice a turn: before it, with timer function 0
+   (`Monster.cpp:3311-3357`), and at each of the turn's 35 `return`s, with function 1
+   (`ProcessPostMonsterMoveFilter`, `:3172-3233`), on one `MMRECORD`'s timer and
+   `DSAVARS` (`CSB.h:2884-2897`), and with `monsterMoveFilterActive` set
+   (`DsaSystem.monsterMoveFilterActive`), without which `&MONL&D` does nothing.
+   - **9a. The location and the pre-move filter** (M).
+     `MONSTERMOVEFILTERCACHE::GetLocation` (`:3077-3135`) tries the key with
+     `(level + 1) << 8` first, then the dungeon's; the record's bits 0-17 are the
+     location, bit 18 `partyLevelOnly` and bits 19-23 `maxDistance`.
+     `specialLocationsFromExpool` reads neither the level keys nor the two fields. The
+     pre-move filter's `&MONBLK` sets the directions the turn then refuses
+     (`MonsterAI.monsterMoveInhibit`).
+   - **9b. The post-move filter, with `finalLocr`** (M). Its nine parameters are where
+     the group ended, the group, the party, and the two words of flags. `finalLocr` is
+     set by `AddObjectToRoom` and `RemoveObjectFromRoom` when the object is the group
+     (`Code11f52.cpp:432-434`, `CSBCode.cpp:5185-5188`) and by `MoveObject`'s level
+     refusal (`Code11f52.cpp:3152-3155`), through the `MMRECORD` that `MoveObject`,
+     `DeleteMonster`, `DamageMonster(Group)`, `CreateCloud` and `CheckMoveFromMissile`
+     pass down; the port's `MonsterSystem.moveMonster`, `WorldMove.moveObject` and
+     `MonsterDamage` would take it. This commit sets the two flags those sites set,
+     `MoveObject_NotAllowedOnLevel` and `MonMove_differentCell`, and no other.
+   - **9c. The turn's flags** (M): the 53 `Setflg`s of `MONSTEREVENTS`
+     (`CSB.h:2815-2868`) that `ProcessTimers29to41` and its helpers make, from
+     `MDF6TI_turnMonsterTowardParty` (`Monster.cpp:1499`) on. The port's helpers take
+     the `AiFrame`, which can carry the record.
 10. **`ESL_CURSORFILTER`** (L, split when taken). `CursorFilter` (`MoveObject.cpp:797`,
     the DSA at `:846`), which may cancel what is about to happen to the object on the
     cursor. CSBWin sends it a packet from 21 places. The port sends six of the packet
