@@ -283,6 +283,7 @@ const ESL_ACTION_NAME_FILTER = 10;
 const ESL_FEEDING_FILTER = 1;
 const ESL_CHAR_DEATH_FILTER = 11;
 const ESL_DAMAGE_CHAR_FILTER = 15;
+const ESL_EQUIP_FILTER = 12;
 const ESL_INDIRECT_ACTIONS = 5;
 const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
 
@@ -704,9 +705,11 @@ export class DsaSystem {
    * with a `NEWDSAPARAMETERS` calls this inside `newDsaParameters`. `each` sets a DSA's
    * parameters, calls `run`, and reads back what it needs. False when none ran. A site
    * that `break`s once its DSA has run (`KillCharacter`'s, `Character.cpp:2586`) passes
-   * `firstOnly`, and only the first runs.
+   * `firstOnly`, and only the first runs. Each DSA has its `DSAVARS` (`Sound.cpp:721`),
+   * which every `run` of it shares: `SetPossession` calls one DSA twice, the second time
+   * with timer function 0 after the first's 1 (`Character.cpp:2975-2986`).
    */
-  private forEachFilterDsa(esl: number, each: (run: () => void) => void, firstOnly = false): boolean {
+  private forEachFilterDsa(esl: number, each: (run: (timerFunction?: number) => void) => void, firstOnly = false): boolean {
     const special = this.dungeon.getSpecialLocation((EDT_SPECIAL_LOCATIONS << 24) | esl);
     if (special === null) return false;
     const locrFilter = locationRelFromInteger(special);
@@ -719,7 +722,11 @@ export class DsaSystem {
       const rec = this.dungeon.getActuatorRecord(rn);
       if (!rec || getActuatorType(rec) !== 47) continue;
       found = true;
-      each(() => this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars()));
+      const vars = new DsaVars();
+      each((timerFunction = 0) => {
+        timer.uByte9 = timerFunction;
+        this.processTimer6Internal(rn, timer, filterPos, true, vars);
+      });
       if (firstOnly) break;
     }
     return found;
@@ -790,6 +797,29 @@ export class DsaSystem {
     this.newDsaParameters(() => this.forEachFilterDsa(ESL_CHAR_DEATH_FILTER, (run) => {
       this.setParameters(1, [chIdx]);
       run();
+    }, true));
+  }
+
+  /**
+   * The equip filter (`doc/CSBwin-src/Character.cpp:2917-2998`), which
+   * `CHARDESC::SetPossession` runs before it writes slot `slot` of champion `chIdx`: the
+   * first DSA at `ESL_EQUIPFILTER`'s location, on parameters of its own, a count of 4 and
+   * the champion's index, the slot, an object and 0, set once (`:2968-2971`). It runs
+   * twice on the same variables and parameters, only the object (`pDSAparameters[3]`) set
+   * again: with timer function 1 for `leaving`, what the slot holds, and with 0 for
+   * `arriving`, each when it is not `RNnul` (`:2975-2986`). Nothing comes back.
+   */
+  equipFilter(chIdx: number, slot: number, leaving: ObjectID, arriving: ObjectID): void {
+    this.newDsaParameters(() => this.forEachFilterDsa(ESL_EQUIP_FILTER, (run) => {
+      this.setParameters(4, [chIdx, slot, 0, 0]);
+      if (leaving !== OBJECT_ID_NULL) {
+        this.parameters[3] = leaving;
+        run(1);
+      }
+      if (arriving !== OBJECT_ID_NULL) {
+        this.parameters[3] = arriving;
+        run(0);
+      }
     }, true));
   }
 

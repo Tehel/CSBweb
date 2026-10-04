@@ -46,12 +46,15 @@ export function freshGame(file: Uint8Array = save, host?: Partial<GameHost>): Ga
   return game;
 }
 
+/** A test DSA's programs: one, its column 0, or one per column, from 0. */
+export type FilterDsa = number[] | { columns: number[][] };
+
 /**
  * A game on `csbgame7.dat` whose filter at special location `esl` (`doc/CSBwin-src/CSB.h:1535-1550`)
  * is the first empty open square of the party's level, holding one type-47 actuator per
- * program, in order, each the one program of a DSA of its own. The globals are `UNSET`.
+ * DSA, in order, each with the programs of a DSA of its own. The globals are `UNSET`.
  */
-export function withFilterDsas(esl: number, programs: number[][], host?: Partial<GameHost>): Game {
+export function withFilterDsas(esl: number, programs: FilterDsa[], host?: Partial<GameHost>): Game {
   const game = freshGame(save, host);
   const dungeon = game.ctx.dungeon;
   const z = game.ctx.party.state.position.z;
@@ -69,7 +72,10 @@ export function withFilterDsas(esl: number, programs: number[][], host?: Partial
   const data: DungeonData = dungeon.getData();
   const entries: DsaDefinition[] = programs.map((program, i) => ({
     description: `test ${i}`, state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,
-    states: [{ actions: [{ column: 0, program: Uint16Array.from(program) }] }],
+    states: [{
+      actions: (Array.isArray(program) ? [program] : program.columns)
+        .map((words, column) => ({ column, program: Uint16Array.from(words) })),
+    }],
   }));
   programs.forEach((_, i) => {
     data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47 | (i << 7), word4: 0, word6: 0 });

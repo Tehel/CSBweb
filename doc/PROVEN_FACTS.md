@@ -3613,6 +3613,24 @@ the wound mask, the kind (`P4`) and 0 (`:2876-2883`). Its word 3 comes back into
 before it (`:2814-2817`) never fires: every path to it has returned on a damage of 0 or
 less. `tools/dump-char-damage-filter.ts`.
 
+## The equip filter runs its location's first DSA twice, on one set of variables
+
+`CHARDESC::SetPossession(index, newObject, true)` walks the chain at `ESL_EQUIPFILTER`'s
+location (12, `doc/CSBwin-src/CSB.h:1547`) and `break`s once the first type-47 actuator has
+run (`doc/CSBwin-src/Character.cpp:2989`), before it writes the slot (`:2996`). It runs on
+parameters of its own (`:2937`), a count of 4, the champion's index, the slot, an object and
+0, set once (`:2968-2971`), and calls the DSA up to twice with the same `DSAVARS`
+(`:2957`): with timer function 1 and the object the slot holds, if any (`:2975-2980`),
+then with timer function 0 and the object arriving, if any (`:2981-2986`). Only the object
+is set again, so the second call sees the other parameters as the first left them. The
+timer function picks the program's column, 1 or 0, through `timerTypeModifier`
+(`doc/CSBwin-src/DSA.cpp:5383`). `RemoveCharacterPossession` and `AddCharacterPossession`
+call it with `true` (`Character.cpp:1850`, `:1962`), so a removal runs the leaving half
+alone and an addition, to a slot its caller found empty, the arriving half. A chest slot
+(30 and up) is written without it (`:1840`, `:1948`), and so is the throw's temporary
+swap of the weapon hand, with `false` (`doc/CSBwin-src/Mouse.cpp:699`, `:706`). Nothing is
+read back. `tools/dump-equip-filter.ts`.
+
 ## The `QueueSound` calls, and the level each is on
 
 | Sound | CSBWin's call | Ordinal → SND item | Level |

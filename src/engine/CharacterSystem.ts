@@ -55,7 +55,7 @@ export class CharacterSystem {
     const champion = this.ctx.party.state.champions[chIdx];
     if (!champion) return OBJECT_ID_NULL;
     const objRemoved = getChampionPossession(champion, slot);
-    this.setPossessionDirect(champion, slot, OBJECT_ID_NULL);
+    this.setPossession(chIdx, slot, OBJECT_ID_NULL);
     if (objRemoved === OBJECT_ID_NULL) return OBJECT_ID_NULL;
     const objNID5 = nameIndexOf(this.ctx, objRemoved);
     this.adjustStatsForItemCarried(champion, slot, -1, objRemoved);
@@ -104,7 +104,7 @@ export class CharacterSystem {
     if (object === OBJECT_ID_NULL) return;
     const champion = this.ctx.party.state.champions[chIdx];
     if (!champion) return;
-    this.setPossessionDirect(champion, place, object);
+    this.setPossession(chIdx, place, object);
     const objNID4 = nameIndexOf(this.ctx, object);
     this.adjustStatsForItemCarried(champion, place, 1, object);
     if (place < 2) {
@@ -158,8 +158,20 @@ export class CharacterSystem {
   }
 
   /**
-   * `CHARDESC::SetPossession`, the bare slot write: CSBWin's temporary hand swap, where
-   * the object is put back at once, and the pair above.
+   * `CHARDESC::SetPossession(index, newObject, true)` (`doc/CSBwin-src/Character.cpp:2917-2998`),
+   * the pair's slot write: the equip filter's DSA sees the object leaving and the one
+   * arriving, then the slot is written.
+   */
+  private setPossession(chIdx: number, slot: number, value: ObjectID): void {
+    const champion = this.ctx.party.state.champions[chIdx];
+    if (!champion) return;
+    this.ctx.systems.dsa.equipFilter(chIdx, slot, getChampionPossession(champion, slot), value);
+    this.setPossessionDirect(champion, slot, value);
+  }
+
+  /**
+   * `CHARDESC::SetPossession(…, false)`, the bare slot write, with no filter: CSBWin's
+   * temporary hand swap, where the object is put back at once (`doc/CSBwin-src/Mouse.cpp:699-706`).
    */
   setPossessionDirect(champion: Champion, slot: number, value: ObjectID): void {
     if (slot >= 0 && slot < champion.possessions.length) champion.possessions[slot] = value;
