@@ -29,7 +29,7 @@ import type {
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, rnEquals } from '../core/types';
 import type { TextRecord } from '../data/dungeonTypes';
 import type { TextDecodeTables } from '../data/tables/ObjectTables';
-import { DecodeText } from '../data/DecodeText';
+import { DecodeText, SubstituteCharacterNames, type TextSubstitution } from '../data/DecodeText';
 import { Expool } from '../data/CsbwinExpool';
 import { DungeonLoader } from '../data/DungeonLoader';
 import type { DungeonSnapshot } from './DungeonSnapshot';
@@ -76,6 +76,11 @@ export class DungeonState {
      * (`engine/MakeMoreRoomInDB`). Without it a full database refuses the record.
      */
     makeMoreRoomInDB: ((db: DBType) => ObjectID) | null = null;
+    /**
+     * What `DecodeText`'s `SubstituteCharacterNames` reads of the game, which `Game`
+     * supplies. Without it a text is decoded as it stands.
+     */
+    textSubstitution: TextSubstitution | null = null;
     private timerWord8Lookup?: (index: number) => ui16 | null;
 
     constructor(data: DungeonData) {
@@ -923,7 +928,20 @@ export class DungeonState {
     }
 
     decodeTextBytes(record: TextRecord, typeOfText: number, max: number, tables: TextDecodeTables): Uint8Array | null {
-        return DecodeText(this.data, record, typeOfText, max, tables);
+        return this.decodeText(record, typeOfText, max, tables)?.text ?? null;
+    }
+
+    /**
+     * `DecodeText` (`doc/CSBwin-src/CSBCode.cpp:5487-5668`) with its substitution: `ok` is
+     * false where CSBWin returns -1, a name or text to substitute that is not there.
+     */
+    decodeText(
+        record: TextRecord, typeOfText: number, max: number, tables: TextDecodeTables,
+    ): { text: Uint8Array; ok: boolean } | null {
+        const text = DecodeText(this.data, record, typeOfText, max, tables);
+        if (!text) return null;
+        if (!this.textSubstitution) return { text, ok: true };
+        return SubstituteCharacterNames(text, max, typeOfText === 0, this.textSubstitution);
     }
 
     decodeTextString(record: TextRecord, typeOfText: number, tables: TextDecodeTables, max = 990): string | null {
@@ -934,8 +952,13 @@ export class DungeonState {
             : this.textBytesToString(bytes);
     }
 
+    /**
+     * The text a party arriving on its square reads, or null when it is hidden or
+     * `DecodeText` returns -1 (`doc/CSBwin-src/Code11f52.cpp:3960-3964`).
+     */
     decodeMessageText(record: TextRecord, tables: TextDecodeTables): string | null {
-        return this.decodeTextString(record, 1, tables);
+        const decoded = this.decodeText(record, 1, 990, tables);
+        return decoded?.ok ? this.textBytesToString(decoded.text) : null;
     }
 
     decodeScrollText(scroll: ScrollRecord, tables: TextDecodeTables): string | null {

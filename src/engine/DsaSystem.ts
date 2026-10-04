@@ -891,6 +891,11 @@ export class DsaSystem {
     return Array.from(this.globalVariables);
   }
 
+  /** `globalVariables[index]`, or null at or past `numGlobalVariables` (`SubstituteGlobalVariable`). */
+  getGlobalVariable(index: number): number | null {
+    return index >= 0 && index < this.globalVariables.length ? this.globalVariables[index]! : null;
+  }
+
   setGlobalVariables(values: readonly number[]): void {
     this.globalVariables.fill(0);
     const count = Math.min(values.length, this.globalVariables.length);

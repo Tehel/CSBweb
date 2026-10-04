@@ -256,6 +256,23 @@ level 0 at (9, 1), and three of its pieces are escapes: "IT IS TOO BAD YOU DID N
 THE TRUE SECRET OF THE FIRESTAFF. NOW THAT I HAVE IT I HAVE NO FURTHER NEED FOR YOU!"
 (`tools/dump-room-text.ts`).
 
+Every `DecodeText` ends in `SubstituteCharacterNames` (`CSBCode.cpp:5664-5667`,
+`:5367-5482`), which replaces three escapes written in the text's own letters: `.Q.A` is
+the champion holding the cursor (`d.HandChar`), `.Q.B` to `.Q.E` the first to fourth
+champion, and `.Q.F` to `.Q.K` print nothing; `.R.` and four hex digits is a global text,
+the `EXPOOL` record `(EDT_GlobalText << 24) | index` (`EDT_GlobalText` is 10,
+`CSB.h:1573`) read byte by byte in memory order up to its zero (`SubstituteGlobalText`,
+`:5309-5333`); `.N.` and two digits is a global variable in decimal
+(`SubstituteGlobalVariable`, `:5335-5352`). A digit is a letter from `A` (0) to `P` (15).
+A wall text, in codes, is looked at only when it holds a `.Q.` (`bcdstrstr`,
+`:5354-5365`), and then all three are replaced. A substitution that fails, a champion
+past `d.NumCharacter`, nobody holding the cursor, a missing record or a variable past
+`numGlobalVariables`, stops the copy there: the text ends at that point, and
+`DecodeText` returns -1. Only the text the party finds on a square checks for -1, and
+then queues nothing (`Code11f52.cpp:3960`). Conflux 3.5 names a companion `.R.AAHL`,
+global text 123, in 224 decodings of its texts; `dm-atari` has none of the three
+(`tools/dump-text-substitution.ts`).
+
 ### Bytecode Example (Viewport.cpp line 979)
 ```cpp
 ui16 StdDrawF3Stone[] = {

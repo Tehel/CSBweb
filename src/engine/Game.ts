@@ -37,6 +37,7 @@ import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem } from './DsaSystem';
 import { Position } from '../core/types';
+import { EDT_GLOBAL_TEXT } from '../data/DecodeText';
 import { VBL_FREQUENCY } from '../core/constants';
 
 import { CharacterStats } from './CharacterStats';
@@ -158,6 +159,12 @@ export class Game implements MainLoop {
         CheckMonsters(ctx.dungeon, tables.monsterDesc, (line) => ctx.host.trace(line));
         this.ctx = ctx;
         ctx.dungeon.makeMoreRoomInDB = (db) => makeMoreRoomInDB(ctx, db);
+        ctx.dungeon.textSubstitution = {
+            handChar: () => ctx.party.state.cursorOwner ?? -1,
+            characterName: (index) => ctx.party.state.champions[index]?.name ?? null,
+            globalText: (index) => ctx.dungeon.locateExpoolRecord(((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0),
+            globalVariable: (index) => ctx.systems.dsa.getGlobalVariable(index),
+        };
         Object.assign(ctx.systems, {
             actuators: new ActuatorSystem(ctx),
             dsa: new DsaSystem(ctx),
