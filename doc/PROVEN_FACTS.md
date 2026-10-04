@@ -5518,7 +5518,8 @@ wounded one, a sleeping party, and both.
 
 `timerTypeModifier[3]` (`doc/CSBwin-src/CSBCode.cpp:21`) is the action SET, CLEAR and
 TOGGLE stand for. `ProcessTimers` sets it to 0, 1, 2 before every timer (`:6412-6414`); a
-DSA's `&MODIFYMESSAGE` (`DSA.cpp:4931-4947`) changes it for the rest of that timer only.
+DSA's `&MODIFYMESSAGE` (`DSA.cpp:4931-4947`) changes it for the rest of that timer only,
+each of its three actions popped `unsigned int` and capped at 3, so a 5 or a -1 is 3.
 Each site reads `timerTypeModifier[pTimer->timerUByte9()]` when it needs it, not once:
 
 - `ProcessTT_OPENROOM` and `ProcessTT_STONEROOM` test it for 3 at each object of the square

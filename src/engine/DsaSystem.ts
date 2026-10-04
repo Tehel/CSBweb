@@ -2123,9 +2123,10 @@ export class DsaSystem {
         break;
       }
       case StkOp.MODIFY_MESSAGE: {
-        const s = bank.stack.pop() & 0x3;
-        const c = bank.stack.pop() & 0x3;
-        const t = bank.stack.pop() & 0x3;
+        // Popped `unsigned int` and capped at 3, no action (`doc/CSBwin-src/DSA.cpp:4935-4943`).
+        const s = Math.min(bank.stack.pop() >>> 0, 3);
+        const c = Math.min(bank.stack.pop() >>> 0, 3);
+        const t = Math.min(bank.stack.pop() >>> 0, 3);
         const modifier = this.ctx.systems.timer.timerTypeModifier;
         modifier[0] = s;
         modifier[1] = c;

@@ -9,7 +9,7 @@
  * 2. **A room timer reads it afresh at each object** (`ProcessTT_OPENROOM`,
  *    `doc/CSBwin-src/Timer.cpp:1712`, `OperateCounterActuator`, `:1609`, `:1624`): a counter
  *    after the DSA on the square counts the way the DSA made the message mean, and a 3
- *    ends the square.
+ *    ends the square. `&MODIFYMESSAGE` caps an action at 3, unsigned (`DSA.cpp:4935-4943`).
  * 3. **A pit reads it after the square's DSAs** (`ProcessTT_PITROOM`, `:2526-2550`): a SET
  *    the DSA makes a TOGGLE closes an open pit.
  * 4. **So does a teleporter, twice** (`ProcessTT_TELEPORTER`, `:2390-2414`): its TOGGLE
@@ -64,7 +64,12 @@ const flags = (game: Game, at: Position): number => game.ctx.dungeon.getMap(at.z
 }
 
 /* ----------------------------- 2. a counter after the DSA -------------------------- */
-for (const [set, expected, what] of [[1, 4, 'CLEAR: counted down'], [3, 5, '3: the square ends at it']] as const) {
+for (const [set, expected, what] of [
+  [1, 4, 'CLEAR: counted down'],
+  [3, 5, '3: the square ends at it'],
+  [5, 5, '5, capped at 3: the square ends at it'],
+  [-1, 5, '-1, unsigned and capped at 3: the square ends at it'],
+] as const) {
   const { game, at } = run(modify(set, 1, 2));
   const data = game.ctx.dungeon.getData();
   const counter = { nextObject: OBJECT_ID_EOF, word2: 48, word4: 0, word6: 0 };

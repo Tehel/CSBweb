@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C127 | `&MODIFYMESSAGE` masks its actions to two bits instead of capping them at 3 | S | ⏳ |
 | C128 | A door timer tests its square before the square's DSAs run, and tests its room type | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
@@ -172,14 +171,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C127 ⏳ `&MODIFYMESSAGE` masks its actions to two bits instead of capping them at 3
-
-`STKOP_ModifyMessage` pops its three actions as `unsigned int` and caps each at 3
-(`doc/CSBwin-src/DSA.cpp:4935-4943`): a 5 or a -1 is 3, no action. The port's
-`MODIFY_MESSAGE` (`src/engine/DsaSystem.ts`) takes `& 0x3`, so a 5 is CLEAR and a 4 is SET;
-only a -1 comes out 3, by the mask. Paying it: the unsigned cap, with a case in
-`tools/dump-timer-modifier.ts`.
 
 ### C128 ⏳ A door timer tests its square before the square's DSAs run, and tests its room type
 
