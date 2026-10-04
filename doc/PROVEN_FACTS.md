@@ -4350,6 +4350,22 @@ location's, `RemoveObjectFromRoom`d first (`:2041-2061`). Any other word leaves 
 only when `checkIndirectIndex` takes the slot it popped first (`DSA.cpp:2831-2837`), so an
 invalid slot leaves them on the stack. Evidence: `tools/dump-dsa-missiles.ts`.
 
+## `&INSMON` rebuilds the facing byte from the record, and copies no status
+
+`InsertMonsterInGroup` (`doc/CSBwin-src/Monster.cpp:4742-4820`), the DSA's `&INSMON`, takes
+`pMonster->facing()`, `word14` bits 8-9, sets the new member's two bits to it with
+`SetMonsterFacingBits`, and writes that byte with `SetMonsterFacingByte` (`:4786-4788`). On
+the party's level the byte is the `ITEM16`'s, so member 0 and the new member face the
+record's direction, which is stale there, and every other member faces north (0). Its
+"fifth" step copies member 0's `singleMonsterStatus` only through `pItem16`, which is
+declared `NULL` and never assigned (`:4747`, `:4815-4818`): the new member keeps the status
+its slot held. Three more of the monster family's edges: `&MONPOSS` of a slot that is no
+group pushes 0xffff, because its `object` is a default `RN`, `RNnul`, which is not `RNeof`
+(`DSA.cpp:3364`, `:3385`, `CSBTypes.h:300`, `:371`); `&MONSTER!`'s `num` is a `ui32`, so
+`i < num - 2` lets a `num` of 0 or 1 write all four hit points (`DSA.cpp:4101`); and
+`&MONL&D` returns before its pop outside the monster move filter (`:4775`), leaving its
+index on the stack. Evidence: `tools/dump-dsa-monsters.ts`.
+
 ## A missile at a door: Zo works the button, grates let small things through, the rest hit it
 
 The door arm of `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1844-1935`), in order:

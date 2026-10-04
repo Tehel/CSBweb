@@ -166,6 +166,14 @@ export class MonsterAI {
     this.timers = ctx.timers;
   }
 
+  /**
+   * `monsterMoveInhibit[4]` (`doc/CSBwin-src/data.cpp:96`), north, east, south and west,
+   * which `&MONBLK` sets and each group's turn clears before its move filter.
+   */
+  get monsterMoveInhibit(): Uint8Array {
+    return this.scratch.monsterMoveInhibit;
+  }
+
   /** `d.PrimaryDirectionToParty`, for `MonsterAttacks`. */
   get primaryDirectionToParty(): number {
     return this.scratch.primaryDirectionToParty;

@@ -5,7 +5,9 @@
  * needs: `DeleteMonster` (:1026), `DropMonsterRemains` (:830),
  * `CreateAndDropObject` (:684), and the four packed-byte accessors
  * `MonsterPositionByte` / `SetMonsterPositionByte` / `MonsterFacingByte` /
- * `SetMonsterFacingByte` (:176-248).
+ * `SetMonsterFacingByte` (:176-248). Beside them, `DeleteMonsterInGroup` and
+ * `InsertMonsterInGroup` (`Monster.cpp:4600`, `:4742`), the DSA's `&DELMON` and
+ * `&INSMON`, which take a member out of a group and put one in.
  *
  * This sits underneath almost everything else about monsters. Four callers want it:
  * the missile system, the monster AI
@@ -18,14 +20,14 @@
  * status bytes **and the pending AI timers** all have to be renumbered together. Get
  * the timer renumbering wrong and a surviving monster inherits a dead one's turn.
  */
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type LocationRel, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord } from '../data/dungeonTypes';
 import { ITEM16_FREE } from '../data/dungeonTypes';
 import { RN_MONSTER_DEATH } from '../core/spellRn';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
-import { TimerFunction, type TimerQueue } from './TimerQueue';
+import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import { setPackedBits } from './MonsterSystem';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
@@ -536,8 +538,8 @@ export class MonsterDamage {
     noItem16: boolean,
     dropResidue: boolean,
   ): MonsterDamageResult {
-    let facings = this.monsterFacingByte(monster, level, noItem16);
-    let positions = this.monsterPositionByte(monster, level, noItem16);
+    const facings = this.monsterFacingByte(monster, level, noItem16);
+    const positions = this.monsterPositionByte(monster, level, noItem16);
 
     if (monsterLeavesDroppings(desc) && !monster.drawAsSize4) {
       if (apply) {
@@ -551,11 +553,34 @@ export class MonsterDamage {
       }
     }
 
+    this.removeFromGroup(monster, desc, indexInGroup, level, attackX, attackY, numMonM1, facings, positions, noItem16);
+
+    return MonsterDamageResult.SOME_NOT_ALL_MONSTERS_DIED;
+  }
+
+  /**
+   * What a member's leaving does to its group, written twice in CSBWin: by
+   * `DamageMonster` for a death (`doc/CSBwin-src/Code11f52.cpp:1141-1239`) and by
+   * `DeleteMonsterInGroup` (`Monster.cpp:4641-4738`). `facings` and `positions` are the
+   * packed bytes as read before it.
+   */
+  private removeFromGroup(
+    monster: CreatureRecord,
+    desc: MonsterDesc,
+    indexInGroup: number,
+    level: number,
+    mapX: number,
+    mapY: number,
+    numMonM1: number,
+    facings: number,
+    positions: number,
+    noItem16: boolean,
+  ): void {
     const onPartyLevel = level === this.ctx.party.state.position.z;
     const item16 = onPartyLevel ? this.dungeon.getAttachedItem16(monster) : null;
 
     if (monster.fear === StateOfFear.StateOfFear6) {
-      this.renumberIndividualTimers(indexInGroup, level, attackX, attackY);
+      this.renumberIndividualTimers(indexInGroup, level, mapX, mapY);
       if (onPartyLevel && item16) {
         // A survivor may take fright. Bravery 15 never does; otherwise the check is
         // against a rising bar as the group thins out.
@@ -583,8 +608,6 @@ export class MonsterDamage {
     this.setMonsterPositionByte(monster, positions & 0x3f, level, noItem16);
     this.setMonsterFacingByte(monster, facings, level, noItem16);
     monster.numMonM1 = (numMonM1 - 1) & 0x3;
-
-    return MonsterDamageResult.SOME_NOT_ALL_MONSTERS_DIED;
   }
 
   /**
@@ -616,6 +639,84 @@ export class MonsterDamage {
         this.timers.reprioritizeTimer(timer.index);
       }
     }
+  }
+
+  /**
+   * `DeleteMonsterInGroup` (`doc/CSBwin-src/Monster.cpp:4600-4739`), the DSA's `&DELMON`:
+   * member `indexInGroup` of the group at `locr` leaves it as a death would, but with no
+   * remains, no cloud and no delete filter. A group of one, or an index past its last
+   * member, is left as it is.
+   */
+  deleteMonsterInGroup(locr: LocationRel, indexInGroup: number): void {
+    const objMon = this.dungeon.findFirstMonster(new Position(locr.x, locr.y, locr.l));
+    if (objMon === OBJECT_ID_EOF) return;
+    const monster = this.dungeon.getCreatureRecord(objMon);
+    const desc = monster ? this.getDesc(monster) : null;
+    if (!monster || !desc) return;
+    const numMonM1 = monster.numMonM1 & 0x3;
+    if (numMonM1 === 0) return; // "Only one monster there!"
+    if (numMonM1 < indexInGroup) return;
+    this.trace(`      Delete Individual monster in group. Index=${indexInGroup} lodation=${locr.l}(${locr.x},${locr.y})`);
+    const positions = this.monsterPositionByte(monster, locr.l, false);
+    const facings = this.monsterFacingByte(monster, locr.l, false);
+    this.removeFromGroup(monster, desc, indexInGroup, locr.l, locr.x, locr.y, numMonM1, facings, positions, false);
+  }
+
+  /**
+   * `InsertMonsterInGroup` (`doc/CSBwin-src/Monster.cpp:4742-4820`), the DSA's `&INSMON`:
+   * a copy of member 0 joins the group at `locr`, in the first corner of `positionMask`
+   * that no member holds, if the group has room. It takes member 0's hit points, a copy of
+   * its `TT_MONSTER_A0` or `TT_MONSTER_B0` timer, the first the walk meets, renumbered to
+   * the new member, and the record's own `facing()`, which `SetMonsterFacingByte` then
+   * writes as the whole facing byte: on the party's level every other member faces north.
+   * The `ITEM16` status is not copied: `pItem16` is never set (`:4815-4818`), so the new
+   * member keeps the status its slot held.
+   */
+  insertMonsterInGroup(locr: LocationRel, positionMask: number): void {
+    const objMon = this.dungeon.findFirstMonster(new Position(locr.x, locr.y, locr.l));
+    if (objMon === OBJECT_ID_EOF) return;
+    const monster = this.dungeon.getCreatureRecord(objMon);
+    const desc = monster ? this.getDesc(monster) : null;
+    if (!monster || !desc) return;
+    let maxNumMon: number;
+    const monsterSize = monsterHorizontalSize(desc);
+    if (monsterSize === 0) {
+      maxNumMon = 4; // 0, 1, 2 and 3 allowed
+      positionMask &= 0x0f;
+    } else if (monsterSize === 1) {
+      maxNumMon = 2; // only 0 and 2 allowed
+      positionMask &= 0x05;
+    } else {
+      return; // no room
+    }
+    const numMonM1 = monster.numMonM1 & 0x3;
+    if (numMonM1 + 1 >= maxNumMon) return;
+    let positions = this.monsterPositionByte(monster, locr.l, false);
+    // Clear the corners members already hold, then take the first left.
+    for (let i = 0; i <= numMonM1; i++) positionMask &= ~(1 << ((positions >> (2 * i)) & 0x3));
+    let newpos = 0;
+    for (; newpos < 4; newpos++, positionMask >>= 1) {
+      if ((positionMask & 1) !== 0) break;
+    }
+    if (newpos === 4) return;
+    positions = setPackedBits(positions, numMonM1 + 1, newpos);
+    this.setMonsterPositionByte(monster, positions, locr.l, false);
+    let facings = monster.facing & 0x3;
+    facings = setPackedBits(facings, numMonM1 + 1, facings & 0x3);
+    this.setMonsterFacingByte(monster, facings, locr.l, false);
+    for (const timer of this.timers.searchOrder()) {
+      if (timer.level !== (locr.l & 0xff)) continue;
+      if (timer.uByte6 !== (locr.x & 0xff)) continue;
+      if (timer.uByte7 !== (locr.y & 0xff)) continue;
+      const tt = timer.function;
+      if (tt !== TimerFunction.TT_MONSTER_A0 && tt !== TimerFunction.TT_MONSTER_B0) continue;
+      const copy: TimerEntry = { ...timer, function: tt + numMonM1 + 1 };
+      this.timers.reprioritizeTimer(timer.index); // "Why do this? We changed nothing."
+      this.timers.addTimer(copy);
+      break;
+    }
+    monster.hp[numMonM1 + 1] = monster.hp[0] ?? 0;
+    monster.numMonM1 = (numMonM1 + 1) & 0x3;
   }
 
   /**

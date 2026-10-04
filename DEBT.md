@@ -105,7 +105,7 @@ In payoff order: the first row is the next item.
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
 | F13 | `npm test` runs its tools one at a time | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
-| G14 | `AsciiDump`: the resumed game's "ASCII DUMP" | — | ⏸️ |
+| G29 | Recording a game and playing it back | — | ⏸️ |
 | G20 | The hint oracle | — | ⏸️ |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
@@ -116,7 +116,7 @@ In payoff order: the first row is the next item.
 | X6 | Extra: the Hint Oracle's hints in the game, as the party moves | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G14 are the active list. `F3` is a phase, whose status is
+The rows above G29 are the active list. `F3` is a phase, whose status is
 `PLAN.md`'s. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
@@ -126,7 +126,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C122 · D17 · E21 · F14 · G29 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C122 · D17 · E21 · F14 · G30 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -248,14 +248,14 @@ ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter 
 `STKOP` (`doc/CSBwin-src/Data.h:1721-1861`, the port's `StkOp`) has 138 values, and 136
 are operations: `Noop` (0) and `2Dup` (23) have no case in `EX_AMPERSAND`, whose default
 says "Illegal subcode" and does nothing (`doc/CSBwin-src/DSA.cpp:4979-4981`), as the
-port's trace does. The port has 84, so 52 are left. `tools/dump-dsa-census.ts` lists
+port's trace does. The port has 91, so 45 are left. `tools/dump-dsa-census.ts` lists
 them: it fails unless what the port lacks is exactly its `LEFT`, so each family's commit
 takes its operations off that list, and this part of the item is done when it is empty.
 
 Conflux, the dungeon that will check them, defines 131 DSAs, with 4646 programs, behind
 1591 type-47 actuators. A static census of its programs decodes each word with the
 operand layout `DsaSystem.execute` reads, and every program decodes to its exact length.
-It uses 118 `&` operations, 45 of the 52. With Conflux's count of each:
+It uses 118 `&` operations, 40 of the 45. With Conflux's count of each:
 
 - **Characters**: what is left of them is `CharNameFetch` 3, which writes the bank's
   text strings (`DSADBANK::SetText`, `DSA.cpp:194`) and so comes with the text family;
@@ -267,8 +267,11 @@ It uses 118 `&` operations, 45 of the 52. With Conflux's count of each:
   ten field operations, from `GetCharges` to `SetSubType`, are ported, checked by
   `tools/dump-dsa-objects.ts`; so are `Throw`, `Cast`, `FilteredCast`, `CreateCloud`,
   `MissileInfoFetch` and `MissileInfoStore`, checked by `tools/dump-dsa-missiles.ts`.
-- **Monsters**: `MonsterFetch` 27, `MonsterStore` 12, `I_MonsterStore` 6, `MonPoss` 3,
-  `MonBlk` 1, `MonLandD` 1, `I_DelMon` 2, `I_InsMon` 2.
+- **Monsters**: what is left of them is `I_MonsterStore` 6, `I_DelMon` 2 and `I_InsMon` 2,
+  which go with the `I_` operations. `MonsterFetch`, `MonsterStore`, `MonPoss`, `MonBlk`,
+  `MonLandD`, `DelMon` and `InsMon` are ported, checked by `tools/dump-dsa-monsters.ts`.
+  `MonLandD` acts only in the monster move filter, and `MonBlk` is read only from it:
+  both wait on G2's `ESL_MONSTERMOVEFILTER` to matter.
 - **Text and sound**: `Message` 62, `Say` 121, `TextFetch` 7, `GlobalTextStore` 16,
   `DiscardText` 1, `Sound` 308 (whose samples are G24's).
 - **The dungeon and the program**: `I_Del` 42, `I_Add` 41, `I_Move` 17, `I_CellStore` 4,
@@ -278,10 +281,9 @@ It uses 118 `&` operations, 45 of the 52. With Conflux's count of each:
   `DisableSaves` 2.
 - **The display**: `Overlay` 25 and `Palette` 5, which need G25.
 
-The seven Conflux never calls: `I_Copy` (87), `DelMon` (95), `InsMon` (96), `TextSay`
-(104), `I_FilteredCast` (120), and `GetSkin` (131) and `SetSkin` (132), which need
-G27. No dungeon here checks these against play, so each is ported with a tool
-of its own.
+The five left that Conflux never calls: `I_Copy` (87), `TextSay` (104), `I_FilteredCast`
+(120), and `GetSkin` (131) and `SetSkin` (132), which need G27. No dungeon here checks
+these against play, so each is ported with a tool of its own.
 
 Every `I_` operation but two is CSBWin's `Indirect`: it packs the operation and its
 operands into a record and sends it to the DSA at `ESL_INDIRECTACTIONS`, whose `I_Indirect`
@@ -293,9 +295,9 @@ location (`:2109-2120`). The port's one `I_` operation, `I_TeleportParty`, share
 census counts it as ported, and the `I_` family's commit gives it CSBWin's path.
 
 The steps: the census is done (`tools/dump-dsa-census.ts`, Conflux's counts by default,
-another `dungeon.dat` as its argument), and so are the characters and the objects. Next,
-one family per commit, in the order above, the seven with their nearest family: the
-monsters next. Every `I_` operation, of whichever family, comes with `I_Indirect` in a
+another `dungeon.dat` as its argument), and so are the characters, the objects and the
+monsters. Next, one family per commit, in the order above, the five with their nearest
+family: text and sound next. Every `I_` operation, of whichever family, comes with `I_Indirect` in a
 family of its own. A family's tool runs its programs through `tools/lib/dsa.ts`. Last, `DSA::Write` and the
 `EXPOOL` records, so that a game with DSAs can be saved (below). An operation is checked
 against Conflux in play once G26 makes it a data set.
@@ -346,6 +348,9 @@ location is not measured yet: the chains read, and the count is this item's firs
 
 - `ESL_MONSTERMOVEFILTER` (`doc/CSBwin-src/Monster.cpp:3080-3130`), which a level can
   have its own of: the key with `(level + 1) << 8` is tried first, then the dungeon's.
+  While it runs, `ProcessDSAFilter` sets `monsterMoveFilterActive`
+  (`DsaSystem.monsterMoveFilterActive`), without which `&MONL&D` does nothing; its
+  `&MONBLK` sets the directions the turn then refuses (`MonsterAI.monsterMoveInhibit`).
 - `ESL_INDIRECTACTIONS`, the DSA every `I_` operation is sent to (`DSA.cpp:2093-2130`,
   G1). The port's `I_TELEPORT_PARTY` teleports at once, as `TeleportParty` does
   (`DsaSystem.ts`, `case StkOp.I_TELEPORT_PARTY`), where CSBWin's sends a record to that
@@ -366,7 +371,7 @@ location is not measured yet: the chains read, and the count is this item's firs
   which may set `deathCloud` and `dropResidue`. CSBWin calls it from `DamageMonster` with
   `DMW_Damage` (`Code11f52.cpp:1112`, `:1122`) and from `MoveObject`'s two deletions with
   `DMW_Movement1` / `DMW_Movement2` (`:3151`, `:3304`). The port's matching places are
-  `MonsterDamage.ts:463` and `MonsterSystem.ts:548`.
+  `MonsterDamage.ts:467` and `MonsterSystem.ts:560`.
 - `MonsterAttackFilter`, which may rewrite a monster attack's whole parameter block
   (`MonsterAttack.ts:146`). CSBWin's block is a file-scope global
   (`doc/CSBwin-src/Monster.cpp:917-938`), and `MonsterAttacks` never writes its
@@ -439,9 +444,10 @@ flag (`doc/CSBwin-src/SaveGame.cpp:2604`), and Conflux's has it.
 holds the raw bits, the renderer's `DrawRoomObjects` / `DrawMonster` take both options as
 false (every creature drawn, never `DrawSize4Index`), and `monster.drawAsSize4` is read ungated in
 `MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:373`) and in `MonsterDamage`
-(`:504`, `:540`). Only `monsterUnique` (`MonsterSystem.ts:70`) applies a gate, as a
-constant `false`. Harmless on DM, because no creature in `dm-atari/dungeon.dat` sets any
-of bits 11-14. Conflux sets both options (`extendedFlags` 0x76), and of its 1257 creature
+(`:508`, `:544`). The four gated getters are in `MonsterSystem.ts` (`monsterInvisible` to
+`monsterPoisoned`, `:73-84`), with both options a constant `false`; only `monsterUnique`'s
+caller and `&MONSTER@` read through them. Harmless on DM, because no creature in
+`dm-atari/dungeon.dat` sets any of bits 11-14. Conflux sets both options (`extendedFlags` 0x76), and of its 1257 creature
 groups 3 are invisible, 372 drawn as size 4 and 194 unique. Modelling it means reading `EF_EXTENDED_FLAGS.InvisibleMonsters` and
 `DrawAsSize4Monsters` in `readExtendedFeatures` and gating every accessor.
 
@@ -510,16 +516,6 @@ the game; whether to model it is the author's call.
 
 Not taken in order; the author names one to start it (see "Priority").
 
-### G14 ⏸️ `AsciiDump`: the resumed game's "ASCII DUMP"
-
-`AsciiDump` (`doc/CSBwin-src/AsciiDump.cpp:2137`) writes the whole dungeon as text to
-`ASCIIDUMP.TXT`, starting with the game's and the levels' information, every cell, the
-objects, and the monsters (`:2152-2160`). The one route to it is the second button of the
-"GAME LOADED, READY TO PLAY." menu (`CSBCode.cpp:10497-10515`), which the port does not
-put up (`tag021028`, `src/renderer/intro/BootSequence.ts`;
-`doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port"), so it would need
-a route of its own. In a page it would be a download.
-
 ### G20 ⏸️ The hint oracle
 
 CSBWin's HINT choice (`_StartHint`, `doc/CSBwin-src/Hint.cpp:6454`, a 7936-line file)
@@ -561,6 +557,32 @@ dungeons' (the signatures an Extended Features block may carry,
 THIS GAME", so a lost game can only load a save; and a data set to list its saves under,
 which its signature can stand for. A dungeon with DSAs waits for G1: `buildSaveFile`
 refuses to save one.
+
+### G29 ⏸️ Recording a game and playing it back
+
+CSBWin can record a game and play it back:
+
+- **The recorder** (`RECORDFILE`, `doc/CSBwin-src/Recording.cpp:820-1080`) is the
+  "Record" menu item (`CSBUI.cpp:945-958`). It writes `logs/RecordNNNNN.log`: a version
+  line, `#` option lines (`#DMRules`, `#ExtraTicks`, …), then one line per input event,
+  `time x y num random` in hex (`Recording.cpp:1054`). The `d.RandomNumber` on each line
+  is what shows that a playback has drifted. A click in the viewport is recorded by
+  `HandleClickInViewport` (`Mouse.cpp:1031`) with fewer coordinates, and every other entry
+  of the mouse queue by `_HandleMouseEvents` (`:1500-1506`).
+- **The player** (`PLAYFILE`, `Recording.cpp:152-805`) is the "Playback" menu item
+  (`CSBUI.cpp:959-966`), which turns `extraTicks` off. It reads `Playfile.log` and feeds
+  its events into the mouse queue at their ticks. It does so from the top of
+  `_HandleMouseEvents` (`Mouse.cpp:1393`), except while gravity runs.
+
+The port has neither, and no way to start either. It keeps only the recorder's count,
+`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:741-748`).
+`extraTicks` is always on (`src/engine/MovementSystem.ts:58-61`).
+
+Once ported, a recording made in CSBWin and played back in the port is an end-to-end test
+of everything at once, and the first line whose `random` differs points at the first
+divergence. That needs the port's random numbers to follow CSBWin's draw for draw. A
+recording cannot be written by hand, nor by a solver such as `tools/solve-3d2d1d.ts`:
+every line needs its exact tick and random state.
 
 ---
 

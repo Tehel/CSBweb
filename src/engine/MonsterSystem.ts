@@ -61,14 +61,26 @@ export const GROUP_INDEX_DETACHED = 0xd8;
 export const GROUP_INDEX_DETACHED_SIZE4 = 0xff;
 
 /**
- * `DB4::Unique()` (doc/CSBwin-src/CSB.h:1129) — `drawAsSize4Monsters && BITS13_13(word14)`.
- * `drawAsSize4Monsters` is a design option from a save's extended-features block
- * (`SaveGame.cpp:399-400`) that defaults to `false` (`data.cpp:78`). The port does not
- * model it (DEBT.md G4), so no monster is unique, whatever bit 13 says.
+ * `DB4::invisible()`, `drawAsSize4()`, `Unique()` and `Poisoned()`
+ * (`doc/CSBwin-src/CSB.h:1125-1132`): bits 11 to 14 of `word14`, each only if its design
+ * option is set, `invisibleMonsters` for the first and `drawAsSize4Monsters` for the
+ * other three. Both options come from a save's extended-features block
+ * (`SaveGame.cpp:394-400`) and default to `false` (`data.cpp:77-78`). The port does not
+ * model them (DEBT.md G4), so each reads `false`, whatever its bit says.
  */
+const INVISIBLE_MONSTERS = false;
 const DRAW_AS_SIZE4_MONSTERS = false;
-function monsterUnique(monster: CreatureRecord): boolean {
+export function monsterInvisible(monster: CreatureRecord): boolean {
+  return INVISIBLE_MONSTERS && monster.invisible;
+}
+export function monsterDrawAsSize4(monster: CreatureRecord): boolean {
+  return DRAW_AS_SIZE4_MONSTERS && monster.drawAsSize4;
+}
+export function monsterUnique(monster: CreatureRecord): boolean {
   return DRAW_AS_SIZE4_MONSTERS && monster.unique;
+}
+export function monsterPoisoned(monster: CreatureRecord): boolean {
+  return DRAW_AS_SIZE4_MONSTERS && monster.poisoned;
 }
 
 export class MonsterSystem {
