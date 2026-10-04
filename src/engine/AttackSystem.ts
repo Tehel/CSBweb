@@ -28,6 +28,7 @@
  * Lord Chaos's endgame is here too: `_Fusion` (`:133`), and `_FusionSequence` (`:2220`),
  * which a boxed-in Lord Chaos starts and which holds the main loop to the credits.
  */
+import { printWithSubstitution } from './PrintWithSubstitution';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { div, sb, sw } from '../core/intCast';
 import { nameIndexOf, type GameContext } from './GameContext';
@@ -1317,7 +1318,8 @@ export class AttackSystem {
         params.dataType = AttackDataType.ADT_Flip;
         params.attdep.flip.heads = this.ctx.random.bool();
         this.callAttackFilter(filter, params, 1);
-        this.ctx.systems.magic.emitSpellMessage(params.attdep.flip.heads !== 0 ? 'IT COMES UP HEADS' : 'IT COMES UP TAILS');
+        // `PrintWithSubstitution(…, 4, true)`: one entry, and translated (`DEBT.md` G21).
+        printWithSubstitution(this.ctx, params.attdep.flip.heads !== 0 ? 'IT COMES UP HEADS' : 'IT COMES UP TAILS', 4);
         break;
 
       case AttackType.atk_SPELLSHIELD:

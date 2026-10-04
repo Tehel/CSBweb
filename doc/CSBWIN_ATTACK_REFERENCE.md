@@ -81,7 +81,7 @@ preserved.
 | CONFUSE | spends a charge, then *falls through* to the shouts |
 | WARCRY / CALM / BRANDISH / BLOWHORN | `WarCryEtc` |
 | SHOOT | fires the shield hand's contents, if it is the matching ammunition class |
-| FLIP | `random(1)` → "IT COMES UP HEADS" / "TAILS" |
+| FLIP | `STRandomBool()`, which the attack filter may change, → "IT COMES UP HEADS" / "TAILS" through `PrintWithSubstitution(…, 4, true)`: one print-queue entry, its linefeed first (`Attack.cpp:1914-1924`; `tools/dump-flip.ts`) |
 | SPELLSHIELD / FIRESHIELD | `MagicShield` at strength 0x118. A return of 0 — the champion had under four mana and got half a shield — quarters the experience and halves the busy time instead of spending a charge |
 | FLUXCAGE | `FluxCage` |
 | FUSE | Lord Chaos's endgame. **Not ported** |
