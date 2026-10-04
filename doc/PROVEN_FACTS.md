@@ -3579,6 +3579,24 @@ text `(EDT_GlobalText << 24) | p` read as a `char *` when it is below 0x10000 an
 size is above 0 (`:8700-8711`), so the -1 it starts at leaves the default. The name drawn
 for a retyped row is the type it had. `tools/dump-action-name-filter.ts`.
 
+## The feeding filter runs every DSA at its location on the whole feeding block
+
+`_FeedCharacter` works out what the object on the cursor is worth into a `FEEDPARAMETERS`
+block (`doc/CSBwin-src/Character.cpp:3936-3997`, `:4032-4285`) and then, before anything
+changes, runs every type-47 actuator at `ESL_FEEDINGFILTER`'s location (1, `CSB.h:1536`),
+each with `continue` (`:4288-4344`): the count is `sizeof(fp) / 4`, 27, and the words are
+the block's 27 longwords in the struct's order, a `bool32` as 1 or 0, copied in before each
+DSA and back after it (`:4333-4336`), so each DSA sees the block the one before left. The
+feeding then does what the block says, `performFeeding` first (`:4350`). The block's
+`location` is the party's square and facing as a `LOCATIONREL` (`:4034-4038`), and a scroll
+gets no `objectType` (`:4087-4091`). What the block cannot change: the champion fed is
+`chIdx`, and the waterskin's gulp is taken by `objNID6`, both read before the filter
+(`:4095`, `:4457`). Two sums reachable only through the filter: `shieldStrengthAdjust` is a
+`ui32` (`:3953`), so `shieldStrength + shieldStrengthAdjust < 0` is never true and a
+negative adjustment leaves the sum's low 16 bits (`:4366-4374`); and `value(value() - 1)`
+sets a waterskin's two bits (`CSB.h:1274`), so an empty one emptied again holds 3
+(`:4457-4460`). `tools/dump-feeding-filter.ts`.
+
 ## The `QueueSound` calls, and the level each is on
 
 | Sound | CSBWin's call | Ordinal → SND item | Level |
@@ -4423,7 +4441,7 @@ the cell's object chain when it is true, since the slave's link now belongs to t
 list. Filters (`ProcessDSAFilter`, `DSA.cpp:5315-5325`) ignore it. Evidence:
 `tools/dump-dsa-delete.ts`.
 
-## A DSA filter runs on a parameter array of its own; the party attack's and the action name's write the current one
+## A DSA filter runs on a parameter array of its own; the party attack's, the action name's and the feeding's write the current one
 
 `pDSAparameters` (`doc/CSBwin-src/DSA.cpp:43-44`) points at the array `&NUMPARAM`, `&PARAM@`
 and `&PARAM!` read and write: word 0 is the count, words 1 to 100 the parameters.
@@ -4441,8 +4459,10 @@ DSAparameters[0] = 0" (`Timer.cpp:1525`). A filter's count and words are therefo
 once it returns, and a DSA run after it, or the program that reached it, finds its own.
 `&PARAM@` reads no word past a count of 0 or more (`DSA.cpp`'s `STKOP_ParamFetch`), so the
 uninitialised words cannot be read: only a parameter message whose record is gone sets a
-count of -1, and on the outer array (see "`&PARAM@` compares the count unsigned"). Two
-filters are the exception. `ActionNameFilter`'s `NEWDSAPARAMETERS` is declared in the block
+count of -1, and on the outer array (see "`&PARAM@` compares the count unsigned"). Three
+filters are the exception. `_FeedCharacter` declares no `NEWDSAPARAMETERS`
+(`Character.cpp:4004-4497`), so the feeding filter's DSAs leave its count, 27, and the
+block in the caller's array (`:4333-4336`). `ActionNameFilter`'s `NEWDSAPARAMETERS` is declared in the block
 that looks for its DSA (`CSBCode.cpp:8653`), which closes before the DSA runs (`:8675`,
 `:8697`), so it writes its count, 5, and its words into the caller's array, and leaves them
 there. The party attack filter:

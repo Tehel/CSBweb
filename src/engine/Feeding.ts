@@ -3,10 +3,11 @@
  * (`doc/CSBwin-src/Character.cpp:3939-4497`).
  *
  * CSBWin does not touch the champion while it works out what an object is worth. It
- * fills in a `FEEDPARAMETERS` block, hands the whole block to the Feeding Filter DSA
+ * fills in a `FEEDPARAMETERS` block, hands the whole block to the feeding filter's DSAs
  * so a dungeon can rewrite any field of it, and only then applies the result. That
  * indirection is the reason the struct exists, so it is kept as one here: the UI half
- * in `src/renderer/ui/Feeding.ts` derives the block, this file applies it, reaching
+ * in `src/renderer/ui/Feeding.ts` derives the block, `DsaSystem.feedingFilter` hands it
+ * to the DSAs as the 27 words below, and this file applies it, reaching
  * the engine (`CurePoison`, `AdjustStamina`, `KillCharacter`, the shield timer) through
  * the context.
  *
@@ -99,6 +100,65 @@ export function clearFeedParameters(): FeedParameters {
     location: -1,
     antiMagicAdjust: 0,
     antiFireAdjust: 0,
+  };
+}
+
+/** `sizeof(fp) / 4` (`doc/CSBwin-src/Character.cpp:4334`): the 27 longwords of `FEEDPARAMETERS`. */
+export const FEED_PARAMETER_WORDS = 27;
+
+/**
+ * `memcpy(pDSAparameters + 1, &fp, sizeof(fp))` (`doc/CSBwin-src/Character.cpp:4333`): the
+ * block as the feeding filter's DSA sees it, a longword per field in the struct's order
+ * (`:3936-3966`), a `bool32` 1 or 0.
+ */
+export function feedParametersToWords(fp: FeedParameters): number[] {
+  const flag = (value: boolean): number => (value ? 1 : 0);
+  return [
+    flag(fp.performFeeding), fp.characterIndex, fp.objectDB, fp.objectType, fp.objectID,
+    fp.foodValue, fp.waterValue, fp.potionType, fp.potionStrength,
+    fp.strengthAdjust, fp.dexterityAdjust, fp.wisdomAdjust, fp.vitalityAdjust,
+    flag(fp.antiVenin), fp.staminaAdjust, fp.shieldStrengthAdjust, fp.shieldDuration,
+    fp.manaAdjust, fp.hitpointAdjust, fp.healCount,
+    flag(fp.emptyFlask), flag(fp.emptyHand), flag(fp.chew), fp.gulp, fp.location,
+    fp.antiMagicAdjust, fp.antiFireAdjust,
+  ].map((word) => word | 0);
+}
+
+/**
+ * `memcpy(&fp, pDSAparameters + 1, sizeof(fp))` (`doc/CSBwin-src/Character.cpp:4336`): the
+ * block back from the feeding filter's DSA, `word(i)` its longword `i`. A `bool32` is
+ * true when it is not 0, as CSBWin's tests of it read it.
+ */
+export function feedParametersFromWords(word: (index: number) => number): FeedParameters {
+  const w = (index: number): number => word(index) | 0;
+  return {
+    performFeeding: w(0) !== 0,
+    characterIndex: w(1),
+    objectDB: w(2),
+    objectType: w(3),
+    objectID: w(4),
+    foodValue: w(5),
+    waterValue: w(6),
+    potionType: w(7),
+    potionStrength: w(8),
+    strengthAdjust: w(9),
+    dexterityAdjust: w(10),
+    wisdomAdjust: w(11),
+    vitalityAdjust: w(12),
+    antiVenin: w(13) !== 0,
+    staminaAdjust: w(14),
+    shieldStrengthAdjust: w(15),
+    shieldDuration: w(16),
+    manaAdjust: w(17),
+    hitpointAdjust: w(18),
+    healCount: w(19),
+    emptyFlask: w(20) !== 0,
+    emptyHand: w(21) !== 0,
+    chew: w(22) !== 0,
+    gulp: w(23),
+    location: w(24),
+    antiMagicAdjust: w(25),
+    antiFireAdjust: w(26),
   };
 }
 
@@ -236,8 +296,9 @@ export function applyFeedParameters(
   ctx.systems.monsterAttack.adjustStamina(chIdx, -fp.staminaAdjust);
 
   if (fp.shieldStrengthAdjust !== 0) {
-    const next = champ.shieldStrength + fp.shieldStrengthAdjust;
-    champ.shieldStrength = next < 0 ? 0 : next & 0xffff;
+    // `shieldStrengthAdjust` is a `ui32` (`:3953`), so the sum `:4366` tests is unsigned and
+    // never below 0: a negative adjustment, which only the filter makes, wraps to 16 bits.
+    champ.shieldStrength = (champ.shieldStrength + fp.shieldStrengthAdjust) & 0xffff;
     // The `TT_72` shield-expiry timer (`doc/CSBwin-src/Character.cpp:4386-4391`).
     ctx.systems.timer.scheduleChampionShieldExpiry(
       chIdx,

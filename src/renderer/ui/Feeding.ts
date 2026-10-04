@@ -8,7 +8,7 @@
 import { OBJNI_APPLE, OBJNI_DRAGON_STEAK, OBJNI_SPECIAL_G, OBJNI_SPECIAL_H, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
 import { PotionType } from '../../core/constants';
 import { applyFeedParameters, clearFeedParameters, derivePotionFeeding, type FeedParameters } from '../../engine/Feeding';
-import { DBType, OBJECT_ID_NULL, ObjectID } from '../../core/types';
+import { DBType, OBJECT_ID_NULL, ObjectID, locationRelToInteger } from '../../core/types';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
 import { descIndexForObject, resolveObjectNameIndex } from './Objects';
@@ -22,8 +22,8 @@ const SOUND_GULP = 8;
  *
  * Works out what the object on the cursor is worth and fills in a `FeedParameters`
  * block. Nothing on the champion changes here: `applyFeedParameters` in
- * `src/engine/Feeding.ts` does that, after the Feeding Filter DSA would have had its
- * chance to rewrite the block.
+ * `src/engine/Feeding.ts` does that, after the feeding filter's DSAs have had their
+ * chance to rewrite the block (`DsaSystem.feedingFilter`).
  */
 export function computeFeedParameters(
   ui: UIState,
@@ -37,10 +37,14 @@ export function computeFeedParameters(
   if (nameIndex < 0) return null;
   const category = ui.ctx.dungeon.rnMaps.dbType(objectId as ObjectID);
 
+  // `doc/CSBwin-src/Character.cpp:4032-4038`, `:4086-4096`: a scroll has no `objectType`,
+  // and the party's square and facing are the block's `location`.
   const fp = clearFeedParameters();
+  const party = ui.partyState;
+  fp.location = locationRelToInteger({ l: party.position.z, x: party.position.x, y: party.position.y, p: party.facing });
   fp.characterIndex = chIdx;
   fp.objectID = objectId;
-  fp.objectType = nameIndex;
+  if (category !== DBType.SCROLL) fp.objectType = nameIndex;
   fp.objectDB = category;
 
   // `d.ObjDesc[objDI].word4 & 1` — the mouth bit of the carry-location mask. Anything
@@ -104,12 +108,11 @@ export function handleMouthPress(ui: UIState): void {
   const objectId = ui.partyState.objectInHand;
   if (objectId === OBJECT_ID_NULL) return;
 
-  const fp = computeFeedParameters(ui, selected, objectId);
-  if (!fp) return;
-
-  // Where the Feeding Filter DSA would rewrite the block
-  // (`doc/CSBwin-src/Character.cpp:4288-4344`). ⏳ Not ported: no dungeon we load
-  // defines `ESL_FEEDINGFILTER`, and the DSA parameter marshalling is its own job.
+  const derived = computeFeedParameters(ui, selected, objectId);
+  if (!derived) return;
+  // `objNID6`, which the filter cannot change, as it can `fp.objectType` (`:4457`).
+  const objNID6 = derived.objectType;
+  const fp = ui.ctx.systems.dsa.feedingFilter(derived);
   if (!applyFeedParameters(ui.ctx, selected, fp)) return;
 
   if (fp.chew) {
@@ -120,9 +123,11 @@ export function handleMouthPress(ui: UIState): void {
       const rec = ui.ctx.dungeon.getPotionRecord(objectId as ObjectID);
       if (rec) rec.potionType = PotionType.EMPTY_FLASK;
     }
-    if (fp.objectType >= OBJNI_WATERSKIN && fp.objectType <= OBJNI_WATER) {
+    // `value(value() - 1)` sets the record's two bits (`doc/CSBwin-src/CSB.h:1274`), so an
+    // empty waterskin, which only the filter empties again, holds 3.
+    if (objNID6 >= OBJNI_WATERSKIN && objNID6 <= OBJNI_WATER) {
       const rec = ui.ctx.dungeon.getMiscRecord(objectId as ObjectID);
-      if (rec) rec.specialState = Math.max(0, (rec.specialState ?? 0) - 1);
+      if (rec) rec.specialState = ((rec.specialState ?? 0) - 1) & 3;
     }
   }
 

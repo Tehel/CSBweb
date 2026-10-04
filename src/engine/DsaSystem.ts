@@ -50,6 +50,7 @@ import { printWithSubstitution } from './PrintWithSubstitution';
 import { findChampionByFingerprint } from './Party';
 import { EDT_GLOBAL_TEXT, GetText } from '../data/DecodeText';
 import { messageParametersKey, readGlobalVariables } from '../data/CsbwinExpool';
+import { FEED_PARAMETER_WORDS, feedParametersFromWords, feedParametersToWords, type FeedParameters } from './Feeding';
 
 /** Which of CSBWin's viewing-filter sites runs the filter (`doc/CSBwin-src/Character.cpp`). */
 export enum ViewingFilterSite {
@@ -279,6 +280,7 @@ const VIEWING_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_VIEWING_FILTER;
 const PARTY_ATTACK_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_PARTY_ATTACK_FILTER;
 const ESL_SOUND_FILTER = 8;
 const ESL_ACTION_NAME_FILTER = 10;
+const ESL_FEEDING_FILTER = 1;
 const ESL_INDIRECT_ACTIONS = 5;
 const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
 
@@ -696,9 +698,9 @@ export class DsaSystem {
    * them (`SoundFilter`'s, `doc/CSBwin-src/Sound.cpp:681-748`, is one): `EXPOOL`'s record
    * `(EDT_SpecialLocations << 24) | esl` names the location, and every type-47 actuator on
    * its square runs in turn, a filter call apiece (`ProcessDSAFilter`), on a timer that
-   * names the square with function and position 0. They share one `NEWDSAPARAMETERS`.
-   * `each` sets a DSA's parameters, calls `run`, and reads back what it needs. False when
-   * none ran.
+   * names the square with function and position 0, and on the current parameters: a site
+   * with a `NEWDSAPARAMETERS` calls this inside `newDsaParameters`. `each` sets a DSA's
+   * parameters, calls `run`, and reads back what it needs. False when none ran.
    */
   private forEachFilterDsa(esl: number, each: (run: () => void) => void): boolean {
     const special = this.dungeon.getSpecialLocation((EDT_SPECIAL_LOCATIONS << 24) | esl);
@@ -707,17 +709,15 @@ export class DsaSystem {
     if (!this.dungeon.isValidLocation(locrFilter)) return false;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
     const timer = filterTimer(filterPos);
-    return this.newDsaParameters(() => {
-      let found = false;
-      for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-        if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
-        const rec = this.dungeon.getActuatorRecord(rn);
-        if (!rec || getActuatorType(rec) !== 47) continue;
-        found = true;
-        each(() => this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars()));
-      }
-      return found;
-    });
+    let found = false;
+    for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+      if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
+      const rec = this.dungeon.getActuatorRecord(rn);
+      if (!rec || getActuatorType(rec) !== 47) continue;
+      found = true;
+      each(() => this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars()));
+    }
+    return found;
   }
 
   /**
@@ -745,16 +745,34 @@ export class DsaSystem {
       const d2 = distanceSquared * 10000;
       for (let i = 0; i < 3; i++) distance100 = Math.trunc((distance100 + Math.trunc(d2 / distance100)) / 2);
     }
-    this.forEachFilterDsa(ESL_SOUND_FILTER, (run) => {
+    this.newDsaParameters(() => this.forEachFilterDsa(ESL_SOUND_FILTER, (run) => {
       this.setParameters(9, [
         soundNumber + 1, highVolume, distanceSquared, level, x, y, VOLUME_FULL, 0, distance100,
       ]);
       this.soundFilterActive = true;
       run();
-    });
+    }));
     if (!this.soundFilterActive) return 1;
     this.soundFilterActive = false;
     return 0;
+  }
+
+  /**
+   * The feeding filter (`doc/CSBwin-src/Character.cpp:4288-4344`), which `_FeedCharacter`
+   * runs once it has worked out what the object is worth, and before anything changes:
+   * every DSA at `ESL_FEEDINGFILTER`'s location in turn, each on the block as the DSA
+   * before it left it, a count of 27 and the block's longwords (`:4333-4336`). Back comes
+   * the block, which is what the feeding then does. `_FeedCharacter` has no
+   * `NEWDSAPARAMETERS`, so the DSAs run on the caller's parameters and leave them theirs.
+   */
+  feedingFilter(fp: FeedParameters): FeedParameters {
+    let block = fp;
+    this.forEachFilterDsa(ESL_FEEDING_FILTER, (run) => {
+      this.setParameters(FEED_PARAMETER_WORDS, feedParametersToWords(block));
+      run();
+      block = feedParametersFromWords((i) => this.getParameter(i));
+    });
+    return block;
   }
 
   /**

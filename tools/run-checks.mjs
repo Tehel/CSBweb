@@ -102,6 +102,7 @@ const CHECKS = [
   { tool: 'dump-viewing-filter.ts' },
   { tool: 'dump-sound-filter.ts' },
   { tool: 'dump-action-name-filter.ts' },
+  { tool: 'dump-feeding-filter.ts' },
   { tool: 'dump-dsa-missiles.ts' },
   { tool: 'dump-dsa-monsters.ts' },
   { tool: 'dump-dsa-text.ts' },
