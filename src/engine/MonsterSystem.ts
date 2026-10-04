@@ -22,6 +22,7 @@ import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
+import { DeleteMonsterWhy, deleteMonsterParameters } from './MonsterDamage';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import {
@@ -557,15 +558,17 @@ export class MonsterSystem {
     let code = resolved.code;
     const placed = this.dungeon.rnMaps.setPos(monsterRn, cornerAfter ?? resolved.corner);
 
-    // Killed by the fall, or not allowed where it landed: gone (`:3147-3176`).
-    // `ProcessMonsterDeleteFilter` is not ported (DEBT.md G2), so `dropResidue` is its
-    // default, `0 < 2`.
+    // Killed by the fall, or not allowed where it landed: gone (`:3147-3176`). The delete
+    // monster filter runs at the group's old square, on the level it left.
     if (resolved.groupDied || !this.dungeon.monsterAllowedOnLevel(monster.creatureType, destLevel)) {
-      this.ctx.systems.monsterDamage.flushPendingDroppings(monster.creatureType, destLevel, destination.x, destination.y);
-      this.ctx.systems.monsterDamage.dropMonsterRemains(
-        destLevel, destination.x, destination.y, placed, 2, fromDungeon ? level : -1, true,
+      const monsterDamage = this.ctx.systems.monsterDamage;
+      const dmp = deleteMonsterParameters(DeleteMonsterWhy.DMW_Movement1, -1);
+      monsterDamage.flushPendingDroppings(monster.creatureType, destLevel, destination.x, destination.y);
+      if (fromDungeon) monsterDamage.processMonsterDeleteFilter(level, oldX, oldY, dmp);
+      monsterDamage.dropMonsterRemains(
+        destLevel, destination.x, destination.y, placed, 2, fromDungeon ? level : -1, dmp.dropResidue < 2,
       );
-      if (fromDungeon) this.ctx.systems.monsterDamage.deleteMonster(level, oldX, oldY);
+      if (fromDungeon) monsterDamage.deleteMonster(level, oldX, oldY);
       return { code: 1, position: destination };
     }
 

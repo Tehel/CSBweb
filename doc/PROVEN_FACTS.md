@@ -3747,6 +3747,36 @@ The block is a file-scope global, and `MonsterAttacks` writes every field of it 
 `disableTime`, which no C++ reads (`:986-1122`), so a filter sees the `disableTime` the last
 one left. `tools/dump-monster-attack-filter.ts`.
 
+## The delete monster filter counts the kill, then runs every DSA at its location
+
+`ProcessMonsterDeleteFilter` (`doc/CSBwin-src/Code11f52.cpp:926-1020`) runs at six sites,
+each before it touches the group: `DamageMonster` for its last member when it removes it
+(`P6`, `DMW_Damage` 3, index -1, `:1110-1113`) and for any other member whatever `P6`
+(`DMW_Damage`, its index, `:1122-1123`); `MoveObject` for a group the fall killed or the
+level refused, at its old square on the level it left (`DMW_Movement1` 4, `:3151-3159`), and
+for a group the party lands on (`DMW_Movement2` 5, `:3304-3305`); `MakeMoreRoomInDB`
+(`DMW_MakeRoom` 2, `doc/CSBwin-src/Character.cpp:280-281`); and the fusion, for every other
+group on the level (`DMW_Fusion` 1, `doc/CSBwin-src/Attack.cpp:2378-2379`).
+
+With no group on the square it does nothing. Otherwise it counts the kill, filter or not,
+in `expool`'s record `(EDT_Statistics << 24) | (ESTAT_NumMonsterKilled << 16) | (why << 8)
+| monsterType` (6 and 0, `CSB.h:1562-1563`), one longword per `alternateGraphics`: with no
+record of four longwords or more it writes a new one of four, else it raises the count
+where the record stands, through `Locate`'s pointer (`:943-962`). A genuine CSBWin save
+carries these records: `csbgame7.dat` has 45 Mummies killed by damage.
+
+Then every type-47 actuator at `ESL_DELETEMONSTERFILTER`'s location (7, `CSB.h:1542`) runs,
+on parameters of their own, one `NEWDSAPARAMETERS` for the function (`:928`), each with a
+count of 8 and the block in the class's order (`:1011-1012`, `CSB.h:2940-2947`):
+`monsterID`, `level`, `x`, `y`, `why`, `dropResidue`, `deathCloud`, `index`. The whole block
+comes back (`:1014`), and the next DSA sees it as the last one left it.
+
+Two fields are read back. `deathCloud` 2 shows no death cloud (`:1114`, `:1124`, `:1258`).
+`dropResidue` is read two ways: `DropMonsterRemains` gets `dropResidue < 2`, so 0 and 1
+drop and 2 and 3 do not (`:1115`, `:3165`, `:3306`, `Character.cpp:282`), while a member other than the
+last drops its remains for anything but 2 (`:1131`), so 3 drops them there. The fusion reads
+neither. `tools/dump-delete-monster-filter.ts`.
+
 ## The `QueueSound` calls, and the level each is on
 
 | Sound | CSBWin's call | Ordinal → SND item | Level |

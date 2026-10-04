@@ -16,7 +16,7 @@ import type { CreatureRecord, Item16Record, TeleporterRecord } from '../data/dun
 import { monsterHorizontalSize, monsterLevitating } from '../data/tables/MonsterDesc';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
-import { MonsterDamageResult } from './MonsterDamage';
+import { DeleteMonsterWhy, MonsterDamageResult, deleteMonsterParameters } from './MonsterDamage';
 import { DELTA_X, DELTA_Y } from './MonsterPerception';
 import { setPackedBits } from './MonsterSystem';
 import { StateOfFear } from './monsterTypes';
@@ -103,10 +103,10 @@ export class WorldMove {
     const at = party.position;
     const monster = this.dungeon.findFirstMonster(at);
     if (monster !== OBJECT_ID_EOF) {
-      // `ProcessMonsterDeleteFilter` is not ported (DEBT.md G2), so `dropResidue` is its
-      // default, `0 < 2`.
       const monsterDamage = this.ctx.systems.monsterDamage;
-      monsterDamage.dropMonsterRemains(at.z, at.x, at.y, monster, 1, at.z, true);
+      const dmp = deleteMonsterParameters(DeleteMonsterWhy.DMW_Movement2, -1);
+      monsterDamage.processMonsterDeleteFilter(at.z, at.x, at.y, dmp);
+      monsterDamage.dropMonsterRemains(at.z, at.x, at.y, monster, 1, at.z, dmp.dropResidue < 2);
       monsterDamage.deleteMonster(at.z, at.x, at.y);
     }
     if (at.z === level) {

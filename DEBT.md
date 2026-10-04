@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | Four DSA filters, and the viewing filter's third site | L | ⏳ step 8 of 12 next |
+| G2 | Three DSA filters, and the viewing filter's third site | L | ⏳ step 9 of 12 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -317,10 +317,10 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G2 ⏳ Four DSA filters, and the viewing filter's third site
+### G2 ⏳ Three DSA filters, and the viewing filter's third site
 
-The port runs thirteen filters: the viewing filter (two of its three sites),
-the monster attack filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
+The port runs fourteen filters: the viewing filter (two of its three sites),
+the monster attack filter, the delete monster filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
 sound filter, the action name filter, the feeding filter, the character death filter, the
 damage filter, the equip filter, the party move filter, and the spell filter at
 `spellFilterLocation`. Each place below uses
@@ -336,18 +336,11 @@ filter's.
 A filter that loops runs each of those DSAs in turn, a filter call apiece; one that
 `break`s runs the first. Each step reads which from its CSBWin site and checks it in a
 `tools/` check through `tools/lib/dsa.ts`: `TestFilter` for one DSA, `withFilterDsas` for
-two on the square where the site loops. Steps 1 to 7, the sound filter, the action name
+two on the square where the site loops. Steps 1 to 8, the sound filter, the action name
 filter, the feeding filter, the character death and damage filters, the equip filter, the
-party move filter, and the monster attack filter, are paid. The steps left, one commit
-each:
+party move filter, the monster attack filter, and the delete monster filter, are paid. The
+steps left, one commit each:
 
-8. **`ESL_DELETEMONSTERFILTER`** (M). `ProcessMonsterDeleteFilter`
-   (`Code11f52.cpp:926`, the DSA at `:1013`). It counts each kill in `expool`'s statistics
-   and runs its DSA, which may set `deathCloud` and `dropResidue`. CSBWin calls it from
-   `DamageMonster` with `DMW_Damage` (`:1112`, `:1122`), from `MoveObject`'s two deletions
-   with `DMW_Movement1` / `DMW_Movement2` (`:3151`, `:3304`), and with `DMW_Fusion`. The
-   port's places are `MonsterDamage.ts:467`, `MonsterSystem.ts:561`, `WorldMove.ts:106`,
-   `MakeMoreRoomInDB.ts:73` and `AttackSystem.ts:1043`.
 9. **`ESL_MONSTERMOVEFILTER`** (M). `MONSTERMOVEFILTERCACHE::GetLocation`
    (`Monster.cpp:3077-3135`) tries the key with `(level + 1) << 8` first, then the
    dungeon's; the record's bits 0-17 are the location, bit 18 `partyLevelOnly` and bits
@@ -699,10 +692,10 @@ run when the panel is drawn. Lost on a save, the line just goes back to colour 1
 An idea from *Legend of Grimrock*. Only a weapon thrown by an **attack action** is
 gathered back, never one thrown from the cursor:
 
-- **THROW** (`atk_THROW`, `src/engine/AttackSystem.ts:1458`) throws the weapon-hand object,
-  slot 1, through `MouseSystem.throwFromWeaponHand` (`src/engine/MouseSystem.ts:44`).
-- **SHOOT** (`attackWithShoot`, `src/engine/AttackSystem.ts:1550`) fires the ammunition
-  held in slot 0 through `MagicSystem.launchObject` (`src/engine/MagicSystem.ts:544`).
+- **THROW** (`atk_THROW`, `src/engine/AttackSystem.ts:1482`) throws the weapon-hand object,
+  slot 1, through `MouseSystem.throwFromWeaponHand` (`src/engine/MouseSystem.ts:42`).
+- **SHOOT** (`attackWithShoot`, `src/engine/AttackSystem.ts:1580`) fires the ammunition
+  held in slot 0 through `MagicSystem.launchObject` (`src/engine/MagicSystem.ts:572`).
   `launchObject` also launches spells, so the object is tagged in the attack, not there.
 
 A thrown object keeps its `ObjectID` all the way: in the missile's `projectileObject`,
@@ -875,6 +868,11 @@ Recorded so that nobody "fixes" them.
   (`doc/CSBwin-src/CSBCode.cpp:3542`), compensates for `MakeMirror` reversing a
   byte-aligned buffer. `getMirroredBitmap` reverses the exact bitmap, so applying it would
   shift a correctly aligned image. The reasoning is in the code.
+- 🚫 **A kill of `alternateGraphics` 4 to 7 is counted nowhere.** `ProcessMonsterDeleteFilter`
+  indexes the kill statistics' four longwords with the three-bit subtype unchecked
+  (`doc/CSBwin-src/Code11f52.cpp:955`, `:960`): a new record's count goes into the stack past
+  its array, an existing one's into the pool past the record. The port writes the record
+  of zeros and raises no count (`MonsterDamage.processMonsterDeleteFilter`).
 - 🚫 **`CHARDESC.load` is recomputed** from the possessions, rather than cached and adjusted
   at each of CSBWin's eight possession writers. Same value, and it cannot drift. `Party.ts`
   made the same choice for `SetHandOwner`. Recorded in the module comment of

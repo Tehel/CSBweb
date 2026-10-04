@@ -20,6 +20,7 @@
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import { getActuatorType } from '../data/actuatorHelpers';
 import type { GameContext } from './GameContext';
+import { DeleteMonsterWhy, deleteMonsterParameters } from './MonsterDamage';
 
 /**
  * `rnD5.pos(0)`, for a group or a missile, which `DeleteDBEntry` has thrown out with its
@@ -69,11 +70,11 @@ export function makeMoreRoomInDB(ctx: GameContext, dbType: DBType): ObjectID {
                         case DBType.CREATURE: {
                             // Designer-planted monsters stay.
                             if (dungeon.getCreatureRecord(rn)!.important) continue;
-                            // `ProcessMonsterDeleteFilter(…, DMW_MakeRoom)` is not ported
-                            // (`DEBT.md` G2), so `dropResidue` is its default, `0 < 2`. The
-                            // delay of -1 drops what the group carries and no droppings.
+                            // The delay of -1 drops what the group carries and no droppings.
                             const monsterDamage = ctx.systems.monsterDamage;
-                            monsterDamage.dropMonsterRemains(level, x, y, rn, -1, level, true);
+                            const dmp = deleteMonsterParameters(DeleteMonsterWhy.DMW_MakeRoom, -1);
+                            monsterDamage.processMonsterDeleteFilter(level, x, y, dmp);
+                            monsterDamage.dropMonsterRemains(level, x, y, rn, -1, level, dmp.dropResidue < 2);
                             monsterDamage.deleteMonster(level, x, y);
                             ctx.levelCleared[dbType] = level & 0xff;
                             return freedRecord(ctx, dbType, rn, index);

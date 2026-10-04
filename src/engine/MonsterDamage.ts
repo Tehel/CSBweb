@@ -46,6 +46,77 @@ export enum MonsterDamageResult {
   ALL_MONSTERS_DIED = 2,
 }
 
+/**
+ * `DELETEMONSTERWHY` (`doc/CSBwin-src/CSB.h:2917-2926`): why a group, or a member of one,
+ * leaves the dungeon. The kill statistics count by it.
+ */
+export enum DeleteMonsterWhy {
+  DMW_Unknown = 0,
+  DMW_Fusion = 1,
+  DMW_MakeRoom = 2,
+  DMW_Damage = 3,
+  DMW_Movement1 = 4,
+  DMW_Movement2 = 5,
+}
+
+/**
+ * `DELETEMONSTERPARAMETERS` (`doc/CSBwin-src/CSB.h:2937-2951`): what the delete monster
+ * filter's DSA reads and may rewrite. `dropResidue` is 0 for the default, 1 to drop the
+ * remains, 2 not to; `deathCloud` 0 for the default, 1 to show the cloud, 2 not to;
+ * `index` is the member's in its group, -1 for the whole group.
+ */
+export interface DeleteMonsterParameters {
+  monsterID: number;
+  level: number;
+  x: number;
+  y: number;
+  why: DeleteMonsterWhy;
+  dropResidue: number;
+  deathCloud: number;
+  index: number;
+}
+
+/**
+ * `DELETEMONSTERPARAMETERS::DELETEMONSTERPARAMETERS` (`doc/CSBwin-src/Code11f52.cpp:918-924`).
+ * The monster and its square are left unset, as CSBWin leaves them, until
+ * `ProcessMonsterDeleteFilter` fills them in.
+ */
+export function deleteMonsterParameters(why: DeleteMonsterWhy, index: number): DeleteMonsterParameters {
+  return { monsterID: 0, level: 0, x: 0, y: 0, why, dropResidue: 0, deathCloud: 0, index };
+}
+
+/** `sizeof(DELETEMONSTERPARAMETERS) / 4` (`doc/CSBwin-src/Code11f52.cpp:1012`): its 8 longwords. */
+export const DELETE_MONSTER_PARAMETER_WORDS = 8;
+
+/**
+ * `memcpy(pDSAparameters + 1, pdmp, sizeof (*pdmp))` (`doc/CSBwin-src/Code11f52.cpp:1011`):
+ * the block as the delete monster filter's DSA sees it, a longword per field in the
+ * class's order (`CSB.h:2940-2947`).
+ */
+export function deleteMonsterParametersToWords(p: DeleteMonsterParameters): number[] {
+  return [p.monsterID, p.level, p.x, p.y, p.why, p.dropResidue, p.deathCloud, p.index].map((word) => word | 0);
+}
+
+/**
+ * `memcpy(pdmp, pDSAparameters + 1, sizeof (*pdmp))` (`doc/CSBwin-src/Code11f52.cpp:1014`):
+ * the block back from the DSA into `p`, `word(i)` its longword `i`.
+ */
+export function deleteMonsterParametersFromWords(p: DeleteMonsterParameters, word: (index: number) => number): void {
+  const w = (index: number): number => word(index) | 0;
+  p.monsterID = w(0);
+  p.level = w(1);
+  p.x = w(2);
+  p.y = w(3);
+  p.why = w(4);
+  p.dropResidue = w(5);
+  p.deathCloud = w(6);
+  p.index = w(7);
+}
+
+/** `EDT_Statistics`, `ESTAT_NumMonsterKilled` (`doc/CSBwin-src/CSB.h:1562-1563`). */
+const EDT_STATISTICS = 6;
+const ESTAT_NUM_MONSTER_KILLED = 0;
+
 /** HP of `0xffff` marks a member that cannot be damaged at all. */
 const HP_INVULNERABLE = 0xffff;
 
@@ -335,6 +406,42 @@ export class MonsterDamage {
   }
 
   /**
+   * `ProcessMonsterDeleteFilter` (`doc/CSBwin-src/Code11f52.cpp:926-1020`), which every
+   * site that deletes a group, or kills a member of one, runs first. `level` is CSBWin's
+   * `attachedLevel` once its -1 is `d.LoadedLevel`. Nothing happens without a group on the
+   * square. Otherwise the kill is counted in `expool`, in the record keyed by the reason
+   * and the monster's type, a longword per `alternateGraphics` (`:943-962`): a new record
+   * of four when there is none of four or more, else the count is raised where the record
+   * stands, through `Locate`'s pointer. Then the filter's DSAs run on `dmp`, which comes
+   * back as they left it (`:961-1015`).
+   *
+   * `alternateGraphics` is three bits, and CSBWin indexes the four longwords with it
+   * unchecked: a subtype of 4 to 7 writes past them. The port counts such a kill nowhere
+   * (DEBT.md H).
+   */
+  processMonsterDeleteFilter(level: number, mapX: number, mapY: number, dmp: DeleteMonsterParameters): void {
+    const monsterRn = this.dungeon.findFirstMonster(new Position(mapX, mapY, level));
+    if (monsterRn === OBJECT_ID_EOF) return;
+    const monster = this.dungeon.getCreatureRecord(monsterRn);
+    if (!monster) return;
+    const subtype = monster.alternateGraphics;
+    const key = ((EDT_STATISTICS << 24) + (ESTAT_NUM_MONSTER_KILLED << 16) + (dmp.why << 8) + monster.creatureType) >>> 0;
+    const record = this.dungeon.locateExpoolRecord(key);
+    if (record === null || record.length < 4) {
+      const nil = [0, 0, 0, 0];
+      if (subtype < 4) nil[subtype]++;
+      this.dungeon.writeExpoolRecord(key, nil);
+    } else if (subtype < record.length) {
+      this.dungeon.writeLocatedExpoolWord(key, subtype, record[subtype]! + 1);
+    }
+    dmp.monsterID = monsterRn;
+    dmp.level = level;
+    dmp.x = mapX;
+    dmp.y = mapY;
+    this.ctx.systems.dsa.deleteMonsterFilter(dmp);
+  }
+
+  /**
    * `DeleteMonster` (`doc/CSBwin-src/Code11f52.cpp:1026`) — remove the whole group
    * from the dungeon and give its `ITEM16` slot back.
    *
@@ -464,29 +571,28 @@ export class MonsterDamage {
     const deadPosition = positions === 255 ? 255 : (positions >> (2 * indexInGroup)) & 0x3;
     const numMonM1 = monster.numMonM1 & 0x3;
 
-    // `ProcessMonsterDeleteFilter` (`Code11f52.cpp:926`) is not ported (DEBT.md G2): no DSA
-
-    // may suppress the death cloud (`deathCloud == 2`) or the remains (`dropResidue == 2`),
-
-    // so both are their defaults.
-
-    const showDeathCloud = true;
-
-    const dropResidue = true;
-
+    // `ProcessMonsterDeleteFilter`'s DSAs may suppress the death cloud (`deathCloud == 2`)
+    // and the remains (`Code11f52.cpp:1110-1128`).
+    let showDeathCloud = true;
     let result: MonsterDamageResult;
 
     if (numMonM1 === 0) {
       // The last member of the group.
       if (apply) {
+        const dmp = deleteMonsterParameters(DeleteMonsterWhy.DMW_Damage, -1);
+        this.processMonsterDeleteFilter(level, attackX, attackY, dmp);
+        if (dmp.deathCloud === 2) showDeathCloud = false;
         const rn = this.dungeon.findFirstMonster(new Position(attackX, attackY, level));
         if (rn !== OBJECT_ID_EOF) {
-          this.dropMonsterRemains(level, attackX, attackY, rn, 2, level, dropResidue);
+          this.dropMonsterRemains(level, attackX, attackY, rn, 2, level, dmp.dropResidue < 2);
         }
         this.deleteMonster(level, attackX, attackY);
       }
       result = MonsterDamageResult.ALL_MONSTERS_DIED;
     } else {
+      const dmp = deleteMonsterParameters(DeleteMonsterWhy.DMW_Damage, indexInGroup);
+      this.processMonsterDeleteFilter(level, attackX, attackY, dmp);
+      if (dmp.deathCloud === 2) showDeathCloud = false;
       result = this.killOneOfGroup(
         monster,
         desc,
@@ -495,10 +601,11 @@ export class MonsterDamage {
         attackX,
         attackY,
         numMonM1,
+        positions,
         deadPosition,
         apply,
         noItem16,
-        dropResidue,
+        dmp.dropResidue,
       );
     }
 
@@ -523,7 +630,9 @@ export class MonsterDamage {
    * Five parallel things are renumbered together — the HP array, the packed position
    * byte, the packed facing byte, the per-member `singleMonsterStatus` bytes, and the
    * queued AI timers — and `numMonM1` then drops by one
-   * (`doc/CSBwin-src/Code11f52.cpp:1121-1240`).
+   * (`doc/CSBwin-src/Code11f52.cpp:1121-1240`). `positions` is the packed position byte
+   * as read before the delete monster filter ran; the facing byte is read after it, as
+   * CSBWin reads them. `dropResidue` is the filter's: 2 drops nothing (`:1131`).
    */
   private killOneOfGroup(
     monster: CreatureRecord,
@@ -533,17 +642,17 @@ export class MonsterDamage {
     attackX: number,
     attackY: number,
     numMonM1: number,
+    positions: number,
     deadPosition: number,
     apply: boolean,
     noItem16: boolean,
-    dropResidue: boolean,
+    dropResidue: number,
   ): MonsterDamageResult {
     const facings = this.monsterFacingByte(monster, level, noItem16);
-    const positions = this.monsterPositionByte(monster, level, noItem16);
 
     if (monsterLeavesDroppings(desc) && !monster.drawAsSize4) {
       if (apply) {
-        if (dropResidue) {
+        if (dropResidue !== 2) {
           this.createAndDropObject(monster.creatureType, level, attackX, attackY, deadPosition, 2);
         }
       } else {

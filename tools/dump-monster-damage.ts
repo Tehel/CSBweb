@@ -26,6 +26,7 @@ import { MonsterDamage, MonsterDamageResult } from '../src/engine/MonsterDamage'
 import { TimerQueue, TimerFunction } from '../src/engine/TimerQueue';
 import type { MissileEncounter } from '../src/engine/MissileEncounter';
 import type { ActuatorSystem } from '../src/engine/ActuatorSystem';
+import type { DsaSystem } from '../src/engine/DsaSystem';
 import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';
 import type { PartyState } from '../src/engine/gameTypes';
 import { graphicsTablesOf, newContext } from './lib/game';
@@ -66,7 +67,8 @@ async function main(): Promise<void> {
   let clouds = 0;
   const damage = new MonsterDamage(ctx);
   // The two systems under test, and stand-ins for the rest: the death cloud is only
-  // counted, no missile waits in the cell a dead group is lifted from, and no pad is there.
+  // counted, no missile waits in the cell a dead group is lifted from, no pad is there,
+  // and no delete monster filter runs.
   ctx.systems.monsters = monsters;
   ctx.systems.monsterDamage = damage;
   ctx.systems.missileEncounter = {
@@ -74,6 +76,7 @@ async function main(): Promise<void> {
     checkMonsterMoveFromMissile: () => false,
   } as unknown as MissileEncounter;
   ctx.systems.actuators = { triggerObjectMove: () => {} } as unknown as ActuatorSystem;
+  ctx.systems.dsa = { deleteMonsterFilter: () => {} } as unknown as DsaSystem;
 
   const pool = dungeon.getItem16Pool();
   const active = pool.map((slot, i) => ({ slot, i })).filter((e) => e.slot.word0 >= 0);

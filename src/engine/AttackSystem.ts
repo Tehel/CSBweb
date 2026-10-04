@@ -35,7 +35,7 @@ import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion } from './gameTypes';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { getPartyChampion, markAllPortraitsChanged } from './Party';
-import { MonsterDamageResult } from './MonsterDamage';
+import { DeleteMonsterWhy, MonsterDamageResult, deleteMonsterParameters } from './MonsterDamage';
 import { TimerFunction } from './TimerQueue';
 import type { PartyAttackFilter } from './DsaSystem';
 import { waitForButtonFlashScript, type LoopScript } from './LoopState';
@@ -1040,7 +1040,7 @@ export class AttackSystem {
       for (let y = 0; y < map.descriptor.height; y++) {
         if (this.findFirstMonsterAt(x, y) === OBJECT_ID_EOF) continue;
         if (x === w4 && y === w6) continue;
-        // `ProcessMonsterDeleteFilter(…, DMW_Fusion)` first, which is not ported (`DEBT.md` G2).
+        monsterDamage.processMonsterDeleteFilter(level, x, y, deleteMonsterParameters(DeleteMonsterWhy.DMW_Fusion, -1));
         monsterDamage.deleteMonster(level, x, y);
       }
     }

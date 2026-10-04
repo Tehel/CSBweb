@@ -54,6 +54,10 @@ import { FEED_PARAMETER_WORDS, feedParametersFromWords, feedParametersToWords, t
 import {
   ATTACK_PARAMETER_WORDS, attackParametersFromWords, attackParametersToWords, type AttackParameters,
 } from './MonsterAttack';
+import {
+  DELETE_MONSTER_PARAMETER_WORDS, deleteMonsterParametersFromWords, deleteMonsterParametersToWords,
+  type DeleteMonsterParameters,
+} from './MonsterDamage';
 import { PARTY_MOVE_DATA_WORDS, partyMoveDataFromWords, partyMoveDataToWords, type PartyMoveData } from './MovementSystem';
 
 /** Which of CSBWin's viewing-filter sites runs the filter (`doc/CSBwin-src/Character.cpp`). */
@@ -290,6 +294,7 @@ const ESL_DAMAGE_CHAR_FILTER = 15;
 const ESL_EQUIP_FILTER = 12;
 const ESL_PARTY_MOVE_FILTER = 14;
 const ESL_MONSTER_ATTACK_FILTER = 0;
+const ESL_DELETE_MONSTER_FILTER = 7;
 const ESL_INDIRECT_ACTIONS = 5;
 const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
 
@@ -859,6 +864,22 @@ export class DsaSystem {
       this.setParameters(ATTACK_PARAMETER_WORDS, attackParametersToWords(p));
       run();
       attackParametersFromWords(p, (i) => this.getParameter(i));
+    }));
+  }
+
+  /**
+   * The delete monster filter (`doc/CSBwin-src/Code11f52.cpp:965-1019`), which
+   * `ProcessMonsterDeleteFilter` runs once it has counted the kill: every DSA at
+   * `ESL_DELETEMONSTERFILTER`'s location in turn, each on the block as the DSA before it
+   * left it, a count of 8 and the block's longwords (`:1011-1012`). Back comes the whole
+   * block, into `p` (`:1014`). The function has one `NEWDSAPARAMETERS` (`:928`), so the
+   * DSAs run on parameters of their own, which they share.
+   */
+  deleteMonsterFilter(p: DeleteMonsterParameters): void {
+    this.newDsaParameters(() => this.forEachFilterDsa(ESL_DELETE_MONSTER_FILTER, (run) => {
+      this.setParameters(DELETE_MONSTER_PARAMETER_WORDS, deleteMonsterParametersToWords(p));
+      run();
+      deleteMonsterParametersFromWords(p, (i) => this.getParameter(i));
     }));
   }
 

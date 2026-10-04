@@ -164,6 +164,11 @@ export class DungeonState {
         return new Expool(this.data).locate(key);
     }
 
+    /** `Locate`'s pointer written through: longword `index` of `key`'s first record. */
+    writeLocatedExpoolWord(key: number, index: number, value: number): void {
+        new Expool(this.data).writeLocated(key, index, value);
+    }
+
     /**
      * `GetExtendedCellFlag` (`doc/CSBwin-src/data.cpp:1679-1689`): the cell's bit of flag
      * `ftype`, clear without a record of at least eight longwords.

@@ -18,7 +18,7 @@ party's level. To test that path, put the party on the group's level in the tool
 as a level change does (it re-rolls their status, so set the status after it).
 
 **The trap.** `DungeonState.getAttachedItem16` checks only that `groupIndex` is within the
-pool (`src/engine/DungeonState.ts:848-852`). A group off the party's level keeps its
+pool (`src/engine/DungeonState.ts:888-892`). A group off the party's level keeps its
 corners byte in that field (5, 6, …), so it gets an unrelated `ITEM16` back. Test
 `level === party.position.z` first, as `MonsterDamage.monsterPositionByte` does.
 

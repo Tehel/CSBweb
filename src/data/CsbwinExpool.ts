@@ -217,6 +217,19 @@ export class Expool {
     }
 
     /**
+     * A write through `Locate`'s pointer: longword `index` of `key`'s first record set to
+     * `value`, the record keeping its place in the pool. Nothing for a record missing or
+     * too short.
+     */
+    writeLocated(key: number, index: number, value: number): void {
+        const hashi = this.find(key);
+        if (hashi === -1) return;
+        const p = this.m(hashi);
+        if (index < 0 || index >= this.blockSize(p) - 2) return;
+        this.setM(p + 2 + index, value);
+    }
+
+    /**
      * `EXPOOL::enlarge` (`doc/CSBwin-src/data.cpp:1610-1633`): one more block, cut into
      * records of `size` longwords and put at the head of that length's free list.
      */
