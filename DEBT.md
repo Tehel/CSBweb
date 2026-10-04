@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | Five DSA filters, and the viewing filter's third site | L | ⏳ step 7 of 12 next |
+| G2 | Four DSA filters, and the viewing filter's third site | L | ⏳ step 8 of 12 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -317,10 +317,10 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G2 ⏳ Five DSA filters, and the viewing filter's third site
+### G2 ⏳ Four DSA filters, and the viewing filter's third site
 
-The port runs twelve filters: the viewing filter (two of its three sites),
-the party attack filter, the adjust skills filter, the missile encounter filter, the
+The port runs thirteen filters: the viewing filter (two of its three sites),
+the monster attack filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
 sound filter, the action name filter, the feeding filter, the character death filter, the
 damage filter, the equip filter, the party move filter, and the spell filter at
 `spellFilterLocation`. Each place below uses
@@ -336,14 +336,11 @@ filter's.
 A filter that loops runs each of those DSAs in turn, a filter call apiece; one that
 `break`s runs the first. Each step reads which from its CSBWin site and checks it in a
 `tools/` check through `tools/lib/dsa.ts`: `TestFilter` for one DSA, `withFilterDsas` for
-two on the square where the site loops. Steps 1 to 6, the sound filter, the action name
-filter, the feeding filter, the character death and damage filters, the equip filter, and
-the party move filter, are paid. The
-steps left, one commit each:
+two on the square where the site loops. Steps 1 to 7, the sound filter, the action name
+filter, the feeding filter, the character death and damage filters, the equip filter, the
+party move filter, and the monster attack filter, are paid. The steps left, one commit
+each:
 
-7. **`ESL_MONSTERATTACKFILTER`** (M). The DSAs at `Monster.cpp:1125-1171`, which may
-   rewrite a monster attack's whole parameter block (`MonsterAttack.ts:157`), the port's
-   `attackParameters`, kept from one attack to the next as CSBWin's file-scope global is.
 8. **`ESL_DELETEMONSTERFILTER`** (M). `ProcessMonsterDeleteFilter`
    (`Code11f52.cpp:926`, the DSA at `:1013`). It counts each kill in `expool`'s statistics
    and runs its DSA, which may set `deathCloud` and `dropResidue`. CSBWin calls it from

@@ -106,6 +106,7 @@ const CHECKS = [
   { tool: 'dump-char-damage-filter.ts' },
   { tool: 'dump-equip-filter.ts' },
   { tool: 'dump-party-move-filter.ts' },
+  { tool: 'dump-monster-attack-filter.ts' },
   { tool: 'dump-dsa-missiles.ts' },
   { tool: 'dump-dsa-monsters.ts' },
   { tool: 'dump-dsa-text.ts' },

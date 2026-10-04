@@ -94,6 +94,53 @@ export interface AttackParameters {
   supressPoison: number;
 }
 
+/** `sizeof(attackParameters) / 4` (`doc/CSBwin-src/Monster.cpp:1165`): its 20 longwords. */
+export const ATTACK_PARAMETER_WORDS = 20;
+
+/**
+ * `memcpy(pDSAparameters + 1, &attackParameters, sizeof(attackParameters))`
+ * (`doc/CSBwin-src/Monster.cpp:1164`): the block as the monster attack filter's DSA sees
+ * it, a longword per field in the struct's order (`:917-938`).
+ */
+export function attackParametersToWords(p: AttackParameters): number[] {
+  return [
+    p.monsterID, p.monsterType, p.monsterIndex, p.monsterLevel, p.monsterX, p.monsterY,
+    p.monsterPos, p.missileOriginPosition, p.missileRange, p.missileDamage, p.missileDecayRate,
+    p.directionToParty, p.distanceToParty, p.missileType, p.monsterShouldLaunchMissile,
+    p.monsterShouldSteal, p.heroToDamage, p.attackSoundOrdinal, p.disableTime, p.supressPoison,
+  ].map((word) => word | 0);
+}
+
+/**
+ * `memcpy(&attackParameters, pDSAparameters + 1, sizeof(attackParameters))`
+ * (`doc/CSBwin-src/Monster.cpp:1167`): the block back from the DSA into `p`, `word(i)` its
+ * longword `i`, a `ui32` field read unsigned.
+ */
+export function attackParametersFromWords(p: AttackParameters, word: (index: number) => number): void {
+  const w = (index: number): number => word(index) | 0;
+  const u = (index: number): number => word(index) >>> 0;
+  p.monsterID = u(0);
+  p.monsterType = u(1);
+  p.monsterIndex = u(2);
+  p.monsterLevel = w(3);
+  p.monsterX = w(4);
+  p.monsterY = w(5);
+  p.monsterPos = w(6);
+  p.missileOriginPosition = w(7);
+  p.missileRange = w(8);
+  p.missileDamage = w(9);
+  p.missileDecayRate = w(10);
+  p.directionToParty = w(11);
+  p.distanceToParty = w(12);
+  p.missileType = u(13);
+  p.monsterShouldLaunchMissile = w(14);
+  p.monsterShouldSteal = w(15);
+  p.heroToDamage = w(16);
+  p.attackSoundOrdinal = w(17);
+  p.disableTime = w(18);
+  p.supressPoison = w(19);
+}
+
 export class MonsterAttack {
   private readonly dungeon: DungeonState;
   private readonly random: CsbRandom;
@@ -154,8 +201,7 @@ export class MonsterAttack {
       return false;
     }
 
-    // `MonsterAttackFilter`, the DSA that may rewrite the whole block, is not ported
-    // (DEBT.md G2).
+    this.ctx.systems.dsa.monsterAttackFilter(this.attackParameters);
     const amended = this.attackParameters;
 
     if (amended.monsterShouldLaunchMissile !== 0) {
@@ -184,8 +230,8 @@ export class MonsterAttack {
       switch (chIdx) {
         case 0: case 1: case 2: case 3:
           break;
-        case 4: // party leader
-          chIdx = party.selectedCharacterIndex >= 0 ? party.selectedCharacterIndex : 0;
+        case 4: // party leader, `d.HandChar` (`doc/CSBwin-src/Monster.cpp:1215-1217`)
+          chIdx = party.cursorOwner ?? -1;
           break;
         case 5: // random live member
           chIdx = this.randomLiveChampion();

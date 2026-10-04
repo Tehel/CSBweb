@@ -51,6 +51,9 @@ import { findChampionByFingerprint } from './Party';
 import { EDT_GLOBAL_TEXT, GetText } from '../data/DecodeText';
 import { messageParametersKey, readGlobalVariables } from '../data/CsbwinExpool';
 import { FEED_PARAMETER_WORDS, feedParametersFromWords, feedParametersToWords, type FeedParameters } from './Feeding';
+import {
+  ATTACK_PARAMETER_WORDS, attackParametersFromWords, attackParametersToWords, type AttackParameters,
+} from './MonsterAttack';
 import { PARTY_MOVE_DATA_WORDS, partyMoveDataFromWords, partyMoveDataToWords, type PartyMoveData } from './MovementSystem';
 
 /** Which of CSBWin's viewing-filter sites runs the filter (`doc/CSBwin-src/Character.cpp`). */
@@ -286,6 +289,7 @@ const ESL_CHAR_DEATH_FILTER = 11;
 const ESL_DAMAGE_CHAR_FILTER = 15;
 const ESL_EQUIP_FILTER = 12;
 const ESL_PARTY_MOVE_FILTER = 14;
+const ESL_MONSTER_ATTACK_FILTER = 0;
 const ESL_INDIRECT_ACTIONS = 5;
 const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
 
@@ -840,6 +844,22 @@ export class DsaSystem {
       block = partyMoveDataFromWords((i) => this.getParameter(i));
     }, true));
     return block;
+  }
+
+  /**
+   * The monster attack filter (`doc/CSBwin-src/Monster.cpp:1125-1171`), which
+   * `MonsterAttacks` runs once the block is filled and before it acts on it: every DSA at
+   * `ESL_MONSTERATTACKFILTER`'s location in turn, each on the block as the DSA before it
+   * left it, a count of 20 and the block's longwords (`:1164-1165`), and on parameters of
+   * its own, a `NEWDSAPARAMETERS` apiece (`:1153`). Back comes the whole block, into `p`
+   * (`:1167`).
+   */
+  monsterAttackFilter(p: AttackParameters): void {
+    this.forEachFilterDsa(ESL_MONSTER_ATTACK_FILTER, (run) => this.newDsaParameters(() => {
+      this.setParameters(ATTACK_PARAMETER_WORDS, attackParametersToWords(p));
+      run();
+      attackParametersFromWords(p, (i) => this.getParameter(i));
+    }));
   }
 
   /**

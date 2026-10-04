@@ -1297,7 +1297,7 @@ stream from CSBWin's even though no state changes. Ported as written.
 `doc/CSBwin-src/Monster.cpp:944` does not deal damage directly. It fills in an
 `attackParameters` block — target, missile or melee, which missile, range, damage, sound —
 hands the whole block to the Monster Attack Filter DSA, which may rewrite any field
-(`:1125-1171`), and only then acts on it. That is why the parameters are a struct rather
+(`:1125-1171`, below), and only then acts on it. That is why the parameters are a struct rather
 than locals, and why the port keeps them as one object.
 
 Two ways a target is chosen. A `word2Bit4` monster picks a *random* live champion, walking
@@ -3722,6 +3722,30 @@ each returns at once on `PM_INHIBITMOVE` (1):
 
 `_TurnParty` and `TraverseStairway` leave `delay` and the stamina adjustments unset; the
 port gives them 0. `tools/dump-party-move-filter.ts`.
+
+## The monster attack filter runs every DSA at its location, each on parameters of its own
+
+`MonsterAttacks` runs the filter once the block is filled and before it acts on it
+(`doc/CSBwin-src/Monster.cpp:1125-1171`). It walks the chain at `ESL_MONSTERATTACKFILTER`'s
+location (0, `doc/CSBwin-src/CSB.h:1535`) and runs every type-47 actuator (`continue`,
+`:1169`), each in a scope with a `NEWDSAPARAMETERS` (`:1153`), so each DSA runs on
+parameters of its own and the caller's are untouched. Each gets a count of 20,
+`sizeof(attackParameters)/4`, then the block's longwords in the struct's order
+(`:1164-1165`; `:917-938`): `monsterID`, `monsterType`, `monsterIndex`, `monsterLevel`,
+`monsterX`, `monsterY`, `monsterPos`, `missileOriginPosition`, `missileRange`,
+`missileDamage`, `missileDecayRate`, `directionToParty`, `distanceToParty`, `missileType`,
+`monsterShouldLaunchMissile`, `monsterShouldSteal`, `heroToDamage`, `attackSoundOrdinal`,
+`disableTime`, `supressPoison`. The whole block comes back (`:1167`), and the next DSA sees
+it as the last one left it.
+
+What follows reads the block as it stands. A launch throws `missileType` only if it is one
+of the seven spell RNs, compared as a `ui32` (`:1180-1191`), so -128 is not `RNFireball`;
+a launch of anything else strikes no blow either, and the attack still returns true.
+`heroToDamage` 4 is `d.HandChar`, the champion holding the cursor, 5 a random live
+champion and 6 the nearest, and anything outside 0-6 returns false (`:1208-1229`).
+The block is a file-scope global, and `MonsterAttacks` writes every field of it again but
+`disableTime`, which no C++ reads (`:986-1122`), so a filter sees the `disableTime` the last
+one left. `tools/dump-monster-attack-filter.ts`.
 
 ## The `QueueSound` calls, and the level each is on
 
