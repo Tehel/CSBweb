@@ -16,8 +16,18 @@ position: `_TAG00799a_9` takes the words at bytes 12, 14 and 18 of the second bl
 (`src/data/SaveGameLoader.ts`, `readI16BE(buf, 12/14/18)`).
 
 The screen lists the titles of the hints that apply, at most `MAXHINTINDICES` = 9 of
-them (`Hint.cpp:11`, the loop in `_TAG00799a_6`, `:5998`). A title chosen shows its
-pages, one at a time (`f.CurPage10484`, `Hint.cpp:341`).
+them (`Hint.cpp:11`, the loop in `_TAG00799a_6`, `:5998`), though the button table
+`s20_16208` has only eight title lines, ids 10 to 17, x 40-280, y 30-42 down to
+142-154 (`Hint.cpp:417-439`). A title chosen shows its pages, one at a time
+(`f.CurPage10484`, `Hint.cpp:341`), in the rectangle x 34-285, y 31-164
+(`Hint.cpp:6343-6346`); NEXT is offered while pages remain and LAST past the first
+(`:6380-6389`). The bottom row's buttons share three rectangles, x 33-100, 127-194 and
+221-289 by y 179-192: LAST or Dump, LOAD, NEXT or OK, and DONE, EXIT or CANCEL
+(`s20_16208`).
+
+CSBWin's original is `HINT.FTL` on the utility disk (`doc/ATARI_ST_DISK_REFERENCE.md`).
+`Hint.cpp`'s function names are offsets in its code segment, as `Chaos.cpp`'s are in
+`CHAOS.FTL`'s.
 
 ## Files
 
@@ -26,7 +36,16 @@ pages, one at a time (`f.CurPage10484`, `Hint.cpp:341`).
 - **`hcsb.dat`** is the Oracle's own item file, indexed as `graphics.dat` is: `TAG002c5e`
   reads its index, `ReadDatSeg` its 100-byte item 0 into `f.Segment1_16872`, and
   `TAG003006` item 1 into a 0x8000-byte buffer and item 2 into a 3456-byte one
-  (`Hint.cpp:4017-4056`). Its contents are not decoded here.
+  (`Hint.cpp:4017-4056`), and `TAG005ae8_1` item 3 into `f.Palette16608` (`:4422`). It
+  has four items, all stored uncompressed (each item's two sizes in the index are
+  equal, and the 18-byte index plus the items is the file's 30793 bytes):
+
+  | Item | Bytes | What |
+  | --- | --- | --- |
+  | 0 | 100 | Fifty words of the screen's parameters, `f.Segment1_16872`: palette slots, inks, fade timings and the colour cycle. Which word does what is not yet written down. |
+  | 1 | 29146 | The backdrop, a 320x200 IMG1 picture (`decodeIMG` reads it): a stone frame round a red field and the three bottom buttons. `TAG0088b8` copies it to the whole screen (`:4086`). |
+  | 2 | 1497 | The font, a 256x27 IMG1 picture, which is 3456 bytes at four bits a pixel. `TAG004962` draws character `c` from x `8 * ((c - 32) & 31)`, y `9 * ((c - 32) / 32)`, 8 wide, 9 apart, with colour 12 transparent (`:3446-3477`). |
+  | 3 | 32 | The palette, sixteen `0RGB` words. |
 
 Both come in CSBWin's Chaos Strikes Back package
 (`static/gamefiles/CSB_Windows_x86-32_20151213.zip`) and sit in `static/gamefiles/csb/`.

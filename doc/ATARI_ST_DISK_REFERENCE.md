@@ -363,7 +363,7 @@ and a folder:
 | `FTLCODE` | 15080 | `4b21e2d5…` | An FTL module (below). It holds the string `A:\SWITCH.DAT`. Not examined. |
 | `SWITCH.DAT` | 7405 | `b1fc60f2…` | Not examined. |
 | `CHAOS.FTL` | 42090 | `2de4a565…` | The utility, `doc/CSBwin-src/Chaos.cpp`'s original (below). |
-| `HINT.FTL` | 49436 | `8dfea415…` | An FTL module. Not examined. |
+| `HINT.FTL` | 49436 | `8dfea415…` | The hint oracle, `doc/CSBwin-src/Hint.cpp`'s original (below). |
 | `HCSB.DAT` | 30793 | `708e113c…` | The hint oracle's, byte-identical to `static/gamefiles/csb/hcsb.dat`. |
 | `HCSB.HTC` | 66172 | `8ce69b54…` | Byte-identical to `static/gamefiles/csb/hcsb.hct`. |
 | `ANIMATE.FTL` | 21128 | `e882f1a6…` | An FTL module. Not examined. |
@@ -412,6 +412,11 @@ offsets in that code: `_TAG000ede`, `_TAG000fc4`, `_TAG00179c`, `_TAG00260e`,
 each begin with `LINK A6` (`4e56`) at their offset. `TAG00439e`, which has no frame,
 begins `move.l d7,-(sp); moveq #0,d7`. `_ReadSavedGame` is `TAG001868`
 (`doc/CSBwin-src/Chaos.cpp:2206`).
+
+**`HINT.FTL` is laid out the same way.** Its header's third segment entry is offset
+`0x0ec6` and length `0xb256`, which end at the file's end. Of the 179 `TAG` offsets
+`Hint.cpp` names, 150 begin with `LINK A6` at their offset in that segment; the 29
+others are not examined.
 
 **"MAKE NEW ADVENTURE" reads no portrait.** Button 13 of `_TAG004518`
 (`doc/CSBwin-src/Chaos.cpp:3949-3973`) makes the same calls as the original, in the same

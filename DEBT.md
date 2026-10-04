@@ -106,14 +106,14 @@ In payoff order: the first row is the next item.
 | F13 | `npm test` runs its tools one at a time | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G29 | Recording a game and playing it back | — | ⏸️ |
-| G20 | The hint oracle | — | ⏸️ |
+| G20 | The Hint Oracle's screen, from `hcsb.dat` | M | ⏸️ |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X1 | Extra: drinking from a fountain with an empty hand | S | ⏸️ |
 | X2 | Extra: a mastery just gained shown in green | S | ⏸️ |
 | X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
 | X5 | Extra: 3D2D1D's vertical moves and gravity | L | ⏸️ |
-| X6 | Extra: the Hint Oracle's hints in the game, as the party moves | M | ⏸️ |
+| X6 | Extra: the Hint Oracle from the inventory, at the party's square | M | ⏸️ |
 | X8 | Extra: RISE's own dialog, and the utility disk's portraits on DM's champions | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -532,18 +532,66 @@ the game; whether to model it is the author's call.
 
 Not taken in order; the author names one to start it (see "Priority").
 
-### G20 ⏸️ The hint oracle
+### G20 ⏸️ The Hint Oracle's screen
 
-CSBWin's HINT choice (`_StartHint`, `doc/CSBwin-src/Hint.cpp:6454`, a 7936-line file)
-reads a CSB save and answers questions about where its party stands. It is not the
-game, so it waits; the author names it to start it.
+Chaos Strikes Back's Hint Oracle is a program of its own: `HINT.FTL` on the utility disk,
+ported by CSBWin as `Hint.cpp` (`_StartHint`, `doc/CSBwin-src/Hint.cpp:6454`). CSBWin
+reaches it from the launcher's HINT choice, which the port does not have
+(`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`), and it reads the party's square from a saved
+game. This item is the screen itself, ported as CSBWin draws it and fed a square. X6 is
+what opens it in the game, and the two are taken together, this one first: with
+nothing to open it, the screen alone is not reachable.
 
-Its data is read: `parseHintOracle` (`src/data/HintOracleLoader.ts`) decodes
-`hcsb.hct`, and `hintsAtPosition` is `_TAG00799a_9`'s lookup
-(`doc/CSBWIN_HINT_ORACLE_REFERENCE.md`, checked by `tools/dump-hint-oracle.ts`). What is
-left is the Oracle's own screen: `hcsb.dat`'s three items, the title menu, the pages,
-and the save chosen from CSBWin's menu. An `hcsb.hct` enciphered under a save's
-`hintKey` (`RC4.cpp`'s cipher, `:5401-5405`) is not read; no save here has a key.
+Done already: `hcsb.hct` (`parseHintOracle` and `hintsAtPosition`,
+`src/data/HintOracleLoader.ts`, checked by `tools/dump-hint-oracle.ts`), and the layout of
+`hcsb.dat`'s four items, the backdrop, the font and the palette among them, with the
+button table (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "What it is", "Files").
+
+What the screen is. About 2000 of `Hint.cpp`'s 7560 lines are the interface; the rest is
+GEMDOS file emulation, a heap, LZW, palette fades and empty GEM stubs.
+
+- `_StartHint`'s loop (`:6513-6633`) keeps the screen in `w_4`: 1 the load screen, 2 the
+  title list (`_TAG00799a_6`, `:5979-6053`, or "There are no clues for this location."
+  with DONE alone, `:6553`), 4 a hint's page (`TAG007fdc_36` and `:6248-6392`). DONE on
+  a page goes back to the list, and on the list back to the load screen (`:6584-6602`).
+- Text is `_DisplayText` (`:3497-3608`): words wrapped at a 9-pixel advance, lines 11
+  apart, centred, `/` a line break, a byte outside 32-127 drawn as `_`, and the font
+  recoloured in place to the ink (`TAG004a22_26`, `:3694-3734`).
+- A screen is built over two buffers with palette fades (`_TAG0051c2_31`,
+  `:4171-4251`), after a fade from black at the start (`:4061-4092`). On the title list
+  one palette slot cycles every 20 VBLs (`:6881-6893`).
+- A click is hit-tested against the enabled rectangles of `s20_16208` into a five-slot
+  queue (`TAG001afe`, `:1975-2021`), and a pressed button's label flashes for 20 VBLs
+  (`TAG008c40_8`, `:6951`). No key does anything: every button's key word is 0, so
+  `TAG008c40_3` registers none (`:6824`). There is no sound.
+
+Two steps, one commit each:
+
+1. **`hcsb.dat` read** (S). Item 0's fifty words, each named where `Hint.cpp` reads
+   it (inks, fade delays and steps, the cycle), into the reference doc. The four items
+   loaded through `GraphicsLoader`, which already reads a stored file
+   (`utility-portraits.dat`), and checked in `tools/dump-hint-oracle.ts`: the sizes,
+   items 1 and 2 decoded at 320x200 and 256x27, and a canary on the font's glyph
+   positions (the `verification-tools` skill).
+2. **The screen** (M). A modal screen beside `ui/SaveMenu.ts` and `ui/ReIncarnate.ts`,
+   hosted by `GameScreen`, with item 3 as its palette while it is up, as the intro's
+   screens have theirs. It opens on a square (`partyLevel`, `partyX`, `partyY`), in place of
+   `TAG006c7e_9(501)`'s save, and starts at `TAG00799a_9`'s lookup, so the first thing
+   shown is the title list. `Hint.cpp`'s function names are kept. Not ported: the load
+   screen and its floppy prompts, the save chooser (`DoMenu`, `:5288-5316`), the save's
+   checksums (the only reason `TAG00686a` reads the groups and the characters,
+   `:5043-5152`), Dump and `HINTDUMP.TXT` (CSBWin's own, `:6529`), and the OK/CANCEL
+   error screen, which `UI_Die` makes unreachable (`:5144-5147`). One behaviour changes:
+   DONE on the title list closes the Oracle where CSBWin's goes back to the load screen,
+   recorded under H when this is paid. `MAXHINTINDICES` is 9 but `s20_16208` has eight
+   title lines, and a ninth title has no rectangle and is read through anyway (`:6011`);
+   the tool asserts that no square of the retail file matches more than seven.
+
+   A `tools/` check drives it headlessly: level 0 (3,23) lists CREATURES, THE MAZE and
+   FULYA PIT in that order, FULYA PIT's three pages go forward with NEXT and back with
+   LAST, with the buttons each page offers, and a level with no records (past 9) shows
+   "no clues". A golden frame of that title list (CSB's data set) goes in
+   `tools/frames/`.
 
 ### G21 ⏸️ `Translation.txt`: the messages the executable prints, translated
 
@@ -731,34 +779,44 @@ Playing the dungeon through also needs saving, which waits on G1's `DSA::Write`:
 by `tools/solve-3d2d1d.ts`, outside the engine. Once both steps are in, a tool that
 replays it through `Game` is the end-to-end proof.
 
-### X6 ⏸️ The Hint Oracle's hints in the game, as the party moves
+### X6 ⏸️ The Hint Oracle from the inventory, at the party's square
 
-CSB's Hint Oracle answers from a saved game, outside it: it lists the titles of the
-hints for the party's square and level, and shows a chosen one page by page, from a
-nudge to the answer. Its data is decoded already (`parseHintOracle` and
-`hintsAtPosition`, `src/data/HintOracleLoader.ts`; the format and the lookup in
-`doc/CSBWIN_HINT_ORACLE_REFERENCE.md`): 210 hints, 492 pages, 3891 squares on levels
-0-9.
+The original Oracle runs apart from the game and reads a save. This extra opens G20's
+screen from a button in the champion's inventory, on the square the party stands on,
+with no save in between. It needs G20.
 
-The extra offers the same hints live, from the party's position in the running game.
+- **Which game.** The data set holds `hcsb.hct` and `hcsb.dat`, which `main.ts` fetches
+  beside `dungeon.dat`. Only `csb` has them, and their coordinates are CSB's dungeon,
+  which a game started from `mini.dat` (RISE) plays too. Without them there is no
+  button. A game whose Extended Features block carries a non-zero `hintKey`
+  (`src/data/CsbwinExtendedFeatures.ts`) reads `hcsb.hct` deciphered under it, as
+  CSBWin does (`Hint.cpp:5401-5405`). `RC4.cpp`'s cipher is ported already, for Conflux's
+  `dungeon.dat`, but no save here has a key.
+- **The button.** A `word0` of the port's own in `buttons17760`, beside the disk (140, x
+  174-182, y 36-44), the sleep icon (145) and the close box (11) (`doc/CSBWIN_MENU_REFERENCE.md`
+  → "The disk icon"). `syncInventoryButtons` installs it only when the extra is on and
+  the files are there. `graphics.dat` has no picture for it. A candidate is the
+  Oracle's own font's `?` (`hcsb.dat` item 2), drawn in the interface's colours, so that
+  no art is invented. The space left of the disk is free in `tools/frames/03-inventory.png`,
+  but the longest name and title CSB can show must be measured against it. The picture
+  and the place are the author's call before this is taken.
+- **Opening it** as the disk icon opens the save menu (`Mouse.cpp:1708-1727`). The click
+  raises a flag, refused with an empty party or a champion only provisionally joined,
+  and whoever drained the queue opens the Oracle. `TAG02076e` runs before it and
+  `TAG0207cc` after it, as around the disk menu (`SaveGame.cpp:860`, `:1274`), and the
+  game stands still while it is up. The square is the party's `partyLevel`, x and y, not
+  `position.z`, which lags a level change until `loadNewPartyLevel`
+  (`.claude/memory/two-step-level-change.md`). G20's DONE on the title list brings back
+  the inventory as it was.
+- **On by default or not.** The X rules put it behind `UISettings.extras`, off. The
+  author may want it on, as for X8's upgrade. It only ever shows in CSB, and no golden
+  frame is of CSB, so none would move. On by default, it is recorded under H, as the
+  coloured cursor is. The author's call before this is taken.
 
-- **Loading.** `main.ts` fetches `${dataSet.dir}/hcsb.hct` next to `dungeon.dat`. Only the
-  `csb` set has one; without it the extra is absent, whatever the setting. The
-  coordinates are the CSB dungeon's (`partyLevel`, x, y), so the file means nothing
-  against another dungeon.
-- **The lookup.** On every square the party arrives on (a step, the stairs, a pit, a
-  teleporter), `hintsAtPosition(oracle, partyLevel, x, y)`, as the Oracle does from a
-  save. The level-wide records (x and y 0xff: a "CREATURES" hint on every level, and
-  one about the level as a whole on most) match every square of their level, so they
-  are shown apart from the square's own, or the indicator would never go out.
-- **Showing it.** A sign that the square has hints; a click lists their titles; a title
-  shows its first page, and each further page is asked for, as the Oracle does, so a
-  player takes only as much help as they want. Where it is drawn, on the canvas or
-  beside it, is the author's to decide before this is taken.
-
-A `tools/` check with the setting on: walk a CSB party onto a square with hints (level 0
-(3,23) offers CREATURES, THE MAZE and FULYA PIT, in that order), across a teleporter
-and down a pit, and check what the extra offers after each move.
+A `tools/` check, the extra on: a CSB party at level 0 (3,23) clicks the button and the
+Oracle lists CREATURES, THE MAZE and FULYA PIT. After a step, a pit and a teleporter it
+lists the new square's hints. In DM there is no button. A golden frame of CSB's
+inventory with the button.
 
 ### X8 ⏸️ RISE's own dialog, and the utility disk's portraits on DM's champions
 
