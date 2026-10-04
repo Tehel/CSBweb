@@ -49,7 +49,7 @@ import { monsterDrawAsSize4, monsterInvisible, monsterPoisoned, monsterUnique } 
 import { printWithSubstitution } from './PrintWithSubstitution';
 import { findChampionByFingerprint } from './Party';
 import { EDT_GLOBAL_TEXT } from '../data/DecodeText';
-import { messageParametersKey } from '../data/CsbwinExpool';
+import { messageParametersKey, readGlobalVariables } from '../data/CsbwinExpool';
 
 export interface ViewingFilterOptions {
   phraseMask: number;
@@ -560,10 +560,12 @@ export class DsaSystem {
   private parameters: Int32Array = new Int32Array(101);
   private adjustSkillsParameters = new Int32Array(5);
   /**
-   * `d.GlobalVariables` — where a dungeon's DSAs keep their puzzle progress, so a read
-   * has to carry them (`getGlobalVariables` / `setGlobalVariables`).
+   * `globalVariables` — where a dungeon's DSAs keep their puzzle progress, so a read
+   * has to carry them (`getGlobalVariables` / `setGlobalVariables`). Its length is
+   * `numGlobalVariables`: a game read takes both from its `EXPOOL`
+   * (`readGlobalVariables`), and a save puts them back (`Expool.storeGlobalVariables`).
    */
-  private globalVariables = new Int32Array(100);
+  private globalVariables: Int32Array;
   /**
    * `monsterMoveFilterActive` (`doc/CSBwin-src/data.cpp:85`), which `ProcessDSAFilter`
    * sets while the monster move filter runs (`Monster.cpp:3229`, `:3355`) and
@@ -591,6 +593,7 @@ export class DsaSystem {
     this.objDescWord4 = ctx.tables.objDescWord4;
     this.carryLocation = ctx.tables.carryLocation;
     this.monsterDesc = ctx.tables.monsterDesc;
+    this.globalVariables = Int32Array.from(readGlobalVariables(ctx.state.dungeon));
   }
 
   setParameters(count: number, values: ArrayLike<number>): void {
@@ -980,7 +983,7 @@ export class DsaSystem {
     return this.processTimer6Internal(rn, timer, location, false, vars);
   }
 
-  /** The DSA global variables, for the state a read restores (`RuntimeSave.ts`). */
+  /** The DSA global variables, all `numGlobalVariables`, for the state a read restores (`RuntimeSave.ts`). */
   getGlobalVariables(): number[] {
     return Array.from(this.globalVariables);
   }
@@ -990,10 +993,9 @@ export class DsaSystem {
     return index >= 0 && index < this.globalVariables.length ? this.globalVariables[index]! : null;
   }
 
+  /** The DSA global variables, and their number, `numGlobalVariables`. */
   setGlobalVariables(values: readonly number[]): void {
-    this.globalVariables.fill(0);
-    const count = Math.min(values.length, this.globalVariables.length);
-    for (let i = 0; i < count; i++) this.globalVariables[i] = values[i] | 0;
+    this.globalVariables = Int32Array.from(values, (value) => value | 0);
   }
 
   private processTimer6Internal(
@@ -1427,7 +1429,10 @@ export class DsaSystem {
             nextState = curState + relState;
             const index = (word >> 6) & 0x7f;
             const value = bank.stack.pop();
-            if (index >= 0 && index < this.globalVariables.length) {
+            // `DSA.cpp:1268-1275`.
+            if (index >= this.globalVariables.length) {
+              this.ctx.host.trace('Global Store to non-existent variable');
+            } else {
               this.globalVariables[index] = value;
             }
             break;
@@ -1443,6 +1448,7 @@ export class DsaSystem {
             const index = (word >> 6) & 0x7f;
             // Past the last variable, "Gloal fetch from non-existent variable" pushes
             // 0xcdcdcdcd (`doc/CSBwin-src/DSA.cpp:1302-1306`).
+            if (index >= this.globalVariables.length) this.ctx.host.trace('Gloal fetch from non-existent variable');
             const value = index < this.globalVariables.length ? this.globalVariables[index] : 0xcdcdcdcd;
             bank.stack.push(value);
             break;

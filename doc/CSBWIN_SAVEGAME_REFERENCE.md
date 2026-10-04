@@ -163,8 +163,10 @@ big-endian.
 Blocks 7-14 are the dungeon image, and they are the bulk of the file.
 
 Two things are written to EXPOOL (block 13's `dbEXPOOL`) just before, rather than to a
-block of their own: the 100 DSA **global variables**, sixteen at a time under
-`(EDT_Database<<24)|(EDBT_GlobalVariables<<16)|i` (`:1141-1148`), and the 24 overlay
+block of their own: the DSA **global variables**, sixteen at a time into the records
+`(EDT_Database<<24)|(EDBT_GlobalVariables<<16)|i` the dungeon has (`:1141-1148`), whose
+number a read takes as theirs (`doc/PROVEN_FACTS.md` → "The DSA global variables are the
+`EXPOOL` records a read finds"), and the 24 overlay
 **palette** records under `(EDT_Palette<<24)+i` (`:1151-1162`).
 
 ### Block 4 is not only the champions
@@ -272,9 +274,8 @@ and the port writes as zero.
 
 **What a file of the port's does not carry**, or the port does not read:
 
-- The DSA programs and their global variables, and the overlay palette records, which
-  only a DSA changes (`DEBT.md` G1); `buildSaveFile` refuses a dungeon that defines a
-  DSA.
+- The overlay palette records, which only a DSA changes, `&DisableSaves`' record, and
+  the DSA tracing flags `WriteDSAs` puts beside the DSAs (`DEBT.md` G1).
 - `SimpleEncryption`, neither written nor read past the header, and `MakeBigActuators`'
   read of the actuator type before the byte swap (`DEBT.md` G4).
 
@@ -369,6 +370,6 @@ it is, what its cell holds, and whether every cell flag in all fourteen maps is 
 save's.
 
 What a load does **not** carry is listed in `src/engine/CsbwinSaveGame.ts` → "What is
-not restored": the DSA global variables in `EXPOOL`, and what no CSBWin file holds
+not restored": what no CSBWin file holds
 (`d.Word11694`, `d.PartySleeping`, `d.PendingDamage` and `d.PendingOuches`, the open
 inventory).

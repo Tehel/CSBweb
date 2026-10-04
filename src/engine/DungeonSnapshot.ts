@@ -162,8 +162,6 @@ export interface DungeonSnapshot {
     objectCounts: ui16[];
     /** Every database's records, by key. A database absent from the map is left alone. */
     databases: Partial<Record<DatabaseKey, DatabaseRecord[]>>;
-    /** `DsaSystem`'s 100 global variables. */
-    dsaGlobals?: number[];
     /**
      * `data.textWords`, base64 of big-endian words. After the load-time conversion this
      * is the compressed text, which is why it and `compressedText` normally hold the

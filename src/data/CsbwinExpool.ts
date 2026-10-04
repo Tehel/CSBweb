@@ -37,6 +37,10 @@ const EDT_MESSAGE_PARAMETERS = 1;
 const EDT_SPECIAL_LOCATIONS = 3;
 /** The last `ESL_*`, `ESL_DAMAGECHARFILTER` (`doc/CSBwin-src/CSB.h:1550`). */
 const ESL_SPECIAL_LOCATION_MAX = 15;
+/** `EDT_Database` (`doc/CSBwin-src/CSB.h:1552`). */
+const EDT_DATABASE = 5;
+/** `EDBT_GlobalVariables` (`doc/CSBwin-src/CSB.h:1557`). */
+const EDBT_GLOBAL_VARIABLES = 4;
 /** `EDT_ChampionBones` (`doc/CSBwin-src/CSB.h:1571`). */
 const EDT_CHAMPION_BONES = 9;
 
@@ -53,6 +57,14 @@ export interface ExpoolDatabase {
 /** `(EDT_ChampionBones << 24) | rn`, the key of a bones object's record. */
 function championBonesKey(rn: number): number {
     return ((EDT_CHAMPION_BONES << 24) | (rn & 0xffff)) >>> 0;
+}
+
+/**
+ * `(EDT_Database << 24) | (EDBT_GlobalVariables << 16) | i`, the key of the `i`th record
+ * of sixteen DSA global variables.
+ */
+function globalVariablesKey(i: number): number {
+    return ((EDT_DATABASE << 24) | (EDBT_GLOBAL_VARIABLES << 16) | i) >>> 0;
 }
 
 /**
@@ -216,6 +228,27 @@ export class Expool {
         return keys;
     }
 
+    /**
+     * `SaveGame`'s copy of the DSA global variables into their records
+     * (`doc/CSBwin-src/SaveGame.cpp:1141-1148`): sixteen to a record, each written
+     * through `Locate`'s pointer, so it keeps its place in the pool. False, where CSBWin
+     * says "Error saving global variables", for a record missing or shorter than
+     * sixteen; that one is left as it was.
+     */
+    storeGlobalVariables(values: readonly number[]): boolean {
+        let saved = true;
+        for (let i = 0; i < Math.floor(values.length / 16); i++) {
+            const hashi = this.find(globalVariablesKey(i));
+            const p = hashi === -1 ? 0 : this.m(hashi);
+            if (hashi === -1 || this.blockSize(p) - 2 < 16) {
+                saved = false;
+                continue;
+            }
+            for (let j = 0; j < 16; j++) this.setM(p + 2 + j, values[16 * i + j]);
+        }
+        return saved;
+    }
+
     /** `EXPOOL::AddChampionBonesRecord` (`doc/CSBwin-src/data.cpp:1636-1643`). */
     addChampionBonesRecord(bonesObject: number, fingerprint: number): void {
         this.write(championBonesKey(bonesObject), [fingerprint & 0xffff]);
@@ -235,6 +268,22 @@ export class Expool {
         const record = this.read(championBonesKey(bonesObject));
         return record?.length === 1 ? record[0] : null;
     }
+}
+
+/**
+ * `LoadGame`'s read of the DSA global variables (`doc/CSBwin-src/SaveGame.cpp:1746-1760`):
+ * sixteen from each record, from the first up to one missing or shorter than sixteen.
+ * Their number is `numGlobalVariables`, 0 for a pool with none.
+ */
+export function readGlobalVariables(db: ExpoolDatabase): number[] {
+    const expool = new Expool(db);
+    const values: number[] = [];
+    for (let i = 0; i < 999; i++) {
+        const record = expool.locate(globalVariablesKey(i));
+        if (!record || record.length < 16) break;
+        values.push(...record.slice(0, 16));
+    }
+    return values;
 }
 
 /** The `EDT_SpecialLocations` entries of an `EXPOOL` database, given as its raw blocks. */

@@ -341,6 +341,104 @@ function readDsa(rcs: RcsReader): DsaDefinition {
 }
 
 /**
+ * `WCS` (`doc/CSBwin-src/data.cpp:1796-1869`): the bytes `WriteDSAs` writes, little-endian
+ * as the PC build's memory holds them, and the checksum `RcsReader` checks them against.
+ */
+class WcsWriter {
+    private checksum = 0xffff;
+    private readonly bytes: number[] = [];
+
+    /** `WCS(handle)`: the checksum so far, and a new one started. */
+    finalizeChecksum(): number {
+        const out = this.checksum >>> 0;
+        this.checksum = 0xffff;
+        return out;
+    }
+
+    writeBytes(buf: ArrayLike<number>): void {
+        for (let i = 0; i < buf.length; i++) {
+            const b = buf[i] & 0xff;
+            this.checksum = (Math.imul(this.checksum, 0xbb40e62d) + 11 + b) >>> 0;
+            this.bytes.push(b);
+        }
+    }
+
+    writeU8(value: number): void {
+        this.writeBytes([value]);
+    }
+
+    writeU16(value: number): void {
+        this.writeBytes([value, value >>> 8]);
+    }
+
+    writeU32(value: number): void {
+        this.writeBytes([value, value >>> 8, value >>> 16, value >>> 24]);
+    }
+
+    /** A `WRITE` beside the checksum, as `WriteDSAs` writes the checksum itself. */
+    writeU32Unsummed(value: number): void {
+        this.bytes.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff);
+    }
+
+    result(): Uint8Array {
+        return Uint8Array.from(this.bytes);
+    }
+}
+
+/**
+ * `DSA::Write` (`doc/CSBwin-src/DSA.cpp:5672-5695`), with `DSAState::Write` and
+ * `DSAAction::Write` (`:5764-5771`, `:5800-5805`): `readDsa`'s fields in its order.
+ * `m_description` is a `char[80]` (`doc/CSBwin-src/Data.h:2444`), written whole: the
+ * string, then zeros.
+ */
+function writeDsa(wcs: WcsWriter, dsa: DsaDefinition): void {
+    const description = new Uint8Array(80);
+    for (let i = 0; i < Math.min(dsa.description.length, 79); i++) {
+        description[i] = dsa.description.charCodeAt(i);
+    }
+    wcs.writeBytes(description);
+    wcs.writeU16(dsa.state);
+    wcs.writeU8(dsa.localState);
+    wcs.writeU8(dsa.groupId);
+    wcs.writeU32(dsa.numStates);
+    wcs.writeU32(dsa.firstDisplayedState);
+    const states = Array.from({ length: dsa.numStates }, (_, i) => dsa.states[i] ?? null);
+    wcs.writeU32(states.filter((s) => s !== null).length);
+    states.forEach((state, stateNum) => {
+        if (!state) return;
+        wcs.writeU32(stateNum);
+        wcs.writeU32(state.actions.length);
+        for (const action of state.actions) {
+            wcs.writeU32(action.column);
+            wcs.writeU32(action.program.length);
+            for (const word of action.program) wcs.writeU16(word);
+        }
+    });
+}
+
+/** `countDSAs` (`doc/CSBwin-src/SaveGame.cpp:755-765`): the DSAs the index holds. */
+export function countDSAs(index: DsaIndex | undefined): number {
+    return (index?.entries ?? []).slice(0, 256).filter((dsa) => dsa).length;
+}
+
+/**
+ * `WriteDSAs` (`doc/CSBwin-src/SaveGame.cpp:767-780`): each DSA of the index, in number
+ * order, behind its number, then the checksum of them all. What `readExtendedFeatures`
+ * reads back.
+ */
+export function buildDsaSection(index: DsaIndex): Uint8Array {
+    const wcs = new WcsWriter();
+    wcs.finalizeChecksum();
+    index.entries.slice(0, 256).forEach((dsa, dsaNum) => {
+        if (!dsa) return;
+        wcs.writeU32(dsaNum);
+        writeDsa(wcs, dsa);
+    });
+    wcs.writeU32Unsummed(wcs.finalizeChecksum());
+    return wcs.result();
+}
+
+/**
  * `ReadExtendedFeatures` (`doc/CSBwin-src/SaveGame.cpp:298-432`) over the front of a file,
  * a save's or a `dungeon.dat`'s: the block, the object maps, the DSAs, the game
  * information and the DSA level index. `offset` is `ExtendedFeaturesSize`, 0 when the
@@ -385,8 +483,6 @@ export function readExtendedFeatures(file: Uint8Array): {
     header?: ExtendedFeaturesBlock;
     /** The game-information bytes, as written. */
     gameInfo?: Uint8Array;
-    /** The DSA section verbatim, when there is one. */
-    dsaBlock?: Uint8Array;
 } {
     const noBlock = { offset: 0, data: file, simpleEncipher: false, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, expandedPortraits: false, indirectText: false, version: 0, cellFlagArraySize: 0 };
     if (file.length < EXTENDED_FEATURES_SIZE) return noBlock;
@@ -446,11 +542,9 @@ export function readExtendedFeatures(file: Uint8Array): {
             : undefined;
 
     let offset = EXTENDED_FEATURES_SIZE + dataMapLength + dataMapLength * 2;
-    const dsaStart = offset;
 
     let dsaLevelIndex: number[][] | undefined;
     let dsaIndex: DsaIndex | undefined;
-    let dsaBlock: Uint8Array | undefined;
 
     if (numDSA > 0) {
         const rcs = new RcsReader(data, offset);
@@ -469,8 +563,6 @@ export function readExtendedFeatures(file: Uint8Array): {
             throw new Error('savegame DSA checksum mismatch');
         }
         offset = rcs.getOffset();
-        // Kept verbatim so the writer can put them back; this port re-serializes no DSA.
-        dsaBlock = data.slice(dsaStart, offset);
     }
 
     const gameInfo = data.slice(offset, offset + gameInfoSize);
@@ -508,7 +600,6 @@ export function readExtendedFeatures(file: Uint8Array): {
         dsaIndex,
         header,
         gameInfo,
-        dsaBlock,
     };
 }
 
@@ -520,16 +611,10 @@ export interface ExtendedFeaturesPrefix {
     /** `dataIndexMap`: one **little-endian** word per slot, 0xffff when free. */
     indexMap: Uint16Array;
     /**
-     * The DSA section verbatim, from `WriteDSAs` to its four-byte checksum, or absent
-     * when `header.numDSA` is 0.
-     *
-     * ⏳ This port does not re-serialize DSA programs; it carries the bytes a save was
-     * read with. A DSA whose state machine has moved since is therefore written back
-     * where it stood, which is wrong — but no dungeon this project loads defines a DSA
-     * at all (`numDSA` is 0 in every committed save), so nothing exercises it. Recorded
-     * in `DEBT.md` G1.
+     * The DSAs, which `buildDsaSection` writes when `header.numDSA` is not 0. The header
+     * must count them (`countDSAs`).
      */
-    dsaBlock?: Uint8Array;
+    dsaIndex?: DsaIndex;
     /**
      * `gameInfo`, without the terminator `ReadGameInfo` appends
      * (`doc/CSBwin-src/SaveGame.cpp:390-397`). Must be exactly `max(0,
@@ -601,10 +686,15 @@ export function buildExtendedFeaturesPrefix(prefix: ExtendedFeaturesPrefix): Uin
     writeU32LE(block, 32, formChecksum(block));
 
     const levelIndex = buildDsaLevelIndex(prefix.dsaLevelIndex);
-    const dsaBlock = header.numDSA !== 0 ? (prefix.dsaBlock ?? new Uint8Array(0)) : new Uint8Array(0);
-    if (header.numDSA !== 0 && !prefix.dsaBlock) {
-        throw new Error(`extended features declare ${header.numDSA} DSAs but carry none`);
+    if (header.numDSA !== countDSAs(prefix.dsaIndex)) {
+        throw new Error(
+            `extended features declare ${header.numDSA} DSAs but carry ${countDSAs(prefix.dsaIndex)}`,
+        );
     }
+    // `if (efb.numDSA != 0) WriteDSAs(...)` (`doc/CSBwin-src/SaveGame.cpp:989-992`).
+    const dsaBlock = header.numDSA !== 0 && prefix.dsaIndex
+        ? buildDsaSection(prefix.dsaIndex)
+        : new Uint8Array(0);
 
     const out = new Uint8Array(
         EXTENDED_FEATURES_SIZE + dataMapLength * 3 + dsaBlock.length +
@@ -653,6 +743,8 @@ export interface LiveExtendedFeatures {
     dmRulesDesignOption?: boolean;
     /** `simpleEncipher`, written as `SimpleEncryption`: the file is enciphered whole. */
     simpleEncipher?: boolean;
+    /** `DSAIndex`, whose DSAs `numDSA` counts. */
+    dsaIndex?: DsaIndex;
 }
 
 /**
@@ -715,9 +807,8 @@ export function readRulesOptions(
  * game-information string. Note that 0 and -1 are different things here; -1 is an
  * allocated-but-empty one.
  *
- * **`numDSA` is 0.** `DSA::Write` is unported, so a world with DSA programs cannot be
- * written; no dungeon this project loads defines one. `buildSaveFile` refuses rather
- * than writing a file that silently lost them.
+ * **`numDSA`** is `countDSAs()` (`:935`), the DSAs `buildExtendedFeaturesPrefix` then
+ * writes.
  */
 export function buildLiveExtendedFeatures(live: LiveExtendedFeatures): ExtendedFeaturesBlock {
     let flags =
@@ -734,7 +825,7 @@ export function buildLiveExtendedFeatures(live: LiveExtendedFeatures): ExtendedF
     return {
         version: EF_VERSION_B,
         flags,
-        numDSA: 0,
+        numDSA: countDSAs(live.dsaIndex),
         editingOptions: 0,
         gameInfoSize: 0,
         cellFlagArraySize: live.cellFlagArraySize,

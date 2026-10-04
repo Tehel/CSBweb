@@ -216,7 +216,7 @@ function main(): void {
   const world = loadCsbwinWorld(oneHero);
   const record = world.save.characterBlock!.slice(0, CHARDESC_SIZE);
   world.save.characterBlock!.set(record, 2 * CHARDESC_SIZE);
-  game.applyRuntimeSaveState(buildCsbwinRuntimeState(world, { dsaGlobals: game.getDsaGlobalVariables() }));
+  game.applyRuntimeSaveState(buildCsbwinRuntimeState(world));
   const written = loadSaveGameState(buildSaveFile(game)).characterBlock!;
   check(
     written.subarray(2 * CHARDESC_SIZE, 3 * CHARDESC_SIZE).join() === record.join()

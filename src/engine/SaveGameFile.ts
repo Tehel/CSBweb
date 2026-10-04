@@ -17,6 +17,7 @@ import { buildCsbwinCharacterBlock } from '../data/CsbwinCharacters';
 import { objectIndexOf } from '../data/CsbwinObjectIndex';
 import { buildDungeonImage, cellFlagArraySize } from '../data/CsbwinDungeonImageWriter';
 import { buildLiveExtendedFeatures } from '../data/CsbwinExtendedFeatures';
+import { Expool } from '../data/CsbwinExpool';
 import type { DungeonData, TimerRecord } from '../data/dungeonTypes';
 import type { Game } from './Game';
 import type { RuntimeSaveState } from './RuntimeSave';
@@ -68,11 +69,10 @@ function buildFileBlocks(
             `newScrolls=${!!dungeon.newScrolls})`,
         );
     }
-    // `DSA::Write` is unported. No dungeon this project loads defines a DSA, and a file
-    // that dropped them silently would be worse than none.
-    const numDSA = (dungeon.dsaIndex?.entries ?? []).filter((e) => e !== null).length;
-    if (numDSA > 0) {
-        throw new Error(`this port cannot write the ${numDSA} DSA programs this dungeon defines`);
+    // The DSA global variables go into their `EXPOOL` records before the databases are
+    // written (`doc/CSBwin-src/SaveGame.cpp:1141-1148`), in the running world as CSBWin's.
+    if (!new Expool(dungeon).storeGlobalVariables(runtime.game.dsaGlobals)) {
+        game.ctx.host.trace('Error saving global variables');
     }
 
     const party = runtime.party;
@@ -88,6 +88,7 @@ function buildFileBlocks(
             dmRules: game.ctx.rules.dmRules,
             dmRulesDesignOption: game.ctx.rules.dmRulesDesignOption,
             simpleEncipher: game.ctx.rules.simpleEncipher,
+            dsaIndex: dungeon.dsaIndex,
         }),
         dungeonImage: buildDungeonImage(dungeon, {
             indirectText: true,
@@ -137,6 +138,9 @@ export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8A
         extendedFeatures: file.extendedFeatures,
         objectIndex: file.objectIndex,
         dsaLevelIndex: game.ctx.state.dungeon.dsaLevelIndex,
+        // The DSAs as play left them: a DSA whose `localState` is 1 keeps its state in
+        // its own `m_state` (`DsaSystem.putState`), which `DSA::Write` writes.
+        dsaIndex: game.ctx.state.dungeon.dsaIndex,
         dungeonImage: file.dungeonImage,
     };
     return saveSaveGameState(saveGameState);

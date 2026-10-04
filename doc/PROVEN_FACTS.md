@@ -1417,6 +1417,32 @@ the directory, the eight blocks of three records, every link and chain. `csbgame
 holds them among others, and CSBWin's loop run over each of the eight leaves its bytes as
 they were.
 
+## The DSA global variables are the `EXPOOL` records a read finds
+
+`numGlobalVariables` is not a constant. Every game read, a new game's from `dungeon.dat`
+as a save's (`goto tag01eec4`, `doc/CSBwin-src/SaveGame.cpp:1533`), clears the globals
+and `Locate`s `(EDT_Database << 24) | (EDBT_GlobalVariables << 16) | i` for `i` from 0:
+each record of at least sixteen longwords gives sixteen globals, their values with them,
+and the first one missing or shorter ends the count (`:1746-1760`). A dungeon editor
+makes those records; nothing in CSBWin's source writes one. So a dungeon with none has no
+global variable, and `GLOBALSTORE` and `GLOBALFETCH` refuse every index, the fetch giving
+`0xcdcdcdcd` (`doc/CSBwin-src/DSA.cpp:1268-1275`, `:1302-1311`). Conflux 3.5's
+`dungeon.dat` has two records, so 32 globals, the first eight `0, 1, 0, 1, 3, 3, 3, 3`;
+3D2D1D's and every save of `tools/fixtures/` have none.
+
+`SaveGame` copies the globals back through `Locate`'s pointer, sixteen to each record
+(`SaveGame.cpp:1141-1148`), so a record keeps its place in the pool and a save adds
+none. A record missing or shorter than sixteen gets the message "Error saving global
+variables".
+
+The DSAs go in the Extended Features block, behind the object maps, when `numDSA`
+(`countDSAs`, `:935`) is not 0 (`:989-992`): `WriteDSAs` writes each DSA's number and
+`DSA::Write`'s fields, through `WCS`, which sums every byte as `FormChecksum` does from
+`0xffff`, and closes with that sum (`:767-780`, `doc/CSBwin-src/DSA.cpp:5672-5695`,
+`:5764-5805`, `doc/CSBwin-src/data.cpp:1796-1869`). `m_description` is written whole, 80
+bytes. Conflux's 131 DSAs written so are its file's section, byte for byte, the string's
+tail zero in every description. Evidence: `tools/dump-dsa-save.ts`.
+
 ## A champion bones record is keyed by the bones' slot in the object indirect index
 
 `AddChampionBonesRecord` writes one longword, `fingerprint & 0xffff`, under the key
@@ -2833,10 +2859,10 @@ the layout would close, and the bytes were then skipped and discarded; the one c
 `parseSpecialLocationsFromSaveData`, hashes its own copy straight out of the save file.
 `DungeonData.expool` now keeps the whole section as bytes (9 records in the seven
 made-to-order saves, 13 in `csbgame7.dat`), which is what lets a save be written back carrying the EXPOOL it was
-read with. Note that `SaveGame` deposits the 100 DSA global variables and the 24 overlay
-palette records into EXPOOL immediately before the image
-(`doc/CSBwin-src/SaveGame.cpp:1141-1162`); this port maintains neither, so the carried
-copy is what a file it writes will hold.
+read with. `SaveGame` deposits the DSA global variables and the 24 overlay palette
+records into EXPOOL immediately before the image (`doc/CSBwin-src/SaveGame.cpp:1141-1164`).
+The port writes the globals ("The DSA global variables are the `EXPOOL` records a read
+finds"), and not the palette (`DEBT.md` G1).
 
 ## Block 15: `WriteAndChecksum` sums bytes, and the closing word is big-endian
 

@@ -274,8 +274,8 @@ It uses 118 `&` operations, 5 of the 7. With Conflux's count of each:
   `CSBgraphics.dat`, which plays nothing until G24. The texts are ported too: `Say`,
   `TextFetch`, `TextSay`, `GlobalTextStore`, `DiscardText` and `CharNameFetch`, checked by
   `tools/dump-dsa-text.ts`.
-- **The dungeon and the program**: what is left of them is `DisableSaves` 2, which goes
-  with the save (below). The other thirteen, `FetchExCellFlg`, `StoreExCellFlg`,
+- **The dungeon and the program**: what is left of them is `DisableSaves` 2, the next
+  step (below). The other thirteen, `FetchExCellFlg`, `StoreExCellFlg`,
   `ThisCell`, `Neighbors`, `Loc2AbsCoord`, `PartyDistance`, `JumpGear`, `GosubGear`,
   `ThisDSAId`, `DSAInfoFetch`, `BitCount`, `MultiplierFetch` and `VSET`, are ported,
   checked by `tools/dump-dsa-dungeon.ts`.
@@ -294,10 +294,11 @@ G27. No dungeon here checks them against play, so each is ported with a tool of 
 The steps: the census is done (`tools/dump-dsa-census.ts`, Conflux's counts by default,
 another `dungeon.dat` as its argument), and so are the characters, the objects, the
 monsters, the texts, the messages and sounds, the dungeon and the program, and the `I_`
-operations. A family's tool runs its programs through `tools/lib/dsa.ts`. Next, and last,
-`DSA::Write` and the `EXPOOL` records, with `DisableSaves`, so that a game with DSAs can
-be saved (below). What is left after that waits on its own item: `SwapCharacter` on G3,
-the display's three on G25, `GetSkin` and `SetSkin` on G27. An operation is checked
+operations, and the save of a dungeon with DSAs: `WriteDSAs`, and the global variables
+read from their `EXPOOL` records at every read and written back at a save, checked by
+`tools/dump-dsa-save.ts`. A family's tool runs its programs through `tools/lib/dsa.ts`.
+Next, and last, `DisableSaves` and the overlay palette's records (below). What is left
+after that waits on its own item: `SwapCharacter` on G3, the display's three on G25, `GetSkin` and `SetSkin` on G27. An operation is checked
 against Conflux in play once G26 makes it a data set.
 
 The rest of the item, with an operation that needs care when ported:
@@ -305,21 +306,8 @@ The rest of the item, with an operation that needs care when ported:
 - **Slave DSAs** are not implemented (`findMaster`, `src/engine/DsaSystem.ts`).
 - **Unported opcodes are traced** once each through `warnedOps` (`DsaSystem.ts`), for a
   dungeon the census has not seen.
-- **Saving a dungeon with DSAs.** `DSA::Write` (`doc/CSBwin-src/Chaos.cpp`) is unported, so
-  `buildSaveFile` refuses a dungeon that defines one rather than write a file without
-  them (`src/engine/SaveGameFile.ts`), and `saveSaveGameState` writes a loaded save's
-  DSA section back verbatim (`SaveGameState.dsaBlock`), where a DSA whose state has moved
-  since the load would be written as it stood. The retail DM dungeon defines none:
-  `numDSA` is 0 in every save of `tools/fixtures/`, with no special-location records.
-- **What a DSA keeps in a save's `EXPOOL`.** `SaveGame` writes the DSA global variables
-  there, sixteen to a record (`doc/CSBwin-src/SaveGame.cpp:1141-1148`), and `LoadGame`
-  reads them back (`:1746-1763`); the port does neither, and a load keeps the running
-  game's (`src/engine/CsbwinSaveGame.ts` → "What is not restored"). Those records are
-  also how many global variables there are: `numGlobalVariables` is sixteen a record
-  found, 0 when there is none (`SaveGame.cpp:1747-1758`), and `EX_GLOBALSTORE` and
-  `EX_GLOBALFETCH` refuse an index at or past it (`DSA.cpp:1268`, `:1302`), where the
-  port always has 100 (`DsaSystem.globalVariables`). `SaveGame` also
-  writes the overlay palette there at every save, as 24 records (`:1152-1164`), which
+- **The overlay palette in a save's `EXPOOL`.** `SaveGame` writes the overlay palette
+  there at every save, as 24 records (`doc/CSBwin-src/SaveGame.cpp:1150-1164`), which
   `LoadGame` takes when all 24 are found (`:1763-1789`). Only a DSA changes that
   palette: `SetOverlayPalette` has one caller (`DSA.cpp:2942`), and it is the identity
   otherwise (`ClearOverlayPalette`, `data.cpp:117`, at `CSBCode.cpp:482`). The port
@@ -329,6 +317,11 @@ The rest of the item, with an operation that needs care when ported:
   port's save of a game started on `dungeon.dat` has no `EXPOOL`, or the bones' alone,
   where CSBWin's has the block and 24 identity records. CSBWin loads either: `Setup`
   makes the block, and with no palette record it keeps the palette it has.
+- **The DSA tracing flags.** `WriteDSAs` is followed by `DSAIndex.WriteTracing()`
+  (`SaveGame.cpp:989-993`), an `EDBT_DSAtraces` record of the flags CSBWin's trace
+  file uses, which a read takes back (`DSAINDEX::ReadTracing`, `DSA.cpp:5553-5576`). The
+  port writes none: the trace is one of CSBWin's debugging features, postponed (see
+  "Priority").
 - **`&DisableSaves`** pops a flag into `disableSaves` (`doc/CSBwin-src/DSA.cpp:2945-2955`).
   While it is set the save menu says only SAVES ARE DISABLED (`SaveGame.cpp:848-856`), and
   the save writer adds an `EDBT_DisableSaves` record to the `EXPOOL` (`:1200-1201`), which

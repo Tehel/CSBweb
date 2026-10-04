@@ -100,11 +100,6 @@ export interface SaveGameState {
    */
   gameInfo?: Uint8Array;
   /**
-   * The DSA section verbatim — `WriteDSAs`' output plus its four-byte checksum. Present
-   * only when `extendedFeatures.numDSA` is non-zero, which no committed save is.
-   */
-  dsaBlock?: Uint8Array;
-  /**
    * `ExtendedFeaturesSize` (`doc/CSBwin-src/SaveGame.cpp:1597`) — how many bytes of
    * block 0 precede GAMEBLOCK1, and so where block 1 starts. Zero for a file with no
    * Extended Features prefix at all.
@@ -690,7 +685,6 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState {
     extendedFeatures: extended.header,
     simpleEncipher: extended.simpleEncipher,
     gameInfo: extended.gameInfo,
-    dsaBlock: extended.dsaBlock,
     extendedFeaturesSize: extended.offset,
     dungeonImageOffset: afterTimerQueue,
     imageLayout: layout ?? undefined,
@@ -894,7 +888,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
         header: save.extendedFeatures,
         typeMap: save.objectIndex?.typeMap ?? new Uint8Array(0),
         indexMap: save.objectIndex?.indexMap ?? new Uint16Array(0),
-        dsaBlock: save.dsaBlock,
+        dsaIndex: save.dsaIndex,
         gameInfo: save.gameInfo,
         dsaLevelIndex: save.dsaLevelIndex,
       })

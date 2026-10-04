@@ -26,18 +26,12 @@
  * | `ITEM16`, missiles | blocks 3 and the image, through `RuntimeSave`'s `applySaveGameState` |
  * | The timer table and the queue that orders it | blocks 5 and 6, through `Game.restoreTimerQueue` |
  * | `d.RandomGameID`, `totalMoveCount`, `d.Byte22808`, `d.Word22592`-`d.Word22598` | `GAMEBLOCK1` (`buildBlock1State`) |
+ * | The DSA global variables, and their number | `EXPOOL` (`readGlobalVariables`, `doc/CSBwin-src/SaveGame.cpp:1746-1760`) |
  *
  * **What is not restored.** A save is the file alone (`SaveGameFile.ts`), so this is
  * everything a save and a load lose. `tools/dump-save-roundtrip.ts` plays a game, saves
  * it, loads it, and holds the whole of what differs to this list.
  *
- * - **The DSA global variables.** CSBWin reads them out of `EXPOOL` under
- *   `(EDT_Database << 24) | (EDBT_GlobalVariables << 16) | i`, sixteen `ui32` per record
- *   (`doc/CSBwin-src/SaveGame.cpp:1746-1763`), and nothing here asks `Expool.locate`
- *   (`src/data/CsbwinExpool.ts`) for them. No committed save needs it: the shipped
- *   DM dungeon defines no DSAs at all — `numDSA` is 0 and there are no special-location
- *   records in any of them — so the live game's globals are kept rather than
- *   cleared. A dungeon with DSAs is not saved at all (`buildSaveFile`).
  * - **What CSBWin's file does not hold either**, and a game it reads starts without:
  *   `d.Word11694` (`gameWon`) and `d.PartySleeping`, `d.PendingDamage` and
  *   `d.PendingOuches` (a blow dealt since the tick's `DisplayCharacterDamage` is never
@@ -64,6 +58,7 @@
  */
 import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
 import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
+import { readGlobalVariables } from '../data/CsbwinExpool';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import { CheckMonsters } from './CheckMonsters';
@@ -75,15 +70,6 @@ import { OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
 import type { Block1State, PartyState } from './gameTypes';
 
-export interface CsbwinRuntimeOptions {
-    /**
-     * The DSA global variables to keep. CSBWin's live in `EXPOOL` and are not read yet
-     * (see the module comment); passing the running game's own leaves them untouched
-     * rather than zeroed.
-     */
-    dsaGlobals?: number[];
-}
-
 /**
  * Build the party state out of `GAMEBLOCK2` and block 4.
  *
@@ -92,8 +78,7 @@ export interface CsbwinRuntimeOptions {
  * too — the setters would validate a champion and rewrite their facing, and a save is
  * restoring a state that was already valid.
  */
-function buildPartyState(world: CsbwinWorld, dsaGlobalsUnused?: never): PartyState {
-    void dsaGlobalsUnused;
+function buildPartyState(world: CsbwinWorld): PartyState {
     const block = world.save.characterBlock;
     const gb2 = world.save.block2;
     if (!block || !gb2) throw new Error('save has no character block or GAMEBLOCK2');
@@ -192,10 +177,7 @@ function buildBlock1State(world: CsbwinWorld): Block1State {
  * Pure: no `Game` is touched, so a verification tool can build one and read it without
  * standing a game up.
  */
-export function buildCsbwinRuntimeState(
-    world: CsbwinWorld,
-    options: CsbwinRuntimeOptions = {},
-): RuntimeSaveState {
+export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
     const gb2 = world.save.block2;
     if (!gb2) throw new Error('save has no GAMEBLOCK2');
     const block = world.save.characterBlock;
@@ -219,7 +201,7 @@ export function buildCsbwinRuntimeState(
                 indexOfFirstMagic: tail.indexOfFirstMagicFootprint,
                 indexOfLastMagic: tail.indexOfLastMagicFootprint,
             },
-            dsaGlobals: options.dsaGlobals ?? [],
+            dsaGlobals: readGlobalVariables(world.dungeon),
             block1: buildBlock1State(world),
         },
         dungeon: {
@@ -266,10 +248,7 @@ export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
     const world = loadCsbwinWorld(bytes);
     installCsbwinWorld(game, world);
     // The snapshot puts back what the installed world already holds.
-    game.applyRuntimeSaveState(buildCsbwinRuntimeState(world, {
-        // Keep what the running game has; see the module comment on `EXPOOL`.
-        dsaGlobals: game.getDsaGlobalVariables(),
-    }));
+    game.applyRuntimeSaveState(buildCsbwinRuntimeState(world));
     // The image's records are already big-actuator records.
     if (world.save.bigActuators) game.ctx.state.dungeon.bigActuators = true;
     return world;
