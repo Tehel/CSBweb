@@ -9,6 +9,7 @@
  *    to each `(EDT_Database << 24) | (EDBT_GlobalVariables << 16) | i` record, from the
  *    first up to one missing. A game on Conflux has its two records' 32; a game on
  *    `csbgame7.dat`, which has none, has none, and `GLOBALSTORE` refuses every index.
+ *    Conflux keeps older records under both keys, and the first of each chain is read.
  * 3. **The global variables at a save** (`SaveGame.cpp:1141-1148`): copied into their
  *    records, which keep their place in the pool, so a second save leaves its size.
  * 4. **The round trip**: `csbgame7.dat` given three DSAs, one of them with its state
@@ -63,6 +64,14 @@ console.log('2. The global variables at a read');
   check(globals.length === 32, "a game on Conflux has its two records' 32 global variables");
   check(same(globals, readGlobalVariables(data)) && same(globals.slice(0, 8), [0, 1, 0, 1, 3, 3, 3, 3]),
     "and each starts at its record's value");
+  // Conflux's pool keeps older records under the same keys; `Locate` takes the first of
+  // the chain, the newest written, and so does the read.
+  const copies = (key: number): number => new Expool(data).keys().filter((k) => k === key).length;
+  console.log(`  records under the two keys: ${copies(globalsKey(0))} and ${copies(globalsKey(1))}`);
+  check(copies(globalsKey(0)) === 9 && copies(globalsKey(1)) === 4 &&
+    same(globals.slice(0, 16), new Expool(data).locate(globalsKey(0))) &&
+    same(globals.slice(16), new Expool(data).locate(globalsKey(1))),
+  "Conflux holds 9 and 4 records under the globals' keys, and the globals are each chain's first");
 
   const csb = freshGame();
   console.log(`  csbgame7.dat: ${csb.systems.dsa.getGlobalVariables().length}`);

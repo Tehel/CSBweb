@@ -1403,7 +1403,11 @@ link, always `RNeof`, over its `size`.
 - **`Write(key, record, size)`** takes the first free record of `size + 2` longwords,
   after an `enlarge` if there is none, and puts it at the head of the key's chain
   (`:1530-1547`). It replaces nothing: two records may share a key, and the newer is the
-  one found. `size` is 29 at most.
+  one found. `size` is 29 at most. Conflux 3.5's `dungeon.dat` holds such records: 57
+  keys have from 2 to 9 records each, and the copies differ in 43 of them. All 57 are
+  `EDT_Database` keys: 27 `EDBT_MonsterNames`, 28 `EDBT_AltMonGraphics` and both
+  `EDBT_GlobalVariables` keys, whose 9 and 4 records `tools/dump-dsa-save.ts` counts. Its
+  pool has no second table.
 - **`Read`** returns the key's first record and hands its longwords back to the head of
   their free list (`:1549-1575`); **`Locate`** leaves the record where it is
   (`:1582-1608`). Both return the record's length, or -1.
