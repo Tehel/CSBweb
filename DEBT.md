@@ -248,25 +248,25 @@ ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter 
 `STKOP` (`doc/CSBwin-src/Data.h:1721-1861`, the port's `StkOp`) has 138 values, and 136
 are operations: `Noop` (0) and `2Dup` (23) have no case in `EX_AMPERSAND`, whose default
 says "Illegal subcode" and does nothing (`doc/CSBwin-src/DSA.cpp:4979-4981`), as the
-port's trace does. The port has 78, so 58 are left. `tools/dump-dsa-census.ts` lists
+port's trace does. The port has 84, so 52 are left. `tools/dump-dsa-census.ts` lists
 them: it fails unless what the port lacks is exactly its `LEFT`, so each family's commit
 takes its operations off that list, and this part of the item is done when it is empty.
 
 Conflux, the dungeon that will check them, defines 131 DSAs, with 4646 programs, behind
 1591 type-47 actuators. A static census of its programs decodes each word with the
 operand layout `DsaSystem.execute` reads, and every program decodes to its exact length.
-It uses 118 `&` operations, 73 of the 83. With Conflux's count of each:
+It uses 118 `&` operations, 45 of the 52. With Conflux's count of each:
 
 - **Characters**: what is left of them is `CharNameFetch` 3, which writes the bank's
   text strings (`DSADBANK::SetText`, `DSA.cpp:194`) and so comes with the text family;
   `I_CharStore` 4 and `I_CausePoison` 6, with the `I_` operations; and `SwapCharacter` 7
   and `I_SwapCharacter` 4, which need G3. The other thirteen are ported, checked by
   `tools/dump-dsa-characters.ts`.
-- **Objects**: what is left of them is `MissileInfoFetch` 2, `MissileInfoStore` 2,
-  `Throw` 1, `Cast` 2, `FilteredCast` 3 and `CreateCloud` 10, and their `I_` forms,
+- **Objects**: what is left of them is the `I_` forms of the missiles, spells and clouds,
   `I_Throw` 14, `I_Cast` 2 and `I_CreateCloud` 59, which go with the `I_` operations. The
   ten field operations, from `GetCharges` to `SetSubType`, are ported, checked by
-  `tools/dump-dsa-objects.ts`.
+  `tools/dump-dsa-objects.ts`; so are `Throw`, `Cast`, `FilteredCast`, `CreateCloud`,
+  `MissileInfoFetch` and `MissileInfoStore`, checked by `tools/dump-dsa-missiles.ts`.
 - **Monsters**: `MonsterFetch` 27, `MonsterStore` 12, `I_MonsterStore` 6, `MonPoss` 3,
   `MonBlk` 1, `MonLandD` 1, `I_DelMon` 2, `I_InsMon` 2.
 - **Text and sound**: `Message` 62, `Say` 121, `TextFetch` 7, `GlobalTextStore` 16,
@@ -293,12 +293,10 @@ location (`:2109-2120`). The port's one `I_` operation, `I_TeleportParty`, share
 census counts it as ported, and the `I_` family's commit gives it CSBWin's path.
 
 The steps: the census is done (`tools/dump-dsa-census.ts`, Conflux's counts by default,
-another `dungeon.dat` as its argument), and so are the characters and the objects'
-fields. Next, one family per commit, in the order above, the seven with their nearest
-family: the objects' missiles, spells and clouds next (`Throw`, `Cast`, `FilteredCast`,
-`CreateCloud`, `MissileInfoFetch`, `MissileInfoStore`). Every `I_` operation, of
-whichever family, comes with `I_Indirect` in a family of its own. A family's tool runs
-its programs through `tools/lib/dsa.ts`. Last, `DSA::Write` and the
+another `dungeon.dat` as its argument), and so are the characters and the objects. Next,
+one family per commit, in the order above, the seven with their nearest family: the
+monsters next. Every `I_` operation, of whichever family, comes with `I_Indirect` in a
+family of its own. A family's tool runs its programs through `tools/lib/dsa.ts`. Last, `DSA::Write` and the
 `EXPOOL` records, so that a game with DSAs can be saved (below). An operation is checked
 against Conflux in play once G26 makes it a data set.
 
@@ -307,13 +305,6 @@ The rest of the item, with an operation that needs care when ported:
 - **Slave DSAs** are not implemented (`findMaster`, `src/engine/DsaSystem.ts`).
 - **Unported opcodes are traced** once each through `warnedOps` (`DsaSystem.ts`), for a
   dungeon the census has not seen.
-- **`STKOP_Throw`** (`DSA.cpp:4558`) is one of the missing opcodes, so
-  `TimerSystem.throwMissile` (`ThrowMissile`, `Timer.cpp:2016`) has no caller. When the
-  opcode is ported, re-port the function's missile-type switch first. CSBWin throws a spell
-  only for the eight words it lists (`RNFireball` … `RNPoisonCloud`, `RNMonsterDeath`), and
-  nothing for any other non-zero word (`Timer.cpp:2029-2040`). The port takes every word
-  `>= 0xff80` as-is and maps the rest through `spellObjectId`. CSBWin also `LoadLevel`s the
-  launch level around the launch (`:2065-2077`).
 - **Saving a dungeon with DSAs.** `DSA::Write` (`doc/CSBwin-src/Chaos.cpp`) is unported, so
   `buildSaveFile` refuses a dungeon that defines one rather than write a file without
   them (`src/engine/SaveGameFile.ts`), and `saveSaveGameState` writes a loaded save's

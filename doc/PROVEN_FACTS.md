@@ -4337,6 +4337,19 @@ uninitialised words cannot be read. The party attack filter is the exception:
 its first two returns, filter or none (`Attack.cpp:1346-1360`, `:1673`). Evidence:
 `tools/dump-dsa-parameters.ts`.
 
+## `&THROW` throws a spell only for the eight words `ThrowMissile` lists
+
+`ThrowMissile` (`doc/CSBwin-src/Timer.cpp:2016-2078`), the DSA's `&THROW`
+(`DSA.cpp:4558-4582`), switches on `missileType & 0xffff` (`:2029-2040`): `RNFireball`,
+`RNPoison`, `RNLightning`, `RNDispellMissile`, `RNZoSpell`, `RNPoisonBolt`, `RNPoisonCloud`
+and `RNMonsterDeath` are `CreateSpell(missileType & 0x7f)`, the word itself; 0 throws the
+first object of a database above `dbMONSTER` and up to `dbMISC` whose corner is the object
+location's, `RemoveObjectFromRoom`d first (`:2041-2061`). Any other word leaves the object
+`RNeof`, and nothing is thrown (`:2063`), however close to a spell it is: `0xff85` and
+`0xff90` throw nothing. Beside it, `&MISSILEINFO!` pops its direction, damage and range
+only when `checkIndirectIndex` takes the slot it popped first (`DSA.cpp:2831-2837`), so an
+invalid slot leaves them on the stack. Evidence: `tools/dump-dsa-missiles.ts`.
+
 ## A missile at a door: Zo works the button, grates let small things through, the rest hit it
 
 The door arm of `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1844-1935`), in order:

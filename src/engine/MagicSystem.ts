@@ -130,6 +130,34 @@ export class MagicSystem {
     return this.castSpell(casterIdx, filtered ?? params);
   }
 
+  /**
+   * `DSACastSpell` (`doc/CSBwin-src/Magic.cpp:1406-1416`), for `&CAST` and `&FILTEREDCAST`:
+   * the first fourteen words of the DSA parameters are the spell's parameters, run through
+   * the spell filter for the second, and champion 0 casts unless they name another.
+   * CSBWin loads the party's level around it, which is the level `castSpell` works on.
+   */
+  dsaCastSpell(filter: boolean): void {
+    const dsa = this.ctx.systems.dsa;
+    let params: SpellParameters = {
+      action: dsa.getParameter(0),
+      incantation: dsa.getParameter(1),
+      chIdx: dsa.getParameter(2),
+      disableTime: dsa.getParameter(3),
+      missileType: dsa.getParameter(4),
+      locationAbs: dsa.getParameter(5),
+      facing: dsa.getParameter(6),
+      skillRequired: dsa.getParameter(7),
+      spellByte5: dsa.getParameter(8),
+      spellClass: dsa.getParameter(9),
+      unused1: dsa.getParameter(10),
+      unused2: dsa.getParameter(11),
+      unused3: dsa.getParameter(12),
+      unused4: dsa.getParameter(13),
+    };
+    if (filter) params = dsa.processSpellFilter(params) ?? params;
+    this.castSpell(0, params);
+  }
+
   private fillSpellParameters(casterIdx: number, incantation: number[], party: PartyState): SpellParameters {
     let value = 0;
     let multiplier = 1000;

@@ -7,7 +7,7 @@ import { CHARFLAG_ATTACK_DISABLE, CHARFLAG_PORTRAIT_CHANGED, getChampionPossessi
 import { selectPaletteForLightLevel } from './LightLevel';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_MONSTER_DEATH, RN_POISON_CLOUD, RN_FFE4,
-  isMagicSpellRn,
+  RN_POISON, RN_POISON_BOLT, RN_ZO_SPELL, isMagicSpellRn,
 } from '../core/spellRn';
 import { findChampionByFingerprint, markAllPortraitsChanged } from './Party';
 import type {
@@ -57,6 +57,11 @@ const SOUND_DOOR_STRUGGLE = 4;
 const SOUND_DOOR_STEP = 2;
 /** `soundTELEPORT` (doc/CSBwin-src/CSB.h:625). */
 const SOUND_TELEPORT = 17;
+/** The missile types `ThrowMissile` throws as spells (`doc/CSBwin-src/Timer.cpp:2029-2040`). */
+const THROWN_SPELLS: ReadonlySet<number> = new Set([
+  RN_FIREBALL, RN_POISON, RN_LIGHTNING, RN_DISPELL_MISSILE, RN_ZO_SPELL, RN_POISON_BOLT, RN_POISON_CLOUD,
+  RN_MONSTER_DEATH,
+]);
 
 export type MissileDropTarget = { monster: ObjectID } | null;
 
@@ -894,9 +899,10 @@ export class TimerSystem {
   }
 
   /**
-   * `ThrowMissile` (doc/CSBwin-src/Timer.cpp:2016). Its one CSBWin caller is the DSA's
-   * `STKOP_Throw` (`DSA.cpp:4558`), which `DsaSystem` does not implement yet, so nothing
-   * calls this — see DEBT.md G1 before wiring it.
+   * `ThrowMissile` (`doc/CSBwin-src/Timer.cpp:2016-2078`), the DSA's `&THROW`
+   * (`DSA.cpp:4558`). A missile type of 0 throws the first object of `objectLocation`'s
+   * corner, taken out of the square; one of the eight spells is thrown as itself; any
+   * other throws nothing. The missile is launched on the launch location's level.
    */
   throwMissile(
     missileType: number,
@@ -929,9 +935,9 @@ export class TimerSystem {
         projectileObject = rn;
         break;
       }
-    } else {
-      // `>= 0xff80` is a spell `RNVAL` already, which the word carries as is.
-      projectileObject = missileTypeWord >= 0xff80 ? missileTypeWord as ObjectID : spellObjectId(missileTypeWord);
+    } else if (THROWN_SPELLS.has(missileTypeWord)) {
+      // `objectToThrow.CreateSpell(missileType & 0x7f)`: `0xff80` plus the spell, the word itself.
+      projectileObject = (0xff80 + (missileType & 0x7f)) as ObjectID;
     }
 
     if (projectileObject === OBJECT_ID_EOF) return false;

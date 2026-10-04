@@ -97,6 +97,7 @@ const CHECKS = [
   { tool: 'dump-dsa-characters.ts' },
   { tool: 'dump-dsa-objects.ts' },
   { tool: 'dump-dsa-parameters.ts' },
+  { tool: 'dump-dsa-missiles.ts' },
   { tool: 'dump-db-reuse.ts' },
   { tool: 'watch-smart-discard.ts' },
   { tool: 'dump-make-more-room.ts' },

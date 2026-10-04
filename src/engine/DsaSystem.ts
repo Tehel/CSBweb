@@ -15,6 +15,9 @@ import { DescIndex, GetBasicObjectType } from './objectIndex';
 import { addToSkill, determineMastery } from './skills';
 import { attributeCurrent, attributeMaximum, attributeMinimum, setAttributeCurrent, setAttributeMaximum, setAttributeMinimum } from './attributes';
 import { sw } from '../core/intCast';
+import {
+  RN_DISPELL_MISSILE, RN_FIREBALL, RN_FLUX_CAGE, RN_MONSTER_DEATH, RN_POISON_CLOUD, RN_ZO_SPELL,
+} from '../core/spellRn';
 import type { ActuatorRecord, CreatureRecord, DsaDefinition, DsaState, TeleporterRecord, TextRecord } from '../data/dungeonTypes';
 import type { SpellParameters } from './magicTypes';
 import {
@@ -2209,6 +2212,35 @@ export class DsaSystem {
         this.setObjectField(subcode, bank.stack.pop(), value);
         break;
       }
+      case StkOp.THROW: {
+        // `DSA.cpp:4558-4582`.
+        const delta = bank.stack.pop();
+        const damage = bank.stack.pop();
+        const range = bank.stack.pop();
+        const direction = bank.stack.pop();
+        const launchLocation = locationRelFromInteger(bank.stack.pop());
+        const objectLocation = locationRelFromInteger(bank.stack.pop());
+        const objectType = bank.stack.pop();
+        this.noFilter(bank);
+        this.ctx.systems.timer.throwMissile(objectType, launchLocation, direction, objectLocation, range, damage,
+          delta, this.ctx.state.tickCount);
+        break;
+      }
+      case StkOp.CAST:
+      case StkOp.FILTERED_CAST:
+        // `DSA.cpp:3091-3106`.
+        this.noFilter(bank);
+        this.ctx.systems.magic.dsaCastSpell(subcode === StkOp.FILTERED_CAST);
+        break;
+      case StkOp.CREATE_CLOUD:
+        this.createCloud(bank);
+        break;
+      case StkOp.MISSILE_INFO_FETCH:
+        this.missileInfoFetch(bank);
+        break;
+      case StkOp.MISSILE_INFO_STORE:
+        this.missileInfoStore(bank);
+        break;
       case StkOp.COUNT_INJURY: {
         // `DSA.cpp:4798-4818`.
         const injuryMask = bank.stack.pop();
@@ -2240,6 +2272,89 @@ export class DsaSystem {
    */
   private noFilter(bank: DsaBank): void {
     if (bank.filter) this.ctx.host.trace('Filter Modifying Dungeon');
+  }
+
+  /**
+   * `STKOP_CreateCloud` (`doc/CSBwin-src/DSA.cpp:2740-2787`): a cloud of one of five
+   * spells, or a Fluxcage, made at a location of any level, as a missile's would be. A
+   * type with no spell is "Illegal cloud type", and makes nothing. CSBWin does not check
+   * the location, and runs `LoadLevel` and `AddObjectToRoom` off their tables for one
+   * past the dungeon; the port makes nothing there.
+   */
+  private createCloud(bank: DsaBank): void {
+    const size = bank.stack.pop();
+    const type = bank.stack.pop();
+    const locr = locationRelFromInteger(bank.stack.pop());
+    this.noFilter(bank);
+    let spellObj: ObjectID = OBJECT_ID_EOF;
+    switch (type) {
+      case 0: spellObj = RN_FIREBALL; break;
+      case 3: spellObj = RN_DISPELL_MISSILE; break;
+      case 4: spellObj = RN_ZO_SPELL; break;
+      case 7: spellObj = RN_POISON_CLOUD; break;
+      case 40: spellObj = RN_MONSTER_DEATH; break;
+      case 50: spellObj = RN_FLUX_CAGE; break;
+      default:
+        this.ctx.host.trace(`Illegal cloud type ${type}`);
+        break;
+    }
+    if (spellObj === OBJECT_ID_EOF) return;
+    if (!this.dungeon.isValidLocation(locr)) return;
+    const at = new Position(locr.x, locr.y, locr.l);
+    if (spellObj === RN_FLUX_CAGE) {
+      this.ctx.systems.missileEncounter.createFluxcage(at, this.ctx.state.tickCount);
+    } else {
+      this.ctx.systems.missileEncounter.createCloud(spellObj, sw(size), locr.x, locr.y, at, locr.p);
+    }
+  }
+
+  /**
+   * `STKOP_MissileInfoFetch` (`doc/CSBwin-src/DSA.cpp:2795-2823`): a missile's contents,
+   * range, damage and direction, the last from its timer's `timerWord8` bits 10-11; -1 for
+   * each when the slot is not a missile. CSBWin reads the timer slot the missile names
+   * whatever it holds; the port finds no timer there only for a record no launch made,
+   * and leaves the direction -1.
+   */
+  private missileInfoFetch(bank: DsaBank): void {
+    let contents = -1;
+    let range = -1;
+    let damage = -1;
+    let direction = -1;
+    const k = bank.stack.pop();
+    if (this.isValidObjectId(k) && this.dungeon.rnMaps.dbType(k) === DBType.MISSILE) {
+      const missile = this.dungeon.getMissileRecord(k);
+      if (missile) {
+        contents = missile.projectileObject & 0xffff;
+        range = missile.rangeRemaining;
+        damage = missile.damageRemaining;
+        const word8 = this.timers.getTimerWord8(missile.timerIndex);
+        if (word8 !== null) direction = (word8 >> 10) & 3;
+      }
+    }
+    bank.stack.push(contents);
+    bank.stack.push(range);
+    bank.stack.push(damage);
+    bank.stack.push(direction);
+  }
+
+  /**
+   * `STKOP_MissileInfoStore` (`doc/CSBwin-src/DSA.cpp:2824-2851`): a missile's range and
+   * damage, cut to their bytes, and its timer's direction. The three values are popped
+   * only when the slot is valid, so an invalid one leaves them on the stack.
+   */
+  private missileInfoStore(bank: DsaBank): void {
+    const k = bank.stack.pop();
+    if (!this.isValidObjectId(k)) return;
+    const direction = bank.stack.pop();
+    const damage = bank.stack.pop();
+    const range = bank.stack.pop();
+    if (this.dungeon.rnMaps.dbType(k) !== DBType.MISSILE) return;
+    const missile = this.dungeon.getMissileRecord(k);
+    if (!missile) return;
+    missile.rangeRemaining = range & 0xff;
+    missile.damageRemaining = damage & 0xff;
+    const timer = this.timers.getTimer(missile.timerIndex);
+    if (timer) timer.timerWord8 = ((timer.timerWord8 & ~(0x3 << 10)) | ((direction & 3) << 10)) & 0xffff;
   }
 
   /**

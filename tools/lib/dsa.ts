@@ -55,16 +55,16 @@ export interface TestFilter {
  * Run `program` as the one program of a test DSA on an empty open square of the party's
  * level, and return the 100 global variables, which start at 0x5a5a. With a `filter`,
  * the program is column 1, run by a timer whose `uByte9` is 1. `again` runs it once more,
- * on the globals as they stand.
+ * on the globals as they stand. `prepare` runs once the square `at` is chosen, before the
+ * DSA is set on it, and a `program` given as a function is built after it.
  */
 export function run(
-  program: number[],
-  prepare: (game: Game) => void = () => {},
+  program: number[] | ((game: Game, at: Position) => number[]),
+  prepare: (game: Game, at: Position) => void = () => {},
   file: Uint8Array = save,
   filter?: TestFilter,
-): { game: Game; g: number[]; again: () => number[] } {
+): { game: Game; g: number[]; again: () => number[]; at: Position } {
   const game = freshGame(file);
-  prepare(game);
   const dungeon = game.ctx.dungeon;
   const z = game.ctx.party.state.position.z;
   const map = dungeon.getMap(z)!;
@@ -78,6 +78,8 @@ export function run(
     }
   }
   if (!at) throw new Error('no empty open square');
+  prepare(game, at);
+  const words = typeof program === 'function' ? program(game, at) : program;
   const data: DungeonData = dungeon.getData();
   data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47, word4: 0, word6: 0 });
   const rn: ObjectID = dungeon.rnMaps.rn(DBType.ACTUATOR, data.databases.actuators.records.length - 1);
@@ -86,8 +88,8 @@ export function run(
     description: 'test', state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,
     states: [{
       actions: filter
-        ? [{ column: 0, program: Uint16Array.from(filter.program) }, { column: 1, program: Uint16Array.from(program) }]
-        : [{ column: 0, program: Uint16Array.from(program) }],
+        ? [{ column: 0, program: Uint16Array.from(filter.program) }, { column: 1, program: Uint16Array.from(words) }]
+        : [{ column: 0, program: Uint16Array.from(words) }],
     }],
   };
   data.dsaIndex = { entries: [dsa] };
@@ -102,5 +104,5 @@ export function run(
     game.systems.dsa.processTimer5(rn, timer, at);
     return game.systems.dsa.getGlobalVariables();
   };
-  return { game, g: again(), again };
+  return { game, g: again(), again, at };
 }
