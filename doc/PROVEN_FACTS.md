@@ -1100,6 +1100,49 @@ step one square at random and try there instead, provided the new square is open
 teleporter, a pit or a door (`OpenTeleporterPitOrDoor`, `doc/CSBwin-src/Timer.cpp:625`). That
 is how he escapes a corner he has been walled into.
 
+## A party without champions presses no party pad, but works wall switches and walks into monsters
+
+A party that has recruited nobody yet (`d.NumCharacter == 0`, the soul walking the Hall of
+Champions) is excluded in exactly these places:
+
+- **Party pads.** `PressurePadOrAlcove`'s floor actuator of type 3, "operated by party",
+  returns before acting when there is no champion (`doc/CSBwin-src/Code11f52.cpp:3756-3758`).
+  Types 1 ("anything") and 2 ("party or monsters") have no such test, so the soul presses
+  them.
+- **Nothing on the wall.** A click on the wall in front is `TouchWallF1` → `TouchWall`
+  (`doc/CSBwin-src/Mouse.cpp:776`, `:290`), and neither reads `d.NumCharacter`: a wall
+  switch tests only the hand (`d.EmptyHanded`, the held object's name index). The soul opens
+  doors with their buttons.
+- **The step's obstacle checks.** In the move command, the whole blocked-step branch is under
+  `if (d.NumCharacter != 0)` (`doc/CSBwin-src/CSBCode.cpp:8263`): both the bump damage
+  against a wall or closed door and the `FindFirstMonster` test that refuses the step and
+  wakes the group (`:8296-8302`). Without champions only `if (direction > 3) return result;`
+  runs (`:8308`). A wall or closed door still stops the soul, since `D5W` stays set and the
+  step is discarded (`:8312`), but without damage. A monster square does not stop it, and
+  the step reaches `MoveObject`, which kills the group (next fact).
+
+## The party landing on a monster group kills it, champions or not
+
+At the end of `MoveObject` for the party (`object == RNnul`), once the party's final square
+is known, `doc/CSBwin-src/Code11f52.cpp:3301-3307` deletes whatever group stands there:
+`FindFirstMonster(d.partyX, d.partyY)`, then `ProcessMonsterDeleteFilter`
+(`DMW_Movement2`), `DropMonsterRemains(..., 1, d.LoadedLevel, dmp.dropResidue<2)` and
+`DeleteMonster`. Nothing there tests `d.NumCharacter`. `d.partyX`/`d.partyY` are the square
+after every teleporter and pit on the way (`:2960`, `:3055`), and the test runs on the
+destination level before `d.newPartyLevel` is set (`:3323`). So the group dies whenever the
+party arrives on its square:
+
+- a plain step, which only a party without champions can take (previous fact);
+- a teleporter, the party's own (`:2960`) or one switched on under it (`WiggleEverything`
+  re-runs the party's `MoveObject` in place, `doc/CSBwin-src/Timer.cpp:2443`);
+- a fall through a pit (`:3055`);
+- the rope's CLIMB DOWN, which tests for a monster on the pit square in front of the party
+  but not on the square below (`doc/CSBwin-src/Attack.cpp:2029`).
+
+`DropMonsterRemains` (`:830`) drops one dropping per group member only for a monster type
+whose descriptor `leavesDroppings()` (`:852`), so a rock pile leaves boulders and a mummy
+nothing. Then it drops whatever the group was carrying (`:895`).
+
 ## Monster AI timers are addressed by map square, and only a DSA move re-aims them all
 
 Timer types 29-41 are found by `uByte6`/`uByte7` (`doc/CSBwin-src/Monster.cpp:1320-1327`).
