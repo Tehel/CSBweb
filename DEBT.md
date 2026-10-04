@@ -297,9 +297,11 @@ another `dungeon.dat` as its argument), and so are the characters, the objects, 
 monsters, the texts, the messages and sounds, the dungeon and the program, and the `I_`
 operations, and the save of a dungeon with DSAs: `WriteDSAs`, and the global variables
 read from their `EXPOOL` records at every read and written back at a save, and
-`DisableSaves`' record, checked by `tools/dump-dsa-save.ts`. A family's tool runs its
-programs through `tools/lib/dsa.ts`. Next, and last, the overlay palette's records (below). What is left
-after that waits on its own item: `SwapCharacter` on G3, the display's three on G25, `GetSkin` and `SetSkin` on G27. An operation is checked
+`DisableSaves`' record, and the overlay palette's 24 records written at every save and
+read back at every read, checked by `tools/dump-dsa-save.ts`. A family's tool runs its
+programs through `tools/lib/dsa.ts`. Next, slave DSAs, then `ECF_FOOTPRINTS`' prints
+(both below). What is left after those waits on its own item: `SwapCharacter` on G3,
+the display's three on G25, `GetSkin` and `SetSkin` on G27. An operation is checked
 against Conflux in play once G26 makes it a data set.
 
 The rest of the item, with an operation that needs care when ported:
@@ -307,17 +309,6 @@ The rest of the item, with an operation that needs care when ported:
 - **Slave DSAs** are not implemented (`findMaster`, `src/engine/DsaSystem.ts`).
 - **Unported opcodes are traced** once each through `warnedOps` (`DsaSystem.ts`), for a
   dungeon the census has not seen.
-- **The overlay palette in a save's `EXPOOL`.** `SaveGame` writes the overlay palette
-  there at every save, as 24 records (`doc/CSBwin-src/SaveGame.cpp:1150-1164`), which
-  `LoadGame` takes when all 24 are found (`:1763-1789`). Only a DSA changes that
-  palette: `SetOverlayPalette` has one caller (`DSA.cpp:2942`), and it is the identity
-  otherwise (`ClearOverlayPalette`, `data.cpp:117`, at `CSBCode.cpp:482`). The port
-  models no overlay palette and writes no such record. And CSBWin's `Setup` gives every
-  loaded game the pool's directory block (`SaveGame.cpp:2773`), where the port makes it
-  at the first record it writes, a death's bones (`src/data/CsbwinExpool.ts`). So the
-  port's save of a game started on `dungeon.dat` has no `EXPOOL`, or the bones' alone,
-  where CSBWin's has the block and 24 identity records. CSBWin loads either: `Setup`
-  makes the block, and with no palette record it keeps the palette it has.
 - **The DSA tracing flags.** `WriteDSAs` is followed by `DSAIndex.WriteTracing()`
   (`SaveGame.cpp:989-993`), an `EDBT_DSAtraces` record of the flags CSBWin's trace
   file uses, which a read takes back (`DSAINDEX::ReadTracing`, `DSA.cpp:5553-5576`). The
@@ -466,8 +457,9 @@ with `&PALETTE` (`SetOverlayPalette`, `:651`; `OVERLAYDATA::CreateOverlayTable`,
 `Graphics.cpp:2978`). `WinScreen.cpp` composes the result. Both read their data from
 `CSBgraphics.dat`. The overlay in force travels in the Extended Features block
 (`OverlayActive`, `overlayOrdinal`, `overlayP1`-`P3`, `CSB.h:491-505`), and the overlay
-palette in `EXPOOL`, as 24 records (G1, "What a DSA keeps in a save's `EXPOOL`"). The port
-models neither. Conflux's DSAs call `&OVERLAY` 25 times and `&PALETTE` 5 times.
+palette in `EXPOOL`, as 24 records. The port holds the overlay palette
+(`src/engine/OverlayPalette.ts`, the identity until a read gives another) and saves and
+reads its records, but draws no overlay and has no `SetOverlayPalette`. Conflux's DSAs call `&OVERLAY` 25 times and `&PALETTE` 5 times.
 
 ### G27 ⏳ Skins: a cell's own wall, floor and ceiling graphics
 

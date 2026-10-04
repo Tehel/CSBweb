@@ -1414,7 +1414,14 @@ link, always `RNeof`, over its `size`.
 
 `SaveGame` `Read`s and `Write`s 24 palette records of 16 longwords, keys
 `(EDT_Palette << 24) + i`, into the pool at every save (`SaveGame.cpp:1152-1164`), so
-every CSBWin save has them. `src/data/CsbwinExpool.ts` is the port, over the file's bytes.
+every CSBWin save has them. They are the overlay palette's 1536 bytes, red, green, then
+blue, 512 of each, copied into the pool's native longwords: a file's `DB11::swap` writes
+each with `LE32` (`data.cpp:1458-1467`), so a longword read big-endian is its four bytes
+taken little-endian. A read takes them back only when all 24 are there, and otherwise
+keeps the palette it has (`SaveGame.cpp:1761-1789`), which is the identity
+`ClearOverlayPalette` makes (`data.cpp:117-145`), since `d.Initialize()` clears it
+(`CSBCode.cpp:482`) before every read (`CSBCode.cpp:11356`, `Code1f9e6.cpp:309`). Every
+committed save holds that identity. Evidence: `tools/dump-dsa-save.ts` section 8. `src/data/CsbwinExpool.ts` is the port, over the file's bytes.
 Evidence: `tools/dump-expool.ts`. Seven of the eight committed saves hold those 24
 records and nothing else, and 24 writes into an empty pool give their 2304 bytes exactly:
 the directory, the eight blocks of three records, every link and chain. `csbgame7.dat`
@@ -2869,8 +2876,9 @@ the layout would close, and the bytes were then skipped and discarded; the one c
 made-to-order saves, 13 in `csbgame7.dat`), which is what lets a save be written back carrying the EXPOOL it was
 read with. `SaveGame` deposits the DSA global variables and the 24 overlay palette
 records into EXPOOL immediately before the image (`doc/CSBwin-src/SaveGame.cpp:1141-1164`).
-The port writes the globals ("The DSA global variables are the `EXPOOL` records a read
-finds"), and not the palette (`DEBT.md` G1).
+The port writes both ("The DSA global variables are the `EXPOOL` records a read finds",
+and the overlay palette in "`EXPOOL` is a directory block, free lists by record length,
+and 32 hash chains").
 
 ## Block 15: `WriteAndChecksum` sums bytes, and the closing word is big-endian
 

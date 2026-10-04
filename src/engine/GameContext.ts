@@ -9,6 +9,7 @@
  * `systems` holds the subsystems themselves, so that they call each other directly, as
  * CSBWin's functions do; `host` holds the calls that leave the engine (`GameHost`).
  */
+import { readOverlayPalette } from '../data/CsbwinExpool';
 import type { DungeonData } from '../data/dungeonTypes';
 import { DBType, type ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
@@ -22,6 +23,7 @@ import { Party } from './Party';
 import { PartyFootprints } from './PartyFootprints';
 import { MouseQueue } from './MouseQueue';
 import { createLoopFlags, type LoopFlags, type MainLoop } from './LoopState';
+import { identityOverlayPalette } from './OverlayPalette';
 import { createSmartDiscardState, type SmartDiscardState } from './SmartDiscard';
 import { SoundQueue } from './SoundQueue';
 import { TimerQueue } from './TimerQueue';
@@ -108,6 +110,11 @@ export interface GameContext {
   readonly levelCleared: Uint8Array;
   /** `DM_rules` and `DMRulesDesignOption`, which outlive a game (`RulesOptions`). */
   readonly rules: RulesOptions;
+  /**
+   * The overlay palette (`src/engine/OverlayPalette.ts`), red, green and blue, as its
+   * world's `EXPOOL` gives it at a read. A read restores it in place.
+   */
+  readonly overlayPalette: Uint8Array;
   /** Every table from `graphics.dat`. */
   readonly tables: GameTables;
   /** What only the host can do: play a sample, trace, tell the UI something. */
@@ -228,6 +235,7 @@ export function createGameContext(
     smartDiscard: createSmartDiscardState(),
     levelCleared: new Uint8Array(16),
     rules: { dmRules: false, dmRulesDesignOption: false, simpleEncipher: false },
+    overlayPalette: readOverlayPalette(dungeonData) ?? identityOverlayPalette(),
     tables,
     host,
     // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.

@@ -27,6 +27,7 @@
  * | The timer table and the queue that orders it | blocks 5 and 6, through `Game.restoreTimerQueue` |
  * | `d.RandomGameID`, `totalMoveCount`, `d.Byte22808`, `d.Word22592`-`d.Word22598` | `GAMEBLOCK1` (`buildBlock1State`) |
  * | The DSA global variables, and their number | `EXPOOL` (`readGlobalVariables`, `doc/CSBwin-src/SaveGame.cpp:1746-1760`) |
+ * | The overlay palette | `EXPOOL` (`readOverlayPalette`, `doc/CSBwin-src/SaveGame.cpp:1761-1789`), the identity without it |
  * | `disableSaves` | `EXPOOL` (`readDisableSaves`, `doc/CSBwin-src/SaveGame.cpp:1791-1793`) |
  *
  * **What is not restored.** A save is the file alone (`SaveGameFile.ts`), so this is
@@ -59,13 +60,14 @@
  */
 import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
 import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
-import { readDisableSaves, readGlobalVariables } from '../data/CsbwinExpool';
+import { readDisableSaves, readGlobalVariables, readOverlayPalette } from '../data/CsbwinExpool';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import { CheckMonsters } from './CheckMonsters';
 import { captureDungeonSnapshot } from './DungeonSnapshot';
 import { DungeonState } from './DungeonState';
 import type { Game } from './Game';
+import { identityOverlayPalette } from './OverlayPalette';
 import type { RuntimeSaveState } from './RuntimeSave';
 import { OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
@@ -203,6 +205,8 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
                 indexOfLastMagic: tail.indexOfLastMagicFootprint,
             },
             dsaGlobals: readGlobalVariables(world.dungeon),
+            // The palette `d.Initialize()` cleared stays when a record is missing.
+            overlayPalette: readOverlayPalette(world.dungeon) ?? identityOverlayPalette(),
             // `disableSaves`'s records leave the pool as they are read (`:1791-1793`).
             disableSaves: readDisableSaves(world.dungeon),
             block1: buildBlock1State(world),

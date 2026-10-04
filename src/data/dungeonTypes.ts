@@ -535,9 +535,9 @@ export interface DungeonData {
      * big-endian (`DB11`, `doc/CSBwin-src/CSB.h:1280-1288`), which `Expool`
      * (`src/data/CsbwinExpool.ts`) reads and writes in place. The champion bones records
      * are the ones play writes; the special locations are read out of it at the load,
-     * below. The DSA global variables and the 24 overlay palette records `SaveGame`
-     * deposits there just before the image (`doc/CSBwin-src/SaveGame.cpp:1141-1162`) are
-     * carried as the file had them, and this port does not maintain them.
+     * below. A save writes the DSA global variables and the 24 overlay palette records
+     * there just before the image (`doc/CSBwin-src/SaveGame.cpp:1141-1164`,
+     * `src/engine/SaveGameFile.ts`).
      */
     expool?: Uint8Array;
     specialLocations?: Record<number, number>; // EXPOOL special locations (EDT_SpecialLocations)

@@ -75,7 +75,9 @@ function buildFileBlocks(
     if (!expool.storeGlobalVariables(runtime.game.dsaGlobals)) {
         game.ctx.host.trace('Error saving global variables');
     }
-    // And so does the record of `disableSaves` (`:1200-1201`).
+    // Then the overlay palette's 24 records (`:1151-1164`), and the record of
+    // `disableSaves` (`:1200-1201`).
+    expool.storeOverlayPalette(runtime.game.overlayPalette);
     if (runtime.game.disableSaves) expool.writeDisableSaves();
 
     const party = runtime.party;

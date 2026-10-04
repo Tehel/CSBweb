@@ -586,8 +586,8 @@ function main(): void {
       g.ctx.party.state.facing = altar.facing as Champion['facing'] & number;
       g.systems.monsters.loadPartyLevel(altar.party.z);
 
-      // A game with no death has no EXPOOL to save, and its save takes away the one a
-      // game it is loaded into has.
+      // A save of the game before the death holds no bones record, and its load takes
+      // away the one a game it is loaded into has.
       const noDeath = buildSaveFile(g);
       g.systems.monsterAttack.killCharacter(victim);
       const bones = bonesAt(g, altar.party)[0];
@@ -618,7 +618,9 @@ function main(): void {
         console.log(["the record's key in the file", slot].join('\t'));
         console.log(["which the file's index names (db:idx)", named].join('\t'));
         console.log(["the record, and the champion's fingerprint", `${filePool.copyChampionBonesRecord(slot)}, ${fingerprint}`].join('\t'));
-        check(blocks === 2, 'the file has an EXPOOL: the directory and a block of bones records');
+        // The bones' block is the pool's first after the directory, written at the death;
+        // the save's overlay palette records fill eight more (`SaveGame.cpp:1151-1164`).
+        check(blocks === 10, "the file's EXPOOL: the directory, a block of bones records, and the palette's eight");
         check(slots.length === 1, 'holding one bones record');
         check(slot === bones, "keyed by the bones' RN, a slot of the object index");
         check(named === `${rnMaps.dbType(bones)}:${rnMaps.idx(bones)}`, "which the file's index names as the bones' record");
@@ -659,8 +661,7 @@ function main(): void {
 
           // The same game, taken back to before anyone died.
           applyCsbwinSave(next, noDeath);
-          check(next.ctx.state.dungeon.expool === undefined && next.ctx.state.dungeon.header.objectCounts[DBType.EXPOOL] === 0,
-            `${name}: a save with no EXPOOL leaves the game none`);
+          check(bonesRecords() === 0, `${name}: a save with no bones record leaves the game none`);
           check(buildSaveFile(next).length > 0, `${name}: and the game saves again`);
         }
       }

@@ -167,7 +167,10 @@ block of their own: the DSA **global variables**, sixteen at a time into the rec
 `(EDT_Database<<24)|(EDBT_GlobalVariables<<16)|i` the dungeon has (`:1141-1148`), whose
 number a read takes as theirs (`doc/PROVEN_FACTS.md` → "The DSA global variables are the
 `EXPOOL` records a read finds"), and the 24 overlay
-**palette** records under `(EDT_Palette<<24)+i` (`:1151-1162`).
+**palette** records under `(EDT_Palette<<24)+i` (`:1151-1164`), each `Read` out and
+`Write`n back, which a read takes when all 24 are there (`:1761-1789`;
+`doc/PROVEN_FACTS.md` → "`EXPOOL` is a directory block, free lists by record length, and
+32 hash chains").
 
 ### Block 4 is not only the champions
 
@@ -274,8 +277,7 @@ and the port writes as zero.
 
 **What a file of the port's does not carry**, or the port does not read:
 
-- The overlay palette records, which only a DSA changes, and the DSA tracing flags
-  `WriteDSAs` puts beside the DSAs (`DEBT.md` G1).
+- The DSA tracing flags `WriteDSAs` puts beside the DSAs (`DEBT.md` G1).
 - `SimpleEncryption`, neither written nor read past the header, and `MakeBigActuators`'
   read of the actuator type before the byte swap (`DEBT.md` G4).
 

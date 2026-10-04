@@ -23,12 +23,22 @@
  *    into the running pool (`SaveGame.cpp:1200-1201`), one more at each save, and a load
  *    sets `disableSaves` from it and reads every such record out of the loaded pool
  *    (`:1791-1793`); a save with it clear writes none, and loads with it clear.
+ * 8. **The overlay palette** (`SaveGame.cpp:1151-1164`, `:1761-1789`): every save `Read`s
+ *    and `Write`s its 24 records into the pool. The identity, which `ClearOverlayPalette`
+ *    makes (`doc/CSBwin-src/data.cpp:117-145`), is what every genuine save holds, and
+ *    written into an empty pool it is the pool of each that holds nothing else, byte for
+ *    byte. So a save of a game on `dungeon.dat`, which has no pool, is CSBWin's pool. A
+ *    palette changed in play comes back from a save, and a world without all 24 records,
+ *    `dungeon.dat`'s, reads as the identity.
  *
  * Run: `npx tsx tools/dump-dsa-save.ts`
  */
 import { readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 
-import { Expool, readDisableSaves, readGlobalVariables } from '../src/data/CsbwinExpool';
+import {
+  Expool, readDisableSaves, readGlobalVariables, readOverlayPalette, type ExpoolDatabase,
+} from '../src/data/CsbwinExpool';
 import { buildDsaSection, readExtendedFeatures, EXTENDED_FEATURES_SIZE } from '../src/data/CsbwinExtendedFeatures';
 import type { DsaDefinition } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -37,9 +47,11 @@ import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { StkOp } from '../src/engine/DsaSystem';
+import { identityOverlayPalette } from '../src/engine/OverlayPalette';
 import { freshGame, globalStore, int, op, run } from './lib/dsa';
 import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
+import { genuineSaves } from './lib/saves';
 
 const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
 const conflux = new Uint8Array(readFileSync(CONFLUX));
@@ -196,6 +208,55 @@ console.log('7. &DISABLESAVES');
   applyCsbwinSave(back, clear);
   check(records(loadCsbwinWorld(clear).dungeon) === 0 && !back.systems.dsa.disableSaves,
     'a save with it clear writes no record, and loads with it clear');
+}
+
+console.log('8. The overlay palette');
+{
+  const sameBytes = (a: Uint8Array | null | undefined, b: Uint8Array): boolean =>
+    !!a && a.length === b.length && a.every((v, i) => v === b[i]);
+  const paletteKey = (i: number): number => ((7 << 24) + i) >>> 0;
+  const identity = identityOverlayPalette();
+  const emptyPool = (): ExpoolDatabase => ({ header: { objectCounts: new Array<number>(16).fill(0) } });
+  const stored = emptyPool();
+  new Expool(stored).storeOverlayPalette(identity);
+  const identityPool = stored.expool!;
+
+  let alone = 0;
+  for (const path of genuineSaves()) {
+    const file = basename(path);
+    const { dungeon } = loadCsbwinWorld(new Uint8Array(readFileSync(path)));
+    check(sameBytes(readOverlayPalette(dungeon), identity), `${file}: its 24 records read as the identity`);
+    if (new Expool(dungeon).keys().length === 24) {
+      check(sameBytes(dungeon.expool, identityPool),
+        `${file}: the identity stored into an empty pool is its ${identityPool.length} bytes`);
+      alone++;
+    }
+  }
+  console.log(`  the identity is every genuine save's palette, and ${alone} pools hold it alone`);
+  check(alone >= 5, `at least five pools are the palette records alone (${alone})`);
+
+  const dat = (): Uint8Array => new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'));
+  const game = newGame(new DungeonLoader().loadDungeonDat(dat()), stockGraphics());
+  check(game.ctx.state.dungeon.expool === undefined && sameBytes(game.ctx.overlayPalette, identity),
+    "a game on dm-atari's dungeon.dat, which has no pool, has the identity");
+  const written = loadCsbwinWorld(buildSaveFile(game)).dungeon;
+  console.log(`  its save: a pool of ${written.header.objectCounts[11]} blocks`);
+  check(written.header.objectCounts[11] === 9 && sameBytes(written.expool, identityPool),
+    "and its save holds the directory and the 24 records, CSBWin's pool");
+
+  // `&PALETTE` is G25's: the palette is changed in place, as `SetOverlayPalette` does.
+  const changed = Uint8Array.from(identity, (_v, i) => (7 * i + 3) & 0xff);
+  game.ctx.overlayPalette.set(changed);
+  const file = buildSaveFile(game);
+  const other = freshGame();
+  applyCsbwinSave(other, file);
+  check(sameBytes(other.ctx.overlayPalette, changed), 'a palette changed in play loads back as it was saved');
+
+  const partial = loadCsbwinWorld(file).dungeon;
+  new Expool(partial).read(paletteKey(23));
+  check(readOverlayPalette(partial) === null, 'a pool short of one record has no palette');
+  other.readNewGame(new DungeonLoader().loadDungeonDat(dat()));
+  check(sameBytes(other.ctx.overlayPalette, identity), 'and a new game read over a changed palette has the identity');
 }
 
 finish();

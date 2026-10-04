@@ -19,8 +19,10 @@
  * first they meet.
  *
  * `Setup` runs at the first `Write`, where CSBWin's runs at the end of `ReadDatabases`
- * (`doc/CSBwin-src/SaveGame.cpp:2773`). The pool is the same from that record on; a world
- * nothing has written a record to has no block, as `dungeon.dat` has none.
+ * (`doc/CSBwin-src/SaveGame.cpp:2773`). The pool is the same from that record on, and
+ * every save writes one, the overlay palette's (`storeOverlayPalette`), so every file
+ * has the directory block as CSBWin's does. Only a world in play that nothing has
+ * written a record to has no block yet, as `dungeon.dat` has none.
  */
 import { readU32BE, writeU32BE } from '../core/bytes';
 import { DBType } from '../core/types';
@@ -43,6 +45,10 @@ const EDT_DATABASE = 5;
 const EDBT_GLOBAL_VARIABLES = 4;
 /** `EDBT_DisableSaves` (`doc/CSBwin-src/CSB.h:1558`). */
 const EDBT_DISABLE_SAVES = 5;
+/** `EDT_Palette` (`doc/CSBwin-src/CSB.h:1564`). */
+const EDT_PALETTE = 7;
+/** The overlay palette's records, of sixteen longwords each (`doc/CSBwin-src/SaveGame.cpp:1158`). */
+const OVERLAY_PALETTE_RECORDS = 24;
 /** `EDT_ChampionBones` (`doc/CSBwin-src/CSB.h:1571`). */
 const EDT_CHAMPION_BONES = 9;
 
@@ -71,6 +77,26 @@ function globalVariablesKey(i: number): number {
 
 /** `(EDT_Database << 24) | (EDBT_DisableSaves << 16)`, the key of the record that disables saves. */
 const DISABLE_SAVES_KEY = ((EDT_DATABASE << 24) | (EDBT_DISABLE_SAVES << 16)) >>> 0;
+
+/** `(EDT_Palette << 24) + i`, the key of the overlay palette's `i`th record. */
+function overlayPaletteKey(i: number): number {
+    return ((EDT_PALETTE << 24) + i) >>> 0;
+}
+
+/**
+ * The `i`th record of the overlay palette (`src/engine/OverlayPalette.ts`): its bytes from
+ * `64 * i`, as `SaveGame` hands them to `Write` (`doc/CSBwin-src/SaveGame.cpp:1163`).
+ * CSBWin copies the bytes into its pool's native longwords, which `DB11::swap` writes
+ * with `LE32` (`doc/CSBwin-src/data.cpp:1458-1467`), so each longword here is its four
+ * bytes taken little-endian.
+ */
+function overlayPaletteRecord(palette: Uint8Array, i: number): number[] {
+    const record: number[] = [];
+    for (let at = 64 * i; at < 64 * (i + 1); at += 4) {
+        record.push((palette[at] | (palette[at + 1] << 8) | (palette[at + 2] << 16) | (palette[at + 3] << 24)) >>> 0);
+    }
+    return record;
+}
 
 /**
  * `(EDT_MessageParameters << 24) + timerID`, the key of the parameters a DSA's `&MESSAGE`
@@ -255,6 +281,18 @@ export class Expool {
     }
 
     /**
+     * `SaveGame`'s copy of the overlay palette into its 24 records
+     * (`doc/CSBwin-src/SaveGame.cpp:1151-1164`), at every save: each record is `Read` out
+     * of the pool, and the palette's sixteen longwords `Write`n in its place.
+     */
+    storeOverlayPalette(palette: Uint8Array): void {
+        for (let i = 0; i < OVERLAY_PALETTE_RECORDS; i++) {
+            this.read(overlayPaletteKey(i));
+            this.write(overlayPaletteKey(i), overlayPaletteRecord(palette, i));
+        }
+    }
+
+    /**
      * `SaveGame`'s record of `disableSaves`, written while it is set
      * (`doc/CSBwin-src/SaveGame.cpp:1200-1201`): a record of no data, in the running
      * world's pool, as every save writes one more.
@@ -298,6 +336,24 @@ export function readGlobalVariables(db: ExpoolDatabase): number[] {
         values.push(...record.slice(0, 16));
     }
     return values;
+}
+
+/**
+ * `LoadGame`'s read of the overlay palette (`doc/CSBwin-src/SaveGame.cpp:1761-1789`): the
+ * 24 records' bytes, or null when one is missing or shorter than sixteen longwords, where
+ * CSBWin keeps the palette it has.
+ */
+export function readOverlayPalette(db: ExpoolDatabase): Uint8Array | null {
+    const expool = new Expool(db);
+    const palette = new Uint8Array(64 * OVERLAY_PALETTE_RECORDS);
+    for (let i = 0; i < OVERLAY_PALETTE_RECORDS; i++) {
+        const record = expool.locate(overlayPaletteKey(i));
+        if (!record || record.length < 16) return null;
+        for (let j = 0; j < 16; j++) {
+            for (let b = 0; b < 4; b++) palette[64 * i + 4 * j + b] = (record[j] >>> (8 * b)) & 0xff;
+        }
+    }
+    return palette;
 }
 
 /**
