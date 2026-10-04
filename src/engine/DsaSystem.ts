@@ -267,6 +267,8 @@ export enum StkOp {
 }
 
 const EDT_SPECIAL_LOCATIONS = 3;
+/** `gameVolume`'s default (`doc/CSBwin-src/Data.h:42`, `data.cpp:277`). */
+const VOLUME_FULL = 0;
 const ESL_MISSILE_ENCOUNTER_FILTER = 13;
 const ESL_ADJUST_SKILLS_FILTER = 6;
 const ESL_VIEWING_FILTER = 3;
@@ -275,6 +277,7 @@ const MISSILE_ENCOUNTER_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_MISSILE
 const ADJUST_SKILLS_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_ADJUST_SKILLS_FILTER;
 const VIEWING_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_VIEWING_FILTER;
 const PARTY_ATTACK_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_PARTY_ATTACK_FILTER;
+const ESL_SOUND_FILTER = 8;
 const ESL_INDIRECT_ACTIONS = 5;
 const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
 
@@ -574,6 +577,8 @@ export class DsaSystem {
    * `&MONL&D` reads. The port does not run that filter yet (DEBT.md G2).
    */
   monsterMoveFilterActive = false;
+  /** `SoundFilter`'s `filterActive` (`doc/CSBwin-src/Sound.cpp:672`): its DSAs are running. */
+  private soundFilterActive = false;
   /**
    * `parameterMessageSequence` (`doc/CSBwin-src/data.cpp:88`): the `uByte5` of the next
    * `TT_ParameterMessage` timer, so that two set at one time run in the order they were
@@ -655,6 +660,85 @@ export class DsaSystem {
 
   getAdjustSkillsParameters(): Int32Array {
     return this.adjustSkillsParameters;
+  }
+
+  /**
+   * The DSAs of the filter at special location `esl`, as CSBWin's looping filter sites run
+   * them (`SoundFilter`'s, `doc/CSBwin-src/Sound.cpp:681-748`, is one): `EXPOOL`'s record
+   * `(EDT_SpecialLocations << 24) | esl` names the location, and every type-47 actuator on
+   * its square runs in turn, a filter call apiece (`ProcessDSAFilter`), on a timer that
+   * names the square with function and position 0. They share one `NEWDSAPARAMETERS`.
+   * `each` sets a DSA's parameters, calls `run`, and reads back what it needs. False when
+   * none ran.
+   */
+  private forEachFilterDsa(esl: number, each: (run: () => void) => void): boolean {
+    const special = this.dungeon.getSpecialLocation((EDT_SPECIAL_LOCATIONS << 24) | esl);
+    if (special === null) return false;
+    const locrFilter = locationRelFromInteger(special);
+    if (!this.dungeon.isValidLocation(locrFilter)) return false;
+    const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
+    const timer: TimerEntry = {
+      index: -1,
+      time: 0,
+      level: locrFilter.l & 0xff,
+      function: 0,
+      uByte5: 0,
+      uByte6: locrFilter.x & 0xff,
+      uByte7: locrFilter.y & 0xff,
+      uByte8: 0,
+      uByte9: 0,
+      sequence: 0,
+      timerWord8: 0,
+      timerWord6: 0,
+    };
+    return this.newDsaParameters(() => {
+      let found = false;
+      for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+        if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
+        const rec = this.dungeon.getActuatorRecord(rn);
+        if (!rec || getActuatorType(rec) !== 47) continue;
+        found = true;
+        each(() => this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars()));
+      }
+      return found;
+    });
+  }
+
+  /**
+   * `SoundFilter` (`doc/CSBwin-src/Sound.cpp:670-756`), which `QueueSound` calls with the
+   * volume it chose, -1 for a sound out of earshot (`doc/CSBwin-src/CSBCode.cpp:1877`), and
+   * the sound's square on its level. Every DSA at `ESL_SOUNDFILTER`'s location runs, and
+   * plays the sound if it pleases (`&SOUND`). 0 when one ran, and the sound is theirs; 1
+   * when none did; 2 while they run, so a sound queued meanwhile plays on.
+   *
+   * The nine parameters (`:730-739`): the sound's ordinal plus 1, the volume, the squared
+   * distance to the party, the level, x and y, `gameVolume`, `NoSound`, and the distance in
+   * hundredths, three Newton steps from the larger of `dx` and `dy`. The port has no volume
+   * menu and no recording's `#NoSound` (`doc/CSBwin-src/Recording.cpp:321`): its page sets
+   * its own volume, so the two are CSBWin's defaults, `VOLUME_FULL` (0) and false
+   * (`doc/CSBwin-src/data.cpp:249`, `:277`).
+   */
+  soundFilter(soundNumber: number, highVolume: number, level: number, x: number, y: number): number {
+    if (this.soundFilterActive) return 2;
+    const party = this.ctx.party.state.position;
+    const dx = Math.abs(party.x - x);
+    const dy = Math.abs(party.y - y);
+    const distanceSquared = dx * dx + dy * dy;
+    let distance100 = 100 * (dx > dy ? dx : dy);
+    if (distanceSquared > 0) {
+      const d2 = distanceSquared * 10000;
+      for (let i = 0; i < 3; i++) distance100 = Math.trunc((distance100 + Math.trunc(d2 / distance100)) / 2);
+    }
+    this.forEachFilterDsa(ESL_SOUND_FILTER, (run) => {
+      this.setParameters(9, [
+        soundNumber + 1, highVolume, distanceSquared, level, x, y, VOLUME_FULL, 0, distance100,
+      ]);
+      this.soundFilterActive = true;
+      run();
+    });
+    if (!this.soundFilterActive) return 1;
+    this.soundFilterActive = false;
+    return 0;
   }
 
   processMissileEncounterFilter(options: {

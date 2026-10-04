@@ -3518,7 +3518,8 @@ sample, just quieter, never ordinal 13's unrelated sample.
 The volume is the ordinal's, decided in `QueueSound` and not by whoever plays the sample.
 From the orthogonal distance `|dx| + |dy|`, `LOCAL_12` is 1 at or below the entry's
 `byte6`, 0 above it, and -1 at or above `byte7`, and a -1 is not played
-(`doc/CSBwin-src/CSBCode.cpp:1867-1876`, `:1878`). `StartSound` receives `LOCAL_12` as
+(`doc/CSBwin-src/CSBCode.cpp:1867-1876`, `:1878`), unless the sound filter's DSAs play
+it (see "The sound filter hands a sound to the dungeon's DSAs"). `StartSound` receives `LOCAL_12` as
 `highVolume` (`:1894-1896`) and attenuates a 0 eighteen times
 (`doc/CSBwin-src/Sound.cpp:662-663`). So ordinal 5 (`byte6` 3, `byte7` 7) is loud up to
 three squares and quiet up to six, and ordinal 20 (0 and 4) is loud only on the square
@@ -3541,6 +3542,25 @@ past — `playMissileImpactSound` and `playCloudSound` called `playSound` with a
 along the way substituted ordinal 5's item for ordinal 4's (a plain object's impact) and
 ordinal 13's item for ordinal 20's (a small blast) — see PLAN.md for the fix and its
 evidence.
+
+## The sound filter hands a sound to the dungeon's DSAs, a silent one included
+
+`QueueSound` calls `SoundFilter(soundNum, LOCAL_12, &soundLocr)` once it has the volume,
+-1 included, and before it drops a silent sound, with `soundLocr` the square on
+`d.LoadedLevel` (`doc/CSBwin-src/CSBCode.cpp:1825`, `:1877-1878`); a 0 back means the
+filter took the sound, and `QueueSound` plays nothing. `SoundFilter`
+(`doc/CSBwin-src/Sound.cpp:670-756`) runs every type-47 actuator at `ESL_SOUNDFILTER`'s
+location (8, `CSB.h:1543`), each with `continue` (`:744`), under one `NEWDSAPARAMETERS`.
+Each sees nine parameters (`:730-739`): the ordinal plus 1, the volume, `dx*dx + dy*dy`
+from the party's square, the sound's level, x and y, `gameVolume`, `NoSound`, and the
+distance in hundredths, three integer Newton steps from `100 * max(dx, dy)` when the
+squared distance is not 0 (`:698-704`): 141 for (1, 1), 500 for (3, 4). It returns 0 when a
+DSA ran, 1 when none did, and 2 at once while its DSAs run (`filterActive`, `:672-676`,
+`:749-754`), so a sound they queue plays on. The DSA plays the sound if it pleases, with
+`&SOUND` (`PlayCustomSound`, `:1039-1062`). `gameVolume` is the volume menu's
+(`VOLUME_FULL`, 0, by default) and `NoSound` a recording's `#NoSound` line (false by
+default, `doc/CSBwin-src/data.cpp:249`, `:277`, `Recording.cpp:321-328`).
+`tools/dump-sound-filter.ts`.
 
 ## The `QueueSound` calls, and the level each is on
 

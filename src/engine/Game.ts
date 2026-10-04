@@ -160,6 +160,8 @@ export class Game implements MainLoop {
         CheckMonsters(ctx.dungeon, tables.monsterDesc, (line) => ctx.host.trace(line));
         this.ctx = ctx;
         ctx.dungeon.makeMoreRoomInDB = (db) => makeMoreRoomInDB(ctx, db);
+        ctx.sounds.soundFilter = (ordinal, highVolume, level, x, y) =>
+            ctx.systems.dsa.soundFilter(ordinal, highVolume, level, x, y);
         ctx.dungeon.textSubstitution = {
             handChar: () => ctx.party.state.cursorOwner ?? -1,
             characterName: (index) => ctx.party.state.champions[index]?.name ?? null,

@@ -16,8 +16,8 @@
  * `deltaTime > 1` does not play the sound: it sets a `TT_20` timer, which
  * `TimerSystem` answers with `QueueSound(ordinal, x, y, 1)` on the timer's level.
  *
- * `SoundFilter`, which can hand the sound to a DSA instead
- * (`doc/CSBwin-src/Sound.cpp:670`), is **not ported** (`DEBT.md` G2).
+ * `SoundFilter` (`doc/CSBwin-src/Sound.cpp:670`) may hand the sound to the dungeon's DSAs
+ * instead (`DsaSystem.soundFilter`).
  *
  * `PlayCustomSound`, a DSA's `&SOUND`, plays here too, at once and at no distance.
  */
@@ -30,6 +30,13 @@ import { TimerFunction, type TimerQueue } from './TimerQueue';
 export class SoundQueue {
   /** `ReadSound`'s `firstTime`: "Cannot find Sound" is said once. */
   private customSoundMissingSaid = false;
+
+  /**
+   * `SoundFilter(ordinal, highVolume, soundLocr)`, with the location as level, x and y:
+   * `DsaSystem.soundFilter` once `Game` has one, 0 when a DSA took the sound. Until then,
+   * and in a tool's context with no DSA system, 1, as for a dungeon with no filter.
+   */
+  soundFilter: (ordinal: number, highVolume: number, level: number, x: number, y: number) => number = () => 1;
 
   /**
    * @param sound1772 `d.sound1772` — the sound table from `graphics.dat` item `0x232`.
@@ -53,7 +60,9 @@ export class SoundQueue {
    * the party's (`doc/CSBwin-src/CSBCode.cpp:1827-1830`). The volume, `LOCAL_12`, comes
    * from the total *orthogonal* distance `|dx| + |dy|` against the ordinal's own entry:
    * loud at or below `byte6`, quiet above it, silent at or above `byte7`
-   * (`:1867-1878`). The host is handed that choice, not the distance (`:1894-1896`).
+   * (`:1867-1876`). The sound filter sees that choice, a silent sound included, and plays
+   * nothing here if its DSAs took the sound (`:1877`). The host is handed the choice, not
+   * the distance (`:1894-1896`).
    */
   queueSound(ordinal: number, mapX: number, mapY: number, deltaTime: number, level: number): void {
     const entry = this.sound1772[ordinal];
@@ -76,6 +85,7 @@ export class SoundQueue {
     const distance = Math.abs(mapX - party.x) + Math.abs(mapY - party.y);
     let highVolume = distance <= (entry.byte6 & 0xff) ? 1 : 0;
     if (distance >= (entry.byte7 & 0xff)) highVolume = -1;
+    if (this.soundFilter(ordinal, highVolume, level, mapX, mapY) === 0) return;
     if (highVolume < 0) return;
 
     const soundId = entry.word0 | 0;

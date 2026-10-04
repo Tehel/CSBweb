@@ -9,6 +9,7 @@ import type { DsaDefinition, DungeonData } from '../../src/data/dungeonTypes';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import type { Game } from '../../src/engine/Game';
+import type { GameHost } from '../../src/engine/GameHost';
 import type { TimerEntry } from '../../src/engine/TimerQueue';
 import { newGame, stockGraphics } from './game';
 import { savePath } from './saves';
@@ -35,10 +36,50 @@ const graphics = stockGraphics();
 const stock = readFileSync('static/gamefiles/dm-atari/dungeon.dat');
 export const save = new Uint8Array(readFileSync(savePath('csbgame7.dat')));
 
-/** A game on `csbgame7.dat`'s world, or another save's. */
-export function freshGame(file: Uint8Array = save): Game {
-  const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(stock)), graphics);
+/** What the global variables start at in a test game: no DSA stored into one. */
+export const UNSET = 0x5a5a;
+
+/** A game on `csbgame7.dat`'s world, or another save's, with the parts of `host` given. */
+export function freshGame(file: Uint8Array = save, host?: Partial<GameHost>): Game {
+  const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(stock)), graphics, host);
   applyCsbwinSave(game, file);
+  return game;
+}
+
+/**
+ * A game on `csbgame7.dat` whose filter at special location `esl` (`doc/CSBwin-src/CSB.h:1535-1550`)
+ * is the first empty open square of the party's level, holding one type-47 actuator per
+ * program, in order, each the one program of a DSA of its own. The globals are `UNSET`.
+ */
+export function withFilterDsas(esl: number, programs: number[][], host?: Partial<GameHost>): Game {
+  const game = freshGame(save, host);
+  const dungeon = game.ctx.dungeon;
+  const z = game.ctx.party.state.position.z;
+  const map = dungeon.getMap(z)!;
+  let at: Position | null = null;
+  for (let x = 0; x < map.descriptor.width && !at; x++) {
+    for (let y = 0; y < map.descriptor.height && !at; y++) {
+      const p = new Position(x, y, z);
+      if (((dungeon.getCellFlag(p) >> 5) & 7) !== RoomType.OPEN) continue;
+      if (dungeon.findFirstObject(p) !== OBJECT_ID_EOF) continue;
+      at = p;
+    }
+  }
+  if (!at) throw new Error('no empty open square');
+  const data: DungeonData = dungeon.getData();
+  const entries: DsaDefinition[] = programs.map((program, i) => ({
+    description: `test ${i}`, state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,
+    states: [{ actions: [{ column: 0, program: Uint16Array.from(program) }] }],
+  }));
+  programs.forEach((_, i) => {
+    data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47 | (i << 7), word4: 0, word6: 0 });
+    dungeon.addObjectToCell(at, dungeon.rnMaps.rn(DBType.ACTUATOR, data.databases.actuators.records.length - 1));
+  });
+  data.dsaIndex = { entries };
+  data.dsaLevelIndex = [];
+  data.dsaLevelIndex[z] = programs.map((_, i) => i);
+  data.specialLocations = { [(3 << 24) | esl]: locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 }) };
+  game.systems.dsa.setGlobalVariables(new Array<number>(100).fill(UNSET));
   return game;
 }
 
@@ -96,7 +137,7 @@ export function run(
   data.dsaLevelIndex = [];
   data.dsaLevelIndex[at.z] = [0];
   filter?.place(game, locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 }));
-  game.systems.dsa.setGlobalVariables(new Array<number>(100).fill(0x5a5a));
+  game.systems.dsa.setGlobalVariables(new Array<number>(100).fill(UNSET));
   const timer = {
     uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: filter ? 1 : 0, level: at.z, time: 0,
   } as TimerEntry;

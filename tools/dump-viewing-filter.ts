@@ -31,16 +31,14 @@ import { readFileSync } from 'node:fs';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { DecodeText, GetText } from '../src/data/DecodeText';
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';
 import { StkOp, ViewingFilterSite, type ViewingFilterResult } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
-import { freshGame, globalStore, int, op, varFetch, varStore } from './lib/dsa';
+import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
 import { check, finish } from './lib/check';
 import { gameTablesOf, stockGraphics } from './lib/game';
 
-/** `(EDT_SpecialLocations << 24) | ESL_VIEWINGFILTER` (`doc/CSBwin-src/CSB.h:1534-1538`). */
-const VIEWING_FILTER_KEY = (3 << 24) | 3;
-const UNSET = 0x5a5a;
+/** `ESL_VIEWINGFILTER` (`doc/CSBwin-src/CSB.h:1538`). */
+const ESL_VIEWINGFILTER = 3;
 
 /** Parameters 0 and 1 into globals `to` and `to + 1`. */
 const params = (to: number): number[] => [
@@ -57,41 +55,8 @@ const describe = (locr: number, index: number, color: number): number[] =>
 const paramStore = (index: number, value: number): number[] =>
   [...int(value), varStore(index), ...int(index + 1), ...int(0), op(StkOp.PARAM_STORE)];
 
-/**
- * A game whose viewing filter's square, an empty open one of the party's level, holds one
- * type-47 actuator per program, in order, each the one program of a DSA of its own.
- */
-function withFilter(programs: number[][]): Game {
-  const game = freshGame();
-  const dungeon = game.ctx.dungeon;
-  const z = game.ctx.party.state.position.z;
-  const map = dungeon.getMap(z)!;
-  let at: Position | null = null;
-  for (let x = 0; x < map.descriptor.width && !at; x++) {
-    for (let y = 0; y < map.descriptor.height && !at; y++) {
-      const p = new Position(x, y, z);
-      if (((dungeon.getCellFlag(p) >> 5) & 7) !== RoomType.OPEN) continue;
-      if (dungeon.findFirstObject(p) !== OBJECT_ID_EOF) continue;
-      at = p;
-    }
-  }
-  if (!at) throw new Error('no empty open square');
-  const data: DungeonData = dungeon.getData();
-  const entries: DsaDefinition[] = programs.map((program, i) => ({
-    description: `test ${i}`, state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,
-    states: [{ actions: [{ column: 0, program: Uint16Array.from(program) }] }],
-  }));
-  programs.forEach((_, i) => {
-    data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47 | (i << 7), word4: 0, word6: 0 });
-    dungeon.addObjectToCell(at, dungeon.rnMaps.rn(DBType.ACTUATOR, data.databases.actuators.records.length - 1));
-  });
-  data.dsaIndex = { entries };
-  data.dsaLevelIndex = [];
-  data.dsaLevelIndex[z] = programs.map((_, i) => i);
-  data.specialLocations = { [VIEWING_FILTER_KEY]: locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 }) };
-  game.systems.dsa.setGlobalVariables(new Array<number>(100).fill(UNSET));
-  return game;
-}
+/** A game whose viewing filter's square holds one DSA per program, in order. */
+const withFilter = (programs: number[][]): Game => withFilterDsas(ESL_VIEWINGFILTER, programs);
 
 function view(game: Game, site: ViewingFilterSite, phraseMask: number, objectId: ObjectID): ViewingFilterResult | null {
   return game.systems.dsa.processViewingFilter({ site, phraseMask, objectId, selectedCharacter: 0 });

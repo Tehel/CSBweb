@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | Twelve DSA filters, and the viewing filter's third site | L | ⏳ step 1 of 12 next |
+| G2 | Eleven DSA filters, and the viewing filter's third site | L | ⏳ step 2 of 12 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -317,11 +317,12 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G2 ⏳ Twelve DSA filters, and the viewing filter's third site
+### G2 ⏳ Eleven DSA filters, and the viewing filter's third site
 
-The port runs five filters: the viewing filter (two of its three sites),
-the party attack filter, the adjust skills filter, the missile encounter filter, and the
-spell filter at `spellFilterLocation`. Each place below uses CSBWin's defaults instead.
+The port runs six filters: the viewing filter (two of its three sites),
+the party attack filter, the adjust skills filter, the missile encounter filter, the
+sound filter, and the spell filter at `spellFilterLocation`. Each place below uses
+CSBWin's defaults instead.
 Conflux reaches every one but the portrait's: its `EXPOOL` names a location for all
 sixteen special locations, `ESL_MONSTERATTACKFILTER` (0) to `ESL_DAMAGECHARFILTER` (15,
 `doc/CSBwin-src/CSB.h:1535-1550`), and the monster move filter's for level 29 too, and a
@@ -332,12 +333,10 @@ filter's.
 
 A filter that loops runs each of those DSAs in turn, a filter call apiece; one that
 `break`s runs the first. Each step reads which from its CSBWin site and checks it in a
-`tools/` check through `tools/lib/dsa.ts`'s `TestFilter`, with two DSAs on the square where
-the site loops. The steps, one commit each:
+`tools/` check through `tools/lib/dsa.ts`: `TestFilter` for one DSA, `withFilterDsas` for
+two on the square where the site loops. Step 1, the sound filter, is paid. The steps left,
+one commit each:
 
-1. **`ESL_SOUNDFILTER`** (S). `SoundFilter` (`doc/CSBwin-src/Sound.cpp:670`, the DSA at
-   `:742`), which `QueueSound` calls once it has the volume, and which may play the sound
-   through a DSA instead (`CSBCode.cpp:1877`). `SoundQueue.queueSound` plays straight on.
 2. **`ESL_ACTIONNAMEFILTER`** (S). `ActionNameFilter` (`CSBCode.cpp:8680`, the DSA at
    `:8697`), which may rename an attack option. The names come straight from
    `AttackNames`.
@@ -353,7 +352,7 @@ the site loops. The steps, one commit each:
 6. **`ESL_PARTYMOVEFILTER`** (M). `CallPartyMoveFilter` (`CSBCode.cpp:7788`, called at
    `:8119`), which may rewrite the stamina adjustments or refuse the move, with its
    `PM_SETDELAY` / `PM_ADDDELAY` arms (`:8122-8128`, `:8336-8346`). See
-   `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:255`) and `Game.ts:792`.
+   `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:255`) and `Game.ts:794`.
 7. **`ESL_MONSTERATTACKFILTER`** (M). `MonsterAttackFilter`, the DSA at
    `Monster.cpp:1166`, which may rewrite a monster attack's whole parameter block
    (`MonsterAttack.ts:146`). CSBWin's block is a file-scope global (`Monster.cpp:917-938`),
@@ -389,9 +388,9 @@ the site loops. The steps, one commit each:
     the masteries, every DSA at the location in turn; the port's `drawAttributePanel`
     (`src/renderer/ui/Character.ts:71`) runs none.
 
-The steps share how a filter is reached and run: a helper in `DsaSystem`, built with the
-first step. Moving the five filters already ported onto it is a refactor, a commit of its
-own.
+The steps share how a filter is reached and run: `DsaSystem.forEachFilterDsa`, which the
+sound filter uses. Moving the other five filters already ported onto it is a refactor, a
+commit of its own.
 
 ### G3 ⏳ The wings
 
@@ -653,7 +652,7 @@ CSBWin can record a game and play it back:
   `_HandleMouseEvents` (`Mouse.cpp:1393`), except while gravity runs.
 
 The port has neither, and no way to start either. It keeps only the recorder's count,
-`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:741-748`).
+`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:812-815`).
 `extraTicks` is always on (`src/engine/MovementSystem.ts:58-61`).
 
 Once ported, a recording made in CSBWin and played back in the port is an end-to-end test

@@ -578,7 +578,7 @@ export class MonsterAttack {
     // `d.PendingDamage[chIdx] += D7W` (`doc/CSBwin-src/Character.cpp:2900`): the HP
     // stay as they are until the tick's `DisplayCharacterDamage`, which takes the sum
     // off, kills, and shows it over the portrait. CSBWin's damage filter DSA before it
-    // (`:2829-2893`) is not ported, as no DSA filter is (`DEBT.md` G2).
+    // (`:2829-2893`) is not ported (`DEBT.md` G2).
     party.pendingDamage[chIdx] = sw(party.pendingDamage[chIdx]! + dealt);
     return dealt;
   }
