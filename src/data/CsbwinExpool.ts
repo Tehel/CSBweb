@@ -39,6 +39,10 @@ const EDT_MESSAGE_PARAMETERS = 1;
 const EDT_SPECIAL_LOCATIONS = 3;
 /** The last `ESL_*`, `ESL_DAMAGECHARFILTER` (`doc/CSBwin-src/CSB.h:1550`). */
 const ESL_SPECIAL_LOCATION_MAX = 15;
+/** `ESL_MONSTERMOVEFILTER` (`doc/CSBwin-src/CSB.h:1537`), which a level may have its own of. */
+const ESL_MONSTER_MOVE_FILTER = 2;
+/** `MONSTERMOVEFILTERCACHE`'s levels (`doc/CSBwin-src/CSB.h:451`). */
+const MONSTER_MOVE_FILTER_LEVELS = 64;
 /** `EDT_Database` (`doc/CSBwin-src/CSB.h:1552`). */
 const EDT_DATABASE = 5;
 /** `EDBT_GlobalVariables` (`doc/CSBwin-src/CSB.h:1557`). */
@@ -384,10 +388,15 @@ export function readDisableSaves(db: ExpoolDatabase): boolean {
 export function specialLocationsFromExpool(bytes: Uint8Array): Record<number, number> | null {
     const expool = new Expool({ expool: bytes, header: { objectCounts: [] } });
     const locations: Record<number, number> = {};
-    for (let esl = 0; esl <= ESL_SPECIAL_LOCATION_MAX; esl++) {
-        const key = ((EDT_SPECIAL_LOCATIONS << 24) | esl) >>> 0;
+    const read = (key: number): void => {
         const record = expool.locate(key);
         if (record && record.length >= 1) locations[key] = record[0];
+    };
+    for (let esl = 0; esl <= ESL_SPECIAL_LOCATION_MAX; esl++) read(((EDT_SPECIAL_LOCATIONS << 24) | esl) >>> 0);
+    // A level's own monster move filter, keyed with `(level + 1) << 8`
+    // (`MONSTERMOVEFILTERCACHE::GetLocation`, doc/CSBwin-src/Monster.cpp:3090).
+    for (let level = 0; level < MONSTER_MOVE_FILTER_LEVELS; level++) {
+        read(((EDT_SPECIAL_LOCATIONS << 24) | ESL_MONSTER_MOVE_FILTER | ((level + 1) << 8)) >>> 0);
     }
     return Object.keys(locations).length === 0 ? null : locations;
 }

@@ -212,6 +212,9 @@ export class MonsterAI {
         `timeUntilAlternateUpdate=${timeUntilAlternateUpdate}`,
     );
 
+    // "Now let the Monster Movement Filter DSA do its thing" (doc/CSBwin-src/Monster.cpp:3311-3357).
+    this.ctx.systems.dsa.monsterMoveFilter(level, mapX, mapY, monsterRn, timerFunction);
+
     const checks = this.initialChecks(monsterRn, mapX, mapY, level, timerFunction, timeUntilAlternateUpdate);
     if (checks.handled) return;
 

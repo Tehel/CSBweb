@@ -3777,6 +3777,38 @@ drop and 2 and 3 do not (`:1115`, `:3165`, `:3306`, `Character.cpp:282`), while 
 last drops its remains for anything but 2 (`:1131`), so 3 drops them there. The fusion reads
 neither. `tools/dump-delete-monster-filter.ts`.
 
+## The monster move filter has a location per level, and runs its first DSA before a turn
+
+`MONSTERMOVEFILTERCACHE::GetLocation` (`doc/CSBwin-src/Monster.cpp:3077-3166`) finds a
+level's filter once, the first time a turn on that level asks (`partyLevelOnly` 0xfffe,
+`:3079`), and keeps it: nothing empties the cache, whose `Clear` is declared
+(`CSB.h:458`) with no body and no caller. It first reads `expool`'s record
+`(EDT_SpecialLocations << 24) | ESL_MONSTERMOVEFILTER | ((level + 1) << 8)` (2,
+`CSB.h:1537`; `:3088-3089`), the level's own; with none, the dungeon's, without the level
+bits, read once for every level (`global`, `:3122-3162`). A record's bits 0-17 are the
+location, bit 18 `partyLevelOnly` and bits 19-23 `maxDistance`; the filter is the first
+type-47 actuator at the location (`break`, `:3116`). A level with a record of its own
+never falls back to the dungeon's, even when no type-47 actuator stands at its location:
+the fallback is taken only while `partyLevelOnly` is still 0xffff (`:3122`). Conflux's
+`EXPOOL` has both records, level 29's the same longword as the dungeon's: 6(6,30),
+`partyLevelOnly` 1, `maxDistance` 16.
+
+`ProcessTimers29to41` clears `monsterMoveInhibit` and then runs the filter
+(`:3306-3357`), before `InitialChecks`, when all four hold: `timeFunc > 0`, so never for
+the reactions `TT_M1` to `TT_M3`; the level has a filter; `partyLevelOnly` is 0 or the
+group is on the party's level; and `dx² + dy² <= maxDistance²`, the group's square against
+the party's, whatever the party's level. The DSA runs on parameters of its own
+(`NEWDSAPARAMETERS`, `:3321`), a count of 7: the level, the group's x and y, the group's RN,
+and the party's level, x and y (`:3340-3347`). `ProcessDSAFilter` sets
+`monsterMoveFilterActive` while it runs (`DSA.cpp:5321-5323`), so its `&MONL&D` reads
+them, and its `&MONBLK` is what the turn's `PossibleMove` then refuses.
+
+Its timer, `mmr.timer`, has function and position 0, `Time` 0 and the group's level, and
+the group's square with x in `uByte7` and y in `uByte6` (`:3324-3329`), the other way round
+from the other filters' (`CSBCode.cpp:8685-8686`). `ProcessDSATimer6` takes `uByte6` as x
+(`DSA.cpp:5385-5386`), so the DSA's master stands at `(y, x)` of the group's level.
+`tools/dump-monster-move-filter.ts`.
+
 ## The `QueueSound` calls, and the level each is on
 
 | Sound | CSBWin's call | Ordinal → SND item | Level |

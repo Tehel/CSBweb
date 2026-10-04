@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | Three DSA filters, and the viewing filter's third site | L | ⏳ step 9a of 12 next |
+| G2 | Three DSA filters, and the viewing filter's third site | L | ⏳ step 9b of 12 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -319,8 +319,9 @@ The rest of the item, with an operation that needs care when ported:
 
 ### G2 ⏳ Three DSA filters, and the viewing filter's third site
 
-The port runs fourteen filters: the viewing filter (two of its three sites),
-the monster attack filter, the delete monster filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
+The port runs fifteen filters: the viewing filter (two of its three sites), the monster
+move filter (before a turn, not after it), the monster attack filter, the delete monster
+filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
 sound filter, the action name filter, the feeding filter, the character death filter, the
 damage filter, the equip filter, the party move filter, and the spell filter at
 `spellFilterLocation`. Each place below uses
@@ -338,22 +339,17 @@ A filter that loops runs each of those DSAs in turn, a filter call apiece; one t
 `tools/` check through `tools/lib/dsa.ts`: `TestFilter` for one DSA, `withFilterDsas` for
 two on the square where the site loops. Steps 1 to 8, the sound filter, the action name
 filter, the feeding filter, the character death and damage filters, the equip filter, the
-party move filter, the monster attack filter, and the delete monster filter, are paid. The
-steps left, one commit each:
+party move filter, the monster attack filter, and the delete monster filter, are paid, and
+so is step 9a, the monster move filter's location and its run before a turn. The steps
+left, one commit each but for 9's two:
 
-9. **`ESL_MONSTERMOVEFILTER`** (L), three commits. The filter runs one DSA, the first
-   type-47 actuator at its location, twice a turn: before it, with timer function 0
-   (`Monster.cpp:3311-3357`), and at each of the turn's 35 `return`s, with function 1
-   (`ProcessPostMonsterMoveFilter`, `:3172-3233`), on one `MMRECORD`'s timer and
-   `DSAVARS` (`CSB.h:2884-2897`), and with `monsterMoveFilterActive` set
-   (`DsaSystem.monsterMoveFilterActive`), without which `&MONL&D` does nothing.
-   - **9a. The location and the pre-move filter** (M).
-     `MONSTERMOVEFILTERCACHE::GetLocation` (`:3077-3135`) tries the key with
-     `(level + 1) << 8` first, then the dungeon's; the record's bits 0-17 are the
-     location, bit 18 `partyLevelOnly` and bits 19-23 `maxDistance`.
-     `specialLocationsFromExpool` reads neither the level keys nor the two fields. The
-     pre-move filter's `&MONBLK` sets the directions the turn then refuses
-     (`MonsterAI.monsterMoveInhibit`).
+9. **`ESL_MONSTERMOVEFILTER`** (L), three commits, the first paid. The filter runs one
+   DSA, the first type-47 actuator at its location, twice a turn: before it, with timer
+   function 0 (`DsaSystem.monsterMoveFilter`, `Monster.cpp:3311-3357`), and at each of
+   the turn's 35 `return`s, with function 1 (`ProcessPostMonsterMoveFilter`,
+   `:3169-3233`), on one `MMRECORD`'s timer and `DSAVARS` (`CSB.h:2884-2897`), which the
+   port's pre-move filter makes for itself and drops. The post-move filter is a second
+   `ProcessDSAFilter` like the first, the record's timer with function 1.
    - **9b. The post-move filter, with `finalLocr`** (M). Its nine parameters are where
      the group ended, the group, the party, and the two words of flags. `finalLocr` is
      set by `AddObjectToRoom` and `RemoveObjectFromRoom` when the object is the group

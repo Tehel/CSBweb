@@ -295,6 +295,8 @@ const ESL_EQUIP_FILTER = 12;
 const ESL_PARTY_MOVE_FILTER = 14;
 const ESL_MONSTER_ATTACK_FILTER = 0;
 const ESL_DELETE_MONSTER_FILTER = 7;
+const ESL_MONSTER_MOVE_FILTER = 2;
+const MONSTER_MOVE_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_MONSTER_MOVE_FILTER;
 const ESL_INDIRECT_ACTIONS = 5;
 const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
 
@@ -552,6 +554,19 @@ function filterTimer(position: Position): TimerEntry {
   };
 }
 
+/**
+ * `MONSTERMOVEFILTERLOCATION` (`doc/CSBwin-src/CSB.h:441-447`): where a level's monster
+ * move filter is, and when it runs. `partyLevelOnly` is the record's bit 18, or 0xffff
+ * when there is no record; `filterObj` is the first type-47 actuator at `locr`, or
+ * `OBJECT_ID_EOF`.
+ */
+interface MonsterMoveFilterLocation {
+  locr: LocationRel;
+  maxDistance: number;
+  partyLevelOnly: number;
+  filterObj: ObjectID;
+}
+
 function signExtend(value: number, bits: number): number {
   const sign = 1 << (bits - 1);
   return (value & (sign - 1)) - (value & sign);
@@ -612,9 +627,18 @@ export class DsaSystem {
   /**
    * `monsterMoveFilterActive` (`doc/CSBwin-src/data.cpp:85`), which `ProcessDSAFilter`
    * sets while the monster move filter runs (`Monster.cpp:3229`, `:3355`) and
-   * `&MONL&D` reads. The port does not run that filter yet (DEBT.md G2).
+   * `&MONL&D` reads. The port runs that filter before a group's turn, not yet after it
+   * (DEBT.md G2).
    */
   monsterMoveFilterActive = false;
+  /**
+   * `monsterMoveFilterCache` (`doc/CSBwin-src/Monster.cpp:3059`): each level's
+   * `MONSTERMOVEFILTERLOCATION` once a turn on it has looked, and the dungeon's, which
+   * every level without a key of its own copies. Nothing empties it (`Clear`,
+   * `CSB.h:458`, has no body and no caller), so it holds for as long as the system lives.
+   */
+  private readonly monsterMoveFilterLocations = new Map<number, MonsterMoveFilterLocation>();
+  private monsterMoveFilterGlobal: MonsterMoveFilterLocation | null = null;
   /** `SoundFilter`'s `filterActive` (`doc/CSBwin-src/Sound.cpp:672`): its DSAs are running. */
   private soundFilterActive = false;
   /**
@@ -881,6 +905,69 @@ export class DsaSystem {
       run();
       deleteMonsterParametersFromWords(p, (i) => this.getParameter(i));
     }));
+  }
+
+  /**
+   * `MONSTERMOVEFILTERCACHE::GetLocation` (`doc/CSBwin-src/Monster.cpp:3077-3166`): the
+   * level's own record, keyed with `(level + 1) << 8`, and failing that the dungeon's,
+   * looked up once. The record's bits 0-17 are the location, bit 18 `partyLevelOnly` and
+   * bits 19-23 `maxDistance`. A level with a record of its own keeps it even when no
+   * type-47 actuator stands there, and then has no filter.
+   */
+  private monsterMoveFilterLocation(level: number): MonsterMoveFilterLocation {
+    const cached = this.monsterMoveFilterLocations.get(level);
+    if (cached) return cached;
+    const fromRecord = (record: number | null): MonsterMoveFilterLocation => {
+      if (record === null) {
+        return { locr: { l: 0, x: 0, y: 0, p: 0 }, maxDistance: 0, partyLevelOnly: 0xffff, filterObj: OBJECT_ID_EOF };
+      }
+      const locr = locationRelFromInteger(record & 0x03ffff);
+      const filterObj = this.dungeon.isValidLocation(locr)
+        ? this.findFirstDsaActuator(new Position(locr.x, locr.y, locr.l))
+        : OBJECT_ID_EOF;
+      return { locr, maxDistance: (record & 0xf80000) >>> 19, partyLevelOnly: (record & 0x040000) >>> 18, filterObj };
+    };
+    let location = fromRecord(this.dungeon.getSpecialLocation((MONSTER_MOVE_FILTER_KEY | ((level + 1) << 8)) >>> 0));
+    if (location.partyLevelOnly === 0xffff) {
+      this.monsterMoveFilterGlobal ??= fromRecord(this.dungeon.getSpecialLocation(MONSTER_MOVE_FILTER_KEY));
+      location = { ...this.monsterMoveFilterGlobal };
+    }
+    this.monsterMoveFilterLocations.set(level, location);
+    return location;
+  }
+
+  /**
+   * The monster move filter before a group's turn (`doc/CSBwin-src/Monster.cpp:3311-3357`),
+   * which `ProcessTimers29to41` runs once it has cleared `monsterMoveInhibit`, for the
+   * group `monster` at `mapX, mapY` on `level`, whose timer function is `timerFunction`.
+   * It runs when that function is above 0, so never for a reaction (`TT_M1` to `TT_M3`),
+   * when the level's location has a DSA, when the group is on the party's level or the
+   * location's `partyLevelOnly` is 0, and when the group is within `maxDistance` of the
+   * party, squared distances compared.
+   *
+   * Only `filterObj` runs, on parameters of its own, a count of 7: the level, the group's
+   * square, the group, and the party's level and square (`:3340-3347`). Its timer has
+   * function and position 0, the level, and the group's square with x in `uByte7` and y
+   * in `uByte6` (`:3324-3329`), the other way round from every other filter's, so the
+   * DSA's master stands at `(y, x)` (`ProcessDSATimer6`, `DSA.cpp:5408-5413`).
+   */
+  monsterMoveFilter(level: number, mapX: number, mapY: number, monster: ObjectID, timerFunction: number): void {
+    const mmfloc = this.monsterMoveFilterLocation(level);
+    const party = this.ctx.party.state.position;
+    const partyX = party.x | 0;
+    const partyY = party.y | 0;
+    if (timerFunction <= 0 || mmfloc.filterObj === OBJECT_ID_EOF) return;
+    if (mmfloc.partyLevelOnly !== 0 && level !== (party.z | 0)) return;
+    if ((mapX - partyX) * (mapX - partyX) + (mapY - partyY) * (mapY - partyY) > mmfloc.maxDistance * mmfloc.maxDistance) return;
+    // The group's square the other way round: x in `uByte7`, y in `uByte6`.
+    const timer = filterTimer(new Position(mapY, mapX, level));
+    const filterPos = new Position(mmfloc.locr.x, mmfloc.locr.y, mmfloc.locr.l);
+    this.newDsaParameters(() => {
+      this.setParameters(7, [level, mapX, mapY, monster, party.z | 0, partyX, partyY]);
+      this.monsterMoveFilterActive = true;
+      this.processTimer6Internal(mmfloc.filterObj, timer, filterPos, true, new DsaVars());
+      this.monsterMoveFilterActive = false;
+    });
   }
 
   /**
