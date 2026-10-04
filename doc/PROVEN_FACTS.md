@@ -5532,7 +5532,9 @@ Each site reads `timerTypeModifier[pTimer->timerUByte9()]` when it needs it, not
   `ActivateDSA`, then read it again: a TOGGLE writes SET or CLEAR into `uByte9`
   (`:1571-1575`, `:2536-2546`, `:2404-2408`). Past that the door and the pit read the raw
   `uByte9` (`:1578`, `:2548`), the teleporter reads it through the modifier again (`:2409`),
-  so a SET that a DSA made a TOGGLE leaves a closed teleporter closed.
+  so a SET that a DSA made a TOGGLE leaves a closed teleporter closed. `ProcessTT_DOOR`
+  reads the door state only after `ActivateDSA` (`:1563-1569`), so its DSAs run on a
+  bashed door too, and it never tests the room type.
 - `ActivateDSA` (`:1500-1538`) runs each DSA on a timer of its own whose `uByte9` is the
   action already read through the modifier, which `ProcessDSATimer6` reads through it once
   more (`DSA.cpp:5351`, `:5383`). A timer just reset reads the same either way.

@@ -17,6 +17,8 @@
  *    made a TOGGLE leaves a closed teleporter closed.
  * 5. **So does a door** (`ProcessTT_DOOR`, `:1556-1586`): a SET the DSA makes a TOGGLE
  *    closes an open door, where a SET leaves it alone.
+ * 6. **A door timer runs the square's DSAs before it looks at the square** (`:1563-1569`):
+ *    on a bashed door, and on a square that is no door.
  *
  * Run: `npx tsx tools/dump-timer-modifier.ts`
  */
@@ -107,6 +109,19 @@ for (const [program, expected, what] of [
   send(game, at, TimerFunction.TT_DOOR, 0);
   console.log(`5. ${what}: an open door's state is ${flags(game, at) & 7}`);
   check((flags(game, at) & 7) === expected, `${what}`);
+}
+
+/* ----------------------------- 6. a door's DSAs run first -------------------------- */
+for (const [type, state, what] of [
+  [RoomType.DOOR, 5, 'a bashed door'],
+  [RoomType.OPEN, 0, 'a square that is no door'],
+] as const) {
+  const { game, at } = run([...int(7), globalStore(0)], room(type, state));
+  game.systems.dsa.setGlobalVariables(new Array<number>(100).fill(0x5a5a));
+  send(game, at, TimerFunction.TT_DOOR, 0);
+  const g = game.systems.dsa.getGlobalVariables()[0];
+  console.log(`6. a door timer to ${what}: global 0 is 0x${g?.toString(16)}, flags 0x${flags(game, at).toString(16)}`);
+  check(g === 7 && (flags(game, at) & 7) === state, `the DSA on ${what} ran, and the square is as it was`);
 }
 
 finish();

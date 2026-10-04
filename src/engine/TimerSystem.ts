@@ -679,21 +679,20 @@ export class TimerSystem {
   }
 
   /**
-   * `ProcessTT_DOOR` (`doc/CSBwin-src/Timer.cpp:1556-1586`). Only a TOGGLE is read through
-   * the modifier after the square's DSAs; otherwise the timer's own `uByte9` decides, and
-   * the `TT_1` keeps it.
+   * `ProcessTT_DOOR` (`doc/CSBwin-src/Timer.cpp:1556-1586`). The square's DSAs run first,
+   * whatever the square is; the door state they leave decides the rest, a bashed door (5)
+   * ending it. Only a TOGGLE is read through the modifier after them; otherwise the
+   * timer's own `uByte9` decides, and the `TT_1` keeps it.
    */
   private processDoor(timer: TimerEntry): void {
     if (this.getTimerAction(timer) === 3) return;
     const map = this.dungeon.getMap(timer.level);
     if (!map) return;
-    const cellFlag = map.cellFlags[timer.uByte6][timer.uByte7];
-    if (((cellFlag >> 5) & 7) !== RoomType.DOOR) return;
-    const doorState = cellFlag & 0x7;
-    if (doorState === 5) return;
 
     this.activateDsa(timer, this.getTimerAction(timer));
 
+    const doorState = map.cellFlags[timer.uByte6][timer.uByte7] & 0x7;
+    if (doorState === 5) return;
     if (this.getTimerAction(timer) === ActuatorAction.TOGGLE) {
       timer.uByte9 = doorState === 0 ? ActuatorAction.CLEAR : ActuatorAction.SET;
     } else if (timer.uByte9 === ActuatorAction.SET) {

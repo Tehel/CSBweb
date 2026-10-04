@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C128 | A door timer tests its square before the square's DSAs run, and tests its room type | S | ⏳ |
 | G1 | Full DSA support: every operation, slave DSAs, and a save of a dungeon with DSAs | L | ⏳ |
 | G2 | Thirteen DSA filters | L | ⏳ |
 | G3 | The wings | M | ⏳ |
@@ -171,17 +170,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C128 ⏳ A door timer tests its square before the square's DSAs run, and tests its room type
-
-`ProcessTT_DOOR` (`doc/CSBwin-src/Timer.cpp:1556-1586`) calls `ActivateDSA` first, then
-reads the cell's low three bits: a bashed door (5) ends it there, and the state the DSAs
-left decides the rest. It never tests the room type. The port's `processDoor`
-(`src/engine/TimerSystem.ts`) returns before the DSAs on a square that is not a door or
-whose door is bashed, and decides on the state it read before they ran, so a DSA that
-moves the door, or a DSA on a bashed door's square, is not seen. Paying it: CSBWin's order,
-with a case in `tools/dump-timer-modifier.ts`'s door section.
-
 
 ---
 
