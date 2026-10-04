@@ -3,7 +3,7 @@
 Chaos Strikes Back's Hint Oracle, as CSBWin ports it in `doc/CSBwin-src/Hint.cpp`. The
 port reads its data with `parseHintOracle` (`src/data/HintOracleLoader.ts`), and
 `tools/dump-hint-oracle.ts` checks the retail file against everything below. Nothing in
-the game uses it yet (`DEBT.md` G20, X6).
+the game uses it yet (`DEBT.md` G20).
 
 ## What it is
 

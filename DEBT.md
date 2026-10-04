@@ -106,14 +106,13 @@ In payoff order: the first row is the next item.
 | F13 | `npm test` runs its tools one at a time | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G29 | Recording a game and playing it back | — | ⏸️ |
-| G20 | The Hint Oracle's screen, from `hcsb.dat` | M | ⏸️ |
+| G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏸️ |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X1 | Extra: drinking from a fountain with an empty hand | S | ⏸️ |
 | X2 | Extra: a mastery just gained shown in green | S | ⏸️ |
 | X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
 | X5 | Extra: 3D2D1D's vertical moves and gravity | L | ⏸️ |
-| X6 | Extra: the Hint Oracle from the inventory, at the party's square | M | ⏸️ |
 | X8 | Extra: RISE's own dialog, and the utility disk's portraits on DM's champions | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -532,15 +531,16 @@ the game; whether to model it is the author's call.
 
 Not taken in order; the author names one to start it (see "Priority").
 
-### G20 ⏸️ The Hint Oracle's screen
+### G20 ⏸️ The Hint Oracle, from the inventory, at the party's square
 
 Chaos Strikes Back's Hint Oracle is a program of its own: `HINT.FTL` on the utility disk,
 ported by CSBWin as `Hint.cpp` (`_StartHint`, `doc/CSBwin-src/Hint.cpp:6454`). CSBWin
 reaches it from the launcher's HINT choice, which the port does not have
 (`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`), and it reads the party's square from a saved
-game. This item is the screen itself, ported as CSBWin draws it and fed a square. X6 is
-what opens it in the game, and the two are taken together, this one first: with
-nothing to open it, the screen alone is not reachable.
+game. The port puts it in the game instead: a button in the champion's inventory opens
+the Oracle's own screen, ported as CSBWin draws it, on the square the party stands on.
+It is CSB's, not an extra: whenever the data set has the Oracle's files, the button is
+there, whatever `UISettings.extras` says, because the port offers no other way to it.
 
 Done already: `hcsb.hct` (`parseHintOracle` and `hintsAtPosition`,
 `src/data/HintOracleLoader.ts`, checked by `tools/dump-hint-oracle.ts`), and the layout of
@@ -565,7 +565,8 @@ GEMDOS file emulation, a heap, LZW, palette fades and empty GEM stubs.
   (`TAG008c40_8`, `:6951`). No key does anything: every button's key word is 0, so
   `TAG008c40_3` registers none (`:6824`). There is no sound.
 
-Two steps, one commit each:
+Three steps, one commit each. The screen alone is not reachable, so steps 2 and 3 are
+taken in one session if they fit:
 
 1. **`hcsb.dat` read** (S). Item 0's fifty words, each named where `Hint.cpp` reads
    it (inks, fade delays and steps, the cycle), into the reference doc. The four items
@@ -592,6 +593,35 @@ Two steps, one commit each:
    LAST, with the buttons each page offers, and a level with no records (past 9) shows
    "no clues". A golden frame of that title list (CSB's data set) goes in
    `tools/frames/`.
+3. **The button** (M). Where the files are (`hcsb.hct` and `hcsb.dat`, which `main.ts`
+   fetches beside `dungeon.dat`; only `csb` has them, and a game started from `mini.dat`
+   by RISE is CSB's dungeon too), the inventory's close box becomes the Oracle's button.
+   The close box is `buttons17760`'s button 11 at x 210-218, y 36-44, beside the disk
+   (140) and the sleep icon (145) (`doc/CSBWIN_MENU_REFERENCE.md` → "The disk icon"),
+   and its picture is part of graphic 17, the inventory's backdrop. It goes because
+   there is no room left of the disk: a name and a title at their longest reach it. The
+   inventory still closes the way it opens, with a right click or the champion's name.
+   Its picture is the Oracle's own `?`, from `hcsb.dat` item 2 at `TAG004962`'s
+   position, drawn over the close box in the interface's colours, so no art is
+   invented. Without the files, the close box is CSBWin's. Both changes, the close box
+   replaced and DONE closing the Oracle, are recorded under H when this is paid.
+
+   A click opens the Oracle the way the disk icon opens the save menu
+   (`Mouse.cpp:1708-1727`). It raises a flag, refused with an empty party or a champion
+   only provisionally joined, and whoever drained the queue opens the screen.
+   `TAG02076e` runs before it and `TAG0207cc` after it, as around the disk menu
+   (`SaveGame.cpp:860`, `:1274`), and the game stands still while it is up. The square
+   is the party's `partyLevel`, x and y, not `position.z`, which lags a level change
+   until `loadNewPartyLevel` (`.claude/memory/two-step-level-change.md`). DONE on the
+   title list brings back the inventory as it was. A game whose Extended Features
+   block carries a non-zero `hintKey` (`src/data/CsbwinExtendedFeatures.ts`) reads
+   `hcsb.hct` deciphered under it, as CSBWin does (`Hint.cpp:5401-5405`). `RC4.cpp`'s
+   cipher is ported already, for Conflux's `dungeon.dat`; no save here has a key.
+
+   A `tools/` check: a CSB party at level 0 (3,23) clicks the button and the Oracle
+   lists CREATURES, THE MAZE and FULYA PIT. After a step, a pit and a teleporter it
+   lists the new square's hints. In DM, button 11 still closes the inventory. A
+   golden frame of CSB's inventory with the button goes in `tools/frames/`.
 
 ### G21 ⏸️ `Translation.txt`: the messages the executable prints, translated
 
@@ -778,45 +808,6 @@ Playing the dungeon through also needs saving, which waits on G1's `DSA::Write`:
 `static/gamefiles/3D2D1D/WALKTHROUGH.md` is a full route computed from CSBWin's rules
 by `tools/solve-3d2d1d.ts`, outside the engine. Once both steps are in, a tool that
 replays it through `Game` is the end-to-end proof.
-
-### X6 ⏸️ The Hint Oracle from the inventory, at the party's square
-
-The original Oracle runs apart from the game and reads a save. This extra opens G20's
-screen from a button in the champion's inventory, on the square the party stands on,
-with no save in between. It needs G20.
-
-- **Which game.** The data set holds `hcsb.hct` and `hcsb.dat`, which `main.ts` fetches
-  beside `dungeon.dat`. Only `csb` has them, and their coordinates are CSB's dungeon,
-  which a game started from `mini.dat` (RISE) plays too. Without them there is no
-  button. A game whose Extended Features block carries a non-zero `hintKey`
-  (`src/data/CsbwinExtendedFeatures.ts`) reads `hcsb.hct` deciphered under it, as
-  CSBWin does (`Hint.cpp:5401-5405`). `RC4.cpp`'s cipher is ported already, for Conflux's
-  `dungeon.dat`, but no save here has a key.
-- **The button.** A `word0` of the port's own in `buttons17760`, beside the disk (140, x
-  174-182, y 36-44), the sleep icon (145) and the close box (11) (`doc/CSBWIN_MENU_REFERENCE.md`
-  → "The disk icon"). `syncInventoryButtons` installs it only when the extra is on and
-  the files are there. `graphics.dat` has no picture for it. A candidate is the
-  Oracle's own font's `?` (`hcsb.dat` item 2), drawn in the interface's colours, so that
-  no art is invented. The space left of the disk is free in `tools/frames/03-inventory.png`,
-  but the longest name and title CSB can show must be measured against it. The picture
-  and the place are the author's call before this is taken.
-- **Opening it** as the disk icon opens the save menu (`Mouse.cpp:1708-1727`). The click
-  raises a flag, refused with an empty party or a champion only provisionally joined,
-  and whoever drained the queue opens the Oracle. `TAG02076e` runs before it and
-  `TAG0207cc` after it, as around the disk menu (`SaveGame.cpp:860`, `:1274`), and the
-  game stands still while it is up. The square is the party's `partyLevel`, x and y, not
-  `position.z`, which lags a level change until `loadNewPartyLevel`
-  (`.claude/memory/two-step-level-change.md`). G20's DONE on the title list brings back
-  the inventory as it was.
-- **On by default or not.** The X rules put it behind `UISettings.extras`, off. The
-  author may want it on, as for X8's upgrade. It only ever shows in CSB, and no golden
-  frame is of CSB, so none would move. On by default, it is recorded under H, as the
-  coloured cursor is. The author's call before this is taken.
-
-A `tools/` check, the extra on: a CSB party at level 0 (3,23) clicks the button and the
-Oracle lists CREATURES, THE MAZE and FULYA PIT. After a step, a pit and a teleporter it
-lists the new square's hints. In DM there is no button. A golden frame of CSB's
-inventory with the button.
 
 ### X8 ⏸️ RISE's own dialog, and the utility disk's portraits on DM's champions
 
