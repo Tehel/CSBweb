@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10c next |
+| G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10d next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -320,7 +320,7 @@ The rest of the item, with an operation that needs care when ported:
 ### G2 ⏳ The cursor filter, the portrait's DSA switch action, and the viewing filter's third site
 
 The port runs sixteen filters: the viewing filter (two of its three sites), the cursor
-filter (nine of its twenty sites), the monster
+filter (twelve of its twenty sites), the monster
 move filter, the monster attack filter, the delete monster
 filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
 sound filter, the action name filter, the feeding filter, the character death filter, the
@@ -350,15 +350,13 @@ move filter, are paid. The steps left, one commit each:
     `NEWDSAPARAMETERS`. Back comes the packet; a site that can be cancelled reads `type`
     against `CURSORFILTER_Cancel` (20). CSBWin calls it from 20 places (a 21st,
     `SaveGame.cpp:2755-2758`, is commented out). The port's is `DsaSystem.cursorFilter`,
-    and nine sites send it their packets: `TouchWall`'s six (`ActuatorSystem.touchWall`:
-    the key, the torch holder, the swap, the gift), and the hand's three, the throw
+    and twelve sites send it their packets: `TouchWall`'s six (`ActuatorSystem.touchWall`:
+    the key, the torch holder, the swap, the gift); the hand's three, the throw
     (`MouseSystem.throwObjectFromCursor`), the pick-up (`tryPickViewportObject`) and the
-    drop (`MouseSystem.dropObjectFromCursor`), checked by `tools/dump-cursor-filter.ts`,
-    where each step below adds its own. The steps left, one commit each:
-    - **10c. The champion's three** (S). `HandleClothingClick`'s `PlaceOnCharacter`, sent
-      even with an empty cursor, which may cancel the click, and `PickFromCharacter`
-      once the slot is emptied (`CSBCode.cpp:6966-6991`, `src/renderer/ui/Mouse.ts:348`);
-      and `_FeedCharacter`'s `Eat` (`Character.cpp:4471-4479`), which cannot cancel.
+    drop (`MouseSystem.dropObjectFromCursor`); and the champion's three, the clothing
+    click's two (`handleClothingClick`) and the mouth's (`handleMouthPress`). They are
+    checked by `tools/dump-cursor-filter.ts`, where each step below adds its own. The
+    steps left, one commit each:
     - **10d. The DSA's four** (S). `EX_DEL`'s `DSA_DEL` (`DSA.cpp:1659-1665`), `EX_ADD`'s
       `DSA_ADD` (`:2062-2071`), `FindCursorSource`'s `DSA_MoveFrom`
       (`MoveObject.cpp:130-143`, `DsaSystem.findCursorSource`) and the cursor
@@ -686,7 +684,7 @@ when the hand is empty.
 
 The extra: with an empty hand, the **cursor owner** drinks. That is the same drink as one
 gulp from a full waterskin: `waterValue = 800` and `SOUND_GULP` (`computeFeedParameters`,
-`src/renderer/ui/Feeding.ts:57-66`), applied through `applyFeedParameters`, so the water cap
+`src/renderer/ui/Feeding.ts:58-67`), applied through `applyFeedParameters`, so the water cap
 and the sound are CSBWin's own. A dead or absent cursor owner drinks nothing.
 
 ### X2 ⏸️ A mastery just gained shown in green

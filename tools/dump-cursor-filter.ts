@@ -35,16 +35,30 @@
  *    `MouseSystem.dropObjectFromCursor`: on the party's square, and in the alcove ahead,
  *    which is the square ahead's facing side.
  *
+ * And the champion's three:
+ *
+ * 12. **The clothing click**: `PlaceOnCharacter` (3) for the hand's object, `RNnul` when
+ *    it is empty, with the champion and the slot; a cancel leaves both as they were
+ *    (`CSBCode.cpp:6966-6972`). Once the slot is emptied, `PickFromCharacter` (4) for what
+ *    it held, whose cancel nothing reads (`:6982-6991`). Run through
+ *    `handleClothingClick`, on champion 0's ready hand.
+ * 13. **The mouth**: `Eat` (8) for the object eaten, whose cancel nothing reads
+ *    (`Character.cpp:4471-4479`), run through `handleMouthPress`.
+ *
  * Run: `npx tsx tools/dump-cursor-filter.ts`
  */
 import { readFileSync } from 'node:fs';
 
+import { OBJNI_APPLE } from '../src/core/objectNameIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { CursorFilterType, StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
+import { handleMouthPress } from '../src/renderer/ui/Feeding';
+import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
+import { handleClothingClick } from '../src/renderer/ui/Mouse';
 import { tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import { VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
@@ -86,7 +100,7 @@ function wallSquare(game: Game): Position {
   throw new Error('no empty square');
 }
 
-/** A new misc object, an apple's record, on no square. */
+/** A new misc object of `miscType`, on no square. */
 function misc(game: Game, miscType = 0): ObjectID {
   const data: DungeonData = game.ctx.dungeon.getData();
   data.databases.misc.records.push({ nextObject: OBJECT_ID_EOF, specialState: 0, important: false, miscType });
@@ -286,6 +300,81 @@ for (const [pos, ahead] of [[1, false], [4, true]] as const) {
     check(done === !cancelled && (party.objectInHand === dropped) === cancelled && onSquare === !cancelled,
       `11. the object is ${cancelled ? 'kept' : 'dropped'} at ${pos}`);
   }
+}
+
+/** `GLOBALFETCH` (`DsaSystem`'s `DsaCommand`): global `index` onto the stack. */
+const globalFetch = (index: number): number => 19 | (index << 6);
+/** The packet the call before left in globals 0 on, kept in globals 20 on, then this call's. */
+const keep: number[] = [
+  ...Array.from({ length: 1 + WORDS }, (_, i) => [globalFetch(i), globalStore(20 + i)]).flat(),
+  ...report(0),
+];
+/** 16 added to `type`: `PlaceOnCharacter` (3) becomes 19, `PickFromCharacter` (4) `Cancel` (20). */
+const shift: number[] = [
+  ...int(WORDS), ...int(10), op(StkOp.PARAM_FETCH),
+  varFetch(11), ...int(CursorFilterType.Cancel - CursorFilterType.PickFromCharacter), op(StkOp.PLUS), varStore(11),
+  ...int(WORDS), ...int(10), op(StkOp.PARAM_STORE),
+];
+
+/** Champion 0's ready hand holding `held` or nothing, and the hand `inHand`, before a click on it. */
+function clothing(programs: number[][], held: boolean, inHand: boolean) {
+  const game = withFilterDsas(ESL_CURSORFILTER, programs);
+  const party = game.ctx.party.state;
+  const ui = newUIState(stockGraphics(), game.ctx);
+  ui.partyState = party;
+  const character = game.systems.character;
+  character.removeCharacterPossession(0, 0);
+  const apple = misc(game);
+  if (held) character.addCharacterPossession(0, apple, 0);
+  party.cursorOwner = 0;
+  party.selectedCharacterIndex = -1;
+  party.objectInHand = inHand ? apple : OBJECT_ID_NULL;
+  handleClothingClick(ui, 0);
+  return { g: game.systems.dsa.getGlobalVariables(), apple, party, slot: party.champions[0]!.possessions[0] };
+}
+
+for (const cancelled of [false, true]) {
+  const { g, apple, party, slot } = clothing([[...report(0), ...(cancelled ? cancel : [])]], false, true);
+  console.log(`PlaceOnCharacter${cancelled ? ', cancelled' : ''}: ${packet(g)}, hand ${party.objectInHand}, slot ${slot}`);
+  check(packet(g) === hand(CursorFilterType.PlaceOnCharacter, apple, 0, 0), `12. ${cancelled ? 'cancelled ' : ''}PlaceOnCharacter's packet, the champion and the slot`);
+  check(cancelled
+    ? party.objectInHand === apple && slot === OBJECT_ID_NULL
+    : party.objectInHand === OBJECT_ID_NULL && slot === apple, `12. the object is ${cancelled ? 'kept' : 'placed'}`);
+}
+
+{
+  const { g, apple, party, slot } = clothing([keep], true, false);
+  console.log(`PlaceOnCharacter then PickFromCharacter: ${packet(g, 20)}, ${packet(g)}`);
+  check(packet(g, 20) === hand(CursorFilterType.PlaceOnCharacter, OBJECT_ID_NULL, 0, 0), '12. an empty hand\'s click sends PlaceOnCharacter for RNnul');
+  check(packet(g) === hand(CursorFilterType.PickFromCharacter, apple, 0, 0), '12. then PickFromCharacter for what the slot held');
+  check(party.objectInHand === apple && slot === OBJECT_ID_NULL, '12. which is taken');
+}
+
+{
+  const { g, apple, party, slot } = clothing([shift, report(0)], true, false);
+  check(packet(g) === hand(CursorFilterType.Cancel, apple, 0, 0), '12. a DSA cancels PickFromCharacter');
+  check(party.objectInHand === apple && slot === OBJECT_ID_NULL, '12. and the object is taken all the same');
+}
+
+{
+  const game = withFilterDsas(ESL_CURSORFILTER, [[...report(0), ...cancel]]);
+  const party = game.ctx.party.state;
+  const ui = newUIState(stockGraphics(), game.ctx);
+  ui.partyState = party;
+  let food = misc(game);
+  for (let miscType = 1; resolveObjectNameIndex(ui, food) !== OBJNI_APPLE; miscType++) {
+    game.ctx.dungeon.getData().databases.misc.records.pop();
+    food = misc(game, miscType);
+  }
+  const apple = food;
+  party.cursorOwner = 0;
+  party.selectedCharacterIndex = 0;
+  party.objectInHand = apple;
+  handleMouthPress(ui);
+  const g = game.systems.dsa.getGlobalVariables();
+  console.log(`Eat, cancelled: ${packet(g)}, hand ${party.objectInHand}`);
+  check(packet(g) === hand(CursorFilterType.Eat, apple, 0), '13. Eat\'s packet, the object eaten and nothing else');
+  check(party.objectInHand === OBJECT_ID_NULL, '13. a cancel does not stop the eating');
 }
 
 finish();

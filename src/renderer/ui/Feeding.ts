@@ -7,6 +7,7 @@
  */
 import { OBJNI_APPLE, OBJNI_DRAGON_STEAK, OBJNI_SPECIAL_G, OBJNI_SPECIAL_H, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
 import { PotionType } from '../../core/constants';
+import { CursorFilterType } from '../../engine/DsaSystem';
 import { applyFeedParameters, clearFeedParameters, derivePotionFeeding, type FeedParameters } from '../../engine/Feeding';
 import { DBType, OBJECT_ID_NULL, ObjectID, locationRelToInteger } from '../../core/types';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
@@ -132,6 +133,11 @@ export function handleMouthPress(ui: UIState): void {
   }
 
   if (fp.emptyHand) {
+    // `CURSORFILTER_Eat`, whose cancel nothing reads (`doc/CSBwin-src/Character.cpp:4471-4479`).
+    const inHand = ui.partyState.objectInHand;
+    if (inHand !== OBJECT_ID_NULL) {
+      ui.ctx.systems.dsa.cursorFilter({ object: inHand, type: CursorFilterType.Eat, p1: 0, p2: 0, p3: 0, p4: 0 });
+    }
     ui.partyState.objectInHand = OBJECT_ID_NULL;
     ui.ctx.dungeon.deleteDBEntry(objectId as ObjectID);
   }

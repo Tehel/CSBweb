@@ -3668,6 +3668,12 @@ touch has taken a key (`:567`). The hand's three can all be cancelled: `ThrowByC
 the level, its square and the button, the position relative to the party (`:827-835`); and
 `DropObject`'s, for the hand's object, with the level, the square it falls on and its
 absolute position, `(partyFacing + pos) & 3` once an alcove's 4 is 2 (`:870-882`).
+`HandleClothingClick` sends `PlaceOnCharacter` for the hand's object, `RNnul` when the hand
+is empty, with the champion and the slot as `p1` and `p2`, and a cancel ends the click
+before anything moves (`CSBCode.cpp:6966-6972`); once the hand and the slot are emptied, it
+sends `PickFromCharacter` for what the slot held, with the same two words, and reads no
+cancel (`:6982-6991`). `_FeedCharacter` sends `Eat` for the object in the hand and nothing
+else, when the feeding empties the hand, and reads no cancel (`Character.cpp:4471-4479`).
 `tools/dump-cursor-filter.ts`.
 
 ## The character death filter and the damage filter run their location's first DSA

@@ -22,6 +22,7 @@ import { UIMode, UIState } from './UIState';
 import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
 import { characterAtPosition } from '../../engine/AddCharacter';
+import { CursorFilterType } from '../../engine/DsaSystem';
 import { freeze, setClockTick, thaw, waitForButtonFlash, wakeUp } from '../../engine/LoopState';
 import {
   hasCursorObject,
@@ -383,6 +384,13 @@ export function handleClothingClick(ui: UIState, button: number): void {
 
   if (objectInHand !== OBJECT_ID_NULL && !canPlaceInSlot(ui, objectInHand, slot)) return;
 
+  // `CURSORFILTER_PlaceOnCharacter`, sent even with an empty cursor, which may cancel the
+  // click (`doc/CSBwin-src/CSBCode.cpp:6966-6972`).
+  const dsa = ui.ctx.systems.dsa;
+  const place = { object: objectInHand, type: CursorFilterType.PlaceOnCharacter, p1: chIdx, p2: slot, p3: 0, p4: 0 };
+  dsa.cursorFilter(place);
+  if (place.type === CursorFilterType.Cancel) return;
+
   // `RemoveCharacterPossession` and `AddCharacterPossession` are the engine's; a chest
   // slot is `d.rnChestContents`, which is ours, and all the pair does past slot 29 is
   // write it (`CharacterSystem.removeCharacterPossession`).
@@ -396,6 +404,8 @@ export function handleClothingClick(ui: UIState, button: number): void {
     } else {
       character.removeCharacterPossession(chIdx, slot);
     }
+    // `CURSORFILTER_PickFromCharacter`, whose cancel nothing reads (`:6982-6991`).
+    dsa.cursorFilter({ object: slotObject, type: CursorFilterType.PickFromCharacter, p1: chIdx, p2: slot, p3: 0, p4: 0 });
     ui.partyState.objectInHand = slotObject;
   }
   if (objectInHand !== OBJECT_ID_NULL) {
