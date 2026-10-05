@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C138 | A scroll in the weapon hand is never shown, and the eye panel is not redrawn at `DrawCharacterState` | M | ⏳ |
+| C138 | A scroll in the weapon hand is never shown, has the unrolled icon, and the eye panel is not redrawn at `DrawCharacterState` | M | ⏳ |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -171,7 +171,7 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C138 ⏳ A scroll in the weapon hand is never shown, and the eye panel is not redrawn at `DrawCharacterState`
+### C138 ⏳ A scroll in the weapon hand is never shown, has the unrolled icon, and the eye panel is not redrawn at `DrawCharacterState`
 
 `TAG0189d4` (`doc/CSBwin-src/Character.cpp:3849-3897`) fills the eye panel from the weapon
 hand: a chest's contents (`d.DisplayResurrectChestOrScroll` 4), a scroll's text through
@@ -179,6 +179,15 @@ hand: a chest's contents (`d.DisplayResurrectChestOrScroll` 4), a scroll's text 
 (`drawInventoryScreen`, `src/renderer/ui/Inventory.ts`) has the chest and food and water
 only: a scroll in the weapon hand is not read, and `displayResurrectChestOrScroll` is
 never 2.
+
+Its icon there is wrong too. A scroll entering the weapon hand is opened
+(`AddCharacterPossession`, `Character.cpp:1981-1986`), so its `NameIndex` is
+`objNI_OpenScroll` (`doc/CSBwin-src/data.cpp:648-655`). `DisplayBackpackItem` adds 1 to
+`objNI_Chest` and `objNI_OpenScroll` in the weapon hand of the selected champion's
+inventory (`Character.cpp:1183-1189`; `D5W` is "the selected champion", `:1117`), so the
+scroll is drawn rolled there, as `objNI_Scroll`, while the party panel's hand, drawn with
+`D5W` 0, shows it unrolled. The port does the chest's half (`getOpenChestIconIndex`,
+`Inventory.ts`) and not the scroll's: the open inventory shows the scroll unrolled.
 
 CSBWin draws that panel at events: from `DrawCharacterState` when the champion's
 `CHARFLAG_chestOrScroll` is set with the inventory open (`Character.cpp:1478-1497`, which
