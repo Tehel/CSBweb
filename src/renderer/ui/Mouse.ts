@@ -216,6 +216,26 @@ export function handleMouseUnclick(ui: UIState): void {
   }
 }
 
+/**
+ * `KillCharacter`'s release of a held eye, or else a held mouth, before it hides the
+ * dead champion's inventory (`doc/CSBwin-src/Character.cpp:2598-2620`), so that
+ * `ShowHideInventory(4)` does not return on it; `RemoveCharacter` has the same
+ * (`:5267-5289`). Each sets the hide count to 1 before it shows the pointer, so it is
+ * back whatever the count was. No `TAG0189d4`: the inventory is closing.
+ */
+export function releaseEyeOrMouth(ui: UIState): void {
+  if (ui.pressingEye) {
+    ui.pressingEye = false;
+    ui.describedObject = null;
+    ui.word23118 = 1;
+    stShowCursor(ui);
+  } else if (ui.pressingMouth) {
+    ui.pressingMouth = false;
+    ui.word23118 = 1;
+    stShowCursor(ui);
+  }
+}
+
 export function isEyeClick(ui: UIState, x: number, y: number): boolean {
   if (ui.partyState.selectedCharacterIndex < 0) return false;
   const rect = getEyeRect(ui);

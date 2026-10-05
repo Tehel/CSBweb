@@ -714,6 +714,12 @@ export class MonsterAttack {
 
     champ.attributes.health = 0;
     champ.incantation = [];
+    // A held eye or mouth let go, then `ShowHideInventory(4)`: the inventory closes on a
+    // dead champion before its possessions drop (`doc/CSBwin-src/Character.cpp:2597-2622`).
+    if (party.selectedCharacterIndex === chIdx) {
+      this.ctx.host.releaseEyeOrMouth();
+      this.ctx.host.showHideInventory(4);
+    }
 
     this.ctx.systems.character.dropAllPossessions(chIdx);
 
@@ -761,12 +767,6 @@ export class MonsterAttack {
       if (chIdx === (party.cursorOwner ?? -1)) setHandOwner(party, living, this.ctx.host);
       if (chIdx === (party.magicCasterIndex ?? -1)) selectMagicCaster(party, living);
     }
-
-    // `ShowHideInventory(4)` (`doc/CSBwin-src/Character.cpp:2622`): the inventory closes
-    // on a dead champion, without releasing a held eye or mouth first (`DEBT.md` C141).
-    // The magic tab is not cleared: `SelectMagicCaster` above handed it to a living
-    // champion, and blanking it would undo that.
-    if (party.selectedCharacterIndex === chIdx) party.selectedCharacterIndex = -1;
   }
 
   private createBonesRecord(): ObjectID | null {

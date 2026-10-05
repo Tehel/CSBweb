@@ -49,6 +49,7 @@ import {
   handleMouseButton,
   handleInventoryToggle,
   handleMouseUnclick,
+  releaseEyeOrMouth,
   searchMouseButtons,
   syncInventoryButtons,
   tag02076e,
@@ -259,6 +260,11 @@ export class GameScreen {
   /** `ShowHideInventory` (`doc/CSBwin-src/CSBCode.cpp:7419`) — the host's `showHideInventory`. */
   showHideInventory(chIdx: number): void {
     handleInventoryToggle(this.ui, chIdx);
+  }
+
+  /** `KillCharacter`'s release of the eye or the mouth — the host's `releaseEyeOrMouth`. */
+  releaseEyeOrMouth(): void {
+    releaseEyeOrMouth(this.ui);
   }
 
   /** `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`) — the host's `repackChest`. */

@@ -94,6 +94,12 @@ export interface GameHost {
    */
   showHideInventory(chIdx: number): void;
   /**
+   * `KillCharacter`'s release of a held eye or mouth, on the champion whose inventory is
+   * open, before its `ShowHideInventory(4)` (`doc/CSBwin-src/Character.cpp:2598-2620`):
+   * the eye and the mouth are the UI's.
+   */
+  releaseEyeOrMouth(): void;
+  /**
    * `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`): a chest left the weapon hand of
    * the champion whose inventory is open (`:1906-1914`). The open chest is the UI's.
    */
@@ -196,6 +202,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     pressingMouth: host.pressingMouth ?? (() => false),
     displayResurrectChestOrScroll: host.displayResurrectChestOrScroll ?? (() => 0),
     showHideInventory: host.showHideInventory ?? (() => {}),
+    releaseEyeOrMouth: host.releaseEyeOrMouth ?? (() => {}),
     repackChest: host.repackChest ?? (() => {}),
     tag02076e: host.tag02076e ?? (() => {}),
     tag0207cc: host.tag0207cc ?? (() => {}),

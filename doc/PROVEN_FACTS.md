@@ -2044,6 +2044,18 @@ Evidence: `tools/dump-viewing-filter.ts`, section 11.
 
 Evidence: `tools/dump-viewing-filter.ts`, section 12 (2 of 5 fail before the hide count).
 
+## A champion's death lets go of a held eye or mouth
+
+`KillCharacter`, on the champion whose inventory is open, clears a held eye
+(`d.PressingEye`, `d.PressingEyeOrMouth`, the held object's name drawn again) or else a
+held mouth, sets `d.Word23118 = 1` and shows the pointer, then hides the inventory with
+`ShowHideInventory(4)` (`doc/CSBwin-src/Character.cpp:2597-2622`), which would return on
+either held (`doc/CSBwin-src/CSBCode.cpp:7439-7440`). So the pointer is back whatever the
+hide count was, and the buttons after 81 answer again. `RemoveCharacter` does the same
+(`Character.cpp:5267-5291`).
+
+Evidence: `tools/dump-viewing-filter.ts`, section 13 (6 of 10 fail before the release).
+
 ## The mastery names are a code table, and six of them start with a rune
 
 `d.Pointer16770[17]` (`doc/CSBwin-src/CSBCode.cpp:370-384`) holds the rank names the eye

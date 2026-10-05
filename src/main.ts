@@ -309,6 +309,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         pressingMouth: () => screen?.pressingMouth() ?? false,
         displayResurrectChestOrScroll: () => screen?.displayResurrectChestOrScroll() ?? 0,
         showHideInventory: (chIdx) => screen?.showHideInventory(chIdx),
+        releaseEyeOrMouth: () => screen?.releaseEyeOrMouth(),
         repackChest: () => screen?.repackChest(),
         // `TAG02076e` / `TAG0207cc` from the engine: the Hall of Champions and `WakeUp`.
         tag02076e: () => screen?.tag02076e(),

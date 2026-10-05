@@ -58,6 +58,9 @@
  *    `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7413`); `HC5` for the mouth
  *    (`Character.cpp:4054-4055`, `CSBCode.cpp:7395`). The hide count `d.Word23118` is
  *    back to 0 after each (`doc/CSBwin-src/Mouse.cpp:1818-1863`).
+ * 13. **A champion's death lets go of the held eye or mouth** when their inventory is
+ *    open, and closes it (`KillCharacter`, `Character.cpp:2597-2622`): the pointer is
+ *    back, and the buttons after 81 are not swallowed any more.
  *
  * Run: `npx tsx tools/dump-viewing-filter.ts`
  */
@@ -72,7 +75,7 @@ import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterD
 import { check, finish } from './lib/check';
 import { gameTablesOf, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
-import { drawCursorItem, handleInventoryToggle, handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
+import { drawCursorItem, handleInventoryToggle, handleMouseButton, handleMouseUnclick, releaseEyeOrMouth } from '../src/renderer/ui/Mouse';
 import { drawCharacterStateEyePanel, drawInventoryScreen, getInventorySlotRect } from '../src/renderer/ui/Inventory';
 import { drawObjectIcon } from '../src/renderer/ui/Draw';
 import { VIEWPORT_X, VIEWPORT_Y, getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
@@ -498,7 +501,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   check(!theUi.pressingMouth, 'with food and water shown (d.DisplayResurrectChestOrScroll 0), the mouth is not held');
 }
 
-/* ------------------------------- 12. the held eye and mouth hide the pointer ---- */
+/* ------------------------------- 12, 13. the pointer, and a death while held ---- */
 {
   // The host's members are the screen's, as `main.ts` wires them.
   let ui: UIState | null = null;
@@ -507,6 +510,8 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     pressingEye: () => ui?.pressingEye ?? false,
     pressingMouth: () => ui?.pressingMouth ?? false,
     displayResurrectChestOrScroll: () => ui?.displayResurrectChestOrScroll ?? 0,
+    showHideInventory: (chIdx) => { if (ui) handleInventoryToggle(ui, chIdx); },
+    releaseEyeOrMouth: () => { if (ui) releaseEyeOrMouth(ui); },
   });
   const party = game.ctx.party.state;
   const graphics = stockGraphics();
@@ -549,6 +554,29 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   check(eyeReleased, "the eye's release shows it again, the hide count back to 0");
   check(mouthHeld, 'the mouth held with an empty hand hides the pointer (STHideCursor(HC5))');
   check(mouthReleased, "the mouth's release shows it again, the hide count back to 0");
+
+  // The mouth on champion 1, whose scroll lets it be held; the eye on champion 2.
+  for (const [what, button, chIdx] of [['mouth', 70, 1], ['eye', 71, 2]] as const) {
+    if (party.selectedCharacterIndex !== chIdx) handleInventoryToggle(theUi, chIdx);
+    drawInventoryScreen(theUi);
+    handleMouseButton(theUi, button, 0, 0);
+    const held = theUi.pressingEye || theUi.pressingMouth;
+    game.systems.monsterAttack.killCharacter(chIdx);
+    const released = !theUi.pressingEye && !theUi.pressingMouth;
+    const closed = party.selectedCharacterIndex === -1;
+    const shown = pointerDrawn() && theUi.word23118 === 0;
+    theUi.diskMenuNeeded = false;
+    handleMouseButton(theUi, 140, 0, 0);
+    const disk = theUi.diskMenuNeeded;
+    console.log(`13. champion ${chIdx} dies with the ${what} held: ${released ? 'let go' : 'still held'}, `
+      + `the inventory ${closed ? 'closed' : 'open'}, the pointer ${shown ? 'shown' : 'hidden'}, `
+      + `the disk icon ${disk ? 'answers' : 'swallowed'}`);
+    check(held, `the ${what} is held before the death`);
+    check(released, `the death lets go of the ${what}`);
+    check(closed, "and closes the dead champion's inventory");
+    check(shown, 'the pointer is back, the hide count 0');
+    check(disk, 'the buttons after 81 are not swallowed');
+  }
 }
 
 finish();

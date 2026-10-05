@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C141 | A champion's death does not release the held eye or mouth | S | ⏳ |
+| C142 | The held eye over an object does not clear the held object's name | S | ⏳ |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -127,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C142 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C143 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -171,17 +171,15 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C141 ⏳ A champion's death does not release the held eye or mouth
+### C142 ⏳ The held eye over an object does not clear the held object's name
 
-`KillCharacter`, on the champion whose inventory is open, clears a held eye
-(`d.PressingEye`, `d.PressingEyeOrMouth`, and the held object's name drawn again) or else a
-held mouth, then closes the inventory through `ShowHideInventory(4)`
-(`doc/CSBwin-src/Character.cpp:2598-2622`), whose `RepackChest` and `d.clockTick = 1` run
-there (`doc/CSBwin-src/CSBCode.cpp:7441-7458`). `RemoveCharacter` does the same
-(`Character.cpp:5267-5291`). The port's `killCharacter` (`src/engine/MonsterAttack.ts`)
-sets `selectedCharacterIndex` to -1 and leaves `pressingEye` and `pressingMouth` as they
-are, so the buttons after 81 stay swallowed until the button is let go
-(`handleMouseButton` in `src/renderer/ui/Mouse.ts`).
+`_ClickOnEye`, with an object in hand, calls `ClearHeldObjectName` before
+`DescribeObject` (`doc/CSBwin-src/Viewport.cpp:7282-7285`): `wRectPos624` filled with
+colour 0 (`Viewport.cpp:3306-3316`). The name comes back at the release, from
+`QuitPressingEye`'s `DrawNameOfHeldObject` (`doc/CSBwin-src/CSBCode.cpp:7408-7412`), or
+from `KillCharacter`'s (`doc/CSBwin-src/Character.cpp:2603-2607`). The port draws the name
+on every compose, held eye or not (`drawHeldObjectName` in `src/renderer/ui/Character.ts`,
+from `GameScreen.presentViewport`).
 
 ---
 
