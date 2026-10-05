@@ -12,6 +12,7 @@ import { decodeCursorBitmap } from '../../data/tables/UITables';
 import { canPlaceInSlot, drawPositionSquare } from './Character';
 import { objectIconBitmap } from './Draw';
 import { handleMouthPress } from './Feeding';
+import { HINT_ORACLE_BUTTON, inventoryButtonList } from './HintOracleButton';
 import { searchButtonList } from './HitTest';
 import { describeObject, getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest, tag0189d4, tag019036 } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
@@ -170,6 +171,13 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     // only provisionally in it, and the icon does nothing. The menu is not opened here —
     // `DiskMenuNeeded` is raised and whoever drained the queue acts on it.
     if (numChampions > 0 && !potential) ui.diskMenuNeeded = true;
+    return;
+  }
+  if (id === HINT_ORACLE_BUTTON) {
+    // The close box, where the data set has the Hint Oracle (`inventoryButtonList`):
+    // guarded as the disk icon is, and like it raising a flag for whoever drained the
+    // queue (`src/renderer/ui/HintOracleButton.ts`).
+    if (numChampions > 0 && !potential) ui.hintOracleNeeded = true;
     return;
   }
   if (id === 147) {
@@ -395,7 +403,7 @@ export function syncInventoryButtons(ui: UIState): void {
   if (ui.uiMode !== UIMode.Adventure) return;
   const buttons = ui.uiTables.graphic231.buttons;
   const inventoryOpen = ui.partyState.selectedCharacterIndex >= 0;
-  ui.secondaryButtons = inventoryOpen ? buttons.buttons17760 : buttons.buttons17304;
+  ui.secondaryButtons = inventoryOpen ? inventoryButtonList(ui) : buttons.buttons17304;
 }
 
 export function handleClothingClick(ui: UIState, button: number): void {

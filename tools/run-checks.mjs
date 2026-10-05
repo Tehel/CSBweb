@@ -173,6 +173,9 @@ const CHECKS = [
   { tool: 'dump-hint-oracle.ts' },
   // Its screen, run headlessly: the title list, a hint's pages, the cycle, no clues.
   { tool: 'dump-hint-oracle-screen.ts' },
+  // Its button, the inventory's close box: the picture, the click on the party's square
+  // after a step, a teleporter and a pit, the clock held, and the close box without it.
+  { tool: 'dump-hint-oracle-button.ts' },
   // Block 4 packed and held up against the real thing: every committed save's
   // character block, written again from the champions it yields, byte for byte.
   { tool: 'dump-character-block.ts' },

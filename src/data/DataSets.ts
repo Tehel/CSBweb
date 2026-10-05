@@ -27,21 +27,28 @@ export interface DataSet {
      * one, and its entrance offers RISE (`src/renderer/intro/PrisonDoor.ts`).
      */
     miniDat: boolean;
+    /**
+     * Whether the folder holds `hcsb.hct` and `hcsb.dat`, Chaos Strikes Back's Hint
+     * Oracle, a program of its own in CSBWin (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md`). Where
+     * it does, the inventory's close box is the Oracle's button
+     * (`src/renderer/ui/HintOracleButton.ts`).
+     */
+    hintOracle: boolean;
 }
 
 export const DATA_SETS: readonly DataSet[] = [
-    { id: 'dm-atari', name: 'Dungeon Master', dir: '/gamefiles/dm-atari', csbGraphics: true, miniDat: false },
+    { id: 'dm-atari', name: 'Dungeon Master', dir: '/gamefiles/dm-atari', csbGraphics: true, miniDat: false, hintOracle: false },
     // The DM Windows package's: the same dungeon re-saved by CSBWin, behind an Extended
     // Features block (doc/PROVEN_FACTS.md → "DM's two `dungeon.dat` files"), and the same
     // `graphics.dat`. The package ships no `CSBgraphics.dat`.
-    { id: 'dm-windows', name: 'Dungeon Master (CSBWin)', dir: '/gamefiles/dm-windows', csbGraphics: false, miniDat: false },
-    { id: 'dm-atari-1.2', name: 'Dungeon Master ST 1.2', dir: '/gamefiles/dm-atari-1.2', csbGraphics: false, miniDat: false },
-    { id: 'dm-atari-1.3-fr', name: 'Dungeon Master ST 1.3 French', dir: '/gamefiles/dm-atari-1.3-fr', csbGraphics: false, miniDat: false },
-    { id: 'kids-dungeon', name: 'Kids dungeon 24', dir: '/gamefiles/kids-dungeon-24', csbGraphics: false, miniDat: false },
-    { id: 'csb', name: 'Chaos Strikes Back', dir: '/gamefiles/csb', csbGraphics: false, miniDat: true },
+    { id: 'dm-windows', name: 'Dungeon Master (CSBWin)', dir: '/gamefiles/dm-windows', csbGraphics: false, miniDat: false, hintOracle: false },
+    { id: 'dm-atari-1.2', name: 'Dungeon Master ST 1.2', dir: '/gamefiles/dm-atari-1.2', csbGraphics: false, miniDat: false, hintOracle: false },
+    { id: 'dm-atari-1.3-fr', name: 'Dungeon Master ST 1.3 French', dir: '/gamefiles/dm-atari-1.3-fr', csbGraphics: false, miniDat: false, hintOracle: false },
+    { id: 'kids-dungeon', name: 'Kids dungeon 24', dir: '/gamefiles/kids-dungeon-24', csbGraphics: false, miniDat: false, hintOracle: false },
+    { id: 'csb', name: 'Chaos Strikes Back', dir: '/gamefiles/csb', csbGraphics: false, miniDat: true, hintOracle: true },
     // Conflux (`static/gamefiles/conflux-3.5-b8/`) is not a set: its `dungeon.dat` reads,
     // and what it needs beyond that is `DEBT.md` G26's.
-    { id: '3d2d1d', name: '3D2D1D', dir: '/gamefiles/3D2D1D', csbGraphics: false, miniDat: false },
+    { id: '3d2d1d', name: '3D2D1D', dir: '/gamefiles/3D2D1D', csbGraphics: false, miniDat: false, hintOracle: false },
 ];
 
 export const DEFAULT_DATA_SET = DATA_SETS[0]!;

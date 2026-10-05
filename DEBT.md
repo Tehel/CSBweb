@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G20 | The Hint Oracle, from the inventory, at the party's square | M | ⏳ the button left |
+| C146 | A read keeps no hint key nor graphics signatures, and a save writes zeros | S | ⏳ |
 | G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits | S | ⏳ waits on G24 |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
@@ -127,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C146 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C147 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -175,8 +175,8 @@ A divergence found along the way goes here, with the next free ID.
 
 Not a divergence yet: the port draws what CSBWin draws. Recorded because it looks like a
 bug of the original that the port might fix, under `CLAUDE.md` → "The one
-non-negotiable rule", once the author has seen it in play (G20's button makes it
-reachable) and judged whether it is worth it.
+non-negotiable rule", once the author has seen it in play (the inventory's Oracle
+button makes it reachable, in the `csb` set) and judged whether it is worth it.
 
 Once a title list is up, each title line goes through `TAG0062a2` with `byte16528`,
 colour 12 to 9 (`doc/CSBwin-src/Hint.cpp:4785-4802`). Slot 9 is the one the title list
@@ -198,6 +198,25 @@ The decision is the author's, after a look in play:
 - **Keep it** (CSBWin's picture): delete this entry; the reference doc already says why.
 - **Fix it**: `ShrinkBLT` gets `w + 1` by `h + 1`, the tool's check of the twelfth line
   becomes "every line holds no colour 12", and an H entry gives both readings.
+
+### C146 ⏳ A read keeps no hint key nor graphics signatures, and a save writes zeros
+
+`ReadExtendedFeatures` zeroes `hintKey` (`doc/CSBwin-src/SaveGame.cpp:314`), then takes
+it from a file's Extended Features block, with the four expected graphics signatures
+(`:378-382`). `SaveGame` writes all five back (`:936-941`). The port keeps none of them:
+its block carries zeros (`buildLiveExtendedFeatures`, `src/data/CsbwinExtendedFeatures.ts`),
+so a game read with a key or a signature and saved again loses it. The Hint Oracle
+deciphers `hcsb.hct` under the key with `RC4.cpp`'s cipher whenever `hintKey[0] != 0`
+(`SETENCIPHERED`, `Hint.cpp:5401-5405`). With no key kept, the port's Oracle reads the
+file plain (`runHintOracle`, `src/renderer/intro/BootSequence.ts`). No file here carries a
+key or a signature, so nothing shows the difference yet.
+
+Paying it: the five kept on the world from every read, beside `spellFilterLocation`
+(`DungeonLoader`, `SaveGameLoader`, `DungeonSnapshot`), zero for a file without a block;
+written back by `buildLiveExtendedFeatures`; and `hcsb.hct` deciphered with
+`rc4PrepareKey(hintKey, 8)` when the key's first byte is not zero. A tool round-trips a
+save whose block carries a key and signatures, and opens the Oracle on an `hcsb.hct`
+enciphered from the retail one.
 
 ---
 
@@ -424,60 +443,6 @@ the game; whether to model it is the author's call.
 ### Postponed until the default dungeon is validated
 
 Not taken in order; the author names one to start it (see "Priority").
-
-### G20 ⏳ The Hint Oracle, from the inventory, at the party's square
-
-Chaos Strikes Back's Hint Oracle is a program of its own: `HINT.FTL` on the utility disk,
-ported by CSBWin as `Hint.cpp` (`_StartHint`, `doc/CSBwin-src/Hint.cpp:6454`). CSBWin
-reaches it from the launcher's HINT choice, which the port does not have
-(`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`), and it reads the party's square from a saved
-game. The port puts it in the game instead: a button in the champion's inventory opens
-the Oracle's own screen, ported as CSBWin draws it, on the square the party stands on.
-It is CSB's, not an extra: whenever the data set has the Oracle's files, the button is
-there, whatever `UISettings.extras` says, because the port offers no other way to it.
-
-Done already. The data: `src/data/HintOracleLoader.ts` reads `hcsb.hct` and `hcsb.dat`,
-checked by `tools/dump-hint-oracle.ts`. The screen: `HintOracleScreen`
-(`src/renderer/intro/HintOracle.ts`) runs `_StartHint` from the load's window to DONE on
-the title list, over an `IntroHost`, on a square it is given, checked headlessly by
-`tools/dump-hint-oracle-screen.ts` (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "The
-screen"). Nothing opens it yet.
-
-One step is left (M): **the button**. Where the files are (`hcsb.hct` and `hcsb.dat`,
-which `main.ts` fetches beside `dungeon.dat`; only `csb` has them, and a game started
-from `mini.dat` by RISE is CSB's dungeon too), the inventory's close box becomes the
-Oracle's button. The close box is `buttons17760`'s button 11 at x 210-218, y 36-44, beside
-the disk (140) and the sleep icon (145) (`doc/CSBWIN_MENU_REFERENCE.md` → "The disk
-icon"), and its picture is part of graphic 17, the inventory's backdrop. It goes because
-there is no room left of the disk: a name and a title at their longest reach it. The
-inventory still closes the way it opens, with a right click or the champion's name. Its
-picture is the Oracle's own `?`, from `hcsb.dat` item 2 at `TAG004962`'s position, drawn
-over the close box in the interface's colours, so no art is invented. Without the files,
-the close box is CSBWin's.
-
-A click opens the Oracle the way the disk icon opens the save menu
-(`Mouse.cpp:1708-1727`). It raises a flag, refused with an empty party or a champion only
-provisionally joined, and whoever drained the queue opens the screen. `TAG02076e` runs
-before it and `TAG0207cc` after it, as around the disk menu (`SaveGame.cpp:860`,
-`:1274`), and the game stands still while it is up. The screen runs as `ShowCredits`
-does, over an `IntroHost` built on `GameScreen` (`runShowCredits`,
-`src/renderer/intro/BootSequence.ts`), with the interface's palette as the colour
-registers it finds; once it closes, the inventory is drawn again in that palette. The
-square is the party's `partyLevel`, x and y, not `position.z`, which lags a level change
-until `loadNewPartyLevel` (`.claude/memory/two-step-level-change.md`). A game whose
-Extended Features block carries a non-zero `hintKey` (`src/data/CsbwinExtendedFeatures.ts`)
-reads `hcsb.hct` deciphered under it, as CSBWin does (`Hint.cpp:5401-5405`). `RC4.cpp`'s
-cipher is ported already, for Conflux's `dungeon.dat`; no save here has a key.
-
-When it is paid, two divergences go under H: the close box replaced, and DONE on the
-title list closing the Oracle where CSBWin's goes back to the load screen
-(`HintOracleScreen.run`).
-
-A `tools/` check: a CSB party at level 0 (3,23) clicks the button and the Oracle lists
-CREATURES, THE MAZE and FULYA PIT. After a step, a pit and a teleporter it lists the new
-square's hints. In DM, button 11 still closes the inventory. Two golden frames go in
-`tools/frames/`, staged by the real click: CSB's inventory with the button, and the
-Oracle's title list it opens.
 
 ### G21 ⏸️ `Translation.txt`: the messages the executable prints, translated
 
@@ -905,7 +870,7 @@ Recorded so that nobody "fixes" them.
   animation (`tag01efee` and `runBootSequence`, `src/renderer/intro/BootSequence.ts`).
   After a lost game `tag01efee` is CSBWin's own.
 - 🚫 **`?intro=0`, and Debug in the saved UI settings, skip the whole intro.** This is a
-  developer affordance with no CSBWin counterpart, kept deliberately: eleven of the fourteen golden
+  developer affordance with no CSBWin counterpart, kept deliberately: thirteen of the sixteen golden
   frames boot through it.
 - 🚫 **The `d.Word11750` countdown** in `TenSecondUpdate` is not ported. It is a
   cursor-redraw counter set only by `CSBCode.cpp:959-965`, which has no counterpart here, so
@@ -982,6 +947,20 @@ Recorded so that nobody "fixes" them.
   keeps word 9's (3) (`HintOracleScreen.tag008c40_8`,
   `doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Item 0"). No pixel differs: every text is
   drawn after an ink set of its own (`:4192-4213`, `:6985-6991`).
+- 🚫 **The inventory's close box is the Hint Oracle's button**, in a data set with the
+  Oracle's files (`csb`). CSBWin reaches the Oracle only from its launcher's HINT choice,
+  which reads a saved game's square. The port has no launcher, and a button of its own
+  has no room left of the disk: a name and a title at their longest reach it. So the
+  close box, `buttons17760`'s entry 3, left button, opens the Oracle on the party's
+  square, searched as the port's button 149, and shows the Oracle's `?`
+  (`src/renderer/ui/HintOracleButton.ts`). The inventory still closes the way it opens,
+  with a right click (entry 0, button 11) or the champion's name. Without the files the
+  close box is CSBWin's (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "In the port: the
+  inventory's button"; `tools/dump-hint-oracle-button.ts`).
+- 🚫 **DONE on the Hint Oracle's title list closes it.** CSBWin's goes back to the load
+  screen (`w_4 = 1`, `doc/CSBwin-src/Hint.cpp:6589-6602`), whose floppy prompts and save
+  chooser only lead to a square, and the port's Oracle has the party's
+  (`HintOracleScreen.run`, `src/renderer/intro/HintOracle.ts`).
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.

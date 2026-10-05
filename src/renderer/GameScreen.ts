@@ -83,6 +83,7 @@ import type { SaveEntry } from '../data/saves';
 import type { ImportedFile } from '../engine/GameSaves';
 import { drawCharacterStateEyePanel, drawInventoryBackground, drawInventoryScreen, repackOpenChest, syncOpenChest } from './ui/Inventory';
 import { drawCharacterState, drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
+import { closeHintOracle, drawHintOracleButton, openHintOracle, type HintOracleFiles } from './ui/HintOracleButton';
 import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
 
 /**
@@ -101,6 +102,7 @@ export type GameScreenHooks = Pick<UIState,
   | 'onImportSave'
   | 'onRestoreSave'
   | 'onRestoreFailed'
+  | 'onOpenHintOracle'
 >;
 
 /** What the screen reads: the graphics, and the game it shows. */
@@ -120,6 +122,8 @@ export interface GameScreenDeps {
    * the one the engine writes through its host's `messages`.
    */
   messages: ScrollingText;
+  /** The Hint Oracle's files, where the data set has them (`src/renderer/ui/HintOracleButton.ts`). */
+  hintOracle?: HintOracleFiles | null;
 }
 
 export class GameScreen {
@@ -190,7 +194,9 @@ export class GameScreen {
       onImportSave: hooks.onImportSave,
       onRestoreSave: hooks.onRestoreSave,
       onRestoreFailed: hooks.onRestoreFailed,
+      onOpenHintOracle: hooks.onOpenHintOracle,
     });
+    ui.hintOracle = deps.hintOracle ?? null;
     this.ui = ui;
     updateButtonLists(ui);
   }
@@ -303,6 +309,33 @@ export class GameScreen {
       this.ui.diskMenuNeeded = false;
       openSaveMenu(this.ui);
     }
+    if (this.ui.hintOracleNeeded) {
+      this.ui.hintOracleNeeded = false;
+      this.openHintOracle();
+    }
+  }
+
+  /**
+   * The Hint Oracle's button acted on (`src/renderer/ui/HintOracleButton.ts`): `TAG02076e`
+   * and the clock stopped, the screen composed once more with them and without the
+   * cursor, the screen the Oracle opens over, and then the page runs the Oracle. Until
+   * `closeHintOracle`, the screen is the Oracle's, and nothing here draws.
+   */
+  private openHintOracle(): void {
+    const square = openHintOracle(this.ui);
+    this.setHoverPoint(null);
+    this.presentViewport();
+    this.ui.onOpenHintOracle(square);
+  }
+
+  /** The Oracle closed: `TAG0207cc`, and the inventory drawn again in the interface's palette. */
+  closeHintOracle(): void {
+    closeHintOracle(this.ui);
+    this.presentViewport();
+  }
+
+  isHintOracleUp(): boolean {
+    return this.ui.hintOracleUp;
   }
 
   /** The button-up, `0x0add` (`doc/CSBwin-src/Mouse.cpp:1523-1549`). */
@@ -416,6 +449,7 @@ export class GameScreen {
    * and with it `GraphicRandom` and `viewportRandom`.
    */
   refreshOverlay(): void {
+    if (this.ui.hintOracleUp) return;
     this.presentViewport();
   }
 
@@ -495,7 +529,7 @@ export class GameScreen {
     this.viewport.selectLevel(position.z);
     this.viewport.draw(position, facing, this.seeThroughWalls(), word1868);
     this.viewportDrawn = true;
-    this.presentViewport();
+    if (!this.ui.hintOracleUp) this.presentViewport();
   }
 
   /** `d.SeeThruWalls`, as `ViewportRenderer.draw` reads it. */
@@ -527,6 +561,7 @@ export class GameScreen {
     }
     if (inventoryOpen && !frozen) {
       drawInventoryBackground(this.ui);
+      drawHintOracleButton(this.ui);
     } else {
       this.blitViewportToScreen();
     }
@@ -614,7 +649,7 @@ export class GameScreen {
       this.bootFrameRenderer();
       return;
     }
-    if (this.viewportDrawn) this.presentViewport();
+    if (this.viewportDrawn && !this.ui.hintOracleUp) this.presentViewport();
   }
 
   private blitViewportToScreen(): void {

@@ -4,8 +4,8 @@ Chaos Strikes Back's Hint Oracle, as CSBWin ports it in `doc/CSBwin-src/Hint.cpp
 port reads its data with `parseHintOracle` and `parseHcsbDat`
 (`src/data/HintOracleLoader.ts`), and `tools/dump-hint-oracle.ts` checks the retail files
 against everything below. `HintOracleScreen` (`src/renderer/intro/HintOracle.ts`) is the
-screen, and `tools/dump-hint-oracle-screen.ts` runs it headlessly. Nothing in the game
-opens it yet (`DEBT.md` G20).
+screen, and `tools/dump-hint-oracle-screen.ts` runs it headlessly. The game opens it
+from the inventory, on the party's square ("In the port: the inventory's button").
 
 ## What it is
 
@@ -327,3 +327,40 @@ is the one shown, and frees what was loaded. It does no fade.
 The cursor calls, `TAG002af4` and `TAG002b0c`, end in `TAG00ae58`, which is empty
 (`:7896`). CSBWin's Oracle shows the system's pointer throughout.
 
+## In the port: the inventory's button
+
+CSBWin has no way into the Oracle from a game. The port's is the inventory's close box,
+in a data set that has `hcsb.hct` and `hcsb.dat` (`DataSet.hintOracle`, `csb` alone;
+`src/renderer/ui/HintOracleButton.ts`). It diverges from CSBWin twice, in `DEBT.md` H:
+the close box replaced, and DONE on the title list closing the Oracle.
+
+- **The button.** `buttons17760` holds button 11 twice: entry 0, the whole screen for the
+  right button, and entry 3, the close box, x 210-218, y 36-44, for the left. With the
+  Oracle, entry 3 is searched as the port's button 149 (`HINT_ORACLE_BUTTON`,
+  `inventoryButtonList`), a number CSBWin does not use, so a right click still closes the
+  inventory. Graphic 17 draws the box as a white X (15) on red (8). The button's picture
+  is the Oracle's `?` in those two colours: font glyph 31, as `TAG004962` reads it
+  (`Hint.cpp:3466-3473`), its cell a pixel in from the box's top left corner, which puts
+  its stem on the box's middle column (`drawHintOracleButton`).
+- **The click** is the disk icon's (`doc/CSBwin-src/Mouse.cpp:1708-1727`). It is refused
+  with an empty party or a champion only provisionally joined, and otherwise raises
+  `hintOracleNeeded`, which `GameScreen.handleMouseButton` acts on once the button is
+  dispatched. `TAG02076e` runs, as before the disk menu (`SaveGame.cpp:860`), and the clock
+  stops (`ctx.state.paused`). The screen is composed once more without the cursor, and
+  the Oracle runs over an `IntroHost` (`runHintOracle`,
+  `src/renderer/intro/BootSequence.ts`), on the party's `position`: x, y and the level,
+  which a save writes as `partyX`, `partyY` and `partyLevel`. The colour registers it
+  finds are the interface's, through which the open inventory is shown, so its first
+  fade starts from the screen as it was. The canvas hides the system's pointer, so the
+  arrow stands in for it. While it is up, the adventure's input is ignored, and the game
+  screen draws nothing.
+- **Leaving.** DONE on the title list closes the Oracle, where CSBWin's goes back to the
+  load screen (`w_4 = 1`, `:6589-6602`). `TAG0207cc` then shows the inventory again, as
+  after the disk menu (`SaveGame.cpp:1274`), and the clock runs.
+- **The key.** The port keeps no saved game's `hintKey` (`DEBT.md` C146), so `hcsb.hct`
+  is read plain.
+
+`tools/dump-hint-oracle-button.ts` checks the picture, and the click on the party's square
+after a step, a teleporter and a pit. Golden frames 15 and 16 are a CSB inventory with
+the button and a hint's page opened through it. The title list is no frame: its palette
+cycle would make it differ from one run to the next.

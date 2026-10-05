@@ -10,6 +10,7 @@ import { extractPresetHeroes } from './data/HeroExtractor';
 import { dataSetFor } from './data/DataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
+import { parseHcsbDat, parseHintOracle } from './data/HintOracleLoader';
 import { BrowserSaveStore, downloadSaveFile } from './data/saves';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
@@ -22,7 +23,8 @@ import { GameScreen } from './renderer/GameScreen';
 import { bindDataSetChooser, bindExtrasToggle, bindSaveDrop, bindUIContext, drawMapPreview } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
-import { Die, runBootSequence, runShowCredits } from './renderer/intro/BootSequence';
+import { Die, runBootSequence, runHintOracle, runShowCredits } from './renderer/intro/BootSequence';
+import type { HintOracleFiles } from './renderer/ui/HintOracleButton';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
@@ -184,6 +186,8 @@ interface GameFiles {
     graphicsLoader: GraphicsLoader;
     /** The optional CSBgraphics.dat overlay (extended decorations, portraits, etc.). */
     csbGraphicsLoader: CSBGraphicsLoader | null;
+    /** The Hint Oracle's `hcsb.hct` and `hcsb.dat`, where the data set has them. */
+    hintOracle: HintOracleFiles | null;
 }
 
 async function loadGameFiles(): Promise<GameFiles> {
@@ -199,7 +203,27 @@ async function loadGameFiles(): Promise<GameFiles> {
         console.log('CSBgraphics.dat not found; extended decorations disabled');
         csbGraphicsLoader = null;
     }
-    return { graphicsLoader, csbGraphicsLoader };
+    return { graphicsLoader, csbGraphicsLoader, hintOracle: await loadHintOracle() };
+}
+
+/**
+ * The Hint Oracle's two files, or `null` where the data set has none, or one does not read:
+ * then the inventory's close box is CSBWin's (`src/renderer/ui/HintOracleButton.ts`).
+ */
+async function loadHintOracle(): Promise<HintOracleFiles | null> {
+    if (!dataSet.hintOracle) return null;
+    const fetchFile = async (name: string): Promise<Uint8Array | null> => {
+        const response = await fetch(`${dataSet.dir}/${name}`).catch(() => null);
+        return response?.ok ? new Uint8Array(await response.arrayBuffer()) : null;
+    };
+    const [hct, dat] = await Promise.all([fetchFile('hcsb.hct'), fetchFile('hcsb.dat')]);
+    if (!hct || !dat) return null;
+    try {
+        return { oracle: parseHintOracle(hct), dat: parseHcsbDat(dat) };
+    } catch (error) {
+        console.warn('No Hint Oracle:', error);
+        return null;
+    }
 }
 
 /**
@@ -357,6 +381,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         ctx: game.ctx,
         csbGraphicsLoader: files.csbGraphicsLoader ?? undefined,
         messages,
+        hintOracle: files.hintOracle,
     }, {
         // The second half of Reincarnate is done: the screen has handed the typed name
         // to the engine (the first half is the host's `openReincarnateScreen`).
@@ -381,6 +406,16 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         onRestoreFailed: (error) => {
             console.error(error instanceof UtilityError ? 'New adventure refused:' : 'Saved game damaged:', error);
             saves.readFailed(error);
+        },
+        // The Hint Oracle's button: the screen has stopped the clock and shaded the
+        // interface, and the Oracle has the canvas until it closes.
+        onOpenHintOracle: (square) => {
+            const close = (): void => {
+                screen?.closeHintOracle();
+            };
+            if (!screen || !files.hintOracle) return close();
+            const deps = { canvas: gameCanvasEl, gameScreen: screen, playSound };
+            runHintOracle(deps, files.hintOracle, square).catch(reportError).finally(close);
         },
     });
     return { game, screen, saves, messages };

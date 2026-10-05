@@ -45,6 +45,15 @@ export class GameInput {
     return this.host.game.mainLoopHasReturned();
   }
 
+  /**
+   * The Hint Oracle is up: it reads the canvas through a host of its own
+   * (`runHintOracle`, `src/renderer/intro/BootSequence.ts`), and the adventure's handlers
+   * neither act nor draw until it closes.
+   */
+  private oracleUp(): boolean {
+    return this.host.screen.isHintOracleUp();
+  }
+
   /** Hand the game the interface's dispatcher for the buttons it does not handle itself. */
   install(): void {
     const host = this.host;
@@ -68,13 +77,13 @@ export class GameInput {
    * to show any.
    */
   mouseMove(x: number, y: number): void {
-    if (this.ended()) return;
+    if (this.ended() || this.oracleUp()) return;
     this.host.screen.setHoverPoint({ x, y });
   }
 
   /** A button pressed: `button` is `MouseEvent.button`'s number. */
   mouseDown(x: number, y: number, button: number): void {
-    if (this.ended()) return;
+    if (this.ended() || this.oracleUp()) return;
     const { game, screen } = this.host;
     const buttonMask = button === 2 ? 1 : button === 0 ? 2 : 0;
     // The save/load screen is modal, the way `_WaitForMenuSelect` is modal: it
@@ -97,7 +106,7 @@ export class GameInput {
   }
 
   mouseUp(): void {
-    if (this.ended() || this.host.screen.isSaveMenuOpen()) return;
+    if (this.ended() || this.oracleUp() || this.host.screen.isSaveMenuOpen()) return;
     this.host.game.onMouseUnClick();
   }
 
@@ -110,7 +119,7 @@ export class GameInput {
 
   /** The pointer gone from the canvas: no cursor, from the next VBL's frame, as a move's. */
   mouseLeave(): void {
-    if (this.ended()) return;
+    if (this.ended() || this.oracleUp()) return;
     this.host.screen.setHoverPoint(null);
   }
 
@@ -121,6 +130,9 @@ export class GameInput {
     // (`doc/CSBwin-src/Code1f9e6.cpp:120-121`): no key is the adventure's any more.
     if (this.ended()) return false;
     const modified = mods.ctrlKey || mods.metaKey || mods.altKey;
+    // The Oracle takes no key (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Waiting for a
+    // button"), and the adventure gets none while it is up; a browser shortcut keeps its.
+    if (this.oracleUp()) return !modified;
     // The Reincarnate name-entry screen is modal on the keyboard as well as
     // the mouse (`keyboardMode = 2`, `doc/CSBwin-src/Code13ea4.cpp:38`): while
     // it is up every key is a letter being typed, so none of the panel, movement

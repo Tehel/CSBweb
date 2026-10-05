@@ -19,6 +19,8 @@ import type { FontData } from '../csbwin/TextRenderer';
 import type { ImageFormat } from '../../core/imageDecoder';
 import { OBJECT_ID_NULL, type ObjectID } from '../../core/types';
 import type { ItemDescriptionLine } from './Objects';
+import type { HintSquare } from '../intro/HintOracle';
+import type { HintOracleFiles } from './HintOracleButton';
 import type { ReincarnateState } from './ReIncarnate';
 import type { SaveMenuState } from './SaveMenu';
 
@@ -100,6 +102,15 @@ export interface UIState {
    * from the mouse queue — so it raises the flag and the caller acts on it.
    */
   diskMenuNeeded: boolean;
+  /**
+   * The Hint Oracle's files, where the data set has them: then the inventory's close box
+   * is the Oracle's button (`src/renderer/ui/HintOracleButton.ts`).
+   */
+  hintOracle: HintOracleFiles | null;
+  /** The Oracle's button was clicked: `diskMenuNeeded`'s twin, acted on by the same caller. */
+  hintOracleNeeded: boolean;
+  /** The Oracle is up: it has the screen, and the interface draws nothing until it closes. */
+  hintOracleUp: boolean;
   pressingEye: boolean;
   /**
    * `d.PressingMouth`: the mouth pressed with an empty hand while the eye panel showed a
@@ -277,6 +288,11 @@ export interface UIState {
    * `onMakeNewAdventure` did, and the entrance shows why.
    */
   readonly onRestoreFailed: (error: unknown) => void;
+  /**
+   * Run the Hint Oracle on `square`, then `closeHintOracle` (`GameScreen.closeHintOracle`):
+   * the page builds the screen it runs on (`runHintOracle`, `src/renderer/intro/BootSequence.ts`).
+   */
+  readonly onOpenHintOracle: (square: HintSquare) => void;
 
   /* ---- back into the renderer ---- */
   getGraphicBitmap(graphicNum: number, format?: ImageFormat): IndexedBitmap | null;
@@ -286,7 +302,7 @@ export interface UIState {
 
 /** The fields of `UIState` that a game in play sets, and a restart clears. */
 type PlayState = Pick<UIState,
-  | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'reincarnate' | 'diskMenuNeeded'
+  | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'reincarnate' | 'diskMenuNeeded' | 'hintOracleNeeded'
   | 'pressingEye' | 'pressingMouth' | 'describedObject' | 'weaponHandScroll' | 'word23144' | 'word23118' | 'pointer23178' | 'pointer23182'
   | 'attackingCharacterOrdinal' | 'possibleAttackTypes' | 'byte20256' | 'word20248'
   | 'word20250' | 'word20252' | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
@@ -305,6 +321,7 @@ function initialPlayState(): PlayState {
     shadedByTag02076e: false,
     reincarnate: null,
     diskMenuNeeded: false,
+    hintOracleNeeded: false,
     pressingEye: false,
     pressingMouth: false,
     describedObject: null,
@@ -350,7 +367,7 @@ export type UISources = Pick<UIState,
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
-  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed'>;
+  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {
@@ -358,6 +375,8 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
     partyState: sources.ctx.party.state,
     ...initialPlayState(),
     saveMenu: null,
+    hintOracle: null,
+    hintOracleUp: false,
     hoverPoint: null,
     mouthChewStartMs: null,
     mouthChewEndMs: 0,

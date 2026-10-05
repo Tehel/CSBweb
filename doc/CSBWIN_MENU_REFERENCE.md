@@ -23,7 +23,10 @@ back to `d.Buttons17304` on close at `:7481`).
 
 **(from data)** `buttons17760[1] = { word0: 140, x 174..182, y 36..44, button: 2 }` — an
 8×8 left-click-only hot spot in screen coordinates. Its neighbours in the same list are
-145 (sleep, x 188..204) and 11 (close inventory, x 210..218).
+145 (sleep, x 188..204) and 11 (close inventory, x 210..218, entry 3). Button 11 is also
+entry 0, the whole screen for the right button. In a data set with the Hint Oracle, entry
+3 is the Oracle's button (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "In the port: the
+inventory's button").
 
 This port already installs `buttons17760`: `syncInventoryButtons`
 (`src/renderer/ui/Mouse.ts`). Until the save menu existed, id 140 simply fell through

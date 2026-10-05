@@ -20,8 +20,9 @@
  *
  * CSBWin deciphers the file with `RC4.cpp`'s cipher when the save's `hintKey` is set
  * (`:5401-5405`). Every save this project has carries a zero key (`doc/PROVEN_FACTS.md` →
- * "The Extended Features header a live game writes"), so only a plain file is read here;
- * an enciphered one fails the header check.
+ * "The Extended Features header a live game writes"), and the port keeps no key from a
+ * read (`DEBT.md` C146), so only a plain file is read here; an enciphered one fails the
+ * header check.
  *
  * `hcsb.dat` is the Oracle's screen: four items indexed as `graphics.dat`'s are, read by
  * `parseHcsbDat`.

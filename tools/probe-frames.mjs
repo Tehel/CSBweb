@@ -349,6 +349,42 @@ console.log('state: F2 front-left wall'); await shot('13-edge-decoration-left');
 await evaluate(FACE(15, 9, 0, 0)); await wait(500);
 console.log('state: F2 front-right wall'); await shot('14-edge-decoration-right');
 
+// The Hint Oracle's button (`src/renderer/ui/HintOracleButton.ts`), CSB's set only: the
+// inventory's close box is the Oracle's `?`, and a real click on it opens the Oracle on the
+// party's square. CSB's `csbgame2.dat` is read into a `?intro=0` game, and its party set on
+// level 4 (1,7), thirteen squares from the nearest creature, so nothing moves while the
+// frames are taken; there the Oracle lists CREATURES and CIRCLE OF POISON. Its title list
+// cycles a palette slot every 21 VBLs, so it is no frame: `tools/dump-hint-oracle-screen.ts`
+// checks its pixels. A hint's page, the first title's, does not cycle, and is one.
+await send('Page.navigate', { url: `${APP}?intro=0&dungeon=csb` });
+await wait(3500);
+await evaluate(`(async()=>{
+  const { game, renderView } = window.__probe;
+  const { applySaveBytes } = await import('/src/engine/SaveGameFile.ts');
+  applySaveBytes(game, new Uint8Array(await (await fetch('/gamefiles/csb/csbgame2.dat')).arrayBuffer()));
+  const party = game.ctx.party.state;
+  party.position.x = 1; party.position.y = 7;
+  renderView();
+  return party.champions.map((c) => c.name).join(', ');
+})()`).then(names => console.log('  csb party:', names));
+await wait(600);
+await canvasClick(15, 15, 2);  await wait(700);
+await leaveCanvas(); await wait(200);
+console.log('state: CSB inventory');
+const csbInventory = await shot('15-csb-inventory');
+await realClick(214, 40); await wait(2500);
+check(await evaluate(`window.__probe.screen.isHintOracleUp()`), 'a real click on the close box opens the Hint Oracle');
+await realClick(160, 36); await wait(3000);
+await leaveCanvas(); await wait(200);
+console.log('state: hint page');         await shot('16-hint-oracle-page');
+// DONE (x 221-289, y 179-192) on the page goes back to the title list, and on the list
+// closes the Oracle: the inventory comes back as it was.
+await realClick(255, 185); await wait(3000);
+await realClick(255, 185); await wait(1500);
+await leaveCanvas(); await wait(200);
+check(!(await evaluate(`window.__probe.screen.isHintOracleUp()`)) && (await canvasPixels()) === csbInventory,
+  'DONE on the page and then on the list closes the Oracle, back to frame 15');
+
 // The CRT effect's input surface. The effect's canvas is shown over the game canvas, and
 // the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,
 // `src/renderer/intro/BootSequence.ts`), so it must let a click through. Boot with the

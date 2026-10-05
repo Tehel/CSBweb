@@ -54,6 +54,7 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     onImportSave: () => { throw new Error('no store to import into in this tool'); },
     onRestoreSave: () => {},
     onRestoreFailed: () => {},
+    onOpenHintOracle: () => {},
     ...hooks,
     getGraphicBitmap,
   });

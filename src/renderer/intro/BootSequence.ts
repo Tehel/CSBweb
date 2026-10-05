@@ -26,10 +26,12 @@
  * dungeon, the utility and the hint oracle; this one runs the dungeon.
  */
 import type { Swoosh } from '../../data/SwooshLoader';
+import type { HintOracleFiles } from '../ui/HintOracleButton';
 import type { SavedGameRead } from '../../engine/GameSaves';
 import type { GameScreen } from '../GameScreen';
 import { decodeCursorBitmap, type UIButton } from '../../data/tables/UITables';
 import { MENU_PRESS_PHASE_MS, menuButtonRect, menuHitTest } from '../ui/Menu';
+import { HintOracleScreen, type HintSquare } from './HintOracle';
 import { fadeToPalette, PALETTE_11914, withCursor, type IntroEvent, type IntroHost } from './IntroHost';
 import { MISSING_PRISON_DOOR_BUTTONS, showPrisonDoor, type PrisonDoorChoice } from './PrisonDoor';
 import { showCredits, type ShowCreditsHooks } from './ShowCredits';
@@ -624,4 +626,32 @@ async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDep
   const choice = (await readGame('resume')) ? 'resume' : await showPrisonDoor(host, prisonDoorButtons(host), readGame, deps.rise);
   await tag021028(host, choice);
   return choice;
+}
+
+/* ------------------------------------------------------------ the Oracle ---- */
+
+/**
+ * The Hint Oracle on `square`, opened by its button in the inventory
+ * (`src/renderer/ui/HintOracleButton.ts`), until DONE on its title list closes it. The
+ * screen has been composed with `TAG02076e`'s shading, and its game stands still; this
+ * host takes the canvas until the Oracle closes, and the page then shows the inventory
+ * again.
+ *
+ * The colour registers are the interface's, as the open inventory shows the screen
+ * through them (`GameScreen.presentViewport`), so the Oracle's first fade starts from the
+ * screen as it was. CSBWin's Oracle shows the system's pointer throughout
+ * (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Leaving"); the page's canvas hides it, so the
+ * arrow stands in for it.
+ */
+export async function runHintOracle(deps: HostDeps, files: HintOracleFiles, square: HintSquare): Promise<void> {
+  const uiTables = deps.gameScreen.getUITables();
+  const { host, detach } = createIntroHost(deps, uiTables.graphic232.palette552[0] ?? PALETTE_11914);
+  try {
+    const oracle = new HintOracleScreen(host, files.oracle, files.dat, square);
+    host.setCursorVisible(true);
+    await oracle.run();
+  } finally {
+    host.setCursorVisible(false);
+    detach();
+  }
 }
