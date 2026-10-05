@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10 of 12 next |
+| G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10a next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -342,13 +342,42 @@ filter, the feeding filter, the character death and damage filters, the equip fi
 party move filter, the monster attack filter, the delete monster filter, and the monster
 move filter, are paid. The steps left, one commit each:
 
-10. **`ESL_CURSORFILTER`** (L, split when taken). `CursorFilter` (`MoveObject.cpp:797`,
-    the DSA at `:846`), which may cancel what is about to happen to the object on the
-    cursor. CSBWin sends it a packet from 21 places. The port sends six of the packet
-    types, all from `ActuatorSystem` (the key, the torch holder, the swap, the gift), to
-    `GameHost.cursorFilter`, which `main.ts` answers with a debug trace. None of the other
-    types is sent, among them `HandleClothingClick`'s `PlaceOnCharacter`, which may cancel
-    the click, and `PickFromCharacter` (`CSBCode.cpp:6966-6972`, `:6982-6991`).
+10. **`ESL_CURSORFILTER`** (L). `CursorFilter` (`MoveObject.cpp:797-865`), which may
+    cancel what is about to happen to the object on the cursor: every DSA at the location
+    in turn, each on the packet as the DSA before it left it, a count of 6 and the
+    packet's six words, `object`, `type`, `p1` to `p4` (`CSB.h:1517-1526`), with no
+    `NEWDSAPARAMETERS`. Back comes the packet; a site that can be cancelled reads `type`
+    against `CURSORFILTER_Cancel` (20). CSBWin calls it from 20 places (a 21st,
+    `SaveGame.cpp:2755-2758`, is commented out). The port sends six of the packet types,
+    all from `ActuatorSystem` (the key, the torch holder, the swap, the gift), to
+    `GameHost.cursorFilter`, which `main.ts` answers with a debug trace
+    (`src/ui/cursorFilter.ts`). The steps, one commit each:
+    - **10a. The filter, and the actuators' six** (M). `DsaSystem.cursorFilter` on
+      `forEachFilterDsa`, `CURSORFILTER_TYPE` with CSBWin's numbers (`CSB.h:1395-1514`),
+      and `ActuatorSystem`'s six sites onto it (`Mouse.cpp:421-429`, `:442-450`,
+      `:479-487`, `:499-506`, `:552-560`, `:575-583`), each packet checked against its
+      site. `GameHost.cursorFilter` and the page's trace go: the DSA is the filter.
+    - **10b. The hand's three** (S). `ThrowByCharacter`'s `Throw` (`Mouse.cpp:686-696`,
+      `MouseSystem.throwByCharacter`), `TAG01a148`'s `PickFromFloor` (`:824-838`, the
+      pick-up in `src/renderer/ui/ViewportPicking.ts`), and `DropObject`'s `DropObject`
+      (`:870-883`, `MouseSystem.dropObjectFromCursor`). All three can be cancelled.
+    - **10c. The champion's three** (S). `HandleClothingClick`'s `PlaceOnCharacter`, sent
+      even with an empty cursor, which may cancel the click, and `PickFromCharacter`
+      once the slot is emptied (`CSBCode.cpp:6966-6991`, `src/renderer/ui/Mouse.ts:348`);
+      and `_FeedCharacter`'s `Eat` (`Character.cpp:4471-4479`), which cannot cancel.
+    - **10d. The DSA's four** (S). `EX_DEL`'s `DSA_DEL` (`DSA.cpp:1659-1665`), `EX_ADD`'s
+      `DSA_ADD` (`:2062-2071`), `FindCursorSource`'s `DSA_MoveFrom`
+      (`MoveObject.cpp:130-143`, `DsaSystem.findCursorSource`) and the cursor
+      destination's `DSA_MoveTo` (`:449-455`), none of which can cancel. Each runs a
+      filter DSA from inside a running DSA, on the running DSA's parameters, which
+      `CursorFilter` overwrites: the step checks that a nested run leaves what CSBWin
+      leaves.
+    - **10e. The game's four** (S). `_ReadEntireGame`'s two `ReadGame`s, with `RNnul`
+      before the hand is emptied (`SaveGame.cpp:1497-1503`) and with the save's object
+      once it is read (`:1650-1655`); `TAG0138ec`'s `ResumeSavedGame` when a resumed
+      game's hand holds something (`CSBCode.cpp:6311-6322`) and `EnteringPrison` for a
+      new game (`:6364-6370`). Both of `TAG0138ec`'s set `p1` four times, so `p2` to `p4`
+      keep the constructor's 0.
 11. **`PortraitTranslateDisable`'s `QueueDSASwitchAction`** (S, `CSBCode.cpp:6540-6612`).
     It fires only on a `DisableMessage`, which the shipped dungeon never carries
     (`HallOfChampions.ts:337`).
