@@ -1551,6 +1551,9 @@ export class DsaSystem {
 
     const currentState = this.getState(masterRecord, masterDsa);
     const msgType = 3 * (timer.uByte8 & 3) + action;
+    // An `OVERRIDE` no operation used dies with its run (`doc/CSBwin-src/DSA.cpp:5416`),
+    // and a run nested in another's clears the caller's.
+    this.overrideP = false;
 
     const bank = new DsaBank(vars);
     bank.stack.clear();

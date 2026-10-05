@@ -4748,6 +4748,16 @@ the cell's object chain when it is true, since the slave's link now belongs to t
 list. Filters (`ProcessDSAFilter`, `DSA.cpp:5315-5325`) ignore it. Evidence:
 `tools/dump-dsa-delete.ts`.
 
+## A DSA's `OVERRIDE` lasts until an operation uses it or the next DSA run starts
+
+`EX_OVERRIDE` (`doc/CSBwin-src/DSA.cpp:1037-1072`) sets the file-scope `Override_P` and
+`Override_Pos` (`:443-444`). Three readers use it and clear it: `GetTarget`, for a
+command's target (`:630-631`), `&MESSAGE` (`:3071-3075`) and `&DESCRIBE` (`:4650-4657`).
+Nothing else clears it but `ProcessDSATimer6`, before every DSA it runs, once the master is
+found (`:5416`). So an `OVERRIDE` no operation used does not reach the next run, and a DSA
+run nested inside another, a filter's, clears the caller's: an `OVERRIDE` set before an
+operation that runs one is gone after it. Evidence: `tools/dump-dsa-message.ts`, section 5.
+
 ## A DSA filter runs on a parameter array of its own; the party attack's, the action name's and the feeding's write the current one
 
 `pDSAparameters` (`doc/CSBwin-src/DSA.cpp:43-44`) points at the array `&NUMPARAM`, `&PARAM@`

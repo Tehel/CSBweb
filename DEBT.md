@@ -92,6 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| C136 | Six DSA operations do not say "Filter Modifying Dungeon" | S | ⚠️ |
 | G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10d next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
@@ -127,7 +128,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C135 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C137 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -170,6 +171,17 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C136 ⚠️ Six DSA operations do not say "Filter Modifying Dungeon"
+
+`NOFILTER` (`doc/CSBwin-src/DSA.cpp:462`) calls `NoFilter`, whose `message` puts up
+"Filter Modifying Dungeon" (`:446-460`), when the running DSA is a filter's. CSBWin has
+it at 16 places. The port's `noFilter` (`DsaSystem.ts`) is at nine of them, and missing at
+`EX_DEL` (`:1655`), `EX_ADD` (`:1979`), `&CELL!` (`:3849`), `&TELEPORT` (`:4594`),
+`&MOVE` (`:4685`) and `&COPY` (`:4708`); `&SWAPCHARACTER`'s (`:4416`) comes with it (G3).
+It is a diagnostic only, which the port's `host.trace` prints and the page leaves silent.
+`message` also counts down CSBWin's `warningCount` (`:449-450`), which the port's trace
+does not model.
 
 ---
 

@@ -17,6 +17,9 @@
  *    negative number plays `d.sound1772`'s entry `-n - 1`, quiet for a volume of 0, none
  *    past the 22nd; a number from 0 up is `CSBgraphics.dat`'s (`DEBT.md` G24), which
  *    plays nothing and is reported once.
+ * 5. **An `OVERRIDE` no operation used dies with its run**: `ProcessDSATimer6` clears
+ *    `Override_P` before every DSA it runs (`DSA.cpp:5416`), so the next run's `&MESSAGE`
+ *    goes to the corner its location names.
  *
  * Run: `npx tsx tools/dump-dsa-message.ts`
  */
@@ -144,6 +147,20 @@ for (const room of ['open', 'stone'] as const) {
   check(JSON.stringify(played) === JSON.stringify([`${table[0]!.word0}/0/0`, `${table[21]!.word0}/0/1`]),
     'entries 0 (quiet: volume 0) and 21 (loud), and nothing past the 22nd');
   check(JSON.stringify(traced) === '["Cannot find Sound"]', 'CSBgraphics.dat\'s sounds play nothing, said once');
+}
+
+/* ----------------------------- 5. an OVERRIDE left unused ------------------------- */
+{
+  /** `EX_OVERRIDE` (`DSA.cpp:1037-1072`): `what` 1, corner 3, the same state. */
+  const override3 = 2 | (1 << 6) | (3 << 9);
+  const { game, again, at } = run((_game, at) => [
+    ...int(here(at)), ...int(0), ...int(0), ...int(DELAY), op(StkOp.MESSAGE),
+    override3,
+  ]);
+  again();
+  const corners = messages(game).map((t) => t.uByte8);
+  console.log(`5. a run that ends on an OVERRIDE, run twice: the messages go to corners ${corners.join(' ')} of (${at.x},${at.y})`);
+  check(corners.join() === '0,0', 'the second run\'s message keeps its corner: the first run\'s OVERRIDE died with it');
 }
 
 finish();
