@@ -168,6 +168,11 @@ export interface UITables {
     wRectPos934: WordRect;
     wRectPos926: WordRect;
     iconDisplay: IconDisplay[];
+    /**
+     * `d.wRectPos624` (`doc/CSBwin-src/Data.h:1452`): the held object's name, which
+     * `ClearHeldObjectName` fills with colour 0 (`doc/CSBwin-src/Viewport.cpp:3306-3316`).
+     */
+    wRectPos624: WordRect;
     word612: number[];
     /** The prison door's right half on the static entrance screen. */
     word100: WordRect;
@@ -700,8 +705,8 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   // Byte640[16] (torch charge to frame mapping)
   const byte640 = Array.from(raw.slice(off, off + 16)); off += 16;
 
-  // wRectPos624, FILL(616,612) length 4
-  off += 8;
+  const wRectPos624 = readWordRect(view, off); off += 8;
+  // FILL(616,612) length 4
   off += 4;
 
   const word612 = readI16Array(view, off, 7); off += 7 * 2;
@@ -801,6 +806,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     wRectPos934,
     wRectPos926,
     iconDisplay,
+    wRectPos624,
     word612,
     word100,
     word140,

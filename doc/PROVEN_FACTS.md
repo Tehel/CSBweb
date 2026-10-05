@@ -2041,8 +2041,15 @@ Evidence: `tools/dump-viewing-filter.ts`, section 11.
   `QuitPressingMouth` shows it (`STShowCursor(HC5)`, `CSBCode.cpp:7395`).
 - CSBWin's other in-play pairs hide and show within one call, so only these two leave it
   hidden from one frame to the next.
+- With an object in hand, `_ClickOnEye` also clears the held object's name,
+  `ClearHeldObjectName` (`doc/CSBwin-src/Viewport.cpp:7284`), which fills `d.wRectPos624`
+  with colour 0 (`:3306-3316`). In the Atari DM `graphics.dat` the rectangle is x 233-319,
+  y 33-38 (`Data.h:1452`: byte 624 of graphic `0x232`), starting at the pen x 0xe9 of
+  `DrawNameOfHeldObject` (`doc/CSBwin-src/Code11f52.cpp:66-74`). `QuitPressingEye` draws the
+  name again (`CSBCode.cpp:7409-7412`), as does `KillCharacter`'s release.
 
-Evidence: `tools/dump-viewing-filter.ts`, section 12 (2 of 5 fail before the hide count).
+Evidence: `tools/dump-viewing-filter.ts`, sections 12 (2 of 5 fail before the hide count)
+and 14 (1 of 4 fails before the name is cleared; the rectangle's x 0xe9 is its canary).
 
 ## A champion's death lets go of a held eye or mouth
 

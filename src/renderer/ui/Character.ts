@@ -684,7 +684,12 @@ export function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): vo
  * learns whose remains they picked up.
  */
 export function drawHeldObjectName(ui: UIState): void {
-
+  if (ui.pressingEye && ui.partyState.objectInHand !== OBJECT_ID_NULL) {
+    // `_ClickOnEye`'s `ClearHeldObjectName` (`doc/CSBwin-src/Viewport.cpp:7284`), until
+    // the release's `DrawNameOfHeldObject` (`doc/CSBwin-src/CSBCode.cpp:7409-7412`).
+    fillRectIndex(ui.screenIndexBuffer, ui.uiTables.graphic232.wRectPos624, 0);
+    return;
+  }
   const objectNames = ui.objectTables.objectNames;
   if (!objectNames || objectNames.length === 0) return;
 

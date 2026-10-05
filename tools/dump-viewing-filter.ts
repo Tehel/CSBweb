@@ -61,6 +61,10 @@
  * 13. **A champion's death lets go of the held eye or mouth** when their inventory is
  *    open, and closes it (`KillCharacter`, `Character.cpp:2597-2622`): the pointer is
  *    back, and the buttons after 81 are not swallowed any more.
+ * 14. **The eye held over an object clears the held object's name** (`ClearHeldObjectName`,
+ *    `doc/CSBwin-src/Viewport.cpp:7284`: `wRectPos624` filled with colour 0,
+ *    `:3306-3316`), and the release draws it again (`QuitPressingEye`,
+ *    `doc/CSBwin-src/CSBCode.cpp:7409-7412`).
  *
  * Run: `npx tsx tools/dump-viewing-filter.ts`
  */
@@ -78,6 +82,7 @@ import { newUIState } from './lib/ui';
 import { drawCursorItem, handleInventoryToggle, handleMouseButton, handleMouseUnclick, releaseEyeOrMouth } from '../src/renderer/ui/Mouse';
 import { drawCharacterStateEyePanel, drawInventoryScreen, getInventorySlotRect } from '../src/renderer/ui/Inventory';
 import { drawObjectIcon } from '../src/renderer/ui/Draw';
+import { drawHeldObjectName } from '../src/renderer/ui/Character';
 import { VIEWPORT_X, VIEWPORT_Y, getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import type { UIState } from '../src/renderer/ui/UIState';
 import { OBJNI_OPEN_SCROLL, OBJNI_SCROLL } from '../src/core/objectNameIndex';
@@ -577,6 +582,33 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     check(shown, 'the pointer is back, the hide count 0');
     check(disk, 'the buttons after 81 are not swallowed');
   }
+
+  // 14. Champion 0's inventory, a weapon in hand.
+  const r = theUi.uiTables.graphic232.wRectPos624;
+  const name = (): number[] => {
+    pixels.fill(0);
+    drawHeldObjectName(theUi);
+    const out: number[] = [];
+    for (let y = r.y1; y <= r.y2; y++) for (let x = r.x1; x <= r.x2; x++) out.push(pixels[y * 320 + x]!);
+    return out;
+  };
+  handleInventoryToggle(theUi, 0);
+  party.objectInHand = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, 0);
+  const shownBefore = name().some((v) => v !== 0);
+  handleMouseButton(theUi, 71, 0, 0);
+  const clearedHeld = theUi.pressingEye && name().every((v) => v === 0);
+  handleMouseUnclick(theUi);
+  const shownAfter = name().some((v) => v !== 0);
+  party.objectInHand = OBJECT_ID_NULL;
+  console.log(`14. wRectPos624 ${JSON.stringify([r.x1, r.x2, r.y1, r.y2])}; the held object's name `
+    + `${shownBefore ? 'drawn' : 'blank'}, the eye held ${clearedHeld ? 'clears it' : 'leaves it'}, `
+    + `released ${shownAfter ? 'draws it' : 'leaves it blank'}`);
+  // Canary: the rectangle starts at `DrawNameOfHeldObject`'s pen x, 0xe9
+  // (`doc/CSBwin-src/Code11f52.cpp:66-74`).
+  check(r.x1 === 0xe9 && r.x2 === 319 && r.y1 === 33 && r.y2 === 38, 'wRectPos624 is the name line, from x 0xe9');
+  check(shownBefore, "with a weapon in hand, its name is drawn");
+  check(clearedHeld, "the eye held over it clears the name (ClearHeldObjectName)");
+  check(shownAfter, "the release draws the name again (DrawNameOfHeldObject)");
 }
 
 finish();

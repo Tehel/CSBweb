@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C142 | The held eye over an object does not clear the held object's name | S | ⏳ |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -170,16 +169,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C142 ⏳ The held eye over an object does not clear the held object's name
-
-`_ClickOnEye`, with an object in hand, calls `ClearHeldObjectName` before
-`DescribeObject` (`doc/CSBwin-src/Viewport.cpp:7282-7285`): `wRectPos624` filled with
-colour 0 (`Viewport.cpp:3306-3316`). The name comes back at the release, from
-`QuitPressingEye`'s `DrawNameOfHeldObject` (`doc/CSBwin-src/CSBCode.cpp:7408-7412`), or
-from `KillCharacter`'s (`doc/CSBwin-src/Character.cpp:2603-2607`). The port draws the name
-on every compose, held eye or not (`drawHeldObjectName` in `src/renderer/ui/Character.ts`,
-from `GameScreen.presentViewport`).
 
 ---
 
