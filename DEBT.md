@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | The portrait's DSA switch action, and the viewing filter's third site | M | ⏳ step 11 next |
+| G2 | The viewing filter's third site | S | ⏳ step 12 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -317,7 +317,7 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G2 ⏳ The portrait's DSA switch action, and the viewing filter's third site
+### G2 ⏳ The viewing filter's third site
 
 The port runs sixteen filters: the viewing filter (two of its three sites), the cursor
 filter, the monster
@@ -327,7 +327,7 @@ sound filter, the action name filter, the feeding filter, the character death fi
 damage filter, the equip filter, the party move filter, and the spell filter at
 `spellFilterLocation`. Each place below uses
 CSBWin's defaults instead.
-Conflux reaches every one but the portrait's: its `EXPOOL` names a location for all
+Conflux reaches every one: its `EXPOOL` names a location for all
 sixteen special locations, `ESL_MONSTERATTACKFILTER` (0) to `ESL_DAMAGECHARFILTER` (15,
 `doc/CSBwin-src/CSB.h:1535-1550`), and the monster move filter's for level 29 too, and a
 type-47 actuator stands at each: 10 at the monster attack filter's, 3 at the feeding's, 5
@@ -338,14 +338,11 @@ filter's.
 A filter that loops runs each of those DSAs in turn, a filter call apiece; one that
 `break`s runs the first. Each step reads which from its CSBWin site and checks it in a
 `tools/` check through `tools/lib/dsa.ts`: `TestFilter` for one DSA, `withFilterDsas` for
-two on the square where the site loops. Steps 1 to 10, the sound filter, the action name
+two on the square where the site loops. Steps 1 to 11, the sound filter, the action name
 filter, the feeding filter, the character death and damage filters, the equip filter, the
 party move filter, the monster attack filter, the delete monster filter, the monster
-move filter and the cursor filter, are paid. The steps left, one commit each:
+move filter, the cursor filter and the portrait's switch action, are paid. The step left:
 
-11. **`PortraitTranslateDisable`'s `QueueDSASwitchAction`** (S, `CSBCode.cpp:6540-6612`).
-    It fires only on a `DisableMessage`, which the shipped dungeon never carries
-    (`HallOfChampions.ts:343`).
 12. **The viewing filter at the eye click** (S). `TAG019036`
     (`Character.cpp:4540-4578`) runs it with phrase mask 0 and object -1 before it draws
     the masteries, every DSA at the location in turn; the port's `drawAttributePanel`

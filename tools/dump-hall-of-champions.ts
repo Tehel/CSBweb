@@ -24,7 +24,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
-import { getActuatorType } from '../src/data/actuatorHelpers';
+import { getActuatorDisableMessage, getActuatorType } from '../src/data/actuatorHelpers';
+import type { ActuatorRecord } from '../src/data/dungeonTypes';
+import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { DungeonData } from '../src/data/dungeonTypes';
@@ -512,9 +514,83 @@ function main(): void {
   check(new Set(fingerprints).size === fingerprints.length, 'every champion has a distinct fingerprint');
   check(fingerprints.every((f) => f !== 0), 'and none is zero');
 
+  disableMessageSection();
   portraitSection();
   edgeDecorationSection();
   finish();
+}
+
+/** The live type-127 actuators on a mirror's wall, in chain order. */
+function portraitActuators(game: Game, mirror: Position, wall: number): ActuatorRecord[] {
+  const out: ActuatorRecord[] = [];
+  for (const rn of cellObjects(game, mirror)) {
+    const decoded = game.ctx.dungeon.rnMaps.decode(rn);
+    if (decoded.category !== DBType.ACTUATOR || decoded.position !== wall) continue;
+    const rec = game.ctx.dungeon.getActuatorRecord(rn);
+    if (rec && getActuatorType(rec) === 127) out.push(rec);
+  }
+  return out;
+}
+
+/**
+ * A portrait's `DisableMessage` (`word4` bits 6-7): when Resurrect or Reincarnate
+ * disables it, `PortraitTranslateDisable` (`doc/CSBwin-src/CSBCode.cpp:6589-6612`) sends
+ * set (1), clear (2) or toggle (3) to the mirror's own cell, at the wall its `Position`
+ * (`word6` bits 12-13) names, as `QueueDSASwitchAction(0, action, d.LoadedLevel, x, y,
+ * pos, 'M')` (`DSA.cpp:485-532`): a stone cell's timer, `TT_STONEROOM`, due now, with
+ * action 0, 1 or 2. The shipped mirrors carry none (`ExtendPortraits` clears the field),
+ * so each case sets it on HALK's.
+ */
+function disableMessageSection(): void {
+  console.log('');
+  console.log('=== a portrait\'s DisableMessage, sent when Resurrect disables it ===');
+
+  const shipped = makeGame();
+  const shippedMessages = shipped.ctx.dungeon.getData().databases.actuators.records
+    .filter((r) => r.nextObject !== OBJECT_ID_NULL && getActuatorType(r) === 127)
+    .map(getActuatorDisableMessage);
+  console.log(`dm-atari portraits: ${shippedMessages.length}, with a DisableMessage: ` +
+    `${shippedMessages.filter((m) => m !== 0).length}`);
+  check(shippedMessages.length === 24 && shippedMessages.every((m) => m === 0),
+    'no portrait of the shipped dungeon carries a DisableMessage');
+
+  const POSITION = 1;
+  const show = (t: TimerEntry): string =>
+    `fn ${t.function} L${t.level} (${t.uByte6},${t.uByte7}) pos ${t.uByte8} act ${t.uByte9} t ${t.time}`;
+  for (const [disableMessage, button] of [[0, RESURRECT], [1, RESURRECT], [2, REINCARNATE], [3, RESURRECT], [1, CANCEL]] as const) {
+    const game = makeGame();
+    const halk = heroByName(game, 'HALK');
+    const { mirror } = standAtMirror(game, halk);
+    const portraits = portraitActuators(game, mirror, halk.location.wall);
+    const portrait = portraits[0];
+    if (portraits.length !== 1 || !portrait) {
+      fail(`HALK's wall has ${portraits.length} portraits, not one`);
+      continue;
+    }
+    portrait.word4 = (portrait.word4 & ~0x00c0) | (disableMessage << 6);
+    portrait.word6 = (portrait.word6 & ~0x3000) | (POSITION << 12);
+    game.systems.mouse.handleWallClick();
+    const before = new Set(game.ctx.timers.getTimers());
+    reincarnateScreen = () => {};
+    game.systems.hallOfChampions.resurrectReincarnateCancel(button);
+    const sent = game.ctx.timers.getTimers().filter((t) => !before.has(t));
+    console.log(`DisableMessage ${disableMessage}, button ${button}: [${sent.map(show).join('; ')}]`);
+
+    if (disableMessage === 0 || button === CANCEL) {
+      check(sent.length === 0, button === CANCEL
+        ? `Cancel disables nothing, so DisableMessage ${disableMessage} sends nothing`
+        : 'DisableMessage 0 (PORTRAIT_ResponseNone) sends nothing');
+      continue;
+    }
+    const t = sent[0];
+    check(sent.length === 1 && t !== undefined
+      && t.function === TimerFunction.TT_STONEROOM
+      && t.level === mirror.z && t.uByte6 === mirror.x && t.uByte7 === mirror.y
+      && t.uByte8 === POSITION && t.uByte9 === disableMessage - 1
+      && t.time === game.ctx.state.tickCount,
+      `DisableMessage ${disableMessage} sends action ${disableMessage - 1} to the mirror's cell at ` +
+      `the portrait's Position, a TT_STONEROOM due now`);
+  }
 }
 
 /**

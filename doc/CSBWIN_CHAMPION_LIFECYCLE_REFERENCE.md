@@ -184,7 +184,9 @@ which also sets `d.DisplayResurrectChestOrScroll = 5`.
 - **Resurrect (160) / Reincarnate (161)**, both first: `RemoveObjectFromRoom` every
   possession **out of** the mirror's cell, then disable the first active portrait
   actuator at that wall and — unless it `BlockDisables()` — every actuator there
-  (`:6668-6734`).
+  (`:6668-6734`). Each portrait disabled first sends its `DisableMessage` to its own cell
+  (`PortraitTranslateDisable`, `:6589-6612`; `doc/PROVEN_FACTS.md` → "A disabled portrait
+  sends its `DisableMessage` to its own cell").
 
   This is the other half of the trick in section 2 step 8: `AddCharacterPossession`
   (`Character.cpp:1936`) never unlinked those objects from the room, so between the add

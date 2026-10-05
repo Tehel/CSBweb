@@ -133,6 +133,15 @@ export function getActuatorDisableMessage(rec: ActuatorRecord): number {
 export const PORTRAIT_INACTIVE = 1;
 
 /**
+ * `PORTRAIT_Response*` (`doc/CSBwin-src/CSB.h:917-920`), what a portrait's two-bit
+ * response fields hold, its `DisableMessage` among them.
+ */
+export const PORTRAIT_RESPONSE_NONE = 0;
+export const PORTRAIT_RESPONSE_SET = 1;
+export const PORTRAIT_RESPONSE_CLEAR = 2;
+export const PORTRAIT_RESPONSE_TOGGLE = 3;
+
+/**
  * `DB3::BlockDisables` (`doc/CSBwin-src/CSB.h:1055`). Set on a portrait actuator, it
  * stops the Hall of Champions from disabling the *other* actuators on the same wall
  * (`doc/CSBwin-src/CSBCode.cpp:6700`).

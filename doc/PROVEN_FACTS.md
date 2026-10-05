@@ -3266,6 +3266,22 @@ be drawn (`Codea59a.cpp:134-137`). The port runs it at the end of `DungeonLoader
 gated on `DungeonImageOptions.expandedPortraits`, which `loadCsbwinWorld` takes from the
 save's block (`tools/dump-extend-portraits.ts`).
 
+## A disabled portrait sends its `DisableMessage` to its own cell
+
+When Resurrect or Reincarnate disables the mirror's portraits (`_ResurrectReincarnateCancel`,
+`doc/CSBwin-src/CSBCode.cpp:6679-6734`), each portrait it disables goes through
+`PortraitTranslateDisable` (`:6589-6612`) first: the first active one, and then, unless it
+`BlockDisables()`, every type-127 actuator left on the wall. That returns if the portrait's
+`State` has `PORTRAIT_InActive`, and otherwise maps its `DisableMessage` (`word4` bits 6-7,
+`CSB.h:1063`) `PORTRAIT_ResponseSet` 1, `Clear` 2 and `Toggle` 3 to the actions 0, 1 and 2
+(`ResponseNone` 0 sends nothing, `CSB.h:917-920`). It sends the action as a DSA's `MESSAGE`
+does, `QueueDSASwitchAction(0, action, d.LoadedLevel, x, y, pPortrait->Position(), 'M')`
+(`DSA.cpp:485-532`): to the mirror's own cell, at the wall the portrait's `Position`
+(`word6` bits 12-13, `CSB.h:1065`) names, as the timer that cell's room type takes, due
+at once. Cancel disables nothing and sends nothing. `ExtendPortraits` clears both fields in
+every file read without `ExpandedPortraits`, so the shipped dungeons' mirrors send nothing
+(`tools/dump-hall-of-champions.ts`).
+
 ## The "simple" encipherment is `RC4.cpp`'s own cipher, with a key of one byte
 
 `RC4.cpp` opens with "This is NOT the RC4 encryption algorithm!!!! Only the key

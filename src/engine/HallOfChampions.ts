@@ -13,7 +13,12 @@
 import type { ActuatorRecord, DatabaseRecord } from '../data/dungeonTypes';
 import {
   PORTRAIT_INACTIVE,
+  PORTRAIT_RESPONSE_CLEAR,
+  PORTRAIT_RESPONSE_SET,
+  PORTRAIT_RESPONSE_TOGGLE,
   blocksDisables,
+  getActuatorDisableMessage,
+  getActuatorPosition,
   getActuatorState,
   getActuatorType,
   setActuatorType,
@@ -338,11 +343,8 @@ export class HallOfChampions {
   /**
    * `doc/CSBwin-src/CSBCode.cpp:6679-6734` — disable the first *active* portrait
    * actuator on the mirror's wall, then, unless it blocks disables, every actuator
-   * on that wall.
-   *
-   * ⏳ `PortraitTranslateDisable`'s `QueueDSASwitchAction` (`:6540-6612`) is not
-   * ported: it fires only when the actuator carries a `DisableMessage`, which is a
-   * CSB extension the shipped DM dungeon never uses.
+   * on that wall. Each portrait disabled sends its `DisableMessage` first
+   * (`portraitTranslateDisable`).
    */
   private disableMirrorActuators(mirror: Position): void {
     const wall = (this.ctx.party.state.facing + 2) & 3;
@@ -363,6 +365,7 @@ export class HallOfChampions {
     for (const record of actuators) {
       if (getActuatorType(record) !== 127) continue;
       if ((getActuatorState(record) & PORTRAIT_INACTIVE) !== 0) continue;
+      this.portraitTranslateDisable(record, mirror);
       setActuatorType(record, 0);
       if (blocksDisables(record)) block = true;
       break;
@@ -371,10 +374,31 @@ export class HallOfChampions {
     for (const record of actuators) {
       if (block) break;
       if (getActuatorType(record) === 127) {
+        this.portraitTranslateDisable(record, mirror);
         block = blocksDisables(record);
       }
       setActuatorType(record, 0);
     }
+  }
+
+  /**
+   * `PortraitTranslateDisable` (`doc/CSBwin-src/CSBCode.cpp:6589-6612`): an active
+   * portrait whose `DisableMessage` is set, clear or toggle sends it to its own cell, at
+   * the wall its `Position` names, through the DSA's `QueueDSASwitchAction` with no
+   * delay. CSBWin passes `d.LoadedLevel`, the party's level at a click. No portrait in
+   * the shipped dungeons carries a message.
+   */
+  private portraitTranslateDisable(portrait: ActuatorRecord, mirror: Position): void {
+    if ((getActuatorState(portrait) & PORTRAIT_INACTIVE) !== 0) return;
+    let action: number;
+    switch (getActuatorDisableMessage(portrait)) {
+      case PORTRAIT_RESPONSE_SET: action = 0; break;
+      case PORTRAIT_RESPONSE_CLEAR: action = 1; break;
+      case PORTRAIT_RESPONSE_TOGGLE: action = 2; break;
+      default: return;
+    }
+    this.ctx.systems.dsa.queueDsaSwitchAction(
+      0, action, mirror.z, mirror.x, mirror.y, getActuatorPosition(portrait), 'M');
   }
 
   /**

@@ -1678,7 +1678,7 @@ export class DsaSystem {
             if (msgType !== MessageType.NULL && target) {
               const action = msgType - 1;
               const morD = opcode === DsaCommand.DESSAGE32 ? 'D' : 'M';
-              this.queueDsaSwitchAction(delay, action, target, morD);
+              this.queueDsaSwitchAction(delay, action, target.l, target.x, target.y, target.p, morD);
             }
             break;
           }
@@ -3897,31 +3897,43 @@ export class DsaSystem {
     return locr;
   }
 
-  private queueDsaSwitchAction(delay: number, action: number, locr: LocationRel, morD: 'M' | 'D'): void {
+  /**
+   * `QueueDSASwitchAction` (`doc/CSBwin-src/DSA.cpp:485-532`): a set, clear or toggle
+   * (`tmrAct` 0, 1, 2) sent `delay` ticks on to a cell, as the timer its room type takes
+   * (`'M'`), or as a `TT_DESSAGE` (`'D'`). A DSA's `MESSAGE` sends it, and so does a
+   * portrait the Hall of Champions disables (`PortraitTranslateDisable`,
+   * `CSBCode.cpp:6589-6612`).
+   */
+  queueDsaSwitchAction(
+    delay: number,
+    tmrAct: number,
+    level: number,
+    targetX: number,
+    targetY: number,
+    targetPos: number,
+    morD: 'M' | 'D',
+  ): void {
     const actionTime = (this.ctx.state.tickCount + delay) >>> 0;
-    let functionType = TimerFunction.TT_DESSAGE;
 
     if (morD === 'M') {
-      const map = this.dungeon.getMap(locr.l);
+      const map = this.dungeon.getMap(level);
       if (!map) return;
-      const cellFlag = map.cellFlags[locr.x]?.[locr.y];
+      const cellFlag = map.cellFlags[targetX]?.[targetY];
       if (cellFlag === undefined) return;
       const roomType = (cellFlag >> 5) & 0x7;
-      let targetPos = locr.p;
       if (roomType !== RoomType.STONE && roomType !== RoomType.FALSEWALL) {
         targetPos = 0;
       }
       const mapping = this.byte1596[roomType];
       if (mapping === 0) {
-        this.ctx.host.trace(`Illegal DSA timer target (${locr.x},${locr.y}) L${locr.l}`);
+        this.ctx.host.trace(`Illegal DSA timer target (${targetX},${targetY}) L${level}`);
         return;
       }
-      functionType = mapping;
-      this.timers.createTimer(functionType, locr.x, locr.y, targetPos, action, actionTime, locr.l);
+      this.timers.createTimer(mapping, targetX, targetY, targetPos, tmrAct, actionTime, level);
       return;
     }
 
-    this.timers.createTimer(functionType, locr.x, locr.y, locr.p, action, actionTime, locr.l);
+    this.timers.createTimer(TimerFunction.TT_DESSAGE, targetX, targetY, targetPos, tmrAct, actionTime, level);
   }
 
   private loadParameter(where: number, rnMaster: ObjectID): number {
