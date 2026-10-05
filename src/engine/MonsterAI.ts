@@ -51,7 +51,7 @@ import {
 } from '../data/tables/MonsterDesc';
 import { setPackedBits } from './MonsterSystem';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
-import { MmRecord } from './MmRecord';
+import { MmRecord, MonsterEvents } from './MmRecord';
 
 /**
  * The values CSBWin passes by reference through the `Try_*` chain.
@@ -326,14 +326,17 @@ export class MonsterAI {
 
     if (fn === TimerFunction.TT_31) {
       // The party ran into us, or attacked us.
+      c.mmr.setflg(MonsterEvents.TT29to41_TT31);
       c.timerFunction = TimerFunction.TT_M1;
       if (fearFactor !== StateOfFear.StateOfFear6 && fearFactor !== StateOfFear.StateOfFear5) {
+        // CSBWin names the flag for the other branch (`doc/CSBwin-src/Monster.cpp:3419`).
+        c.mmr.setflg(MonsterEvents.TT29to41_fear5or6);
         this.trace('      MAI timeFunc 31.  FearFactor not 5 or 6. So Delete all timers and set fear to 6.');
         this.timers.deleteMonsterMovementTimers(c.mapX, c.mapY, c.level, (line) => this.trace(line));
         this.maybeDelTimersFear6TurnIndividuals(
           c.monster, c.slot, c.slotIndex, frame.timer, c.timeUntilAlternateUpdate,
           c.timerFunction, c.mapX, c.mapY, c.level, c.desc,
-          c.indexOfLastMonster, c.horizSize, true,
+          c.indexOfLastMonster, c.horizSize, true, c.mmr,
         );
         return;
       }
@@ -343,9 +346,11 @@ export class MonsterAI {
     }
 
     if (fn === TimerFunction.TT_30) {
+      c.mmr.setflg(MonsterEvents.TT29to41_TT30);
       c.timerFunction = TimerFunction.TT_M2;
       if (fearFactor === StateOfFear.StateOfFear6 || fearFactor === StateOfFear.StateOfFear5) {
         this.trace('      MAI timeFunc 30.  FearFactor is 5 or 6.');
+        c.mmr.setflg(MonsterEvents.TT29to41_fear5or6doNothing);
         return;
       }
       const fearIs2or3 = fearFactor === StateOfFear.StateOfFear2 || fearFactor === StateOfFear.StateOfFear3;
@@ -357,12 +362,15 @@ export class MonsterAI {
           c.fearFactorIs6 = false;
           this.turnMonstersAsGroup(
             c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize,
-            frame.bool36, frame.sinceLastUpdate,
+            frame.bool36, frame.sinceLastUpdate, c.mmr,
           );
+          c.mmr.setflg(MonsterEvents.TT29to41_TT30turnAsGroup);
           if (c.timerFunction < TimerFunction.TT_M1) {
             if (!frame.bool36) return;
+            c.mmr.setflg(MonsterEvents.TT29to41_TT30deleteTimersMaybeSetFear);
             this.deleteTimersMaybeSetFear(c.monster, c.slotIndex, c.mapX, c.mapY, c.level, c.fearFactorIs6);
           }
+          c.mmr.setflg(MonsterEvents.TT29to41_TT30IncrementTimeByW52PlusRandom);
           this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
           this.startBGroupTimer(
             frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, true, c.mapX, c.mapY,
@@ -374,11 +382,13 @@ export class MonsterAI {
       }
       c.fearFactorIs6 = fearFactor === StateOfFear.StateOfFear6;
       frame.bool36 = false;
+      c.mmr.setflg(MonsterEvents.TT29to41_TT30TryDirectionsD5toD4);
       this.tryDirectionsD5ToD4(frame, c);
       return;
     }
 
     if (fn === TimerFunction.TT_29) {
+      c.mmr.setflg(MonsterEvents.TT29to41_TT29);
       this.trace('      MAI timeFunc 29.');
       c.timerFunction = TimerFunction.TT_M3;
       c.fearFactorIs6 = fearFactor === StateOfFear.StateOfFear6;
@@ -412,6 +422,7 @@ export class MonsterAI {
    * fear state 0 or 3 while seen at range (go to state 7 and charge).
    */
   private processATimer(frame: AiFrame, c: AiConst, fearFactor: number): void {
+    c.mmr.setflg(MonsterEvents.TT29to41_TTmonsterA3);
     const flipped = A_TO_B[c.timerFunction];
     if (flipped === undefined) {
       this.trace(`MonsterAI: illegal monster AI timer ${c.timerFunction}`);
@@ -423,12 +434,15 @@ export class MonsterAI {
     const seen = this.blocked(c, -1);
     this.trace(`      MAI timeFunc<37.  Blocked=${seen}`);
     if (seen !== 0) {
+      c.mmr.setflg(MonsterEvents.TT29to41_blocked);
       if (fearFactor !== StateOfFear.StateOfFear6 && fearFactor !== StateOfFear.StateOfFear5) {
+        c.mmr.setflg(MonsterEvents.TT29to41_fearNot5or6);
         if (c.xDistance + c.yDistance <= 1) {
+          c.mmr.setflg(MonsterEvents.TT29to41_MaybeDeleteTimersFear6TurnIndividuals);
           this.maybeDelTimersFear6TurnIndividuals(
             c.monster, c.slot, c.slotIndex, frame.timer, c.timeUntilAlternateUpdate,
             c.timerFunction, c.mapX, c.mapY, c.level, c.desc,
-            c.indexOfLastMonster, c.horizSize, true,
+            c.indexOfLastMonster, c.horizSize, true, c.mmr,
           );
           return;
         }
@@ -444,6 +458,7 @@ export class MonsterAI {
           (fear === StateOfFear.StateOfFear0 || fear === StateOfFear.StateOfFear3) &&
           notSeven(fear)
         ) {
+          c.mmr.setflg(MonsterEvents.TT29to41_fear0or3);
           c.monster.fear = StateOfFear.StateOfFear7;
           this.rememberPartyPosition(c.slot);
           frame.timer.time = (frame.timer.time + 1) >>> 0;
@@ -457,6 +472,7 @@ export class MonsterAI {
     }
 
     if (fearFactor === StateOfFear.StateOfFear6) {
+      c.mmr.setflg(MonsterEvents.TT29to41_fear6);
       this.trace('      MAI fearFactor==6');
       const member = c.timerFunction - TimerFunction.TT_MONSTER_A0;
       frame.i60 = this.ctx.systems.monsters.nextMonsterUpdateTime(
@@ -472,6 +488,7 @@ export class MonsterAI {
     }
 
     if (c.xDistance > 3 || c.yDistance > 3) {
+      c.mmr.setflg(MonsterEvents.TT29to41_w30w32GretaterThan3);
       frame.i60 = this.ctx.state.tickCount + monsterDelayFromMoveToAttack(c.desc);
       this.trace(
         `      MAI fearFactor != 6.  Distance to party > 3. AdditionalDelayAfter(move/attack) = ` +
@@ -496,7 +513,9 @@ export class MonsterAI {
    * position inside the cell, or turns, or gives up and moves.
    */
   private processIndividualBTimer(frame: AiFrame, c: AiConst, fearFactor: number): void {
+    c.mmr.setflg(MonsterEvents.TT29to41_TTnot37);
     if (fearFactor === StateOfFear.StateOfFear5) {
+      c.mmr.setflg(MonsterEvents.TT29to41_fear5);
       if (c.indexOfLastMonster !== 0) {
         this.ctx.systems.monsters.clearAttackingAndDeleteMovementTimers(c.slotIndex, c.mapX, c.mapY, c.level);
       }
@@ -507,6 +526,7 @@ export class MonsterAI {
     const member = c.timerFunction - TimerFunction.TT_MONSTER_B0;
     if (((c.slot.singleMonsterStatus[member] ?? 0) & SMS_ATTACKING) !== 0) {
       // Mid-attack: schedule the follow-through.
+      c.mmr.setflg(MonsterEvents.TT29to41_attacking);
       frame.i60 = this.ctx.systems.monsters.nextMonsterUpdateTime(c.slot, member, false, c.mapX, c.mapY, c.level);
       const roll = this.random.zeroTo3();
       const attackTicks = c.desc.attackTicks07 & 0xff;
@@ -520,6 +540,7 @@ export class MonsterAI {
       return;
     }
 
+    c.mmr.setflg(MonsterEvents.TT29to41_notAttacking);
     if (member > c.indexOfLastMonster) return;
 
     const preferredDirection = this.scratch.primaryDirectionToParty;
@@ -698,7 +719,7 @@ export class MonsterAI {
           this.maybeDelTimersFear6TurnIndividuals(
             c.monster, c.slot, c.slotIndex, frame.timer, c.timeUntilAlternateUpdate,
             c.timerFunction, c.mapX, c.mapY, c.level, c.desc,
-            c.indexOfLastMonster, c.horizSize, false,
+            c.indexOfLastMonster, c.horizSize, false, c.mmr,
           );
           return;
         }
@@ -717,7 +738,7 @@ export class MonsterAI {
         this.maybeDelTimersFear6TurnIndividuals(
           c.monster, c.slot, c.slotIndex, frame.timer, c.timeUntilAlternateUpdate,
           c.timerFunction, c.mapX, c.mapY, c.level, c.desc,
-          c.indexOfLastMonster, c.horizSize, false,
+          c.indexOfLastMonster, c.horizSize, false, c.mmr,
         );
         return;
       }
@@ -799,8 +820,12 @@ export class MonsterAI {
           c.monsterRn, c.desc, c.level, c.mapX, c.mapY, direction, false, this.scratch,
         );
         if (probe.possible) {
+          c.mmr.setflg(MonsterEvents.T524_possibleMove);
           frame.d5 = direction;
-          if (!this.stepOrDefer(frame, c, newX, newY)) return;
+          const stays = this.stepOrDefer(frame, c, newX, newY);
+          if (frame.bool36) c.mmr.setflg(stays ? MonsterEvents.T524_moveFailed : MonsterEvents.T524_moveSucceeded);
+          if (!stays) return;
+          c.mmr.setflg(MonsterEvents.T524_processInvincibleAndFinish);
           this.processInvincibleAndFinish(frame, c, direction);
           return;
         }
@@ -814,10 +839,11 @@ export class MonsterAI {
             ) === 0 ||
             this.random.bool() !== 0
           ) {
+            c.mmr.setflg(MonsterEvents.T524_mabeDeleteTimersFear6TurnIndividuals);
             this.maybeDelTimersFear6TurnIndividuals(
               c.monster, c.slot, c.slotIndex, frame.timer, c.timeUntilAlternateUpdate,
               c.timerFunction, c.mapX, c.mapY, c.level, c.desc,
-              c.indexOfLastMonster, c.horizSize, c.processingATimer,
+              c.indexOfLastMonster, c.horizSize, c.processingATimer, c.mmr,
             );
             return;
           }
@@ -829,6 +855,7 @@ export class MonsterAI {
     } while (start !== direction);
 
     frame.d5 = direction;
+    c.mmr.setflg(MonsterEvents.T524_ProcessInvincibleAndFinish);
     this.processInvincibleAndFinish(frame, c, direction);
   }
 
@@ -869,9 +896,7 @@ export class MonsterAI {
 
     if (!found) {
       if (!c.invincible) {
-        this.turnMonstersAsGroup(
-          c.slot, c.slotIndex, preferredDirection, c.indexOfLastMonster, c.horizSize, true, frame.sinceLastUpdate,
-        );
+        this.turnMonsterGroup(c.slot, c.slotIndex, preferredDirection, c.indexOfLastMonster, c.horizSize);
         this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
         this.startBGroupTimer(
           frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, c.processingATimer, c.mapX, c.mapY,
@@ -921,7 +946,7 @@ export class MonsterAI {
           // Cornered next to the party: stop panicking.
           c.monster.fear = StateOfFear.StateOfFear0;
           this.turnMonstersAsGroup(
-            c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize, false, frame.sinceLastUpdate,
+            c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize, false, frame.sinceLastUpdate, c.mmr,
           );
           if (c.timerFunction < TimerFunction.TT_M1) return;
           this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
@@ -950,7 +975,7 @@ export class MonsterAI {
     // The panic ran out.
     c.monster.fear = StateOfFear.StateOfFear0;
     this.turnMonstersAsGroup(
-      c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize, false, frame.sinceLastUpdate,
+      c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize, false, frame.sinceLastUpdate, c.mmr,
     );
     if (c.timerFunction < TimerFunction.TT_M1) return;
     this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
@@ -983,7 +1008,7 @@ export class MonsterAI {
     if (c.mapX === c.slot.uByte6 && c.mapY === c.slot.uByte7) {
       c.monster.fear = StateOfFear.StateOfFear0;
       this.turnMonstersAsGroup(
-        c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize, false, frame.sinceLastUpdate,
+        c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize, false, frame.sinceLastUpdate, c.mmr,
       );
       if (c.timerFunction < TimerFunction.TT_M1) return;
       this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
@@ -1054,7 +1079,11 @@ export class MonsterAI {
       // Any non-zero `MoveObject` ends the turn; otherwise the timer follows the group to
       // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:1711-1720`).
       const moved = this.ctx.systems.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level, undefined, c.mmr);
-      if (moved.code !== 0) return true;
+      if (moved.code !== 0) {
+        c.mmr.setflg(MonsterEvents.PIn_moveTwoSquaresSucceeded);
+        return true;
+      }
+      c.mmr.setflg(MonsterEvents.PIn_moveTwoSquaresFailed);
       frame.timer.uByte6 = moved.position.x & 0xff;
       frame.timer.uByte7 = moved.position.y & 0xff;
       c.slot.ubPrevX = c.mapX & 0xff;
@@ -1083,8 +1112,10 @@ export class MonsterAI {
     ) {
       preferred = this.random.zeroTo3();
       frame.secondaryDirection = (preferred + 1) & 0x3;
+      c.mmr.setflg(MonsterEvents.PIAF_processInvincible);
       if (this.processInvincible(frame, c, preferred)) return;
     }
+    c.mmr.setflg(MonsterEvents.PIAF_standardFinish);
     this.standardFinish(frame, c);
   }
 
@@ -1097,7 +1128,11 @@ export class MonsterAI {
     if (!frame.bool36) {
       if (this.random.zeroTo3() !== 0) {
         if (c.attackDistance > monsterSmellingDistance(c.desc)) {
-          if (c.timerFunction < TimerFunction.TT_M1 && !frame.bool36) return;
+          c.mmr.setflg(MonsterEvents.SF_greaterThanSmellingDistance);
+          if (c.timerFunction < TimerFunction.TT_M1 && !frame.bool36) {
+            c.mmr.setflg(MonsterEvents.SF_return);
+            return;
+          }
           this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
           this.startBGroupTimer(
             frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, c.processingATimer, c.mapX, c.mapY,
@@ -1106,6 +1141,7 @@ export class MonsterAI {
         }
       }
       if (c.timerFunction === TimerFunction.TT_M3) {
+        c.mmr.setflg(MonsterEvents.SF_timeFuncMinusThree);
         if (c.timerFunction < TimerFunction.TT_M1 && !frame.bool36) return;
         this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
         this.startBGroupTimer(
@@ -1115,13 +1151,16 @@ export class MonsterAI {
       }
     }
 
+    c.mmr.setflg(MonsterEvents.SF_TurnMonstersAsGroup);
     this.turnMonstersAsGroup(
-      c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize, frame.bool36, frame.sinceLastUpdate,
+      c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize, frame.bool36, frame.sinceLastUpdate, c.mmr,
     );
     if (c.timerFunction < TimerFunction.TT_M1) {
       if (!frame.bool36) return;
+      c.mmr.setflg(MonsterEvents.SF_DeleteTimersMaybeSetFear);
       this.deleteTimersMaybeSetFear(c.monster, c.slotIndex, c.mapX, c.mapY, c.level, c.fearFactorIs6);
     }
+    c.mmr.setflg(MonsterEvents.SF_IncrementTime);
     this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
     this.startBGroupTimer(
       frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, c.processingATimer, c.mapX, c.mapY,
@@ -1156,11 +1195,13 @@ export class MonsterAI {
     return true;
   }
 
-  /** Turn the group to face where it wanted to go, then wait out a move interval. */
+  /**
+   * `Process_Invincible`'s two dead ends: turn the group to face where it wanted to go,
+   * then wait out a move interval (`doc/CSBwin-src/Monster.cpp:1662-1673`, `:1681-1692`).
+   */
   private turnAndWait(frame: AiFrame, c: AiConst, preferredDirection: number): void {
-    this.turnMonstersAsGroup(
-      c.slot, c.slotIndex, preferredDirection, c.indexOfLastMonster, c.horizSize, true, frame.sinceLastUpdate,
-    );
+    c.mmr.setflg(MonsterEvents.PIn_turnMonsterGroup);
+    this.turnMonsterGroup(c.slot, c.slotIndex, preferredDirection, c.indexOfLastMonster, c.horizSize);
     this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
     this.startBGroupTimer(
       frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, c.processingATimer, c.mapX, c.mapY,
@@ -1275,6 +1316,7 @@ export class MonsterAI {
         timerFunction !== TimerFunction.TT_MONSTER_B0 &&
         timerFunction !== TimerFunction.TT_MONSTER_A0
       ) {
+        mmr.setflg(MonsterEvents.IC29to41_Not32_33_37_38);
         this.trace('Skip monster AI because not party level  and timer is not for group leader');
         return blank();
       }
@@ -1301,16 +1343,24 @@ export class MonsterAI {
       const numMon = (monster.numMonM1 & 0x3) + 1;
       for (let i = 0; i < numMon; i++) {
         if ((monster.hp[i] ?? 0) !== 0) continue;
+        mmr.setflg(MonsterEvents.IC29to41_atLeastOneMemberAlreadyDead);
         const result = this.ctx.systems.monsterDamage.damageMonster(
           monster, i, level, mapX, mapY, 0, true, !onPartyLevel, mmr,
         );
         if (result !== MonsterDamageResult.NO_MONSTER_DIED) {
+          mmr.setflg(MonsterEvents.IC29to41_damageMonsterSucceeded);
           const timer = this.makeTimer(mapX, mapY, level, timerFunction, timeUntilAlternateUpdate);
           timer.time = this.ctx.state.tickCount >>> 0;
           timer.uByte5 = 0;
           this.timers.addTimer(timer);
           return blank();
         }
+      }
+      // CSBWin tests `IC29to41_atLeastOneMemberAlreadDead`, a flag of its own that nothing
+      // sets, not the one the loop sets, so `IC29to41_damageMonsterFailed` is never set
+      // (`doc/CSBwin-src/Monster.cpp:2835-2836`).
+      if (mmr.getflg(MonsterEvents.IC29to41_atLeastOneMemberAlreadDead)) {
+        mmr.setflg(MonsterEvents.IC29to41_damageMonsterFailed);
       }
     }
 
@@ -1340,6 +1390,7 @@ export class MonsterAI {
         const moved = this.ctx.systems.monsters.moveMonster(monsterRn, mapX, mapY, newX, newY, level, undefined, mmr);
         this.trace(`      MAI MoveObject to (${newX},${newY}) returned ${moved.code}`);
         if (moved.code !== 0) {
+          mmr.setflg(MonsterEvents.IC29to41_randomMoveSucceeded);
           this.trace('      MAI Skip monster AI because MoveObject non-zero');
           return blank();
         }
@@ -1347,6 +1398,7 @@ export class MonsterAI {
         // dropped the group a level, and only the square is re-aimed.
         timer.uByte6 = moved.position.x & 0xff;
         timer.uByte7 = moved.position.y & 0xff;
+        mmr.setflg(MonsterEvents.IC29to41_randomMoveFailed);
       } else {
         this.trace('      MAI  No attempt to move monster. Que 37 timer');
       }
@@ -1356,12 +1408,14 @@ export class MonsterAI {
       const delay = Math.max(levelGap << 4, 2 * desc.movementTicks06);
       timer.time = (timer.time + delay) >>> 0;
       this.timers.addTimer(timer);
+      mmr.setflg(MonsterEvents.IC29to41_doNothing);
       return blank();
     }
 
     // (5) On the party's level from here on.
     if (monsterInvincible(desc) && this.ctx.state.gameWon) {
       // Lord Chaos stops moving once the game is won.
+      mmr.setflg(MonsterEvents.IC29to41_doNothing);
       return blank();
     }
     if (monsterInvincible(desc)) {
@@ -1379,6 +1433,7 @@ export class MonsterAI {
     if (timePerMove === 255) timePerMove = 100;
 
     if (party.freezeLifeTimer !== 0 && !monsterInvincible(desc)) {
+      mmr.setflg(MonsterEvents.IC29to41_doNothing);
       if (timerFunction < TimerFunction.TT_EMPTY) return blank();
       timer.function = timerFunction;
       timer.uByte8 = timeUntilAlternateUpdate & 0xff;
@@ -1389,6 +1444,7 @@ export class MonsterAI {
 
     if (timerFunction >= TimerFunction.TT_EMPTY) {
       // The only path that lets the AI proper run.
+      mmr.setflg(MonsterEvents.IC29to41_exitFalse);
       return {
         handled: false,
         sinceLastUpdate,
@@ -1413,6 +1469,7 @@ export class MonsterAI {
     timer.time = (timer.time + delay) >>> 0;
     this.trace(`      MAI Change negative timer function to type ${timer.function}`);
     this.timers.addTimer(timer);
+    mmr.setflg(MonsterEvents.IC29to41_doNothing);
     return blank();
   }
 
@@ -1515,7 +1572,7 @@ export class MonsterAI {
    * `preferredDirection` is replaced by a random one when the group has no reason to
    * face anywhere in particular — CSBWin's `(bool_36 == false) && (w_54 >= 0)`.
    */
-  turnMonstersAsGroup(
+  private turnMonstersAsGroup(
     slot: Item16Record,
     slotIndex: number,
     preferredDirection: number,
@@ -1523,9 +1580,25 @@ export class MonsterAI {
     horizSize: number,
     hasPreference: boolean,
     sinceLastUpdate: number,
+    mmr: MmRecord,
   ): void {
     let direction = preferredDirection;
     if (!hasPreference && sinceLastUpdate >= 0) direction = this.random.zeroTo3();
+    mmr.setflg(MonsterEvents.TMAG_turnMonsterGroup);
+    this.turnMonsterGroup(slot, slotIndex, direction, indexOfLastMonster, horizSize);
+  }
+
+  /**
+   * `TurnMonsterGroup`, which `Try_Preferred_Direction_Then_Others` and `Process_Invincible`
+   * call directly, setting no flag.
+   */
+  private turnMonsterGroup(
+    slot: Item16Record,
+    slotIndex: number,
+    direction: number,
+    indexOfLastMonster: number,
+    horizSize: number,
+  ): void {
     const ref = { facings: slot.facings };
     this.ctx.systems.monsterPerception.turnMonsterGroup(
       this.scratch, slotIndex, ref, direction, indexOfLastMonster, horizSize === 1, this.ctx.state.tickCount,
@@ -1555,6 +1628,7 @@ export class MonsterAI {
     indexOfLastMonster: number,
     horizSize: number,
     processingATimer: boolean,
+    mmr: MmRecord,
   ): void {
     if (timerFunction === TimerFunction.TT_M2) {
       this.timers.deleteMonsterMovementTimers(mapX, mapY, level, (line) => this.trace(line));
@@ -1573,6 +1647,7 @@ export class MonsterAI {
       const monsterDirection = (slot.facings >> (2 * monIdx)) & 0x3;
       const turns = preferred !== monsterDirection && (monIdx === 0 || this.random.bool() === 0);
       if (turns) {
+        mmr.setflg(MonsterEvents.MDF6TI_turnMonsterTowardParty);
         const ref = { facings: slot.facings };
         this.ctx.systems.monsterPerception.turnMonster(
           this.scratch,

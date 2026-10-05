@@ -3840,6 +3840,32 @@ pre-move filter's own included, leaves `finalLocr` alone. `RN ==` compares the s
 (`CSBTypes.h:349-352`), so the stairs' turn of the group's corner does not break the
 match. `tools/dump-monster-move-filter.ts`.
 
+## The turn's flags, and three that are never set
+
+`flgs` is the set of `MONSTEREVENTS` (`doc/CSBwin-src/CSB.h:2815-2868`), bit `f % 32` of
+word `f / 32` (`Setflg`, `:2896`). Besides `MoveObject_NotAllowedOnLevel` and
+`MonMove_differentCell`, 53 `Setflg`s in `Monster.cpp` set them, each named after the
+function it sits in: `MDF6TI` `MaybeDelTimers_Fear6_TurnIndividuals` (`:1499`), `TMAG`
+`Turn_Monsters_As_Group` (`:1573`), `PIn` `Process_Invincible` (`:1662-1718`), `SF`
+`Standard_Finish` (`:1790-1877`), `PIAF` `Process_Invincible_And_Finish` (`:1950`,
+`:1972`), `T524` `Try_Directions_D5_To_D4` (`:2433-2525`), `IC` `InitialChecks`
+(`:2764-3054`) and `TT29to41` `ProcessTimers29to41` itself (`:3414-3829`).
+`Try_Preferred_Direction_Then_Others`, `Try_To_Move`, `TryUByte67` and `D4D0Finish` set
+none of their own: their `TurnMonsterGroup` and `Process_Invincible` calls are direct
+(`:2060`, `:2072`), and only `Turn_Monsters_As_Group` sets `TMAG_turnMonsterGroup`, on
+every call (`:1573`).
+
+Three flags are never set. `TMAG_tunrMonsterGroup` (1) has no `Setflg`.
+`IC29to41_atLeastOneMemberAlreadDead` (23) neither, yet it is the one `InitialChecks`
+tests after its loop over the dead members (`:2835`), which set
+`IC29to41_atLeastOneMemberAlreadyDead` (21, `:2812`): so `IC29to41_damageMonsterFailed`
+(24, `:2836`) is never set either. Several names say the opposite of their branch:
+`TT29to41_fear5or6` is set when the fear is *not* 5 or 6 (`:3417-3419`), and the
+`...moveSucceeded` / `...moveFailed` pairs (`:1715-1718`, `:2444-2447`, `:2918-2929`)
+follow `MoveObject`'s answer, so "failed" is an answer of 0, the group on its new square,
+and "succeeded" any other, the group gone, teleported or off the level.
+`tools/dump-monster-move-filter.ts`.
+
 ## The `QueueSound` calls, and the level each is on
 
 | Sound | CSBWin's call | Ordinal → SND item | Level |

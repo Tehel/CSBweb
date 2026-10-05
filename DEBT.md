@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | Three DSA filters, and the viewing filter's third site | L | ⏳ step 9c of 12 next |
+| G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10 of 12 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -317,10 +317,10 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G2 ⏳ Three DSA filters, and the viewing filter's third site
+### G2 ⏳ The cursor filter, the portrait's DSA switch action, and the viewing filter's third site
 
 The port runs fifteen filters: the viewing filter (two of its three sites), the monster
-move filter (without the turn's flags), the monster attack filter, the delete monster
+move filter, the monster attack filter, the delete monster
 filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
 sound filter, the action name filter, the feeding filter, the character death filter, the
 damage filter, the equip filter, the party move filter, and the spell filter at
@@ -337,24 +337,11 @@ filter's.
 A filter that loops runs each of those DSAs in turn, a filter call apiece; one that
 `break`s runs the first. Each step reads which from its CSBWin site and checks it in a
 `tools/` check through `tools/lib/dsa.ts`: `TestFilter` for one DSA, `withFilterDsas` for
-two on the square where the site loops. Steps 1 to 8, the sound filter, the action name
+two on the square where the site loops. Steps 1 to 9, the sound filter, the action name
 filter, the feeding filter, the character death and damage filters, the equip filter, the
-party move filter, the monster attack filter, and the delete monster filter, are paid, and
-so are steps 9a and 9b, the monster move filter's location, its run before a turn, and its
-run after it on `finalLocr`. The steps left, one commit each:
+party move filter, the monster attack filter, the delete monster filter, and the monster
+move filter, are paid. The steps left, one commit each:
 
-9. **`ESL_MONSTERMOVEFILTER`** (L), three commits, the first two paid. The filter runs
-   one DSA, the first type-47 actuator at its location, before a group's turn
-   (`DsaSystem.monsterMoveFilter`, `Monster.cpp:3311-3357`) and after it
-   (`DsaSystem.postMonsterMoveFilter`, `:3169-3233`), on the turn's `MmRecord`
-   (`MMRECORD`, `CSB.h:2884-2897`), which `MonsterAI.processTimers29to41` makes and hands
-   down as CSBWin's `pmmr`. The post-move filter's last two parameters are the record's
-   flags, of which the port sets two: `MoveObject_NotAllowedOnLevel`
-   (`MonsterSystem.moveMonster`) and `MonMove_differentCell`.
-   - **9c. The turn's flags** (M): the 53 `Setflg`s of `MONSTEREVENTS`
-     (`CSB.h:2815-2868`) that `ProcessTimers29to41` and its helpers make, from
-     `MDF6TI_turnMonsterTowardParty` (`Monster.cpp:1499`) on. The port's helpers take
-     the `AiFrame` or the `AiConst`, whose `mmr` is the record.
 10. **`ESL_CURSORFILTER`** (L, split when taken). `CursorFilter` (`MoveObject.cpp:797`,
     the DSA at `:846`), which may cancel what is about to happen to the object on the
     cursor. CSBWin sends it a packet from 21 places. The port sends six of the packet

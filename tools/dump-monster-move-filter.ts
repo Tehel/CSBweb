@@ -30,6 +30,11 @@
  *    `InitialChecks` kills (`Monster.cpp:2795-2835`) is nowhere, level -1
  *    (`RemoveObjectFromRoom`, `CSBCode.cpp:5185-5188`); a step onto a level that refuses
  *    the group also sets `MoveObject_NotAllowedOnLevel` (`Code11f52.cpp:3152-3156`).
+ * 9. **The turn's flags**, the 53 `Setflg`s of `ProcessTimers29to41` and its helpers
+ *    (`MONSTEREVENTS`, `CSB.h:2815-2868`), as the post-move filter sees them: the exact
+ *    set of a turn whose path is staged, and what any of the group's ordinary turns
+ *    implies of its flags. `IC29to41_damageMonsterFailed` is never set: CSBWin tests a
+ *    flag nothing sets (`Monster.cpp:2835-2836`).
  *
  * Run: `npx tsx tools/dump-monster-move-filter.ts`
  */
@@ -42,6 +47,8 @@ import { StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
 import { MonsterEvents } from '../src/engine/MmRecord';
 import { TimerFunction } from '../src/engine/TimerQueue';
+import { StateOfFear } from '../src/engine/monsterTypes';
+import { SMS_ATTACKING } from '../src/data/dungeonTypes';
 import { UNSET, globalStore, int, op, varFetch, varStore, withFilterDsas, type FilterDsa } from './lib/dsa';
 import { check, finish } from './lib/check';
 
@@ -339,6 +346,129 @@ function turnsUntil(game: Game, rn: ObjectID, stop: (p: Post, from: Position) =>
     'a step the level refuses deletes the group: finalLocr is nowhere');
   check(refused !== null && flagged(refused.p, MonsterEvents.MoveObject_NotAllowedOnLevel)
     && flagged(refused.p, MonsterEvents.MonMove_differentCell), 'MoveObject_NotAllowedOnLevel and MonMove_differentCell');
+}
+
+/* ------------------------------- 9. the turn's flags --------------------------- */
+/** The names of the flags the post-move filter saw, sorted. */
+const flagNames = (p: Post): string[] =>
+  Object.values(MonsterEvents).filter((v): v is MonsterEvents => typeof v === 'number' && flagged(p, v))
+    .map((v) => MonsterEvents[v]).sort();
+const names = (...fs: MonsterEvents[]): string[] => fs.map((f) => MonsterEvents[f]).sort();
+const E = MonsterEvents;
+
+/** A turn of the party level's group as `timerFunction`, after `stage`; the flags it set. */
+function stagedTurn(timerFunction: number, stage: (game: Game, rn: ObjectID, at: Position) => void): string[] {
+  const game = postGame();
+  const { rn, at } = group(game);
+  stage(game, rn, at);
+  const p = post(turn(game, timerFunction, at));
+  return p.count === 9 ? flagNames(p) : ['(no post-move filter)'];
+}
+const record16 = (game: Game, rn: ObjectID) => {
+  const monster = game.ctx.dungeon.getCreatureRecord(rn)!;
+  return { monster, slot: game.ctx.dungeon.getAttachedItem16(monster)! };
+};
+/** The party three squares south of the group, every member facing north. */
+const southOfFacingNorth = (game: Game, rn: ObjectID, at: Position): void => {
+  const p = game.ctx.party.state.position;
+  p.x = at.x;
+  p.y = at.y + 3;
+  record16(game, rn).slot.facings = 0;
+};
+const withFear = (fear: StateOfFear) => (game: Game, rn: ObjectID): void => {
+  record16(game, rn).monster.fear = fear;
+};
+
+const exact: Array<[string, string[], string[]]> = [
+  ['TT_31, fear 0, member 0 facing away from the party', stagedTurn(TimerFunction.TT_31, southOfFacingNorth),
+    names(E.IC29to41_exitFalse, E.TT29to41_TT31, E.TT29to41_fear5or6, E.MDF6TI_turnMonsterTowardParty)],
+  ['TT_30, fear 5', stagedTurn(TimerFunction.TT_30, withFear(StateOfFear.StateOfFear5)),
+    names(E.IC29to41_exitFalse, E.TT29to41_TT30, E.TT29to41_fear5or6doNothing)],
+  ['TT_MONSTER_B0, fear 0, member 0 attacking', stagedTurn(TimerFunction.TT_MONSTER_B0, (game, rn) => {
+    record16(game, rn).slot.singleMonsterStatus[0] |= SMS_ATTACKING;
+  }), names(E.IC29to41_exitFalse, E.TT29to41_TTnot37, E.TT29to41_attacking)],
+  ['TT_MONSTER_B1 of a one-member group, fear 0', stagedTurn(TimerFunction.TT_MONSTER_B1, () => {}),
+    names(E.IC29to41_exitFalse, E.TT29to41_TTnot37, E.TT29to41_notAttacking)],
+  ['TT_MONSTER_B1 off the party\'s level', stagedTurn(TimerFunction.TT_MONSTER_B1, (game) => {
+    game.ctx.party.state.position.z += 1;
+  }), names(E.IC29to41_Not32_33_37_38)],
+  ['FREEZE LIFE', stagedTurn(TimerFunction.TT_MONSTER_BGROUP, (game) => {
+    game.ctx.party.state.freezeLifeTimer = 10;
+  }), names(E.IC29to41_doNothing)],
+  ['a one-member group at 0 HP', stagedTurn(TimerFunction.TT_MONSTER_BGROUP, (game, rn) => {
+    record16(game, rn).monster.hp[0] = 0;
+  }), names(E.IC29to41_atLeastOneMemberAlreadyDead, E.IC29to41_damageMonsterSucceeded, E.MonMove_differentCell)],
+];
+for (const [what, got, want] of exact) {
+  console.log(`9. ${what}: ${got.join(' ')}`);
+  check(got.join() === want.join(), `${what}: ${want.join(' ')}`);
+}
+
+{
+  // An A timer, fear 2, the party out of reach: whether the group sees it is the board's.
+  const got = stagedTurn(TimerFunction.TT_MONSTER_A0, (game, rn, at) => {
+    withFear(StateOfFear.StateOfFear2)(game, rn);
+    const p = game.ctx.party.state.position;
+    p.x = at.x + 3;
+    p.y = at.y + 4;
+  });
+  const seen = got.includes('TT29to41_blocked');
+  const want = names(E.IC29to41_exitFalse, E.TT29to41_TTmonsterA3, E.TT29to41_w30w32GretaterThan3,
+    ...(seen ? [E.TT29to41_blocked, E.TT29to41_fearNot5or6] : []));
+  console.log(`9. TT_MONSTER_A0, fear 2, the party 3 east and 4 south: ${got.join(' ')}`);
+  check(got.join() === want.join(), `an A timer out of reach: ${want.join(' ')}`);
+}
+{
+  // Off the party's level, the leader's turn is a random step, or none. CSBWin's "failed"
+  // is `MoveObject` answering 0, the group on its new square; "succeeded" is any other
+  // answer, the group gone, teleported or off the level (`Monster.cpp:2908-2929`).
+  const got = stagedTurn(TimerFunction.TT_MONSTER_BGROUP, (game) => {
+    game.ctx.party.state.position.z += 1;
+  });
+  const ways = [
+    names(E.IC29to41_randomMoveSucceeded),
+    names(E.IC29to41_randomMoveSucceeded, E.MonMove_differentCell),
+    names(E.IC29to41_randomMoveFailed, E.IC29to41_doNothing, E.MonMove_differentCell),
+    names(E.IC29to41_doNothing),
+  ].map((w) => w.join());
+  console.log(`9. TT_MONSTER_Bgroup off the party's level: ${got.join(' ')}`);
+  check(ways.includes(got.join()), 'off the party\'s level: a step MoveObject answers with 1, an ordinary step, or none');
+}
+{
+  // TT_29 tries the four directions, and TT_30's flag for that path is not set.
+  const got = stagedTurn(TimerFunction.TT_29, () => {});
+  console.log(`9. TT_29: ${got.join(' ')}`);
+  check(got.includes('TT29to41_TT29') && got.includes('IC29to41_exitFalse') && !got.includes('TT29to41_TT30TryDirectionsD5toD4')
+    && got.some((n) => n.startsWith('T524_')), 'TT_29: Try_Directions_D5_To_D4, without TT_30\'s flag');
+}
+{
+  // The group's ordinary turns: what each flag implies of the others.
+  const game = postGame();
+  const { rn } = group(game);
+  const seen = new Set<string>();
+  const broken = new Set<string>();
+  const implies = (got: string[], a: MonsterEvents, b: MonsterEvents): void => {
+    if (got.includes(MonsterEvents[a]) && !got.includes(MonsterEvents[b])) broken.add(`${MonsterEvents[a]} without ${MonsterEvents[b]}`);
+  };
+  turnsUntil(game, rn, (p) => {
+    const got = flagNames(p);
+    got.forEach((n) => seen.add(n));
+    if (!got.includes('IC29to41_exitFalse')) broken.add('a turn without IC29to41_exitFalse');
+    for (const sf of [E.SF_greaterThanSmellingDistance, E.SF_timeFuncMinusThree, E.SF_TurnMonstersAsGroup]) {
+      implies(got, sf, E.PIAF_standardFinish);
+    }
+    implies(got, E.SF_return, E.SF_greaterThanSmellingDistance);
+    implies(got, E.SF_IncrementTime, E.SF_TurnMonstersAsGroup);
+    implies(got, E.SF_TurnMonstersAsGroup, E.TMAG_turnMonsterGroup);
+    implies(got, E.T524_moveFailed, E.MonMove_differentCell);
+    implies(got, E.T524_moveSucceeded, E.T524_possibleMove);
+    implies(got, E.T524_moveFailed, E.T524_possibleMove);
+    return false;
+  });
+  console.log(`9. forty turns of the group: flags seen ${[...seen].sort().join(' ')}`);
+  check(broken.size === 0, `each turn's flags hold together${broken.size ? `: ${[...broken].join('; ')}` : ''}`);
+  check(!seen.has('TMAG_tunrMonsterGroup') && !seen.has('IC29to41_atLeastOneMemberAlreadDead') && !seen.has('IC29to41_damageMonsterFailed'),
+    'the three flags nothing sets are never set');
 }
 
 finish();
