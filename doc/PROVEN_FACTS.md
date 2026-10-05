@@ -4235,8 +4235,11 @@ fails before the eye gate),
   `TouchWall` returns 1 when a switch fired, `result = 1` under `if (!switchOpen)`
   (`:537-539`), and 0 otherwise (`:315`). So a switch makes a tick due at once, and a
   touch that fired nothing puts off a tick that was due by one VBL, as a refused move does.
+- While nobody owns the cursor (`d.HandChar == -1`), `TouchWall` skips every actuator but
+  a portrait, type 127 (`Mouse.cpp:357-360`), so a party with no champion yet works no
+  switch, lock or gift. The test reads `d.HandChar` at each actuator.
 
-Evidence: `tools/dump-mouse-queue.ts`, case 9.
+Evidence: `tools/dump-mouse-queue.ts`, case 9; `tools/dump-cursor-filter.ts`, case 8.
 
 ## The other handlers that write `d.clockTick`
 

@@ -408,7 +408,12 @@ async function main(): Promise<void> {
   check(firstTickFrame === 1, 'the door button brings the tick on in the frame of the click (d.clockTick = 1)');
   check(doorFrames > 1 && ticksUntilDone === 2, "its TT_DOOR fires in the tick after that one, not in the click's");
 
+  // A switch answers only a cursor someone owns (`Mouse.cpp:357-360`): a champion's.
+  party.champions = [champion()];
+  party.cursorOwner = 0;
   const switchFrames = framesUntil(switchScene, 'wall');
+  party.champions = [];
+  party.cursorOwner = -1;
   console.log(`wall switch touched from (${switchScene.x},${switchScene.y}) facing ${switchScene.dir}: ` +
     `the next tick ran ${switchFrames} frame(s) from the click`);
   check(switchFrames === 1, 'a wall switch that fired brings the tick on in the frame of the click');

@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C133 | `TouchWall` acts on a cursor nobody owns | S | ⏳ |
 | C134 | `TouchWall`'s hand after a swap is the swapped-in object | S | ⏳ |
 | G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10b next |
 | G3 | The wings | M | ⏳ |
@@ -172,15 +171,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C133 ⏳ `TouchWall` acts on a cursor nobody owns
-
-`TouchWall` skips every actuator but a portrait (127) while `d.HandChar` is -1, nobody
-owning the cursor (`doc/CSBwin-src/Mouse.cpp:357-360`). The port's `touchWall`
-(`src/engine/ActuatorSystem.ts:142`) has no such test, and neither has its caller,
-`MouseSystem.handleWallClick`, so a party with no champion yet works a wall's switches
-and locks. The fix is the test, at the same place in the loop, and a check that a
-pushbutton does nothing before the first champion is recruited.
 
 ### C134 ⏳ `TouchWall`'s hand after a swap is the swapped-in object
 

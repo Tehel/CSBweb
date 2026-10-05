@@ -132,6 +132,8 @@ function scene(): Scene {
   });
   game.setRandomSeed(0x12345678);
   game.ctx.party.state.champions = [champion(0)];
+  // CSBWin's party with a champion has a cursor owner, whom `TouchWall` asks for (`Mouse.cpp:357-360`).
+  game.ctx.party.state.cursorOwner = 0;
   const queued: number[][] = [];
   const queueSound = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
   game.ctx.sounds.queueSound = (ordinal, mapX, mapY, deltaTime, level) => {

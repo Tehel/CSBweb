@@ -163,13 +163,17 @@ export class ActuatorSystem {
       if (decoded.category === DBType.ACTUATOR) {
         const actuatorPos = decoded.position & 0x3;
         remainingActuators[actuatorPos] = Math.max(0, remainingActuators[actuatorPos] - 1);
-        if (actuatorPos !== (touchedPosition & 0x3)) {
-          continue;
-        }
-
         const rec = this.dungeon.getActuatorRecord(rn);
         const actuatorType = rec ? getActuatorType(rec) : 0;
         if (!rec || actuatorType === 0) {
+          continue;
+        }
+        // With nobody owning the cursor, `d.HandChar == -1`, only a portrait answers
+        // (`Mouse.cpp:357-360`). Read at each actuator, as a recruit gives it an owner.
+        if ((party.cursorOwner ?? -1) === -1 && actuatorType !== 127) {
+          continue;
+        }
+        if (actuatorPos !== (touchedPosition & 0x3)) {
           continue;
         }
 

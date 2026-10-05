@@ -20,15 +20,21 @@
  * 7. **The gift's**: `GiftFromGod` (16) on an empty hand, `RNnul` (0xFFFF), cancelled to
  *    no gift (`:575-589`); and after a key taken by the same touch, `RNempty` (0), the
  *    local `objectInHand` the key leaves (`:567`).
+ * 8. **Nobody owns the cursor**, a party with no champion yet on the shipped dungeon: a
+ *    pushbutton and a gift answer nothing, only a portrait would (`:357-360`).
  *
  * Run: `npx tsx tools/dump-cursor-filter.ts`
  */
+import { readFileSync } from 'node:fs';
+
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import type { DungeonData } from '../src/data/dungeonTypes';
+import { DungeonLoader } from '../src/data/DungeonLoader';
 import { CursorFilterType, StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import { freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
+import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 
 /** `ESL_CURSORFILTER` (`doc/CSBwin-src/CSB.h:1544`). */
@@ -190,6 +196,19 @@ for (const cancelled of [false, true]) {
   const g = s.touch();
   check(packet(g) === s.expect(CursorFilterType.GiftFromGod, 0), '7. after a key taken, the gift\'s packet carries RNempty');
   check(s.party.objectInHand !== OBJECT_ID_NULL, '7. and the gift is given');
+}
+
+{
+  const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'))), stockGraphics());
+  const at = wallSquare(game);
+  actuator(game, at, 1, 0);
+  actuator(game, at, 12, ROCK);
+  const party = game.ctx.party.state;
+  const fired = game.systems.actuators.touchWall(at, 0);
+  console.log(`no champion: cursorOwner ${party.cursorOwner ?? -1}, fired ${fired}, hand ${party.objectInHand}`);
+  check(party.champions.length === 0 && (party.cursorOwner ?? -1) === -1, '8. the new game has no champion, so nobody owns the cursor');
+  check(!fired, '8. the pushbutton does not fire');
+  check(party.objectInHand === OBJECT_ID_NULL, '8. and the gift is not given');
 }
 
 finish();
