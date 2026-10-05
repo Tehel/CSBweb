@@ -10,6 +10,8 @@ import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
 import { readExpectedSignatures, readRulesOptions } from '../data/CsbwinExtendedFeatures';
 import { readDisableSaves } from '../data/CsbwinExpool';
+import { die } from './Die';
+import { readFileSignatures } from './FileSignatures';
 import type { PartyState, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
 import { ensureHandOwner } from './Party';
@@ -259,6 +261,9 @@ export class Game implements MainLoop {
      * DSA"). So the port sends neither.
      */
     readNewGame(data: DungeonData): void {
+        // `LoadGame`'s end (doc/CSBwin-src/SaveGame.cpp:1795-1822): the world must name no
+        // other graphics.dat than this one, which is checked before anything is installed.
+        readFileSignatures(this.ctx, data);
         const fresh = new Game(data, this.ctx.tables);
         // `totalMoveCount` is a global, not `d.`'s (`doc/CSBwin-src/data.cpp:253`), so
         // `d.Initialize()` leaves it and the new game counts on from the last one.
@@ -276,21 +281,21 @@ export class Game implements MainLoop {
     }
 
     /**
-     * `_ReadEntireGame` for a new game from the bytes of `dungeon.dat`: false when
-     * `ReadDatabases` fails (doc/CSBwin-src/SaveGame.cpp:1740-1742), and the read then ends
-     * at `tag01efee`, the boot's (`src/renderer/intro/BootSequence.ts`). The parse fails
-     * before anything is installed, so the running game is left as it was.
+     * `_ReadEntireGame` for a new game from the bytes of `dungeon.dat`. Where
+     * `ReadDatabases` fails (doc/CSBwin-src/SaveGame.cpp:1740-1742) CSBWin's read ends at
+     * `tag01efee`, and at the boot in `die(0xbad)`. The author's decision is that a game
+     * file that does not read ends the game wherever it is read (`DEBT.md` H): `die(0xbad)`,
+     * whose message says why. The parse fails before anything is installed, so the
+     * running game is left as it was.
      */
-    readDungeonDat(bytes: Uint8Array): boolean {
+    readDungeonDat(bytes: Uint8Array): void {
         let data: DungeonData;
         try {
             data = new DungeonLoader().loadDungeonDat(bytes);
         } catch (error) {
-            this.ctx.host.trace(`dungeon.dat failed its read: ${error}`);
-            return false;
+            die(this.ctx.host, 0xbad, `SAVED GAME DAMAGED!\ndungeon.dat: ${error instanceof Error ? error.message : error}`);
         }
         this.readNewGame(data);
-        return true;
     }
 
     /**

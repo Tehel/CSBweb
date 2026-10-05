@@ -237,6 +237,9 @@ const CHECKS = [
   // buffer: CHARDESC carries the picture rather than a graphic-26 index, so the frames
   // (which only ever see an injected party) cover the other path entirely.
   { tool: 'dump-portraits.ts' },
+  // The graphics files' signatures, and CSBWin's checks of them at a read and at
+  // CSBgraphics.dat's first section read: a file the game does not name ends the game.
+  { tool: 'dump-file-signatures.ts' },
   { tool: 'dump-csbwin-timers.ts' },
   // Our *own* save, the CSBWin file F5, F9 and the disk menu write and read: saved and
   // loaded over genuine saves and over played games, with the whole of what a load

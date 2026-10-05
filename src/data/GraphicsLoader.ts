@@ -9,6 +9,7 @@ import { BinaryFile, Endianness } from '../core/BinaryFile';
 import { decompressGraphics } from '../core/compression';
 import { decodeIMG, ImageFormat, type DecodedImage } from '../core/imageDecoder';
 import type { ui16 } from '../core/types';
+import { Signature, type FileSignature } from './FileSignature';
 
 /**
  * Cached graphic entry
@@ -39,6 +40,11 @@ export class GraphicsLoader {
     private file: BinaryFile;
     private data: GraphicsData | null = null;
     private imageCache: Map<ui16, DecodedImage>;
+    /**
+     * `graphicSignature1/2`, the file's `Signature`, which CSBWin takes at its first
+     * `openGraphicsFile`, before the title (`src/engine/FileSignatures.ts`).
+     */
+    private fileSignature: FileSignature | null = null;
 
     constructor() {
         this.file = new BinaryFile(Endianness.BIG_ENDIAN); // Atari ST format
@@ -72,6 +78,7 @@ export class GraphicsLoader {
         if (itemCount === 0 || itemCount > 1000) {
             throw new Error(`Invalid graphics file: item count = ${itemCount}`);
         }
+        this.fileSignature = Signature(this.file.read(0, this.file.length()));
 
         // Read compressed sizes (itemCount words)
         const compressedSizes: ui16[] = [];
@@ -152,6 +159,12 @@ export class GraphicsLoader {
      */
     getItemCount(): ui16 {
         return this.data?.itemCount || 0;
+    }
+
+    /** The file's signature (`fileSignature`). */
+    getSignature(): FileSignature {
+        if (!this.fileSignature) throw new Error('Graphics not loaded');
+        return this.fileSignature;
     }
 
     /**

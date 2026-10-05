@@ -11,6 +11,7 @@
  */
 import { readOverlayPalette } from '../data/CsbwinExpool';
 import { noExpectedSignatures, type ExpectedSignatures } from '../data/CsbwinExtendedFeatures';
+import { noRuntimeFileSignatures, type RuntimeFileSignatures } from '../data/FileSignature';
 import type { DungeonData } from '../data/dungeonTypes';
 import { DBType, type ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
@@ -116,6 +117,11 @@ export interface GameContext {
    * game as `rules` do (`ExpectedSignatures`).
    */
   readonly signatures: ExpectedSignatures;
+  /**
+   * What the last world read named of the graphics files in its `EXPOOL`
+   * (`RuntimeFileSignatures`, `src/engine/FileSignatures.ts`), which outlives a game too.
+   */
+  readonly runtimeFileSignatures: RuntimeFileSignatures;
   /**
    * The overlay palette (`src/engine/OverlayPalette.ts`), red, green and blue, as its
    * world's `EXPOOL` gives it at a read. A read restores it in place.
@@ -253,6 +259,7 @@ export function createGameContext(
       invisibleMonsters: false, drawAsSize4Monsters: false, simpleEncipher: false,
     },
     signatures: noExpectedSignatures(),
+    runtimeFileSignatures: noRuntimeFileSignatures(),
     overlayPalette: readOverlayPalette(dungeonData) ?? identityOverlayPalette(),
     tables,
     host,

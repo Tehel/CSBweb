@@ -1,0 +1,50 @@
+/**
+ * A game file's signature, CSBWin's check that `graphics.dat` and `CSBgraphics.dat` are
+ * the files a game was made with (`openGraphicsFile`, `OpenCSBgraphicsFile`,
+ * `doc/CSBwin-src/Graphics.cpp:1764-1819`, `:1840-1896`; `src/engine/FileSignatures.ts`).
+ */
+import { md5 } from '../core/md5';
+
+/** `graphicSignature1/2` or `CSBgraphicSignature1/2` (`doc/CSBwin-src/data.cpp:46-48`). */
+export interface FileSignature {
+    signature1: number;
+    signature2: number;
+}
+
+/**
+ * `Signature(fileHandle, …)` (`doc/CSBwin-src/data.cpp:1953-1975`): the file's MD5, its
+ * first eight bytes as two longwords, little-endian. A first longword of 0 is 1.
+ */
+export function Signature(bytes: Uint8Array): FileSignature {
+    const result = md5(bytes);
+    const word = (at: number): number =>
+        (result[at] | (result[at + 1] << 8) | (result[at + 2] << 16) | (result[at + 3] << 24)) >>> 0;
+    const signature1 = word(0);
+    return { signature1: signature1 === 0 ? 1 : signature1, signature2: word(4) };
+}
+
+/**
+ * `o = (n | (n>>16)) & 0xffff` over `n = signature1 | signature2`
+ * (`doc/CSBwin-src/Graphics.cpp:1784-1785`, `:1849-1851`): the sixteen bits a dungeon's
+ * `EDBT_RuntimeFileSignatures` record names a file by.
+ */
+export function foldedSignature(signature: FileSignature): number {
+    const n = (signature.signature1 | signature.signature2) >>> 0;
+    return ((n | (n >>> 16)) & 0xffff) >>> 0;
+}
+
+/**
+ * `EDBT_Debuging_data`, `EDBT_CSBGraphicsSignature_data` and `EDBT_GraphicsSignature_data`
+ * (`doc/CSBwin-src/data.cpp:50-53`): what the last world read named of the two graphics
+ * files, in its `EXPOOL` (`readRuntimeFileSignatures`, `src/data/CsbwinExpool.ts`).
+ */
+export interface RuntimeFileSignatures {
+    debuging: number;
+    csbGraphicsSignature: number;
+    graphicsSignature: number;
+}
+
+/** The three as they are before any world is read: `0xffffffff` (`doc/CSBwin-src/data.cpp:50-53`). */
+export function noRuntimeFileSignatures(): RuntimeFileSignatures {
+    return { debuging: 0xffffffff, csbGraphicsSignature: 0xffffffff, graphicsSignature: 0xffffffff };
+}

@@ -15,13 +15,13 @@
  * 3. **At the boot** (0): CSBWin's `die(0xbad)`. The author's divergence (`DEBT.md` H): the
  *    same menu with the one line and OK, and the click throws `BadSavedGame`, which
  *    `runBootSequence` catches to start again from the title.
- * 4. **A new game's read** ends there too (`SaveGame.cpp:1740-1742`). The page builds its
- *    `Game` over an empty world and reads `dungeon.dat` once the entrance's doors have
- *    opened (`Game.readDungeonDat`, `readNewGame` in `BootSequence.ts`). CSB's prison with a
- *    byte of its compressed image flipped fails the checksum, and a file cut short of its
- *    first eight bytes fails `ReadDatabases`' first `READ`; either leaves the empty world as
- *    it was. The failure reaches `tag01efee`, whose menu or `BadSavedGame` follows as for a
- *    save, and a read that succeeds puts up no menu.
+ * 4. **A new game's read** ends there too in CSBWin (`SaveGame.cpp:1740-1742`); in the
+ *    port it ends the game, the author's decision for a game file (`DEBT.md` H). The page
+ *    builds its `Game` over an empty world and reads `dungeon.dat` once the entrance's doors
+ *    have opened (`Game.readDungeonDat`). CSB's prison with a byte of its compressed image
+ *    flipped fails the checksum, and a file cut short of its first eight bytes fails
+ *    `ReadDatabases`' first `READ`; either is `die(0xbad)` with the reason, and leaves the
+ *    empty world as it was.
  * 5. **A save that read** goes on to `_TAG021028`'s hand-off
  *    (`doc/CSBwin-src/CSBCode.cpp:10493-10537`), where CSBWin puts up "GAME LOADED, READY
  *    TO PLAY." and the port, deliberately, nothing: the chooser's picture fades to black,
@@ -34,6 +34,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
+import { Die } from '../src/engine/Die';
 import type { Game } from '../src/engine/Game';
 import { applySaveBytes } from '../src/engine/SaveGameFile';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
@@ -259,36 +260,26 @@ async function checkNewGameRead(): Promise<void> {
 
   const game = newGame(emptyDungeonData(), graphics);
   const levels = () => game.ctx.dungeon.getData().maps.length;
-  const readDamaged = game.readDungeonDat(damaged);
-  const readShort = game.readDungeonDat(short);
-  console.log(`  damaged prison: ${readDamaged}, 4-byte file: ${readShort}, levels after both: ${levels()}`);
-  check(!readDamaged && !readShort, 'a checksum mismatch and a short file both fail the read');
-  check(levels() === 0, 'and the empty world the page boots over is left as it was');
-  const readIntact = game.readDungeonDat(prison);
-  console.log(`  intact prison: ${readIntact}, levels ${levels()}, start ${JSON.stringify(game.ctx.party.state.position)}`);
-  check(readIntact && levels() === 2, 'the intact prison reads, its two levels installed');
-
-  const run = async (read: boolean, partyHasDied: boolean) => {
-    const s = scriptedHost(read ? [] : [{ kind: 'click', ...okCentre(), buttons: 2 }]);
-    const menus: string[] = [];
-    let result: unknown;
+  const read = (bytes: Uint8Array): unknown => {
     try {
-      result = await Boot.readNewGame(s.host, { gameScreen: menuScreen(s.host, menus), readNewGame: () => Promise.resolve(read) }, partyHasDied);
+      game.readDungeonDat(bytes);
+      return 'read';
     } catch (error) {
-      result = error;
+      return error;
     }
-    return { result, menus, log: s.log };
   };
-  const good = await run(true, false);
-  console.log(`  read: ${good.result}, menus ${good.menus.length}, host calls ${good.log.length}`);
-  check(good.result === true && good.menus.length === 0 && good.log.length === 0, 'a read that succeeds goes straight on');
-  const lost = await run(false, true);
-  console.log(`  failed after a lost game: ${lost.result}; ${lost.menus.join(' | ')}`);
-  check(lost.result === false && lost.menus.length === 1 && lost.menus[0]!.startsWith('"SAVED GAME DAMAGED!" / "PUT THE'),
-    'a failed read after a lost game is tag01efee\'s menu, then false: the entrance again');
-  const boot = await run(false, false);
-  console.log(`  failed at the boot: ${boot.result instanceof Error ? boot.result.constructor.name : boot.result}`);
-  check(boot.result instanceof Boot.BadSavedGame, 'and at the boot BadSavedGame, back to the title');
+  const readDamaged = read(damaged);
+  const readShort = read(short);
+  const describe = (result: unknown) => (result instanceof Die ? `Die 0x${result.errorNum.toString(16)}: ${result.message.split('\n').slice(1).join(' / ')}` : String(result));
+  console.log(`  damaged prison: ${describe(readDamaged)}`);
+  console.log(`  4-byte file: ${describe(readShort)}`);
+  console.log(`  levels after both: ${levels()}`);
+  check([readDamaged, readShort].every((r) => r instanceof Die && r.errorNum === 0xbad && r.message.includes('SAVED GAME DAMAGED!\ndungeon.dat: ')),
+    'a checksum mismatch and a short file both end the game, die(0xbad), with the reason');
+  check(levels() === 0, 'and the empty world the page boots over is left as it was');
+  const readIntact = read(prison);
+  console.log(`  intact prison: ${describe(readIntact)}, levels ${levels()}, start ${JSON.stringify(game.ctx.party.state.position)}`);
+  check(readIntact === 'read' && levels() === 2, 'the intact prison reads, its two levels installed');
 }
 
 /* ------------------------------------------- 5. the hand-off after a load ---- */
@@ -311,12 +302,6 @@ async function checkHandOff(): Promise<void> {
   console.log(`  enter: ${entered.log.length} host calls, the screen ${entered.host.screen.pixels.every((p) => p === 3) ? 'as it was' : 'CHANGED'}`);
   check(entered.log.length === 0 && entered.host.screen.pixels.every((p) => p === 3),
     'a new game\'s hand-off leaves the opened doors\' picture to the page');
-}
-
-/** The centre of the centred one-button set's OK. */
-function okCentre(): { x: number; y: number } {
-  const ok = menuButtonList({ uiTables: graphicsTablesOf(graphics).ui } as unknown as UIState, 1, true)[0]!;
-  return { x: (ok.x1 + ok.x2) >> 1, y: (ok.y1 + ok.y2) >> 1 };
 }
 
 async function main(): Promise<void> {

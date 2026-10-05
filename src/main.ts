@@ -20,10 +20,12 @@ import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import { loadGlfx } from './lib/glfx-loader';
 import { GameScreen } from './renderer/GameScreen';
-import { bindDataSetChooser, bindExtrasToggle, bindSaveDrop, bindUIContext, drawMapPreview } from './ui';
+import { bindDataSetChooser, bindExtrasToggle, bindSaveDrop, bindUIContext, drawMapPreview, showFatalMessage } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
-import { Die, runBootSequence, runHintOracle, runShowCredits } from './renderer/intro/BootSequence';
+import { runBootSequence, runHintOracle, runShowCredits } from './renderer/intro/BootSequence';
+import { Die } from './engine/Die';
+import { csbGraphicsOpener } from './engine/FileSignatures';
 import type { HintOracleFiles } from './renderer/ui/HintOracleButton';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
@@ -184,8 +186,8 @@ function refreshScreen() {
  */
 interface GameFiles {
     graphicsLoader: GraphicsLoader;
-    /** The optional CSBgraphics.dat overlay (extended decorations, portraits, etc.). */
-    csbGraphicsLoader: CSBGraphicsLoader | null;
+    /** `CSBgraphics.dat`, CSBWin's extensions' overlay, or its absence (`CSBGraphicsLoader`). */
+    csbGraphicsLoader: CSBGraphicsLoader;
     /** The Hint Oracle's `hcsb.hct` and `hcsb.dat`, where the data set has them. */
     hintOracle: HintOracleFiles | null;
 }
@@ -196,12 +198,12 @@ async function loadGameFiles(): Promise<GameFiles> {
     await graphicsLoader.load(`${dataSet.dir}/graphics.dat`);
     console.log(`✓ Loaded graphics: ${graphicsLoader.getItemCount()} items`);
 
-    let csbGraphicsLoader: CSBGraphicsLoader | null = new CSBGraphicsLoader();
-    if (dataSet.csbGraphics && await csbGraphicsLoader.tryLoad(`${dataSet.dir}/CSBgraphics.dat`)) {
+    // A data set's file that does not load or parse throws, and the page refuses it
+    // (`reportError`).
+    const csbGraphicsLoader = new CSBGraphicsLoader();
+    if (dataSet.csbGraphics) {
+        await csbGraphicsLoader.load(`${dataSet.dir}/CSBgraphics.dat`);
         console.log('✓ Loaded CSBgraphics.dat overlay');
-    } else {
-        console.log('CSBgraphics.dat not found; extended decorations disabled');
-        csbGraphicsLoader = null;
     }
     return { graphicsLoader, csbGraphicsLoader, hintOracle: await loadHintOracle() };
 }
@@ -230,19 +232,16 @@ async function loadHintOracle(): Promise<HintOracleFiles | null> {
 /**
  * `_ReadEntireGame` for a new game (doc/CSBwin-src/SaveGame.cpp:1480-1494): the data set's
  * `dungeon.dat`, read into the running game. A file that will not open is `die(50)`
- * (`:1480-1486`); one that fails its read is `false`, for the boot's `tag01efee`. The
- * game's playthrough is then held against the store's (`GameSaves.newGameRead`).
+ * (`:1480-1486`), and so is one that fails its read `die(0xbad)` (`Game.readDungeonDat`).
+ * The game's playthrough is then held against the store's (`GameSaves.newGameRead`).
  */
-async function readNewGame(game: Game, saves: GameSaves): Promise<boolean> {
+async function readNewGame(game: Game, saves: GameSaves): Promise<void> {
     const name = `${dataSet.dir}/dungeon.dat`;
     const response = await fetch(name).catch(() => null);
     if (!response?.ok) throw new Die(50, `Cannot open dungeon file '${name}'`);
-    const read = game.readDungeonDat(new Uint8Array(await response.arrayBuffer()));
-    if (read) {
-        console.log(`✓ Read ${name}: ${game.ctx.dungeon.getData().maps.length} levels`);
-        await saves.newGameRead();
-    }
-    return read;
+    game.readDungeonDat(new Uint8Array(await response.arrayBuffer()));
+    console.log(`✓ Read ${name}: ${game.ctx.dungeon.getData().maps.length} levels`);
+    await saves.newGameRead();
 }
 
 /**
@@ -362,6 +361,9 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         portraitOf: (champion) => screen?.portraitPixelsFor(champion),
     });
 
+    // `CSBgraphics.dat` opens at its first section read, against what the game read names.
+    files.csbGraphicsLoader.opener = csbGraphicsOpener(game.ctx);
+
     // The game's saves: the disk menu's, the boot's chooser's, and F5 and F9's. The store
     // draws from a stream of its own for a row of an earlier version that names no
     // playthrough, and so does an import for a file that names none: the game's stream
@@ -380,7 +382,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         graphicsLoader: files.graphicsLoader,
         tables: graphicsTables,
         ctx: game.ctx,
-        csbGraphicsLoader: files.csbGraphicsLoader ?? undefined,
+        csbGraphicsLoader: files.csbGraphicsLoader,
         messages,
         hintOracle: files.hintOracle,
     }, {
@@ -629,9 +631,15 @@ function logSave(message: string, error?: unknown): void {
     else console.warn(`${message}:`, error);
 }
 
-/** An error that ends the page's game: `init`'s, or `die`'s (`Die`) wherever it comes from. */
+/**
+ * An error that ends the page's game: `init`'s, or `die`'s (`Die`) wherever it comes from.
+ * The game stops, and the message takes the screen's place (`showFatalMessage`).
+ */
 function reportError(error: unknown): void {
     console.error(error);
+    game?.stop();
+    setCrtEnabled(false);
+    showFatalMessage(gameCanvasEl, error instanceof Error ? error.message : String(error));
 }
 
 

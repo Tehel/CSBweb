@@ -174,10 +174,12 @@ export interface GameHost {
    */
   portraitOf(champion: Champion): number[] | undefined;
   /**
-   * `die(errorNum, msg)` (`doc/CSBwin-src/CSBCode.cpp:86-112`) in play: a frame threw —
-   * the engine throws where CSBWin calls `die` — and the loop has stopped
-   * (`Game.gameLoop`). CSBWin shows the message and quits; the page reports it. Left out,
-   * the error is thrown again, so nothing swallows it.
+   * `die(errorNum, msg)` (`doc/CSBwin-src/CSBCode.cpp:86-112`): a frame threw — the engine
+   * throws where CSBWin calls `die` — and the loop has stopped (`Game.gameLoop`), or a
+   * check of a game file failed (`die`, `src/engine/Die.ts`), which tells the host before
+   * it throws. CSBWin shows the message and quits; the page ends its game and prints the
+   * message, once however often it is told. Left out, the error is thrown again, so
+   * nothing swallows it.
    */
   die(error: unknown): void;
 }

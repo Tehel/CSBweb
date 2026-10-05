@@ -114,7 +114,8 @@ function main(): void {
   const graphics = stockGraphics();
   // The page's boot: a `Game` over the empty world, and `dungeon.dat` read after ENTER.
   const boot = newGame(emptyDungeonData(), graphics);
-  check(boot.readDungeonDat(read('static/gamefiles/dm-windows/dungeon.dat')), 'the boot reads dm-windows');
+  boot.readDungeonDat(read('static/gamefiles/dm-windows/dungeon.dat'));
+  check(boot.ctx.dungeon.getData().maps.length > 0, 'the boot reads dm-windows');
   console.log(`  a new game on dm-windows: dmRulesDesignOption ${boot.ctx.rules.dmRulesDesignOption}, dmRules ${boot.ctx.rules.dmRules}`);
   check(boot.ctx.rules.dmRulesDesignOption && !boot.ctx.rules.dmRules,
     'DMRules sets DMRulesDesignOption, and DM_rules stays off without DMRulesOption');

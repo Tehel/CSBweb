@@ -261,15 +261,16 @@ function checkEnciphering(): void {
   // Both games through `readDungeonDat`, the path a new game takes, which reads the rules.
   const graphics = stockGraphics();
   const game = newGame(plainData, graphics);
-  check(game.readDungeonDat(enciphered), 'a new game reads it');
-  check(game.ctx.rules.simpleEncipher, 'and has simpleEncipher');
+  game.readDungeonDat(enciphered);
+  check(game.ctx.rules.simpleEncipher, 'a new game reads it, and has simpleEncipher');
   const save = buildSaveFile(game);
   const saved = readExtendedFeatures(save);
   console.log(`  its save: ${save.length} bytes, opens ${hex(save.subarray(0, 8))}; simpleEncipher ${saved.simpleEncipher}`);
   check(sentinelOf(save) !== EXTENDED_SENTINEL && saved.simpleEncipher, 'its save is enciphered');
   check(((saved.header?.flags ?? 0) & EF_FLAGS.SimpleEncryption) !== 0, 'and declares SimpleEncryption');
   const plainGame = newGame(new DungeonLoader().loadDungeonDat(plainFile), graphics);
-  check(plainGame.readDungeonDat(plainFile) && !plainGame.ctx.rules.simpleEncipher, 'a new game on the plain file has no simpleEncipher');
+  plainGame.readDungeonDat(plainFile);
+  check(!plainGame.ctx.rules.simpleEncipher, 'a new game on the plain file has no simpleEncipher');
   check(readExtendedFeatures(buildSaveFile(plainGame)).simpleEncipher === false, 'and saves a plain file');
   game.ctx.rules.simpleEncipher = false;
   const plainSave = buildSaveFile(game);

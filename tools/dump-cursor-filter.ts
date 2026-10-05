@@ -523,7 +523,8 @@ const stock = new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat
 {
   const game = freshGame();
   applySaveBytes(game, save);
-  check(game.readDungeonDat(stock), '16. dungeon.dat is read');
+  game.readDungeonDat(stock);
+  check(game.ctx.dungeon.getData().maps.length > 0, '16. dungeon.dat is read');
   placeFilterDsas(game, ESL_CURSORFILTER, [countedFilterDsa]);
   const party = game.ctx.party.state;
   party.objectInHand = misc(game);

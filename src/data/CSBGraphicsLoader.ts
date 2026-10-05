@@ -7,6 +7,7 @@
 
 import type { ui32 } from '../core/types';
 import { readU16LE, readU32LE } from '../core/bytes';
+import { Signature, type FileSignature } from './FileSignature';
 
 export enum CSBGraphicType {
   ViewportOverlay = 0,
@@ -308,13 +309,31 @@ export function getExternalPortraitAddress(csbGraphics: CSBGraphicsLoader | null
   return csbGraphics?.getExternalPortrait(index) ?? ERROR_PORTRAIT;
 }
 
+/**
+ * A data set's `CSBgraphics.dat`, or the file's absence: a loader that loads nothing is a
+ * data set without one, which reads no section and still opens as CSBWin's does
+ * (`opener`).
+ */
 export class CSBGraphicsLoader {
   private data: Uint8Array | null = null;
   private sections: SectionHeader[] = [];
   private wallCache = new Map<number, ExtendedWallDecoration>();
   private floorCache = new Map<number, ExtendedFloorDecoration>();
   private portraitCache = new Map<number, IndexedBitmap>();
+  /** `CSBgraphicSignature1/2`: the file's `Signature`, taken as it loads. */
+  private fileSignature: FileSignature | null = null;
+  /** `CSBgraphicsFile.f >= 0`: the file has opened, and is not checked again. */
+  private opened = false;
+  /**
+   * `OpenCSBgraphicsFile`, which `ReadCSBgraphic` calls first
+   * (`doc/CSBwin-src/Graphics.cpp:3219`): the game's checks (`csbGraphicsOpener`,
+   * `src/engine/FileSignatures.ts`), given the signature, or `null` for a file that is not
+   * there, and true when the file opens. One that dies refuses the file: nothing more is
+   * read from it. Left `null`, as a tool leaves it, the file opens unchecked.
+   */
+  opener: ((signature: FileSignature | null) => boolean) | null = null;
 
+  /** The file at `url`. One that will not load or parse throws: the page refuses it. */
   async load(url: string): Promise<void> {
     const response = await fetch(url);
     if (!response.ok) {
@@ -324,26 +343,18 @@ export class CSBGraphicsLoader {
     this.loadFromArray(buf);
   }
 
-  async tryLoad(url: string): Promise<boolean> {
-    try {
-      await this.load(url);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   loadFromArray(data: Uint8Array): void {
-    this.data = data;
     this.sections = this.parseSections(data);
+    this.data = data;
+    this.fileSignature = Signature(data);
   }
 
-  isLoaded(): boolean {
-    return this.data !== null && this.sections.length > 0;
+  /** The file's signature, or `null` for a loader that loaded none. */
+  getSignature(): FileSignature | null {
+    return this.fileSignature;
   }
 
   getWallDecoration(id: number): ExtendedWallDecoration | null {
-    if (!this.isLoaded()) return null;
     const cached = this.wallCache.get(id);
     if (cached) return cached;
 
@@ -386,7 +397,6 @@ export class CSBGraphicsLoader {
   }
 
   getFloorDecoration(id: number): ExtendedFloorDecoration | null {
-    if (!this.isLoaded()) return null;
     const cached = this.floorCache.get(id);
     if (cached) return cached;
 
@@ -468,6 +478,20 @@ export class CSBGraphicsLoader {
     return { width, height, pixels: out };
   }
 
+  /** `OpenCSBgraphicsFile`, through `opener`: whether the file is open. */
+  private open(): boolean {
+    if (this.opened) return true;
+    if (!this.opener) return (this.opened = this.data !== null);
+    try {
+      this.opened = this.opener(this.data ? this.fileSignature : null);
+    } catch (error) {
+      this.data = null;
+      this.sections = [];
+      throw error;
+    }
+    return this.opened;
+  }
+
   private parseSections(data: Uint8Array): SectionHeader[] {
     if (data.length < 12) throw new Error('CSBgraphics.dat too small');
     const s0 = String.fromCharCode(data[0] ?? 0, data[1] ?? 0, data[2] ?? 0, data[3] ?? 0);
@@ -492,8 +516,12 @@ export class CSBGraphicsLoader {
     return sections;
   }
 
+  /**
+   * `ReadCSBgraphic` (`doc/CSBwin-src/Graphics.cpp:3201`): section `type`/`id`, inflated,
+   * or `null`. It opens the file first (`open`).
+   */
   private readSection(type: number, id: number, minimumSize: number): Uint8Array | null {
-    if (!this.data) return null;
+    if (!this.open() || !this.data) return null;
     const header = this.sections.find((section) => section.type === type && section.id === id);
     if (!header) return null;
     if (header.uncompressedSize < minimumSize) return null;

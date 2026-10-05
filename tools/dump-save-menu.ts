@@ -2897,11 +2897,11 @@ async function checkPlayTime(graphics: GraphicsLoader): Promise<void> {
     saves.read({ entry: saveEntryOf(before), bytes: await store.read(exact.id) });
     const fromOldRow = game.playTime();
     play(30);
-    const read = game.readDungeonDat(new Uint8Array(readFileSync(resolve(DUNGEON))));
+    game.readDungeonDat(new Uint8Array(readFileSync(resolve(DUNGEON))));
     console.log(`  a save whose row holds no play time, loaded: ${seconds(fromOldRow)}; a new game read after 30 VBLs: ${seconds(game.playTime())}`);
     check(saveEntryOf(before).playTime === 0 && fromOldRow === 0,
       'a stored row from before rows held the play time counts none, and its game starts from 0');
-    check(read && game.playTime() === 0, 'a new game read into the running one has played no time');
+    check(game.playTime() === 0, 'a new game read into the running one has played no time');
   } finally {
     Date.now = realNow;
   }

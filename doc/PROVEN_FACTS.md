@@ -2737,6 +2737,48 @@ colours and 464 bytes of pixels: Conflux's 156 and `dm-atari`'s 197, from id 24 
 Verified, not inferred: seven of them, ids 44, 46, 47, 49, 50, 146 and 148 in both files,
 decode this way to cells 14, 12, 8, 4, 7, 23 and 22 of CSB's basic graphic 26, pixel for
 pixel (`tools/dump-portraits.ts`). Top-down rows or swapped nibbles would match none.
+## The graphics files' signatures: what CSBWin checks, and when
+
+`Signature` (`doc/CSBwin-src/data.cpp:1953-1975`) is a file's MD5, RSA's reference code
+(`md5C.cpp`, whose `MD5Transform` reads a block's words in x86 order, the RFC's), its
+first eight bytes taken as two little-endian longwords, `signature1` from bytes 0-3 and
+`signature2` from 4-7; a `signature1` of 0 is made 1. A dungeon names a file by sixteen
+bits, `o = (n | (n >> 16)) & 0xffff` over `n = signature1 | signature2`
+(`Graphics.cpp:1784-1785`, `:1849-1851`).
+
+What a world names is read at the end of `LoadGame` (`SaveGame.cpp:1795-1820`):
+`EDBT_Debuging_data`, `EDBT_CSBGraphicsSignature_data` and `EDBT_GraphicsSignature_data`
+are zeroed, then each is the first longword of its `EXPOOL` record where `Locate` finds
+one with a longword or more: `EDBT_Debuging` 0, and, only when that is 0,
+`EDBT_RuntimeFileSignatures` 0 (`CSBgraphics.dat`) and 1 (`graphics.dat`) under
+`EDT_Database` (`CSB.h:1552-1556`). Before any read all three are `0xffffffff`
+(`data.cpp:50-53`).
+
+- **`graphics.dat`** is checked after every read, by `openGraphicsFile` (`:1821`): an
+  `EDBT_GraphicsSignature_data` that is neither 0 nor `0xffffffff` and is not `o` is
+  `die(0x3c6c, "Incorrect Graphics File signature\nActuatl Signature = %d")`, CSBWin's
+  spelling (`Graphics.cpp:1806-1816`). Its other comparison, against an Extended Features
+  block's `expectedGraphicSignature1/2`, runs only while the file's own signature is 0,
+  at the first call, which is `ReadGraphicsIndex`'s before the title
+  (`CSBCode.cpp:11359`); no read has set the expected pair by then, so it is 0 and the
+  comparison is skipped (`Graphics.cpp:1787-1804`).
+- **`CSBgraphics.dat`** is checked once, by `OpenCSBgraphicsFile` at the first
+  `ReadCSBgraphic` (`:3219`); once open it is only rewound (`:1844-1848`). A file that is
+  not there puts up "Cannot find 'CSBgraphics.dat'" the first time, and dies with `0xbad`
+  if the expected pair is not 0 (`:1853-1864`). Otherwise, under an
+  `EDBT_CSBGraphicsSignature_data` that is not 0 and an `EDBT_Debuging_data` of 0, an `o`
+  (0 made 1) that differs is `die(0x3c6c, "Incorrect CSBGraphics File signature\nActual
+  Signature = %d")` (`:1885-1894`). The comparison against the expected pair (`:1872-1884`)
+  needs the signature to be 0 and the pair not, but the line before takes the signature
+  whenever the pair is not 0 (`:1865-1871`), and a signature is never 0: it never runs.
+  Before any read the check is skipped, `EDBT_Debuging_data` being `0xffffffff`.
+
+No `dungeon.dat` here, Conflux's included, and no genuine save in `tools/fixtures/` holds
+any of the three records, and every Extended Features block among them expects zeros.
+The port: `src/data/FileSignature.ts`, `readRuntimeFileSignatures`
+(`src/data/CsbwinExpool.ts`), `src/engine/FileSignatures.ts`; evidence
+`tools/dump-file-signatures.ts`.
+
 ## A `CHARDESC` slot past the party holds zeros, or the champion who left it
 
 `d.CH16482[4]` is four records whatever `d.NumCharacter` is
@@ -3361,12 +3403,12 @@ not open is `die(50)` with "Cannot open dungeon file", not `tag01efee`, and then
 read's (`SaveGame.cpp:1523-1532`).
 
 The port's boot runs `tag01efee` in `src/renderer/intro/BootSequence.ts`, reached from
-the load-only chooser (`restoreChosenSave`, `src/renderer/ui/SaveMenu.ts`) and from a new
-game's read (`readNewGame` there, over `Game.readDungeonDat`). The page builds its `Game`
-over the empty world (`emptyDungeonData`) and reads `dungeon.dat` into it after ENTER. At
-the boot, the line is a one-button menu and its click goes back to the title (`DEBT.md`
-H); a `dungeon.dat` that will not open throws `Die`, which the page reports as it reports
-any error that ends `init`. The full save menu, which CSBWin does not have, keeps its
+the load-only chooser (`restoreChosenSave`, `src/renderer/ui/SaveMenu.ts`). At the boot,
+the line is a one-button menu and its click goes back to the title (`DEBT.md` H). The
+page builds its `Game` over the empty world (`emptyDungeonData`) and reads `dungeon.dat`
+into it after ENTER (`Game.readDungeonDat`). A `dungeon.dat` that will not open throws
+`Die`, and one that does not read is `die(0xbad)` with the reason, not `tag01efee`: a game
+file that does not read ends the game, the author's decision (`DEBT.md` H). The full save menu, which CSBWin does not have, keeps its
 status line. Evidence: `tools/dump-bad-saved-game.ts`, and `tools/dump-new-game.ts` for the
 empty world's random stream.
 

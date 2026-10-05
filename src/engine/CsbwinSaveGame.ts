@@ -60,6 +60,7 @@
  */
 import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
 import { readExpectedSignatures, readRulesOptions } from '../data/CsbwinExtendedFeatures';
+import { readFileSignatures } from './FileSignatures';
 import { readDisableSaves, readGlobalVariables, readOverlayPalette } from '../data/CsbwinExpool';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
@@ -240,6 +241,8 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
  * restores its state over it (`applyCsbwinSave`).
  */
 function installCsbwinWorld(game: Game, world: CsbwinWorld): void {
+    // `LoadGame`'s end (doc/CSBwin-src/SaveGame.cpp:1795-1822), before anything is installed.
+    readFileSignatures(game.ctx, world.dungeon);
     // Before `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
     CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc, (line) => game.ctx.host.trace(line));
     readRulesOptions(game.ctx.rules, world.save.extendedFeatures, world.save.simpleEncipher);

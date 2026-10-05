@@ -76,10 +76,12 @@ function main(): void {
   }
 
   // Each set's tables are its own file's: CSB's differ from DM's in the six tables its
-  // graphics.dat changes, and in no other.
+  // graphics.dat changes, and in no other. The file's signature is not a table, and is
+  // left out: it differs between any two files.
+  const tableKeys = (tables: Record<string, unknown>) => Object.keys(tables).filter((k) => k !== 'graphicsSignature');
   const dm = tablesOf.get('dm-atari') as unknown as Record<string, unknown>;
   const csb = tablesOf.get('csb') as unknown as Record<string, unknown>;
-  const differing = Object.keys(dm).filter((k) => JSON.stringify(dm[k]) !== JSON.stringify(csb[k]));
+  const differing = tableKeys(dm).filter((k) => JSON.stringify(dm[k]) !== JSON.stringify(csb[k]));
   console.log(`== tables that differ between dm-atari and csb: ${differing.join(', ')} ==`);
   const expected = ['monsterDesc', 'textDecode', 'experienceForAttacking', 'skillNumber', 'byte20046', 'spells'];
   check(differing.length === expected.length && expected.every((k) => differing.includes(k)),
@@ -90,7 +92,7 @@ function main(): void {
   // canary for the names' length), and only the words differ.
   const en = tablesOf.get('dm-atari-1.2') as unknown as Record<string, unknown>;
   const fr = tablesOf.get('dm-atari-1.3-fr') as unknown as Record<string, unknown>;
-  const translated = Object.keys(en).filter((k) => JSON.stringify(en[k]) !== JSON.stringify(fr[k]));
+  const translated = tableKeys(en).filter((k) => JSON.stringify(en[k]) !== JSON.stringify(fr[k]));
   console.log(`== tables that differ between dm-atari-1.2 and dm-atari-1.3-fr: ${translated.join(', ')} ==`);
   check(translated.length === 2 && translated.includes('attackNames') && translated.includes('textDecode'),
     'dm-atari-1.3-fr differs from 1.2 in its attack names and text decoding only: its spells are 1.2\'s');

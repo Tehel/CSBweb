@@ -28,6 +28,7 @@
 import type { Swoosh } from '../../data/SwooshLoader';
 import { readHintOracle } from '../../data/HintOracleLoader';
 import type { HintOracleFiles } from '../ui/HintOracleButton';
+import { Die } from '../../engine/Die';
 import type { SavedGameRead } from '../../engine/GameSaves';
 import type { GameScreen } from '../GameScreen';
 import { decodeCursorBitmap, type UIButton } from '../../data/tables/UITables';
@@ -53,11 +54,11 @@ export interface BootSequenceDeps {
    */
   consumeSavedGameRead: () => SavedGameRead;
   /**
-   * `_ReadEntireGame` for a new game: `dungeon.dat` read into the running game. False when
-   * `ReadDatabases` fails (`doc/CSBwin-src/SaveGame.cpp:1740-1742`), which ends at
-   * `tag01efee`; a file that will not open throws `Die` (`:1480-1486`).
+   * `_ReadEntireGame` for a new game: `dungeon.dat` read into the running game. A file
+   * that will not open (`doc/CSBwin-src/SaveGame.cpp:1480-1486`), or does not read
+   * (`:1740-1742`, the author's decision), throws `Die`.
    */
-  readNewGame: () => Promise<boolean>;
+  readNewGame: () => Promise<void>;
   /**
    * Whether the entrance has RISE (`src/renderer/intro/PrisonDoor.ts`): the data set
    * has a `mini.dat` to make a new adventure in.
@@ -360,17 +361,13 @@ async function utilityRefusal(host: IntroHost, menus: MenuScreen, message: strin
 }
 
 /**
- * `_ReadEntireGame` once the entrance's doors have opened on a new game: `dungeon.dat`,
- * then `tag01efee` if the read failed, as a save's does. Resolves to whether the game is in.
+ * `_ReadEntireGame` once the entrance's doors have opened on a new game: `dungeon.dat`.
+ * Where CSBWin's read fails it ends at `tag01efee` as a save's does; the port's ends the
+ * game (`Game.readDungeonDat`), so the game is in when this returns.
  */
-export async function readNewGame(
-  host: IntroHost,
-  deps: Pick<BootSequenceDeps, 'readNewGame'> & { gameScreen: MenuScreen },
-  partyHasDied: boolean,
-): Promise<boolean> {
-  if (await deps.readNewGame()) return true;
-  await tag01efee(host, deps.gameScreen, partyHasDied);
-  return false;
+async function readNewGame(deps: Pick<BootSequenceDeps, 'readNewGame'>): Promise<boolean> {
+  await deps.readNewGame();
+  return true;
 }
 
 /**
@@ -382,7 +379,7 @@ function readEntireGame(
   deps: Pick<BootSequenceDeps, 'gameScreen' | 'consumeSavedGameRead' | 'readNewGame'>,
   partyHasDied: boolean,
 ): (choice: PrisonDoorChoice) => Promise<boolean> {
-  return (choice) => (choice === 'enter' ? readNewGame(host, deps, partyHasDied)
+  return (choice) => (choice === 'enter' ? readNewGame(deps)
     : choice === 'rise' ? readNewAdventure(host, deps, partyHasDied)
     : readSavedGame(host, deps, partyHasDied));
 }
@@ -396,17 +393,6 @@ function readEntireGame(
 export class BadSavedGame extends Error {
   constructor() {
     super('SAVED GAME DAMAGED!');
-  }
-}
-
-/**
- * `die(errorNum, msg)` (`doc/CSBwin-src/CSBCode.cpp:86-112`): CSBWin's message box, then
- * the program's end. Nothing in the boot catches it; the page reports it where `init`
- * reports any error.
- */
-export class Die extends Error {
-  constructor(readonly errorNum: number, msg: string) {
-    super(`System Error  0x${(errorNum >>> 0).toString(16).padStart(8, '0')}\n${msg}`);
   }
 }
 
@@ -582,7 +568,7 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
 
 /** A new game read with no entrance to go back to: a failed read throws. */
 async function enterAnyway(deps: Pick<BootSequenceDeps, 'readNewGame'>): Promise<PrisonDoorChoice> {
-  if (!(await deps.readNewGame())) throw new Error('dungeon.dat: SAVED GAME DAMAGED!');
+  await deps.readNewGame();
   return 'enter';
 }
 

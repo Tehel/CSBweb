@@ -6,6 +6,7 @@
  * call `extractGraphicsTables` once per `graphics.dat`: the engine's `GameTables` is built
  * from the result (`buildGameTables`), and the screen is handed the same object.
  */
+import type { FileSignature } from '../FileSignature';
 import type { GraphicsLoader } from '../GraphicsLoader';
 import { extractObjectTables, type ObjectTables } from './ObjectTables';
 import { extractUITables, type UITables } from './UITables';
@@ -18,6 +19,8 @@ export interface GraphicsTables {
   readonly viewport: ViewportTables;
   /** Graphic `0x22f`, and the object half of `0x22e`. */
   readonly objects: ObjectTables;
+  /** The file's own signature (`GraphicsLoader.getSignature`), which a read checks. */
+  readonly signature: FileSignature;
 }
 
 export function extractGraphicsTables(graphics: GraphicsLoader): GraphicsTables {
@@ -26,5 +29,6 @@ export function extractGraphicsTables(graphics: GraphicsLoader): GraphicsTables 
     ui: extractUITables(graphics),
     viewport,
     objects: extractObjectTables(graphics, viewport.wallRectanglesOffset),
+    signature: graphics.getSignature(),
   };
 }

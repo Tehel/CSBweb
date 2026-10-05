@@ -6,6 +6,7 @@ export { bindExtrasToggle } from './events';
 export { drawMapPreview } from './mapPreview';
 export { bindDataSetChooser } from './dataSetChooser';
 export { bindSaveDrop } from './saveDrop';
+export { showFatalMessage } from './fatalMessage';
 
 export function bindUIContext(ctx: UIContext): void {
     setUIContext(ctx);

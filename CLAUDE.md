@@ -126,7 +126,7 @@ item or monster is, read from `dungeon.dat` or a save. The `peek-dungeon` skill 
 ```
 audio/      SoundManager (the samples, played through Web Audio) and soundsIndex
 core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
-            (LZW/RLE/SND), imageDecoder (IMG1/IMG2), types, RnMaps (what an RN names:
+            (LZW/RLE/SND), imageDecoder (IMG1/IMG2), md5, types, RnMaps (what an RN names:
             RN::dbType, pos, idx), intCast (sw, div, ApplyLimits), objectNameIndex
             (OBJNI_* constants)
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor,
@@ -154,7 +154,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             save is, written from the game and read back), GameSaves (a save built and
             written to the store, or read back: the disk menu's, the boot's and F5/F9's),
             Chaos (the UTILITY's "MAKE NEW ADVENTURE": a saved game's party into
-            `mini.dat`), skills, AddCharacter, objectIndex
+            `mini.dat`), FileSignatures (the graphics files checked against what a
+            read names), Die (CSBWin's `die`), skills, AddCharacter, objectIndex
             (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
             GameInput (where a click or a key goes once the page has read it),
@@ -174,8 +175,9 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
   ui/       The DM interface, one module per CSBWin file — Mouse, Inventory, Character,
             MagicPanel, Feeding, Objects, Draw, HitTest, ViewportPicking, all over
             a shared UIState. See doc/UI_MODULE_MAP.md.
-ui/         DOM-side debug chrome (settings, map preview, champion panel), and saveDrop
-            (the save menu's import: a file dropped on the page)
+ui/         DOM-side debug chrome (settings, map preview, champion panel), saveDrop
+            (the save menu's import: a file dropped on the page), and fatalMessage (the
+            screen an error that ends the game leaves)
 lib/        glfx (the CRT effect's WebGL) and its loader
 main.ts     Bootstrap and wiring
 ```

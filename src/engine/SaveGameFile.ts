@@ -11,6 +11,7 @@
  * What a file does not hold, a load does not give back: `src/engine/CsbwinSaveGame.ts` →
  * "What is not restored", which `tools/dump-save-roundtrip.ts` holds to its list.
  */
+import { Die } from './Die';
 import { saveSaveGameState, type Block1, type Block2, type SaveGameState } from '../data/SaveGameLoader';
 import { applyCsbwinSave } from './CsbwinSaveGame';
 import { buildCsbwinCharacterBlock } from '../data/CsbwinCharacters';
@@ -264,12 +265,14 @@ export class SaveFileError extends Error {}
  *
  * The two menus and the quick-load all come through here. A failure becomes a
  * `SaveFileError`, because the menu's status line is the only place it can be shown,
- * and it wants a short line rather than a stack.
+ * and it wants a short line rather than a stack. A `Die` stays one: it has ended the
+ * game, and the page has its message (`src/engine/Die.ts`).
  */
 export function applySaveBytes(game: Game, bytes: Uint8Array): void {
     try {
         applyCsbwinSave(game, bytes);
     } catch (error) {
+        if (error instanceof Die) throw error;
         throw new SaveFileError(`CSBWIN SAVE: ${(error as Error).message}`.toUpperCase());
     }
     game.savedGameRead();

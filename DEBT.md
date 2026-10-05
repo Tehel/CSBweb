@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G24 | `CSBgraphics.dat`'s sounds and alternate monster graphics, and its signature | L | ⏳ step 2 of 5 next |
+| G24 | `CSBgraphics.dat`'s sounds and alternate monster graphics | L | ⏳ step 2 of 5 next |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G25, G27 |
@@ -340,7 +340,7 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G24 ⏳ `CSBgraphics.dat`'s sounds and alternate monster graphics, and its signature
+### G24 ⏳ `CSBgraphics.dat`'s sounds and alternate monster graphics
 
 CSBWin reads eight kinds of section from `CSBgraphics.dat` (`CGT_*`,
 `doc/CSBwin-src/CSB.h:289-296`). The port reads three, the wall and the floor decorations
@@ -359,7 +359,8 @@ The overlays and their palettes are G25, and the backgrounds, which are what a s
 draws, G27.
 
 Every reader goes through `ReadCSBgraphic` (`doc/CSBwin-src/Graphics.cpp:3201`), which the
-port has (`CSBGraphicsLoader.readSection`). The steps, one commit each:
+port has (`CSBGraphicsLoader.readSection`). The steps, one commit each, of which 1 and 5
+are done:
 
 1. **Portraits**: done. `ImportBitmap` and `GetExternalPortraitAddress` are
    `CSBGraphicsLoader.importBitmap` and `getExternalPortraitAddress`, drawn for a `charID`
@@ -379,13 +380,12 @@ port has (`CSBGraphicsLoader.readSection`). The steps, one commit each:
    (`Code51a4.cpp:1139-1751`), CSBWin's copy of the original that takes its graphics and
    descriptions from the record, and its derived graphics
    (`GetAlternateDerivedGraphicAddress`, `:1119`). It may split again once read.
-5. **The signature.** `OpenCSBgraphicsFile` (`Graphics.cpp:1840-1896`) takes the file's
-   MD5 through `Signature` (`data.cpp:1943-1975`), and dies when it differs from the one
-   a read's Extended Features block named (`ExpectedSignatures`,
-   `src/data/CsbwinExtendedFeatures.ts`) or from `EDBT_CSBGraphicsSignature`'s. The port
-   computes no signature, for this file or for `graphics.dat` (`:1786-1796`, the same
-   check), and no item holds the latter. What the port does where CSBWin dies is the
-   author's call, asked when this step is reached.
+5. **The signature**: done. `Signature` and the checks of both graphics files,
+   `openGraphicsFile`'s at every read and `OpenCSBgraphicsFile`'s at the first section
+   read, are `src/data/FileSignature.ts` and `src/engine/FileSignatures.ts`
+   (`doc/PROVEN_FACTS.md` → "The graphics files' signatures"), checked by
+   `tools/dump-file-signatures.ts`. Where CSBWin dies the page ends its game on a message
+   (H, "A game file refused ends the game").
 
 ### G25 ⏳ Viewport overlays and overlay palettes
 
@@ -861,12 +861,23 @@ Recorded so that nobody "fixes" them.
 - 🚫 **The game does not quit.** `_ShowCredits` ends in `UI_PushMessage(UIM_TERMINATE)`
   (`doc/CSBwin-src/Code1f9e6.cpp:349`), which closes CSBWin. A page cannot close itself,
   so the credits picture stays up (`src/renderer/intro/ShowCredits.ts`).
-- 🚫 **A damaged file at the boot goes back to the title.** There `tag01efee` prints
+- 🚫 **A damaged save at the boot goes back to the title.** There `tag01efee` prints
   "SAVED GAME DAMAGED!" and calls `die(0xbad)`, which ends CSBWin
   (`doc/CSBwin-src/SaveGame.cpp:1905-1907`). A page cannot end itself, so the author's
   decision is a one-button menu with the line and OK, whose click goes back to the title
   animation (`tag01efee` and `runBootSequence`, `src/renderer/intro/BootSequence.ts`).
   After a lost game `tag01efee` is CSBWin's own.
+- 🚫 **A game file refused ends the game.** CSBWin dies on a `graphics.dat` or
+  `CSBgraphics.dat` it cannot find or whose signature is not the one the game names
+  (`doc/PROVEN_FACTS.md` → "The graphics files' signatures"), and on a `dungeon.dat` that
+  will not open. Its message box is the executable's; the author's decision is that the
+  page uses nothing more of the file and ends its game on a screen of its own: the
+  message, white on black, in a browser font of 12pt or more, in the canvas's place
+  (`showFatalMessage`, `src/ui/fatalMessage.ts`), where the player decides what to do. So
+  does every error that ends the page's game. Two cases die here where CSBWin does not:
+  a data set's `CSBgraphics.dat` that does not load or parse, which CSBWin would meet
+  only at a read; and a `dungeon.dat` that does not read, which CSBWin's `tag01efee`
+  takes as a damaged save (`die(0xbad)` at the boot, the menu after a lost game).
 - 🚫 **`?intro=0`, and Debug in the saved UI settings, skip the whole intro.** This is a
   developer affordance with no CSBWin counterpart, kept deliberately: thirteen of the sixteen golden
   frames boot through it.

@@ -26,6 +26,7 @@
  */
 import { readU32BE, writeU32BE } from '../core/bytes';
 import { DBType } from '../core/types';
+import type { RuntimeFileSignatures } from './FileSignature';
 
 /** `sizeof(DB11)`, an `EXPOOL` block (`doc/CSBwin-src/CSB.h:1280-1288`). */
 export const EXPOOL_RECORD_SIZE = 256;
@@ -45,6 +46,10 @@ const ESL_MONSTER_MOVE_FILTER = 2;
 const MONSTER_MOVE_FILTER_LEVELS = 64;
 /** `EDT_Database` (`doc/CSBwin-src/CSB.h:1552`). */
 const EDT_DATABASE = 5;
+/** `EDBT_RuntimeFileSignatures` (`doc/CSBwin-src/CSB.h:1555`). */
+const EDBT_RUNTIME_FILE_SIGNATURES = 2;
+/** `EDBT_Debuging` (`doc/CSBwin-src/CSB.h:1556`). */
+const EDBT_DEBUGING = 3;
 /** `EDBT_GlobalVariables` (`doc/CSBwin-src/CSB.h:1557`). */
 const EDBT_GLOBAL_VARIABLES = 4;
 /** `EDBT_DisableSaves` (`doc/CSBwin-src/CSB.h:1558`). */
@@ -382,6 +387,27 @@ export function readDisableSaves(db: ExpoolDatabase): boolean {
     let disableSaves = false;
     while (expool.read(DISABLE_SAVES_KEY) !== null) disableSaves = true;
     return disableSaves;
+}
+
+/**
+ * `LoadGame`'s `EDBT_Debuging_data`, `EDBT_CSBGraphicsSignature_data` and
+ * `EDBT_GraphicsSignature_data` (`doc/CSBwin-src/SaveGame.cpp:1795-1820`): each 0 unless
+ * the pool holds its record with a longword or more (`Locate` greater than 0), then that
+ * record's first. The two signatures are read only when `EDBT_Debuging_data` is 0. Their
+ * keys are `EDBT_RuntimeFileSignatures`' 0 and 1.
+ */
+export function readRuntimeFileSignatures(db: ExpoolDatabase): RuntimeFileSignatures {
+    const expool = new Expool(db);
+    const first = (edbt: number, i: number): number => {
+        const record = expool.locate(((EDT_DATABASE << 24) + (edbt << 16) + i) >>> 0);
+        return record && record.length > 0 ? record[0] : 0;
+    };
+    const debuging = first(EDBT_DEBUGING, 0);
+    return {
+        debuging,
+        csbGraphicsSignature: debuging === 0 ? first(EDBT_RUNTIME_FILE_SIGNATURES, 0) : 0,
+        graphicsSignature: debuging === 0 ? first(EDBT_RUNTIME_FILE_SIGNATURES, 1) : 0,
+    };
 }
 
 /** The `EDT_SpecialLocations` entries of an `EXPOOL` database, given as its raw blocks. */

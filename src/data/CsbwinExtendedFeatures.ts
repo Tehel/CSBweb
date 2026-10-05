@@ -761,7 +761,8 @@ export interface LiveExtendedFeatures {
  * file's block (`SaveGame.cpp:378-381`) and `SaveGame` writes them back (`:936-939`). It
  * never clears them, where it zeroes `hintKey` before it looks for a block (`:314`), so a
  * file without one leaves them as they were. `Graphics.cpp:1786-1796` and `:1852-1881`
- * check them against the graphics files' own, which this port does not compute.
+ * check them against the graphics files' own, a comparison that can never fail
+ * (`src/engine/FileSignatures.ts`): only `OpenCSBgraphicsFile`'s "Cannot find" reads them.
  */
 export interface ExpectedSignatures {
     expectedGraphicSignature1: number;

@@ -12,6 +12,7 @@
  * port's names, since CSBWin gives them none worth keeping.
  */
 import type { SpellDefinition } from '../data/spellTypes';
+import type { FileSignature } from '../data/FileSignature';
 import type { GraphicsTables } from '../data/tables/GraphicsTables';
 import type { TextDecodeTables, WeaponDesc } from '../data/tables/ObjectTables';
 import { type MonsterDesc } from '../data/tables/MonsterDesc';
@@ -118,6 +119,11 @@ export interface GameTables {
 
   /** `d.sound1772[22]` — `QueueSound`'s table (`Data.h:1402`). */
   readonly sound1772: SoundTableEntry[];
+
+  // --- The file itself ---
+
+  /** `graphicSignature1/2`: `graphics.dat`'s `Signature` (`src/engine/FileSignatures.ts`). */
+  readonly graphicsSignature: FileSignature;
 }
 
 /** Every table in `GameTables`, from what `extractGraphicsTables` read of `graphics.dat`. */
@@ -169,5 +175,7 @@ export function buildGameTables(graphics: GraphicsTables): GameTables {
     moveButtons: ui.graphic231.moveButtons,
 
     sound1772: g232.sound1772,
+
+    graphicsSignature: graphics.signature,
   };
 }
