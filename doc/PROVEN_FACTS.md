@@ -2762,8 +2762,10 @@ header included: `RIFF`, `WAVEfmt `, PCM, mono, 11025 Hz, 8-bit, and the `data` 
 size at byte 40, which is why `ReadSound` reads the count there. Conflux's 611 and
 `dm-atari`'s 618, ids 220 up, all decode so (`tools/dump-custom-sounds.ts`): unsummed
 bytes would spell no header. One section in each, 705 (`coat`), has a 4-byte `fact` chunk
-at byte 36 before its `data` chunk of 4574 samples, so `ReadSound` reads a count of 4 and
-`PlayCustomSound` plays four bytes, the `fact` chunk's own (`DEBT.md` C147).
+at byte 36, holding 4574, before its `data` chunk of 4574 samples at byte 48, so
+`ReadSound` reads a count of 4 and `PlayCustomSound` plays four bytes, the `fact` chunk's
+own. The port plays the `data` chunk instead (`DEBT.md` H → "A `CSBgraphics.dat` sound
+plays its WAV file's `data` chunk").
 ## The graphics files' signatures: what CSBWin checks, and when
 
 `Signature` (`doc/CSBwin-src/data.cpp:1953-1975`) is a file's MD5, RSA's reference code

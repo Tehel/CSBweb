@@ -6,8 +6,10 @@
  * 1. **Every `CGT_Sound` section plays** (`SOUNDDATA::ReadSound`, `:989-1025`): its bytes
  *    summed with the one before, the count at byte 40, the samples from 44. The canary is
  *    the header the sum leaves: a WAV file's, mono, 8-bit, at 11025 Hz, `Decode`'s rate
- *    (`:338`), and its `data` chunk's size the count. One section of each file has a
- *    `fact` chunk there instead, and plays what its byte 40 says.
+ *    (`:338`), and its `data` chunk's size the count. One section of each file, 705, has a
+ *    `fact` chunk there instead, and plays its `data` chunk, after the `fact` one: a
+ *    deliberate divergence from CSBWin, which plays the `fact` chunk's four bytes
+ *    (`DEBT.md` H).
  * 2. **A section that is not there** plays nothing, "Cannot find Sound" the first time
  *    only (`:1003-1008`).
  * 3. **A section shorter than its count** plays nothing, "Sound too short" every time
@@ -40,6 +42,8 @@ interface Scene {
   game: Game;
   /** `[sample count, volume]` of each sound handed to the host. */
   played: [number, number][];
+  /** The samples of each sound handed to the host. */
+  sounds: Uint8Array[];
   traced: string[];
 }
 
@@ -51,19 +55,23 @@ if (!data) throw new Error('dungeon.dat did not load');
 
 function scene(): Scene {
   const played: [number, number][] = [];
+  const sounds: Uint8Array[] = [];
   const traced: string[] = [];
   const game = newGame(data!, graphics, {
-    playCustomSound: (sound, volume) => played.push([sound.length, volume]),
+    playCustomSound: (sound, volume) => {
+      played.push([sound.length, volume]);
+      sounds.push(sound);
+    },
     trace: (line) => traced.push(line),
   });
-  return { game, played, traced };
+  return { game, played, sounds, traced };
 }
 
 /* ----------------------------- 1. every section ------------------------------------ */
 for (const [file, expected] of FILES) {
   const loader = new CSBGraphicsLoader();
   loader.loadFromArray(new Uint8Array(readFileSync(resolve(file))));
-  const { game, played, traced } = scene();
+  const { game, played, sounds, traced } = scene();
   // The section as `ReadSound` leaves it: the reader sums the bytes in place.
   let read: Uint8Array | null = null;
   game.ctx.sounds.csbGraphics = {
@@ -73,6 +81,7 @@ for (const [file, expected] of FILES) {
   let wav = 0;
   const wrong: number[] = [];
   const fact: number[] = [];
+  let factPlayed = '';
   for (let soundNum = 0; soundNum < 1024; soundNum++) {
     read = null;
     const before = played.length;
@@ -80,12 +89,19 @@ for (const [file, expected] of FILES) {
     const bytes = read as Uint8Array | null;
     if (!bytes) continue;
     sections++;
-    const count = readU32LE(bytes, 40);
+    let count = readU32LE(bytes, 40);
     const header = ascii(bytes, 0, 4) + ascii(bytes, 8, 16);
     const format = `${readU16LE(bytes, 20)}/${readU16LE(bytes, 22)}/${readU32LE(bytes, 24)}/${readU16LE(bytes, 34)}`;
     if (header === 'RIFFWAVEfmt ' && format === '1/1/11025/8') {
       if (ascii(bytes, 36, 40) === 'data') wav++;
-      else if (ascii(bytes, 36, 40) === 'fact') fact.push(soundNum);
+      else if (ascii(bytes, 36, 40) === 'fact' && count === 4 && ascii(bytes, 48, 52) === 'data') {
+        // The `fact` chunk's four bytes, then the `data` chunk's header, then its samples.
+        fact.push(soundNum);
+        count = readU32LE(bytes, 52);
+        const sound = sounds[before];
+        factPlayed += `${soundNum}: ${count} samples from byte 56 of ${bytes.length}` +
+          `${sound && sound.every((sample, i) => sample === bytes[56 + i]) ? ', played' : ', not played'}`;
+      }
     }
     if (played.length !== before + 1 || played[before]![0] !== count || played[before]![1] !== 1) wrong.push(soundNum);
   }
@@ -94,6 +110,9 @@ for (const [file, expected] of FILES) {
   check(sections === expected, `${file}: its ${expected} sound sections`);
   check(wrong.length === 0, `${file}: each played whole, its count of samples at a divisor of 1 (wrong: ${wrong.join(' ')})`);
   check(wav === expected - 1 && fact.length === 1, `${file}: every section a WAV file once summed, one with a fact chunk`);
+  console.log(`   ${factPlayed}`);
+  check(factPlayed === '705: 4574 samples from byte 56 of 4630, played',
+    `${file}: sound 705 plays its data chunk's 4574 samples, not its fact chunk's 4 bytes`);
   check(JSON.stringify(traced) === '["Cannot find Sound"]', `${file}: the numbers with no section said once`);
 }
 

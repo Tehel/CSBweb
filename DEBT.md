@@ -104,7 +104,6 @@ In payoff order: the first row is the next item.
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C145 | The Hint Oracle's title boxes keep colour 12 on their last line and a half | S | ⏸️ waits on the author |
-| C147 | `CSBgraphics.dat`'s sound 705 plays four bytes of its header | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X1 | Extra: drinking from a fountain with an empty hand | S | ⏸️ |
@@ -197,27 +196,6 @@ The decision is the author's, after a look in play:
 - **Fix it**: `ShrinkBLT` gets `w + 1` by `h + 1`, the tool's check of the twelfth line
   becomes "every line holds no colour 12", and an H entry gives both readings.
 
-
-### C147 ⏸️ `CSBgraphics.dat`'s sound 705 plays four bytes of its header
-
-Not a divergence: the port plays what CSBWin plays. Recorded because it looks like a slip
-of the file that the port might work around, under `CLAUDE.md` → "The one
-non-negotiable rule", once the author has judged it worth it.
-
-`ReadSound` takes the sample count from byte 40 of a sound, where a plain WAV file has its
-`data` chunk's size (`doc/CSBwin-src/Sound.cpp:1015`). Sound 705 (`coat`) of both
-`CSBgraphics.dat` here has a 4-byte `fact` chunk at byte 36 instead, and its `data` chunk,
-4574 samples, after it: the count read is 4, and `&SOUND 705` plays the `fact` chunk's
-four bytes, a click at most (`doc/PROVEN_FACTS.md` → "`CSBgraphics.dat`'s sounds are WAV
-files"; `tools/dump-custom-sounds.ts` finds it). Whether any of Conflux's programs plays
-705 is not yet known (G26).
-
-The decision is the author's:
-
-- **Keep it** (CSBWin's sound): delete this entry; the fact already says why.
-- **Fix it**: `SoundQueue.readSound` takes the `data` chunk's size and samples wherever the
-  chunk starts, the tool's check of 705 becomes "4574 samples", and an H entry gives both
-  readings.
 ---
 
 ## F — Verification debt
@@ -914,6 +892,16 @@ Recorded so that nobody "fixes" them.
   data set already holds, about one pair of games in 16 million: the page draws the next
   pair once the new game is read (`GameSaves.newGameRead`, `src/engine/GameSaves.ts`),
   checked by `tools/dump-save-menu.ts` on a store that holds a pinned stream's first ids.
+- 🚫 **A `CSBgraphics.dat` sound plays its WAV file's `data` chunk.** `ReadSound` takes the
+  sample count from byte 40 and the samples from byte 44
+  (`doc/CSBwin-src/Sound.cpp:1015-1024`), which are the `data` chunk's only after a
+  16-byte `fmt ` chunk. Sound 705 (`coat`) of
+  both files here has a 4-byte `fact` chunk there, so CSBWin plays its four bytes, a
+  click at most; the port plays the `data` chunk after it, its 4574 samples, the count
+  the `fact` chunk itself gives. Every other sound starts its `data` chunk at byte 36, and
+  plays as in CSBWin, as does a section that is not a RIFF file (`doc/PROVEN_FACTS.md` →
+  "`CSBgraphics.dat`'s sounds are WAV files"; `SoundQueue.readSound`,
+  `tools/dump-custom-sounds.ts`).
 - 🚫 **Audio sample rates**, a documented exception to faithfulness:
   `doc/PROVEN_FACTS.md` → "Audio sample rates".
 - 🚫 **`dm-atari/graphics.dat` is not CSBWin's file.** It is CSBWin's with two items from

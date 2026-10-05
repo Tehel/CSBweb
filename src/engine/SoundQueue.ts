@@ -137,6 +137,12 @@ export class SoundQueue {
    * WAV files, each byte stored as the change from the one before"). `null` for a section
    * that cannot be read, said the first time ("Cannot find Sound"), and for one shorter
    * than its count, said every time ("Sound too short").
+   *
+   * A deliberate divergence (`DEBT.md` H): the count and the samples are the `data`
+   * chunk's, wherever a RIFF file's chunks put it (`wavDataChunk`). Bytes 40 and 44 are
+   * that chunk's only after a 16-byte `fmt ` one, and sound 705, with a `fact` chunk
+   * between them, would play that chunk's four bytes. A section that is not such a file
+   * is read as CSBWin reads it.
    */
   private readSound(soundNum: number): Uint8Array | null {
     const fileData = this.csbGraphics?.readSection(CSBGraphicType.Sound, soundNum, 44) ?? null;
@@ -151,11 +157,27 @@ export class SoundQueue {
       fileData[i] = (fileData[i] + prevByte) & 0xff;
       prevByte = fileData[i];
     }
-    const numSample = readU32LE(fileData, 40);
-    if (numSample + 44 > fileData.length) {
+    const [start, numSample] = wavDataChunk(fileData) ?? [44, readU32LE(fileData, 40)];
+    if (numSample + start > fileData.length) {
       this.host.trace('Sound too short');
       return null;
     }
-    return fileData.slice(44, 44 + numSample);
+    return fileData.slice(start, start + numSample);
   }
+}
+
+/**
+ * Where a RIFF `WAVE` file's first `data` chunk starts its bytes, and how many it holds:
+ * the chunks walked from byte 12, each an id, a little-endian size and that many bytes,
+ * padded to an even length. `null` for anything else, or a file whose chunks end first.
+ */
+function wavDataChunk(bytes: Uint8Array): [number, number] | null {
+  const id = (at: number): string => String.fromCharCode(...bytes.subarray(at, at + 4));
+  if (id(0) !== 'RIFF' || id(8) !== 'WAVE') return null;
+  for (let at = 12; at + 8 <= bytes.length;) {
+    const size = readU32LE(bytes, at + 4);
+    if (id(at) === 'data') return [at + 8, size];
+    at += 8 + size + (size & 1);
+  }
+  return null;
 }
