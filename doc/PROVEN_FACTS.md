@@ -2737,6 +2737,33 @@ colours and 464 bytes of pixels: Conflux's 156 and `dm-atari`'s 197, from id 24 
 Verified, not inferred: seven of them, ids 44, 46, 47, 49, 50, 146 and 148 in both files,
 decode this way to cells 14, 12, 8, 4, 7, 23 and 22 of CSB's basic graphic 26, pixel for
 pixel (`tools/dump-portraits.ts`). Top-down rows or swapped nibbles would match none.
+
+## `CSBgraphics.dat`'s sounds are WAV files, each byte stored as the change from the one before
+
+`SOUNDDATA::ReadSound(soundNum)` (`doc/CSBwin-src/Sound.cpp:989-1025`) reads the
+`CGT_Sound` section `soundNum`, of at least 44 bytes, and adds to each byte the one before
+it as that one now stands (`:1010-1014`): the bytes are stored as differences. The sample
+count is then the 32-bit word at byte 40, and the samples follow from byte 44; a count past
+the section's end gives "Sound too short", every time (`:1015-1020`). A section that cannot
+be read gives "Cannot find Sound", the first time only (`:1003-1008`).
+`PlayCustomSound` plays it for a DSA's `&SOUND` numbered from 0 (`:1052-1059`), through
+`SOUNDDATA::Decode(volume ? volume : 1)` (`:315-359`): each sample through a table that
+divides its distance from 128 by the volume (`:321-329`), in a WAV header at a fixed
+11025 Hz, 8-bit and mono (`:332-347`). That is without DirectX. Under DirectX, which a
+dungeon's Extended Features can turn on (`DefaultDirectX`,
+`doc/CSBwin-src/SaveGame.cpp:413-418`), `Decode` leaves the samples as they are, and
+DirectSound attenuates the sound by `volume` plus the game volume's attenuation, in
+decibels, clamped to 0-100 (`Sound.cpp:1058`, `doc/CSBwin-src/CSBUI.cpp:1637-1670`). The
+port takes the first path, as its `StartSound` does (`SoundManager.playCustomSound`,
+`SoundManager.playSound`).
+
+Once summed, every sound section of both files here is a whole WAV file, its 44-byte
+header included: `RIFF`, `WAVEfmt `, PCM, mono, 11025 Hz, 8-bit, and the `data` chunk's
+size at byte 40, which is why `ReadSound` reads the count there. Conflux's 611 and
+`dm-atari`'s 618, ids 220 up, all decode so (`tools/dump-custom-sounds.ts`): unsummed
+bytes would spell no header. One section in each, 705 (`coat`), has a 4-byte `fact` chunk
+at byte 36 before its `data` chunk of 4574 samples, so `ReadSound` reads a count of 4 and
+`PlayCustomSound` plays four bytes, the `fact` chunk's own (`DEBT.md` C147).
 ## The graphics files' signatures: what CSBWin checks, and when
 
 `Signature` (`doc/CSBwin-src/data.cpp:1953-1975`) is a file's MD5, RSA's reference code

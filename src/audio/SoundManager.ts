@@ -1,6 +1,23 @@
 import { SNDexpand } from '../core/compression';
+import { div } from '../core/intCast';
 import type { GraphicsLoader } from '../data/GraphicsLoader';
 import { buildSoundCatalog, ratesDefault, type SoundInfo, type SoundTableEntry } from './soundsIndex';
+
+/** `SNDHEAD`'s `nSamplesPerSecond` in `SOUNDDATA::Decode` (`doc/CSBwin-src/Sound.cpp:338`). */
+const CUSTOM_SOUND_RATE = 11025;
+
+/**
+ * `SOUNDDATA::Decode(volume)`'s samples (`doc/CSBwin-src/Sound.cpp:315-359`), without
+ * DirectX: each unsigned 8-bit sample through the volume table, which divides its
+ * distance from 128 by `volume`, rounded to the nearest, a half away from 128
+ * (`:321-329`).
+ */
+export function soundDataDecode(sound: Uint8Array, volume: number): Uint8Array {
+  const volTable = new Uint8Array(256);
+  for (let i = 0; i < 128; i++) volTable[i] = div(i - 128 - div(volume, 2), volume) + 128;
+  for (let i = 128; i < 256; i++) volTable[i] = div(i - 128 + div(volume, 2), volume) + 128;
+  return sound.map((sample) => volTable[sample]);
+}
 
 interface SoundVariant {
   name: string;
@@ -127,6 +144,24 @@ export class SoundManager {
     gain.gain.value = highVolume === 0 ? 1 / 18 : 1;
     source.connect(gain);
     gain.connect(this.gainNode);
+    source.start();
+  }
+
+  /**
+   * `PlayCustomSound`'s sound of `CSBgraphics.dat` (`doc/CSBwin-src/Sound.cpp:1055-1058`),
+   * which plays nothing with the sound off: `Decode(volume)`'s samples (`soundDataDecode`)
+   * at its 11025 Hz.
+   */
+  playCustomSound(sound: Uint8Array, volume: number): void {
+    if (!this.audioContext || !this.gainNode || !this.enabled) return;
+    if (sound.length === 0) return;
+    const samples = soundDataDecode(sound, volume);
+    const buffer = this.audioContext.createBuffer(1, samples.length, CUSTOM_SOUND_RATE);
+    const channel = buffer.getChannelData(0);
+    for (let i = 0; i < samples.length; i++) channel[i] = (samples[i] - 128) / 128;
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.gainNode);
     source.start();
   }
 

@@ -2,7 +2,8 @@
  * CSBgraphics.dat loader (CSBWin overlay graphics).
  *
  * Implements ReadCSBgraphic + OVLDECODE from CSBWin Graphics.cpp.
- * Used for extended wall/floor decorations (ReadWallDecoration/ReadFloorDecoration).
+ * Used for extended wall/floor decorations (ReadWallDecoration/ReadFloorDecoration), the
+ * portraits past graphic 26's, and the sounds a DSA's `&SOUND` plays (`SoundQueue`).
  */
 
 import type { ui32 } from '../core/types';
@@ -518,9 +519,10 @@ export class CSBGraphicsLoader {
 
   /**
    * `ReadCSBgraphic` (`doc/CSBwin-src/Graphics.cpp:3201`): section `type`/`id`, inflated,
-   * or `null`. It opens the file first (`open`).
+   * or `null`. It opens the file first (`open`). The bytes are the caller's own, as
+   * CSBWin's are a fresh allocation, to change as it reads them.
    */
-  private readSection(type: number, id: number, minimumSize: number): Uint8Array | null {
+  readSection(type: number, id: number, minimumSize: number): Uint8Array | null {
     if (!this.open() || !this.data) return null;
     const header = this.sections.find((section) => section.type === type && section.id === id);
     if (!header) return null;

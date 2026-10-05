@@ -313,6 +313,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const game = new Game(emptyDungeonData(), tables, {
         messages,
         playSound,
+        playCustomSound: (samples, volume) => sound.playCustomSound(samples, volume),
         // `d.PartySleeping`: button 145 puts the party to sleep, 146 or a blow
         // wakes it. The UI follows with `Buttons17796` (`doc/CSBwin-src/Mouse.cpp:1698`)
         // or the adventure lists back (`CSBCode.cpp:7056-7057`), and the message
@@ -363,6 +364,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
 
     // `CSBgraphics.dat` opens at its first section read, against what the game read names.
     files.csbGraphicsLoader.opener = csbGraphicsOpener(game.ctx);
+    // A DSA's `&SOUND` numbered from 0 plays one of its sounds.
+    game.ctx.sounds.csbGraphics = files.csbGraphicsLoader;
 
     // The game's saves: the disk menu's, the boot's chooser's, and F5 and F9's. The store
     // draws from a stream of its own for a row of an earlier version that names no

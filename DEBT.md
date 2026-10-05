@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G24 | `CSBgraphics.dat`'s sounds and alternate monster graphics | L | ⏳ step 2 of 5 next |
+| G24 | `CSBgraphics.dat`'s alternate monster graphics | L | ⏳ step 3 of 5 next |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G25, G27 |
@@ -104,6 +104,7 @@ In payoff order: the first row is the next item.
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C145 | The Hint Oracle's title boxes keep colour 12 on their last line and a half | S | ⏸️ waits on the author |
+| C147 | `CSBgraphics.dat`'s sound 705 plays four bytes of its header | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X1 | Extra: drinking from a fountain with an empty hand | S | ⏸️ |
@@ -124,7 +125,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C147 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C148 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -196,6 +197,27 @@ The decision is the author's, after a look in play:
 - **Fix it**: `ShrinkBLT` gets `w + 1` by `h + 1`, the tool's check of the twelfth line
   becomes "every line holds no colour 12", and an H entry gives both readings.
 
+
+### C147 ⏸️ `CSBgraphics.dat`'s sound 705 plays four bytes of its header
+
+Not a divergence: the port plays what CSBWin plays. Recorded because it looks like a slip
+of the file that the port might work around, under `CLAUDE.md` → "The one
+non-negotiable rule", once the author has judged it worth it.
+
+`ReadSound` takes the sample count from byte 40 of a sound, where a plain WAV file has its
+`data` chunk's size (`doc/CSBwin-src/Sound.cpp:1015`). Sound 705 (`coat`) of both
+`CSBgraphics.dat` here has a 4-byte `fact` chunk at byte 36 instead, and its `data` chunk,
+4574 samples, after it: the count read is 4, and `&SOUND 705` plays the `fact` chunk's
+four bytes, a click at most (`doc/PROVEN_FACTS.md` → "`CSBgraphics.dat`'s sounds are WAV
+files"; `tools/dump-custom-sounds.ts` finds it). Whether any of Conflux's programs plays
+705 is not yet known (G26).
+
+The decision is the author's:
+
+- **Keep it** (CSBWin's sound): delete this entry; the fact already says why.
+- **Fix it**: `SoundQueue.readSound` takes the `data` chunk's size and samples wherever the
+  chunk starts, the tool's check of 705 becomes "4574 samples", and an H entry gives both
+  readings.
 ---
 
 ## F — Verification debt
@@ -294,8 +316,8 @@ It uses 118 `&` operations, 3 of the 5. With Conflux's count of each:
   `MonLandD`, `DelMon` and `InsMon` are ported, checked by `tools/dump-dsa-monsters.ts`.
   `MonLandD` acts only in the monster move filter, and `MonBlk` is read only from it.
 - **Messages, sounds and texts**: none is left. `Message` and `Sound` are ported,
-  checked by `tools/dump-dsa-message.ts`; a `Sound` number from 0 up is a sample of
-  `CSBgraphics.dat`, which plays nothing until G24. The texts are ported too: `Say`,
+  checked by `tools/dump-dsa-message.ts`; a `Sound` number from 0 up is a sound of
+  `CSBgraphics.dat` (`tools/dump-custom-sounds.ts`). The texts are ported too: `Say`,
   `TextFetch`, `TextSay`, `GlobalTextStore`, `DiscardText` and `CharNameFetch`, checked by
   `tools/dump-dsa-text.ts`.
 - **The dungeon and the program**: none is left. `FetchExCellFlg`, `StoreExCellFlg`,
@@ -340,37 +362,33 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G24 ⏳ `CSBgraphics.dat`'s sounds and alternate monster graphics
+### G24 ⏳ `CSBgraphics.dat`'s alternate monster graphics
 
 CSBWin reads eight kinds of section from `CSBgraphics.dat` (`CGT_*`,
-`doc/CSBwin-src/CSB.h:289-296`). The port reads three, the wall and the floor decorations
-and the portraits (`src/data/CSBGraphicsLoader.ts`). Conflux's file holds 156 portraits,
-611 sounds, 123 alternate monster graphics, 90 backgrounds, 112 viewport overlays, 51
-overlay palettes, 36 wall and 72 floor decorations. Of the five kinds the port does not
-read, Conflux reaches:
-
-- **Sounds** (`Sound.cpp:996`): what its 308 `&SOUND`s play with a number from 0 up.
-  `SoundQueue.playCustomSound` plays nothing for those and traces "Cannot find Sound"
-  once, as CSBWin does without the file.
-- **Alternate monster graphics** (`Code51a4.cpp:1097`): 598 of its creature groups have
-  `alternateGraphics` 1 to 3.
-
-The overlays and their palettes are G25, and the backgrounds, which are what a skin
-draws, G27.
+`doc/CSBwin-src/CSB.h:289-296`). The port reads four, the wall and the floor decorations,
+the portraits and the sounds (`src/data/CSBGraphicsLoader.ts`, `SoundQueue.readSound`).
+Conflux's file holds 156 portraits, 611 sounds, 123 alternate monster graphics, 90
+backgrounds, 112 viewport overlays, 51 overlay palettes, 36 wall and 72 floor
+decorations. Of the four kinds the port does not read, Conflux reaches the alternate
+monster graphics (`Code51a4.cpp:1097`): 598 of its creature groups have
+`alternateGraphics` 1 to 3. The overlays and their palettes are G25, and the backgrounds,
+which are what a skin draws, G27.
 
 Every reader goes through `ReadCSBgraphic` (`doc/CSBwin-src/Graphics.cpp:3201`), which the
-port has (`CSBGraphicsLoader.readSection`). The steps, one commit each, of which 1 and 5
-are done:
+port has (`CSBGraphicsLoader.readSection`). The steps, one commit each, of which 1, 2 and
+5 are done:
 
 1. **Portraits**: done. `ImportBitmap` and `GetExternalPortraitAddress` are
    `CSBGraphicsLoader.importBitmap` and `getExternalPortraitAddress`, drawn for a `charID`
    past 23 in the status box (`getPortraitBitmap`, `src/renderer/ui/Character.ts`) and in
    the mirror (`drawChampionPortrait`, `src/renderer/bytecode/DrawDecorations.ts`), and
    checked by `tools/dump-portraits.ts`.
-2. **Sounds.** `SOUNDDATA::ReadSound` (`Sound.cpp:989-1025`): a section's bytes summed
-   with the previous one, the sample count at byte 40, the 8-bit samples from 44.
-   `PlayCustomSound`'s branch from 0 (`:1039-1059`) plays them, through `Decode`'s
-   volume (`:315`). `SoundQueue.playCustomSound` replaces its trace with it.
+2. **Sounds**: done. `SOUNDDATA::ReadSound` is `SoundQueue.readSound`, and
+   `PlayCustomSound`'s branch from 0 ends in `GameHost.playCustomSound`, which the page
+   plays through `SOUNDDATA::Decode`'s volume table (`soundDataDecode`,
+   `src/audio/SoundManager.ts`), checked by `tools/dump-custom-sounds.ts`
+   (`doc/PROVEN_FACTS.md` → "`CSBgraphics.dat`'s sounds are WAV files, each byte stored
+   as the change from the one before").
 3. **Alternate monster graphics, the record.** `AltGraphicMapping` (`Code51a4.cpp:1060-1069`,
    an `EDBT_AltMonGraphics` record of the `EXPOOL`, which a dungeon file carries and
    nothing in CSBWin writes), `GetAlternateGraphicsRecord` (`:1071-1112`) and its

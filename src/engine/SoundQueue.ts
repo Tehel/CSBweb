@@ -19,8 +19,11 @@
  * `SoundFilter` (`doc/CSBwin-src/Sound.cpp:670`) may hand the sound to the dungeon's DSAs
  * instead (`DsaSystem.soundFilter`).
  *
- * `PlayCustomSound`, a DSA's `&SOUND`, plays here too, at once and at no distance.
+ * `PlayCustomSound`, a DSA's `&SOUND`, plays here too, at once and at no distance, a
+ * sample of `graphics.dat` or a sound of `CSBgraphics.dat`.
  */
+import { readU32LE } from '../core/bytes';
+import { CSBGraphicType, type CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import type { SoundTableEntry } from '../data/tables/UITables';
 import type { GameHost } from './GameHost';
 import type { GameState } from './gameTypes';
@@ -32,6 +35,12 @@ export class SoundQueue {
   private customSoundMissingSaid = false;
 
   /**
+   * `CSBgraphics.dat`, where `ReadSound` reads a sound numbered from 0. The page sets it
+   * to its data set's; `null`, as a tool leaves it, is a data set without the file.
+   */
+  csbGraphics: Pick<CSBGraphicsLoader, 'readSection'> | null = null;
+
+  /**
    * `SoundFilter(ordinal, highVolume, soundLocr)`, with the location as level, x and y:
    * `DsaSystem.soundFilter` once `Game` has one, 0 when a DSA took the sound. Until then,
    * and in a tool's context with no DSA system, 1, as for a dungeon with no filter.
@@ -40,15 +49,15 @@ export class SoundQueue {
 
   /**
    * @param sound1772 `d.sound1772` — the sound table from `graphics.dat` item `0x232`.
-   * @param host where a sample goes (`GameHost.playSound`), and `PlayCustomSound`'s
-   *   complaint (`trace`).
+   * @param host where a sample goes (`GameHost.playSound`), and a sound of
+   *   `CSBgraphics.dat` (`playCustomSound`), and `ReadSound`'s complaints (`trace`).
    * @param state `state.tickCount` is `d.Time`, the clock a delayed sound is due by.
    * @param timers where a delayed sound's `TT_20` goes.
    */
   constructor(
     private readonly party: Party,
     private readonly sound1772: ArrayLike<SoundTableEntry>,
-    private readonly host: Pick<GameHost, 'playSound' | 'trace'>,
+    private readonly host: Pick<GameHost, 'playSound' | 'playCustomSound' | 'trace'>,
     private readonly state: Pick<GameState, 'tickCount'>,
     private readonly timers: TimerQueue,
   ) {}
@@ -100,9 +109,10 @@ export class SoundQueue {
    * `PlayCustomSound(soundNum, volume, flags)` (`doc/CSBwin-src/Sound.cpp:1039-1062`), a
    * DSA's `&SOUND`. A negative number is `d.sound1772`'s entry `-soundNum - 1`, none past
    * the 22nd, played by `StartSound`, loud unless `volume` is 0 (`:647-667`). `flags` is
-   * unused. A number from 0 up is a sound of `CSBgraphics.dat` (`CGT_Sound`,
-   * `SOUNDDATA::ReadSound`, `:989-1027`), which the port does not read (`DEBT.md` G24): it
-   * plays nothing, as CSBWin does without the file, and says so once (`:1003-1008`).
+   * unused. A number from 0 up is a sound of `CSBgraphics.dat` (`readSound`), played
+   * through `SOUNDDATA::Decode` with `volume` as its divisor, 1 for a volume of 0
+   * (`:1057`). The game's volume and `NoSound` are the host's, which CSBWin checks
+   * after the read, so a sound that cannot be read is said even with the sound off.
    */
   playCustomSound(soundNum: number, volume: number): void {
     if (soundNum < 0) {
@@ -113,8 +123,39 @@ export class SoundQueue {
       this.host.playSound(entry.word0 | 0, 0, volume === 0 ? 0 : 1);
       return;
     }
-    if (this.customSoundMissingSaid) return;
-    this.customSoundMissingSaid = true;
-    this.host.trace('Cannot find Sound');
+    const sound = this.readSound(soundNum);
+    if (!sound) return;
+    this.host.playCustomSound(sound, volume ? volume : 1);
+  }
+
+  /**
+   * `SOUNDDATA::ReadSound(soundNum)` (`doc/CSBwin-src/Sound.cpp:989-1025`): the
+   * `CGT_Sound` section `soundNum`, of at least 44 bytes, each byte summed with the one
+   * before it as that one now stands; the sample count is the word at byte 40, and the
+   * samples follow from byte 44. Every such section of the two `CSBgraphics.dat` here is a
+   * WAV file, its header included (`doc/PROVEN_FACTS.md` → "`CSBgraphics.dat`'s sounds are
+   * WAV files, each byte stored as the change from the one before"). `null` for a section
+   * that cannot be read, said the first time ("Cannot find Sound"), and for one shorter
+   * than its count, said every time ("Sound too short").
+   */
+  private readSound(soundNum: number): Uint8Array | null {
+    const fileData = this.csbGraphics?.readSection(CSBGraphicType.Sound, soundNum, 44) ?? null;
+    if (!fileData) {
+      if (this.customSoundMissingSaid) return null;
+      this.customSoundMissingSaid = true;
+      this.host.trace('Cannot find Sound');
+      return null;
+    }
+    let prevByte = 0;
+    for (let i = 0; i < fileData.length; i++) {
+      fileData[i] = (fileData[i] + prevByte) & 0xff;
+      prevByte = fileData[i];
+    }
+    const numSample = readU32LE(fileData, 40);
+    if (numSample + 44 > fileData.length) {
+      this.host.trace('Sound too short');
+      return null;
+    }
+    return fileData.slice(44, 44 + numSample);
   }
 }

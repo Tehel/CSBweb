@@ -15,8 +15,9 @@
  * 3. **Any other room timer gives a count of 0** (`Timer.cpp:1704-1707`).
  * 4. **`&SOUND`** (`DSA.cpp:4612-4624`, `PlayCustomSound`, `Sound.cpp:1039-1062`): a
  *    negative number plays `d.sound1772`'s entry `-n - 1`, quiet for a volume of 0, none
- *    past the 22nd; a number from 0 up is `CSBgraphics.dat`'s (`DEBT.md` G24), which
- *    plays nothing and is reported once.
+ *    past the 22nd; a number from 0 up is `CSBgraphics.dat`'s, which, in a game with no
+ *    such file, plays nothing and is reported once (the sounds themselves are
+ *    `tools/dump-custom-sounds.ts`'s).
  * 5. **An `OVERRIDE` no operation used dies with its run**: `ProcessDSATimer6` clears
  *    `Override_P` before every DSA it runs (`DSA.cpp:5416`), so the next run's `&MESSAGE`
  *    goes to the corner its location names.
@@ -146,7 +147,7 @@ for (const room of ['open', 'stone'] as const) {
   console.log(`4. played ${played.join(' ')}; traced ${JSON.stringify(traced)}`);
   check(JSON.stringify(played) === JSON.stringify([`${table[0]!.word0}/0/0`, `${table[21]!.word0}/0/1`]),
     'entries 0 (quiet: volume 0) and 21 (loud), and nothing past the 22nd');
-  check(JSON.stringify(traced) === '["Cannot find Sound"]', 'CSBgraphics.dat\'s sounds play nothing, said once');
+  check(JSON.stringify(traced) === '["Cannot find Sound"]', 'without CSBgraphics.dat, its sounds play nothing, said once');
 }
 
 /* ----------------------------- 5. an OVERRIDE left unused ------------------------- */

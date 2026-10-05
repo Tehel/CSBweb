@@ -45,6 +45,12 @@ export interface GameHost {
    * (`doc/CSBwin-src/Sound.cpp:663`); left out, the sample plays loud.
    */
   playSound(soundId: number, rateIdx?: number, highVolume?: number): void;
+  /**
+   * Play a sound of `CSBgraphics.dat`, its samples as `ReadSound` left them: the rest of
+   * `PlayCustomSound`, `SOUNDDATA::Decode(volume)` and `sounder.Sound`
+   * (`doc/CSBwin-src/Sound.cpp:1055-1058`). `volume` is `Decode`'s divisor, never 0.
+   */
+  playCustomSound(sound: Uint8Array, volume: number): void;
   /** Dev-only trace, CSBWin's `AITraceActive` / `AttackTraceActive` output. */
   trace(line: string): void;
   /**
@@ -191,6 +197,7 @@ export interface GameHost {
 export function createGameHost(host: Partial<GameHost> = {}): GameHost {
   return {
     playSound: host.playSound ?? (() => {}),
+    playCustomSound: host.playCustomSound ?? (() => {}),
     trace: host.trace ?? (() => {}),
     messages: host.messages ?? {
       printLinefeed: () => {},

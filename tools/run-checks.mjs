@@ -237,6 +237,9 @@ const CHECKS = [
   // buffer: CHARDESC carries the picture rather than a graphic-26 index, so the frames
   // (which only ever see an injected party) cover the other path entirely.
   { tool: 'dump-portraits.ts' },
+  // The sounds of CSBgraphics.dat a DSA's &SOUND plays: every section of both files read
+  // as `ReadSound` does, each a WAV file once summed, and `Decode`'s volume table.
+  { tool: 'dump-custom-sounds.ts' },
   // The graphics files' signatures, and CSBWin's checks of them at a read and at
   // CSBgraphics.dat's first section read: a file the game does not name ends the game.
   { tool: 'dump-file-signatures.ts' },
