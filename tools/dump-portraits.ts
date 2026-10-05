@@ -20,7 +20,14 @@
  *
  *   - a party loaded from a CSBWin save must show its `CHARDESC` pixels;
  *   - a champion carrying only `portraitGraphic` must still show that cell of graphic
- *     26, because that is the path every champion created in play takes.
+ *     26, because that is the path every champion created in play takes;
+ *   - and one whose `charID` is past 23 shows `CSBgraphics.dat`'s portrait
+ *     (`GetExternalPortraitAddress`, `doc/CSBwin-src/Bitmaps.cpp:540`), or CSBWin's
+ *     error portrait without one.
+ *
+ * The canary for `ImportBitmap`'s decode (bottom-up rows, high nibble first, nibbles
+ * as palette indices): seven of the portrait sections of both `CSBgraphics.dat` files
+ * here are cells of CSB's graphic 26, and must decode to them pixel for pixel.
  *
  * Run: `npx tsx tools/dump-portraits.ts [save]`
  */
@@ -29,6 +36,7 @@ import { resolve } from 'node:path';
 
 import { ImageFormat } from '../src/core/imageDecoder';
 import { Direction, Position } from '../src/core/types';
+import { CSBGraphicsLoader, ERROR_PORTRAIT, getExternalPortraitAddress } from '../src/data/CSBGraphicsLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import {
   PORTRAIT_HEIGHT,
@@ -52,6 +60,16 @@ import { newUIState } from './lib/ui';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 const DEFAULT_SAVE = 'tools/fixtures/csbgame7.dat';
+const CSB_GRAPHICS = 'static/gamefiles/csb/graphics.dat';
+/** The two `CSBgraphics.dat` here, with how many portrait sections each holds. */
+const CSB_GRAPHICS_FILES: [string, number][] = [
+  ['static/gamefiles/conflux-3.5-b8/CSBgraphics.dat', 156],
+  ['static/gamefiles/dm-atari/CSBgraphics.dat', 197],
+];
+/** Portrait section → the cell of CSB's graphic 26 it is a copy of, in both files. */
+const CSB_CELL_COPIES = '44=14 46=12 47=8 49=4 50=7 146=23 148=22';
+/** One of Conflux's heroes' portraits, which are 274, 275 and 276. */
+const CONFLUX_HERO_PORTRAIT = 274;
 
 const SCREEN_W = 320;
 const SCREEN_H = 200;
@@ -181,7 +199,86 @@ function main(): void {
     'the cell packs into CHARDESC bitplanes and reads back unchanged',
   );
 
+  /* ---- 3. a charID past 23: CSBgraphics.dat's portraits ----------------------- */
+
+  console.log('\n=== external portraits, charID > 23 ===');
+  const csbSheet = graphicsSheetCells(CSB_GRAPHICS);
+  let conflux: CSBGraphicsLoader | null = null;
+  for (const [path, sections] of CSB_GRAPHICS_FILES) {
+    const csbGraphics = new CSBGraphicsLoader();
+    csbGraphics.loadFromArray(new Uint8Array(readFileSync(resolve(path))));
+    conflux ??= csbGraphics;
+    let read = 0;
+    let sized = 0;
+    const copies: string[] = [];
+    for (let index = 0; index < 1000; index++) {
+      const bitmap = csbGraphics.importBitmap(index);
+      if (!bitmap) continue;
+      read++;
+      if (bitmap.width === PORTRAIT_WIDTH && bitmap.height === PORTRAIT_HEIGHT) sized++;
+      const cell = csbSheet.indexOf(Array.from(bitmap.pixels).join(','));
+      if (cell >= 0) copies.push(`${index}=${cell}`);
+    }
+    console.log(`${path}: ${read} portraits, ${sized} of them 32x29; cells of CSB's graphic 26: ${copies.join(' ')}`);
+    check(read === sections && sized === sections, `${path}: all ${sections} portrait sections read, at 32x29`);
+    check(copies.join(' ') === CSB_CELL_COPIES, `${path}: the sections that copy CSB's graphic 26 decode to its cells`);
+  }
+  if (!conflux) throw new Error('no CSBgraphics.dat');
+
+  console.log('the error portrait:');
+  for (let y = 0; y < ERROR_PORTRAIT.height; y++) {
+    let line = '';
+    for (let x = 0; x < ERROR_PORTRAIT.width; x++) line += ERROR_PORTRAIT.pixels[y * ERROR_PORTRAIT.width + x] === 2 ? '.' : '#';
+    console.log(`  ${line}`);
+  }
+  const errorColours = new Set(ERROR_PORTRAIT.pixels);
+  check(
+    errorColours.size === 2 && errorColours.has(0) && errorColours.has(2),
+    'the error portrait is colour 0 on colour 2, as `errorPortraitBitmap`\'s planes give',
+  );
+  check(getExternalPortraitAddress(null, CONFLUX_HERO_PORTRAIT) === ERROR_PORTRAIT,
+    'without CSBgraphics.dat, a portrait past 23 is the error portrait');
+  check(getExternalPortraitAddress(conflux, 999) === ERROR_PORTRAIT,
+    'and so is a portrait section the file does not hold');
+
+  const external = getExternalPortraitAddress(conflux, CONFLUX_HERO_PORTRAIT);
+  check(external !== ERROR_PORTRAIT && new Set(external.pixels).size > 2,
+    `Conflux's portrait ${CONFLUX_HERO_PORTRAIT} is a picture`);
+  check(
+    conflux.importBitmap(CONFLUX_HERO_PORTRAIT)?.pixels.every((v, i) => v === external.pixels[i]) === true,
+    'GetExternalPortraitAddress gives ImportBitmap\'s picture',
+  );
+  check(getExternalPortraitAddress(conflux, CONFLUX_HERO_PORTRAIT) === external, 'and caches it by index');
+
+  const hero: Champion = { ...withIndex, name: 'EXTERNAL', portraitGraphic: CONFLUX_HERO_PORTRAIT };
+  const noFile = portraitOnScreen(render([hero], 0), 0);
+  check(noFile.every((v, i) => v === ERROR_PORTRAIT.pixels[i]),
+    'a champion with charID past 23 and no CSBgraphics.dat shows the error portrait');
+  ui.context.csbGraphics = conflux;
+  const onScreen = portraitOnScreen(render([hero], 0), 0);
+  const shown = onScreen.every((v, i) => v === external.pixels[i]);
+  console.log(`portrait ${CONFLUX_HERO_PORTRAIT} in the status box: ${shown ? 'matches' : 'WRONG'}`);
+  check(shown, `a champion with charID ${CONFLUX_HERO_PORTRAIT} shows Conflux's portrait in the status box`);
+
   finish();
+}
+
+/** The 24 cells of `graphicsPath`'s graphic 26, each as its pixels joined. */
+function graphicsSheetCells(graphicsPath: string): string[] {
+  const graphics = new GraphicsLoader();
+  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(graphicsPath))));
+  const sheet = graphics.getImage(26, ImageFormat.IMG1);
+  const cells: string[] = [];
+  for (let cell = 0; cell < 24; cell++) {
+    const pixels: number[] = [];
+    for (let y = 0; y < PORTRAIT_HEIGHT; y++) {
+      for (let x = 0; x < PORTRAIT_WIDTH; x++) {
+        pixels.push(sheet.pixels[(29 * (cell >> 3) + y) * sheet.width + ((cell & 7) << 5) + x] ?? 0);
+      }
+    }
+    cells.push(pixels.join(','));
+  }
+  return cells;
 }
 
 main();

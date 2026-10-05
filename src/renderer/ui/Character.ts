@@ -8,6 +8,7 @@
  */
 import { ImageFormat } from '../../core/imageDecoder';
 import { OBJECT_ID_NULL, ObjectID } from '../../core/types';
+import { getExternalPortraitAddress } from '../../data/CSBGraphicsLoader';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
 import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, getChampionPossession, Champion } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
@@ -525,10 +526,9 @@ export function drawShieldDots(ui: UIState, baseX: number, champion: Champion): 
  * (`doc/CSBwin-src/Character.cpp:4644`).
  *
  * A champion read from a genuine CSBWin save carries the pixels themselves, because
- * that is all `CHARDESC` holds; one this engine created carries the graphic-26 cell
+ * that is all `CHARDESC` holds; one this engine created carries the `charID`
  * `AddCharacter` would have blitted from, because the engine has no graphics of its
- * own. Prefer the pixels: they are the faithful field, and an external portrait
- * (`charID > 23`, `:498`) has no cell to fall back to.
+ * own. Prefer the pixels: they are the faithful field.
  */
 export function getChampionPortrait(ui: UIState, champion: Champion): IndexedBitmap | null {
   const pixels = champion.portrait;
@@ -549,8 +549,13 @@ export function getChampionPortrait(ui: UIState, champion: Champion): IndexedBit
   return null;
 }
 
+/**
+ * The portrait `AddCharacter` copies for `charID` (`doc/CSBwin-src/Character.cpp:484-508`):
+ * a cell of basic graphic 26 up to 23, and `GetExternalPortraitAddress`'s past it.
+ */
 export function getPortraitBitmap(ui: UIState, portraitIndex: number): IndexedBitmap | null {
   if (portraitIndex < 0) return null;
+  if (portraitIndex > 23) return getExternalPortraitAddress(ui.context.csbGraphics, portraitIndex);
   const cached = ui.portraitCache.get(portraitIndex);
   if (cached) return cached;
 

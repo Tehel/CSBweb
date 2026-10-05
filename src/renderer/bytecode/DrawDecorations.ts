@@ -8,7 +8,7 @@
  */
 
 import { OBJECT_ID_EOF, type ObjectID } from '../../core/types';
-import type { CSBGraphicsLoader, ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
+import { getExternalPortraitAddress, type CSBGraphicsLoader, type ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { RectPos } from '../../data/tables/UITables';
 import { bltShapeToViewportIndex, cropBitmap, tag0088b2Explicit, tag0088b2Index } from '../csbwin/CanvasBlitter';
@@ -176,9 +176,9 @@ function drawWallDecorationGraphic(draw: ViewportDraw, graphicOrdinal: number, r
  *
  * `championPortraitOrdinal` is 1-based, so 0 means "no portrait" and the ordinal is
  * decremented to CSBWin's `charID` before use. Graphic 26 is a 256x87 sheet of 32x29
- * cells, 8 per row: `srcX = (charID & 7) << 5`, `srcY = 29 * (charID >> 3)`. The
- * transparent colour is **1**, not the 10 that `BltShapeToViewport` uses, so the
- * mirror's glass shows around the head.
+ * cells, 8 per row: `srcX = (charID & 7) << 5`, `srcY = 29 * (charID >> 3)`; past 23,
+ * the portrait is `CSBgraphics.dat`'s (`:3700-3709`). The transparent colour is **1**,
+ * not the 10 that `BltShapeToViewport` uses, so the mirror's glass shows around the head.
  */
 function drawChampionPortrait(draw: ViewportDraw, championPortraitOrdinal: number): void {
   if (championPortraitOrdinal === 0) return;
@@ -190,9 +190,22 @@ function drawChampionPortrait(draw: ViewportDraw, championPortraitOrdinal: numbe
   if (!viewport || !rect || !getGraphic) return;
 
   if (charID > 23) {
-    // `GetExternalPortraitAddress` (`:3706`) — a CSB dungeon may ship its own
-    // portraits outside graphic 26. ⏳ Not supported; the shipped DM dungeon uses
-    // charIDs 0..23 only.
+    // `GetExternalPortraitAddress` (`:3706`): the 32x29 portrait itself, from its corner.
+    const portrait = getExternalPortraitAddress(draw.context.csbGraphics, charID);
+    tag0088b2Index(
+      portrait,
+      viewport,
+      {
+        x1: rect.x1 | 0,
+        y1: rect.y1 | 0,
+        x2: rect.x2 | 0,
+        y2: rect.y2 | 0,
+        srcX: 0,
+        srcY: 0,
+        srcStride: portrait.width,
+      },
+      1,
+    );
     return;
   }
 

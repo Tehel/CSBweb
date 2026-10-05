@@ -283,7 +283,7 @@ and the port writes as zero.
 
 - The DSA tracing flags `WriteDSAs` puts beside the DSAs (`DEBT.md` G1).
 - `SimpleEncryption`, neither written nor read past the header, and `MakeBigActuators`'
-  read of the actuator type before the byte swap (`DEBT.md` G4).
+  read of the actuator type before the byte swap (`DEBT.md` H).
 
 ### Evidence
 

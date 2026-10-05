@@ -100,7 +100,7 @@ export interface Champion {
     name: string;
     title: string;
     attributes: ChampionAttributes;
-    portraitGraphic?: ui16;     // Optional portrait index in graphic 26
+    portraitGraphic?: ui16;     // `AddCharacter`'s `charID`: a cell of graphic 26, or past 23 a CSBgraphics.dat portrait
     /**
      * `CHARDESC.portrait` (`doc/CSBwin-src/CSB.h:2593`) — the champion's own copy of
      * their portrait, 32x29 palette indices, one byte each.

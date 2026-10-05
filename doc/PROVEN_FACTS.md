@@ -2695,7 +2695,7 @@ once, at the moment the champion joins, and the character record owns it from th
 `charID <= 23` cuts basic graphic 26, a 256x87 sheet of 24 cells at `(charID&7)<<5` by
 `(charID>>3)*29`; anything above 23 comes from `CSBgraphics.dat`
 (`GetExternalPortraitAddress`, `doc/CSBwin-src/Bitmaps.cpp:540-569`, which insists on
-32 by 29 at `:561`) and **has no cell to be an index into**. Every later draw copies the
+32 by 29 at `:557`) and **has no cell to be an index into**. Every later draw copies the
 record's own bytes back out at 16 bytes per line — `CharacterPortraitToStatusBox`
 (`doc/CSBwin-src/Character.cpp:4644-4656`), called from `DrawCharacterStatusBox` only
 when that champion's inventory is open (`:1289-1293`).
@@ -2714,11 +2714,29 @@ plane order or a byte swap each still yield a plausible 32x29 block, and none of
 match.
 
 Consequence for the port: `Champion.portrait` holds those 928 palette indices, and the
-status box prefers them. `Champion.portraitGraphic` — the graphic-26 cell — remains for
-champions this engine creates, because the engine holds no graphics to blit from, but it
+status box prefers them. `Champion.portraitGraphic` — the `charID`, a graphic-26 cell or
+past 23 a `CSBgraphics.dat` portrait — remains for champions this engine creates, because the engine holds no graphics to blit from, but it
 is this port's shortcut and not a CSBWin field. A champion out of a genuine save has
 pixels and no index at all, which is why a loaded party once showed four empty boxes.
 
+
+## A `CSBgraphics.dat` portrait is a bare 16-colour bitmap whose nibbles are palette indices
+
+`ImportBitmap(ui32 index, …)` reads a `CGT_Portrait` section (`doc/CSBwin-src/Bitmaps.cpp:246-435`)
+as a Windows bitmap: the packed 14-byte file header (`bfType` must be `BM`), the 40-byte
+info header (`biBitCount` must be 4), then `biClrUsed` colours, or 16 when it is 0. The
+colour table is stepped over and never read, and the pixels start right after it,
+whatever `bfOffBits` says (`:313-315`). Each nibble is the colour index as it stands, high
+nibble the left pixel; rows are bottom-up, `(width+1)/2` bytes each, with no padding to
+four (`:356-435`). `GetExternalPortraitAddress` (`:540-571`) takes only a 32 by 29 result,
+and gives `GetErrorPortrait`'s picture, the word "Error" in colour 0 on colour 2
+(`errorPortraitBitmap`, `:464-524`), for anything else, the section missing included.
+
+Every portrait section of both files here is 582 bytes, which is that layout with 16
+colours and 464 bytes of pixels: Conflux's 156 and `dm-atari`'s 197, from id 24 up.
+Verified, not inferred: seven of them, ids 44, 46, 47, 49, 50, 146 and 148 in both files,
+decode this way to cells 14, 12, 8, 4, 7, 23 and 22 of CSB's basic graphic 26, pixel for
+pixel (`tools/dump-portraits.ts`). Top-down rows or swapped nibbles would match none.
 ## A `CHARDESC` slot past the party holds zeros, or the champion who left it
 
 `d.CH16482[4]` is four records whatever `d.NumCharacter` is

@@ -168,7 +168,7 @@ export interface GameHost {
   drawCharacterState(chIdx: number, charFlags: number): void;
   /**
    * The portrait pixels of a champion carrying only `portraitGraphic`, a cell of graphic
-   * 26, which only the screen holds: `SaveToWings` writes them with the rest of the
+   * 26 or a portrait of `CSBgraphics.dat`, which only the screen holds: `SaveToWings` writes them with the rest of the
    * `CHARDESC` (`SwapCharacter.ts`). Left out, such a champion goes to the wings with a
    * blank portrait.
    */

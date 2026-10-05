@@ -225,9 +225,8 @@ export function readCsbwinCharacter(
     causeOfDamage: readU16LE(block, base + 282),
     monsterCausingDamage: readU16LE(block, base + 284),
     // The champion's own copy of their portrait. Champions this port creates instead
-    // carry `portraitGraphic`, the graphic-26 cell `AddCharacter` blitted from; a save
-    // has only the pixels, and for an externally supplied portrait that is all there
-    // ever was.
+    // carry `portraitGraphic`, the `charID` `AddCharacter` blitted from; a save has only
+    // the pixels.
     portrait: readPortrait(block, base),
   };
 
@@ -322,7 +321,7 @@ const setU32BE = (b: Uint8Array, o: number, v: number): void => {
  * Pack 32x29 palette indices back into the four interleaved bitplanes `CHARDESC` holds.
  *
  * The inverse of `readPortrait`, byte for byte. A champion the engine created has no
- * pixels — it carries `portraitGraphic`, the graphic-26 cell, because the engine holds
+ * pixels — it carries `portraitGraphic`, its `charID`, because the engine holds
  * no graphics to blit from — so the caller must resolve that to pixels first (the
  * renderer's `getPortraitBitmap` does it); here, a missing portrait writes 464 zero
  * bytes, which is what CSBWin's own `ClearMemory` leaves for a slot nobody filled.

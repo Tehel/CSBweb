@@ -22,7 +22,7 @@ code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, and the work it
-needs is in the active list: G1, G4, G24, G25, G27 and G26. Its `dungeon.dat` is
+needs is in the active list: G1, G24, G25, G27 and G26. Its `dungeon.dat` is
 enciphered, and reads whole (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is
 `RC4.cpp`'s own cipher"). Each entry says what Conflux uses of it, measured on the
 deciphered file.
@@ -92,8 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | L | ⏳ step 1 of 5 next |
-| G4 | Custom-dungeon extensions: external portraits | S | ⏳ paid with G24 step 1 |
+| G24 | `CSBgraphics.dat`'s sounds and alternate monster graphics, and its signature | L | ⏳ step 2 of 5 next |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G25, G27 |
@@ -118,8 +117,7 @@ The rows above G29 are the active list. `F3` is a phase, whose status is
 `PLAN.md`'s. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
-row meanwhile. `G1` sits below G25 and G27, whose features its last operations need, and `G4` below
-G24, whose portraits it draws.
+row meanwhile. `G1` sits below G25 and G27, whose features its last operations need.
 The G rows down to G26 are Conflux's (see "Priority"). The F
 rows are independent of the rest ("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
@@ -342,29 +340,15 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G4 ⏳ Custom-dungeon extensions: external portraits
-
-**External portraits** for `charID > 23` (`GetExternalPortraitAddress`,
-`doc/CSBwin-src/Character.cpp:498-508`). No shipped DM hero has one. Conflux does: three
-of the 22 heroes `HeroExtractor` reads from it have portraits 274, 275 and 276, which come
-from `CSBgraphics.dat`, so this is paid with G24's step 1.
-
-**A file matter, off Conflux's path.** `MakeBigActuators` reads each actuator's type before
-the byte swap, so CSBWin takes bits 8-14 of `word2` for it where the port takes the type
-(`doc/PROVEN_FACTS.md` → "`MakeBigActuators` runs before the byte swap");
-`tools/dump-dungeon-conversions.ts` fails if a dungeon has a type-47 actuator under either
-reading, and DM has none. The conversion runs only on a file without the `BigActuators`
-flag (`doc/CSBwin-src/SaveGame.cpp:2604`), and Conflux's has it.
-
-### G24 ⏳ `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics
+### G24 ⏳ `CSBgraphics.dat`'s sounds and alternate monster graphics, and its signature
 
 CSBWin reads eight kinds of section from `CSBgraphics.dat` (`CGT_*`,
-`doc/CSBwin-src/CSB.h:289-296`). The port reads two, the wall and the floor decorations
-(`src/data/CSBGraphicsLoader.ts`). Conflux's file holds 156 portraits, 611 sounds, 123
-alternate monster graphics, 90 backgrounds, 112 viewport overlays, 51 overlay palettes, 36
-wall and 72 floor decorations. Of the six kinds the port does not read, Conflux reaches:
+`doc/CSBwin-src/CSB.h:289-296`). The port reads three, the wall and the floor decorations
+and the portraits (`src/data/CSBGraphicsLoader.ts`). Conflux's file holds 156 portraits,
+611 sounds, 123 alternate monster graphics, 90 backgrounds, 112 viewport overlays, 51
+overlay palettes, 36 wall and 72 floor decorations. Of the five kinds the port does not
+read, Conflux reaches:
 
-- **Portraits** (`doc/CSBwin-src/Bitmaps.cpp:287`): its heroes with portraits past 23 (G4).
 - **Sounds** (`Sound.cpp:996`): what its 308 `&SOUND`s play with a number from 0 up.
   `SoundQueue.playCustomSound` plays nothing for those and traces "Cannot find Sound"
   once, as CSBWin does without the file.
@@ -377,12 +361,11 @@ draws, G27.
 Every reader goes through `ReadCSBgraphic` (`doc/CSBwin-src/Graphics.cpp:3201`), which the
 port has (`CSBGraphicsLoader.readSection`). The steps, one commit each:
 
-1. **Portraits**, with G4. `ImportBitmap(index, …)` (`Bitmaps.cpp:246-435`) reads a
-   `CGT_Portrait` section as a 16-colour BMP, bottom-up rows of nibbles that are palette
-   indices (its colour table is skipped, not used). `GetExternalPortraitAddress`
-   (`:540-571`) caches it by index, and gives `GetErrorPortrait`'s picture (`:526-536`)
-   when the section is missing or not 32 by 29. Drawn where G4's two call sites are:
-   `AddCharacter` (`Character.cpp:498-508`) and the mirror (`CSBCode.cpp:3700-3709`).
+1. **Portraits**: done. `ImportBitmap` and `GetExternalPortraitAddress` are
+   `CSBGraphicsLoader.importBitmap` and `getExternalPortraitAddress`, drawn for a `charID`
+   past 23 in the status box (`getPortraitBitmap`, `src/renderer/ui/Character.ts`) and in
+   the mirror (`drawChampionPortrait`, `src/renderer/bytecode/DrawDecorations.ts`), and
+   checked by `tools/dump-portraits.ts`.
 2. **Sounds.** `SOUNDDATA::ReadSound` (`Sound.cpp:989-1025`): a section's bytes summed
    with the previous one, the sample count at byte 40, the 8-bit samples from 44.
    `PlayCustomSound`'s branch from 0 (`:1039-1059`) plays them, through `Decode`'s
@@ -739,6 +722,13 @@ Recorded so that nobody "fixes" them.
   (`doc/CSBwin-src/CSBCode.cpp:3542`), compensates for `MakeMirror` reversing a
   byte-aligned buffer. `getMirroredBitmap` reverses the exact bitmap, so applying it would
   shift a correctly aligned image. The reasoning is in the code.
+- 🚫 **`MakeBigActuators` reads the actuator's type, not CSBWin's byte-order slip.** CSBWin
+  converts the actuators of a file without the `BigActuators` flag before their byte swap
+  (`doc/CSBwin-src/SaveGame.cpp:2601-2608`), so it takes bits 8-14 of `word2` for the
+  type where the port takes the type itself (`doc/PROVEN_FACTS.md` → "`MakeBigActuators`
+  runs before the byte swap"). The two differ only for a type-47 actuator under either
+  reading: DM has none, Conflux's file has the flag, and `tools/dump-dungeon-conversions.ts`
+  fails for a dungeon that has one.
 - 🚫 **A kill of `alternateGraphics` 4 to 7 is counted nowhere.** `ProcessMonsterDeleteFilter`
   indexes the kill statistics' four longwords with the three-bit subtype unchecked
   (`doc/CSBwin-src/Code11f52.cpp:955`, `:960`): a new record's count goes into the stack past
