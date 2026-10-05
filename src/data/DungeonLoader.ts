@@ -195,6 +195,7 @@ export class DungeonLoader {
             if (ef.simpleEncipher) data.simpleEncipher = true;
             data.extendedWallDecorations = ef.extendedWallDecorations;
             data.spellFilterLocation = ef.spellFilterLocation;
+            data.hintKey = ef.header.hintKey;
             if (ef.dsaLevelIndex) data.dsaLevelIndex = ef.dsaLevelIndex;
             if (ef.dsaIndex) data.dsaIndex = ef.dsaIndex;
             const specialLocations = data.expool ? specialLocationsFromExpool(data.expool) : null;

@@ -345,6 +345,11 @@ const NOT_CARRIED: Array<{ pattern: string; why: string; holds: (d: Difference, 
     holds: (d) => d.was == null && d.now === 0,
   },
   {
+    pattern: '.dungeon.snapshot.hintKey',
+    why: 'the block\'s hint key, written out: eight zeros',
+    holds: (d) => d.was == null && d.now === 'AAAAAAAAAAA=',
+  },
+  {
     pattern: '.dungeon.snapshot.databases.scrolls[].textReference',
     why: 'a free record keeps only its link (data.cpp:993-1015)',
     holds: (d, { live }) => isFree(live, 'scrolls', d),

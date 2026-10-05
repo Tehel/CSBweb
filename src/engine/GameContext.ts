@@ -10,6 +10,7 @@
  * CSBWin's functions do; `host` holds the calls that leave the engine (`GameHost`).
  */
 import { readOverlayPalette } from '../data/CsbwinExpool';
+import { noExpectedSignatures, type ExpectedSignatures } from '../data/CsbwinExtendedFeatures';
 import type { DungeonData } from '../data/dungeonTypes';
 import { DBType, type ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
@@ -110,6 +111,11 @@ export interface GameContext {
   readonly levelCleared: Uint8Array;
   /** `DM_rules` and `DMRulesDesignOption`, which outlive a game (`RulesOptions`). */
   readonly rules: RulesOptions;
+  /**
+   * The graphics signatures the last Extended Features block read named, which outlive a
+   * game as `rules` do (`ExpectedSignatures`).
+   */
+  readonly signatures: ExpectedSignatures;
   /**
    * The overlay palette (`src/engine/OverlayPalette.ts`), red, green and blue, as its
    * world's `EXPOOL` gives it at a read. A read restores it in place.
@@ -246,6 +252,7 @@ export function createGameContext(
       dmRules: false, dmRulesDesignOption: false,
       invisibleMonsters: false, drawAsSize4Monsters: false, simpleEncipher: false,
     },
+    signatures: noExpectedSignatures(),
     overlayPalette: readOverlayPalette(dungeonData) ?? identityOverlayPalette(),
     tables,
     host,

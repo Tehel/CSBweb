@@ -30,8 +30,8 @@
  * - `expool` is database 11, which play writes: a death puts the bones' record there
  *   (`src/data/CsbwinExpool.ts`). The rest of it is the file's, and this port cannot
  *   regenerate it.
- * - `dsaLevelIndex`, `dsaIndex`, `specialLocations`, `extendedWallDecorations` and
- *   `spellFilterLocation` are carried for the same reason. `dungeon.dat` has none of
+ * - `dsaLevelIndex`, `dsaIndex`, `specialLocations`, `extendedWallDecorations`,
+ *   `spellFilterLocation` and `hintKey` are carried for the same reason. `dungeon.dat` has none of
  *   them; a CSBWin save's Extended Features block and `EXPOOL` do, and a CSBWin load
  *   writes them into the world (`buildCsbwinRuntimeState`). Only each DSA's `state`
  *   changes in play, but `dsaIndex` goes in whole, since it is the save's.
@@ -120,6 +120,7 @@ export const DUNGEON_DATA_SOURCES = {
     specialLocations: 'snapshot',
     extendedWallDecorations: 'snapshot',
     spellFilterLocation: 'snapshot',
+    hintKey: 'snapshot',
     bigActuators: 'loaded',
     indirectText: 'loaded',
     newScrolls: 'loaded',
@@ -179,7 +180,7 @@ export interface DungeonSnapshot {
     expool?: string | null;
     /**
      * `data.dsaLevelIndex`, one base64 string of big-endian words per level. This and the
-     * next four are what a CSBWin load writes. Each is `null` where the world has none,
+     * next five are what a CSBWin load writes. Each is `null` where the world has none,
      * which a restore then removes.
      */
     dsaLevelIndex?: string[] | null;
@@ -189,6 +190,8 @@ export interface DungeonSnapshot {
     specialLocations?: Array<[number, number]> | null;
     extendedWallDecorations?: boolean | null;
     spellFilterLocation?: number | null;
+    /** `data.hintKey`, base64. */
+    hintKey?: string | null;
 }
 
 function encodeBytes(bytes: Uint8Array): string {
@@ -329,6 +332,7 @@ export function captureDungeonSnapshot(data: DungeonData): DungeonSnapshot {
         : null;
     snapshot.extendedWallDecorations = data.extendedWallDecorations ?? null;
     snapshot.spellFilterLocation = data.spellFilterLocation ?? null;
+    snapshot.hintKey = data.hintKey ? encodeBytes(data.hintKey) : null;
 
     return snapshot;
 }
@@ -404,4 +408,6 @@ export function applyDungeonSnapshot(data: DungeonData, snapshot: DungeonSnapsho
     }
     if (snapshot.spellFilterLocation === null) delete data.spellFilterLocation;
     else if (snapshot.spellFilterLocation !== undefined) data.spellFilterLocation = snapshot.spellFilterLocation;
+    if (snapshot.hintKey === null) delete data.hintKey;
+    else if (snapshot.hintKey) data.hintKey = decodeBytes(snapshot.hintKey);
 }

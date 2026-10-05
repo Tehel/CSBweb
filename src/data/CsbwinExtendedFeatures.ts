@@ -749,6 +749,45 @@ export interface LiveExtendedFeatures {
     simpleEncipher?: boolean;
     /** `DSAIndex`, whose DSAs `numDSA` counts. */
     dsaIndex?: DsaIndex;
+    /** The four `expected…Signature`s, as the last block read gave them. */
+    signatures?: ExpectedSignatures;
+    /** `hintKey`, as the world's file gave it; absent, eight zeros. */
+    hintKey?: Uint8Array;
+}
+
+/**
+ * `expectedGraphicSignature1/2` and `expectedCSBgraphicSignature1/2`, process-wide globals,
+ * 0 at start (`doc/CSBwin-src/data.cpp:47-49`). `ReadExtendedFeatures` assigns them from a
+ * file's block (`SaveGame.cpp:378-381`) and `SaveGame` writes them back (`:936-939`). It
+ * never clears them, where it zeroes `hintKey` before it looks for a block (`:314`), so a
+ * file without one leaves them as they were. `Graphics.cpp:1786-1796` and `:1852-1881`
+ * check them against the graphics files' own, which this port does not compute.
+ */
+export interface ExpectedSignatures {
+    expectedGraphicSignature1: number;
+    expectedGraphicSignature2: number;
+    expectedCSBgraphicSignature1: number;
+    expectedCSBgraphicSignature2: number;
+}
+
+/** The four signatures as they are at start (`doc/CSBwin-src/data.cpp:47-49`). */
+export function noExpectedSignatures(): ExpectedSignatures {
+    return {
+        expectedGraphicSignature1: 0, expectedGraphicSignature2: 0,
+        expectedCSBgraphicSignature1: 0, expectedCSBgraphicSignature2: 0,
+    };
+}
+
+/**
+ * `ReadExtendedFeatures`' four signatures (`doc/CSBwin-src/SaveGame.cpp:378-381`), from a
+ * file's block. A file with none (`header` undefined) assigns none.
+ */
+export function readExpectedSignatures(signatures: ExpectedSignatures, header: ExtendedFeaturesBlock | undefined): void {
+    if (!header) return;
+    signatures.expectedGraphicSignature1 = header.graphicsSignature1;
+    signatures.expectedGraphicSignature2 = header.graphicsSignature2;
+    signatures.expectedCSBgraphicSignature1 = header.csbGraphicsSignature1;
+    signatures.expectedCSBgraphicSignature2 = header.csbGraphicsSignature2;
 }
 
 /**
@@ -806,13 +845,16 @@ export function readRulesOptions(
  * every committed save, which is the three unconditional ones (0xe0) plus the wall
  * decorations and DM rules.
  *
+ * **What a read gave.** `graphicsSignature1/2` and `csbGraphicsSignature1/2` are
+ * `expectedGraphicSignature*` (`:936-939`), the last block read's (`ExpectedSignatures`),
+ * which `Graphics.cpp:1786-1796` treats as "no expectation" when both halves are zero.
+ * `hintKey` is the world's file's (`:941`), `Hint.cpp`'s key, and `hintKey[0] == 0` is
+ * its own "no key" test (`doc/CSBwin-src/Hint.cpp:5508`). All five are zero in every
+ * committed save.
+ *
  * **Zero, and measured zero rather than assumed.** `editingOptions` is never assigned by
- * `SaveGame` at all. `graphicsSignature1/2` and `csbGraphicsSignature1/2` are
- * `expectedGraphicSignature*`, which `Graphics.cpp:1786-1796` treats as "no expectation"
- * when both halves are zero — this port computes no signature. `hintKey` is `Hint.cpp`'s
- * key, and `hintKey[0] == 0` is its own "no key" test (`doc/CSBwin-src/Hint.cpp:5508`).
- * `overlayOrdinal` is the overlay number **plus one**, so 0 is "no overlay", and the four
- * parameters go with it. All eight are zero in every committed save.
+ * `SaveGame` at all. `overlayOrdinal` is the overlay number **plus one**, so 0 is "no
+ * overlay", and the four parameters go with it. All are zero in every committed save.
  *
  * **`gameInfoSize` is 0**, meaning `gameInfo == NULL` (`:977-978`) — this port has no
  * game-information string. Note that 0 and -1 are different things here; -1 is an
@@ -842,8 +884,8 @@ export function buildLiveExtendedFeatures(live: LiveExtendedFeatures): ExtendedF
         editingOptions: 0,
         gameInfoSize: 0,
         cellFlagArraySize: live.cellFlagArraySize,
-        graphicsSignature1: 0,
-        graphicsSignature2: 0,
+        graphicsSignature1: (live.signatures?.expectedGraphicSignature1 ?? 0) >>> 0,
+        graphicsSignature2: (live.signatures?.expectedGraphicSignature2 ?? 0) >>> 0,
         spellFilterLocation: (live.spellFilterLocation ?? 0) >>> 0,
         extendedFlags: extendedFlags >>> 0,
         overlayOrdinal: 0,
@@ -851,8 +893,8 @@ export function buildLiveExtendedFeatures(live: LiveExtendedFeatures): ExtendedF
         overlayP2: 0,
         overlayP3: 0,
         overlayP4: 0,
-        csbGraphicsSignature1: 0,
-        csbGraphicsSignature2: 0,
-        hintKey: new Uint8Array(8),
+        csbGraphicsSignature1: (live.signatures?.expectedCSBgraphicSignature1 ?? 0) >>> 0,
+        csbGraphicsSignature2: (live.signatures?.expectedCSBgraphicSignature2 ?? 0) >>> 0,
+        hintKey: live.hintKey ? live.hintKey.slice(0, 8) : new Uint8Array(8),
     };
 }

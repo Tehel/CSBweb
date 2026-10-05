@@ -10,7 +10,7 @@ import { extractPresetHeroes } from './data/HeroExtractor';
 import { dataSetFor } from './data/DataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
-import { parseHcsbDat, parseHintOracle } from './data/HintOracleLoader';
+import { parseHcsbDat } from './data/HintOracleLoader';
 import { BrowserSaveStore, downloadSaveFile } from './data/saves';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
@@ -207,8 +207,9 @@ async function loadGameFiles(): Promise<GameFiles> {
 }
 
 /**
- * The Hint Oracle's two files, or `null` where the data set has none, or one does not read:
- * then the inventory's close box is CSBWin's (`src/renderer/ui/HintOracleButton.ts`).
+ * The Hint Oracle's two files, or `null` where the data set has none, or `hcsb.dat` does
+ * not read: then the inventory's close box is CSBWin's (`src/renderer/ui/HintOracleButton.ts`).
+ * `hcsb.hct` is read when the Oracle opens, under the running world's key.
  */
 async function loadHintOracle(): Promise<HintOracleFiles | null> {
     if (!dataSet.hintOracle) return null;
@@ -219,7 +220,7 @@ async function loadHintOracle(): Promise<HintOracleFiles | null> {
     const [hct, dat] = await Promise.all([fetchFile('hcsb.hct'), fetchFile('hcsb.dat')]);
     if (!hct || !dat) return null;
     try {
-        return { oracle: parseHintOracle(hct), dat: parseHcsbDat(dat) };
+        return { hct, dat: parseHcsbDat(dat) };
     } catch (error) {
         console.warn('No Hint Oracle:', error);
         return null;
@@ -415,7 +416,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             };
             if (!screen || !files.hintOracle) return close();
             const deps = { canvas: gameCanvasEl, gameScreen: screen, playSound };
-            runHintOracle(deps, files.hintOracle, square).catch(reportError).finally(close);
+            runHintOracle(deps, files.hintOracle, square, game.ctx.state.dungeon.hintKey).catch(reportError).finally(close);
         },
     });
     return { game, screen, saves, messages };

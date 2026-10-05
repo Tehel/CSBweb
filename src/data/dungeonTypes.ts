@@ -563,6 +563,12 @@ export interface DungeonData {
     word22592?: number;
     spellFilterLocation?: number; // Extended-feature spell filter location
     /**
+     * `hintKey`, the Extended Features block's eight bytes (`doc/CSBwin-src/SaveGame.cpp:382`),
+     * the key the Hint Oracle deciphers `hcsb.hct` under. Unset for a file without a
+     * block, for which `ReadExtendedFeatures` leaves it zeroed (`:314`).
+     */
+    hintKey?: Uint8Array;
+    /**
      * The Extended Features block a `dungeon.dat` opens with, when it has one (the DM
      * Windows package's). A new game read from it takes its rule flags
      * (`readRulesOptions`, `src/data/CsbwinExtendedFeatures.ts`).

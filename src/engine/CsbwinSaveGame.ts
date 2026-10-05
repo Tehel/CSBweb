@@ -52,14 +52,14 @@
  * - A timer's bytes 6-9 come back under both readings, the bytes and the words, where
  *   the live entry had the one its creator set (`RuntimeSave.collapseTimerBytes`).
  * - The footprint ring is the file's twenty-four entries, the ones not yet walked zero.
- * - `dsaLevelIndex`, `extendedWallDecorations` and `spellFilterLocation` are the
- *   Extended Features block's, written out where a game from `dungeon.dat` had none.
+ * - `dsaLevelIndex`, `extendedWallDecorations`, `spellFilterLocation` and `hintKey` are
+ *   the Extended Features block's, written out where a game from `dungeon.dat` had none.
  * - A free record keeps only its link: the object a deleted scroll named, what a
  *   deleted monster carried or a deleted chest held, is not written
  *   (`doc/CSBwin-src/data.cpp:993-1015`).
  */
 import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
-import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
+import { readExpectedSignatures, readRulesOptions } from '../data/CsbwinExtendedFeatures';
 import { readDisableSaves, readGlobalVariables, readOverlayPalette } from '../data/CsbwinExpool';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
@@ -219,7 +219,7 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
             timerSequence: world.save.timerSequence,
             firstAvailTimer: gb2.firstAvailTimer,
             missiles: world.save.missiles,
-            // The image holds none of these five: the save carries them beside it.
+            // The image holds none of these six: the save carries them beside it.
             snapshot: captureDungeonSnapshot({
                 ...world.dungeon,
                 dsaLevelIndex: world.save.dsaLevelIndex,
@@ -227,6 +227,7 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
                 specialLocations: world.save.specialLocations,
                 extendedWallDecorations: world.save.extendedWallDecorations,
                 spellFilterLocation: world.save.spellFilterLocation,
+                hintKey: world.save.hintKey,
             }),
         },
     };
@@ -234,20 +235,22 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
 
 /**
  * `_ReadEntireGame`'s read of a save's world, installed as the running game's
- * (`Game.installWorld`): the image, structure and all, with the five the save carries
- * beside it, its rules, and `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:1826). The save
+ * (`Game.installWorld`): the image, structure and all, with the six the save carries
+ * beside it, its rules and signatures, and `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:1826). The save
  * restores its state over it (`applyCsbwinSave`).
  */
 function installCsbwinWorld(game: Game, world: CsbwinWorld): void {
     // Before `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
     CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc, (line) => game.ctx.host.trace(line));
     readRulesOptions(game.ctx.rules, world.save.extendedFeatures, world.save.simpleEncipher);
+    readExpectedSignatures(game.ctx.signatures, world.save.extendedFeatures);
     game.installWorld(Object.assign(world.dungeon, {
         dsaLevelIndex: world.save.dsaLevelIndex,
         dsaIndex: world.save.dsaIndex,
         specialLocations: world.save.specialLocations,
         extendedWallDecorations: world.save.extendedWallDecorations,
         spellFilterLocation: world.save.spellFilterLocation,
+        hintKey: world.save.hintKey,
     }));
 }
 

@@ -20,15 +20,18 @@
  * The screen itself is `HintOracleScreen` (`src/renderer/intro/HintOracle.ts`), which the
  * page runs over an `IntroHost` (`runHintOracle`, `src/renderer/intro/BootSequence.ts`).
  */
-import type { HcsbDat, HintOracle } from '../../data/HintOracleLoader';
+import type { HcsbDat } from '../../data/HintOracleLoader';
 import type { Rect, UIButton } from '../../data/tables/UITables';
 import type { HintSquare } from '../intro/HintOracle';
 import { tag02076e, tag0207cc } from './Mouse';
 import type { UIState } from './UIState';
 
-/** The Oracle's two files, `hcsb.hct` and `hcsb.dat`, as read. */
+/**
+ * The Oracle's two files: `hcsb.hct` as fetched, which `readHintOracle` reads under the
+ * running world's `hintKey` when the Oracle opens, and `hcsb.dat` as read.
+ */
 export interface HintOracleFiles {
-  oracle: HintOracle;
+  hct: Uint8Array;
   dat: HcsbDat;
 }
 

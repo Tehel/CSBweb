@@ -1,7 +1,7 @@
 # CSBWin Hint Oracle Reference (Sourced)
 
 Chaos Strikes Back's Hint Oracle, as CSBWin ports it in `doc/CSBwin-src/Hint.cpp`. The
-port reads its data with `parseHintOracle` and `parseHcsbDat`
+port reads its data with `readHintOracle` and `parseHcsbDat`
 (`src/data/HintOracleLoader.ts`), and `tools/dump-hint-oracle.ts` checks the retail files
 against everything below. `HintOracleScreen` (`src/renderer/intro/HintOracle.ts`) is the
 screen, and `tools/dump-hint-oracle-screen.ts` runs it headlessly. The game opens it
@@ -101,13 +101,14 @@ from item 0: 2 and 7 are constants (`:4065-4066`).
 
 ## Enciphering
 
-When the save's `hintKey` is not zero, CSBWin reads `hcsb.hct` through `RC4.cpp`'s cipher under
-that eight-byte key (`SETENCIPHERED`, `Hint.cpp:5401-5405`, `:5625-5629`). The key comes from
-the save's Extended Features block (`memcpy(hintKey, efb.hintKey, 8)`,
-`doc/CSBwin-src/SaveGame.cpp:382`). Every save this project has carries a zero key
-(`doc/PROVEN_FACTS.md` → "The Extended Features header a live game writes"), and the
-shipped `hcsb.hct` is plain. `parseHintOracle` reads a plain file only; an enciphered
-one fails its first header check.
+When the save's `hintKey[0]` is not zero, CSBWin reads `hcsb.hct` through `RC4.cpp`'s
+cipher under a stream made from that eight-byte key (`SETENCIPHERED`, `Hint.cpp:5401-5405`,
+`:5625-5629`; `doc/PROVEN_FACTS.md` → "The "simple" encipherment is `RC4.cpp`'s own
+cipher"). The key comes from the save's Extended Features block
+(`memcpy(hintKey, efb.hintKey, 8)`, `doc/CSBwin-src/SaveGame.cpp:382`). `readHintOracle`
+deciphers the file under the key when its first byte is not 0, then parses it with
+`parseHintOracle`. Every save this project has carries a zero key, and the shipped
+`hcsb.hct` is plain; `tools/dump-hint-key.ts` reads it enciphered.
 
 ## `hcsb.hct`
 
@@ -357,8 +358,11 @@ the close box replaced, and DONE on the title list closing the Oracle.
 - **Leaving.** DONE on the title list closes the Oracle, where CSBWin's goes back to the
   load screen (`w_4 = 1`, `:6589-6602`). `TAG0207cc` then shows the inventory again, as
   after the disk menu (`SaveGame.cpp:1274`), and the clock runs.
-- **The key.** The port keeps no saved game's `hintKey` (`DEBT.md` C146), so `hcsb.hct`
-  is read plain.
+- **The key.** `hcsb.hct` is fetched with the page and read when the Oracle opens, under
+  the running world's `hintKey`, the one its last read took from a block
+  (`runHintOracle`). A file that does not read under it opens no Oracle, and the page
+  reports the error. CSBWin's error routine, `TAG0093a0_17`, draws nothing
+  (`Hint.cpp:7108-7113`).
 
 `tools/dump-hint-oracle-button.ts` checks the picture, and the click on the party's square
 after a step, a teleporter and a pit. Golden frames 15 and 16 are a CSB inventory with

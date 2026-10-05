@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C146 | A read keeps no hint key nor graphics signatures, and a save writes zeros | S | ⏳ |
 | G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits | S | ⏳ waits on G24 |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
@@ -199,25 +198,6 @@ The decision is the author's, after a look in play:
 - **Fix it**: `ShrinkBLT` gets `w + 1` by `h + 1`, the tool's check of the twelfth line
   becomes "every line holds no colour 12", and an H entry gives both readings.
 
-### C146 ⏳ A read keeps no hint key nor graphics signatures, and a save writes zeros
-
-`ReadExtendedFeatures` zeroes `hintKey` (`doc/CSBwin-src/SaveGame.cpp:314`), then takes
-it from a file's Extended Features block, with the four expected graphics signatures
-(`:378-382`). `SaveGame` writes all five back (`:936-941`). The port keeps none of them:
-its block carries zeros (`buildLiveExtendedFeatures`, `src/data/CsbwinExtendedFeatures.ts`),
-so a game read with a key or a signature and saved again loses it. The Hint Oracle
-deciphers `hcsb.hct` under the key with `RC4.cpp`'s cipher whenever `hintKey[0] != 0`
-(`SETENCIPHERED`, `Hint.cpp:5401-5405`). With no key kept, the port's Oracle reads the
-file plain (`runHintOracle`, `src/renderer/intro/BootSequence.ts`). No file here carries a
-key or a signature, so nothing shows the difference yet.
-
-Paying it: the five kept on the world from every read, beside `spellFilterLocation`
-(`DungeonLoader`, `SaveGameLoader`, `DungeonSnapshot`), zero for a file without a block;
-written back by `buildLiveExtendedFeatures`; and `hcsb.hct` deciphered with
-`rc4PrepareKey(hintKey, 8)` when the key's first byte is not zero. A tool round-trips a
-save whose block carries a key and signatures, and opens the Oracle on an `hcsb.hct`
-enciphered from the retail one.
-
 ---
 
 ## F — Verification debt
@@ -259,7 +239,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 153 checks sequentially (`spawnSync`, `:273`), each a
+`tools/run-checks.mjs` spawns its 172 checks sequentially (`spawnSync`, `:307`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and

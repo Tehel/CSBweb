@@ -8,7 +8,7 @@
 
 import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
-import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
+import { readExpectedSignatures, readRulesOptions } from '../data/CsbwinExtendedFeatures';
 import { readDisableSaves } from '../data/CsbwinExpool';
 import type { PartyState, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
@@ -307,12 +307,14 @@ export class Game implements MainLoop {
     }
 
     /**
-     * `ReadExtendedFeatures`' rule flags for a new game, from the block its `dungeon.dat`
-     * opens with (doc/CSBwin-src/SaveGame.cpp:392-398, read at `ReadDatabases`' start,
-     * `:2347`). A file with no block leaves the rules as they were.
+     * `ReadExtendedFeatures`' rule flags and graphics signatures for a new game, from the
+     * block its `dungeon.dat` opens with (doc/CSBwin-src/SaveGame.cpp:378-381, `:392-398`,
+     * read at `ReadDatabases`' start, `:2347`). A file with no block leaves them as they
+     * were.
      */
     private readNewGameRules(data: DungeonData): void {
         readRulesOptions(this.ctx.rules, data.extendedFeatures, data.simpleEncipher);
+        readExpectedSignatures(this.ctx.signatures, data.extendedFeatures);
     }
 
     /**

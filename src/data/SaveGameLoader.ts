@@ -66,6 +66,8 @@ export interface SaveGameState {
   extendedWallDecorations?: boolean;
   specialLocations?: Record<number, number>;
   spellFilterLocation?: number;
+  /** `EXTENDEDFEATURESBLOCK.hintKey`, absent for a file without a block. */
+  hintKey?: Uint8Array;
   /**
    * `gb2.handChar` — the champion index holding the cursor, -1 for nobody.
    * `LoadGame` restores `d.HandChar` from it (`doc/CSBwin-src/SaveGame.cpp:1636`).
@@ -679,6 +681,7 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState {
     extendedWallDecorations: extended.extendedWallDecorations,
     specialLocations: specialLocations ?? undefined,
     spellFilterLocation: extended.spellFilterLocation,
+    hintKey: extended.header?.hintKey,
     handChar: block2.handChar,
     magicCaster: block2.magicCaster,
     block1: parseBlock1(block1Buf),

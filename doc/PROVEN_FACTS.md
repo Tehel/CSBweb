@@ -3427,6 +3427,13 @@ and carry the flag (`:324-338`); from there `READ` deciphers every buffer by its
 in the file (`doc/CSBwin-src/system.cpp:301-313`), and `WRITE` enciphers the same way
 (`:315-329`). The whole file is enciphered, the block included.
 
+The Hint Oracle reads `hcsb.hct` through the same cipher under a stream of its own when
+the save's `hintKey[0]` is not 0 (`doc/CSBwin-src/Hint.cpp:5401-5405`, `:5625-5629`).
+`SETENCIPHERED` (`system.cpp:274-286`) does not use the key as RC4's: it prepares the
+eight bytes of `hintKey`, XORs the five constants `{112, 32, 34, 1, 6}` with the stream's
+first five bytes, and prepares those five as the key. The file is then read by its
+position, from byte 0. `readHintOracle` (`src/data/HintOracleLoader.ts`) does this.
+
 `ReadExtendedFeatures` sets the global `simpleEncipher` with the file's mark (`:337`),
 and nothing clears it (`doc/CSBwin-src/data.cpp:243`). `SaveGame` then marks every save
 file enciphered with the same key (`SaveGame.cpp:914-920`) and sets `SimpleEncryption`
@@ -3614,6 +3621,15 @@ header without the bit leaves three bytes of terminator for GAMEBLOCK1 to eat.
 `gameInfoSize` is 0 for "no game information at all" and `gameInfoSize - 1` when there is
 some (`:977-978`), which makes **-1** an allocated-but-empty string. A port with no game
 information writes 0.
+
+The four signatures and `hintKey` are written from what the reads left
+(`:936-941`), not computed. `ReadExtendedFeatures` zeroes `hintKey` before it looks for a
+block (`:314`), and takes it and the signatures from one (`:378-382`). It never clears the
+signatures, process-wide globals that start at 0 (`doc/CSBwin-src/data.cpp:47-49`), so a
+file without a block keeps the last block's signatures and has a zero key. The port keeps
+the key on the world (`DungeonData.hintKey`), the signatures on the game
+(`ctx.signatures`), and writes all five back (`buildLiveExtendedFeatures`);
+`tools/dump-hint-key.ts` checks it.
 
 ## A live timer keeps its object in three places, and a file has one
 

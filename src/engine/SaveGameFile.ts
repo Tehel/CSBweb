@@ -96,6 +96,8 @@ function buildFileBlocks(
             drawAsSize4Monsters: game.ctx.rules.drawAsSize4Monsters,
             simpleEncipher: game.ctx.rules.simpleEncipher,
             dsaIndex: dungeon.dsaIndex,
+            signatures: game.ctx.signatures,
+            hintKey: dungeon.hintKey,
         }),
         dungeonImage: buildDungeonImage(dungeon, {
             indirectText: true,

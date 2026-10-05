@@ -25,7 +25,7 @@ import { readFileSync } from 'node:fs';
 import { Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { hintsAtPosition, MAXHINTINDICES, parseHcsbDat, parseHintOracle } from '../src/data/HintOracleLoader';
+import { hintsAtPosition, MAXHINTINDICES, parseHcsbDat, parseHintOracle, readHintOracle } from '../src/data/HintOracleLoader';
 import type { Game } from '../src/engine/Game';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { MovementAction } from '../src/engine/gameTypes';
@@ -44,9 +44,10 @@ import { newUIState } from './lib/ui';
 
 const CSB = 'static/gamefiles/csb';
 const files: HintOracleFiles = {
-  oracle: parseHintOracle(new Uint8Array(readFileSync(`${CSB}/hcsb.hct`))),
+  hct: new Uint8Array(readFileSync(`${CSB}/hcsb.hct`)),
   dat: parseHcsbDat(new Uint8Array(readFileSync(`${CSB}/hcsb.dat`))),
 };
+const plain = parseHintOracle(files.hct);
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(`${CSB}/graphics.dat`)));
 
@@ -120,13 +121,14 @@ async function oracleTitles(ui: UIState, square: HintSquare): Promise<string[]> 
     takeClick: () => queue.shift() ?? null,
     discardAllInput: () => { queue.length = 0; },
   };
-  const oracle = new HintOracleScreen(host, files.oracle, files.dat, square);
+  // As the page opens it, under the running world's key (`runHintOracle`).
+  const oracle = new HintOracleScreen(host, readHintOracle(files.hct, ui.ctx.state.dungeon.hintKey), files.dat, square);
   await oracle.run();
   return titles ?? [];
 }
 
 const titlesAt = (sq: HintSquare): string[] =>
-  hintsAtPosition(files.oracle, sq.level, sq.x, sq.y).slice(0, MAXHINTINDICES).map((i) => files.oracle.hints[i]!.title);
+  hintsAtPosition(plain, sq.level, sq.x, sq.y).slice(0, MAXHINTINDICES).map((i) => plain.hints[i]!.title);
 const same = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((v, i) => v === b[i]);
 const where = (sq: HintSquare): string => `level ${sq.level} (${sq.x},${sq.y})`;
 

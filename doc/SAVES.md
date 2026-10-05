@@ -72,7 +72,8 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   to `CSBGAME4.DAT`, `doc/CSBwin-src/CSBCode.cpp:9747-9756`), and guards against the
   wrong graphics with the signatures an Extended Features block may carry
   (`expectedGraphicSignature1/2`, `SaveGame.cpp:378-379`, checked at
-  `Graphics.cpp:1784-1815`), which the port neither checks nor writes.
+  `Graphics.cpp:1784-1815`). The port does not check them. It keeps those a read gives
+  and writes them back (`ctx.signatures`).
 - **RISE makes a save of its own.** On an entrance whose data set has a `mini.dat`,
   CSB's, RISE opens the chooser over every data set's saves (`SaveMenu`'s `rise` mode,
   `src/renderer/intro/PrisonDoor.ts`), and its LOAD is CSBWin's UTILITY → "MAKE NEW

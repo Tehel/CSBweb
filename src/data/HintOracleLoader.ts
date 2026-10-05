@@ -19,10 +19,9 @@
  * `pageCount - 1` chunk lengths after it are 0.
  *
  * CSBWin deciphers the file with `RC4.cpp`'s cipher when the save's `hintKey` is set
- * (`:5401-5405`). Every save this project has carries a zero key (`doc/PROVEN_FACTS.md` →
- * "The Extended Features header a live game writes"), and the port keeps no key from a
- * read (`DEBT.md` C146), so only a plain file is read here; an enciphered one fails the
- * header check.
+ * (`:5401-5405`), and `readHintOracle` does too, under the running world's key. Every save
+ * this project has carries a zero key (`doc/PROVEN_FACTS.md` → "The Extended Features
+ * header a live game writes"), and the shipped file is plain.
  *
  * `hcsb.dat` is the Oracle's screen: four items indexed as `graphics.dat`'s are, read by
  * `parseHcsbDat`.
@@ -30,6 +29,7 @@
 import { readU16BE } from '../core/bytes';
 import { LZWexpand, RLEexpand } from '../core/compression';
 import type { DecodedImage } from '../core/imageDecoder';
+import { rc4Encipher, rc4PrepareKey } from './CsbwinExtendedFeatures';
 import { GraphicsLoader } from './GraphicsLoader';
 
 /** `#define MAXHINTINDICES 9` (`doc/CSBwin-src/Hint.cpp:11`): the titles the menu shows. */
@@ -75,6 +75,35 @@ function latin1(bytes: Uint8Array): string {
     let s = '';
     for (const b of bytes) s += String.fromCharCode(b);
     return s;
+}
+
+/**
+ * `SETENCIPHERED(file, hintKey, 8)`'s stream (`doc/CSBwin-src/system.cpp:274-286`): the key
+ * prepared, five constant bytes put through it, and those five prepared as the key.
+ */
+function hintKeyStream(hintKey: Uint8Array): Uint8Array {
+    const key5 = Uint8Array.of(112, 32, 34, 1, 6);
+    rc4Encipher(rc4PrepareKey(hintKey, 8), key5, 0);
+    return rc4PrepareKey(key5, 5);
+}
+
+/**
+ * `hcsb.hct` as the Oracle reads it under `hintKey`: plain when the key's first byte is 0,
+ * and otherwise deciphered, each byte by its place in the file, as every `READ` of a file
+ * `SETENCIPHERED` gives it (`doc/CSBwin-src/Hint.cpp:5401-5405`, `:5625-5629`,
+ * `system.cpp:301-313`). The cipher is a XOR, so this also enciphers a plain file. Throws
+ * on anything `_TAG006c7e_xxx` would reject.
+ */
+export function readHintOracle(file: Uint8Array, hintKey: Uint8Array | undefined): HintOracle {
+    if (!hintKey || hintKey[0] === 0) return parseHintOracle(file);
+    return parseHintOracle(encipherHintFile(file, hintKey));
+}
+
+/** A copy of `file` put through `hintKey`'s stream, from its first byte. */
+export function encipherHintFile(file: Uint8Array, hintKey: Uint8Array): Uint8Array {
+    const out = file.slice();
+    rc4Encipher(hintKeyStream(hintKey), out, 0);
+    return out;
 }
 
 /** Parse a plain `hcsb.hct`. Throws on anything `_TAG006c7e_xxx` would reject. */

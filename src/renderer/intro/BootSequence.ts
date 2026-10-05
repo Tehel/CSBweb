@@ -26,6 +26,7 @@
  * dungeon, the utility and the hint oracle; this one runs the dungeon.
  */
 import type { Swoosh } from '../../data/SwooshLoader';
+import { readHintOracle } from '../../data/HintOracleLoader';
 import type { HintOracleFiles } from '../ui/HintOracleButton';
 import type { SavedGameRead } from '../../engine/GameSaves';
 import type { GameScreen } from '../GameScreen';
@@ -642,12 +643,19 @@ async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDep
  * screen as it was. CSBWin's Oracle shows the system's pointer throughout
  * (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Leaving"); the page's canvas hides it, so the
  * arrow stands in for it.
+ *
+ * `hcsb.hct` is read under `hintKey`, the running world's, as CSBWin's Oracle reads it
+ * under the saved game's (`readHintOracle`). A file that does not read throws before the
+ * screen is taken.
  */
-export async function runHintOracle(deps: HostDeps, files: HintOracleFiles, square: HintSquare): Promise<void> {
+export async function runHintOracle(
+  deps: HostDeps, files: HintOracleFiles, square: HintSquare, hintKey: Uint8Array | undefined,
+): Promise<void> {
+  const hints = readHintOracle(files.hct, hintKey);
   const uiTables = deps.gameScreen.getUITables();
   const { host, detach } = createIntroHost(deps, uiTables.graphic232.palette552[0] ?? PALETTE_11914);
   try {
-    const oracle = new HintOracleScreen(host, files.oracle, files.dat, square);
+    const oracle = new HintOracleScreen(host, hints, files.dat, square);
     host.setCursorVisible(true);
     await oracle.run();
   } finally {
