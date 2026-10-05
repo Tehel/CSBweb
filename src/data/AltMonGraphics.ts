@@ -1,14 +1,16 @@
 /**
  * A monster's alternate graphics: the `CSBgraphics.dat` section that `DrawMonster` draws a
  * group from in place of `graphics.dat`'s pictures of its type
- * (`doc/CSBwin-src/Code51a4.cpp:963-1125`).
+ * (`doc/CSBwin-src/Code51a4.cpp:963-1125`), and the cache of the section and of the
+ * pictures drawn from it.
  *
  * A group's `alternateGraphics()`, 0 to 7, picks one. The dungeon may map a type's four on
  * a level to sections of its choosing (`AltGraphicMapping`); otherwise graphic `n` of
  * type `mt` is section `3 * mt + n - 1`, and 0 is the type's own pictures.
  */
 import { readU16LE, readU32LE } from '../core/bytes';
-import { CSBGraphicType, type CSBGraphicsLoader } from './CSBGraphicsLoader';
+import { Die } from '../engine/Die';
+import { CSBGraphicType, decodePlanar, type CSBGraphicsLoader, type IndexedBitmap } from './CSBGraphicsLoader';
 import { altMonGraphicsKey, Expool, type ExpoolDatabase } from './CsbwinExpool';
 import type { CreatureRecord } from './dungeonTypes';
 import type { MonsterDesc } from './tables/MonsterDesc';
@@ -132,11 +134,43 @@ export function AltGraphicMapping(db: ExpoolDatabase, level: number, mt: number,
   return located.value | 0;
 }
 
-/** `ALTMONCACHE` (`doc/CSBwin-src/Code51a4.cpp:981-1026`), the record's half. */
+/** Each `ALTMONGRAPH`'s basic graphics, decoded once. */
+const basicGraphics = new WeakMap<AltMonGraph, Map<number, IndexedBitmap>>();
+
+/**
+ * `GetAlternateBasicGraphicAddress(pGraph, graphicFBSAE)` (`doc/CSBwin-src/Code51a4.cpp:1113-1116`):
+ * the picture at `graphicOffsets[graphicFBSAE]` in `graphic`, unchecked, as CSBWin's
+ * pointer. Where CSBWin returns the address, the port decodes the picture, `byteWidth` and
+ * `height` the `ITEM12`'s size of its view, as `DrawMonster` reads it.
+ */
+export function GetAlternateBasicGraphicAddress(pGraph: AltMonGraph, graphicFBSAE: number, byteWidth: number, height: number): IndexedBitmap {
+  let decoded = basicGraphics.get(pGraph);
+  if (!decoded) {
+    decoded = new Map();
+    basicGraphics.set(pGraph, decoded);
+  }
+  const width = 2 * byteWidth;
+  let bitmap = decoded.get(graphicFBSAE);
+  if (!bitmap || bitmap.width !== width || bitmap.height !== height) {
+    const { buffer, byteOffset } = pGraph.graphic;
+    const at = Math.min(byteOffset + (pGraph.graphicOffsets[graphicFBSAE] | 0), buffer.byteLength);
+    bitmap = { width, height, pixels: decodePlanar(new Uint8Array(buffer, at), width, height) };
+    decoded.set(graphicFBSAE, bitmap);
+  }
+  return bitmap;
+}
+
+/** `ALTMONCACHE` (`doc/CSBwin-src/Code51a4.cpp:981-1026`). */
 class AltMonCacheEntry {
   pGraphic: AltMonGraph | null = null;
   /** -1 until searched; 0 with no `pGraphic` once a search found nothing. */
   size = -1;
+  /**
+   * The pictures `DrawMonster` derives from `pGraphic`'s, by `graphicNumFBSAE`: shrunk for
+   * the rows further away. Ten in CSBWin, whose eleventh, which a front view with a mirror
+   * and every other view would reach, is past the array.
+   */
+  pDerivedGraphic: (IndexedBitmap | null)[] = new Array<IndexedBitmap | null>(NUM_DERIVED_GRAPHIC).fill(null);
   /** The section `pGraphic` is, or -1. */
   graphicID = -1;
 
@@ -144,13 +178,16 @@ class AltMonCacheEntry {
   Clear(): void {
     this.pGraphic = null;
     this.size = -1;
+    this.pDerivedGraphic = new Array<IndexedBitmap | null>(NUM_DERIVED_GRAPHIC).fill(null);
     this.graphicID = -1;
   }
 }
 
+type AltMonster = Pick<CreatureRecord, 'creatureType' | 'alternateGraphics'>;
+
 /**
- * `altMonCache[27][4]` and `GetAlternateGraphicsRecord` (`doc/CSBwin-src/Code51a4.cpp:1029`,
- * `:1071-1110`). A slot remembers a search that found nothing (`size` 0) and keeps
+ * `altMonCache[27][4]`, `GetAlternateGraphicsRecord` and the derived graphics
+ * (`doc/CSBwin-src/Code51a4.cpp:1029`, `:1044-1058`, `:1071-1110`, `:1119-1125`). A slot remembers a search that found nothing (`size` 0) and keeps
  * answering `NULL` for it, even for another section, since only a slot holding a graphic
  * is cleared when its section changes. `CleanupAltMonCache` empties every slot.
  *
@@ -185,7 +222,7 @@ export class AltMonCache {
     csbGraphics: Pick<CSBGraphicsLoader, 'readSection'> | null | undefined,
     db: ExpoolDatabase,
     level: number,
-    pMonster: Pick<CreatureRecord, 'creatureType' | 'alternateGraphics'>,
+    pMonster: AltMonster,
   ): AltMonGraph | null {
     const mt = pMonster.creatureType;
     const altGraphic = pMonster.alternateGraphics;
@@ -210,5 +247,24 @@ export class AltMonCache {
       entry.graphicID = id;
     }
     return pGraphic;
+  }
+
+  /**
+   * `AllocateAlternateDerivedGraphic(pMonster, graphicFBSAE, width, height)`
+   * (`doc/CSBwin-src/Code51a4.cpp:1044-1058`): true if the group's derived graphic
+   * `graphicFBSAE` exists; else a blank one of `width` by `height` pixels is made, and
+   * false. Making one of width 0 is `die(0x3334)`.
+   */
+  AllocateAlternateDerivedGraphic(pMonster: AltMonster, graphicFBSAE: number, width = 0, height = 0): boolean {
+    const entry = this.slot(pMonster.creatureType, pMonster.alternateGraphics);
+    if (entry.pDerivedGraphic[graphicFBSAE]) return true;
+    if (width === 0) throw new Die(0x3334, 'Alternate Zero Width');
+    entry.pDerivedGraphic[graphicFBSAE] = { width, height, pixels: new Uint8Array(width * height) };
+    return false;
+  }
+
+  /** `GetAlternateDerivedGraphicAddress(pMonster, graphicFBSAE)` (`doc/CSBwin-src/Code51a4.cpp:1119-1125`). */
+  GetAlternateDerivedGraphicAddress(pMonster: AltMonster, graphicFBSAE: number): IndexedBitmap | null {
+    return this.slot(pMonster.creatureType, pMonster.alternateGraphics).pDerivedGraphic[graphicFBSAE] ?? null;
   }
 }

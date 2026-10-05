@@ -20,6 +20,7 @@ import {
 } from '../csbwin/CanvasBlitter';
 import type { DungeonState } from '../../engine/DungeonState';
 import type { CreatureRecord } from '../../data/dungeonTypes';
+import { GetAlternateBasicGraphicAddress, type AltMonGraph } from '../../data/AltMonGraphics';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { RectPos } from '../../data/tables/UITables';
 import {
@@ -175,9 +176,14 @@ export function DrawRoomObjects(
     if (relativeCellNumber < 0) break;
 
     if (monsterRecord && monsterState) {
+      // `GetAlternateGraphicsRecord(pMonster)` at each position, on `d.LoadedLevel`
+      // (`Code51a4.cpp:2259-2295`): the group's pictures from `CSBgraphics.dat`, or its type's own.
+      const pAltMonsterGraphic = draw.context.altMonCache?.GetAlternateGraphicsRecord(
+        draw.context.csbGraphics, dungeon.getData(), draw.context.frameMapIndex ?? 0, monsterRecord,
+      ) ?? null;
       DrawMonster(
         draw, monsterRecord, monsterState, facing, relativeCellNumber, curAbsPos, relLoc, sideOfDoor,
-        middleLeftRight, positionList, positionListIndex,
+        middleLeftRight, positionList, positionListIndex, pAltMonsterGraphic,
       );
     }
 
@@ -448,6 +454,12 @@ function decodeMonsterStatus(status: number): { attacking: boolean; mirror: bool
  *
  * A group `drawAsSize4()` is drawn as one figure filling the cell: size 2, centred, the
  * member `DrawSize4Index` picks (`:420-441`, `:465`).
+ *
+ * With `pAlternateGraphic`, a `CSBgraphics.dat` section, this is CSBWin's second
+ * `DrawMonster` (`:1139-1751`), its copy of the first that draws the group from the
+ * section: its `MONSTERDESC`'s `word4`, its `ITEM12` and its `ITEM110` stand for the type's
+ * `d.MonsterDescriptor`, `d.Item6414` and `d.s6982` entries. The group's size is still its
+ * type's (`:1218-1222`).
  */
 function DrawMonster(
   draw: ViewportDraw,
@@ -461,6 +473,7 @@ function DrawMonster(
   middleLeftRight: number,
   positionList: number,
   positionListIndex: number,
+  pAlternateGraphic: AltMonGraph | null,
 ): void {
   const tables = draw.context.objectTables;
   if (!tables) return;
@@ -532,7 +545,7 @@ function DrawMonster(
   if (relativeCellNumber > 9) relativeCellNumber--;
 
   for (;;) {
-    drawMonsterAt(draw, pmtDesc, sms, monsterRelFacing, relativeCellNumber, positionWithinCell, middleLeftRight);
+    drawMonsterAt(draw, monster, pAlternateGraphic, pmtDesc, sms, monsterRelFacing, relativeCellNumber, positionWithinCell, middleLeftRight);
     if (w94 === 0) break;
     w94 = 0;
     sms = decodeMonsterStatus(monsterState.statuses[indexWithinGroup === 0 ? 1 : 0] ?? 0);
@@ -540,9 +553,14 @@ function DrawMonster(
   }
 }
 
-/** The body of `DrawMonster`'s drawing loop (`Code51a4.cpp:569-945`): one sprite. */
+/**
+ * The body of `DrawMonster`'s drawing loop (`Code51a4.cpp:569-945`, and the alternate's,
+ * `:1363-1749`): one sprite.
+ */
 function drawMonsterAt(
   draw: ViewportDraw,
+  monster: CreatureRecord,
+  pAlternateGraphic: AltMonGraph | null,
   pmtDesc: ObjectTables['monsterDesc'][number],
   sms: { attacking: boolean; mirror: boolean; nibble0: number; nibble3: number },
   monsterRelFacing: number,
@@ -554,16 +572,24 @@ function drawMonsterAt(
   const getGraphic = draw.context.getGraphicBitmap;
   if (!tables || !draw.context.viewportIndexBuffer || !getGraphic) return;
 
-  const pI12 = tables.monsterGraphics[pmtDesc.type];
+  // The alternate reads `word4` alone of its `MONSTERDESC`.
+  const mtDesc = pAlternateGraphic ? pAlternateGraphic.monsterDesc : pmtDesc;
+  const pI12 = pAlternateGraphic ? pAlternateGraphic.item12 : tables.monsterGraphics[pmtDesc.type];
   if (!pI12) return;
-  const monsterXYonScreen = tables.monsterPositions[(pI12.uByte10 >> 4) & 15]?.[relativeCellNumber]?.[positionWithinCell];
+  const monsterXYonScreen = pAlternateGraphic
+    ? pAlternateGraphic.item110[relativeCellNumber]?.[positionWithinCell]
+    : tables.monsterPositions[(pI12.uByte10 >> 4) & 15]?.[relativeCellNumber]?.[positionWithinCell];
   if (!monsterXYonScreen || monsterXYonScreen.y === 0) return;
 
-  const hasSide = monsterHasSideGraphic(pmtDesc);
-  const hasBack = monsterHasBackGraphic(pmtDesc);
-  const hasAttack = monsterHasAttackGraphic(pmtDesc);
+  const hasSide = monsterHasSideGraphic(mtDesc);
+  const hasBack = monsterHasBackGraphic(mtDesc);
+  const hasAttack = monsterHasAttackGraphic(mtDesc);
 
-  let graphicNum0 = 446 + (pI12.word0 | 0);
+  // The alternate numbers its pictures from 0, the section's own, and its derived ones
+  // (`graphicNumFBSAE`) from 0 in its slot of the cache. The first `DrawMonster` keeps no
+  // derived graphic in the port, so only the alternate counts them.
+  let graphicNum0 = pAlternateGraphic ? 0 : 446 + (pI12.word0 | 0);
+  let graphicNumFBSAE = 0;
   let showBackView = false;
   let showAttackView = false;
   let frontViewMirror = false;
@@ -572,6 +598,7 @@ function drawMonsterAt(
   const showSideView = hasSide && (monsterRelFacing & 1) !== 0;
   if (showSideView) {
     graphicNum0++;
+    graphicNumFBSAE += 2;
     srcByteWidth = pI12.sideByteWidth;
     srcHeight = pI12.sideHeight;
   } else {
@@ -583,17 +610,32 @@ function drawMonsterAt(
       srcByteWidth = pI12.attackByteWidth;
       srcHeight = pI12.attackHeight;
       graphicNum0++;
-      if (hasSide) graphicNum0++;
-      if (hasBack) graphicNum0++;
+      graphicNumFBSAE += 2;
+      if (hasSide) {
+        graphicNum0++;
+        graphicNumFBSAE += 2;
+      }
+      if (hasBack) {
+        graphicNum0++;
+        graphicNumFBSAE += 2;
+      }
     } else {
       srcByteWidth = pI12.frontRearByteWidth;
       srcHeight = pI12.frontRearHeight;
-      if (showBackView) graphicNum0 += hasSide ? 2 : 1;
-      else frontViewMirror = monsterNonAttackingMirrorOK(pmtDesc) && sms.mirror;
+      if (showBackView) {
+        graphicNum0 += hasSide ? 2 : 1;
+        graphicNumFBSAE += hasSide ? 4 : 2;
+      } else {
+        frontViewMirror = monsterNonAttackingMirrorOK(mtDesc) && sms.mirror;
+        if (frontViewMirror) graphicNumFBSAE += 2 + (hasSide ? 2 : 0) + (hasBack ? 2 : 0) + (hasAttack ? 2 : 0);
+      }
     }
   }
 
-  const base = getGraphic(graphicNum0);
+  const altMonCache = draw.context.altMonCache;
+  const base = pAlternateGraphic
+    ? GetAlternateBasicGraphicAddress(pAlternateGraphic, graphicNum0, srcByteWidth, srcHeight)
+    : getGraphic(graphicNum0);
   if (!base) return;
 
   let src = base;
@@ -610,14 +652,25 @@ function drawMonsterAt(
       (showSideView && monsterRelFacing === 1) ||
       (showAttackView && sms.mirror) ||
       (!showSideView && !showBackView && !showAttackView && frontViewMirror);
+    if (pAlternateGraphic && altMonCache && frontViewMirror) {
+      // The alternate asks for its mirrored front view as a derived graphic of no width,
+      // which, the first time, is `die(0x3334, "Alternate Zero Width")` (`:1544`,
+      // `:1053`): no other view makes that graphic. No section of the files here has
+      // `NonAttackingMirrorOK()`.
+      altMonCache.AllocateAlternateDerivedGraphic(monster, graphicNumFBSAE);
+      src = altMonCache.GetAlternateDerivedGraphicAddress(monster, graphicNumFBSAE) ?? base;
+      mirror = false;
+    }
   } else {
     let b102: boolean;
     let scaleFactor: number;
     let distancePalette: Uint8Array;
+    if (frontViewMirror) graphicNumFBSAE++;
     if (relativeCellNumber >= 3) {
       // Exactly two rows ahead.
+      graphicNumFBSAE++;
       distanceFromUs = 1;
-      b102 = monsterWord4Bit7(pmtDesc) && !showSideView && !showBackView && !showAttackView;
+      b102 = monsterWord4Bit7(mtDesc) && !showSideView && !showBackView && !showAttackView;
       distancePalette = tables.monsterColorMapMedium;
       scaleFactor = 20; // 20/32 = 0.625
     } else {
@@ -631,15 +684,24 @@ function drawMonsterAt(
     dstByteWidth = (srcByteWidth * scaleFactor + (scaleFactor >> 1)) >> 5;
     dstHeight = (srcHeight * scaleFactor + (scaleFactor >> 1)) >> 5;
     transparentColor = mapColorValue(distancePalette, pI12.uByte10 & 15);
-    src = shrinkBlt(base, base.width, base.height, Math.max(1, dstByteWidth * 2), Math.max(1, dstHeight), distancePalette);
+    if (pAlternateGraphic && altMonCache) {
+      // The shrunk picture is kept in the group's slot of the cache (`:1620-1638`).
+      if (!altMonCache.AllocateAlternateDerivedGraphic(monster, graphicNumFBSAE, 2 * dstByteWidth, dstHeight)) {
+        const derived = altMonCache.GetAlternateDerivedGraphicAddress(monster, graphicNumFBSAE)!;
+        derived.pixels.set(shrinkBlt(base, 2 * srcByteWidth, srcHeight, derived.width, derived.height, distancePalette).pixels);
+      }
+      src = altMonCache.GetAlternateDerivedGraphicAddress(monster, graphicNumFBSAE)!;
+    } else {
+      src = shrinkBlt(base, base.width, base.height, Math.max(1, dstByteWidth * 2), Math.max(1, dstHeight), distancePalette);
+    }
     // The last term can never hold, since `frontViewMirror` needs
     // `NonAttackingMirrorOK()`: a front view is not mirrored beyond the first row
     // (`:859-864`). The 68000 code in the comment above it tests `(word4 & 4) != 0`.
     mirror =
       (showSideView && monsterRelFacing === 1) ||
       (showAttackView && sms.mirror) ||
-      (b102 && monsterWord4Bit8(pmtDesc)) ||
-      (frontViewMirror && !monsterNonAttackingMirrorOK(pmtDesc));
+      (b102 && monsterWord4Bit8(mtDesc)) ||
+      (frontViewMirror && !monsterNonAttackingMirrorOK(mtDesc));
   }
   // CSBWin's `Mirror` moves the row padding to the left and reads past it (`w_90`); the
   // port's bitmaps are unpadded, so there is nothing to skip.

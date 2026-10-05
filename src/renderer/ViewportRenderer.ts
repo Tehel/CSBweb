@@ -10,6 +10,7 @@
 import type { GraphicsLoader } from '../data/GraphicsLoader';
 import type { MapData } from '../data/dungeonTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
+import { AltMonCache } from '../data/AltMonGraphics';
 import { DrawViewport } from './DrawViewport';
 import {
   PRISON_LEVEL_INDEX,
@@ -135,6 +136,7 @@ export class ViewportRenderer {
       graphicCache: deps.graphicCache,
       objectTables: this.objectTables,
       csbGraphics: deps.csbGraphicsLoader,
+      altMonCache: new AltMonCache(),
       dungeonState: this.dungeonState,
       footprints: deps.footprints,
       gameState: deps.gameState,

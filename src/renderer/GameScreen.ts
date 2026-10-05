@@ -507,6 +507,10 @@ export class GameScreen {
    * screen's state as a new game has it, and the adventure's button lists and key tables.
    */
   initializePlayState(): void {
+    // `Cleanup(false)`'s `CleanupAltMonCache`, before the game that follows a lost one
+    // (`doc/CSBwin-src/Code1f9e6.cpp:302`, `Graphics.cpp:2206`). The first game starts
+    // with the screen's own, empty.
+    this.viewport.context.altMonCache?.CleanupAltMonCache();
     initializePlayState(this.ui);
     this.setUIMode(UIMode.Adventure);
   }

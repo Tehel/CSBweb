@@ -16,6 +16,7 @@ import {
   type IndexedBitmap,
   type PaletteIndexViewportBuffer
 } from '../csbwin/CanvasBlitter';
+import type { AltMonCache } from '../../data/AltMonGraphics';
 import type { DungeonState } from '../../engine/DungeonState';
 import type { PartyFootprints } from '../../engine/PartyFootprints';
 import type { GameState } from '../../engine/gameTypes';
@@ -80,6 +81,11 @@ export interface InterpreterContext {
   // CSBWin object rendering tables (graphics.dat 0x22e + 0x22f)
   objectTables?: ObjectTables;
   csbGraphics?: CSBGraphicsLoader;
+  /**
+   * `altMonCache`: the alternate monster graphics `DrawMonster` has read from `csbGraphics`,
+   * and the pictures derived from them. Emptied at each game's start (`CleanupAltMonCache`).
+   */
+  altMonCache?: AltMonCache;
   dungeonState?: DungeonState;
   /** `d.PartyFootprints`, which `SummarizeRoomInfo` searches for the magic prints. */
   footprints?: PartyFootprints;

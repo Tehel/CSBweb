@@ -2792,6 +2792,36 @@ big-endian, `word4` would name no view but the front. Conflux's `dungeon.dat` ca
 `EDBT_AltMonGraphics` records under 37 keys, of which `Locate` reads the first, and every
 one of the 586 groups that has an alternate graphic on its level finds its section.
 
+## The alternate `DrawMonster`: bitplanes, derived graphics kept, and a `die` for a mirrored front
+
+Where `GetAlternateGraphicsRecord` finds a section for the group, `ProcessOnePosition`
+calls the second `DrawMonster` (`doc/CSBwin-src/Code51a4.cpp:2259-2295`, `:1139-1751`),
+asking at every position after the row four ahead's. It is the first one with its data
+read from the section, and the group's size still read from its type's `MONSTERDESC`
+(`:1218-1222`):
+
+- **The pictures are CSBWin's own bitmaps, as it keeps `graphics.dat`'s in memory**: each
+  line in groups of 16 pixels, each group four big-endian words, one per bitplane, high
+  bit first (`TAG0088b2`'s 16-pixel masks, `Graphics.cpp:572-576`), `GetAlternateBasicGraphicAddress`
+  pointing at `graphic + graphicOffsets[n]` (`:1113-1116`). Fifteen of Conflux's sections
+  are their type's front view at `graphics.dat`'s size, transparent exactly where it is;
+  with each word's bytes swapped, none is (`tools/dump-alt-mon-draw.ts`).
+- **Derived graphics are numbered from 0 in the group's cache slot** (`graphicNumFBSAE`):
+  front 0 and 1 at three and two rows, then 2 and 3 for the side view, the back's and the
+  attack's after it as `word4` has them, then the mirrored front: `2 + 2 * (side + back +
+  attack)` beside the party, one more at three rows and two more at two. Further away, the
+  picture is shrunk into a graphic that `AllocateAlternateDerivedGraphic` makes once and
+  keeps (`:1620-1638`, `:1044-1058`), and a view that is mirrored is mirrored in a copy, so
+  the graphic kept is never mirrored. With a mirrored front and all three other views
+  that number reaches 10, past `pDerivedGraphic[10]`.
+- **Beside the party, a front view with a mirror ends the program.** The branch asks
+  `AllocateAlternateDerivedGraphic(pDB4_58, graphicNumFBSAE)` with no width
+  (`:1544`). No other view makes that graphic, so the first time it is
+  `die(0x3334, "Alternate Zero Width")` (`:1053`). The lines after it read the
+  `graphics.dat` graphic `graphicNum0` and the first `DrawMonster`'s derived graphic
+  `graphicNumFBSAE`, never the section's. Only a section whose `word4` has
+  `NonAttackingMirrorOK()` gets there, and no section of either file here has it.
+
 ## The graphics files' signatures: what CSBWin checks, and when
 
 `Signature` (`doc/CSBwin-src/data.cpp:1953-1975`) is a file's MD5, RSA's reference code

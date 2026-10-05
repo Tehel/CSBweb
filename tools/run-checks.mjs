@@ -243,6 +243,10 @@ const CHECKS = [
   // CSBgraphics.dat's alternate monster graphics: every section of both files read as an
   // ALTMONGRAPH, the dungeon's mapping of them by level and type, and the cache's slots.
   { tool: 'dump-alt-mon-graphics.ts' },
+  // A group drawn from its alternate graphic: the section's bitplanes, its places and
+  // views, the derived graphics kept for the rows further away, and CSBWin's die for a
+  // mirrored front beside the party; and the default dungeon names none.
+  { tool: 'dump-alt-mon-draw.ts' },
   // The graphics files' signatures, and CSBWin's checks of them at a read and at
   // CSBgraphics.dat's first section read: a file the game does not name ends the game.
   { tool: 'dump-file-signatures.ts' },

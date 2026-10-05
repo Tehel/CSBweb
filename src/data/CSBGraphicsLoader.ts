@@ -270,7 +270,11 @@ class OvlDecode {
   }
 }
 
-function decodePlanar(data: Uint8Array, width: number, height: number): Uint8Array {
+/**
+ * A graphic as CSBWin keeps one in memory, the Atari's: each line in groups of 16 pixels,
+ * each group four big-endian words, one per bitplane, the first pixel the high bit.
+ */
+export function decodePlanar(data: Uint8Array, width: number, height: number): Uint8Array {
   const groups = (width + 15) >> 4;
   const out = new Uint8Array(width * height);
   for (let y = 0; y < height; y++) {
