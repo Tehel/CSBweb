@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G25 | Viewport overlays and overlay palettes | M | ⏳ |
+| G25 | Viewport overlays and overlay palettes | L | ⏳ step 1 of 2 |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G25, G27 |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
@@ -342,16 +342,41 @@ The rest of the item, with an operation that needs care when ported:
 ### G25 ⏳ Viewport overlays and overlay palettes
 
 A DSA lays an image over the viewport with `&OVERLAY` (`SelectOverlay`,
-`doc/CSBwin-src/Bitmaps.cpp:687`, read by `OVERLAYDATA::ReadOverlay`, `:572`), and tints it
-with `&PALETTE` (`SetOverlayPalette`, `:651`; `OVERLAYDATA::CreateOverlayTable`,
-`Graphics.cpp:2978`). `WinScreen.cpp` composes the result. Both read their data from
-`CSBgraphics.dat`. The overlay in force travels in the Extended Features block
-(`OverlayActive`, `overlayOrdinal`, `overlayP1`-`P3`, `CSB.h:491-505`), and the overlay
-palette in `EXPOOL`, as 24 records. The port holds the overlay palette
-(`src/engine/OverlayPalette.ts`, the identity until a read gives another) and saves and
-reads its records, but draws no overlay and has no `SetOverlayPalette`. Conflux's
-`CSBgraphics.dat` holds 112 viewport overlays and 51 overlay palettes, and its DSAs call
-`&OVERLAY` 25 times and `&PALETTE` 5 times.
+`doc/CSBwin-src/Bitmaps.cpp:687-720`, read by `OVERLAYDATA::ReadOverlay`, `:572-630`),
+tints the view with `&PALETTE` (`SetOverlayPalette`, `:651-685`), and shifts it with
+`&JITTER` (`DSA.cpp:4903-4930`). The overlay is a `CGT_ViewportOverlay` section of
+`CSBgraphics.dat`, a 224x136 8-bit Windows bitmap, and the palette a `CGT_OverlayPalette`
+one, 512 RGB555 words. The overlay ends by itself at `m_p3`, checked after every
+`d.Time++` (`CSBCode.cpp:675`, `Attack.cpp:2209`), and travels in the Extended Features
+block (`OverlayActive`, `overlayOrdinal`, `overlayP1`-`P4`, `SaveGame.cpp:968-976`, read
+back at `:421-430`); the overlay palette travels in `EXPOOL`, as 24 records, which the
+port already saves and reads (`src/engine/OverlayPalette.ts`). Conflux's
+`CSBgraphics.dat` holds 112 overlays, every one 224x136 with 256 colours, and 51
+palettes; its DSAs call `&OVERLAY` 25 times, `&PALETTE` 5 times and `&JITTER` 7 times.
+
+The screen side: in `VM_ADVENTURE` only, `display` sends the viewport's 224x136
+(`WinScreen.cpp:1515-1527`) through `OVERLAYDATA::CreateOverlayTable`
+(`Graphics.cpp:2978-3090`), whose table, indexed by overlay byte and Atari colour, gives a
+16-bit RGB555 pixel: the colour through the overlay palette, blended with the overlay's
+by `m_p2`, colour `m_p4` transparent when `m_p1 & 1`. `UpdateScreenArea` places it with
+the jitter (`WinScreen.cpp:1067-1205`, 3 of 13 cases implemented). With the overlay palette
+the identity and no overlay active, the 16-colour branch gives exactly CSBWin's straight
+colours, which the port's present path already stands for.
+
+Steps:
+
+1. **The engine** ⏳: `currentOverlay`, `overlayActive` and the jitter, `ReadOverlay`,
+   `Mirror`, `SelectOverlay` and `SetOverlayPalette`; the three DSA operations, off the
+   census's `LEFT`; the expiry in `advanceTime`; the Extended Features block written from
+   the overlay and read back into it. Checked by a tool on Conflux's file.
+2. **The screen** ⏳: `CreateOverlayTable` and the viewport's composition in
+   `VM_ADVENTURE`, the jitter with it, a frame with an overlay up. It waits on the
+   author: CSBWin's pixel is RGB555, which Windows widens to 8 bits, and the port's
+   colours are an Atari intensity ×36 (`src/renderer/csbwin/CanvasBlitter.ts`), which
+   is neither. The options: (a) a 5-bit channel widened `(v << 3) | (v >> 2)` in the
+   overlay path only, the straight path keeping ×36, so the golden frames stay; (b) the
+   same widening, and the straight path brought to it too, `(i << 2 | i >> 1)` then
+   widened, which moves every golden frame by up to 4 per channel.
 
 ### G27 ⏳ Skins: a cell's own wall, floor and ceiling graphics
 
