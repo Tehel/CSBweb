@@ -45,7 +45,8 @@ import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/engine/CsbwinSa
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import { DUNGEON_DATA_SOURCES, type FieldSource } from '../src/engine/DungeonSnapshot';
-import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../src/data/CsbwinCharacters';
+import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH, writeCsbwinCharacter } from '../src/data/CsbwinCharacters';
+import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { ImageFormat } from '../src/core/imageDecoder';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
@@ -286,6 +287,28 @@ function main(): void {
       const cell = matchPortraitCell(cells, pixels);
       console.log(`  portrait ${champion.name}: graphic 26 cell ${cell}`);
       check(cell >= 0, `${name}/${champion.name}: the portrait is a cell of basic graphic 26`);
+    }
+
+    // The fingerprint, `AddCharacter`'s `(partyLevel << 10) | (partyX << 5) | partyY`
+    // (`doc/CSBwin-src/Character.cpp:514-518`). Every committed save's champions were
+    // taken in the Hall of Champions, on level 0, so it names a square of that level.
+    // `swapCharacter` stops at `shieldStrength` (`doc/CSBwin-src/SaveGame.cpp:490-521`),
+    // so the word is little-endian in the file: read big-endian, IAIDO's 0x0144 is
+    // 0x4401, a square of level 17. Written back, it is the file's two bytes again.
+    const hall = world.dungeon.maps[0]!.descriptor;
+    for (const [i, champion] of party.champions.entries()) {
+      const fp = champion.fingerprint;
+      check(
+        fp >> 10 === 0 && ((fp >> 5) & 31) < hall.width && (fp & 31) < hall.height,
+        `${name}/${champion.name}: the fingerprint 0x${fp.toString(16)} is a square of the Hall of Champions`,
+      );
+      const written = new Uint8Array(CHARDESC_SIZE);
+      writeCsbwinCharacter(written, 0, champion);
+      const file = world.save.characterBlock!.subarray(i * CHARDESC_SIZE + 276, i * CHARDESC_SIZE + 286);
+      check(
+        written.subarray(276, 286).every((b, j) => b === file[j]),
+        `${name}/${champion.name}: talents, fingerprint and the cause of damage go back as the file holds them`,
+      );
     }
 
     // `CHARDESC.load` against the port's own sum. CSBWin keeps the total incrementally

@@ -38,9 +38,13 @@ big-endian word.
 The exception is the CSB-era **"Extended Features" block, which is little-endian** —
 `SwapExtendedFeaturesBlock` has a body only `#ifdef _bigEndian`
 (`doc/CSBwin-src/SaveGame.cpp:183-200`), so on the shipping build it does nothing and
-the block keeps native PC order. A save file is therefore mixed-endian, and the port
-reads it that way: `readU16LE`/`readU32LE` for that one header
-(`src/data/CsbwinExtendedFeatures.ts`), `readU16BE` everywhere else.
+the block keeps native PC order. A swap function also leaves out whatever it does not
+name: `swapCharacter` stops at `shieldStrength`, so a `CHARDESC`'s `talents`,
+`fingerPrint`, `causeOfDamage` and `monsterCausingDamage` (276-285) are little-endian
+too (`doc/PROVEN_FACTS.md` → "`CHARDESC`'s talents, fingerprint and cause of damage are
+little-endian in a save"). A save file is therefore mixed-endian, and the port reads it
+that way: `readU16LE`/`readU32LE` for that header (`src/data/CsbwinExtendedFeatures.ts`)
+and those four fields (`src/data/CsbwinCharacters.ts`), `readU16BE` everywhere else.
 
 ## GAMEBLOCK1 (512 bytes)
 

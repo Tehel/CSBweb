@@ -17,7 +17,11 @@
  *   closes the span. `title[16]`, `wordx24` and `FILL26[2]` are one field.
  * - `name` and `title` are plain `char` arrays and are **not** byte-swapped;
  *   `swapCharacter` lists every field it swaps and they are not among them
- *   (`doc/CSBwin-src/SaveGame.cpp:490-521`). Everything else here is big-endian.
+ *   (`doc/CSBwin-src/SaveGame.cpp:490-521`).
+ * - Nor are the four words after `shieldStrength`: `talents`, `fingerPrint`,
+ *   `causeOfDamage` and `monsterCausingDamage` keep the memory order of the
+ *   little-endian build, so the file holds them **little-endian**. Everything else here
+ *   is big-endian.
  * - `portrait[1]` at 336 is really 464 bytes — `FILL337[800-337]` is the rest of it —
  *   and holds the champion's portrait **bitmap**. See `readPortrait` below.
  */
@@ -27,7 +31,9 @@ import {
 import type { Attribute } from '../engine/attributes';
 import { OBJECT_ID_NULL, type i8, type i16, type ui8, type ui16, type ObjectID } from '../core/types';
 import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';
-import { readI16BE, readI32BE, readI8, readU16BE, readU32BE, readU8 } from '../core/bytes';
+import {
+  readI16BE, readI32BE, readI8, readU16BE, readU16LE, readU32LE, readU8, writeU16LE, writeU32LE,
+} from '../core/bytes';
 
 /** The seven `ATTRIBUTE` triples start here, three bytes each, `FILL91` after them. */
 const ATTRIBUTES_OFFSET = 70;
@@ -208,16 +214,16 @@ export function readCsbwinCharacter(
     skills: readSkills(block, base),
     possessions: slots,
     shieldStrength: readU16BE(block, base + 274),
-    fingerprint: readU16BE(block, base + 280) as ui16,
+    fingerprint: readU16LE(block, base + 280) as ui16,
     // `charFlags` holds the champion's gender and their busy bit. The rest below are
     // carried, not used: the save writer needs every field back, and these have no
     // reader in the engine yet.
     charFlags,
     timerIndex: readI16BE(block, base + 46),
-    talents: readU32BE(block, base + 276),
+    talents: readU32LE(block, base + 276),
     load: readU16BE(block, base + 272),
-    causeOfDamage: readU16BE(block, base + 282),
-    monsterCausingDamage: readU16BE(block, base + 284),
+    causeOfDamage: readU16LE(block, base + 282),
+    monsterCausingDamage: readU16LE(block, base + 284),
     // The champion's own copy of their portrait. Champions this port creates instead
     // carry `portraitGraphic`, the graphic-26 cell `AddCharacter` blitted from; a save
     // has only the pixels, and for an externally supplied portrait that is all there
@@ -446,10 +452,11 @@ export function writeCsbwinCharacter(
 
   setU16BE(block, base + 272, options.load?.(champion) ?? champion.load);
   setU16BE(block, base + 274, champion.shieldStrength);
-  setU32BE(block, base + 276, champion.talents);
-  setU16BE(block, base + 280, champion.fingerprint);
-  setU16BE(block, base + 282, champion.causeOfDamage);
-  setU16BE(block, base + 284, champion.monsterCausingDamage);
+  // Little-endian: `swapCharacter` stops at `shieldStrength`.
+  writeU32LE(block, base + 276, champion.talents);
+  writeU16LE(block, base + 280, champion.fingerprint);
+  writeU16LE(block, base + 282, champion.causeOfDamage);
+  writeU16LE(block, base + 284, champion.monsterCausingDamage);
 
   writePortrait(block, base, champion.portrait ?? options.portraitOf?.(champion));
 }

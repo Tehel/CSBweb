@@ -2243,6 +2243,24 @@ name at 0 and title at 8, whole. So neither resurrection, nor reincarnation, nor
 renaming by either keyboard route clobbers `title[0]`; whatever does it is specific to
 how those older files were produced. Do not "fix" the reader for it.
 
+## `CHARDESC`'s talents, fingerprint and cause of damage are little-endian in a save
+
+`swapCharacter` byte-swaps the `CHARDESC` words from `busyTimer` (44) to
+`shieldStrength` (274) and stops there (`doc/CSBwin-src/SaveGame.cpp:490-521`). The four
+fields after it — `ui32 talents` at 276, `ui16 fingerPrint` at 280, `ui16 causeOfDamage`
+at 282, `ui16 monsterCausingDamage` at 284 (`doc/CSBwin-src/CSB.h`, `CHARDESC`) — go to
+the file as the little-endian build holds them in memory: **little-endian**, in a file
+that is otherwise big-endian.
+
+Verified on data: every champion of every committed save in `tools/fixtures/` has the
+bytes `44 01` (IAIDO), `45 01`, `27 01`, `0e 02`, … at 280. Read little-endian they are
+`AddCharacter`'s `(partyLevel << 10) | (partyX << 5) | partyY`
+(`doc/CSBwin-src/Character.cpp:514-518`) of a square of level 0, the Hall of Champions:
+0x0144 is (10,4). Read big-endian, 0x4401 is a square of level 17, which the dungeon
+does not have (`tools/dump-csbwin-load.ts`). The bones record `AddChampionBonesRecord`
+writes is a longword of the pool, swapped as one (`DB11::swap`), so it holds the same
+0x0144, and only the little-endian reading pairs it with the champion.
+
 ## The dungeon image layout in a save file, and the two record sizes that change
 
 Blocks 7-14 of a save (the dungeon image) are plain and uncompressed. This is the
