@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E21 | Five DSA filters find and run their DSAs by hand | S | ⏳ |
 | C137 | The viewing filter's DSAs run at every compose of the inventory | M | ⏳ |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
@@ -165,18 +164,6 @@ What the redesign will replace, and what it should not carry across:
 
 Paying it is the redesign's first step: settings as a model the page renders, the CRT in a
 module of its own, a `publicDir` holding only what the page serves, and `server.js` gone.
-
-### E21 ⏳ Five DSA filters find and run their DSAs by hand
-
-`DsaSystem.forEachFilterDsa` finds a filter's location, builds its timer (`filterTimer`)
-and runs every type-47 actuator there, or the first, each with its own `DsaVars`. Nine
-filters go through it, and the monster move and action name filters take `filterTimer`.
-Five spell the same steps out again, each with a `TimerEntry`
-literal of its own: `processMissileEncounterFilter`, `processViewingFilter`,
-`processAdjustSkillsFilter`, `callPartyAttackFilter` and `processSpellFilter`
-(`src/engine/DsaSystem.ts`). Paying it moves them onto `forEachFilterDsa`, or onto
-`filterTimer` where a site's loop differs (the viewing filter's scroll goes on down the
-chain of the object a DSA names), with every tool's output byte-identical.
 
 ---
 

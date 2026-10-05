@@ -328,8 +328,6 @@ const ESL_MISSILE_ENCOUNTER_FILTER = 13;
 const ESL_ADJUST_SKILLS_FILTER = 6;
 const ESL_VIEWING_FILTER = 3;
 const ESL_PARTY_ATTACK_FILTER = 4;
-const MISSILE_ENCOUNTER_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_MISSILE_ENCOUNTER_FILTER;
-const ADJUST_SKILLS_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_ADJUST_SKILLS_FILTER;
 const VIEWING_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_VIEWING_FILTER;
 const PARTY_ATTACK_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_PARTY_ATTACK_FILTER;
 const ESL_SOUND_FILTER = 8;
@@ -794,7 +792,19 @@ export class DsaSystem {
   private forEachFilterDsa(esl: number, each: (run: (timerFunction?: number) => void) => void, firstOnly = false): boolean {
     const special = this.dungeon.getSpecialLocation((EDT_SPECIAL_LOCATIONS << 24) | esl);
     if (special === null) return false;
-    const locrFilter = locationRelFromInteger(special);
+    return this.forEachDsaAt(locationRelFromInteger(special), each, firstOnly);
+  }
+
+  /**
+   * `forEachFilterDsa` at a location the site has found by other means: the spell
+   * filter's is the dungeon's `SpellFilterLocation`, not an `EXPOOL` record. False when the
+   * location is not in the dungeon, or no DSA ran.
+   */
+  private forEachDsaAt(
+    locrFilter: LocationRel,
+    each: (run: (timerFunction?: number) => void) => void,
+    firstOnly = false,
+  ): boolean {
     if (!this.dungeon.isValidLocation(locrFilter)) return false;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
     const timer = filterTimer(filterPos);
@@ -1160,37 +1170,14 @@ export class DsaSystem {
     direction: number;
     index: number;
   }): number {
-    const special = this.dungeon.getSpecialLocation(MISSILE_ENCOUNTER_FILTER_KEY);
-    if (special === null) return 0;
-    const locrFilter = locationRelFromInteger(special);
-    if (!this.dungeon.isValidLocation(locrFilter)) return 0;
-    const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
-    const dsaActuator = this.findFirstDsaActuator(filterPos);
-    if (dsaActuator === OBJECT_ID_EOF) return 0;
-
-    const timer: TimerEntry = {
-      index: -1,
-      time: 0,
-      level: locrFilter.l & 0xff,
-      function: 0,
-      uByte5: 0,
-      uByte6: locrFilter.x & 0xff,
-      uByte7: locrFilter.y & 0xff,
-      uByte8: 0,
-      uByte9: 0,
-      sequence: 0,
-      timerWord8: 0,
-      timerWord6: 0,
-    };
-
     const encounterLoc = locationRelToInteger({
       l: options.position.z & 0x3f,
       x: options.position.x & 0x1f,
       y: options.position.y & 0x1f,
       p: options.posInCell & 0x3,
     });
-
-    return this.newDsaParameters(() => {
+    let result = 0;
+    this.newDsaParameters(() => this.forEachFilterDsa(ESL_MISSILE_ENCOUNTER_FILTER, (run) => {
       this.setParameters(7, [
         0,
         options.type | 0,
@@ -1200,9 +1187,10 @@ export class DsaSystem {
         options.direction | 0,
         options.index | 0,
       ]);
-      this.processTimer6Internal(dsaActuator, timer, filterPos, true, new DsaVars());
-      return this.getParameter(0);
-    });
+      run();
+      result = this.getParameter(0);
+    }, true));
+    return result;
   }
 
   /**
@@ -1221,21 +1209,7 @@ export class DsaSystem {
     const locrFilter = locationRelFromInteger(special);
     if (!this.dungeon.isValidLocation(locrFilter)) return null;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
-
-    const timer: TimerEntry = {
-      index: -1,
-      time: 0,
-      level: locrFilter.l & 0xff,
-      function: 0,
-      uByte5: 0,
-      uByte6: locrFilter.x & 0xff,
-      uByte7: locrFilter.y & 0xff,
-      uByte8: 0,
-      uByte9: 0,
-      sequence: 0,
-      timerWord8: 0,
-      timerWord6: 0,
-    };
+    const timer = filterTimer(filterPos);
 
     const scrollSite = options.site === ViewingFilterSite.SCROLL;
     const descriptionSite = options.site === ViewingFilterSite.DESCRIPTION;
@@ -1286,58 +1260,29 @@ export class DsaSystem {
     experience: number;
     why: number;
   }): { chIdx: number; skillNumber: number; experience: number } | null {
-    const special = this.dungeon.getSpecialLocation(ADJUST_SKILLS_FILTER_KEY);
-    if (special === null) return null;
-    const locrFilter = locationRelFromInteger(special);
-    if (!this.dungeon.isValidLocation(locrFilter)) return null;
-    const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
-
-    const timer: TimerEntry = {
-      index: -1,
-      time: 0,
-      level: locrFilter.l & 0xff,
-      function: 0,
-      uByte5: 0,
-      uByte6: locrFilter.x & 0xff,
-      uByte7: locrFilter.y & 0xff,
-      uByte8: 0,
-      uByte9: 0,
-      sequence: 0,
-      timerWord8: 0,
-      timerWord6: 0,
-    };
-
     let chIdx = options.chIdx | 0;
     let skillNumber = options.skillNumber | 0;
     let experience = options.experience | 0;
     let why = options.why | 0;
 
-    const found = this.newDsaParameters(() => {
-      let found = false;
-      for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-        if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
-        const rec = this.dungeon.getActuatorRecord(rn);
-        if (!rec || getActuatorType(rec) !== 47) continue;
-        found = true;
-        this.setParameters(9, [
-          chIdx,
-          skillNumber,
-          experience,
-          why,
-          this.adjustSkillsParameters[0] ?? 0,
-          this.adjustSkillsParameters[1] ?? 0,
-          this.adjustSkillsParameters[2] ?? 0,
-          this.adjustSkillsParameters[3] ?? 0,
-          this.adjustSkillsParameters[4] ?? 0,
-        ]);
-        this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars());
-        chIdx = this.getParameter(0);
-        skillNumber = this.getParameter(1);
-        experience = this.getParameter(2);
-        why = this.getParameter(3);
-      }
-      return found;
-    });
+    const found = this.newDsaParameters(() => this.forEachFilterDsa(ESL_ADJUST_SKILLS_FILTER, (run) => {
+      this.setParameters(9, [
+        chIdx,
+        skillNumber,
+        experience,
+        why,
+        this.adjustSkillsParameters[0] ?? 0,
+        this.adjustSkillsParameters[1] ?? 0,
+        this.adjustSkillsParameters[2] ?? 0,
+        this.adjustSkillsParameters[3] ?? 0,
+        this.adjustSkillsParameters[4] ?? 0,
+      ]);
+      run();
+      chIdx = this.getParameter(0);
+      skillNumber = this.getParameter(1);
+      experience = this.getParameter(2);
+      why = this.getParameter(3);
+    }));
 
     if (!found) return null;
     return { chIdx, skillNumber, experience };
@@ -1357,13 +1302,8 @@ export class DsaSystem {
     const locrFilter = locationRelFromInteger(special);
     if (!this.dungeon.isValidLocation(locrFilter)) return null;
     const position = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
-    for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
-      const rec = this.dungeon.getActuatorRecord(rn);
-      if (!rec || getActuatorType(rec) !== 47) continue;
-      return { position, actuator: rn };
-    }
-    return null;
+    const actuator = this.findFirstDsaActuator(position);
+    return actuator === OBJECT_ID_EOF ? null : { position, actuator };
   }
 
   /**
@@ -1399,21 +1339,8 @@ export class DsaSystem {
    * the three calls apart.
    */
   callPartyAttackFilter(filter: PartyAttackFilter, words: ArrayLike<number>, msg: number): number[] {
-    const timer: TimerEntry = {
-      index: -1,
-      time: 0,
-      level: filter.position.z & 0xff,
-      function: msg & 0xff,
-      uByte5: 0,
-      uByte6: filter.position.x & 0xff,
-      uByte7: filter.position.y & 0xff,
-      uByte8: 0,
-      uByte9: msg & 0xff,
-      sequence: 0,
-      timerWord8: 0,
-      timerWord6: 0,
-    };
-
+    const timer = filterTimer(filter.position);
+    timer.uByte9 = msg & 0xff;
     this.storeAttackParameters(words);
     this.processTimer6Internal(filter.actuator, timer, filter.position, true, new DsaVars());
 
@@ -1425,70 +1352,43 @@ export class DsaSystem {
   processSpellFilter(params: SpellParameters): SpellParameters | null {
     const location = this.dungeon.getSpellFilterLocation();
     if ((location & 0x80000000) === 0) return null;
-    const locrFilter = locationRelFromInteger(location & 0x7fffffff);
-    if (!this.dungeon.isValidLocation(locrFilter)) return null;
-    const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
-
-    const timer: TimerEntry = {
-      index: -1,
-      time: 0,
-      level: locrFilter.l & 0xff,
-      function: 0,
-      uByte5: 0,
-      uByte6: locrFilter.x & 0xff,
-      uByte7: locrFilter.y & 0xff,
-      uByte8: 0,
-      uByte9: 0,
-      sequence: 0,
-      timerWord8: 0,
-      timerWord6: 0,
-    };
-
     let updated: SpellParameters = { ...params };
 
-    const found = this.newDsaParameters(() => {
-      let found = false;
-      for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-        if (this.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
-        const rec = this.dungeon.getActuatorRecord(rn);
-        if (!rec || getActuatorType(rec) !== 47) continue;
-        found = true;
-        this.setParameters(14, [
-          updated.action,
-          updated.incantation,
-          updated.chIdx,
-          updated.disableTime,
-          updated.missileType,
-          updated.locationAbs,
-          updated.facing,
-          updated.skillRequired,
-          updated.spellByte5,
-          updated.spellClass,
-          updated.unused1,
-          updated.unused2,
-          updated.unused3,
-          updated.unused4,
-        ]);
-        this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars());
-        updated = {
-          action: this.getParameter(0),
-          incantation: this.getParameter(1),
-          chIdx: this.getParameter(2),
-          disableTime: this.getParameter(3),
-          missileType: this.getParameter(4),
-          locationAbs: this.getParameter(5),
-          facing: this.getParameter(6),
-          skillRequired: this.getParameter(7),
-          spellByte5: this.getParameter(8),
-          spellClass: this.getParameter(9),
-          unused1: this.getParameter(10),
-          unused2: this.getParameter(11),
-          unused3: this.getParameter(12),
-          unused4: this.getParameter(13),
-        };
-      }
-      return found;
-    });
+    const found = this.newDsaParameters(() => this.forEachDsaAt(locationRelFromInteger(location & 0x7fffffff), (run) => {
+      this.setParameters(14, [
+        updated.action,
+        updated.incantation,
+        updated.chIdx,
+        updated.disableTime,
+        updated.missileType,
+        updated.locationAbs,
+        updated.facing,
+        updated.skillRequired,
+        updated.spellByte5,
+        updated.spellClass,
+        updated.unused1,
+        updated.unused2,
+        updated.unused3,
+        updated.unused4,
+      ]);
+      run();
+      updated = {
+        action: this.getParameter(0),
+        incantation: this.getParameter(1),
+        chIdx: this.getParameter(2),
+        disableTime: this.getParameter(3),
+        missileType: this.getParameter(4),
+        locationAbs: this.getParameter(5),
+        facing: this.getParameter(6),
+        skillRequired: this.getParameter(7),
+        spellByte5: this.getParameter(8),
+        spellClass: this.getParameter(9),
+        unused1: this.getParameter(10),
+        unused2: this.getParameter(11),
+        unused3: this.getParameter(12),
+        unused4: this.getParameter(13),
+      };
+    }));
 
     if (!found) return null;
     return updated;
