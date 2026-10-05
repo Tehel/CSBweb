@@ -35,6 +35,11 @@
  * game with bones on the floor and reads the file's own pool: the record is there, under
  * the bones' slot, and a game that loads the file resurrects from it.
  *
+ * Bones whose champion has left the party name and resurrect the one in the wings
+ * (`CopyCharacter`, `Timer.cpp:2771-2782`): healed to half their maximum there, and
+ * nobody joins. One alive in the wings is refused at the drop, and a timer reads them out
+ * of the wings for good.
+ *
  * Run: `npx tsx tools/dump-vi-altar.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -62,6 +67,9 @@ import { graphicsTablesOf, newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { readCsbwinCharacter, writeCsbwinCharacter } from '../src/data/CsbwinCharacters';
+import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
+import { getFromWings, saveToWings } from '../src/engine/Wings';
 
 /** `EDT_ChampionBones` (`doc/CSBwin-src/CSB.h:1571`). */
 const EDT_CHAMPION_BONES = 9;
@@ -665,6 +673,81 @@ function main(): void {
           check(buildSaveFile(next).length > 0, `${name}: and the game saves again`);
         }
       }
+    }
+  }
+
+  /* ---------------------------------------- 8. a champion in the wings ----------- */
+
+  console.log('');
+  console.log('=== the bones of a champion who has left the party ===');
+  {
+    // HERO1 dies by the altar, and leaves the party for the wings as `CharacterDelete`
+    // would: their record saved, the champions after them a slot down.
+    const inWings = (dead: boolean) => {
+      const { game: g, objectTables, uiTables } = makeGame();
+      const altar = findViAltars(g).find((a) => a.alcove.z === 0)!;
+      g.ctx.party.state.position = altar.party;
+      g.ctx.party.state.facing = altar.facing as Champion['facing'] & number;
+      g.systems.monsters.loadPartyLevel(altar.party.z);
+      g.systems.monsterAttack.killCharacter(1);
+      const left = g.ctx.party.state.champions[1]!;
+      if (!dead) left.attributes.health = 50;
+      const record = new Uint8Array(CHARDESC_SIZE);
+      writeCsbwinCharacter(record, 0, left);
+      saveToWings(g.ctx.dungeon, record);
+      g.ctx.party.state.champions.splice(1, 1);
+      g.ctx.party.state.cursorOwner = 0;
+      return { g, objectTables, uiTables, bones: bonesAt(g, altar.party)[0], altar, fingerprint: left.fingerprint };
+    };
+    const hp = (g: Game, fingerprint: number): string => {
+      const record = getFromWings(g.ctx.dungeon, fingerprint, true);
+      return record ? String(readCsbwinCharacter(record, 0).champion.attributes.health) : 'not in the wings';
+    };
+
+    const dead = inWings(true);
+    if (dead.bones === undefined) {
+      fail('the death left no bones');
+    } else {
+      const { g, objectTables, uiTables, bones, altar, fingerprint } = dead;
+      const name = getObjectDisplayName(makeUI(g, objectTables, uiTables), bones, OBJNI_BONES_A);
+      console.log(['name shown for the bones', name].join('\t'));
+      check(name === 'HERO1 BONES', 'CopyCharacter names the bones from the wings');
+
+      g.ctx.dungeon.removeObjectFromCell(altar.party, bones);
+      g.ctx.party.state.objectInHand = bones;
+      check(g.systems.mouse.dropObjectFromCursor(4, { viAltar: true }), 'the bones go into the alcove');
+      console.log(['tick', 'bones in alcove', 'HP in the wings', 'champions'].join('\t'));
+      const row = (t: number): void => {
+        console.log([t, bonesAt(g, altar.alcove).length, hp(g, fingerprint), g.ctx.party.state.champions.length].join('\t'));
+      };
+      row(0);
+      runTicks(g, 8);
+      row(8);
+      check(hp(g, fingerprint) === '100', 'the champion in the wings is healed to half their maximum, 200');
+      check(bonesAt(g, altar.alcove).length === 0, 'and the bones consumed');
+      check(g.ctx.party.state.champions.length === 3, 'and nobody joins the party');
+    }
+
+    // One alive in the wings: the drop sets no timer, and a timer set all the same
+    // reads them out of the wings for good, leaving the bones (`Timer.cpp:2775-2776`).
+    const alive = inWings(false);
+    if (alive.bones === undefined) {
+      fail('the death left no bones');
+    } else {
+      const { g, bones, altar, fingerprint } = alive;
+      g.ctx.dungeon.removeObjectFromCell(altar.party, bones);
+      g.ctx.party.state.objectInHand = bones;
+      g.systems.mouse.dropObjectFromCursor(4, { viAltar: true });
+      runTicks(g, 8);
+      console.log(`alive in the wings: dropped, 8 ticks: ${bonesAt(g, altar.alcove).length} bones, HP ${hp(g, fingerprint)}`);
+      check(bonesAt(g, altar.alcove).length === 1 && hp(g, fingerprint) === '50', 'the drop sets no timer for the living');
+      const placed = bonesAt(g, altar.alcove)[0]!;
+      g.ctx.dungeon.addChampionBonesRecord(placed, fingerprint);
+      g.systems.timer.scheduleViAltar(placed, altar.alcove, g.ctx.dungeon.rnMaps.pos(placed) & 0x3, g.ctx.state.tickCount);
+      runTicks(g, 8);
+      console.log(`  a timer set all the same, 8 ticks: ${bonesAt(g, altar.alcove).length} bones, ${hp(g, fingerprint)}`);
+      check(bonesAt(g, altar.alcove).length === 1 && hp(g, fingerprint) === 'not in the wings',
+        'a timer reads the living out of the wings for good, and leaves the bones');
     }
   }
 

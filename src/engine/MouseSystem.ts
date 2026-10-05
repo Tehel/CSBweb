@@ -23,7 +23,7 @@ import { CursorFilterType } from './DsaSystem';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { setClockTick, speed } from './LoopState';
 import type { Champion } from './gameTypes';
-import { findChampionByFingerprint } from './Party';
+import { copyCharacter } from './Party';
 import { AdjustSkillsWhy, determineMastery } from './skills';
 import { TimerFunction } from './TimerQueue';
 
@@ -116,10 +116,10 @@ export class MouseSystem {
    * between them is the whole point. Bones made by a **death** carry an expool
    * record holding the champion's fingerprint; there `value` is the kind of bones
    * and must be **2** ("a dead champion's", `doc/CSBwin-src/CSB.h:1264`), and the
-   * champion is found by fingerprint. Bones placed by the **dungeon** carry no
-   * record; there `value` is itself the champion index and there is no `== 2` test
-   * at all, or every dungeon-authored bones object but one aimed at champion 2 would be
-   * ignored.
+   * champion is found by fingerprint, in the party or the wings. Bones placed by the
+   * **dungeon** carry no record; there `value` is itself the champion index and there
+   * is no `== 2` test at all, or every dungeon-authored bones object but one aimed at
+   * champion 2 would be ignored.
    *
    * Both arms refuse a champion who is not dead, so the altar cannot be used to
    * resurrect the living.
@@ -132,17 +132,18 @@ export class MouseSystem {
 
     const party = this.ctx.party.state;
     const fingerprint = this.ctx.dungeon.copyChampionBonesRecord(obj);
-    let chIdx: number;
+    let champion: Champion | null | undefined;
     if (fingerprint !== null) {
-      chIdx = findChampionByFingerprint(party, fingerprint);
-      if (chIdx === -1) return;
+      // `CopyCharacter`: the party's champion, or a copy of one in the wings.
+      champion = copyCharacter(party, this.ctx.dungeon, fingerprint);
+      if (!champion) return;
       if ((misc.specialState | 0) !== 2) return;
     } else {
-      chIdx = (misc.specialState | 0) & 0x3;
+      const chIdx = (misc.specialState | 0) & 0x3;
       // `if (chIdx < d.NumCharacter)`.
       if (chIdx >= party.champions.length) return;
+      champion = party.champions[chIdx];
     }
-    const champion = party.champions[chIdx];
     if (!champion) return;
     if ((champion.attributes?.health ?? 0) !== 0) return;
 

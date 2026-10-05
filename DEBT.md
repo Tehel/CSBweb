@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G3 | The wings | M | ⏳ |
+| G3 | The wings: step 2, `SwapCharacter` | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
 | G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | M | ⏳ |
@@ -315,52 +315,54 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G3 ⏳ The wings
+### G3 ⏳ The wings — step 2 of 2, `SwapCharacter`
 
-CSBWin keeps champions who have left the party in a store that `CHARDESC::GetFromWings` /
-`SaveToWings` reach (`doc/CSBwin-src/Character.cpp:5239`). Two things consult it, and
-cannot here:
+CSBWin keeps champions who have left the party in `EXPOOL`, as eight 25-longword records
+of their 800-byte `CHARDESC` (`doc/PROVEN_FACTS.md` → "A champion in the wings is eight
+`EXPOOL` records of the `CHARDESC` as memory holds it"). Split in two:
 
-- `CopyCharacter`, so bones dropped by a departed champion take no name;
-- `ProcessTT_ViAltar` state 1, which heals such a champion to `MaxHP/2` and saves them
-  back (`Timer.cpp:2769-2782`).
+1. ✅ **The record and its readers.** `src/engine/Wings.ts` is `SaveToWings`,
+   `GetFromWings` and `LocateInWings`, over a `CHARDESC` in the file's form;
+   `copyCharacter` (`src/engine/Party.ts`) and `fingerprintExists` look in the wings
+   after the party, so bones name a departed champion, the Altar of Vi heals one there
+   (`TimerSystem.reviveInWings`), and a new fingerprint steps over one. `&CHAR@`,
+   `&TALENTS@`, `&TALENTS!`, `&CHARNAME@` and `&WHEREISCHAR` read them. Evidence:
+   `tools/dump-wings.ts`, `tools/dump-vi-altar.ts` section 8.
+2. ⏳ **`SwapCharacter`**, which nothing calls yet, so nothing in the port fills the
+   wings. Only a DSA does: `STKOP_SwapCharacter` (`DSA.cpp:4413-4419`, unported, as is
+   `I_SwapCharacter`'s record) is its one caller. Nothing in the retail game removes a
+   living champion from the party; Conflux does, `SwapCharacter` 7 times and 4 more
+   through `I_SwapCharacter`.
 
-`Party.findChampionByFingerprint` is where both would grow their second half. Four DSA
-operations read the wings too, and find nobody there: `&CHAR@`, `&TALENTS@` and
-`&TALENTS!` with bit 16 of their index set, through `GetFromWings`
-(`Character.cpp:5171`), which reads a `CHARDESC` from eight 25-longword `EXPOOL` records,
-and `CharNameFetch` through `LocateInWings` (`:5220`, G1). `&WHEREISCHAR` only tests for
-the first record, and is ported (`DSA.cpp:4399-4407`). Only a DSA
-fills the wings: `STKOP_SwapCharacter` (`DSA.cpp:4413-4419`) is the one caller of
-`SwapCharacter` (`Character.cpp:5472`), and through it of `CharacterDelete` / `CharacterAdd`
-and every `SaveToWings`. Nothing in the retail game removes a living champion from the
-party. Conflux does: `SwapCharacter` 7 times, and 4 more through `I_SwapCharacter`.
-`CharacterDelete` shifts the champions after the one leaving down a slot and sets the
-last slot's HP to 0, so that slot keeps a copy of the last champion, possessions and all
-(`Character.cpp:5366-5388`): it goes into `PartyState.vacantCharacters`, which `&CHPOSS`
-reads (`doc/PROVEN_FACTS.md` → "A `CHARDESC` slot past the party holds zeros, or the
-champion who left it").
+What step 2 takes, read from the source:
 
-What porting it takes, read from the source:
-
-- **The record.** `SaveToWings` writes the 800-byte `CHARDESC` as it sits in the
-  little-endian build's memory, as eight records of 25 longwords under
-  `(EDT_Character << 24) | (i << 16) | fingerPrint`, each after a `Read` of the same key
-  that drops an older one (`Character.cpp:5149-5169`). Memory is the file's form with
-  `swapCharacter`'s fields byte-swapped (`SaveGame.cpp:490-521`), and the pool's
-  longwords are those bytes read little-endian, as the overlay palette's are
-  (`src/data/CsbwinExpool.ts`). So `writeCsbwinCharacter`, then `swapCharacter`'s swaps,
-  then a little-endian read gives the 200 longwords, and the reverse reads one back.
-  `Expool` already has `read`, `write` and `locate`; the wings go to a save with the pool.
-- **The reads.** `GetFromWings(fp, testOnly)` takes the eight records out of the pool
-  (`Read`) or, `testOnly`, copies them (`Locate`), and fails on a record missing or not 25 longwords
-  long, or on a `fingerPrint` that is not `fp` (`:5171-5218`). `LocateInWings` returns
-  record 0 alone, enough for the name (`:5220-5236`).
-- **`SwapCharacter`** (`:5472-5510`): its three cases, `CharacterDelete` (`:5351-5414`),
-  `CharacterAdd` (`:5417-5436`) and `CharacterSwap` (`:5438-5469`), and through them
-  `RemoveCharacter` (`:5254-5337`) and a busy champion's timer ended as if expired
-  (`TAG011366`, `Timer.cpp:2686`). `CharacterDelete` `die`s when a champion it shifts
-  holds a timer (`:5368-5374`).
+- **`SwapCharacter`** (`Character.cpp:5472-5510`): 2 for the last champion deleted, 3
+  for an add to a full party, 4 for a fingerprint not in the wings (`GetFromWings`,
+  testing only), then its three cases, each returning 0.
+- **`CharacterDelete`** (`:5351-5414`): a busy champion's timer deleted and ended as if
+  expired (`TAG011366`, `Timer.cpp:2686`, the port's `MonsterAttack.tag011366`), then
+  `RemoveCharacter`, `SaveToWings`, the champions after them shifted down a slot
+  (`die` when one shifted holds a timer, `:5368-5374`), `d.HandChar`,
+  `d.SelectedCharacterOrdinal` and `d.MagicCaster` moved down with them,
+  `d.NumCharacter--`, and the last slot's HP set to 0: that slot keeps a copy of the
+  last champion, possessions and all, which goes into `PartyState.vacantCharacters`
+  (`doc/PROVEN_FACTS.md` → "A `CHARDESC` slot past the party holds zeros, or the
+  champion who left it"). `d.PendingDamage` is not shifted. Then the vacated portrait
+  box and hand box are filled with colour 0 and everything is redrawn.
+- **`CharacterAdd`** (`:5417-5436`): `GetFromWings` into slot `d.NumCharacter`, which
+  takes the records out, the first corner nobody stands in, facing 0.
+- **`CharacterSwap`** (`:5438-5469`): the timer as in a delete, `RemoveCharacter`,
+  `SaveToWings`, `GetFromWings` into the same slot, the first free corner (5 when there
+  is none), and the facing of the one who left.
+- **`RemoveCharacter`** (`:5254-5337`), `KillCharacter`'s tail without the death: the
+  held eye or mouth let go and the inventory closed (`GameHost.releaseEyeOrMouth`,
+  `showHideInventory`), the incantation cleared, the facing the party's,
+  `maxRecentDamage` 0, the poison cured, the hand and the magic tab handed to the first
+  living champion.
+- **The portrait.** `SaveToWings` writes the portrait's pixels with the rest. A champion
+  this port creates carries `portraitGraphic`, not pixels, and only the page can turn
+  one into the other (`GameSaves`' `portraitOf`), so the engine needs it from the host to
+  write the record, or a champion back from the wings has a blank portrait.
 
 ### G4 ⏳ Custom-dungeon extensions: external portraits, the monster design options
 
@@ -1024,7 +1026,9 @@ Recorded so that nobody "fixes" them.
   (`tools/dump-move-from-missile.ts`, section 3).
 - 🚫 **An index CSBWin does not bound reads nobody.** `&CHAR@`, `&TALENTS@` and
   `&TALENTS!` take an index of 0x20000 or more with bit 16 clear as `d.CH16482 + charIdx`
-  (`doc/CSBwin-src/DSA.cpp:4196`, `:4274`, `:4325`), a record over 100 MB past `d`, and
+  (`doc/CSBwin-src/DSA.cpp:4196`, `:4274`, `:4325`), a record over 100 MB past `d`;
+  `&CHAR@` of a champion in the wings takes `d.PendingDamage[charIdx]` off their HP, bit
+  16 and all, 128 KB past that array of four (`:4200`), and the port takes nothing; and
   `&EXPERIENCE+` reads the HP of a negative one from the `d.` variables before the array,
   then hands it to `AddToSkill` (`:4552`). The port reads zeros, leaves the talents and
   adds nothing (`executeAmpersand`, `src/engine/DsaSystem.ts`). A slot from 0 to 3 that no

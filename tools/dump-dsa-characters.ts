@@ -7,8 +7,8 @@
  *    (`doc/CSBwin-src/DSA.cpp:4127-4165`), and nothing when `index + num` passes 100.
  * 2. **`&CHAR@`** writes a champion's 59 fields (`:4166-4241`): HP less the pending
  *    damage, the attributes packed minimum, maximum, current, the skills in pairs.
- *    Champion 4 is the hand's owner; an index past the party, or one in the wings, reads
- *    zeros.
+ *    Champion 4 is the hand's owner; an index past the party, or a fingerprint nobody in
+ *    the wings has, reads zeros (the wings are `dump-wings.ts`'s).
  * 3. **`&CHPOSS`** (`:3330-3357`): an empty slot is -1, a negative champion the hand, a
  *    slot past 29 slot 0. A champion slot past the party is read too: 0 on
  *    `csbgame-early-1hero.dat`, whose slots 1 to 3 are the zero bytes `DBank::Initialize`

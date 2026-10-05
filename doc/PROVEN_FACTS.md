@@ -1534,6 +1534,32 @@ the file's index names as the bones' record, and resurrects from it in a game th
 the file. Four of the committed saves (`csbgame3`, `4`, `6` and `7`) have a block of
 three-longword records, the length of a bones record, with every record free.
 
+## A champion in the wings is eight `EXPOOL` records of the `CHARDESC` as memory holds it
+
+`SaveToWings` writes the 800-byte `CHARDESC` as eight records of 25 longwords, record `i`
+under `(EDT_Character << 24) | (i << 16) | fingerPrint`, each after a `Read` of the same
+key (`doc/CSBwin-src/Character.cpp:5149-5169`, `CSB.h:1568`). The longwords are the
+struct's own memory, `(ui32 *)this + 25*i`, so in the little-endian build they are the
+file's form with `swapCharacter`'s fields reversed (`SaveGame.cpp:490-521`), four bytes
+taken low byte first: longword 0 starts with the name's first letter, longword 13 holds
+HP in its low word and the maximum in its high one, and the talents at 276, which
+`swapCharacter` leaves alone, are longword 69 as they stand. `fingerPrint`, at 280, is
+in record 2.
+
+`GetFromWings` assembles the eight records, by `Locate` when `testOnly` and by `Read`
+otherwise, and fails at the first record missing or not 25 longwords long, the records
+before it having left the pool on a read; it fails too when the assembled `fingerPrint`
+is not the one asked for (`Character.cpp:5171-5218`). `LocateInWings` returns record 0
+alone (`:5220-5236`), enough for the name. `CopyCharacter` (`:5239-5251`) and
+`FingerprintExists` (`:437-450`) look in the party first, then `GetFromWings` testing
+only.
+
+`ProcessTT_ViAltar` fetches bones' champion from the wings with a read
+(`Timer.cpp:2771-2782`): one found dead is healed to `MaxHP()/2` and saved back, the
+bones deleted, and no timer follows; one found alive is not saved back, so it leaves the
+wings for good, and its bones stay. Evidence: `tools/dump-wings.ts`, and
+`tools/dump-vi-altar.ts` section 8.
+
 ## `KillCharacter` is the only way a champion's hit points reach zero
 
 Nothing in CSBWin assigns `HP(0)` outside `KillCharacter` (`doc/CSBwin-src/Character.cpp:2526`).

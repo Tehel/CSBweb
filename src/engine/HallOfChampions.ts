@@ -72,7 +72,7 @@ export class HallOfChampions {
   addChampion(champion: Champion): boolean {
     const party = this.ctx.party;
     const pos = party.state.position;
-    champion.fingerprint = computeChampionFingerprint(party.state.champions, pos.z, pos.x, pos.y);
+    champion.fingerprint = computeChampionFingerprint(party.state.champions, this.ctx.dungeon, pos.z, pos.x, pos.y);
     if (!party.addChampion(champion)) return false;
     if (party.state.champions.length === 1) {
       setHandOwner(party.state, 0, this.ctx.host);
@@ -119,6 +119,7 @@ export class HallOfChampions {
     champion.damageFromDirection = party.facing;
     champion.fingerprint = computeChampionFingerprint(
       party.champions,
+      this.ctx.dungeon,
       party.position.z,
       party.position.x,
       party.position.y,

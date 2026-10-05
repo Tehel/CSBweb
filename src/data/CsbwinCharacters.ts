@@ -506,6 +506,32 @@ export function buildCsbwinCharacterBlock(
   return block;
 }
 
+/** The bytes from `at` reversed in place, `n` of them. */
+function reverseBytes(record: Uint8Array, at: number, n: number): void {
+  for (let i = 0; i < n / 2; i++) {
+    const b = record[at + i];
+    record[at + i] = record[at + n - 1 - i];
+    record[at + n - 1 - i] = b;
+  }
+}
+
+/**
+ * `swapCharacter` (`doc/CSBwin-src/SaveGame.cpp:490-521`) on one 800-byte `CHARDESC`: the
+ * fields the file holds big-endian reversed in place, from `busyTimer` at 44 to
+ * `shieldStrength` at 274. It turns the file's form into the little-endian build's memory
+ * and back, so it is its own inverse.
+ */
+export function swapCharacter(record: Uint8Array): void {
+  for (let at = 44; at < 70; at += 2) reverseBytes(record, at, 2);
+  for (let j = 0; j < 20; j++) {
+    reverseBytes(record, SKILLS_OFFSET + j * SKILL_SIZE, 2);
+    reverseBytes(record, SKILLS_OFFSET + j * SKILL_SIZE + 2, 4);
+  }
+  for (let j = 0; j < 30; j++) reverseBytes(record, POSSESSIONS_OFFSET + j * 2, 2);
+  reverseBytes(record, 272, 2);
+  reverseBytes(record, 274, 2);
+}
+
 /** `Possession(index)` of a slot past the party: the record's own word, as CSBWin reads it. */
 export function vacantPossession(vacant: VacantCharacter, index: number): ObjectID {
   if (vacant instanceof Uint8Array) return readU16BE(vacant, POSSESSIONS_OFFSET + index * 2) as ObjectID;

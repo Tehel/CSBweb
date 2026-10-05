@@ -1,6 +1,7 @@
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, rnEquals, type LocationRel, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import { sb, sw } from '../core/intCast';
+import { readI16BE, writeU16BE } from '../core/bytes';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { CHARFLAG_ATTACK_DISABLE, CHARFLAG_PORTRAIT_CHANGED, getChampionPossession, type PartyState } from './gameTypes';
@@ -10,6 +11,7 @@ import {
   RN_POISON, RN_POISON_BOLT, RN_ZO_SPELL, isMagicSpellRn,
 } from '../core/spellRn';
 import { drawCharacterState, findChampionByFingerprint, markAllPortraitsChanged } from './Party';
+import { getFromWings, saveToWings } from './Wings';
 import type {
   ActuatorRecord,
   MapData,
@@ -1037,14 +1039,11 @@ export class TimerSystem {
       const fingerprint = this.dungeon.getChampionBonesRecord(target);
       if (fingerprint !== null) {
         const found = findChampionByFingerprint(this.ctx.party.state, fingerprint);
-        chIdx = found === -1 ? null : found;
-        // ⏳ CSBWin's other arm here is the wings: a champion whose fingerprint
-        // matches nobody in the party is fetched with `CHARDESC::GetFromWings`,
-        // healed to `MaxHP/2`, saved back, and the bones deleted with the timer
-        // stopping there (`doc/CSBwin-src/Timer.cpp:2769-2782`). This port has no
-        // wings (`DEBT.md` G3), so nobody is found there, which is CSBWin's
-        // `if (!character.GetFromWings(…)) break`.
-        if (chIdx === null) return;
+        if (found === -1) {
+          this.reviveInWings(fingerprint, location, target);
+          return;
+        }
+        chIdx = found;
         if (!this.isChampionDead(this.ctx.party.state.champions[chIdx])) return;
       } else {
         // `chIndex = DB10A2->value()` (`doc/CSBwin-src/Timer.cpp:2788`). Bones with no
@@ -1069,6 +1068,25 @@ export class TimerSystem {
       const chIdx = pos & 0x3;
       this.ctx.systems.character.bringCharacterToLife(chIdx);
     }
+  }
+
+  /**
+   * `ProcessTT_ViAltar`'s arm for a champion who has left the party
+   * (`doc/CSBwin-src/Timer.cpp:2771-2782`): fetched out of the wings, healed to half
+   * their maximum HP and saved back, and the bones deleted, with no timer after. The
+   * fetch is `GetFromWings`' `Read`, so a champion found alive leaves the wings for good,
+   * and so does every record before a missing one.
+   */
+  private reviveInWings(fingerprint: number, location: Position, bones: ObjectID): void {
+    const character = getFromWings(this.dungeon, fingerprint, false);
+    if (!character) return;
+    // `if (character.HP() > 0) break`.
+    if (readI16BE(character, 52) > 0) return;
+    // `character.HP(character.MaxHP()/2)`.
+    writeU16BE(character, 52, Math.trunc(readI16BE(character, 54) / 2));
+    saveToWings(this.dungeon, character);
+    if (!this.dungeon.removeObjectFromCell(location, bones)) return;
+    this.dungeon.deleteDBEntry(bones);
   }
 
   private queueViAltarTimer(

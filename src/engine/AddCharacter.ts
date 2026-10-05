@@ -16,6 +16,7 @@ import { sw } from '../core/intCast';
 import { CHARFLAG_MALE, emptyPossessions, type Champion } from './gameTypes';
 import { makeAddCharacterAttributes } from './attributes';
 import { createSkillsFromSubskillLevels } from './skills';
+import { getFromWings, type WingsPool } from './Wings';
 
 export interface AddCharacterTables {
   carryLocation: ArrayLike<number>;
@@ -30,13 +31,12 @@ export interface AddCharacterItem {
 }
 
 /**
- * `FingerprintExists` (`doc/CSBwin-src/Character.cpp:437-450`).
- *
- * ⚠️ CSBWin also searches the wings (`character.GetFromWings`), the pool of champions
- * who have left the party. We have no wings, so only the live party is scanned.
+ * `FingerprintExists` (`doc/CSBwin-src/Character.cpp:437-450`): a champion of the party
+ * has it, or one in the wings (`GetFromWings`, testing only).
  */
-export function fingerprintExists(champions: Champion[], fingerprint: number): boolean {
-  return champions.some((champ) => champ.fingerprint === (fingerprint & 0xffff));
+export function fingerprintExists(champions: Champion[], pool: WingsPool, fingerprint: number): boolean {
+  if (champions.some((champ) => champ.fingerprint === (fingerprint & 0xffff))) return true;
+  return getFromWings(pool, fingerprint, true) !== null;
 }
 
 /**
@@ -46,12 +46,13 @@ export function fingerprintExists(champions: Champion[], fingerprint: number): b
  */
 export function computeChampionFingerprint(
   champions: Champion[],
+  pool: WingsPool,
   level: number,
   x: number,
   y: number,
 ): number {
   let fingerprint = ((level << 10) | (x << 5) | y) & 0xffff;
-  while (fingerprintExists(champions, fingerprint)) {
+  while (fingerprintExists(champions, pool, fingerprint)) {
     fingerprint = (fingerprint + 1) & 0xffff;
   }
   return fingerprint;

@@ -11,6 +11,7 @@ import { CHARFLAG_CHEST_OR_SCROLL, CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, M
 import type { GameHost } from './GameHost';
 import { addCharacterDefaults } from './AddCharacter';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
+import { getFromWings, wingsChampion, type WingsPool } from './Wings';
 import { Direction as Dir } from '../core/types';
 
 /**
@@ -310,13 +311,10 @@ export function getPartyChampion(party: PartyState, chIdx: number): Champion | n
 }
 
 /**
- * `CHARDESC::CopyCharacter` (`doc/CSBwin-src/Character.cpp:5239`), party half — the
- * champion a bones fingerprint belongs to, or -1.
- *
- * ⚠️ CSBWin searches the party and then `GetFromWings`, the store of champions who
- * have left it. This port has no wings, so a fingerprint that matches nobody in the
- * party is simply unknown here where CSBWin might still resolve it. Every caller is
- * written to fail closed on -1 rather than guess.
+ * The first champion of the party with `fingerprint`'s low word, or -1: the party half of
+ * `CHARDESC::CopyCharacter` (`doc/CSBwin-src/Character.cpp:5239-5251`), and the loop
+ * `ProcessTT_ViAltar` and `&CHARNAME@` spell out (`Timer.cpp:2752-2755`,
+ * `DSA.cpp:3215-3222`).
  */
 export function findChampionByFingerprint(party: PartyState, fingerprint: number): number {
     const wanted = fingerprint & 0xffff;
@@ -326,6 +324,18 @@ export function findChampionByFingerprint(party: PartyState, fingerprint: number
         if ((champion.fingerprint & 0xffff) === wanted) return i;
     }
     return -1;
+}
+
+/**
+ * `CHARDESC::CopyCharacter` (`doc/CSBwin-src/Character.cpp:5239-5251`): the first champion
+ * of the party with `fingerprint`'s low word, else a copy of the one in the wings
+ * (`GetFromWings`, testing only), else null. The party's is the champion itself.
+ */
+export function copyCharacter(party: PartyState, pool: WingsPool, fingerprint: number): Champion | null {
+    const chIdx = findChampionByFingerprint(party, fingerprint);
+    if (chIdx !== -1) return party.champions[chIdx]!;
+    const character = getFromWings(pool, fingerprint, true);
+    return character ? wingsChampion(character) : null;
 }
 
 /**

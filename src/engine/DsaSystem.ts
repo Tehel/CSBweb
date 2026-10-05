@@ -49,6 +49,9 @@ import { monsterHorizontalSize } from '../data/tables/MonsterDesc';
 import { monsterDrawAsSize4, monsterInvisible, monsterPoisoned, monsterUnique } from './MonsterSystem';
 import { printWithSubstitution } from './PrintWithSubstitution';
 import { findChampionByFingerprint } from './Party';
+import { getFromWings, locateInWings, saveToWings, wingsChampion } from './Wings';
+import { readU32LE, writeU32LE } from '../core/bytes';
+import { decodeCharField } from '../data/CsbwinSaveInfo';
 import { EDT_GLOBAL_TEXT, GetText } from '../data/DecodeText';
 import { messageParametersKey, readGlobalVariables } from '../data/CsbwinExpool';
 import { FEED_PARAMETER_WORDS, feedParametersFromWords, feedParametersToWords, type FeedParameters } from './Feeding';
@@ -644,8 +647,8 @@ interface GearJump {
   col: number;
 }
 
-/** `EDT_Character` (`doc/CSBwin-src/CSB.h:1568`): a champion in the wings, keyed by fingerprint. */
-const EDT_CHARACTER = 8;
+/** `talents`' offset in a `CHARDESC`, a longword `swapCharacter` leaves little-endian. */
+const CHARDESC_TALENTS = 276;
 
 /** `LIMIT(min, x, max)` (`doc/CSBwin-src/CSB.h:3109`): `max` is tested first. */
 function limit(min: number, x: number, max: number): number {
@@ -2708,17 +2711,21 @@ export class DsaSystem {
         const result = new Array<number>(59).fill(0);
         if (((index + num) >>> 0) > 100 || (charIdx < 0x10000 && charIdx >= party.champions.length) || charIdx < 0) {
           // `memset(result, 0, …)`.
-        } else if (charIdx & 0x10000) {
-          // `GetFromWings` finds nobody, so the record is `memset` to zero (`DEBT.md` G3).
         } else {
-          // An index of 0x20000 or more without bit 16 reads nobody (`DEBT.md` H).
-          const pc = this.getChampion(party, charIdx);
+          // Bit 16 is a fingerprint in the wings (`GetFromWings`, testing only), where
+          // nobody leaves the record `memset` to zero. An index of 0x20000 or more
+          // without bit 16 reads nobody, as does `d.PendingDamage[charIdx]` past its
+          // four (`DEBT.md` H).
+          const inWings = (charIdx & 0x10000) !== 0;
+          const character = inWings ? getFromWings(this.dungeon, charIdx & 0xffff, true) : null;
+          const pc = inWings ? character && wingsChampion(character) : this.getChampion(party, charIdx);
           if (pc) {
             result[0] = pc.facing;
             result[1] = pc.food;
-            result[2] = Math.max(pc.attributes.health - (party.pendingDamage[charIdx] ?? 0), 0);
-            // `pc->load`, which the port sums from the possessions (`DEBT.md` H).
-            result[3] = this.ctx.systems.characterStats.characterLoad(pc);
+            result[2] = Math.max(pc.attributes.health - (inWings ? 0 : party.pendingDamage[charIdx] ?? 0), 0);
+            // `pc->load`, which the port sums from a party champion's possessions
+            // (`DEBT.md` H), and the record holds for one in the wings.
+            result[3] = inWings ? pc.load : this.ctx.systems.characterStats.characterLoad(pc);
             result[4] = pc.attributes.mana;
             result[5] = pc.wounds;
             result[6] = pc.partyPosition;
@@ -2746,21 +2753,35 @@ export class DsaSystem {
         break;
       }
       case StkOp.TALENTS_FETCH: {
-        // `DSA.cpp:4242-4290`. A wings index finds nobody (`DEBT.md` G3).
+        // `DSA.cpp:4242-4290`. Bit 16 is a fingerprint in the wings.
         const party = this.ctx.party.state;
         let charIdx = bank.stack.pop();
         if (charIdx === 4) charIdx = party.cursorOwner;
-        const pc = charIdx & 0x10000 ? null : this.getChampion(party, charIdx);
+        if (charIdx >= 0 && charIdx & 0x10000) {
+          const character = getFromWings(this.dungeon, charIdx & 0xffff, true);
+          bank.stack.push(character ? readU32LE(character, CHARDESC_TALENTS) : 0);
+          break;
+        }
+        const pc = this.getChampion(party, charIdx);
         bank.stack.push(pc ? pc.talents : 0);
         break;
       }
       case StkOp.TALENTS_STORE: {
-        // `DSA.cpp:4291-4347`. A wings index finds nobody (`DEBT.md` G3).
+        // `DSA.cpp:4291-4347`. Bit 16 is a fingerprint in the wings, whose copy is saved
+        // back when the talents change.
         const party = this.ctx.party.state;
         let charIdx = bank.stack.pop();
         const newTalents = bank.stack.pop() >>> 0;
         if (charIdx === 4) charIdx = party.cursorOwner;
-        const pc = charIdx & 0x10000 ? null : this.getChampion(party, charIdx);
+        if (charIdx >= 0 && charIdx & 0x10000) {
+          const character = getFromWings(this.dungeon, charIdx & 0xffff, true);
+          if (character && readU32LE(character, CHARDESC_TALENTS) !== newTalents) {
+            writeU32LE(character, CHARDESC_TALENTS, newTalents);
+            saveToWings(this.dungeon, character);
+          }
+          break;
+        }
+        const pc = this.getChampion(party, charIdx);
         if (pc) pc.talents = newTalents;
         break;
       }
@@ -2792,10 +2813,7 @@ export class DsaSystem {
         this.ctx.party.state.champions.forEach((champ, charIdx) => {
           if (champ.fingerprint === fingerPrint) val = charIdx;
         });
-        if (val === 4) {
-          const key = ((EDT_CHARACTER << 24) | (fingerPrint & 0xffff)) >>> 0;
-          if (this.dungeon.locateExpoolRecord(key)?.length === 25) val = 5;
-        }
+        if (val === 4 && locateInWings(this.dungeon, fingerPrint) !== null) val = 5;
         bank.stack.push(val);
         break;
       }
@@ -2842,15 +2860,17 @@ export class DsaSystem {
         break;
       }
       case StkOp.CHAR_NAME_FETCH: {
-        // `DSA.cpp:3204-3237`: the first champion with the fingerprint. CSBWin looks in
-        // the wings next (`LocateInWings`), which the port does not have (`DEBT.md` G3).
+        // `DSA.cpp:3204-3237`: the first champion with the fingerprint, else the one in
+        // the wings (`LocateInWings`).
         // `SetText(pName, 8, index)` copies nine bytes, the name's eight and a ninth:
         // only a name of eight letters, which runs on into the title, would show it.
         const index = bank.stack.pop() & 0xffff;
         const fingerprint = bank.stack.pop() & 0xffff;
         const party = this.ctx.party.state;
         const charIdx = findChampionByFingerprint(party, fingerprint);
-        bank.setText(charIdx >= 0 ? party.champions[charIdx]!.name.slice(0, 8) : '', index);
+        const inWings = charIdx >= 0 ? null : locateInWings(this.dungeon, fingerprint);
+        const name = charIdx >= 0 ? party.champions[charIdx]!.name : inWings ? decodeCharField(inWings.subarray(0, 8)) : '';
+        bank.setText(name.slice(0, 8), index);
         break;
       }
       case StkOp.TEXT_SAY: {

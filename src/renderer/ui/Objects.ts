@@ -10,7 +10,7 @@ import { DescIndex, GetBasicObjectType, NameIndex } from '../../engine/objectInd
 import { DBType, ObjectID } from '../../core/types';
 import { ViewingFilterResult, ViewingFilterSite } from '../../engine/DsaSystem';
 import { Champion } from '../../engine/gameTypes';
-import { findChampionByFingerprint } from '../../engine/Party';
+import { copyCharacter } from '../../engine/Party';
 import { determineMastery as determineMasteryEngine } from '../../engine/skills';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { UIState } from './UIState';
@@ -74,10 +74,7 @@ export function getObjectName(ui: UIState, objectNameIndex: number): string {
  * `objNI_Bones_a` rather than on the `DB10` misc type, and both refuse bones whose
  * `value()` is 0: those are inert scenery, not anybody's remains
  * (`doc/CSBwin-src/CSB.h:1258-1264`).
- *
- * ⚠️ `CopyCharacter` searches the party and then `GetFromWings`; this port has no
- * wings, so a fingerprint matching nobody still in the party goes unresolved and the
- * bones keep their plain name — see `findChampionByFingerprint`.
+ * `CopyCharacter` finds the champion in the party, or in the wings.
  */
 export function getBonesChampion(ui: UIState, objectId: ObjectID, objectNameIndex: number): Champion | null {
   if (objectNameIndex !== OBJNI_BONES_A) return null;
@@ -87,9 +84,7 @@ export function getBonesChampion(ui: UIState, objectId: ObjectID, objectNameInde
   if ((misc.specialState | 0) === 0) return null;
   const fingerprint = ui.ctx.dungeon.copyChampionBonesRecord(objectId);
   if (fingerprint === null) return null;
-  const chIdx = findChampionByFingerprint(ui.partyState, fingerprint);
-  if (chIdx === -1) return null;
-  return ui.partyState.champions[chIdx] ?? null;
+  return copyCharacter(ui.partyState, ui.ctx.dungeon, fingerprint);
 }
 
 export function getObjectDisplayName(ui: UIState, objectId: ObjectID, objectNameIndex: number): string {
