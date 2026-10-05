@@ -92,6 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| C144 | A champion's death leaves their facing as it was | S | ⏳ |
 | G3 | The wings: step 2, `SwapCharacter` | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -126,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C144 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C145 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -169,6 +170,18 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C144 ⏳ A champion's death leaves their facing as it was
+
+`KillCharacter` sets the dead champion's `facing` to the party's
+(`doc/CSBwin-src/Character.cpp:2650`), after the bones are down and with `byte33`,
+`incantation[0]` and `maxRecentDamage` (`:2648-2651`). The port's
+`MonsterAttack.killCharacter` clears the other three and leaves `facing` alone, so a
+dead champion faces wherever they last did. `&CHAR@` reads it (`result[0]`,
+`DSA.cpp:4198`) and a save writes it; `BringCharacterToLife` sets it again at the
+resurrection (`Character.cpp:823`, ported), so the screen never shows the difference.
+The fix is the one assignment, and a check in `tools/dump-vi-altar.ts` or a death tool
+that a champion who dies facing away from the party reads the party's facing.
 
 ---
 
