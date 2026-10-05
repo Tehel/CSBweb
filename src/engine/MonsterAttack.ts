@@ -734,9 +734,12 @@ export class MonsterAttack {
       this.dungeon.addChampionBonesRecord(objD4, champ.fingerprint);
     }
 
+    // `pcA3->facing = (ui8)d.partyFacing`, `maxRecentDamage = 0`
+    // (`doc/CSBwin-src/Character.cpp:2650-2651`).
+    champ.facing = party.facing;
+    champ.maxRecentDamage = 0;
     // `if (pcA3->poisonCount) CurePoison(chIdx)` — a corpse is not poisoned, and the
     // TT_75 timers must not outlive it (`doc/CSBwin-src/Character.cpp:2663-2666`).
-    champ.maxRecentDamage = 0;
     if (champ.poisonCount) this.curePoison(chIdx);
 
     // `KillCharacter`'s tail (`doc/CSBwin-src/Character.cpp:2670-2694`): find a living

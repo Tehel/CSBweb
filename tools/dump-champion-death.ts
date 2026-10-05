@@ -6,7 +6,8 @@
  * the possessions drop, a `misc_BonesOfHero` with `value(2)` appears in the champion's
  * corner, the expool records the bones↔fingerprint pairing the Altar of Vi resolves
  * through, the cursor and the magic tab move to somebody living, and `d.GameIsLost` is
- * set when nobody is. A path that zeroes `health` by hand skips all six.
+ * set when nobody is, and the dead champion is turned to face the party's way. A path
+ * that zeroes `health` by hand skips all seven.
  *
  * Two paths in this port used to do exactly that, so a champion killed by exhaustion or
  * by a missile was unresurrectable and a party wiped by either did not lose the game:
@@ -18,7 +19,7 @@
  *     corner to a champion, asks `DetermineMagicDamage` for the blow, and applies it
  *     with `DamageCharacter(chIdx, damage, 12, kind)`.
  *
- * This drives both, plus a plain `DamageCharacter`, and checks the same six
+ * This drives both, plus a plain `DamageCharacter`, and checks the same seven
  * consequences each time. It also tabulates `DetermineMagicDamage` across the
  * projectile kinds, where the interesting part is not the numbers — they are random —
  * but which *arm* each projectile takes, which the `kind` and poison columns give away.
@@ -38,7 +39,7 @@ import { resolve } from 'node:path';
 
 import { MISC_BONES_OF_HERO } from '../src/core/constants';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
-import type { ObjectID } from '../src/core/types';
+import type { Direction, ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
@@ -140,6 +141,8 @@ function armChampion(game: Game, chIdx: number): void {
   // the mirror, so the inventory still showed the dropped object there (DEBT.md C27).
   const spare = dagger();
   champ.possessions![8] = spare;
+  // Facing away from the party, so the death's `facing = d.partyFacing` shows.
+  champ.facing = ((game.ctx.party.state.facing + 2) & 3) as Direction;
 }
 
 /** A fresh dagger record, as `armChampion` makes them. */
@@ -252,7 +255,7 @@ function bonesAt(game: Game, cell: Position): ObjectID[] {
   return out;
 }
 
-/** The six consequences of a death, in one row. */
+/** The seven consequences of a death, in one row. */
 type Aftermath = {
   dead: boolean;
   bones: boolean;
@@ -260,6 +263,7 @@ type Aftermath = {
   expoolRecord: boolean;
   dropped: boolean;
   gameIsLost: boolean;
+  facesParty: boolean;
 };
 
 function aftermath(game: Game, cell: Position, chIdx: number, lastAlive: boolean): Aftermath {
@@ -275,12 +279,13 @@ function aftermath(game: Game, cell: Position, chIdx: number, lastAlive: boolean
     dropped: Array.from({ length: 30 }, (_, slot) => getChampionPossession(champ, slot)).every((v) => v === OBJECT_ID_NULL),
     // Only meaningful when the victim was the last one standing.
     gameIsLost: lastAlive ? game.ctx.party.state.gameIsLost : true,
+    facesParty: champ.facing === game.ctx.party.state.facing,
   };
 }
 
 function report(label: string, a: Aftermath): void {
   console.log([
-    label, a.dead, a.bones, a.bonesValue2, a.expoolRecord, a.dropped, a.gameIsLost,
+    label, a.dead, a.bones, a.bonesValue2, a.expoolRecord, a.dropped, a.gameIsLost, a.facesParty,
   ].join('\t'));
   check(a.dead, `${label}: the champion is dead`);
   check(a.bones, `${label}: exactly one bones object is left behind`);
@@ -288,10 +293,12 @@ function report(label: string, a: Aftermath): void {
   check(a.expoolRecord, `${label}: and an expool record, so the Altar of Vi can resolve them`);
   check(a.dropped, `${label}: every possession was dropped`);
   check(a.gameIsLost, `${label}: with nobody left alive, the game is lost`);
+  // `pcA3->facing = (ui8)d.partyFacing` (`doc/CSBwin-src/Character.cpp:2650`).
+  check(a.facesParty, `${label}: and the dead champion faces the party's way`);
 }
 
 function main(): void {
-  console.log(['path', 'dead', 'bones', 'value=2', 'expool', 'dropped', 'gameIsLost'].join('\t'));
+  console.log(['path', 'dead', 'bones', 'value=2', 'expool', 'dropped', 'gameIsLost', 'facesParty'].join('\t'));
 
   /* ------------------------------------ 1. DamageCharacter, the control ---------- */
   {
@@ -359,7 +366,7 @@ function main(): void {
     }
     check(shots < 12, 'a fireball into the party cell kills a 20-hit-point champion within a few shots');
     console.log('');
-    console.log(['path', 'dead', 'bones', 'value=2', 'expool', 'dropped', 'gameIsLost'].join('\t'));
+    console.log(['path', 'dead', 'bones', 'value=2', 'expool', 'dropped', 'gameIsLost', 'facesParty'].join('\t'));
     report('missile', aftermath(g, cell, 0, true));
   }
 

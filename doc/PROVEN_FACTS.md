@@ -1431,6 +1431,14 @@ is added afterwards, unconditionally, with the same `objD4`, so it pairs the bon
 they came to rest. Evidence: `tools/dump-champion-death.ts` section 7 (2 of 49 checks fail
 before C31's fix).
 
+After the bones, `KillCharacter` clears `byte33`, `incantation[0]` and `maxRecentDamage`
+and turns the dead champion to the party's facing, `pcA3->facing = (ui8)d.partyFacing`
+(`doc/CSBwin-src/Character.cpp:2648-2651`). The screen never shows it, since
+`BringCharacterToLife` sets the facing again (`:823`), but `&CHAR@` reads it
+(`DSA.cpp:4198`) and a save carries it. Evidence: `tools/dump-champion-death.ts`, the
+`facesParty` column of the death table (3 checks fail without the assignment).
+
+
 Unconditionally also means whatever the fingerprint: `AddChampionBonesRecord` stores
 `fingerprint & 0xffff` with no test (`doc/CSBwin-src/data.cpp:1636-1643`), so a fingerprint
 of 0 — `AddCharacter`'s for a champion recruited at level 0, (0, 0)
