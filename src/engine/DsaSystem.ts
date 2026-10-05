@@ -67,6 +67,11 @@ export enum ViewingFilterSite {
   DESCRIPTION,
   /** `DescribeObject`'s scroll (`:3506`): parameter 0 is 0, and a DSA may name another scroll. */
   SCROLL,
+  /**
+   * `TAG019036`'s, the eye clicked with an empty hand (`:4524-4578`): parameter 0 is 0
+   * and the object -1, whatever `objectId` says, and nothing the DSAs leave is read.
+   */
+  ATTRIBUTES,
 }
 
 export interface ViewingFilterOptions {
@@ -1207,7 +1212,8 @@ export class DsaSystem {
    * into the mask, which only `&DESCRIBE` changes (`ModifyDescription`, `:3797-3830`).
    * At the scroll site, an object a DSA names in parameter 1 becomes the loop's own `obj`,
    * so the loop goes on down that object's chain, and is drawn if it is a scroll
-   * (`:3509-3518`). Null when no DSA stands there.
+   * (`:3509-3518`). `TAG019036`'s site runs them as the description's does, with
+   * parameter 0 always 0 (`:4566-4569`). Null when no DSA stands there.
    */
   processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
     const special = this.dungeon.getSpecialLocation(VIEWING_FILTER_KEY);
@@ -1232,6 +1238,8 @@ export class DsaSystem {
     };
 
     const scrollSite = options.site === ViewingFilterSite.SCROLL;
+    const descriptionSite = options.site === ViewingFilterSite.DESCRIPTION;
+    const objectParameter = options.site === ViewingFilterSite.ATTRIBUTES ? -1 : options.objectId | 0;
     return this.newDsaParameters(() => {
       const ctx: ViewingFilterContext = {
         phraseMask: options.phraseMask | 0,
@@ -1248,8 +1256,8 @@ export class DsaSystem {
           if (!rec || getActuatorType(rec) !== 47) continue;
           found = true;
           this.setParameters(3, [
-            scrollSite ? 0 : ctx.phraseMask,
-            options.objectId | 0,
+            descriptionSite ? ctx.phraseMask : 0,
+            objectParameter,
             options.selectedCharacter | 0,
           ]);
           this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars());

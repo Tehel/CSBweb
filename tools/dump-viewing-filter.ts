@@ -24,6 +24,13 @@
  *    feed `DecodeText` puts in front and code 28: `/` to `GetText`, a space to
  *    `DecodeText`, or a line feed in place of that space for a second one in a row.
  *
+ * 8. **The eye clicked with an empty hand runs it too** (`TAG019036`,
+ *    `doc/CSBwin-src/Character.cpp:4524-4578`, from `_ClickOnEye`, `Viewport.cpp:7257-7290`):
+ *    every DSA at the location, each seeing parameter 0 as 0, the object as -1 and the
+ *    champion whose inventory is open. Once a press: a second press while the eye is held
+ *    runs nothing, and the next press after the release runs it again. With an object in
+ *    hand the eye describes it instead, and this site runs nothing.
+ *
  * Run: `npx tsx tools/dump-viewing-filter.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -36,6 +43,8 @@ import type { Game } from '../src/engine/Game';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
 import { check, finish } from './lib/check';
 import { gameTablesOf, stockGraphics } from './lib/game';
+import { newUIState } from './lib/ui';
+import { handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
 
 /** `ESL_VIEWINGFILTER` (`doc/CSBwin-src/CSB.h:1538`). */
 const ESL_VIEWINGFILTER = 3;
@@ -207,6 +216,54 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     console.log(`7. ${name}: ${same} of ${records.length} texts, ${slashes} with code 28, read by GetText as DecodeText reads them`);
     check(same === records.length && records.length > 0, `every text in use in ${name} reads by GetText as by DecodeText`);
   }
+}
+
+/* ------------------------------- 8. the eye with an empty hand ----------------- */
+{
+  /** Parameters 0 to 2 into globals `to` to `to + 2`. */
+  const params3 = (to: number): number[] => [
+    ...int(3), ...int(10), op(StkOp.PARAM_FETCH),
+    varFetch(10), globalStore(to), varFetch(11), globalStore(to + 1), varFetch(12), globalStore(to + 2),
+  ];
+  const game = withFilter([[...params3(0), ...describe(-1, 0, 5)], [...params3(10)]]);
+  const party = game.ctx.party.state;
+  const ui = newUIState(stockGraphics(), game.ctx);
+  ui.partyState = party;
+  party.selectedCharacterIndex = 1;
+  party.objectInHand = OBJECT_ID_NULL;
+  const unset = (): void => {
+    const g = game.systems.dsa.getGlobalVariables();
+    for (const i of [0, 1, 2, 10, 11, 12]) g[i] = UNSET;
+    game.systems.dsa.setGlobalVariables(g);
+  };
+  const ran = (): boolean => game.systems.dsa.getGlobalVariables()[0] !== UNSET;
+
+  unset();
+  handleMouseButton(ui, 71, 0, 0);
+  const g = game.systems.dsa.getGlobalVariables();
+  console.log(`8. the eye clicked with an empty hand: the first DSA sees ${hex(g[0])}, ${g[1]}, ${g[2]}; `
+    + `the second ${g[10] === UNSET ? 'does not run' : `sees ${hex(g[10])}, ${g[11]}, ${g[12]}`}`);
+  check(g[0] === 0 && g[1] === -1 && g[2] === 1,
+    'the first DSA sees phrase mask 0, object -1 and the champion whose inventory is open');
+  check(g[10] === 0 && g[11] === -1 && g[12] === 1,
+    "the second runs too, and sees parameter 0 as 0 whatever the first one's &DESCRIBE did");
+  unset();
+  handleMouseButton(ui, 71, 0, 0);
+  const again = ran();
+  handleMouseUnclick(ui);
+  handleMouseButton(ui, 71, 0, 0);
+  const afterRelease = ran();
+  handleMouseUnclick(ui);
+  console.log(`   a second press while held ${again ? 'runs it' : 'runs nothing'}; `
+    + `a press after the release ${afterRelease ? 'runs it' : 'runs nothing'}`);
+  check(!again, 'a press while the eye is held runs nothing (_ClickOnEye returns on d.PressingEye)');
+  check(afterRelease, 'the next press after the release runs it again');
+  unset();
+  party.objectInHand = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, 0);
+  handleMouseButton(ui, 71, 0, 0);
+  handleMouseUnclick(ui);
+  console.log(`   with an object in hand the eye's own site ${ran() ? 'runs' : 'runs nothing'}`);
+  check(!ran(), 'with an object in hand, TAG019036 does not run');
 }
 
 finish();

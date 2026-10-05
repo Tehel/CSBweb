@@ -16,13 +16,13 @@ import { searchButtonList } from './HitTest';
 import { getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
 import { drawLegalAttackTypes, handleAttackAreaClick } from './Attack';
-import { resolveObjectNameIndex } from './Objects';
+import { applyViewingFilter, resolveObjectNameIndex } from './Objects';
 import { OBJECT_ID_NULL } from '../../core/types';
 import { UIMode, UIState } from './UIState';
 import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
 import { characterAtPosition } from '../../engine/AddCharacter';
-import { CursorFilterType } from '../../engine/DsaSystem';
+import { CursorFilterType, ViewingFilterSite } from '../../engine/DsaSystem';
 import { freeze, setClockTick, thaw, waitForButtonFlash, wakeUp } from '../../engine/LoopState';
 import {
   hasCursorObject,
@@ -210,9 +210,19 @@ export function isEyeClick(ui: UIState, x: number, y: number): boolean {
   return x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2;
 }
 
+/**
+ * `_ClickOnEye` (`doc/CSBwin-src/Viewport.cpp:7257-7290`): a press while the eye is
+ * held does nothing. With an empty hand, `TAG019036` runs the viewing filter before it
+ * draws the attributes (`doc/CSBwin-src/Character.cpp:4524-4578`); the panel itself is
+ * drawn from `pressingEye` (`drawInventoryScreen`).
+ */
 export function handleEyePress(ui: UIState): void {
   if (ui.partyState.selectedCharacterIndex < 0) return;
+  if (ui.pressingEye) return;
   ui.pressingEye = true;
+  if (ui.partyState.objectInHand === OBJECT_ID_NULL) {
+    applyViewingFilter(ui, ViewingFilterSite.ATTRIBUTES, OBJECT_ID_NULL, 0);
+  }
 }
 
 export function handlePartyBlockClick(ui: UIState, button: number, x: number, y: number): void {

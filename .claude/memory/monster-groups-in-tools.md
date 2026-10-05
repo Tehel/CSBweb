@@ -23,7 +23,7 @@ corners byte in that field (5, 6, …), so it gets an unrelated `ITEM16` back. T
 `level === party.position.z` first, as `MonsterDamage.monsterPositionByte` does.
 
 **Why:** the next monster work needs this, the DSA's `I_DelMon`, `I_InsMon` and
-`I_MonsterStore`, and G2's monster move filter, and finding it took a scan of every
+`I_MonsterStore`, and the DSA's monster move filter, and finding it took a scan of every
 fixture.
 
 **How to apply:** start a monster tool from `dump-dsa-monsters.ts`'s positions and

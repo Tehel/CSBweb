@@ -22,7 +22,7 @@ code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, and the work it
-needs is in the active list: G1 to G4, G24, G25, G27 and G26. Its `dungeon.dat` is
+needs is in the active list: G1, G3, G4, G24, G25, G27 and G26. Its `dungeon.dat` is
 enciphered, and reads whole (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is
 `RC4.cpp`'s own cipher"). Each entry says what Conflux uses of it, measured on the
 deciphered file.
@@ -92,7 +92,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | The viewing filter's third site | S | ⏳ step 12 next |
+| E21 | Five DSA filters find and run their DSAs by hand | S | ⏳ |
+| C137 | The viewing filter's DSAs run at every compose of the inventory | M | ⏳ |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -127,7 +128,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C137 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C138 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -165,11 +166,45 @@ What the redesign will replace, and what it should not carry across:
 Paying it is the redesign's first step: settings as a model the page renders, the CRT in a
 module of its own, a `publicDir` holding only what the page serves, and `server.js` gone.
 
+### E21 ⏳ Five DSA filters find and run their DSAs by hand
+
+`DsaSystem.forEachFilterDsa` finds a filter's location, builds its timer (`filterTimer`)
+and runs every type-47 actuator there, or the first, each with its own `DsaVars`. Nine
+filters go through it, and the monster move and action name filters take `filterTimer`.
+Five spell the same steps out again, each with a `TimerEntry`
+literal of its own: `processMissileEncounterFilter`, `processViewingFilter`,
+`processAdjustSkillsFilter`, `callPartyAttackFilter` and `processSpellFilter`
+(`src/engine/DsaSystem.ts`). Paying it moves them onto `forEachFilterDsa`, or onto
+`filterTimer` where a site's loop differs (the viewing filter's scroll goes on down the
+chain of the object a DSA names), with every tool's output byte-identical.
+
 ---
 
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C137 ⏳ The viewing filter's DSAs run at every compose of the inventory
+
+CSBWin runs the viewing filter where it draws the eye panel, and draws that only at
+events: `DescribeObject` or `TAG019036` from `_ClickOnEye`, once a press
+(`doc/CSBwin-src/Viewport.cpp:7257-7290`), and from `DrawCharacterState` when the
+champion's `CHARFLAG_chestOrScroll` is set with the inventory open
+(`doc/CSBwin-src/Character.cpp:1478-1497`), through `TAG0189d4` (`:3849`) for a scroll or
+a chest in hand. The port draws the panel from live state at every compose of the screen
+(`drawInventoryScreen`, `src/renderer/ui/Inventory.ts`, from `GameScreen.presentViewport`),
+which a click, a key, the message scroll and a move of the pointer each make, and runs
+the description's and the scroll's sites there (`getObjectDescriptionLines`,
+`src/renderer/ui/Objects.ts`; `drawScrollPanel`, `Inventory.ts`). So a DSA at
+`ESL_VIEWINGFILTER` runs once a compose while a description or a scroll is shown, and
+whatever it does besides `&DESCRIBE` (a global, a message, a timer) is done that many
+times. The eye with an empty hand runs it at the press (`handleEyePress`,
+`src/renderer/ui/Mouse.ts`), as `_ClickOnEye` does, but never from `DrawCharacterState`,
+because the port has no `CHARFLAG_chestOrScroll` (`AdjustStatsForItemCarried.ts:181`).
+
+Paying it means running the filter at CSBWin's events and keeping its result for the
+composes between them. Of the dungeons here only Conflux has a viewing filter, with one
+DSA.
 
 ---
 
@@ -268,8 +303,7 @@ It uses 118 `&` operations, 4 of the 6. With Conflux's count of each:
   checked by `tools/dump-dsa-missiles.ts`.
 - **Monsters**: none is left. `MonsterFetch`, `MonsterStore`, `MonPoss`, `MonBlk`,
   `MonLandD`, `DelMon` and `InsMon` are ported, checked by `tools/dump-dsa-monsters.ts`.
-  `MonLandD` acts only in the monster move filter, and `MonBlk` is read only from it:
-  both wait on G2's `ESL_MONSTERMOVEFILTER` to matter.
+  `MonLandD` acts only in the monster move filter, and `MonBlk` is read only from it.
 - **Messages, sounds and texts**: none is left. `Message` and `Sound` are ported,
   checked by `tools/dump-dsa-message.ts`; a `Sound` number from 0 up is a sample of
   `CSBgraphics.dat`, which plays nothing until G24. The texts are ported too: `Say`,
@@ -316,41 +350,6 @@ The rest of the item, with an operation that needs care when ported:
   file uses, which a read takes back (`DSAINDEX::ReadTracing`, `DSA.cpp:5553-5576`). The
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
-
-### G2 ⏳ The viewing filter's third site
-
-The port runs sixteen filters: the viewing filter (two of its three sites), the cursor
-filter, the monster
-move filter, the monster attack filter, the delete monster
-filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
-sound filter, the action name filter, the feeding filter, the character death filter, the
-damage filter, the equip filter, the party move filter, and the spell filter at
-`spellFilterLocation`. Each place below uses
-CSBWin's defaults instead.
-Conflux reaches every one: its `EXPOOL` names a location for all
-sixteen special locations, `ESL_MONSTERATTACKFILTER` (0) to `ESL_DAMAGECHARFILTER` (15,
-`doc/CSBwin-src/CSB.h:1535-1550`), and the monster move filter's for level 29 too, and a
-type-47 actuator stands at each: 10 at the monster attack filter's, 3 at the feeding's, 5
-at the monster move's, 3 at the delete-monster's, 9 at the action name's, 4 at the
-character death's, 3 at the damage's, one at each of the others, and 39 at the spell
-filter's.
-
-A filter that loops runs each of those DSAs in turn, a filter call apiece; one that
-`break`s runs the first. Each step reads which from its CSBWin site and checks it in a
-`tools/` check through `tools/lib/dsa.ts`: `TestFilter` for one DSA, `withFilterDsas` for
-two on the square where the site loops. Steps 1 to 11, the sound filter, the action name
-filter, the feeding filter, the character death and damage filters, the equip filter, the
-party move filter, the monster attack filter, the delete monster filter, the monster
-move filter, the cursor filter and the portrait's switch action, are paid. The step left:
-
-12. **The viewing filter at the eye click** (S). `TAG019036`
-    (`Character.cpp:4540-4578`) runs it with phrase mask 0 and object -1 before it draws
-    the masteries, every DSA at the location in turn; the port's `drawAttributePanel`
-    (`src/renderer/ui/Character.ts:71`) runs none.
-
-The steps share how a filter is reached and run: `DsaSystem.forEachFilterDsa`, which the
-sound filter uses, and `filterTimer`. Moving the other five filters already ported onto it is a refactor, a
-commit of its own.
 
 ### G3 ⏳ The wings
 
