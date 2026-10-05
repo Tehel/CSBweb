@@ -171,6 +171,8 @@ const CHECKS = [
   { tool: 'dump-rise.ts' },
   // Chaos Strikes Back's Hint Oracle data, hcsb.hct, decoded and its limits checked.
   { tool: 'dump-hint-oracle.ts' },
+  // Its screen, run headlessly: the title list, a hint's pages, the cycle, no clues.
+  { tool: 'dump-hint-oracle-screen.ts' },
   // Block 4 packed and held up against the real thing: every committed save's
   // character block, written again from the champions it yields, byte for byte.
   { tool: 'dump-character-block.ts' },

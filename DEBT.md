@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
+| G20 | The Hint Oracle, from the inventory, at the party's square | M | ⏳ the button left |
 | G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits | S | ⏳ waits on G24 |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
@@ -407,90 +407,48 @@ the Oracle's own screen, ported as CSBWin draws it, on the square the party stan
 It is CSB's, not an extra: whenever the data set has the Oracle's files, the button is
 there, whatever `UISettings.extras` says, because the port offers no other way to it.
 
-Done already, in `src/data/HintOracleLoader.ts` and checked by
-`tools/dump-hint-oracle.ts`: `hcsb.hct` (`parseHintOracle` and `hintsAtPosition`), and
-`hcsb.dat`'s four items (`parseHcsbDat`), item 0's fifty words named where `Hint.cpp`
-reads them, with the button table (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "What it is",
-"Files", "Item 0").
+Done already. The data: `src/data/HintOracleLoader.ts` reads `hcsb.hct` and `hcsb.dat`,
+checked by `tools/dump-hint-oracle.ts`. The screen: `HintOracleScreen`
+(`src/renderer/intro/HintOracle.ts`) runs `_StartHint` from the load's window to DONE on
+the title list, over an `IntroHost`, on a square it is given, checked headlessly by
+`tools/dump-hint-oracle-screen.ts` (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "The
+screen"). Nothing opens it yet.
 
-What the screen is. About 2000 of `Hint.cpp`'s 7560 lines are the interface; the rest is
-GEMDOS file emulation, a heap, LZW, palette fades and empty GEM stubs.
+One step is left (M): **the button**. Where the files are (`hcsb.hct` and `hcsb.dat`,
+which `main.ts` fetches beside `dungeon.dat`; only `csb` has them, and a game started
+from `mini.dat` by RISE is CSB's dungeon too), the inventory's close box becomes the
+Oracle's button. The close box is `buttons17760`'s button 11 at x 210-218, y 36-44, beside
+the disk (140) and the sleep icon (145) (`doc/CSBWIN_MENU_REFERENCE.md` → "The disk
+icon"), and its picture is part of graphic 17, the inventory's backdrop. It goes because
+there is no room left of the disk: a name and a title at their longest reach it. The
+inventory still closes the way it opens, with a right click or the champion's name. Its
+picture is the Oracle's own `?`, from `hcsb.dat` item 2 at `TAG004962`'s position, drawn
+over the close box in the interface's colours, so no art is invented. Without the files,
+the close box is CSBWin's.
 
-- `_StartHint`'s loop (`:6513-6633`) keeps the screen in `w_4`: 1 the load screen, 2 the
-  title list (`_TAG00799a_6`, `:5979-6053`, or "There are no clues for this location."
-  with DONE alone, `:6553`), 4 a hint's page (`TAG007fdc_36` and `:6248-6392`). DONE on
-  a page goes back to the list, and on the list back to the load screen (`:6584-6602`).
-- Text is `_DisplayText` (`:3497-3608`): words wrapped at a 9-pixel advance, lines 11
-  apart, centred, `/` a line break, a byte outside 32-127 drawn as `_`, and the font
-  recoloured in place to the ink (`TAG004a22_26`, `:3694-3734`).
-- A screen is built over two buffers with palette fades (`_TAG0051c2_31`,
-  `:4171-4251`), after a fade from black at the start (`:4061-4092`). On the title list
-  one palette slot cycles every 20 VBLs (`:6881-6893`).
-- A click is hit-tested against the enabled rectangles of `s20_16208` into a five-slot
-  queue (`TAG001afe`, `:1975-2021`), and a pressed button's label flashes for 20 VBLs
-  (`TAG008c40_8`, `:6951`). No key does anything: every button's key word is 0, so
-  `TAG008c40_3` registers none (`:6824`). There is no sound.
+A click opens the Oracle the way the disk icon opens the save menu
+(`Mouse.cpp:1708-1727`). It raises a flag, refused with an empty party or a champion only
+provisionally joined, and whoever drained the queue opens the screen. `TAG02076e` runs
+before it and `TAG0207cc` after it, as around the disk menu (`SaveGame.cpp:860`,
+`:1274`), and the game stands still while it is up. The screen runs as `ShowCredits`
+does, over an `IntroHost` built on `GameScreen` (`runShowCredits`,
+`src/renderer/intro/BootSequence.ts`), with the interface's palette as the colour
+registers it finds; once it closes, the inventory is drawn again in that palette. The
+square is the party's `partyLevel`, x and y, not `position.z`, which lags a level change
+until `loadNewPartyLevel` (`.claude/memory/two-step-level-change.md`). A game whose
+Extended Features block carries a non-zero `hintKey` (`src/data/CsbwinExtendedFeatures.ts`)
+reads `hcsb.hct` deciphered under it, as CSBWin does (`Hint.cpp:5401-5405`). `RC4.cpp`'s
+cipher is ported already, for Conflux's `dungeon.dat`; no save here has a key.
 
-Two steps are left, one commit each. The screen alone is not reachable, so both are
-taken in one session if they fit:
+When it is paid, two divergences go under H: the close box replaced, and DONE on the
+title list closing the Oracle where CSBWin's goes back to the load screen
+(`HintOracleScreen.run`).
 
-1. **The screen** (M). A modal screen beside `ui/SaveMenu.ts` and `ui/ReIncarnate.ts`,
-   hosted by `GameScreen`, with item 3 as its palette while it is up, as the intro's
-   screens have theirs. It opens on a square (`partyLevel`, `partyX`, `partyY`), in place of
-   `TAG006c7e_9(501)`'s save, and starts at `TAG00799a_9`'s lookup, so the first thing
-   shown is the title list. `Hint.cpp`'s function names are kept. Not ported: the load
-   screen and its floppy prompts, the save chooser (`DoMenu`, `:5288-5316`), the save's
-   checksums (the only reason `TAG00686a` reads the groups and the characters,
-   `:5043-5152`), Dump and `HINTDUMP.TXT` (CSBWin's own, `:6529`), and the OK/CANCEL
-   error screen, which `UI_Die` makes unreachable (`:5144-5147`). One behaviour changes:
-   DONE on the title list closes the Oracle where CSBWin's goes back to the load screen,
-   recorded under H when this is paid. `MAXHINTINDICES` is 9 but `s20_16208` has eight
-   title lines, and a ninth title has no rectangle and is read through anyway (`:6011`);
-   the tool asserts that no square of the retail file matches more than seven.
-
-   One CSBWin slip is fixed (`CLAUDE.md` → "The one non-negotiable rule"), and recorded
-   under H when this is paid. After a button's flash, `_TAG008c40_8` resets the ink from
-   `Long16864`, which its own comment puts at byte 8 of item 0, words 4-5, but reads as
-   `f.Segment1_16872+8`, words 8-9: the port takes word 5 (9) where CSBWin takes word 9
-   (3) (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Item 0", word 9). No pixel changes:
-   every text is drawn after an ink set of its own (`:4192-4213`, `:6985-6991`; the
-   only other draw, `:7151`, passes `s20_16208[17]`, which has no label and draws
-   nothing).
-
-   A `tools/` check drives it headlessly: level 0 (3,23) lists CREATURES, THE MAZE and
-   FULYA PIT in that order, FULYA PIT's three pages go forward with NEXT and back with
-   LAST, with the buttons each page offers, and a level with no records (past 9) shows
-   "no clues". A golden frame of that title list (CSB's data set) goes in
-   `tools/frames/`.
-2. **The button** (M). Where the files are (`hcsb.hct` and `hcsb.dat`, which `main.ts`
-   fetches beside `dungeon.dat`; only `csb` has them, and a game started from `mini.dat`
-   by RISE is CSB's dungeon too), the inventory's close box becomes the Oracle's button.
-   The close box is `buttons17760`'s button 11 at x 210-218, y 36-44, beside the disk
-   (140) and the sleep icon (145) (`doc/CSBWIN_MENU_REFERENCE.md` → "The disk icon"),
-   and its picture is part of graphic 17, the inventory's backdrop. It goes because
-   there is no room left of the disk: a name and a title at their longest reach it. The
-   inventory still closes the way it opens, with a right click or the champion's name.
-   Its picture is the Oracle's own `?`, from `hcsb.dat` item 2 at `TAG004962`'s
-   position, drawn over the close box in the interface's colours, so no art is
-   invented. Without the files, the close box is CSBWin's. Both changes, the close box
-   replaced and DONE closing the Oracle, are recorded under H when this is paid.
-
-   A click opens the Oracle the way the disk icon opens the save menu
-   (`Mouse.cpp:1708-1727`). It raises a flag, refused with an empty party or a champion
-   only provisionally joined, and whoever drained the queue opens the screen.
-   `TAG02076e` runs before it and `TAG0207cc` after it, as around the disk menu
-   (`SaveGame.cpp:860`, `:1274`), and the game stands still while it is up. The square
-   is the party's `partyLevel`, x and y, not `position.z`, which lags a level change
-   until `loadNewPartyLevel` (`.claude/memory/two-step-level-change.md`). DONE on the
-   title list brings back the inventory as it was. A game whose Extended Features
-   block carries a non-zero `hintKey` (`src/data/CsbwinExtendedFeatures.ts`) reads
-   `hcsb.hct` deciphered under it, as CSBWin does (`Hint.cpp:5401-5405`). `RC4.cpp`'s
-   cipher is ported already, for Conflux's `dungeon.dat`; no save here has a key.
-
-   A `tools/` check: a CSB party at level 0 (3,23) clicks the button and the Oracle
-   lists CREATURES, THE MAZE and FULYA PIT. After a step, a pit and a teleporter it
-   lists the new square's hints. In DM, button 11 still closes the inventory. A
-   golden frame of CSB's inventory with the button goes in `tools/frames/`.
+A `tools/` check: a CSB party at level 0 (3,23) clicks the button and the Oracle lists
+CREATURES, THE MAZE and FULYA PIT. After a step, a pit and a teleporter it lists the new
+square's hints. In DM, button 11 still closes the inventory. Two golden frames go in
+`tools/frames/`, staged by the real click: CSB's inventory with the button, and the
+Oracle's title list it opens.
 
 ### G21 ⏸️ `Translation.txt`: the messages the executable prints, translated
 
@@ -987,6 +945,14 @@ Recorded so that nobody "fixes" them.
   `SelectMagicCaster` take when its HP is not zero: the record a slot past the party
   keeps, or, the party being four, `d.PartyFootprints[19]` past the array. The port's
   refuse any slot past the party (`removeCharacter`, `src/engine/SwapCharacter.ts`).
+- 🚫 **The Hint Oracle's ink after a button's flash is item 0's word 5.** `_TAG008c40_8`
+  resets the ink from `Long16864`, which CSBWin's own comment puts at byte 8 of
+  `f.Segment1_16872`, words 4-5 (`doc/CSBwin-src/Hint.cpp:247`), but reads as
+  `f.Segment1_16872+8`, an `i16` array plus 8, words 8-9 (`:6995`): a byte offset taken
+  as a word index. The port keeps the low word of words 4-5, word 5 (9), where CSBWin
+  keeps word 9's (3) (`HintOracleScreen.tag008c40_8`,
+  `doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Item 0"). No pixel differs: every text is
+  drawn after an ink set of its own (`:4192-4213`, `:6985-6991`).
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.

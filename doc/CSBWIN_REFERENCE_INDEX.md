@@ -22,7 +22,7 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 - `doc/CSBWIN_SAVEGAME_REFERENCE.md` - Extended features and save/load structures: the sixteen blocks in write order, how much of each the port writes and reads, and the tools that prove it.
 - `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` - Everything before the party is in the dungeon: the title animation and `ShrinkBLT`, the dungeon entrance and the synthetic 5x5 level behind its doors, the 31-frame door animation, the credits scroll, and how "Resume" differs from the in-game disk icon.
 - `doc/CSBWIN_MENU_REFERENCE.md` - The disk icon and the menu system behind it: graphic 0, the four button layouts, text metrics, the modal loop and its press animation, the four save slots, and this port's deliberate divergences.
-- `doc/CSBWIN_HINT_ORACLE_REFERENCE.md` - Chaos Strikes Back's Hint Oracle: the `hcsb.hct` format (location table, hint records, compressed pages), which hints apply to a square, and the menu's limits.
+- `doc/CSBWIN_HINT_ORACLE_REFERENCE.md` - Chaos Strikes Back's Hint Oracle: the `hcsb.hct` format (location table, hint records, compressed pages), which hints apply to a square, and the menu's limits, and the screen: its builds, fades, texts, buttons and click queue.
 
 ## Other CSBWin-sourced docs
 

@@ -168,7 +168,9 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
             dungeon entrance, the door animation, the credits scroll. And the end of
             the game (`ShowCredits`), on the same host. See
             doc/CSBWIN_TITLE_SCREEN_REFERENCE.md. Before the title, as an extra, the
-            Atari disk's FTL logo (`Swoosh`, doc/ATARI_ST_DISK_REFERENCE.md).
+            Atari disk's FTL logo (`Swoosh`, doc/ATARI_ST_DISK_REFERENCE.md). And CSB's
+            Hint Oracle (`HintOracle`), a program of its own in CSBWin
+            (doc/CSBWIN_HINT_ORACLE_REFERENCE.md).
   ui/       The DM interface, one module per CSBWin file — Mouse, Inventory, Character,
             MagicPanel, Feeding, Objects, Draw, HitTest, ViewportPicking, all over
             a shared UIState. See doc/UI_MODULE_MAP.md.

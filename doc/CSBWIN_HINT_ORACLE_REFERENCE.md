@@ -3,8 +3,9 @@
 Chaos Strikes Back's Hint Oracle, as CSBWin ports it in `doc/CSBwin-src/Hint.cpp`. The
 port reads its data with `parseHintOracle` and `parseHcsbDat`
 (`src/data/HintOracleLoader.ts`), and `tools/dump-hint-oracle.ts` checks the retail files
-against everything below. Nothing in
-the game uses it yet (`DEBT.md` G20).
+against everything below. `HintOracleScreen` (`src/renderer/intro/HintOracle.ts`) is the
+screen, and `tools/dump-hint-oracle-screen.ts` runs it headlessly. Nothing in the game
+opens it yet (`DEBT.md` G20).
 
 ## What it is
 
@@ -185,3 +186,144 @@ no square matches more than seven, so the array is never overrun.
 Every level from 0 to 9 has one or two level-wide records (a "CREATURES" hint on each,
 and a hint about the level as a whole such as "THE MAZE" on level 0). 3891 squares have
 a record of their own.
+
+## The screen
+
+All of it is `Hint.cpp`, a `RESTARTABLE` coroutine that yields on `wvbl()`.
+
+### Two screens
+
+`f.Pointer16506` holds two 320x200 screens. `f.Word16498` names the one drawn on; the
+other is shown. `TAG0051c2_35` (`:4256`) swaps them: the one drawn on is shown, and the
+other gets the backdrop (`TAG0088b8(&rectPos14516, f.Pointer16900, 1)`).
+`TAG0051c2_36` (`:4316`) sends the drawing to the screen shown, and `TAG0051c2_37`
+(`:4338`) sends it back.
+
+### The window
+
+`_TAG0051c2_1` (`:3989-4100`), once `hcsb.dat` is read: the font's first ink
+(`TAG004a22_26(word 10, word 8)`), a fade to `f.Palette16640` (zero: black) with delay 2
+and 7 steps, the backdrop on both screens, and a fade to item 3, 2 and 7 again.
+
+`_FadePalette` (`:4576-4660`) starts from the screen's palette. Each step moves every
+component of every colour one unit toward the target, sets the palette when the delay
+is not zero, and waits the delay in VBLs.
+
+### A screen built
+
+`_TAG0051c2_31` (`:4171-4251`):
+
+1. Ink word 2, and the label of every enabled button drawn (`TAG008c40_6`).
+2. `TAG005ae8_9` (`:4451`) copies the screen's palette **into** `f.Palette16608`. Then
+   slot word 0 is set to word 1 there, and two fades go to it: words 12-13, then 10-11.
+   On the old screen, that dims the old texts, which are in ink word 0.
+3. `ClearKeyboard`: the keys are read, and the click queue is emptied.
+4. A swap. The VBL count is noted (`f.Long16876`).
+5. Ink word 2, a VBL, and the labels again. Then ink word 0, and list 9's texts, last
+   added first. A text whose page has `i12` 8 gets a frame in word 6's colour, one pixel
+   wide just outside its rectangle (`TAG005f9a_1`, `:4666-4737`).
+6. Slot word 0 is set to word 3 in `f.Palette16608`. Then a VBL at least, until word 9's
+   VBLs have passed since the swap.
+7. A swap, two fades to `f.Palette16608` (words 10-11, then 12-13), and ink word 4.
+
+Every `_DisplayText` ends with a VBL, so the labels and the texts take one each. With
+retail item 0, the title list of three titles is first waiting 67 VBLs after the
+Oracle opens: 28 for the window, 17 before the swap, 9 after it, and 13 for the last
+fades.
+
+### Texts
+
+`_DisplayText` (`:3497-3608`):
+
+- A line starts 11 pixels below the rectangle's top (`:3524`), and each next line 11
+  lower (`:3599`). A line whose baseline is past the rectangle's bottom is not drawn.
+- A word that would pass the rectangle's width goes to the next line. A word wider than
+  the line is cut where it fills it.
+- `/` breaks a line. The width is measured only at a space, so a word just before a `/`
+  can overrun the rectangle.
+- With `w14 & 1`, which every text here has, a line is centred.
+- A byte below 32 or above 127 is drawn as `_` (95).
+
+`TAG004962` (`:3446-3477`) draws a glyph 8 wide and 9 high, 9 apart, with its baseline
+at the line's y. Colour 12 is transparent. A space draws nothing.
+
+The ink is `TAG004a22_26` (`:3694-3734`). The current ink's slot of `byte16544` gets the
+new colour, and the font is passed through that map in place (`ShrinkBLT` at full
+size). Glyph pixels are always the current ink, and the transparent 12 is never one.
+
+### The title list
+
+`_TAG00799a_6` (`:5979-6053`). For each title, up to `MAXHINTINDICES`:
+
+- its line, button 10 on, is enabled;
+- slot word 8 is set to word 36, and the palette is set;
+- its rectangle goes in list 19;
+- a text of the title goes in list 9, with frame code 8;
+- its button takes the title as its label (`TAG008c40_12(…, 5, title)`). So the build
+  draws each title twice, in ink word 2 as a label, then in ink word 0.
+
+Once the screen is up, each title line on the screen shown goes through `TAG0062a2`
+(`:4785-4802`) with `byte16528`, which sends colour 12 to 9. On retail item 3 both are
+`0x310` at that point (slot 9 was just set from word 36), so nothing changes until
+the cycle.
+
+`TAG0062a2` copies the rectangle into a buffer with `TAG0088b8`'s lines, which are
+`(w + 16) / 16` sixteen-pixel groups for a rectangle `w + 1` pixels wide. It then remaps
+the buffer with `ShrinkBLT(…, w, h, w, h, map)`, whose lines are `(w + 15) / 16` groups,
+and copies the whole `w + 1` by `h + 1` back. On a title line (x 40-280, y 13 lines), the
+remap covers 240 by 12 pixels laid end to end over lines of 256. That is the first
+eleven lines whole and 64 pixels of the twelfth; the rest of the twelfth and the
+thirteenth keep their colour 12. While the cycle runs, the bottom of each title's box
+stays `0x310`.
+
+### Waiting for a button
+
+`_TAG008c40_5` (`:6837-6903`) reads one click a VBL. On the title list, while no
+button comes, slot word 8 takes the next of word 32's colours from word 36 on. That
+happens when `f.Long14110 + 20 < VBLCount`, so every 21 VBLs. Its first step sets word
+36, the colour the list was built with. A button resets the slot to word 36.
+
+Clicks: `TAG001afe` (`:1975-2021`) queues a click as the first enabled button under it,
+in `t12_14106`'s order, with rectangles inclusive (`TAG001a32`). CSBWin passes it mask 1
+for either mouse button (`doc/CSBwin-src/CSBUI.cpp:1194-1220`), and every button takes
+mask 1. The queue has five slots, and its full test (`word14202 + 2 == word14202`, mod 5)
+never holds. `_TAG001dde` (`:2153-2205`) waits a VBL, then takes the oldest click.
+
+No key does anything: every button's key word (`w12`) is 0, so `TAG008c40_3` registers
+none.
+
+### A button pressed
+
+`_TAG008c40_8` (`:6951-7003`), on the screen shown:
+
+1. The button's label is drawn in ink word 7, and the screen waits.
+   `TAG005a1e_5(20)` is `do { wvbl } while (w_2-- != 0)` (`:4365-4396`), so the wait is
+   21 VBLs.
+2. The label is drawn again in the button's own ink (`w18`: 1, 2 for a title line).
+3. The ink is reset (see "Item 0", word 9), and every button is disabled
+   (`TAG008c40_2`).
+
+A button with no label dies ("Sorry about that", `TAG0093a0_18`). Every button enabled
+here has one.
+
+### A hint's pages
+
+`_TAG007fdc_36` (`:6355-6392`) shows page 1 of the line chosen, or the page one before or
+after. It takes the page from `f.Word10482`'s hint and the page count from `f.Word10516`'s,
+and both are the line chosen. DONE is enabled, then NEXT while pages remain, then LAST past
+the first. The page's text is in x 34-285, y 31-164 (`_TAG007fdc_7`, `:6276-6353`).
+`_TAG007fdc_7` also makes a text of the hint's title in y 5-30, and draws it nowhere.
+
+### No clues
+
+A square with no hints shows `text15024[4]`, "There are no clues for this location.", in
+x 31-290, y 70-150 (`:474-485`), with DONE alone (`:6551-6555`).
+
+### Leaving
+
+EXIT's `_TAG0051c2_2` (`:4103-4166`) makes sure the program's own screen, `Pointer16506[0]`,
+is the one shown, and frees what was loaded. It does no fade.
+
+The cursor calls, `TAG002af4` and `TAG002b0c`, end in `TAG00ae58`, which is empty
+(`:7896`). CSBWin's Oracle shows the system's pointer throughout.
+
