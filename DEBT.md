@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C134 | `TouchWall`'s hand after a swap is the swapped-in object | S | ⏳ |
 | G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10b next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
@@ -171,17 +170,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C134 ⏳ `TouchWall`'s hand after a swap is the swapped-in object
-
-A type-16 swap puts the hand's object on the wall and the square's object on the cursor
-(`ObjectToCursor`), but leaves `TouchWall`'s local `objectInHand` the object now on the
-wall (`doc/CSBwin-src/Mouse.cpp:470-511`); the port sets its local to the object now in
-the hand (`src/engine/ActuatorSystem.ts:301`). Every later actuator of the same touch
-reads that local: a lock (types 3, 4, 11 and 17) compares its type, and a `TakeKey` sends
-it in the cursor filter's packet and deletes its record (`:549-569`). The fix keeps the
-local as CSBWin does, with a check of a lock after a swap on one wall side; what CSBWin
-then does to the wall's object is to be read at `:561-568` before choosing the check.
 
 ---
 

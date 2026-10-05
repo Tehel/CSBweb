@@ -4238,6 +4238,11 @@ fails before the eye gate),
 - While nobody owns the cursor (`d.HandChar == -1`), `TouchWall` skips every actuator but
   a portrait, type 127 (`Mouse.cpp:357-360`), so a party with no champion yet works no
   switch, lock or gift. The test reads `d.HandChar` at each actuator.
+- A type-16 swap puts the square's object in the hand with `ObjectToCursor` (`:507`) but
+  leaves `TouchWall`'s local `objectInHand` the object it has put on the wall
+  (`:491-497`). No later actuator of the touch reads it: a type 16 answers only as the
+  last actuator of its side (`remainingActuators`, `:473-474`), and every actuator after
+  it is on another side.
 
 Evidence: `tools/dump-mouse-queue.ts`, case 9; `tools/dump-cursor-filter.ts`, case 8.
 

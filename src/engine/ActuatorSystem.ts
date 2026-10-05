@@ -301,8 +301,10 @@ export class ActuatorSystem {
             const placed = this.dungeon.rnMaps.setPos(objectInHand, actuatorPos);
             this.dungeon.addObjectToCell(position, placed);
             this.applyCursorFilter(CursorFilterType.SwapReplace, firstObject, position, actuatorPos);
+            // `ObjectToCursor` (`Mouse.cpp:507`) fills the hand, not the local
+            // `objectInHand`, which stays the object now on the wall. No later actuator
+            // of this touch reads it: a type 16 is the last of its side.
             party.objectInHand = firstObject;
-            objectInHand = firstObject;
             emptyHanded = false;
             switchOpen = false;
             break;
