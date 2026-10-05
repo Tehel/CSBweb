@@ -2159,6 +2159,9 @@ export class DsaSystem {
         } else if (location === -1) {
           const party = this.ctx.party.state;
           if (!party) break;
+          // `CURSORFILTER_DSA_ADD` for the copy, which cannot cancel; `ObjectToCursor`
+          // then fills the hand, whatever the filter put there (`DSA.cpp:2062-2071`).
+          this.cursorFilter({ object: cloned, type: CursorFilterType.DSA_ADD, p1: 0, p2: 0, p3: 0, p4: 0 });
           party.objectInHand = cloned;
         } else if (location > -1000) {
           const party = this.ctx.party.state;
@@ -4112,6 +4115,10 @@ export class DsaSystem {
     const party = this.ctx.party.state;
     if (!party) return null;
     if (location === -1) {
+      if (party.objectInHand === OBJECT_ID_NULL) return null;
+      // `CURSORFILTER_DSA_DEL`, which cannot cancel; `RemoveObjectFromHand` then takes
+      // whatever the hand holds once it returns (`doc/CSBwin-src/DSA.cpp:1657-1665`).
+      this.cursorFilter({ object: party.objectInHand, type: CursorFilterType.DSA_DEL, p1: 0, p2: 0, p3: 0, p4: 0 });
       const removed = party.objectInHand;
       if (removed === OBJECT_ID_NULL) return null;
       party.objectInHand = OBJECT_ID_NULL;
@@ -4309,7 +4316,13 @@ export class DsaSystem {
     if (!party) return { error: DsaMoveError.SER_NoObjInCursor, object: OBJECT_ID_EOF };
     const obj = party.objectInHand;
     if (obj === OBJECT_ID_NULL) return { error: DsaMoveError.SER_NoObjInCursor, object: OBJECT_ID_EOF };
-    if (doit) party.objectInHand = OBJECT_ID_NULL;
+    if (doit) {
+      // `CURSORFILTER_DSA_MoveFrom`, which cannot cancel. The object moved is the one
+      // found before it, and the hand is emptied of whatever it holds after
+      // (`doc/CSBwin-src/MoveObject.cpp:130-143`).
+      this.cursorFilter({ object: obj, type: CursorFilterType.DSA_MoveFrom, p1: 0, p2: 0, p3: 0, p4: 0 });
+      party.objectInHand = OBJECT_ID_NULL;
+    }
     return { error: DsaMoveError.SER_OK, object: obj };
   }
 
@@ -4504,7 +4517,13 @@ export class DsaSystem {
     const party = this.ctx.party.state;
     if (!party) return DsaMoveError.DER_CursorNotEmpty;
     if (party.objectInHand !== OBJECT_ID_NULL) return DsaMoveError.DER_CursorNotEmpty;
-    if (doit) party.objectInHand = object;
+    if (doit) {
+      // `CURSORFILTER_DSA_MoveTo`, which cannot cancel (`doc/CSBwin-src/MoveObject.cpp:449-455`).
+      if (object !== OBJECT_ID_NULL) {
+        this.cursorFilter({ object, type: CursorFilterType.DSA_MoveTo, p1: 0, p2: 0, p3: 0, p4: 0 });
+      }
+      party.objectInHand = object;
+    }
     return DsaMoveError.DER_OK;
   }
 

@@ -45,17 +45,31 @@
  * 13. **The mouth**: `Eat` (8) for the object eaten, whose cancel nothing reads
  *    (`Character.cpp:4471-4479`), run through `handleMouthPress`.
  *
+ * And the DSA's four, sent from inside a running DSA, an ordinary one on another square,
+ * none of which can be cancelled:
+ *
+ * 14. **`&DEL` of the hand**: `DSA_DEL` (10) for the hand's object (`DSA.cpp:1657-1665`).
+ *    **`&ADD` to the hand**: `DSA_ADD` (11) for the copy (`:2062-2071`). **`&MOVE` from
+ *    the hand**, to a champion's slot: `DSA_MoveFrom` (18) for the hand's object
+ *    (`MoveObject.cpp:130-143`); **and back**: `DSA_MoveTo` (19) for it
+ *    (`:449-455`). Each with no `p1` to `p4`.
+ * 15. **The running DSA after the filter's**: its parameters are the packet the filter
+ *    left (`CursorFilter` has no `NEWDSAPARAMETERS`); its stack and its variables are its
+ *    own, untouched (`ProcessDSATimer6` runs the filter's on a `DSADBANK` of its own,
+ *    `DSA.cpp:5350-5353`); an `OVERRIDE` it set before is gone (`:5416`).
+ *
  * Run: `npx tsx tools/dump-cursor-filter.ts`
  */
 import { readFileSync } from 'node:fs';
 
 import { OBJNI_APPLE } from '../src/core/objectNameIndex';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
-import type { DungeonData } from '../src/data/dungeonTypes';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, locationRelToInteger, type ObjectID } from '../src/core/types';
+import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { CursorFilterType, StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
+import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { handleMouthPress } from '../src/renderer/ui/Feeding';
 import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { handleClothingClick } from '../src/renderer/ui/Mouse';
@@ -375,6 +389,112 @@ for (const cancelled of [false, true]) {
   console.log(`Eat, cancelled: ${packet(g)}, hand ${party.objectInHand}`);
   check(packet(g) === hand(CursorFilterType.Eat, apple, 0), '13. Eat\'s packet, the object eaten and nothing else');
   check(party.objectInHand === OBJECT_ID_NULL, '13. a cancel does not stop the eating');
+}
+
+/**
+ * A DSA of its own, not the filter's, on the test wall of `game`, whose one program is
+ * `words`, run once as a timer's would be.
+ */
+function runDsa(game: Game, words: (at: Position) => number[]): Position {
+  const dungeon = game.ctx.dungeon;
+  const data: DungeonData = dungeon.getData();
+  const at = wallSquare(game);
+  const dsa: DsaDefinition = {
+    description: 'caller', state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,
+    states: [{ actions: [{ column: 0, program: Uint16Array.from(words(at)) }] }],
+  };
+  data.dsaIndex!.entries.push(dsa);
+  const selectors = data.dsaLevelIndex![at.z]!;
+  selectors.push(data.dsaIndex!.entries.length - 1);
+  data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47 | ((selectors.length - 1) << 7), word4: 0, word6: 0 });
+  const rn = dungeon.rnMaps.rn(DBType.ACTUATOR, data.databases.actuators.records.length - 1);
+  dungeon.addObjectToCell(at, rn);
+  const timer = { uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: 0, level: at.z, time: 0 } as TimerEntry;
+  game.systems.dsa.processTimer5(rn, timer, at);
+  return at;
+}
+
+/** The filter's DSA: the packet it is sent reported in globals 0 on, then cancelled. */
+const filterDsa = [...report(0), ...cancel];
+const dsaPacket = (type: number, rn: number): string => [WORDS, rn, type, 0, 0, 0, 0].join();
+
+{
+  const game = withFilterDsas(ESL_CURSORFILTER, [filterDsa]);
+  const party = game.ctx.party.state;
+  const held = misc(game);
+  party.objectInHand = held;
+  runDsa(game, () => [...int(held), ...int(-1), op(StkOp.DEL)]);
+  const g = game.systems.dsa.getGlobalVariables();
+  const freed = !game.ctx.dungeon.getData().databases.misc.records[game.ctx.dungeon.rnMaps.idx(held)];
+  console.log(`&DEL of the hand: ${packet(g)}, hand ${party.objectInHand}, record ${freed ? 'freed' : 'kept'}`);
+  check(packet(g) === dsaPacket(CursorFilterType.DSA_DEL, held), '14. &DEL sends DSA_DEL for the hand\'s object');
+  check(party.objectInHand === OBJECT_ID_NULL && freed, '14. a cancel does not stop the &DEL, which frees the object');
+}
+
+{
+  const game = withFilterDsas(ESL_CURSORFILTER, [filterDsa]);
+  const party = game.ctx.party.state;
+  const original = misc(game);
+  party.objectInHand = OBJECT_ID_NULL;
+  runDsa(game, () => [...int(0), ...int(-1), ...int(original), op(StkOp.ADD)]);
+  const g = game.systems.dsa.getGlobalVariables();
+  const copy = party.objectInHand;
+  console.log(`&ADD to the hand: ${packet(g)}, hand ${copy} (copy of ${original})`);
+  check(copy !== OBJECT_ID_NULL && copy !== original, '14. a cancel does not stop the &ADD, which puts a copy in the hand');
+  check(packet(g) === dsaPacket(CursorFilterType.DSA_ADD, copy), '14. and sends DSA_ADD for the copy');
+}
+
+{
+  const game = withFilterDsas(ESL_CURSORFILTER, [filterDsa]);
+  const party = game.ctx.party.state;
+  const SLOT = 13;
+  game.systems.character.removeCharacterPossession(0, SLOT);
+  const held = misc(game);
+  party.objectInHand = held;
+  /** `&MOVE`'s ten operands, source then destination: type, object mask, position mask, location, depth. */
+  const move = (src: number[], dst: number[]): number[] => [...[...src, ...dst].flatMap(int), op(StkOp.MOVE)];
+  const CURSOR = [2, 0, 0, 0, 0];
+  const CHAMPION0 = [4, 0, 0, SLOT, 0];
+  runDsa(game, () => [...move(CURSOR, CHAMPION0)]);
+  const slot = party.champions[0]!.possessions[SLOT];
+  const from = game.systems.dsa.getGlobalVariables();
+  console.log(`&MOVE from the hand: ${packet(from)}, slot ${SLOT} ${slot}, hand ${party.objectInHand}`);
+  check(packet(from) === dsaPacket(CursorFilterType.DSA_MoveFrom, held), '14. &MOVE from the hand sends DSA_MoveFrom for its object');
+  check(slot === held && party.objectInHand === OBJECT_ID_NULL, '14. a cancel does not stop the move');
+
+  runDsa(game, () => [...move(CHAMPION0, CURSOR)]);
+  const to = game.systems.dsa.getGlobalVariables();
+  console.log(`&MOVE to the hand: ${packet(to)}, hand ${party.objectInHand}`);
+  check(packet(to) === dsaPacket(CursorFilterType.DSA_MoveTo, held), '14. &MOVE to the hand sends DSA_MoveTo for the object');
+  check(party.objectInHand === held && party.champions[0]!.possessions[SLOT] === OBJECT_ID_NULL, '14. a cancel does not stop the move');
+}
+
+{
+  const game = withFilterDsas(ESL_CURSORFILTER, [filterDsa]);
+  const party = game.ctx.party.state;
+  const held = misc(game);
+  party.objectInHand = held;
+  /** `EX_OVERRIDE` (`DSA.cpp:1037-1072`): `what` 1, corner 3, the same state. */
+  const override3 = 2 | (1 << 6) | (3 << 9);
+  const at = runDsa(game, (at) => [
+    ...int(77), varStore(10), ...int(1234),
+    override3,
+    ...int(held), ...int(-1), op(StkOp.DEL),
+    globalStore(40), varFetch(10), globalStore(41),
+    op(StkOp.NUM_PARAM), globalStore(42),
+    ...int(WORDS), ...int(50), op(StkOp.PARAM_FETCH),
+    ...Array.from({ length: WORDS }, (_, i) => [varFetch(50 + i), globalStore(43 + i)]).flat(),
+    ...int(locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 })), ...int(0), ...int(0), ...int(5), op(StkOp.MESSAGE),
+  ]);
+  const g = game.systems.dsa.getGlobalVariables();
+  const corners = game.ctx.timers.searchOrder()
+    .filter((t) => t.function === TimerFunction.TT_PARAMETER_MESSAGE && t.uByte6 === at.x && t.uByte7 === at.y)
+    .map((t) => t.uByte8);
+  console.log(`after &DEL: stack ${g[40]}, variable 10 ${g[41]}, parameters ${g.slice(42, 49).join()}, message to corner ${corners.join()}`);
+  check(g.slice(42, 49).join() === dsaPacket(CursorFilterType.Cancel, held), '15. the caller\'s parameters are the packet the filter left');
+  check(g[40] === 1234, '15. the caller\'s stack is its own');
+  check(g[41] === 77, '15. so are its variables');
+  check(corners.join() === '0', '15. the OVERRIDE it set before the &DEL is gone');
 }
 
 finish();

@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10d next |
+| G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10e next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -320,7 +320,7 @@ The rest of the item, with an operation that needs care when ported:
 ### G2 ⏳ The cursor filter, the portrait's DSA switch action, and the viewing filter's third site
 
 The port runs sixteen filters: the viewing filter (two of its three sites), the cursor
-filter (twelve of its twenty sites), the monster
+filter (sixteen of its twenty sites), the monster
 move filter, the monster attack filter, the delete monster
 filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
 sound filter, the action name filter, the feeding filter, the character death filter, the
@@ -350,20 +350,14 @@ move filter, are paid. The steps left, one commit each:
     `NEWDSAPARAMETERS`. Back comes the packet; a site that can be cancelled reads `type`
     against `CURSORFILTER_Cancel` (20). CSBWin calls it from 20 places (a 21st,
     `SaveGame.cpp:2755-2758`, is commented out). The port's is `DsaSystem.cursorFilter`,
-    and twelve sites send it their packets: `TouchWall`'s six (`ActuatorSystem.touchWall`:
+    and sixteen sites send it their packets: `TouchWall`'s six (`ActuatorSystem.touchWall`:
     the key, the torch holder, the swap, the gift); the hand's three, the throw
     (`MouseSystem.throwObjectFromCursor`), the pick-up (`tryPickViewportObject`) and the
-    drop (`MouseSystem.dropObjectFromCursor`); and the champion's three, the clothing
-    click's two (`handleClothingClick`) and the mouth's (`handleMouthPress`). They are
-    checked by `tools/dump-cursor-filter.ts`, where each step below adds its own. The
-    steps left, one commit each:
-    - **10d. The DSA's four** (S). `EX_DEL`'s `DSA_DEL` (`DSA.cpp:1659-1665`), `EX_ADD`'s
-      `DSA_ADD` (`:2062-2071`), `FindCursorSource`'s `DSA_MoveFrom`
-      (`MoveObject.cpp:130-143`, `DsaSystem.findCursorSource`) and the cursor
-      destination's `DSA_MoveTo` (`:449-455`), none of which can cancel. Each runs a
-      filter DSA from inside a running DSA, on the running DSA's parameters, which
-      `CursorFilter` overwrites: the step checks that a nested run leaves what CSBWin
-      leaves.
+    drop (`MouseSystem.dropObjectFromCursor`); the champion's three, the clothing
+    click's two (`handleClothingClick`) and the mouth's (`handleMouthPress`); and the
+    DSA's four, `&DEL` and `&ADD` of the hand and `&MOVE` from and to it
+    (`DsaSystem.findCursorSource`, `checkObjectToCursor`). They are checked by
+    `tools/dump-cursor-filter.ts`, where the step left adds its own:
     - **10e. The game's four** (S). `_ReadEntireGame`'s two `ReadGame`s, with `RNnul`
       before the hand is emptied (`SaveGame.cpp:1497-1503`) and with the save's object
       once it is read (`:1650-1655`); `TAG0138ec`'s `ResumeSavedGame` when a resumed

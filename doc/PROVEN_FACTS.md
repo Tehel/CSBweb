@@ -3674,6 +3674,16 @@ before anything moves (`CSBCode.cpp:6966-6972`); once the hand and the slot are 
 sends `PickFromCharacter` for what the slot held, with the same two words, and reads no
 cancel (`:6982-6991`). `_FeedCharacter` sends `Eat` for the object in the hand and nothing
 else, when the feeding empties the hand, and reads no cancel (`Character.cpp:4471-4479`).
+The DSA's four send no `p1` to `p4` and read no cancel: `EX_DEL` of the hand sends `DSA_DEL`
+for its object, then `RemoveObjectFromHand` takes whatever the hand holds once the filter
+returns (`DSA.cpp:1657-1665`); `EX_ADD` to the hand sends `DSA_ADD` for the copy, then
+`ObjectToCursor` puts it there (`:2062-2071`); `FindCursorSource`, at `&MOVE`'s second,
+real pass over the source, sends `DSA_MoveFrom` for the hand's object, which is the one
+moved, then empties the hand (`MoveObject.cpp:130-143`); and `CheckObjectToCursor`, at the
+real pass over the destination, sends `DSA_MoveTo` for the object, unless it is `RNnul`
+(`:449-455`). These four run the filter's DSAs inside the DSA that called them, which
+keeps its own stack and variables (`ProcessDSATimer6`'s `DSADBANK`, `DSA.cpp:5350-5353`),
+finds the packet in its parameters, and loses an `OVERRIDE` it had set (`:5416`).
 `tools/dump-cursor-filter.ts`.
 
 ## The character death filter and the damage filter run their location's first DSA
