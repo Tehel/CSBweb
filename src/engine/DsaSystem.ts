@@ -49,6 +49,7 @@ import { monsterHorizontalSize } from '../data/tables/MonsterDesc';
 import { monsterDrawAsSize4, monsterInvisible, monsterPoisoned, monsterUnique } from './MonsterSystem';
 import { printWithSubstitution } from './PrintWithSubstitution';
 import { findChampionByFingerprint } from './Party';
+import { swapCharacter } from './SwapCharacter';
 import { getFromWings, locateInWings, saveToWings, wingsChampion } from './Wings';
 import { readU32LE, writeU32LE } from '../core/bytes';
 import { decodeCharField } from '../data/CsbwinSaveInfo';
@@ -2815,6 +2816,14 @@ export class DsaSystem {
         });
         if (val === 4 && locateInWings(this.dungeon, fingerPrint) !== null) val = 5;
         bank.stack.push(val);
+        break;
+      }
+      case StkOp.SWAP_CHARACTER: {
+        // `DSA.cpp:4413-4425`.
+        this.noFilter(bank);
+        const fingerPrint = bank.stack.pop();
+        const index = bank.stack.pop();
+        bank.stack.push(swapCharacter(this.ctx, index, fingerPrint));
         break;
       }
       case StkOp.CHAR_STORE:

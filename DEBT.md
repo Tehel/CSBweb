@@ -22,7 +22,7 @@ code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, and the work it
-needs is in the active list: G1, G3, G4, G24, G25, G27 and G26. Its `dungeon.dat` is
+needs is in the active list: G1, G4, G24, G25, G27 and G26. Its `dungeon.dat` is
 enciphered, and reads whole (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is
 `RC4.cpp`'s own cipher"). Each entry says what Conflux uses of it, measured on the
 deciphered file.
@@ -92,13 +92,12 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G3 | The wings: step 2, `SwapCharacter` | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
 | G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | M | ⏳ |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
-| G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G3, G25, G27 |
+| G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G25, G27 |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
 | G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
@@ -119,7 +118,7 @@ The rows above G29 are the active list. `F3` is a phase, whose status is
 `PLAN.md`'s. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
-row meanwhile. `G1` sits below G3, G25 and G27, whose features its last operations need.
+row meanwhile. `G1` sits below G25 and G27, whose features its last operations need.
 The G rows down to G26 are Conflux's (see "Priority"). The F
 rows are independent of the rest ("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
@@ -248,7 +247,7 @@ ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter 
 `STKOP` (`doc/CSBwin-src/Data.h:1721-1861`, the port's `StkOp`) has 138 values, and 135
 are operations: `Noop` (0), `2Dup` (23) and `I_FilteredCast` (120) have no case in
 `EX_AMPERSAND`, whose default says "Illegal subcode" and does nothing
-(`doc/CSBwin-src/DSA.cpp:4979-4981`), as the port's trace does. The port has 129, so 6
+(`doc/CSBwin-src/DSA.cpp:4979-4981`), as the port's trace does. The port has 130, so 5
 are left. `tools/dump-dsa-census.ts` lists them: it fails unless what the port lacks is
 exactly its `LEFT`, so each family's commit takes its operations off that list, and this
 part of the item is done when it is empty.
@@ -256,11 +255,10 @@ part of the item is done when it is empty.
 Conflux, the dungeon that will check them, defines 131 DSAs, with 4646 programs, behind
 1591 type-47 actuators. A static census of its programs decodes each word with the
 operand layout `DsaSystem.execute` reads, and every program decodes to its exact length.
-It uses 118 `&` operations, 4 of the 6. With Conflux's count of each:
+It uses 118 `&` operations, 3 of the 5. With Conflux's count of each:
 
-- **Characters**: what is left of them is `SwapCharacter` 7, which needs G3. The other
-  thirteen are ported, checked by `tools/dump-dsa-characters.ts`, and `CharNameFetch`
-  with the texts.
+- **Characters**: none is left. Thirteen are checked by `tools/dump-dsa-characters.ts`,
+  `CharNameFetch` with the texts, and `SwapCharacter` 7 by `tools/dump-swap-character.ts`.
 - **Objects**: none is left. The ten field operations, from `GetCharges` to
   `SetSubType`, are ported, checked by `tools/dump-dsa-objects.ts`; so are `Throw`,
   `Cast`, `FilteredCast`, `CreateCloud`, `MissileInfoFetch` and `MissileInfoStore`,
@@ -284,7 +282,7 @@ It uses 118 `&` operations, 4 of the 6. With Conflux's count of each:
   ported, checked by `tools/dump-dsa-indirect.ts`. Conflux's: `I_Del` 42, `I_Add` 41,
   `I_CreateCloud` 59, `I_Move` 17, `I_Throw` 14, `I_CausePoison` 6, `I_MonsterStore` 6,
   `I_CharStore` 4, `I_CellStore` 4, `I_SwapCharacter` 4, `I_Cast` 2, `I_DelMon` 2 and
-  `I_InsMon` 2. `I_SwapCharacter`'s record runs `SwapCharacter`, which waits on G3.
+  `I_InsMon` 2.
 - **The display**: `Overlay` 25, `Palette` 5 and `Jitter` 7, which need G25. The jitter
   moves the view only while an overlay is in use (`doc/CSBwin-src/WinScreen.cpp:1069-1080`).
 
@@ -301,8 +299,8 @@ read back at every read, checked by `tools/dump-dsa-save.ts`, and the footprints
 `ECF_FOOTPRINTS` shows, checked by `tools/dump-footprint-decoration.ts`. A family's tool
 runs its programs through `tools/lib/dsa.ts`. Slave DSAs owe nothing: CSBWin has none
 (`doc/CSBWIN_DSA_REFERENCE.md`, `FindMaster`). What is left waits on its own item:
-`SwapCharacter` on G3, the display's three on G25, `GetSkin` and `SetSkin` on G27, so G1's
-row sits below theirs and each of those items finishes its share of G1. An operation is
+the display's three on G25, `GetSkin` and `SetSkin` on G27, so G1's row sits below theirs
+and each of those items finishes its share of G1. An operation is
 checked against Conflux in play once G26 makes it a data set.
 
 The rest of the item, with an operation that needs care when ported:
@@ -314,55 +312,6 @@ The rest of the item, with an operation that needs care when ported:
   file uses, which a read takes back (`DSAINDEX::ReadTracing`, `DSA.cpp:5553-5576`). The
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
-
-### G3 ⏳ The wings — step 2 of 2, `SwapCharacter`
-
-CSBWin keeps champions who have left the party in `EXPOOL`, as eight 25-longword records
-of their 800-byte `CHARDESC` (`doc/PROVEN_FACTS.md` → "A champion in the wings is eight
-`EXPOOL` records of the `CHARDESC` as memory holds it"). Split in two:
-
-1. ✅ **The record and its readers.** `src/engine/Wings.ts` is `SaveToWings`,
-   `GetFromWings` and `LocateInWings`, over a `CHARDESC` in the file's form;
-   `copyCharacter` (`src/engine/Party.ts`) and `fingerprintExists` look in the wings
-   after the party, so bones name a departed champion, the Altar of Vi heals one there
-   (`TimerSystem.reviveInWings`), and a new fingerprint steps over one. `&CHAR@`,
-   `&TALENTS@`, `&TALENTS!`, `&CHARNAME@` and `&WHEREISCHAR` read them. Evidence:
-   `tools/dump-wings.ts`, `tools/dump-vi-altar.ts` section 8.
-2. ⏳ **`SwapCharacter`**, which nothing calls yet, so nothing in the port fills the
-   wings. Only a DSA does: `STKOP_SwapCharacter` (`DSA.cpp:4413-4419`, unported, as is
-   `I_SwapCharacter`'s record) is its one caller. Nothing in the retail game removes a
-   living champion from the party; Conflux does, `SwapCharacter` 7 times and 4 more
-   through `I_SwapCharacter`.
-
-What step 2 takes, read from the source:
-
-- **`SwapCharacter`** (`Character.cpp:5472-5510`): 2 for the last champion deleted, 3
-  for an add to a full party, 4 for a fingerprint not in the wings (`GetFromWings`,
-  testing only), then its three cases, each returning 0.
-- **`CharacterDelete`** (`:5351-5414`): a busy champion's timer deleted and ended as if
-  expired (`TAG011366`, `Timer.cpp:2686`, the port's `MonsterAttack.tag011366`), then
-  `RemoveCharacter`, `SaveToWings`, the champions after them shifted down a slot
-  (`die` when one shifted holds a timer, `:5368-5374`), `d.HandChar`,
-  `d.SelectedCharacterOrdinal` and `d.MagicCaster` moved down with them,
-  `d.NumCharacter--`, and the last slot's HP set to 0: that slot keeps a copy of the
-  last champion, possessions and all, which goes into `PartyState.vacantCharacters`
-  (`doc/PROVEN_FACTS.md` → "A `CHARDESC` slot past the party holds zeros, or the
-  champion who left it"). `d.PendingDamage` is not shifted. Then the vacated portrait
-  box and hand box are filled with colour 0 and everything is redrawn.
-- **`CharacterAdd`** (`:5417-5436`): `GetFromWings` into slot `d.NumCharacter`, which
-  takes the records out, the first corner nobody stands in, facing 0.
-- **`CharacterSwap`** (`:5438-5469`): the timer as in a delete, `RemoveCharacter`,
-  `SaveToWings`, `GetFromWings` into the same slot, the first free corner (5 when there
-  is none), and the facing of the one who left.
-- **`RemoveCharacter`** (`:5254-5337`), `KillCharacter`'s tail without the death: the
-  held eye or mouth let go and the inventory closed (`GameHost.releaseEyeOrMouth`,
-  `showHideInventory`), the incantation cleared, the facing the party's,
-  `maxRecentDamage` 0, the poison cured, the hand and the magic tab handed to the first
-  living champion.
-- **The portrait.** `SaveToWings` writes the portrait's pixels with the rest. A champion
-  this port creates carries `portraitGraphic`, not pixels, and only the page can turn
-  one into the other (`GameSaves`' `portraitOf`), so the engine needs it from the host to
-  write the record, or a champion back from the wings has a blank portrait.
 
 ### G4 ⏳ Custom-dungeon extensions: external portraits, the monster design options
 
@@ -1041,7 +990,12 @@ Recorded so that nobody "fixes" them.
   that is not there and `&MULTIPLIER@` of a negative one read a level descriptor past
   the array (`DSA.cpp:323-324`, `:3984`): the port reads zeros. And `&VSET` with a count
   whose sum with `dst` or `src` wraps past 2^32 writes past the 100 variables
-  (`:4862`, `:4881`): the port stops at the last (`DsaSystem.vset`).
+  (`:4862`, `:4881`): the port stops at the last (`DsaSystem.vset`). `RemoveCharacter`,
+  with no other champion living, hands the cursor and the magic tab to slot
+  `d.NumCharacter` (`Character.cpp:5318-5335`), which `SetHandOwner` and
+  `SelectMagicCaster` take when its HP is not zero: the record a slot past the party
+  keeps, or, the party being four, `d.PartyFootprints[19]` past the array. The port's
+  refuse any slot past the party (`removeCharacter`, `src/engine/SwapCharacter.ts`).
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.

@@ -7,6 +7,7 @@
  * null object that does nothing (a `die` that throws again), so no caller asks whether
  * anybody is listening. Headless, nobody is, and the game plays the same.
  */
+import type { Champion } from './gameTypes';
 
 /**
  * Fragment-based message emitter, mirroring CSBWin's global `PrintLinefeed()` /
@@ -166,6 +167,13 @@ export interface GameHost {
    */
   drawCharacterState(chIdx: number, charFlags: number): void;
   /**
+   * The portrait pixels of a champion carrying only `portraitGraphic`, a cell of graphic
+   * 26, which only the screen holds: `SaveToWings` writes them with the rest of the
+   * `CHARDESC` (`SwapCharacter.ts`). Left out, such a champion goes to the wings with a
+   * blank portrait.
+   */
+  portraitOf(champion: Champion): number[] | undefined;
+  /**
    * `die(errorNum, msg)` (`doc/CSBwin-src/CSBCode.cpp:86-112`) in play: a frame threw —
    * the engine throws where CSBWin calls `die` — and the loop has stopped
    * (`Game.gameLoop`). CSBWin shows the message and quits; the page reports it. Left out,
@@ -213,6 +221,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     displayCharacterDamage: host.displayCharacterDamage ?? (() => {}),
     tag011366: host.tag011366 ?? (() => {}),
     drawCharacterState: host.drawCharacterState ?? (() => {}),
+    portraitOf: host.portraitOf ?? (() => undefined),
     die: host.die ?? ((error) => { throw error; }),
   };
 }

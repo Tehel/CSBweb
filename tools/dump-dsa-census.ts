@@ -34,7 +34,7 @@ const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
 
 /** What the port lacks, in `STKOP` order. A ported family comes off this list. */
 const LEFT: readonly string[] = [
-  'OVERLAY', 'PALETTE', 'SWAP_CHARACTER', 'GET_SKIN', 'SET_SKIN', 'JITTER',
+  'OVERLAY', 'PALETTE', 'GET_SKIN', 'SET_SKIN', 'JITTER',
 ];
 
 /** The `STKOP` values that are no `case` of `EX_AMPERSAND`'s switch, nor `I_Indirect` (point 1). */

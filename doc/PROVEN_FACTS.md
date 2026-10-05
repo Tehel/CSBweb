@@ -2736,15 +2736,29 @@ pixels and no index at all, which is why a loaded party once showed four empty b
   record stays, possessions and all; those objects are still in the mirror's cell.
 - **A save's own after a load**: the file carries all four records, 3328 bytes with the
   party tail (`SaveGame.cpp:1126`, `:1676`).
+- **The last champion, after a DSA's `&SWAPCHARACTER` deleted one.** `CharacterDelete`
+  copies each champion after the one who left a slot down, takes one off
+  `d.NumCharacter` and sets the HP of the slot it leaves to 0, and nothing else
+  (`doc/CSBwin-src/Character.cpp:5366-5389`): the record is the last champion's,
+  possessions and all, those objects still theirs.
 
 `AddCharacter` clears 800 bytes of the slot before it fills it
-(`doc/CSBwin-src/Character.cpp:481`), and every loop over the champions stops at
-`d.NumCharacter`, so the one reader of such a slot is `&CHPOSS`, which bounds its index
-to 0-3 and no further (`DSA.cpp:3342-3347`). On a never-filled slot it pushes 0, since
-it pushes -1 only for `RNnul` (`:3353-3354`). The port keeps the slots as
+(`doc/CSBwin-src/Character.cpp:481`), and so does `GetFromWings`, which copies a whole
+record in. Three readers reach such a slot. `&CHPOSS` bounds its index to 0-3 and no
+further (`DSA.cpp:3342-3347`); on a never-filled slot it pushes 0, since it pushes -1
+only for `RNnul` (`:3353-3354`). `CharacterAdd` and `CharacterSwap` look for a free
+corner with a loop that, when nobody in the party stands in it, compares
+`d.CH16482[d.NumCharacter].charPosition` (`Character.cpp:5422-5431`, `:5454-5464`):
+for an add, the champion just read from the wings; for a swap, the slot past the party,
+whose corner is passed over too, or, the party being four, byte 29 past the array, the
+high byte of `d.PartyFootprints[7]` on the little-endian build (`Data.h:766-778`), and
+with no corner left the champion stands in corner 5. And `RemoveCharacter`, with no
+other champion living, hands the cursor and the magic tab to slot `d.NumCharacter`,
+which `SetHandOwner` and `SelectMagicCaster` refuse only if its HP is 0
+(`Character.cpp:5318-5335`). The port keeps the slots as
 `PartyState.vacantCharacters`; `tools/dump-dsa-characters.ts` (3b, 3c),
-`tools/dump-hall-of-champions.ts` (Cancel) and `tools/dump-character-block.ts` (5) check
-the three ways in.
+`tools/dump-hall-of-champions.ts` (Cancel), `tools/dump-character-block.ts` (5) and
+`tools/dump-swap-character.ts` (2, 4) check the four ways in and the corner search.
 
 ## `CHARDESC.incantation` is a C string, and a cast leaves the rest of it behind
 

@@ -333,6 +333,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         displayCharacterDamage: (chIdx, damage) => screen?.displayCharacterDamage(chIdx, damage),
         tag011366: (chIdx) => screen?.tag011366(chIdx),
         drawCharacterState: (chIdx, charFlags) => screen?.drawCharacterState(chIdx, charFlags),
+        // A champion sent to the wings by `&SWAPCHARACTER` takes their portrait's pixels.
+        portraitOf: (champion) => screen?.portraitPixelsFor(champion),
     });
 
     // The game's saves: the disk menu's, the boot's chooser's, and F5 and F9's. The store

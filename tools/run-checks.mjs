@@ -70,6 +70,7 @@ const CHECKS = [
   { tool: 'dump-dm-rules.ts' },
   { tool: 'dump-vi-altar.ts' },
   { tool: 'dump-wings.ts' },
+  { tool: 'dump-swap-character.ts' },
   // EXPOOL, where a death's bones record is kept: the pools of the genuine saves rebuilt
   // byte for byte, and put through CSBWin's own save loop unchanged.
   { tool: 'dump-expool.ts' },
