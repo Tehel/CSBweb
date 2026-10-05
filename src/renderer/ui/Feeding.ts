@@ -98,18 +98,29 @@ export function computeFeedParameters(
   return fp;
 }
 
+/**
+ * `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4004`), the mouth pressed. With an empty
+ * hand, the mouth is held (`:4041-4058`) unless the eye panel already shows food and
+ * water: `drawInventoryScreen` draws them over the chest, the scroll or the Resurrect
+ * menu until the release (`handleMouseUnclick`). As with the eye (`handleEyePress`), the
+ * button is taken to be down at the press, and the release comes through the queue.
+ */
 export function handleMouthPress(ui: UIState): void {
   if (ui.partyState.cursorOwner < 0) return;
-  // `if (d.PotentialCharacterOrdinal != 0) RETURN;` — the mouth is inert while the
-  // Hall of Champions menu is up (`doc/CSBwin-src/Character.cpp:4061`).
-  if (ui.partyState.potentialChampionIndex >= 0) return;
   const selected = ui.partyState.selectedCharacterIndex;
   if (selected < 0) return;
   const champ = ui.partyState.champions[selected] ?? null;
   if (!champ || (champ.attributes.health | 0) === 0) return;
 
   const objectId = ui.partyState.objectInHand;
-  if (objectId === OBJECT_ID_NULL) return;
+  if (objectId === OBJECT_ID_NULL) {
+    if (ui.displayResurrectChestOrScroll === 0) return;
+    ui.pressingMouth = true;
+    return;
+  }
+  // `if (d.PotentialCharacterOrdinal != 0) RETURN;` — with an object in hand, the mouth
+  // is inert while the Hall of Champions menu is up (`:4061`).
+  if (ui.partyState.potentialChampionIndex >= 0) return;
 
   const derived = computeFeedParameters(ui, selected, objectId);
   if (!derived) return;

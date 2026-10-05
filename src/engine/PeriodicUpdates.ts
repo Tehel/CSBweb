@@ -228,7 +228,8 @@ export function tenSecondUpdate(ctx: GameContext): void {
             }
         }
         if (chIdx === party.selectedCharacterIndex
-            && (ctx.host.pressingEye() || ctx.host.displayResurrectChestOrScroll() === 0)) {
+            && (ctx.host.pressingMouth() || ctx.host.pressingEye()
+                || ctx.host.displayResurrectChestOrScroll() === 0)) {
             champ.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
         }
     }

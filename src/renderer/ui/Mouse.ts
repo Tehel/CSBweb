@@ -142,9 +142,9 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
   }
   // `if (d.PressingEye!=0) {lastTime=d.Time; RETURN_int(result);};` and the same for
   // the mouth (doc/CSBwin-src/Mouse.cpp:1679-1680): every button after 81 is swallowed
-  // until the button-up lets go. The port has no pressed mouth — `handleMouthPress`
-  // feeds on the press — so only the eye is tested.
+  // until the button-up lets go.
   if (ui.pressingEye) return;
+  if (ui.pressingMouth) return;
   if (id === 145) {
     // The sleep icon, `buttons17760` beside the disk (`doc/CSBWIN_MENU_REFERENCE.md`), so
     // it is only ever clicked with an inventory open. `ShowHideInventory(4)` closes it
@@ -198,14 +198,18 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
 }
 
 /**
- * The button let go. With the eye held, `QuitPressingEye`
- * (`doc/CSBwin-src/CSBCode.cpp:7399-7414`): the panel goes back to what `TAG0189d4`
- * draws, which describes the weapon hand's scroll again.
+ * The button let go (`doc/CSBwin-src/Mouse.cpp:1530-1544`). With the eye held,
+ * `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7399-7414`); otherwise, with the mouth
+ * held, `QuitPressingMouth` (`:7390-7395`). Either way the panel goes back to what
+ * `TAG0189d4` draws, which describes the weapon hand's scroll again.
  */
 export function handleMouseUnclick(ui: UIState): void {
   if (ui.pressingEye) {
     ui.pressingEye = false;
     ui.describedObject = null;
+    tag0189d4(ui);
+  } else if (ui.pressingMouth) {
+    ui.pressingMouth = false;
     tag0189d4(ui);
   }
 }
@@ -293,8 +297,8 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
     if (!champ || (champ.attributes.health | 0) === 0) return;
   }
   // `if (d.PressingMouth != 0) return; if (d.PressingEye != 0) return; d.clockTick = 1;`
-  // (`doc/CSBwin-src/CSBCode.cpp:7439-7441`). The port has no pressed mouth:
-  // `handleMouthPress` feeds on the press.
+  // (`doc/CSBwin-src/CSBCode.cpp:7439-7441`).
+  if (ui.pressingMouth) return;
   if (ui.pressingEye) return;
   setClockTick(ui.ctx, 1);
   if (button === 4) {

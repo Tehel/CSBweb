@@ -306,6 +306,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         closeAttackMenuOf: (chIdx) => screen?.closeAttackMenuOf(chIdx),
         attackingCharacterOrdinal: () => screen?.attackingCharacterOrdinal() ?? 0,
         pressingEye: () => screen?.pressingEye() ?? false,
+        pressingMouth: () => screen?.pressingMouth() ?? false,
         displayResurrectChestOrScroll: () => screen?.displayResurrectChestOrScroll() ?? 0,
         showHideInventory: (chIdx) => screen?.showHideInventory(chIdx),
         repackChest: () => screen?.repackChest(),

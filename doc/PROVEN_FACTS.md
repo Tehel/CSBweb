@@ -2007,6 +2007,27 @@ endgame.
 The port redraws the panel every frame, so `drawInventoryScreen` tests the held eye before
 the candidate. Evidence: `tools/dump-mastery-panel.ts`, last section.
 
+## The mouth held with an empty hand
+
+- `_FeedCharacter` tests `d.EmptyHanded` before `d.PotentialCharacterOrdinal`
+  (`doc/CSBwin-src/Character.cpp:4041-4061`): with an empty hand it returns when the eye
+  panel shows food and water (`d.DisplayResurrectChestOrScroll == 0`), and otherwise sets
+  `d.PressingMouth` and draws food and water (`DisplayFoodWater`, `:4056`) over the
+  chest, the scroll or a candidate's Resurrect menu, leaving
+  `d.DisplayResurrectChestOrScroll` as it was.
+- `DisplayFoodWater` starts with `RepackChest` (`doc/CSBwin-src/Viewport.cpp:7233-7250`):
+  a chest open in the weapon hand is packed while the mouth is held.
+- While it is held, `DrawCharacterState` draws food and water before testing the eye
+  (`Character.cpp:1478-1481`), the ten-second update sets `CHARFLAG_chestOrScroll` for it
+  (`doc/CSBwin-src/Code17818.cpp:435-443`), `ShowHideInventory` returns
+  (`doc/CSBwin-src/CSBCode.cpp:7439`), and every button after 81 is swallowed
+  (`doc/CSBwin-src/Mouse.cpp:1679-1680`).
+- The button-up lets go of the eye if it is held, and of the mouth only otherwise
+  (`Mouse.cpp:1530-1544`). `QuitPressingMouth` is `TAG0189d4`, so the panel is drawn again
+  from the weapon hand (`CSBCode.cpp:7390-7395`).
+
+Evidence: `tools/dump-viewing-filter.ts`, section 11.
+
 ## The mastery names are a code table, and six of them start with a rune
 
 `d.Pointer16770[17]` (`doc/CSBwin-src/CSBCode.cpp:370-384`) holds the rank names the eye

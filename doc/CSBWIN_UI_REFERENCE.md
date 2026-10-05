@@ -89,7 +89,7 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 ## Mouth click and feeding
 
 - The mouth button dispatch uses `D6W == 70` to call `FeedCharacter` (`doc/CSBwin-src/Mouse.cpp:1653-1656`), while eye uses `D6W == 71` (`doc/CSBwin-src/Mouse.cpp:1659-1662`).
-- When the hand is empty, `FeedCharacter` sets `PressingMouth`/`PressingEyeOrMouth`, shows food/water (`DisplayFoodWater`), and defers until mouse release (`doc/CSBwin-src/Character.cpp:4041-4058`).
+- When the hand is empty, `FeedCharacter` returns if the eye panel already shows food and water (`d.DisplayResurrectChestOrScroll == 0`); otherwise it sets `PressingMouth`/`PressingEyeOrMouth`, shows food/water (`DisplayFoodWater`) over the panel, and waits for the release, `QuitPressingMouth` (`doc/CSBwin-src/Character.cpp:4041-4058`, `doc/CSBwin-src/CSBCode.cpp:7390-7395`). See `doc/PROVEN_FACTS.md` → "The mouth held with an empty hand".
 - `FeedCharacter` only allows items with `ObjDesc.word4 & 1` (can put in mouth), otherwise it rejects chests and scrolls (`doc/CSBwin-src/Character.cpp:4071-4079`).
 - Waterskins (`objNI_Waterskin..objNI_Water`) give `waterValue = 800` when non-empty, set `gulp = 8`, and later decrement the waterskin value by one (`doc/CSBwin-src/Character.cpp:4099-4113`, `doc/CSBwin-src/Character.cpp:4451-4460`).
 - Water flasks (`potion_WaterFlask`) give `waterValue = 1600` and convert to `potion_EmptyFlask` (`doc/CSBwin-src/Character.cpp:4262-4269`, `doc/CSBwin-src/Character.cpp:4451-4456`).

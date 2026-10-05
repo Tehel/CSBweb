@@ -46,6 +46,13 @@
  *    ten-second update and poison run the eye's own site again (`Character.cpp:1478-1497`,
  *    `CSBCode.cpp:7220-7225`). In that hand the scroll is drawn rolled
  *    (`DisplayBackpackItem`, `Character.cpp:1183-1189`).
+ * 11. **The mouth held with an empty hand shows food and water over the scroll**
+ *    (`_FeedCharacter`, `doc/CSBwin-src/Character.cpp:4041-4058`), and runs nothing;
+ *    `d.DisplayResurrectChestOrScroll` stays 2. While it is held the ten-second update
+ *    draws food and water again (`Character.cpp:1478-1481`, `Code17818.cpp:435-443`) and
+ *    the inventory will not close (`CSBCode.cpp:7439`); the release is `QuitPressingMouth`
+ *    (`CSBCode.cpp:7390-7395`), whose `TAG0189d4` reads the scroll again. With food and
+ *    water already shown, the mouth is not held.
  *
  * Run: `npx tsx tools/dump-viewing-filter.ts`
  */
@@ -63,7 +70,7 @@ import { newUIState } from './lib/ui';
 import { handleInventoryToggle, handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
 import { drawCharacterStateEyePanel, drawInventoryScreen, getInventorySlotRect } from '../src/renderer/ui/Inventory';
 import { drawObjectIcon } from '../src/renderer/ui/Draw';
-import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
+import { VIEWPORT_X, VIEWPORT_Y, getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import type { UIState } from '../src/renderer/ui/UIState';
 import { OBJNI_OPEN_SCROLL, OBJNI_SCROLL } from '../src/core/objectNameIndex';
 import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
@@ -402,6 +409,88 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   const blank = slotPixels(() => {});
   console.log(`    the weapon hand's icon is the ${drawn === rolled ? 'rolled' : drawn === unrolled ? 'unrolled' : 'unknown'} scroll`);
   check(rolled !== unrolled && rolled !== blank && drawn === rolled, "in the open inventory's weapon hand, the open scroll is drawn rolled");
+}
+
+/* ------------------------------- 11. the mouth held with an empty hand ---------- */
+{
+  let ui: UIState | null = null;
+  const game = withFilterDsas(ESL_VIEWINGFILTER, [[...params(0)]], {
+    drawCharacterState: (chIdx, charFlags) => { if (ui) drawCharacterStateEyePanel(ui, chIdx, charFlags); },
+    pressingEye: () => ui?.pressingEye ?? false,
+    pressingMouth: () => ui?.pressingMouth ?? false,
+    displayResurrectChestOrScroll: () => ui?.displayResurrectChestOrScroll ?? 0,
+  });
+  const party = game.ctx.party.state;
+  const graphics = stockGraphics();
+  const cache = new Map();
+  const theUi = newUIState(graphics, game.ctx, {
+    getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
+  });
+  ui = theUi;
+  theUi.partyState = party;
+  party.selectedCharacterIndex = -1;
+  party.objectInHand = OBJECT_ID_NULL;
+  const character = game.systems.character;
+  character.removeCharacterPossession(1, 1);
+  const scroll = game.ctx.dungeon.rnMaps.rn(DBType.SCROLL, 0);
+  handleInventoryToggle(theUi, 1);
+  const g = (): number[] => game.systems.dsa.getGlobalVariables();
+  const unset = (): void => {
+    const v = g();
+    v[0] = UNSET;
+    v[1] = UNSET;
+    game.systems.dsa.setGlobalVariables(v);
+  };
+  const seen = (): number | null => (g()[0] === UNSET ? null : g()[1]!);
+  // The eye panel's pixels, `wRectPos926` in the viewport.
+  const r = theUi.uiTables.graphic232.wRectPos926;
+  const pixels = theUi.screenIndexBuffer.pixels;
+  const panel = (draw: () => void): string => {
+    pixels.fill(0);
+    draw();
+    const out: number[] = [];
+    for (let y = r.y1 + VIEWPORT_Y; y <= r.y2 + VIEWPORT_Y; y++) {
+      for (let x = r.x1 + VIEWPORT_X; x <= r.x2 + VIEWPORT_X; x++) out.push(pixels[y * 320 + x]!);
+    }
+    return out.join();
+  };
+  // Food and water as an empty weapon hand shows them.
+  const foodWater = panel(() => drawInventoryScreen(theUi));
+  character.addCharacterPossession(1, scroll, 1);
+  const scrollShown = panel(() => drawInventoryScreen(theUi));
+
+  unset();
+  handleMouseButton(theUi, 70, 0, 0);
+  const atPress = seen();
+  const held = theUi.pressingMouth;
+  const heldPanel = panel(() => drawInventoryScreen(theUi));
+  console.log(`11. the mouth pressed with an empty hand: ${held ? 'held' : 'not held'}, `
+    + `the panel ${heldPanel === foodWater ? 'food and water' : heldPanel === scrollShown ? 'the scroll' : 'unknown'}, `
+    + `${atPress === null ? 'runs nothing' : `runs on ${atPress}`}`);
+  check(foodWater !== scrollShown, 'the food and water panel and the scroll panel differ');
+  check(held, 'the mouth pressed with an empty hand and the scroll shown is held (d.PressingMouth)');
+  check(heldPanel === foodWater, 'held, the panel is food and water');
+  check(atPress === null, 'the press runs no viewing filter');
+  check(theUi.displayResurrectChestOrScroll === 2, 'held, d.DisplayResurrectChestOrScroll stays 2');
+  unset();
+  tenSecondUpdate(game.ctx);
+  check(seen() === null, 'the ten-second update with the mouth held runs nothing');
+  check(panel(() => drawInventoryScreen(theUi)) === foodWater, 'after the ten-second update, the panel is still food and water');
+  handleInventoryToggle(theUi, 1);
+  check(party.selectedCharacterIndex === 1, 'with the mouth held, the inventory does not close (ShowHideInventory returns on d.PressingMouth)');
+  unset();
+  handleMouseUnclick(theUi);
+  const atRelease = seen();
+  console.log(`    the release: ${atRelease === null ? 'runs nothing' : `runs on ${atRelease}`}, `
+    + `the panel ${panel(() => drawInventoryScreen(theUi)) === scrollShown ? 'the scroll' : 'not the scroll'}`);
+  check(!theUi.pressingMouth && atRelease === scroll, "the release lets go, and TAG0189d4 runs the scroll's viewing filter");
+  check(panel(() => drawInventoryScreen(theUi)) === scrollShown, 'released, the panel is the scroll again');
+
+  character.removeCharacterPossession(1, 1);
+  drawInventoryScreen(theUi);
+  handleMouseButton(theUi, 70, 0, 0);
+  console.log(`    with food and water shown, the mouth is ${theUi.pressingMouth ? 'held' : 'not held'}`);
+  check(!theUi.pressingMouth, 'with food and water shown (d.DisplayResurrectChestOrScroll 0), the mouth is not held');
 }
 
 finish();

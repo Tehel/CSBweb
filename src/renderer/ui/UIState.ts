@@ -102,6 +102,12 @@ export interface UIState {
   diskMenuNeeded: boolean;
   pressingEye: boolean;
   /**
+   * `d.PressingMouth`: the mouth pressed with an empty hand while the eye panel showed a
+   * chest, a scroll or the Resurrect menu (`doc/CSBwin-src/Character.cpp:4041-4058`).
+   * Food and water are drawn over it until the release (`drawInventoryScreen`).
+   */
+  pressingMouth: boolean;
+  /**
    * What `_ClickOnEye`'s `DescribeObject(d.objectInHand, 1)` drew at the press
    * (`doc/CSBwin-src/Viewport.cpp:7280-7286`), kept for the composes until the release.
    * CSBWin draws that panel once, so its viewing filter runs once a press
@@ -272,7 +278,7 @@ export interface UIState {
 /** The fields of `UIState` that a game in play sets, and a restart clears. */
 type PlayState = Pick<UIState,
   | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'reincarnate' | 'diskMenuNeeded'
-  | 'pressingEye' | 'describedObject' | 'weaponHandScroll' | 'word23144' | 'pointer23178' | 'pointer23182'
+  | 'pressingEye' | 'pressingMouth' | 'describedObject' | 'weaponHandScroll' | 'word23144' | 'pointer23178' | 'pointer23182'
   | 'attackingCharacterOrdinal' | 'possibleAttackTypes' | 'byte20256' | 'word20248'
   | 'word20250' | 'word20252' | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
   | 'characterDamage'
@@ -291,6 +297,7 @@ function initialPlayState(): PlayState {
     reincarnate: null,
     diskMenuNeeded: false,
     pressingEye: false,
+    pressingMouth: false,
     describedObject: null,
     weaponHandScroll: null,
     word23144: 0,

@@ -80,13 +80,13 @@ export interface GameHost {
    */
   attackingCharacterOrdinal(): number;
   /**
-   * `d.PressingEye` and `d.DisplayResurrectChestOrScroll`, which the ten-second update
-   * and `PoisonCharacter` read before they set `CHARFLAG_chestOrScroll`
+   * `d.PressingEye`, `d.PressingMouth` and `d.DisplayResurrectChestOrScroll`, which the
+   * ten-second update and `PoisonCharacter` read before they set `CHARFLAG_chestOrScroll`
    * (`doc/CSBwin-src/Code17818.cpp:435-443`, `doc/CSBwin-src/CSBCode.cpp:7220-7225`):
-   * the eye held, and what `TAG0189d4` last put in its panel, are the UI's. The port
-   * has no pressed mouth, so `d.PressingMouth` is always 0 (`DEBT.md` C139).
+   * the eye or the mouth held, and what `TAG0189d4` last put in its panel, are the UI's.
    */
   pressingEye(): boolean;
+  pressingMouth(): boolean;
   displayResurrectChestOrScroll(): number;
   /**
    * `ShowHideInventory(chIdx)` (`doc/CSBwin-src/CSBCode.cpp:7419`), 4 to hide: the
@@ -193,6 +193,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     closeAttackMenuOf: host.closeAttackMenuOf ?? (() => {}),
     attackingCharacterOrdinal: host.attackingCharacterOrdinal ?? (() => 0),
     pressingEye: host.pressingEye ?? (() => false),
+    pressingMouth: host.pressingMouth ?? (() => false),
     displayResurrectChestOrScroll: host.displayResurrectChestOrScroll ?? (() => 0),
     showHideInventory: host.showHideInventory ?? (() => {}),
     repackChest: host.repackChest ?? (() => {}),

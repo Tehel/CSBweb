@@ -246,6 +246,11 @@ export class GameScreen {
     return this.ui.pressingEye;
   }
 
+  /** `d.PressingMouth` — the host's `pressingMouth`. */
+  pressingMouth(): boolean {
+    return this.ui.pressingMouth;
+  }
+
   /** `d.DisplayResurrectChestOrScroll` — the host's `displayResurrectChestOrScroll`. */
   displayResurrectChestOrScroll(): number {
     return this.ui.displayResurrectChestOrScroll;

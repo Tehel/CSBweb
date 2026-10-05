@@ -106,11 +106,19 @@ export function drawInventoryScreen(ui: UIState): void {
   // the Resurrect menu included, without touching `d.DisplayResurrectChestOrScroll`.
   // `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7399`) calls `TAG0189d4` again.
   //
+  // The held mouth comes before it, as in `DrawCharacterState`
+  // (`doc/CSBwin-src/Character.cpp:1478-1481`): `_FeedCharacter`'s `DisplayFoodWater`
+  // (`:4056`) draws food and water over the chest, the scroll or the Resurrect menu,
+  // and leaves `d.DisplayResurrectChestOrScroll` as it was. Its `RepackChest` is the
+  // compose's (`getActiveChestView`, `syncOpenChest`).
+  //
   // Not held, the panel is what `TAG0189d4` last drew, from what is in the weapon hand:
   // a chest's contents, a scroll as its viewing filter left it (`ui.weaponHandScroll`),
   // or food and water.
   const handObject = getChampionPossession(champion, 1);
-  if (ui.pressingEye) {
+  if (ui.pressingMouth) {
+    drawFoodWaterPanel(ui, champion);
+  } else if (ui.pressingEye) {
     const cursorObject = ui.partyState.objectInHand;
     if (chestView) {
       // Held, only a chest on the cursor is a chest view (`getActiveChestView`).
@@ -168,14 +176,15 @@ export function tag019036(ui: UIState): void {
 
 /**
  * `DrawCharacterState`'s eye panel (`doc/CSBwin-src/Character.cpp:1478-1497`): with
- * `CHARFLAG_chestOrScroll` and the champion's inventory open, the held eye with an empty
- * hand draws the attributes again, through `TAG019036`; with an object held it draws
- * nothing; and not held, `TAG0189d4` draws the panel. The port has no pressed mouth (C139), whose
- * food and water would come first.
+ * `CHARFLAG_chestOrScroll` and the champion's inventory open, the held mouth draws food
+ * and water (the compose's, `drawInventoryScreen`); the held eye with an empty hand draws
+ * the attributes again, through `TAG019036`; with an object held it draws nothing; and
+ * neither held, `TAG0189d4` draws the panel.
  */
 export function drawCharacterStateEyePanel(ui: UIState, chIdx: number, charFlags: number): void {
   if ((charFlags & CHARFLAG_CHEST_OR_SCROLL) === 0) return;
   if (ui.partyState.selectedCharacterIndex !== chIdx) return;
+  if (ui.pressingMouth) return;
   if (ui.pressingEye) {
     if (ui.partyState.objectInHand === OBJECT_ID_NULL) tag019036(ui);
   } else {
@@ -317,7 +326,7 @@ export function getActiveChestView(ui: UIState, champion: Champion): ChestViewSo
     return { id: cursorObject, source: 'cursor' };
   }
 
-  if (ui.pressingEye) return null;
+  if (ui.pressingEye || ui.pressingMouth) return null;
   const handSlot = 1; // CSBWin uses weapon hand for chest display.
   const handObject = getChampionPossession(champion, handSlot);
   if (handObject !== OBJECT_ID_NULL && isChestRecord(ui, handObject)) {

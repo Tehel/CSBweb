@@ -762,9 +762,10 @@ export class MonsterAttack {
       if (chIdx === (party.magicCasterIndex ?? -1)) selectMagicCaster(party, living);
     }
 
-    // `ShowHideInventory(4)` (`doc/CSBwin-src/Character.cpp:2619`): the inventory closes
-    // on a dead champion. The magic tab is not cleared: `SelectMagicCaster` above handed
-    // it to a living champion, and blanking it would undo that.
+    // `ShowHideInventory(4)` (`doc/CSBwin-src/Character.cpp:2622`): the inventory closes
+    // on a dead champion, without releasing a held eye or mouth first (`DEBT.md` C141).
+    // The magic tab is not cleared: `SelectMagicCaster` above handed it to a living
+    // champion, and blanking it would undo that.
     if (party.selectedCharacterIndex === chIdx) party.selectedCharacterIndex = -1;
   }
 

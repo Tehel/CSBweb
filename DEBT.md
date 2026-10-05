@@ -92,7 +92,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C139 | The mouth held with an empty hand does not show food and water | S | ⏳ |
+| C140 | The held eye and mouth do not hide the pointer | S | ⏳ |
+| C141 | A champion's death does not release the held eye or mouth | S | ⏳ |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -127,7 +128,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C140 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C142 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -171,21 +172,30 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C139 ⏳ The mouth held with an empty hand does not show food and water
+### C140 ⏳ The held eye and mouth do not hide the pointer
 
-`FeedCharacter` with an empty hand (`doc/CSBwin-src/Character.cpp:4041-4058`) returns when
-the eye panel already shows food and water (`d.DisplayResurrectChestOrScroll == 0`).
-Otherwise, with the button still down, it sets `d.PressingMouth` and `d.PressingEyeOrMouth`
-and draws food and water over the chest or the scroll in the weapon hand, until the release
-runs `QuitPressingMouth` (`doc/CSBwin-src/CSBCode.cpp:7390-7395`), whose `TAG0189d4` draws
-the panel back and runs the scroll's viewing filter again. The port's `handleMouthPress`
-(`src/renderer/ui/Feeding.ts`) returns on an empty hand, so there is no pressed mouth: the
-panel stays as it was, and the readers of `d.PressingMouth` take it as 0 (`GameHost.pressingEye`,
-`drawCharacterStateEyePanel` in `src/renderer/ui/Inventory.ts`, the button swallowing in
-`src/renderer/ui/Mouse.ts`, `handleInventoryToggle`).
+`_ClickOnEye` hides the pointer while the eye is held (`STHideCursor(HC47)`,
+`doc/CSBwin-src/Viewport.cpp:7275`) and `QuitPressingEye` shows it again
+(`STShowCursor(HC47)`, `doc/CSBwin-src/CSBCode.cpp:7413`). The mouth held with an empty
+hand does the same with `HC5` (`doc/CSBwin-src/Character.cpp:4054`,
+`CSBCode.cpp:7395`), and sets the hide count `d.Word23118` to 1 after hiding
+(`Character.cpp:4055`). `STHideCursor` removes the pointer when the count leaves 0, and
+`STShowCursor` asks for it back when the count returns to 0
+(`doc/CSBwin-src/Mouse.cpp:1818-1863`). The port keeps no hide count in play: the pointer
+stays drawn while the eye or the mouth is held (`handleEyePress` in
+`src/renderer/ui/Mouse.ts`, `handleMouthPress` in `src/renderer/ui/Feeding.ts`).
 
-Paying it means a `pressingMouth` beside `pressingEye`, set by the press and cleared by the
-button-up as `QuitPressingMouth`, with its readers.
+### C141 ⏳ A champion's death does not release the held eye or mouth
+
+`KillCharacter`, on the champion whose inventory is open, clears a held eye
+(`d.PressingEye`, `d.PressingEyeOrMouth`, and the held object's name drawn again) or else a
+held mouth, then closes the inventory through `ShowHideInventory(4)`
+(`doc/CSBwin-src/Character.cpp:2598-2622`), whose `RepackChest` and `d.clockTick = 1` run
+there (`doc/CSBwin-src/CSBCode.cpp:7441-7458`). `RemoveCharacter` does the same
+(`Character.cpp:5267-5291`). The port's `killCharacter` (`src/engine/MonsterAttack.ts`)
+sets `selectedCharacterIndex` to -1 and leaves `pressingEye` and `pressingMouth` as they
+are, so the buttons after 81 stay swallowed until the button is let go
+(`handleMouseButton` in `src/renderer/ui/Mouse.ts`).
 
 ---
 
