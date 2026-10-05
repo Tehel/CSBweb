@@ -18,6 +18,7 @@ import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { FontData } from '../csbwin/TextRenderer';
 import type { ImageFormat } from '../../core/imageDecoder';
 import { OBJECT_ID_NULL, type ObjectID } from '../../core/types';
+import type { ItemDescriptionLine } from './Objects';
 import type { ReincarnateState } from './ReIncarnate';
 import type { SaveMenuState } from './SaveMenu';
 
@@ -33,6 +34,15 @@ export enum UIMode {
 }
 
 export type ScreenIndexBuffer = ReturnType<typeof createPaletteIndexViewportBuffer>;
+
+/** `DescribeObject`'s eye panel for one object, as its viewing filter left it. */
+export interface DescribedObject {
+  objectId: ObjectID;
+  /** A scroll's: the scroll to draw, the one the filter named or the one described. */
+  scrollId: ObjectID;
+  /** Anything else's: the lines under the name. */
+  lines: ItemDescriptionLine[];
+}
 
 export interface UIState {
   /* ---- data sources ---- */
@@ -91,6 +101,14 @@ export interface UIState {
    */
   diskMenuNeeded: boolean;
   pressingEye: boolean;
+  /**
+   * What `_ClickOnEye`'s `DescribeObject(d.objectInHand, 1)` drew at the press
+   * (`doc/CSBwin-src/Viewport.cpp:7280-7286`), kept for the composes until the release.
+   * CSBWin draws that panel once, so its viewing filter runs once a press
+   * (`doc/CSBwin-src/Character.cpp:3455-3530`, `:3724-3772`). Null with the eye released,
+   * an empty hand or a chest in it. Made by `describeObject` (`ui/Inventory.ts`).
+   */
+  describedObject: DescribedObject | null;
   hoverPoint: { x: number; y: number } | null;
   /**
    * `d.Word23144` — the marching order being changed: 0, or one more than the position,
@@ -246,7 +264,7 @@ export interface UIState {
 /** The fields of `UIState` that a game in play sets, and a restart clears. */
 type PlayState = Pick<UIState,
   | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'reincarnate' | 'diskMenuNeeded'
-  | 'pressingEye' | 'word23144' | 'pointer23178' | 'pointer23182'
+  | 'pressingEye' | 'describedObject' | 'word23144' | 'pointer23178' | 'pointer23182'
   | 'attackingCharacterOrdinal' | 'possibleAttackTypes' | 'byte20256' | 'word20248'
   | 'word20250' | 'word20252' | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
   | 'characterDamage'
@@ -265,6 +283,7 @@ function initialPlayState(): PlayState {
     reincarnate: null,
     diskMenuNeeded: false,
     pressingEye: false,
+    describedObject: null,
     word23144: 0,
     pointer23178: null,
     pointer23182: null,

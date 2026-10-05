@@ -13,10 +13,10 @@ import { canPlaceInSlot, drawPositionSquare } from './Character';
 import { objectIconBitmap } from './Draw';
 import { handleMouthPress } from './Feeding';
 import { searchButtonList } from './HitTest';
-import { getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest } from './Inventory';
+import { describeObject, getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
 import { drawLegalAttackTypes, handleAttackAreaClick } from './Attack';
-import { applyViewingFilter, resolveObjectNameIndex } from './Objects';
+import { applyViewingFilter, isChestRecord, resolveObjectNameIndex } from './Objects';
 import { OBJECT_ID_NULL } from '../../core/types';
 import { UIMode, UIState } from './UIState';
 import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
@@ -200,6 +200,7 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
 export function handleMouseUnclick(ui: UIState): void {
   if (ui.pressingEye) {
     ui.pressingEye = false;
+    ui.describedObject = null;
   }
 }
 
@@ -213,15 +214,20 @@ export function isEyeClick(ui: UIState, x: number, y: number): boolean {
 /**
  * `_ClickOnEye` (`doc/CSBwin-src/Viewport.cpp:7257-7290`): a press while the eye is
  * held does nothing. With an empty hand, `TAG019036` runs the viewing filter before it
- * draws the attributes (`doc/CSBwin-src/Character.cpp:4524-4578`); the panel itself is
- * drawn from `pressingEye` (`drawInventoryScreen`).
+ * draws the attributes (`doc/CSBwin-src/Character.cpp:4524-4578`); with an object,
+ * `DescribeObject` runs it as it describes the object (`describeObject`), and the
+ * composes until the release draw what it left. The panel itself is drawn from
+ * `pressingEye` (`drawInventoryScreen`).
  */
 export function handleEyePress(ui: UIState): void {
   if (ui.partyState.selectedCharacterIndex < 0) return;
   if (ui.pressingEye) return;
   ui.pressingEye = true;
-  if (ui.partyState.objectInHand === OBJECT_ID_NULL) {
+  const inHand = ui.partyState.objectInHand;
+  if (inHand === OBJECT_ID_NULL) {
     applyViewingFilter(ui, ViewingFilterSite.ATTRIBUTES, OBJECT_ID_NULL, 0);
+  } else if (!isChestRecord(ui, inHand)) {
+    ui.describedObject = describeObject(ui, inHand);
   }
 }
 

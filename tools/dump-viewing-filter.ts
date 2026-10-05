@@ -29,7 +29,12 @@
  *    every DSA at the location, each seeing parameter 0 as 0, the object as -1 and the
  *    champion whose inventory is open. Once a press: a second press while the eye is held
  *    runs nothing, and the next press after the release runs it again. With an object in
- *    hand the eye describes it instead, and this site runs nothing.
+ *    hand the eye describes it instead, and this site runs nothing: the DSA sees the
+ *    object, which the description's site passes.
+ * 9. **With an object in hand it runs once a press, at the press** (`DescribeObject`, from
+ *    `_ClickOnEye`, `Viewport.cpp:7286`): CSBWin draws the description or the scroll once,
+ *    so the inventory composed again and again while the eye is held runs no DSA, and the
+ *    next press after the release runs it again.
  *
  * Run: `npx tsx tools/dump-viewing-filter.ts`
  */
@@ -45,6 +50,7 @@ import { check, finish } from './lib/check';
 import { gameTablesOf, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
+import { drawInventoryScreen } from '../src/renderer/ui/Inventory';
 
 /** `ESL_VIEWINGFILTER` (`doc/CSBwin-src/CSB.h:1538`). */
 const ESL_VIEWINGFILTER = 3;
@@ -262,8 +268,47 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   party.objectInHand = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, 0);
   handleMouseButton(ui, 71, 0, 0);
   handleMouseUnclick(ui);
-  console.log(`   with an object in hand the eye's own site ${ran() ? 'runs' : 'runs nothing'}`);
-  check(!ran(), 'with an object in hand, TAG019036 does not run');
+  // The description's site runs instead (section 9), and passes the object, not -1.
+  const seen = game.systems.dsa.getGlobalVariables()[1];
+  console.log(`   with an object in hand the DSA sees object ${seen}: the eye's own site ${seen === -1 ? 'runs' : 'runs nothing'}`);
+  check(seen === party.objectInHand, 'with an object in hand, TAG019036 does not run, and the description sees the object');
+}
+
+/* ------------------------------- 9. the eye with an object in hand -------------- */
+{
+  const game = withFilter([[...params(0)]]);
+  const party = game.ctx.party.state;
+  const ui = newUIState(stockGraphics(), game.ctx);
+  ui.partyState = party;
+  party.selectedCharacterIndex = 1;
+  const unset = (): void => {
+    const g = game.systems.dsa.getGlobalVariables();
+    g[0] = UNSET;
+    game.systems.dsa.setGlobalVariables(g);
+  };
+  const ran = (): boolean => game.systems.dsa.getGlobalVariables()[0] !== UNSET;
+  for (const [what, inHand] of [
+    ['a weapon', game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, 0)],
+    ['a scroll', game.ctx.dungeon.rnMaps.rn(DBType.SCROLL, 0)],
+  ] as const) {
+    party.objectInHand = inHand;
+    unset();
+    handleMouseButton(ui, 71, 0, 0);
+    const atPress = ran();
+    unset();
+    for (let i = 0; i < 3; i++) drawInventoryScreen(ui);
+    const atCompose = ran();
+    handleMouseUnclick(ui);
+    unset();
+    handleMouseButton(ui, 71, 0, 0);
+    const again = ran();
+    handleMouseUnclick(ui);
+    console.log(`9. ${what} in hand: the press ${atPress ? 'runs it' : 'runs nothing'}, three composes `
+      + `while held ${atCompose ? 'run it' : 'run nothing'}, the next press ${again ? 'runs it' : 'runs nothing'}`);
+    check(atPress, `with ${what} in hand, the press runs the viewing filter`);
+    check(!atCompose, `with ${what} in hand, composing the held eye's panel runs no DSA`);
+    check(again, `with ${what} in hand, the next press after the release runs it again`);
+  }
 }
 
 finish();

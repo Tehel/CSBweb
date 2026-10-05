@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C137 | The viewing filter's DSAs run at every compose of the inventory | M | ⏳ |
+| C138 | A scroll in the weapon hand is never shown, and the eye panel is not redrawn at `DrawCharacterState` | M | ⏳ |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -127,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C138 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C139 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -171,27 +171,32 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C137 ⏳ The viewing filter's DSAs run at every compose of the inventory
+### C138 ⏳ A scroll in the weapon hand is never shown, and the eye panel is not redrawn at `DrawCharacterState`
 
-CSBWin runs the viewing filter where it draws the eye panel, and draws that only at
-events: `DescribeObject` or `TAG019036` from `_ClickOnEye`, once a press
-(`doc/CSBwin-src/Viewport.cpp:7257-7290`), and from `DrawCharacterState` when the
-champion's `CHARFLAG_chestOrScroll` is set with the inventory open
-(`doc/CSBwin-src/Character.cpp:1478-1497`), through `TAG0189d4` (`:3849`) for a scroll or
-a chest in hand. The port draws the panel from live state at every compose of the screen
-(`drawInventoryScreen`, `src/renderer/ui/Inventory.ts`, from `GameScreen.presentViewport`),
-which a click, a key, the message scroll and a move of the pointer each make, and runs
-the description's and the scroll's sites there (`getObjectDescriptionLines`,
-`src/renderer/ui/Objects.ts`; `drawScrollPanel`, `Inventory.ts`). So a DSA at
-`ESL_VIEWINGFILTER` runs once a compose while a description or a scroll is shown, and
-whatever it does besides `&DESCRIBE` (a global, a message, a timer) is done that many
-times. The eye with an empty hand runs it at the press (`handleEyePress`,
-`src/renderer/ui/Mouse.ts`), as `_ClickOnEye` does, but never from `DrawCharacterState`,
-because the port has no `CHARFLAG_chestOrScroll` (`AdjustStatsForItemCarried.ts:181`).
+`TAG0189d4` (`doc/CSBwin-src/Character.cpp:3849-3897`) fills the eye panel from the weapon
+hand: a chest's contents (`d.DisplayResurrectChestOrScroll` 4), a scroll's text through
+`DescribeObject(objD7, 0)` (2), and food and water otherwise (0). The port's
+(`drawInventoryScreen`, `src/renderer/ui/Inventory.ts`) has the chest and food and water
+only: a scroll in the weapon hand is not read, and `displayResurrectChestOrScroll` is
+never 2.
 
-Paying it means running the filter at CSBWin's events and keeping its result for the
-composes between them. Of the dungeons here only Conflux has a viewing filter, with one
-DSA.
+CSBWin draws that panel at events: from `DrawCharacterState` when the champion's
+`CHARFLAG_chestOrScroll` is set with the inventory open (`Character.cpp:1478-1497`, which
+with the eye held and an empty hand runs `TAG019036` instead, and with an object held
+draws nothing), and from `QuitPressingEye` and `QuitPressingMouth`
+(`doc/CSBwin-src/CSBCode.cpp:7390-7414`). The flag is set by `AdjustStatsForItemCarried`
+(`Character.cpp:1779`), a chest or a scroll leaving or entering the weapon hand
+(`:1910-1921`, `:1997-2004`), eating and drinking (`:4488-4491`), the ten-second update
+(`doc/CSBwin-src/Code17818.cpp:432-443`), poison (`CSBCode.cpp:7221-7225`) and
+`ShowHideInventory` (`:7504-7512`). The port has no `CHARFLAG_chestOrScroll`
+(`AdjustStatsForItemCarried.ts:181`) and draws the panel from live state at every compose.
+So the viewing filter's scroll site never runs from the weapon hand, and `TAG019036`'s
+runs at the eye's press (`handleEyePress`, `src/renderer/ui/Mouse.ts`) but never again
+from `DrawCharacterState` while the eye is held.
+
+Paying it means the scroll's branch of `TAG0189d4`, its viewing filter run at those
+events and its result kept for the composes between them, as `ui.describedObject` keeps
+the eye press's (`describeObject`, `Inventory.ts`).
 
 ---
 

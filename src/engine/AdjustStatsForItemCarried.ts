@@ -179,5 +179,5 @@ export function AdjustStatsForItemCarried(
     incrAttributeMinimum(attribute, D4W);
   }
   // `charFlags |= CHARFLAG_chestOrScroll | CHARFLAG_statsChanged` has no counterpart:
-  // the panels are drawn from live state every frame.
+  // the panels are drawn from live state every frame (`DEBT.md` C138).
 }

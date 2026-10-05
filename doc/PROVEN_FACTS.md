@@ -4865,6 +4865,16 @@ chain, not the actuators'. Parameter 1 starts as the scroll being read, a valid 
 a DSA after the first runs only if the first stores an invalid object there. Evidence:
 `tools/dump-viewing-filter.ts`.
 
+The filter runs where the eye panel is drawn, and CSBWin draws that panel only at events,
+leaving it in the viewport as drawn between them: `_ClickOnEye`, once a press, runs
+`TAG019036` with an empty hand and `DescribeObject(d.objectInHand, 1)` with an object
+(`doc/CSBwin-src/Viewport.cpp:7278-7287`); `DrawCharacterState`, when the champion's
+`CHARFLAG_chestOrScroll` is set with the inventory open, runs `TAG019036` with the eye held
+and an empty hand, nothing with the eye held and an object, and `TAG0189d4` otherwise
+(`Character.cpp:1478-1497`); `QuitPressingEye` and `QuitPressingMouth` run `TAG0189d4`
+(`doc/CSBwin-src/CSBCode.cpp:7390-7414`). So a DSA at the location runs once an event,
+however often the screen is shown. Evidence: `tools/dump-viewing-filter.ts`, section 9.
+
 `&DESCRIBE` with a location, `ModifyDescription` (`Character.cpp:3816-3830`), sets the phrase
 from every text at the location whose corner matches, with no `IsValid`, so the last such
 text wins, and enables the phrase whatever the text holds, an empty one included. It reads

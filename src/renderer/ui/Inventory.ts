@@ -19,7 +19,7 @@ import { drawAttributePanel, drawFoodWaterPanel, drawVitalsAndLoad, getInventory
 import { blitBasicGraphicToViewport, drawObjectIcon, drawWoundedOutline } from './Draw';
 import { drawMouthChewAnimation } from './Feeding';
 import { applyViewingFilter, drawItemDescriptionLine, getInventoryPlaceholderIndex, getObjectDescriptionLines, getObjectDisplayName, isChestRecord, resolveObjectNameIndex } from './Objects';
-import { UIState, emptyChestContents } from './UIState';
+import { DescribedObject, UIState, emptyChestContents } from './UIState';
 
 const MAX_LINES_IN_SCROLL = 9;
 const MAX_SCROLL_LINE_LENGTH = 16;
@@ -362,9 +362,30 @@ export function drawInspectArrow(ui: UIState, fromEye: boolean): void {
   blitBasicGraphicToViewport(ui, graphicIndex, g232.wRectPos934, 16, 8);
 }
 
-export function drawObjectInfoPanel(ui: UIState, objectId: ObjectID): void {
+/**
+ * `DescribeObject` (`doc/CSBwin-src/Character.cpp:3411`) for the eye panel, the part that
+ * runs the viewing filter: a scroll's site leaves the scroll to draw (`:3455-3530`), and
+ * anything else's leaves the lines under its name (`:3724-3791`). A chest's panel is
+ * `drawChestPanel`'s, and runs no filter.
+ */
+export function describeObject(ui: UIState, objectId: ObjectID): DescribedObject {
   if (ui.ctx.dungeon.rnMaps.dbType(objectId) === DBType.SCROLL) {
-    drawScrollPanel(ui, objectId);
+    const scrollId = applyViewingFilter(ui, ViewingFilterSite.SCROLL, objectId, 0)?.objectId ?? objectId;
+    return { objectId, scrollId, lines: [] };
+  }
+  const lines = getObjectDescriptionLines(ui, objectId, resolveObjectNameIndex(ui, objectId));
+  return { objectId, scrollId: OBJECT_ID_NULL, lines };
+}
+
+/**
+ * The eye panel for the object in hand, from what the press described
+ * (`ui.describedObject`). An object that is not the one described is described afresh.
+ */
+export function drawObjectInfoPanel(ui: UIState, objectId: ObjectID): void {
+  if (ui.describedObject?.objectId !== objectId) ui.describedObject = describeObject(ui, objectId);
+  const described = ui.describedObject;
+  if (ui.ctx.dungeon.rnMaps.dbType(objectId) === DBType.SCROLL) {
+    drawScrollPanel(ui, described.scrollId);
     return;
   }
   const g232 = ui.uiTables.graphic232;
@@ -396,9 +417,8 @@ export function drawObjectInfoPanel(ui: UIState, objectId: ObjectID): void {
     }
   }
 
-  const lines = getObjectDescriptionLines(ui, objectId, objectNameIndex);
   const textState = { x: VIEWPORT_X + 108, y: VIEWPORT_Y + 87 };
-  for (const line of lines) {
+  for (const line of described.lines) {
     drawItemDescriptionLine(ui, line.text, line.color, textState);
   }
   drawInspectArrow(ui, ui.pressingEye);
@@ -422,9 +442,8 @@ export function getEyeRect(ui: UIState): Rect | null {
   };
 }
 
-export function drawScrollPanel(ui: UIState, objectId: ObjectID): void {
-  const scrollId = applyViewingFilter(ui, ViewingFilterSite.SCROLL, objectId, 0)?.objectId ?? objectId;
-
+/** `DisplayScroll` (`doc/CSBwin-src/Character.cpp:3316`): the scroll's text in the panel. */
+export function drawScrollPanel(ui: UIState, scrollId: ObjectID): void {
   const scroll = ui.ctx.dungeon.getScrollRecord(scrollId);
   if (!scroll) return;
   const text = ui.ctx.dungeon.decodeScrollText(scroll, ui.objectTables.textDecode) ?? '';
