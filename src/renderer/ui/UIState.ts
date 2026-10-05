@@ -131,6 +131,15 @@ export interface UIState {
    */
   word23144: number;
   /**
+   * `d.Word23118`, the pointer's hide count: `STHideCursor` raises it and takes the
+   * pointer off as it leaves 0, `STShowCursor` lowers it and asks for the pointer back as
+   * it returns to 0 (`doc/CSBwin-src/Mouse.cpp:1818-1863`); `drawCursorItem` draws none
+   * while it is above 0. CSBWin's other pairs hide and show within one call, which the
+   * port's composes never see; only the held eye and mouth hold it from the press to the
+   * release (`stHideCursor`).
+   */
+  word23118: number;
+  /**
    * `d.Pointer23178` and `d.Pointer23182` (`doc/CSBwin-src/CSBCode.cpp:1950-1951`), the
    * 32x16 cursor `TAG0025a6` makes of the square it picks up, for the palette above the
    * split and the one below it.
@@ -278,7 +287,7 @@ export interface UIState {
 /** The fields of `UIState` that a game in play sets, and a restart clears. */
 type PlayState = Pick<UIState,
   | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'reincarnate' | 'diskMenuNeeded'
-  | 'pressingEye' | 'pressingMouth' | 'describedObject' | 'weaponHandScroll' | 'word23144' | 'pointer23178' | 'pointer23182'
+  | 'pressingEye' | 'pressingMouth' | 'describedObject' | 'weaponHandScroll' | 'word23144' | 'word23118' | 'pointer23178' | 'pointer23182'
   | 'attackingCharacterOrdinal' | 'possibleAttackTypes' | 'byte20256' | 'word20248'
   | 'word20250' | 'word20252' | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
   | 'characterDamage'
@@ -301,6 +310,7 @@ function initialPlayState(): PlayState {
     describedObject: null,
     weaponHandScroll: null,
     word23144: 0,
+    word23118: 0,
     pointer23178: null,
     pointer23182: null,
     attackingCharacterOrdinal: 0,
@@ -367,6 +377,20 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
 
     ...hooks,
   };
+}
+
+/**
+ * `STHideCursor` (`doc/CSBwin-src/Mouse.cpp:1839-1863`): `_ClickOnEye`'s `HC47`
+ * (`doc/CSBwin-src/Viewport.cpp:7275`) and `_FeedCharacter`'s `HC5`
+ * (`doc/CSBwin-src/Character.cpp:4054`), until the release's `stShowCursor`.
+ */
+export function stHideCursor(ui: UIState): void {
+  ui.word23118++;
+}
+
+/** `STShowCursor` (`doc/CSBwin-src/Mouse.cpp:1818-1833`). */
+export function stShowCursor(ui: UIState): void {
+  ui.word23118--;
 }
 
 /** CSBWin drives animation off the VBL counter; the browser gives us a wall clock. */

@@ -92,7 +92,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C140 | The held eye and mouth do not hide the pointer | S | ⏳ |
 | C141 | A champion's death does not release the held eye or mouth | S | ⏳ |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
@@ -171,19 +170,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C140 ⏳ The held eye and mouth do not hide the pointer
-
-`_ClickOnEye` hides the pointer while the eye is held (`STHideCursor(HC47)`,
-`doc/CSBwin-src/Viewport.cpp:7275`) and `QuitPressingEye` shows it again
-(`STShowCursor(HC47)`, `doc/CSBwin-src/CSBCode.cpp:7413`). The mouth held with an empty
-hand does the same with `HC5` (`doc/CSBwin-src/Character.cpp:4054`,
-`CSBCode.cpp:7395`), and sets the hide count `d.Word23118` to 1 after hiding
-(`Character.cpp:4055`). `STHideCursor` removes the pointer when the count leaves 0, and
-`STShowCursor` asks for it back when the count returns to 0
-(`doc/CSBwin-src/Mouse.cpp:1818-1863`). The port keeps no hide count in play: the pointer
-stays drawn while the eye or the mouth is held (`handleEyePress` in
-`src/renderer/ui/Mouse.ts`, `handleMouthPress` in `src/renderer/ui/Feeding.ts`).
 
 ### C141 ⏳ A champion's death does not release the held eye or mouth
 

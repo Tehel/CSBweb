@@ -15,7 +15,7 @@ import { DBType, OBJECT_ID_NULL, ObjectID, locationRelToInteger } from '../../co
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
 import { descIndexForObject, resolveObjectNameIndex } from './Objects';
-import { UIState, nowMs } from './UIState';
+import { UIState, nowMs, stHideCursor } from './UIState';
 
 /** The swallow, sound ordinal 8 (`fp.gulp = 8`, `doc/CSBwin-src/Character.cpp:4111`). */
 const SOUND_GULP = 8;
@@ -116,6 +116,9 @@ export function handleMouthPress(ui: UIState): void {
   if (objectId === OBJECT_ID_NULL) {
     if (ui.displayResurrectChestOrScroll === 0) return;
     ui.pressingMouth = true;
+    // `STHideCursor(HC5); d.Word23118 = 1;` (`:4054-4055`).
+    stHideCursor(ui);
+    ui.word23118 = 1;
     return;
   }
   // `if (d.PotentialCharacterOrdinal != 0) RETURN;` — with an object in hand, the mouth

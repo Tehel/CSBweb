@@ -53,6 +53,11 @@
  *    the inventory will not close (`CSBCode.cpp:7439`); the release is `QuitPressingMouth`
  *    (`CSBCode.cpp:7390-7395`), whose `TAG0189d4` reads the scroll again. With food and
  *    water already shown, the mouth is not held.
+ * 12. **The held eye and mouth hide the pointer** until the release: `STHideCursor(HC47)`
+ *    in `_ClickOnEye` (`doc/CSBwin-src/Viewport.cpp:7275`) and `STShowCursor(HC47)` in
+ *    `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7413`); `HC5` for the mouth
+ *    (`Character.cpp:4054-4055`, `CSBCode.cpp:7395`). The hide count `d.Word23118` is
+ *    back to 0 after each (`doc/CSBwin-src/Mouse.cpp:1818-1863`).
  *
  * Run: `npx tsx tools/dump-viewing-filter.ts`
  */
@@ -67,7 +72,7 @@ import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterD
 import { check, finish } from './lib/check';
 import { gameTablesOf, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
-import { handleInventoryToggle, handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
+import { drawCursorItem, handleInventoryToggle, handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
 import { drawCharacterStateEyePanel, drawInventoryScreen, getInventorySlotRect } from '../src/renderer/ui/Inventory';
 import { drawObjectIcon } from '../src/renderer/ui/Draw';
 import { VIEWPORT_X, VIEWPORT_Y, getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
@@ -491,6 +496,59 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   handleMouseButton(theUi, 70, 0, 0);
   console.log(`    with food and water shown, the mouth is ${theUi.pressingMouth ? 'held' : 'not held'}`);
   check(!theUi.pressingMouth, 'with food and water shown (d.DisplayResurrectChestOrScroll 0), the mouth is not held');
+}
+
+/* ------------------------------- 12. the held eye and mouth hide the pointer ---- */
+{
+  // The host's members are the screen's, as `main.ts` wires them.
+  let ui: UIState | null = null;
+  const game = withFilterDsas(ESL_VIEWINGFILTER, [[...params(0)]], {
+    drawCharacterState: (chIdx, charFlags) => { if (ui) drawCharacterStateEyePanel(ui, chIdx, charFlags); },
+    pressingEye: () => ui?.pressingEye ?? false,
+    pressingMouth: () => ui?.pressingMouth ?? false,
+    displayResurrectChestOrScroll: () => ui?.displayResurrectChestOrScroll ?? 0,
+  });
+  const party = game.ctx.party.state;
+  const graphics = stockGraphics();
+  const cache = new Map();
+  const theUi = newUIState(graphics, game.ctx, {
+    getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
+  });
+  ui = theUi;
+  theUi.partyState = party;
+  party.selectedCharacterIndex = -1;
+  party.objectInHand = OBJECT_ID_NULL;
+  const character = game.systems.character;
+  const scroll = game.ctx.dungeon.rnMaps.rn(DBType.SCROLL, 0);
+  // A scroll in champion 1's weapon hand, so the mouth can be held over it.
+  character.removeCharacterPossession(1, 1);
+  character.addCharacterPossession(1, scroll, 1);
+  theUi.hoverPoint = { x: 100, y: 60 };
+  const pixels = theUi.screenIndexBuffer.pixels;
+  const pointerDrawn = (): boolean => {
+    pixels.fill(0);
+    drawCursorItem(theUi, false);
+    return pixels.some((v) => v !== 0);
+  };
+  handleInventoryToggle(theUi, 1);
+  drawInventoryScreen(theUi);
+  const before = pointerDrawn();
+  handleMouseButton(theUi, 71, 0, 0);
+  const eyeHeld = theUi.pressingEye && !pointerDrawn();
+  handleMouseUnclick(theUi);
+  const eyeReleased = pointerDrawn() && theUi.word23118 === 0;
+  handleMouseButton(theUi, 70, 0, 0);
+  const mouthHeld = theUi.pressingMouth && !pointerDrawn();
+  handleMouseUnclick(theUi);
+  const mouthReleased = pointerDrawn() && theUi.word23118 === 0;
+  console.log(`12. the pointer: ${before ? 'drawn' : 'not drawn'}; the eye held ${eyeHeld ? 'hides it' : 'leaves it'}, `
+    + `released ${eyeReleased ? 'shows it' : 'leaves it hidden'}; the mouth held ${mouthHeld ? 'hides it' : 'leaves it'}, `
+    + `released ${mouthReleased ? 'shows it' : 'leaves it hidden'}`);
+  check(before, 'with nothing held, the pointer is drawn');
+  check(eyeHeld, 'the eye held hides the pointer (STHideCursor(HC47))');
+  check(eyeReleased, "the eye's release shows it again, the hide count back to 0");
+  check(mouthHeld, 'the mouth held with an empty hand hides the pointer (STHideCursor(HC5))');
+  check(mouthReleased, "the mouth's release shows it again, the hide count back to 0");
 }
 
 finish();

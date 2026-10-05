@@ -2028,6 +2028,22 @@ the candidate. Evidence: `tools/dump-mastery-panel.ts`, last section.
 
 Evidence: `tools/dump-viewing-filter.ts`, section 11.
 
+## The held eye and mouth hide the pointer until the release
+
+- `STHideCursor` raises the hide count `d.Word23118` and takes the pointer off the screen
+  as it leaves 0; `STShowCursor` lowers it and asks for the pointer back as it returns to
+  0 (`doc/CSBwin-src/Mouse.cpp:1818-1863`).
+- `_ClickOnEye` hides it once the eye is held (`STHideCursor(HC47)`,
+  `doc/CSBwin-src/Viewport.cpp:7275`), and `QuitPressingEye` shows it last
+  (`STShowCursor(HC47)`, `doc/CSBwin-src/CSBCode.cpp:7413`).
+- `_FeedCharacter`, holding the mouth with an empty hand, hides it and then sets
+  `d.Word23118 = 1` (`STHideCursor(HC5)`, `doc/CSBwin-src/Character.cpp:4054-4055`);
+  `QuitPressingMouth` shows it (`STShowCursor(HC5)`, `CSBCode.cpp:7395`).
+- CSBWin's other in-play pairs hide and show within one call, so only these two leave it
+  hidden from one frame to the next.
+
+Evidence: `tools/dump-viewing-filter.ts`, section 12 (2 of 5 fail before the hide count).
+
 ## The mastery names are a code table, and six of them start with a rune
 
 `d.Pointer16770[17]` (`doc/CSBwin-src/CSBCode.cpp:370-384`) holds the rank names the eye

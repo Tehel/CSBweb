@@ -84,7 +84,7 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 
 ## Eye click and inspection flow
 
-- `ClickOnEye` sets `PressingEyeOrMouth`/`PressingEye`, draws the eye icon (`objNI_Special_e`), and if the hand is empty calls `TAG019036` (attributes); otherwise it calls `DescribeObject(d.objectInHand, 1)` (`doc/CSBwin-src/Viewport.cpp`).
+- `ClickOnEye` sets `PressingEyeOrMouth`/`PressingEye`, hides the pointer until `QuitPressingEye`, draws the eye icon (`objNI_Special_e`), and if the hand is empty calls `TAG019036` (attributes); otherwise it calls `DescribeObject(d.objectInHand, 1)` (`doc/CSBwin-src/Viewport.cpp:7257-7290`). The held mouth hides it too; see `doc/PROVEN_FACTS.md` → "The held eye and mouth hide the pointer until the release".
 
 ## Mouth click and feeding
 

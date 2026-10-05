@@ -18,7 +18,7 @@ import { handleMagicClick } from './MagicPanel';
 import { drawLegalAttackTypes, handleAttackAreaClick } from './Attack';
 import { isChestRecord, resolveObjectNameIndex } from './Objects';
 import { OBJECT_ID_NULL } from '../../core/types';
-import { UIMode, UIState } from './UIState';
+import { UIMode, UIState, stHideCursor, stShowCursor } from './UIState';
 import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
 import { characterAtPosition } from '../../engine/AddCharacter';
@@ -208,9 +208,11 @@ export function handleMouseUnclick(ui: UIState): void {
     ui.pressingEye = false;
     ui.describedObject = null;
     tag0189d4(ui);
+    stShowCursor(ui);
   } else if (ui.pressingMouth) {
     ui.pressingMouth = false;
     tag0189d4(ui);
+    stShowCursor(ui);
   }
 }
 
@@ -233,6 +235,7 @@ export function handleEyePress(ui: UIState): void {
   if (ui.partyState.selectedCharacterIndex < 0) return;
   if (ui.pressingEye) return;
   ui.pressingEye = true;
+  stHideCursor(ui);
   const inHand = ui.partyState.objectInHand;
   if (inHand === OBJECT_ID_NULL) {
     tag019036(ui);
@@ -594,6 +597,8 @@ function drawMarchingOrderCursor(ui: UIState, x: number, y: number, dynamicPalet
 export function drawCursorItem(ui: UIState, dynamicPaletteSwitching: boolean): void {
   ui.objectCursorFootprint = null;
   if (!ui.hoverPoint) return;
+  // The held eye or mouth has hidden it (`stHideCursor`).
+  if (ui.word23118 > 0) return;
   if (ui.word23144 !== 0) {
     // `CreateCursorBitmap` asks before anything else (`doc/CSBwin-src/CSBCode.cpp:2234`).
     drawMarchingOrderCursor(ui, Math.floor(ui.hoverPoint.x), Math.floor(ui.hoverPoint.y), dynamicPaletteSwitching);
