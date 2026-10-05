@@ -448,6 +448,15 @@ taken in one session if they fit:
    title lines, and a ninth title has no rectangle and is read through anyway (`:6011`);
    the tool asserts that no square of the retail file matches more than seven.
 
+   One CSBWin slip is fixed (`CLAUDE.md` → "The one non-negotiable rule"), and recorded
+   under H when this is paid. After a button's flash, `_TAG008c40_8` resets the ink from
+   `Long16864`, which its own comment puts at byte 8 of item 0, words 4-5, but reads as
+   `f.Segment1_16872+8`, words 8-9: the port takes word 5 (9) where CSBWin takes word 9
+   (3) (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Item 0", word 9). No pixel changes:
+   every text is drawn after an ink set of its own (`:4192-4213`, `:6985-6991`; the
+   only other draw, `:7151`, passes `s20_16208[17]`, which has no label and draws
+   nothing).
+
    A `tools/` check drives it headlessly: level 0 (3,23) lists CREATURES, THE MAZE and
    FULYA PIT in that order, FULYA PIT's three pages go forward with NEXT and back with
    LAST, with the buttons each page offers, and a level with no records (past 9) shows

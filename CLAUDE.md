@@ -11,6 +11,13 @@ Project memory index: @.claude/memory/MEMORY.md
 same magic numbers, same edge cases. When our code, our docs, or intuition disagree with
 CSBWin, CSBWin wins.
 
+It is followed faithfully, not blindly. When CSBWin is **obviously wrong** — a slip of its
+own translation, such as a byte offset read as a word index, or a bug that costs the
+player something the game means to give (a hint, an item, a message) — the port does the
+right thing instead. "Obviously" is earned: cite both readings, and rule out a misread
+helper first (`.claude/memory/memmove-source-first.md`). Each such fix is a deliberate
+divergence, listed under `DEBT.md` H with its proof.
+
 Corollaries:
 
 - **Never guess.** If a table, offset, rectangle or formula is not read from the game data
@@ -23,7 +30,7 @@ Corollaries:
 - Tables must be extracted at runtime from `graphics.dat` / `dungeon.dat`, never hardcoded.
 - Documented exceptions exist and are rare — see "Audio sample rates" and
   "`dm-atari/graphics.dat` is CSBWin's with three items from the 1.2 disk" in
-  `doc/PROVEN_FACTS.md`, the two places we knowingly diverge (listed under `DEBT.md` H).
+  `doc/PROVEN_FACTS.md`, and the rest of `DEBT.md` H.
   Don't create new ones silently.
 
 ## Where things are written down

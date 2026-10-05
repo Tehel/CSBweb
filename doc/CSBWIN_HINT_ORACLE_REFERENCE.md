@@ -80,11 +80,11 @@ Three things read its words.
 | 2 | 1 | `:4192`, `:4210` | The ink before the screen's buttons are drawn and before their labels are (`TAG008c40_6`, "Text appears on buttons") |
 | 3 | 0x770 | `:4235-4236` | The colour slot word 0 takes once the texts are drawn, before the last two fades |
 | 4 | 1 | `:4249` | The ink `_TAG0051c2_31` leaves set |
-| 5 | 9 | — | Not read |
+| 5 | 9 | — | Not read by CSBWin; the ink after a button's flash in the original (word 9) |
 | 6 | 9 | `:4224` | The colour of the frame round a text of list 9 whose `i12` is 8: `TAG005f9a_1` draws it one pixel wide, outside the text's rectangle (`TAG005f9a_xxx`, `:4666-4732`) |
 | 7 | 10 | `:6985` | The ink a pressed button's label flashes in (`_TAG008c40_8`), for 20 VBLs before it is drawn again in the button's own (`:6986-6990`) |
 | 8 | 9 | `:4058-4060`, `:6017`, `:6870`, `:6886` | The font's ink as stored (the load's first `TAG004a22_26`), and the palette slot the title list cycles: word 36 when a title is drawn and when a click ends the wait, the cycle's colours between |
-| 9 | 3 | `:4240`, `:6995-6999` | The VBLs `_TAG0051c2_31` waits at least, from just after its first two fades, before its last two; and the ink after a button's flash, set unless it is the button's own. CSBWin reads words 8-9 there as a long (`LoadLong(f.Segment1_16872+8)`) and keeps the low word, which is word 9, though its own comment puts that long, `Long16864`, at byte 8: words 4-5 (`:247`) |
+| 9 | 3 | `:4240`, `:6995-6999` | The VBLs `_TAG0051c2_31` waits at least, from just after its first two fades, before its last two; and the ink after a button's flash, set unless it is the button's own. CSBWin reads words 8-9 there as a long (`LoadLong(f.Segment1_16872+8)`) and keeps the low word, which is word 9, though its own comment puts that long, `Long16864`, at byte 8: words 4-5 (`:247`), whose low word is word 5. No text is drawn in that ink: each draw sets its own first |
 | 10, 11 | 1, 1 | `:4204-4205`, `:4243-4244` | The second and third fades: delay, steps. Word 10 is also the slot the first ink call sets (`:4058`) |
 | 12, 13 | 2, 6 | `:4201-4202`, `:4246-4247` | The first and last fades: delay, steps |
 | 14-19 | 0xffff | — | Not read |
