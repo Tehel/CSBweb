@@ -1,6 +1,5 @@
 import type { UIContext } from './context';
 import { setUIContext } from './context';
-export { handleCursorFilter } from './cursorFilter';
 import { bindUIEvents } from './events';
 export { bindExtrasToggle } from './events';
 

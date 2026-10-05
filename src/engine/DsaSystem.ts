@@ -135,6 +135,46 @@ enum DsaVarType {
 }
 
 /** `STKOP` (`doc/CSBwin-src/Data.h:1721-1861`): every `&` operation, in CSBWin's order. */
+/** `CURSORFILTER_TYPE` (`doc/CSBwin-src/CSB.h:1395-1514`): what is about to happen to the object. */
+export enum CursorFilterType {
+  Unknown = 0,
+  ReadGame = 1,
+  PickFromFloor = 2,
+  PlaceOnCharacter = 3,
+  PickFromCharacter = 4,
+  Throw = 5,
+  EnteringPrison = 6,
+  DropObject = 7,
+  Eat = 8,
+  ResumeSavedGame = 9,
+  DSA_DEL = 10,
+  DSA_ADD = 11,
+  TakeFromTorchHolder = 12,
+  PlaceInTorchHolder = 13,
+  SwapRemove = 14,
+  SwapReplace = 15,
+  GiftFromGod = 16,
+  TakeKey = 17,
+  DSA_MoveFrom = 18,
+  DSA_MoveTo = 19,
+  /** What a DSA sets `type` to, to cancel what can be cancelled. */
+  Cancel = 20,
+}
+
+/**
+ * `CURSORFILTER_PACKET` (`doc/CSBwin-src/CSB.h:1517-1526`), six `int`s. `object` is the RN
+ * as `ConvertToInteger` gives it, `RNnul` 0xFFFF for none; `p1` to `p4` are the type's
+ * own, 0 when it has none: for an actuator's, the level, the square and the wall side.
+ */
+export interface CursorFilterPacket {
+  object: number;
+  type: number;
+  p1: number;
+  p2: number;
+  p3: number;
+  p4: number;
+}
+
 export enum StkOp {
   NOOP = 0,
   PLUS = 1,
@@ -297,6 +337,7 @@ const ESL_PARTY_MOVE_FILTER = 14;
 const ESL_MONSTER_ATTACK_FILTER = 0;
 const ESL_DELETE_MONSTER_FILTER = 7;
 const ESL_MONSTER_MOVE_FILTER = 2;
+const ESL_CURSOR_FILTER = 9;
 const MONSTER_MOVE_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_MONSTER_MOVE_FILTER;
 const ESL_INDIRECT_ACTIONS = 5;
 const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
@@ -821,6 +862,28 @@ export class DsaSystem {
       block = feedParametersFromWords((i) => this.getParameter(i));
     });
     return block;
+  }
+
+  /**
+   * `CursorFilter` (`doc/CSBwin-src/MoveObject.cpp:797-865`), which a site calls before
+   * it does something to the object on the cursor: every DSA at `ESL_CURSORFILTER`'s
+   * location in turn, each on the packet as the DSA before it left it, a count of 6 and
+   * the packet's six words (`:846-847`). Back comes the whole packet, into `cfp`
+   * (`:849`); a site that can be cancelled reads its `type` against
+   * `CursorFilterType.Cancel`. There is no `NEWDSAPARAMETERS`, so the DSAs run on the
+   * caller's parameters and leave them theirs.
+   */
+  cursorFilter(cfp: CursorFilterPacket): void {
+    this.forEachFilterDsa(ESL_CURSOR_FILTER, (run) => {
+      this.setParameters(6, [cfp.object, cfp.type, cfp.p1, cfp.p2, cfp.p3, cfp.p4]);
+      run();
+      cfp.object = this.getParameter(0);
+      cfp.type = this.getParameter(1);
+      cfp.p1 = this.getParameter(2);
+      cfp.p2 = this.getParameter(3);
+      cfp.p3 = this.getParameter(4);
+      cfp.p4 = this.getParameter(5);
+    });
   }
 
   /**

@@ -36,7 +36,7 @@ import {
     OBJNI_CHEST,
     OBJNI_NOT_AN_OBJECT,
 } from '../core/objectNameIndex';
-import { CursorFilterType } from './GameHost';
+import { CursorFilterType } from './DsaSystem';
 
 /** CSBWin message colours (`doc/CSBWIN_MESSAGES_REFERENCE.md`). */
 export const MSG_COLOR_SPELL = 4;
@@ -340,14 +340,15 @@ export class ActuatorSystem {
               if (allow) {
                 const deleted = objectInHand;
                 party.objectInHand = OBJECT_ID_NULL;
-                objectInHand = OBJECT_ID_NULL;
+                // `RNempty`, which a gift's packet carries after it (`Mouse.cpp:567`).
+                objectInHand = 0 as ObjectID;
                 emptyHanded = true;
                 if (deleted !== OBJECT_ID_NULL) {
                   this.dungeon.deleteDBEntry(deleted);
                 }
               }
             } else if (emptyHanded && actuatorType === 12) {
-              const allow = this.applyCursorFilter(CursorFilterType.GiftFromGod, OBJECT_ID_NULL, position, actuatorPos);
+              const allow = this.applyCursorFilter(CursorFilterType.GiftFromGod, objectInHand, position, actuatorPos);
               if (allow) {
                 const gift = constructPredefinedMissile(this.dungeon, getActuatorValue(rec));
                 if (gift !== null) {
@@ -727,21 +728,20 @@ export class ActuatorSystem {
     return GetBasicObjectType(this.dungeon, this.objDescObjectType, rn);
   }
 
+  /**
+   * `CursorFilter` on a packet of `type` for `object`, with `TouchWall`'s four words: the
+   * level, the wall's square and the side touched (`doc/CSBwin-src/Mouse.cpp:421-429`).
+   * False when a DSA cancelled.
+   */
   private applyCursorFilter(
     type: CursorFilterType,
     object: ObjectID,
     position: Position,
     pos: number,
   ): boolean {
-    return this.ctx.host.cursorFilter({
-      type,
-      object,
-      dbType: this.dungeon.rnMaps.dbType(object),
-      level: position.z,
-      x: position.x,
-      y: position.y,
-      pos,
-    });
+    const cfp = { object, type, p1: position.z, p2: position.x, p3: position.y, p4: pos };
+    this.ctx.systems.dsa.cursorFilter(cfp);
+    return cfp.type !== CursorFilterType.Cancel;
   }
 
   private findFirstDrawableObject(position: Position): ObjectID | null {

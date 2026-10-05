@@ -19,7 +19,7 @@ import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import { loadGlfx } from './lib/glfx-loader';
 import { GameScreen } from './renderer/GameScreen';
-import { bindDataSetChooser, bindExtrasToggle, bindSaveDrop, bindUIContext, drawMapPreview, handleCursorFilter } from './ui';
+import { bindDataSetChooser, bindExtrasToggle, bindSaveDrop, bindUIContext, drawMapPreview } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { Die, runBootSequence, runShowCredits } from './renderer/intro/BootSequence';
@@ -287,7 +287,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     let screen: GameScreen | null = null;
     // Over an empty world, as `d.Initialize()` leaves CSBWin's: the boot reads the game.
     const game = new Game(emptyDungeonData(), tables, {
-        cursorFilter: handleCursorFilter,
         messages,
         playSound,
         // `d.PartySleeping`: button 145 puts the party to sleep, 146 or a blow

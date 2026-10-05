@@ -92,7 +92,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10a next |
+| C133 | `TouchWall` acts on a cursor nobody owns | S | ⏳ |
+| C134 | `TouchWall`'s hand after a swap is the swapped-in object | S | ⏳ |
+| G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10b next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -127,7 +129,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C133 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C135 · D17 · E21 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -170,6 +172,26 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C133 ⏳ `TouchWall` acts on a cursor nobody owns
+
+`TouchWall` skips every actuator but a portrait (127) while `d.HandChar` is -1, nobody
+owning the cursor (`doc/CSBwin-src/Mouse.cpp:357-360`). The port's `touchWall`
+(`src/engine/ActuatorSystem.ts:142`) has no such test, and neither has its caller,
+`MouseSystem.handleWallClick`, so a party with no champion yet works a wall's switches
+and locks. The fix is the test, at the same place in the loop, and a check that a
+pushbutton does nothing before the first champion is recruited.
+
+### C134 ⏳ `TouchWall`'s hand after a swap is the swapped-in object
+
+A type-16 swap puts the hand's object on the wall and the square's object on the cursor
+(`ObjectToCursor`), but leaves `TouchWall`'s local `objectInHand` the object now on the
+wall (`doc/CSBwin-src/Mouse.cpp:470-511`); the port sets its local to the object now in
+the hand (`src/engine/ActuatorSystem.ts:301`). Every later actuator of the same touch
+reads that local: a lock (types 3, 4, 11 and 17) compares its type, and a `TakeKey` sends
+it in the cursor filter's packet and deletes its record (`:549-569`). The fix keeps the
+local as CSBWin does, with a check of a lock after a swap on one wall side; what CSBWin
+then does to the wall's object is to be read at `:561-568` before choosing the check.
 
 ---
 
@@ -319,7 +341,8 @@ The rest of the item, with an operation that needs care when ported:
 
 ### G2 ⏳ The cursor filter, the portrait's DSA switch action, and the viewing filter's third site
 
-The port runs fifteen filters: the viewing filter (two of its three sites), the monster
+The port runs sixteen filters: the viewing filter (two of its three sites), the cursor
+filter (six of its twenty sites), the monster
 move filter, the monster attack filter, the delete monster
 filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
 sound filter, the action name filter, the feeding filter, the character death filter, the
@@ -348,15 +371,10 @@ move filter, are paid. The steps left, one commit each:
     packet's six words, `object`, `type`, `p1` to `p4` (`CSB.h:1517-1526`), with no
     `NEWDSAPARAMETERS`. Back comes the packet; a site that can be cancelled reads `type`
     against `CURSORFILTER_Cancel` (20). CSBWin calls it from 20 places (a 21st,
-    `SaveGame.cpp:2755-2758`, is commented out). The port sends six of the packet types,
-    all from `ActuatorSystem` (the key, the torch holder, the swap, the gift), to
-    `GameHost.cursorFilter`, which `main.ts` answers with a debug trace
-    (`src/ui/cursorFilter.ts`). The steps, one commit each:
-    - **10a. The filter, and the actuators' six** (M). `DsaSystem.cursorFilter` on
-      `forEachFilterDsa`, `CURSORFILTER_TYPE` with CSBWin's numbers (`CSB.h:1395-1514`),
-      and `ActuatorSystem`'s six sites onto it (`Mouse.cpp:421-429`, `:442-450`,
-      `:479-487`, `:499-506`, `:552-560`, `:575-583`), each packet checked against its
-      site. `GameHost.cursorFilter` and the page's trace go: the DSA is the filter.
+    `SaveGame.cpp:2755-2758`, is commented out). The port's is `DsaSystem.cursorFilter`,
+    and `TouchWall`'s six sites send it their packets (`ActuatorSystem.touchWall`: the
+    key, the torch holder, the swap, the gift), checked by `tools/dump-cursor-filter.ts`,
+    where each step below adds its own. The steps left, one commit each:
     - **10b. The hand's three** (S). `ThrowByCharacter`'s `Throw` (`Mouse.cpp:686-696`,
       `MouseSystem.throwByCharacter`), `TAG01a148`'s `PickFromFloor` (`:824-838`, the
       pick-up in `src/renderer/ui/ViewportPicking.ts`), and `DropObject`'s `DropObject`

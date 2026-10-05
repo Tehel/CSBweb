@@ -3647,6 +3647,23 @@ negative adjustment leaves the sum's low 16 bits (`:4366-4374`); and `value(valu
 sets a waterskin's two bits (`CSB.h:1274`), so an empty one emptied again holds 3
 (`:4457-4460`). `tools/dump-feeding-filter.ts`.
 
+## The cursor filter runs every DSA at its location on the packet, which a site may cancel
+
+`CursorFilter` (`doc/CSBwin-src/MoveObject.cpp:797-865`) runs every type-47 actuator at
+`ESL_CURSORFILTER`'s location (9, `CSB.h:1544`), each with `continue`: the count is
+`sizeof(*cfp) / 4`, 6, and the words are `CURSORFILTER_PACKET`'s six `int`s, `object`,
+`type`, `p1` to `p4` (`CSB.h:1517-1526`), copied in before each DSA and back after it
+(`:846-849`), so each DSA sees the packet the one before left. The constructor sets
+`object` to `RNnul` and the rest to 0 (`:790-795`); `object` is `ConvertToInteger`'s
+`ui16` (`CSBTypes.h:371`). The types are `CURSORFILTER_TYPE`'s (`CSB.h:1395-1514`); a site
+that can be cancelled tests `type` against `CURSORFILTER_Cancel` (20) once the filter
+returns. `TouchWall`'s six (`Mouse.cpp:421-583`) send the level, the wall's square and the
+side touched as `p1` to `p4`. Of them, `TakeFromTorchHolder`, `PlaceInTorchHolder`,
+`SwapRemove`, `TakeKey` and `GiftFromGod` can be cancelled, and `SwapReplace`, sent once
+the swap is half made, cannot. `GiftFromGod`'s object is `TouchWall`'s local
+`objectInHand`: `RNnul` on an empty hand, but `RNempty` (0) once a lock earlier on the same
+touch has taken a key (`:567`). `tools/dump-cursor-filter.ts`.
+
 ## The character death filter and the damage filter run their location's first DSA
 
 `KillCharacter` and `DamageCharacter` each walk the chain at their filter's location,
@@ -4728,10 +4745,12 @@ DSAparameters[0] = 0" (`Timer.cpp:1525`). A filter's count and words are therefo
 once it returns, and a DSA run after it, or the program that reached it, finds its own.
 `&PARAM@` reads no word past a count of 0 or more (`DSA.cpp`'s `STKOP_ParamFetch`), so the
 uninitialised words cannot be read: only a parameter message whose record is gone sets a
-count of -1, and on the outer array (see "`&PARAM@` compares the count unsigned"). Three
+count of -1, and on the outer array (see "`&PARAM@` compares the count unsigned"). Four
 filters are the exception. `_FeedCharacter` declares no `NEWDSAPARAMETERS`
 (`Character.cpp:4004-4497`), so the feeding filter's DSAs leave its count, 27, and the
-block in the caller's array (`:4333-4336`). `ActionNameFilter`'s `NEWDSAPARAMETERS` is declared in the block
+block in the caller's array (`:4333-4336`). Nor does `CursorFilter`
+(`MoveObject.cpp:797-865`), nor any function of `Mouse.cpp` or `MoveObject.cpp`, so its
+DSAs leave its count, 6, and the packet in the caller's array (`:846-849`). `ActionNameFilter`'s `NEWDSAPARAMETERS` is declared in the block
 that looks for its DSA (`CSBCode.cpp:8653`), which closes before the DSA runs (`:8675`,
 `:8697`), so it writes its count, 5, and its words into the caller's array, and leaves them
 there. The party attack filter:

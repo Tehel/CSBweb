@@ -4,33 +4,9 @@
  * area and the renderer behind it; a tool hands the parts it listens to, or nothing.
  *
  * Every member is present: `createGameHost` fills what the host left out with a
- * null object that does nothing (a cursor filter that lets everything through; a `die`
- * that throws again), so no caller asks whether anybody is listening. Headless, nobody is, and the game plays the
- * same.
+ * null object that does nothing (a `die` that throws again), so no caller asks whether
+ * anybody is listening. Headless, nobody is, and the game plays the same.
  */
-import type { DBType, ObjectID } from '../core/types';
-
-export enum CursorFilterType {
-  TakeKey = 'TakeKey',
-  TakeFromTorchHolder = 'TakeFromTorchHolder',
-  PlaceInTorchHolder = 'PlaceInTorchHolder',
-  SwapRemove = 'SwapRemove',
-  SwapReplace = 'SwapReplace',
-  GiftFromGod = 'GiftFromGod',
-}
-
-export interface CursorFilterPacket {
-  type: CursorFilterType;
-  object: ObjectID;
-  /** `object`'s database, which the page has no world to read it from. */
-  dbType: DBType;
-  level: number;
-  x: number;
-  y: number;
-  pos: number;
-}
-
-export type CursorFilterHook = (packet: CursorFilterPacket) => boolean;
 
 /**
  * Fragment-based message emitter, mirroring CSBWin's global `PrintLinefeed()` /
@@ -70,8 +46,6 @@ export interface GameHost {
   playSound(soundId: number, rateIdx?: number, highVolume?: number): void;
   /** Dev-only trace, CSBWin's `AITraceActive` / `AttackTraceActive` output. */
   trace(line: string): void;
-  /** `CursorFilter`, the host's view of the object on the cursor. */
-  cursorFilter: CursorFilterHook;
   /**
    * The message area, CSBWin's `PrintLinefeed()` / `QuePrintLines(color, text)`
    * (`doc/CSBWIN_MESSAGES_REFERENCE.md`).
@@ -190,7 +164,6 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
   return {
     playSound: host.playSound ?? (() => {}),
     trace: host.trace ?? (() => {}),
-    cursorFilter: host.cursorFilter ?? (() => true),
     messages: host.messages ?? {
       printLinefeed: () => {},
       quePrintLines: () => {},

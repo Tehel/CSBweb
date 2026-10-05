@@ -109,6 +109,7 @@ const CHECKS = [
   { tool: 'dump-monster-attack-filter.ts' },
   { tool: 'dump-delete-monster-filter.ts' },
   { tool: 'dump-monster-move-filter.ts' },
+  { tool: 'dump-cursor-filter.ts' },
   { tool: 'dump-dsa-missiles.ts' },
   { tool: 'dump-dsa-monsters.ts' },
   { tool: 'dump-dsa-text.ts' },
