@@ -4758,6 +4758,19 @@ found (`:5416`). So an `OVERRIDE` no operation used does not reach the next run,
 run nested inside another, a filter's, clears the caller's: an `OVERRIDE` set before an
 operation that runs one is gone after it. Evidence: `tools/dump-dsa-message.ts`, section 5.
 
+## A filter's DSA that changes the dungeon says so, and goes on
+
+`NOFILTER` (`doc/CSBwin-src/DSA.cpp:462`) calls `NoFilter` when the running DSA is a
+filter's (`pdsaDbank->filter`, set from `ProcessDSAFilter`'s `true`, `:5080`), which puts
+up "Filter Modifying Dungeon" through `message` (`:446-460`) and returns: the operation
+then does what it does. Sixteen operations have it, each after popping its operands:
+`EX_DEL` (`:1655`), `EX_ADD` (`:1979`), `&DELMON`, `&INSMON`, `&CREATECLOUD`, `&CAST`,
+`&FILTEREDCAST`, `&CELL!` (`:3849`), `&MONSTER!`, `&CAUSEPOISON`, `&SWAPCHARACTER`,
+`&CHAR!`, `&THROW`, `&TELEPORT` (`:4594`), `&MOVE` (`:4685`) and `&COPY`, once the two
+objects are found of one type (`:4708`). `message` stops putting it up once
+`warningCount` runs out (`:449-450`); the port's trace says it every time. Evidence:
+`tools/dump-dsa-nofilter.ts`, for the six with a line number here.
+
 ## A DSA filter runs on a parameter array of its own; the party attack's, the action name's and the feeding's write the current one
 
 `pDSAparameters` (`doc/CSBwin-src/DSA.cpp:43-44`) points at the array `&NUMPARAM`, `&PARAM@`

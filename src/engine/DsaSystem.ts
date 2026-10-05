@@ -2096,6 +2096,7 @@ export class DsaSystem {
       case StkOp.DEL: {
         const location = bank.stack.pop();
         const objId = bank.stack.pop();
+        this.noFilter(bank);
         if (location < 0) {
           const removed = this.deleteFromNegativeLocation(location);
           if (removed !== null && removed !== undefined) {
@@ -2142,6 +2143,7 @@ export class DsaSystem {
         const objId = bank.stack.pop();
         const location = bank.stack.pop();
         const posMask = bank.stack.pop() & 0xf;
+        this.noFilter(bank);
         if (!this.canAddToLocation(location)) break;
         if (!this.isValidObjectId(objId)) break;
         const cloned = this.copyItem(objId);
@@ -2243,6 +2245,7 @@ export class DsaSystem {
       }
       case StkOp.TELEPORT_PARTY: {
         const location = bank.stack.pop();
+        this.noFilter(bank);
         const locr = locationRelFromInteger(location);
         if (!this.dungeon.isValidLocation(locr)) break;
         this.teleportParty(locr);
@@ -2395,6 +2398,7 @@ export class DsaSystem {
         const srcDecoded = this.dungeon.rnMaps.decode(srcId);
         const dstDecoded = this.dungeon.rnMaps.decode(dstId);
         if (srcDecoded.category !== dstDecoded.category) break;
+        this.noFilter(bank);
         if (srcDecoded.category === DBType.ACTUATOR) {
           const src = this.dungeon.getActuatorRecord(srcId);
           const dst = this.dungeon.getActuatorRecord(dstId);
@@ -2416,6 +2420,7 @@ export class DsaSystem {
         const srcPosMsk = bank.stack.pop();
         const srcObjMsk = bank.stack.pop();
         const srcType = bank.stack.pop();
+        this.noFilter(bank);
         this.moveObjectDsa(
           srcType,
           srcObjMsk,
@@ -2603,6 +2608,7 @@ export class DsaSystem {
         const arraySize = bank.stack.pop();
         const arrayIndex = bank.stack.pop();
         const loc = bank.stack.pop();
+        this.noFilter(bank);
         const locr = locationRelFromInteger(loc);
         if (!this.dungeon.isValidLocation(locr)) break;
         if (arrayIndex < 0 || arrayIndex + arraySize > 100) break;

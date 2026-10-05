@@ -114,6 +114,7 @@ const CHECKS = [
   { tool: 'dump-dsa-monsters.ts' },
   { tool: 'dump-dsa-text.ts' },
   { tool: 'dump-dsa-message.ts' },
+  { tool: 'dump-dsa-nofilter.ts' },
   { tool: 'dump-dsa-indirect.ts' },
   { tool: 'dump-dsa-dungeon.ts' },
   { tool: 'dump-dsa-save.ts' },
