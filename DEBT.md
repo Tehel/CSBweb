@@ -407,10 +407,11 @@ the Oracle's own screen, ported as CSBWin draws it, on the square the party stan
 It is CSB's, not an extra: whenever the data set has the Oracle's files, the button is
 there, whatever `UISettings.extras` says, because the port offers no other way to it.
 
-Done already: `hcsb.hct` (`parseHintOracle` and `hintsAtPosition`,
-`src/data/HintOracleLoader.ts`, checked by `tools/dump-hint-oracle.ts`), and the layout of
-`hcsb.dat`'s four items, the backdrop, the font and the palette among them, with the
-button table (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "What it is", "Files").
+Done already, in `src/data/HintOracleLoader.ts` and checked by
+`tools/dump-hint-oracle.ts`: `hcsb.hct` (`parseHintOracle` and `hintsAtPosition`), and
+`hcsb.dat`'s four items (`parseHcsbDat`), item 0's fifty words named where `Hint.cpp`
+reads them, with the button table (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "What it is",
+"Files", "Item 0").
 
 What the screen is. About 2000 of `Hint.cpp`'s 7560 lines are the interface; the rest is
 GEMDOS file emulation, a heap, LZW, palette fades and empty GEM stubs.
@@ -430,16 +431,10 @@ GEMDOS file emulation, a heap, LZW, palette fades and empty GEM stubs.
   (`TAG008c40_8`, `:6951`). No key does anything: every button's key word is 0, so
   `TAG008c40_3` registers none (`:6824`). There is no sound.
 
-Three steps, one commit each. The screen alone is not reachable, so steps 2 and 3 are
+Two steps are left, one commit each. The screen alone is not reachable, so both are
 taken in one session if they fit:
 
-1. **`hcsb.dat` read** (S). Item 0's fifty words, each named where `Hint.cpp` reads
-   it (inks, fade delays and steps, the cycle), into the reference doc. The four items
-   loaded through `GraphicsLoader`, which already reads a stored file
-   (`utility-portraits.dat`), and checked in `tools/dump-hint-oracle.ts`: the sizes,
-   items 1 and 2 decoded at 320x200 and 256x27, and a canary on the font's glyph
-   positions (the `verification-tools` skill).
-2. **The screen** (M). A modal screen beside `ui/SaveMenu.ts` and `ui/ReIncarnate.ts`,
+1. **The screen** (M). A modal screen beside `ui/SaveMenu.ts` and `ui/ReIncarnate.ts`,
    hosted by `GameScreen`, with item 3 as its palette while it is up, as the intro's
    screens have theirs. It opens on a square (`partyLevel`, `partyX`, `partyY`), in place of
    `TAG006c7e_9(501)`'s save, and starts at `TAG00799a_9`'s lookup, so the first thing
@@ -458,7 +453,7 @@ taken in one session if they fit:
    LAST, with the buttons each page offers, and a level with no records (past 9) shows
    "no clues". A golden frame of that title list (CSB's data set) goes in
    `tools/frames/`.
-3. **The button** (M). Where the files are (`hcsb.hct` and `hcsb.dat`, which `main.ts`
+2. **The button** (M). Where the files are (`hcsb.hct` and `hcsb.dat`, which `main.ts`
    fetches beside `dungeon.dat`; only `csb` has them, and a game started from `mini.dat`
    by RISE is CSB's dungeon too), the inventory's close box becomes the Oracle's button.
    The close box is `buttons17760`'s button 11 at x 210-218, y 36-44, beside the disk

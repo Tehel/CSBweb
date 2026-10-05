@@ -1,8 +1,9 @@
 # CSBWin Hint Oracle Reference (Sourced)
 
 Chaos Strikes Back's Hint Oracle, as CSBWin ports it in `doc/CSBwin-src/Hint.cpp`. The
-port reads its data with `parseHintOracle` (`src/data/HintOracleLoader.ts`), and
-`tools/dump-hint-oracle.ts` checks the retail file against everything below. Nothing in
+port reads its data with `parseHintOracle` and `parseHcsbDat`
+(`src/data/HintOracleLoader.ts`), and `tools/dump-hint-oracle.ts` checks the retail files
+against everything below. Nothing in
 the game uses it yet (`DEBT.md` G20).
 
 ## What it is
@@ -42,14 +43,60 @@ CSBWin's original is `HINT.FTL` on the utility disk (`doc/ATARI_ST_DISK_REFERENC
 
   | Item | Bytes | What |
   | --- | --- | --- |
-  | 0 | 100 | Fifty words of the screen's parameters, `f.Segment1_16872`: palette slots, inks, fade timings and the colour cycle. Which word does what is not yet written down. |
+  | 0 | 100 | Fifty words of the screen's parameters, `f.Segment1_16872`: palette slots, inks, fade timings and the colour cycle. See "Item 0" below. |
   | 1 | 29146 | The backdrop, a 320x200 IMG1 picture (`decodeIMG` reads it): a stone frame round a red field and the three bottom buttons. `TAG0088b8` copies it to the whole screen (`:4086`). |
   | 2 | 1497 | The font, a 256x27 IMG1 picture, which is 3456 bytes at four bits a pixel. `TAG004962` draws character `c` from x `8 * ((c - 32) & 31)`, y `9 * ((c - 32) / 32)`, 8 wide, 9 apart, with colour 12 transparent (`:3446-3477`). |
   | 3 | 32 | The palette, sixteen `0RGB` words. |
 
+`TAG005ae8_1` byte-swaps the palette's words (`:4415-4432`); item 0's are swapped where
+they are read, each through `LE16`, so every word of both is big-endian. The font's
+glyphs are all colour 9 on the transparent 12, and that 9 is item 0's word 8.
+
 Both come in CSBWin's Chaos Strikes Back package
 (`static/gamefiles/CSB_Windows_x86-32_20151213.zip`) and sit in `static/gamefiles/csb/`.
 CSBWin opens them by the names `"0hcsb.hct"` and `"0hcsb.dat"` (`Hint.cpp:554-555`).
+
+### Item 0
+
+Three things read its words.
+
+- **The palette fades.** `PaletteFade` (`:4493-4511`) is `FadePalette` (`:4576-4660`) with
+  the packet's target palette, a start palette (NULL: the screen's), the mask 273 and
+  two words, a delay and a step count. Each step moves every colour's three components
+  (273 is 0x111: all three) one unit toward the target, sets the palette and waits the
+  delay in VBLs.
+- **The ink.** `TAG004a22_26(colour, …)` (`:3694-3734`) recolours the font in place
+  (`ShrinkBLT` through `byte16544`, a sixteen-slot map holding 10 × a colour): the slot
+  of the current ink (`word15708`) gets the new one, which becomes current. Its first
+  call, at load, finds no current ink (`word15708` is -1, `:507`): it gives slot word 10
+  the colour word 8, and makes word 8 current. That is the colour the font is drawn
+  in, and the font has no pixel of colour 1, so the slot it sets changes nothing.
+- **Palette slots** set directly in `f.Palette16608`.
+
+| Word | Retail | Read at | What |
+| --- | --- | --- | --- |
+| 0 | 2 | `:4198`, `:4213`, `:4235` | In `_TAG0051c2_31`, which builds a screen: the palette slot that is set to word 1 before its fades and to word 3 after its texts, and the ink of the texts it draws from list 9 (`:4213-4232`) |
+| 1 | 0x620 | `:4199` | The colour slot word 0 fades in with |
+| 2 | 1 | `:4192`, `:4210` | The ink before the screen's buttons are drawn and before their labels are (`TAG008c40_6`, "Text appears on buttons") |
+| 3 | 0x770 | `:4235-4236` | The colour slot word 0 takes once the texts are drawn, before the last two fades |
+| 4 | 1 | `:4249` | The ink `_TAG0051c2_31` leaves set |
+| 5 | 9 | — | Not read |
+| 6 | 9 | `:4224` | The colour of the frame round a text of list 9 whose `i12` is 8: `TAG005f9a_1` draws it one pixel wide, outside the text's rectangle (`TAG005f9a_xxx`, `:4666-4732`) |
+| 7 | 10 | `:6985` | The ink a pressed button's label flashes in (`_TAG008c40_8`), for 20 VBLs before it is drawn again in the button's own (`:6986-6990`) |
+| 8 | 9 | `:4058-4060`, `:6017`, `:6870`, `:6886` | The font's ink as stored (the load's first `TAG004a22_26`), and the palette slot the title list cycles: word 36 when a title is drawn and when a click ends the wait, the cycle's colours between |
+| 9 | 3 | `:4240`, `:6995-6999` | The VBLs `_TAG0051c2_31` waits at least, from just after its first two fades, before its last two; and the ink after a button's flash, set unless it is the button's own. CSBWin reads words 8-9 there as a long (`LoadLong(f.Segment1_16872+8)`) and keeps the low word, which is word 9, though its own comment puts that long, `Long16864`, at byte 8: words 4-5 (`:247`) |
+| 10, 11 | 1, 1 | `:4204-4205`, `:4243-4244` | The second and third fades: delay, steps. Word 10 is also the slot the first ink call sets (`:4058`) |
+| 12, 13 | 2, 6 | `:4201-4202`, `:4246-4247` | The first and last fades: delay, steps |
+| 14-19 | 0xffff | — | Not read |
+| 20-31 | 0 | — | Not read |
+| 32 | 10 | `:6889` | How many colours the title list cycles through, from word 36 on |
+| 33 | 2 | — | Not read: the cycle waits 20 VBLs a colour, where the commented-out read of word 33 was (`word16806 = 20; //LE16(f.Segment1_16872[33])`, `:6882`) |
+| 34, 35 | 0 | — | Not read |
+| 36-45 | 0x310 0x300 0x410 0x400 0x510 0x500 0x510 0x400 0x410 0x300 | `:6018`, `:6869`, `:6887` | The cycle's ten colours, shades of red |
+| 46-49 | 0 | — | Not read |
+
+The load's two fades, to `f.Palette16640` and then to item 3, take neither delay nor steps
+from item 0: 2 and 7 are constants (`:4065-4066`).
 
 ## Enciphering
 

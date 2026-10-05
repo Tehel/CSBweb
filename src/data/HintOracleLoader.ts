@@ -1,5 +1,5 @@
 /**
- * `hcsb.hct`, the data of Chaos Strikes Back's Hint Oracle.
+ * `hcsb.hct` and `hcsb.dat`, the data of Chaos Strikes Back's Hint Oracle.
  *
  * CSBWin's HINT choice (`_StartHint`, `doc/CSBwin-src/Hint.cpp:6454`) reads it in
  * `_TAG006c7e_xxx` (`:5395-5505`); `doc/CSBWIN_HINT_ORACLE_REFERENCE.md` has the format.
@@ -22,9 +22,14 @@
  * (`:5401-5405`). Every save this project has carries a zero key (`doc/PROVEN_FACTS.md` →
  * "The Extended Features header a live game writes"), so only a plain file is read here;
  * an enciphered one fails the header check.
+ *
+ * `hcsb.dat` is the Oracle's screen: four items indexed as `graphics.dat`'s are, read by
+ * `parseHcsbDat`.
  */
 import { readU16BE } from '../core/bytes';
 import { LZWexpand, RLEexpand } from '../core/compression';
+import type { DecodedImage } from '../core/imageDecoder';
+import { GraphicsLoader } from './GraphicsLoader';
 
 /** `#define MAXHINTINDICES 9` (`doc/CSBwin-src/Hint.cpp:11`): the titles the menu shows. */
 export const MAXHINTINDICES = 9;
@@ -152,4 +157,40 @@ export function hintsAtPosition(oracle: HintOracle, level: number, x: number, y:
         else if (l.x === HINT_ANYWHERE && l.y === HINT_ANYWHERE) found.push(l.hint);
     }
     return found;
+}
+
+/**
+ * `hcsb.dat`'s four items, as `_TAG0051c2_1` reads them (`Hint.cpp:4028-4054`).
+ * What each word of `segment1` does is in `doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Item 0".
+ */
+export interface HcsbDat {
+    /** Item 0, `f.Segment1_16872`: fifty words, `segment1[n]` being `LE16(f.Segment1_16872[n])`. */
+    segment1: number[];
+    /** Item 1, the backdrop, 320x200 (`f.Pointer16900`). */
+    backdrop: DecodedImage;
+    /** Item 2, the font, 256x27 (`f.Pointer16908`). */
+    font: DecodedImage;
+    /** Item 3, `f.Palette16608` as `TAG005ae8_1` reads it: sixteen `0RGB` words. */
+    palette: number[];
+}
+
+/** `i16 Segment1_16872[50]` (`Hint.cpp:246`). */
+export const HCSB_SEGMENT1_WORDS = 50;
+
+/** Parse `hcsb.dat`. Throws where `ReadDatSeg` would read past an item into its buffer. */
+export function parseHcsbDat(file: Uint8Array): HcsbDat {
+    const loader = new GraphicsLoader();
+    loader.loadFromArray(file);
+    if (loader.getItemCount() < 4) throw new Error(`hcsb.dat: ${loader.getItemCount()} items, not 4`);
+    const words = (item: number, count: number): number[] => {
+        const raw = loader.getRawGraphic(item);
+        if (raw.length !== 2 * count) throw new Error(`hcsb.dat: item ${item} is ${raw.length} bytes, not ${2 * count}`);
+        return Array.from({ length: count }, (_, i) => readU16BE(raw, 2 * i));
+    };
+    return {
+        segment1: words(0, HCSB_SEGMENT1_WORDS),
+        backdrop: loader.getImage(1),
+        font: loader.getImage(2),
+        palette: words(3, 16),
+    };
 }
