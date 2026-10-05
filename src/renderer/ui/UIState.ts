@@ -109,6 +109,14 @@ export interface UIState {
    * an empty hand or a chest in it. Made by `describeObject` (`ui/Inventory.ts`).
    */
   describedObject: DescribedObject | null;
+  /**
+   * What `TAG0189d4`'s `DescribeObject(objD7, 0)` drew for the scroll in the weapon hand
+   * of the champion whose inventory is open (`doc/CSBwin-src/Character.cpp:3849-3897`),
+   * kept for the composes until it runs again: at the inventory's opening, at the eye's
+   * release and at a `DrawCharacterState` with `CHARFLAG_chestOrScroll`. Null with
+   * anything else in the hand. Made by `tag0189d4` (`ui/Inventory.ts`).
+   */
+  weaponHandScroll: DescribedObject | null;
   hoverPoint: { x: number; y: number } | null;
   /**
    * `d.Word23144` — the marching order being changed: 0, or one more than the position,
@@ -264,7 +272,7 @@ export interface UIState {
 /** The fields of `UIState` that a game in play sets, and a restart clears. */
 type PlayState = Pick<UIState,
   | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'reincarnate' | 'diskMenuNeeded'
-  | 'pressingEye' | 'describedObject' | 'word23144' | 'pointer23178' | 'pointer23182'
+  | 'pressingEye' | 'describedObject' | 'weaponHandScroll' | 'word23144' | 'pointer23178' | 'pointer23182'
   | 'attackingCharacterOrdinal' | 'possibleAttackTypes' | 'byte20256' | 'word20248'
   | 'word20250' | 'word20252' | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
   | 'characterDamage'
@@ -284,6 +292,7 @@ function initialPlayState(): PlayState {
     diskMenuNeeded: false,
     pressingEye: false,
     describedObject: null,
+    weaponHandScroll: null,
     word23144: 0,
     pointer23178: null,
     pointer23182: null,

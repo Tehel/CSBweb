@@ -17,8 +17,9 @@ import {
     incrAttributeCurrent,
 } from './attributes';
 import { nameIndexOf, type GameContext } from './GameContext';
-import { getChampionPossession } from './gameTypes';
+import { CHARFLAG_CHEST_OR_SCROLL, getChampionPossession } from './gameTypes';
 import { selectPaletteForLightLevel } from './LightLevel';
+import { drawAllCharacterState } from './Party';
 import { GetBasicObjectType } from './objectIndex';
 import { determineMastery, ensureSkills } from './skills';
 
@@ -91,7 +92,9 @@ export function ninetySecondUpdate(ctx: GameContext): void {
  * counter armed only by `CSBCode.cpp:959-965`, which this port has no equivalent
  * of, so it is always zero and the branch is dead. The trailing
  * `charFlags |= CHARFLAG_statsChanged` has no counterpart either: the panels are
- * redrawn from live state every frame.
+ * redrawn from live state every frame. `CHARFLAG_chestOrScroll` has, for the champion
+ * whose inventory is open with the eye held or food and water in its panel
+ * (`:435-443`), and `DrawAllCharacterState` draws it (`:448`).
  */
 export function tenSecondUpdate(ctx: GameContext): void {
     const party = ctx.party.state;
@@ -224,5 +227,10 @@ export function tenSecondUpdate(ctx: GameContext): void {
                 champ.maxRecentDamage = 0;
             }
         }
+        if (chIdx === party.selectedCharacterIndex
+            && (ctx.host.pressingEye() || ctx.host.displayResurrectChestOrScroll() === 0)) {
+            champ.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
+        }
     }
+    drawAllCharacterState(party, ctx.host);
 }

@@ -4885,6 +4885,43 @@ codes and escape tables as `DecodeText` for a text that is not a wall's, but wha
 reads what `DecodeText` at `0x8001` reads before its substitution, but for that line feed
 and code 28. Evidence: `tools/dump-viewing-filter.ts`.
 
+## `CHARFLAG_chestOrScroll` fills the open inventory's eye panel again, and a scroll in the weapon hand is read there
+
+`TAG0189d4` (`doc/CSBwin-src/Character.cpp:3849-3897`) is the eye panel at rest: the
+Resurrect menu while a champion is only provisionally joined, else what the selected
+champion's weapon hand holds: a chest's contents (`d.DisplayResurrectChestOrScroll` 4), a
+scroll through `DescribeObject(objD7, 0)` (2), so in the scroll's viewing filter site, and
+food and water for anything else or nothing (0).
+
+It runs from `QuitPressingEye` and `QuitPressingMouth` (`doc/CSBwin-src/CSBCode.cpp:7390-7414`)
+and from `DrawCharacterState` when the champion's `CHARFLAG_chestOrScroll` (0x0800,
+`doc/CSBwin-src/CSB.h:2469`) is set with their inventory open, the mouth and the eye not held
+(`Character.cpp:1478-1497`). `DrawCharacterState` returns at once with no graphic flag set
+(`:1251`) and clears them all as it ends (`:1514`). What sets the flag:
+
+- `AdjustStatsForItemCarried`, for any champion, when the object in that slot gives a bonus
+  (`Character.cpp:1779`);
+- a chest or a scroll leaving or entering the weapon hand of the champion whose inventory is
+  open (`RemoveCharacterPossession`, `:1906-1921`; `AddCharacterPossession`, `:1969`,
+  `:1997-2004`);
+- feeding, with food and water in the panel (`:4486-4492`);
+- the ten-second update, for the champion whose inventory is open, with the mouth or the eye
+  held or food and water in the panel (`doc/CSBwin-src/Code17818.cpp:433-443`), which then
+  draws every champion (`:448`, `DrawAllCharacterState`, `CSBCode.cpp:6826-6836`);
+- `PoisonCharacter`, for that champion with food and water in the panel
+  (`CSBCode.cpp:7220-7225`);
+- `ShowHideInventory`, opening an inventory (`:7504-7514`).
+
+So the scroll's viewing filter runs when the inventory opens, when the scroll enters the
+hand and when the eye is let go, not while the scroll stays shown; with the eye held and an
+empty hand, the ten-second update and poison run `TAG019036`'s site again.
+
+`DisplayBackpackItem` adds 1 to the name index of a chest or an open scroll in the weapon
+hand of the open inventory (`Character.cpp:1183-1189`; `D5W`, "the selected champion",
+`:1117`): the open chest is drawn there, and the scroll, opened by entering the weapon hand
+(`:1981-1986`), rolled (`objNI_OpenScroll + 1` is `objNI_Scroll`, `doc/CSBwin-src/Objects.h:470-471`), while the party panel's
+hand shows it open. Evidence: `tools/dump-viewing-filter.ts`, section 10.
+
 ## A DSA's `I_` operation acts only when its record reaches the `ESL_INDIRECTACTIONS` DSA
 
 `&%TELEPORTPARTY`, `&%DEL` and the thirteen other `I_` operations do not act: `Indirect`

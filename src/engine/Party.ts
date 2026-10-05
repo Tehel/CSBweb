@@ -7,7 +7,7 @@
 
 import { OBJECT_ID_NULL, ui8, Direction, Position } from '../core/types';
 import type { PartyState, Champion } from './gameTypes';
-import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, MovementAction } from './gameTypes';
+import { CHARFLAG_CHEST_OR_SCROLL, CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, MovementAction } from './gameTypes';
 import type { GameHost } from './GameHost';
 import { addCharacterDefaults } from './AddCharacter';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
@@ -225,14 +225,38 @@ export function setHandOwner(party: PartyState, chIdx: number, host: Pick<GameHo
         if ((champion.attributes?.health ?? 0) === 0) return;
     }
     party.cursorOwner = -1;
-    if (current !== -1) host.drawCharacterState(current, CHARFLAG_CURSOR);
+    if (current !== -1) drawCharacterState(party, current, CHARFLAG_CURSOR, host);
     if (chIdx === -1) return;
     party.cursorOwner = chIdx;
     // `pcA3->facing = (ui8)d.partyFacing` (doc/CSBwin-src/CSBCode.cpp:8417).
     const champion = getPartyChampion(party, chIdx);
     if (champion) champion.facing = party.facing;
     if (chIdx === party.potentialChampionIndex) return;
-    host.drawCharacterState(chIdx, CHARFLAG_CURSOR);
+    drawCharacterState(party, chIdx, CHARFLAG_CURSOR, host);
+}
+
+/**
+ * `DrawCharacterState(chIdx)` (`doc/CSBwin-src/Character.cpp:1229`): the host draws
+ * `charFlags`, the flags just set, with the champion's `CHARFLAG_CHEST_OR_SCROLL`, which
+ * is cleared as `:1514` clears every graphic flag. Nothing set, nothing is drawn (`:1251`).
+ */
+export function drawCharacterState(
+    party: PartyState, chIdx: number, charFlags: number, host: Pick<GameHost, 'drawCharacterState'>,
+): void {
+    const champion = party.champions[chIdx];
+    if (champion) {
+        charFlags |= champion.charFlags & CHARFLAG_CHEST_OR_SCROLL;
+        champion.charFlags &= ~CHARFLAG_CHEST_OR_SCROLL;
+    }
+    if (charFlags !== 0) host.drawCharacterState(chIdx, charFlags);
+}
+
+/**
+ * `DrawAllCharacterState` (`doc/CSBwin-src/CSBCode.cpp:6826-6836`), for the flags the
+ * champions hold.
+ */
+export function drawAllCharacterState(party: PartyState, host: Pick<GameHost, 'drawCharacterState'>): void {
+    for (let i = 0; i < party.champions.length; i++) drawCharacterState(party, i, 0, host);
 }
 
 /**
@@ -242,7 +266,7 @@ export function setHandOwner(party: PartyState, chIdx: number, host: Pick<GameHo
  */
 export function markAllPortraitsChanged(party: PartyState, host: Pick<GameHost, 'drawCharacterState'>): void {
     for (let i = 0; i < party.champions.length; i++) {
-        host.drawCharacterState(i, CHARFLAG_PORTRAIT_CHANGED);
+        drawCharacterState(party, i, CHARFLAG_PORTRAIT_CHANGED, host);
     }
 }
 

@@ -9,6 +9,8 @@ import { OBJNI_APPLE, OBJNI_DRAGON_STEAK, OBJNI_SPECIAL_G, OBJNI_SPECIAL_H, OBJN
 import { PotionType } from '../../core/constants';
 import { CursorFilterType } from '../../engine/DsaSystem';
 import { applyFeedParameters, clearFeedParameters, derivePotionFeeding, type FeedParameters } from '../../engine/Feeding';
+import { CHARFLAG_CHEST_OR_SCROLL } from '../../engine/gameTypes';
+import { drawCharacterState } from '../../engine/Party';
 import { DBType, OBJECT_ID_NULL, ObjectID, locationRelToInteger } from '../../core/types';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
@@ -143,6 +145,11 @@ export function handleMouthPress(ui: UIState): void {
   }
 
   if (fp.gulp >= 0) ui.ctx.sounds.queueSound(fp.gulp, ui.partyState.position.x, ui.partyState.position.y, 0, ui.ctx.party.state.position.z);
+  // `CHARFLAG_statsChanged` has no counterpart, the panels being drawn from live state;
+  // `CHARFLAG_chestOrScroll` has, with food and water in the eye panel, and the
+  // `DrawCharacterState` that ends the feeding (`doc/CSBwin-src/Character.cpp:4486-4492`).
+  if (ui.displayResurrectChestOrScroll === 0) champ.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
+  drawCharacterState(ui.partyState, selected, 0, ui.ctx.host);
 }
 
 export function getFoodValue(ui: UIState, nameIndex: number): number {

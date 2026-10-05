@@ -13,16 +13,16 @@ import { canPlaceInSlot, drawPositionSquare } from './Character';
 import { objectIconBitmap } from './Draw';
 import { handleMouthPress } from './Feeding';
 import { searchButtonList } from './HitTest';
-import { describeObject, getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest } from './Inventory';
+import { describeObject, getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest, tag0189d4, tag019036 } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
 import { drawLegalAttackTypes, handleAttackAreaClick } from './Attack';
-import { applyViewingFilter, isChestRecord, resolveObjectNameIndex } from './Objects';
+import { isChestRecord, resolveObjectNameIndex } from './Objects';
 import { OBJECT_ID_NULL } from '../../core/types';
 import { UIMode, UIState } from './UIState';
 import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
 import { characterAtPosition } from '../../engine/AddCharacter';
-import { CursorFilterType, ViewingFilterSite } from '../../engine/DsaSystem';
+import { CursorFilterType } from '../../engine/DsaSystem';
 import { freeze, setClockTick, thaw, waitForButtonFlash, wakeUp } from '../../engine/LoopState';
 import {
   hasCursorObject,
@@ -197,10 +197,16 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
   }
 }
 
+/**
+ * The button let go. With the eye held, `QuitPressingEye`
+ * (`doc/CSBwin-src/CSBCode.cpp:7399-7414`): the panel goes back to what `TAG0189d4`
+ * draws, which describes the weapon hand's scroll again.
+ */
 export function handleMouseUnclick(ui: UIState): void {
   if (ui.pressingEye) {
     ui.pressingEye = false;
     ui.describedObject = null;
+    tag0189d4(ui);
   }
 }
 
@@ -225,7 +231,7 @@ export function handleEyePress(ui: UIState): void {
   ui.pressingEye = true;
   const inHand = ui.partyState.objectInHand;
   if (inHand === OBJECT_ID_NULL) {
-    applyViewingFilter(ui, ViewingFilterSite.ATTRIBUTES, OBJECT_ID_NULL, 0);
+    tag019036(ui);
   } else if (!isChestRecord(ui, inHand)) {
     ui.describedObject = describeObject(ui, inHand);
   }
@@ -304,6 +310,9 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
     syncOpenChest(ui, null);
   }
   syncInventoryButtons(ui);
+  // `ShowHideInventory`'s `CHARFLAG_chestOrScroll` and `DrawCharacterState`
+  // (`doc/CSBwin-src/CSBCode.cpp:7504-7514`), which never runs with the eye held (`:7440`).
+  if (ui.partyState.selectedCharacterIndex >= 0) tag0189d4(ui);
 }
 
 /**

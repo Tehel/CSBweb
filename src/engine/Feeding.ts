@@ -23,6 +23,7 @@ import {
 } from './attributes';
 import type { GameContext } from './GameContext';
 import { CHARFLAG_PORTRAIT_CHANGED, type Champion } from './gameTypes';
+import { drawCharacterState } from './Party';
 
 /** `MAXMANA` (`doc/CSBwin-src/Character.cpp:4396`). */
 const MAX_MANA = 900;
@@ -308,7 +309,7 @@ export function applyFeedParameters(
     );
     // `CHARFLAG_portraitChanged` (`:4393`), which the `DrawCharacterState` that ends the
     // feeding draws (`:4492`); nothing in between shows on the champion's box.
-    ctx.host.drawCharacterState(chIdx, CHARFLAG_PORTRAIT_CHANGED);
+    drawCharacterState(party, chIdx, CHARFLAG_PORTRAIT_CHANGED, ctx.host);
   }
 
   // The unconfirmed champion in a Hall of Champions mirror takes no mana, no healing

@@ -23,8 +23,8 @@ import { MISC_BONES_OF_HERO } from '../core/constants';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
-import { getChampionPossession, type Champion } from './gameTypes';
-import { getPartyChampion } from './Party';
+import { CHARFLAG_CHEST_OR_SCROLL, getChampionPossession, type Champion } from './gameTypes';
+import { drawCharacterState, getPartyChampion } from './Party';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import { selectMagicCaster, setHandOwner } from './Party';
 import { AttributeIndex, attributeCurrent, championAttribute, setAttributeCurrentWithinLimits } from './attributes';
@@ -979,12 +979,17 @@ export class MonsterAttack {
     if (!champ) return;
 
     this.damageCharacter(chIdx, Math.max(1, Math.trunc(strength / 64)), 0, 0);
+    // `CHARFLAG_statsChanged` has no counterpart: the panels are drawn from live state.
+    if (chIdx === party.selectedCharacterIndex && this.ctx.host.displayResurrectChestOrScroll() === 0) {
+      champ.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
+    }
 
     const remaining = strength - 1;
     if (remaining !== 0) {
       champ.poisonCount = Math.min(255, champ.poisonCount + 1);
       this.ctx.systems.timer.schedulePoison(chIdx, remaining, this.ctx.party.state.position.z);
     }
+    drawCharacterState(party, chIdx, 0, this.ctx.host);
   }
 
   /**

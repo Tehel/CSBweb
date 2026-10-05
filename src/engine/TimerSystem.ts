@@ -9,7 +9,7 @@ import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_MONSTER_DEATH, RN_POISON_CLOUD, RN_FFE4,
   RN_POISON, RN_POISON_BOLT, RN_ZO_SPELL, isMagicSpellRn,
 } from '../core/spellRn';
-import { findChampionByFingerprint, markAllPortraitsChanged } from './Party';
+import { drawCharacterState, findChampionByFingerprint, markAllPortraitsChanged } from './Party';
 import type {
   ActuatorRecord,
   MapData,
@@ -375,7 +375,7 @@ export class TimerSystem {
     if (!champ) return;
     // CSBWin stores the result through `uw()`, so it wraps rather than clamping.
     champ.shieldStrength = (champ.shieldStrength - sw(timer.timerWord6)) & 0xffff;
-    this.ctx.host.drawCharacterState(chIdx, CHARFLAG_PORTRAIT_CHANGED);
+    drawCharacterState(this.ctx.party.state, chIdx, CHARFLAG_PORTRAIT_CHANGED, this.ctx.host);
   }
 
   /**

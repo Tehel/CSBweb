@@ -80,7 +80,7 @@ import {
 import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
 import type { SaveEntry } from '../data/saves';
 import type { ImportedFile } from '../engine/GameSaves';
-import { drawInventoryBackground, drawInventoryScreen, repackOpenChest, syncOpenChest } from './ui/Inventory';
+import { drawCharacterStateEyePanel, drawInventoryBackground, drawInventoryScreen, repackOpenChest, syncOpenChest } from './ui/Inventory';
 import { drawCharacterState, drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
 import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
 
@@ -239,6 +239,16 @@ export class GameScreen {
   /** `d.AttackingCharacterOrdinal` — the host's `attackingCharacterOrdinal`. */
   attackingCharacterOrdinal(): number {
     return this.ui.attackingCharacterOrdinal;
+  }
+
+  /** `d.PressingEye` — the host's `pressingEye`. */
+  pressingEye(): boolean {
+    return this.ui.pressingEye;
+  }
+
+  /** `d.DisplayResurrectChestOrScroll` — the host's `displayResurrectChestOrScroll`. */
+  displayResurrectChestOrScroll(): number {
+    return this.ui.displayResurrectChestOrScroll;
   }
 
   /** `ShowHideInventory` (`doc/CSBwin-src/CSBCode.cpp:7419`) — the host's `showHideInventory`. */
@@ -418,9 +428,13 @@ export class GameScreen {
     this.ui.characterDamage[chIdx] = null;
   }
 
-  /** `DrawCharacterState`'s redraw of the name or the box — the host's `drawCharacterState`. */
+  /**
+   * `DrawCharacterState`'s redraw of the name or the box, and of the open inventory's eye
+   * panel — the host's `drawCharacterState`.
+   */
   drawCharacterState(chIdx: number, charFlags: number): void {
     drawCharacterState(this.ui, chIdx, charFlags);
+    drawCharacterStateEyePanel(this.ui, chIdx, charFlags);
   }
 
   /** Buttons 147 to 148: `gameFrozen`, the screen's side of it. */

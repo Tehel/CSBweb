@@ -6,10 +6,10 @@
  * an opened chest borrows the inventory's item grid, which is why `openChest` /
  * `repackOpenChest` live next to the slot rectangles.
  */
-import { OBJNI_OPEN_CHEST, OBJNI_SPECIAL_D, OBJNI_SPECIAL_E } from '../../core/objectNameIndex';
+import { OBJNI_OPEN_CHEST, OBJNI_OPEN_SCROLL, OBJNI_SPECIAL_D, OBJNI_SPECIAL_E } from '../../core/objectNameIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID } from '../../core/types';
 import { ViewingFilterSite } from '../../engine/DsaSystem';
-import { Champion, getChampionPossession } from '../../engine/gameTypes';
+import { CHARFLAG_CHEST_OR_SCROLL, Champion, getChampionPossession } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { tag0088b2Index } from '../csbwin/CanvasBlitter';
@@ -75,6 +75,10 @@ export function drawInventoryScreen(ui: UIState): void {
     let objectIndex = getInventoryItemIndex(ui, champion, slot);
     if (chestView?.source === 'hand' && chestView.slot === slot) {
       objectIndex = getOpenChestIconIndex(ui);
+    } else if (slot === 1 && objectIndex === OBJNI_OPEN_SCROLL) {
+      // `objNID4 + 1`: in the weapon hand of the inventory open, the scroll its panel
+      // unrolls is drawn rolled (`doc/CSBwin-src/Character.cpp:1183-1189`).
+      objectIndex = OBJNI_OPEN_SCROLL + 1;
     }
     const rect = getInventorySlotRect(iconSlots, slot);
     if (!rect) continue;
@@ -101,6 +105,11 @@ export function drawInventoryScreen(ui: UIState): void {
   // (`doc/CSBwin-src/Viewport.cpp:7257`) draws over whatever `TAG0189d4` left there,
   // the Resurrect menu included, without touching `d.DisplayResurrectChestOrScroll`.
   // `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7399`) calls `TAG0189d4` again.
+  //
+  // Not held, the panel is what `TAG0189d4` last drew, from what is in the weapon hand:
+  // a chest's contents, a scroll as its viewing filter left it (`ui.weaponHandScroll`),
+  // or food and water.
+  const handObject = getChampionPossession(champion, 1);
   if (ui.pressingEye) {
     const cursorObject = ui.partyState.objectInHand;
     if (chestView) {
@@ -116,6 +125,10 @@ export function drawInventoryScreen(ui: UIState): void {
   } else if (chestView) {
     ui.displayResurrectChestOrScroll = chestView.source === 'hand' ? 4 : 0;
     drawChestPanel(ui, chestView);
+  } else if (handObject !== OBJECT_ID_NULL && ui.ctx.dungeon.rnMaps.dbType(handObject) === DBType.SCROLL) {
+    ui.displayResurrectChestOrScroll = 2;
+    if (ui.weaponHandScroll?.objectId !== handObject) ui.weaponHandScroll = describeObject(ui, handObject);
+    drawScrollPanel(ui, ui.weaponHandScroll.scrollId);
   } else {
     ui.displayResurrectChestOrScroll = 0;
     drawFoodWaterPanel(ui, champion);
@@ -124,6 +137,50 @@ export function drawInventoryScreen(ui: UIState): void {
   drawEyeIcon(ui);
   drawVitalsAndLoad(ui, champion);
   drawMouthAndEyeBoxes(ui, champion);
+}
+
+/**
+ * `TAG0189d4` (`doc/CSBwin-src/Character.cpp:3849-3897`)'s description of a scroll in the
+ * weapon hand of the champion whose inventory is open: `DescribeObject(objD7, 0)`, whose
+ * viewing filter runs here, at the events that call it, and not at every compose
+ * (`ui.weaponHandScroll`). The rest of what it draws, the Resurrect menu, a chest or
+ * food and water, is drawn from live state (`drawInventoryScreen`).
+ */
+export function tag0189d4(ui: UIState): void {
+  ui.weaponHandScroll = null;
+  if (ui.partyState.potentialChampionIndex >= 0) return;
+  const champion = ui.partyState.champions[ui.partyState.selectedCharacterIndex];
+  if (!champion) return;
+  const objD7 = getChampionPossession(champion, 1);
+  if (objD7 === OBJECT_ID_NULL || ui.ctx.dungeon.rnMaps.dbType(objD7) !== DBType.SCROLL) return;
+  ui.weaponHandScroll = describeObject(ui, objD7);
+}
+
+/**
+ * `TAG019036` (`doc/CSBwin-src/Character.cpp:4502-4590`), the eye clicked with an empty
+ * hand: the viewing filter runs before the attributes are drawn (`:4524-4578`), which the
+ * held eye's compose draws (`drawInventoryScreen`). Its `RepackChest` is the compose's
+ * (`syncOpenChest`).
+ */
+export function tag019036(ui: UIState): void {
+  applyViewingFilter(ui, ViewingFilterSite.ATTRIBUTES, OBJECT_ID_NULL, 0);
+}
+
+/**
+ * `DrawCharacterState`'s eye panel (`doc/CSBwin-src/Character.cpp:1478-1497`): with
+ * `CHARFLAG_chestOrScroll` and the champion's inventory open, the held eye with an empty
+ * hand draws the attributes again, through `TAG019036`; with an object held it draws
+ * nothing; and not held, `TAG0189d4` draws the panel. The port has no pressed mouth (C139), whose
+ * food and water would come first.
+ */
+export function drawCharacterStateEyePanel(ui: UIState, chIdx: number, charFlags: number): void {
+  if ((charFlags & CHARFLAG_CHEST_OR_SCROLL) === 0) return;
+  if (ui.partyState.selectedCharacterIndex !== chIdx) return;
+  if (ui.pressingEye) {
+    if (ui.partyState.objectInHand === OBJECT_ID_NULL) tag019036(ui);
+  } else {
+    tag0189d4(ui);
+  }
 }
 
 /**

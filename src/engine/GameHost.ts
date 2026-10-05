@@ -80,6 +80,15 @@ export interface GameHost {
    */
   attackingCharacterOrdinal(): number;
   /**
+   * `d.PressingEye` and `d.DisplayResurrectChestOrScroll`, which the ten-second update
+   * and `PoisonCharacter` read before they set `CHARFLAG_chestOrScroll`
+   * (`doc/CSBwin-src/Code17818.cpp:435-443`, `doc/CSBwin-src/CSBCode.cpp:7220-7225`):
+   * the eye held, and what `TAG0189d4` last put in its panel, are the UI's. The port
+   * has no pressed mouth, so `d.PressingMouth` is always 0 (`DEBT.md` C139).
+   */
+  pressingEye(): boolean;
+  displayResurrectChestOrScroll(): number;
+  /**
    * `ShowHideInventory(chIdx)` (`doc/CSBwin-src/CSBCode.cpp:7419`), 4 to hide: the
    * inventory is the UI's. `_FusionSequence` hides an open one (`Attack.cpp:2269-2272`).
    */
@@ -140,11 +149,14 @@ export interface GameHost {
   tag011366(chIdx: number): void;
   /**
    * `DrawCharacterState(chIdx)` (`doc/CSBwin-src/Character.cpp:1229`) with `charFlags`
-   * just set, for the two redraws the screen's own drawing of every box on every frame
-   * cannot stand in for, because they go over the damage shown: `CHARFLAG_PORTRAIT_CHANGED`
-   * fills the whole box (`:1255-1307`), and `CHARFLAG_CURSOR` the name of a champion
-   * whose inventory is closed (`:1310-1356`). CSBWin draws at once wherever it sets
-   * either, so the engine calls this there and keeps no flag.
+   * just set, for the three redraws the screen's own drawing of every box on every frame
+   * cannot stand in for. Two go over the damage shown: `CHARFLAG_PORTRAIT_CHANGED` fills
+   * the whole box (`:1255-1307`), and `CHARFLAG_CURSOR` the name of a champion whose
+   * inventory is closed (`:1310-1356`). CSBWin draws at once wherever it sets either, so
+   * the engine calls this there and keeps no flag. The third, `CHARFLAG_CHEST_OR_SCROLL`,
+   * fills the open inventory's eye panel again (`:1478-1497`), which runs the viewing
+   * filter; the engine keeps it in the champion's `charFlags` until a `DrawCharacterState`
+   * (`drawCharacterState`, `Party.ts`).
    */
   drawCharacterState(chIdx: number, charFlags: number): void;
   /**
@@ -180,6 +192,8 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     championJoined: host.championJoined ?? (() => {}),
     closeAttackMenuOf: host.closeAttackMenuOf ?? (() => {}),
     attackingCharacterOrdinal: host.attackingCharacterOrdinal ?? (() => 0),
+    pressingEye: host.pressingEye ?? (() => false),
+    displayResurrectChestOrScroll: host.displayResurrectChestOrScroll ?? (() => 0),
     showHideInventory: host.showHideInventory ?? (() => {}),
     repackChest: host.repackChest ?? (() => {}),
     tag02076e: host.tag02076e ?? (() => {}),

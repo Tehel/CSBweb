@@ -26,8 +26,9 @@ import { DBType, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { characterAtPosition } from './AddCharacter';
 import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
 import { nameIndexOf, type GameContext } from './GameContext';
-import { getChampionPossession, type Champion } from './gameTypes';
+import { CHARFLAG_CHEST_OR_SCROLL, getChampionPossession, type Champion } from './gameTypes';
 import { selectPaletteForLightLevel } from './LightLevel';
+import { drawCharacterState } from './Party';
 
 export class CharacterSystem {
   constructor(private readonly ctx: GameContext) {}
@@ -44,10 +45,13 @@ export class CharacterSystem {
    * any of `Torch_a`-`Torch_d` and a worn Illumulet `_b`. The attack menu and the open
    * chest are the UI's, so those two go out as `GameHost` notices.
    *
-   * The light changes are followed by `SelectPaletteForLightLevel`. No counterpart here:
-   * `DrawEightHands`, `DisplayBackpackItem` and the `charFlags` redraw bits (the panels
-   * are derived from live state every frame); `load` (`CharacterStats.characterLoad`
-   * re-sums it). The chest slots (30 and up) are `d.rnChestContents`, the open
+   * The light changes are followed by `SelectPaletteForLightLevel`. A chest or a scroll
+   * out of the selected champion's weapon hand sets `CHARFLAG_chestOrScroll`
+   * (`:1906-1921`), which the `DrawCharacterState` every caller makes next draws
+   * (`doc/CSBwin-src/DSA.cpp:1674-1675`, `doc/CSBwin-src/CSBCode.cpp:6995-6998`); the
+   * port draws it as the call ends. No counterpart here: `DrawEightHands`,
+   * `DisplayBackpackItem` and the other `charFlags` redraw bits (the panels are derived
+   * from live state every frame); `load` (`CharacterStats.characterLoad` re-sums it). The chest slots (30 and up) are `d.rnChestContents`, the open
    * inventory's, and nothing but the stat call reads them here, which does nothing past
    * slot 29; so the inventory click writes them itself and no caller passes one.
    */
@@ -81,11 +85,17 @@ export class CharacterSystem {
         this.ctx.dungeon.getWeaponRecord(objRemoved)!.litTorch = false;
         selectPaletteForLightLevel(this.ctx);
       }
-      // `LOCAL_2`, `chIdx+1 == d.SelectedCharacterOrdinal` (`:1856`, `:1906-1914`).
-      if (chIdx === this.ctx.party.state.selectedCharacterIndex && slot === 1 && objNID5 === OBJNI_CHEST) {
-        this.ctx.host.repackChest();
+      // `LOCAL_2`, `chIdx+1 == d.SelectedCharacterOrdinal` (`:1856`, `:1906-1921`).
+      if (chIdx === this.ctx.party.state.selectedCharacterIndex && slot === 1) {
+        if (objNID5 === OBJNI_CHEST) {
+          this.ctx.host.repackChest();
+          champion.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
+        } else if (objNID5 >= OBJNI_OPEN_SCROLL && objNID5 <= OBJNI_SCROLL) {
+          champion.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
+        }
       }
     }
+    drawCharacterState(this.ctx.party.state, chIdx, 0, this.ctx.host);
     return objRemoved;
   }
 
@@ -97,8 +107,11 @@ export class CharacterSystem {
    * opens; into either hand an unlit torch (`NameIndex == Torch_a`, `:1988`) is lit.
    * Round the neck an Illumulet gets `value(1)` and adds `d.Word1074[2]` to
    * `d.Brightness`, a Jewel Symal gets `value(1)`. A light change is followed by
-   * `SelectPaletteForLightLevel`. The rest has no counterpart here, as in
-   * `removeCharacterPossession`. A chest slot (30 and up) is the inventory click's.
+   * `SelectPaletteForLightLevel`. A chest or a scroll into the selected champion's
+   * weapon hand sets `CHARFLAG_chestOrScroll` (`:1997-2004`), drawn as the call ends
+   * (`doc/CSBwin-src/DSA.cpp:2075-2076`, `doc/CSBwin-src/Magic.cpp:1377-1378`). The rest
+   * has no counterpart here, as in `removeCharacterPossession`. A chest slot (30 and up)
+   * is the inventory click's.
    */
   addCharacterPossession(chIdx: number, object: ObjectID, place: number): void {
     if (object === OBJECT_ID_NULL) return;
@@ -118,6 +131,12 @@ export class CharacterSystem {
       if (objNID4 === OBJNI_TORCH_A) {
         this.ctx.dungeon.getWeaponRecord(object)!.litTorch = true;
         selectPaletteForLightLevel(this.ctx);
+      } else if (
+        chIdx === this.ctx.party.state.selectedCharacterIndex && place === 1
+        && (objNID4 === OBJNI_CHEST || (objNID4 >= OBJNI_OPEN_SCROLL && objNID4 <= OBJNI_SCROLL))
+      ) {
+        // `bool_2`, `chIdx+1 == d.SelectedCharacterOrdinal` (`:1969`).
+        champion.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
       }
     } else if (place === 10) {
       if (objNID4 >= OBJNI_ILLUMULET_A && objNID4 <= OBJNI_ILLUMULET_B) {
@@ -129,6 +148,7 @@ export class CharacterSystem {
         this.ctx.dungeon.getMiscRecord(object)!.specialState = 1;
       }
     }
+    drawCharacterState(this.ctx.party.state, chIdx, 0, this.ctx.host);
   }
 
   /**

@@ -35,6 +35,17 @@
  *    `_ClickOnEye`, `Viewport.cpp:7286`): CSBWin draws the description or the scroll once,
  *    so the inventory composed again and again while the eye is held runs no DSA, and the
  *    next press after the release runs it again.
+ * 10. **A scroll in the weapon hand of the inventory open is read** (`TAG0189d4`,
+ *    `doc/CSBwin-src/Character.cpp:3849-3897`), in the scroll's site, at the events that
+ *    draw that panel: the inventory's opening (`ShowHideInventory`,
+ *    `doc/CSBwin-src/CSBCode.cpp:7504-7514`), the scroll entering the hand
+ *    (`AddCharacterPossession`, `Character.cpp:1997-2004`), and the eye's release
+ *    (`QuitPressingEye`, `CSBCode.cpp:7399-7414`); not at a compose, not with the
+ *    inventory closed, and not at the ten-second update while the scroll shows
+ *    (`doc/CSBwin-src/Code17818.cpp:435-443`). With the eye held and an empty hand, the
+ *    ten-second update and poison run the eye's own site again (`Character.cpp:1478-1497`,
+ *    `CSBCode.cpp:7220-7225`). In that hand the scroll is drawn rolled
+ *    (`DisplayBackpackItem`, `Character.cpp:1183-1189`).
  *
  * Run: `npx tsx tools/dump-viewing-filter.ts`
  */
@@ -49,8 +60,13 @@ import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterD
 import { check, finish } from './lib/check';
 import { gameTablesOf, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
-import { handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
-import { drawInventoryScreen } from '../src/renderer/ui/Inventory';
+import { handleInventoryToggle, handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
+import { drawCharacterStateEyePanel, drawInventoryScreen, getInventorySlotRect } from '../src/renderer/ui/Inventory';
+import { drawObjectIcon } from '../src/renderer/ui/Draw';
+import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
+import type { UIState } from '../src/renderer/ui/UIState';
+import { OBJNI_OPEN_SCROLL, OBJNI_SCROLL } from '../src/core/objectNameIndex';
+import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
 
 /** `ESL_VIEWINGFILTER` (`doc/CSBwin-src/CSB.h:1538`). */
 const ESL_VIEWINGFILTER = 3;
@@ -309,6 +325,83 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     check(!atCompose, `with ${what} in hand, composing the held eye's panel runs no DSA`);
     check(again, `with ${what} in hand, the next press after the release runs it again`);
   }
+}
+
+/* ------------------------------- 10. the scroll in the weapon hand -------------- */
+{
+  // The host's three members are the screen's, as `main.ts` wires them.
+  let ui: UIState | null = null;
+  const game = withFilterDsas(ESL_VIEWINGFILTER, [[...params(0)]], {
+    drawCharacterState: (chIdx, charFlags) => { if (ui) drawCharacterStateEyePanel(ui, chIdx, charFlags); },
+    pressingEye: () => ui?.pressingEye ?? false,
+    displayResurrectChestOrScroll: () => ui?.displayResurrectChestOrScroll ?? 0,
+  });
+  const party = game.ctx.party.state;
+  const graphics = stockGraphics();
+  const cache = new Map();
+  const theUi = newUIState(graphics, game.ctx, {
+    getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
+  });
+  ui = theUi;
+  theUi.partyState = party;
+  party.selectedCharacterIndex = -1;
+  party.objectInHand = OBJECT_ID_NULL;
+  const character = game.systems.character;
+  character.removeCharacterPossession(1, 1);
+  const scroll = game.ctx.dungeon.rnMaps.rn(DBType.SCROLL, 0);
+  const unset = (): void => {
+    const g = game.systems.dsa.getGlobalVariables();
+    g[0] = UNSET;
+    g[1] = UNSET;
+    game.systems.dsa.setGlobalVariables(g);
+  };
+  /** The object the filter ran on, -1 at the eye's own site, or null when it did not run. */
+  const seen = (): number | null => {
+    const g = game.systems.dsa.getGlobalVariables();
+    return g[0] === UNSET ? null : g[1]!;
+  };
+  const step = (what: string, act: () => void, want: number | null): void => {
+    unset();
+    act();
+    const got = seen();
+    console.log(`10. ${what}: ${got === null ? 'runs nothing' : got === -1 ? "runs the eye's site" : `runs on ${got}`}`);
+    check(got === want, `${what}: ${want === null ? 'runs nothing' : want === -1 ? "the eye's site" : 'the scroll site, on the scroll'}`);
+  };
+
+  step('the scroll into a closed inventory\'s weapon hand', () => character.addCharacterPossession(1, scroll, 1), null);
+  step('the inventory opened', () => handleInventoryToggle(theUi, 1), scroll);
+  step('three composes', () => { for (let i = 0; i < 3; i++) drawInventoryScreen(theUi); }, null);
+  check(theUi.displayResurrectChestOrScroll === 2, 'a scroll in the weapon hand leaves d.DisplayResurrectChestOrScroll 2');
+  step('the ten-second update with the scroll shown', () => tenSecondUpdate(game.ctx), null);
+  step('the eye pressed with an empty hand', () => handleMouseButton(theUi, 71, 0, 0), -1);
+  step('the ten-second update with the eye held', () => tenSecondUpdate(game.ctx), -1);
+  step('the eye released', () => handleMouseUnclick(theUi), scroll);
+  step('the scroll out of the weapon hand', () => character.removeCharacterPossession(1, 1), null);
+  check(theUi.weaponHandScroll === null, 'with the hand empty, nothing is kept');
+  drawInventoryScreen(theUi);
+  check(theUi.displayResurrectChestOrScroll === 0, 'with the hand empty, the panel is food and water');
+  handleMouseButton(theUi, 71, 0, 0);
+  step('poison with the eye held and food and water shown', () => game.systems.monsterAttack.poisonCharacter(1, 1), -1);
+  handleMouseUnclick(theUi);
+  step('the scroll back into the open inventory\'s weapon hand', () => character.addCharacterPossession(1, scroll, 1), scroll);
+
+  // The icon: the slot drawn alone on a cleared screen is the rolled scroll's.
+  const rect = getInventorySlotRect(theUi.uiTables.graphic232.iconDisplay, 1)!;
+  const word612 = theUi.uiTables.graphic232.word612;
+  const pixels = theUi.screenIndexBuffer.pixels;
+  const slotPixels = (draw: () => void): string => {
+    pixels.fill(0);
+    draw();
+    const out: number[] = [];
+    for (let y = rect.y1; y <= rect.y2; y++) for (let x = rect.x1; x <= rect.x2; x++) out.push(pixels[y * 320 + x]!);
+    return out.join();
+  };
+  const drawn = slotPixels(() => drawInventoryScreen(theUi));
+  const rolled = slotPixels(() => drawObjectIcon(theUi, rect, OBJNI_SCROLL, word612));
+  const unrolled = slotPixels(() => drawObjectIcon(theUi, rect, OBJNI_OPEN_SCROLL, word612));
+  const blank = slotPixels(() => {});
+  console.log(`    the weapon hand's icon is the ${drawn === rolled ? 'rolled' : drawn === unrolled ? 'unrolled' : 'unknown'} scroll`);
+  check(rolled !== unrolled && rolled !== blank && drawn === rolled, "in the open inventory's weapon hand, the open scroll is drawn rolled");
 }
 
 finish();

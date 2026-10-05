@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C138 | A scroll in the weapon hand is never shown, has the unrolled icon, and the eye panel is not redrawn at `DrawCharacterState` | M | ⏳ |
+| C139 | The mouth held with an empty hand does not show food and water | S | ⏳ |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -127,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C139 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C140 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -171,41 +171,21 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C138 ⏳ A scroll in the weapon hand is never shown, has the unrolled icon, and the eye panel is not redrawn at `DrawCharacterState`
+### C139 ⏳ The mouth held with an empty hand does not show food and water
 
-`TAG0189d4` (`doc/CSBwin-src/Character.cpp:3849-3897`) fills the eye panel from the weapon
-hand: a chest's contents (`d.DisplayResurrectChestOrScroll` 4), a scroll's text through
-`DescribeObject(objD7, 0)` (2), and food and water otherwise (0). The port's
-(`drawInventoryScreen`, `src/renderer/ui/Inventory.ts`) has the chest and food and water
-only: a scroll in the weapon hand is not read, and `displayResurrectChestOrScroll` is
-never 2.
+`FeedCharacter` with an empty hand (`doc/CSBwin-src/Character.cpp:4041-4058`) returns when
+the eye panel already shows food and water (`d.DisplayResurrectChestOrScroll == 0`).
+Otherwise, with the button still down, it sets `d.PressingMouth` and `d.PressingEyeOrMouth`
+and draws food and water over the chest or the scroll in the weapon hand, until the release
+runs `QuitPressingMouth` (`doc/CSBwin-src/CSBCode.cpp:7390-7395`), whose `TAG0189d4` draws
+the panel back and runs the scroll's viewing filter again. The port's `handleMouthPress`
+(`src/renderer/ui/Feeding.ts`) returns on an empty hand, so there is no pressed mouth: the
+panel stays as it was, and the readers of `d.PressingMouth` take it as 0 (`GameHost.pressingEye`,
+`drawCharacterStateEyePanel` in `src/renderer/ui/Inventory.ts`, the button swallowing in
+`src/renderer/ui/Mouse.ts`, `handleInventoryToggle`).
 
-Its icon there is wrong too. A scroll entering the weapon hand is opened
-(`AddCharacterPossession`, `Character.cpp:1981-1986`), so its `NameIndex` is
-`objNI_OpenScroll` (`doc/CSBwin-src/data.cpp:648-655`). `DisplayBackpackItem` adds 1 to
-`objNI_Chest` and `objNI_OpenScroll` in the weapon hand of the selected champion's
-inventory (`Character.cpp:1183-1189`; `D5W` is "the selected champion", `:1117`), so the
-scroll is drawn rolled there, as `objNI_Scroll`, while the party panel's hand, drawn with
-`D5W` 0, shows it unrolled. The port does the chest's half (`getOpenChestIconIndex`,
-`Inventory.ts`) and not the scroll's: the open inventory shows the scroll unrolled.
-
-CSBWin draws that panel at events: from `DrawCharacterState` when the champion's
-`CHARFLAG_chestOrScroll` is set with the inventory open (`Character.cpp:1478-1497`, which
-with the eye held and an empty hand runs `TAG019036` instead, and with an object held
-draws nothing), and from `QuitPressingEye` and `QuitPressingMouth`
-(`doc/CSBwin-src/CSBCode.cpp:7390-7414`). The flag is set by `AdjustStatsForItemCarried`
-(`Character.cpp:1779`), a chest or a scroll leaving or entering the weapon hand
-(`:1910-1921`, `:1997-2004`), eating and drinking (`:4488-4491`), the ten-second update
-(`doc/CSBwin-src/Code17818.cpp:432-443`), poison (`CSBCode.cpp:7221-7225`) and
-`ShowHideInventory` (`:7504-7512`). The port has no `CHARFLAG_chestOrScroll`
-(`AdjustStatsForItemCarried.ts:181`) and draws the panel from live state at every compose.
-So the viewing filter's scroll site never runs from the weapon hand, and `TAG019036`'s
-runs at the eye's press (`handleEyePress`, `src/renderer/ui/Mouse.ts`) but never again
-from `DrawCharacterState` while the eye is held.
-
-Paying it means the scroll's branch of `TAG0189d4`, its viewing filter run at those
-events and its result kept for the composes between them, as `ui.describedObject` keeps
-the eye press's (`describeObject`, `Inventory.ts`).
+Paying it means a `pressingMouth` beside `pressingEye`, set by the press and cleared by the
+button-up as `QuitPressingMouth`, with its readers.
 
 ---
 
@@ -654,7 +634,7 @@ when the hand is empty.
 
 The extra: with an empty hand, the **cursor owner** drinks. That is the same drink as one
 gulp from a full waterskin: `waterValue = 800` and `SOUND_GULP` (`computeFeedParameters`,
-`src/renderer/ui/Feeding.ts:58-67`), applied through `applyFeedParameters`, so the water cap
+`src/renderer/ui/Feeding.ts:60-69`), applied through `applyFeedParameters`, so the water cap
 and the sound are CSBWin's own. A dead or absent cursor owner drinks nothing.
 
 ### X2 ⏸️ A mastery just gained shown in green
@@ -996,7 +976,7 @@ Recorded so that nobody "fixes" them.
   frames boot through it.
 - 🚫 **The `d.Word11750` countdown** in `TenSecondUpdate` is not ported. It is a
   cursor-redraw counter set only by `CSBCode.cpp:959-965`, which has no counterpart here, so
-  the branch is dead (`src/engine/PeriodicUpdates.ts:90`).
+  the branch is dead (`src/engine/PeriodicUpdates.ts:91`).
 - 🚫 **A drawn `RandomGameID` is never 0, nor a stored save's.** CSBWin keeps the
   product of its two draws whatever it is (`doc/CSBwin-src/SaveGame.cpp:1523-1532`), and
   it is 0 when either low word is, about one new game in 32768. The author's decision:

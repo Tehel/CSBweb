@@ -56,6 +56,14 @@ export const CHARFLAG_CURSOR = 0x0080;
  * the champion's whole box and draws it afresh (`doc/CSBwin-src/Character.cpp:1255-1307`).
  */
 export const CHARFLAG_PORTRAIT_CHANGED = 0x1000;
+/**
+ * `CHARFLAG_chestOrScroll` (`doc/CSBwin-src/CSB.h:2469`): with the champion's inventory
+ * open, `DrawCharacterState` fills the eye panel again (`doc/CSBwin-src/Character.cpp:1478-1497`).
+ * The one redraw flag the engine keeps in `charFlags`, as CSBWin does, because what sets
+ * it is not what draws it: `drawCharacterState` (`Party.ts`) hands it to the host and
+ * clears it.
+ */
+export const CHARFLAG_CHEST_OR_SCROLL = 0x0800;
 import type { DungeonData } from '../data/dungeonTypes';
 
 /**
@@ -132,10 +140,11 @@ export interface Champion {
      * `CHARDESC.charFlags` (`doc/CSBwin-src/CSB.h:2457-2481`). Bit 3 is
      * `CHARFLAG_attackDisable`, the champion's busy state (`CHARFLAG_ATTACK_DISABLE`),
      * and bit 4 `CHARFLAG_male`. 0xff80 are redraw flags CSBWin sets as the game runs
-     * and saves as they stand; this port redraws every frame and keeps none of them
-     * here, so it carries whatever the file or `AddCharacter` gave it. The two whose
-     * redraw goes over something a frame cannot work out again are handed to the host
-     * instead (`CHARFLAG_CURSOR`, `CHARFLAG_PORTRAIT_CHANGED`).
+     * and saves as they stand; this port redraws every frame and keeps one of them
+     * here, `CHARFLAG_CHEST_OR_SCROLL`, whose redraw runs the viewing filter. Of the
+     * rest it carries whatever the file or `AddCharacter` gave it. The two whose redraw
+     * goes over something a frame cannot work out again are handed to the host instead
+     * (`CHARFLAG_CURSOR`, `CHARFLAG_PORTRAIT_CHANGED`).
      */
     charFlags: i16;
     /**
