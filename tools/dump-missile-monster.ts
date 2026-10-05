@@ -52,6 +52,7 @@ import type { Champion } from '../src/engine/gameTypes';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { MonsterDamageResult } from '../src/engine/MonsterDamage';
 import type { AiConst, AiFrame } from '../src/engine/MonsterAI';
+import { MmRecord } from '../src/engine/MmRecord';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import {
   monsterAbsorbsDaggersEtc,
@@ -383,7 +384,7 @@ function main(): void {
       slotIndex: group.groupIndex, desc, mapX: target.x, mapY: target.y, level: target.z,
       timeUntilAlternateUpdate: 0, indexOfLastMonster: 1, horizSize: 0, invincible: false,
       xDistance: 0, yDistance: 1, attackDistance: 1, timerFunction: TimerFunction.TT_MONSTER_B0,
-      fearFactorIs6: false, processingATimer: true,
+      fearFactorIs6: false, processingATimer: true, mmr: new MmRecord(),
     };
     const ai = game.ctx.systems.monsterAI as unknown as {
       sidestepBeforeMeleeing(frame: AiFrame, c: AiConst, member: number, preferredDirection: number): boolean;
@@ -425,7 +426,7 @@ function main(): void {
       slotIndex: group.groupIndex, desc, mapX: target.x, mapY: target.y, level: target.z,
       timeUntilAlternateUpdate: 0, indexOfLastMonster: 0, horizSize: 0, invincible: false,
       xDistance: 0, yDistance: 1, attackDistance: 0, timerFunction: TimerFunction.TT_MONSTER_B0,
-      fearFactorIs6: false, processingATimer: true,
+      fearFactorIs6: false, processingATimer: true, mmr: new MmRecord(),
     };
     const ai = game.ctx.systems.monsterAI as unknown as {
       checkMonsterVersusMissiles(c: AiConst): boolean;

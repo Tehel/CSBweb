@@ -41,6 +41,7 @@ import { vacantPossession } from '../data/CsbwinCharacters';
 import { TimerFunction } from './TimerQueue';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { MonsterSystem } from './MonsterSystem';
+import { MonsterEvents, type MmRecord } from './MmRecord';
 import type { WorldMove } from './WorldMove';
 import type { CsbRandom } from '../core/random';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
@@ -370,7 +371,8 @@ const enum DsaMoveError {
   DER_NoCloudsPlease = -15,
 }
 
-class DsaVars {
+/** `DSAVARS` (`doc/CSBwin-src/CSB.h:2877-2882`): a DSA run's variables. */
+export class DsaVars {
   definedFlags: Uint8Array;
   values: Int32Array;
 
@@ -627,8 +629,7 @@ export class DsaSystem {
   /**
    * `monsterMoveFilterActive` (`doc/CSBwin-src/data.cpp:85`), which `ProcessDSAFilter`
    * sets while the monster move filter runs (`Monster.cpp:3229`, `:3355`) and
-   * `&MONL&D` reads. The port runs that filter before a group's turn, not yet after it
-   * (DEBT.md G2).
+   * `&MONL&D` reads: before a group's turn and after it.
    */
   monsterMoveFilterActive = false;
   /**
@@ -949,9 +950,18 @@ export class DsaSystem {
    * square, the group, and the party's level and square (`:3340-3347`). Its timer has
    * function and position 0, the level, and the group's square with x in `uByte7` and y
    * in `uByte6` (`:3324-3329`), the other way round from every other filter's, so the
-   * DSA's master stands at `(y, x)` (`ProcessDSATimer6`, `DSA.cpp:5408-5413`).
+   * DSA's master stands at `(y, x)` (`ProcessDSATimer6`, `DSA.cpp:5408-5413`). The timer,
+   * the group, its square and the DSA's variables go into `mmr`, the turn's record, for
+   * the post-move filter, which runs only when this one did.
    */
-  monsterMoveFilter(level: number, mapX: number, mapY: number, monster: ObjectID, timerFunction: number): void {
+  monsterMoveFilter(
+    level: number,
+    mapX: number,
+    mapY: number,
+    monster: ObjectID,
+    timerFunction: number,
+    mmr: MmRecord,
+  ): void {
     const mmfloc = this.monsterMoveFilterLocation(level);
     const party = this.ctx.party.state.position;
     const partyX = party.x | 0;
@@ -960,14 +970,54 @@ export class DsaSystem {
     if (mmfloc.partyLevelOnly !== 0 && level !== (party.z | 0)) return;
     if ((mapX - partyX) * (mapX - partyX) + (mapY - partyY) * (mapY - partyY) > mmfloc.maxDistance * mmfloc.maxDistance) return;
     // The group's square the other way round: x in `uByte7`, y in `uByte6`.
-    const timer = filterTimer(new Position(mapY, mapX, level));
-    const filterPos = new Position(mmfloc.locr.x, mmfloc.locr.y, mmfloc.locr.l);
+    mmr.timer = filterTimer(new Position(mapY, mapX, level));
+    mmr.objMonster = monster;
+    mmr.locr = { l: level, x: mapX, y: mapY, p: 0 };
+    mmr.finalLocr = { ...mmr.locr };
+    mmr.calledPreMoveFilter = true;
     this.newDsaParameters(() => {
       this.setParameters(7, [level, mapX, mapY, monster, party.z | 0, partyX, partyY]);
-      this.monsterMoveFilterActive = true;
-      this.processTimer6Internal(mmfloc.filterObj, timer, filterPos, true, new DsaVars());
-      this.monsterMoveFilterActive = false;
+      this.runMonsterMoveFilter(mmfloc, mmr);
     });
+  }
+
+  /**
+   * `ProcessPostMonsterMoveFilter` (`doc/CSBwin-src/Monster.cpp:3169-3233`), which every
+   * `return` of `ProcessTimers29to41` runs, from `:3373` to `:4448`: the same DSA again,
+   * when the pre-move filter ran, on the record's timer with function 1, so the DSA's
+   * column 1, and the record's variables.
+   *
+   * Its parameters, a count of 9: where the group ended (`finalLocr`, level -1 once it
+   * has left the dungeon), the group, the party's level and square, and the two words of
+   * the turn's flags. `MonMove_differentCell` is set first when the group ended on
+   * another square than its turn began on.
+   */
+  postMonsterMoveFilter(mmr: MmRecord): void {
+    if (!mmr.calledPreMoveFilter || !mmr.timer) return;
+    const mmfloc = this.monsterMoveFilterLocation(mmr.locr.l);
+    this.newDsaParameters(() => {
+      const { locr, finalLocr } = mmr;
+      if (locr.l !== finalLocr.l || locr.x !== finalLocr.x || locr.y !== finalLocr.y) {
+        mmr.setflg(MonsterEvents.MonMove_differentCell);
+      }
+      mmr.timer!.function = 1;
+      mmr.timer!.uByte9 = 1;
+      mmr.timer!.uByte8 = 0;
+      const party = this.ctx.party.state.position;
+      this.setParameters(9, [
+        finalLocr.l, finalLocr.x, finalLocr.y, mmr.objMonster,
+        party.z | 0, party.x | 0, party.y | 0, mmr.flgs[0]!, mmr.flgs[1]!,
+      ]);
+      this.runMonsterMoveFilter(mmfloc, mmr);
+    });
+  }
+
+  /** `ProcessDSAFilter` on the level's filter DSA, the record's timer and variables. */
+  private runMonsterMoveFilter(mmfloc: MonsterMoveFilterLocation, mmr: MmRecord): void {
+    const filterPos = new Position(mmfloc.locr.x, mmfloc.locr.y, mmfloc.locr.l);
+    this.monsterMoveFilterActive = true;
+    this.processTimer6Internal(mmfloc.filterObj, mmr.timer!, filterPos, true, mmr.dsaVars);
+    this.monsterMoveFilterActive = false;
   }
 
   /**

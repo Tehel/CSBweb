@@ -51,6 +51,7 @@ import {
 } from '../data/tables/MonsterDesc';
 import { setPackedBits } from './MonsterSystem';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
+import { MmRecord } from './MmRecord';
 
 /**
  * The values CSBWin passes by reference through the `Try_*` chain.
@@ -98,6 +99,8 @@ export interface AiConst {
   timerFunction: number;
   fearFactorIs6: boolean;
   processingATimer: boolean;
+  /** `&mmr`, the turn's record. */
+  mmr: MmRecord;
 }
 
 /**
@@ -186,7 +189,10 @@ export class MonsterAI {
 
   /**
    * `ProcessTimers29to41` (`doc/CSBwin-src/Monster.cpp:3239`) — one monster group's
-   * turn, from the top.
+   * turn, from the top, with `mmr`, the record its monster move filter reads, and which
+   * the turn hands down to every move, blow and missile that can take the group away.
+   * Every `return` of CSBWin's turn runs the post-move filter first (`:3373` to
+   * `:4448`), so the port runs it once the turn is over, however it ended.
    */
   processTimers29to41(options: {
     mapX: number;
@@ -195,6 +201,21 @@ export class MonsterAI {
     timerFunction: number;
     timeUntilAlternateUpdate: number;
   }): void {
+    const mmr = new MmRecord();
+    this.turn(options, mmr);
+    this.ctx.systems.dsa.postMonsterMoveFilter(mmr);
+  }
+
+  private turn(
+    options: {
+      mapX: number;
+      mapY: number;
+      level: number;
+      timerFunction: number;
+      timeUntilAlternateUpdate: number;
+    },
+    mmr: MmRecord,
+  ): void {
     const { mapX, mapY, level, timerFunction, timeUntilAlternateUpdate } = options;
     const party = this.ctx.party.state;
     const s = this.scratch;
@@ -213,9 +234,9 @@ export class MonsterAI {
     );
 
     // "Now let the Monster Movement Filter DSA do its thing" (doc/CSBwin-src/Monster.cpp:3311-3357).
-    this.ctx.systems.dsa.monsterMoveFilter(level, mapX, mapY, monsterRn, timerFunction);
+    this.ctx.systems.dsa.monsterMoveFilter(level, mapX, mapY, monsterRn, timerFunction, mmr);
 
-    const checks = this.initialChecks(monsterRn, mapX, mapY, level, timerFunction, timeUntilAlternateUpdate);
+    const checks = this.initialChecks(monsterRn, mapX, mapY, level, timerFunction, timeUntilAlternateUpdate, mmr);
     if (checks.handled) return;
 
     const monster = this.dungeon.getCreatureRecord(monsterRn);
@@ -280,6 +301,7 @@ export class MonsterAI {
       timerFunction: timerFunction,
       fearFactorIs6: false,
       processingATimer: true,
+      mmr,
     };
 
     this.dispatch(frame, c, fearFactor);
@@ -1031,7 +1053,7 @@ export class MonsterAI {
     if (frame.bool36) {
       // Any non-zero `MoveObject` ends the turn; otherwise the timer follows the group to
       // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:1711-1720`).
-      const moved = this.ctx.systems.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level);
+      const moved = this.ctx.systems.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level, undefined, c.mmr);
       if (moved.code !== 0) return true;
       frame.timer.uByte6 = moved.position.x & 0xff;
       frame.timer.uByte7 = moved.position.y & 0xff;
@@ -1124,7 +1146,7 @@ export class MonsterAI {
     }
     // Any non-zero `MoveObject` ends the turn; otherwise the timer follows the group to
     // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:2105-2112`, `:2440-2449`).
-    const moved = this.ctx.systems.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level);
+    const moved = this.ctx.systems.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level, undefined, c.mmr);
     if (moved.code !== 0) return false;
     frame.timer.uByte6 = moved.position.x & 0xff;
     frame.timer.uByte7 = moved.position.y & 0xff;
@@ -1193,7 +1215,7 @@ export class MonsterAI {
         if (decoded.position !== position) continue;
         const missile = this.dungeon.getMissileRecord(rn);
         const timerIndex = missile?.timerIndex;
-        if (encounter.processMissileEncounter(-1, mapX, mapY, mapX, mapY, level, position, rn)) {
+        if (encounter.processMissileEncounter(-1, mapX, mapY, mapX, mapY, level, position, rn, c.mmr)) {
           if (timerIndex !== undefined) this.timers.deleteTimer(timerIndex);
           hitSomething = true;
           break;
@@ -1230,6 +1252,7 @@ export class MonsterAI {
     level: number,
     timerFunction: number,
     timeUntilAlternateUpdate: number,
+    mmr: MmRecord,
   ): InitialChecksResult {
     const party = this.ctx.party.state;
     const partyLevel = party.position.z | 0;
@@ -1279,7 +1302,7 @@ export class MonsterAI {
       for (let i = 0; i < numMon; i++) {
         if ((monster.hp[i] ?? 0) !== 0) continue;
         const result = this.ctx.systems.monsterDamage.damageMonster(
-          monster, i, level, mapX, mapY, 0, true, !onPartyLevel,
+          monster, i, level, mapX, mapY, 0, true, !onPartyLevel, mmr,
         );
         if (result !== MonsterDamageResult.NO_MONSTER_DIED) {
           const timer = this.makeTimer(mapX, mapY, level, timerFunction, timeUntilAlternateUpdate);
@@ -1314,7 +1337,7 @@ export class MonsterAI {
       if (probe.possible) {
         const newX = mapX + (DELTA_X[direction] ?? 0);
         const newY = mapY + (DELTA_Y[direction] ?? 0);
-        const moved = this.ctx.systems.monsters.moveMonster(monsterRn, mapX, mapY, newX, newY, level);
+        const moved = this.ctx.systems.monsters.moveMonster(monsterRn, mapX, mapY, newX, newY, level, undefined, mmr);
         this.trace(`      MAI MoveObject to (${newX},${newY}) returned ${moved.code}`);
         if (moved.code !== 0) {
           this.trace('      MAI Skip monster AI because MoveObject non-zero');

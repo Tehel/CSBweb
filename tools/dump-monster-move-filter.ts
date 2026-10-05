@@ -20,6 +20,16 @@
  * 5. **A level's own record comes first**, the dungeon's is the fallback, and a level
  *    whose record names a square without a DSA has no filter (`:3079-3162`).
  * 6. **The location is looked up once per level** (`:3079`), and kept.
+ * 7. **The post-move filter** (`ProcessPostMonsterMoveFilter`, `:3169-3233`), which every
+ *    `return` of the turn runs: the same DSA's column 1, its timer function 1, on the
+ *    variables the pre-move filter left, with a count of 9: where the group ended, the
+ *    group, the party's level and square, and the turn's two words of flags. Only after
+ *    a pre-move filter that ran.
+ * 8. **`finalLocr` follows the group** through the turn's `MMRECORD`: a step puts it on
+ *    the new square and sets `MonMove_differentCell` (`:3177-3183`); a group the turn's
+ *    `InitialChecks` kills (`Monster.cpp:2795-2835`) is nowhere, level -1
+ *    (`RemoveObjectFromRoom`, `CSBCode.cpp:5185-5188`); a step onto a level that refuses
+ *    the group also sets `MoveObject_NotAllowedOnLevel` (`Code11f52.cpp:3152-3156`).
  *
  * Run: `npx tsx tools/dump-monster-move-filter.ts`
  */
@@ -30,8 +40,9 @@ import type { DungeonData } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
+import { MonsterEvents } from '../src/engine/MmRecord';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { UNSET, globalStore, int, op, varFetch, withFilterDsas } from './lib/dsa';
+import { UNSET, globalStore, int, op, varFetch, varStore, withFilterDsas, type FilterDsa } from './lib/dsa';
 import { check, finish } from './lib/check';
 
 /** `ESL_MONSTERMOVEFILTER` (`doc/CSBwin-src/CSB.h:1537`), and its keys. */
@@ -62,7 +73,7 @@ function group(game: Game): { rn: ObjectID; at: Position } {
 }
 
 /** A game whose filter square holds `programs`, its location given by `records(locr)`. */
-function filterGame(programs: number[][], records: (locr: number) => Record<number, number>): { game: Game; locr: number } {
+function filterGame(programs: FilterDsa[], records: (locr: number) => Record<number, number>): { game: Game; locr: number } {
   const game = withFilterDsas(ESL_MONSTERMOVEFILTER, programs);
   const data: DungeonData = game.ctx.dungeon.getData();
   const locr = data.specialLocations![(3 << 24) | ESL_MONSTERMOVEFILTER]!;
@@ -209,6 +220,125 @@ const ran = (g: number[]): boolean => g[0] === 1;
   const second = ran(turn(game));
   console.log(`6. a turn, then the record removed, then a turn: ${first ? 'runs' : 'does not run'}, ${second ? 'runs' : 'does not run'}`);
   check(first && second, 'the location the first turn found is the one the level keeps');
+}
+
+/* ------------------------------- 7. the post-move filter ---------------------- */
+/** The post-move column: its count into global 10, its nine parameters into 11-19, variable 50 into 20. */
+const POST = [
+  op(StkOp.NUM_PARAM), globalStore(10),
+  ...int(9), ...int(20), op(StkOp.PARAM_FETCH),
+  ...Array.from({ length: 9 }, (_, i) => [varFetch(20 + i), globalStore(11 + i)]).flat(),
+  varFetch(50), globalStore(20),
+];
+/** The pre-move column: its count into global 0, and 42 into variable 50. */
+const PRE = [op(StkOp.NUM_PARAM), globalStore(0), ...int(42), varStore(50)];
+/** What the post-move filter saw, from the globals. */
+interface Post { count: number; final: number[]; group: number; party: number[]; flgs: number[]; variable: number }
+const post = (g: number[]): Post => ({
+  count: g[10]!, final: g.slice(11, 14), group: g[14]!, party: g.slice(15, 18), flgs: [g[18]! >>> 0, g[19]! >>> 0], variable: g[20]!,
+});
+const bit = (f: MonsterEvents): [number, number] => [f >>> 5, 1 << (f & 31)];
+const flagged = (p: Post, f: MonsterEvents): boolean => (p.flgs[bit(f)[0]]! & bit(f)[1]) !== 0;
+
+/** A game with both columns at a location reaching the whole level. */
+function postGame(maxDistance = 31): Game {
+  return filterGame([{ columns: [PRE, POST] }], (locr) => ({ [DUNGEON_KEY]: record(locr, maxDistance) })).game;
+}
+/** Where `rn` is on the party's level now, or null. */
+function where(game: Game, rn: ObjectID): Position | null {
+  const z = game.ctx.party.state.position.z;
+  const map = game.ctx.dungeon.getMap(z)!;
+  for (let x = 0; x < map.descriptor.width; x++) {
+    for (let y = 0; y < map.descriptor.height; y++) {
+      if (game.ctx.dungeon.findFirstMonster(new Position(x, y, z)) === rn) return new Position(x, y, z);
+    }
+  }
+  return null;
+}
+/** Turns of the group `rn`, ten ticks apart, until `stop` holds of what the post-move filter saw. */
+function turnsUntil(game: Game, rn: ObjectID, stop: (p: Post, from: Position) => boolean): { p: Post; from: Position } | null {
+  for (let i = 0; i < 40; i++) {
+    const from = where(game, rn);
+    if (!from) return null;
+    game.ctx.state.tickCount += 10;
+    game.systems.dsa.setGlobalVariables(new Array<number>(100).fill(UNSET));
+    const p = post(turn(game, TimerFunction.TT_MONSTER_BGROUP, from));
+    if (stop(p, from)) return { p, from };
+  }
+  return null;
+}
+
+{
+  const game = postGame();
+  const dsa = game.systems.dsa;
+  dsa.setParameters(3, [7, 8, 9]);
+  const { rn, at } = group(game);
+  const party = game.ctx.party.state.position;
+  const g = turn(game);
+  const p = post(g);
+  console.log(`7. a turn of the group ${rn} at ${at.z}(${at.x},${at.y}): the pre-move column saw ${g[0]} parameters; `
+    + `the post-move filter saw ${p.count} parameters, final [${p.final.join(', ')}], group ${p.group}, `
+    + `party [${p.party.join(', ')}], flags ${p.flgs.join(' ')}, variable 50 ${p.variable}`);
+  check(g[0] === 7, 'the pre-move filter runs column 0, and the post-move filter does not');
+  check(p.count === 9, 'the post-move filter runs column 1, with a count of 9');
+  check(p.final.join() === [at.z, at.x, at.y].join() && where(game, rn)?.toString() === at.toString(),
+    'the group stayed: finalLocr is its square');
+  check(p.group === rn && p.party.join() === [party.z, party.x, party.y].join(), 'the group, the party\'s level and square');
+  check(!flagged(p, MonsterEvents.MonMove_differentCell), 'no MonMove_differentCell');
+  check(p.variable === 42, 'the post-move filter has the variables the pre-move filter left (one DSAVARS)');
+  check(!dsa.monsterMoveFilterActive, 'monsterMoveFilterActive is cleared after it');
+  check([0, 1, 2].map((i) => dsa.getParameter(i)).join() === '7,8,9', 'the caller\'s parameters are as they were');
+
+  const reaction = postGame();
+  const g1 = turn(reaction, TimerFunction.TT_M1);
+  const far = postGame(0);
+  const { at: farAt } = group(far);
+  far.ctx.party.state.position.x = farAt.x + 1;
+  const g2 = turn(far);
+  console.log(`7. a reaction: post-move count ${g1[10] === UNSET ? 'unset' : g1[10]}; `
+    + `a turn beyond maxDistance: ${g2[10] === UNSET ? 'unset' : g2[10]}`);
+  check(g1[10] === UNSET && g2[10] === UNSET, 'no pre-move filter, no post-move filter');
+}
+
+/* ------------------------------- 8. finalLocr ---------------------------------- */
+{
+  const game = postGame();
+  const { rn } = group(game);
+  const moved = turnsUntil(game, rn, (p, from) => p.final.join() !== [from.z, from.x, from.y].join());
+  const now = where(game, rn);
+  console.log(`8. the turn that moved the group from ${moved?.from.x},${moved?.from.y}: final [${moved?.p.final.join(', ')}], `
+    + `it is at ${now?.x},${now?.y}; flags ${moved?.p.flgs.join(' ')}`);
+  check(moved !== null && now !== null && moved.p.final.join() === [now.z, now.x, now.y].join(),
+    'a step: finalLocr is the square the group now stands on');
+  check(moved !== null && flagged(moved.p, MonsterEvents.MonMove_differentCell)
+    && !flagged(moved.p, MonsterEvents.MoveObject_NotAllowedOnLevel), 'MonMove_differentCell, and only it of the two');
+}
+{
+  const game = postGame();
+  const { rn } = group(game);
+  const monster = game.ctx.dungeon.getCreatureRecord(rn)!;
+  monster.hp[0] = 0;
+  const p = post(turn(game));
+  console.log(`8. a one-member group at 0 HP: final [${p.final.join(', ')}], flags ${p.flgs.join(' ')}, `
+    + `the group ${where(game, rn) ? 'still there' : 'gone'}`);
+  check((monster.numMonM1 & 3) === 0, 'the group has one member');
+  check(p.final.join() === '-1,0,0' && where(game, rn) === null, 'InitialChecks deletes it: finalLocr is nowhere, level -1');
+  check(flagged(p, MonsterEvents.MonMove_differentCell), 'MonMove_differentCell');
+}
+{
+  const game = postGame();
+  const { rn } = group(game);
+  const map = game.ctx.dungeon.getMap(game.ctx.party.state.position.z)!;
+  const allowed = map.monsterTypes;
+  map.monsterTypes = [];
+  const refused = turnsUntil(game, rn, (p) => p.final[0] === -1);
+  map.monsterTypes = allowed;
+  console.log(`8. the level refusing the group: final [${refused?.p.final.join(', ')}], flags ${refused?.p.flgs.join(' ')}, `
+    + `the group ${where(game, rn) ? 'still there' : 'gone'}`);
+  check(refused !== null && refused.p.final.join() === '-1,0,0' && where(game, rn) === null,
+    'a step the level refuses deletes the group: finalLocr is nowhere');
+  check(refused !== null && flagged(refused.p, MonsterEvents.MoveObject_NotAllowedOnLevel)
+    && flagged(refused.p, MonsterEvents.MonMove_differentCell), 'MoveObject_NotAllowedOnLevel and MonMove_differentCell');
 }
 
 finish();

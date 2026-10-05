@@ -22,6 +22,7 @@ import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
+import { MonsterEvents, type MmRecord } from './MmRecord';
 import { DeleteMonsterWhy, deleteMonsterParameters } from './MonsterDamage';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
@@ -495,6 +496,12 @@ export class MonsterSystem {
    * `MoveObject` (`MoveObject.cpp:538`), which overrides the turn the same way. Nothing
    * reads a group's corner in between: the pads read it only in a stone cell.
    *
+   * `mmr` is `pmmr`, the record of the group's turn, which `ProcessTimers29to41` hands
+   * down and every other caller leaves out. It follows the group: lifted, it is nowhere
+   * (`RemoveObjectFromRoom`, `CSBCode.cpp:5185-5188`), set down, it is on its square
+   * (`AddObjectToRoom`, `:432-435`), and refused by the level, its level is -1 and
+   * `MoveObject_NotAllowedOnLevel` is set (`:3152-3156`).
+   *
    * Returns `code`, CSBWin's return value, and `position`, its `d.NewX`, `d.NewY` and
    * `d.NewLevel` (`:3174-3176`) — where the group ended up. Every caller that goes on
    * after a move does so only when `code` is 0 (`Monster.cpp:1711`, `:2105`, `:2440`,
@@ -519,6 +526,7 @@ export class MonsterSystem {
     newY: number,
     level: number,
     cornerAfter?: number,
+    mmr?: MmRecord,
   ): { code: number; position: Position } {
     const requested = new Position(newX, newY, level);
     const monster = this.dungeon.getCreatureRecord(monsterRn);
@@ -540,18 +548,19 @@ export class MonsterSystem {
         new Position(oldX, oldY, level),
         newX >= 0 ? requested : null,
         monsterRn,
+        mmr,
       );
       if (hit) return { code: 1, position: requested };
     }
 
     // Lifted and not set down again (`:3297`).
     if (newX < 0) {
-      if (fromDungeon) this.liftMonster(monsterRn, oldX, oldY, level, levitated);
+      if (fromDungeon) this.liftMonster(monsterRn, oldX, oldY, level, levitated, mmr);
       return { code: 0, position: requested };
     }
 
     // Follow teleporters and fall down pits, exactly as the party does.
-    const resolved = this.ctx.systems.worldMove.resolveMonsterDestination(requested, monsterRn, oldX, oldY);
+    const resolved = this.ctx.systems.worldMove.resolveMonsterDestination(requested, monsterRn, oldX, oldY, mmr);
 
     const destination = resolved.position;
     const destLevel = destination.z | 0;
@@ -563,12 +572,16 @@ export class MonsterSystem {
     if (resolved.groupDied || !this.dungeon.monsterAllowedOnLevel(monster.creatureType, destLevel)) {
       const monsterDamage = this.ctx.systems.monsterDamage;
       const dmp = deleteMonsterParameters(DeleteMonsterWhy.DMW_Movement1, -1);
+      if (mmr) {
+        mmr.setflg(MonsterEvents.MoveObject_NotAllowedOnLevel);
+        mmr.finalLocr.l = -1;
+      }
       monsterDamage.flushPendingDroppings(monster.creatureType, destLevel, destination.x, destination.y);
       if (fromDungeon) monsterDamage.processMonsterDeleteFilter(level, oldX, oldY, dmp);
       monsterDamage.dropMonsterRemains(
         destLevel, destination.x, destination.y, placed, 2, fromDungeon ? level : -1, dmp.dropResidue < 2,
       );
-      if (fromDungeon) monsterDamage.deleteMonster(level, oldX, oldY);
+      if (fromDungeon) monsterDamage.deleteMonster(level, oldX, oldY, mmr);
       return { code: 1, position: destination };
     }
 
@@ -579,7 +592,7 @@ export class MonsterSystem {
       return { code: 0, position: destination };
     }
 
-    if (fromDungeon) this.liftMonster(placed, oldX, oldY, level, levitated);
+    if (fromDungeon) this.liftMonster(placed, oldX, oldY, level, levitated, mmr);
 
     // The destination is unusable if the party is standing there or another monster
     // already is. CSBWin then parks the group on a TT_60/TT_61 timer to retry.
@@ -606,6 +619,7 @@ export class MonsterSystem {
 
     // Set it down (`:3384-3399`): "Not current room. Room changed."
     this.dungeon.addObjectToCell(destination, placed);
+    mmr?.objectAdded(placed, destLevel, destination.x, destination.y);
     if (!levitated) this.ctx.systems.actuators.triggerObjectMove(destination, placed, true, false, this.ctx.party.state.facing);
 
     // A freshly attached group, or one placed from nowhere, needs its first timer.
@@ -629,8 +643,16 @@ export class MonsterSystem {
    * a levitating group through `RemoveObjectFromRoom`, any other through
    * `PlaceOrRemoveObjectInRoom` with `unchangedRoom` = "the party stands here".
    */
-  private liftMonster(monsterRn: ObjectID, oldX: number, oldY: number, level: number, levitated: boolean): void {
+  private liftMonster(
+    monsterRn: ObjectID,
+    oldX: number,
+    oldY: number,
+    level: number,
+    levitated: boolean,
+    mmr: MmRecord | undefined,
+  ): void {
     const old = new Position(oldX, oldY, level);
+    mmr?.objectRemoved(monsterRn);
     this.dungeon.removeObjectFromCell(old, monsterRn);
     if (levitated) return;
     const party = this.ctx.party.state.position;

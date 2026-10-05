@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | Three DSA filters, and the viewing filter's third site | L | ⏳ step 9b of 12 next |
+| G2 | Three DSA filters, and the viewing filter's third site | L | ⏳ step 9c of 12 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -320,7 +320,7 @@ The rest of the item, with an operation that needs care when ported:
 ### G2 ⏳ Three DSA filters, and the viewing filter's third site
 
 The port runs fifteen filters: the viewing filter (two of its three sites), the monster
-move filter (before a turn, not after it), the monster attack filter, the delete monster
+move filter (without the turn's flags), the monster attack filter, the delete monster
 filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
 sound filter, the action name filter, the feeding filter, the character death filter, the
 damage filter, the equip filter, the party move filter, and the spell filter at
@@ -340,29 +340,21 @@ A filter that loops runs each of those DSAs in turn, a filter call apiece; one t
 two on the square where the site loops. Steps 1 to 8, the sound filter, the action name
 filter, the feeding filter, the character death and damage filters, the equip filter, the
 party move filter, the monster attack filter, and the delete monster filter, are paid, and
-so is step 9a, the monster move filter's location and its run before a turn. The steps
-left, one commit each but for 9's two:
+so are steps 9a and 9b, the monster move filter's location, its run before a turn, and its
+run after it on `finalLocr`. The steps left, one commit each:
 
-9. **`ESL_MONSTERMOVEFILTER`** (L), three commits, the first paid. The filter runs one
-   DSA, the first type-47 actuator at its location, twice a turn: before it, with timer
-   function 0 (`DsaSystem.monsterMoveFilter`, `Monster.cpp:3311-3357`), and at each of
-   the turn's 35 `return`s, with function 1 (`ProcessPostMonsterMoveFilter`,
-   `:3169-3233`), on one `MMRECORD`'s timer and `DSAVARS` (`CSB.h:2884-2897`), which the
-   port's pre-move filter makes for itself and drops. The post-move filter is a second
-   `ProcessDSAFilter` like the first, the record's timer with function 1.
-   - **9b. The post-move filter, with `finalLocr`** (M). Its nine parameters are where
-     the group ended, the group, the party, and the two words of flags. `finalLocr` is
-     set by `AddObjectToRoom` and `RemoveObjectFromRoom` when the object is the group
-     (`Code11f52.cpp:432-434`, `CSBCode.cpp:5185-5188`) and by `MoveObject`'s level
-     refusal (`Code11f52.cpp:3152-3155`), through the `MMRECORD` that `MoveObject`,
-     `DeleteMonster`, `DamageMonster(Group)`, `CreateCloud` and `CheckMoveFromMissile`
-     pass down; the port's `MonsterSystem.moveMonster`, `WorldMove.moveObject` and
-     `MonsterDamage` would take it. This commit sets the two flags those sites set,
-     `MoveObject_NotAllowedOnLevel` and `MonMove_differentCell`, and no other.
+9. **`ESL_MONSTERMOVEFILTER`** (L), three commits, the first two paid. The filter runs
+   one DSA, the first type-47 actuator at its location, before a group's turn
+   (`DsaSystem.monsterMoveFilter`, `Monster.cpp:3311-3357`) and after it
+   (`DsaSystem.postMonsterMoveFilter`, `:3169-3233`), on the turn's `MmRecord`
+   (`MMRECORD`, `CSB.h:2884-2897`), which `MonsterAI.processTimers29to41` makes and hands
+   down as CSBWin's `pmmr`. The post-move filter's last two parameters are the record's
+   flags, of which the port sets two: `MoveObject_NotAllowedOnLevel`
+   (`MonsterSystem.moveMonster`) and `MonMove_differentCell`.
    - **9c. The turn's flags** (M): the 53 `Setflg`s of `MONSTEREVENTS`
      (`CSB.h:2815-2868`) that `ProcessTimers29to41` and its helpers make, from
      `MDF6TI_turnMonsterTowardParty` (`Monster.cpp:1499`) on. The port's helpers take
-     the `AiFrame`, which can carry the record.
+     the `AiFrame` or the `AiConst`, whose `mmr` is the record.
 10. **`ESL_CURSORFILTER`** (L, split when taken). `CursorFilter` (`MoveObject.cpp:797`,
     the DSA at `:846`), which may cancel what is about to happen to the object on the
     cursor. CSBWin sends it a packet from 21 places. The port sends six of the packet
@@ -428,9 +420,9 @@ flag (`doc/CSBwin-src/SaveGame.cpp:2604`), and Conflux's has it.
 (`SaveGame.cpp:394-400`, `false` by default). The port models neither: `CreatureRecord`
 holds the raw bits, the renderer's `DrawRoomObjects` / `DrawMonster` take both options as
 false (every creature drawn, never `DrawSize4Index`), and `monster.drawAsSize4` is read ungated in
-`MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:373`) and in `MonsterDamage`
-(`:508`, `:544`). The four gated getters are in `MonsterSystem.ts` (`monsterInvisible` to
-`monsterPoisoned`, `:73-84`), with both options a constant `false`; only `monsterUnique`'s
+`MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:381`) and in `MonsterDamage`
+(`:619`, `:657`). The four gated getters are in `MonsterSystem.ts` (`monsterInvisible` to
+`monsterPoisoned`, `:74-85`), with both options a constant `false`; only `monsterUnique`'s
 caller and `&MONSTER@` read through them. Harmless on DM, because no creature in
 `dm-atari/dungeon.dat` sets any of bits 11-14. Conflux sets both options (`extendedFlags` 0x76), and of its 1257 creature
 groups 3 are invisible, 372 drawn as size 4 and 194 unique. Modelling it means reading `EF_EXTENDED_FLAGS.InvisibleMonsters` and
@@ -715,7 +707,7 @@ gathered back, never one thrown from the cursor:
 
 A thrown object keeps its `ObjectID` all the way: in the missile's `projectileObject`,
 on the floor where it lands, and in a monster's possessions when a hit absorbs it
-(`MissileEncounter.ts:436`), which the monster drops when it dies. So a tag table
+(`MissileEncounter.ts:444`), which the monster drops when it dies. So a tag table
 `ObjectID → { champion, slot }`, filled at the throw, follows it without any further
 work.
 

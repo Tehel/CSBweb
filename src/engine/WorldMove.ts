@@ -22,6 +22,7 @@ import { setPackedBits } from './MonsterSystem';
 import { StateOfFear } from './monsterTypes';
 import { decodeMissileTimerWord8 } from './missileHelpers';
 import type { TimerQueue } from './TimerQueue';
+import type { MmRecord } from './MmRecord';
 
 /** `soundTELEPORT` (`doc/CSBwin-src/CSB.h:625`). */
 const SOUND_TELEPORT = 17;
@@ -38,6 +39,8 @@ interface MonsterMove {
   oldY: number;
   attachedLevel: number;
   noItem16: boolean;
+  /** `MoveObject`'s `pmmr`, which the fall's `DamageMonsterGroup` takes (`:3097`). */
+  mmr: MmRecord | undefined;
 }
 
 export class WorldMove {
@@ -236,6 +239,7 @@ export class WorldMove {
     monsterRn: ObjectID,
     oldX: number,
     oldY: number,
+    mmr?: MmRecord,
   ): { position: Position; code: number; audible: boolean; groupDied: boolean; corner: number } {
     const rec = this.dungeon.getCreatureRecord(monsterRn);
     const decoded = this.dungeon.rnMaps.decode(monsterRn);
@@ -250,7 +254,7 @@ export class WorldMove {
       facing,
       undefined,
       canFall,
-      rec ? { record: rec, oldX, oldY, attachedLevel: destination.z, noItem16: !item16Attached } : undefined,
+      rec ? { record: rec, oldX, oldY, attachedLevel: destination.z, noItem16: !item16Attached, mmr } : undefined,
     );
     return {
       position: result.position,
@@ -506,7 +510,7 @@ export class WorldMove {
    */
   private monsterFallsIntoPit(monster: MonsterMove): number {
     return this.ctx.systems.monsterDamage.damageMonsterGroup(
-      monster.record, monster.attachedLevel, monster.oldX, monster.oldY, 20, false, monster.noItem16,
+      monster.record, monster.attachedLevel, monster.oldX, monster.oldY, 20, false, monster.noItem16, monster.mmr,
     );
   }
 

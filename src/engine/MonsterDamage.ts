@@ -28,6 +28,7 @@ import { RN_MONSTER_DEATH } from '../core/spellRn';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
+import type { MmRecord } from './MmRecord';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import { setPackedBits } from './MonsterSystem';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
@@ -448,9 +449,10 @@ export class MonsterDamage {
    * The HP array is cleared *before* the group is lifted with `MoveObject(obj, x, y,
    * -1, 0)` (`:1037-1038`) — so `CheckMoveFromMissile` finds no hit points and returns
    * at once (`:2593-2596`) — and the lift releases the square's pads. Without the hook
-   * (a standalone `MonsterDamage`) the group is only unlinked.
+   * (a standalone `MonsterDamage`) the group is only unlinked. `mmr` is the turn's record,
+   * which the lift tells the group is gone.
    */
-  deleteMonster(level: number, mapX: number, mapY: number): void {
+  deleteMonster(level: number, mapX: number, mapY: number, mmr?: MmRecord): void {
     const position = new Position(mapX, mapY, level);
     const rn = this.dungeon.findFirstMonster(position);
     if (rn === OBJECT_ID_EOF) return;
@@ -459,7 +461,7 @@ export class MonsterDamage {
 
     this.trace(`Deleting monster ${rn.toString(16)} ${level}(${mapX},${mapY})`);
     monster.hp = [0, 0, 0, 0];
-    this.ctx.systems.monsters.moveMonster(rn, mapX, mapY, -1, 0, level);
+    this.ctx.systems.monsters.moveMonster(rn, mapX, mapY, -1, 0, level, undefined, mmr);
     const groupIndex = monster.groupIndex;
     this.dungeon.deleteDBEntry(rn);
 
@@ -502,6 +504,7 @@ export class MonsterDamage {
     damage: number,
     apply: boolean,
     noItem16: boolean,
+    mmr?: MmRecord,
   ): MonsterDamageResult {
     // `d.Word13046 = 0` (`doc/CSBwin-src/Code11f52.cpp:1333`): whatever an earlier call
     // left for `TAG00b522` is forgotten.
@@ -515,7 +518,7 @@ export class MonsterDamage {
 
     for (let index = monster.numMonM1 & 3; index >= 0; index--) {
       const dealt = base + this.random.below(2 * spread);
-      const result = this.damageMonster(monster, index, level, mapX, mapY, dealt, apply, noItem16);
+      const result = this.damageMonster(monster, index, level, mapX, mapY, dealt, apply, noItem16, mmr);
       const died = result !== MonsterDamageResult.NO_MONSTER_DIED;
       allDied = allDied && died;
       anyDied = anyDied || died;
@@ -551,6 +554,7 @@ export class MonsterDamage {
     damage: number,
     apply: boolean,
     noItem16: boolean,
+    mmr?: MmRecord,
   ): MonsterDamageResult {
     const desc = this.getDesc(monster);
     if (!desc) return MonsterDamageResult.NO_MONSTER_DIED;
@@ -586,7 +590,7 @@ export class MonsterDamage {
         if (rn !== OBJECT_ID_EOF) {
           this.dropMonsterRemains(level, attackX, attackY, rn, 2, level, dmp.dropResidue < 2);
         }
-        this.deleteMonster(level, attackX, attackY);
+        this.deleteMonster(level, attackX, attackY, mmr);
       }
       result = MonsterDamageResult.ALL_MONSTERS_DIED;
     } else {
@@ -614,10 +618,10 @@ export class MonsterDamage {
       const size = [110, 190, 255][monsterHorizontalSize(desc)] ?? 255;
       if (monster.drawAsSize4) {
         if (numMonM1 === 0) {
-          this.ctx.systems.missileEncounter.createDeathCloud(RN_MONSTER_DEATH, 255, new Position(attackX, attackY, level), 255);
+          this.ctx.systems.missileEncounter.createDeathCloud(RN_MONSTER_DEATH, 255, new Position(attackX, attackY, level), 255, mmr);
         }
       } else {
-        this.ctx.systems.missileEncounter.createDeathCloud(RN_MONSTER_DEATH, size, new Position(attackX, attackY, level), deadPosition);
+        this.ctx.systems.missileEncounter.createDeathCloud(RN_MONSTER_DEATH, size, new Position(attackX, attackY, level), deadPosition, mmr);
       }
     }
 

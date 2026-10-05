@@ -35,6 +35,7 @@ import { MonsterType } from './monsterTypes';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
 import { DescIndex, IsAKey } from './objectIndex';
 import { TimerFunction, type TimerQueue } from './TimerQueue';
+import type { MmRecord } from './MmRecord';
 import { setDoorState, type MissileDropTarget } from './TimerSystem';
 
 const WEAPON_DAGGER = 8;
@@ -86,7 +87,12 @@ export class MissileEncounter {
     return (this.monsterDamageResult as number) === MonsterDamageResult.ALL_MONSTERS_DIED;
   }
 
-  private checkMoveFromMissile(oldPos: Position, newPos: Position | null, movedObject: ObjectID | null): void {
+  private checkMoveFromMissile(
+    oldPos: Position,
+    newPos: Position | null,
+    movedObject: ObjectID | null,
+    mmr: MmRecord | undefined,
+  ): void {
     const party = this.ctx.party.state;
     const movedObjectType = movedObject === null ? -2 : -1;
     const whoLeavesCell = [0, 0, 0, 0];
@@ -169,6 +175,7 @@ export class MissileEncounter {
             level,
             (leaving - 1) & 0xff,
             missileRn,
+            mmr,
           );
 
           if (hit) {
@@ -206,15 +213,15 @@ export class MissileEncounter {
    */
   checkPartyMoveFromMissile(from: Position, to: Position | null): boolean {
     this.movedObjectWasDestroyed = false;
-    this.checkMoveFromMissile(from, to, null);
+    this.checkMoveFromMissile(from, to, null, undefined);
     return this.movedObjectWasDestroyed;
   }
 
-  /** `CheckMoveFromMissile` for a monster leaving a square. */
-  checkMonsterMoveFromMissile(from: Position, to: Position | null, monsterRn: ObjectID): boolean {
+  /** `CheckMoveFromMissile` for a monster leaving a square, with `MoveObject`'s `pmmr`. */
+  checkMonsterMoveFromMissile(from: Position, to: Position | null, monsterRn: ObjectID, mmr?: MmRecord): boolean {
     this.movedObjectWasDestroyed = false;
     this.monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
-    this.checkMoveFromMissile(from, to, monsterRn);
+    this.checkMoveFromMissile(from, to, monsterRn, mmr);
     return this.movedObjectWasDestroyed;
   }
 
@@ -233,6 +240,7 @@ export class MissileEncounter {
     level: number,
     objectPos: number,
     missileRn: ObjectID,
+    mmr?: MmRecord,
   ): boolean {
     const missile = this.dungeon.getMissileRecord(missileRn);
     if (!missile) return false;
@@ -358,7 +366,7 @@ export class MissileEncounter {
         }
         // The missile is spent either way: a dispel missile does a champion no damage
         // at all (`DetermineMagicDamage` returns 0 for it) and still lands.
-        return this.finishMissileEncounter(missileRn, missile, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+        return this.finishMissileEncounter(missileRn, missile, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY, mmr);
       }
       case -1: {
         // The monster arm (`doc/CSBwin-src/Code11f52.cpp:1960-2042`).
@@ -404,7 +412,7 @@ export class MissileEncounter {
           // `DetermineMagicDamage` call above just set.
           const poison = sw(this.ctx.systems.monsterDamage.determinePoisonDamage(monsterType, magic.poisonStrength));
           const result = this.ctx.systems.monsterDamage.damageMonster(
-            monster, monsterOrdinal - 1, position.z, objX, objY, blow + poison, true, false,
+            monster, monsterOrdinal - 1, position.z, objX, objY, blow + poison, true, false, mmr,
           );
           // "At least one monster in group remains": the survivors react.
           if (result !== MonsterDamageResult.ALL_MONSTERS_DIED) {
@@ -437,13 +445,13 @@ export class MissileEncounter {
             }
           }
         }
-        return this.finishMissileEncounter(missileRn, missile, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+        return this.finishMissileEncounter(missileRn, missile, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY, mmr);
       }
       default:
         break;
     }
 
-    return this.finishMissileEncounter(missileRn, missile, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+    return this.finishMissileEncounter(missileRn, missile, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY, mmr);
   }
 
   missileEncounterFilter(
@@ -540,6 +548,7 @@ export class MissileEncounter {
     nonPoisonSpell: boolean,
     objX: number,
     objY: number,
+    mmr: MmRecord | undefined,
   ): boolean {
     // `pDBmissile`, read before the switch (`doc/CSBwin-src/Code11f52.cpp:1761`): a
     // filter can delete the missile meanwhile, and the tail goes on with its record.
@@ -555,7 +564,7 @@ export class MissileEncounter {
         }
       }
       const cloudPos = projectile === RN_POISON_CLOUD ? 255 : objectPos & 0xff;
-      this.createCloud(projectile, size, objX, objY, position, cloudPos);
+      this.createCloud(projectile, size, objX, objY, position, cloudPos, mmr);
     } else {
       this.playMissileImpactSound(projectile, position);
     }
@@ -613,8 +622,8 @@ export class MissileEncounter {
    * (`doc/CSBwin-src/Code11f52.cpp:1376`, called from `DamageMonster`). The cloud
    * machinery lives here because that is where every other cloud is made.
    */
-  createDeathCloud(projectile: ObjectID, size: number, position: Position, posInCell: number): void {
-    this.createCloud(projectile, size, position.x, position.y, position, posInCell);
+  createDeathCloud(projectile: ObjectID, size: number, position: Position, posInCell: number, mmr?: MmRecord): void {
+    this.createCloud(projectile, size, position.x, position.y, position, posInCell, mmr);
   }
 
   /**
@@ -661,6 +670,7 @@ export class MissileEncounter {
     objY: number,
     position: Position,
     posInCell: number,
+    mmr?: MmRecord,
   ): void {
     if (objX < 0 || objY < 0) return;
     // `P1.GetSpellType()` (doc/CSBwin-src/Code11f52.cpp:1428).
@@ -710,7 +720,7 @@ export class MissileEncounter {
     damage -= this.random.below(2 * fireResistance + 1);
     if (damage <= 0) return;
     this.monsterDamageResult =
-      this.ctx.systems.monsterDamage.damageMonsterGroup(monster, position.z, objX, objY, damage, true, false);
+      this.ctx.systems.monsterDamage.damageMonsterGroup(monster, position.z, objX, objY, damage, true, false, mmr);
   }
 
   private createCloudRecord(cloudType: number, size: number, posInCell: number): ObjectID | null {

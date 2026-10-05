@@ -3809,6 +3809,37 @@ from the other filters' (`CSBCode.cpp:8685-8686`). `ProcessDSATimer6` takes `uBy
 (`DSA.cpp:5385-5386`), so the DSA's master stands at `(y, x)` of the group's level.
 `tools/dump-monster-move-filter.ts`.
 
+## The monster move filter runs again after the turn, on where the group ended
+
+Every `return` of `ProcessTimers29to41`, from `InitialChecks`'s (`doc/CSBwin-src/Monster.cpp:3373`)
+to the last (`:4448`), calls `ProcessPostMonsterMoveFilter` first (`:3169-3233`), with the
+turn's `MMRECORD` (`CSB.h:2884-2897`). It returns at once unless the pre-move filter ran
+(`CalledPreMoveFilter`, set just before it, `:3351`). Otherwise it sets
+`MonMove_differentCell` (51, `CSB.h:2867`) when `finalLocr` differs from `locr` in level,
+x or y, sets the record's timer to function 1 and position 0, and runs the same DSA
+(`pmmfloc->filterObj`) through `ProcessDSAFilter` on that timer and on the record's
+`dsaVars`, the variables the pre-move filter left. The function picks the column:
+`inputMsgType = 3 * timerPosition + timerTypeModifier[function]` (`DSA.cpp:5383`, `:5415`),
+so the pre-move filter is the DSA's column 0 and the post-move filter its column 1. Its
+parameters, under `NEWDSAPARAMETERS`, are a count of 9: `finalLocr`'s level, x and y, the
+group's RN, the party's level, x and y, and `flgs[0]` and `flgs[1]` (`:3211-3220`).
+
+`mmr.locr` and `mmr.finalLocr` start as the group's square (`:3330-3334`). The record goes
+down, as `pmmr`, through `InitialChecks` and the turn's helpers to every `MoveObject`,
+`DeleteMonster`, `DamageMonster`, `DamageMonsterGroup`, `CreateCloud`,
+`CheckMoveFromMissile` and `ProcessMissileEncounter` the turn calls, and three places
+change `finalLocr` when the object they handle is `pmmr->objMonster`:
+`AddObjectToRoom` sets it to the loaded level and the square (`Code11f52.cpp:432-435`), or
+to `(-1, 0, 0)` when `mapX < 0` (`:486-489`); `RemoveObjectFromRoom` sets `(-1, 0, 0)`
+(`CSBCode.cpp:5185-5188`); and `MoveObject`, when the fall killed the group or the level
+refuses its type, sets `MoveObject_NotAllowedOnLevel` (50) and `finalLocr.l = -1`
+(`Code11f52.cpp:3152-3156`) before `DeleteMonster` lifts it. A group the turn kills or
+moves off the level ends at `(-1, 0, 0)`; one that steps ends on its new square. Every
+other caller of those functions passes `NULL`, so a DSA that moves the group, the
+pre-move filter's own included, leaves `finalLocr` alone. `RN ==` compares the slot
+(`CSBTypes.h:349-352`), so the stairs' turn of the group's corner does not break the
+match. `tools/dump-monster-move-filter.ts`.
+
 ## The `QueueSound` calls, and the level each is on
 
 | Sound | CSBWin's call | Ordinal → SND item | Level |
