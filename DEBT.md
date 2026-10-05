@@ -341,6 +341,27 @@ last slot's HP to 0, so that slot keeps a copy of the last champion, possessions
 reads (`doc/PROVEN_FACTS.md` → "A `CHARDESC` slot past the party holds zeros, or the
 champion who left it").
 
+What porting it takes, read from the source:
+
+- **The record.** `SaveToWings` writes the 800-byte `CHARDESC` as it sits in the
+  little-endian build's memory, as eight records of 25 longwords under
+  `(EDT_Character << 24) | (i << 16) | fingerPrint`, each after a `Read` of the same key
+  that drops an older one (`Character.cpp:5149-5169`). Memory is the file's form with
+  `swapCharacter`'s fields byte-swapped (`SaveGame.cpp:490-521`), and the pool's
+  longwords are those bytes read little-endian, as the overlay palette's are
+  (`src/data/CsbwinExpool.ts`). So `writeCsbwinCharacter`, then `swapCharacter`'s swaps,
+  then a little-endian read gives the 200 longwords, and the reverse reads one back.
+  `Expool` already has `read`, `write` and `locate`; the wings go to a save with the pool.
+- **The reads.** `GetFromWings(fp, testOnly)` takes the eight records out of the pool
+  (`Read`) or, `testOnly`, copies them (`Locate`), and fails on a record missing or not 25 longwords
+  long, or on a `fingerPrint` that is not `fp` (`:5171-5218`). `LocateInWings` returns
+  record 0 alone, enough for the name (`:5220-5236`).
+- **`SwapCharacter`** (`:5472-5510`): its three cases, `CharacterDelete` (`:5351-5414`),
+  `CharacterAdd` (`:5417-5436`) and `CharacterSwap` (`:5438-5469`), and through them
+  `RemoveCharacter` (`:5254-5337`) and a busy champion's timer ended as if expired
+  (`TAG011366`, `Timer.cpp:2686`). `CharacterDelete` `die`s when a champion it shifts
+  holds a timer (`:5368-5374`).
+
 ### G4 ⏳ Custom-dungeon extensions: external portraits, the monster design options
 
 **External portraits** for `charID > 23` (`GetExternalPortraitAddress`,
