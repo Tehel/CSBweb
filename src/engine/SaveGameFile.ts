@@ -99,6 +99,7 @@ function buildFileBlocks(
             dsaIndex: dungeon.dsaIndex,
             signatures: game.ctx.signatures,
             hintKey: dungeon.hintKey,
+            overlay: game.ctx.overlay.toExtendedFeatures(),
         }),
         dungeonImage: buildDungeonImage(dungeon, {
             indirectText: true,

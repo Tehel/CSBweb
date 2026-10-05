@@ -2738,6 +2738,48 @@ Verified, not inferred: seven of them, ids 44, 46, 47, 49, 50, 146 and 148 in bo
 decode this way to cells 14, 12, 8, 4, 7, 23 and 22 of CSB's basic graphic 26, pixel for
 pixel (`tools/dump-portraits.ts`). Top-down rows or swapped nibbles would match none.
 
+## A viewport overlay is a 224x136 bitmap of bytes, and its end is a `d.Time`
+
+`OVERLAYDATA::ReadOverlay` reads a `CGT_ViewportOverlay` section of `CSBgraphics.dat`
+(`doc/CSBwin-src/Bitmaps.cpp:572-630`) as a Windows bitmap: the 14- and 40-byte headers,
+`biClrUsed` colours (256 when 0), then `(biWidth+1)/2*2 * biHeight` pixel bytes, copied as
+they stand, no more than `136*224`. The colours go into `m_overlayPalette` and the
+parameters `m_p1`-`m_p4` back to 0. Every one of Conflux 3.5's 112 overlays is 224x136
+with 256 colours; `UpdateScreenArea` reads line `135 - line`, the file's bottom-up order
+(`WinScreen.cpp:1249`).
+
+- `&OVERLAY` pops the overlay number, then `p4`, `p3`, `p2`, `p1` (`DSA.cpp:2919-2930`).
+  `SelectOverlay` (`Bitmaps.cpp:687-720`) reads the overlay unless it is the one in memory,
+  and sets `overlayActive` to whether it has one; a change of `p1`'s bit 1 mirrors every
+  line (`Mirror`, `:632-649`); a `p3` of 0 keeps the end, another sets it to `d.Time + p3`.
+  `p1` bit 0 makes colour `p4` transparent, and `p2` is the graphic's share of a pixel in
+  percent (`CreateOverlayTable`, `Graphics.cpp:2978-3069`).
+- The overlay goes down at the tick whose `d.Time++` takes `d.Time` past `m_p3`, checked
+  after both `d.Time++`s (`CSBCode.cpp:675`, `Attack.cpp:2209`). Otherwise only a failed
+  read puts it down, and a read's Extended Features block.
+- `&PALETTE` pops `density`, the number, then two words `SetOverlayPalette` does not read
+  (`DSA.cpp:2932-2944`). A negative number is `ClearOverlayPalette`; another blends a
+  `CGT_OverlayPalette` section's 512 little-endian RGB555 words in, each 5-bit intensity
+  `v` widened to `v << 3 | v >> 2`, as `(old * (100 - density) + new * density + 50) / 100`
+  (`Bitmaps.cpp:651-685`).
+- `&JITTER` pops `yOverlayJitter`, `xOverlayJitter`, `yGraphicJitter`, `xGraphicJitter`
+  (`DSA.cpp:4903-4930`).
+- A save writes `OverlayActive` from `overlayActive`, and `overlayOrdinal` as
+  `m_overlayNumber + 1` with `m_p1`-`m_p4` whether or not the overlay is up
+  (`SaveGame.cpp:968-976`). `_ReadEntireGame` first frees the overlay
+  (`currentOverlay.Cleanup()`, `:1472`); a block then sets `overlayActive` from the flag and,
+  for an ordinal above 0, calls `SelectOverlay` again (`:421-430`), which puts the overlay up
+  whatever the flag said. `d.Initialize()` has set `d.Time` to 0 before the read
+  (`CSBCode.cpp:346`), so the saved `m_p3` comes back as the same `d.Time`. A file without
+  the block leaves `overlayActive` as it was (`:323`, `:341`).
+- `ReadCSBgraphic`'s `static bool firstTime` is one for all its failures: the first, if it
+  is a file that will not open, also sets `overlayActive = false` (`Graphics.cpp:3220-3228`);
+  a missing section asked with `mustExist` clears it too (`:3253-3262`), and every caller
+  asks with it.
+- `display` draws the viewport's 224x136 through the overlay only in `VM_ADVENTURE`
+  (`WinScreen.cpp:1515-1527`), which an open inventory, sleep and the freeze leave
+  (`CSBCode.cpp:7487`, `Mouse.cpp:1703`, `:1735`).
+
 ## `CSBgraphics.dat`'s sounds are WAV files, each byte stored as the change from the one before
 
 `SOUNDDATA::ReadSound(soundNum)` (`doc/CSBwin-src/Sound.cpp:989-1025`) reads the

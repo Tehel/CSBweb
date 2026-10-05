@@ -338,6 +338,15 @@ export class CSBGraphicsLoader {
    * read from it. Left `null`, as a tool leaves it, the file opens unchecked.
    */
   opener: ((signature: FileSignature | null) => boolean) | null = null;
+  /**
+   * What `ReadCSBgraphic` does besides its message box when the file will not open, the
+   * first time it fails at all (`doc/CSBwin-src/Graphics.cpp:3220-3228`): `overlayActive =
+   * false` (`Overlay.active`). Its `firstTime` is one for every failure, so a missing
+   * section said first means this never happens.
+   */
+  cannotOpen: (() => void) | null = null;
+  /** `ReadCSBgraphic`'s `firstTime`, cleared by its first failure. */
+  private firstTime = true;
 
   /** The file at `url`. One that will not load or parse throws: the page refuses it. */
   async load(url: string): Promise<void> {
@@ -528,9 +537,19 @@ export class CSBGraphicsLoader {
    * CSBWin's are a fresh allocation, to change as it reads them.
    */
   readSection(type: number, id: number, minimumSize: number): Uint8Array | null {
-    if (!this.open() || !this.data) return null;
+    if (!this.open() || !this.data) {
+      if (this.firstTime) {
+        this.cannotOpen?.();
+        this.firstTime = false;
+      }
+      return null;
+    }
     const header = this.sections.find((section) => section.type === type && section.id === id);
-    if (!header) return null;
+    if (!header) {
+      // Every caller passes `mustExist` true (`:3253-3262`).
+      this.firstTime = false;
+      return null;
+    }
     if (header.uncompressedSize < minimumSize) return null;
     const start = header.fileOffset;
     const end = start + header.compressedSize;

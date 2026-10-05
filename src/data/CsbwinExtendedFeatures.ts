@@ -730,6 +730,17 @@ function buildDsaLevelIndex(index: number[][] | undefined): Uint8Array {
 }
 
 /** What a live game has to supply for its own Extended Features header. */
+/** The overlay as the Extended Features block carries it (`src/engine/Overlay.ts`). */
+export interface SavedOverlay {
+    /** `overlayActive`, written as `OverlayActive`. */
+    active: boolean;
+    overlayOrdinal: number;
+    overlayP1: number;
+    overlayP2: number;
+    overlayP3: number;
+    overlayP4: number;
+}
+
 export interface LiveExtendedFeatures {
     /** `cellflagArraySize` — `cellFlagArraySize(dungeon.maps)`, the length of block 14. */
     cellFlagArraySize: number;
@@ -753,6 +764,8 @@ export interface LiveExtendedFeatures {
     signatures?: ExpectedSignatures;
     /** `hintKey`, as the world's file gave it; absent, eight zeros. */
     hintKey?: Uint8Array;
+    /** `overlayActive` and `currentOverlay` (`Overlay.toExtendedFeatures`); absent, none. */
+    overlay?: SavedOverlay;
 }
 
 /**
@@ -841,10 +854,15 @@ export function readRulesOptions(
  * `ExtendedTimers`, which together select the 16-byte `TIMER` this port writes, and
  * `DefaultDirectX`, which is a UI preference CSBWin sets on every save. Plus
  * `ExtendedWallDecorations` from the world, `DMRulesOption` from `DM_rules` (`:950-951`),
- * and the monster design options `InvisibleMonsters` and `DrawAsSize4Monsters` from
- * `invisibleMonsters` and `drawAsSize4Monsters` (`:947-948`, `:958-959`). Measured: 0xf8 in
- * every committed save, which is the three unconditional ones (0xe0) plus the wall
- * decorations and DM rules.
+ * the monster design options `InvisibleMonsters` and `DrawAsSize4Monsters` from
+ * `invisibleMonsters` and `drawAsSize4Monsters` (`:947-948`, `:958-959`), and
+ * `OverlayActive` from `overlayActive` (`:968-971`). Measured: 0xf8 in every committed
+ * save, which is the three unconditional ones (0xe0) plus the wall decorations and DM
+ * rules.
+ *
+ * **The overlay.** `overlayOrdinal` is `currentOverlay.m_overlayNumber` **plus one**, so 0
+ * is "no overlay ever read", and `overlayP1`-`P4` are its `m_p1`-`m_p4` (`:972-976`),
+ * `m_p3` the `d.Time` it ends after. All are zero in every committed save.
  *
  * **What a read gave.** `graphicsSignature1/2` and `csbGraphicsSignature1/2` are
  * `expectedGraphicSignature*` (`:936-939`), the last block read's (`ExpectedSignatures`),
@@ -854,8 +872,7 @@ export function readRulesOptions(
  * committed save.
  *
  * **Zero, and measured zero rather than assumed.** `editingOptions` is never assigned by
- * `SaveGame` at all. `overlayOrdinal` is the overlay number **plus one**, so 0 is "no
- * overlay", and the four parameters go with it. All are zero in every committed save.
+ * `SaveGame` at all.
  *
  * **`gameInfoSize` is 0**, meaning `gameInfo == NULL` (`:977-978`) — this port has no
  * game-information string. Note that 0 and -1 are different things here; -1 is an
@@ -877,6 +894,7 @@ export function buildLiveExtendedFeatures(live: LiveExtendedFeatures): ExtendedF
     if (live.dmRules) extendedFlags |= EF_EXTENDED_FLAGS.DMRulesOption;
     if (live.extendedWallDecorations) extendedFlags |= EF_EXTENDED_FLAGS.ExtendedWallDecorations;
     if (live.drawAsSize4Monsters) extendedFlags |= EF_EXTENDED_FLAGS.DrawAsSize4Monsters;
+    if (live.overlay?.active) extendedFlags |= EF_EXTENDED_FLAGS.OverlayActive;
 
     return {
         version: EF_VERSION_B,
@@ -889,11 +907,11 @@ export function buildLiveExtendedFeatures(live: LiveExtendedFeatures): ExtendedF
         graphicsSignature2: (live.signatures?.expectedGraphicSignature2 ?? 0) >>> 0,
         spellFilterLocation: (live.spellFilterLocation ?? 0) >>> 0,
         extendedFlags: extendedFlags >>> 0,
-        overlayOrdinal: 0,
-        overlayP1: 0,
-        overlayP2: 0,
-        overlayP3: 0,
-        overlayP4: 0,
+        overlayOrdinal: (live.overlay?.overlayOrdinal ?? 0) >>> 0,
+        overlayP1: (live.overlay?.overlayP1 ?? 0) >>> 0,
+        overlayP2: (live.overlay?.overlayP2 ?? 0) >>> 0,
+        overlayP3: (live.overlay?.overlayP3 ?? 0) >>> 0,
+        overlayP4: (live.overlay?.overlayP4 ?? 0) >>> 0,
         csbGraphicsSignature1: (live.signatures?.expectedCSBgraphicSignature1 ?? 0) >>> 0,
         csbGraphicsSignature2: (live.signatures?.expectedCSBgraphicSignature2 ?? 0) >>> 0,
         hintKey: live.hintKey ? live.hintKey.slice(0, 8) : new Uint8Array(8),

@@ -366,6 +366,10 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     files.csbGraphicsLoader.opener = csbGraphicsOpener(game.ctx);
     // A DSA's `&SOUND` numbered from 0 plays one of its sounds.
     game.ctx.sounds.csbGraphics = files.csbGraphicsLoader;
+    // So do a DSA's `&OVERLAY` and `&PALETTE`, and a file that will not open puts the
+    // overlay down.
+    game.ctx.overlay.csbGraphics = files.csbGraphicsLoader;
+    files.csbGraphicsLoader.cannotOpen = () => { game.ctx.overlay.active = false; };
 
     // The game's saves: the disk menu's, the boot's chooser's, and F5 and F9's. The store
     // draws from a stream of its own for a row of an earlier version that names no

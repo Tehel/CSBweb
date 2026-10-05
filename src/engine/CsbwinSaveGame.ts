@@ -247,6 +247,7 @@ function installCsbwinWorld(game: Game, world: CsbwinWorld): void {
     CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc, (line) => game.ctx.host.trace(line));
     readRulesOptions(game.ctx.rules, world.save.extendedFeatures, world.save.simpleEncipher);
     readExpectedSignatures(game.ctx.signatures, world.save.extendedFeatures);
+    game.ctx.overlay.readExtendedFeatures(world.save.extendedFeatures);
     game.installWorld(Object.assign(world.dungeon, {
         dsaLevelIndex: world.save.dsaLevelIndex,
         dsaIndex: world.save.dsaIndex,

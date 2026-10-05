@@ -3084,6 +3084,34 @@ export class DsaSystem {
       case StkOp.VSET:
         this.vset(bank);
         break;
+      case StkOp.OVERLAY: {
+        // `doc/CSBwin-src/DSA.cpp:2919-2930`.
+        const onum = bank.stack.pop();
+        const p4 = bank.stack.pop();
+        const p3 = bank.stack.pop();
+        const p2 = bank.stack.pop();
+        const p1 = bank.stack.pop();
+        this.ctx.overlay.SelectOverlay(onum, p1, p2, p3, p4, this.ctx.state.tickCount);
+        break;
+      }
+      case StkOp.PALETTE: {
+        // `doc/CSBwin-src/DSA.cpp:2932-2944`.
+        const density = bank.stack.pop();
+        const onum = bank.stack.pop();
+        bank.stack.pop(); // p2, which `SetOverlayPalette` does not read
+        bank.stack.pop(); // p1, nor this
+        this.ctx.overlay.SetOverlayPalette(onum, density);
+        break;
+      }
+      case StkOp.JITTER: {
+        // `doc/CSBwin-src/DSA.cpp:4903-4930`.
+        const yOverlay = bank.stack.pop();
+        const xOverlay = bank.stack.pop();
+        const yGraphic = bank.stack.pop();
+        const xGraphic = bank.stack.pop();
+        this.ctx.overlay.Jitter(xGraphic, yGraphic, xOverlay, yOverlay);
+        break;
+      }
       case StkOp.DISABLE_SAVES:
         // `doc/CSBwin-src/DSA.cpp:2945-2955`.
         this.disableSaves = bank.stack.pop() !== 0;

@@ -244,7 +244,7 @@ console.log('8. The overlay palette');
   check(written.header.objectCounts[11] === 9 && sameBytes(written.expool, identityPool),
     "and its save holds the directory and the 24 records, CSBWin's pool");
 
-  // `&PALETTE` is G25's: the palette is changed in place, as `SetOverlayPalette` does.
+  // Bytes no `&PALETTE` makes, changed in place as `Overlay.SetOverlayPalette` changes them.
   const changed = Uint8Array.from(identity, (_v, i) => (7 * i + 3) & 0xff);
   game.ctx.overlayPalette.set(changed);
   const file = buildSaveFile(game);

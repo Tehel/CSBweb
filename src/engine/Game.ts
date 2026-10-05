@@ -314,12 +314,13 @@ export class Game implements MainLoop {
     /**
      * `ReadExtendedFeatures`' rule flags and graphics signatures for a new game, from the
      * block its `dungeon.dat` opens with (doc/CSBwin-src/SaveGame.cpp:378-381, `:392-398`,
-     * read at `ReadDatabases`' start, `:2347`). A file with no block leaves them as they
-     * were.
+     * read at `ReadDatabases`' start, `:2347`), and its overlay (`Overlay.readExtendedFeatures`).
+     * A file with no block leaves them as they were.
      */
     private readNewGameRules(data: DungeonData): void {
         readRulesOptions(this.ctx.rules, data.extendedFeatures, data.simpleEncipher);
         readExpectedSignatures(this.ctx.signatures, data.extendedFeatures);
+        this.ctx.overlay.readExtendedFeatures(data.extendedFeatures);
     }
 
     /**
@@ -663,7 +664,7 @@ export class Game implements MainLoop {
      * `display` are the host's `drawViewport`. `StartQueuedSound` has no counterpart: it
      * plays nothing, since `d.CurrentSound` stays -1 once `QueueSound`'s assignment is
      * commented out (`doc/CSBwin-src/CSBCode.cpp:1906`) and `QueueSound` calls `StartSound`
-     * itself. Nor has the overlay's timeout, which the port does not model.
+     * itself.
      */
     *processTimersViewportAndSound(): LoopScript {
         if (this.systems.timer.processTimers()) {
@@ -681,6 +682,8 @@ export class Game implements MainLoop {
      */
     private advanceTime(): void {
         this.ctx.state.tickCount++;
+        // The overlay's end (`CSBCode.cpp:675`, `Attack.cpp:2209`).
+        this.ctx.overlay.expire(this.ctx.state.tickCount);
         // `parameterMessageSequence = 0;` (`CSBCode.cpp:676`, `Attack.cpp:2210`).
         this.ctx.systems.dsa.parameterMessageSequence = 0;
     }

@@ -13,7 +13,7 @@
  * start and at the restart (`CSBCode.cpp:11356`, `Code1f9e6.cpp:309`), so a world
  * without the records reads as the identity. A save writes it back
  * (`Expool.storeOverlayPalette`). Only a DSA's `&PALETTE` changes it in play
- * (`SetOverlayPalette`, `doc/CSBwin-src/Bitmaps.cpp:651-686`), which `DEBT.md` G25 ports.
+ * (`Overlay.SetOverlayPalette`, `doc/CSBwin-src/Bitmaps.cpp:651-686`).
  */
 
 /** `sizeof(palette)` in `SaveGame` and `LoadGame`: three components of 512 entries. */

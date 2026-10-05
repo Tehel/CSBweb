@@ -25,6 +25,7 @@ import { Party } from './Party';
 import { PartyFootprints } from './PartyFootprints';
 import { MouseQueue } from './MouseQueue';
 import { createLoopFlags, type LoopFlags, type MainLoop } from './LoopState';
+import { Overlay } from './Overlay';
 import { identityOverlayPalette } from './OverlayPalette';
 import { createSmartDiscardState, type SmartDiscardState } from './SmartDiscard';
 import { SoundQueue } from './SoundQueue';
@@ -127,6 +128,11 @@ export interface GameContext {
    * world's `EXPOOL` gives it at a read. A read restores it in place.
    */
   readonly overlayPalette: Uint8Array;
+  /**
+   * The viewport overlay and its jitter (`src/engine/Overlay.ts`), globals of CSBWin's
+   * that outlive a game; a read takes what its Extended Features block says of them.
+   */
+  readonly overlay: Overlay;
   /** Every table from `graphics.dat`. */
   readonly tables: GameTables;
   /** What only the host can do: play a sample, trace, tell the UI something. */
@@ -242,6 +248,7 @@ export function createGameContext(
     block1: newGameBlock1(random, dungeonData),
   };
   const timers = newGameTimerQueue(dungeonData);
+  const overlayPalette = readOverlayPalette(dungeonData) ?? identityOverlayPalette();
   return {
     dungeon,
     party,
@@ -260,7 +267,8 @@ export function createGameContext(
     },
     signatures: noExpectedSignatures(),
     runtimeFileSignatures: noRuntimeFileSignatures(),
-    overlayPalette: readOverlayPalette(dungeonData) ?? identityOverlayPalette(),
+    overlayPalette,
+    overlay: new Overlay(overlayPalette, (line) => host.trace(line)),
     tables,
     host,
     // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.

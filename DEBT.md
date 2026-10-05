@@ -92,9 +92,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G25 | Viewport overlays and overlay palettes | L | ⏳ step 1 of 2 |
+| G25 | Viewport overlays and overlay palettes | L | ⏳ step 2 of 2, waits on the author |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
-| G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G25, G27 |
+| G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G27 |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
 | G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
@@ -116,7 +116,7 @@ The rows above G29 are the active list. `F3` is a phase, whose status is
 `PLAN.md`'s. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
-row meanwhile. `G1` sits below G25 and G27, whose features its last operations need.
+row meanwhile. `G1` sits below G27, whose feature its last operations need.
 The G rows down to G26 are Conflux's (see "Priority"). The F
 rows are independent of the rest ("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
@@ -273,7 +273,7 @@ ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter 
 `STKOP` (`doc/CSBwin-src/Data.h:1721-1861`, the port's `StkOp`) has 138 values, and 135
 are operations: `Noop` (0), `2Dup` (23) and `I_FilteredCast` (120) have no case in
 `EX_AMPERSAND`, whose default says "Illegal subcode" and does nothing
-(`doc/CSBwin-src/DSA.cpp:4979-4981`), as the port's trace does. The port has 130, so 5
+(`doc/CSBwin-src/DSA.cpp:4979-4981`), as the port's trace does. The port has 133, so 2
 are left. `tools/dump-dsa-census.ts` lists them: it fails unless what the port lacks is
 exactly its `LEFT`, so each family's commit takes its operations off that list, and this
 part of the item is done when it is empty.
@@ -281,7 +281,7 @@ part of the item is done when it is empty.
 Conflux, the dungeon that will check them, defines 131 DSAs, with 4646 programs, behind
 1591 type-47 actuators. A static census of its programs decodes each word with the
 operand layout `DsaSystem.execute` reads, and every program decodes to its exact length.
-It uses 118 `&` operations, 3 of the 5. With Conflux's count of each:
+It uses 118 `&` operations, every one ported. With Conflux's count of each:
 
 - **Characters**: none is left. Thirteen are checked by `tools/dump-dsa-characters.ts`,
   `CharNameFetch` with the texts, and `SwapCharacter` 7 by `tools/dump-swap-character.ts`.
@@ -309,7 +309,8 @@ It uses 118 `&` operations, 3 of the 5. With Conflux's count of each:
   `I_CreateCloud` 59, `I_Move` 17, `I_Throw` 14, `I_CausePoison` 6, `I_MonsterStore` 6,
   `I_CharStore` 4, `I_CellStore` 4, `I_SwapCharacter` 4, `I_Cast` 2, `I_DelMon` 2 and
   `I_InsMon` 2.
-- **The display**: `Overlay` 25, `Palette` 5 and `Jitter` 7, which need G25. The jitter
+- **The display**: none is left. `Overlay` 25, `Palette` 5 and `Jitter` 7 are ported,
+  checked by `tools/dump-dsa-overlay.ts`; what they draw is G25's step 2. The jitter
   moves the view only while an overlay is in use (`doc/CSBwin-src/WinScreen.cpp:1069-1080`).
 
 The two left that Conflux never calls: `GetSkin` (131) and `SetSkin` (132), which need
@@ -318,15 +319,14 @@ G27. No dungeon here checks them against play, so each is ported with a tool of 
 The steps: the census is done (`tools/dump-dsa-census.ts`, Conflux's counts by default,
 another `dungeon.dat` as its argument), and so are the characters, the objects, the
 monsters, the texts, the messages and sounds, the dungeon and the program, and the `I_`
-operations, and the save of a dungeon with DSAs: `WriteDSAs`, and the global variables
+operations, and the display's three, and the save of a dungeon with DSAs: `WriteDSAs`, and the global variables
 read from their `EXPOOL` records at every read and written back at a save, and
 `DisableSaves`' record, and the overlay palette's 24 records written at every save and
 read back at every read, checked by `tools/dump-dsa-save.ts`, and the footprints a cell's
 `ECF_FOOTPRINTS` shows, checked by `tools/dump-footprint-decoration.ts`. A family's tool
 runs its programs through `tools/lib/dsa.ts`. Slave DSAs owe nothing: CSBWin has none
-(`doc/CSBWIN_DSA_REFERENCE.md`, `FindMaster`). What is left waits on its own item:
-the display's three on G25, `GetSkin` and `SetSkin` on G27, so G1's row sits below theirs
-and each of those items finishes its share of G1. An operation is
+(`doc/CSBWIN_DSA_REFERENCE.md`, `FindMaster`). What is left waits on G27: `GetSkin` and
+`SetSkin`, so G1's row sits below it, and G27 finishes its share of G1. An operation is
 checked against Conflux in play once G26 makes it a data set.
 
 The rest of the item, with an operation that needs care when ported:
@@ -365,10 +365,10 @@ colours, which the port's present path already stands for.
 
 Steps:
 
-1. **The engine** ⏳: `currentOverlay`, `overlayActive` and the jitter, `ReadOverlay`,
-   `Mirror`, `SelectOverlay` and `SetOverlayPalette`; the three DSA operations, off the
-   census's `LEFT`; the expiry in `advanceTime`; the Extended Features block written from
-   the overlay and read back into it. Checked by a tool on Conflux's file.
+1. **The engine** ✅: `src/engine/Overlay.ts` (`GameContext.overlay`), the three DSA
+   operations, the end in `advanceTime`, and the overlay in the Extended Features block,
+   checked by `tools/dump-dsa-overlay.ts` on Conflux's file
+   (`doc/PROVEN_FACTS.md` → "A viewport overlay is a 224x136 bitmap of bytes").
 2. **The screen** ⏳: `CreateOverlayTable` and the viewport's composition in
    `VM_ADVENTURE`, the jitter with it, a frame with an overlay up. It waits on the
    author: CSBWin's pixel is RGB555, which Windows widens to 8 bits, and the port's
