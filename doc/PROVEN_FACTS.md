@@ -2766,6 +2766,32 @@ at byte 36, holding 4574, before its `data` chunk of 4574 samples at byte 48, so
 `ReadSound` reads a count of 4 and `PlayCustomSound` plays four bytes, the `fact` chunk's
 own. The port plays the `data` chunk instead (`DEBT.md` H → "A `CSBgraphics.dat` sound
 plays its WAV file's `data` chunk").
+
+## A `CSBgraphics.dat` alternate monster graphic is an `ALTMONGRAPH`, little-endian
+
+`GetAlternateGraphicsRecord` (`doc/CSBwin-src/Code51a4.cpp:1071-1110`) reads a
+`CGT_AlternateMonsterGraphic` section of at least `sizeof(ALTMONGRAPH)`, 192 bytes, and
+takes it as one as it stands (`:967-979`, packed, `CSB.h:18`): a `MONSTERDESC` (26 bytes),
+an `ITEM12` (12), an `ITEM110` (110), ten 32-bit `graphicOffsets`, -1 for none, and the
+graphics from byte 188, each offset counted from there. Nothing is swapped, so the words
+are the PC's, little-endian, where `graphics.dat`'s tables are swapped from big-endian as
+they are read. The alternate `DrawMonster` reads `monsterDesc.word4`'s view and mirror
+bits alone of the `MONSTERDESC`, the `ITEM12`'s sizes and transparent colour, and the
+`ITEM110`'s positions (`:1214-1216`, `:1370`); the graphics are `graphicNum0` 0 (front),
+then side, back and attack as `word4` names them (`:1377-1489`). The section is graphic
+`3 * mt + n - 1` for alternate graphic `n` of type `mt`, unless the level's `EXPOOL`
+record `(EDT_Database << 24) | (EDBT_AltMonGraphics << 16) | (level << 8) | mt`, of four
+longwords, maps it (`AltGraphicMapping`, `:1060-1069`): -1 is the default, -2 none. Only
+a mapping reaches graphic 0.
+
+Both files here hold the same 123 sections, ids 0 to 123 without 65, and in each the
+graphics `word4` names lie end to end from offset 0 at the size their `ITEM12` gives
+them, 120 sections ending with the last; 32, 52 and 64 hold one or two more pictures
+past them, which `word4` does not name (`tools/dump-alt-mon-graphics.ts`). Read
+big-endian, `word4` would name no view but the front. Conflux's `dungeon.dat` carries 81
+`EDBT_AltMonGraphics` records under 37 keys, of which `Locate` reads the first, and every
+one of the 586 groups that has an alternate graphic on its level finds its section.
+
 ## The graphics files' signatures: what CSBWin checks, and when
 
 `Signature` (`doc/CSBwin-src/data.cpp:1953-1975`) is a file's MD5, RSA's reference code

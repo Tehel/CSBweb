@@ -240,6 +240,9 @@ const CHECKS = [
   // The sounds of CSBgraphics.dat a DSA's &SOUND plays: every section of both files read
   // as `ReadSound` does, each a WAV file once summed, and `Decode`'s volume table.
   { tool: 'dump-custom-sounds.ts' },
+  // CSBgraphics.dat's alternate monster graphics: every section of both files read as an
+  // ALTMONGRAPH, the dungeon's mapping of them by level and type, and the cache's slots.
+  { tool: 'dump-alt-mon-graphics.ts' },
   // The graphics files' signatures, and CSBWin's checks of them at a read and at
   // CSBgraphics.dat's first section read: a file the game does not name ends the game.
   { tool: 'dump-file-signatures.ts' },

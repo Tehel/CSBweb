@@ -54,6 +54,8 @@ const EDBT_DEBUGING = 3;
 const EDBT_GLOBAL_VARIABLES = 4;
 /** `EDBT_DisableSaves` (`doc/CSBwin-src/CSB.h:1558`). */
 const EDBT_DISABLE_SAVES = 5;
+/** `EDBT_AltMonGraphics` (`doc/CSBwin-src/CSB.h:1561`). */
+const EDBT_ALT_MON_GRAPHICS = 8;
 /** `EDT_Palette` (`doc/CSBwin-src/CSB.h:1564`). */
 const EDT_PALETTE = 7;
 /** The overlay palette's records, of sixteen longwords each (`doc/CSBwin-src/SaveGame.cpp:1158`). */
@@ -82,6 +84,16 @@ function championBonesKey(rn: number): number {
  */
 function globalVariablesKey(i: number): number {
     return ((EDT_DATABASE << 24) | (EDBT_GLOBAL_VARIABLES << 16) | i) >>> 0;
+}
+
+/**
+ * `(EDT_Database << 24) | (EDBT_AltMonGraphics << 16) | (level << 8) | mt`, the key of the
+ * record that maps a monster type's four alternate graphics on a level to sections of
+ * `CSBgraphics.dat` (`AltGraphicMapping`, `doc/CSBwin-src/Code51a4.cpp:1065`). A dungeon
+ * file carries it; nothing in CSBWin writes one.
+ */
+export function altMonGraphicsKey(level: number, mt: number): number {
+    return ((EDT_DATABASE << 24) | (EDBT_ALT_MON_GRAPHICS << 16) | (level << 8) | mt) >>> 0;
 }
 
 /** `(EDT_Database << 24) | (EDBT_DisableSaves << 16)`, the key of the record that disables saves. */
@@ -223,6 +235,19 @@ export class Expool {
         const record: number[] = [];
         for (let i = 2; i < size; i++) record.push(this.m(p + i));
         return record;
+    }
+
+    /**
+     * A read through `Locate`'s pointer: `Locate`'s size for `key`, and longword `index`
+     * of its first record, or null where CSBWin returns -1. The pointer reads on past the
+     * record's end, as CSBWin's does, into whatever the pool holds there; past the pool,
+     * where CSBWin reads its heap, the longword reads as 0.
+     */
+    locateAt(key: number, index: number): { size: number; value: number } | null {
+        const hashi = this.find(key);
+        if (hashi === -1) return null;
+        const p = this.m(hashi);
+        return { size: this.blockSize(p) - 2, value: this.m(p + 2 + index) };
     }
 
     /**

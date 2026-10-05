@@ -3,7 +3,8 @@
  *
  * Implements ReadCSBgraphic + OVLDECODE from CSBWin Graphics.cpp.
  * Used for extended wall/floor decorations (ReadWallDecoration/ReadFloorDecoration), the
- * portraits past graphic 26's, and the sounds a DSA's `&SOUND` plays (`SoundQueue`).
+ * portraits past graphic 26's, the sounds a DSA's `&SOUND` plays (`SoundQueue`), and the
+ * alternate monster graphics (`AltMonGraphics`).
  */
 
 import type { ui32 } from '../core/types';

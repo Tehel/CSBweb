@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G24 | `CSBgraphics.dat`'s alternate monster graphics | L | ⏳ step 3 of 5 next |
+| G24 | `CSBgraphics.dat`'s alternate monster graphics | L | ⏳ step 4 of 5 next |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G25, G27 |
@@ -343,18 +343,18 @@ The rest of the item, with an operation that needs care when ported:
 ### G24 ⏳ `CSBgraphics.dat`'s alternate monster graphics
 
 CSBWin reads eight kinds of section from `CSBgraphics.dat` (`CGT_*`,
-`doc/CSBwin-src/CSB.h:289-296`). The port reads four, the wall and the floor decorations,
-the portraits and the sounds (`src/data/CSBGraphicsLoader.ts`, `SoundQueue.readSound`).
-Conflux's file holds 156 portraits, 611 sounds, 123 alternate monster graphics, 90
-backgrounds, 112 viewport overlays, 51 overlay palettes, 36 wall and 72 floor
-decorations. Of the four kinds the port does not read, Conflux reaches the alternate
-monster graphics (`Code51a4.cpp:1097`): 598 of its creature groups have
-`alternateGraphics` 1 to 3. The overlays and their palettes are G25, and the backgrounds,
-which are what a skin draws, G27.
+`doc/CSBwin-src/CSB.h:289-296`). The port reads five, the wall and the floor decorations,
+the portraits, the sounds and the alternate monster graphics
+(`src/data/CSBGraphicsLoader.ts`, `SoundQueue.readSound`, `src/data/AltMonGraphics.ts`),
+but draws no alternate monster graphic yet. Conflux's file holds 156 portraits, 611
+sounds, 123 alternate monster graphics, 90 backgrounds, 112 viewport overlays, 51 overlay
+palettes, 36 wall and 72 floor decorations. Conflux reaches the alternate monster graphics
+(`Code51a4.cpp:1097`): 586 of the groups on its levels have one. The overlays and their
+palettes are G25, and the backgrounds, which are what a skin draws, G27.
 
 Every reader goes through `ReadCSBgraphic` (`doc/CSBwin-src/Graphics.cpp:3201`), which the
-port has (`CSBGraphicsLoader.readSection`). The steps, one commit each, of which 1, 2 and
-5 are done:
+port has (`CSBGraphicsLoader.readSection`). The steps, one commit each, of which 1, 2, 3
+and 5 are done:
 
 1. **Portraits**: done. `ImportBitmap` and `GetExternalPortraitAddress` are
    `CSBGraphicsLoader.importBitmap` and `getExternalPortraitAddress`, drawn for a `charID`
@@ -367,15 +367,22 @@ port has (`CSBGraphicsLoader.readSection`). The steps, one commit each, of which
    `src/audio/SoundManager.ts`), checked by `tools/dump-custom-sounds.ts`
    (`doc/PROVEN_FACTS.md` → "`CSBgraphics.dat`'s sounds are WAV files, each byte stored
    as the change from the one before").
-3. **Alternate monster graphics, the record.** `AltGraphicMapping` (`Code51a4.cpp:1060-1069`,
-   an `EDBT_AltMonGraphics` record of the `EXPOOL`, which a dungeon file carries and
-   nothing in CSBWin writes), `GetAlternateGraphicsRecord` (`:1071-1112`) and its
-   per-type cache, and the `ALTMONGRAPH` layout (`:967`). A tool reads Conflux's 123
-   sections and checks each one's offsets against its size.
+3. **Alternate monster graphics, the record**: done. `ALTMONGRAPH`, `AltGraphicMapping`
+   and `GetAlternateGraphicsRecord` with `altMonCache`'s record half are
+   `src/data/AltMonGraphics.ts` (`doc/PROVEN_FACTS.md` → "A `CSBgraphics.dat` alternate
+   monster graphic is an `ALTMONGRAPH`, little-endian"), checked by
+   `tools/dump-alt-mon-graphics.ts`. Nothing draws from it yet.
 4. **Alternate monster graphics, the drawing.** The alternate `DrawMonster`
    (`Code51a4.cpp:1139-1751`), CSBWin's copy of the original that takes its graphics and
-   descriptions from the record, and its derived graphics
-   (`GetAlternateDerivedGraphicAddress`, `:1119`). It may split again once read.
+   descriptions from the record, called where `DrawRoomObjects` finds one
+   (`:2259-2280`, `DrawRoomObjects.ts`'s `DrawMonster` call) on the party's level, CSBWin's
+   `d.LoadedLevel` there; `GetAlternateBasicGraphicAddress` (`:1113`); and the derived
+   graphics, `ALTMONCACHE`'s other half (`AllocateAlternateDerivedGraphic`, `:1044`,
+   `GetAlternateDerivedGraphicAddress`, `:1119`). The `AltMonCache` gets its owner here,
+   for the whole of a game: `CleanupAltMonCache` runs in `Cleanup(false)`
+   (`Graphics.cpp:2206`, `data.cpp:2015`), at every game's start and at the restart after
+   a lost one (`CSBCode.cpp:11304`, `Code1f9e6.cpp:302`), where `main.ts` resets the
+   screen. It may split again once read.
 5. **The signature**: done. `Signature` and the checks of both graphics files,
    `openGraphicsFile`'s at every read and `OpenCSBgraphicsFile`'s at the first section
    read, are `src/data/FileSignature.ts` and `src/engine/FileSignatures.ts`
