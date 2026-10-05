@@ -31,6 +31,7 @@ const CHECKS = [
   { tool: 'dump-monster-activation.ts', args: ['3'] },
   { tool: 'dump-monster-perception.ts' },
   { tool: 'dump-monster-damage.ts' },
+  { tool: 'dump-monster-design-options.ts' },
   { tool: 'dump-monster-move.ts' },
   { tool: 'dump-monster-pad.ts' },
   { tool: 'dump-monster-move-code.ts' },

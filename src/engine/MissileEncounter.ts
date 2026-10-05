@@ -31,6 +31,7 @@ import { CloudType } from './cloudTypes';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { MonsterDamageResult } from './MonsterDamage';
+import { monsterDrawAsSize4 } from './MonsterSystem';
 import { MonsterType } from './monsterTypes';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
 import { DescIndex, IsAKey } from './objectIndex';
@@ -378,7 +379,7 @@ export class MissileEncounter {
         // unless the group is drawn as one full-cell figure, when member 1 takes it.
         let monsterOrdinal = ordinalOfMonsterAtPosition(this.dungeon, this.ctx.tables.monsterDesc, monster, objectPos);
         if (monsterOrdinal === 0) {
-          if (!monster.drawAsSize4) return false;
+          if (!monsterDrawAsSize4(this.ctx.rules, monster)) return false;
           monsterOrdinal = 1;
         }
         if (this.missileEncounterFilter(1, position, objectPos, missileRn, filterProjectile, monsterOrdinal - 1) === 1) {

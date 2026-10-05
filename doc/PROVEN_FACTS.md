@@ -6261,3 +6261,17 @@ door its state's bit with `=` rather than `|=` (`:2276`), which changes nothing 
 bits are still 0 there, and has no case for room type 7, whose cell matches no mask. `&J*`
 and `&G*` both pop the state first and the column second (`:4738-4739`, `:4749-4750`).
 Evidence: `tools/dump-dsa-dungeon.ts`.
+
+## `DrawSize4Index` matches the record's facing against a mask shifted per member
+
+`DrawSize4Index` picks the member a `drawAsSize4()` group is drawn as
+(`doc/CSBwin-src/Code51a4.cpp:323-348`). Past the attackers, it loops
+`for (i=0, mask=3; i<=numMonM1; i++, mask<<=2, monsterFacing<<=2)` testing
+`((facingByte ^ monsterFacing) & mask) == 0`, where `facingByte` is `pDB4->facing()`, the
+record's two bits 8-9, not `ITEM16`'s byte of four facings. For member 0 that is "the
+record faces the party's opposite"; past it, `mask` looks at bits of `facingByte` that are
+always zero, so member `i` matches exactly when `monsterFacing` itself is 0, which is
+when the party faces south (2). A record facing 1 seen by a party facing south is drawn as
+its second member (ordinal 2), whichever way that member faces; from any other facing it
+is drawn as its first.
+`tools/dump-monster-design-options.ts` checks it, transcribed as written.

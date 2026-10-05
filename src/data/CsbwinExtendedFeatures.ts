@@ -741,6 +741,10 @@ export interface LiveExtendedFeatures {
     dmRules?: boolean;
     /** `DMRulesDesignOption`, written as `DMRules`. */
     dmRulesDesignOption?: boolean;
+    /** `invisibleMonsters`, written as `InvisibleMonsters`. */
+    invisibleMonsters?: boolean;
+    /** `drawAsSize4Monsters`, written as `DrawAsSize4Monsters`. */
+    drawAsSize4Monsters?: boolean;
     /** `simpleEncipher`, written as `SimpleEncryption`: the file is enciphered whole. */
     simpleEncipher?: boolean;
     /** `DSAIndex`, whose DSAs `numDSA` counts. */
@@ -748,23 +752,29 @@ export interface LiveExtendedFeatures {
 }
 
 /**
- * `ReadExtendedFeatures`' two rule flags (`doc/CSBwin-src/SaveGame.cpp:392-398`):
- * `DMRulesDesignOption` from `flags & DMRules`, `DM_rules` from
- * `extendedFlags & DMRulesOption`. A file with no block (`header` undefined) assigns
- * neither, as CSBWin, which never reaches that function for it.
+ * `ReadExtendedFeatures`' rule flags and monster design options
+ * (`doc/CSBwin-src/SaveGame.cpp:392-400`): `DMRulesDesignOption` from `flags & DMRules`,
+ * `DM_rules`, `invisibleMonsters` and `drawAsSize4Monsters` from `extendedFlags`'
+ * `DMRulesOption`, `InvisibleMonsters` and `DrawAsSize4Monsters`. A file with no block
+ * (`header` undefined) assigns none, as CSBWin, which never reaches that function for it.
  *
  * And `simpleEncipher`, which the function sets for an enciphered file and nothing ever
  * clears (`:333-338`): `enciphered` is `readExtendedFeatures`' `simpleEncipher`.
  */
 export function readRulesOptions(
-    rules: { dmRules: boolean; dmRulesDesignOption: boolean; simpleEncipher: boolean },
+    rules: {
+        dmRules: boolean; dmRulesDesignOption: boolean;
+        invisibleMonsters: boolean; drawAsSize4Monsters: boolean; simpleEncipher: boolean;
+    },
     header: ExtendedFeaturesBlock | undefined,
     enciphered: boolean | undefined,
 ): void {
     if (!header) return;
     if (enciphered) rules.simpleEncipher = true;
     rules.dmRulesDesignOption = (header.flags & EF_FLAGS.DMRules) !== 0;
+    rules.invisibleMonsters = (header.extendedFlags & EF_EXTENDED_FLAGS.InvisibleMonsters) !== 0;
     rules.dmRules = (header.extendedFlags & EF_EXTENDED_FLAGS.DMRulesOption) !== 0;
+    rules.drawAsSize4Monsters = (header.extendedFlags & EF_EXTENDED_FLAGS.DrawAsSize4Monsters) !== 0;
 }
 
 /**
@@ -790,10 +800,11 @@ export function readRulesOptions(
  * **`extendedFlags`.** Three unconditional (`:964-966`): `SequencedTimers` and
  * `ExtendedTimers`, which together select the 16-byte `TIMER` this port writes, and
  * `DefaultDirectX`, which is a UI preference CSBWin sets on every save. Plus
- * `ExtendedWallDecorations` from the world and `DMRulesOption` from `DM_rules`
- * (`:950-951`). `InvisibleMonsters` and `DrawAsSize4Monsters` are global design options
- * with no equivalent here. Measured: 0xf8 in every committed save, which is the three
- * unconditional ones (0xe0) plus the wall decorations and DM rules.
+ * `ExtendedWallDecorations` from the world, `DMRulesOption` from `DM_rules` (`:950-951`),
+ * and the monster design options `InvisibleMonsters` and `DrawAsSize4Monsters` from
+ * `invisibleMonsters` and `drawAsSize4Monsters` (`:947-948`, `:958-959`). Measured: 0xf8 in
+ * every committed save, which is the three unconditional ones (0xe0) plus the wall
+ * decorations and DM rules.
  *
  * **Zero, and measured zero rather than assumed.** `editingOptions` is never assigned by
  * `SaveGame` at all. `graphicsSignature1/2` and `csbGraphicsSignature1/2` are
@@ -819,8 +830,10 @@ export function buildLiveExtendedFeatures(live: LiveExtendedFeatures): ExtendedF
     let extendedFlags =
         EF_EXTENDED_FLAGS.SequencedTimers | EF_EXTENDED_FLAGS.ExtendedTimers |
         EF_EXTENDED_FLAGS.DefaultDirectX;
+    if (live.invisibleMonsters) extendedFlags |= EF_EXTENDED_FLAGS.InvisibleMonsters;
     if (live.dmRules) extendedFlags |= EF_EXTENDED_FLAGS.DMRulesOption;
     if (live.extendedWallDecorations) extendedFlags |= EF_EXTENDED_FLAGS.ExtendedWallDecorations;
+    if (live.drawAsSize4Monsters) extendedFlags |= EF_EXTENDED_FLAGS.DrawAsSize4Monsters;
 
     return {
         version: EF_VERSION_B,

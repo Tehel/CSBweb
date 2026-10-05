@@ -20,6 +20,7 @@ import {
 import type { DungeonState } from '../engine/DungeonState';
 import type { PartyFootprints } from '../engine/PartyFootprints';
 import type { GameState } from '../engine/gameTypes';
+import type { MonsterDesignOptions } from '../engine/MonsterSystem';
 import type { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, PaletteIndexViewportBuffer } from './csbwin/CanvasBlitter';
 import { createPaletteIndexViewportBuffer, cropBitmap, mirrorBitmap, tag0088b2Index } from './csbwin/CanvasBlitter';
@@ -57,6 +58,8 @@ export interface ViewportRendererDeps {
   footprints?: PartyFootprints;
   /** The game's state, whose `tickCount` is `d.Time`. */
   gameState?: GameState;
+  /** The monster design options, `GameContext.rules`; without them both are off. */
+  rules?: MonsterDesignOptions;
   csbGraphicsLoader?: CSBGraphicsLoader;
   /** Graphic `0x22e`'s rectangles, from the game's one `GraphicsTables`. */
   viewportTables: ViewportTables;
@@ -135,6 +138,7 @@ export class ViewportRenderer {
       dungeonState: this.dungeonState,
       footprints: deps.footprints,
       gameState: deps.gameState,
+      rules: deps.rules,
       viewportIndexBuffer: this.buffer,
       seeThroughWalls: false,
       roomData: [],

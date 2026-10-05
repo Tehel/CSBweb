@@ -3440,10 +3440,10 @@ export class DsaSystem {
       result[0] = (monster.numMonM1 & 0x3) + 1;
       result[1] = monster.creatureType;
       for (let i = 0; i < 4; i++) result[2 + i] = monster.hp[i] ?? 0;
-      if (monsterInvisible(monster)) result[6] |= 1;
-      if (monsterDrawAsSize4(monster)) result[6] |= 2;
-      if (monsterUnique(monster)) result[6] |= 4;
-      if (monsterPoisoned(monster)) result[6] |= 8;
+      if (monsterInvisible(this.ctx.rules, monster)) result[6] |= 1;
+      if (monsterDrawAsSize4(this.ctx.rules, monster)) result[6] |= 2;
+      if (monsterUnique(this.ctx.rules, monster)) result[6] |= 4;
+      if (monsterPoisoned(this.ctx.rules, monster)) result[6] |= 8;
       result[7] = monster.alternateGraphics;
     }
     const n = Math.min(8, num);

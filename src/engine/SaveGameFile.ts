@@ -92,6 +92,8 @@ function buildFileBlocks(
             spellFilterLocation: dungeon.spellFilterLocation,
             dmRules: game.ctx.rules.dmRules,
             dmRulesDesignOption: game.ctx.rules.dmRulesDesignOption,
+            invisibleMonsters: game.ctx.rules.invisibleMonsters,
+            drawAsSize4Monsters: game.ctx.rules.drawAsSize4Monsters,
             simpleEncipher: game.ctx.rules.simpleEncipher,
             dsaIndex: dungeon.dsaIndex,
         }),

@@ -5,7 +5,8 @@
  *
  *   - the victim is `OrdinalOfMonsterAtPosition(group, objectPos)` — the member standing
  *     in the corner the missile arrived at. Nobody there lets the missile fly on, unless
- *     the group is `drawAsSize4`, when member 1 takes it;
+ *     the group is `drawAsSize4()` (bit 12, with the `drawAsSize4Monsters` design option
+ *     on), when member 1 takes it;
  *   - a fireball reaching a Black Flame heals it by `DetermineMagicDamage`, capped at
  *     1000, and the missile is simply gone — no damage, no explosion;
  *   - otherwise the damage is `64 * DetermineMagicDamage(...)`, cut to 16 bits, divided
@@ -287,6 +288,24 @@ function main(): void {
     console.log(`DamageMonster: ${JSON.stringify(log.hits)}   hp now [${group.hp.slice(0, 2)}]`);
     check(log.hits.length === 0 && group.hp[0] === 900 && group.hp[1] === 900,
       'OrdinalOfMonsterAtPosition says 0 and the group is not drawAsSize4: nobody is hit');
+  }
+  // The same group with bit 12 set: `drawAsSize4()` is `drawAsSize4Monsters && bit 12`
+  // (`CSB.h:1127`), so the bit lets member 1 take it only with the design option on.
+  for (const option of [false, true]) {
+    const arena = makeArena(2)!;
+    const { game, group, launch } = arena;
+    game.ctx.dungeon.getAttachedItem16(group)!.positions = 3 | (2 << 2);
+    group.drawAsSize4 = true;
+    game.ctx.rules.drawAsSize4Monsters = option;
+    const log = spy(game);
+    const falchion = newRecord(game, 'weapons', DBType.WEAPON, {
+      nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
+      cursed: false, important: false, weaponType: WEAPON_FALCHION,
+    });
+    fly(game, falchion, launch);
+    console.log(`bit 12, drawAsSize4Monsters ${option}: DamageMonster: ${JSON.stringify(log.hits)}`);
+    check(option ? log.hits.length === 1 && log.hits[0]!.index === 0 : log.hits.length === 0,
+      option ? 'drawn as size 4: member 1 takes it (Code11f52.cpp:1965-1966)' : 'the bit means nothing with the option off: nobody is hit');
   }
 
   /* ----------------------- 3. a fireball feeds a Black Flame ------------------------ */

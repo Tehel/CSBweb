@@ -148,8 +148,8 @@ async function main(): Promise<void> {
   // TT_60/TT_61 timers of its own kind already waiting on the square; from 31 up it
   // deletes the group instead of queueing a 32nd, unless the group is `Unique()` or
   // carries something (`:2473-2512`). `Unique()` is `drawAsSize4Monsters && bit 13`
-  // (`CSB.h:1129`), and that design option is off in every dungeon we load, so a raw
-  // bit 13 must not save a group.
+  // (`CSB.h:1129`), and that design option is off in DM's dungeon, so a raw bit 13 must
+  // not save a group.
   {
     const dest = new Position(1, 1, level);
     const parked = (): number => game.ctx.timers.getTimers()

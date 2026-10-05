@@ -19,6 +19,7 @@ import {
 import type { DungeonState } from '../../engine/DungeonState';
 import type { PartyFootprints } from '../../engine/PartyFootprints';
 import type { GameState } from '../../engine/gameTypes';
+import type { MonsterDesignOptions } from '../../engine/MonsterSystem';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { RectPos } from '../../data/tables/UITables';
 import type { CSBGraphicsLoader } from '../../data/CSBGraphicsLoader';
@@ -84,6 +85,11 @@ export interface InterpreterContext {
   footprints?: PartyFootprints;
   /** The game's state, whose `tickCount` (`d.Time`) `SummarizeRoomInfo` reads. */
   gameState?: GameState;
+  /**
+   * `invisibleMonsters` and `drawAsSize4Monsters`, which `DrawRoomObjects` and `DrawMonster`
+   * read (`doc/CSBwin-src/Code51a4.cpp:2205`, `:420`). Absent, both are off, as at CSBWin's start.
+   */
+  rules?: MonsterDesignOptions;
   frameFacing?: number;
   frameMapIndex?: number;
   doorGraphics?: number[][]; // d.DoorGraphic[3][2] resolved for current level (Code390e.cpp:180+)

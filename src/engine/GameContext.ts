@@ -124,18 +124,26 @@ export interface GameContext {
 }
 
 /**
- * Three of CSBWin's process-wide globals, not `d.`'s: `DM_rules` (`doc/CSBwin-src/data.cpp:251`),
- * `DMRulesDesignOption` (`CSBUI.cpp:137`) and `simpleEncipher`, all `false` at start. Only
- * `ReadExtendedFeatures` assigns the first two from a file (`SaveGame.cpp:392-398`), and only for a
- * file whose block is present, so a file without one (`dm-atari/dungeon.dat`, CSB's
- * Atari-era saves) leaves both as they were. A new game and a load therefore keep them:
- * `Game.readNewGame` and the save paths never replace this object.
+ * Five of CSBWin's process-wide globals, not `d.`'s: `DM_rules` (`doc/CSBwin-src/data.cpp:251`),
+ * `DMRulesDesignOption` (`CSBUI.cpp:137`), `invisibleMonsters` and `drawAsSize4Monsters`
+ * (`data.cpp:77-78`) and `simpleEncipher`, all `false` at start. Only `ReadExtendedFeatures`
+ * assigns the first four from a file (`SaveGame.cpp:392-400`), and only for a file whose block
+ * is present, so a file without one (`dm-atari/dungeon.dat`, CSB's Atari-era saves) leaves them
+ * as they were. A new game and a load therefore keep them: `Game.readNewGame` and the save
+ * paths never replace this object.
  */
 export interface RulesOptions {
   /** `DM_rules`: reincarnation costs nothing (`CSBCode.cpp:6740`, `:6761`). */
   dmRules: boolean;
   /** `DMRulesDesignOption`: the dungeon asks for DM rules, forced on at the boot. */
   dmRulesDesignOption: boolean;
+  /** `invisibleMonsters`: a creature's bit 11 hides it (`DB4::invisible()`, `CSB.h:1125`). */
+  invisibleMonsters: boolean;
+  /**
+   * `drawAsSize4Monsters`: a creature's bits 12-14 count, drawn as one figure filling the cell,
+   * unique, poisoned (`DB4::drawAsSize4()`, `Unique()`, `Poisoned()`, `CSB.h:1127-1132`).
+   */
+  drawAsSize4Monsters: boolean;
   /**
    * `simpleEncipher` (`data.cpp:243`): a file read was enciphered, so every save is
    * (`SaveGame.cpp:914-920`, `:943-946`). Set by an enciphered file, cleared by none.
@@ -234,7 +242,10 @@ export function createGameContext(
     sounds: new SoundQueue(party, tables.sound1772, host, state, timers),
     smartDiscard: createSmartDiscardState(),
     levelCleared: new Uint8Array(16),
-    rules: { dmRules: false, dmRulesDesignOption: false, simpleEncipher: false },
+    rules: {
+      dmRules: false, dmRulesDesignOption: false,
+      invisibleMonsters: false, drawAsSize4Monsters: false, simpleEncipher: false,
+    },
     overlayPalette: readOverlayPalette(dungeonData) ?? identityOverlayPalette(),
     tables,
     host,

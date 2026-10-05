@@ -32,6 +32,7 @@ import {
   monsterWord4Bit8,
 } from '../../data/tables/MonsterDesc';
 import { ordinalAtPositionBytes } from '../../engine/monsterPosition';
+import { monsterDrawAsSize4, monsterInvisible, type MonsterDesignOptions } from '../../engine/MonsterSystem';
 import { DBType, OBJECT_ID_EOF, type ObjectID } from '../../core/types';
 import { applyLimits } from '../../core/intCast';
 import { viewportRandom, type ViewportDraw } from './ViewportDraw';
@@ -123,12 +124,11 @@ export function DrawRoomObjects(
 
   for (let rn = firstObject; rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
     const { category } = dungeon.rnMaps.decode(rn);
-    // The last creature in the chain (`objMonster_54`, `Code51a4.cpp:2204-2210`).
-    // `invisible()` is gated on `invisibleMonsters`, false in DM (`DEBT.md`, "The
-    // monster design options"), so every creature is drawn.
+    // The last creature in the chain that is not `invisible()` (`objMonster_54`,
+    // `Code51a4.cpp:2204-2210`).
     if (category === DBType.CREATURE) {
       const record = dungeon.getCreatureRecord(rn);
-      if (record) {
+      if (record && !monsterInvisible(designOptions(draw), record)) {
         monsterRecord = record;
         monsterState = dungeon.getMonsterRenderState(record);
       }
@@ -398,6 +398,32 @@ function drawSingleObject(
   return { nextSmallOffset: currentSmallOffset };
 }
 
+const NO_DESIGN_OPTIONS: MonsterDesignOptions = { invisibleMonsters: false, drawAsSize4Monsters: false };
+
+function designOptions(draw: ViewportDraw): MonsterDesignOptions {
+  return draw.context.rules ?? NO_DESIGN_OPTIONS;
+}
+
+/**
+ * `DrawSize4Index` (`doc/CSBwin-src/Code51a4.cpp:323-348`): the member of a group drawn as
+ * one cell-filling figure, as an ordinal: the first attacking, else the first whose facing
+ * matches the party's opposite, else the first. The facing test reads `DB4::facing()`, the
+ * record's two bits, against a mask shifted per member, as CSBWin writes it.
+ */
+export function DrawSize4Index(monster: CreatureRecord, statuses: Uint8Array, partyFacing: number): number {
+  const numMonM1 = monster.numMonM1 & 3;
+  if (numMonM1 === 0) return 1;
+  for (let i = 0; i <= numMonM1; i++) {
+    if (decodeMonsterStatus(statuses[i] ?? 0).attacking) return i + 1;
+  }
+  let monsterFacing = (partyFacing + 2) & 3;
+  const facingByte = monster.facing & 3;
+  for (let i = 0, mask = 3; i <= numMonM1; i++, mask <<= 2, monsterFacing <<= 2) {
+    if (((facingByte ^ monsterFacing) & mask) === 0) return i + 1;
+  }
+  return 1;
+}
+
 function decodeMonsterStatus(status: number): { attacking: boolean; mirror: boolean; nibble0: number; nibble3: number } {
   return {
     attacking: (status & 0x80) !== 0,
@@ -420,8 +446,8 @@ function decodeMonsterStatus(status: number): { attacking: boolean; mirror: bool
  * a pair seen from the front or back is drawn both at once, the second sprite in the
  * other half (`w_94`, `:946-958`).
  *
- * `drawAsSize4()` is gated on `drawAsSize4Monsters`, false in DM (`DEBT.md`, "The
- * monster design options"), so `DrawSize4Index` is never reached.
+ * A group `drawAsSize4()` is drawn as one figure filling the cell: size 2, centred, the
+ * member `DrawSize4Index` picks (`:420-441`, `:465`).
  */
 function DrawMonster(
   draw: ViewportDraw,
@@ -446,15 +472,18 @@ function DrawMonster(
 
   const pmtDesc = tables.monsterDesc[monster.creatureType];
   if (!pmtDesc) return;
-  const monsterSize = monsterHorizontalSize(pmtDesc);
+  const drawAsSize4 = monsterDrawAsSize4(designOptions(draw), monster);
+  const monsterSize = drawAsSize4 ? 2 : monsterHorizontalSize(pmtDesc);
 
-  let rootIndexOfMonsterInGroup = ordinalAtPositionBytes({
-    positions: monsterState.positions,
-    facings: monsterState.facings,
-    numMonM1: monster.numMonM1,
-    horizontalSize: monsterSize,
-    position: curAbsPos,
-  });
+  let rootIndexOfMonsterInGroup = drawAsSize4
+    ? DrawSize4Index(monster, monsterState.statuses, facing)
+    : ordinalAtPositionBytes({
+      positions: monsterState.positions,
+      facings: monsterState.facings,
+      numMonM1: monster.numMonM1,
+      horizontalSize: monsterSize,
+      position: curAbsPos,
+    });
   let indexWithinGroup: number;
   if (rootIndexOfMonsterInGroup !== 0) {
     // At least part of a monster is here!
@@ -469,7 +498,7 @@ function DrawMonster(
   const monsterAbsFacing = (monsterState.facings >> (2 * rootIndexOfMonsterInGroup)) & 3;
   const monsterRelFacing = (facing - monsterAbsFacing) & 3; // 0=away, 1=right, 2=toward, 3=left
   let w94 = 0;
-  let d4 = monsterState.positions & 0xff;
+  let d4 = drawAsSize4 ? 255 : monsterState.positions & 0xff;
   // Several monsters that each fill the cell are invisible: "People have taken
   // advantage of this ... uh .. feature." (`:471-484`).
   if (monsterSize === 2 && d4 !== 255) return;

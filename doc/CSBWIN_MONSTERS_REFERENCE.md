@@ -93,8 +93,26 @@ size **minus one**), `facing()` in bits 8-9, `important()` bit 10, `invisible()`
 `invisible()`, `drawAsSize4()`, `Unique()` and `Poisoned()` are each gated on a
 global design option read from the save game's extended-features block —
 `InvisibleMonsters` = 0x02 and `DrawAsSize4Monsters` = 0x04 in `extendedFlags`
-(`doc/CSBwin-src/CSB.h:494-496`, set at `doc/CSBwin-src/SaveGame.cpp:394-400`). Both
-default to false, so plain Dungeon Master never sees them.
+(`doc/CSBwin-src/CSB.h:494-496`, set at `doc/CSBwin-src/SaveGame.cpp:394-400`, written
+back at `:947-948` and `:958-959`). Both default to false (`data.cpp:77-78`), so plain
+Dungeon Master never sees them; Conflux 3.5 sets both. With them on:
+
+- an `invisible()` creature is passed over by `DrawRoomObjects`' walk of the cell, which
+  draws the last creature that is not (`doc/CSBwin-src/Code51a4.cpp:2204-2210`);
+- a `drawAsSize4()` group is drawn as size 2, its positions taken as 255, so one figure,
+  centred (`:420-441`, `:469`). The member drawn is `DrawSize4Index`'s (`:323-348`): 1 for a
+  lone monster, else the first attacking, else the first whose facing passes
+  `((facingByte ^ monsterFacing) & mask) == 0`, with `facingByte` the record's own two
+  `facing()` bits, `monsterFacing` the party's facing plus 2, and both `mask` and
+  `monsterFacing` shifted two bits a member, else 1;
+- a missile reaching a `drawAsSize4()` group's empty corner hits member 1
+  (`Code11f52.cpp:1965-1966`);
+- a member of a `drawAsSize4()` group dying while another lives drops nothing
+  (`:1126-1127`), and the group shows its death cloud only for its last member, size 255
+  at position 255 (`:1258-1264`);
+- a `Unique()` group is not deleted when a square's 31 movement timers overflow
+  (`:2496`);
+- `&MONSTER@` reads all four (`DSA.cpp:4021-4024`).
 
 `STATE_OF_FEAR` (`doc/CSBwin-src/CSBTypes.h:164`) has no state 1. A giggler's steal puts
 its group into state 5 one time in eight, or on a coin toss when it took something

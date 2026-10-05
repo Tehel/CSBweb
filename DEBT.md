@@ -92,9 +92,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
 | G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | M | ⏳ |
+| G4 | Custom-dungeon extensions: external portraits | S | ⏳ waits on G24 |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G25, G27 |
@@ -118,7 +118,8 @@ The rows above G29 are the active list. `F3` is a phase, whose status is
 `PLAN.md`'s. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
-row meanwhile. `G1` sits below G25 and G27, whose features its last operations need.
+row meanwhile. `G1` sits below G25 and G27, whose features its last operations need, and `G4` below
+G24, whose portraits it draws.
 The G rows down to G26 are Conflux's (see "Priority"). The F
 rows are independent of the rest ("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
@@ -313,12 +314,12 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G4 ⏳ Custom-dungeon extensions: external portraits, the monster design options
+### G4 ⏳ Custom-dungeon extensions: external portraits
 
 **External portraits** for `charID > 23` (`GetExternalPortraitAddress`,
 `doc/CSBwin-src/Character.cpp:498-508`). No shipped DM hero has one. Conflux does: three
 of the 22 heroes `HeroExtractor` reads from it have portraits 274, 275 and 276, which come
-from `CSBgraphics.dat` (G24).
+from `CSBgraphics.dat`, so this waits on G24's portraits.
 
 **A file matter, off Conflux's path.** `MakeBigActuators` reads each actuator's type before
 the byte swap, so CSBWin takes bits 8-14 of `word2` for it where the port takes the type
@@ -326,20 +327,6 @@ the byte swap, so CSBWin takes bits 8-14 of `word2` for it where the port takes 
 `tools/dump-dungeon-conversions.ts` fails if a dungeon has a type-47 actuator under either
 reading, and DM has none. The conversion runs only on a file without the `BigActuators`
 flag (`doc/CSBwin-src/SaveGame.cpp:2604`), and Conflux's has it.
-
-**The monster design options.** `DB4::invisible()` is gated on `invisibleMonsters`, and
-`drawAsSize4()`, `Unique()` and `Poisoned()` on `drawAsSize4Monsters`
-(`CSB.h:1125-1132`). Both options are read from a save's `extendedFlags`
-(`SaveGame.cpp:394-400`, `false` by default). The port models neither: `CreatureRecord`
-holds the raw bits, the renderer's `DrawRoomObjects` / `DrawMonster` take both options as
-false (every creature drawn, never `DrawSize4Index`), and `monster.drawAsSize4` is read ungated in
-`MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:381`) and in `MonsterDamage`
-(`:619`, `:657`). The four gated getters are in `MonsterSystem.ts` (`monsterInvisible` to
-`monsterPoisoned`, `:74-85`), with both options a constant `false`; only `monsterUnique`'s
-caller and `&MONSTER@` read through them. Harmless on DM, because no creature in
-`dm-atari/dungeon.dat` sets any of bits 11-14. Conflux sets both options (`extendedFlags` 0x76), and of its 1257 creature
-groups 3 are invisible, 372 drawn as size 4 and 194 unique. Modelling it means reading `EF_EXTENDED_FLAGS.InvisibleMonsters` and
-`DrawAsSize4Monsters` in `readExtendedFeatures` and gating every accessor.
 
 ### G24 ⏳ `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics
 

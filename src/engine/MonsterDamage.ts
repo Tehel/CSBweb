@@ -30,7 +30,7 @@ import type { GameContext } from './GameContext';
 import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
 import type { MmRecord } from './MmRecord';
 import { MonsterType, StateOfFear } from './monsterTypes';
-import { setPackedBits } from './MonsterSystem';
+import { monsterDrawAsSize4, setPackedBits } from './MonsterSystem';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import {
   monsterBravery,
@@ -616,7 +616,7 @@ export class MonsterDamage {
     if (showDeathCloud) {
       // Cloud size follows the monster's footprint: one corner, two, or the cell.
       const size = [110, 190, 255][monsterHorizontalSize(desc)] ?? 255;
-      if (monster.drawAsSize4) {
+      if (monsterDrawAsSize4(this.ctx.rules, monster)) {
         if (numMonM1 === 0) {
           this.ctx.systems.missileEncounter.createDeathCloud(RN_MONSTER_DEATH, 255, new Position(attackX, attackY, level), 255, mmr);
         }
@@ -654,7 +654,7 @@ export class MonsterDamage {
   ): MonsterDamageResult {
     const facings = this.monsterFacingByte(monster, level, noItem16);
 
-    if (monsterLeavesDroppings(desc) && !monster.drawAsSize4) {
+    if (monsterLeavesDroppings(desc) && !monsterDrawAsSize4(this.ctx.rules, monster)) {
       if (apply) {
         if (dropResidue !== 2) {
           this.createAndDropObject(monster.creatureType, level, attackX, attackY, deadPosition, 2);
