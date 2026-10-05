@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10b next |
+| G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10c next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -320,7 +320,7 @@ The rest of the item, with an operation that needs care when ported:
 ### G2 ⏳ The cursor filter, the portrait's DSA switch action, and the viewing filter's third site
 
 The port runs sixteen filters: the viewing filter (two of its three sites), the cursor
-filter (six of its twenty sites), the monster
+filter (nine of its twenty sites), the monster
 move filter, the monster attack filter, the delete monster
 filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
 sound filter, the action name filter, the feeding filter, the character death filter, the
@@ -350,13 +350,11 @@ move filter, are paid. The steps left, one commit each:
     `NEWDSAPARAMETERS`. Back comes the packet; a site that can be cancelled reads `type`
     against `CURSORFILTER_Cancel` (20). CSBWin calls it from 20 places (a 21st,
     `SaveGame.cpp:2755-2758`, is commented out). The port's is `DsaSystem.cursorFilter`,
-    and `TouchWall`'s six sites send it their packets (`ActuatorSystem.touchWall`: the
-    key, the torch holder, the swap, the gift), checked by `tools/dump-cursor-filter.ts`,
+    and nine sites send it their packets: `TouchWall`'s six (`ActuatorSystem.touchWall`:
+    the key, the torch holder, the swap, the gift), and the hand's three, the throw
+    (`MouseSystem.throwObjectFromCursor`), the pick-up (`tryPickViewportObject`) and the
+    drop (`MouseSystem.dropObjectFromCursor`), checked by `tools/dump-cursor-filter.ts`,
     where each step below adds its own. The steps left, one commit each:
-    - **10b. The hand's three** (S). `ThrowByCharacter`'s `Throw` (`Mouse.cpp:686-696`,
-      `MouseSystem.throwByCharacter`), `TAG01a148`'s `PickFromFloor` (`:824-838`, the
-      pick-up in `src/renderer/ui/ViewportPicking.ts`), and `DropObject`'s `DropObject`
-      (`:870-883`, `MouseSystem.dropObjectFromCursor`). All three can be cancelled.
     - **10c. The champion's three** (S). `HandleClothingClick`'s `PlaceOnCharacter`, sent
       even with an empty cursor, which may cancel the click, and `PickFromCharacter`
       once the slot is emptied (`CSBCode.cpp:6966-6991`, `src/renderer/ui/Mouse.ts:348`);
@@ -683,7 +681,7 @@ CSBWin's fountain is a wall decoration, not an actuator: the renderer sets
 (`doc/CSBwin-src/CSBCode.cpp:3302-3308`), and a click on viewport button 5 with it set
 fills a waterskin or an empty flask held in the cursor, and does nothing else
 (`doc/CSBwin-src/Mouse.cpp:1194-1225`). The port has the same thing in
-`tryUseFrontWallItem` (`src/renderer/ui/ViewportPicking.ts:134`), which returns at once
+`tryUseFrontWallItem` (`src/renderer/ui/ViewportPicking.ts:138`), which returns at once
 when the hand is empty.
 
 The extra: with an empty hand, the **cursor owner** drinks. That is the same drink as one
@@ -712,7 +710,7 @@ An idea from *Legend of Grimrock*. Only a weapon thrown by an **attack action** 
 gathered back, never one thrown from the cursor:
 
 - **THROW** (`atk_THROW`, `src/engine/AttackSystem.ts:1482`) throws the weapon-hand object,
-  slot 1, through `MouseSystem.throwFromWeaponHand` (`src/engine/MouseSystem.ts:42`).
+  slot 1, through `MouseSystem.throwFromWeaponHand` (`src/engine/MouseSystem.ts:43`).
 - **SHOOT** (`attackWithShoot`, `src/engine/AttackSystem.ts:1580`) fires the ammunition
   held in slot 0 through `MagicSystem.launchObject` (`src/engine/MagicSystem.ts:572`).
   `launchObject` also launches spells, so the object is tagged in the attack, not there.

@@ -3662,7 +3662,13 @@ side touched as `p1` to `p4`. Of them, `TakeFromTorchHolder`, `PlaceInTorchHolde
 `SwapRemove`, `TakeKey` and `GiftFromGod` can be cancelled, and `SwapReplace`, sent once
 the swap is half made, cannot. `GiftFromGod`'s object is `TouchWall`'s local
 `objectInHand`: `RNnul` on an empty hand, but `RNempty` (0) once a lock earlier on the same
-touch has taken a key (`:567`). `tools/dump-cursor-filter.ts`.
+touch has taken a key (`:567`). The hand's three can all be cancelled: `ThrowByCharacter`'s
+`Throw`, for the hand's object, with the side thrown to as `p1` and no square
+(`Mouse.cpp:689-694`); `TAG01a148`'s `PickFromFloor`, for the object under the button, with
+the level, its square and the button, the position relative to the party (`:827-835`); and
+`DropObject`'s, for the hand's object, with the level, the square it falls on and its
+absolute position, `(partyFacing + pos) & 3` once an alcove's 4 is 2 (`:870-882`).
+`tools/dump-cursor-filter.ts`.
 
 ## The character death filter and the damage filter run their location's first DSA
 
@@ -4267,7 +4273,8 @@ Evidence: `tools/dump-mouse-queue.ts`, case 9; `tools/dump-cursor-filter.ts`, ca
   returns skip: no cursor owner (`:802`), a monster that is not levitating at the position
   (`:819`), and a cursor filter's cancel (`:835`). The test for an object in the slot
   (`:825`) does not guard it.
-- `DropObject` ends with `d.clockTick = 1` (`Mouse.cpp:964`).
+- `DropObject` ends with `d.clockTick = 1` (`Mouse.cpp:964`), which a cursor filter's
+  cancel skips (`:882`).
 - The attack menu, `_TAG019fac`, sets `d.clockTick = (i16)intResult` after an option's
   `ExecuteAttack` (`Character.cpp:4716-4717`). PASS, button 112, calls `ExecuteAttack(-1)`
   and writes nothing (`:4679-4682`). `ExecuteAttack` returns 0 without attacking when the

@@ -23,6 +23,18 @@
  * 8. **Nobody owns the cursor**, a party with no champion yet on the shipped dungeon: a
  *    pushbutton and a gift answer nothing, only a portrait would (`:357-360`).
  *
+ * And the hand's three, each cancelled to nothing done:
+ *
+ * 9. **The throw**: `Throw` (5) for the hand's object, with the side thrown to and no
+ *    square (`Mouse.cpp:689-694`), run through `MouseSystem.throwObjectFromCursor`.
+ * 10. **The pick-up**: `PickFromFloor` (2) for the object clicked, the level, its square
+ *    and the viewport button, its position relative to the party (`:827-835`), run
+ *    through `tryPickViewportObject`. A cancel makes no tick due (`:840`).
+ * 11. **The drop**: `DropObject` (7) for the hand's object, the level, the square it falls
+ *    on and its absolute position (`:874-882`), run through
+ *    `MouseSystem.dropObjectFromCursor`: on the party's square, and in the alcove ahead,
+ *    which is the square ahead's facing side.
+ *
  * Run: `npx tsx tools/dump-cursor-filter.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -33,8 +45,11 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { CursorFilterType, StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
+import { tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
+import { VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
 import { newGame, stockGraphics } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 
 /** `ESL_CURSORFILTER` (`doc/CSBwin-src/CSB.h:1544`). */
@@ -209,6 +224,68 @@ for (const cancelled of [false, true]) {
   check(party.champions.length === 0 && (party.cursorOwner ?? -1) === -1, '8. the new game has no champion, so nobody owns the cursor');
   check(!fired, '8. the pushbutton does not fire');
   check(party.objectInHand === OBJECT_ID_NULL, '8. and the gift is not given');
+}
+
+/** The packet the hand's sites send: the count and the six words. */
+const hand = (type: number, rn: number, p1: number, p2 = 0, p3 = 0, p4 = 0): string => [WORDS, rn, type, p1, p2, p3, p4].join();
+
+for (const cancelled of [false, true]) {
+  const game = withFilterDsas(ESL_CURSORFILTER, [[...report(0), ...(cancelled ? cancel : [])]]);
+  const party = game.ctx.party.state;
+  const thrown = misc(game);
+  party.cursorOwner = 0;
+  party.objectInHand = thrown;
+  const launched = game.systems.mouse.throwObjectFromCursor(1);
+  const g = game.systems.dsa.getGlobalVariables();
+  console.log(`Throw${cancelled ? ', cancelled' : ''}: ${packet(g)}, launched ${launched}`);
+  check(packet(g) === hand(CursorFilterType.Throw, thrown, 1),
+    `9. ${cancelled ? 'cancelled ' : ''}Throw's packet, the side thrown to and no square`);
+  check(launched === !cancelled && (party.objectInHand === thrown) === cancelled, `9. the object is ${cancelled ? 'kept' : 'thrown'}`);
+}
+
+for (const cancelled of [false, true]) {
+  const game = withFilterDsas(ESL_CURSORFILTER, [[...report(0), ...(cancelled ? cancel : [])]]);
+  const party = game.ctx.party.state;
+  const at = party.position;
+  const lying = game.ctx.dungeon.rnMaps.setPos(misc(game), party.facing & 3);
+  game.ctx.dungeon.addObjectToCell(at, lying);
+  party.cursorOwner = 0;
+  party.objectInHand = OBJECT_ID_NULL;
+  game.ctx.loop.clockTick = false;
+  const ui = newUIState(stockGraphics(), game.ctx);
+  const button = { x1: 10, x2: 20, y1: 10, y2: 20 };
+  const none = { x1: 255, x2: 0, y1: 0, y2: 0 };
+  ui.context.viewportObjectButtons = [button, none, none, none, none, none];
+  ui.context.viewportObjectRNs = [lying, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF];
+  const picked = tryPickViewportObject(ui, 15, 15 + VIEWPORT_Y);
+  const g = game.systems.dsa.getGlobalVariables();
+  console.log(`PickFromFloor${cancelled ? ', cancelled' : ''}: ${packet(g)}, picked ${picked}`);
+  check(packet(g) === hand(CursorFilterType.PickFromFloor, lying, at.z, at.x, at.y, 0),
+    `10. ${cancelled ? 'cancelled ' : ''}PickFromFloor's packet, the square and the button`);
+  check(picked === !cancelled && (party.objectInHand === lying) === !cancelled
+    && objectsAt(game, at).includes(lying) === cancelled, `10. the object is ${cancelled ? 'left' : 'picked up'}`);
+  check(game.ctx.loop.clockTick === !cancelled, `10. ${cancelled ? 'no tick is' : 'a tick is'} made due`);
+}
+
+for (const [pos, ahead] of [[1, false], [4, true]] as const) {
+  for (const cancelled of [false, true]) {
+    const game = withFilterDsas(ESL_CURSORFILTER, [[...report(0), ...(cancelled ? cancel : [])]]);
+    const party = game.ctx.party.state;
+    const facing = party.facing & 3;
+    const at = ahead ? [party.position.north, party.position.east, party.position.south, party.position.west][facing] : party.position;
+    const dropped = misc(game);
+    party.cursorOwner = 0;
+    party.objectInHand = dropped;
+    const done = game.systems.mouse.dropObjectFromCursor(pos);
+    const g = game.systems.dsa.getGlobalVariables();
+    const absolute = (facing + (ahead ? 2 : pos)) & 3;
+    console.log(`DropObject at ${pos}${cancelled ? ', cancelled' : ''}: ${packet(g)}, dropped ${done}`);
+    check(packet(g) === hand(CursorFilterType.DropObject, dropped, at.z, at.x, at.y, absolute),
+      `11. ${cancelled ? 'cancelled ' : ''}DropObject's packet at ${pos}, the square and the position it falls on`);
+    const onSquare = objectsAt(game, at).some((rn) => game.ctx.dungeon.rnMaps.idx(rn) === game.ctx.dungeon.rnMaps.idx(dropped));
+    check(done === !cancelled && (party.objectInHand === dropped) === cancelled && onSquare === !cancelled,
+      `11. the object is ${cancelled ? 'kept' : 'dropped'} at ${pos}`);
+  }
 }
 
 finish();

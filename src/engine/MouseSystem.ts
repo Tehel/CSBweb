@@ -19,6 +19,7 @@ import {
   type Position,
 } from '../core/types';
 import { ActuatorAction } from '../data/actuatorHelpers';
+import { CursorFilterType } from './DsaSystem';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { setClockTick, speed } from './LoopState';
 import type { Champion } from './gameTypes';
@@ -90,6 +91,11 @@ export class MouseSystem {
 
     const newPos = (facing + dropPos) & 0x3;
 
+    // `CURSORFILTER_DropObject`, which may cancel the drop (`doc/CSBwin-src/Mouse.cpp:874-882`).
+    const cfp = { object: obj, type: CursorFilterType.DropObject, p1: party.position.z, p2: target.x, p3: target.y, p4: newPos };
+    this.ctx.systems.dsa.cursorFilter(cfp);
+    if (cfp.type === CursorFilterType.Cancel) return false;
+
     // `objD4.pos(w_4); MoveObject(objD4, -1, 0, D6W, D5W, NULL, NULL)`
     // (`doc/CSBwin-src/Mouse.cpp:881-882`): a freshly-dropped object still walks
     // through an active teleporter or open pit on the cell it lands on.
@@ -154,6 +160,11 @@ export class MouseSystem {
 
     const obj = party.objectInHand;
     if (obj === OBJECT_ID_NULL) return false;
+
+    // `CURSORFILTER_Throw`, which may cancel the throw (`doc/CSBwin-src/Mouse.cpp:689-694`).
+    const cfp = { object: obj, type: CursorFilterType.Throw, p1: leftOrRight, p2: 0, p3: 0, p4: 0 };
+    this.ctx.systems.dsa.cursorFilter(cfp);
+    if (cfp.type === CursorFilterType.Cancel) return false;
 
     const champion = party.champions[owner] ?? null;
     if (!champion) return false;

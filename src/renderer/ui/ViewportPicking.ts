@@ -15,6 +15,7 @@ import { GraphicRoomType, RoomType as SummaryRoomType } from '../bytecode/Types'
 import { resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 import { setClockTick } from '../../engine/LoopState';
+import { CursorFilterType } from '../../engine/DsaSystem';
 
 const POTION_WATER_FLASK = 15;
 
@@ -79,8 +80,12 @@ export function tryPickViewportObject(ui: UIState, x: number, y: number): boolea
   const target = getPickupCellForRelativePos(ui, hit.relativeLocation);
   if (!target) return false;
   if (isMonsterBlockingPickup(ui, hit.relativeLocation, target)) return false;
+  // `CURSORFILTER_PickFromFloor`, which may cancel the pick-up (`doc/CSBwin-src/Mouse.cpp:827-835`).
+  const cfp = { object: hit.rn, type: CursorFilterType.PickFromFloor, p1: target.z, p2: target.x, p3: target.y, p4: hit.relativeLocation };
+  ui.ctx.systems.dsa.cursorFilter(cfp);
+  if (cfp.type === CursorFilterType.Cancel) return false;
   // `TAG01a148` ends with `d.clockTick = 1` (`doc/CSBwin-src/Mouse.cpp:840`), which only
-  // its returns for no cursor owner and a monster in the way skip.
+  // its returns for no cursor owner, a monster in the way and a cancel skip.
   setClockTick(ui.ctx, 1);
   if (!ui.ctx.dungeon.removeObjectFromCell(target, hit.rn)) return false;
   ui.ctx.systems.mouse.triggerObjectMove(target, hit.rn, false, false, ui.partyState.facing & 0x3);
