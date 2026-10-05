@@ -3684,7 +3684,27 @@ real pass over the destination, sends `DSA_MoveTo` for the object, unless it is 
 (`:449-455`). These four run the filter's DSAs inside the DSA that called them, which
 keeps its own stack and variables (`ProcessDSATimer6`'s `DSADBANK`, `DSA.cpp:5350-5353`),
 finds the packet in its parameters, and loses an `OVERRIDE` it had set (`:5416`).
+`TAG0138ec`, as the game read begins (`CSBCode.cpp:10548`), sends one and reads no cancel:
+`ResumeSavedGame` for the object in a saved game's hand, and nothing for an empty one
+(`:6297-6322`); `EnteringPrison` for `RNnul` in a new game, whose hand it then empties
+(`:6364-6371`). Each sets `p1` four times and leaves `p2` to `p4` the constructor's 0.
 `tools/dump-cursor-filter.ts`.
+
+## The cursor filter's `ReadGame` runs no DSA
+
+`_ReadEntireGame` sends `CURSORFILTER_ReadGame` twice: for `RNnul` before a new game's read
+empties the hand (`doc/CSBwin-src/SaveGame.cpp:1497-1503`), and for the save's object once a
+saved game's `GAMEBLOCK2` is read (`:1650-1655`). Neither runs a DSA. `EXPOOL::Locate`
+returns -1 while `m` is `NULL` (`data.cpp:1587`), and only `EXPOOL::Setup` sets it from
+`NULL` (`:1507-1522`; `enlarge` reallocates it, but only `Write` calls that, which reads
+`m` first, `:1536`). `Setup` is called once, as `ReadDatabases` returns 1
+(`SaveGame.cpp:2773-2774`), after both sends (`:1741`). Every path to `_ReadEntireGame`
+has set `m` to `NULL` first: `_StartCSB` and the restart after a lost game call
+`Cleanup(false)` (`CSBCode.cpp:11304`, `Code1f9e6.cpp:302`), whose `expool.Cleanup()`
+does it (`data.cpp:2026`, `:1525-1528`), and the only read retried after that,
+`_GameSetup`'s loop (`CSBCode.cpp:10633-10640`), retries one that failed: once
+`ReadDatabases` has succeeded, `D0W` stays 1 and no later branch of the read reaches
+`tag01efee` (`SaveGame.cpp:1741-1830`).
 
 ## The character death filter and the damage filter run their location's first DSA
 

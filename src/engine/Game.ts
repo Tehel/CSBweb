@@ -36,8 +36,8 @@ import { createLoopFlags, flashButton, vblFlashButton, vblInterrupt, waitForButt
 import { makeMoreRoomInDB } from './MakeMoreRoomInDB';
 import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
-import { DsaSystem } from './DsaSystem';
-import { Position } from '../core/types';
+import { CursorFilterType, DsaSystem } from './DsaSystem';
+import { OBJECT_ID_NULL, Position } from '../core/types';
 import { EDT_GLOBAL_TEXT } from '../data/DecodeText';
 import { VBL_FREQUENCY } from '../core/constants';
 
@@ -139,6 +139,11 @@ export class Game implements MainLoop {
      */
     private canRestart = false;
     /**
+     * `d.gameState == GAMESTATE_ResumeSavedGame` as `TAG0138ec` reads it: the game was read
+     * from a save (`savedGameRead`), not from `dungeon.dat` (`readNewGame`).
+     */
+    private resumedSavedGame = false;
+    /**
      * The player's time in this game, in VBLs: every VBL of the loop but the frozen
      * game's and the save menu's (`playTime`).
      */
@@ -204,6 +209,9 @@ export class Game implements MainLoop {
             return;
         }
 
+        // `_TAG021028` ends in `TAG0138ec()` and `d.ClockRunning = 1`, and `MainLoop` follows
+        // (doc/CSBwin-src/CSBCode.cpp:10548-10549, `:11320`).
+        this.tag0138ec();
         this.running = true;
         this.vblClockStart = Date.now();
         this.vblsPaced = 0;
@@ -242,6 +250,13 @@ export class Game implements MainLoop {
      * gives the rest of a new game, the party at the start, the clock and the timers,
      * which a load restores here, so every system keeps its object and the page its
      * wiring.
+     *
+     * `_ReadEntireGame` sends the cursor filter `CURSORFILTER_ReadGame` for `RNnul` before it
+     * empties the hand (doc/CSBwin-src/SaveGame.cpp:1497-1503), and a saved game's read
+     * sends it again for the save's object (`:1650-1655`). Neither runs a DSA: both come
+     * before `ReadDatabases` sets the `EXPOOL` up (`:2773`), and every path to the read
+     * has emptied it first (doc/PROVEN_FACTS.md → "The cursor filter's `ReadGame` runs no
+     * DSA"). So the port sends neither.
      */
     readNewGame(data: DungeonData): void {
         const fresh = new Game(data, this.ctx.tables);
@@ -256,6 +271,7 @@ export class Game implements MainLoop {
         this.ctx.systems.dsa.disableSaves = readDisableSaves(data);
         this.readNewGameRules(data);
         this.canRestart = false;
+        this.resumedSavedGame = false;
         this.playedVbls = 0;
     }
 
@@ -311,10 +327,35 @@ export class Game implements MainLoop {
 
     /**
      * The tail of `_ReadEntireGame` once a saved game is in: `d.CanRestartFromSavegame = 1`
-     * (doc/CSBwin-src/SaveGame.cpp:1883). `applySaveBytes` calls it.
+     * (doc/CSBwin-src/SaveGame.cpp:1883). `applySaveBytes` calls it. A save read in play,
+     * which only the port has, begins at once (`tag0138ec`), as one read at the entrance or
+     * after a lost game begins when the loop starts (`start`).
      */
     savedGameRead(): void {
         this.canRestart = true;
+        this.resumedSavedGame = true;
+        if (this.running) this.tag0138ec();
+    }
+
+    /**
+     * `TAG0138ec`'s cursor filter, as the game read begins (doc/CSBwin-src/CSBCode.cpp:6289-6379):
+     * `CURSORFILTER_ResumeSavedGame` for the object in a saved game's hand, and nothing for
+     * an empty one (`:6297-6322`); `CURSORFILTER_EnteringPrison` for `RNnul` in a new game,
+     * whose hand is then emptied (`:6364-6371`). Neither reads the packet back. Both set
+     * `p1` four times, so `p2` to `p4` keep the constructor's 0 (`MoveObject.cpp:790-795`).
+     * The rest of `TAG0138ec`, which puts the object on the cursor and draws the champions,
+     * is not here.
+     */
+    private tag0138ec(): void {
+        const party = this.ctx.party.state;
+        if (this.resumedSavedGame) {
+            const object = party.objectInHand;
+            if (object === OBJECT_ID_NULL) return;
+            this.systems.dsa.cursorFilter({ object, type: CursorFilterType.ResumeSavedGame, p1: 0, p2: 0, p3: 0, p4: 0 });
+            return;
+        }
+        this.systems.dsa.cursorFilter({ object: OBJECT_ID_NULL, type: CursorFilterType.EnteringPrison, p1: 0, p2: 0, p3: 0, p4: 0 });
+        party.objectInHand = OBJECT_ID_NULL;
     }
 
     /** `d.CanRestartFromSavegame`. */

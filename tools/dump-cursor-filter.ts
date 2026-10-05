@@ -58,6 +58,18 @@
  *    own, untouched (`ProcessDSATimer6` runs the filter's on a `DSADBANK` of its own,
  *    `DSA.cpp:5350-5353`); an `OVERRIDE` it set before is gone (`:5416`).
  *
+ * And the game's, `TAG0138ec`'s two as the loop starts (`Game.start`), neither of which
+ * reads the packet back, and `_ReadEntireGame`'s two, which run no DSA:
+ *
+ * 16. **A new game**, read from `dungeon.dat` after a save: `EnteringPrison` (6) for
+ *    `RNnul`, with no `p1` to `p4`, then the hand emptied (`CSBCode.cpp:6364-6371`). The
+ *    read itself sends nothing.
+ * 17. **A saved game**: `ResumeSavedGame` (9) for the object in the hand, with no `p1` to
+ *    `p4`, which stays there (`:6311-6322`); nothing for an empty hand. The read itself
+ *    sends nothing.
+ * 18. **A save read in play**, which only the port has: `ResumeSavedGame` at once, once the
+ *    read is in (`Game.savedGameRead`).
+ *
  * Run: `npx tsx tools/dump-cursor-filter.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -69,13 +81,14 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { CursorFilterType, StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
+import { applySaveBytes } from '../src/engine/SaveGameFile';
 import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { handleMouthPress } from '../src/renderer/ui/Feeding';
 import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { handleClothingClick } from '../src/renderer/ui/Mouse';
 import { tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import { VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
-import { freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
+import { UNSET, freshGame, globalStore, int, op, placeFilterDsas, save, varFetch, varStore, withFilterDsas } from './lib/dsa';
 import { newGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
@@ -495,6 +508,70 @@ const dsaPacket = (type: number, rn: number): string => [WORDS, rn, type, 0, 0, 
   check(g[40] === 1234, '15. the caller\'s stack is its own');
   check(g[41] === 77, '15. so are its variables');
   check(corners.join() === '0', '15. the OVERRIDE it set before the &DEL is gone');
+}
+
+/** The filter's DSA, counting its runs in global 50: the packet reported, then cancelled. */
+const countedFilterDsa = [...report(0), globalFetch(50), ...int(1), op(StkOp.PLUS), globalStore(50), ...cancel];
+const runs = (game: Game): number => game.systems.dsa.getGlobalVariables()[50]! - UNSET;
+/** The loop started and stopped at once: `TAG0138ec` runs, and no VBL. */
+function startAndStop(game: Game): void {
+  game.start();
+  game.stop();
+}
+const stock = new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'));
+
+{
+  const game = freshGame();
+  applySaveBytes(game, save);
+  check(game.readDungeonDat(stock), '16. dungeon.dat is read');
+  placeFilterDsas(game, ESL_CURSORFILTER, [countedFilterDsa]);
+  const party = game.ctx.party.state;
+  party.objectInHand = misc(game);
+  const read = runs(game);
+  startAndStop(game);
+  const g = game.systems.dsa.getGlobalVariables();
+  console.log(`new game: ${packet(g)}, runs ${read} at the read and ${runs(game) - read} at the start, hand ${party.objectInHand}`);
+  check(read === 0, '16. the read sends nothing');
+  check(runs(game) === 1 && packet(g) === dsaPacket(CursorFilterType.EnteringPrison, OBJECT_ID_NULL), '16. the start sends EnteringPrison for RNnul');
+  check(party.objectInHand === OBJECT_ID_NULL, '16. and empties the hand');
+}
+
+for (const inHand of [true, false]) {
+  const game = freshGame();
+  applySaveBytes(game, save);
+  placeFilterDsas(game, ESL_CURSORFILTER, [countedFilterDsa]);
+  const party = game.ctx.party.state;
+  const held = inHand ? misc(game) : OBJECT_ID_NULL;
+  party.objectInHand = held;
+  const read = runs(game);
+  startAndStop(game);
+  const g = game.systems.dsa.getGlobalVariables();
+  console.log(`saved game, ${inHand ? 'hand full' : 'hand empty'}: ${packet(g)}, runs ${read} at the read and ${runs(game) - read} at the start, hand ${party.objectInHand}`);
+  check(read === 0, '17. the read sends nothing');
+  if (inHand) {
+    check(runs(game) === 1 && packet(g) === dsaPacket(CursorFilterType.ResumeSavedGame, held), '17. the start sends ResumeSavedGame for the hand\'s object');
+    check(party.objectInHand === held, '17. which a cancel leaves in the hand');
+  } else {
+    check(runs(game) === 0, '17. an empty hand sends nothing');
+  }
+}
+
+{
+  const game = freshGame();
+  placeFilterDsas(game, ESL_CURSORFILTER, [countedFilterDsa]);
+  const party = game.ctx.party.state;
+  game.start();
+  try {
+    game.systems.dsa.setGlobalVariables(new Array<number>(100).fill(UNSET));
+    const held = misc(game);
+    party.objectInHand = held;
+    game.savedGameRead();
+    const g = game.systems.dsa.getGlobalVariables();
+    console.log(`save read in play: ${packet(g)}, runs ${runs(game)}, hand ${party.objectInHand}`);
+    check(runs(game) === 1 && packet(g) === dsaPacket(CursorFilterType.ResumeSavedGame, held), '18. a save read in play sends ResumeSavedGame at once');
+  } finally {
+    game.stop();
+  }
 }
 
 finish();

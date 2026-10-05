@@ -91,7 +91,8 @@ function buildPartyState(world: CsbwinWorld): PartyState {
 
     // `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`:1642`) — the cursor's
     // object is an indirect slot number like every other RN in the file. `RNempty` is 0;
-    // the port keeps `RNnul` as its one empty value.
+    // the port keeps `RNnul` as its one empty value. The `CURSORFILTER_ReadGame` that follows
+    // (`:1650-1655`) runs no DSA (`Game.readNewGame`).
     const rawInHand = gb2.objectInHand & 0xffff;
     const objectInHand =
         rawInHand === 0 || rawInHand === 0xffff || rawInHand === 0xfffe

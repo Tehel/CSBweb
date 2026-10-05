@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G2 | The cursor filter, the portrait's DSA switch action, and the viewing filter's third site | L | ⏳ step 10e next |
+| G2 | The portrait's DSA switch action, and the viewing filter's third site | M | ⏳ step 11 next |
 | G3 | The wings | M | ⏳ |
 | G4 | Custom-dungeon extensions: external portraits, the monster design options | M | ⏳ |
 | G20 | The Hint Oracle, from the inventory, at the party's square | L | ⏳ |
@@ -317,10 +317,10 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G2 ⏳ The cursor filter, the portrait's DSA switch action, and the viewing filter's third site
+### G2 ⏳ The portrait's DSA switch action, and the viewing filter's third site
 
 The port runs sixteen filters: the viewing filter (two of its three sites), the cursor
-filter (sixteen of its twenty sites), the monster
+filter, the monster
 move filter, the monster attack filter, the delete monster
 filter, the party attack filter, the adjust skills filter, the missile encounter filter, the
 sound filter, the action name filter, the feeding filter, the character death filter, the
@@ -338,35 +338,14 @@ filter's.
 A filter that loops runs each of those DSAs in turn, a filter call apiece; one that
 `break`s runs the first. Each step reads which from its CSBWin site and checks it in a
 `tools/` check through `tools/lib/dsa.ts`: `TestFilter` for one DSA, `withFilterDsas` for
-two on the square where the site loops. Steps 1 to 9, the sound filter, the action name
+two on the square where the site loops. Steps 1 to 10, the sound filter, the action name
 filter, the feeding filter, the character death and damage filters, the equip filter, the
-party move filter, the monster attack filter, the delete monster filter, and the monster
-move filter, are paid. The steps left, one commit each:
+party move filter, the monster attack filter, the delete monster filter, the monster
+move filter and the cursor filter, are paid. The steps left, one commit each:
 
-10. **`ESL_CURSORFILTER`** (L). `CursorFilter` (`MoveObject.cpp:797-865`), which may
-    cancel what is about to happen to the object on the cursor: every DSA at the location
-    in turn, each on the packet as the DSA before it left it, a count of 6 and the
-    packet's six words, `object`, `type`, `p1` to `p4` (`CSB.h:1517-1526`), with no
-    `NEWDSAPARAMETERS`. Back comes the packet; a site that can be cancelled reads `type`
-    against `CURSORFILTER_Cancel` (20). CSBWin calls it from 20 places (a 21st,
-    `SaveGame.cpp:2755-2758`, is commented out). The port's is `DsaSystem.cursorFilter`,
-    and sixteen sites send it their packets: `TouchWall`'s six (`ActuatorSystem.touchWall`:
-    the key, the torch holder, the swap, the gift); the hand's three, the throw
-    (`MouseSystem.throwObjectFromCursor`), the pick-up (`tryPickViewportObject`) and the
-    drop (`MouseSystem.dropObjectFromCursor`); the champion's three, the clothing
-    click's two (`handleClothingClick`) and the mouth's (`handleMouthPress`); and the
-    DSA's four, `&DEL` and `&ADD` of the hand and `&MOVE` from and to it
-    (`DsaSystem.findCursorSource`, `checkObjectToCursor`). They are checked by
-    `tools/dump-cursor-filter.ts`, where the step left adds its own:
-    - **10e. The game's four** (S). `_ReadEntireGame`'s two `ReadGame`s, with `RNnul`
-      before the hand is emptied (`SaveGame.cpp:1497-1503`) and with the save's object
-      once it is read (`:1650-1655`); `TAG0138ec`'s `ResumeSavedGame` when a resumed
-      game's hand holds something (`CSBCode.cpp:6311-6322`) and `EnteringPrison` for a
-      new game (`:6364-6370`). Both of `TAG0138ec`'s set `p1` four times, so `p2` to `p4`
-      keep the constructor's 0.
 11. **`PortraitTranslateDisable`'s `QueueDSASwitchAction`** (S, `CSBCode.cpp:6540-6612`).
     It fires only on a `DisableMessage`, which the shipped dungeon never carries
-    (`HallOfChampions.ts:337`).
+    (`HallOfChampions.ts:343`).
 12. **The viewing filter at the eye click** (S). `TAG019036`
     (`Character.cpp:4540-4578`) runs it with phrase mask 0 and object -1 before it draws
     the masteries, every DSA at the location in turn; the port's `drawAttributePanel`
