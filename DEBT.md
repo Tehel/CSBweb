@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G25 | Viewport overlays and overlay palettes | L | ⏳ step 2 of 2, waits on the author |
+| G25 | Viewport overlays and overlay palettes | L | ⏳ step 2 of 2 |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G27 |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
@@ -370,13 +370,20 @@ Steps:
    checked by `tools/dump-dsa-overlay.ts` on Conflux's file
    (`doc/PROVEN_FACTS.md` → "A viewport overlay is a 224x136 bitmap of bytes").
 2. **The screen** ⏳: `CreateOverlayTable` and the viewport's composition in
-   `VM_ADVENTURE`, the jitter with it, a frame with an overlay up. It waits on the
-   author: CSBWin's pixel is RGB555, which Windows widens to 8 bits, and the port's
-   colours are an Atari intensity ×36 (`src/renderer/csbwin/CanvasBlitter.ts`), which
-   is neither. The options: (a) a 5-bit channel widened `(v << 3) | (v >> 2)` in the
-   overlay path only, the straight path keeping ×36, so the golden frames stay; (b) the
-   same widening, and the straight path brought to it too, `(i << 2 | i >> 1)` then
-   widened, which moves every golden frame by up to 4 per channel.
+   `VM_ADVENTURE`, the jitter with it, a frame with an overlay up. CSBWin's pixel is
+   RGB555, which Windows widens to 8 bits, and the port's colours are an Atari intensity
+   ×36 (`src/renderer/csbwin/CanvasBlitter.ts`), which is neither. Two ways, both built,
+   behind a dev setting kept with the page's settings in `localStorage`
+   (`src/ui/settings.ts`), so the author can compare them before choosing: (a) a 5-bit
+   channel widened `(v << 3) | (v >> 2)` in the overlay path only, the straight path
+   keeping ×36, so the golden frames stay; (b) the same widening, and the straight path
+   brought to it too, `(i << 2 | i >> 1)` then widened, which moves every golden frame by
+   up to 4 per channel. (a) is the default until the author chooses; then the setting and
+   the other way go.
+   No game here runs the code: `dm-atari/dungeon.dat` has no DSA, and Conflux is not a
+   data set until G26. So a dev control beside the canvas shows an overlay or an overlay
+   palette, by number, with `SelectOverlay`'s and `SetOverlayPalette`'s parameters, from
+   the data set's `CSBgraphics.dat`; `dm-atari`'s holds 113 overlays and 51 palettes.
 
 ### G27 ⏳ Skins: a cell's own wall, floor and ceiling graphics
 
