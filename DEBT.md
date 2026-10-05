@@ -92,8 +92,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | M | ⏳ |
-| G4 | Custom-dungeon extensions: external portraits | S | ⏳ waits on G24 |
+| G24 | `CSBgraphics.dat`'s portraits, sounds and alternate monster graphics | L | ⏳ step 1 of 5 next |
+| G4 | Custom-dungeon extensions: external portraits | S | ⏳ paid with G24 step 1 |
 | G25 | Viewport overlays and overlay palettes | M | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G25, G27 |
@@ -347,7 +347,7 @@ The rest of the item, with an operation that needs care when ported:
 **External portraits** for `charID > 23` (`GetExternalPortraitAddress`,
 `doc/CSBwin-src/Character.cpp:498-508`). No shipped DM hero has one. Conflux does: three
 of the 22 heroes `HeroExtractor` reads from it have portraits 274, 275 and 276, which come
-from `CSBgraphics.dat`, so this waits on G24's portraits.
+from `CSBgraphics.dat`, so this is paid with G24's step 1.
 
 **A file matter, off Conflux's path.** `MakeBigActuators` reads each actuator's type before
 the byte swap, so CSBWin takes bits 8-14 of `word2` for it where the port takes the type
@@ -373,8 +373,36 @@ wall and 72 floor decorations. Of the six kinds the port does not read, Conflux 
 
 The overlays and their palettes are G25, and the backgrounds, which are what a skin
 draws, G27.
-CSBWin also checks the file's signature against the one the dungeon's Extended Features
-block names (`SaveGame.cpp:380`, `Graphics.cpp:1865-1881`).
+
+Every reader goes through `ReadCSBgraphic` (`doc/CSBwin-src/Graphics.cpp:3201`), which the
+port has (`CSBGraphicsLoader.readSection`). The steps, one commit each:
+
+1. **Portraits**, with G4. `ImportBitmap(index, …)` (`Bitmaps.cpp:246-435`) reads a
+   `CGT_Portrait` section as a 16-colour BMP, bottom-up rows of nibbles that are palette
+   indices (its colour table is skipped, not used). `GetExternalPortraitAddress`
+   (`:540-571`) caches it by index, and gives `GetErrorPortrait`'s picture (`:526-536`)
+   when the section is missing or not 32 by 29. Drawn where G4's two call sites are:
+   `AddCharacter` (`Character.cpp:498-508`) and the mirror (`CSBCode.cpp:3700-3709`).
+2. **Sounds.** `SOUNDDATA::ReadSound` (`Sound.cpp:989-1025`): a section's bytes summed
+   with the previous one, the sample count at byte 40, the 8-bit samples from 44.
+   `PlayCustomSound`'s branch from 0 (`:1039-1059`) plays them, through `Decode`'s
+   volume (`:315`). `SoundQueue.playCustomSound` replaces its trace with it.
+3. **Alternate monster graphics, the record.** `AltGraphicMapping` (`Code51a4.cpp:1060-1069`,
+   an `EDBT_AltMonGraphics` record of the `EXPOOL`, which a dungeon file carries and
+   nothing in CSBWin writes), `GetAlternateGraphicsRecord` (`:1071-1112`) and its
+   per-type cache, and the `ALTMONGRAPH` layout (`:967`). A tool reads Conflux's 123
+   sections and checks each one's offsets against its size.
+4. **Alternate monster graphics, the drawing.** The alternate `DrawMonster`
+   (`Code51a4.cpp:1139-1751`), CSBWin's copy of the original that takes its graphics and
+   descriptions from the record, and its derived graphics
+   (`GetAlternateDerivedGraphicAddress`, `:1119`). It may split again once read.
+5. **The signature.** `OpenCSBgraphicsFile` (`Graphics.cpp:1840-1896`) takes the file's
+   MD5 through `Signature` (`data.cpp:1943-1975`), and dies when it differs from the one
+   a read's Extended Features block named (`ExpectedSignatures`,
+   `src/data/CsbwinExtendedFeatures.ts`) or from `EDBT_CSBGraphicsSignature`'s. The port
+   computes no signature, for this file or for `graphics.dat` (`:1786-1796`, the same
+   check), and no item holds the latter. What the port does where CSBWin dies is the
+   author's call, asked when this step is reached.
 
 ### G25 ⏳ Viewport overlays and overlay palettes
 
