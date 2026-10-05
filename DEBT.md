@@ -22,8 +22,8 @@ code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, and the work it
-needs is in the active list: G1, G25, G27 and G26. Its `dungeon.dat` is
-enciphered, and reads whole (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is
+needs is in the active list: G1, G27 and G26, and G25 once the author has chosen its
+colours. Its `dungeon.dat` is enciphered, and reads whole (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is
 `RC4.cpp`'s own cipher"). Each entry says what Conflux uses of it, measured on the
 deciphered file.
 DSA support is aimed at whole, not at Conflux's share of it: G1 is every operation CSBWin
@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G25 | Viewport overlays and overlay palettes | L | ⏳ step 2 of 2 |
+| C148 | The overlay comes back as a save menu or sleep ends, not at the next tick | S | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G27 |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
@@ -102,6 +102,7 @@ In payoff order: the first row is the next item.
 | F13 | `npm test` runs its tools one at a time | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G29 | Recording a game and playing it back | — | ⏸️ |
+| G25 | Viewport overlays and overlay palettes: RGB555 or ×36 | S | ⏸️ waits on the author |
 | C145 | The Hint Oracle's title boxes keep colour 12 on their last line and a half | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
@@ -123,7 +124,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C148 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C149 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -166,6 +167,19 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C148 ⏳ The overlay comes back as a save menu or sleep ends, not at the next tick
+
+The viewport is drawn through the overlay in `VM_ADVENTURE` only
+(`doc/CSBwin-src/WinScreen.cpp:1527`). A save menu sets `VM_LEFTMENU` or `VM_CENTERMENU`
+(`Menu.cpp:465-472`) and sleep `VM_SLEEPING` (`Mouse.cpp:1703`), and CSBWin goes back to
+`VM_ADVENTURE` from them at the next tick's start (`CSBCode.cpp:603-611`). The port has no
+`videoMode`: `GameScreen.isAdventureVideoMode` reads the inventory, the freeze, sleep and
+the save menu as they stand, so for the frames between a menu's or a sleep's end and the
+next tick the port shows the overlay, a tint or a jitter, where CSBWin shows the straight
+viewport. Leaving an inventory (`CSBCode.cpp:7453`) and the freeze (`Mouse.cpp:1764`) go
+back at once in both. The fix is `videoMode` itself, on `LoopState`, set where CSBWin sets
+it, and a tool that closes the menu and reads it before and after the tick.
 
 ### C145 ⏸️ The Hint Oracle's title boxes keep colour 12 on their last line and a half
 
@@ -310,8 +324,9 @@ It uses 118 `&` operations, every one ported. With Conflux's count of each:
   `I_CharStore` 4, `I_CellStore` 4, `I_SwapCharacter` 4, `I_Cast` 2, `I_DelMon` 2 and
   `I_InsMon` 2.
 - **The display**: none is left. `Overlay` 25, `Palette` 5 and `Jitter` 7 are ported,
-  checked by `tools/dump-dsa-overlay.ts`; what they draw is G25's step 2. The jitter
-  moves the view only while an overlay is in use (`doc/CSBwin-src/WinScreen.cpp:1069-1080`).
+  checked by `tools/dump-dsa-overlay.ts`, and what they draw by
+  `tools/dump-overlay-screen.ts`. The jitter moves the view in `VM_ADVENTURE`, an overlay
+  up or not (`doc/CSBwin-src/WinScreen.cpp:1069-1080`).
 
 The two left that Conflux never calls: `GetSkin` (131) and `SetSkin` (132), which need
 G27. No dungeon here checks them against play, so each is ported with a tool of its own.
@@ -339,7 +354,7 @@ The rest of the item, with an operation that needs care when ported:
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
 
-### G25 ⏳ Viewport overlays and overlay palettes
+### G25 ⏸️ Viewport overlays and overlay palettes: RGB555 or ×36
 
 A DSA lays an image over the viewport with `&OVERLAY` (`SelectOverlay`,
 `doc/CSBwin-src/Bitmaps.cpp:687-720`, read by `OVERLAYDATA::ReadOverlay`, `:572-630`),
@@ -359,31 +374,37 @@ The screen side: in `VM_ADVENTURE` only, `display` sends the viewport's 224x136
 (`Graphics.cpp:2978-3090`), whose table, indexed by overlay byte and Atari colour, gives a
 16-bit RGB555 pixel: the colour through the overlay palette, blended with the overlay's
 by `m_p2`, colour `m_p4` transparent when `m_p1 & 1`. `UpdateScreenArea` places it with
-the jitter (`WinScreen.cpp:1067-1205`, 3 of 13 cases implemented). With the overlay palette
+the jitter (`WinScreen.cpp:1064-1300`, 3 of 13 cases implemented). With the overlay palette
 the identity and no overlay active, the 16-colour branch gives exactly CSBWin's straight
 colours, which the port's present path already stands for.
 
-Steps:
+What is built: the engine (`src/engine/Overlay.ts`, `GameContext.overlay`), the three DSA
+operations, the end in `advanceTime` and the overlay in the Extended Features block,
+checked by `tools/dump-dsa-overlay.ts` on Conflux's file; and the screen
+(`src/renderer/csbwin/OverlayScreen.ts`, `GameScreen.drawViewportThroughOverlay`), checked
+by `tools/dump-overlay-screen.ts` and golden frame 17, which a dev control beside the
+canvas puts up (`src/ui/overlayControl.ts`): any overlay, overlay palette or graphic jitter
+of the data set's `CSBgraphics.dat` (`dm-atari`'s holds 113 overlays and 51 palettes), with
+`SelectOverlay`'s and `SetOverlayPalette`'s parameters
+(`doc/PROVEN_FACTS.md` → "The viewport through an overlay is an RGB555 table").
 
-1. **The engine** ✅: `src/engine/Overlay.ts` (`GameContext.overlay`), the three DSA
-   operations, the end in `advanceTime`, and the overlay in the Extended Features block,
-   checked by `tools/dump-dsa-overlay.ts` on Conflux's file
-   (`doc/PROVEN_FACTS.md` → "A viewport overlay is a 224x136 bitmap of bytes").
-2. **The screen** ⏳: `CreateOverlayTable` and the viewport's composition in
-   `VM_ADVENTURE`, the jitter with it, a frame with an overlay up. CSBWin's pixel is
-   RGB555, which Windows widens to 8 bits, and the port's colours are an Atari intensity
-   ×36 (`src/renderer/csbwin/CanvasBlitter.ts`), which is neither. Two ways, both built,
-   behind a dev setting kept with the page's settings in `localStorage`
-   (`src/ui/settings.ts`), so the author can compare them before choosing: (a) a 5-bit
-   channel widened `(v << 3) | (v >> 2)` in the overlay path only, the straight path
-   keeping ×36, so the golden frames stay; (b) the same widening, and the straight path
-   brought to it too, `(i << 2 | i >> 1)` then widened, which moves every golden frame by
-   up to 4 per channel. (a) is the default until the author chooses; then the setting and
-   the other way go.
-   No game here runs the code: `dm-atari/dungeon.dat` has no DSA, and Conflux is not a
-   data set until G26. So a dev control beside the canvas shows an overlay or an overlay
-   palette, by number, with `SelectOverlay`'s and `SetOverlayPalette`'s parameters, from
-   the data set's `CSBgraphics.dat`; `dm-atari`'s holds 113 overlays and 51 palettes.
+What is left is the author's choice of colours. CSBWin's pixel is RGB555, which Windows
+widens to 8 bits, `(v << 3) | (v >> 2)`; the port's straight colours are an Atari
+intensity ×36 (`src/renderer/csbwin/CanvasBlitter.ts`), which is neither. The viewport
+through the overlay is always RGB555 widened. The dev setting **RGB555** beside the canvas
+(`UISettings.rgb555`, kept in `localStorage`) switches the rest of the screen:
+
+- **(a) ×36**, the default: the golden frames stay. Under an overlay, a tint or a jitter,
+  the viewport's colours and the panels' differ by up to 6 a channel for the same Atari
+  colour (intensities 0-7: 0 36 72 108 144 180 216 252 against 0 33 74 107 148 181 222 255).
+- **(b) RGB555**: CSBWin's straight palette, five bits `(i << 2) | (i >> 1)` widened, on
+  every screen, the title's and the entrance's too, so the viewport and the panels are one
+  picture. Every golden frame moves, by up to 6 a channel, once.
+
+Either way the setting goes, with `setCanvasColours`'s other branch and the RGB555 button;
+for (b), the golden frames are taken again in the same commit, and `atariToRGB`
+(`src/core/types.ts`) follows. The dev control stays, as the only way to see an overlay
+until Conflux is a data set (G26).
 
 ### G27 ⏳ Skins: a cell's own wall, floor and ceiling graphics
 
@@ -413,6 +434,12 @@ Once the items above are paid, what is left is the page's side:
   monster types up to 40 (DM's: 59, 8, 11 and 26). Its creature records use types 0 to
   26 only. What CSBWin does with a level's monster type past 26 is not traced;
 - a golden frame at Conflux's start, and a tool that plays its first ticks.
+
+Its seven `&JITTER` calls: which values they pass is not looked at. CSBWin's source draws
+an overlay jitter (`xOverlayJitter` other than 0) in none of its cases, and stops in
+`NotImplemented`, the game's end (`doc/CSBwin-src/WinScreen.cpp:1121-1196`), as the port
+does (`UpdateViewportArea`). If a call passes one, the 20230608 binary the author plays
+may do otherwise: try it there before playing on.
 
 Its `AutoRecord` flag (0x10) asks CSBWin to record the game for playback, which is not
 the game; whether to model it is the author's call.

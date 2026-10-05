@@ -2777,8 +2777,45 @@ with 256 colours; `UpdateScreenArea` reads line `135 - line`, the file's bottom-
   a missing section asked with `mustExist` clears it too (`:3253-3262`), and every caller
   asks with it.
 - `display` draws the viewport's 224x136 through the overlay only in `VM_ADVENTURE`
-  (`WinScreen.cpp:1515-1527`), which an open inventory, sleep and the freeze leave
-  (`CSBCode.cpp:7487`, `Mouse.cpp:1703`, `:1735`).
+  (`WinScreen.cpp:1515-1527`): see the next section.
+
+## The viewport through an overlay is an RGB555 table
+
+`display` calls `UpdateScreenArea` for the viewport, x 0, y `0x21`, 224 by 136, with
+`useOverlay` set to `videoMode == VM_ADVENTURE` and the viewport's palette,
+`d.Palette11946` while `d.DynamicPaletteSwitching` is on (`doc/CSBwin-src/WinScreen.cpp:1493-1527`).
+An open inventory leaves `VM_ADVENTURE` (`CSBCode.cpp:7487`, back at `:7453`), and so do
+sleep (`Mouse.cpp:1703`), the freeze (`:1735`, back at `:1764`) and a save menu
+(`Menu.cpp:465-472`); from sleep and a menu CSBWin goes back at the next tick's start,
+unless an inventory is open or the party sleeps (`CSBCode.cpp:603-611`).
+
+`UpdateScreenArea` allocates the overlay's memory and builds `m_table` afresh
+(`WinScreen.cpp:1064-1065`), 8192 bytes, 256 overlay bytes by 16 Atari colours
+(`Graphics.cpp:2951-2952`), each entry an RGB555 pixel, and draws each pixel as
+`m_table[(overlay << 4) + colour]` (`BLT1`, `WinScreen.cpp:348-360`). `CreateOverlayTable`
+(`Graphics.cpp:2978-3090`) has three branches:
+
+- **Not `useOverlay`**: the straight palette, each intensity `i` five bits
+  `(i << 2) | (i >> 1)` (`:3069-3090`).
+- **`useOverlay`, no overlay up**: 16 entries, each colour's overlay-palette entry
+  `rrrgggbbb` with each channel `& 0xf8` (`:3049-3068`). Through the identity overlay
+  palette (`ClearOverlayPalette`) this is the straight palette, for all 512 colours.
+- **An overlay up**: `transparency = m_p2`; entry `(I << 4) + i` is, per channel,
+  `(palette(i) * m_p2 + overlayColour(I) * (100 - m_p2)) / 800`, in `ui32`, where
+  `palette(i)` is colour `i` through the overlay palette and `overlayColour(I)` the
+  bitmap's colour `I`. With bit 0 of `m_p1`, row `I == m_p4` is `palette(i) * 100 / 800`
+  (`:2989-3048`).
+
+The overlay's byte for viewport line `line` is `m_overlay[224 * (135 - line) + x]`, and 0
+when the overlay is down (`WinScreen.cpp:1248-1250`). The jitter is read only with
+`useOverlay`, an overlay up or not (`:1069-1080`): `yGraphicJitter` starts the screen's
+lines at `-y`, colour 0 above line 0 and, for a negative `y`, past line 136, so that the
+line just below the viewport, the screen's 169, shows (`:1081-1090`, `:1199-1213`);
+`xGraphicJitter` moves the picture right by `x`, colour 0 where it has left, the overlay
+unmoved (`:1121-1196`). Every case with `xOverlayJitter` other than 0 is
+`NotImplemented`, whose message box ends the program (`:1121-1196`, `system.cpp:177-190`).
+`yOverlayJitter` is read nowhere. The pixels go to Windows as 16-bit `BI_RGB`, RGB555
+(`:1312-1341`).
 
 ## `CSBgraphics.dat`'s sounds are WAV files, each byte stored as the change from the one before
 

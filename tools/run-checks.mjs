@@ -122,6 +122,7 @@ const CHECKS = [
   { tool: 'dump-dsa-dungeon.ts' },
   { tool: 'dump-dsa-save.ts' },
   { tool: 'dump-dsa-overlay.ts' },
+  { tool: 'dump-overlay-screen.ts' },
   { tool: 'dump-timer-modifier.ts' },
   { tool: 'dump-flip.ts' },
   { tool: 'dump-db-reuse.ts' },

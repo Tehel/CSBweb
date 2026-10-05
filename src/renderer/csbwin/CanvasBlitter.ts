@@ -397,6 +397,35 @@ function groupPixel(bitmap: IndexedBitmap, group: number, i: number): number {
   return x < bitmap.width && y < bitmap.height ? bitmap.pixels[y * bitmap.width + x] : 0;
 }
 
+/**
+ * How the canvas shows an Atari intensity, 0 to 7, outside the overlay's path
+ * (`OverlayScreen.ts`), which is RGB555 widened as Windows shows it:
+ *
+ * - `x36`: the intensity times 36, the port's own, and the golden frames';
+ * - `rgb555`: CSBWin's straight palette, the intensity as five bits `(i << 2) | (i >> 1)`
+ *   (`CreateOverlayTable`, `doc/CSBwin-src/Graphics.cpp:3069-3090`), widened the same way,
+ *   so that the viewport through the overlay and the screen around it are one picture.
+ *
+ * A dev setting (`UISettings.rgb555`) chooses, until the author settles on one (`DEBT.md` G25).
+ */
+export type CanvasColours = 'x36' | 'rgb555';
+
+/** The canvas's 8-bit channel for each Atari intensity. */
+const atariIntensity = new Uint8Array(8);
+
+export function setCanvasColours(colours: CanvasColours): void {
+  for (let i = 0; i < 8; i++) {
+    const v = (i << 2) | (i >> 1);
+    atariIntensity[i] = colours === 'rgb555' ? (v << 3) | (v >> 2) : i * 36;
+  }
+}
+
+/** The colours the canvas is shown in now. */
+export function canvasColours(): CanvasColours {
+  return atariIntensity[7] === 7 * 36 ? 'x36' : 'rgb555';
+}
+setCanvasColours('x36');
+
 export function updateImageDataFromIndex(
   imageData: ImageData,
   src: PaletteIndexViewportBuffer,
@@ -416,10 +445,9 @@ export function updateImageDataFromIndex(
     const colorIndex = inPx[i] & 0x0f;
     const color = palette[colorIndex] ?? 0;
 
-    // Keep color conversion consistent with existing `createImageData()` helper.
-    const r = ((color >> 8) & 0x7) * 36;
-    const g = ((color >> 4) & 0x7) * 36;
-    const b = (color & 0x7) * 36;
+    const r = atariIntensity[(color >> 8) & 0x7]!;
+    const g = atariIntensity[(color >> 4) & 0x7]!;
+    const b = atariIntensity[color & 0x7]!;
 
     const o = i * 4;
     out[o + 0] = r;
@@ -461,9 +489,9 @@ export function updateImageDataFromIndexWithViewportPalette(
       const palette = useViewportPalette ? viewportPalette : uiPalette;
       const color = palette[colorIndex] ?? 0;
 
-      const r = ((color >> 8) & 0x7) * 36;
-      const g = ((color >> 4) & 0x7) * 36;
-      const b = (color & 0x7) * 36;
+      const r = atariIntensity[(color >> 8) & 0x7]!;
+      const g = atariIntensity[(color >> 4) & 0x7]!;
+      const b = atariIntensity[color & 0x7]!;
 
       const o = idx * 4;
       out[o + 0] = r;
@@ -498,9 +526,9 @@ export function reconvertThroughPalette(
       const idx = sy * src.width + sx;
       const color = palette[src.pixels[idx] & 0x0f] ?? 0;
       const o = idx * 4;
-      out[o + 0] = ((color >> 8) & 0x7) * 36;
-      out[o + 1] = ((color >> 4) & 0x7) * 36;
-      out[o + 2] = (color & 0x7) * 36;
+      out[o + 0] = atariIntensity[(color >> 8) & 0x7]!;
+      out[o + 1] = atariIntensity[(color >> 4) & 0x7]!;
+      out[o + 2] = atariIntensity[color & 0x7]!;
       out[o + 3] = 255;
     }
   }

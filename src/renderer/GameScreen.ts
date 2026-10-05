@@ -25,6 +25,8 @@ import {
   updateImageDataFromIndexWithViewportPalette,
   reconvertThroughPalette,
 } from './csbwin/CanvasBlitter';
+import { CreateOverlayTable, OVERLAY_TABLE_SIZE, overlayDrawsNothing, UpdateViewportArea } from './csbwin/OverlayScreen';
+import { die } from '../engine/Die';
 import type { GraphicsTables } from '../data/tables/GraphicsTables';
 import type { UIButton, UITables } from '../data/tables/UITables';
 import { flashedButton } from '../engine/LoopState';
@@ -136,6 +138,8 @@ export class GameScreen {
   /** `d.LogicalScreenBase`, the whole screen as palette indices. */
   private readonly screen: ScreenIndexBuffer;
   private readonly uiPalette: number[];
+  /** `currentOverlay.m_table`, which `UpdateScreenArea` builds again for each frame. */
+  private readonly overlayTable = new Uint16Array(OVERLAY_TABLE_SIZE);
   private readonly messages: ScrollingText;
   /** A dungeon view has been drawn, so there is an adventure frame to compose again. */
   private viewportDrawn = false;
@@ -629,7 +633,38 @@ export class GameScreen {
     } else {
       updateImageDataFromIndex(this.screenImageData, this.screen, uiPalette);
     }
+    if (this.isAdventureVideoMode(inventoryOpen, frozen)) this.drawViewportThroughOverlay(viewportPalette);
     this.screenCtx.putImageData(this.screenImageData, 0, 0);
+  }
+
+  /**
+   * `videoMode == VM_ADVENTURE`, which `display` gives the viewport's `UpdateScreenArea` as
+   * `useOverlay` (`doc/CSBwin-src/WinScreen.cpp:1527`): no inventory open
+   * (`CSBCode.cpp:7453`, `:7487`), not frozen (`Mouse.cpp:1735`, `:1764`), not asleep
+   * (`:1703`), and no save menu up (`Menu.cpp:465-472`). CSBWin goes back to it from the
+   * last two at the next tick (`CSBCode.cpp:603-611`), and the port as they end.
+   */
+  private isAdventureVideoMode(inventoryOpen: boolean, frozen: boolean): boolean {
+    return !inventoryOpen && !frozen && !this.ui.partyState.sleeping && !isSaveMenuOpen(this.ui);
+  }
+
+  /**
+   * The viewport drawn again, over what the straight path made of it, through
+   * `CreateOverlayTable` and `UpdateScreenArea` (`OverlayScreen.ts`), unless they would
+   * draw the straight path's picture. `UpdateScreenArea` allocates the overlay's memory
+   * first (`doc/CSBwin-src/WinScreen.cpp:1064`). The object in hand of the coloured cursor
+   * is shown through the interface palette after, as the straight path shows it.
+   */
+  private drawViewportThroughOverlay(viewportPalette: number[]): void {
+    const { overlay, overlayPalette, host } = this.ui.ctx;
+    if (overlayDrawsNothing(overlay, overlayPalette)) return;
+    overlay.current.Allocate();
+    CreateOverlayTable(this.overlayTable, viewportPalette, true, overlay, overlayPalette);
+    UpdateViewportArea(this.screenImageData.data, this.screen.pixels, this.overlayTable, overlay, true,
+      (n) => die(host, n, `You have encountered code at relative address 0x${n.toString(16).padStart(6, '0')} that I thought was unused.`));
+    if (this.ui.objectCursorFootprint) {
+      reconvertThroughPalette(this.screenImageData, this.screen, this.ui.objectCursorFootprint, 12, this.uiPalette);
+    }
   }
 
   /**

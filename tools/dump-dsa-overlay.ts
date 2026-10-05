@@ -1,8 +1,8 @@
 /**
- * The viewport overlay's engine half (`DEBT.md` G25, step 1), on Conflux 3.5's
+ * The viewport overlay's engine half, on Conflux 3.5's
  * `CSBgraphics.dat`: what `&OVERLAY`, `&PALETTE` and `&JITTER` change, the overlay's end,
  * and its travel in a save's Extended Features block. What the screen does with it is
- * step 2's.
+ * `tools/dump-overlay-screen.ts`'s.
  *
  * 1. **`ReadOverlay`** (`doc/CSBwin-src/Bitmaps.cpp:572-630`): overlay 1, a 224x136
  *    bitmap of 256 colours, is its file's pixel bytes and colours, as stored. A missing

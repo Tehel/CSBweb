@@ -20,7 +20,7 @@ import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import { loadGlfx } from './lib/glfx-loader';
 import { GameScreen } from './renderer/GameScreen';
-import { bindDataSetChooser, bindExtrasToggle, bindSaveDrop, bindUIContext, drawMapPreview, showFatalMessage } from './ui';
+import { bindCanvasColoursToggle, bindDataSetChooser, bindExtrasToggle, bindSaveDrop, bindUIContext, drawMapPreview, showFatalMessage } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { runBootSequence, runHintOracle, runShowCredits } from './renderer/intro/BootSequence';
@@ -589,6 +589,7 @@ async function init() {
     try {
         bindDataSetChooser(dataSet);
         bindExtrasToggle();
+        bindCanvasColoursToggle();
         const files = await loadGameFiles();
         // Every graphics.dat table, read once: the engine's set is built from it, and the
         // screen is handed the same object.

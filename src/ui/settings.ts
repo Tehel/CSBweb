@@ -1,5 +1,6 @@
 import { getUIContext, isDebugFeaturesEnabled, isExtrasEnabled, setDebugFeaturesEnabled, setExtrasEnabled } from './context';
 import { isChampionPanelVisible, updateChampionPanel } from './championPanel';
+import { canvasColours, setCanvasColours } from '../renderer/csbwin/CanvasBlitter';
 
 const UI_SETTINGS_KEY = 'dmweb_ui_settings_v1';
 
@@ -13,6 +14,12 @@ export interface UISettings {
     soundVolume: number;
     /** The extras (`DEBT.md` X): with it off, the game is CSBWin's. */
     extras: boolean;
+    /**
+     * The canvas's colours outside the overlay's path: CSBWin's RGB555, widened, where off
+     * is the port's intensity times 36 (`setCanvasColours`). A dev setting, until the
+     * author chooses one (`DEBT.md` G25).
+     */
+    rgb555: boolean;
 }
 
 export function loadUISettings(): UISettings {
@@ -29,6 +36,7 @@ export function loadUISettings(): UISettings {
             soundEnabled: parsed.soundEnabled ?? true,
             soundVolume: parsed.soundVolume ?? 0.8,
             extras: parsed.extras ?? false,
+            rgb555: parsed.rgb555 ?? false,
         };
     } catch {
         return defaultUISettings();
@@ -52,6 +60,7 @@ export function readUISettings(): UISettings {
         soundEnabled: getUIContext()?.isSoundEnabled() ?? true,
         soundVolume: getUIContext()?.getSoundVolume() ?? 0.8,
         extras: isExtrasEnabled(),
+        rgb555: canvasColours() === 'rgb555',
     };
 }
 
@@ -67,6 +76,7 @@ export function applyUISettings(settings: UISettings): void {
     const soundButton = document.getElementById('btn-sound') as HTMLButtonElement | null;
     const soundVolume = document.getElementById('sound-volume') as HTMLInputElement | null;
     const extrasButton = document.getElementById('btn-extras') as HTMLButtonElement | null;
+    const rgb555Button = document.getElementById('btn-rgb555') as HTMLButtonElement | null;
 
     mapEl && (mapEl.style.display = settings.mapVisible ? 'block' : 'none');
     championsEl && (championsEl.style.display = settings.championsVisible ? 'block' : 'none');
@@ -91,6 +101,10 @@ export function applyUISettings(settings: UISettings): void {
     soundButton?.classList.toggle('is-pressed', settings.soundEnabled);
     if (ctx) ctx.setSoundVolume(settings.soundVolume);
     if (soundVolume) soundVolume.value = String(Math.round(settings.soundVolume * 100));
+
+    setCanvasColours(settings.rgb555 ? 'rgb555' : 'x36');
+    rgb555Button?.classList.toggle('is-pressed', settings.rgb555);
+    ctx?.refreshScreen();
 }
 
 function defaultUISettings(): UISettings {
@@ -103,5 +117,6 @@ function defaultUISettings(): UISettings {
         soundEnabled: true,
         soundVolume: 0.8,
         extras: false,
+        rgb555: false,
     };
 }

@@ -6,8 +6,8 @@
  * (`expire`), and a read's Extended Features block (`readExtendedFeatures`).
  *
  * `display` draws the viewport through them in `VM_ADVENTURE`
- * (`doc/CSBwin-src/WinScreen.cpp:1515-1527`, `Graphics.cpp:2978-3090`), which the port
- * does not yet (`DEBT.md` G25, step 2). Neither has it `m_change`, `jitterChanged` or
+ * (`doc/CSBwin-src/WinScreen.cpp:1515-1527`, `Graphics.cpp:2978-3090`), the port's
+ * `src/renderer/csbwin/OverlayScreen.ts`. Neither has it `m_change`, `jitterChanged` or
  * `ForceScreenDraw`: they tell `UpdateScreenArea` an area must be drawn again, and the
  * port composes the whole screen at every present.
  */

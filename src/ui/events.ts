@@ -4,6 +4,8 @@ import { handleMapCanvasClick } from './mapPreview';
 import { updateChampionPanel } from './championPanel';
 import { applyUISettings, loadUISettings, readUISettings, saveUISettings } from './settings';
 import { getEventPosition } from './utils';
+import { bindOverlayControl } from './overlayControl';
+import { canvasColours, setCanvasColours } from '../renderer/csbwin/CanvasBlitter';
 
 let uiBound = false;
 
@@ -17,6 +19,7 @@ const soundButton = document.getElementById('btn-sound') as HTMLButtonElement | 
 const soundVolume = document.getElementById('sound-volume') as HTMLInputElement | null;
 const extrasButton = document.getElementById('btn-extras') as HTMLButtonElement | null;
 const dmRulesButton = document.getElementById('btn-dm-rules') as HTMLButtonElement | null;
+const rgb555Button = document.getElementById('btn-rgb555') as HTMLButtonElement | null;
 
 function bindCanvasEvents(canvas: HTMLCanvasElement | null, input: GameInput): void {
     if (!canvas) return;
@@ -63,6 +66,24 @@ export function bindExtrasToggle(): void {
         extrasButton.classList.toggle('is-pressed', next);
         console.info(next ? 'Extras enabled' : 'Extras disabled');
         saveUISettings({ ...loadUISettings(), extras: next });
+    });
+}
+
+/**
+ * The RGB555 button, bound before the intro as the Extras one is: the canvas's colours
+ * are every screen's, the title's and the entrance's too (`setCanvasColours`). The saved
+ * set is written back with this one flag changed.
+ */
+export function bindCanvasColoursToggle(): void {
+    setCanvasColours(loadUISettings().rgb555 ? 'rgb555' : 'x36');
+    rgb555Button?.classList.toggle('is-pressed', canvasColours() === 'rgb555');
+    rgb555Button?.addEventListener('click', () => {
+        const next = canvasColours() === 'rgb555' ? 'x36' : 'rgb555';
+        setCanvasColours(next);
+        rgb555Button.classList.toggle('is-pressed', next === 'rgb555');
+        console.info(next === 'rgb555' ? "CSBWin's RGB555 colours" : 'Colours times 36');
+        saveUISettings({ ...loadUISettings(), rgb555: next === 'rgb555' });
+        getUIContext()?.refreshScreen();
     });
 }
 
@@ -166,6 +187,8 @@ export function bindUIEvents(): void {
         mapCanvasEl?.addEventListener('click', (e) => {
             handleMapCanvasClick(e);
         });
+
+        bindOverlayControl(ctx);
     }
 
     applyUISettings(loadUISettings());
