@@ -534,9 +534,12 @@ export class CSBGraphicsLoader {
   /**
    * `ReadCSBgraphic` (`doc/CSBwin-src/Graphics.cpp:3201`): section `type`/`id`, inflated,
    * or `null`. It opens the file first (`open`). The bytes are the caller's own, as
-   * CSBWin's are a fresh allocation, to change as it reads them.
+   * CSBWin's are a fresh allocation, to change as it reads them. A section missing that
+   * `mustExist` asked for ends `firstTime`, CSBWin's "Missing section" message; one that
+   * did not ask, as `BACKGROUND_LIB` sometimes does not (`src/data/BackgroundLib.ts`),
+   * leaves it (`:3253-3262`).
    */
-  readSection(type: number, id: number, minimumSize: number): Uint8Array | null {
+  readSection(type: number, id: number, minimumSize: number, mustExist = true): Uint8Array | null {
     if (!this.open() || !this.data) {
       if (this.firstTime) {
         this.cannotOpen?.();
@@ -546,7 +549,7 @@ export class CSBGraphicsLoader {
     }
     const header = this.sections.find((section) => section.type === type && section.id === id);
     if (!header) {
-      // Every caller passes `mustExist` true (`:3253-3262`).
+      if (!mustExist) return null;
       this.firstTime = false;
       return null;
     }

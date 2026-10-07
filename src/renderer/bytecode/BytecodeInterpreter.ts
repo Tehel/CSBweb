@@ -24,6 +24,7 @@ import type { MonsterDesignOptions } from '../../engine/MonsterSystem';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { RectPos } from '../../data/tables/UITables';
 import type { CSBGraphicsLoader } from '../../data/CSBGraphicsLoader';
+import type { BackgroundLib } from '../../data/BackgroundLib';
 import { OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../core/types';
 
 /**
@@ -86,6 +87,12 @@ export interface InterpreterContext {
    * and the pictures derived from them. Emptied at each game's start (`CleanupAltMonCache`).
    */
   altMonCache?: AltMonCache;
+  /**
+   * `backgroundLib`: the `CGT_Backgrounds` sections of `csbGraphics` a skin's program draws
+   * with. Emptied at each game's start, with `altMonCache` (`CleanupGraphics`,
+   * `doc/CSBwin-src/Graphics.cpp:2204-2206`).
+   */
+  backgroundLib?: BackgroundLib;
   dungeonState?: DungeonState;
   /** `d.PartyFootprints`, which `SummarizeRoomInfo` searches for the magic prints. */
   footprints?: PartyFootprints;

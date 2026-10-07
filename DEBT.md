@@ -292,7 +292,9 @@ reads and sets a cell's skin with `&GETSKIN` and `&SETSKIN` (`DSA.cpp:3107-3135`
 skins are stored, and the formats, are in `doc/CSBWIN_RENDERING_REFERENCE.md` →
 "Backgrounds and Skins". The port has the skins and the two operations
 (`src/engine/SkinCache.ts`, step 1), and draws none of it: `DrawViewport` gives every cell
-skin 0 (`src/renderer/DrawViewport.ts`, "Default skin for prototype").
+skin 0 (`src/renderer/DrawViewport.ts`, "Default skin for prototype"). The library the
+programs read through is `src/data/BackgroundLib.ts` (step 2), at the viewport context's
+`backgroundLib`.
 
 What the data sets here use of it:
 
@@ -318,12 +320,10 @@ The steps, in order. Each step's tool runs on Conflux's files and The Towers of 
    `src/engine/SkinCache.ts`, `DungeonState.skinCache`, a new one with every world read,
    as CSBWin's `Cleanup(false)` empties it before every game. Checked by
    `tools/dump-skins.ts`, which counts the skins above.
-2. ⏳ **`BACKGROUND_LIB` (M).** The cache of `CGT_Backgrounds` sections over
-   `CSBGraphicsLoader.readSection`, with `GetBackgroundGraphic`'s entry for a section
-   that is missing (`Viewport.cpp:5801-5909`); `GetSkinDef`, `GetSkinID` and its eight
-   getters, `GetWallDecorationID`, `GetCode`, `GetMask`, `MaskExists`, `GetBitmap`,
-   `GetDecorationBitmap` and `CreateBackgroundGraphic` (`:5367-5800`). A tool prints
-   Conflux's skins and checks them against the section's bytes.
+2. ✅ **`BACKGROUND_LIB`.** `src/data/BackgroundLib.ts`, the viewport context's
+   `backgroundLib`, emptied with `altMonCache`. Checked by `tools/dump-background-lib.ts`,
+   which prints Conflux's skins and checks them, the programs, masks and bitmaps against
+   the sections' bytes.
 3. ⏳ **A skin's program run (M).** `DrawViewport` fills `skinNumber` (the cell's, else
    the level's default) and runs a skinned cell's program from
    `pCode[pCode[0] + 8 * cell + graphicRoomType]`, or nothing. `Interpret` starts at an
