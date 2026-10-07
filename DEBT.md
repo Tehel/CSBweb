@@ -21,8 +21,9 @@ of work follow it, the author's next challenges: a redesigned page, and a second
 code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
-**Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, and the work it
-needs is G26, in the active list. Its `dungeon.dat` is enciphered, and reads whole
+**Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, a data set
+(`conflux`) whose first ticks play (`tools/watch-conflux-start.ts`) and whose start is a
+golden frame. What waits on the author for it is C150. Its `dungeon.dat` is enciphered, and reads whole
 (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is `RC4.cpp`'s own cipher"). Its
 skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets"). Every DSA operation CSBWin has is ported, not only Conflux's share
 (`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
@@ -93,7 +94,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G26 | Conflux 3.5 as a data set | M | ⏳ |
 | Phase 17 | Deployment: the Docker image, the data sets' manifest, the statistics | L | in `PLAN.md` |
 | G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
@@ -102,6 +102,7 @@ In payoff order: the first row is the next item.
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C145 | The Hint Oracle's title boxes keep colour 12 on their last line and a half | S | ⏸️ waits on the author |
+| C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X1 | Extra: drinking from a fountain with an empty hand | S | ⏸️ |
@@ -112,17 +113,16 @@ In payoff order: the first row is the next item.
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G29 are the active list. `F3` and `Phase 17` are phases, whose status is
-`PLAN.md`'s: deployment is not debt, and its row only marks its place, straight after
-Conflux. One row sits
+`PLAN.md`'s: deployment is not debt, and its row only marks its place. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
-row meanwhile. G26 is Conflux's (see "Priority"). The F
+row meanwhile. The F
 rows are independent of the rest ("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C150 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C151 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -208,6 +208,24 @@ The decision is the author's, after a look in play:
 - **Fix it**: `ShrinkBLT` gets `w + 1` by `h + 1`, the tool's check of the twelfth line
   becomes "every line holds no colour 12", and an H entry gives both readings.
 
+### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
+
+Not a divergence yet: the port does what CSBWin's source does. Recorded because the
+20230608 binary the author plays may do otherwise (`.claude/memory/csbwin-binary-newer-than-source.md`).
+
+Conflux 3.5 calls `&JITTER` seven times. It pops `yOverlay`, `xOverlay`, `yGraphic` and
+`xGraphic` (`doc/CSBwin-src/DSA.cpp:4903-4930`), and six of the calls push 0 for both
+overlay values. The seventh, DSA 125 ("Jitter S0: P1x, P2y, P3 ticks …"), state 0 and 1,
+action 7, pushes its variables 0 and 1 and `&OVER`s them both, so the overlay jitter is the
+graphic jitter. Four actuators select DSA 125: level 29 (15,16), and level 39 (30,16),
+(31,16) and (31,17). Whether a message reaches its action 7 in play is not traced.
+
+With the overlay up and `xOverlayJitter` other than 0, `UpdateViewportArea` stops in
+`NotImplemented`, the game's end (`doc/CSBwin-src/WinScreen.cpp:1121-1196`), and so does
+the port (`UpdateViewportArea`, `src/renderer/csbwin/OverlayScreen.ts`); `yOverlayJitter`
+is read nowhere. Paying it: the author plays those squares in CSBWin 20230608, and if the
+game goes on there, ports what that binary draws.
+
 ---
 
 ## F — Verification debt
@@ -279,28 +297,6 @@ postponed ones follow, under their own heading (see "Priority").
 
 Paying it needs a file of each form, or the author's decision to port them unchecked.
 
-### G26 ⏳ Conflux 3.5 as a data set
-
-What is left is the page's side:
-
-- a `DATA_SETS` entry with `csbGraphics` (`src/data/DataSets.ts`), and a `KNOWN_DUNGEONS`
-  signature from `tools/dump-dungeon-signature.ts` (`src/data/DungeonSignature.ts`). The
-  comments in both that say why Conflux is missing go with them;
-- **its `graphics.dat`**, 456953 bytes where DM's is 271921. Its tables extract without an
-  error, and nothing has looked at them further. Its levels name no graphic past DM's:
-  wall decorations up to 59, floor decorations up to 8, door decorations up to 11 and
-  monster types up to 26, DM's own maxima;
-- a golden frame at Conflux's start, and a tool that plays its first ticks.
-
-Its seven `&JITTER` calls: which values they pass is not looked at. CSBWin's source draws
-an overlay jitter (`xOverlayJitter` other than 0) in none of its cases, and stops in
-`NotImplemented`, the game's end (`doc/CSBwin-src/WinScreen.cpp:1121-1196`), as the port
-does (`UpdateViewportArea`). If a call passes one, the 20230608 binary the author plays
-may do otherwise: try it there before playing on.
-
-Its `AutoRecord` flag (0x10) asks CSBWin to record the game for playback, which is not
-the game; whether to model it is the author's call.
-
 ### Postponed until the default dungeon is validated
 
 Not taken in order; the author names one to start it (see "Priority").
@@ -349,7 +345,9 @@ CSBWin can record a game and play it back:
   its events into the mouse queue at their ticks. It does so from the top of
   `_HandleMouseEvents` (`Mouse.cpp:1393`), except while gravity runs.
 
-The port has neither, and no way to start either. It keeps only the recorder's count,
+Conflux 3.5's Extended Features block sets `AutoRecord` (0x10), `RecordDesignOption`
+(`doc/CSBwin-src/SaveGame.cpp:401-402`): a game read from it records unless the command
+line or the menu says not to (`:2376-2391`). The port has neither, and no way to start either. It keeps only the recorder's count,
 `totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:873-876`).
 `extraTicks` is always on (`src/engine/MovementSystem.ts:119-122`).
 

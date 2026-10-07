@@ -397,6 +397,15 @@ await leaveCanvas(); await wait(200);
 check(!(await evaluate(`window.__probe.screen.isHintOracleUp()`)) && (await canvasPixels()) === csbInventory,
   'DONE on the page and then on the list closes the Oracle, back to frame 15');
 
+// Conflux 3.5 at its start: level 0, (13,24) facing north, no champion. Nearly every view
+// of it runs a skin's program from its `CSBgraphics.dat`, and its DSAs run from the first
+// tick (`tools/watch-conflux-start.ts`). The square in front is a wall, which its skin
+// paints with a picture, and nothing in view moves.
+await send('Page.navigate', { url: `${APP}?intro=0&dungeon=conflux` });
+await wait(3500);
+await leaveCanvas(); await wait(200);
+console.log('state: Conflux start');     await shot('18-conflux-start');
+
 // The CRT effect's input surface. The effect's canvas is shown over the game canvas, and
 // the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,
 // `src/renderer/intro/BootSequence.ts`), so it must let a click through. Boot with the

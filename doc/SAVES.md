@@ -133,10 +133,10 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   the dungeon a save is refused in (`checkDungeon`). That takes a catalogue of
   known dungeons' signatures (`KNOWN_DUNGEONS`), each with the data sets that play it,
   which may list dungeons the port cannot play: so the digests are committed, not read
-  from the page's files, and a tool holds each to the file here. It lists five: Dungeon
+  from the page's files, and a tool holds each to the file here. It lists seven: Dungeon
   Master; Chaos Strikes Back, which is `mini.dat`'s, and its prison, the set's
-  `dungeon.dat`, both the `csb` set's; Kids dungeon 24; and 3D2D1D. Conflux has no
-  signature until it is a data set (`DEBT.md` G26). A dungeon is added from what
+  `dungeon.dat`, both the `csb` set's; Kids dungeon 24; 3D2D1D; Conflux 3.5; and The
+  Towers of Chaos 3.3. A dungeon is added from what
   `tools/dump-dungeon-signature.ts` prints when given its file: the digests as the
   catalogue lists them.
 - **Play time is the player's**: wall-clock time in the game, the frozen game and the

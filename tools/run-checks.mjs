@@ -126,6 +126,7 @@ const CHECKS = [
   { tool: 'dump-skin-programs.ts' },
   { tool: 'dump-custom-graphics.ts' },
   { tool: 'dump-virtual-graphics.ts' },
+  { tool: 'watch-conflux-start.ts' },
   { tool: 'dump-dsa-overlay.ts' },
   { tool: 'dump-overlay-screen.ts' },
   { tool: 'dump-video-mode.ts' },

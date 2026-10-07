@@ -46,9 +46,10 @@ export const DATA_SETS: readonly DataSet[] = [
     { id: 'dm-atari-1.3-fr', name: 'Dungeon Master ST 1.3 French', dir: '/gamefiles/dm-atari-1.3-fr', csbGraphics: false, miniDat: false, hintOracle: false },
     { id: 'kids-dungeon', name: 'Kids dungeon 24', dir: '/gamefiles/kids-dungeon-24', csbGraphics: false, miniDat: false, hintOracle: false },
     { id: 'csb', name: 'Chaos Strikes Back', dir: '/gamefiles/csb', csbGraphics: false, miniDat: true, hintOracle: true },
-    // Conflux (`static/gamefiles/conflux-3.5-b8/`) is not a set: its `dungeon.dat` reads,
-    // and what it needs beyond that is `DEBT.md` G26's.
     { id: '3d2d1d', name: '3D2D1D', dir: '/gamefiles/3D2D1D', csbGraphics: false, miniDat: false, hintOracle: false },
+    // Its `dungeon.dat` is enciphered (doc/PROVEN_FACTS.md → "The "simple" encipherment is
+    // `RC4.cpp`'s own cipher"), and nearly every view of it runs a skin's program.
+    { id: 'conflux', name: 'Conflux 3.5', dir: '/gamefiles/conflux-3.5-b8', csbGraphics: true, miniDat: false, hintOracle: false },
     { id: 'towers-of-chaos', name: 'The Towers of Chaos 3.3', dir: '/gamefiles/towers-of-chaos-3.3', csbGraphics: true, miniDat: false, hintOracle: false },
 ];
 

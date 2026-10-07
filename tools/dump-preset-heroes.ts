@@ -5,7 +5,10 @@
  * hero text's checks, with `legalHero` in place of a text that fails one.
  *
  * Checks:
- * - every hero of the shipped sets is legal, and DM has its 24;
+ * - every hero of the shipped sets is legal, and DM has its 24. Conflux 3.5 is the
+ *   exception: 249 of its 307 portraits face a square with no hero text, most of them
+ *   none at all and the rest a message such as "ENTER THE WELL AND SAVE THE CITY", and
+ *   58 are heroes;
  * - SYRA's French title is "L}ENFANT DE SAUVAGE": `%H` is 1.3-fr's `d.Byte10016` entry
  *   H, "}", and the title is nineteen characters, the most a title may have;
  * - the limits, on hero texts built to meet and to pass them;
@@ -24,7 +27,7 @@ import { readHeroText } from '../src/engine/AddCharacter';
 import { check, finish } from './lib/check';
 import { newGame, presetHeroesOf } from './lib/game';
 
-const SETS = ['dm-atari', 'dm-atari-1.2', 'dm-atari-1.3-fr', 'dm-windows', 'csb', 'kids-dungeon-24', '3D2D1D', 'towers-of-chaos-3.3'];
+const SETS = ['dm-atari', 'dm-atari-1.2', 'dm-atari-1.3-fr', 'dm-windows', 'csb', 'kids-dungeon-24', '3D2D1D', 'towers-of-chaos-3.3', 'conflux-3.5-b8'];
 const DELTA_X = [0, 1, 0, -1];
 const DELTA_Y = [-1, 0, 1, 0];
 
@@ -53,7 +56,12 @@ for (const set of SETS) {
       + ` ${h.male ? 'M' : 'F'} ${h.health}/${h.stamina}/${h.mana} pen ${h.reincarnateAttributePenalty},${h.reincarnateStatPenalty}`
       + ` text ${h.textRecordIndex}${h.illegal ? '  ILLEGAL' : ''}`);
   }
-  check(heroes.every((h) => !h.illegal), `${set}: every hero text is legal`);
+  const illegal = heroes.filter((h) => h.illegal).length;
+  if (set === 'conflux-3.5-b8') {
+    check(heroes.length === 307 && illegal === 249, `${set}: 249 of 307 hero texts are illegal (${illegal} of ${heroes.length})`);
+  } else {
+    check(illegal === 0, `${set}: every hero text is legal`);
+  }
 }
 check(all['dm-atari']!.length === 24, `dm-atari has 24 heroes (got ${all['dm-atari']!.length})`);
 

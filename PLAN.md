@@ -25,12 +25,11 @@ any verified fact into `doc/`; then delete the phase's body and add its line to
 The goal is a complete, faithful game on `dm-atari`. The work, in order:
 
 1. **`DEBT.md`'s active rows**: the unported CSBWin features the default dungeon and
-   Chaos Strikes Back reach, and those Conflux 3.5 needs: the indirect `ObjectID`, full
-   DSA support, and `CSBgraphics.dat`'s other sections (`DEBT.md` → "Priority"). `DEBT.md` says how
+   Chaos Strikes Back reach (`DEBT.md` → "Priority"). `DEBT.md` says how
    to work an item. **One item per commit, a few per session**, then `/clear`. Its index is
    the live status; its first row is the next item.
-2. **Phase 17, deployment**, straight after G26, before the rest of `DEBT.md`'s rows and
-   before the extras. Its row in `DEBT.md`'s index marks the place.
+2. **Phase 17, deployment**, now that Conflux 3.5 is a data set, before the rest of
+   `DEBT.md`'s rows and before the extras. Its row in `DEBT.md`'s index marks the place.
 3. Phase 15 step 4 interleaves anywhere.
 
 ⏸️ **Postponed until the default dungeon is validated**: a save of a dungeon the port does
@@ -192,8 +191,7 @@ container. The game files come from a mounted directory, not from the image. A s
 server serves the page and the files, and counts games: games started, won and lost.
 There are no logins.
 
-It comes straight after `DEBT.md` G26, so Conflux ships as one of the data sets, and
-before the extras. Until then, `npm run dev` is the only way the game runs.
+Conflux 3.5 is one of the data sets it ships, and it comes before the extras. Until then, `npm run dev` is the only way the game runs.
 
 **The pattern is the sibling projects'** (`SenTynel`, `gpo`, `linkedin-games/player`,
 next to this checkout):
@@ -359,4 +357,4 @@ it later, along with the FAQ and the statistics page.
 
    `doc/DEPLOYMENT.md` records the procedure, written as `linkedin-games/player`'s is.
 
-Status: ⏳ not started. Waits for G26.
+Status: ⏳ not started. It is the first row of `DEBT.md`'s index.

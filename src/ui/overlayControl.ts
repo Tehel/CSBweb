@@ -2,9 +2,9 @@ import type { UIContext } from './context';
 
 /**
  * The overlay's dev control: the data set's overlays and overlay palettes shown as a DSA's
- * `&OVERLAY`, `&PALETTE` and `&JITTER` show them (`src/engine/Overlay.ts`), with their
- * parameters, since no dungeon the port plays runs one until Conflux is a data set
- * (`DEBT.md` G26). It changes the game as they do, so a save made after carries what it showed. Hide
+ * `&OVERLAY`, `&PALETTE` and `&JITTER` show them (`src/engine/Overlay.ts`), with
+ * parameters typed in rather than a DSA's: Conflux's DSAs choose their own. It changes
+ * the game as they do, so a save made after carries what it showed. Hide
  * is the page's alone: CSBWin puts an overlay down at its end, or when a read fails.
  */
 export function bindOverlayControl(ctx: UIContext): void {
