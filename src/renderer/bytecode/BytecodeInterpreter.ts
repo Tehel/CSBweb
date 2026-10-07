@@ -11,6 +11,7 @@ import { ViewportDraw } from './ViewportDraw';
 import { DrawFloorDecorations, DrawWallDecoration, drawWallText } from './DrawDecorations';
 import { DrawDoor, DrawDoorSwitch, DrawTeleporter } from './DrawDoor';
 import { DrawRoomObjects } from './DrawRoomObjects';
+import { ApplyBackground, ApplyDecoration, ViewportBMP } from './ApplyBackground';
 import { readU16LE, readU32LE } from '../../core/bytes';
 import {
   tag0088b2Explicit,
@@ -993,19 +994,28 @@ export class BytecodeInterpreter {
   }
 
   /**
-   * What a skin's program draws and makes (`Viewport.cpp:3063-3115`, `:3209-3277`): each
-   * pops its arguments as CSBWin does and goes to the graphic trace with CSBWin's own
-   * `GTRACE` line, but draws and makes nothing yet. Placeholders: `DrawCustomGraphic` and
-   * `DrawCustomDecoration` are `DEBT.md` G27 step 4, the three virtual graphics step 5.
+   * What a skin's program draws and makes (`Viewport.cpp:3063-3115`, `:3209-3277`).
+   * `DrawCustomGraphic` and `DrawCustomDecoration` draw their graphic into the viewport
+   * (`ApplyBackground.ts`). The three virtual graphics pop their arguments as CSBWin does
+   * and go to the graphic trace with CSBWin's own `GTRACE` line, but make nothing yet: a
+   * placeholder, `DEBT.md` G27 step 5.
    */
   private opCustomGraphic(opcode: number): boolean {
     const trace = this.context.graphicTrace;
+    const lib = this.context.backgroundLib;
     switch (opcode) {
       case Opcode.DrawCustomGraphic: {
         const maskNumber = pop();
         const maskID = pop();
         const graphicID = pop();
+        const pMask = lib?.GetMask(maskID >>> 0, maskNumber >>> 0, 12) ?? null;
+        const pGraphic = lib?.GetBitmap(graphicID >>> 0, 2) ?? null;
+        this.applyToViewport((bmp) => ApplyBackground(bmp, pMask, pGraphic?.data ?? null, pGraphic?.bitmapSize ?? 0));
         trace?.(`   DrawCustomGraphic(${graphicID}, ${maskID}, ${maskNumber})`);
+        if (pMask !== null) {
+          const header = (i: number): number => readU16LE(pMask.data, pMask.offset + 2 * i);
+          trace?.(`    dstX=${(header(2) << 16) >> 16}, dstY=${header(3)}, width=${header(4)}, height=${header(5)}`);
+        }
         break;
       }
       case Opcode.CreateVirtualBitmap: {
@@ -1020,7 +1030,9 @@ export class BytecodeInterpreter {
         const locationNumber = pop();
         const decorationNumber = pop();
         const decorationID = pop();
-        trace?.(`   DrawCustomDecoration(${decorationID}, ${decorationNumber}, ${locationNumber})`);
+        const decoration = lib?.GetDecorationBitmap(decorationID >>> 0, decorationNumber >>> 0, locationNumber >>> 0) ?? null;
+        if (decoration === null) break;
+        this.applyToViewport((bmp) => ApplyDecoration(bmp, decoration.bitmap, decoration.location, decoration.bitmapSize));
         break;
       }
       case Opcode.CreateVirtualMask: {
@@ -1046,6 +1058,15 @@ export class BytecodeInterpreter {
       }
     }
     return true;
+  }
+
+  /** Runs a drawing on the viewport as CSBWin's `d.pViewportBMP` bytes, and writes them back. */
+  private applyToViewport(draw: (viewportBMP: ViewportBMP) => void): void {
+    const viewport = this.context.viewportIndexBuffer;
+    if (!viewport) return;
+    const viewportBMP = new ViewportBMP(viewport);
+    draw(viewportBMP);
+    viewportBMP.flush();
   }
 
   /**

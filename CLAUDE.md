@@ -162,7 +162,8 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
             ViewportRenderer (the dungeon view only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, ViewportDraw (what the drawing shares with it),
             DrawDecorations and DrawDoor (CSBCode.cpp's drawing), DrawRoomObjects
-            (Code51a4.cpp's: objects, monsters, missiles, clouds), BytecodePrograms
+            (Code51a4.cpp's: objects, monsters, missiles, clouds), ApplyBackground (a
+            skin's own graphics, on the viewport as Atari planar bytes), BytecodePrograms
             (168 cell programs), Opcodes
   csbwin/   SummarizeRoomInfo, CanvasBlitter, TextRenderer, ScrollingText
   intro/    Everything before the party is in the dungeon: the title animation, the

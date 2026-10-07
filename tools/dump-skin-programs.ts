@@ -28,7 +28,8 @@
  *    flag on some paths they never pop, which CSBWin's ring absorbs as the port's does.
  *    What the programs ask to draw, through `DrawCustomGraphic` and the three virtual
  *    graphics, is counted from CSBWin's graphic trace, and the starting view's is
- *    printed. Steps 4 and 5 draw it; until then those opcodes only pop their arguments.
+ *    printed. `tools/dump-custom-graphics.ts` checks what `DrawCustomGraphic` draws; the
+ *    virtual graphics only pop their arguments until step 5.
  *
  * Run: `npx tsx tools/dump-skin-programs.ts [--all]`.
  */
@@ -302,7 +303,7 @@ function views(): void {
             if (((before.sp - after.sp) & 0xff) > expected.length) leftOver = false;
             for (const line of trace) {
               const name = /^\s*(\w+)/.exec(line)![1]!;
-              if (name !== 'Draw' && name !== 'bMask' && name !== 'aMask') calls.set(name, (calls.get(name) ?? 0) + 1);
+              if (name !== 'Draw' && name !== 'bMask' && name !== 'aMask' && name !== 'dstX') calls.set(name, (calls.get(name) ?? 0) + 1);
             }
           }
         }

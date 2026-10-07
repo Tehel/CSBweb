@@ -251,7 +251,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 184 checks sequentially (`spawnSync`, `:332`), each a
+`tools/run-checks.mjs` spawns its 184 checks sequentially (`spawnSync`, `:333`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and
@@ -292,11 +292,12 @@ reads and sets a cell's skin with `&GETSKIN` and `&SETSKIN` (`DSA.cpp:3107-3135`
 skins are stored, and the formats, are in `doc/CSBWIN_RENDERING_REFERENCE.md` →
 "Backgrounds and Skins". The port has the skins and the two operations
 (`src/engine/SkinCache.ts`, step 1), the library the programs read through
-(`src/data/BackgroundLib.ts`, step 2, the viewport context's `backgroundLib`), and runs a
-skinned cell's program (step 3). What a program draws of its own graphics, it does not
-draw yet: `DrawCustomGraphic`, `DrawCustomDecoration` and the three opcodes that make
-virtual graphics pop their arguments and go to the graphic trace, and stop there
-(`BytecodeInterpreter.opCustomGraphic`).
+(`src/data/BackgroundLib.ts`, step 2, the viewport context's `backgroundLib`), runs a
+skinned cell's program (step 3), and draws the skins' own graphics and decorations
+(`src/renderer/bytecode/ApplyBackground.ts`, step 4). The three opcodes that make virtual
+graphics pop their arguments and go to the graphic trace, and stop there
+(`BytecodeInterpreter.opCustomGraphic`), so a `DrawCustomGraphic` of a virtual graphic
+finds no bitmap and draws nothing.
 
 What the data sets here use of it:
 
@@ -333,10 +334,10 @@ The steps, in order. Each step's tool runs on Conflux's files and The Towers of 
    `GetMaskHeader`, `NeedVirtualMaskQ` and `BitmapInfo`. Checked by
    `tools/dump-skin-programs.ts`; `tools/dump-render-probe.ts` checks that every standard
    program leaves both stacks as it found them, so none reads what another left.
-4. ⏳ **Custom graphics drawn (M).** `DrawCustomGraphic` through `ApplyBackground` and
-   `ApplyBackground3` (`:3063-3082`, `:6444-6497`, `:6124-6440`), and
-   `DrawCustomDecoration` through `ApplyDecoration` (`:3102-3115`, `:6500-6541`), in
-   place of their placeholders in `opCustomGraphic`.
+4. ✅ **Custom graphics drawn.** `ApplyBackground`, `ApplyBackground3` and
+   `ApplyDecoration` on the viewport as CSBWin's planar bytes (`ViewportBMP`). Checked by
+   `tools/dump-custom-graphics.ts`, against the blit they mean, on every mask a skin of
+   either file names.
 5. ⏳ **Virtual graphics (M).** `CreateVirtualBitmap` (`AffineTransform4`),
    `CreateVirtualMask` (`AffineTransform1`, `CreateNewMask`) and
    `CreateVirtualAffineMask` (`CreateNewAffineMask`) (`:3083-3101`, `:3209-3277`,
