@@ -229,6 +229,9 @@ const CHECKS = [
   // CSB's long 0x231 carries CSBWin's four prison-door buttons (the canary).
   { tool: 'dump-data-sets.ts' },
   { tool: 'dump-build.ts' },
+  // The deployed server: its start-up check, caching, preconditions, refused paths, and
+  // server.ts itself, run as Node runs it, stopped by SIGTERM.
+  { tool: 'dump-server.ts' },
   // A dungeon.dat behind an Extended Features block, the DM Windows package's: read in the
   // block's shape it is DM's dungeon converted, and a new game takes the block's rules.
   { tool: 'dump-extended-dungeon.ts' },
@@ -350,6 +353,8 @@ if (!existsSync(TSX)) {
 
 console.log('\ntypes');
 run('tsc --noEmit', TSC, ['--noEmit']);
+// The server as Node strips it: erasable syntax only (server/tsconfig.json).
+run('tsc --noEmit -p server', TSC, ['--noEmit', '-p', 'server']);
 
 console.log('\nchecks');
 for (const { tool, args = [] } of CHECKS) {

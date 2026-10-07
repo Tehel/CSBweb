@@ -94,7 +94,7 @@
  *
  * Run: `npx tsx tools/dump-save-menu.ts`
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 
 import { CsbRandom } from '../src/core/random';
@@ -769,7 +769,6 @@ async function checkSaveFile(): Promise<void> {
 function checkCsbwinListing(): void {
   console.log('');
   console.log('=== genuine CSBWin saves, as the menu would list them ===');
-  const { statSync } = require('node:fs') as typeof import('node:fs');
   const paths = genuineSaves();
   check(paths.length > 0, `${SAVE_DIR} holds at least one genuine save`);
 

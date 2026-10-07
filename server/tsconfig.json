@@ -1,0 +1,10 @@
+{
+  // The server as Node 24 runs it, types stripped: only erasable syntax, and type-only
+  // imports marked as such. `npm test` checks it beside the root project.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["."]
+}

@@ -1,5 +1,5 @@
 {
-  "name": "dmjs",
+  "name": "dmweb",
   "version": "0.0.1",
   "description": "Dungeon Master for web browser",
   "scripts": {
@@ -8,7 +8,7 @@
     "test": "node tools/run-checks.mjs",
     "fetch-csbwin-src": "node tools/fetch-csbwin-src.mjs",
     "preview": "vite preview",
-    "start": "node server.js"
+    "start": "node server/server.ts"
   },
   "repository": {
     "type": "git",
@@ -19,11 +19,6 @@
   "bugs": {
     "url": "https://github.com/Tehel/dmjs/issues"
   },
-  "dependencies": {
-    "express": ">=4.15.3",
-    "serve-favicon": ">=2.4.3"
-  },
-  "main": "server.js",
   "directories": {
     "doc": "doc"
   },
@@ -34,6 +29,6 @@
     "vite": "^8.3.0"
   },
   "keywords": [],
-  "type": "commonjs",
+  "type": "module",
   "homepage": "https://github.com/Tehel/dmjs#readme"
 }

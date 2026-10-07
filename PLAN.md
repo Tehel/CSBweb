@@ -215,7 +215,7 @@ next to this checkout):
 **Shape:**
 
 ```
-image:   dist/ (the built page) + server/ (one TS entry point, run by Node 24 as is)
+image:   dist/ (the built page) + server/ (run by Node 24 as is) + src/data/DataSets.ts
 mounts:  /data/gamefiles  :ro   the data sets, swoosh/, manifest.json
          /data/stats            stats.db (SQLite, WAL)
 env:     PORT, GAMEFILES_DIR, STATS_DB
@@ -252,24 +252,30 @@ it later, along with the FAQ and the statistics page.
    build is `index.html` and `assets/`, under 1 MB. `tools/dump-build.ts` builds into a
    scratch folder and asserts it: only the page's own file types, nothing of `static/`,
    and every file `index.html` names present.
-3. ⏳ **The server.** `server/server.ts`, on `node:http`, with no dependency. Node 24
-   strips the types (as `gpo/prod-server.ts` does), so it uses only erasable syntax and
-   imports with `.ts` extensions. It is inside the `tsc` gate, as `tools/` is.
+3. ✅ **The server.** `server/server.ts` (`npm start`) on `node:http`, with no dependency;
+   `server/app.ts` is what it answers, which a tool can stand up on a free port. Node 24
+   runs it as it is, stripping the types, so it uses only erasable syntax, marks its
+   type-only imports and names its imports with `.ts`: `server/tsconfig.json` holds it
+   to that, and `npm test` runs `tsc` on it beside the root project. The package is an
+   ES module (`"type": "module"`) so that Node runs `server.ts` and the page's own
+   manifest parser, `src/data/DataSets.ts`, which the server imports: step 6's image
+   copies that file beside `server/`. Running it locally needs Node 22.18 or later.
 
-   It replaces the stale `server.js`, which runs Express on port 9010 and has an
-   unauthenticated `/stopserver` that exits the process. The `express` and
-   `serve-favicon` dependencies go with it.
+   It reads `PORT` (8080), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
+   `static/gamefiles/`), and serves:
+   - `dist/`: `index.html` is `no-cache`, and `assets/`' hashed files are `immutable`.
+   - `gamefiles/` from `GAMEFILES_DIR`, `no-cache`, with ETag and Last-Modified.
+   - `api/health`, for the compose healthcheck. `api/event` and `api/stats` come with
+     steps 4 and 5.
 
-   What it serves:
-   - `dist/`. Hashed assets are `immutable`, and `index.html` is `no-cache`.
-   - `gamefiles/` from `GAMEFILES_DIR`, with ETag and Last-Modified. A path that leaves
-     the directory is refused.
-   - `api/event` and `api/stats` (steps 4 and 5).
-   - `api/health`, for the compose healthcheck.
-
-   At startup it checks that the manifest parses and that each folder it names exists,
-   so a bad mount fails the container rather than the player's boot. It shuts down on
-   SIGTERM, closing the database, and logs to stdout.
+   Every file answers a conditional GET with 304, and only GET and HEAD are allowed. A
+   path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once decoded,
+   is refused with 400 before it reaches the disk. At startup it checks that `index.html`
+   is built, that the manifest parses and that each folder it names exists, and exits
+   with 1 otherwise, so a bad mount fails the container rather than the player's boot.
+   On SIGTERM it stops listening, lets the requests in flight finish (5 s at most) and
+   exits with 0; step 5 closes the database there. It logs to stdout.
+   `tools/dump-server.ts` asserts all of it, `server.ts` included, run as its own process.
 4. ⏳ **The player id and the events.** All of this is page-side (`src/ui/`). The engine
    sends nothing and stays silent, as it does today.
 
@@ -347,4 +353,4 @@ it later, along with the FAQ and the statistics page.
 
    `doc/DEPLOYMENT.md` records the procedure, written as `linkedin-games/player`'s is.
 
-Status: ⚠️ steps 1 and 2 done; step 3 is next. It is the first row of `DEBT.md`'s index.
+Status: ⚠️ steps 1 to 3 done; step 4 is next. It is the first row of `DEBT.md`'s index.

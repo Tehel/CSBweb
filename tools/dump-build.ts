@@ -17,7 +17,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 
-const ROOT = resolve(__dirname, '..');
+const ROOT = resolve(import.meta.dirname, '..');
 const PAGE_TYPES = new Set(['.html', '.js', '.css', '.ico', '.png']);
 
 let failures = 0;
