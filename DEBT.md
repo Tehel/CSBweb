@@ -356,18 +356,64 @@ The rest of the item, with an operation that needs care when ported:
 
 ### G27 ⏳ Skins: a cell's own wall, floor and ceiling graphics
 
-A CSBWin cell has a skin number, which the viewport's drawing programs read
-(`CurrentSkin`, `SkinNumber`, `doc/CSBwin-src/Viewport.cpp:3028-3032`). Through
-`BACKGROUND_LIB` they turn it into the IDs of the wall, floor, middle and ceiling graphics
-and their masks, and of a skin's wall decoration (`:3035-3061`). Those are read from
-`CSBgraphics.dat`'s background sections (`CGT_Backgrounds`, `BACKGROUND_LIB::FindGraphicInCache`,
-`:5801-5830`). A DSA reads and sets a cell's skin with `&GETSKIN` and `&SETSKIN`
-(`DSA.cpp:3107`, through `skinCache`). The port has none of it: `DrawViewport` gives every
-cell skin 0 (`src/renderer/DrawViewport.ts`, "Default skin for prototype"), and its
-interpreter has none of the background opcodes. Where a cell's skin is kept between DSA
-calls and in a file is not yet traced. Conflux's file holds 90 background sections, and
-its programs never call `&GETSKIN` or `&SETSKIN`. Whether its cells carry skins is part of
-the tracing.
+A CSBWin cell has a skin number, and a level a default one for its cells of skin 0. A
+skinned cell is drawn by its skin's own program, from `CSBgraphics.dat`, in place of the
+standard one, and a skin with no program draws nothing there (`DrawViewport`,
+`doc/CSBwin-src/Viewport.cpp:6765-6818`). The program reads the skin's wall, floor, middle
+and ceiling graphics, their masks and its decorations through `BACKGROUND_LIB`. A DSA
+reads and sets a cell's skin with `&GETSKIN` and `&SETSKIN` (`DSA.cpp:3107-3135`). How
+skins are stored, and the formats, are in `doc/CSBWIN_RENDERING_REFERENCE.md` →
+"Backgrounds and Skins". The port has none of it: `DrawViewport` gives every cell skin 0
+(`src/renderer/DrawViewport.ts`, "Default skin for prototype").
+
+What the data sets here use of it:
+
+- **Conflux 3.5** has skins on 11459 cells, 48 different ones, and a default skin on
+  most levels: 11, which has no graphics and runs program 64. Nearly every view of
+  Conflux runs a skin's program. Its `CSBgraphics.dat` has 51 skins, 90 background
+  sections and four programs (61 to 64). Its DSAs never call `&GETSKIN` or `&SETSKIN`.
+- **`dm-atari`'s `CSBgraphics.dat`** also holds 90 background sections, but DM's dungeon has no
+  skins, so no frame of it moves. 3D2D1D's file has the default skins record, all 0.
+- **Every standard opcode the skin programs use is ported.** Of the skin opcodes (60302
+  to 60362) they use 33, among them the three that make virtual graphics, and not
+  `DrawCustomDecoration`, `WallDecorationID` or `FloorDecorationID`.
+
+The steps, in order. Each step's tool runs on Conflux's files:
+
+1. ⏳ **The skin cache, and G1's last two operations (S).** `SKIN_CACHE`
+   (`doc/CSBwin-src/data.cpp:2058-2171`) over the port's `Expool`: `Load`, `GetSkin`,
+   `GetDefaultSkin` (read once, until `Cleanup`) and `SetSkin`, which writes the column's
+   record back trimmed of its trailing zeros. A save keeps the records with the rest of
+   `EXPOOL`. Then `&GETSKIN` and `&SETSKIN`, which empty `tools/dump-dsa-census.ts`'s
+   `LEFT` and finish G1's operations. A tool checks Conflux's skins and default skins
+   against the bytes, a `SetSkin` round trip through a save, and its no-op cases.
+2. ⏳ **`BACKGROUND_LIB` (M).** The cache of `CGT_Backgrounds` sections over
+   `CSBGraphicsLoader.readSection`, with `GetBackgroundGraphic`'s entry for a section
+   that is missing (`Viewport.cpp:5801-5909`); `GetSkinDef`, `GetSkinID` and its eight
+   getters, `GetWallDecorationID`, `GetCode`, `GetMask`, `MaskExists`, `GetBitmap`,
+   `GetDecorationBitmap` and `CreateBackgroundGraphic` (`:5367-5800`). A tool prints
+   Conflux's skins and checks them against the section's bytes.
+3. ⏳ **A skin's program run (M).** `DrawViewport` fills `skinNumber` (the cell's, else
+   the level's default) and runs a skinned cell's program from
+   `pCode[pCode[0] + 8 * cell + graphicRoomType]`, or nothing. `Interpret` starts at an
+   address, a word below 60000 calls a subroutine through the return stack, and `Return`
+   pops back to the `0xffff` sentinel (`Viewport.cpp:2473-2474`, `:3017-3021`,
+   `:3293-3301`). The two stacks become CSBWin's: static rings of 256 words, whose `pop`
+   is signed (`:2215-2247`). If a standard program reads differently through them, that
+   is a C item. Then the stack words (`SWAP` to `LSHIFT`, `ToR`, `RTo`, `TwoDup`,
+   `TwoDrop`, `IsOdd`), `CurrentSkin`, `SkinNumber`, `CurrentCell` and the eleven ID
+   opcodes (`:3028-3062`, `:3116-3186`).
+4. ⏳ **Custom graphics drawn (M).** `DrawCustomGraphic` through `ApplyBackground` and
+   `ApplyBackground3` (`:3063-3082`, `:6444-6497`, `:6124-6440`), `DrawCustomDecoration`
+   through `ApplyDecoration` (`:3102-3115`, `:6500-6541`), `GetMaskHeader` and
+   `BitmapInfo` (`:3187-3198`, `:3278-3290`).
+5. ⏳ **Virtual graphics (M).** `CreateVirtualBitmap` (`AffineTransform4`),
+   `CreateVirtualMask` (`AffineTransform1`, `CreateNewMask`), `CreateVirtualAffineMask`
+   (`CreateNewAffineMask`) and `NeedVirtualMaskQ` (`:3083-3101`, `:3199-3277`,
+   `CUSTOMBITMAP` and the two transforms at `:131-279`, `:5445-5625`).
+
+Steps 3 to 5 are proved by their tools on what they draw. A frame of a skinned view
+comes with G26's golden frame at Conflux's start.
 
 ### G26 ⏳ Conflux 3.5 as a data set
 

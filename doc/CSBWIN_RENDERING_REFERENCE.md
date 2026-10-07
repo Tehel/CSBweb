@@ -724,6 +724,7 @@ rectpos.w.x2 = 270;  // Right edge of viewport on screen
 **Location**: `Viewport.cpp`
 
 - `BACKGROUND_LIB::FindGraphicInCache` loads background assets via `ReadCSBgraphic(CGT_Backgrounds, graphicID, ...)` and caches them by `BACKGROUND_GRAPHIC.id`.
+- A background section is CSBWin's native memory, so its words are little-endian: `CSBgraphics.dat`'s skin index reads 51 skins in Conflux 3.5's file, and each program's first word is its `mainOffset`.
 - `BACKGROUND_LIB::GetSkinDef` reads background graphic ID `1` as the skin index: `pSkinIndex[0]` is the number of skins and `pSkinIndex[skinNum+1]` is the byte offset to that skin definition; it rejects entries where `skinDefOffset + minimumSize >= actualSize`.
 - `GetSkinID` returns `pSkinDef[IDnum]`; `GetFloorGraphicID`/`GetMiddleGraphicID`/`GetCeilingGraphicID`/`GetWallGraphicID` map to indices `0..3`, `GetFloorMaskID`/`GetMiddleMaskID`/`GetCeilingMaskID`/`GetWallMaskID` map to `4..7`, and `GetCode` uses index `8` with a minimum code size of `2 * (1 + 8*21)` bytes.
 - `GetWallDecorationID` expects `pSkinDef[9]` to be the floor-decoration count, skips `numFloorDec + 1` entries, then reads a wall-decoration count and IDs from the same array.
@@ -736,13 +737,18 @@ rectpos.w.x2 = 270;  // Right edge of viewport on screen
 
 - `SKIN_CACHE::GetSkin` loads expool records with `recId = (EDT_Skins << 24) + (level << 4) + (x / 2)`; the per-cell index is `(2 * y) + (x & 1)` and returns `0` for out-of-range or missing data.
 - `SKIN_CACHE::GetDefaultSkin` reads expool record `recId = (EDT_Skins << 24) + 0x800000` into a 64-byte `defaultSkins` array and returns `defaultSkins[level]`.
+- A cell's skin is kept nowhere but in those `EXPOOL` records, so a save keeps it with the rest of database 11. One record holds a column pair, two bytes a row: `memcpy` copies the record's native longwords into `m_columns` (`doc/CSBwin-src/data.cpp:2080`), and `DB11::swap` reads them little-endian (`data.cpp:1458-1467`), so byte `i` of a record is bits `8 * (i & 3)` up of its longword `i >> 2`. The default skins record is read the same way, byte `level` (`data.cpp:2115-2134`).
+- `GetSkin` returns 0 for a negative level, for `x`/`y` below 0 or past the level's `LastColumn()`/`LastRow()`, for a column pair with no record, and for an index past the record (`data.cpp:2088-2112`). `Load` keeps one level's records, and forgets them all when another level is asked (`data.cpp:2061-2086`). `GetDefaultSkin` returns 0 while `EXPOOL` is not open, and reads its record only once, until `Cleanup` (`Graphics.cpp:2205`).
+- `SetSkin` does nothing when the byte already holds the skin, or when the index is past the record and the skin is 0. Otherwise it reads and deletes the old record, widens it to 64 bytes of zeros, sets the byte, and writes the record back trimmed of its trailing zero bytes to whole longwords, or writes none when every byte is 0 (`data.cpp:2138-2171`).
+- `&GETSKIN` pops a location, `y` in bits 0-4, `x` in 5-9 and the level in 10-15, and pushes `GetSkin`; `&SETSKIN` pops the location, then the skin, and calls `SetSkin` with its low byte (`doc/CSBwin-src/DSA.cpp:3107-3135`). The viewport asks `d.LoadedLevel`.
 
 ### DrawViewport skin selection
 
 **Location**: `Viewport.cpp`
 
 - `DrawViewport` sets `roomData[userCellNum].skinNumber` from `skinCache.GetSkin` (fallback to `GetDefaultSkin`), and for non-zero skins selects custom code with `mainOffset = pCode[0]` and `startOffset = pCode[mainOffset + 8*userCellNum + roomData[userCellNum].graphicRoomType]` before calling `Interpret`.
-- `CustomBackgrounds` (guarded by `#ifndef newgraphics`) uses `skinCache` and `backgroundLib.GetSkinDef` to apply background masks/bitmaps: `pSkinDef[0]/[4]` (mask size 64, bitmap size 7840), `pSkinDef[2]/[6]` (size 3248), and for `roomNum < 5` `pSkinDef[1]/[5]` (size 4144).
+- A skinned cell whose skin has no program (`GetCode` null) draws nothing (`Viewport.cpp:6789-6806`).
+- `CustomBackgrounds` is compiled out (`#ifndef newgraphics`, and `newgraphics` is defined at `Viewport.cpp:315`). It uses `skinCache` and `backgroundLib.GetSkinDef` to apply background masks/bitmaps: `pSkinDef[0]/[4]` (mask size 64, bitmap size 7840), `pSkinDef[2]/[6]` (size 3248), and for `roomNum < 5` `pSkinDef[1]/[5]` (size 4144).
 
 ---
 
@@ -750,7 +756,8 @@ rectpos.w.x2 = 270;  // Right edge of viewport on screen
 
 **Location**: `Viewport.cpp`
 
-- `Interpret` pushes a return-stack sentinel `0xffff`, treats opcodes `< 60000` as subroutine calls (push return address, jump to absolute offset), and `Return` pops back to that address until the sentinel.
+- The data stack and the return stack are static rings of 256 `ui16`, indexed by a `ui8` that `push` decrements first, kept from one `Interpret` to the next; `pop` returns an `i16` (`Viewport.cpp:2215-2247`).
+- `Interpret` starts at `code + startAddr`, pushes a return-stack sentinel `0xffff`, treats opcodes `< 60000` as subroutine calls (push return address, jump to absolute offset), and `Return` pops back to that address until the sentinel.
 
 ---
 
