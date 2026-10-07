@@ -11,6 +11,7 @@ import { ViewportDraw } from './ViewportDraw';
 import { DrawFloorDecorations, DrawWallDecoration, drawWallText } from './DrawDecorations';
 import { DrawDoor, DrawDoorSwitch, DrawTeleporter } from './DrawDoor';
 import { DrawRoomObjects } from './DrawRoomObjects';
+import { readU16LE, readU32LE } from '../../core/bytes';
 import {
   tag0088b2Explicit,
   type IndexedBitmap,
@@ -94,6 +95,17 @@ export interface InterpreterContext {
    */
   backgroundLib?: BackgroundLib;
   dungeonState?: DungeonState;
+  /**
+   * The square and facing `DrawViewport` draws from: `IsOdd` reads them as `d.partyLevel`,
+   * `d.partyX`, `d.partyY` and `d.partyFacing` (`doc/CSBwin-src/Viewport.cpp:3185`). They
+   * are the party's everywhere but in the prison, where nothing is skinned.
+   */
+  viewParty?: { x: number; y: number; z: number; facing: number };
+  /**
+   * CSBWin's graphic trace (`GTRACE_*`, on while `traceViewportDrawing` is set): the lines
+   * a skin's drawing writes. Absent, as in a game, nothing is traced.
+   */
+  graphicTrace?: (line: string) => void;
   /** `d.PartyFootprints`, which `SummarizeRoomInfo` searches for the magic prints. */
   footprints?: PartyFootprints;
   /** The game's state, whose `tickCount` (`d.Time`) `SummarizeRoomInfo` reads. */
@@ -288,6 +300,69 @@ enum StdBitmapPtr {
 }
 
 /**
+ * CSBWin's `stack` and `rstack` (`doc/CSBwin-src/Viewport.cpp:2215-2247`): static rings of
+ * 256 words, each indexed by a byte that `push` decrements first. They are kept from one
+ * `Interpret` to the next, and a program that pops more than it pushed reads what an
+ * earlier one left. `pop` and `rpop` return an `i16`; `popRN` reads the word unsigned.
+ */
+const stack = new Uint16Array(256);
+const rstack = new Uint16Array(256);
+let sp = 0;
+let rsp = 0;
+
+function pop(): number {
+  const v = stack[sp]!;
+  sp = (sp + 1) & 0xff;
+  return (v << 16) >> 16;
+}
+
+/** `push(i32 v)`: `stack[--sp] = (i16)v`, the low sixteen bits. */
+function push(v: number): void {
+  sp = (sp - 1) & 0xff;
+  stack[sp] = v;
+}
+
+/**
+ * `popRN` (`Viewport.cpp:2249-2258`): the word, unsigned. CSBWin checks it with
+ * `checkIndirectIndex`; the port passes it on unchecked.
+ */
+function popRN(): ObjectID {
+  const n = stack[sp]!;
+  sp = (sp + 1) & 0xff;
+  return n as ObjectID;
+}
+
+function rpop(): number {
+  const v = rstack[rsp]!;
+  rsp = (rsp + 1) & 0xff;
+  return (v << 16) >> 16;
+}
+
+function rpush(v: number): void {
+  rsp = (rsp - 1) & 0xff;
+  rstack[rsp] = v;
+}
+
+/** `(i16)n`: a word of the code read as a signed jump. */
+function popMany(count: number): number[] {
+  return Array.from({ length: count }, () => pop());
+}
+
+function i16(n: number): number {
+  return (n << 16) >> 16;
+}
+
+/** The two rings' indexes, `sp` and `rsp`, for the tools that check a program leaves them as it found them. */
+export function interpreterStackPointers(): { sp: number; rsp: number } {
+  return { sp, rsp };
+}
+
+/** The data stack's top `n` words as `pop` reads them, the top first, for the tools. */
+export function interpreterStackTop(n: number): number[] {
+  return Array.from({ length: n }, (_, i) => (stack[(sp + i) & 0xff]! << 16) >> 16);
+}
+
+/**
  * Bytecode interpreter - direct port from CSBWin Viewport.cpp
  *
  * This function executes a bytecode program by iterating through
@@ -296,8 +371,9 @@ enum StdBitmapPtr {
 export class BytecodeInterpreter {
   private context: InterpreterContext;
   private pc: number = 0;  // Program counter
-  private program: number[] = [];
-  private stack: number[] = [];
+  private program: ArrayLike<number> = [];
+  /** `cellNum`, the cell `Interpret` draws. */
+  private cellNum = 0;
   /** The context, bitmap caches and blits the drawing functions share with the machine. */
   private readonly draw: ViewportDraw;
   private removeMortarJoint = true;
@@ -311,28 +387,26 @@ export class BytecodeInterpreter {
   }
 
   /**
-   * Execute a bytecode program
-   * Direct port of Interpret() from Viewport.cpp line ~6794
+   * `Interpret` (`doc/CSBwin-src/Viewport.cpp:2425-2474`, `:3292-3301`): `code` run from
+   * word `startAddr` until a `Return` pops the `0xffff` it pushes first. A word below 60000
+   * calls a subroutine at that address, its return address on `rstack`. A standard
+   * program starts at 0; a skin's is the words of its section (`DrawViewport`).
    */
-  public interpret(program: number[], cellNum: number): void {
-    this.program = program;
-    this.pc = 0;
-    this.stack = [];
+  public interpret(code: ArrayLike<number>, startAddr: number, cellNum: number): void {
+    this.program = code;
+    this.pc = startAddr;
+    this.cellNum = cellNum;
     this.removeMortarJoint = true;
     this.hasAlcove = 0;
+    rpush(0xffff);
 
-    void cellNum;
-    // Executing program for cell ${cellNum}
-
-    // Main interpreter loop
-    while (this.pc < this.program.length) {
-      const opcode = this.program[this.pc];
+    for (;;) {
+      // CSBWin reads on past the code's end; the port stops there.
+      if (this.pc >= this.program.length) return;
+      const opcode = this.program[this.pc]!;
       this.pc++;
 
-      // Dispatch to opcode handler
-      if (!this.executeOpcode(opcode)) {
-        break;  // Return opcode
-      }
+      if (!this.executeOpcode(opcode)) return;
     }
   }
 
@@ -376,7 +450,7 @@ export class BytecodeInterpreter {
         return this.opGetDecoration0();
 
       case Opcode.SeeThroughWalls:
-        this.stack.push(this.context.seeThroughWalls ? 1 : 0);
+        push(this.context.seeThroughWalls ? 1 : 0);
         return true;
 
       case Opcode.LeaveMortarJoint:
@@ -473,40 +547,40 @@ export class BytecodeInterpreter {
 
       // See-Thru-Walls through the F1 wall (Viewport.cpp:2957-3016).
       case Opcode.StdAllocateDerivedGraphic:
-        this.allocateDerivedGraphic(this.stack.pop() ?? 0);
+        this.allocateDerivedGraphic(pop());
         return true;
       case Opcode.StdBitmapViewport:
-        this.stack.push(StdBitmapPtr.BMP_StdBitmapViewport);
+        push(StdBitmapPtr.BMP_StdBitmapViewport);
         return true;
       case Opcode.StdSeeThruWallsRect:
-        this.stack.push(StdRectPtr.RECT_StdSeeThruWallsRect);
+        push(StdRectPtr.RECT_StdSeeThruWallsRect);
         return true;
       case Opcode.StdSeeThruWallsRect2:
-        this.stack.push(StdRectPtr.RECT_StdSeeThruWallsRect2);
+        push(StdRectPtr.RECT_StdSeeThruWallsRect2);
         return true;
       case Opcode.StdSeeThruWallsRectUByte4:
-        this.stack.push(this.context.seeThruWallsRectUByte4 ?? 0);
+        push(this.context.seeThruWallsRectUByte4 ?? 0);
         return true;
       case Opcode.StdSeeThruWallsRectUByte6:
-        this.stack.push(this.context.seeThruWallsRectUByte6 ?? 0);
+        push(this.context.seeThruWallsRectUByte6 ?? 0);
         return true;
       case Opcode.MinusOne:
-        this.stack.push(-1);
+        push(-1);
         return true;
       case Opcode.Zero:
-        this.stack.push(0);
+        push(0);
         return true;
       case Opcode.StdBltToDerivedGraphic:
         return this.opStdBltDerivedGraphic(true);
       case Opcode.StdBltFromDerivedGraphic:
         return this.opStdBltDerivedGraphic(false);
       case Opcode.StdDeleteDerivedGraphic:
-        this.derivedGraphics.delete(this.stack.pop() ?? 0);
+        this.derivedGraphics.delete(pop());
         // CSBWin's case has no `break` and falls into `StdHoleInWallBitmap` (Viewport.cpp:3015-3016).
-        this.stack.push(StdBitmapPtr.BMP_StdHoleInWallBitmap);
+        push(StdBitmapPtr.BMP_StdHoleInWallBitmap);
         return true;
       case Opcode.StdHoleInWallBitmap:
-        this.stack.push(StdBitmapPtr.BMP_StdHoleInWallBitmap);
+        push(StdBitmapPtr.BMP_StdHoleInWallBitmap);
         return true;
 
       case Opcode.StdDrawDoorSwitch:
@@ -782,9 +856,72 @@ export class BytecodeInterpreter {
       case Opcode.WallF1R1Left:
         return this.opWallPosition(opcode);
 
-      default:
-        console.warn(`WARNING: Unimplemented opcode ${opcode}`)
+      case Opcode.ToR:
+        rpush(pop());
         return true;
+      case Opcode.RTo:
+        push(rpop());
+        return true;
+      case Opcode.CurrentSkin:
+      case Opcode.SkinNumber:
+      case Opcode.CurrentCell:
+      case Opcode.WallGraphicID:
+      case Opcode.FloorGraphicID:
+      case Opcode.MiddleGraphicID:
+      case Opcode.CeilingGraphicID:
+      case Opcode.WallMaskID:
+      case Opcode.FloorMaskID:
+      case Opcode.MiddleMaskID:
+      case Opcode.CeilingMaskID:
+      case Opcode.WallDecorationID:
+        return this.opSkinQuery(opcode);
+      case Opcode.DrawCustomGraphic:
+      case Opcode.CreateVirtualBitmap:
+      case Opcode.DrawCustomDecoration:
+      case Opcode.CreateVirtualMask:
+      case Opcode.CreateVirtualAffineMask:
+        return this.opCustomGraphic(opcode);
+      case Opcode.GetMaskHeader:
+      case Opcode.NeedVirtualMaskQ:
+      case Opcode.BitmapInfo:
+        return this.opBackgroundQuery(opcode);
+      case Opcode.SWAP:
+      case Opcode.DROP:
+      case Opcode.TwoDrop:
+      case Opcode.OVER:
+      case Opcode.ROT:
+      case Opcode.DUP:
+      case Opcode.TwoDup:
+      case Opcode.QuestionDUP:
+      case Opcode.PICK:
+      case Opcode.ROLL:
+      case Opcode.PLUS:
+      case Opcode.MINUS:
+      case Opcode.GEAR:
+      case Opcode.SLASH:
+      case Opcode.EQUAL:
+      case Opcode.LESS:
+      case Opcode.GREATER:
+      case Opcode.ULESS:
+      case Opcode.ZEROEQUAL:
+      case Opcode.NOT:
+      case Opcode.ZEROLESS:
+      case Opcode.ZEROGREATER:
+      case Opcode.AND:
+      case Opcode.OR:
+      case Opcode.LSHIFT:
+      case Opcode.IsOdd:
+        return this.opStackWord(opcode);
+
+      default:
+        if (opcode < 60000) {
+          rpush(this.pc);
+          this.pc = opcode;
+          return true;
+        }
+        // `InterpretError("Unknown display opcode...")`, and `Interpret` returns.
+        console.warn(`WARNING: Unimplemented opcode ${opcode}`);
+        return false;
     }
   }
 
@@ -792,19 +929,276 @@ export class BytecodeInterpreter {
   // OPCODE HANDLERS
   // ============================================================
 
+  /** `Return` (`Viewport.cpp:3017-3021`): back to the caller, or out at the sentinel. */
   private opReturn(): boolean {
-    return false;  // Stop execution
+    const raddr = rpop() & 0xffff;
+    if (raddr === 0xffff) return false;
+    this.pc = raddr;
+    return true;
+  }
+
+  /**
+   * The skin's queries (`doc/CSBwin-src/Viewport.cpp:3028-3062`): the cell's skin, another
+   * cell's, the cell's number, and the IDs of the skin's definition. A skin number is
+   * popped as an `i16` and passed as a `ui32`.
+   */
+  private opSkinQuery(opcode: number): boolean {
+    const roomData = this.context.roomData;
+    const lib = this.context.backgroundLib;
+    switch (opcode) {
+      case Opcode.CurrentSkin:
+        push(roomData[this.cellNum]!.skinNumber);
+        break;
+      case Opcode.SkinNumber: {
+        // CSBWin indexes `roomData[21]` with whatever was popped; past it the port reads 0.
+        const relativeCell = pop();
+        push(roomData[relativeCell]?.skinNumber ?? 0);
+        break;
+      }
+      case Opcode.CurrentCell:
+        push(roomData[this.cellNum]!.relativeCellNumber);
+        break;
+      case Opcode.WallGraphicID:
+        push(lib?.GetWallGraphicID(pop() >>> 0) ?? 0);
+        break;
+      case Opcode.FloorGraphicID:
+        push(lib?.GetFloorGraphicID(pop() >>> 0) ?? 0);
+        break;
+      case Opcode.MiddleGraphicID:
+        push(lib?.GetMiddleGraphicID(pop() >>> 0) ?? 0);
+        break;
+      case Opcode.CeilingGraphicID:
+        push(lib?.GetCeilingGraphicID(pop() >>> 0) ?? 0);
+        break;
+      case Opcode.WallMaskID:
+        push(lib?.GetWallMaskID(pop() >>> 0) ?? 0);
+        break;
+      case Opcode.FloorMaskID:
+        push(lib?.GetFloorMaskID(pop() >>> 0) ?? 0);
+        break;
+      case Opcode.MiddleMaskID:
+        push(lib?.GetMiddleMaskID(pop() >>> 0) ?? 0);
+        break;
+      case Opcode.CeilingMaskID:
+        push(lib?.GetCeilingMaskID(pop() >>> 0) ?? 0);
+        break;
+      case Opcode.WallDecorationID: {
+        const wallDecorationNum = pop();
+        const skinNum = pop();
+        push(lib?.GetWallDecorationID(skinNum >>> 0, wallDecorationNum >>> 0) ?? 0);
+        break;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * What a skin's program draws and makes (`Viewport.cpp:3063-3115`, `:3209-3277`): each
+   * pops its arguments as CSBWin does and goes to the graphic trace with CSBWin's own
+   * `GTRACE` line, but draws and makes nothing yet. Placeholders: `DrawCustomGraphic` and
+   * `DrawCustomDecoration` are `DEBT.md` G27 step 4, the three virtual graphics step 5.
+   */
+  private opCustomGraphic(opcode: number): boolean {
+    const trace = this.context.graphicTrace;
+    switch (opcode) {
+      case Opcode.DrawCustomGraphic: {
+        const maskNumber = pop();
+        const maskID = pop();
+        const graphicID = pop();
+        trace?.(`   DrawCustomGraphic(${graphicID}, ${maskID}, ${maskNumber})`);
+        break;
+      }
+      case Opcode.CreateVirtualBitmap: {
+        const maskNumber = pop();
+        const maskID = pop();
+        const virtualGraphicID = pop();
+        const graphicID = pop();
+        trace?.(`  CreateVirtualBitmap(${graphicID}, ${virtualGraphicID}, ${maskID}, ${maskNumber}`);
+        break;
+      }
+      case Opcode.DrawCustomDecoration: {
+        const locationNumber = pop();
+        const decorationNumber = pop();
+        const decorationID = pop();
+        trace?.(`   DrawCustomDecoration(${decorationID}, ${decorationNumber}, ${locationNumber})`);
+        break;
+      }
+      case Opcode.CreateVirtualMask: {
+        const newMaskNumber = pop();
+        const newMaskID = pop();
+        const aMask = popMany(6).reverse(); // Cxx Cxy Cxc Cyx Cyy Cyc
+        const bMask = popMany(6).reverse(); // srcX srcY dstX dstY width height
+        const oldMaskNumber = pop();
+        const oldMaskID = pop();
+        trace?.(`CreateVirtualMask(${oldMaskID}, ${oldMaskNumber}, bmask, amask, ${newMaskID}, ${newMaskNumber}`);
+        trace?.(`   bMask = ${bMask.join(' ')}`);
+        trace?.(`   aMask = ${aMask.join(' ')}`);
+        break;
+      }
+      case Opcode.CreateVirtualAffineMask: {
+        const newMaskNumber = pop();
+        const newMaskID = pop();
+        // Cxx Cxy Cxc Cyx Cyy Cyc srcX srcY srcWidth srcHeight dstWidth dstHeight
+        const aMask = popMany(12).reverse();
+        trace?.(`CreateVirtualAffineMask (aMask, ${newMaskID} ${newMaskNumber}`);
+        trace?.(`    aMask = ${aMask.join(' ')}`);
+        break;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * What a skin's program reads of the background library (`Viewport.cpp:3187-3198`,
+   * `:3205-3208`, `:3278-3290`): a mask's header, whether a mask is missing, and a
+   * bitmap's size.
+   */
+  private opBackgroundQuery(opcode: number): boolean {
+    const lib = this.context.backgroundLib;
+    switch (opcode) {
+      case Opcode.GetMaskHeader: {
+        const maskNumber = pop();
+        const maskID = pop();
+        const pMask = lib?.GetMask(maskID >>> 0, maskNumber >>> 0, 12) ?? null;
+        if (pMask === null) break;
+        // `BACKGROUND_MASK` (`CSB.h:330-339`): srcX, srcY, dstX, dstY, width, height.
+        for (let i = 0; i < 6; i++) push(readU16LE(pMask.data, pMask.offset + 2 * i));
+        break;
+      }
+      case Opcode.NeedVirtualMaskQ: {
+        const maskNumber = pop();
+        const maskID = pop();
+        const pMask = lib?.MaskExists(maskID >>> 0, maskNumber >>> 0) ?? null;
+        push(pMask === null ? 1 : 0);
+        break;
+      }
+      case Opcode.BitmapInfo: {
+        let width = 0;
+        let height = 0;
+        const graphicID = pop();
+        const pGraphic = lib?.GetBitmap(graphicID >>> 0, 4) ?? null;
+        if (pGraphic !== null) {
+          width = readU32LE(pGraphic.data, 0);
+          // A width of 0 divides by zero in CSBWin; the port leaves the height 0.
+          if (width !== 0) height = Math.floor(((pGraphic.bitmapSize - 1) * 8) / width);
+        }
+        push(width);
+        push(height);
+        break;
+      }
+    }
+    return true;
+  }
+
+  /** The stack words (`Viewport.cpp:3116-3186`), on the ring itself where CSBWin works on it. */
+  private opStackWord(opcode: number): boolean {
+    let n: number;
+    let temp: number;
+    switch (opcode) {
+      case Opcode.SWAP:
+        temp = stack[sp]!;
+        stack[sp] = stack[(sp + 1) & 0xff]!;
+        stack[(sp + 1) & 0xff] = temp;
+        break;
+      case Opcode.DROP:
+        sp = (sp + 1) & 0xff;
+        break;
+      case Opcode.TwoDrop:
+        sp = (sp + 2) & 0xff;
+        break;
+      case Opcode.OVER:
+        push(stack[(sp + 1) & 0xff]!);
+        break;
+      case Opcode.ROT:
+        temp = stack[(sp + 2) & 0xff]!;
+        stack[(sp + 2) & 0xff] = stack[(sp + 1) & 0xff]!;
+        stack[(sp + 1) & 0xff] = stack[sp]!;
+        stack[sp] = temp;
+        break;
+      case Opcode.DUP:
+        push(stack[sp]!);
+        break;
+      case Opcode.TwoDup:
+        push(stack[(sp + 1) & 0xff]!);
+        push(stack[(sp + 1) & 0xff]!);
+        break;
+      case Opcode.QuestionDUP:
+        if (stack[sp] !== 0) push(stack[sp]!);
+        break;
+      case Opcode.PICK:
+        temp = stack[sp]!;
+        stack[sp] = stack[(sp + temp) & 0xff]!;
+        break;
+      case Opcode.ROLL:
+        n = pop() - 1;
+        temp = stack[(sp + n) & 0xff]!;
+        for (let x = n; x > 0; x--) stack[(sp + x) & 0xff] = stack[(sp + x - 1) & 0xff]!;
+        stack[sp] = temp;
+        break;
+      case Opcode.PLUS:
+        push(pop() + pop());
+        break;
+      case Opcode.MINUS:
+        n = pop();
+        push(pop() - n);
+        break;
+      case Opcode.GEAR:
+        push(pop() * pop());
+        break;
+      case Opcode.SLASH:
+        // C's division, toward zero. By zero CSBWin faults; the port pushes 0.
+        n = pop();
+        push(Math.trunc(pop() / n));
+        break;
+      case Opcode.EQUAL:
+        push(pop() === pop() ? 1 : 0);
+        break;
+      case Opcode.LESS:
+        n = pop();
+        push(n < pop() ? 1 : 0);
+        break;
+      case Opcode.GREATER:
+        n = pop();
+        push(n > pop() ? 1 : 0);
+        break;
+      case Opcode.ULESS:
+        n = pop();
+        push((n >>> 0) < (pop() >>> 0) ? 1 : 0);
+        break;
+      case Opcode.ZEROEQUAL:
+      case Opcode.NOT:
+        push(pop() === 0 ? 1 : 0);
+        break;
+      case Opcode.ZEROLESS:
+        push(pop() < 0 ? 1 : 0);
+        break;
+      case Opcode.ZEROGREATER:
+        push(pop() > 0 ? 1 : 0);
+        break;
+      case Opcode.AND:
+        push(pop() & pop());
+        break;
+      case Opcode.OR:
+        push(pop() | pop());
+        break;
+      case Opcode.LSHIFT:
+        n = pop();
+        push(pop() << n);
+        break;
+      case Opcode.IsOdd: {
+        // `d.partyLevel + d.partyX + d.partyY + d.partyFacing`: the view's square and facing.
+        const party = this.context.viewParty;
+        push(party ? (party.z + party.x + party.y + party.facing) & 1 : 0);
+        break;
+      }
+    }
+    return true;
   }
 
   private opStdBltShape(): boolean {
     // CSBWin: pop rectangle pointer, pop bitmap pointer, then blit with transparentColor=10.
-    const rectanglePtr = this.stack.pop();
-    const bitmapPtr = this.stack.pop();
-
-    if (bitmapPtr === undefined || rectanglePtr === undefined) {
-      // ERROR: StdBltShape - missing arguments
-      return true;
-    }
+    const rectanglePtr = pop();
+    const bitmapPtr = pop();
 
     // StdBltShape(bitmapPtr=${bitmapPtr}, rectPtr=${rectanglePtr})
 
@@ -830,9 +1224,9 @@ export class BytecodeInterpreter {
 
   private opJumpZ(): boolean {
     // Pop condition from stack
-    const condition = this.stack.pop();
+    const condition = pop();
     // Next value is jump offset
-    const offset = this.program[this.pc];
+    const offset = i16(this.program[this.pc]!);
     this.pc++;
 
     if (condition === 0) {
@@ -844,8 +1238,8 @@ export class BytecodeInterpreter {
   }
 
   private opJumpNZ(): boolean {
-    const condition = this.stack.pop();
-    const offset = this.program[this.pc];
+    const condition = pop();
+    const offset = i16(this.program[this.pc]!);
     this.pc++;
 
     if (condition !== 0) {
@@ -857,7 +1251,7 @@ export class BytecodeInterpreter {
   }
 
   private opJump(): boolean {
-    const offset = this.program[this.pc];
+    const offset = i16(this.program[this.pc]!);
     this.pc++;
 
     // -> Jumping ${offset} instructions
@@ -867,11 +1261,11 @@ export class BytecodeInterpreter {
 
   private opLiteral(): boolean {
     // Next value is the literal to push
-    const value = this.program[this.pc];
+    const value = this.program[this.pc]!;
     this.pc++;
 
     // Literal(${value})
-    this.stack.push(value);
+    push(value);
 
     return true;
   }
@@ -895,7 +1289,7 @@ export class BytecodeInterpreter {
     };
     const ptr = mapping[opcode] ?? StdBitmapPtr.BMP_StdWallBitmapF3;
     // WallBitmapPtr[${ptr}]
-    this.stack.push(ptr);
+    push(ptr);
     return true;
   }
 
@@ -903,19 +1297,14 @@ export class BytecodeInterpreter {
     // Push CSBWin RECT_POINTERS value (resolved later by StdRectanglePointers)
     const rectPtr = this.getStdWallRectanglePointer(opcode);
     // WallRectanglePtr[${rectPtr}]
-    this.stack.push(rectPtr);
+    push(rectPtr);
     return true;
   }
 
   private opStdBltShapeToViewport(mirror: boolean): boolean {
     // CSBWin StdBltShapeToViewport / StdMirrorShapeToViewport (Viewport.cpp:2849-2859)
-    const rectanglePtr = this.stack.pop();
-    const bitmapPtr = this.stack.pop();
-    if (bitmapPtr === undefined || rectanglePtr === undefined) {
-      // ERROR: ${mirror ? 'StdMirrorShapeToViewport' : 'StdBltShapeToViewport'} - missing arguments
-      return true;
-    }
-
+    const rectanglePtr = pop();
+    const bitmapPtr = pop();
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
     const bitmap = this.resolveStdBitmapPointer(bitmapPtr);
     if (!rectRef || Array.isArray(rectRef) || !bitmap) {
@@ -930,13 +1319,8 @@ export class BytecodeInterpreter {
 
   private opStdGraphicToViewport(mirror: boolean): boolean {
     // CSBWin StdGraphicToViewport / StdMirrorGraphicToViewport (Viewport.cpp:2899-2908)
-    const rectanglePtr = this.stack.pop();
-    const graphicNum = this.stack.pop();
-    if (graphicNum === undefined || rectanglePtr === undefined) {
-      // ERROR: ${mirror ? 'StdMirrorGraphicToViewport' : 'StdGraphicToViewport'} - missing arguments
-      return true;
-    }
-
+    const rectanglePtr = pop();
+    const graphicNum = pop();
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
     if (!rectRef || Array.isArray(rectRef)) {
       // ERROR: Invalid rectanglePtr=${rectanglePtr}
@@ -962,33 +1346,28 @@ export class BytecodeInterpreter {
 
   private opGetDecoration0(): boolean {
     // CSBWin `GetDecoration0` (Viewport.cpp:2875-2878)
-    const relativeCell = this.stack.pop();
-    if (relativeCell === undefined) {
-      // ERROR: GetDecoration0 - missing relativeCell
-      this.stack.push(0);
-      return true;
-    }
+    const relativeCell = pop();
     const v = this.context.roomData[relativeCell]?.decorations[0] ?? 0;
     // GetDecoration0(cell=${relativeCell}) -> ${v}
-    this.stack.push(v);
+    push(v);
     return true;
   }
 
   private opCellNumber(opcode: number): boolean {
     const cell = this.relativeCellFromCellOpcode(opcode);
     // CellNumber(${Opcode[opcode]}) -> ${cell}
-    this.stack.push(cell);
+    push(cell);
     return true;
   }
 
   private opCondition(opcode: number): boolean {
     if (opcode === Opcode.Alcove) {
       // CSBWin uses the last StdDrawWallDecoration result (Viewport.cpp:2946).
-      this.stack.push(this.hasAlcove ? 1 : 0);
+      push(this.hasAlcove ? 1 : 0);
       return true;
     }
     // Condition(${Opcode[opcode]}) -> 0
-    this.stack.push(0);
+    push(0);
     return true;
   }
 
@@ -996,41 +1375,32 @@ export class BytecodeInterpreter {
     // CSBWin Viewport.cpp:2641-2643
     const v = opcode === Opcode.wallDecorationFront ? 1 : opcode === Opcode.wallDecorationLeft ? 2 : 0;
     // WallDecorationPos(${Opcode[opcode]}) -> ${v}
-    this.stack.push(v);
+    push(v);
     return true;
   }
 
   private opHasDecoration(): boolean {
     // CSBWin Viewport.cpp:2633-2637
-    const wallDecorationPos = this.stack.pop();
-    const relativeCell = this.stack.pop();
-    if (wallDecorationPos === undefined || relativeCell === undefined) {
-      // ERROR: HasDecoration - missing arguments
-      this.stack.push(0);
-      return true;
-    }
+    const wallDecorationPos = pop();
+    const relativeCell = pop();
     const cell = this.context.roomData[relativeCell];
     const has = cell ? (cell.decorations[wallDecorationPos as 0 | 1 | 2] !== 0 ? 1 : 0) : 0;
     // HasDecoration(cell=${relativeCell}, pos=${wallDecorationPos}) -> ${has}
-    this.stack.push(has);
+    push(has);
     return true;
   }
 
   private opDoorSwitch(): boolean {
-    const relativeCell = this.stack.pop();
-    if (relativeCell === undefined) {
-      this.stack.push(0);
-      return true;
-    }
+    const relativeCell = pop();
     const doorIndex = this.context.roomData[relativeCell | 0]?.decorations[1] ?? 0;
     const dungeon = this.context.dungeonState;
     if (!dungeon) {
-      this.stack.push(0);
+      push(0);
       return true;
     }
     const rec = dungeon.getDoorRecordByIndex(doorIndex | 0);
     const hasSwitch = rec?.hasButton ? 1 : 0;
-    this.stack.push(hasSwitch);
+    push(hasSwitch);
     return true;
   }
 
@@ -1038,19 +1408,14 @@ export class BytecodeInterpreter {
     const cell = this.relativeCellFromFloorDecorationOpcode(opcode);
     const v = this.context.roomData[cell]?.decorations[2] ?? 0;
     // FloorDecorationGraphicOrdinal(${Opcode[opcode]}) cell=${cell} -> ${v}
-    this.stack.push(v);
+    push(v);
     return true;
   }
 
   private opStdDrawFloorDecoration(): boolean {
     // CSBWin StdDrawFloorDecoration: (relativeCell floorGraphicOrdinal ...)
-    const floorGraphicOrdinal = this.stack.pop();
-    const relativeCell = this.stack.pop();
-
-    if (floorGraphicOrdinal === undefined || relativeCell === undefined) {
-      // ERROR: StdDrawFloorDecoration - missing arguments
-      return true;
-    }
+    const floorGraphicOrdinal = pop();
+    const relativeCell = pop();
 
     const floorCell = BytecodeInterpreter.floorDrawingLocations[relativeCell | 0] ?? 0;
     DrawFloorDecorations(this.draw, floorGraphicOrdinal | 0, floorCell | 0);
@@ -1058,14 +1423,9 @@ export class BytecodeInterpreter {
   }
 
   private opStdDrawCeilingPit(): boolean {
-    const mapY = this.stack.pop();
-    const mapX = this.stack.pop();
-    const relCellRF = this.stack.pop();
-
-    if (mapY === undefined || mapX === undefined || relCellRF === undefined) {
-      // ERROR: StdDrawCeilingPit - missing arguments
-      return true;
-    }
+    const mapY = pop();
+    const mapX = pop();
+    const relCellRF = pop();
 
     const dungeon = this.context.dungeonState;
     const getGraphic = this.context.getGraphicBitmap;
@@ -1118,14 +1478,14 @@ export class BytecodeInterpreter {
    * `TAG0088b2` between a standard bitmap and a derived graphic, every argument off the stack.
    */
   private opStdBltDerivedGraphic(toDerived: boolean): boolean {
-    const xparentColor = this.stack.pop() ?? 0;
-    const dstWidth = this.stack.pop() ?? 0;
-    const srcWidth = this.stack.pop() ?? 0;
-    const srcY = this.stack.pop() ?? 0;
-    const srcX = this.stack.pop() ?? 0;
-    const pDstRect = this.resolveStdRectanglePointer(this.stack.pop() ?? 0);
-    const dstPtr = this.stack.pop() ?? 0;
-    const srcPtr = this.stack.pop() ?? 0;
+    const xparentColor = pop();
+    const dstWidth = pop();
+    const srcWidth = pop();
+    const srcY = pop();
+    const srcX = pop();
+    const pDstRect = this.resolveStdRectanglePointer(pop());
+    const dstPtr = pop();
+    const srcPtr = pop();
     const dst = toDerived ? this.derivedGraphics.get(dstPtr) : this.resolveStdBitmapPointer(dstPtr)?.pixels;
     const src = toDerived ? this.resolveStdBitmapPointer(srcPtr)?.pixels : this.derivedGraphics.get(srcPtr);
     if (!src || !dst || !pDstRect || Array.isArray(pDstRect)) return true;
@@ -1161,13 +1521,8 @@ export class BytecodeInterpreter {
 
   private opStdDrawDoorSwitch(): boolean {
     // CSBWin `StdDrawDoorSwitch` (Viewport.cpp:2886-2889)
-    const distance = this.stack.pop();
-    const switchId = this.stack.pop();
-
-    if (distance === undefined || switchId === undefined) {
-      // ERROR: StdDrawDoorSwitch - missing arguments
-      return true;
-    }
+    const distance = pop();
+    const switchId = pop();
 
     DrawDoorSwitch(this.draw, switchId | 0, distance | 0);
     return true;
@@ -1185,41 +1540,25 @@ export class BytecodeInterpreter {
   ];
 
   private opStdDrawRoomObjects(): boolean {
-    const drawOrder = this.stack.pop();
-    const relCellRF = this.stack.pop();
-    const mapY = this.stack.pop();
-    const mapX = this.stack.pop();
-    const firstObject = this.stack.pop();
-
-    if (
-      drawOrder === undefined ||
-      relCellRF === undefined ||
-      mapX === undefined ||
-      mapY === undefined ||
-      firstObject === undefined
-    ) {
-      // ERROR: StdDrawRoomObjects - missing arguments
-      return true;
-    }
+    const drawOrder = pop();
+    const relCellRF = pop();
+    const mapY = pop();
+    const mapX = pop();
+    const firstObject = popRN();
 
     const facing = this.context.frameFacing ?? 0;
     const idx = relCellRF | 0;
     const relativeCell = BytecodeInterpreter.objectDrawingLocations[idx] ?? 0;
 
     // StdDrawRoomObjects(first=${firstObject}, x=${mapX}, y=${mapY}, rf=${relCellRF} -> rel=${relativeCell}, drawOrder=0x${drawOrder.toString(16)})
-    DrawRoomObjects(this.draw, firstObject as ObjectID, facing, mapX | 0, mapY | 0, relativeCell | 0, drawOrder | 0);
+    DrawRoomObjects(this.draw, firstObject, facing, mapX | 0, mapY | 0, relativeCell | 0, drawOrder | 0);
     return true;
   }
 
   private opStdDrawTeleporter(): boolean {
     // CSBWin `StdDrawTeleporter` (Viewport.cpp:2891-2896)
-    const wallRectPtr = this.stack.pop();
-    const teleporterRectPtr = this.stack.pop();
-
-    if (wallRectPtr === undefined || teleporterRectPtr === undefined) {
-      // ERROR: StdDrawTeleporter - missing arguments
-      return true;
-    }
+    const wallRectPtr = pop();
+    const teleporterRectPtr = pop();
 
     const wallRect = this.resolveStdRectanglePointer(wallRectPtr);
     const teleporterRect = this.resolveStdRectanglePointer(teleporterRectPtr);
@@ -1234,20 +1573,10 @@ export class BytecodeInterpreter {
 
   private opStdDrawDoor(): boolean {
     // CSBWin `StdDrawDoor` (Viewport.cpp:2589-2610)
-    const rectPtr = this.stack.pop();
-    const doorGraphicIndex = this.stack.pop();
-    const doorState = this.stack.pop();
-    const doorRecordIndex = this.stack.pop();
-
-    if (
-      rectPtr === undefined ||
-      doorGraphicIndex === undefined ||
-      doorState === undefined ||
-      doorRecordIndex === undefined
-    ) {
-      // ERROR: StdDrawDoor - missing arguments
-      return true;
-    }
+    const rectPtr = pop();
+    const doorGraphicIndex = pop();
+    const doorState = pop();
+    const doorRecordIndex = pop();
 
     const rectRef = this.resolveStdRectanglePointer(rectPtr);
     if (!rectRef || !Array.isArray(rectRef)) {
@@ -1263,14 +1592,9 @@ export class BytecodeInterpreter {
 
   private opStdDrawWallDecoration(): boolean {
     // CSBWin `StdDrawWallDecoration` (Viewport.cpp:2942-2949)
-    const wallDecorationDrawLocation = this.stack.pop();
-    const wallDecorationPos = this.stack.pop();
-    const relativeCell = this.stack.pop();
-
-    if (wallDecorationDrawLocation === undefined || wallDecorationPos === undefined || relativeCell === undefined) {
-      // ERROR: StdDrawWallDecoration - missing arguments
-      return true;
-    }
+    const wallDecorationDrawLocation = pop();
+    const wallDecorationPos = pop();
+    const relativeCell = pop();
 
     const rd = this.context.roomData[relativeCell | 0];
     const graphicOrdinal = rd?.decorations[(wallDecorationPos as 0 | 1 | 2) ?? 0] ?? 0;
@@ -1288,14 +1612,9 @@ export class BytecodeInterpreter {
 
   private opStdDrawWallText(): boolean {
     // CSBWin `StdDrawWallText` (Viewport.cpp:2930-2940)
-    const wallDecorationDrawLocation = this.stack.pop();
-    const wallDecorationPos = this.stack.pop();
-    const relativeCell = this.stack.pop();
-
-    if (wallDecorationDrawLocation === undefined || wallDecorationPos === undefined || relativeCell === undefined) {
-      // ERROR: StdDrawWallText - missing arguments
-      return true;
-    }
+    const wallDecorationDrawLocation = pop();
+    const wallDecorationPos = pop();
+    const relativeCell = pop();
 
     const rd = this.context.roomData[relativeCell | 0];
     const textRN = rd?.text[(wallDecorationPos as 0 | 1 | 2) ?? 0] ?? OBJECT_ID_EOF;
@@ -1610,7 +1929,7 @@ export class BytecodeInterpreter {
     };
     const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdFloorPitRectangleF0;
     // FloorPitRectanglePtr(${Opcode[opcode]})[${rectPtr}]
-    this.stack.push(rectPtr);
+    push(rectPtr);
     return true;
   }
 
@@ -1631,7 +1950,7 @@ export class BytecodeInterpreter {
     };
     const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdTeleporterRectangleF0;
     // TeleporterRectanglePtr(${Opcode[opcode]})[${rectPtr}]
-    this.stack.push(rectPtr);
+    push(rectPtr);
     return true;
   }
 
@@ -1665,7 +1984,7 @@ export class BytecodeInterpreter {
     };
     const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdStairFacingUpRectangleF0L;
     // StairRectanglePtr(${Opcode[opcode]})[${rectPtr}]
-    this.stack.push(rectPtr);
+    push(rectPtr);
     return true;
   }
 
@@ -1732,7 +2051,7 @@ export class BytecodeInterpreter {
     }
 
     // StairGraphic(${Opcode[opcode]}) -> ${graphicIndex}
-    this.stack.push(graphicIndex);
+    push(graphicIndex);
     return true;
   }
 
@@ -1760,7 +2079,7 @@ export class BytecodeInterpreter {
     }
 
     // StairEdgeGraphic(${Opcode[opcode]}) -> ${graphicIndex}
-    this.stack.push(graphicIndex);
+    push(graphicIndex);
     return true;
   }
 
@@ -1777,7 +2096,7 @@ export class BytecodeInterpreter {
     };
     const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdStairEdgeRectangleF0L;
     // StairEdgeRectanglePtr(${Opcode[opcode]})[${rectPtr}]
-    this.stack.push(rectPtr);
+    push(rectPtr);
     return true;
   }
 
@@ -1796,7 +2115,7 @@ export class BytecodeInterpreter {
     };
     const ptr = mapping[opcode] ?? StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF1;
     // DoorBitmapPtr(${Opcode[opcode]}) -> ${ptr}
-    this.stack.push(ptr);
+    push(ptr);
     return true;
   }
 
@@ -1804,7 +2123,7 @@ export class BytecodeInterpreter {
     const cell = this.relativeCellFromDoorOpcode(opcode);
     const v = this.context.roomData[cell]?.decorations[1] ?? 0;
     // DoorRecordIndex(${Opcode[opcode]}) cell=${cell} -> ${v}
-    this.stack.push(v);
+    push(v);
     return true;
   }
 
@@ -1812,7 +2131,7 @@ export class BytecodeInterpreter {
     const cell = this.relativeCellFromDoorOpcode(opcode);
     const v = this.context.roomData[cell]?.decorations[0] ?? 0;
     // DoorState(${Opcode[opcode]}) cell=${cell} -> ${v}
-    this.stack.push(v);
+    push(v);
     return true;
   }
 
@@ -1821,7 +2140,7 @@ export class BytecodeInterpreter {
     const graphicsIndex =
       opcode === Opcode.StdDoorGraphicsF3 ? 2 : opcode === Opcode.StdDoorGraphicsF2 ? 1 : 0;
     // DoorGraphics(${Opcode[opcode]})[${graphicsIndex}]
-    this.stack.push(graphicsIndex);
+    push(graphicsIndex);
     return true;
   }
 
@@ -1840,7 +2159,7 @@ export class BytecodeInterpreter {
     };
     const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdDoorRectsF1;
     // DoorRectsPtr(${Opcode[opcode]})[${rectPtr}]
-    this.stack.push(rectPtr);
+    push(rectPtr);
     return true;
   }
 
@@ -1868,7 +2187,7 @@ export class BytecodeInterpreter {
     };
     const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdDoorFacingFrameRightRectF1;
     // DoorFrameRectanglePtr(${Opcode[opcode]})[${rectPtr}]
-    this.stack.push(rectPtr);
+    push(rectPtr);
     return true;
   }
 
@@ -1899,7 +2218,7 @@ export class BytecodeInterpreter {
 
     const drawOrder = drawOrderMap[opcode] ?? 0;
     // DrawOrder(${drawOrder})
-    this.stack.push(drawOrder);
+    push(drawOrder);
     return true;
   }
 
@@ -1909,8 +2228,8 @@ export class BytecodeInterpreter {
     const x = rd?.x ?? 0;
     const y = rd?.y ?? 0;
     // CellXY(${Opcode[opcode]}) cell=${cell} -> (x=${x}, y=${y})
-    this.stack.push(x);
-    this.stack.push(y);
+    push(x);
+    push(y);
     return true;
   }
 
@@ -1918,7 +2237,7 @@ export class BytecodeInterpreter {
     const cell = this.relativeCellFromContentsOpcode(opcode);
     const v = this.context.roomData[cell]?.rn2 ?? 0;
     // CellContents(${Opcode[opcode]}) cell=${cell} -> ${v}
-    this.stack.push(v);
+    push(v);
     return true;
   }
 
@@ -1941,7 +2260,7 @@ export class BytecodeInterpreter {
     };
     const v = mapping[opcode] ?? 0;
     // WallPosition(${Opcode[opcode]}) -> ${v}
-    this.stack.push(v);
+    push(v);
     return true;
   }
 

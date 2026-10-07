@@ -94,6 +94,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| C149 | A Conflux cell flagged with objects whose first object is `RNnul` throws in `DrawRoomObjects` | S | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
 | Phase 17 | Deployment: the Docker image, the data sets' manifest, the statistics | L | in `PLAN.md` |
@@ -124,7 +125,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C149 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C150 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -181,6 +182,22 @@ The redesigned page also links to two pages:
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C149 ⏳ A Conflux cell flagged with objects whose first object is `RNnul` throws in `DrawRoomObjects`
+
+On Conflux 3.5's map 63, (21,29) is a stone cell whose flag says it has objects (0x1f),
+and whose first object, as `DungeonState.findFirstObject` reads it from the object list,
+is `RNnul` (0xFFFF). Seen from (17,28) facing east it is F4R1: `SummarizeRoomInfo` gives
+it that `rn2`, `F4R1Contents` pushes it, and `DrawRoomObjects` takes it as the chain's
+first object and throws in `RnMaps.decode` ("Illegal object Indirect Index 65535"). The
+port throws on it before and after G27 step 3, and the frame is lost. CSBWin's
+`DrawRoomObjects` returns only for `RNeof` (`doc/CSBwin-src/Code51a4.cpp:2707`), and
+`StdDrawRoomObjects` reads its contents with `popRN`, which makes 0xFFFF `RNnul`
+(`Viewport.cpp:2249-2258`, `:2914`). What CSBWin's `SummarizeRoomInfo` puts in `rn2` for
+such a cell, what its chain walk does with `RNnul`, and whether other Conflux cells are
+alike, is not traced. `peek-dungeon` shows the cell with no object. Conflux is no data
+set yet, so no game reaches it; `tools/dump-skin-programs.ts --all` stops there, and its
+default run, the starting levels only, does not.
 
 ### C145 ⏸️ The Hint Oracle's title boxes keep colour 12 on their last line and a half
 
@@ -291,10 +308,12 @@ and ceiling graphics, their masks and its decorations through `BACKGROUND_LIB`. 
 reads and sets a cell's skin with `&GETSKIN` and `&SETSKIN` (`DSA.cpp:3107-3135`). How
 skins are stored, and the formats, are in `doc/CSBWIN_RENDERING_REFERENCE.md` →
 "Backgrounds and Skins". The port has the skins and the two operations
-(`src/engine/SkinCache.ts`, step 1), and draws none of it: `DrawViewport` gives every cell
-skin 0 (`src/renderer/DrawViewport.ts`, "Default skin for prototype"). The library the
-programs read through is `src/data/BackgroundLib.ts` (step 2), at the viewport context's
-`backgroundLib`.
+(`src/engine/SkinCache.ts`, step 1), the library the programs read through
+(`src/data/BackgroundLib.ts`, step 2, the viewport context's `backgroundLib`), and runs a
+skinned cell's program (step 3). What a program draws of its own graphics, it does not
+draw yet: `DrawCustomGraphic`, `DrawCustomDecoration` and the three opcodes that make
+virtual graphics pop their arguments and go to the graphic trace, and stop there
+(`BytecodeInterpreter.opCustomGraphic`).
 
 What the data sets here use of it:
 
@@ -306,8 +325,8 @@ What the data sets here use of it:
   cells, and
   its default skins are all 0. Its `CSBgraphics.dat` has 38 skins, 21 background sections
   and one program (64), which uses a subset of Conflux's skin opcodes, the virtual
-  graphics among them. It is a data set already, and draws its skinned cells with the standard programs
-  until step 3.
+  graphics among them. It is a data set already, and of its skinned cells draws only what
+  their program draws with the standard opcodes until step 4.
 - **`dm-atari`'s `CSBgraphics.dat`** also holds 90 background sections, but DM's dungeon has no
   skins, so no frame of it moves. 3D2D1D's file has the default skins record, all 0.
 - **Every standard opcode the skin programs use is ported.** Of the skin opcodes (60302
@@ -324,24 +343,23 @@ The steps, in order. Each step's tool runs on Conflux's files and The Towers of 
    `backgroundLib`, emptied with `altMonCache`. Checked by `tools/dump-background-lib.ts`,
    which prints Conflux's skins and checks them, the programs, masks and bitmaps against
    the sections' bytes.
-3. ⏳ **A skin's program run (M).** `DrawViewport` fills `skinNumber` (the cell's, else
-   the level's default) and runs a skinned cell's program from
-   `pCode[pCode[0] + 8 * cell + graphicRoomType]`, or nothing. `Interpret` starts at an
-   address, a word below 60000 calls a subroutine through the return stack, and `Return`
-   pops back to the `0xffff` sentinel (`Viewport.cpp:2473-2474`, `:3017-3021`,
-   `:3293-3301`). The two stacks become CSBWin's: static rings of 256 words, whose `pop`
-   is signed (`:2215-2247`). If a standard program reads differently through them, that
-   is a C item. Then the stack words (`SWAP` to `LSHIFT`, `ToR`, `RTo`, `TwoDup`,
-   `TwoDrop`, `IsOdd`), `CurrentSkin`, `SkinNumber`, `CurrentCell` and the eleven ID
-   opcodes (`:3028-3062`, `:3116-3186`).
+3. ✅ **A skin's program run.** `DrawViewport` fills `skinNumber` and runs a skinned
+   cell's program from its cell table (`skinProgramStart`), or nothing; the interpreter's
+   two stacks are CSBWin's rings, kept from one program to the next, with subroutine
+   calls, the stack words, the skin's queries, and three reads of the library:
+   `GetMaskHeader`, `NeedVirtualMaskQ` and `BitmapInfo`. Checked by
+   `tools/dump-skin-programs.ts`; `tools/dump-render-probe.ts` checks that every standard
+   program leaves both stacks as it found them, so none reads what another left.
 4. ⏳ **Custom graphics drawn (M).** `DrawCustomGraphic` through `ApplyBackground` and
-   `ApplyBackground3` (`:3063-3082`, `:6444-6497`, `:6124-6440`), `DrawCustomDecoration`
-   through `ApplyDecoration` (`:3102-3115`, `:6500-6541`), `GetMaskHeader` and
-   `BitmapInfo` (`:3187-3198`, `:3278-3290`).
+   `ApplyBackground3` (`:3063-3082`, `:6444-6497`, `:6124-6440`), and
+   `DrawCustomDecoration` through `ApplyDecoration` (`:3102-3115`, `:6500-6541`), in
+   place of their placeholders in `opCustomGraphic`.
 5. ⏳ **Virtual graphics (M).** `CreateVirtualBitmap` (`AffineTransform4`),
-   `CreateVirtualMask` (`AffineTransform1`, `CreateNewMask`), `CreateVirtualAffineMask`
-   (`CreateNewAffineMask`) and `NeedVirtualMaskQ` (`:3083-3101`, `:3199-3277`,
-   `CUSTOMBITMAP` and the two transforms at `:131-279`, `:5445-5625`).
+   `CreateVirtualMask` (`AffineTransform1`, `CreateNewMask`) and
+   `CreateVirtualAffineMask` (`CreateNewAffineMask`) (`:3083-3101`, `:3209-3277`,
+   `CUSTOMBITMAP` and the two transforms at `:131-279`, `:5445-5625`). Until then no
+   virtual mask exists, so `NeedVirtualMaskQ` answers 1 at every view, and the programs
+   ask for every virtual graphic again each time, where CSBWin makes each once.
 
 Steps 3 to 5 are proved by their tools on what they draw. A frame of a skinned view
 comes with G26's golden frame at Conflux's start.

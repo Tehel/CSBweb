@@ -14,6 +14,7 @@ import { BytecodePrograms } from './bytecode/BytecodePrograms';
 import type { DungeonState } from '../engine/DungeonState';
 import { summarizeRoomInfoCsbwin } from './csbwin/SummarizeRoomInfo';
 import { Position } from '../core/types';
+import { readU16LE } from '../core/bytes';
 
 /**
  * Relative X coordinates for each cell
@@ -88,6 +89,8 @@ export function DrawViewport(
 
   // Allocate room data for all 21 cells
   const roomData: SummarizeRoomData[] = new Array(21);
+  const level = position.z;
+  context.viewParty = { x: position.x, y: position.y, z: level, facing };
 
   // Initialize the bytecode interpreter
   const interpreter = new BytecodeInterpreter(context);
@@ -97,12 +100,17 @@ export function DrawViewport(
     // Calculate absolute position for this cell
     const pos = RelativeXY(facing, relativeY[cellNum], relativeX[cellNum], position.x, position.y);
 
+    // The cell's skin, else the level's default, on `d.LoadedLevel`, the level drawn
+    // (`doc/CSBwin-src/Viewport.cpp:6777-6786`).
+    let skinNumber = dungeonState.skinCache.GetSkin(level, pos.x, pos.y);
+    if (skinNumber === 0) skinNumber = dungeonState.skinCache.GetDefaultSkin(level);
+
     // Initialize room data structure
     roomData[cellNum] = {
       x: pos.x,
       y: pos.y,
       relativeCellNumber: cellNum,
-      skinNumber: 0, // Default skin for prototype
+      skinNumber,
       roomType: RoomType.STONE, // Will be overwritten by summarizeRoomInfoCsbwin
       championPortraitOrdinal: 0,
       graphicRoomType: GraphicRoomType.STONE,
@@ -121,12 +129,26 @@ export function DrawViewport(
 
   // Second pass: Execute bytecode programs to draw each cell
   for (let cellNum = 0; cellNum < 21; cellNum++) {
+    const skinNumber = roomData[cellNum].skinNumber;
+    if (skinNumber !== 0) {
+      // A skin's own program, from its cell table; a skin with none draws nothing
+      // (`Viewport.cpp:6789-6806`).
+      const pCode = context.backgroundLib?.GetCode(skinNumber) ?? null;
+      if (pCode !== null) {
+        const code = skinCodeWords(pCode);
+        const startOffset = skinProgramStart(code, cellNum, roomData[cellNum].graphicRoomType);
+        context.graphicTrace?.(`  Draw Cell ${cellNum} skin ${skinNumber}`);
+        interpreter.interpret(code, startOffset, cellNum);
+      }
+      continue;
+    }
+
     // Get the bytecode program for this cell and room type
     const program = getBytecodeProgram(cellNum, roomData[cellNum].graphicRoomType);
 
     if (program) {
       // Execute the bytecode program to render this cell
-      interpreter.interpret(program, cellNum);
+      interpreter.interpret(program, 0, cellNum);
     }
   }
 
@@ -134,6 +156,31 @@ export function DrawViewport(
   // the cell programs: `SummarizeRoomInfo` fills `championPortraitOrdinal`, and the
   // `SeeThroughWalls` opcode reads `context.seeThroughWalls`
   // (doc/CSBwin-src/Viewport.cpp:2638), both set up by `ViewportRenderer.drawViewportFrame`.
+}
+
+/**
+ * A skin's program section as CSBWin reads it, `ui16` words in its native, little-endian
+ * order (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Background library"). Read once a section:
+ * `BACKGROUND_LIB` keeps the section's bytes as long as the game.
+ */
+const skinCodes = new WeakMap<Uint8Array, Uint16Array>();
+function skinCodeWords(section: Uint8Array): Uint16Array {
+  let words = skinCodes.get(section);
+  if (!words) {
+    words = new Uint16Array(section.length >> 1);
+    for (let i = 0; i < words.length; i++) words[i] = readU16LE(section, 2 * i);
+    skinCodes.set(section, words);
+  }
+  return words;
+}
+
+/**
+ * Where a skin's program draws a cell of a graphic room type: `mainOffset = pCode[0]`, then
+ * `pCode[mainOffset + 8 * cell + graphicRoomType]` (`doc/CSBwin-src/Viewport.cpp:6796-6797`).
+ */
+export function skinProgramStart(code: ArrayLike<number>, cellNum: number, graphicRoomType: number): number {
+  const mainOffset = code[0]!;
+  return code[mainOffset + 8 * cellNum + graphicRoomType]!;
 }
 
 /** The 21 cells' names in the program table, by relative cell number. */

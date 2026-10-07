@@ -123,6 +123,14 @@ export function createPrisonDungeonState(randomSeed: number): DungeonState {
     getDsaLevelIndex(): never {
       return unreachable('a DSA level index');
     },
+    // CSBWin asks the skins of `d.LoadedLevel`, not of the prison, and draws the prison
+    // before a game is read or after a read that failed (`doc/CSBwin-src/CSBCode.cpp:10624-10639`),
+    // from whatever its pool holds then, which the port does not keep. A placeholder: every
+    // cell is skin 0, drawn by the standard programs.
+    skinCache: {
+      GetSkin: (): number => 0,
+      GetDefaultSkin: (): number => 0,
+    },
   };
   return stub as unknown as DungeonState;
 }

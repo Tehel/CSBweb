@@ -753,7 +753,7 @@ rectpos.w.x2 = 270;  // Right edge of viewport on screen
 
 **Location**: `Viewport.cpp`
 
-- `DrawViewport` sets `roomData[userCellNum].skinNumber` from `skinCache.GetSkin` (fallback to `GetDefaultSkin`), and for non-zero skins selects custom code with `mainOffset = pCode[0]` and `startOffset = pCode[mainOffset + 8*userCellNum + roomData[userCellNum].graphicRoomType]` before calling `Interpret`.
+- `DrawViewport` sets `roomData[userCellNum].skinNumber` from `skinCache.GetSkin` (fallback to `GetDefaultSkin`), on `d.LoadedLevel`, and for non-zero skins selects custom code with `mainOffset = pCode[0]` and `startOffset = pCode[mainOffset + 8*userCellNum + roomData[userCellNum].graphicRoomType]` before calling `Interpret` (`Viewport.cpp:6777-6806`). The port is `DrawViewport` and `skinProgramStart` (`src/renderer/DrawViewport.ts`); in Conflux 3.5's and The Towers of Chaos 3.3's programs, the code each cell's address leads to draws that cell's objects (`tools/dump-skin-programs.ts`).
 - A skinned cell whose skin has no program (`GetCode` null) draws nothing (`Viewport.cpp:6789-6806`).
 - `CustomBackgrounds` is compiled out (`#ifndef newgraphics`, and `newgraphics` is defined at `Viewport.cpp:315`). It uses `skinCache` and `backgroundLib.GetSkinDef` to apply background masks/bitmaps: `pSkinDef[0]/[4]` (mask size 64, bitmap size 7840), `pSkinDef[2]/[6]` (size 3248), and for `roomNum < 5` `pSkinDef[1]/[5]` (size 4144).
 
@@ -763,8 +763,12 @@ rectpos.w.x2 = 270;  // Right edge of viewport on screen
 
 **Location**: `Viewport.cpp`
 
-- The data stack and the return stack are static rings of 256 `ui16`, indexed by a `ui8` that `push` decrements first, kept from one `Interpret` to the next; `pop` returns an `i16` (`Viewport.cpp:2215-2247`).
-- `Interpret` starts at `code + startAddr`, pushes a return-stack sentinel `0xffff`, treats opcodes `< 60000` as subroutine calls (push return address, jump to absolute offset), and `Return` pops back to that address until the sentinel.
+- The data stack and the return stack are static rings of 256 `ui16`, indexed by a `ui8` that `push` decrements first, kept from one `Interpret` to the next; `pop` returns an `i16` (`Viewport.cpp:2215-2247`). `popRN` reads the word unsigned (`:2249-2258`); `StdDrawRoomObjects` takes its contents that way (`:2914`).
+- `Interpret` starts at `code + startAddr`, pushes a return-stack sentinel `0xffff`, treats opcodes `< 60000` as subroutine calls (push return address, jump to absolute offset), and `Return` pops back to that address until the sentinel (`:2473-2474`, `:3017-3021`, `:3292-3301`). An opcode of 60000 or more with no case ends `Interpret` with `InterpretError`, the sentinel left on the return stack: `FloorDecorationID` (60309) is one, in the enum and in no case.
+- A jump's operand is read as `(i16)n` and added to `P` after the operand (`:2863-2874`).
+- `LESS` and `GREATER` pop the top as `n` and compare it with the word under it: `n = pop(); push((n<pop()) ? 1 : 0)`, so `a b LESS` is `b < a`. `ULESS` compares the two as unsigned `i32`s, `SLASH` divides the second by the top, `ROLL` takes its count from the top, and `PICK` replaces the top `t` with the word `t` below it (`:3116-3186`).
+- `IsOdd` is `(d.partyLevel + d.partyX + d.partyY + d.partyFacing) & 1` (`:3185`).
+- The skin programs of Conflux 3.5 and The Towers of Chaos 3.3 leave a word on the data stack on some paths: Conflux's program 64, at cell F3L1's address (word 561), pushes `Literal 0`, and on the path that draws the standard wall drops it and pushes `Literal 1`; neither path pops what it left. No program leaves more than one, and every one returns to its sentinel (`tools/dump-skin-programs.ts`). Every standard program leaves both stacks as it found them (`tools/dump-render-probe.ts`).
 
 ---
 

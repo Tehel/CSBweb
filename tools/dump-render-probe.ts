@@ -27,7 +27,9 @@
  *
  * What it asserts: the port's table is null in exactly CSBWin's `NOP` slots and holds
  * the one `Any` program in each slot of F4L1, F4R1 and F4, no program reaches an
- * unimplemented opcode, and every program draws exactly what it drew when
+ * unimplemented opcode, every program leaves the interpreter's two stacks as it found
+ * them, which CSBWin keeps from one program to the next (`Viewport.cpp:2215-2247`), so
+ * none reads what another left, and every program draws exactly what it drew when
  * `tools/reference/render-probe.tsv` was written, every pixel of it one of the 16 colours.
  * Under See-Thru-Walls, every program runs without an unimplemented opcode, and the F1
  * wall shows what is behind it through graphic 41's hole, pixel for pixel (`seeThruWalls`).
@@ -50,7 +52,7 @@ import { resolve } from 'node:path';
 
 import { atariToRGB, OBJECT_ID_EOF, Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
+import { BytecodeInterpreter, interpreterStackPointers } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { BytecodePrograms } from '../src/renderer/bytecode/BytecodePrograms';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
@@ -162,8 +164,12 @@ function main(): void {
         const before = warnings.length;
         renderer.buffer.pixels.fill(UNDRAWN);
         renderer.context.roomData = roomDataFor(start, passFacing, cell, type as GraphicRoomType, doorIndex);
-        new BytecodeInterpreter(renderer.context).interpret(program, cell);
+        const stacks = interpreterStackPointers();
+        new BytecodeInterpreter(renderer.context).interpret(program, 0, cell);
         check(warnings.length === before, `${pass} ${name} runs without a warning: ${warnings.slice(before).join('; ')}`);
+        const after = interpreterStackPointers();
+        check(after.sp === stacks.sp && after.rsp === stacks.rsp,
+          `${pass} ${name} leaves both stacks as it found them (sp ${stacks.sp} -> ${after.sp}, rsp ${stacks.rsp} -> ${after.rsp})`);
 
         const pixels = renderer.buffer.pixels;
         let drawn = 0;
@@ -228,7 +234,7 @@ function seeThruWalls(renderer: ViewportRenderer, start: Position, facing: numbe
       const before = warnings.length;
       renderer.buffer.pixels.fill(UNDRAWN);
       ctx.roomData = roomDataFor(start, facing, cell, type as GraphicRoomType, doorIndex);
-      new BytecodeInterpreter(ctx).interpret(program, cell);
+      new BytecodeInterpreter(ctx).interpret(program, 0, cell);
       check(warnings.length === before, `see-thru ${cellNames[cell]}_${roomTypeNames[type]} runs without a warning: ${warnings.slice(before).join('; ')}`);
     }
   }
@@ -239,7 +245,7 @@ function seeThruWalls(renderer: ViewportRenderer, start: Position, facing: numbe
     ctx.seeThroughWalls = seeThru;
     renderer.buffer.pixels.set(pattern);
     ctx.roomData = roomDataFor(start, facing, f1, GraphicRoomType.STONE, doorIndex);
-    new BytecodeInterpreter(ctx).interpret(getBytecodeProgram(f1, GraphicRoomType.STONE)!, f1);
+    new BytecodeInterpreter(ctx).interpret(getBytecodeProgram(f1, GraphicRoomType.STONE)!, 0, f1);
     return Uint8Array.from(renderer.buffer.pixels);
   };
   const wall = drawF1Stone(false);
@@ -271,7 +277,7 @@ function seeThruWalls(renderer: ViewportRenderer, start: Position, facing: numbe
   const f0 = cellNames.indexOf('F0');
   renderer.buffer.pixels.fill(UNDRAWN);
   ctx.roomData = roomDataFor(start, facing, f0, GraphicRoomType.DOOR_EDGE, doorIndex);
-  new BytecodeInterpreter(ctx).interpret(getBytecodeProgram(f0, GraphicRoomType.DOOR_EDGE)!, f0);
+  new BytecodeInterpreter(ctx).interpret(getBytecodeProgram(f0, GraphicRoomType.DOOR_EDGE)!, 0, f0);
   const edge = renderer.buffer.pixels.filter((p) => p !== UNDRAWN).length;
   check(edge > 0, `under See-Thru-Walls F0 DoorEdge still draws its frame (${edge} pixels)`);
   ctx.seeThroughWalls = false;

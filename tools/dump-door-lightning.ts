@@ -16,9 +16,8 @@
  * viewport-only stream for `DrawViewport` so rendering can't perturb monster AI or
  * combat — when the resolved `DoorTOC` entry has bit 0x400 set.
  *
- * This confirms the real dungeon data has the bit, then drives `opStdDrawDoor`
- * directly (bypassing only rectangle-pointer resolution, which is proven elsewhere)
- * across many redraws of the same closed door and checks the drawn bitmap doesn't
+ * This confirms the real dungeon data has the bit, then runs `StdDrawDoor` (bypassing
+ * only rectangle-pointer resolution, which is proven elsewhere) across many redraws of the same closed door and checks the drawn bitmap doesn't
  * sit at a single, frozen identity.
  *
  * Run: `npx tsx tools/dump-door-lightning.ts`
@@ -27,6 +26,7 @@ import { readFileSync } from 'node:fs';
 
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
+import { Opcode } from '../src/renderer/bytecode/Opcodes';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf } from './lib/game';
@@ -63,8 +63,14 @@ const fakeRect = { x1: 100, x2: 107, y1: 50, y2: 57 };
 interp.resolveStdRectanglePointer = () => [fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect];
 
 function drawClosedDoorOnce(): string {
-  interp.stack = [0 /* doorRecordIndex */, 4 /* doorState: closed */, 0 /* doorGraphicIndex */, 0 /* rectPtr, ignored */];
-  interp.opStdDrawDoor();
+  interp.interpret([
+    Opcode.Literal, 0, // doorRecordIndex
+    Opcode.Literal, 4, // doorState: closed
+    Opcode.Literal, 0, // doorGraphicIndex
+    Opcode.Literal, 0, // rectPtr, ignored
+    Opcode.StdDrawDoor,
+    Opcode.Return,
+  ], 0, 0);
   return Buffer.from(viewportIndexBuffer.pixels).toString('hex');
 }
 
