@@ -46,7 +46,8 @@ Corollaries:
 | `doc/SAVES.md` | The port's own save design: the store, the playthrough, the dialog, F5 and F9. |
 | `doc/CSBWIN_SYMBOL_INDEX.tsv` | Every CSBWin symbol → `File.cpp:line`. Grep this before grepping the tree. |
 | `NOTES.md` | The author's personal scratchpad. **Do not edit.** Flag problems instead. |
-| `doc/CSBwin-src/` | The C++ reference (gitignored, not ours). |
+| `doc/CSBwin-src/` | The C++ reference (gitignored, not ours): `CSBwin_SRC_20160923`, Version 15.9. |
+| `doc/CSBwin-src-20230608/` | CSBWin's last source, the reference once `DEBT.md` C151-C157 are paid (gitignored). |
 
 **Documentation contract:** before working on a topic, read its doc. When you verify a new
 fact in the C++ source, write it down with a `doc/CSBwin-src/<File>.cpp:<line>` reference.

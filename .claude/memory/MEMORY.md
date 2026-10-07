@@ -17,4 +17,4 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Past the MVP](past-the-mvp.md) — a 🚫 "not wanted" CSBWin feature in DEBT.md H means "not yet": retire it into the active item
 - [Saves mutually compatible](saves-mutually-compatible.md) — every CSBWin save imports and every export loads in CSBWin; no reader special case for port-only files
 - [Monster groups in tools](monster-groups-in-tools.md) — `csbgame7.dat`'s groups of several are on levels 5 and 7; `loadPartyLevelIfChanged` gives them an ITEM16; `getAttachedItem16` alone lies off the party's level
-- [CSBWin binary newer than source](csbwin-binary-newer-than-source.md) — the author tests CSBWin 20230608, the source tree is ≤2015: a contradiction may be the version; record both and ask
+- [CSBWin binary newer than source](csbwin-binary-newer-than-source.md) — the source tree is CSBwin_SRC_20160923 (15.9 ≈ 15.8); the author plays 20230608, whose source is on the site: diff before calling it a contradiction

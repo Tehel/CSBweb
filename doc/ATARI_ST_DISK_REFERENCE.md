@@ -16,7 +16,7 @@ is marked as such.
 
 ## The disk and the files taken from it
 
-`static/gamefiles/DungeonMaster1v2E.stx` (md5 `279e322b837e98ea258f0b16a736f9ca`, untracked)
+`archive/DungeonMaster1v2E.stx` (md5 `279e322b837e98ea258f0b16a736f9ca`, gitignored)
 is a Pasti image: 80 tracks, single-sided, 10 sectors of 512 bytes a track (plus two
 more track records Pasti keeps). Track 0 carries the copy protection: sector 7 is stored
 with fuzzy bits and a CRC error (FDC flags `0x88`), and an extra sector numbered 247
@@ -287,8 +287,8 @@ and three rocks (weapons #104, #105, #106, map 1).
 
 ## The French 1.3 disk
 
-`static/gamefiles/DungeonMaster1v3Fr.stx` (md5 `933955a6a596081b4bc62655efeafde5`,
-untracked) has the 1.2 disk's geometry, copy protection, boot sector and six files.
+`archive/DungeonMaster1v3Fr.stx` (md5 `933955a6a596081b4bc62655efeafde5`,
+gitignored) has the 1.2 disk's geometry, copy protection, boot sector and six files.
 `SWOOSH.IMG` and `START.PRG` are byte-identical to 1.2's; `BOOTER` (`e9db80a6…`), `START.PAK`
 (95208 bytes, `6131be44…`), `GRAPHICS.DAT` and `DUNGEON.DAT` are not. The two data files are
 in `static/gamefiles/dm-atari-1.3-fr/`, and both load:

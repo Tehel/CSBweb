@@ -95,6 +95,13 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | Phase 17 | Deployment: the Docker image, the data sets' manifest, the statistics | L | in `PLAN.md` |
+| C151 | A click is matched to its button when it is queued, not when it is taken | M | ⏳ |
+| C152 | A wall text seen from afar shows its plaque at full height | M | ⏳ |
+| C153 | `&PARAM@` reads variable 0 for each missing parameter | S | ⏳ |
+| C154 | The attacker's hand may keep its cyan border after a PASS or a zero-delay attack | S | ⏳ |
+| C155 | The Extended Features block's bits 0x100, 0x200 and 0x400 | S | ⏳ |
+| C156 | A champion's bones read "NAMEBONES"; CSBWin 20230608 puts a space between | S | ⏳ |
+| C157 | CSBWin 20230608 becomes the reference | L | ⏳ |
 | G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
@@ -112,7 +119,8 @@ In payoff order: the first row is the next item.
 | X8 | Extra: RISE's own dialog, and the utility disk's portraits on DM's champions | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G29 are the active list. `F3` and `Phase 17` are phases, whose status is
+The rows above G29 are the active list. C151-C157 are CSBWin's changes from 2016 to 2023
+(see "CSBWin's changes from 2016 to 2023" in tier C), taken right after Phase 17. `F3` and `Phase 17` are phases, whose status is
 `PLAN.md`'s: deployment is not debt, and its row only marks its place. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
@@ -122,7 +130,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C151 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C158 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -216,8 +224,156 @@ graphic jitter. Four actuators select DSA 125: level 29 (15,16), and level 39 (3
 With the overlay up and `xOverlayJitter` other than 0, `UpdateViewportArea` stops in
 `NotImplemented`, the game's end (`doc/CSBwin-src/WinScreen.cpp:1121-1196`), and so does
 the port (`UpdateViewportArea`, `src/renderer/csbwin/OverlayScreen.ts`); `yOverlayJitter`
-is read nowhere. Paying it: the author plays those squares in CSBWin 20230608, and if the
-game goes on there, ports what that binary draws.
+is read nowhere. The 20230608 source is the same at both places (`UpdateViewportArea` and
+`&JITTER`, `doc/CSBwin-src-20230608/WinScreen.cpp`, `DSA.cpp`), so that build stops too
+unless it was not built from its own source. Paying it: the author plays those squares in
+CSBWin 20230608, and if the game goes on there, ports what that binary draws.
+
+### CSBWin's changes from 2016 to 2023
+
+C151-C156 are changes Paul Stevens made after the source the port follows and before the
+build the author plays. `doc/CSBwin-src/` is `CSBwin_SRC_20160923.zip` from
+dianneandpaul.net/CSBwin/, "Version 15.9" (`CSBwin.rc:322`), with the author's cosmetic
+edits in `CSBCode.cpp`, `RC4.cpp`, `SaveGame.cpp` and `Data.h`. 15.9 is a side branch of
+`CSBwin_SRC_20160325` (15.8) whose only change is accessors for a monster's `word20`, so it
+behaves as 15.8. `doc/CSBwin-src-20230608/` is `CSBwin_SRC_20230608.7z`, the main line's
+last source (gitignored like the other, CRLF turned to LF, nothing else changed).
+
+They are taken once Phase 17 is done, then C157. A port of one cites the 2023 file and line,
+and needs no H entry, since C157 makes that source the reference.
+
+The rest of the 2016-2023 diff changes nothing the port has: the 64-bit port (`uintptr_t`,
+and typed structs in `Chaos.cpp` and `Hint.cpp`, whose allocator fixes are in code the port
+never had), `TranslateLanguage` hooks (G21), the playfile (G29), and the Linux and
+Raspberry Pi front-ends. Two changes are not taken:
+
+- "CAN'T REACH" and "NEED AMMO" are centred on x 272 with five-pixel characters
+  (`TextOutToScreen_Centered`, `Attack.cpp:972-980`, `CSBCode.cpp:1785`), which puts them
+  2 and 3 pixels right of the original's 242 and 248. It serves translations.
+- The utility's word-10 save form, whose adventure write is left `NotImplemented` (G28).
+
+### C151 ⏳ A click is matched to its button when it is queued, not when it is taken
+
+The port finds a click's button as it queues it (`MouseQueue.enqueueClick`,
+`src/engine/MouseQueue.ts`), as `OnMouseClick` does in `doc/CSBwin-src/CSBCode.cpp:7607`.
+If the button lists change between the click and its turn, it is taken as a button of the
+old screen. CSBWin 20230608 defines `POST_TRANSLATE_CLICK` (`CSB.h:1716`, its comment at
+`:1735-1779`). A click is queued as `UNTRANSLATED_CLICK` (0xfffe) with its point and mouse
+buttons (`OnMouseClick`, `CSBCode.cpp:7670`). `_HandleMouseEvents` translates the head
+of the queue when it takes it, and drops a click that hits no button and looks at the next
+(`TranslateMouseClick`, `Mouse.cpp:1374`; the loop at `:1510`). Reincarnate mode (`0xade`)
+and the scroll area (`0xd8`) move into that translation. Keys, the button-up and the
+gravity moves are queued already translated (`TAG0196da`, `CSBCode.cpp:8516`;
+`OnMouseUnClick`, `:7640`; `GravityMove`, `Mouse.cpp:1260`). The same commit moves
+`d.MouseInterlock = 0` out of the queued branch (`:7775-7780`); the port has no interlock.
+
+Paying it: the entry carries the point and the mouse buttons, the queue keeps a click that
+hit nothing, and `Game.handleMouseEvents` translates on taking. A tool queues a click,
+changes the screen's buttons, and checks the button taken. Size M.
+
+### C152 ⏳ A wall text seen from afar shows its plaque at full height
+
+`DrawWallDecoration` draws a text away from the square in front of the party as a
+decoration. For a text of one to three lines, the original sets the plaque's bottom from
+`Byte4212[3 * WallDecorationDerivedGraphicOffset[relativePosition] + numLine - 1]`.
+`doc/CSBwin-src/CSBCode.cpp:3564-3600` copies 8 bytes from the text's end into `LOCAL_22`,
+sets that `y2`, and blits with `pWDP` (`:3676-3678`), so the bottom is never used. CSBWin
+20230608 copies the rectangle first (`MemMove(pWDP, &LOCAL_22.b, 4)`, `CSBCode.cpp:3625`),
+sets its `y2` (`:3649-3660`), and blits with it (`:3743`). The port follows 2016:
+`DrawWallDecoration(draw, numWallDecoration + 1, relativePosition)`
+(`src/renderer/bytecode/DrawDecorations.ts`).
+
+Paying it: extract `Byte4212[16]` from graphic `0x22e` next to `Byte4196`
+(`ABS_WALL_TEXT_LINE_Y2`, `src/data/tables/ObjectTables.ts`), proved with a canary
+(`.claude/skills/verification-tools/`), and `WallDecorationDerivedGraphicOffset[12]` if the
+port has no copy yet. Then count the lines and pass the adjusted rectangle. A golden frame
+of a short text seen from two squares away. Size M.
+
+### C153 ⏳ `&PARAM@` reads variable 0 for each missing parameter
+
+For each parameter past the count, `doc/CSBwin-src/DSA.cpp:2977` reads `Var(0)`, and so
+does the port (`StkOp.PARAM_FETCH`, `src/engine/DsaSystem.ts`). A read of a variable that
+is not well defined calls `NoValue` on it (`DSA.cpp:142`). CSBWin 20230608 reads `Var(j)`
+(`DSA.cpp:2978`), the parameter's number. The variable marked `NonParameter` is `i + j`,
+so even the new read may not be the one meant. Follow 2023 and note `i + j` in the
+comment. A `tools/` check of a short `&PARAM@` against an undefined variable `j`. Size S.
+
+### C154 ⏳ The attacker's hand may keep its cyan border after a PASS or a zero-delay attack
+
+`TAG01b1c0` redraws the attacker with `AttackingCharacterOrdinal` still set
+(`doc/CSBwin-src/Character.cpp:4886-4897`), and the hand is drawn with the cyan border
+when `chIdx + 1 == AttackingCharacterOrdinal`. CSBWin 20230608 decrements the ordinal first,
+so the redraw goes without it (`Character.cpp:4904-4923`; the reason in its comment). The
+port's `closeAttackMenu` draws nothing and lets the next draw do it
+(`src/renderer/ui/Attack.ts`), so it may not show the border at all. Paying it: check in
+play or with `probe-ui`. If the border stays, port 2023's order; if not, delete this
+entry. Size S.
+
+### C155 ⏳ The Extended Features block's bits 0x100, 0x200 and 0x400
+
+CSBWin 20230608 has three more `EXTENDEDFLAGS`: `SupressDSAWarning` 0x100,
+`GravityGame` 0x200 and `ThreeDMovements` 0x400 (`CSB.h:501-503`). `ReadExtendedFeatures`
+sets `SupressDSAWarningOption`, `bGravityGame` and `bThreeDMovements` from them
+(`SaveGame.cpp:415-430`). The first stops the "Excessive DSA operations" warning
+(`DSA.cpp:5472`); the port has no warning. The other two turn on X5's moves, which 2016
+can never turn on. `EF_EXTENDED_FLAGS` has none of them
+(`src/data/CsbwinExtendedFeatures.ts`), so a dungeon that sets them loses them.
+
+The save writer sets none of the three (`SaveGame.cpp:962-1000`), and the utility writes
+only `SupressDSAWarning` (`Chaos.cpp:2168-2171`). A 3D2D1D game saved in CSBWin therefore
+reloads with neither the vertical moves nor gravity, and cannot be finished. The port
+writes all three back as read. CSBWin's writer costs the player the dungeon's rules, which
+makes it "obviously wrong": an H entry with both readings, and a check that a save keeps
+them. 3D2D1D is the only dungeon here that sets the bits.
+
+The flags are not the whole of gravity's state, and CSBWin saves none of the rest:
+`moveHistory[4]`, `gravityMove` and `nextGravityMoveTime` (`data.cpp:245-247`, X5's
+step 2). Two consequences, both CSBWin's own:
+
+- **No save during a slide.** While `gravityMove` is set, `_HandleMouseEvents` empties the
+  queue each pass (`Mouse.cpp:1482-1491`), so the disk icon's click is lost and CSBWin
+  saves only at rest. The port's F5 does not go through the queue (`GameInput`,
+  `src/renderer/GameInput.ts`), so it must refuse during a slide: "CANNOT SAVE NOW", as
+  for a script holding the loop (`doc/SAVES.md` → "The two keys"). The Sleepsave comes from
+  a click, so the queue drops it as it drops the disk icon's.
+- **The axis history is lost.** `moveHistory` holds the order of the last three axes
+  moved and the direction last moved along each (`MoveParty`,
+  `CSBCode.cpp:8128-8163`). `GravityMove` tries the axes in that order
+  (`Mouse.cpp:1260-1300`). It is initialised once, `{0,1,2,0}`, and never on a load, so
+  CSBWin starts from its default after a restart, or from the last game's history after
+  a load. The first slide after a load may take another way than it would have. Three
+  moves of the player's, one along each axis, restore it. The port starts every loaded
+  game from `{0,1,2,0}`, CSBWin's state after a restart. The 3D2D1D route tool (X5)
+  checks that the dungeon is still solvable from a save at each point of the route.
+
+Reading and writing the bits is size S; the moves are X5.
+
+### C156 ⏳ A champion's bones read "NAMEBONES"; CSBWin 20230608 puts a space between
+
+`DrawNameOfHeldObject` and `DescribeObject` glue the dead champion's
+name onto the object's name (`doc/CSBwin-src/Code11f52.cpp:56-57`, `Character.cpp:3570-3571`),
+and so does the port. CSBWin 20230608 builds it with `DescribeChampionBones`, which
+translates `"% " + name` and puts the champion's name for the `%` (`Code11f52.cpp:29`). With
+no translation `TranslateLanguage` returns its text (`Translation.cpp:187`), so that is
+"NAME BONES". The author's decision: take the space, in the hand's name and in the
+inventory's description alike. A `tools/` check prints both for a champion's bones.
+
+### C157 ⏳ CSBWin 20230608 becomes the reference
+
+After C151-C156. Steps:
+
+1. **Swap the trees.** `doc/CSBwin-src-20230608/` replaces `doc/CSBwin-src/`, and
+   `node tools/gen-csbwin-index.mjs` rebuilds `doc/CSBWIN_SYMBOL_INDEX.tsv`.
+2. **Re-cite.** About 3,400 `doc/CSBwin-src/<File>:<line>` citations in 360 files (code
+   comments, `doc/`, tools, this file) point at 2016 lines. Map each line through the diff
+   by script, not by hand. A line whose code changed is checked by eye, and its fact
+   rewritten if 2023 changed it.
+3. **Review every divergence.** Each H entry, each C entry and each `CLAUDE.md` exception
+   is checked against 2023: one that 2023 fixed is no longer a divergence. The
+   `memmove-source-first` memory and `CLAUDE.md` → "The one non-negotiable rule" name the
+   tree; the `csbwin-binary-newer-than-source` memory is deleted.
+
+Size L.
 
 ---
 
@@ -288,6 +444,10 @@ postponed ones follow, under their own heading (see "Priority").
   (`:1738-1793`), from the globals the read left, with `BigActuators` set whatever the
   file had and no `cellFlagArraySize`. CSB's `mini.dat` has none. `TAG000fc4` throws.
 
+CSBWin 20230608 reads the word-10 form but stops when it writes its adventure: the branch
+is `NotImplemented(0xfc4)` unless `impfc4` is defined, and nothing defines it
+(`doc/CSBwin-src-20230608/Chaos.cpp:2103-2113`).
+
 Paying it needs a file of each form, or the author's decision to port them unchecked.
 
 ### Postponed until the default dungeon is validated
@@ -297,16 +457,44 @@ Not taken in order; the author names one to start it (see "Priority").
 ### G21 ⏸️ `Translation.txt`: the messages the executable prints, translated
 
 The messages the executable prints are string literals in CSBWin: " MUMBLES A MEANINGLESS
-SPELL.", " RESURRECTED", "READY TO SAVE GAME" and so on. `ReadTranslationFile` reads
-pairs of quoted strings, English then translation, from the game directory's
-`Translation.txt` (`doc/CSBwin-src/Translation.cpp:14-58`, called at `CSBUI.cpp:906`), and
-`TranslateLanguage` swaps a literal for its pair at 24 call sites (`Magic.cpp:1016-1033`,
-`CSBCode.cpp:6806`, `Character.cpp:3249`, `SaveGame.cpp:871-875`, `Graphics.cpp:309`, `:1546`, …).
-Not every message goes through it: " JUST GAINED A " (`Magic.cpp:175`) does not. The port
-prints the English literals. A translated `graphics.dat` and `dungeon.dat` (the French 1.3
-set) therefore play with English messages. Paying it means porting the two functions and
-reading the file from the data set's folder; the French set would still need a
-`Translation.txt`, which no file here provides.
+SPELL.", " RESURRECTED", "HEALTH", the skill titles, the menus. `ReadTranslationFile` reads
+`Translation.txt` from the game directory: one pair of quoted strings a line, English then
+translation, and `//` comment lines (`doc/CSBwin-src/Translation.cpp:14-58`, called at
+`CSBUI.cpp:906`). `TranslateLanguage` swaps a literal for its pair, and returns it unchanged
+when it has none. The port prints the English literals, so the French 1.3 set
+(`dm-atari-1.3-fr`) plays with French objects, scrolls and walls, and English messages.
+
+The 2016 source translates at 24 call sites, and some messages not at all: " JUST GAINED A "
+(`Magic.cpp:175`). CSBWin 20230608 translates at about a hundred. It adds `QuePrintLines`'s
+`translate` argument, the level gain, the menu titles (`Menu.cpp`), the inventory's labels
+and object descriptions, scrolls and floor texts, and wall texts in their 5-bit code
+(`TranslateWallLanguage`, `doc/CSBwin-src-20230608/Translation.cpp`). It also reads the
+file into a table hashed on the first two characters. So the port follows 2023's call
+sites, after C157.
+
+A French file exists: `TranslationFrench.txt` on dianneandpaul.net/CSBwin/ (2018, 201
+lines, UTF-8 with a BOM, no accents since the font has none). It is a player's work in
+progress, not the French Atari program's own strings: its comments mark which lines were
+seen working ("good"), which were never seen, and which do not match the English key
+("no good", with a corrected line below). Its words are its translator's ("PRIEST" is
+"MAGE", "WIZARD" "DRUIDE"), and the author, a native speaker, disagrees with some of them,
+those two first. The author reviews the file before it ships.
+
+The French 1.3 program's own strings are the faithful source where they exist. The disk
+image is `archive/DungeonMaster1v3Fr.stx` (gitignored; `doc/ATARI_ST_DISK_REFERENCE.md`
+→ "The French 1.3 disk"). The program is presumably `START.PAK`, packed and not yet
+examined, whose 1.3 differs from 1.2's, so it must be unpacked before its strings can be
+read. It holds only what the 1988 program printed: the CSBWin-only messages (the save
+dialog's file menus, DSA texts, the utility, the Hint Oracle) have no French original and
+come from the file above or from the author. Some French words are not strings at all,
+but pictures in `graphics.dat` already drawn in French (RESSUSCITER / RÉINCARNER /
+ANNULER, NOURRITURE, EAU).
+
+Paying it: port `ReadTranslationFile` and `TranslateLanguage`, read the file from the data
+set's folder (a manifest field, as `hintOracle` is), and put `TranslateLanguage` at 2023's
+call sites. Then a `Translation.txt` for `dm-atari-1.3-fr`: the program's strings first,
+the file above for the rest, reviewed by the author. And a golden frame of a translated
+message.
 
 ### G22 ⏸️ An unknown dungeon played from its save
 
@@ -444,11 +632,10 @@ cannot be played as designed. It needs two features that `doc/CSBwin-src/` conta
 hardwires off: `ThreeDMovements` and `GravityGame` are `false` and never assigned
 (`doc/CSBwin-src/data.cpp:239-240`).
 
-The 2019 `CSBwin.exe` shipped with the dungeon sets them from `efb.extendedFlags` bits
-`0x400` and `0x200`, bits our `EXTENDEDFLAGS` enum does not have. That is known only from
-the exe's disassembly, so porting it means citing the exe for those two bits. It becomes
-a new exception to "CSBWin source wins", to be recorded under H when this is paid.
-Everything else is in our source.
+CSBWin 20230608 sets them from `efb.extendedFlags` bits `0x400` and `0x200`
+(`doc/CSBwin-src-20230608/SaveGame.cpp:427-430`), as the 2019 `CSBwin.exe` shipped with
+the dungeon does. C155 reads those bits, so this builds on it, and no exception to
+"CSBWin source wins" is needed. Everything else is in our source.
 
 The gate is the dungeon, not a setting. This is the one departure from the X rules above:
 no other dungeon here sets either bit, so DM and CSB are unchanged, and the keys cannot
@@ -456,8 +643,7 @@ be used to cheat there.
 
 Two steps:
 
-1. **Vertical moves** (M). Read the two bits into the rules, next to
-   `readRulesOptions` (`src/data/CsbwinExtendedFeatures.ts`). Bind the PC keys `-` and
+1. **Vertical moves** (M). With the two bits read (C155), bind the PC keys `-` and
    `=` (`KeyboardEvent.code` `Minus` and `Equal`, scancodes `0x0c`/`0x0d` in
    `config.txt`) to keyscans `0x4900`/`0x4a00`. Queue them as buttons
    `0x1124`/`0x1125` when `ThreeDMovements` is set (`TAG0196da`,
@@ -468,7 +654,8 @@ Two steps:
 2. **Gravity** (M). `moveHistory`, `gravityMove` and `nextGravityMoveTime`, updated in
    `MoveParty` (`CSBCode.cpp:8041-8083`). `GravityMove` (`Mouse.cpp:1258-1342`) and its
    hook at the head of `_HandleMouseEvents` (`:1381-1390`), which empties the queue while
-   gravity runs. CSBWin does not save the three variables, so neither does the port.
+   gravity runs. CSBWin does not save the three variables, so neither does the port: what
+   that costs, and F5's refusal during a slide, are in C155.
 
 A `watch-*.ts` proves each step on the real 3D2D1D files: up and down through map 1's
 fake pits, a refused move into stone with its damage, and a gravity slide ending where
