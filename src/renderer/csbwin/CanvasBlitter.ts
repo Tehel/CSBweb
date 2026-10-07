@@ -398,33 +398,13 @@ function groupPixel(bitmap: IndexedBitmap, group: number, i: number): number {
 }
 
 /**
- * How the canvas shows an Atari intensity, 0 to 7, outside the overlay's path
- * (`OverlayScreen.ts`), which is RGB555 widened as Windows shows it:
- *
- * - `x36`: the intensity times 36, the port's own, and the golden frames';
- * - `rgb555`: CSBWin's straight palette, the intensity as five bits `(i << 2) | (i >> 1)`
- *   (`CreateOverlayTable`, `doc/CSBwin-src/Graphics.cpp:3069-3090`), widened the same way,
- *   so that the viewport through the overlay and the screen around it are one picture.
- *
- * A dev setting (`UISettings.rgb555`) chooses, until the author settles on one (`DEBT.md` G25).
+ * The canvas's 8-bit channel for each Atari intensity, 0 to 7: the intensity times 36.
+ * CSBWin's straight palette is RGB555, each intensity five bits `(i << 2) | (i >> 1)`
+ * (`CreateOverlayTable`, `doc/CSBwin-src/Graphics.cpp:3069-3090`), which Windows widens to
+ * eight; only the viewport through the overlay is shown so (`OverlayScreen.ts`). A
+ * deliberate divergence (`DEBT.md` H).
  */
-export type CanvasColours = 'x36' | 'rgb555';
-
-/** The canvas's 8-bit channel for each Atari intensity. */
-const atariIntensity = new Uint8Array(8);
-
-export function setCanvasColours(colours: CanvasColours): void {
-  for (let i = 0; i < 8; i++) {
-    const v = (i << 2) | (i >> 1);
-    atariIntensity[i] = colours === 'rgb555' ? (v << 3) | (v >> 2) : i * 36;
-  }
-}
-
-/** The colours the canvas is shown in now. */
-export function canvasColours(): CanvasColours {
-  return atariIntensity[7] === 7 * 36 ? 'x36' : 'rgb555';
-}
-setCanvasColours('x36');
+const atariIntensity = Uint8Array.from({ length: 8 }, (_, i) => i * 36);
 
 export function updateImageDataFromIndex(
   imageData: ImageData,

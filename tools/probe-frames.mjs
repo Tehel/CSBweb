@@ -352,16 +352,11 @@ console.log('state: F2 front-right wall'); const edgeRight = await shot('14-edge
 // control as a DSA's `&OVERLAY` and `&JITTER` would put it up: `dm-atari`'s overlay 1 over
 // the same view, half of each pixel the overlay's, its colour 0 transparent, and the view
 // shifted four pixels right under it. Hidden and shifted back after, the view is frame 14.
-// The RGB555 colours move every pixel of the screen, and back.
 const setInputs = (values) => evaluate(`(()=>{for (const [id, v] of Object.entries(${JSON.stringify(values)}))
   document.getElementById(id).value = String(v); return 1;})()`);
 await setInputs({ 'overlay-number': 1, 'overlay-p1': 1, 'overlay-p2': 50, 'overlay-p3': 0, 'overlay-p4': 0, 'overlay-jitter-x': 4, 'overlay-jitter-y': 0 });
 await click('#btn-overlay-show'); await click('#btn-overlay-jitter'); await wait(500);
-console.log('state: overlay');           const overlaid = await shot('17-overlay');
-await click('#btn-rgb555'); await wait(300);
-const rgb555 = await canvasPixels();
-await click('#btn-rgb555'); await wait(300);
-check(rgb555 !== overlaid && (await canvasPixels()) === overlaid, 'the RGB555 button changes the colours, and gives them back');
+console.log('state: overlay');           await shot('17-overlay');
 await setInputs({ 'overlay-jitter-x': 0 });
 await click('#btn-overlay-hide'); await click('#btn-overlay-jitter'); await wait(500);
 check((await canvasPixels()) === edgeRight, 'the overlay hidden and the view shifted back, it is frame 14 again');

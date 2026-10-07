@@ -8,7 +8,7 @@
  *
  * CSBWin hands Windows RGB555 pixels, which the port widens to eight bits a channel as
  * `(v << 3) | (v >> 2)`. The rest of the screen is the straight path's
- * (`updateImageDataFromIndex`), in the colours `setCanvasColours` chose.
+ * (`updateImageDataFromIndex`), each intensity times 36 (`DEBT.md` H).
  */
 import type { Overlay } from '../../engine/Overlay';
 import { OVERLAY_HEIGHT, OVERLAY_WIDTH } from '../../engine/Overlay';

@@ -177,6 +177,7 @@ never carried out, because the project has **no test framework**.
 5. ⏸️ Compare against CSBWin screenshots for a few known scenes (Phase 7's skipped
    validation). Postponed, perhaps for good: staging the same scene in CSBWin without
    cheats costs more than it would prove, and the golden frames and the render probe
-   already catch any pixel that changes unintentionally.
+   already catch any pixel that changes unintentionally. When it is taken, the canvas's
+   colours go with it: an Atari intensity times 36, not CSBWin's RGB555 (`DEBT.md` H).
 
 Status: 🔄 in progress — steps 1, 2 and 3 done, 4 part-done; 5 postponed.

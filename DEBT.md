@@ -22,10 +22,9 @@ code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, and the work it
-needs is in the active list: G1, G27 and G26, and G25 once the author has chosen its
-colours. Its `dungeon.dat` is enciphered, and reads whole (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is
-`RC4.cpp`'s own cipher"). Each entry says what Conflux uses of it, measured on the
-deciphered file.
+needs is in the active list: G1, G27 and G26. Its `dungeon.dat` is enciphered, and reads
+whole (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is `RC4.cpp`'s own cipher").
+Each entry says what Conflux uses of it, measured on the deciphered file.
 DSA support is aimed at whole, not at Conflux's share of it: G1 is every operation CSBWin
 has, so G27 is on the path though Conflux's programs never call `&GETSKIN`.
 
@@ -102,7 +101,6 @@ In payoff order: the first row is the next item.
 | F13 | `npm test` runs its tools one at a time | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G29 | Recording a game and playing it back | — | ⏸️ |
-| G25 | Viewport overlays and overlay palettes: RGB555 or ×36 | S | ⏸️ waits on the author |
 | C145 | The Hint Oracle's title boxes keep colour 12 on their last line and a half | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
@@ -353,58 +351,6 @@ The rest of the item, with an operation that needs care when ported:
   file uses, which a read takes back (`DSAINDEX::ReadTracing`, `DSA.cpp:5553-5576`). The
   port writes none: the trace is one of CSBWin's debugging features, postponed (see
   "Priority").
-
-### G25 ⏸️ Viewport overlays and overlay palettes: RGB555 or ×36
-
-A DSA lays an image over the viewport with `&OVERLAY` (`SelectOverlay`,
-`doc/CSBwin-src/Bitmaps.cpp:687-720`, read by `OVERLAYDATA::ReadOverlay`, `:572-630`),
-tints the view with `&PALETTE` (`SetOverlayPalette`, `:651-685`), and shifts it with
-`&JITTER` (`DSA.cpp:4903-4930`). The overlay is a `CGT_ViewportOverlay` section of
-`CSBgraphics.dat`, a 224x136 8-bit Windows bitmap, and the palette a `CGT_OverlayPalette`
-one, 512 RGB555 words. The overlay ends by itself at `m_p3`, checked after every
-`d.Time++` (`CSBCode.cpp:675`, `Attack.cpp:2209`), and travels in the Extended Features
-block (`OverlayActive`, `overlayOrdinal`, `overlayP1`-`P4`, `SaveGame.cpp:968-976`, read
-back at `:421-430`); the overlay palette travels in `EXPOOL`, as 24 records, which the
-port already saves and reads (`src/engine/OverlayPalette.ts`). Conflux's
-`CSBgraphics.dat` holds 112 overlays, every one 224x136 with 256 colours, and 51
-palettes; its DSAs call `&OVERLAY` 25 times, `&PALETTE` 5 times and `&JITTER` 7 times.
-
-The screen side: in `VM_ADVENTURE` only, `display` sends the viewport's 224x136
-(`WinScreen.cpp:1515-1527`) through `OVERLAYDATA::CreateOverlayTable`
-(`Graphics.cpp:2978-3090`), whose table, indexed by overlay byte and Atari colour, gives a
-16-bit RGB555 pixel: the colour through the overlay palette, blended with the overlay's
-by `m_p2`, colour `m_p4` transparent when `m_p1 & 1`. `UpdateScreenArea` places it with
-the jitter (`WinScreen.cpp:1064-1300`, 3 of 13 cases implemented). With the overlay palette
-the identity and no overlay active, the 16-colour branch gives exactly CSBWin's straight
-colours, which the port's present path already stands for.
-
-What is built: the engine (`src/engine/Overlay.ts`, `GameContext.overlay`), the three DSA
-operations, the end in `advanceTime` and the overlay in the Extended Features block,
-checked by `tools/dump-dsa-overlay.ts` on Conflux's file; and the screen
-(`src/renderer/csbwin/OverlayScreen.ts`, `GameScreen.drawViewportThroughOverlay`), checked
-by `tools/dump-overlay-screen.ts` and golden frame 17, which a dev control beside the
-canvas puts up (`src/ui/overlayControl.ts`): any overlay, overlay palette or graphic jitter
-of the data set's `CSBgraphics.dat` (`dm-atari`'s holds 113 overlays and 51 palettes), with
-`SelectOverlay`'s and `SetOverlayPalette`'s parameters
-(`doc/PROVEN_FACTS.md` → "The viewport through an overlay is an RGB555 table").
-
-What is left is the author's choice of colours. CSBWin's pixel is RGB555, which Windows
-widens to 8 bits, `(v << 3) | (v >> 2)`; the port's straight colours are an Atari
-intensity ×36 (`src/renderer/csbwin/CanvasBlitter.ts`), which is neither. The viewport
-through the overlay is always RGB555 widened. The dev setting **RGB555** beside the canvas
-(`UISettings.rgb555`, kept in `localStorage`) switches the rest of the screen:
-
-- **(a) ×36**, the default: the golden frames stay. Under an overlay, a tint or a jitter,
-  the viewport's colours and the panels' differ by up to 6 a channel for the same Atari
-  colour (intensities 0-7: 0 36 72 108 144 180 216 252 against 0 33 74 107 148 181 222 255).
-- **(b) RGB555**: CSBWin's straight palette, five bits `(i << 2) | (i >> 1)` widened, on
-  every screen, the title's and the entrance's too, so the viewport and the panels are one
-  picture. Every golden frame moves, by up to 6 a channel, once.
-
-Either way the setting goes, with `setCanvasColours`'s other branch and the RGB555 button;
-for (b), the golden frames are taken again in the same commit, and `atariToRGB`
-(`src/core/types.ts`) follows. The dev control stays, as the only way to see an overlay
-until Conflux is a data set (G26).
 
 ### G27 ⏳ Skins: a cell's own wall, floor and ceiling graphics
 
@@ -713,6 +659,18 @@ Two steps, one commit each:
 
 Recorded so that nobody "fixes" them.
 
+- 🚫 **The canvas shows an Atari intensity times 36, not RGB555.** CSBWin hands Windows
+  RGB555 pixels, its straight palette each intensity `i` as five bits `(i << 2) | (i >> 1)`
+  (`CreateOverlayTable`, `doc/CSBwin-src/Graphics.cpp:3069-3090`), which Windows widens to
+  8 bits as `(v << 3) | (v >> 2)`: intensities 0-7 show as 0 33 74 107 148 181 222 255.
+  The port's canvas shows them as `i * 36`, 0 36 72 108 144 180 216 252
+  (`atariIntensity`, `src/renderer/csbwin/CanvasBlitter.ts`, and `atariToRGB`,
+  `src/core/types.ts`), up to 6 a channel apart, and the golden frames are taken so. Only
+  the viewport through an overlay, a tint or a jitter is CSBWin's RGB555 widened
+  (`src/renderer/csbwin/OverlayScreen.ts`), so while one is up the viewport and the panels
+  show the same Atari colour up to 6 a channel apart. `tools/dump-overlay-screen.ts` prints
+  both. To revisit when frames are compared with CSBWin's (`PLAN.md` → Phase 15, step 5):
+  RGB555 on every screen would move every golden frame once.
 - 🚫 **An object in hand keeps its colours over the dungeon view** (X4). CSBWin draws the
   cursor rows from screen row 29 down as the object's colour-4 silhouette while the view
   is shown (`doc/PROVEN_FACTS.md` → "An object in hand is a colour-4 silhouette over the
