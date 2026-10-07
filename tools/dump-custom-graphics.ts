@@ -1,5 +1,5 @@
 /**
- * What a skin's program draws of its own graphics (`DEBT.md` G27, step 4):
+ * What a skin's program draws of its own graphics:
  * `DrawCustomGraphic` through `ApplyBackground` and `ApplyBackground3`, and
  * `DrawCustomDecoration` through `ApplyDecoration` (`doc/CSBwin-src/Viewport.cpp:3063-3082`,
  * `:3102-3115`, `:6124-6541`; `src/renderer/bytecode/ApplyBackground.ts`).

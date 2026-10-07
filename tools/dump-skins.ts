@@ -1,5 +1,5 @@
 /**
- * Skins (`DEBT.md` G27, step 1): `SKIN_CACHE` (`doc/CSBwin-src/data.cpp:2058-2171`,
+ * Skins: `SKIN_CACHE` (`doc/CSBwin-src/data.cpp:2058-2171`,
  * `src/engine/SkinCache.ts`) and the DSA operations on it, `&GETSKIN` and `&SETSKIN`
  * (`doc/CSBwin-src/DSA.cpp:3107-3135`).
  *

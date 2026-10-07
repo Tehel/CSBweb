@@ -1,5 +1,5 @@
 /**
- * A skin's program run (`DEBT.md` G27, step 3): `DrawViewport` runs a skinned cell's own
+ * A skin's program run: `DrawViewport` runs a skinned cell's own
  * program from `CSBgraphics.dat`, on CSBWin's two stacks, through subroutine calls
  * (`doc/CSBwin-src/Viewport.cpp:6765-6818`, `:2215-2247`, `:2473-2474`, `:3017-3021`, `:3292-3301`).
  *
@@ -18,7 +18,9 @@
  *    finds for each of the 168 cells and room types draws the objects of its own cell:
  *    every `…Contents` opcode it reaches before its `Return` names that cell. The canary
  *    for `pCode[pCode[0] + 8 * cell + graphicRoomType]`: a table read by type then cell,
- *    or off by a word, sends a cell to another cell's code.
+ *    or off by a word, sends a cell to another cell's code. The code before the tables
+ *    holds 33 of the skin opcodes (60302 to 60362): the three virtual graphics, and not
+ *    `DrawCustomDecoration`, `WallDecorationID` or `FloorDecorationID`.
  * 4. **Views**, in Conflux 3.5 and The Towers of Chaos 3.3: from every square of the
  *    party's starting level, in each facing (every level with `--all`, minutes), the
  *    cells `DrawViewport` runs a skin's program for are exactly those whose skin, the
@@ -28,8 +30,8 @@
  *    flag on some paths they never pop, which CSBWin's ring absorbs as the port's does.
  *    What the programs ask to draw, through `DrawCustomGraphic` and the three virtual
  *    graphics, is counted from CSBWin's graphic trace, and the starting view's is
- *    printed. `tools/dump-custom-graphics.ts` checks what `DrawCustomGraphic` draws; the
- *    virtual graphics only pop their arguments until step 5.
+ *    printed. `tools/dump-custom-graphics.ts` checks what `DrawCustomGraphic` draws, and
+ *    `tools/dump-virtual-graphics.ts` what the virtual graphics make.
  *
  * Run: `npx tsx tools/dump-skin-programs.ts [--all]`.
  */
@@ -208,6 +210,7 @@ function words(section: Uint8Array): number[] {
 
 function cellTables(): void {
   console.log('3. The cell tables');
+  const skinOpcodes = new Set<number>();
   for (const set of SETS) {
     const csb = csbGraphics(set.dir);
     const lib = new BackgroundLib(csb);
@@ -220,6 +223,11 @@ function cellTables(): void {
     let own = true;
     for (const id of [...ids].sort((a, b) => a - b)) {
       const code = words(csb.readSection(CSBGraphicType.Backgrounds, id, 0)!);
+      for (let p = 1; p < code[0]!; p++) {
+        const op = code[p]!;
+        if (op === O.Literal || op === O.Jump || op === O.JumpZ || op === O.JumpNZ) p++;
+        else if (op >= 60302 && op <= 60362) skinOpcodes.add(op);
+      }
       for (let c = 0; c < 21; c++) {
         for (let type = 0; type < 8; type++) {
           for (let p = skinProgramStart(code, c, type); p < code.length && code[p] !== O.Return; p++) {
@@ -239,6 +247,11 @@ function cellTables(): void {
     check(own && contents > 0,
       `${set.name}: programs ${[...ids].sort((a, b) => a - b).join(', ')}, each cell's code draws its own cell's objects (${contents} Contents opcodes)`);
   }
+  const has = (op: number): boolean => skinOpcodes.has(op);
+  console.log(`  the skin opcodes (60302 to 60362) the programs' code holds: ${skinOpcodes.size}`);
+  check(skinOpcodes.size === 33 && has(O.CreateVirtualBitmap) && has(O.CreateVirtualMask) && has(O.CreateVirtualAffineMask)
+    && !has(O.DrawCustomDecoration) && !has(O.WallDecorationID) && !has(O.FloorDecorationID),
+    'the programs use 33 skin opcodes, the three virtual graphics among them, and not DrawCustomDecoration, WallDecorationID or FloorDecorationID');
 }
 
 function views(): void {

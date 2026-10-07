@@ -17,7 +17,8 @@ Complete reference for how CSBWin (the C++ Dungeon Master port) implements graph
 12. [CSBgraphics Container Format](#csbgraphics-container-format)
 13. [Backgrounds and Skins](#backgrounds-and-skins)
 14. [Bytecode Interpreter Details](#bytecode-interpreter-details)
-15. [Affine Transforms and Masks](#affine-transforms-and-masks)
+15. [Virtual graphics](#virtual-graphics)
+16. [Skins in the data sets](#skins-in-the-data-sets)
 
 ---
 
@@ -782,13 +783,31 @@ rectpos.w.x2 = 270;  // Right edge of viewport on screen
 
 ---
 
-## Affine Transforms and Masks
+## Virtual graphics
 
 **Location**: `Viewport.cpp`
 
-- `AffineTransform4` maps destination pixels using `srcX = Cxx*col + Cxy*row + Cxc + 16` and `srcY = Cyx*col + Cyy*row + Cyc + 16`, then wraps via modulo `32 * srcWidth/srcHeight` before reading `GetPixel4` and writing `PutPixel4`.
-- `AffineTransform1` uses the same coefficient math as `AffineTransform4`, but reads/writes 1-bit mask pixels via `GetPixel1`/`PutPixel1`.
-- `CreateVirtualMask` sets `Xform.srcX = Xform.srcY = 0`, `Xform.srcWidth/Height` from the old mask, and `Xform.dstWidth/Height` from the new mask before calling `AffineTransform1`.
+A skin's program makes graphics of its own, which it then draws with as it draws the
+file's: a bitmap transformed from another (`CreateVirtualBitmap`), a mask transformed from
+another (`CreateVirtualMask`), and a transform kept in a mask section for a later
+`CreateVirtualBitmap` (`CreateVirtualAffineMask`). The port is `src/data/CustomBitmap.ts`
+and the creators of `src/data/BackgroundLib.ts`, checked by `tools/dump-virtual-graphics.ts`.
+
+- `AFFINEMASK` is twelve `i32`s: `Cxx`, `Cxy`, `Cxc`, `Cyx`, `Cyy`, `Cyc`, `srcX`, `srcY`, `srcWidth`, `srcHeight`, `dstWidth`, `dstHeight` (`doc/CSBwin-src/CSB.h:341-355`).
+- `AffineTransform4` and `AffineTransform1` read destination pixel (`col`, `row`) from source pixel `srcX + ((Cxx*col + Cxy*row + Cxc + 16) mod 32*srcWidth) / 32`, and likewise in y with `Cyx`, `Cyy`, `Cyc`, `srcY` and `srcHeight`; `mod` is `((a % m) + m) % m`. The coefficients are in 32nds of a pixel, and the `+ 16` rounds to the nearest source pixel: `Cxx` 16 reads pixel `(col + 1) / 2` (`Viewport.cpp:196-216`, `:248-268`).
+- `CUSTOMBITMAP` reads and writes a pixel a byte at a time, in the viewport's byte order: for pixel `x` of its group, the first byte of each plane word for `x & 15` under 8, the second otherwise. A bitmap's planes are four words a group, a mask's one. `GetPixel4` and `GetPixel1` return -1 when the group's first word index is past `m_maxIndex`, which they call the first word not accessible but read when equal; `PutPixel4` of -1 sets all four planes, colour 15 (`:108-194`, `:218-245`, `:270-280`).
+- The opcode `CreateVirtualBitmap` pops `maskNumber`, `maskID`, `virtualGraphicID`, `graphicID`, and does nothing without `GetBitmap(graphicID, 2)` or `GetMask(maskID, maskNumber, 48)`, which it reads as an `AFFINEMASK` (`:3083-3101`). `BACKGROUND_LIB::CreateVirtualBitmap` refuses a `dstWidth` that is not whole groups, and a `virtualGraphicID` of which a graphic of two bytes or more exists. It makes a graphic of `4 * (dstSize + 1)` bytes, where `dstSize = dstWidth * dstHeight / 2` already counts bytes, so four times what the pixels need; its first longword is `dstWidth`. The source's `m_maxIndex` is `2 * (srcSize - 1)` words for a section of `srcSize` longwords (`:5445-5481`).
+- The opcode `CreateVirtualMask` pops the new mask's number and ID, the six coefficients from `Cyc` back to `Cxx`, a `BACKGROUND_MASK` header from `height` back to `srcX`, and the old mask's number and ID. It refuses a `width` of 0 or not whole groups, makes room for the new mask with `CreateNewMask`, and fills it with `CreateVirtualMask`'s transform of `GetMask(oldMaskID, oldMaskNumber, 6)`, whose width and height are the source's, the new mask's the destination's, and `srcX`, `srcY` 0 (`:3205-3245`, `:5603-5624`).
+- `CreateNewMask` finds or makes the mask section (a count of 0 when made), and when `number` is not below the count grows the index to `number + 1` entries: the masks move up by four bytes an added entry, the added entries are 0, and the offsets already there move up by as much. An entry that is not 0 is refused, with a "Design Error" message box ("Creating a Virtual Mask that already exists.") once per run. The new mask goes at the section's end, `(width + 15) / 16 * height` words and its header; CSBWin copies `sizeof (BACKGROUND_MASK)`, fourteen bytes, so a first mask word from its caller's stack, which the transform then writes over (`:5484-5540`).
+- The opcode `CreateVirtualAffineMask` pops the new mask's number and ID and the twelve fields from `dstHeight` back to `Cxx`, refuses a `dstWidth` of 0 or not whole groups, and keeps the transform with `CreateNewAffineMask` (`:3246-3277`), which is `CreateNewMask` for 48 bytes but for one line: growing the index by `n` entries, it moves the offsets already there up by 4, not `4 * n` (`:5577`). No transform of Conflux 3.5's or The Towers of Chaos 3.3's programs grows its section's index by more than one entry past offsets it holds, so it does not show (`tools/dump-virtual-graphics.ts`).
+- The programs ask `NeedVirtualMaskQ` before making a mask, so each is made once. `CreateVirtualBitmap` they call at every view, and it returns at once for a bitmap already made. From every square of the party's starting level, Conflux's programs make 9 virtual bitmaps, 67 virtual masks and 5 transforms, and draw a virtual bitmap through a virtual mask in 120 ways; The Towers of Chaos' make 2, 27 and 2, and draw 27. Every pixel they read lies within its source (`tools/dump-virtual-graphics.ts`).
+
+## Skins in the data sets
+
+- **Conflux 3.5** has skins on 11407 cells, 42 different ones, and a default skin on most levels: 11, which has no graphics and runs program 64, so nearly every view of Conflux runs a skin's program. Its `CSBgraphics.dat` has 51 skins, 90 background sections and four programs (61 to 64). Its DSAs never call `&GETSKIN` or `&SETSKIN` (`tools/dump-skins.ts`, `tools/dump-background-lib.ts`).
+- **The Towers of Chaos 3.3** has skins 1, 2, 3, 5 and 6 on 4530 cells, and its default skins are all 0. Its `CSBgraphics.dat` has 38 skins, 21 background sections and one program (64), which uses a subset of Conflux's skin opcodes, the virtual graphics among them.
+- **`dm-atari`'s `CSBgraphics.dat`** also holds 90 background sections, but DM's dungeon has no skins. 3D2D1D's file has the default skins record, all 0.
+- Of the skin opcodes (60302 to 60362) the programs use 33, among them the three that make virtual graphics, and not `DrawCustomDecoration`, `WallDecorationID` or `FloorDecorationID` (`tools/dump-skin-programs.ts`).
 
 ---
 

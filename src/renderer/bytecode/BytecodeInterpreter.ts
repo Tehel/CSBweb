@@ -345,10 +345,6 @@ function rpush(v: number): void {
 }
 
 /** `(i16)n`: a word of the code read as a signed jump. */
-function popMany(count: number): number[] {
-  return Array.from({ length: count }, () => pop());
-}
-
 function i16(n: number): number {
   return (n << 16) >> 16;
 }
@@ -994,11 +990,12 @@ export class BytecodeInterpreter {
   }
 
   /**
-   * What a skin's program draws and makes (`Viewport.cpp:3063-3115`, `:3209-3277`).
+   * What a skin's program draws and makes (`Viewport.cpp:3063-3115`, `:3205-3277`).
    * `DrawCustomGraphic` and `DrawCustomDecoration` draw their graphic into the viewport
-   * (`ApplyBackground.ts`). The three virtual graphics pop their arguments as CSBWin does
-   * and go to the graphic trace with CSBWin's own `GTRACE` line, but make nothing yet: a
-   * placeholder, `DEBT.md` G27 step 5.
+   * (`ApplyBackground.ts`). The three virtual graphics make a bitmap or a mask in the
+   * background library, which the program draws with afterwards, or a transform a
+   * `CreateVirtualBitmap` reads (`BackgroundLib`, `CustomBitmap.ts`). CSBWin's `_DEBUG`
+   * build also writes each virtual graphic to a file, which the port does not.
    */
   private opCustomGraphic(opcode: number): boolean {
     const trace = this.context.graphicTrace;
@@ -1024,6 +1021,11 @@ export class BytecodeInterpreter {
         const virtualGraphicID = pop();
         const graphicID = pop();
         trace?.(`  CreateVirtualBitmap(${graphicID}, ${virtualGraphicID}, ${maskID}, ${maskNumber}`);
+        const pGraphic = lib?.GetBitmap(graphicID >>> 0, 2) ?? null;
+        if (pGraphic === null) break; // do nothing
+        const pAffineMask = lib!.GetMask(maskID >>> 0, maskNumber >>> 0, 48);
+        if (pAffineMask === null) break; // do nothing
+        lib!.CreateVirtualBitmap(pGraphic.data, pGraphic.bitmapSize, virtualGraphicID >>> 0, pAffineMask);
         break;
       }
       case Opcode.DrawCustomDecoration: {
@@ -1038,22 +1040,57 @@ export class BytecodeInterpreter {
       case Opcode.CreateVirtualMask: {
         const newMaskNumber = pop();
         const newMaskID = pop();
-        const aMask = popMany(6).reverse(); // Cxx Cxy Cxc Cyx Cyy Cyc
-        const bMask = popMany(6).reverse(); // srcX srcY dstX dstY width height
+        const Cyc = pop();
+        const Cyy = pop();
+        const Cyx = pop();
+        const Cxc = pop();
+        const Cxy = pop();
+        const Cxx = pop();
+        // `BACKGROUND_MASK`'s words: `ui16`s, and `dstX` an `i16`.
+        const height = pop() & 0xffff;
+        const width = pop() & 0xffff;
+        const dstY = pop() & 0xffff;
+        const dstX = pop();
+        const srcY = pop() & 0xffff;
+        const srcX = pop() & 0xffff;
+        const bMask = { srcX, srcY, dstX, dstY, width, height };
+        const aMask = { Cxx, Cxy, Cxc, Cyx, Cyy, Cyc, srcX: 0, srcY: 0, srcWidth: 0, srcHeight: 0, dstWidth: 0, dstHeight: 0 };
         const oldMaskNumber = pop();
         const oldMaskID = pop();
         trace?.(`CreateVirtualMask(${oldMaskID}, ${oldMaskNumber}, bmask, amask, ${newMaskID}, ${newMaskNumber}`);
-        trace?.(`   bMask = ${bMask.join(' ')}`);
-        trace?.(`   aMask = ${aMask.join(' ')}`);
+        trace?.(`   bMask = ${srcX} ${srcY} ${dstX} ${dstY} ${width} ${height}`);
+        trace?.(`   aMask = ${Cxx} ${Cxy} ${Cxc} ${Cyx} ${Cyy} ${Cyc}`);
+        if (width <= 0) break;
+        if ((width & 15) !== 0) break;
+        if (!lib) break;
+        const pNewMask = lib.CreateNewMask(newMaskID >>> 0, newMaskNumber >>> 0, bMask);
+        if (pNewMask === null) break;
+        const pOldMask = lib.GetMask(oldMaskID >>> 0, oldMaskNumber >>> 0, 6);
+        if (pOldMask === null) break;
+        lib.CreateVirtualMask(pOldMask, pNewMask, aMask);
         break;
       }
       case Opcode.CreateVirtualAffineMask: {
         const newMaskNumber = pop();
         const newMaskID = pop();
-        // Cxx Cxy Cxc Cyx Cyy Cyc srcX srcY srcWidth srcHeight dstWidth dstHeight
-        const aMask = popMany(12).reverse();
+        const dstHeight = pop();
+        const dstWidth = pop();
+        const srcHeight = pop();
+        const srcWidth = pop();
+        const srcY = pop();
+        const srcX = pop();
+        const Cyc = pop();
+        const Cyy = pop();
+        const Cyx = pop();
+        const Cxc = pop();
+        const Cxy = pop();
+        const Cxx = pop();
+        const aMask = { Cxx, Cxy, Cxc, Cyx, Cyy, Cyc, srcX, srcY, srcWidth, srcHeight, dstWidth, dstHeight };
         trace?.(`CreateVirtualAffineMask (aMask, ${newMaskID} ${newMaskNumber}`);
-        trace?.(`    aMask = ${aMask.join(' ')}`);
+        trace?.(`    aMask = ${Cxx} ${Cxy} ${Cxc} ${Cyx} ${Cyy} ${Cyc} ${srcX} ${srcY} ${srcWidth} ${srcHeight} ${dstWidth} ${dstHeight}`);
+        if (dstWidth <= 0) break;
+        if ((dstWidth & 15) !== 0) break;
+        lib?.CreateNewAffineMask(newMaskID >>> 0, newMaskNumber >>> 0, aMask);
         break;
       }
     }

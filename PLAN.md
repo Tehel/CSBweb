@@ -121,7 +121,7 @@ notes of the phases closed up to 2026-09-26; for a phase closed later, its line 
 | 3 | Floor/ceiling pipeline |
 | 4 | `SummarizeRoomInfo()` authoritative |
 | 5 | Opcode surface area |
-| 6 | Custom skins / `BACKGROUND_LIB` (⏳ `DEBT.md` G27) |
+| 6 | Custom skins / `BACKGROUND_LIB` |
 | 7 | UI rendering (faithful DM layout) |
 | 7.5 | Light level / palette switching |
 | 8 | CSBWin-compatible actuators |

@@ -22,10 +22,9 @@ code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, and the work it
-needs is in the active list: G27 and G26. Its `dungeon.dat` is enciphered, and reads
-whole (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is `RC4.cpp`'s own cipher").
-Each entry says what Conflux uses of it, measured on the deciphered file.
-Every DSA operation CSBWin has is ported, not only Conflux's share
+needs is G26, in the active list. Its `dungeon.dat` is enciphered, and reads whole
+(`doc/PROVEN_FACTS.md` → "The "simple" encipherment is `RC4.cpp`'s own cipher"). Its
+skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets"). Every DSA operation CSBWin has is ported, not only Conflux's share
 (`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
 
 The order, then:
@@ -94,7 +93,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
 | Phase 17 | Deployment: the Docker image, the data sets' manifest, the statistics | L | in `PLAN.md` |
 | G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
@@ -118,7 +116,7 @@ The rows above G29 are the active list. `F3` and `Phase 17` are phases, whose st
 Conflux. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
-row meanwhile. The G rows down to G26 are Conflux's (see "Priority"). The F
+row meanwhile. G26 is Conflux's (see "Priority"). The F
 rows are independent of the rest ("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
@@ -281,76 +279,9 @@ postponed ones follow, under their own heading (see "Priority").
 
 Paying it needs a file of each form, or the author's decision to port them unchecked.
 
-### G27 ⏳ Skins: a cell's own wall, floor and ceiling graphics
-
-A CSBWin cell has a skin number, and a level a default one for its cells of skin 0. A
-skinned cell is drawn by its skin's own program, from `CSBgraphics.dat`, in place of the
-standard one, and a skin with no program draws nothing there (`DrawViewport`,
-`doc/CSBwin-src/Viewport.cpp:6765-6818`). The program reads the skin's wall, floor, middle
-and ceiling graphics, their masks and its decorations through `BACKGROUND_LIB`. A DSA
-reads and sets a cell's skin with `&GETSKIN` and `&SETSKIN` (`DSA.cpp:3107-3135`). How
-skins are stored, and the formats, are in `doc/CSBWIN_RENDERING_REFERENCE.md` →
-"Backgrounds and Skins". The port has the skins and the two operations
-(`src/engine/SkinCache.ts`, step 1), the library the programs read through
-(`src/data/BackgroundLib.ts`, step 2, the viewport context's `backgroundLib`), runs a
-skinned cell's program (step 3), and draws the skins' own graphics and decorations
-(`src/renderer/bytecode/ApplyBackground.ts`, step 4). The three opcodes that make virtual
-graphics pop their arguments and go to the graphic trace, and stop there
-(`BytecodeInterpreter.opCustomGraphic`), so a `DrawCustomGraphic` of a virtual graphic
-finds no bitmap and draws nothing.
-
-What the data sets here use of it:
-
-- **Conflux 3.5** has skins on 11407 cells, 42 different ones, and a default skin on
-  most levels: 11, which has no graphics and runs program 64. Nearly every view of
-  Conflux runs a skin's program. Its `CSBgraphics.dat` has 51 skins, 90 background
-  sections and four programs (61 to 64). Its DSAs never call `&GETSKIN` or `&SETSKIN`.
-- **The Towers of Chaos 3.3** (`towers-of-chaos`) has skins 1, 2, 3, 5 and 6 on 4530
-  cells, and
-  its default skins are all 0. Its `CSBgraphics.dat` has 38 skins, 21 background sections
-  and one program (64), which uses a subset of Conflux's skin opcodes, the virtual
-  graphics among them. It is a data set already, and of its skinned cells draws only what
-  their program draws with the standard opcodes until step 4.
-- **`dm-atari`'s `CSBgraphics.dat`** also holds 90 background sections, but DM's dungeon has no
-  skins, so no frame of it moves. 3D2D1D's file has the default skins record, all 0.
-- **Every standard opcode the skin programs use is ported.** Of the skin opcodes (60302
-  to 60362) they use 33, among them the three that make virtual graphics, and not
-  `DrawCustomDecoration`, `WallDecorationID` or `FloorDecorationID`.
-
-The steps, in order. Each step's tool runs on Conflux's files and The Towers of Chaos':
-
-1. ✅ **The skin cache, and `&GETSKIN` and `&SETSKIN`.** `SKIN_CACHE` is
-   `src/engine/SkinCache.ts`, `DungeonState.skinCache`, a new one with every world read,
-   as CSBWin's `Cleanup(false)` empties it before every game. Checked by
-   `tools/dump-skins.ts`, which counts the skins above.
-2. ✅ **`BACKGROUND_LIB`.** `src/data/BackgroundLib.ts`, the viewport context's
-   `backgroundLib`, emptied with `altMonCache`. Checked by `tools/dump-background-lib.ts`,
-   which prints Conflux's skins and checks them, the programs, masks and bitmaps against
-   the sections' bytes.
-3. ✅ **A skin's program run.** `DrawViewport` fills `skinNumber` and runs a skinned
-   cell's program from its cell table (`skinProgramStart`), or nothing; the interpreter's
-   two stacks are CSBWin's rings, kept from one program to the next, with subroutine
-   calls, the stack words, the skin's queries, and three reads of the library:
-   `GetMaskHeader`, `NeedVirtualMaskQ` and `BitmapInfo`. Checked by
-   `tools/dump-skin-programs.ts`; `tools/dump-render-probe.ts` checks that every standard
-   program leaves both stacks as it found them, so none reads what another left.
-4. ✅ **Custom graphics drawn.** `ApplyBackground`, `ApplyBackground3` and
-   `ApplyDecoration` on the viewport as CSBWin's planar bytes (`ViewportBMP`). Checked by
-   `tools/dump-custom-graphics.ts`, against the blit they mean, on every mask a skin of
-   either file names.
-5. ⏳ **Virtual graphics (M).** `CreateVirtualBitmap` (`AffineTransform4`),
-   `CreateVirtualMask` (`AffineTransform1`, `CreateNewMask`) and
-   `CreateVirtualAffineMask` (`CreateNewAffineMask`) (`:3083-3101`, `:3209-3277`,
-   `CUSTOMBITMAP` and the two transforms at `:131-279`, `:5445-5625`). Until then no
-   virtual mask exists, so `NeedVirtualMaskQ` answers 1 at every view, and the programs
-   ask for every virtual graphic again each time, where CSBWin makes each once.
-
-Steps 3 to 5 are proved by their tools on what they draw. A frame of a skinned view
-comes with G26's golden frame at Conflux's start.
-
 ### G26 ⏳ Conflux 3.5 as a data set
 
-Once the items above are paid, what is left is the page's side:
+What is left is the page's side:
 
 - a `DATA_SETS` entry with `csbGraphics` (`src/data/DataSets.ts`), and a `KNOWN_DUNGEONS`
   signature from `tools/dump-dungeon-signature.ts` (`src/data/DungeonSignature.ts`). The

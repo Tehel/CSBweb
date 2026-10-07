@@ -16,14 +16,30 @@
  * `Cleanup` empties it, from `CleanupGraphics` (`doc/CSBwin-src/Graphics.cpp:2204`) before
  * every game CSBWin reads.
  */
-import { readU16LE, readU32LE } from '../core/bytes';
+import { readU16LE, readU32LE, writeU16LE, writeU32LE } from '../core/bytes';
 import { CSBGraphicType, type CSBGraphicsLoader } from './CSBGraphicsLoader';
+import {
+  AFFINEMASK_SIZE, AffineTransform1, AffineTransform4, CUSTOMBITMAP, readAffineMask, writeAffineMask, type AFFINEMASK,
+} from './CustomBitmap';
 
 /** `BACKGROUND_GRAPHIC` (`CSB.h:357-362`). `data` is `null` in a missing graphic's entry. */
 interface BackgroundGraphic {
   id: number;
   size: number;
   data: Uint8Array | null;
+}
+
+/**
+ * `BACKGROUND_MASK`'s header (`CSB.h:330-337`), as `CreateVirtualMask` fills one from the
+ * stack: `ui16`s but `dstX`, an `i16`.
+ */
+export interface BackgroundMaskHeader {
+  srcX: number;
+  srcY: number;
+  dstX: number;
+  dstY: number;
+  width: number;
+  height: number;
 }
 
 /** A pointer into a background graphic: its bytes, and a byte offset into them. */
@@ -50,8 +66,17 @@ export interface DecorationBitmap {
 /** `GetCode`'s minimum size: the start address and 21 cells of eight room types (`Viewport.cpp:5705`). */
 const CODE_MINIMUM_SIZE = 2 * (1 + 8 * 21);
 
+// The `static bool errorMsg` of `CreateNewMask` and `CreateNewAffineMask`, by their
+// messages: each is shown once per process.
+const designErrorShown = new Set<string>();
+
 export class BackgroundLib {
   private backgroundGraphics: BackgroundGraphic[] = [];
+  /**
+   * `UI_MessageBox`'s "Design Error", which a virtual mask made twice raises; a tool
+   * reads it, and the page shows nothing.
+   */
+  messageBox: (line: string) => void = () => {};
 
   /** `reader` is the data set's `CSBgraphics.dat`; without one, every section is missing. */
   constructor(private readonly reader: Pick<CSBGraphicsLoader, 'readSection'> | null | undefined) {}
@@ -93,6 +118,143 @@ export class BackgroundLib {
     const { data, size: actualSize } = this.backgroundGraphics[idx]!;
     if (actualSize < minimumSize) return null;
     return { data: data!, bitmapSize: actualSize >>> 2 };
+  }
+
+  /**
+   * `BACKGROUND_LIB::CreateVirtualBitmap` (`Viewport.cpp:5445-5481`): graphic
+   * `virtualGraphicID`, `pMask`'s transform of the bitmap `pGraphic` (`srcSize` `i32`s),
+   * unless a graphic of 2 bytes or more has that id. Its size is `4 * (dstSize + 1)` for a
+   * `dstSize` that already counts bytes: four times what its pixels need, which
+   * `GetBitmap`'s `bitmapSize` and `ApplyBackground`'s size check then read. A negative
+   * `dstHeight` makes a size no `UI_malloc` gives, and throws here.
+   */
+  CreateVirtualBitmap(pGraphic: Uint8Array, srcSize: number, virtualGraphicID: number, pMask: BackgroundPointer): void {
+    const pxform = readAffineMask(pMask);
+    if ((pxform.dstWidth & 15) !== 0) return;
+    let idx = this.BackgroundGraphicExists(virtualGraphicID, 2, false);
+    if (idx >= 0) return;
+    const dstSize = (Math.trunc(Math.imul(pxform.dstWidth, pxform.dstHeight) / 2) >>> 0); // bytes
+    this.CreateBackgroundGraphic(virtualGraphicID, (4 * (dstSize + 1)) >>> 0);
+    idx = this.GetBackgroundGraphic(virtualGraphicID, (4 * (dstSize + 1)) | 0, true);
+    if (idx < 0) return;
+    const pV = this.backgroundGraphics[idx]!.data!; // The virtual graphic.
+    writeU32LE(pV, 0, pxform.dstWidth >>> 0);
+    if (pxform.dstWidth <= 0) return;
+    const cSrcBitmap = new CUSTOMBITMAP();
+    const cDstBitmap = new CUSTOMBITMAP();
+    cSrcBitmap.Initialize(pGraphic, 4, srcSize - 1);
+    cDstBitmap.Initialize(pV, 4, dstSize);
+    AffineTransform4(cSrcBitmap, cDstBitmap, pxform);
+  }
+
+  /**
+   * `BACKGROUND_LIB::CreateNewMask` (`Viewport.cpp:5484-5540`): room for mask `number` in
+   * mask section `id`, made if there is none, and `pMask`'s header copied into it. The
+   * section's index grows to take `number`, its masks moving up behind it; `null`, and
+   * CSBWin's "Design Error" once, when the mask is there already.
+   *
+   * CSBWin copies `sizeof (BACKGROUND_MASK)`, fourteen bytes, the header and a first mask
+   * word from its caller's stack; the port's word is 0, as is the rest of the new room,
+   * which `UI_realloc` leaves as it finds it.
+   */
+  CreateNewMask(id: number, number: number, pMask: BackgroundMaskHeader): BackgroundPointer | null {
+    const gsize = (((pMask.width + 15) >> 4) * pMask.height * 2 + 12) >>> 0;
+    const p = this.newMaskRoom(id, number, gsize, false, 'Creating a Virtual Mask\nthat already exists.');
+    if (p === null) return null;
+    const header = [pMask.srcX, pMask.srcY, pMask.dstX, pMask.dstY, pMask.width, pMask.height];
+    header.forEach((word, i) => writeU16LE(p.data, p.offset + 2 * i, word & 0xffff));
+    return p;
+  }
+
+  /**
+   * `BACKGROUND_LIB::CreateNewAffineMask` (`Viewport.cpp:5543-5600`): `CreateNewMask` for
+   * an `AFFINEMASK`, copied whole. Where the index grows by `n` entries, CSBWin moves the
+   * offsets already there up by 4, not `4 * n` (`:5577`), so past one new entry they point
+   * short of their masks; the port does the same.
+   */
+  CreateNewAffineMask(id: number, number: number, pMask: AFFINEMASK): BackgroundPointer | null {
+    const p = this.newMaskRoom(id, number, AFFINEMASK_SIZE, true, 'Creating a Virtual Affine Mask\nthat already exists.');
+    if (p === null) return null;
+    writeAffineMask(p.data, p.offset, pMask);
+    return p;
+  }
+
+  /**
+   * `BACKGROUND_LIB::CreateVirtualMask` (`Viewport.cpp:5603-5624`): `pNewMask`'s pixels,
+   * `pAffine`'s transform of `pOldMask`'s.
+   */
+  CreateVirtualMask(pOldMask: BackgroundPointer, pNewMask: BackgroundPointer, pAffine: AFFINEMASK): void {
+    const srcBitmap = new CUSTOMBITMAP();
+    const dstBitmap = new CUSTOMBITMAP();
+    srcBitmap.InitializeMask(pOldMask);
+    dstBitmap.InitializeMask(pNewMask);
+    const Xform: AFFINEMASK = {
+      Cxx: pAffine.Cxx,
+      Cxy: pAffine.Cxy,
+      Cxc: pAffine.Cxc,
+      Cyx: pAffine.Cyx,
+      Cyy: pAffine.Cyy,
+      Cyc: pAffine.Cyc,
+      srcX: 0,
+      srcY: 0,
+      dstHeight: readU16LE(pNewMask.data, pNewMask.offset + 10),
+      dstWidth: readU16LE(pNewMask.data, pNewMask.offset + 8),
+      srcHeight: readU16LE(pOldMask.data, pOldMask.offset + 10),
+      srcWidth: readU16LE(pOldMask.data, pOldMask.offset + 8),
+    };
+    AffineTransform1(srcBitmap, dstBitmap, Xform);
+  }
+
+  /**
+   * What `CreateNewMask` and `CreateNewAffineMask` share: mask section `id`, made with a
+   * count of 0 where `BackgroundGraphicExists` finds none, its index grown to take entry
+   * `number`, and `gsize` bytes added at its end for that entry. Growing the index by `n`
+   * entries moves the offsets already there up by `4 * n`, or by 4 for an affine mask.
+   * `null` where the entry is not 0, after the "Design Error" message the first time.
+   */
+  private newMaskRoom(id: number, number: number, gsize: number, affine: boolean, message: string): BackgroundPointer | null {
+    let idx = this.BackgroundGraphicExists(id, 0, false);
+    if (idx < 0) {
+      idx = this.CreateBackgroundGraphic(id, 4);
+      writeU32LE(this.backgroundGraphics[idx]!.data!, 0, 0); // Number of masks
+    }
+    const graphic = this.backgroundGraphics[idx]!;
+    const count = readU32LE(graphic.data!, 0);
+    if (count <= number) {
+      // We need to make some room for the new index.
+      const n = number - count + 1; // # index entries we need to add.
+      this.resize(graphic, graphic.size + 4 * n);
+      const pbg = graphic.data!;
+      const length = graphic.size - 4 * number - 8;
+      if (length > 0) pbg.copyWithin(4 * number + 8, 4 * count + 4, 4 * count + 4 + length);
+      pbg.fill(0, 4 * count + 4, 4 * count + 4 + 4 * n);
+      for (let i = 0; i < count; i++) {
+        const offset = readU32LE(pbg, 4 * (i + 1));
+        if (offset !== 0) writeU32LE(pbg, 4 * (i + 1), (offset + (affine ? 4 : 4 * n)) >>> 0);
+      }
+      writeU32LE(pbg, 0, count + n);
+    }
+    if (readU32LE(graphic.data!, 4 * (number + 1)) !== 0) {
+      if (!designErrorShown.has(message)) {
+        designErrorShown.add(message);
+        this.messageBox(`Design Error: ${message.replace('\n', ' ')}`);
+      }
+      return null;
+    }
+    // Now the index entry exists but is zero: it takes the section's size, and the
+    // section grows by the new mask.
+    const offset = graphic.size;
+    writeU32LE(graphic.data!, 4 * (number + 1), offset);
+    this.resize(graphic, graphic.size + gsize);
+    return { data: graphic.data!, offset };
+  }
+
+  /** `UI_realloc` of a graphic: its bytes kept, the new ones 0. */
+  private resize(graphic: BackgroundGraphic, size: number): void {
+    const data = new Uint8Array(size);
+    data.set(graphic.data!.subarray(0, Math.min(size, graphic.data!.length)));
+    graphic.data = data;
+    graphic.size = size;
   }
 
   /**

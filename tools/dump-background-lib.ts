@@ -1,5 +1,5 @@
 /**
- * `BACKGROUND_LIB` (`DEBT.md` G27, step 2; `src/data/BackgroundLib.ts`,
+ * `BACKGROUND_LIB` (`src/data/BackgroundLib.ts`,
  * `doc/CSBwin-src/Viewport.cpp:5333-5899`): the `CGT_Backgrounds` sections of
  * `CSBgraphics.dat`, and what a skin reads from them.
  *

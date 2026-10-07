@@ -49,8 +49,6 @@ export const DATA_SETS: readonly DataSet[] = [
     // Conflux (`static/gamefiles/conflux-3.5-b8/`) is not a set: its `dungeon.dat` reads,
     // and what it needs beyond that is `DEBT.md` G26's.
     { id: '3d2d1d', name: '3D2D1D', dir: '/gamefiles/3D2D1D', csbGraphics: false, miniDat: false, hintOracle: false },
-    // Its cells have skins, whose programs run but whose own graphics draw nothing yet
-    // (`DEBT.md` G27).
     { id: 'towers-of-chaos', name: 'The Towers of Chaos 3.3', dir: '/gamefiles/towers-of-chaos-3.3', csbGraphics: true, miniDat: false, hintOracle: false },
 ];
 
