@@ -95,6 +95,7 @@ In payoff order: the first row is the next item.
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G27 |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
+| Phase 17 | Deployment: the Docker image, the data sets' manifest, the statistics | L | in `PLAN.md` |
 | G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
@@ -111,8 +112,9 @@ In payoff order: the first row is the next item.
 | X8 | Extra: RISE's own dialog, and the utility disk's portraits on DM's champions | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G29 are the active list. `F3` is a phase, whose status is
-`PLAN.md`'s. One row sits
+The rows above G29 are the active list. `F3` and `Phase 17` are phases, whose status is
+`PLAN.md`'s: deployment is not debt, and its row only marks its place, straight after
+Conflux. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
 row meanwhile. `G1` sits below G27, whose feature its last operations need.
@@ -157,8 +159,22 @@ What the redesign will replace, and what it should not carry across:
   unauthenticated `/stopserver` that exits the process; `package.json` keeps its two
   runtime dependencies, `"main": "server.js"` and the name `dmjs`.
 
+The last two bullets are `PLAN.md` Phase 17's (steps 2 and 3), which comes first. What is
+left of them when the redesign starts is paid here.
+
 Paying it is the redesign's first step: settings as a model the page renders, the CRT in a
 module of its own, a `publicDir` holding only what the page serves, and `server.js` gone.
+The redesigned page also links to two pages:
+
+- **A static FAQ.** Among its answers is one paragraph on the statistics Phase 17
+  collects, and why:
+  - to check that the game is actually played;
+  - a leaderboard of the preferred champions;
+  - where parties die most often.
+
+  It insists that the statistics are anonymous: no name, no IP address, no browser
+  profiling. A random id, drawn in the browser, is used only for counting players.
+- **The public statistics**, drawn from Phase 17's `api/stats`.
 
 ---
 

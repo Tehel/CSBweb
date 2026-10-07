@@ -29,7 +29,9 @@ The goal is a complete, faithful game on `dm-atari`. The work, in order:
    DSA support, and `CSBgraphics.dat`'s other sections (`DEBT.md` → "Priority"). `DEBT.md` says how
    to work an item. **One item per commit, a few per session**, then `/clear`. Its index is
    the live status; its first row is the next item.
-2. Phase 15 step 4 interleaves anywhere.
+2. **Phase 17, deployment**, straight after G26, before the rest of `DEBT.md`'s rows and
+   before the extras. Its row in `DEBT.md`'s index marks the place.
+3. Phase 15 step 4 interleaves anywhere.
 
 ⏸️ **Postponed until the default dungeon is validated**: a save of a dungeon the port does
 not know (`DEBT.md` G22), CSBWin's debugging features (G14, the ASCII dump), and Phase 15
@@ -182,3 +184,179 @@ never carried out, because the project has **no test framework**.
    colours go with it: an Atari intensity times 36, not CSBWin's RGB555 (`DEBT.md` H).
 
 Status: 🔄 in progress — steps 1, 2 and 3 done, 4 part-done; 5 postponed.
+
+### Phase 17 — Deployment: the game served from the author's VPS
+
+Goal: the game on the author's VPS (a V-R4 that already serves other projects), in a Docker
+container. The game files come from a mounted directory, not from the image. A small Node
+server serves the page and the files, and counts games: games started, won and lost.
+There are no logins.
+
+It comes straight after `DEBT.md` G26, so Conflux ships as one of the data sets, and
+before the extras. Until then, `npm run dev` is the only way the game runs.
+
+**The pattern is the sibling projects'** (`SenTynel`, `gpo`, `linkedin-games/player`,
+next to this checkout):
+
+- A two-stage `node:24-alpine` image. The runtime stage has no `node_modules`
+  (`linkedin-games/player`: zero production dependencies, SQLite from `node:sqlite`), runs
+  as `USER node` (uid 1000, the VPS's `ubuntu`, so a bind-mounted directory is writable
+  in the container and readable over SSH), and uses the exec form, so Node is PID 1 and
+  receives SIGTERM.
+- Compose publishes on **`127.0.0.1:<port>` only**. The host's nginx proxies to it, with
+  a certbot certificate, one `server` block per subdomain (`gpo/utils/nginx-gpo.conf`).
+  A port published on `0.0.0.0` answers the whole internet whatever `ufw` says
+  (`linkedin-games/player/docker-compose.yaml`).
+- Deploys go through `docker save | gzip`, then `scp`, then `docker load`, then
+  `docker-compose down && up -d`: the VPS's Compose v1 cannot recreate a container
+  (`linkedin-games/player/docs/deployment.md`). The target comes from a gitignored `.env`,
+  as in `SenTynel/utils/deploy.sh`: the repository names no host, login or remote path.
+  The author deploys by hand. A session's job ends at "built, checked, here is the
+  command".
+
+**Shape:**
+
+```
+image:   dist/ (the built page) + server/ (one TS entry point, run by Node 24 as is)
+mounts:  /data/gamefiles  :ro   the data sets, swoosh/, manifest.json
+         /data/stats            stats.db (SQLite, WAL)
+env:     PORT, GAMEFILES_DIR, STATS_DB
+```
+
+**The site is served over HTTPS**, with a Let's Encrypt certificate from certbot. It
+has to be: `crypto.subtle` (`src/data/DungeonSignature.ts`) and `crypto.randomUUID` exist
+only in a secure context. The dev server's `localhost` counts as one, and a plain-HTTP
+address does not.
+
+**The page ships as it is**, debug chrome included. The redesign (`DEBT.md` E15) replaces
+it later, along with the FAQ and the statistics page.
+
+1. ⏳ **The manifest replaces `DATA_SETS`.** `static/gamefiles/manifest.json`, committed
+   with the files it describes, lists:
+   - each set, with today's `DataSet` fields. Its `dir` is relative to the manifest
+     (`dm-atari`, not `/gamefiles/dm-atari`).
+   - the default set's id.
+   - the FTL logo's folder (`SWOOSH_DIR`, `src/main.ts:273`), or none.
+
+   The page fetches the manifest before `dataSetFor` (`src/main.ts:44`), and the chooser
+   (`src/ui/dataSetChooser.ts`) lists it. One module parses it, for both the page and the
+   tools. A manifest that is missing or malformed ends the boot on `fatalMessage`, with a
+   message that says why.
+
+   The tools read the manifest from disk through one `tools/lib` helper:
+   `dump-data-sets`, `dump-file-signatures`, `dump-dungeon-signature`, `dump-rise`,
+   `dump-sleep-save` and `dump-save-menu`. `dump-data-sets` also asserts that every
+   folder exists and holds the files its flags promise.
+
+   The store's upgrade (`src/data/saves/idb.ts:44`) gives old rows `'dm-atari'` as a
+   literal. Those rows are dm-atari's because of their history, not because of whatever
+   the manifest names as default.
+
+   The deployed manifest is the author's, uploaded with the files. It lists `dm-atari`
+   (the default), `csb`, `kids-dungeon` and Conflux, and not `3d2d1d`, `dm-windows` or
+   the other Atari versions. The repository's manifest keeps every set, because the
+   tools need them all.
+
+   Every fetch becomes relative to the page (`gamefiles/…`, Vite `base: './'`), so the
+   game also runs under a sub-path.
+2. ⏳ **The build ships no game data.** `publicDir: 'static'` copies all of `static/` into
+   `dist/`: 95 MB of game files, PDFs, box art and `extracted/`. Dev keeps serving
+   `static/`, and the build copies only what the page itself needs (the favicon). Check:
+   list the contents of `dist/` after `npm run build`, with no `.dat` and no `.pdf`
+   among them.
+3. ⏳ **The server.** `server/server.ts`, on `node:http`, with no dependency. Node 24
+   strips the types (as `gpo/prod-server.ts` does), so it uses only erasable syntax and
+   imports with `.ts` extensions. It is inside the `tsc` gate, as `tools/` is.
+
+   It replaces the stale `server.js`, which runs Express on port 9010 and has an
+   unauthenticated `/stopserver` that exits the process. The `express` and
+   `serve-favicon` dependencies go with it.
+
+   What it serves:
+   - `dist/`. Hashed assets are `immutable`, and `index.html` is `no-cache`.
+   - `gamefiles/` from `GAMEFILES_DIR`, with ETag and Last-Modified. A path that leaves
+     the directory is refused.
+   - `api/event` and `api/stats` (steps 4 and 5).
+   - `api/health`, for the compose healthcheck.
+
+   At startup it checks that the manifest parses and that each folder it names exists,
+   so a bad mount fails the container rather than the player's boot. It shuts down on
+   SIGTERM, closing the database, and logs to stdout.
+4. ⏳ **The player id and the events.** All of this is page-side (`src/ui/`). The engine
+   sends nothing and stays silent, as it does today.
+
+   The player id is a `crypto.randomUUID()` drawn at first start and kept in
+   `localStorage`, as `src/ui/settings.ts` keeps the settings. If the player clears it,
+   the page draws a new one, and that is accepted: the id is for counting players, not
+   for knowing who they are.
+
+   A game is its **playthrough** (`doc/SAVES.md` → "A playthrough"). The id is drawn when
+   the game is new and carried by every save, so one game's events link up across loads,
+   sessions and imports. Each event carries the player id, the data set, the playthrough
+   and the build (a git hash through Vite's `define`):
+   - `started`: a new game's first tick (the boot's new game, or RISE's new adventure).
+   - `party`: at `GameHost.championJoined` (`src/main.ts:343`), with the champions'
+     names. A DM party is empty at the first tick and fills up in the Hall.
+   - `won` and `lost`: at `showEndOfGame` (`src/main.ts:446`), with the game clock and
+     the party's names. A lost game also carries the level and square
+     (`party.state.position`, read there already).
+
+   **Anonymity is a rule of the code, not just of the FAQ.** No player's name, no
+   address and no browser fingerprint (user agent, screen, language) is sent or stored.
+   A name typed on the Reincarnate screen is the player's own text, so it is never sent.
+   The champion is reported by its mirror's name (`HallOfChampions.reincarnationSource`)
+   and flagged as reincarnated. A party that comes from a save (RISE, an imported game)
+   has names nobody has vouched for, so a name is reported only if it is one of the
+   dungeon's mirrors. There is no `visit` event: the player id appears only with a game.
+
+   Events are sent with `navigator.sendBeacon`, and a failure is ignored: nothing an
+   event does delays or breaks the game. Only a production build sends them, so dev and
+   the tools never do.
+5. ⏳ **The statistics store.** SQLite through `node:sqlite`, as in
+   `linkedin-games/player`, in one `events` table: when, player, type, set, playthrough,
+   build and a JSON payload.
+
+   The database file is on the host, in the mounted `/data/stats` (`STATS_DB`), and never
+   in the container's writable layer, which is lost on every deploy's `down`. It runs in
+   WAL mode, and the server closes it on SIGTERM so the WAL is checkpointed into the main
+   file. The server creates the schema if the file is missing.
+
+   The server validates every event: a known type and a body of at most 4 KB. It also
+   checks every champion name against the set's mirrors and drops the others, so a
+   modified page cannot store free text either. A rate limit per address, in memory, trusts the forwarded address
+   only because the port is on loopback. No address is stored.
+
+   `api/stats` is public and returns aggregates only, never single events. The page
+   that shows them comes with the redesign. The aggregates are what the FAQ promises:
+   - **Use**: players, and games started and won per set and per week.
+   - **Preferred champions**: how often each one is in a party, per set.
+   - **Where parties die**: lost games per set, level and square, which is enough for a
+     heat map on `peek-dungeon`'s map.
+   - **Games won**: the game time, and the wall time since `started`.
+6. ⏳ **The image and the stack.** A two-stage `Dockerfile` and a `.dockerignore`
+   (`node_modules`, `dist`, `static/gamefiles`, `doc/CSBwin-src`, `RTC`, `archive`, `.env`,
+   `.git`). The build stage runs `npm ci && npm run build`, which includes `tsc`.
+   `npm test` needs the game files, so it stays the gate before a commit, not part of
+   the image build.
+
+   `docker-compose.yaml`:
+   - `127.0.0.1:<port>:80`.
+   - `../gamefiles:/data/gamefiles:ro` and `../stats:/data/stats`.
+   - `restart: unless-stopped`, `stop_grace_period`, a healthcheck on `api/health` and
+     rotated `json-file` logs.
+
+   `utils/deploy.sh` is SenTynel's, which reads the target from `.env`, plus an `scp` of
+   the compose file, so the remote stack cannot drift from the repository.
+
+   Check: `tools/check-frames.sh` against the container (a `--url`), which proves the
+   built page draws what the dev server draws.
+7. ⏳ **On the VPS, by the author:**
+   - a subdomain at the root, with its nginx site and certbot certificate, as `gpo`'s.
+     Step 1's relative paths keep a sub-path possible.
+   - the game files and their manifest, uploaded once and on each change. They are not
+     part of a deploy.
+   - a backup of `stats/`.
+
+   `doc/DEPLOYMENT.md` records the procedure, written as `linkedin-games/player`'s is.
+
+Status: ⏳ not started. Waits for G26.
