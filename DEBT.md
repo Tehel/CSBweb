@@ -372,13 +372,18 @@ What the data sets here use of it:
   most levels: 11, which has no graphics and runs program 64. Nearly every view of
   Conflux runs a skin's program. Its `CSBgraphics.dat` has 51 skins, 90 background
   sections and four programs (61 to 64). Its DSAs never call `&GETSKIN` or `&SETSKIN`.
+- **The Towers of Chaos 3.3** (`towers-of-chaos`) has skins 1 to 6 on 4530 cells, and
+  its default skins are all 0. Its `CSBgraphics.dat` has 38 skins, 21 background sections
+  and one program (64), which uses a subset of Conflux's skin opcodes, the virtual
+  graphics among them. It is a data set already, and draws its skinned cells with the standard programs
+  until step 3.
 - **`dm-atari`'s `CSBgraphics.dat`** also holds 90 background sections, but DM's dungeon has no
   skins, so no frame of it moves. 3D2D1D's file has the default skins record, all 0.
 - **Every standard opcode the skin programs use is ported.** Of the skin opcodes (60302
   to 60362) they use 33, among them the three that make virtual graphics, and not
   `DrawCustomDecoration`, `WallDecorationID` or `FloorDecorationID`.
 
-The steps, in order. Each step's tool runs on Conflux's files:
+The steps, in order. Each step's tool runs on Conflux's files and The Towers of Chaos':
 
 1. ⏳ **The skin cache, and G1's last two operations (S).** `SKIN_CACHE`
    (`doc/CSBwin-src/data.cpp:2058-2171`) over the port's `Expool`: `Load`, `GetSkin`,

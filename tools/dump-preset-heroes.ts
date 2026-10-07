@@ -24,7 +24,7 @@ import { readHeroText } from '../src/engine/AddCharacter';
 import { check, finish } from './lib/check';
 import { newGame, presetHeroesOf } from './lib/game';
 
-const SETS = ['dm-atari', 'dm-atari-1.2', 'dm-atari-1.3-fr', 'dm-windows', 'csb', 'kids-dungeon-24', '3D2D1D'];
+const SETS = ['dm-atari', 'dm-atari-1.2', 'dm-atari-1.3-fr', 'dm-windows', 'csb', 'kids-dungeon-24', '3D2D1D', 'towers-of-chaos-3.3'];
 const DELTA_X = [0, 1, 0, -1];
 const DELTA_Y = [-1, 0, 1, 0];
 

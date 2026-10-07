@@ -10,7 +10,7 @@
  *    digest against `node:crypto`'s of those bytes.
  * 2. The catalogue against the files here: every data set's `dungeon.dat`, and CSB's
  *    `mini.dat`, is a catalogue dungeon that lists the set, whole; no entry is left
- *    without its file, and no digest is listed twice.
+ *    without its file, and no two dungeons share a digest.
  * 3. Each committed save, early ones and late ones, is its own dungeon's, whole, and
  *    matches no level of any other.
  * 4. The port's own save of a new game is its dungeon's.
@@ -144,7 +144,13 @@ async function checkCatalogue(): Promise<void> {
   }
   check(DATA_SETS.every((set) => KNOWN_DUNGEONS.some((d) => d.dataSets.includes(set.id))), 'every data set plays a catalogue dungeon');
   console.log(`  ${KNOWN_DUNGEONS.length} dungeons, ${digests.length} levels`);
-  check(new Set(digests).size === digests.length, 'no two levels of the catalogue have one digest');
+  // A dungeon may repeat a digest, as The Towers of Chaos does its unused levels: a match
+  // is level by level. Two dungeons may not share one.
+  const owners = new Map<string, Set<string>>();
+  for (const dungeon of KNOWN_DUNGEONS) {
+    for (const digest of dungeon.signature) owners.set(digest, (owners.get(digest) ?? new Set()).add(dungeon.name));
+  }
+  check([...owners.values()].every((names) => names.size === 1), 'no two dungeons of the catalogue have a level with one digest');
 }
 
 /* ------------------------------------------------------------- 3. the saves --- */
