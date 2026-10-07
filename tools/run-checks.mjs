@@ -232,6 +232,9 @@ const CHECKS = [
   // The deployed server: its start-up check, caching, preconditions, refused paths, and
   // server.ts itself, run as Node runs it, stopped by SIGTERM.
   { tool: 'dump-server.ts' },
+  // The statistics' events the page sends: a new game's first tick, the Hall's joins by
+  // their mirror's name, a won game's masteries, a lost game's square, and nothing typed.
+  { tool: 'dump-game-events.ts' },
   // A dungeon.dat behind an Extended Features block, the DM Windows package's: read in the
   // block's shape it is DM's dungeon converted, and a new game takes the block's rules.
   { tool: 'dump-extended-dungeon.ts' },

@@ -11,7 +11,7 @@ import { MANIFEST_NAME, dataSetFor, parseManifest, type DataSet, type DataSetMan
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
 import { parseHcsbDat } from './data/HintOracleLoader';
-import { BrowserSaveStore, downloadSaveFile } from './data/saves';
+import { BrowserSaveStore, downloadSaveFile, type OpenedSave } from './data/saves';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
 import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
@@ -32,6 +32,7 @@ import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
 import { loadUISettings, type UISettings } from './ui/settings';
+import { GameEvents, mirrorNames, playerId, sendBeacon } from './ui/gameEvents';
 
 console.log('Dungeon Master Web - Initializing...');
 
@@ -240,13 +241,14 @@ async function loadHintOracle(): Promise<HintOracleFiles | null> {
  * (`:1480-1486`), and so is one that fails its read `die(0xbad)` (`Game.readDungeonDat`).
  * The game's playthrough is then held against the store's (`GameSaves.newGameRead`).
  */
-async function readNewGame(game: Game, saves: GameSaves): Promise<void> {
+async function readNewGame(game: Game, saves: GameSaves, events: GameEvents): Promise<void> {
     const name = `${dataSet.dir}/dungeon.dat`;
     const response = await fetch(name).catch(() => null);
     if (!response?.ok) throw new Die(50, `Cannot open dungeon file '${name}'`);
     game.readDungeonDat(new Uint8Array(await response.arrayBuffer()));
     console.log(`✓ Read ${name}: ${game.ctx.dungeon.getData().maps.length} levels`);
     await saves.newGameRead();
+    events.newGameRead();
 }
 
 /**
@@ -308,7 +310,7 @@ async function loadSwooshFiles(sound: SoundManager, settings: UISettings): Promi
  * `GameHost`, the screen its `GameScreenHooks`. Both are handed the one message area,
  * which the engine writes and the screen draws.
  */
-function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager): { game: Game; screen: GameScreen; saves: GameSaves; messages: ScrollingText } {
+function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager): Built {
     const messages = new ScrollingText();
     const playSound = (soundId: number, rateIdx?: number, highVolume?: number) => sound.playSound(soundId, rateIdx, highVolume);
     // The screen is built second, over the engine's dungeon, so the engine→UI notices
@@ -344,14 +346,19 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // `TAG02076e` / `TAG0207cc` from the engine: the Hall of Champions and `WakeUp`.
         tag02076e: () => screen?.tag02076e(),
         tag0207cc: () => screen?.tag0207cc(),
-        // The prison's fourth champion asks whether the adventure begins.
-        championJoined: () => saves.championJoined(),
+        // The prison's fourth champion asks whether the adventure begins, and every
+        // champion is reported.
+        championJoined: (joined) => {
+            saves.championJoined();
+            events.championJoined(joined);
+        },
         // `ShowCredits(1)`: `MainLoop` has returned on a lost game
         // (doc/CSBwin-src/CSBCode.cpp:11325), or has won it (`:631`).
         // A frame threw: CSBWin's `die`, the loop stopped.
         die: reportError,
         showCredits: (word11694) => {
-            if (screen) showEndOfGame(game, screen, saves, sound, messages, word11694).catch(reportError);
+            events.ended(word11694);
+            if (screen) showEndOfGame({ game, screen, saves, messages, events }, sound, word11694).catch(reportError);
         },
         // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself.
         drawViewport: () => renderView(),
@@ -390,6 +397,25 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         askBeginAdventure: (source) => screen?.askBeginAdventure(source),
     }, logSave, storeRandom);
 
+    // The statistics' events: sent by a production build only, and shown on the console
+    // otherwise. The mirrors are the data set's own, read from its `dungeon.dat` once.
+    let mirrors: Promise<ReadonlySet<string>> | null = null;
+    const readMirrors = async (): Promise<ReadonlySet<string>> => {
+        const response = await fetch(`${dataSet.dir}/dungeon.dat`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return mirrorNames(new Uint8Array(await response.arrayBuffer()), game);
+    };
+    const events = new GameEvents({
+        game,
+        set: dataSet.id,
+        build: __DMWEB_BUILD__,
+        player: playerId,
+        mirrors: () => mirrors ??= readMirrors(),
+        send: import.meta.env.PROD ? sendBeacon : (event) => console.debug('Event, not sent:', event),
+    });
+    // RISE's new adventure, which a read then makes the running game.
+    let adventure: OpenedSave | null = null;
+
     screen = new GameScreen(gameCanvasEl, {
         graphicsLoader: files.graphicsLoader,
         tables: graphicsTables,
@@ -408,14 +434,18 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         onListEverySave: () => saves.listEverySet(),
         onReadSave: (entry) => saves.open(entry),
         // RISE, on the entrance: a new adventure from a save of any set.
-        onMakeNewAdventure: async (source) => saves.makeNewAdventure(source, await readMiniDat()),
+        onMakeNewAdventure: async (source) => (adventure = await saves.makeNewAdventure(source, await readMiniDat())),
         onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
         isPrison: () => saves.inPrison(),
         // EXPORT: the row's file as the store holds it, downloaded under the row's name.
         onExportSave: async (entry) => downloadSaveFile(entry.name, (await saves.open(entry)).bytes),
         // The import: a file dropped on the page (`bindSaveDrop`), held against the dungeon.
         onImportSave: (file, confirmed) => saves.importSave(file, confirmed),
-        onRestoreSave: (save) => saves.read(save),
+        onRestoreSave: (save) => {
+            saves.read(save);
+            if (save === adventure) events.newGameRead();
+            else events.savedGameRead();
+        },
         // The boot's chooser only: its read failed, and `tag01efee` follows; or RISE's
         // new adventure was refused, and the entrance says why.
         onRestoreFailed: (error) => {
@@ -435,7 +465,16 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             runHintOracle(deps, files.hintOracle, square, game.ctx.state.dungeon.hintKey).catch(reportError).finally(close);
         },
     });
-    return { game, screen, saves, messages };
+    return { game, screen, saves, messages, events };
+}
+
+/** What `construct` builds, which the boot, the play and the end of the game share. */
+interface Built {
+    game: Game;
+    screen: GameScreen;
+    saves: GameSaves;
+    messages: ScrollingText;
+    events: GameEvents;
 }
 
 /**
@@ -447,7 +486,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
  * entrance has set up the next game, and `_StartCSB` runs `MainLoop` again
  * (doc/CSBwin-src/CSBCode.cpp:11320-11327), on the same `Game` and the same screen.
  */
-async function showEndOfGame(game: Game, screen: GameScreen, saves: GameSaves, sound: SoundManager, messages: ScrollingText, word11694: boolean): Promise<void> {
+async function showEndOfGame({ game, screen, saves, messages, events }: Built, sound: SoundManager, word11694: boolean): Promise<void> {
     screen.setHoverPoint(null);
     screen.refreshOverlay();
     const { x, y, z } = game.ctx.party.state.position;
@@ -457,7 +496,7 @@ async function showEndOfGame(game: Game, screen: GameScreen, saves: GameSaves, s
             gameScreen: screen,
             playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
             consumeSavedGameRead: () => saves.consumeSavedGameRead(),
-            readNewGame: () => readNewGame(game, saves),
+            readNewGame: () => readNewGame(game, saves, events),
             rise: dataSet.miniDat,
         },
         {
@@ -510,7 +549,7 @@ async function createCrt(): Promise<void> {
  *
  * With the extras on, the FTL logo comes first (`loadSwooshFiles`).
  */
-async function runIntro(game: Game, screen: GameScreen, saves: GameSaves, sound: SoundManager): Promise<PrisonDoorChoice> {
+async function runIntro({ game, screen, saves, events }: Built, sound: SoundManager): Promise<PrisonDoorChoice> {
     const settings = loadUISettings();
     const skipIntro =
         new URLSearchParams(window.location.search).get('intro') === '0'
@@ -520,7 +559,7 @@ async function runIntro(game: Game, screen: GameScreen, saves: GameSaves, sound:
         gameScreen: screen,
         playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
         consumeSavedGameRead: () => saves.consumeSavedGameRead(),
-        readNewGame: () => readNewGame(game, saves),
+        readNewGame: () => readNewGame(game, saves, events),
         rise: dataSet.miniDat,
         swoosh: skipIntro ? null : await loadSwooshFiles(sound, settings),
         skip: skipIntro,
@@ -528,7 +567,7 @@ async function runIntro(game: Game, screen: GameScreen, saves: GameSaves, sound:
 }
 
 /** The page's side of play: its input and debug chrome, and a redraw per move and per tick. */
-function wire(game: Game, screen: GameScreen, saves: GameSaves, sound: SoundManager, messages: ScrollingText): void {
+function wire({ game, screen, saves, messages, events }: Built, sound: SoundManager): void {
     bindUIContext({
         screen,
         game,
@@ -555,6 +594,7 @@ function wire(game: Game, screen: GameScreen, saves: GameSaves, sound: SoundMana
     // (doc/CSBwin-src/CSBCode.cpp:618-639).
     let mapPreviewAt = '';
     game.onTick(() => {
+        events.tick();
         // `if (d.SelectedCharacterOrdinal != 0) goto tag000730; if (d.PartySleeping != 0)
         // goto tag000730;` (doc/CSBwin-src/CSBCode.cpp:636-637): no `DrawViewport` while an
         // inventory is open or the party sleeps.
@@ -653,8 +693,8 @@ async function init() {
         }
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen);
-        await runIntro(built.game, built.screen, built.saves, sound);
-        wire(built.game, built.screen, built.saves, sound, built.messages);
+        await runIntro(built, sound);
+        wire(built, sound);
         start(built.game);
     } catch (error) {
         reportError(error);

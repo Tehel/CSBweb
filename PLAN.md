@@ -276,36 +276,46 @@ it later, along with the FAQ and the statistics page.
    On SIGTERM it stops listening, lets the requests in flight finish (5 s at most) and
    exits with 0; step 5 closes the database there. It logs to stdout.
    `tools/dump-server.ts` asserts all of it, `server.ts` included, run as its own process.
-4. ⏳ **The player id and the events.** All of this is page-side (`src/ui/`). The engine
-   sends nothing and stays silent, as it does today.
+4. ✅ **The player id and the events.** `src/ui/gameEvents.ts`, page-side: the engine
+   sends nothing and stays silent. Its one part in it is `GameHost.championJoined`, which
+   hands the page the champion, their mirror's name (`HallOfChampions.reincarnationSource`)
+   and whether they were reincarnated.
 
-   The player id is a `crypto.randomUUID()` drawn at first start and kept in
-   `localStorage`, as `src/ui/settings.ts` keeps the settings. If the player clears it,
-   the page draws a new one, and that is accepted: the id is for counting players, not
-   for knowing who they are.
+   The player id (`playerId`) is a `crypto.randomUUID()` drawn at first start and kept in
+   `localStorage` (`dmweb_player_v1`). If the player clears it, the page draws a new one,
+   and that is accepted: the id is for counting players, not for knowing who they are.
 
-   A game is its **playthrough** (`doc/SAVES.md` → "A playthrough"). The id is drawn when
-   the game is new and carried by every save, so one game's events link up across loads,
-   sessions and imports. Each event carries the player id, the data set, the playthrough
-   and the build (a git hash through Vite's `define`):
-   - `started`: a new game's first tick (the boot's new game, or RISE's new adventure).
-   - `party`: at `GameHost.championJoined` (`src/main.ts:343`), with the champions'
-     names. A DM party is empty at the first tick and fills up in the Hall.
-   - `won` and `lost`: at `showEndOfGame` (`src/main.ts:446`), with the game clock and
-     the party's names. A lost game also carries the level and square
-     (`party.state.position`, read there already).
+   A game is its **playthrough** (`doc/SAVES.md` → "A playthrough"), `d.RandomGameID`,
+   so one game's events link up across loads, sessions and imports. Each event is
+   `{ type, player, set, playthrough, build, payload }`, the build being the commit, or
+   `DMWEB_BUILD` where the build is given one (`vite.config.mts`'s `__DMWEB_BUILD__`):
+   - `started`, `{}`: a new game's first tick. A new game is the boot's or the end
+     screen's `readNewGame`, or RISE's adventure read (the entrance's, or the prison's
+     BEGIN THE ADVENTURE).
+   - `party`, `{ champions }`: the party as it stands once a champion has joined. A DM
+     party is empty at the first tick and fills up in the Hall.
+   - `won`, `{ gameTime, playTime, champions }`: the game clock (`d.Time`, in ticks),
+     the player's time in the game (`Game.playTime`, in ms), and the party, each
+     champion with their four masteries as the won screen shows them,
+     `DetermineMastery(chIdx, skill | 0xc000)` for fighter, ninja, priest and wizard.
+   - `lost`, `{ gameTime, playTime, champions, level, x, y }`: the same without the
+     masteries, and the square the party died on.
 
    **Anonymity is a rule of the code, not just of the FAQ.** No player's name, no
    address and no browser fingerprint (user agent, screen, language) is sent or stored.
-   A name typed on the Reincarnate screen is the player's own text, so it is never sent.
-   The champion is reported by its mirror's name (`HallOfChampions.reincarnationSource`)
-   and flagged as reincarnated. A party that comes from a save (RISE, an imported game)
-   has names nobody has vouched for, so a name is reported only if it is one of the
-   dungeon's mirrors. There is no `visit` event: the player id appears only with a game.
+   A name typed on the Reincarnate screen is the player's own text, so it is never sent:
+   a champion who joined in this page goes by their mirror's name, with
+   `reincarnated: true` when they were reincarnated. A champion this page did not see
+   join (a loaded game's, RISE's) has a name nobody has vouched for, which is reported
+   only if it is one of the set's mirrors, read from its `dungeon.dat` (`mirrorNames`),
+   and as `null` otherwise. A CSB adventure made from a DM party therefore names none of
+   it: CSB's mirrors are its prison's. There is no `visit` event: the player id appears
+   only with a game.
 
-   Events are sent with `navigator.sendBeacon`, and a failure is ignored: nothing an
-   event does delays or breaks the game. Only a production build sends them, so dev and
-   the tools never do.
+   Events are sent with `navigator.sendBeacon` to `api/event`, and a failure is ignored:
+   nothing an event does delays or breaks the game. Only a production build sends them;
+   dev shows them on the console, and the tools never send. `tools/dump-game-events.ts`
+   asserts all of it on the real engine, the Hall's joins and a genuine save included.
 5. ⏳ **The statistics store.** SQLite through `node:sqlite`, as in
    `linkedin-games/player`, in one `events` table: when, player, type, set, playthrough,
    build and a JSON payload.
@@ -326,10 +336,13 @@ it later, along with the FAQ and the statistics page.
    - **Preferred champions**: how often each one is in a party, per set.
    - **Where parties die**: lost games per set, level and square, which is enough for a
      heat map on `peek-dungeon`'s map.
-   - **Games won**: the game time, and the wall time since `started`.
+   - **Games won**: the game time, the play time and the wall time since `started`,
+     and the parties that won, with their masteries.
 6. ⏳ **The image and the stack.** A two-stage `Dockerfile` and a `.dockerignore`
    (`node_modules`, `dist`, `static/gamefiles`, `doc/CSBwin-src`, `RTC`, `archive`, `.env`,
-   `.git`). The build stage runs `npm ci && npm run build`, which includes `tsc`.
+   `.git`). The build stage runs `npm ci && npm run build`, which includes `tsc`. It
+   has no `.git`, so the commit comes in as a build argument, `DMWEB_BUILD`, which names
+   the build in the events (step 4).
    `npm test` needs the game files, so it stays the gate before a commit, not part of
    the image build.
 

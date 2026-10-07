@@ -178,8 +178,9 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
             MagicPanel, Feeding, Objects, Draw, HitTest, ViewportPicking, all over
             a shared UIState. See doc/UI_MODULE_MAP.md.
 ui/         DOM-side debug chrome (settings, map preview, champion panel), saveDrop
-            (the save menu's import: a file dropped on the page), and fatalMessage (the
-            screen an error that ends the game leaves)
+            (the save menu's import: a file dropped on the page), fatalMessage (the
+            screen an error that ends the game leaves), and gameEvents (what the
+            server's statistics are told: a game started, joined, won or lost)
 lib/        glfx (the CRT effect's WebGL) and its loader
 main.ts     Bootstrap and wiring
 ```

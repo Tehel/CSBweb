@@ -10,6 +10,17 @@
 import type { Champion } from './gameTypes';
 
 /**
+ * A champion who has joined (`GameHost.championJoined`): the name of the mirror's hero
+ * text, `AddCharacter`'s (`HallOfChampions.reincarnationSource`), which a REINCARNATE has
+ * replaced on the champion with the player's own.
+ */
+export interface JoinedChampion {
+  champion: Champion;
+  mirror: string;
+  reincarnated: boolean;
+}
+
+/**
  * Fragment-based message emitter, mirroring CSBWin's global `PrintLinefeed()` /
  * `QuePrintLines(color, text)` pair (`doc/CSBwin-src/CSBCode.cpp:1654`, `:1744`).
  *
@@ -71,9 +82,10 @@ export interface GameHost {
    * A champion has joined for good: RESURRECT or REINCARNATE has run to the end of
    * `_ResurrectReincarnateCancel` (`doc/CSBwin-src/CSBCode.cpp:6808`), the champion's name
    * printed and the inventory closed. Not CSBWin's: the page asks there whether the
-   * prison's party, once it is four, begins the adventure (`GameSaves.championJoined`).
+   * prison's party, once it is four, begins the adventure (`GameSaves.championJoined`),
+   * and reports the party (`src/ui/gameEvents.ts`).
    */
-  championJoined(): void;
+  championJoined(joined: JoinedChampion): void;
   /**
    * A champion's weapon hand changed (`AddCharacterPossession` /
    * `RemoveCharacterPossession`): `if (d.AttackingCharacterOrdinal == chIdx+1)
