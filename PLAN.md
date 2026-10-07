@@ -262,11 +262,10 @@ it later, along with the FAQ and the statistics page.
    copies that file beside `server/`. Running it locally needs Node 22.18 or later.
 
    It reads `PORT` (8080), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
-   `static/gamefiles/`), and serves:
+   `static/gamefiles/`), and `STATS_DB` (step 5), and serves:
    - `dist/`: `index.html` is `no-cache`, and `assets/`' hashed files are `immutable`.
    - `gamefiles/` from `GAMEFILES_DIR`, `no-cache`, with ETag and Last-Modified.
-   - `api/health`, for the compose healthcheck. `api/event` and `api/stats` come with
-     steps 4 and 5.
+   - `api/health`, for the compose healthcheck, and step 5's `api/event` and `api/stats`.
 
    Every file answers a conditional GET with 304, and only GET and HEAD are allowed. A
    path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once decoded,
@@ -274,7 +273,7 @@ it later, along with the FAQ and the statistics page.
    is built, that the manifest parses and that each folder it names exists, and exits
    with 1 otherwise, so a bad mount fails the container rather than the player's boot.
    On SIGTERM it stops listening, lets the requests in flight finish (5 s at most) and
-   exits with 0; step 5 closes the database there. It logs to stdout.
+   exits with 0, closing step 5's store. It logs to stdout.
    `tools/dump-server.ts` asserts all of it, `server.ts` included, run as its own process.
 4. ✅ **The player id and the events.** `src/ui/gameEvents.ts`, page-side: the engine
    sends nothing and stays silent. Its one part in it is `GameHost.championJoined`, which
@@ -316,28 +315,59 @@ it later, along with the FAQ and the statistics page.
    nothing an event does delays or breaks the game. Only a production build sends them;
    dev shows them on the console, and the tools never send. `tools/dump-game-events.ts`
    asserts all of it on the real engine, the Hall's joins and a genuine save included.
-5. ⏳ **The statistics store.** SQLite through `node:sqlite`, as in
-   `linkedin-games/player`, in one `events` table: when, player, type, set, playthrough,
-   build and a JSON payload.
+5. ⚠️ **The statistics store.** `server/stats.ts`: SQLite through `node:sqlite`, one
+   `events` table: when (the server's clock), player, type, set, playthrough, build and
+   the payload as JSON. The file is `STATS_DB` (the checkout's `stats/stats.db`, which git
+   ignores), made with its folder and its schema when missing. On the VPS it is in the
+   mounted `/data/stats`, never in the container's writable layer, which every deploy's
+   `down` loses. It runs in WAL mode, and the server closes it on SIGTERM, which
+   checkpoints the WAL into the file. A store that cannot be opened stops the server
+   before it listens.
 
-   The database file is on the host, in the mounted `/data/stats` (`STATS_DB`), and never
-   in the container's writable layer, which is lost on every deploy's `down`. It runs in
-   WAL mode, and the server closes it on SIGTERM so the WAL is checkpointed into the main
-   file. The server creates the schema if the file is missing.
+   `api/event` takes a POST only (`server/app.ts`). A rate limit of 30 events a minute per
+   address, counted in memory, comes first; the address is nginx's `X-Real-IP`, trusted
+   only because the port is on loopback, and it is never stored. A body is at most 4 KB
+   (413 otherwise), and `server/events.ts` checks it field by field and rebuilds it from
+   what passed, so a modified page cannot store free text: the player is a UUID, the
+   build a token, the set one of the manifest's, every number an integer in its range, at
+   most four champions, a won game's masteries four, and a champion's name one of the
+   set's mirrors, or `null`. An event stored answers 204, a bad one 400.
 
-   The server validates every event: a known type and a body of at most 4 KB. It also
-   checks every champion name against the set's mirrors and drops the others, so a
-   modified page cannot store free text either. A rate limit per address, in memory, trusts the forwarded address
-   only because the port is on loopback. No address is stored.
-
-   `api/stats` is public and returns aggregates only, never single events. The page
-   that shows them comes with the redesign. The aggregates are what the FAQ promises:
-   - **Use**: players, and games started and won per set and per week.
-   - **Preferred champions**: how often each one is in a party, per set.
+   `api/stats` is public, not cached, and returns aggregates only, never an event, a
+   player or a playthrough. The page that shows them comes with the redesign:
+   - **Use**: players ever, and per set and week (from Monday, UTC) the players and the
+     games started and won (distinct playthroughs).
+   - **Preferred champions**: per set, the games each mirror's champion was in a party of
+     (`party`, `won` and `lost` events).
    - **Where parties die**: lost games per set, level and square, which is enough for a
      heat map on `peek-dungeon`'s map.
-   - **Games won**: the game time, the play time and the wall time since `started`,
-     and the parties that won, with their masteries.
+   - **Games won**: each one's week, game time, play time and wall time since its
+     `started` (`null` when none came), and its party with their masteries.
+
+   `tools/dump-stats.ts` asserts the checks and the store's aggregates over a scripted
+   fortnight, `tools/dump-server.ts` the API over HTTP and the store's life in
+   `server.ts`, and `tools/dump-game-events.ts` that the server takes every event the
+   real engine makes as the page sent it.
+
+   ⚠️ **Not done: the server knows no set's mirrors**, so every champion's name is stored
+   as `null`, and the preferred champions stay empty (`server/server.ts` passes
+   `mirrors: () => new Set()`). The page reads them through `DungeonLoader`,
+   `extractPresetHeroes` and the text tables of `graphics.dat`'s item 0x22f, Conflux's
+   decipherment included, which Node cannot run as they are (their imports name no
+   `.ts`). How the server learns them is the author's decision:
+   - **A. The manifest names them.** Each set gets `"mirrors": [...]`, which a tool writes
+     from its `dungeon.dat` and `dump-data-sets` asserts against it; the server reads
+     them from the manifest it already parses, and stays as Node runs it. The page could
+     read them there too, and stop fetching `dungeon.dat` for them. The cost is a derived
+     list kept in a data file: the deployed manifest must be regenerated whenever a set
+     is added or changes, and a set without the list stores no names.
+   - **B. The server reads them from each set's files at start-up** (recommended), through
+     the page's own modules, bundled for Node by Vite's SSR build in the image's build
+     stage (the reader alone, or the whole server, which would also drop step 3's
+     erasable-syntax rule and the copy of `DataSets.ts`). Nothing derived is kept by hand,
+     and a set whose files do not load stops the container, as a bad mount does. The cost
+     is a build step for the server: `npm start` needs it first, and `dump-server` too.
+   - **C. No names.** The `null`s stay, and the preferred champions go from the FAQ.
 6. ⏳ **The image and the stack.** A two-stage `Dockerfile` and a `.dockerignore`
    (`node_modules`, `dist`, `static/gamefiles`, `doc/CSBwin-src`, `RTC`, `archive`, `.env`,
    `.git`). The build stage runs `npm ci && npm run build`, which includes `tsc`. It
@@ -345,6 +375,8 @@ it later, along with the FAQ and the statistics page.
    the build in the events (step 4).
    `npm test` needs the game files, so it stays the gate before a commit, not part of
    the image build.
+   Node still calls `node:sqlite` experimental and warns once at start-up; the exec form
+   can pass `--disable-warning=ExperimentalWarning`.
 
    `docker-compose.yaml`:
    - `127.0.0.1:<port>:80`.
@@ -366,4 +398,5 @@ it later, along with the FAQ and the statistics page.
 
    `doc/DEPLOYMENT.md` records the procedure, written as `linkedin-games/player`'s is.
 
-Status: ⚠️ steps 1 to 3 done; step 4 is next. It is the first row of `DEBT.md`'s index.
+Status: ⚠️ steps 1 to 4 done, and step 5 but for the champions' names, which wait on the
+author's choice of A, B or C; step 6 is next. It is the first row of `DEBT.md`'s index.

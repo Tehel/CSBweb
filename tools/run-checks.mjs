@@ -229,9 +229,11 @@ const CHECKS = [
   // CSB's long 0x231 carries CSBWin's four prison-door buttons (the canary).
   { tool: 'dump-data-sets.ts' },
   { tool: 'dump-build.ts' },
-  // The deployed server: its start-up check, caching, preconditions, refused paths, and
-  // server.ts itself, run as Node runs it, stopped by SIGTERM.
+  // The deployed server: its start-up check, caching, preconditions, refused paths, the
+  // statistics' API, and server.ts itself, run as Node runs it, stopped by SIGTERM.
   { tool: 'dump-server.ts' },
+  // The statistics: what api/event accepts and rebuilds, the SQLite store, its aggregates.
+  { tool: 'dump-stats.ts' },
   // The statistics' events the page sends: a new game's first tick, the Hall's joins by
   // their mirror's name, a won game's masteries, a lost game's square, and nothing typed.
   { tool: 'dump-game-events.ts' },

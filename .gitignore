@@ -16,5 +16,8 @@ static/backstory
 # WSL/NTFS alternate data stream droppings
 *:Zone.Identifier
 
+# the server statistics of `npm start`
+/stats/
+
 # CSBWin's source, fetched by npm run fetch-csbwin-src
 doc/CSBwin-src/

@@ -10,6 +10,9 @@
  * mirror's name, flagged; and a champion nobody saw join is named only by one of the
  * set's mirrors. And that an event can fail without failing the game.
  *
+ * And that the server takes every event the engine made as it is (`server/events.ts`): the
+ * page and the server agree on its shape, field for field.
+ *
  * Run: npx tsx tools/dump-game-events.ts
  */
 
@@ -24,6 +27,7 @@ import type { JoinedChampion } from '../src/engine/GameHost';
 import { DELTA_X, DELTA_Y } from '../src/engine/MonsterPerception';
 import { determineMastery } from '../src/engine/skills';
 import { GameEvents, mirrorNames, type GameEvent, type LostPayload, type PartyPayload, type WonPayload } from '../src/ui/gameEvents';
+import { checkEvent } from '../server/events.ts';
 import { check, finish } from './lib/check';
 import { dataSetNamed } from './lib/dataSets';
 import { newGame, presetHeroesOfGame, stockGraphics } from './lib/game';
@@ -38,6 +42,8 @@ const PLAYER = '00000000-0000-4000-8000-000000000000';
 const BUILD = 'test';
 
 const DM = dataSetNamed('dm-atari');
+/** Every event a harness sent where it was not told to send elsewhere. */
+const everySent: GameEvent[] = [];
 const dungeonDat = new Uint8Array(readFileSync(joinPath(DM.dir, 'dungeon.dat')));
 
 interface Harness {
@@ -64,7 +70,7 @@ function harness(options: { mirrors?: () => Promise<ReadonlySet<string>>; send?:
     build: BUILD,
     player: () => PLAYER,
     mirrors: options.mirrors ?? (async () => names),
-    send: options.send ?? ((event) => sent.push(event)),
+    send: options.send ?? ((event) => { sent.push(event); everySent.push(event); }),
   });
   (game as unknown as { reincarnating: () => number }).reincarnating = () => reincarnating;
   return { game, events, sent, settle: () => new Promise((done) => setTimeout(done, 0)) };
@@ -222,6 +228,17 @@ async function main(): Promise<void> {
       threw = true;
     }
     check(!threw, 'a send that throws reaches neither the game nor the page');
+  }
+
+  /* ------------------------------------------------- the server's check ----- */
+  {
+    const game = harness().game;
+    const rules = { sets: new Set([DM.id]), mirrors: () => mirrorNames(dungeonDat, game) };
+    const types = new Set(everySent.map((event) => event.type));
+    const changed = everySent.filter((event) => JSON.stringify(checkEvent(JSON.stringify(event), rules)) !== JSON.stringify(event));
+    console.log(`\n=== the server's check: ${everySent.length} events (${[...types].join(', ')}), ${changed.length} refused or changed ===`);
+    for (const event of changed) console.log(`  ${JSON.stringify(event)}: ${JSON.stringify(checkEvent(JSON.stringify(event), rules))}`);
+    check(types.size === 4 && changed.length === 0, "the server stores every type of the engine's events as the page sent it");
   }
 
   finish();

@@ -1,7 +1,7 @@
 /**
- * The deployed server (PLAN.md Phase 17, step 3, `server/`), stood up on a free port over
- * a scratch build and scratch game files, and asked what a browser, a curious visitor and
- * the compose healthcheck would ask.
+ * The deployed server (PLAN.md Phase 17, steps 3 and 5, `server/`), stood up on a free port
+ * over a scratch build, scratch game files and a scratch statistics store, and asked what a
+ * browser, a curious visitor, the page's beacon and the compose healthcheck would ask.
  *
  * Asserts:
  *   - the start-up check: the repository's manifest passes, and a missing `index.html`, a
@@ -13,19 +13,25 @@
  *   - no path leaves the two folders, `..` and `.` raw, percent-encoded or behind a
  *     backslash, and no dot-file is served;
  *   - `/api/health`, and a 405 for a method that is not GET or HEAD;
- *   - `server.ts` itself, as Node runs it: a bad mount exits 1 before it listens, and
- *     SIGTERM stops a listening server with 0.
+ *   - `/api/event`: POST only, an event stored (what is stored, `dump-stats` asserts), a bad
+ *     one 400, a body over 4 KB 413 whether it says so or not, and the rate limit per
+ *     forwarded address, 429; `/api/stats`: the store's aggregates, not cached;
+ *   - `server.ts` itself, as Node runs it: a bad mount or a store it cannot open exits 1
+ *     before it listens, and SIGTERM stops a listening server with 0, the store made and
+ *     its WAL checkpointed.
  *
  * Usage: npx tsx tools/dump-server.ts
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { checkFiles, createAppServer, pathSegments, type ServerOptions } from '../server/app.ts';
+import { checkFiles, createAppServer, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
+import { RateLimit } from '../server/events.ts';
+import { StatsStore } from '../server/stats.ts';
 import { GAMEFILES_DIR } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -43,7 +49,7 @@ interface Answer {
 }
 
 /** `path` sent as it is: `fetch` would resolve its `..` before the server saw it. */
-function ask(port: number, path: string, method = 'GET', headers: Record<string, string> = {}): Promise<Answer> {
+function ask(port: number, path: string, method = 'GET', headers: Record<string, string> = {}, body?: string): Promise<Answer> {
     return new Promise((done, fail) => {
         const req = request({ host: '127.0.0.1', port, path, method, headers }, (res) => {
             let body = '';
@@ -52,7 +58,7 @@ function ask(port: number, path: string, method = 'GET', headers: Record<string,
             res.on('end', () => done({ status: res.statusCode ?? 0, headers: res.headers, body }));
         });
         req.on('error', fail);
-        req.end();
+        req.end(body);
     });
 }
 
@@ -171,6 +177,44 @@ async function checkAnswers(port: number): Promise<void> {
     check((await ask(port, '/api/health', 'DELETE')).status === 405, 'DELETE on /api/health: 405');
 }
 
+const PLAYER = '00000000-0000-4000-8000-000000000000';
+/** The scratch server's rate limit: events per address and window. */
+const EVENTS_PER_WINDOW = 5;
+
+async function checkEvents(port: number, store: StatsStore): Promise<void> {
+    console.log('\nThe statistics:');
+    let address = 0;
+    /** Each from its own address, so that only the rate limit's own check meets it. */
+    const post = (body: string, headers: Record<string, string> = {}) =>
+        ask(port, '/api/event', 'POST', { 'Content-Type': 'text/plain;charset=UTF-8', 'X-Real-IP': `10.0.0.${++address}`, ...headers }, body);
+    const event = (playthrough: number) => JSON.stringify({ type: 'started', player: PLAYER, set: 'a', playthrough, build: 'test', payload: {} });
+
+    const stored = await post(event(1));
+    check(stored.status === 204 && stored.body === '', 'an event: 204, no body');
+    const stats = await ask(port, '/api/stats');
+    console.log(`  /api/stats: ${stats.body.replace(/"week":"[^"]+"/g, '"week":<this week>')}`);
+    check(stats.status === 200 && String(stats.headers['content-type']).startsWith('application/json') && stats.headers['cache-control'] === 'no-store',
+        '/api/stats: JSON, not cached');
+    check(JSON.stringify(JSON.parse(stats.body)) === JSON.stringify(store.stats()) && store.stats().players === 1, 'the store\'s aggregates, the event in them');
+    check((await ask(port, '/api/stats', 'HEAD')).body === '', 'HEAD /api/stats: no body');
+
+    const bad = await post(event(-1));
+    check(bad.status === 400 && bad.body === 'Bad event: bad playthrough', `a bad event: ${bad.status}, ${bad.body}`);
+    const big = JSON.stringify({ ...JSON.parse(event(2)), padding: 'x'.repeat(4096) });
+    check((await post(big)).status === 413, 'a body over 4 KB that says so: 413');
+    check((await post(big, { 'Transfer-Encoding': 'chunked' })).status === 413, 'a body over 4 KB, chunked: 413');
+    const get = await ask(port, '/api/event');
+    check(get.status === 405 && get.headers.allow === 'POST', 'GET on /api/event: 405, with Allow: POST');
+    check(store.stats().players === 1, 'and none of those was stored');
+
+    const answers: number[] = [];
+    for (let i = 0; i <= EVENTS_PER_WINDOW; i++) answers.push((await post(event(10 + i), { 'X-Real-IP': '10.1.1.1' })).status);
+    console.log(`  ${EVENTS_PER_WINDOW + 1} events from one address: ${answers.join(' ')}`);
+    check(answers.slice(0, -1).every((status) => status === 204) && answers[EVENTS_PER_WINDOW] === 429, `the rate limit: ${EVENTS_PER_WINDOW} an address, then 429`);
+    check((await post(event(20), { 'X-Real-IP': '10.1.1.2' })).status === 204, 'another address is still heard');
+    check((await ask(port, '/api/event', 'POST', {}, event(21))).status === 204, 'without X-Real-IP, the socket\'s address counts');
+}
+
 /** `server.ts` run as Node runs it: on its own types where this Node strips them, through tsx otherwise. */
 function startEntry(env: Record<string, string>): ChildProcess {
     const strips = (process.features as { typescript?: unknown }).typescript;
@@ -178,6 +222,11 @@ function startEntry(env: Record<string, string>): ChildProcess {
     return spawn(process.execPath, [...args, join(ROOT, 'server', 'server.ts')], {
         cwd: ROOT, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'],
     });
+}
+
+/** The first line that is not Node's warning about `node:sqlite`. */
+function firstLine(out: string): string {
+    return out.trim().split('\n').find((line) => !line.includes('ExperimentalWarning') && !line.includes('--trace-warnings')) ?? '';
 }
 
 /** What the child printed, and its exit code, once it ends; `onLine` sees each line as it comes. */
@@ -198,12 +247,16 @@ function finish(child: ChildProcess, onLine: (line: string) => void = () => {}):
 
 async function checkEntry(scratch: string, options: ServerOptions): Promise<void> {
     console.log('\nserver.ts:');
-    const badMount = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: join(scratch, 'nowhere') }));
-    console.log(`  bad mount: exit ${badMount.code}, ${badMount.out.trim()}`);
+    const statsDb = join(scratch, 'stats', 'stats.db');
+    const badMount = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: join(scratch, 'nowhere'), STATS_DB: statsDb }));
+    console.log(`  bad mount: exit ${badMount.code}, ${firstLine(badMount.out).replace(scratch, '<scratch>')}`);
     check(badMount.code === 1 && badMount.out.includes('Not starting:'), 'a bad mount exits 1 before it listens');
+    const badStore = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: options.distDir }));
+    console.log(`  bad store: exit ${badStore.code}, ${firstLine(badStore.out).replace(scratch, '<scratch>')}`);
+    check(badStore.code === 1 && badStore.out.includes('Not starting:'), 'a store it cannot open exits 1 before it listens');
 
     let healthy = false;
-    const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir });
+    const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: statsDb });
     const ended = finish(child, (line) => {
         const listening = /^Listening on port (\d+)/.exec(line);
         if (!listening) return;
@@ -212,25 +265,39 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
             .finally(() => child.kill('SIGTERM'));
     });
     const { code, out } = await ended;
-    for (const line of out.trim().split('\n')) console.log(`  | ${line.replace(scratch, '<scratch>').replace(scratch, '<scratch>')}`);
+    for (const line of out.trim().split('\n')) {
+        if (!line.includes('ExperimentalWarning') && !line.includes('--trace-warnings')) console.log(`  | ${line.split(scratch).join('<scratch>')}`);
+    }
     check(healthy, 'it listens on the PORT given, 0 for a free one, and answers /api/health');
     check(code === 0 && out.includes('SIGTERM: shutting down') && out.includes('Stopped'), 'SIGTERM stops it, with 0');
+    check(existsSync(statsDb) && !existsSync(`${statsDb}-wal`), 'the store was made, its folder too, and closed with its WAL checkpointed');
 }
 
 async function main(): Promise<void> {
     const scratch = mkdtempSync(join(tmpdir(), 'dmweb-server-'));
     let server: Server | null = null;
+    let store: StatsStore | null = null;
     try {
         const options = scratchFiles(scratch);
         checkStartUp(scratch, options);
 
-        server = createAppServer(options);
+        store = new StatsStore(join(scratch, 'scratch-stats.db'));
+        const api: ApiOptions = {
+            store,
+            rules: { sets: new Set(['a']), mirrors: () => new Set() },
+            rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
+            now: Date.now,
+        };
+        server = createAppServer(options, api);
         await new Promise<void>((done) => server!.listen(0, '127.0.0.1', done));
-        await checkAnswers((server.address() as AddressInfo).port);
+        const port = (server.address() as AddressInfo).port;
+        await checkAnswers(port);
+        await checkEvents(port, store);
 
         await checkEntry(scratch, options);
     } finally {
         server?.close();
+        store?.close();
         rmSync(scratch, { recursive: true, force: true });
     }
 
