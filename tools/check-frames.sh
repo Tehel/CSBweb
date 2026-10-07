@@ -13,9 +13,9 @@
 #
 #   bash tools/check-frames.sh            # compare against the committed baseline
 #   bash tools/check-frames.sh --update   # accept the current rendering as the baseline
-#   bash tools/check-frames.sh --url http://localhost:8080/
+#   bash tools/check-frames.sh --url http://localhost:8088/
 #                                         # compare a page served elsewhere: the image's
-#                                         # (Dockerfile), built with DMWEB_PROBE=1
+#                                         # (Dockerfile), built with CSBWEB_PROBE=1
 set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root" || exit 1

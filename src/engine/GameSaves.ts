@@ -132,7 +132,7 @@ export function makeSaveFileName(savedAt: number, taken: ReadonlySet<string> = n
     const d = new Date(savedAt);
     const p = (n: number, w = 2) => String(n).padStart(w, '0');
     const stem =
-        `dmweb-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}` +
+        `csbweb-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}` +
         `-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
     let name = `${stem}${SAVE_FILE_EXTENSION}`;
     let n = 2;

@@ -15,7 +15,7 @@ export type EventType = (typeof EVENT_TYPES)[number];
 
 /** `crypto.randomUUID()`'s form, which `playerId` draws. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-/** A commit, or the image's `DMWEB_BUILD`. */
+/** A commit, or the image's `CSBWEB_BUILD`. */
 const BUILD = /^[0-9A-Za-z._-]{1,40}$/;
 /** `CHARDESC.name[8]`, its last byte the terminating NUL (`doc/CSBwin-src/CSB.h:2486`). */
 const MAX_NAME = 7;

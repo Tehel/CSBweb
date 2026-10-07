@@ -10,7 +10,7 @@
  *   - the CRT's scanlines are in the bundle, not fetched by a name the build no longer
  *     serves;
  *   - the bundle hands the probes no `window.__probe`, which only a build made with
- *     `DMWEB_PROBE=1` does (`vite.config.mts`): the image the golden frames check.
+ *     `CSBWEB_PROBE=1` does (`vite.config.mts`): the image the golden frames check.
  *
  * Usage: npx tsx tools/dump-build.ts
  */
@@ -36,11 +36,11 @@ function listFiles(dir: string): string[] {
 }
 
 async function main(): Promise<void> {
-    const outDir = mkdtempSync(join(tmpdir(), 'dmweb-build-'));
+    const outDir = mkdtempSync(join(tmpdir(), 'csbweb-build-'));
     try {
         const vite = spawnSync(resolve(ROOT, 'node_modules/.bin/vite'),
             ['build', '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'],
-            { cwd: ROOT, encoding: 'utf8', env: { ...process.env, DMWEB_PROBE: undefined } });
+            { cwd: ROOT, encoding: 'utf8', env: { ...process.env, CSBWEB_PROBE: undefined } });
         if (vite.status !== 0) throw new Error(`vite build failed:\n${vite.stdout}${vite.stderr}`);
 
         const files = listFiles(outDir).map((f) => relative(outDir, f)).sort();

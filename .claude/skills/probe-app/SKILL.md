@@ -1,6 +1,6 @@
 ---
 name: probe-app
-description: Look at the running DMweb app and read its live state — take a screenshot, click the canvas, evaluate an expression against the real game object. Use when a bug only shows on screen (a panel prints the wrong word, a click lands on the wrong champion, an object is in the chain but not drawn) and a headless tools/dump-*.ts therefore cannot see it.
+description: Look at the running CSBweb app and read its live state — take a screenshot, click the canvas, evaluate an expression against the real game object. Use when a bug only shows on screen (a panel prints the wrong word, a click lands on the wrong champion, an object is in the chain but not drawn) and a headless tools/dump-*.ts therefore cannot see it.
 ---
 
 # Probing the running app
@@ -64,11 +64,11 @@ only by a screenshot has no regression test.
 
 ## The handle
 
-`src/main.ts` creates `window.__probe` under `__DMWEB_PROBE__`, a build-time constant
+`src/main.ts` creates `window.__probe` under `__CSBWEB_PROBE__`, a build-time constant
 (`vite.config.mts`), not under `isDebugFeaturesEnabled()` like the rest of the Phase 14
 scaffolding. That is deliberate: the Debug toggle is applied from saved UI settings
 *after* init runs, so it always reads false at that point. The constant is true on the
-dev server, and in a build only with `DMWEB_PROBE=1`, which `tools/check-image.sh` gives
+dev server, and in a build only with `CSBWEB_PROBE=1`, which `tools/check-image.sh` gives
 the image it checks the golden frames against. A deployed bundle has no handle
 (`tools/dump-build.ts` asserts it).
 

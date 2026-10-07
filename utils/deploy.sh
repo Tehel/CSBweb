@@ -28,17 +28,17 @@ set +a
 build="$(git -C "$root" rev-parse --short HEAD)"
 [ -z "$(git -C "$root" status --porcelain --untracked-files=no)" ] || build="$build-dirty"
 
-echo "building dmweb:latest ($build)"
-docker build --build-arg DMWEB_BUILD="$build" -t dmweb:latest "$root"
+echo "building csbweb:latest ($build)"
+docker build --build-arg CSBWEB_BUILD="$build" -t csbweb:latest "$root"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-docker save dmweb:latest | gzip > "$tmp/dmweb.tar.gz"
+docker save csbweb:latest | gzip > "$tmp/csbweb.tar.gz"
 
 echo "shipping to $DEPLOY_HOST:$DEPLOY_DIR"
 # stats/ is made here, by the login user, so that the container's uid 1000 can write it.
-ssh "$DEPLOY_HOST" "mkdir -p '$DEPLOY_DIR/app' '$DEPLOY_DIR/stats'"
-scp "$tmp/dmweb.tar.gz" "$root/docker-compose.yaml" "$DEPLOY_HOST:$DEPLOY_DIR/app/"
-ssh "$DEPLOY_HOST" "cd '$DEPLOY_DIR/app' && gunzip -c dmweb.tar.gz | docker load && rm dmweb.tar.gz \
+ssh "$DEPLOY_HOST" "mkdir -p '$DEPLOY_DIR/stats'"
+scp "$tmp/csbweb.tar.gz" "$root/docker-compose.yaml" "$DEPLOY_HOST:$DEPLOY_DIR/"
+ssh "$DEPLOY_HOST" "cd '$DEPLOY_DIR' && gunzip -c csbweb.tar.gz | docker load && rm csbweb.tar.gz \
   && docker-compose down && docker-compose up -d && docker-compose ps"
 echo "deployed $build"

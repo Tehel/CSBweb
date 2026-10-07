@@ -1,4 +1,4 @@
-# dmweb – Technical debt
+# csbweb – Technical debt
 
 This file is the **authority on technical debt**: everything known to be wrong, divergent
 from CSBWin, duplicated, or left unfinished in code that is otherwise considered done. It

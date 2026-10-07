@@ -8,7 +8,7 @@
 import { stampBlock1Rows, stampSaveRecords, upgradeSaveRecords } from './legacyRows';
 import type { DrawPlaythrough, StoredSaveRecord } from './SaveStore';
 
-const DB_NAME = 'dmweb-saves';
+const DB_NAME = 'csbweb-saves';
 /**
  * 4: no row's file holds 0 in all four of `GAMEBLOCK1`'s `Byte22598`, `Byte22596`,
  * `Word22594` and `Word22592`. 3: every row names a playthrough, its file's own. 2: a

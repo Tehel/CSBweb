@@ -1,4 +1,4 @@
-# DMweb
+# CSBweb
 
 A TypeScript/Canvas port of **Dungeon Master** (Atari ST), running in the browser.
 

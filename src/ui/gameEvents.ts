@@ -160,7 +160,7 @@ export class GameEvents {
     }
 }
 
-const PLAYER_ID_KEY = 'dmweb_player_v1';
+const PLAYER_ID_KEY = 'csbweb_player_v1';
 
 /**
  * The player's id: a `crypto.randomUUID()` drawn at first start and kept in

@@ -1,5 +1,5 @@
 {
-  "name": "dmweb",
+  "name": "csbweb",
   "version": "0.0.1",
   "description": "Dungeon Master for web browser",
   "scripts": {
@@ -8,7 +8,8 @@
     "test": "node tools/run-checks.mjs",
     "fetch-csbwin-src": "node tools/fetch-csbwin-src.mjs",
     "preview": "vite preview",
-    "start": "node server/server.ts"
+    "start": "node server/server.ts",
+    "deploy": "utils/deploy.sh"
   },
   "repository": {
     "type": "git",

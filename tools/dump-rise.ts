@@ -336,7 +336,7 @@ const PRISON = new DungeonLoader().loadDungeonDat(read(resolve(CSB, 'dungeon.dat
 const PRISON_HEROES = presetHeroesOf(PRISON, graphics);
 
 /** A save's name as printed: its date is the wall clock's, which would make the output vary. */
-const undated = (text: string): string => text.replace(/dmweb-\d{8}-\d{6}(-\d+)?/g, 'dmweb-<date>');
+const undated = (text: string): string => text.replace(/csbweb-\d{8}-\d{6}(-\d+)?/g, 'csbweb-<date>');
 
 /** The prison's game, under `dataSet`, its saves in `store`, and what asked the question. */
 function prisonGame(store: ReturnType<typeof memoryStore>, dataSet = 'csb') {

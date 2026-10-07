@@ -37,7 +37,7 @@
 //
 // CDP_PORT overrides the DevTools port (default 9222), and APP_URL the page (the dev
 // server on DEV_PORT, 9000), which must have `window.__probe`: the dev server's, or a
-// build's made with `DMWEB_PROBE=1` (`vite.config.mts`).
+// build's made with `CSBWEB_PROBE=1` (`vite.config.mts`).
 //
 // This is the closest thing the project has to a rendering test (PLAN.md Phase 15) — it
 // caught nothing during the Phase 14 split, which is exactly what it was there to do.
@@ -148,7 +148,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   // A page opened with \`keepsaves\` keeps the store, so a game saved on one page can be
   // resumed from the entrance of the next.
   if (!location.search.includes('keepsaves')) {
-    try { indexedDB.deleteDatabase('dmweb-saves'); } catch (e) {}
+    try { indexedDB.deleteDatabase('csbweb-saves'); } catch (e) {}
   }
   let seed = 0x2545f491;
   Math.random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
@@ -276,7 +276,7 @@ check(onHeading !== chooserUp && onHeading !== entrance && (await canvasPixels()
 // What the file holds is `tools/dump-save-menu.ts`'s to show.
 await canvasClick(195, 168, 0); await wait(1000);
 console.log('  downloads:', downloads.join(', ') || 'none');
-check(downloads.length === 1 && /^dmweb-\d{8}-\d{6}\.dat$/.test(downloads[0]),
+check(downloads.length === 1 && /^csbweb-\d{8}-\d{6}\.dat$/.test(downloads[0]),
   'EXPORT in the chooser starts one download, a .dat under the save\'s name');
 // A file dropped on the page while the chooser is up: the page's own listener
 // (`bindSaveDrop`, `src/ui/saveDrop.ts`), which no Node tool can run either. The file is
@@ -415,7 +415,7 @@ console.log('state: Conflux start');     await shot('18-conflux-start');
 // effect in the saved settings: the intro is drawn through it, and a real click on the
 // entrance's scroll brings up the credits, as the click for frame 08 did.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
-  try { localStorage.setItem('dmweb_ui_settings_v1', JSON.stringify({ crt: true })); } catch (e) {}
+  try { localStorage.setItem('csbweb_ui_settings_v1', JSON.stringify({ crt: true })); } catch (e) {}
 ` });
 await send('Page.navigate', { url: `${APP}?keepsaves` });
 await wait(7000);

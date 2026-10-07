@@ -3,7 +3,7 @@ description: Resume paying off DEBT.md, one item (or one step) per session
 argument-hint: "[notes: the author's answer to a pending decision, or an item to take instead]"
 ---
 
-Resume paying off DMweb's technical debt.
+Resume paying off CSBweb's technical debt.
 
 ## Notes for this session
 

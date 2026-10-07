@@ -1,4 +1,4 @@
-# dmweb – Implementation Plan
+# csbweb – Implementation Plan
 
 Project priority: **maximum compliance with the CSBWin C++ implementation** in `doc/CSBwin-src/`.
 
@@ -261,7 +261,7 @@ it later, along with the FAQ and the statistics page.
    manifest parser, `src/data/DataSets.ts`, which the server imports: step 6's image
    copies that file beside `server/`. Running it locally needs Node 22.18 or later.
 
-   It reads `PORT` (8080), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
+   It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
    `static/gamefiles/`), and `STATS_DB` (step 5), and serves:
    - `dist/`: `index.html` is `no-cache`, and `assets/`' hashed files are `immutable`.
    - `gamefiles/` from `GAMEFILES_DIR`, `no-cache`, with ETag and Last-Modified.
@@ -280,13 +280,13 @@ it later, along with the FAQ and the statistics page.
    hands the page the champion and whether they were reincarnated.
 
    The player id (`playerId`) is a `crypto.randomUUID()` drawn at first start and kept in
-   `localStorage` (`dmweb_player_v1`). If the player clears it, the page draws a new one,
+   `localStorage` (`csbweb_player_v1`). If the player clears it, the page draws a new one,
    and that is accepted: the id is for counting players, not for knowing who they are.
 
    A game is its **playthrough** (`doc/SAVES.md` → "A playthrough"), `d.RandomGameID`,
    so one game's events link up across loads, sessions and imports. Each event is
    `{ type, player, set, playthrough, build, payload }`, the build being the commit, or
-   `DMWEB_BUILD` where the build is given one (`vite.config.mts`'s `__DMWEB_BUILD__`):
+   `CSBWEB_BUILD` where the build is given one (`vite.config.mts`'s `__CSBWEB_BUILD__`):
    - `started`, `{}`: a new game's first tick. A new game is the boot's or the end
      screen's `readNewGame`, or RISE's adventure read (the entrance's, or the prison's
      BEGIN THE ADVENTURE).
@@ -354,17 +354,17 @@ it later, along with the FAQ and the statistics page.
    the tools' `.ts` that `tsc` checks beside them, and the package and build files, so
    no game file, no `.git` and no `.env` can reach it. The build stage runs
    `npm ci && npm run build`, `tsc` included. It has no `.git`, so the commit comes in
-   as the build argument `DMWEB_BUILD`, which names the build in the events (step 4).
+   as the build argument `CSBWEB_BUILD`, which names the build in the events (step 4).
    The runtime stage has no `node_modules`: `package.json` (for `"type": "module"`),
    `server/`, `src/data/DataSets.ts` and the built `dist/`. It runs as `USER node`
    (uid 1000), with the exec form, so Node is PID 1 and gets SIGTERM, and
    `--disable-warning=ExperimentalWarning` silences `node:sqlite`'s. The server listens
-   on 8080 in the container, where an unprivileged user needs no capability to bind it.
+   on 8085 in the container, where an unprivileged user needs no capability to bind it.
    `npm test` needs the game files, so it stays the gate before a commit, not part of
    the image build.
 
-   `docker-compose.yaml` (`version: '3.8'`, for the VPS's Compose v1) runs `dmweb:latest`
-   on `127.0.0.1:${DMWEB_PORT:-8080}:8080`, the port from an optional `.env` beside it,
+   `docker-compose.yaml` (`version: '3.8'`, for the VPS's Compose v1) runs `csbweb:latest`
+   on `127.0.0.1:${CSBWEB_PORT:-8085}:8085`, the port from an optional `.env` beside it,
    mounts `../gamefiles:/data/gamefiles:ro` and `../stats:/data/stats`, and has
    `restart: unless-stopped`, a 10 s `stop_grace_period`, a healthcheck on `api/health`
    (busybox's `wget`) and `json-file` logs rotated at 3 x 10 MB. On the VPS it lives in
@@ -377,7 +377,7 @@ it later, along with the FAQ and the statistics page.
    then loads the image and runs `docker-compose down && up -d`. The author runs it.
 
    The page's probe handle (`window.__probe`, `src/main.ts`) is the dev server's, and a
-   build's only with `DMWEB_PROBE=1` (`__DMWEB_PROBE__`, `vite.config.mts`); a deployed
+   build's only with `CSBWEB_PROBE=1` (`__CSBWEB_PROBE__`, `vite.config.mts`); a deployed
    bundle has none, which `tools/dump-build.ts` asserts. `tools/check-image.sh` builds
    the image with it, runs it over the checkout's game files, and runs
    `tools/check-frames.sh --url` against it: the eighteen golden frames, drawn by the

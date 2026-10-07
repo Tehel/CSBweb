@@ -33,7 +33,7 @@ npm test -- --frames   # ...and the golden frames (needs google-chrome)
 ## Project Structure
 
 ```
-dmweb/
+csbweb/
 ├── src/                   # TypeScript source; CLAUDE.md → "Code layout" has the map
 │   ├── core/              # binary reads, decompression, image decoding, object ids
 │   ├── data/              # dungeon.dat, graphics.dat and save-file readers and writers

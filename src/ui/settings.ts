@@ -1,7 +1,7 @@
 import { getUIContext, isDebugFeaturesEnabled, isExtrasEnabled, setDebugFeaturesEnabled, setExtrasEnabled } from './context';
 import { isChampionPanelVisible, updateChampionPanel } from './championPanel';
 
-const UI_SETTINGS_KEY = 'dmweb_ui_settings_v1';
+const UI_SETTINGS_KEY = 'csbweb_ui_settings_v1';
 
 export interface UISettings {
     mapVisible: boolean;

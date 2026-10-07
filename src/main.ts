@@ -403,7 +403,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const events = new GameEvents({
         game,
         set: dataSet.id,
-        build: __DMWEB_BUILD__,
+        build: __CSBWEB_BUILD__,
         player: playerId,
         send: import.meta.env.PROD ? sendBeacon : (event) => console.debug('Event, not sent:', event),
     });
@@ -678,9 +678,9 @@ async function init() {
         // Guarded on a build-time flag rather than `isDebugFeaturesEnabled()`, which the
         // rest of the Phase 14 scaffolding uses: that toggle is applied from the saved UI
         // settings *after* this init runs, so it always reads false here.
-        // `__DMWEB_PROBE__` is the dev server's, and a build's only with `DMWEB_PROBE=1`
+        // `__CSBWEB_PROBE__` is the dev server's, and a build's only with `CSBWEB_PROBE=1`
         // (`vite.config.mts`), so the handle cannot reach a deployed bundle.
-        if (__DMWEB_PROBE__) {
+        if (__CSBWEB_PROBE__) {
             // `presetHeroes`: the heroes behind the dungeon's mirrors, for `tools/lib/buildParty.mjs`.
             const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode);
             (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView, presetHeroes, applySaveBytes };

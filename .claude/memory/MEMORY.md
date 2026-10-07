@@ -1,4 +1,4 @@
-# DMweb project memory
+# CSBweb project memory
 
 One line per memory in this directory. Committed with the project; never shared.
 

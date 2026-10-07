@@ -196,7 +196,7 @@ function checkStore(scratch: string): void {
 }
 
 function main(): void {
-    const scratch = mkdtempSync(join(tmpdir(), 'dmweb-stats-'));
+    const scratch = mkdtempSync(join(tmpdir(), 'csbweb-stats-'));
     try {
         checkTheChecks();
         checkStore(scratch);

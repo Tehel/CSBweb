@@ -1,6 +1,6 @@
 ---
 name: playtest-bug
-description: Diagnose and fix a bug noticed while playing DMweb. Use when the author reports something wrong on screen or in play — a panel that prints nothing, an item that behaves wrong, a click that acts on the wrong champion, a timer that stalls, a thing that should resurrect and doesn't. Covers orienting cheaply, triangulating against CSBWin, and the five things every fix owes.
+description: Diagnose and fix a bug noticed while playing CSBweb. Use when the author reports something wrong on screen or in play — a panel that prints nothing, an item that behaves wrong, a click that acts on the wrong champion, a timer that stalls, a thing that should resurrect and doesn't. Covers orienting cheaply, triangulating against CSBWin, and the five things every fix owes.
 ---
 
 # Fixing a playtest bug

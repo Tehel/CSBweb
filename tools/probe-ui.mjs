@@ -80,7 +80,7 @@ if (!(await up(CDP, '/json/version'))) {
   console.error(`starting headless chrome on :${CDP}`);
   spawn('google-chrome', [
     '--headless=new', `--remote-debugging-port=${CDP}`,
-    `--user-data-dir=${join(tmpdir(), 'dmweb-probe-profile')}`,
+    `--user-data-dir=${join(tmpdir(), 'csbweb-probe-profile')}`,
     '--no-first-run', '--no-default-browser-check', '--window-size=1600,1000',
     `http://localhost:${APP}/`,
   ], { detached: true, stdio: 'ignore' }).unref();
@@ -136,7 +136,7 @@ const boot = async () => {
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `
     try {
       localStorage.clear();
-      localStorage.setItem('dmweb_ui_settings_v1', JSON.stringify({
+      localStorage.setItem('csbweb_ui_settings_v1', JSON.stringify({
         mapVisible: true, smooth: false,
         debug: true, crt: false, soundEnabled: false, soundVolume: 0.8 }));
     } catch (e) {}

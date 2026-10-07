@@ -274,7 +274,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
 }
 
 async function main(): Promise<void> {
-    const scratch = mkdtempSync(join(tmpdir(), 'dmweb-server-'));
+    const scratch = mkdtempSync(join(tmpdir(), 'csbweb-server-'));
     let server: Server | null = null;
     let store: StatsStore | null = null;
     try {
