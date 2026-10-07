@@ -335,6 +335,9 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
   if (ui.pressingMouth) return;
   if (ui.pressingEye) return;
   setClockTick(ui.ctx, 1);
+  // `videoMode = VM_ADVENTURE` as an open inventory closes (`:7453`), and
+  // `VM_INVENTORY` as one opens (`:7487`).
+  if (ui.partyState.selectedCharacterIndex >= 0) ui.ctx.loop.videoMode = 'VM_ADVENTURE';
   if (button === 4) {
     syncOpenChest(ui, null);
     ui.partyState.selectedCharacterIndex = -1;
@@ -347,6 +350,7 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
   if (ui.partyState.selectedCharacterIndex !== previous) {
     syncOpenChest(ui, null);
   }
+  if (ui.partyState.selectedCharacterIndex >= 0) ui.ctx.loop.videoMode = 'VM_INVENTORY';
   syncInventoryButtons(ui);
   // `ShowHideInventory`'s `CHARFLAG_chestOrScroll` and `DrawCharacterState`
   // (`doc/CSBwin-src/CSBCode.cpp:7504-7514`), which never runs with the eye held (`:7440`).
@@ -398,6 +402,7 @@ export function tag0207cc(ui: UIState): void {
   const selected = party.selectedCharacterIndex;
   if (selected >= 0) {
     party.selectedCharacterIndex = -1;
+    ui.ctx.loop.videoMode = 'VM_ADVENTURE';
     handleInventoryToggle(ui, selected);
   }
 }

@@ -2785,9 +2785,15 @@ with 256 colours; `UpdateScreenArea` reads line `135 - line`, the file's bottom-
 `useOverlay` set to `videoMode == VM_ADVENTURE` and the viewport's palette,
 `d.Palette11946` while `d.DynamicPaletteSwitching` is on (`doc/CSBwin-src/WinScreen.cpp:1493-1527`).
 An open inventory leaves `VM_ADVENTURE` (`CSBCode.cpp:7487`, back at `:7453`), and so do
-sleep (`Mouse.cpp:1703`), the freeze (`:1735`, back at `:1764`) and a save menu
-(`Menu.cpp:465-472`); from sleep and a menu CSBWin goes back at the next tick's start,
-unless an inventory is open or the party sleeps (`CSBCode.cpp:603-611`).
+sleep (`Mouse.cpp:1703`, back in `WakeUp`, `CSBCode.cpp:7062`), the freeze (`Mouse.cpp:1735`,
+back at `:1764`) and a menu (`Menu.cpp:465-472`: `VM_LEFTMENU` for the disk menu,
+`VM_CENTERMENU` for `_ReadEntireGame`'s). Nothing puts a menu's mode back as it closes:
+the next tick's top does, any mode but `VM_INVENTORY` and while the party is awake
+(`CSBCode.cpp:603-611`), so the viewport is straight until then. A disk menu closed over an
+open inventory goes to `VM_INVENTORY` at once, through `TAG0207cc`'s `ShowHideInventory`
+(`SaveGame.cpp:1274`, `CSBCode.cpp:9953-9958`). A game starts outside `VM_ADVENTURE` (the
+prison door, `CSBCode.cpp:9579`, or a menu), and its first tick sets it
+(`tools/dump-video-mode.ts`).
 
 `UpdateScreenArea` allocates the overlay's memory and builds `m_table` afresh
 (`WinScreen.cpp:1064-1065`), 8192 bytes, 256 overlay bytes by 16 Atari colours

@@ -409,10 +409,15 @@ export function isSaveMenuOpen(ui: UIState): boolean {
  * The full screen is the disk menu, `_DisplayDiskMenu`, so `TAG02076e` runs first
  * (`doc/CSBwin-src/SaveGame.cpp:860`) and `TAG0207cc` last (`:1274`): `tag02076e` and
  * `tag0207cc`. The load-only one is `_ReadEntireGame` (`:1435`), which calls neither.
+ * `_DoMenu` sets `videoMode` (`Menu.cpp:465-472`): `VM_LEFTMENU` for the disk menu's
+ * `ClearOldScreen` of 0 (`SaveGame.cpp:870`), `VM_CENTERMENU` for `_ReadEntireGame`'s 1
+ * (`:1549`). Closing the menu leaves it, until `TAG0207cc` shows an open inventory again
+ * or the next tick's top (`CSBCode.cpp:603-611`).
  */
 export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
   if (ui.saveMenu) return;
   if (mode === 'full') tag02076e(ui);
+  ui.ctx.loop.videoMode = mode === 'full' ? 'VM_LEFTMENU' : 'VM_CENTERMENU';
   ui.ctx.state.paused = true;
   ui.saveMenu = {
     mode,

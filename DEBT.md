@@ -91,7 +91,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C148 | The overlay comes back as a save menu or sleep ends, not at the next tick | S | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G27 |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
@@ -181,19 +180,6 @@ The redesigned page also links to two pages:
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C148 ⏳ The overlay comes back as a save menu or sleep ends, not at the next tick
-
-The viewport is drawn through the overlay in `VM_ADVENTURE` only
-(`doc/CSBwin-src/WinScreen.cpp:1527`). A save menu sets `VM_LEFTMENU` or `VM_CENTERMENU`
-(`Menu.cpp:465-472`) and sleep `VM_SLEEPING` (`Mouse.cpp:1703`), and CSBWin goes back to
-`VM_ADVENTURE` from them at the next tick's start (`CSBCode.cpp:603-611`). The port has no
-`videoMode`: `GameScreen.isAdventureVideoMode` reads the inventory, the freeze, sleep and
-the save menu as they stand, so for the frames between a menu's or a sleep's end and the
-next tick the port shows the overlay, a tint or a jitter, where CSBWin shows the straight
-viewport. Leaving an inventory (`CSBCode.cpp:7453`) and the freeze (`Mouse.cpp:1764`) go
-back at once in both. The fix is `videoMode` itself, on `LoopState`, set where CSBWin sets
-it, and a tool that closes the menu and reads it before and after the tick.
 
 ### C145 ⏸️ The Hint Oracle's title boxes keep colour 12 on their last line and a half
 
@@ -456,7 +442,7 @@ CSBWin can record a game and play it back:
   `_HandleMouseEvents` (`Mouse.cpp:1393`), except while gravity runs.
 
 The port has neither, and no way to start either. It keeps only the recorder's count,
-`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:815-818`).
+`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:873-876`).
 `extraTicks` is always on (`src/engine/MovementSystem.ts:119-122`).
 
 Once ported, a recording made in CSBWin and played back in the port is an end-to-end test

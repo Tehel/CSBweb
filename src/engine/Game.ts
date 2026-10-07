@@ -529,6 +529,13 @@ export class Game implements MainLoop {
      * Process one game tick (~4 times per second)
      */
     private gameTick(): void {
+        // `tag000698` (doc/CSBwin-src/CSBCode.cpp:603-611): a menu's mode, or any other
+        // but an inventory's or sleep's, goes back to `VM_ADVENTURE`. `ForceScreenDraw()`
+        // and `UI_Invalidate(true)` are the port's every frame.
+        const loop = this.ctx.loop;
+        if (loop.videoMode !== 'VM_ADVENTURE' && loop.videoMode !== 'VM_INVENTORY' && !this.ctx.party.state.sleeping) {
+            loop.videoMode = 'VM_ADVENTURE';
+        }
         // `d.vblCount = 0;` (doc/CSBwin-src/CSBCode.cpp:617): the next tick falls due
         // `d.Speed` VBLs from here. `d.Speed` itself is `speed()`, which the one game speed
         // makes the same value the top of the tick sets (`:612-616`).

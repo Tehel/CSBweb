@@ -64,7 +64,26 @@ export interface LoopFlags {
   word11776: boolean;
   /** An inversion since the page last took it (`Game.takeFlashChanged`): a redraw is due. */
   flashChanged: boolean;
+  /**
+   * `videoMode` (a global of `data.cpp`), which the viewport is drawn through the overlay
+   * in only when it is `VM_ADVENTURE` (`GameScreen.isAdventureVideoMode`). It is set where
+   * CSBWin sets it: an inventory shown or hidden (`ShowHideInventory`,
+   * doc/CSBwin-src/CSBCode.cpp:7453, `:7487`), `TAG0207cc` (`:9957`), `WakeUp` (`:7062`),
+   * the freeze and the thaw (`Mouse.cpp:1735`, `:1764`), sleep (`:1703`) and a menu
+   * (`Menu.cpp:465-472`). The top of every tick puts any other mode back to
+   * `VM_ADVENTURE`, awake and with no inventory open (`CSBCode.cpp:603-611`): a menu
+   * closed shows the straight viewport until then.
+   */
+  videoMode: VideoMode;
 }
+
+/**
+ * CSBWin's `VIDEOMODE` (doc/CSBwin-src/Data.h:63-77), the values the game sets. The
+ * screens before it (`VM_PRESENTS`, `VM_PRISONDOOR`, `VM_CREDITS`) and after it
+ * (`VM_THEEND`, `VM_CAST`) are the intro's host, which has no overlay.
+ */
+export type VideoMode =
+  | 'VM_DEFAULT' | 'VM_CENTERMENU' | 'VM_LEFTMENU' | 'VM_ADVENTURE' | 'VM_INVENTORY' | 'VM_FROZEN' | 'VM_SLEEPING';
 
 /**
  * A `RESTARTABLE` sequence that holds the main loop inside one of its calls, as
@@ -96,10 +115,13 @@ export interface MainLoop {
 
 export function createLoopFlags(): LoopFlags {
   // `d.FlashButnActive = 0; d.Word11776 = 0;` at the game start
-  // (doc/CSBwin-src/CSBCode.cpp:10477-10478).
+  // (doc/CSBwin-src/CSBCode.cpp:10477-10478). A game starts from the prison door
+  // (`VM_PRISONDOOR`, `:9579`), a menu or "THE END", never in `VM_ADVENTURE`: its first
+  // tick sets that (`:603-611`). `VM_DEFAULT` stands for all of them.
   return {
     clockTick: false, vblCount: 0, newPartyLevel: -1, clockRunning: true, gameFrozen: false,
     flashButnActive: false, flashButn: { x1: 0, x2: 0, y1: 0, y2: 0 }, word11776: false, flashChanged: false,
+    videoMode: 'VM_DEFAULT',
   };
 }
 
@@ -221,7 +243,8 @@ export function vblInterrupt(ctx: GameContext): void {
  * sleeping party (`Monster.cpp:4531`, `Character.cpp:2809-2812`). `d.clockTick = 1`,
  * `d.PartySleeping = 0`, the message timeouts rescaled to the game speed
  * (`scrollingText.SetNewSpeed(d.Speed, …)`, `:7053`), the adventure button lists back (the
- * host's listeners), `DiscardAllInput()`, and `TAG0207cc` last (`:7061`).
+ * host's listeners), `DiscardAllInput()`, `TAG0207cc` (`:7061`), and `videoMode =
+ * VM_ADVENTURE` last (`:7062`).
  */
 export function wakeUp(ctx: GameContext): void {
   const oldSpeed = speed(ctx);
@@ -231,22 +254,28 @@ export function wakeUp(ctx: GameContext): void {
   ctx.host.sleepChanged(false);
   ctx.mouseQueue.discardAllInput();
   ctx.host.tag0207cc();
+  ctx.loop.videoMode = 'VM_ADVENTURE';
 }
 
 /**
  * The engine's half of button 147, the freeze (doc/CSBwin-src/Mouse.cpp:1731-1759):
- * `d.ClockRunning = 0`, `gameFrozen = true`, `DiscardAllInput()`. The screen's half is
- * `handleMouseButton`'s.
+ * `d.ClockRunning = 0`, `gameFrozen = true`, `videoMode = VM_FROZEN`,
+ * `DiscardAllInput()`. The screen's half is `handleMouseButton`'s.
  */
 export function freeze(ctx: GameContext): void {
   ctx.loop.clockRunning = false;
   ctx.loop.gameFrozen = true;
+  ctx.loop.videoMode = 'VM_FROZEN';
   ctx.mouseQueue.discardAllInput();
 }
 
-/** The engine's half of button 148, the thaw (doc/CSBwin-src/Mouse.cpp:1760-1773). */
+/**
+ * The engine's half of button 148, the thaw (doc/CSBwin-src/Mouse.cpp:1760-1773):
+ * `videoMode = VM_ADVENTURE` before `TAG0207cc`, which shows an open inventory again.
+ */
 export function thaw(ctx: GameContext): void {
   ctx.loop.clockRunning = true;
   ctx.loop.gameFrozen = false;
+  ctx.loop.videoMode = 'VM_ADVENTURE';
   ctx.mouseQueue.discardAllInput();
 }

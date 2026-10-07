@@ -640,19 +640,17 @@ export class GameScreen {
     } else {
       updateImageDataFromIndex(this.screenImageData, this.screen, uiPalette);
     }
-    if (this.isAdventureVideoMode(inventoryOpen, frozen)) this.drawViewportThroughOverlay(viewportPalette);
+    if (this.isAdventureVideoMode()) this.drawViewportThroughOverlay(viewportPalette);
     this.screenCtx.putImageData(this.screenImageData, 0, 0);
   }
 
   /**
    * `videoMode == VM_ADVENTURE`, which `display` gives the viewport's `UpdateScreenArea` as
-   * `useOverlay` (`doc/CSBwin-src/WinScreen.cpp:1527`): no inventory open
-   * (`CSBCode.cpp:7453`, `:7487`), not frozen (`Mouse.cpp:1735`, `:1764`), not asleep
-   * (`:1703`), and no save menu up (`Menu.cpp:465-472`). CSBWin goes back to it from the
-   * last two at the next tick (`CSBCode.cpp:603-611`), and the port as they end.
+   * `useOverlay` (`doc/CSBwin-src/WinScreen.cpp:1527`). `LoopFlags.videoMode` says where
+   * it is set.
    */
-  private isAdventureVideoMode(inventoryOpen: boolean, frozen: boolean): boolean {
-    return !inventoryOpen && !frozen && !this.ui.partyState.sleeping && !isSaveMenuOpen(this.ui);
+  private isAdventureVideoMode(): boolean {
+    return this.ui.ctx.loop.videoMode === 'VM_ADVENTURE';
   }
 
   /**
