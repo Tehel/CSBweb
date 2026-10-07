@@ -226,8 +226,9 @@ shows the logo before the title animation, and with it off the boot is CSBWin's.
 button is live from the start of the page, the entrance included (`bindExtrasToggle`), and
 the next load follows it.
 
-- `main.ts` fetches `/gamefiles/swoosh/swoosh.img` and `swoosh.wav` as it does a game's
-  files. Without the first there is no logo; without the second it is silent.
+- `main.ts` fetches `swoosh.img` and `swoosh.wav` from the folder the data sets' manifest
+  names (`"swoosh"`, `src/data/DataSets.ts`), as it does a game's files. Without a folder or
+  the first file there is no logo; without the second it is silent.
 - `loadSwoosh` (`src/data/SwooshLoader.ts`) reads the picture, the colour patterns and the
   palette script from the file. Only the decoder is code of the port's, a transcription of
   `$0070`–`$01d4`.

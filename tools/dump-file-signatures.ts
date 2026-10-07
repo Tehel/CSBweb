@@ -29,7 +29,6 @@ import { md5 } from '../src/core/md5';
 import { CSBGraphicsLoader } from '../src/data/CSBGraphicsLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { Expool, readRuntimeFileSignatures, type ExpoolDatabase } from '../src/data/CsbwinExpool';
-import { DATA_SETS } from '../src/data/DataSets';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { foldedSignature, Signature, type FileSignature } from '../src/data/FileSignature';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -37,6 +36,7 @@ import { Die } from '../src/engine/Die';
 import { csbGraphicsOpener } from '../src/engine/FileSignatures';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { applySaveBytes } from '../src/engine/SaveGameFile';
+import { DATA_SETS } from './lib/dataSets';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics } from './lib/game';
 import { genuineSaves } from './lib/saves';
@@ -78,7 +78,7 @@ check(vectors.every(([text, want]) => digestHex(new TextEncoder().encode(text)) 
 const ramp = Uint8Array.from({ length: 200 }, (_, i) => (i * 37) & 0xff);
 check(Array.from({ length: 200 }, (_, n) => n).every((n) => digestHex(ramp.subarray(0, n)) === createHash('md5').update(ramp.subarray(0, n)).digest('hex')),
   'Node\'s digest for every length from 0 to 199');
-const gameFiles = DATA_SETS.flatMap((set) => [`static${set.dir}/graphics.dat`, `static${set.dir}/dungeon.dat`, ...(set.csbGraphics ? [`static${set.dir}/CSBgraphics.dat`] : [])]);
+const gameFiles = DATA_SETS.flatMap((set) => [`${set.dir}/graphics.dat`, `${set.dir}/dungeon.dat`, ...(set.csbGraphics ? [`${set.dir}/CSBgraphics.dat`] : [])]);
 gameFiles.push('static/gamefiles/conflux-3.5-b8/CSBgraphics.dat', 'static/gamefiles/conflux-3.5-b8/graphics.dat');
 check(gameFiles.every((path) => digestHex(read(path)) === createHash('md5').update(read(path)).digest('hex')),
   `Node's digest for all ${gameFiles.length} game files`);
@@ -94,12 +94,12 @@ check(foldedSignature({ signature1: 0x12340000, signature2: 0x00005678 }) === (0
 const graphicsOf = new Map<string, GraphicsLoader>();
 for (const set of DATA_SETS) {
   const graphics = new GraphicsLoader();
-  graphics.loadFromArray(read(`static${set.dir}/graphics.dat`));
+  graphics.loadFromArray(read(`${set.dir}/graphics.dat`));
   graphicsOf.set(set.id, graphics);
   console.log(`  ${set.id.padEnd(16)} graphics.dat    ${sig(graphics.getSignature())}`);
   if (set.csbGraphics) {
     const csb = new CSBGraphicsLoader();
-    csb.loadFromArray(read(`static${set.dir}/CSBgraphics.dat`));
+    csb.loadFromArray(read(`${set.dir}/CSBgraphics.dat`));
     console.log(`  ${set.id.padEnd(16)} CSBgraphics.dat ${sig(csb.getSignature()!)}`);
   }
 }
@@ -119,10 +119,10 @@ const named = (world: ExpoolDatabase & { extendedFeatures?: { graphicsSignature1
   return `EDBT ${r.debuging} / ${r.csbGraphicsSignature} / ${r.graphicsSignature}; expected ${expected}`;
 };
 for (const set of DATA_SETS) {
-  const data = new DungeonLoader().loadDungeonDat(read(`static${set.dir}/dungeon.dat`));
+  const data = new DungeonLoader().loadDungeonDat(read(`${set.dir}/dungeon.dat`));
   console.log(`  ${set.id.padEnd(16)} ${named(data)}`);
   const game = newGame(data, graphicsOf.get(set.id)!);
-  const result = outcome(() => game.readDungeonDat(read(`static${set.dir}/dungeon.dat`)));
+  const result = outcome(() => game.readDungeonDat(read(`${set.dir}/dungeon.dat`)));
   check(result === 'ok', `${set.id}: its dungeon.dat reads under its own graphics.dat (${describe(result)})`);
 }
 console.log(`  ${'conflux-3.5-b8'.padEnd(16)} ${named(new DungeonLoader().loadDungeonDat(read('static/gamefiles/conflux-3.5-b8/dungeon.dat')))}`);

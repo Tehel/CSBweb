@@ -32,13 +32,13 @@ import { basename, resolve } from 'node:path';
 
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { readCsbwinSaveInfo } from '../src/data/CsbwinSaveInfo';
-import { DATA_SETS } from '../src/data/DataSets';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import {
   checkDungeon, dungeonSignature, identifyDungeon, KNOWN_DUNGEONS, levelWalls, type KnownDungeon,
 } from '../src/data/DungeonSignature';
 import type { DungeonData, MapData } from '../src/data/dungeonTypes';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
+import { DATA_SETS } from './lib/dataSets';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics } from './lib/game';
 import { genuineSaves, savePath } from './lib/saves';
@@ -119,7 +119,7 @@ async function checkCatalogue(): Promise<void> {
   console.log(['file', 'levels', 'dungeon', 'matching', 'whole'].join('\t'));
   const reached = new Set<KnownDungeon>();
   const files: Array<{ label: string; set: string; dungeon: DungeonData }> = DATA_SETS.map((set) => ({
-    label: `${set.id}/dungeon.dat`, set: set.id, dungeon: dungeonDat(`static${set.dir}/dungeon.dat`),
+    label: `${set.id}/dungeon.dat`, set: set.id, dungeon: dungeonDat(`${set.dir}/dungeon.dat`),
   }));
   files.push({ label: 'csb/mini.dat', set: 'csb', dungeon: loadCsbwinWorld(read(MINI)).dungeon });
   for (const file of files) {

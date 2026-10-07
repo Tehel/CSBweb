@@ -37,7 +37,7 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
 - **The store upgrades its older rows** (`src/data/saves/legacyRows.ts`, run once by
   `idb.ts`). To version 2, it keeps of each older row the CSBWin file alone, out of its
   `.dmweb.json` when it is one, and reads the row again from that file. An older row
-  names no data set, so every one becomes the default set's; a row that holds no CSBWin
+  names no data set, so every one becomes `dm-atari`'s, the one set there was; a row that holds no CSBWin
   file, which no build could load, is dropped. To version 3, it stamps a playthrough
   into each file that names none ("A playthrough"). To version 4, it gives each file
   that holds 0 in all four of `GAMEBLOCK1`'s `Byte22598`, `Byte22596`, `Word22594` and

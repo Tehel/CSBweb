@@ -7,7 +7,7 @@ import { SoundManager } from './audio/SoundManager';
 import { CsbRandom } from './core/random';
 import { CSBGraphicsLoader } from './data/CSBGraphicsLoader';
 import { extractPresetHeroes } from './data/HeroExtractor';
-import { dataSetFor } from './data/DataSets';
+import { MANIFEST_NAME, dataSetFor, parseManifest, type DataSet, type DataSetManifest } from './data/DataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
 import { parseHcsbDat } from './data/HintOracleLoader';
@@ -39,11 +39,16 @@ let game: Game | null = null;
 let screen: GameScreen | null = null;
 let crtController: CrtController | null = null;
 
-/** The game this page plays, chosen before anything is loaded (`?dungeon=<id>`). */
-const dataSetId = new URLSearchParams(window.location.search).get('dungeon');
-const dataSet = dataSetFor(dataSetId);
-if (dataSetId !== null && dataSet.id !== dataSetId) console.warn(`Unknown data set '${dataSetId}'; playing ${dataSet.id}`);
-const CRT_SCANLINES_SRC = '/QPN59-320x200-resized.png';
+/** The folder of the games and their manifest, relative to the page as every fetch is. */
+const GAMEFILES_DIR = 'gamefiles';
+/**
+ * The game this page plays, chosen from the manifest before anything else is loaded
+ * (`?dungeon=<id>`, `chooseDataSet`).
+ */
+let dataSet!: DataSet;
+/** The FTL logo's folder, the manifest's, or `null` where it names none. */
+let swooshDir: string | null = null;
+const CRT_SCANLINES_SRC = 'QPN59-320x200-resized.png';
 const CRT_UPDATE_INTERVAL_MS = 1000 / 20;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
@@ -269,8 +274,7 @@ function createSoundManager(graphicsLoader: GraphicsLoader, tables: GameTables):
     return sound;
 }
 
-/** The Atari ST disk's FTL logo and the recording of its sound, which every data set shares. */
-const SWOOSH_DIR = '/gamefiles/swoosh';
+/** The recording of the FTL logo's sound. */
 const SWOOSH_RECORDING = 'swoosh';
 
 /**
@@ -280,9 +284,10 @@ const SWOOSH_RECORDING = 'swoosh';
  * silent without that file.
  */
 async function loadSwooshFiles(sound: SoundManager, settings: UISettings): Promise<{ image: Swoosh; startSound: () => void } | null> {
-    if (!settings.extras) return null;
+    if (!settings.extras || swooshDir === null) return null;
+    const dir = swooshDir;
     const fetchFile = async (name: string): Promise<ArrayBuffer | null> => {
-        const response = await fetch(`${SWOOSH_DIR}/${name}`).catch(() => null);
+        const response = await fetch(`${dir}/${name}`).catch(() => null);
         return response?.ok ? response.arrayBuffer() : null;
     };
     const [img, wav] = await Promise.all([fetchFile('swoosh.img'), fetchFile('swoosh.wav')]);
@@ -587,9 +592,31 @@ function start(game: Game): void {
     drawMapPreview(game.ctx.party.state.position.z);
 }
 
+/**
+ * The data sets' manifest (`src/data/DataSets.ts`). Without it the page cannot choose a
+ * game, so a manifest that is missing or malformed ends the boot, and the error says why.
+ */
+async function loadManifest(): Promise<DataSetManifest> {
+    const url = `${GAMEFILES_DIR}/${MANIFEST_NAME}`;
+    const response = await fetch(url).catch(() => null);
+    if (!response?.ok) throw new Error(`Cannot read the data sets' manifest '${url}'${response ? ` (HTTP ${response.status})` : ''}.`);
+    return parseManifest(await response.text(), GAMEFILES_DIR);
+}
+
+/** The set `?dungeon=<id>` names, or the manifest's default. */
+function chooseDataSet(manifest: DataSetManifest): DataSet {
+    const id = new URLSearchParams(window.location.search).get('dungeon');
+    const set = dataSetFor(manifest, id);
+    if (id !== null && set.id !== id) console.warn(`Unknown data set '${id}'; playing ${set.id}`);
+    return set;
+}
+
 async function init() {
     try {
-        bindDataSetChooser(dataSet);
+        const manifest = await loadManifest();
+        dataSet = chooseDataSet(manifest);
+        swooshDir = manifest.swooshDir;
+        bindDataSetChooser(manifest, dataSet);
         bindExtrasToggle();
         const files = await loadGameFiles();
         // Every graphics.dat table, read once: the engine's set is built from it, and the

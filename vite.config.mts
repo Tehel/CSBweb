@@ -3,6 +3,8 @@ import { resolve } from 'path';
 
 export default defineConfig({
   root: '.',
+  // Every URL relative to the page, so the game also runs under a sub-path.
+  base: './',
   publicDir: 'static',
   build: {
     outDir: 'dist',

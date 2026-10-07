@@ -122,7 +122,6 @@ import {
   type StoredSaveRecord,
 } from '../src/data/saves/SaveStore';
 import { stampBlock1Rows, stampSaveRecords, upgradeSaveRecords } from '../src/data/saves/legacyRows';
-import { DEFAULT_DATA_SET, dataSetFor } from '../src/data/DataSets';
 import { KNOWN_DUNGEONS } from '../src/data/DungeonSignature';
 import { Game } from '../src/engine/Game';
 import type { GameHost, MessageSink } from '../src/engine/GameHost';
@@ -152,6 +151,7 @@ import {
 } from '../src/renderer/ui/Menu';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
+import { DEFAULT_DATA_SET, dataSetNamed } from './lib/dataSets';
 import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
@@ -1223,7 +1223,7 @@ async function checkSaveCall(): Promise<void> {
     console.log('');
     console.log('=== one store, two data sets ===');
     const shared = memoryStore();
-    const csbSet = dataSetFor('csb');
+    const csbSet = dataSetNamed('csb');
     const dm = await stage(false, DEFAULT_DATA_SET, shared, 'DAROO');
     const csb = await stage(false, csbSet, shared, 'LEYLA');
     const dmOld = await dm.saves.save('stopped', 'new');
@@ -1277,7 +1277,7 @@ async function checkSaveCall(): Promise<void> {
     // Another playthrough of the same set has no save of its own to load, and neither
     // has a set with no save at all.
     const stranger = await stage(false, DEFAULT_DATA_SET, shared, 'WUUF');
-    const empty = await stage(false, dataSetFor('dm-windows'), shared);
+    const empty = await stage(false, dataSetNamed('dm-windows'), shared);
     const beforeNone = told.length;
     await stranger.saves.quickLoad();
     await empty.saves.quickLoad();
@@ -2478,7 +2478,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
   game.ctx.state.block1.randomGameID = 0x0da200;
   const screen = { portraitOf: () => undefined, repackOpenChest: () => {} };
   const saves = new GameSaves(game, DEFAULT_DATA_SET, store, screen, log, new CsbRandom(SEED));
-  const csbSaves = new GameSaves(game, dataSetFor('csb'), store, screen, log, new CsbRandom(SEED));
+  const csbSaves = new GameSaves(game, dataSetNamed('csb'), store, screen, log, new CsbRandom(SEED));
   const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));
   const same = (a: Uint8Array | undefined, b: Uint8Array | undefined): boolean =>
     a !== undefined && b !== undefined && a.length === b.length && a.every((byte, i) => byte === b[i]);
@@ -2988,7 +2988,7 @@ async function checkUpgrade(): Promise<void> {
     game.ctx.state.block1.randomGameID = id;
     return buildSaveFile(game);
   };
-  const csbSet = dataSetFor('csb');
+  const csbSet = dataSetNamed('csb');
   const v2 = (name: string, dataSet: string, names: string[], id: number, savedAt: number, more: Partial<StoredSaveRecord> = {}): StoredSaveRecord => {
     const bytes = fileOf(names, id);
     return { id: name, name, dataSet, quick: false, savedAt, ...readSaveFileFields(bytes)!, bytes: buffer(bytes), ...more };

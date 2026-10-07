@@ -39,7 +39,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { CsbRandom } from '../src/core/random';
-import { dataSetFor } from '../src/data/DataSets';
 import { Direction, Position } from '../src/core/types';
 import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -68,6 +67,7 @@ import { searchButtonList } from '../src/renderer/ui/HitTest';
 import { menuButtonList, menuButtonRect } from '../src/renderer/ui/Menu';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
 import type { UIButton } from '../src/data/tables/UITables';
+import { dataSetNamed } from './lib/dataSets';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
 import { memoryStore, savePath } from './lib/saves';
@@ -195,7 +195,7 @@ function row(id: string, dataSet: string, bytes: Uint8Array, usedAt: number): Sa
 }
 
 function newSaves(store: ReturnType<typeof memoryStore>, seed = SEED): GameSaves {
-  return new GameSaves(newGame(emptyDungeonData(), graphics), dataSetFor('csb'), store,
+  return new GameSaves(newGame(emptyDungeonData(), graphics), dataSetNamed('csb'), store,
     { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {}, new CsbRandom(seed));
 }
 
@@ -344,7 +344,7 @@ function prisonGame(store: ReturnType<typeof memoryStore>, dataSet = 'csb') {
   let saves: GameSaves | null = null;
   const game: Game = newGame(PRISON, graphics, { championJoined: () => saves?.championJoined() });
   game.setRandomSeed(SEED);
-  saves = new GameSaves(game, dataSetFor(dataSet), store, {
+  saves = new GameSaves(game, dataSetNamed(dataSet), store, {
     portraitOf: () => undefined,
     repackOpenChest: () => {},
     askBeginAdventure: (source) => { asked.push(source?.name ?? null); },

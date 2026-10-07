@@ -20,7 +20,6 @@
 import { readFileSync } from 'node:fs';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import { DEFAULT_DATA_SET, dataSetFor } from '../src/data/DataSets';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { formatSaveRow, saveEntryOf, slotOf, type SaveEntry, type StoredSaveRecord } from '../src/data/saves/SaveStore';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
@@ -29,6 +28,7 @@ import type { MessageSink } from '../src/engine/GameHost';
 import { GameSaves, PRISON_WORD22592 } from '../src/engine/GameSaves';
 import { wakeUp, type LoopScript } from '../src/engine/LoopState';
 import { handleMouseButton } from '../src/renderer/ui/Mouse';
+import { DEFAULT_DATA_SET, dataSetNamed } from './lib/dataSets';
 import { check, finish } from './lib/check';
 import { newGame } from './lib/game';
 import { memoryStore, savePath } from './lib/saves';
@@ -186,7 +186,7 @@ async function checkSilentRefusals(): Promise<void> {
     s.game.runScript(hold());
   });
   await refused('while a DSA has disabled saves', (s) => { s.game.systems.dsa.disableSaves = true; });
-  await refused('in CSB\'s prison', (s) => { s.game.ctx.state.block1.word22592 = PRISON_WORD22592; }, dataSetFor('csb'));
+  await refused('in CSB\'s prison', (s) => { s.game.ctx.state.block1.word22592 = PRISON_WORD22592; }, dataSetNamed('csb'));
 
   const failing = stage(memoryStore(() => {}, true));
   await failing.saves.sleepSave();

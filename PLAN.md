@@ -229,37 +229,25 @@ address does not.
 **The page ships as it is**, debug chrome included. The redesign (`DEBT.md` E15) replaces
 it later, along with the FAQ and the statistics page.
 
-1. ⏳ **The manifest replaces `DATA_SETS`.** `static/gamefiles/manifest.json`, committed
-   with the files it describes, lists:
-   - each set, with today's `DataSet` fields. Its `dir` is relative to the manifest
-     (`dm-atari`, not `/gamefiles/dm-atari`).
-   - the default set's id.
-   - the FTL logo's folder (`SWOOSH_DIR`, `src/main.ts:273`), or none.
-
-   The page fetches the manifest before `dataSetFor` (`src/main.ts:44`), and the chooser
-   (`src/ui/dataSetChooser.ts`) lists it. One module parses it, for both the page and the
-   tools. A manifest that is missing or malformed ends the boot on `fatalMessage`, with a
-   message that says why.
-
-   The tools read the manifest from disk through one `tools/lib` helper:
-   `dump-data-sets`, `dump-file-signatures`, `dump-dungeon-signature`, `dump-rise`,
-   `dump-sleep-save` and `dump-save-menu`. `dump-data-sets` also asserts that every
-   folder exists and holds the files its flags promise.
-
-   The store's upgrade (`src/data/saves/idb.ts:44`) gives old rows `'dm-atari'` as a
-   literal. Those rows are dm-atari's because of their history, not because of whatever
-   the manifest names as default.
+1. ✅ **The manifest.** `static/gamefiles/manifest.json`, committed with the files it
+   describes, lists each set (its `dir` relative to the manifest), the default set's id
+   and the FTL logo's folder, or none. `src/data/DataSets.ts` parses it for the page and
+   the tools. The page fetches it first (`loadManifest`, `src/main.ts`), and one that is
+   missing or malformed ends the boot on `fatalMessage`, saying why; the chooser lists
+   it. The tools read it through `tools/lib/dataSets.ts`, and `dump-data-sets` asserts
+   the parser's refusals and that every folder holds the files its flags promise. The
+   store's upgrade gives version-1 rows `'dm-atari'` as a literal
+   (`src/data/saves/idb.ts`), whatever the manifest's default. Every URL is relative to
+   the page (Vite `base: './'`), so the game also runs under a sub-path.
 
    The deployed manifest is the author's, uploaded with the files. It lists `dm-atari`
    (the default), `csb`, `kids-dungeon` and Conflux, and not `3d2d1d`, `dm-windows` or
    the other Atari versions. The repository's manifest keeps every set, because the
    tools need them all.
-
-   Every fetch becomes relative to the page (`gamefiles/…`, Vite `base: './'`), so the
-   game also runs under a sub-path.
 2. ⏳ **The build ships no game data.** `publicDir: 'static'` copies all of `static/` into
    `dist/`: 95 MB of game files, PDFs, box art and `extracted/`. Dev keeps serving
-   `static/`, and the build copies only what the page itself needs (the favicon). Check:
+   `static/`, and the build copies only what the page itself needs (the favicon, and the CRT's
+   scanlines, `QPN59-320x200-resized.png`). Check:
    list the contents of `dist/` after `npm run build`, with no `.dat` and no `.pdf`
    among them.
 3. ⏳ **The server.** `server/server.ts`, on `node:http`, with no dependency. Node 24
@@ -357,4 +345,4 @@ it later, along with the FAQ and the statistics page.
 
    `doc/DEPLOYMENT.md` records the procedure, written as `linkedin-games/player`'s is.
 
-Status: ⏳ not started. It is the first row of `DEBT.md`'s index.
+Status: ⚠️ step 1 done; step 2 is next. It is the first row of `DEBT.md`'s index.
