@@ -1,5 +1,5 @@
 /**
- * The DSA operations on an object's fields (`DEBT.md` G1, the objects family), each run
+ * The DSA operations on an object's fields (the objects family), each run
  * through `DsaSystem.execute` as one program of a test DSA, against the possessions of a
  * genuine save (`csbgame7.dat`).
  *

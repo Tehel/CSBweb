@@ -1,5 +1,5 @@
 /**
- * The DSA operations `&MESSAGE` and `&SOUND` (`DEBT.md` G1, the message and sound family),
+ * The DSA operations `&MESSAGE` and `&SOUND` (the message and sound family),
  * each run through `DsaSystem.execute` as a program of a test DSA on a genuine save
  * (`csbgame7.dat`).
  *

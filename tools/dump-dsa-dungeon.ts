@@ -1,5 +1,5 @@
 /**
- * The DSA operations on the dungeon and the program (`DEBT.md` G1, that family), each run
+ * The DSA operations on the dungeon and the program, each run
  * through `DsaSystem.execute` as a program of a test DSA on a genuine save
  * (`csbgame7.dat`).
  *

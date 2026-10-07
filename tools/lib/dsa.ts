@@ -1,6 +1,6 @@
 /**
  * Running a DSA program in a tool: the program words, and a test DSA that runs one
- * program against a game on a genuine save (`DEBT.md` G1's family tools).
+ * program against a game on a genuine save (the `dump-dsa-*` tools).
  */
 import { readFileSync } from 'node:fs';
 

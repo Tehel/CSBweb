@@ -1,5 +1,5 @@
 /**
- * The DSA `I_` operations (`DEBT.md` G1, the indirect family), each run through
+ * The DSA `I_` operations (the indirect family), each run through
  * `DsaSystem.execute` as a program of a test DSA on a genuine save (`csbgame7.dat`).
  *
  * 1. **No `ESL_INDIRECTACTIONS`, no action** (`Indirect`, `doc/CSBwin-src/DSA.cpp:2109-2120`):

@@ -1,5 +1,5 @@
 /**
- * The DSA operations on missiles, spells and clouds (`DEBT.md` G1, the objects family),
+ * The DSA operations on missiles, spells and clouds (the objects family),
  * each run through `DsaSystem.execute` as a program of a test DSA on a genuine save
  * (`csbgame7.dat`).
  *

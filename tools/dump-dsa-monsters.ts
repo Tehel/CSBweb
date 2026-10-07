@@ -1,5 +1,5 @@
 /**
- * The DSA operations on monsters (`DEBT.md` G1, the monsters family), each run through
+ * The DSA operations on monsters (the monsters family), each run through
  * `DsaSystem.execute` as a program of a test DSA on a genuine save (`csbgame7.dat`), on
  * its groups of levels 5 and 7, off the party's level and, with the party moved there, on
  * it.

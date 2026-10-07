@@ -247,7 +247,7 @@ Against the write order above, over `dungeon.dat` and the eight saves of
 | 15 | final checksum word | ✅ `buildImageChecksum`, proved against each save's own closing word |
 
 **Block 0** carries two things through as they were read rather than writing them again,
-the DSA section (`DEBT.md` G1) and the game-info string, and one field as it was read
+the DSA section and the game-info string, and one field as it was read
 rather than derived: `gameInfoSize` is signed, and -1 means an empty game info that still
 exists, which is not the 0 that means none (`doc/PROVEN_FACTS.md` →
 "`EXTENDEDFEATURESBLOCK` offsets, and `gameInfoSize` is signed").
@@ -281,7 +281,8 @@ and the port writes as zero.
 
 **What a file of the port's does not carry**, or the port does not read:
 
-- The DSA tracing flags `WriteDSAs` puts beside the DSAs (`DEBT.md` G1).
+- The DSA tracing flags `WriteDSAs` puts beside the DSAs, postponed with CSBWin's other
+  debugging features (`DEBT.md` → "Priority").
 - `SimpleEncryption`, neither written nor read past the header, and `MakeBigActuators`'
   read of the actuator type before the byte swap (`DEBT.md` H).
 

@@ -31,6 +31,7 @@ import type { TextRecord } from '../data/dungeonTypes';
 import type { TextDecodeTables } from '../data/tables/ObjectTables';
 import { DecodeText, SubstituteCharacterNames, type TextSubstitution } from '../data/DecodeText';
 import { Expool } from '../data/CsbwinExpool';
+import { SkinCache } from './SkinCache';
 import { DungeonLoader } from '../data/DungeonLoader';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import { applyDungeonSnapshot, captureDungeonSnapshot } from './DungeonSnapshot';
@@ -92,9 +93,15 @@ export class DungeonState {
      */
     textSubstitution: TextSubstitution | null = null;
     private timerWord8Lookup?: (index: number) => ui16 | null;
+    /**
+     * `skinCache`, new with every world taken and every state restored, where CSBWin's
+     * `Cleanup` empties it before a game is read (`src/engine/SkinCache.ts`).
+     */
+    skinCache: SkinCache;
 
     constructor(data: DungeonData) {
         this.data = data;
+        this.skinCache = new SkinCache(data);
     }
 
     /**
@@ -103,6 +110,7 @@ export class DungeonState {
      */
     install(data: DungeonData): void {
         this.data = data;
+        this.skinCache = new SkinCache(data);
     }
 
     /**
@@ -189,6 +197,7 @@ export class DungeonState {
 
     applySnapshot(snapshot: DungeonSnapshot): void {
         applyDungeonSnapshot(this.data, snapshot);
+        this.skinCache = new SkinCache(this.data);
     }
 
     /**

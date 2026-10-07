@@ -1,5 +1,5 @@
 /**
- * The DSA operations on texts (`DEBT.md` G1, the text family), each run through
+ * The DSA operations on texts (the text family), each run through
  * `DsaSystem.execute` as a program of a test DSA on a genuine save (`csbgame7.dat`).
  *
  * 1. **`&TEXT@` and `&TEXTSAY`** (`doc/CSBwin-src/DSA.cpp:3168-3193`, `:3239-3252`): a text

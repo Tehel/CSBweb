@@ -12,14 +12,14 @@
  *    of a parameter record that `I_Indirect` runs as `FilteredCast` (`:2358`), which no
  *    operation writes. That leaves 135.
  * 2. **The port's list** is the `case StkOp.…` labels of `executeAmpersand`. What it lacks
- *    is pinned below in `LEFT`, so a port of a family shortens the list here in the same
- *    commit, and the operations of `DEBT.md` G1 are done when it is empty.
+ *    is pinned below in `LEFT`, which is empty: the port has every operation, and an
+ *    operation taken out fails here.
  * 3. **The census.** Every program of the dungeon decodes to its exact length with
  *    CSBWin's operand layout, read off `EX_*` (`DSA.cpp:574-1340`, `:1491-1515`,
  *    `:4986`) and the command words (`Data.h:1879-2384`). A field is a relative state
  *    unless `IsMaxState`, which compares it with `-MAXSTATE`: in every command but
  *    `QUESTION` that value is out of the field's signed range, so CSBWin never reads the
- *    extra word. The default dungeon is Conflux 3.5's, whose counts `DEBT.md` G1 gives.
+ *    extra word. The default dungeon is Conflux 3.5's.
  *
  * Run: `npx tsx tools/dump-dsa-census.ts [dungeon.dat]`
  */
@@ -32,10 +32,8 @@ import { check, finish } from './lib/check';
 
 const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
 
-/** What the port lacks, in `STKOP` order. A ported family comes off this list. */
-const LEFT: readonly string[] = [
-  'GET_SKIN', 'SET_SKIN',
-];
+/** What the port lacks, in `STKOP` order: nothing. */
+const LEFT: readonly string[] = [];
 
 /** The `STKOP` values that are no `case` of `EX_AMPERSAND`'s switch, nor `I_Indirect` (point 1). */
 const NOT_OPERATIONS = new Set<number>([StkOp.NOOP, StkOp.TWO_DUP, StkOp.I_FILTERED_CAST]);

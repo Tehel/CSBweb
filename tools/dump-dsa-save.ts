@@ -1,5 +1,5 @@
 /**
- * A save of a dungeon with DSAs (`DEBT.md` G1, that step): the DSAs themselves, and what
+ * A save of a dungeon with DSAs: the DSAs themselves, and what
  * they keep in `EXPOOL`, the global variables and the record that disables saves.
  *
  * 1. **`WriteDSAs`** (`doc/CSBwin-src/SaveGame.cpp:767-780`, `DSA::Write`,

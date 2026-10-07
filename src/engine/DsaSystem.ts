@@ -2950,6 +2950,20 @@ export class DsaSystem {
         this.noFilter(bank);
         this.ctx.systems.magic.dsaCastSpell(subcode === StkOp.FILTERED_CAST);
         break;
+      case StkOp.GET_SKIN: {
+        // `DSA.cpp:3107-3121`: `y` in bits 0-4, `x` in 5-9, the level in 10-15.
+        const loc = bank.stack.pop();
+        bank.stack.push(this.dungeon.skinCache.GetSkin((loc >> 10) & 63, (loc >> 5) & 31, loc & 31));
+        break;
+      }
+      case StkOp.SET_SKIN: {
+        // `DSA.cpp:3122-3135`: the location, then the skin, of which `SetSkin` takes the
+        // low byte.
+        const loc = bank.stack.pop();
+        const skin = bank.stack.pop();
+        this.dungeon.skinCache.SetSkin((loc >> 10) & 63, (loc >> 5) & 31, loc & 31, skin & 0xff);
+        break;
+      }
       case StkOp.CREATE_CLOUD:
         this.createCloud(bank);
         break;

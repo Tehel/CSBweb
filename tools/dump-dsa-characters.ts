@@ -1,5 +1,5 @@
 /**
- * The DSA operations on the champions (`DEBT.md` G1, the characters family), each run
+ * The DSA operations on the champions (the characters family), each run
  * through `DsaSystem.execute` as one program of a test DSA, against the party of a
  * genuine save (`csbgame7.dat`).
  *

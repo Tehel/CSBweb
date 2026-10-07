@@ -85,6 +85,7 @@ This document captures verified DSA behavior from the CSBWin C++ source under `d
 
 - `STKOP_CellFetch` packs room data into a variable array: slot 0 is `roomType`, slot 1 encodes room attributes (room-type specific), and slot 2+ contain teleporter facing/what/dest or door state/type/decoration when present (`doc/CSBwin-src/DSA.cpp`).
 - `STKOP_CellStore` writes room attributes back to `CELLFLAG` and updates teleporter/door fields (rotation, scope, door switch/mode, etc.) with guard rules for door state transitions (bashed/open) (`doc/CSBwin-src/DSA.cpp`).
+- `STKOP_GetSkin` and `STKOP_SetSkin` read and set a cell's skin through `skinCache` (`DSA.cpp:3107-3135`); see `doc/CSBWIN_RENDERING_REFERENCE.md` → "Skin cache".
 - `STKOP_FalsePit` toggles bit 0 on pit `CELLFLAG` when the location is valid and room type is PIT (`doc/CSBwin-src/DSA.cpp`).
 
 ## Generator delay helpers

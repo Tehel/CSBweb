@@ -22,11 +22,11 @@ code needs before them: a base solid enough to build them on. `E15` is the page
 redesign's first step.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, and the work it
-needs is in the active list: G1, G27 and G26. Its `dungeon.dat` is enciphered, and reads
+needs is in the active list: G27 and G26. Its `dungeon.dat` is enciphered, and reads
 whole (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is `RC4.cpp`'s own cipher").
 Each entry says what Conflux uses of it, measured on the deciphered file.
-DSA support is aimed at whole, not at Conflux's share of it: G1 is every operation CSBWin
-has, so G27 is on the path though Conflux's programs never call `&GETSKIN`.
+Every DSA operation CSBWin has is ported, not only Conflux's share
+(`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
 
 The order, then:
 
@@ -40,7 +40,10 @@ The order, then:
 and no session picks one up unless the author names it:
 
 - **A save of a dungeon the port does not know** (G22).
-- **CSBWin's debugging features** that are not part of the game (the ASCII dump).
+- **CSBWin's debugging features** that are not part of the game: the ASCII dump, and the
+  DSA trace, whose flags `WriteDSAs` follows the DSAs with, an `EDBT_DSAtraces` record
+  (`DSAIndex.WriteTracing()`, `doc/CSBwin-src/SaveGame.cpp:989-993`) that a read takes
+  back (`DSAINDEX::ReadTracing`, `DSA.cpp:5553-5576`). The port writes none.
 - **Comparing frames against CSBWin's own screenshots** (`PLAN.md` → Phase 15, step 5):
   staging the same scene in CSBWin, without cheats, costs more than it proves.
 - **X — Extras**: gameplay features CSBWin does not have, wanted by the author once the
@@ -92,7 +95,6 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
-| G1 | Full DSA support: every operation, and a save of a dungeon with DSAs | L | ⏳ waits on G27 |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
 | Phase 17 | Deployment: the Docker image, the data sets' manifest, the statistics | L | in `PLAN.md` |
 | G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
@@ -116,8 +118,7 @@ The rows above G29 are the active list. `F3` and `Phase 17` are phases, whose st
 Conflux. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
-row meanwhile. `G1` sits below G27, whose feature its last operations need.
-The G rows down to G26 are Conflux's (see "Priority"). The F
+row meanwhile. The G rows down to G26 are Conflux's (see "Priority"). The F
 rows are independent of the rest ("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
@@ -280,80 +281,6 @@ postponed ones follow, under their own heading (see "Priority").
 
 Paying it needs a file of each form, or the author's decision to port them unchecked.
 
-### G1 ⏳ Full DSA support: every operation, and a save of a dungeon with DSAs
-
-The goal is the whole of CSBWin's DSA, not what one dungeon calls. Every command is
-ported, but for `DSACMD_RANDOM` (10), which has no case in CSBWin's interpreter either.
-`STKOP` (`doc/CSBwin-src/Data.h:1721-1861`, the port's `StkOp`) has 138 values, and 135
-are operations: `Noop` (0), `2Dup` (23) and `I_FilteredCast` (120) have no case in
-`EX_AMPERSAND`, whose default says "Illegal subcode" and does nothing
-(`doc/CSBwin-src/DSA.cpp:4979-4981`), as the port's trace does. The port has 133, so 2
-are left. `tools/dump-dsa-census.ts` lists them: it fails unless what the port lacks is
-exactly its `LEFT`, so each family's commit takes its operations off that list, and this
-part of the item is done when it is empty.
-
-Conflux, the dungeon that will check them, defines 131 DSAs, with 4646 programs, behind
-1591 type-47 actuators. A static census of its programs decodes each word with the
-operand layout `DsaSystem.execute` reads, and every program decodes to its exact length.
-It uses 118 `&` operations, every one ported. With Conflux's count of each:
-
-- **Characters**: none is left. Thirteen are checked by `tools/dump-dsa-characters.ts`,
-  `CharNameFetch` with the texts, and `SwapCharacter` 7 by `tools/dump-swap-character.ts`.
-- **Objects**: none is left. The ten field operations, from `GetCharges` to
-  `SetSubType`, are ported, checked by `tools/dump-dsa-objects.ts`; so are `Throw`,
-  `Cast`, `FilteredCast`, `CreateCloud`, `MissileInfoFetch` and `MissileInfoStore`,
-  checked by `tools/dump-dsa-missiles.ts`.
-- **Monsters**: none is left. `MonsterFetch`, `MonsterStore`, `MonPoss`, `MonBlk`,
-  `MonLandD`, `DelMon` and `InsMon` are ported, checked by `tools/dump-dsa-monsters.ts`.
-  `MonLandD` acts only in the monster move filter, and `MonBlk` is read only from it.
-- **Messages, sounds and texts**: none is left. `Message` and `Sound` are ported,
-  checked by `tools/dump-dsa-message.ts`; a `Sound` number from 0 up is a sound of
-  `CSBgraphics.dat` (`tools/dump-custom-sounds.ts`). The texts are ported too: `Say`,
-  `TextFetch`, `TextSay`, `GlobalTextStore`, `DiscardText` and `CharNameFetch`, checked by
-  `tools/dump-dsa-text.ts`.
-- **The dungeon and the program**: none is left. `FetchExCellFlg`, `StoreExCellFlg`,
-  `ThisCell`, `Neighbors`, `Loc2AbsCoord`, `PartyDistance`, `JumpGear`, `GosubGear`,
-  `ThisDSAId`, `DSAInfoFetch`, `BitCount`, `MultiplierFetch` and `VSET` are ported,
-  checked by `tools/dump-dsa-dungeon.ts`; so is `DisableSaves` 2, with its `EXPOOL`
-  record, checked by `tools/dump-dsa-save.ts`. While saves are disabled the port's disk
-  dialog saves nothing and says so, and loads and exports as ever (`doc/SAVES.md`).
-- **The `I_` operations**: none is left. The fifteen that send their operands to the DSA
-  at `ESL_INDIRECTACTIONS`, `I_Indirect` 1 that runs them there, and `I_Delay` 22 are
-  ported, checked by `tools/dump-dsa-indirect.ts`. Conflux's: `I_Del` 42, `I_Add` 41,
-  `I_CreateCloud` 59, `I_Move` 17, `I_Throw` 14, `I_CausePoison` 6, `I_MonsterStore` 6,
-  `I_CharStore` 4, `I_CellStore` 4, `I_SwapCharacter` 4, `I_Cast` 2, `I_DelMon` 2 and
-  `I_InsMon` 2.
-- **The display**: none is left. `Overlay` 25, `Palette` 5 and `Jitter` 7 are ported,
-  checked by `tools/dump-dsa-overlay.ts`, and what they draw by
-  `tools/dump-overlay-screen.ts`. The jitter moves the view in `VM_ADVENTURE`, an overlay
-  up or not (`doc/CSBwin-src/WinScreen.cpp:1069-1080`).
-
-The two left that Conflux never calls: `GetSkin` (131) and `SetSkin` (132), which need
-G27. No dungeon here checks them against play, so each is ported with a tool of its own.
-
-The steps: the census is done (`tools/dump-dsa-census.ts`, Conflux's counts by default,
-another `dungeon.dat` as its argument), and so are the characters, the objects, the
-monsters, the texts, the messages and sounds, the dungeon and the program, and the `I_`
-operations, and the display's three, and the save of a dungeon with DSAs: `WriteDSAs`, and the global variables
-read from their `EXPOOL` records at every read and written back at a save, and
-`DisableSaves`' record, and the overlay palette's 24 records written at every save and
-read back at every read, checked by `tools/dump-dsa-save.ts`, and the footprints a cell's
-`ECF_FOOTPRINTS` shows, checked by `tools/dump-footprint-decoration.ts`. A family's tool
-runs its programs through `tools/lib/dsa.ts`. Slave DSAs owe nothing: CSBWin has none
-(`doc/CSBWIN_DSA_REFERENCE.md`, `FindMaster`). What is left waits on G27: `GetSkin` and
-`SetSkin`, so G1's row sits below it, and G27 finishes its share of G1. An operation is
-checked against Conflux in play once G26 makes it a data set.
-
-The rest of the item, with an operation that needs care when ported:
-
-- **Unported opcodes are traced** once each through `warnedOps` (`DsaSystem.ts`), for a
-  dungeon the census has not seen.
-- **The DSA tracing flags.** `WriteDSAs` is followed by `DSAIndex.WriteTracing()`
-  (`SaveGame.cpp:989-993`), an `EDBT_DSAtraces` record of the flags CSBWin's trace
-  file uses, which a read takes back (`DSAINDEX::ReadTracing`, `DSA.cpp:5553-5576`). The
-  port writes none: the trace is one of CSBWin's debugging features, postponed (see
-  "Priority").
-
 ### G27 ⏳ Skins: a cell's own wall, floor and ceiling graphics
 
 A CSBWin cell has a skin number, and a level a default one for its cells of skin 0. A
@@ -363,16 +290,18 @@ standard one, and a skin with no program draws nothing there (`DrawViewport`,
 and ceiling graphics, their masks and its decorations through `BACKGROUND_LIB`. A DSA
 reads and sets a cell's skin with `&GETSKIN` and `&SETSKIN` (`DSA.cpp:3107-3135`). How
 skins are stored, and the formats, are in `doc/CSBWIN_RENDERING_REFERENCE.md` →
-"Backgrounds and Skins". The port has none of it: `DrawViewport` gives every cell skin 0
-(`src/renderer/DrawViewport.ts`, "Default skin for prototype").
+"Backgrounds and Skins". The port has the skins and the two operations
+(`src/engine/SkinCache.ts`, step 1), and draws none of it: `DrawViewport` gives every cell
+skin 0 (`src/renderer/DrawViewport.ts`, "Default skin for prototype").
 
 What the data sets here use of it:
 
-- **Conflux 3.5** has skins on 11459 cells, 48 different ones, and a default skin on
+- **Conflux 3.5** has skins on 11407 cells, 42 different ones, and a default skin on
   most levels: 11, which has no graphics and runs program 64. Nearly every view of
   Conflux runs a skin's program. Its `CSBgraphics.dat` has 51 skins, 90 background
   sections and four programs (61 to 64). Its DSAs never call `&GETSKIN` or `&SETSKIN`.
-- **The Towers of Chaos 3.3** (`towers-of-chaos`) has skins 1 to 6 on 4530 cells, and
+- **The Towers of Chaos 3.3** (`towers-of-chaos`) has skins 1, 2, 3, 5 and 6 on 4530
+  cells, and
   its default skins are all 0. Its `CSBgraphics.dat` has 38 skins, 21 background sections
   and one program (64), which uses a subset of Conflux's skin opcodes, the virtual
   graphics among them. It is a data set already, and draws its skinned cells with the standard programs
@@ -385,13 +314,10 @@ What the data sets here use of it:
 
 The steps, in order. Each step's tool runs on Conflux's files and The Towers of Chaos':
 
-1. ⏳ **The skin cache, and G1's last two operations (S).** `SKIN_CACHE`
-   (`doc/CSBwin-src/data.cpp:2058-2171`) over the port's `Expool`: `Load`, `GetSkin`,
-   `GetDefaultSkin` (read once, until `Cleanup`) and `SetSkin`, which writes the column's
-   record back trimmed of its trailing zeros. A save keeps the records with the rest of
-   `EXPOOL`. Then `&GETSKIN` and `&SETSKIN`, which empty `tools/dump-dsa-census.ts`'s
-   `LEFT` and finish G1's operations. A tool checks Conflux's skins and default skins
-   against the bytes, a `SetSkin` round trip through a save, and its no-op cases.
+1. ✅ **The skin cache, and `&GETSKIN` and `&SETSKIN`.** `SKIN_CACHE` is
+   `src/engine/SkinCache.ts`, `DungeonState.skinCache`, a new one with every world read,
+   as CSBWin's `Cleanup(false)` empties it before every game. Checked by
+   `tools/dump-skins.ts`, which counts the skins above.
 2. ⏳ **`BACKGROUND_LIB` (M).** The cache of `CGT_Backgrounds` sections over
    `CSBGraphicsLoader.readSection`, with `GetBackgroundGraphic`'s entry for a section
    that is missing (`Viewport.cpp:5801-5909`); `GetSkinDef`, `GetSkinID` and its eight
@@ -473,8 +399,7 @@ and the tables read from `graphics.dat`, which the player would pick from the kn
 dungeons' (the signatures an Extended Features block may carry,
 `doc/CSBwin-src/SaveGame.cpp:378-379`, could suggest one); a `dungeon.dat` for "RESTART
 THIS GAME", so a lost game can only load a save; and a data set to list its saves under,
-which its signature can stand for. A dungeon with DSAs waits for G1: `buildSaveFile`
-refuses to save one.
+which its signature can stand for.
 
 ### G29 ⏸️ Recording a game and playing it back
 
@@ -627,8 +552,6 @@ fake pits, a refused move into stone with its damage, and a gravity slide ending
 `GravityMove` finds no axis. 3D2D1D's six DSAs use only MESSAGE, OVERRIDE,
 COPYTELEPORTER and GOSUB, and it has no party-move filter. A hand probe ran the 1D
 corridor's chain correctly in the engine (`doc/3D2D1D.md`), but no tool proves it yet.
-Playing the dungeon through also needs saving, which waits on G1's `DSA::Write`:
-`buildSaveFile` refuses any dungeon that defines a DSA.
 `static/gamefiles/3D2D1D/WALKTHROUGH.md` is a full route computed from CSBWin's rules
 by `tools/solve-3d2d1d.ts`, outside the engine. Once both steps are in, a tool that
 replays it through `Game` is the end-to-end proof.
