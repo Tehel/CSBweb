@@ -99,6 +99,25 @@ export interface DungeonImageOptions {
 }
 
 /**
+ * Where each level's cells start in the cell flag array: `LEVELDESC.cellOffset` is a
+ * 16-bit word, so a dungeon whose array passes 64K stores it wrapped. CSBWin takes level
+ * 0's as it stands and adds each next level's difference from the one before, `& 0xffff`
+ * (`doc/CSBwin-src/SaveGame.cpp:2676-2685`), which unwraps it while the levels are in
+ * order. Conflux 3.5's map 63 starts at 66155, stored as 619.
+ */
+export function levelCellOffsets(descriptors: readonly MapDescriptor[]): number[] {
+    const offsets: number[] = [];
+    let cellOffset = 0;
+    descriptors.forEach((d, level) => {
+        cellOffset = level === 0
+            ? d.dataOffset
+            : cellOffset + ((d.dataOffset - descriptors[level - 1].dataOffset) & 0xffff);
+        offsets.push(cellOffset);
+    });
+    return offsets;
+}
+
+/**
  * The world before anything is read: no level, no record, no text. What `d.Initialize()`
  * leaves CSBWin's `d` with until `_ReadEntireGame` reads `dungeon.dat` or a save
  * (`doc/CSBwin-src/Code1f9e6.cpp:309`, `CSBCode.cpp:10634`). The page builds its `Game`
@@ -965,9 +984,10 @@ export class DungeonLoader {
      */
     private parseMapData(offset: number, descriptors: MapDescriptor[]): MapData[] {
         const maps: MapData[] = [];
+        const cellOffsets = levelCellOffsets(descriptors);
 
         for (const descriptor of descriptors) {
-            this.file.seek(offset + descriptor.dataOffset);
+            this.file.seek(offset + cellOffsets[descriptor.mapIndex]);
 
             const cellFlags: CellFlag[][] = [];
 

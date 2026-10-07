@@ -30,8 +30,7 @@
  *    graphics, is counted from CSBWin's graphic trace, and the starting view's is
  *    printed. Steps 4 and 5 draw it; until then those opcodes only pop their arguments.
  *
- * Run: `npx tsx tools/dump-skin-programs.ts [--all]`. With `--all`, Conflux's views stop
- * on map 63, at a cell `DrawRoomObjects` throws on (`DEBT.md` C149).
+ * Run: `npx tsx tools/dump-skin-programs.ts [--all]`.
  */
 import { readFileSync } from 'node:fs';
 

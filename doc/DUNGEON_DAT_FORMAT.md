@@ -147,7 +147,7 @@ const facing = (startPos >> 10) & 0x03; // Bits 10-11
 
 | Offset | Type | Name | Description |
 |--------|------|------|-------------|
-| +0x00 | word | Map Data Offset | Offset into map data section |
+| +0x00 | word | Map Data Offset | Offset into map data section, wrapped at 64K (`PROVEN_FACTS.md` → "`LEVELDESC.cellOffset` wraps at 64K") |
 | +0x02 | word | Component Flags | Graphics usage flags (DM2 only) |
 | +0x04 | word | (Unused) | Always 0 |
 | +0x06 | byte | Offset X | Map offset X in dungeon |

@@ -29,6 +29,7 @@
  */
 import { writeU16BE, writeU32LE } from '../core/bytes';
 import { EXPOOL_RECORD_SIZE } from './CsbwinExpool';
+import { levelCellOffsets } from './DungeonLoader';
 import { DBType, OBJECT_ID_NULL } from '../core/types';
 import type {
     ActuatorRecord, ClothingRecord, CloudRecord, ContainerRecord, CreatureRecord, DatabaseRecord,
@@ -134,7 +135,8 @@ export function buildColumnIndex(columnIndex: readonly number[]): Uint8Array {
 /**
  * How long block 14 is: the far end of the last level's per-level tables.
  *
- * Each level's cells start at its own `LEVELDESC.cellOffset` and are followed
+ * Each level's cells start at its own `LEVELDESC.cellOffset`, unwrapped
+ * (`levelCellOffsets`), and are followed
  * immediately by four tables whose lengths the descriptor gives — the monster types,
  * then the wall, floor and door decoration tables, in that order
  * (`SetPartyLevel`, `doc/CSBwin-src/CSBCode.cpp:5778+`). Measured on `dungeon.dat` and on
@@ -142,10 +144,11 @@ export function buildColumnIndex(columnIndex: readonly number[]): Uint8Array {
  * `LegacyCellFlagArraySize` and the saves' `cellFlagArraySize` both say.
  */
 export function cellFlagArraySize(maps: readonly MapData[]): number {
+    const cellOffsets = levelCellOffsets(maps.map((map) => map.descriptor));
     let end = 0;
-    for (const map of maps) {
-        end = Math.max(end, map.descriptor.dataOffset + mapCellFlagLength(map));
-    }
+    maps.forEach((map, level) => {
+        end = Math.max(end, cellOffsets[level] + mapCellFlagLength(map));
+    });
     return end;
 }
 
@@ -160,15 +163,17 @@ function mapCellFlagLength(map: MapData): number {
 
 /**
  * Block 14 — `d.cellFlagArray`, one byte per cell in `[x][y]` order, each level at its
- * descriptor's `cellOffset`, each followed by its four per-level tables.
+ * descriptor's `cellOffset` unwrapped (`levelCellOffsets`), each followed by its four
+ * per-level tables.
  *
  * The size is the caller's, not this function's, because the Extended Features block
  * declares it and the two must agree; `cellFlagArraySize` computes the value to declare.
  */
 export function buildCellFlagArray(maps: readonly MapData[], size: number): Uint8Array {
     const buf = new Uint8Array(size);
-    for (const map of maps) {
-        let at = map.descriptor.dataOffset;
+    const cellOffsets = levelCellOffsets(maps.map((map) => map.descriptor));
+    maps.forEach((map, level) => {
+        let at = cellOffsets[level];
         const { width, height } = map.descriptor;
         if (at + mapCellFlagLength(map) > size) {
             throw new Error(
@@ -183,7 +188,7 @@ export function buildCellFlagArray(maps: readonly MapData[], size: number): Uint
         ]) {
             for (const value of table ?? []) buf[at++] = value & 0xff;
         }
-    }
+    });
     return buf;
 }
 

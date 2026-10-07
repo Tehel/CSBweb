@@ -3224,9 +3224,22 @@ documented as unread. `tools/dump-dungeon-image-blocks.ts` is the check: blocks 
 `dungeon.dat` and for every save. Blanking `word12Bits8_11` in the writer fails it on
 levels 3, 5 and 12 of every one of the nine files.
 
+### `LEVELDESC.cellOffset` wraps at 64K, and CSBWin unwraps it
+
+`cellOffset` is a `ui16`, "only the least significant 16 bits" of the offset
+(`doc/CSBwin-src/CSB.h:2089-2091`). `ReadDatabases` takes level 0's as it
+stands and adds each next level's difference from the one before, `& 0xffff`
+(`doc/CSBwin-src/SaveGame.cpp:2676-2685`), so a cell flag array past 64K reads in order as
+long as no level starts more than 64K after the one before. Conflux 3.5's array is 67198
+bytes, and its map 63 starts at 66155, stored as 619. Read as stored, map 63 is map 0's
+bytes: its flagged cells disagree with the object list's column index and take other
+columns' objects, among them `RNnul`. `levelCellOffsets` (`src/data/DungeonLoader.ts`) is
+the reader's and the writer's; `tools/dump-cell-offsets.ts` checks the column index
+against the flags in every data set, and block 14 written back against Conflux's own.
+
 ### The cell flag array's length is derivable, and lands on the declared value
 
-Each level's cells start at its `LEVELDESC.cellOffset` and run `width * height` bytes,
+Each level's cells start at its `LEVELDESC.cellOffset`, unwrapped, and run `width * height` bytes,
 immediately followed by four per-level tables whose lengths the descriptor gives — monster
 types, then the wall, floor and door decoration tables (`SetPartyLevel`,
 `doc/CSBwin-src/CSBCode.cpp:5778+`). The far end of the last of them is the array's length.

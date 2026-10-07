@@ -198,6 +198,9 @@ const CHECKS = [
   // their RNs resolved. It found thirteen fields the loader was dropping and the whole of
   // EXPOOL, which had no parser at all.
   { tool: 'dump-dungeon-image-blocks.ts' },
+  // Each level's cells where CSBWin reads them, `cellOffset` unwrapped past 64K: the object
+  // list's column index against the flags in every data set, and Conflux's block 14.
+  { tool: 'dump-cell-offsets.ts' },
   // The three conversions `ReadDatabases` runs over an original dungeon, measured
   // against a dungeon CSBWin converted itself: every committed save was made from this
   // same dungeon.dat, so its converted form is sitting in eight files. Without them a

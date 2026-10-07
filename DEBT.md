@@ -94,7 +94,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C149 | A Conflux cell flagged with objects whose first object is `RNnul` throws in `DrawRoomObjects` | S | ⏳ |
 | G27 | Skins: a cell's own wall, floor and ceiling graphics | L | ⏳ |
 | G26 | Conflux 3.5 as a data set | M | ⏳ |
 | Phase 17 | Deployment: the Docker image, the data sets' manifest, the statistics | L | in `PLAN.md` |
@@ -183,22 +182,6 @@ The redesigned page also links to two pages:
 
 A divergence found along the way goes here, with the next free ID.
 
-### C149 ⏳ A Conflux cell flagged with objects whose first object is `RNnul` throws in `DrawRoomObjects`
-
-On Conflux 3.5's map 63, (21,29) is a stone cell whose flag says it has objects (0x1f),
-and whose first object, as `DungeonState.findFirstObject` reads it from the object list,
-is `RNnul` (0xFFFF). Seen from (17,28) facing east it is F4R1: `SummarizeRoomInfo` gives
-it that `rn2`, `F4R1Contents` pushes it, and `DrawRoomObjects` takes it as the chain's
-first object and throws in `RnMaps.decode` ("Illegal object Indirect Index 65535"). The
-port throws on it before and after G27 step 3, and the frame is lost. CSBWin's
-`DrawRoomObjects` returns only for `RNeof` (`doc/CSBwin-src/Code51a4.cpp:2707`), and
-`StdDrawRoomObjects` reads its contents with `popRN`, which makes 0xFFFF `RNnul`
-(`Viewport.cpp:2249-2258`, `:2914`). What CSBWin's `SummarizeRoomInfo` puts in `rn2` for
-such a cell, what its chain walk does with `RNnul`, and whether other Conflux cells are
-alike, is not traced. `peek-dungeon` shows the cell with no object. Conflux is no data
-set yet, so no game reaches it; `tools/dump-skin-programs.ts --all` stops there, and its
-default run, the starting levels only, does not.
-
 ### C145 ⏸️ The Hint Oracle's title boxes keep colour 12 on their last line and a half
 
 Not a divergence yet: the port draws what CSBWin draws. Recorded because it looks like a
@@ -268,7 +251,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 172 checks sequentially (`spawnSync`, `:307`), each a
+`tools/run-checks.mjs` spawns its 184 checks sequentially (`spawnSync`, `:332`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and
@@ -372,10 +355,9 @@ Once the items above are paid, what is left is the page's side:
   signature from `tools/dump-dungeon-signature.ts` (`src/data/DungeonSignature.ts`). The
   comments in both that say why Conflux is missing go with them;
 - **its `graphics.dat`**, 456953 bytes where DM's is 271921. Its tables extract without an
-  error, and nothing has looked at them further. Its levels name graphics past DM's: wall
-  decorations up to 192, floor decorations up to 108, door decorations up to 56, and
-  monster types up to 40 (DM's: 59, 8, 11 and 26). Its creature records use types 0 to
-  26 only. What CSBWin does with a level's monster type past 26 is not traced;
+  error, and nothing has looked at them further. Its levels name no graphic past DM's:
+  wall decorations up to 59, floor decorations up to 8, door decorations up to 11 and
+  monster types up to 26, DM's own maxima;
 - a golden frame at Conflux's start, and a tool that plays its first ticks.
 
 Its seven `&JITTER` calls: which values they pass is not looked at. CSBWin's source draws
