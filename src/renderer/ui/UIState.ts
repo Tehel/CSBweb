@@ -109,6 +109,12 @@ export interface UIState {
   hintOracle: HintOracleFiles | null;
   /** The Oracle's button was clicked: `diskMenuNeeded`'s twin, acted on by the same caller. */
   hintOracleNeeded: boolean;
+  /**
+   * The player put the party to sleep, button 145, or woke it, button 146: the
+   * Sleepsave is due (`onSleepSave`), acted on by `diskMenuNeeded`'s caller once the
+   * click is drained. A blow that wakes the party raises nothing. The port's own.
+   */
+  sleepSaveNeeded: boolean;
   /** The Oracle is up: it has the screen, and the interface draws nothing until it closes. */
   hintOracleUp: boolean;
   pressingEye: boolean;
@@ -293,6 +299,11 @@ export interface UIState {
    * the page builds the screen it runs on (`runHintOracle`, `src/renderer/intro/BootSequence.ts`).
    */
   readonly onOpenHintOracle: (square: HintSquare) => void;
+  /**
+   * Write the playthrough's Sleepsave (`GameSaves.sleepSave`, `src/engine/GameSaves.ts`),
+   * as `sleepSaveNeeded` asks. Silent, and awaited by nobody.
+   */
+  readonly onSleepSave: () => void;
 
   /* ---- back into the renderer ---- */
   getGraphicBitmap(graphicNum: number, format?: ImageFormat): IndexedBitmap | null;
@@ -302,7 +313,7 @@ export interface UIState {
 
 /** The fields of `UIState` that a game in play sets, and a restart clears. */
 type PlayState = Pick<UIState,
-  | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'reincarnate' | 'diskMenuNeeded' | 'hintOracleNeeded'
+  | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'reincarnate' | 'diskMenuNeeded' | 'hintOracleNeeded' | 'sleepSaveNeeded'
   | 'pressingEye' | 'pressingMouth' | 'describedObject' | 'weaponHandScroll' | 'word23144' | 'word23118' | 'pointer23178' | 'pointer23182'
   | 'attackingCharacterOrdinal' | 'possibleAttackTypes' | 'byte20256' | 'word20248'
   | 'word20250' | 'word20252' | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
@@ -322,6 +333,7 @@ function initialPlayState(): PlayState {
     reincarnate: null,
     diskMenuNeeded: false,
     hintOracleNeeded: false,
+    sleepSaveNeeded: false,
     pressingEye: false,
     pressingMouth: false,
     describedObject: null,
@@ -367,7 +379,7 @@ export type UISources = Pick<UIState,
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
-  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle'>;
+  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {

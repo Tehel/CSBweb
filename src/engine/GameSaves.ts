@@ -5,17 +5,22 @@
  * The file itself is `SaveGameFile.ts`'s to write and `CsbwinSaveGame.ts`'s to read: a
  * save is a CSBWin file. This is what calls them for the page: the disk menu's SAVE and LOAD
  * (`src/renderer/ui/SaveMenu.ts`), the boot's chooser (`src/renderer/intro/BootSequence.ts`),
- * and the F5 and F9 keys.
+ * the F5 and F9 keys, and the Sleepsave.
  *
  * The store (`src/data/saves/`) holds every data set's saves, each row naming its own, and
  * the game's are its data set's: what the menu and the chooser list. Among them, those of
- * the game's playthrough (`d.RandomGameID`) are what F5 and F9 work on.
+ * the game's playthrough (`d.RandomGameID`) are what F5, F9 and the Sleepsave work on.
  *
  * F5 and F9 do not exist in CSBWin, which has only the disk menu. F5 writes the
  * playthrough's quick-save, one slot written over at each press, and never a save the
  * menu made or wrote over; F9 loads the playthrough's newest save, the slot or the menu's. Neither
  * raises a dialog, so what either did, or why it did nothing, is a line in the message
  * area, and one for the console with the save's name.
+ *
+ * The Sleepsave does not exist in CSBWin either: the playthrough's slot of its own,
+ * written when the party lies down and written over when the player wakes it, never
+ * when a blow does (`sleepSave`). It is silent: what it did is a line for the console
+ * alone.
  *
  * A file from outside, CSBWin's or another browser's export, comes into the store through
  * `importSave`, once its dungeon has been held against the data set's
@@ -28,8 +33,8 @@ import type { DataSet } from '../data/DataSets';
 import { checkDungeon, dungeonSignature, type DungeonCheck } from '../data/DungeonSignature';
 import { stampRandomGameID } from '../data/SaveGameLoader';
 import {
-    SAVE_FILE_EXTENSION, joinedPlaythrough, quickSlot, readSaveFileFields,
-    type OpenedSave, type SaveEntry, type SaveStore,
+    SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields, slotOf,
+    type OpenedSave, type SaveEntry, type SaveSlot, type SaveStore,
 } from '../data/saves';
 import { UtilityDiskMessages, UtilityError, makeNewAdventure } from './Chaos';
 import type { Game } from './Game';
@@ -75,15 +80,15 @@ export interface GameSavesScreen {
 /**
  * Whether the game runs on while a save is written. The disk menu has stopped the clock
  * and repacked an open chest (`TAG02076e`, `doc/CSBwin-src/Character.cpp:5116-5125`); F5
- * has done neither.
+ * and the Sleepsave have done neither.
  */
 export type SaveClock = 'running' | 'stopped';
 
 /**
- * Where a save is written: a row of its own, F5's slot, or over a listed save, the one
- * selected in the disk menu.
+ * Where a save is written: a row of its own, a slot of the playthrough (F5's or the
+ * Sleepsave), or over a listed save, the one selected in the disk menu.
  */
-export type SaveTarget = 'new' | 'quick' | SaveEntry;
+export type SaveTarget = 'new' | SaveSlot | SaveEntry;
 
 /** A file on its way into the store (`GameSaves.importSave`). */
 export interface ImportedFile {
@@ -245,12 +250,12 @@ export class GameSaves {
     /**
      * Build a save and write it to the store, as a row of the game's data set. A `'new'`
      * one is a row of its own, under a name no save has in any set: a row's name is its
-     * key. F5's (`'quick'`) is written over the playthrough's slot (`quickSlot`), which
-     * keeps its key and its name and takes the new file and its date; the first press
-     * makes the slot, as a new row. The menu's SAVE over a listed save does the same to
-     * that row, whatever game it held: it is the game's playthrough's from then on, and
-     * the menu's, so a quick-save written over is F5's slot no longer and the next press
-     * makes another.
+     * key. F5's (`'quick'`) is written over the playthrough's quick-save (`slotOf`),
+     * which keeps its key and its name and takes the new file and its date; the first
+     * press makes the slot, as a new row. The Sleepsave (`'sleep'`) is its own slot, the
+     * same way. The menu's SAVE over a listed save does the same to that row, whatever
+     * game it held: it is the game's playthrough's from then on, and the menu's, so a
+     * slot written over is its slot no longer and the next save to it makes another.
      *
      * With the clock stopped, the save's tail (`Game.saveWritten`) runs once the file is
      * written, and a write that fails skips it, as CSBWin's `SaveError` jumps past it
@@ -284,14 +289,14 @@ export class GameSaves {
         if (!fields) throw new Error('the save file does not read back');
         if (clock === 'running') this.game.saveWritten();
         await this.marked;
-        const quick = target === 'quick';
         const rows = typeof target === 'string' ? await this.store.list(null) : [];
         const over = typeof target !== 'string' ? target
-            : quick ? quickSlot(rows, this.dataSet.id, fields.playthrough) : undefined;
+            : target === 'new' ? undefined : slotOf(rows, target, this.dataSet.id, fields.playthrough);
         const name = over ? over.name : makeSaveFileName(savedAt, new Set(rows.map((row) => row.name)));
         const id = over ? over.id : name;
         const entry: SaveEntry = {
-            id, name, dataSet: this.dataSet.id, quick, savedAt, usedAt: savedAt, playTime,
+            id, name, dataSet: this.dataSet.id, quick: target === 'quick', sleep: target === 'sleep',
+            savedAt, usedAt: savedAt, playTime,
             unofficial: this.unofficial, ...fields,
         };
         await this.store.write(entry, bytes);
@@ -377,7 +382,7 @@ export class GameSaves {
         const name = importedFileName(file.name, new Set(rows.flatMap((row) => [row.id, row.name])));
         const now = Date.now();
         const entry: SaveEntry = {
-            id: name, name, dataSet: this.dataSet.id, quick: false,
+            id: name, name, dataSet: this.dataSet.id, quick: false, sleep: false,
             savedAt: file.modifiedAt ?? now, usedAt: now, playTime: 0,
             unofficial: check.kind === 'modified', ...fields,
         };
@@ -429,7 +434,7 @@ export class GameSaves {
             new Set(rows.flatMap((row) => [row.id, row.name])));
         const now = Date.now();
         const entry: SaveEntry = {
-            id: name, name, dataSet: this.dataSet.id, quick: false,
+            id: name, name, dataSet: this.dataSet.id, quick: false, sleep: false,
             savedAt: now, usedAt: now, playTime: 0, unofficial: false, ...fields,
         };
         await this.store.write(entry, bytes);
@@ -513,7 +518,34 @@ export class GameSaves {
     }
 
     /**
-     * F9: the newest save of the game's playthrough, F5's or the menu's. Not while a
+     * The Sleepsave: the playthrough's slot of its own (`'sleep'`), apart from F5's,
+     * written when the party lies down, button 145, and written over when the player
+     * wakes it, button 146. A blow that wakes the party (`WakeUp` from
+     * `doc/CSBwin-src/Monster.cpp:4531` and `Character.cpp:2811`) writes nothing, so the
+     * slot keeps the moment the party lay down. Both are player's clicks, after which the
+     * screen calls this (`UIState.sleepSaveNeeded`); neither does anything in CSBWin.
+     *
+     * Not where F5 is refused (`quickSave`), nor in the prison, where a save would ask
+     * "BEGIN THE ADVENTURE?". It says nothing in the message area, refused, written or
+     * failed: what it did is a line for the console alone.
+     */
+    async sleepSave(): Promise<void> {
+        const { champions, potentialChampionIndex } = this.game.ctx.party.state;
+        if (champions.length === 0 || potentialChampionIndex >= 0 || this.game.isRunningScript()
+            || this.game.ctx.systems.dsa.disableSaves || this.inPrison()) {
+            this.log('Sleepsave skipped: no party, a champion being chosen, a script running, saves disabled, or the prison');
+            return;
+        }
+        try {
+            const entry = await this.save('running', 'sleep');
+            this.log(`Sleepsaved ${entry.name}`);
+        } catch (error) {
+            this.log('Sleepsave failed', error);
+        }
+    }
+
+    /**
+     * F9: the newest save of the game's playthrough, F5's, the Sleepsave or the menu's. Not while a
      * script holds the loop: it would run on in the loaded world.
      *
      * A playthrough with no save is `_ReadEntireGame`'s "CAN'T FIND SAVED GAME!"

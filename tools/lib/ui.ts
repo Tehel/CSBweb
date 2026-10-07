@@ -55,6 +55,7 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     onRestoreSave: () => {},
     onRestoreFailed: () => {},
     onOpenHintOracle: () => {},
+    onSleepSave: () => {},
     ...hooks,
     getGraphicBitmap,
   });

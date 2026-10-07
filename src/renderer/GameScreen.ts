@@ -105,6 +105,7 @@ export type GameScreenHooks = Pick<UIState,
   | 'onRestoreSave'
   | 'onRestoreFailed'
   | 'onOpenHintOracle'
+  | 'onSleepSave'
 >;
 
 /** What the screen reads: the graphics, and the game it shows. */
@@ -199,6 +200,7 @@ export class GameScreen {
       onRestoreSave: hooks.onRestoreSave,
       onRestoreFailed: hooks.onRestoreFailed,
       onOpenHintOracle: hooks.onOpenHintOracle,
+      onSleepSave: hooks.onSleepSave,
     });
     ui.hintOracle = deps.hintOracle ?? null;
     this.ui = ui;
@@ -305,7 +307,8 @@ export class GameScreen {
    * A button `Game.handleMouseEvents` took off the mouse queue and does not handle itself.
    * `DiskMenuNeeded` is raised by the disk icon's handler and acted on by whoever called
    * `HandleMouseEvents` — the main loop in CSBWin (`doc/CSBwin-src/CSBCode.cpp:762`), this
-   * method here. The deferral is the whole reason the flag exists.
+   * method here. The deferral is the whole reason the flag exists. The Oracle's button
+   * and the Sleepsave raise flags of their own, acted on here the same way.
    */
   handleMouseButton(num: number, x: number, y: number): void {
     handleMouseButton(this.ui, num, x, y);
@@ -316,6 +319,10 @@ export class GameScreen {
     if (this.ui.hintOracleNeeded) {
       this.ui.hintOracleNeeded = false;
       this.openHintOracle();
+    }
+    if (this.ui.sleepSaveNeeded) {
+      this.ui.sleepSaveNeeded = false;
+      this.ui.onSleepSave();
     }
   }
 

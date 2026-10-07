@@ -26,6 +26,11 @@ export interface SaveEntry {
     playthrough: number;
     /** Whether F5 wrote it, rather than the menu's SAVE. */
     quick: boolean;
+    /**
+     * Whether it is the Sleepsave, which the party lying down writes and the player
+     * waking it writes over (`GameSaves.sleepSave`), rather than the menu's SAVE.
+     */
+    sleep: boolean;
     /** Milliseconds since the epoch: the row's own, since a CSBWin file holds no date. */
     savedAt: number;
     /**
@@ -59,17 +64,18 @@ export interface SaveRecord extends SaveEntry {
 }
 
 /**
- * A row as a store may hold it: one written before rows held `usedAt`, `playTime` or
- * `unofficial` has none of them.
+ * A row as a store may hold it: one written before rows held `usedAt`, `playTime`,
+ * `unofficial` or `sleep` has none of them.
  */
-export type StoredSaveRecord = Omit<SaveRecord, 'usedAt' | 'playTime' | 'unofficial'>
-    & { usedAt?: number; playTime?: number; unofficial?: boolean };
+export type StoredSaveRecord = Omit<SaveRecord, 'usedAt' | 'playTime' | 'unofficial' | 'sleep'>
+    & { usedAt?: number; playTime?: number; unofficial?: boolean; sleep?: boolean };
 
 /**
  * A stored row's entry, without its bytes. A row written before rows held `usedAt` has
  * none, and counts as last used when it was saved; one written before they held
  * `playTime` counts no time played; one written before they held `unofficial` is of its
- * data set's own dungeon, since no file came in from outside then.
+ * data set's own dungeon, since no file came in from outside then; one written before
+ * they held `sleep` is no Sleepsave, since no build wrote one then.
  */
 export function saveEntryOf(record: StoredSaveRecord): SaveEntry {
     return {
@@ -78,6 +84,7 @@ export function saveEntryOf(record: StoredSaveRecord): SaveEntry {
         dataSet: record.dataSet,
         playthrough: record.playthrough,
         quick: record.quick,
+        sleep: record.sleep ?? false,
         savedAt: record.savedAt,
         usedAt: record.usedAt ?? record.savedAt,
         playTime: record.playTime ?? 0,
@@ -131,14 +138,17 @@ export function joinedPlaythrough(entry: SaveEntry, rows: SaveEntry[]): number {
     return found ? found.playthrough : 0;
 }
 
+/** A playthrough's two slots: F5's quick-save, and the Sleepsave. */
+export type SaveSlot = 'quick' | 'sleep';
+
 /**
- * F5's slot: the quick-save of a playthrough in a data set, which the key writes over.
- * The newest, where a store holds several: an earlier build made a row at each press,
- * and the older ones stay as they are.
+ * A slot of a playthrough in a data set, which each save to it writes over: F5's
+ * quick-save, or the Sleepsave. The newest, where a store holds several: an earlier
+ * build made a quick-save row at each press, and the older ones stay as they are.
  */
-export function quickSlot(rows: SaveEntry[], dataSet: string, playthrough: number): SaveEntry | undefined {
+export function slotOf(rows: SaveEntry[], slot: SaveSlot, dataSet: string, playthrough: number): SaveEntry | undefined {
     return sortSaveEntries(rows).find(
-        (row) => row.quick && row.dataSet === dataSet && row.playthrough === playthrough,
+        (row) => row[slot] && row.dataSet === dataSet && row.playthrough === playthrough,
     );
 }
 
@@ -242,12 +252,13 @@ export function formatPlaythroughRow(playthrough: Playthrough, folded: boolean, 
 
 /**
  * A save's row under its playthrough's heading: `  2026-09-13 14:05 L14 QUICKSAVE`, the
- * day and the time it was saved, the level, and `QUICKSAVE` on F5's. The party is the
- * heading's.
+ * day and the time it was saved, the level, `QUICKSAVE` on F5's and `SLEEPSAVE` on the
+ * Sleepsave. The party is the heading's.
  */
 export function formatSaveRow(entry: SaveEntry, maxChars = 32): string {
     const level = `L${Math.max(0, entry.level | 0)}`;
-    const row = `  ${formatSaveDate(entry.savedAt)} ${formatSaveTime(entry.savedAt)} ${level}${entry.quick ? ' QUICKSAVE' : ''}`;
+    const slot = entry.quick ? ' QUICKSAVE' : entry.sleep ? ' SLEEPSAVE' : '';
+    const row = `  ${formatSaveDate(entry.savedAt)} ${formatSaveTime(entry.savedAt)} ${level}${slot}`;
     return row.length > maxChars ? row.slice(0, maxChars) : row;
 }
 

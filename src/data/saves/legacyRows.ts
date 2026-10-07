@@ -90,6 +90,7 @@ function upgradeSaveRecord(old: unknown, dataSet: string): SaveRecord | null {
         name,
         dataSet,
         quick: false,
+        sleep: false,
         savedAt,
         usedAt: savedAt,
         playTime: 0,

@@ -189,7 +189,7 @@ function checkButtons(): void {
 
 function row(id: string, dataSet: string, bytes: Uint8Array, usedAt: number): SaveEntry {
   return {
-    id, name: id, dataSet, quick: false, savedAt: usedAt, usedAt, playTime: 1234, unofficial: false,
+    id, name: id, dataSet, quick: false, sleep: false, savedAt: usedAt, usedAt, playTime: 1234, unofficial: false,
     ...readSaveFileFields(bytes)!,
   };
 }

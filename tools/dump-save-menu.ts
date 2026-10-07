@@ -112,10 +112,10 @@ import {
   joinedPlaythrough,
   lastUsedSave,
   playthroughsOf,
-  quickSlot,
   readSaveFileFields,
   saveEntryOf,
   SAVE_FILE_EXTENSION,
+  slotOf,
   sortSaveEntries,
   type SaveEntry,
   type SaveStore,
@@ -498,6 +498,7 @@ function entry(over: Partial<SaveEntry>): SaveEntry {
     dataSet: DEFAULT_DATA_SET.id,
     playthrough: 0,
     quick: false,
+    sleep: false,
     savedAt: 0,
     playTime: 0,
     level: 0,
@@ -674,7 +675,7 @@ function checkListLogic(): void {
     entry({ name: 'quick, another playthrough', playthrough: 9, quick: true, savedAt: 300 }),
     entry({ name: 'quick, another set', playthrough: 7, quick: true, dataSet: 'csb', savedAt: 400 }),
   ];
-  const slot = (dataSet: string, playthrough: number): string => quickSlot(slots, dataSet, playthrough)?.name ?? 'none';
+  const slot = (dataSet: string, playthrough: number): string => slotOf(slots, 'quick', dataSet, playthrough)?.name ?? 'none';
   console.log(`  F5's slot: playthrough 7 "${slot(DEFAULT_DATA_SET.id, 7)}", 9 "${slot(DEFAULT_DATA_SET.id, 9)}", 7 in csb "${slot('csb', 7)}", 8 "${slot(DEFAULT_DATA_SET.id, 8)}"`);
   check(slot(DEFAULT_DATA_SET.id, 7) === 'quick, newer', 'F5\'s slot is the playthrough\'s newest quick-save, never the menu\'s save');
   check(slot(DEFAULT_DATA_SET.id, 9) === 'quick, another playthrough' && slot('csb', 7) === 'quick, another set',

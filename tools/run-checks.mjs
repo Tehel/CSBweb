@@ -262,6 +262,9 @@ const CHECKS = [
   // of graphic 0's pieces, the row formatting, and the two metadata paths. Nothing here is
   // visible to the golden frames until there are saves to list.
   { tool: 'dump-save-menu.ts' },
+  // The Sleepsave: a playthrough's slot apart from F5's, written when the party lies down
+  // and when the player wakes it, never when a blow does; silent, and refused where F5 is.
+  { tool: 'dump-sleep-save.ts' },
   // A playthrough stamped into a save file that names none: six bytes of GAMEBLOCK1, in a
   // block that is scrambled and folded, over every genuine save.
   { tool: 'dump-save-stamp.ts' },

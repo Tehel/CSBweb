@@ -9,7 +9,7 @@ where CSBWin has four files in a directory and nothing to say.
 
 Everything goes through `GameSaves` (`src/engine/GameSaves.ts`), which is built with the
 game, its data set and the store. It is where every save is built and written to the
-store (the disk menu's SAVE and F5) and where a save's bytes are read back into the game
+store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are read back into the game
 (LOAD, the boot's chooser and F9).
 
 ## What a save is
@@ -31,8 +31,8 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
 - **Every save is a row of IndexedDB** (`SaveRecord`, `src/data/saves/SaveStore.ts`): the
   file's bytes beside what the list needs. The level, the champions' names and the
   playthrough (below) are read from the file's own blocks when the row is written; the
-  data set, the date, when the save was last used, the play time and whether F5 wrote it
-  are the row's own. Nothing is JSON, and no row holds anything a `.dat` could not be
+  data set, the date, when the save was last used, the play time and whether it is F5's
+  or the Sleepsave are the row's own. Nothing is JSON, and no row holds anything a `.dat` could not be
   listed without.
 - **The store upgrades its older rows** (`src/data/saves/legacyRows.ts`, run once by
   `idb.ts`). To version 2, it keeps of each older row the CSBWin file alone, out of its
@@ -55,8 +55,8 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   disk needs `showDirectoryPicker`, which is Chromium's alone. **Export** downloads the
   selected save's bare `.dat`, which CSBWin opens: the row's bytes as the store holds
   them, under the row's name (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`).
-  What the row alone holds, its date, its play time and whether F5 wrote it, stays
-  behind. **Import** is a `.dat` dropped on the page while the dialog is up, the disk
+  What the row alone holds, its date, its play time and whether it is F5's or the
+  Sleepsave, stays behind. **Import** is a `.dat` dropped on the page while the dialog is up, the disk
   menu's or the entrance's chooser (`bindSaveDrop`, `src/ui/saveDrop.ts`): the whole
   page, since the CRT effect shows a canvas of its own over the game's, and a file
   dropped with no dialog up is swallowed rather than opened by the browser. There is
@@ -196,16 +196,17 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   touches a save made from the dialog, which is what is left when a quick-save was made
   at the wrong moment. The slot is the playthrough's newest quick-save in the data set
   (`quickSlot`, `src/data/saves/SaveStore.ts`); a press writes its file and its date
-  there, under the row's key and name, and the first press makes the row. **F9 loads
-  the playthrough's newest save**, the quick slot or another, and finds none in a
-  playthrough not saved yet, a new game's. Both are the player's, not debug features,
+  there, under the row's key and name, and the first press makes the row. **The
+  Sleepsave is a slot of its own** beside it ("The Sleepsave"). **F9 loads the
+  playthrough's newest save**, either slot or another, and finds none in a playthrough
+  not saved yet, a new game's. Both are the player's, not debug features,
   and what they did is printed in the message area ("The two keys").
 - **SAVE writes over the selected save**, or makes a new one from the heading of the
   running game's playthrough; a game with no save yet has no heading, and makes its
   first from the list's "new save" row. The row written over keeps its key and its name
   and takes the file, its date and the game's playthrough, and is the dialog's save from
   then on: a quick-save written over is F5's slot no longer, and the next F5 makes
-  another. On another playthrough's heading SAVE does nothing, the author's decision: a
+  another, and the same for the Sleepsave. On another playthrough's heading SAVE does nothing, the author's decision: a
   file holds the running game's id, so a new save is never another playthrough's.
   **LOAD takes any save**, and from a heading the last save used of its playthrough.
   Either asks first when the save, the one read or the one written over, is of another
@@ -246,7 +247,8 @@ opens the same one, load-only.
   a load or a save is `_DoMenu`'s centred menu, alone on the cleared screen.
 - **A two-level list**: a heading for each playthrough, named by the champions of its
   newest save, and under it, folded or not, its saves, newest first, each with its day,
-  its time, its level and, on F5's, "QUICKSAVE" (`layoutRows`). The playthroughs are in
+  its time, its level and, on F5's, "QUICKSAVE", on the Sleepsave "SLEEPSAVE"
+  (`layoutRows`). The playthroughs are in
   the order of their last
   use, a playthrough's being that of the save of its own last used
   (`playthroughsOf`, `src/data/saves/SaveStore.ts`). The dialog opens with the first
@@ -326,6 +328,28 @@ CSBWin's own "UNABLE TO SAVE GAME!" (`doc/CSBwin-src/SaveGame.cpp:1266`) and "CA
 SAVED GAME!" (`:1585`) for a write that failed and for no save at all; a file that does
 not read gives the line the dialog's message would be. Each outcome is also a line for
 the console, with the save's name, and with the error behind a failure.
+
+## The Sleepsave
+
+The port's own, as F5 is: a slot of each playthrough, apart from F5's and found the same
+way (`slotOf`, `src/data/saves/SaveStore.ts`), written when the party lies down and
+written over when the player wakes it (`GameSaves.sleepSave`). Both are player's clicks,
+the sleep icon, button 145, and the click that wakes, button 146, and each raises
+`UIState.sleepSaveNeeded`, which the screen acts on once the click is drained, as on the
+disk icon's flag (`GameScreen.handleMouseButton`). A blow that wakes the party
+(`WakeUp` from `doc/CSBwin-src/Monster.cpp:4531` and `Character.cpp:2811`) raises
+nothing, so the slot keeps the moment the party lay down. The author's decision: lying
+down is always the player's choice, but not always a safe place, so the slot never
+touches F5's or a dialog's save.
+
+- **Silent.** It says nothing in the message area, written, refused or failed: what it
+  did is a line for the console alone.
+- **Refused where F5 is**, with no party, with a champion being chosen, while a script
+  holds the loop and while a DSA has disabled saves, and in CSB's prison, where a save
+  asks "BEGIN THE ADVENTURE?" (`GameSaves.inPrison`).
+- **Saved as F5 saves**, the clock running. A party lying down has closed the inventory
+  first, and `d.PartySleeping` is in no file, so a load of either save is of a party
+  awake.
 
 ## What the dialog leaves out
 
@@ -410,6 +434,12 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
   scrolling back; the track and the slider taking no click; a key bringing the list
   back; a list that fits having the whole track for a slider).
 - **The double click**: "the double click".
+- **The Sleepsave**: `tools/dump-sleep-save.ts` (the slot found apart from F5's, per
+  playthrough and data set; the "SLEEPSAVE" row; a stored row from before the flag; two
+  Sleepsaves one row; F5 and the Sleepsave never writing over each other; F9 loading it
+  when newest; SAVE over it making it the dialog's; nothing in the message area; each
+  refusal, and a failed write, a line for the console; buttons 145 and 146 asking for it,
+  a blow's `WakeUp` and a refused sleep not).
 - **EXPORT**: "EXPORT" (no label and no click on a heading, and on "NEW SAVE" in "the
   menu's selection"; on a save, the press, then one file under the row's name, the
   store's bytes byte for byte, which read as a CSBWin save; no row written and the game

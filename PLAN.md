@@ -73,14 +73,15 @@ Back** are not postponed: it is the next dungeon to try.
 - Saves: a save is a CSBWin `.dat` file, all sixteen blocks, written by the game and
   read back as a genuine one is (`doc/CSBWIN_SAVEGAME_REFERENCE.md`). The dialog behind
   the disk icon and at the entrance lists them by playthrough, with LOAD, SAVE, EXPORT
-  and an import by a file dropped on the page; F5 and F9 (`doc/SAVES.md`).
+  and an import by a file dropped on the page; F5 and F9, and the Sleepsave
+  (`doc/SAVES.md`).
 - Three data sets (`src/data/DataSets.ts`: `dm-atari`, the default, `dm-windows` and
   `csb`), one chosen before the boot by `?dungeon=<id>`, and the DM Rules toggle.
 - Debug scaffolding is the chrome beside the canvas (`src/ui/`): the settings, the map
   preview and the champion panel. Its teleport by a click on the map and its cursor
   filter trace are behind `isDebugFeaturesEnabled()`. It has no log of its own: what
-  the page reports goes to the console, a move's position at debug level, what F5 or
-  F9 did at info level.
+  the page reports goes to the console, a move's position at debug level, what F5,
+  F9 or the Sleepsave did at info level.
 
 **Incomplete:**
 - ⚠️ **Validation.** Several completed phases listed validation steps (render tests, render

@@ -151,18 +151,21 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     // it is only ever clicked with an inventory open. `ShowHideInventory(4)` closes it
     // and `TAG02076e` shades the interface before anything else
     // (`doc/CSBwin-src/Mouse.cpp:1683-1691`); the rest is the engine's. Refused, like the
-    // disk, while a champion is only provisionally joined.
+    // disk, while a champion is only provisionally joined. The party lying down asks
+    // for the Sleepsave, the port's own (`UIState.sleepSaveNeeded`).
     if (!potential) {
       if (ui.partyState.selectedCharacterIndex >= 0) handleInventoryToggle(ui, 4);
       tag02076e(ui);
-      ui.ctx.systems.mouse.sleep();
+      if (ui.ctx.systems.mouse.sleep()) ui.sleepSaveNeeded = true;
     }
     return;
   }
   if (id === 146) {
     // `WakeUp()` (`doc/CSBwin-src/Mouse.cpp:1709-1714`): `Buttons17796`, a click anywhere
-    // in the viewport while the party sleeps.
+    // in the viewport while the party sleeps. The player waking it asks for the
+    // Sleepsave; a blow's `WakeUp` does not come here.
     wakeUp(ui.ctx);
+    ui.sleepSaveNeeded = true;
     return;
   }
   if (id === 140) {

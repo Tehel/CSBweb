@@ -417,6 +417,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             console.error(error instanceof UtilityError ? 'New adventure refused:' : 'Saved game damaged:', error);
             saves.readFailed(error);
         },
+        // The party lay down, or the player woke it: the playthrough's Sleepsave.
+        onSleepSave: () => { void saves.sleepSave(); },
         // The Hint Oracle's button: the screen has stopped the clock and shaded the
         // interface, and the Oracle has the canvas until it closes.
         onOpenHintOracle: (square) => {
@@ -632,7 +634,7 @@ async function init() {
     }
 }
 
-/** What F5 or F9 did, for the console (`GameSaves`), with the error of one that failed. */
+/** What F5, F9 or the Sleepsave did, for the console (`GameSaves`), with the error of one that failed. */
 function logSave(message: string, error?: unknown): void {
     if (error === undefined) console.info(message);
     else console.warn(`${message}:`, error);
