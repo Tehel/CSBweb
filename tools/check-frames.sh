@@ -13,12 +13,23 @@
 #
 #   bash tools/check-frames.sh            # compare against the committed baseline
 #   bash tools/check-frames.sh --update   # accept the current rendering as the baseline
+#   bash tools/check-frames.sh --url http://localhost:8080/
+#                                         # compare a page served elsewhere: the image's
+#                                         # (Dockerfile), built with DMWEB_PROBE=1
 set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root" || exit 1
 
 update=0
-[ "${1:-}" = "--update" ] && update=1
+url=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --update) update=1 ;;
+    --url) url="${2:-}"; shift ;;
+    *) echo "unknown argument: $1" >&2; exit 1 ;;
+  esac
+  shift
+done
 
 # Overridable so a run can sit beside a dev server you already have open.
 DEV_PORT="${DEV_PORT:-9000}"
@@ -61,7 +72,13 @@ wait_for() { # url, seconds, what
 }
 
 # --- the dev server -----------------------------------------------------------------
-if listening "http://127.0.0.1:$DEV_PORT/"; then
+if [ -n "$url" ]; then
+  # The page is the one given, which must hand the probe `window.__probe`; no dev server.
+  url="${url%/}/"
+  listening "$url" || { echo "nothing answers at $url" >&2; exit 1; }
+  echo "using the page at $url"
+  export APP_URL="$url"
+elif listening "http://127.0.0.1:$DEV_PORT/"; then
   echo "using the dev server already on :$DEV_PORT"
 else
   echo "starting the dev server on :$DEV_PORT"
@@ -89,7 +106,7 @@ else
   "$chrome" --headless=new --remote-debugging-port="$CDP_PORT" \
     --user-data-dir="$chrome_profile" --no-first-run --no-default-browser-check \
     --window-size=1600,1000 \
-    "http://localhost:$DEV_PORT/" >/dev/null 2>&1 &
+    "${url:-http://localhost:$DEV_PORT/}" >/dev/null 2>&1 &
   chrome_pid=$!
   started_chrome=1
   wait_for "http://127.0.0.1:$CDP_PORT/json/version" 30 "Chrome" || exit 1

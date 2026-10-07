@@ -25,6 +25,9 @@ export default defineConfig(({ command }) => ({
   publicDir: command === 'serve' ? 'static' : false,
   define: {
     __DMWEB_BUILD__: JSON.stringify(buildId()),
+    // The CDP probes' handle (`src/main.ts`): the dev server's, and a build's only when
+    // asked for, so that the golden frames can check a built page. A deployed one has none.
+    __DMWEB_PROBE__: JSON.stringify(command === 'serve' || process.env.DMWEB_PROBE === '1'),
   },
   build: {
     outDir: 'dist',

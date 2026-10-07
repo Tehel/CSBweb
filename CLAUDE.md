@@ -80,6 +80,7 @@ npm run build          # tsc && vite build
 npm test               # the gate: tsc + every asserting tool  (~80s, DEBT.md F13)
 npm test -- --frames   # …and the golden frames               (~40s more)
 npm start              # the deployed server, server/, over dist/  (Node >= 22.18)
+bash tools/check-image.sh  # the golden frames against the Docker image (Docker, ~2 min)
 ```
 
 **Build hygiene (non-negotiable):** `npm test` must pass before any commit. It runs

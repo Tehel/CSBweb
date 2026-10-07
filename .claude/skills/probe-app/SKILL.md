@@ -64,11 +64,13 @@ only by a screenshot has no regression test.
 
 ## The handle
 
-`src/main.ts` creates `window.__probe` under `import.meta.env.DEV`, not under
-`isDebugFeaturesEnabled()` like the rest of the Phase 14 scaffolding. That is deliberate:
-the Debug toggle is applied from saved UI settings *after* init runs, so it always reads
-false at that point. `import.meta.env.DEV` is constant-folded away by `vite build`, so the
-handle cannot reach a production bundle.
+`src/main.ts` creates `window.__probe` under `__DMWEB_PROBE__`, a build-time constant
+(`vite.config.mts`), not under `isDebugFeaturesEnabled()` like the rest of the Phase 14
+scaffolding. That is deliberate: the Debug toggle is applied from saved UI settings
+*after* init runs, so it always reads false at that point. The constant is true on the
+dev server, and in a build only with `DMWEB_PROBE=1`, which `tools/check-image.sh` gives
+the image it checks the golden frames against. A deployed bundle has no handle
+(`tools/dump-build.ts` asserts it).
 
 Leaving a probe browser running does not disturb `tools/check-frames.sh` — it reloads and
 re-seeds the page itself. Verified: `npm test -- --frames` passes 34/34 with one up.

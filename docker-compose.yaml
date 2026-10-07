@@ -1,0 +1,33 @@
+# The stack on the VPS (PLAN.md Phase 17, step 6). `utils/deploy.sh` copies this file to
+# `<DEPLOY_DIR>/app/` and loads the image beside it, so the folders are:
+#
+#   <DEPLOY_DIR>/app/        this file, and an optional `.env` with DMWEB_PORT
+#   <DEPLOY_DIR>/gamefiles/  the data sets, `swoosh/` and `manifest.json`, uploaded by hand
+#   <DEPLOY_DIR>/stats/      stats.db, which a deploy's `down` leaves alone
+#
+# The VPS runs Compose v1, hence the `version` key.
+version: '3.8'
+services:
+  dmweb:
+    image: dmweb:latest
+    # Loopback only: the host's nginx proxies to it. A port published on 0.0.0.0 answers
+    # the whole internet whatever ufw says.
+    ports:
+      - '127.0.0.1:${DMWEB_PORT:-8080}:8080'
+    volumes:
+      - ../gamefiles:/data/gamefiles:ro
+      - ../stats:/data/stats
+    restart: unless-stopped
+    # The server lets the requests in flight finish for 5 s, then closes the store.
+    stop_grace_period: 10s
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8080/api/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'

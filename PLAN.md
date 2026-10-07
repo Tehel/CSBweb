@@ -349,27 +349,39 @@ it later, along with the FAQ and the statistics page.
    fortnight, `tools/dump-server.ts` the API over HTTP and the store's life in
    `server.ts`, and `tools/dump-game-events.ts` that the server takes every event the
    real engine makes as the page sent it.
-6. ⏳ **The image and the stack.** A two-stage `Dockerfile` and a `.dockerignore`
-   (`node_modules`, `dist`, `static/gamefiles`, `doc/CSBwin-src`, `RTC`, `archive`, `.env`,
-   `.git`). The build stage runs `npm ci && npm run build`, which includes `tsc`. It
-   has no `.git`, so the commit comes in as a build argument, `DMWEB_BUILD`, which names
-   the build in the events (step 4).
+6. ✅ **The image and the stack.** A two-stage `Dockerfile` on `node:24-alpine`. Its
+   `.dockerignore` is an allowlist: the build context is the page's sources, `server/`,
+   the tools' `.ts` that `tsc` checks beside them, and the package and build files, so
+   no game file, no `.git` and no `.env` can reach it. The build stage runs
+   `npm ci && npm run build`, `tsc` included. It has no `.git`, so the commit comes in
+   as the build argument `DMWEB_BUILD`, which names the build in the events (step 4).
+   The runtime stage has no `node_modules`: `package.json` (for `"type": "module"`),
+   `server/`, `src/data/DataSets.ts` and the built `dist/`. It runs as `USER node`
+   (uid 1000), with the exec form, so Node is PID 1 and gets SIGTERM, and
+   `--disable-warning=ExperimentalWarning` silences `node:sqlite`'s. The server listens
+   on 8080 in the container, where an unprivileged user needs no capability to bind it.
    `npm test` needs the game files, so it stays the gate before a commit, not part of
    the image build.
-   Node still calls `node:sqlite` experimental and warns once at start-up; the exec form
-   can pass `--disable-warning=ExperimentalWarning`.
 
-   `docker-compose.yaml`:
-   - `127.0.0.1:<port>:80`.
-   - `../gamefiles:/data/gamefiles:ro` and `../stats:/data/stats`.
-   - `restart: unless-stopped`, `stop_grace_period`, a healthcheck on `api/health` and
-     rotated `json-file` logs.
+   `docker-compose.yaml` (`version: '3.8'`, for the VPS's Compose v1) runs `dmweb:latest`
+   on `127.0.0.1:${DMWEB_PORT:-8080}:8080`, the port from an optional `.env` beside it,
+   mounts `../gamefiles:/data/gamefiles:ro` and `../stats:/data/stats`, and has
+   `restart: unless-stopped`, a 10 s `stop_grace_period`, a healthcheck on `api/health`
+   (busybox's `wget`) and `json-file` logs rotated at 3 x 10 MB. On the VPS it lives in
+   `<DEPLOY_DIR>/app/`, beside `<DEPLOY_DIR>/gamefiles/` and `<DEPLOY_DIR>/stats/`.
 
-   `utils/deploy.sh` is SenTynel's, which reads the target from `.env`, plus an `scp` of
-   the compose file, so the remote stack cannot drift from the repository.
+   `utils/deploy.sh` reads `DEPLOY_HOST` and `DEPLOY_DIR` from a gitignored `.env` at the
+   root, builds the image with the commit as its build (`-dirty` when tracked files
+   differ), `docker save | gzip`s it, makes `app/` and `stats/` over SSH (as the login
+   user, so that uid 1000 can write the store), `scp`s the image and the compose file,
+   then loads the image and runs `docker-compose down && up -d`. The author runs it.
 
-   Check: `tools/check-frames.sh` against the container (a `--url`), which proves the
-   built page draws what the dev server draws.
+   The page's probe handle (`window.__probe`, `src/main.ts`) is the dev server's, and a
+   build's only with `DMWEB_PROBE=1` (`__DMWEB_PROBE__`, `vite.config.mts`); a deployed
+   bundle has none, which `tools/dump-build.ts` asserts. `tools/check-image.sh` builds
+   the image with it, runs it over the checkout's game files, and runs
+   `tools/check-frames.sh --url` against it: the eighteen golden frames, drawn by the
+   built page as the container serves it, match the dev server's.
 7. ⏳ **On the VPS, by the author:**
    - a subdomain at the root, with its nginx site and certbot certificate, as `gpo`'s.
      Step 1's relative paths keep a sub-path possible.
@@ -379,4 +391,5 @@ it later, along with the FAQ and the statistics page.
 
    `doc/DEPLOYMENT.md` records the procedure, written as `linkedin-games/player`'s is.
 
-Status: ⚠️ steps 1 to 5 done; step 6 is next. It is the first row of `DEBT.md`'s index.
+Status: ⚠️ steps 1 to 6 done; step 7 is next, the author's, with `doc/DEPLOYMENT.md`
+for a session to write. It is the first row of `DEBT.md`'s index.

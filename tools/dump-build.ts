@@ -8,7 +8,9 @@
  *     no `.dat`, no `.pdf`, nothing of `static/`;
  *   - every local `href` and `src` in `index.html` names a file the build holds;
  *   - the CRT's scanlines are in the bundle, not fetched by a name the build no longer
- *     serves.
+ *     serves;
+ *   - the bundle hands the probes no `window.__probe`, which only a build made with
+ *     `DMWEB_PROBE=1` does (`vite.config.mts`): the image the golden frames check.
  *
  * Usage: npx tsx tools/dump-build.ts
  */
@@ -37,7 +39,8 @@ async function main(): Promise<void> {
     const outDir = mkdtempSync(join(tmpdir(), 'dmweb-build-'));
     try {
         const vite = spawnSync(resolve(ROOT, 'node_modules/.bin/vite'),
-            ['build', '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'], { cwd: ROOT, encoding: 'utf8' });
+            ['build', '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'],
+            { cwd: ROOT, encoding: 'utf8', env: { ...process.env, DMWEB_PROBE: undefined } });
         if (vite.status !== 0) throw new Error(`vite build failed:\n${vite.stdout}${vite.stderr}`);
 
         const files = listFiles(outDir).map((f) => relative(outDir, f)).sort();
@@ -67,6 +70,7 @@ async function main(): Promise<void> {
         const bundle = files.filter((f) => f.endsWith('.js')).map((f) => readFileSync(join(outDir, f), 'utf8')).join('');
         check(!bundle.includes('QPN59'), 'the bundle fetches no scanlines by their old name');
         check(/data:image\/png;base64,|crt-scanlines-[\w-]+\.png/.test(bundle), 'the CRT scanlines are in the bundle, inlined or hashed');
+        check(!bundle.includes('__probe'), 'the bundle hands the probes no handle');
     } finally {
         rmSync(outDir, { recursive: true, force: true });
     }

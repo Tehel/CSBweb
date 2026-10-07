@@ -35,7 +35,9 @@
 //   node tools/probe-frames.mjs tools/frames        # refresh the committed baseline
 //   node tools/probe-frames.mjs /tmp/now            # then diff /tmp/now against it
 //
-// CDP_PORT overrides the DevTools port (default 9222).
+// CDP_PORT overrides the DevTools port (default 9222), and APP_URL the page (the dev
+// server on DEV_PORT, 9000), which must have `window.__probe`: the dev server's, or a
+// build's made with `DMWEB_PROBE=1` (`vite.config.mts`).
 //
 // This is the closest thing the project has to a rendering test (PLAN.md Phase 15) — it
 // caught nothing during the Phase 14 split, which is exactly what it was there to do.
@@ -45,7 +47,9 @@ import { encodePng } from './lib/png.mjs';
 
 const PORT = Number(process.env.CDP_PORT ?? 9222);
 const DEV_PORT = Number(process.env.DEV_PORT ?? 9000);
-const APP = `http://localhost:${DEV_PORT}/`;
+// APP_URL: a page served elsewhere than the dev server, built with its probe handle
+// (`check-frames.sh --url`).
+const APP = process.env.APP_URL ?? `http://localhost:${DEV_PORT}/`;
 const res = await fetch(`http://127.0.0.1:${PORT}/json/list`);
 const page = (await res.json()).find(t => t.type === 'page');
 const ws = new WebSocket(page.webSocketDebuggerUrl);
@@ -371,8 +375,7 @@ check((await canvasPixels()) === edgeRight, 'the overlay hidden and the view shi
 await send('Page.navigate', { url: `${APP}?intro=0&dungeon=csb` });
 await wait(3500);
 await evaluate(`(async()=>{
-  const { game, renderView } = window.__probe;
-  const { applySaveBytes } = await import('/src/engine/SaveGameFile.ts');
+  const { game, renderView, applySaveBytes } = window.__probe;
   applySaveBytes(game, new Uint8Array(await (await fetch('/gamefiles/csb/csbgame2.dat')).arrayBuffer()));
   const party = game.ctx.party.state;
   party.position.x = 1; party.position.y = 7;

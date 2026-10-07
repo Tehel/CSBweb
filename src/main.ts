@@ -31,6 +31,7 @@ import type { HintOracleFiles } from './renderer/ui/HintOracleButton';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
+import { applySaveBytes } from './engine/SaveGameFile';
 import { loadUISettings, type UISettings } from './ui/settings';
 import { GameEvents, playerId, sendBeacon } from './ui/gameEvents';
 
@@ -669,20 +670,20 @@ async function init() {
         sound.setEnabled(settings.soundEnabled);
         sound.setVolume(settings.soundVolume);
         console.log('✓ Game engine and screen constructed');
-        // Dev-only debug handle. `tools/probe-ui.mjs` drives the live app through this
-        // over CDP — see the `probe-app` skill. Module scope is invisible to the
-        // DevTools protocol, so a bug that only shows on screen is otherwise
-        // unreachable without hand-patching this file.
+        // The probes' handle. `tools/probe-ui.mjs` and `tools/probe-frames.mjs` drive the
+        // live app through this over CDP — see the `probe-app` skill. Module scope is
+        // invisible to the DevTools protocol, so a bug that only shows on screen is
+        // otherwise unreachable without hand-patching this file.
         //
-        // Guarded on Vite's build-time DEV flag rather than `isDebugFeaturesEnabled()`,
-        // which the rest of the Phase 14 scaffolding uses: that toggle is applied from
-        // the saved UI settings *after* this init runs, so it always reads false here.
-        // `import.meta.env.DEV` is constant-folded to false by `vite build`, so the
-        // handle cannot reach a production bundle.
-        if (import.meta.env.DEV) {
+        // Guarded on a build-time flag rather than `isDebugFeaturesEnabled()`, which the
+        // rest of the Phase 14 scaffolding uses: that toggle is applied from the saved UI
+        // settings *after* this init runs, so it always reads false here.
+        // `__DMWEB_PROBE__` is the dev server's, and a build's only with `DMWEB_PROBE=1`
+        // (`vite.config.mts`), so the handle cannot reach a deployed bundle.
+        if (__DMWEB_PROBE__) {
             // `presetHeroes`: the heroes behind the dungeon's mirrors, for `tools/lib/buildParty.mjs`.
             const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode);
-            (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView, presetHeroes };
+            (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView, presetHeroes, applySaveBytes };
         }
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen);

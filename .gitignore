@@ -19,5 +19,8 @@ static/backstory
 # the server statistics of `npm start`
 /stats/
 
+# the deploy target (utils/deploy.sh)
+.env
+
 # CSBWin's source, fetched by npm run fetch-csbwin-src
 doc/CSBwin-src/
