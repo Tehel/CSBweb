@@ -19,6 +19,7 @@ import { UtilityDiskMessages, UtilityError } from './engine/Chaos';
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import { loadGlfx } from './lib/glfx-loader';
+import crtScanlinesUrl from './assets/crt-scanlines.png';
 import { GameScreen } from './renderer/GameScreen';
 import { bindDataSetChooser, bindExtrasToggle, bindSaveDrop, bindUIContext, drawMapPreview, showFatalMessage } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
@@ -48,7 +49,6 @@ const GAMEFILES_DIR = 'gamefiles';
 let dataSet!: DataSet;
 /** The FTL logo's folder, the manifest's, or `null` where it names none. */
 let swooshDir: string | null = null;
-const CRT_SCANLINES_SRC = 'QPN59-320x200-resized.png';
 const CRT_UPDATE_INTERVAL_MS = 1000 / 20;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
@@ -89,7 +89,7 @@ function createCrtController(canvas: HTMLCanvasElement): CrtController {
     parent.appendChild(glcanvas);
 
     lines = new Image();
-    lines.src = CRT_SCANLINES_SRC;
+    lines.src = crtScanlinesUrl;
     // What the effect is given: the game canvas with the scanlines over it, composed on a
     // canvas of its own. Only the game paints the game canvas: scanlines painted there
     // would darken it with every pass, and a screen that does not repaint (the entrance,

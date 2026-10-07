@@ -148,20 +148,19 @@ What the redesign will replace, and what it should not carry across:
   (`src/ui/context.ts`) is how the panels reach the game.
 - **`main.ts` holds the page's features**: the 100-line CRT controller (`:42-150`) and
   the end-of-game flow.
-- **`static/` is Vite's `publicDir`** (`vite.config.mts`), so a build copies all of it:
-  `CSBwin.exe` and the three zips, Conflux, the author's saves, the manuals and the
-  backstory, and assets the page does not load (`static/glfx.js`,
-  `static/glfx-latest-minified.js` — the page loads `src/lib/`'s copy —,
-  `QPN59-1400x1000.png`, `QPN59-320x200-cropped.png`).
+- **`static/` holds files nothing loads**: `static/glfx.js` and
+  `static/glfx-latest-minified.js` (the page loads `src/lib/`'s copy),
+  `QPN59-1400x1000.png` and `QPN59-320x200-cropped.png`. It is the dev server's
+  `publicDir` only, so a build ships none of them (`vite.config.mts`).
 - **`server.js`** is an Express static server from before Vite, on port 9010, with an
   unauthenticated `/stopserver` that exits the process; `package.json` keeps its two
   runtime dependencies, `"main": "server.js"` and the name `dmjs`.
 
-The last two bullets are `PLAN.md` Phase 17's (steps 2 and 3), which comes first. What is
-left of them when the redesign starts is paid here.
+The last bullet is `PLAN.md` Phase 17's (step 3), which comes first. What is left of it
+when the redesign starts is paid here.
 
 Paying it is the redesign's first step: settings as a model the page renders, the CRT in a
-module of its own, a `publicDir` holding only what the page serves, and `server.js` gone.
+module of its own, a `static/` holding only what the dev server needs, and `server.js` gone.
 The redesigned page also links to two pages:
 
 - **A static FAQ.** Among its answers is one paragraph on the statistics Phase 17

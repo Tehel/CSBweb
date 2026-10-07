@@ -20,7 +20,7 @@ server.get('/stopserver', (req, res) => {
 });
 
 // set the favicon
-server.use(favicon(`${__dirname}/static/favicon.ico`));
+server.use(favicon(`${__dirname}/src/assets/favicon.ico`));
 
 // fallthrough to static content
 server.use(express.static(`${__dirname}/static`));

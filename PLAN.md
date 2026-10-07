@@ -244,12 +244,14 @@ it later, along with the FAQ and the statistics page.
    (the default), `csb`, `kids-dungeon` and Conflux, and not `3d2d1d`, `dm-windows` or
    the other Atari versions. The repository's manifest keeps every set, because the
    tools need them all.
-2. ⏳ **The build ships no game data.** `publicDir: 'static'` copies all of `static/` into
-   `dist/`: 95 MB of game files, PDFs, box art and `extracted/`. Dev keeps serving
-   `static/`, and the build copies only what the page itself needs (the favicon, and the CRT's
-   scanlines, `QPN59-320x200-resized.png`). Check:
-   list the contents of `dist/` after `npm run build`, with no `.dat` and no `.pdf`
-   among them.
+2. ✅ **The build ships no game data.** `static/` is Vite's `publicDir` for the dev server
+   only (`vite.config.mts`), which serves the game files, the manuals and the rest of it
+   as they stand; a build ships none of it. The page's own files are modules under
+   `src/assets/`, which the build hashes: the favicon, named by `index.html`, and the CRT's
+   scanlines, imported by `src/main.ts` (small enough that the bundle inlines them). A
+   build is `index.html` and `assets/`, under 1 MB. `tools/dump-build.ts` builds into a
+   scratch folder and asserts it: only the page's own file types, nothing of `static/`,
+   and every file `index.html` names present.
 3. ⏳ **The server.** `server/server.ts`, on `node:http`, with no dependency. Node 24
    strips the types (as `gpo/prod-server.ts` does), so it uses only erasable syntax and
    imports with `.ts` extensions. It is inside the `tsc` gate, as `tools/` is.
@@ -345,4 +347,4 @@ it later, along with the FAQ and the statistics page.
 
    `doc/DEPLOYMENT.md` records the procedure, written as `linkedin-games/player`'s is.
 
-Status: ⚠️ step 1 done; step 2 is next. It is the first row of `DEBT.md`'s index.
+Status: ⚠️ steps 1 and 2 done; step 3 is next. It is the first row of `DEBT.md`'s index.

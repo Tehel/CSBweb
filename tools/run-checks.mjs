@@ -228,6 +228,7 @@ const CHECKS = [
   // The page's data sets: each loads, builds its own tables, and stands a Game up, and
   // CSB's long 0x231 carries CSBWin's four prison-door buttons (the canary).
   { tool: 'dump-data-sets.ts' },
+  { tool: 'dump-build.ts' },
   // A dungeon.dat behind an Extended Features block, the DM Windows package's: read in the
   // block's shape it is DM's dungeon converted, and a new game takes the block's rules.
   { tool: 'dump-extended-dungeon.ts' },
