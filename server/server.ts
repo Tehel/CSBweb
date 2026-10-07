@@ -48,12 +48,7 @@ try {
 
 const server = createAppServer(options, {
     store,
-    rules: {
-        sets: new Set(ids),
-        // No set's mirrors are known to the server yet, so every champion's name is stored
-        // as `null`: how it learns them waits on the author (PLAN.md Phase 17, step 5).
-        mirrors: () => new Set(),
-    },
+    rules: { sets: new Set(ids) },
     rateLimit: new RateLimit(EVENTS_PER_MINUTE, 60_000),
     now: Date.now,
 });

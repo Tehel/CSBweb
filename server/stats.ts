@@ -34,7 +34,7 @@ export interface Stats {
     players: number;
     /** Per set and week: distinct players, and games started and won. */
     weeks: { set: string; week: string; players: number; started: number; won: number }[];
-    /** Per set: the games each mirror's champion was in a party of. */
+    /** Per set: the games a champion of each name was in a party of. */
     champions: { set: string; name: string; games: number }[];
     /** Per set: the lost games on each square. */
     deaths: { set: string; level: number; x: number; y: number; count: number }[];
@@ -73,7 +73,7 @@ export class StatsStore {
         const champions = all(`
             SELECT e.data_set AS "set", json_extract(c.value, '$.name') AS name, COUNT(DISTINCT e.playthrough) AS games
             FROM events e, json_each(e.payload, '$.champions') c
-            WHERE e.type IN ('party', 'won', 'lost') AND json_extract(c.value, '$.name') IS NOT NULL
+            WHERE e.type IN ('party', 'won', 'lost')
             GROUP BY 1, 2 ORDER BY 1, 3 DESC, 2`) as Stats['champions'];
         const deaths = all(`
             SELECT data_set AS "set", json_extract(payload, '$.level') AS level,

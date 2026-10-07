@@ -284,7 +284,7 @@ async function main(): Promise<void> {
         store = new StatsStore(join(scratch, 'scratch-stats.db'));
         const api: ApiOptions = {
             store,
-            rules: { sets: new Set(['a']), mirrors: () => new Set() },
+            rules: { sets: new Set(['a']) },
             rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
             now: Date.now,
         };

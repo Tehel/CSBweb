@@ -32,7 +32,7 @@ import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
 import { loadUISettings, type UISettings } from './ui/settings';
-import { GameEvents, mirrorNames, playerId, sendBeacon } from './ui/gameEvents';
+import { GameEvents, playerId, sendBeacon } from './ui/gameEvents';
 
 console.log('Dungeon Master Web - Initializing...');
 
@@ -398,19 +398,12 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     }, logSave, storeRandom);
 
     // The statistics' events: sent by a production build only, and shown on the console
-    // otherwise. The mirrors are the data set's own, read from its `dungeon.dat` once.
-    let mirrors: Promise<ReadonlySet<string>> | null = null;
-    const readMirrors = async (): Promise<ReadonlySet<string>> => {
-        const response = await fetch(`${dataSet.dir}/dungeon.dat`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return mirrorNames(new Uint8Array(await response.arrayBuffer()), game);
-    };
+    // otherwise.
     const events = new GameEvents({
         game,
         set: dataSet.id,
         build: __DMWEB_BUILD__,
         player: playerId,
-        mirrors: () => mirrors ??= readMirrors(),
         send: import.meta.env.PROD ? sendBeacon : (event) => console.debug('Event, not sent:', event),
     });
     // RISE's new adventure, which a read then makes the running game.

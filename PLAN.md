@@ -277,8 +277,7 @@ it later, along with the FAQ and the statistics page.
    `tools/dump-server.ts` asserts all of it, `server.ts` included, run as its own process.
 4. ✅ **The player id and the events.** `src/ui/gameEvents.ts`, page-side: the engine
    sends nothing and stays silent. Its one part in it is `GameHost.championJoined`, which
-   hands the page the champion, their mirror's name (`HallOfChampions.reincarnationSource`)
-   and whether they were reincarnated.
+   hands the page the champion and whether they were reincarnated.
 
    The player id (`playerId`) is a `crypto.randomUUID()` drawn at first start and kept in
    `localStorage` (`dmweb_player_v1`). If the player clears it, the page draws a new one,
@@ -302,20 +301,21 @@ it later, along with the FAQ and the statistics page.
 
    **Anonymity is a rule of the code, not just of the FAQ.** No player's name, no
    address and no browser fingerprint (user agent, screen, language) is sent or stored.
-   A name typed on the Reincarnate screen is the player's own text, so it is never sent:
-   a champion who joined in this page goes by their mirror's name, with
-   `reincarnated: true` when they were reincarnated. A champion this page did not see
-   join (a loaded game's, RISE's) has a name nobody has vouched for, which is reported
-   only if it is one of the set's mirrors, read from its `dungeon.dat` (`mirrorNames`),
-   and as `null` otherwise. A CSB adventure made from a DM party therefore names none of
-   it: CSB's mirrors are its prison's. There is no `visit` event: the player id appears
-   only with a game.
+   A champion is reported as `{ name, id }`, with `reincarnated: true` when they joined
+   in this page by REINCARNATE. The name is the one they carry, the mirror's or the one
+   typed on the Reincarnate screen, whether the game is played, loaded or RISE's. The id
+   is their portrait's `charID` (`Champion.portraitGraphic`: a cell of graphic 26, or
+   past 23 a `CSBgraphics.dat` portrait), and `null` for a champion read from a save,
+   who carries the portrait's pixels and no id, as in CSBWin. It is stored and not used
+   yet: it is there for a portrait beside a name, which the page can draw from its own
+   data files, or the manifest could list. There is no `visit` event: the player id
+   appears only with a game.
 
    Events are sent with `navigator.sendBeacon` to `api/event`, and a failure is ignored:
    nothing an event does delays or breaks the game. Only a production build sends them;
    dev shows them on the console, and the tools never send. `tools/dump-game-events.ts`
    asserts all of it on the real engine, the Hall's joins and a genuine save included.
-5. ⚠️ **The statistics store.** `server/stats.ts`: SQLite through `node:sqlite`, one
+5. ✅ **The statistics store.** `server/stats.ts`: SQLite through `node:sqlite`, one
    `events` table: when (the server's clock), player, type, set, playthrough, build and
    the payload as JSON. The file is `STATS_DB` (the checkout's `stats/stats.db`, which git
    ignores), made with its folder and its schema when missing. On the VPS it is in the
@@ -328,17 +328,18 @@ it later, along with the FAQ and the statistics page.
    address, counted in memory, comes first; the address is nginx's `X-Real-IP`, trusted
    only because the port is on loopback, and it is never stored. A body is at most 4 KB
    (413 otherwise), and `server/events.ts` checks it field by field and rebuilds it from
-   what passed, so a modified page cannot store free text: the player is a UUID, the
-   build a token, the set one of the manifest's, every number an integer in its range, at
-   most four champions, a won game's masteries four, and a champion's name one of the
-   set's mirrors, or `null`. An event stored answers 204, a bad one 400.
+   what passed: the player is a UUID, the build a token, the set one of the manifest's,
+   every number an integer in its range, at most four champions, a champion's id `null`
+   or an `i16`, a won game's masteries four. The only text a modified page could store is
+   a champion's name, of 7 characters at most (`CHARDESC.name[8]`,
+   `doc/CSBwin-src/CSB.h:2486`). An event stored answers 204, a bad one 400.
 
    `api/stats` is public, not cached, and returns aggregates only, never an event, a
    player or a playthrough. The page that shows them comes with the redesign:
    - **Use**: players ever, and per set and week (from Monday, UTC) the players and the
      games started and won (distinct playthroughs).
-   - **Preferred champions**: per set, the games each mirror's champion was in a party of
-     (`party`, `won` and `lost` events).
+   - **Preferred champions**: per set, the games a champion of each name was in a party
+     of (`party`, `won` and `lost` events).
    - **Where parties die**: lost games per set, level and square, which is enough for a
      heat map on `peek-dungeon`'s map.
    - **Games won**: each one's week, game time, play time and wall time since its
@@ -348,26 +349,6 @@ it later, along with the FAQ and the statistics page.
    fortnight, `tools/dump-server.ts` the API over HTTP and the store's life in
    `server.ts`, and `tools/dump-game-events.ts` that the server takes every event the
    real engine makes as the page sent it.
-
-   ⚠️ **Not done: the server knows no set's mirrors**, so every champion's name is stored
-   as `null`, and the preferred champions stay empty (`server/server.ts` passes
-   `mirrors: () => new Set()`). The page reads them through `DungeonLoader`,
-   `extractPresetHeroes` and the text tables of `graphics.dat`'s item 0x22f, Conflux's
-   decipherment included, which Node cannot run as they are (their imports name no
-   `.ts`). How the server learns them is the author's decision:
-   - **A. The manifest names them.** Each set gets `"mirrors": [...]`, which a tool writes
-     from its `dungeon.dat` and `dump-data-sets` asserts against it; the server reads
-     them from the manifest it already parses, and stays as Node runs it. The page could
-     read them there too, and stop fetching `dungeon.dat` for them. The cost is a derived
-     list kept in a data file: the deployed manifest must be regenerated whenever a set
-     is added or changes, and a set without the list stores no names.
-   - **B. The server reads them from each set's files at start-up** (recommended), through
-     the page's own modules, bundled for Node by Vite's SSR build in the image's build
-     stage (the reader alone, or the whole server, which would also drop step 3's
-     erasable-syntax rule and the copy of `DataSets.ts`). Nothing derived is kept by hand,
-     and a set whose files do not load stops the container, as a bad mount does. The cost
-     is a build step for the server: `npm start` needs it first, and `dump-server` too.
-   - **C. No names.** The `null`s stay, and the preferred champions go from the FAQ.
 6. ⏳ **The image and the stack.** A two-stage `Dockerfile` and a `.dockerignore`
    (`node_modules`, `dist`, `static/gamefiles`, `doc/CSBwin-src`, `RTC`, `archive`, `.env`,
    `.git`). The build stage runs `npm ci && npm run build`, which includes `tsc`. It
@@ -398,5 +379,4 @@ it later, along with the FAQ and the statistics page.
 
    `doc/DEPLOYMENT.md` records the procedure, written as `linkedin-games/player`'s is.
 
-Status: ⚠️ steps 1 to 4 done, and step 5 but for the champions' names, which wait on the
-author's choice of A, B or C; step 6 is next. It is the first row of `DEBT.md`'s index.
+Status: ⚠️ steps 1 to 5 done; step 6 is next. It is the first row of `DEBT.md`'s index.

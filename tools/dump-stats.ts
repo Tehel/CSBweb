@@ -6,16 +6,16 @@
  *
  * Asserts:
  *   - an event of each type passes, rebuilt from its checked fields only: what the page
- *     did not send under a known name is dropped, and a champion who is not one of the
- *     set's mirrors is stored as `null`;
+ *     did not send under a known name is dropped;
  *   - every field that could carry free text or nonsense is refused: a player that is not
  *     a UUID, an unknown set or type, a build that is not a token, a number out of its
- *     range, a fifth champion, masteries that are not four;
+ *     range, a champion's name past 7 characters, a fifth champion, masteries that are
+ *     not four;
  *   - the store: the schema made in a missing file, WAL mode, and the WAL checkpointed into
  *     the file on close, which holds the events when it is opened again;
  *   - the aggregates of a scripted fortnight, exactly: players, games started and won per
  *     set and week, the champions per set, the deaths per square, the won games with their
- *     wall time; and no player id or playthrough in them.
+ *     wall time; and no player id or build in them.
  *
  * Usage: npx tsx tools/dump-stats.ts
  */
@@ -32,10 +32,10 @@ const P1 = '11111111-1111-4111-8111-111111111111';
 const P2 = '22222222-2222-4222-8222-222222222222';
 const P3 = '33333333-3333-4333-8333-333333333333';
 
-const RULES: EventRules = {
-    sets: new Set(['dm-atari', 'csb']),
-    mirrors: (set) => new Set(set === 'dm-atari' ? ['HALK', 'WU TSE', 'SYRA'] : []),
-};
+const RULES: EventRules = { sets: new Set(['dm-atari', 'csb']) };
+
+/** A champion as the page reports one: its id a cell of graphic 26, or `null` from a save. */
+const ch = (name: string, id: number | null = 0, more: object = {}) => ({ name, id, ...more });
 
 function event(type: string, player: string, set: string, playthrough: number, payload: object, extra: object = {}): string {
     return JSON.stringify({ type, player, set, playthrough, build: 'abc1234', payload, ...extra });
@@ -50,27 +50,28 @@ function accepted(body: string): CheckedEvent {
 function checkTheChecks(): void {
     console.log('What api/event accepts:');
     const party = accepted(event('party', P1, 'dm-atari', 7, {
-        champions: [{ name: 'HALK' }, { name: 'WU TSE', reincarnated: true, note: 'free text' }, { name: 'ROSE' }, { name: null }],
+        champions: [ch('HALK', 3), ch('BOB', 7, { reincarnated: true, note: 'free text' }), ch('ROSE', null), ch('', 0x7fff)],
         note: 'free text',
     }, { note: 'free text' }));
     console.log(`  party: ${JSON.stringify(party)}`);
     check(JSON.stringify(party) === JSON.stringify({
         type: 'party', player: P1, set: 'dm-atari', playthrough: 7, build: 'abc1234',
-        payload: { champions: [{ name: 'HALK' }, { name: 'WU TSE', reincarnated: true }, { name: null }, { name: null }] },
-    }), 'party: rebuilt, unknown fields dropped, a name that is no mirror stored as null');
+        payload: { champions: [ch('HALK', 3), ch('BOB', 7, { reincarnated: true }), ch('ROSE', null), ch('', 0x7fff)] },
+    }), 'party: rebuilt, unknown fields dropped, every name and id as sent');
 
-    const won = accepted(event('won', P1, 'dm-atari', 7, { gameTime: 123456, playTime: 7890000, champions: [{ name: 'SYRA', masteries: [1, 2, 3, 15] }] }));
+    const won = accepted(event('won', P1, 'dm-atari', 7, { gameTime: 123456, playTime: 7890000, champions: [ch('SYRA', 2, { masteries: [1, 2, 3, 15] })] }));
     console.log(`  won  : ${JSON.stringify(won.payload)}`);
-    check(JSON.stringify(won.payload) === '{"gameTime":123456,"playTime":7890000,"champions":[{"name":"SYRA","masteries":[1,2,3,15]}]}', 'won: its times and masteries');
-    const lost = accepted(event('lost', P1, 'csb', 0xffffffff, { gameTime: 0, playTime: 0, champions: [{ name: 'HALK' }], level: 3, x: 31, y: 0 }));
+    check(JSON.stringify(won.payload) === '{"gameTime":123456,"playTime":7890000,"champions":[{"name":"SYRA","id":2,"masteries":[1,2,3,15]}]}',
+        'won: its times and masteries');
+    const lost = accepted(event('lost', P1, 'csb', 0xffffffff, { gameTime: 0, playTime: 0, champions: [ch('ÉLÉONOR')], level: 3, x: 31, y: 0 }));
     console.log(`  lost : ${JSON.stringify(lost.payload)}`);
-    check(JSON.stringify(lost.payload) === '{"gameTime":0,"playTime":0,"champions":[{"name":null}],"level":3,"x":31,"y":0}',
-        "lost: its square; a dm-atari mirror's name is no csb mirror's");
+    check(JSON.stringify(lost.payload) === '{"gameTime":0,"playTime":0,"champions":[{"name":"ÉLÉONOR","id":0}],"level":3,"x":31,"y":0}',
+        'lost: its square; a name of 7 characters, counted as characters');
     const started = accepted(event('started', P1, 'csb', 0, { anything: 'free text' }));
     check(JSON.stringify(started.payload) === '{}', 'started: an empty payload, whatever was sent');
 
     console.log('\nWhat it refuses:');
-    const champion = { name: 'HALK', masteries: [1, 1, 1, 1] };
+    const champion = ch('HALK', 0, { masteries: [1, 1, 1, 1] });
     const refusals: [string, string][] = [
         ['{', 'not JSON'],
         ['[]', 'not an object'],
@@ -87,11 +88,16 @@ function checkTheChecks(): void {
         [event('party', P1, 'csb', 1, {}), 'bad champions'],
         [event('party', P1, 'csb', 1, { champions: [champion, champion, champion, champion, champion] }), 'bad champions'],
         [event('party', P1, 'csb', 1, { champions: ['HALK'] }), 'bad champion'],
-        [event('party', P1, 'csb', 1, { champions: [{ name: 7 }] }), 'bad name'],
-        [event('party', P1, 'csb', 1, { champions: [{ name: 'HALK', reincarnated: 'yes' }] }), 'bad reincarnated'],
-        [event('won', P1, 'csb', 1, { gameTime: 1, playTime: 1, champions: [{ name: 'HALK' }] }), 'bad masteries'],
-        [event('won', P1, 'csb', 1, { gameTime: 1, playTime: 1, champions: [{ name: 'HALK', masteries: [1, 1, 1] }] }), 'bad masteries'],
-        [event('won', P1, 'csb', 1, { gameTime: 1, playTime: 1, champions: [{ name: 'HALK', masteries: [1, 1, 1, 64] }] }), 'bad masteries'],
+        [event('party', P1, 'csb', 1, { champions: [{ name: 7, id: 0 }] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [{ name: null, id: 0 }] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [ch('ABCDEFGH')] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [{ name: 'HALK' }] }), 'bad id'],
+        [event('party', P1, 'csb', 1, { champions: [ch('HALK', -1)] }), 'bad id'],
+        [event('party', P1, 'csb', 1, { champions: [ch('HALK', 0x8000)] }), 'bad id'],
+        [event('party', P1, 'csb', 1, { champions: [ch('HALK', 0, { reincarnated: 'yes' })] }), 'bad reincarnated'],
+        [event('won', P1, 'csb', 1, { gameTime: 1, playTime: 1, champions: [ch('HALK')] }), 'bad masteries'],
+        [event('won', P1, 'csb', 1, { gameTime: 1, playTime: 1, champions: [ch('HALK', 0, { masteries: [1, 1, 1] })] }), 'bad masteries'],
+        [event('won', P1, 'csb', 1, { gameTime: 1, playTime: 1, champions: [ch('HALK', 0, { masteries: [1, 1, 1, 64] })] }), 'bad masteries'],
         [event('won', P1, 'csb', 1, { gameTime: -1, playTime: 1, champions: [] }), 'bad gameTime'],
         [event('won', P1, 'csb', 1, { gameTime: 1, playTime: '1', champions: [] }), 'bad playTime'],
         [event('lost', P1, 'csb', 1, { gameTime: 1, playTime: 1, champions: [], level: 0, x: 256, y: 0 }), 'bad square'],
@@ -114,19 +120,19 @@ const day = (date: string, hour = 10) => Date.parse(`${date}T${String(hour).padS
 /** A fortnight of three players, scripted: see the expected aggregates below. */
 const FORTNIGHT: [number, string][] = [
     [day('2026-10-05'), event('started', P1, 'dm-atari', 1, {})],
-    [day('2026-10-05', 11), event('party', P1, 'dm-atari', 1, { champions: [{ name: 'HALK' }] })],
-    [day('2026-10-05', 12), event('party', P1, 'dm-atari', 1, { champions: [{ name: 'HALK' }, { name: 'WU TSE' }] })],
+    [day('2026-10-05', 11), event('party', P1, 'dm-atari', 1, { champions: [ch('HALK', 3)] })],
+    [day('2026-10-05', 12), event('party', P1, 'dm-atari', 1, { champions: [ch('HALK', 3), ch('WU TSE', 9)] })],
     [day('2026-10-07'), event('won', P1, 'dm-atari', 1, {
-        gameTime: 1000, playTime: 5000, champions: [{ name: 'HALK', masteries: [3, 2, 1, 1] }, { name: 'WU TSE', masteries: [2, 3, 1, 1] }],
+        gameTime: 1000, playTime: 5000, champions: [ch('HALK', 3, { masteries: [3, 2, 1, 1] }), ch('WU TSE', 9, { masteries: [2, 3, 1, 1] })],
     })],
     [day('2026-10-06'), event('started', P2, 'dm-atari', 2, {})],
-    [day('2026-10-06', 11), event('party', P2, 'dm-atari', 2, { champions: [{ name: 'HALK' }, { name: 'PLAYERNAME', reincarnated: true }] })],
-    [day('2026-10-06', 12), event('lost', P2, 'dm-atari', 2, { gameTime: 50, playTime: 60, champions: [{ name: 'HALK' }], level: 1, x: 2, y: 3 })],
-    [day('2026-10-06', 13), event('lost', P2, 'dm-atari', 2, { gameTime: 50, playTime: 90, champions: [{ name: 'HALK' }], level: 1, x: 2, y: 3 })],
+    [day('2026-10-06', 11), event('party', P2, 'dm-atari', 2, { champions: [ch('HALK', 3), ch('BOB', 1, { reincarnated: true })] })],
+    [day('2026-10-06', 12), event('lost', P2, 'dm-atari', 2, { gameTime: 50, playTime: 60, champions: [ch('HALK', null)], level: 1, x: 2, y: 3 })],
+    [day('2026-10-06', 13), event('lost', P2, 'dm-atari', 2, { gameTime: 50, playTime: 90, champions: [ch('HALK', null)], level: 1, x: 2, y: 3 })],
     [day('2026-10-11'), event('started', P2, 'csb', 3, {})],
     [day('2026-10-12'), event('started', P1, 'dm-atari', 4, {})],
-    [day('2026-10-13'), event('won', P1, 'dm-atari', 5, { gameTime: 9, playTime: 8, champions: [{ name: 'SYRA', masteries: [1, 1, 4, 4] }] })],
-    [day('2026-10-14'), event('lost', P3, 'csb', 3, { gameTime: 7, playTime: 6, champions: [{ name: 'GOTHMOG' }], level: 0, x: 5, y: 5 })],
+    [day('2026-10-13'), event('won', P1, 'dm-atari', 5, { gameTime: 9, playTime: 8, champions: [ch('SYRA', null, { masteries: [1, 1, 4, 4] })] })],
+    [day('2026-10-14'), event('lost', P3, 'csb', 3, { gameTime: 7, playTime: 6, champions: [ch('GOTHMOG', null)], level: 0, x: 5, y: 5 })],
 ];
 
 const EXPECTED: Stats = {
@@ -138,7 +144,9 @@ const EXPECTED: Stats = {
         { set: 'dm-atari', week: '2026-10-12', players: 1, started: 1, won: 1 },
     ],
     champions: [
+        { set: 'csb', name: 'GOTHMOG', games: 1 },
         { set: 'dm-atari', name: 'HALK', games: 2 },
+        { set: 'dm-atari', name: 'BOB', games: 1 },
         { set: 'dm-atari', name: 'SYRA', games: 1 },
         { set: 'dm-atari', name: 'WU TSE', games: 1 },
     ],
@@ -149,9 +157,9 @@ const EXPECTED: Stats = {
     wins: [
         {
             set: 'dm-atari', week: '2026-10-05', gameTime: 1000, playTime: 5000, wallTime: 2 * 24 * 3600 * 1000,
-            champions: [{ name: 'HALK', masteries: [3, 2, 1, 1] }, { name: 'WU TSE', masteries: [2, 3, 1, 1] }],
+            champions: [ch('HALK', 3, { masteries: [3, 2, 1, 1] }), ch('WU TSE', 9, { masteries: [2, 3, 1, 1] })],
         },
-        { set: 'dm-atari', week: '2026-10-12', gameTime: 9, playTime: 8, wallTime: null, champions: [{ name: 'SYRA', masteries: [1, 1, 4, 4] }] },
+        { set: 'dm-atari', week: '2026-10-12', gameTime: 9, playTime: 8, wallTime: null, champions: [ch('SYRA', null, { masteries: [1, 1, 4, 4] })] },
     ],
 };
 
@@ -184,8 +192,7 @@ function checkStore(scratch: string): void {
         check(JSON.stringify(stats[key]) === JSON.stringify(EXPECTED[key]), `${key}, as scripted`);
     }
     const json = JSON.stringify(stats);
-    check(![P1, P2, P3, 'PLAYERNAME', 'GOTHMOG', 'abc1234'].some((text) => json.includes(text)),
-        'no player id, typed name, unvouched name or build in them');
+    check(![P1, P2, P3, 'abc1234'].some((text) => json.includes(text)), 'no player id or build in them');
 }
 
 function main(): void {

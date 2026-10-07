@@ -171,8 +171,9 @@ The redesigned page also links to two pages:
   - a leaderboard of the preferred champions;
   - where parties die most often.
 
-  It insists that the statistics are anonymous: no name, no IP address, no browser
-  profiling. A random id, drawn in the browser, is used only for counting players.
+  It insists that the statistics are anonymous: no player's name, no IP address, no
+  browser profiling. A random id, drawn in the browser, is used only for counting
+  players. Champions go by the names they carry, which a player can type.
 - **The public statistics**, drawn from Phase 17's `api/stats`.
 
 ---

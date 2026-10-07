@@ -235,7 +235,7 @@ const CHECKS = [
   // The statistics: what api/event accepts and rebuilds, the SQLite store, its aggregates.
   { tool: 'dump-stats.ts' },
   // The statistics' events the page sends: a new game's first tick, the Hall's joins by
-  // their mirror's name, a won game's masteries, a lost game's square, and nothing typed.
+  // name and charID, a won game's masteries, a lost game's square, all as the server takes them.
   { tool: 'dump-game-events.ts' },
   // A dungeon.dat behind an Extended Features block, the DM Windows package's: read in the
   // block's shape it is DM's dungeon converted, and a new game takes the block's rules.

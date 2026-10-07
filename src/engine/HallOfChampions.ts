@@ -235,11 +235,7 @@ export class HallOfChampions {
     this.ctx.loop.videoMode = 'VM_ADVENTURE';
     setClockTick(this.ctx, 1);
     this.ctx.host.tag0207cc();
-    this.ctx.host.championJoined({
-      champion,
-      mirror: this.reincarnationSource?.name ?? champion.name,
-      reincarnated: button === 161,
-    });
+    this.ctx.host.championJoined({ champion, reincarnated: button === 161 });
   }
 
   /**

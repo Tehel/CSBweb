@@ -9,14 +9,9 @@
  */
 import type { Champion } from './gameTypes';
 
-/**
- * A champion who has joined (`GameHost.championJoined`): the name of the mirror's hero
- * text, `AddCharacter`'s (`HallOfChampions.reincarnationSource`), which a REINCARNATE has
- * replaced on the champion with the player's own.
- */
+/** A champion who has joined (`GameHost.championJoined`), by RESURRECT or REINCARNATE. */
 export interface JoinedChampion {
   champion: Champion;
-  mirror: string;
   reincarnated: boolean;
 }
 

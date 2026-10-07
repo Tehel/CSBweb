@@ -1,10 +1,10 @@
 /**
  * What `api/event` accepts (PLAN.md Phase 17, step 5): the events the page's `GameEvents`
  * sends (`src/ui/gameEvents.ts`), checked field by field and rebuilt from what passed, so
- * that nothing the server has not checked reaches the store. A modified page cannot store
- * free text: the player is a UUID, the build a short token, the set one of the manifest's,
- * every number an integer in its range, and a champion's name one of the set's mirrors,
- * or `null`.
+ * that nothing the server has not checked reaches the store. The player is a UUID, the
+ * build a short token, the set one of the manifest's, every number an integer in its
+ * range, and the only text a modified page could store is a champion's name, of 7
+ * characters at most.
  */
 
 /** The largest body `api/event` reads. */
@@ -17,6 +17,10 @@ export type EventType = (typeof EVENT_TYPES)[number];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** A commit, or the image's `DMWEB_BUILD`. */
 const BUILD = /^[0-9A-Za-z._-]{1,40}$/;
+/** `CHARDESC.name[8]`, its last byte the terminating NUL (`doc/CSBwin-src/CSB.h:2486`). */
+const MAX_NAME = 7;
+/** `AddCharacter`'s `charID`, an `i16` (`doc/CSBwin-src/Character.cpp:456`). */
+const MAX_ID = 0x7fff;
 /** A party's slots. */
 const MAX_CHAMPIONS = 4;
 /** Fighter, ninja, priest and wizard. */
@@ -26,7 +30,8 @@ const MAX_MASTERY = 63;
 const MAX_COORDINATE = 255;
 
 export interface CheckedChampion {
-    name: string | null;
+    name: string;
+    id: number | null;
     reincarnated?: true;
     masteries?: number[];
 }
@@ -44,8 +49,6 @@ export interface CheckedEvent {
 export interface EventRules {
     /** The manifest's data sets' ids. */
     sets: ReadonlySet<string>;
-    /** The names of a set's mirrors: a champion named otherwise is stored as `null`. */
-    mirrors: (set: string) => ReadonlySet<string>;
 }
 
 /** The event `body` holds, or why it is refused. */
@@ -65,15 +68,15 @@ export function checkEvent(body: string, rules: EventRules): CheckedEvent | stri
     if (typeof build !== 'string' || !BUILD.test(build)) return 'bad build';
     if (!isRecord(payload)) return 'payload is not an object';
 
-    const checked = checkPayload(type as EventType, payload, rules.mirrors(set));
+    const checked = checkPayload(type as EventType, payload);
     if (typeof checked === 'string') return checked;
     return { type: type as EventType, player, set, playthrough, build, payload: checked };
 }
 
-function checkPayload(type: EventType, payload: Record<string, unknown>, mirrors: ReadonlySet<string>): CheckedEvent['payload'] | string {
+function checkPayload(type: EventType, payload: Record<string, unknown>): CheckedEvent['payload'] | string {
     if (type === 'started') return {};
 
-    const champions = checkChampions(payload.champions, mirrors, type === 'won');
+    const champions = checkChampions(payload.champions, type === 'won');
     if (typeof champions === 'string') return champions;
     if (type === 'party') return { champions };
 
@@ -87,15 +90,16 @@ function checkPayload(type: EventType, payload: Record<string, unknown>, mirrors
     return { gameTime, playTime, champions, level, x, y };
 }
 
-function checkChampions(champions: unknown, mirrors: ReadonlySet<string>, won: boolean): CheckedChampion[] | string {
+function checkChampions(champions: unknown, won: boolean): CheckedChampion[] | string {
     if (!Array.isArray(champions) || champions.length > MAX_CHAMPIONS) return 'bad champions';
     const checked: CheckedChampion[] = [];
     for (const champion of champions) {
         if (!isRecord(champion)) return 'bad champion';
-        const { name, reincarnated, masteries } = champion;
-        if (name !== null && typeof name !== 'string') return 'bad name';
+        const { name, id, reincarnated, masteries } = champion;
+        if (typeof name !== 'string' || [...name].length > MAX_NAME) return 'bad name';
+        if (id !== null && !isInteger(id, 0, MAX_ID)) return 'bad id';
         if (reincarnated !== undefined && reincarnated !== true) return 'bad reincarnated';
-        const kept: CheckedChampion = { name: name !== null && mirrors.has(name) ? name : null };
+        const kept: CheckedChampion = { name, id };
         if (reincarnated) kept.reincarnated = true;
         if (won) {
             if (!Array.isArray(masteries) || masteries.length !== MASTERIES || !masteries.every((m) => isInteger(m, 0, MAX_MASTERY))) {
