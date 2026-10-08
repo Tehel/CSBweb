@@ -1644,7 +1644,12 @@ panel (`doc/CSBwin-src/Character.cpp:3549-3580`) and `DrawNameOfHeldObject`
 (`doc/CSBwin-src/Code11f52.cpp:31-59`), the 14-character line at screen (0xe9, 0x25) naming
 what the cursor carries. Both key on the **name index** being `objNI_Bones_a` — not on the
 `DB10` misc type — both refuse bones whose `value()` is 0, and both prefix the champion's
-name with no separator: `StrCpy(name); StrCat(d.ObjectNames[objNID6])` gives `HALKBONES`.
+name. In 2016 with no separator: `StrCpy(name); StrCat(d.ObjectNames[objNID6])` gives
+`HALKBONES`. CSBWin 20230608, which the port follows, names them through
+`DescribeChampionBones` at both places (`doc/CSBwin-src-20230608/Code11f52.cpp:91`,
+`Character.cpp:3587`): `TranslateLanguage("% " + objName)`, the champion's name for every
+`%` (`Code11f52.cpp:29-60`). With no translation the text comes back as it went in
+(`Translation.cpp:187`), so it gives `HALK BONES`.
 `DrawNameOfHeldObject` uses `RN::NameIndex()`, the resolved index, so a compass in hand
 reads the way the party faces and a lit torch reads its burn state.
 

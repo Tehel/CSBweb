@@ -16,7 +16,7 @@ import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, PaletteIndexViewportBuffer, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon, drawPossessionBox, possessionBoxGraphic } from './Draw';
-import { descIndexForObject, getBonesChampion, getInventoryPlaceholderIndex, getRoleMastery, resolveObjectNameIndex } from './Objects';
+import { descIndexForObject, describeChampionBones, getBonesChampion, getInventoryPlaceholderIndex, getRoleMastery, resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 import type { Rect } from '../../data/tables/UITables';
 /** `d.Pointer16596` (`doc/CSBwin-src/CSBCode.cpp:363-366`), the four base skills. */
@@ -667,9 +667,10 @@ export function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): vo
  *
  * Two details are the function, not decoration. The index is `RN::NameIndex()`, the
  * *resolved* one, so a compass reads the way the party faces and a lit torch reads its
- * burn state. And bones carry the dead champion's name glued to the front, through the
- * same lookup the eye's object panel uses — which is the only place a player ever
- * learns whose remains they picked up.
+ * burn state. And bones carry the dead champion's name in front, "NAME BONES", through
+ * the same lookup and `DescribeChampionBones` the eye's object panel uses
+ * (`heldObjectName`) — which is the only place a player ever learns whose remains they
+ * picked up.
  */
 export function drawHeldObjectName(ui: UIState): void {
   if (ui.pressingEye && ui.partyState.objectInHand !== OBJECT_ID_NULL) {
@@ -682,16 +683,22 @@ export function drawHeldObjectName(ui: UIState): void {
   if (!objectNames || objectNames.length === 0) return;
 
   const objectId = ui.partyState.objectInHand;
-  let label = '';
-  if (objectId !== OBJECT_ID_NULL) {
-    const nameIndex = resolveObjectNameIndex(ui, objectId);
-    label = objectNames[nameIndex] ?? '';
-    const owner = getBonesChampion(ui, objectId as ObjectID, nameIndex);
-    if (owner?.name) label = `${owner.name}${label}`;
-  }
+  const label = objectId !== OBJECT_ID_NULL ? heldObjectName(ui, objectId as ObjectID) : '';
 
   const padded = (label || '').padEnd(14, ' ').slice(0, 14);
   drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 0xe9, 0x25, 4, 0, padded);
+}
+
+/**
+ * The name `DrawNameOfHeldObject` prints for `objectId`: its resolved name, and for a
+ * champion's bones `DescribeChampionBones` over it
+ * (`doc/CSBwin-src-20230608/Code11f52.cpp:72-100`).
+ */
+export function heldObjectName(ui: UIState, objectId: ObjectID): string {
+  const nameIndex = resolveObjectNameIndex(ui, objectId);
+  const name = ui.objectTables.objectNames[nameIndex] ?? '';
+  const owner = getBonesChampion(ui, objectId, nameIndex);
+  return owner?.name ? describeChampionBones(owner.name, name) : name;
 }
 
 export function canPlaceInSlot(ui: UIState, objectId: number, slot: number): boolean {

@@ -20,8 +20,8 @@ bottom; `&PARAM@`'s `Var(j)`; the attacker's cyan border; three new extended fla
 space in a champion's bones).
 
 **How to apply:** when an observation contradicts the source, diff the function against
-`doc/CSBwin-src-20230608/` before anything else: the difference may be the version. The
-change still to port is `DEBT.md` C156, and C157 makes 2023 the reference, after
-which this memory is deleted. If it is, write both into the debt entry and ask the author which to
+`doc/CSBwin-src-20230608/` before anything else: the difference may be the version. Every
+2023 change is ported, and `DEBT.md` C157 makes 2023 the reference, after which this
+memory is deleted. If it is, write both into the debt entry and ask the author which to
 follow. When nothing differs, the observation is a port bug. ([[port-in-dependency-order]]
 still applies to what gets ported first.)

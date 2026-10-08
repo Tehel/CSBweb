@@ -94,7 +94,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C156 | A champion's bones read "NAMEBONES"; CSBWin 20230608 puts a space between | S | ⏳ |
 | C159 | `&CELL@`'s pit, false wall and door bits leave their variable undefined in CSBWin | S | ⏳ |
 | C157 | CSBWin 20230608 becomes the reference | L | ⏳ |
 | G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
@@ -115,8 +114,8 @@ In payoff order: the first row is the next item.
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G29 are the active list.
-C156 and C157 are CSBWin's changes from 2016 to 2023 (see "CSBWin's changes from 2016 to
-2023" in tier C), taken first. `F3` is a phase, whose
+C157 makes CSBWin 20230608 the reference (see "CSBWin's changes from 2016 to 2023" in
+tier C). `F3` is a phase, whose
 status is `PLAN.md`'s, and its row only marks its place. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
@@ -228,18 +227,17 @@ CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
 ### CSBWin's changes from 2016 to 2023
 
-C156 is a change Paul Stevens made after the source the port follows and before the
-build the author plays. `doc/CSBwin-src/` is `CSBwin_SRC_20160923.zip` from
+Paul Stevens went on changing CSBWin after the source the port follows, up to the build
+the author plays. `doc/CSBwin-src/` is `CSBwin_SRC_20160923.zip` from
 dianneandpaul.net/CSBwin/, "Version 15.9" (`CSBwin.rc:322`), with the author's cosmetic
 edits in `CSBCode.cpp`, `RC4.cpp`, `SaveGame.cpp` and `Data.h`. 15.9 is a side branch of
 `CSBwin_SRC_20160325` (15.8) whose only change is accessors for a monster's `word20`, so it
 behaves as 15.8. `doc/CSBwin-src-20230608/` is `CSBwin_SRC_20230608.7z`, the main line's
 last source (gitignored like the other, CRLF turned to LF, nothing else changed).
 
-It is taken first, then C157. A port of such a change cites the 2023 file and line,
-and needs no H entry, since C157 makes that source the reference.
-
-The rest of the 2016-2023 diff changes nothing the port has: the 64-bit port (`uintptr_t`,
+Every change of that diff that alters what the port has is ported, citing the 2023 file
+and line, with no H entry, since C157 makes that source the reference. The rest changes
+nothing the port has: the 64-bit port (`uintptr_t`,
 and typed structs in `Chaos.cpp` and `Hint.cpp`, whose allocator fixes are in code the port
 never had), `TranslateLanguage` hooks (G21), the playfile (G29), and the Linux and
 Raspberry Pi front-ends. Two changes are not taken:
@@ -248,16 +246,6 @@ Raspberry Pi front-ends. Two changes are not taken:
   (`TextOutToScreen_Centered`, `Attack.cpp:972-980`, `CSBCode.cpp:1785`), which puts them
   2 and 3 pixels right of the original's 242 and 248. It serves translations.
 - The utility's word-10 save form, whose adventure write is left `NotImplemented` (G28).
-
-### C156 ⏳ A champion's bones read "NAMEBONES"; CSBWin 20230608 puts a space between
-
-`DrawNameOfHeldObject` and `DescribeObject` glue the dead champion's
-name onto the object's name (`doc/CSBwin-src/Code11f52.cpp:56-57`, `Character.cpp:3570-3571`),
-and so does the port. CSBWin 20230608 builds it with `DescribeChampionBones`, which
-translates `"% " + name` and puts the champion's name for the `%` (`Code11f52.cpp:29`). With
-no translation `TranslateLanguage` returns its text (`Translation.cpp:187`), so that is
-"NAME BONES". The author's decision: take the space, in the hand's name and in the
-inventory's description alike. A `tools/` check prints both for a champion's bones.
 
 ### C159 ⏳ `&CELL@`'s pit, false wall and door bits leave their variable undefined in CSBWin
 
@@ -280,7 +268,7 @@ Size S.
 
 ### C157 ⏳ CSBWin 20230608 becomes the reference
 
-After C156. Steps:
+Steps:
 
 1. **Swap the trees.** `doc/CSBwin-src-20230608/` replaces `doc/CSBwin-src/`, and
    `node tools/gen-csbwin-index.mjs` rebuilds `doc/CSBWIN_SYMBOL_INDEX.tsv`.

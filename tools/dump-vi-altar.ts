@@ -55,6 +55,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import type { ObjectTables } from '../src/data/tables/ObjectTables';
 import type { UITables } from '../src/data/tables/UITables';
+import { heldObjectName } from '../src/renderer/ui/Character';
 import { getObjectDisplayName, resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import type { UIState } from '../src/renderer/ui/UIState';
 import { OBJNI_BONES_A } from '../src/core/objectNameIndex';
@@ -517,10 +518,14 @@ function main(): void {
         check(nameIndex === OBJNI_BONES_A, "a death's bones are objNI_Bones_a, which is what offers them to the altar");
 
         // What the player reads. Both places CSBWin prints a bones name put the dead
-        // champion's name in front of it, with no separator.
+        // champion's name in front of it, through `DescribeChampionBones`'s "% BONES"
+        // (doc/CSBwin-src-20230608/Code11f52.cpp:29-60).
         const shown = getObjectDisplayName(ui, bones, nameIndex);
+        const inHand = heldObjectName(ui, bones);
         console.log(['name shown for the bones', shown].join('\t'));
+        console.log(['name in the hand', inHand].join('\t'));
         check(shown === `HERO${victim} BONES`, "and they are named for their owner, not just 'BONES'");
+        check(inHand === `HERO${victim} BONES`, 'the hand names them so too, with the space');
 
         // Pick them up and drop them in, the way the viewport click does.
         g.ctx.dungeon.removeObjectFromCell(altar.party, bones);

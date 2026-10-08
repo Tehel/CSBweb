@@ -87,15 +87,26 @@ export function getBonesChampion(ui: UIState, objectId: ObjectID, objectNameInde
   return copyCharacter(ui.partyState, ui.ctx.dungeon, fingerprint);
 }
 
+/**
+ * `DescribeChampionBones` (`doc/CSBwin-src-20230608/Code11f52.cpp:29-60`): the translation
+ * of `"% " + objName`, with the champion's name for each `%`. With no translation (`DEBT.md`
+ * G21) `TranslateLanguage` gives its text back (`Translation.cpp:187`), so this reads
+ * "NAME BONES". The hand's line and the inventory's description both name bones so
+ * (`Code11f52.cpp:91`, `Character.cpp:3587`).
+ */
+export function describeChampionBones(name: string, objName: string): string {
+  return `% ${objName}`.split('%').join(name);
+}
+
 export function getObjectDisplayName(ui: UIState, objectId: ObjectID, objectNameIndex: number): string {
   let name = getObjectName(ui, objectNameIndex);
   if (!name) return name;
   const { category } = ui.ctx.dungeon.rnMaps.decode(objectId);
 
-  // `StrCpy(descriptiveText, pcA0->name); StrCat(descriptiveText, d.ObjectNames[objNID6])`
-  // — no separator, so the two run together exactly as CSBWin prints them.
+  // `DescribeObject`'s `DescribeChampionBones(descriptiveText, pcA0->name, d.ObjectNames[objNID6])`
+  // (doc/CSBwin-src-20230608/Character.cpp:3587).
   const owner = getBonesChampion(ui, objectId, objectNameIndex);
-  if (owner?.name) name = `${owner.name} ${name}`;
+  if (owner?.name) name = describeChampionBones(owner.name, name);
 
   if (category === DBType.POTION) {
     if (objectNameIndex !== OBJNI_WATER_FLASK && objectNameIndex !== OBJNI_EMPTY_FLASK) {
