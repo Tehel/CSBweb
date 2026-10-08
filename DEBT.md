@@ -96,7 +96,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G28 | The utility's untried form: a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
@@ -267,17 +266,6 @@ one tool per commit, each tool's output byte-identical.
 Things CSBWin does that the port has not built. These are not defects in existing code;
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
-
-### G28 ⏳ The utility's untried form: a `mini.dat` with an Extended Features block
-
-`src/engine/Chaos.ts` refuses it, so such a `mini.dat` makes no adventure.
-`_TAG000fc4` writes a new Extended Features block when `mini.dat` opened with one
-(`doc/CSBwin-src/Chaos.cpp:2141-2200`), from the globals the read left, with
-`BigActuators` set whatever the file had, `SupressDSAWarning` from
-`SupressDSAWarningOption`, and no `cellFlagArraySize`. CSB's `mini.dat` has none.
-`TAG000fc4` throws (`tools/dump-new-adventure.ts`).
-
-Paying it needs such a file, or the author's decision to port the branch unchecked.
 
 ### Postponed until the default dungeon is validated
 
@@ -718,6 +706,11 @@ Recorded so that nobody "fixes" them.
   `GAMEBLOCK1` that opens only with word 10, CSBWin stops in `NotImplemented(0x1868)`
   (`doc/CSBwin-src/Chaos.cpp:2966-2999`); the port refuses it with message 14. No known
   file has that form (`doc/PROVEN_FACTS.md` → "Only the word-29 form reads").
+- 🚫 **A `mini.dat` with an Extended Features block makes no adventure.** CSBWin's
+  `_TAG000fc4` writes the new adventure a fresh block when `mini.dat` opened with one
+  (`doc/CSBwin-src/Chaos.cpp:2141-2200`). The port refuses such a file (`TAG000fc4`,
+  `src/engine/Chaos.ts`; `tools/dump-new-adventure.ts`). `mini.dat` is CSB's own, as on
+  its disk, and no file with a block is known: only a dungeon editor could make one.
 - 🚫 **A champion who dies in hand is put down on nobody.** `KillCharacter` does not end a
   change of the marching order, and `TAG0025a6` then writes the dead champion's facing and
   position to `d.CH16482[-1]`, outside the champions (`doc/PROVEN_FACTS.md` → "Changing

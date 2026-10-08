@@ -302,12 +302,13 @@ export function TAG002724(source: UtilityGame, mini: UtilityGame, random: CsbRan
  * is its byte sum.
  *
  * When `mini.dat` opened with an Extended Features block, CSBWin writes a new one from
- * the globals the read left; that branch is not ported (`DEBT.md` G28).
+ * the globals the read left (`:2141-2200`). The port refuses such a file, which no known
+ * `mini.dat` is (`DEBT.md` H).
  */
 export function TAG000fc4(source: UtilityGame, mini: UtilityGame): Uint8Array {
     CheckChampionNames(source);
     if (mini.extendedFeatures) {
-        throw new Error('a mini.dat with an Extended Features block is not supported (DEBT.md G28)');
+        throw new Error('a mini.dat with an Extended Features block is not supported');
     }
     const block1 = mini.block1.slice();
     const blocks = [mini.block2, mini.item16, mini.characters, mini.timers, mini.timerQueue].map((b) => b.slice());

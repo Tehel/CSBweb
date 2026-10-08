@@ -18,7 +18,7 @@
  *    levels, the party where `mini.dat` put its own, the saved game's champions.
  * 4. The refusals, each with CSBWin's message: no party, "ALREADY UTILIZED", a name
  *    missing or twice, `mini.dat` not a new adventure, either file damaged, and the
- *    unported branch (`DEBT.md` G28), a `mini.dat` with an Extended Features block.
+ *    port's own, a `mini.dat` with an Extended Features block (`DEBT.md` H).
  *
  * Run: `npx tsx tools/dump-new-adventure.ts`
  */
@@ -260,7 +260,7 @@ function refusals(): void {
   const unsummed = makeNewAdventure(CSBGAME7, MINI.subarray(0, MINI.length - 2), new CsbRandom(SEED));
   check(same(unsummed, makeNewAdventure(CSBGAME7, MINI, new CsbRandom(SEED))), 'a mini.dat without the word after its dungeon is taken, and makes the same adventure');
 
-  // The unported branch: a mini.dat behind an Extended Features block.
+  // The port's own refusal: a mini.dat behind an Extended Features block (DEBT.md H).
   let unported: string | null = null;
   try {
     makeNewAdventure(CSBGAME7, CSBGAME7, new CsbRandom(SEED));
@@ -268,7 +268,7 @@ function refusals(): void {
     unported = (error as Error).message;
   }
   console.log(`  csbgame7.dat as mini.dat: ${unported}`);
-  check(unported !== null && /G28/.test(unported), 'a mini.dat with an Extended Features block passes TAG0026c4 and is refused at the write, which is not ported');
+  check(unported !== null && /Extended Features/.test(unported), 'a mini.dat with an Extended Features block passes TAG0026c4 and is refused at the write');
 }
 
 canary();
