@@ -19,22 +19,14 @@
  *
  * Run: `npx tsx tools/dump-savegame.ts [level]`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import { DUNGEON_DATA_SOURCES, type FieldSource } from '../src/engine/DungeonSnapshot';
 import { getActuatorValue, setActuatorValue } from '../src/data/actuatorHelpers';
-import { newGame } from './lib/game';
+import { stockGame } from './lib/game';
 import { check, finish } from './lib/check';
-
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 
 /**
  * A whole independent world. Two of these is the whole trick: a quick-load happens
@@ -42,15 +34,7 @@ const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
  * round-trips within one live `Game` would prove nothing.
  */
 async function loadWorld(): Promise<Game> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
-
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
-
-  return newGame(data, graphics);
+  return stockGame();
 }
 
 function roomTypeAt(game: Game, x: number, y: number, level: number): number {

@@ -22,18 +22,14 @@
  *
  * Run: `npx tsx tools/dump-door-lightning.ts`
  */
-import { readFileSync } from 'node:fs';
-
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { Opcode } from '../src/renderer/bytecode/Opcodes';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf } from './lib/game';
+import { graphicsTablesOf, stockGraphics } from './lib/game';
 import { standIn } from './lib/standIn';
 
-const graphics = new GraphicsLoader();
-graphics.loadFromArray(new Uint8Array(readFileSync('static/gamefiles/dm-atari/graphics.dat')));
+const graphics = stockGraphics();
 const objectTables = graphicsTablesOf(graphics).objects;
 
 console.log('doorCharacteristics:', Array.from(objectTables.doorCharacteristics).map((v) => `0x${(v & 0xffff).toString(16)}`));

@@ -238,22 +238,18 @@ The table-extraction round-trip checks are a live phase, so they stay in `PLAN.m
 `tools/lib/game.ts` gives every tool the same `Game` and tables (`E1a`). What each tool
 builds around them is its own:
 
-- 41 tools name `dm-atari/dungeon.dat` or its `graphics.dat` in their code, beside
+- 25 tools name `dm-atari/dungeon.dat` or its `graphics.dat` in their code, beside
   `stockDungeon()` and `stockGraphics()`: `dump-atari-saves`, `-bad-saved-game`,
-  `-check-monsters`, `-cloud-draw`, `-compressed-dungeon`, `-csbwin-load`,
-  `-csbwin-timers`, `-csbwin-world`, `-cursor-filter`, `-defined-items`,
-  `-dm-atari-graphics`, `-dm-rules`, `-door-lightning`, `-dsa-decoder`, `-dsa-save`,
+  `-check-monsters`, `-compressed-dungeon`, `-cursor-filter`, `-defined-items`,
+  `-dm-atari-graphics`, `-dm-rules`, `-dsa-decoder`, `-dsa-save`,
   `-dungeon-conversions`, `-dungeon-image-blocks`, `-dungeon-signature`,
   `-extended-dungeon`, `-extend-portraits`, `-file-signatures`, `-hint-key`,
-  `-image-checksum`, `-intro`, `-level-items`, `-live-save-file`,
-  `-monster-activation`, `-monster-design-options`, `-monster-tables`,
-  `-new-adventure`, `-object-definitions`, `-object-index`, `-object-name-index`,
-  `-portraits`, `-savegame`, `-save-menu`, `-save-roundtrip`, `-timer-heap`,
-  `-timer-sequence`, `gen-utility-portraits` and `peek-dungeon`. Their loads have a
-  shape of their own: a path in a constant, bytes kept to read again, a loader the tool
-  goes on using, a table of data sets. Some read the file's bytes as their subject (a
-  signature, a checksum, the compression, the Extended Features block), and those keep
-  the path.
+  `-image-checksum`, `-level-items`, `-monster-design-options`, `-new-adventure`,
+  `-object-definitions`, `-save-menu`, `gen-utility-portraits` and `peek-dungeon`. Their
+  loads have a shape of their own: a path in a constant, bytes kept to read again, a
+  loader the tool goes on using, a table of data sets. Some read the file's bytes as their
+  subject (a signature, a checksum, the compression, the Extended Features block), and
+  those keep the path.
 - 31 tools extract the UI tables again (`graphicsTablesOf(…).ui`) beside the `UIState`
   that `tools/lib/ui.ts` builds them into.
 - 20 tools make 33 `as unknown as` casts: to build a partial record, or to read a
@@ -281,7 +277,7 @@ keeps beside a `Game` is in a `WeakMap` of its own (`dump-game-events`,
 6. **The stock dungeon and a test champion** as `tools/lib` helpers, and the tools moved
    to them, a few tools per commit. The helpers are written: `stockDungeon` and
    `stockGame` (`tools/lib/game.ts`), `testChampion` (`tools/lib/champion.ts`). Every
-   tool's champion is `testChampion`'s. What is left is the first bullet's 41 tools,
+   tool's champion is `testChampion`'s. What is left is the first bullet's 25 tools,
    each moved to the helpers unless the file's bytes are its subject.
 7. **What is left**: every remaining cast either goes, or builds a stand-in value the
    tool cannot type otherwise (a partial record, a fake `ImageData`), with a comment that

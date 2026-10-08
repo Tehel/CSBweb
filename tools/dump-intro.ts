@@ -32,9 +32,6 @@
  *
  * Run: `npx tsx tools/dump-intro.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { ratesDefault } from '../src/audio/soundsIndex';
 import { buildSoundCatalog } from '../src/audio/soundsIndex';
@@ -84,16 +81,13 @@ import {
   prisonCellFlags,
 } from '../src/renderer/intro/PrisonLevel';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf } from './lib/game';
+import { graphicsTablesOf, stockGraphics } from './lib/game';
 
-const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 /** A palette index no entrance artwork uses, so the stubbed corridor is identifiable. */
 const INTERIOR_MARKER = 7;
 
 function loadGraphics(): GraphicsLoader {
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
-  return graphics;
+  return stockGraphics();
 }
 
 function size(rect: { x1: number; x2: number; y1: number; y2: number }): string {

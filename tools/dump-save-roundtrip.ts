@@ -54,7 +54,6 @@ import { resolve } from 'node:path';
 
 import { OBJECT_ID_NULL, Position, type Direction, type ObjectID } from '../src/core/types';
 import { sw } from '../src/core/intCast';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/engine/CsbwinSaveGame';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
@@ -65,12 +64,10 @@ import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import { CHARFLAG_ATTACK_DISABLE, MovementAction, type Champion } from '../src/engine/gameTypes';
-import { newGame, presetHeroesOfGame } from './lib/game';
+import { newGame, presetHeroesOfGame, stockDungeon, stockGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { savePath } from './lib/saves';
 
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 const CSB = 'static/gamefiles/csb';
 
 /** `CHARDESC.portrait` unpacked: 32x29 palette indices, one byte each. */
@@ -80,10 +77,7 @@ const PORTRAIT_PIXELS = 32 * 29;
 const DOOR = { x: 1, y: 14, level: 0 };
 
 function loadWorld(): Game {
-  const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
-  return newGame(data, graphics);
+  return stockGame();
 }
 
 function fromCsbwinSave(file: string): Game {
@@ -260,7 +254,7 @@ interface Sides { live: Game; loaded: Game; now: RuntimeSaveState }
 function csbOverDm(): Game {
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve(CSB, 'graphics.dat'))));
-  return newGame(new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON)))), graphics);
+  return newGame(stockDungeon(), graphics);
 }
 
 /**

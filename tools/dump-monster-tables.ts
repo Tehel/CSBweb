@@ -29,14 +29,18 @@ import {
 } from '../src/data/tables/MonsterDesc';
 import { AttackType, MonsterType } from '../src/engine/monsterTypes';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf } from './lib/game';
+import { graphicsTablesOf, stockGraphics } from './lib/game';
 
-const DEFAULT_GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
+/** The `graphics.dat` the argument names, or the stock one. */
+function graphicsOf(path: string | undefined): GraphicsLoader {
+  if (path === undefined) return stockGraphics();
+  const graphics = new GraphicsLoader();
+  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(process.cwd(), path))));
+  return graphics;
+}
 
 function main(): void {
-  const path = resolve(process.cwd(), process.argv[2] ?? DEFAULT_GRAPHICS);
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(path)));
+  const graphics = graphicsOf(process.argv[2]);
 
   const objectTables = graphicsTablesOf(graphics).objects;
   const uiTables = graphicsTablesOf(graphics).ui;

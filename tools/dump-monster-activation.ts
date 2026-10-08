@@ -8,31 +8,18 @@
  *
  * Run: `npx tsx tools/dump-monster-activation.ts [level]`  (default: level 3)
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { DungeonState } from '../src/engine/DungeonState';
 import { MonsterSystem } from '../src/engine/MonsterSystem';
 import { TimerQueue, TimerFunction } from '../src/engine/TimerQueue';
 import { CsbRandom } from '../src/core/random';
 import { MonsterType } from '../src/engine/monsterTypes';
 import type { PartyState } from '../src/engine/gameTypes';
-import { graphicsTablesOf, newContext } from './lib/game';
+import { graphicsTablesOf, newContext, stockDungeon, stockGraphics } from './lib/game';
 import { check, fail, finish } from './lib/check';
 
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
-
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve(process.cwd(), DUNGEON))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
-
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(process.cwd(), GRAPHICS))));
+  const data = stockDungeon();
+  const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
 
   const dungeon = new DungeonState(data);

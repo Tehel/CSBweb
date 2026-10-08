@@ -18,20 +18,12 @@
  *
  * Run: `npx tsx tools/dump-timer-sequence.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import type { Game } from '../src/engine/Game';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { TimerFunction, TimerQueue, timerLess } from '../src/engine/TimerQueue';
-import { newGame } from './lib/game';
+import { stockGame } from './lib/game';
 import { check, finish } from './lib/check';
-
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 
 /** The tick every labelled timer is due on, and the level they are on. */
 const DUE = 1000;
@@ -101,10 +93,7 @@ function wrap(q: TimerQueue): number[] {
 
 // 3. Across a save.
 function loadWorld(): Game {
-  const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
-  return newGame(data, graphics);
+  return stockGame();
 }
 
 function queueOf(game: Game): string {

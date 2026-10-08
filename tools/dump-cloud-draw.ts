@@ -47,14 +47,10 @@
  *
  * Run: `npx tsx tools/dump-cloud-draw.ts`
  */
-import { readFileSync } from 'node:fs';
-
 import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { applyLimits } from '../src/core/intCast';
 import { CsbRandom } from '../src/core/random';
 import { RN_POISON_CLOUD } from '../src/core/spellRn';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { DrawTeleporter, graphicRandomState } from '../src/renderer/bytecode/DrawDoor';
 import { DrawClouds, DrawRoomObjects } from '../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw, viewportRandom } from '../src/renderer/bytecode/ViewportDraw';
@@ -62,11 +58,10 @@ import { createPaletteIndexViewportBuffer, shrinkBlt, type IndexedBitmap } from 
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../src/renderer/ViewportRenderer';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
 import { RnMaps } from '../src/core/RnMaps';
 
-const graphics = new GraphicsLoader();
-graphics.loadFromArray(new Uint8Array(readFileSync('static/gamefiles/dm-atari/graphics.dat')));
+const graphics = stockGraphics();
 const viewportTables = graphicsTablesOf(graphics).viewport;
 const realTables = graphicsTablesOf(graphics).objects;
 
@@ -508,11 +503,7 @@ check([0, 1, 2].every((c) => realTables.cloudPositions7042[2 * c + 1] === 47) &&
 
   // A dungeon of its own each time: a game plays in the data it is given.
   const arena = () => {
-    const loader = new DungeonLoader();
-    loader.loadFromArray(new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat')));
-    const data = loader.getData();
-    if (!data) throw new Error('dungeon.dat did not load');
-    const game = newGame(data, graphics);
+    const game = newGame(stockDungeon(), graphics);
     const map = game.ctx.dungeon.getMap(LEVEL)!;
     for (let x = CX - 3; x <= CX + 3; x++) {
       for (let y = CY - 3; y <= CY + 3; y++) {

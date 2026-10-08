@@ -49,14 +49,11 @@
  * Run: `npx tsx tools/dump-live-save-file.ts`
  */
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import {
   Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position,
 } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/engine/CsbwinSaveGame';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { objectIndexOf } from '../src/data/CsbwinObjectIndex';
@@ -65,12 +62,9 @@ import type { PresetHero } from '../src/data/HeroExtractor';
 import { Game } from '../src/engine/Game';
 import { MovementAction } from '../src/engine/gameTypes';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
-import { newGame, presetHeroesOfGame } from './lib/game';
+import { presetHeroesOfGame, stockGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { savePath } from './lib/saves';
-
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 
 const DELTA_X = [0, 1, 0, -1];
 const DELTA_Y = [-1, 0, 1, 0];
@@ -86,10 +80,7 @@ const RESURRECT = 160;
 /* ------------------------------------------------------------------------ fixture --- */
 
 function makeGame(): Game {
-  const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
-  const game = newGame(data, graphics);
+  const game = stockGame();
   game.setRandomSeed(0x12345678);
   return game;
 }

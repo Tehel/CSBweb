@@ -32,13 +32,9 @@
  *
  * Run: `npx tsx tools/dump-object-name-index.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import * as OBJNI from '../src/core/objectNameIndex';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf } from './lib/game';
+import { graphicsTablesOf, stockGraphics } from './lib/game';
 
 /**
  * The name `graphics.dat` must hold at each constant.
@@ -103,11 +99,7 @@ const ALIASES: Array<[keyof typeof OBJNI, keyof typeof OBJNI]> = [
 ];
 
 function main(): void {
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(
-    new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))),
-  );
-  const objectTables = graphicsTablesOf(graphics).objects;
+  const objectTables = graphicsTablesOf(stockGraphics()).objects;
   const names = objectTables.objectNames;
 
   console.log(`graphics.dat holds ${names.length} object names`);

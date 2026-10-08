@@ -35,12 +35,9 @@
  * Run: `npx tsx tools/dump-csbwin-load.ts [path-or-directory]`
  */
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/engine/CsbwinSaveGame';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
@@ -48,12 +45,10 @@ import { DUNGEON_DATA_SOURCES, type FieldSource } from '../src/engine/DungeonSna
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH, writeCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { ImageFormat } from '../src/core/imageDecoder';
-import { newGame } from './lib/game';
+import { stockGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
 
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 /**
  * The saves made by playing: `csbgame7.dat`, and any `csbgame<n>.dat` given by path. The
  * hyphenated ones beside it were made to order at the first moment the game allows a save, so their
@@ -103,13 +98,7 @@ function differingFields(table: SourceTable, a: any, b: any, path = ''): string[
 
 /** A fresh game on the real `dungeon.dat`, exactly as the app boots one. */
 function loadWorld(): Game {
-  const loader = new DungeonLoader();
-  const data = loader.loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
-
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
-
-  return newGame(data, graphics);
+  return stockGame();
 }
 
 /**
@@ -119,9 +108,7 @@ function loadWorld(): Game {
  * (`doc/CSBwin-src/Character.cpp:487-496`), which is this grid.
  */
 function portraitCells(): number[][] {
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
-  const sheet = graphics.getImage(26, ImageFormat.IMG1);
+  const sheet = stockGraphics().getImage(26, ImageFormat.IMG1);
   const cols = Math.floor(sheet.width / PORTRAIT_WIDTH);
   const rows = Math.floor(sheet.height / PORTRAIT_HEIGHT);
   const cells: number[][] = [];

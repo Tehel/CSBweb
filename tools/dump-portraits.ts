@@ -46,7 +46,6 @@ import {
 } from '../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { buildCsbwinRuntimeState } from '../src/engine/CsbwinSaveGame';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Party } from '../src/engine/Party';
 import type { Champion } from '../src/engine/gameTypes';
@@ -54,11 +53,9 @@ import { IndexedBitmap, createPaletteIndexViewportBuffer } from '../src/renderer
 import { drawPartyStatus, getPortraitBitmap } from '../src/renderer/ui/Character';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
-import { newGame } from './lib/game';
+import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 const DEFAULT_SAVE = 'tools/fixtures/csbgame7.dat';
 const CSB_GRAPHICS = 'static/gamefiles/csb/graphics.dat';
 /** The two `CSBgraphics.dat` here, with how many portrait sections each holds. */
@@ -95,9 +92,8 @@ function portraitOnScreen(pixels: Uint8Array, chIdx: number): number[] {
 function main(): void {
   const savePath = process.argv[2] ?? DEFAULT_SAVE;
 
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
-  const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
+  const graphics = stockGraphics();
+  const data = stockDungeon();
 
   const cache = new Map<string, IndexedBitmap>();
   const ui: UIState = newUIState(graphics, newGame(data, graphics).ctx, {

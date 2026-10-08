@@ -22,14 +22,9 @@
  *
  * Run: `npx tsx tools/dump-object-index.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import * as OBJNI from '../src/core/objectNameIndex';
 import { RN_FFE4, RN_FIREBALL } from '../src/core/spellRn';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { DatabaseRecord, Databases } from '../src/data/dungeonTypes';
 import { DungeonState } from '../src/engine/DungeonState';
 import {
@@ -41,7 +36,7 @@ import {
   type ObjectIndexTables,
 } from '../src/engine/objectIndex';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf } from './lib/game';
+import { graphicsTablesOf, stockDungeon, stockGraphics } from './lib/game';
 
 const DATABASE_OF: Array<[DBType, keyof Databases]> = [
   [DBType.DOOR, 'doors'],
@@ -61,17 +56,9 @@ const OBJECT_DBS = new Set([
 ]);
 
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(
-    new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))),
-  );
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const dungeon = new DungeonState(data);
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(
-    new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))),
-  );
+  const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
   const uiTables = graphicsTablesOf(graphics).ui;
   const names = objectTables.objectNames;

@@ -19,16 +19,14 @@
  * Run: `npx tsx tools/dump-csbwin-world.ts [path-or-directory]`
  */
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
 import type { ContainerRecord, CreatureRecord, DungeonData } from '../src/data/dungeonTypes';
 import { check, finish } from './lib/check';
+import { stockDungeon } from './lib/game';
 import { genuineSaves } from './lib/saves';
 
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 /** The saves made at the first possible moment; their world is still the pristine one. */
 const EARLY = /^csbgame-early-/;
 
@@ -102,7 +100,7 @@ function countCellFlagDifferences(a: DungeonData, b: DungeonData): number {
 }
 
 function main(): void {
-  const pristine = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
+  const pristine = stockDungeon();
   const totalCells = pristine.maps.reduce(
     (sum, m) => sum + m.descriptor.width * m.descriptor.height, 0);
   const pristineChains = walkObjectChains(pristine);

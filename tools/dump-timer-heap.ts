@@ -33,17 +33,14 @@
  * Run: `npx tsx tools/dump-timer-heap.ts`
  */
 import { readFileSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { basename } from 'node:path';
 
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { TimerFunction, TimerQueue, timerLess, type TimerEntry } from '../src/engine/TimerQueue';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockDungeon, stockGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 import { genuineSaves, savePath } from './lib/saves';
-
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 
 const json = (v: unknown): string => JSON.stringify(v);
 
@@ -236,7 +233,7 @@ function checkRandom(): void {
 
 function checkLoadedGames(files: string[]): void {
   console.log('\n=== 4. one tick after the load ===');
-  const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
+  const data = stockDungeon();
   const graphics = stockGraphics();
   let firedSome = 0;
   for (const file of files) {
@@ -268,8 +265,7 @@ function checkLoadedGames(files: string[]): void {
 
 function checkTableSize(files: string[]): void {
   console.log('\n=== 5. the table\'s size ===');
-  const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
-  const size = newGame(data, stockGraphics()).ctx.timers.getMaxTimers();
+  const size = stockGame().ctx.timers.getMaxTimers();
   const saved = files.map((file) => loadSaveGameState(new Uint8Array(readFileSync(savePath(file)))).maxTimers);
   console.log(`  a new game: ${size} slots; the saves: ${[...new Set(saved)].join(', ')}`);
   check(size === 467, `a new game's table is 100 + (182 + 75) + (0 + 60) + (0 + 50) = 467 slots, not ${size}`);

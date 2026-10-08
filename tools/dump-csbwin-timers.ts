@@ -38,31 +38,22 @@
  * Run: `npx tsx tools/dump-csbwin-timers.ts`
  */
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import { RN_POISON_CLOUD } from '../src/core/spellRn';
 import { Position } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { Game } from '../src/engine/Game';
 import { TimerFunction, timerLess, type TimerEntry } from '../src/engine/TimerQueue';
-import { newGame } from './lib/game';
+import { stockGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { savePath } from './lib/saves';
-
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 
 /** The door these two saves were made around, and the cell the party faces. */
 const DOOR = { x: 1, y: 14, level: 0 };
 
 function loadWorld(): Game {
-  const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
-  return newGame(data, graphics);
+  return stockGame();
 }
 
 /**
