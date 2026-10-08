@@ -244,7 +244,7 @@ console.log('7. ReadCSBgraphic\'s first failure');
   b.loader.opener = () => true;
   b.loader.readSection(CSBGraphicType.OverlayPalette, 999, 0);
   b.loader.opener = () => false;
-  (b.loader as unknown as { opened: boolean }).opened = false;
+  b.loader.opened = false;
   b.loader.readSection(CSBGraphicType.OverlayPalette, 1, 0);
   console.log(`  a missing section first: cannotOpen called ${b.said()} times`);
   check(b.said() === 0, 'a missing section first, and it never does');

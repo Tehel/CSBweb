@@ -328,8 +328,12 @@ export class CSBGraphicsLoader {
   private portraitCache = new Map<number, IndexedBitmap>();
   /** `CSBgraphicSignature1/2`: the file's `Signature`, taken as it loads. */
   private fileSignature: FileSignature | null = null;
-  /** `CSBgraphicsFile.f >= 0`: the file has opened, and is not checked again. */
-  private opened = false;
+  /**
+   * `CSBgraphicsFile.f >= 0`: the file has opened, and is not checked again. Public so
+   * that `tools/` can close it again, as only CSBWin's shutdown does
+   * (`CSBgraphicsFile.Cleanup()`, `doc/CSBwin-src/Graphics.cpp:2236`).
+   */
+  opened = false;
   /**
    * `OpenCSBgraphicsFile`, which `ReadCSBgraphic` calls first
    * (`doc/CSBwin-src/Graphics.cpp:3246`): the game's checks (`csbGraphicsOpener`,
