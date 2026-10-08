@@ -21,12 +21,13 @@
  * before the buttons come back.
  *
  * ⚠️ One deliberate divergence: CSBWin's `_FlashAttackDamage` ends in `VBLDelay(15)`, a
- * quarter-second in which the whole game is stopped. A browser cannot block the frame
- * loop, so the flash is timed instead — `attackFlashUntilMs` — and `tag01b29a` brings
- * the buttons back no sooner than it runs out. Same duration, same appearance; the game
- * simply keeps running underneath, as it already does for the feeding animation. The
- * figure stays up after the flash, as CSBWin's does, until `DrawLegalAttackTypes`
- * draws over it.
+ * quarter-second in which the whole game is stopped, and the next tick, due by then,
+ * draws the buttons over it. A browser cannot block the frame loop, so the flash is timed
+ * instead — `attackFlashUntilMs` — and `tag01b29a` brings the buttons back no sooner than
+ * it runs out; the game keeps running underneath, as it already does for the feeding
+ * animation. The author's decision is a longer flash, `FLASH_MS`, for the text to be
+ * read (`DEBT.md` H). The figure stays up after the flash, as CSBWin's does, until
+ * `DrawLegalAttackTypes` draws over it.
  */
 import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
 import { DBType, OBJECT_ID_NULL, type ObjectID } from '../../core/types';
@@ -43,8 +44,12 @@ import { searchButtonList } from './HitTest';
 import { getAttackClass, getBaseObjectNameIndex, resolveObjectNameIndex } from './Objects';
 import { nowMs, UIState } from './UIState';
 
-/** `VBLDelay(15)` at 60 Hz — a quarter of a second. */
-const FLASH_MS = 250;
+/**
+ * How long the flash holds the buttons back. CSBWin's is `VBLDelay(15)`, a quarter of a
+ * second; the author's choice is 400 ms, over one tick of 15 VBLs and under two, so the
+ * damage is up for two ticks whatever the jitter of the wall clock against the VBLs.
+ */
+export const FLASH_MS = 400;
 
 /** `DrawAttackButton`'s rectangle for champion `chIdx` (`Character.cpp:4837`). */
 export function attackButtonRect(chIdx: number): Rect {

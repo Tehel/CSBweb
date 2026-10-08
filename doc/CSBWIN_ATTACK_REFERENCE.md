@@ -163,9 +163,10 @@ six, so the texts start at x 245 and 250, right of their centre (the original's 
 ## Deliberately not ported
 
 - **`_FlashAttackDamage`'s `VBLDelay(15)`**, which stops the whole game for a quarter of a
-  second. A browser cannot block the frame loop, so the flash is a timed overlay of the
-  same duration and the game keeps running underneath — as it already does for the feeding
-  animation.
+  second. A browser cannot block the frame loop, so the flash is a timed overlay and the
+  game keeps running underneath — as it already does for the feeding animation. The
+  author's decision is 400 ms (`FLASH_MS`), so the damage stays up for two ticks rather
+  than CSBWin's one (`DEBT.md` H).
 
 `FluxCage`'s neighbour test is kept **as written**: CSBWin checks `(LCX, LCY-1)` twice and
 never looks south (`:1607-1610`), so a cage count of 3 is reachable in only three of the

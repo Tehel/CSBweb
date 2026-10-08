@@ -670,10 +670,15 @@ Recorded so that nobody "fixes" them.
   at each of CSBWin's eight possession writers. Same value, and it cannot drift. `Party.ts`
   made the same choice for `SetHandOwner`. Recorded in the module comment of
   `src/engine/CharacterStats.ts`.
-- 🚫 **`_FlashAttackDamage` does not stop the game.** CSBWin's ends in `VBLDelay(15)`,
-  which halts everything for a quarter of a second. The port shows the flash as a timed
-  overlay of the same length while the game keeps running, as it already does for the
-  feeding animation (`src/renderer/ui/Attack.ts`, module comment).
+- 🚫 **`_FlashAttackDamage` does not stop the game, and lasts two ticks.** CSBWin's ends in
+  `VBLDelay(15)`, which halts everything for a quarter of a second, and the tick due by
+  then draws the buttons over the damage (`doc/CSBwin-src/Attack.cpp:1039`,
+  `CSBCode.cpp:8950-8958`). The port shows the flash as a timed overlay while the game
+  keeps running, as it already does for the feeding animation. The author's decision is
+  400 ms (`FLASH_MS`, `src/renderer/ui/Attack.ts`), over one tick and under two, so the
+  text can be read: the damage is up for two ticks, half a second, where CSBWin's is up
+  for one. The keys still open an attack menu over it. `tools/dump-attack-panel.ts`
+  checks that the first tick after the flash leaves it up.
 - 🚫 **Three inputs bypass the mouse queue:** the save menu and the Reincarnate screen,
   which are modal, and the panel keys in `src/renderer/ui/Keyboard.ts`, whose module
   comment gives the reason. So none of them reaches `totalMoveCount`: CSBWin's save menu

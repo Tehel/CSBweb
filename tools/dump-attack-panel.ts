@@ -28,8 +28,10 @@ import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/en
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import {
-  attackPanelTick, closeAttackMenu, drawAttackPanel, executeAttack, prepareAttack, takeAttackOption,
+  attackPanelTick, closeAttackMenu, drawAttackPanel, executeAttack, FLASH_MS, prepareAttack,
+  takeAttackOption,
 } from '../src/renderer/ui/Attack';
+import { VBL_PER_TICK } from '../src/engine/LoopState';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
@@ -116,6 +118,13 @@ async function main(): Promise<void> {
   attackPanelTick(ui);
   const damage = render('the tick: the damage');
   check(damage !== menu && damage !== buttons, "the tick's FlashAttackDamage draws the damage over it");
+  // The author's flash (DEBT.md H): over one tick and under two, where CSBWin's
+  // VBLDelay(15) is one. The next tick, a tick's milliseconds on, leaves the damage up.
+  const tickMs = (VBL_PER_TICK * 1000) / 60;
+  check(FLASH_MS > tickMs && FLASH_MS < 2 * tickMs, `the flash, ${FLASH_MS} ms, is over one tick and under two`);
+  ui.attackFlashUntilMs -= tickMs;
+  attackPanelTick(ui);
+  check(render('a tick on') === damage, 'the first tick after the flash leaves the damage up');
   ui.attackFlashUntilMs = 0;
   check(render('the flash over, before the tick') === damage,
     'the damage stays up after its VBLDelay(15) (Attack.cpp:1039)');
