@@ -153,6 +153,14 @@ export interface ObjectTables {
   // Wall text helpers (DrawWallDecoration, CSBCode.cpp:3258+)
   wallTextRect: RectPos; // d.Byte4192 rect for mortar joint removal
   wallTextLineY2: Uint8Array; // d.Byte4196[4]
+  /**
+   * `d.Byte4212[16]`: the bottom of a wall text's plaque seen from afar, by distance and
+   * line count, `[3 * wallDecorationDerivedGraphicOffset[relativePosition] + numLine - 1]`
+   * for one to three lines (`doc/CSBwin-src-20230608/CSBCode.cpp:3649-3660`).
+   */
+  wallTextPlaqueY2: Uint8Array;
+  /** `d.WallDecorationDerivedGraphicOffset[12]`: which of five distances a relative position is. */
+  wallDecorationDerivedGraphicOffset: Uint8Array;
 
   // Wall decoration alcove markers (CSBCode.cpp:205-219, Data.h:1174-1177)
   alcoveDecorationIndices: Uint8Array; // d.Byte4038[4]
@@ -228,6 +236,8 @@ const ABS_WALL_DECORATION_POSITION = 4836; // wallDecorationPosition[8][13] (8*1
 const ABS_WALL_DECORATION_RECT_SET_INDEX = 4100; // Byte4100[60]
 const ABS_WALL_TEXT_RECT = 4192; // Byte4192 (RectPos x1,x2,y1,y2)
 const ABS_WALL_TEXT_LINE_Y2 = 4196; // Byte4196[4]
+const ABS_BYTE4212 = 4212; // Byte4212[16]
+const ABS_WALL_DECORATION_DERIVED_GRAPHIC_OFFSET = 4024; // WallDecorationDerivedGraphicOffset[12]
 const ABS_BYTE4038 = 4038; // Byte4038[4]
 const ABS_WORD4040 = 4040; // Word4040[1]
 const ABS_BYTE4124 = 4124; // Byte4124[2] (door switch rect set indices)
@@ -711,6 +721,9 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const wallDecorationRectSetIndexOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_WALL_DECORATION_RECT_SET_INDEX);
   const wallTextRectOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_WALL_TEXT_RECT);
   const wallTextLineY2Offset = computeOffsetFromWall(wallRectanglesOffset, ABS_WALL_TEXT_LINE_Y2);
+  const wallTextPlaqueY2Offset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE4212);
+  const wallDecorationDerivedGraphicOffsetOffset = computeOffsetFromWall(
+    wallRectanglesOffset, ABS_WALL_DECORATION_DERIVED_GRAPHIC_OFFSET);
   const alcoveDecorationIndicesOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE4038);
   const fountainDecorationIndexOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_WORD4040);
   const doorSwitchRectIndexOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE4124);
@@ -751,6 +764,8 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     wallDecorationRectSetIndexOffset < 0 ||
     wallTextRectOffset < 0 ||
     wallTextLineY2Offset < 0 ||
+    wallTextPlaqueY2Offset < 0 ||
+    wallDecorationDerivedGraphicOffsetOffset < 0 ||
     alcoveDecorationIndicesOffset < 0 ||
     fountainDecorationIndexOffset < 0 ||
     doorSwitchRectIndexOffset < 0 ||
@@ -816,6 +831,9 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const wallDecorationRectSetIndex = readWallDecorationRectSetIndex(raw22e, wallRectanglesOffset);
   const wallTextRect = readRectPosByte4(raw22e, wallTextRectOffset);
   const wallTextLineY2 = raw22e.slice(wallTextLineY2Offset, wallTextLineY2Offset + 4);
+  const wallTextPlaqueY2 = raw22e.slice(wallTextPlaqueY2Offset, wallTextPlaqueY2Offset + 16);
+  const wallDecorationDerivedGraphicOffset = raw22e.slice(
+    wallDecorationDerivedGraphicOffsetOffset, wallDecorationDerivedGraphicOffsetOffset + 12);
   const alcoveDecorationIndices = raw22e.slice(alcoveDecorationIndicesOffset, alcoveDecorationIndicesOffset + 4);
   const fountainDecorationIndex = readI16BE(raw22e, fountainDecorationIndexOffset);
   const doorSwitchRectIndex = raw22e.slice(doorSwitchRectIndexOffset, doorSwitchRectIndexOffset + 2);
@@ -916,6 +934,8 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     wallDecorationRectSetIndex,
     wallTextRect,
     wallTextLineY2,
+    wallTextPlaqueY2,
+    wallDecorationDerivedGraphicOffset,
     alcoveDecorationIndices,
     fountainDecorationIndex,
     doorSwitchRectIndex,

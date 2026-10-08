@@ -21,6 +21,14 @@
  *      and by the addressing above written out here, pixel for pixel; none has more
  *      lines than `d.Byte4196` has entries, a line over 18 glyphs or a code past the font.
  *   3. a code of 50 on its own: glyph 14's rows 1 to 7 in rows 0 to 6, and row 7 untouched.
+ *   4. a text seen from afar, at positions 0 to 11, is its plaque: CSBWin 20230608 blits it
+ *      through `LOCAL_22`, a copy of its rectangle whose bottom is
+ *      `d.Byte4212[3 * d.WallDecorationDerivedGraphicOffset[relativePosition] + numLine - 1]`
+ *      for one to three lines (`doc/CSBwin-src-20230608/CSBCode.cpp:3625-3660`, `:3743`).
+ *      The canary: `WallDecorationDerivedGraphicOffset` is the `0,0,1,1,1,2,2,3,3,3,4,4`
+ *      of CSBWin's comment (`:3654`), and each of `Byte4212`'s five triples rises inside
+ *      the rectangles of its distance. Then a text of one, two or three lines draws the
+ *      four-line plaque cut at that row, and nothing below it.
  *
  * Run: `npx tsx tools/dump-wall-text.ts`
  */
@@ -167,6 +175,60 @@ for (const set of ['dm-atari', 'dm-atari-1.3-fr']) {
   console.log(`code 50 alone: ${drawn} pixels drawn at x ${x1}..${x1 + 7}, y ${y2 - 7}..${y2}`);
   check(asGlyph14 && outside === 0, "code 50 draws glyph 14's rows 1 to 7 one row up, and nothing in its last row or outside its cell");
   if (set === 'dm-atari') check(drawn > 0, 'which is not nothing: glyph 14 has pixels below its first row');
+
+  // 4. The plaque from afar.
+  const offsets = Array.from(tables.wallDecorationDerivedGraphicOffset);
+  const plaqueY2 = Array.from(tables.wallTextPlaqueY2);
+  const textRects = tables.wallDecorationRectSets[tables.wallDecorationRectSetIndex[0]!]!;
+  console.log(`WallDecorationDerivedGraphicOffset ${offsets.join(',')}; Byte4212 ${plaqueY2.join(',')}`);
+  check(offsets.join(',') === '0,0,1,1,1,2,2,3,3,3,4,4', "WallDecorationDerivedGraphicOffset is CSBWin's comment");
+  let inside = plaqueY2[15] === 0;
+  for (let position = 0; position < 12; position++) {
+    const rect = textRects[position]!;
+    const [a, b, c] = plaqueY2.slice(3 * offsets[position]!, 3 * offsets[position]! + 3) as [number, number, number];
+    if (!(rect.y1 < a && a < b && b < c && c < rect.y2)) inside = false;
+  }
+  check(inside, "each of Byte4212's triples rises inside its distance's text rectangles, and its last byte is 0");
+
+  const far = (lines: number, position: number): Uint8Array => {
+    const bytes: number[] = [];
+    for (let line = 0; line < lines; line++) bytes.push(0, line === lines - 1 ? 129 : 128);
+    const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, UNDRAWN);
+    const context: any = {
+      viewportIndexBuffer,
+      objectTables: tables,
+      getGraphicBitmap,
+      numWallDecoration: 0,
+      dungeonState: {
+        getMap: () => ({ wallDecorationTOC: [] }),
+        getTextRecord: () => ({}),
+        decodeWallTextBytes: () => Uint8Array.from(bytes),
+      },
+    };
+    drawWallText(new ViewportDraw(context), dungeon.rnMaps.rn(DBType.TEXT, 0), position, false);
+    return viewportIndexBuffer.pixels;
+  };
+  let cut = 0;
+  let wrongCut = 0;
+  for (let position = 0; position < 12; position++) {
+    const full = far(4, position);
+    for (let lines = 1; lines <= 3; lines++) {
+      const y2 = plaqueY2[3 * offsets[position]! + lines - 1]!;
+      const got = far(lines, position);
+      let same = true;
+      let below = 0;
+      for (let i = 0; i < got.length; i++) {
+        const expected = Math.floor(i / 224) <= y2 ? full[i] : UNDRAWN;
+        if (got[i] !== expected) same = false;
+        if (Math.floor(i / 224) > y2 && full[i] !== UNDRAWN) below++;
+      }
+      if (!same) wrongCut++;
+      if (below > 0) cut++;
+    }
+  }
+  console.log(`the plaque from afar: ${cut} of 36 cuts leave out pixels of the four-line plaque`);
+  check(wrongCut === 0, 'a text of one to three lines seen from afar is the four-line plaque cut at Byte4212');
+  check(cut === 36, 'and every cut leaves something out');
   console.log('');
 }
 

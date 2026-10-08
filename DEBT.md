@@ -94,7 +94,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C152 | A wall text seen from afar shows its plaque at full height | M | ⏳ |
 | C153 | `&PARAM@` reads variable 0 for each missing parameter | S | ⏳ |
 | C154 | The attacker's hand may keep its cyan border after a PASS or a zero-delay attack | S | ⏳ |
 | C155 | The Extended Features block's bits 0x100, 0x200 and 0x400 | S | ⏳ |
@@ -118,7 +117,7 @@ In payoff order: the first row is the next item.
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G29 are the active list.
-C152-C157 are CSBWin's changes from 2016 to 2023 (see "CSBWin's changes from 2016 to
+C153-C157 are CSBWin's changes from 2016 to 2023 (see "CSBWin's changes from 2016 to
 2023" in tier C), taken first. `F3` is a phase, whose
 status is `PLAN.md`'s, and its row only marks its place. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
@@ -231,7 +230,7 @@ CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
 ### CSBWin's changes from 2016 to 2023
 
-C152-C156 are changes Paul Stevens made after the source the port follows and before the
+C153-C156 are changes Paul Stevens made after the source the port follows and before the
 build the author plays. `doc/CSBwin-src/` is `CSBwin_SRC_20160923.zip` from
 dianneandpaul.net/CSBwin/, "Version 15.9" (`CSBwin.rc:322`), with the author's cosmetic
 edits in `CSBCode.cpp`, `RC4.cpp`, `SaveGame.cpp` and `Data.h`. 15.9 is a side branch of
@@ -251,24 +250,6 @@ Raspberry Pi front-ends. Two changes are not taken:
   (`TextOutToScreen_Centered`, `Attack.cpp:972-980`, `CSBCode.cpp:1785`), which puts them
   2 and 3 pixels right of the original's 242 and 248. It serves translations.
 - The utility's word-10 save form, whose adventure write is left `NotImplemented` (G28).
-
-### C152 ⏳ A wall text seen from afar shows its plaque at full height
-
-`DrawWallDecoration` draws a text away from the square in front of the party as a
-decoration. For a text of one to three lines, the original sets the plaque's bottom from
-`Byte4212[3 * WallDecorationDerivedGraphicOffset[relativePosition] + numLine - 1]`.
-`doc/CSBwin-src/CSBCode.cpp:3564-3600` copies 8 bytes from the text's end into `LOCAL_22`,
-sets that `y2`, and blits with `pWDP` (`:3676-3678`), so the bottom is never used. CSBWin
-20230608 copies the rectangle first (`MemMove(pWDP, &LOCAL_22.b, 4)`, `CSBCode.cpp:3625`),
-sets its `y2` (`:3649-3660`), and blits with it (`:3743`). The port follows 2016:
-`DrawWallDecoration(draw, numWallDecoration + 1, relativePosition)`
-(`src/renderer/bytecode/DrawDecorations.ts`).
-
-Paying it: extract `Byte4212[16]` from graphic `0x22e` next to `Byte4196`
-(`ABS_WALL_TEXT_LINE_Y2`, `src/data/tables/ObjectTables.ts`), proved with a canary
-(`.claude/skills/verification-tools/`), and `WallDecorationDerivedGraphicOffset[12]` if the
-port has no copy yet. Then count the lines and pass the adjusted rectangle. A golden frame
-of a short text seen from two squares away. Size M.
 
 ### C153 ⏳ `&PARAM@` reads variable 0 for each missing parameter
 
@@ -341,7 +322,7 @@ inventory's description alike. A `tools/` check prints both for a champion's bon
 
 ### C157 ⏳ CSBWin 20230608 becomes the reference
 
-After C152-C156. Steps:
+After C153-C156. Steps:
 
 1. **Swap the trees.** `doc/CSBwin-src-20230608/` replaces `doc/CSBwin-src/`, and
    `node tools/gen-csbwin-index.mjs` rebuilds `doc/CSBWIN_SYMBOL_INDEX.tsv`.

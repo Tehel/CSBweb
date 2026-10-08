@@ -4824,6 +4824,28 @@ set's two texts that decode to a 50 are a scroll's and a teleporter square's mes
 
 Evidence: `tools/dump-wall-text.ts`.
 
+## A wall text seen from afar is its plaque, cut short for one to three lines
+
+Away from the wall in front of the party, `DrawWallDecoration` draws a text as the
+decoration `d.NumWallDecoration` (`StdDrawWallText`, `doc/CSBwin-src/Viewport.cpp:2925-2937`).
+It counts the text's lines, one for each byte of 128 or more up to the 129 that ends it
+(`doc/CSBwin-src-20230608/CSBCode.cpp:3631-3639`). CSBWin 20230608 blits the plaque through
+`LOCAL_22`, a copy of the position's rectangle (`:3625`, `:3743`), and for one to three
+lines sets its bottom to `d.Byte4212[3 * d.WallDecorationDerivedGraphicOffset[relativePosition]
++ numLine - 1]` (`:3650-3660`): the scaled plaque is drawn from its top, so a short text
+shows fewer of its rows. CSBWin 15.9 sets that bottom in a copy of 8 bytes from the text's
+end and blits with the rectangle itself, so its plaque is always whole
+(`doc/CSBwin-src/CSBCode.cpp:3590-3598`, `:3676-3678`).
+
+Both tables are graphic 0x22e's, the same in `dm-atari`, `dm-atari-1.3-fr` and `csb`:
+`WallDecorationDerivedGraphicOffset` = `0,0,1,1,1,2,2,3,3,3,4,4`, the five distances of
+positions 0 to 11 as CSBWin's comment gives them (`:3654`), and `Byte4212` =
+`45,48,53, 43,49,56, 42,49,56, 46,53,63, 46,57,68, 0`, one rising triple a distance, each
+inside the text rectangles of its positions (set 1: 41-60 for the F3 sides, 37-63 F3
+front, 38-67 F2 sides, 37-73 F2 front, 36-83 F1 sides).
+
+Evidence: `tools/dump-wall-text.ts` case 4, and golden frame `19-wall-text-f2`.
+
 ## A cloud's flip and mirror are two viewport coin flips; a missile's are not random at all
 
 `DrawClouds` (`doc/CSBwin-src/Code51a4.cpp:257-260`) sets `w_142 = STRandomBool() != 0`

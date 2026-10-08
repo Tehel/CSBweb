@@ -364,6 +364,13 @@ console.log('state: overlay');           await shot('17-overlay');
 await setInputs({ 'overlay-jitter-x': 0 });
 await click('#btn-overlay-hide'); await click('#btn-overlay-jitter'); await wait(500);
 check((await canvasPixels()) === edgeRight, 'the overlay hidden and the view shifted back, it is frame 14 again');
+// A wall text seen from afar is its plaque, cut short for a text of one to three lines
+// (`doc/CSBwin-src-20230608/CSBCode.cpp:3625-3660`). "HALL OF / CHAMPIONS", on the north
+// face of level 0 (8,5), seen from (8,3) facing south: two lines at F2 centre, so the
+// plaque stops at `d.Byte4212[10]`, row 53 of its 37-73. `tools/dump-wall-text.ts` pins
+// the cut at every position; this frame pins it in a real view.
+await evaluate(FACE(8, 3, 0, 2)); await wait(500);
+console.log('state: wall text at F2');   await shot('19-wall-text-f2');
 
 // The Hint Oracle's button (`src/renderer/ui/HintOracleButton.ts`), CSB's set only: the
 // inventory's close box is the Oracle's `?`, and a real click on it opens the Oracle on the

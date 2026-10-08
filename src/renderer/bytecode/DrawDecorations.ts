@@ -22,17 +22,21 @@ import type { ViewportDraw } from './ViewportDraw';
  * with a portrait still to draw, and every other decoration has no portrait, so
  * CSBWin bails only when *both* are absent (`:3191`) and draws the frame only when
  * `graphicIndex >= 0` (`:3673`).
+ *
+ * `expandedText` is a wall text's `ExpandedText`, decoded by `drawWallText`, which passes
+ * `d.NumWallDecoration+1` to draw it from afar as its plaque.
  */
 export function DrawWallDecoration(
   draw: ViewportDraw,
   graphicOrdinal: number,
   relativePosition: number,
   championPortraitOrdinal = 0,
+  expandedText: Uint8Array | null = null,
 ): boolean {
   if (graphicOrdinal === 0 && championPortraitOrdinal === 0) return false;
 
   const isAlcove = graphicOrdinal !== 0
-    ? drawWallDecorationGraphic(draw, graphicOrdinal, relativePosition)
+    ? drawWallDecorationGraphic(draw, graphicOrdinal, relativePosition, expandedText)
     : false;
 
   // `if (relativePosition == 12)` (`:3685`) — only the wall the party stands against
@@ -47,7 +51,12 @@ export function DrawWallDecoration(
  * The frame half of `DrawWallDecoration`: everything under CSBWin's
  * `if (graphicIndex >= 0)`.
  */
-function drawWallDecorationGraphic(draw: ViewportDraw, graphicOrdinal: number, relativePosition: number): boolean {
+function drawWallDecorationGraphic(
+  draw: ViewportDraw,
+  graphicOrdinal: number,
+  relativePosition: number,
+  expandedText: Uint8Array | null,
+): boolean {
   const tables = draw.context.objectTables;
   const dungeon = draw.context.dungeonState;
   const viewport = draw.context.viewportIndexBuffer;
@@ -87,6 +96,18 @@ function drawWallDecorationGraphic(draw: ViewportDraw, graphicOrdinal: number, r
   const dstH = y2 - y1 + 1;
   if (dstW <= 0 || dstH <= 0) return isAlcove;
 
+  // `LOCAL_22`, CSBWin 20230608's copy of `pWDP`'s rectangle, the one blitted. A text of one
+  // to three lines cuts its plaque short (`doc/CSBwin-src-20230608/CSBCode.cpp:3625-3660`,
+  // `:3743`). Position 12 shows the words instead, in `drawWallText`.
+  let blitY2 = y2;
+  if (graphicIndex === numWallDecoration && expandedText) {
+    const numLine = countWallTextLines(expandedText);
+    if (numLine < 4) {
+      const distance = tables.wallDecorationDerivedGraphicOffset[relativePosition] ?? 0;
+      blitY2 = tables.wallTextPlaqueY2[3 * distance + numLine - 1] ?? y2;
+    }
+  }
+
   // CSBWin: `relativePosition % 5 > 1` selects front view; otherwise side view (CSBCode.cpp:3171-3176).
   const frontView = (relativePosition % 5) > 1;
   const graphicNum = 121 + 2 * decorationIndex + (frontView ? 1 : 0);
@@ -114,7 +135,7 @@ function drawWallDecorationGraphic(draw: ViewportDraw, graphicOrdinal: number, r
 
   if (relativePosition >= 10) {
     const bitmap = mirror ? draw.getMirroredBitmap(src) : src;
-    bltShapeToViewportIndex(bitmap, viewport, { x1, y1, x2, y2 });
+    bltShapeToViewportIndex(bitmap, viewport, { x1, y1, x2, y2: blitY2 });
     return isAlcove;
   }
 
@@ -167,8 +188,22 @@ function drawWallDecorationGraphic(draw: ViewportDraw, graphicOrdinal: number, r
   // `getMirroredBitmap` reverses the exact `finalBitmapWidth + 1` bitmap, so ours is
   // already flush at 0 and the same offset would shift it wrongly.
 
-  bltShapeToViewportIndex(scaled, viewport, { x1, y1, x2, y2, srcX: srcOffsetX });
+  bltShapeToViewportIndex(scaled, viewport, { x1, y1, x2, y2: blitY2, srcX: srcOffsetX });
   return isAlcove;
+}
+
+/**
+ * `DrawWallDecoration`'s count of a text's lines (`doc/CSBwin-src-20230608/CSBCode.cpp:3631-3639`):
+ * one for each byte of 128 or more, up to the 129 that ends the text, which counts too.
+ */
+function countWallTextLines(text: Uint8Array): number {
+  let numLine = 0;
+  let i = 0;
+  for (;;) {
+    while (i < text.length && (text[i] ?? 0) < 128) i++;
+    numLine++;
+    if ((text[i++] ?? 0x81) === 0x81) return numLine;
+  }
 }
 
 /**
@@ -332,18 +367,18 @@ export function drawWallText(draw: ViewportDraw, textRN: ObjectID, relativePosit
   const getGraphic = draw.context.getGraphicBitmap;
   if (!tables || !dungeon || !viewport || !getGraphic) return;
 
-  // CSBWin draws real text only on the front wall immediately in front of the party (relativePosition==12).
-  if (relativePosition !== 12) {
-    const numWallDecoration = draw.context.numWallDecoration ?? 0;
-    DrawWallDecoration(draw, numWallDecoration + 1, relativePosition);
-    return;
-  }
-
   const rec = dungeon.getTextRecord(textRN);
   if (!rec) return;
 
   const textBytes = dungeon.decodeWallTextBytes(rec, tables.textDecode);
   if (!textBytes) return;
+
+  // CSBWin draws real text only on the front wall immediately in front of the party (relativePosition==12).
+  if (relativePosition !== 12) {
+    const numWallDecoration = draw.context.numWallDecoration ?? 0;
+    DrawWallDecoration(draw, numWallDecoration + 1, relativePosition, 0, textBytes);
+    return;
+  }
 
   const font = getGraphic(120);
   if (!font) return;
