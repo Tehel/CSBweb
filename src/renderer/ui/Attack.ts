@@ -36,7 +36,7 @@ import { CHARFLAG_ATTACK_DISABLE, getChampionPossession, SLOT_WEAPON_HAND, type 
 import { determineMastery } from '../../engine/skills';
 import { flashButton, setClockTick } from '../../engine/LoopState';
 import { fillRectIndex, shrinkBlt, tag0088b2Index } from '../csbwin/CanvasBlitter';
-import { drawTextLineIndex } from '../csbwin/TextRenderer';
+import { drawTextLineIndex, textOutToScreenCentered } from '../csbwin/TextRenderer';
 import { Rect } from '../../data/tables/UITables';
 import { drawObjectIconMask, shadeRectIndex } from './Draw';
 import { searchButtonList } from './HitTest';
@@ -469,8 +469,9 @@ function drawAttackDamageFlash(ui: UIState): void {
   const damage = ui.attackFlashValue;
 
   if (damage < 0) {
-    const [x, text] = damage === -1 ? [242, "CAN'T REACH"] : [248, 'NEED AMMO'];
-    drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, x, 100, 4, 0, text);
+    // `D5W = 224+48` for both (`doc/CSBwin-src/Attack.cpp:972-980`).
+    const text = damage === -1 ? "CAN'T REACH" : 'NEED AMMO';
+    textOutToScreenCentered(ui.screenIndexBuffer, ui.fontData, 224 + 48, 100, 4, 0, text);
     return;
   }
 

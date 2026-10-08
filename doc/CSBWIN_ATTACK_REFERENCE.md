@@ -154,7 +154,11 @@ into `d.wRectPos20202`; the other two are graphic 14 passed through `ShrinkBLT` 
 and 42x37 (`Attack.cpp:1011`) and blitted into `d.wRectPos20226` and `d.wRectPos20234`,
 rectangles of those widths. The burst is drawn off-centre in graphic 14 so that all three
 centre on x=274, under the digits. Two negative values are messages instead: -1
-"CAN'T REACH", -2 "NEED AMMO".
+"CAN'T REACH", -2 "NEED AMMO", in colour 4 at y 100 through `TextOutToScreen_Centered` on
+x 272 (`doc/CSBwin-src/Attack.cpp:972-980`). That helper takes five pixels a character,
+`x - (5 * strlen) / 2` (`doc/CSBwin-src/CSBCode.cpp:1785-1794`), where the font advances
+six, so the texts start at x 245 and 250, right of their centre (the original's started at
+242 and 248). `tools/dump-attack-panel.ts` checks both.
 
 ## Deliberately not ported
 

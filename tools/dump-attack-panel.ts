@@ -163,6 +163,28 @@ async function main(): Promise<void> {
   ui.attackFlashValue = 0;
 
   console.log('');
+  console.log("=== CAN'T REACH and NEED AMMO, centred on x 272 (Attack.cpp:972-980) ===");
+  // `TextOutToScreen_Centered` takes five pixels a character (CSBCode.cpp:1791), so the
+  // texts start at 272 - 55 / 2 = 245 and 272 - 45 / 2 = 250, where the original's were
+  // at 242 and 248. Both texts' first letters light their left column.
+  for (const [value, left] of [[-1, 245], [-2, 250]] as const) {
+    const screen = createPaletteIndexViewportBuffer(320, 200, 7);
+    ui.screenIndexBuffer = screen;
+    ui.attackingCharacterOrdinal = 0;
+    ui.attackFlashValue = value;
+    drawAttackPanel(ui);
+    let x1 = 320;
+    for (let y = panel.y1; y <= panel.y2; y++) {
+      for (let x = panel.x1; x <= panel.x2; x++) {
+        if (screen.pixels[y * 320 + x] === 4) x1 = Math.min(x1, x);
+      }
+    }
+    console.log(`damage ${value}\ttext from x ${x1}`);
+    check(x1 === left, `damage ${value}: the text starts at x ${left}`);
+  }
+  ui.attackFlashValue = 0;
+
+  console.log('');
   console.log('=== the flinch, with a candidate at the mirror (CSBCode.cpp:8913-8942) ===');
   const champ = party.state.champions[0]!;
   party.state.cursorOwner = -1;

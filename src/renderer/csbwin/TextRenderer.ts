@@ -38,6 +38,24 @@ export function drawTextLineIndex(
   drawTextLineIndexInternal(dst, font, x, y, color, backgroundColor, normalizedText);
 }
 
+/**
+ * `TextOutToScreen_Centered` (`doc/CSBwin-src/CSBCode.cpp:1785-1794`): the text centred on
+ * `x` as five pixels a character, `x - (5 * length) / 2`, whatever the font's advance of
+ * six. So a text of `n` characters sits about `n / 2` pixels right of its centre.
+ */
+export function textOutToScreenCentered(
+  dst: PaletteIndexViewportBuffer,
+  font: FontData,
+  x: number,
+  y: number,
+  color: number,
+  backgroundColor: number | null,
+  text: string
+): void {
+  const left = x - Math.trunc((5 * text.length) / 2);
+  drawTextLineIndex(dst, font, left, y, color, backgroundColor, text);
+}
+
 export function drawTextLineIndexRaw(
   dst: PaletteIndexViewportBuffer,
   font: FontData,

@@ -234,15 +234,11 @@ CRLF turned to LF and nothing else changed. The previous reference is in git his
 change is accessors for a monster's `word20`, so it behaves as 15.8.
 
 Every change between the two that alters what the port has is ported, but for the
-utility's stop on a word-10 saved game (`DEBT.md` H) and one change not taken, below. The rest
+utility's stop on a word-10 saved game (`DEBT.md` H). The rest
 changes nothing the port has: the 64-bit port (`uintptr_t`, and typed structs in
 `Chaos.cpp` and `Hint.cpp`, whose allocator fixes are in code the port never had),
 `TranslateLanguage` hooks (G21), the playfile (G29), and the Linux and Raspberry Pi
 front-ends.
-
-- "CAN'T REACH" and "NEED AMMO" are centred on x 272 with five-pixel characters
-  (`TextOutToScreen_Centered`, `Attack.cpp:972-980`, `CSBCode.cpp:1785`), which puts them
-  2 and 3 pixels right of the original's 242 and 248. It serves translations.
 
 ### C157 ⏳ CSBWin 20230608 becomes the reference
 
@@ -251,8 +247,7 @@ every citation of a 2016 line is mapped to its 2023 line, in the file its paragr
 (`doc/PLAN_ARCHIVE.md`'s are mapped and unreviewed). One step is left:
 
 1. **Review every divergence.** Each H entry, each C entry and each `CLAUDE.md` exception
-   is checked against 2023: one that 2023 fixed is no longer a divergence. The change not
-   taken ("CSBWin's changes from 2016 to 2023" above) becomes an H entry or is ported.
+   is checked against 2023: one that 2023 fixed is no longer a divergence.
    X5 is CSBWin 20230608's own feature, which a dungeon's Extended Features block turns
    on, so it moves to G and loses its exception to the X rules.
    The `memmove-source-first` memory and `CLAUDE.md` → "The one non-negotiable rule" name
