@@ -112,7 +112,7 @@ function encounter(
   pick?: (game: Game) => ObjectID,
 ): Outcome {
   const game = makeGame(door.toc);
-  const me = game.systems.missileEncounter as any;
+  const me = game.systems.missileEncounter;
   const at = findClosedDoor(game);
   const map = game.ctx.dungeon.getMap(at.z)!;
   map.cellFlags[at.x][at.y] = (map.cellFlags[at.x][at.y] & 0xf8) | door.state;
@@ -134,9 +134,9 @@ function encounter(
 
   const hits: Outcome['hits'] = [];
   const hitDoor = me.hitDoor.bind(me);
-  me.hitDoor = (p: Position, force: number, explosion: boolean, delay = 0, time?: number): boolean => {
+  me.hitDoor = (p: Position, force: number, explosion: boolean, delay = 0): boolean => {
     hits.push({ force, explosion, delay });
-    return hitDoor(p, force, explosion, delay, time);
+    return hitDoor(p, force, explosion, delay);
   };
   const before = new Set(game.ctx.timers.getTimers().map((t) => t.index));
   const spent = me.processMissileEncounter(RoomType.DOOR, at.x, at.y, at.x, at.y, at.z, 0, missileRn);
