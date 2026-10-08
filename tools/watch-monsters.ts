@@ -11,24 +11,15 @@
  *
  * Run: `npx tsx tools/watch-monsters.ts [level] [partyX] [partyY] [ticks]`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';
-import { newGame, processTimersAt } from './lib/game';
+import { newGame, processTimersAt, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
 
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
 
   const level = Number(process.argv[2] ?? 2);
   const px = Number(process.argv[3] ?? 6);

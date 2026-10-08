@@ -28,18 +28,13 @@
  *
  * Run: `npx tsx tools/dump-monster-move-code.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { SMS_ATTACKING } from '../src/data/dungeonTypes';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import type { AiConst, AiFrame } from '../src/engine/MonsterAI';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { monsterLevitating } from '../src/data/tables/MonsterDesc';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
 import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
@@ -48,16 +43,12 @@ import { rigTeleporter } from './lib/teleporter';
 const DELTAS: ReadonlyArray<readonly [number, number]> = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 
 async function main(): Promise<void> {
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
   const walks = (type: number): boolean => !monsterLevitating(objectTables.monsterDesc[type]!);
 
   const makeGame = async (): Promise<Game> => {
-    const loader = new DungeonLoader();
-    await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-    const data = loader.getData();
-    if (!data) throw new Error('dungeon.dat did not load');
+    const data = stockDungeon();
     const game = newGame(data, graphics);
     game.setRandomSeed(0x12345678);
     return game;

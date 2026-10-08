@@ -23,19 +23,15 @@
  *
  * Run: `npx tsx tools/dump-hidden-alcove.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { getActuatorValue } from '../src/data/actuatorHelpers';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics, stockDungeon } from './lib/game';
 
 const MAP = 5;
 const HIDDEN = new Position(13, 19, MAP);
@@ -51,10 +47,7 @@ const ALCOVES: Array<{ wall: Position; party: Position; facing: Direction; actua
 const objectTables = graphicsTablesOf(stockGraphics()).objects;
 
 function makeGame(): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const game = newGame(data, stockGraphics());
   game.ctx.party.state.position = new Position(12, 19, MAP);
   game.ctx.party.state.facing = Direction.EAST;

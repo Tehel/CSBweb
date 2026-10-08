@@ -26,17 +26,12 @@
  *
  * Run: `npx tsx tools/dump-dsa-move.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import {
   DBType, locationRelToInteger, OBJECT_ID_EOF, Position, RoomType, type ObjectID,
 } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { newGame, processTimersAt } from './lib/game';
+import { newGame, processTimersAt, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { RN_POISON_CLOUD, RN_POISON_BOLT } from '../src/core/spellRn';
@@ -45,14 +40,10 @@ const SER_BadCloudTimer = 16;
 const CELL = 1;
 
 async function main(): Promise<void> {
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
 
   const makeGame = async (): Promise<Game> => {
-    const loader = new DungeonLoader();
-    await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-    const data = loader.getData();
-    if (!data) throw new Error('dungeon.dat did not load');
+    const data = stockDungeon();
     const game = newGame(data, graphics);
     // Fixed seed, so the numbers below repeat run to run. This used to sit *after* a
     // `return new Game(...)` — dead code, so every run of this tool was unseeded

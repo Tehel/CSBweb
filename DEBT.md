@@ -238,8 +238,9 @@ The table-extraction round-trip checks are a live phase, so they stay in `PLAN.m
 `tools/lib/game.ts` gives every tool the same `Game` and tables (`E1a`). What each tool
 builds around them is its own:
 
-- 88 tools read `dm-atari/dungeon.dat` themselves, most through a `DungeonLoader` of
-  their own, and 50 name its `graphics.dat` beside `stockGraphics()`.
+- 47 tools read `dm-atari/dungeon.dat` themselves, and 21 name its `graphics.dat`
+  beside `stockGraphics()`: the loads in a shape of their own, a path in a constant,
+  bytes kept to read again, a loader the tool goes on using.
 - 31 tools extract the UI tables again (`graphicsTablesOf(…).ui`) beside the `UIState`
   that `tools/lib/ui.ts` builds them into.
 - 20 tools make 33 `as unknown as` casts: to build a partial record, or to read a

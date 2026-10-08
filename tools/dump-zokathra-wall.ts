@@ -22,20 +22,16 @@
  *
  * Run: `npx tsx tools/dump-zokathra-wall.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { OBJNI_THE_FIRESTAFF_A, OBJNI_THE_FIRESTAFF_B } from '../src/core/objectNameIndex';
 import { getActuatorType } from '../src/data/actuatorHelpers';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics, stockDungeon } from './lib/game';
 
 const PARTY = new Position(24, 4, 13);
 const FACING_NORTH = 0;
@@ -48,10 +44,7 @@ const MISC_ZOKATHRA = 51;
 const objectTables = graphicsTablesOf(stockGraphics()).objects;
 
 function makeGame(): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const game = newGame(data, stockGraphics());
   game.ctx.party.state.position = PARTY;
   game.ctx.party.state.facing = FACING_NORTH;

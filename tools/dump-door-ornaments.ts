@@ -18,13 +18,9 @@
  *
  * Run: `npx tsx tools/dump-door-ornaments.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics, stockDungeon } from './lib/game';
 
 const NEARNESS = ['F3', 'F2', 'F1'];
 
@@ -64,10 +60,7 @@ function main(): void {
   check(tables.doorOrnamentColorMapF3[9] === 90 && tables.doorOrnamentColorMapF2[9] === 90,
     'both colour maps keep the transparent colour 9 (ShrinkBLT reads an entry as colour * 10)');
 
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const dungeon = newGame(data, graphics).ctx.dungeon;
   let past = 0;
   let ornate = 0;

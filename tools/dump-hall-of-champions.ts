@@ -37,7 +37,7 @@ import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInf
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import { attackButtonRect, drawAttackButton } from '../src/renderer/ui/Attack';
 import { ImageFormat } from '../src/core/imageDecoder';
-import { graphicsTablesOf, newGame, presetHeroesOfGame } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOfGame, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { drawCursorItem, handleClothingClick, tag02076e, tag0207cc } from '../src/renderer/ui/Mouse';
 import type { UIState } from '../src/renderer/ui/UIState';
@@ -65,13 +65,9 @@ const pairCalls: string[] = [];
 let pairUi: UIState | null = null;
 
 function makeGame(): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
 
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
   sharedGraphics = graphics;
   return gameOn(data, graphics);
 }

@@ -30,11 +30,7 @@
  *
  * Run: `npx tsx tools/dump-footprint-decoration.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { Position } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { DungeonState, extendedCellFlagsKey } from '../src/engine/DungeonState';
 import { PartyFootprints } from '../src/engine/PartyFootprints';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
@@ -43,13 +39,10 @@ import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInf
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../src/renderer/ViewportRenderer';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, stockGraphics } from './lib/game';
+import { graphicsTablesOf, stockGraphics, stockDungeon } from './lib/game';
 
 function main(): void {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const dungeon = new DungeonState(data);
   const map = dungeon.getMap(0);
   if (!map) throw new Error('no level 0');
@@ -182,10 +175,7 @@ function drawing(): void {
   check(fits(1) && !fits(0) && !fits(2), 'canary: graphics 241-246 are the sizes of set 1\'s rectangles, and of no other set\'s');
 
   // A fresh level 0: the scenarios above turned one of its cells into a false wall.
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const dungeon = new DungeonState(data);
   const map = dungeon.getMap(0)!;
   const isOpen = (x: number, y: number): boolean => y >= 0 && (map.cellFlags[x]![y]! >> 5) === RoomType.OPEN;

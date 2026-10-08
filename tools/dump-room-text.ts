@@ -13,21 +13,12 @@
  *
  * Run: `npx tsx tools/dump-room-text.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { newGame } from './lib/game';
+import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 
-const loader = new DungeonLoader();
-loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-const data = loader.getData();
-if (!data) throw new Error('dungeon.dat did not load');
-const graphics = new GraphicsLoader();
-graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+const data = stockDungeon();
+const graphics = stockGraphics();
 
 const queued: Array<{ color: number; text: string }> = [];
 const game = newGame(data, graphics, {

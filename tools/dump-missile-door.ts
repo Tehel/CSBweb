@@ -18,31 +18,22 @@
  *
  * Run: `npx tsx tools/dump-missile-door.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { OBJNI_FIRST_KEY, OBJNI_LAST_KEY } from '../src/core/objectNameIndex';
 import { RN_DISPELL_MISSILE, RN_FIREBALL, RN_ZO_SPELL } from '../src/core/spellRn';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { DescIndex } from '../src/engine/objectIndex';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { gameTablesOf, graphicsTablesOf } from './lib/game';
+import { gameTablesOf, graphicsTablesOf, stockDungeon, stockGraphics } from './lib/game';
 import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 
-const graphics = new GraphicsLoader();
-graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+const graphics = stockGraphics();
 const objectTables = graphicsTablesOf(graphics).objects;
 
 /** A game whose `d.DoorCharacteristics` are all `doorToc`, so any door has that `DoorTOC`. */
 function makeGame(doorToc: number): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const game = new Game(data, { ...gameTablesOf(graphics), doorCharacteristics: [doorToc, doorToc, doorToc, doorToc] });
   game.setRandomSeed(0x12345678);
   return game;

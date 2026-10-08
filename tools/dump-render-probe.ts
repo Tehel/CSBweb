@@ -51,7 +51,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { atariToRGB, OBJECT_ID_EOF, Position } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { BytecodeInterpreter, interpreterStackPointers } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { BytecodePrograms } from '../src/renderer/bytecode/BytecodePrograms';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
@@ -67,7 +66,7 @@ import {
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../src/renderer/ViewportRenderer';
 import { check, fail, finish } from './lib/check';
-import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics, stockDungeon } from './lib/game';
 import { writeIndexedPng } from './lib/png';
 
 const BASELINE = resolve('tools/reference/render-probe.tsv');
@@ -105,10 +104,7 @@ const ROOM_TYPE: Record<GraphicRoomType, RoomType> = {
 };
 
 function main(): void {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const graphics = stockGraphics();
   const game = newGame(data, graphics);
   const dungeon = game.ctx.dungeon;

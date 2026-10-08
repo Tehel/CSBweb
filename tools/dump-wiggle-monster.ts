@@ -17,32 +17,23 @@
  *
  * Run: `npx tsx tools/dump-wiggle-monster.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { ActuatorAction } from '../src/data/actuatorHelpers';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { CreatureRecord } from '../src/data/dungeonTypes';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { monsterLevitating } from '../src/data/tables/MonsterDesc';
-import { graphicsTablesOf, newGame, processTimersAt } from './lib/game';
+import { graphicsTablesOf, newGame, processTimersAt, stockDungeon, stockGraphics } from './lib/game';
 import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { rigTeleporter } from './lib/teleporter';
 
-const graphics = new GraphicsLoader();
-graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+const graphics = stockGraphics();
 const objectTables = graphicsTablesOf(graphics).objects;
 
 function makeGame(): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   return game;

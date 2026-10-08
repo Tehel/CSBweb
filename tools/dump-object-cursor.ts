@@ -20,12 +20,7 @@
  *
  * Run: `npx tsx tools/dump-object-cursor.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { Direction, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Party } from '../src/engine/Party';
 import {
   reconvertThroughPalette,
@@ -36,7 +31,7 @@ import { type UIState } from '../src/renderer/ui/UIState';
 import { objectIconBitmap } from '../src/renderer/ui/Draw';
 import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import * as mouse from '../src/renderer/ui/Mouse';
 
@@ -46,12 +41,8 @@ const COPPER_COIN = 125;
 const CATEGORY_JUNK = 10;
 
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const data = stockDungeon();
+  const graphics = stockGraphics();
   const uiTables = graphicsTablesOf(graphics).ui;
   const objectTables = graphicsTablesOf(graphics).objects;
 

@@ -24,14 +24,13 @@ import { resolve } from 'node:path';
 
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { Game } from '../src/engine/Game';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import { readWallDecorationRectSetIndex } from '../src/data/tables/ObjectTables';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics, stockDungeon } from './lib/game';
 
 /** Wall ornaments 50 and 55: one crack switch, button out and button pushed in. */
 const WALL_ORNAMENT_CRACK_SWITCH_OUT = 50;
@@ -49,10 +48,7 @@ const ornamentGraphic = (ornament: number): number => 121 + 2 * ornament;
 const objectTables = graphicsTablesOf(stockGraphics()).objects;
 
 function makeGame(): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   return newGame(data, stockGraphics());
 }
 

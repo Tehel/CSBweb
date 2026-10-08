@@ -20,12 +20,8 @@
  *
  * Run: `npx tsx tools/dump-missile-draw.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, type ObjectID } from '../src/core/types';
 import { RN_FIREBALL, RN_LIGHTNING } from '../src/core/spellRn';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { DungeonState } from '../src/engine/DungeonState';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import { drawMissilesAtPosition, GetGraphicClass } from '../src/renderer/bytecode/DrawRoomObjects';
@@ -33,13 +29,10 @@ import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
 import { standIn } from './lib/standIn';
-import { graphicsTablesOf, stockGraphics } from './lib/game';
+import { graphicsTablesOf, stockGraphics, stockDungeon } from './lib/game';
 
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const dungeon = new DungeonState(data);
   const graphics = stockGraphics();
   const tables = graphicsTablesOf(graphics).objects;

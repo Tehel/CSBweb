@@ -18,9 +18,6 @@
  *   5. `IsCharacterLucky` spending luck inside Minimum..Maximum
  *      (`doc/CSBwin-src/Character.cpp:2199`).
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import {
   ADD_CHARACTER_ATTRIBUTE_CAP,
@@ -41,7 +38,7 @@ import { CsbRandom } from '../src/core/random';
 import { levelUp } from '../src/engine/skills';
 import type { Champion } from '../src/engine/gameTypes';
 import { check, finish } from './lib/check';
-import { presetHeroesOf, stockGraphics } from './lib/game';
+import { presetHeroesOf, stockGraphics, stockDungeon } from './lib/game';
 
 const NAMES = ['LUCK', 'STRENGTH', 'DEXTERITY', 'WISDOM', 'VITALITY', 'ANTI-MAGIC', 'ANTI-FIRE'];
 
@@ -81,10 +78,7 @@ function main(): void {
   console.log('');
   console.log('=== AddCharacter, from the real Hall of Champions mirrors ===');
 
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const heroes = presetHeroesOf(data, stockGraphics());
   check(heroes.length > 0, `the dungeon defines preset heroes (got ${heroes.length})`);
 

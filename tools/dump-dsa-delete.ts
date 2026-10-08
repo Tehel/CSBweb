@@ -15,18 +15,13 @@
  *
  * Run: `npx tsx tools/dump-dsa-delete.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import {
   DBType, locationRelToInteger, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID,
 } from '../src/core/types';
 import type { DungeonData } from '../src/data/dungeonTypes';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import type { TimerEntry } from '../src/engine/TimerQueue';
-import { newGame } from './lib/game';
+import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 
@@ -46,14 +41,10 @@ function delProgram(objId: number, location: number): Uint16Array {
 }
 
 async function main(): Promise<void> {
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
 
   const makeGame = async (): Promise<Game> => {
-    const loader = new DungeonLoader();
-    await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-    const data = loader.getData();
-    if (!data) throw new Error('dungeon.dat did not load');
+    const data = stockDungeon();
     const game = newGame(data, graphics);
     // Fixed seed, so the numbers below repeat run to run. This used to sit *after* a
     // `return new Game(...)` — dead code, so every run of this tool was unseeded

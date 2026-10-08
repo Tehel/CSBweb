@@ -29,20 +29,16 @@
  *
  * Run: `npx tsx tools/dump-viewport-click.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import { RoomType } from '../src/renderer/bytecode/Types';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
 import type { ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { Game } from '../src/engine/Game';
 import { resolveEmptyHandedViewportClick, findDropAreaHit, resolveViewportCursorAction, testThrow, tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import type { UIState } from '../src/renderer/ui/UIState';
 import type { RectPos } from '../src/data/tables/UITables';
-import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics, stockDungeon } from './lib/game';
 import { newUIState } from './lib/ui';
 import { wrapMember } from './lib/standIn';
 import { check, fail, finish } from './lib/check';
@@ -63,10 +59,7 @@ const UNSET: RectPos = { x1: 255, x2: 0, y1: 0, y2: 0 };
 const played: Array<[number, number]> = [];
 
 function makeGame(): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   return newGame(data, stockGraphics(), { playSound: (soundId, _rateIdx, highVolume) => played.push([soundId, highVolume ?? -1]) });
 }
 

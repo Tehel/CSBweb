@@ -11,22 +11,16 @@
  *
  * Run: `npx tsx tools/dump-add-object-to-room.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { OBJECT_ID_EOF, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { DungeonState } from '../src/engine/DungeonState';
 import { check, finish } from './lib/check';
+import { stockDungeon } from './lib/game';
 
 const hex = (rn: number): string => rn.toString(16).padStart(4, '0');
 
 function main(): void {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const dungeon = new DungeonState(data);
 
   const chainOf = (p: Position): ObjectID[] => {

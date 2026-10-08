@@ -23,14 +23,14 @@
  * Run: `npx tsx tools/dump-expool.ts`
  */
 import { readFileSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { basename } from 'node:path';
 
 import { readU32BE } from '../src/core/bytes';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { EXPOOL_RECORD_SIZE, Expool, type ExpoolDatabase } from '../src/data/CsbwinExpool';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
+import { stockDungeon } from './lib/game';
 
 /** `EDT_Palette` (`doc/CSBwin-src/CSB.h:1567`). */
 const EDT_PALETTE = 7;
@@ -135,10 +135,7 @@ function main(): void {
   console.log('');
   console.log('=== champion bones records, in a world dungeon.dat made ===');
   {
-    const loader = new DungeonLoader();
-    loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-    const data = loader.getData();
-    if (!data) throw new Error('dungeon.dat did not load');
+    const data = stockDungeon();
     check(data.expool === undefined && data.header.objectCounts[11] === 0, 'dungeon.dat has no EXPOOL block');
 
     const pool = new Expool(data);

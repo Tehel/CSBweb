@@ -21,16 +21,11 @@
  *
  * Run: `npx tsx tools/dump-db-reuse.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import type { DungeonState } from '../src/engine/DungeonState';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { constructPredefinedMissile } from '../src/engine/missileHelpers';
-import { newGame } from './lib/game';
+import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { RN_POISON_BOLT } from '../src/core/spellRn';
@@ -40,14 +35,10 @@ const MISSILE_TYPE_BOULDER = 128;
 const WEAPON_ARROW = 27;
 
 async function main(): Promise<void> {
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
 
   const makeGame = async (): Promise<Game> => {
-    const loader = new DungeonLoader();
-    await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-    const data = loader.getData();
-    if (!data) throw new Error('dungeon.dat did not load');
+    const data = stockDungeon();
     const game = newGame(data, graphics);
     game.setRandomSeed(0x12345678);
     return game;

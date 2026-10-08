@@ -13,13 +13,8 @@
  *
  * Run: `npx tsx tools/dump-monster-perception.ts [level] [partyX] [partyY]`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { CsbRandom } from '../src/core/random';
 import { Position, RoomType } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { DungeonState } from '../src/engine/DungeonState';
 import { MonsterSystem } from '../src/engine/MonsterSystem';
 import {
@@ -32,20 +27,16 @@ import { PartyFootprints } from '../src/engine/PartyFootprints';
 import { TimerQueue } from '../src/engine/TimerQueue';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { monsterSightDistance } from '../src/data/tables/MonsterDesc';
-import { graphicsTablesOf, newContext } from './lib/game';
+import { graphicsTablesOf, newContext, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 import type { PartyState } from '../src/engine/gameTypes';
 
 const DIRS = ['N', 'E', 'S', 'W'];
 
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
 
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
 
   const dungeon = new DungeonState(data);

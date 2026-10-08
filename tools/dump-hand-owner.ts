@@ -14,18 +14,13 @@
  *
  * Run: `npx tsx tools/dump-hand-owner.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, Direction, OBJECT_ID_NULL, Position } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Party, ensureHandOwner, initialPartyState, setHandOwner } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { getChampionPossession, type Champion, type PartyState } from '../src/engine/gameTypes';
 import { type UIState } from '../src/renderer/ui/UIState';
-import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { handleClothingClick } from '../src/renderer/ui/Mouse';
@@ -40,13 +35,9 @@ function row(what: string, party: PartyState): void {
 }
 
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
 
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
   const uiTables = graphicsTablesOf(graphics).ui;
   const objectTables = graphicsTablesOf(graphics).objects;
   const addTables: AddCharacterTables = {

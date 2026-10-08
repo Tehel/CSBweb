@@ -25,10 +25,9 @@ import { resolve } from 'node:path';
 import { soundDataDecode } from '../src/audio/SoundManager';
 import { readU16LE, readU32LE } from '../src/core/bytes';
 import { CSBGraphicType, CSBGraphicsLoader } from '../src/data/CSBGraphicsLoader';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, stockDungeon } from './lib/game';
 
 /** The two `CSBgraphics.dat` here, with how many sound sections each holds. */
 const FILES: [string, number][] = [
@@ -48,10 +47,7 @@ interface Scene {
 }
 
 const graphics = stockGraphics();
-const dungeon = new DungeonLoader();
-dungeon.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-const data = dungeon.getData();
-if (!data) throw new Error('dungeon.dat did not load');
+const data = stockDungeon();
 
 function scene(): Scene {
   const played: [number, number][] = [];

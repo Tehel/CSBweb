@@ -17,32 +17,23 @@
  *
  * Run: `npx tsx tools/dump-local-action.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, Direction, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { DsaSystem } from '../src/engine/DsaSystem';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import type { GameContext } from '../src/engine/GameContext';
 import { Party } from '../src/engine/Party';
-import { graphicsTablesOf, newContext, presetHeroesOf } from './lib/game';
+import { graphicsTablesOf, newContext, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 const SKILL = 8;
 
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const data = stockDungeon();
+  const graphics = stockGraphics();
   const uiTables = graphicsTablesOf(graphics).ui;
   const objectTables = graphicsTablesOf(graphics).objects;
   const addTables: AddCharacterTables = {

@@ -31,17 +31,15 @@
  * Run: `npx tsx tools/dump-magic-footprints.ts`
  */
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import { RoomType } from '../src/core/types';
 import { readCsbwinPartyTail } from '../src/data/CsbwinCharacters';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import type { Game } from '../src/engine/Game';
 import { PartyFootprints } from '../src/engine/PartyFootprints';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, stockDungeon } from './lib/game';
 import { check, finish } from './lib/check';
 import { savePath } from './lib/saves';
 
@@ -49,10 +47,7 @@ import { savePath } from './lib/saves';
 const YA_BRO_ROS = [0x66, 0x70, 0x73];
 
 function loadWorld(): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   return newGame(data, stockGraphics());
 }
 

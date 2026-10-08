@@ -13,22 +13,15 @@
  *
  * Run: `npx tsx tools/dump-missile-exterior.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { RN_FIREBALL } from '../src/core/spellRn';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
-import { newGame, stockGraphics, processTimersAt } from './lib/game';
+import { newGame, stockGraphics, processTimersAt, stockDungeon } from './lib/game';
 import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 function makeGame(): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const game = newGame(data, stockGraphics());
   game.setRandomSeed(0x12345678);
   return game;

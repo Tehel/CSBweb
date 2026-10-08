@@ -23,9 +23,6 @@
  *
  * Run: `npx tsx tools/dump-reincarnate-entry.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { emptyDungeonData } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { Champion } from '../src/engine/gameTypes';
@@ -37,7 +34,7 @@ import {
 } from '../src/renderer/ui/ReIncarnate';
 import type { UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { standIn } from './lib/standIn';
 
@@ -77,8 +74,7 @@ const OK = { x: 206, y: 151 };
 const BACKSPACE = { x: 140, y: 151 };
 
 function main(): void {
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
   const uiTables = graphicsTablesOf(graphics).ui;
   const special = uiTables.graphic232.specialChars;
   const gridUI = makeHarness(graphics, []).ui;

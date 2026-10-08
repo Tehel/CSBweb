@@ -20,20 +20,13 @@
  *
  * Run: `npx tsx tools/dump-vbl-clock.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
 import { freeze, thaw, VBL_PER_TICK, wakeUp, type LoopScript } from '../src/engine/LoopState';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, stockDungeon } from './lib/game';
 import { check, finish } from './lib/check';
 
 function freshGame(): { game: Game; ticks: () => number; vbls: () => number } {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const game = newGame(data, stockGraphics());
   game.setRandomSeed(0x12345678);
   let ticks = 0;

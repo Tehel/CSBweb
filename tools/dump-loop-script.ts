@@ -23,16 +23,12 @@
  *
  * Run: `npx tsx tools/dump-loop-script.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { Position } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { MessageSink } from '../src/engine/GameHost';
 import { WON_GAME_VBLS, type Game } from '../src/engine/Game';
 import type { LoopScript } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
+import { newGame, stockGraphics, runVbl, TICK_DUE, stockDungeon } from './lib/game';
 import { ButtonsAt } from './lib/clicks';
 import { wrapMember } from './lib/standIn';
 
@@ -55,10 +51,7 @@ interface Watched {
 }
 
 function watchedGame(): Watched {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const w = {
     log: [], vbls: 0, frameCallbacks: 0, clockTicks: 0, printed: 0, credits: [], handled: [],
     timerPasses: [], frames: 0, win: false,
