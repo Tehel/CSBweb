@@ -376,7 +376,11 @@ export class ActuatorSystem {
     return result;
   }
 
-  private pressurePadOrAlcove(
+  /**
+   * `PressurePadOrAlcove` (doc/CSBwin-src/Code11f52.cpp:3720). Public so that `tools/` can
+   * fire one actuator without the move that reaches it.
+   */
+  pressurePadOrAlcove(
     rn: ObjectID,
     rec: ActuatorRecord,
     position: Position,
@@ -592,9 +596,9 @@ export class ActuatorSystem {
    * `DoesPartyHave` (`doc/CSBwin-src/Code11f52.cpp:3657-3715`), for actuator type 8: the 30
    * possessions of every champion with hit points, then the cursor — which the `goto` back
    * into the loop checks whoever holds it — and, for each one that is a chest, the chest's
-   * contents too.
+   * contents too. Public so that `tools/` can ask it without an actuator.
    */
-  private doesPartyHave(actuatorValue: number): boolean {
+  doesPartyHave(actuatorValue: number): boolean {
     const matches = (obj: ObjectID | null | undefined): boolean => {
       if (obj === null || obj === undefined || obj === OBJECT_ID_NULL) return false;
       const objNI = this.getBasicObjectType(obj);
@@ -616,7 +620,11 @@ export class ActuatorSystem {
     return matches(party.objectInHand);
   }
 
-  private performLocalAction(localActionType: number, mapX: number, mapY: number, mapZ: number, mapPos: number): void {
+  /**
+   * `PerformLocalAction` (doc/CSBwin-src/Mouse.cpp:239). Public so that `tools/` can run
+   * one without an actuator, and watch the actuators' calls.
+   */
+  performLocalAction(localActionType: number, mapX: number, mapY: number, mapZ: number, mapPos: number): void {
     if (localActionType === 10) {
       // SkillIncreaser(8, 300, mapPos == -1 ? 0 : 1) (doc/CSBwin-src/Mouse.cpp:210-231).
       let adjustment = 300;

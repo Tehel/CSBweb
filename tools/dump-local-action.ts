@@ -20,7 +20,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, Direction, Position } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -28,6 +28,7 @@ import { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { DsaSystem } from '../src/engine/DsaSystem';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
+import type { GameContext } from '../src/engine/GameContext';
 import { Party } from '../src/engine/Party';
 import { graphicsTablesOf, newContext, presetHeroesOf } from './lib/game';
 import { check, finish } from './lib/check';
@@ -53,7 +54,7 @@ async function main(): Promise<void> {
   // Three champions whose cells are deliberately not their indices: index 0 stands in
   // cell 2, index 1 in cell 0, index 2 in cell 1.
   const CELLS = [2, 0, 1];
-  const makeParty = (handChar: number): { party: Party; actuators: ActuatorSystem } => {
+  const makeParty = (handChar: number): { party: Party; actuators: ActuatorSystem; ctx: GameContext } => {
     const party = new Party(new Position(1, 1, 0), Direction.NORTH);
     CELLS.forEach((cell, i) =>
       party.addChampion(createChampionFromPreset(heroes[i], cell, assignPresetHeroPossessions(heroes[i].inventory, addTables))));
@@ -63,7 +64,7 @@ async function main(): Promise<void> {
     const actuators = new ActuatorSystem(ctx);
     // `AdjustSkills` asks the DSA's skill filter, which this dungeon does not define.
     ctx.systems.dsa = new DsaSystem(ctx);
-    return { party, actuators };
+    return { party, actuators, ctx };
   };
   const exp = (party: Party): number[] => party.state.champions.map((c) => c.skills[SKILL].experience);
   const gained = (before: number[], after: number[]): number[] => after.map((v, i) => v - before[i]);
@@ -72,7 +73,7 @@ async function main(): Promise<void> {
   {
     const { party, actuators } = makeParty(1);
     const before = exp(party);
-    (actuators as any).performLocalAction(10, 5, 5, 0, 2);
+    actuators.performLocalAction(10, 5, 5, 0, 2);
     const g = gained(before, exp(party));
     console.log(`1. HandChar 1, wall position 2 (champion 0's cell): gained ${g.join(', ')}`);
     check(g[1] > 0 && g[0] === 0 && g[2] === 0, 'only d.HandChar (champion 1) is credited, not the champion standing in cell 2');
@@ -80,7 +81,7 @@ async function main(): Promise<void> {
   {
     const { party, actuators } = makeParty(-1);
     const before = exp(party);
-    (actuators as any).performLocalAction(10, 5, 5, 0, 2);
+    actuators.performLocalAction(10, 5, 5, 0, 2);
     const g = gained(before, exp(party));
     console.log(`   HandChar -1: gained ${g.join(', ')}`);
     check(g.every((v) => v === 0), 'with no cursor owner a positioned skill increaser credits nobody');
@@ -92,7 +93,7 @@ async function main(): Promise<void> {
     const { party, actuators } = makeParty(0);
     party.state.champions[2].attributes.health = 0;
     const before = exp(party);
-    (actuators as any).performLocalAction(10, 5, 5, 0, -1);
+    actuators.performLocalAction(10, 5, 5, 0, -1);
     const g = gained(before, exp(party));
     split = g[0];
     console.log(`2. mapPos -1, champion 2 dead: gained ${g.join(', ')}`);
@@ -101,7 +102,7 @@ async function main(): Promise<void> {
   {
     const { party, actuators } = makeParty(0);
     const before = exp(party);
-    (actuators as any).performLocalAction(10, 5, 5, 0, 2);
+    actuators.performLocalAction(10, 5, 5, 0, 2);
     const whole = gained(before, exp(party))[0];
     console.log(`   one champion's share of the split vs the whole 300: ${split} vs ${whole}`);
     check(split < whole, 'the split share is smaller than a single champion\'s whole 300 (the dead count in the divisor)');
@@ -109,18 +110,18 @@ async function main(): Promise<void> {
 
   // ---- 3. An alcove hands PerformLocalAction -1, never its wall position.
   {
-    const { actuators } = makeParty(0);
+    const { actuators, ctx } = makeParty(0);
     const seen: number[] = [];
-    (actuators as any).performLocalAction = (_type: number, _x: number, _y: number, _z: number, mapPos: number) => seen.push(mapPos);
+    actuators.performLocalAction = (_type, _x, _y, _z, mapPos) => { seen.push(mapPos); };
     // Wall actuator type 1 (any object), local-action only, local type 10, action SET.
-    const rec = { nextObject: 0xfffe, word2: 1, word4: 0x800, word6: 10 << 4 };
-    const rnMaps = (actuators as any).dungeon.rnMaps;
+    const rec = { nextObject: OBJECT_ID_EOF, word2: 1, word4: 0x800, word6: 10 << 4 };
+    const rnMaps = ctx.dungeon.rnMaps;
     const rn = rnMaps.setPos(rnMaps.rn(DBType.ACTUATOR, 0), 2);
     const context = {
       objectDB5To13Present: false, monstersPresent: false, sameTypeObjectPresent: false,
       differentTypeObjectPresent: false, movedObjectDBNum: DBType.WEAPON, movedObjectNameIndex: 0,
     };
-    (actuators as any).pressurePadOrAlcove(rn, rec, new Position(5, 5, 0), true, false, 0x1400, 2, 0, context);
+    actuators.pressurePadOrAlcove(rn, rec, new Position(5, 5, 0), true, false, 0x1400 as ObjectID, 2, 0, context);
     console.log(`3. alcove at wall position 2: PerformLocalAction mapPos = ${seen.join(', ') || '(not called)'}`);
     check(seen.length === 1, 'the alcove actuator fires its local action');
     check(seen[0] === -1, 'PressurePadOrAlcove passes -1, not the alcove\'s wall position');

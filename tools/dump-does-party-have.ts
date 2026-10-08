@@ -57,7 +57,7 @@ async function main(): Promise<void> {
   const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x1234) });
   ctx.state.tickCount = 1000;
   const actuators = new ActuatorSystem(ctx);
-  const has = (value: number): boolean => (actuators as any).doesPartyHave(value);
+  const has = (value: number): boolean => actuators.doesPartyHave(value);
 
   // A floor object the party does not already carry, and a chest to carry it in.
   const carried = new Set<number>();
