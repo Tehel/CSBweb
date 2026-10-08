@@ -775,20 +775,10 @@ Recorded so that nobody "fixes" them.
   nowhere; the author's decision is to keep it all the same. The port keeps
   `CHARFLAG_male` and clears the rest, as the mask reads (`TAG002724`,
   `src/engine/Chaos.ts`; `tools/dump-new-adventure.ts`).
-- 🚫 **A saved game the utility cannot read is damaged, not the program's end.**
-  `_ReadSavedGame` unscrambles `GAMEBLOCK1` with word 29 and, if that fails, with word 10
-  (`doc/CSBwin-src/Chaos.cpp:2966-2981`). A block that only word 10 opens sets
-  `word_0002` to 1, and CSBWin then stops in `NotImplemented(0x1868)`, whose message box
-  ends the program (`:2984-2999`, `system.cpp:177-190`): the code that reads that form,
-  `#ifdef impReadSavedGame`, is in no build, and `TAG00260e` and `TAG002724` stop the
-  same way on it past the first stop (`#ifdef imp260e`, `:3215-3228`; `#ifdef
-  alternateFormat`, `:3314-3334`). CSBWin's own saves zero words 10 and 29 alike
-  (`ScrambleAndWrite`, `SaveGame.cpp:714-759`), so they open with either. A page cannot
-  end itself, and the author's decision is that a refusal is better than nothing: the
-  port reads only the word-29 form, and `ReadSavedGame` refuses any other with the
-  utility's message 14, "SAVED GAME ERROR" (`src/engine/Chaos.ts`).
-  `tools/dump-new-adventure.ts` builds such a block from `csbgame7.dat` and checks the
-  refusal.
+- 🚫 **A saved game the utility cannot read is damaged, not the program's end.** On a
+  `GAMEBLOCK1` that opens only with word 10, CSBWin stops in `NotImplemented(0x1868)`
+  (`doc/CSBwin-src/Chaos.cpp:2966-2999`); the port refuses it with message 14. No known
+  file has that form (`doc/PROVEN_FACTS.md` → "Only the word-29 form reads").
 - 🚫 **A champion who dies in hand is put down on nobody.** `KillCharacter` does not end a
   change of the marching order, and `TAG0025a6` then writes the dead champion's facing and
   position to `d.CH16482[-1]`, outside the champions (`doc/PROVEN_FACTS.md` → "Changing

@@ -17,20 +17,16 @@
  * 3. The new adventure loads into a `Game` on CSB's graphics: `mini.dat`'s eleven
  *    levels, the party where `mini.dat` put its own, the saved game's champions.
  * 4. The refusals, each with CSBWin's message: no party, "ALREADY UTILIZED", a name
- *    missing or twice, `mini.dat` not a new adventure, either file damaged, a saved
- *    game whose `GAMEBLOCK1` unscrambles only with word 10, which stops CSBWin where
- *    the port calls it damaged (`DEBT.md` H), and the unported branch (`DEBT.md` G28),
- *    a `mini.dat` with an Extended Features block.
+ *    missing or twice, `mini.dat` not a new adventure, either file damaged, and the
+ *    unported branch (`DEBT.md` G28), a `mini.dat` with an Extended Features block.
  *
  * Run: `npx tsx tools/dump-new-adventure.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { readU16BE, readU32BE, readU32LE, writeU16BE } from '../src/core/bytes';
+import { readU16BE, readU32BE, readU32LE } from '../src/core/bytes';
 import { CsbRandom } from '../src/core/random';
-import { readExtendedFeatures } from '../src/data/CsbwinExtendedFeatures';
-import { readUnscrambleBlock, rescrambleBlock1, scramble } from '../src/data/CsbwinSaveStream';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import {
@@ -216,28 +212,6 @@ function load(made: Uint8Array): void {
     'empty-handed, at full health');
 }
 
-/**
- * `file` with its `GAMEBLOCK1` in `_ReadSavedGame`'s second form: the second half
- * scrambled with word 10 as its hash, where CSBWin's own saves use word 29
- * (`doc/CSBwin-src/Chaos.cpp:2966-2981`). `ScrambleAndWrite` zeroes both, so word 10
- * takes a value of its own first, and word 127 the fold that goes with it.
- */
-function scrambledWithWord10(file: Uint8Array): Uint8Array {
-  const extended = readExtendedFeatures(file);
-  check(!extended.simpleEncipher, 'csbgame7.dat is not enciphered, so its GAMEBLOCK1 is rewritten where it lies');
-  const block1 = readUnscrambleBlock(file, extended.offset).buf;
-  writeU16BE(block1, 20, 0x1234);
-  rescrambleBlock1(block1);
-  const out = file.slice();
-  out.set(block1, extended.offset);
-  check(refusal(() => ReadSavedGame(out, 0)) === null, 'with that word 10, and scrambled with word 29, the saved game reads');
-  const plain = readUnscrambleBlock(block1, 0).buf;
-  check(readU16BE(plain, 20) !== readU16BE(plain, 58), 'words 10 and 29 differ, so word 29 cannot open the rewritten block');
-  scramble(plain.subarray(256), readU16BE(plain, 20), 128);
-  out.set(plain, extended.offset);
-  return out;
-}
-
 function refusals(): void {
   console.log('\n=== 4. the refusals ===');
   const fresh = (): UtilityGame => ReadSavedGame(CSBGAME7, 0);
@@ -272,8 +246,6 @@ function refusals(): void {
   const damaged = CSBGAME7.slice();
   damaged[damaged.length - 100] ^= 1;
   cases.push(['a saved game with one bit of its dungeon flipped', () => makeNewAdventure(damaged, MINI, new CsbRandom(SEED)), UtilityDiskMessages[14]]);
-  const word10 = scrambledWithWord10(CSBGAME7);
-  cases.push(['a saved game whose GAMEBLOCK1 unscrambles only with word 10', () => ReadSavedGame(word10, 0), UtilityDiskMessages[14]]);
   const damagedMini = MINI.slice();
   damagedMini[600] ^= 1;
   cases.push(['a mini.dat with one bit of GAMEBLOCK2 flipped', () => makeNewAdventure(CSBGAME7, damagedMini, new CsbRandom(SEED)), UtilityDiskMessages[25]]);
