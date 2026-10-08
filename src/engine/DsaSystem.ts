@@ -512,7 +512,8 @@ class DsaBank {
    */
   private texts: Array<string | null> | null = null;
 
-  constructor(public vars: DsaVars) {}
+  /** `trace` says what CSBWin's `NoValue` asks in its message box. */
+  constructor(public vars: DsaVars, private readonly trace: (line: string) => void) {}
 
   /** `DSADBANK::SetText` (`doc/CSBwin-src/DSA.cpp:194-205`): an index past 9 sets nothing. */
   setText(text: string, index: number): void {
@@ -532,15 +533,25 @@ class DsaBank {
 
   /**
    * `DSADBANK::Var(i)` (`doc/CSBwin-src/DSA.cpp:141`): a variable not well defined, never
-   * set or past a short `&PARAM@`, is zeroed by the read (`NoValue`, `:227-238`).
+   * set or past a short `&PARAM@`, is zeroed by the read (`NoValue`).
    */
   getVar(index: number): number {
     if (index < 0 || index >= this.vars.values.length) return 0;
     if (this.vars.definedFlags[index] !== DsaVarType.WellDefined) {
-      this.vars.values[index] = 0;
+      this.noValue(index);
       return 0;
     }
     return this.vars.values[index] ?? 0;
+  }
+
+  /**
+   * `DSADBANK::NoValue` (`doc/CSBwin-src/DSA.cpp:227-238`): the variable is zeroed, and
+   * the message box CSBWin raises, until its player answers "yes" to suppress it, is a
+   * trace each time.
+   */
+  private noValue(index: number): void {
+    this.vars.values[index] = 0;
+    this.trace(`DSA variable[${index}] used without having been assigned a value.`);
   }
 
   setVar(index: number, value: number): void {
@@ -1467,7 +1478,7 @@ export class DsaSystem {
     // and a run nested in another's clears the caller's.
     this.overrideP = false;
 
-    const bank = new DsaBank(vars);
+    const bank = new DsaBank(vars, (line) => this.ctx.host.trace(line));
     bank.stack.clear();
     bank.filter = filter;
     const finalState = this.execute({
@@ -2406,7 +2417,9 @@ export class DsaSystem {
         if (n > paramCount) {
           this.ctx.host.trace('DSA &PARAM@ non-existent parameter');
           for (let j = paramCount; j < n; j++) {
-            bank.getVar(0); // `pdsaDbank->Var(0)` (`:2977`): a read of variable 0, as written
+            // `pdsaDbank->Var(j)` (`doc/CSBwin-src-20230608/DSA.cpp:2978`): a read of the
+            // parameter's number, where the variable marked is `index + j`.
+            bank.getVar(j);
             bank.setVarState(index + j, DsaVarType.NonParameter);
           }
           n = paramCount;

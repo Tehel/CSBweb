@@ -15,6 +15,9 @@
  *    they stand. A count short of `n` copies what there is, and the variables past it
  *    read 0.
  * 4. **Past 100, `&PARAM@` and `&PARAM!` do nothing** (`:2965-2968`, `:3009-3012`).
+ * 5. **A short `&PARAM@` reads each missing parameter's number** (`Var(j)`,
+ *    `doc/CSBwin-src-20230608/DSA.cpp:2978`): on a count of 3, `&PARAM@ 5` reads variables
+ *    3 and 4, and `NoValue` names them; variable 0 is not read.
  *
  * Run: `npx tsx tools/dump-dsa-parameters.ts`
  */
@@ -105,6 +108,18 @@ function message(game: Game, words: number[] | null): void {
   console.log(`4. &PARAM@ 101 leaves a variable of 77 at ${g[0]}; after &PARAM! 101, word 1 is ${g[1]}`);
   check(g[0] === 77, '&PARAM@ 101 copies nothing and marks nothing');
   check(g[1] === 11, '&PARAM! 101 stores nothing');
+}
+
+/* ------------------------------- 5. the variables a short fetch reads -------- */
+{
+  const { game, again } = run([...int(5), ...int(10), op(StkOp.PARAM_FETCH)]);
+  message(game, [11, 22, 33]);
+  const traced: string[] = [];
+  game.ctx.host.trace = (line) => { traced.push(line); };
+  again();
+  const read = traced.flatMap((line) => /^DSA variable\[(\d+)\]/.exec(line)?.[1] ?? []);
+  console.log(`5. &PARAM@ 5 on a count of 3 reads the variables ${read.join(' ')}`);
+  check(read.join() === '3,4', 'each missing parameter reads the variable of its number, never variable 0');
 }
 
 finish();

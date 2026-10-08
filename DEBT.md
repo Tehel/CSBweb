@@ -94,10 +94,10 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C153 | `&PARAM@` reads variable 0 for each missing parameter | S | ⏳ |
 | C154 | The attacker's hand may keep its cyan border after a PASS or a zero-delay attack | S | ⏳ |
 | C155 | The Extended Features block's bits 0x100, 0x200 and 0x400 | S | ⏳ |
 | C156 | A champion's bones read "NAMEBONES"; CSBWin 20230608 puts a space between | S | ⏳ |
+| C159 | `&CELL@`'s pit, false wall and door bits leave their variable undefined in CSBWin | S | ⏳ |
 | C157 | CSBWin 20230608 becomes the reference | L | ⏳ |
 | G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
@@ -117,7 +117,7 @@ In payoff order: the first row is the next item.
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G29 are the active list.
-C153-C157 are CSBWin's changes from 2016 to 2023 (see "CSBWin's changes from 2016 to
+C154-C157 are CSBWin's changes from 2016 to 2023 (see "CSBWin's changes from 2016 to
 2023" in tier C), taken first. `F3` is a phase, whose
 status is `PLAN.md`'s, and its row only marks its place. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
@@ -128,7 +128,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C159 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C160 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -230,7 +230,7 @@ CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
 ### CSBWin's changes from 2016 to 2023
 
-C153-C156 are changes Paul Stevens made after the source the port follows and before the
+C154-C156 are changes Paul Stevens made after the source the port follows and before the
 build the author plays. `doc/CSBwin-src/` is `CSBwin_SRC_20160923.zip` from
 dianneandpaul.net/CSBwin/, "Version 15.9" (`CSBwin.rc:322`), with the author's cosmetic
 edits in `CSBCode.cpp`, `RC4.cpp`, `SaveGame.cpp` and `Data.h`. 15.9 is a side branch of
@@ -250,15 +250,6 @@ Raspberry Pi front-ends. Two changes are not taken:
   (`TextOutToScreen_Centered`, `Attack.cpp:972-980`, `CSBCode.cpp:1785`), which puts them
   2 and 3 pixels right of the original's 242 and 248. It serves translations.
 - The utility's word-10 save form, whose adventure write is left `NotImplemented` (G28).
-
-### C153 ⏳ `&PARAM@` reads variable 0 for each missing parameter
-
-For each parameter past the count, `doc/CSBwin-src/DSA.cpp:2977` reads `Var(0)`, and so
-does the port (`StkOp.PARAM_FETCH`, `src/engine/DsaSystem.ts`). A read of a variable that
-is not well defined calls `NoValue` on it (`DSA.cpp:142`). CSBWin 20230608 reads `Var(j)`
-(`DSA.cpp:2978`), the parameter's number. The variable marked `NonParameter` is `i + j`,
-so even the new read may not be the one meant. Follow 2023 and note `i + j` in the
-comment. A `tools/` check of a short `&PARAM@` against an undefined variable `j`. Size S.
 
 ### C154 ⏳ The attacker's hand may keep its cyan border after a PASS or a zero-delay attack
 
@@ -320,9 +311,28 @@ no translation `TranslateLanguage` returns its text (`Translation.cpp:187`), so 
 "NAME BONES". The author's decision: take the space, in the hand's name and in the
 inventory's description alike. A `tools/` check prints both for a champion's bones.
 
+### C159 ⏳ `&CELL@`'s pit, false wall and door bits leave their variable undefined in CSBWin
+
+`STKOP_CellFetch` reports a square's flags in the variable after its room type. For a
+stone, open, teleporter or stairs square it ORs each bit in with
+`Var(arrayIndex+1, Var(arrayIndex+1) | bit)`, which leaves the variable well defined
+(`doc/CSBwin-src/DSA.cpp:3704-3765`). For a pit, a false wall and a door it calls
+`SetVarBit` instead (`:3767-3810`), which zeroes a variable not well defined (`NoValue`)
+and ORs the bit, but never marks it well defined (`DSA.cpp:143`; the same in 20230608,
+`:144`). Unless the DSA set that variable before, its next read zeroes it again, and the
+pit's, false wall's or door's bits read 0. The port's `setVarBit` sets the variable
+(`src/engine/DsaSystem.ts`), so the bits read as set.
+
+It looks like a slip of CSBWin's translation: the same operation's other cases leave the
+variable defined, and the commented-out original beside each call is
+`tempVar[arrayIndex+1] |= bit`, from before variables had a defined state. Paying it: an H
+entry with both readings, and a `tools/` check that `&CELL@` on a pit, with the variable
+never set, reads the pit's bits. Or, if it does not hold up, port `SetVarBit` as written.
+Size S.
+
 ### C157 ⏳ CSBWin 20230608 becomes the reference
 
-After C153-C156. Steps:
+After C154-C156. Steps:
 
 1. **Swap the trees.** `doc/CSBwin-src-20230608/` replaces `doc/CSBwin-src/`, and
    `node tools/gen-csbwin-index.mjs` rebuilds `doc/CSBWIN_SYMBOL_INDEX.tsv`.

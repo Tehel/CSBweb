@@ -6537,7 +6537,9 @@ message whose `EXPOOL` record is gone leaves (`Timer.cpp:1401`, `:1701`, `:2180`
 never short, and the `n` words are copied as they stand. Past a short count, the variables
 are marked `DVT_NonParameter` (`:2975-2979`) and keep their values, but any read of a
 variable that is not `DVT_WellDefined` zeroes it (`DSADBANK::Var`, `:141`, `NoValue`,
-`:227-238`), so they read 0, and `&PARAM!` skips them. `STKOP_ParamStore` (`:3000-3020`)
+`:227-238`), so they read 0, and `&PARAM!` skips them. Before marking variable `i + j`,
+the loop reads a variable: `Var(0)` in 15.9, `Var(j)`, the missing parameter's number, in
+20230608 (`doc/CSBwin-src-20230608/DSA.cpp:2978`). The port follows 20230608. `STKOP_ParamStore` (`:3000-3020`)
 does nothing past 100 either. Evidence: `tools/dump-dsa-parameters.ts`.
 
 ## A DSA's extended cell flags are one `EXPOOL` record a column, and `&ECF!` re-adds it
