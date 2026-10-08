@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-CSBWin's `MemMove(ui8 *src, ui8 *dest, i32 byteCount)` (`doc/CSBwin-src/CSBCode.cpp:834`)
+CSBWin's `MemMove(void *src, void *dest, i32 byteCount)` (`doc/CSBwin-src/CSBCode.cpp:834`)
 takes its **source first**, the Atari way, and calls `memmove(dest, src, byteCount)`.
 `MemMove(&a[i+1], &a[i], n)` therefore moves entries *down*, a removal.
 

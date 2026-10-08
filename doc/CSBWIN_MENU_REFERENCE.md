@@ -403,7 +403,7 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    MODIFIED VERSION OF" over the dungeon's name, with CONFIRM and CANCEL. A save of
    another dungeon, or of an unknown one, is refused in a one-option menu, under OK. A
    file that does not read is the dialog's message, CSBWin's own "SAVED GAME DAMAGED!"
-   (`SaveGame.cpp:2118`).
+   (`SaveGame.cpp:2117`).
 6. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
    addition, not a changed behaviour, as are the list's other keys (the arrows, Home
    and End, Page Up and Down, Enter for LOAD), the wheel, and a double click on a save,

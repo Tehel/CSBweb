@@ -48,11 +48,11 @@ binary runs three programs. This one runs the dungeon.
 
 ## The graphics
 
-| item | pointer (`Data.h:255-266`) | what it is | DM size |
+| item | pointer (`Data.h:255-275`) | what it is | DM size |
 | --- | --- | --- | --- |
 | 1 | (temporary) | the title screen, three bands in one 320×200 image | 3697 |
-| 2 | `d.Pointer22952` | prison door, **left** half, 128×161 | 2682 |
-| 3 | `d.Pointer22936` | prison door, **right** half, 128×161 | 2741 |
+| 2 | `d.Pointer22952[0]` | prison door, **left** half, 128×161 | 2682 |
+| 3 | `d.Pointer22952[4]` | prison door, **right** half, 128×161 | 2741 |
 | 4 | `d.Pointer22956` | "Prison entrance minus door", 320×200 | 9845 |
 | 5 | `d.Pointer22960` | the credits scroll, 320×200 | 6144 |
 | 534 | `d.Pointer22968` | the latch click | 39 |
@@ -90,7 +90,7 @@ right are **painted into graphic 4**. Nothing is drawn as text at runtime.
 They are the last 136 bytes of a 1826-byte item and they are read by a parser that walks the
 whole thing field by field, so `tools/dump-intro.ts` checks each one against something
 CSBWin states independently: `Word84` against `allocateMemory(20608,0)` at `:9603`, `Word60`
-against the `SrcByteWidth` of 112 at `:9519`, `Word44` against `pGraphic += 9120; // =57*160`
+against the `SrcByteWidth` of 112 at `:9521`, `Word44` against `pGraphic += 9120; // =57*160`
 at `:9376`, and `Word92`/`Word100` against each other tiling 0..231 with no seam.
 `tools/dump-show-credits.ts` checks `Word108` against graphic 6, 80×14: the 40-byte source
 width of `BLT2Screen(…, d.Word108, 40, -1)` and the 560 bytes `A3` skips past it
@@ -188,15 +188,15 @@ tidied: which source column each of 48 destination columns lands on is visible a
 ```c
   d.PrimaryButtonList = d.Buttons16932;
   d.SecondaryButtonList = NULL;  d.pKeyXlate2 = NULL;  d.pKeyXlate1 = NULL;
-  for (D7W=0; D7W<8; D7W++) (&d.Pointer22952)[D7W] = allocateMemory(10304, 0);
+  for (D7W=0; D7W<8; D7W++) d.Pointer22952[D7W] = allocateMemory(10304, 0);
   d.Pointer22920 = allocateMemory(20608,0);   // the pristine interior
   d.Pointer22916 = allocateMemory(20608,0);   // the animation's working buffer
 ```
 
-`(&d.Pointer22952)[0..7]` walks the declaration-ordered pointer block at `Data.h:259-266`:
-`[0]=22952 … [4]=22936 … [7]=22924`. Slots **0..3** hold the left half at sub-word shifts of
-0/4/8/12 pixels, **4..7** the right half — so the animation only ever blits whole 16-pixel
-words, with the `D7W & 3` slot supplying the sub-word part and the source x offset the rest.
+`d.Pointer22952` is an array of eight pointers (`Data.h:267-275`). Slots **0..3** hold the
+left half at sub-word shifts of 0/4/8/12 pixels, **4..7** the right half — so the animation
+only ever blits whole 16-pixel words, with the `D7W & 3` slot supplying the sub-word part
+and the source x offset the rest.
 
 The right half's slots are redundant: slot `n+4` holds the door shifted right by `4n` and the
 animation then reads it from `4n` in, which cancels. All of its motion comes from `Word76.x1`
@@ -216,8 +216,8 @@ walking right. The port transcribes it anyway rather than simplify, to stay grep
   DrawViewport(2, 2, 0); //facing south, x=2; y=0.
   d.ViewportUpdated = 0;  d.UseByteCoordinates = 0;
   TAG0088b2(d.LogicalScreenBase, d.Pointer22920, d.Word84, 0, 30, 160, 128, -1);
-  BLT2Screen(d.Pointer22952, (RectPos *)d.Word92,  64, -1);   // left half
-  BLT2Screen(d.Pointer22936, (RectPos *)d.Word100, 64, -1);   // right half
+  BLT2Screen(d.Pointer22952[0], (RectPos *)d.Word92, 64, -1);   // left half
+  BLT2Screen(d.Pointer22952[4], (RectPos *)d.Word100, 64, -1);   // right half
   FadeToPalette(_2_,&d.Palette360);
 ```
 
@@ -358,8 +358,8 @@ So the screen's palette decides what colour it is. Index 4 is `0x654` under the 
 adventure palette. Same bitmap, different screen.
 
 The hot spot is the top-left corner: `d.Word23156` and `d.Word23158`, the offsets
-`CreateCursorBitmap` subtracts, are both 0 for the arrow and only become 8 for the object
-cursor (`:2294`, `:2123`).
+`DrawCursor` subtracts (`:2450`, `:2469`), are both 0 for the arrow (`:2293-2294`) and
+become 8 for the object cursor (`:2327-2328`).
 
 `DrawCursor` and `RemoveCursor` (`:2432`, `:2231`) run from the VBL handler and bracket each
 other: the cursor is composited over the frame and lifted again, so it is never part of the
@@ -471,7 +471,7 @@ the doors, and `_GameSetup` runs its retry loop:
 `_ReadEntireGame` skips `dungeon.dat` entirely on this path (`:1574`) and goes **straight to
 the file chooser** — there is no "READY TO SAVE GAME" menu first, unlike the in-game disk
 icon. It calls `SelectSaveGame(_9_, 1, 1, 1)` (`:1688`), against the disk icon's
-`SelectSaveGame(_5_, 0, 0, 1)` (`:917`):
+`SelectSaveGame(_5_, 0, 0, 1)` (`:920`):
 
 | | entrance "Resume" | in-game disk icon |
 | --- | --- | --- |
@@ -571,7 +571,7 @@ which runs its timers and ends the same way.
    emptied (`:116-121`).
 2. `QueueSound(6, d.partyX, d.partyY, 0)`, the dying sound, and `VBLDelay(240)` (`:126-127`).
 3. Graphics 6 (80×14, "THE END") and 5 (the credits picture, read compressed as `0x8005` and
-   expanded later) are read (`:142-155`).
+   expanded later) are read (`Code1f9e6.cpp:132-145`).
 4. `d.DynamicPaletteSwitching` is 0, so `FadeToPalette(Palette11914)` — to black — rather
    than the `Darken` steps (`:148-170`). It is 0 because `_StartCSB` cleared it, and the VBL
    that could restore it from `d.Word11740` does so only while `d.ViewportUpdated` is set
@@ -633,8 +633,8 @@ of the tick, `d.Time++` and `scrollingText.ClockTick()` among it, does not run. 
 `Game.gameTick` stops there, and `runFrame` then runs 300 VBLs of `vblInterrupt` alone
 before `GameHost.showCredits(true)`. `d.Word11694` is `GameState.gameWon`.
 
-1. As the lost game's step 1, but no dying sound and no wait (`:134`).
-2. Graphic 208, the champion frame, is read after graphic 6 (`:148-153`): 64×43, the 1376
+1. As the lost game's step 1, but no dying sound and no wait (`Code1f9e6.cpp:124`).
+2. Graphic 208, the champion frame, is read after graphic 6 (`:138-143`): 64×43, the 1376
    bytes `A3` skips.
 3. With `d.DynamicPaletteSwitching` set: `d.Palette11978` saved in `LOCAL_78`, then eight
    times a VBL and `Darken` (`:27`: each non-zero channel down one) on every colour of

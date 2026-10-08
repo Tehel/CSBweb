@@ -253,19 +253,19 @@ every citation of a 2016 line was mapped to its 2023 line through the diff by
 `tools/recite-csbwin.py`, which maps every unchanged line exactly. Two steps are left:
 
 1. **The review list**, `doc/C157-review.tsv`: the citations the script could not settle
-   alone, one a row, with the line it is on (`where`; the row's `text` finds it if lines
-   moved), the citation as it now reads and the 2016 one it came from (read against
-   `doc/CSBwin-src-20160923/`). Two kinds:
-   - `changed` (about 200): the cited 2016 lines changed in 2023. Read both. If the fact
+   alone, one a row, every one left in `doc/PROVEN_FACTS.md`, with the line it is on
+   (`where`; the row's `text` finds it if lines moved), the citation as it now reads and
+   the 2016 one it came from (read against `doc/CSBwin-src-20160923/`). Two kinds:
+   - `changed` (91): the cited 2016 lines changed in 2023. Read both. If the fact
      changed, rewrite it, and a behaviour the port lacks is a C entry; otherwise nothing.
-   - `file` (about 240): a `:N` whose file is not named beside it. The script took the
+   - `file` (167): a `:N` whose file is not named beside it. The script took the
      file its quoted identifiers point at, else the nearest; `note` gives the other
      candidates, which map elsewhere. Confirm the file from the text, or map the 2016 line
      from the right one.
 
-   Work it a document at a time, deleting each row once settled, about 150 rows a session.
-   `doc/PROVEN_FACTS.md` holds more than half. A `file` row is most often wrong where an
-   aside names another file between the paragraph's own and the `:N` (a header, `Data.h`,
+   Work it a section at a time, deleting each row once settled, about 150 rows a session,
+   so two sessions are left. A `file` row is most often wrong where an aside names another
+   file between the paragraph's own and the `:N` (a header, `Data.h`,
    `system.cpp`): the script took the aside, and `note`'s candidate is the right one.
    Most `changed` rows are cosmetic: the 64-bit rewrite keeps each old line as a `//`
    comment beside its typed one, and braces, casts, `TranslateLanguage` wrappers and the
@@ -277,6 +277,8 @@ every citation of a 2016 line was mapped to its 2023 line through the diff by
 2. **Review every divergence.** Each H entry, each C entry and each `CLAUDE.md` exception
    is checked against 2023: one that 2023 fixed is no longer a divergence. The change not
    taken ("CSBWin's changes from 2016 to 2023" above) becomes an H entry or is ported.
+   X5 is CSBWin 20230608's own feature, which a dungeon's Extended Features block turns
+   on, so it moves to G and loses its exception to the X rules.
    The `memmove-source-first` memory and `CLAUDE.md` → "The one non-negotiable rule" name
    the tree.
 
@@ -373,7 +375,7 @@ Not taken in order; the author names one to start it (see "Priority").
 The messages the executable prints are string literals in CSBWin: " MUMBLES A MEANINGLESS
 SPELL.", " RESURRECTED", "HEALTH", the skill titles, the menus. `ReadTranslationFile` reads
 `Translation.txt` from the game directory: one pair of quoted strings a line, English then
-translation, and `//` comment lines (`doc/CSBwin-src/Translation.cpp:131-175`, called at
+translation, and `//` comment lines (`doc/CSBwin-src/Translation.cpp:131-176`, called at
 `CSBUI.cpp:927`). `TranslateLanguage` swaps a literal for its pair, and returns it unchanged
 when it has none. The port prints the English literals, so the French 1.3 set
 (`dm-atari-1.3-fr`) plays with French objects, scrolls and walls, and English messages.
@@ -540,16 +542,16 @@ monster, walk onto the cell, and check the inventory, the floor chain and the lo
 ### X5 ⏸️ 3D2D1D's vertical moves and gravity
 
 `doc/3D2D1D.md` has the whole account. The 3D2D1D dungeon (data set `3d2d1d`) loads but
-cannot be played as designed. It needs two features that `doc/CSBwin-src/` contains but
-hardwires off: `ThreeDMovements` and `GravityGame` are `false` and never assigned
+cannot be played as designed. It needs two CSBWin features the port has not ported,
+behind `bThreeDMovements` and `bGravityGame`, which start `false`
 (`doc/CSBwin-src/data.cpp:240-241`).
 
-CSBWin 20230608 sets them from `efb.extendedFlags` bits `0x400` and `0x200`
+CSBWin sets them from `efb.extendedFlags` bits `0x400` and `0x200`
 (`doc/CSBwin-src/SaveGame.cpp:427-430`), as the 2019 `CSBwin.exe` shipped with
 the dungeon does, and so does the port: `bThreeDMovements` and `bGravityGame` in
 `ctx.rules` (`readRulesOptions`, `src/data/CsbwinExtendedFeatures.ts`), which a save
 writes back (H → "A save keeps the dungeon's three 2023 flags"). Nothing reads them yet.
-No exception to "CSBWin source wins" is needed. Everything else is in our source.
+Everything else is in CSBWin's source.
 
 The gate is the dungeon, not a setting. This is the one departure from the X rules above:
 no other dungeon here sets either bit, so DM and CSB are unchanged, and the keys cannot
@@ -791,7 +793,7 @@ Recorded so that nobody "fixes" them.
 - 🚫 **A champion carried into a new adventure keeps their sex.** `TAG002724` masks
   `charFlags` with `LE16(LE16(wordGear(+48) & 16))`, which on the little-endian build
   keeps 0x1000 of the file's word and clears `CHARFLAG_male`
-  (`doc/CSBwin-src/Chaos.cpp:3381`). Nothing in CSBWin reads the flag, so it shows
+  (`doc/CSBwin-src/Chaos.cpp:3392`). Nothing in CSBWin reads the flag, so it shows
   nowhere; the author's decision is to keep it all the same. The port keeps
   `CHARFLAG_male` and clears the rest, as the mask reads (`TAG002724`,
   `src/engine/Chaos.ts`; `tools/dump-new-adventure.ts`).
@@ -836,9 +838,9 @@ Recorded so that nobody "fixes" them.
   words").
 - 🚫 **The vertical-move guard** in `MoveParty` (`CSBCode.cpp:8287-8291`) is not ported,
   because nothing in the port reaches it. Move Up / Down (`0x1124` / `0x1125`) come only
-  from the 3DMaze extension's `ThreeDMovements` keys and `GravityMove`, which X5 ports with
-  the guard. The 2016 source cannot reach it either: its flags are initialised `false`
-  (`data.cpp:240-241`) and assigned nowhere in the tree.
+  from the 3DMaze extension's `bThreeDMovements` keys and `GravityMove`, which X5 ports with
+  the guard. CSBWin reaches it only in a dungeon whose Extended Features block sets
+  `ThreeDMovements` (`doc/CSBwin-src/SaveGame.cpp:427-430`): 3D2D1D, here.
 - 🚫 **The main loop makes one pass a VBL, not one a message.** CSBWin's loop makes a pass
   for every message the UI hands it (`doc/CSBwin-src/CSBUI.cpp:1274-1293`): each VBL's
   `UIM_VBL` (`system.cpp:624-630`), and a mouse button going down, which pushes a message
@@ -869,7 +871,7 @@ Recorded so that nobody "fixes" them.
   so the credits picture stays up (`src/renderer/intro/ShowCredits.ts`).
 - 🚫 **A damaged save at the boot goes back to the title.** There `tag01efee` prints
   "SAVED GAME DAMAGED!" and calls `die(0xbad)`, which ends CSBWin
-  (`doc/CSBwin-src/SaveGame.cpp:2117-2119`). A page cannot end itself, so the author's
+  (`doc/CSBwin-src/SaveGame.cpp:2117-2118`). A page cannot end itself, so the author's
   decision is a one-button menu with the line and OK, whose click goes back to the title
   animation (`tag01efee` and `runBootSequence`, `src/renderer/intro/BootSequence.ts`).
   After a lost game `tag01efee` is CSBWin's own.

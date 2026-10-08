@@ -64,7 +64,7 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   the file's date, as CSBWin ranks its slots by their files' `MODIFIEDTIME`
   (`doc/CSBwin-src/CSBCode.cpp:9890-9924`); it counts no time played, and is the last
   save used (`GameSaves.importSave`, `src/engine/GameSaves.ts`). A file that does not
-  read is CSBWin's "SAVED GAME DAMAGED!" (`SaveGame.cpp:2118`).
+  read is CSBWin's "SAVED GAME DAMAGED!" (`SaveGame.cpp:2117`).
 - **A save knows its dungeon.** A row carries its data set's id, and the list shows the
   running data set's saves only (`GameSaves.dataSet`). The filter is the list's
   parameter, not its rule: RISE lists every set's (below), since a DM save feeds a CSB

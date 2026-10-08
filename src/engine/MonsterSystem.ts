@@ -381,8 +381,8 @@ export class MonsterSystem {
    * A `monsterIndex` below zero means "every member of the group", and is the only
    * case that loops; a non-negative index touches exactly that one member.
    *
-   * Note CSBWin's own naming inversion in the delay choice, preserved here: when
-   * `attacking` is true it uses `AdditionalDelayFromAttackToMove`.
+   * The delay is `word20` bits 8-11 when `attacking` is true, else bits 4-7
+   * (`doc/CSBwin-src/CSBCode.cpp:6031-6040`).
    */
   nextMonsterUpdateTime(
     slot: Item16Record,

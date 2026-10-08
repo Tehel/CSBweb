@@ -71,8 +71,10 @@ plus `NonAttackingMirrorOK` 0x0004 and `AttackingMirrorOK` 0x0200.
 - `bravery()` = `word16` bits 4-7; 15 means never afraid, and it is also the
   resistance to WAR CRY, CALM, BRANDISH and BLOW HORN.
 - `FireResistance()` = `word18` bits 4-7, `PoisonResistance()` = bits 8-11.
-- `AdditionalDelayFromMoveToAttack()` = `word20` bits 4-7,
-  `AdditionalDelayFromAttackToMove()` = bits 8-11.
+- `word20` bits 4-7 are the time a group's next turn adds when it is not attacking, and
+  bits 8-11 when it is (`CSB.h`'s comment on `word20`, read at `CSBCode.cpp:6031-6040`;
+  `monsterDelayFromMoveToAttack` and `monsterDelayFromAttackToMove`,
+  `src/data/tables/MonsterDesc.ts`).
 
 ### `DB4` — the per-group record in `dungeon.dat`
 

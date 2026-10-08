@@ -145,7 +145,7 @@ single running checksum by `WriteAndChecksum` and closed by one final word.
 | 9 | `d.objectListIndex` | 2 × `numColumnPointers` | `:1252` |
 | 10 | `d.objectList` | 2 × `ObjectListLength()` | `:1262` |
 | 11 | `d.indirectTextIndex` | 4 × `NumWordsInTextArray()` | `:1271` |
-| 12 | `d.sizeOfCompressedText` + `d.compressedText` | 4 + 2 × size | `:1280`, `:1286` |
+| 12 | `d.sizeOfCompressedText` + `d.compressedText` | 4 + 2 × size | `:1280`, `:1288` |
 | 13 | all 16 databases' records | `DBSize(n)` × `dbEntrySizes[n]` | `:1297-1313` |
 | 14 | `d.cellFlagArray` | `cellflagArraySize` | `:1314` |
 | 15 | final checksum word | 2 | `:1320` |
@@ -153,7 +153,7 @@ single running checksum by `WriteAndChecksum` and closed by one final word.
 Block 11's index and block 12's size longword are **little-endian**, alone with the
 Extended Features header in an otherwise big-endian file: both go out through `BE32`
 (`:175-182`, `:1279-1284`), which is the identity on the little-endian build CSBWin ships
-as. The compressed text words after the size are written with no swap at all (`:1286`) —
+as. The compressed text words after the size are written with no swap at all (`:1288`) —
 they are the Atari-era 5-bit text array, big-endian in memory and big-endian in the file.
 `NumWordsInTextArray` (header `word6`) counts block 11's **index entries**, not text
 words: `ConvertToIndirectText` overwrites it with the index length (`:2486`), which is why

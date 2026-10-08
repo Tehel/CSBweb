@@ -97,7 +97,7 @@ width and a height.
 Reached from a wall click on actuator type **127** whose state lacks `PORTRAIT_InActive`
 (`Mouse.cpp:514-520`); only one champion may be added per click.
 
-1. Refuses if the cursor holds an object, or the party is already four (`:479-480`).
+1. Refuses if the cursor holds an object, or the party is already four (`Character.cpp:479-480`).
 2. Copies the portrait — graphic 26 for `charID <= 23`, an external portrait
    otherwise (`:488-510`).
 3. Assigns a **fingerprint**: `(partyLevel<<10)|(partyX<<5)|partyY`, incremented until
@@ -131,7 +131,7 @@ Reached from a wall click on actuator type **127** whose state lacks `PORTRAIT_I
    `reincarnateStatPenalty` (fallback 8) and `randomPoints` (fallback 3). All 24
    shipped DM heroes stop at the skills, so all three take their fallbacks.
 
-   Each attribute is two letters, held at 224 above it (`:644-659`). A skill letter
+   Each attribute is two letters, held at 224 above it (`:642-657`). A skill letter
    `'A'` leaves the skill empty, `'B'`..`'R'` give levels 1 to 17 (`125 << level`), and
    anything else is illegal (`:662-681`; `neophyteSkills`, which would let `'A'` set
    125, is only set by a recording's playback, `data.cpp:91`). `talents` is the eight
@@ -153,7 +153,7 @@ Reached from a wall click on actuator type **127** whose state lacks `PORTRAIT_I
 7. Sets `d.PotentialCharacterOrdinal = NumCharacter + 1` and increments `NumCharacter`
    (`:705-706`) — the champion is *provisionally* in the party.
 8. Collects every object in the **mirror's** cell (the cell in front, at the opposite
-   position) into the champion's possessions (`:716-791`). The slot search is a
+   position) into the champion's possessions (`Character.cpp:716-791`). The slot search is a
    `switch` with two `goto case9`s: clothing takes the first of body slots 2..5 its
    carry mask allows, a weapon takes slot 1, a scroll or potion takes slot 11, and
    anything left over takes the neck (10) if it is legal and free, otherwise the next
@@ -169,9 +169,9 @@ Reached from a wall click on actuator type **127** whose state lacks `PORTRAIT_I
 9. Opens the inventory on the Resurrect/Reincarnate/Cancel screen (`:793`).
 
 `d.PotentialCharacterOrdinal` is the "almost but not quite added" flag (`Data.h:948`).
-While it is non-zero the mouth is inert (`:4126`), the eye shows the menu rather than
-food/water (`TAG0189d4`, `:3921`), and the champion is skipped when looking for a living
-party member (`:2734`).
+While it is non-zero the mouth is inert (`Character.cpp:4078`), the eye shows the menu rather than
+food/water (`TAG0189d4`, `:3873`), and the champion is skipped when looking for a living
+party member (`:2680`).
 
 ## 3. Resurrect / Reincarnate / Cancel (`CSBCode.cpp:6674`)
 
@@ -243,7 +243,7 @@ Two fields, `D6W` = 1 for the name and 2 for the title, `D7W` characters typed:
   the last is the one being named. A duplicate is refused silently: the screen simply
   stays up.
 
-### The letter grid (`:174-210`)
+### The letter grid (`:186-222`)
 
 Screen `107..215 x 116..144`, three rows of eleven cells on a 10-pixel pitch. The
 arithmetic has three traps:
@@ -276,7 +276,7 @@ tick's `DisplayCharacterDamage` (`CSBCode.cpp:7143`, called at `:667`) calls
    special location, actuator type 47, with `pDSAparameters[1] = chIdx` (`:2540-2594`).
 2. `HP(0)`, mark the portrait changed.
 3. If this champion is selected, cancel eye/mouth pressing and hide the inventory.
-4. `DropAllPossessions` (`:2549`).
+4. `DropAllPossessions` (`:2629`).
 5. Create a `DB10` bones record: `miscType = misc_BonesOfHero`, `important = true`,
    **`value = 2`** ("these are a dead champion's bones"), placed at the champion's own
    `charPosition` in the party's cell, and registered with
@@ -293,8 +293,9 @@ leaves the party alive.
 ## 5. Bones and the Vi altar
 
 The bones' **name** is the champion's name prefixed to the object name, resolved
-through `CopyChampionBonesRecord` → `CHARDESC::CopyCharacter(fingerprint)`, and only
-when the record's `value != 0` (`Character.cpp:3563-3597`). `CopyCharacter` (`:5264`)
+through `CopyChampionBonesRecord` → `CHARDESC::CopyCharacter(fingerprint)` and written by
+`DescribeChampionBones` (`Code11f52.cpp:29-60`), and only when the record's `value != 0`
+(`Character.cpp:3563-3597`). `CopyCharacter` (`:5264`)
 searches the party first, then `GetFromWings` for champions no longer in it.
 
 Dropping bones into an **alcove** while `d.FacingViAltar` is set schedules a
@@ -349,7 +350,7 @@ a temporary one.
 ## 6. Feeding, drinking and potions (`Character.cpp:4037-4487`)
 
 The mouth handler does not apply anything directly. It fills a `FEEDPARAMETERS` block
-(`:3957`), hands it to the Feeding Filter DSA to amend, and applies the result. With an
+(`:3953`), hands it to the Feeding Filter DSA to amend, and applies the result. With an
 empty hand and `DisplayResurrectChestOrScroll != 0` it instead just shows food/water.
 
 Potions read `DB8.strength()` and derive three terms (`:4161-4165`):

@@ -164,5 +164,5 @@ centre on x=274, under the digits. Two negative values are messages instead: -1
   animation.
 
 `FluxCage`'s neighbour test is kept **as written**: CSBWin checks `(LCX, LCY-1)` twice and
-never looks south (`:1626-1630`), so a cage count of 3 is reachable in only three of the
+never looks south (`:1607-1610`), so a cage count of 3 is reachable in only three of the
 four directions. That is the behaviour the real game has.
