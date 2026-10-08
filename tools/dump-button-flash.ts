@@ -51,6 +51,7 @@ import { newGame, runVbl, TICK_DUE } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { ButtonsAt } from './lib/clicks';
+import { standIn, wrapMember } from './lib/standIn';
 import { handleUIKey } from '../src/renderer/ui/Keyboard';
 
 /** The button each queued click is taken as (`ButtonsAt`). */
@@ -287,8 +288,7 @@ async function main(): Promise<void> {
   let castAt = -1;
   let frameNo = 0;
   const magic = game.systems.magic;
-  const castSpellFromUi = magic.castSpellFromUi.bind(magic);
-  magic.castSpellFromUi = (chIdx) => { castAt = frameNo; return castSpellFromUi(chIdx); };
+  wrapMember(magic, 'castSpellFromUi', (cast) => (chIdx) => { castAt = frameNo; return cast(chIdx); });
   party.magicCasterIndex = 0;
   const word18552 = ui.uiTables.graphic231.word18552;
   const buttons18060 = ui.uiTables.graphic231.buttons.buttons18060;
@@ -372,7 +372,7 @@ async function main(): Promise<void> {
     'a blow at the air (0, d.clockTick = 0) should flash the option with no tick, and the next VBL put it back (:773)');
   // A blow that lands returns 1, which makes a tick due. Whether one lands is the attack
   // tools' business: here a stand-in for the engine's `Attack` decides it.
-  game.systems.character.executeAttack = () => 1;
+  standIn(game.systems.character, 'executeAttack', () => 1);
   prepareAttack(ui, 0);
   const first = flashOf('option 113, a blow that lands', clickAt(attackRect(113)));
   check(same(first.tick ?? null, OPTIONS[0]!) && same(first.after[0]!, OPTIONS[0]!) && first.after[1] === null,

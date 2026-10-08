@@ -39,6 +39,7 @@ import type { UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
+import { standIn } from './lib/standIn';
 
 /**
  * The interface over a game with no dungeon and a party of `championNames`, records with
@@ -56,9 +57,9 @@ function makeHarness(graphics: GraphicsLoader, championNames: string[]): Harness
   const game = newGame(emptyDungeonData(), graphics);
   for (const name of championNames) game.ctx.party.state.champions.push({ name } as Champion);
   const harness: Harness = { ui: newUIState(graphics, game.ctx), named: null };
-  game.systems.hallOfChampions.reincarnateNamed = (chIdx, name, title) => {
+  standIn(game.systems.hallOfChampions, 'reincarnateNamed', (chIdx, name, title) => {
     harness.named = { chIdx, name, title };
-  };
+  });
   return harness;
 }
 

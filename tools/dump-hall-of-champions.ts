@@ -50,6 +50,8 @@ const RESURRECT = 160;
 const REINCARNATE = 161;
 const CANCEL = 162;
 
+/** Each game's `GameHost.messages`, as `gameOn` records them. */
+const messagesOf = new WeakMap<Game, Array<{ color: number; text: string }>>();
 /** The graphics loader, kept aside so the portrait section can re-read its tables. */
 let sharedGraphics: GraphicsLoader | null = null;
 /** Where the games' `GameHost.openReincarnateScreen` goes; a scenario points it at its screen. */
@@ -103,7 +105,7 @@ function gameOn(data: DungeonData, graphics: GraphicsLoader): Game {
     tag0207cc: () => { pairCalls.push(pairCall(game, 'TAG0207cc')); if (pairUi) tag0207cc(pairUi); },
   });
   game.setRandomSeed(0x12345678);
-  (game as unknown as { probeMessages: typeof messages }).probeMessages = messages;
+  messagesOf.set(game, messages);
   return game;
 }
 
@@ -113,7 +115,9 @@ function pairCall(game: Game, name: string): string {
 }
 
 function probeMessages(game: Game): Array<{ color: number; text: string }> {
-  return (game as unknown as { probeMessages: Array<{ color: number; text: string }> }).probeMessages;
+  const messages = messagesOf.get(game);
+  if (!messages) throw new Error('a game not built by gameOn');
+  return messages;
 }
 
 /** Stand the party in front of a mirror, facing it, as a player walking up would. */

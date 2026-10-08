@@ -45,6 +45,9 @@ const DM = dataSetNamed('dm-atari');
 const everySent: GameEvent[] = [];
 const dungeonDat = new Uint8Array(readFileSync(joinPath(DM.dir, 'dungeon.dat')));
 
+/** Each harness's game: the champion its `GameHost.openReincarnateScreen` was last given, -1 for none. */
+const reincarnatingOf = new WeakMap<Game, () => number>();
+
 interface Harness {
   game: Game;
   events: GameEvents;
@@ -67,7 +70,7 @@ function harness(options: { send?: (event: GameEvent) => void } = {}): Harness {
     player: () => PLAYER,
     send: options.send ?? ((event) => { sent.push(event); everySent.push(event); }),
   });
-  (game as unknown as { reincarnating: () => number }).reincarnating = () => reincarnating;
+  reincarnatingOf.set(game, () => reincarnating);
   return { game, events, sent };
 }
 
@@ -81,7 +84,7 @@ function join(game: Game, hero: PresetHero, button: number): void {
   if (!hall.addCharacter(hero.portraitIndex)) throw new Error(`${hero.name}'s mirror took no champion`);
   hall.resurrectReincarnateCancel(button);
   if (button === REINCARNATE) {
-    const chIdx = (game as unknown as { reincarnating: () => number }).reincarnating();
+    const chIdx = reincarnatingOf.get(game)?.() ?? -1;
     hall.reincarnateNamed(chIdx, TYPED_NAME, TYPED_TITLE);
   }
 }

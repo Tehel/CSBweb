@@ -30,6 +30,7 @@ import { Opcode } from '../src/renderer/bytecode/Opcodes';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf } from './lib/game';
+import { standIn } from './lib/standIn';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync('static/gamefiles/dm-atari/graphics.dat')));
@@ -60,7 +61,7 @@ const interp = new BytecodeInterpreter(context);
 // only need real `graphics.dat` geometry to reach the code this tool cares about,
 // so it is stubbed to a fixed door rect set.
 const fakeRect = { x1: 100, x2: 107, y1: 50, y2: 57 };
-interp.resolveStdRectanglePointer = () => [fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect];
+standIn(interp, 'resolveStdRectanglePointer', () => [fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect]);
 
 function drawClosedDoorOnce(): string {
   interp.interpret([

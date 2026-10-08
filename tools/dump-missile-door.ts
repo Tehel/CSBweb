@@ -30,6 +30,7 @@ import { Game } from '../src/engine/Game';
 import { DescIndex } from '../src/engine/objectIndex';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { gameTablesOf, graphicsTablesOf } from './lib/game';
+import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 const graphics = new GraphicsLoader();
@@ -133,11 +134,10 @@ function encounter(
   game.ctx.timers.missileFilterTimer = game.ctx.timers.getTimer(missile.timerIndex);
 
   const hits: Outcome['hits'] = [];
-  const hitDoor = me.hitDoor.bind(me);
-  me.hitDoor = (p: Position, force: number, explosion: boolean, delay = 0): boolean => {
+  wrapMember(me, 'hitDoor', (hitDoor) => (p: Position, force: number, explosion: boolean, delay = 0): boolean => {
     hits.push({ force, explosion, delay });
     return hitDoor(p, force, explosion, delay);
-  };
+  });
   const before = new Set(game.ctx.timers.getTimers().map((t) => t.index));
   const spent = me.processMissileEncounter(RoomType.DOOR, at.x, at.y, at.x, at.y, at.z, 0, missileRn);
   const doorTimers = game.ctx.timers.getTimers()

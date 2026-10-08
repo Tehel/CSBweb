@@ -74,7 +74,8 @@ default, so with it off the game is CSBWin's and the golden frames do not move.
    moves. Better still, and expected for any split of a module: every tool's full output is
    byte-identical before and after (only `dump-save-menu`, by one byte, and
    `dump-savegame`, by its payload's size, vary on their own: both carry the save's
-   wall-clock date, and `dump-new-game`, by the random game ids it prints), and the
+   wall-clock date, and `dump-new-game` and `dump-game-events`, by the random game ids
+   they print), and the
    author's runtime saves hash the same after load and
    after 600 ticks. A refactor that uncovers a divergence records it in tier C. If it is
    fixed at all, the fix goes in a **separate** commit, so every commit is either
@@ -96,7 +97,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | L | ⏳ step 4 of 6 |
+| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | L | ⏳ step 5 of 7 |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | G29 | Recording a game and playing it back | — | ⏸️ |
@@ -238,33 +239,45 @@ builds around them is its own:
 
 - 40 tools spell out `addCharacterDefaults()`, most inside a champion-building function
   of their own; 145 construct a `DungeonLoader`, most to read `dm-atari/dungeon.dat`.
-- 8 tools stand in for an engine call by assigning over the system's method
-  (`executeAttack`, `castSpellFromUi`, `consumeAttackDamageToDisplay`,
-  `reincarnateNamed`, `dump-missile-door`'s `hitDoor`, `dump-door-lightning`'s
-  `resolveStdRectanglePointer`), which nothing types as a stand-in or puts back. Two more hang a
-  stand-in on `Game` itself: `dump-hall-of-champions` stores its messages in a property
-  `Game` does not have, and `dump-game-events` replaces `reincarnating`. 31 tools extract
-  the UI tables again (`graphicsTablesOf(…).ui`) beside the `UIState` that
-  `tools/lib/ui.ts` builds them into.
-- 22 tools make 37 `as unknown as` casts: to build a partial record, to read a record's
-  fields by name, or, in the two tools above, to hang a stand-in on `Game`. 2 more tools
-  cast through `as any`, to stand a partial record in for `getMissileRecord`'s
-  (`dump-missile-draw`) or for a `ViewportDraw`'s context (`dump-teleporter-shimmer`).
+- 30 tools stand in for an engine or renderer method by assigning over it, which
+  nothing marks as a stand-in or puts back: `dump-adjust-skills`, `-alt-mon-draw`,
+  `-cast-spell`, `-champion-death`, `-character-damage`, `-clouds`,
+  `-delete-monster-filter`, `-drop-move-object`, `-dsa-delete`, `-fusion`,
+  `-local-action`, `-loop-die`, `-loop-script`, `-missile-draw`, `-missile-drop`,
+  `-missile-exterior`, `-missile-monster`, `-monster-design-options`, `-monster-draw`,
+  `-monster-missile-type`, `-monster-move-code`, `-monster-pad`, `-move-from-missile`,
+  `-party-collision`, `-party-move`, `-queue-sound`, `-viewport-click`,
+  `-wiggle-monster`, `-wiggle-objects`, and `watch-smart-discard`. A member that is a
+  hook by design is not one of them: `GameHost`'s, `CSBGraphicsLoader`'s `opener` and
+  `cannotOpen`, `BackgroundLib.messageBox`, the interpreter context's `graphicTrace`, a
+  `UIState`'s `getGraphicBitmap`; nor are the globals (`Date.now`, `Math.random`,
+  `console`).
+- 31 tools extract the UI tables again (`graphicsTablesOf(…).ui`) beside the `UIState`
+  that `tools/lib/ui.ts` builds them into.
+- 20 tools make 33 `as unknown as` casts: to build a partial record, or to read a
+  record's fields by name. 2 more tools cast through `as any`, to stand a partial record
+  in for `getMissileRecord`'s (`dump-missile-draw`, whose `draw` context is an `any` as
+  well) or for a `ViewportDraw`'s context (`dump-teleporter-shimmer`).
   `tsc` checks none of them. A renamed member leaves the tool compiling, and a write to
   it then sets a new property: the tool goes on passing while testing nothing.
 
-Paid in six steps, each tool's whole output byte-identical across every commit
-("How to work this list", point 3). Steps 1 to 3 are done: `Game`'s seam for the tools
+Paid in seven steps, each tool's whole output byte-identical across every commit
+("How to work this list", point 3). Steps 1 to 4 are done: `Game`'s seam for the tools
 is public, `gameTick` and `lastInputTime` beside `runFrame`; every `UIState` a tool
 drives is `newUIState`'s (`tools/lib/ui.ts`), whose context a tool stages by assigning
-its fields; and every other private a tool drove is public, with the reason in its
-comment, so no tool casts into a private.
+its fields; every other private a tool drove is public, with the reason in its
+comment, so no tool casts into a private; and `tools/lib/standIn.ts` (`standIn`,
+`wrapMember`) replaces a public member with a stand-in typed as the member and puts it
+back, for `dump-attack-panel`, `-button-flash`, `-door-lightning`, `-key-bindings`,
+`-magic-panel`, `-missile-door`, `-mouse-queue` and `-reincarnate-entry`. What a tool
+keeps beside a `Game` is in a `WeakMap` of its own (`dump-game-events`,
+`dump-hall-of-champions`).
 
-4. **The stand-ins**: a `tools/lib` helper that replaces a member with a typed stand-in
-   and puts it back, for the eight method stand-ins and `Game`'s two. One commit.
-5. **The stock dungeon and a test champion** as `tools/lib` helpers, and the tools moved
+5. **The other stand-ins**: the thirty tools above moved to `standIn` and `wrapMember`,
+   a few tools per commit.
+6. **The stock dungeon and a test champion** as `tools/lib` helpers, and the tools moved
    to them, a few tools per commit.
-6. **What is left**: every remaining cast either goes, or builds a stand-in value the
+7. **What is left**: every remaining cast either goes, or builds a stand-in value the
    tool cannot type otherwise (a partial record, a fake `ImageData`), with a comment that
    says so. The item is paid when no tool reaches a private through a cast and no `as any`
    is left.

@@ -36,6 +36,7 @@ import { type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
 import { newUIState } from './lib/ui';
+import { standIn } from './lib/standIn';
 
 async function main(): Promise<void> {
   const loader = new DungeonLoader();
@@ -65,15 +66,15 @@ async function main(): Promise<void> {
   });
   ui.partyState = party.state;
   let damageToDisplay = 0;
-  game.systems.attack.consumeAttackDamageToDisplay = () => {
+  standIn(game.systems.attack, 'consumeAttackDamageToDisplay', () => {
     const damage = damageToDisplay;
     damageToDisplay = 0;
     return damage;
-  };
-  game.systems.character.executeAttack = () => {
+  });
+  standIn(game.systems.character, 'executeAttack', () => {
     damageToDisplay = 20;
     return 1;
-  };
+  });
 
   /** Draw the panel over a screen of 7s and hand back its rectangle's pixels. */
   const panel = uiTables.graphic232.word20;

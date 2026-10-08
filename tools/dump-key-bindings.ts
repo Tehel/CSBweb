@@ -30,6 +30,7 @@ import { CHARFLAG_ATTACK_DISABLE } from '../src/engine/gameTypes';
 import type { LoopScript } from '../src/engine/LoopState';
 import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
 import { newUIState } from './lib/ui';
+import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { handleUIKey, keyScanOf, tableKeyButton, translateKey } from '../src/renderer/ui/Keyboard';
 import { attackPanelTick, closeAttackMenu, handleAttackAreaClick } from '../src/renderer/ui/Attack';
@@ -98,21 +99,21 @@ async function main(): Promise<void> {
   ui.partyState = party.state;
 
   let attacks: Array<{ chIdx: number; attackType: number }> = [];
-  game.systems.character.executeAttack = (chIdx: number, attackType: number) => {
+  standIn(game.systems.character, 'executeAttack', (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
     return 1;
-  };
+  });
   // `d.clockTick` as the handlers leave it (`LoopState.setClockTick`).
   const clockTick = (): string => (ctx.loop.clockTick ? 'due' : 'not due');
   let casts: Array<{ chIdx: number; incantation: number[] }> = [];
   // Stands in for `CastMagic`, which clears the runes of a cast it does not refuse;
   // `tools/dump-magic-panel.ts` drives the real one.
-  game.systems.magic.castSpellFromUi = (chIdx: number) => {
+  standIn(game.systems.magic, 'castSpellFromUi', (chIdx: number) => {
     const champion = party.state.champions[chIdx]!;
     casts.push({ chIdx, incantation: [...champion.incantation] });
     champion.incantation = [];
     return 0;
-  };
+  });
 
   let held = false;
   // A rune key's `_MagicSelection` holds the loop for its flashes (`magicSelectionScript`):
@@ -254,11 +255,11 @@ async function main(): Promise<void> {
   //         `PrepareAttack` returns on `CHARFLAG_attackDisable`
   //         (`doc/CSBwin-src/Character.cpp:4941`). The stub attack busies the attacker, as
   //         the real one's `DisableCharacterAction` does.
-  game.systems.character.executeAttack = (chIdx: number, attackType: number) => {
+  const restoreAttack = standIn(game.systems.character, 'executeAttack', (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
     party.state.champions[chIdx].charFlags |= CHARFLAG_ATTACK_DISABLE;
     return 1;
-  };
+  });
   const hand = ui.uiTables.graphic231.buttons.buttons17952.find((b) => b.word0 === 116);
   check(hand !== undefined, 'buttons17952 should hold champion 1\'s hand, button 116');
   const clickHand = (): void => {
@@ -291,12 +292,13 @@ async function main(): Promise<void> {
     while (held) yield 1;
   }
   ctx.loop.clockTick = false;
-  game.systems.character.executeAttack = (chIdx: number, attackType: number) => {
+  restoreAttack();
+  const restoreRecording = standIn(game.systems.character, 'executeAttack', (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
     held = true;
     game.runScript(hold());
     return 1;
-  };
+  });
   const option = ui.uiTables.graphic231.buttons.buttons17892.find((b) => b.word0 === 113);
   check(option !== undefined, 'buttons17892 should hold the first attack option, button 113');
   attacks = [];
@@ -315,10 +317,7 @@ async function main(): Promise<void> {
   held = false;
   game.runFrame();
   check(!game.isRunningScript(), 'a VBL ends the script, and the loop is free');
-  game.systems.character.executeAttack = (chIdx: number, attackType: number) => {
-    attacks.push({ chIdx, attackType });
-    return 1;
-  };
+  restoreRecording();
   if (option) handleAttackAreaClick(ui, (option.x1 + option.x2) >> 1, (option.y1 + option.y2) >> 1);
   row(ui, 'option', true);
   check(ui.attackingCharacterOrdinal === 0 && clockTick() === 'due',

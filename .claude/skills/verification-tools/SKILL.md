@@ -153,9 +153,11 @@ each other through `ctx.systems` (`DEBT.md` E1c), which such a context leaves em
 what the path under test reaches, with the real system or a cast stand-in
 (`ctx.systems.missileEncounter = { createDeathCloud: () => { clouds++; } } as unknown as MissileEncounter`,
 `dump-monster-damage.ts`). A missing one fails loudly on `undefined`, never silently.
-To intercept a call inside a whole `Game`, replace the method on the instance
-(`game.systems.monsterDamage.damageMonster = …`, `dump-missile-monster.ts`): every caller goes
-through the instance at call time. Before E1a each
+To intercept a call inside a whole `Game`, replace the method on the instance with
+`standIn(target, 'member', replacement)`, or `wrapMember(target, 'member', (real) => …)`
+for one that calls the real method (`tools/lib/standIn.ts`): every caller goes through
+the instance at call time, `tsc` checks the stand-in against the member, and the
+function either returns puts the member back. Before E1a each
 tool hand-built the subset of tables it thought it needed, and two tests silently
 measured nothing because of it (the armour test without the clothing tables;
 `GetCharacterToDamage` without `byte586`, where a wall bump hurt the back row). A new

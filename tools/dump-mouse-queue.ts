@@ -58,6 +58,7 @@ import { graphicsTablesOf, newGame, runVbl, TICK_DUE } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { ButtonsAt } from './lib/clicks';
+import { standIn, wrapMember } from './lib/standIn';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { freeze, thaw } from '../src/engine/LoopState';
@@ -536,12 +537,9 @@ async function main(): Promise<void> {
   // The engine's `CastMagic` and `Attack`, the UI's calls, wrapped to read their results.
   const { magic, character } = game.systems;
   let castResult = -99;
-  const castSpellFromUi = magic.castSpellFromUi.bind(magic);
-  magic.castSpellFromUi = (chIdx) => (castResult = castSpellFromUi(chIdx));
+  wrapMember(magic, 'castSpellFromUi', (cast) => (chIdx) => (castResult = cast(chIdx)));
   let attackResult = -99;
-  const executeAttack = character.executeAttack.bind(character);
-  const recordAttack = (chIdx: number, attackType: number): number => (attackResult = executeAttack(chIdx, attackType));
-  character.executeAttack = recordAttack;
+  wrapMember(character, 'executeAttack', (attack) => (chIdx, attackType) => (attackResult = attack(chIdx, attackType)));
   const centreOf = (list: Array<{ word0: number; x1: number; y1: number; x2: number; y2: number }> | null, id: number): [number, number] => {
     const b = list?.find((entry) => entry.word0 === id);
     if (!b) throw new Error(`no button ${id} in the list`);
@@ -682,11 +680,11 @@ async function main(): Promise<void> {
   check(offered.has(0), 'an empty hand at an empty square has an attack that returns 0');
   // Every real attack there returns 0, so the engine's `Attack` is stood in for once by
   // one that lands: the handler hands on what it gets.
-  character.executeAttack = () => (attackResult = 1);
+  const restoreAttack = standIn(character, 'executeAttack', () => (attackResult = 1));
   const landedFrames = attackOnce('frames', centreOf(buttons.buttons17892, 113)) as number;
   row('ExecuteAttack (Attack stood in, 1)', String(attackResult), landedFrames, '-', 'set');
   check(attackResult === 1 && landedFrames === 1, 'an attack that returns 1 makes a tick due');
-  character.executeAttack = recordAttack;
+  restoreAttack();
   const passFrames = attackOnce('frames', [passX, passY]) as number;
   const passDueRuns = attackOnce('due', [passX, passY]) as boolean;
   row('PASS', String(attackResult), passFrames, passDueRuns, 'untouched');

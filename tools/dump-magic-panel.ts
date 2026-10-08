@@ -35,6 +35,7 @@ import { drawTextLineIndexRaw, loadFontData } from '../src/renderer/csbwin/TextR
 import { drawMagicIncantation, drawSpellMenuCharacters, handleMagicClick } from '../src/renderer/ui/MagicPanel';
 import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
+import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 function champion(name: string): Champion {
@@ -72,8 +73,7 @@ async function main(): Promise<void> {
   // The engine's `CastMagic`, the UI's call, wrapped to read its result.
   const magic = game.systems.magic;
   let castResult = -99;
-  const castSpellFromUi = magic.castSpellFromUi.bind(magic);
-  magic.castSpellFromUi = (chIdx) => (castResult = castSpellFromUi(chIdx));
+  wrapMember(magic, 'castSpellFromUi', (cast) => (chIdx) => (castResult = cast(chIdx)));
 
   const reset = (count: number): void => {
     party.champions = ['ALEX', 'BORIS', 'CHANI', 'DARIA'].slice(0, count).map(champion);
