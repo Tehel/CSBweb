@@ -9,7 +9,7 @@
  * `d.PaletteBrightness` entry at or below the total, 5 with no light at all, read from the
  * tables rather than written here.
  *
- * 1. **A level loaded** (`LoadPartyLevel`, `:823`): level 0, whose experience multiplier
+ * 1. **A level loaded** (`LoadPartyLevel`, `CSBCode.cpp:829`): level 0, whose experience multiplier
  *    is 0, is palette 0 however dark; level 2 with no light is 5.
  * 2. **A torch into a hand** (`AddCharacterPossession`, `Character.cpp:1997`): one of
  *    charge 3 gives `Word1074[3]`; a second in the other hand adds half of its own

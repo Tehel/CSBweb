@@ -20,12 +20,12 @@
  *    before it, and a change to the file's last byte fails the read. Five databases run
  *    past record 1023, and the object index has 19925 slots.
  * 4. **A block it gives up on is no block.** CSBWin seeks back and returns 0 in three
- *    cases, and its caller reads the file from the first byte (`:320-353`):
- *    - the checksum is wrong (`:345-353`): a save with one fill byte of its block changed
+ *    cases, and its caller reads the file from the first byte (`SaveGame.cpp:322-355`):
+ *    - the checksum is wrong (`:347-355`): a save with one fill byte of its block changed
  *      is read as GAMEBLOCK1 at byte 0, which `ReadUnscrambleBlock` refuses, and that is
  *      `tag01efee` (`:1724-1726`); a `dungeon.dat` so changed is read as a dungeon from
  *      byte 0 (`:2560-2566`), and fails by those bytes;
- *    - the sentinel is tested with `strcmp` (`:326`, `:333`), so the twentieth byte must
+ *    - the sentinel is tested with `strcmp` (`:326`, `:335`), so the twentieth byte must
  *      be the terminator;
  *    - the sentinel appears only once deciphered and `flags` has no `SimpleEncryption`
  *      (`:335-345`): Conflux's block with the flag cleared.

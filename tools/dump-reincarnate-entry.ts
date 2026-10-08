@@ -128,7 +128,7 @@ function main(): void {
   check(expected.every((c, i) => letters[i] === c), 'and start at A in the top-left cell');
   // The carriage-return key is *tall*: it occupies the last cell of both the second
   // and third rows, which is why CSBWin tests for two codes, 86 and 97, and why it
-  // also owns the grid line between them (`:196-201`, `:209-211`).
+  // also owns the grid line between them (`Code13ea4.cpp:208-213`, `:221-223`).
   check(readOut.filter((c) => c === '\n').length === 2,
     'the carriage-return key answers from both of the rows it spans');
   const punctuation = readOut.filter((c) => ',.;: '.includes(c));
@@ -164,9 +164,9 @@ function main(): void {
 
     type(h, 'zed');
     show(h, "typed 'zed'");
-    check(h.ui.reincarnate?.name === 'ZED', 'lower case is folded to upper (`:230-233`)');
+    check(h.ui.reincarnate?.name === 'ZED', 'lower case is folded to upper (`:246-249`)');
 
-    // A leading space is refused in either field (`:243-246`).
+    // A leading space is refused in either field (`:259-262`).
     const h2 = makeHarness(uiTables, ['HALK', 'BORIS']);
     openReincarnateScreen(h2.ui, 1);
     type(h2, ' ');
@@ -191,7 +191,7 @@ function main(): void {
     show(h, 'typed a title');
     reincarnateKey(h.ui, 'Enter');
     check(h.ui.reincarnate?.stage === 2 && h.ui.reincarnate?.title === 'THE RENAMED',
-      'Return in the title does nothing at all (`:279-281`)');
+      'Return in the title does nothing at all (`:286-288`)');
 
     // The title stops at nineteen.
     const h4 = makeHarness(uiTables, ['HALK', 'BORIS']);
@@ -212,7 +212,7 @@ function main(): void {
     openReincarnateScreen(h.ui, 1);
     reincarnateKey(h.ui, 'Backspace');
     check(h.ui.reincarnate?.name === '' && h.ui.reincarnate?.stage === 1,
-      'backspace on an empty name does nothing (`:304-305`)');
+      'backspace on an empty name does nothing (`:311-312`)');
 
     type(h, 'ZED');
     reincarnateKey(h.ui, 'Backspace');
@@ -223,7 +223,7 @@ function main(): void {
     check(h.ui.reincarnate?.stage === 2, 'now in the title');
     reincarnateKey(h.ui, 'Backspace');
     show(h, 'empty title, backspace');
-    // `:320-327`: it steps back into the name and lands **on** its last character,
+    // `:327-334`: it steps back into the name and lands **on** its last character,
     // ready to replace it — so one letter is lost, not none.
     check(h.ui.reincarnate?.stage === 1, 'backspace off the front of the title returns to the name');
     check(h.ui.reincarnate?.name === 'Z', 'and takes the name\'s last character with it');
@@ -234,7 +234,7 @@ function main(): void {
   console.log('');
   console.log('=== OK, and the duplicate-name rule ===');
   {
-    // An empty name refuses OK; the title may be empty (`:127-131`).
+    // An empty name refuses OK; the title may be empty (`:135-139`).
     const h = makeHarness(uiTables, ['HALK', 'BORIS']);
     openReincarnateScreen(h.ui, 1);
     reincarnateClick(h.ui, OK.x, OK.y);
@@ -249,7 +249,7 @@ function main(): void {
   }
   {
     // The comparison runs against every champion but the last — the last is the one
-    // being named, so it can never collide with itself (`:141-147`).
+    // being named, so it can never collide with itself (`:149-155`).
     const h = makeHarness(uiTables, ['HALK', 'BORIS']);
     openReincarnateScreen(h.ui, 1);
     type(h, 'HALK');
@@ -266,7 +266,7 @@ function main(): void {
   }
   {
     // Trailing spaces are trimmed before the comparison and before the name is kept
-    // (`:135-140`), so "HALK  " is the same name as "HALK".
+    // (`:143-148`), so "HALK  " is the same name as "HALK".
     const h = makeHarness(uiTables, ['HALK', 'BORIS']);
     openReincarnateScreen(h.ui, 1);
     type(h, 'HALK  ');

@@ -202,7 +202,7 @@ async function main(): Promise<void> {
   }
   check(refused > 0, 'the scene should have a refused step, to cover the flash without a tick');
 
-  // ---- a pass without a tick puts it back too (:773) -----------------------------
+  // ---- a pass without a tick puts it back too (CSBCode.cpp:773) -----------------------------
   reset();
   flashButton(game.ctx, TURN_RIGHT.x1, TURN_RIGHT.x2, TURN_RIGHT.y1, TURN_RIGHT.y2);
   const standing = same(flashedButton(game.ctx), TURN_RIGHT) && !loop.flashButnActive;
@@ -364,7 +364,7 @@ async function main(): Promise<void> {
   prepareAttack(ui, 0);
   const pass = flashOf('PASS', clickAt(attackRect(112)));
   check(pass.tick === undefined && same(pass.after[0]!, PASS) && pass.after[1] === null && pass.after[2] === null,
-    'PASS should flash (0x11d, 0x13f, 0x4d, 0x53) with no tick, and the next VBL put it back (:766)');
+    'PASS should flash (0x11d, 0x13f, 0x4d, 0x53) with no tick, and the next VBL put it back (CSBCode.cpp:773)');
   check(ui.attackingCharacterOrdinal === 0, 'PASS should close the menu');
 
   prepareAttack(ui, 0);

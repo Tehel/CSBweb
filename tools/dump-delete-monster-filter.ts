@@ -10,10 +10,10 @@
  * 2. **Every DSA at the location runs**, each with a count of 8 and the block
  *    (`:1046-1047`): the group's RN, its level and square, the reason, `dropResidue`,
  *    `deathCloud`, and the member's index, -1 for the whole group (`CSB.h:2999-3006`).
- *    The second sees the block the first rewrote (`:1017`), and both run on parameters of
+ *    The second sees the block the first rewrote (`Code11f52.cpp:1049`), and both run on parameters of
  *    their own (`NEWDSAPARAMETERS`, `:963`).
  * 3. **`deathCloud` 2 shows no cloud, `dropResidue` 2 drops no remains**
- *    (`:1149`, `:1127`, `:1118`, `:1134`). The group's last member drops them only for a
+ *    (`Code11f52.cpp:1149`, `:1159`, `:1150`, `:1166`). The group's last member drops them only for a
  *    `dropResidue` below 2, another member for anything but 2: so 3 drops a member's and
  *    not the last one's.
  * 4. **Each site gives its reason**: the party landing on a group (`DMW_Movement2`,

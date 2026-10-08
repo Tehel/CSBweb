@@ -256,21 +256,24 @@ every citation of a 2016 line was mapped to its 2023 line through the diff by
    alone, one a row, with the line it is on (`where`; the row's `text` finds it if lines
    moved), the citation as it now reads and the 2016 one it came from (read against
    `doc/CSBwin-src-20160923/`). Two kinds:
-   - `changed` (about 270): the cited 2016 lines changed in 2023. Read both. If the fact
+   - `changed` (about 200): the cited 2016 lines changed in 2023. Read both. If the fact
      changed, rewrite it, and a behaviour the port lacks is a C entry; otherwise nothing.
-   - `file` (about 360): a `:N` whose file is not named beside it. The script took the
+   - `file` (about 240): a `:N` whose file is not named beside it. The script took the
      file its quoted identifiers point at, else the nearest; `note` gives the other
      candidates, which map elsewhere. Confirm the file from the text, or map the 2016 line
      from the right one.
 
    Work it a document at a time, deleting each row once settled, about 150 rows a session.
-   `doc/PROVEN_FACTS.md` holds a third. Most `changed` rows are cosmetic: the 64-bit
-   rewrite keeps each old line as a `//` comment beside its typed one, and braces, casts
-   and `TranslateLanguage` wrappers move. Comparing the two ranges' tokens, without
+   `doc/PROVEN_FACTS.md` holds more than half. A `file` row is most often wrong where an
+   aside names another file between the paragraph's own and the `:N` (a header, `Data.h`,
+   `system.cpp`): the script took the aside, and `note`'s candidate is the right one.
+   Most `changed` rows are cosmetic: the 64-bit rewrite keeps each old line as a `//`
+   comment beside its typed one, and braces, casts, `TranslateLanguage` wrappers and the
+   messages moved into `d.Pointer228xx` move. Comparing the two ranges' tokens, without
    comments, braces and `;`, leaves what really changed. `POST_TRANSLATE_CLICK` is
-   defined (`CSB.h:1716`), so its `#ifdef` branches are the live ones. When the list is empty, delete it,
-   `tools/recite-csbwin.py` and `doc/CSBwin-src-20160923/`, and the `CLAUDE.md` row that
-   names the last.
+   defined (`CSB.h:1716`), so its `#ifdef` branches are the live ones. When the list is
+   empty, delete it, `tools/recite-csbwin.py` and `doc/CSBwin-src-20160923/`, and the
+   `CLAUDE.md` row that names the last.
 2. **Review every divergence.** Each H entry, each C entry and each `CLAUDE.md` exception
    is checked against 2023: one that 2023 fixed is no longer a divergence. The change not
    taken ("CSBWin's changes from 2016 to 2023" above) becomes an H entry or is ported.

@@ -117,7 +117,7 @@ function findStairs(game: Game, down: boolean, accept: (s: Stairs) => boolean = 
   throw new Error(`no ${down ? 'down' : 'up'} stairs with an open exit`);
 }
 
-/** `:3180-3186`: the corner turned to face back towards the stairs. */
+/** `Code11f52.cpp:3159-3165`: the corner turned to face back towards the stairs. */
 function turnedCorner(corner: number, dir: number): number {
   const back = (dir + 2) & 3;
   return ((((corner - back + 1) & 2) >> 1) + back) & 3;
@@ -171,7 +171,7 @@ function main(): void {
   /* ------------------------------------ 3-4. a monster moved onto stairs ---- */
   /**
    * A group beside stairs going down, in a corner the stairs turn: neither of the two
-   * corners they can leave it in (`:3180-3186`), so a group set down unturned shows.
+   * corners they can leave it in (`Code11f52.cpp:3159-3165`), so a group set down unturned shows.
    */
   const monsterBesideStairs = (): { game: Game; stairs: Stairs; rn: ObjectID; corner: number; type: number } => {
     const game = makeGame();

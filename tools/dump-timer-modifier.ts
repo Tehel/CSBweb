@@ -17,7 +17,7 @@
  *    made a TOGGLE leaves a closed teleporter closed.
  * 5. **So does a door** (`ProcessTT_DOOR`, `:1556-1586`): a SET the DSA makes a TOGGLE
  *    closes an open door, where a SET leaves it alone.
- * 6. **A door timer runs the square's DSAs before it looks at the square** (`:1564-1570`):
+ * 6. **A door timer runs the square's DSAs before it looks at the square** (`:1563-1569`):
  *    on a bashed door, and on a square that is no door.
  *
  * Run: `npx tsx tools/dump-timer-modifier.ts`

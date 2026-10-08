@@ -11,15 +11,15 @@
  *    the group's square, the group, and the party's level and square (`:3348-3355`), with
  *    `monsterMoveFilterActive` set, so `&MONL&D` reads them (`DSA.cpp:4769-4791`), and
  *    cleared after. The caller's parameters are as they were.
- * 2. **Only the first type-47 actuator at the location runs** (`:3117`).
+ * 2. **Only the first type-47 actuator at the location runs** (`Monster.cpp:3120`).
  * 3. **`&MONBLK` survives into the turn**: the turn cleared `monsterMoveInhibit` before
  *    the filter, not after (`:3314-3317`).
- * 4. **When it runs** (`:3313-3320`): never for a reaction (`TT_M1`), only within
+ * 4. **When it runs** (`:3320-3327`): never for a reaction (`TT_M1`), only within
  *    `maxDistance` of the party, squared distances compared, and with `partyLevelOnly`
  *    set only on the party's level.
  * 5. **A level's own record comes first**, the dungeon's is the fallback, and a level
- *    whose record names a square without a DSA has no filter (`:3080-3163`).
- * 6. **The location is looked up once per level** (`:3080`), and kept.
+ *    whose record names a square without a DSA has no filter (`:3083-3166`).
+ * 6. **The location is looked up once per level** (`:3083`), and kept.
  * 7. **The post-move filter** (`ProcessPostMonsterMoveFilter`, `:3173-3237`), which every
  *    `return` of the turn runs: the same DSA's column 1, its timer function 1, on the
  *    variables the pre-move filter left, with a count of 9: where the group ended, the

@@ -13,8 +13,8 @@
  *     declares — stay the number of records. A full database's `Enlarge` is
  *     `tools/dump-make-more-room.ts`'s.
  *  4. The indirect index. `DeleteDBEntry` frees the record's slot with it, `0xff`/`0xffff`
- *     (`:995-1017`), and the next new object, of any database, takes the lowest free
- *     slot (`:958-978`, `:1011-1013`). A slot that names a free record of the database is
+ *     (`data.cpp:995-1017`), and the next new object, of any database, takes the lowest free
+ *     slot (`:935-955`, `:988-990`). A slot that names a free record of the database is
  *     taken with its record, first, record 0 included. A record two slots name, or
  *     whose slot carries bit 0x80, is "Cloned!!!": deleting it changes nothing. Slot 0
  *     names door 0, so door 0 is such a record as soon as a cell's chain holds it.

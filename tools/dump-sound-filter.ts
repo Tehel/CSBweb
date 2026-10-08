@@ -6,12 +6,12 @@
  *
  * 1. **A dungeon with no filter plays the sound** (`SoundFilter` returns 1).
  * 2. **Every DSA at the location runs**, the second after the first, a filter call apiece
- *    (`:715-757`), and the sound is theirs: nothing plays (`QueueSound` returns at `:1906`).
- * 3. **The nine parameters** (`:740-749`): the ordinal plus 1, the volume, the squared
+ *    (`Sound.cpp:710-752`), and the sound is theirs: nothing plays (`QueueSound` returns at `CSBCode.cpp:1906`).
+ * 3. **The nine parameters** (`Sound.cpp:735-744`): the ordinal plus 1, the volume, the squared
  *    distance, the sound's level, x and y, `gameVolume` and `NoSound` (CSBWin's defaults,
  *    0 and 0), and the distance in hundredths, three integer Newton steps from
  *    `100 * max(dx, dy)`: 141 for a step of (1, 1), 500 for (3, 4), 0 on the party's square.
- * 4. **A sound out of earshot reaches the filter too**, with volume -1 (`:1905-1907`).
+ * 4. **A sound out of earshot reaches the filter too**, with volume -1 (`CSBCode.cpp:1905-1907`).
  * 5. **A DSA plays the sound if it pleases**, with `&SOUND` (`PlayCustomSound`,
  *    `Sound.cpp:1048-1071`).
  * 6. **A sound queued while the DSAs run plays on** (`filterActive`, `:677-681`): the

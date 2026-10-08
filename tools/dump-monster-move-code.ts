@@ -17,7 +17,7 @@
  *     loop (`:3182-3211`). The port applied the damage at the pit square, where no group
  *     stood, so nothing was deleted and the group walked on below.
  *  5. A teleporter to a level the group's type may not live on: the teleport happens and
- *     the group is deleted after the loop (`:3151`). The port refused the teleport and
+ *     the group is deleted after the loop (`:3182`). The port refused the teleport and
  *     left the group on the teleporter.
  *  6. `CreateMonster` on the party's level returns `RNnul` and makes no sound, because
  *     the attach makes `MoveObject` return 1 (`Monster.cpp:222-231`); a generator queues

@@ -408,8 +408,8 @@ async function main(): Promise<void> {
   // `TT_DOOR` for `d.Time+1` (Mouse.cpp:1079-1086). A tick runs `ProcessTimers` before its
   // `d.Time++` (`CSBCode.cpp:636`, `:670`), so the tick in the frame of the click passes the
   // door by, and the one after it moves it. `TouchWallF1` sets it to what `TouchWall`
-  // returns (`:789`): 1 when a switch fired, 0 when nothing did, which puts off a tick that
-  // was due. A cell ahead off the map leaves it alone (`:794-797`).
+  // returns (`Mouse.cpp:789`): 1 when a switch fired, 0 when nothing did, which puts off a tick that
+  // was due. A cell ahead off the map leaves it alone (`:785-788`).
   const inMap = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < width && y < height;
   const stone = (x: number, y: number): boolean =>
     inMap(x, y) && ((dungeon.getCellFlag(new Position(x, y, level)) >> 5) & 0x7) === RoomType.STONE;
