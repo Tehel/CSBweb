@@ -108,7 +108,7 @@ function drawWallDecorationGraphic(
     }
   }
 
-  // CSBWin: `relativePosition % 5 > 1` selects front view; otherwise side view (CSBCode.cpp:3227-3232).
+  // CSBWin: `relativePosition % 5 > 1` selects front view; otherwise side view (CSBCode.cpp:3265-3269).
   const frontView = (relativePosition % 5) > 1;
   const graphicNum = 121 + 2 * decorationIndex + (frontView ? 1 : 0);
 
@@ -212,7 +212,7 @@ function countWallTextLines(text: Uint8Array): number {
  * `championPortraitOrdinal` is 1-based, so 0 means "no portrait" and the ordinal is
  * decremented to CSBWin's `charID` before use. Graphic 26 is a 256x87 sheet of 32x29
  * cells, 8 per row: `srcX = (charID & 7) << 5`, `srcY = 29 * (charID >> 3)`; past 23,
- * the portrait is `CSBgraphics.dat`'s (`:3765-3774`). The transparent colour is **1**,
+ * the portrait is `CSBgraphics.dat`'s (`:3768-3780`). The transparent colour is **1**,
  * not the 10 that `BltShapeToViewport` uses, so the mirror's glass shows around the head.
  */
 function drawChampionPortrait(draw: ViewportDraw, championPortraitOrdinal: number): void {

@@ -27,7 +27,7 @@
  * The three-byte terminator is easy to miss and not optional: `WriteDSALevelIndex` ends
  * with `triple[0] = triple[1] = triple[2] = 255;` and one more `WRITE`
  * (`doc/CSBwin-src/SaveGame.cpp:808-809`), and `ReadDSALevelIndex` loops until it reads a
- * triple whose first byte is above 63 (`:425-438`) — consuming it. Without those three
+ * triple whose first byte is above 63 (`:286-295`) — consuming it. Without those three
  * bytes the reader would eat the first three bytes of GAMEBLOCK1.
  *
  * A `dungeon.dat` may open with the same prefix (`DungeonLoader.loadDungeonDat`). This
@@ -192,7 +192,7 @@ export function rc4PrepareKey(keyData: Uint8Array, keyDataLen: number): Uint8Arr
 }
 
 /**
- * `RC4_encipher` (`doc/CSBwin-src/RC4.cpp:65-76`): XOR `buffer` in place with the stream
+ * `RC4_encipher` (`doc/CSBwin-src/RC4.cpp:63-76`): XOR `buffer` in place with the stream
  * from `position`, the buffer's place in its file. Its own inverse.
  */
 export function rc4Encipher(state: Uint8Array, buffer: Uint8Array, position: number): void {

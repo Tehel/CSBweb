@@ -30,9 +30,9 @@ import {
 
 /* ------------------------------------------------------------------- constants ---- */
 
-/** `graphics.dat` items, named as `Data.h:255-266` names the pointers they load into. */
-const GRAPHIC_DOOR_LEFT = 2;    // d.Pointer22952 — 128x161
-const GRAPHIC_DOOR_RIGHT = 3;   // d.Pointer22936 — 128x161
+/** `graphics.dat` items, named as `Data.h:255-277` names the pointers they load into. */
+const GRAPHIC_DOOR_LEFT = 2;    // d.Pointer22952[0] — 128x161
+const GRAPHIC_DOOR_RIGHT = 3;   // d.Pointer22952[4] — 128x161
 const GRAPHIC_ENTRANCE = 4;     // d.Pointer22956 — "Prison entrance minus door"
 const GRAPHIC_CREDITS = 5;      // d.Pointer22960 — the scroll
 const GRAPHIC_SOUND_LATCH = 534;// d.Pointer22968 — the click as the doors unlock
@@ -60,7 +60,7 @@ export const INTERIOR_HEIGHT = 161;
 export const INTERIOR_SCREEN_Y = 30;
 /** Only 232 of the 256 columns ever reach the screen — the `112 + 4*2` bytes at `:9557`. */
 export const INTERIOR_VISIBLE_WIDTH = 232;
-/** `for (D7W = 1; D7W != 32; D7W++)` (`:9501`). */
+/** `for (D7W = 1; D7W != 32; D7W++)` (`:9503`). */
 export const DOOR_STEPS = 31;
 /** `for (i=0; i<6; i++) { CheckSoundQueue(); wvbl(_1_); }` (`:9550`). */
 const DOOR_STEP_VBLS = 6;
@@ -171,7 +171,7 @@ export function withRiseButton(buttons: UIButton[]): UIButton[] {
 
 /** The eight pre-shifted door halves, plus the pristine interior behind them. */
 export interface PrisonDoorAssets {
-  /** `(&d.Pointer22952)[0..7]`: 0..3 the left half at 0/4/8/12 px, 4..7 the right half. */
+  /** `d.Pointer22952[0..7]`: 0..3 the left half at 0/4/8/12 px, 4..7 the right half. */
   slots: IndexedBitmap[];
   entrance: IndexedBitmap;
   credits: IndexedBitmap;
@@ -240,7 +240,7 @@ export async function drawPrisonDoor(host: IntroHost, assets: PrisonDoorAssets):
   // working buffer the door animation restores from every frame.
   tag0088b2Index(host.screen, assets.interior, { ...rects.word84, srcX: 0, srcY: INTERIOR_SCREEN_Y, srcStride: host.screen.width }, -1);
 
-  // The two halves, shut. (`:9717`, `:9720`)
+  // The two halves, shut. (`:9721`, `:9725`)
   tag0088b2Index(assets.slots[0], host.screen, { ...rects.word92, srcX: 0, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
   tag0088b2Index(assets.slots[4], host.screen, { ...rects.word100, srcX: 0, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
 

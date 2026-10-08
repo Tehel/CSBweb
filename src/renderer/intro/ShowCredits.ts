@@ -7,14 +7,14 @@
  * drawn straight to the screen like the pre-game screens, so it runs over the same
  * `IntroHost`:
  *
- * 1. the dying sound, and 240 VBLs (`:132-139`);
+ * 1. the dying sound, and 240 VBLs (`:122-129`);
  * 2. the fade to black: `d.DynamicPaletteSwitching` is 0, so `FadeToPalette(Palette11914)`
  *    rather than the `Darken` steps (`:148-170`);
  * 3. "THE END", graphic 6, alone on a cleared screen at `d.Word108`, faded up to a palette
  *    of `0x002` with colour 15 at `0x777`, and 300 VBLs (`:227-238`);
  * 4. with `d.CanRestartFromSavegame` set, the "RESTART THIS GAME" button for 899 VBLs
  *    (`:240-282`); pressed, the screen goes black and the game is set up again
- *    (`:293-332`), which is the caller's;
+ *    (`:283-322`), which is the caller's;
  * 5. the fade back to the dark blue, the credits picture, graphic 5, in `d.Palette328`,
  *    until a button is held or a key waits (`:326-337`);
  * 6. with `d.CanRestartFromSavegame` set, back to "THE END" without the 300 VBLs
@@ -42,7 +42,7 @@ const GRAPHIC_CREDITS = 5;
  * 64x43 — the 1376 bytes `A3` skips.
  */
 export const GRAPHIC_CHAMPION_FRAME = 208;
-/** `D6L = 48 * D7W`, and `d.Word132` and `d.Word140` moved down 48 a champion (`:177`, `:221-224`). */
+/** `D6L = 48 * D7W`, and `d.Word132` and `d.Word140` moved down 48 a champion (`:177`, `:211-214`). */
 export const WON_CHAMPION_PITCH = 48;
 /** `QueueSound(6, d.partyX, d.partyY, 0); //Dying sound` (`:126`). */
 export const SOUND_DYING = 6;
@@ -141,7 +141,7 @@ export async function showCredits(host: IntroHost, hooks: ShowCreditsHooks): Pro
     }
     await host.vbl(1);
   } else {
-    // The whole screen is in `globalPalette`, the interface's, and fades from it (`:178-180`).
+    // The whole screen is in `globalPalette`, the interface's, and fades from it (`:168-170`).
     await fadeToPalette(host, PALETTE_11914);
   }
   if (hooks.word11694) {
@@ -158,7 +158,7 @@ export async function showCredits(host: IntroHost, hooks: ShowCreditsHooks): Pro
     await fadeToPalette(host, PALETTE_LOCAL_46);
     if (firstTime) await host.vbl(THE_END_VBLS);
     if (hooks.canRestartFromSavegame && (await offerRestart(host))) {
-      // `:295-298`: to black, then the interface's palette over the black screen.
+      // `:285-288`: to black, then the interface's palette over the black screen.
       await fadeToPalette(host, PALETTE_LOCAL_110);
       host.screen.pixels.fill(0);
       await fadeToPalette(host, rects.palette552[0] ?? PALETTE_11914);

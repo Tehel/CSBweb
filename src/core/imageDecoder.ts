@@ -40,8 +40,8 @@ export interface DecodedImage extends ImageDimensions {
  *
  * Four bytes of `width`, `height`, then a byte-oriented opcode stream. Pixels are 4-bit
  * palette indices written left to right, top to bottom, into a buffer whose line pitch is
- * rounded **up to a whole 16-pixel group** — `D7W = ((width+15)>>1) & 0x7ff8` bytes
- * (`CSBCode.cpp:10995`). Every image in `graphics.dat` happens to be a multiple of 16 wide,
+ * rounded **up to a whole 16-pixel group** — `destBytesPerLine = ((width+15)>>1) & 0x7ff8`
+ * bytes (`CSBCode.cpp:11000`). Every image in `graphics.dat` happens to be a multiple of 16 wide,
  * so the padding never shows; it is here because the "copy the previous line" opcode is
  * defined in terms of that pitch.
  *
@@ -72,7 +72,7 @@ export function decodeIMG(data: Uint8Array, format: ImageFormat = ImageFormat.IM
         ? (data[2] << 8) | data[3]
         : data[2] | (data[3] << 8);
 
-    // `D7W = (I16)(((D7W+15)>>1)&0x7ff8)` bytes per line; two pixels to the byte.
+    // `destBytesPerLine = (I16)(((destBytesPerLine+15)>>1)&0x7ff8)` bytes per line; two pixels to the byte.
     const stride = ((((width + 15) >> 1) & 0x7ff8)) * 2;
     const total = stride * height;
     const buffer = new Uint8Array(total);

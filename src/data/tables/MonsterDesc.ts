@@ -59,7 +59,7 @@ export const monsterAttackingMirrorOK = (d: MonsterDesc): boolean => (d.word4 & 
 export const monsterWord4Bit10 = (d: MonsterDesc): boolean => (d.word4 & 0x0400) !== 0;
 
 /*
- * `word14` / `word16` / `word18` / `word20` bitfields (doc/CSBwin-src/CSB.h:2410-2421).
+ * `word14` / `word16` / `word18` / `word20` bitfields (doc/CSBwin-src/CSB.h:2407-2421).
  * `sightDistance` is halved for each level of darkness by the caller.
  */
 export const monsterSightDistance = (d: MonsterDesc): number => d.word14 & 15;

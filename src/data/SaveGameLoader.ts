@@ -708,7 +708,7 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState {
  *
  * Every offset is `GAMEBLOCK2`'s own (`doc/CSBwin-src/SaveGame.cpp:108-134`) and every
  * field is big-endian, because `SaveGame` runs `swapBlock2` over the struct immediately
- * before it checksums and writes it (`:1136-1141`, `:1160`).
+ * before it checksums and writes it (`:1115-1120`, `:1158-1165`).
  *
  * Bytes 50-127 are `FILL180`, which `SaveGame` clears before writing (`:1055`), so they
  * are left as the zeros `new Uint8Array` supplies.

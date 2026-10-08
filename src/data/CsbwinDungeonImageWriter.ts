@@ -295,7 +295,7 @@ export function databaseRecordSize(db: number, options: DatabaseWriteOptions = {
  * - **11, `EXPOOL`.** Written from `dungeon.expool`, the blocks the world holds. The key
  *   of each champion bones record is the bones' RN (`src/data/CsbwinExpool.ts`). The DSA
  *   global variables and the 24 overlay palette records are written into it just before
- *   the image, as `SaveGame` does (`:1144-1167`, `src/engine/SaveGameFile.ts`).
+ *   the image, as `SaveGame` does (`doc/CSBwin-src/SaveGame.cpp:1206-1231`, `src/engine/SaveGameFile.ts`).
  * - **12 and 13**, which `CSB.h` marks `//Not used`. Empty in every file here.
  */
 export function buildDatabases(

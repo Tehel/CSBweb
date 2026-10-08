@@ -31,7 +31,7 @@
  * "Don't use entry zero" (`:2180-2185`).
  *
  * Two slots may name the same `(db, idx)`: `convertScrolls` gives a scroll's text a slot
- * of its own (`AllocateIndirectIndex`, `:2365`) beside the one `ConvertListOfObjects`
+ * of its own (`AllocateIndirectIndex`, `:2371`) beside the one `ConvertListOfObjects`
  * gave the record if it lies in a chain.
  */
 import { RnMaps } from '../core/RnMaps';

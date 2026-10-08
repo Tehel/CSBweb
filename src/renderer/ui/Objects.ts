@@ -92,7 +92,7 @@ export function getBonesChampion(ui: UIState, objectId: ObjectID, objectNameInde
  * of `"% " + objName`, with the champion's name for each `%`. With no translation (`DEBT.md`
  * G21) `TranslateLanguage` gives its text back (`Translation.cpp:187`), so this reads
  * "NAME BONES". The hand's line and the inventory's description both name bones so
- * (`Code11f52.cpp:126`, `Character.cpp:3604`).
+ * (`Code11f52.cpp:91`, `Character.cpp:3587`).
  */
 export function describeChampionBones(name: string, objName: string): string {
   return `% ${objName}`.split('%').join(name);

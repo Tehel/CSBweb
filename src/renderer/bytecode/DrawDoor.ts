@@ -58,7 +58,7 @@ export function DrawDoor(
   let bitmap: IndexedBitmap = graphic;
   let ownBitmap = false;
   const drawOrnament = (ornament: number, near: number) => {
-    if (ornament === 0) return; // `TAG004b26` returns at once (`:4067`)
+    if (ornament === 0) return; // `TAG004b26` returns at once (`:4066`)
     if (!ownBitmap) {
       bitmap = { width: bitmap.width, height: bitmap.height, pixels: bitmap.pixels.slice() };
       ownBitmap = true;
@@ -87,7 +87,7 @@ export function DrawDoor(
     }
   }
 
-  // The near door under See-Thru-Walls (`:4175-4181`).
+  // The near door under See-Thru-Walls (`:4233-4239`).
   if (rect === draw.context.doorRects?.F1 && draw.context.seeThroughWalls) drawOrnament(17, 2);
 
   const blit = (r: RectPos | undefined) => {
@@ -96,7 +96,7 @@ export function DrawDoor(
   };
 
   if (s === 4 || s === 5) {
-    if (s === 5) drawOrnament(16, nearness); // bashed (`:4191`)
+    if (s === 5) drawOrnament(16, nearness); // bashed (`:4249`)
     blit(rect[0]);
     return;
   }

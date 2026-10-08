@@ -2686,7 +2686,7 @@ above is what a player actually touches.
 **Every other naming path is correctly bounded**, and this is worth knowing before
 porting any of them: `AddCharacter` stops at `D6W >= 7` and writes its terminator at
 `name[7]` at worst (`doc/CSBwin-src/Character.cpp:554-568`); the reincarnate screen gates
-the name at `D7W == 7` and the title at 19 (`doc/CSBwin-src/Code13ea4.cpp:64-68,282`);
+the name at `D7W == 7` and the title at 19 (`doc/CSBwin-src/Code13ea4.cpp:64-68,283`);
 `CopyCharacter`, `SaveToWings`/`GetFromWings` and `RemoveCharacter`'s compaction all move
 the whole 800-byte struct; and `swapCharacter` touches nothing below offset 32
 (`doc/CSBwin-src/SaveGame.cpp:498-550`).
@@ -5500,7 +5500,7 @@ cloud-timer lookup (`MoveObject.cpp:233-241`) — is first in that order.
 `Level()` and `timerWord6()` (the square):
 
 - **New map timer (5-10)**, only while `deleteDuplicateTimers != 0` (initialised -1,
-  `data.cpp:65`; a save may set it, `SaveGame.cpp:1994-1994`): the first matching **map timer
+  `data.cpp:65`; a save may set it, `SaveGame.cpp:1965-1975`): the first matching **map timer
   of any function** — a `TT_STONEROOM` only with the same `uByte8` — takes the new `uByte9`
   and is returned; the new one is not queued. Failing that, the first matching `TT_1` is
   deleted — the new `uByte9` becoming `1 - old.uByte9` if it was 2 — and the new one is queued.

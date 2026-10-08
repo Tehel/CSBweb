@@ -18,7 +18,7 @@
  * There is deliberately **no cancel**. CSBWin offers none: the only way out is a name
  * that is at least one character long and not already worn by another champion.
  *
- * ## The letter grid (`:184-220`)
+ * ## The letter grid (`:187-222`)
  *
  * Screen coordinates, three rows of eleven cells on a 10-pixel pitch:
  *
@@ -37,11 +37,11 @@ import { fillRectIndex } from '../csbwin/CanvasBlitter';
 import { blitBasicGraphicToViewport } from './Draw';
 import { UIState } from './UIState';
 
-/** `d.CH16482[].name` is seven characters, the title nineteen (`:47-48`). */
+/** `d.CH16482[].name` is seven characters, the title nineteen (`:49-50`). */
 const NAME_MAX = 7;
 const TITLE_MAX = 19;
 
-/** Where each field's first character sits, in *screen* coordinates (`:57-58`, `:290`). */
+/** Where each field's first character sits, in *screen* coordinates (`:61-62`, `:305-306`). */
 const NAME_X = 177;
 const NAME_Y = 91;
 const TITLE_X = 105;
@@ -88,7 +88,7 @@ export function isReincarnateScreenOpen(ui: UIState): boolean {
 
 /**
  * `D4W` (`:64-70`) — the title is full and no more will be taken. The name has no
- * equivalent: at seven characters it advances to the title on its own (`:253-255`).
+ * equivalent: at seven characters it advances to the title on its own (`:282-284`).
  */
 function fieldIsFull(state: ReincarnateState): boolean {
   return state.stage === 2 && state.count === TITLE_MAX;
@@ -143,7 +143,7 @@ export function drawReincarnateScreen(ui: UIState): void {
 }
 
 /**
- * A key, as CSBWin's loop sees it (`:225-335`). `key` is a DOM `KeyboardEvent.key`.
+ * A key, as CSBWin's loop sees it (`:238-342`). `key` is a DOM `KeyboardEvent.key`.
  * Returns whether the screen consumed it — while it is open, it consumes everything.
  */
 export function reincarnateKey(ui: UIState, key: string): boolean {
@@ -161,14 +161,14 @@ export function reincarnateKey(ui: UIState, key: string): boolean {
 }
 
 /**
- * A click, in screen coordinates (`:126-212`). The screen reads the mouse queue itself
+ * A click, in screen coordinates (`:135-224`). The screen reads the mouse queue itself
  * rather than going through a button list, so this takes raw coordinates.
  */
 export function reincarnateClick(ui: UIState, x: number, y: number): boolean {
   const state = ui.reincarnate;
   if (!state) return false;
 
-  // OK (`:127-165`). Refused while the name is empty; always available once the title
+  // OK (`:135-177`). Refused while the name is empty; always available once the title
   // stage is reached, even with an empty title.
   if (
     (state.stage === 2 || state.count > 0) &&
@@ -178,13 +178,13 @@ export function reincarnateClick(ui: UIState, x: number, y: number): boolean {
     return true;
   }
 
-  // Backspace (`:166-173`).
+  // Backspace (`:179-186`).
   if (x >= BACKSPACE_X1 && x <= BACKSPACE_X2 && y >= BUTTON_Y1 && y <= BUTTON_Y2) {
     applyCharacterCode(state, 8);
     return true;
   }
 
-  // The letter grid (`:174-210`).
+  // The letter grid (`:187-222`).
   if (x >= GRID_X1 && x <= GRID_X2 && y >= GRID_Y1 && y <= GRID_Y2) {
     const code = gridCharacterAt(ui, x, y);
     if (code !== null) applyCharacterCode(state, code);
@@ -193,7 +193,7 @@ export function reincarnateClick(ui: UIState, x: number, y: number): boolean {
 }
 
 /**
- * The grid arithmetic of `:180-210`, kept in CSBWin's own order so the two odd cases
+ * The grid arithmetic of `:192-222`, kept in CSBWin's own order so the two odd cases
  * survive: the carriage-return key answering to two codes, and the shift that closes
  * the gap it leaves in the alphabet.
  */
@@ -218,7 +218,7 @@ export function gridCharacterAt(ui: UIState, x: number, y: number): number | nul
   return code;
 }
 
-/** The tail of the loop (`:225-335`), shared by the keyboard and the letter grid. */
+/** The tail of the loop (`:238-342`), shared by the keyboard and the letter grid. */
 function applyCharacterCode(state: ReincarnateState, rawCode: number): void {
   let code = rawCode;
   // `if ((D5W>='a') && (D5W<='z')) D5W -= 32;`
@@ -245,7 +245,7 @@ function applyCharacterCode(state: ReincarnateState, rawCode: number): void {
   }
 
   if (code === 13) {
-    // Return ends the name, and does nothing at all in the title (`:279-283`).
+    // Return ends the name, and does nothing at all in the title (`:286-290`).
     if (state.stage !== 1) return;
     if (state.count <= 0) return;
     advanceToTitle(state);
@@ -257,7 +257,7 @@ function applyCharacterCode(state: ReincarnateState, rawCode: number): void {
     if (state.stage === 1 && state.count === 0) return;
     if (state.count === 0) {
       // Backspacing off the front of the title steps back into the name and puts the
-      // cursor **on** its last character, ready to replace it (`:320-327`).
+      // cursor **on** its last character, ready to replace it (`:327-334`).
       state.stage = 1;
       state.count = Math.max(0, state.name.length - 1);
       state.name = state.name.slice(0, state.count);
@@ -277,7 +277,7 @@ function advanceToTitle(state: ReincarnateState): void {
 }
 
 /**
- * The OK button (`:127-165`).
+ * The OK button (`:135-177`).
  *
  * Trailing spaces are trimmed off the name before it is compared, and the comparison
  * runs against every champion **except the last** — the last is the one being named.

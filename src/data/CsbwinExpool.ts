@@ -416,7 +416,7 @@ export function readDisableSaves(db: ExpoolDatabase): boolean {
 
 /**
  * `LoadGame`'s `EDBT_Debuging_data`, `EDBT_CSBGraphicsSignature_data` and
- * `EDBT_GraphicsSignature_data` (`doc/CSBwin-src/SaveGame.cpp:1966-2023`): each 0 unless
+ * `EDBT_GraphicsSignature_data` (`doc/CSBwin-src/SaveGame.cpp:1977-2022`): each 0 unless
  * the pool holds its record with a longword or more (`Locate` greater than 0), then that
  * record's first. The two signatures are read only when `EDBT_Debuging_data` is 0. Their
  * keys are `EDBT_RuntimeFileSignatures`' 0 and 1.

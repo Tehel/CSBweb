@@ -230,7 +230,7 @@ export class GameScreen {
   /**
    * Offer a key to the Reincarnate name-entry screen. Returns whether it took it —
    * while that screen is up it takes everything, which is what makes it modal
-   * (`keyboardMode = 2`, `doc/CSBwin-src/Code13ea4.cpp:38`).
+   * (`keyboardMode = 2`, `doc/CSBwin-src/Code13ea4.cpp:40`).
    */
   handleReincarnateKey(key: string): boolean {
     return reincarnateKey(this.ui, key);

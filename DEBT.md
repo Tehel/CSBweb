@@ -95,6 +95,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C157 | CSBWin 20230608 becomes the reference | L | ⏳ |
+| C162 | A dungeon's `EDBT_DeleteDuplicateTimers` record is not read | S | ⏳ |
 | G28 | The utility's untried form: a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
@@ -124,7 +125,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C162 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C163 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -255,9 +256,9 @@ every citation of a 2016 line was mapped to its 2023 line through the diff by
    alone, one a row, with the line it is on (`where`; the row's `text` finds it if lines
    moved), the citation as it now reads and the 2016 one it came from (read against
    `doc/CSBwin-src-20160923/`). Two kinds:
-   - `changed` (about 390): the cited 2016 lines changed in 2023. Read both. If the fact
+   - `changed` (about 270): the cited 2016 lines changed in 2023. Read both. If the fact
      changed, rewrite it, and a behaviour the port lacks is a C entry; otherwise nothing.
-   - `file` (about 405): a `:N` whose file is not named beside it. The script took the
+   - `file` (about 360): a `:N` whose file is not named beside it. The script took the
      file its quoted identifiers point at, else the nearest; `note` gives the other
      candidates, which map elsewhere. Confirm the file from the text, or map the 2016 line
      from the right one.
@@ -277,6 +278,22 @@ every citation of a 2016 line was mapped to its 2023 line through the diff by
    the tree.
 
 Size L.
+
+### C162 ⏳ A dungeon's `EDBT_DeleteDuplicateTimers` record is not read
+
+`_ReadEntireGame` sets `deleteDuplicateTimers` from the pool once the databases are read,
+for a new game and a saved one alike: 1 when the pool holds no
+`(EDT_Database << 24) | (EDBT_DeleteDuplicateTimers << 16)` record, else the record's first
+longword (`doc/CSBwin-src/SaveGame.cpp:1965-1975`). `SetTimer` merges a new map timer into
+a matching one only while it is not 0 (`doc/CSBwin-src/Timer.cpp:1011-1053`). The port's
+`TimerQueue.deleteDuplicateTimers` is always true (`src/engine/TimerQueue.ts`), and nothing
+reads the record. CSBWin writes none; a dungeon editor does. 3D2D1D's `dungeon.dat` holds
+one of 0, so CSBWin plays it without the merge; Conflux 3.5's holds 1; no other data set
+here has one.
+
+Paying it: read the record beside `readDisableSaves` (`src/data/CsbwinExpool.ts`), set the
+queue's flag from it, and a tool that queues two matching map timers in 3D2D1D and sees
+both kept.
 
 ---
 

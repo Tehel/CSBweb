@@ -3,7 +3,7 @@
  *
  * The UI half of the champion's attack, from `doc/CSBwin-src/Character.cpp`:
  * `ItemHasChargesLeft` (`:4762`), `GetLegalAttackTypes` (`:4789`), `DrawAttackButton`
- * (`:4832`), `TAG01b1c0` (`:4903`), `PrepareAttack` (`:4929`), `_ExecuteAttack`
+ * (`:4832`), `TAG01b1c0` (`:4904`), `PrepareAttack` (`:4929`), `_ExecuteAttack`
  * (`:4969`), plus `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8823`),
  * `_TAG019fac` (`doc/CSBwin-src/Character.cpp:4678`), `_TAG01b29a`
  * (`doc/CSBwin-src/CSBCode.cpp:8904`) and `_FlashAttackDamage`
@@ -193,7 +193,7 @@ function nameAttackOptions(ui: UIState): void {
 }
 
 /**
- * `TAG01b1c0` (`doc/CSBwin-src/Character.cpp:4903`) — close the menu again, and ask for
+ * `TAG01b1c0` (`doc/CSBwin-src/Character.cpp:4904`) — close the menu again, and ask for
  * the panel to be redrawn on the next tick. It draws nothing there, so the menu stays on
  * the screen until `TAG01b29a` draws the damage or the buttons over it. Its redraw of the
  * attacker's hands is the frame's, which no longer boxes the weapon hand in cyan
