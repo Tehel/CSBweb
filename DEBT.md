@@ -94,7 +94,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C151 | A click is matched to its button when it is queued, not when it is taken | M | ⏳ |
+| C158 | The inventory opens and closes without `DiscardAllInput` | S | ⏳ |
 | C152 | A wall text seen from afar shows its plaque at full height | M | ⏳ |
 | C153 | `&PARAM@` reads variable 0 for each missing parameter | S | ⏳ |
 | C154 | The attacker's hand may keep its cyan border after a PASS or a zero-delay attack | S | ⏳ |
@@ -118,8 +118,9 @@ In payoff order: the first row is the next item.
 | X8 | Extra: RISE's own dialog, and the utility disk's portraits on DM's champions | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G29 are the active list. C151-C157 are CSBWin's changes from 2016 to 2023
-(see "CSBWin's changes from 2016 to 2023" in tier C), taken first. `F3` is a phase, whose
+The rows above G29 are the active list. C158 is a bug of the port's, and comes first.
+C152-C157 are CSBWin's changes from 2016 to 2023 (see "CSBWin's changes from 2016 to
+2023" in tier C), taken next. `F3` is a phase, whose
 status is `PLAN.md`'s, and its row only marks its place. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
@@ -129,7 +130,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C158 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C159 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -231,7 +232,7 @@ CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
 ### CSBWin's changes from 2016 to 2023
 
-C151-C156 are changes Paul Stevens made after the source the port follows and before the
+C152-C156 are changes Paul Stevens made after the source the port follows and before the
 build the author plays. `doc/CSBwin-src/` is `CSBwin_SRC_20160923.zip` from
 dianneandpaul.net/CSBwin/, "Version 15.9" (`CSBwin.rc:322`), with the author's cosmetic
 edits in `CSBCode.cpp`, `RC4.cpp`, `SaveGame.cpp` and `Data.h`. 15.9 is a side branch of
@@ -251,25 +252,6 @@ Raspberry Pi front-ends. Two changes are not taken:
   (`TextOutToScreen_Centered`, `Attack.cpp:972-980`, `CSBCode.cpp:1785`), which puts them
   2 and 3 pixels right of the original's 242 and 248. It serves translations.
 - The utility's word-10 save form, whose adventure write is left `NotImplemented` (G28).
-
-### C151 ⏳ A click is matched to its button when it is queued, not when it is taken
-
-The port finds a click's button as it queues it (`MouseQueue.enqueueClick`,
-`src/engine/MouseQueue.ts`), as `OnMouseClick` does in `doc/CSBwin-src/CSBCode.cpp:7607`.
-If the button lists change between the click and its turn, it is taken as a button of the
-old screen. CSBWin 20230608 defines `POST_TRANSLATE_CLICK` (`CSB.h:1716`, its comment at
-`:1735-1779`). A click is queued as `UNTRANSLATED_CLICK` (0xfffe) with its point and mouse
-buttons (`OnMouseClick`, `CSBCode.cpp:7670`). `_HandleMouseEvents` translates the head
-of the queue when it takes it, and drops a click that hits no button and looks at the next
-(`TranslateMouseClick`, `Mouse.cpp:1374`; the loop at `:1510`). Reincarnate mode (`0xade`)
-and the scroll area (`0xd8`) move into that translation. Keys, the button-up and the
-gravity moves are queued already translated (`TAG0196da`, `CSBCode.cpp:8516`;
-`OnMouseUnClick`, `:7640`; `GravityMove`, `Mouse.cpp:1260`). The same commit moves
-`d.MouseInterlock = 0` out of the queued branch (`:7775-7780`); the port has no interlock.
-
-Paying it: the entry carries the point and the mouse buttons, the queue keeps a click that
-hit nothing, and `Game.handleMouseEvents` translates on taking. A tool queues a click,
-changes the screen's buttons, and checks the button taken. Size M.
 
 ### C152 ⏳ A wall text seen from afar shows its plaque at full height
 
@@ -360,7 +342,7 @@ inventory's description alike. A `tools/` check prints both for a champion's bon
 
 ### C157 ⏳ CSBWin 20230608 becomes the reference
 
-After C151-C156. Steps:
+After C152-C156. Steps:
 
 1. **Swap the trees.** `doc/CSBwin-src-20230608/` replaces `doc/CSBwin-src/`, and
    `node tools/gen-csbwin-index.mjs` rebuilds `doc/CSBWIN_SYMBOL_INDEX.tsv`.
@@ -374,6 +356,19 @@ After C151-C156. Steps:
    tree; the `csbwin-binary-newer-than-source` memory is deleted.
 
 Size L.
+
+### C158 ⏳ The inventory opens and closes without `DiscardAllInput`
+
+`ShowHideInventory` empties the mouse queue when it hides the inventory
+(`doc/CSBwin-src/CSBCode.cpp:7480`) and when it shows one (`:7520`), after it has set the
+secondary button list; a sleeping party's return at `:7468-7472` comes before either. The
+port's `handleInventoryToggle` (`src/renderer/ui/Mouse.ts`) sets the list
+(`syncInventoryButtons`) and discards nothing, so a key or a click queued behind the
+portrait or the close box is taken against the new screen, where CSBWin loses it. Its other
+callers (`HallOfChampions`, a champion's death, `GameScreen`'s `showHideInventory`) reach
+the same function. Paying it: `ctx.mouseQueue.discardAllInput()` at the two places, a
+`tools/` check that a turn queued behind button 7 is lost, and a look at the port's
+callers that may rely on the queue surviving. Size S.
 
 ---
 

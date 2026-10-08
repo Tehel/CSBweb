@@ -1,6 +1,9 @@
 /**
  * CSBWin's one mouse queue, `pMouseQueue` (doc/CSBwin-src/Mouse.cpp): clicks, their
- * button-ups and keys alike, as button numbers. A ring of `MOUSEQLEN` entries that keeps
+ * button-ups and keys alike. A key and a button-up are queued as their button numbers; a
+ * click is queued untranslated, with its point and mouse buttons, and matched to its
+ * button only when `HandleMouseEvents` comes to it (`POST_TRANSLATE_CLICK`,
+ * doc/CSBwin-src-20230608/CSB.h:1716-1779). A ring of `MOUSEQLEN` entries that keeps
  * one slot empty — `MouseQStart` is the next entry to handle, `MouseQEnd` the last one
  * queued, and `MouseQEnd + 1 == MouseQStart` means empty.
  *
@@ -19,12 +22,22 @@ export const MOUSEQLEN = 8;
 /** The button-up `OnMouseUnClick` queues (doc/CSBwin-src/CSBCode.cpp:7594). */
 export const MOUSE_UNCLICK = 0x0add;
 
-/** One `pMouseQueue` entry: a button number and the point clicked (0,0 for a key). */
-export interface MouseQueueEntry { num: number; x: number; y: number }
+/**
+ * `UNTRANSLATED_CLICK`: the `translatedButtonNum` of a click not yet matched to its button
+ * (doc/CSBwin-src-20230608/CSB.h:1735).
+ */
+export const UNTRANSLATED_CLICK = 0xfffe;
+
+/**
+ * One `pMouseQueue` entry, `MouseQueueEnt` (doc/CSBwin-src-20230608/CSB.h:1726-1781): a
+ * button number, `UNTRANSLATED_CLICK` until a click is translated, the point clicked (0,0
+ * for a key), and a click's mouse buttons, `SearchButtonList`'s mask.
+ */
+export interface MouseQueueEntry { num: number; x: number; y: number; buttons: number }
 
 export class MouseQueue {
   private readonly entries: MouseQueueEntry[] =
-    Array.from({ length: MOUSEQLEN }, () => ({ num: 0, x: 0, y: 0 }));
+    Array.from({ length: MOUSEQLEN }, () => ({ num: 0, x: 0, y: 0, buttons: 0 }));
   private start = 0;
   private end = MOUSEQLEN - 1;
 
@@ -38,21 +51,21 @@ export class MouseQueue {
     if (end > MOUSEQLEN - 1) end -= MOUSEQLEN;
     if (end === this.start) return false;
     this.end = (this.end + 1) % MOUSEQLEN;
-    this.entries[this.end] = { num, x: 0, y: 0 };
+    this.entries[this.end] = { num, x: 0, y: 0, buttons: 0 };
     return true;
   }
 
   /**
-   * The queueing half of `OnMouseClick` (doc/CSBwin-src/CSBCode.cpp:7607): queued only
-   * while fewer than `MOUSEQLEN-2` entries wait — there must be room left for the
-   * button-up — and never for a click that hit no button (`:7626-7690`). Says whether it
-   * was queued.
+   * `OnMouseClick` (doc/CSBwin-src-20230608/CSBCode.cpp:7670): the click queued as
+   * `UNTRANSLATED_CLICK` with its point and mouse buttons, only while fewer than
+   * `MOUSEQLEN-2` entries wait — there must be room left for the button-up
+   * (`:7694-7711`). A click that hits no button is queued too, and dropped when it is
+   * translated (`Game.handleMouseEvents`). Says whether it was queued.
    */
-  enqueueClick(num: number, x: number, y: number): boolean {
-    if (num === 0) return false;
+  enqueueClick(x: number, y: number, buttons: number): boolean {
     if (this.count() >= MOUSEQLEN - 2) return false;
     this.end = (this.end + 1) % MOUSEQLEN;
-    this.entries[this.end] = { num, x, y };
+    this.entries[this.end] = { num: UNTRANSLATED_CLICK, x, y, buttons };
     return true;
   }
 
@@ -63,7 +76,7 @@ export class MouseQueue {
   enqueueUnClick(): void {
     if (this.count() >= MOUSEQLEN - 1) return;
     this.end = (this.end + 1) % MOUSEQLEN;
-    this.entries[this.end] = { num: MOUSE_UNCLICK, x: 0, y: 0 };
+    this.entries[this.end] = { num: MOUSE_UNCLICK, x: 0, y: 0, buttons: 0 };
   }
 
   /** `numEnt`: how many entries wait (doc/CSBwin-src/CSBCode.cpp:7589-7590). */

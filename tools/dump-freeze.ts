@@ -107,6 +107,7 @@ async function main(): Promise<void> {
   Mouse.updateButtonLists(ui);
   const handled: number[] = [];
   game.setMouseEventHandlers({
+    translate: (x, y, buttons) => Mouse.searchMouseButtons(ui, x, y, buttons),
     button: (num, x, y) => { handled.push(num); Mouse.handleMouseButton(ui, num, x, y); },
     unclick: () => Mouse.handleMouseUnclick(ui),
   });
@@ -122,7 +123,7 @@ async function main(): Promise<void> {
   };
   const click = (x: number, y: number, buttons = 2): number => {
     const num = Mouse.searchMouseButtons(ui, x, y, buttons);
-    game.onMouseClick(num, x, y);
+    game.onMouseClick(x, y, buttons);
     game.onMouseUnClick();
     return num;
   };

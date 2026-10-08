@@ -75,6 +75,7 @@ function setup(withOracle: boolean): Setup {
   if (withOracle) ui.hintOracle = files;
   updateButtonLists(ui);
   game.setMouseEventHandlers({
+    translate: (x, y, buttons) => searchMouseButtons(ui, x, y, buttons),
     button: (num, x, y) => {
       handleMouseButton(ui, num, x, y);
       if (ui.hintOracleNeeded) {
@@ -90,7 +91,7 @@ function setup(withOracle: boolean): Setup {
 /** A left click at (x, y), searched in the interface's lists and queued, then a VBL to take it. */
 function click(s: Setup, x: number, y: number, buttons = 2): number {
   const id = searchMouseButtons(s.ui, x, y, buttons);
-  s.game.onMouseClick(id, x, y);
+  s.game.onMouseClick(x, y, buttons);
   runVbl(s.game);
   s.game.onMouseUnClick();
   runVbl(s.game);

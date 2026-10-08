@@ -79,6 +79,7 @@ const ui: UIState = newUIState(graphics, game.ctx);
 ui.partyState = party;
 Mouse.updateButtonLists(ui);
 game.setMouseEventHandlers({
+  translate: (x, y, buttons) => Mouse.searchMouseButtons(ui, x, y, buttons),
   button: (num, x, y) => Mouse.handleMouseButton(ui, num, x, y),
   unclick: () => Mouse.handleMouseUnclick(ui),
 });

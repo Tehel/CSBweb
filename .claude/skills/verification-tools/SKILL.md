@@ -225,8 +225,11 @@ then the mouse queue (`HandleMouseEvents`), then a tick if `d.clockTick` is set.
 `runVbl(game, sinceTick)` (`tools/lib/game.ts`) sets the count first: `runVbl(game,
 TICK_DUE)` makes a tick due in that VBL, `runVbl(game, 1)` makes none due by the count, and
 `runVbl(game)` lets it run on, a tick every fifteenth VBL. Queue input with
-`enqueueMovement` (a key) or `onMouseClick(num, x, y)` / `onMouseUnClick()`, catch the
-non-movement buttons with `setMouseEventHandlers`, empty the queue with
+`enqueueMovement` (a key) or `onMouseClick(x, y, buttons)` / `onMouseUnClick()`, and catch
+the non-movement buttons with `setMouseEventHandlers`. A click is matched to its button
+only when it is taken, by the handlers' `translate`: a tool with an interface passes
+`searchMouseButtons`, and one without uses `ButtonsAt` (`tools/lib/clicks.ts`), which
+says what button a point is and queues the click there. Empty the queue with
 `discardAllInput()`, and reach `lastInputTime` through a cast (`dump-mouse-queue.ts`,
 `dump-party-collision.ts` case 6). `lastInputTime == 0` disables the one-per-tick gate, as
 `lastTime == 0` does in CSBWin, so start the clock first. Every tick runs the monsters

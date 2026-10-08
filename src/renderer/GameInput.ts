@@ -58,6 +58,7 @@ export class GameInput {
   install(): void {
     const host = this.host;
     host.game.setMouseEventHandlers({
+      translate: (x, y, buttons) => host.screen.searchMouseButtons(x, y, buttons),
       button: (num, x, y) => {
         host.screen.handleMouseButton(num, x, y);
         host.refreshScreen();
@@ -101,8 +102,9 @@ export class GameInput {
       return;
     }
     // Queued, not handled: `Game.handleMouseEvents` takes it off the queue in its turn,
-    // behind any key or click already waiting, and hands it to `handleMouseButton`.
-    game.onMouseClick(screen.searchMouseButtons(x, y, buttonMask), x, y);
+    // behind any key or click already waiting, matches it to the button the screen has
+    // there then, and hands it to `handleMouseButton`.
+    game.onMouseClick(x, y, buttonMask);
   }
 
   mouseUp(): void {

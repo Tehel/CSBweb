@@ -9,6 +9,9 @@
  * - A click is queued only while fewer than `MOUSEQLEN-2` wait, leaving room for its
  *   button-up (`OnMouseClick`, `CSBCode.cpp:7626-7630`); the button-up, `0xadd`, while
  *   fewer than `MOUSEQLEN-1` wait (`OnMouseUnClick`, `:7581-7600`).
+ * - A click is queued untranslated, and matched to its button when `HandleMouseEvents`
+ *   comes to it; one that hits nothing then is dropped for the entry behind it
+ *   (`POST_TRANSLATE_CLICK`, doc/CSBwin-src-20230608/Mouse.cpp:1374-1442, `:1510-1528`).
  * - `HandleMouseEvents` takes the head only if `lastTime` allows (`Mouse.cpp:1468-1476`),
  *   leaves a held step at the head, blocking everything behind it (`:1485-1498`), and
  *   stamps `lastTime` for every button it handles, a click as much as a turn — but not
@@ -52,10 +55,14 @@ import { TimerFunction } from '../src/engine/TimerQueue';
 import { graphicsTablesOf, newGame, runVbl, TICK_DUE } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
+import { ButtonsAt } from './lib/clicks';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { freeze, thaw } from '../src/engine/LoopState';
 import { handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
+
+/** The button each queued click is taken as (`ButtonsAt`). */
+const buttonsAt = new ButtonsAt();
 
 /** A plain champion: the disk icon wants a party, the eye a champion to look through. */
 function champion(): Champion {
@@ -118,6 +125,7 @@ async function main(): Promise<void> {
   let unclicks = 0;
   let frameNo = 0;
   game.setMouseEventHandlers({
+    translate: buttonsAt.translate,
     button: (num, x, y) => handled.push({ num, x, y, frame: frameNo }),
     unclick: () => { unclicks++; },
   });
@@ -155,9 +163,9 @@ async function main(): Promise<void> {
   // ---- 2: a click needs room for its button-up -----------------------------------
   reset();
   for (let i = 0; i < 5; i++) game.enqueueMovement(MovementAction.TURN_LEFT);
-  const clickWithFive = game.onMouseClick(NUM_INVENTORY, 10, 50);
+  const clickWithFive = buttonsAt.click(game, NUM_INVENTORY, 10, 50);
   const countAfterFirst = game.ctx.mouseQueue.count();
-  const clickWithSix = game.onMouseClick(NUM_INVENTORY, 10, 50);
+  const clickWithSix = buttonsAt.click(game, NUM_INVENTORY, 10, 50);
   game.onMouseUnClick();
   const countAfterUp = game.ctx.mouseQueue.count();
   game.onMouseUnClick();
@@ -169,9 +177,58 @@ async function main(): Promise<void> {
   check(countAfterUp === 7, 'a button-up should queue while six entries wait');
   check(countAfterSecondUp === 7, 'a button-up should be refused while seven entries wait (MOUSEQLEN-1)');
 
+  // ---- 2b: a click is matched to its button when it is taken ------------------------
+  // `OnMouseClick` queues `UNTRANSLATED_CLICK` with the point and the mouse buttons, a
+  // click that hits nothing as much as any (doc/CSBwin-src-20230608/CSBCode.cpp:7694-7711).
+  // `_HandleMouseEvents` translates the head before anything else, against the lists the
+  // screen has then, and drops a click that hits nothing for the entry behind it
+  // (`TranslateMouseClick`, `Mouse.cpp:1374-1442`; the loop at `:1510-1528`). The
+  // translation is written into the entry, so a click that then waits for its tick keeps it.
+  reset();
+  for (let i = 0; i < 5; i++) game.enqueueMovement(MovementAction.TURN_LEFT);
+  const missWithFive = buttonsAt.click(game, 0, 30, 40);
+  const hitBehindMiss = buttonsAt.click(game, NUM_INVENTORY, 31, 40);
+  console.log(`a click on nothing with 5 waiting: ${missWithFive ? 'queued' : 'refused'}; ` +
+    `a click on a button behind it: ${hitBehindMiss ? 'queued' : 'refused'}`);
+  check(missWithFive && !hitBehindMiss, 'a click that hits nothing takes its place in the queue like any other');
+
+  reset();
+  buttonsAt.click(game, NUM_INVENTORY, 30, 40);
+  buttonsAt.put(81, 30, 40);
+  frame();
+  console.log(`a click whose button changed before its turn: taken as ${handled.map((h) => h.num).join() || 'nothing'}`);
+  check(handled.length === 1 && handled[0]!.num === 81 && handled[0]!.x === 30 && handled[0]!.y === 40,
+    'a click is the button the screen has at its point when it is taken, not when it was queued');
+
+  reset();
+  buttonsAt.click(game, NUM_INVENTORY, 30, 40);
+  buttonsAt.put(0, 30, 40);
+  game.enqueueMovement(MovementAction.TURN_LEFT);
+  const facingMiss = party.facing;
+  const movesMiss = game.ctx.state.block1.totalMoveCount;
+  frame();
+  const turnedPastMiss = party.facing !== facingMiss;
+  console.log(`a click that hits nothing when taken, a turn behind it: handled ${handled.length}, ` +
+    `turned in the same pass ${turnedPastMiss}, counted ${game.ctx.state.block1.totalMoveCount - movesMiss}`);
+  check(handled.length === 0 && turnedPastMiss, 'it is dropped, and the entry behind it goes in the same pass');
+  check(game.ctx.state.block1.totalMoveCount - movesMiss === 1, 'only the turn is recorded');
+
+  reset();
+  buttonsAt.click(game, NUM_INVENTORY, 10, 50);
+  buttonsAt.click(game, NUM_INVENTORY, 30, 40);
+  frame(); // the first click, which stamps lastTime and ends the pass
+  frame(); // the second at the head: translated, and held to the next tick
+  const waited = handled.length === 1 && game.ctx.mouseQueue.count() === 1;
+  buttonsAt.put(81, 30, 40);
+  frame(true);
+  frame();
+  console.log(`a click translated while it waited, its button changed after: taken as ${handled.slice(1).map((h) => h.num).join() || 'nothing'}`);
+  check(waited && handled.length === 2 && handled[1]!.num === NUM_INVENTORY,
+    'a click translated at the head keeps that button while it waits for its tick');
+
   // ---- 3: a click takes the tick, and the turn behind it waits ---------------------
   reset();
-  game.onMouseClick(NUM_INVENTORY, 12, 60);
+  buttonsAt.click(game, NUM_INVENTORY, 12, 60);
   game.enqueueMovement(MovementAction.TURN_LEFT);
   const facing0 = party.facing;
   frame();
@@ -200,11 +257,11 @@ async function main(): Promise<void> {
   // ---- 5: the on-screen arrows ---------------------------------------------------
   reset();
   const from = party.position;
-  game.onMouseClick(3, 270, 130);
+  buttonsAt.click(game, 3, 270, 130);
   frame();
   const stepped = party.position.x !== from.x || party.position.y !== from.y;
   const facing2 = party.facing;
-  game.onMouseClick(1, 240, 130);
+  buttonsAt.click(game, 1, 240, 130);
   frame(true);
   frame();
   const turnedLeft = party.facing === ((facing2 + 3) & 3);
@@ -218,7 +275,7 @@ async function main(): Promise<void> {
   reset();
   party.partyMoveDisableTimer = 2;
   game.enqueueMovement(MovementAction.MOVE_FORWARD);
-  game.onMouseClick(NUM_INVENTORY, 10, 50);
+  buttonsAt.click(game, NUM_INVENTORY, 10, 50);
   frame();
   const blockedCount = game.ctx.mouseQueue.count();
   const blockedHandled = handled.length;
@@ -235,7 +292,7 @@ async function main(): Promise<void> {
 
   // ---- 7: DiscardAllInput drops a click -------------------------------------------
   reset();
-  game.onMouseClick(NUM_INVENTORY, 10, 50);
+  buttonsAt.click(game, NUM_INVENTORY, 10, 50);
   game.discardAllInput();
   frame();
   console.log(`click then DiscardAllInput: handled ${handled.length}, queue ${game.ctx.mouseQueue.count()}`);
@@ -257,14 +314,14 @@ async function main(): Promise<void> {
   frame();
   const afterStep = moves() - m0;
   frame(true);
-  game.onMouseClick(NUM_INVENTORY, 10, 50);
+  buttonsAt.click(game, NUM_INVENTORY, 10, 50);
   game.onMouseUnClick();
   frame();
   frame(true); // the click stamped lastTime: its button-up goes in the next tick
   frame();
   const afterClick = moves() - m0;
   frame(true);
-  game.onMouseClick(0x64, 0x114, 0x2f);
+  buttonsAt.click(game, 0x64, 0x114, 0x2f);
   frame();
   frame(true);
   game.enqueueKeyButton(0x2000);
@@ -272,7 +329,7 @@ async function main(): Promise<void> {
   const afterIgnored = moves() - m0;
   freeze(game.ctx);
   frame(true);
-  game.onMouseClick(NUM_INVENTORY, 10, 50);
+  buttonsAt.click(game, NUM_INVENTORY, 10, 50);
   frame();
   const whileFrozen = moves() - m0;
   thaw(game.ctx);
@@ -290,6 +347,7 @@ async function main(): Promise<void> {
   const ui = newUIState(graphics, game.ctx);
   ui.partyState = party;
   game.setMouseEventHandlers({
+    translate: buttonsAt.translate,
     button: (num, x, y) => handleMouseButton(ui, num, x, y),
     unclick: () => handleMouseUnclick(ui),
   });
@@ -299,9 +357,9 @@ async function main(): Promise<void> {
     party.selectedCharacterIndex = 0;
     ui.pressingEye = false;
     ui.diskMenuNeeded = false;
-    game.onMouseClick(71, 20, 50);
+    buttonsAt.click(game, 71, 20, 50);
     if (withButtonUp) game.onMouseUnClick();
-    game.onMouseClick(140, 178, 40);
+    buttonsAt.click(game, 140, 178, 40);
     for (let i = 0; i < 3; i++) { frame(true); frame(); }
     return ui.diskMenuNeeded;
   };
@@ -363,6 +421,7 @@ async function main(): Promise<void> {
 
   let viewportArm: 'door' | 'wall' = 'wall';
   game.setMouseEventHandlers({
+    translate: buttonsAt.translate,
     button: (num) => {
       if (num !== 80) return;
       if (viewportArm === 'door') game.systems.mouse.handleDoorSwitchClick();
@@ -390,7 +449,7 @@ async function main(): Promise<void> {
     viewportArm = arm;
     frame(true);
     const ticksAtClick = game.ctx.state.tickCount;
-    game.onMouseClick(80, 100, 100);
+    buttonsAt.click(game, 80, 100, 100);
     firstTickFrame = 0;
     for (let n = 1; n <= 30; n++) {
       vbl();
@@ -425,7 +484,7 @@ async function main(): Promise<void> {
     game.ctx.party.setFacing(at.dir);
     viewportArm = 'wall';
     frame(true);
-    game.onMouseClick(80, 100, 100);
+    buttonsAt.click(game, 80, 100, 100);
     const before = game.ctx.state.tickCount;
     frame(true);
     return game.ctx.state.tickCount !== before;
@@ -462,7 +521,7 @@ async function main(): Promise<void> {
   };
   const buttons = uiTables.graphic231.buttons;
   let onClick: () => void = () => {};
-  game.setMouseEventHandlers({ button: () => onClick(), unclick: () => {} });
+  game.setMouseEventHandlers({ translate: buttonsAt.translate, button: () => onClick(), unclick: () => {} });
   /** A fresh party of one, at the scene, holding the cursor and the magic tab. */
   const soloParty = (): void => {
     reset();
@@ -484,7 +543,7 @@ async function main(): Promise<void> {
     onClick = handler;
     frame(true);
     const ticksAtClick = game.ctx.state.tickCount;
-    game.onMouseClick(num, 100, 100);
+    buttonsAt.click(game, num, 100, 100);
     for (let n = 1; n <= 30; n++) {
       vbl();
       if (game.ctx.state.tickCount !== ticksAtClick) return n;
@@ -495,7 +554,7 @@ async function main(): Promise<void> {
   const dueTickRuns = (handler: () => void, num = 80): boolean => {
     onClick = handler;
     frame(true);
-    game.onMouseClick(num, 100, 100);
+    buttonsAt.click(game, num, 100, 100);
     const before = game.ctx.state.tickCount;
     frame(true);
     return game.ctx.state.tickCount !== before;
@@ -637,8 +696,8 @@ async function main(): Promise<void> {
     };
     frame(true);
     const ticksAtClick = game.ctx.state.tickCount;
-    game.onMouseClick(80, 100, 100);
-    game.onMouseClick(80, 100, 100);
+    buttonsAt.click(game, 80, 100, 100);
+    buttonsAt.click(game, 80, 100, 100);
     game.ctx.loop.clockTick = due;
     while (++vbls <= 30 && (seen.held < 0 || seen.toTick < 0 || seen.next < 0)) {
       vbl();

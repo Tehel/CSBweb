@@ -33,6 +33,10 @@ import { WON_GAME_VBLS, type Game } from '../src/engine/Game';
 import type { LoopScript } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
+import { ButtonsAt } from './lib/clicks';
+
+/** The button each queued click is taken as (`ButtonsAt`). */
+const clicks = new ButtonsAt();
 
 interface Watched {
   game: Game;
@@ -113,9 +117,9 @@ function checkWaits(): void {
   const callbacks = w.frameCallbacks;
   game.runScript(script());
   check(w.log.join(' ') === `a@${start}` && game.isRunningScript(), 'runScript runs it at once, up to its first VBLDelay');
-  game.onMouseClick(20, 100, 100);
+  clicks.click(game, 20, 100, 100);
   const handled: number[] = [];
-  game.setMouseEventHandlers({ button: (num) => handled.push(num), unclick: () => {} });
+  game.setMouseEventHandlers({ translate: clicks.translate, button: (num) => handled.push(num), unclick: () => {} });
   for (let n = 0; n < 32; n++) frame(w);
   console.log(`  32 VBLs: tick ${tick} -> ${game.ctx.state.tickCount}; print-queue entries ${w.printed - printed}; queued ${game.ctx.mouseQueue.count()}`);
   check(game.isRunningScript() && game.ctx.state.tickCount === tick && w.printed === printed,
@@ -150,15 +154,16 @@ function checkFromHandler(): void {
     w.log.push(`resumed@${w.frames}`);
   }
   game.setMouseEventHandlers({
+    translate: clicks.translate,
     button: (num) => {
       handled.push(num);
       if (num === 20) game.runScript(script());
     },
     unclick: () => { handled.push(0x0add); },
   });
-  game.onMouseClick(20, 100, 100);
+  clicks.click(game, 20, 100, 100);
   game.onMouseUnClick();
-  game.onMouseClick(21, 100, 100);
+  clicks.click(game, 21, 101, 100);
   const tick = game.ctx.state.tickCount;
   const printed = w.printed;
   frame(w);

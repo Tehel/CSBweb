@@ -50,7 +50,11 @@ import type { Rect } from '../src/data/tables/UITables';
 import { newGame, runVbl, TICK_DUE } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
+import { ButtonsAt } from './lib/clicks';
 import { handleUIKey } from '../src/renderer/ui/Keyboard';
+
+/** The button each queued click is taken as (`ButtonsAt`). */
+const clicks = new ButtonsAt();
 
 const TURN_LEFT: Rect = { x1: 0xea, x2: 0x0105, y1: 0x7d, y2: 0x91 };
 const TURN_RIGHT: Rect = { x1: 0x123, x2: 0x13e, y1: 0x7d, y2: 0x91 };
@@ -122,7 +126,7 @@ async function main(): Promise<void> {
   if (!scene) throw new Error(`level ${level} has no open cell with an open neighbour`);
   const party = game.ctx.party.state;
   party.champions = [];
-  game.setMouseEventHandlers({ button: () => {}, unclick: () => {} });
+  game.setMouseEventHandlers({ translate: clicks.translate, button: () => {}, unclick: () => {} });
 
   type Internals = { lastInputTime: number };
   const internals = game as unknown as Internals;
@@ -180,7 +184,7 @@ async function main(): Promise<void> {
 
   // ---- a step, from a click on the arrow ---------------------------------------------
   const from = { x: scene.x, y: scene.y };
-  const step = flashOf('step forward', () => game.onMouseClick(3, moveButtons[0]!.x1 + 1, moveButtons[0]!.y1 + 1));
+  const step = flashOf('step forward', () => clicks.click(game, 3, moveButtons[0]!.x1 + 1, moveButtons[0]!.y1 + 1));
   check(party.position.x !== from.x || party.position.y !== from.y, 'the step should have been taken');
   check(same(step.tick ?? null, moveButtons[0]!) && step.after[1] === null,
     'a step forward should flash d.MoveButn18496[0] in its tick, and the next VBL put it back');
@@ -354,8 +358,8 @@ async function main(): Promise<void> {
   const partner: Champion = { ...caster, name: 'TWO', possessions: emptyPossessions(), partyPosition: 1, incantation: [] };
   party.champions = [caster, partner];
   party.magicCasterIndex = -1;
-  game.setMouseEventHandlers({ button: (num, x, y) => { if (num === 111) handleAttackAreaClick(ui, x, y); }, unclick: () => {} });
-  const clickAt = (r: Rect) => () => { game.onMouseClick(111, (r.x1 + r.x2) >> 1, (r.y1 + r.y2) >> 1); };
+  game.setMouseEventHandlers({ translate: clicks.translate, button: (num, x, y) => { if (num === 111) handleAttackAreaClick(ui, x, y); }, unclick: () => {} });
+  const clickAt = (r: Rect) => () => { clicks.click(game, 111, (r.x1 + r.x2) >> 1, (r.y1 + r.y2) >> 1); };
 
   prepareAttack(ui, 0);
   const pass = flashOf('PASS', clickAt(attackRect(112)));

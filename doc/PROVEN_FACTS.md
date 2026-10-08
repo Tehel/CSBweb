@@ -4621,10 +4621,16 @@ reading `:1515` without its `#ifdef`.) The ring keeps one slot empty: `MouseQSta
 the next entry to handle, `MouseQEnd` the last one queued, `MouseQEnd + 1 == MouseQStart`
 is empty, and `numEnt = (MouseQEnd - MouseQStart + 1 + MOUSEQLEN) % MOUSEQLEN`.
 
-- **A click** is turned into a button by `SearchButtonList` over the primary, then the
-  secondary list, and queued with its point only if it hit one and `numEnt < MOUSEQLEN-2`
-  — "no room for a matching 'UnClick'" otherwise (`OnMouseClick`,
-  `doc/CSBwin-src/CSBCode.cpp:7607-7696`). So a click is taken while fewer than six wait.
+- **A click** is queued untranslated, `UNTRANSLATED_CLICK` (0xfffe) with its point and
+  mouse buttons, if `numEnt < MOUSEQLEN-2` — "no room for a matching 'UnClick'" otherwise
+  (`OnMouseClick`, `doc/CSBwin-src-20230608/CSBCode.cpp:7670-7711`). So a click is taken
+  while fewer than six wait, whether or not it hits a button. `HandleMouseEvents` turns
+  the head into a button by `SearchButtonList` over the primary, then the secondary list,
+  as the screen has them then, and drops a click that hits none for the entry behind it
+  (`TranslateMouseClick`, `doc/CSBwin-src-20230608/Mouse.cpp:1374-1442`; the loop at
+  `:1510-1528`). The button is written into the entry, so a click held to the next tick
+  keeps it. The 2016 source translated at the queueing, and queued only a click that hit
+  a button (`doc/CSBwin-src/CSBCode.cpp:7607-7696`).
 - **The button-up** is `0x0add`, queued while `numEnt < MOUSEQLEN-1` (`OnMouseUnClick`,
   `:7581-7600`), whether or not its click was.
 - **A key** is translated to its button by `TAG0196da` and refused only when

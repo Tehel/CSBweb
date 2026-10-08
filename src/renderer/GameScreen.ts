@@ -213,7 +213,7 @@ export class GameScreen {
 
   /* Mouse entry points for the host page; the work is in `ui/Mouse.ts`. */
 
-  /** The button a click hits, 0 for none; the host queues it with `Game.onMouseClick`. */
+  /** The button a click hits, 0 for none: `Game.handleMouseEvents`' translation of a queued click. */
   searchMouseButtons(x: number, y: number, buttons: number): number {
     return searchMouseButtons(this.ui, x, y, buttons);
   }

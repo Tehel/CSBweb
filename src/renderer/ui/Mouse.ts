@@ -2,10 +2,11 @@
  * The mouse: CSBWin's click ring buffer, the button dispatcher, and the cursor.
  *
  * Mirrors `doc/CSBwin-src/Mouse.cpp`. Clicks are not handled where they arrive: the host
- * turns one into a button with `searchMouseButtons` and queues it on the game's one mouse
- * queue (`Game.onMouseClick`), where it waits its turn behind keys and other clicks.
- * `Game.handleMouseEvents` handles the turns and steps itself and hands every other button
- * to `handleMouseButton`, the dispatcher on the `word0` ids `searchButtonList` returns.
+ * queues one on the game's one mouse queue (`Game.onMouseClick`), where it waits its turn
+ * behind keys and other clicks. `Game.handleMouseEvents` turns it into a button with
+ * `searchMouseButtons` when it comes to it, handles the turns and steps itself, and hands
+ * every other button to `handleMouseButton`, the dispatcher on the `word0` ids
+ * `searchButtonList` returns.
  */
 import { IndexedBitmap, createPaletteIndexViewportBuffer, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { decodeCursorBitmap } from '../../data/tables/UITables';
@@ -36,8 +37,8 @@ import {
 export { decodeCursorBitmap };
 
 /**
- * `OnMouseClick`'s button search (doc/CSBwin-src/CSBCode.cpp:7631-7676): the primary list,
- * then the secondary. 0 for a click that hit no button, which is never queued.
+ * `TranslateMouseClick`'s button search (doc/CSBwin-src-20230608/Mouse.cpp:1393-1404): the
+ * primary list, then the secondary. 0 for a click that hit no button, which the queue drops.
  */
 export function searchMouseButtons(ui: UIState, x: number, y: number, buttons: number): number {
   const id = searchButtonList(ui.primaryButtons, x, y, buttons);

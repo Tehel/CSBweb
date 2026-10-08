@@ -33,7 +33,7 @@ import { MagicSystem } from './MagicSystem';
 import { CharacterSystem } from './CharacterSystem';
 import { MouseSystem } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
-import { MOUSE_UNCLICK, type MouseQueueEntry } from './MouseQueue';
+import { MOUSE_UNCLICK, UNTRANSLATED_CLICK, type MouseQueueEntry } from './MouseQueue';
 import { createLoopFlags, flashButton, vblFlashButton, vblInterrupt, waitForButtonFlash, type LoopScript, type MainLoop } from './LoopState';
 import { makeMoreRoomInDB } from './MakeMoreRoomInDB';
 import { smartDiscard } from './SmartDiscard';
@@ -53,8 +53,16 @@ import type { GameTables } from './GameTables';
 export type GameEventCallback = (game: Game) => void;
 export type MovementCallback = (success: boolean, result?: MovementResult) => void;
 
-/** Where `HandleMouseEvents` sends the buttons it does not handle itself. */
+/**
+ * What `HandleMouseEvents` asks of the screen: a click's button, and where the buttons it
+ * does not handle itself go.
+ */
 export interface MouseEventHandlers {
+    /**
+     * `TranslateMouseClick`'s search (doc/CSBwin-src-20230608/Mouse.cpp:1374-1442): the
+     * button the screen's lists put at the point clicked now, 0 for none.
+     */
+    translate(x: number, y: number, buttons: number): number;
     /** Any button but a turn, a step or the button-up, with the point clicked. */
     button(num: number, x: number, y: number): void;
     /** `0x0add`, the button-up. */
@@ -715,14 +723,13 @@ export class Game implements MainLoop {
     }
 
     /**
-     * The queueing half of `OnMouseClick` (doc/CSBwin-src/CSBCode.cpp:7607): the caller
-     * has already searched the UI's button lists (`SearchButtonList`) for `num`. Queued
-     * only while fewer than `MOUSEQLEN-2` entries wait — there must be room left for the
-     * button-up — and never for a click that hit no button (`:7626-7690`). Says whether
-     * it was queued.
+     * `OnMouseClick` (doc/CSBwin-src-20230608/CSBCode.cpp:7670): the click at (x, y) with
+     * the mouse buttons `buttons`, queued untranslated (`MouseQueue.enqueueClick`) while
+     * fewer than `MOUSEQLEN-2` entries wait. Its button is the one the screen has there
+     * when `handleMouseEvents` comes to it. Says whether it was queued.
      */
-    onMouseClick(num: number, x: number, y: number): boolean {
-        return this.ctx.mouseQueue.enqueueClick(num, x, y);
+    onMouseClick(x: number, y: number, buttons: number): boolean {
+        return this.ctx.mouseQueue.enqueueClick(x, y, buttons);
     }
 
     /**
@@ -793,8 +800,12 @@ export class Game implements MainLoop {
     /**
      * `HandleMouseEvents` (doc/CSBwin-src/Mouse.cpp:1349), which the main loop calls with
      * `delta = 1` (`CSBCode.cpp:748`): at most one entry of the mouse queue, and a result
-     * whose bit 0 asks to be called again at once. The head waits, rather than being
-     * taken, while
+     * whose bit 0 asks to be called again at once. A click at the head is translated
+     * first, against the button lists of the screen as it is now, and one that hits no
+     * button is dropped for the entry behind it (`TranslateMouseClick`, the loop at
+     * doc/CSBwin-src-20230608/Mouse.cpp:1510-1528). The translation stays with the entry,
+     * so a click that then waits is the same button when it goes. The head waits, rather
+     * than being taken, while
      *
      * - an entry was handled this tick: `lastTime != 0 && d.Time < lastTime + delta`
      *   (`Mouse.cpp:1468-1476`), unless the game is frozen and the head is 148, the thaw
@@ -820,7 +831,11 @@ export class Game implements MainLoop {
     private handleMouseEvents(delta: number): number {
         const result = 0;
         const queue = this.ctx.mouseQueue;
-        if (queue.count() === 0) return result;
+        for (;;) {
+            if (queue.count() === 0) return result;
+            if (this.translateMouseClick(queue.head())) break;
+            queue.take();
+        }
         const frozen = this.ctx.loop.gameFrozen;
         if (frozen && queue.head().num !== 148) {
             queue.take();
@@ -863,6 +878,22 @@ export class Game implements MainLoop {
         }
         this.lastInputTime = time;
         return result;
+    }
+
+    /**
+     * `TranslateMouseClick` (doc/CSBwin-src-20230608/Mouse.cpp:1374-1442): a click still
+     * `UNTRANSLATED_CLICK` gets the button the screen has at its point, and an entry that
+     * is already a button is left as it is. False for a click that hits no button. The
+     * Reincarnate screen's `0xade` is not here: that screen takes its clicks itself, past
+     * the queue (`DEBT.md` H, "Three inputs bypass the mouse queue"). Nor is the scroll
+     * area's `0xd8`: `IsTextScrollArea` is false on Windows (`WinScreen.cpp:99-102`).
+     */
+    private translateMouseClick(entry: MouseQueueEntry): boolean {
+        if (entry.num !== UNTRANSLATED_CLICK) return true;
+        const num = this.mouseEventHandlers?.translate(entry.x, entry.y, entry.buttons) ?? 0;
+        if (num === 0) return false;
+        entry.num = num;
+        return true;
     }
 
     /**
