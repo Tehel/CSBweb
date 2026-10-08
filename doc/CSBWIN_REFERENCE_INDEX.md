@@ -2,6 +2,26 @@
 
 This index links the CSBWin-sourced reference docs under `doc/`.
 
+## The tree: CSBWin 20230608
+
+`doc/CSBwin-src/` is `CSBwin_SRC_20230608.7z` from dianneandpaul.net/CSBwin/, the main
+line's last source and the build the author plays ("Version 2023.06.08", `CSBwin.rc:313`),
+CRLF turned to LF and nothing else changed. `doc/CSBWIN_SYMBOL_INDEX.tsv` is built from it,
+and every citation in `doc/`, `src/` and `tools/` names its lines (`doc/PLAN_ARCHIVE.md`'s
+are mapped by script and unreviewed).
+
+The port followed `CSBwin_SRC_20160923.zip` before it, which is in git history
+(`git show 5efad3b^:doc/CSBwin-src/<File>`): "Version 15.9", with the author's cosmetic
+edits in `CSBCode.cpp`, `RC4.cpp`, `SaveGame.cpp` and `Data.h`, a side branch of
+`CSBwin_SRC_20160325` (15.8) whose only change is accessors for a monster's `word20`, so it
+behaves as 15.8. Every change between the two that alters what the port has is ported, but
+for the utility's stop on a word-10 saved game (`DEBT.md` H). The rest changes nothing the
+port has: the 64-bit port (`uintptr_t`, and typed structs in `Chaos.cpp` and `Hint.cpp`,
+whose allocator fixes are in code the port never had), `TranslateLanguage` hooks (`DEBT.md`
+G21), the playfile (G29), and the Linux and Raspberry Pi front-ends. None of the port's
+deliberate divergences (`DEBT.md` H, and the exceptions `CLAUDE.md` names) is a code path
+that 2023 changed.
+
 ## Core CSBWin references
 
 - `doc/CSBWIN_ARCHITECTURE.md` - High-level architecture and system overview (sourced from CSBWin code).
@@ -33,6 +53,6 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 - `doc/SAVES.md` - Not CSBWin-sourced: the port's saves. A save as a CSBWin `.dat` in a row of IndexedDB, the dungeon check on an import, the playthrough (`d.RandomGameID`), F5 and F9, the dialog behind the disk icon, and the evidence for each.
 - `doc/UI_MODULE_MAP.md` - Which `src/renderer/ui/` module ports which CSBWin UI file.
 - `doc/ATARI_ST_DISK_REFERENCE.md` - Not CSBWin-sourced: the English 1.2 Atari ST disk. The boot chain, the FTL logo (`SWOOSH.IMG`: its picture codec, palette script and sound), and how the 1.2 `graphics.dat` and `dungeon.dat` differ from the ones we ship (the Crack Switch (In) among them).
-- `doc/3D2D1D.md` - The 3D2D1D dungeon: the vertical moves and gravity, the two `extendedFlags` bits CSBWin reads them from, and the two keys (`DEBT.md` X5).
+- `doc/3D2D1D.md` - The 3D2D1D dungeon: the vertical moves and gravity, the two `extendedFlags` bits CSBWin reads them from, and the two keys (`DEBT.md` G30).
 - `doc/MONSTER_BEHAVIOUR.md` - Plain-language account of monster decision-making: senses, moods, the turn as a decision tree, per-type differences, and what remains unexplained.
 - `doc/monster-behaviour.html` - The same text as a formatted, self-contained page. Open it straight from disk; no external fonts, scripts or stylesheets.

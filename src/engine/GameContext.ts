@@ -177,13 +177,13 @@ export interface RulesOptions {
   /**
    * `bGravityGame` (`doc/CSBwin-src/data.cpp:241`): the party falls along the axes
    * it last moved on (`CSBCode.cpp:8166`). Read from the dungeon; nothing plays it yet
-   * (`DEBT.md` X5).
+   * (`DEBT.md` G30).
    */
   bGravityGame: boolean;
   /**
    * `bThreeDMovements` (`doc/CSBwin-src/data.cpp:240`): the keys that move the party
    * up and down a level (`CSBCode.cpp:8575`). Read from the dungeon; nothing plays it yet
-   * (`DEBT.md` X5).
+   * (`DEBT.md` G30).
    */
   bThreeDMovements: boolean;
 }

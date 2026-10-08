@@ -6,10 +6,10 @@ Project memory index: @.claude/memory/MEMORY.md
 
 ## The one non-negotiable rule
 
-`doc/CSBwin-src/` (Paul R. Stevens' C++ port of the disassembled original, ~120k LOC) is the
-**authoritative specification**. Every behaviour must mirror it — same order of operations,
-same magic numbers, same edge cases. When our code, our docs, or intuition disagree with
-CSBWin, CSBWin wins.
+`doc/CSBwin-src/` (Paul R. Stevens' C++ port of the disassembled original, ~120k LOC, his
+last source, CSBWin 20230608) is the **authoritative specification**. Every behaviour must
+mirror it — same order of operations, same magic numbers, same edge cases. When our code,
+our docs, or intuition disagree with CSBWin, CSBWin wins.
 
 It is followed faithfully, not blindly. When CSBWin is **obviously wrong** — a slip of its
 own translation, such as a byte offset read as a word index, or a bug that costs the

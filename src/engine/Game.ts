@@ -826,7 +826,7 @@ export class Game implements MainLoop {
      * the port never defers.
      *
      * Not ported: the vertical-move buttons `0x1124`/`0x1125` and the gravity hook
-     * (`DEBT.md` X5).
+     * (`DEBT.md` G30).
      */
     private handleMouseEvents(delta: number): number {
         const result = 0;

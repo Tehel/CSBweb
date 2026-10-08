@@ -332,7 +332,7 @@ export class MovementSystem {
         // produce those moves (doc/CSBwin-src/data.cpp:240-241). CSBWin reads them from
         // the dungeon's Extended Features (doc/CSBwin-src/SaveGame.cpp:427-430), as the
         // port does (`ctx.rules.bThreeDMovements`, `bGravityGame`), and 3D2D1D sets both;
-        // nothing here produces those moves until `DEBT.md` X5.
+        // nothing here produces those moves until `DEBT.md` G30.
         if (this.party.state.champions.length !== 0) {
             if (this.dungeon.findFirstMonster(newPosition) !== OBJECT_ID_EOF) {
                 // `ProcessTimers29to41(newX, newY, TT_M1, 0)` (doc/CSBwin-src/CSBCode.cpp:8389).
