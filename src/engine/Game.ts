@@ -111,8 +111,10 @@ export class Game implements MainLoop {
      * `HandleMouseEvents`' `static i32 lastTime` (doc/CSBwin-src/Mouse.cpp:1452): the
      * `d.Time` of the last button it handled, click, turn or step. Zeroed by its
      * initialise call, which a game load makes (`SaveGame.cpp:1785`).
+     * Public so that `tools/` can open the gate (0) or shut it for the rest of a tick
+     * (`ctx.state.tickCount`: an entry handled in it).
      */
-    private lastInputTime = 0;
+    lastInputTime = 0;
     /**
      * What every subsystem shares (`GameContext`), created first. The game's state,
      * party, dungeon, timer queue, footprints, sound queue and random stream are its
@@ -537,9 +539,10 @@ export class Game implements MainLoop {
     }
 
     /**
-     * Process one game tick (~4 times per second)
+     * Process one game tick (~4 times per second). Public so that `tools/` can step a
+     * tick without the VBL around it (`runFrame`).
      */
-    private gameTick(): void {
+    gameTick(): void {
         // `tag000698` (doc/CSBwin-src/CSBCode.cpp:613-621): a menu's mode, or any other
         // but an inventory's or sleep's, goes back to `VM_ADVENTURE`. `ForceScreenDraw()`
         // and `UI_Invalidate(true)` are the port's every frame.

@@ -97,7 +97,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | E15 | The page shell | L | ⏳ with the page redesign |
-| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | L | ⏳ step 1 of 6 |
+| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | L | ⏳ step 2 of 6 |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C145 | The Hint Oracle's title boxes keep colour 12 on their last line and a half | S | ⏸️ waits on the author |
@@ -244,21 +244,19 @@ builds around them is its own:
   `dump-hall-of-champions` stores its messages in a property `Game` does not have, and
   `dump-game-events` replaces `reincarnating`. 32 tools extract the UI tables again
   (`graphicsTablesOf(…).ui`) beside the `UIState` that `tools/lib/ui.ts` builds them into.
-- 37 tools make 79 `as unknown as` casts: into `Game`'s private members (`lastInputTime`,
-  5 tools; `gameTick`, 6), into other systems' (`DsaSystem`'s `teleportParty`,
+- 32 tools make 68 `as unknown as` casts: into the systems' private members
+  (`DsaSystem`'s `teleportParty`,
   `wiggleEverything`, `stepOrDefer`, `climbDownIntoPit`, `castMagic`, `dispatch`,
   `dropMissileObject`, …), and to pass partial `UIState` literals (16, in 7 tools); 9
   more tools reach privates through `as any` (`moveObjectDsa`, `performLocalAction`,
   `doesPartyHave`, `getMissileRecord`, …). `tsc` checks none of them. A renamed member
-  leaves the tool compiling, and a write to it then sets a new property: a tool that pins
-  `lastInputTime` would go on passing while testing nothing.
+  leaves the tool compiling, and a write to it then sets a new property: the tool goes on
+  passing while testing nothing.
 
 Paid in six steps, each tool's whole output byte-identical across every commit
-("How to work this list", point 3):
+("How to work this list", point 3). Step 1 is done: `Game`'s seam for the tools is
+public, `gameTick` and `lastInputTime` beside `runFrame`, and no tool casts into `Game`.
 
-1. **`Game`'s seam.** `gameTick` and `lastInputTime` become public members, documented
-   as what the tools drive (a VBL is already `runFrame`, and `runVbl` sets its count),
-   and the tools that cast into them name them. One commit.
 2. **The partial `UIState` literals** go to `newUIState` (`tools/lib/ui.ts`), or to the
    tables it holds, one tool per commit.
 3. **Other systems' privates.** Each private a tool drives either becomes public, with

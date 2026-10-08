@@ -140,7 +140,7 @@ for (const name of ATARI_SAVES) {
   let ran = 0;
   try {
     while (ran < TICKS && !party.gameIsLost) {
-      (game as unknown as { gameTick(): void }).gameTick();
+      game.gameTick();
       ran++;
     }
   } catch (error) {

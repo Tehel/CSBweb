@@ -1,6 +1,6 @@
 ---
 name: headless-frame-timing-probe
-description: Testing which state a tick's frame sees, without a browser — onTick as probe, private gameTick, stubbed processTimers
+description: Testing which state a tick's frame sees, without a browser — onTick as probe, game.gameTick(), stubbed processTimers
 metadata:
   type: project
 ---
@@ -10,7 +10,7 @@ golden frame is one still screen state, not the order of things inside a tick.
 
 - Register `game.onTick(...)` and record what the frame would see (party position,
   `ctx.loop.newPartyLevel`, `party.state.gameIsLost`, `mainLoopHasReturned()`).
-- Run one tick with `(game as unknown as { gameTick(): void }).gameTick()`.
+- Run one tick with `game.gameTick()`, public for the tools.
 - To make something happen *inside the timers* (a monster's blow, a pit opening), replace
   `game.systems.timer.processTimers` with a stub that does it and returns `false`.
 

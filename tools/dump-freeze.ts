@@ -112,8 +112,6 @@ async function main(): Promise<void> {
     unclick: () => Mouse.handleMouseUnclick(ui),
   });
 
-  type Internals = { lastInputTime: number };
-  const internals = game as unknown as Internals;
   /**
    * One VBL, the last tick's top `sinceTick` VBLs ago, this one included (`runVbl`);
    * -1 lets the count run on.
@@ -139,7 +137,7 @@ async function main(): Promise<void> {
   console.log('');
   console.log('=== Esc adventuring: button 147 (Mouse.cpp:1870-1898) ===');
   {
-    internals.lastInputTime = 0;
+    game.lastInputTime = 0;
     handled.length = 0;
     check(press('Escape') === 147, 'Byte18400 turns Esc into 147');
     // Queued behind the freeze: `DiscardAllInput()` must lose it.
@@ -166,7 +164,7 @@ async function main(): Promise<void> {
     console.log(`${game.ctx.state.tickCount - before} ticks in 10 frames, each 300 ms after the last tick`);
     check(game.ctx.state.tickCount === before, 'd.ClockRunning == 0: no tick runs');
     handled.length = 0;
-    internals.lastInputTime = 0;
+    game.lastInputTime = 0;
     game.enqueueKeyButton(1);
     game.enqueueKeyButton(3);
     const facing = party.facing;
@@ -183,7 +181,7 @@ async function main(): Promise<void> {
   {
     handled.length = 0;
     // An entry was handled this tick, and no tick can come: only `thawCommand` lets it in.
-    internals.lastInputTime = game.ctx.state.tickCount;
+    game.lastInputTime = game.ctx.state.tickCount;
     check(click(160, 100, 1) === 148, 'a right click in the middle of the screen is 148');
     const before = game.ctx.state.tickCount;
     frame(-1);
@@ -202,7 +200,7 @@ async function main(): Promise<void> {
   {
     Mouse.handleInventoryToggle(ui, 0);
     check(party.selectedCharacterIndex === 0 && ui.secondaryButtons === lists.buttons17760, 'HERO0\'s inventory is open');
-    internals.lastInputTime = 0;
+    game.lastInputTime = 0;
     check(Mouse.searchMouseButtons(ui, 0, 199, 2) === 0, 'x 0, y 199 is not: the upper bounds are excluded');
     check(click(0, 198) === 147, 'x 0, y 198 is 147');
     frame(-1);
@@ -222,7 +220,7 @@ async function main(): Promise<void> {
   {
     game.systems.mouse.sleep();
     check(Keyboard.translateKey(ui, Keyboard.keyScanOf('Enter')) === 146, 'asleep, Return is 146');
-    internals.lastInputTime = 0;
+    game.lastInputTime = 0;
     check(press('Escape') === 147, 'and Esc 147');
     frame(-1);
     console.log(`${state()} before=${ui.modeBeforeFreeze}`);

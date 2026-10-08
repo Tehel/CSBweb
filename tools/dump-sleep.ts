@@ -115,8 +115,6 @@ async function main(): Promise<void> {
     unclick: () => Mouse.handleMouseUnclick(ui),
   });
 
-  type Internals = { lastInputTime: number };
-  const internals = game as unknown as Internals;
   /**
    * One VBL, the last tick's top `sinceTick` VBLs ago, this one included (`runVbl`);
    * -1 lets the count run on.
@@ -145,7 +143,7 @@ async function main(): Promise<void> {
     party.potentialChampionIndex = -1;
   }
   {
-    internals.lastInputTime = 0;
+    game.lastInputTime = 0;
     handled.length = 0;
     click(iconX, iconY);
     // Queued behind the icon: `DiscardAllInput()` must lose it.
@@ -178,7 +176,7 @@ async function main(): Promise<void> {
   console.log('=== WakeUp by click (CSBCode.cpp:7106) ===');
   {
     notified.length = 0;
-    internals.lastInputTime = 0;
+    game.lastInputTime = 0;
     click(100, 100);
     const before = game.ctx.state.tickCount;
     frame(1); // a VBL since the last tick: only clockTick = 1 lets this one through
@@ -199,7 +197,7 @@ async function main(): Promise<void> {
   console.log('=== WakeUp by Return (Byte18440) ===');
   {
     game.systems.mouse.sleep();
-    internals.lastInputTime = 0;
+    game.lastInputTime = 0;
     check(game.enqueueKeyButton(146), 'Return is queued as 146');
     frame();
     check(!game.isPartySleeping(), 'and wakes the party');
@@ -250,9 +248,8 @@ async function main(): Promise<void> {
       check(!game.isPartySleeping(), 'MonsterDamagesCharacter wakes the party whatever the outcome');
       // In a tick: the blow's clockTick = 1 is cleared by the tick's own clockTick = 0.
       game.systems.mouse.sleep();
-      const internalsTick = game as unknown as { gameTick(): void };
       game.onTick(() => { if (game.isPartySleeping()) wakeUp(game.ctx); });
-      internalsTick.gameTick();
+      game.gameTick();
       const before = game.ctx.state.tickCount;
       frame(1);
       check(game.ctx.state.tickCount === before, 'woken inside a tick, the next frame is not a tick');

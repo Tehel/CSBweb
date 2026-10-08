@@ -78,7 +78,7 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
   game.applyRuntimeSaveState(game.getRuntimeSaveState());
   check(s.currentMode === SmartDiscardMode.NewDB && s.currentDBNum === DBType.MISC,
     'a game read starts the cycle over: NewDB, current database misc');
-  (game as unknown as { gameTick(): void }).gameTick();
+  game.gameTick();
   check(s.currentMode === SmartDiscardMode.Count && s.currentDBNum === DBType.WEAPON,
     'one game tick: the next database, weapons, is being counted');
 

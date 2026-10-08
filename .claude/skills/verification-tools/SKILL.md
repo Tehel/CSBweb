@@ -235,8 +235,8 @@ the non-movement buttons with `setMouseEventHandlers`. A click is matched to its
 only when it is taken, by the handlers' `translate`: a tool with an interface passes
 `searchMouseButtons`, and one without uses `ButtonsAt` (`tools/lib/clicks.ts`), which
 says what button a point is and queues the click there. Empty the queue with
-`discardAllInput()`, and reach `lastInputTime` through a cast (`dump-mouse-queue.ts`,
-`dump-party-collision.ts` case 6). `lastInputTime == 0` disables the one-per-tick gate, as
+`discardAllInput()`, and set `game.lastInputTime`, public for the tools
+(`dump-mouse-queue.ts`, `dump-party-collision.ts` case 6). `lastInputTime == 0` disables the one-per-tick gate, as
 `lastTime == 0` does in CSBWin, so start the clock first. Every tick runs the monsters
 too, so do anything that needs a monster where you found it before the VBLs that tick,
 or step with `runVbl(game, 1)` so none is due.

@@ -132,8 +132,6 @@ async function main(): Promise<void> {
     unclick: () => { unclicks++; },
   });
 
-  type Internals = { lastInputTime: number };
-  const internals = game as unknown as Internals;
   /** One VBL; `tickDue` makes a game tick run in it, after the queue. */
   const frame = (tickDue = false): void => {
     frameNo++;
@@ -145,7 +143,7 @@ async function main(): Promise<void> {
     game.ctx.party.setFacing(scene!.dir);
     party.partyMoveDisableTimer = 0;
     party.word11712 = 0;
-    internals.lastInputTime = 0;
+    game.lastInputTime = 0;
     handled.length = 0;
     unclicks = 0;
   };

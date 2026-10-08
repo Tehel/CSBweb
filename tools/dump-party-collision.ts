@@ -289,8 +289,6 @@ async function main(): Promise<void> {
   // one input queue is `Game`'s mouse queue. `d.clockTick = 0` cancels a tick that was due:
   // the VBL sets it again on the next VBL, since `vblCount` is still `>= d.Speed`
   // (`:1076-1087`), so the tick runs one frame later.
-  type Internals = { lastInputTime: number };
-  const internals = game as unknown as Internals;
   /** `d.LoadedLevel`'s party half: the level whose groups `LoadPartyLevel` attached. */
   const loadedLevel = (): number | null => (game.systems.monsters as unknown as { loadedLevel: number | null }).loadedLevel;
   let discard: {
@@ -303,7 +301,7 @@ async function main(): Promise<void> {
       game.ctx.party.setFacing(dir);
       // The headless equivalent of waiting out the last step's delay (case 8).
       game.ctx.party.state.partyMoveDisableTimer = 0;
-      internals.lastInputTime = 0;
+      game.lastInputTime = 0;
       game.discardAllInput();
       for (const a of actions) game.enqueueMovement(a);
     };
@@ -429,7 +427,7 @@ async function main(): Promise<void> {
       game.ctx.party.setFacing(run.dir);
       party.partyMoveDisableTimer = 0;
       party.word11712 = 0;
-      internals.lastInputTime = 0;
+      game.lastInputTime = 0;
       game.discardAllInput();
       const frame = (tickDue: boolean): void => {
         runVbl(game, tickDue ? TICK_DUE : 1);
@@ -574,7 +572,7 @@ async function main(): Promise<void> {
       game.ctx.party.setFacing(stairs.dir);
       game.systems.monsters.loadPartyLevel(level);
       party.partyMoveDisableTimer = 0;
-      internals.lastInputTime = 0;
+      game.lastInputTime = 0;
       game.discardAllInput();
       game.enqueueMovement(MovementAction.MOVE_FORWARD);
       game.enqueueMovement(MovementAction.TURN_LEFT);
@@ -691,12 +689,12 @@ async function main(): Promise<void> {
       party.position = new Position(pit.x, pit.y, level);
       game.systems.monsters.loadPartyLevel(level);
       party.partyMoveDisableTimer = 0;
-      internals.lastInputTime = 0;
+      game.lastInputTime = 0;
       game.discardAllInput();
       game.ctx.loop.newPartyLevel = -1;
       // An event was handled this tick, so the turn waits for the next one
       // (`Mouse.cpp:1596-1604`) — past the tick in which the pit opens.
-      internals.lastInputTime = game.ctx.state.tickCount;
+      game.lastInputTime = game.ctx.state.tickCount;
       game.enqueueMovement(MovementAction.TURN_LEFT);
       const facingBefore = party.facing;
       // `TT_PIT` with `uByte9 = 0` (set: open), due at the next tick: it runs its timers on

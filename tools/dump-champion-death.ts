@@ -615,7 +615,7 @@ function main(): void {
     g.systems.timer.processTimers = () => { g.systems.monsterAttack.damageCharacter(0, 999, 0, 0); return false; };
     const drawn: string[] = [];
     g.onTick(() => drawn.push(`gameIsLost ${g.ctx.party.state.gameIsLost}, main loop returned ${g.mainLoopHasReturned()}`));
-    (g as unknown as { gameTick(): void }).gameTick();
+    g.gameTick();
     console.log(`the killing blow's tick draws: ${drawn.join('; ') || 'nothing'}; then main loop returned ${g.mainLoopHasReturned()}`);
     check(drawn.length === 1 && drawn[0] === 'gameIsLost false, main loop returned false',
       "the tick of the killing blow draws the frame before DisplayCharacterDamage kills");

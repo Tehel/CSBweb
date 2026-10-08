@@ -261,7 +261,7 @@ function main(): void {
       const p = game.ctx.party.state.position;
       drawn.push(`(${p.x},${p.y}) L${p.z}${game.ctx.loop.newPartyLevel !== -1 ? ' pending' : ''}`);
     });
-    (game as unknown as { gameTick(): void }).gameTick();
+    game.gameTick();
     const want = `(${stairs.exitLevel.x},${stairs.exitLevel.y}) L${stairs.exitLevel.z}`;
     console.log(`6. the party steps from (${beside.x},${beside.y}) L${beside.z} into the stairs (${stairs.at.x},${stairs.at.y}): `
       + `moved ${moved}, after the step (${between.x},${between.y}) L${between.z}; the tick draws ${drawn.join(', ') || 'nothing'} `

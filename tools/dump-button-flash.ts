@@ -128,8 +128,6 @@ async function main(): Promise<void> {
   party.champions = [];
   game.setMouseEventHandlers({ translate: clicks.translate, button: () => {}, unclick: () => {} });
 
-  type Internals = { lastInputTime: number };
-  const internals = game as unknown as Internals;
   /** One VBL; `tickDue` makes a game tick run in it, after the queue. */
   const frame = (tickDue = false): void => {
     runVbl(game, tickDue ? TICK_DUE : 1);
@@ -142,7 +140,7 @@ async function main(): Promise<void> {
     game.ctx.party.setFacing(scene!.dir);
     party.partyMoveDisableTimer = 0;
     party.word11712 = 0;
-    internals.lastInputTime = 0;
+    game.lastInputTime = 0;
     frame();
     frame();
     game.takeFlashChanged();

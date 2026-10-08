@@ -202,7 +202,7 @@ console.log("=== Game's tick ===");
   g.systems.timer.processTimers = () => { g.systems.monsterAttack.damageCharacter(0, 9, 0, 0); return false; };
   const seen: number[] = [];
   g.onTick(() => seen.push(g.ctx.party.state.champions[0]!.attributes.health));
-  (g as unknown as { gameTick(): void }).gameTick();
+  g.gameTick();
   const hp = g.ctx.party.state.champions[0]!.attributes.health;
   console.log(`the tick draws at HP ${seen.join(',')}, and ends at HP ${hp}; calls [${calls.join('; ')}]`);
   check(seen.join(',') === '200' && hp === 191, 'the tick draws first, then takes the damage off');
