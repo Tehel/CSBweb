@@ -38,6 +38,7 @@ import { DrawRoomObjects, mapColorValue } from '../src/renderer/bytecode/DrawRoo
 import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, mirrorBitmap, shrinkBlt } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
+import { wrapMember } from './lib/standIn';
 import { graphicsTablesOf, stockGraphics } from './lib/game';
 
 const graphics = stockGraphics();
@@ -100,11 +101,10 @@ function drawScene(scene: Scene, cache: AltMonCache, files: Pick<CSBGraphicsLoad
     },
   };
   const draw = new ViewportDraw(context);
-  const blit = draw.blitShapeToViewportIndexWithTransparent.bind(draw);
-  draw.blitShapeToViewportIndexWithTransparent = (src: any, rect: any, t: number) => {
+  wrapMember(draw, 'blitShapeToViewportIndexWithTransparent', (blit) => (src, rect, t) => {
     blits.push({ src, x1: rect.x1, x2: rect.x2, y2: rect.y2, transparent: t });
     blit(src, rect, t);
-  };
+  });
   DrawRoomObjects(draw, monsterRn, 0, 0, 0, scene.cell, ORDER);
   return { blits, ownGraphics };
 }

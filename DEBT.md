@@ -239,12 +239,10 @@ builds around them is its own:
 
 - 40 tools spell out `addCharacterDefaults()`, most inside a champion-building function
   of their own; 145 construct a `DungeonLoader`, most to read `dm-atari/dungeon.dat`.
-- 30 tools stand in for an engine or renderer method by assigning over it, which
-  nothing marks as a stand-in or puts back: `dump-adjust-skills`, `-alt-mon-draw`,
-  `-cast-spell`, `-champion-death`, `-character-damage`, `-clouds`,
-  `-delete-monster-filter`, `-drop-move-object`, `-dsa-delete`, `-fusion`,
-  `-local-action`, `-loop-die`, `-loop-script`, `-missile-draw`, `-missile-drop`,
-  `-missile-exterior`, `-missile-monster`, `-monster-design-options`, `-monster-draw`,
+- 20 tools stand in for an engine or renderer method by assigning over it, which
+  nothing marks as a stand-in or puts back: `dump-local-action`, `-loop-die`,
+  `-loop-script`, `-missile-draw`, `-missile-drop`, `-missile-exterior`,
+  `-missile-monster`, `-monster-design-options`, `-monster-draw`,
   `-monster-missile-type`, `-monster-move-code`, `-monster-pad`, `-move-from-missile`,
   `-party-collision`, `-party-move`, `-queue-sound`, `-viewport-click`,
   `-wiggle-monster`, `-wiggle-objects`, and `watch-smart-discard`. A member that is a
@@ -268,12 +266,15 @@ drives is `newUIState`'s (`tools/lib/ui.ts`), whose context a tool stages by ass
 its fields; every other private a tool drove is public, with the reason in its
 comment, so no tool casts into a private; and `tools/lib/standIn.ts` (`standIn`,
 `wrapMember`) replaces a public member with a stand-in typed as the member and puts it
-back, for `dump-attack-panel`, `-button-flash`, `-door-lightning`, `-key-bindings`,
-`-magic-panel`, `-missile-door`, `-mouse-queue` and `-reincarnate-entry`. What a tool
+back, for `dump-adjust-skills`, `-alt-mon-draw`, `-attack-panel`, `-button-flash`,
+`-cast-spell`, `-champion-death`, `-character-damage`, `-clouds`,
+`-delete-monster-filter`, `-door-lightning`, `-drop-move-object`, `-dsa-delete`,
+`-fusion`, `-key-bindings`, `-magic-panel`, `-missile-door`, `-mouse-queue` and
+`-reincarnate-entry`. What a tool
 keeps beside a `Game` is in a `WeakMap` of its own (`dump-game-events`,
 `dump-hall-of-champions`).
 
-5. **The other stand-ins**: the thirty tools above moved to `standIn` and `wrapMember`,
+5. **The other stand-ins**: the twenty tools above moved to `standIn` and `wrapMember`,
    a few tools per commit.
 6. **The stock dungeon and a test champion** as `tools/lib` helpers, and the tools moved
    to them, a few tools per commit.

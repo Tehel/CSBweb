@@ -49,6 +49,7 @@ import { DescIndexOfRecord } from '../src/engine/objectIndex';
 import type { DatabaseRecord } from '../src/data/dungeonTypes';
 import { OBJNI_ILLUMULET_A, OBJNI_JEWEL_SYMAL_A, OBJNI_TORCH_A } from '../src/core/objectNameIndex';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { standIn } from './lib/standIn';
 import { check, fail, finish } from './lib/check';
 import { emptyPossessions, getChampionPossession } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -612,7 +613,7 @@ function main(): void {
     if (!cell) { fail('no open cell with an open neighbour'); finish(); return; }
     g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
-    g.systems.timer.processTimers = () => { g.systems.monsterAttack.damageCharacter(0, 999, 0, 0); return false; };
+    standIn(g.systems.timer, 'processTimers', () => { g.systems.monsterAttack.damageCharacter(0, 999, 0, 0); return false; });
     const drawn: string[] = [];
     g.onTick(() => drawn.push(`gameIsLost ${g.ctx.party.state.gameIsLost}, main loop returned ${g.mainLoopHasReturned()}`));
     g.gameTick();

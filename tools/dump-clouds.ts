@@ -36,6 +36,7 @@ import { Game } from '../src/engine/Game';
 import { SoundQueue } from '../src/engine/SoundQueue';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { newGame, processTimersAt } from './lib/game';
+import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -229,12 +230,12 @@ async function main(): Promise<void> {
     const game = await makeGame();
     let ordinal: number | null = null;
     const original = SoundQueue.prototype.queueSound;
-    SoundQueue.prototype.queueSound = function (this: SoundQueue, o, mapX, mapY, deltaTime, level) {
+    const restore = standIn(SoundQueue.prototype, 'queueSound', function (this: SoundQueue, o, mapX, mapY, deltaTime, level) {
       ordinal = o;
       return original.call(this, o, mapX, mapY, deltaTime, level);
-    };
+    });
     game.systems.missileEncounter.createDeathCloud(RN_FIREBALL, size, at, 255);
-    SoundQueue.prototype.queueSound = original;
+    restore();
     return ordinal;
   };
   const bigOrdinal = await soundOrdinal(200);

@@ -52,6 +52,7 @@ import { AttackType, MonsterType } from '../src/engine/monsterTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
 import { check, finish } from './lib/check';
+import { wrapMember } from './lib/standIn';
 import { createMonsterAt } from './lib/createMonster';
 import { newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
 
@@ -178,11 +179,10 @@ function arena(withLordChaos: boolean, strip: ScrollingText | null = null): Aren
     game, seedAfterCloud: null, credits: hooks.credits, inventory: [], portraits: [], printed: [], views: 0, drawn: hooks.drawn, frames: 0,
   };
   const encounter = game.ctx.systems.missileEncounter;
-  const createCloud = encounter.createCloud.bind(encounter);
-  encounter.createCloud = (...args: Parameters<typeof createCloud>): void => {
+  wrapMember(encounter, 'createCloud', (createCloud) => (...args) => {
     createCloud(...args);
     a.seedAfterCloud = game.ctx.random.getSeed();
-  };
+  });
   return a;
 }
 
@@ -374,11 +374,10 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fre
   };
   if (inventoryOpen) game.ctx.party.state.selectedCharacterIndex = 0;
   const sounds: number[] = [];
-  const queueSound = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
-  game.ctx.sounds.queueSound = (ordinal, x, y, delta, level) => {
+  wrapMember(game.ctx.sounds, 'queueSound', (queueSound) => (ordinal, x, y, delta, level) => {
     sounds.push(ordinal);
     queueSound(ordinal, x, y, delta, level);
-  };
+  });
   const others = monstersOnLevel(game) - 1;
   const champion = game.ctx.party.state.champions[0]!;
   const stamina = champion.attributes.stamina;

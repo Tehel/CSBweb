@@ -31,6 +31,7 @@ import { DeleteMonsterWhy } from '../src/engine/MonsterDamage';
 import { makeMoreRoomInDB } from '../src/engine/MakeMoreRoomInDB';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
+import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 /** `ESL_DELETEMONSTERFILTER` (`doc/CSBwin-src/CSB.h:1545`). */
@@ -191,7 +192,7 @@ for (const [members, index, residue] of [[2, 1, 3], [1, 0, 3], [2, 1, 2]] as con
   const game = withFilterDsas(ESL_DELETEMONSTERFILTER, [report(0)]);
   const dungeon = game.ctx.dungeon;
   const { rn, at } = groups(game)[0]!;
-  dungeon.monsterAllowedOnLevel = () => false;
+  standIn(dungeon, 'monsterAllowedOnLevel', () => false);
   const to = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => new Position(at.x + dx!, at.y + dy!, at.z))
     .find((p) => ((dungeon.getCellFlag(p) >> 5) & 7) === 1 && dungeon.findFirstMonster(p) === OBJECT_ID_EOF)!;
   game.systems.monsters.moveMonster(rn, at.x, at.y, to.x, to.y, at.z);
@@ -204,7 +205,7 @@ for (const [members, index, residue] of [[2, 1, 3], [1, 0, 3], [2, 1, 2]] as con
 {
   const game = withFilterDsas(ESL_DELETEMONSTERFILTER, [report(0)]);
   // A database that cannot grow, so a group is deleted to make room.
-  game.ctx.dungeon.enlarge = () => -1;
+  standIn(game.ctx.dungeon, 'enlarge', () => -1);
   makeMoreRoomInDB(game.ctx, DBType.CREATURE);
   const g = game.systems.dsa.getGlobalVariables();
   console.log(`4. MakeMoreRoomInDB: [${g.slice(1, 9).join(', ')}]`);

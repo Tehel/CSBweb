@@ -42,6 +42,7 @@ import { drawCharacterState, drawPartyStatus } from '../src/renderer/ui/Characte
 import { type UIState } from '../src/renderer/ui/UIState';
 import { graphicsTablesOf, newGame, presetHeroesOf, processTimersAt } from './lib/game';
 import { newUIState } from './lib/ui';
+import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 function champion(i: number): Champion {
@@ -199,7 +200,7 @@ console.log("=== Game's tick ===");
   // CSBCode.cpp:648) with the HP untouched; `DisplayCharacterDamage` follows (`:667`).
   const calls: string[] = [];
   const g = makeGame(1, calls);
-  g.systems.timer.processTimers = () => { g.systems.monsterAttack.damageCharacter(0, 9, 0, 0); return false; };
+  standIn(g.systems.timer, 'processTimers', () => { g.systems.monsterAttack.damageCharacter(0, 9, 0, 0); return false; });
   const seen: number[] = [];
   g.onTick(() => seen.push(g.ctx.party.state.champions[0]!.attributes.health));
   g.gameTick();

@@ -31,6 +31,7 @@ import { MovementAction } from '../src/engine/gameTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import type { Champion } from '../src/engine/gameTypes';
 import { newGame } from './lib/game';
+import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { rigTeleporter } from './lib/teleporter';
 import { emptyPossessions } from '../src/engine/gameTypes';
@@ -132,11 +133,10 @@ type PadCall = { at: Position; place: boolean; unchangedRoom: boolean };
 function spy(game: Game): PadCall[] {
   const calls: PadCall[] = [];
   const actuators = game.systems.actuators;
-  const real = actuators.triggerObjectMove.bind(actuators);
-  actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
+  wrapMember(actuators, 'triggerObjectMove', (real) => (position, object, place, unchangedRoom, facing) => {
     if (game.ctx.dungeon.rnMaps.dbType(object) === DBType.WEAPON) calls.push({ at: position, place, unchangedRoom });
     return real(position, object, place, unchangedRoom, facing);
-  };
+  });
   return calls;
 }
 
@@ -221,12 +221,11 @@ function main(): void {
     const rn = takeWeapon(game);
     const queue = game.ctx.timers;
     const actuators = game.systems.actuators;
-    const real = actuators.triggerObjectMove.bind(actuators);
     let padTimer = -1;
-    actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
+    wrapMember(actuators, 'triggerObjectMove', (real) => (position, object, place, unchangedRoom, facing) => {
       padTimer = queue.createTimer(TimerFunction.TT_DOOR, position.x, position.y, 0, 0, game.ctx.state.tickCount, position.z).index;
       return real(position, object, place, unchangedRoom, facing);
-    };
+    });
     const queued = (): boolean => padTimer >= 0 && queue.getTimers().some((t) => t.index === padTimer);
 
     game.ctx.party.state.cursorOwner = 0;

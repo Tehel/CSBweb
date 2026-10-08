@@ -27,6 +27,7 @@ import type { MessageSink } from '../src/engine/GameHost';
 import { adjustSkills, AdjustSkillsWhy, createEmptySkills, determineMastery } from '../src/engine/skills';
 import { monsterWord16_8_11 } from '../src/data/tables/MonsterDesc';
 import { newGame, stockGraphics } from './lib/game';
+import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 function champion(i: number): Champion {
@@ -72,7 +73,7 @@ party.position = new Position(6, 14, 2);
 
 const filtered: number[] = [];
 const dsa = ctx.systems.dsa;
-dsa.processAdjustSkillsFilter = (params) => { filtered.push(params.why); return null; };
+standIn(dsa, 'processAdjustSkillsFilter', (params) => { filtered.push(params.why); return null; });
 
 /** One point short of Fighter mastery 2: 500 experience halves once (`DetermineMastery`). */
 function primeFighter(): void {
@@ -140,11 +141,13 @@ const retarget = (answer: { chIdx: number; skillNumber: number }, champ1Fighter:
   for (const s of party.champions[1].skills) { s.experience = 0; s.tempAdjust = 0; }
   party.champions[1].skills[0].experience = champ1Fighter;
   party.lastMonsterAttackTime = ctx.state.tickCount;
-  dsa.processAdjustSkillsFilter = (params) => {
+  const restore = standIn(dsa, 'processAdjustSkillsFilter', (params) => {
     filtered.push(params.why);
     return { chIdx: answer.chIdx, skillNumber: answer.skillNumber, experience: params.experience };
-  };
-  return adjustSkills(ctx, 0, 7, 4, AdjustSkillsWhy.SkillIncreaser1, 0);
+  });
+  const r = adjustSkills(ctx, 0, 7, 4, AdjustSkillsWhy.SkillIncreaser1, 0);
+  restore();
+  return r;
 };
 {
   const r = retarget({ chIdx: 1, skillNumber: 4 }, 0);

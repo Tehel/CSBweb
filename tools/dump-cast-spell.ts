@@ -29,6 +29,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import type { SpellParameters } from '../src/engine/magicTypes';
 import { newGame } from './lib/game';
+import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { CHARFLAG_PORTRAIT_CHANGED, emptyPossessions } from '../src/engine/gameTypes';
 
@@ -119,14 +120,13 @@ async function main(): Promise<void> {
   // Zokathra, through a filter's missile type 7, with the hands full or not. Every pad call
   // for a misc object is recorded.
   const actuators = game.systems.actuators;
-  const realTrigger = actuators.triggerObjectMove.bind(actuators);
   const padCalls: string[] = [];
-  actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
+  const restoreTrigger = wrapMember(actuators, 'triggerObjectMove', (realTrigger) => (position, object, place, unchangedRoom, facing) => {
     if (game.ctx.dungeon.rnMaps.dbType(object) === DBType.MISC) {
       padCalls.push(`(${position.x},${position.y},${position.z}) ${place ? 'place' : 'lift'} unchanged ${unchangedRoom}`);
     }
     return realTrigger(position, object, place, unchangedRoom, facing);
-  };
+  });
   const party = game.ctx.party.state.position;
   const miscAtParty = (): ObjectID[] => {
     const found: ObjectID[] = [];
@@ -147,7 +147,7 @@ async function main(): Promise<void> {
   };
   const zokEmpty = zokathra(0);
   const zokFull = zokathra(2);
-  actuators.triggerObjectMove = realTrigger;
+  restoreTrigger();
 
   const row = (label: string, r: ReturnType<typeof cast>): void =>
     console.log(`${label.padEnd(28)} result ${r.result}  exp +${r.experience}  seeThru ${r.seeThruWalls}  printed ${JSON.stringify(r.printed)}`);

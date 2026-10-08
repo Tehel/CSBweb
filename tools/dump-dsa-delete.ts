@@ -27,6 +27,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import type { TimerEntry } from '../src/engine/TimerQueue';
 import { newGame } from './lib/game';
+import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 const OP_LOAD = 6;
@@ -126,15 +127,14 @@ async function main(): Promise<void> {
   const run = (game: Game, slave: ObjectID, at: Position, watch: ObjectID[]): { result: boolean; midRun: number[] } => {
     const dsa = game.systems.dsa;
     const midRun: number[] = [];
-    const original = dsa.executeAmpersand;
-    dsa.executeAmpersand = function (subcode, bank, exPkt) {
-      const jump = original.call(this, subcode, bank, exPkt);
+    const restore = wrapMember(dsa, 'executeAmpersand', (original) => (subcode, bank, exPkt) => {
+      const jump = original(subcode, bank, exPkt);
       if (subcode === STK_DEL) for (const rn of watch) midRun.push(link(game, rn));
       return jump;
-    };
+    });
     const timer = { uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: 0, level: at.z, time: 0 } as TimerEntry;
     const result = dsa.processTimer5(slave, timer, at);
-    dsa.executeAmpersand = original;
+    restore();
     return { result, midRun };
   };
 
