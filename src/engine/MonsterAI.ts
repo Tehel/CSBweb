@@ -38,7 +38,6 @@ import {
 } from './MonsterPerception';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import {
-  monsterDelayFromAttackToMove,
   monsterDelayFromMoveToAttack,
   monsterHorizontalSize,
   monsterInvincible,
@@ -491,8 +490,7 @@ export class MonsterAI {
       c.mmr.setflg(MonsterEvents.TT29to41_w30w32GretaterThan3);
       frame.i60 = this.ctx.state.tickCount + monsterDelayFromMoveToAttack(c.desc);
       this.trace(
-        `      MAI fearFactor != 6.  Distance to party > 3. AdditionalDelayAfter(move/attack) = ` +
-          `${monsterDelayFromMoveToAttack(c.desc)}, ${monsterDelayFromAttackToMove(c.desc)}`,
+        `      MAI fearFactor != 6.  Distance to party > 3.  mt->word20 = ${c.desc.word20}`,
       );
       this.setMonsterTimer(frame.timer, frame.i60, c.timeUntilAlternateUpdate, true);
       return;
