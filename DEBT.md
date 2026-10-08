@@ -94,7 +94,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C159 | `&CELL@`'s pit, false wall and door bits leave their variable undefined in CSBWin | S | ⏳ |
 | C157 | CSBWin 20230608 becomes the reference | L | ⏳ |
 | G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
@@ -246,25 +245,6 @@ Raspberry Pi front-ends. Two changes are not taken:
   (`TextOutToScreen_Centered`, `Attack.cpp:972-980`, `CSBCode.cpp:1785`), which puts them
   2 and 3 pixels right of the original's 242 and 248. It serves translations.
 - The utility's word-10 save form, whose adventure write is left `NotImplemented` (G28).
-
-### C159 ⏳ `&CELL@`'s pit, false wall and door bits leave their variable undefined in CSBWin
-
-`STKOP_CellFetch` reports a square's flags in the variable after its room type. For a
-stone, open, teleporter or stairs square it ORs each bit in with
-`Var(arrayIndex+1, Var(arrayIndex+1) | bit)`, which leaves the variable well defined
-(`doc/CSBwin-src/DSA.cpp:3704-3765`). For a pit, a false wall and a door it calls
-`SetVarBit` instead (`:3767-3810`), which zeroes a variable not well defined (`NoValue`)
-and ORs the bit, but never marks it well defined (`DSA.cpp:143`; the same in 20230608,
-`:144`). Unless the DSA set that variable before, its next read zeroes it again, and the
-pit's, false wall's or door's bits read 0. The port's `setVarBit` sets the variable
-(`src/engine/DsaSystem.ts`), so the bits read as set.
-
-It looks like a slip of CSBWin's translation: the same operation's other cases leave the
-variable defined, and the commented-out original beside each call is
-`tempVar[arrayIndex+1] |= bit`, from before variables had a defined state. Paying it: an H
-entry with both readings, and a `tools/` check that `&CELL@` on a pit, with the variable
-never set, reads the pit's bits. Or, if it does not hold up, port `SetVarBit` as written.
-Size S.
 
 ### C157 ⏳ CSBWin 20230608 becomes the reference
 

@@ -560,9 +560,15 @@ class DsaBank {
     this.vars.definedFlags[index] = DsaVarType.WellDefined;
   }
 
+  /**
+   * `DSADBANK::SetVarBit` (`doc/CSBwin-src/DSA.cpp:143`): a variable not well defined is
+   * zeroed (`NoValue`) before the bit goes in, and is still not well defined after.
+   * `&CELL@`, its one caller, has set the variable to 0 first.
+   */
   setVarBit(index: number, bitmask: number): void {
-    const current = this.getVar(index);
-    this.setVar(index, current | bitmask);
+    if (index < 0 || index >= this.vars.values.length) return;
+    if (this.vars.definedFlags[index] !== DsaVarType.WellDefined) this.noValue(index);
+    this.vars.values[index] = (this.vars.values[index] ?? 0) | bitmask;
   }
 
   setVarState(index: number, state: DsaVarType): void {
@@ -2456,6 +2462,8 @@ export class DsaSystem {
         const arraySize = bank.stack.pop();
         const arrayIndex = bank.stack.pop();
         if (arrayIndex < 0 || arrayIndex + arraySize > 100) break;
+        // `Var(arrayIndex+j, 0)` (doc/CSBwin-src/DSA.cpp:3690-3693): every variable of the
+        // array is well defined from here, so `SetVarBit` below never zeroes one.
         for (let i = 0; i < arraySize; i++) {
           bank.setVar(arrayIndex + i, 0);
         }
@@ -2470,18 +2478,20 @@ export class DsaSystem {
         bank.setVar(arrayIndex, roomType);
         if (arraySize < 2) break;
         switch (roomType) {
+          // `Var(arrayIndex+1, Var(arrayIndex+1) | bit)` for these four; `SetVarBit` for a
+          // pit, a false wall and a door (doc/CSBwin-src/DSA.cpp:3704-3810).
           case RoomType.STONE:
-            if (cellFlag & 0x8) bank.setVarBit(arrayIndex + 1, 0x01);
-            if (cellFlag & 0x4) bank.setVarBit(arrayIndex + 1, 0x02);
-            if (cellFlag & 0x2) bank.setVarBit(arrayIndex + 1, 0x04);
-            if (cellFlag & 0x1) bank.setVarBit(arrayIndex + 1, 0x08);
+            if (cellFlag & 0x8) bank.setVar(arrayIndex + 1, bank.getVar(arrayIndex + 1) | 0x01);
+            if (cellFlag & 0x4) bank.setVar(arrayIndex + 1, bank.getVar(arrayIndex + 1) | 0x02);
+            if (cellFlag & 0x2) bank.setVar(arrayIndex + 1, bank.getVar(arrayIndex + 1) | 0x04);
+            if (cellFlag & 0x1) bank.setVar(arrayIndex + 1, bank.getVar(arrayIndex + 1) | 0x08);
             break;
           case RoomType.OPEN:
-            if (cellFlag & 0x08) bank.setVarBit(arrayIndex + 1, 0x01);
+            if (cellFlag & 0x08) bank.setVar(arrayIndex + 1, bank.getVar(arrayIndex + 1) | 0x01);
             break;
           case RoomType.TELEPORTER: {
-            if (cellFlag & 0x08) bank.setVarBit(arrayIndex + 1, 0x08);
-            if (cellFlag & 0x04) bank.setVarBit(arrayIndex + 1, 0x04);
+            if (cellFlag & 0x08) bank.setVar(arrayIndex + 1, bank.getVar(arrayIndex + 1) | 0x08);
+            if (cellFlag & 0x04) bank.setVar(arrayIndex + 1, bank.getVar(arrayIndex + 1) | 0x04);
             if (arraySize < 3) break;
             const tp = this.getFirstTeleporterRecord(new Position(locr.x, locr.y, locr.l));
             if (!tp) break;
@@ -2499,8 +2509,8 @@ export class DsaSystem {
             break;
           }
           case RoomType.STAIRS:
-            if (cellFlag & 0x04) bank.setVarBit(arrayIndex + 1, 0x04);
-            if (cellFlag & 0x08) bank.setVarBit(arrayIndex + 1, 0x08);
+            if (cellFlag & 0x04) bank.setVar(arrayIndex + 1, bank.getVar(arrayIndex + 1) | 0x04);
+            if (cellFlag & 0x08) bank.setVar(arrayIndex + 1, bank.getVar(arrayIndex + 1) | 0x08);
             break;
           case RoomType.PIT:
             if (cellFlag & 0x01) bank.setVarBit(arrayIndex + 1, 0x01);
@@ -2514,6 +2524,7 @@ export class DsaSystem {
           case RoomType.DOOR: {
             const door = this.getFirstDoorRecord(new Position(locr.x, locr.y, locr.l));
             if (!door) break;
+            bank.setVar(arrayIndex + 1, 0);
             if (cellFlag & 0x04) bank.setVarBit(arrayIndex + 1, 0x01);
             if (door.vertical) bank.setVarBit(arrayIndex + 1, 0x02);
             if (door.hasButton) bank.setVarBit(arrayIndex + 1, 0x04);

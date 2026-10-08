@@ -6562,6 +6562,17 @@ the loop reads a variable: `Var(0)` in 15.9, `Var(j)`, the missing parameter's n
 20230608 (`doc/CSBwin-src-20230608/DSA.cpp:2978`). The port follows 20230608. `STKOP_ParamStore` (`:3000-3020`)
 does nothing past 100 either. Evidence: `tools/dump-dsa-parameters.ts`.
 
+## `&CELL@` sets its array to 0 first, so `SetVarBit` never zeroes a bit
+
+`STKOP_CellFetch` (`doc/CSBwin-src/DSA.cpp:3677-3830`) sets each variable of its array to
+0 with `Var(arrayIndex+j, 0)` before it reads the square (`:3690-3693`), which marks it
+`DVT_WellDefined`. The flags of a stone, open, teleporter or stairs square go into the
+second variable with `Var(i, Var(i) | bit)`; those of a pit, a false wall and a door with
+`SetVarBit` (`:3767-3810`), which zeroes a variable that is not well defined and does not
+mark it so (`:143`, the same in 20230608, `:144`). Here it always is, so every room type's
+bits read back as set; a door's arm even sets the variable to 0 again before its bits.
+Evidence: `tools/dump-dsa-cell-fetch.ts`, which fails if the array is not set first.
+
 ## A DSA's extended cell flags are one `EXPOOL` record a column, and `&ECF!` re-adds it
 
 `&ECF@` and `&ECF!` (`doc/CSBwin-src/DSA.cpp:3270-3327`) key a record on

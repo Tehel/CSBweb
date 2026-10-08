@@ -103,6 +103,7 @@ const CHECKS = [
   { tool: 'dump-dsa-characters.ts' },
   { tool: 'dump-dsa-objects.ts' },
   { tool: 'dump-dsa-parameters.ts' },
+  { tool: 'dump-dsa-cell-fetch.ts' },
   { tool: 'dump-viewing-filter.ts' },
   { tool: 'dump-sound-filter.ts' },
   { tool: 'dump-action-name-filter.ts' },
