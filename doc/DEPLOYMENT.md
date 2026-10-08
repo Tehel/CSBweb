@@ -80,6 +80,14 @@ The repository's manifest keeps every set, because the tools need them all. The 
 one is the author's own copy, uploaded with the files: which sets the site offers is the
 author's choice. Today it is the repository's, all nine sets.
 
+The manifest is strict JSON, read by `JSON.parse`: a comment makes it unreadable, and the
+server will not start on it. To take a set off the chooser without deleting it, give it
+`"hidden": true`. The chooser beside the canvas leaves it out (`chooserSets`,
+`src/data/DataSets.ts`), unless it is the set being played, and `?dungeon=<id>` plays it
+all the same. The server treats it as any other set: its folder is checked at start-up,
+its files are served, and its events are taken. Keys the parser does not know are
+ignored, so a note can go in a key of its own, such as `"_note"`.
+
 The game files are not part of a deploy. They are uploaded once, and again when they
 change. **Everything in `gamefiles/` can be downloaded**, readmes and stray folders
 included, since the server serves the folder as it stands.

@@ -15,7 +15,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { MANIFEST_NAME, dataSetFor, parseManifest, type DataSet } from '../src/data/DataSets';
+import { MANIFEST_NAME, chooserSets, dataSetFor, parseManifest, type DataSet } from '../src/data/DataSets';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { GameTables } from '../src/engine/GameTables';
@@ -55,6 +55,15 @@ function checkParser(): void {
   check(dataSetFor(parsed, null) === parsed.defaultSet && dataSetFor(parsed, 'nowhere') === parsed.defaultSet
     && dataSetFor(parsed, 'b') === parsed.dataSets[1], 'no ?dungeon=, or an unknown one, plays the default; a known one plays itself');
 
+  // A hidden set: out of the chooser, but played by its ?dungeon=, and listed while it is.
+  const hiding = parseManifest(manifest({ dataSets: [set(), set({ id: 'b', dir: 'b', hidden: true }), set({ id: 'c', dir: 'c', hidden: false })] }), '');
+  const [a, b, c] = hiding.dataSets as [DataSet, DataSet, DataSet];
+  const listed = (current: DataSet) => chooserSets(hiding, current).map((s) => s.id).join(',');
+  console.log(`  hidden: ${hiding.dataSets.map((s) => `${s.id} ${s.hidden}`).join(', ')}; the chooser lists ${listed(a)}, and ${listed(b)} while b is played`);
+  check(!a.hidden && b.hidden && !c.hidden, '"hidden" is read as written, and left out it is false');
+  check(listed(a) === 'a,c' && listed(c) === 'a,c', 'the chooser leaves a hidden set out');
+  check(dataSetFor(hiding, 'b') === b && listed(b) === 'a,b,c', 'a hidden set is played by its ?dungeon=, and the chooser lists it while it is');
+
   const malformed: Array<[string, string]> = [
     ['{"default": "a", ', 'not JSON'],
     ['[]', 'not an object'],
@@ -66,6 +75,7 @@ function checkParser(): void {
     [manifest({ dataSets: [set({ dir: '../a' })] }), `data set 'a' has no "dir"`],
     [manifest({ dataSets: [set({ dir: 'a/' })] }), `data set 'a' has no "dir"`],
     [manifest({ dataSets: [set({ hintOracle: 'yes' })] }), `data set 'a' has no "hintOracle"`],
+    [manifest({ dataSets: [set({ hidden: 'yes' })] }), `data set 'a' has a "hidden" that is neither true nor false`],
     [manifest({ dataSets: [set(), set({ dir: 'b' })] }), `two data sets are 'a'`],
     [manifest({ default: 'b' }), '"default" names none'],
     [manifest({ default: undefined }), '"default" names none'],

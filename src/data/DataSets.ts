@@ -17,7 +17,8 @@
  *                      "csbGraphics": true, "miniDat": false, "hintOracle": false }, …] }
  *
  * A folder is named relative to the manifest. `swoosh`, the FTL logo's folder, may be
- * `null` or left out.
+ * `null` or left out. A set with `"hidden": true` is left out of the chooser and plays all
+ * the same by its `?dungeon=` (`chooserSets`); `hidden` may be left out, for `false`.
  */
 
 export interface DataSet {
@@ -45,6 +46,11 @@ export interface DataSet {
      * (`src/renderer/ui/HintOracleButton.ts`).
      */
     hintOracle: boolean;
+    /**
+     * Whether the chooser leaves it out (`chooserSets`). It is played by its `?dungeon=` all
+     * the same, and the server takes its events and serves its files as any other's.
+     */
+    hidden: boolean;
 }
 
 /** What `manifest.json` says, its folders resolved. */
@@ -94,7 +100,9 @@ export function parseManifest(text: string, base: string): DataSetManifest {
             if (typeof value !== 'boolean') throw manifestError(`data set '${id}' has no "${flag}", true or false`);
             return value;
         });
-        return { id, name, dir: under(base, dir), csbGraphics: flags[0]!, miniDat: flags[1]!, hintOracle: flags[2]! };
+        const hidden = entry.hidden ?? false;
+        if (typeof hidden !== 'boolean') throw manifestError(`data set '${id}' has a "hidden" that is neither true nor false`);
+        return { id, name, dir: under(base, dir), csbGraphics: flags[0]!, miniDat: flags[1]!, hintOracle: flags[2]!, hidden };
     });
     const twice = dataSets.find((set, i) => dataSets.findIndex((other) => other.id === set.id) !== i);
     if (twice) throw manifestError(`two data sets are '${twice.id}'`);
@@ -107,7 +115,15 @@ export function parseManifest(text: string, base: string): DataSetManifest {
     return { dataSets, defaultSet, swooshDir: isFolder(swoosh) ? under(base, swoosh) : null };
 }
 
-/** The set `?dungeon=<id>` names, or the default when it names none or an unknown one. */
+/**
+ * The sets the chooser lists, in the manifest's order: every set but the hidden ones, and
+ * `current` even when hidden, so that the chooser shows the set being played.
+ */
+export function chooserSets(manifest: DataSetManifest, current: DataSet): DataSet[] {
+    return manifest.dataSets.filter((set) => !set.hidden || set === current);
+}
+
+/** The set `?dungeon=<id>` names, hidden or not, or the default when it names none or an unknown one. */
 export function dataSetFor(manifest: DataSetManifest, id: string | null): DataSet {
     return manifest.dataSets.find((s) => s.id === id) ?? manifest.defaultSet;
 }
