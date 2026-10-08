@@ -28,11 +28,10 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH, writePortrait } from '../src/data/CsbwinCharacters';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, presetHeroesOf, stockGraphics } from './lib/game';
+import { graphicsTablesOf, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { writeIndexedPng } from './lib/png';
 
 const OUTPUT = 'static/gamefiles/csb/utility-portraits.dat';
@@ -161,11 +160,7 @@ if (!folder) throw new Error('no PORTRAIT folder on the disk');
 const files = disk.list(folder).filter((f) => !f.isDirectory && f.name.endsWith('.CMP'));
 check(files.length === 24, `PORTRAIT holds 24 .CMP files (${files.length})`);
 
-const dungeon = new DungeonLoader();
-dungeon.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-const data = dungeon.getData();
-if (!data) throw new Error('dm-atari/dungeon.dat did not load');
-const heroes = presetHeroesOf(data, stockGraphics());
+const heroes = presetHeroesOf(stockDungeon(), stockGraphics());
 
 const sheet = new Uint8Array(SHEET_WIDTH * SHEET_HEIGHT);
 const cmpByCell = new Map<number, Uint8Array>();

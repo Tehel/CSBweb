@@ -98,7 +98,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | L | ⏳ step 6 of 7 |
+| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | L | ⏳ step 7 of 7 |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | G29 | Recording a game and playing it back | — | ⏸️ |
@@ -238,17 +238,8 @@ The table-extraction round-trip checks are a live phase, so they stay in `PLAN.m
 `tools/lib/game.ts` gives every tool the same `Game` and tables (`E1a`). What each tool
 builds around them is its own:
 
-- 17 tools name `dm-atari/dungeon.dat` or its `graphics.dat` in their code, beside
-  `stockDungeon()` and `stockGraphics()`: `dump-bad-saved-game`, `-compressed-dungeon`,
-  `-cursor-filter`, `-defined-items`, `-dm-atari-graphics`, `-dungeon-conversions`,
-  `-dungeon-image-blocks`, `-extended-dungeon`, `-extend-portraits`, `-file-signatures`,
-  `-hint-key`, `-image-checksum`, `-level-items`, `-object-definitions`, `-save-menu`,
-  `gen-utility-portraits` and `peek-dungeon`. Their loads have a shape of their own: a
-  path in a constant, bytes kept to read again, a loader the tool goes on using, a table
-  of data sets. Some read the file's bytes as their subject (a signature, a checksum, the
-  compression, the Extended Features block), and those keep the path.
-- 31 tools extract the UI tables again (`graphicsTablesOf(…).ui`) beside the `UIState`
-  that `tools/lib/ui.ts` builds them into.
+- 31 tools extract the UI tables again (`graphicsTablesOf(…).ui`), 19 of them beside the
+  `UIState` that `tools/lib/ui.ts` builds them into.
 - 20 tools make 33 `as unknown as` casts: to build a partial record, or to read a
   record's fields by name. 2 more tools cast through `as any`, to stand a partial record
   in for `getMissileRecord`'s (`dump-missile-draw`, whose `draw` context is an `any` as
@@ -257,7 +248,7 @@ builds around them is its own:
   it then sets a new property: the tool goes on passing while testing nothing.
 
 Paid in seven steps, each tool's whole output byte-identical across every commit
-("How to work this list", point 3). Steps 1 to 5 are done: `Game`'s seam for the tools
+("How to work this list", point 3). Steps 1 to 6 are done: `Game`'s seam for the tools
 is public, `gameTick` and `lastInputTime` beside `runFrame`; every `UIState` a tool
 drives is `newUIState`'s (`tools/lib/ui.ts`), whose context a tool stages by assigning
 its fields; every other private a tool drove is public, with the reason in its
@@ -267,19 +258,26 @@ back, for every tool that stands in for an engine or renderer method. A member t
 a hook by design is assigned directly: `GameHost`'s, `CSBGraphicsLoader`'s `opener` and
 `cannotOpen`, `BackgroundLib.messageBox`, the interpreter context's `graphicTrace`, a
 `UIState`'s `getGraphicBitmap`; and so are the globals (`Date.now`, `Math.random`,
-`console`). What a tool
-keeps beside a `Game` is in a `WeakMap` of its own (`dump-game-events`,
-`dump-hall-of-champions`).
+`console`). What a tool keeps beside a `Game` is in a `WeakMap` of its own
+(`dump-game-events`, `dump-hall-of-champions`).
 
-6. **The stock dungeon and a test champion** as `tools/lib` helpers, and the tools moved
-   to them, a few tools per commit. The helpers are written: `stockDungeon` and
-   `stockGame` (`tools/lib/game.ts`), `testChampion` (`tools/lib/champion.ts`). Every
-   tool's champion is `testChampion`'s. What is left is the first bullet's 17 tools,
-   each moved to the helpers unless the file's bytes are its subject.
-7. **What is left**: every remaining cast either goes, or builds a stand-in value the
-   tool cannot type otherwise (a partial record, a fake `ImageData`), with a comment that
-   says so. The item is paid when no tool reaches a private through a cast and no `as any`
-   is left.
+Every tool's stock dungeon, graphics and game are `stockDungeon`, `stockGraphics` and
+`stockGame`'s (`tools/lib/game.ts`), and every champion is `testChampion`'s
+(`tools/lib/champion.ts`). A tool names the stock files only where the path is the
+default of its own argument (`dump-defined-items`, `-level-items`, `-object-definitions`,
+`peek-dungeon`), or where the file's bytes are its subject: a file cut short
+(`dump-bad-saved-game`), the bytes `Game.readDungeonDat` reads (`-cursor-filter`,
+`-save-menu`), the image unconverted or read with a flag (`-dungeon-conversions`,
+`-dungeon-image-blocks`, `-extend-portraits`), the Extended Features block
+(`-extended-dungeon`, `-hint-key`), the compression, the checksum and the signatures
+(`-compressed-dungeon`, `-image-checksum`, `-file-signatures`), and the file it builds
+(`-dm-atari-graphics`).
+
+7. **What is left**: a tool with a `UIState` reads the UI tables off it rather than
+   extracting them again; and every remaining cast either goes, or builds a stand-in
+   value the tool cannot type otherwise (a partial record, a fake `ImageData`), with a
+   comment that says so. The item is paid when no tool reaches a private through a cast
+   and no `as any` is left.
 
 ---
 

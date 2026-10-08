@@ -41,7 +41,7 @@ import type { Game } from '../src/engine/Game';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { check, finish } from './lib/check';
 import { freshGame } from './lib/dsa';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, STOCK_DIR, stockDungeon, stockGraphics } from './lib/game';
 
 const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));
 const load = (bytes: Uint8Array): DungeonData => new DungeonLoader().loadDungeonDat(bytes);
@@ -58,7 +58,7 @@ function differing(a: Databases, b: Databases, key: keyof Databases): number[] {
 }
 
 function main(): void {
-  const atari = load(read('static/gamefiles/dm-atari/dungeon.dat'));
+  const atari = stockDungeon();
   const windows = load(read('static/gamefiles/dm-windows/dungeon.dat'));
   const ef = windows.extendedFeatures;
 
@@ -134,10 +134,10 @@ function main(): void {
   boot.forceDMRulesAtBoot();
   check(boot.ctx.rules.dmRules, "and _ShowPrisonDoor's force turns DM_rules on");
 
-  const restart = newGame(load(read('static/gamefiles/dm-atari/dungeon.dat')), graphics);
+  const restart = newGame(stockDungeon(), graphics);
   restart.ctx.rules.dmRules = true;
   restart.ctx.rules.dmRulesDesignOption = true;
-  restart.readNewGame(load(read('static/gamefiles/dm-atari/dungeon.dat')));
+  restart.readNewGame(stockDungeon());
   check(restart.ctx.rules.dmRules && restart.ctx.rules.dmRulesDesignOption,
     'readNewGame on a file with no block leaves the rules as they were');
   restart.readNewGame(load(read('static/gamefiles/dm-windows/dungeon.dat')));
@@ -192,7 +192,7 @@ function main(): void {
     header: { ...header, extendedFlags: EF_EXTENDED_FLAGS.SupressDSAWarning },
     typeMap: new Uint8Array(0), indexMap: new Uint16Array(0),
   });
-  const atariFile = read('static/gamefiles/dm-atari/dungeon.dat');
+  const atariFile = read(`${STOCK_DIR}/dungeon.dat`);
   const supressFile = new Uint8Array(supressPrefix.length + atariFile.length);
   supressFile.set(supressPrefix);
   supressFile.set(atariFile, supressPrefix.length);

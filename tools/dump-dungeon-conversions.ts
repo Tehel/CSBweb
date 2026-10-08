@@ -53,9 +53,10 @@ import { getActuatorType } from '../src/data/actuatorHelpers';
 import { DBType, OBJECT_ID_NULL } from '../src/core/types';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { check, fail, finish } from './lib/check';
+import { STOCK_DIR, stockDungeon } from './lib/game';
 import { SAVE_DIR, genuineSaves } from './lib/saves';
 
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
+const DUNGEON = `${STOCK_DIR}/dungeon.dat`;
 
 /** How many entries of two arrays differ, over the length they share. */
 function diffs(a: readonly number[], b: readonly number[]): number {
@@ -79,7 +80,7 @@ function readRaw(): DungeonData {
 
 /** `dungeon.dat` with all three run, which is what the game now holds. */
 function readConverted(): DungeonData {
-  return new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
+  return stockDungeon();
 }
 
 /* ------------------------------------------------------------------- the sections --- */

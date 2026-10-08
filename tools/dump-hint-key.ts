@@ -24,13 +24,12 @@ import { readFileSync } from 'node:fs';
 
 import { readExtendedFeatures } from '../src/data/CsbwinExtendedFeatures';
 import { formChecksum } from '../src/data/CsbwinObjectIndex';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { encipherHintFile, parseHintOracle, readHintOracle } from '../src/data/HintOracleLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import type { Game } from '../src/engine/Game';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics } from './lib/game';
+import { STOCK_DIR, stockDungeon, stockGame } from './lib/game';
 import { savePath } from './lib/saves';
 
 const KEY = Uint8Array.of(0x5a, 0x01, 0xff, 0x80, 0x00, 0x13, 0x37, 0xc4);
@@ -71,9 +70,7 @@ function withKeyAndSignatures(file: Uint8Array): Uint8Array {
   return out;
 }
 
-const graphics = stockGraphics();
-const dungeonDat = new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'));
-const freshGame = (): Game => newGame(new DungeonLoader().loadDungeonDat(dungeonDat), graphics);
+const freshGame = (): Game => stockGame();
 
 const original = new Uint8Array(readFileSync(savePath('csbgame7.dat')));
 const keyed = withKeyAndSignatures(original);
@@ -98,8 +95,8 @@ check(sameBytes(other.ctx.state.dungeon.hintKey, KEY) && sameNumbers(signaturesO
   'the file the save wrote reads back with all five');
 
 console.log('3. A file without a block');
-check(readExtendedFeatures(dungeonDat).header === undefined, '`dm-atari/dungeon.dat` has no block');
-game.readNewGame(new DungeonLoader().loadDungeonDat(dungeonDat));
+check(readExtendedFeatures(new Uint8Array(readFileSync(`${STOCK_DIR}/dungeon.dat`))).header === undefined, '`dm-atari/dungeon.dat` has no block');
+game.readNewGame(stockDungeon());
 console.log(`  world's key ${hex(game.ctx.state.dungeon.hintKey)}, signatures ${hexWords(signaturesOf(game))}`);
 check(game.ctx.state.dungeon.hintKey === undefined, 'a new game from it has no key');
 check(sameNumbers(signaturesOf(game), SIGNATURES), 'and keeps the signatures the last block gave');
