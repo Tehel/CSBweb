@@ -232,7 +232,7 @@ reference, `CSBwin_SRC_20160923.zip`, "Version 15.9", with the author's cosmetic
 `CSBCode.cpp`, `RC4.cpp`, `SaveGame.cpp` and `Data.h`: a side branch of
 `CSBwin_SRC_20160325` (15.8) whose only change is accessors for a monster's `word20`, so it
 behaves as 15.8. It is gitignored, in git history as `doc/CSBwin-src/`, and stays until
-C157's review list is worked through.
+C157's re-citing is done (its step 1).
 
 Every change between the two that alters what the port has is ported, but for the
 utility's stop on a word-10 saved game (`DEBT.md` H) and one change not taken, below. The rest
@@ -249,34 +249,26 @@ front-ends.
 
 `doc/CSBwin-src/` is the 2023 tree, `doc/CSBWIN_SYMBOL_INDEX.tsv` is built from it, and
 every citation of a 2016 line was mapped to its 2023 line through the diff by
-`tools/recite-csbwin.py`, which maps every unchanged line exactly. Three steps are left:
+`tools/recite-csbwin.py`, which maps every unchanged line exactly. Every citation it
+listed for review is settled. Two steps are left:
 
-1. **The review list**, `doc/C157-review.tsv`: the citations the script could not settle
-   alone, one a row, every one left in `doc/PROVEN_FACTS.md` from its line 4347 on, with
-   the line it is on (`where`; the row's `text` finds it if lines moved), the citation as
-   it now reads and the 2016 one it came from (read against `doc/CSBwin-src-20160923/`).
-   All 83 are `file` rows: a `:N` whose file is not named beside it. The script took the
-   file its quoted identifiers point at, else the nearest; `note` gives the other
-   candidates, which map elsewhere. Confirm the file from the text, or map the 2016 line
-   from the right one (`map_line` in `tools/recite-csbwin.py` does it, given the file).
-   Delete each row once settled; one session is left. A `file` row is most often wrong
-   where an aside names another file between the paragraph's own and the `:N` (a header,
-   `CSB.h`, `Data.h`, `system.cpp`): the script took the aside, and `note`'s candidate is
-   the right one. The neighbours of a wrong row are worth a look too: the script mapped
-   the `:N` it did not list through the same file, and a wrong file whose lines did not
-   move in 2023 leaves the 2016 number standing, as it was.
-2. **The continuations the script did not list.** It lists a `:N` only when its
+1. **The continuations the script did not list.** It lists a `:N` only when its
    candidates tie; one it picked on weak evidence, a token that both files hold, goes
    through unlisted. `PROVEN_FACTS.md` → "The party moves through one `MoveObject`" had
    all its `:N` mapped through `CSBCode.cpp`, named in the line above, where
    `MoveObject` is `Code11f52.cpp`'s, and only the ones whose lines changed were listed.
    Paying it: run `resolve` over the pre-C157 text (`git show 5efad3b^:<file>`) and list
-   every continuation whose candidates map it apart, with the winner's margin; settle
-   those the way the review list is.
+   every continuation whose candidates map it apart, with the winner's margin. Settle each
+   against the text: confirm the file from what the paragraph quotes, or map the 2016 line
+   from the right one (`map_line`, given the file). A wrong pick is most often a file
+   named in an aside between the paragraph's own and the `:N` (a header, `CSB.h`,
+   `Data.h`, `system.cpp`, another function's file): the script took the aside. Its
+   neighbours are worth a look too, mapped through the same wrong file; one whose lines
+   did not move in 2023 still reads its 2016 number.
 
-   When both are done, delete the list, `tools/recite-csbwin.py` and
-   `doc/CSBwin-src-20160923/`, and the `CLAUDE.md` row that names the last.
-3. **Review every divergence.** Each H entry, each C entry and each `CLAUDE.md` exception
+   When it is done, delete `tools/recite-csbwin.py` and `doc/CSBwin-src-20160923/`, and
+   the `CLAUDE.md` row that names the last.
+2. **Review every divergence.** Each H entry, each C entry and each `CLAUDE.md` exception
    is checked against 2023: one that 2023 fixed is no longer a divergence. The change not
    taken ("CSBWin's changes from 2016 to 2023" above) becomes an H entry or is ported.
    X5 is CSBWin 20230608's own feature, which a dungeon's Extended Features block turns

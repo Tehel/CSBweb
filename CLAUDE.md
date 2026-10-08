@@ -48,7 +48,7 @@ Corollaries:
 | `doc/CSBWIN_SYMBOL_INDEX.tsv` | Every CSBWin symbol → `File.cpp:line`. Grep this before grepping the tree. |
 | `NOTES.md` | The author's personal scratchpad. **Do not edit.** Flag problems instead. |
 | `doc/CSBwin-src/` | The C++ reference (not ours, committed as published): `CSBwin_SRC_20230608`, CSBWin's last source and the build the author plays. |
-| `doc/CSBwin-src-20160923/` | The previous reference, 15.9 (gitignored; in git history as `doc/CSBwin-src/`), kept until `DEBT.md` C157's review list is worked through. |
+| `doc/CSBwin-src-20160923/` | The previous reference, 15.9 (gitignored; in git history as `doc/CSBwin-src/`), kept until `DEBT.md` C157's re-citing is done. |
 
 **Documentation contract:** before working on a topic, read its doc. When you verify a new
 fact in the C++ source, write it down with a `doc/CSBwin-src/<File>.cpp:<line>` reference.

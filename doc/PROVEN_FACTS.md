@@ -4630,7 +4630,7 @@ set (`doc/CSBwin-src/CSBCode.cpp:8311-8348`); `roomSTAIRS` is handled before it
 of every tick sets `d.Speed` to `speedTable[gameSpeed].vblPerTick` while awake and zeroes
 `d.vblCount` (`:622-627`); `SPEED_NORMAL`'s is 15 (`CSBwin.cpp:181`), so a tick every 15
 VBLs. `d.clockTick` is cleared only by the end of a tick (`:714`) or by a handler, so a tick
-that falls due while the loop cannot run it (frozen, `:767`, or held in a sequence) stays
+that falls due while the loop cannot run it (frozen, `:775`, or held in a sequence) stays
 due and runs in the first pass that can. The port counts VBLs the same way
 (`vblInterrupt`, `src/engine/LoopState.ts`), and the page runs as many VBLs as the wall
 clock holds (`Game.gameLoop`). Evidence: `tools/dump-vbl-clock.ts`.
@@ -4656,7 +4656,7 @@ whether or not the party is empty. `DiscardAllInput` (`:7591`) drains the key qu
 through `UI_CONSTAT` / `UI_DIRECT_CONIN` (`CSBUI.cpp:1395-1412`) and resets the mouse
 queue (`d.MouseQStart = 0`, `d.MouseQEnd = MOUSEQLEN-1`), so every move keyed or clicked
 behind the bump is lost. `d.clockTick` is the "a tick is due" flag: the main loop runs a
-tick only when it is non-zero (`:773-774`) and clears it after each (`:724`); the VBL
+tick only when it is non-zero (`:773-774`) and clears it after each (`:714`); the VBL
 handler sets it on **every** VBL once `d.vblCount >= d.Speed` (`:1076-1087`), and
 `vblCount` is reset only at the top of a tick (`:627`). So zeroing it cancels nothing: a
 tick already due runs one VBL later. How much input that can be is the next entry.
@@ -4835,8 +4835,8 @@ level's square (`Code11f52.cpp:2903-2904`, `:2995-2996`, `:3090-3091`; `Traverse
 the game's start and load (`:9685`, `SaveGame.cpp:1759`, `:2621`). `ProcessTimers` does not test
 `d.newPartyLevel`, so a timer due after the move in the same pass runs with the new square,
 the old `d.partyLevel` and the old level's groups attached. `d.newPartyLevel = -1` comes
-after the arrival's `MoveObject` (`:630-632`), so a level change that `MoveObject` makes
-is dropped. The viewport is drawn only after the check (`:643-647`). Evidence:
+after the arrival's `MoveObject` (`:632-633`), so a level change that `MoveObject` makes
+is dropped. The viewport is drawn only after the check (`:645-649`). Evidence:
 `tools/dump-party-collision.ts` cases 10 and 12, `tools/dump-party-move.ts` case 6.
 
 ## At most 31 groups wait on one square; the next is deleted unless it is unique or carries something
@@ -4889,7 +4889,7 @@ end and blits with the rectangle itself, so its plaque is always whole: its line
 
 Both tables are graphic 0x22e's, the same in `dm-atari`, `dm-atari-1.3-fr` and `csb`:
 `WallDecorationDerivedGraphicOffset` = `0,0,1,1,1,2,2,3,3,3,4,4`, the five distances of
-positions 0 to 11 as CSBWin's comment gives them (`:3716`), and `Byte4212` =
+positions 0 to 11 as CSBWin's comment gives them (`:3654`), and `Byte4212` =
 `45,48,53, 43,49,56, 42,49,56, 46,53,63, 46,57,68, 0`, one rising triple a distance, each
 inside the text rectangles of its positions (set 1: 41-60 for the F3 sides, 37-63 F3
 front, 38-67 F2 sides, 37-73 F2 front, 36-83 F1 sides).
@@ -5435,9 +5435,9 @@ The door arm of `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1879-19
 1. A Zo spell (`RNZoSpell`) at a door whose state is not 5 queues
    `CreateTimer(TT_DOOR, x, y, 0, 2, d.Time + 1)` if the door has its switch bit
    (`DB0::doorSwitch`, `word2` bit 6, `CSB.h:846`), and then `break`s to the shared tail
-   whether or not it did — so the spell is spent even at an open door (`:1887-1899`).
-2. A door that is broken (5) or open (0, 1) lets the missile on (`return 0`, `:1900`).
-3. `D0B = BITS8_15(d.DoorTOC[doorType]); if (D0W & 2)` (`:1904-1905`) — bit 1 of the
+   whether or not it did — so the spell is spent even at an open door (`:1887-1900`).
+2. A door that is broken (5) or open (0, 1) lets the missile on (`return 0`, `:1901`).
+3. `D0B = BITS8_15(d.DoorTOC[doorType]); if (D0W & 2)` (`:1905-1906`) — bit 1 of the
    **high** byte (0x200) marks a door missiles may pass (`Monster.cpp:323` reads bit 0,
    0x100, for monsters). A cloud-typed projectile (a spell) passes if
    `IsNonPhysicalSpell()`, i.e. `>= RNDispellMissile` (0xff83, `CSBTypes.h:379`). A thrown
@@ -5641,9 +5641,9 @@ the chain has reached.
 
 A group that falls is hurt by `DamageMonsterGroup(pDB4, oldX, oldY, 20, 0, !item16Attached)`
 (`:3131-3132`) — its old square, and `P5 = 0`, so the last member's death is not applied
-(`:1120`) and dead members' droppings wait in `d.Byte13050` for `TAG00b522`, which drops
+(`:1145`) and dead members' droppings wait in `d.Byte13050` for `TAG00b522`, which drops
 them at the square the group fell to (`:3136-3139`). `DamageMonsterGroup` empties that list
-first (`d.Word13046 = 0`, `:1368`). If the whole group died the loop stops (`:3156`). After the
+first (`d.Word13046 = 0`, `:1368`). If the whole group died the loop stops (`:3135`). After the
 loop, a group the fall killed, or one whose type is not allowed on the level it ended on,
 is deleted (`:3182-3211`): `TAG00b522`, `DropMonsterRemains` at the new square, and
 `DeleteMonster` at the old one when it had one — a group placed from nowhere keeps its
@@ -6099,7 +6099,7 @@ on the **first** rectangle hit, then returns (`:1100-1137`):
   not imaginary. So a closed imaginary false wall (level 2, (7,9), `cf` 0xc1, in the
   shipped dungeon) has `d.CellTypeJustAhead == 0` and is silent.
 - With an object in hand, the click tests `d.CellTypeJustAhead == 0` alone (`:1166`).
-  Then only the two near drop areas and button 5 answer (`:1167-1180`), with no throw.
+  Then only the two near drop areas and button 5 answer (`:1168-1181`), with no throw.
   So before that closed imaginary false wall a click in the throw area does nothing.
 
 Evidence: `tools/dump-viewport-click.ts`.
@@ -6313,23 +6313,23 @@ In order:
   facing byte `(d.partyFacing + 2) & 3` (`:2283-2289`). With an `ITEM16` that is the raw
   value, not the byte's four copies (`SetMonsterFacingByte`, `Code11f52.cpp:272-287`).
 - Every Fluxcage on the party's square, then on his, removed, one per scan from the
-  square's first drawable object (`:2323-2337`).
+  square's first drawable object (`:2290-2304`).
 - Six fireballs on his square, sizes 55 to 255 by 40, each shown and followed by
   `VBLDelay(MS2VBL(500))`, 31 VBLs (`:2307-2315`); sound 17, `mon_25`, 31 VBLs
-  (`:2316-2320`); six dispells the same way (`:2354-2361`).
+  (`:2316-2320`); six dispells the same way (`:2321-2328`).
 - The flicker: for `D6W` 3, 2, 1 and `D7w` 4 down to 1, sound 17 and the type set to
   `mon_25` on odd `D7w`, `mon_LordChaos` (23) on even, each shown `D6W - 1` times with 31
-  VBLs: twelve views, and the last four type changes are never shown (`:2362-2387`).
+  VBLs: twelve views, and the last four type changes are never shown (`:2329-2354`).
 - A size-255 fireball, 25 VBLs before it and 50 after, and a size-255 dispell, 50 VBLs
   after (`:2355-2365`); `mon_GreyLord`, 31 VBLs; `d.Word1868 = 1`, 31 VBLs (`:2366-2371`).
   That is the only write of `d.Word1868`, and its one read is `DrawRoomObjects`: while it
   is set, a Fluxcage's teleporter shimmer is not drawn (`Code51a4.cpp:2774`), so the
   cages still around the Grey Lord vanish from the view.
 - Every monster on the level but his deleted, after `ProcessMonsterDeleteFilter` with
-  `DMW_Fusion` (`:2372-2389`), 31 VBLs (`:2388-2389`).
+  `DMW_Fusion` (`:2372-2389`), 31 VBLs (`:2390-2391`).
 - The texts of cell (0, 0) of the party's level, which `ProcessTimers` loads again after
   each timer (`CSBCode.cpp:6641`), gathered in chain order into `obj_26[8]` (`:2230`,
-  `:2423-2429`): a ninth would run past the array. Each is decoded with
+  `:2392-2398`): a ninth would run past the array. Each is decoded with
   `DecodeText(…, 0x8001, 200)`, which writes a linefeed first (`CSBCode.cpp:5576-5579`), so
   the byte compared, `b_226[1]`, is the text's first letter. The loop makes one pass per
   text, and each pass prints the first text in chain order whose letter is `b_9`, 'A' at
@@ -6375,7 +6375,7 @@ BY LEARNING THE TRUTH …" the last one shown. On a strip that has printed nothi
 and the credits come with "BY YOUR BRAVE DEEDS …" complete and "YOUR NAMES WILL BE
 RECORDED …" never shown. `RemoveTimedOutText` and `PrintLines` still carry the waits
 (`wvbl`, `RESTART`) CSBWin commented out when it made the strip a queue (`:1508-1512`,
-`:1682-1685`).
+`:1699-1702`).
 
 The port does not show the speech this way. Its waits after a text and after "THE END."
 are CSBWin's VBLs, 780 and 600, with the strip's clock run on each of them
