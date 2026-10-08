@@ -34,7 +34,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
-  DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type LocationRel, type ObjectID,
+  DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID,
 } from '../src/core/types';
 import { RN_FIREBALL } from '../src/core/spellRn';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -249,8 +249,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
 {
   const { game, log } = makeGame();
   stand(game, log, from, facing);
-  const dsa = game.systems.dsa as unknown as { teleportParty(locr: LocationRel): void };
-  dsa.teleportParty({ l: game.ctx.dungeon.getMap(pit.z)!.descriptor.level, x: pit.x, y: pit.y, p: 0 });
+  game.systems.dsa.teleportParty({ l: game.ctx.dungeon.getMap(pit.z)!.descriptor.level, x: pit.x, y: pit.y, p: 0 });
   tick(game, log);
   compare('3. the DSA teleport onto the pit', log, [`missile ${at(from)}->${at(from)}`, ...fallTail(from, below)]);
 }

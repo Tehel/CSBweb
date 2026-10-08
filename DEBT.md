@@ -245,13 +245,13 @@ builds around them is its own:
   `Game` does not have, and `dump-game-events` replaces `reincarnating`. 31 tools extract
   the UI tables again (`graphicsTablesOf(…).ui`) beside the `UIState` that
   `tools/lib/ui.ts` builds them into.
-- 26 tools make 52 `as unknown as` casts, into the systems' private members
-  (`DsaSystem`'s `teleportParty`, `wiggleEverything`, `stepOrDefer`, `climbDownIntoPit`,
-  `castMagic`, `dispatch`, `dropMissileObject`, …) or to build a partial record; 9 more
-  tools reach privates through `as any` (`moveObjectDsa`, `performLocalAction`,
-  `doesPartyHave`, `getMissileRecord`, …). `tsc` checks none of them. A renamed member
-  leaves the tool compiling, and a write to it then sets a new property: the tool goes on
-  passing while testing nothing.
+- 26 tools make 50 `as unknown as` casts, into the systems' private members
+  (`TimerSystem`'s `wiggleEverything`, `dispatch` and `dropMissileObject`, `MonsterAI`'s
+  `stepOrDefer`, `AttackSystem`'s `climbDownIntoPit`, `MagicSystem`'s `castMagic`, …) or
+  to build a partial record; 6 more tools reach privates through `as any`
+  (`performLocalAction`, `doesPartyHave`, `getMissileRecord`, …). `tsc` checks none of
+  them. A renamed member leaves the tool compiling, and a write to it then sets a new
+  property: the tool goes on passing while testing nothing.
 
 Paid in six steps, each tool's whole output byte-identical across every commit
 ("How to work this list", point 3). Steps 1 and 2 are done: `Game`'s seam for the tools
@@ -261,7 +261,10 @@ context a tool stages by assigning its fields.
 
 3. **Other systems' privates.** Each private a tool drives either becomes public, with
    the reason in its comment, or the tool reaches it through the public path the engine
-   uses. One system per commit.
+   uses. One system per commit. `DsaSystem` is done. Left: `TimerSystem`,
+   `ActuatorSystem`, `MagicSystem`, `MonsterAI`, `MonsterSystem` (`loadedLevel`),
+   `MissileEncounter`, `WorldMove`, `AttackSystem`, `BytecodeInterpreter`, and
+   `CSBGraphicsLoader`'s `opened` (`dump-dsa-overlay`).
 4. **The stand-ins**: a `tools/lib` helper that replaces a member with a typed stand-in
    and puts it back, for the six method stand-ins and `Game`'s two. One commit.
 5. **The stock dungeon and a test champion** as `tools/lib` helpers, and the tools moved

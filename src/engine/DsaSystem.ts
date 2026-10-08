@@ -1998,7 +1998,8 @@ export class DsaSystem {
     return finalState;
   }
 
-  private executeAmpersand(subcode: number, bank: DsaBank, exPkt: ExecutionPacket): GearJump | void {
+  /** Public so that `tools/` can watch an operation run, in the middle of a program. */
+  executeAmpersand(subcode: number, bank: DsaBank, exPkt: ExecutionPacket): GearJump | void {
     switch (subcode) {
       case StkOp.TWO_DROP:
         bank.stack.pop();
@@ -4208,7 +4209,8 @@ export class DsaSystem {
     return party.champions[index] ?? null;
   }
 
-  private moveObjectDsa(
+  /** `&MOVE`'s move. Public so that `tools/` can make one without a program. */
+  moveObjectDsa(
     srcType: number,
     srcObjMsk: number,
     srcPosMsk: number,
@@ -4341,7 +4343,8 @@ export class DsaSystem {
     return { error: DsaMoveError.SER_OK, object: obj };
   }
 
-  private findCharacterSource(chIdx: number, carryLoc: number, doit: boolean): { error: number; object: ObjectID } {
+  /** `&MOVE`'s character source. Public so that `tools/` can take one arm of a move alone. */
+  findCharacterSource(chIdx: number, carryLoc: number, doit: boolean): { error: number; object: ObjectID } {
     const party = this.ctx.party.state;
     if (!party) return { error: DsaMoveError.SER_IllegalCharacterIndex, object: OBJECT_ID_EOF };
     if (chIdx < 0 || chIdx >= party.champions.length) {
@@ -4504,7 +4507,8 @@ export class DsaSystem {
     return { error: DsaMoveError.SER_NoSuchObjectInChest, object: OBJECT_ID_EOF };
   }
 
-  private findCharacterDestination(
+  /** `&MOVE`'s character destination. Public so that `tools/` can take one arm of a move alone. */
+  findCharacterDestination(
     chIdx: number,
     carryLoc: number,
     object: ObjectID,
@@ -4944,9 +4948,10 @@ export class DsaSystem {
   /**
    * `STKOP_TeleportParty` (doc/CSBwin-src/DSA.cpp:4584): the party moved by a pretend
    * teleporter — `what(2)`, party and objects — through the world `MoveObject`, which
-   * resolves whatever the destination does to them.
+   * resolves whatever the destination does to them. Public so that `tools/` can make one
+   * without a program.
    */
-  private teleportParty(locr: LocationRel): void {
+  teleportParty(locr: LocationRel): void {
     const party = this.ctx.party.state;
     const pretendTeleporter: TeleporterRecord = {
       nextObject: OBJECT_ID_EOF,

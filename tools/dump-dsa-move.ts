@@ -90,7 +90,7 @@ async function main(): Promise<void> {
   };
 
   const move = (game: Game, category: DBType, from: Position, to: Position, corner: number): number =>
-    (game.systems.dsa as any).moveObjectDsa(
+    game.systems.dsa.moveObjectDsa(
       CELL, 1 << category, 0xf, locationRelToInteger({ l: from.z, x: from.x, y: from.y, p: 0 }), 0,
       CELL, 0, 1 << corner, locationRelToInteger({ l: to.z, x: to.x, y: to.y, p: 0 }), 0,
     );

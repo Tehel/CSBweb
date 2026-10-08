@@ -222,7 +222,7 @@ function main(): void {
     const beside = stairs.beside!;
     const turned = turnedCorner(game.ctx.dungeon.rnMaps.pos(rn), stairs.dir);
     const p = (turned + 2) & 3;
-    const error = (game.systems.dsa as any).moveObjectDsa(
+    const error = game.systems.dsa.moveObjectDsa(
       1, 1 << DBType.CREATURE, 0xf, locationRelToInteger({ l: beside.z, x: beside.x, y: beside.y, p: 0 }), 0,
       1, 0, 1 << p, locationRelToInteger({ l: stairs.at.z, x: stairs.at.x, y: stairs.at.y, p: 0 }), 0,
     );

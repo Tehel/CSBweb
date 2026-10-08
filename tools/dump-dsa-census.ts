@@ -130,7 +130,7 @@ function decode(program: Uint16Array, commands: Map<string, number>, operations:
 /** The `case StkOp.…` labels of `executeAmpersand`, the port's operations. */
 function portedOperations(): Set<number> {
   const source = readFileSync(resolve('src/engine/DsaSystem.ts'), 'utf8');
-  const start = source.indexOf('private executeAmpersand(');
+  const start = source.indexOf('\n  executeAmpersand(');
   const end = source.indexOf('\n  private ', start + 1);
   const ported = new Set<number>();
   for (const [, name] of source.slice(start, end).matchAll(/case StkOp\.(\w+):/g)) {

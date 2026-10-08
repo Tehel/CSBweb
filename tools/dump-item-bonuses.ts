@@ -78,13 +78,6 @@ function firstRecord(g: Game, category: DBType.SCROLL | DBType.CHEST): ObjectID 
   return g.ctx.dungeon.rnMaps.rn(category, 0);
 }
 
-type DsaCharacterMoves = {
-  findCharacterSource(chIdx: number, carryLoc: number, doit: boolean): { error: number; object: ObjectID };
-  findCharacterDestination(chIdx: number, carryLoc: number, object: ObjectID, doit: boolean): number;
-};
-/** The DSA's `&MOVE` arms for a character (`doc/CSBwin-src/MoveObject.cpp:146`, `:420`). */
-const dsaOf = (g: Game): DsaCharacterMoves => g.systems.dsa as unknown as DsaCharacterMoves;
-
 function champion(i: number): Champion {
   return {
     ...addCharacterDefaults(),
@@ -322,7 +315,7 @@ async function main(): Promise<void> {
       'the inventory click puts the bonus on and takes it off');
 
     // The DSA's `&MOVE` to and from a character (`MoveObject.cpp:435`, `:160`).
-    const dsa = dsaOf(g);
+    const dsa = g.systems.dsa;
     const towers = newObject(g, NI.OBJNI_POWERTOWERS);
     const strength = b.attributes.stats[AttributeIndex.Strength]!;
     dsa.findCharacterDestination(1, 4, towers, true);
@@ -426,9 +419,9 @@ async function main(): Promise<void> {
     check(unlit === `${brightness} 0 ${NI.OBJNI_ILLUMULET_A}`, 'and taken off it goes dark again');
     party.objectInHand = OBJECT_ID_NULL;
     const symal = newObject(g, NI.OBJNI_JEWEL_SYMAL_A);
-    dsaOf(g).findCharacterDestination(1, 10, symal, true);
+    g.systems.dsa.findCharacterDestination(1, 10, symal, true);
     const symalOn = gNameIndex(symal);
-    dsaOf(g).findCharacterSource(1, 10, true);
+    g.systems.dsa.findCharacterSource(1, 10, true);
     console.log(`a Jewel Symal round the neck by a DSA move: name ${symalOn}, off: ${gNameIndex(symal)}`);
     check(symalOn === NI.OBJNI_JEWEL_SYMAL_B && gNameIndex(symal) === NI.OBJNI_JEWEL_SYMAL_A,
       'a worn Jewel Symal reads as its _b, and as its _a again off');
