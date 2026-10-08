@@ -37,7 +37,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { MovementAction } from '../src/engine/gameTypes';
 import type { Champion } from '../src/engine/gameTypes';
 import { MonsterType } from '../src/engine/monsterTypes';
-import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
+import { TimerFunction } from '../src/engine/TimerQueue';
 import { sw } from '../src/core/intCast';
 import { newGame, runVbl, TICK_DUE } from './lib/game';
 import { check, finish } from './lib/check';
@@ -713,16 +713,16 @@ async function main(): Promise<void> {
         uByte5: 0xab, uByte6: 0, uByte7: 0, uByte8: 0, uByte9: 0,
         sequence: 0, timerWord8: 0, timerWord6: 0,
       });
-      const timerSystem = game.systems.timer as unknown as { dispatch(timer: TimerEntry): void };
+      const timerSystem = game.systems.timer;
       const dispatch = timerSystem.dispatch;
       let probeSaw: { x: number; y: number; level: number; pending: number; loaded: number | null } | null = null;
-      timerSystem.dispatch = function (this: unknown, timer: TimerEntry): void {
+      timerSystem.dispatch = function (timer) {
         if (timer.function === TimerFunction.TT_DOOR_STEP && timer.uByte5 === 0xab) {
           const p = party.position;
           probeSaw = { x: p.x, y: p.y, level: p.z, pending: game.ctx.loop.newPartyLevel, loaded: loadedLevel() };
-          return;
+          return false;
         }
-        dispatch.call(this, timer);
+        return dispatch.call(this, timer);
       };
       const frame = (tickDue: boolean): void => {
         runVbl(game, tickDue ? TICK_DUE : 1);

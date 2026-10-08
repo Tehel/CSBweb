@@ -140,9 +140,8 @@ function spy(game: Game): PadCall[] {
   return calls;
 }
 
-type Dropper = { dropMissileObject(projectile: number, position: Position, posInCell: number): void };
 const throwLands = (game: Game, rn: ObjectID, at: Position, corner: number): void =>
-  (game.systems.timer as unknown as Dropper).dropMissileObject(rn, at, corner);
+  game.systems.timer.dropMissileObject(rn, at, corner);
 
 function main(): void {
   /* ------------------------------------- 1. a drop onto the party's own square ---- */

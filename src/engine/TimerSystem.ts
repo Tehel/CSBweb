@@ -129,8 +129,11 @@ export class TimerSystem {
     return false;
   }
 
-  /** One timer. True when it has won the game: `ProcessTT_STONEROOM`'s actuator type 18. */
-  private dispatch(timer: TimerEntry): boolean {
+  /**
+   * One timer. True when it has won the game: `ProcessTT_STONEROOM`'s actuator type 18.
+   * Public so that `tools/` can watch a timer as it runs.
+   */
+  dispatch(timer: TimerEntry): boolean {
     // The monster AI is routed off before the switch, exactly as CSBWin does
     // (doc/CSBwin-src/CSBCode.cpp:6481-6488) — timer types 29-41 never reach the
     // ordinary timer dispatch.
@@ -1735,8 +1738,9 @@ export class TimerSystem {
    * teleporter/pit loop, then `PlaceOrRemoveObjectInRoom`, so it moves on from an active
    * teleporter and presses a pad. `oldX` is -2, not -1, so a relative teleporter turns
    * its corner (`Code11f52.cpp:3035-3041`). A spell or a cloud is not dropped (`:173`).
+   * Public so that `tools/` can land an object without its flight.
    */
-  private dropMissileObject(projectileObject: ObjectID, position: Position, posInCell: number): void {
+  dropMissileObject(projectileObject: ObjectID, position: Position, posInCell: number): void {
     if (projectileObject >= 0xff80) return;
     const decoded = this.dungeon.rnMaps.decode(projectileObject);
     if (decoded.category === DBType.CLOUD) return;
@@ -1744,7 +1748,11 @@ export class TimerSystem {
     this.ctx.systems.worldMove.moveObject(dropped, -2, 0, position.x, position.y, position.z);
   }
 
-  private wiggleEverything(mapX: number, mapY: number, level: number): void {
+  /**
+   * `WiggleEverything` (doc/CSBwin-src/Timer.cpp:2428). Public so that `tools/` can wiggle
+   * a square without the timer that opens it.
+   */
+  wiggleEverything(mapX: number, mapY: number, level: number): void {
     const position = new Position(mapX, mapY, level);
 
     if (this.isPartyAt(position)) {

@@ -258,8 +258,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
 {
   const { game, log } = makeGame();
   stand(game, log, pit, facing);
-  const wiggle = game.systems.timer as unknown as { wiggleEverything(x: number, y: number, level: number): void };
-  wiggle.wiggleEverything(pit.x, pit.y, pit.z);
+  game.systems.timer.wiggleEverything(pit.x, pit.y, pit.z);
   tick(game, log);
   compare('4. the wiggle of the party\'s square as its pit opens', log, [`missile ${at(pit)}->${at(pit)}`, ...fallTail(pit, below)]);
 }
@@ -268,8 +267,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   stand(game, log, from, facing);
   const fireball = launch(game, from, 1);
   log.length = 0;
-  const wiggle = game.systems.timer as unknown as { wiggleEverything(x: number, y: number, level: number): void };
-  wiggle.wiggleEverything(from.x, from.y, from.z);
+  game.systems.timer.wiggleEverything(from.x, from.y, from.z);
   tick(game, log);
   compare('5. the wiggle of the party\'s square as nothing happens', log, [`missile ${at(from)}->${at(from)}`, 'tick']);
   check(!inCell(game, from, fireball), 'the fireball in a champion\'s corner of that square is met');
