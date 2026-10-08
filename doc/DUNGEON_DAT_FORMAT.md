@@ -449,26 +449,24 @@ Bits 1-0:   (Varies by sensor type)
 | +0x0C | word | HP 4 | Hit points for creature 4 |
 | +0x0E | word | Attributes | Creature flags |
 
-**Creature Types** (byte at +0x04):
+**Creature Types** (byte at +0x04): CSBWin's `MONSTERTYPE`
+(`doc/CSBwin-src/Objects.h:153-183`), with the names its dump prints
+(`MonsterName`, `doc/CSBwin-src/AsciiDump.cpp:306-339`). CSBWin names neither 5 nor 25.
 ```
-0  = Giant Scorpion (Giggler)
-1  = Swamp Slime / Slime Devil
-2  = Mummy
-3  = Black Flame
-4  = Skeleton
-5  = Couatl
-6  = Vexirk
-7  = Magenta Worm
-8  = Trolin / Ant Man
-9  = Giant Wasp / Muncher
-10 = Animated Armour / Deth Knight
-11 = Materializer
-12 = Water Elemental
-13 = Oitu
-14 = Demon
-15 = Lord Chaos
-16 = Red Dragon
-... (27 types total in CSB)
+0  = mon_Scorpion        14 = mon_Vexirk
+1  = mon_SlimeDevil      15 = mon_Worm
+2  = mon_Giggler         16 = mon_AntMan
+3  = mon_FlyingEye       17 = mon_Muncher
+4  = mon_Hellhound       18 = mon_DethKnight
+5  = mon_5               19 = mon_Zytaz
+6  = mon_Screamer        20 = mon_WaterElemental
+7  = mon_RockPile        21 = mon_Oitu
+8  = mon_Rive            22 = mon_Demon
+9  = mon_StoneGolem      23 = mon_LordChaos
+10 = mon_Mummy           24 = mon_Dragon
+11 = mon_BlackFlame      25 = mon_25
+12 = mon_Skeleton        26 = mon_GreyLord
+13 = mon_Couatl
 ```
 
 **Positions** (byte at +0x05):

@@ -729,6 +729,28 @@ on or off the neck (`Character.cpp:1867`, `:1903`, `:1992`, `:2017`), a `TT_LIGH
 
 Evidence: `tools/dump-light-level.ts`.
 
+## A level's monster colours are the last claimant's
+
+`ReadGraphicsForLevel` sets palette colours 9 and 10 to their defaults, then walks the
+level's monster-type list in order and lets each type's `ITEM12.uByte11` override them
+(`doc/CSBwin-src/Code390e.cpp:323-344`; the mechanism is in
+`doc/CSBWIN_RENDERING_REFERENCE.md`, "Monster palette selection"). Nothing arbitrates. A
+later type overwrites an earlier one, and every monster on the level is drawn with the
+last claimant's colours. The order is the level's own list, as stored after its cell flags.
+
+The Atari DM dungeon keeps to this: no level holds two types that claim different colours.
+CSB's (`csb/csbgame2.dat`) does not, and the Worm (`mon_Worm`, colour 9 scheme 7 `0x505`,
+colour 10 scheme 6 `0x404`, magenta) is never drawn in its own colours there:
+
+| Level | Types, in list order | Worm drawn as |
+| --- | --- | --- |
+| 0 | Zytaz, Worm, Lord Chaos, Grey Lord, Demon, Black Flame | Demon's `0x400` / `0x300`, red |
+| 4 (the start) | Worm, Flying Eye, Stone Golem, Scorpion | Flying Eye's and Scorpion's `0x650` / `0x430`, yellow |
+| 9 | Giggler, Worm, Dragon | Dragon's `0x400` / `0x300`, red |
+
+The colour values are the brightest palette's entries in `csb/graphics.dat`'s
+`specialColors`.
+
 ## `Blocked()` de-duplicates the group's facings before testing
 
 `doc/CSBwin-src/Monster.cpp:542-563` builds a list of the group's *distinct* facings and tests
