@@ -36,17 +36,14 @@ import { OBJECT_ID_EOF, OBJECT_ID_NULL } from '../src/core/types';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { cellFlagArraySize } from '../src/data/CsbwinDungeonImageWriter';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
-import { newGame } from './lib/game';
+import { newGame, stockDungeon } from './lib/game';
 import { check, finish } from './lib/check';
 import { savePath } from './lib/saves';
 
 const CSB = 'static/gamefiles/csb';
-/** DM's `dungeon.dat`, fourteen levels: the world each game is built over before its load. */
-const DM_DUNGEON = new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat')));
 const ATARI_SAVES = ['mini.dat', 'csbgame2.dat'];
 /** A save CSBWin wrote of DM, with an Extended Features block. */
 const CONTROL = 'csbgame7.dat';
@@ -108,8 +105,8 @@ for (const name of ATARI_SAVES) {
   console.log(`  chains: ${objects} objects${problems.length ? `, ${problems.length} problems: ${problems.slice(0, 3).join('; ')}` : ''}`);
   check(objects > 0 && problems.length === 0, `${name}: every object chain walks to RNeof`);
 
-  // A running game built over DM's world, which the save's replaces.
-  const game = newGame(new DungeonLoader().loadDungeonDat(DM_DUNGEON), csbGraphics);
+  // A running game built over DM's world, fourteen levels, which the save's replaces.
+  const game = newGame(stockDungeon(), csbGraphics);
   const builtOver = game.ctx.dungeon.getMapCount();
   try {
     applyCsbwinSave(game, bytes);

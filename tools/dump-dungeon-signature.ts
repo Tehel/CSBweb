@@ -40,7 +40,7 @@ import type { DungeonData, MapData } from '../src/data/dungeonTypes';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { DATA_SETS } from './lib/dataSets';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics } from './lib/game';
+import { stockDungeon, stockGame } from './lib/game';
 import { genuineSaves, savePath } from './lib/saves';
 
 const DM = 'Dungeon Master';
@@ -190,7 +190,7 @@ async function checkSaves(): Promise<void> {
 
 async function checkOwnSave(): Promise<void> {
   console.log('\n=== 4. the port\'s own save ===');
-  const game = newGame(dungeonDat('static/gamefiles/dm-atari/dungeon.dat'), stockGraphics());
+  const game = stockGame();
   const bytes = buildSaveFile(game);
   const match = identifyDungeon(await dungeonSignature(loadCsbwinWorld(bytes).dungeon));
   console.log(`  a new game saved, ${bytes.length} bytes: ${match?.dungeon.name ?? '-'}, ${match?.levels ?? 0} levels`);
@@ -322,7 +322,7 @@ async function printFile(path: string): Promise<void> {
 async function main(): Promise<void> {
   const path = process.argv[2];
   if (path) await printFile(path);
-  await checkInput(dungeonDat('static/gamefiles/dm-atari/dungeon.dat'));
+  await checkInput(stockDungeon());
   await checkCatalogue();
   await checkSaves();
   await checkOwnSave();

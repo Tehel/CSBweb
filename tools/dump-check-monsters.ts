@@ -24,17 +24,15 @@ import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL } from '../src/core/types';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { CheckCelltypes } from '../src/data/CsbwinDungeonConversions';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { CreatureRecord, DungeonData } from '../src/data/dungeonTypes';
 import { CheckMonsters } from '../src/engine/CheckMonsters';
 import { DungeonState } from '../src/engine/DungeonState';
 import { monsterHorizontalSize } from '../src/data/tables/MonsterDesc';
 import { check, finish } from './lib/check';
-import { gameTablesOf, newGame, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, stockDungeon, stockGame, stockGraphics } from './lib/game';
 import { genuineSaves } from './lib/saves';
 
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const CSB = 'static/gamefiles/csb';
 const ATARI_SAVES = ['mini.dat', 'csbgame2.dat'];
 
@@ -91,7 +89,7 @@ function measure(label: string, data: DungeonData, attached: ReadonlySet<number>
 }
 
 console.log('\ndungeon.dat and the saves, read as the port reads them (CheckCelltypes already run):');
-const dungeonChanged = measure('dm-atari/dungeon.dat', new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON)))));
+const dungeonChanged = measure('dm-atari/dungeon.dat', stockDungeon());
 check(dungeonChanged.size === 0, 'dm-atari/dungeon.dat: CheckMonsters changes nothing');
 
 const saveFiles = [
@@ -117,7 +115,7 @@ for (const { file, changed } of withChanges) {
   const savedSlots = new Map(saved.save.item16.filter((s) => s.word0 >= 0).map((s) => [s.word0, s]));
   // A running game over DM's `dungeon.dat`, as the page builds one: the load installs
   // the save's world, CSB's eleven levels as well as DM's fourteen.
-  const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(DUNGEON))), stockGraphics());
+  const game = stockGame();
   applyCsbwinSave(game, bytes);
   const records = game.ctx.dungeon.getData().databases.creatures.records;
   const pool = game.ctx.dungeon.getItem16Pool();
@@ -170,7 +168,7 @@ const carried: Case = { name: 'size 1, a group of four carried by the size-0 gro
 
 /** dungeon.dat with the cases written over its first live groups, a carried group, and a cell of type 7. */
 function builtWorld(): { data: DungeonData; indices: number[]; carriedIndex: number } {
-  const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
+  const data = stockDungeon();
   const records = data.databases.creatures.records;
   const live = records.map((r, i) => (r.nextObject !== OBJECT_ID_NULL && r.possession === OBJECT_ID_EOF ? i : -1)).filter((i) => i >= 0);
   const indices = live.slice(0, cases.length);
@@ -204,7 +202,7 @@ function checkBuilt(label: string, records: CreatureRecord[], indices: number[],
 
 // CheckCelltypes on a cell of type 7: open floor, the low five bits kept.
 {
-  const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
+  const data = stockDungeon();
   data.maps[0].cellFlags[0][0] = (7 << 5) | 0x0b;
   data.maps[1].cellFlags[2][3] = (6 << 5) | 0x0b;
   CheckCelltypes(data);

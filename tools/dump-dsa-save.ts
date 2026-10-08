@@ -49,7 +49,7 @@ import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { StkOp } from '../src/engine/DsaSystem';
 import { identityOverlayPalette } from '../src/engine/OverlayPalette';
 import { freshGame, globalStore, int, op, run } from './lib/dsa';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockDungeon, stockGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
 
@@ -235,8 +235,7 @@ console.log('8. The overlay palette');
   console.log(`  the identity is every genuine save's palette, and ${alone} pools hold it alone`);
   check(alone >= 5, `at least five pools are the palette records alone (${alone})`);
 
-  const dat = (): Uint8Array => new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'));
-  const game = newGame(new DungeonLoader().loadDungeonDat(dat()), stockGraphics());
+  const game = stockGame();
   check(game.ctx.state.dungeon.expool === undefined && sameBytes(game.ctx.overlayPalette, identity),
     "a game on dm-atari's dungeon.dat, which has no pool, has the identity");
   const written = loadCsbwinWorld(buildSaveFile(game)).dungeon;
@@ -255,7 +254,7 @@ console.log('8. The overlay palette');
   const partial = loadCsbwinWorld(file).dungeon;
   new Expool(partial).read(paletteKey(23));
   check(readOverlayPalette(partial) === null, 'a pool short of one record has no palette');
-  other.readNewGame(new DungeonLoader().loadDungeonDat(dat()));
+  other.readNewGame(stockDungeon());
   check(sameBytes(other.ctx.overlayPalette, identity), 'and a new game read over a changed palette has the identity');
 }
 

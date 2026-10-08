@@ -150,7 +150,7 @@ import {
 import { type UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { DEFAULT_DATA_SET, dataSetNamed } from './lib/dataSets';
-import { graphicsTablesOf, newGame, stockGame } from './lib/game';
+import { graphicsTablesOf, newGame, stockGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { SAVE_DIR, genuineSaves, memoryStore, savePath } from './lib/saves';
@@ -158,16 +158,13 @@ import * as SaveMenu from '../src/renderer/ui/SaveMenu';
 import * as Inventory from '../src/renderer/ui/Inventory';
 import { testChampion } from './lib/champion';
 
-const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 
 
 /* ------------------------------------------------------------------------------- */
 
 function loadGraphics(): GraphicsLoader {
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
-  return graphics;
+  return stockGraphics();
 }
 
 /** A graphic of `graphics` as the bitmap the menu's drawing blits. */

@@ -33,7 +33,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
+import { emptyDungeonData } from '../src/data/DungeonLoader';
 import { Die } from '../src/engine/Die';
 import type { Game } from '../src/engine/Game';
 import { applySaveBytes } from '../src/engine/SaveGameFile';
@@ -44,7 +44,7 @@ import { MENU_TITLE1_COLOR, MENU_TITLE2_COLOR, doMenu, drawMenuPress, menuButton
 import type { UIHooks, UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { savePath } from './lib/saves';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
@@ -58,7 +58,7 @@ const PRISON = 'static/gamefiles/csb/dungeon.dat';
 const graphics = stockGraphics();
 
 function freshGame(): Game {
-  return newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(resolve(DUNGEON)))), graphics);
+  return stockGame();
 }
 
 /* ------------------------------------------------ 1. the chooser's hand-off ---- */

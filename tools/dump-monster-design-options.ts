@@ -38,9 +38,8 @@ import { ViewportRenderer } from '../src/renderer/ViewportRenderer';
 import { check, fail, finish } from './lib/check';
 import { standIn, wrapMember } from './lib/standIn';
 import { createMonsterAt } from './lib/createMonster';
-import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, stockGame, stockGraphics } from './lib/game';
 
-const DM_DUNGEON = new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat')));
 const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
 const graphics = stockGraphics();
 const EAST = 1;
@@ -56,18 +55,8 @@ function quiet<T>(fn: () => T): T {
   }
 }
 
-function loadDungeon(bytes: Uint8Array) {
-  return quiet(() => {
-    const loader = new DungeonLoader();
-    loader.loadFromArray(bytes);
-    const data = loader.getData();
-    if (!data) throw new Error('dungeon.dat did not load');
-    return data;
-  });
-}
-
 function dmGame(): Game {
-  return quiet(() => newGame(loadDungeon(DM_DUNGEON), graphics));
+  return quiet(() => stockGame());
 }
 
 function options(rules: RulesOptions): string {

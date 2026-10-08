@@ -19,16 +19,12 @@
  *
  * Run: `npx tsx tools/dump-dsa-decoder.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, locationRelToInteger, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
 import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
-import { newGame, stockGraphics } from './lib/game';
+import { stockGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 const OVERRIDE = 2;
@@ -50,9 +46,6 @@ const loadInteger = (value: number): number[] => [LOAD | (LOAD_INTEGER << 6), va
 const globalStore = (index: number): number => GLOBALSTORE | (index << 6);
 const globalFetch = (index: number): number => GLOBALFETCH | (index << 6);
 
-const graphics = stockGraphics();
-const stock = readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'));
-
 interface Run {
   game: Game;
   dsa: DsaDefinition;
@@ -62,8 +55,7 @@ interface Run {
 
 /** Run `program` as column 0 of a one-state DSA whose state starts at `state`. */
 function run(program: number[], state = 0): Run {
-  const data = new DungeonLoader().loadDungeonDat(new Uint8Array(stock));
-  const game = newGame(data, graphics);
+  const game = stockGame();
   const dungeon = game.ctx.dungeon;
   const start = dungeon.getStartPosition();
   const map = dungeon.getMap(start.z)!;

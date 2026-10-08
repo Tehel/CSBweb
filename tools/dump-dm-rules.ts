@@ -23,15 +23,12 @@ import { basename, resolve } from 'node:path';
 
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { Game } from '../src/engine/Game';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
-
-const DM_DUNGEON = new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat')));
 
 /** `fn` without the loaders' progress lines. */
 function quiet<T>(fn: () => T): T {
@@ -46,13 +43,7 @@ function quiet<T>(fn: () => T): T {
 
 /** A new game on a fresh parse of DM's `dungeon.dat`. */
 function dmGame(): Game {
-  return quiet(() => {
-    const loader = new DungeonLoader();
-    loader.loadFromArray(DM_DUNGEON);
-    const data = loader.getData();
-    if (!data) throw new Error('dungeon.dat did not load');
-    return newGame(data, stockGraphics());
-  });
+  return quiet(() => stockGame());
 }
 
 function rulesOf(game: Game): string {

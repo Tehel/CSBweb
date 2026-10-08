@@ -27,7 +27,6 @@ import { resolve } from 'node:path';
 
 import { readU16BE, readU32BE, readU32LE } from '../src/core/bytes';
 import { CsbRandom } from '../src/core/random';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import {
   CheckChampionNames,
@@ -43,7 +42,7 @@ import {
 } from '../src/engine/Chaos';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { check, finish } from './lib/check';
-import { newGame } from './lib/game';
+import { newGame, stockDungeon } from './lib/game';
 import { savePath } from './lib/saves';
 
 const CSB = 'static/gamefiles/csb';
@@ -193,7 +192,7 @@ function load(made: Uint8Array): void {
   console.log('\n=== 3. the new adventure, loaded ===');
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(read(resolve(CSB, 'graphics.dat')));
-  const game = newGame(new DungeonLoader().loadDungeonDat(read('static/gamefiles/dm-atari/dungeon.dat')), graphics);
+  const game = newGame(stockDungeon(), graphics);
   try {
     applyCsbwinSave(game, made);
   } catch (error) {
