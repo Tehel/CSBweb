@@ -145,6 +145,8 @@ export class HallOfChampions {
     // (`CSBCode.cpp:7487`). Then `TAG02076e()` (`:797`).
     party.selectedCharacterIndex = index;
     this.ctx.loop.videoMode = 'VM_INVENTORY';
+    // Its `DiscardAllInput()` (`CSBCode.cpp:7520`).
+    this.ctx.mouseQueue.discardAllInput();
     this.ctx.host.tag02076e();
     return true;
   }
@@ -167,10 +169,11 @@ export class HallOfChampions {
       // Cancel (`:6629-6658`): hide the inventory and take the champion back out.
       // Their possessions were never removed from the mirror, so they stay there.
       // `ShowHideInventory(4)` sets `d.clockTick = 1` (`:7441`) and `videoMode =
-      // VM_ADVENTURE` (`:7453`).
+      // VM_ADVENTURE` (`:7453`), and ends in `DiscardAllInput()` (`:7480`).
       party.selectedCharacterIndex = -1;
       this.ctx.loop.videoMode = 'VM_ADVENTURE';
       setClockTick(this.ctx, 1);
+      this.ctx.mouseQueue.discardAllInput();
       if (party.champions.length === 1) {
         setHandOwner(party, -1, this.ctx.host);
       }
@@ -230,10 +233,12 @@ export class HallOfChampions {
     messages.quePrintLines(color, button === 160 ? ' RESURRECTED' : ' REINCARNATED');
 
     // `ShowHideInventory(4)` (`:6807`), with its `d.clockTick = 1` (`:7441`) and
-    // `videoMode = VM_ADVENTURE` (`:7453`), then `TAG0207cc()` (`:6808`).
+    // `videoMode = VM_ADVENTURE` (`:7453`) and `DiscardAllInput()` (`:7480`), then
+    // `TAG0207cc()` (`:6808`).
     party.selectedCharacterIndex = -1;
     this.ctx.loop.videoMode = 'VM_ADVENTURE';
     setClockTick(this.ctx, 1);
+    this.ctx.mouseQueue.discardAllInput();
     this.ctx.host.tag0207cc();
     this.ctx.host.championJoined({ champion, reincarnated: button === 161 });
   }

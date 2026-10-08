@@ -343,6 +343,9 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
     syncOpenChest(ui, null);
     ui.partyState.selectedCharacterIndex = -1;
     syncInventoryButtons(ui);
+    // `DiscardAllInput()` once the adventure's list is back (`:7480`), but not for a
+    // sleeping party, which returns before it (`:7468-7472`).
+    if (!ui.partyState.sleeping) ui.ctx.mouseQueue.discardAllInput();
     return;
   }
   const previous = ui.partyState.selectedCharacterIndex;
@@ -356,6 +359,9 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
   // `ShowHideInventory`'s `CHARFLAG_chestOrScroll` and `DrawCharacterState`
   // (`doc/CSBwin-src/CSBCode.cpp:7504-7514`), which never runs with the eye held (`:7440`).
   if (ui.partyState.selectedCharacterIndex >= 0) tag0189d4(ui);
+  // `DiscardAllInput()` once the new secondary list is set, as the inventory closes
+  // (`:7480`) or opens (`:7520`): a key or a click queued behind the portrait is lost.
+  ui.ctx.mouseQueue.discardAllInput();
 }
 
 /**

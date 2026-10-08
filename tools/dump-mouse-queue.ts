@@ -21,6 +21,8 @@
  * - The on-screen arrows are buttons 1-6 (`buttons17304`); `HandleMouseEvents` sends
  *   1-2 to `TurnParty` and 3-6 to `MoveParty` (`Mouse.cpp:1550-1570`).
  * - `DiscardAllInput` empties the queue, clicks included (`CSBCode.cpp:7532-7544`).
+ * - `ShowHideInventory` calls it as it opens an inventory and as it closes one
+ *   (`CSBCode.cpp:7480`, `:7520`), so a turn queued behind the portrait is lost.
  * - `totalMoveCount` counts each entry `HandleMouseEvents` takes past the held-step test
  *   (`Mouse.cpp:1506`), below 0x2000 and not the no-op (`Recording.cpp:1011-1019`).
  * - While the eye or the mouth is pressed, every button after 81 — the disk icon, 140,
@@ -369,6 +371,34 @@ async function main(): Promise<void> {
     `behind its button-up: ${diskAfterRelease ? 'menu' : 'swallowed'}`);
   check(!diskWhilePressing, 'the disk icon should do nothing while the eye is pressed');
   check(diskAfterRelease, 'the disk icon should ask for the menu once the eye is let go');
+
+  // ---- 8b: the inventory opens and closes with DiscardAllInput ----------------------
+  // `ShowHideInventory` ends in `DiscardAllInput()` as it opens an inventory and as it
+  // closes one (doc/CSBwin-src/CSBCode.cpp:7480, `:7520`), so a turn queued behind the
+  // portrait, button 7, is lost either way. A sleeping party's close returns before it
+  // (`:7468-7472`).
+  const turnBehindPortrait = (): { opened: boolean; turned: boolean; left: number } => {
+    const facingBefore = party.facing;
+    const wasOpen = party.selectedCharacterIndex === 0;
+    buttonsAt.click(game, 7, 20, 10);
+    game.enqueueMovement(MovementAction.TURN_LEFT);
+    for (let i = 0; i < 3; i++) { frame(true); frame(); }
+    return {
+      opened: party.selectedCharacterIndex === 0 && !wasOpen,
+      turned: party.facing !== facingBefore,
+      left: game.ctx.mouseQueue.count(),
+    };
+  };
+  reset();
+  party.champions = [champion()];
+  party.selectedCharacterIndex = -1;
+  const opening = turnBehindPortrait();
+  const closing = turnBehindPortrait();
+  console.log(`a turn behind the portrait: opening ${opening.opened ? 'opened' : 'did not open'}, turned ${opening.turned}; ` +
+    `closing ${party.selectedCharacterIndex < 0 ? 'closed' : 'did not close'}, turned ${closing.turned}; queue left ${closing.left}`);
+  check(opening.opened && !opening.turned, 'a turn queued behind the portrait that opens the inventory is lost');
+  check(party.selectedCharacterIndex < 0 && !closing.turned && closing.left === 0,
+    'a turn queued behind the portrait that closes the inventory is lost');
   party.champions = [];
   party.selectedCharacterIndex = -1;
 

@@ -4651,6 +4651,11 @@ is empty, and `numEnt = (MouseQEnd - MouseQStart + 1 + MOUSEQLEN) % MOUSEQLEN`.
 - While `d.PressingEye` or `d.PressingMouth` is set, every button tested after 81 —
   140 the disk icon, 145-148, 200-216 — is swallowed, `lastTime` stamped
   (`Mouse.cpp:1679-1680`); only the button-up, which comes before, lets go.
+- **`ShowHideInventory`** ends in `DiscardAllInput()` once it has set the secondary
+  list, whether it closes an inventory (`doc/CSBwin-src/CSBCode.cpp:7480`) or opens one
+  (`:7520`), so whatever was queued behind the portrait, the close box or the sleep icon
+  is lost. A sleeping party's close returns before it (`:7468-7472`). The Hall of
+  Champions' calls (`Character.cpp:796`, `CSBCode.cpp:6634`, `:6807`) discard too.
 
 Evidence: `tools/dump-mouse-queue.ts` (it crashes before the port had the queue; case 8
 fails before the eye gate),

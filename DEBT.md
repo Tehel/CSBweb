@@ -94,7 +94,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C158 | The inventory opens and closes without `DiscardAllInput` | S | ⏳ |
 | C152 | A wall text seen from afar shows its plaque at full height | M | ⏳ |
 | C153 | `&PARAM@` reads variable 0 for each missing parameter | S | ⏳ |
 | C154 | The attacker's hand may keep its cyan border after a PASS or a zero-delay attack | S | ⏳ |
@@ -118,9 +117,9 @@ In payoff order: the first row is the next item.
 | X8 | Extra: RISE's own dialog, and the utility disk's portraits on DM's champions | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G29 are the active list. C158 is a bug of the port's, and comes first.
+The rows above G29 are the active list.
 C152-C157 are CSBWin's changes from 2016 to 2023 (see "CSBWin's changes from 2016 to
-2023" in tier C), taken next. `F3` is a phase, whose
+2023" in tier C), taken first. `F3` is a phase, whose
 status is `PLAN.md`'s, and its row only marks its place. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
@@ -356,19 +355,6 @@ After C152-C156. Steps:
    tree; the `csbwin-binary-newer-than-source` memory is deleted.
 
 Size L.
-
-### C158 ⏳ The inventory opens and closes without `DiscardAllInput`
-
-`ShowHideInventory` empties the mouse queue when it hides the inventory
-(`doc/CSBwin-src/CSBCode.cpp:7480`) and when it shows one (`:7520`), after it has set the
-secondary button list; a sleeping party's return at `:7468-7472` comes before either. The
-port's `handleInventoryToggle` (`src/renderer/ui/Mouse.ts`) sets the list
-(`syncInventoryButtons`) and discards nothing, so a key or a click queued behind the
-portrait or the close box is taken against the new screen, where CSBWin loses it. Its other
-callers (`HallOfChampions`, a champion's death, `GameScreen`'s `showHideInventory`) reach
-the same function. Paying it: `ctx.mouseQueue.discardAllInput()` at the two places, a
-`tools/` check that a turn queued behind button 7 is lost, and a look at the port's
-callers that may rely on the queue surviving. Size S.
 
 ---
 
