@@ -22,7 +22,7 @@ import { DecodeText, EDT_GLOBAL_TEXT, SubstituteCharacterNames, type TextSubstit
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { Expool } from '../src/data/CsbwinExpool';
 import { check, finish } from './lib/check';
-import { gameTablesOf, newGame, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, stockGraphics, stockDungeon } from './lib/game';
 
 const ascii = (s: string): Uint8Array => Uint8Array.from([...s].map((c) => c.charCodeAt(0)).concat(0));
 const text = (b: Uint8Array): string => String.fromCharCode(...b.slice(0, b.indexOf(0) < 0 ? b.length : b.indexOf(0)));
@@ -97,7 +97,7 @@ check(dungeon.decodeMessageText(rec, tables) === '\nRAAHL S VISION IS VEILED. TH
   'the floor message carries the name');
 
 console.log('3. The default dungeon');
-const dm = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'))), stockGraphics());
+const dm = newGame(stockDungeon(), stockGraphics());
 const dmTables = gameTablesOf(stockGraphics()).textDecode;
 const dmData = dm.ctx.dungeon.getData();
 let same = 0;

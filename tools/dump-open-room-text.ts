@@ -17,20 +17,18 @@
  *
  * Run: `npx tsx tools/dump-open-room-text.ts`
  */
-import { readFileSync } from 'node:fs';
 
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { ActuatorAction, getActuatorTargetX, getActuatorTargetY, getActuatorType, isActuatorLocalActionOnly } from '../src/data/actuatorHelpers';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, stockDungeon } from './lib/game';
 
 const queued: Array<{ color: number; text: string }> = [];
 
 function scene(): Game {
-  const data = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat')));
+  const data = stockDungeon();
   return newGame(data, stockGraphics(), {
     messages: {
       printLinefeed: () => {},

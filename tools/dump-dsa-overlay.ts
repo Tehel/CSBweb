@@ -34,7 +34,6 @@ import { readFileSync } from 'node:fs';
 
 import { CSBGraphicsLoader, CSBGraphicType } from '../src/data/CSBGraphicsLoader';
 import { EF_EXTENDED_FLAGS } from '../src/data/CsbwinExtendedFeatures';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { readU16LE, readU32LE } from '../src/core/bytes';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
@@ -44,7 +43,7 @@ import { Overlay, OVERLAY_HEIGHT, OVERLAY_WIDTH } from '../src/engine/Overlay';
 import { identityOverlayPalette } from '../src/engine/OverlayPalette';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { freshGame, globalStore, int, op, run } from './lib/dsa';
-import { newGame, runVbl, stockGraphics, TICK_DUE } from './lib/game';
+import { newGame, runVbl, stockGraphics, TICK_DUE, stockDungeon } from './lib/game';
 import { check, finish } from './lib/check';
 
 const conflux = new CSBGraphicsLoader();
@@ -177,7 +176,7 @@ console.log('5. &JITTER');
 console.log('6. A save');
 {
   const loadInto = (file: Uint8Array): Game => {
-    const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'))), stockGraphics());
+    const game = newGame(stockDungeon(), stockGraphics());
     withConflux(game);
     applyCsbwinSave(game, file);
     return game;

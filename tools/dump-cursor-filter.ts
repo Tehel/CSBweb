@@ -77,7 +77,6 @@ import { readFileSync } from 'node:fs';
 import { OBJNI_APPLE } from '../src/core/objectNameIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, locationRelToInteger, type ObjectID } from '../src/core/types';
 import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { CursorFilterType, StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
@@ -89,7 +88,7 @@ import { handleClothingClick } from '../src/renderer/ui/Mouse';
 import { tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import { VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { UNSET, freshGame, globalStore, int, op, placeFilterDsas, save, varFetch, varStore, withFilterDsas } from './lib/dsa';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, stockDungeon } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 
@@ -255,7 +254,7 @@ for (const cancelled of [false, true]) {
 }
 
 {
-  const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'))), stockGraphics());
+  const game = newGame(stockDungeon(), stockGraphics());
   const at = wallSquare(game);
   actuator(game, at, 1, 0);
   actuator(game, at, 12, ROCK);

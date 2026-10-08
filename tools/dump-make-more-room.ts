@@ -27,20 +27,17 @@
  *
  * Run: `npx tsx tools/dump-make-more-room.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import { DBType, getRoomType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { getActuatorType } from '../src/data/actuatorHelpers';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Databases, MiscRecord } from '../src/data/dungeonTypes';
 import { dbMax } from '../src/engine/DungeonState';
 import type { Game } from '../src/engine/Game';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, stockDungeon } from './lib/game';
 import { check, finish } from './lib/check';
 
 function makeGame(): Game {
-  const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
+  const data = stockDungeon();
   return newGame(data, stockGraphics());
 }
 

@@ -32,14 +32,13 @@ import { getActuatorType, getActuatorValue } from '../src/data/actuatorHelpers';
 import { AltGraphicMapping, AltMonCache, readAltMonGraph, type AltMonGraph } from '../src/data/AltMonGraphics';
 import { CSBGraphicType, CSBGraphicsLoader, decodePlanar, type IndexedBitmap } from '../src/data/CSBGraphicsLoader';
 import type { ExpoolDatabase } from '../src/data/CsbwinExpool';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { Die } from '../src/engine/Die';
 import { DrawRoomObjects, mapColorValue } from '../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, mirrorBitmap, shrinkBlt } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
 import { wrapMember } from './lib/standIn';
-import { graphicsTablesOf, stockGraphics } from './lib/game';
+import { graphicsTablesOf, stockGraphics, stockDungeon } from './lib/game';
 
 const graphics = stockGraphics();
 const tables = graphicsTablesOf(graphics).objects;
@@ -236,7 +235,7 @@ function defaultDungeon(): void {
   console.log('=== the default dungeon ===');
   const log = console.log;
   console.log = () => {};
-  const dm = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
+  const dm = stockDungeon();
   console.log = log;
   const groups = dm.databases.creatures.records.filter((r) => r.alternateGraphics !== 0).length;
   const generators = dm.databases.actuators.records.filter((a) => getActuatorType(a) === 6 && ((getActuatorValue(a) >> 5) & 3) !== 0).length;

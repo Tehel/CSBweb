@@ -21,16 +21,13 @@
  *
  * Run: `npx tsx tools/watch-smart-discard.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import { getActuatorType } from '../src/data/actuatorHelpers';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { MiscRecord } from '../src/data/dungeonTypes';
 import type { Game } from '../src/engine/Game';
 import { SDObjList, scanOneCell, smartDiscard, SmartDiscardMode, type SDObj } from '../src/engine/SmartDiscard';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, stockDungeon } from './lib/game';
 import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 
@@ -38,7 +35,7 @@ const MODE_NAMES = ['NotActive', 'NewDB', 'Count', 'Scan', 'Discard'];
 const DB_NAMES: Record<number, string> = { [DBType.WEAPON]: 'weapons', [DBType.CLOTHING]: 'clothing', [DBType.MISC]: 'misc' };
 
 function makeGame(): Game {
-  const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
+  const data = stockDungeon();
   return newGame(data, stockGraphics());
 }
 

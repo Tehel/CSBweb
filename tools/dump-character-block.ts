@@ -32,12 +32,11 @@ import {
 } from '../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { loadSaveGameState, saveSaveGameState } from '../src/data/SaveGameLoader';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/engine/CsbwinSaveGame';
 import type { Champion } from '../src/engine/gameTypes';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, stockDungeon } from './lib/game';
 import { check, finish } from './lib/check';
 import { genuineSaves, savePath } from './lib/saves';
 
@@ -209,8 +208,7 @@ function main(): void {
     'a champion left past the party is packed as one in it',
   );
   const oneHero = new Uint8Array(readFileSync(savePath('csbgame-early-1hero.dat')));
-  const game = newGame(new DungeonLoader().loadDungeonDat(
-    new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'))), stockGraphics());
+  const game = newGame(stockDungeon(), stockGraphics());
   applyCsbwinSave(game, oneHero);
   // The same file again, with champion 0's record in slot 2 as a Cancel would leave it.
   const world = loadCsbwinWorld(oneHero);

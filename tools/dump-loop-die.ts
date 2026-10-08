@@ -8,12 +8,9 @@
  *
  * Run: `npx tsx tools/dump-loop-die.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { createGameHost } from '../src/engine/GameHost';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, stockDungeon } from './lib/game';
 import { standIn } from './lib/standIn';
 
 let failures = 0;
@@ -22,9 +19,7 @@ function check(ok: boolean, what: string): void {
   if (!ok) failures++;
 }
 
-const data = new DungeonLoader().loadFromArray(
-  new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))),
-);
+const data = stockDungeon();
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /** A game whose `failOn`-th frame throws; how many frames ran, and what `die` received. */
