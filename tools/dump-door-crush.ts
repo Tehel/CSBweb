@@ -23,45 +23,18 @@
  *
  * Run: `npx tsx tools/dump-door-crush.ts [level]`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
-import type { Champion } from '../src/engine/gameTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { monsterNonMaterial, monsterVerticalSize } from '../src/data/tables/MonsterDesc';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
-import { emptyPossessions } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
-
-function champion(i: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `HERO${i}`,
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
-}
+import { testChampion } from './lib/champion';
 
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
 
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
 
   const level = Number(process.argv[2] ?? 2);
@@ -134,7 +107,7 @@ async function main(): Promise<void> {
 
   // ---- Case 2: the door closes on the party -------------------------------
   setDoorStateAt(door.x, door.y, 0);
-  game.ctx.party.state.champions = [champion(0), champion(1)];
+  game.ctx.party.state.champions = [testChampion(0), testChampion(1)];
   game.ctx.party.state.position = new Position(door.x, door.y, level);
   const hpBefore = game.ctx.party.state.champions.map((c) => c.attributes.health);
   startClosing();

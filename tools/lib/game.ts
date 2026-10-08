@@ -10,6 +10,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { DungeonLoader } from '../../src/data/DungeonLoader';
 import type { DungeonData } from '../../src/data/dungeonTypes';
 import { extractPresetHeroes, type PresetHero } from '../../src/data/HeroExtractor';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
@@ -24,13 +25,29 @@ const extracted = new WeakMap<GraphicsLoader, GraphicsTables>();
 const built = new WeakMap<GraphicsLoader, GameTables>();
 let stock: GraphicsLoader | null = null;
 
+/** The folder of the stock data set, the default dungeon. */
+export const STOCK_DIR = 'static/gamefiles/dm-atari';
+
 /** The stock DM `graphics.dat`, loaded once. */
 export function stockGraphics(): GraphicsLoader {
   if (!stock) {
     stock = new GraphicsLoader();
-    stock.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+    stock.loadFromArray(new Uint8Array(readFileSync(resolve(`${STOCK_DIR}/graphics.dat`))));
   }
   return stock;
+}
+
+/**
+ * The stock DM `dungeon.dat`, read as a new game reads it (`loadDungeonDat`). A fresh copy
+ * every call: a game plays on the data it is given, so two games never share one.
+ */
+export function stockDungeon(): DungeonData {
+  return new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(resolve(`${STOCK_DIR}/dungeon.dat`))));
+}
+
+/** `newGame` over a fresh `stockDungeon()` and `stockGraphics()`. */
+export function stockGame(host?: Partial<GameHost>): Game {
+  return newGame(stockDungeon(), stockGraphics(), host);
 }
 
 /** `extractGraphicsTables(graphics)`, remembered per loader. */

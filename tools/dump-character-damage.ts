@@ -20,52 +20,29 @@
  *
  * Run: `npx tsx tools/dump-character-damage.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { PotionType } from '../src/core/constants';
 import { CsbRandom } from '../src/core/random';
 import { Direction, Position } from '../src/core/types';
 import { CHARACTER_BLOCK_SIZE, readCsbwinPartyTail, writeCsbwinPartyTail } from '../src/data/CsbwinCharacters';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { applyFeedParameters, clearFeedParameters, derivePotionFeeding } from '../src/engine/Feeding';
 import { Party, setHandOwner } from '../src/engine/Party';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { AttributeIndex, attributeCurrent, makeAddCharacterAttributes } from '../src/engine/attributes';
-import { addCharacterDefaults, assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
-import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, emptyPossessions, type Champion } from '../src/engine/gameTypes';
+import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
+import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { drawCharacterState, drawPartyStatus } from '../src/renderer/ui/Character';
 import { type UIState } from '../src/renderer/ui/UIState';
-import { graphicsTablesOf, newGame, presetHeroesOf, processTimersAt } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOf, processTimersAt, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
+import { testChampion } from './lib/champion';
 
-function champion(i: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `HERO${i}`,
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
-}
-
-const dungeonLoader = new DungeonLoader();
-dungeonLoader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-const data = dungeonLoader.getData();
-if (!data) throw new Error('dungeon.dat did not load');
-const graphics = new GraphicsLoader();
-graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+const data = stockDungeon();
+const graphics = stockGraphics();
 
 /** `DrawCharacterState`'s flags, by CSBWin's names. */
 function flagNames(charFlags: number): string {
@@ -88,7 +65,7 @@ function makeGame(count: number, calls: string[], draws: string[] = []): Game {
     drawCharacterState: (chIdx, charFlags) => draws.push(`${chIdx} ${flagNames(charFlags)}`),
   });
   game.setRandomSeed(0x12345678);
-  for (let i = 0; i < count; i++) game.systems.hallOfChampions.addChampion(champion(i));
+  for (let i = 0; i < count; i++) game.systems.hallOfChampions.addChampion(testChampion(i));
   game.ctx.party.state.position = new Position(6, 14, 2);
   return game;
 }

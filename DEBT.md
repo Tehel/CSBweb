@@ -238,8 +238,10 @@ The table-extraction round-trip checks are a live phase, so they stay in `PLAN.m
 `tools/lib/game.ts` gives every tool the same `Game` and tables (`E1a`). What each tool
 builds around them is its own:
 
-- 40 tools spell out `addCharacterDefaults()`, most inside a champion-building function
-  of their own; 145 construct a `DungeonLoader`, most to read `dm-atari/dungeon.dat`.
+- 30 tools spell out `addCharacterDefaults()`, most inside a champion-building function
+  of their own; 116 read `dm-atari/dungeon.dat` themselves, most through a
+  `DungeonLoader` of their own, and 72 load its `graphics.dat` beside
+  `stockGraphics()`.
 - 31 tools extract the UI tables again (`graphicsTablesOf(…).ui`) beside the `UIState`
   that `tools/lib/ui.ts` builds them into.
 - 20 tools make 33 `as unknown as` casts: to build a partial record, or to read a
@@ -265,7 +267,9 @@ keeps beside a `Game` is in a `WeakMap` of its own (`dump-game-events`,
 `dump-hall-of-champions`).
 
 6. **The stock dungeon and a test champion** as `tools/lib` helpers, and the tools moved
-   to them, a few tools per commit.
+   to them, a few tools per commit. The helpers are written: `stockDungeon` and
+   `stockGame` (`tools/lib/game.ts`), `testChampion` (`tools/lib/champion.ts`). The
+   counts in the first bullet are the tools still to move.
 7. **What is left**: every remaining cast either goes, or builds a stand-in value the
    tool cannot type otherwise (a partial record, a fake `ImageData`), with a comment that
    says so. The item is paid when no tool reaches a private through a cast and no `as any`

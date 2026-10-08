@@ -10,51 +10,24 @@
  *
  * Run: `npx tsx tools/dump-ninety-second-update.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, Position } from '../src/core/types';
 import type { WeaponRecord } from '../src/data/dungeonTypes';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { isNinetySecondTick, ninetySecondUpdate } from '../src/engine/PeriodicUpdates';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
-import type { Champion } from '../src/engine/gameTypes';
-import { newGame } from './lib/game';
+import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
-import { emptyPossessions } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { testChampion } from './lib/champion';
 
 const WEAPON_TORCH = 2;
 
-function champion(i: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `HERO${i}`,
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
-}
-
 function makeGame(): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
 
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
 
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
-  game.systems.hallOfChampions.addChampion(champion(0));
+  game.systems.hallOfChampions.addChampion(testChampion(0));
   game.ctx.party.state.position = new Position(6, 14, 2);
   return game;
 }
@@ -116,7 +89,7 @@ function main(): void {
   console.log('=== 3. a Hall of Champions recruit ===');
   {
     const game = makeGame();
-    game.systems.hallOfChampions.addChampion(champion(1));
+    game.systems.hallOfChampions.addChampion(testChampion(1));
     const own = giveTorch(game, 0, 8);
     const recruits = giveTorch(game, 1, 8);
     game.ctx.party.state.potentialChampionIndex = 1;

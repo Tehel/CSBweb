@@ -27,51 +27,21 @@
  *
  * Run: `npx tsx tools/dump-party-collision.ts [level]`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { MovementAction } from '../src/engine/gameTypes';
 import type { Champion } from '../src/engine/gameTypes';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { sw } from '../src/core/intCast';
-import { newGame, runVbl, TICK_DUE } from './lib/game';
+import { runVbl, TICK_DUE, stockGame } from './lib/game';
 import { standIn, wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
-import { emptyPossessions } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { testChampion } from './lib/champion';
 
 /** A plain champion — the party only has to exist for `d.NumCharacter != 0`. */
-function champion(i: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `HERO${i}`,
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
-}
-
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
-
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-
   const level = Number(process.argv[2] ?? 2);
-  const game = newGame(data, graphics);
+  const game = stockGame();
   game.setRandomSeed(0x12345678);
   game.ctx.party.state.position = new Position(0, 0, level);
   game.systems.monsters.loadPartyLevel(level);
@@ -144,7 +114,7 @@ async function main(): Promise<void> {
 
   // ---- Case 2: a real party walks into the monster ------------------------
   // (Case 1, the empty party, is last: it deletes the monster.)
-  game.ctx.party.state.champions = [champion(0)];
+  game.ctx.party.state.champions = [testChampion(0)];
   const blocked = attempt('party vs monster');
 
   // ---- Case 3: the same party walks into a wall, for contrast -------------
@@ -190,7 +160,7 @@ async function main(): Promise<void> {
   // only covers `TT_MAP_FIRST..TT_MAP_LAST` (5..10) plus `TT_1`/`TT_DOOR`/
   // `TT_BASH_DOOR` (`doc/CSBwin-src/Timer.cpp:1011-1052`), and 31 is outside it. The
   // clock is frozen here so they pile up visibly; in play each fires on the next tick.
-  game.ctx.party.state.champions = [champion(0)];
+  game.ctx.party.state.champions = [testChampion(0)];
   const untouchedRn = (() => {
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
@@ -250,7 +220,7 @@ async function main(): Promise<void> {
       game.ctx.party.setFacing(wall!.facing);
       lastQueued = undefined;
     };
-    game.ctx.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+    game.ctx.party.state.champions = [testChampion(0), testChampion(1), testChampion(2), testChampion(3)];
     // A new party: what the earlier steps dealt the last one is not theirs to take.
     game.ctx.party.state.pendingDamage = [0, 0, 0, 0];
     standAtWall();
@@ -305,7 +275,7 @@ async function main(): Promise<void> {
       game.discardAllInput();
       for (const a of actions) game.enqueueMovement(a);
     };
-    game.ctx.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+    game.ctx.party.state.champions = [testChampion(0), testChampion(1), testChampion(2), testChampion(3)];
 
     // The monster first, with no tick due, so that it is still where the scene found it.
     queueAt(scene.px, scene.py, facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT]);
@@ -349,7 +319,7 @@ async function main(): Promise<void> {
       game.ctx.party.state.position = new Position(wall!.px, wall!.py, level);
       game.ctx.party.setFacing(wall!.facing);
     };
-    game.ctx.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+    game.ctx.party.state.champions = [testChampion(0), testChampion(1), testChampion(2), testChampion(3)];
     const champs = game.ctx.party.state.champions;
     const st = (): number[] => champs.map((c) => c.attributes.stamina);
     standAtWall();
@@ -421,7 +391,7 @@ async function main(): Promise<void> {
     check(run !== null, 'the level should have three open, empty cells in a row');
     if (run) {
       const party = game.ctx.party.state;
-      party.champions = [champion(0), champion(1), champion(2), champion(3)];
+      party.champions = [testChampion(0), testChampion(1), testChampion(2), testChampion(3)];
       party.position = new Position(run.x, run.y, level);
       game.ctx.party.setFacing(run.dir);
       party.partyMoveDisableTimer = 0;
@@ -566,7 +536,7 @@ async function main(): Promise<void> {
     check(stairs !== null, 'the level should have an open cell beside a stairway');
     if (stairs) {
       const party = game.ctx.party.state;
-      party.champions = [champion(0), champion(1), champion(2), champion(3)];
+      party.champions = [testChampion(0), testChampion(1), testChampion(2), testChampion(3)];
       party.position = new Position(stairs.px, stairs.py, level);
       game.ctx.party.setFacing(stairs.dir);
       game.systems.monsters.loadPartyLevel(level);
@@ -647,7 +617,7 @@ async function main(): Promise<void> {
       const cells = map.cellFlags;
       const saved = cells[tx][ty];
       cells[tx][ty] = (RoomType.EMPTY << 5) | (saved & 0x1f);
-      game.ctx.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+      game.ctx.party.state.champions = [testChampion(0), testChampion(1), testChampion(2), testChampion(3)];
       game.ctx.party.state.position = new Position(spot.px, spot.py, level);
       game.ctx.party.setFacing(spot.dir);
       const entered = game.move(MovementAction.MOVE_FORWARD);
@@ -684,7 +654,7 @@ async function main(): Promise<void> {
       };
       setCell(saved & 0xf7); // closed: the party stands on it
       const party = game.ctx.party.state;
-      party.champions = [champion(0), champion(1), champion(2), champion(3)];
+      party.champions = [testChampion(0), testChampion(1), testChampion(2), testChampion(3)];
       party.position = new Position(pit.x, pit.y, level);
       game.systems.monsters.loadPartyLevel(level);
       party.partyMoveDisableTimer = 0;

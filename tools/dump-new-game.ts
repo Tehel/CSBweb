@@ -36,50 +36,20 @@
  * Run: `npx tsx tools/dump-new-game.ts`
  */
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import { CsbRandom } from '../src/core/random';
 import { OBJECT_ID_NULL, Position } from '../src/core/types';
-import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
-import type { DungeonData } from '../src/data/dungeonTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
+import { emptyDungeonData } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
 import { DATABASE_CATEGORY } from '../src/engine/DungeonState';
 import { drawRandomGameID } from '../src/engine/GameContext';
-import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { MovementAction } from '../src/engine/gameTypes';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { check, finish } from './lib/check';
-import { gameTablesOf, newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
+import { gameTablesOf, newGame, stockDungeon, stockGraphics, runVbl, TICK_DUE } from './lib/game';
+import { testChampion } from './lib/champion';
 
-const DUNGEON = readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'));
 const SEED = 0x2468ace0;
-
-/** A fresh parse: play writes into the `DungeonData` it runs on. */
-function parse(): DungeonData {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(DUNGEON));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
-  return data;
-}
-
-function champion(i: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `HERO${i}`,
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
-}
 
 /** The runtime state, hashed without `GAMEBLOCK1`. */
 function stateHash(game: Game): string {
@@ -137,11 +107,11 @@ function lowWord(seed: number): number {
  */
 function checkSpares(): void {
   console.log('=== a new game\'s databases: the file\'s records and Byte7302\'s spares ===');
-  const file = parse().header.objectCounts;
+  const file = stockDungeon().header.objectCounts;
   const { byte7302 } = gameTablesOf(stockGraphics());
-  const game = newGame(parse(), stockGraphics());
+  const game = newGame(stockDungeon(), stockGraphics());
   const data = game.ctx.dungeon.getData();
-  const loaded = newGame(parse(), stockGraphics());
+  const loaded = newGame(stockDungeon(), stockGraphics());
   applySaveBytes(loaded, buildSaveFile(game));
   const reloaded = loaded.ctx.dungeon.getData();
   for (const [key, database] of Object.entries(data.databases)) {
@@ -184,7 +154,7 @@ function checkZeroDraw(): void {
   // And a new game on that stream, the host's `rand()` pinned to its seed.
   const random = Math.random;
   Math.random = () => seed / 0x100000000;
-  const game = newGame(parse(), stockGraphics());
+  const game = newGame(stockDungeon(), stockGraphics());
   Math.random = random;
   check(game.ctx.state.block1.randomGameID === second, 'a new game whose first two draws give 0 takes the next two');
 }
@@ -195,13 +165,13 @@ function runFrames(game: Game, count: number): void {
 }
 
 function main(): void {
-  const fresh = newGame(parse(), stockGraphics());
+  const fresh = newGame(stockDungeon(), stockGraphics());
   fresh.setRandomSeed(SEED);
 
-  const played = newGame(parse(), stockGraphics());
+  const played = newGame(stockDungeon(), stockGraphics());
   played.setRandomSeed(0x13579bdf);
-  played.systems.hallOfChampions.addChampion(champion(0));
-  played.systems.hallOfChampions.addChampion(champion(1));
+  played.systems.hallOfChampions.addChampion(testChampion(0));
+  played.systems.hallOfChampions.addChampion(testChampion(1));
   played.ctx.party.state.position = new Position(6, 14, 2);
   for (let n = 0; n < 40; n++) {
     if (n % 8 === 0) played.enqueueMovement(n % 16 === 0 ? MovementAction.TURN_LEFT : MovementAction.MOVE_FORWARD);
@@ -214,13 +184,13 @@ function main(): void {
   const newAtFirst = played.canRestartFromSavegame();
   const bytes = buildSaveFile(played);
   played.saveWritten();
-  const loaded = newGame(parse(), stockGraphics());
+  const loaded = newGame(stockDungeon(), stockGraphics());
   applySaveBytes(loaded, bytes);
   console.log(['new', newAtFirst, 'saved', played.canRestartFromSavegame(), 'loaded', loaded.canRestartFromSavegame()].join('\t'));
   check(!newAtFirst, 'a new game cannot be restarted');
   check(played.canRestartFromSavegame(), 'a saved one can');
   check(loaded.canRestartFromSavegame(), 'and so can a loaded one');
-  loaded.readNewGame(parse());
+  loaded.readNewGame(stockDungeon());
   check(!loaded.canRestartFromSavegame(), 'until a new game is read into it');
   console.log('');
 
@@ -236,7 +206,7 @@ function main(): void {
   const lostBlock1 = { ...played.ctx.state.block1 };
   // The stream the rebuilt game's `d.RandomGameID` came from: the fresh parse's own
   // `Game`, whose seed `readNewGame` restores along with the rest.
-  played.readNewGame(parse());
+  played.readNewGame(stockDungeon());
   const rebuiltSeed = played.getRuntimeSaveState().game.randomSeed;
   played.resumeMainLoop();
   played.setRandomSeed(SEED);
@@ -271,13 +241,13 @@ function main(): void {
   const random = Math.random;
   let draws = 0;
   Math.random = () => (++draws, 0.6180339887);
-  const direct = newGame(parse(), stockGraphics());
+  const direct = newGame(stockDungeon(), stockGraphics());
   const directDraws = draws;
   draws = 0;
   const booted = newGame(emptyDungeonData(), stockGraphics());
   const emptyDraws = draws;
   const emptyID = booted.ctx.state.block1.randomGameID;
-  booted.readNewGame(parse());
+  booted.readNewGame(stockDungeon());
   const bootDraws = draws;
   Math.random = random;
   const bootDiff = differingParts(direct, booted);
