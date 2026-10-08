@@ -155,6 +155,7 @@ const CHECKS = [
   { tool: 'dump-magic-footprints.ts' },
   { tool: 'dump-footprint-decoration.ts' },
   { tool: 'dump-timer-dedupe.ts' },
+  { tool: 'dump-delete-duplicate-timers.ts' },
   { tool: 'dump-timer-sequence.ts' },
   { tool: 'dump-timer-heap.ts' },
   { tool: 'dump-throwing.ts' },

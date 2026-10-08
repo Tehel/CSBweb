@@ -9,7 +9,7 @@
 import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
 import { readExpectedSignatures, readRulesOptions } from '../data/CsbwinExtendedFeatures';
-import { readDisableSaves } from '../data/CsbwinExpool';
+import { readDeleteDuplicateTimers, readDisableSaves } from '../data/CsbwinExpool';
 import { die } from './Die';
 import { readFileSignatures } from './FileSignatures';
 import type { PartyState, MovementResult } from './gameTypes';
@@ -317,6 +317,9 @@ export class Game implements MainLoop {
     installWorld(data: DungeonData): void {
         this.ctx.state.dungeon = data;
         this.ctx.dungeon.install(data);
+        // `deleteDuplicateTimers`, a global every read sets from the world's `EXPOOL`
+        // once the databases are in (doc/CSBwin-src/SaveGame.cpp:1965-1975).
+        this.ctx.timers.deleteDuplicateTimers = readDeleteDuplicateTimers(data);
     }
 
     /**

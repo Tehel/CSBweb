@@ -160,7 +160,13 @@ export class TimerQueue {
    */
   private maxTimers = 0;
   private indexMap = new Map<number, TimerEntry>();
-  private deleteDuplicateTimers = true; // CSBWin deleteDuplicateTimers default
+  /**
+   * `deleteDuplicateTimers` (`doc/CSBwin-src/data.cpp:65`), a global: whether a new map
+   * timer merges into a matching one (`applyDuplicateTimerRules`). Every read of a game
+   * sets it from its world's `EXPOOL` (`readDeleteDuplicateTimers`), true where the pool
+   * has no record of it.
+   */
+  deleteDuplicateTimers = true;
 
   /** The live timers in `m_timerQueue`'s heap order, not their firing order. */
   getTimers(): readonly TimerEntry[] {

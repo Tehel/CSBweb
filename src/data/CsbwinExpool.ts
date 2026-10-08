@@ -46,6 +46,8 @@ const ESL_MONSTER_MOVE_FILTER = 2;
 const MONSTER_MOVE_FILTER_LEVELS = 64;
 /** `EDT_Database` (`doc/CSBwin-src/CSB.h:1555`). */
 const EDT_DATABASE = 5;
+/** `EDBT_DeleteDuplicateTimers` (`doc/CSBwin-src/CSB.h:1557`). */
+const EDBT_DELETE_DUPLICATE_TIMERS = 1;
 /** `EDBT_RuntimeFileSignatures` (`doc/CSBwin-src/CSB.h:1558`). */
 const EDBT_RUNTIME_FILE_SIGNATURES = 2;
 /** `EDBT_Debuging` (`doc/CSBwin-src/CSB.h:1559`). */
@@ -412,6 +414,21 @@ export function readDisableSaves(db: ExpoolDatabase): boolean {
     let disableSaves = false;
     while (expool.read(DISABLE_SAVES_KEY) !== null) disableSaves = true;
     return disableSaves;
+}
+
+/**
+ * `LoadGame`'s `deleteDuplicateTimers` (`doc/CSBwin-src/SaveGame.cpp:1965-1975`), for a new
+ * game and a saved one alike: true when the pool holds no
+ * `(EDT_Database << 24) + (EDBT_DeleteDuplicateTimers << 16)` record, "the old way", else
+ * whether the record's first longword is not 0, the only use `SetTimer` makes of it
+ * (`doc/CSBwin-src/Timer.cpp:1014`). CSBWin reads that longword through `Locate`'s pointer
+ * whatever the record's size, so a record of none reads what follows it in the pool.
+ * CSBWin writes no such record; a dungeon editor does.
+ */
+export function readDeleteDuplicateTimers(db: ExpoolDatabase): boolean {
+    const record = new Expool(db).locateAt(
+        ((EDT_DATABASE << 24) + (EDBT_DELETE_DUPLICATE_TIMERS << 16)) >>> 0, 0);
+    return record === null || record.value !== 0;
 }
 
 /**

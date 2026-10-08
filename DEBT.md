@@ -96,7 +96,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C162 | A dungeon's `EDBT_DeleteDuplicateTimers` record is not read | S | ⏳ |
 | G28 | The utility's untried form: a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
@@ -221,22 +220,6 @@ the port (`UpdateViewportArea`, `src/renderer/csbwin/OverlayScreen.ts`); `yOverl
 is read nowhere. The 2016 source is the same at both places, so every build stops there
 unless the binary was not built from its source. Paying it: the author plays those squares
 in CSBWin 20230608, and if the game goes on there, ports what that binary draws.
-
-### C162 ⏳ A dungeon's `EDBT_DeleteDuplicateTimers` record is not read
-
-`_ReadEntireGame` sets `deleteDuplicateTimers` from the pool once the databases are read,
-for a new game and a saved one alike: 1 when the pool holds no
-`(EDT_Database << 24) | (EDBT_DeleteDuplicateTimers << 16)` record, else the record's first
-longword (`doc/CSBwin-src/SaveGame.cpp:1965-1975`). `SetTimer` merges a new map timer into
-a matching one only while it is not 0 (`doc/CSBwin-src/Timer.cpp:1011-1053`). The port's
-`TimerQueue.deleteDuplicateTimers` is always true (`src/engine/TimerQueue.ts`), and nothing
-reads the record. CSBWin writes none; a dungeon editor does. 3D2D1D's `dungeon.dat` holds
-one of 0, so CSBWin plays it without the merge; Conflux 3.5's holds 1; no other data set
-here has one.
-
-Paying it: read the record beside `readDisableSaves` (`src/data/CsbwinExpool.ts`), set the
-queue's flag from it, and a tool that queues two matching map timers in 3D2D1D and sees
-both kept.
 
 ---
 

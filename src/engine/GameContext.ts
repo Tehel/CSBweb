@@ -9,7 +9,7 @@
  * `systems` holds the subsystems themselves, so that they call each other directly, as
  * CSBWin's functions do; `host` holds the calls that leave the engine (`GameHost`).
  */
-import { readOverlayPalette } from '../data/CsbwinExpool';
+import { readDeleteDuplicateTimers, readOverlayPalette } from '../data/CsbwinExpool';
 import { noExpectedSignatures, type ExpectedSignatures } from '../data/CsbwinExtendedFeatures';
 import { noRuntimeFileSignatures, type RuntimeFileSignatures } from '../data/FileSignature';
 import type { DungeonData } from '../data/dungeonTypes';
@@ -192,10 +192,12 @@ export interface RulesOptions {
  * A new game's timer table, as `ReadDatabases` sizes it (`doc/CSBwin-src/SaveGame.cpp:2761`,
  * `:2768-2776`, `:2824-2828`): 100 slots, and one more per record of the monster
  * database and of each database from the missiles on, a record count being the file's
- * and `d.Byte7302`'s extra ones together (`DungeonState.addNewGameSpares`).
+ * and `d.Byte7302`'s extra ones together (`DungeonState.addNewGameSpares`). The read
+ * then takes `deleteDuplicateTimers` from the world's `EXPOOL` (`:1965-1975`).
  */
 function newGameTimerQueue(dungeonData: DungeonData): TimerQueue {
   const timers = new TimerQueue();
+  timers.deleteDuplicateTimers = readDeleteDuplicateTimers(dungeonData);
   timers.allocate(100);
   for (let db = 0; db < 16; db++) {
     if (db !== DBType.CREATURE && db < DBType.MISSILE) continue;

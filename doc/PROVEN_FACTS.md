@@ -1539,6 +1539,18 @@ The DSAs go in the Extended Features block, behind the object maps, when `numDSA
 bytes. Conflux's 131 DSAs written so are its file's section, byte for byte, the string's
 tail zero in every description. Evidence: `tools/dump-dsa-save.ts`.
 
+## Every read sets `deleteDuplicateTimers` from an `EXPOOL` record
+
+`deleteDuplicateTimers` is a global, initialised -1 (`doc/CSBwin-src/data.cpp:65`), and
+every game read sets it once the databases are in, a new game's as a save's: 1, "the old
+way", when `Locate` finds no `(EDT_Database << 24) + (EDBT_DeleteDuplicateTimers << 16)`
+record, else the longword `Locate`'s pointer gives, the record's first
+(`doc/CSBwin-src/SaveGame.cpp:1965-1975`). `SetTimer` only tests it against 0
+(`doc/CSBwin-src/Timer.cpp:1014`). Nothing in CSBWin's source writes the record; a dungeon
+editor does, and a save keeps it, the pool being written as it is. 3D2D1D's `dungeon.dat`
+holds one of 0, so a new map timer there never merges into a matching one; Conflux 3.5's
+holds one of 1; no other data set here has one (`tools/dump-delete-duplicate-timers.ts`).
+
 ## A champion bones record is keyed by the bones' slot in the object indirect index
 
 `AddChampionBonesRecord` writes one longword, `fingerprint & 0xffff`, under the key
@@ -5500,8 +5512,9 @@ cloud-timer lookup (`MoveObject.cpp:233-241`) — is first in that order.
 `SetTimer`'s duplicate rules (`Timer.cpp:1011-1125`), with "matches" meaning same `Time()`,
 `Level()` and `timerWord6()` (the square):
 
-- **New map timer (5-10)**, only while `deleteDuplicateTimers != 0` (initialised -1,
-  `data.cpp:65`; a save may set it, `SaveGame.cpp:1965-1975`): the first matching **map timer
+- **New map timer (5-10)**, only while `deleteDuplicateTimers != 0` (which every read
+  sets from the world's `EXPOOL`: see "Every read sets `deleteDuplicateTimers` from an
+  `EXPOOL` record"): the first matching **map timer
   of any function** — a `TT_STONEROOM` only with the same `uByte8` — takes the new `uByte9`
   and is returned; the new one is not queued. Failing that, the first matching `TT_1` is
   deleted — the new `uByte9` becoming `1 - old.uByte9` if it was 2 — and the new one is queued.
