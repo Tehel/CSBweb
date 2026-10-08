@@ -238,16 +238,16 @@ builds around them is its own:
 
 - 40 tools spell out `addCharacterDefaults()`, most inside a champion-building function
   of their own; 145 construct a `DungeonLoader`, most to read `dm-atari/dungeon.dat`.
-- 5 tools stand in for an engine call the UI makes by assigning over the system's method
-  (`executeAttack`, `castSpellFromUi`, `consumeAttackDamageToDisplay`), which nothing
+- 6 tools stand in for an engine call the UI makes by assigning over the system's method
+  (`executeAttack`, `castSpellFromUi`, `consumeAttackDamageToDisplay`, `reincarnateNamed`), which nothing
   types as a stand-in or puts back. Two more hang a stand-in on `Game` itself:
   `dump-hall-of-champions` stores its messages in a property `Game` does not have, and
   `dump-game-events` replaces `reincarnating`. 31 tools extract the UI tables again
   (`graphicsTablesOf(…).ui`) beside the `UIState` that `tools/lib/ui.ts` builds them into.
-- 31 tools make 65 `as unknown as` casts: into the systems' private members
+- 30 tools make 59 `as unknown as` casts: into the systems' private members
   (`DsaSystem`'s `teleportParty`,
   `wiggleEverything`, `stepOrDefer`, `climbDownIntoPit`, `castMagic`, `dispatch`,
-  `dropMissileObject`, …), and to pass partial `UIState` literals (13, in 5 tools); 9
+  `dropMissileObject`, …), and to pass partial `UIState` literals (7, in 4 tools); 9
   more tools reach privates through `as any` (`moveObjectDsa`, `performLocalAction`,
   `doesPartyHave`, `getMissileRecord`, …). `tsc` checks none of them. A renamed member
   leaves the tool compiling, and a write to it then sets a new property: the tool goes on
@@ -258,13 +258,13 @@ Paid in six steps, each tool's whole output byte-identical across every commit
 public, `gameTick` and `lastInputTime` beside `runFrame`, and no tool casts into `Game`.
 
 2. **The partial `UIState` literals** go to `newUIState` (`tools/lib/ui.ts`), or to the
-   tables it holds, one tool per commit. Left: `dump-reincarnate-entry`,
-   `dump-save-menu`, `dump-viewport-click`, `dump-freeze` and `dump-sleep`.
+   tables it holds, one tool per commit. Left: `dump-save-menu`,
+   `dump-viewport-click`, `dump-freeze` and `dump-sleep`.
 3. **Other systems' privates.** Each private a tool drives either becomes public, with
    the reason in its comment, or the tool reaches it through the public path the engine
    uses. One system per commit.
 4. **The stand-ins**: a `tools/lib` helper that replaces a member with a typed stand-in
-   and puts it back, for the five method stand-ins and `Game`'s two. One commit.
+   and puts it back, for the six method stand-ins and `Game`'s two. One commit.
 5. **The stock dungeon and a test champion** as `tools/lib` helpers, and the tools moved
    to them, a few tools per commit.
 6. **What is left**: every remaining cast either goes, or builds a stand-in value the

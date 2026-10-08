@@ -26,9 +26,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { emptyDungeonData } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { Champion } from '../src/engine/gameTypes';
-import type { UITables } from '../src/data/tables/UITables';
 import {
   gridCharacterAt,
   openReincarnateScreen,
@@ -37,36 +37,28 @@ import {
 } from '../src/renderer/ui/ReIncarnate';
 import type { UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 
 /**
- * Just enough `UIState` for the module: it reads `reincarnate`, `uiTables`,
- * `partyState` and the engine's `HallOfChampions.reincarnateNamed`, and calls `onReincarnated`. Standing up the whole renderer would prove nothing
- * extra and would need a browser.
+ * The interface over a game with no dungeon and a party of `championNames`, records with
+ * a name and nothing else: the module reads `reincarnate`, `uiTables`, the party's names
+ * and the engine's `HallOfChampions.reincarnateNamed`, and calls `onReincarnated`. The
+ * engine's half is a stand-in that only notes the name it was given, so the champions
+ * need nothing more.
  */
 interface Harness {
   ui: UIState;
   named: { chIdx: number; name: string; title: string } | null;
 }
 
-function makeHarness(uiTables: UITables, championNames: string[]): Harness {
-  const harness: Harness = { ui: null as unknown as UIState, named: null };
-  const champions = championNames.map((name) => ({ name }) as Champion);
-  harness.ui = {
-    uiTables,
-    partyState: { champions },
-    reincarnate: null,
-    onReincarnated: () => {},
-    ctx: {
-      systems: {
-        hallOfChampions: {
-          reincarnateNamed: (chIdx: number, name: string, title: string) => {
-            harness.named = { chIdx, name, title };
-          },
-        },
-      },
-    },
-  } as unknown as UIState;
+function makeHarness(graphics: GraphicsLoader, championNames: string[]): Harness {
+  const game = newGame(emptyDungeonData(), graphics);
+  for (const name of championNames) game.ctx.party.state.champions.push({ name } as Champion);
+  const harness: Harness = { ui: newUIState(graphics, game.ctx), named: null };
+  game.systems.hallOfChampions.reincarnateNamed = (chIdx, name, title) => {
+    harness.named = { chIdx, name, title };
+  };
   return harness;
 }
 
@@ -88,6 +80,7 @@ function main(): void {
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
   const uiTables = graphicsTablesOf(graphics).ui;
   const special = uiTables.graphic232.specialChars;
+  const gridUI = makeHarness(graphics, []).ui;
 
   /* ---------------------------------------- the tables it needs ------------------ */
 
@@ -112,7 +105,7 @@ function main(): void {
     const cells: string[] = [];
     for (let col = 0; col < 11; col++) {
       const { x, y } = cellCentre(col, row);
-      const code = gridCharacterAt({ uiTables } as unknown as UIState, x, y);
+      const code = gridCharacterAt(gridUI, x, y);
       const label = code === null ? '·' : code === 13 ? 'CR' : JSON.stringify(String.fromCharCode(code));
       cells.push(label);
       if (code !== null) readOut.push(code === 13 ? '\n' : String.fromCharCode(code));
@@ -136,12 +129,12 @@ function main(): void {
   check(punctuation.join('') === ',.;: ', 'and the five SpecialChars follow the alphabet');
 
   // The dead lines between the keys.
-  check(gridCharacterAt({ uiTables } as unknown as UIState, 116, 120) === null,
+  check(gridCharacterAt(gridUI, 116, 120) === null,
     'a click on a vertical grid line hits nothing');
-  check(gridCharacterAt({ uiTables } as unknown as UIState, 120, 125) === null,
+  check(gridCharacterAt(gridUI, 120, 125) === null,
     'and one on a horizontal grid line hits nothing');
   // ...except where the tall carriage-return key crosses one.
-  check(gridCharacterAt({ uiTables } as unknown as UIState, 210, 135) === 13,
+  check(gridCharacterAt(gridUI, 210, 135) === 13,
     'except at x>=207, y=135, which is the carriage-return key');
 
   /* ---------------------------------------- typing a name ------------------------ */
@@ -155,7 +148,7 @@ function main(): void {
   };
 
   {
-    const h = makeHarness(uiTables, ['HALK', 'BORIS']);
+    const h = makeHarness(graphics, ['HALK', 'BORIS']);
     openReincarnateScreen(h.ui, 1);
     show(h, 'opened');
     // CSBWin blanks both fields before the loop (`:55-56`), so nothing is inherited.
@@ -167,13 +160,13 @@ function main(): void {
     check(h.ui.reincarnate?.name === 'ZED', 'lower case is folded to upper (`:246-249`)');
 
     // A leading space is refused in either field (`:259-262`).
-    const h2 = makeHarness(uiTables, ['HALK', 'BORIS']);
+    const h2 = makeHarness(graphics, ['HALK', 'BORIS']);
     openReincarnateScreen(h2.ui, 1);
     type(h2, ' ');
     check(h2.ui.reincarnate?.name === '', 'a leading space is refused');
 
     // Seven characters fill the name and move to the title with no return needed.
-    const h3 = makeHarness(uiTables, ['HALK', 'BORIS']);
+    const h3 = makeHarness(graphics, ['HALK', 'BORIS']);
     openReincarnateScreen(h3.ui, 1);
     type(h3, 'ABCDEFG');
     show(h3, "typed 'ABCDEFG'");
@@ -194,7 +187,7 @@ function main(): void {
       'Return in the title does nothing at all (`:286-288`)');
 
     // The title stops at nineteen.
-    const h4 = makeHarness(uiTables, ['HALK', 'BORIS']);
+    const h4 = makeHarness(graphics, ['HALK', 'BORIS']);
     openReincarnateScreen(h4.ui, 1);
     type(h4, 'ZED');
     reincarnateKey(h4.ui, 'Enter');
@@ -208,7 +201,7 @@ function main(): void {
   console.log('');
   console.log('=== backspace ===');
   {
-    const h = makeHarness(uiTables, ['HALK', 'BORIS']);
+    const h = makeHarness(graphics, ['HALK', 'BORIS']);
     openReincarnateScreen(h.ui, 1);
     reincarnateKey(h.ui, 'Backspace');
     check(h.ui.reincarnate?.name === '' && h.ui.reincarnate?.stage === 1,
@@ -235,7 +228,7 @@ function main(): void {
   console.log('=== OK, and the duplicate-name rule ===');
   {
     // An empty name refuses OK; the title may be empty (`:135-139`).
-    const h = makeHarness(uiTables, ['HALK', 'BORIS']);
+    const h = makeHarness(graphics, ['HALK', 'BORIS']);
     openReincarnateScreen(h.ui, 1);
     reincarnateClick(h.ui, OK.x, OK.y);
     check(h.named === null && h.ui.reincarnate !== null, 'OK is refused while the name is empty');
@@ -250,7 +243,7 @@ function main(): void {
   {
     // The comparison runs against every champion but the last — the last is the one
     // being named, so it can never collide with itself (`:149-155`).
-    const h = makeHarness(uiTables, ['HALK', 'BORIS']);
+    const h = makeHarness(graphics, ['HALK', 'BORIS']);
     openReincarnateScreen(h.ui, 1);
     type(h, 'HALK');
     reincarnateClick(h.ui, OK.x, OK.y);
@@ -267,13 +260,13 @@ function main(): void {
   {
     // Trailing spaces are trimmed before the comparison and before the name is kept
     // (`:143-148`), so "HALK  " is the same name as "HALK".
-    const h = makeHarness(uiTables, ['HALK', 'BORIS']);
+    const h = makeHarness(graphics, ['HALK', 'BORIS']);
     openReincarnateScreen(h.ui, 1);
     type(h, 'HALK  ');
     reincarnateClick(h.ui, OK.x, OK.y);
     check(h.named === null, 'trailing spaces do not sneak a duplicate name past the check');
 
-    const h2 = makeHarness(uiTables, ['HALK', 'BORIS']);
+    const h2 = makeHarness(graphics, ['HALK', 'BORIS']);
     openReincarnateScreen(h2.ui, 1);
     type(h2, 'ZED  ');
     reincarnateClick(h2.ui, OK.x, OK.y);
@@ -282,7 +275,7 @@ function main(): void {
   }
   {
     // The letter grid must reach the same state machine the keyboard does.
-    const h = makeHarness(uiTables, ['HALK', 'BORIS']);
+    const h = makeHarness(graphics, ['HALK', 'BORIS']);
     openReincarnateScreen(h.ui, 1);
     // Z is row 2 col 4 (the third row starts at V), E and D are row 0 cols 4 and 3.
     for (const [col, row] of [[4, 2], [4, 0], [3, 0]] as const) {
