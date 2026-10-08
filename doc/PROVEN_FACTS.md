@@ -193,7 +193,7 @@ It then sets `d.newPartyLevel`, `d.partyX` and `d.partyY` (`doc/CSBwin-src/CSBCo
 and loads nothing: for a moment the party stands at the new x and y on the level it left.
 A pit does the same through `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:3356-3358`). The
 main loop's tick loads the new level first (`LoadPartyLevel`, `CSBCode.cpp:631`), runs
-the timers, loads again if they moved the party (`:640`), and only then draws the viewport
+the timers, loads again if they moved the party (`:645`), and only then draws the viewport
 (`DrawViewport`, `:648`). So no frame ever shows the new square on the old level.
 
 ### Exit Stair Facing (Code11f52.cpp lines 290-325)
@@ -1341,7 +1341,7 @@ tosses for the launch before it tosses for a fireball. `tools/dump-monster-missi
 
 `monsterShouldLaunchMissile` requires `word14_12_15 > 1` *and* either distance above 1 or a
 coin toss (`doc/CSBwin-src/Monster.cpp:1039-1041`) — so a thrower next to you sometimes
-punches instead. The missile is fixed per type (`:1040-1075`): Vexirk and Lord Chaos roll
+punches instead. The missile is fixed per type (`:1044-1079`): Vexirk and Lord Chaos roll
 between a fireball and one of four spells, Slime Devils spit poison, Flying Eyes throw
 lightning seven times in eight, Zytaz alternate poison cloud and fireball, Demons and
 Dragons breathe fire. Everything else has no missile at all: `missile` starts as `RNnul`
@@ -1551,7 +1551,7 @@ keeps its number when the object moves within its cell, since the position is in
 
 `ProcessTT_ViAltar` takes the record with `GetChampionBonesRecord`, a `Read`
 (`doc/CSBwin-src/Timer.cpp:2750`), and does so before it looks at the champion: bones it
-then refuses, their champion alive (`:2794`) or in no wings (`:2775`), stay on the
+then refuses, their champion alive (`:2759`) or in no wings (`:2775`), stay on the
 floor with no record, and a later offering reads their `value` as the champion's index
 (`:2788`). `tools/dump-vi-altar.ts` section 3b stages it. `DropObject`, `DescribeObject` and
 `DrawNameOfHeldObject` copy it with `CopyChampionBonesRecord`, a `Locate`
@@ -1684,7 +1684,7 @@ every record of `dungeon.dat`.
 - **`RN::DescIndex`** (`doc/CSBwin-src/data.cpp:569-601`) returns -1 for `RNempty`, which is
   **0x0000** (`doc/CSBwin-src/CSBTypes.h:255`) — not `RNnul` (0xffff, `:244`) nor `RNeof`
   (0xfffe, `:243`). Those two fall to the `default` arm anyway, since their `dbType()` is
-  15. A chest's row is `BITS1_2(word4) + objDI_Chest` (`:617`), not a constant 1; a
+  15. A chest's row is `BITS1_2(word4) + objDI_Chest` (`data.cpp:583-584`), not a constant 1; a
   scroll's is `objDI_Scroll` without reading the record at all.
 - **`GetBasicObjectType`** (`doc/CSBwin-src/CSBCode.cpp:1255-1268`) tests `RNnul` itself,
   then answers `objNI_NotAnObject` (0xff) for a -1 row, else `d.ObjDesc[row].objectType()`.
@@ -1888,7 +1888,7 @@ connects at all with `Quickness` — dexterity, stamina and load — against the
 `dexterity12` plus `random(32)` plus the level's experience multiplier, less 16
 (`:601-607`). **Mastery is not in that comparison.** It enters only afterwards, twice: via
 `DetermineThrowingDistance`'s `2 * mastery` term (`doc/CSBwin-src/Character.cpp:2421`) and
-a flat `+10` when `random(64) < mastery` (`:891-897`).
+a flat `+10` when `random(64) < mastery` (`Attack.cpp:867-872`).
 
 Measured with `tools/dump-player-attacks.ts`, 300 SWINGs each at the same Worm group on
 level 3: a champion at skill-4 mastery 4 landed 213 blows for 798 damage; one at mastery 8
@@ -2985,7 +2985,7 @@ The port: `src/data/FileSignature.ts`, `readRuntimeFileSignatures`
 - **Zeros at every start.** `RN`'s default constructor sets `0xffff`
   (`doc/CSBwin-src/CSBTypes.h:306`), but `DBank`'s own constructor, which runs after its
   members', does `memset (this,0,sizeof (*this))` (`doc/CSBwin-src/CSBCode.cpp:324-327`),
-  and so does `DBank::Initialize` (`:323-330`), called at each start and restart
+  and so does `DBank::Initialize` (`:333-340`), called at each start and restart
   (`:11540`, `:11591`, `Code1f9e6.cpp:309`). So a never-filled slot's thirty possessions
   are RN 0, not `RNnul`. Every committed save with fewer than four champions holds 800
   zero bytes in each slot past the party.
@@ -3196,7 +3196,7 @@ Two places put bytes there:
 
 - `GameTimers::Allocate` grows the array and `memset`s each **new** slot to 0
   (`doc/CSBwin-src/Timer.cpp:678-683`).
-- `SetTimer` fills a slot with `memcpy(A0, A1, sizeof(TIMER))` (`:1132`) from the
+- `SetTimer` fills a slot with `memcpy(A0, A1, sizeof(TIMER))` (`:1133`) from the
   caller's `TIMER`, whose constructor assigns **0xcd** to `m_timerSequence`, the five
   `m_timerUByteN`, `m_timerLevel` and all three of `unused13`
   (`doc/CSBwin-src/CSB.h:1868-1879`). Every other one of those is overwritten before the
@@ -3293,7 +3293,7 @@ original bytes to preserve.
 | --- | --- | --- |
 | `DB0` door | `word2` bits 9-15, marked `????` (`:825-832`) | no |
 | `DB1` teleporter | the low byte of `word4`; only `destLevel()` = bits 8-15 is named (`:866-873`) | no |
-| `DB2` text | `word2` bits 1-2, between `show()` and `index()` (`:1003-1017`) | no |
+| `DB2` text | `word2` bits 1-2, between `show()` and `index()` (`:890-901`) | no |
 | `DB4` creature | `word14` bits 4, 7 and 15 (`:1099-1142`) | **yes** — `creature[38]` of `dungeon.dat` holds `word14 = 0x490`, bits 4, 7 and 10 |
 | `DB6` clothing | `word2` bits 14-15 (`:1179-1195`) | no |
 | `DB7` scroll, 4-byte form | `word2` bits 10-15, the old `b10_15()` (`:1202-1209`) | **yes** — bit 10 |
@@ -3534,7 +3534,7 @@ or the header's word 2 when that is 0 (`:2624-2631`). The word goes through `LE1
 byte swap on the little-endian build, so it is big-endian, as `WriteAndChecksum` writes
 it (`:1320`). `StreamInput` fails when fewer bytes remain than it is asked for
 (`CSBCode.cpp:9132-9148`), so one stray byte after the cell flags is no word either. A
-mismatch returns 0, and `_ReadEntireGame` goes to `tag01efee` (`:1758-1759`). The port
+mismatch returns 0, and `_ReadEntireGame` goes to `tag01efee` (`SaveGame.cpp:1911-1912`). The port
 throws "dungeon image checksum mismatch" from `DungeonLoader`
 (`tools/dump-image-checksum.ts`).
 
@@ -3701,7 +3701,7 @@ Features block. The key is `simple[0] = 1; simple[1] = 0; RC4_prepare_key(simple
 one byte, the second never read (`doc/CSBwin-src/SaveGame.cpp:328-331`, and `SaveGame`'s
 at `:941-944`). `ReadExtendedFeatures` deciphers the 512 bytes it has read at position 0
 when they do not open with the sentinel, and marks the file enciphered if they then do
-and carry the flag (`:324-338`); from there `READ` deciphers every buffer by its position
+and carry the flag (`:326-340`); from there `READ` deciphers every buffer by its position
 in the file (`doc/CSBwin-src/system.cpp:301-313`), and `WRITE` enciphers the same way
 (`:315-329`). The whole file is enciphered, the block included.
 
@@ -4081,7 +4081,7 @@ for a retyped row is the type it had. `tools/dump-action-name-filter.ts`.
 `_FeedCharacter` works out what the object on the cursor is worth into a `FEEDPARAMETERS`
 block (`doc/CSBwin-src/Character.cpp:3953-4014`, `:4049-4302`) and then, before anything
 changes, runs every type-47 actuator at `ESL_FEEDINGFILTER`'s location (1, `CSB.h:1539`),
-each with `continue` (`:4302-4358`): the count is `sizeof(fp) / 4`, 27, and the words are
+each with `continue` (`:4305-4361`): the count is `sizeof(fp) / 4`, 27, and the words are
 the block's 27 longwords in the struct's order, a `bool32` as 1 or 0, copied in before each
 DSA and back after it (`:4350-4353`), so each DSA sees the block the one before left. The
 feeding then does what the block says, `performFeeding` first (`:4367`). The block's
@@ -4100,7 +4100,7 @@ sets a waterskin's two bits (`CSB.h:1277`), so an empty one emptied again holds 
 `ESL_CURSORFILTER`'s location (9, `CSB.h:1547`), each with `continue`: the count is
 `sizeof(*cfp) / 4`, 6, and the words are `CURSORFILTER_PACKET`'s six `int`s, `object`,
 `type`, `p1` to `p4` (`CSB.h:1520-1529`), copied in before each DSA and back after it
-(`:861-864`), so each DSA sees the packet the one before left. The constructor sets
+(`:846-849`), so each DSA sees the packet the one before left. The constructor sets
 `object` to `RNnul` and the rest to 0 (`:790-795`); `object` is `ConvertToInteger`'s
 `ui16` (`CSBTypes.h:377`). The types are `CURSORFILTER_TYPE`'s (`CSB.h:1398-1517`); a site
 that can be cancelled tests `type` against `CURSORFILTER_Cancel` (20) once the filter
@@ -4272,15 +4272,15 @@ where the record stands, through `Locate`'s pointer (`:978-997`). A genuine CSBW
 carries these records: `csbgame7.dat` has 45 Mummies killed by damage.
 
 Then every type-47 actuator at `ESL_DELETEMONSTERFILTER`'s location (7, `CSB.h:1545`) runs,
-on parameters of their own, one `NEWDSAPARAMETERS` for the function (`:943`), each with a
-count of 8 and the block in the class's order (`:1014-1015`, `CSB.h:2999-3006`):
+on parameters of their own, one `NEWDSAPARAMETERS` for the function (`:963`), each with a
+count of 8 and the block in the class's order (`:1046-1047`, `CSB.h:2999-3006`):
 `monsterID`, `level`, `x`, `y`, `why`, `dropResidue`, `deathCloud`, `index`. The whole block
-comes back (`:1017`), and the next DSA sees it as the last one left it.
+comes back (`:1049`), and the next DSA sees it as the last one left it.
 
 Two fields are read back. `deathCloud` 2 shows no death cloud (`:1149`, `:1159`, `:1293`).
 `dropResidue` is read two ways: `DropMonsterRemains` gets `dropResidue < 2`, so 0 and 1
 drop and 2 and 3 do not (`:1150`, `:3200`, `:3341`, `Character.cpp:283`), while a member other than the
-last drops its remains for anything but 2 (`:1307`), so 3 drops them there. The fusion reads
+last drops its remains for anything but 2 (`Code11f52.cpp:1166`), so 3 drops them there. The fusion reads
 neither. `tools/dump-delete-monster-filter.ts`.
 
 ## The monster move filter has a location per level, and runs its first DSA before a turn
@@ -4336,7 +4336,7 @@ down, as `pmmr`, through `InitialChecks` and the turn's helpers to every `MoveOb
 `CheckMoveFromMissile` and `ProcessMissileEncounter` the turn calls, and three places
 change `finalLocr` when the object they handle is `pmmr->objMonster`:
 `AddObjectToRoom` sets it to the loaded level and the square (`Code11f52.cpp:467-470`), or
-to `(-1, 0, 0)` when `mapX < 0` (`:487-490`); `RemoveObjectFromRoom` sets `(-1, 0, 0)`
+to `(-1, 0, 0)` when `mapX < 0` (`:521-524`); `RemoveObjectFromRoom` sets `(-1, 0, 0)`
 (`CSBCode.cpp:5250-5253`); and `MoveObject`, when the fall killed the group or the level
 refuses its type, sets `MoveObject_NotAllowedOnLevel` (50) and `finalLocr.l = -1`
 (`Code11f52.cpp:3187-3191`) before `DeleteMonster` lifts it. A group the turn kills or
@@ -4461,7 +4461,7 @@ Both calls of `CheckMonsterVersusMissiles` pass the group's whole positions byte
 `pI16A2->positions()` (`Monster.cpp:3896`, `:3974`), and the scan skips every missile with
 `objD6.pos() != position` (`:4491`). `RN::pos()` is `(dataTypeMap[…] >> 4) & 3`
 (`CSBTypes.h:337-341`), 0 to 3, so a byte with any of bits 2-7 set meets no missile: a lone
-monster spread over its cell (`positions() = 0xff`, `:3869`) never does, nor one whose byte
+monster spread over its cell (`positions() = 0xff`, `:3870`) never does, nor one whose byte
 still holds a second member's corner. Evidence: `tools/dump-missile-monster.ts` scenario 6.
 
 ## Torches burn down every 512 ticks, and a recruit's does not
@@ -4858,7 +4858,7 @@ creature records in `dm-atari/dungeon.dat` sets any of bits 11-14. Evidence:
 
 `DrawWallDecoration` draws a text's words only on the wall in front of the party
 (`relativePosition == 12`, `doc/CSBwin-src/CSBCode.cpp:3306-3351`). A line is the bytes
-up to one of 128 or more, 18 at most (`:3333-3336`), at `x1 = 112 - 4*length`,
+up to one of 128 or more, 18 at most (`:3329-3332`), at `x1 = 112 - 4*length`,
 `y2 = d.Byte4196[line]` (48, 59, 75, 86), `y1 = y2 - 7`, each glyph 8 pixels on. Each
 byte is one `TAG0088b2(font, viewport, &rect, 8*code, 0, 144, 112, 10)` (`:3339-3346`)
 from graphic 120, 288x8: 36 glyphs. `TAG0088b2` addresses its source as
@@ -5361,7 +5361,7 @@ It runs from `QuitPressingEye` and `QuitPressingMouth` (`doc/CSBwin-src/CSBCode.
 and from `DrawCharacterState` when the champion's `CHARFLAG_chestOrScroll` (0x0800,
 `doc/CSBwin-src/CSB.h:2528`) is set with their inventory open, the mouth and the eye not held
 (`Character.cpp:1483-1502`). `DrawCharacterState` returns at once with no graphic flag set
-(`:1255`) and clears them all as it ends (`:1519`). What sets the flag:
+(`:1256`) and clears them all as it ends (`:1519`). What sets the flag:
 
 - `AdjustStatsForItemCarried`, for any champion, when the object in that slot gives a bonus
   (`Character.cpp:1784`);
@@ -5583,7 +5583,7 @@ flying monster takes the stairs too.
 
 `objD7.pos(p)` changes the object itself, not a copy: `RN::pos(p)` writes the corner into the
 global `dataTypeMap` entry for the RN's indirect index (`CSBTypes.h:342-347`), and `RN`
-equality compares only that index (`:349-356`, `IsSameObjectAs` `:368-371`). So does an
+equality compares only that index (`:355-362`, `IsSameObjectAs` `:368-371`). So does an
 integer compare: `ConvertToInteger` returns the indirect index (`:377`), as in the DSA's
 `&DEL` (`DSA.cpp:1691`). No compare in CSBWin sees a corner. The port's ID carries the corner,
 so its chain walkers compare with `rnEquals`, and a group the stairs turned is set down under
@@ -5726,7 +5726,7 @@ empty first. After `AdjustStatsForItemCarried(pcA3, place, +1, object)` (`:1975`
   `open(true)` (`:1986-1991`);
 - slot 0 or 1, a torch named `objNI_Torch_a`: `litTorch(1)` (`:1993-1999`). An unlit torch
   always reads `_a`; a lit one reads `_a + d.Byte640[charges]` (`data.cpp:640-646`);
-- slot 10, an Illumulet: `value(1)` and `d.Brightness += d.Word1074[2]` (`:2015-2023`); a
+- slot 10, an Illumulet: `value(1)` and `d.Brightness += d.Word1074[2]` (`:2016-2024`); a
   Jewel Symal: `value(1)` (`:2027-2033`).
 
 Unlike the removal it repacks no chest: a chest or scroll going into the open inventory's
@@ -6182,7 +6182,7 @@ and deletion; and a loaded game runs every timer due by its first tick,
 `KillCharacter` sets `d.GameIsLost` when no champion is left
 (`doc/CSBwin-src/Character.cpp:2685`). The tick that follows, or the one it happens in, runs
 its timers as usual; then `if (d.GameIsLost == 0)` (`doc/CSBwin-src/CSBCode.cpp:668`) guards
-everything from `d.Time++` to the mouse queue, and `MainLoop` returns (`:777-778`) without
+everything from `d.Time++` to the mouse queue, and `MainLoop` returns (`:787-788`) without
 `d.Time` moving on. `_StartCSB` sets `d.DynamicPaletteSwitching = 0` and calls
 `ShowCredits(_3_, d.GameIsLost)` (`:11557-11561`). Nothing turns the switching back on:
 the VBL restores it from `d.Word11740` only while `d.ViewportUpdated` is set (`:916-919`),

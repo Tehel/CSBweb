@@ -10,7 +10,7 @@
  *    `doc/CSBwin-src/Timer.cpp:1712`, `OperateCounterActuator`, `:1609`, `:1624`): a counter
  *    after the DSA on the square counts the way the DSA made the message mean, and a 3
  *    ends the square. `&MODIFYMESSAGE` caps an action at 3, unsigned (`DSA.cpp:4936-4944`).
- * 3. **A pit reads it after the square's DSAs** (`ProcessTT_PITROOM`, `:2527-2551`): a SET
+ * 3. **A pit reads it after the square's DSAs** (`ProcessTT_PITROOM`, `Timer.cpp:2526-2550`): a SET
  *    the DSA makes a TOGGLE closes an open pit.
  * 4. **So does a teleporter, twice** (`ProcessTT_TELEPORTER`, `:2390-2414`): its TOGGLE
  *    writes SET into `uByte9`, which is read through the modifier again, so a SET the DSA

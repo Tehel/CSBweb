@@ -133,7 +133,7 @@ per tick: `delta = TextTimeout - d.Time`, then
 `delta = (delta*(oldSpeed+1) + newSpeed)/(newSpeed+1)` (`CSBCode.cpp:1608-1619`). Sleep calls
 it with `(d.Speed, 0)` (`Mouse.cpp:1835`), `WakeUp` with
 `(d.Speed, speedTable[gameSpeed].vblPerTick)` (`CSBCode.cpp:7112`), and the top of every tick
-while awake with the same arguments (`:621-625`). At the default `SPEED_NORMAL`, 15 VBLs per
+while awake with the same arguments (`:622-626`). At the default `SPEED_NORMAL`, 15 VBLs per
 tick (`data.cpp:276`, `CSBwin.cpp:181`), falling asleep multiplies what is left of each
 timeout by 16, and waking divides it by 16, rounding up.
 

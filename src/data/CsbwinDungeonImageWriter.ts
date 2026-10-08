@@ -233,7 +233,7 @@ export function buildIndirectTextIndex(indirectTextIndex: readonly number[]): Ui
  *
  * The size is one **little-endian** longword, for the same reason as block 11: it goes
  * out through `BE32` (`doc/CSBwin-src/SaveGame.cpp:1279-1284`). The text words that
- * follow are written with **no swap at all** (`:1200`) — they are the Atari-era 5-bit
+ * follow are written with **no swap at all** (`:1289-1292`) — they are the Atari-era 5-bit
  * text array, which is never swapped on the way in either, so they are big-endian in
  * memory and big-endian in the file.
  */

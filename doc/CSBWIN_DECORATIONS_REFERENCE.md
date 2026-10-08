@@ -49,7 +49,7 @@ visible, and CSBWin picks which part with `srcOffsetX` (`:3599-3623`):
 - position **9** runs off the *right* edge, shows its **left** end, `srcOffsetX = 0`;
 - position **7** runs off the *left* edge, shows its **right** end, so
   `srcOffsetX = finalBitmapWidth - (pWDP->rect.x2 - pWDP->rect.x1)` — CSBWin's comment is
-  "Jst ahead to the left. Truncate graphic" (`:3612`). The window then finishes exactly on
+  "Jst ahead to the left. Truncate graphic" (`:3608`). The window then finishes exactly on
   the bitmap's last column.
 
 Getting position 7 wrong is visible as a decoration cropped on the wrong side *and*

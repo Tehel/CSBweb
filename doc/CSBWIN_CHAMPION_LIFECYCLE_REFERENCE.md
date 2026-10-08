@@ -20,7 +20,7 @@ The three are not interchangeable, and which one a piece of code touches is the 
 point:
 
 - **Current** is what gameplay reads: `MaxLoad` (`Code11f52.cpp:4324`), `Quickness`
-  (`Character.cpp:2225`), throwing distance (`:2341`), the armour term (`:2443`),
+  (`Character.cpp:2225`), throwing distance (`:2283`), the armour term (`:2443`),
   spell success (`Magic.cpp:1225`, `Code17818.cpp:218`), `IsCharacterLucky` (`:2193`),
   and the attribute-scaled damage reduction `TAG016426` (`:2052`).
 - **Maximum** is what a **level gain** raises — `LevelUp` calls `IncrMaximum` and never

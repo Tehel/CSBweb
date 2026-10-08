@@ -893,7 +893,7 @@ export function readRulesOptions(
  * **What a read gave.** `graphicsSignature1/2` and `csbGraphicsSignature1/2` are
  * `expectedGraphicSignature*` (`:961-964`), the last block read's (`ExpectedSignatures`),
  * which `Graphics.cpp:1810-1820` treats as "no expectation" when both halves are zero.
- * `hintKey` is the world's file's (`:956`), `Hint.cpp`'s key, and `hintKey[0] == 0` is
+ * `hintKey` is the world's file's (`SaveGame.cpp:966`), `Hint.cpp`'s key, and `hintKey[0] == 0` is
  * its own "no key" test (`doc/CSBwin-src/Hint.cpp:6252`). All five are zero in every
  * committed save.
  *

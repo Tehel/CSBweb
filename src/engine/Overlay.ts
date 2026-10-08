@@ -241,7 +241,7 @@ export class Overlay {
 
   /**
    * `currentOverlay.Cleanup()` at the start of `_ReadEntireGame` (`doc/CSBwin-src/SaveGame.cpp:1573`),
-   * then `ReadExtendedFeatures`' overlay (`:421-430`), for a new game's `dungeon.dat` as
+   * then `ReadExtendedFeatures`' overlay (`:425-438`), for a new game's `dungeon.dat` as
    * for a save. A file without the block leaves `overlayActive` as it was. With one, the
    * flag sets it, and an overlay it names is selected again, which draws it whatever the
    * flag said; its end, saved as a `d.Time`, comes back as one, for `d.Initialize()` has

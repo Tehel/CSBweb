@@ -26,7 +26,7 @@
  * - `_TAG019fac` flashes the attack menu's PASS `(0x11d, 0x13f, 0x4d, 0x53)` and its three
  *   options `(0xea, 0x13e, 0x56, 0x60)`, `(…, 0x62, 0x6c)`, `(…, 0x6e, 0x78)`, each before its
  *   `ExecuteAttack` (`Character.cpp:4694-4734`). The attack's tick draws the option
- *   inverted, and the next VBL puts it back; a PASS brings no tick, and `:764`'s wait puts
+ *   inverted, and the next VBL puts it back; a PASS brings no tick, and `CSBCode.cpp:773`'s wait puts
  *   it back. An attack key flashes its row as the click would.
  * - `vblFlashButn` flips bit plane 2 over the rectangle, corners included (`VBL.cpp:60-122`),
  *   which is bit 2 of the pixel's index (`WinScreen.cpp:314-330`).

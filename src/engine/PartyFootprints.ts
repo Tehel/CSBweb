@@ -5,7 +5,7 @@
  * (`doc/CSBwin-src/Data.h:796`) and the three functions that maintain them:
  * `AddFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4381`), `DeleteFootprintEntry`
  * (`:4357`), and `SearchFootprints` (`doc/CSBwin-src/CSBCode.cpp:7125`). The trail is
- * appended to on every party move (`:3281-3308`).
+ * appended to on every party move (`Code11f52.cpp:3260-3282`).
  *
  * Two consumers: `GetBestMonsterFacingP1` sniffs it to decide which way to turn when
  * it cannot see the party (`doc/CSBwin-src/Monster.cpp:617-627`), and the Magic

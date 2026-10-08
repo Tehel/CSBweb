@@ -565,7 +565,7 @@ export interface DungeonData {
     /**
      * `hintKey`, the Extended Features block's eight bytes (`doc/CSBwin-src/SaveGame.cpp:384`),
      * the key the Hint Oracle deciphers `hcsb.hct` under. Unset for a file without a
-     * block, for which `ReadExtendedFeatures` leaves it zeroed (`:314`).
+     * block, for which `ReadExtendedFeatures` leaves it zeroed (`:316`).
      */
     hintKey?: Uint8Array;
     /**

@@ -172,7 +172,7 @@ function drawWallDecorationGraphic(
   //   - position 9 (F2 front-right) runs off the *right* edge, so it shows its left
   //     end and the offset is 0;
   //   - position 7 (F2 front-left) runs off the *left* edge, so it must show its
-  //     **right** end — CSBWin's "Jst ahead to the left. Truncate graphic" (`:3612`).
+  //     **right** end — CSBWin's "Jst ahead to the left. Truncate graphic" (`:3608`).
   //
   // Without this, position 7 drew its left end into a slot flush against the left
   // border: cropped on the wrong side, and with the transparent margin that should

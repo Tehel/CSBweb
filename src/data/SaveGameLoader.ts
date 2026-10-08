@@ -159,7 +159,7 @@ export interface SaveGameState {
  * `GAMEBLOCK1`'s own fields: the 512 bytes less `Byte740`, which `ScrambleAndWrite`
  * overwrites, and the ten hashes and checksums of blocks 2-6
  * (`doc/CSBwin-src/SaveGame.cpp:61-105`). `SaveGame` fills them from `d.` at
- * `:1073-1079` and `:1097`, and `LoadGame` reads them back at `:1728-1738` and
+ * `:1083-1089` and `:1097`, and `LoadGame` reads them back at `:1728-1738` and
  * `:2063-2085`.
  *
  * `swapBlock1` byte-swaps `RandomGameID`, the hashes, the checksums, `Word22594` and
@@ -853,7 +853,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   const timerQueueChecksum = genChecksum(timerQueue, timerQueueHash, timerQueue.length / 2);
 
   // `SaveGame` memsets the block (`doc/CSBwin-src/SaveGame.cpp:881-882`) and fills it
-  // from `d.` (`:1073-1087`); `swapBlock1` then turns the fields it lists big-endian
+  // from `d.` (`:1083-1097`); `swapBlock1` then turns the fields it lists big-endian
   // and leaves `SaveOption` and `totalMoveCount` native (see `Block1`).
   const b1 = save.block1 ?? emptyBlock1();
   const block1Plain = new Uint8Array(BLOCK1_SIZE);

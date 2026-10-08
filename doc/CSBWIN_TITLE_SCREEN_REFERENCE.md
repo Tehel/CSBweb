@@ -349,7 +349,7 @@ just two colours:
 ```
 00..............      0  = the outline
 040.............      4  = the body
-0440............      .  = colour 12, transparent (`Flood(d.CursorBitmap, 12, …)`, `:2309`)
+0440............      .  = colour 12, transparent (`Flood(d.CursorBitmap, 12, …)`, `:2307`)
 04440...........
 ```
 
