@@ -54,7 +54,7 @@ const CHARACTERS_SIZE = 3328;
  * Only CSBWin's own form is read, the one whose `GAMEBLOCK1` unscrambles with word 29
  * (`wordGear(A4+2) == 2`). `_ReadSavedGame` falls back to word 10 (`:2966-2981`), but
  * a block that unscrambles only with it stops CSBWin in `NotImplemented(0x1868)`
- * (`:2984-2999`); the port calls the file damaged (`DEBT.md` C161).
+ * (`:2984-2999`); the port calls the file damaged (`DEBT.md` H).
  */
 export interface UtilityGame {
     /** `A4+38`: `GAMEBLOCK1`, plain. */

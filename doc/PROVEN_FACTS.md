@@ -3552,6 +3552,13 @@ blocks as the file holds them, unscrambled but not byte-swapped.
   party it is message 29, and a champion with no name, or two whose names compare
   equal with `strcmp`, is message 20 (`_CheckChampionNames`, `:1774-1812`). `mini.dat`
   must have `Byte22596` 2 or more and `Word22592` 13 (`_TAG0026c4`, `:3243-3259`).
+- **Only the word-29 form reads.** `_ReadSavedGame` unscrambles `GAMEBLOCK1` with its
+  word 29 as the hash and, if the sum fails, with word 10 (`UnscrambleBlock1`,
+  `:1673-1710`; `:2955-2981`). A block that only word 10 opens sets `word_0002` to 1,
+  whose reader is compiled out: `NotImplemented(0x1868)` shows a message box and ends
+  the program (`:2984-2999`, `system.cpp:177-190`). `ScrambleAndWrite` zeroes words
+  0-126, words 10 and 29 among them (`SaveGame.cpp:714-759`), so a save CSBWin wrote
+  opens with either. The port refuses the word-10 form with message 14 (`DEBT.md` H).
 - **The copy.** Into `mini.dat`'s record go `GAMEBLOCK1` bytes 256-295 and `Word22594`
   of the saved game, its `RandomGameID` plus one, its 3200 bytes of `CHARDESC`s and its
   champion count (`gb2.numcharacter`); everything else is `mini.dat`'s, the party's

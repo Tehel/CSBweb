@@ -95,7 +95,6 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C157 | CSBWin 20230608 becomes the reference | L | ⏳ |
-| C161 | A saved game that unscrambles only with word 10 stops CSBWin's utility, and the port calls it damaged | S | ⏳ |
 | G28 | The utility's untried form: a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
@@ -224,22 +223,6 @@ is read nowhere. The 2016 source is the same at both places, so every build stop
 unless the binary was not built from its source. Paying it: the author plays those squares
 in CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
-### C161 ⏳ A saved game that unscrambles only with word 10 stops CSBWin's utility, and the port calls it damaged
-
-`_ReadSavedGame` unscrambles `GAMEBLOCK1` with word 29 and, if that fails, with word 10
-(`doc/CSBwin-src/Chaos.cpp:2966-2981`). A block that only word 10 opens sets
-`word_0002` to 1, and CSBWin then stops in `NotImplemented(0x1868)`, whose message box
-ends the program (`:2984-2999`, `system.cpp:177-190`): the code that read that form,
-`impReadSavedGame`, is defined nowhere. `TAG00260e` and `TAG002724` stop the same way on
-it (`imp260e`, `:3215-3228`; `alternateFormat`, `:3314-3334`), past the first stop.
-The port reads only the word-29 form, so `ReadSavedGame` reports such a file as
-damaged, message 14 (`src/engine/Chaos.ts`).
-
-Paying it: `ReadSavedGame` stops where CSBWin does, through the page's
-`notImplemented`, as `UpdateViewportArea` does (`src/renderer/csbwin/OverlayScreen.ts`),
-and `tools/dump-new-adventure.ts` checks it on a block scrambled with word 10. No file of
-that form is here, so the check builds one.
-
 ### CSBWin's changes from 2016 to 2023
 
 `doc/CSBwin-src/` is `CSBwin_SRC_20230608.7z` from dianneandpaul.net/CSBwin/, the main
@@ -252,7 +235,7 @@ behaves as 15.8. It is gitignored, in git history as `doc/CSBwin-src/`, and stay
 C157's review list is worked through.
 
 Every change between the two that alters what the port has is ported, but for the
-utility's stop on a word-10 saved game (C161) and one change not taken, below. The rest
+utility's stop on a word-10 saved game (`DEBT.md` H) and one change not taken, below. The rest
 changes nothing the port has: the 64-bit port (`uintptr_t`, and typed structs in
 `Chaos.cpp` and `Hint.cpp`, whose allocator fixes are in code the port never had),
 `TranslateLanguage` hooks (G21), the playfile (G29), and the Linux and Raspberry Pi
@@ -792,6 +775,20 @@ Recorded so that nobody "fixes" them.
   nowhere; the author's decision is to keep it all the same. The port keeps
   `CHARFLAG_male` and clears the rest, as the mask reads (`TAG002724`,
   `src/engine/Chaos.ts`; `tools/dump-new-adventure.ts`).
+- 🚫 **A saved game the utility cannot read is damaged, not the program's end.**
+  `_ReadSavedGame` unscrambles `GAMEBLOCK1` with word 29 and, if that fails, with word 10
+  (`doc/CSBwin-src/Chaos.cpp:2966-2981`). A block that only word 10 opens sets
+  `word_0002` to 1, and CSBWin then stops in `NotImplemented(0x1868)`, whose message box
+  ends the program (`:2984-2999`, `system.cpp:177-190`): the code that reads that form,
+  `#ifdef impReadSavedGame`, is in no build, and `TAG00260e` and `TAG002724` stop the
+  same way on it past the first stop (`#ifdef imp260e`, `:3215-3228`; `#ifdef
+  alternateFormat`, `:3314-3334`). CSBWin's own saves zero words 10 and 29 alike
+  (`ScrambleAndWrite`, `SaveGame.cpp:714-759`), so they open with either. A page cannot
+  end itself, and the author's decision is that a refusal is better than nothing: the
+  port reads only the word-29 form, and `ReadSavedGame` refuses any other with the
+  utility's message 14, "SAVED GAME ERROR" (`src/engine/Chaos.ts`).
+  `tools/dump-new-adventure.ts` builds such a block from `csbgame7.dat` and checks the
+  refusal.
 - 🚫 **A champion who dies in hand is put down on nobody.** `KillCharacter` does not end a
   change of the marching order, and `TAG0025a6` then writes the dead champion's facing and
   position to `d.CH16482[-1]`, outside the champions (`doc/PROVEN_FACTS.md` → "Changing
