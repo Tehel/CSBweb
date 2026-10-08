@@ -99,7 +99,7 @@ import { basename, resolve } from 'node:path';
 
 import { CsbRandom } from '../src/core/random';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
+import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { readCsbwinSaveInfo } from '../src/data/CsbwinSaveInfo';
 import {
@@ -134,8 +134,7 @@ import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { holdsNoBlock1Words, loadSaveGameState, stampRandomGameID } from '../src/data/SaveGameLoader';
 import { ReadSavedGame, TAG00260e } from '../src/engine/Chaos';
 import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
-import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
-import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
+import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import {
   MENU_HEIGHT,
   MENU_OPTION_COLOR,
@@ -187,18 +186,9 @@ function graphicBitmaps(graphics: GraphicsLoader): (graphicNum: number) => Index
   };
 }
 
-/** Enough of a `UIState` to run the menu's drawing into a buffer. */
+/** The interface over a game with no dungeon, to run the menu's drawing into its screen. */
 function makeDrawingUI(graphics: GraphicsLoader): UIState {
-  const ui = {
-    screenIndexBuffer: createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0),
-    fontData: loadFontData(graphics),
-    uiTables: graphicsTablesOf(graphics).ui,
-    getGraphicBitmap: graphicBitmaps(graphics),
-    renderLastFrame(): void {
-      /* nothing to present in a tool */
-    },
-  };
-  return ui as unknown as UIState;
+  return newUIState(graphics, newGame(emptyDungeonData(), graphics).ctx, { getGraphicBitmap: graphicBitmaps(graphics) });
 }
 
 function pixelAt(ui: UIState, x: number, y: number): number {
