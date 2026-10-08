@@ -1638,8 +1638,10 @@ export class AttackSystem {
    * *first* drop of a controlled descent costs stamina instead of blood. Only the
    * first: the flag is cleared by the fall itself, so a rope onto a stack of pits
    * still hurts for every pit after the one climbed into.
+   *
+   * Public so that `tools/` can climb down without a rope and an attack.
    */
-  private climbDownIntoPit(target: Position): void {
+  climbDownIntoPit(target: Position): void {
     const party = this.ctx.party.state;
     const worldMove = this.ctx.systems.worldMove;
     worldMove.withSupressedPitDamage(() =>

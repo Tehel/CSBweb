@@ -238,8 +238,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   // `whoLeavesNewCell[tailPosLeft]` (`Code11f52.cpp:2675-2695`).
   const fireball = launch(game, pit, (facing + 3) & 3);
   log.length = 0;
-  const climb = game.systems.attack as unknown as { climbDownIntoPit(target: Position): void };
-  climb.climbDownIntoPit(pit);
+  game.systems.attack.climbDownIntoPit(pit);
   tick(game, log);
   compare('2. the climb down', log, [`missile ${at(from)}->${at(pit)}`, ...fallTail(from, below)]);
   check(!inCell(game, pit, fireball), 'the fireball in the pit\'s square is met by the second half-step');
