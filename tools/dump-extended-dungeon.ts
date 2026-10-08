@@ -14,6 +14,12 @@
  * `DM_rules` from `DMRulesOption` (`:392-398`), at boot and after a lost game, and a file
  * with no block leaves them.
  *
+ * And CSBWin 20230608's three flags (`SupressDSAWarning`, `GravityGame`, `ThreeDMovements`,
+ * `doc/CSBwin-src-20230608/SaveGame.cpp:415-430`): 3D2D1D sets the last two, which a save
+ * keeps (`DEBT.md` H → "A save keeps the dungeon's three 2023 flags") and a load takes back;
+ * a block alone sets the first, and a file with no block clears it and leaves the others
+ * (`:312`).
+ *
  * And a compressed body behind a block, which no shipped file has: a block built with
  * `buildExtendedFeaturesPrefix` in front of CSB's compressed `dungeon.dat` reads as CSB's
  * own, the body taken from byte 8 plus the block's size (`:2362-2369`). The `'@'` case,
@@ -26,9 +32,15 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
-import { buildExtendedFeaturesPrefix, EF_FLAGS, type ExtendedFeaturesBlock } from '../src/data/CsbwinExtendedFeatures';
+import {
+  buildExtendedFeaturesPrefix, EF_EXTENDED_FLAGS, EF_FLAGS, readExtendedFeatures, type ExtendedFeaturesBlock,
+} from '../src/data/CsbwinExtendedFeatures';
 import type { Databases, DungeonData } from '../src/data/dungeonTypes';
+import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
+import type { Game } from '../src/engine/Game';
+import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { check, finish } from './lib/check';
+import { freshGame } from './lib/dsa';
 import { newGame, stockGraphics } from './lib/game';
 
 const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));
@@ -152,6 +164,50 @@ function main(): void {
   const { extendedFeatures: _e, extendedWallDecorations: _x, spellFilterLocation: _s, hintKey: _k, dsaLevelIndex, ...rest } = behind;
   check(dsaLevelIndex?.every((row) => row.every((v) => v === 0xffff)) === true, 'the block\'s empty DSA level index');
   check(json(rest) === json(csb), "the world is CSB's own");
+
+  console.log("== CSBWin 20230608's three flags ==");
+  const flagsOf = (game: Game): string => {
+    const r = game.ctx.rules;
+    return `SupressDSAWarningOption ${r.supressDSAWarningOption}, bGravityGame ${r.bGravityGame}, bThreeDMovements ${r.bThreeDMovements}`;
+  };
+  const savedFlags = (game: Game): number => readExtendedFeatures(buildSaveFile(game)).header?.extendedFlags ?? 0;
+  const maze = newGame(emptyDungeonData(), graphics);
+  maze.readDungeonDat(read('static/gamefiles/3D2D1D/dungeon.dat'));
+  console.log(`  a new game on 3D2D1D, extendedFlags 0x${maze.ctx.dungeon.getData().extendedFeatures?.extendedFlags.toString(16)}: ${flagsOf(maze)}`);
+  check(maze.ctx.rules.bGravityGame && maze.ctx.rules.bThreeDMovements && !maze.ctx.rules.supressDSAWarningOption,
+    'GravityGame and ThreeDMovements set bGravityGame and bThreeDMovements (SaveGame.cpp:427-430 in 20230608)');
+  const mazeSaved = savedFlags(maze);
+  console.log(`  its save's extendedFlags 0x${mazeSaved.toString(16)}`);
+  check((mazeSaved & 0x700) === (EF_EXTENDED_FLAGS.GravityGame | EF_EXTENDED_FLAGS.ThreeDMovements),
+    'its save writes both back, where CSBWin writes neither (DEBT.md H)');
+  const loaded = freshGame();
+  check(!loaded.ctx.rules.bGravityGame && !loaded.ctx.rules.bThreeDMovements, 'a game on csbgame7.dat has neither');
+  applyCsbwinSave(loaded, buildSaveFile(maze));
+  console.log(`  that save loaded over it: ${flagsOf(loaded)}`);
+  check(loaded.ctx.rules.bGravityGame && loaded.ctx.rules.bThreeDMovements, 'the 3D2D1D save, loaded, has both');
+
+  // A block of the original shapes whose only extended flag is `SupressDSAWarning`, before
+  // dm-atari's own file.
+  const supressPrefix = buildExtendedFeaturesPrefix({
+    header: { ...header, extendedFlags: EF_EXTENDED_FLAGS.SupressDSAWarning },
+    typeMap: new Uint8Array(0), indexMap: new Uint16Array(0),
+  });
+  const atariFile = read('static/gamefiles/dm-atari/dungeon.dat');
+  const supressFile = new Uint8Array(supressPrefix.length + atariFile.length);
+  supressFile.set(supressPrefix);
+  supressFile.set(atariFile, supressPrefix.length);
+  maze.readNewGame(load(supressFile));
+  console.log(`  readNewGame on a block with SupressDSAWarning alone: ${flagsOf(maze)}`);
+  check(maze.ctx.rules.supressDSAWarningOption && !maze.ctx.rules.bGravityGame && !maze.ctx.rules.bThreeDMovements,
+    'SupressDSAWarning sets SupressDSAWarningOption (SaveGame.cpp:415-416), and the block clears the other two');
+  check((savedFlags(maze) & 0x700) === EF_EXTENDED_FLAGS.SupressDSAWarning,
+    'a save writes it back, where CSBWin does not (DEBT.md H)');
+  maze.ctx.rules.bGravityGame = true;
+  maze.ctx.rules.bThreeDMovements = true;
+  maze.readNewGame(load(atariFile));
+  console.log(`  readNewGame on dm-atari, with the two set: ${flagsOf(maze)}`);
+  check(!maze.ctx.rules.supressDSAWarningOption && maze.ctx.rules.bGravityGame && maze.ctx.rules.bThreeDMovements,
+    'a file with no block clears SupressDSAWarningOption (SaveGame.cpp:312) and leaves the other two');
 
   finish();
 }

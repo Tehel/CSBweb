@@ -3778,6 +3778,21 @@ They are assigned in four places:
 `SaveGame` writes both back (`SaveGame.cpp:950-955`). All eight committed saves carry
 both bits.
 
+**CSBWin 20230608's three extended flags.** `EXTENDEDFLAGS` gains `SupressDSAWarning`
+0x100, `GravityGame` 0x200 and `ThreeDMovements` 0x400
+(`doc/CSBwin-src-20230608/CSB.h:501-503`). `ReadExtendedFeatures` clears
+`SupressDSAWarningOption` at its head, beside `indirectText` and the other shapes
+(`SaveGame.cpp:312`), so every file read clears it, block or not, and sets it from its bit
+(`:415-416`).
+`bGravityGame` and `bThreeDMovements` (`data.cpp:240-241`, `false` at start) are set from
+theirs only for a file with a block (`:427-430`), like `DM_rules`. `SaveGame` writes none
+of the three (`:955-993`), and the utility's `mini.dat` only `SupressDSAWarning`
+(`Chaos.cpp:2168-2171`); the port writes all three back (`DEBT.md` H → "A save keeps the
+dungeon's three 2023 flags"). `SupressDSAWarningOption` stops one message box, "Excessive
+DSA operations", when the DSAs ran more than 50,000 operations too fast (`DSA.cpp:5466-5477`),
+which the port does not give. Of the dungeons here only 3D2D1D sets any of them, its
+`extendedFlags` 0x6b0 (`tools/dump-extended-dungeon.ts`).
+
 ## `NumWordsInTextArray` means two different things either side of the conversion
 
 `DUNGEONDATINDEX::word6` sizes the raw text array in a `dungeon.dat` — 1749 words for DM

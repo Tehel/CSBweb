@@ -115,6 +115,7 @@ function main(): void {
     const rules: RulesOptions = {
       dmRules: false, dmRulesDesignOption: false,
       invisibleMonsters: false, drawAsSize4Monsters: false, simpleEncipher: false,
+      supressDSAWarningOption: false, bGravityGame: false, bThreeDMovements: false,
     };
     const conflux = quiet(() => new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(resolve(CONFLUX)))));
     readRulesOptions(rules, conflux.extendedFeatures, conflux.simpleEncipher);

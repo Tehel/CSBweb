@@ -16,11 +16,12 @@ branch off `CSBwin_SRC_20160325` (15.8) whose only change is accessors for a mon
 is the only check against a running CSBWin, and the two are seven years apart. Most of
 the gap is 64-bit cleanup and translation support; a handful of changes alter behaviour
 (the click translated when it is taken, not when it is queued; the wall text plaque's
-bottom; `&PARAM@`'s `Var(j)`; the attacker's cyan border; three new extended flags).
+bottom; `&PARAM@`'s `Var(j)`; the attacker's cyan border; three new extended flags; the
+space in a champion's bones).
 
 **How to apply:** when an observation contradicts the source, diff the function against
 `doc/CSBwin-src-20230608/` before anything else: the difference may be the version. The
-changes still to port are `DEBT.md` C155 and C156, and C157 makes 2023 the reference, after
+change still to port is `DEBT.md` C156, and C157 makes 2023 the reference, after
 which this memory is deleted. If it is, write both into the debt entry and ask the author which to
 follow. When nothing differs, the observation is a port bug. ([[port-in-dependency-order]]
 still applies to what gets ported first.)

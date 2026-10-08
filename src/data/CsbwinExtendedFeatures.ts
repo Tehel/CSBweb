@@ -56,7 +56,10 @@ export const EF_FLAGS = {
     BigActuators: 0x80,
 } as const;
 
-/** `EXTENDEDFEATURESBLOCK::EXTENDEDFLAGS` (`doc/CSBwin-src/CSB.h:491-501`). */
+/**
+ * `EXTENDEDFEATURESBLOCK::EXTENDEDFLAGS` (`doc/CSBwin-src/CSB.h:491-501`), and the three
+ * CSBWin 20230608 adds (`doc/CSBwin-src-20230608/CSB.h:501-503`).
+ */
 export const EF_EXTENDED_FLAGS = {
     OverlayActive: 0x00000001,
     InvisibleMonsters: 0x00000002,
@@ -66,6 +69,9 @@ export const EF_EXTENDED_FLAGS = {
     SequencedTimers: 0x00000020,
     DefaultDirectX: 0x00000040,
     ExtendedTimers: 0x00000080,
+    SupressDSAWarning: 0x00000100,
+    GravityGame: 0x00000200,
+    ThreeDMovements: 0x00000400,
 } as const;
 
 /**
@@ -766,6 +772,12 @@ export interface LiveExtendedFeatures {
     hintKey?: Uint8Array;
     /** `overlayActive` and `currentOverlay` (`Overlay.toExtendedFeatures`); absent, none. */
     overlay?: SavedOverlay;
+    /** `SupressDSAWarningOption`, written as `SupressDSAWarning`, where CSBWin writes none. */
+    supressDSAWarningOption?: boolean;
+    /** `bGravityGame`, written as `GravityGame`, where CSBWin writes none. */
+    bGravityGame?: boolean;
+    /** `bThreeDMovements`, written as `ThreeDMovements`, where CSBWin writes none. */
+    bThreeDMovements?: boolean;
 }
 
 /**
@@ -813,21 +825,32 @@ export function readExpectedSignatures(signatures: ExpectedSignatures, header: E
  *
  * And `simpleEncipher`, which the function sets for an enciphered file and nothing ever
  * clears (`:333-338`): `enciphered` is `readExtendedFeatures`' `simpleEncipher`.
+ *
+ * And CSBWin 20230608's three: `SupressDSAWarningOption`, `bGravityGame` and
+ * `bThreeDMovements` from `SupressDSAWarning`, `GravityGame` and `ThreeDMovements`
+ * (`doc/CSBwin-src-20230608/SaveGame.cpp:415-416`, `:427-430`). The first is cleared at
+ * the function's head beside `indirectText` and the other shapes (`:312`), so a file with
+ * no block clears it; the other two it leaves.
  */
 export function readRulesOptions(
     rules: {
         dmRules: boolean; dmRulesDesignOption: boolean;
         invisibleMonsters: boolean; drawAsSize4Monsters: boolean; simpleEncipher: boolean;
+        supressDSAWarningOption: boolean; bGravityGame: boolean; bThreeDMovements: boolean;
     },
     header: ExtendedFeaturesBlock | undefined,
     enciphered: boolean | undefined,
 ): void {
+    rules.supressDSAWarningOption = false;
     if (!header) return;
     if (enciphered) rules.simpleEncipher = true;
     rules.dmRulesDesignOption = (header.flags & EF_FLAGS.DMRules) !== 0;
     rules.invisibleMonsters = (header.extendedFlags & EF_EXTENDED_FLAGS.InvisibleMonsters) !== 0;
     rules.dmRules = (header.extendedFlags & EF_EXTENDED_FLAGS.DMRulesOption) !== 0;
     rules.drawAsSize4Monsters = (header.extendedFlags & EF_EXTENDED_FLAGS.DrawAsSize4Monsters) !== 0;
+    rules.supressDSAWarningOption = (header.extendedFlags & EF_EXTENDED_FLAGS.SupressDSAWarning) !== 0;
+    rules.bGravityGame = (header.extendedFlags & EF_EXTENDED_FLAGS.GravityGame) !== 0;
+    rules.bThreeDMovements = (header.extendedFlags & EF_EXTENDED_FLAGS.ThreeDMovements) !== 0;
 }
 
 /**
@@ -858,7 +881,10 @@ export function readRulesOptions(
  * `invisibleMonsters` and `drawAsSize4Monsters` (`:947-948`, `:958-959`), and
  * `OverlayActive` from `overlayActive` (`:968-971`). Measured: 0xf8 in every committed
  * save, which is the three unconditional ones (0xe0) plus the wall decorations and DM
- * rules.
+ * rules. And, where CSBWin 20230608 writes none of them
+ * (`doc/CSBwin-src-20230608/SaveGame.cpp:955-993`), `SupressDSAWarning`, `GravityGame` and
+ * `ThreeDMovements` as the last file read gave them: a deliberate divergence, `DEBT.md`
+ * H → "A save keeps the dungeon's three 2023 flags".
  *
  * **The overlay.** `overlayOrdinal` is `currentOverlay.m_overlayNumber` **plus one**, so 0
  * is "no overlay ever read", and `overlayP1`-`P4` are its `m_p1`-`m_p4` (`:972-976`),
@@ -895,6 +921,9 @@ export function buildLiveExtendedFeatures(live: LiveExtendedFeatures): ExtendedF
     if (live.extendedWallDecorations) extendedFlags |= EF_EXTENDED_FLAGS.ExtendedWallDecorations;
     if (live.drawAsSize4Monsters) extendedFlags |= EF_EXTENDED_FLAGS.DrawAsSize4Monsters;
     if (live.overlay?.active) extendedFlags |= EF_EXTENDED_FLAGS.OverlayActive;
+    if (live.supressDSAWarningOption) extendedFlags |= EF_EXTENDED_FLAGS.SupressDSAWarning;
+    if (live.bGravityGame) extendedFlags |= EF_EXTENDED_FLAGS.GravityGame;
+    if (live.bThreeDMovements) extendedFlags |= EF_EXTENDED_FLAGS.ThreeDMovements;
 
     return {
         version: EF_VERSION_B,

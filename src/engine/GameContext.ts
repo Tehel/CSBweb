@@ -142,13 +142,14 @@ export interface GameContext {
 }
 
 /**
- * Five of CSBWin's process-wide globals, not `d.`'s: `DM_rules` (`doc/CSBwin-src/data.cpp:251`),
+ * Eight of CSBWin's process-wide globals, not `d.`'s: `DM_rules` (`doc/CSBwin-src/data.cpp:251`),
  * `DMRulesDesignOption` (`CSBUI.cpp:137`), `invisibleMonsters` and `drawAsSize4Monsters`
- * (`data.cpp:77-78`) and `simpleEncipher`, all `false` at start. Only `ReadExtendedFeatures`
- * assigns the first four from a file (`SaveGame.cpp:392-400`), and only for a file whose block
- * is present, so a file without one (`dm-atari/dungeon.dat`, CSB's Atari-era saves) leaves them
- * as they were. A new game and a load therefore keep them: `Game.readNewGame` and the save
- * paths never replace this object.
+ * (`data.cpp:77-78`), `simpleEncipher`, and CSBWin 20230608's three, all `false` at start.
+ * Only `ReadExtendedFeatures` assigns the first four from a file (`SaveGame.cpp:392-400`), and
+ * only for a file whose block is present, so a file without one (`dm-atari/dungeon.dat`,
+ * CSB's Atari-era saves) leaves them as they were; the same for the last two of the three.
+ * A new game and a load therefore keep them: `Game.readNewGame` and the save paths never
+ * replace this object.
  */
 export interface RulesOptions {
   /** `DM_rules`: reincarnation costs nothing (`CSBCode.cpp:6740`, `:6761`). */
@@ -167,6 +168,24 @@ export interface RulesOptions {
    * (`SaveGame.cpp:914-920`, `:943-946`). Set by an enciphered file, cleared by none.
    */
   simpleEncipher: boolean;
+  /**
+   * `SupressDSAWarningOption` (`doc/CSBwin-src-20230608/data.cpp:63`): the dungeon stops
+   * "Excessive DSA operations" (`DSA.cpp:5472`), a warning the port does not give. Kept to
+   * be written back. Unlike the rest, every file read clears it (`SaveGame.cpp:312`).
+   */
+  supressDSAWarningOption: boolean;
+  /**
+   * `bGravityGame` (`doc/CSBwin-src-20230608/data.cpp:241`): the party falls along the axes
+   * it last moved on (`CSBCode.cpp:8166`). Read from the dungeon; nothing plays it yet
+   * (`DEBT.md` X5).
+   */
+  bGravityGame: boolean;
+  /**
+   * `bThreeDMovements` (`doc/CSBwin-src-20230608/data.cpp:240`): the keys that move the party
+   * up and down a level (`CSBCode.cpp:8575`). Read from the dungeon; nothing plays it yet
+   * (`DEBT.md` X5).
+   */
+  bThreeDMovements: boolean;
 }
 
 /**
@@ -264,6 +283,7 @@ export function createGameContext(
     rules: {
       dmRules: false, dmRulesDesignOption: false,
       invisibleMonsters: false, drawAsSize4Monsters: false, simpleEncipher: false,
+      supressDSAWarningOption: false, bGravityGame: false, bThreeDMovements: false,
     },
     signatures: noExpectedSignatures(),
     runtimeFileSignatures: noRuntimeFileSignatures(),
