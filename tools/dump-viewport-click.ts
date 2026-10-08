@@ -43,6 +43,7 @@ import { resolveEmptyHandedViewportClick, findDropAreaHit, resolveViewportCursor
 import type { UIState } from '../src/renderer/ui/UIState';
 import type { RectPos } from '../src/data/tables/UITables';
 import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, fail, finish } from './lib/check';
 import { VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 
@@ -78,16 +79,14 @@ function itemsAt(game: Game, cell: Position): ObjectID[] {
 }
 
 function makeUI(game: Game, rn: ObjectID, facingAlcove: boolean): UIState {
-  return {
-    ctx: game.ctx,
-    partyState: game.ctx.party.state,
-    context: {
-      facingAlcove,
-      doorSwitchRects: [],
-      viewportObjectButtons: [UNSET, UNSET, UNSET, UNSET, { ...BUTTON_4 }, { ...BUTTON_5 }].map((b) => ({ ...b })),
-      viewportObjectRNs: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, rn],
-    },
-  } as unknown as UIState;
+  const ui = newUIState(stockGraphics(), game.ctx);
+  Object.assign(ui.context, {
+    facingAlcove,
+    doorSwitchRects: [],
+    viewportObjectButtons: [UNSET, UNSET, UNSET, UNSET, { ...BUTTON_4 }, { ...BUTTON_5 }].map((b) => ({ ...b })),
+    viewportObjectRNs: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, rn],
+  });
+  return ui;
 }
 
 /** `roomData[17]`, the cell ahead, as `DrawViewport` summarises it. */
@@ -114,17 +113,15 @@ function summaryAhead(game: Game): SummarizeRoomData {
 function bareUI(game: Game, facingAlcove: boolean): UIState {
   const roomData: SummarizeRoomData[] = [];
   roomData[17] = summaryAhead(game);
-  return {
-    ctx: game.ctx,
-    partyState: game.ctx.party.state,
-    context: {
-      facingAlcove,
-      doorSwitchRects: [],
-      viewportObjectButtons: [UNSET, UNSET, UNSET, UNSET, UNSET, UNSET].map((b) => ({ ...b })),
-      viewportObjectRNs: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
-      roomData,
-    },
-  } as unknown as UIState;
+  const ui = newUIState(stockGraphics(), game.ctx);
+  Object.assign(ui.context, {
+    facingAlcove,
+    doorSwitchRects: [],
+    viewportObjectButtons: [UNSET, UNSET, UNSET, UNSET, UNSET, UNSET].map((b) => ({ ...b })),
+    viewportObjectRNs: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
+    roomData,
+  });
+  return ui;
 }
 
 /** A screen point at the centre of a viewport rectangle. */
@@ -224,7 +221,7 @@ function main(): void {
   const inHand = (party: Position, facing: number, x: number, y: number): string => {
     game.ctx.party.state.position = party;
     game.ctx.party.state.facing = facing;
-    const ui = { ...bareUI(game, false), uiTables: { graphic231: { dropAreas } } } as unknown as UIState;
+    const ui = bareUI(game, false);
     const ahead = ui.context!.roomData[17];
     const got = resolveViewportCursorAction(ui, x, y);
     const does = got === null ? 'null' : got.kind === 'drop' ? `drop ${got.pos}` : got.kind === 'throw' ? `throw ${got.side}` : got.kind;
@@ -234,7 +231,7 @@ function main(): void {
   // A point in `testThrow`'s left half (y 47-102) that is in no drop area.
   const [throwX, throwY] = [80, 75];
   check(game.ctx.party.state.objectInHand === rn, 'the alcove\'s object is still in hand');
-  check(testThrow(throwX, throwY, false) === 0 && findDropAreaHit({ uiTables: { graphic231: { dropAreas } } } as unknown as UIState,
+  check(testThrow(throwX, throwY, false) === 0 && findDropAreaHit(bareUI(game, false),
     throwX, throwY, 4) === null, `(${throwX},${throwY}) throws left and is in no drop area`);
   check(inHand(PARTY, FACING_NORTH, throwX, throwY) === 'throw 0', 'open floor ahead: the point throws');
   check(inHand(PARTY, FACING_NORTH, farX, farY) === 'drop 2', 'open floor ahead: the far drop area drops');
