@@ -98,7 +98,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | L | ⏳ step 5 of 7 |
+| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | L | ⏳ step 6 of 7 |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | G29 | Recording a game and playing it back | — | ⏸️ |
@@ -240,14 +240,6 @@ builds around them is its own:
 
 - 40 tools spell out `addCharacterDefaults()`, most inside a champion-building function
   of their own; 145 construct a `DungeonLoader`, most to read `dm-atari/dungeon.dat`.
-- 10 tools stand in for an engine or renderer method by assigning over it, which
-  nothing marks as a stand-in or puts back: `dump-monster-move-code`, `-monster-pad`,
-  `-move-from-missile`, `-party-collision`, `-party-move`, `-queue-sound`,
-  `-viewport-click`, `-wiggle-monster`, `-wiggle-objects`, and `watch-smart-discard`. A member that is a
-  hook by design is not one of them: `GameHost`'s, `CSBGraphicsLoader`'s `opener` and
-  `cannotOpen`, `BackgroundLib.messageBox`, the interpreter context's `graphicTrace`, a
-  `UIState`'s `getGraphicBitmap`; nor are the globals (`Date.now`, `Math.random`,
-  `console`).
 - 31 tools extract the UI tables again (`graphicsTablesOf(…).ui`) beside the `UIState`
   that `tools/lib/ui.ts` builds them into.
 - 20 tools make 33 `as unknown as` casts: to build a partial record, or to read a
@@ -258,24 +250,20 @@ builds around them is its own:
   it then sets a new property: the tool goes on passing while testing nothing.
 
 Paid in seven steps, each tool's whole output byte-identical across every commit
-("How to work this list", point 3). Steps 1 to 4 are done: `Game`'s seam for the tools
+("How to work this list", point 3). Steps 1 to 5 are done: `Game`'s seam for the tools
 is public, `gameTick` and `lastInputTime` beside `runFrame`; every `UIState` a tool
 drives is `newUIState`'s (`tools/lib/ui.ts`), whose context a tool stages by assigning
 its fields; every other private a tool drove is public, with the reason in its
 comment, so no tool casts into a private; and `tools/lib/standIn.ts` (`standIn`,
 `wrapMember`) replaces a public member with a stand-in typed as the member and puts it
-back, for `dump-adjust-skills`, `-alt-mon-draw`, `-attack-panel`, `-button-flash`,
-`-cast-spell`, `-champion-death`, `-character-damage`, `-clouds`,
-`-delete-monster-filter`, `-door-lightning`, `-drop-move-object`, `-dsa-delete`,
-`-fusion`, `-key-bindings`, `-local-action`, `-loop-die`, `-loop-script`,
-`-magic-panel`, `-missile-door`, `-missile-draw`, `-missile-drop`,
-`-missile-exterior`, `-missile-monster`, `-monster-design-options`, `-monster-draw`,
-`-monster-missile-type`, `-mouse-queue` and `-reincarnate-entry`. What a tool
+back, for every tool that stands in for an engine or renderer method. A member that is
+a hook by design is assigned directly: `GameHost`'s, `CSBGraphicsLoader`'s `opener` and
+`cannotOpen`, `BackgroundLib.messageBox`, the interpreter context's `graphicTrace`, a
+`UIState`'s `getGraphicBitmap`; and so are the globals (`Date.now`, `Math.random`,
+`console`). What a tool
 keeps beside a `Game` is in a `WeakMap` of its own (`dump-game-events`,
 `dump-hall-of-champions`).
 
-5. **The other stand-ins**: the ten tools above moved to `standIn` and `wrapMember`,
-   a few tools per commit.
 6. **The stock dungeon and a test champion** as `tools/lib` helpers, and the tools moved
    to them, a few tools per commit.
 7. **What is left**: every remaining cast either goes, or builds a stand-in value the

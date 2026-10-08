@@ -34,6 +34,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { newGame, processTimersAt } from './lib/game';
+import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { RN_POISON_CLOUD, RN_FIREBALL } from '../src/core/spellRn';
 
@@ -109,11 +110,10 @@ type PadCall = { at: Position; category: number; place: boolean; unchangedRoom: 
 function spy(game: Game): PadCall[] {
   const calls: PadCall[] = [];
   const actuators = game.systems.actuators;
-  const real = actuators.triggerObjectMove.bind(actuators);
-  actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
+  wrapMember(actuators, 'triggerObjectMove', (real) => (position, object, place, unchangedRoom, facing) => {
     calls.push({ at: position, category: game.ctx.dungeon.rnMaps.dbType(object), place, unchangedRoom });
     return real(position, object, place, unchangedRoom, facing);
-  };
+  });
   return calls;
 }
 

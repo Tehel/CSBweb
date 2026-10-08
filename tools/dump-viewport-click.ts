@@ -44,6 +44,7 @@ import type { UIState } from '../src/renderer/ui/UIState';
 import type { RectPos } from '../src/data/tables/UITables';
 import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
+import { wrapMember } from './lib/standIn';
 import { check, fail, finish } from './lib/check';
 import { VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 
@@ -247,11 +248,10 @@ function main(): void {
   // And the sound: ordinal 4, at the party, with no delay.
   game.ctx.party.state.position = PARTY;
   const queued: number[][] = [];
-  const queueSound = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
-  game.ctx.sounds.queueSound = (ordinal, mapX, mapY, deltaTime, level) => {
+  wrapMember(game.ctx.sounds, 'queueSound', (queueSound) => (ordinal, mapX, mapY, deltaTime, level) => {
     queued.push([ordinal, mapX, mapY, deltaTime]);
     queueSound(ordinal, mapX, mapY, deltaTime, level);
-  };
+  });
   played.length = 0;
   game.systems.mouse.handleStoneClick();
   const item = game.ctx.tables.sound1772[4]?.word0;

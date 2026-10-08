@@ -40,6 +40,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { newGame, stockGraphics, processTimersAt } from './lib/game';
+import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 function champion(i: number): Champion {
@@ -135,7 +136,7 @@ console.log(`party at (${party.x},${party.y}) L${party.z}; the eastbound missile
 
 const calls: FilterCall[] = [];
 let onWall: (() => void) | null = null;
-game.systems.dsa.processMissileEncounterFilter = (o: { type: number; missile: number; direction: number }): number => {
+standIn(game.systems.dsa, 'processMissileEncounterFilter', (o) => {
   calls.push({ type: o.type, missile: o.missile, direction: o.direction, filterObjectSet: tq.missileFilterObject !== OBJECT_ID_NULL });
   if (o.type === 4 && onWall) {
     const move = onWall;
@@ -143,7 +144,7 @@ game.systems.dsa.processMissileEncounterFilter = (o: { type: number; missile: nu
     move();
   }
   return 0;
-};
+});
 const show = (label: string, c: FilterCall | undefined): void =>
   console.log(`${label}: ${c ? `type ${c.type}, missile 0x${c.missile.toString(16)}, direction ${c.direction}, inside MissileTimer ${c.filterObjectSet}` : 'no filter call'}`);
 

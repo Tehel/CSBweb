@@ -40,6 +40,7 @@ import { MonsterType } from '../src/engine/monsterTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { sw } from '../src/core/intCast';
 import { newGame, runVbl, TICK_DUE } from './lib/game';
+import { standIn, wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -119,11 +120,10 @@ async function main(): Promise<void> {
 
   // The bump's sound is the ordinal it queues, `QueueSound(18, d.partyX, d.partyY, 0)`.
   let lastQueued: number | undefined;
-  const queueSound = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
-  game.ctx.sounds.queueSound = (ordinal, mapX, mapY, deltaTime, soundLevel) => {
+  wrapMember(game.ctx.sounds, 'queueSound', (queueSound) => (ordinal, mapX, mapY, deltaTime, soundLevel) => {
     lastQueued = ordinal;
     queueSound(ordinal, mapX, mapY, deltaTime, soundLevel);
-  };
+  });
   const soundOfLastMove = (): number | undefined => lastQueued;
 
   const stand = (): void => {
@@ -361,10 +361,9 @@ async function main(): Promise<void> {
 
     // A load makes the formula non-trivial: 3 * 400 / MaxLoad + 1.
     const stats = game.systems.characterStats;
-    const realLoad = stats.characterLoad.bind(stats);
     const back = champs.findIndex((c) => ![wall!.facing & 3, (wall!.facing + 1) & 3].includes(c.partyPosition));
     const laden = champs.findIndex((_c, i) => i !== back);
-    stats.characterLoad = (c: Champion) => (c === champs[laden] ? 400 : c === champs[back] ? 2000 : 0);
+    const restoreLoad = standIn(stats, 'characterLoad', (c) => (c === champs[laden] ? 400 : c === champs[back] ? 2000 : 0));
     for (const c of champs) c.attributes.stamina = 100;
     champs[back].attributes.stamina = 1;
     // After the stamina is set: `MaxLoad` is stamina-adjusted, so the tired champion's is lower.
@@ -373,7 +372,7 @@ async function main(): Promise<void> {
     standAtWall();
     game.move(MovementAction.MOVE_FORWARD);
     game.systems.monsterAttack.displayCharacterDamage();
-    stats.characterLoad = realLoad;
+    restoreLoad();
     stamina = {
       bump, turn, loaded: 100 - champs[laden].attributes.stamina, loadedCost,
       // The back-row champion is not hurt by the bump, so all the HP lost is exhaustion.
@@ -477,14 +476,14 @@ async function main(): Promise<void> {
 
       // `TimeToMove` (CSBCode.cpp:7062) and the slowest-living rule.
       const stats = game.systems.characterStats;
-      const realLoad = stats.characterLoad.bind(stats);
       const c0 = party.champions[0];
       const max = stats.maxLoad(c0);
       const ttm = (load: number, wounds = 0): number => {
-        stats.characterLoad = () => load;
+        const restore = standIn(stats, 'characterLoad', () => load);
         c0.wounds = wounds;
         const v = stats.timeToMove(c0);
         c0.wounds = 0;
+        restore();
         return v;
       };
       const table = {
@@ -493,14 +492,14 @@ async function main(): Promise<void> {
       };
       const overExpected = sw(4 + Math.trunc(((4 * (Math.trunc((max * 3) / 2) - max)) & 0xffff) / max));
       // Champion 1 laden, champion 2 overloaded but dead: the delay is champion 1's.
-      stats.characterLoad = (c: Champion) =>
-        c === party.champions[1] ? Math.trunc((max * 6) / 8) : c === party.champions[2] ? max * 2 : 0;
+      const restoreLoad = standIn(stats, 'characterLoad', (c) =>
+        c === party.champions[1] ? Math.trunc((max * 6) / 8) : c === party.champions[2] ? max * 2 : 0);
       party.champions[2].attributes.health = 0;
       party.position = new Position(run.x, run.y, level);
       game.ctx.party.setFacing(run.dir);
       game.move(MovementAction.MOVE_FORWARD);
       const slowestLiving = party.partyMoveDisableTimer;
-      stats.characterLoad = realLoad;
+      restoreLoad();
 
       console.log(
         `move delay: first step ${firstStep}, its tick in its VBL ${stepTicked}, delay after it ${delayAfterStep}, ` +
@@ -713,22 +712,20 @@ async function main(): Promise<void> {
         uByte5: 0xab, uByte6: 0, uByte7: 0, uByte8: 0, uByte9: 0,
         sequence: 0, timerWord8: 0, timerWord6: 0,
       });
-      const timerSystem = game.systems.timer;
-      const dispatch = timerSystem.dispatch;
       let probeSaw: { x: number; y: number; level: number; pending: number; loaded: number | null } | null = null;
-      timerSystem.dispatch = function (timer) {
+      const restoreDispatch = wrapMember(game.systems.timer, 'dispatch', (dispatch) => (timer) => {
         if (timer.function === TimerFunction.TT_DOOR_STEP && timer.uByte5 === 0xab) {
           const p = party.position;
           probeSaw = { x: p.x, y: p.y, level: p.z, pending: game.ctx.loop.newPartyLevel, loaded: loadedLevel() };
           return false;
         }
-        return dispatch.call(this, timer);
-      };
+        return dispatch(timer);
+      });
       const frame = (tickDue: boolean): void => {
         runVbl(game, tickDue ? TICK_DUE : 1);
       };
       frame(true);
-      timerSystem.dispatch = dispatch;
+      restoreDispatch();
       const newLevel = party.position.z;
       const below = dungeon.incrementLevel(new Position(pit.x, pit.y, level), 1)!;
       const queuedAfterTick = game.ctx.mouseQueue.count();

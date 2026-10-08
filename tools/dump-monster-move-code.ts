@@ -40,6 +40,7 @@ import type { AiConst, AiFrame } from '../src/engine/MonsterAI';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { monsterLevitating } from '../src/data/tables/MonsterDesc';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { rigTeleporter } from './lib/teleporter';
@@ -263,8 +264,7 @@ async function main(): Promise<void> {
     const at = opens(game, z)[0]!;
     partyOn(game, z, [at]);
     const sounds: number[] = [];
-    const queue = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
-    game.ctx.sounds.queueSound = (ordinal, x, y, dt, level) => { sounds.push(ordinal); queue(ordinal, x, y, dt, level); };
+    wrapMember(game.ctx.sounds, 'queueSound', (queue) => (ordinal, x, y, dt, level) => { sounds.push(ordinal); queue(ordinal, x, y, dt, level); });
     const made = game.systems.monsters.createMonster({
       value: typeOn(game, z), hitPointMultiplier: 1, numMonM1: 0, facing: 0,
       mapX: at.x, mapY: at.y, level: z, invisible: false, drawAsSize4: false,

@@ -31,6 +31,7 @@ import type { MiscRecord } from '../src/data/dungeonTypes';
 import type { Game } from '../src/engine/Game';
 import { SDObjList, scanOneCell, smartDiscard, SmartDiscardMode, type SDObj } from '../src/engine/SmartDiscard';
 import { newGame, stockGraphics } from './lib/game';
+import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 const MODE_NAMES = ['NotActive', 'NewDB', 'Count', 'Scan', 'Discard'];
@@ -222,11 +223,10 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
 
   // The record's index, read as the object is lifted: `DeleteDBEntry` then frees its slot.
   const lifted: { object: ObjectID; index: number; at: Position }[] = [];
-  const moveObject = ctx.systems.worldMove.moveObject.bind(ctx.systems.worldMove);
-  ctx.systems.worldMove.moveObject = (object, oldX, oldY, newX, newY, level) => {
+  wrapMember(ctx.systems.worldMove, 'moveObject', (moveObject) => (object, oldX, oldY, newX, newY, level) => {
     if (newX < 0) lifted.push({ object, index: dungeon.rnMaps.idx(object), at: new Position(oldX, oldY, level) });
     return moveObject(object, oldX, oldY, newX, newY, level);
-  };
+  });
 
   smartDiscard(ctx, true);
   // Weapons and clothing are counted and left; misc reaches Scan.

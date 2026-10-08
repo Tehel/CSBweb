@@ -44,6 +44,7 @@ import type { Game } from '../src/engine/Game';
 import { emptyPossessions, MovementAction, type Champion } from '../src/engine/gameTypes';
 import { DELTA_X, DELTA_Y } from '../src/engine/MonsterPerception';
 import { newGame, stockGraphics } from './lib/game';
+import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 function champion(i: number): Champion {
@@ -78,36 +79,26 @@ function makeGame(): { game: Game; log: string[] } {
   const log: string[] = [];
   const party = game.ctx.party.state;
 
-  const missiles = game.systems.missileEncounter;
-  const check = missiles.checkPartyMoveFromMissile.bind(missiles);
-  missiles.checkPartyMoveFromMissile = (from, to) => {
+  wrapMember(game.systems.missileEncounter, 'checkPartyMoveFromMissile', (check) => (from, to) => {
     log.push(`missile ${at(from)}->${to ? at(to) : 'none'}`);
     return check(from, to);
-  };
-  const wm = game.systems.worldMove;
-  const fall = wm.partyFallsIntoPit.bind(wm);
-  wm.partyFallsIntoPit = () => {
+  });
+  wrapMember(game.systems.worldMove, 'partyFallsIntoPit', (fall) => () => {
     log.push(`fall at ${at(party.position)}`);
     fall();
-  };
-  const prints = game.ctx.footprints;
-  const record = prints.recordPartyMove.bind(prints);
-  prints.recordPartyMove = (time, level, x, y, magic) => {
+  });
+  wrapMember(game.ctx.footprints, 'recordPartyMove', (record) => (time, level, x, y, magic) => {
     log.push(`footprint ${at(new Position(x, y, level))}`);
     record(time, level, x, y, magic);
-  };
-  const actuators = game.ctx.systems.actuators;
-  const pads = actuators.triggerObjectMove.bind(actuators);
-  actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
+  });
+  wrapMember(game.ctx.systems.actuators, 'triggerObjectMove', (pads) => (position, object, place, unchangedRoom, facing) => {
     if (object === OBJECT_ID_NULL) log.push(`${place ? 'place' : 'remove'} ${at(position)} ${unchangedRoom ? 'same' : 'moved'}`);
     return pads(position, object, place, unchangedRoom, facing);
-  };
-  const monsters = game.systems.monsters;
-  const load = monsters.loadPartyLevel.bind(monsters);
-  monsters.loadPartyLevel = (level) => {
+  });
+  wrapMember(game.systems.monsters, 'loadPartyLevel', (load) => (level) => {
     log.push(`load ${level}`);
     load(level);
-  };
+  });
   return { game, log };
 }
 
@@ -297,12 +288,10 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   const { game, log } = makeGame();
   stand(game, log, from, facing);
   const facings: number[] = [];
-  const actuators = game.ctx.systems.actuators;
-  const pads = actuators.triggerObjectMove.bind(actuators);
-  actuators.triggerObjectMove = (position, object, place, unchangedRoom, faced) => {
+  wrapMember(game.ctx.systems.actuators, 'triggerObjectMove', (pads) => (position, object, place, unchangedRoom, faced) => {
     facings.push(faced);
     return pads(position, object, place, unchangedRoom, faced);
-  };
+  });
   game.move(MovementAction.TURN_RIGHT);
   tick(game, log);
   compare('7. a turn', log, [`remove ${at(from)} same`, `place ${at(from)} same`, 'tick']);

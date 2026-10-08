@@ -29,6 +29,7 @@ import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { monsterLevitating } from '../src/data/tables/MonsterDesc';
 import { graphicsTablesOf, newGame, processTimersAt } from './lib/game';
+import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { rigTeleporter } from './lib/teleporter';
@@ -104,11 +105,10 @@ function wiggle(z: number, type: number, to: (game: Game, at: Position) => Posit
 
   let calls = 0;
   const actuators = game.systems.actuators;
-  const real = actuators.triggerObjectMove.bind(actuators);
-  actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
+  wrapMember(actuators, 'triggerObjectMove', (real) => (position, object, place, unchangedRoom, facing) => {
     calls++;
     return real(position, object, place, unchangedRoom, facing);
-  };
+  });
   // At tick 0: the group's first AI timer is due at tick 1, and must not move it first.
   game.ctx.timers.createTimer(TimerFunction.TT_TELEPORTER, at.x, at.y, 0, ActuatorAction.SET, 0, z);
   processTimersAt(game, 0);

@@ -39,6 +39,7 @@ import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { monsterLevitating } from '../src/data/tables/MonsterDesc';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 
@@ -99,11 +100,10 @@ async function main(): Promise<void> {
   const spy = (game: Game): PadCall[] => {
     const calls: PadCall[] = [];
     const actuators = game.systems.actuators;
-    const real = actuators.triggerObjectMove.bind(actuators);
-    actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
+    wrapMember(actuators, 'triggerObjectMove', (real) => (position, object, place, unchangedRoom, facing) => {
       calls.push({ at: position, place, unchangedRoom });
       return real(position, object, place, unchangedRoom, facing);
-    };
+    });
     return calls;
   };
   const same = (a: Position, b: Position): boolean => a.x === b.x && a.y === b.y && a.z === b.z;

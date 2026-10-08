@@ -92,6 +92,7 @@ import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { gameTablesOf, newGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
+import { wrapMember } from './lib/standIn';
 
 /** North, east, south, west: `DELTA_X` / `DELTA_Y`. */
 const DELTAS: ReadonlyArray<readonly [number, number]> = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -135,11 +136,10 @@ function scene(): Scene {
   // CSBWin's party with a champion has a cursor owner, whom `TouchWall` asks for (`Mouse.cpp:358-361`).
   game.ctx.party.state.cursorOwner = 0;
   const queued: number[][] = [];
-  const queueSound = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
-  game.ctx.sounds.queueSound = (ordinal, mapX, mapY, deltaTime, level) => {
+  wrapMember(game.ctx.sounds, 'queueSound', (queueSound) => (ordinal, mapX, mapY, deltaTime, level) => {
     queued.push([ordinal, mapX, mapY, deltaTime, level]);
     queueSound(ordinal, mapX, mapY, deltaTime, level);
-  };
+  });
   return { game, queued, played };
 }
 
