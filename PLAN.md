@@ -387,7 +387,20 @@ it later, along with the FAQ and the statistics page.
      Step 1's relative paths keep a sub-path possible.
    - the game files and their manifest, uploaded once and on each change. They are not
      part of a deploy.
-   - a backup of `stats/`.
+   - a backup of `stats/`, `linkedin-games/player`'s: the host's cron runs
+     `server/backup.ts` in the container, which snapshots the store with `node:sqlite`'s
+     `backup` while the server keeps serving, WAL included, into `stats/backups/`
+     (`tools/dump-server.ts` asserts it). Snapshots older than 14 days are deleted:
+
+     ```
+     17 3 * * * cd /home/ubuntu/csbweb/app && /usr/bin/docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning server/backup.ts < /dev/null >> /home/ubuntu/csbweb/stats/backup.log 2>&1 && find /home/ubuntu/csbweb/stats/backups -name '*.db' -mtime +14 -delete
+     ```
+
+     `< /dev/null` is not optional: `exec -T` reads stdin, and pasted into a script fed
+     over `ssh` it swallows the rest of the script. `utils/pull-backups.sh` copies the
+     snapshots off the VPS, to `../backups/csbweb/`. A restore stops the stack, copies a
+     snapshot over `stats/stats.db`, deletes `stats.db-wal` and `stats.db-shm` (stale,
+     they would bring the old state back), and starts it again.
 
    `doc/DEPLOYMENT.md` records the procedure, written as `linkedin-games/player`'s is.
 

@@ -18,16 +18,19 @@
  *     forwarded address, 429; `/api/stats`: the store's aggregates, not cached;
  *   - `server.ts` itself, as Node runs it: a bad mount or a store it cannot open exits 1
  *     before it listens, and SIGTERM stops a listening server with 0, the store made and
- *     its WAL checkpointed.
+ *     its WAL checkpointed;
+ *   - `backup.ts`, run beside that server: a snapshot in `backups/` holding the events
+ *     still in the WAL, the server serving throughout, and exit 1 on a missing store.
  *
  * Usage: npx tsx tools/dump-server.ts
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 
 import { checkFiles, createAppServer, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
 import { RateLimit } from '../server/events.ts';
@@ -215,11 +218,11 @@ async function checkEvents(port: number, store: StatsStore): Promise<void> {
     check((await ask(port, '/api/event', 'POST', {}, event(21))).status === 204, 'without X-Real-IP, the socket\'s address counts');
 }
 
-/** `server.ts` run as Node runs it: on its own types where this Node strips them, through tsx otherwise. */
-function startEntry(env: Record<string, string>): ChildProcess {
+/** A script of `server/` run as Node runs it: on its own types where this Node strips them, through tsx otherwise. */
+function startEntry(env: Record<string, string>, script = 'server.ts'): ChildProcess {
     const strips = (process.features as { typescript?: unknown }).typescript;
     const args = strips ? [] : ['--import', 'tsx'];
-    return spawn(process.execPath, [...args, join(ROOT, 'server', 'server.ts')], {
+    return spawn(process.execPath, [...args, join(ROOT, 'server', script)], {
         cwd: ROOT, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'],
     });
 }
@@ -256,19 +259,45 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     check(badStore.code === 1 && badStore.out.includes('Not starting:'), 'a store it cannot open exits 1 before it listens');
 
     let healthy = false;
+    let walHeld = false;
+    let backedUp: { code: number | null; out: string; events: number; answering: boolean } | null = null;
     const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: statsDb });
     const ended = finish(child, (line) => {
         const listening = /^Listening on port (\d+)/.exec(line);
         if (!listening) return;
-        ask(Number(listening[1]), '/api/health')
-            .then((answer) => { healthy = answer.status === 200; })
-            .finally(() => child.kill('SIGTERM'));
+        const port = Number(listening[1]);
+        (async () => {
+            healthy = (await ask(port, '/api/health')).status === 200;
+            // Three events, which the running server holds in its WAL, then a backup beside it.
+            for (let i = 0; i < 3; i++) {
+                await ask(port, '/api/event', 'POST', { 'Content-Type': 'text/plain;charset=UTF-8' },
+                    JSON.stringify({ type: 'started', player: PLAYER, set: 'a', playthrough: 100 + i, build: 'test', payload: {} }));
+            }
+            walHeld = existsSync(`${statsDb}-wal`) && statSync(`${statsDb}-wal`).size > 0;
+            const run = await finish(startEntry({ STATS_DB: statsDb }, 'backup.ts'));
+            const target = /"target":"([^"]+)"/.exec(run.out)?.[1];
+            let events = -1;
+            if (target) {
+                const copy = new DatabaseSync(target, { readOnly: true });
+                events = (copy.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number }).n;
+                copy.close();
+            }
+            backedUp = { code: run.code, out: run.out, events, answering: (await ask(port, '/api/health')).status === 200 };
+        })().finally(() => child.kill('SIGTERM'));
     });
     const { code, out } = await ended;
     for (const line of out.trim().split('\n')) {
         if (!line.includes('ExperimentalWarning') && !line.includes('--trace-warnings')) console.log(`  | ${line.split(scratch).join('<scratch>')}`);
     }
     check(healthy, 'it listens on the PORT given, 0 for a free one, and answers /api/health');
+    const backup = backedUp as { code: number | null; out: string; events: number; answering: boolean } | null;
+    console.log(`  backup.ts: exit ${backup?.code}, ${firstLine(backup?.out ?? '').split(scratch).join('<scratch>').replace(/stats-[\dTZ-]+\.db/, 'stats-<date>.db').replace(/"bytes":\d+/, '"bytes":<n>')}`);
+    check(backup?.code === 0 && /<scratch>\/stats\/backups\/stats-[\dTZ-]+\.db/.test((backup?.out ?? '').split(scratch).join('<scratch>')),
+        'backup.ts, run beside the server, writes a snapshot into backups/ beside the store');
+    check(walHeld && backup?.events === 3, 'the snapshot holds the events the server had in its WAL');
+    check(backup?.answering === true, 'the server kept serving through the backup');
+    const noStore = await finish(startEntry({ STATS_DB: join(scratch, 'nowhere', 'stats.db') }, 'backup.ts'));
+    check(noStore.code === 1 && noStore.out.includes('backup_failed'), 'backup.ts on a store that is not there exits 1');
     check(code === 0 && out.includes('SIGTERM: shutting down') && out.includes('Stopped'), 'SIGTERM stops it, with 0');
     check(existsSync(statsDb) && !existsSync(`${statsDb}-wal`), 'the store was made, its folder too, and closed with its WAL checkpointed');
 }
