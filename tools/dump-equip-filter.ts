@@ -1,15 +1,15 @@
 /**
- * The equip filter (`doc/CSBwin-src/Character.cpp:2917-2998`), which `CHARDESC::SetPossession`
- * runs for `RemoveCharacterPossession` and `AddCharacterPossession` (`:1850`, `:1962`), with
+ * The equip filter (`doc/CSBwin-src/Character.cpp:2922-3003`), which `CHARDESC::SetPossession`
+ * runs for `RemoveCharacterPossession` and `AddCharacterPossession` (`:1855`, `:1967`), with
  * two DSAs on its square, against a genuine save (`csbgame7.dat`).
  *
  * 1. **A dungeon with no filter moves the object** out of the slot and into another.
- * 2. **An object leaving and one arriving**: only the first DSA runs (`break`, `:2989`),
- *    on parameters of its own (`NEWDSAPARAMETERS`, `:2937`), a count of 4, the champion,
- *    the slot, the object and 0 (`:2968-2971`). It runs with timer function 1 (column 1)
- *    for the object leaving, then 0 (column 0) for the one arriving (`:2975-2986`), on the
+ * 2. **An object leaving and one arriving**: only the first DSA runs (`break`, `:2994`),
+ *    on parameters of its own (`NEWDSAPARAMETERS`, `:2942`), a count of 4, the champion,
+ *    the slot, the object and 0 (`:2973-2976`). It runs with timer function 1 (column 1)
+ *    for the object leaving, then 0 (column 0) for the one arriving (`:2980-2991`), on the
  *    same variables, and with the parameters the first call left but the object
- *    (`:2978`, `:2984`). The caller's parameters are as they were after it.
+ *    (`:2983`, `:2989`). The caller's parameters are as they were after it.
  * 3. **`RemoveCharacterPossession`** runs the leaving half alone, and the slot is empty.
  * 4. **`AddCharacterPossession`** runs the arriving half alone, on variables of its own,
  *    and the object is in the slot.
@@ -22,7 +22,7 @@ import type { Game } from '../src/engine/Game';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
 import { check, finish } from './lib/check';
 
-/** `ESL_EQUIPFILTER` (`doc/CSBwin-src/CSB.h:1547`). */
+/** `ESL_EQUIPFILTER` (`doc/CSBwin-src/CSB.h:1550`). */
 const ESL_EQUIPFILTER = 12;
 
 /** The filter's parameter count, then its first `n` parameters, into globals `to` on. */

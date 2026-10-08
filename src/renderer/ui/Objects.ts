@@ -69,11 +69,11 @@ export function getObjectName(ui: UIState, objectNameIndex: number): string {
  * The champion a bones object belongs to, or `null`.
  *
  * The same four-step lookup CSBWin spells out twice — in the eye's object panel
- * (`doc/CSBwin-src/Character.cpp:3549-3580`) and in `DrawNameOfHeldObject`
- * (`doc/CSBwin-src/Code11f52.cpp:38-59`). Both key on the *name index* being
+ * (`doc/CSBwin-src/Character.cpp:3563-3597`) and in `DrawNameOfHeldObject`
+ * (`doc/CSBwin-src/Code11f52.cpp:73-94`). Both key on the *name index* being
  * `objNI_Bones_a` rather than on the `DB10` misc type, and both refuse bones whose
  * `value()` is 0: those are inert scenery, not anybody's remains
- * (`doc/CSBwin-src/CSB.h:1258-1264`).
+ * (`doc/CSBwin-src/CSB.h:1261-1267`).
  * `CopyCharacter` finds the champion in the party, or in the wings.
  */
 export function getBonesChampion(ui: UIState, objectId: ObjectID, objectNameIndex: number): Champion | null {
@@ -88,11 +88,11 @@ export function getBonesChampion(ui: UIState, objectId: ObjectID, objectNameInde
 }
 
 /**
- * `DescribeChampionBones` (`doc/CSBwin-src-20230608/Code11f52.cpp:29-60`): the translation
+ * `DescribeChampionBones` (`doc/CSBwin-src/Code11f52.cpp:29-60`): the translation
  * of `"% " + objName`, with the champion's name for each `%`. With no translation (`DEBT.md`
  * G21) `TranslateLanguage` gives its text back (`Translation.cpp:187`), so this reads
  * "NAME BONES". The hand's line and the inventory's description both name bones so
- * (`Code11f52.cpp:91`, `Character.cpp:3587`).
+ * (`Code11f52.cpp:126`, `Character.cpp:3604`).
  */
 export function describeChampionBones(name: string, objName: string): string {
   return `% ${objName}`.split('%').join(name);
@@ -104,7 +104,7 @@ export function getObjectDisplayName(ui: UIState, objectId: ObjectID, objectName
   const { category } = ui.ctx.dungeon.rnMaps.decode(objectId);
 
   // `DescribeObject`'s `DescribeChampionBones(descriptiveText, pcA0->name, d.ObjectNames[objNID6])`
-  // (doc/CSBwin-src-20230608/Character.cpp:3587).
+  // (doc/CSBwin-src/Character.cpp:3587).
   const owner = getBonesChampion(ui, objectId, objectNameIndex);
   if (owner?.name) name = describeChampionBones(owner.name, name);
 
@@ -303,7 +303,7 @@ export function determineMastery(ui: UIState, champion: Champion, skill: number)
 }
 
 /**
- * `DetermineMastery(chIdx, role|0x8000)` (`doc/CSBwin-src/Character.cpp:4593`) — the rank
+ * `DetermineMastery(chIdx, role|0x8000)` (`doc/CSBwin-src/Character.cpp:4610`) — the rank
  * the eye panel prints is the earned one, so the `0x8000` flag drops the temporary
  * adjustment a spell or potion may be carrying.
  */

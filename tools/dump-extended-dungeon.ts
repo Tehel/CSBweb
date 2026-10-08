@@ -1,7 +1,7 @@
 /**
  * A `dungeon.dat` that opens with an Extended Features block: the DM Windows package's
  * (`static/gamefiles/dm-windows/`), read by `DungeonLoader.loadDungeonDat` as
- * `ReadDatabases` reads it (doc/CSBwin-src/SaveGame.cpp:2346-2374): `ReadExtendedFeatures`
+ * `ReadDatabases` reads it (doc/CSBwin-src/SaveGame.cpp:2558-2586): `ReadExtendedFeatures`
  * first, then the image behind the block, in the shape the block declares.
  *
  * The canary is the world itself. The file is DM's dungeon re-saved by CSBWin
@@ -11,18 +11,18 @@
  * object map would scramble every database, not three.
  *
  * Then the rules: a new game takes `DMRulesDesignOption` from the block's `DMRules` and
- * `DM_rules` from `DMRulesOption` (`:392-398`), at boot and after a lost game, and a file
+ * `DM_rules` from `DMRulesOption` (`:394-400`), at boot and after a lost game, and a file
  * with no block leaves them.
  *
  * And CSBWin 20230608's three flags (`SupressDSAWarning`, `GravityGame`, `ThreeDMovements`,
- * `doc/CSBwin-src-20230608/SaveGame.cpp:415-430`): 3D2D1D sets the last two, which a save
+ * `doc/CSBwin-src/SaveGame.cpp:415-430`): 3D2D1D sets the last two, which a save
  * keeps (`DEBT.md` H → "A save keeps the dungeon's three 2023 flags") and a load takes back;
  * a block alone sets the first, and a file with no block clears it and leaves the others
  * (`:312`).
  *
  * And a compressed body behind a block, which no shipped file has: a block built with
  * `buildExtendedFeaturesPrefix` in front of CSB's compressed `dungeon.dat` reads as CSB's
- * own, the body taken from byte 8 plus the block's size (`:2362-2369`). The `'@'` case,
+ * own, the body taken from byte 8 plus the block's size (`:2574-2581`). The `'@'` case,
  * whose body starts at byte 8 of the file, inside the block, is transcribed but has no
  * file that exercises it.
  *
@@ -199,7 +199,7 @@ function main(): void {
   maze.readNewGame(load(supressFile));
   console.log(`  readNewGame on a block with SupressDSAWarning alone: ${flagsOf(maze)}`);
   check(maze.ctx.rules.supressDSAWarningOption && !maze.ctx.rules.bGravityGame && !maze.ctx.rules.bThreeDMovements,
-    'SupressDSAWarning sets SupressDSAWarningOption (SaveGame.cpp:415-416), and the block clears the other two');
+    'SupressDSAWarning sets SupressDSAWarningOption (SaveGame.cpp:419-420), and the block clears the other two');
   check((savedFlags(maze) & 0x700) === EF_EXTENDED_FLAGS.SupressDSAWarning,
     'a save writes it back, where CSBWin does not (DEBT.md H)');
   maze.ctx.rules.bGravityGame = true;
@@ -207,7 +207,7 @@ function main(): void {
   maze.readNewGame(load(atariFile));
   console.log(`  readNewGame on dm-atari, with the two set: ${flagsOf(maze)}`);
   check(!maze.ctx.rules.supressDSAWarningOption && maze.ctx.rules.bGravityGame && maze.ctx.rules.bThreeDMovements,
-    'a file with no block clears SupressDSAWarningOption (SaveGame.cpp:312) and leaves the other two');
+    'a file with no block clears SupressDSAWarningOption (SaveGame.cpp:314) and leaves the other two');
 
   finish();
 }

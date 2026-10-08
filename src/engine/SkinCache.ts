@@ -1,20 +1,20 @@
 /**
- * `SKIN_CACHE` (`doc/CSBwin-src/CSB.h:181-195`, `doc/CSBwin-src/data.cpp:2058-2171`): a
+ * `SKIN_CACHE` (`doc/CSBwin-src/CSB.h:181-195`, `doc/CSBwin-src/data.cpp:2062-2175`): a
  * cell's skin, read from its `EXPOOL` record, and the level's default skin.
  *
  * A record holds a column pair, two bytes a row: byte `(2 * y) + (x & 1)`. CSBWin copies
  * the record's native longwords into `m_columns` with `memcpy`, and `DB11::swap` reads
- * them little-endian (`data.cpp:1458-1467`), so byte `i` is bits `8 * (i & 3)` up of
+ * them little-endian (`data.cpp:1461-1470`), so byte `i` is bits `8 * (i & 3)` up of
  * longword `i >> 2` (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skin cache").
  *
  * The cache forgets everything at `Cleanup` (`CSB.h:194`), which `Cleanup(false)` runs
- * through `CleanupGraphics` (`doc/CSBwin-src/Graphics.cpp:2205`) before every game CSBWin
+ * through `CleanupGraphics` (`doc/CSBwin-src/Graphics.cpp:2231`) before every game CSBWin
  * reads. `DungeonState` builds a new one for each world it takes.
  */
 import { Expool } from '../data/CsbwinExpool';
 import type { DungeonData } from '../data/dungeonTypes';
 
-/** `EDT_Skins` (`doc/CSBwin-src/CSB.h:1551`). */
+/** `EDT_Skins` (`doc/CSBwin-src/CSB.h:1554`). */
 const EDT_SKINS = 4;
 
 /** `(EDT_Skins << 24) + (level << 4) + (x / 2)`, the key of a column pair's record. */
@@ -41,7 +41,7 @@ export class SkinCache {
 
     constructor(private readonly data: DungeonData) {}
 
-    /** `SKIN_CACHE::Load` (`data.cpp:2061-2086`): the column pair of `x` on `level`, read. */
+    /** `SKIN_CACHE::Load` (`data.cpp:2065-2090`): the column pair of `x` on `level`, read. */
     private Load(level: number, x: number): number {
         if (level !== this.m_level) {
             this.m_level = level;
@@ -62,7 +62,7 @@ export class SkinCache {
     }
 
     /**
-     * `SKIN_CACHE::GetSkin` (`data.cpp:2088-2112`): 0 off the level, for a column pair with
+     * `SKIN_CACHE::GetSkin` (`data.cpp:2092-2116`): 0 off the level, for a column pair with
      * no record, and past the record's end. CSBWin reads a level past the dungeon's from
      * past the end of `d.pLevelDescriptors`, which is undefined; the port says 0.
      */
@@ -82,7 +82,7 @@ export class SkinCache {
     }
 
     /**
-     * `SKIN_CACHE::GetDefaultSkin` (`data.cpp:2115-2134`): byte `level` of the default
+     * `SKIN_CACHE::GetDefaultSkin` (`data.cpp:2119-2138`): byte `level` of the default
      * skins' record, read once. Its `expool.IsOpen()` holds in a game: CSBWin's pool is set
      * up by the end of `ReadDatabases` (`src/data/CsbwinExpool.ts`).
      */
@@ -100,7 +100,7 @@ export class SkinCache {
     }
 
     /**
-     * `SKIN_CACHE::SetSkin` (`data.cpp:2138-2171`): nothing when the byte holds the skin
+     * `SKIN_CACHE::SetSkin` (`data.cpp:2142-2175`): nothing when the byte holds the skin
      * already, or lies past the record and the skin is 0. Otherwise the record is taken
      * out of the pool, widened to 64 bytes of zeros, given the skin, and written back
      * trimmed of its trailing zero bytes to whole longwords, or not at all when every byte

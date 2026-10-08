@@ -3,9 +3,9 @@
  * quarters full has its least useful objects thrown away, one per tick.
  *
  *  1. Every game read and the tail of a save start the cycle over on the misc database
- *     (`:747-757`), and each tick of the loop does one step (`CSBCode.cpp:678`). The
+ *     (`:747-757`), and each tick of the loop does one step (`CSBCode.cpp:688`). The
  *     retail dungeon's databases are nowhere near 6000 records (`db.Max` 8000 × 3/4,
- *     `CSB.h:1646`, `SmartDiscard.cpp:14`), so the cycle only counts: weapons, clothing,
+ *     `CSB.h:1649`, `SmartDiscard.cpp:14`), so the cycle only counts: weapons, clothing,
  *     misc, weapons, fifty records a step (`:762-850`).
  *  2. `ScanOneCell`'s priority (`:454-603`): 20 plus the level difference off the
  *     party's level, the square distance on it; the Nth object of a type on a corner

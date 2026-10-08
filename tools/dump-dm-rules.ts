@@ -5,15 +5,15 @@
  *
  * - `ReadExtendedFeatures` sets `DMRulesDesignOption` from `flags & DMRules` (0x40) and
  *   `DM_rules` from `extendedFlags & DMRulesOption` (0x08)
- *   (`doc/CSBwin-src/SaveGame.cpp:392-398`). Every committed CSBWin save must load its own
+ *   (`doc/CSBwin-src/SaveGame.cpp:394-400`). Every committed CSBWin save must load its own
  *   two bits, whatever the game held before.
  * - A file with no block leaves both as they were: `mini.dat`, CSB's Atari-era save.
  * - `_ShowPrisonDoor` forces `DM_rules` on from `DMRulesDesignOption` alone
- *   (`CSBCode.cpp:10672-10676`).
- * - `SaveGame` writes both back (`SaveGame.cpp:950-955`), and the port's own save carries
+ *   (`CSBCode.cpp:10796-10800`).
+ * - `SaveGame` writes both back (`SaveGame.cpp:975-980`), and the port's own save carries
  *   them in its block through a load.
  * - `_ResurrectReincarnateCancel` charges the reincarnation penalties only
- *   `if (!DM_rules)` (`CSBCode.cpp:6740`, `:6761`); `dump-hall-of-champions.ts` shows
+ *   `if (!DM_rules)` (`CSBCode.cpp:6799`, `:6820`); `dump-hall-of-champions.ts` shows
  *   both sides at a mirror.
  *
  * Run: `npx tsx tools/dump-dm-rules.ts`
@@ -66,7 +66,7 @@ console.log('=== a new game on dm-atari/dungeon.dat (no Extended Features block)
 const fresh = dmGame();
 console.log(`  ${rulesOf(fresh)}`);
 check(!fresh.ctx.rules.dmRules && !fresh.ctx.rules.dmRulesDesignOption,
-  'both start false (data.cpp:251, CSBUI.cpp:137)');
+  'both start false (data.cpp:252, CSBUI.cpp:148)');
 fresh.forceDMRulesAtBoot();
 check(!fresh.ctx.rules.dmRules, 'and the boot forces nothing without the design option');
 
@@ -119,7 +119,7 @@ const booted = dmGame();
 booted.ctx.rules.dmRulesDesignOption = true;
 booted.forceDMRulesAtBoot();
 console.log(`  ${rulesOf(booted)}`);
-check(booted.ctx.rules.dmRules, 'DMRules forces DM_rules on (CSBCode.cpp:10672-10676)');
+check(booted.ctx.rules.dmRules, 'DMRules forces DM_rules on (CSBCode.cpp:10796-10800)');
 
 /* ------------------------------------------------- written and read back ----- */
 

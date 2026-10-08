@@ -3,7 +3,7 @@
  *
  * Straight transcriptions of CSBWin's enums so the two codebases stay greppable:
  * `MONSTERTYPE` (doc/CSBwin-src/Objects.h:153), `STATE_OF_FEAR`
- * (doc/CSBwin-src/CSBTypes.h:164) and `ATTACKTYPE` (doc/CSBwin-src/CSB.h:574).
+ * (doc/CSBwin-src/CSBTypes.h:169) and `ATTACKTYPE` (doc/CSBwin-src/CSB.h:577).
  * CSBWin's own gaps and oddities are preserved — the unnamed `mon_5`/`mon_25`, the
  * missing fear state 1, and the three attack types marked "Not in CSB", whose names
  * really are stored as `"X"` in `graphics.dat`.
@@ -46,7 +46,7 @@ export enum MonsterType {
  *
  * There is no state 1. State 5 is what a giggler is put into after it steals
  * something, and states 4 and above are reset to 0 by `DetachItem16`
- * (doc/CSBwin-src/CSBCode.cpp:6129).
+ * (doc/CSBwin-src/CSBCode.cpp:6188).
  */
 export enum StateOfFear {
   StateOfFear0 = 0,

@@ -1,8 +1,8 @@
 /**
- * An actuator's local action (`PerformLocalAction`, `doc/CSBwin-src/Mouse.cpp:238-256`) —
+ * An actuator's local action (`PerformLocalAction`, `doc/CSBwin-src/Mouse.cpp:239-257`) —
  * which champion a skill increaser credits, and what position a pad or alcove hands on.
  *
- *  1. Type 10 is `SkillIncreaser(8, 300, mapPos == -1 ? 0 : 1)` (`Mouse.cpp:209-230`).
+ *  1. Type 10 is `SkillIncreaser(8, 300, mapPos == -1 ? 0 : 1)` (`Mouse.cpp:210-231`).
  *     With a position it credits `d.HandChar`, the champion who owns the cursor, and
  *     nobody when there is none. The port used to look for the living champion whose
  *     *cell* (`partyPosition`) equalled the actuator's wall position — a cell treated
@@ -10,10 +10,10 @@
  *  2. With `-1` the 300 is split: `sw(300 / d.NumCharacter)` to every champion with
  *     `HP() != 0`, the dead still counting in the divisor.
  *  3. `PressurePadOrAlcove` ends `QueueSwitchAction(DB3A3, tmrAction, mapX, mapY, -1)`
- *     (`doc/CSBwin-src/Code11f52.cpp:3875`) — `-1` for an alcove as much as a floor pad.
+ *     (`doc/CSBwin-src/Code11f52.cpp:3910`) — `-1` for an alcove as much as a floor pad.
  *     The port passed the alcove's wall position on, so an alcove skill increaser
  *     credited one champion instead of splitting, and an alcove's `RotateActuatorList`
- *     (`:3471-3525`) filtered by a position CSBWin never gives it.
+ *     (`:3506-3560`) filtered by a position CSBWin never gives it.
  *
  * Run: `npx tsx tools/dump-local-action.ts`
  */

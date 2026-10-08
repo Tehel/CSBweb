@@ -33,7 +33,7 @@ export interface UIButton extends Rect {
   name?: string;
 }
 
-/** CSBWin `KeyXlate` (`doc/CSBwin-src/CSB.h:1379`): a key and the button it queues. */
+/** CSBWin `KeyXlate` (`doc/CSBwin-src/CSB.h:1382`): a key and the button it queues. */
 export interface KeyXlate {
   mouse: number;
   keyscan: number;
@@ -58,7 +58,7 @@ export interface UITables {
     wRectPos20210: WordRect;
     wRectPos20202: WordRect;
     shrinkColorMap: number[];
-    /* Attack tables — all indexed by ATTACKTYPE (doc/CSBwin-src/Data.h:638-651). */
+    /* Attack tables — all indexed by ATTACKTYPE (doc/CSBwin-src/Data.h:647-660). */
     experienceForAttacking: Int8Array; // Byte20178[44] — ATTACKPARAMETERS.experienceGained
     skillNumber: Int8Array; // SkillNumber[44] — which skill the attack trains/requires
     byte20090: Int8Array; // Byte20090[44] — becomes CHARDESC.word64 for the attack
@@ -80,12 +80,12 @@ export interface UITables {
     /**
      * `d.Word18552[28]`: the rectangles `_MagicSelection` flashes for magic buttons
      * 101-107, the six runes and the take-back, four words each, `x1, x2, y1, y2`
-     * (`doc/CSBwin-src/Magic.cpp:568-570`).
+     * (`doc/CSBwin-src/Magic.cpp:571-573`).
      */
     word18552: WordRect[];
     moveButtons: WordRect[];
     dropAreas: Rect[];
-    /** The key tables `TAG0196da` reads (`KeyXlate`, `doc/CSBwin-src/CSB.h:1379`). */
+    /** The key tables `TAG0196da` reads (`KeyXlate`, `doc/CSBwin-src/CSB.h:1382`). */
     keys: {
       byte18448: KeyXlate[]; // frozen: Esc is 148
       byte18440: KeyXlate[]; // asleep: Return is 146, Esc 147
@@ -129,9 +129,9 @@ export interface UITables {
     /** `d.Byte586[8][4]` — the order an attack from a given side reaches the party. */
     byte586: number[][];
     /**
-     * `d.DropOrder[30]` (`doc/CSBwin-src/Data.h:1405`) — the order in which
+     * `d.DropOrder[30]` (`doc/CSBwin-src/Data.h:1420`) — the order in which
      * `DropAllPossessions` empties a dying champion's slots
-     * (`doc/CSBwin-src/Character.cpp:2506-2508`).
+     * (`doc/CSBwin-src/Character.cpp:2511-2513`).
      */
     dropOrder: number[];
     word1526: number[][];
@@ -169,8 +169,8 @@ export interface UITables {
     wRectPos926: WordRect;
     iconDisplay: IconDisplay[];
     /**
-     * `d.wRectPos624` (`doc/CSBwin-src/Data.h:1452`): the held object's name, which
-     * `ClearHeldObjectName` fills with colour 0 (`doc/CSBwin-src/Viewport.cpp:3306-3316`).
+     * `d.wRectPos624` (`doc/CSBwin-src/Data.h:1467`): the held object's name, which
+     * `ClearHeldObjectName` fills with colour 0 (`doc/CSBwin-src/Viewport.cpp:3313-3323`).
      */
     wRectPos624: WordRect;
     word612: number[];
@@ -216,7 +216,7 @@ export interface UITables {
  * Both are 128 bytes of Atari planar data: sixteen rows of four 16-bit bitplane words, so
  * each row is eight bytes and each pixel a 4-bit index gathered across the planes. Colour
  * 12 is transparent — `CreateCursorBitmap` floods its working buffer with it before
- * blitting the shape in (`doc/CSBwin-src/CSBCode.cpp:2276`).
+ * blitting the shape in (`doc/CSBwin-src/CSBCode.cpp:2309`).
  *
  * The arrow is drawn straight from this bitmap with no colour mapping, which is why it
  * changes colour with the screen: its body is palette index 4, and that is `0x654` beige
@@ -300,8 +300,8 @@ function readI32Array(view: DataView, off: number, count: number): number[] {
 }
 
 /**
- * `count` `KeyXlate` slots, `{ui16 mouse; ui16 keyscan;}` (`doc/CSBwin-src/CSB.h:1379-1383`),
- * up to the terminating `mouse == 0`, which `TAG0196da` stops at (`CSBCode.cpp:8446`).
+ * `count` `KeyXlate` slots, `{ui16 mouse; ui16 keyscan;}` (`doc/CSBwin-src/CSB.h:1382-1386`),
+ * up to the terminating `mouse == 0`, which `TAG0196da` stops at (`CSBCode.cpp:8533`).
  */
 function readKeyXlate(view: DataView, off: number, count: number): KeyXlate[] {
   const keys: KeyXlate[] = [];
@@ -380,7 +380,7 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
   off += 16;
 
   // Seven parallel 44-entry tables indexed by ATTACKTYPE, then the attack names,
-  // then the per-attack-class legal-attack lists (doc/CSBwin-src/Data.h:638-651).
+  // then the per-attack-class legal-attack lists (doc/CSBwin-src/Data.h:647-660).
   // These are signed bytes in CSBWin; `PossibleAttackTypes` relies on -1 meaning
   // "no such option", so keep the sign.
   const attackTableOffset = off;
@@ -397,9 +397,9 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
   off = attackTableOffset + 44 * 7;
 
   // NUL-separated, indexed by attack type — CSBWin walks the list counting
-  // terminators (`GetAttackTypeName`, doc/CSBwin-src/CSBCode.cpp:8609).
+  // terminators (`GetAttackTypeName`, doc/CSBwin-src/CSBCode.cpp:8714).
   // `AttackNames[300]` in CSBWin's struct, which asserts the graphic is 0x4e8 bytes
-  // (doc/CSBwin-src/CSBCode.cpp:10153). The French 1.3 file's names take 400 and its
+  // (doc/CSBwin-src/CSBCode.cpp:10277). The French 1.3 file's names take 400 and its
   // graphic is 100 bytes longer; what follows them is the same 584 bytes in both, so
   // the names are whatever lies between the attack tables and that tail
   // (doc/PROVEN_FACTS.md → "The French 1.3 `graphics.dat`: longer words").
@@ -411,7 +411,7 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
   // LEGALATTACKS.byte0[8] (doc/CSBwin-src/Data.h:225). Byte 0 is the always-legal
   // attack; bytes 1-2 are the two optional attacks (255 = absent) and bytes 4-5 the
   // mastery each needs, with bit 7 meaning "the item must have charges left"
-  // (`GetLegalAttackTypes`, doc/CSBwin-src/Character.cpp:4769-4808).
+  // (`GetLegalAttackTypes`, doc/CSBwin-src/Character.cpp:4786-4825).
   requireSize(raw, off, 44 * 8, '0x230 legalAttacks');
   const legalAttacks: Uint8Array[] = [];
   for (let i = 0; i < 44; i++) {
@@ -438,7 +438,7 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
     spellOff += 8;
   }
 
-  // Byte19016[6] and Byte19010[24] live at the tail of graphic 0x230 (Data.h:680-681).
+  // Byte19016[6] and Byte19010[24] live at the tail of graphic 0x230 (Data.h:689-690).
   const tailOffset = raw.length - 30;
   requireSize(raw, tailOffset, 30, '0x230 Byte19016/Byte19010');
   const spellFirstRuneScale = Array.from(raw.slice(tailOffset, tailOffset + 6));
@@ -471,7 +471,7 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
  * Split a fixed-size blob into NUL-terminated strings.
  *
  * CSBWin never counts these — it walks forward over `n` terminators to reach the
- * nth name (doc/CSBwin-src/CSBCode.cpp:8609) — so a trailing run of padding zeroes
+ * nth name (doc/CSBwin-src/CSBCode.cpp:8714) — so a trailing run of padding zeroes
  * simply yields no further entries.
  */
 function readNulSeparatedNames(raw: Uint8Array): string[] {
@@ -651,24 +651,24 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   const wRectPos1454 = readWordRectArray(view, off, 4); off += 4 * 8;
 
   /**
-   * `d.SpecialChars[6]` (`doc/CSBwin-src/Data.h:1422`) — comma, period, semi-colon,
+   * `d.SpecialChars[6]` (`doc/CSBwin-src/Data.h:1437`) — comma, period, semi-colon,
    * colon, space. The name-entry keyboard's letter grid runs 'A'..'Z' and then indexes
    * this table for the punctuation keys past 'Z'
-   * (`doc/CSBwin-src/Code13ea4.cpp:203-207`).
+   * (`doc/CSBwin-src/Code13ea4.cpp:215-219`).
    */
   const specialChars = Array.from(raw.slice(off, off + 6)); off += 6;
   // `d.Byte1416[2]` — a one-character C string the name-entry screen fills in to print
-  // the letter just typed (`Code13ea4.cpp:249`). The port passes the character instead.
+  // the letter just typed (`Code13ea4.cpp:265`). The port passes the character instead.
   off += 2;
   /**
    * `d.Byte1414[2]` — the other one-character string, the name-entry screen's cursor.
    * It is drawn in colour 9 to mark where the next letter will go and redrawn in 13 to
-   * take the mark away (`Code13ea4.cpp:70-79`, `:283-291`).
+   * take the mark away (`Code13ea4.cpp:70-79`, `:299-307`).
    */
   const byte1414 = Array.from(raw.slice(off, off + 2)); off += 2;
   /**
-   * `d.Byte1412[6]` (doc/CSBwin-src/Data.h:1412) — per-body-part weighting for how
-   * much a shield held in hand protects that part (doc/CSBwin-src/Character.cpp:2419).
+   * `d.Byte1412[6]` (doc/CSBwin-src/Data.h:1427) — per-body-part weighting for how
+   * much a shield held in hand protects that part (doc/CSBwin-src/Character.cpp:2424).
    */
   const byte1412 = Array.from(raw.slice(off, off + 6)); off += 6;
 
@@ -714,15 +714,15 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   // FILL(598,590) length 8, then two tables the monster attack code needs.
   off += 8;
   /**
-   * `d.uByte590[4]` (doc/CSBwin-src/Data.h:1461) — the wound-location bitmasks a
+   * `d.uByte590[4]` (doc/CSBwin-src/Data.h:1476) — the wound-location bitmasks a
    * monster's attack picks from, indexed by how far down `MONSTERDESC.word22`'s
-   * nibbles the roll fell (doc/CSBwin-src/Monster.cpp:4548-4556).
+   * nibbles the roll fell (doc/CSBwin-src/Monster.cpp:4561-4569).
    */
   const uByte590 = Array.from(raw.slice(off, off + 4)); off += 4;
   /**
-   * `d.Byte586[8][4]` (doc/CSBwin-src/Data.h:1462) — for each of eight
+   * `d.Byte586[8][4]` (doc/CSBwin-src/Data.h:1477) — for each of eight
    * direction/side combinations, the party positions in the order an attack from
-   * there reaches them (`DetermineAttackOrder`, doc/CSBwin-src/Character.cpp:384).
+   * there reaches them (`DetermineAttackOrder`, doc/CSBwin-src/Character.cpp:385).
    */
   const byte586: number[][] = [];
   for (let i = 0; i < 8; i++) byte586.push(Array.from(raw.slice(off + i * 4, off + i * 4 + 4)));
@@ -742,7 +742,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
 
   // `Word140` down to `Word12`, in the file's own order. The names are the original
   // Atari offsets and they run *downward* through the item, which is why an array read
-  // forward indexes them in reverse (`doc/CSBwin-src/Data.h:1475-1487`).
+  // forward indexes them in reverse (`doc/CSBwin-src/Data.h:1490-1502`).
   const wordRects = readWordRectArray(view, off, 17);
   // The title animation and the prison door (`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`).
   // The end of the game (`_ShowCredits`, `doc/CSBwin-src/Code1f9e6.cpp:66`).

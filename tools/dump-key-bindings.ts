@@ -146,7 +146,7 @@ async function main(): Promise<void> {
     "'w' with champion 2's menu open should perform their first attack");
   check(ui.attackingCharacterOrdinal === 0, 'performing an attack should close the menu');
   check(clockTick() === 'due',
-    "and set d.clockTick to what it returned, as the click does (Character.cpp:4716-4717)");
+    "and set d.clockTick to what it returned, as the click does (Character.cpp:4733-4734)");
   check(ui.word20250 === 1, 'closing the menu should leave the panel owing a redraw');
 
   // ---- 2. Any of the column's three keys opens the menu; with it open, each is its row,
@@ -240,7 +240,7 @@ async function main(): Promise<void> {
   }
 
   // ---- 6. `d.PotentialCharacterOrdinal` makes every panel inert
-  //         (`doc/CSBwin-src/Mouse.cpp:1578-1650`), keys included.
+  //         (`doc/CSBwin-src/Mouse.cpp:1717-1789`), keys included.
   party.state.potentialChampionIndex = 0;
   press('q');
   check(ui.attackingCharacterOrdinal === 0, 'no attack menu while a champion is only provisional');
@@ -252,7 +252,7 @@ async function main(): Promise<void> {
 
   // ---- 7. A busy champion opens no menu, by key or by a click on their hand:
   //         `PrepareAttack` returns on `CHARFLAG_attackDisable`
-  //         (`doc/CSBwin-src/Character.cpp:4916`). The stub attack busies the attacker, as
+  //         (`doc/CSBwin-src/Character.cpp:4941`). The stub attack busies the attacker, as
   //         the real one's `DisableCharacterAction` does.
   game.systems.character.executeAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
@@ -282,8 +282,8 @@ async function main(): Promise<void> {
   closeAttackMenu(ui);
 
   // ---- 8. An attack that starts a script (the fusion's `_FusionSequence`) never returns
-  //         to its caller (`doc/CSBwin-src/Character.cpp:4972`): `TAG01b1c0` leaves the
-  //         menu up, and `d.clockTick = intResult` (`:4717`) is not set. While the script
+  //         to its caller (`doc/CSBwin-src/Character.cpp:4997`): `TAG01b1c0` leaves the
+  //         menu up, and `d.clockTick = intResult` (`:4734`) is not set. While the script
   //         holds the loop every panel key is claimed and dead: CSBWin's UI only queues.
   // The attack holds the loop in a script of its own, as `_FusionSequence` does, until
   // `held` lets it go and a VBL ends it.

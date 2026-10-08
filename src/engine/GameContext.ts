@@ -85,11 +85,11 @@ export interface GameContext {
   /** The game's own state: `state.tickCount` is `d.Time`. */
   readonly state: GameState;
   /**
-   * `d.RandomNumber` (`doc/CSBwin-src/CSBCode.cpp:351`), the one game-visible random
+   * `d.RandomNumber` (`doc/CSBwin-src/CSBCode.cpp:361`), the one game-visible random
    * stream. Everything with a game-visible outcome draws from it, in CSBWin's order, so a
    * seeded run is reproducible and an AI trace is comparable with CSBWin's. Rendering must
    * never draw from it: CSBWin keeps a separate `viewportRandom` precisely so drawing
-   * "doesn't upset the game" (`doc/CSBwin-src/Viewport.cpp:6706`). Seeded from the host
+   * "doesn't upset the game" (`doc/CSBwin-src/Viewport.cpp:6713`). Seeded from the host
    * on first draw; `Game.setRandomSeed` pins it for a tool.
    */
   readonly random: CsbRandom;
@@ -106,7 +106,7 @@ export interface GameContext {
   /** `SmartDiscard.cpp`'s statics: where the discard cycle stands. */
   readonly smartDiscard: SmartDiscardState;
   /**
-   * `d.LevelCleared[16]` (`doc/CSBwin-src/Data.h:941`), one per database: the level
+   * `d.LevelCleared[16]` (`doc/CSBwin-src/Data.h:956`), one per database: the level
    * `MakeMoreRoomInDB` last took an object from, where its next sweep starts. Zero at
    * the start and never saved.
    */
@@ -142,46 +142,46 @@ export interface GameContext {
 }
 
 /**
- * Eight of CSBWin's process-wide globals, not `d.`'s: `DM_rules` (`doc/CSBwin-src/data.cpp:251`),
- * `DMRulesDesignOption` (`CSBUI.cpp:137`), `invisibleMonsters` and `drawAsSize4Monsters`
- * (`data.cpp:77-78`), `simpleEncipher`, and CSBWin 20230608's three, all `false` at start.
- * Only `ReadExtendedFeatures` assigns the first four from a file (`SaveGame.cpp:392-400`), and
+ * Eight of CSBWin's process-wide globals, not `d.`'s: `DM_rules` (`doc/CSBwin-src/data.cpp:252`),
+ * `DMRulesDesignOption` (`CSBUI.cpp:148`), `invisibleMonsters` and `drawAsSize4Monsters`
+ * (`data.cpp:78-79`), `simpleEncipher`, and CSBWin 20230608's three, all `false` at start.
+ * Only `ReadExtendedFeatures` assigns the first four from a file (`SaveGame.cpp:394-402`), and
  * only for a file whose block is present, so a file without one (`dm-atari/dungeon.dat`,
  * CSB's Atari-era saves) leaves them as they were; the same for the last two of the three.
  * A new game and a load therefore keep them: `Game.readNewGame` and the save paths never
  * replace this object.
  */
 export interface RulesOptions {
-  /** `DM_rules`: reincarnation costs nothing (`CSBCode.cpp:6740`, `:6761`). */
+  /** `DM_rules`: reincarnation costs nothing (`CSBCode.cpp:6799`, `:6820`). */
   dmRules: boolean;
   /** `DMRulesDesignOption`: the dungeon asks for DM rules, forced on at the boot. */
   dmRulesDesignOption: boolean;
-  /** `invisibleMonsters`: a creature's bit 11 hides it (`DB4::invisible()`, `CSB.h:1125`). */
+  /** `invisibleMonsters`: a creature's bit 11 hides it (`DB4::invisible()`, `CSB.h:1128`). */
   invisibleMonsters: boolean;
   /**
    * `drawAsSize4Monsters`: a creature's bits 12-14 count, drawn as one figure filling the cell,
-   * unique, poisoned (`DB4::drawAsSize4()`, `Unique()`, `Poisoned()`, `CSB.h:1127-1132`).
+   * unique, poisoned (`DB4::drawAsSize4()`, `Unique()`, `Poisoned()`, `CSB.h:1130-1135`).
    */
   drawAsSize4Monsters: boolean;
   /**
-   * `simpleEncipher` (`data.cpp:243`): a file read was enciphered, so every save is
-   * (`SaveGame.cpp:914-920`, `:943-946`). Set by an enciphered file, cleared by none.
+   * `simpleEncipher` (`data.cpp:244`): a file read was enciphered, so every save is
+   * (`SaveGame.cpp:939-946`, `:968-971`). Set by an enciphered file, cleared by none.
    */
   simpleEncipher: boolean;
   /**
-   * `SupressDSAWarningOption` (`doc/CSBwin-src-20230608/data.cpp:63`): the dungeon stops
+   * `SupressDSAWarningOption` (`doc/CSBwin-src/data.cpp:63`): the dungeon stops
    * "Excessive DSA operations" (`DSA.cpp:5472`), a warning the port does not give. Kept to
    * be written back. Unlike the rest, every file read clears it (`SaveGame.cpp:312`).
    */
   supressDSAWarningOption: boolean;
   /**
-   * `bGravityGame` (`doc/CSBwin-src-20230608/data.cpp:241`): the party falls along the axes
+   * `bGravityGame` (`doc/CSBwin-src/data.cpp:241`): the party falls along the axes
    * it last moved on (`CSBCode.cpp:8166`). Read from the dungeon; nothing plays it yet
    * (`DEBT.md` X5).
    */
   bGravityGame: boolean;
   /**
-   * `bThreeDMovements` (`doc/CSBwin-src-20230608/data.cpp:240`): the keys that move the party
+   * `bThreeDMovements` (`doc/CSBwin-src/data.cpp:240`): the keys that move the party
    * up and down a level (`CSBCode.cpp:8575`). Read from the dungeon; nothing plays it yet
    * (`DEBT.md` X5).
    */
@@ -189,8 +189,8 @@ export interface RulesOptions {
 }
 
 /**
- * A new game's timer table, as `ReadDatabases` sizes it (`doc/CSBwin-src/SaveGame.cpp:2549`,
- * `:2556-2564`, `:2612-2616`): 100 slots, and one more per record of the monster
+ * A new game's timer table, as `ReadDatabases` sizes it (`doc/CSBwin-src/SaveGame.cpp:2761`,
+ * `:2768-2776`, `:2824-2828`): 100 slots, and one more per record of the monster
  * database and of each database from the missiles on, a record count being the file's
  * and `d.Byte7302`'s extra ones together (`DungeonState.addNewGameSpares`).
  */
@@ -206,7 +206,7 @@ function newGameTimerQueue(dungeonData: DungeonData): TimerQueue {
 
 /**
  * `d.RandomGameID` as a new game draws it: the product of the low words of two draws
- * (`doc/CSBwin-src/SaveGame.cpp:1523-1532`).
+ * (`doc/CSBwin-src/SaveGame.cpp:1638-1647`).
  *
  * CSBWin keeps a product of 0, which either word being 0 gives, about one game in
  * 32768. The port draws again: an id is never 0, the value a file of an earlier build
@@ -223,13 +223,13 @@ export function drawRandomGameID(random: CsbRandom): number {
 
 /**
  * `_ReadEntireGame`'s `d.` for a new game: the four words it sets first
- * (`doc/CSBwin-src/SaveGame.cpp:1467-1470`), `Word22592` then taken from a compressed
- * `dungeon.dat` and staying 13 for a plain one (`:2350-2358`, `DungeonData.word22592`),
+ * (`doc/CSBwin-src/SaveGame.cpp:1568-1571`), `Word22592` then taken from a compressed
+ * `dungeon.dat` and staying 13 for a plain one (`:2562-2570`, `DungeonData.word22592`),
  * and `d.RandomGameID` (`drawRandomGameID`).
  *
  * The empty world (`emptyDungeonData`) is what `d.Initialize()` leaves before any read,
  * and `d.Initialize()` draws nothing: it only seeds `d.RandomNumber`
- * (`doc/CSBwin-src/CSBCode.cpp:350-351`). Its `RandomGameID` is 0, and the stream is left
+ * (`doc/CSBwin-src/CSBCode.cpp:360-361`). Its `RandomGameID` is 0, and the stream is left
  * for the read.
  */
 function newGameBlock1(random: CsbRandom, dungeonData: DungeonData): Block1State {

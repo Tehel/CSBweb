@@ -45,7 +45,7 @@ A function that turns out not to need the state does not take it — the pure he
 | `ui/Character.ts` | `Character.cpp` | Portraits, hand icons, shield dots, the damage figure over a hurt champion's name (`DisplayCharacterDamage`'s blit), life/stamina/mana bars, attributes, food/water, carried load, possession slots |
 | `ui/Feeding.ts` | `Character.cpp` | The mouth button and the chew animation. Derives a `FEEDPARAMETERS` block (`_FeedCharacter`'s first half); `src/engine/Feeding.ts` applies it (`applyFeedParameters`) |
 | `ui/MagicPanel.ts` | `Magic.cpp` (UI half) | Rune keypad, the incantation being assembled, its mana cost |
-| `ui/Attack.ts` | `Character.cpp` (attack half), `CSBCode.cpp:8718-8862` | The attack buttons and the attack menu: legal options, the per-tick panel state, the damage flash |
+| `ui/Attack.ts` | `Character.cpp` (attack half), `CSBCode.cpp:8823-8967` | The attack buttons and the attack menu: legal options, the per-tick panel state, the damage flash |
 | `ui/Objects.ts` | `Objects.cpp`, `Code17818.cpp` | Name-index resolution, description phrases, weight, `DetermineMastery` |
 | `ui/Draw.ts` | `CSBUI.cpp` | Screen-buffer primitives (`fillRect`, shading, object icons, bars) and the static chrome |
 | `ui/ViewportPicking.ts` | `Mouse.cpp`, `Viewport.cpp` | What the point under the cursor refers to |
@@ -62,10 +62,10 @@ the sound chip — and to nothing else. `IntroHost.ts` is that hardware as an in
 | Module | CSBWin counterpart | Holds |
 | --- | --- | --- |
 | `intro/IntroHost.ts` | the ST, and `Graphics.cpp` (`_FadeToPalette`) | The interface the screens draw through, the eight-step palette fade, `d.Palette11914` (black), and the Timer-A → sample-rate mapping |
-| `intro/TitleSequence.ts` | `CSBCode.cpp:9203` (`_DisplayChaosStrikesBack`) | The title animation and `ShrinkBLT`'s 16.16 fixed point |
-| `intro/PrisonDoor.ts` | `CSBCode.cpp:9459` / `:9545` / `:9379` / `:9629` | The dungeon entrance, its three buttons, the 31-frame door animation and the credits scroll |
-| `intro/PrisonLevel.ts` | `CSBCode.cpp:9556-9576` | The synthetic 5×5 level behind the doors, as a `DungeonState` the real viewport renderer can read |
-| `intro/BootSequence.ts` | `CSBCode.cpp:11338` (`_AskWhatToDo`) | The input queue, the VBL clock and the order the screens run in |
+| `intro/TitleSequence.ts` | `CSBCode.cpp:9308` (`_DisplayChaosStrikesBack`) | The title animation and `ShrinkBLT`'s 16.16 fixed point |
+| `intro/PrisonDoor.ts` | `CSBCode.cpp:9577` / `:9667` / `:9485` / `:9753` | The dungeon entrance, its three buttons, the 31-frame door animation and the credits scroll |
+| `intro/PrisonLevel.ts` | `CSBCode.cpp:9678-9698` | The synthetic 5×5 level behind the doors, as a `DungeonState` the real viewport renderer can read |
+| `intro/BootSequence.ts` | `CSBCode.cpp:11573` (`_AskWhatToDo`) | The input queue, the VBL clock and the order the screens run in |
 
 ## `GameScreen` and `ViewportRenderer`
 

@@ -4,23 +4,23 @@
  * its groups of levels 5 and 7, off the party's level and, with the party moved there, on
  * it.
  *
- * 1. **`&MONSTER@` and `&MONSTER!`** (`doc/CSBwin-src/DSA.cpp:3992-4126`): the count, type,
+ * 1. **`&MONSTER@` and `&MONSTER!`** (`doc/CSBwin-src/DSA.cpp:3993-4127`): the count, type,
  *    hit points, flags and alternate graphics of a group into variables, the flags each
  *    through its gated `DB4` accessor, so all four read 0 on a dungeon without the design
  *    options; and the hit points, flags and graphics written back, as far as `num`
  *    reaches, all four hit points for a `num` of 0 or 1.
- * 2. **`&MONPOSS`** (`DSA.cpp:3358-3388`): a group's possessions by index, -1 past the
+ * 2. **`&MONPOSS`** (`DSA.cpp:3359-3389`): a group's possessions by index, -1 past the
  *    last, 0xffff for a slot that is no group.
- * 3. **`&DELMON`** is `DeleteMonsterInGroup` (`Monster.cpp:4600-4739`): a member leaves
+ * 3. **`&DELMON`** is `DeleteMonsterInGroup` (`Monster.cpp:4613-4752`): a member leaves
  *    the group, its hit points, corners, facings, status and `TT_MONSTER` timers closing
  *    up over it; a group of one, or an index past its last member, is left alone.
- * 4. **`&INSMON`** is `InsertMonsterInGroup` (`Monster.cpp:4742-4820`): a copy of member 0
+ * 4. **`&INSMON`** is `InsertMonsterInGroup` (`Monster.cpp:4755-4833`): a copy of member 0
  *    in the first free corner of the mask, with its hit points and a copy of its
  *    `TT_MONSTER_A0`, and the record's facing written as the whole facing byte; nothing
  *    for a full group, a corner already held, or a group as wide as its square.
- * 5. **`&MONBLK`** (`DSA.cpp:4625-4638`) sets `monsterMoveInhibit`, the four directions
+ * 5. **`&MONBLK`** (`DSA.cpp:4626-4639`) sets `monsterMoveInhibit`, the four directions
  *    `PossibleMove` refuses.
- * 6. **`&MONL&D`** (`DSA.cpp:4768-4790`) does nothing, not even pop, outside the monster
+ * 6. **`&MONL&D`** (`DSA.cpp:4769-4791`) does nothing, not even pop, outside the monster
  *    move filter; in it, the group's location and distance from the filter's parameters.
  *
  * Run: `npx tsx tools/dump-dsa-monsters.ts`

@@ -9,11 +9,11 @@
  * - `TestDirectPathOpen` (:375) — line of sight, by slope-following
  * - `Blocked` (:518) — can this group see the party at all
  * - `GetBestMonsterFacingP1` (:596) — smelling, and the footprint trail
- * - `PossibleMove` (:635), `FindPossibleMove` (:775), `PossibleDoubleMove` (:799)
- * - `TurnMonster` (:821) and `TurnMonsterGroup` (:876)
+ * - `PossibleMove` (:635), `FindPossibleMove` (:779), `PossibleDoubleMove` (:803)
+ * - `TurnMonster` (:825) and `TurnMonsterGroup` (:880)
  *
  * plus `IsItInThisDirection` and `GetPrimaryAndSecondaryDirection` from
- * `Code11f52.cpp` (:2144 and :2181) and `DistanceBetweenPoints` (:4506).
+ * `Code11f52.cpp` (:2179 and :2216) and `DistanceBetweenPoints` (:4519).
  *
  * `PossibleMove` communicates through several `d.` globals rather than a return
  * value — whether a door blocked it, which monster was in the way, whether the step
@@ -52,7 +52,7 @@ export const DELTA_Y = [-1, 0, 1, 0];
 const TELEPORTER_WILLINGNESS = 10;
 
 /**
- * `RelativeXY` (`doc/CSBwin-src/CSBCode.cpp:4571`) — step `forward` cells along
+ * `RelativeXY` (`doc/CSBwin-src/CSBCode.cpp:4636`) — step `forward` cells along
  * `facing` and `right` cells along `facing + 1`.
  */
 export function relativeXY(facing: number, forward: number, right: number, mapX: number, mapY: number): { x: number; y: number } {
@@ -64,13 +64,13 @@ export function relativeXY(facing: number, forward: number, right: number, mapX:
   };
 }
 
-/** `DistanceBetweenPoints` (`doc/CSBwin-src/Monster.cpp:4506`) — orthogonal, "crow". */
+/** `DistanceBetweenPoints` (`doc/CSBwin-src/Monster.cpp:4519`) — orthogonal, "crow". */
 export function distanceBetweenPoints(x1: number, y1: number, x2: number, y2: number): number {
   return Math.abs(x1 - x2) + Math.abs(y1 - y2);
 }
 
 /**
- * `IsItInThisDirection` (`doc/CSBwin-src/Code11f52.cpp:2144`).
+ * `IsItInThisDirection` (`doc/CSBwin-src/Code11f52.cpp:2179`).
  *
  * True when the destination lies within a 45°-ish cone ahead of `dir`. "Even with
  * us" counts as ahead, and the sideways tolerance is `ahead + 1`, so the cone is one
@@ -91,7 +91,7 @@ export function isItInThisDirection(dir: number, myX: number, myY: number, destX
 }
 
 /**
- * `GetPrimaryAndSecondaryDirection` (`doc/CSBwin-src/Code11f52.cpp:2181`).
+ * `GetPrimaryAndSecondaryDirection` (`doc/CSBwin-src/Code11f52.cpp:2216`).
  *
  * The primary direction is the one within 45° of the target. At exactly 45° the two
  * candidate directions are assigned to primary and secondary at random; inside 45°
@@ -514,7 +514,7 @@ export class MonsterPerception {
   }
 
   /**
-   * `FindPossibleMove` (`doc/CSBwin-src/Monster.cpp:775`) — the first untested
+   * `FindPossibleMove` (`doc/CSBwin-src/Monster.cpp:779`) — the first untested
    * direction that works, **1-based** (0 = none).
    */
   findPossibleMove(
@@ -535,7 +535,7 @@ export class MonsterPerception {
   }
 
   /**
-   * `PossibleDoubleMove` (`doc/CSBwin-src/Monster.cpp:799`) — can the group take a
+   * `PossibleDoubleMove` (`doc/CSBwin-src/Monster.cpp:803`) — can the group take a
    * *second* step in the same direction. A Fluxcage already found in that direction
    * refuses it outright, and `RFPAW` is hard-coded off for the second step.
    */
@@ -563,7 +563,7 @@ export class MonsterPerception {
   }
 
   /**
-   * `TurnMonster` (`doc/CSBwin-src/Monster.cpp:821`).
+   * `TurnMonster` (`doc/CSBwin-src/Monster.cpp:825`).
    *
    * A monster already facing *away* from the preferred direction turns only 90°, to
    * one side at random, rather than spinning about face. Anything else snaps straight
@@ -604,7 +604,7 @@ export class MonsterPerception {
   }
 
   /**
-   * `TurnMonsterGroup` (`doc/CSBwin-src/Monster.cpp:876`).
+   * `TurnMonsterGroup` (`doc/CSBwin-src/Monster.cpp:880`).
    *
    * Each member turns on a coin toss, except member 0, which always turns. When
    * `asPairs` is set and the group has more than one member the loop starts one lower

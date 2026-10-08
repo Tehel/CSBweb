@@ -19,11 +19,11 @@ import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMas
 import { descIndexForObject, describeChampionBones, getBonesChampion, getInventoryPlaceholderIndex, getRoleMastery, resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 import type { Rect } from '../../data/tables/UITables';
-/** `d.Pointer16596` (`doc/CSBwin-src/CSBCode.cpp:363-366`), the four base skills. */
+/** `d.Pointer16596` (`doc/CSBwin-src/CSBCode.cpp:373-376`), the four base skills. */
 export const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const CHAR_COLORS = [7, 11, 8, 14];
 /**
- * `d.Pointer16770` (`doc/CSBwin-src/CSBCode.cpp:370-384`), indexed by the mastery
+ * `d.Pointer16770` (`doc/CSBwin-src/CSBCode.cpp:380-394`), indexed by the mastery
  * `DetermineMastery` returns, so slots 0 and 1 are never read (CSBWin leaves 1 out of the
  * panel and dies on 0). The six master ranks begin with the characters `` ` `` and `a`..`e`,
  * which in the DM font (graphic `0x22d`) are the rune glyphs for Lo, Um, On, Ee, Ux and
@@ -53,7 +53,7 @@ const ATTRIBUTE_LABELS = ['STRENGTH', 'DEXTERITY', 'WISDOM', 'VITALITY', 'ANTI-M
 export function drawFoodWaterPanel(ui: UIState, champion: Champion): void {
   const g232 = ui.uiTables.graphic232;
   blitBasicGraphicToViewport(ui, 20, g232.wRectPos926, 144, 8);
-  // CSBWin's widths, 24, 24 and 48 bytes (doc/CSBwin-src/Viewport.cpp:7243-7247), are
+  // CSBWin's widths, 24, 24 and 48 bytes (doc/CSBwin-src/Viewport.cpp:7250-7254), are
   // the English words' 48, 48 and 96 pixels. The French 1.3 "NOURRITURE" is 96 wide, as
   // its `wRectPos950` is, so each word is read at its own width
   // (doc/PROVEN_FACTS.md → "The French 1.3 `graphics.dat`: longer words").
@@ -75,7 +75,7 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
 
   // `for (D7W=0; D7W<=3; D7W++)` — one line per role, `Smaller(16, mastery)` capped and
   // mastery 1 (no experience at all) left off the panel entirely
-  // (`doc/CSBwin-src/Character.cpp:4590-4605`).
+  // (`doc/CSBwin-src/Character.cpp:4607-4622`).
   let lineY = 58;
   for (let role = 0; role < ROLE_LABELS.length; role++) {
     const mastery = Math.min(16, getRoleMastery(ui, champion, role));
@@ -95,7 +95,7 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
   }
 
   // `for (D7W=1; D7W<=6; D7W++)` — the panel lists attributes 1..6 and never Luck
-  // (`doc/CSBwin-src/Character.cpp:4609`). Red when Current has fallen below Maximum,
+  // (`doc/CSBwin-src/Character.cpp:4626`). Red when Current has fallen below Maximum,
   // green when a potion has pushed it above.
   const stats = champion.attributes?.stats ?? [];
   const attrValues: number[] = [];
@@ -244,7 +244,7 @@ export function computeLoadWeight(ui: UIState, champion: Champion): number {
   return ui.ctx.systems.characterStats.characterLoad(champion);
 }
 
-/** `MaxLoad` (`doc/CSBwin-src/Code11f52.cpp:4280`), in the engine. */
+/** `MaxLoad` (`doc/CSBwin-src/Code11f52.cpp:4318`), in the engine. */
 export function computeMaxLoad(ui: UIState, champion: Champion): number {
   return ui.ctx.systems.characterStats.maxLoad(champion);
 }
@@ -269,7 +269,7 @@ export function formatMaxLoad(value: number): string {
 /**
  * A champion's square in the top view of positions: `DrawCharacterState` fills it with
  * the champion's colour and lays the facing arrow, graphic 28, over it
- * (`doc/CSBwin-src/Character.cpp:1458-1476`). `TAG0025a6` makes its cursor of it too.
+ * (`doc/CSBwin-src/Character.cpp:1463-1481`). `TAG0025a6` makes its cursor of it too.
  */
 export function drawPositionSquare(
   ui: UIState,
@@ -316,8 +316,8 @@ export function drawPartyStatus(ui: UIState): void {
     // and it rotates when the party turns while the boxes do not.
     const champion = party.champions[chIdx] ?? null;
     // `DrawAllCharacterState` draws boxes 0..d.NumCharacter-1 only
-    // (`doc/CSBwin-src/CSBCode.cpp:6831-6834`), and a box emptied is filled with colour 0
-    // (`:6641-6649`, `Character.cpp:5387-5398`): a box with nobody in it stays as black as
+    // (`doc/CSBwin-src/CSBCode.cpp:6890-6893`), and a box emptied is filled with colour 0
+    // (`:6700-6708`, `Character.cpp:5412-5423`): a box with nobody in it stays as black as
     // the cleared screen.
     if (!champion) continue;
     fillRectIndex(
@@ -334,11 +334,11 @@ export function drawPartyStatus(ui: UIState): void {
         drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, baseX + 1, 5, nameColor, 1, champion.name);
       }
       // Under the life bars: `DisplayCharacterDamage` calls `DrawCharacterState`, whose
-      // `DrawLifeBars` goes over graphic 15's right edge (`doc/CSBwin-src/CSBCode.cpp:7203`).
+      // `DrawLifeBars` goes over graphic 15's right edge (`doc/CSBwin-src/CSBCode.cpp:7262`).
       if (champion) drawCharacterDamage(ui, chIdx, champion, false);
     }
 
-    // `if (pcA3->HP() != 0)`, and graphic 8 otherwise (`doc/CSBwin-src/Character.cpp:1261`).
+    // `if (pcA3->HP() != 0)`, and graphic 8 otherwise (`doc/CSBwin-src/Character.cpp:1266`).
     if (champion && (champion.attributes.health | 0) === 0) {
       const deadGraphic = ui.getGraphicBitmap(8);
       if (deadGraphic) {
@@ -395,8 +395,8 @@ export function drawPartyStatus(ui: UIState): void {
     }
 
     // `DrawCharacterState` draws the square inside `if (pcA3->HP() != 0)`, and only for a
-    // champion in the party (`doc/CSBwin-src/Character.cpp:1308`, `:1457-1475`): an empty
-    // box has none, and `KillCharacter` blanks a dead champion's (`:2664-2667`).
+    // champion in the party (`doc/CSBwin-src/Character.cpp:1313`, `:1462-1480`): an empty
+    // box has none, and `KillCharacter` blanks a dead champion's (`:2669-2672`).
     if (champion && champion.attributes.health !== 0) {
       const dir = (champion.partyPosition + 4 - facing) & 3;
       drawPositionSquare(ui, ui.screenIndexBuffer, g232.wRectPos1454[dir], chIdx, champion, facing);
@@ -405,7 +405,7 @@ export function drawPartyStatus(ui: UIState): void {
 
   // `TAG0025a6` blanks the square it picks a champion up from, and `DrawCharacterState`
   // leaves that square alone until the champion is put down
-  // (`doc/CSBwin-src/CSBCode.cpp:2108-2111`, `Character.cpp:1458-1461`).
+  // (`doc/CSBwin-src/CSBCode.cpp:2137-2140`, `Character.cpp:1463-1466`).
   if (ui.word23144 !== 0) fillRectIndex(ui.screenIndexBuffer, g232.wRectPos1454[ui.word23144 - 1], 0);
 
   drawTopBarHandIcons(ui);
@@ -413,7 +413,7 @@ export function drawPartyStatus(ui: UIState): void {
 
 /**
  * What `DisplayCharacterDamage` blits for a champion who lost HP this tick
- * (`doc/CSBwin-src/CSBCode.cpp:7121-7171`), for as long as it stays on CSBWin's screen.
+ * (`doc/CSBwin-src/CSBCode.cpp:7180-7230`), for as long as it stays on CSBWin's screen.
  * With the champion's inventory open it is graphic 16 over the portrait, at `69*chIdx+7`,
  * and the figure at y 16; otherwise graphic 15 over the name, at `69*chIdx`, and the
  * figure at y 5. Both are masked with colour 10, and the figure is `TAG014af6(damage, 0,
@@ -469,13 +469,13 @@ function drawCharacterDamage(ui: UIState, chIdx: number, champion: Champion, inv
 }
 
 /**
- * What `DrawCharacterState` (`doc/CSBwin-src/Character.cpp:1229`) draws over the damage
+ * What `DrawCharacterState` (`doc/CSBwin-src/Character.cpp:1234`) draws over the damage
  * shown, for the flags the engine hands the host. `CHARFLAG_portraitChanged` fills the
  * whole box, x `69*chIdx` to +66 by y 0 to 28, and draws the portrait or the name back
- * (`:1255-1307`). `CHARFLAG_cursor` fills the name's rectangle, x to +42 by y 0 to 6,
- * when the champion's inventory is closed (`:1343-1355`); the five columns of graphic 15
+ * (`:1260-1312`). `CHARFLAG_cursor` fills the name's rectangle, x to +42 by y 0 to 6,
+ * when the champion's inventory is closed (`:1348-1360`); the five columns of graphic 15
  * to its right are colour 10, which the blit leaves out. With the inventory open the
- * name goes into the viewport (`:1322-1339`) and the figure over the portrait stays.
+ * name goes into the viewport (`:1327-1344`) and the figure over the portrait stays.
  * Everything else those flags draw, the screen draws on every frame.
  */
 export function drawCharacterState(ui: UIState, chIdx: number, charFlags: number): void {
@@ -523,7 +523,7 @@ export function drawShieldDots(ui: UIState, baseX: number, champion: Champion): 
 
 /**
  * `&d.CH16482[chIdx].portrait` — the picture `CharacterPortraitToStatusBox` blits
- * (`doc/CSBwin-src/Character.cpp:4644`).
+ * (`doc/CSBwin-src/Character.cpp:4661`).
  *
  * A champion read from a genuine CSBWin save carries the pixels themselves, because
  * that is all `CHARDESC` holds; one this engine created carries the `charID`
@@ -550,7 +550,7 @@ export function getChampionPortrait(ui: UIState, champion: Champion): IndexedBit
 }
 
 /**
- * The portrait `AddCharacter` copies for `charID` (`doc/CSBwin-src/Character.cpp:484-508`):
+ * The portrait `AddCharacter` copies for `charID` (`doc/CSBwin-src/Character.cpp:485-509`):
  * a cell of basic graphic 26 up to 23, and `GetExternalPortraitAddress`'s past it.
  */
 export function getPortraitBitmap(ui: UIState, portraitIndex: number): IndexedBitmap | null {
@@ -632,7 +632,7 @@ export function drawTopBarHandIcons(ui: UIState): void {
 }
 
 export function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): void {
-  // `if (pcA3->HP() > 0)` (`doc/CSBwin-src/Character.cpp:920`).
+  // `if (pcA3->HP() > 0)` (`doc/CSBwin-src/Character.cpp:921`).
   if ((champion.attributes.health | 0) <= 0) return;
   const offsets = ui.uiTables.graphic232.word1526[chIdx];
   const masks = ui.uiTables.graphic232.word1502[chIdx];
@@ -662,7 +662,7 @@ export function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): vo
 }
 
 /**
- * `DrawNameOfHeldObject` (`doc/CSBwin-src/Code11f52.cpp:31`) — the 14-character line
+ * `DrawNameOfHeldObject` (`doc/CSBwin-src/Code11f52.cpp:65`) — the 14-character line
  * above the action area naming whatever the cursor is carrying.
  *
  * Two details are the function, not decoration. The index is `RN::NameIndex()`, the
@@ -674,8 +674,8 @@ export function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): vo
  */
 export function drawHeldObjectName(ui: UIState): void {
   if (ui.pressingEye && ui.partyState.objectInHand !== OBJECT_ID_NULL) {
-    // `_ClickOnEye`'s `ClearHeldObjectName` (`doc/CSBwin-src/Viewport.cpp:7284`), until
-    // the release's `DrawNameOfHeldObject` (`doc/CSBwin-src/CSBCode.cpp:7409-7412`).
+    // `_ClickOnEye`'s `ClearHeldObjectName` (`doc/CSBwin-src/Viewport.cpp:7291`), until
+    // the release's `DrawNameOfHeldObject` (`doc/CSBwin-src/CSBCode.cpp:7468-7471`).
     fillRectIndex(ui.screenIndexBuffer, ui.uiTables.graphic232.wRectPos624, 0);
     return;
   }
@@ -692,7 +692,7 @@ export function drawHeldObjectName(ui: UIState): void {
 /**
  * The name `DrawNameOfHeldObject` prints for `objectId`: its resolved name, and for a
  * champion's bones `DescribeChampionBones` over it
- * (`doc/CSBwin-src-20230608/Code11f52.cpp:72-100`).
+ * (`doc/CSBwin-src/Code11f52.cpp:72-100`).
  */
 export function heldObjectName(ui: UIState, objectId: ObjectID): string {
   const nameIndex = resolveObjectNameIndex(ui, objectId);

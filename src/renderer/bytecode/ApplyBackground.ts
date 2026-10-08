@@ -1,7 +1,7 @@
 /**
  * What a skin's program draws of its own graphics: `ApplyBackground`, `ApplyBackground3`
- * and `ApplyDecoration` (`doc/CSBwin-src/Viewport.cpp:6124-6541`), which
- * `DrawCustomGraphic` and `DrawCustomDecoration` call (`:3063-3082`, `:3102-3115`).
+ * and `ApplyDecoration` (`doc/CSBwin-src/Viewport.cpp:6131-6548`), which
+ * `DrawCustomGraphic` and `DrawCustomDecoration` call (`:3070-3089`, `:3109-3122`).
  *
  * CSBWin draws them into `d.pViewportBMP`, the viewport in the Atari's form: 136 lines of
  * 112 bytes, each line fourteen groups of sixteen pixels, each group four big-endian
@@ -22,7 +22,7 @@ import type { PaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
 
 const LINE_BYTES = 112;
 const LINES = 136;
-/** `d.pViewportBMP`'s size (`doc/CSBwin-src/CSBCode.cpp:10121`). */
+/** `d.pViewportBMP`'s size (`doc/CSBwin-src/CSBCode.cpp:10245`). */
 export const VIEWPORT_BMP_SIZE = LINE_BYTES * LINES;
 
 /** The port's viewport as CSBWin's `d.pViewportBMP` bytes (see the module comment). */
@@ -101,7 +101,7 @@ function maskHeader(mask: BackgroundPointer) {
 }
 
 /**
- * `ApplyBackground` (`Viewport.cpp:6444-6497`): the pixels of `bitmap` the mask selects,
+ * `ApplyBackground` (`Viewport.cpp:6451-6504`): the pixels of `bitmap` the mask selects,
  * from (`srcX`, `srcY`) to (`dstX`, `dstY`), sixteen at a time; `ApplyBackground3` when
  * either x is not on a group's start. `bitmap` is the section, its width longword first,
  * and `bitmapsize` its size in `ui32`s.
@@ -160,7 +160,7 @@ export function ApplyBackground(
 }
 
 /**
- * `ApplyBackground3` (`Viewport.cpp:6124-6440`): `ApplyBackground` shifted, for a source
+ * `ApplyBackground3` (`Viewport.cpp:6131-6447`): `ApplyBackground` shifted, for a source
  * or a destination off a group's start, line by line in CSBWin's four cases of the shifts.
  * The case of a destination shift under 8 and a source shift of 8 or more draws nothing:
  * its body is commented out in CSBWin. Pointers are byte offsets: `S` into `src`, `D` into
@@ -384,7 +384,7 @@ export function ApplyBackground3(
 }
 
 /**
- * `ApplyDecoration` (`Viewport.cpp:6500-6541`): a decoration, a byte of width and one of
+ * `ApplyDecoration` (`Viewport.cpp:6507-6548`): a decoration, a byte of width and one of
  * height, then per group of sixteen pixels a mask word and the four plane words, at the
  * location's byte of x, taken to a group, and its byte of y. CSBWin's group loop counts
  * groups two at a time (`col += 2` over `width / 16`), so it draws the first half of each

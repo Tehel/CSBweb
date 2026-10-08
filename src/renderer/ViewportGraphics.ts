@@ -63,7 +63,7 @@ export const VIEWPORT_X = 0;
 export const VIEWPORT_Y = 33;
 
 /**
- * The wall bitmaps, as palette-index images (CSBWin `CSBCode.cpp:2877-2893`). For wall set 0,
+ * The wall bitmaps, as palette-index images (CSBWin `CSBCode.cpp:2933-2949`). For wall set 0,
  * graphics 84-89 are `pWallBitmaps[0..5]` (F0R1, F0L1, F1, F2, F3, the F3L2 corner), and
  * `pWallBitmaps[6]` is the corner mirrored. The bytecode interpreter writes indices into a
  * viewport buffer, and the renderer converts to RGBA only at the end.
@@ -98,7 +98,7 @@ export function initializeWallBitmapsIndexed(
  * Initialize door bitmaps as palette-index images (no RGBA conversion).
  *
  * CSBWin `ReadWallBitmaps()` loads door bitmaps from `firstWallGraphic + [0..6]` into `pDoorBitmaps[1..7]`
- * and precomputes `pDoorBitmaps[0]` as a mirror of `pDoorBitmaps[2]` (CSBCode.cpp:2870-2897).
+ * and precomputes `pDoorBitmaps[0]` as a mirror of `pDoorBitmaps[2]` (CSBCode.cpp:2926-2953).
  */
 export function initializeDoorBitmapsIndexed(
   graphicsLoader: GraphicsLoader,
@@ -132,7 +132,7 @@ export function initializeDoorBitmapsIndexed(
 /**
  * Initialize floor and ceiling graphics as palette-index images (no RGBA conversion).
  *
- * CSBWin: `ReadAndExpandGraphic(P1*2 + 75, d.pFloorBitmap, ...)` and `... + 76` (CSBCode.cpp:2864-2865)
+ * CSBWin: `ReadAndExpandGraphic(P1*2 + 75, d.pFloorBitmap, ...)` and `... + 76` (CSBCode.cpp:2920-2921)
  */
 export function initializeFloorCeilingIndexed(
   graphicsLoader: GraphicsLoader,

@@ -1,14 +1,14 @@
 /**
  * Monsters hitting the party.
  *
- * Ports `MonsterAttacks` (`doc/CSBwin-src/Monster.cpp:944`) and
- * `MonsterDamagesCharacter` (`:4518`), together with the champion-side chain they
- * drive: `DamageCharacter` (`doc/CSBwin-src/Character.cpp:2703`), `KillCharacter`
- * (`:2526`), `Quickness` (`:2209`), `IsCharacterLucky` (`:2165`), the
- * attribute-scaled reduction `TAG016426` (`:2042`), `GetCharacterToDamage`
- * (`doc/CSBwin-src/CSBCode.cpp:6884`), `DetermineAttackOrder`
- * (`doc/CSBwin-src/Character.cpp:384`) and `PoisonCharacter`
- * (`doc/CSBwin-src/CSBCode.cpp:7211`).
+ * Ports `MonsterAttacks` (`doc/CSBwin-src/Monster.cpp:948`) and
+ * `MonsterDamagesCharacter` (`:4531`), together with the champion-side chain they
+ * drive: `DamageCharacter` (`doc/CSBwin-src/Character.cpp:2708`), `KillCharacter`
+ * (`:2531`), `Quickness` (`:2214`), `IsCharacterLucky` (`:2170`), the
+ * attribute-scaled reduction `TAG016426` (`:2047`), `GetCharacterToDamage`
+ * (`doc/CSBwin-src/CSBCode.cpp:6943`), `DetermineAttackOrder`
+ * (`doc/CSBwin-src/Character.cpp:385`) and `PoisonCharacter`
+ * (`doc/CSBwin-src/CSBCode.cpp:7270`).
  *
  * `MonsterAttacks` is not one attack but a decision about *how* to attack: it fills
  * in an `AttackParameters` block — who to hit, whether to throw a missile instead,
@@ -37,7 +37,7 @@ import { TimerFunction } from './TimerQueue';
 
 /**
  * The missile "projectile" RNs a monster can throw (`doc/CSBwin-src/CSBTypes.h`, used
- * at `doc/CSBwin-src/Monster.cpp:1041-1076`). Re-exported for the callers that used to
+ * at `doc/CSBwin-src/Monster.cpp:1045-1080`). Re-exported for the callers that used to
  * take them from here; the values live in `src/core/spellRn.ts`, which says why.
  */
 export {
@@ -62,11 +62,11 @@ const THROWABLE: ReadonlySet<number> = new Set([
 ]);
 
 /**
- * `ATTACK_PARAMETERES` (`doc/CSBwin-src/Monster.cpp:917-938`), twenty longwords.
+ * `ATTACK_PARAMETERES` (`doc/CSBwin-src/Monster.cpp:921-942`), twenty longwords.
  *
  * Kept as one block because the Monster Attack Filter DSA is handed the whole thing
  * and may rewrite any field before it is acted on
- * (`doc/CSBwin-src/Monster.cpp:1125-1171`). The two flags are CSBWin's `i32`s, tested
+ * (`doc/CSBwin-src/Monster.cpp:1129-1175`). The two flags are CSBWin's `i32`s, tested
  * against 0, and `missileType` its `ui32`, so a value the filter writes is kept as written.
  */
 export interface AttackParameters {
@@ -94,13 +94,13 @@ export interface AttackParameters {
   supressPoison: number;
 }
 
-/** `sizeof(attackParameters) / 4` (`doc/CSBwin-src/Monster.cpp:1165`): its 20 longwords. */
+/** `sizeof(attackParameters) / 4` (`doc/CSBwin-src/Monster.cpp:1169`): its 20 longwords. */
 export const ATTACK_PARAMETER_WORDS = 20;
 
 /**
  * `memcpy(pDSAparameters + 1, &attackParameters, sizeof(attackParameters))`
- * (`doc/CSBwin-src/Monster.cpp:1164`): the block as the monster attack filter's DSA sees
- * it, a longword per field in the struct's order (`:917-938`).
+ * (`doc/CSBwin-src/Monster.cpp:1168`): the block as the monster attack filter's DSA sees
+ * it, a longword per field in the struct's order (`:921-942`).
  */
 export function attackParametersToWords(p: AttackParameters): number[] {
   return [
@@ -113,7 +113,7 @@ export function attackParametersToWords(p: AttackParameters): number[] {
 
 /**
  * `memcpy(&attackParameters, pDSAparameters + 1, sizeof(attackParameters))`
- * (`doc/CSBwin-src/Monster.cpp:1167`): the block back from the DSA into `p`, `word(i)` its
+ * (`doc/CSBwin-src/Monster.cpp:1171`): the block back from the DSA into `p`, `word(i)` its
  * longword `i`, a `ui32` field read unsigned.
  */
 export function attackParametersFromWords(p: AttackParameters, word: (index: number) => number): void {
@@ -147,7 +147,7 @@ export class MonsterAttack {
 
   /**
    * `attackParameters`, the file-scope block `MonsterAttacks` fills in place
-   * (`doc/CSBwin-src/Monster.cpp:917-938`), zeroes before the first attack. An attack
+   * (`doc/CSBwin-src/Monster.cpp:921-942`), zeroes before the first attack. An attack
    * writes every field again but `disableTime`, which no C++ reads.
    */
   readonly attackParameters: AttackParameters = {
@@ -168,7 +168,7 @@ export class MonsterAttack {
   }
 
   /**
-   * `MonsterAttacks` (`doc/CSBwin-src/Monster.cpp:944`).
+   * `MonsterAttacks` (`doc/CSBwin-src/Monster.cpp:948`).
    *
    * Returns whether the member is now in its attacking pose, which is what the AI
    * feeds to `NextMonsterUpdateTime` to pick the attack sprite.
@@ -206,8 +206,8 @@ export class MonsterAttack {
 
     if (amended.monsterShouldLaunchMissile !== 0) {
       if (THROWABLE.has(amended.missileType)) {
-        // `LaunchMissile` as a monster calls it (`doc/CSBwin-src/Monster.cpp:1194-1203`),
-        // on `(RNVAL)attackParameters.missileType` (`:1188`). The projectile is the spell
+        // `LaunchMissile` as a monster calls it (`doc/CSBwin-src/Monster.cpp:1198-1207`),
+        // on `(RNVAL)attackParameters.missileType` (`:1192`). The projectile is the spell
         // RN itself (`RNFireball` and friends): a spell has no record behind it, so
         // nothing is built for it.
         this.ctx.systems.magic.launchMissile(
@@ -217,7 +217,7 @@ export class MonsterAttack {
           context.level,
           amended.missileOriginPosition,
           amended.directionToParty,
-          // `ApplyLimits(20, range, 255)` (doc/CSBwin-src/Monster.cpp:1200).
+          // `ApplyLimits(20, range, 255)` (doc/CSBwin-src/Monster.cpp:1204).
           applyLimits(20, amended.missileRange, 255),
           amended.missileDamage,
           amended.missileDecayRate,
@@ -230,7 +230,7 @@ export class MonsterAttack {
       switch (chIdx) {
         case 0: case 1: case 2: case 3:
           break;
-        case 4: // party leader, `d.HandChar` (`doc/CSBwin-src/Monster.cpp:1215-1217`)
+        case 4: // party leader, `d.HandChar` (`doc/CSBwin-src/Monster.cpp:1219-1221`)
           chIdx = party.cursorOwner ?? -1;
           break;
         case 5: // random live member
@@ -277,8 +277,8 @@ export class MonsterAttack {
    * `ITEM16`'s `uByte5`, as a successful war cry leaves it (`AttackSystem`).
    *
    * `d.uByte13126[8]` is never written in CSBWin: `DBank::Initialize` zeroes all of `d`
-   * (`doc/CSBwin-src/CSBCode.cpp:329`), no graphic is loaded over it, and it lies below
-   * the 3328 bytes of the save's character block (`Data.h:765-785`). So every try looks at
+   * (`doc/CSBwin-src/CSBCode.cpp:339`), no graphic is loaded over it, and it lies below
+   * the 3328 bytes of the save's character block (`Data.h:780-800`). So every try looks at
    * slot 0, the ready hand. `DrawCharacterState` has no counterpart: the panels are drawn
    * from live state.
    */
@@ -313,10 +313,10 @@ export class MonsterAttack {
   }
 
   /**
-   * Fill in the attack parameter block (`doc/CSBwin-src/Monster.cpp:986-1122`), field by
+   * Fill in the attack parameter block (`doc/CSBwin-src/Monster.cpp:990-1126`), field by
    * field in CSBWin's order, which is the order of its random draws: whether to launch,
    * then which missile, then whom to hit, then the range. False where CSBWin returns
-   * false (`:1092`): a `word2Bit4` monster that finds no live champion, before the range
+   * false (`:1096`): a `word2Bit4` monster that finds no live champion, before the range
    * is drawn.
    *
    * The one piece of real geometry here is `missileOriginPosition`: which corner of
@@ -353,7 +353,7 @@ export class MonsterAttack {
     p.monsterY = mapY;
 
     // Only monsters whose `word14_12_15` is above 1 throw anything, and then only
-    // at range or on a coin toss (doc/CSBwin-src/Monster.cpp:1035-1037).
+    // at range or on a coin toss (doc/CSBwin-src/Monster.cpp:1039-1041).
     p.monsterShouldLaunchMissile =
       monsterWord14_12_15(desc) > 1 &&
       (context.orthogonalDistanceToParty > 1 || this.random.bool() !== 0) ? 1 : 0;
@@ -387,7 +387,7 @@ export class MonsterAttack {
     return true;
   }
 
-  /** Which missile a given monster type throws (`doc/CSBwin-src/Monster.cpp:1041-1076`). */
+  /** Which missile a given monster type throws (`doc/CSBwin-src/Monster.cpp:1045-1080`). */
   private chooseMissile(monsterType: number): ObjectID {
     switch (monsterType) {
       case MonsterType.mon_Vexirk:
@@ -409,19 +409,19 @@ export class MonsterAttack {
       case MonsterType.mon_Dragon:
         return RN_FIREBALL;
       default:
-        // `missile = RNnul` (doc/CSBwin-src/Monster.cpp:1041), stored as its integer,
-        // 0xffff (`:1076`).
+        // `missile = RNnul` (doc/CSBwin-src/Monster.cpp:1045), stored as its integer,
+        // 0xffff (`:1080`).
         return OBJECT_ID_NULL;
     }
   }
 
   /**
-   * `MonsterDamagesCharacter` (`doc/CSBwin-src/Monster.cpp:4518`).
+   * `MonsterDamagesCharacter` (`doc/CSBwin-src/Monster.cpp:4531`).
    *
    * Two chances to avoid the blow entirely before any damage is rolled: being quicker
    * than the monster (and winning a 3-in-4 roll), and being lucky. A sleeping party is
-   * woken first (`Monster.cpp:4531`), so it gets both like anyone else: the
-   * `d.PartySleeping == 0` guard around them (`:4536`) is read after `WakeUp`.
+   * woken first (`Monster.cpp:4544`), so it gets both like anyone else: the
+   * `d.PartySleeping == 0` guard around them (`:4549`) is read after `WakeUp`.
    *
    * The damage itself is deliberately convoluted: a base from the monster's `attack10`
    * reduced by twice the champion's Fighter mastery, then halved, then grown by three
@@ -454,7 +454,7 @@ export class MonsterAttack {
 
     // Where the blow lands. A roll with any of bits 4-6 set walks down `word22`'s
     // nibbles to pick a wound mask; otherwise it is one of the first two body parts
-    // (doc/CSBwin-src/Monster.cpp:4546-4560).
+    // (doc/CSBwin-src/Monster.cpp:4559-4573).
     let woundMask: number;
     const roll = this.random.next() & 0xffff;
     if (roll & 0x70) {
@@ -498,7 +498,7 @@ export class MonsterAttack {
   }
 
   /**
-   * `DamageAllCharacters` (`doc/CSBwin-src/Code11f52.cpp:4378`) — one blow that lands
+   * `DamageAllCharacters` (`doc/CSBwin-src/Code11f52.cpp:4416`) — one blow that lands
    * on the whole party, as a fireball or a poison cloud does. Returns how many
    * champions actually took damage.
    *
@@ -521,7 +521,7 @@ export class MonsterAttack {
   }
 
   /**
-   * `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4413`) — spend or restore stamina.
+   * `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4451`) — spend or restore stamina.
    *
    * `decrement` is *subtracted*, so a negative value restores. The interesting half is
    * the bottom: stamina never goes below zero, and whatever the decrement overshot by
@@ -546,7 +546,7 @@ export class MonsterAttack {
   }
 
   /**
-   * `DamageCharacter` (`doc/CSBwin-src/Character.cpp:2703`).
+   * `DamageCharacter` (`doc/CSBwin-src/Character.cpp:2708`).
    *
    * `kind` is CSBWin's `P4`, and it selects how the blow is mitigated: 1 fire,
    * 5 spell, 6 wisdom-scaled, 2 half armour, anything else full armour. Zero skips
@@ -557,13 +557,13 @@ export class MonsterAttack {
    */
   damageCharacter(chIdx: number, damage: number, woundMask: number, kind: number): number {
     const party = this.ctx.party.state;
-    // The early guards, in CSBWin's order (`doc/CSBwin-src/Character.cpp:2712-2717`).
+    // The early guards, in CSBWin's order (`doc/CSBwin-src/Character.cpp:2717-2722`).
     // The recruit standing in a Hall of Champions mirror and a won game both return
     // non-zero, so a caller reading the result sees "damage was dealt".
     let dealt = sw(damage);
     if (chIdx === -1) return 0;
     if (party.potentialChampionIndex === chIdx) return chIdx + 1;
-    // `d.Word11694`, only ever set to 1 (`Attack.cpp:2268`, `Timer.cpp:2371`).
+    // `d.Word11694`, only ever set to 1 (`Attack.cpp:2270`, `Timer.cpp:2371`).
     if (this.ctx.state.gameWon) return 1;
     if (dealt <= 0) return 0;
     const champ = getPartyChampion(party, chIdx);
@@ -579,7 +579,7 @@ export class MonsterAttack {
         parts++;
         // `P4 == 4` sets bit 15 of the index, which halves the shield term and makes
         // `TAG009470` scale rather than take the raw strength
-        // (doc/CSBwin-src/Character.cpp:2729-2741).
+        // (doc/CSBwin-src/Character.cpp:2734-2746).
         armourTotal += this.armourStrength(champ, part, kind === 4);
       }
       let armour = parts !== 0 ? Math.trunc(armourTotal / parts) : 0;
@@ -594,7 +594,7 @@ export class MonsterAttack {
           dealt = sw(this.attributeScaledReduction(champ, 6, dealt) - party.fireShield);
         } else if (kind === 2) {
           // `P4 == 2` halves the *armour*, not the damage
-          // (`doc/CSBwin-src/Character.cpp:2780`) — a pit fall and a poison cloud both
+          // (`doc/CSBwin-src/Character.cpp:2785`) — a pit fall and a poison cloud both
           // get partly through plate. This branch was missing: with the unarmoured
           // fixtures the tools use, `0 >> 1` is still 0, so nothing showed.
           armour >>= 1;
@@ -609,12 +609,12 @@ export class MonsterAttack {
 
       // Wounds. The threshold starts at a vitality-scaled random value and doubles
       // each time, so a big hit marks several body parts
-      // (doc/CSBwin-src/Character.cpp:2789-2803).
+      // (doc/CSBwin-src/Character.cpp:2794-2808).
       let threshold = this.attributeScaledReduction(champ, 4, this.random.below(128) + 10);
       if (dealt > threshold) {
         do {
           const bit = 1 << this.random.below(8);
-          // `d.PendingOuches[chIdx] |= D1W` (`:2803`): the tick's
+          // `d.PendingOuches[chIdx] |= D1W` (`:2808`): the tick's
           // `DisplayCharacterDamage` hands them on to `ouches`.
           party.pendingOuches[chIdx] = (party.pendingOuches[chIdx]! | (bit & woundMask)) & 0xffff;
           threshold <<= 1;
@@ -627,9 +627,9 @@ export class MonsterAttack {
     if (dealt <= 0) dealt = 0;
 
     // The damage filter's DSA may set what is dealt, to anything a word holds
-    // (`doc/CSBwin-src/Character.cpp:2829-2893`).
+    // (`doc/CSBwin-src/Character.cpp:2834-2898`).
     dealt = sw(this.ctx.systems.dsa.damageCharFilter(chIdx, champ.fingerprint, damage, dealt, woundMask, kind));
-    // `d.PendingDamage[chIdx] += D7W` (`:2900`): the HP stay as they are until the tick's
+    // `d.PendingDamage[chIdx] += D7W` (`:2905`): the HP stay as they are until the tick's
     // `DisplayCharacterDamage`, which takes the sum off, kills, and shows it over the
     // portrait.
     party.pendingDamage[chIdx] = sw(party.pendingDamage[chIdx]! + dealt);
@@ -637,8 +637,8 @@ export class MonsterAttack {
   }
 
   /**
-   * `DisplayCharacterDamage` (`doc/CSBwin-src/CSBCode.cpp:7084`), once a main-loop tick
-   * after `StartQueuedSound` (`:657`): each champion's pending wounds join `ouches`, and
+   * `DisplayCharacterDamage` (`doc/CSBwin-src/CSBCode.cpp:7143`), once a main-loop tick
+   * after `StartQueuedSound` (`:667`): each champion's pending wounds join `ouches`, and
    * the pending damage comes off the HP, killing a champion it would take to 0 or below.
    * A champion who survives has the loss shown over their name, or over their portrait
    * when their inventory is open, until a `TT_12` five ticks on takes it away
@@ -665,9 +665,9 @@ export class MonsterAttack {
       }
       champ.attributes.health = left;
       // `CHARFLAG_statsChanged` / `CHARFLAG_ouches` and the blits of graphic 15 or 16
-      // with `TAG014af6(damage, 0, 3)` on it (`:7121-7171`) are the screen's.
+      // with `TAG014af6(damage, 0, 3)` on it (`:7180-7230`) are the screen's.
       this.ctx.host.displayCharacterDamage(chIdx, damage);
-      // The timer that erases it (`:7172-7202`), on `d.partyLevel`.
+      // The timer that erases it (`:7231-7261`), on `d.partyLevel`.
       const time = (this.ctx.state.tickCount + 5) >>> 0;
       const existing = champ.timerIndex === -1 ? null : this.ctx.timers.getTimer(champ.timerIndex);
       if (existing === null) {
@@ -697,16 +697,16 @@ export class MonsterAttack {
   }
 
   /**
-   * `KillCharacter` (`doc/CSBwin-src/Character.cpp:2526`) — drop everything, leave
+   * `KillCharacter` (`doc/CSBwin-src/Character.cpp:2531`) — drop everything, leave
    * bones.
    *
    * The bones record carries `value = 2` to mark it as a *dead champion's* bones
    * rather than an ordinary item, and its position in the cell is the champion's own
    * party position, so the bones appear where the champion stood
-   * (`doc/CSBwin-src/Character.cpp:2626-2645`).
+   * (`doc/CSBwin-src/Character.cpp:2631-2650`).
    */
   killCharacter(chIdx: number): void {
-    // The character death filter's DSA, before anything changes (`:2535-2589`).
+    // The character death filter's DSA, before anything changes (`:2540-2594`).
     this.ctx.systems.dsa.charDeathFilter(chIdx);
     const party = this.ctx.party.state;
     const champ = getPartyChampion(this.ctx.party.state, chIdx);
@@ -715,7 +715,7 @@ export class MonsterAttack {
     champ.attributes.health = 0;
     champ.incantation = [];
     // A held eye or mouth let go, then `ShowHideInventory(4)`: the inventory closes on a
-    // dead champion before its possessions drop (`doc/CSBwin-src/Character.cpp:2597-2622`).
+    // dead champion before its possessions drop (`doc/CSBwin-src/Character.cpp:2602-2627`).
     if (party.selectedCharacterIndex === chIdx) {
       this.ctx.host.releaseEyeOrMouth();
       this.ctx.host.showHideInventory(4);
@@ -724,25 +724,25 @@ export class MonsterAttack {
     this.ctx.systems.character.dropAllPossessions(chIdx);
 
     // `objD4.pos(charPosition)`, then `MoveObject(objD4, -1, 0, d.partyX, d.partyY)`
-    // and `expool.AddChampionBonesRecord(objD4, …)` (`doc/CSBwin-src/Character.cpp:2626-2646`):
+    // and `expool.AddChampionBonesRecord(objD4, …)` (`doc/CSBwin-src/Character.cpp:2631-2651`):
     // the bones are set down like the possessions, so over an open pit they fall.
     const bones = this.createBonesRecord();
     if (bones !== null) {
       const objD4 = this.dungeon.rnMaps.setPos(bones, champ.partyPosition & 0x3);
       this.ctx.systems.worldMove.moveObject(objD4, -1, 0, party.position.x, party.position.y, party.position.z);
-      // `AddChampionBonesRecord`, whatever the fingerprint (`:2646`): 0 pairs the bones too.
+      // `AddChampionBonesRecord`, whatever the fingerprint (`:2651`): 0 pairs the bones too.
       this.dungeon.addChampionBonesRecord(objD4, champ.fingerprint);
     }
 
     // `pcA3->facing = (ui8)d.partyFacing`, `maxRecentDamage = 0`
-    // (`doc/CSBwin-src/Character.cpp:2650-2651`).
+    // (`doc/CSBwin-src/Character.cpp:2655-2656`).
     champ.facing = party.facing;
     champ.maxRecentDamage = 0;
     // `if (pcA3->poisonCount) CurePoison(chIdx)` — a corpse is not poisoned, and the
-    // TT_75 timers must not outlive it (`doc/CSBwin-src/Character.cpp:2663-2666`).
+    // TT_75 timers must not outlive it (`doc/CSBwin-src/Character.cpp:2668-2671`).
     if (champ.poisonCount) this.curePoison(chIdx);
 
-    // `KillCharacter`'s tail (`doc/CSBwin-src/Character.cpp:2670-2694`): find a living
+    // `KillCharacter`'s tail (`doc/CSBwin-src/Character.cpp:2675-2699`): find a living
     // party member, and hand on everything the dead champion was holding on to.
     //
     // The search skips the *potential* champion — the one standing in a Hall of
@@ -779,12 +779,12 @@ export class MonsterAttack {
       specialState: 2,
       important: true,
       miscType: MISC_BONES_OF_HERO,
-    }, true); // `FindEmptyDB10Entry(true)` (`doc/CSBwin-src/Character.cpp:2625`)
+    }, true); // `FindEmptyDB10Entry(true)` (`doc/CSBwin-src/Character.cpp:2630`)
     return rn === OBJECT_ID_NULL ? null : rn;
   }
 
   /**
-   * `TAG01680a` (`doc/CSBwin-src/Character.cpp:2391`) — how well one body part is
+   * `TAG01680a` (`doc/CSBwin-src/Character.cpp:2396`) — how well one body part is
    * protected, 0 to 100.
    *
    * Three contributions, and they are not the obvious ones:
@@ -802,7 +802,7 @@ export class MonsterAttack {
    * result is halved and clamped to 0-100 before it reaches the damage scaling.
    *
    * The throwing-distance term in (1) is `DetermineThrowingDistance(chIdx, hand)`
-   * (`:2416`) — how well the champion is handling what is in that hand. A shield too
+   * (`:2421`) — how well the champion is handling what is in that hand. A shield too
    * heavy for its bearer therefore protects less, which is the same weight-versus-load
    * curve that governs a throw.
    */
@@ -848,14 +848,14 @@ export class MonsterAttack {
     }
 
     // A wounded part is worth less, and a sleeping party's armour half
-    // (`doc/CSBwin-src/Character.cpp:2478-2486`).
+    // (`doc/CSBwin-src/Character.cpp:2483-2491`).
     if ((champ.wounds & (1 << bodyPart)) !== 0) total = sw(total - (this.random.zeroTo3() + 8));
     if (party.sleeping) total >>= 1;
     return applyLimits(0, total >> 1, 100);
   }
 
   /**
-   * `TAG009470` (`doc/CSBwin-src/Character.cpp:167`) — a garment's armour value,
+   * `TAG009470` (`doc/CSBwin-src/Character.cpp:168`) — a garment's armour value,
    * optionally scaled by its own flags rather than taken raw.
    */
   private clothingArmourValue(clothingType: number, scale: boolean): number {
@@ -869,7 +869,7 @@ export class MonsterAttack {
   /* ------------------------------------------------------------ champion ---- */
 
   /**
-   * `Quickness` (`doc/CSBwin-src/Character.cpp:2209`) lives in `CharacterStats`, which
+   * `Quickness` (`doc/CSBwin-src/Character.cpp:2214`) lives in `CharacterStats`, which
    * owns the `MaxLoad` chain; this supplies `d.PartySleeping`.
    */
   quickness(champ: Champion): number {
@@ -877,7 +877,7 @@ export class MonsterAttack {
   }
 
   /**
-   * `IsCharacterLucky` (`doc/CSBwin-src/Character.cpp:2165`).
+   * `IsCharacterLucky` (`doc/CSBwin-src/Character.cpp:2170`).
    *
    * Two ways to be lucky: a flat coin-toss-and-roll that ignores the attribute
    * entirely, or a roll against current Luck. Either way Luck then moves by 2 —
@@ -897,7 +897,7 @@ export class MonsterAttack {
   }
 
   /**
-   * `TAG016426` (`doc/CSBwin-src/Character.cpp:2042`) — scale a value down by an
+   * `TAG016426` (`doc/CSBwin-src/Character.cpp:2047`) — scale a value down by an
    * attribute: `value * (170 - attribute) / 128`.
    *
    * CSBWin carries a long comment here about a genuine FTL bug — the original stored
@@ -908,13 +908,13 @@ export class MonsterAttack {
     const attr = championAttribute(champ, attrNum);
     const margin = 170 - attr;
     // A very high attribute (above 154) falls into a separate branch that divides by
-    // 8 flat rather than scaling (doc/CSBwin-src/Character.cpp:2060-2062).
+    // 8 flat rather than scaling (doc/CSBwin-src/Character.cpp:2065-2067).
     if (margin < 16) return value >> 3;
     return scaledMultiply(value, 7, margin);
   }
 
   /**
-   * `GetCharacterToDamage` (`doc/CSBwin-src/CSBCode.cpp:6884`) — the first live
+   * `GetCharacterToDamage` (`doc/CSBwin-src/CSBCode.cpp:6943`) — the first live
    * champion in the order an attack from that side reaches the party, or -1.
    *
    * Only adjacent attackers can reach anyone: `xDist + yDist > 1` returns -1.
@@ -939,7 +939,7 @@ export class MonsterAttack {
   }
 
   /**
-   * `DetermineAttackOrder` (`doc/CSBwin-src/Character.cpp:384`) — pick one of
+   * `DetermineAttackOrder` (`doc/CSBwin-src/Character.cpp:385`) — pick one of
    * `Byte586`'s eight orderings from the attack direction and which side of the cell
    * it came from.
    *
@@ -963,7 +963,7 @@ export class MonsterAttack {
   }
 
   /**
-   * `PoisonCharacter` (`doc/CSBwin-src/CSBCode.cpp:7211`).
+   * `PoisonCharacter` (`doc/CSBwin-src/CSBCode.cpp:7270`).
    *
    * `strength` is a *tick count*, not a dose. Each call deals `Larger(1, strength/64)`
    * unmitigated damage — mask and kind both zero, so armour and wounds are skipped —
@@ -997,7 +997,7 @@ export class MonsterAttack {
   }
 
   /**
-   * `CurePoison` (`doc/CSBwin-src/Character.cpp:3007`) — cancel every outstanding
+   * `CurePoison` (`doc/CSBwin-src/Character.cpp:3012`) — cancel every outstanding
    * `TT_75` for this champion and clear the count. Anti-venin, and `KillCharacter`.
    */
   curePoison(chIdx: number): void {
@@ -1007,7 +1007,7 @@ export class MonsterAttack {
     if (champ) champ.poisonCount = 0;
   }
 
-  /** `RanLiveChar` (`doc/CSBwin-src/Monster.cpp:905`). */
+  /** `RanLiveChar` (`doc/CSBwin-src/Monster.cpp:909`). */
   private randomLiveChampion(): number {
     const party = this.ctx.party.state;
     const live: number[] = [];

@@ -1,10 +1,10 @@
 /**
- * `AdjustStatsForItemCarried` (`doc/CSBwin-src/Character.cpp:1569-1780`, `TAG0157e8`) —
+ * `AdjustStatsForItemCarried` (`doc/CSBwin-src/Character.cpp:1574-1785`, `TAG0157e8`) —
  * what carrying an object does to its bearer.
  *
- * CSBWin calls it with `+1` from `AddCharacterPossession` (`:1970`) and with `-1` from
- * `RemoveCharacterPossession` (`:1858`), and brackets a curse change with a `-1` and a
- * `+1` in `SetCursed` (`:1801`, `:1815`). Every writer of a champion's slots must do the
+ * CSBWin calls it with `+1` from `AddCharacterPossession` (`:1975`) and with `-1` from
+ * `RemoveCharacterPossession` (`:1863`), and brackets a curse change with a `-1` and a
+ * `+1` in `SetCursed` (`:1806`, `:1820`). Every writer of a champion's slots must do the
  * same, or a bonus goes on along one path and comes off along another.
  *
  * The bonus is baked into the attributes, not recomputed: a CSBWin save stores the
@@ -42,7 +42,7 @@ import { incrAttributeCurrent, incrAttributeMaximum, incrAttributeMinimum } from
 import type { DungeonState } from './DungeonState';
 import { CHARFLAG_CHEST_OR_SCROLL, type Champion } from './gameTypes';
 
-// `whatToAdjust` (`:1581-1592`) — the first seven are `Attributes[]` indices.
+// `whatToAdjust` (`:1586-1597`) — the first seven are `Attributes[]` indices.
 const adjustLuck = 0;
 const adjustStrength = 1;
 const adjustDexterity = 2;

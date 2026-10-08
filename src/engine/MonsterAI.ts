@@ -1,12 +1,12 @@
 /**
  * The monster AI state machine.
  *
- * Ports `doc/CSBwin-src/Monster.cpp`'s `InitialChecks` (:2730) and
- * `ProcessTimers29to41` (:3239) together with the helper chain they were factored
- * into — `Set_Monster_Timer` (:1337), `SetMonsterTimerB` (:1260),
- * `EnsureI60NonZero` (:1381), `Increment_Time_By_W52_Plus_Random` (:1395),
- * `Delete_Timers_Maybe_Set_Fear` (:1412), `MaybeDelTimers_Fear6_TurnIndividuals`
- * (:1436), `Turn_Monsters_As_Group` (:1557) and `StartBGroupTimer` (:1587).
+ * Ports `doc/CSBwin-src/Monster.cpp`'s `InitialChecks` (:2734) and
+ * `ProcessTimers29to41` (:3243) together with the helper chain they were factored
+ * into — `Set_Monster_Timer` (:1341), `SetMonsterTimerB` (:1264),
+ * `EnsureI60NonZero` (:1385), `Increment_Time_By_W52_Plus_Random` (:1399),
+ * `Delete_Timers_Maybe_Set_Fear` (:1416), `MaybeDelTimers_Fear6_TurnIndividuals`
+ * (:1440), `Turn_Monsters_As_Group` (:1561) and `StartBGroupTimer` (:1591).
  *
  * Those helpers exist because Paul Stevens unwound a pile of `goto`s in the original
  * disassembly, and his comment says so at each one. They are kept as separate
@@ -170,7 +170,7 @@ export class MonsterAI {
   }
 
   /**
-   * `monsterMoveInhibit[4]` (`doc/CSBwin-src/data.cpp:96`), north, east, south and west,
+   * `monsterMoveInhibit[4]` (`doc/CSBwin-src/data.cpp:97`), north, east, south and west,
    * which `&MONBLK` sets and each group's turn clears before its move filter.
    */
   get monsterMoveInhibit(): Uint8Array {
@@ -188,11 +188,11 @@ export class MonsterAI {
   }
 
   /**
-   * `ProcessTimers29to41` (`doc/CSBwin-src/Monster.cpp:3239`) — one monster group's
+   * `ProcessTimers29to41` (`doc/CSBwin-src/Monster.cpp:3243`) — one monster group's
    * turn, from the top, with `mmr`, the record its monster move filter reads, and which
    * the turn hands down to every move, blow and missile that can take the group away.
-   * Every `return` of CSBWin's turn runs the post-move filter first (`:3373` to
-   * `:4448`), so the port runs it once the turn is over, however it ended.
+   * Every `return` of CSBWin's turn runs the post-move filter first (`:3381` to
+   * `:4461`), so the port runs it once the turn is over, however it ended.
    */
   processTimers29to41(options: {
     mapX: number;
@@ -221,7 +221,7 @@ export class MonsterAI {
     const s = this.scratch;
 
     // "Clear all modifications to monster behaviour. The Monster Movement filter may
-    // set some of these things." (doc/CSBwin-src/Monster.cpp:3298-3305)
+    // set some of these things." (doc/CSBwin-src/Monster.cpp:3306-3313)
     s.monsterMoveInhibit.fill(0);
 
     const monsterRn = this.dungeon.findFirstMonster(new Position(mapX, mapY, level));
@@ -233,7 +233,7 @@ export class MonsterAI {
         `timeUntilAlternateUpdate=${timeUntilAlternateUpdate}`,
     );
 
-    // "Now let the Monster Movement Filter DSA do its thing" (doc/CSBwin-src/Monster.cpp:3311-3357).
+    // "Now let the Monster Movement Filter DSA do its thing" (doc/CSBwin-src/Monster.cpp:3319-3365).
     this.ctx.systems.dsa.monsterMoveFilter(level, mapX, mapY, monsterRn, timerFunction, mmr);
 
     const checks = this.initialChecks(monsterRn, mapX, mapY, level, timerFunction, timeUntilAlternateUpdate, mmr);
@@ -245,7 +245,7 @@ export class MonsterAI {
     if (!desc) return;
 
     // The rest of the prologue: distances and direction to the party, and the
-    // per-turn direction flags (doc/CSBwin-src/Monster.cpp:3384-3396).
+    // per-turn direction flags (doc/CSBwin-src/Monster.cpp:3392-3404).
     s.monsterX = mapX;
     s.monsterY = mapY;
     s.partyX = party.position.x | 0;
@@ -309,7 +309,7 @@ export class MonsterAI {
 
   /**
    * The `timeFunc` dispatch at the heart of `ProcessTimers29to41`
-   * (`doc/CSBwin-src/Monster.cpp:3409-4462`).
+   * (`doc/CSBwin-src/Monster.cpp:3417-4475`).
    *
    * Three shapes of turn, in the order CSBWin tests them:
    *
@@ -329,7 +329,7 @@ export class MonsterAI {
       c.mmr.setflg(MonsterEvents.TT29to41_TT31);
       c.timerFunction = TimerFunction.TT_M1;
       if (fearFactor !== StateOfFear.StateOfFear6 && fearFactor !== StateOfFear.StateOfFear5) {
-        // CSBWin names the flag for the other branch (`doc/CSBwin-src/Monster.cpp:3419`).
+        // CSBWin names the flag for the other branch (`doc/CSBwin-src/Monster.cpp:3427`).
         c.mmr.setflg(MonsterEvents.TT29to41_fear5or6);
         this.trace('      MAI timeFunc 31.  FearFactor not 5 or 6. So Delete all timers and set fear to 6.');
         this.timers.deleteMonsterMovementTimers(c.mapX, c.mapY, c.level, (line) => this.trace(line));
@@ -415,7 +415,7 @@ export class MonsterAI {
   }
 
   /**
-   * Timer types 32-36 — the "A" family (`doc/CSBwin-src/Monster.cpp:3607-3752`).
+   * Timer types 32-36 — the "A" family (`doc/CSBwin-src/Monster.cpp:3615-3762`).
    *
    * The timer flips to its B twin and then, mostly, just reschedules. The interesting
    * cases are being seen by a party that is *adjacent* (break formation) and being in
@@ -451,7 +451,7 @@ export class MonsterAI {
         // what it did." The `fearFactor != 7` term cannot fail once the first two
         // have passed, and `tsc` narrows the type enough to say so — hence the
         // widened local, which keeps the test as written rather than dropping it
-        // (doc/CSBwin-src/Monster.cpp:3665-3672).
+        // (doc/CSBwin-src/Monster.cpp:3677-3684).
         const fear: number = fearFactor;
         const notSeven = (v: number): boolean => v !== (StateOfFear.StateOfFear7 as number);
         if (
@@ -504,7 +504,7 @@ export class MonsterAI {
 
   /**
    * Timer types 38-41 — one member's own turn
-   * (`doc/CSBwin-src/Monster.cpp:3770-4106`).
+   * (`doc/CSBwin-src/Monster.cpp:3784-4119`).
    *
    * A member already attacking simply schedules its next swing. One that is not
    * decides whether it can attack: it must be able to see the party, be facing it (or
@@ -548,7 +548,7 @@ export class MonsterAI {
     if (attackDistance !== 0) this.rememberPartyPosition(c.slot);
 
     // A lone monster in an open cell sometimes shuffles to another corner, or spreads
-    // to fill the cell (positions = 0xff) (doc/CSBwin-src/Monster.cpp:3846-3893).
+    // to fill the cell (positions = 0xff) (doc/CSBwin-src/Monster.cpp:3860-3907).
     let shuffle = 0;
     if (c.indexOfLastMonster === 0 && c.horizSize !== 2) {
       shuffle = this.random.next() & 0xffff;
@@ -634,7 +634,7 @@ export class MonsterAI {
 
   /**
    * A monster about to melee that is standing in the wrong corner shifts sideways
-   * first (`doc/CSBwin-src/Monster.cpp:3925-3999`). Returns true when it did, in
+   * first (`doc/CSBwin-src/Monster.cpp:3939-4013`). Returns true when it did, in
    * which case the turn is over.
    */
   private sidestepBeforeMeleeing(
@@ -669,7 +669,7 @@ export class MonsterAI {
       }
       if (ordinal === 0) {
         if (this.checkMonsterVersusMissiles(c)) return true;
-        // `d.MonsterDamageResult != 1` (`doc/CSBwin-src/Monster.cpp:3966`): a missile that
+        // `d.MonsterDamageResult != 1` (`doc/CSBwin-src/Monster.cpp:3980`): a missile that
         // killed some of the group but not all leaves its corners as they were.
         if (this.ctx.systems.missileEncounter.monsterDamageResult !== MonsterDamageResult.SOME_NOT_ALL_MONSTERS_DIED) {
           c.slot.positions = setPackedBits(c.slot.positions, member, pos);
@@ -687,7 +687,7 @@ export class MonsterAI {
 
   /**
    * Timer type 37 — the group's ordinary turn
-   * (`doc/CSBwin-src/Monster.cpp:4106-4452`).
+   * (`doc/CSBwin-src/Monster.cpp:4119-4465`).
    *
    * Fear state decides almost everything. States 0, 2 and 3 are the calm ones and can
    * end in a hunt; 5 flees; 7 charges; anything else just waits.
@@ -794,7 +794,7 @@ export class MonsterAI {
   /* ------------------------------------------------------- the Try_* chain ---- */
 
   /**
-   * `Try_Directions_D5_To_D4` (`doc/CSBwin-src/Monster.cpp:2380`).
+   * `Try_Directions_D5_To_D4` (`doc/CSBwin-src/Monster.cpp:2384`).
    *
    * Try all four directions starting from a random one, wrapping round. A direction
    * that would double back to the square just left is skipped three times out of
@@ -831,7 +831,7 @@ export class MonsterAI {
         }
         if (probe.moveOntoPartyPosition && c.timerFunction !== TimerFunction.TT_M3) {
           // Reaching the party is as good as arriving. The `& 15 != 5` test throttles
-          // how often a group re-forms (doc/CSBwin-src/Monster.cpp:2497-2513).
+          // how often a group re-forms (doc/CSBwin-src/Monster.cpp:2501-2517).
           if (
             (c.timeUntilAlternateUpdate & 15) !== 5 ||
             this.ctx.systems.monsterPerception.findPossibleMove(
@@ -860,7 +860,7 @@ export class MonsterAI {
   }
 
   /**
-   * `Try_Preferred_Direction_Then_Others` (`doc/CSBwin-src/Monster.cpp:2001`).
+   * `Try_Preferred_Direction_Then_Others` (`doc/CSBwin-src/Monster.cpp:2005`).
    *
    * Four candidate directions in a fixed order: the preferred one, the secondary, the
    * secondary reversed, and the preferred reversed — the last two each behind a die
@@ -915,7 +915,7 @@ export class MonsterAI {
   }
 
   /**
-   * `Try_To_Move` (`doc/CSBwin-src/Monster.cpp:2156`) — the fleeing path.
+   * `Try_To_Move` (`doc/CSBwin-src/Monster.cpp:2160`) — the fleeing path.
    *
    * A monster that can see the party runs *away* from it: the preferred direction is
    * the direction to the party turned 180°, and `timePerMove` is cut by a quarter so
@@ -985,7 +985,7 @@ export class MonsterAI {
   }
 
   /**
-   * `D4D0Finish` (`doc/CSBwin-src/Monster.cpp:2557`) — close in on the party at
+   * `D4D0Finish` (`doc/CSBwin-src/Monster.cpp:2561`) — close in on the party at
    * double speed.
    */
   private d4d0Finish(frame: AiFrame, c: AiConst): void {
@@ -999,7 +999,7 @@ export class MonsterAI {
   }
 
   /**
-   * `TryUByte67` (`doc/CSBwin-src/Monster.cpp:2625`) — head for the square the group
+   * `TryUByte67` (`doc/CSBwin-src/Monster.cpp:2629`) — head for the square the group
    * last knew the party to be at. Standing on it already means the trail is cold, so
    * the group calms down.
    */
@@ -1025,7 +1025,7 @@ export class MonsterAI {
   }
 
   /**
-   * `Process_Invincible` (`doc/CSBwin-src/Monster.cpp:1612`) — Lord Chaos moves *two*
+   * `Process_Invincible` (`doc/CSBwin-src/Monster.cpp:1616`) — Lord Chaos moves *two*
    * squares at a time, and a Fluxcage is what stops him.
    *
    * Returns true when the turn is finished. The `FindPossibleMove` call at the top
@@ -1077,7 +1077,7 @@ export class MonsterAI {
     frame.bool36 = remaining <= 0;
     if (frame.bool36) {
       // Any non-zero `MoveObject` ends the turn; otherwise the timer follows the group to
-      // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:1711-1720`).
+      // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:1715-1724`).
       const moved = this.ctx.systems.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level, undefined, c.mmr);
       if (moved.code !== 0) {
         c.mmr.setflg(MonsterEvents.PIn_moveTwoSquaresSucceeded);
@@ -1097,7 +1097,7 @@ export class MonsterAI {
   }
 
   /**
-   * `Process_Invincible_And_Finish` (`doc/CSBwin-src/Monster.cpp:1894`) — an
+   * `Process_Invincible_And_Finish` (`doc/CSBwin-src/Monster.cpp:1898`) — an
    * invincible monster keeps trying random double-moves until one works or the loop
    * conditions fail; everything else falls straight through to `Standard_Finish`.
    */
@@ -1120,7 +1120,7 @@ export class MonsterAI {
   }
 
   /**
-   * `Standard_Finish` (`doc/CSBwin-src/Monster.cpp:1740`) — how nearly every turn
+   * `Standard_Finish` (`doc/CSBwin-src/Monster.cpp:1744`) — how nearly every turn
    * ends: maybe turn the group, then schedule the next one.
    */
   private standardFinish(frame: AiFrame, c: AiConst): void {
@@ -1184,7 +1184,7 @@ export class MonsterAI {
       return true;
     }
     // Any non-zero `MoveObject` ends the turn; otherwise the timer follows the group to
-    // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:2105-2112`, `:2440-2449`).
+    // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:2109-2116`, `:2444-2453`).
     const moved = this.ctx.systems.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level, undefined, c.mmr);
     if (moved.code !== 0) return false;
     frame.timer.uByte6 = moved.position.x & 0xff;
@@ -1197,7 +1197,7 @@ export class MonsterAI {
 
   /**
    * `Process_Invincible`'s two dead ends: turn the group to face where it wanted to go,
-   * then wait out a move interval (`doc/CSBwin-src/Monster.cpp:1662-1673`, `:1681-1692`).
+   * then wait out a move interval (`doc/CSBwin-src/Monster.cpp:1666-1677`, `:1685-1696`).
    */
   private turnAndWait(frame: AiFrame, c: AiConst, preferredDirection: number): void {
     c.mmr.setflg(MonsterEvents.PIn_turnMonsterGroup);
@@ -1225,7 +1225,7 @@ export class MonsterAI {
   }
 
   /**
-   * `CheckMonsterVersusMissiles` (`doc/CSBwin-src/Monster.cpp:4462`) — shifting
+   * `CheckMonsterVersusMissiles` (`doc/CSBwin-src/Monster.cpp:4475`) — shifting
    * position inside a cell can walk the monster into a missile already there. Resolves
    * every missile whose corner is the group's positions byte, stopping early if the group
    * is wiped out.
@@ -1251,7 +1251,7 @@ export class MonsterAI {
       ) {
         const decoded = this.dungeon.rnMaps.decode(rn);
         if (decoded.category !== DBType.MISSILE) continue;
-        // The whole positions byte, as both callers pass it (`Monster.cpp:3882`, `:3960`):
+        // The whole positions byte, as both callers pass it (`Monster.cpp:3896`, `:3974`):
         // a corner is 0-3, so a byte with any of bits 2-7 set meets no missile.
         if (decoded.position !== position) continue;
         const missile = this.dungeon.getMissileRecord(rn);
@@ -1269,7 +1269,7 @@ export class MonsterAI {
   }
 
   /**
-   * `InitialChecks` (`doc/CSBwin-src/Monster.cpp:2730`).
+   * `InitialChecks` (`doc/CSBwin-src/Monster.cpp:2734`).
    *
    * The gate every monster timer passes through. It answers `handled: true` when the
    * timer has been disposed of — re-queued, or deliberately dropped — and the AI
@@ -1334,7 +1334,7 @@ export class MonsterAI {
     // (3) A member with no hit points is removed before anything else happens. The
     // timer goes back on the queue at the current time so that, if anyone survived,
     // it expires again immediately and we come back here
-    // (doc/CSBwin-src/Monster.cpp:2795-2835).
+    // (doc/CSBwin-src/Monster.cpp:2799-2839).
     if (
       timerFunction !== TimerFunction.TT_M1 &&
       timerFunction !== TimerFunction.TT_M2 &&
@@ -1358,7 +1358,7 @@ export class MonsterAI {
       }
       // CSBWin tests `IC29to41_atLeastOneMemberAlreadDead`, a flag of its own that nothing
       // sets, not the one the loop sets, so `IC29to41_damageMonsterFailed` is never set
-      // (`doc/CSBwin-src/Monster.cpp:2835-2836`).
+      // (`doc/CSBwin-src/Monster.cpp:2839-2840`).
       if (mmr.getflg(MonsterEvents.IC29to41_atLeastOneMemberAlreadDead)) {
         mmr.setflg(MonsterEvents.IC29to41_damageMonsterFailed);
       }
@@ -1369,7 +1369,7 @@ export class MonsterAI {
     // CSBWin initialises `attackDistance` to 24 by a deliberate patch of the Atari
     // binary: on rare paths the variable was read uninitialised, which only made the
     // monster behave slightly oddly but made the two builds impossible to compare
-    // (doc/CSBwin-src/Monster.cpp:2853-2866).
+    // (doc/CSBwin-src/Monster.cpp:2857-2870).
     const attackDistance = 24;
 
     const timer = this.makeTimer(mapX, mapY, level, timerFunction, 0);
@@ -1394,7 +1394,7 @@ export class MonsterAI {
           this.trace('      MAI Skip monster AI because MoveObject non-zero');
           return blank();
         }
-        // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:2908-2928`): a pit may have
+        // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:2912-2932`): a pit may have
         // dropped the group a level, and only the square is re-aimed.
         timer.uByte6 = moved.position.x & 0xff;
         timer.uByte7 = moved.position.y & 0xff;
@@ -1428,7 +1428,7 @@ export class MonsterAI {
     if (sinceLastUpdate < 0) sinceLastUpdate += 256;
 
     // A monster that never moves is still given a nominal 100 for the arithmetic that
-    // follows (doc/CSBwin-src/Monster.cpp:2990-2994).
+    // follows (doc/CSBwin-src/Monster.cpp:2994-2998).
     let timePerMove = desc.movementTicks06 & 0xff;
     if (timePerMove === 255) timePerMove = 100;
 
@@ -1476,7 +1476,7 @@ export class MonsterAI {
   /* -------------------------------------------------------- timer helpers ---- */
 
   /**
-   * `SetMonsterTimerB` (`doc/CSBwin-src/Monster.cpp:1260`).
+   * `SetMonsterTimerB` (`doc/CSBwin-src/Monster.cpp:1264`).
    *
    * The A and B timer families are the same events seen from two sides. If the
    * alternate time is *sooner* than the one already on the timer, the timer flips
@@ -1500,7 +1500,7 @@ export class MonsterAI {
   }
 
   /**
-   * `Set_Monster_Timer` (`doc/CSBwin-src/Monster.cpp:1337`).
+   * `Set_Monster_Timer` (`doc/CSBwin-src/Monster.cpp:1341`).
    *
    * `processingATimer` selects which of the two events is being scheduled — CSBWin's
    * own comment: when true, `i_60` is the time of the next A event and
@@ -1521,21 +1521,21 @@ export class MonsterAI {
     return i60;
   }
 
-  /** `EnsureI60NonZero` (`doc/CSBwin-src/Monster.cpp:1381`). */
+  /** `EnsureI60NonZero` (`doc/CSBwin-src/Monster.cpp:1385`). */
   ensureI60NonZero(i60: number, slot: Item16Record, monsterX: number, monsterY: number, level: number): number {
     if (i60 !== 0) return i60;
     return this.ctx.systems.monsters.nextMonsterUpdateTime(slot, -1, false, monsterX, monsterY, level);
   }
 
   /**
-   * `Increment_Time_By_W52_Plus_Random` (`doc/CSBwin-src/Monster.cpp:1395`) — never
+   * `Increment_Time_By_W52_Plus_Random` (`doc/CSBwin-src/Monster.cpp:1399`) — never
    * less than one tick, however fast the monster.
    */
   incrementTimeByTimePerMovePlusRandom(timer: TimerEntry, timePerMove: number): void {
     timer.time = (timer.time + Math.max(1, timePerMove + this.random.zeroTo3() - 1)) >>> 0;
   }
 
-  /** `StartBGroupTimer` (`doc/CSBwin-src/Monster.cpp:1587`). */
+  /** `StartBGroupTimer` (`doc/CSBwin-src/Monster.cpp:1591`). */
   startBGroupTimer(
     timer: TimerEntry,
     slot: Item16Record,
@@ -1551,7 +1551,7 @@ export class MonsterAI {
   }
 
   /**
-   * `Delete_Timers_Maybe_Set_Fear` (`doc/CSBwin-src/Monster.cpp:1412`) — a group that
+   * `Delete_Timers_Maybe_Set_Fear` (`doc/CSBwin-src/Monster.cpp:1416`) — a group that
    * has been driven to fear factor 6 and then bounced is put to 7, the top state.
    */
   deleteTimersMaybeSetFear(
@@ -1567,7 +1567,7 @@ export class MonsterAI {
   }
 
   /**
-   * `Turn_Monsters_As_Group` (`doc/CSBwin-src/Monster.cpp:1557`).
+   * `Turn_Monsters_As_Group` (`doc/CSBwin-src/Monster.cpp:1561`).
    *
    * `preferredDirection` is replaced by a random one when the group has no reason to
    * face anywhere in particular — CSBWin's `(bool_36 == false) && (w_54 >= 0)`.
@@ -1607,7 +1607,7 @@ export class MonsterAI {
   }
 
   /**
-   * `MaybeDelTimers_Fear6_TurnIndividuals` (`doc/CSBwin-src/Monster.cpp:1436`).
+   * `MaybeDelTimers_Fear6_TurnIndividuals` (`doc/CSBwin-src/Monster.cpp:1440`).
    *
    * The group breaks formation: fear goes to 6, each member turns towards the party
    * (member 0 always, the rest on a coin toss) and each gets its **own** `TT_MONSTER_B<n>`
@@ -1727,7 +1727,7 @@ export class MonsterAI {
   }
 }
 
-/** The A→B flip when an "A" timer is processed (`doc/CSBwin-src/Monster.cpp:3611-3620`). */
+/** The A→B flip when an "A" timer is processed (`doc/CSBwin-src/Monster.cpp:3623-3632`). */
 const A_TO_B: Record<number, number> = {
   [TimerFunction.TT_MONSTER_AGROUP]: TimerFunction.TT_MONSTER_BGROUP,
   [TimerFunction.TT_MONSTER_A0]: TimerFunction.TT_MONSTER_B0,
@@ -1736,7 +1736,7 @@ const A_TO_B: Record<number, number> = {
   [TimerFunction.TT_MONSTER_A3]: TimerFunction.TT_MONSTER_B3,
 };
 
-/** `SetMonsterTimerB`'s B→A mapping (`doc/CSBwin-src/Monster.cpp:1267-1273`). */
+/** `SetMonsterTimerB`'s B→A mapping (`doc/CSBwin-src/Monster.cpp:1271-1277`). */
 const B_TO_A: Record<number, number> = {
   [TimerFunction.TT_MONSTER_BGROUP]: TimerFunction.TT_MONSTER_AGROUP,
   [TimerFunction.TT_MONSTER_B0]: TimerFunction.TT_MONSTER_A0,
@@ -1745,7 +1745,7 @@ const B_TO_A: Record<number, number> = {
   [TimerFunction.TT_MONSTER_B3]: TimerFunction.TT_MONSTER_A3,
 };
 
-/** Member index → its own B timer (`doc/CSBwin-src/Monster.cpp:1528-1536`). */
+/** Member index → its own B timer (`doc/CSBwin-src/Monster.cpp:1532-1540`). */
 const MEMBER_B_TIMER: Record<number, number> = {
   0: TimerFunction.TT_MONSTER_B0,
   1: TimerFunction.TT_MONSTER_B1,

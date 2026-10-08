@@ -113,7 +113,7 @@ console.log(`backdrop ${backdrop.width}x${backdrop.height}, font ${font.width}x$
 check(backdrop.width === 320 && backdrop.height === 200, 'item 1 is 320x200');
 check(font.width === 256 && font.height === 27, 'item 2 is 256x27, 3456 bytes at four bits a pixel');
 
-// TAG004962 (`Hint.cpp:3446-3477`): character c is the 8x9 cell at
+// TAG004962 (`Hint.cpp:4138-4169`): character c is the 8x9 cell at
 // (8 * ((c - 32) & 31), 9 * ((c - 32) / 32)), colour 12 transparent.
 const TRANSPARENT = 12;
 const glyph = (c: string): string[] => {
@@ -126,7 +126,7 @@ const glyph = (c: string): string[] => {
 };
 const ink = new Set(font.pixels);
 console.log(`font colours: ${[...ink].sort((a, b) => a - b).join(' ')}`);
-// `TAG004a22_26(P1, word 10, word 8)` at load (`:4058-4060`) takes word 8 as the ink the
+// `TAG004a22_26(P1, word 10, word 8)` at load (`:4778-4780`) takes word 8 as the ink the
 // font is drawn in: a word at the wrong offset would not name it.
 check(ink.size === 2 && ink.has(TRANSPARENT) && ink.has(segment1[8]!), 'the font is drawn in colour 12 and item 0\'s word 8 alone');
 check(glyph(' ').every((row) => row === '........'), 'the space is an empty cell');
@@ -137,7 +137,7 @@ check(letterA.join('/') === '.####.../...###../..##.#../..#####./.##...#./.##...
 const blank = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789?'].filter((c) => glyph(c).every((row) => row === '........'));
 check(blank.length === 0, `every letter, digit and '?' has a glyph (empty: ${blank.join('')})`);
 
-// `s20_16208`'s bottom row (`Hint.cpp:417-439`): three buttons at x 33-100, 127-194 and
+// `s20_16208`'s bottom row (`Hint.cpp:546-568`): three buttons at x 33-100, 127-194 and
 // 221-289, y 179-192. Each one's middle is the same colour, and the field above is not.
 const at = (x: number, y: number): number => backdrop.pixels[y * backdrop.width + x]!;
 const buttons = [[33, 100], [127, 194], [221, 289]].map(([x1, x2]) => at((x1! + x2!) >> 1, (179 + 192) >> 1));

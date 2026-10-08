@@ -2,7 +2,7 @@
  * A skin's virtual graphics: `CreateVirtualBitmap`,
  * `CreateVirtualMask` and `CreateVirtualAffineMask` make a bitmap, a mask or a transform
  * in the background library, which a skin's program then draws with
- * (`doc/CSBwin-src/Viewport.cpp:3083-3101`, `:3205-3277`, `:5445-5624`, `:108-280`).
+ * (`doc/CSBwin-src/Viewport.cpp:3090-3108`, `:3212-3284`, `:5452-5631`, `:108-280`).
  *
  * 1. **The transforms**, on a hand-made bitmap of 32 by 4 pixels, read back by a decoder of
  *    its own (sixteen pixels a group, four big-endian plane words, the first pixel the
@@ -15,7 +15,7 @@
  *    up by four bytes an entry added, and puts the new mask, its header copied, at the
  *    section's old end; a second time refuses, and shows the "Design Error" once.
  *    `CreateNewAffineMask` moves the offsets up by 4 whatever it adds, as CSBWin does
- *    (`:5577`), and a new id starts a section of its own.
+ *    (`:5584`), and a new id starts a section of its own.
  * 3. **Views**, in Conflux 3.5 and The Towers of Chaos 3.3: from every square of the
  *    party's starting level, in each facing, twice over. Every virtual bitmap and mask the
  *    programs make is the transform of its source as the decoder above reads it, with no

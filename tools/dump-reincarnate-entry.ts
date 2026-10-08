@@ -8,7 +8,7 @@
  * out of `graphics.dat`.
  *
  * The letter grid is where a port goes wrong quietly, because its arithmetic has three
- * oddities that all look like mistakes (`:180-210`):
+ * oddities that all look like mistakes (`:192-222`):
  *
  *   - the pixel rows and columns *between* the keys are dead, `(x+4)%10` and
  *     `(y+5)%10`, except where the tall carriage-return key crosses one;
@@ -94,7 +94,7 @@ function main(): void {
   console.log('=== d.SpecialChars, from graphics.dat item 0x232 ===');
   console.log(special.map((c) => `${c} ${c ? JSON.stringify(String.fromCharCode(c)) : '(nul)'}`).join('  '));
   console.log('');
-  // CSBWin's own comment: "comma,period,semi-colon,colon,space" (Data.h:1422). Getting
+  // CSBWin's own comment: "comma,period,semi-colon,colon,space" (Data.h:1437). Getting
   // this offset wrong would put arbitrary bytes on the punctuation keys.
   check(special[0] === 44, 'SpecialChars[0] is a comma');
   check(special[1] === 46, 'SpecialChars[1] is a period');
@@ -191,7 +191,7 @@ function main(): void {
     show(h, 'typed a title');
     reincarnateKey(h.ui, 'Enter');
     check(h.ui.reincarnate?.stage === 2 && h.ui.reincarnate?.title === 'THE RENAMED',
-      'Return in the title does nothing at all (`:270-272`)');
+      'Return in the title does nothing at all (`:279-281`)');
 
     // The title stops at nineteen.
     const h4 = makeHarness(uiTables, ['HALK', 'BORIS']);
@@ -212,7 +212,7 @@ function main(): void {
     openReincarnateScreen(h.ui, 1);
     reincarnateKey(h.ui, 'Backspace');
     check(h.ui.reincarnate?.name === '' && h.ui.reincarnate?.stage === 1,
-      'backspace on an empty name does nothing (`:295-296`)');
+      'backspace on an empty name does nothing (`:304-305`)');
 
     type(h, 'ZED');
     reincarnateKey(h.ui, 'Backspace');
@@ -223,7 +223,7 @@ function main(): void {
     check(h.ui.reincarnate?.stage === 2, 'now in the title');
     reincarnateKey(h.ui, 'Backspace');
     show(h, 'empty title, backspace');
-    // `:311-318`: it steps back into the name and lands **on** its last character,
+    // `:320-327`: it steps back into the name and lands **on** its last character,
     // ready to replace it — so one letter is lost, not none.
     check(h.ui.reincarnate?.stage === 1, 'backspace off the front of the title returns to the name');
     check(h.ui.reincarnate?.name === 'Z', 'and takes the name\'s last character with it');

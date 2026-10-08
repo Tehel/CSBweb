@@ -1,17 +1,17 @@
 /**
- * The character death filter (`doc/CSBwin-src/Character.cpp:2535-2589`) and the damage
- * filter (`:2829-2893`), which `KillCharacter` and `DamageCharacter` run, each through
+ * The character death filter (`doc/CSBwin-src/Character.cpp:2540-2594`) and the damage
+ * filter (`:2834-2898`), which `KillCharacter` and `DamageCharacter` run, each through
  * `MonsterAttack` with two DSAs on its square, against a genuine save (`csbgame7.dat`).
  *
  * 1. **A dungeon with no filter deals the damage worked out.**
- * 2. **Only the first DSA at the damage filter's location runs** (`break`, `:2888`), on
- *    parameters of its own (`NEWDSAPARAMETERS`, `:2845`): a count of 7, then the champion,
+ * 2. **Only the first DSA at the damage filter's location runs** (`break`, `:2893`), on
+ *    parameters of its own (`NEWDSAPARAMETERS`, `:2850`): a count of 7, then the champion,
  *    their fingerprint, the damage asked for, the damage worked out, the wound mask, the
- *    kind and 0 (`:2876-2883`). The caller's parameters are as they were after it.
- * 3. **Its word 3 is what is dealt** (`:2886`, `:2900`): the pending damage and the result.
+ *    kind and 0 (`:2881-2888`). The caller's parameters are as they were after it.
+ * 3. **Its word 3 is what is dealt** (`:2891`, `:2905`): the pending damage and the result.
  * 4. **Anything a word holds**: -5 heals the pending damage, and 0x10003 deals 3.
- * 5. **Only the first DSA at the death filter's location runs** (`:2586`), before the
- *    champion is touched (`:2596`): a count of 1 and the champion's index, with their HP
+ * 5. **Only the first DSA at the death filter's location runs** (`:2591`), before the
+ *    champion is touched (`:2601`): a count of 1 and the champion's index, with their HP
  *    still read through `&CHAR@`. The champion dies after it.
  *
  * Run: `npx tsx tools/dump-char-damage-filter.ts`
@@ -21,7 +21,7 @@ import type { Game } from '../src/engine/Game';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
 import { check, finish } from './lib/check';
 
-/** `ESL_CHARDEATHFILTER` and `ESL_DAMAGECHARFILTER` (`doc/CSBwin-src/CSB.h:1546`, `:1550`). */
+/** `ESL_CHARDEATHFILTER` and `ESL_DAMAGECHARFILTER` (`doc/CSBwin-src/CSB.h:1549`, `:1553`). */
 const ESL_CHARDEATHFILTER = 11;
 const ESL_DAMAGECHARFILTER = 15;
 

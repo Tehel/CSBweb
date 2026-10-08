@@ -7,8 +7,8 @@ const FONT_ROW_STRIDE = 128;
 const FONT_CHAR_ADVANCE = 6;
 /**
  * A glyph is five pixels wide, font bits 4..0, and starts at the pen: `BltOneChar` shifts
- * the byte by `11-D3W` so bit 4 lands on pixel `x` (`doc/CSBwin-src/Graphics.cpp:218`),
- * and `TextOut_OneLine`'s mask `0x07ff07ff >> D3W` (`Graphics.cpp:341`) clears those five
+ * the byte by `11-D3W` so bit 4 lands on pixel `x` (`doc/CSBwin-src/Graphics.cpp:219`),
+ * and `TextOut_OneLine`'s mask `0x07ff07ff >> D3W` (`Graphics.cpp:342`) clears those five
  * pixels only, leaving the sixth, the gap to the next character, as it was.
  */
 const FONT_GLYPH_WIDTH = 5;

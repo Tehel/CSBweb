@@ -1,5 +1,5 @@
 /**
- * `CheckMoveFromMissile` (`doc/CSBwin-src/Code11f52.cpp:2530-2776`) and the missile
+ * `CheckMoveFromMissile` (`doc/CSBwin-src/Code11f52.cpp:2565-2811`) and the missile
  * filter's globals.
  *
  * `MissileTimer` copies the timer it runs into `missileFilterTimer` and points
@@ -8,10 +8,10 @@
  * else writes either, `CheckMoveFromMissile` included. So:
  *
  *  1. A party move made while a missile timer runs meets the missiles it leaves, as any
- *     other does. Here the move is made by `MissileEncounterFilter` (`Code11f52.cpp:1626`)
+ *     other does. Here the move is made by `MissileEncounterFilter` (`Code11f52.cpp:1661`)
  *     as a missile strikes a wall, which is where a dungeon's filter DSA can teleport the
  *     party from.
- *  2. The filter's parameter 6, `BITS10_11(missileFilterTimer.timerWord8())` (`:1681`),
+ *  2. The filter's parameter 6, `BITS10_11(missileFilterTimer.timerWord8())` (`:1716`),
  *     is the direction of the last missile `MissileTimer` ran, also once that timer is
  *     over, and not that of the missile the party walks away from.
  *  3. While `MissileTimer` runs, its missile's record names timer 0xffff
@@ -19,7 +19,7 @@
  *     (`:700-714`), whose function is `TT_Missile` even on the first tick (`:231-234`).
  *     So a move out of the flying missile's own corner meets it: here a throw's first tick
  *     in the party's square, into a wall whose filter moves the party. CSBWin's hit then
- *     deletes timer 0xffff, outside its array (`Code11f52.cpp:2742`, `Timer.cpp:965`); the
+ *     deletes timer 0xffff, outside its array (`Code11f52.cpp:2777`, `Timer.cpp:965`); the
  *     port's deletes no timer, not even one queued since in the slot the missile's timer
  *     left.
  *

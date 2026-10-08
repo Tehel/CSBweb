@@ -21,10 +21,10 @@
  *
  * `fn` is 1, `TT_DOOR_STEP`; `x`,`y` are 1 and 14; `u9` is the action, 0 in one file and
  * 1 in the other; the 0xcd tail is `TIMER`'s constructor fill
- * (`doc/CSBwin-src/CSB.h:1805-1816`), which is itself a check that byte 12 really is the
+ * (`doc/CSBwin-src/CSB.h:1868-1879`), which is itself a check that byte 12 really is the
  * level and 13-15 really are unused.
  *
- * That is `TIMER` read exactly as `doc/CSBwin-src/CSB.h:1799-2052` declares it: a
+ * That is `TIMER` read exactly as `doc/CSBwin-src/CSB.h:1862-2115` declares it: a
  * big-endian `m_time`, the function, five bytes, a big-endian sequence, the level. The
  * door's map coordinates land on the cell the party is facing, and the one byte that
  * differs between the two files is the one CSBWin's own comment calls the action. If any
@@ -68,7 +68,7 @@ function loadWorld(): Game {
 /**
  * The door's state, `CELLFLAG` bits 0-2. **0 is fully open and 4 fully shut** — the
  * count is how far the door has come *down*, not how far it has risen
- * (`doc/CSBwin-src/CSBTypes.h:185-192`: "00 = open, 01 = almost open, 02 = half open,
+ * (`doc/CSBwin-src/CSBTypes.h:190-197`: "00 = open, 01 = almost open, 02 = half open,
  * 03 = almost closed, 04 = closed, 05 = bashed open"). Both saves start at 2.
  */
 function doorState(game: Game): number {
@@ -115,7 +115,7 @@ function main(): void {
     );
 
     // The queue is CSBWin's binary heap, restored verbatim
-    // (`doc/CSBwin-src/SaveGame.cpp:1687-1723`): no timer is `timerLess` than its parent.
+    // (`doc/CSBwin-src/SaveGame.cpp:1813-1879`): no timer is `timerLess` than its parent.
     // `dump-timer-heap.ts` checks every committed save's.
     const entry = (i: number): TimerEntry => ({ ...save.timers![queue[i]], index: queue[i] });
     let heap = true;
@@ -200,10 +200,10 @@ function main(): void {
 
   /* ---- a timer set after the load, before the first timer pass ---- */
 
-  // The save sets `d.Time` (`LoadGame`, doc/CSBwin-src/SaveGame.cpp:1624), and what is
+  // The save sets `d.Time` (`LoadGame`, doc/CSBwin-src/SaveGame.cpp:1748), and what is
   // scheduled before the first tick schedules from it: poison 36 ticks on
-  // (`CSBCode.cpp:7228-7235`), a Ya potion's shield (`Character.cpp:4386-4391`), a
-  // cloud's first turn (`Code11f52.cpp:1428`, one tick on).
+  // (`CSBCode.cpp:7287-7294`), a Ya potion's shield (`Character.cpp:4403-4408`), a
+  // cloud's first turn (`Code11f52.cpp:1463`, one tick on).
   const loaded = loadWorld();
   applyCsbwinSave(loaded, new Uint8Array(readFileSync(savePath(cases[0].file))));
   const clock = loaded.ctx.state.tickCount;

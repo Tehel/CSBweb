@@ -332,7 +332,7 @@ export class CSBGraphicsLoader {
   private opened = false;
   /**
    * `OpenCSBgraphicsFile`, which `ReadCSBgraphic` calls first
-   * (`doc/CSBwin-src/Graphics.cpp:3219`): the game's checks (`csbGraphicsOpener`,
+   * (`doc/CSBwin-src/Graphics.cpp:3246`): the game's checks (`csbGraphicsOpener`,
    * `src/engine/FileSignatures.ts`), given the signature, or `null` for a file that is not
    * there, and true when the file opens. One that dies refuses the file: nothing more is
    * read from it. Left `null`, as a tool leaves it, the file opens unchecked.
@@ -340,7 +340,7 @@ export class CSBGraphicsLoader {
   opener: ((signature: FileSignature | null) => boolean) | null = null;
   /**
    * What `ReadCSBgraphic` does besides its message box when the file will not open, the
-   * first time it fails at all (`doc/CSBwin-src/Graphics.cpp:3220-3228`): `overlayActive =
+   * first time it fails at all (`doc/CSBwin-src/Graphics.cpp:3247-3255`): `overlayActive =
    * false` (`Overlay.active`). Its `firstTime` is one for every failure, so a missing
    * section said first means this never happens.
    */
@@ -382,7 +382,7 @@ export class CSBGraphicsLoader {
       desc[i] = readDecorationDesc(raw, i * 6);
     }
 
-    const bitmapOffset = descCount * 6 + 2; // +2 alignment padding (CSBCode.cpp:3161)
+    const bitmapOffset = descCount * 6 + 2; // +2 alignment padding (CSBCode.cpp:3217)
     const sideDesc = desc[11];
     const frontDesc = desc[12];
     const sideSize = sideDesc.widthBytes * sideDesc.height;
@@ -532,12 +532,12 @@ export class CSBGraphicsLoader {
   }
 
   /**
-   * `ReadCSBgraphic` (`doc/CSBwin-src/Graphics.cpp:3201`): section `type`/`id`, inflated,
+   * `ReadCSBgraphic` (`doc/CSBwin-src/Graphics.cpp:3228`): section `type`/`id`, inflated,
    * or `null`. It opens the file first (`open`). The bytes are the caller's own, as
    * CSBWin's are a fresh allocation, to change as it reads them. A section missing that
    * `mustExist` asked for ends `firstTime`, CSBWin's "Missing section" message; one that
    * did not ask, as `BACKGROUND_LIB` sometimes does not (`src/data/BackgroundLib.ts`),
-   * leaves it (`:3253-3262`).
+   * leaves it (`:3280-3289`).
    */
   readSection(type: number, id: number, minimumSize: number, mustExist = true): Uint8Array | null {
     if (!this.open() || !this.data) {

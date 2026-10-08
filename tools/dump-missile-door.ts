@@ -1,5 +1,5 @@
 /**
- * The door arm of `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1844-1935`).
+ * The door arm of `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1879-1970`).
  *
  *  1. A Zo spell at a door that is not broken toggles it through a `TT_DOOR` at
  *     `d.Time + 1` if the door has a button, and is spent **either way** (`break`). The

@@ -40,15 +40,15 @@ Corollaries:
 | `CLAUDE.md` | This file. High-level orientation only; keep it short. |
 | `PLAN.md` | **Authority on detailed project status.** Live phases. |
 | `DEBT.md` | **Authority on technical debt**, in payoff order. Paying it off is the current priority. |
-| `doc/PLAN_ARCHIVE.md` | Working notes of the phases and debt items closed up to 2026-09-26. **Frozen**, reference only — read on demand. |
+| `doc/PLAN_ARCHIVE.md` | Working notes of the phases and debt items closed up to 2026-09-26. **Frozen**, reference only — read on demand. Its CSBWin citations are mapped to 2023 lines by script, unreviewed. |
 | `doc/CSBWIN_REFERENCE_INDEX.md` | Index of the per-topic CSBWin reference docs. |
 | `doc/PROVEN_FACTS.md` | Verified facts with `File.cpp:line` citations. |
 | `doc/SAVES.md` | The port's own save design: the store, the playthrough, the dialog, F5 and F9. |
 | `doc/DEPLOYMENT.md` | The deployed game: the server, the image, the VPS, deploying and backups. `doc/STATISTICS.md`: what it counts. |
 | `doc/CSBWIN_SYMBOL_INDEX.tsv` | Every CSBWin symbol → `File.cpp:line`. Grep this before grepping the tree. |
 | `NOTES.md` | The author's personal scratchpad. **Do not edit.** Flag problems instead. |
-| `doc/CSBwin-src/` | The C++ reference (gitignored, not ours): `CSBwin_SRC_20160923`, Version 15.9. |
-| `doc/CSBwin-src-20230608/` | CSBWin's last source, the reference once `DEBT.md` C151-C157 are paid (gitignored). |
+| `doc/CSBwin-src/` | The C++ reference (not ours, committed as published): `CSBwin_SRC_20230608`, CSBWin's last source and the build the author plays. |
+| `doc/CSBwin-src-20160923/` | The previous reference, 15.9 (gitignored; in git history as `doc/CSBwin-src/`), kept until `DEBT.md` C157's review list is worked through. |
 
 **Documentation contract:** before working on a topic, read its doc. When you verify a new
 fact in the C++ source, write it down with a `doc/CSBwin-src/<File>.cpp:<line>` reference.

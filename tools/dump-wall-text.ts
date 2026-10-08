@@ -2,14 +2,14 @@
  * The words on the wall the party stands against.
  *
  * `DrawWallDecoration` draws a text's lines itself when the wall is the one in front of
- * the party (`relativePosition == 12`, `doc/CSBwin-src/CSBCode.cpp:3245-3290`). A line is
+ * the party (`relativePosition == 12`, `doc/CSBwin-src/CSBCode.cpp:3306-3351`). A line is
  * the bytes up to one of 128 or more, 18 of them at most, centred: `x1 = 112 - 4*length`,
  * each glyph 8 pixels on, `y2 = d.Byte4196[line]`, `y1 = y2 - 7`. Each byte is blitted
  * from graphic 120 by `TAG0088b2(font, viewport, &rect, 8*code, 0, 144, 112, 10)`
- * (`:3278-3285`): source x `8*code` in lines of 144 bytes, 288 pixels, colour 10 left out.
+ * (`:3339-3346`): source x `8*code` in lines of 144 bytes, 288 pixels, colour 10 left out.
  *
  * Nothing checks `code` against the font's 36 glyphs. `TAG0088b2` addresses its source as
- * `src + srcY*srcByteWidth + srcX/2` (`doc/CSBwin-src/Graphics.cpp:559`), so a code of 36
+ * `src + srcY*srcByteWidth + srcX/2` (`doc/CSBwin-src/Graphics.cpp:571`), so a code of 36
  * or more reads on into the rows below: glyph `code - 36`, one row up, its last row read
  * from past the graphic's end, where the port writes nothing. No wall text of `dm-atari`
  * or of the French 1.3 set holds such a code: the two French texts that decode to a 50,
@@ -24,7 +24,7 @@
  *   4. a text seen from afar, at positions 0 to 11, is its plaque: CSBWin 20230608 blits it
  *      through `LOCAL_22`, a copy of its rectangle whose bottom is
  *      `d.Byte4212[3 * d.WallDecorationDerivedGraphicOffset[relativePosition] + numLine - 1]`
- *      for one to three lines (`doc/CSBwin-src-20230608/CSBCode.cpp:3625-3660`, `:3743`).
+ *      for one to three lines (`doc/CSBwin-src/CSBCode.cpp:3625-3660`, `:3743`).
  *      The canary: `WallDecorationDerivedGraphicOffset` is the `0,0,1,1,1,2,2,3,3,3,4,4`
  *      of CSBWin's comment (`:3654`), and each of `Byte4212`'s five triples rises inside
  *      the rectangles of its distance. Then a text of one, two or three lines draws the

@@ -148,9 +148,9 @@ function main(): void {
     // ---- The dungeon image (blocks 7-14) --------------------------------
     //
     // `LoadGame` calls `ReadDatabases()` immediately after the timer queue
-    // (`doc/CSBwin-src/SaveGame.cpp:1739`). A save is loaded with
+    // (`doc/CSBwin-src/SaveGame.cpp:1909`). A save is loaded with
     // `d.gameState == GAMESTATE_ResumeSavedGame`, so that function skips its own
-    // extended-features/compression preamble (`:2345-2346`) and streams straight on
+    // extended-features/compression preamble (`:2557-2558`) and streams straight on
     // from the current file position: the image is plain, uncompressed, big-endian.
     const image = state.dungeonImageOffset;
     if (image !== undefined) {
@@ -176,7 +176,7 @@ function main(): void {
 
     // The layout closure check, and the whole point of the exercise: the image's last
     // section is the cell flags, whose length the extended block declares, and after it
-    // comes only `WriteAndChecksum`'s final word (`doc/CSBwin-src/SaveGame.cpp:1222`).
+    // comes only `WriteAndChecksum`'s final word (`doc/CSBwin-src/SaveGame.cpp:1320`).
     // If every section length from the header to the last database is right, the sum
     // lands exactly on `EOF - 2`. One wrong record size anywhere and it does not.
     const layout = state.imageLayout;
@@ -194,7 +194,7 @@ function main(): void {
     check(state.missiles !== undefined, `${name}: the missile database should parse`);
     if (state.missiles) {
       // A record is free when its link is `RNnul`, CSBWin's own test
-      // (`doc/CSBwin-src/data.cpp:946`, `:960`). The pool is always allocated at full
+      // (`doc/CSBwin-src/data.cpp:948`, `:962`). The pool is always allocated at full
       // size, 60 records whatever is happening on screen, and a free record's other
       // words are whatever was left in them, so they say nothing about it.
       const live = state.missiles.filter((m) => m.nextObject !== OBJECT_ID_NULL);

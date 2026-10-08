@@ -2,40 +2,40 @@
  * Prove that clicks and keys share CSBWin's one mouse queue, and that `HandleMouseEvents`
  * handles one entry of it per tick whatever the entry is.
  *
- * - `MOUSEQLEN` is 8: `Data.h:1513` leaves `#define NoKeyQue` commented out, so the
- *   3 at `:1515` is dead and the 8 at `:1517` is live (doc/CSBwin-src/Data.h:1513-1518).
+ * - `MOUSEQLEN` is 8: `Data.h:1528` leaves `#define NoKeyQue` commented out, so the
+ *   3 at `:1530` is dead and the 8 at `:1532` is live (doc/CSBwin-src/Data.h:1528-1533).
  * - A key is queued unless 7 entries wait — `TAG0196da` refuses it when
- *   `MouseQEnd + 2 == MouseQStart` (doc/CSBwin-src/CSBCode.cpp:8439-8443).
+ *   `MouseQEnd + 2 == MouseQStart` (doc/CSBwin-src/CSBCode.cpp:8526-8530).
  * - A click is queued only while fewer than `MOUSEQLEN-2` wait, leaving room for its
- *   button-up (`OnMouseClick`, `CSBCode.cpp:7626-7630`); the button-up, `0xadd`, while
- *   fewer than `MOUSEQLEN-1` wait (`OnMouseUnClick`, `:7581-7600`).
+ *   button-up (`OnMouseClick`, `CSBCode.cpp:7695-7713`); the button-up, `0xadd`, while
+ *   fewer than `MOUSEQLEN-1` wait (`OnMouseUnClick`, `:7640-7663`).
  * - A click is queued untranslated, and matched to its button when `HandleMouseEvents`
  *   comes to it; one that hits nothing then is dropped for the entry behind it
- *   (`POST_TRANSLATE_CLICK`, doc/CSBwin-src-20230608/Mouse.cpp:1374-1442, `:1510-1528`).
- * - `HandleMouseEvents` takes the head only if `lastTime` allows (`Mouse.cpp:1468-1476`),
- *   leaves a held step at the head, blocking everything behind it (`:1485-1498`), and
+ *   (`POST_TRANSLATE_CLICK`, doc/CSBwin-src/Mouse.cpp:1374-1442, `:1510-1528`).
+ * - `HandleMouseEvents` takes the head only if `lastTime` allows (`Mouse.cpp:1596-1604`),
+ *   leaves a held step at the head, blocking everything behind it (`:1619-1632`), and
  *   stamps `lastTime` for every button it handles, a click as much as a turn — but not
  *   for the button-up, which returns `result |= 1` so the next entry follows in the same
- *   pass (`:1523-1549`), the main loop calling it again while that bit is set
- *   (`CSBCode.cpp:746-761`).
+ *   pass (`:1662-1688`), the main loop calling it again while that bit is set
+ *   (`CSBCode.cpp:756-771`).
  * - The on-screen arrows are buttons 1-6 (`buttons17304`); `HandleMouseEvents` sends
- *   1-2 to `TurnParty` and 3-6 to `MoveParty` (`Mouse.cpp:1550-1570`).
- * - `DiscardAllInput` empties the queue, clicks included (`CSBCode.cpp:7532-7544`).
+ *   1-2 to `TurnParty` and 3-6 to `MoveParty` (`Mouse.cpp:1689-1709`).
+ * - `DiscardAllInput` empties the queue, clicks included (`CSBCode.cpp:7591-7603`).
  * - `ShowHideInventory` calls it as it opens an inventory and as it closes one
- *   (`CSBCode.cpp:7480`, `:7520`), so a turn queued behind the portrait is lost.
+ *   (`CSBCode.cpp:7539`, `:7579`), so a turn queued behind the portrait is lost.
  * - `totalMoveCount` counts each entry `HandleMouseEvents` takes past the held-step test
- *   (`Mouse.cpp:1506`), below 0x2000 and not the no-op (`Recording.cpp:1011-1019`).
+ *   (`Mouse.cpp:1645`), below 0x2000 and not the no-op (`Recording.cpp:1091-1114`).
  * - While the eye or the mouth is pressed, every button after 81 — the disk icon, 140,
- *   among them — is swallowed (`Mouse.cpp:1679-1680`), until the button-up.
+ *   among them — is swallowed (`Mouse.cpp:1818-1819`), until the button-up.
  * - A viewport click on a door button, or on a wall switch that fires, sets
  *   `d.clockTick = 1`, so a tick runs in the frame of the click. A touch of the wall that
  *   fires nothing sets it to 0, and a tick that was due waits a frame. A cell ahead off
- *   the map leaves it alone (`Mouse.cpp:784-788`, `:1078`).
- * - `ShowHideInventory`, the pick-up and the drop set it to 1 as well (`CSBCode.cpp:7441`,
- *   `Mouse.cpp:840`, `:964`), the eye's press aside; the attack menu and the cast button
- *   set it to what the attack or the cast returned (`Character.cpp:4716-4717`,
- *   `Magic.cpp:564`), and a pass leaves it alone. A turn and a step set it to 1 before
- *   anything else, "Extra Ticks" being on (`CSBCode.cpp:7866-7869`, `:8084-8087`).
+ *   the map leaves it alone (`Mouse.cpp:785-789`, `:1079`).
+ * - `ShowHideInventory`, the pick-up and the drop set it to 1 as well (`CSBCode.cpp:7500`,
+ *   `Mouse.cpp:841`, `:965`), the eye's press aside; the attack menu and the cast button
+ *   set it to what the attack or the cast returned (`Character.cpp:4733-4734`,
+ *   `Magic.cpp:567`), and a pass leaves it alone. A turn and a step set it to 1 before
+ *   anything else, "Extra Ticks" being on (`CSBCode.cpp:7953-7956`, `:8171-8174`).
  *
  * Run: `npx tsx tools/dump-mouse-queue.ts [level]`
  */
@@ -181,7 +181,7 @@ async function main(): Promise<void> {
 
   // ---- 2b: a click is matched to its button when it is taken ------------------------
   // `OnMouseClick` queues `UNTRANSLATED_CLICK` with the point and the mouse buttons, a
-  // click that hits nothing as much as any (doc/CSBwin-src-20230608/CSBCode.cpp:7694-7711).
+  // click that hits nothing as much as any (doc/CSBwin-src/CSBCode.cpp:7694-7711).
   // `_HandleMouseEvents` translates the head before anything else, against the lists the
   // screen has then, and drops a click that hits nothing for the entry behind it
   // (`TranslateMouseClick`, `Mouse.cpp:1374-1442`; the loop at `:1510-1528`). The
@@ -302,8 +302,8 @@ async function main(): Promise<void> {
 
   // ---- 7b: totalMoveCount counts what HandleMouseEvents records -------------------
   // `RecordFile_Record(&pMouseQueue[d.MouseQStart])` once an entry is past the held-step
-  // test (doc/CSBwin-src/Mouse.cpp:1506), counted when below 0x2000 and not the no-op
-  // (`Recording.cpp:1011-1019`). A held step and a frozen game's discard come first.
+  // test (doc/CSBwin-src/Mouse.cpp:1645), counted when below 0x2000 and not the no-op
+  // (`Recording.cpp:1091-1114`). A held step and a frozen game's discard come first.
   reset();
   const moves = (): number => game.ctx.state.block1.totalMoveCount;
   const m0 = moves();
@@ -345,7 +345,7 @@ async function main(): Promise<void> {
 
   // ---- 8: the disk icon waits for the eye to be let go ----------------------------
   // `if (d.PressingEye!=0) {lastTime=d.Time; RETURN_int(result);};` sits after button 81
-  // and before 140 (doc/CSBwin-src/Mouse.cpp:1679-1680). Through the real dispatcher.
+  // and before 140 (doc/CSBwin-src/Mouse.cpp:1818-1819). Through the real dispatcher.
   const ui = newUIState(graphics, game.ctx);
   ui.partyState = party;
   game.setMouseEventHandlers({
@@ -374,9 +374,9 @@ async function main(): Promise<void> {
 
   // ---- 8b: the inventory opens and closes with DiscardAllInput ----------------------
   // `ShowHideInventory` ends in `DiscardAllInput()` as it opens an inventory and as it
-  // closes one (doc/CSBwin-src/CSBCode.cpp:7480, `:7520`), so a turn queued behind the
+  // closes one (doc/CSBwin-src/CSBCode.cpp:7539, `:7579`), so a turn queued behind the
   // portrait, button 7, is lost either way. A sleeping party's close returns before it
-  // (`:7468-7472`).
+  // (`:7527-7531`).
   const turnBehindPortrait = (): { opened: boolean; turned: boolean; left: number } => {
     const facingBefore = party.facing;
     const wasOpen = party.selectedCharacterIndex === 0;
@@ -404,12 +404,12 @@ async function main(): Promise<void> {
 
   // ---- 9: a click that works something makes a tick due -----------------------------
   // The main loop runs a tick after `HandleMouseEvents` whenever `d.clockTick` is set
-  // (doc/CSBwin-src/CSBCode.cpp:763-764). The door button sets it to 1 before queueing its
-  // `TT_DOOR` for `d.Time+1` (Mouse.cpp:1078-1085). A tick runs `ProcessTimers` before its
-  // `d.Time++` (`CSBCode.cpp:626`, `:660`), so the tick in the frame of the click passes the
+  // (doc/CSBwin-src/CSBCode.cpp:773-774). The door button sets it to 1 before queueing its
+  // `TT_DOOR` for `d.Time+1` (Mouse.cpp:1079-1086). A tick runs `ProcessTimers` before its
+  // `d.Time++` (`CSBCode.cpp:636`, `:670`), so the tick in the frame of the click passes the
   // door by, and the one after it moves it. `TouchWallF1` sets it to what `TouchWall`
-  // returns (`:788`): 1 when a switch fired, 0 when nothing did, which puts off a tick that
-  // was due. A cell ahead off the map leaves it alone (`:784-787`).
+  // returns (`:789`): 1 when a switch fired, 0 when nothing did, which puts off a tick that
+  // was due. A cell ahead off the map leaves it alone (`:794-797`).
   const inMap = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < width && y < height;
   const stone = (x: number, y: number): boolean =>
     inMap(x, y) && ((dungeon.getCellFlag(new Position(x, y, level)) >> 5) & 0x7) === RoomType.STONE;
@@ -497,7 +497,7 @@ async function main(): Promise<void> {
   check(firstTickFrame === 1, 'the door button brings the tick on in the frame of the click (d.clockTick = 1)');
   check(doorFrames > 1 && ticksUntilDone === 2, "its TT_DOOR fires in the tick after that one, not in the click's");
 
-  // A switch answers only a cursor someone owns (`Mouse.cpp:357-360`): a champion's.
+  // A switch answers only a cursor someone owns (`Mouse.cpp:358-361`): a champion's.
   party.champions = [champion()];
   party.cursorOwner = 0;
   const switchFrames = framesUntil(switchScene, 'wall');
@@ -528,11 +528,11 @@ async function main(): Promise<void> {
 
   // ---- 10: the other handlers that write d.clockTick -------------------------------
   // `ShowHideInventory` sets it to 1 once past its dead-champion and pressed-eye/mouth
-  // returns (doc/CSBwin-src/CSBCode.cpp:7434-7441). The pick-up `TAG01a148` and
-  // `DropObject` end with it (Mouse.cpp:840, :964). The attack menu sets it to
-  // `ExecuteAttack`'s result, and a pass leaves it alone (Character.cpp:4679-4682,
-  // :4716-4717). The cast button sets it to `CastMagic`'s result, `CastSpell`'s with 3
-  // made 0 (Magic.cpp:564, :945-956). Each click goes through the queue to the real
+  // returns (doc/CSBwin-src/CSBCode.cpp:7493-7500). The pick-up `TAG01a148` and
+  // `DropObject` end with it (Mouse.cpp:841, :965). The attack menu sets it to
+  // `ExecuteAttack`'s result, and a pass leaves it alone (Character.cpp:4696-4699,
+  // :4733-4734). The cast button sets it to `CastMagic`'s result, `CastSpell`'s with 3
+  // made 0 (Magic.cpp:567, :948-959). Each click goes through the queue to the real
   // handler: the UI's dispatcher, or for the viewport `HandleClickInViewport`'s calls
   // (`src/renderer/ui/Mouse.ts`).
   // The engine's `CastMagic` and `Attack`, the UI's calls, wrapped to read their results.
@@ -626,7 +626,7 @@ async function main(): Promise<void> {
   const eyeFrames = framesToTick(() => handleMouseButton(ui, 7, 0, 0));
   const openedUnderEye = party.selectedCharacterIndex === 0;
   row('button 7, eye pressed', openedUnderEye ? 'opened' : 'refused', eyeFrames, '-', 'untouched');
-  check(!openedUnderEye, 'ShowHideInventory returns while the eye is pressed (CSBCode.cpp:7440)');
+  check(!openedUnderEye, 'ShowHideInventory returns while the eye is pressed (CSBCode.cpp:7499)');
   check(eyeFrames > 1, 'and leaves d.clockTick alone');
 
   soloParty();
@@ -701,7 +701,7 @@ async function main(): Promise<void> {
   // `RESTARTABLE` and holds the pass through its flash (`magicSelectionScript`), three
   // VBLs for a cast, and in the VBL it returns the pass goes on where it stopped: no further entry
   // (the click's `result` is 0), then `if (d.clockTick == 0)` and the tick
-  // (CSBCode.cpp:747-765). So a cast's tick runs in the script's last VBL, and so does a
+  // (CSBCode.cpp:757-775). So a cast's tick runs in the script's last VBL, and so does a
   // tick that was due while a rune's flash held the pass; the click queued behind is taken
   // in the VBL after that tick.
   const [castX, castY] = centreOf(buttons.buttons18060, 108);
@@ -755,7 +755,7 @@ async function main(): Promise<void> {
     }
   }
   check(castResults.has(0) && castResults.has(1) && castResults.has(3), 'the casts return 0, 1 and 3');
-  // A rune (101) leaves `d.clockTick` alone (Magic.cpp:566-581).
+  // A rune (101) leaves `d.clockTick` alone (Magic.cpp:569-584).
   const runeFromClear = magicClick([], runeX, runeY, false);
   const runeAdded = party.champions[0]!.incantation.length === 1;
   const runeFromSet = magicClick([], runeX, runeY, true);
@@ -767,8 +767,8 @@ async function main(): Promise<void> {
     'a tick due while the flash held the pass runs in the VBL _MagicSelection returns, and the click behind is taken in the next');
 
   // `_TurnParty` and `MoveParty` open with `if (extraTicks) d.clockTick = 1;`, and
-  // `extraTicks` is on (CSBCode.cpp:7866-7869, :8084-8087, data.cpp:279). A step the
-  // terrain refuses then sets it to 0 (:8310-8314).
+  // `extraTicks` is on (CSBCode.cpp:7953-7956, :8171-8174, data.cpp:280). A step the
+  // terrain refuses then sets it to 0 (:8397-8401).
   soloParty();
   const facingBefore = party.facing;
   const turnFrames = framesToTick(() => {}, 1);

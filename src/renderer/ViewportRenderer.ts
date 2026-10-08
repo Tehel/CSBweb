@@ -46,8 +46,8 @@ export interface WallBitmapSet {
 }
 
 // Full-viewport (224×136) palette-index templates.
-// `ceilingMirrored` corresponds to CSBWin `(x+y+facing)&1 == 0` path (Viewport.cpp:6752-6754).
-// `floorMirrored` corresponds to CSBWin `(x+y+facing)&1 == 1` path (Viewport.cpp:6741-6744).
+// `ceilingMirrored` corresponds to CSBWin `(x+y+facing)&1 == 0` path (Viewport.cpp:6759-6761).
+// `floorMirrored` corresponds to CSBWin `(x+y+facing)&1 == 1` path (Viewport.cpp:6748-6751).
 export interface FloorCeiling {
   normal: Uint8Array;
   mirrored: Uint8Array;
@@ -164,8 +164,8 @@ export class ViewportRenderer {
   /**
    * One frame of the dungeon seen from `position`. `seeThroughWalls` is CSBWin's
    * `d.SeeThruWalls`, read as a boolean each frame:
-   * `case SeeThroughWalls: push(d.SeeThruWalls?1:0);` (doc/CSBwin-src/Viewport.cpp:2638).
-   * The engine maintains the counter (`Magic.cpp:1314` increments it, TT_73 decrements
+   * `case SeeThroughWalls: push(d.SeeThruWalls?1:0);` (doc/CSBwin-src/Viewport.cpp:2645).
+   * The engine maintains the counter (`Magic.cpp:1316` increments it, TT_73 decrements
    * it — see `TimerSystem.processSeeThruWallsTimer`). `word1868` is `d.Word1868`, which
    * hides the Fluxcages' shimmer (`InterpreterContext.word1868`).
    */
@@ -234,7 +234,7 @@ export class ViewportRenderer {
    * Separate from `draw` so the prison-door screen can run the same renderer over its
    * synthetic 5x5 level (`renderPrisonInterior`, `intro/PrisonLevel.ts`) — which is what
    * CSBWin does when it swaps `d.LevelCellFlags` and `d.pCurLevelDesc` and calls
-   * `DrawViewport(2, 2, 0)` (`doc/CSBwin-src/CSBCode.cpp:9556-9583`). The palette
+   * `DrawViewport(2, 2, 0)` (`doc/CSBwin-src/CSBCode.cpp:9678-9705`). The palette
    * bookkeeping stays with `selectLevel`: it belongs to the level the party is on.
    */
   private drawViewportFrame(
@@ -285,9 +285,9 @@ export class ViewportRenderer {
     }
 
     // `d.DoorTOC[2] = d.DoorCharacteristics[doorType0Index/doorType1Index]`
-    // (`doc/CSBwin-src/CSBCode.cpp:5780-5783`) — the level's two door "types" resolved
+    // (`doc/CSBwin-src/CSBCode.cpp:5845-5848`) — the level's two door "types" resolved
     // to their characteristics word, bit 10 of which flags a "lightning door" and
-    // drives `DrawDoor`'s per-frame random mirror/flip (`CSBCode.cpp:4156-4166`).
+    // drives `DrawDoor`'s per-frame random mirror/flip (`CSBCode.cpp:4221-4231`).
     const doorCharacteristics = this.objectTables.doorCharacteristics;
     this.context.doorTOC = doorCharacteristics
       ? [doorCharacteristics[doorType0] ?? 0, doorCharacteristics[doorType1] ?? 0]
@@ -295,7 +295,7 @@ export class ViewportRenderer {
 
     this.context.seeThroughWalls = seeThroughWalls;
 
-    // CSBWin: `d.UseMirrorImages = (x + y + facing) & 1` (Viewport.cpp:6740)
+    // CSBWin: `d.UseMirrorImages = (x + y + facing) & 1` (Viewport.cpp:6747)
     const useMirrorImages = ((x + y + facing) & 1) !== 0;
     this.context.useMirrorImages = useMirrorImages;
 
@@ -344,7 +344,7 @@ export class ViewportRenderer {
       throw new Error(`Expected 7 wall bitmaps, got ${normal.length}`);
     }
 
-    // CSBWin behavior (Viewport.cpp:6741-6750 + Code390e.cpp:104-113):
+    // CSBWin behavior (Viewport.cpp:6748-6757 + Code390e.cpp:104-113):
     // - When `UseMirrorImages != 0`, F0L1/F0R1 are swapped by using mirrored copies of the opposite side.
     // - Other distances use mirrored copies of their own bitmaps.
     // - Corner bitmaps (index 5/6) are not swapped here.
@@ -407,9 +407,9 @@ export class ViewportRenderer {
     mirrorFloor: boolean
   ): Uint8Array {
     // CSBWin geometry constants from Viewport.cpp:
-    // - Mirror ceiling height = 0x1d (29) (Viewport.cpp:6753)
-    // - Mirror floor height   = 0x46 (70) (Viewport.cpp:6743)
-    // These match the memory sizes set up in CSBCode.cpp:10122-10123:
+    // - Mirror ceiling height = 0x1d (29) (Viewport.cpp:6760)
+    // - Mirror floor height   = 0x46 (70) (Viewport.cpp:6750)
+    // These match the memory sizes set up in CSBCode.cpp:10246-10247:
     //   3248 (112*29), 4144 (112*37), 7840 (112*70) for (ceiling, black, floor).
     const CEILING_H = 0x1d;
     const FLOOR_H = 0x46;
@@ -446,7 +446,7 @@ export class ViewportRenderer {
 
   /**
    * `DrawViewport(2, 2, 0)` over the synthetic prison level — the corridor seen through the
-   * doorway on the entrance screen (`doc/CSBwin-src/CSBCode.cpp:9583`). Returns a copy of
+   * doorway on the entrance screen (`doc/CSBwin-src/CSBCode.cpp:9705`). Returns a copy of
    * `d.pViewportBMP`, which the door animation re-blits on every frame.
    *
    * `lastPaletteLevel` is cleared so the first real frame after this re-applies the level's

@@ -1,5 +1,5 @@
 /**
- * `SelectPaletteForLightLevel` (`doc/CSBwin-src/CSBCode.cpp:7242-7336`): `d.CurrentPalette`
+ * `SelectPaletteForLightLevel` (`doc/CSBwin-src/CSBCode.cpp:7301-7395`): `d.CurrentPalette`
  * set by the engine where the light changes, and a monster's sight shortened by it in the
  * dark (`Monster.cpp:577-581`).
  *
@@ -9,17 +9,17 @@
  * `d.PaletteBrightness` entry at or below the total, 5 with no light at all, read from the
  * tables rather than written here.
  *
- * 1. **A level loaded** (`LoadPartyLevel`, `:819`): level 0, whose experience multiplier
+ * 1. **A level loaded** (`LoadPartyLevel`, `:823`): level 0, whose experience multiplier
  *    is 0, is palette 0 however dark; level 2 with no light is 5.
- * 2. **A torch into a hand** (`AddCharacterPossession`, `Character.cpp:1992`): one of
+ * 2. **A torch into a hand** (`AddCharacterPossession`, `Character.cpp:1997`): one of
  *    charge 3 gives `Word1074[3]`; a second in the other hand adds half of its own
  *    (the second brightest is shifted one place less); out of the hand again
- *    (`RemoveCharacterPossession`, `:1903`), dark.
- * 3. **An Illumulet round the neck** (`:2017`, `:1867`): `Word1074[2]` on, and off.
- * 4. **A light timer** (`SetBrightnessTimer`, `Magic.cpp:839`, as `atk_LIGHT` sets it,
- *    `Attack.cpp`): the light at once, then each `TT_LIGHT` step (`CSBCode.cpp:6517`) back
+ *    (`RemoveCharacterPossession`, `:1908`), dark.
+ * 3. **An Illumulet round the neck** (`:2022`, `:1872`): `Word1074[2]` on, and off.
+ * 4. **A light timer** (`SetBrightnessTimer`, `Magic.cpp:842`, as `atk_LIGHT` sets it,
+ *    `Attack.cpp`): the light at once, then each `TT_LIGHT` step (`CSBCode.cpp:6576`) back
  *    to the dark.
- * 5. **The torches burning down** (`NinetySecondUpdate`, `:7384`): a torch of charge 1
+ * 5. **The torches burning down** (`NinetySecondUpdate`, `:7443`): a torch of charge 1
  *    burns out, and the level goes dark.
  * 6. **A monster's sight**: on level 2, dark, every monster that cannot see in the dark
  *    and sees the party in full light is checked against `d.CurrentPalette`, as the AI

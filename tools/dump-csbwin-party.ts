@@ -40,7 +40,7 @@ const DB_OF_CATEGORY: Record<number, keyof DungeonData['databases']> = {
 /**
  * The six databases a champion can hold an object from. CSBWin has no list of its own —
  * it does not need one, because nothing ever puts a door in a hand — so this is the set
- * `RN::DescIndex` will answer for (`doc/CSBwin-src/data.cpp:566-598`): scroll, chest,
+ * `RN::DescIndex` will answer for (`doc/CSBwin-src/data.cpp:567-599`): scroll, chest,
  * misc, weapon, clothing, potion. Everything else returns -1, "not an object".
  */
 const CARRYABLE = new Set([5, 6, 7, 8, 9, 10]);
@@ -114,7 +114,7 @@ function main(): void {
       check((c.possessions ?? []).length === 30, `${name}/${c.name}: thirty possession slots`);
 
       // Name and title are C strings and stop at their terminator, as `TextToViewport`
-      // does (`doc/CSBwin-src/Character.cpp:1324,1338`). Several genuine saves hold a
+      // does (`doc/CSBwin-src/Character.cpp:1329,1343`). Several genuine saves hold a
       // title whose first byte is a NUL — a champion reincarnated with the name retyped
       // and the title left empty, where `_ReIncarnate` clears only `title[0]` and the
       // old title's tail shows through (`doc/PROVEN_FACTS.md` → "A champion's title can
@@ -128,7 +128,7 @@ function main(): void {
       //
       // Every non-empty slot must name a **live** record — `nextObject != RNnul`,
       // CSBWin's own free-record marker (`DeleteDBEntry`,
-      // `doc/CSBwin-src/data.cpp:993-1015`) — in one of the six databases a champion
+      // `doc/CSBwin-src/data.cpp:995-1017`) — in one of the six databases a champion
       // can hold an object from. Categories 0-4 are doors, teleporters, texts,
       // actuators and monsters: none of them is carryable, and a wrongly-decoded
       // reference lands in them immediately, because they are the low-numbered

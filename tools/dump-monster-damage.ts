@@ -101,7 +101,7 @@ async function main(): Promise<void> {
     }
     // Per-member timers only exist while the group is in fear state 6 — that is the
     // state `MaybeDelTimers_Fear6_TurnIndividuals` creates them in — and CSBWin gates
-    // the whole renumbering block on it (doc/CSBwin-src/Code11f52.cpp:1147).
+    // the whole renumbering block on it (doc/CSBwin-src/Code11f52.cpp:1182).
     rec.fear = StateOfFear.StateOfFear6;
     const timersQueued = timers.getTimers().filter(t => t.uByte6 === mx && t.uByte7 === my
       && t.function >= TimerFunction.TT_MONSTER_A0 && t.function <= TimerFunction.TT_MONSTER_B3).length;
@@ -122,7 +122,7 @@ async function main(): Promise<void> {
     // Note the `-1` entry in this listing: it is the group timer, TT_MONSTER_BGROUP
     // (37), which falls inside CSBWin's own A0..B3 scan range but yields a member
     // index of -1, so it matches neither `== indexInGroup` nor `> indexInGroup` and
-    // is correctly left alone (doc/CSBwin-src/Code11f52.cpp:1155-1163).
+    // is correctly left alone (doc/CSBwin-src/Code11f52.cpp:1190-1198).
     const memberTimers = timers.getTimers()
       .filter(t => t.uByte6 === mx && t.uByte7 === my
         && t.function >= TimerFunction.TT_MONSTER_A0 && t.function <= TimerFunction.TT_MONSTER_B3)

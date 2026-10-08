@@ -80,7 +80,7 @@ function rewrite(bytes: Uint8Array): {
 /**
  * The live timers that carry an object reference, and where in the record it sits.
  *
- * `ConvertTimers` switches on the timer function (`doc/CSBwin-src/SaveGame.cpp:2027-2050`):
+ * `ConvertTimers` switches on the timer function (`doc/CSBwin-src/SaveGame.cpp:2239-2262`):
  * functions 48 and 49 carry `timerObj6` — bytes 6-7 — and are the missile in flight;
  * 24, 25, 60 and 61 carry `timerObj8`, bytes 8-9. Every other function reads those bytes
  * as plain numbers (a map square, an action code) and must not be touched.

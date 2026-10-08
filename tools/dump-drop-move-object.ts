@@ -1,17 +1,17 @@
 /**
- * The two drops go through `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2796`).
+ * The two drops go through `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2831`).
  *
  * `DropObject` puts the cursor's object down with `MoveObject(objD4, -1, 0, x, y)`
- * (`doc/CSBwin-src/Mouse.cpp:882`), and a thrown object whose flight ends is put down with
+ * (`doc/CSBwin-src/Mouse.cpp:883`), and a thrown object whose flight ends is put down with
  * `MoveObject(obj, -2, 0, x, y)` (`ProcessObjectFromMissile`, `Timer.cpp:151-159`).
  * `MouseSystem.dropObjectFromCursor` and `TimerSystem.dropMissileObject` hand-rolled it, and
  * differed from it in two ways:
  *
  *  1. They placed the object with `unchangedRoom` false. `MoveObject` places an object
- *     with `unchangedRoom` = "the party stands on this square" (`:3433-3448`), so an item
+ *     with `unchangedRoom` = "the party stands on this square" (`:3468-3483`), so an item
  *     dropped where the party stands does not press a type-1 pad the party is already on.
  *  2. The cursor drop turned the object's corner on a relative teleporter. `MoveObject`
- *     turns it only when `oldX != -1` (`:3000-3006`): a thrown object (`oldX` -2) turns,
+ *     turns it only when `oldX != -1` (`:3035-3041`): a thrown object (`oldX` -2) turns,
  *     a dropped one keeps the corner it was dropped at.
  *
  * The teleporter is a real record from `dungeon.dat`, rigged by `tools/lib/teleporter.ts`.
@@ -159,7 +159,7 @@ function main(): void {
       + `there ${landed !== null}, pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place, c.unchangedRoom]))}`);
     check(dropped && landed !== null && game.ctx.dungeon.rnMaps.pos(landed) === 1, 'the item lies on the party square, corner 1');
     check(calls.length === 1 && calls[0]!.place && same(calls[0]!.at, party) && calls[0]!.unchangedRoom,
-      'it is placed with unchangedRoom = the party stands there (Code11f52.cpp:3433-3448)');
+      'it is placed with unchangedRoom = the party stands there (Code11f52.cpp:3468-3483)');
   }
 
   /* ---------------------------- 2. a drop onto a relative teleporter in front ---- */
@@ -177,7 +177,7 @@ function main(): void {
       + `pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place, c.unchangedRoom]))}`);
     check(landed !== null, 'the item is carried to the destination');
     check(landed !== null && game.ctx.dungeon.rnMaps.pos(landed) === 2,
-      'it keeps the corner it was dropped at: oldX is -1 (Code11f52.cpp:3000-3006)');
+      'it keeps the corner it was dropped at: oldX is -1 (Code11f52.cpp:3035-3041)');
     check(calls.length === 1 && same(calls[0]!.at, dest) && !calls[0]!.unchangedRoom,
       'it is placed once, at the destination, with unchangedRoom false');
   }
@@ -194,7 +194,7 @@ function main(): void {
       + `pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place, c.unchangedRoom]))}`);
     check(landed !== null && game.ctx.dungeon.rnMaps.pos(landed) === 3, 'the item lies on the party square, corner 3');
     check(calls.length === 1 && calls[0]!.place && calls[0]!.unchangedRoom,
-      'it is placed with unchangedRoom = the party stands there (Code11f52.cpp:3433-3448)');
+      'it is placed with unchangedRoom = the party stands there (Code11f52.cpp:3468-3483)');
   }
 
   /* ----------------------------- 4. a thrown item landing on a relative teleporter ---- */
@@ -207,13 +207,13 @@ function main(): void {
     console.log(`4. thrown item lands on the teleporter at (${front.x},${front.y}), rotation 1: at (${dest.x},${dest.y}) `
       + `${landed !== null}, corner ${landed !== null ? game.ctx.dungeon.rnMaps.pos(landed) : '-'}`);
     check(landed !== null && game.ctx.dungeon.rnMaps.pos(landed) === 3,
-      'it is carried to the destination and turned: oldX is -2, not -1 (Code11f52.cpp:3000-3006)');
+      'it is carried to the destination and turned: oldX is -2, not -1 (Code11f52.cpp:3035-3041)');
   }
 
   /* ------------------- 5. a pad's timer due at once waits for the tick ---- */
-  // `ProcessTimers` runs from the main loop's tick (`CSBCode.cpp:627`) and from
-  // `_FusionSequence` (`Attack.cpp:2199`), nowhere else: not from `DropObject`
-  // (`Mouse.cpp:860-890`), the pick-up's `MoveObject` (`:836`) or `MoveParty`. A pad
+  // `ProcessTimers` runs from the main loop's tick (`CSBCode.cpp:637`) and from
+  // `_FusionSequence` (`Attack.cpp:2201`), nowhere else: not from `DropObject`
+  // (`Mouse.cpp:861-891`), the pick-up's `MoveObject` (`:837`) or `MoveParty`. A pad
   // pressed by the object queues its action for `d.Time`, and it is still queued when
   // the handler returns.
   {

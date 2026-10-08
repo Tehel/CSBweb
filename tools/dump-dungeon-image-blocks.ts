@@ -65,12 +65,12 @@ import { genuineSaves } from './lib/saves';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 
-/** Everything from here up is an `RNVAL` literal, not a slot (`CSBTypes.h:236-250`). */
+/** Everything from here up is an `RNVAL` literal, not a slot (`CSBTypes.h:242-256`). */
 const RN_LITERAL_FLOOR = 0xff00;
 
 /* ------------------------------------------------------------------ field names --- */
 
-/** Which `DUNGEONDATINDEX` word an offset falls in (`doc/CSBwin-src/CSB.h:2057-2082`). */
+/** Which `DUNGEONDATINDEX` word an offset falls in (`doc/CSBwin-src/CSB.h:2120-2145`). */
 function headerField(i: number): string {
   if (i < 2) return 'sentinel';
   if (i < 4) return 'word2 (LegacyCellFlagArraySize)';
@@ -98,7 +98,7 @@ function descriptorField(i: number): string {
 
 /**
  * One database's record shape: the byte offset of every field, and which of them are RNs.
- * Transcribed from the `DBn` classes in `doc/CSBwin-src/CSB.h:818-1345`; the offsets are
+ * Transcribed from the `DBn` classes in `doc/CSBwin-src/CSB.h:821-1348`; the offsets are
  * the ones `DungeonLoader` reads and `CsbwinDungeonImageWriter` writes.
  */
 interface RecordShape {
@@ -394,7 +394,7 @@ function compareObjectList(s: Subject, mine: Uint8Array): void {
  *
  * One class of word is neither, and is exempt by name: **the second RN of a free record**.
  * `DeleteDBEntry` writes `RNnul` over a record's link and frees the indirect slot that
- * named it, but leaves the rest of the record alone (`doc/CSBwin-src/data.cpp:993-1015`),
+ * named it, but leaves the rest of the record alone (`doc/CSBwin-src/data.cpp:995-1017`),
  * so a deleted record routinely still points its possession or contents chain at a slot
  * that has since been freed or reused.
  * `DungeonLoader.readRNOfRecord` reads those and drops them, because resolving one is
@@ -522,7 +522,7 @@ function main(): void {
     options: { indirectText: false, bigActuators: false, newScrolls: false },
     // It has no Extended Features block, so its own header is the authority:
     // `ReadDatabases` falls back to `LegacyCellFlagArraySize` when `cellflagArraySize`
-    // is 0 (`doc/CSBwin-src/SaveGame.cpp:2412-2415`).
+    // is 0 (`doc/CSBwin-src/SaveGame.cpp:2624-2627`).
     declaredCellFlagSize: dungeon.header.mapDataSize,
     // `dungeon.dat` is not a save and carries no `WriteAndChecksum` word.
     hasChecksum: false,

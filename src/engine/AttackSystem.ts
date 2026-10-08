@@ -25,7 +25,7 @@
  * to a signed 16-bit word, and several steps can leave the running total negative, so
  * the `sw()` calls are load-bearing rather than decoration.
  *
- * Lord Chaos's endgame is here too: `_Fusion` (`:133`), and `_FusionSequence` (`:2220`),
+ * Lord Chaos's endgame is here too: `_Fusion` (`:133`), and `_FusionSequence` (`:2222`),
  * which a boxed-in Lord Chaos starts and which holds the main loop to the credits.
  */
 import { printWithSubstitution } from './PrintWithSubstitution';
@@ -317,7 +317,7 @@ export class AttackSystem {
   }
 
   /**
-   * `CharacterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:4046`), shared with
+   * `CharacterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:4084`), shared with
    * `AddCharacter` and the Vi altar rather than kept as a second copy — the two
    * transcriptions had already drifted apart on whether a dead champion holds a corner.
    */
@@ -954,7 +954,7 @@ export class AttackSystem {
   }
 
   /**
-   * `_FusionSequence` (`doc/CSBwin-src/Attack.cpp:2220`), the end of the game, which holds
+   * `_FusionSequence` (`doc/CSBwin-src/Attack.cpp:2222`), the end of the game, which holds
    * the main loop to the credits (`LoopScript`): the game won, the light and the shields
    * up, Lord Chaos made all but unkillable and turned to face the party, the Fluxcages on
    * the party's square and his taken away, six fireballs of growing size and six dispells
@@ -1061,7 +1061,7 @@ export class AttackSystem {
         // byte, and the text is printed from there with the letter turned into a linefeed.
         const text = dungeon.decodeTextString(dungeon.getTextRecord(rn)!, 0x8001, this.ctx.tables.textDecode, 200);
         if (text === null || text.charCodeAt(1) !== letter) continue;
-        // `TAG00187e()` (`doc/CSBwin-src/Hint.cpp:1816`) resets the hint oracle's `f.`
+        // `TAG00187e()` (`doc/CSBwin-src/Hint.cpp:2067`) resets the hint oracle's `f.`
         // state, which only the oracle reads.
         messages.printLines(15, '\n' + text.slice(2), this.ctx.state.tickCount);
         yield* mainLoop.processTimersViewportAndSound();
@@ -1081,7 +1081,7 @@ export class AttackSystem {
   /**
    * `VBLDelay(vbls)` after a line of the ending, with `scrollingText.ClockTick()` on each
    * of its VBLs. That call is the port's own (`DEBT.md` H, "The ending's speech is shown
-   * whole"): CSBWin's `_VBLDelay` only waits (`doc/CSBwin-src/CSBCode.cpp:1137-1147`), so
+   * whole"): CSBWin's `_VBLDelay` only waits (`doc/CSBwin-src/CSBCode.cpp:1147-1157`), so
    * a row held back by a scroll is placed when the next text is printed, one row per
    * text, and the credits come with most of the speech never shown
    * (`doc/PROVEN_FACTS.md` → "The Grey Lord's speech reaches the strip one row per text
@@ -1097,9 +1097,9 @@ export class AttackSystem {
   }
 
   /**
-   * One pass of `_FusionSequence`'s cage removal (`doc/CSBwin-src/Attack.cpp:2288-2302`):
+   * One pass of `_FusionSequence`'s cage removal (`doc/CSBwin-src/Attack.cpp:2290-2304`):
    * the first Fluxcage from the square's first drawable object on
-   * (`FindFirstDrawableObject`, `CSBCode.cpp:5140`) taken out of the square
+   * (`FindFirstDrawableObject`, `CSBCode.cpp:5205`) taken out of the square
    * (`RemoveObjectFromRoom`). Says whether there was one.
    */
   private removeFluxcage(x: number, y: number, level: number): boolean {
@@ -1377,7 +1377,7 @@ export class AttackSystem {
         this.callAttackFilter(filter, params, 1);
         this.fusion(params.attackX, params.attackY);
         // `_FusionSequence` has started: `Fusion(_8_, …)` never returns in CSBWin
-        // (`doc/CSBwin-src/Attack.cpp:1971`), so none of the attack's tail runs.
+        // (`doc/CSBwin-src/Attack.cpp:1973`), so none of the attack's tail runs.
         if (this.ctx.systems.mainLoop.isRunningScript()) return this.endAttack(params, successfulAttack);
         break;
 
@@ -1412,7 +1412,7 @@ export class AttackSystem {
 
       case AttackType.atk_WINDOW: {
         const duration = sw(this.ctx.random.below(this.masteryOf(pChar, params.skillNumber) + 8) + 5);
-        // `d.SeeThruWalls++` plus the `TT_73` timer (`doc/CSBwin-src/Attack.cpp:2016`).
+        // `d.SeeThruWalls++` plus the `TT_73` timer (`doc/CSBwin-src/Attack.cpp:2018`).
         this.ctx.party.state.seeThruWalls = sb(this.ctx.party.state.seeThruWalls + 1);
         this.ctx.systems.magic.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
         params.dataType = AttackDataType.ADT_Window;
@@ -1564,7 +1564,7 @@ export class AttackSystem {
   }
 
   /**
-   * `atk_SHOOT` (`doc/CSBwin-src/Attack.cpp:1841`) — a bow or a sling, which fires
+   * `atk_SHOOT` (`doc/CSBwin-src/Attack.cpp:1842`) — a bow or a sling, which fires
    * whatever is in the *shield* hand.
    *
    * The ammunition has to match: weapon classes 16-31 need `uByte1 == 10` (arrows),
@@ -1573,7 +1573,7 @@ export class AttackSystem {
    *
    * ⚠️ CSBWin overwrites the damage it just computed with the weapon's class byte —
    * `pParam->attdep.shoot.damage = D4W` immediately after
-   * `= 2 * (pWeapon_18->word4 + w_42)` (`:1905-1906`). It is plainly a bug, and it is
+   * `= 2 * (pWeapon_18->word4 + w_42)` (`:1906-1907`). It is plainly a bug, and it is
    * what the real game does, so it is kept: a shot's damage is the weapon class, not
    * the mastery-scaled figure.
    */
@@ -1631,10 +1631,10 @@ export class AttackSystem {
   }
 
   /**
-   * `atk_CLIMBDOWN` (`doc/CSBwin-src/Attack.cpp:2033`) — into the pit deliberately,
+   * `atk_CLIMBDOWN` (`doc/CSBwin-src/Attack.cpp:2035`) — into the pit deliberately,
    * which means falling all the way down whatever chain of pits is below.
    *
-   * CSBWin sets `d.SupressPitDamage` around the move (`Attack.cpp:2031`), so the
+   * CSBWin sets `d.SupressPitDamage` around the move (`Attack.cpp:2033`), so the
    * *first* drop of a controlled descent costs stamina instead of blood. Only the
    * first: the flag is cleared by the fall itself, so a rope onto a stack of pits
    * still hurts for every pit after the one climbed into.

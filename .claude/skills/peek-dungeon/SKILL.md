@@ -39,7 +39,7 @@ before answering.
 
 ## Reading the output honestly
 
-- The flag byte is decoded per room type from `CSBTypes.h:177-209`, so that decoding is
+- The flag byte is decoded per room type from `CSBTypes.h:182-214`, so that decoding is
   settled.
 - An actuator line gives `type` and `value`, then the fields "if read as a target". Many
   actuator types reuse `word4`/`word6` for other things, so the target is only a reading.

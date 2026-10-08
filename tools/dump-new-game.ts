@@ -3,7 +3,7 @@
  *
  * After a lost game, the dungeon entrance's "enter" starts a new game without the page
  * being reloaded. CSBWin reads `dungeon.dat` into the same `d` it has just
- * cleared (`doc/CSBwin-src/Code1f9e6.cpp:302-310`, `SaveGame.cpp:1480-1494`); the port
+ * cleared (`doc/CSBwin-src/Code1f9e6.cpp:302-310`, `SaveGame.cpp:1579-1594`); the port
  * restores a fresh world into the running `Game` the way a load does. What that could get
  * wrong while still looking like a new game: a door left open, a bones object left on the
  * floor, a timer left in the queue, the clock left where the old game stopped, or the loop
@@ -22,8 +22,8 @@
  * `GAMEBLOCK1`'s fields (`GameState.block1`) are the one part a rebuilt game must *not*
  * share with a fresh one, so the whole-state comparison leaves them out and they are
  * checked on their own: `d.RandomGameID` is drawn again from the new game's stream
- * (`doc/CSBwin-src/SaveGame.cpp:1523-1532`), and `totalMoveCount`, a global outside `d`
- * (`data.cpp:253`), counts on from the lost game. A draw of 0 is drawn again, where
+ * (`doc/CSBwin-src/SaveGame.cpp:1638-1647`), and `totalMoveCount`, a global outside `d`
+ * (`data.cpp:254`), counts on from the lost game. A draw of 0 is drawn again, where
  * CSBWin keeps it (`DEBT.md` H): checked on a stream whose first pair of draws gives 0.
  *
  * And the page's boot, which builds its `Game` over the empty world and reads `dungeon.dat`
@@ -113,7 +113,7 @@ function expectedGameID(seed: number): number {
   return (lowWord(s1) * lowWord(s2)) >>> 0;
 }
 
-/** `d.RandomNumber`'s step (`doc/CSBwin-src/CSBCode.cpp:1182-1217`), and the step back. */
+/** `d.RandomNumber`'s step (`doc/CSBwin-src/CSBCode.cpp:1192-1227`), and the step back. */
 function lcgNext(seed: number): number {
   return (Math.imul(seed, 0xbb40e62d) + 11) >>> 0;
 }
@@ -132,7 +132,7 @@ function lowWord(seed: number): number {
 /**
  * A new game's databases: `ReadDatabases` sizes each at the file's records and
  * `d.Byte7302[db]` spares, cleared to link `RNnul` behind the file's
- * (`doc/CSBwin-src/SaveGame.cpp:2556-2564`, `data.cpp:773-801`), and the header says so.
+ * (`doc/CSBwin-src/SaveGame.cpp:2768-2776`, `data.cpp:774-802`), and the header says so.
  * A save of it declares and carries them; a load reads them as they are, with none added.
  */
 function checkSpares(): void {
@@ -209,7 +209,7 @@ function main(): void {
   }
 
   // `d.CanRestartFromSavegame`: cleared by a new game, set by a save and by a load
-  // (doc/CSBwin-src/SaveGame.cpp:1494, :1260, :1883).
+  // (doc/CSBwin-src/SaveGame.cpp:1594, :1358, :2087).
   console.log('=== d.CanRestartFromSavegame ===');
   const newAtFirst = played.canRestartFromSavegame();
   const bytes = buildSaveFile(played);

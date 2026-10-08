@@ -38,7 +38,7 @@ This document lists skill/experience behavior directly visible in the CSBWin C++
   - If skill is 4..11 and the last monster attack was more than 150 ticks ago, experience is halved (`doc/CSBwin-src/Magic.cpp`).
   - If the current level has a non-zero experience multiplier, experience is multiplied by that value (`doc/CSBwin-src/Magic.cpp`, `doc/CSBwin-src/CSB.h`).
   - If skill is a subskill (>=4) and the last monster attack was within 25 ticks, experience is doubled (`doc/CSBwin-src/Magic.cpp`).
-- `LastMonsterAttackTime` is updated when `MonsterAttacks` runs (`doc/CSBwin-src/Monster.cpp:982`) and drives the timing gates above.
+- `LastMonsterAttackTime` is updated when `MonsterAttacks` runs (`doc/CSBwin-src/Monster.cpp:986`) and drives the timing gates above.
 - The Adjust Skills DSA filter (`ESL_ADJUSTSKILLSFILTER`) can mutate `(chIdx, skillNumber, experience, why)` and uses `adjustSkillsParameters[5]` as extra args (`doc/CSBwin-src/Magic.cpp`, `doc/CSBwin-src/DSA.cpp`, `doc/CSBwin-src/data.cpp`).
 - After scaling (and DSA filter), experience is added to the target skill and clamped via `LimitSkillExperience` (`doc/CSBwin-src/Magic.cpp`).
 - `tempAdjust` increases by `ApplyLimits(1, experience/8, 100)` when under 32000 (`doc/CSBwin-src/Magic.cpp`).
@@ -89,7 +89,7 @@ This document lists skill/experience behavior directly visible in the CSBWin C++
 
 ## Timed effects and decay
 
-- `TenSecondUpdate` (called when `(d.Time & 63) == 0`, or `& 15` while sleeping — `doc/CSBwin-src/CSBCode.cpp:686-688`) uses `DetermineMastery(Wizard) + DetermineMastery(Priest)` and Wisdom to drive mana regeneration, while reducing `tempAdjust` by 1 for each skill each update (`doc/CSBwin-src/Code17818.cpp`). It also steps each attribute's Current one point toward its Maximum when `(d.Time & 255) == 0` (`& 63` asleep), which is how the red left by a level gain fades (`doc/CSBwin-src/Code17818.cpp:384-414`).
+- `TenSecondUpdate` (called when `(d.Time & 63) == 0`, or `& 15` while sleeping — `doc/CSBwin-src/CSBCode.cpp:696-698`) uses `DetermineMastery(Wizard) + DetermineMastery(Priest)` and Wisdom to drive mana regeneration, while reducing `tempAdjust` by 1 for each skill each update (`doc/CSBwin-src/Code17818.cpp`). It also steps each attribute's Current one point toward its Maximum when `(d.Time & 255) == 0` (`& 63` asleep), which is how the red left by a level gain fades (`doc/CSBwin-src/Code17818.cpp:384-414`).
 
 ## DSA and scripting hooks
 

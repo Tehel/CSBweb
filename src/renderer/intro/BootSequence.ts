@@ -1,19 +1,19 @@
 /**
  * Everything that happens before the party is in the dungeon.
  *
- * CSBWin's shape, from `UIM_INITIALIZE` (`doc/CSBwin-src/CSBUI.cpp:907`) down:
+ * CSBWin's shape, from `UIM_INITIALIZE` (`doc/CSBwin-src/CSBUI.cpp:928`) down:
  *
  * ```
- * _AskWhatToDo          CSBCode.cpp:11338
- *  ├ _DisplayChaosStrikesBack  :9203      the title animation
+ * _AskWhatToDo          CSBCode.cpp:11573
+ *  ├ _DisplayChaosStrikesBack  :9308      the title animation
  *  ├ DoMenu QUIT/DUNGEON/UTILITY/HINT     not ported: this program is only the dungeon
- *  └ _StartCSB           :11290
- *     └ _ShowPrisonDoor  :10656
- *        ├ _GameSetup(1) :10589
- *        │  ├ _TAG01f746 :9459             the entrance screen
+ *  └ _StartCSB           :11525
+ *     └ _ShowPrisonDoor  :10780
+ *        ├ _GameSetup(1) :10713
+ *        │  ├ _TAG01f746 :9577             the entrance screen
  *        │  └ _ReadEntireGame               dungeon.dat, or the chosen save
  *        │     └ tag01efee                  a failed read
- *        └ _TAG021028    :10460            the hand-off to the adventure
+ *        └ _TAG021028    :10584            the hand-off to the adventure
  * ```
  *
  * This module is the two ends of that: it builds the `IntroHost` the screens draw through —
@@ -55,8 +55,8 @@ export interface BootSequenceDeps {
   consumeSavedGameRead: () => SavedGameRead;
   /**
    * `_ReadEntireGame` for a new game: `dungeon.dat` read into the running game. A file
-   * that will not open (`doc/CSBwin-src/SaveGame.cpp:1480-1486`), or does not read
-   * (`:1740-1742`, the author's decision), throws `Die`.
+   * that will not open (`doc/CSBwin-src/SaveGame.cpp:1579-1586`), or does not read
+   * (`:1910-1912`, the author's decision), throws `Die`.
    */
   readNewGame: () => Promise<void>;
   /**
@@ -93,14 +93,14 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
   let queue: IntroEvent[] = [];
   let waiting: ((event: IntroEvent) => void) | null = null;
   // `d.Byte1222`, the arrow. The hand (`d.Byte1350`) only ever appears with an object on
-  // the cursor (`d.CursorShape != 0`, `doc/CSBwin-src/CSBCode.cpp:2255`), which cannot
+  // the cursor (`d.CursorShape != 0`, `doc/CSBwin-src/CSBCode.cpp:2288`), which cannot
   // happen before there is a party.
   const arrow = decodeCursorBitmap(uiTables.graphic232.cursorArrow);
   let cursorVisible = false;
   let pointerX = -100;
   let pointerY = -100;
   // `d.MouseSwitches`: set on a press, cleared on any release (`doc/CSBwin-src/system.cpp:455-461`,
-  // `CSBCode.cpp:7585`).
+  // `CSBCode.cpp:7644`).
   let mouseSwitches = 0;
 
   const push = (event: IntroEvent): void => {
@@ -113,7 +113,7 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     }
   };
 
-  // CSBWin's mask: 2 = left, 1 = right (`doc/CSBwin-src/CSB.h:1659-1667`).
+  // CSBWin's mask: 2 = left, 1 = right (`doc/CSBwin-src/CSB.h:1662-1670`).
   const pointAt = (e: MouseEvent): { x: number; y: number } => {
     const rect = canvas.getBoundingClientRect();
     return {
@@ -243,13 +243,13 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
  *
  * `_ReadEntireGame` goes straight to the file chooser on this path — no "READY TO SAVE
  * GAME" menu first — and passes `SelectSaveGame(_9_, 1, 1, 1)`
- * (`doc/CSBwin-src/SaveGame.cpp:1563`). The leading 1 is `_DoMenu`'s "fade and clear the
+ * (`doc/CSBwin-src/SaveGame.cpp:1688`). The leading 1 is `_DoMenu`'s "fade and clear the
  * old screen", so the chooser comes up on black rather than over the entrance, and the
  * `checkExist` 1 blanks slots with no file behind them — which is exactly what this port's
  * `loadOnly` mode already does with an unbounded list (`ui/SaveMenu.ts`).
  *
  * Anything but `'loaded'` makes `_GameSetup`'s retry loop put the entrance back up
- * (`doc/CSBwin-src/CSBCode.cpp:10634-10641`), `'damaged'` once `tag01efee` is done.
+ * (`doc/CSBwin-src/CSBCode.cpp:10758-10765`), `'damaged'` once `tag01efee` is done.
  *
  * A load closes the chooser once the save is read, which is after the click, so the wait
  * for input also ends when the chooser closes. What the chooser last showed stays on the
@@ -266,13 +266,13 @@ async function openLoadMenu(
   await fadeToPalette(host, PALETTE_11914);
   host.screen.pixels.fill(0);
 
-  // `STShowCursor(HC33)` right before `SelectSaveGame` (`doc/CSBwin-src/SaveGame.cpp:1562`).
+  // `STShowCursor(HC33)` right before `SelectSaveGame` (`doc/CSBwin-src/SaveGame.cpp:1687`).
   host.setCursorVisible(true);
   let shown: Uint8Array | null = null;
   let chooserClosed: () => void = () => {};
   const closed = new Promise<null>((resolve) => { chooserClosed = () => resolve(null); });
   // Every redraw is presented with the cursor on it, which stays up from `STShowCursor` to
-  // `STHideCursor` (`SaveGame.cpp:1562-1564`), as the VBL handler draws it over each frame.
+  // `STHideCursor` (`SaveGame.cpp:1687-1689`), as the VBL handler draws it over each frame.
   const draw = (): void => {
     if (gameScreen.isSaveMenuOpen()) {
       gameScreen.drawSaveMenuOnly();
@@ -300,14 +300,14 @@ async function openLoadMenu(
   }
 
   gameScreen.setBootFrameRenderer(null);
-  host.setCursorVisible(false);         // `STHideCursor(HC33)` (`SaveGame.cpp:1564`)
+  host.setCursorVisible(false);         // `STHideCursor(HC33)` (`SaveGame.cpp:1689`)
   return deps.consumeSavedGameRead();
 }
 
 /**
  * The chooser, then `tag01efee` if the read failed. `partyHasDied` is `d.PartyHasDied`:
  * false at the boot, true once the credits' RESTART THIS GAME has set it
- * (`doc/CSBwin-src/Mouse.cpp:1798`). Resolves to whether a save is in.
+ * (`doc/CSBwin-src/Mouse.cpp:1937`). Resolves to whether a save is in.
  */
 async function readSavedGame(
   host: IntroHost,
@@ -340,7 +340,7 @@ async function readNewAdventure(
  * A `UtilityDiskMessages` text as the two titles of the boot's menu: its first line,
  * and the rest on one, which the menu splits once it is 30 characters or more
  * (`splitLongLine`). CSBWin's utility prints it in a dialog box of its own
- * (`_UtilityDialogBox`, `doc/CSBwin-src/Chaos.cpp:1091`), which the port does not have.
+ * (`_UtilityDialogBox`, `doc/CSBwin-src/Chaos.cpp:1423`), which the port does not have.
  */
 export function utilityMenuTitles(message: string): [string, string | null] {
   const lines = message.split('\n').filter((line) => line.length > 0);
@@ -349,7 +349,7 @@ export function utilityMenuTitles(message: string): [string, string | null] {
 
 /**
  * The utility's refusal of a new adventure, and its OK: the button CSBWin's dialog
- * gives it (`UtilityDiskMessages[32]`, `doc/CSBwin-src/Chaos.cpp:1448`). The click goes
+ * gives it (`UtilityDiskMessages[32]`, `doc/CSBwin-src/Chaos.cpp:1794`). The click goes
  * back to the entrance.
  */
 async function utilityRefusal(host: IntroHost, menus: MenuScreen, message: string): Promise<void> {
@@ -387,7 +387,7 @@ function readEntireGame(
 /**
  * What `die(0xbad)` stands for here: the boot's damaged file, acknowledged. `runBootSequence`
  * catches it and starts again from the title. CSBWin's `die` ends in `UI_Die`
- * (`doc/CSBwin-src/CSBCode.cpp:86-112`), which throws too (`CSBUI.cpp:1393-1396`), out to
+ * (`doc/CSBwin-src/CSBCode.cpp:96-122`), which throws too (`CSBUI.cpp:1414-1417`), out to
  * the program's end.
  */
 export class BadSavedGame extends Error {
@@ -398,9 +398,9 @@ export class BadSavedGame extends Error {
 
 /**
  * `tag01efee`, where every failed read of `_ReadEntireGame` ends
- * (`doc/CSBwin-src/SaveGame.cpp:1895-1907`): a fade to `d.Palette11978`, then, after a
+ * (`doc/CSBwin-src/SaveGame.cpp:2098-2119`): a fade to `d.Palette11978`, then, after a
  * lost game, a one-button menu whose click goes back to `tag01ec56`, which returns -1 and
- * so puts the entrance up again (`:1556-1559`).
+ * so puts the entrance up again (`:1681-1684`).
  *
  * At the boot CSBWin prints the line and calls `die(0xbad)`, which ends the program. A
  * page cannot end itself (`DEBT.md` H), so the line is a menu of its own with an OK to
@@ -415,15 +415,15 @@ export async function tag01efee(host: IntroHost, menus: MenuScreen, partyHasDied
   } else {
     await doMenuCentred(host, menus, 'SAVED GAME DAMAGED!', null, ['OK']);
   }
-  host.setCursorVisible(true);          // `STShowCursor(HC33)` (`:1900`)
+  host.setCursorVisible(true);          // `STShowCursor(HC33)` (`:2112`)
   await waitForMenuSelect(host, menus, 1);
-  host.setCursorVisible(false);         // `STHideCursor(HC33)` (`:1902`)
+  host.setCursorVisible(false);         // `STHideCursor(HC33)` (`:2114`)
   if (!partyHasDied) throw new BadSavedGame();
 }
 
 /**
  * `d.Palette11978`, the interface's palette: `_GameSetup` fills it from `d.Palette552[0]`
- * (`doc/CSBwin-src/CSBCode.cpp:10623`).
+ * (`doc/CSBwin-src/CSBCode.cpp:10747`).
  */
 function palette11978(host: IntroHost): readonly number[] {
   return host.uiTables.graphic232.palette552[0] ?? host.globalPalette;
@@ -435,17 +435,17 @@ function palette11978(host: IntroHost): readonly number[] {
 export type MenuScreen = Pick<GameScreen, 'doMenu' | 'menuButtonList' | 'drawMenuPress'>;
 
 /**
- * `_TAG021028`'s screen when the game was loaded (`doc/CSBwin-src/CSBCode.cpp:10493-10537`):
- * both `_ShowPrisonDoor` (`:10677`) and the restart (`Code1f9e6.cpp:318`) call it once
+ * `_TAG021028`'s screen when the game was loaded (`doc/CSBwin-src/CSBCode.cpp:10617-10661`):
+ * both `_ShowPrisonDoor` (`:10801`) and the restart (`Code1f9e6.cpp:318`) call it once
  * `_GameSetup` has returned. The rest of `_TAG021028`, the adventure's state and its first
  * frame, is the page's.
  *
  * CSBWin loops there on a menu, "GAME LOADED, READY TO PLAY." over PLAY GAME and ASCII
- * DUMP (`:10497-10515`). The port puts none up: a loaded game is played at once
+ * DUMP (`:10621-10639`). The port puts none up: a loaded game is played at once
  * (`doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port"). It keeps what
  * that menu's `_DoMenu` did to the chooser's picture, `FadeOldScreen` and `ClearOldScreen`
  * (`Menu.cpp:285-292`), a fade to black and a cleared screen, and then `wvbl(_4_)` and the
- * cleared screen the adventure opens on (`CSBCode.cpp:10535-10536`).
+ * cleared screen the adventure opens on (`CSBCode.cpp:10659-10660`).
  */
 export async function tag021028(host: IntroHost, choice: PrisonDoorChoice): Promise<void> {
   if (choice === 'enter') return;
@@ -516,7 +516,7 @@ async function waitForMenuSelect(host: IntroHost, gameScreen: MenuScreen, numBut
 /**
  * `d.Buttons16932`. Dungeon Master's `graphics.dat` stops 48 bytes short of carrying it,
  * and CSBWin patches in a hardcoded copy for exactly that case
- * (`doc/CSBwin-src/CSBCode.cpp:10148-10156`); `extractUITables` returns an empty list
+ * (`doc/CSBwin-src/CSBCode.cpp:10272-10280`); `extractUITables` returns an empty list
  * under the same condition.
  */
 function prisonDoorButtons(host: IntroHost): UIButton[] {
@@ -586,7 +586,7 @@ export type EndOfGame = PrisonDoorChoice | 'terminate';
  * The colour registers are the interface's: with `d.DynamicPaletteSwitching` set the VBL
  * copies `d.Palette11978` into `globalPalette` on every frame
  * (`doc/CSBwin-src/WinScreen.cpp:1493-1498`), and `_GameSetup` fills `Palette11978` from
- * `d.Palette552[0]` (`CSBCode.cpp:10623`).
+ * `d.Palette552[0]` (`CSBCode.cpp:10747`).
  */
 export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks: ShowCreditsHooks): Promise<EndOfGame> {
   const uiTables = deps.gameScreen.getUITables();
@@ -601,10 +601,10 @@ export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks
 }
 
 /**
- * `GameSetup(_25_, 0)` (`doc/CSBwin-src/Code1f9e6.cpp:310`, `CSBCode.cpp:10589`): no
+ * `GameSetup(_25_, 0)` (`doc/CSBwin-src/Code1f9e6.cpp:310`, `CSBCode.cpp:10713`): no
  * entrance first. `d.Initialize()` has just left `d.gameState` at 0,
  * `GAMESTATE_ResumeSavedGame`, so its `ReadEntireGame` is the save chooser; a cancel puts
- * the entrance up, and the loop goes on from there as it does at boot (`:10634-10641`),
+ * the entrance up, and the loop goes on from there as it does at boot (`:10758-10765`),
  * with `d.PartyHasDied` set, so a failed read of `dungeon.dat` or a save goes back to the
  * entrance too.
  */

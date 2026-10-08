@@ -20,7 +20,7 @@ import {
 import type { InterpreterContext } from './BytecodeInterpreter';
 
 /**
- * `viewportRandom` (`doc/CSBwin-src/Viewport.cpp:6706-6707`): CSBWin saves
+ * `viewportRandom` (`doc/CSBwin-src/Viewport.cpp:6713-6714`): CSBWin saves
  * `d.RandomNumber`, swaps this stream in for the duration of `DrawViewport`, and
  * restores the game's own value afterward, so every `STRandomBool()` a drawing
  * function calls — the lightning door's mirror/flip, for one — reads this and
@@ -29,7 +29,7 @@ import type { InterpreterContext } from './BytecodeInterpreter';
  * that calls it, or every frame would reroll from the same point and the effect
  * would never move.
  */
-export const viewportRandom = new CsbRandom(0x34175432); // `Viewport.cpp:6697`
+export const viewportRandom = new CsbRandom(0x34175432); // `Viewport.cpp:6704`
 
 export class ViewportDraw {
   private mirrorCache = new WeakMap<IndexedBitmap, IndexedBitmap>();

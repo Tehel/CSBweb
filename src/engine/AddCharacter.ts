@@ -1,11 +1,11 @@
 /**
- * `AddCharacter` (`doc/CSBwin-src/Character.cpp:456`) — the Hall of Champions.
+ * `AddCharacter` (`doc/CSBwin-src/Character.cpp:457`) — the Hall of Champions.
  *
  * The engine half: the fingerprint, the champion's corner of the cell, the possession
  * slot chosen for each object lying in the mirror, and the champion record built out of
  * a hero text. `HallOfChampions.addCharacter` drives it;
  * `HallOfChampions.resurrectReincarnateCancel` is the other end
- * (`doc/CSBwin-src/CSBCode.cpp:6615`).
+ * (`doc/CSBwin-src/CSBCode.cpp:6674`).
  */
 
 import { DescIndexOfRecord } from './objectIndex';
@@ -31,7 +31,7 @@ export interface AddCharacterItem {
 }
 
 /**
- * `FingerprintExists` (`doc/CSBwin-src/Character.cpp:437-450`): a champion of the party
+ * `FingerprintExists` (`doc/CSBwin-src/Character.cpp:438-451`): a champion of the party
  * has it, or one in the wings (`GetFromWings`, testing only).
  */
 export function fingerprintExists(champions: Champion[], pool: WingsPool, fingerprint: number): boolean {
@@ -40,7 +40,7 @@ export function fingerprintExists(champions: Champion[], pool: WingsPool, finger
 }
 
 /**
- * `AddCharacter`'s fingerprint (`doc/CSBwin-src/Character.cpp:514-518`) —
+ * `AddCharacter`'s fingerprint (`doc/CSBwin-src/Character.cpp:515-519`) —
  * `(partyLevel<<10)|(partyX<<5)|partyY`, bumped until unused. This is the key the
  * champion's bones record resolves through, so it must be derived, not invented.
  */
@@ -59,7 +59,7 @@ export function computeChampionFingerprint(
 }
 
 /**
- * `doc/CSBwin-src/Character.cpp:522-528` — the new champion takes the first corner of
+ * `doc/CSBwin-src/Character.cpp:523-529` — the new champion takes the first corner of
  * the cell nobody stands in, counting round from the party's facing.
  */
 export function findFreeCharPosition(champions: Champion[], partyFacing: number): number {
@@ -71,11 +71,11 @@ export function findFreeCharPosition(champions: Champion[], partyFacing: number)
 }
 
 /**
- * `CharacterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:4046`) — the champion standing
+ * `CharacterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:4084`) — the champion standing
  * in a given corner, or -1.
  *
  * A corner held by a **dead** champion counts as free: CSBWin returns `i` only inside
- * `if (d.CH16482[i].HP() != 0)` and otherwise keeps looking (`:4062-4066`). That is
+ * `if (d.CH16482[i].HP() != 0)` and otherwise keeps looking (`:4100-4104`). That is
  * load-bearing in both callers. A new champion may take a corpse's corner; and
  * `BringCharacterToLife` asks this about the champion it is *about to* revive, who is
  * still dead — were they to match themselves, every resurrection would relocate, and
@@ -92,8 +92,8 @@ export function characterAtPosition(champions: Champion[], position: number): nu
 }
 
 /**
- * `AddCharacter`'s possession loop (`doc/CSBwin-src/Character.cpp:730-790`). The slot
- * choice is here; `place` is the `AddCharacterPossession` (`:789`), called for each
+ * `AddCharacter`'s possession loop (`doc/CSBwin-src/Character.cpp:731-791`). The slot
+ * choice is here; `place` is the `AddCharacterPossession` (`:790`), called for each
  * object as it is chosen, and it must write `possessions`, which the next choice reads.
  * By default it writes the slot and nothing else.
  *
@@ -211,41 +211,41 @@ export type ChampionDefaults = Pick<
 
 /**
  * What `AddCharacter` gives every `CHARDESC` before it reads the hero: the whole record
- * cleared, `ClearMemory((ui8 *)pcA3, 800)` (`doc/CSBwin-src/Character.cpp:481`), then its
- * constant stores (`:512-521`). The one initializer of these fields:
+ * cleared, `ClearMemory((ui8 *)pcA3, 800)` (`doc/CSBwin-src/Character.cpp:482`), then its
+ * constant stores (`:513-522`). The one initializer of these fields:
  * `createChampionFromPreset` and the tools' champion builders spread it, and
  * `Party.setState` fills an older save's gaps from it.
  */
 export function addCharacterDefaults(): ChampionDefaults {
   return {
-    busyTimerIndex: -1, // `pcA3->busyTimer = -1` (`:520`)
-    attackType: -1, // `pcA3->attackType = -1` (`:519`)
+    busyTimerIndex: -1, // `pcA3->busyTimer = -1` (`:521`)
+    attackType: -1, // `pcA3->attackType = -1` (`:520`)
     attackStatModifier: 0, // `word64`, cleared
     wounds: 0, // `ouches`, cleared
     poisonCount: 0,
     maxRecentDamage: 0,
-    damageFromDirection: 0, // `facing3`, cleared here; `AddCharacter` sets it at `:531`
+    damageFromDirection: 0, // `facing3`, cleared here; `AddCharacter` sets it at `:532`
     shieldStrength: 0,
-    // `CHARFLAG_positionChanged` (`:530`) is a redraw flag, which the port does not model;
-    // `createChampionFromPreset` ORs in `CHARFLAG_male` (`:594`).
+    // `CHARFLAG_positionChanged` (`:531`) is a redraw flag, which the port does not model;
+    // `createChampionFromPreset` ORs in `CHARFLAG_male` (`:595`).
     charFlags: 0,
-    timerIndex: -1, // `pcA3->timerIndex = -1` (`:521`)
-    talents: 0, // `pcA3->talents = 0` (`:512`)
+    timerIndex: -1, // `pcA3->timerIndex = -1` (`:522`)
+    talents: 0, // `pcA3->talents = 0` (`:513`)
     causeOfDamage: 0,
     monsterCausingDamage: 0,
     load: 0,
-    title: '', // read off the hero text (`:585-590`); `createChampionFromPreset` sets it
-    // Cleared here. `AddCharacter` then sets `d.partyFacing` (`:522`), and so does
+    title: '', // read off the hero text (`:586-591`); `createChampionFromPreset` sets it
+    // Cleared here. `AddCharacter` then sets `d.partyFacing` (`:523`), and so does
     // `HallOfChampions.addCharacter`.
     facing: 0,
-    // Cleared here. `AddCharacter` computes it (`:513-516`), and so do
+    // Cleared here. `AddCharacter` computes it (`:514-517`), and so do
     // `HallOfChampions.addCharacter` and `HallOfChampions.addChampion`.
     fingerprint: 0,
   };
 }
 
 /**
- * What `AddCharacter` reads off a hero text (`doc/CSBwin-src/Character.cpp:557-701`):
+ * What `AddCharacter` reads off a hero text (`doc/CSBwin-src/Character.cpp:558-702`):
  * the fields it stores in the `CHARDESC`, and the two reincarnation penalties it leaves in
  * file-scope globals for `_ResurrectReincarnateCancel`.
  */
@@ -267,7 +267,7 @@ export interface HeroText {
   /** The sixteen skill letters, `'A'` as 0: each sets `skills92[4..19]` to `125 << level`. */
   skillLevels: number[];
   /**
-   * `reincarnateAttributePenalty` / `reincarnateStatPenalty` (`:682-685`): the sixteenths
+   * `reincarnateAttributePenalty` / `reincarnateStatPenalty` (`:683-686`): the sixteenths
    * the Reincarnate button charges, read after the skill letters. A text that stops at the
    * skills, as every shipped DM hero's does, reads 0xff for both, out of range, so 2 and 8.
    */
@@ -279,21 +279,21 @@ export interface HeroText {
 }
 
 /**
- * `legalHero` (`doc/CSBwin-src/Character.cpp:475-476`): the hero read when the party's
+ * `legalHero` (`doc/CSBwin-src/Character.cpp:476-477`): the hero read when the party's
  * cell holds no text, and read again in place of a text that fails a check.
  */
 const LEGAL_HERO = Uint8Array.from(
   'BOGUS\nILLEGAL HERO\n\nM\nAABBAABBAABB\nABABABABABABAB\nCCCCCCCCCCCCCCCC\0',
   (c) => c.charCodeAt(0),
 );
-const MAXHP = 999; // `doc/CSBwin-src/CSB.h:2452-2454`
+const MAXHP = 999; // `doc/CSBwin-src/CSB.h:2511-2513`
 const MAXSTAMINA = 9999;
 const MAXMANA = 900;
-/** `neophyteSkills` (`doc/CSBwin-src/data.cpp:90`) is only set by a recording's playback. */
+/** `neophyteSkills` (`doc/CSBwin-src/data.cpp:91`) is only set by a recording's playback. */
 const NEOPHYTE_SKILLS = false;
 
 /**
- * `AddCharacter`'s reading of a hero text (`doc/CSBwin-src/Character.cpp:557-701`), over
+ * `AddCharacter`'s reading of a hero text (`doc/CSBwin-src/Character.cpp:558-702`), over
  * the bytes `DecodeText(…, 0x8002, 990)` made of it, or `legalHero`'s when the cell had no
  * text (`null`). `for (illegalHero=true; illegalHero; A2=legalHero)`: a text that fails any
  * check is read no further and `legalHero` is read in its place. CSBWin reads on past a
@@ -310,14 +310,14 @@ export function readHeroText(text: Uint8Array | null): HeroText {
 function readHeroTextOnce(buf: Uint8Array): Omit<HeroText, 'illegal'> | null {
   let a = 0;
   const next = (): number => buf[a++] ?? 0; // past the NUL, a byte the loops still end on
-  // The name, to the first line break, at most seven characters (`:558-567`).
+  // The name, to the first line break, at most seven characters (`:559-568`).
   let name = '';
   for (let c = next(); c !== 10; c = next()) {
     if (name.length >= 7) return null;
     name += String.fromCharCode(c);
   }
   // The title runs to the second line break, its two lines joined with nothing between
-  // them (CSB's "SPELLWEAVER OF KE" and "LT"), at most nineteen characters (`:570-590`).
+  // them (CSB's "SPELLWEAVER OF KE" and "LT"), at most nineteen characters (`:571-591`).
   let title = '';
   for (let lines = 0; ;) {
     const c = next();
@@ -329,11 +329,11 @@ function readHeroTextOnce(buf: Uint8Array): Omit<HeroText, 'illegal'> | null {
       title += String.fromCharCode(c);
     }
   }
-  // `:591-600`
+  // `:592-601`
   const gender = next();
   if (gender !== 0x4d && gender !== 0x46) return null; // 'M', 'F'
   a++;
-  // `:601-640`: each of the three is illegal past its maximum, and as -1 (a letter
+  // `:602-641`: each of the three is illegal past its maximum, and as -1 (a letter
   // outside 'A'..'P'); `(unsigned)` makes any negative value the first.
   const health = DecodeCharacterValue(buf, a, 4);
   if (health < 0 || health > MAXHP) return null;
@@ -344,7 +344,7 @@ function readHeroTextOnce(buf: Uint8Array): Omit<HeroText, 'illegal'> | null {
   const mana = DecodeCharacterValue(buf, a, 4);
   if (mana < 0 || mana > MAXMANA) return null;
   a += 5;
-  // `:641-656`: two letters each, above 224 held at 224.
+  // `:642-657`: two letters each, above 224 held at 224.
   const attributes: number[] = [];
   for (let i = 0; i <= 6; i++) {
     const value = DecodeCharacterValue(buf, a, 2);
@@ -353,7 +353,7 @@ function readHeroTextOnce(buf: Uint8Array): Omit<HeroText, 'illegal'> | null {
     a += 2;
   }
   a++;
-  // `:661-680`: 'A' is no experience, 'B'..'R' are levels 1 to 17, anything else illegal.
+  // `:662-681`: 'A' is no experience, 'B'..'R' are levels 1 to 17, anything else illegal.
   const skillLevels: number[] = [];
   for (let i = 0; i < 16; i++) {
     const level = (next() << 24 >> 24) - 0x41; // `*(A2++)` is a signed char
@@ -361,8 +361,8 @@ function readHeroTextOnce(buf: Uint8Array): Omit<HeroText, 'illegal'> | null {
     else if (level === 0) skillLevels.push(0);
     else return null;
   }
-  // `:681-688`. `randomPoints` is read and never used: `_ResurrectReincarnateCancel`
-  // hardcodes twelve points (`doc/CSBwin-src/CSBCode.cpp:6779`).
+  // `:682-689`. `randomPoints` is read and never used: `_ResurrectReincarnateCancel`
+  // hardcodes twelve points (`doc/CSBwin-src/CSBCode.cpp:6838`).
   const getOneValue = (): number => {
     const c = buf[a] ?? 0;
     if (c < 0x41 || c > 0x5a) return 0xff;
@@ -387,7 +387,7 @@ function readHeroTextOnce(buf: Uint8Array): Omit<HeroText, 'illegal'> | null {
 }
 
 /**
- * `DecodeCharacterValue` (`doc/CSBwin-src/Character.cpp:414-431`): `num` letters 'A'..'P',
+ * `DecodeCharacterValue` (`doc/CSBwin-src/Character.cpp:415-432`): `num` letters 'A'..'P',
  * a nibble each. Any other letter is -1, but a NUL ends a truncatable value early, and
  * that value is returned without `sw`.
  */
@@ -427,7 +427,7 @@ export function createChampionFromHeroText(
   const maxStamina = hero.stamina;
   const maxMana = hero.mana;
   const slots = possessions ?? emptyPossessions();
-  // `:661-700`, with `neophyteSkills` off: a level-0 letter leaves the skill at nothing.
+  // `:662-701`, with `neophyteSkills` off: a level-0 letter leaves the skill at nothing.
   const skills = createSkillsFromSubskillLevels(hero.skillLevels, NEOPHYTE_SKILLS);
 
   return {
@@ -443,7 +443,7 @@ export function createChampionFromHeroText(
       maxMana,
       // `AddCharacter` reads the seven attributes off the mirror's text in this
       // order and gives each the same Maximum and Current
-      // (`doc/CSBwin-src/Character.cpp:640-659`).
+      // (`doc/CSBwin-src/Character.cpp:641-660`).
       stats: makeAddCharacterAttributes([
         hero.luck,
         hero.strength,
@@ -454,9 +454,9 @@ export function createChampionFromHeroText(
         hero.antiFire,
       ]),
     },
-    // `if (D0W == 'M') pcA3->charFlags |= CHARFLAG_male;` (`Character.cpp:591-600`).
+    // `if (D0W == 'M') pcA3->charFlags |= CHARFLAG_male;` (`Character.cpp:592-601`).
     charFlags: hero.male ? CHARFLAG_MALE : 0,
-    talents: hero.talents, // `:688`
+    talents: hero.talents, // `:689`
     portraitGraphic: charID,
     incantation: [],
     food: 1500,

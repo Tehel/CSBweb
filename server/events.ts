@@ -17,9 +17,9 @@ export type EventType = (typeof EVENT_TYPES)[number];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** A commit, or the image's `CSBWEB_BUILD`. */
 const BUILD = /^[0-9A-Za-z._-]{1,40}$/;
-/** `CHARDESC.name[8]`, its last byte the terminating NUL (`doc/CSBwin-src/CSB.h:2486`). */
+/** `CHARDESC.name[8]`, its last byte the terminating NUL (`doc/CSBwin-src/CSB.h:2545`). */
 const MAX_NAME = 7;
-/** `AddCharacter`'s `charID`, an `i16` (`doc/CSBwin-src/Character.cpp:456`). */
+/** `AddCharacter`'s `charID`, an `i16` (`doc/CSBwin-src/Character.cpp:457`). */
 const MAX_ID = 0x7fff;
 /** A party's slots. */
 const MAX_CHAMPIONS = 4;

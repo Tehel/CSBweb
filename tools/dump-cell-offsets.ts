@@ -3,14 +3,14 @@
  *
  * `LEVELDESC.cellOffset` is a 16-bit word. CSBWin takes level 0's as it stands and adds
  * each next level's difference from the one before, `& 0xffff`
- * (doc/CSBwin-src/SaveGame.cpp:2676-2685), so a dungeon whose cell flags pass 64K still
+ * (doc/CSBwin-src/SaveGame.cpp:2889-2898), so a dungeon whose cell flags pass 64K still
  * reads in order. Conflux 3.5's does: its map 63 starts at 66155, stored as 619. Read as
  * stored, map 63's cells would be map 0's, and a cell there whose flag says it has
  * objects would take its first object from another column's list.
  *
  * The canary is the object list's column index, which the file stores apart from the
  * cell flags: each column's entry must step past exactly the cells of that column whose
- * flag has `0x10` (`GetObjectListIndex`, doc/CSBwin-src/CSBCode.cpp:5103-5127), and every
+ * flag has `0x10` (`GetObjectListIndex`, doc/CSBwin-src/CSBCode.cpp:5168-5192), and every
  * such cell's first object is a real one. A level read at the wrong offset breaks both.
  * Then the writer: block 14 built from the read levels (`buildCellFlagArray`) is the
  * file's own cell flag array byte for byte, at the size the file declares.
@@ -67,7 +67,7 @@ function main(): void {
       (empty.length ? ` (not ${empty.slice(0, 3).join(', ')}, ${empty.length} in all)` : ''));
 
     // An image behind an Extended Features block declares its cell flag array's size and
-    // ends with it, then the checksum word (`ReadDatabases`, SaveGame.cpp:2651-2658).
+    // ends with it, then the checksum word (`ReadDatabases`, SaveGame.cpp:2863-2870).
     const ef = readExtendedFeatures(file);
     if (!ef.header || ef.cellFlagArraySize === 0) continue;
     const image = ef.data.subarray(ef.offset);

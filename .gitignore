@@ -3,8 +3,9 @@ node_modules
 archive
 .claude/settings.local.json
 
-# CSBWin unpacked source code
-doc/CSBwin*
+# CSBWin's source: the reference (npm run fetch-csbwin-src), and any other
+doc/CSBwin-src/
+doc/CSBwin-src-*/
 
 # tool output
 tools/output
@@ -21,6 +22,3 @@ static/backstory
 
 # the deploy target (utils/deploy.sh)
 .env
-
-# CSBWin's source, fetched by npm run fetch-csbwin-src
-doc/CSBwin-src/

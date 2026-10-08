@@ -1,30 +1,30 @@
 /**
  * The party's world `MoveObject(RNnul, oldX, oldY, newX, newY, …)`
- * (`doc/CSBwin-src/Code11f52.cpp:2796-3325`), from each of its callers.
+ * (`doc/CSBwin-src/Code11f52.cpp:2831-3360`), from each of its callers.
  *
  * Every caller passes its own cells, and `MoveObject` does the rest in one order:
- * `CheckMoveFromMissile(oldX, oldY, newX, newY)` with those cells (`:2847-2853`); the
+ * `CheckMoveFromMissile(oldX, oldY, newX, newY)` with those cells (`:2882-2888`); the
  * party set on the new square and taken through the pits, where a fall hurts with the
- * party already on the square below (`:3053-3086`); nothing more when it is back on its
- * square facing the same way (`:3194-3201`); a footprint when it left it (`:3224-3247`);
- * the old square's pads (`:3258-3268`); then on its level the new square's pads
- * (`:3309-3317`), and on another nothing more until the top of the next tick, which
+ * party already on the square below (`:3088-3121`); nothing more when it is back on its
+ * square facing the same way (`:3229-3236`); a footprint when it left it (`:3259-3282`);
+ * the old square's pads (`:3293-3303`); then on its level the new square's pads
+ * (`:3344-3352`), and on another nothing more until the top of the next tick, which
  * makes the arrival, `LoadPartyLevel` and `MoveObject(RNnul, -1, 0, x, y)`
- * (`d.newPartyLevel`, `CSBCode.cpp:618-623`), which leaves a second footprint and presses
+ * (`d.newPartyLevel`, `CSBCode.cpp:628-633`), which leaves a second footprint and presses
  * the pads there. Each case records those steps, runs the top of the tick (`tick` in the
  * record), and compares them with that order:
  *
- *  1. the step onto a pit (`CSBCode.cpp:8324`), past a fireball in the square it leaves;
- *  2. the climb down (`Attack.cpp:2032`), which passes the pit, not the square below, so
+ *  1. the step onto a pit (`CSBCode.cpp:8411`), past a fireball in the square it leaves;
+ *  2. the climb down (`Attack.cpp:2034`), which passes the pit, not the square below, so
  *     the second half-step meets a fireball in the pit's square;
- *  3. the DSA teleport onto the pit (`DSA.cpp:4604`), which passes the party's square twice;
+ *  3. the DSA teleport onto the pit (`DSA.cpp:4605`), which passes the party's square twice;
  *  4. the wiggle of the square the party stands on (`Timer.cpp:2443`), as its pit opens,
  *     and 5. as nothing happens: the missiles in the party's own square are still met;
- *  6. the step into stairs (`CSBCode.cpp:8212`, `:7774`): lifted twice, then arriving on
+ *  6. the step into stairs (`CSBCode.cpp:8299`, `:7861`): lifted twice, then arriving on
  *     the stairs of the other level;
  *  7. a turn, which is not a `MoveObject` and leaves no footprint, but lifts the party off
  *     its square and places it back facing the new way, the room unchanged
- *     (`CSBCode.cpp:7912-7934`);
+ *     (`CSBCode.cpp:7999-8021`);
  *  8. a champion the fall kills leaves their bones on the square below, where the party
  *     is by then.
  *
@@ -146,7 +146,7 @@ function findPit(game: Game): { pit: Position; from: Position; facing: Direction
 /**
  * Stairs, an empty square `from` which the party steps into them, and the stairs on the
  * other level, where `TraverseStairway` stands the party (`d.partyX = x`,
- * `CSBCode.cpp:7776-7777`).
+ * `CSBCode.cpp:7863-7864`).
  */
 function findStairs(game: Game): { stairs: Position; from: Position; facing: Direction; next: Position } {
   const dungeon = game.ctx.dungeon;
@@ -235,7 +235,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   const { game, log } = makeGame();
   stand(game, log, from, facing);
   // The pit's corner the head of the party leaves in the second half-step:
-  // `whoLeavesNewCell[tailPosLeft]` (`Code11f52.cpp:2640-2660`).
+  // `whoLeavesNewCell[tailPosLeft]` (`Code11f52.cpp:2675-2695`).
   const fireball = launch(game, pit, (facing + 3) & 3);
   log.length = 0;
   const climb = game.systems.attack as unknown as { climbDownIntoPit(target: Position): void };
@@ -291,7 +291,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   ]);
   check(
     at(held) === at(new Position(s.next.x, s.next.y, s.from.z)),
-    'until the tick, the party is on the new square with its old level (TraverseStairway, CSBCode.cpp:7775-7781)',
+    'until the tick, the party is on the new square with its old level (TraverseStairway, CSBCode.cpp:7862-7868)',
   );
   check(at(game.ctx.party.state.position) === at(s.next), `the party stands on the stairs below, ${at(s.next)}`);
 }
@@ -323,7 +323,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   game.ctx.party.state.champions[0]!.attributes.health = 1;
   game.move(MovementAction.MOVE_FORWARD);
   // The fall only adds to `d.PendingDamage`. The next tick loads the level below, and
-  // its `DisplayCharacterDamage` kills there (doc/CSBwin-src/CSBCode.cpp:615-657).
+  // its `DisplayCharacterDamage` kills there (doc/CSBwin-src/CSBCode.cpp:625-667).
   check(game.ctx.party.state.champions[0]!.attributes.health !== 0, 'the fall itself does not kill: the damage is pending');
   game.loadNewPartyLevel();
   game.systems.monsterAttack.displayCharacterDamage();

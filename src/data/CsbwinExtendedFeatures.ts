@@ -1,9 +1,9 @@
 /**
  * Block 0 of a CSBWin save: the "Extended Features" prefix.
  *
- * It is 512 bytes of `EXTENDEDFEATURESBLOCK` (`doc/CSBwin-src/CSB.h:463-511`) followed
+ * It is 512 bytes of `EXTENDEDFEATURESBLOCK` (`doc/CSBwin-src/CSB.h:463-514`) followed
  * by four variable-length runs, in this order
- * (`SaveGame`, `doc/CSBwin-src/SaveGame.cpp:918-998`):
+ * (`SaveGame`, `doc/CSBwin-src/SaveGame.cpp:944-1023`):
  *
  * ```
  *   512                      EXTENDEDFEATURESBLOCK
@@ -15,19 +15,19 @@
  *                            closed by one triple of 0xff
  * ```
  *
- * `ReadExtendedFeatures` reads exactly that back (`:298-432`) and `LoadGame` then reads
+ * `ReadExtendedFeatures` reads exactly that back (`:299-440`) and `LoadGame` then reads
  * GAMEBLOCK1 from wherever it left the file position, so the prefix's length is part of
  * the format rather than something either side may round.
  *
  * **The block is little-endian**, alone with the indirect text index in a big-endian
  * file: `SwapExtendedFeaturesBlock` has a body only `#ifdef _bigEndian`
- * (`doc/CSBwin-src/SaveGame.cpp:183-200`), so on the PC build CSBWin ships as it does
+ * (`doc/CSBwin-src/SaveGame.cpp:184-201`), so on the PC build CSBWin ships as it does
  * nothing and every field keeps native order.
  *
  * The three-byte terminator is easy to miss and not optional: `WriteDSALevelIndex` ends
  * with `triple[0] = triple[1] = triple[2] = 255;` and one more `WRITE`
- * (`doc/CSBwin-src/SaveGame.cpp:800-801`), and `ReadDSALevelIndex` loops until it reads a
- * triple whose first byte is above 63 (`:421-430`) — consuming it. Without those three
+ * (`doc/CSBwin-src/SaveGame.cpp:808-809`), and `ReadDSALevelIndex` loops until it reads a
+ * triple whose first byte is above 63 (`:425-438`) — consuming it. Without those three
  * bytes the reader would eat the first three bytes of GAMEBLOCK1.
  *
  * A `dungeon.dat` may open with the same prefix (`DungeonLoader.loadDungeonDat`). This
@@ -42,7 +42,7 @@ import { readU16LE, readU32LE, writeU16LE, writeU32LE } from '../core/bytes';
 /** `strcpy(efb.sentinel, " Extended Features ")` — 19 characters and a terminator. */
 export const EXTENDED_SENTINEL = ' Extended Features ';
 
-/** `sizeof(EXTENDEDFEATURESBLOCK)`, asserted by CSBWin itself (`SaveGame.cpp:917`). */
+/** `sizeof(EXTENDEDFEATURESBLOCK)`, asserted by CSBWin itself (`SaveGame.cpp:943`). */
 export const EXTENDED_FEATURES_SIZE = 512;
 
 /** `EXTENDEDFEATURESBLOCK::FLAGS` (`doc/CSBwin-src/CSB.h:472-481`). */
@@ -57,8 +57,8 @@ export const EF_FLAGS = {
 } as const;
 
 /**
- * `EXTENDEDFEATURESBLOCK::EXTENDEDFLAGS` (`doc/CSBwin-src/CSB.h:491-501`), and the three
- * CSBWin 20230608 adds (`doc/CSBwin-src-20230608/CSB.h:501-503`).
+ * `EXTENDEDFEATURESBLOCK::EXTENDEDFLAGS` (`doc/CSBwin-src/CSB.h:491-504`), and the three
+ * CSBWin 20230608 adds (`doc/CSBwin-src/CSB.h:501-503`).
  */
 export const EF_EXTENDED_FLAGS = {
     OverlayActive: 0x00000001,
@@ -76,8 +76,8 @@ export const EF_EXTENDED_FLAGS = {
 
 /**
  * `ExtendedFeaturesVersion`. `'@'` (0x40) is "no extended features"
- * (`doc/CSBwin-src/data.cpp:248`); `'B'` and up store the new six-byte SCROLL
- * (`doc/CSBwin-src/SaveGame.cpp:2189-2200`), and every committed save is `'B'`.
+ * (`doc/CSBwin-src/data.cpp:249`); `'B'` and up store the new six-byte SCROLL
+ * (`doc/CSBwin-src/SaveGame.cpp:2401-2412`), and every committed save is `'B'`.
  */
 export const EF_VERSION_B = 0x42;
 
@@ -99,9 +99,9 @@ export interface ExtendedFeaturesBlock {
     /**
      * `efb.gameInfoSize`, **signed**, and not the same thing as the number of bytes
      * written: `SaveGame` stores 0 when there is no game information at all and
-     * `gameInfoSize - 1` when there is (`doc/CSBwin-src/SaveGame.cpp:977-978`), so an
+     * `gameInfoSize - 1` when there is (`doc/CSBwin-src/SaveGame.cpp:1002-1003`), so an
      * allocated-but-empty one stores **-1** and `WriteGameInfo` then writes nothing
-     * (`:265-270`). That is why this is carried rather than derived from the bytes — the
+     * (`:266-271`). That is why this is carried rather than derived from the bytes — the
      * two are indistinguishable at zero.
      */
     gameInfoSize: number;
@@ -149,11 +149,11 @@ export function parseExtendedFeaturesBlock(block: Uint8Array): ExtendedFeaturesB
     };
 }
 
-/** `SIZE` (`doc/CSBwin-src/RC4.cpp:5`): the length of the stream, which then repeats. */
+/** `SIZE` (`doc/CSBwin-src/RC4.cpp:8`): the length of the stream, which then repeats. */
 const RC4_SIZE = 8192;
 
 /**
- * `RC4_prepare_key` (`doc/CSBwin-src/RC4.cpp:20-48`): the stream `RC4_encipher` XORs a
+ * `RC4_prepare_key` (`doc/CSBwin-src/RC4.cpp:25-61`): the stream `RC4_encipher` XORs a
  * buffer with, which CSBWin keeps in a static `rc4_key` and this returns.
  *
  * It is not RC4, as the file's own first lines warn: only the key schedule is. The
@@ -161,7 +161,7 @@ const RC4_SIZE = 8192;
  * second loop's swaps leave it, and each byte after them is `(unsigned char)counter`
  * XORed with one byte of RC4's output.
  *
- * `swap_byte` is the XOR swap (`:14`), so an entry swapped with itself becomes 0.
+ * `swap_byte` is the XOR swap (`:19`), so an entry swapped with itself becomes 0.
  */
 export function rc4PrepareKey(keyData: Uint8Array, keyDataLen: number): Uint8Array {
     const state = new Uint8Array(RC4_SIZE);
@@ -192,7 +192,7 @@ export function rc4PrepareKey(keyData: Uint8Array, keyDataLen: number): Uint8Arr
 }
 
 /**
- * `RC4_encipher` (`doc/CSBwin-src/RC4.cpp:52-55`): XOR `buffer` in place with the stream
+ * `RC4_encipher` (`doc/CSBwin-src/RC4.cpp:65-76`): XOR `buffer` in place with the stream
  * from `position`, the buffer's place in its file. Its own inverse.
  */
 export function rc4Encipher(state: Uint8Array, buffer: Uint8Array, position: number): void {
@@ -202,7 +202,7 @@ export function rc4Encipher(state: Uint8Array, buffer: Uint8Array, position: num
 /**
  * The stream of the "simple" encipherment: `simple[0] = 1; simple[1] = 0;
  * RC4_prepare_key(simple, 1)`, a key of one byte
- * (`doc/CSBwin-src/SaveGame.cpp:326-329`, `:915-918`).
+ * (`doc/CSBwin-src/SaveGame.cpp:328-331`, `:941-944`).
  */
 export function simpleEncipherKey(): Uint8Array {
     return rc4PrepareKey(new Uint8Array([1, 0]), 1);
@@ -347,7 +347,7 @@ function readDsa(rcs: RcsReader): DsaDefinition {
 }
 
 /**
- * `WCS` (`doc/CSBwin-src/data.cpp:1796-1869`): the bytes `WriteDSAs` writes, little-endian
+ * `WCS` (`doc/CSBwin-src/data.cpp:1799-1872`): the bytes `WriteDSAs` writes, little-endian
  * as the PC build's memory holds them, and the checksum `RcsReader` checks them against.
  */
 class WcsWriter {
@@ -392,9 +392,9 @@ class WcsWriter {
 }
 
 /**
- * `DSA::Write` (`doc/CSBwin-src/DSA.cpp:5672-5695`), with `DSAState::Write` and
- * `DSAAction::Write` (`:5764-5771`, `:5800-5805`): `readDsa`'s fields in its order.
- * `m_description` is a `char[80]` (`doc/CSBwin-src/Data.h:2444`), written whole: the
+ * `DSA::Write` (`doc/CSBwin-src/DSA.cpp:5673-5696`), with `DSAState::Write` and
+ * `DSAAction::Write` (`:5765-5772`, `:5801-5806`): `readDsa`'s fields in its order.
+ * `m_description` is a `char[80]` (`doc/CSBwin-src/Data.h:2459`), written whole: the
  * string, then zeros.
  */
 function writeDsa(wcs: WcsWriter, dsa: DsaDefinition): void {
@@ -422,13 +422,13 @@ function writeDsa(wcs: WcsWriter, dsa: DsaDefinition): void {
     });
 }
 
-/** `countDSAs` (`doc/CSBwin-src/SaveGame.cpp:755-765`): the DSAs the index holds. */
+/** `countDSAs` (`doc/CSBwin-src/SaveGame.cpp:763-773`): the DSAs the index holds. */
 export function countDSAs(index: DsaIndex | undefined): number {
     return (index?.entries ?? []).slice(0, 256).filter((dsa) => dsa).length;
 }
 
 /**
- * `WriteDSAs` (`doc/CSBwin-src/SaveGame.cpp:767-780`): each DSA of the index, in number
+ * `WriteDSAs` (`doc/CSBwin-src/SaveGame.cpp:775-788`): each DSA of the index, in number
  * order, behind its number, then the checksum of them all. What `readExtendedFeatures`
  * reads back.
  */
@@ -445,15 +445,15 @@ export function buildDsaSection(index: DsaIndex): Uint8Array {
 }
 
 /**
- * `ReadExtendedFeatures` (`doc/CSBwin-src/SaveGame.cpp:298-432`) over the front of a file,
+ * `ReadExtendedFeatures` (`doc/CSBwin-src/SaveGame.cpp:299-440`) over the front of a file,
  * a save's or a `dungeon.dat`'s: the block, the object maps, the DSAs, the game
  * information and the DSA level index. `offset` is `ExtendedFeaturesSize`, 0 when the
  * file opens with no block: one shorter than 512 bytes, one without the sentinel plain or
- * enciphered, or one whose block fails its checksum (`:320-353`). The file is then read
+ * enciphered, or one whose block fails its checksum (`:322-355`). The file is then read
  * from its first byte.
  *
  * A block found only once deciphered, with `SimpleEncryption` in its `flags`, marks the
- * whole file enciphered (`:324-338`): `simpleEncipher` is then set, and `data` is the
+ * whole file enciphered (`:326-340`): `simpleEncipher` is then set, and `data` is the
  * file deciphered, as every later `READ` of it gives it (`simpleEncipher`). The maps and
  * whatever follows them are read from `data`, and so is the rest of the file by every
  * caller. For any other file `data` is the file as given.
@@ -464,7 +464,7 @@ export function readExtendedFeatures(file: Uint8Array): {
     data: Uint8Array;
     /**
      * CSBWin's `simpleEncipher`, set when the block was found by deciphering and carries
-     * `SimpleEncryption` (`doc/CSBwin-src/SaveGame.cpp:333-338`).
+     * `SimpleEncryption` (`doc/CSBwin-src/SaveGame.cpp:335-340`).
      */
     simpleEncipher: boolean;
     sequencedTimers: boolean;
@@ -498,7 +498,7 @@ export function readExtendedFeatures(file: Uint8Array): {
 
     // Without the sentinel the block may be an enciphered one: deciphered, it must open
     // with the sentinel and carry `SimpleEncryption` in its `flags`
-    // (`doc/CSBwin-src/SaveGame.cpp:324-343`). The file is then enciphered from its
+    // (`doc/CSBwin-src/SaveGame.cpp:326-345`). The file is then enciphered from its
     // first byte to its last.
     if (!hasExtendedSentinel(file)) {
         const decoded = file.slice(0, EXTENDED_FEATURES_SIZE);
@@ -512,7 +512,7 @@ export function readExtendedFeatures(file: Uint8Array): {
     const parsed = data.subarray(0, EXTENDED_FEATURES_SIZE);
 
     // `ReadExtendedFeatures` verifies the block against its own checksum before it
-    // believes a single field of it (`doc/CSBwin-src/SaveGame.cpp:345-353`): the stored
+    // believes a single field of it (`doc/CSBwin-src/SaveGame.cpp:347-355`): the stored
     // value is lifted out, the field zeroed, and `FormChecksum` run over all 512 bytes.
     // A block that fails is no block: CSBWin seeks back and returns 0, and its caller
     // reads GAMEBLOCK1, or the dungeon's header, from the file's first byte.
@@ -528,7 +528,7 @@ export function readExtendedFeatures(file: Uint8Array): {
     const typeMapChecksum = readU32LE(parsed, 24);
     const indexMapChecksum = readU32LE(parsed, 28);
     // A `gameInfoSize` of -1 is a game information allocated but empty, which
-    // `WriteGameInfo` writes no byte of (`doc/CSBwin-src/SaveGame.cpp:265-270`): it
+    // `WriteGameInfo` writes no byte of (`doc/CSBwin-src/SaveGame.cpp:266-271`): it
     // advances nothing.
     const gameInfoSize = Math.max(0, header.gameInfoSize);
     const { flags, extendedFlags, numDSA } = header;
@@ -623,14 +623,14 @@ export interface ExtendedFeaturesPrefix {
     dsaIndex?: DsaIndex;
     /**
      * `gameInfo`, without the terminator `ReadGameInfo` appends
-     * (`doc/CSBwin-src/SaveGame.cpp:390-397`). Must be exactly `max(0,
+     * (`doc/CSBwin-src/SaveGame.cpp:392-399`). Must be exactly `max(0,
      * header.gameInfoSize)` bytes long, since that field is what tells the reader how
      * many to consume.
      */
     gameInfo?: Uint8Array;
     /**
      * `DSALevelIndex[level][selector]`, 64 x 32, 0xffff where unset. Only entries below
-     * 256 are written (`doc/CSBwin-src/SaveGame.cpp:792`).
+     * 256 are written (`doc/CSBwin-src/SaveGame.cpp:800`).
      */
     dsaLevelIndex?: number[][];
 }
@@ -641,8 +641,8 @@ export interface ExtendedFeaturesPrefix {
  *
  * The header's `dataMapLength`, its two map checksums and `gameInfoSize` are computed
  * here from the arrays actually being written, exactly as `SaveGame` computes them from
- * the live arrays (`doc/CSBwin-src/SaveGame.cpp:921-931`, `:977`). Its own checksum goes
- * in last, over all 512 bytes with the field zeroed (`:981-983`).
+ * the live arrays (`doc/CSBwin-src/SaveGame.cpp:946-956`, `:1002`). Its own checksum goes
+ * in last, over all 512 bytes with the field zeroed (`:1006-1008`).
  */
 export function buildExtendedFeaturesPrefix(prefix: ExtendedFeaturesPrefix): Uint8Array {
     const { header, typeMap, indexMap } = prefix;
@@ -697,7 +697,7 @@ export function buildExtendedFeaturesPrefix(prefix: ExtendedFeaturesPrefix): Uin
             `extended features declare ${header.numDSA} DSAs but carry ${countDSAs(prefix.dsaIndex)}`,
         );
     }
-    // `if (efb.numDSA != 0) WriteDSAs(...)` (`doc/CSBwin-src/SaveGame.cpp:989-992`).
+    // `if (efb.numDSA != 0) WriteDSAs(...)` (`doc/CSBwin-src/SaveGame.cpp:1014-1017`).
     const dsaBlock = header.numDSA !== 0 && prefix.dsaIndex
         ? buildDsaSection(prefix.dsaIndex)
         : new Uint8Array(0);
@@ -717,7 +717,7 @@ export function buildExtendedFeaturesPrefix(prefix: ExtendedFeaturesPrefix): Uin
 }
 
 /**
- * `WriteDSALevelIndex` (`doc/CSBwin-src/SaveGame.cpp:782-802`): a `(level, selector,
+ * `WriteDSALevelIndex` (`doc/CSBwin-src/SaveGame.cpp:790-810`): a `(level, selector,
  * dsaIndex)` triple for every entry below 256, in level-then-selector order, closed by
  * `ff ff ff`.
  */
@@ -783,9 +783,9 @@ export interface LiveExtendedFeatures {
 /**
  * `expectedGraphicSignature1/2` and `expectedCSBgraphicSignature1/2`, process-wide globals,
  * 0 at start (`doc/CSBwin-src/data.cpp:47-49`). `ReadExtendedFeatures` assigns them from a
- * file's block (`SaveGame.cpp:378-381`) and `SaveGame` writes them back (`:936-939`). It
- * never clears them, where it zeroes `hintKey` before it looks for a block (`:314`), so a
- * file without one leaves them as they were. `Graphics.cpp:1786-1796` and `:1852-1881`
+ * file's block (`SaveGame.cpp:380-383`) and `SaveGame` writes them back (`:961-964`). It
+ * never clears them, where it zeroes `hintKey` before it looks for a block (`:316`), so a
+ * file without one leaves them as they were. `Graphics.cpp:1810-1820` and `:1876-1905`
  * check them against the graphics files' own, a comparison that can never fail
  * (`src/engine/FileSignatures.ts`): only `OpenCSBgraphicsFile`'s "Cannot find" reads them.
  */
@@ -805,7 +805,7 @@ export function noExpectedSignatures(): ExpectedSignatures {
 }
 
 /**
- * `ReadExtendedFeatures`' four signatures (`doc/CSBwin-src/SaveGame.cpp:378-381`), from a
+ * `ReadExtendedFeatures`' four signatures (`doc/CSBwin-src/SaveGame.cpp:380-383`), from a
  * file's block. A file with none (`header` undefined) assigns none.
  */
 export function readExpectedSignatures(signatures: ExpectedSignatures, header: ExtendedFeaturesBlock | undefined): void {
@@ -818,17 +818,17 @@ export function readExpectedSignatures(signatures: ExpectedSignatures, header: E
 
 /**
  * `ReadExtendedFeatures`' rule flags and monster design options
- * (`doc/CSBwin-src/SaveGame.cpp:392-400`): `DMRulesDesignOption` from `flags & DMRules`,
+ * (`doc/CSBwin-src/SaveGame.cpp:394-402`): `DMRulesDesignOption` from `flags & DMRules`,
  * `DM_rules`, `invisibleMonsters` and `drawAsSize4Monsters` from `extendedFlags`'
  * `DMRulesOption`, `InvisibleMonsters` and `DrawAsSize4Monsters`. A file with no block
  * (`header` undefined) assigns none, as CSBWin, which never reaches that function for it.
  *
  * And `simpleEncipher`, which the function sets for an enciphered file and nothing ever
- * clears (`:333-338`): `enciphered` is `readExtendedFeatures`' `simpleEncipher`.
+ * clears (`:335-340`): `enciphered` is `readExtendedFeatures`' `simpleEncipher`.
  *
  * And CSBWin 20230608's three: `SupressDSAWarningOption`, `bGravityGame` and
  * `bThreeDMovements` from `SupressDSAWarning`, `GravityGame` and `ThreeDMovements`
- * (`doc/CSBwin-src-20230608/SaveGame.cpp:415-416`, `:427-430`). The first is cleared at
+ * (`doc/CSBwin-src/SaveGame.cpp:415-416`, `:427-430`). The first is cleared at
  * the function's head beside `indirectText` and the other shapes (`:312`), so a file with
  * no block clears it; the other two it leaves.
  */
@@ -855,46 +855,46 @@ export function readRulesOptions(
 
 /**
  * The 512-byte header a running game writes, field for field against `SaveGame`
- * (`doc/CSBwin-src/SaveGame.cpp:915-980`).
+ * (`doc/CSBwin-src/SaveGame.cpp:941-1005`).
  *
  * Nothing here is a guess. Each field is either assigned by that function from something
  * this port holds, or measured to be zero in all eight committed saves and named
  * below as such — `memset(&efb,0,512)` runs first, so a field `SaveGame` never touches
  * is genuinely zero rather than merely unknown.
  *
- * **`flags`.** `SaveGame` sets four unconditionally: `LevelDSAInfoPresent` (`:940`),
+ * **`flags`.** `SaveGame` sets four unconditionally: `LevelDSAInfoPresent` (`:965`),
  * because it always writes the DSA level index and `ReadExtendedFeatures` only reads it
- * back when the bit is on (`:387-390`); `IndirectText`, `ExpandedPortraits` and
- * `BigActuators` (`:961-963`), which are the shapes of blocks 11-13 and of `CHARDESC`.
+ * back when the bit is on (`:389-392`); `IndirectText`, `ExpandedPortraits` and
+ * `BigActuators` (`:986-988`), which are the shapes of blocks 11-13 and of `CHARDESC`.
  * They must agree with the image actually written, which is what
- * `convertOriginalDungeon` guarantees. `DMRules` is `DMRulesDesignOption` (`:952-953`).
- * `SimpleEncryption` is `simpleEncipher` (`:943-946`), and `saveSaveGameState` then
- * enciphers the whole file (`:914-920`). `AutoRecord` is an option this port does not
+ * `convertOriginalDungeon` guarantees. `DMRules` is `DMRulesDesignOption` (`:977-978`).
+ * `SimpleEncryption` is `simpleEncipher` (`:968-971`), and `saveSaveGameState` then
+ * enciphers the whole file (`:939-946`). `AutoRecord` is an option this port does not
  * model and writes off. Measured: every committed save carries 0xe9, the four (0xa9)
  * plus `DMRules`.
  *
- * **`extendedFlags`.** Three unconditional (`:964-966`): `SequencedTimers` and
+ * **`extendedFlags`.** Three unconditional (`:989-991`): `SequencedTimers` and
  * `ExtendedTimers`, which together select the 16-byte `TIMER` this port writes, and
  * `DefaultDirectX`, which is a UI preference CSBWin sets on every save. Plus
- * `ExtendedWallDecorations` from the world, `DMRulesOption` from `DM_rules` (`:950-951`),
+ * `ExtendedWallDecorations` from the world, `DMRulesOption` from `DM_rules` (`:975-976`),
  * the monster design options `InvisibleMonsters` and `DrawAsSize4Monsters` from
- * `invisibleMonsters` and `drawAsSize4Monsters` (`:947-948`, `:958-959`), and
- * `OverlayActive` from `overlayActive` (`:968-971`). Measured: 0xf8 in every committed
+ * `invisibleMonsters` and `drawAsSize4Monsters` (`:972-973`, `:983-984`), and
+ * `OverlayActive` from `overlayActive` (`:993-996`). Measured: 0xf8 in every committed
  * save, which is the three unconditional ones (0xe0) plus the wall decorations and DM
  * rules. And, where CSBWin 20230608 writes none of them
- * (`doc/CSBwin-src-20230608/SaveGame.cpp:955-993`), `SupressDSAWarning`, `GravityGame` and
+ * (`doc/CSBwin-src/SaveGame.cpp:955-993`), `SupressDSAWarning`, `GravityGame` and
  * `ThreeDMovements` as the last file read gave them: a deliberate divergence, `DEBT.md`
  * H → "A save keeps the dungeon's three 2023 flags".
  *
  * **The overlay.** `overlayOrdinal` is `currentOverlay.m_overlayNumber` **plus one**, so 0
- * is "no overlay ever read", and `overlayP1`-`P4` are its `m_p1`-`m_p4` (`:972-976`),
+ * is "no overlay ever read", and `overlayP1`-`P4` are its `m_p1`-`m_p4` (`:997-1001`),
  * `m_p3` the `d.Time` it ends after. All are zero in every committed save.
  *
  * **What a read gave.** `graphicsSignature1/2` and `csbGraphicsSignature1/2` are
- * `expectedGraphicSignature*` (`:936-939`), the last block read's (`ExpectedSignatures`),
- * which `Graphics.cpp:1786-1796` treats as "no expectation" when both halves are zero.
- * `hintKey` is the world's file's (`:941`), `Hint.cpp`'s key, and `hintKey[0] == 0` is
- * its own "no key" test (`doc/CSBwin-src/Hint.cpp:5508`). All five are zero in every
+ * `expectedGraphicSignature*` (`:961-964`), the last block read's (`ExpectedSignatures`),
+ * which `Graphics.cpp:1810-1820` treats as "no expectation" when both halves are zero.
+ * `hintKey` is the world's file's (`:956`), `Hint.cpp`'s key, and `hintKey[0] == 0` is
+ * its own "no key" test (`doc/CSBwin-src/Hint.cpp:6252`). All five are zero in every
  * committed save.
  *
  * **Zero, and measured zero rather than assumed.** `editingOptions` is never assigned by

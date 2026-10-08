@@ -6,11 +6,11 @@
  * - the **box index** — its slot in the top bar and in `d.CH16482[]`, which never moves;
  * - `CHARDESC.charPosition` (`champion.partyPosition`) — the *corner of the cell* it
  *   stands in, which `setPartyFacing` rotates every time the party turns
- *   (`doc/CSBwin-src/Code11f52.cpp:4085`).
+ *   (`doc/CSBwin-src/Code11f52.cpp:4123`).
  *
  * Every click that names a champion names a box: `HandleClothingClick` resolves it as
- * `d.CH16482[D7W]` (`doc/CSBwin-src/CSBCode.cpp:6956`), and `_HandleMagicClick` hands a
- * box index to `SelectMagicCaster` (`doc/CSBwin-src/Magic.cpp:689-696`). Nothing on
+ * `d.CH16482[D7W]` (`doc/CSBwin-src/CSBCode.cpp:7015`), and `_HandleMagicClick` hands a
+ * box index to `SelectMagicCaster` (`doc/CSBwin-src/Magic.cpp:692-699`). Nothing on
  * screen shows the difference — the inventory of the champion you clicked *looks*
  * right, because it is drawn from the box index — so only a tool can see a click
  * routed to the wrong champion, and only after a turn, since the two indices agree
@@ -128,7 +128,7 @@ async function main(): Promise<void> {
   /**
    * Click inventory slot `slot` of the champion whose *box* is `box`, and report
    * which champion the click actually touched. CSBWin numbers the inventory buttons
-   * from 8 (`slot = button - 8`, doc/CSBwin-src/CSBCode.cpp:6944).
+   * from 8 (`slot = button - 8`, doc/CSBwin-src/CSBCode.cpp:7003).
    */
   function clickInventorySlot(what: string, box: number, slot: number): number {
     party.state.selectedCharacterIndex = box;
@@ -182,11 +182,11 @@ async function main(): Promise<void> {
   }
 
   // ---- 4. A backpack slot, and the top-bar hands, which take the other branch of
-  //         `HandleClothingClick` (`button < 8`, doc/CSBwin-src/CSBCode.cpp:6933-6942).
+  //         `HandleClothingClick` (`button < 8`, doc/CSBwin-src/CSBCode.cpp:6992-7001).
   // Putting an object *into* an empty slot is the other direction, and the one a
   // player notices most — it is the click that makes an item vanish into the wrong
   // backpack. `HandleClothingClick`'s slots run 0-12 for the hands and the paper doll
-  // and 13-29 for the backpack (`doc/CSBwin-src/CSBCode.cpp:6921-6925`, where they are
+  // and 13-29 for the backpack (`doc/CSBwin-src/CSBCode.cpp:6980-6984`, where they are
   // named by button number), so slot 20 is a backpack pocket — empty for every preset
   // hero, and it takes anything.
   for (let box = 0; box < 4; box++) {
@@ -219,7 +219,7 @@ async function main(): Promise<void> {
   party.state.selectedCharacterIndex = -1;
   party.state.objectInHand = OBJECT_ID_NULL;
   // The middle of box `box`'s tab with `caster` casting (`DrawSpellControls`,
-  // `doc/CSBwin-src/Character.cpp:5002-5085`): 12 pixels wide, 14 apart, and the
+  // `doc/CSBwin-src/Character.cpp:5027-5110`): 12 pixels wide, 14 apart, and the
   // caster's own 45 wide.
   const tabX = (box: number, caster: number): number =>
     box < caster ? 233 + 14 * box + 5 : box > caster ? 266 + 14 * box + 5 : 233 + 14 * box + 22;

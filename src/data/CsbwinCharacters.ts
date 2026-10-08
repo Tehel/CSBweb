@@ -4,20 +4,20 @@
  * The block is 3328 bytes — `CHARDESC[4]` at 800 bytes each, then **128 bytes of
  * party-wide state** that merely happens to sit next to them in `Data.h`. The struct
  * comments bracket the span exactly: `// 3328 bytes read into byte16482`
- * (`doc/CSBwin-src/Data.h:765`) opens it and
- * `///////////// End of Character portion of save file /////////////` (`:783`) closes
+ * (`doc/CSBwin-src/Data.h:780`) opens it and
+ * `///////////// End of Character portion of save file /////////////` (`:798`) closes
  * it. So the footprint trail and the shield timers are part of the *character* block.
  *
- * Every field below is `CHARDESC` (`doc/CSBwin-src/CSB.h:2483-2594`) read at its
+ * Every field below is `CHARDESC` (`doc/CSBwin-src/CSB.h:2542-2653`) read at its
  * declared offset, with two corrections that struct does not state:
  *
  * - `title` runs 8..27 — **20 bytes**, not the declared 16. `AddCharacter` refuses a
  *   title character only at `D6W >= 19` and then writes `title[D6W] = 0`, so index 19
- *   is a legal write (`doc/CSBwin-src/Character.cpp:578-587`), and `facing` at 28
+ *   is a legal write (`doc/CSBwin-src/Character.cpp:579-588`), and `facing` at 28
  *   closes the span. `title[16]`, `wordx24` and `FILL26[2]` are one field.
  * - `name` and `title` are plain `char` arrays and are **not** byte-swapped;
  *   `swapCharacter` lists every field it swaps and they are not among them
- *   (`doc/CSBwin-src/SaveGame.cpp:490-521`).
+ *   (`doc/CSBwin-src/SaveGame.cpp:498-529`).
  * - Nor are the four words after `shieldStrength`: `talents`, `fingerPrint`,
  *   `causeOfDamage` and `monsterCausingDamage` keep the memory order of the
  *   little-endian build, so the file holds them **little-endian**. Everything else here
@@ -43,12 +43,12 @@ const SKILL_SIZE = 6;
 /** `RN possessions[30]`, two bytes each. */
 const POSSESSIONS_OFFSET = 212;
 /**
- * `i8 portrait[1]` at 336 (`doc/CSBwin-src/CSB.h:2593`), with `FILL337[800-337]` after
+ * `i8 portrait[1]` at 336 (`doc/CSBwin-src/CSB.h:2652`), with `FILL337[800-337]` after
  * it: 464 bytes, which is exactly `32*29/2` — the champion carries their **portrait
  * bitmap**, not an index to one. `AddCharacter` blits it out of basic graphic 26 for a
  * standard hero and out of `GetExternalPortraitAddress` for `charID > 23`
- * (`doc/CSBwin-src/Character.cpp:486-508`), and `CharacterPortraitToStatusBox` blits it
- * straight back to the status box at 16 bytes per line (`:4644-4656`).
+ * (`doc/CSBwin-src/Character.cpp:487-509`), and `CharacterPortraitToStatusBox` blits it
+ * straight back to the status box at 16 bytes per line (`:4661-4673`).
  */
 const PORTRAIT_OFFSET = 336;
 /** 32 pixels wide, 29 rows, four bitplanes: 16 bytes per line, 464 in all. */
@@ -89,7 +89,7 @@ function readSkills(block: Uint8Array, base: number): Skill[] {
  *
  * Every one of them is an **indirect-index slot number**, not a packed RN:
  * `ConvertCharacters` rewrites all thirty through `ConvertListOfObjects` the moment an
- * original dungeon is read (`doc/CSBwin-src/SaveGame.cpp:2046-2064`), so from then on
+ * original dungeon is read (`doc/CSBwin-src/SaveGame.cpp:2258-2276`), so from then on
  * that is what a champion carries, as in this port. Read as packed RNs, the slots would
  * be categories 0 and 1 with indices far past those databases.
  */
@@ -113,11 +113,11 @@ function readPossessions(block: Uint8Array, base: number): ObjectID[] {
  * form.
  *
  * `swapCharacter` lists every field it byte-swaps and the portrait is not among them
- * (`doc/CSBwin-src/SaveGame.cpp:490-521`), so these 464 bytes are the Atari layout the
+ * (`doc/CSBwin-src/SaveGame.cpp:498-529`), so these 464 bytes are the Atari layout the
  * graphics were loaded in: per 16 pixels, four big-endian plane words, plane 0 carrying
  * bit 0 of the colour index and the leftmost pixel in bit 15. That is what `TAG0088b2`
  * reads — `LE16(*puwA0)` over four consecutive words per group
- * (`doc/CSBwin-src/Graphics.cpp:764-779`).
+ * (`doc/CSBwin-src/Graphics.cpp:785-800`).
  *
  * Proven, not inferred: `tools/dump-csbwin-load.ts` decodes the four champions of every
  * committed save this way and every one of them matches a cell of basic graphic 26
@@ -191,9 +191,9 @@ export function readCsbwinCharacter(
     facing: readU8(block, base + 28) as 0 | 1 | 2 | 3,
     partyPosition: readU8(block, base + 29) as ui8,
     attackType: readI8(block, base + 32),
-    // `StrLen(pcA3->incantation)` (`doc/CSBwin-src/Magic.cpp:812`) — a C string, so the
+    // `StrLen(pcA3->incantation)` (`doc/CSBwin-src/Magic.cpp:815`) — a C string, so the
     // first zero ends it. Dropping the zeros instead would bring back the symbols a cast
-    // leaves behind it: `CastSpell` clears `incantation[0]` and nothing else (`:951`), so
+    // leaves behind it: `CastSpell` clears `incantation[0]` and nothing else (`:954`), so
     // a champion who has just cast holds bytes like `00 69 6f 00`, and has no runes
     // pending in CSBWin.
     incantation: incantationPrefix(incantationBytes),
@@ -231,7 +231,7 @@ export function readCsbwinCharacter(
   };
 
   // An unused slot is `ClearMemory`'d to 800 zero bytes by `AddCharacter`
-  // (`doc/CSBwin-src/Character.cpp:478`), so a blank name and no maximum health is
+  // (`doc/CSBwin-src/Character.cpp:479`), so a blank name and no maximum health is
   // "nobody here" rather than a champion with odd stats.
   const occupied = name.length > 0 || maxHealth > 0;
   return { champion, charFlags, occupied };
@@ -243,7 +243,7 @@ export function isMale(charFlags: number): boolean {
 }
 
 /**
- * The 128 bytes after the four `CHARDESC`s, laid out by `Data.h:766-782`. Offsets are
+ * The 128 bytes after the four `CHARDESC`s, laid out by `Data.h:781-797`. Offsets are
  * from the start of block 4, so `4 * 800 = 3200` is `Brightness`.
  */
 export interface CsbwinPartyTail {
@@ -265,7 +265,7 @@ export interface CsbwinPartyTail {
 }
 
 const TAIL = 4 * CHARDESC_SIZE;
-/** Block 4 in full: four `CHARDESC` and the party tail (`doc/CSBwin-src/Data.h:765`). */
+/** Block 4 in full: four `CHARDESC` and the party tail (`doc/CSBwin-src/Data.h:780`). */
 export const CHARACTER_BLOCK_SIZE = TAIL + 128;
 
 export function readCsbwinPartyTail(block: Uint8Array): CsbwinPartyTail {
@@ -367,8 +367,8 @@ export interface CsbwinCharacterWriteOptions {
  * Every field `readCsbwinCharacter` reads is written back at the offset it was read
  * from, plus the six that only the writer needs — `byte30`, `byte31`, `uByte43`, the
  * three `FILL` runs — which CSBWin fills with constants:
- * `pcA3->byte30 = 1; pcA3->byte31 = 2;` (`doc/CSBwin-src/Character.cpp:515-516`) over a
- * record `ClearMemory` has zeroed (`:478`).
+ * `pcA3->byte30 = 1; pcA3->byte31 = 2;` (`doc/CSBwin-src/Character.cpp:516-517`) over a
+ * record `ClearMemory` has zeroed (`:479`).
  *
  * The possessions are written as the slots they are: the file's RNs are the port's
  * (`doc/PROVEN_FACTS.md` -> "An RN in a save file is an indirect index").
@@ -399,9 +399,9 @@ export function writeCsbwinCharacter(
   block[base + 31] = 2;
   block[base + 32] = champion.attackType & 0xff;
   // `byte33`, the index of the next rune. Every CSBWin writer of it keeps it at
-  // `strlen(incantation) & 3` — the add (`doc/CSBwin-src/CSBCode.cpp:8984-8988`), the
-  // backspace (`Magic.cpp:814-817`), the cast (`:951-952`) and the two resets
-  // (`Character.cpp:2648-2649`, `:5293-5294`) — so it is derived, never carried.
+  // `strlen(incantation) & 3` — the add (`doc/CSBwin-src/CSBCode.cpp:9089-9093`), the
+  // backspace (`Magic.cpp:817-820`), the cast (`:954-955`) and the two resets
+  // (`Character.cpp:2653-2654`, `:5318-5319`) — so it is derived, never carried.
   block[base + 33] = champion.incantation.length & 3;
   const incantation = champion.incantationField;
   const live = champion.incantation ?? [];
@@ -483,7 +483,7 @@ export function writeCsbwinPartyTail(block: Uint8Array, tail: CsbwinPartyTail): 
  *
  * A slot past the party holds what `PartyState.vacantCharacters` says CSBWin holds
  * there, and without one the 800 zero bytes `DBank::Initialize` leaves
- * (`doc/CSBwin-src/CSBCode.cpp:323-330`), which is what every committed save with fewer
+ * (`doc/CSBwin-src/CSBCode.cpp:333-340`), which is what every committed save with fewer
  * than four champions holds.
  */
 export function buildCsbwinCharacterBlock(
@@ -515,7 +515,7 @@ function reverseBytes(record: Uint8Array, at: number, n: number): void {
 }
 
 /**
- * `swapCharacter` (`doc/CSBwin-src/SaveGame.cpp:490-521`) on one 800-byte `CHARDESC`: the
+ * `swapCharacter` (`doc/CSBwin-src/SaveGame.cpp:498-529`) on one 800-byte `CHARDESC`: the
  * fields the file holds big-endian reversed in place, from `busyTimer` at 44 to
  * `shieldStrength` at 274. It turns the file's form into the little-endian build's memory
  * and back, so it is its own inverse.

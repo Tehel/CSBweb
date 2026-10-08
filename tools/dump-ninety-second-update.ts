@@ -1,7 +1,7 @@
 /**
- * `NinetySecondUpdate` (`doc/CSBwin-src/CSBCode.cpp:7339-7387`) — torches burning down.
+ * `NinetySecondUpdate` (`doc/CSBwin-src/CSBCode.cpp:7398-7446`) — torches burning down.
  *
- *   1. Cadence: whenever `(d.Time & 511) == 0` (`doc/CSBwin-src/CSBCode.cpp:680-683`),
+ *   1. Cadence: whenever `(d.Time & 511) == 0` (`doc/CSBwin-src/CSBCode.cpp:690-693`),
  *      every 512 ticks — about 85 seconds, not 90.
  *   2. Each torch in either hand loses one charge; one that reaches 0 loses its
  *      `important` flag.

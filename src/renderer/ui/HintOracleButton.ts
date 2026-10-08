@@ -10,11 +10,11 @@
  * as `HINT_ORACLE_BUTTON`. The inventory still closes the way it opens, with a right
  * click or the champion's name.
  *
- * The click is the disk icon's (`doc/CSBwin-src/Mouse.cpp:1708-1727`): refused with an
+ * The click is the disk icon's (`doc/CSBwin-src/Mouse.cpp:1847-1866`): refused with an
  * empty party or a champion only provisionally joined, it raises a flag, and whoever
  * drained the mouse queue opens the screen (`GameScreen.handleMouseButton`). `TAG02076e`
  * runs before it and `TAG0207cc` after it, as around the disk menu
- * (`doc/CSBwin-src/SaveGame.cpp:860`, `:1274`), and the clock stands still while it is up,
+ * (`doc/CSBwin-src/SaveGame.cpp:877`, `:1375`), and the clock stands still while it is up,
  * as under the disk menu (`ctx.state.paused`).
  *
  * The screen itself is `HintOracleScreen` (`src/renderer/intro/HintOracle.ts`), which the
@@ -56,7 +56,7 @@ const withOracleButton = new WeakMap<UIButton[], UIButton[]>();
 
 /**
  * The inventory's secondary list, `buttons17760`, as `ShowHideInventory` installs it
- * (`doc/CSBwin-src/CSBCode.cpp:7518`): with the Oracle, its close box is `HINT_ORACLE_BUTTON`.
+ * (`doc/CSBwin-src/CSBCode.cpp:7577`): with the Oracle, its close box is `HINT_ORACLE_BUTTON`.
  */
 export function inventoryButtonList(ui: UIState): UIButton[] {
   const list = ui.uiTables.graphic231.buttons.buttons17760;
@@ -69,7 +69,7 @@ export function inventoryButtonList(ui: UIState): UIButton[] {
   return renumbered;
 }
 
-/** The font's width and its transparent colour (`TAG004962`, `doc/CSBwin-src/Hint.cpp:3466-3473`). */
+/** The font's width and its transparent colour (`TAG004962`, `doc/CSBwin-src/Hint.cpp:4158-4165`). */
 const FONT_WIDTH = 256;
 const FONT_TRANSPARENT = 12;
 /** `TAG004962`'s glyph: 8 wide, 9 high. */
@@ -83,7 +83,7 @@ export function closeBoxRect(ui: UIState): Rect | null {
 
 /**
  * The button's picture, over the close box that graphic 17 has just drawn: the Oracle's
- * own `?`, the glyph `TAG004962` draws for it from `hcsb.dat` item 2 (`Hint.cpp:3466-3473`),
+ * own `?`, the glyph `TAG004962` draws for it from `hcsb.dat` item 2 (`Hint.cpp:4158-4165`),
  * in the close box's two colours, read from graphic 17 where they stand: its paper the
  * middle of the box's top line, its ink the middle of the box, where the X crosses. The
  * glyph's cell starts a pixel in from the box's top left corner, which puts the stem on

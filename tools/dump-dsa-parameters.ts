@@ -3,20 +3,20 @@
  * a genuine save (`csbgame7.dat`).
  *
  * 1. **A filter runs on a parameter array of its own** (`NEWDSAPARAMETERS`,
- *    `doc/CSBwin-src/CSB.h:4220-4235`, in `AdjustSkills`, `doc/CSBwin-src/Magic.cpp:196`):
+ *    `doc/CSBwin-src/CSB.h:4286-4301`, in `AdjustSkills`, `doc/CSBwin-src/Magic.cpp:199`):
  *    the adjust-skills filter sees its nine parameters, and a DSA a timer runs after it
  *    still finds a count of 0, the array the filter wrote being gone.
  * 2. **The party attack's parameters are the current array's** (`SetupDSAParam`,
  *    `doc/CSBwin-src/Attack.cpp:1346-1360`): after an attack, with no party attack filter,
  *    a DSA a timer runs finds the count 124, `sizeof(ATTACKPARAMETERS)`, and the attack's
  *    words, its champion and its type first.
- * 3. **`&PARAM@` compares the count unsigned** (`doc/CSBwin-src/DSA.cpp:2956-2985`): a
+ * 3. **`&PARAM@` compares the count unsigned** (`doc/CSBwin-src/DSA.cpp:2957-2986`): a
  *    count of -1, a parameter message whose `EXPOOL` record is gone, copies the words as
  *    they stand. A count short of `n` copies what there is, and the variables past it
  *    read 0.
- * 4. **Past 100, `&PARAM@` and `&PARAM!` do nothing** (`:2965-2968`, `:3009-3012`).
+ * 4. **Past 100, `&PARAM@` and `&PARAM!` do nothing** (`:2966-2969`, `:3010-3013`).
  * 5. **A short `&PARAM@` reads each missing parameter's number** (`Var(j)`,
- *    `doc/CSBwin-src-20230608/DSA.cpp:2978`): on a count of 3, `&PARAM@ 5` reads variables
+ *    `doc/CSBwin-src/DSA.cpp:2978`): on a count of 3, `&PARAM@ 5` reads variables
  *    3 and 4, and `NoValue` names them; variable 0 is not read.
  *
  * Run: `npx tsx tools/dump-dsa-parameters.ts`
@@ -31,7 +31,7 @@ import { AdjustSkillsWhy, adjustSkills } from '../src/engine/skills';
 import { globalStore, int, op, report, run, varFetch, varStore } from './lib/dsa';
 import { check, finish } from './lib/check';
 
-/** `(EDT_SpecialLocations << 24) | ESL_ADJUSTSKILLSFILTER` (`doc/CSBwin-src/Magic.cpp:259`). */
+/** `(EDT_SpecialLocations << 24) | ESL_ADJUSTSKILLSFILTER` (`doc/CSBwin-src/Magic.cpp:262`). */
 const ADJUST_SKILLS_FILTER_KEY = (3 << 24) | 6;
 
 /* ------------------------------- 1. a filter's own parameter array ------------- */

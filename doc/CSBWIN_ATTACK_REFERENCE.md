@@ -1,7 +1,7 @@
 # The champion's attack
 
 Source: `doc/CSBwin-src/Attack.cpp` (the engine) and `doc/CSBwin-src/Character.cpp` plus
-`doc/CSBwin-src/CSBCode.cpp:8718-8862` (the menu). Ported to
+`doc/CSBwin-src/CSBCode.cpp:8823-8967` (the menu). Ported to
 `src/engine/AttackSystem.ts` and `src/renderer/ui/Attack.ts`.
 
 Monsters hitting the party is the other half and lives in `doc/CSBWIN_MONSTERS_REFERENCE.md`.
@@ -81,7 +81,7 @@ preserved.
 | CONFUSE | spends a charge, then *falls through* to the shouts |
 | WARCRY / CALM / BRANDISH / BLOWHORN | `WarCryEtc` |
 | SHOOT | fires the shield hand's contents, if it is the matching ammunition class |
-| FLIP | `STRandomBool()`, which the attack filter may change, → "IT COMES UP HEADS" / "TAILS" through `PrintWithSubstitution(…, 4, true)`: one print-queue entry, its linefeed first (`Attack.cpp:1914-1924`; `tools/dump-flip.ts`) |
+| FLIP | `STRandomBool()`, which the attack filter may change, → "IT COMES UP HEADS" / "TAILS" through `PrintWithSubstitution(…, 4, true)`: one print-queue entry, its linefeed first (`Attack.cpp:1915-1925`; `tools/dump-flip.ts`) |
 | SPELLSHIELD / FIRESHIELD | `MagicShield` at strength 0x118. A return of 0 — the champion had under four mana and got half a shield — quarters the experience and halves the busy time instead of spending a charge |
 | FLUXCAGE | `FluxCage` |
 | FUSE | Lord Chaos's endgame. **Not ported** |
@@ -95,7 +95,7 @@ preserved.
 
 The tail, in order and after the `msg` 2 filter call: busy timer, stamina, experience, and
 **last of all** the monster wake-up. The wake-up is deliberately deferred to the very end
-(`:2172-2185`) because activating a group re-enters the Monster Move Filter, and CSBWin
+(`:2174-2187`) because activating a group re-enters the Monster Move Filter, and CSBWin
 would rather not have two DSA filters nested.
 
 ### `WarCryEtc`
@@ -110,12 +110,12 @@ skill reward is halved. Either way skill 14 is credited.
 ### `_Fusion`
 
 `atk_FUSE` aims at the square in front of the party, runs the `msg` 1 filter, then
-`_Fusion` (`:1963-1972`). A dispell cloud lands on the square, and if Lord Chaos stands
+`_Fusion` (`:1965-1974`). A dispell cloud lands on the square, and if Lord Chaos stands
 there he tries to escape, in shuffled directions: a square next to him first, then one two
 away, which lets him jump over the party or a monster but never through a Fluxcage or a
 wall. Boxed in, `_FusionSequence` starts. The rules are in `doc/PROVEN_FACTS.md` → "The
 fusion: a dispell cloud, then Lord Chaos's escape"; the port is `AttackSystem.fusion`, the
-evidence `tools/dump-fusion.ts`. `_FusionSequence` (`:2220`), the ending itself, holds the
+evidence `tools/dump-fusion.ts`. `_FusionSequence` (`:2222`), the ending itself, holds the
 main loop to the credits: `doc/PROVEN_FACTS.md` → "`_FusionSequence`: the end of the
 game", ported as `AttackSystem.fusionSequence`.
 
@@ -131,17 +131,17 @@ The strip under the viewport is a two-state panel, and `d.Word20252` is the stat
   backdrop rectangle is chosen by how many options there are —
   `wRectPos20202` / `20210` / `20218` for three / two / one.
 
-`d.Word20250` means "the panel owes a redraw" and `TAG01b29a` (`CSBCode.cpp:8799`), called
+`d.Word20250` means "the panel owes a redraw" and `TAG01b29a` (`CSBCode.cpp:8904`), called
 once per game tick, is what services it: it flashes `d.attackDamageToDisplay` if there is
 one, and otherwise puts the buttons back. It is also where each champion turns to face
 whatever hit them hardest since the last tick — the flinch you see in play.
 
-Clicks arrive as button 111 and are routed by `TAG019fac` (`Character.cpp:4661`) to
+Clicks arrive as button 111 and are routed by `TAG019fac` (`Character.cpp:4678`) to
 whichever button list matches the state: `Buttons17952` (ids 116-119, pick a champion) or
 `Buttons17892` (id 112 PASS, 113-115 the options). Only the options below `d.Word20248` are
 live.
 
-Each option offered goes through `ActionNameFilter` (`CSBCode.cpp:8634-8713`) as its row is
+Each option offered goes through `ActionNameFilter` (`CSBCode.cpp:8739-8818`) as its row is
 drawn: a DSA at `ESL_ACTIONNAMEFILTER`'s location may name it with a global text, and may
 change the attack it is (`doc/PROVEN_FACTS.md` → "The action name filter runs its
 location's first DSA, found once, for each option offered"). The port decides the names in

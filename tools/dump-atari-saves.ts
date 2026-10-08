@@ -1,11 +1,11 @@
 /**
  * The Atari-era saves: files with no Extended Features block, as Chaos Strikes Back ships
- * them. `mini.dat` is the eleven-level dungeon a CSB game is made from (`Chaos.cpp:2246`),
+ * them. `mini.dat` is the eleven-level dungeon a CSB game is made from (`Chaos.cpp:2837`),
  * `csbgame2.dat` a party in it.
  *
  * Such a file declares no cell flag array size, and `ReadDatabases` then takes the image
- * header's `LegacyCellFlagArraySize`, its word 2 (`doc/CSBwin-src/SaveGame.cpp:2412-2415`,
- * `CSB.h:2072`). The image's last section is the cell flags, so a wrong size either fails
+ * header's `LegacyCellFlagArraySize`, its word 2 (`doc/CSBwin-src/SaveGame.cpp:2624-2627`,
+ * `CSB.h:2135`). The image's last section is the cell flags, so a wrong size either fails
  * `loadCsbwinWorld`'s closure check or parses on into the wrong bytes.
  *
  * For each file, asked of the loader and then of a running `Game`:
@@ -147,7 +147,7 @@ for (const name of ATARI_SAVES) {
     check(false, `${name}: the game should run — ${(error as Error).message}`);
     continue;
   }
-  // The tick that finds the game lost returns before `d.Time++` (`CSBCode.cpp:658`).
+  // The tick that finds the game lost returns before `d.Time++` (`CSBCode.cpp:668`).
   const completed = party.gameIsLost ? ran - 1 : ran;
   console.log(`  clock ${start} -> ${game.getTickCount()}, ${ran} ticks` +
     (party.gameIsLost ? ', the game lost' : ''));

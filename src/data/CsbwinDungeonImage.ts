@@ -3,9 +3,9 @@
  *
  * Blocks 7-14 of a save are the dungeon image: the same structure as `dungeon.dat`,
  * written plain and uncompressed after the timer queue. `LoadGame` reaches it by
- * calling `ReadDatabases()` there (`doc/CSBwin-src/SaveGame.cpp:1739`) with
+ * calling `ReadDatabases()` there (`doc/CSBwin-src/SaveGame.cpp:1909`) with
  * `d.gameState == GAMESTATE_ResumeSavedGame`, which makes that function skip its own
- * extended-features/compression preamble (`:2345-2374`) and stream straight on.
+ * extended-features/compression preamble (`:2557-2586`) and stream straight on.
  *
  * Because the structure is `dungeon.dat`'s, this does not reimplement fourteen record
  * parsers — it hands the byte range to `DungeonLoader` with the three differences the
@@ -42,7 +42,7 @@ export function loadCsbwinWorld(file: Uint8Array): CsbwinWorld {
 
     // The closure check, done here rather than left to a tool: the image's last section
     // is the cell flags, whose length the Extended Features block declares, and after it
-    // there is only `WriteAndChecksum`'s final word (`doc/CSBwin-src/SaveGame.cpp:1222`).
+    // there is only `WriteAndChecksum`'s final word (`doc/CSBwin-src/SaveGame.cpp:1320`).
     // If any section length is wrong the sum misses, and parsing on would read records
     // out of the middle of neighbouring sections rather than fail.
     const cellFlagArraySize = save.cellFlagArraySize ?? 0;

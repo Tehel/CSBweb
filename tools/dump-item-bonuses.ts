@@ -1,7 +1,7 @@
 /**
  * What carrying an object does to its bearer — `AdjustStatsForItemCarried`
- * (`doc/CSBwin-src/Character.cpp:1569-1780`) — and what else `AddCharacterPossession` /
- * `RemoveCharacterPossession` (`:1936-2037`, `:1822-1930`), the one pair every writer
+ * (`doc/CSBwin-src/Character.cpp:1574-1785`) — and what else `AddCharacterPossession` /
+ * `RemoveCharacterPossession` (`:1941-2042`, `:1827-1935`), the one pair every writer
  * goes through, do.
  *
  *   npx tsx tools/dump-item-bonuses.ts
@@ -154,7 +154,7 @@ type Stat = AttributeIndex | 'maxMana';
 /** `dm` is the name in the Atari DM data where it is not the CSBWin identifier's (CSB's). */
 interface Row { id: string; dm?: string; objNI: number; slot: number; stat: Stat; bonus: number }
 
-// `doc/CSBwin-src/Character.cpp:1616-1760`, top to bottom.
+// `doc/CSBwin-src/Character.cpp:1621-1765`, top to bottom.
 const table: Row[] = [
   { id: 'RabbitsFoot', objNI: NI.OBJNI_RABBITS_FOOT, slot: 29, stat: AttributeIndex.Luck, bonus: 10 },
   { id: 'MaceOfOrder', objNI: NI.OBJNI_MACE_OF_ORDER, slot: 1, stat: AttributeIndex.Strength, bonus: 5 },
@@ -307,7 +307,7 @@ async function main(): Promise<void> {
     check(worn === '36 53' && after === '20 43', 'a death takes each bonus off as the object drops');
 
     // The inventory click: champion 1's inventory is open, so a button of 8 and up is a
-    // slot of theirs (`slot = button - 8`, `doc/CSBwin-src/CSBCode.cpp:6944`).
+    // slot of theirs (`slot = button - 8`, `doc/CSBwin-src/CSBCode.cpp:7003`).
     const ui = uiOver(g);
     g.ctx.party.state.selectedCharacterIndex = 1;
     const b = g.ctx.party.state.champions[1]!;
@@ -333,7 +333,7 @@ async function main(): Promise<void> {
   }
   {
     // A Hall of Champions recruit carries what the mirror hands out, and CSBWin places
-    // each object with `AddCharacterPossession` (`Character.cpp:789`), so the recruit
+    // each object with `AddCharacterPossession` (`Character.cpp:790`), so the recruit
     // arrives with the bonuses. BORIS's mirror holds a Rabbit's Foot, +10 Luck anywhere.
     const g = makeGame();
     for (const hero of presetHeroesOfGame(g)) {
@@ -380,7 +380,7 @@ async function main(): Promise<void> {
     );
 
     // A torch refilled into an empty hand from the backpack (`TAG011594`,
-    // `CSBCode.cpp:6246-6247`) is lit: `NameIndex == Torch_a` (`Character.cpp:1988`).
+    // `CSBCode.cpp:6305-6306`) is lit: `NameIndex == Torch_a` (`Character.cpp:1993`).
     const torch = newObject(g, NI.OBJNI_TORCH_A, { charges: 15 });
     const torchIndex = g.ctx.dungeon.rnMaps.idx(torch);
     party.champions[1]!.possessions[7] = torch;
@@ -395,7 +395,7 @@ async function main(): Promise<void> {
     check(outByClick === false && party.objectInHand === torch, 'and taking it out of the hand puts it out');
     party.objectInHand = OBJECT_ID_NULL;
 
-    // A scroll opens in the weapon hand and closes out of it (`:1981-1986`, `:1892-1896`).
+    // A scroll opens in the weapon hand and closes out of it (`:1986-1991`, `:1897-1901`).
     const scroll = firstRecord(g, DBType.SCROLL);
     const scrolls = g.ctx.dungeon.getData().databases.scrolls.records;
     scrolls[0]!.open = false;
@@ -410,7 +410,7 @@ async function main(): Promise<void> {
     party.objectInHand = OBJECT_ID_NULL;
 
     // Round the neck an Illumulet gets `value(1)` and adds `d.Word1074[2]` to the party's
-    // light (`:2011-2019`); a Jewel Symal gets `value(1)` (`:2022-2028`).
+    // light (`:2016-2024`); a Jewel Symal gets `value(1)` (`:2027-2033`).
     const misc = g.ctx.dungeon.getData().databases.misc.records;
     const step = uiTables.graphic232.word1074[2]!;
     const brightness = party.brightness;
@@ -434,8 +434,8 @@ async function main(): Promise<void> {
       'a worn Jewel Symal reads as its _b, and as its _a again off');
 
     // The notices. Any change to a weapon hand asks the UI to close that champion's attack
-    // menu (`:1888-1891`, `:1977-1980`); a chest out of the weapon hand of the champion
-    // whose inventory is open asks it to repack the chest (`:1906-1914`).
+    // menu (`:1893-1896`, `:1982-1985`); a chest out of the weapon hand of the champion
+    // whose inventory is open asks it to repack the chest (`:1911-1919`).
     const chest = firstRecord(g, DBType.CHEST);
     notices.length = 0;
     party.objectInHand = chest;
@@ -462,7 +462,7 @@ async function main(): Promise<void> {
   }
   {
     // ZED's mirror hands out a torch, and `AddCharacter` puts it in with
-    // `AddCharacterPossession` (`Character.cpp:789`), so if it lands in a hand it is lit.
+    // `AddCharacterPossession` (`Character.cpp:790`), so if it lands in a hand it is lit.
     const g = makeGame();
     const data = g.ctx.dungeon.getData();
     const zed = presetHeroesOfGame(g).find((h) => h.name === 'ZED');

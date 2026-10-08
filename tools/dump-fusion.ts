@@ -1,5 +1,5 @@
 /**
- * `atk_FUSE` and `_Fusion` (doc/CSBwin-src/Attack.cpp:1963-1972, `:133-213`): the dispell
+ * `atk_FUSE` and `_Fusion` (doc/CSBwin-src/Attack.cpp:1965-1974, `:133-213`): the dispell
  * cloud on the square in front of the party, and Lord Chaos's escape from it.
  *
  * An arena on Lord Chaos's own level (12, where `monsterAllowedOnLevel` lets him stand):
@@ -17,7 +17,7 @@
  * 5. **Caged on two sides, a monster on the third.** He jumps over the monster: the
  *    near square may be occupied, only not a Fluxcage or a wall.
  * 6. **Boxed in.** The square behind the party is stone: he stays, "toast" (`:213`),
- *    and `_FusionSequence` (`:2220`) holds the loop to the credits, `executeAttack`'s
+ *    and `_FusionSequence` (`:2222`) holds the loop to the credits, `executeAttack`'s
  *    tail left undone: the game won, an open inventory hidden before the first view
  *    (run with one open and with none), the light and shields up, the cages on his square
  *    and the party's gone, the type at each of its 33 views, sound 17 thirteen times,
@@ -312,7 +312,7 @@ function checkOverAMonster(): void {
 
 /**
  * The creature type at each `_ProcessTimersViewportAndSound` of `_FusionSequence`
- * (`Attack.cpp:2280-2388`): Lord Chaos through the six fireballs, `mon_25` through the six
+ * (`Attack.cpp:2282-2390`): Lord Chaos through the six fireballs, `mon_25` through the six
  * dispells, the flicker (for `D6W` 3, 2 and 1, four types each shown `D6W - 1` times,
  * `mon_25` on odd `D7w`), `mon_25` for the last fireball and dispell, then the Grey Lord,
  * through the deletions and one view for each text of cell (0, 0) printed.
@@ -333,9 +333,9 @@ function expectedTypes(texts: number): number[] {
   return types;
 }
 
-/** The VBLs of `_FusionSequence`'s `VBLDelay`s, but the texts' (`Attack.cpp:2305-2389`, `:2427`). */
+/** The VBLs of `_FusionSequence`'s `VBLDelay`s, but the texts' (`Attack.cpp:2307-2391`, `:2429`). */
 const SEQUENCE_VBLS = 6 * 31 + 31 + 6 * 31 + (4 * 2 + 4 * 1) * 31 + 25 + 50 + 50 + 31 + 31 + 31 + 600;
-/** Each text's `VBLDelay(780)` (`Attack.cpp:2415`). */
+/** Each text's `VBLDelay(780)` (`Attack.cpp:2417`). */
 const TEXT_VBLS = 780;
 /**
  * The texts on cell (0, 0) of level 12, chained D, C, B, A, as `DecodeText(…, 0x8001)` gives
@@ -350,7 +350,7 @@ const ENDING_TEXTS: Record<string, { idx: number; text: string }> = {
 
 function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fresh' | 'scrolled' | null = null): void {
   console.log('');
-  console.log('=== 6. boxed in: toast (Attack.cpp:213), and _FusionSequence (:2220) to the credits,'
+  console.log('=== 6. boxed in: toast (Attack.cpp:213), and _FusionSequence (:2222) to the credits,'
     + ` ${inventoryOpen ? 'the inventory open' : 'no inventory open'}${withoutB ? ', the "B" text taken off cell (0, 0)' : ''}`
     + `${stripState === null ? '' : `, onto a strip that has ${stripState === 'fresh' ? 'printed nothing' : 'scrolled, its rows timed out'}`} ===`);
   const strip = stripState === null ? null : stripState === 'fresh' ? new ScrollingText() : scrolledStrip();
@@ -396,7 +396,7 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fre
   check(party.brightness === 200 && party.partyShield === 100 && party.spellShield === 100 && party.fireShield === 100,
     'd.Brightness is 200, and the three shields 100');
   check(a.portraits.length === 1 && a.portraits[0]!.chIdx === 0 && a.portraits[0]!.views === 0,
-    'MarkAllPortraitsChanged draws the box afresh before the first view (Attack.cpp:2279)');
+    'MarkAllPortraitsChanged draws the box afresh before the first view (Attack.cpp:2281)');
   check(lordChaos.hp[0]! > 9000 && lordChaos.hp[0]! <= 10000, 'his hit points are 10000, less the first fireball');
   check(!game.systems.attack.isCellFluxcage(CX, CY) && !game.systems.attack.isCellFluxcage(CX, CY + 1),
     'the Fluxcages on his square and the party\'s are gone');
@@ -409,7 +409,7 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fre
     ? a.inventory.length === 1 && a.inventory[0]!.chIdx === 4 && a.inventory[0]!.views === 0
     : a.inventory.length === 0,
   inventoryOpen
-    ? 'ShowHideInventory(4) hides the open inventory, before the first view (Attack.cpp:2269-2272)'
+    ? 'ShowHideInventory(4) hides the open inventory, before the first view (Attack.cpp:2271-2274)'
     : 'with no inventory open, ShowHideInventory is not called');
 
   let creditsAt = 0;
@@ -430,7 +430,7 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fre
   console.log(`  d.Word1868 ${word1868.map((w) => (w ? 1 : 0)).join('')}`);
   const unset = want.length - 2 - letters.length;
   check(word1868.length === want.length && word1868.every((w, i) => w === (i >= unset)),
-    'd.Word1868 is set for the views after the Grey Lord\'s first, and the texts\' (Attack.cpp:2364-2369)');
+    'd.Word1868 is set for the views after the Grey Lord\'s first, and the texts\' (Attack.cpp:2366-2371)');
   check(game.ctx.state.tickCount - tick === want.length, 'each view is a turn of the clock');
   check(sounds.filter((n) => n === 17).length === 13, 'sound 17 once before the dispells and once for each of the twelve flickers');
   check(others > 0 && monstersOnLevel(game) === 1 && greyLordAt(game, CX, CY), 'every other monster on the level is deleted');
@@ -442,8 +442,8 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fre
   ];
   check(JSON.stringify(a.printed.map(({ color, text }) => ({ color, text }))) === JSON.stringify(wantPrinted),
     withoutB
-      ? 'with no "B", only the "A" text is printed: the letters stop at the gap (Attack.cpp:2398-2422)'
-      : 'the four texts in the order of their letters, each letter a linefeed, then "THE END." between linefeeds (Attack.cpp:2398-2426)');
+      ? 'with no "B", only the "A" text is printed: the letters stop at the gap (Attack.cpp:2400-2424)'
+      : 'the four texts in the order of their letters, each letter a linefeed, then "THE END." between linefeeds (Attack.cpp:2400-2428)');
   const frames = a.printed.map((p) => p.frame);
   const endAt = frames[letters.length]!;
   check(frames.slice(0, letters.length).every((f, i) => frames[i + 1]! - f === TEXT_VBLS)

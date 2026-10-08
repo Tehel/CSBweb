@@ -13,7 +13,7 @@ than guessed.
 ### `MONSTERDESC` — the per-type descriptor
 
 27 records of 26 bytes each, in `graphics.dat` item `0x22f`, at `d.MonsterDescriptor`
-(`doc/CSBwin-src/Data.h:1076`, struct at `doc/CSBwin-src/CSB.h:2256`).
+(`doc/CSBwin-src/Data.h:1091`, struct at `doc/CSBwin-src/CSB.h:2319`).
 
 | Offset | Field | Notes |
 | --- | --- | --- |
@@ -36,14 +36,14 @@ than guessed.
 | 22 | `uByte22[4]` | |
 
 Six fields are byte-swapped on load — `word2`, `word4`, `word14`, `word16`, `word18`,
-`word20` (`fixItem26`, `doc/CSBwin-src/CSBCode.cpp:10042`). Everything else is a
+`word20` (`fixItem26`, `doc/CSBwin-src/CSBCode.cpp:10166`). Everything else is a
 plain byte. `LE16` on a little-endian host is a byte swap, so these are big-endian in
 the file like the rest of the Atari-derived data.
 
 **One fixup precedes the swap:** a `movementTicks06` of zero is forced to 1, with a
-message box (`doc/CSBwin-src/CSBCode.cpp:10163-10173`).
+message box (`doc/CSBwin-src/CSBCode.cpp:10287-10297`).
 
-`word2` bits (`doc/CSBwin-src/CSB.h:2268-2296`):
+`word2` bits (`doc/CSBwin-src/CSB.h:2331-2359`):
 
 | Bits | Accessor | Meaning |
 | --- | --- | --- |
@@ -60,11 +60,11 @@ message box (`doc/CSBwin-src/CSBCode.cpp:10163-10173`).
 | 12 | `canSeeInDark()` | |
 | 13 | `invincible()` | Impervious to damage |
 
-`word4` (`MONSTERDESC_WORD4`, `doc/CSBwin-src/CSB.h:2232-2253`) says which sprites
+`word4` (`MONSTERDESC_WORD4`, `doc/CSBwin-src/CSB.h:2295-2316`) says which sprites
 exist — `HasSideGraphic` 0x0008, `HasBackGraphic` 0x0010, `HasAttackGraphic` 0x0020 —
 plus `NonAttackingMirrorOK` 0x0004 and `AttackingMirrorOK` 0x0200.
 
-`word14`/`word16`/`word18`/`word20` bitfields (`doc/CSBwin-src/CSB.h:2348-2362`):
+`word14`/`word16`/`word18`/`word20` bitfields (`doc/CSBwin-src/CSB.h:2410-2421`):
 
 - `sightDistance()` = `word14` bits 0-3, **halved for each level of darkness**.
 - `smellingDistance()` = `word14` bits 8-11, compared against distance to prey.
@@ -76,11 +76,11 @@ plus `NonAttackingMirrorOK` 0x0004 and `AttackingMirrorOK` 0x0200.
 
 ### `DB4` — the per-group record in `dungeon.dat`
 
-16 bytes (`doc/CSBwin-src/CSB.h:1075-1139`). Two fields are dual-purpose, and both
+16 bytes (`doc/CSBwin-src/CSB.h:1078-1142`). Two fields are dual-purpose, and both
 were being misread by this port before Phase 12:
 
 - **`uByte4`** packs `monsterType()` in bits 0-4 and `alternateGraphics()` in bits
-  5-7 (`doc/CSBwin-src/CSB.h:1113-1116`). The type *must* be masked to 5 bits before
+  5-7 (`doc/CSBwin-src/CSB.h:1116-1119`). The type *must* be masked to 5 bits before
   it indexes `MonsterDescriptor[27]`.
 - **`uByte5` / `groupIndex()`** is the `ITEM16` slot index while the group is on the
   party's level, and *is* the four packed 2-bit member positions otherwise. The two
@@ -93,8 +93,8 @@ size **minus one**), `facing()` in bits 8-9, `important()` bit 10, `invisible()`
 `invisible()`, `drawAsSize4()`, `Unique()` and `Poisoned()` are each gated on a
 global design option read from the save game's extended-features block —
 `InvisibleMonsters` = 0x02 and `DrawAsSize4Monsters` = 0x04 in `extendedFlags`
-(`doc/CSBwin-src/CSB.h:494-496`, set at `doc/CSBwin-src/SaveGame.cpp:394-400`, written
-back at `:947-948` and `:958-959`). Both default to false (`data.cpp:77-78`), so plain
+(`doc/CSBwin-src/CSB.h:494-496`, set at `doc/CSBwin-src/SaveGame.cpp:396-402`, written
+back at `:972-973` and `:983-984`). Both default to false (`data.cpp:78-79`), so plain
 Dungeon Master never sees them; Conflux 3.5 sets both. With them on:
 
 - an `invisible()` creature is passed over by `DrawRoomObjects`' walk of the cell, which
@@ -106,22 +106,22 @@ Dungeon Master never sees them; Conflux 3.5 sets both. With them on:
   `facing()` bits, `monsterFacing` the party's facing plus 2, and both `mask` and
   `monsterFacing` shifted two bits a member, else 1;
 - a missile reaching a `drawAsSize4()` group's empty corner hits member 1
-  (`Code11f52.cpp:1965-1966`);
+  (`Code11f52.cpp:2000-2001`);
 - a member of a `drawAsSize4()` group dying while another lives drops nothing
-  (`:1126-1127`), and the group shows its death cloud only for its last member, size 255
-  at position 255 (`:1258-1264`);
+  (`:1161-1162`), and the group shows its death cloud only for its last member, size 255
+  at position 255 (`:1293-1299`);
 - a `Unique()` group is not deleted when a square's 31 movement timers overflow
-  (`:2496`);
-- `&MONSTER@` reads all four (`DSA.cpp:4021-4024`).
+  (`:2531`);
+- `&MONSTER@` reads all four (`DSA.cpp:4022-4025`).
 
-`STATE_OF_FEAR` (`doc/CSBwin-src/CSBTypes.h:164`) has no state 1. A giggler's steal puts
+`STATE_OF_FEAR` (`doc/CSBwin-src/CSBTypes.h:169`) has no state 1. A giggler's steal puts
 its group into state 5 one time in eight, or on a coin toss when it took something
 (`doc/CSBwin-src/Monster.cpp:279-285`), and `DetachItem16` resets any state ≥ 4 back to 0
-(`doc/CSBwin-src/CSBCode.cpp:6129`).
+(`doc/CSBwin-src/CSBCode.cpp:6188`).
 
 ### `ITEM16` — the per-group runtime slot
 
-16 bytes (`doc/CSBwin-src/CSB.h:2190-2227`), one per monster group **on the loaded
+16 bytes (`doc/CSBwin-src/CSB.h:2253-2290`), one per monster group **on the loaded
 level only**. This is where all the live movement state lives:
 
 | Offset | Field | Meaning |
@@ -133,20 +133,20 @@ level only**. This is where all the live movement state lives:
 | 5 | `uByte5` | Pause countdown (a giggler gets `Random(64) + 20`) |
 | 6-7 | `uByte6`, `uByte7` | mapX / mapY of the square being approached |
 | 8-9 | `ubPrevX`, `ubPrevY` | Previous mapX / mapY |
-| 10-11 | `uByte10`, `uByte11` | mapX / mapY where the slot was attached — set only by `AttachItem16ToMonster` (`CSBCode.cpp:6088-6091`); a frightened group heads back there (`Monster.cpp:2273-2277`) |
+| 10-11 | `uByte10`, `uByte11` | mapX / mapY where the slot was attached — set only by `AttachItem16ToMonster` (`CSBCode.cpp:6147-6150`); a frightened group heads back there (`Monster.cpp:2277-2281`) |
 | 12-15 | `singleMonsterStatus[4]` | Per-member status byte |
 
 `word0` is the one swapped field, byte-swapped on load from a save game
-(`doc/CSBwin-src/SaveGame.cpp:486`).
+(`doc/CSBwin-src/SaveGame.cpp:494`).
 
-`SINGLE_MONSTER_STATUS` (`doc/CSBwin-src/CSB.h:2171-2188`): bit 7 = attacking, bit 6
+`SINGLE_MONSTER_STATUS` (`doc/CSBwin-src/CSB.h:2234-2251`): bit 7 = attacking, bit 6
 = mirror the sprite, bits 0-2 and 3-5 are two signed 2-bit screen offsets applied
 while the monster walks. Bit 6 is set or cleared on a coin flip in
 `MonsterUpdateTime`; bit 7 is cleared when the movement timers are removed.
 
 ## Group lifecycle
 
-`ProcessMonstersOnLevel` (`doc/CSBwin-src/CSBCode.cpp:6169`) is the bootstrap. It
+`ProcessMonstersOnLevel` (`doc/CSBwin-src/CSBCode.cpp:6228`) is the bootstrap. It
 walks every cell of the loaded level, and for each cell whose flags have bit 16 set
 (has objects) it finds the **first** monster in the chain and does three things in
 order:
@@ -157,7 +157,7 @@ order:
 
 It then `break`s out of the chain: **one monster group per cell.**
 
-`AttachItem16ToMonster` (`doc/CSBwin-src/CSBCode.cpp:6024`) linear-scans for the
+`AttachItem16ToMonster` (`doc/CSBwin-src/CSBCode.cpp:6083`) linear-scans for the
 first slot with `word0 < 0`, growing the array by 50 (capped at 1050) if it runs out.
 Then, in order: `word0 = monster index`; `positions() = pDB4->groupIndex()` (saving
 the packed positions the DB4 was carrying); `groupIndex(item16Index)` (the DB4 now
@@ -166,7 +166,7 @@ holds the slot number); `uByte10`/`ubPrevX` = mapX and `uByte11`/`ubPrevY` = map
 `pDB4->facing()`; every `singleMonsterStatus` cleared; and finally
 `NextMonsterUpdateTime(pi16A2, -1, false)`.
 
-`DetachItem16` (`doc/CSBwin-src/CSBCode.cpp:6117`) reverses it: `groupIndex()` gets
+`DetachItem16` (`doc/CSBwin-src/CSBCode.cpp:6176`) reverses it: `groupIndex()` gets
 the packed positions back, `facing()` gets the packed facings, any fear state ≥ 4 is
 reset to 0, and `word0` goes back to `-1`.
 
@@ -185,13 +185,13 @@ size-1 monster. It finishes with `MoveObject`, which is what actually attaches t
 
 A monster **not** on the party's level has its `groupIndex` parked at `0xd8`, or
 `0xff` if it fills the whole cell (`doc/CSBwin-src/MoveObject.cpp:517-518`, and the
-same for a DSA-copied monster at `doc/CSBwin-src/DSA.cpp:1884-1887`). This is what
+same for a DSA-copied monster at `doc/CSBwin-src/DSA.cpp:1885-1888`). This is what
 makes CSBWin's bare `groupIndex() < d.MaxITEM16` test
 (`doc/CSBwin-src/Monster.cpp:531`) a valid "is an `ITEM16` attached?" check.
 
 ## AI timers
 
-`TIMERTYPE` 29-41 are the monster AI (`doc/CSBwin-src/CSB.h:1765-1779`):
+`TIMERTYPE` 29-41 are the monster AI (`doc/CSBwin-src/CSB.h:1828-1842`):
 
 | Value | Name | Meaning |
 | --- | --- | --- |
@@ -203,15 +203,15 @@ makes CSBWin's bare `groupIndex() < d.MaxITEM16` test
 
 `ProcessTimers` routes the whole span to `ProcessTimers29to41(uByte6, uByte7,
 Function(), uByte8)` before its own switch statement
-(`doc/CSBwin-src/CSBCode.cpp:6422-6429`) — so the monster AI never reaches the
+(`doc/CSBwin-src/CSBCode.cpp:6481-6488`) — so the monster AI never reaches the
 ordinary timer dispatch.
 
 Three negative pseudo-types exist that never sit on the queue
-(`doc/CSBwin-src/CSB.h:1743-1745`). `ProcessTimers29to41` rewrites its incoming
+(`doc/CSBwin-src/CSB.h:1806-1808`). `ProcessTimers29to41` rewrites its incoming
 function code into one of them to record *why* it woke: `TT_M1` = monster attacked or
 bumped into, `TT_M2` = monster damaged, `TT_M3` = monster damaged by a cloud or a
 door. `InitialChecks` maps `TT_M3` back to `TT_29`
-(`doc/CSBwin-src/Monster.cpp:3022`).
+(`doc/CSBwin-src/Monster.cpp:3026`).
 
 ## Perception and movement
 
@@ -246,7 +246,7 @@ describes as broken but which is the only writer of the age bytes smelling reads
 
 ## Moving a group
 
-`MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:2796-3424`), ported as
+`MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:2831-3459`), ported as
 `MonsterSystem.moveMonster`. In order:
 
 1. If the group is leaving a real square on the party's level, `CheckMoveFromMissile`
@@ -254,11 +254,11 @@ describes as broken but which is the only writer of the age bytes smelling reads
    walks out of it. If that removed the group, the move returns 1.
 2. The destination goes through the same cell-effect resolution the party uses, so
    teleporter chains and pit falls apply identically. A monster teleport also rotates
-   the group's facings and positions (`TeleportMonster`, `:2308`), through the `ITEM16`
+   the group's facings and positions (`TeleportMonster`, `:2343`), through the `ITEM16`
    of the level the group is attached to. A fall hurts the group at its old square
    with the death deferred; if all of it died, the loop stops.
 3. A group the fall killed, or one on a level its type may not live on, is deleted:
-   remains at the new square, `DeleteMonster` at the old (`:3147-3176`).
+   remains at the new square, `DeleteMonster` at the old (`:3182-3211`).
 4. The group is lifted off its old square (pads released). If the resolved destination
    holds the party or another monster, it is parked in abeyance rather than placed.
 5. Otherwise, crossing on or off the party's level attaches or detaches the `ITEM16`,
@@ -275,9 +275,9 @@ escape from a walled-in corner, on which AI timers are re-aimed, and on what
 ## Damage and death
 
 Ported in `src/engine/MonsterDamage.ts`. `DamageMonster`
-(`doc/CSBwin-src/Code11f52.cpp:1054`) returns one of three results —
+(`doc/CSBwin-src/Code11f52.cpp:1089`) returns one of three results —
 `NO_MONSTER_DIED`, `SOME_NOT_ALL_MONSTERS_DIED`, `ALL_MONSTERS_DIED`
-(`doc/CSBwin-src/CSB.h:2928`) — and has four callers: the missile system, the AI gate
+(`doc/CSBwin-src/CSB.h:2987`) — and has four callers: the missile system, the AI gate
 `InitialChecks`, champion melee (`Attack.cpp:503`) and cloud damage
 (`Timer.cpp:524`).
 
@@ -293,7 +293,7 @@ for the fear-state-6 gate on timer renumbering, for how the group timer survives
 renumbering by arithmetic rather than by an explicit test, and for the range-split
 encoding of `MonsterDroppings`.
 
-`DropMonsterRemains` (`:830`) takes an explicit `monsterAttachedToLevel` because of a
+`DropMonsterRemains` (`:865`) takes an explicit `monsterAttachedToLevel` because of a
 bug CSBWin fixed: a monster teleported onto a level its type is not allowed on dies
 *there*, so `d.LoadedLevel` is the destination and reading the position byte with it
 would consult an `ITEM16` belonging to a different level.
@@ -301,29 +301,29 @@ would consult an `ITEM16` belonging to a different level.
 ## Attacking the party
 
 Ported in `src/engine/MonsterAttack.ts`. `MonsterAttacks`
-(`doc/CSBwin-src/Monster.cpp:944`) is a *decision* about how to attack, expressed as
+(`doc/CSBwin-src/Monster.cpp:948`) is a *decision* about how to attack, expressed as
 a parameter block the Monster Attack Filter DSA may rewrite before anything happens —
 see `doc/PROVEN_FACTS.md` for that, for which monsters throw what, for the two
 independent chances to avoid a blow, for the many-stage damage formula, and for how
 wounds accumulate.
 
-The champion side is `MonsterDamagesCharacter` (`:4518`) → `DamageCharacter`
-(`doc/CSBwin-src/Character.cpp:2703`), which only adds to `d.PendingDamage`; the tick's
-`DisplayCharacterDamage` (`doc/CSBwin-src/CSBCode.cpp:7084`) takes it off the HP and calls
-`KillCharacter` (`Character.cpp:2526`) (`doc/PROVEN_FACTS.md` → "`DamageCharacter` only
+The champion side is `MonsterDamagesCharacter` (`:4531`) → `DamageCharacter`
+(`doc/CSBwin-src/Character.cpp:2708`), which only adds to `d.PendingDamage`; the tick's
+`DisplayCharacterDamage` (`doc/CSBwin-src/CSBCode.cpp:7143`) takes it off the HP and calls
+`KillCharacter` (`Character.cpp:2531`) (`doc/PROVEN_FACTS.md` → "`DamageCharacter` only
 adds to `d.PendingDamage`"). `DamageCharacter`'s
 `P4` selects the mitigation: 1 fire, 5 spell, 6 wisdom-scaled, 2 half armour, anything
 else full armour, 0 no mitigation and no wounds at all. Its value comes from
 `MONSTERDESC.uByte22[2]`, which is non-zero for every shipped monster except the
 Giggler.
 
-Armour is `TAG01680a` (`doc/CSBwin-src/Character.cpp:2391`) averaged over every body
+Armour is `TAG01680a` (`doc/CSBwin-src/Character.cpp:2396`) averaged over every body
 part the blow could land on. It combines shields held in either hand — weighted per
 body part by `Byte1412`, so a shield covers some parts far better than others — a
 vitality-scaled random term, the champion's shield spell, the party shield, the
 temporary modifier the champion's *own* attack type imposes, and the garment worn on
 the struck part. A wounded part then loses `STRandom0_3() + 8`, a sleeping party's
-total is halved, and the result is halved again and held to 0-100 (`:2478-2486`;
+total is halved, and the result is halved again and held to 0-100 (`:2483-2491`;
 `doc/PROVEN_FACTS.md` → "`TAG01680a`: a wounded part and a sleeping party are less
 protected").
 
@@ -331,14 +331,14 @@ protected").
 
 Everything the champion attack pipeline needs is in `graphics.dat` item `0x230`,
 immediately after `Byte20194[16]` (the ShrinkBLT colour map) and immediately before
-`Spells[25]` (`doc/CSBwin-src/Data.h:638-651`). Seven parallel 44-entry signed-byte
+`Spells[25]` (`doc/CSBwin-src/Data.h:647-660`). Seven parallel 44-entry signed-byte
 tables indexed by `ATTACKTYPE`, then `AttackNames[300]`, then `legalAttacks[44]`:
 
 | Table | Use |
 | --- | --- |
 | `experienceForAttacking[44]` | `ATTACKPARAMETERS.experienceGained` (`Attack.cpp:1730`) |
 | `SkillNumber[44]` | Which skill the attack requires and trains |
-| `Byte20090[44]` | Assigned to `CHARDESC.word64` for the attack (`Character.cpp:4970`) |
+| `Byte20090[44]` | Assigned to `CHARDESC.word64` for the attack (`Character.cpp:4995`) |
 | `Byte20046[44]` | Base stamina cost, `+ STRandomBool()` (`Attack.cpp:1721`) |
 | `Byte20002[44]` | The "D6W" factor into `DeterminePhysicalAttackDamage` (`Attack.cpp:1131`) |
 | `Byte19958[44]` | The "D7W" factor, likewise (`Attack.cpp:1137`) |
@@ -346,27 +346,27 @@ tables indexed by `ATTACKTYPE`, then `AttackNames[300]`, then `legalAttacks[44]`
 
 `AttackNames[300]` is a **NUL-separated** list indexed by attack type;
 `GetAttackTypeName` walks forward over `n` terminators rather than indexing
-(`doc/CSBwin-src/CSBCode.cpp:8609`). Note this differs from `ObjectNames`, which
+(`doc/CSBwin-src/CSBCode.cpp:8714`). Note this differs from `ObjectNames`, which
 terminates each entry with a high bit instead.
 
-`ATTACKTYPE` (`doc/CSBwin-src/CSB.h:574`) has 44 entries. Three are marked "Not in
+`ATTACKTYPE` (`doc/CSBwin-src/CSB.h:577`) has 44 entries. Three are marked "Not in
 CSB" — `atk_JUGGLE` (0), `atk_SPEED` (3) and `atk_PRAY` (26) — and the names really
 are stored as `"N"` and `"X"` in the graphics file, which is a useful confirmation
 that the offsets above are right.
 
 `LEGALATTACKS` is 8 bytes (`doc/CSBwin-src/Data.h:225`), one per attack class, read
-by `GetLegalAttackTypes` (`doc/CSBwin-src/Character.cpp:4769-4808`):
+by `GetLegalAttackTypes` (`doc/CSBwin-src/Character.cpp:4786-4825`):
 
 - byte 0 — the always-legal attack, copied to `PossibleAttackTypes[0]` unconditionally.
 - bytes 1-2 — two optional attacks, 255 meaning absent.
 - bytes 4-5 — the mastery each of those needs. **Bit 7 means the wielded item must
-  have charges left** (`ItemHasChargesLeft`, `doc/CSBwin-src/Character.cpp:4744`);
+  have charges left** (`ItemHasChargesLeft`, `doc/CSBwin-src/Character.cpp:4761`);
   the remaining bits are compared against `DetermineMastery`.
 - byte 6 — read into `d.Word20262` and, in CSBWin's own words, "Not used anywhere!!"
-  (`doc/CSBwin-src/Character.cpp:4932`). It looks like a skill number.
+  (`doc/CSBwin-src/Character.cpp:4957`). It looks like a skill number.
 - bytes 3 and 7 — always zero in the shipped data.
 
-`PrepareAttack` (`doc/CSBwin-src/Character.cpp:4904`) picks the class from
+`PrepareAttack` (`doc/CSBwin-src/Character.cpp:4929`) picks the class from
 `ObjDesc[weapon.DescIndex()].AttackClass()`, and falls back to **class 2** for an
 empty weapon hand. A class of 0 means the item affords no attack at all and the
 click is ignored. It refuses outright if the champion has `CHARFLAG_attackDisable`

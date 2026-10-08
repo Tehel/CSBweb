@@ -1,22 +1,22 @@
 /**
- * `SwapCharacter` (`doc/CSBwin-src/Character.cpp:5472-5510`), a DSA's `&SWAPCHARACTER`
- * (`DSA.cpp:4413-4425`): a champion sent to the wings, brought back, or one for the other.
+ * `SwapCharacter` (`doc/CSBwin-src/Character.cpp:5497-5535`), a DSA's `&SWAPCHARACTER`
+ * (`DSA.cpp:4414-4426`): a champion sent to the wings, brought back, or one for the other.
  * The records themselves are `dump-wings.ts`'s.
  *
  * 1. **The refusals.** 3 to add to a full party, 4 for a fingerprint not in the wings, 2
  *    to delete the last champion; an index outside the party and no fingerprint is 0 and
  *    nothing. None changes the party.
- * 2. **`CharacterDelete`** (`:5351-5414`): the champion into the wings with the party's
+ * 2. **`CharacterDelete`** (`:5376-5439`): the champion into the wings with the party's
  *    facing, the ones after a slot down with the cursor's owner and the open inventory,
  *    the magic tab to the first living champion, and the slot past the party a copy of
  *    the last champion with HP 0. Their own inventory open, it closes.
- * 3. **`CharacterAdd`** (`:5417-5436`): back out of the wings into the slot after the
+ * 3. **`CharacterAdd`** (`:5442-5461`): back out of the wings into the slot after the
  *    last, facing 0, in the first corner nobody holds, the champion's own corner being
  *    passed over as if someone held it.
- * 4. **`CharacterSwap`** (`:5438-5469`): the champion out and the one from the wings into
+ * 4. **`CharacterSwap`** (`:5463-5494`): the champion out and the one from the wings into
  *    the same slot, with the facing of the one who left, in the free corner, or 5 when the
  *    high byte of `d.PartyFootprints[7]`, read as `d.CH16482[4].charPosition`, is it.
- * 5. **The damage shown** (`:5357-5362`): its `TT_12` deleted and `TAG011366` run; a
+ * 5. **The damage shown** (`:5382-5387`): its `TT_12` deleted and `TAG011366` run; a
  *    champion moved down a slot with one is CSBWin's `die(0x452a)`. The poison is cured.
  * 6. **The portrait** of a champion carrying only `portraitGraphic` is the host's pixels.
  * 7. **A save carries it**: the party of three, the slot past it and the wings.

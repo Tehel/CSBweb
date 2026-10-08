@@ -17,7 +17,7 @@
  *    whatever is standing in it on every one of those ticks.
  *  - A fireball bursts a door open (cell flag bottom bits 4 → 5) and does not linger at
  *    all — one tick and gone.
- *  - `CreateCloud`'s own sound (`doc/CSBwin-src/Code11f52.cpp:1432-1440`) is
+ *  - `CreateCloud`'s own sound (`doc/CSBwin-src/Code11f52.cpp:1467-1475`) is
  *    `QueueSound(size>80 ? 5 : 20, ...)` for a fireball — two *ordinals* into the sound
  *    table that both resolve to the same SND item, so a small blast is meant to be a
  *    quieter version of the same explosion, not a different sound. `playCloudSound`
@@ -284,8 +284,8 @@ async function main(): Promise<void> {
 
   /* ------------------------------------------- 6. a Fluxcage runs out ---------- */
 
-  // `CreateFluxcage` (`doc/CSBwin-src/Code11f52.cpp:1515-1539`) queues a `TT_24` at
-  // `d.Time + 100` whose `timerObj8()` is the cage; `TT_24` (`CSBCode.cpp:6494-6510`)
+  // `CreateFluxcage` (`doc/CSBwin-src/Code11f52.cpp:1550-1574`) queues a `TT_24` at
+  // `d.Time + 100` whose `timerObj8()` is the cage; `TT_24` (`CSBCode.cpp:6553-6569`)
   // takes that object out of its square and frees its record. The port used to read the
   // object off `timerWord8`, which a live cage's timer leaves at 0 — so the cage stayed,
   // and `DeleteDBEntry(0)` freed door record 0, cutting its cell's chain.

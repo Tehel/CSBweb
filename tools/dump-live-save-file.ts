@@ -44,7 +44,7 @@
  * `GAMEBLOCK1` travels too: `d.RandomGameID`, `totalMoveCount`, `d.Word22592`-`22598`
  * and `d.Byte22808` come back, `SaveOption` is SAVE AND PLAY's 1, and a third section
  * takes `LoadGame`'s branch for an Atari DM save, which no committed save does
- * (`doc/CSBwin-src/SaveGame.cpp:1861-1877`).
+ * (`doc/CSBwin-src/SaveGame.cpp:2065-2081`).
  *
  * Run: `npx tsx tools/dump-live-save-file.ts`
  */
@@ -80,7 +80,7 @@ const DATABASE_KEYS: Array<keyof Databases> = [
   'scrolls', 'potions', 'containers', 'misc', 'missiles', 'clouds',
 ];
 
-/** `_ResurrectReincarnateCancel`'s button ids (`doc/CSBwin-src/CSBCode.cpp:6615`). */
+/** `_ResurrectReincarnateCancel`'s button ids (`doc/CSBwin-src/CSBCode.cpp:6674`). */
 const RESURRECT = 160;
 
 /* ------------------------------------------------------------------------ fixture --- */
@@ -161,7 +161,7 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
     `${label}: the object on the cursor is the same record ` +
     `(${b.objectInHand} vs ${a.objectInHand})`);
   check(before.getTickCount() === after.getTickCount(), `${label}: the clock`);
-  // `GAMEBLOCK1` (SaveGame.cpp:1058-1072, :1603-1611, :1859-1881).
+  // `GAMEBLOCK1` (SaveGame.cpp:1083-1097, :1728-1735, :2063-2085).
   const g1 = before.ctx.state.block1;
   const g2 = after.ctx.state.block1;
   check(g1.randomGameID === g2.randomGameID && g1.totalMoveCount === g2.totalMoveCount,
@@ -170,7 +170,7 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
     g1.word22596 === g2.word22596 && g1.word22598 === g2.word22598 &&
     same(g1.byte22808, g2.byte22808),
     `${label}: d.Word22592-22598 and d.Byte22808`);
-  // `gb2.partyMoveDisableTimer`, `Word11712`, `Word11714` (SaveGame.cpp:1029-1031, :1645-1647).
+  // `gb2.partyMoveDisableTimer`, `Word11712`, `Word11714` (SaveGame.cpp:1054-1056, :1769-1771).
   check(b.partyMoveDisableTimer === a.partyMoveDisableTimer && b.word11712 === a.word11712 &&
     b.word11714 === a.word11714,
     `${label}: the move delay and the throw's move lock ` +
@@ -226,7 +226,7 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
     for (let i = 0; i < Math.max(from.length, to.length); i++) {
       // A **free** record — link `RNnul` — cannot be compared past its link, and
       // deliberately so: `DeleteDBEntry` frees the indirect slot the record's secondary
-      // RN names but leaves the word alone (`doc/CSBwin-src/data.cpp:993-1015`), so this
+      // RN names but leaves the word alone (`doc/CSBwin-src/data.cpp:995-1017`), so this
       // port's reader drops it and its writer puts `RNnul` back. DM's scroll 33 is the
       // one such record in the shipped dungeon.
       const link = (from[i] as { nextObject?: number } | undefined)?.nextObject;
@@ -259,7 +259,7 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
     `${label}: every timer record but its sequence stamp`);
   // Less each member's status byte: a load attaches the party level's groups again, and
   // `AttachItem16ToMonster` clears the byte and re-rolls it through `NextMonsterUpdateTime`
-  // (`doc/CSBwin-src/CSBCode.cpp:6107-6110`), from a seed the load itself has moved on, so
+  // (`doc/CSBwin-src/CSBCode.cpp:6166-6169`), from a seed the load itself has moved on, so
   // two loads of one game roll it differently.
   const pool = (d: typeof beforeTimers) => (d.item16 ?? []).map((slot) => {
     const { singleMonsterStatus, ...rest } = slot; void singleMonsterStatus; return rest;
@@ -328,7 +328,7 @@ function writeAndReload(label: string, game: Game): Game | null {
   }
   check(parsed.save.extendedFeatures !== undefined, `${label}: it carries an Extended Features block`);
   check(parsed.save.dungeonImageOffset !== undefined, `${label}: and a dungeon image`);
-  // Plus `DMRules` when the game holds `DMRulesDesignOption` (`SaveGame.cpp:952-953`).
+  // Plus `DMRules` when the game holds `DMRulesDesignOption` (`SaveGame.cpp:977-978`).
   const flagsExpected = game.ctx.rules.dmRulesDesignOption ? 0xe9 : 0xa9;
   check((parsed.save.extendedFeatures?.flags ?? 0) === flagsExpected,
     `${label}: flags declare LevelDSAInfo|IndirectText|ExpandedPortraits|BigActuators, and DMRules ` +
@@ -344,9 +344,9 @@ function writeAndReload(label: string, game: Game): Game | null {
   check(!!parsed.save.objectIndex && parsed.save.objectIndex.typeMap.join() === held.typeMap.join()
     && parsed.save.objectIndex.indexMap.join() === held.indexMap.join(),
     `${label}: block 0 carries the game's object indirect index, slot for slot (${held.length} slots)`);
-  // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`SaveGame.cpp:1033`): an
+  // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`SaveGame.cpp:1058`): an
   // empty cursor is `RNnul`, as in every committed save that has one. `RNempty` (0)
-  // would load in CSBWin as an object in hand (`:1649`, `:2753`).
+  // would load in CSBWin as an object in hand (`:1773`, `:2966`).
   check(parsed.save.block1?.saveOption === 1, `${label}: SaveOption is SAVE AND PLAY's 1`);
   const inHand = game.ctx.party.state.objectInHand;
   if (inHand === OBJECT_ID_NULL) {
@@ -409,7 +409,7 @@ function playFromDungeonDat(): Game {
     const thrown = game.systems.mouse.throwObjectFromCursor(0);
     console.log(`  threw 0x${(toThrow as number).toString(16)}: ${thrown}`);
     check(thrown, 'the object left the cursor as a missile');
-    // `d.Word11712 = 4; d.Word11714 = d.partyFacing;` (Mouse.cpp:753-754).
+    // `d.Word11712 = 4; d.Word11714 = d.partyFacing;` (Mouse.cpp:754-755).
     check(party.word11712 === 4 && party.word11714 === party.facing,
       `the throw locks steps in its direction for 4 ticks (${party.word11712}, ${party.word11714})`);
   } else {
@@ -508,7 +508,7 @@ function main(): void {
   // **A load is not a no-op, and CSBWin's is not either.** `reloadAfterSaveGame` deletes
   // and re-creates the movement timers of every monster group on the party's level, and
   // `NextMonsterUpdateTime` re-rolls each member's walk offsets
-  // (`doc/CSBwin-src/CSBCode.cpp:10491`, `doc/CSBwin-src/CSBCode.cpp:5842`), so a
+  // (`doc/CSBwin-src/CSBCode.cpp:10615`, `doc/CSBwin-src/CSBCode.cpp:5907`), so a
   // world with live monsters comes back with different timer slots, a different queue
   // order, different `ITEM16` walk bytes and the odd creature facing. That is play, not
   // loss, and it is why `tools/dump-save-roundtrip.ts` says the same thing.
@@ -529,7 +529,7 @@ function main(): void {
   // `LoadGame`'s other branch, which no committed save takes: `Byte22596 == 1` marks an
   // Atari DM save, whose `Word22592` comes from the dungeon it holds and whose
   // `Word22596` / `Word22594` stay `_ReadEntireGame`'s 2 and 1
-  // (doc/CSBwin-src/SaveGame.cpp:1467-1470, :1861-1877). DM's image has fourteen levels
+  // (doc/CSBwin-src/SaveGame.cpp:1568-1571, :2065-2081). DM's image has fourteen levels
   // and a sentinel of 99, which is the 10.
   console.log('\n=== 3. GAMEBLOCK1 of an Atari DM save ===');
   const world = loadCsbwinWorld(new Uint8Array(readFileSync(savePath('csbgame7.dat'))));

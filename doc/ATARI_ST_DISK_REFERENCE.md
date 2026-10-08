@@ -281,7 +281,7 @@ credits, the pressed crack's button and the crack's placement, and no other chan
 1.2 disk").
 
 `dungeon.dat` is the same size in both (33442 bytes, uncompressed) and differs in four
-bytes: bit 7 of `word2`, which CSBWin calls `important` (`doc/CSBwin-src/CSB.h:1148`), is
+bytes: bit 7 of `word2`, which CSBWin calls `important` (`doc/CSBwin-src/CSB.h:1151`), is
 set in the 1.2 file and clear in CSBWin's (`dm-atari/` and `dm-windows/`) for four weapons: a sling (weapon #54, map 0 (16,7))
 and three rocks (weapons #104, #105, #106, map 1).
 
@@ -324,7 +324,7 @@ are French ("JE SUIS DUR JE SUIS AZUR ET JE FULGURE" is `TEXT #70` on map 5).
 | `0x232` | Six x coordinates. Bytes 875 and 883 are the low bytes of `wRectPos958.x2` (159 → 143, EAU) and `wRectPos950.x2` (159 → 207, NOURRITURE). 1707, 1709, 1715 and 1717, not identified individually, are in the last 136 bytes, where the entrance's rectangles are. |
 
 `DecodeText` looks up code 30's next code in `d.Byte10336` for wall text and in
-`d.Byte10016` for any other text (`doc/CSBwin-src/CSBCode.cpp:5559-5574`; the port's
+`d.Byte10016` for any other text (`doc/CSBwin-src/CSBCode.cpp:5624-5639`; the port's
 `DungeonState.ts`, reading `textDecode`), 8 bytes a string. In 1.2, `Byte10336` holds
 strings 2 and 3 (THE, YOU, in wall glyphs) and `Byte10016` strings 0–3 (`?`, `!`, `THE `,
 `YOU `). 1.3 makes strings 0, 1 and 4–9 single glyphs past the 1.2 character sets: 28, 29
@@ -412,7 +412,7 @@ offsets in that code: `_TAG000ede`, `_TAG000fc4`, `_TAG00179c`, `_TAG00260e`,
 `_TAG0026c4`, `TAG002724`, `_StartChaos` (`TAG002a38`), `_TAG004430` and `_TAG004518`
 each begin with `LINK A6` (`4e56`) at their offset. `TAG00439e`, which has no frame,
 begins `move.l d7,-(sp); moveq #0,d7`. `_ReadSavedGame` is `TAG001868`
-(`doc/CSBwin-src/Chaos.cpp:2206`).
+(`doc/CSBwin-src/Chaos.cpp:2788`).
 
 **`HINT.FTL` is laid out the same way.** Its header's third segment entry is offset
 `0x0ec6` and length `0xb256`, which end at the file's end. Of the 179 `TAG` offsets
@@ -420,7 +420,7 @@ begins `move.l d7,-(sp); moveq #0,d7`. `_ReadSavedGame` is `TAG001868`
 others are not examined.
 
 **"MAKE NEW ADVENTURE" reads no portrait.** Button 13 of `_TAG004518`
-(`doc/CSBwin-src/Chaos.cpp:3949-3973`) makes the same calls as the original, in the same
+(`doc/CSBwin-src/Chaos.cpp:4806-4833`) makes the same calls as the original, in the same
 order: `chaos:$491a`-`$4972` calls `$352c` (`InvertButton`), `$260e`, `$1868`, `$26c4`,
 `$439e`, `$2724`, `$439e`, `$0fc4`, `$352c`. A new adventure's portraits are the editor's
 copies, which `TAG00439e` swaps into the champions around `TAG002724`.
@@ -433,7 +433,7 @@ the only function that does so with `0x1a`, `0x4e` and `0x4f` (`Fsetdta`, `Fsfir
 `_TAG000ede` (the slot and "REPLACE …?" prompt) and `_TAG000fc4` (the game's write), and
 calls `0x3c` (`Fcreate`) through `$9a(a5)` as `_TAG000fc4` does. The data holds the paths
 `A:\PORTRAIT\` and `.CMP`, the buttons GAME, PORTRAIT and CANCEL, and these messages,
-which `UtilityDiskMessages` (`doc/CSBwin-src/Chaos.cpp:275-318`) keeps as empty strings.
+which `UtilityDiskMessages` (`doc/CSBwin-src/Chaos.cpp:518-561`) keeps as empty strings.
 Taken in the order they are stored, CSBWin's own messages fall at their own indices, and
 these fall at the empty ones:
 

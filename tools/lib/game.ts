@@ -94,9 +94,9 @@ export const TICK_DUE = VBL_PER_TICK;
 
 /**
  * A timer pass at `time`: the clock set to it, then `ProcessTimers`, which reads `d.Time`
- * (`doc/CSBwin-src/CSBCode.cpp:6383`) as `processTimers` reads `ctx.state.tickCount`.
+ * (`doc/CSBwin-src/CSBCode.cpp:6442`) as `processTimers` reads `ctx.state.tickCount`.
  * For a tool that steps the timers on a clock of its own rather than through `Game`'s tick.
- * The tick's `DisplayCharacterDamage` (`:657`) follows, so the damage the timers dealt
+ * The tick's `DisplayCharacterDamage` (`:667`) follows, so the damage the timers dealt
  * comes off the HP as it would in play.
  */
 export function processTimersAt(game: Game, time: number): boolean {

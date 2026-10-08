@@ -1,10 +1,10 @@
 /**
- * `ReadExtendedFeatures` (`doc/CSBwin-src/SaveGame.cpp:298-432`) at the front of a file:
+ * `ReadExtendedFeatures` (`doc/CSBwin-src/SaveGame.cpp:299-440`) at the front of a file:
  * the "simple" encipherment it looks for when the sentinel is not there, and the blocks
  * it gives up on.
  *
- * 1. **The stream.** `RC4_prepare_key(simple, 1)` with `simple[0] = 1` (`:326-329`) makes
- *    8192 bytes (`doc/CSBwin-src/RC4.cpp:20-48`), and it is not RC4's. The bytes expected
+ * 1. **The stream.** `RC4_prepare_key(simple, 1)` with `simple[0] = 1` (`:328-331`) makes
+ *    8192 bytes (`doc/CSBwin-src/RC4.cpp:25-61`), and it is not RC4's. The bytes expected
  *    here are CSBWin's own: `RC4.cpp` compiled as it stands, a buffer of 8192 zeroes put
  *    through `RC4_encipher(buf, 8192, 0)`, and printed. `FormChecksum` over the whole
  *    stream covers the bytes not listed.
@@ -23,14 +23,14 @@
  *    cases, and its caller reads the file from the first byte (`:320-353`):
  *    - the checksum is wrong (`:345-353`): a save with one fill byte of its block changed
  *      is read as GAMEBLOCK1 at byte 0, which `ReadUnscrambleBlock` refuses, and that is
- *      `tag01efee` (`:1599-1601`); a `dungeon.dat` so changed is read as a dungeon from
- *      byte 0 (`:2348-2354`), and fails by those bytes;
- *    - the sentinel is tested with `strcmp` (`:324`, `:333`), so the twentieth byte must
+ *      `tag01efee` (`:1724-1726`); a `dungeon.dat` so changed is read as a dungeon from
+ *      byte 0 (`:2560-2566`), and fails by those bytes;
+ *    - the sentinel is tested with `strcmp` (`:326`, `:333`), so the twentieth byte must
  *      be the terminator;
  *    - the sentinel appears only once deciphered and `flags` has no `SimpleEncryption`
- *      (`:333-343`): Conflux's block with the flag cleared.
+ *      (`:335-345`): Conflux's block with the flag cleared.
  *    The last two are given a checksum that matches, so only the test named refuses them.
- * 5. **A save of an enciphered game is enciphered** (`SaveGame.cpp:914-920`, `:943-946`):
+ * 5. **A save of an enciphered game is enciphered** (`SaveGame.cpp:939-946`, `:968-971`):
  *    DM's CSBWin `dungeon.dat` enciphered as CSBWin would, `SimpleEncryption` set, reads
  *    as the plain file does and sets `simpleEncipher`. The game's save is the save it
  *    makes with the flag cleared, its flag and checksum aside, enciphered whole; it

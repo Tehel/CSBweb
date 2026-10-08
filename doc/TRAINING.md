@@ -12,7 +12,7 @@ Levels are numbered from 1, the Hall of Champions level. A "tick" is one game ti
 
 ## How experience is scaled
 
-Every gain goes through `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:200-260`), which applies
+Every gain goes through `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:203-263`), which applies
 three factors in this order:
 
 1. **Skills 4-11 (Fighter and Ninja sub-skills) earn half** when no monster has attacked the
@@ -22,7 +22,7 @@ three factors in this order:
 3. **Every sub-skill (4-19) earns double** when a monster attacked in the last 25 ticks.
    The base skills 0-3 are never doubled.
 
-Only `MonsterAttacks` sets `d.LastMonsterAttackTime` (`doc/CSBwin-src/Monster.cpp:982`); a
+Only `MonsterAttacks` sets `d.LastMonsterAttackTime` (`doc/CSBwin-src/Monster.cpp:986`); a
 missile arriving at the party does not. See `doc/PROVEN_FACTS.md`, "Only `MonsterAttacks` sets
 `d.LastMonsterAttackTime`".
 
@@ -58,7 +58,7 @@ can reach them, train at the bottom: that turns ×2 or ×3 into ×5 or ×6 for e
 `_Attack` sends BASH, HACK, BERZERK, KICK, SWING and CHOP at a door when the cell in front is
 a door whose state is closed, `(flags & 7) == 4` (`doc/CSBwin-src/Attack.cpp:1794-1812`). It
 does not check whether the door can be broken. `HitDoor` checks that afterwards and quietly
-returns 0 for a door an axe can't open (`doc/CSBwin-src/Code11f52.cpp:2276-2281`). Either way
+returns 0 for a door an axe can't open (`doc/CSBwin-src/Code11f52.cpp:2311-2316`). Either way
 the attack leaves the switch with `successfulAttack` still at its starting value of 1, so it
 is **not a miss**. The attack earns its **full** experience, with the busy time fixed at 6.
 
@@ -96,7 +96,7 @@ it again. Mana goes in; priest experience and fighter or ninja experience come o
 ### Sleep to get mana back
 
 `TenSecondUpdate`, which regenerates mana, runs every 64 ticks awake and every 16 asleep
-(`doc/CSBwin-src/CSBCode.cpp:686-688`): **four times** as fast. Asleep, skill levels do
+(`doc/CSBwin-src/CSBCode.cpp:696-698`): **four times** as fast. Asleep, skill levels do
 not count: every mastery reads 1 (`doc/CSBwin-src/Code17818.cpp:29-36`), so whether mana
 comes back depends on Wisdom alone. Each point costs 14 stamina, even for a master.
 
@@ -110,7 +110,7 @@ skills it also lifts the ×½, so they earn ×4.
 - **The weight of what you throw.** See below.
 - **Punching the air.** It is a miss, and misses earn half (see below).
 - **Skill increasers.** CSBWin has one (`SkillIncreaser(8, 300, …)`, local action 10,
-  `doc/CSBwin-src/Mouse.cpp:209-256`), but no actuator in DM's `dungeon.dat` uses local
+  `doc/CSBwin-src/Mouse.cpp:210-257`), but no actuator in DM's `dungeon.dat` uses local
   action 10.
 - **Gear, for levels.** The Firestaff, the Pendant Feral, the Ekkhard Cross, the Moonstone,
   the Gem of Ages and the Sceptre of Lyf all add mastery when casting, but the level-up check
@@ -121,7 +121,7 @@ skills it also lifts the ×½, so they earn ×4.
 
 ### Throwing (skill 10, Throw)
 
-`ThrowByCharacter` (`doc/CSBwin-src/Mouse.cpp:724-737`) awards:
+`ThrowByCharacter` (`doc/CSBwin-src/Mouse.cpp:725-738`) awards:
 
 - **8** for anything that is not a weapon, whether a compass or a boulder;
 - **12** for a weapon;
@@ -129,11 +129,11 @@ skills it also lifts the ×½, so they earn ×4.
   That includes the swords, maces and clubs (class 0) and the dagger and axes (class 2), not
   only the throwing weapons.
 
-**Weight earns nothing.** It only costs stamina (`TAG016382`, `doc/CSBwin-src/Mouse.cpp:653`):
+**Weight earns nothing.** It only costs stamina (`TAG016382`, `doc/CSBwin-src/Mouse.cpp:654`):
 weight/2 in tenths of a kilo, clamped to 1-10, plus half of each further 10. Heavy objects
 also fly a shorter distance. Throwing from the attack menu's THROW instead of the cursor adds
 the menu's own **+5** to the same skill (`experienceForAttacking[THROW]`, applied in
-`_Attack`'s tail, `doc/CSBwin-src/Attack.cpp:2157-2159`). Every throw makes the champion busy
+`_Attack`'s tail, `doc/CSBwin-src/Attack.cpp:2159-2161`). Every throw makes the champion busy
 for 4 ticks.
 
 | Item | Weight | Exp per throw | Stamina |
@@ -161,7 +161,7 @@ easier to find. Coordinates are the port's map-preview grid: x left to right, y 
 
 `AttackWithPhysicalForce` returns 0 when there is no monster in the square
 (`doc/CSBWIN_ATTACK_REFERENCE.md`, gate 2). `_Attack` then treats the attack as a miss and
-halves both the experience and the busy time (`doc/CSBwin-src/Attack.cpp:1834-1838`). A wall
+halves both the experience and the busy time (`doc/CSBwin-src/Attack.cpp:1834-1839`). A wall
 counts the same as empty air, unless it is a closed door (see above).
 
 | Attack | Base exp | Exp at the air | Busy after a miss | Stamina |
@@ -179,7 +179,7 @@ most per attack. That makes a KICK at a closed door (13) the best Fight training
 ## Priest
 
 Casting has no busy time. The experience of a cast (`CastSpell`,
-`doc/CSBwin-src/Magic.cpp:1197-1211`) is
+`doc/CSBwin-src/Magic.cpp:1199-1213`) is
 
 ```
 D = spell's required skill + power      (power: LO=1 … MON=6)
@@ -189,7 +189,7 @@ exp = random(0-7) + 16·D + 8·(power-1)·required + D²
 and it goes to the skill in the spell's own record (`byte5`, graphics `0x230`), whatever the
 caster's class. The mana is the rune table `Byte19010`: the power rune costs 1-6, and every
 later rune costs its base × (8, 12, 16, 20, 24, 28)[power] shifted right by 3, so a
-remainder is dropped (`TAG01b990`, `doc/CSBwin-src/CSBCode.cpp:8973-8979`).
+remainder is dropped (`TAG01b990`, `doc/CSBwin-src/CSBCode.cpp:9078-9084`).
 
 | Potion | Skill | Exp per mana, LO → MON |
 |---|---|---|
@@ -211,7 +211,7 @@ power, so a higher power mostly means fewer casts and fewer flasks. What matters
 failing. If your mastery of the spell's skill is *k* levels short of `required + power`,
 `CastSpell` makes *k* wisdom tests, each passed with probability
 `(min(Wisdom + 15, 115) + 1) / 128`. A failure burns the mana, makes no potion, and earns
-experience ÷ 2^k (`doc/CSBwin-src/Magic.cpp:1216-1232`). A potion needs an empty flask in
+experience ÷ 2^k (`doc/CSBwin-src/Magic.cpp:1218-1234`). A potion needs an empty flask in
 hand (`GetFlaskInHand`), and without one the mana is lost and nothing is learned.
 
 ## Wizard

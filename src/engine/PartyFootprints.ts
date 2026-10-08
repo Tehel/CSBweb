@@ -2,10 +2,10 @@
  * The party's footprint trail — how monsters smell you.
  *
  * Ports CSBWin's `d.PartyFootprints[24]` / `d.Byte13220[24]` pair
- * (`doc/CSBwin-src/Data.h:781`) and the three functions that maintain them:
- * `AddFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4343`), `DeleteFootprintEntry`
- * (`:4319`), and `SearchFootprints` (`doc/CSBwin-src/CSBCode.cpp:7066`). The trail is
- * appended to on every party move (`:3225-3247`).
+ * (`doc/CSBwin-src/Data.h:796`) and the three functions that maintain them:
+ * `AddFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4381`), `DeleteFootprintEntry`
+ * (`:4357`), and `SearchFootprints` (`doc/CSBwin-src/CSBCode.cpp:7125`). The trail is
+ * appended to on every party move (`:3281-3308`).
  *
  * Two consumers: `GetBestMonsterFacingP1` sniffs it to decide which way to turn when
  * it cannot see the party (`doc/CSBwin-src/Monster.cpp:617-627`), and the Magic
@@ -17,12 +17,12 @@
  *
  * About `AddFootprintEntry`: Paul Stevens' own comment on it reads "I think this is
  * much hogwash. Does nothing useful. Is full of errors. Perhaps an old, abandoned
- * debug trace" (`doc/CSBwin-src/Code11f52.cpp:4344-4346`). It is ported anyway,
+ * debug trace" (`doc/CSBwin-src/Code11f52.cpp:4382-4384`). It is ported anyway,
  * errors and all, because it is what writes the age bytes that the smelling check
  * then reads — and it is the only thing that writes them.
  */
 
-/** `d.PartyFootprints` and `d.Byte13220` are both 24 entries (`Data.h:781`). */
+/** `d.PartyFootprints` and `d.Byte13220` are both 24 entries (`Data.h:796`). */
 export const MAX_FOOTPRINT_ENTRIES = 24;
 
 export class PartyFootprints {
@@ -77,7 +77,7 @@ export class PartyFootprints {
   }
 
   /**
-   * `SearchFootprints` (`doc/CSBwin-src/CSBCode.cpp:7066`) — the **newest** entry at
+   * `SearchFootprints` (`doc/CSBwin-src/CSBCode.cpp:7125`) — the **newest** entry at
    * this square, searched from the end backwards, returned as a 1-based index (0 =
    * no print here).
    *
@@ -95,7 +95,7 @@ export class PartyFootprints {
 
   /**
    * Record a party move, mirroring `MoveObject`'s footprint block
-   * (`doc/CSBwin-src/Code11f52.cpp:3225-3247`).
+   * (`doc/CSBwin-src/Code11f52.cpp:3260-3282`).
    *
    * The order is load-bearing: the trail is first trimmed to 23 entries or fewer,
    * then the *departed* square's age is written by `addFootprintEntry` (unless the trail
@@ -129,9 +129,9 @@ export class PartyFootprints {
   }
 
   /**
-   * `DeleteFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4319`): the entries above `at`
+   * `DeleteFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4357`): the entries above `at`
    * move down one, prints and ages alike. CSBWin's `MemMove` takes its source first
-   * (`MemMove(src, dest, byteCount)`, `doc/CSBwin-src/CSBCode.cpp:824`), so
+   * (`MemMove(src, dest, byteCount)`, `doc/CSBwin-src/CSBCode.cpp:834`), so
    * `MemMove(&d.PartyFootprints[P1+1], &d.PartyFootprints[P1], …)` copies `[P1+1]` onto `[P1]`.
    */
   private deleteFootprintEntry(at: number): void {
@@ -148,7 +148,7 @@ export class PartyFootprints {
   }
 
   /**
-   * `AddFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4343`) — walk the trail from
+   * `AddFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4381`) — walk the trail from
    * the newest end towards the oldest, writing `deltaTime` into every age byte.
    *
    * Bit 15 of `deltaTime` selects how the first entry it touches combines with what
@@ -196,7 +196,7 @@ export class PartyFootprints {
   }
 
   /**
-   * YA BRO ROS's mark (`doc/CSBwin-src/Magic.cpp:1333-1342`): the magic range starts at
+   * YA BRO ROS's mark (`doc/CSBwin-src/Magic.cpp:1335-1344`): the magic range starts at
    * the trail's end, and a weak spell closes it there too. A spell of power 3 or more
    * sets the end to 0, which only the next party move (`recordPartyMove`) raises.
    */

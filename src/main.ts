@@ -168,7 +168,7 @@ function isCrtEnabled(): boolean {
 /**
  * `DrawViewport`, then the screen composed over it (`GameScreen.drawViewport`): the main
  * loop's tick and a script's tick. A game's first view is the tick `MainLoop` opens with
- * (`tag000698`, doc/CSBwin-src/CSBCode.cpp:601; `Game.start`). Every other redraw is
+ * (`tag000698`, doc/CSBwin-src/CSBCode.cpp:611; `Game.start`). Every other redraw is
  * `refreshScreen`'s.
  */
 function renderView() {
@@ -237,9 +237,9 @@ async function loadHintOracle(): Promise<HintOracleFiles | null> {
 }
 
 /**
- * `_ReadEntireGame` for a new game (doc/CSBwin-src/SaveGame.cpp:1480-1494): the data set's
+ * `_ReadEntireGame` for a new game (doc/CSBwin-src/SaveGame.cpp:1579-1594): the data set's
  * `dungeon.dat`, read into the running game. A file that will not open is `die(50)`
- * (`:1480-1486`), and so is one that fails its read `die(0xbad)` (`Game.readDungeonDat`).
+ * (`:1579-1586`), and so is one that fails its read `die(0xbad)` (`Game.readDungeonDat`).
  * The game's playthrough is then held against the store's (`GameSaves.newGameRead`).
  */
 async function readNewGame(game: Game, saves: GameSaves, events: GameEvents): Promise<void> {
@@ -254,7 +254,7 @@ async function readNewGame(game: Game, saves: GameSaves, events: GameEvents): Pr
 
 /**
  * The data set's `mini.dat`, for RISE's new adventure. A file that will not open is the
- * utility's "CAN'T FIND NEW ADVENTURE MINI.DAT" (doc/CSBwin-src/Chaos.cpp:2245-2251).
+ * utility's "CAN'T FIND NEW ADVENTURE MINI.DAT" (doc/CSBwin-src/Chaos.cpp:2835-2843).
  */
 async function readMiniDat(): Promise<Uint8Array> {
     const response = await fetch(`${dataSet.dir}/mini.dat`).catch(() => null);
@@ -323,15 +323,15 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         playSound,
         playCustomSound: (samples, volume) => sound.playCustomSound(samples, volume),
         // `d.PartySleeping`: button 145 puts the party to sleep, 146 or a blow
-        // wakes it. The UI follows with `Buttons17796` (`doc/CSBwin-src/Mouse.cpp:1698`)
-        // or the adventure lists back (`CSBCode.cpp:7056-7057`), and the message
-        // area with its tenfold timeout (`CSBCode.cpp:1546-1553`).
+        // wakes it. The UI follows with `Buttons17796` (`doc/CSBwin-src/Mouse.cpp:1837`)
+        // or the adventure lists back (`CSBCode.cpp:7115-7116`), and the message
+        // area with its tenfold timeout (`CSBCode.cpp:1556-1563`).
         sleepChanged: (sleeping) => {
             screen?.setUIMode(sleeping ? UIMode.Sleeping : UIMode.Adventure);
             messages.setPartySleeping(sleeping);
         },
         // The first half of Reincarnate: the engine raises the name-entry screen
-        // (`doc/CSBwin-src/CSBCode.cpp:6738` around `Code13ea4.cpp:20`); the
+        // (`doc/CSBwin-src/CSBCode.cpp:6797` around `Code13ea4.cpp:20`); the
         // screen hands its answer to `HallOfChampions.reincarnateNamed`.
         openReincarnateScreen: (chIdx) => screen?.openReincarnateScreen(chIdx),
         // A weapon hand changed, or a chest left the open inventory's weapon hand:
@@ -354,7 +354,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             events.championJoined(joined);
         },
         // `ShowCredits(1)`: `MainLoop` has returned on a lost game
-        // (doc/CSBwin-src/CSBCode.cpp:11325), or has won it (`:631`).
+        // (doc/CSBwin-src/CSBCode.cpp:11560), or has won it (`:641`).
         // A frame threw: CSBWin's `die`, the loop stopped.
         die: reportError,
         showCredits: (word11694) => {
@@ -478,7 +478,7 @@ interface Built {
  *
  * A game that was saved or loaded can be restarted from it. Then the chooser or the
  * entrance has set up the next game, and `_StartCSB` runs `MainLoop` again
- * (doc/CSBwin-src/CSBCode.cpp:11320-11327), on the same `Game` and the same screen.
+ * (doc/CSBwin-src/CSBCode.cpp:11555-11562), on the same `Game` and the same screen.
  */
 async function showEndOfGame({ game, screen, saves, messages, events }: Built, sound: SoundManager, word11694: boolean): Promise<void> {
     screen.setHoverPoint(null);
@@ -499,7 +499,7 @@ async function showEndOfGame({ game, screen, saves, messages, events }: Built, s
             word11694,
             champions: word11694 ? wonChampions(game, screen) : [],
             // `_StartCSB` turns palette switching off before a lost game's credits
-            // (doc/CSBwin-src/CSBCode.cpp:11323); `MainLoop`'s won game leaves it as it was.
+            // (doc/CSBwin-src/CSBCode.cpp:11558); `MainLoop`'s won game leaves it as it was.
             palette11946: word11694 ? screen.palette11946() : null,
         },
     );
@@ -585,12 +585,12 @@ function wire({ game, screen, saves, messages, events }: Built, sound: SoundMana
 
     // A move draws nothing: it brings a tick on at once (`d.clockTick = 1`), and CSBWin
     // draws the viewport only in the tick, once a new party level is loaded
-    // (doc/CSBwin-src/CSBCode.cpp:618-639).
+    // (doc/CSBwin-src/CSBCode.cpp:628-649).
     let mapPreviewAt = '';
     game.onTick(() => {
         events.tick();
         // `if (d.SelectedCharacterOrdinal != 0) goto tag000730; if (d.PartySleeping != 0)
-        // goto tag000730;` (doc/CSBwin-src/CSBCode.cpp:636-637): no `DrawViewport` while an
+        // goto tag000730;` (doc/CSBwin-src/CSBCode.cpp:646-647): no `DrawViewport` while an
         // inventory is open or the party sleeps.
         const { selectedCharacterIndex, sleeping } = game.ctx.party.state;
         if (selectedCharacterIndex < 0 && !sleeping) renderView();
@@ -603,9 +603,9 @@ function wire({ game, screen, saves, messages, events }: Built, sound: SoundMana
 
     // The engine drives the message strip (`GameHost.messages`), a scanline of its scroll
     // a VBL; CSBWin's `vblInterrupt` invalidates the window after each
-    // (doc/CSBwin-src/CSBCode.cpp:1003). A VBL that inverted a flashed button is drawn too,
+    // (doc/CSBwin-src/CSBCode.cpp:1013). A VBL that inverted a flashed button is drawn too,
     // unless its tick holds the paint until the put-back (`Game.paintHeld`). And so is one
-    // the pointer has moved before: the VBL handler alone draws the cursor (`:1040-1043`),
+    // the pointer has moved before: the VBL handler alone draws the cursor (`:1050-1053`),
     // and a move of the pointer draws nothing itself (`GameInput.mouseMove`).
     game.onFrame(() => {
         if (game.paintHeld()) return;

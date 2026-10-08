@@ -2,10 +2,10 @@
  * A giggler robs the party.
  *
  * `MonsterAttacks` sends a giggler's blow to `StealFromCharacter`
- * (`doc/CSBwin-src/Monster.cpp:1231-1234`, `:239`) instead of `MonsterDamagesCharacter`.
+ * (`doc/CSBwin-src/Monster.cpp:1235-1238`, `:239`) instead of `MonsterDamagesCharacter`.
  * The steal empties the slot `d.uByte13126` names into the group's possession chain: the
  * first object becomes the chain's head, the next ones go on its end (`AddObjectToRoom`
- * with no cell, `Code11f52.cpp:491-499`). CSBWin never writes `d.uByte13126`, so it is all
+ * with no cell, `Code11f52.cpp:526-534`). CSBWin never writes `d.uByte13126`, so it is all
  * zeroes and only ever names slot 0, the ready hand.
  *
  * The party stands next to the retail dungeon's first giggler, every champion holding a

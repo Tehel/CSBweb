@@ -2,11 +2,11 @@
  * The attack menu.
  *
  * The UI half of the champion's attack, from `doc/CSBwin-src/Character.cpp`:
- * `ItemHasChargesLeft` (`:4745`), `GetLegalAttackTypes` (`:4772`), `DrawAttackButton`
- * (`:4815`), `TAG01b1c0` (`:4886`), `PrepareAttack` (`:4904`), `_ExecuteAttack`
- * (`:4944`), plus `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8718`),
- * `_TAG019fac` (`doc/CSBwin-src/Character.cpp:4661`), `_TAG01b29a`
- * (`doc/CSBwin-src/CSBCode.cpp:8799`) and `_FlashAttackDamage`
+ * `ItemHasChargesLeft` (`:4762`), `GetLegalAttackTypes` (`:4789`), `DrawAttackButton`
+ * (`:4832`), `TAG01b1c0` (`:4903`), `PrepareAttack` (`:4929`), `_ExecuteAttack`
+ * (`:4969`), plus `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8823`),
+ * `_TAG019fac` (`doc/CSBwin-src/Character.cpp:4678`), `_TAG01b29a`
+ * (`doc/CSBwin-src/CSBCode.cpp:8904`) and `_FlashAttackDamage`
  * (`doc/CSBwin-src/Attack.cpp:949`).
  *
  * The area under the viewport is a two-state panel and `word20252` is the state:
@@ -46,14 +46,14 @@ import { nowMs, UIState } from './UIState';
 /** `VBLDelay(15)` at 60 Hz — a quarter of a second. */
 const FLASH_MS = 250;
 
-/** `DrawAttackButton`'s rectangle for champion `chIdx` (`Character.cpp:4820`). */
+/** `DrawAttackButton`'s rectangle for champion `chIdx` (`Character.cpp:4837`). */
 export function attackButtonRect(chIdx: number): Rect {
   const x1 = 22 * chIdx + 233;
   return { x1, y1: 86, x2: x1 + 19, y2: 120 };
 }
 
 /**
- * `ItemHasChargesLeft` (`doc/CSBwin-src/Character.cpp:4745`).
+ * `ItemHasChargesLeft` (`doc/CSBwin-src/Character.cpp:4762`).
  *
  * Whether the thing in the fighting hand still has a charge to spend. Anything that is
  * not a weapon, a garment or a misc object counts as ready — CSBWin's `default: return
@@ -78,7 +78,7 @@ export function itemHasChargesLeft(ui: UIState, chIdx: number): boolean {
 }
 
 /**
- * `GetLegalAttackTypes` (`doc/CSBwin-src/Character.cpp:4772`).
+ * `GetLegalAttackTypes` (`doc/CSBwin-src/Character.cpp:4789`).
  *
  * An object's `legalAttacks` row holds three attack types and, for the second and
  * third, the mastery they demand. The first is *always* offered — that is what makes
@@ -122,8 +122,8 @@ function masteryOf(ui: UIState, champ: Champion, skill: number): number {
 }
 
 /**
- * `PrepareAttack` (`doc/CSBwin-src/Character.cpp:4904`) — open the attack menu for one
- * champion, unless they are busy or dead (`:4916`).
+ * `PrepareAttack` (`doc/CSBwin-src/Character.cpp:4929`) — open the attack menu for one
+ * champion, unless they are busy or dead (`:4941`).
  *
  * An empty fighting hand still has attacks: attack class 2, which is the bare-handed
  * row. A held object whose attack class is 0 has none at all and the click is ignored.
@@ -153,10 +153,10 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
 }
 
 /**
- * `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8718`), the state it leaves: the
+ * `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8823`), the state it leaves: the
  * panel shows what `word20252` and the ordinal say, which `drawAttackPanel` composes each
  * frame, so a menu `TAG01b1c0` closed and the damage figure are off the screen. The
- * option list's names are decided here, once, as CSBWin draws them (`:8743-8789`).
+ * option list's names are decided here, once, as CSBWin draws them (`:8848-8894`).
  */
 export function drawLegalAttackTypes(ui: UIState): void {
   ui.closedAttackMenuOrdinal = 0;
@@ -167,10 +167,10 @@ export function drawLegalAttackTypes(ui: UIState): void {
 }
 
 /**
- * `DrawLegalAttackTypes`'s option list (`doc/CSBwin-src/CSBCode.cpp:8745-8789`): one option
+ * `DrawLegalAttackTypes`'s option list (`doc/CSBwin-src/CSBCode.cpp:8850-8894`): one option
  * unless `PossibleAttackTypes[1]` is set, two unless `[2]` is too, and three rows named by
  * `GetAttackTypeName`. Each row offered goes through the action name filter after its
- * default name is read (`ActionNameFilter`, `:8774-8777`), which may name it otherwise and
+ * default name is read (`ActionNameFilter`, `:8879-8882`), which may name it otherwise and
  * changes the attack it is.
  */
 function nameAttackOptions(ui: UIState): void {
@@ -193,7 +193,7 @@ function nameAttackOptions(ui: UIState): void {
 }
 
 /**
- * `TAG01b1c0` (`doc/CSBwin-src/Character.cpp:4886`) — close the menu again, and ask for
+ * `TAG01b1c0` (`doc/CSBwin-src/Character.cpp:4903`) — close the menu again, and ask for
  * the panel to be redrawn on the next tick. It draws nothing there, so the menu stays on
  * the screen until `TAG01b29a` draws the damage or the buttons over it. Its redraw of the
  * attacker's hands is the frame's, which no longer boxes the weapon hand in cyan
@@ -207,7 +207,7 @@ export function closeAttackMenu(ui: UIState): void {
 }
 
 /**
- * `_ExecuteAttack` (`doc/CSBwin-src/Character.cpp:4944`).
+ * `_ExecuteAttack` (`doc/CSBwin-src/Character.cpp:4969`).
  *
  * `option` is 0-2 for one of the listed attacks, or -1 for the PASS button, which
  * closes the menu without attacking and returns CSBWin's -1.
@@ -222,8 +222,8 @@ export function executeAttack(ui: UIState, option: number): number {
     const attackType = ui.possibleAttackTypes[option] & 0xff;
     if (attackType === ATTACK_TYPE_NONE) return 0;
     result = ui.ctx.systems.character.executeAttack(chIdx, attackType);
-    // The fusion's `Attack(_1_, …)` never returns (`Character.cpp:4972`): `_FusionSequence`
-    // ends in `ShowCredits` (`Attack.cpp:2429`), so `TAG01b1c0` does not run and the menu
+    // The fusion's `Attack(_1_, …)` never returns (`Character.cpp:4997`): `_FusionSequence`
+    // ends in `ShowCredits` (`Attack.cpp:2431`), so `TAG01b1c0` does not run and the menu
     // stays on the panel to the end of the game.
     if (ui.ctx.systems.mainLoop.isRunningScript()) return result;
   }
@@ -233,7 +233,7 @@ export function executeAttack(ui: UIState, option: number): number {
 
 /**
  * One of the listed attacks (0-2) taken, by a click or its key: `ExecuteAttack`, then
- * `d.clockTick = (i16)intResult` (`doc/CSBwin-src/Character.cpp:4716-4717`), so an attack
+ * `d.clockTick = (i16)intResult` (`doc/CSBwin-src/Character.cpp:4733-4734`), so an attack
  * makes a tick due and a 0 puts one off. The fusion's `ExecuteAttack(_6_, …)` does not
  * return to set it.
  */
@@ -243,7 +243,7 @@ export function takeAttackOption(ui: UIState, option: number): void {
 }
 
 /**
- * `_TAG019fac`'s half with the menu open (`doc/CSBwin-src/Character.cpp:4677-4717`): button
+ * `_TAG019fac`'s half with the menu open (`doc/CSBwin-src/Character.cpp:4694-4734`): button
  * `id` of `d.Buttons17892`, 112 for PASS and 113-115 for the options. Each is flashed
  * before its `ExecuteAttack`.
  */
@@ -263,7 +263,7 @@ export function attackMenuButton(ui: UIState, id: number): void {
 }
 
 /**
- * `_TAG019fac` (`doc/CSBwin-src/Character.cpp:4661`) — button 111, the panel area.
+ * `_TAG019fac` (`doc/CSBwin-src/Character.cpp:4678`) — button 111, the panel area.
  *
  * Which button list is consulted depends on the panel's state, so the same screen
  * region means "pick a champion" or "pick an attack" at different moments.
@@ -286,7 +286,7 @@ export function handleAttackAreaClick(ui: UIState, x: number, y: number): void {
 }
 
 /**
- * `_TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8799`) — once per game tick.
+ * `_TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8904`) — once per game tick.
  *
  * Two jobs. It turns each champion to face whatever hit them hardest since the last
  * tick, which is the flinch you see in play; and it services `word20250` by flashing
@@ -297,7 +297,7 @@ export function attackPanelTick(ui: UIState): void {
   if (party.champions.length === 0) return;
 
   // Asleep, or with a candidate at the mirror, nobody turns and the damage is kept for
-  // the first tick after (`CSBCode.cpp:8808-8816`).
+  // the first tick after (`CSBCode.cpp:8913-8921`).
   const candidate = party.potentialChampionIndex >= 0;
   if (party.sleeping || candidate) {
     if (ui.attackingCharacterOrdinal !== 0) {
@@ -342,7 +342,7 @@ export function attackPanelTick(ui: UIState): void {
 }
 
 /**
- * `DrawAttackButton` (`doc/CSBwin-src/Character.cpp:4815`).
+ * `DrawAttackButton` (`doc/CSBwin-src/Character.cpp:4832`).
  *
  * A dead champion's button is a black hole rather than a blue box; a living one shows
  * the icon of whatever it is fighting with, or the bare-fist icon for an empty hand. An
@@ -378,7 +378,7 @@ export function drawAttackButton(ui: UIState, chIdx: number): void {
     );
   }
 
-  // `Character.cpp:4875-4880`: busy, a candidate in the party, or asleep.
+  // `Character.cpp:4892-4897`: busy, a candidate in the party, or asleep.
   const busy = (champ.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0;
   const candidate = ui.partyState.potentialChampionIndex >= 0;
   if (busy || candidate || (ui.partyState.sleeping)) {
@@ -387,7 +387,7 @@ export function drawAttackButton(ui: UIState, chIdx: number): void {
 }
 
 /**
- * `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8718`) — the whole panel, either
+ * `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8823`) — the whole panel, either
  * state.
  *
  * The backdrop rectangle for the option list depends on how many options there are, so
@@ -449,7 +449,7 @@ export function drawAttackPanel(ui: UIState): void {
 }
 
 /**
- * `GetAttackTypeName` (`doc/CSBwin-src/CSBCode.cpp:8609-8627`): the low byte names the
+ * `GetAttackTypeName` (`doc/CSBwin-src/CSBCode.cpp:8714-8732`): the low byte names the
  * attack, and 255 (-1) nothing.
  */
 function attackTypeName(ui: UIState, attackType: number): string {

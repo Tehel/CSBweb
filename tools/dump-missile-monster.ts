@@ -1,7 +1,7 @@
 /**
  * A missile reaching a monster: which member it hits, and how hard.
  *
- * `ProcessMissileEncounter`'s monster arm (`doc/CSBwin-src/Code11f52.cpp:1960-2042`):
+ * `ProcessMissileEncounter`'s monster arm (`doc/CSBwin-src/Code11f52.cpp:1995-2077`):
  *
  *   - the victim is `OrdinalOfMonsterAtPosition(group, objectPos)` — the member standing
  *     in the corner the missile arrived at. Nobody there lets the missile fly on, unless
@@ -12,7 +12,7 @@
  *   - otherwise the damage is `64 * DetermineMagicDamage(...)`, cut to 16 bits, divided
  *     by the descriptor's `defense08`, plus `DeterminePoisonDamage(type, d.Word12962)`;
  *   - `RNprojectile` is still the *potion* all through the switch: a thrown Ven or Ful
- *     potion only becomes its cloud in the shared tail (`:2060-2063`). So the blow a
+ *     potion only becomes its cloud in the shared tail (`:2095-2098`). So the blow a
  *     bomb lands before it explodes is a thrown object's — weight and a random 0-3 —
  *     for a monster and for a champion alike.
  *
@@ -24,14 +24,14 @@
  * Scenario 5 is the other way round: a member of a group of two, on level 2, sidesteps
  * before it melees, and `CheckMonsterVersusMissiles` finds a missile in the group's
  * corner that kills that member. The encounter looks the group up on `d.LoadedLevel`
- * (`Code11f52.cpp:1765`), which during a monster's turn is the monster's own level
- * (`LoadLevel(timeEnt.Level())`, `CSBCode.cpp:6416-6417`). `d.MonsterDamageResult` is
+ * (`Code11f52.cpp:1800`), which during a monster's turn is the monster's own level
+ * (`LoadLevel(timeEnt.Level())`, `CSBCode.cpp:6475-6476`). `d.MonsterDamageResult` is
  * then 1, some but not all died, and the sidestep leaves the corners as the encounter
- * left them (`Monster.cpp:3959-3970`).
+ * left them (`Monster.cpp:3973-3984`).
  *
  * Scenario 6: `CheckMonsterVersusMissiles` skips every missile whose `pos()` is not the
- * group's whole positions byte (`Monster.cpp:4478`), which both callers pass unmasked
- * (`:3882`, `:3960`). A lone monster spread over its cell (255), or one whose byte still
+ * group's whole positions byte (`Monster.cpp:4491`), which both callers pass unmasked
+ * (`:3896`, `:3974`). A lone monster spread over its cell (255), or one whose byte still
  * holds another member's corner, meets no missile at all.
  *
  * Run: `npx tsx tools/dump-missile-monster.ts`
@@ -221,7 +221,7 @@ function fly(game: Game, projectile: ObjectID, launch: Position): void {
   }
 }
 
-/** `D0L = 64 * (magic & 0xffff); D5W = sw((D0L & 0xffff) / defense08)` — `:2006-2012`. */
+/** `D0L = 64 * (magic & 0xffff); D5W = sw((D0L & 0xffff) / defense08)` — `:2041-2047`. */
 function monsterBlow(magic: number, defense08: number): number {
   return sw(Math.trunc(((64 * (magic & 0xffff)) & 0xffff) / (defense08 === 0 ? 1 : defense08)));
 }
@@ -290,7 +290,7 @@ function main(): void {
       'OrdinalOfMonsterAtPosition says 0 and the group is not drawAsSize4: nobody is hit');
   }
   // The same group with bit 12 set: `drawAsSize4()` is `drawAsSize4Monsters && bit 12`
-  // (`CSB.h:1127`), so the bit lets member 1 take it only with the design option on.
+  // (`CSB.h:1130`), so the bit lets member 1 take it only with the design option on.
   for (const option of [false, true]) {
     const arena = makeArena(2)!;
     const { game, group, launch } = arena;
@@ -305,7 +305,7 @@ function main(): void {
     fly(game, falchion, launch);
     console.log(`bit 12, drawAsSize4Monsters ${option}: DamageMonster: ${JSON.stringify(log.hits)}`);
     check(option ? log.hits.length === 1 && log.hits[0]!.index === 0 : log.hits.length === 0,
-      option ? 'drawn as size 4: member 1 takes it (Code11f52.cpp:1965-1966)' : 'the bit means nothing with the option off: nobody is hit');
+      option ? 'drawn as size 4: member 1 takes it (Code11f52.cpp:2000-2001)' : 'the bit means nothing with the option off: nobody is hit');
   }
 
   /* ----------------------- 3. a fireball feeds a Black Flame ------------------------ */
@@ -389,7 +389,7 @@ function main(): void {
     };
 
     // Facing north (0) from corner 2, the member turns to corner 1, which is empty
-    // (Monster.cpp:3940-3958).
+    // (Monster.cpp:3954-3972).
     const frame: AiFrame = {
       timer: {
         index: -1, time: game.ctx.state.tickCount, level: target.z, function: TimerFunction.TT_MONSTER_B0,
@@ -451,9 +451,9 @@ function main(): void {
       checkMonsterVersusMissiles(c: AiConst): boolean;
     };
     const log = spy(game);
-    // `objD6.pos() != position` (Monster.cpp:4478): RN::pos() is 0-3, so only a byte whose
+    // `objD6.pos() != position` (Monster.cpp:4491): RN::pos() is 0-3, so only a byte whose
     // bits 2-7 are all 0 can equal it. 255 is a centred lone monster, as the shuffle at
-    // Monster.cpp:3855 leaves one; 7 is member 0 in corner 3 over a stale member-1 corner.
+    // Monster.cpp:3869 leaves one; 7 is member 0 in corner 3 over a stale member-1 corner.
     for (const positions of [255, 3 | (1 << 2)]) {
       slot.positions = positions;
       ai.checkMonsterVersusMissiles(c);

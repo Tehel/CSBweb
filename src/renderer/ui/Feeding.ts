@@ -17,11 +17,11 @@ import { drawObjectIconAt } from './Draw';
 import { descIndexForObject, resolveObjectNameIndex } from './Objects';
 import { UIState, nowMs, stHideCursor, tag002572 } from './UIState';
 
-/** The swallow, sound ordinal 8 (`fp.gulp = 8`, `doc/CSBwin-src/Character.cpp:4111`). */
+/** The swallow, sound ordinal 8 (`fp.gulp = 8`, `doc/CSBwin-src/Character.cpp:4128`). */
 const SOUND_GULP = 8;
 
 /**
- * The derivation half of `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4062-4287`).
+ * The derivation half of `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4079-4304`).
  *
  * Works out what the object on the cursor is worth and fills in a `FeedParameters`
  * block. Nothing on the champion changes here: `applyFeedParameters` in
@@ -40,7 +40,7 @@ export function computeFeedParameters(
   if (nameIndex < 0) return null;
   const category = ui.ctx.dungeon.rnMaps.dbType(objectId as ObjectID);
 
-  // `doc/CSBwin-src/Character.cpp:4032-4038`, `:4086-4096`: a scroll has no `objectType`,
+  // `doc/CSBwin-src/Character.cpp:4049-4055`, `:4103-4113`: a scroll has no `objectType`,
   // and the party's square and facing are the block's `location`.
   const fp = clearFeedParameters();
   const party = ui.partyState;
@@ -99,8 +99,8 @@ export function computeFeedParameters(
 }
 
 /**
- * `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4004`), the mouth pressed. With an empty
- * hand, the mouth is held (`:4041-4058`) unless the eye panel already shows food and
+ * `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4021`), the mouth pressed. With an empty
+ * hand, the mouth is held (`:4058-4075`) unless the eye panel already shows food and
  * water: `drawInventoryScreen` draws them over the chest, the scroll or the Resurrect
  * menu until the release (`handleMouseUnclick`). As with the eye (`handleEyePress`), the
  * button is taken to be down at the press, and the release comes through the queue.
@@ -116,18 +116,18 @@ export function handleMouthPress(ui: UIState): void {
   if (objectId === OBJECT_ID_NULL) {
     if (ui.displayResurrectChestOrScroll === 0) return;
     ui.pressingMouth = true;
-    // `STHideCursor(HC5); d.Word23118 = 1;` (`:4054-4055`).
+    // `STHideCursor(HC5); d.Word23118 = 1;` (`:4071-4072`).
     stHideCursor(ui);
     ui.word23118 = 1;
     return;
   }
   // `if (d.PotentialCharacterOrdinal != 0) RETURN;` — with an object in hand, the mouth
-  // is inert while the Hall of Champions menu is up (`:4061`).
+  // is inert while the Hall of Champions menu is up (`:4078`).
   if (ui.partyState.potentialChampionIndex >= 0) return;
 
   const derived = computeFeedParameters(ui, selected, objectId);
   if (!derived) return;
-  // `objNID6`, which the filter cannot change, as it can `fp.objectType` (`:4457`).
+  // `objNID6`, which the filter cannot change, as it can `fp.objectType` (`:4474`).
   const objNID6 = derived.objectType;
   const fp = ui.ctx.systems.dsa.feedingFilter(derived);
   if (!applyFeedParameters(ui.ctx, selected, fp)) return;
@@ -140,7 +140,7 @@ export function handleMouthPress(ui: UIState): void {
       const rec = ui.ctx.dungeon.getPotionRecord(objectId as ObjectID);
       if (rec) rec.potionType = PotionType.EMPTY_FLASK;
     }
-    // `value(value() - 1)` sets the record's two bits (`doc/CSBwin-src/CSB.h:1274`), so an
+    // `value(value() - 1)` sets the record's two bits (`doc/CSBwin-src/CSB.h:1277`), so an
     // empty waterskin, which only the filter empties again, holds 3.
     if (objNID6 >= OBJNI_WATERSKIN && objNID6 <= OBJNI_WATER) {
       const rec = ui.ctx.dungeon.getMiscRecord(objectId as ObjectID);
@@ -149,12 +149,12 @@ export function handleMouthPress(ui: UIState): void {
   }
 
   if (fp.emptyHand) {
-    // `CURSORFILTER_Eat`, whose cancel nothing reads (`doc/CSBwin-src/Character.cpp:4471-4479`).
+    // `CURSORFILTER_Eat`, whose cancel nothing reads (`doc/CSBwin-src/Character.cpp:4488-4496`).
     const inHand = ui.partyState.objectInHand;
     if (inHand !== OBJECT_ID_NULL) {
       ui.ctx.systems.dsa.cursorFilter({ object: inHand, type: CursorFilterType.Eat, p1: 0, p2: 0, p3: 0, p4: 0 });
     }
-    // `RemoveObjectFromHand()` (`:4480`), and its `TAG002572`.
+    // `RemoveObjectFromHand()` (`:4497`), and its `TAG002572`.
     ui.partyState.objectInHand = OBJECT_ID_NULL;
     tag002572(ui);
     ui.ctx.dungeon.deleteDBEntry(objectId as ObjectID);
@@ -163,7 +163,7 @@ export function handleMouthPress(ui: UIState): void {
   if (fp.gulp >= 0) ui.ctx.sounds.queueSound(fp.gulp, ui.partyState.position.x, ui.partyState.position.y, 0, ui.ctx.party.state.position.z);
   // `CHARFLAG_statsChanged` has no counterpart, the panels being drawn from live state;
   // `CHARFLAG_chestOrScroll` has, with food and water in the eye panel, and the
-  // `DrawCharacterState` that ends the feeding (`doc/CSBwin-src/Character.cpp:4486-4492`).
+  // `DrawCharacterState` that ends the feeding (`doc/CSBwin-src/Character.cpp:4503-4509`).
   if (ui.displayResurrectChestOrScroll === 0) champ.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
   drawCharacterState(ui.partyState, selected, 0, ui.ctx.host);
 }

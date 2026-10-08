@@ -68,22 +68,22 @@ export interface UIState {
   /**
    * The mode button 147 froze, which button 148 puts back with its lists and key tables:
    * CSBWin's `d.Pointer18982` / `Pointer18986` / `pKeyXlate18974` / `pKeyXlate18978`
-   * (`doc/CSBwin-src/Mouse.cpp:1748-1751`, `:1766-1769`).
+   * (`doc/CSBwin-src/Mouse.cpp:1887-1890`, `:1905-1908`).
    */
   modeBeforeFreeze: UIMode;
   /**
    * `TAG02076e` has run and `TAG0207cc` has not: the movement-arrow, magic and weapon-ready
-   * areas stay shaded (`doc/CSBwin-src/Character.cpp:5118-5132`) until `TAG0207cc` redraws
-   * them (`CSBCode.cpp:9934-9966`). CSBWin draws these once and the screen holds them;
+   * areas stay shaded (`doc/CSBwin-src/Character.cpp:5143-5157`) until `TAG0207cc` redraws
+   * them (`CSBCode.cpp:10058-10090`). CSBWin draws these once and the screen holds them;
    * this port redraws every frame, so it keeps the state.
    */
   shadedByTag02076e: boolean;
   /**
    * `SetCursorShape(0)`, the arrow, is the cursor: `TAG02076e` set it
-   * (`doc/CSBwin-src/Character.cpp:5133`), and nothing has set the cursor from the hand
-   * since. `TAG002572` does (`CSBCode.cpp:2030-2051`): `TAG0207cc`'s (`:9965`) and
-   * `RemoveObjectFromHand`'s (`Mouse.cpp:636`), and so does `ObjectToCursor`'s
-   * `CreateObjectCursor` (`CSBCode.cpp:6864-6871`). An object moved in a Hall of Champions
+   * (`doc/CSBwin-src/Character.cpp:5158`), and nothing has set the cursor from the hand
+   * since. `TAG002572` does (`CSBCode.cpp:2059-2080`): `TAG0207cc`'s (`:10089`) and
+   * `RemoveObjectFromHand`'s (`Mouse.cpp:637`), and so does `ObjectToCursor`'s
+   * `CreateObjectCursor` (`CSBCode.cpp:6923-6930`). An object moved in a Hall of Champions
    * candidate's inventory is therefore on the cursor, under the shading (`tag002572`).
    */
   arrowCursorShape: boolean;
@@ -105,7 +105,7 @@ export interface UIState {
   /**
    * `DiskMenuNeeded` (`doc/CSBwin-src/Data.h:159`). The disk icon's handler cannot open
    * the menu itself — CSBWin because that would recurse into `HandleMouseEvents`
-   * (`doc/CSBwin-src/Mouse.cpp:1712-1719`), this port because the click is being drained
+   * (`doc/CSBwin-src/Mouse.cpp:1851-1858`), this port because the click is being drained
    * from the mouse queue — so it raises the flag and the caller acts on it.
    */
   diskMenuNeeded: boolean;
@@ -127,21 +127,21 @@ export interface UIState {
   pressingEye: boolean;
   /**
    * `d.PressingMouth`: the mouth pressed with an empty hand while the eye panel showed a
-   * chest, a scroll or the Resurrect menu (`doc/CSBwin-src/Character.cpp:4041-4058`).
+   * chest, a scroll or the Resurrect menu (`doc/CSBwin-src/Character.cpp:4058-4075`).
    * Food and water are drawn over it until the release (`drawInventoryScreen`).
    */
   pressingMouth: boolean;
   /**
    * What `_ClickOnEye`'s `DescribeObject(d.objectInHand, 1)` drew at the press
-   * (`doc/CSBwin-src/Viewport.cpp:7280-7286`), kept for the composes until the release.
+   * (`doc/CSBwin-src/Viewport.cpp:7287-7293`), kept for the composes until the release.
    * CSBWin draws that panel once, so its viewing filter runs once a press
-   * (`doc/CSBwin-src/Character.cpp:3455-3530`, `:3724-3772`). Null with the eye released,
+   * (`doc/CSBwin-src/Character.cpp:3469-3544`, `:3741-3789`). Null with the eye released,
    * an empty hand or a chest in it. Made by `describeObject` (`ui/Inventory.ts`).
    */
   describedObject: DescribedObject | null;
   /**
    * What `TAG0189d4`'s `DescribeObject(objD7, 0)` drew for the scroll in the weapon hand
-   * of the champion whose inventory is open (`doc/CSBwin-src/Character.cpp:3849-3897`),
+   * of the champion whose inventory is open (`doc/CSBwin-src/Character.cpp:3866-3914`),
    * kept for the composes until it runs again: at the inventory's opening, at the eye's
    * release and at a `DrawCharacterState` with `CHARFLAG_chestOrScroll`. Null with
    * anything else in the hand. Made by `tag0189d4` (`ui/Inventory.ts`).
@@ -151,20 +151,20 @@ export interface UIState {
   /**
    * `d.Word23144` — the marching order being changed: 0, or one more than the position,
    * relative to the party's facing, of the square a champion was picked up from
-   * (`TAG0025a6`, `doc/CSBwin-src/CSBCode.cpp:2053`).
+   * (`TAG0025a6`, `doc/CSBwin-src/CSBCode.cpp:2082`).
    */
   word23144: number;
   /**
    * `d.Word23118`, the pointer's hide count: `STHideCursor` raises it and takes the
    * pointer off as it leaves 0, `STShowCursor` lowers it and asks for the pointer back as
-   * it returns to 0 (`doc/CSBwin-src/Mouse.cpp:1818-1863`); `drawCursorItem` draws none
+   * it returns to 0 (`doc/CSBwin-src/Mouse.cpp:1957-2002`); `drawCursorItem` draws none
    * while it is above 0. CSBWin's other pairs hide and show within one call, which the
    * port's composes never see; only the held eye and mouth hold it from the press to the
    * release (`stHideCursor`).
    */
   word23118: number;
   /**
-   * `d.Pointer23178` and `d.Pointer23182` (`doc/CSBwin-src/CSBCode.cpp:1950-1951`), the
+   * `d.Pointer23178` and `d.Pointer23182` (`doc/CSBwin-src/CSBCode.cpp:1979-1980`), the
    * 32x16 cursor `TAG0025a6` makes of the square it picks up, for the palette above the
    * split and the one below it.
    */
@@ -202,7 +202,7 @@ export interface UIState {
   attackOptionCount: number;
   attackOptionNames: string[];
   /**
-   * The ordinal `TAG01b1c0` cleared (`doc/CSBwin-src/Character.cpp:4887-4897`), whose menu
+   * The ordinal `TAG01b1c0` cleared (`doc/CSBwin-src/Character.cpp:4904-4922`), whose menu
    * is still on CSBWin's screen: nothing draws over it until the panel's next
    * `DrawLegalAttackTypes` or `FlashAttackDamage`, which set it back to 0.
    */
@@ -212,13 +212,13 @@ export interface UIState {
   attackFlashUntilMs: number;
   /**
    * The damage `DisplayCharacterDamage` blitted into each champion's box
-   * (`doc/CSBwin-src/CSBCode.cpp:7121-7171`), still on CSBWin's screen, or null: the HP
+   * (`doc/CSBwin-src/CSBCode.cpp:7180-7230`), still on CSBWin's screen, or null: the HP
    * lost, and whether it went over the portrait of an open inventory (graphic 16) or
    * over the name (graphic 15). `TAG011366` draws over it. See `ui/Character.ts`.
    */
   characterDamage: ({ damage: number; inventoryOpen: boolean } | null)[];
   /**
-   * `d.DisplayResurrectChestOrScroll` (`doc/CSBwin-src/Character.cpp:3838`) — what the
+   * `d.DisplayResurrectChestOrScroll` (`doc/CSBwin-src/Character.cpp:3855`) — what the
    * eye panel is currently showing, which is also what a click in it means: 5 the
    * Resurrect/Reincarnate/Cancel menu, 4 an open chest, 0 anything else. Written by
    * `TAG0189d4`'s port in `drawInventoryScreen`, read by `tag01a6ea`.
@@ -253,7 +253,7 @@ export interface UIState {
   /* ---- hooks out to the page ---- */
   /**
    * The name-entry screen has been answered and the engine has finished Reincarnate
-   * (`HallOfChampions.reincarnateNamed`, `doc/CSBwin-src/Code13ea4.cpp:155-160`): the
+   * (`HallOfChampions.reincarnateNamed`, `doc/CSBwin-src/Code13ea4.cpp:167-172`): the
    * page redraws the view the screen covered.
    */
   readonly onReincarnated: () => void;
@@ -329,8 +329,8 @@ type PlayState = Pick<UIState,
 
 /**
  * The screen's share of `d` as a game begins: `d.Initialize()` zeroes the whole of `d`
- * (`doc/CSBwin-src/CSBCode.cpp:323-330`), and `TAG021028` sets the adventure's lists and
- * `d.Word20252` (`:10473-10490`).
+ * (`doc/CSBwin-src/CSBCode.cpp:333-340`), and `TAG021028` sets the adventure's lists and
+ * `d.Word20252` (`:10597-10614`).
  */
 function initialPlayState(): PlayState {
   return {
@@ -419,27 +419,27 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
 }
 
 /**
- * `TAG002572` (`doc/CSBwin-src/CSBCode.cpp:2030-2051`): the cursor set from the hand, the
+ * `TAG002572` (`doc/CSBwin-src/CSBCode.cpp:2059-2080`): the cursor set from the hand, the
  * hand or the arrow for an empty one, the object's cursor for a full one. The port draws
  * those from the hand every frame (`drawCursorItem`), so what is left of it is the end of
  * the arrow `TAG02076e`'s `SetCursorShape(0)` put up. `RemoveObjectFromHand` calls it
- * (`Mouse.cpp:636`), and `ObjectToCursor`'s `CreateObjectCursor` has the same effect
- * (`CSBCode.cpp:6864-6871`, `:1976-1984`).
+ * (`Mouse.cpp:637`), and `ObjectToCursor`'s `CreateObjectCursor` has the same effect
+ * (`CSBCode.cpp:6923-6930`, `:2005-2013`).
  */
 export function tag002572(ui: UIState): void {
   ui.arrowCursorShape = false;
 }
 
 /**
- * `STHideCursor` (`doc/CSBwin-src/Mouse.cpp:1839-1863`): `_ClickOnEye`'s `HC47`
- * (`doc/CSBwin-src/Viewport.cpp:7275`) and `_FeedCharacter`'s `HC5`
- * (`doc/CSBwin-src/Character.cpp:4054`), until the release's `stShowCursor`.
+ * `STHideCursor` (`doc/CSBwin-src/Mouse.cpp:1978-2002`): `_ClickOnEye`'s `HC47`
+ * (`doc/CSBwin-src/Viewport.cpp:7282`) and `_FeedCharacter`'s `HC5`
+ * (`doc/CSBwin-src/Character.cpp:4071`), until the release's `stShowCursor`.
  */
 export function stHideCursor(ui: UIState): void {
   ui.word23118++;
 }
 
-/** `STShowCursor` (`doc/CSBwin-src/Mouse.cpp:1818-1833`). */
+/** `STShowCursor` (`doc/CSBwin-src/Mouse.cpp:1957-1972`). */
 export function stShowCursor(ui: UIState): void {
   ui.word23118--;
 }

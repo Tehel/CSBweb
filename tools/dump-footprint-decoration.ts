@@ -4,7 +4,7 @@
  *
  * Where `cfD4` is still set by the room-type switch (an open floor, a teleporter, a door,
  * an open false wall, a pit whose flag bit 0 is set: `:263-392`), the newest print on the
- * cell (`SearchFootprints`, `CSBCode.cpp:7066`), if its index lies in
+ * cell (`SearchFootprints`, `CSBCode.cpp:7125`), if its index lies in
  * `[d.IndexOfFirstMagicFootprint, d.IndexOfLastMagicFootprint)`, sets bit 15 of the floor
  * decoration, which the cell program draws as the footprint graphic. Stairs clear `cfD4`
  * (`:373`), so a print there never shows. An open false wall falls through into `roomOPEN`
@@ -12,18 +12,18 @@
  *
  * The trail is a real `PartyFootprints` walked over real cells of level 0 of
  * `dm-atari/dungeon.dat`: one print before YA BRO ROS's mark (`markMagicFootprints`,
- * `Magic.cpp:1333-1342`), the rest after it, as `MoveObject` records them.
+ * `Magic.cpp:1335-1344`), the rest after it, as `MoveObject` records them.
  *
  * The same bit is set where prints can show by the cell's extended cell flag
  * `ECF_FOOTPRINTS` (bit 0), once `d.Time > 0` (`:419-425`): `GetExtendedCellFlag`
- * (`data.cpp:1679-1689`) reads the cell's row bit of longword 0 of the column's `EXPOOL`
+ * (`data.cpp:1682-1692`) reads the cell's row bit of longword 0 of the column's `EXPOOL`
  * record, `(EDT_ExtendedCellFlags << 24) + (level << 5) + x`, which a DSA's `&ECF!` writes,
  * and finds nothing in a record shorter than eight longwords.
  *
  * Then the drawing. `DrawFloorDecorations` draws the bit as ordinal 16
- * (`CSBCode.cpp:3984-3987`), slot 15 of `d.LoadedFloorDecorations`, which no level fills:
+ * (`CSBCode.cpp:4049-4052`), slot 15 of `d.LoadedFloorDecorations`, which no level fills:
  * `ReadTablesFromGraphicsFile` sets it once to graphic 241 and rectangle set 1
- * (`:10270-10273`). The canary for both numbers: graphics 241-246 are the sizes of set 1's
+ * (`:10394-10397`). The canary for both numbers: graphics 241-246 are the sizes of set 1's
  * nine rectangles and of no other set's. And a frame of the real renderer with a magic
  * print on the cell ahead differs from the frame without it, inside that cell's rectangle,
  * the trail having been round its ring of 24 and the party having walked on from the print.

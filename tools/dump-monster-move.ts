@@ -4,7 +4,7 @@
  * Four things need to hold when a group moves, and none of them are visible without
  * looking: the record leaves one cell and appears in the other; its `ITEM16` keeps
  * `uByte10`/`uByte11` and `ubPrevX`/`ubPrevY` — only `AttachItem16ToMonster` sets the
- * first pair (`CSBCode.cpp:6088-6090`), the AI caller the second; its AI timers stay behind at the
+ * first pair (`CSBCode.cpp:6147-6149`), the AI caller the second; its AI timers stay behind at the
  * square it left, since `MoveObject` never re-aims them; and a move onto an occupied square parks
  * the group on an abeyance timer instead of losing it — up to 31 of them per square, past
  * which an ordinary group is deleted.
@@ -91,7 +91,7 @@ async function main(): Promise<void> {
     check(!monsterAt(mx, my), 'the old cell should no longer hold the creature');
     check(monsterAt(nx, ny), 'the new cell should hold the creature');
     // `MoveObject` does not re-aim them; the AI caller re-aims the one it is processing
-    // (doc/CSBwin-src/Monster.cpp:2440), and only a DSA move re-aims the rest.
+    // (doc/CSBwin-src/Monster.cpp:2444), and only a DSA move re-aims the rest.
     check(timersAtOld === timersBefore && timersAtNew === 0, 'the AI timers should stay where they were');
     check(mover.slot.uByte10 === mx && mover.slot.uByte11 === my,
       "MoveObject leaves ITEM16's uByte10/11 alone (only AttachItem16ToMonster sets them)");
@@ -144,11 +144,11 @@ async function main(): Promise<void> {
   }
 
   // ---- Case 4: CreateMovementTimer's overflow guard ------------------------
-  // `CreateMovementTimer` (doc/CSBwin-src/Code11f52.cpp:2446-2524) counts the
+  // `CreateMovementTimer` (doc/CSBwin-src/Code11f52.cpp:2481-2559) counts the
   // TT_60/TT_61 timers of its own kind already waiting on the square; from 31 up it
   // deletes the group instead of queueing a 32nd, unless the group is `Unique()` or
-  // carries something (`:2473-2512`). `Unique()` is `drawAsSize4Monsters && bit 13`
-  // (`CSB.h:1129`), and that design option is off in DM's dungeon, so a raw bit 13 must
+  // carries something (`:2508-2547`). `Unique()` is `drawAsSize4Monsters && bit 13`
+  // (`CSB.h:1132`), and that design option is off in DM's dungeon, so a raw bit 13 must
   // not save a group.
   {
     const dest = new Position(1, 1, level);

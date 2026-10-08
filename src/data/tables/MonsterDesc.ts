@@ -1,9 +1,9 @@
 /**
  * CSBWin `MONSTERDESC` — 26 bytes, 27 of them, from `graphics.dat` item `0x22f`
- * (doc/CSBwin-src/CSB.h:2256-2363, `d.MonsterDescriptor[27]` at doc/CSBwin-src/Data.h:1076).
+ * (doc/CSBwin-src/CSB.h:2319-2422, `d.MonsterDescriptor[27]` at doc/CSBwin-src/Data.h:1091).
  *
  * `word2`, `word4`, `word14`, `word16`, `word18` and `word20` are the six swapped
- * fields (`fixItem26`, doc/CSBwin-src/CSBCode.cpp:10042) — i.e. big-endian in the
+ * fields (`fixItem26`, doc/CSBwin-src/CSBCode.cpp:10166) — i.e. big-endian in the
  * file, like everything else of Atari origin. The named bit accessors below are
  * kept as free functions rather than methods so the record stays a plain struct.
  */
@@ -28,7 +28,7 @@ export interface MonsterDesc {
 }
 
 /*
- * `MONSTERDESC.word2` (doc/CSBwin-src/CSB.h:2268-2296).
+ * `MONSTERDESC.word2` (doc/CSBwin-src/CSB.h:2331-2359).
  */
 export const monsterHorizontalSize = (d: MonsterDesc): number => d.word2 & 3;
 export const monsterVerticalSize = (d: MonsterDesc): number => (d.word2 & 0x180) >> 7;
@@ -44,7 +44,7 @@ export const monsterCanSeeInDark = (d: MonsterDesc): boolean => (d.word2 & 0x100
 export const monsterInvincible = (d: MonsterDesc): boolean => (d.word2 & 0x2000) !== 0;
 
 /*
- * `MONSTERDESC_WORD4` (doc/CSBwin-src/CSB.h:2232-2253).
+ * `MONSTERDESC_WORD4` (doc/CSBwin-src/CSB.h:2295-2316).
  */
 export const monsterNibble0 = (d: MonsterDesc): number => d.word4 & 3;
 export const monsterNibble12 = (d: MonsterDesc): number => (d.word4 >> 12) & 3;
@@ -59,7 +59,7 @@ export const monsterAttackingMirrorOK = (d: MonsterDesc): boolean => (d.word4 & 
 export const monsterWord4Bit10 = (d: MonsterDesc): boolean => (d.word4 & 0x0400) !== 0;
 
 /*
- * `word14` / `word16` / `word18` / `word20` bitfields (doc/CSBwin-src/CSB.h:2348-2362).
+ * `word14` / `word16` / `word18` / `word20` bitfields (doc/CSBwin-src/CSB.h:2410-2421).
  * `sightDistance` is halved for each level of darkness by the caller.
  */
 export const monsterSightDistance = (d: MonsterDesc): number => d.word14 & 15;

@@ -1,11 +1,11 @@
 /**
- * `MakeMoreRoomInDB` (`doc/CSBwin-src/Character.cpp:182-358`): a database is full and a new
+ * `MakeMoreRoomInDB` (`doc/CSBwin-src/Character.cpp:183-359`): a database is full and a new
  * object needs a record, so throw an object of that database out of the dungeon and hand
  * its record over. `FindEmptyDB<n>Entry` calls it when `FindEmptyDBEntry` finds no free
- * record (`CSBCode.cpp:4942-5084`); here, `DungeonState.findEmptyDBEntry` does.
+ * record (`CSBCode.cpp:5007-5149`); here, `DungeonState.findEmptyDBEntry` does.
  *
  * It first `Enlarge`s the database (`DungeonState.enlarge`), which fails once it holds
- * `db.Max` records, 8000 for most (`data.cpp:813-876`, `CSB.h:1646`). Since
+ * `db.Max` records, 8000 for most (`data.cpp:814-877`, `CSB.h:1649`). Since
  * `FindEmptyDBEntry` has tried that already, it succeeds here only when that one had a
  * free record but no slot to give it.
  *
@@ -25,8 +25,8 @@ import { DeleteMonsterWhy, deleteMonsterParameters } from './MonsterDamage';
 /**
  * `rnD5.pos(0)`, for a group or a missile, which `DeleteDBEntry` has thrown out with its
  * slot: CSBWin returns that free slot, which names no record, and `FindEmptyDB<n>Entry`'s
- * `GetRecordAddressDB<n>` then reads none (`doc/CSBwin-src/data.cpp:1011-1014`,
- * `CSBCode.cpp:4847`). The port names the freed record anew, `RN(dbType, index)`, as the
+ * `GetRecordAddressDB<n>` then reads none (`doc/CSBwin-src/data.cpp:1013-1016`,
+ * `CSBCode.cpp:4912`). The port names the freed record anew, `RN(dbType, index)`, as the
  * Atari original's RN, the record's own number, still named it (`DEBT.md` H). A record
  * `DeleteDBEntry` left alone, "Cloned!!!", keeps its slot, and that is returned.
  */
@@ -80,7 +80,7 @@ export function makeMoreRoomInDB(ctx: GameContext, dbType: DBType): ObjectID {
                             return freedRecord(ctx, dbType, rn, index);
                         }
                         case DBType.MISSILE: {
-                            // `TAG00e156`: the missile's timer goes (`Code11f52.cpp:1545-1551`),
+                            // `TAG00e156`: the missile's timer goes (`Code11f52.cpp:1580-1586`),
                             // then `RemoveObjectFromRoom` and `ProcessObjectFromMissile`, which
                             // the port's `processObjectFromMissile` does together.
                             ctx.timers.deleteTimer(dungeon.getMissileRecord(rn)!.timerIndex);

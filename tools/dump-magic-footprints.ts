@@ -5,9 +5,9 @@
  *
  * - the spell starts the range at the trail's end, `d.IndexOfFirstMagicFootprint =
  *   d.NumFootprintEnt`, and closes it there for a spell power under 3 or sets its end to
- *   0 otherwise (`doc/CSBwin-src/Magic.cpp:1331-1342`);
+ *   0 otherwise (`doc/CSBwin-src/Magic.cpp:1333-1344`);
  * - each party move while `d.MagicFootprintsActive` raises the end to the new count
- *   (`Code11f52.cpp:3237-3241`);
+ *   (`Code11f52.cpp:3272-3276`);
  * - the save writes the count and both ends into the party tail beside the trail.
  *
  * So a party that casts, then walks four squares, saves the range from the count at the
@@ -18,13 +18,13 @@
  *
  * - `csbgame-early-3hero-nospace.dat`, whose trail holds three prints;
  * - `csbgame-early-1hero.dat`, whose trail is empty. Only the first move's
- *   `AddFootprintEntry` waits for a print (`if (D6W != 0)`, `Code11f52.cpp:3231-3234`): the
+ *   `AddFootprintEntry` waits for a print (`if (D6W != 0)`, `Code11f52.cpp:3266-3269`): the
  *   move still counts and stores its own, so the trail grows from nothing, as CSBWin's
  *   `csbgame-early-2hero-renamed.dat`, one move later, shows with its one print.
  *
  * And the ring itself, on a bare `PartyFootprints`. `DeleteFootprintEntry`
- * (`Code11f52.cpp:4318-4338`) drops an entry by moving the ones above it down one:
- * `MemMove` takes its source first (`CSBCode.cpp:824`). So a full trail is always the last
+ * (`Code11f52.cpp:4356-4376`) drops an entry by moving the ones above it down one:
+ * `MemMove` takes its source first (`CSBCode.cpp:834`). So a full trail is always the last
  * 24 squares walked, in order, the magic range slides down with them, and the ten-second
  * update's drop of the oldest print (`Code17818.cpp:181-195`) leaves the rest in place.
  *

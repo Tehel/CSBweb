@@ -1,7 +1,7 @@
 /**
  * A game file's signature, CSBWin's check that `graphics.dat` and `CSBgraphics.dat` are
  * the files a game was made with (`openGraphicsFile`, `OpenCSBgraphicsFile`,
- * `doc/CSBwin-src/Graphics.cpp:1764-1819`, `:1840-1896`; `src/engine/FileSignatures.ts`).
+ * `doc/CSBwin-src/Graphics.cpp:1788-1843`, `:1864-1920`; `src/engine/FileSignatures.ts`).
  */
 import { md5 } from '../core/md5';
 
@@ -12,7 +12,7 @@ export interface FileSignature {
 }
 
 /**
- * `Signature(fileHandle, …)` (`doc/CSBwin-src/data.cpp:1953-1975`): the file's MD5, its
+ * `Signature(fileHandle, …)` (`doc/CSBwin-src/data.cpp:1956-1979`): the file's MD5, its
  * first eight bytes as two longwords, little-endian. A first longword of 0 is 1.
  */
 export function Signature(bytes: Uint8Array): FileSignature {
@@ -25,7 +25,7 @@ export function Signature(bytes: Uint8Array): FileSignature {
 
 /**
  * `o = (n | (n>>16)) & 0xffff` over `n = signature1 | signature2`
- * (`doc/CSBwin-src/Graphics.cpp:1784-1785`, `:1849-1851`): the sixteen bits a dungeon's
+ * (`doc/CSBwin-src/Graphics.cpp:1808-1809`, `:1873-1875`): the sixteen bits a dungeon's
  * `EDBT_RuntimeFileSignatures` record names a file by.
  */
 export function foldedSignature(signature: FileSignature): number {

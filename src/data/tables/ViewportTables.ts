@@ -8,7 +8,7 @@ export interface ViewportTables {
   mirrorWallRectF2: RectPos; // d.Byte2962 (byte RectPos for mirrored F2)
   mirrorWallRectF3: RectPos; // d.Byte2958 (byte RectPos for mirrored F3)
 
-  // Additional CSBWin viewport tables in `graphic 0x22e` (Data.h:1184+)
+  // Additional CSBWin viewport tables in `graphic 0x22e` (Data.h:1199+)
   teleporterRectangles: RectPos[]; // `d.teleporterRectangles[12]`
   doorRects: {
     F1R1: RectPos[]; // `d.DoorRectsF1R1[10]`
@@ -30,17 +30,17 @@ export interface ViewportTables {
   stairFacingDownRect: RectPos[]; // `d.StairFacingDownRect[11]`
   stairFacingUpRect: RectPos[]; // `d.StairFacingUpRect[11]`
 
-  // See-through door edge helpers (Viewport.cpp:2576+)
+  // See-through door edge helpers (Viewport.cpp:2583+)
   seeThruWallsRect: RectPos; // `d.SeeThruWallsRect`
   seeThruWallsRect2: RectPos; // `(RectPos *)&d.SeeThruWallsRect.b.uByte4`
-  /** `d.SeeThruWallsRect.b.uByte4` / `.uByte6`: where in the viewport the F1 wall's hole starts (`Viewport.cpp:2961-2962`). */
+  /** `d.SeeThruWallsRect.b.uByte4` / `.uByte6`: where in the viewport the F1 wall's hole starts (`Viewport.cpp:2968-2969`). */
   seeThruWallsRectUByte4: number;
   seeThruWallsRectUByte6: number;
   seeThruDoorEdgeRect: RectPos; // `(RectPos *)d.uByte2542`
   /**
    * `(RectPos *)d.Byte2546` — where the Hall of Champions portrait goes in the
    * viewport, used only by the `relativePosition == 12` arm of `DrawWallDecoration`
-   * (`doc/CSBwin-src/CSBCode.cpp:3693-3700`). Byte-form: 32x29 pixels, the size of one
+   * (`doc/CSBwin-src/CSBCode.cpp:3758-3765`). Byte-form: 32x29 pixels, the size of one
    * cell of the graphic-26 portrait sheet.
    */
   championPortraitRect: RectPos;

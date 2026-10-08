@@ -1,7 +1,7 @@
 /**
  * Falling down a pit, and what it costs.
  *
- * `MoveObject`'s pit branch (`doc/CSBwin-src/Code11f52.cpp:3016-3106`) is the only
+ * `MoveObject`'s pit branch (`doc/CSBwin-src/Code11f52.cpp:3051-3141`) is the only
  * place the party's own fall damage happens, and none of it is visible on a frame.
  * Three outcomes share the branch:
  *
@@ -70,7 +70,7 @@ function fall(g: Game, pit: Position): Position {
   g.ctx.party.state.position = new Position(pit.x, pit.y, pit.z);
   g.systems.worldMove.moveParty(-1, 0, pit.x, pit.y);
   // The next tick: the level below loaded, then `DisplayCharacterDamage` takes the fall
-  // off the HP (doc/CSBwin-src/CSBCode.cpp:615-657).
+  // off the HP (doc/CSBwin-src/CSBCode.cpp:625-667).
   g.loadNewPartyLevel();
   g.systems.monsterAttack.displayCharacterDamage();
   return g.ctx.party.state.position;

@@ -21,24 +21,24 @@ import type { Rect, SoundTableEntry } from '../data/tables/UITables';
 export interface GameTables {
   // --- Objects: `d.ObjDesc`, where a possession may go, and in what order it drops ---
 
-  /** `d.ObjDesc[180].objectType()` — an object's name index (`Data.h:1085`). */
+  /** `d.ObjDesc[180].objectType()` — an object's name index (`Data.h:1100`). */
   readonly objDescObjectType: ArrayLike<number>;
   /** `d.ObjDesc[180].word4` — the carry-location mask. */
   readonly objDescWord4: ArrayLike<number>;
-  /** `d.CarryLocation[38]` (`Data.h:1427`). */
+  /** `d.CarryLocation[38]` (`Data.h:1442`). */
   readonly carryLocation: ArrayLike<number>;
-  /** `d.Byte640` — a lit torch's charge to its name-index offset (`Data.h:1450`). */
+  /** `d.Byte640` — a lit torch's charge to its name-index offset (`Data.h:1465`). */
   readonly byte640: ArrayLike<number>;
-  /** `d.DropOrder[30]` — the order `DropAllPossessions` empties the slots (`Data.h:1405`). */
+  /** `d.DropOrder[30]` — the order `DropAllPossessions` empties the slots (`Data.h:1420`). */
   readonly dropOrder: ArrayLike<number>;
 
   // --- Object descriptors: weapons, clothing, miscellaneous ---
 
-  /** `d.weapons[46]`, the whole `WEAPONDESC` (`Data.h:1082`). */
+  /** `d.weapons[46]`, the whole `WEAPONDESC` (`Data.h:1097`). */
   readonly weaponDesc: ArrayLike<WeaponDesc>;
   /** `d.weapons[46].weight`. */
   readonly weaponWeights: ArrayLike<number>;
-  /** `d.ClothingDesc[58].weight` (`Data.h:1081`). */
+  /** `d.ClothingDesc[58].weight` (`Data.h:1096`). */
   readonly clothingWeights: ArrayLike<number>;
   /** `d.ClothingDesc[58].uByte1` — the armour strength a garment gives. */
   readonly clothingArmour: ArrayLike<number>;
@@ -49,9 +49,9 @@ export interface GameTables {
 
   // --- Monsters ---
 
-  /** `d.MonsterDescriptor[27]` (`Data.h:1076`). */
+  /** `d.MonsterDescriptor[27]` (`Data.h:1091`). */
   readonly monsterDesc: ArrayLike<MonsterDesc>;
-  /** `d.MonsterDroppings[40]` — what a dying monster leaves behind (`Data.h:1074`). */
+  /** `d.MonsterDroppings[40]` — what a dying monster leaves behind (`Data.h:1089`). */
   readonly monsterDroppings: ArrayLike<number>;
   /** `d.Byte10340[4]` — a group's facing byte without an `ITEM16`. */
   readonly byte10340: ArrayLike<number>;
@@ -60,15 +60,15 @@ export interface GameTables {
 
   // --- The dungeon ---
 
-  /** `d.DoorCharacteristics[4]`, which each level indexes twice to form `DoorTOC` (`Data.h:1073`). */
+  /** `d.DoorCharacteristics[4]`, which each level indexes twice to form `DoorTOC` (`Data.h:1088`). */
   readonly doorCharacteristics: ArrayLike<number>;
   /** `d.Byte1596[8]` — the room-type timer functions. */
   readonly byte1596: ArrayLike<number>;
-  /** `d.Byte7302[16]` — the extra records a new game gives each database (`Data.h:1099`). */
+  /** `d.Byte7302[16]` — the extra records a new game gives each database (`Data.h:1114`). */
   readonly byte7302: ArrayLike<number>;
-  /** `d.Word1074[16]` — the light table; entry 2 is an Illumulet's brightness and the LIGHT attack's step (`Data.h:1424`). */
+  /** `d.Word1074[16]` — the light table; entry 2 is an Illumulet's brightness and the LIGHT attack's step (`Data.h:1439`). */
   readonly word1074: number[];
-  /** `d.PaletteBrightness[6]` — the least light each viewport palette needs, brightest first (`Data.h:1422`). */
+  /** `d.PaletteBrightness[6]` — the least light each viewport palette needs, brightest first (`Data.h:1437`). */
   readonly paletteBrightness: ArrayLike<number>;
   /** `d.Byte10080`, `d.Byte10336` and `d.Byte10016`, `DecodeText`'s escape strings. */
   readonly textDecode: TextDecodeTables;
@@ -84,7 +84,7 @@ export interface GameTables {
   /** `d.Byte1386[4]` — each champion's message colour. */
   readonly byte1386: ArrayLike<number>;
 
-  // --- Attacks and spells: graphic `0x230`, indexed by `ATTACKTYPE` (`Data.h:638-651`).
+  // --- Attacks and spells: graphic `0x230`, indexed by `ATTACKTYPE` (`Data.h:647-660`).
   //     CSBWin names most of them after their addresses, and so do we: nothing in the C++
   //     says what four of them mean. ---
 
@@ -111,13 +111,13 @@ export interface GameTables {
 
   /**
    * `d.MoveButn18496[4]` — the step arrows' screen rectangles, forward, right, backward
-   * and left (`doc/CSBwin-src/Data.h:699`), which `FlashButton` flashes.
+   * and left (`doc/CSBwin-src/Data.h:708`), which `FlashButton` flashes.
    */
   readonly moveButtons: readonly Rect[];
 
   // --- Sound ---
 
-  /** `d.sound1772[22]` — `QueueSound`'s table (`Data.h:1402`). */
+  /** `d.sound1772[22]` — `QueueSound`'s table (`Data.h:1417`). */
   readonly sound1772: SoundTableEntry[];
 
   // --- The file itself ---

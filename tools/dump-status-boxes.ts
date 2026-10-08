@@ -1,14 +1,14 @@
 /**
  * The boxes around the mouth and the eye in an open inventory.
  *
- * `doc/CSBwin-src/Character.cpp:1363-1392` blits one of two graphics into each of two
+ * `doc/CSBwin-src/Character.cpp:1368-1397` blits one of two graphics into each of two
  * fixed rectangles: **33** is the plain box, **34** the one that marks something wrong.
  * The mouth is marked when the champion is starving, parched or poisoned; the eye when
  * any of attributes **1..6** has Current below Maximum.
  *
  * The second is the "red square after a level gain" this port had an open question
  * about for a long time, and the answer is that it has nothing to do with levels. A
- * level raises the *maxima* (`doc/CSBwin-src/Magic.cpp:98-148`) and leaves Current
+ * level raises the *maxima* (`doc/CSBwin-src/Magic.cpp:101-151`) and leaves Current
  * where it stood, so the gap opens and the box changes — and a champion drained by a
  * monster shows exactly the same box.
  *

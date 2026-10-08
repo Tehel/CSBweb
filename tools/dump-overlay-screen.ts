@@ -2,14 +2,14 @@
  * The viewport overlay's screen half (`src/renderer/csbwin/OverlayScreen.ts`), on `dm-atari`'s `CSBgraphics.dat`: the table
  * `CreateOverlayTable` builds, and the viewport `UpdateScreenArea` composes through it.
  *
- * 1. **The straight branch** (`doc/CSBwin-src/Graphics.cpp:3069-3090`): each intensity as
+ * 1. **The straight branch** (`doc/CSBwin-src/Graphics.cpp:3096-3117`): each intensity as
  *    five bits `(i << 2) | (i >> 1)`. The canvas shows the rest of the screen in each
  *    intensity times 36 instead, a deliberate divergence (`DEBT.md` H): both are printed.
- * 2. **No overlay up** (`:3049-3068`): through the identity overlay palette, every Atari
+ * 2. **No overlay up** (`:3076-3095`): through the identity overlay palette, every Atari
  *    colour is the straight branch's, which is why the screen keeps its straight path then
  *    (`overlayDrawsNothing`). A palette from `&PALETTE`, a graphic jitter or an overlay up
  *    each make it draw.
- * 3. **An overlay up** (`:2989-3048`): entry `(I << 4) + i` is `m_p2` percent of colour
+ * 3. **An overlay up** (`:3016-3075`): entry `(I << 4) + i` is `m_p2` percent of colour
  *    `i` and the rest of overlay colour `I`, each channel `/ 800`; with bit 0 of `m_p1`,
  *    colour `m_p4` is colour `i`'s alone.
  * 4. **The composition** (`WinScreen.cpp:1064-1300`): each viewport pixel is

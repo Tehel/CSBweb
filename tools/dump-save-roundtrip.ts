@@ -20,14 +20,14 @@
  *     the lowest ones. `LoadGame` is followed by `reloadAfterSaveGame`, whose
  *     `processMonstersOnLevel` deletes and re-creates the movement timers of every
  *     monster group on the party's level (`LoadPartyLevel`,
- *     `doc/CSBwin-src/CSBCode.cpp:10491`), so a restore that numbered new timers above the
+ *     `doc/CSBwin-src/CSBCode.cpp:10615`), so a restore that numbered new timers above the
  *     restored ones would abandon two slots a cycle on `csbgame7.dat`.
  *     3b. A table filled to `SetTimer`'s jump (`Timer.cpp:999-1008`) is written with its
  *     new size and its cursor, and read back with both.
  *  4. `GAMEBLOCK2`'s wiring, and 5. the busy bit, out of a live game and back.
  *  6. **Playing on after a save, beside a load of it.** The save does to the game it
  *     leaves what a load does, once the file is closed
- *     (`doc/CSBwin-src/SaveGame.cpp:1237-1245`, `Game.saveWritten`), so the two never part.
+ *     (`doc/CSBwin-src/SaveGame.cpp:1335-1343`, `Game.saveWritten`), so the two never part.
  *  7. **A save carries its world**: one of CSB's eleven levels, loaded into a game built
  *     over DM's fourteen, installs the file's world.
  *  8. **The file alone.** A game played from `dungeon.dat`, one played on from
@@ -43,7 +43,7 @@
  * no-op. `processMonstersOnLevel` really does create new timers, so their `sequence`
  * numbers advance and the random stream moves on; `NextMonsterUpdateTime` really does
  * re-roll each member's `singleMonsterStatus` walk offsets
- * (`doc/CSBwin-src/CSBCode.cpp:5842`), so a monster's sprite may sit a pixel further
+ * (`doc/CSBwin-src/CSBCode.cpp:5907`), so a monster's sprite may sit a pixel further
  * left after a load. Sections 1 to 5 leave those out by name; 6, 7 and 9 compare with
  * the game the save left, which has been through the same.
  *
@@ -210,7 +210,7 @@ function compareConvertedImage(label: string, source: Game, restored: Game): voi
 
 /**
  * A timer table as a file holds it. `TIMER` bytes 6-7 and 8-9 are each one pair, read as
- * two bytes or as a word by the timer's function (`doc/CSBwin-src/CSB.h:1818-1860`). A
+ * two bytes or as a word by the timer's function (`doc/CSBwin-src/CSB.h:1881-1923`). A
  * live entry carries the reading its creator set and a loaded one both, so the game a
  * save left and a load of it are compared on the bytes, which are the file's. Section 9
  * checks that a word never says more than its bytes.
@@ -351,7 +351,7 @@ const NOT_CARRIED: Array<{ pattern: string; why: string; holds: (d: Difference, 
   },
   {
     pattern: '.dungeon.snapshot.databases.scrolls[].textReference',
-    why: 'a free record keeps only its link (data.cpp:993-1015)',
+    why: 'a free record keeps only its link (data.cpp:995-1017)',
     holds: (d, { live }) => isFree(live, 'scrolls', d),
   },
   {
@@ -394,7 +394,7 @@ function playFromDungeonDat(): Game {
     party.position = new Position(hero.location.x - DELTA_X[facing]!, hero.location.y - DELTA_Y[facing]!, hero.location.map);
     party.facing = facing as Direction;
     game.systems.mouse.handleWallClick();
-    // `_ResurrectReincarnateCancel`'s Resurrect (`doc/CSBwin-src/CSBCode.cpp:6615`).
+    // `_ResurrectReincarnateCancel`'s Resurrect (`doc/CSBwin-src/CSBCode.cpp:6674`).
     game.systems.hallOfChampions.resurrectReincarnateCancel(160);
   }
   for (const action of [
@@ -533,7 +533,7 @@ function main(): void {
 
     check(before === 2, `${file}: the door starts half open, as the file has it`);
     check(viaPayload === viaFile, `${file}: the door ends where loading the file directly puts it`);
-    // 0 is fully open and 4 fully shut (`doc/CSBwin-src/CSBTypes.h:185-192`).
+    // 0 is fully open and 4 fully shut (`doc/CSBwin-src/CSBTypes.h:190-197`).
     check(viaPayload === (expected === 'open' ? 0 : 4),
       `${file}: the door came ${expected} after the round trip`);
   }
@@ -567,7 +567,7 @@ function main(): void {
 
   // `SetTimer` jumps `m_firstAvailTimer` to `m_maxTimers` and enlarges the table once it
   // is within five of full (`doc/CSBwin-src/Timer.cpp:999-1008`); `SaveGame` writes both
-  // and `LoadGame` reads both back (`SaveGame.cpp:1638-1640`).
+  // and `LoadGame` reads both back (`SaveGame.cpp:1762-1764`).
   console.log('\n=== csbgame7.dat filled to the jump, then saved and loaded ===');
   {
     const filled = fromCsbwinSave('csbgame7.dat');
@@ -652,7 +652,7 @@ function main(): void {
   /* ---- 5. the busy bit, out of a live game and back ---- */
 
   // A busy champion is `CHARFLAG_attackDisable` in `charFlags`. `DisableCharacterAction`
-  // sets it when the champion has no busy timer yet (`doc/CSBwin-src/Magic.cpp:528-531`)
+  // sets it when the champion has no busy timer yet (`doc/CSBwin-src/Magic.cpp:531-534`)
   // and `EnableCharacterAction` clears it (`Timer.cpp:2646`), so a save written while
   // the champion is busy carries bit 3, and one written after the timer fired does not.
   console.log('\n=== CHARFLAG_attackDisable, busy and freed ===');
@@ -687,7 +687,7 @@ function main(): void {
     check(busy(champion(next)) && champion(next).busyTimerIndex === timer,
       'and so does a fresh game that reads it back');
 
-    // Busied again while busy, the timer is replaced by a later one (`Magic.cpp:517-525`):
+    // Busied again while busy, the timer is replaced by a later one (`Magic.cpp:520-528`):
     // due at d.Time + 8 + 8/2. The bit is already set and stays.
     game.ctx.systems.magic.disableCharacterAction(0, 8);
     report('busied again', game);
@@ -695,8 +695,8 @@ function main(): void {
       'busied again while busy, the champion keeps the bit and a busy timer');
 
     // Set between ticks for d.Time + n, as an attack click sets it, the TT_11 fires in the
-    // n+1th tick: the first runs its timers on the d.Time it was set from (CSBCode.cpp:626,
-    // :660). Live, d.Time + 12; restored, the first timer's d.Time + 8.
+    // n+1th tick: the first runs its timers on the d.Time it was set from (CSBCode.cpp:636,
+    // :670). Live, d.Time + 12; restored, the first timer's d.Time + 8.
     for (const [label, g, ticks] of [['live', game, 13], ['restored', next, 9]] as const) {
       advance(g, ticks - 1);
       check(busy(champion(g)), `${label}: still busy ${ticks - 1} ticks on, one before the timer`);
@@ -734,7 +734,7 @@ function main(): void {
   /* ---- 6. playing on after a save, beside a load of it ---- */
 
   // Once the file is closed, CSBWin's save detaches every group and runs
-  // `ProcessMonstersOnLevel` (`doc/CSBwin-src/SaveGame.cpp:1237-1245`), as a restore does,
+  // `ProcessMonstersOnLevel` (`doc/CSBwin-src/SaveGame.cpp:1335-1343`), as a restore does,
   // so the game played on after a save is the one a load of it gives back. csbgame7.dat's
   // party level has live groups; 30 ticks of play first make their timers the game's own.
   // Stepped side by side, the monsters' ITEM16 slots (their `singleMonsterStatus` among
@@ -782,7 +782,7 @@ function main(): void {
 
   // The file carries the whole world, structure and all, and a load installs it in place
   // of the one the game was running (`applyCsbwinSave`), as `_ReadEntireGame` reads a
-  // save's (`doc/CSBwin-src/SaveGame.cpp:2324`). CSB's `mini.dat`, eleven levels, is
+  // save's (`doc/CSBwin-src/SaveGame.cpp:2536`). CSB's `mini.dat`, eleven levels, is
   // played 30 ticks in a game built over DM's fourteen, saved, and loaded into another
   // game built over DM's. Section 9 plays the two on side by side.
   console.log('\n=== a save of CSB\'s world, into a game built over DM\'s ===');

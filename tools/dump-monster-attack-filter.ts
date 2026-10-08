@@ -1,23 +1,23 @@
 /**
- * The monster attack filter (`doc/CSBwin-src/Monster.cpp:1125-1171`), which `MonsterAttacks`
+ * The monster attack filter (`doc/CSBwin-src/Monster.cpp:1129-1175`), which `MonsterAttacks`
  * runs between filling in its parameter block and acting on it, with DSAs on its square,
  * against a genuine save (`csbgame7.dat`). A group on the party's level, made a Mummy,
  * attacks the party, which stands north of it.
  *
  * 1. **Every DSA at the location runs**, each with a count of 20 and the
- *    `ATTACK_PARAMETERES` block (`:1164-1165`), in the struct's order (`:917-938`):
+ *    `ATTACK_PARAMETERES` block (`:1168-1169`), in the struct's order (`:921-942`):
  *    the monster's RN, type, index in the group and level, its square, its corner, the
  *    missile's corner, range, damage and decay, the direction and distance to the party,
  *    the missile, the two flags, the champion to hit, the sound, `disableTime` and
  *    `supressPoison` -1.
  * 2. **A DSA's rewrite is what the next one sees, and what the attack does**: the blow goes
  *    to the champion it names, and only to that one.
- * 3. **Each DSA runs on parameters of its own** (`NEWDSAPARAMETERS`, `:1153`): the caller's
+ * 3. **Each DSA runs on parameters of its own** (`NEWDSAPARAMETERS`, `:1157`): the caller's
  *    are as they were.
  * 4. **A launch the filter asks for** throws the missile it names, from the group's square
- *    (`:1180-1204`). `missileType` is a `ui32`, so -128 is not `RNFireball`'s 0xff80, and
+ *    (`:1184-1208`). `missileType` is a `ui32`, so -128 is not `RNFireball`'s 0xff80, and
  *    nothing is thrown.
- * 5. **Champion 4 is the leader**, `d.HandChar` (`:1215-1217`): whoever holds the cursor.
+ * 5. **Champion 4 is the leader**, `d.HandChar` (`:1219-1221`): whoever holds the cursor.
  * 6. **The block outlives the attack**: `disableTime`, which `MonsterAttacks` never writes,
  *    is what the last filter left there.
  *
@@ -32,7 +32,7 @@ import { MonsterType } from '../src/engine/monsterTypes';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
 import { check, finish } from './lib/check';
 
-/** `ESL_MONSTERATTACKFILTER` (`doc/CSBwin-src/CSB.h:1535`). */
+/** `ESL_MONSTERATTACKFILTER` (`doc/CSBwin-src/CSB.h:1538`). */
 const ESL_MONSTERATTACKFILTER = 0;
 const WORDS = 20;
 

@@ -50,7 +50,7 @@ import { monsterNonMaterial, monsterVerticalSize } from '../data/tables/MonsterD
 import { constructPredefinedMissile, decodeMissileTimerWord8, encodeMissileTimerWord8, spellObjectId } from './missileHelpers';
 
 /**
- * `soundDOOROPENING` (doc/CSBwin-src/CSB.h:626) — what the party hears when a closing
+ * `soundDOOROPENING` (doc/CSBwin-src/CSB.h:629) — what the party hears when a closing
  * door springs back off them.
  */
 const SOUND_DOOR_OPENING = 18;
@@ -58,7 +58,7 @@ const SOUND_DOOR_OPENING = 18;
 const SOUND_DOOR_STRUGGLE = 4;
 /** The ordinal `ProcessTT_1` queues for each step a door moves (`QueueSound(2, …)`, Timer.cpp:1375). */
 const SOUND_DOOR_STEP = 2;
-/** `soundTELEPORT` (doc/CSBwin-src/CSB.h:625). */
+/** `soundTELEPORT` (doc/CSBwin-src/CSB.h:628). */
 const SOUND_TELEPORT = 17;
 /** The missile types `ThrowMissile` throws as spells (`doc/CSBwin-src/Timer.cpp:2029-2040`). */
 const THROWN_SPELLS: ReadonlySet<number> = new Set([
@@ -82,8 +82,8 @@ export class TimerSystem {
   /**
    * `timerTypeModifier` (`doc/CSBwin-src/CSBCode.cpp:21`): the action each of SET, CLEAR
    * and TOGGLE stands for. `ProcessTimers` makes it 0, 1, 2 again before every timer
-   * (`:6412-6414`), and a DSA's `&MODIFYMESSAGE` changes it for the rest of the timer
-   * that ran it (`DSA.cpp:4931-4947`).
+   * (`:6471-6473`), and a DSA's `&MODIFYMESSAGE` changes it for the rest of the timer
+   * that ran it (`DSA.cpp:4932-4948`).
    */
   readonly timerTypeModifier = [0, 1, 2];
 
@@ -95,8 +95,8 @@ export class TimerSystem {
   }
 
   /**
-   * `ProcessTimers` (doc/CSBwin-src/CSBCode.cpp:6383): every timer due by `d.Time`,
-   * `ctx.state.tickCount`. True, at once, when one has won the game (`:6459-6464`), and
+   * `ProcessTimers` (doc/CSBwin-src/CSBCode.cpp:6442): every timer due by `d.Time`,
+   * `ctx.state.tickCount`. True, at once, when one has won the game (`:6518-6523`), and
    * the rest wait.
    */
   processTimers(): boolean {
@@ -132,7 +132,7 @@ export class TimerSystem {
   /** One timer. True when it has won the game: `ProcessTT_STONEROOM`'s actuator type 18. */
   private dispatch(timer: TimerEntry): boolean {
     // The monster AI is routed off before the switch, exactly as CSBWin does
-    // (doc/CSBwin-src/CSBCode.cpp:6422-6429) — timer types 29-41 never reach the
+    // (doc/CSBwin-src/CSBCode.cpp:6481-6488) — timer types 29-41 never reach the
     // ordinary timer dispatch.
     if (
       timer.function >= TimerFunction.TT_FIRST_MONSTER_AI &&
@@ -190,7 +190,7 @@ export class TimerSystem {
       case TimerFunction.TT_11:
         this.processActionDisableTimer(timer);
         break;
-      // `case TT_12: TAG011366(timeEnt.timerUByte5()); break;` (doc/CSBwin-src/CSBCode.cpp:6477).
+      // `case TT_12: TAG011366(timeEnt.timerUByte5()); break;` (doc/CSBwin-src/CSBCode.cpp:6536).
       case TimerFunction.TT_12:
         this.ctx.systems.monsterAttack.tag011366(timer.uByte5 & 0xff);
         break;
@@ -233,7 +233,7 @@ export class TimerSystem {
         this.processReactivateGenerator(timer);
         break;
       case TimerFunction.TT_20:
-        // `doc/CSBwin-src/CSBCode.cpp:6485-6492`, on `d.LoadedLevel`, the timer's.
+        // `doc/CSBwin-src/CSBCode.cpp:6544-6551`, on `d.LoadedLevel`, the timer's.
         this.ctx.sounds.queueSound(timer.timerWord8, timer.uByte6, timer.uByte7, 1, timer.level);
         break;
       default:
@@ -245,7 +245,7 @@ export class TimerSystem {
   private processActionDisableTimer(timer: TimerEntry): void {
     const chIdx = timer.uByte5 & 0xff;
     if (!this.ctx.party.state.champions[chIdx]) return;
-    // The `TT_11` case (doc/CSBwin-src/CSBCode.cpp:6466-6475): `EnableCharacterAction`,
+    // The `TT_11` case (doc/CSBwin-src/CSBCode.cpp:6525-6534): `EnableCharacterAction`,
     // then `TAG0115ee(chIdx, uByte6 - 1)` when `uByte6 != 0` — the slot a throw emptied.
     this.enableCharacterAction(chIdx);
     const refillSlot = timer.uByte6 & 0xff;
@@ -346,8 +346,8 @@ export class TimerSystem {
 
   /**
    * `TT_71`, `TT_73` and `TT_79` take one off an `i8` counter, and `TT_74`, `TT_77` and
-   * `TT_78` their word off an `i16` shield (`doc/CSBwin-src/CSBCode.cpp:6519`,
-   * `:6549-6572`). None has a floor: a timer that takes back more than is there leaves
+   * `TT_78` their word off an `i16` shield (`doc/CSBwin-src/CSBCode.cpp:6578`,
+   * `:6608-6631`). None has a floor: a timer that takes back more than is there leaves
    * the counter below zero.
    */
   private processInvisibleTimer(): void {
@@ -367,9 +367,9 @@ export class TimerSystem {
   }
 
   /**
-   * `TT_72` (`doc/CSBwin-src/CSBCode.cpp:6520`) — a champion's own shield expires and
+   * `TT_72` (`doc/CSBwin-src/CSBCode.cpp:6579`) — a champion's own shield expires and
    * the Ya potion's contribution comes back off. Their box is drawn afresh
-   * (`CHARFLAG_portraitChanged`, `:6545-6547`).
+   * (`CHARFLAG_portraitChanged`, `:6604-6606`).
    */
   private processChampionShieldTimer(timer: TimerEntry): void {
     const chIdx = timer.uByte5 & 0xff;
@@ -381,7 +381,7 @@ export class TimerSystem {
   }
 
   /**
-   * The `TT_72` half of the Ya potion (`doc/CSBwin-src/Character.cpp:4386-4391`):
+   * The `TT_72` half of the Ya potion (`doc/CSBwin-src/Character.cpp:4403-4408`):
    * `shieldDuration` ticks from now, carrying the amount to take back.
    */
   scheduleChampionShieldExpiry(chIdx: number, amount: number, duration: number, level: number): void {
@@ -401,7 +401,7 @@ export class TimerSystem {
   }
 
   /**
-   * `TT_75` (`doc/CSBwin-src/CSBCode.cpp:6554`) — one tick of poison.
+   * `TT_75` (`doc/CSBwin-src/CSBCode.cpp:6613`) — one tick of poison.
    *
    * The count comes down here and `PoisonCharacter` puts it back up if there are ticks
    * left, so `poisonCount` sits at 1 for as long as the champion is poisoned and
@@ -416,7 +416,7 @@ export class TimerSystem {
   }
 
   /**
-   * The `TT_75` half of `PoisonCharacter` (`doc/CSBwin-src/CSBCode.cpp:7228-7235`):
+   * The `TT_75` half of `PoisonCharacter` (`doc/CSBwin-src/CSBCode.cpp:7287-7294`):
    * 36 ticks from now, on the party's level, carrying the champion and the number of
    * ticks still to come.
    */
@@ -439,7 +439,7 @@ export class TimerSystem {
   }
 
   /**
-   * The timer sweep of `CurePoison` (`doc/CSBwin-src/Character.cpp:3007-3031`) —
+   * The timer sweep of `CurePoison` (`doc/CSBwin-src/Character.cpp:3012-3036`) —
    * delete every outstanding `TT_75` for this champion. Zeroing `poisonCount` is the
    * caller's half. CSBWin walks a `TIMER_SEARCH`, so this walks `searchOrder`.
    */
@@ -735,7 +735,7 @@ export class TimerSystem {
       const target = new Position(x, y, timer.level);
 
       // `w_10 = pDB0_4->mode()` — read before either arm. Bit 5 of `DB0.word2`,
-      // up/down vs sideways (doc/CSBwin-src/CSB.h:837), which the loader reads as
+      // up/down vs sideways (doc/CSBwin-src/CSB.h:840), which the loader reads as
       // `vertical`.
       const doorRn = this.dungeon.findFirstDoor(target);
       const doorRecord =
@@ -950,7 +950,7 @@ export class TimerSystem {
 
   /**
    * `ThrowMissile` (`doc/CSBwin-src/Timer.cpp:2016-2078`), the DSA's `&THROW`
-   * (`DSA.cpp:4558`). A missile type of 0 throws the first object of `objectLocation`'s
+   * (`DSA.cpp:4559`). A missile type of 0 throws the first object of `objectLocation`'s
    * corner, taken out of the square; one of the eight spells is thrown as itself; any
    * other throws nothing. The missile is launched on the launch location's level.
    */
@@ -1049,7 +1049,7 @@ export class TimerSystem {
         // `chIndex = DB10A2->value()` (`doc/CSBwin-src/Timer.cpp:2788`). Bones with no
         // expool record were placed by the dungeon rather than by a death, and their
         // `value` — `DB10`'s bits 14-15, this port's `specialState`
-        // (`doc/CSBwin-src/CSB.h:1272`) — *is* the champion index.
+        // (`doc/CSBwin-src/CSB.h:1275`) — *is* the champion index.
         const record = this.dungeon.getMiscRecord(target);
         if (!record) return;
         chIdx = (record.specialState ?? 0) & 0x3;
@@ -1149,7 +1149,7 @@ export class TimerSystem {
 
   /**
    * Mirrors CSBWin `FindFirstMonster()` + `RN::NonMaterial()`
-   * (doc/CSBwin-src/Code11f52.cpp:533, doc/CSBwin-src/data.cpp:553).
+   * (doc/CSBwin-src/Code11f52.cpp:568, doc/CSBwin-src/data.cpp:554).
    * Only the FIRST monster in the cell chain is consulted, exactly as the
    * false-wall timer does (doc/CSBwin-src/Timer.cpp:1466-1472).
    */
@@ -1205,9 +1205,9 @@ export class TimerSystem {
       countMinus1 = (countMinus1 - 1) & 0xffff;
     }
 
-    // `ProcessTimers` has loaded the timer's level (`doc/CSBwin-src/CSBCode.cpp:6416-6417`),
+    // `ProcessTimers` has loaded the timer's level (`doc/CSBwin-src/CSBCode.cpp:6475-6476`),
     // so a 0 takes that level's multiplier (`Timer.cpp:1782-1786`), and the group is made
-    // there (`CreateMonster`'s `MoveObject` on `d.LoadedLevel`, `Code11f52.cpp:2857`).
+    // there (`CreateMonster`'s `MoveObject` on `d.LoadedLevel`, `Code11f52.cpp:2892`).
     const hitPointMultiplier = getActuatorHitPointMultiplier(actuator)
       || (this.dungeon.getMap(timer.level)?.descriptor.difficulty ?? 0);
     const facing = this.random.zeroTo3(); // doc/CSBwin-src/Timer.cpp:1791
@@ -1451,7 +1451,7 @@ export class TimerSystem {
         curMapX += missileDir === 1 ? 1 : missileDir === 3 ? -1 : 0;
         curMapY += missileDir === 2 ? 1 : missileDir === 0 ? -1 : 0;
 
-        // Off the map, `GetCellFlags` answers a stone cell (doc/CSBwin-src/CSBCode.cpp:4609)
+        // Off the map, `GetCellFlags` answers a stone cell (doc/CSBwin-src/CSBCode.cpp:4674)
         // and the room is `roomEXTERIOR`, which counts as stone (Timer.cpp:321-340), so the
         // missile meets the exterior wall.
         const map = this.dungeon.getMap(timer.level)!;
@@ -1579,14 +1579,14 @@ export class TimerSystem {
   }
 
   /**
-   * `TT_24` (`doc/CSBwin-src/CSBCode.cpp:6494`) — the object's time is up: out of the
+   * `TT_24` (`doc/CSBwin-src/CSBCode.cpp:6553`) — the object's time is up: out of the
    * cell and its record freed. Nothing happens once the game is won, which leaves the
    * Fluxcages around Lord Chaos standing through the endgame.
    */
   private processExpireObject(timer: TimerEntry): void {
     if (this.ctx.state.gameWon) return;
     // `timeEnt.timerObj8()`: the object, which this port keeps on `object`, as every
-    // creator of a `TT_24` / `TT_25` puts it there (`CreateFluxcage`, Code11f52.cpp:1535).
+    // creator of a `TT_24` / `TT_25` puts it there (`CreateFluxcage`, Code11f52.cpp:1570).
     const rn = timer.object ?? OBJECT_ID_EOF;
     if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return;
     const position = new Position(timer.uByte6 & 0xff, timer.uByte7 & 0xff, timer.level & 0xff);
@@ -1734,7 +1734,7 @@ export class TimerSystem {
    * `MoveObject(objD6.pos(missile.pos()), -2, 0, mapX, mapY, NULL, NULL)` — the
    * teleporter/pit loop, then `PlaceOrRemoveObjectInRoom`, so it moves on from an active
    * teleporter and presses a pad. `oldX` is -2, not -1, so a relative teleporter turns
-   * its corner (`Code11f52.cpp:3000-3006`). A spell or a cloud is not dropped (`:138`).
+   * its corner (`Code11f52.cpp:3035-3041`). A spell or a cloud is not dropped (`:173`).
    */
   private dropMissileObject(projectileObject: ObjectID, position: Position, posInCell: number): void {
     if (projectileObject >= 0xff80) return;
@@ -1757,7 +1757,7 @@ export class TimerSystem {
       this.ctx.systems.monsters.moveMonster(monster, mapX, mapY, mapX, mapY, level);
     }
 
-    // `FindFirstDrawableObject` (`doc/CSBwin-src/CSBCode.cpp:5140`), then count what
+    // `FindFirstDrawableObject` (`doc/CSBwin-src/CSBCode.cpp:5205`), then count what
     // lies beyond a monster: that many links are walked, whatever they hold, so an
     // object moved back into this cell is not moved twice (`Timer.cpp:2451-2465`).
     let first = this.dungeon.findFirstObject(position);

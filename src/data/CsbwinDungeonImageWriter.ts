@@ -2,18 +2,18 @@
  * Blocks 7-14 of a CSBWin save: the dungeon image, written.
  *
  * `src/data/CsbwinDungeonImage.ts` is the reader; this is the inverse, block by block,
- * in `SaveGame`'s own write order (`doc/CSBwin-src/SaveGame.cpp:1166-1221`):
+ * in `SaveGame`'s own write order (`doc/CSBwin-src/SaveGame.cpp:1234-1319`):
  *
  * | # | what | size | written at |
  * | --- | --- | --- | --- |
- * | 7 | `d.dungeonDatIndex` | 44 | `:1168` |
- * | 8 | `d.pLevelDescriptors` | 16 x `NumLevel` | `:1173` |
- * | 9 | `d.objectListIndex` | 2 x `numColumnPointers` | `:1178` |
- * | 10 | `d.objectList` | 2 x `ObjectListLength()` | `:1183` |
- * | 11 | `d.indirectTextIndex` | 4 x `NumWordsInTextArray()` | `:1188` |
- * | 12 | `sizeOfCompressedText` + the text | 4 + 2 x size | `:1193`, `:1197` |
- * | 13 | all sixteen databases | `DBSize(n)` x `dbEntrySizes[n]` | `:1203-1215` |
- * | 14 | `d.cellFlagArray` | `cellflagArraySize` | `:1216` |
+ * | 7 | `d.dungeonDatIndex` | 44 | `:1236` |
+ * | 8 | `d.pLevelDescriptors` | 16 x `NumLevel` | `:1242` |
+ * | 9 | `d.objectListIndex` | 2 x `numColumnPointers` | `:1252` |
+ * | 10 | `d.objectList` | 2 x `ObjectListLength()` | `:1262` |
+ * | 11 | `d.indirectTextIndex` | 4 x `NumWordsInTextArray()` | `:1271` |
+ * | 12 | `sizeOfCompressedText` + the text | 4 + 2 x size | `:1280`, `:1286` |
+ * | 13 | all sixteen databases | `DBSize(n)` x `dbEntrySizes[n]` | `:1297-1313` |
+ * | 14 | `d.cellFlagArray` | `cellflagArraySize` | `:1314` |
  *
  * All eight are written. Four of them — 7, 8, 9 and 14 — hold no object reference and are
  * byte-identical to the file they came from. Blocks 10 and 13 are full of RNs, and an RN
@@ -23,7 +23,7 @@
  *
  * Every word is **big-endian**. `SaveGame` runs `DUNGEONDATINDEX::Swap`,
  * `swapLevelDescriptors` and `swapPointer10454` over each section immediately before
- * `WriteAndChecksum` and again immediately after (`:1166-1181`), and those helpers are
+ * `WriteAndChecksum` and again immediately after (`:1234-1260`), and those helpers are
  * `LE16` per field — a byte swap on the little-endian build CSBWin ships as. The cell
  * flags are bytes and have no order at all.
  */
@@ -46,7 +46,7 @@ export const LEVEL_DESCRIPTOR_SIZE = 16;
 const bit = (b: boolean | undefined): number => (b ? 1 : 0);
 
 /**
- * Block 7 — `DUNGEONDATINDEX` (`doc/CSBwin-src/CSB.h:2057-2082`), 22 big-endian words.
+ * Block 7 — `DUNGEONDATINDEX` (`doc/CSBwin-src/CSB.h:2120-2145`), 22 big-endian words.
  *
  * The six named ones are `sentinel`, `word2` (`LegacyCellFlagArraySize`), `word4` (whose
  * **high** byte is `NumLevel` — `BITS8_15(word4)` — and whose low byte CSBWin never
@@ -56,7 +56,7 @@ const bit = (b: boolean | undefined): number => (b ? 1 : 0);
  * `word2` is carried rather than recomputed. In the committed saves it is **0** — the real
  * length lives in the Extended Features block's `cellFlagArraySize`, and `ReadDatabases`
  * falls back to `LegacyCellFlagArraySize` only when that is zero
- * (`doc/CSBwin-src/SaveGame.cpp:2412-2415`) — but a file may fill both, so neither value
+ * (`doc/CSBwin-src/SaveGame.cpp:2624-2627`) — but a file may fill both, so neither value
  * can be derived from the other.
  */
 export function buildDungeonImageHeader(header: DungeonHeader): Uint8Array {
@@ -122,7 +122,7 @@ export function buildLevelDescriptors(descriptors: readonly MapDescriptor[]): Ui
  *
  * It is saved state and not dungeon structure: `DungeonState.addObjectToCell` and
  * `removeObjectFromCell` rewrite every later entry whenever a cell gains or loses its
- * last object, as CSBWin does (`doc/CSBwin-src/CSBCode.cpp:5211-5224`), which is why
+ * last object, as CSBWin does (`doc/CSBwin-src/CSBCode.cpp:5276-5289`), which is why
  * CSBWin writes the array into the save beside the object list
  * (`doc/PROVEN_FACTS.md` → "The column index is saved state, not dungeon structure").
  */
@@ -139,7 +139,7 @@ export function buildColumnIndex(columnIndex: readonly number[]): Uint8Array {
  * (`levelCellOffsets`), and are followed
  * immediately by four tables whose lengths the descriptor gives — the monster types,
  * then the wall, floor and door decoration tables, in that order
- * (`SetPartyLevel`, `doc/CSBwin-src/CSBCode.cpp:5778+`). Measured on `dungeon.dat` and on
+ * (`SetPartyLevel`, `doc/CSBwin-src/CSBCode.cpp:5843+`). Measured on `dungeon.dat` and on
  * every committed save this lands on 12366, which is exactly what `dungeon.dat`'s
  * `LegacyCellFlagArraySize` and the saves' `cellFlagArraySize` both say.
  */
@@ -213,13 +213,13 @@ export function buildObjectList(objectList: readonly number[]): Uint8Array {
  * Block 11 — `d.indirectTextIndex`, `NumWordsInTextArray` **little-endian** longwords.
  *
  * Little-endian alone in a big-endian image: `SwapIndirectTextIndex` applies `BE32`
- * (`doc/CSBwin-src/SaveGame.cpp:174-181`), which is the identity on the little-endian
+ * (`doc/CSBwin-src/SaveGame.cpp:175-182`), which is the identity on the little-endian
  * build CSBWin ships as, so the array keeps native PC order. Each entry is a word offset
  * into the compressed text.
  *
  * `NumWordsInTextArray` — header `word6` — counts **index entries** here, not text words:
  * `ConvertToIndirectText` overwrites it with the index length when it converts
- * (`doc/CSBwin-src/SaveGame.cpp:2274`). That is why a save says 125 where `dungeon.dat`
+ * (`doc/CSBwin-src/SaveGame.cpp:2486`). That is why a save says 125 where `dungeon.dat`
  * says 1749.
  */
 export function buildIndirectTextIndex(indirectTextIndex: readonly number[]): Uint8Array {
@@ -232,8 +232,8 @@ export function buildIndirectTextIndex(indirectTextIndex: readonly number[]): Ui
  * Block 12 — `d.sizeOfCompressedText` then the text itself.
  *
  * The size is one **little-endian** longword, for the same reason as block 11: it goes
- * out through `BE32` (`doc/CSBwin-src/SaveGame.cpp:1192-1194`). The text words that
- * follow are written with **no swap at all** (`:1197`) — they are the Atari-era 5-bit
+ * out through `BE32` (`doc/CSBwin-src/SaveGame.cpp:1279-1284`). The text words that
+ * follow are written with **no swap at all** (`:1200`) — they are the Atari-era 5-bit
  * text array, which is never swapped on the way in either, so they are big-endian in
  * memory and big-endian in the file.
  */
@@ -249,7 +249,7 @@ export function buildCompressedText(compressedText: readonly number[]): Uint8Arr
  * big-endian words, and no size longword in front of them.
  *
  * `ConvertToIndirectText` is what turns this into blocks 11 and 12, and it runs once when
- * an original dungeon is read (`doc/CSBwin-src/SaveGame.cpp:2221-2276`), so no save ever
+ * an original dungeon is read (`doc/CSBwin-src/SaveGame.cpp:2433-2488`), so no save ever
  * carries this form. It is here so that the writer is the exact inverse of the reader on
  * both kinds of image, which is what lets `dungeon.dat` be a test case.
  */
@@ -268,8 +268,8 @@ export interface DatabaseWriteOptions {
 }
 
 /**
- * `dbEntrySizes` (`doc/CSBwin-src/SaveGame.cpp:2571-2575` for the ACTUATOR special case,
- * `:2189-2200` for SCROLL). Databases 12 and 13 are `//Not used` in `CSB.h` and have no
+ * `dbEntrySizes` (`doc/CSBwin-src/SaveGame.cpp:2783-2787` for the ACTUATOR special case,
+ * `:2401-2412` for SCROLL). Databases 12 and 13 are `//Not used` in `CSB.h` and have no
  * record size; both are empty in every file this project holds.
  */
 export function databaseRecordSize(db: number, options: DatabaseWriteOptions = {}): number {
@@ -281,10 +281,10 @@ export function databaseRecordSize(db: number, options: DatabaseWriteOptions = {
 
 /**
  * Block 13 — all sixteen databases, back to back, in `DBType` order
- * (`doc/CSBwin-src/SaveGame.cpp:1203-1215`).
+ * (`doc/CSBwin-src/SaveGame.cpp:1297-1313`).
  *
  * This is the inverse of `DungeonLoader`'s thirteen record parsers, field for field and
- * bit for bit against the `DBn` classes in `doc/CSBwin-src/CSB.h:818-1345`. Writing it
+ * bit for bit against the `DBn` classes in `doc/CSBwin-src/CSB.h:821-1348`. Writing it
  * is what found the bits those parsers were dropping — the door's `word2` bits 9-15, the
  * chest's whole `word4` and its two trailing bytes, the misc item's `cursed` and
  * `subType`, the new scroll's uninitialised `word4` debris, and four more; all are
@@ -295,7 +295,7 @@ export function databaseRecordSize(db: number, options: DatabaseWriteOptions = {
  * - **11, `EXPOOL`.** Written from `dungeon.expool`, the blocks the world holds. The key
  *   of each champion bones record is the bones' RN (`src/data/CsbwinExpool.ts`). The DSA
  *   global variables and the 24 overlay palette records are written into it just before
- *   the image, as `SaveGame` does (`:1141-1164`, `src/engine/SaveGameFile.ts`).
+ *   the image, as `SaveGame` does (`:1144-1167`, `src/engine/SaveGameFile.ts`).
  * - **12 and 13**, which `CSB.h` marks `//Not used`. Empty in every file here.
  */
 export function buildDatabases(
@@ -379,7 +379,7 @@ function databaseRecords(dungeon: DungeonData, db: number): DatabaseRecord[] {
  * A **free** record's secondary RN — a creature's possessions, a chest's contents, a
  * missile's flying object, a scroll's text — cannot be reproduced, and deliberately so:
  * `DeleteDBEntry` writes `RNnul` over the link and frees the indirect slot but leaves the
- * rest of the record alone (`doc/CSBwin-src/data.cpp:993-1015`), so a free record
+ * rest of the record alone (`doc/CSBwin-src/data.cpp:995-1017`), so a free record
  * routinely still points at a slot that has since been freed. `readRNOfRecord` reads
  * those and drops them, which is the only reading that does not make a perfectly good
  * save unreadable, and this writes `RNnul` back where the file holds the stale slot.
@@ -398,7 +398,7 @@ function writeRecord(
     switch (db) {
         case DBType.DOOR: {
             const r = record as DoorRecord;
-            // `DB0::word2` (`doc/CSBwin-src/CSB.h:822-845`).
+            // `DB0::word2` (`doc/CSBwin-src/CSB.h:825-848`).
             writeU16BE(buf, at + 2,
                 ((r.word2Bits9_15 ?? 0) << 9) | (bit(r.destructibleByChop) << 8) |
                 (bit(r.destructibleByFireball) << 7) | (bit(r.hasButton) << 6) |
@@ -407,7 +407,7 @@ function writeRecord(
         }
         case DBType.TELEPORTER: {
             const r = record as TeleporterRecord;
-            // `DB1::word2` and `word4` (`doc/CSBwin-src/CSB.h:849-895`).
+            // `DB1::word2` and `word4` (`doc/CSBwin-src/CSB.h:852-898`).
             writeU16BE(buf, at + 2,
                 (bit(r.sound) << 15) | ((r.scope & 3) << 13) | (bit(r.absoluteRotation) << 12) |
                 ((r.rotation & 3) << 10) | ((r.destY & 0x1f) << 5) | (r.destX & 0x1f));
@@ -417,7 +417,7 @@ function writeRecord(
         case DBType.TEXT: {
             const r = record as TextRecord;
             // `DB2::word2` — `index()` is bits 3-15, `show()` bit 0
-            // (`doc/CSBwin-src/CSB.h:988-1002`).
+            // (`doc/CSBwin-src/CSB.h:991-1005`).
             writeU16BE(buf, at + 2,
                 ((r.textOffset & 0x1fff) << 3) | ((r.word2Bits1_2 ?? 0) << 1) | bit(r.visible));
             return;
@@ -433,7 +433,7 @@ function writeRecord(
         }
         case DBType.CREATURE: {
             const r = record as CreatureRecord;
-            // `DB4` (`doc/CSBwin-src/CSB.h:1075-1139`).
+            // `DB4` (`doc/CSBwin-src/CSB.h:1078-1142`).
             writeU16BE(buf, at + 2, writtenSecondary(r.possession, link));
             buf[at + 4] = ((r.alternateGraphics & 7) << 5) | (r.creatureType & 0x1f);
             buf[at + 5] = r.groupIndex & 0xff;
@@ -447,7 +447,7 @@ function writeRecord(
         }
         case DBType.WEAPON: {
             const r = record as WeaponRecord;
-            // `DB5::word2` (`doc/CSBwin-src/CSB.h:1141-1174`).
+            // `DB5::word2` (`doc/CSBwin-src/CSB.h:1144-1177`).
             writeU16BE(buf, at + 2,
                 (bit(r.litTorch) << 15) | (bit(r.broken) << 14) | ((r.charges & 0xf) << 10) |
                 (bit(r.poisoned) << 9) | (bit(r.cursed) << 8) | (bit(r.important) << 7) |
@@ -456,7 +456,7 @@ function writeRecord(
         }
         case DBType.CLOTHING: {
             const r = record as ClothingRecord;
-            // `DB6::word2` (`doc/CSBwin-src/CSB.h:1176-1192`).
+            // `DB6::word2` (`doc/CSBwin-src/CSB.h:1179-1195`).
             writeU16BE(buf, at + 2,
                 ((r.word2Bits14_15 ?? 0) << 14) | (bit(r.broken) << 13) | ((r.charges & 0xf) << 9) |
                 (bit(r.cursed) << 8) | (bit(r.important) << 7) | (r.clothingType & 0x7f));
@@ -466,7 +466,7 @@ function writeRecord(
             const r = record as ScrollRecord;
             if (options.newScrolls) {
                 // `DB7` in its six-byte form: link, an RN to the text record, then a word
-                // whose bit 0 is `open` (`doc/CSBwin-src/CSB.h:1195-1216`). The text RN
+                // whose bit 0 is `open` (`doc/CSBwin-src/CSB.h:1198-1219`). The text RN
                 // is a secondary reference and follows the free-record rule above.
                 const text = r.textObject;
                 if (text === undefined) throw new Error('a four-byte scroll cannot be written as a six-byte one');
@@ -482,14 +482,14 @@ function writeRecord(
         }
         case DBType.POTION: {
             const r = record as PotionRecord;
-            // `DB8::word2` (`doc/CSBwin-src/CSB.h:1218-1234`).
+            // `DB8::word2` (`doc/CSBwin-src/CSB.h:1221-1237`).
             writeU16BE(buf, at + 2,
                 (bit(r.important) << 15) | ((r.potionType & 0x7f) << 8) | (r.power & 0xff));
             return;
         }
         case DBType.CHEST: {
             const r = record as ContainerRecord;
-            // `DB9` (`doc/CSBwin-src/CSB.h:1236-1250`): link, contents, `m_word4`,
+            // `DB9` (`doc/CSBwin-src/CSB.h:1239-1253`): link, contents, `m_word4`,
             // `m_uByte6[2]`. `containerType` is bits 1-2 of `m_word4`; the rest of that
             // word is carried, because it is not zero and CSBWin names none of it.
             writeU16BE(buf, at + 2, writtenSecondary(r.containedObject, link));
@@ -500,7 +500,7 @@ function writeRecord(
         }
         case DBType.MISC: {
             const r = record as MiscRecord;
-            // `DB10::word2` (`doc/CSBwin-src/CSB.h:1265-1305`).
+            // `DB10::word2` (`doc/CSBwin-src/CSB.h:1268-1308`).
             writeU16BE(buf, at + 2,
                 ((r.specialState & 3) << 14) | ((r.subType ?? 0) << 9) | (bit(r.cursed) << 8) |
                 (bit(r.important) << 7) | (r.miscType & 0x7f));
@@ -508,7 +508,7 @@ function writeRecord(
         }
         case DBType.MISSILE: {
             const r = record as MissileRecord;
-            // `DB14` (`doc/CSBwin-src/CSB.h:1317-1328`).
+            // `DB14` (`doc/CSBwin-src/CSB.h:1320-1331`).
             writeU16BE(buf, at + 2, writtenSecondary(r.projectileObject, link));
             buf[at + 4] = r.rangeRemaining & 0xff;
             buf[at + 5] = r.damageRemaining & 0xff;
@@ -517,7 +517,7 @@ function writeRecord(
         }
         case DBType.CLOUD: {
             const r = record as CloudRecord;
-            // `DB15::word2` (`doc/CSBwin-src/CSB.h:1330-1345`).
+            // `DB15::word2` (`doc/CSBwin-src/CSB.h:1333-1348`).
             writeU16BE(buf, at + 2,
                 ((r.value & 0xff) << 8) | (bit(r.bit7) << 7) | (r.cloudType & 0x7f));
             return;
@@ -611,13 +611,13 @@ export function buildDungeonImage(
  * Block 15 — the one word that closes the file.
  *
  * `WriteAndChecksum` sums the **bytes** of each section it writes into a `ui16` starting
- * from zero and adds that into a running total (`doc/CSBwin-src/SaveGame.cpp:679-698`),
+ * from zero and adds that into a running total (`doc/CSBwin-src/SaveGame.cpp:687-706`),
  * which is the same thing as summing every byte of blocks 7-14 into a `ui16`. The word
- * is then written through `LE16` (`:1220-1222`) — a byte swap on the little-endian build
+ * is then written through `LE16` (`:1318-1320`) — a byte swap on the little-endian build
  * — so it lands **big-endian**, like the rest of the image.
  *
  * Nothing before block 7 is in it: the running total is set to 0 immediately after the
- * EXPOOL side-writes and just before the header goes out (`:1166`).
+ * EXPOOL side-writes and just before the header goes out (`:1234`).
  */
 export function buildImageChecksum(image: Uint8Array): Uint8Array {
     let sum = 0;

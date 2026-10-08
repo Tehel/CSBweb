@@ -77,7 +77,7 @@ export function drawInventoryScreen(ui: UIState): void {
       objectIndex = getOpenChestIconIndex(ui);
     } else if (slot === 1 && objectIndex === OBJNI_OPEN_SCROLL) {
       // `objNID4 + 1`: in the weapon hand of the inventory open, the scroll its panel
-      // unrolls is drawn rolled (`doc/CSBwin-src/Character.cpp:1183-1189`).
+      // unrolls is drawn rolled (`doc/CSBwin-src/Character.cpp:1188-1194`).
       objectIndex = OBJNI_OPEN_SCROLL + 1;
     }
     const rect = getInventorySlotRect(iconSlots, slot);
@@ -94,19 +94,19 @@ export function drawInventoryScreen(ui: UIState): void {
     }
   }
 
-  // `TAG0189d4` (`doc/CSBwin-src/Character.cpp:3847`). The branch also decides what a
+  // `TAG0189d4` (`doc/CSBwin-src/Character.cpp:3864`). The branch also decides what a
   // click in this area means, which is why it leaves `displayResurrectChestOrScroll`
   // behind for `tag01a6ea` exactly as CSBWin does.
   //
   // The held eye comes first. It is button 71, with no `PotentialCharacterOrdinal`
-  // gate (`doc/CSBwin-src/Mouse.cpp:1659-1664`), and `_ClickOnEye`
-  // (`doc/CSBwin-src/Viewport.cpp:7257`) draws over whatever `TAG0189d4` left there,
+  // gate (`doc/CSBwin-src/Mouse.cpp:1798-1803`), and `_ClickOnEye`
+  // (`doc/CSBwin-src/Viewport.cpp:7264`) draws over whatever `TAG0189d4` left there,
   // the Resurrect menu included, without touching `d.DisplayResurrectChestOrScroll`.
-  // `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7399`) calls `TAG0189d4` again.
+  // `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7458`) calls `TAG0189d4` again.
   //
   // The held mouth comes before it, as in `DrawCharacterState`
-  // (`doc/CSBwin-src/Character.cpp:1478-1481`): `_FeedCharacter`'s `DisplayFoodWater`
-  // (`:4056`) draws food and water over the chest, the scroll or the Resurrect menu,
+  // (`doc/CSBwin-src/Character.cpp:1483-1486`): `_FeedCharacter`'s `DisplayFoodWater`
+  // (`:4073`) draws food and water over the chest, the scroll or the Resurrect menu,
   // and leaves `d.DisplayResurrectChestOrScroll` as it was. Its `RepackChest` is the
   // compose's (`getActiveChestView`, `syncOpenChest`).
   //
@@ -146,7 +146,7 @@ export function drawInventoryScreen(ui: UIState): void {
 }
 
 /**
- * `TAG0189d4` (`doc/CSBwin-src/Character.cpp:3849-3897`)'s description of a scroll in the
+ * `TAG0189d4` (`doc/CSBwin-src/Character.cpp:3866-3914`)'s description of a scroll in the
  * weapon hand of the champion whose inventory is open: `DescribeObject(objD7, 0)`, whose
  * viewing filter runs here, at the events that call it, and not at every compose
  * (`ui.weaponHandScroll`). The rest of what it draws, the Resurrect menu, a chest or
@@ -163,8 +163,8 @@ export function tag0189d4(ui: UIState): void {
 }
 
 /**
- * `TAG019036` (`doc/CSBwin-src/Character.cpp:4502-4590`), the eye clicked with an empty
- * hand: the viewing filter runs before the attributes are drawn (`:4524-4578`), which the
+ * `TAG019036` (`doc/CSBwin-src/Character.cpp:4519-4607`), the eye clicked with an empty
+ * hand: the viewing filter runs before the attributes are drawn (`:4541-4595`), which the
  * held eye's compose draws (`drawInventoryScreen`). Its `RepackChest` is the compose's
  * (`syncOpenChest`).
  */
@@ -173,7 +173,7 @@ export function tag019036(ui: UIState): void {
 }
 
 /**
- * `DrawCharacterState`'s eye panel (`doc/CSBwin-src/Character.cpp:1478-1497`): with
+ * `DrawCharacterState`'s eye panel (`doc/CSBwin-src/Character.cpp:1483-1502`): with
  * `CHARFLAG_chestOrScroll` and the champion's inventory open, the held mouth draws food
  * and water (the compose's, `drawInventoryScreen`); the held eye with an empty hand draws
  * the attributes again, through `TAG019036`; with an object held it draws nothing; and
@@ -191,7 +191,7 @@ export function drawCharacterStateEyePanel(ui: UIState, chIdx: number, charFlags
 }
 
 /**
- * The boxes around the mouth and the eye (`doc/CSBwin-src/Character.cpp:1363-1392`).
+ * The boxes around the mouth and the eye (`doc/CSBwin-src/Character.cpp:1368-1397`).
  *
  * Two blits of the same shape from the `CHARFLAG_statsChanged` block, differing only
  * in which graphic each picks. Graphic **33** is the plain box and **34** the marked
@@ -203,7 +203,7 @@ export function drawCharacterStateEyePanel(ui: UIState, chIdx: number, charFlags
  *   Luck (index 0) is deliberately outside the loop.
  *
  * The second one is what a player reads as "the red square after a level gain": a
- * level raises the *maxima* (`doc/CSBwin-src/Magic.cpp:98-148`) and leaves Current
+ * level raises the *maxima* (`doc/CSBwin-src/Magic.cpp:101-151`) and leaves Current
  * where it was, so the gap opens and the box changes. Nothing about it is
  * level-specific — a drained champion shows the same box.
  *
@@ -219,7 +219,7 @@ export function drawMouthAndEyeBoxes(ui: UIState, champion: Champion): void {
 }
 
 /**
- * `if (food < 0 || water < 0 || poisonCount != 0)` (`doc/CSBwin-src/Character.cpp:1363`).
+ * `if (food < 0 || water < 0 || poisonCount != 0)` (`doc/CSBwin-src/Character.cpp:1368`).
  *
  * Note `< 0`, not `<= 0`: a champion at exactly zero food is not yet starving.
  */
@@ -232,7 +232,7 @@ export function mouthBoxGraphic(champion: Champion): number {
 
 /**
  * `for (D4W=1; D4W<=6; D4W++)` over Current vs Maximum
- * (`doc/CSBwin-src/Character.cpp:1379-1392`).
+ * (`doc/CSBwin-src/Character.cpp:1384-1397`).
  *
  * The loop starts at **1**, so Luck can never mark the eye however far it has fallen.
  */
@@ -246,7 +246,7 @@ export function eyeBoxGraphic(champion: Champion): number {
 }
 
 /**
- * `TAG0189a8` (`doc/CSBwin-src/Character.cpp:3837`) — graphic 40, the
+ * `TAG0189a8` (`doc/CSBwin-src/Character.cpp:3854`) — graphic 40, the
  * Resurrect / Reincarnate / Cancel menu a provisionally added champion is waiting on.
  */
 export function drawResurrectMenu(ui: UIState): void {
@@ -369,7 +369,7 @@ export function openChest(ui: UIState, chestId: ObjectID): void {
 }
 
 /**
- * `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`) — link the open chest's objects back
+ * `RepackChest` (`doc/CSBwin-src/Character.cpp:3113`) — link the open chest's objects back
  * into it, in slot order. The engine asks for it when the chest leaves the weapon hand of
  * the champion whose inventory is open (`GameHost.repackChest`).
  */
@@ -423,9 +423,9 @@ export function drawInspectArrow(ui: UIState, fromEye: boolean): void {
 }
 
 /**
- * `DescribeObject` (`doc/CSBwin-src/Character.cpp:3411`) for the eye panel, the part that
- * runs the viewing filter: a scroll's site leaves the scroll to draw (`:3455-3530`), and
- * anything else's leaves the lines under its name (`:3724-3791`). A chest's panel is
+ * `DescribeObject` (`doc/CSBwin-src/Character.cpp:3424`) for the eye panel, the part that
+ * runs the viewing filter: a scroll's site leaves the scroll to draw (`:3469-3544`), and
+ * anything else's leaves the lines under its name (`:3741-3808`). A chest's panel is
  * `drawChestPanel`'s, and runs no filter.
  */
 export function describeObject(ui: UIState, objectId: ObjectID): DescribedObject {
@@ -461,7 +461,7 @@ export function drawObjectInfoPanel(ui: UIState, objectId: ObjectID): void {
       y2: VIEWPORT_Y + 74,
     };
     drawObjectIcon(ui, iconRect, objectNameIndex, g232.word612);
-    // `TextToViewport(134, 68, COLOR_13, A3, false)` (`doc/CSBwin-src/Character.cpp:3615`).
+    // `TextToViewport(134, 68, COLOR_13, A3, false)` (`doc/CSBwin-src/Character.cpp:3632`).
     // Raw: a potion's power rune is `` ` `` or `a`..`e`, which upper-casing would lose.
     const name = getObjectDisplayName(ui, objectId, objectNameIndex);
     if (name) {
@@ -502,7 +502,7 @@ export function getEyeRect(ui: UIState): Rect | null {
   };
 }
 
-/** `DisplayScroll` (`doc/CSBwin-src/Character.cpp:3316`): the scroll's text in the panel. */
+/** `DisplayScroll` (`doc/CSBwin-src/Character.cpp:3321`): the scroll's text in the panel. */
 export function drawScrollPanel(ui: UIState, scrollId: ObjectID): void {
   const scroll = ui.ctx.dungeon.getScrollRecord(scrollId);
   if (!scroll) return;

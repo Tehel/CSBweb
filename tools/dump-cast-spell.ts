@@ -2,20 +2,20 @@
  * Prove `CastSpell` honours a spell filter's overrides where CSBWin does, and only there.
  *
  * A DSA spell filter (`DsaSystem.processSpellFilter`) can rewrite the `SPELL_PARAMETERS`
- * `CastSpell` receives (`doc/CSBwin-src/Magic.cpp:1090`). No dungeon this port loads defines
+ * `CastSpell` receives (`doc/CSBwin-src/Magic.cpp:1092`). No dungeon this port loads defines
  * one, so this calls `MagicSystem.castSpell` with the parameters directly:
  *
  * - the difficulty is `D4W = pSpell->skillRequired + spellPower` — the spell's own skill,
  *   not the filter's — while the filter's `skillRequired` feeds only the experience's
- *   middle term `8 * (spellPower - 1) * skillRequired` (`:1199-1211`);
- * - a filter's `missileType` replaces `BITS4_9(pSpell->word6)` (`:1201-1205`), so it
+ *   middle term `8 * (spellPower - 1) * skillRequired` (`:1201-1213`);
+ * - a filter's `missileType` replaces `BITS4_9(pSpell->word6)` (`:1203-1207`), so it
  *   changes what a class-3 spell does;
  * - `action` is handled first, before `chIdx >= d.NumCharacter` and `HP() == 0`
- *   (`:1110-1153`): a filter's abort message prints for a dead caster, and an action with
+ *   (`:1112-1155`): a filter's abort message prints for a dead caster, and an action with
  *   no message (8) casts normally.
  * - Zokathra (missile type 7) goes into the first empty hand, and with both hands full is
  *   dropped in the party's cell with `MoveObject(obj_2, -1, 0, d.partyX, d.partyY)`
- *   (`:1360-1387`), so the pads there see it placed, with `unchangedRoom` true.
+ *   (`:1362-1389`), so the pads there see it placed, with `unchangedRoom` true.
  *
  * Run: `npx tsx tools/dump-cast-spell.ts`
  */
@@ -110,7 +110,7 @@ async function main(): Promise<void> {
   const plain = cast({});
   const hardSkill = cast({ skillRequired: 60 });
   const seeThru = cast({ missileType: 2 });
-  // Ya Ir, the party shield: `MarkAllPortraitsChanged` (`doc/CSBwin-src/Magic.cpp:1329`).
+  // Ya Ir, the party shield: `MarkAllPortraitsChanged` (`doc/CSBwin-src/Magic.cpp:1331`).
   game.ctx.party.state.partyShield = 0;
   portraits.length = 0;
   const partyShield = cast({ missileType: 4 });
@@ -181,7 +181,7 @@ async function main(): Promise<void> {
   check(seeThru.result === 1 && seeThru.seeThruWalls === 1,
     "a filter's missileType 2 should make the class-3 spell see-through-walls");
   check(partyShield.result === 1 && partyShieldUp > 0 && partyShieldPortraits === '0',
-    "the party shield draws every champion's box afresh (Magic.cpp:1329)");
+    "the party shield draws every champion's box afresh (Magic.cpp:1331)");
   check(deadAbort.result === 0 && deadAbort.printed === 'THE SPELL FIZZLES.',
     `a filter's abort should print for a dead caster, as CSBWin checks the action first (${JSON.stringify(deadAbort.printed)})`);
   check(silentAbort.result === 0 && silentAbort.printed === '', 'action 1 should abort silently');
@@ -193,7 +193,7 @@ async function main(): Promise<void> {
     && game.ctx.dungeon.rnMaps.pos(zokFull.last) === 0,
     'Zokathra with both hands full lies in the party\'s cell, at corner 0');
   check(zokFull.pads.length === 1 && zokFull.pads[0] === `(${party.x},${party.y},${party.z}) place unchanged true`,
-    `Zokathra with both hands full is placed through MoveObject, so the pads see it (Magic.cpp:1380-1387): ${JSON.stringify(zokFull.pads)}`);
+    `Zokathra with both hands full is placed through MoveObject, so the pads see it (Magic.cpp:1382-1389): ${JSON.stringify(zokFull.pads)}`);
 
   finish();
 }

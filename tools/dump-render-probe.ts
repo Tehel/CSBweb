@@ -1,7 +1,7 @@
 /**
  * The render probe: every cell program, run on its own over controlled input.
  *
- * `DrawViewport` (`doc/CSBwin-src/Viewport.cpp:6694`) runs one bytecode program per
+ * `DrawViewport` (`doc/CSBwin-src/Viewport.cpp:6701`) runs one bytecode program per
  * relative cell, chosen from `pStdDrawCode[21][8]` by the cell and its graphic room type
  * (`:1952`). 46 of the 168 slots are `NOP`, a null that `DrawViewport` skips: every type
  * at F4L2, F4R2, F2L2 and F2R2, and all but Stone at F3L2 and F3R2. F4L1, F4R1 and F4
@@ -23,7 +23,7 @@
  *   StairEdge/StairFacing  `decorations[0] = 0` (`cellFlags & 4` clear)
  *
  * Everything runs twice: from the party's start square, and from the same square facing
- * one step clockwise, which flips `d.UseMirrorImages` (`Viewport.cpp:6740`).
+ * one step clockwise, which flips `d.UseMirrorImages` (`Viewport.cpp:6747`).
  *
  * What it asserts: the port's table is null in exactly CSBWin's `NOP` slots and holds
  * the one `Any` program in each slot of F4L1, F4R1 and F4, no program reaches an
@@ -213,7 +213,7 @@ function main(): void {
 }
 
 /**
- * See-Thru-Walls (`d.SeeThruWalls`, `doc/CSBwin-src/Viewport.cpp:2639`). Every program runs
+ * See-Thru-Walls (`d.SeeThruWalls`, `doc/CSBwin-src/Viewport.cpp:2646`). Every program runs
  * with it set and reaches no unimplemented opcode. Then F1 Stone, the one wall it opens
  * (`StdDrawF1Stone`, `Viewport.cpp:1048-1087`), is drawn over a patterned viewport, the
  * pattern standing for what the cells behind it drew. Inside `SeeThruWallsRect2`, the hole

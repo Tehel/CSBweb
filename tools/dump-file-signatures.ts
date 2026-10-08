@@ -3,16 +3,16 @@
  *
  * 1. **MD5** (`src/core/md5.ts`) agrees with Node's on the RFC's vectors and on every game
  *    file here.
- * 2. **`Signature`** (`doc/CSBwin-src/data.cpp:1953-1975`) is the digest's first eight bytes
+ * 2. **`Signature`** (`doc/CSBwin-src/data.cpp:1956-1979`) is the digest's first eight bytes
  *    as two little-endian longwords, and the fold `(n | n >> 16) & 0xffff`. Printed for
  *    every `graphics.dat` and `CSBgraphics.dat`, with what each `dungeon.dat` and genuine
  *    save names of them: its `EDBT_RuntimeFileSignatures` records and its Extended
  *    Features block's expected pairs. Every one reads under its own data set's files.
- * 3. **`openGraphicsFile` at a read** (`SaveGame.cpp:1795-1822`, `Graphics.cpp:1806-1816`):
+ * 3. **`openGraphicsFile` at a read** (`SaveGame.cpp:1966-2025`, `Graphics.cpp:1830-1840`):
  *    a world whose `EXPOOL` names this `graphics.dat` reads, one that names another dies
  *    with `0x3c6c`, the page told first and nothing installed, and a record of 0 or one
  *    under a nonzero `EDBT_Debuging` is no check. The same through a save's read.
- * 4. **`OpenCSBgraphicsFile` at the first section read** (`Graphics.cpp:1840-1896`): before
+ * 4. **`OpenCSBgraphicsFile` at the first section read** (`Graphics.cpp:1864-1920`): before
  *    any read it opens; under a world naming its fold it opens, under one naming another
  *    it dies and the file is refused from there; once open it is not checked again. A
  *    file that is not there traces "Cannot find" once and dies with `0xbad` only where an
@@ -45,7 +45,7 @@ const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(p
 const hex = (n: number): string => (n >>> 0).toString(16).padStart(8, '0');
 const sig = (s: FileSignature): string => `${hex(s.signature2)} ${hex(s.signature1)} (fold ${foldedSignature(s)})`;
 
-/** `(EDT_Database << 24) + (edbt << 16) + i` (`doc/CSBwin-src/CSB.h:1552-1556`). */
+/** `(EDT_Database << 24) + (edbt << 16) + i` (`doc/CSBwin-src/CSB.h:1555-1559`). */
 const edbtKey = (edbt: number, i: number): number => ((5 << 24) + (edbt << 16) + i) >>> 0;
 const EDBT_RUNTIME_FILE_SIGNATURES = 2;
 const EDBT_DEBUGING = 3;

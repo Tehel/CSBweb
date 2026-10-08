@@ -1,22 +1,22 @@
 /**
- * The feeding filter (`doc/CSBwin-src/Character.cpp:4288-4344`), which `_FeedCharacter` runs
+ * The feeding filter (`doc/CSBwin-src/Character.cpp:4305-4361`), which `_FeedCharacter` runs
  * between working out what the object is worth and doing it, run through
  * `handleMouthPress` with DSAs on its square, against a genuine save (`csbgame7.dat`).
  *
  * 1. **A dungeon with no filter feeds as the object says**: an apple's food value.
  * 2. **Every DSA at the location runs**, each with a count of 27 and the `FEEDPARAMETERS`
- *    block (`:4333-4336`), in the struct's order (`:3936-3966`): `performFeeding`, the
+ *    block (`:4350-4353`), in the struct's order (`:3953-3983`): `performFeeding`, the
  *    champion, the object's database, name index and RN, the food and water values, …,
- *    `chew`, `gulp`, and the party's square and facing as a `LOCATIONREL` (`:4034-4038`).
+ *    `chew`, `gulp`, and the party's square and facing as a `LOCATIONREL` (`:4051-4055`).
  * 3. **A DSA's rewrite is what the next one sees, and what the feeding does**: water
  *    instead of food.
- * 4. **`performFeeding` 0 feeds nothing**, and the apple stays on the cursor (`:4350`).
+ * 4. **`performFeeding` 0 feeds nothing**, and the apple stays on the cursor (`:4367`).
  * 5. **The DSAs run on the caller's parameters**: `_FeedCharacter` has no
  *    `NEWDSAPARAMETERS`, so the last block is left there.
  * 6. **A negative shield adjustment wraps**: `shieldStrengthAdjust` is a `ui32`, so the sum
- *    is never below 0 (`:3953`, `:4366-4374`), and the shield is its low 16 bits.
+ *    is never below 0 (`:3970`, `:4383-4391`), and the shield is its low 16 bits.
  * 7. **An empty waterskin emptied again holds 3**: `value(value() - 1)` sets two bits
- *    (`:4457-4460`, `CSB.h:1274`).
+ *    (`:4474-4477`, `CSB.h:1277`).
  *
  * Run: `npx tsx tools/dump-feeding-filter.ts`
  */
@@ -33,7 +33,7 @@ import { check, finish } from './lib/check';
 import { stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 
-/** `ESL_FEEDINGFILTER` (`doc/CSBwin-src/CSB.h:1536`). */
+/** `ESL_FEEDINGFILTER` (`doc/CSBwin-src/CSB.h:1539`). */
 const ESL_FEEDINGFILTER = 1;
 const WORDS = 27;
 

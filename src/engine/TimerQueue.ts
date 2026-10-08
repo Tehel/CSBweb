@@ -2,12 +2,12 @@ import { OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
 
 /**
- * CSBWin `TIMERTYPE` (doc/CSBwin-src/CSB.h:1741-1797).
+ * CSBWin `TIMERTYPE` (doc/CSBwin-src/CSB.h:1804-1860).
  *
  * The negative entries are not real queue entries — `ProcessTimers29to41` rewrites
  * its incoming function code into one of them to say *why* it was woken
- * (doc/CSBwin-src/Monster.cpp:3405+), and `InitialChecks` maps `TT_M3` back to
- * `TT_29` (doc/CSBwin-src/Monster.cpp:3022).
+ * (doc/CSBwin-src/Monster.cpp:3413+), and `InitialChecks` maps `TT_M3` back to
+ * `TT_29` (doc/CSBwin-src/Monster.cpp:3026).
  */
 export enum TimerFunction {
   TT_M3 = -3, // Monster damaged by a cloud or a door
@@ -28,14 +28,14 @@ export enum TimerFunction {
   /**
    * The end of the damage shown over a champion's name (`TAG011366`,
    * doc/CSBwin-src/Timer.cpp:2686): `uByte5` is the champion. `DisplayCharacterDamage`
-   * arms it five ticks on (`CSBCode.cpp:7172-7202`).
+   * arms it five ticks on (`CSBCode.cpp:7231-7261`).
    */
   TT_12 = 12,
   TT_VI_ALTAR = 13,
   /**
-   * A delayed sound (`QueueSound` with `deltaTime > 1`, doc/CSBwin-src/CSBCode.cpp:1832-1848):
+   * A delayed sound (`QueueSound` with `deltaTime > 1`, doc/CSBwin-src/CSBCode.cpp:1861-1877):
    * `timerWord8` is the ordinal, played with `QueueSound(ordinal, x, y, 1)` on the
-   * timer's level when it fires (`:6485-6492`).
+   * timer's level when it fires (`:6544-6551`).
    */
   TT_20 = 20,
   /**
@@ -46,7 +46,7 @@ export enum TimerFunction {
   TT_25 = 25,
   /**
    * Remove an object from its cell and free its record
-   * (`doc/CSBwin-src/CSBCode.cpp:6494`). A general expiry timer; the Fluxcage is what
+   * (`doc/CSBwin-src/CSBCode.cpp:6553`). A general expiry timer; the Fluxcage is what
    * uses it, with a 100-tick life. Suppressed once the game is won.
    */
   TT_24 = 24,
@@ -78,7 +78,7 @@ export enum TimerFunction {
   TT_LIGHT = 70,
   TT_71 = 71,
   /**
-   * A champion's own shield wears off (`doc/CSBwin-src/CSBCode.cpp:6520`). `uByte5` is
+   * A champion's own shield wears off (`doc/CSBwin-src/CSBCode.cpp:6579`). `uByte5` is
    * the champion, `timerWord6` the amount to take back off `shieldStrength`. Armed by
    * a Ya potion.
    */
@@ -86,7 +86,7 @@ export enum TimerFunction {
   TT_73 = 73,
   TT_74 = 74,
   /**
-   * One tick of poison (`doc/CSBwin-src/CSBCode.cpp:6554`). `uByte5` is the champion,
+   * One tick of poison (`doc/CSBwin-src/CSBCode.cpp:6613`). `uByte5` is the champion,
    * `timerWord6` how many ticks are left; the handler decrements `poisonCount` and
    * calls `PoisonCharacter` again, which re-arms the timer until the count runs out.
    */
@@ -127,14 +127,14 @@ export class TimerQueue {
    * the missile `MissileTimer` is moving, and its copy of the timer. Only
    * `TimerSystem.processMissileTimer` writes them. Every exit puts the object back to
    * `RNnul` and leaves the copy, so `missileFilterTimer` is the last missile timer run,
-   * and `MissileEncounterFilter` reads its direction (`Code11f52.cpp:1681`) for every
+   * and `MissileEncounterFilter` reads its direction (`Code11f52.cpp:1716`) for every
    * encounter, whatever caused it. `null` is the zeroed global, before any missile has
    * flown.
    */
   missileFilterObject = OBJECT_ID_NULL;
   missileFilterTimer: TimerEntry | null = null;
   /**
-   * `m_timerQueue` (`doc/CSBwin-src/Data.h:1535`), `m_numTimer` entries long: the live
+   * `m_timerQueue` (`doc/CSBwin-src/Data.h:1550`), `m_numTimer` entries long: the live
    * timers as CSBWin's binary min-heap over `timerLess`. The head, `queue[0]`, is the next
    * timer due, and each entry is not `timerLess` than its parent at `(i - 1) >> 1`. The
    * rest of the array is in no firing order, and the order it is in is CSBWin's, because
@@ -142,10 +142,10 @@ export class TimerQueue {
    * writes this array as the queue and a load reads it back.
    */
   private queue: TimerEntry[] = [];
-  /** `m_timerSequence` (`Data.h:1542`), a `ui16`: the stamp the next queued timer takes. */
+  /** `m_timerSequence` (`Data.h:1557`), a `ui16`: the stamp the next queued timer takes. */
   private nextSequence = 0;
   /**
-   * `m_firstAvailTimer` (`doc/CSBwin-src/Data.h:1540`) — the slot the next `SetTimer`
+   * `m_firstAvailTimer` (`doc/CSBwin-src/Data.h:1555`) — the slot the next `SetTimer`
    * will take.
    *
    * It is a cursor, not a counter: `deleteTimer` lowers it whenever a slot below it
@@ -258,7 +258,7 @@ export class TimerQueue {
    * **The entry is copied**, exactly as CSBWin copies the struct into its timer array.
    * Callers legitimately reuse one `TimerEntry` as a template across a loop — CSBWin's
    * `MaybeDelTimers_Fear6_TurnIndividuals` does it for every member of a monster group
-   * (`doc/CSBwin-src/Monster.cpp:1476-1553`) — and storing the object by reference would put
+   * (`doc/CSBwin-src/Monster.cpp:1480-1557`) — and storing the object by reference would put
    * the *same* entry in the queue several times, so each later mutation would rewrite
    * entries already queued and break the heap. Read the returned entry, never the
    * argument, for the queued `index`.
@@ -277,7 +277,7 @@ export class TimerQueue {
     // `D5L = m_firstAvailTimer` (`doc/CSBwin-src/Timer.cpp:1129`), stamped with
     // `m_timerSequence++` (`:1189`) — so a duplicate dropped above consumes no number, and
     // a timer queued again gets a fresh one — then walk the cursor forward to the next
-    // empty entry (`Timer.cpp:1195-1198`). The counter is a `ui16` (`Data.h:1542`): the
+    // empty entry (`Timer.cpp:1195-1198`). The counter is a `ui16` (`Data.h:1557`): the
     // timer that finds it at 0xffff repacks the stamps in use, takes 0xffff itself, and
     // leaves it at 0.
     if (this.nextSequence === 0xffff) this.repackSequences();
@@ -360,7 +360,7 @@ export class TimerQueue {
    * Replace the whole queue with a saved one.
    *
    * `LoadGame` restores CSBWin's timer array and its queue verbatim
-   * (`doc/CSBwin-src/SaveGame.cpp:1687-1723`): the queue is the heap as the save left it,
+   * (`doc/CSBwin-src/SaveGame.cpp:1813-1879`): the queue is the heap as the save left it,
    * so this takes it as given. Re-inserting through `addTimer` would build another heap
    * array, and would also run the duplicate-timer rules over a set of timers that
    * legitimately coexist — two door steps on the same cell at different times, say — and
@@ -372,7 +372,7 @@ export class TimerQueue {
    * `DungeonState`'s `timerWord8` lookup is by index.
    *
    * The table's size and the free cursor come back as `LoadGame` reads them,
-   * `gb2.MaxTimers` and `gb2.FirstAvailTimer` (`doc/CSBwin-src/SaveGame.cpp:1638-1640`),
+   * `gb2.MaxTimers` and `gb2.FirstAvailTimer` (`doc/CSBwin-src/SaveGame.cpp:1762-1764`),
    * into a table that is not first allocated as a new game's. A save that carries no
    * cursor gets the lowest free slot, which is the cursor unless the table has filled.
    *
@@ -403,7 +403,7 @@ export class TimerQueue {
 
   /**
    * `gameTimers.FirstAvailTimer()` — the cursor above. `SaveGame` writes it into
-   * `GAMEBLOCK2` offset 26 (`doc/CSBwin-src/SaveGame.cpp:1023`).
+   * `GAMEBLOCK2` offset 26 (`doc/CSBwin-src/SaveGame.cpp:1048`).
    */
   getFirstAvailTimer(): number {
     return this.firstAvailTimer;
@@ -429,7 +429,7 @@ export class TimerQueue {
 
   /**
    * `TIMER_SEARCH::AdjustTimerPriority` (`doc/CSBwin-src/Timer.cpp:913-916`), as
-   * `Code11f52.cpp:1194` calls it: `AdjustTimerQueue` at the timer's queue position,
+   * `Code11f52.cpp:1229` calls it: `AdjustTimerQueue` at the timer's queue position,
    * after its sort key changed. The function code is part of the ordering (see
    * `timerLess`), so renumbering a monster's per-member AI timer moves it in the heap.
    * The timer is not removed and queued again, so the duplicate-timer rules and its
@@ -460,7 +460,7 @@ export class TimerQueue {
   }
 
   /**
-   * `DeleteMonsterMovementTimers` (`doc/CSBwin-src/Monster.cpp:1297`) — drop every
+   * `DeleteMonsterMovementTimers` (`doc/CSBwin-src/Monster.cpp:1301`) — drop every
    * timer of type 29-41 on this level at this square, in `searchOrder`. `trace` receives
    * CSBWin's `AITraceActive` line.
    */

@@ -100,7 +100,7 @@ export class MagicSystem {
     timerIndex: number,
     position: number,
   ): ObjectID | null {
-    // `FindEmptyDB14Entry` (`doc/CSBwin-src/CSBCode.cpp:5056`).
+    // `FindEmptyDB14Entry` (`doc/CSBwin-src/CSBCode.cpp:5121`).
     const rn = this.dungeon.findEmptyDBEntry('missiles', {
       nextObject: OBJECT_ID_EOF,
       projectileObject: (projectileObject & 0xffff) as ObjectID,
@@ -111,7 +111,7 @@ export class MagicSystem {
     return rn === OBJECT_ID_NULL ? null : this.dungeon.rnMaps.setPos(rn, position & 0x3);
   }
 
-  /** `SetBrightnessTimer` (`doc/CSBwin-src/Magic.cpp:827-840`). */
+  /** `SetBrightnessTimer` (`doc/CSBwin-src/Magic.cpp:830-843`). */
   setBrightnessTimer(deltaSteps: number, delayTicks: number): void {
     const time = (this.ctx.state.tickCount + delayTicks) >>> 0;
     this.ctx.systems.timer.queueBrightnessTimer(deltaSteps, time);
@@ -119,7 +119,7 @@ export class MagicSystem {
   }
 
   private castMagic(casterIdx: number): number {
-    // `WaitForButtonFlash(); // If any are active.` (doc/CSBwin-src/Magic.cpp:939).
+    // `WaitForButtonFlash(); // If any are active.` (doc/CSBwin-src/Magic.cpp:942).
     waitForButtonFlash(this.ctx);
     const party = this.ctx.party.state;
     const champion = party.champions[casterIdx];
@@ -131,7 +131,7 @@ export class MagicSystem {
   }
 
   /**
-   * `DSACastSpell` (`doc/CSBwin-src/Magic.cpp:1406-1416`), for `&CAST` and `&FILTEREDCAST`:
+   * `DSACastSpell` (`doc/CSBwin-src/Magic.cpp:1408-1418`), for `&CAST` and `&FILTEREDCAST`:
    * the first fourteen words of the DSA parameters are the spell's parameters, run through
    * the spell filter for the second, and champion 0 casts unless they name another.
    * CSBWin loads the party's level around it, which is the level `castSpell` works on.
@@ -185,8 +185,8 @@ export class MagicSystem {
   }
 
   /**
-   * `CastSpell` (`doc/CSBwin-src/Magic.cpp:1090`). A spell filter's `action` is handled
-   * before the caster is even looked at (`:1110-1149`), so its message prints for a
+   * `CastSpell` (`doc/CSBwin-src/Magic.cpp:1092`). A spell filter's `action` is handled
+   * before the caster is even looked at (`:1112-1151`), so its message prints for a
    * dead caster too; an `action` with no message (0, or 8 and up) casts normally.
    */
   private castSpell(chIdx: number, spellParameters: SpellParameters): number {
@@ -202,7 +202,7 @@ export class MagicSystem {
       }
       return 0;
     }
-    // `if (chIdx >= d.NumCharacter) return 0;` and `if (pcA3->HP() == 0) return 0;` (`:1150-1153`).
+    // `if (chIdx >= d.NumCharacter) return 0;` and `if (pcA3->HP() == 0) return 0;` (`:1152-1155`).
     if (!champion) return 0;
     if ((champion.attributes.health | 0) <= 0) return 0;
 
@@ -238,7 +238,7 @@ export class MagicSystem {
 
     // `D4W = sw(pSpell->skillRequired + spellPower)` — the spell's *own* skill sets the
     // difficulty; a filter's `skillRequired` only enters the experience's middle term
-    // (`:1206-1211`).
+    // (`:1208-1213`).
     const required = sw(spell.skillRequired + spellPower);
     const w4 = this.computeSpellExperience(required, spellPower, skillRequired);
     const mastery = determineMastery(champion, spellByte5, {
@@ -358,14 +358,14 @@ export class MagicSystem {
           case 7: {
             const zokathra = this.createMiscObject(51);
             if (zokathra) {
-              // The first empty hand, the shield hand first (`doc/CSBwin-src/Magic.cpp:1360-1378`).
+              // The first empty hand, the shield hand first (`doc/CSBwin-src/Magic.cpp:1362-1380`).
               const hand = getChampionPossession(champion, 0) === OBJECT_ID_NULL ? 0
                 : getChampionPossession(champion, 1) === OBJECT_ID_NULL ? 1 : -1;
               if (hand !== -1) {
                 this.ctx.systems.character.addCharacterPossession(casterIdx, zokathra, hand);
               } else {
                 // Both hands full: dropped in the party's cell like any drop, so it presses
-                // a pad there (`MoveObject(obj_2, -1, 0, d.partyX, d.partyY)`, `:1380-1387`).
+                // a pad there (`MoveObject(obj_2, -1, 0, d.partyX, d.partyY)`, `:1382-1389`).
                 const at = this.ctx.party.state.position;
                 this.ctx.systems.worldMove.moveObject(zokathra, -1, 0, at.x, at.y, at.z);
               }
@@ -502,7 +502,7 @@ export class MagicSystem {
   }
 
   /**
-   * `DisableCharacterAction` (`doc/CSBwin-src/Magic.cpp:502`) — busy the champion for
+   * `DisableCharacterAction` (`doc/CSBwin-src/Magic.cpp:505`) — busy the champion for
    * `timeDelay` ticks, or stretch the busy timer they already have. Any delay is taken,
    * 0 or less included, as CSBWin has no guard.
    */
@@ -543,7 +543,7 @@ export class MagicSystem {
   }
 
   /**
-   * `CharacterThrowsSpell` (`doc/CSBwin-src/Magic.cpp:470`).
+   * `CharacterThrowsSpell` (`doc/CSBwin-src/Magic.cpp:473`).
    *
    * The decay rate comes from the champion's *maximum* mana, not the current amount,
    * so a naturally powerful caster's bolts keep their damage longer regardless of how
@@ -566,7 +566,7 @@ export class MagicSystem {
   }
 
   /**
-   * `LaunchObject` (`doc/CSBwin-src/Magic.cpp:449`) — throw from the champion's own
+   * `LaunchObject` (`doc/CSBwin-src/Magic.cpp:452`) — throw from the champion's own
    * side of the cell, so a bolt cast by the front-right champion leaves on the right.
    */
   launchObject(
@@ -593,7 +593,7 @@ export class MagicSystem {
     return launched ? 1 : 0;
   }
 
-  /** `CastSpell`'s `spellParameters.action` switch (`doc/CSBwin-src/Magic.cpp:1110-1136`): '' aborts silently, null casts. */
+  /** `CastSpell`'s `spellParameters.action` switch (`doc/CSBwin-src/Magic.cpp:1112-1138`): '' aborts silently, null casts. */
   private getSpellAbortMessage(action: number): string | null {
     let msg: string | null = null;
     switch (action | 0) {
@@ -632,7 +632,7 @@ export class MagicSystem {
   }
 
   /**
-   * CSBWin `StandardSpellMessage()` (`doc/CSBwin-src/Magic.cpp:1058`): a linefeed, then the
+   * CSBWin `StandardSpellMessage()` (`doc/CSBwin-src/Magic.cpp:1060`): a linefeed, then the
    * text in colour 4, with '%' replaced by the caster's name. One logical line — the
    * message area word-wraps it.
    */
@@ -644,7 +644,7 @@ export class MagicSystem {
   }
 
   /**
-   * CSBWin `SpellErrorMsg()` (`doc/CSBwin-src/Magic.cpp:1004`).
+   * CSBWin `SpellErrorMsg()` (`doc/CSBwin-src/Magic.cpp:1007`).
    *
    * Emitted as a linefeed followed by separate fragments, all colour 4. The fragments carry
    * their own leading/trailing spaces and flow onto a single wrapped line — CSBWin never
@@ -686,9 +686,9 @@ export class MagicSystem {
 
   /**
    * The magic panel's cast button. CSBWin's caller hands `CastMagic` nothing but the
-   * caster (`doc/CSBwin-src/Magic.cpp:564`): the mana was spent rune by rune. It sets
+   * caster (`doc/CSBwin-src/Magic.cpp:567`): the mana was spent rune by rune. It sets
    * `d.clockTick` to what `CastMagic` returns, which is `CastSpell`'s result with 3 made 0,
-   * and any other result clears the incantation (`:945-956`). The raw result is returned,
+   * and any other result clears the incantation (`:948-959`). The raw result is returned,
    * for the tools.
    */
   castSpellFromUi(chIdx: number): number {

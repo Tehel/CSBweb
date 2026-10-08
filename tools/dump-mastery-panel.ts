@@ -2,7 +2,7 @@
  * The mastery lines at the top of the eye panel — "NOVICE FIGHTER", "` MASTER WIZARD".
  *
  * `drawAttributePanel` prints one line per role above the six attributes
- * (`doc/CSBwin-src/Character.cpp:4590-4605`):
+ * (`doc/CSBwin-src/Character.cpp:4607-4622`):
  *
  *     D5W = DetermineMastery(D4W, D7W|0x8000);
  *     D5W = Smaller(16, D5W);
@@ -16,14 +16,14 @@
  * covers this panel — none of the five captured states has a champion with earned
  * experience showing its inventory — so only a tool sees them:
  *
- *   1. **`d.Pointer16770` is a code table, not a data table** (`doc/CSBwin-src/CSBCode.cpp:370`).
+ *   1. **`d.Pointer16770` is a code table, not a data table** (`doc/CSBwin-src/CSBCode.cpp:380`).
  *      It is one of the rare things in this port that is *not* extracted from
  *      `graphics.dat`, and it sat empty here, so every line was skipped by the
  *      `if (!masteryLabel) continue;` guard while the attributes below it drew fine.
  *   2. **The six master ranks start with `` ` `` and `a`..`e`** — in the DM font
  *      (graphic `0x22d`) those codes hold the rune glyphs for Lo, Um, On, Ee, Ux and Mon.
  *      Our `drawTextLineIndex` upper-cases its argument, which CSBWin's
- *      `TextOut_OneLine` does not (`doc/CSBwin-src/Graphics.cpp:335` indexes the font with
+ *      `TextOut_OneLine` does not (`doc/CSBwin-src/Graphics.cpp:336` indexes the font with
  *      the raw byte), so `a MASTER` would come out as `A MASTER` — an 'A', not the rune.
  *      Hence `drawTextLineIndexRaw`. The last check below is the canary for that.
  *   3. **The `0x8000`** — the printed rank is the *earned* one, so a temporary adjustment
@@ -34,7 +34,7 @@
  *
  * The last section is the object panel, where the same rune glyphs prefix a potion's name
  * with its power once the champion is past mastery 1 as a priest
- * (`doc/CSBwin-src/Character.cpp:3599-3615`), and must reach the font raw as well.
+ * (`doc/CSBwin-src/Character.cpp:3616-3632`), and must reach the font raw as well.
  *
  * What to look for in the output: a line for every role whose mastery exceeds 1, at
  * x=108 / y=58+7n in viewport coordinates, matching the string spelled out here
@@ -290,11 +290,11 @@ async function main(): Promise<void> {
 
   // ------------------------------------- the eye over a Hall of Champions candidate
   // `TAG0189d4` puts the Resurrect / Reincarnate menu where the panel goes
-  // (`doc/CSBwin-src/Character.cpp:3856`), but the eye is button 71 and has no
-  // `PotentialCharacterOrdinal` gate (`doc/CSBwin-src/Mouse.cpp:1659-1664`): `_ClickOnEye`
-  // draws the panel over the menu (`doc/CSBwin-src/Viewport.cpp:7257`) and leaves
+  // (`doc/CSBwin-src/Character.cpp:3873`), but the eye is button 71 and has no
+  // `PotentialCharacterOrdinal` gate (`doc/CSBwin-src/Mouse.cpp:1798-1803`): `_ClickOnEye`
+  // draws the panel over the menu (`doc/CSBwin-src/Viewport.cpp:7264`) and leaves
   // `d.DisplayResurrectChestOrScroll` at 5; `QuitPressingEye` calls `TAG0189d4` again
-  // (`doc/CSBwin-src/CSBCode.cpp:7399`). So this needs the whole inventory drawn, with
+  // (`doc/CSBwin-src/CSBCode.cpp:7458`). So this needs the whole inventory drawn, with
   // graphic 40 really there to cover the panel.
   console.log('=== the eye held over a candidate\'s Resurrect menu ===');
   const cache = new Map();
@@ -334,7 +334,7 @@ async function main(): Promise<void> {
   console.log('');
 
   // ------------------------------------------ a potion's power, as a rune before its name
-  // `doc/CSBwin-src/Character.cpp:3599-3615`: once the selected champion is past mastery 1
+  // `doc/CSBwin-src/Character.cpp:3616-3632`: once the selected champion is past mastery 1
   // as a priest, the object panel prefixes a potion's name with the character
   // `95 + strength()/40` — `` ` `` and `a`..`e`, the six power-rune glyphs — and prints
   // the lot with `TextToViewport(134, 68, COLOR_13, …)`. The same raw-text trap as the

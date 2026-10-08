@@ -2,7 +2,7 @@
  * The name-entry screen a reincarnated champion is given.
  *
  * `_ReIncarnate` (`doc/CSBwin-src/Code13ea4.cpp:20`), reached from
- * `_ResurrectReincarnateCancel`'s button 161 (`doc/CSBwin-src/CSBCode.cpp:6738`) — the
+ * `_ResurrectReincarnateCancel`'s button 161 (`doc/CSBwin-src/CSBCode.cpp:6797`) — the
  * *first* thing that branch does, before the skills are wiped and the penalties
  * charged. It blanks the champion's name and title and has the player type new ones,
  * either on the real keyboard or on the letter grid drawn in the viewport.
@@ -18,7 +18,7 @@
  * There is deliberately **no cancel**. CSBWin offers none: the only way out is a name
  * that is at least one character long and not already worn by another champion.
  *
- * ## The letter grid (`:174-210`)
+ * ## The letter grid (`:184-220`)
  *
  * Screen coordinates, three rows of eleven cells on a 10-pixel pitch:
  *
@@ -29,7 +29,7 @@
  * - codes 86 and 97 are the two halves of that carriage-return key, and become 13;
  * - anything above 86 shifts down by one to close the gap the key leaves;
  * - anything past `'Z'` indexes `d.SpecialChars` — comma, period, semi-colon, colon,
- *   space (`doc/CSBwin-src/Data.h:1422`).
+ *   space (`doc/CSBwin-src/Data.h:1437`).
  */
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
@@ -41,7 +41,7 @@ import { UIState } from './UIState';
 const NAME_MAX = 7;
 const TITLE_MAX = 19;
 
-/** Where each field's first character sits, in *screen* coordinates (`:57-58`, `:281`). */
+/** Where each field's first character sits, in *screen* coordinates (`:57-58`, `:290`). */
 const NAME_X = 177;
 const NAME_Y = 91;
 const TITLE_X = 105;
@@ -143,7 +143,7 @@ export function drawReincarnateScreen(ui: UIState): void {
 }
 
 /**
- * A key, as CSBWin's loop sees it (`:225-326`). `key` is a DOM `KeyboardEvent.key`.
+ * A key, as CSBWin's loop sees it (`:225-335`). `key` is a DOM `KeyboardEvent.key`.
  * Returns whether the screen consumed it — while it is open, it consumes everything.
  */
 export function reincarnateKey(ui: UIState, key: string): boolean {
@@ -218,7 +218,7 @@ export function gridCharacterAt(ui: UIState, x: number, y: number): number | nul
   return code;
 }
 
-/** The tail of the loop (`:225-326`), shared by the keyboard and the letter grid. */
+/** The tail of the loop (`:225-335`), shared by the keyboard and the letter grid. */
 function applyCharacterCode(state: ReincarnateState, rawCode: number): void {
   let code = rawCode;
   // `if ((D5W>='a') && (D5W<='z')) D5W -= 32;`
@@ -245,7 +245,7 @@ function applyCharacterCode(state: ReincarnateState, rawCode: number): void {
   }
 
   if (code === 13) {
-    // Return ends the name, and does nothing at all in the title (`:270-274`).
+    // Return ends the name, and does nothing at all in the title (`:279-283`).
     if (state.stage !== 1) return;
     if (state.count <= 0) return;
     advanceToTitle(state);
@@ -253,11 +253,11 @@ function applyCharacterCode(state: ReincarnateState, rawCode: number): void {
   }
 
   if (code === 8) {
-    // `if ((D6W==1) && (D7W==0)) continue;` — nothing to rub out (`:295-296`).
+    // `if ((D6W==1) && (D7W==0)) continue;` — nothing to rub out (`:311-312`).
     if (state.stage === 1 && state.count === 0) return;
     if (state.count === 0) {
       // Backspacing off the front of the title steps back into the name and puts the
-      // cursor **on** its last character, ready to replace it (`:311-318`).
+      // cursor **on** its last character, ready to replace it (`:320-327`).
       state.stage = 1;
       state.count = Math.max(0, state.name.length - 1);
       state.name = state.name.slice(0, state.count);
@@ -270,7 +270,7 @@ function applyCharacterCode(state: ReincarnateState, rawCode: number): void {
   }
 }
 
-/** `tag0142c2` (`:283-289`) — hand the cursor to the title field. */
+/** `tag0142c2` (`:299-305`) — hand the cursor to the title field. */
 function advanceToTitle(state: ReincarnateState): void {
   state.stage = 2;
   state.count = 0;

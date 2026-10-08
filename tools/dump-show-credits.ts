@@ -2,10 +2,10 @@
  * The end of a lost game — `MainLoop` returning, and `_ShowCredits(1)` after it.
  *
  * 1. **The loop ends on the tick of death.** `KillCharacter` sets `d.GameIsLost` when
- *    nobody is left (`doc/CSBwin-src/Character.cpp:2680`); the tick's timers have run, and
- *    everything under `if (d.GameIsLost == 0)` does not (`CSBCode.cpp:658-778`): no
+ *    nobody is left (`doc/CSBwin-src/Character.cpp:2685`); the tick's timers have run, and
+ *    everything under `if (d.GameIsLost == 0)` does not (`CSBCode.cpp:668-788`): no
  *    `scrollingText.ClockTick()`, no periodic update, and no tick after it. `_StartCSB`
- *    then calls `ShowCredits(_3_, d.GameIsLost)` (`:11325`). Three deaths: one inside a
+ *    then calls `ShowCredits(_3_, d.GameIsLost)` (`:11560`). Three deaths: one inside a
  *    timer (poison), one between ticks (as a mouse handler kills), and one that leaves a
  *    champion standing.
  * 2. **The screen.** `showCredits` over a headless `IntroHost` and the real
@@ -29,9 +29,9 @@
  *
  * 5. **The CSB win.** A stone-room timer on an actuator of type 18, at any position, sets
  *    `d.Word11694`, clears `d.CanRestartFromSavegame` and makes `ProcessTimers` return at
- *    once, the timers behind it left queued (`Timer.cpp:2366-2372`, `CSBCode.cpp:6459-6464`).
+ *    once, the timers behind it left queued (`Timer.cpp:2366-2372`, `CSBCode.cpp:6518-6523`).
  *    The tick ends there, and `MainLoop` waits 300 VBLs, their `vblInterrupt` and no pass,
- *    before `ShowCredits(1)` (`CSBCode.cpp:627-633`).
+ *    before `ShowCredits(1)` (`CSBCode.cpp:637-643`).
  *
  * Run: `npx tsx tools/dump-show-credits.ts`
  */
@@ -161,7 +161,7 @@ function runPastDeath(label: string, w: Watched, limit: number): number {
 }
 
 function checkTickOfDeath(): void {
-  console.log('=== MainLoop returns on the tick of death (CSBCode.cpp:658-778) ===');
+  console.log('=== MainLoop returns on the tick of death (CSBCode.cpp:668-788) ===');
 
   // Poison of strength 128: 2 now (`max(1, 128/64)`), then 1 from `TT_75` 36 ticks later,
   // inside `ProcessTimers`.
@@ -174,7 +174,7 @@ function checkTickOfDeath(): void {
   }
 
   // A death between ticks, as a click or a step would cause: the next tick runs its
-  // timers, then ends before its `d.Time++` (CSBCode.cpp:658-660).
+  // timers, then ends before its `d.Time++` (CSBCode.cpp:668-670).
   {
     const w = watchedGame([200]);
     for (let n = 1; n <= 3; n++) frame(w);
@@ -592,7 +592,7 @@ async function checkWon(): Promise<void> {
 
 function checkCsbWin(): void {
   console.log('');
-  console.log('=== the CSB win: actuator type 18 (Timer.cpp:2366-2372, CSBCode.cpp:627-633) ===');
+  console.log('=== the CSB win: actuator type 18 (Timer.cpp:2366-2372, CSBCode.cpp:637-643) ===');
   const w = watchedGame([200]);
   const game = w.game;
   const dungeon = game.ctx.dungeon;
@@ -614,7 +614,7 @@ function checkCsbWin(): void {
   setActuatorType(dungeon.getActuatorRecord(rn)!, 18);
   // A position other than the actuator's: type 18 ignores it. And a timer due with it,
   // behind it in the queue, both due in the next tick, which runs its timers on the
-  // `d.Time` of now (CSBCode.cpp:626, :660).
+  // `d.Time` of now (CSBCode.cpp:636, :670).
   const due = game.ctx.state.tickCount;
   const otherPos = (game.ctx.dungeon.rnMaps.pos(rn) + 1) & 3;
   game.ctx.timers.createTimer(TimerFunction.TT_STONEROOM, x, y, otherPos, 0, due, z);

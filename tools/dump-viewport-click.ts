@@ -1,12 +1,12 @@
 /**
  * An empty-handed click in the viewport: which of the six viewport buttons it touches.
  *
- * `HandleClickInViewport` (`doc/CSBwin-src/Mouse.cpp:1053-1135`) tests the door switch,
+ * `HandleClickInViewport` (`doc/CSBwin-src/Mouse.cpp:1054-1136`) tests the door switch,
  * then buttons 0..5 in order, and the first hit wins. 0-4 are the objects drawn in the
- * cells ahead; 5 is the front wall's decoration (`CSBCode.cpp:3299`). An alcove's
+ * cells ahead; 5 is the front wall's decoration (`CSBCode.cpp:3360`). An alcove's
  * objects are drawn *inside* its decoration, so the order is what lets a player take an
  * object out of an alcove at all — and button 5 of an alcove touches nothing
- * (`if (d.FacingAlcove == 0) TouchWallF1()`, `Mouse.cpp:1123-1128`).
+ * (`if (d.FacingAlcove == 0) TouchWallF1()`, `Mouse.cpp:1124-1129`).
  *
  * The port tested the wall decoration first and the objects last. That went unnoticed
  * while a wall click that touched no actuator fell through to the pickup; once it
@@ -17,14 +17,14 @@
  * test, not the renderer, so they are written into the context by hand.
  *
  * A click that touches no button makes a sound on the bare stone ahead
- * (`Mouse.cpp:1138-1157`): not an alcove, `d.CellTypeJustAhead` stone, the cell's flags
+ * (`Mouse.cpp:1139-1158`): not an alcove, `d.CellTypeJustAhead` stone, the cell's flags
  * `(cf & 5) == 0`, and the click within x 33-189, y 44-150. `d.CellTypeJustAhead` comes
  * from the port's own `SummarizeRoomInfo` over the real cell, so that a closed imaginary
  * false wall (level 2, (7,9)) shows the two tests disagreeing. The sound is checked down
  * to the sample the host is asked to play.
  *
  * With an object in hand, the same click tests `d.CellTypeJustAhead == 0` alone
- * (`Mouse.cpp:1165`), so before that false wall it takes the stone arm: the two near drop
+ * (`Mouse.cpp:1166`), so before that false wall it takes the stone arm: the two near drop
  * areas and button 5, and no throw.
  *
  * Run: `npx tsx tools/dump-viewport-click.ts`
@@ -213,7 +213,7 @@ function main(): void {
   check(stone(imaginary, FACING_NORTH, false, 111, 97) === null, 'but is silent: (cf & 5) != 0');
 
   // With an object in hand the click tests `d.CellTypeJustAhead == 0` and nothing else
-  // (`Mouse.cpp:1165`): stone ahead offers the two near drop areas and button 5, and
+  // (`Mouse.cpp:1166`): stone ahead offers the two near drop areas and button 5, and
   // anything else the throw and all four drop areas. The closed imaginary false wall is
   // stone here, as it is to `SummarizeRoomInfo`. The object is the alcove's, still in hand.
   const dropAreas = graphicsTablesOf(stockGraphics()).ui.graphic231.dropAreas;

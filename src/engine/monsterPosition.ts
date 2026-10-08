@@ -1,7 +1,7 @@
 /**
  * Where a group's members sit inside a cell.
  *
- * `OrdinalOfMonsterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:619`) answers "which
+ * `OrdinalOfMonsterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:654`) answers "which
  * member of this group, 1-based, is standing in that corner", and 0 for nobody. It is
  * asked by three unrelated systems — a missile arriving (`TimerSystem`), a monster
  * shuffling within its cell (`MonsterAI`) and a champion swinging a sword
@@ -22,7 +22,7 @@ import { monsterHorizontalSize, type MonsterDesc } from '../data/tables/MonsterD
 import type { DungeonState } from './DungeonState';
 
 /**
- * `OrdinalOfMonsterAtPosition(pDB4, pos)` (`doc/CSBwin-src/Code11f52.cpp:619`): reads the
+ * `OrdinalOfMonsterAtPosition(pDB4, pos)` (`doc/CSBwin-src/Code11f52.cpp:654`): reads the
  * group's position and facing bytes and its descriptor's `horizontalSize`, then asks
  * {@link ordinalAtPositionBytes}.
  */

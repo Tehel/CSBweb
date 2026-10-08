@@ -1,5 +1,5 @@
 /**
- * `BACKGROUND_LIB` (`doc/CSBwin-src/CSB.h:364-419`, `doc/CSBwin-src/Viewport.cpp:5333-5899`):
+ * `BACKGROUND_LIB` (`doc/CSBwin-src/CSB.h:364-419`, `doc/CSBwin-src/Viewport.cpp:5340-5906`):
  * the `CGT_Backgrounds` sections of `CSBgraphics.dat` a skin draws with, read once and kept,
  * and the readers of the skin index, the masks, the bitmaps and the decorations in them.
  *
@@ -13,7 +13,7 @@
  * `CreateBackgroundGraphic` makes with that id afterwards is never found.
  * `BackgroundGraphicExists` records no miss, and reads the file again each time.
  *
- * `Cleanup` empties it, from `CleanupGraphics` (`doc/CSBwin-src/Graphics.cpp:2204`) before
+ * `Cleanup` empties it, from `CleanupGraphics` (`doc/CSBwin-src/Graphics.cpp:2230`) before
  * every game CSBWin reads.
  */
 import { readU16LE, readU32LE, writeU16LE, writeU32LE } from '../core/bytes';
@@ -63,7 +63,7 @@ export interface DecorationBitmap {
   bitmapSize: number;
 }
 
-/** `GetCode`'s minimum size: the start address and 21 cells of eight room types (`Viewport.cpp:5705`). */
+/** `GetCode`'s minimum size: the start address and 21 cells of eight room types (`Viewport.cpp:5712`). */
 const CODE_MINIMUM_SIZE = 2 * (1 + 8 * 21);
 
 // The `static bool errorMsg` of `CreateNewMask` and `CreateNewAffineMask`, by their
@@ -81,13 +81,13 @@ export class BackgroundLib {
   /** `reader` is the data set's `CSBgraphics.dat`; without one, every section is missing. */
   constructor(private readonly reader: Pick<CSBGraphicsLoader, 'readSection'> | null | undefined) {}
 
-  /** `BACKGROUND_LIB::Cleanup` (`Viewport.cpp:5341-5359`). */
+  /** `BACKGROUND_LIB::Cleanup` (`Viewport.cpp:5348-5366`). */
   Cleanup(): void {
     this.backgroundGraphics = [];
   }
 
   /**
-   * `BACKGROUND_LIB::GetMask` (`Viewport.cpp:5367-5382`): mask `masknum` of a mask section,
+   * `BACKGROUND_LIB::GetMask` (`Viewport.cpp:5374-5389`): mask `masknum` of a mask section,
    * a `ui32` count and as many byte offsets. `null` past the count, for an offset of 0 or
    * past the section, or an index that does not fit. Its `minimumSize` is unused.
    */
@@ -95,7 +95,7 @@ export class BackgroundLib {
     return this.MaskExists(graphicID, masknum);
   }
 
-  /** `BACKGROUND_LIB::MaskExists` (`Viewport.cpp:5384-5399`), the same reading as `GetMask`'s. */
+  /** `BACKGROUND_LIB::MaskExists` (`Viewport.cpp:5391-5406`), the same reading as `GetMask`'s. */
   MaskExists(graphicID: number, masknum: number): BackgroundPointer | null {
     const idx = this.BackgroundGraphicExists(graphicID, 4, false);
     if (idx < 0) return null;
@@ -109,7 +109,7 @@ export class BackgroundLib {
   }
 
   /**
-   * `BACKGROUND_LIB::GetBitmap` (`Viewport.cpp:5402-5413`): a bitmap section, and
+   * `BACKGROUND_LIB::GetBitmap` (`Viewport.cpp:5409-5420`): a bitmap section, and
    * `bitmapSize`, its size in `i32` units.
    */
   GetBitmap(graphicID: number, minimumSize: number): { data: Uint8Array; bitmapSize: number } | null {
@@ -121,7 +121,7 @@ export class BackgroundLib {
   }
 
   /**
-   * `BACKGROUND_LIB::CreateVirtualBitmap` (`Viewport.cpp:5445-5481`): graphic
+   * `BACKGROUND_LIB::CreateVirtualBitmap` (`Viewport.cpp:5452-5488`): graphic
    * `virtualGraphicID`, `pMask`'s transform of the bitmap `pGraphic` (`srcSize` `i32`s),
    * unless a graphic of 2 bytes or more has that id. Its size is `4 * (dstSize + 1)` for a
    * `dstSize` that already counts bytes: four times what its pixels need, which
@@ -148,7 +148,7 @@ export class BackgroundLib {
   }
 
   /**
-   * `BACKGROUND_LIB::CreateNewMask` (`Viewport.cpp:5484-5540`): room for mask `number` in
+   * `BACKGROUND_LIB::CreateNewMask` (`Viewport.cpp:5491-5547`): room for mask `number` in
    * mask section `id`, made if there is none, and `pMask`'s header copied into it. The
    * section's index grows to take `number`, its masks moving up behind it; `null`, and
    * CSBWin's "Design Error" once, when the mask is there already.
@@ -167,9 +167,9 @@ export class BackgroundLib {
   }
 
   /**
-   * `BACKGROUND_LIB::CreateNewAffineMask` (`Viewport.cpp:5543-5600`): `CreateNewMask` for
+   * `BACKGROUND_LIB::CreateNewAffineMask` (`Viewport.cpp:5550-5607`): `CreateNewMask` for
    * an `AFFINEMASK`, copied whole. Where the index grows by `n` entries, CSBWin moves the
-   * offsets already there up by 4, not `4 * n` (`:5577`), so past one new entry they point
+   * offsets already there up by 4, not `4 * n` (`:5584`), so past one new entry they point
    * short of their masks; the port does the same.
    */
   CreateNewAffineMask(id: number, number: number, pMask: AFFINEMASK): BackgroundPointer | null {
@@ -180,7 +180,7 @@ export class BackgroundLib {
   }
 
   /**
-   * `BACKGROUND_LIB::CreateVirtualMask` (`Viewport.cpp:5603-5624`): `pNewMask`'s pixels,
+   * `BACKGROUND_LIB::CreateVirtualMask` (`Viewport.cpp:5610-5631`): `pNewMask`'s pixels,
    * `pAffine`'s transform of `pOldMask`'s.
    */
   CreateVirtualMask(pOldMask: BackgroundPointer, pNewMask: BackgroundPointer, pAffine: AFFINEMASK): void {
@@ -258,7 +258,7 @@ export class BackgroundLib {
   }
 
   /**
-   * `BACKGROUND_LIB::GetDecorationBitmap` (`Viewport.cpp:5626-5659`): a `ui16` count, as
+   * `BACKGROUND_LIB::GetDecorationBitmap` (`Viewport.cpp:5633-5666`): a `ui16` count, as
    * many byte offsets, a `ui16` count of locations and the locations, a word each. `null`
    * where it returns -1. Neither count is checked against the section: a word past it
    * reads 0 here, where CSBWin reads what lies past its allocation.
@@ -287,7 +287,7 @@ export class BackgroundLib {
   }
 
   /**
-   * `BACKGROUND_LIB::GetSkinDef` (`Viewport.cpp:5662-5691`): skin `skinNum`'s definition in
+   * `BACKGROUND_LIB::GetSkinDef` (`Viewport.cpp:5669-5698`): skin `skinNum`'s definition in
    * graphic 1, the skin index, a `ui16` count of skins and a byte offset each. `null`
    * without the index, past the count, for an offset of 0, or for a definition that does
    * not leave `minimumSize` bytes and one more before the section's end.
@@ -306,7 +306,7 @@ export class BackgroundLib {
   }
 
   /**
-   * `BACKGROUND_LIB::GetCode` (`Viewport.cpp:5694-5710`): the section of skin `skinNum`'s
+   * `BACKGROUND_LIB::GetCode` (`Viewport.cpp:5701-5717`): the section of skin `skinNum`'s
    * program, ID 8 of its definition, or `null` for an ID of 0 or a section too small for
    * the start address and the 168 cell programs' addresses.
    */
@@ -318,35 +318,35 @@ export class BackgroundLib {
     return this.backgroundGraphics[idx]!.data;
   }
 
-  /** `BACKGROUND_LIB::GetSkinID` (`Viewport.cpp:5712-5723`): word `IDnum` of the skin's definition, or 0. */
+  /** `BACKGROUND_LIB::GetSkinID` (`Viewport.cpp:5719-5730`): word `IDnum` of the skin's definition, or 0. */
   GetSkinID(skinNum: number, IDnum: number): number {
     const pSkinDef = this.GetSkinDef(skinNum, 18);
     if (pSkinDef === null) return 0;
     return readU16LE(pSkinDef.data, pSkinDef.offset + 2 * IDnum);
   }
 
-  /** `BACKGROUND_LIB::GetFloorGraphicID` (`Viewport.cpp:5725-5728`). */
+  /** `BACKGROUND_LIB::GetFloorGraphicID` (`Viewport.cpp:5732-5735`). */
   GetFloorGraphicID(skinNum: number): number {
     return this.GetSkinID(skinNum, 0);
   }
 
-  /** `BACKGROUND_LIB::GetMiddleGraphicID` (`Viewport.cpp:5730-5733`). */
+  /** `BACKGROUND_LIB::GetMiddleGraphicID` (`Viewport.cpp:5737-5740`). */
   GetMiddleGraphicID(skinNum: number): number {
     return this.GetSkinID(skinNum, 1);
   }
 
-  /** `BACKGROUND_LIB::GetCeilingGraphicID` (`Viewport.cpp:5735-5738`). */
+  /** `BACKGROUND_LIB::GetCeilingGraphicID` (`Viewport.cpp:5742-5745`). */
   GetCeilingGraphicID(skinNum: number): number {
     return this.GetSkinID(skinNum, 2);
   }
 
-  /** `BACKGROUND_LIB::GetWallGraphicID` (`Viewport.cpp:5740-5743`). */
+  /** `BACKGROUND_LIB::GetWallGraphicID` (`Viewport.cpp:5747-5750`). */
   GetWallGraphicID(skinNum: number): number {
     return this.GetSkinID(skinNum, 3);
   }
 
   /**
-   * `BACKGROUND_LIB::GetWallDecorationID` (`Viewport.cpp:5745-5763`): after the nine IDs,
+   * `BACKGROUND_LIB::GetWallDecorationID` (`Viewport.cpp:5752-5770`): after the nine IDs,
    * a count of floor decorations and their IDs, then a count of wall decorations and
    * theirs. CSBWin bounds the word `index` by `skinDefSize`, a count of bytes, so a word
    * up to twice past the section's end passes: it reads 0 here, where CSBWin reads what
@@ -367,28 +367,28 @@ export class BackgroundLib {
     return word(index);
   }
 
-  /** `BACKGROUND_LIB::GetFloorMaskID` (`Viewport.cpp:5765-5768`). */
+  /** `BACKGROUND_LIB::GetFloorMaskID` (`Viewport.cpp:5772-5775`). */
   GetFloorMaskID(skinNum: number): number {
     return this.GetSkinID(skinNum, 4);
   }
 
-  /** `BACKGROUND_LIB::GetMiddleMaskID` (`Viewport.cpp:5770-5773`). */
+  /** `BACKGROUND_LIB::GetMiddleMaskID` (`Viewport.cpp:5777-5780`). */
   GetMiddleMaskID(skinNum: number): number {
     return this.GetSkinID(skinNum, 5);
   }
 
-  /** `BACKGROUND_LIB::GetCeilingMaskID` (`Viewport.cpp:5775-5778`). */
+  /** `BACKGROUND_LIB::GetCeilingMaskID` (`Viewport.cpp:5782-5785`). */
   GetCeilingMaskID(skinNum: number): number {
     return this.GetSkinID(skinNum, 6);
   }
 
-  /** `BACKGROUND_LIB::GetWallMaskID` (`Viewport.cpp:5780-5783`). */
+  /** `BACKGROUND_LIB::GetWallMaskID` (`Viewport.cpp:5787-5790`). */
   GetWallMaskID(skinNum: number): number {
     return this.GetSkinID(skinNum, 7);
   }
 
   /**
-   * `BACKGROUND_LIB::FindGraphicInCache` (`Viewport.cpp:5801-5839`): the first entry with
+   * `BACKGROUND_LIB::FindGraphicInCache` (`Viewport.cpp:5808-5846`): the first entry with
    * the id, else the section read and added, else -1 with nothing added.
    */
   private FindGraphicInCache(graphicID: number, mustExist: boolean): number {
@@ -404,7 +404,7 @@ export class BackgroundLib {
   }
 
   /**
-   * `BACKGROUND_LIB::BackgroundGraphicExists` (`Viewport.cpp:5841-5852`): the entry's
+   * `BACKGROUND_LIB::BackgroundGraphicExists` (`Viewport.cpp:5848-5859`): the entry's
    * index, or -1 when there is none or it is smaller than `minimumSize`. CSBWin's
    * `actualSize` is the entry's `size`, which its callers read only for an index it
    * returns; the port's read the entry. Private in CSBWin.
@@ -417,7 +417,7 @@ export class BackgroundLib {
   }
 
   /**
-   * `BACKGROUND_LIB::GetBackgroundGraphic` (`Viewport.cpp:5855-5872`): as
+   * `BACKGROUND_LIB::GetBackgroundGraphic` (`Viewport.cpp:5862-5879`): as
    * `BackgroundGraphicExists`, but a graphic not found gets an entry of size -1 and no
    * data. Private in CSBWin.
    */
@@ -432,7 +432,7 @@ export class BackgroundLib {
   }
 
   /**
-   * `BACKGROUND_LIB::CreateBackgroundGraphic` (`Viewport.cpp:5875-5899`): a new entry of
+   * `BACKGROUND_LIB::CreateBackgroundGraphic` (`Viewport.cpp:5882-5906`): a new entry of
    * `graphicSize` bytes, or -1 when `BackgroundGraphicExists` finds the id. CSBWin's
    * `UI_malloc` leaves the bytes as they were; the port's are 0, and its callers write
    * them. Private in CSBWin.

@@ -1,5 +1,5 @@
 /**
- * `DecodeText` (`doc/CSBwin-src/CSBCode.cpp:5487`): a text record's 5-bit codes, three to
+ * `DecodeText` (`doc/CSBwin-src/CSBCode.cpp:5552`): a text record's 5-bit codes, three to
  * a word, into bytes, through graphics.dat's escape tables (`doc/PROVEN_FACTS.md` →
  * "Text Retrieval and Decode"). A free function over the dungeon's words, so that a
  * reader holding a `DungeonData` and the tables (`extractPresetHeroes`) decodes as
@@ -182,19 +182,19 @@ export interface TextSubstitution {
     globalVariable(index: number): number | null;
 }
 
-/** `EDT_GlobalText` (`doc/CSBwin-src/CSB.h:1573`). */
+/** `EDT_GlobalText` (`doc/CSBwin-src/CSB.h:1576`). */
 export const EDT_GLOBAL_TEXT = 10;
 
 const DOT = 0x2e;
 const A = 0x41;
 
 /**
- * `SubstituteCharacterNames` (`doc/CSBwin-src/CSBCode.cpp:5367-5482`), the end of every
- * `DecodeText` (`:5664-5667`): `.Q.A` is the champion holding the cursor and `.Q.B` to
+ * `SubstituteCharacterNames` (`doc/CSBwin-src/CSBCode.cpp:5432-5547`), the end of every
+ * `DecodeText` (`:5729-5732`): `.Q.A` is the champion holding the cursor and `.Q.B` to
  * `.Q.E` the first to fourth (`.Q.F` to `.Q.K` print nothing), `.R.` and four hex digits
  * a global text, `.N.` and two a global variable in decimal. A digit is a letter from `A`
  * (0) to `P` (15). A wall text, `bcd`, holds codes rather than ASCII and is only looked at
- * when it has a `.Q.` (`bcdstrstr`, `:5354-5365`); the others when they have any of the
+ * when it has a `.Q.` (`bcdstrstr`, `:5419-5430`); the others when they have any of the
  * three. A substitution that fails, a name or text that is not there, stops the copy:
  * the text ends there, and `ok` is false, which is `DecodeText`'s -1.
  */
@@ -294,7 +294,7 @@ export function SubstituteCharacterNames(
 }
 
 /**
- * `SubstituteCharacterName` (`doc/CSBwin-src/CSBCode.cpp:5275-5293`): the name's eight
+ * `SubstituteCharacterName` (`doc/CSBwin-src/CSBCode.cpp:5340-5358`): the name's eight
  * bytes, or up to its end. False when there is no such champion.
  */
 function substituteName(name: string | null, put: (c: number) => boolean): boolean {

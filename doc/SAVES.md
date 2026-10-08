@@ -62,17 +62,17 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   dropped with no dialog up is swallowed rather than opened by the browser. There is
   no file picker. The row keeps the file's name, numbered while a save has it, and
   the file's date, as CSBWin ranks its slots by their files' `MODIFIEDTIME`
-  (`doc/CSBwin-src/CSBCode.cpp:9766-9800`); it counts no time played, and is the last
+  (`doc/CSBwin-src/CSBCode.cpp:9890-9924`); it counts no time played, and is the last
   save used (`GameSaves.importSave`, `src/engine/GameSaves.ts`). A file that does not
-  read is CSBWin's "SAVED GAME DAMAGED!" (`SaveGame.cpp:1906`).
+  read is CSBWin's "SAVED GAME DAMAGED!" (`SaveGame.cpp:2118`).
 - **A save knows its dungeon.** A row carries its data set's id, and the list shows the
   running data set's saves only (`GameSaves.dataSet`). The filter is the list's
   parameter, not its rule: RISE lists every set's (below), since a DM save feeds a CSB
   game. CSBWin keeps a game's saves in that game's directory (`CSBGAME.DAT`
-  to `CSBGAME4.DAT`, `doc/CSBwin-src/CSBCode.cpp:9747-9756`), and guards against the
+  to `CSBGAME4.DAT`, `doc/CSBwin-src/CSBCode.cpp:9871-9880`), and guards against the
   wrong graphics with the signatures an Extended Features block may carry
-  (`expectedGraphicSignature1/2`, `SaveGame.cpp:378-379`, checked at
-  `Graphics.cpp:1784-1815`). The port does not check them. It keeps those a read gives
+  (`expectedGraphicSignature1/2`, `SaveGame.cpp:380-381`, checked at
+  `Graphics.cpp:1808-1839`). The port does not check them. It keeps those a read gives
   and writes them back (`ctx.signatures`).
 - **RISE makes a save of its own.** On an entrance whose data set has a `mini.dat`,
   CSB's, RISE opens the chooser over every data set's saves (`SaveMenu`'s `rise` mode,
@@ -87,7 +87,7 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   the entrance.
 
   CSBWin makes a CSB game in three steps (`doc/CSBwin-src/Chaos.cpp:1-5`): the prison
-  is played, its party saved as `CSBGAMEn.DAT` (`SaveGame.cpp:902-908`); the utility
+  is played, its party saved as `CSBGAMEn.DAT` (`SaveGame.cpp:926-932`); the utility
   makes the new adventure from that save; and the door's RESUME loads it. RISE is the
   second step, and in play the port offers it too, below.
 - **The prison asks "BEGIN THE ADVENTURE?".** The prison has no way out, and its text
@@ -151,12 +151,12 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
 ## A playthrough
 
 - **`d.RandomGameID` names it**: drawn when a new game is read
-  (`doc/CSBwin-src/SaveGame.cpp:1523-1532`), kept in `GAMEBLOCK1` (offset 308, written at
-  `:1060`), carried by the port as `block1.randomGameID`, and what CSBWin itself tests
-  for "THAT'S NOT THE SAME GAME" (`:1605-1606`). It is drawn before the Hall of
+  (`doc/CSBwin-src/SaveGame.cpp:1638-1647`), kept in `GAMEBLOCK1` (offset 308, written at
+  `:1085`), carried by the port as `block1.randomGameID`, and what CSBWin itself tests
+  for "THAT'S NOT THE SAME GAME" (`:1730-1731`). It is drawn before the Hall of
   Champions, so it names a game from its first step, whoever is in the party. Two new
   games differ: `CsbRandom` takes its seed from `Math.random` at its first draw
-  (`src/core/random.ts`), as CSBWin seeds from the system time (`CSBCode.cpp:350`).
+  (`src/core/random.ts`), as CSBWin seeds from the system time (`CSBCode.cpp:360`).
   A drawn id is never 0: where CSBWin keeps a product of 0, the port draws again
   (`drawRandomGameID`, `src/engine/GameContext.ts`; `DEBT.md` H).
 - **No stored save holds 0**, which names no playthrough. A file of an earlier build
@@ -173,7 +173,7 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   the page gives it a stream of its own to draw from (`src/main.ts`). The import is
   the other way in, by the same rule and from the same stream
   (`GameSaves.importSave`). So 0 is no special value to the game: a load takes the
-  file's id as it is, as CSBWin does (`doc/CSBwin-src/SaveGame.cpp:1610`), and the
+  file's id as it is, as CSBWin does (`doc/CSBwin-src/SaveGame.cpp:1734`), and the
   game's saves carry it. The draw still never gives 0.
 - **No id drawn here is a stored save's.** CSBWin's draw is the
   product of two 16-bit words from consecutive draws of one stream, and two games draw
@@ -214,7 +214,7 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   never checked, since loading an old save and saving over a newer one is ordinary
   play. The question is `_DoMenu`'s two-option menu in the
   dialog's place: CSBWin's own line for a save of another `d.RandomGameID`, "THAT'S NOT
-  THE SAME GAME" (`doc/CSBwin-src/SaveGame.cpp:1605-1606`), over the action and CANCEL
+  THE SAME GAME" (`doc/CSBwin-src/SaveGame.cpp:1730-1731`), over the action and CANCEL
   (`asksFirst`, `src/renderer/ui/SaveMenu.ts`). The boot's chooser has no game behind
   it and never asks.
 - **The last save used**, loaded or written, is the dialog's selection when it opens,
@@ -299,7 +299,7 @@ opens the same one, load-only.
   and its question. Not on a heading, which a click folds.
 - **CANCEL, Esc and a right-click close it.**
 - **While a DSA has disabled saves** (`&DISABLESAVES`, `DsaSystem.disableSaves`), CSBWin's
-  disk menu is only "SAVES ARE DISABLED" and OK (`doc/CSBwin-src/SaveGame.cpp:848-856`),
+  disk menu is only "SAVES ARE DISABLED" and OK (`doc/CSBwin-src/SaveGame.cpp:856-873`),
   since it did nothing but save. The dialog loads and exports too, so it opens as ever,
   with that line as its message, and saves nothing: SAVE has no label anywhere, and
   there is no "NEW SAVE" (`savesDisabled`, `src/renderer/ui/SaveMenu.ts`).
@@ -310,7 +310,7 @@ opens the same one, load-only.
   `src/renderer/intro/BootSequence.ts`).
 - **No "GAME LOADED, READY TO PLAY."**, nor its "ASCII DUMP" (`DEBT.md` G14): a
   loaded game is played at once. It is CSBWin's `_TAG021028` menu
-  (`doc/CSBwin-src/CSBCode.cpp:10493-10537`), so its absence is an entry of
+  (`doc/CSBwin-src/CSBCode.cpp:10617-10661`), so its absence is an entry of
   `doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port". The boot's
   hand-off keeps the fade to black and the cleared screen that menu gave the chooser's
   picture (`tag021028`, `src/renderer/intro/BootSequence.ts`).
@@ -322,10 +322,10 @@ its playthrough, F5's or the dialog's ("A playthrough"). Each key says what it d
 line of the message area, in white (`GameSaves.tell`; `doc/CSBWIN_MESSAGES_REFERENCE.md`):
 "GAME SAVED" or "GAME LOADED"; "CANNOT SAVE NOW" with no party, with a champion still
 being chosen, or while a script holds the loop, and "CANNOT LOAD NOW" for that last;
-CSBWin's disk menu's "SAVES ARE DISABLED" (`doc/CSBwin-src/SaveGame.cpp:848-856`) while a
+CSBWin's disk menu's "SAVES ARE DISABLED" (`doc/CSBwin-src/SaveGame.cpp:856-873`) while a
 DSA has disabled saves (`&DISABLESAVES`);
-CSBWin's own "UNABLE TO SAVE GAME!" (`doc/CSBwin-src/SaveGame.cpp:1266`) and "CAN'T FIND
-SAVED GAME!" (`:1585`) for a write that failed and for no save at all; a file that does
+CSBWin's own "UNABLE TO SAVE GAME!" (`doc/CSBwin-src/SaveGame.cpp:1363`) and "CAN'T FIND
+SAVED GAME!" (`:1710`) for a write that failed and for no save at all; a file that does
 not read gives the line the dialog's message would be. Each outcome is also a line for
 the console, with the save's name, and with the error behind a failure.
 
@@ -337,7 +337,7 @@ written over when the player wakes it (`GameSaves.sleepSave`). Both are player's
 the sleep icon, button 145, and the click that wakes, button 146, and each raises
 `UIState.sleepSaveNeeded`, which the screen acts on once the click is drained, as on the
 disk icon's flag (`GameScreen.handleMouseButton`). A blow that wakes the party
-(`WakeUp` from `doc/CSBwin-src/Monster.cpp:4531` and `Character.cpp:2811`) raises
+(`WakeUp` from `doc/CSBwin-src/Monster.cpp:4544` and `Character.cpp:2816`) raises
 nothing, so the slot keeps the moment the party lay down. The author's decision: lying
 down is always the player's choice, but not always a safe place, so the slot never
 touches F5's or a dialog's save.

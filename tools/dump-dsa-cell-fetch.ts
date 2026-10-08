@@ -1,13 +1,13 @@
 /**
- * `&CELL@` (`STKOP_CellFetch`, `doc/CSBwin-src/DSA.cpp:3677-3830`), run as the program of a
+ * `&CELL@` (`STKOP_CellFetch`, `doc/CSBwin-src/DSA.cpp:3678-3831`), run as the program of a
  * test DSA on a genuine save (`csbgame7.dat`), on squares of the party's level made a pit,
  * a false wall and a stone wall for the run.
  *
  * The array's variables are set to 0 before anything else (`Var(arrayIndex+j, 0)`,
- * `:3690-3693`), so they are well defined when the pit's and the false wall's bits go in
- * through `SetVarBit` (`:3767-3790`), which zeroes a variable that is not
- * (`DSA.cpp:143`). Their bits therefore read back as set, as a stone wall's do through
- * `Var(i, Var(i) | bit)` (`:3704-3720`), though the DSA never set the variables itself.
+ * `:3691-3694`), so they are well defined when the pit's and the false wall's bits go in
+ * through `SetVarBit` (`:3768-3791`), which zeroes a variable that is not
+ * (`DSA.cpp:144`). Their bits therefore read back as set, as a stone wall's do through
+ * `Var(i, Var(i) | bit)` (`:3705-3721`), though the DSA never set the variables itself.
  *
  * Run: `npx tsx tools/dump-dsa-cell-fetch.ts`
  */

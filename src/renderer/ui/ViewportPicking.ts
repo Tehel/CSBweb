@@ -40,15 +40,15 @@ export type EmptyHandedViewportTarget = 'doorSwitch' | 'wall' | 'object' | 'ston
 
 /**
  * What an empty-handed click in the viewport touches, in `HandleClickInViewport`'s order
- * (`doc/CSBwin-src/Mouse.cpp:1053-1157`): the door switch first, then the six viewport
+ * (`doc/CSBwin-src/Mouse.cpp:1054-1158`): the door switch first, then the six viewport
  * buttons 0..5, the first hit winning. 0-4 are the objects drawn in the cells ahead and 5
- * is the front wall's decoration (`CSBCode.cpp:3299`), so an object lying in an alcove is
+ * is the front wall's decoration (`CSBCode.cpp:3360`), so an object lying in an alcove is
  * picked up rather than the alcove touched. Button 5 of an alcove touches nothing at all
- * — `TouchWallF1` only runs `if (d.FacingAlcove == 0)` (`Mouse.cpp:1123-1128`).
+ * — `TouchWallF1` only runs `if (d.FacingAlcove == 0)` (`Mouse.cpp:1124-1129`).
  *
  * A click that hit no button is `'stone'`, which makes a sound, when it lands on the bare
- * stone ahead (`:1138-1157`): the party is not facing an alcove, `d.CellTypeJustAhead`
- * (`roomData[17].roomType`, `Viewport.cpp:6782-6785`) is stone, the cell's own flags are
+ * stone ahead (`:1139-1158`): the party is not facing an alcove, `d.CellTypeJustAhead`
+ * (`roomData[17].roomType`, `Viewport.cpp:6789-6792`) is stone, the cell's own flags are
  * stone or a false wall neither open nor imaginary (`(cf & 5) == 0`), and the click is
  * within x 33-189, y 44-150. A closed imaginary false wall passes the first test and fails
  * the second.
@@ -80,11 +80,11 @@ export function tryPickViewportObject(ui: UIState, x: number, y: number): boolea
   const target = getPickupCellForRelativePos(ui, hit.relativeLocation);
   if (!target) return false;
   if (isMonsterBlockingPickup(ui, hit.relativeLocation, target)) return false;
-  // `CURSORFILTER_PickFromFloor`, which may cancel the pick-up (`doc/CSBwin-src/Mouse.cpp:827-835`).
+  // `CURSORFILTER_PickFromFloor`, which may cancel the pick-up (`doc/CSBwin-src/Mouse.cpp:828-836`).
   const cfp = { object: hit.rn, type: CursorFilterType.PickFromFloor, p1: target.z, p2: target.x, p3: target.y, p4: hit.relativeLocation };
   ui.ctx.systems.dsa.cursorFilter(cfp);
   if (cfp.type === CursorFilterType.Cancel) return false;
-  // `TAG01a148` ends with `d.clockTick = 1` (`doc/CSBwin-src/Mouse.cpp:840`), which only
+  // `TAG01a148` ends with `d.clockTick = 1` (`doc/CSBwin-src/Mouse.cpp:841`), which only
   // its returns for no cursor owner, a monster in the way and a cancel skip.
   setClockTick(ui.ctx, 1);
   if (!ui.ctx.dungeon.removeObjectFromCell(target, hit.rn)) return false;
@@ -103,7 +103,7 @@ export function resolveViewportCursorAction(ui: UIState, x: number, y: number): 
   if (objectId === OBJECT_ID_NULL) return null;
   if (ui.partyState.cursorOwner < 0) return null;
 
-  // `d.CellTypeJustAhead == 0` (`doc/CSBwin-src/Mouse.cpp:1165`), which is all this arm
+  // `d.CellTypeJustAhead == 0` (`doc/CSBwin-src/Mouse.cpp:1166`), which is all this arm
   // tests: a false wall that is not open summarises as stone, imaginary or not
   // (`Codea59a.cpp:278-279`), unlike the bare-stone sound's `(cf & 5) == 0`.
   const stoneAhead = ui.context.roomData?.[17]?.roomType === SummaryRoomType.STONE;

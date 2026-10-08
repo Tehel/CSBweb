@@ -30,7 +30,7 @@ const graphicRoomTypes: number[] = (() => {
   return map;
 })();
 
-// Port of `GetCellFlags()` boundary behavior used by viewport rendering (CSBCode.cpp:4609-4662).
+// Port of `GetCellFlags()` boundary behavior used by viewport rendering (CSBCode.cpp:4674-4727).
 function getCellFlagsViewport(dungeon: DungeonState, position: Position): number {
   const { x, y, z } = position;
   const map = dungeon.getMap(z);
@@ -173,7 +173,7 @@ function summarizeStoneRoom(
   rslt.roomType = RoomType.STONE;
   rslt.championPortraitOrdinal = 0;
 
-  // Port of CSBWin TAG00a4a2 random wall decorations (Codea59a.cpp:76, CSBCode.cpp:5714+).
+  // Port of CSBWin TAG00a4a2 random wall decorations (Codea59a.cpp:76, CSBCode.cpp:5779+).
   let rightCFmask = cellFlags & 8;
   let rearCFmask = cellFlags & 8;
   let leftCFmask = cellFlags & 8;

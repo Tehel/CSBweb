@@ -1,28 +1,28 @@
 /**
  * Every engine sound is queued by its ordinal, through `QueueSound`
- * (`doc/CSBwin-src/CSBCode.cpp:1819`), which looks it up in `d.sound1772` and decides from
+ * (`doc/CSBwin-src/CSBCode.cpp:1848`), which looks it up in `d.sound1772` and decides from
  * the level and the distance whether, and how loud, the host plays it.
  *
  * One case per CSBWin call:
  *
- *  1. The door button: `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:1079`).
- *  2. A wall switch: `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:542`).
- *  3. A pressure pad: `QueueSound(soundPRESSUREPAD, mapX, mapY, 1)` (`Code11f52.cpp:3864`),
+ *  1. The door button: `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:1080`).
+ *  2. A wall switch: `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:543`).
+ *  3. A pressure pad: `QueueSound(soundPRESSUREPAD, mapX, mapY, 1)` (`Code11f52.cpp:3899`),
  *     on the pad's level, so a pad pressed on another level than the party's is not heard.
  *  4. The party through a teleporter: `QueueSound(soundTELEPORT, d.partyX, d.partyY, 0)`,
- *     once `d.partyX` and `d.partyY` are the destination's (`Code11f52.cpp:2960-2965`).
+ *     once `d.partyX` and `d.partyY` are the destination's (`Code11f52.cpp:2995-3000`).
  *  5. A group through a teleporter: `QueueSound(17, newX, newY, 1)`, at the destination
- *     and on its level (`Code11f52.cpp:2955`, `:2983-2986`).
+ *     and on its level (`Code11f52.cpp:2990`, `:3018-3021`).
  *  6. A door's step: `QueueSound(2, x, y, 1)` on the timer's level (`Timer.cpp:1375`),
  *     heard beside the door, not six squares away (ordinal 2's `byte7`), nor from another
  *     level.
- *  7. The gulp: `QueueSound(fp.gulp, d.partyX, d.partyY, 0)` (`Character.cpp:4483-4486`),
- *     with `fp.gulp = 8` (`:4126`).
+ *  7. The gulp: `QueueSound(fp.gulp, d.partyX, d.partyY, 0)` (`Character.cpp:4500-4503`),
+ *     with `fp.gulp = 8` (`:4143`).
  *
  *  8. A sound a timer, a missile or a group makes on another level than the party's, on
  *     `d.LoadedLevel`, which is the timer's (`ProcessTimers` loads it,
- *     `CSBCode.cpp:6416-6417`) or the group's. With `deltaTime` 1, `QueueSound` returns
- *     (`CSBCode.cpp:1827-1830`), so the party, on another level at the same x and y, hears
+ *     `CSBCode.cpp:6475-6476`) or the group's. With `deltaTime` 1, `QueueSound` returns
+ *     (`CSBCode.cpp:1856-1859`), so the party, on another level at the same x and y, hears
  *     none of them. One row per caller:
  *     a. `CreateMonster`'s `QueueSound(soundTELEPORT, mapX, mapY, 1)` (`Monster.cpp:230`);
  *     b. a door rebounding off a group, `QueueSound(4, x, y, 1)` (`Timer.cpp:1352`);
@@ -32,11 +32,11 @@
  *     d. a group out of abeyance, `TT_61`'s `QueueSound(17, x, y, 1)` (`Timer.cpp:2591`);
  *     e. a group's death, `DropMonsterRemains`'s
  *        `QueueSound(droppedWeapon?0:soundMONDEATH, …, bodyPartSoundDelay)`
- *        (`Code11f52.cpp:913`);
+ *        (`Code11f52.cpp:948`);
  *     f. a thrown weapon hitting a door, the encounter's `QueueSound(soundNum, …, 1)`
- *        (`Code11f52.cpp:2120`);
+ *        (`Code11f52.cpp:2155`);
  *     g. `CreateCloud`'s `QueueSound(size>80 ? 5 : 20, …, 1)` and `QueueSound(13, …, 1)`
- *        (`Code11f52.cpp:1436-1445`), and the `RNffe4` cloud's `QueueSound(5, x, y, 1)`
+ *        (`Code11f52.cpp:1471-1480`), and the `RNffe4` cloud's `QueueSound(5, x, y, 1)`
  *        each time its timer fires (`Timer.cpp:556`).
  *     The Deth Knight's flip (`NextMonsterUpdateTime`) and a group's double move
  *     (`MonsterAI`'s teleport sound) have no row: both run only for a group that holds
@@ -45,17 +45,17 @@
  *
  *  9. The volume is the ordinal's, not its SND item's: ordinals 5 and 20 both name item
  *     537, with `byte6`/`byte7` 3/7 and 0/4. `LOCAL_12` is 1 at or below `byte6`, 0 above
- *     it, and the sound is dropped at or above `byte7` (`CSBCode.cpp:1867-1878`), and
- *     `StartSound` gets that choice (`:1894-1896`). So ordinal 5 is loud three squares
+ *     it, and the sound is dropped at or above `byte7` (`CSBCode.cpp:1896-1907`), and
+ *     `StartSound` gets that choice (`:1923-1925`). So ordinal 5 is loud three squares
  *     away and quiet six away, where ordinal 20 is quiet at three and not heard at four.
  * 10. A delayed sound: with `deltaTime > 1`, `QueueSound` plays nothing and sets a `TT_20`
  *     due at `d.Time + deltaTime - 1`, the ordinal in `timerWord8` and the entry's `byte4`
- *     in `timerUByte5` (`CSBCode.cpp:1832-1848`), and `ProcessTimers` queues it again
- *     with `deltaTime` 1 on the timer's level when it fires (`:6485-6492`). A champion's
- *     wound, `QueueSound(chIdx + 9, d.partyX, d.partyY, 2)` (`Monster.cpp:4584`), is
- *     queued inside a timer pass, which ends with `d.Time++` (`CSBCode.cpp:660`), so it is
+ *     in `timerUByte5` (`CSBCode.cpp:1861-1877`), and `ProcessTimers` queues it again
+ *     with `deltaTime` 1 on the timer's level when it fires (`:6544-6551`). A champion's
+ *     wound, `QueueSound(chIdx + 9, d.partyX, d.partyY, 2)` (`Monster.cpp:4597`), is
+ *     queued inside a timer pass, which ends with `d.Time++` (`CSBCode.cpp:670`), so it is
  *     heard in the tick after, and a delayed sound on another
- *     level than the party's sets no timer at all (`:1827-1830`).
+ *     level than the party's sets no timer at all (`:1856-1859`).
  *
  * The wall bump's `QueueSound(18, …)` is `tools/dump-party-collision.ts`'s.
  *
@@ -132,7 +132,7 @@ function scene(): Scene {
   });
   game.setRandomSeed(0x12345678);
   game.ctx.party.state.champions = [champion(0)];
-  // CSBWin's party with a champion has a cursor owner, whom `TouchWall` asks for (`Mouse.cpp:357-360`).
+  // CSBWin's party with a champion has a cursor owner, whom `TouchWall` asks for (`Mouse.cpp:358-361`).
   game.ctx.party.state.cursorOwner = 0;
   const queued: number[][] = [];
   const queueSound = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
@@ -204,7 +204,7 @@ function main(): void {
       if (roomType(game, p) !== RoomType.DOOR) continue;
       const door = game.ctx.dungeon.findFirstDoor(p);
       if (door === OBJECT_ID_EOF || !game.ctx.dungeon.getDoorRecordByIndex(game.ctx.dungeon.rnMaps.idx(door))?.hasButton) continue;
-      // `nsDoor != (facing & 1)` (`Mouse.cpp:1063-1066`): an east-west door is faced from the south.
+      // `nsDoor != (facing & 1)` (`Mouse.cpp:1064-1067`): an east-west door is faced from the south.
       const facing = (game.ctx.dungeon.getCellFlag(p) & 0x8) !== 0 ? 0 : 1;
       const party = new Position(p.x - DELTAS[facing][0], p.y - DELTAS[facing][1], p.z);
       if (inBounds(game, party)) at = { party, facing };
@@ -256,7 +256,7 @@ function main(): void {
       if (roomType(game, p) !== RoomType.OPEN) continue;
       for (const rn of objectsAt(game, p, DBType.ACTUATOR)) {
         const rec = game.ctx.dungeon.getActuatorRecord(rn)!;
-        // Type 3, the party's own pad (`Code11f52.cpp:3796-3812`), pressed facing any way
+        // Type 3, the party's own pad (`Code11f52.cpp:3831-3847`), pressed facing any way
         // when its value is 0, and pressed again as often as the party steps on it.
         if (getActuatorType(rec) !== 3 || getActuatorValue(rec) !== 0 || isActuatorOnceOnly(rec) || !isActuatorAudible(rec)) continue;
         if (getActuatorAction(rec) === ActuatorAction.CONSTPRESSURE) continue;

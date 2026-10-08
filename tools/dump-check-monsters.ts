@@ -1,6 +1,6 @@
 /**
  * `CheckCelltypes` and `CheckMonsters`: the two clean-ups `_ReadEntireGame` runs over the
- * world once the whole file is read (`doc/CSBwin-src/SaveGame.cpp:1342-1400`, `:1825-1826`),
+ * world once the whole file is read (`doc/CSBwin-src/SaveGame.cpp:1443-1501`, `:2028-2029`),
  * a new game's and a save's alike.
  *
  * - What each changes in `dm-atari/dungeon.dat`, every committed save, and CSB's

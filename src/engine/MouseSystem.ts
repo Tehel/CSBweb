@@ -1,8 +1,8 @@
 /**
  * `MouseSystem` — the engine half of CSBWin's `Mouse.cpp`: the cursor object dropped
- * (`DropObject`, `Mouse.cpp:848`, with its Vi-altar arm) or thrown (`ThrowObjectInHand`,
- * `:764`), and `ThrowByCharacter` (`:672`), which the THROW attack also runs; the engine
- * arms of `HandleClickInViewport` (`:1031` — the door button, the wall touched, the
+ * (`DropObject`, `Mouse.cpp:849`, with its Vi-altar arm) or thrown (`ThrowObjectInHand`,
+ * `:765`), and `ThrowByCharacter` (`:673`), which the THROW attack also runs; the engine
+ * arms of `HandleClickInViewport` (`:1032` — the door button, the wall touched, the
  * floor pick-up's `MoveObject`); and button 145, `Sleep`. The UI half — the hit tests,
  * the inventory click — is `src/renderer/ui/Mouse.ts`.
  *
@@ -35,7 +35,7 @@ export class MouseSystem {
   constructor(private readonly ctx: GameContext) {}
 
   /**
-   * `ThrowByCharacter` with an explicit hand (`doc/CSBwin-src/Mouse.cpp:672`) — the
+   * `ThrowByCharacter` with an explicit hand (`doc/CSBwin-src/Mouse.cpp:673`) — the
    * THROW attack, which throws what is in the fighting hand rather than what the
    * cursor is holding. `range`/`damage`/`decayRate` of -1 mean "compute them", which
    * is how the Party Attack Filter can override any of the three.
@@ -62,7 +62,7 @@ export class MouseSystem {
 
   /**
    * Drop the cursor object into the current/front cell, following CSBWin's DropObject positioning rules,
-   * and make a tick due at once (`d.clockTick = 1`, `doc/CSBwin-src/Mouse.cpp:964`).
+   * and make a tick due at once (`d.clockTick = 1`, `doc/CSBwin-src/Mouse.cpp:965`).
    */
   dropObjectFromCursor(relativePos: number, options?: DropCursorOptions): boolean {
     const party = this.ctx.party.state;
@@ -91,13 +91,13 @@ export class MouseSystem {
 
     const newPos = (facing + dropPos) & 0x3;
 
-    // `CURSORFILTER_DropObject`, which may cancel the drop (`doc/CSBwin-src/Mouse.cpp:874-882`).
+    // `CURSORFILTER_DropObject`, which may cancel the drop (`doc/CSBwin-src/Mouse.cpp:875-883`).
     const cfp = { object: obj, type: CursorFilterType.DropObject, p1: party.position.z, p2: target.x, p3: target.y, p4: newPos };
     this.ctx.systems.dsa.cursorFilter(cfp);
     if (cfp.type === CursorFilterType.Cancel) return false;
 
     // `objD4.pos(w_4); MoveObject(objD4, -1, 0, D6W, D5W, NULL, NULL)`
-    // (`doc/CSBwin-src/Mouse.cpp:881-882`): a freshly-dropped object still walks
+    // (`doc/CSBwin-src/Mouse.cpp:882-883`): a freshly-dropped object still walks
     // through an active teleporter or open pit on the cell it lands on.
     const dropped = this.ctx.dungeon.rnMaps.setPos(obj, newPos);
     party.objectInHand = OBJECT_ID_NULL;
@@ -110,12 +110,12 @@ export class MouseSystem {
   }
 
   /**
-   * Dropping bones into the Vi altar's alcove (`doc/CSBwin-src/Mouse.cpp:894-960`).
+   * Dropping bones into the Vi altar's alcove (`doc/CSBwin-src/Mouse.cpp:895-961`).
    *
    * The two arms are the same pair `ProcessTT_ViAltar` runs on, and the difference
    * between them is the whole point. Bones made by a **death** carry an expool
    * record holding the champion's fingerprint; there `value` is the kind of bones
-   * and must be **2** ("a dead champion's", `doc/CSBwin-src/CSB.h:1264`), and the
+   * and must be **2** ("a dead champion's", `doc/CSBwin-src/CSB.h:1267`), and the
    * champion is found by fingerprint, in the party or the wings. Bones placed by the
    * **dungeon** carry no record; there `value` is itself the champion index and there
    * is no `== 2` test at all, or every dungeon-authored bones object but one aimed at
@@ -151,7 +151,7 @@ export class MouseSystem {
   }
 
   /**
-   * `ThrowObjectInHand` / `TAG01772e` (`doc/CSBwin-src/Mouse.cpp:764`) — throw what
+   * `ThrowObjectInHand` / `TAG01772e` (`doc/CSBwin-src/Mouse.cpp:765`) — throw what
    * the cursor is holding, on behalf of the champion who owns the cursor.
    */
   throwObjectFromCursor(leftOrRight: number): boolean {
@@ -162,7 +162,7 @@ export class MouseSystem {
     const obj = party.objectInHand;
     if (obj === OBJECT_ID_NULL) return false;
 
-    // `CURSORFILTER_Throw`, which may cancel the throw (`doc/CSBwin-src/Mouse.cpp:689-694`).
+    // `CURSORFILTER_Throw`, which may cancel the throw (`doc/CSBwin-src/Mouse.cpp:690-695`).
     const cfp = { object: obj, type: CursorFilterType.Throw, p1: leftOrRight, p2: 0, p3: 0, p4: 0 };
     this.ctx.systems.dsa.cursorFilter(cfp);
     if (cfp.type === CursorFilterType.Cancel) return false;
@@ -172,7 +172,7 @@ export class MouseSystem {
 
     // CSBWin's `hand < 0` path: the object goes into the fighting hand for exactly
     // as long as it takes to measure the throw, because `DetermineThrowingDistance`
-    // reads a *possession*, not a loose object (`doc/CSBwin-src/Mouse.cpp:698-705`).
+    // reads a *possession*, not a loose object (`doc/CSBwin-src/Mouse.cpp:699-706`).
     const saved = champion.possessions[1]!;
     this.ctx.systems.character.setPossessionDirect(champion, 1, obj);
     const throwingDistance = this.ctx.systems.characterStats.determineThrowingDistance(
@@ -187,7 +187,7 @@ export class MouseSystem {
   }
 
   /**
-   * The tail of `ThrowByCharacter` / `TAG017570` (`doc/CSBwin-src/Mouse.cpp:722-756`),
+   * The tail of `ThrowByCharacter` / `TAG017570` (`doc/CSBwin-src/Mouse.cpp:723-757`),
    * from the sound to `LaunchMissile`.
    *
    * The order matters and is not the obvious one: the throw **raises skill 10 before**
@@ -250,7 +250,7 @@ export class MouseSystem {
       overrides && overrides.decayRate >= 0 ? overrides.decayRate : decayRate,
       this.ctx.state.tickCount,
     );
-    // `d.Word11712 = 4; d.Word11714 = d.partyFacing;` (doc/CSBwin-src/Mouse.cpp:753-754):
+    // `d.Word11712 = 4; d.Word11714 = d.partyFacing;` (doc/CSBwin-src/Mouse.cpp:754-755):
     // for 4 ticks the party cannot step after what it threw.
     party.word11712 = 4;
     party.word11714 = party.facing;
@@ -258,7 +258,7 @@ export class MouseSystem {
   }
 
   /**
-   * `TAG016382` (`doc/CSBwin-src/Mouse.cpp:653`) — the stamina a throw costs, which
+   * `TAG016382` (`doc/CSBwin-src/Mouse.cpp:654`) — the stamina a throw costs, which
    * grows faster than linearly with weight: half the weight, clamped to 1-10, and then
    * half of every remaining 10 units piled on top.
    */
@@ -274,20 +274,20 @@ export class MouseSystem {
   /**
    * The UI's object move: today only the pick-up from the floor (`ViewportPicking`),
    * whose `TAG01a148` ends in `MoveObject(obj, x, y, -1, 0)`
-   * (doc/CSBwin-src/Mouse.cpp:836). The UI has already taken the object out of the cell;
+   * (doc/CSBwin-src/Mouse.cpp:837). The UI has already taken the object out of the cell;
    * this is `ActuatorSystem.triggerObjectMove` (`PlaceOrRemoveObjectInRoom`). The timers
    * it queues wait for the tick, as every timer does: `ProcessTimers` runs only from the
-   * tick (doc/CSBwin-src/CSBCode.cpp:627) and `_FusionSequence` (`Attack.cpp:2199`).
+   * tick (doc/CSBwin-src/CSBCode.cpp:637) and `_FusionSequence` (`Attack.cpp:2201`).
    */
   triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
     this.ctx.systems.actuators.triggerObjectMove(position, object, place, unchangedRoom, facing);
   }
 
   /**
-   * `HandleClickInViewport`'s wall arm, `TouchWallF1` (doc/CSBwin-src/Mouse.cpp:776,
-   * reached at `:1127`): touch the wall ahead, on the side that faces the party. A cell
-   * ahead off the map is not touched, and leaves `d.clockTick` alone (`:784-787`).
-   * Otherwise `d.clockTick = TouchWall(...)` (`:788`): a switch that fired makes a tick
+   * `HandleClickInViewport`'s wall arm, `TouchWallF1` (doc/CSBwin-src/Mouse.cpp:777,
+   * reached at `:1128`): touch the wall ahead, on the side that faces the party. A cell
+   * ahead off the map is not touched, and leaves `d.clockTick` alone (`:785-788`).
+   * Otherwise `d.clockTick = TouchWall(...)` (`:789`): a switch that fired makes a tick
    * due at once, and a touch that fired nothing puts off a tick that was due.
    */
   handleWallClick(): boolean {
@@ -305,7 +305,7 @@ export class MouseSystem {
   }
 
   /**
-   * `HandleClickInViewport`'s last empty-handed arm (doc/CSBwin-src/Mouse.cpp:1138-1157):
+   * `HandleClickInViewport`'s last empty-handed arm (doc/CSBwin-src/Mouse.cpp:1139-1158):
    * a click that touched no button, on the bare stone ahead, is heard at the party.
    * `ViewportPicking.resolveEmptyHandedViewportClick` decides that the click is one.
    */
@@ -315,9 +315,9 @@ export class MouseSystem {
   }
 
   /**
-   * `HandleClickInViewport`'s door-button arm (doc/CSBwin-src/Mouse.cpp:1060-1086): an
+   * `HandleClickInViewport`'s door-button arm (doc/CSBwin-src/Mouse.cpp:1061-1087): an
    * empty hand on the button of the door ahead makes a tick due at once
-   * (`d.clockTick = 1`, `:1078`), plays the switch sound and queues a `TT_DOOR` toggle for
+   * (`d.clockTick = 1`, `:1079`), plays the switch sound and queues a `TT_DOOR` toggle for
    * the next tick, so the door starts moving in the tick the click brings on.
    */
   handleDoorSwitchClick(): boolean {
@@ -358,14 +358,14 @@ export class MouseSystem {
   }
 
   /**
-   * The engine half of button 145, the sleep icon (doc/CSBwin-src/Mouse.cpp:1683-1708).
+   * The engine half of button 145, the sleep icon (doc/CSBwin-src/Mouse.cpp:1822-1847).
    * The UI has already hidden the inventory and asked (`ShowHideInventory(4)`,
    * `TAG02076e`); this is `d.PartySleeping = 1`, `scrollingText.SetNewSpeed(d.Speed, 0)`
    * and `d.Speed = 0` — which makes a tick due on every VBL (`vblInterrupt`) —,
-   * `DiscardAllInput()` and `videoMode = VM_SLEEPING` (`:1703`). The sleep-mode button list, `Buttons17796`, and
+   * `DiscardAllInput()` and `videoMode = VM_SLEEPING` (`:1842`). The sleep-mode button list, `Buttons17796`, and
    * `DisplaySleepScreen` are the host's listeners' business.
    *
-   * Refused while a champion is only provisionally in the party (`:1685`).
+   * Refused while a champion is only provisionally in the party (`:1824`).
    */
   sleep(): boolean {
     const party = this.ctx.party.state;

@@ -1,6 +1,6 @@
 /**
- * The teleporter's shimmer, `DrawTeleporter` (`doc/CSBwin-src/CSBCode.cpp:4266-4302`) through
- * `TAG008c98` (`doc/CSBwin-src/Graphics.cpp:1169-1316`), against an oracle that runs the C++
+ * The teleporter's shimmer, `DrawTeleporter` (`doc/CSBwin-src/CSBCode.cpp:4331-4367`) through
+ * `TAG008c98` (`doc/CSBwin-src/Graphics.cpp:1193-1340`), against an oracle that runs the C++
  * loop as written: over Atari interleaved bitplanes, four words to a 16-pixel group, with
  * `D0W..D3W &= D5W` for the mask's plane-0 word and `D1W |= ~D5W`, `D3W |= ~D5W` for colour
  * 10. The port's `tag008c98` works on palette indices, so the two share nothing but the

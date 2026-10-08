@@ -1,23 +1,23 @@
 /**
  * What `MoveObject` returns for a monster, and what its callers do with it
- * (`doc/CSBwin-src/Code11f52.cpp:2796-3424`; DEBT.md C24).
+ * (`doc/CSBwin-src/Code11f52.cpp:2831-3459`; DEBT.md C24).
  *
  *  1. A teleport on the party's level returns 1 — `LOCAL_14` is `TeleportMonster`'s
- *     value (`:2988`, `:2384`) — starts the group's timers where it lands and deletes
- *     those at the square it left (`:3401-3421`).
+ *     value (`:3023`, `:2419`) — starts the group's timers where it lands and deletes
+ *     those at the square it left (`:3436-3456`).
  *  2. The AI stops on it: every `MoveObject` caller in the AI returns on a non-zero
  *     value and re-aims `timer_70` only when it is 0, and then at `d.NewX, d.NewY`
- *     (`Monster.cpp:2440-2449`). The port went on, re-aimed its timer at the teleporter
+ *     (`Monster.cpp:2444-2453`). The port went on, re-aimed its timer at the teleporter
  *     and set `ubPrevX/Y`.
  *  3. A teleport onto the party's level from another is `LOCAL_14 = 1` plus the attach's
- *     `LOCAL_14++` (`:3376`), so 2, and `ClearAttacking_DeleteMovementTimers` runs on
- *     `d.Item16[0]` (`:3411-3413`) — another group's slot, a CSBWin quirk kept.
+ *     `LOCAL_14++` (`:3411`), so 2, and `ClearAttacking_DeleteMovementTimers` runs on
+ *     `d.Item16[0]` (`:3446-3448`) — another group's slot, a CSBWin quirk kept.
  *  4. A pit that kills the whole group: `DamageMonsterGroup(…, oldX, oldY, 20, P5 = 0,
- *     …)` defers the death (`:3095-3100`), and `MoveObject` deletes the group after the
- *     loop (`:3147-3176`). The port applied the damage at the pit square, where no group
+ *     …)` defers the death (`:3130-3135`), and `MoveObject` deletes the group after the
+ *     loop (`:3182-3211`). The port applied the damage at the pit square, where no group
  *     stood, so nothing was deleted and the group walked on below.
  *  5. A teleporter to a level the group's type may not live on: the teleport happens and
- *     the group is deleted after the loop (`:3147`). The port refused the teleport and
+ *     the group is deleted after the loop (`:3151`). The port refused the teleport and
  *     left the group on the teleporter.
  *  6. `CreateMonster` on the party's level returns `RNnul` and makes no sound, because
  *     the attach makes `MoveObject` return 1 (`Monster.cpp:222-231`); a generator queues
@@ -141,7 +141,7 @@ async function main(): Promise<void> {
     check(before > 0 && aiTimersAt(game, from) === 0 && aiTimersAt(game, dest) > 0,
       'its timers start where it landed and are gone from where it was');
 
-    // The same step taken by the AI (`Monster.cpp:2440-2449`).
+    // The same step taken by the AI (`Monster.cpp:2444-2453`).
     const game2 = await makeGame();
     partyOn(game2, z, [tp, from, dest]);
     teleporter(game2, tp, dest);

@@ -2,19 +2,19 @@
  * The message area's pace: one print-queue entry a pass of the main loop, and the scroll.
  *
  * - The main loop takes one `printQueue` entry a pass, at `tag0007c8`, whether or not a
- *   tick ran, frozen or not (doc/CSBwin-src/CSBCode.cpp:714-721, `:765`), and `PrintLines`
- *   ends in `ClockTick` (`:1736`). So a message reaches the screen without a tick, stamped
+ *   tick ran, frozen or not (doc/CSBwin-src/CSBCode.cpp:724-731, `:775`), and `PrintLines`
+ *   ends in `ClockTick` (`:1753`). So a message reaches the screen without a tick, stamped
  *   with the `d.Time` it is printed at. The save menu holds the loop in `DisplayDiskMenu`
- *   (`:762`), so it takes none.
- * - A new row at the bottom is `ScrollUp` (`:1583-1596`): `d.PushTextUp = 1`,
+ *   (`:772`), so it takes none.
+ * - A new row at the bottom is `ScrollUp` (`:1593-1606`): `d.PushTextUp = 1`,
  *   `d.TextScanlineScrollCount = 0`. `vblInterrupt`, which runs before the pass its VBL
- *   wakes (`system.cpp:624-630`, `CSBUI.cpp:1253-1272`), moves the strip, scanlines
+ *   wakes (`system.cpp:624-630`, `CSBUI.cpp:1274-1293`), moves the strip, scanlines
  *   172-199, up one scanline a VBL and blanks the bottom `count`, until the count reaches 7
- *   and turns to -1; the next VBL clears `d.PushTextUp` (`CSBCode.cpp:971-1004`).
- * - Until then `ClockTick` places nothing (`:1526-1527`) and `RemoveTimedOutText` removes
- *   nothing (`:1505-1508`). A piece printed during the scroll waits for the next
- *   `ClockTick`: the tick's own, after the timers (`:677`), or the next `PrintLines`.
- * - `DiscardText` stops the scroll (`:1441-1464`).
+ *   and turns to -1; the next VBL clears `d.PushTextUp` (`CSBCode.cpp:981-1014`).
+ * - Until then `ClockTick` places nothing (`:1536-1537`) and `RemoveTimedOutText` removes
+ *   nothing (`:1515-1518`). A piece printed during the scroll waits for the next
+ *   `ClockTick`: the tick's own, after the timers (`:687`), or the next `PrintLines`.
+ * - `DiscardText` stops the scroll (`:1451-1474`).
  * - A restart after a lost game empties the strip, and leaves `printQueue`
  *   (`ScrollingText.restart`).
  *
@@ -86,7 +86,7 @@ function main(): void {
   };
   const rows = (): string[] => messages.snapshot().map((line) => line.trim());
 
-  console.log('=== one entry a pass, no tick (CSBCode.cpp:714-721) ===');
+  console.log('=== one entry a pass, no tick (CSBCode.cpp:724-731) ===');
   const t0 = game.ctx.state.tickCount;
   for (const text of ['ONE', 'TWO', 'THREE', 'FOUR']) say(text);
   const placedAt: number[] = [];
@@ -101,7 +101,7 @@ function main(): void {
     'each row is stamped with the d.Time it was printed at, + 70');
 
   console.log('');
-  console.log('=== a fifth row scrolls the strip, a scanline a VBL (CSBCode.cpp:971-1004) ===');
+  console.log('=== a fifth row scrolls the strip, a scanline a VBL (CSBCode.cpp:981-1014) ===');
   const before = strip();
   say('FIVE');
   frame();
@@ -137,7 +137,7 @@ function main(): void {
     'the tick\'s own ClockTick places it, stamped with the new d.Time');
 
   console.log('');
-  console.log('=== RemoveTimedOutText waits for the scroll (CSBCode.cpp:1505-1508) ===');
+  console.log('=== RemoveTimedOutText waits for the scroll (CSBCode.cpp:1515-1518) ===');
   say('SIX');
   frame();
   const late = game.ctx.state.tickCount + 500;
@@ -155,7 +155,7 @@ function main(): void {
   frame(true);
   frame(true);
   check(game.ctx.state.tickCount === frozenAt && messages.backlog().printQueue === 0,
-    'frozen, no tick runs, and the loop still takes both entries (CSBCode.cpp:765)');
+    'frozen, no tick runs, and the loop still takes both entries (CSBCode.cpp:775)');
   thaw(game.ctx);
   for (let i = 0; i < 7; i++) frame();
   frame(true);
@@ -166,13 +166,13 @@ function main(): void {
   game.ctx.state.paused = true;
   for (let i = 0; i < 3; i++) frame();
   check(messages.scrollState().textScanlineScrollCount === 3 && messages.backlog().printQueue === 1,
-    'paused, the scroll goes on and the entry waits (CSBCode.cpp:762)');
+    'paused, the scroll goes on and the entry waits (CSBCode.cpp:772)');
   game.ctx.state.paused = false;
   frame();
   check(messages.backlog().printQueue === 0, 'unpaused, the next pass takes it');
 
   console.log('');
-  console.log('=== DiscardText stops the scroll (CSBCode.cpp:1441-1464) ===');
+  console.log('=== DiscardText stops the scroll (CSBCode.cpp:1451-1474) ===');
   say('GONE');
   frame();
   check(messages.scrollState().textScanlineScrollCount >= 0, 'a scroll is under way');

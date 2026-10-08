@@ -4,18 +4,18 @@
  *
  * `MonsterAttacks` starts from `missile = RNnul`, lets the monster's type pick a spell
  * RN, and stores `attackParameters.missileType = missile.ConvertToInteger()`
- * (`doc/CSBwin-src/Monster.cpp:1041-1076`). So a monster that throws nothing reports
+ * (`doc/CSBwin-src/Monster.cpp:1045-1080`). So a monster that throws nothing reports
  * 0xffff, not 0. Walks every level, stands the party on it, and lets one group of each
  * monster type the dungeon holds attack once.
  *
  * A thrower's attack at range must also put the spell in flight: `LaunchMissile` takes
- * the spell RN as the projectile as it is (`doc/CSBwin-src/Monster.cpp:1194-1203`), so
+ * the spell RN as the projectile as it is (`doc/CSBwin-src/Monster.cpp:1198-1207`), so
  * the group's cell gains a missile whose projectile is that RN. The same holds for a
- * champion's spell attack, through `LaunchObject` (`doc/CSBwin-src/Magic.cpp:449-462`).
+ * champion's spell attack, through `LaunchObject` (`doc/CSBwin-src/Magic.cpp:452-465`).
  *
  * The block is filled in CSBWin's order, which is the order of its random draws
- * (`doc/CSBwin-src/Monster.cpp:1035-1076`): whether to launch, then which missile. And a
- * `word2Bit4` monster that finds no live champion gives up there (`:1092`): no missile,
+ * (`doc/CSBwin-src/Monster.cpp:1039-1080`): whether to launch, then which missile. And a
+ * `word2Bit4` monster that finds no live champion gives up there (`:1096`): no missile,
  * no range drawn, and false.
  *
  * Run: `npx tsx tools/dump-monster-missile-type.ts`
@@ -37,7 +37,7 @@ import { MonsterType } from '../src/engine/monsterTypes';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
-/** The missiles each thrower may pick (`doc/CSBwin-src/Monster.cpp:1042-1075`). */
+/** The missiles each thrower may pick (`doc/CSBwin-src/Monster.cpp:1046-1079`). */
 const THROWS: ReadonlyMap<number, readonly number[]> = new Map([
   [MonsterType.mon_Vexirk, [RN_FIREBALL, RN_DISPELL_MISSILE, RN_LIGHTNING, RN_POISON_CLOUD, RN_ZO_SPELL]],
   [MonsterType.mon_LordChaos, [RN_FIREBALL, RN_DISPELL_MISSILE, RN_LIGHTNING, RN_POISON_CLOUD, RN_ZO_SPELL]],

@@ -46,7 +46,7 @@ const DB_OF_CATEGORY: Record<number, keyof DungeonData['databases']> = {
  * list entry is the head of one cell's chain; each record's link is the next object,
  * `RNeof` ends it, and a chest or a monster opens a chain of its own
  * (`ConvertListOfObjects` recurses into exactly those two, plus a missile's flying
- * object — `doc/CSBwin-src/SaveGame.cpp:1977-2013`).
+ * object — `doc/CSBwin-src/SaveGame.cpp:2189-2225`).
  *
  * Nothing here is lenient. A chain that runs into a free record, past the end of a
  * database, into a category that has none, or round in a circle is a problem, and a

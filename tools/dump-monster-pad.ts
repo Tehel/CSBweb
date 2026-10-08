@@ -1,27 +1,27 @@
 /**
  * A monster's own move presses pads, and leaves its other AI timers behind
- * (`MoveObject`'s monster branch, `doc/CSBwin-src/Code11f52.cpp:3258-3424`).
+ * (`MoveObject`'s monster branch, `doc/CSBwin-src/Code11f52.cpp:3293-3459`).
  *
  *  1. A group that does not levitate leaves its square through
- *     `PlaceOrRemoveObjectInRoom(oldX, oldY, obj, partyThere, remove)` (`:3287`) and
+ *     `PlaceOrRemoveObjectInRoom(oldX, oldY, obj, partyThere, remove)` (`:3322`) and
  *     arrives through `PlaceOrRemoveObjectInRoom(newX, newY, obj, false, place)`
- *     (`:3392`), so walking onto a floor pad fires it. The port spliced the chains
+ *     (`:3427`), so walking onto a floor pad fires it. The port spliced the chains
  *     and called no actuator.
  *  2. Walking off it releases it.
  *  3. A group that goes into abeyance has already left its square (the removal at
- *     `:3257-3296` comes before the occupancy test at `:3335-3358`), so its pad is
+ *     `:3292-3331` comes before the occupancy test at `:3370-3393`), so its pad is
  *     released too.
  *  4. A levitating group uses `RemoveObjectFromRoom` / `AddObjectToRoom`
- *     (`:3274`, `:3386`) and presses nothing.
+ *     (`:3309`, `:3421`) and presses nothing.
  *  5. An ordinary step leaves the group's other AI timers where they were:
  *     `MoveObject` never re-aims them, and the AI caller re-aims only the timer it is
- *     processing (`Monster.cpp:1711`, `:2105`, `:2440`, `:2908`). Only a DSA's cell move
+ *     processing (`Monster.cpp:1715`, `:2109`, `:2444`, `:2912`). Only a DSA's cell move
  *     re-aims the rest (`MoveObject.cpp:539-571`; `tools/dump-dsa-move.ts` section 6).
  *  6. A group deleted on a pad releases it: `DeleteMonster` takes it off its square with
- *     `MoveObject(obj, x, y, -1, 0)` (`Code11f52.cpp:1038`), which lifts it through
- *     `PlaceOrRemoveObjectInRoom` and returns before the monster branch (`:3257-3297`).
+ *     `MoveObject(obj, x, y, -1, 0)` (`Code11f52.cpp:1073`), which lifts it through
+ *     `PlaceOrRemoveObjectInRoom` and returns before the monster branch (`:3292-3332`).
  *     The port spliced the chain and released nothing. A levitating group is lifted with
- *     `RemoveObjectFromRoom` and releases nothing (`:3274`).
+ *     `RemoveObjectFromRoom` and releases nothing (`:3309`).
  *
  * The pad is a real one from `dungeon.dat`: the first actuator of type 1 (party,
  * monster or object) on an open square with an open neighbour.

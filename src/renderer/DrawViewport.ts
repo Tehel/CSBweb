@@ -85,7 +85,7 @@ export function DrawViewport(
   // The floor/ceiling background is composed by the caller before this runs, so the cell
   // programs below blit on top of it — see `ViewportRenderer.drawViewportFrame`, which mirrors
   // CSBWin's `FloorAndCeilingOnly()` + conditional `Mirror()`
-  // (doc/CSBwin-src/Viewport.cpp:3327, doc/CSBwin-src/Viewport.cpp:6740).
+  // (doc/CSBwin-src/Viewport.cpp:3334, doc/CSBwin-src/Viewport.cpp:6747).
 
   // Allocate room data for all 21 cells
   const roomData: SummarizeRoomData[] = new Array(21);
@@ -101,7 +101,7 @@ export function DrawViewport(
     const pos = RelativeXY(facing, relativeY[cellNum], relativeX[cellNum], position.x, position.y);
 
     // The cell's skin, else the level's default, on `d.LoadedLevel`, the level drawn
-    // (`doc/CSBwin-src/Viewport.cpp:6777-6786`).
+    // (`doc/CSBwin-src/Viewport.cpp:6784-6793`).
     let skinNumber = dungeonState.skinCache.GetSkin(level, pos.x, pos.y);
     if (skinNumber === 0) skinNumber = dungeonState.skinCache.GetDefaultSkin(level);
 
@@ -132,7 +132,7 @@ export function DrawViewport(
     const skinNumber = roomData[cellNum].skinNumber;
     if (skinNumber !== 0) {
       // A skin's own program, from its cell table; a skin with none draws nothing
-      // (`Viewport.cpp:6789-6806`).
+      // (`Viewport.cpp:6796-6813`).
       const pCode = context.backgroundLib?.GetCode(skinNumber) ?? null;
       if (pCode !== null) {
         const code = skinCodeWords(pCode);
@@ -155,7 +155,7 @@ export function DrawViewport(
   // Wall champion portraits, see-thru walls and custom backgrounds are all handled inside
   // the cell programs: `SummarizeRoomInfo` fills `championPortraitOrdinal`, and the
   // `SeeThroughWalls` opcode reads `context.seeThroughWalls`
-  // (doc/CSBwin-src/Viewport.cpp:2638), both set up by `ViewportRenderer.drawViewportFrame`.
+  // (doc/CSBwin-src/Viewport.cpp:2645), both set up by `ViewportRenderer.drawViewportFrame`.
 }
 
 /**
@@ -176,7 +176,7 @@ function skinCodeWords(section: Uint8Array): Uint16Array {
 
 /**
  * Where a skin's program draws a cell of a graphic room type: `mainOffset = pCode[0]`, then
- * `pCode[mainOffset + 8 * cell + graphicRoomType]` (`doc/CSBwin-src/Viewport.cpp:6796-6797`).
+ * `pCode[mainOffset + 8 * cell + graphicRoomType]` (`doc/CSBwin-src/Viewport.cpp:6803-6804`).
  */
 export function skinProgramStart(code: ArrayLike<number>, cellNum: number, graphicRoomType: number): number {
   const mainOffset = code[0]!;

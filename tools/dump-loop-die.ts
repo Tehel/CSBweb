@@ -1,5 +1,5 @@
 /**
- * A frame that throws is CSBWin's `die` (`doc/CSBwin-src/CSBCode.cpp:86-112`): the engine
+ * A frame that throws is CSBWin's `die` (`doc/CSBwin-src/CSBCode.cpp:96-122`): the engine
  * throws where CSBWin calls it — the timer table full, a `MissileTimer` placement, a
  * `_FusionSequence` with no monster ahead — and CSBWin shows the message and quits. The
  * loop (`Game.gameLoop`) stops, schedules no further frame, and hands the error to

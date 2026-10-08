@@ -3,17 +3,17 @@
  * each run through `DsaSystem.execute` as a program of a test DSA on a genuine save
  * (`csbgame7.dat`).
  *
- * 1. **`&THROW`** is `ThrowMissile` (`doc/CSBwin-src/DSA.cpp:4558-4582`,
+ * 1. **`&THROW`** is `ThrowMissile` (`doc/CSBwin-src/DSA.cpp:4559-4583`,
  *    `Timer.cpp:2016-2078`): one of the eight spells flies as itself, from the launch
  *    corner, with its range, damage, direction and decay in the missile and its timer; a
  *    type of 0 takes the first object of the object location's corner out of its square
  *    and throws it; any other type throws nothing.
- * 2. **`&MISSILEINFO@` and `&MISSILEINFO!`** (`DSA.cpp:2795-2851`) read and write a
+ * 2. **`&MISSILEINFO@` and `&MISSILEINFO!`** (`DSA.cpp:2796-2852`) read and write a
  *    missile's contents, range, damage and its timer's direction; a slot that is no
  *    missile reads -1 four times, and `&MISSILEINFO!` on an invalid slot pops only it.
- * 3. **`&CREATECLOUD`** (`DSA.cpp:2740-2787`): types 0, 3, 4, 7 and 40 make a spell's
+ * 3. **`&CREATECLOUD`** (`DSA.cpp:2741-2788`): types 0, 3, 4, 7 and 40 make a spell's
  *    cloud, with its `TT_25`; 50 a Fluxcage, with its `TT_24`; any other nothing.
- * 4. **`&CAST` and `&FILTEREDCAST`** are `DSACastSpell` (`Magic.cpp:1406-1416`): the
+ * 4. **`&CAST` and `&FILTEREDCAST`** are `DSACastSpell` (`Magic.cpp:1408-1418`): the
  *    fourteen DSA parameters are the spell's, and the second runs them through the spell
  *    filter first, on a parameter array of its own, so the program's are as it left them.
  *

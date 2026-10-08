@@ -1,21 +1,21 @@
 /**
  * The freeze: button 147 stops the game, button 148 starts it again.
  *
- * - Button 147 (doc/CSBwin-src/Mouse.cpp:1731-1759): Esc in the adventure key table
+ * - Button 147 (doc/CSBwin-src/Mouse.cpp:1870-1898): Esc in the adventure key table
  *   `Byte18400` and the sleep table `Byte18440`, or a left click on the one pixel x 0,
  *   y 198 of the adventure list `Buttons17196` (its rectangle is 0-1 by 198-199, and
- *   `SearchButtonList` excludes the upper bounds, `CSBCode.cpp:7561-7564`). `d.ClockRunning = 0`, `gameFrozen = true`,
+ *   `SearchButtonList` excludes the upper bounds, `CSBCode.cpp:7620-7623`). `d.ClockRunning = 0`, `gameFrozen = true`,
  *   `TAG02076e()`, "GAME FROZEN" in the viewport, the lists and key tables saved and
  *   replaced by `Buttons17832` (the whole screen is 148) and `Byte18448` (Esc is 148),
  *   `DiscardAllInput()`.
- * - Frozen, no tick runs (`CSBCode.cpp:765`), and `HandleMouseEvents` throws away every
- *   entry but 148, one per call (`Mouse.cpp:1433-1444`). The thaw is never made to wait
- *   for a tick that cannot come (`thawCommand`, `:1463-1476`).
- * - Button 148 (`:1760-1773`): `d.ClockRunning = 1`, `TAG0207cc()`, the saved lists and
+ * - Frozen, no tick runs (`CSBCode.cpp:775`), and `HandleMouseEvents` throws away every
+ *   entry but 148, one per call (`Mouse.cpp:1548-1565`). The thaw is never made to wait
+ *   for a tick that cannot come (`thawCommand`, `:1591-1604`).
+ * - Button 148 (`:1899-1912`): `d.ClockRunning = 1`, `TAG0207cc()`, the saved lists and
  *   key tables back, `DiscardAllInput()`. The tick that fell due while frozen runs in the
  *   frame that thaws.
  * - Asleep, `TAG02076e` does nothing and `TAG0207cc` only redraws the sleep screen
- *   (`Character.cpp:5111`, `CSBCode.cpp:9938-9942`): the thaw goes back to the sleep lists.
+ *   (`Character.cpp:5136`, `CSBCode.cpp:10062-10066`): the thaw goes back to the sleep lists.
  *
  * Run: `npx tsx tools/dump-freeze.ts`
  */
@@ -137,7 +137,7 @@ async function main(): Promise<void> {
     `frozen=${game.isFrozen()} mode=${ui.uiMode} shaded=${ui.shadedByTag02076e} sleeping=${game.isPartySleeping()}`;
 
   console.log('');
-  console.log('=== Esc adventuring: button 147 (Mouse.cpp:1731-1759) ===');
+  console.log('=== Esc adventuring: button 147 (Mouse.cpp:1870-1898) ===');
   {
     internals.lastInputTime = 0;
     handled.length = 0;
@@ -179,7 +179,7 @@ async function main(): Promise<void> {
   }
 
   console.log('');
-  console.log('=== a click anywhere: button 148 (Mouse.cpp:1760-1773) ===');
+  console.log('=== a click anywhere: button 148 (Mouse.cpp:1899-1912) ===');
   {
     handled.length = 0;
     // An entry was handled this tick, and no tick can come: only `thawCommand` lets it in.
@@ -227,7 +227,7 @@ async function main(): Promise<void> {
     frame(-1);
     console.log(`${state()} before=${ui.modeBeforeFreeze}`);
     check(game.isFrozen() && game.isPartySleeping(), 'frozen, and still asleep');
-    check(!ui.shadedByTag02076e, 'TAG02076e does nothing asleep (Character.cpp:5111)');
+    check(!ui.shadedByTag02076e, 'TAG02076e does nothing asleep (Character.cpp:5136)');
     const before = game.ctx.state.tickCount;
     for (let i = 0; i < 5; i++) frame(1);
     check(game.ctx.state.tickCount === before, 'asleep, every frame is a tick, but frozen none is');
@@ -244,7 +244,7 @@ async function main(): Promise<void> {
   }
 
   console.log('');
-  console.log('=== "GAME FROZEN" (Mouse.cpp:1737-1746) ===');
+  console.log('=== "GAME FROZEN" (Mouse.cpp:1876-1885) ===');
   {
     const width = 224;
     const height = 136;
@@ -266,7 +266,7 @@ async function main(): Promise<void> {
     }
     console.log(`ink=${ink} box=(${minX},${minY})-(${maxX},${maxY}) other=${other}`);
     check(other === 0, 'only colours 0 and 4');
-    // `TextOut_OneLine` draws up from y (`doc/CSBwin-src/Graphics.cpp:320`), as the sleep
+    // `TextOut_OneLine` draws up from y (`doc/CSBwin-src/Graphics.cpp:321`), as the sleep
     // screen's "WAKE UP" does.
     check(ink > 0 && minX >= 81 && minY === 69 - 4 && maxY === 69 && maxX < 81 + 11 * 6,
       '"GAME FROZEN" sits in rows 65-69 from x 81, eleven 6-pixel cells wide');

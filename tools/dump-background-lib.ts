@@ -1,6 +1,6 @@
 /**
  * `BACKGROUND_LIB` (`src/data/BackgroundLib.ts`,
- * `doc/CSBwin-src/Viewport.cpp:5333-5899`): the `CGT_Backgrounds` sections of
+ * `doc/CSBwin-src/Viewport.cpp:5340-5906`): the `CGT_Backgrounds` sections of
  * `CSBgraphics.dat`, and what a skin reads from them.
  *
  * 1. **The skin index**, graphic 1, of Conflux 3.5's and The Towers of Chaos 3.3's files:

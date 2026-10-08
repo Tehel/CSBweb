@@ -3,18 +3,18 @@
  *
  * `MainLoop` returns on the tick the last champion dies, and `_StartCSB` clears
  * `d.DynamicPaletteSwitching` and calls `ShowCredits(_3_, d.GameIsLost)`
- * (`doc/CSBwin-src/CSBCode.cpp:11322-11326`). What follows is a still picture and a wait,
+ * (`doc/CSBwin-src/CSBCode.cpp:11557-11561`). What follows is a still picture and a wait,
  * drawn straight to the screen like the pre-game screens, so it runs over the same
  * `IntroHost`:
  *
- * 1. the dying sound, and 240 VBLs (`:122-129`);
+ * 1. the dying sound, and 240 VBLs (`:132-139`);
  * 2. the fade to black: `d.DynamicPaletteSwitching` is 0, so `FadeToPalette(Palette11914)`
  *    rather than the `Darken` steps (`:148-170`);
  * 3. "THE END", graphic 6, alone on a cleared screen at `d.Word108`, faded up to a palette
  *    of `0x002` with colour 15 at `0x777`, and 300 VBLs (`:227-238`);
  * 4. with `d.CanRestartFromSavegame` set, the "RESTART THIS GAME" button for 899 VBLs
  *    (`:240-282`); pressed, the screen goes black and the game is set up again
- *    (`:283-322`), which is the caller's;
+ *    (`:293-332`), which is the caller's;
  * 5. the fade back to the dark blue, the credits picture, graphic 5, in `d.Palette328`,
  *    until a button is held or a key waits (`:326-337`);
  * 6. with `d.CanRestartFromSavegame` set, back to "THE END" without the 300 VBLs
@@ -42,7 +42,7 @@ const GRAPHIC_CREDITS = 5;
  * 64x43 — the 1376 bytes `A3` skips.
  */
 export const GRAPHIC_CHAMPION_FRAME = 208;
-/** `D6L = 48 * D7W`, and `d.Word132` and `d.Word140` moved down 48 a champion (`:177`, `:211-214`). */
+/** `D6L = 48 * D7W`, and `d.Word132` and `d.Word140` moved down 48 a champion (`:177`, `:221-224`). */
 export const WON_CHAMPION_PITCH = 48;
 /** `QueueSound(6, d.partyX, d.partyY, 0); //Dying sound` (`:126`). */
 export const SOUND_DYING = 6;
@@ -52,7 +52,7 @@ export const DYING_SOUND_VBLS = 240;
 export const THE_END_VBLS = 300;
 /** `for (D7W=900; (--D7W!=0)&&(d.PartyHasDied==0);)` (`:260`): 899 VBLs at most. */
 export const RESTART_BUTTON_VBLS = 899;
-/** The button `HandleMouseEvents` answers with `d.PartyHasDied = 1` (`Mouse.cpp:1798`). */
+/** The button `HandleMouseEvents` answers with `d.PartyHasDied = 1` (`Mouse.cpp:1937`). */
 export const BUTTON_RESTART_THIS_GAME = 0xd7;
 
 /** `fillMemory((i16 *)&LOCAL_110, 16, 2, 2)` (`:230`): sixteen words of `0x002`. */
@@ -94,7 +94,7 @@ export interface ShowCreditsHooks {
   champions: readonly WonChampion[];
   /**
    * `d.Palette11946` if `d.DynamicPaletteSwitching` is on, `null` if it is off. `_StartCSB`
-   * turns it off before a lost game's `ShowCredits` (`doc/CSBwin-src/CSBCode.cpp:11323`).
+   * turns it off before a lost game's `ShowCredits` (`doc/CSBwin-src/CSBCode.cpp:11558`).
    */
   palette11946: readonly number[] | null;
 }
@@ -141,7 +141,7 @@ export async function showCredits(host: IntroHost, hooks: ShowCreditsHooks): Pro
     }
     await host.vbl(1);
   } else {
-    // The whole screen is in `globalPalette`, the interface's, and fades from it (`:168-170`).
+    // The whole screen is in `globalPalette`, the interface's, and fades from it (`:178-180`).
     await fadeToPalette(host, PALETTE_11914);
   }
   if (hooks.word11694) {
@@ -158,7 +158,7 @@ export async function showCredits(host: IntroHost, hooks: ShowCreditsHooks): Pro
     await fadeToPalette(host, PALETTE_LOCAL_46);
     if (firstTime) await host.vbl(THE_END_VBLS);
     if (hooks.canRestartFromSavegame && (await offerRestart(host))) {
-      // `:285-288`: to black, then the interface's palette over the black screen.
+      // `:295-298`: to black, then the interface's palette over the black screen.
       await fadeToPalette(host, PALETTE_LOCAL_110);
       host.screen.pixels.fill(0);
       await fadeToPalette(host, rects.palette552[0] ?? PALETTE_11914);

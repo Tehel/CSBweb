@@ -1,8 +1,8 @@
 /**
- * `SwapCharacter` (`doc/CSBwin-src/Character.cpp:5472-5510`), a DSA's `&SWAPCHARACTER`:
+ * `SwapCharacter` (`doc/CSBwin-src/Character.cpp:5497-5535`), a DSA's `&SWAPCHARACTER`:
  * a champion of the party sent to the wings, one from the wings brought into the party,
  * or one for the other in the same slot (`CharacterDelete`, `CharacterAdd`,
- * `CharacterSwap`, `:5351-5469`). Nothing else in CSBWin takes a living champion out of
+ * `CharacterSwap`, `:5376-5494`). Nothing else in CSBWin takes a living champion out of
  * the party, and the retail dungeons never do.
  *
  * A champion goes into the wings as the `CHARDESC` the save writer packs, so the portrait
@@ -48,7 +48,7 @@ export function swapCharacter(ctx: GameContext, index: number, fingerPrint: numb
 }
 
 /**
- * `CharacterDelete` (`doc/CSBwin-src/Character.cpp:5351-5414`): the champion into the
+ * `CharacterDelete` (`doc/CSBwin-src/Character.cpp:5376-5439`): the champion into the
  * wings and the ones after them a slot down, with the cursor's owner, the open
  * inventory and the caster. `d.PendingDamage` stays where it is. The slot left past the
  * party keeps a copy of the champion who was last, possessions and all, with HP 0. The
@@ -79,7 +79,7 @@ function characterDelete(ctx: GameContext, chIdx: number): number {
 }
 
 /**
- * `CharacterAdd` (`doc/CSBwin-src/Character.cpp:5417-5436`): the champion out of the
+ * `CharacterAdd` (`doc/CSBwin-src/Character.cpp:5442-5461`): the champion out of the
  * wings into the slot after the last, in the first corner nobody stands in, facing 0.
  * The search reads the slot it fills as one of the party's, so a corner the champion
  * already holds is passed over too.
@@ -106,7 +106,7 @@ function characterAdd(ctx: GameContext, fingerPrint: number): number {
 }
 
 /**
- * `CharacterSwap` (`doc/CSBwin-src/Character.cpp:5438-5469`): the champion at `index`
+ * `CharacterSwap` (`doc/CSBwin-src/Character.cpp:5463-5494`): the champion at `index`
  * into the wings, and the one with `fingerPrint` out of them into the same slot, in the
  * first corner nobody stands in, else 5, and with the facing of the one who left. The
  * search reads `d.CH16482[d.NumCharacter]` for a corner nobody holds: the slot past the
@@ -139,7 +139,7 @@ function characterSwap(ctx: GameContext, index: number, fingerPrint: number): nu
 }
 
 /**
- * `RemoveCharacter` (`doc/CSBwin-src/Character.cpp:5254-5337`), `KillCharacter`'s tail
+ * `RemoveCharacter` (`doc/CSBwin-src/Character.cpp:5279-5362`), `KillCharacter`'s tail
  * without the death: the held eye or mouth let go and the inventory closed, the
  * incantation cleared, the facing the party's, the poison cured, and the cursor and the
  * magic tab handed to the first living champion. Nobody living, that is slot
@@ -170,7 +170,7 @@ function removeCharacter(ctx: GameContext, chIdx: number): void {
 
 /**
  * A champion's `TT_12` deleted and `TAG011366` run, "as if it had expired"
- * (`doc/CSBwin-src/Character.cpp:5357-5362`, `:5443-5448`).
+ * (`doc/CSBwin-src/Character.cpp:5382-5387`, `:5468-5473`).
  */
 function expireDamageTimer(ctx: GameContext, chIdx: number): void {
   const champion = ctx.party.state.champions[chIdx]!;
@@ -182,7 +182,7 @@ function expireDamageTimer(ctx: GameContext, chIdx: number): void {
 /**
  * `d.CH16482[i].charPosition` for `i` from 0 to 4. Past the party it is the record a
  * slot keeps (`PartyState.vacantCharacters`). Index 4 is past the array, whose 800
- * bytes on are `d.Brightness` and the party state after it (`doc/CSBwin-src/Data.h:766-782`):
+ * bytes on are `d.Brightness` and the party state after it (`doc/CSBwin-src/Data.h:781-797`):
  * byte 29 is the high byte of `d.PartyFootprints[7]`, at 14, on the little-endian build.
  */
 function slotCharPosition(ctx: GameContext, i: number): number {
@@ -194,7 +194,7 @@ function slotCharPosition(ctx: GameContext, i: number): number {
 }
 
 /**
- * `RedrawEverything` (`doc/CSBwin-src/Character.cpp:5340-5349`): `CHARFLAG_positionChanged`
+ * `RedrawEverything` (`doc/CSBwin-src/Character.cpp:5365-5374`): `CHARFLAG_positionChanged`
  * and `CHARFLAG_weaponAttack`, which the screen draws on every frame, and
  * `MarkAllPortraitsChanged`.
  */

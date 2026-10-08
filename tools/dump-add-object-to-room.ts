@@ -1,11 +1,11 @@
 /**
- * `AddObjectToRoom` with a cell (`doc/CSBwin-src/Code11f52.cpp:392`), as
+ * `AddObjectToRoom` with a cell (`doc/CSBwin-src/Code11f52.cpp:427`), as
  * `DungeonState.addObjectToCell`.
  *
- * CSBWin clears the new object's link before either arm (`:428`), so whichever way the
+ * CSBWin clears the new object's link before either arm (`:463`), so whichever way the
  * object joins the cell it ends its chain: as the first object of a cell that had none
- * (`:455-482`), as the object stuffed into an `RNeof` root (`:441-453`), or behind the last
- * object of the cell's chain (`:491-499`). Each scenario hands it an object whose link is
+ * (`:490-517`), as the object stuffed into an `RNeof` root (`:476-488`), or behind the last
+ * object of the cell's chain (`:526-534`). Each scenario hands it an object whose link is
  * still live (the head of a chain of two or more in `dungeon.dat`) and checks that the
  * cell's chain is exactly what was there, then that object, then `RNeof`.
  *
@@ -69,7 +69,7 @@ function main(): void {
     check(ok, `${what}: the chain is ${expected.map(hex).join(' ')} then RNeof, got ${got.map(hex).join(' ')}`);
   };
 
-  // `:455-482`: the first object of a cell that had none.
+  // `:490-517`: the first object of a cell that had none.
   {
     const cell = empty[0]!;
     const obj = linkedObject(long[0]!);
@@ -77,7 +77,7 @@ function main(): void {
     expectChain(cell, [obj], `new root at (${cell.x},${cell.y})`);
   }
 
-  // `:441-453`: the cell's flag says objects, its root is `RNeof`.
+  // `:476-488`: the cell's flag says objects, its root is `RNeof`.
   {
     const cell = single[0]!;
     dungeon.setFirstObject(cell, OBJECT_ID_EOF);
@@ -86,7 +86,7 @@ function main(): void {
     expectChain(cell, [obj], `RNeof root at (${cell.x},${cell.y})`);
   }
 
-  // `:491-499`: behind the last object of the cell's chain.
+  // `:526-534`: behind the last object of the cell's chain.
   {
     const cell = long[2]!;
     const before = chainOf(cell);

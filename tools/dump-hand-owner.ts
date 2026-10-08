@@ -3,7 +3,7 @@
  *
  * `d.HandChar` is invisible on screen — nothing is drawn differently when it is -1 —
  * but CSBWin gates every inventory-slot click on it
- * (`doc/CSBwin-src/Mouse.cpp:1600-1606`), so a party with no cursor owner silently
+ * (`doc/CSBwin-src/Mouse.cpp:1739-1745`), so a party with no cursor owner silently
  * cannot pick anything up, from the floor or from a champion. This drives the four
  * places CSBWin moves ownership and then does the real thing a player does: click a
  * filled inventory slot and check the object actually reaches the hand.
@@ -71,7 +71,7 @@ async function main(): Promise<void> {
   console.log(['step', 'champions', 'cursorOwner', 'objectInHand'].join('\t'));
 
   // ---- 1. `SetHandOwner(0)` when the party gets its first champion.
-  //         (doc/CSBwin-src/Character.cpp:706-710)
+  //         (doc/CSBwin-src/Character.cpp:707-711)
   // The game's own party, so that the inventory click in 5. reaches its systems.
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
@@ -90,7 +90,7 @@ async function main(): Promise<void> {
   check(owner(party.state) === 0, 'a second champion should not take the cursor');
 
   // ---- 2. The guards: a dead champion cannot own it, -1 clears it.
-  //         (doc/CSBwin-src/CSBCode.cpp:8395-8397 and :8409-8413)
+  //         (doc/CSBwin-src/CSBCode.cpp:8482-8484 and :8496-8500)
   const second = party.state.champions[1];
   second.attributes.health = 0;
   setHandOwner(party.state, 1, game.ctx.host);
@@ -112,7 +112,7 @@ async function main(): Promise<void> {
   check(owner(empty.state) === -1, 'the repair must leave an empty party alone');
 
   // ---- 4. The cursor leaves a dying owner for a living champion.
-  //         (doc/CSBwin-src/Character.cpp:2670-2686)
+  //         (doc/CSBwin-src/Character.cpp:2675-2691)
   second.attributes.health = 40;
   setHandOwner(party.state, 1, game.ctx.host);
   check(owner(party.state) === 1, 'the second champion should now own the cursor');
@@ -127,7 +127,7 @@ async function main(): Promise<void> {
 
   // ---- 5. The thing a player actually does: click a filled inventory slot and check
   //         the object lands in the hand, then clicking again puts it back.
-  //         (`HandleClothingClick`, doc/CSBwin-src/CSBCode.cpp:6928)
+  //         (`HandleClothingClick`, doc/CSBwin-src/CSBCode.cpp:6987)
   const ui: UIState = newUIState(graphics, game.ctx);
   ui.partyState = party.state;
   party.state.selectedCharacterIndex = 0;
@@ -147,7 +147,7 @@ async function main(): Promise<void> {
     // weapon hand comes back as WEAPON#88, rn 37976 — the same rn
     // `tools/dump-level-items.ts` reports lying in HALK's mirror cell (7,8) on level 0,
     // which is where the mirror hands it over from. Slot 1 is the weapon hand
-    // (doc/CSBwin-src/CSBCode.cpp:6947).
+    // (doc/CSBwin-src/CSBCode.cpp:7006).
     check(slot === 1 && category === DBType.WEAPON,
       `slot 1 should hold a WEAPON record, got slot ${slot} ${DBType[category] ?? category}`);
 

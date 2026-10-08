@@ -69,7 +69,7 @@ export interface InterpreterContext {
   championPortraitRect?: RectPos;
   /**
    * `d.Word1868`: set, a Fluxcage's shimmer is not drawn (`DrawRoomObjects`,
-   * `doc/CSBwin-src/Code51a4.cpp:2774`). Only `_FusionSequence` sets it (`Attack.cpp:2367`).
+   * `doc/CSBwin-src/Code51a4.cpp:2774`). Only `_FusionSequence` sets it (`Attack.cpp:2369`).
    */
   word1868?: boolean;
 
@@ -92,13 +92,13 @@ export interface InterpreterContext {
   /**
    * `backgroundLib`: the `CGT_Backgrounds` sections of `csbGraphics` a skin's program draws
    * with. Emptied at each game's start, with `altMonCache` (`CleanupGraphics`,
-   * `doc/CSBwin-src/Graphics.cpp:2204-2206`).
+   * `doc/CSBwin-src/Graphics.cpp:2230-2232`).
    */
   backgroundLib?: BackgroundLib;
   dungeonState?: DungeonState;
   /**
    * The square and facing `DrawViewport` draws from: `IsOdd` reads them as `d.partyLevel`,
-   * `d.partyX`, `d.partyY` and `d.partyFacing` (`doc/CSBwin-src/Viewport.cpp:3185`). They
+   * `d.partyX`, `d.partyY` and `d.partyFacing` (`doc/CSBwin-src/Viewport.cpp:3192`). They
    * are the party's everywhere but in the prison, where nothing is skinned.
    */
   viewParty?: { x: number; y: number; z: number; facing: number };
@@ -123,7 +123,7 @@ export interface InterpreterContext {
   /**
    * `d.Word2514[17][2]`: per door ornament, its graphic and its position set
    * (`d.Byte4122`). Slots 15 and 16, the bashed door (graphic 301) and See-Thru-Walls
-   * (302), are set once (`doc/CSBwin-src/CSBCode.cpp:10251-10262`), and the level's own
+   * (302), are set once (`doc/CSBwin-src/CSBCode.cpp:10375-10386`), and the level's own
    * from its `DoorDecorationTOC` (`Code390e.cpp:275-284`), which leaves any slot past
    * the level's count as the last level to fill it left it.
    */
@@ -131,15 +131,15 @@ export interface InterpreterContext {
   /**
    * `d.LoadedFloorDecorations[16][2]`: per floor decoration, its first graphic and its
    * rectangle set (`d.Byte4110`). Slot 15, the footprints (graphic 241, set 1), is set
-   * once (`doc/CSBwin-src/CSBCode.cpp:10270-10273`), and the level's own from its
+   * once (`doc/CSBwin-src/CSBCode.cpp:10394-10397`), and the level's own from its
    * `FloorDecorationTOC` (`Code390e.cpp:263-274`), at most fifteen of them.
    */
   loadedFloorDecorations?: Array<[number, number]>;
-  numWallDecoration?: number; // d.NumWallDecoration (CSBCode.cpp:5798)
-  useMirrorImages?: boolean; // d.UseMirrorImages (Viewport.cpp:6740)
+  numWallDecoration?: number; // d.NumWallDecoration (CSBCode.cpp:5863)
+  useMirrorImages?: boolean; // d.UseMirrorImages (Viewport.cpp:6747)
 
   viewportIndexBuffer?: PaletteIndexViewportBuffer;
-  seeThroughWalls?: boolean; // d.SeeThruWalls (Viewport.cpp:2639)
+  seeThroughWalls?: boolean; // d.SeeThruWalls (Viewport.cpp:2646)
   facingAlcove?: boolean;
   facingViAltar?: boolean;
   facingWaterFountain?: boolean;
@@ -384,7 +384,7 @@ export class BytecodeInterpreter {
   }
 
   /**
-   * `Interpret` (`doc/CSBwin-src/Viewport.cpp:2425-2474`, `:3292-3301`): `code` run from
+   * `Interpret` (`doc/CSBwin-src/Viewport.cpp:2425-2474`, `:3299-3308`): `code` run from
    * word `startAddr` until a `Return` pops the `0xffff` it pushes first. A word below 60000
    * calls a subroutine at that address, its return address on `rstack`. A standard
    * program starts at 0; a skin's is the words of its section (`DrawViewport`).
@@ -542,7 +542,7 @@ export class BytecodeInterpreter {
       case Opcode.StdDrawSeeThruDoorEdge:
         return this.opStdDrawSeeThruDoorEdge();
 
-      // See-Thru-Walls through the F1 wall (Viewport.cpp:2957-3016).
+      // See-Thru-Walls through the F1 wall (Viewport.cpp:2964-3023).
       case Opcode.StdAllocateDerivedGraphic:
         this.allocateDerivedGraphic(pop());
         return true;
@@ -573,7 +573,7 @@ export class BytecodeInterpreter {
         return this.opStdBltDerivedGraphic(false);
       case Opcode.StdDeleteDerivedGraphic:
         this.derivedGraphics.delete(pop());
-        // CSBWin's case has no `break` and falls into `StdHoleInWallBitmap` (Viewport.cpp:3015-3016).
+        // CSBWin's case has no `break` and falls into `StdHoleInWallBitmap` (Viewport.cpp:3022-3023).
         push(StdBitmapPtr.BMP_StdHoleInWallBitmap);
         return true;
       case Opcode.StdHoleInWallBitmap:
@@ -926,7 +926,7 @@ export class BytecodeInterpreter {
   // OPCODE HANDLERS
   // ============================================================
 
-  /** `Return` (`Viewport.cpp:3017-3021`): back to the caller, or out at the sentinel. */
+  /** `Return` (`Viewport.cpp:3024-3028`): back to the caller, or out at the sentinel. */
   private opReturn(): boolean {
     const raddr = rpop() & 0xffff;
     if (raddr === 0xffff) return false;
@@ -935,7 +935,7 @@ export class BytecodeInterpreter {
   }
 
   /**
-   * The skin's queries (`doc/CSBwin-src/Viewport.cpp:3028-3062`): the cell's skin, another
+   * The skin's queries (`doc/CSBwin-src/Viewport.cpp:3035-3069`): the cell's skin, another
    * cell's, the cell's number, and the IDs of the skin's definition. A skin number is
    * popped as an `i16` and passed as a `ui32`.
    */
@@ -990,7 +990,7 @@ export class BytecodeInterpreter {
   }
 
   /**
-   * What a skin's program draws and makes (`Viewport.cpp:3063-3115`, `:3205-3277`).
+   * What a skin's program draws and makes (`Viewport.cpp:3070-3122`, `:3212-3284`).
    * `DrawCustomGraphic` and `DrawCustomDecoration` draw their graphic into the viewport
    * (`ApplyBackground.ts`). The three virtual graphics make a bitmap or a mask in the
    * background library, which the program draws with afterwards, or a transform a
@@ -1107,8 +1107,8 @@ export class BytecodeInterpreter {
   }
 
   /**
-   * What a skin's program reads of the background library (`Viewport.cpp:3187-3198`,
-   * `:3205-3208`, `:3278-3290`): a mask's header, whether a mask is missing, and a
+   * What a skin's program reads of the background library (`Viewport.cpp:3194-3205`,
+   * `:3212-3215`, `:3285-3297`): a mask's header, whether a mask is missing, and a
    * bitmap's size.
    */
   private opBackgroundQuery(opcode: number): boolean {
@@ -1148,7 +1148,7 @@ export class BytecodeInterpreter {
     return true;
   }
 
-  /** The stack words (`Viewport.cpp:3116-3186`), on the ring itself where CSBWin works on it. */
+  /** The stack words (`Viewport.cpp:3123-3193`), on the ring itself where CSBWin works on it. */
   private opStackWord(opcode: number): boolean {
     let n: number;
     let temp: number;
@@ -1360,7 +1360,7 @@ export class BytecodeInterpreter {
   }
 
   private opStdBltShapeToViewport(mirror: boolean): boolean {
-    // CSBWin StdBltShapeToViewport / StdMirrorShapeToViewport (Viewport.cpp:2849-2859)
+    // CSBWin StdBltShapeToViewport / StdMirrorShapeToViewport (Viewport.cpp:2856-2866)
     const rectanglePtr = pop();
     const bitmapPtr = pop();
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
@@ -1376,7 +1376,7 @@ export class BytecodeInterpreter {
   }
 
   private opStdGraphicToViewport(mirror: boolean): boolean {
-    // CSBWin StdGraphicToViewport / StdMirrorGraphicToViewport (Viewport.cpp:2899-2908)
+    // CSBWin StdGraphicToViewport / StdMirrorGraphicToViewport (Viewport.cpp:2906-2915)
     const rectanglePtr = pop();
     const graphicNum = pop();
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
@@ -1403,7 +1403,7 @@ export class BytecodeInterpreter {
   }
 
   private opGetDecoration0(): boolean {
-    // CSBWin `GetDecoration0` (Viewport.cpp:2875-2878)
+    // CSBWin `GetDecoration0` (Viewport.cpp:2882-2885)
     const relativeCell = pop();
     const v = this.context.roomData[relativeCell]?.decorations[0] ?? 0;
     // GetDecoration0(cell=${relativeCell}) -> ${v}
@@ -1420,7 +1420,7 @@ export class BytecodeInterpreter {
 
   private opCondition(opcode: number): boolean {
     if (opcode === Opcode.Alcove) {
-      // CSBWin uses the last StdDrawWallDecoration result (Viewport.cpp:2946).
+      // CSBWin uses the last StdDrawWallDecoration result (Viewport.cpp:2953).
       push(this.hasAlcove ? 1 : 0);
       return true;
     }
@@ -1430,7 +1430,7 @@ export class BytecodeInterpreter {
   }
 
   private opWallDecorationPos(opcode: number): boolean {
-    // CSBWin Viewport.cpp:2641-2643
+    // CSBWin Viewport.cpp:2648-2650
     const v = opcode === Opcode.wallDecorationFront ? 1 : opcode === Opcode.wallDecorationLeft ? 2 : 0;
     // WallDecorationPos(${Opcode[opcode]}) -> ${v}
     push(v);
@@ -1438,7 +1438,7 @@ export class BytecodeInterpreter {
   }
 
   private opHasDecoration(): boolean {
-    // CSBWin Viewport.cpp:2633-2637
+    // CSBWin Viewport.cpp:2640-2644
     const wallDecorationPos = pop();
     const relativeCell = pop();
     const cell = this.context.roomData[relativeCell];
@@ -1521,9 +1521,9 @@ export class BytecodeInterpreter {
   }
 
   /**
-   * CSBWin `AllocateDerivedGraphic` (`doc/CSBwin-src/CSBCode.cpp:11211`): a buffer of
+   * CSBWin `AllocateDerivedGraphic` (`doc/CSBwin-src/CSBCode.cpp:11446`): a buffer of
    * `GetDerivedGraphicSize(n)` bytes, kept if it already exists. Graphic 1, the only one a
-   * program allocates, is 4560 bytes (`CSBCode.cpp:10248`), 96x95 pixels.
+   * program allocates, is 4560 bytes (`CSBCode.cpp:10372`), 96x95 pixels.
    */
   private allocateDerivedGraphic(graphicNum: number): void {
     if (this.derivedGraphics.has(graphicNum)) return;
@@ -1532,7 +1532,7 @@ export class BytecodeInterpreter {
   }
 
   /**
-   * CSBWin `StdBltToDerivedGraphic` / `StdBltFromDerivedGraphic` (Viewport.cpp:2965-3014):
+   * CSBWin `StdBltToDerivedGraphic` / `StdBltFromDerivedGraphic` (Viewport.cpp:2972-3021):
    * `TAG0088b2` between a standard bitmap and a derived graphic, every argument off the stack.
    */
   private opStdBltDerivedGraphic(toDerived: boolean): boolean {
@@ -1552,7 +1552,7 @@ export class BytecodeInterpreter {
   }
 
   /**
-   * CSBWin `StdDrawSeeThruDoorEdge` (`doc/CSBwin-src/Viewport.cpp:2576-2587`): the door edge
+   * CSBWin `StdDrawSeeThruDoorEdge` (`doc/CSBwin-src/Viewport.cpp:2583-2594`): the door edge
    * the party stands in, with the hole of graphic 41 cut through it. CSBWin's own comment
    * says the source X offset "isn't right"; it is ported as it stands.
    */
@@ -1578,7 +1578,7 @@ export class BytecodeInterpreter {
   }
 
   private opStdDrawDoorSwitch(): boolean {
-    // CSBWin `StdDrawDoorSwitch` (Viewport.cpp:2886-2889)
+    // CSBWin `StdDrawDoorSwitch` (Viewport.cpp:2893-2896)
     const distance = pop();
     const switchId = pop();
 
@@ -1614,7 +1614,7 @@ export class BytecodeInterpreter {
   }
 
   private opStdDrawTeleporter(): boolean {
-    // CSBWin `StdDrawTeleporter` (Viewport.cpp:2891-2896)
+    // CSBWin `StdDrawTeleporter` (Viewport.cpp:2898-2903)
     const wallRectPtr = pop();
     const teleporterRectPtr = pop();
 
@@ -1630,7 +1630,7 @@ export class BytecodeInterpreter {
   }
 
   private opStdDrawDoor(): boolean {
-    // CSBWin `StdDrawDoor` (Viewport.cpp:2589-2610)
+    // CSBWin `StdDrawDoor` (Viewport.cpp:2596-2617)
     const rectPtr = pop();
     const doorGraphicIndex = pop();
     const doorState = pop();
@@ -1642,14 +1642,14 @@ export class BytecodeInterpreter {
       return true;
     }
 
-    // `d.DoorGraphic[doorGraphicIndex]`; index 0 is F1, nearness 2 (`doc/CSBwin-src/Viewport.cpp:2591-2598`).
+    // `d.DoorGraphic[doorGraphicIndex]`; index 0 is F1, nearness 2 (`doc/CSBwin-src/Viewport.cpp:2598-2605`).
     const graphicIndex = doorGraphicIndex | 0;
     DrawDoor(this.draw, doorRecordIndex | 0, doorState | 0, this.context.doorGraphics?.[graphicIndex], 2 - graphicIndex, rectRef);
     return true;
   }
 
   private opStdDrawWallDecoration(): boolean {
-    // CSBWin `StdDrawWallDecoration` (Viewport.cpp:2942-2949)
+    // CSBWin `StdDrawWallDecoration` (Viewport.cpp:2949-2956)
     const wallDecorationDrawLocation = pop();
     const wallDecorationPos = pop();
     const relativeCell = pop();
@@ -1657,7 +1657,7 @@ export class BytecodeInterpreter {
     const rd = this.context.roomData[relativeCell | 0];
     const graphicOrdinal = rd?.decorations[(wallDecorationPos as 0 | 1 | 2) ?? 0] ?? 0;
     // CSBWin passes the cell's `championPortraitOrdinal` as the fourth argument
-    // (`doc/CSBwin-src/Viewport.cpp:2946-2950`); `SummarizeRoomInfo` set it from the
+    // (`doc/CSBwin-src/Viewport.cpp:2953-2957`); `SummarizeRoomInfo` set it from the
     // type-127 actuator on the wall the party is facing.
     this.hasAlcove = DrawWallDecoration(
       this.draw,
@@ -1669,7 +1669,7 @@ export class BytecodeInterpreter {
   }
 
   private opStdDrawWallText(): boolean {
-    // CSBWin `StdDrawWallText` (Viewport.cpp:2930-2940)
+    // CSBWin `StdDrawWallText` (Viewport.cpp:2937-2947)
     const wallDecorationDrawLocation = pop();
     const wallDecorationPos = pop();
     const relativeCell = pop();
@@ -2047,7 +2047,7 @@ export class BytecodeInterpreter {
   }
 
   private opStairGraphic(opcode: number): boolean {
-    // Port from CSBWin Viewport.cpp:2730-2750 and Code390e.cpp:117-127.
+    // Port from CSBWin Viewport.cpp:2737-2757 and Code390e.cpp:117-127.
     const wallSet = this.context.wallGraphicSet ?? 0;
     const base = 90 + wallSet * 18;
     const up = (i: number) => base + i; // up[6]=base+0 ... up[0]=base+6
@@ -2114,7 +2114,7 @@ export class BytecodeInterpreter {
   }
 
   private opStairEdgeGraphic(opcode: number): boolean {
-    // Port from CSBWin Viewport.cpp:2800-2807 and Code390e.cpp:117-127.
+    // Port from CSBWin Viewport.cpp:2807-2814 and Code390e.cpp:117-127.
     const wallSet = this.context.wallGraphicSet ?? 0;
     const base = 90 + wallSet * 18;
     const edge = (i: number) => base + 14 + i; // edge[3]=base+14 ... edge[0]=base+17 (reverse mapped below)
@@ -2159,7 +2159,7 @@ export class BytecodeInterpreter {
   }
 
   private opDoorBitmap(opcode: number): boolean {
-    // Push CSBWin BITMAP_POINTERS value (Viewport.cpp:2830-2839).
+    // Push CSBWin BITMAP_POINTERS value (Viewport.cpp:2837-2846).
     const mapping: { [key: number]: number } = {
       [Opcode.StdDoorFacingFrameLeftBitmapF3L1]: StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF3L1,
       [Opcode.StdDoorFacingFrameLeftBitmapF3]: StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF3,
@@ -2194,7 +2194,7 @@ export class BytecodeInterpreter {
   }
 
   private opDoorGraphics(opcode: number): boolean {
-    // CSBWin Viewport.cpp:2561-2563
+    // CSBWin Viewport.cpp:2568-2570
     const graphicsIndex =
       opcode === Opcode.StdDoorGraphicsF3 ? 2 : opcode === Opcode.StdDoorGraphicsF2 ? 1 : 0;
     // DoorGraphics(${Opcode[opcode]})[${graphicsIndex}]
@@ -2250,7 +2250,7 @@ export class BytecodeInterpreter {
   }
 
   private opDrawOrder(opcode: number): boolean {
-    // Port of CSBWin's draw order constant opcodes (Viewport.cpp:2611-2630).
+    // Port of CSBWin's draw order constant opcodes (Viewport.cpp:2618-2637).
     const drawOrderMap: { [key: number]: number } = {
       [Opcode.DrawOrder00]: 0x00,
       [Opcode.DrawOrder01]: 0x01,
@@ -2300,7 +2300,7 @@ export class BytecodeInterpreter {
   }
 
   private opWallPosition(opcode: number): boolean {
-    // CSBWin Viewport.cpp:2645-2657 maps these to RELATIVE_WALL_NUMBERS values.
+    // CSBWin Viewport.cpp:2652-2664 maps these to RELATIVE_WALL_NUMBERS values.
     const mapping: { [key: number]: number } = {
       [Opcode.WallF3L1Right]: 0,
       [Opcode.WallF3R1Left]: 1,

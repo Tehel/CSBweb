@@ -1,5 +1,5 @@
 /**
- * `CLOUDTYPE` (`doc/CSBwin-src/CSB.h:1320`) — `DB15.word2` bits 0-6.
+ * `CLOUDTYPE` (`doc/CSBwin-src/CSB.h:1323`) — `DB15.word2` bits 0-6.
  *
  * A "cloud" is CSBWin's catch-all for a transient effect sitting in a cell: the burst
  * of a fireball, a lingering poison cloud, the puff a dying monster leaves, and the

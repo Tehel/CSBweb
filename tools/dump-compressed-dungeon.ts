@@ -1,16 +1,16 @@
 /**
  * A compressed `dungeon.dat`: `ReadDatabases`' new-game preamble and `ExpandData`
- * (`doc/CSBwin-src/SaveGame.cpp:2346-2374`, `CSBCode.cpp:9846-9929`).
+ * (`doc/CSBwin-src/SaveGame.cpp:2558-2586`, `CSBCode.cpp:9970-10053`).
  *
  * Chaos Strikes Back's `dungeon.dat`, the prison, is the one compressed file there is:
  * 2098 bytes opening with 33028, which expand to 2622. The expansion is proven byte for
  * byte by the image's own checksum. `ReadDatabases` adds up every byte it fetches and
- * compares the sum with the word that follows the cell flags (`SaveGame.cpp:2654-2658`,
- * `FetchDataBytes`, `CSBCode.cpp:9081-9106`), and that word is the last of the expanded
+ * compares the sum with the word that follows the cell flags (`SaveGame.cpp:2866-2870`,
+ * `FetchDataBytes`, `CSBCode.cpp:9186-9211`), and that word is the last of the expanded
  * image, so one wrong byte anywhere in it fails the sum. Then the image has to parse
  * with its sections ending exactly at that word, and the new game has to take
  * `d.Word22592` from the file's word 6 (12), where a plain `dungeon.dat`'s keeps the 13
- * `_ReadEntireGame` sets (`SaveGame.cpp:1470`).
+ * `_ReadEntireGame` sets (`SaveGame.cpp:1571`).
  *
  * DM's `dungeon.dat` is plain: through the same entry it must read exactly as before.
  *

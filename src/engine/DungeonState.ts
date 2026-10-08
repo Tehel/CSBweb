@@ -62,12 +62,12 @@ const DATABASE_KEY: Partial<Record<DBType, keyof Databases>> = Object.fromEntrie
     Object.entries(DATABASE_CATEGORY).map(([key, db]) => [db, key])) as Partial<Record<DBType, keyof Databases>>;
 
 /**
- * `DATABASES::Max` (`doc/CSBwin-src/CSB.h:1646`): the most records `Enlarge` grows
+ * `DATABASES::Max` (`doc/CSBwin-src/CSB.h:1649`): the most records `Enlarge` grows
  * database `dbNum` to.
  */
-/** `EDT_ExtendedCellFlags` (`doc/CSBwin-src/CSB.h:1532`): eight longwords, a bit a row. */
+/** `EDT_ExtendedCellFlags` (`doc/CSBwin-src/CSB.h:1535`): eight longwords, a bit a row. */
 const EDT_EXTENDED_CELL_FLAGS = 2;
-/** `ECF_FOOTPRINTS` (`doc/CSBwin-src/CSB.h:1533`): the extended cell flag that shows footprints. */
+/** `ECF_FOOTPRINTS` (`doc/CSBwin-src/CSB.h:1536`): the extended cell flag that shows footprints. */
 export const ECF_FOOTPRINTS = 0;
 
 /** `(EDT_ExtendedCellFlags << 24) + (level << 5) + x`: a column's record of extended cell flags. */
@@ -143,7 +143,7 @@ export class DungeonState {
     /**
      * The three below are `expool`'s (`src/data/CsbwinExpool.ts`). The record's key is the
      * bones' RN, its slot in the object indirect index, which a move within the cell does
-     * not change (`RN::pos`, `doc/CSBwin-src/CSBTypes.h:336-342`).
+     * not change (`RN::pos`, `doc/CSBwin-src/CSBTypes.h:342-348`).
      */
     addChampionBonesRecord(bones: ObjectID, fingerprint: number): void {
         new Expool(this.data).addChampionBonesRecord(bones, fingerprint);
@@ -178,7 +178,7 @@ export class DungeonState {
     }
 
     /**
-     * `GetExtendedCellFlag` (`doc/CSBwin-src/data.cpp:1679-1689`): the cell's bit of flag
+     * `GetExtendedCellFlag` (`doc/CSBwin-src/data.cpp:1682-1692`): the cell's bit of flag
      * `ftype`, clear without a record of at least eight longwords.
      */
     getExtendedCellFlag(level: number, x: number, y: number, ftype: number): boolean {
@@ -220,7 +220,7 @@ export class DungeonState {
     /**
      * Find the map index and coordinates for a level delta using CSBWin's IncrementLevel logic.
      *
-     * Ported from CSBWin `IncrementLevel()` (doc/CSBwin-src/CSBCode.cpp:4709-4759).
+     * Ported from CSBWin `IncrementLevel()` (doc/CSBwin-src/CSBCode.cpp:4774-4824).
      */
     incrementLevel(position: Position, delta: number): Position | null {
         const map = this.getMap(position.z);
@@ -251,7 +251,7 @@ export class DungeonState {
     /**
      * Find a valid facing when exiting stairs on a level.
      *
-     * Ported from CSBWin `ExitStairsDirection()` (doc/CSBwin-src/Code11f52.cpp:290-325).
+     * Ported from CSBWin `ExitStairsDirection()` (doc/CSBwin-src/Code11f52.cpp:325-360).
      */
     getExitStairsDirection(position: Position, fallback: Direction): Direction {
         const { x, y, z } = position;
@@ -295,7 +295,7 @@ export class DungeonState {
     /**
      * Index within `data.objectList` for the first object in (map,x,y), or -1 if none/out of bounds.
      *
-     * Ported from CSBWin `GetObjectListIndex()` (doc/CSBwin-src/CSBCode.cpp:5103-5127).
+     * Ported from CSBWin `GetObjectListIndex()` (doc/CSBwin-src/CSBCode.cpp:5168-5192).
      */
     getObjectListIndex(position: Position): number {
         const { x, y, z } = position;
@@ -320,7 +320,7 @@ export class DungeonState {
     /**
      * Find first object RN in a cell, or `OBJECT_ID_EOF` if none.
      *
-     * Ported from CSBWin `FindFirstObject()` (doc/CSBwin-src/CSBCode.cpp:5130-5137).
+     * Ported from CSBWin `FindFirstObject()` (doc/CSBwin-src/CSBCode.cpp:5195-5202).
      */
     findFirstObject(position: Position): ObjectID {
         const idx = this.getObjectListIndex(position);
@@ -338,8 +338,8 @@ export class DungeonState {
     }
 
     /**
-     * `AddObjectToRoom(newObj, RNnul, mapX, mapY, NULL)` (`doc/CSBwin-src/Code11f52.cpp:392`):
-     * clear the new object's link (`:428`), then make it the cell's first object or hang it
+     * `AddObjectToRoom(newObj, RNnul, mapX, mapY, NULL)` (`doc/CSBwin-src/Code11f52.cpp:427`):
+     * clear the new object's link (`:463`), then make it the cell's first object or hang it
      * off the last one. Returns false if the cell is out of bounds.
      */
     addObjectToCell(position: Position, rn: ObjectID): boolean {
@@ -386,7 +386,7 @@ export class DungeonState {
 
     /**
      * `AddObjectToRoom(newObj, prevObj, -1, 0, NULL)` — the arm with no cell
-     * (`doc/CSBwin-src/Code11f52.cpp:428`, `:491-499`): clear the new object's link,
+     * (`doc/CSBwin-src/Code11f52.cpp:463`, `:526-534`): clear the new object's link,
      * then hang it off the last object of the chain `prevObj` is in.
      */
     addObjectToChain(newObj: ObjectID, prevObj: ObjectID): void {
@@ -457,7 +457,7 @@ export class DungeonState {
     /**
      * Return the linked-list next pointer for a record RN, or `OBJECT_ID_EOF`.
      *
-     * Ported from CSBWin `GetDBRecordLink()` (doc/CSBwin-src/CSBCode.cpp:5090-5100).
+     * Ported from CSBWin `GetDBRecordLink()` (doc/CSBwin-src/CSBCode.cpp:5155-5165).
      */
     getDBRecordLink(rn: ObjectID): ObjectID {
         if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return OBJECT_ID_EOF;
@@ -574,20 +574,20 @@ export class DungeonState {
     }
 
     /**
-     * `FindEmptyDB<n>Entry` (`doc/CSBwin-src/CSBCode.cpp:4942-5084`) over
-     * `DATABASES::FindEmptyDBEntry` (`doc/CSBwin-src/data.cpp:918-990`): the RN of a new
+     * `FindEmptyDB<n>Entry` (`doc/CSBwin-src/CSBCode.cpp:5007-5149`) over
+     * `DATABASES::FindEmptyDBEntry` (`doc/CSBwin-src/data.cpp:920-992`): the RN of a new
      * object of database `db`, whose record then holds `record`; `RNnul` when there is
      * no room.
      *
      * `FindEmptyDBEntry` walks the index for a slot whose record is free, noting the
      * lowest free slot on the way (`RnMaps.findEmptyIndexEntry`), then the records from
-     * 1 for a free one (`:954-966`), and gives the record that slot, or a new one, at
+     * 1 for a free one (`:956-968`), and gives the record that slot, or a new one, at
      * corner 0 (`RnMaps.assignIndexEntry`). `important`, CSBWin's own argument, lets it
      * make a new slot when the index is all but full: a DSA's copy and a champion's
-     * bones pass it (`DSA.cpp:1773-1868`, `Character.cpp:2625`).
+     * bones pass it (`DSA.cpp:1774-1869`, `Character.cpp:2630`).
      *
      * With no free record it `Enlarge`s the database (`enlarge`) and names the first new
-     * record through `RN(dbType, index)` (`:967-972`). When the database is at `db.Max`
+     * record through `RN(dbType, index)` (`:969-974`). When the database is at `db.Max`
      * already, or `FindEmptyDBEntry` gives `RNnul`, it falls back on `MakeMoreRoomInDB`
      * (`makeMoreRoomInDB`) and stores `record` over the record of the RN that gives.
      */
@@ -623,9 +623,9 @@ export class DungeonState {
     }
 
     /**
-     * `ReadDatabases`' sizes for a new game (`doc/CSBwin-src/SaveGame.cpp:2556-2564`): each
+     * `ReadDatabases`' sizes for a new game (`doc/CSBwin-src/SaveGame.cpp:2768-2776`): each
      * database holds the file's records and `d.Byte7302[db]` more, which
-     * `DATABASES::Allocate` clears to link `RNnul` behind the file's (`data.cpp:773-801`).
+     * `DATABASES::Allocate` clears to link `RNnul` behind the file's (`data.cpp:774-802`).
      * The header's `DBSize`, `objectCounts` here, says so, and a save then declares it.
      * Every `graphics.dat` the port reads gives the expool and the two unused databases
      * none.
@@ -644,12 +644,12 @@ export class DungeonState {
     }
 
     /**
-     * `DATABASES::Enlarge` (`doc/CSBwin-src/data.cpp:813-876`): database `dbType` grows by
+     * `DATABASES::Enlarge` (`doc/CSBwin-src/data.cpp:814-877`): database `dbType` grows by
      * 100 cleared records, their link `RNnul` and the first's `RNeof`, and the index of
      * that first record, the old size, is returned. -1 once the database holds `db.Max`
      * records (`dbMax`). The header's `DBSize`, `objectCounts` here, becomes the new
      * size, which a save then declares. CSBWin asks the player first unless
-     * `AutoEnlarge`, which it sets on the line before (`:843`), and nothing sets
+     * `AutoEnlarge`, which it sets on the line before (`:844`), and nothing sets
      * `m_noEnlarge`, so it always goes ahead.
      */
     enlarge(dbType: DBType): number {
@@ -668,7 +668,7 @@ export class DungeonState {
     }
 
     /**
-     * `DeleteDBEntry` (`doc/CSBwin-src/data.cpp:993-1015`): the record's link becomes
+     * `DeleteDBEntry` (`doc/CSBwin-src/data.cpp:995-1017`): the record's link becomes
      * `RNnul` and the slot naming it is freed (`RnMaps.deleteIndexEntry`), unless it is
      * "Cloned!!!", when nothing changes. An RN whose slot is free names no record.
      */
@@ -686,7 +686,7 @@ export class DungeonState {
     /**
      * Find the first DOOR record RN in a cell, or `OBJECT_ID_EOF`.
      *
-     * Ported from CSBWin `FindFirstDoor()` semantics (doc/CSBwin-src/Code11f52.cpp:579+).
+     * Ported from CSBWin `FindFirstDoor()` semantics (doc/CSBwin-src/Code11f52.cpp:614+).
      */
     findFirstDoor(position: Position): ObjectID {
         for (let rn = this.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.getDBRecordLink(rn)) {
@@ -696,7 +696,7 @@ export class DungeonState {
     }
 
     /**
-     * `FindFirstMonster` (doc/CSBwin-src/Code11f52.cpp:533, :604) — the first creature in
+     * `FindFirstMonster` (doc/CSBwin-src/Code11f52.cpp:568, :639) — the first creature in
      * the cell's object chain, or `OBJECT_ID_EOF`.
      */
     findFirstMonster(position: Position): ObjectID {
@@ -707,7 +707,7 @@ export class DungeonState {
     }
 
     /**
-     * `MonsterAllowedOnLevel` (doc/CSBwin-src/Code11f52.cpp:120) — is `monsterType` among
+     * `MonsterAllowedOnLevel` (doc/CSBwin-src/Code11f52.cpp:155) — is `monsterType` among
      * the creature types the level's descriptor lists. CSBWin also accepts an RN and
      * reads the type from its record; callers here resolve the record first.
      */
@@ -721,7 +721,7 @@ export class DungeonState {
     }
 
     /**
-     * `LOCATIONREL::IsValid` (doc/CSBwin-src/DSA.cpp:310) — a level that exists and a
+     * `LOCATIONREL::IsValid` (doc/CSBwin-src/DSA.cpp:311) — a level that exists and a
      * cell inside its bounds.
      */
     isValidLocation(locr: LocationRel): boolean {
@@ -735,7 +735,7 @@ export class DungeonState {
     /**
      * `d.DoorTOC[doorType]` for `level` — built at level load from the level descriptor's
      * two door type indices into `DoorCharacteristics[4]`
-     * (doc/CSBwin-src/CSBCode.cpp:5780-5783). The low byte is the force needed to bash
+     * (doc/CSBwin-src/CSBCode.cpp:5845-5848). The low byte is the force needed to bash
      * the door; bit 8 marks a door monsters may walk through.
      */
     doorTOC(level: number, doorType: number, doorCharacteristics: ArrayLike<number> | null | undefined): number {
@@ -976,7 +976,7 @@ export class DungeonState {
     }
 
     /**
-     * `DecodeText` (`doc/CSBwin-src/CSBCode.cpp:5487-5668`) with its substitution: `ok` is
+     * `DecodeText` (`doc/CSBwin-src/CSBCode.cpp:5552-5733`) with its substitution: `ok` is
      * false where CSBWin returns -1, a name or text to substitute that is not there.
      */
     decodeText(
@@ -998,7 +998,7 @@ export class DungeonState {
 
     /**
      * The text a party arriving on its square reads, or null when it is hidden or
-     * `DecodeText` returns -1 (`doc/CSBwin-src/Code11f52.cpp:3960-3964`).
+     * `DecodeText` returns -1 (`doc/CSBwin-src/Code11f52.cpp:3995-4002`).
      */
     decodeMessageText(record: TextRecord, tables: TextDecodeTables): string | null {
         const decoded = this.decodeText(record, 1, 990, tables);

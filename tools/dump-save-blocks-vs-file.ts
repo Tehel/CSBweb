@@ -10,7 +10,7 @@
  *
  * The comparison is made on the *scrambled* bytes, straight out of both files, which is
  * legitimate because `SaveGame` writes zero for all five block hashes
- * (`doc/CSBwin-src/SaveGame.cpp:1063-1067`) and so does `saveSaveGameState`: with the
+ * (`doc/CSBwin-src/SaveGame.cpp:1088-1092`) and so does `saveSaveGameState`: with the
  * same hash the keystream is the same, so equal plaintext is equal ciphertext and a
  * diff is a diff either way.
  *
@@ -22,8 +22,8 @@
  *
  * - **The bytes of block 1 `SaveGame` never assigns**: `Byte740[256…299]`, `FILL438` and
  *   `Checksum354…374`. `SaveGame` memsets the block before filling it
- *   (`doc/CSBwin-src/SaveGame.cpp:864-865`) and `ScrambleAndWrite` writes only words
- *   0-127 of `Byte740` (`:706-750`), so a CSBWin build of this source writes zeros there
+ *   (`doc/CSBwin-src/SaveGame.cpp:881-882`) and `ScrambleAndWrite` writes only words
+ *   0-127 of `Byte740` (`:714-758`), so a CSBWin build of this source writes zeros there
  *   and so does this port. The committed saves agree, and a file some other build wrote
  *   need not. Every field of the block is asserted, bar the checksum words of a block whose
  *   own exempt bytes differ (below) and word 127, which sums them.
@@ -50,7 +50,7 @@ import { genuineSaves } from './lib/saves';
 const BLOCK1_SIZE = 512;
 const BLOCK2_SIZE = 128;
 
-/** Which `GAMEBLOCK1` field an offset falls in (`doc/CSBwin-src/SaveGame.cpp:60-104`). */
+/** Which `GAMEBLOCK1` field an offset falls in (`doc/CSBwin-src/SaveGame.cpp:61-105`). */
 const BLOCK1_FIELDS: Array<[number, number, string]> = [
   [0, 256, 'Byte740 (ScrambleAndWrite)'], [256, 300, 'Byte740 tail'], [300, 301, 'Byte22598'],
   [301, 302, 'Byte22596'], [302, 306, 'FILL438'], [306, 308, 'SaveOption'],
@@ -82,7 +82,7 @@ function block1DebrisSums(offset: number, timers: boolean, queue: boolean): bool
 }
 const CHARACTER_SIZE = 3328;
 
-/** Which `GAMEBLOCK2` field an offset falls in (`doc/CSBwin-src/SaveGame.cpp:107-133`). */
+/** Which `GAMEBLOCK2` field an offset falls in (`doc/CSBwin-src/SaveGame.cpp:108-134`). */
 const BLOCK2_FIELDS: Array<[number, number, string]> = [
   [0, 4, 'Time'], [4, 8, 'ranseed'], [8, 10, 'ObjectInHand'], [10, 12, 'numcharacter'],
   [12, 14, 'partyx'], [14, 16, 'partyy'], [16, 18, 'partyfacing'], [18, 20, 'partyLevel'],

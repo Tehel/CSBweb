@@ -4,29 +4,29 @@
  * genuine save (`csbgame7.dat`).
  *
  * 1. **`&PARTY@`** writes twelve of the party's globals to the variables
- *    (`doc/CSBwin-src/DSA.cpp:4127-4165`), and nothing when `index + num` passes 100.
- * 2. **`&CHAR@`** writes a champion's 59 fields (`:4166-4241`): HP less the pending
+ *    (`doc/CSBwin-src/DSA.cpp:4128-4166`), and nothing when `index + num` passes 100.
+ * 2. **`&CHAR@`** writes a champion's 59 fields (`:4167-4242`): HP less the pending
  *    damage, the attributes packed minimum, maximum, current, the skills in pairs.
  *    Champion 4 is the hand's owner; an index past the party, or a fingerprint nobody in
  *    the wings has, reads zeros (the wings are `dump-wings.ts`'s).
- * 3. **`&CHPOSS`** (`:3330-3357`): an empty slot is -1, a negative champion the hand, a
+ * 3. **`&CHPOSS`** (`:3331-3358`): an empty slot is -1, a negative champion the hand, a
  *    slot past 29 slot 0. A champion slot past the party is read too: 0 on
  *    `csbgame-early-1hero.dat`, whose slots 1 to 3 are the zero bytes `DBank::Initialize`
  *    leaves, and a cancelled candidate's own possessions.
- * 4. **`&MASTERY`** (`:3389-3410`): flags 1 and 2 are `DetermineMastery`'s 0x4000 and
+ * 4. **`&MASTERY`** (`:3390-3411`): flags 1 and 2 are `DetermineMastery`'s 0x4000 and
  *    0x8000; a champion or skill out of range is 0.
- * 5. **`&WHOHASTALENT`, `&WHEREISCHAR`, `&TALENTS@`, `&TALENTS!`** (`:4242-4412`): a
+ * 5. **`&WHOHASTALENT`, `&WHEREISCHAR`, `&TALENTS@`, `&TALENTS!`** (`:4243-4413`): a
  *    fingerprint in the party is its index, one with a 25-longword `EDT_Character` record
  *    in `EXPOOL` 5, any other 4.
- * 6. **`&COUNTINJURY`** (`:4798-4818`) counts the wounds of the living champions the
+ * 6. **`&COUNTINJURY`** (`:4799-4819`) counts the wounds of the living champions the
  *    mask names.
- * 7. **`&ISCARRIED`** (`:1520-1641`): where a particular object is, a chest's contents
+ * 7. **`&ISCARRIED`** (`:1521-1642`): where a particular object is, a chest's contents
  *    searched, the hand as 255; how many of a basic type are carried.
- * 8. **`&CHAR!`** (`:4426-4541`) writes food, water, mana, stamina and the attributes
+ * 8. **`&CHAR!`** (`:4427-4542`) writes food, water, mana, stamina and the attributes
  *    clamped; an HP below the champion's is pending damage, one above it HP; a dead
  *    champion's HP and the potential champion are left alone.
- * 9. **`&EXPERIENCE+`** adds `(UI16)experience` (`Magic.cpp:409`), and nothing to a dead
- *    champion; **`&CAUSEPOISON`** is `PoisonCharacter` (`CSBCode.cpp:7211`).
+ * 9. **`&EXPERIENCE+`** adds `(UI16)experience` (`Magic.cpp:412`), and nothing to a dead
+ *    champion; **`&CAUSEPOISON`** is `PoisonCharacter` (`CSBCode.cpp:7270`).
  *
  * Run: `npx tsx tools/dump-dsa-characters.ts`
  */
@@ -130,7 +130,7 @@ function charFetchExpected(game: Game, chIdx: number): number[] {
   check(g[4] === g[0], 'a champion past 4 is champion 0');
 }
 {
-  // `d.CH16482[chindex].Possession(possindex)` for any slot up to 3 (`DSA.cpp:3345-3347`).
+  // `d.CH16482[chindex].Possession(possindex)` for any slot up to 3 (`DSA.cpp:3346-3348`).
   const oneHero = new Uint8Array(readFileSync(savePath('csbgame-early-1hero.dat')));
   const { g } = run([
     ...int(1), ...int(0), op(StkOp.CH_POSS), globalStore(0),

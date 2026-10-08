@@ -1,12 +1,12 @@
 /**
- * Changing the marching order: `TAG0025a6` (`doc/CSBwin-src/CSBCode.cpp:2053`), which the
+ * Changing the marching order: `TAG0025a6` (`doc/CSBwin-src/CSBCode.cpp:2082`), which the
  * four squares of the top view of positions, buttons 125-128, reach
- * (`doc/CSBwin-src/Mouse.cpp:1586-1597`).
+ * (`doc/CSBwin-src/Mouse.cpp:1725-1736`).
  *
  * A click on a champion's square picks them up: the square turns black and becomes the
  * cursor, over a black shadow two pixels down and right. A second click puts them down,
  * facing the party's way, and whoever stood there takes the square they left. The pointer
- * leaving the top view lets go (`CSBCode.cpp:938-945`).
+ * leaving the top view lets go (`CSBCode.cpp:948-955`).
  *
  * What to look for: each row is a click, with the four champions' positions and facings
  * after it. The two that swap swap, and only the one put down turns to face the party's
@@ -92,11 +92,11 @@ async function main(): Promise<void> {
     console.log([what, ui.word23144, positions(state)].join('\t'));
   };
 
-  // ---- An empty square picks nobody up (`CSBCode.cpp:2063-2064`).
+  // ---- An empty square picks nobody up (`CSBCode.cpp:2092-2093`).
   click('empty square 3', 3);
   check(ui.word23144 === 0, 'an empty square should pick nobody up');
 
-  // ---- Pick up champion 0: the cursor is the square over its shadow (`:2069-2107`).
+  // ---- Pick up champion 0: the cursor is the square over its shadow (`:2098-2136`).
   click('pick up square 0', 0);
   check(ui.word23144 === 1, 'picking up square 0 should set d.Word23144 to 1');
   const square = createPaletteIndexViewportBuffer(19, 14);
@@ -118,9 +118,9 @@ async function main(): Promise<void> {
   check(bad23178 === 0, `d.Pointer23178 should be the square over a black shadow (${bad23178} pixels off)`);
   check(bad23182 === 0, `d.Pointer23182 should be the square's colour-4 silhouette over it (${bad23182} pixels off)`);
 
-  // ---- While in hand, the square is black (`:2108-2111`), and the cursor is drawn 9
+  // ---- While in hand, the square is black (`:2137-2140`), and the cursor is drawn 9
   //      pixels left of and 7 above the pointer; in the dungeon view the rows on screen
-  //      row 29 and below come from `d.Pointer23182` (`:2325-2386`).
+  //      row 29 and below come from `d.Pointer23182` (`:2358-2419`).
   drawPartyStatus(ui);
   const r0 = g232.wRectPos1454[0];
   const screen = ui.screenIndexBuffer!;
@@ -155,7 +155,7 @@ async function main(): Promise<void> {
     'letting go should move and turn nobody');
 
   // ---- Put down on another champion's square: the two swap, and only the one put down
-  //      turns to face the party's way (`:2118-2150`).
+  //      turns to face the party's way (`:2147-2179`).
   click('pick up square 0', 0);
   click('put down on square 1', 1);
   check(state.champions[0].partyPosition === 1 && state.champions[1].partyPosition === 0,
@@ -183,7 +183,7 @@ async function main(): Promise<void> {
   state.facing = Direction.NORTH;
 
   // ---- A champion who dies in hand stays in hand: `KillCharacter` clears d.Word23244,
-  //      not d.Word23144 (`Character.cpp:2653-2658`). Put down, they are -1, and only the
+  //      not d.Word23144 (`Character.cpp:2658-2663`). Put down, they are -1, and only the
   //      champion on the target square moves.
   click('pick up square 1', 1);
   const dying = state.champions[1];
@@ -195,7 +195,7 @@ async function main(): Promise<void> {
   check(state.champions[0].partyPosition === 1, 'the champion on square 0 should have moved to square 1');
 
   // ---- The top view has a square for a living champion only: the dead champion 1 and
-  //      the empty fourth box have none (`Character.cpp:1308`, `:2664-2667`), so the dead
+  //      the empty fourth box have none (`Character.cpp:1313`, `:2669-2672`), so the dead
   //      champion does not paint over champion 0, who shares their square. The screen is
   //      cleared first, as `GameScreen.presentViewport` does.
   screen.pixels.fill(0);
@@ -227,14 +227,14 @@ async function main(): Promise<void> {
   console.log(['top view', 'square:owner/lit', squares.join(' ')].join('\t'));
 
   // ---- The fourth box, with nobody in it, stays black: `DrawAllCharacterState` draws
-  //      boxes 0..d.NumCharacter-1 only (`CSBCode.cpp:6831-6834`), and a box emptied is
-  //      filled with colour 0 (`:6641-6649`, `Character.cpp:5387-5398`).
+  //      boxes 0..d.NumCharacter-1 only (`CSBCode.cpp:6890-6893`), and a box emptied is
+  //      filled with colour 0 (`:6700-6708`, `Character.cpp:5412-5423`).
   let emptyLit = 0;
   for (let y = 0; y <= 28; y++) for (let x = 69 * 3; x <= 69 * 3 + 66; x++) if (screen.pixels[y * 320 + x] !== 0) emptyLit++;
   console.log(['empty box 3', 'lit', emptyLit].join('\t'));
   check(emptyLit === 0, `the box of a champion not in the party should be black (${emptyLit} pixels lit)`);
 
-  // ---- `GameScreen.setPartyState` empties the hand for another game (`CSBCode.cpp:10485`)
+  // ---- `GameScreen.setPartyState` empties the hand for another game (`CSBCode.cpp:10609`)
   //      — covered by reading; it has no engine to drive here.
 
   finish();

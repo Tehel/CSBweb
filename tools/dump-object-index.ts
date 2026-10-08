@@ -4,7 +4,7 @@
  *
  * The port used to carry five copies of `RN::DescIndex` and they had drifted: two of
  * them made every chest description 1, where CSBWin adds the chest's `BITS1_2(word4)`
- * (`doc/CSBwin-src/data.cpp:582`), and only the UI had a `NameIndex`. This pins the one
+ * (`doc/CSBwin-src/data.cpp:583`), and only the UI had a `NameIndex`. This pins the one
  * copy that is left to CSBWin's shape:
  *
  * - every record of the six object databases has a row in `d.ObjDesc`, and the RN form
@@ -17,7 +17,7 @@
  *   compass, a torch and a waterskin — the canary that the offsets are right;
  * - `NameIndex` turns the compass with the party, burns a lit torch through `Byte640`,
  *   closes a scroll, fills a waterskin and charges the six charged weapons
- *   (`doc/CSBwin-src/data.cpp:612-700`). Those states are forced on real records, in
+ *   (`doc/CSBwin-src/data.cpp:613-701`). Those states are forced on real records, in
  *   memory, since the stock dungeon does not hold every one.
  *
  * Run: `npx tsx tools/dump-object-index.ts`
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
   // --- an RN no slot of the maps holds -------------------------------------------
   // `RN::checkIndirectIndex` refuses 0 and anything from `dataMapLength` on, and every
   // `RNVAL` is past it: `dbType()` answers `dbUNKNOWN`, while `pos()` and `idx()` would
-  // read outside the maps, which the port refuses (`doc/CSBwin-src/CSBTypes.h:324-347`).
+  // read outside the maps, which the port refuses (`doc/CSBwin-src/CSBTypes.h:330-353`).
   const throws = (read: () => unknown): boolean => {
     try { read(); return false; } catch { return true; }
   };

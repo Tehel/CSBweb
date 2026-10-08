@@ -12,17 +12,17 @@
  *     its direction and energy, and the new level (`:574-596`). The port left the
  *     timer at the old square, so the missile flew on from where it no longer was.
  *
- * The move itself is the low-level `MoveObject` (`Code11f52.cpp:2796`): lift with
+ * The move itself is the low-level `MoveObject` (`Code11f52.cpp:2831`): lift with
  * `MoveObject(obj, x, y, -1, 0)`, set down with `MoveObject(obj, -1, 0, x, y)`
  * (`MoveObject.cpp:203-220`, `:531-538`). The port spliced the chains directly, so:
  *  4. an item set down on an active teleporter stayed on it instead of being carried on;
  *  5. an item set down on an open pit stayed on it instead of falling — and so did a
- *     cloud, which is not `Levitating` (`Code11f52.cpp:2417-2437`);
+ *     cloud, which is not `Levitating` (`Code11f52.cpp:2452-2472`);
  *  6. a monster moved within the party's level keeps its `ITEM16`, and its AI timers
  *     follow it to the new square (`MoveObject.cpp:539-571`); the port left them behind;
  *  7. a monster moved off the party's level has `groupIndex` 0xd8 / 0xff (`:504-521`);
  *  8. a monster moved onto the party's level gets an `ITEM16` and its first AI timers
- *     (`Code11f52.cpp:3363-3405`); the port gave it neither.
+ *     (`Code11f52.cpp:3398-3440`); the port gave it neither.
  *
  * Run: `npx tsx tools/dump-dsa-move.ts`
  */
@@ -252,7 +252,7 @@ async function main(): Promise<void> {
     /**
      * A game with the party on level `a` and a group made on `level` at `at`. Its type
      * is allowed on both `a` and `b`: `MoveObject` deletes a group that ends on a level
-     * its type may not live on (`doc/CSBwin-src/Code11f52.cpp:3147-3176`).
+     * its type may not live on (`doc/CSBwin-src/Code11f52.cpp:3182-3211`).
      */
     const withMonster = async (level: number, at: (g: Game, z: number) => Position): Promise<{
       game: Game; party: number; other: number; rn: ObjectID; where: Position;

@@ -11,7 +11,7 @@
  * So the stamp is run over real files: the eight genuine CSBWin saves, and the two of
  * `static/gamefiles/csb`, which have no Extended Features block before `GAMEBLOCK1`.
  * One of those, `mini.dat`, has 127 words that are not zero in the block's first half,
- * where CSBWin writes zeroes (`doc/CSBwin-src/SaveGame.cpp:725-738`, the `STRandom()` it
+ * where CSBWin writes zeroes (`doc/CSBwin-src/SaveGame.cpp:733-746`, the `STRandom()` it
  * comments out). For each:
  *
  * 1. The stamped file differs from the original in six bytes at most, all in
@@ -47,7 +47,7 @@ import { genuineSaves } from './lib/saves';
 /** The saves with no Extended Features block: `GAMEBLOCK1` opens the file. */
 const BARE_SAVES = ['static/gamefiles/csb/mini.dat', 'static/gamefiles/csb/csbgame2.dat'];
 
-/** `RandomGameID` in `GAMEBLOCK1` (`doc/CSBwin-src/SaveGame.cpp:1060`), and the fold's last word. */
+/** `RandomGameID` in `GAMEBLOCK1` (`doc/CSBwin-src/SaveGame.cpp:1085`), and the fold's last word. */
 const ID_OFFSET = 308;
 const FOLD_END_OFFSET = 254;
 
@@ -129,7 +129,7 @@ function checkFile(path: string): void {
     writeU32BE(written, ID_OFFSET, ID);
     scrambleAndWrite(written);
     check(sameBytes(written, stamped.subarray(offset, offset + BLOCK1_SIZE)),
-      `${name}: the stamped block is what ScrambleAndWrite (SaveGame.cpp:706-751) writes for the block with that id`);
+      `${name}: the stamped block is what ScrambleAndWrite (SaveGame.cpp:714-759) writes for the block with that id`);
   } else {
     check(inBlock.every((at) => at >= FOLD_END_OFFSET), `${name}: the ${foldWords} words of its first half that are not zero are kept`);
   }

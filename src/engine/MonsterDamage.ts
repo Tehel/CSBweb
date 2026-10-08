@@ -1,17 +1,17 @@
 /**
  * Hurting and killing monsters.
  *
- * Ports `DamageMonster` (`doc/CSBwin-src/Code11f52.cpp:1054`) and the helpers it
- * needs: `DeleteMonster` (:1026), `DropMonsterRemains` (:830),
- * `CreateAndDropObject` (:684), and the four packed-byte accessors
+ * Ports `DamageMonster` (`doc/CSBwin-src/Code11f52.cpp:1089`) and the helpers it
+ * needs: `DeleteMonster` (:1061), `DropMonsterRemains` (:865),
+ * `CreateAndDropObject` (:719), and the four packed-byte accessors
  * `MonsterPositionByte` / `SetMonsterPositionByte` / `MonsterFacingByte` /
- * `SetMonsterFacingByte` (:176-248). Beside them, `DeleteMonsterInGroup` and
- * `InsertMonsterInGroup` (`Monster.cpp:4600`, `:4742`), the DSA's `&DELMON` and
+ * `SetMonsterFacingByte` (:211-283). Beside them, `DeleteMonsterInGroup` and
+ * `InsertMonsterInGroup` (`Monster.cpp:4613`, `:4755`), the DSA's `&DELMON` and
  * `&INSMON`, which take a member out of a group and put one in.
  *
  * This sits underneath almost everything else about monsters. Four callers want it:
  * the missile system, the monster AI
- * gate `InitialChecks` (`doc/CSBwin-src/Monster.cpp:2813`), the champion melee path
+ * gate `InitialChecks` (`doc/CSBwin-src/Monster.cpp:2817`), the champion melee path
  * (`doc/CSBwin-src/Attack.cpp:503`), and cloud damage (`doc/CSBwin-src/Timer.cpp:524`).
  *
  * The hard part is not the arithmetic — it is what happens when *one* member of a
@@ -40,7 +40,7 @@ import {
   monsterLeavesDroppings,
 } from '../data/tables/MonsterDesc';
 
-/** `MONSTER_DAMAGE_RESULT` (`doc/CSBwin-src/CSB.h:2928`). */
+/** `MONSTER_DAMAGE_RESULT` (`doc/CSBwin-src/CSB.h:2987`). */
 export enum MonsterDamageResult {
   NO_MONSTER_DIED = 0,
   SOME_NOT_ALL_MONSTERS_DIED = 1,
@@ -48,7 +48,7 @@ export enum MonsterDamageResult {
 }
 
 /**
- * `DELETEMONSTERWHY` (`doc/CSBwin-src/CSB.h:2917-2926`): why a group, or a member of one,
+ * `DELETEMONSTERWHY` (`doc/CSBwin-src/CSB.h:2976-2985`): why a group, or a member of one,
  * leaves the dungeon. The kill statistics count by it.
  */
 export enum DeleteMonsterWhy {
@@ -61,7 +61,7 @@ export enum DeleteMonsterWhy {
 }
 
 /**
- * `DELETEMONSTERPARAMETERS` (`doc/CSBwin-src/CSB.h:2937-2951`): what the delete monster
+ * `DELETEMONSTERPARAMETERS` (`doc/CSBwin-src/CSB.h:2996-3010`): what the delete monster
  * filter's DSA reads and may rewrite. `dropResidue` is 0 for the default, 1 to drop the
  * remains, 2 not to; `deathCloud` 0 for the default, 1 to show the cloud, 2 not to;
  * `index` is the member's in its group, -1 for the whole group.
@@ -78,7 +78,7 @@ export interface DeleteMonsterParameters {
 }
 
 /**
- * `DELETEMONSTERPARAMETERS::DELETEMONSTERPARAMETERS` (`doc/CSBwin-src/Code11f52.cpp:918-924`).
+ * `DELETEMONSTERPARAMETERS::DELETEMONSTERPARAMETERS` (`doc/CSBwin-src/Code11f52.cpp:953-959`).
  * The monster and its square are left unset, as CSBWin leaves them, until
  * `ProcessMonsterDeleteFilter` fills them in.
  */
@@ -86,20 +86,20 @@ export function deleteMonsterParameters(why: DeleteMonsterWhy, index: number): D
   return { monsterID: 0, level: 0, x: 0, y: 0, why, dropResidue: 0, deathCloud: 0, index };
 }
 
-/** `sizeof(DELETEMONSTERPARAMETERS) / 4` (`doc/CSBwin-src/Code11f52.cpp:1012`): its 8 longwords. */
+/** `sizeof(DELETEMONSTERPARAMETERS) / 4` (`doc/CSBwin-src/Code11f52.cpp:1047`): its 8 longwords. */
 export const DELETE_MONSTER_PARAMETER_WORDS = 8;
 
 /**
- * `memcpy(pDSAparameters + 1, pdmp, sizeof (*pdmp))` (`doc/CSBwin-src/Code11f52.cpp:1011`):
+ * `memcpy(pDSAparameters + 1, pdmp, sizeof (*pdmp))` (`doc/CSBwin-src/Code11f52.cpp:1046`):
  * the block as the delete monster filter's DSA sees it, a longword per field in the
- * class's order (`CSB.h:2940-2947`).
+ * class's order (`CSB.h:2999-3006`).
  */
 export function deleteMonsterParametersToWords(p: DeleteMonsterParameters): number[] {
   return [p.monsterID, p.level, p.x, p.y, p.why, p.dropResidue, p.deathCloud, p.index].map((word) => word | 0);
 }
 
 /**
- * `memcpy(pdmp, pDSAparameters + 1, sizeof (*pdmp))` (`doc/CSBwin-src/Code11f52.cpp:1014`):
+ * `memcpy(pdmp, pDSAparameters + 1, sizeof (*pdmp))` (`doc/CSBwin-src/Code11f52.cpp:1049`):
  * the block back from the DSA into `p`, `word(i)` its longword `i`.
  */
 export function deleteMonsterParametersFromWords(p: DeleteMonsterParameters, word: (index: number) => number): void {
@@ -114,19 +114,19 @@ export function deleteMonsterParametersFromWords(p: DeleteMonsterParameters, wor
   p.index = w(7);
 }
 
-/** `EDT_Statistics`, `ESTAT_NumMonsterKilled` (`doc/CSBwin-src/CSB.h:1562-1563`). */
+/** `EDT_Statistics`, `ESTAT_NumMonsterKilled` (`doc/CSBwin-src/CSB.h:1565-1566`). */
 const EDT_STATISTICS = 6;
 const ESTAT_NUM_MONSTER_KILLED = 0;
 
 /** HP of `0xffff` marks a member that cannot be damaged at all. */
 const HP_INVULNERABLE = 0xffff;
 
-/** `soundMONDEATH` (`doc/CSBwin-src/CSB.h:624`); ordinal 0 is the dropped-weapon clatter. */
+/** `soundMONDEATH` (`doc/CSBwin-src/CSB.h:627`); ordinal 0 is the dropped-weapon clatter. */
 const SOUND_ORDINAL_MONSTER_DEATH = 4;
 const SOUND_ORDINAL_DROPPED_ITEM = 0;
 
 /**
- * `MonsterDroppings` index per monster type (`doc/CSBwin-src/Code11f52.cpp:700-729`).
+ * `MonsterDroppings` index per monster type (`doc/CSBwin-src/Code11f52.cpp:735-764`).
  *
  * A monster type absent from this table drops nothing — `CreateAndDropObject`
  * returns immediately on its `default:` branch. Each entry is a start offset into
@@ -144,12 +144,12 @@ const MONSTER_DROPPINGS_INDEX: Partial<Record<MonsterType, number>> = {
   [MonsterType.mon_Dragon]: 0,
 };
 
-/** Only the Deth Knight's droppings are cursed (`doc/CSBwin-src/Code11f52.cpp:712`). */
+/** Only the Deth Knight's droppings are cursed (`doc/CSBwin-src/Code11f52.cpp:747`). */
 const CURSED_DROPPINGS: ReadonlySet<number> = new Set([MonsterType.mon_DethKnight]);
 
 /**
  * `CreateAndDropObject`'s type/index split of a `MonsterDroppings` word
- * (`doc/CSBwin-src/Code11f52.cpp:735-753`). A value below 23 is skipped entirely.
+ * (`doc/CSBwin-src/Code11f52.cpp:770-788`). A value below 23 is skipped entirely.
  */
 const DROPPING_MISC_BASE = 127;
 const DROPPING_CLOTHING_BASE = 69;
@@ -169,7 +169,7 @@ export class MonsterDamage {
   /* ------------------------------------------------- packed byte accessors ---- */
 
   /**
-   * `MonsterPositionByte` (`doc/CSBwin-src/Code11f52.cpp:176`).
+   * `MonsterPositionByte` (`doc/CSBwin-src/Code11f52.cpp:211`).
    *
    * The four packed 2-bit positions live in the `ITEM16` while the group is on the
    * party's level, and in `DB4.groupIndex` otherwise. `noItem16` forces the DB4
@@ -185,7 +185,7 @@ export class MonsterDamage {
     return monster.groupIndex & 0xff;
   }
 
-  /** `SetMonsterPositionByte` (`doc/CSBwin-src/Code11f52.cpp:203`). */
+  /** `SetMonsterPositionByte` (`doc/CSBwin-src/Code11f52.cpp:238`). */
   setMonsterPositionByte(monster: CreatureRecord, value: number, level: number, noItem16: boolean): void {
     if (level === this.ctx.party.state.position.z && !noItem16) {
       const item16 = this.dungeon.getAttachedItem16(monster);
@@ -196,7 +196,7 @@ export class MonsterDamage {
   }
 
   /**
-   * `MonsterFacingByte` (`doc/CSBwin-src/Code11f52.cpp:221`).
+   * `MonsterFacingByte` (`doc/CSBwin-src/Code11f52.cpp:256`).
    *
    * With no `ITEM16` the whole group faces one way, so the byte comes from the
    * 4-entry replication table rather than being packed per member.
@@ -210,7 +210,7 @@ export class MonsterDamage {
     return (this.ctx.tables.byte10340[monster.facing & 0x3] ?? 0) & 0xff;
   }
 
-  /** `SetMonsterFacingByte` (`doc/CSBwin-src/Code11f52.cpp:237`). */
+  /** `SetMonsterFacingByte` (`doc/CSBwin-src/Code11f52.cpp:272`). */
   setMonsterFacingByte(monster: CreatureRecord, value: number, level: number, noItem16: boolean): void {
     if (level === this.ctx.party.state.position.z && !noItem16) {
       const item16 = this.dungeon.getAttachedItem16(monster);
@@ -223,7 +223,7 @@ export class MonsterDamage {
   /* ------------------------------------------------------------- droppings ---- */
 
   /**
-   * `CreateAndDropObject` (`doc/CSBwin-src/Code11f52.cpp:684`) — the worm rounds,
+   * `CreateAndDropObject` (`doc/CSBwin-src/Code11f52.cpp:719`) — the worm rounds,
    * bones and armour a dying monster leaves behind.
    *
    * Walks that type's `MonsterDroppings` list until a zero word. A word with bit 15
@@ -294,7 +294,7 @@ export class MonsterDamage {
 
   /**
    * Allocate a weapon, clothing or misc record for a dropping — `FindEmptyDB5Entry`,
-   * `FindEmptyDB6Entry`, `FindEmptyDB10Entry` (`doc/CSBwin-src/CSBCode.cpp:4990-5054`).
+   * `FindEmptyDB6Entry`, `FindEmptyDB10Entry` (`doc/CSBwin-src/CSBCode.cpp:5055-5119`).
    */
   private createDroppedRecord(category: DBType, type: number, cursed: boolean): ObjectID | null {
     switch (category) {
@@ -337,7 +337,7 @@ export class MonsterDamage {
   }
 
   /**
-   * `DropMonsterRemains` (`doc/CSBwin-src/Code11f52.cpp:830`) — droppings for every
+   * `DropMonsterRemains` (`doc/CSBwin-src/Code11f52.cpp:865`) — droppings for every
    * member of the group, then everything the group was carrying.
    *
    * `monsterAttachedToLevel` exists because of a bug CSBWin fixed: when a monster is
@@ -407,14 +407,14 @@ export class MonsterDamage {
   }
 
   /**
-   * `ProcessMonsterDeleteFilter` (`doc/CSBwin-src/Code11f52.cpp:926-1020`), which every
+   * `ProcessMonsterDeleteFilter` (`doc/CSBwin-src/Code11f52.cpp:961-1055`), which every
    * site that deletes a group, or kills a member of one, runs first. `level` is CSBWin's
    * `attachedLevel` once its -1 is `d.LoadedLevel`. Nothing happens without a group on the
    * square. Otherwise the kill is counted in `expool`, in the record keyed by the reason
-   * and the monster's type, a longword per `alternateGraphics` (`:943-962`): a new record
+   * and the monster's type, a longword per `alternateGraphics` (`:978-997`): a new record
    * of four when there is none of four or more, else the count is raised where the record
    * stands, through `Locate`'s pointer. Then the filter's DSAs run on `dmp`, which comes
-   * back as they left it (`:961-1015`).
+   * back as they left it (`:996-1050`).
    *
    * `alternateGraphics` is three bits, and CSBWin indexes the four longwords with it
    * unchecked: a subtype of 4 to 7 writes past them. The port counts such a kill nowhere
@@ -443,12 +443,12 @@ export class MonsterDamage {
   }
 
   /**
-   * `DeleteMonster` (`doc/CSBwin-src/Code11f52.cpp:1026`) — remove the whole group
+   * `DeleteMonster` (`doc/CSBwin-src/Code11f52.cpp:1061`) — remove the whole group
    * from the dungeon and give its `ITEM16` slot back.
    *
    * The HP array is cleared *before* the group is lifted with `MoveObject(obj, x, y,
-   * -1, 0)` (`:1037-1038`) — so `CheckMoveFromMissile` finds no hit points and returns
-   * at once (`:2593-2596`) — and the lift releases the square's pads. Without the hook
+   * -1, 0)` (`:1072-1073`) — so `CheckMoveFromMissile` finds no hit points and returns
+   * at once (`:2628-2631`) — and the lift releases the square's pads. Without the hook
    * (a standalone `MonsterDamage`) the group is only unlinked. `mmr` is the turn's record,
    * which the lift tells the group is gone.
    */
@@ -478,7 +478,7 @@ export class MonsterDamage {
   /* ---------------------------------------------------------------- damage ---- */
 
   /**
-   * `DamageMonster` (`doc/CSBwin-src/Code11f52.cpp:1054`).
+   * `DamageMonster` (`doc/CSBwin-src/Code11f52.cpp:1089`).
    *
    * `apply` is CSBWin's `P6`: when zero the group is *not* actually removed and
    * droppings are queued for later instead — that is how a monster killed while
@@ -488,7 +488,7 @@ export class MonsterDamage {
    * packed position and facing bytes live.
    */
   /**
-   * `DamageMonsterGroup` (`doc/CSBwin-src/Code11f52.cpp:1317`) — one blow that lands on
+   * `DamageMonsterGroup` (`doc/CSBwin-src/Code11f52.cpp:1352`) — one blow that lands on
    * every member of a group, as a cloud or an explosion does.
    *
    * The damage is not shared out evenly: an eighth-plus-one is taken off the top and
@@ -506,7 +506,7 @@ export class MonsterDamage {
     noItem16: boolean,
     mmr?: MmRecord,
   ): MonsterDamageResult {
-    // `d.Word13046 = 0` (`doc/CSBwin-src/Code11f52.cpp:1333`): whatever an earlier call
+    // `d.Word13046 = 0` (`doc/CSBwin-src/Code11f52.cpp:1368`): whatever an earlier call
     // left for `TAG00b522` is forgotten.
     this.pendingDroppings.length = 0;
     if (damage <= 0) return MonsterDamageResult.NO_MONSTER_DIED;
@@ -530,7 +530,7 @@ export class MonsterDamage {
   }
 
   /**
-   * `DeterminePoisonDamage` (`doc/CSBwin-src/Code11f52.cpp:1358`).
+   * `DeterminePoisonDamage` (`doc/CSBwin-src/Code11f52.cpp:1393`).
    *
    * Poison resistance 15 means total immunity; otherwise the damage is *multiplied* by
    * eight and divided by resistance-plus-one, so a poison cloud is devastating against
@@ -576,7 +576,7 @@ export class MonsterDamage {
     const numMonM1 = monster.numMonM1 & 0x3;
 
     // `ProcessMonsterDeleteFilter`'s DSAs may suppress the death cloud (`deathCloud == 2`)
-    // and the remains (`Code11f52.cpp:1110-1128`).
+    // and the remains (`Code11f52.cpp:1145-1163`).
     let showDeathCloud = true;
     let result: MonsterDamageResult;
 
@@ -634,9 +634,9 @@ export class MonsterDamage {
    * Five parallel things are renumbered together — the HP array, the packed position
    * byte, the packed facing byte, the per-member `singleMonsterStatus` bytes, and the
    * queued AI timers — and `numMonM1` then drops by one
-   * (`doc/CSBwin-src/Code11f52.cpp:1121-1240`). `positions` is the packed position byte
+   * (`doc/CSBwin-src/Code11f52.cpp:1156-1275`). `positions` is the packed position byte
    * as read before the delete monster filter ran; the facing byte is read after it, as
-   * CSBWin reads them. `dropResidue` is the filter's: 2 drops nothing (`:1131`).
+   * CSBWin reads them. `dropResidue` is the filter's: 2 drops nothing (`:1166`).
    */
   private killOneOfGroup(
     monster: CreatureRecord,
@@ -673,8 +673,8 @@ export class MonsterDamage {
 
   /**
    * What a member's leaving does to its group, written twice in CSBWin: by
-   * `DamageMonster` for a death (`doc/CSBwin-src/Code11f52.cpp:1141-1239`) and by
-   * `DeleteMonsterInGroup` (`Monster.cpp:4641-4738`). `facings` and `positions` are the
+   * `DamageMonster` for a death (`doc/CSBwin-src/Code11f52.cpp:1176-1274`) and by
+   * `DeleteMonsterInGroup` (`Monster.cpp:4654-4751`). `facings` and `positions` are the
    * packed bytes as read before it.
    */
   private removeFromGroup(
@@ -729,7 +729,7 @@ export class MonsterDamage {
    * The dead member's own timer is deleted; every timer belonging to a *higher*
    * member index slides down by one, in both the A and B families, and its queue
    * priority is re-evaluated because the function code is part of the sort key
-   * (`doc/CSBwin-src/Code11f52.cpp:1152-1196`). One `TIMER_SEARCH` walk does both, in
+   * (`doc/CSBwin-src/Code11f52.cpp:1187-1231`). One `TIMER_SEARCH` walk does both, in
    * the order it meets the timers, as CSBWin's does.
    */
   private renumberIndividualTimers(indexInGroup: number, level: number, mapX: number, mapY: number): void {
@@ -755,7 +755,7 @@ export class MonsterDamage {
   }
 
   /**
-   * `DeleteMonsterInGroup` (`doc/CSBwin-src/Monster.cpp:4600-4739`), the DSA's `&DELMON`:
+   * `DeleteMonsterInGroup` (`doc/CSBwin-src/Monster.cpp:4613-4752`), the DSA's `&DELMON`:
    * member `indexInGroup` of the group at `locr` leaves it as a death would, but with no
    * remains, no cloud and no delete filter. A group of one, or an index past its last
    * member, is left as it is.
@@ -776,13 +776,13 @@ export class MonsterDamage {
   }
 
   /**
-   * `InsertMonsterInGroup` (`doc/CSBwin-src/Monster.cpp:4742-4820`), the DSA's `&INSMON`:
+   * `InsertMonsterInGroup` (`doc/CSBwin-src/Monster.cpp:4755-4833`), the DSA's `&INSMON`:
    * a copy of member 0 joins the group at `locr`, in the first corner of `positionMask`
    * that no member holds, if the group has room. It takes member 0's hit points, a copy of
    * its `TT_MONSTER_A0` or `TT_MONSTER_B0` timer, the first the walk meets, renumbered to
    * the new member, and the record's own `facing()`, which `SetMonsterFacingByte` then
    * writes as the whole facing byte: on the party's level every other member faces north.
-   * The `ITEM16` status is not copied: `pItem16` is never set (`:4815-4818`), so the new
+   * The `ITEM16` status is not copied: `pItem16` is never set (`:4828-4831`), so the new
    * member keeps the status its slot held.
    */
   insertMonsterInGroup(locr: LocationRel, positionMask: number): void {
@@ -834,7 +834,7 @@ export class MonsterDamage {
 
   /**
    * `d.Byte13050` / `d.Word13046` — droppings owed by a monster that died while being
-   * moved, flushed by `TAG00b522` (`doc/CSBwin-src/Code11f52.cpp:802-822`) once the
+   * moved, flushed by `TAG00b522` (`doc/CSBwin-src/Code11f52.cpp:837-857`) once the
    * move completes.
    */
   private pendingDroppings: number[] = [];

@@ -1,9 +1,9 @@
 /**
  * `ReadDatabases`' checksum word: the byte sum of every section from the header to the end
  * of the cell flags, compared with the big-endian word after them, and the read failed
- * when they differ (`doc/CSBwin-src/SaveGame.cpp:2654-2658`, `FetchDataBytes` at
- * `CSBCode.cpp:9081-9106`). A file with fewer than two bytes after the cell flags skips the
- * comparison, since `StreamInput` cannot read the word (`CSBCode.cpp:9027-9043`).
+ * when they differ (`doc/CSBwin-src/SaveGame.cpp:2866-2870`, `FetchDataBytes` at
+ * `CSBCode.cpp:9186-9211`). A file with fewer than two bytes after the cell flags skips the
+ * comparison, since `StreamInput` cannot read the word (`CSBCode.cpp:9132-9148`).
  *
  * One byte flipped in the last cell flag changes nothing the parsers or the closure check
  * of a save look at, so only the comparison can catch it: in the prison's expanded image,

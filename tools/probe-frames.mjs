@@ -254,7 +254,7 @@ check(!(await wheelTaken()), 'the entrance leaves the wheel to the page');
 await canvasClick(270, 84, 0);  await wait(1500);
 check(await wheelTaken(), 'the entrance\'s chooser takes the wheel, for its list');
 // The cursor stays up as the chooser redraws, from `STShowCursor` to `STHideCursor`
-// (`doc/CSBwin-src/SaveGame.cpp:1562-1564`): after a notch of the wheel and two keys, the
+// (`doc/CSBwin-src/SaveGame.cpp:1687-1689`): after a notch of the wheel and two keys, the
 // arrow is still where the click that opened it left it, and the pointer leaving the
 // canvas takes it off. The pointer stays off for the comparisons below.
 const leaveCanvas = () => evaluate(`document.getElementById('game-canvas').dispatchEvent(new MouseEvent('mouseleave')),1`);
@@ -324,7 +324,7 @@ await evaluate(`(()=>{
 await wait(3000);
 console.log('state: crack switch');      await shot('09-crack-switch');
 
-// Door ornaments (`TAG004b26`, `doc/CSBwin-src/CSBCode.cpp:3993`), drawn onto the door's
+// Door ornaments (`TAG004b26`, `doc/CSBwin-src/CSBCode.cpp:4058`), drawn onto the door's
 // bitmap before the blit. The entrance door, level 0 (1,2), seen from the start square:
 // ornament 7 at full size, the black double door, over the grid that is its door type.
 // Then level 4 door 60 at (4,25), two squares east of (2,25): a wooden door whose lock
@@ -342,7 +342,7 @@ console.log('state: entrance door');     await shot('10-entrance-door');
 await evaluate(FACE(2, 25, 4, 1)); await wait(500);
 console.log('state: door lock, F2');     await shot('11-door-lock-f2');
 // A wall decoration on an F2 edge wall, positions 7 and 9 of `DrawWallDecoration`
-// (`doc/CSBwin-src/CSBCode.cpp:3538-3562`). One mirror frame in the Hall of Champions,
+// (`doc/CSBwin-src/CSBCode.cpp:3599-3623`). One mirror frame in the Hall of Champions,
 // the south face of level 0 (16,7), seen from two squares south and one to either side,
 // facing north: from (17,9) it is front-left, from (15,9) front-right. It is scaled to the
 // F2 centre width and cut by the screen border, so on the left it must show the bitmap's
@@ -365,7 +365,7 @@ await setInputs({ 'overlay-jitter-x': 0 });
 await click('#btn-overlay-hide'); await click('#btn-overlay-jitter'); await wait(500);
 check((await canvasPixels()) === edgeRight, 'the overlay hidden and the view shifted back, it is frame 14 again');
 // A wall text seen from afar is its plaque, cut short for a text of one to three lines
-// (`doc/CSBwin-src-20230608/CSBCode.cpp:3625-3660`). "HALL OF / CHAMPIONS", on the north
+// (`doc/CSBwin-src/CSBCode.cpp:3625-3660`). "HALL OF / CHAMPIONS", on the north
 // face of level 0 (8,5), seen from (8,3) facing south: two lines at F2 centre, so the
 // plaque stops at `d.Byte4212[10]`, row 53 of its 37-73. `tools/dump-wall-text.ts` pins
 // the cut at every position; this frame pins it in a real view.

@@ -68,12 +68,12 @@ This document captures the casting pipeline and spell effects from the CSBWin C+
 
 ## Timer expiry effects
 
-- `TT_71` decrements `d.Invisible` (`doc/CSBwin-src/CSBCode.cpp:6519`).
-- `TT_73` decrements `d.SeeThruWalls` (`doc/CSBwin-src/CSBCode.cpp:6549`).
-- `TT_74` subtracts `timerWord6` from `d.PartyShield` and marks portraits dirty (`doc/CSBwin-src/CSBCode.cpp:6550-6564`).
-- `TT_77` subtracts `timerWord6` from `d.SpellShield` and marks portraits dirty (`doc/CSBwin-src/CSBCode.cpp:6565-6568`).
-- `TT_78` subtracts `timerWord6` from `d.FireShield` and marks portraits dirty (`doc/CSBwin-src/CSBCode.cpp:6569-6571`).
-- `TT_79` decrements `d.MagicFootprintsActive` (`doc/CSBwin-src/CSBCode.cpp:6572`).
+- `TT_71` decrements `d.Invisible` (`doc/CSBwin-src/CSBCode.cpp:6578`).
+- `TT_73` decrements `d.SeeThruWalls` (`doc/CSBwin-src/CSBCode.cpp:6608`).
+- `TT_74` subtracts `timerWord6` from `d.PartyShield` and marks portraits dirty (`doc/CSBwin-src/CSBCode.cpp:6609-6623`).
+- `TT_77` subtracts `timerWord6` from `d.SpellShield` and marks portraits dirty (`doc/CSBwin-src/CSBCode.cpp:6624-6627`).
+- `TT_78` subtracts `timerWord6` from `d.FireShield` and marks portraits dirty (`doc/CSBwin-src/CSBCode.cpp:6628-6630`).
+- `TT_79` decrements `d.MagicFootprintsActive` (`doc/CSBwin-src/CSBCode.cpp:6631`).
 
 None of the six has a floor, and each counter is signed: `doc/PROVEN_FACTS.md` → "The
 spell counters have no floor".

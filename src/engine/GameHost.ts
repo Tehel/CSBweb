@@ -17,7 +17,7 @@ export interface JoinedChampion {
 
 /**
  * Fragment-based message emitter, mirroring CSBWin's global `PrintLinefeed()` /
- * `QuePrintLines(color, text)` pair (`doc/CSBwin-src/CSBCode.cpp:1654`, `:1744`).
+ * `QuePrintLines(color, text)` pair (`doc/CSBwin-src/CSBCode.cpp:1664`, `:1761`).
  *
  * Messages are composed from FRAGMENTS that flow onto one logical line and get word-wrapped
  * by the message area — never from pre-split strings containing newlines.
@@ -48,13 +48,13 @@ export interface GameHost {
   /**
    * Play a sample, CSBWin's `StartSound`; `QueueSound` and the few direct `StartSound`s
    * end here. `highVolume` is `QueueSound`'s `LOCAL_12`: 1 loud, 0 quiet
-   * (`doc/CSBwin-src/Sound.cpp:663`); left out, the sample plays loud.
+   * (`doc/CSBwin-src/Sound.cpp:668`); left out, the sample plays loud.
    */
   playSound(soundId: number, rateIdx?: number, highVolume?: number): void;
   /**
    * Play a sound of `CSBgraphics.dat`, its samples as `ReadSound` left them: the rest of
    * `PlayCustomSound`, `SOUNDDATA::Decode(volume)` and `sounder.Sound`
-   * (`doc/CSBwin-src/Sound.cpp:1055-1058`). `volume` is `Decode`'s divisor, never 0.
+   * (`doc/CSBwin-src/Sound.cpp:1064-1067`). `volume` is `Decode`'s divisor, never 0.
    */
   playCustomSound(sound: Uint8Array, volume: number): void;
   /** Dev-only trace, CSBWin's `AITraceActive` / `AttackTraceActive` output. */
@@ -68,14 +68,14 @@ export interface GameHost {
   sleepChanged(sleeping: boolean): void;
   /**
    * Reincarnate raises the name-entry screen, which the engine does not own
-   * (`doc/CSBwin-src/CSBCode.cpp:6738`). The screen answers through
+   * (`doc/CSBwin-src/CSBCode.cpp:6797`). The screen answers through
    * `HallOfChampions.reincarnateNamed`; with no screen, Reincarnate stops where CSBWin would be
    * waiting for a name.
    */
   openReincarnateScreen(chIdx: number): void;
   /**
    * A champion has joined for good: RESURRECT or REINCARNATE has run to the end of
-   * `_ResurrectReincarnateCancel` (`doc/CSBwin-src/CSBCode.cpp:6808`), the champion's name
+   * `_ResurrectReincarnateCancel` (`doc/CSBwin-src/CSBCode.cpp:6867`), the champion's name
    * printed and the inventory closed. Not CSBWin's: the page asks there whether the
    * prison's party, once it is four, begins the adventure (`GameSaves.championJoined`),
    * and reports the party (`src/ui/gameEvents.ts`).
@@ -84,7 +84,7 @@ export interface GameHost {
   /**
    * A champion's weapon hand changed (`AddCharacterPossession` /
    * `RemoveCharacterPossession`): `if (d.AttackingCharacterOrdinal == chIdx+1)
-   * TAG01b1c0();` (`doc/CSBwin-src/Character.cpp:1888-1891`, `:1977-1980`). The attack
+   * TAG01b1c0();` (`doc/CSBwin-src/Character.cpp:1893-1896`, `:1982-1985`). The attack
    * menu is the UI's.
    */
   closeAttackMenuOf(chIdx: number): void;
@@ -96,51 +96,51 @@ export interface GameHost {
   /**
    * `d.PressingEye`, `d.PressingMouth` and `d.DisplayResurrectChestOrScroll`, which the
    * ten-second update and `PoisonCharacter` read before they set `CHARFLAG_chestOrScroll`
-   * (`doc/CSBwin-src/Code17818.cpp:435-443`, `doc/CSBwin-src/CSBCode.cpp:7220-7225`):
+   * (`doc/CSBwin-src/Code17818.cpp:435-443`, `doc/CSBwin-src/CSBCode.cpp:7279-7284`):
    * the eye or the mouth held, and what `TAG0189d4` last put in its panel, are the UI's.
    */
   pressingEye(): boolean;
   pressingMouth(): boolean;
   displayResurrectChestOrScroll(): number;
   /**
-   * `ShowHideInventory(chIdx)` (`doc/CSBwin-src/CSBCode.cpp:7419`), 4 to hide: the
-   * inventory is the UI's. `_FusionSequence` hides an open one (`Attack.cpp:2269-2272`).
+   * `ShowHideInventory(chIdx)` (`doc/CSBwin-src/CSBCode.cpp:7478`), 4 to hide: the
+   * inventory is the UI's. `_FusionSequence` hides an open one (`Attack.cpp:2271-2274`).
    */
   showHideInventory(chIdx: number): void;
   /**
    * `KillCharacter`'s release of a held eye or mouth, on the champion whose inventory is
-   * open, before its `ShowHideInventory(4)` (`doc/CSBwin-src/Character.cpp:2598-2620`):
+   * open, before its `ShowHideInventory(4)` (`doc/CSBwin-src/Character.cpp:2603-2625`):
    * the eye and the mouth are the UI's.
    */
   releaseEyeOrMouth(): void;
   /**
-   * `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`): a chest left the weapon hand of
-   * the champion whose inventory is open (`:1906-1914`). The open chest is the UI's.
+   * `RepackChest` (`doc/CSBwin-src/Character.cpp:3113`): a chest left the weapon hand of
+   * the champion whose inventory is open (`:1911-1919`). The open chest is the UI's.
    */
   repackChest(): void;
   /**
-   * `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108`): the open chest repacked, the
+   * `TAG02076e` (`doc/CSBwin-src/Character.cpp:5133`): the open chest repacked, the
    * interface shaded and the arrow cursor, all the UI's. `AddCharacter` calls it once the
-   * candidate's inventory is shown (`:796-797`).
+   * candidate's inventory is shown (`:797-798`).
    */
   tag02076e(): void;
   /**
-   * `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934`), `TAG02076e`'s undoing: `WakeUp` calls it
-   * last (`:7061`), and `_ResurrectReincarnateCancel` once the inventory is hidden (`:6657`,
-   * `:6808`).
+   * `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:10058`), `TAG02076e`'s undoing: `WakeUp` calls it
+   * last (`:7120`), and `_ResurrectReincarnateCancel` once the inventory is hidden (`:6716`,
+   * `:6867`).
    */
   tag0207cc(): void;
   /**
    * `ShowCredits(1)`, the end of the game, which the engine does not draw: from
    * `_StartCSB` once `MainLoop` has returned on a lost game
-   * (`doc/CSBwin-src/CSBCode.cpp:11322-11326`), or from `MainLoop` 300 VBLs after
-   * `ProcessTimers` has won it (`:627-633`), with `d.Word11694` set. The loop has stopped
+   * (`doc/CSBwin-src/CSBCode.cpp:11557-11561`), or from `MainLoop` 300 VBLs after
+   * `ProcessTimers` has won it (`:637-643`), with `d.Word11694` set. The loop has stopped
    * by then (`Game.mainLoopHasReturned`).
    */
   showCredits(word11694: boolean): void;
   /**
    * `DrawViewport(d.partyFacing, d.partyX, d.partyY); display();` from a script's tick,
-   * `_ProcessTimersViewportAndSound` (`doc/CSBwin-src/Attack.cpp:2205-2206`), which runs
+   * `_ProcessTimersViewportAndSound` (`doc/CSBwin-src/Attack.cpp:2207-2208`), which runs
    * none of the main loop's tick listeners. The main loop's tick draws its viewport
    * through those listeners (`Game.onTick`).
    */
@@ -152,12 +152,12 @@ export interface GameHost {
    */
   paint(): void;
   /**
-   * `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8799`), from the main loop's tick after
-   * `d.Time++` (`:685`): the champions' flinch and the attack panel, both the UI's.
+   * `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8904`), from the main loop's tick after
+   * `d.Time++` (`:695`): the champions' flinch and the attack panel, both the UI's.
    */
   tag01b29a(): void;
   /**
-   * `DisplayCharacterDamage`'s blit (`doc/CSBwin-src/CSBCode.cpp:7121-7171`): the
+   * `DisplayCharacterDamage`'s blit (`doc/CSBwin-src/CSBCode.cpp:7180-7230`): the
    * champion lost `damage` HP this tick, shown in red over their name — or over their
    * portrait, their inventory being open — until `tag011366`. The screen is the UI's.
    */
@@ -168,13 +168,13 @@ export interface GameHost {
    */
   tag011366(chIdx: number): void;
   /**
-   * `DrawCharacterState(chIdx)` (`doc/CSBwin-src/Character.cpp:1229`) with `charFlags`
+   * `DrawCharacterState(chIdx)` (`doc/CSBwin-src/Character.cpp:1234`) with `charFlags`
    * just set, for the three redraws the screen's own drawing of every box on every frame
    * cannot stand in for. Two go over the damage shown: `CHARFLAG_PORTRAIT_CHANGED` fills
-   * the whole box (`:1255-1307`), and `CHARFLAG_CURSOR` the name of a champion whose
-   * inventory is closed (`:1310-1356`). CSBWin draws at once wherever it sets either, so
+   * the whole box (`:1260-1312`), and `CHARFLAG_CURSOR` the name of a champion whose
+   * inventory is closed (`:1315-1361`). CSBWin draws at once wherever it sets either, so
    * the engine calls this there and keeps no flag. The third, `CHARFLAG_CHEST_OR_SCROLL`,
-   * fills the open inventory's eye panel again (`:1478-1497`), which runs the viewing
+   * fills the open inventory's eye panel again (`:1483-1502`), which runs the viewing
    * filter; the engine keeps it in the champion's `charFlags` until a `DrawCharacterState`
    * (`drawCharacterState`, `Party.ts`).
    */
@@ -187,7 +187,7 @@ export interface GameHost {
    */
   portraitOf(champion: Champion): number[] | undefined;
   /**
-   * `die(errorNum, msg)` (`doc/CSBwin-src/CSBCode.cpp:86-112`): a frame threw — the engine
+   * `die(errorNum, msg)` (`doc/CSBwin-src/CSBCode.cpp:96-122`): a frame threw — the engine
    * throws where CSBWin calls `die` — and the loop has stopped (`Game.gameLoop`), or a
    * check of a game file failed (`die`, `src/engine/Die.ts`), which tells the host before
    * it throws. CSBWin shows the message and quits; the page ends its game and prints the

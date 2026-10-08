@@ -811,7 +811,7 @@ M\r
 
 A new game's `dungeon.dat` may be compressed. `ReadDatabases` reads the first 8 bytes and
 takes the file as compressed when their first word is 33028; otherwise it rewinds and
-reads it plain (`doc/CSBwin-src/SaveGame.cpp:2346-2374`). A saved game is never read this
+reads it plain (`doc/CSBwin-src/SaveGame.cpp:2558-2586`). A saved game is never read this
 way. The port: `DungeonLoader.loadDungeonDat` and `ExpandData`
 (`src/core/compression.ts`), checked by `tools/dump-compressed-dungeon.ts`.
 
@@ -821,12 +821,12 @@ way. The port: `DungeonLoader.loadDungeonDat` and `ExpandData`
 |--------|------|---------|
 | +0x00 | word | 33028 (`0x8104`) |
 | +0x02 | long | The expanded size in bytes |
-| +0x06 | word | `d.Word22592`, which a plain file leaves at `_ReadEntireGame`'s 13 (`SaveGame.cpp:1470`) |
+| +0x06 | word | `d.Word22592`, which a plain file leaves at `_ReadEntireGame`'s 13 (`SaveGame.cpp:1571`) |
 
 All three big-endian. The rest of the file is the compressed body, expanded by
 `ExpandData` into a buffer that `FetchDataBytes` then reads as it would the plain file.
 
-### The body (`ExpandData`, `CSBCode.cpp:9846-9929`)
+### The body (`ExpandData`, `CSBCode.cpp:9970-10053`)
 
 The first 20 bytes are two tables: 4 bytes, then 16. The codes follow as big-endian
 words, read one bit at a time from bit 15 down, a code running on into the next word
@@ -845,7 +845,7 @@ word's worth.
 
 CSB's `dungeon.dat` is the one compressed file known: 2098 bytes, expanding to 2622, with
 `Word22592` 12. The expanded image ends with the checksum word `ReadDatabases` compares
-with the byte sum of everything it fetched (`SaveGame.cpp:2654-2658`), 0x939f, and the
+with the byte sum of everything it fetched (`SaveGame.cpp:2866-2870`), 0x939f, and the
 port's expansion matches it. DM's `dungeon.dat` is plain, and has no checksum word.
 
 ---

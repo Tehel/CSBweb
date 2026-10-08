@@ -1,21 +1,21 @@
 /**
  * `WiggleEverything` moves each object with the low-level `MoveObject`
- * (`doc/CSBwin-src/Timer.cpp:2428-2512`, `Code11f52.cpp:2796`).
+ * (`doc/CSBwin-src/Timer.cpp:2428-2512`, `Code11f52.cpp:2831`).
  *
  * When a teleporter switches on or a pit opens, every object standing there is moved
  * with `MoveObject(obj, x, y, x, y)`. `TimerSystem.wiggleObject` hand-rolled it, and
  * differed from `MoveObject` in three ways:
  *
- *  1. It kept a cloud out of pits. `Levitating` (`Code11f52.cpp:2417-2437`) is true for a
+ *  1. It kept a cloud out of pits. `Levitating` (`Code11f52.cpp:2452-2472`) is true for a
  *     missile and a flying monster only, so a cloud falls, and its `TT_25` follows it to
  *     the level below (`Timer.cpp:2491-2510`).
  *  2. It pressed pads for a missile, which is levitating and moves with
- *     `RemoveObjectFromRoom` / `AddObjectToRoom` (`Code11f52.cpp:3272-3274`,
- *     `:3427-3429`). Its timer still follows it: square, direction, ID, level
+ *     `RemoveObjectFromRoom` / `AddObjectToRoom` (`Code11f52.cpp:3307-3309`,
+ *     `:3462-3464`). Its timer still follows it: square, direction, ID, level
  *     (`Timer.cpp:2474-2489`).
  *  3. It passed "same square" as `PlaceOrRemoveObjectInRoom`'s `unchangedRoom`, where
- *     `MoveObject` passes "the party stands on this square" (`Code11f52.cpp:3278-3293`,
- *     `:3433-3448`): an item teleported to where the party stands is placed with
+ *     `MoveObject` passes "the party stands on this square" (`Code11f52.cpp:3313-3328`,
+ *     `:3468-3483`): an item teleported to where the party stands is placed with
  *     `unchangedRoom` true.
  *
  * The teleporter and the pit are real ones from `dungeon.dat`, switched off and then

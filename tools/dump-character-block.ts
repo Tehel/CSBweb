@@ -132,7 +132,7 @@ function main(): void {
 
   // 1. A champion the *engine* created carries `portraitGraphic` and no pixels, so the
   //    writer asks for them. `AddCharacter` does this blit at the moment the champion
-  //    joins (`doc/CSBwin-src/Character.cpp:486-495`); the port does it here instead.
+  //    joins (`doc/CSBwin-src/Character.cpp:487-496`); the port does it here instead.
   const indexed: Champion = { ...champion, portrait: undefined, portraitGraphic: 7 };
   const fromIndex = buildCsbwinCharacterBlock([indexed], tail, {
     portraitOf: (c) => (c.portraitGraphic === 7 ? champion.portrait : undefined),
@@ -172,8 +172,8 @@ function main(): void {
     'and a champion who has typed a rune since, from the incantation',
   );
   // `byte33` is CSBWin's index for the next rune. Each of its five writers keeps it at
-  // `strlen(incantation) & 3` (`CSBCode.cpp:8984-8988`, `Magic.cpp:814-817`, `:951-952`,
-  // `Character.cpp:2648-2649`, `:5293-5294`), so after two runes it is 2, whatever the
+  // `strlen(incantation) & 3` (`CSBCode.cpp:9089-9093`, `Magic.cpp:817-820`, `:954-955`,
+  // `Character.cpp:2653-2654`, `:5318-5319`), so after two runes it is 2, whatever the
   // save said. A stale one would have CSBWin write the third rune over the first.
   check(
     afterCast[33] === 2,
@@ -200,7 +200,7 @@ function main(): void {
     'and so does the party state beside them',
   );
 
-  // 5. The slots past the party, which only `&CHPOSS` reads (`DSA.cpp:3345-3347`). A
+  // 5. The slots past the party, which only `&CHPOSS` reads (`DSA.cpp:3346-3348`). A
   //    champion left there by a Cancel is packed as a champion is, and a slot read from a
   //    file goes back as it came, through a game: loaded, played from, saved.
   const left = buildCsbwinCharacterBlock([], tail, {}, [champion]);

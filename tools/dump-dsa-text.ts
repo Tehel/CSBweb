@@ -2,20 +2,20 @@
  * The DSA operations on texts (the text family), each run through
  * `DsaSystem.execute` as a program of a test DSA on a genuine save (`csbgame7.dat`).
  *
- * 1. **`&TEXT@` and `&TEXTSAY`** (`doc/CSBwin-src/DSA.cpp:3168-3193`, `:3239-3252`): a text
+ * 1. **`&TEXT@` and `&TEXTSAY`** (`doc/CSBwin-src/DSA.cpp:3169-3194`, `:3240-3253`): a text
  *    record decoded with `DecodeText(…, 0x8002, 999)` into one of the run's ten texts,
  *    and printed. Nothing for an index past 9, an object index out of the map, or an
  *    object that is no text; a text never set prints nothing.
- * 2. **`&CHARNAME@`** (`DSA.cpp:3204-3237`): the name of the first champion with the
+ * 2. **`&CHARNAME@`** (`DSA.cpp:3205-3238`): the name of the first champion with the
  *    fingerprint, "" for nobody (the wings are `dump-wings.ts`'s).
- * 3. **`&GLOBALTEXT!`** (`DSA.cpp:3194-3202`, `SetGlobalText`, `CSBCode.cpp:5295-5307`):
+ * 3. **`&GLOBALTEXT!`** (`DSA.cpp:3195-3203`, `SetGlobalText`, `CSBCode.cpp:5360-5372`):
  *    the text as an `EXPOOL` record, four bytes to a longword in memory order, which
  *    `DecodeText`'s `.R.` reads back.
- * 4. **`&SAY`** (`DSA.cpp:3137-3160`): the first text of a square, at any corner, printed;
+ * 4. **`&SAY`** (`DSA.cpp:3138-3161`): the first text of a square, at any corner, printed;
  *    nothing for a location off the dungeon.
- * 5. **`PrintWithSubstitution`** (`Graphics.cpp:1540-1596`), which both print through:
+ * 5. **`PrintWithSubstitution`** (`Graphics.cpp:1564-1620`), which both print through:
  *    a linefeed first, one queue entry, `@p`, `@N` and "HUH???", the colour as a word.
- * 6. **`&DISCARDTEXT`** (`DSA.cpp:3161-3167`) empties the strip.
+ * 6. **`&DISCARDTEXT`** (`DSA.cpp:3162-3168`) empties the strip.
  *
  * Run: `npx tsx tools/dump-dsa-text.ts`
  */

@@ -14,7 +14,7 @@ ReadAndExpandGraphic(firstWallGraphic + 7 + i, d.pWallBitmaps[i], 0, 0);
 
 ### Wall Bitmap Mapping
 
-| pWallBitmaps index | Loaded via ReadAndExpandGraphic() | Allocated bytes (CSBCode.cpp:10104+) |
+| pWallBitmaps index | Loaded via ReadAndExpandGraphic() | Allocated bytes (CSBCode.cpp:10228+) |
 |--------------------|-----------------------------------|--------------------------------------|
 | pWallBitmaps[0]    | graphics.dat index 84             | 2176                                 |
 | pWallBitmaps[1]    | graphics.dat index 85             | 2176                                 |
@@ -76,9 +76,9 @@ struct wordRectPos {
 
 CSBWin loads the viewport coordinate/rectangle tables from `graphics.dat` at startup as part of “graphic `0x22e`”:
 
-- `CSBCode.cpp:10125`: `ReadAndExpandGraphic(0x8000|0x22e, (ui8 *)d.Byte7248+2, 0,0);`
-- `Data.h:1109+`: marks the loaded region as “Start of graphic 0x22e”
-- `Data.h:1238`: `RectPos wallRectangles[14];` (and many related rectangles) are within that region
+- `CSBCode.cpp:10249`: `ReadAndExpandGraphic(0x8000|0x22e, (ui8 *)d.Byte7248+2, 0,0);`
+- `Data.h:1124+`: marks the loaded region as “Start of graphic 0x22e”
+- `Data.h:1253`: `RectPos wallRectangles[14];` (and many related rectangles) are within that region
 
 So the coordinates and source parameters (`RectPos.b.uByte4..uByte7`) exist in the shipped data tables; they are not hard-coded in C++.
 

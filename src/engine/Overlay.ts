@@ -1,12 +1,12 @@
 /**
  * The viewport overlay: CSBWin's `currentOverlay` (`OVERLAYDATA`, `doc/CSBwin-src/CSB.h:220-237`,
- * `data.cpp:65`), `overlayActive` (`data.cpp:68`) and the four jitters (`data.cpp:69-72`),
+ * `data.cpp:66`), `overlayActive` (`data.cpp:69`) and the four jitters (`data.cpp:70-73`),
  * process-wide globals and not `d.`'s, with what changes them: a DSA's `&OVERLAY`
  * (`SelectOverlay`), `&PALETTE` (`SetOverlayPalette`) and `&JITTER`, the clock
  * (`expire`), and a read's Extended Features block (`readExtendedFeatures`).
  *
  * `display` draws the viewport through them in `VM_ADVENTURE`
- * (`doc/CSBwin-src/WinScreen.cpp:1515-1527`, `Graphics.cpp:2978-3090`), the port's
+ * (`doc/CSBwin-src/WinScreen.cpp:1515-1527`, `Graphics.cpp:3005-3117`), the port's
  * `src/renderer/csbwin/OverlayScreen.ts`. Neither has it `m_change`, `jitterChanged` or
  * `ForceScreenDraw`: they tell `UpdateScreenArea` an area must be drawn again, and the
  * port composes the whole screen at every present.
@@ -19,7 +19,7 @@ import type { ExtendedFeaturesBlock, SavedOverlay } from '../data/CsbwinExtended
 import { EF_EXTENDED_FLAGS } from '../data/CsbwinExtendedFeatures';
 import { identityOverlayPalette } from './OverlayPalette';
 
-/** The overlay's width and height: `m_overlay` is `136*224` bytes (`Graphics.cpp:2950`). */
+/** The overlay's width and height: `m_overlay` is `136*224` bytes (`Graphics.cpp:2977`). */
 export const OVERLAY_WIDTH = 224;
 export const OVERLAY_HEIGHT = 136;
 
@@ -49,13 +49,13 @@ export class OverlayData {
   /** `m_p4`: the transparent colour. */
   p4 = 0;
 
-  /** `OVERLAYDATA::Allocate` (`doc/CSBwin-src/Graphics.cpp:2947-2955`), but `m_table`. */
+  /** `OVERLAYDATA::Allocate` (`doc/CSBwin-src/Graphics.cpp:2974-2982`), but `m_table`. */
   Allocate(): void {
     if (this.overlay === null) this.overlay = new Uint8Array(OVERLAY_WIDTH * OVERLAY_HEIGHT);
     if (this.overlayPalette === null) this.overlayPalette = new Uint32Array(256);
   }
 
-  /** `OVERLAYDATA::Cleanup` (`Graphics.cpp:2958-2976`): the memory freed, the number -1. */
+  /** `OVERLAYDATA::Cleanup` (`Graphics.cpp:2985-3003`): the memory freed, the number -1. */
   Cleanup(): void {
     this.overlay = null;
     this.overlayPalette = null;
@@ -221,7 +221,7 @@ export class Overlay {
   }
 
   /**
-   * `STKOP_Jitter` (`doc/CSBwin-src/DSA.cpp:4903-4930`): the overlay's and the graphic's
+   * `STKOP_Jitter` (`doc/CSBwin-src/DSA.cpp:4904-4931`): the overlay's and the graphic's
    * shift, as the DSA pops them.
    */
   Jitter(xGraphic: number, yGraphic: number, xOverlay: number, yOverlay: number): void {
@@ -232,20 +232,20 @@ export class Overlay {
   }
 
   /**
-   * The overlay's end, after each `d.Time++`: the main loop's (`doc/CSBwin-src/CSBCode.cpp:675`)
-   * and a script's tick's (`Attack.cpp:2209`). It stays in memory, and its `m_p3` with it.
+   * The overlay's end, after each `d.Time++`: the main loop's (`doc/CSBwin-src/CSBCode.cpp:685`)
+   * and a script's tick's (`Attack.cpp:2211`). It stays in memory, and its `m_p3` with it.
    */
   expire(time: number): void {
     if (this.current.p3 !== 0 && this.current.p3 < time) this.active = false;
   }
 
   /**
-   * `currentOverlay.Cleanup()` at the start of `_ReadEntireGame` (`doc/CSBwin-src/SaveGame.cpp:1472`),
+   * `currentOverlay.Cleanup()` at the start of `_ReadEntireGame` (`doc/CSBwin-src/SaveGame.cpp:1573`),
    * then `ReadExtendedFeatures`' overlay (`:421-430`), for a new game's `dungeon.dat` as
    * for a save. A file without the block leaves `overlayActive` as it was. With one, the
    * flag sets it, and an overlay it names is selected again, which draws it whatever the
    * flag said; its end, saved as a `d.Time`, comes back as one, for `d.Initialize()` has
-   * set `d.Time` to 0 before every read (`CSBCode.cpp:346`).
+   * set `d.Time` to 0 before every read (`CSBCode.cpp:356`).
    */
   readExtendedFeatures(efb: ExtendedFeaturesBlock | undefined): void {
     this.current.Cleanup();
@@ -256,7 +256,7 @@ export class Overlay {
     }
   }
 
-  /** What `SaveGame` writes of the overlay into the Extended Features block (`SaveGame.cpp:968-976`). */
+  /** What `SaveGame` writes of the overlay into the Extended Features block (`SaveGame.cpp:993-1001`). */
   toExtendedFeatures(): SavedOverlay {
     return {
       active: this.active,

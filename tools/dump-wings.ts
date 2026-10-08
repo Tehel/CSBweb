@@ -1,6 +1,6 @@
 /**
  * The wings (`CHARDESC::SaveToWings`, `GetFromWings`, `LocateInWings`,
- * `doc/CSBwin-src/Character.cpp:5149-5236`): a champion who has left the party, kept as
+ * `doc/CSBwin-src/Character.cpp:5174-5261`): a champion who has left the party, kept as
  * eight 25-longword `EXPOOL` records, and what reads them. The bones and the Altar of Vi
  * are `dump-vi-altar.ts`'s.
  *
@@ -13,7 +13,7 @@
  *    records; reading takes them out. A record missing fails it, the ones before it
  *    gone; a `fingerPrint` (record 2's) that is not the key's fails it too. `LocateInWings`
  *    is record 0 alone. A second `SaveToWings` replaces the first, one record a key.
- * 3. **`FingerprintExists`** (`Character.cpp:437-450`): `AddCharacter`'s fingerprint
+ * 3. **`FingerprintExists`** (`Character.cpp:438-451`): `AddCharacter`'s fingerprint
  *    steps over one in the wings.
  * 4. **A save carries them**, in the pool: the file read back holds the same 800 bytes.
  * 5. **The DSA readers** (`doc/CSBwin-src/DSA.cpp`): `&CHAR@` with bit 16 is the
@@ -38,7 +38,7 @@ import { attributeCurrent, attributeMaximum, attributeMinimum } from '../src/eng
 import { freshGame, globalStore, int, op, report, run } from './lib/dsa';
 import { check, finish } from './lib/check';
 
-/** `EDT_Character` (`doc/CSBwin-src/CSB.h:1568`). */
+/** `EDT_Character` (`doc/CSBwin-src/CSB.h:1571`). */
 const EDT_CHARACTER = 8;
 const key = (i: number, fp: number): number => ((EDT_CHARACTER << 24) | (i << 16) | fp) >>> 0;
 /** A fingerprint nobody in `csbgame7.dat`'s party has. */

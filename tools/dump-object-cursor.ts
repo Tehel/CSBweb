@@ -1,6 +1,6 @@
 /**
- * The cursor of an object in hand: `CreateObjectCursor` (`doc/CSBwin-src/CSBCode.cpp:1976`)
- * builds it twice, and `CreateCursorBitmap` (`:2208`) picks between the two and the arrow.
+ * The cursor of an object in hand: `CreateObjectCursor` (`doc/CSBwin-src/CSBCode.cpp:2005`)
+ * builds it twice, and `CreateCursorBitmap` (`:2241`) picks between the two and the arrow.
  *
  * `d.Pointer23186` is the icon over a black shadow two pixels down and right.
  * `d.Pointer23190` is the same shadow under the icon's silhouette in colour 4, which every
@@ -88,7 +88,7 @@ async function main(): Promise<void> {
   console.log(`copper coin RN 0x${coin.toString(16)}, icon ${COPPER_COIN}: ${colour9} of 256 pixels colour 9`);
   check(colour9 > 32, 'the copper coin icon should be mostly colour 9');
 
-  // The two cursors, from the icon: `CSBCode.cpp:1986-2025`.
+  // The two cursors, from the icon: `CSBCode.cpp:2015-2054`.
   const iconAt = (x: number, y: number): number => (x < 16 && y < 16 ? icon.pixels[y * 16 + x] : 12);
   const shadowAt = (x: number, y: number): boolean => x >= 2 && y >= 2 && iconAt(x - 2, y - 2) !== 12;
   const want23186 = (x: number, y: number): number => (iconAt(x, y) !== 12 ? iconAt(x, y) : shadowAt(x, y) ? 0 : 12);
@@ -131,7 +131,7 @@ async function main(): Promise<void> {
   check(offBy(100, 100, want23190) === 0, 'over the viewport the cursor should be d.Pointer23190, the colour-4 silhouette');
   check(colourCount(9) === 0, 'over the viewport no pixel of the coin should be drawn in colour 9');
 
-  // ---- Straddling row 29: the rows above it are the icon (`:2319-2388`).
+  // ---- Straddling row 29: the rows above it are the icon (`:2352-2421`).
   row('split', 100, 30, true);
   check(offBy(100, 30, (x, y, sy) => (sy >= 29 ? want23190(x, y) : want23186(x, y))) === 0,
     'straddling row 29 the cursor should be d.Pointer23186 above it and d.Pointer23190 from it');
@@ -140,7 +140,7 @@ async function main(): Promise<void> {
   row('inventory', 100, 100, false);
   check(offBy(100, 100, want23186) === 0, 'with the inventory open the cursor should be d.Pointer23186, the icon');
 
-  // ---- Over the portraits: the icon (`tag0029ba`, then `:2305` with D6 <= 0).
+  // ---- Over the portraits: the icon (`tag0029ba`, then `:2338` with D6 <= 0).
   row('portraits', 100, 15, true);
   check(offBy(100, 15, want23186) === 0, 'over the portraits the cursor should be the icon');
 

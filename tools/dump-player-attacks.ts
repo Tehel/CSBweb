@@ -394,7 +394,7 @@ async function main(): Promise<void> {
   // ---------------------------------------------------------------- case 8
   // `Attack.cpp`'s door arm calls `HitDoor(x, y, strength, 0, 2)`
   // (`doc/CSBwin-src/Attack.cpp:1803-1808`). With a delay, `HitDoor` queues a
-  // `TT_BASH_DOOR` at `d.Time + 2` (`Code11f52.cpp:2285-2292`) and `ProcessTT_BASH_DOOR`
+  // `TT_BASH_DOOR` at `d.Time + 2` (`Code11f52.cpp:2320-2327`) and `ProcessTT_BASH_DOOR`
   // shatters the door when it fires (`Timer.cpp:1492`). `SetTimer` meanwhile deletes
   // every `TT_1` / `TT_DOOR` timer on that cell (`Timer.cpp:1102-1123`).
   console.log('\n=== 8. Door bash: HitDoor\'s two-tick delay ===');
@@ -445,7 +445,7 @@ async function main(): Promise<void> {
       game.ctx.state.tickCount++;
     };
     // The blow is a click, between ticks: the first tick runs its timers on the d.Time of
-    // the blow (CSBCode.cpp:626, :660), so d.Time + 2 is the third.
+    // the blow (CSBCode.cpp:636, :670), so d.Time + 2 is the third.
     tick();
     check(doorState() === 4, `one tick later the door still holds (state ${doorState()})`);
     tick();
@@ -454,9 +454,9 @@ async function main(): Promise<void> {
     check(doorState() === 5, `three ticks later it is shattered (state ${doorState()})`);
   }
 
-  // `HitDoor` compares the force with `d.DoorTOC[doorType]` (`Code11f52.cpp:2277`), and
+  // `HitDoor` compares the force with `d.DoorTOC[doorType]` (`Code11f52.cpp:2312`), and
   // `DoorTOC` is the level's pick of two `DoorCharacteristics` entries
-  // (`CSBCode.cpp:5780-5783`), not `DoorCharacteristics[doorType]`. Stock DM has no
+  // (`CSBCode.cpp:5845-5848`), not `DoorCharacteristics[doorType]`. Stock DM has no
   // breakable door on the three levels whose mapping differs (6, 12, 13), so remap
   // level 1's type-1 slot to entry 3 (force 255) and hit the same door with force 100.
   console.log('\n=== 8b. HitDoor reads DoorTOC, not DoorCharacteristics ===');

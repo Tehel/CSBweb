@@ -53,7 +53,7 @@ import {
  * genuine saves (`doc/PROVEN_FACTS.md` → "The dungeon image layout in a save file").
  * Defaults are `dungeon.dat`, so existing callers are unaffected.
  */
-/** The first word of a compressed `dungeon.dat` (`doc/CSBwin-src/SaveGame.cpp:2351`). */
+/** The first word of a compressed `dungeon.dat` (`doc/CSBwin-src/SaveGame.cpp:2563`). */
 const DUNGEON_COMPRESSED_SIGNATURE = 33028;
 
 export interface DungeonImageOptions {
@@ -84,7 +84,7 @@ export interface DungeonImageOptions {
     /**
      * The length of the cell flags, the image's last section: the Extended Features
      * block's when it declares one, else the header's word 2, `LegacyCellFlagArraySize`
-     * (`doc/CSBwin-src/SaveGame.cpp:2412-2419`). Defaults to the header's.
+     * (`doc/CSBwin-src/SaveGame.cpp:2624-2631`). Defaults to the header's.
      */
     cellFlagArraySize?: number;
     /**
@@ -102,7 +102,7 @@ export interface DungeonImageOptions {
  * Where each level's cells start in the cell flag array: `LEVELDESC.cellOffset` is a
  * 16-bit word, so a dungeon whose array passes 64K stores it wrapped. CSBWin takes level
  * 0's as it stands and adds each next level's difference from the one before, `& 0xffff`
- * (`doc/CSBwin-src/SaveGame.cpp:2676-2685`), which unwraps it while the levels are in
+ * (`doc/CSBwin-src/SaveGame.cpp:2889-2898`), which unwraps it while the levels are in
  * order. Conflux 3.5's map 63 starts at 66155, stored as 619.
  */
 export function levelCellOffsets(descriptors: readonly MapDescriptor[]): number[] {
@@ -120,7 +120,7 @@ export function levelCellOffsets(descriptors: readonly MapDescriptor[]): number[
 /**
  * The world before anything is read: no level, no record, no text. What `d.Initialize()`
  * leaves CSBWin's `d` with until `_ReadEntireGame` reads `dungeon.dat` or a save
- * (`doc/CSBwin-src/Code1f9e6.cpp:309`, `CSBCode.cpp:10634`). The page builds its `Game`
+ * (`doc/CSBwin-src/Code1f9e6.cpp:309`, `CSBCode.cpp:10758`). The page builds its `Game`
  * over it, and the boot's read installs the real one (`Game.installWorld`).
  */
 export function emptyDungeonData(): DungeonData {
@@ -171,12 +171,12 @@ export class DungeonLoader {
 
     /**
      * A new game's `dungeon.dat`, as `ReadDatabases` opens it when the game is not a
-     * resumed one (`doc/CSBwin-src/SaveGame.cpp:2346-2374`). `ReadExtendedFeatures` reads
+     * resumed one (`doc/CSBwin-src/SaveGame.cpp:2558-2586`). `ReadExtendedFeatures` reads
      * a block at the front, if there is one, and returns its size. Behind it, a file whose
      * first word is 33028 is compressed: the long at 2 is the expanded size, the word at 6
      * is `d.Word22592`, and the body goes through `ExpandData`. The body is read from byte
      * 8 plus the block's size, unless the block's `ExtendedFeaturesVersion` is `'@'`, when
-     * it is read from byte 8 of the file (`:2362-2369`). Any other file is read as it
+     * it is read from byte 8 of the file (`:2574-2581`). Any other file is read as it
      * stands, after the block.
      *
      * The block declares the image's shape (`bigActuators`, `indirectText`, six-byte
@@ -303,7 +303,7 @@ export class DungeonLoader {
                 indirectObjects: this.options.objectIndex !== undefined,
             });
             // Not part of `ReadDatabases`: `_ReadEntireGame` runs these once the whole
-            // file is read (`doc/CSBwin-src/SaveGame.cpp:1825-1827`), a save's as a new
+            // file is read (`doc/CSBwin-src/SaveGame.cpp:2028-2030`), a save's as a new
             // game's. The `CheckMonsters` between them needs the tables, so `Game` and
             // `applyCsbwinSave` run it (`src/engine/CheckMonsters.ts`).
             CheckCelltypes(data);
@@ -435,12 +435,12 @@ export class DungeonLoader {
 
     /**
      * `ReadDatabases`' checksum. Every section it reads goes through `FetchDataBytes`,
-     * which adds each byte into a `ui16` (`doc/CSBwin-src/CSBCode.cpp:9081-9106`), from
+     * which adds each byte into a `ui16` (`doc/CSBwin-src/CSBCode.cpp:9186-9211`), from
      * the header to the end of the cell flags; then it reads the word after them and
-     * fails the read when it differs from the sum (`SaveGame.cpp:2654-2658`). The word
+     * fails the read when it differs from the sum (`SaveGame.cpp:2866-2870`). The word
      * goes through `LE16`, a byte swap on the little-endian build, so it is big-endian
      * like the rest of the image. When fewer than two bytes follow, `StreamInput` fails
-     * (`CSBCode.cpp:9027-9043`) and nothing is compared: DM's `dungeon.dat` has no word.
+     * (`CSBCode.cpp:9132-9148`) and nothing is compared: DM's `dungeon.dat` has no word.
      *
      * CSBWin compares once every section is read; comparing before the parsers run
      * fails the same reads, without handing a damaged image to them.
@@ -464,7 +464,7 @@ export class DungeonLoader {
         const textDataOffset = objectListOffset + header.objectListSize * 2;
         // In a save the text is already indirect: `NumWordsInTextArray` counts index
         // entries (`ConvertToIndirectText` repurposes it,
-        // `doc/CSBwin-src/SaveGame.cpp:2272`), each 4 bytes, then a 4-byte
+        // `doc/CSBwin-src/SaveGame.cpp:2484`), each 4 bytes, then a 4-byte
         // `sizeOfCompressedText` and that many words of text. Both the index and the
         // size word are little-endian, alone in a big-endian image.
         let doorsOffset: number;
@@ -504,8 +504,8 @@ export class DungeonLoader {
     private getDatabaseRecordSize(dbType: number): number {
         const sizes = [4, 6, 4, 8, 16, 4, 4, 4, 4, 8, 4, 0, 0, 0, 8, 4];
         // `dbEntrySizes[dbACTUATOR]` is the *big* size in CSBWin; the small one is the
-        // special case (`doc/CSBwin-src/SaveGame.cpp:2571-2575`). SCROLL grows the same
-        // way from extended-features version 'B' (`:2189-2200`).
+        // special case (`doc/CSBwin-src/SaveGame.cpp:2783-2787`). SCROLL grows the same
+        // way from extended-features version 'B' (`:2401-2412`).
         if (dbType === DBType.ACTUATOR && this.options.bigActuators) return 10;
         if (dbType === DBType.SCROLL && this.options.newScrolls) return 6;
         if (dbType === 11 && this.options.expool) return EXPOOL_RECORD_SIZE;
@@ -527,7 +527,7 @@ export class DungeonLoader {
      *
      * CSBWin marks a record deleted by writing `RNnul` over its link and frees the
      * indirect slot that named it in the same breath (`DeleteDBEntry`,
-     * `doc/CSBwin-src/data.cpp:993-1015`); everything else in the record is left as it
+     * `doc/CSBwin-src/data.cpp:995-1017`); everything else in the record is left as it
      * was. So in a save a free record routinely still holds a reference to a slot that
      * has since been freed or reused. CSBWin never looks: a free record is reached only
      * by the allocator, which clears it before handing it out. A free record's other RNs
@@ -640,7 +640,7 @@ export class DungeonLoader {
 
     /**
      * `count` records of database `db` as `DATABASES::Enlarge` clears them
-     * (`doc/CSBwin-src/data.cpp:864-875`): every byte 0 and the link `RNnul`, read
+     * (`doc/CSBwin-src/data.cpp:865-876`): every byte 0 and the link `RNnul`, read
      * through the database's own parser as a save's are, in the record shape
      * `bigActuators` and `newScrolls` give. So a cleared record is what a save of it
      * gives back: its other RNs are `RNnul` (`readRNOfRecord`).
@@ -770,7 +770,7 @@ export class DungeonLoader {
                 nextObject,
                 possession,
                 // DB4::monsterType() masks to 5 bits; the top three are the alternate
-                // graphic selector (doc/CSBwin-src/CSB.h:1113-1116).
+                // graphic selector (doc/CSBwin-src/CSB.h:1116-1119).
                 creatureType: uByte4 & 0x1f,
                 alternateGraphics: (uByte4 >> 5) & 0x7,
                 groupIndex,
@@ -844,7 +844,7 @@ export class DungeonLoader {
         for (let i = 0; i < count; i++) {
             const nextObject = this.readRN();
             if (this.options.newScrolls) {
-                // `DB7` (`doc/CSBwin-src/CSB.h:1195-1216`): link, then an RN to the text
+                // `DB7` (`doc/CSBwin-src/CSB.h:1198-1219`): link, then an RN to the text
                 // record, then a word whose bit 0 is "open". The RN's record index is
                 // exactly what the old 10-bit field held, so storing that keeps every
                 // reader of `textReference` unchanged.
@@ -1001,7 +1001,7 @@ export class DungeonLoader {
             }
 
             // Extra per-level tables follow immediately after the CELLFLAG array in dungeon.dat.
-            // CSBWin: `SetPartyLevel()` reads them from `EndOfCELLFLAGS + numMonsterType` (CSBCode.cpp:5778+).
+            // CSBWin: `SetPartyLevel()` reads them from `EndOfCELLFLAGS + numMonsterType` (CSBCode.cpp:5843+).
             const numMonsterType = descriptor.creatureTypesAllowed;
             const numWallDecoration = descriptor.wallGraphicsCount; // LEVELDESC.NumWallDecoration()
             const numFloorDecorations = descriptor.floorGraphicsCount; // LEVELDESC.NumFloorDecorations()

@@ -3,7 +3,7 @@
  *
  * CSBWin has one directory and four fixed slots (`doc/CSBWIN_MENU_REFERENCE.md` → "The
  * four slots"), and keeps a game's saves in that game's directory
- * (`doc/CSBwin-src/CSBCode.cpp:9747-9756`). The page has one store, IndexedDB
+ * (`doc/CSBwin-src/CSBCode.cpp:9871-9880`). The page has one store, IndexedDB
  * (`BrowserSaveStore`), for every data set, so a row names its own.
  *
  * **Nothing in this file touches the DOM**: the rows, their order and their formatting
@@ -21,7 +21,7 @@ export interface SaveEntry {
     dataSet: string;
     /**
      * The playthrough: the file's `d.RandomGameID`, drawn when a new game is read
-     * (`doc/CSBwin-src/SaveGame.cpp:1523-1532`) and kept in `GAMEBLOCK1` (`:1060`).
+     * (`doc/CSBwin-src/SaveGame.cpp:1638-1647`) and kept in `GAMEBLOCK1` (`:1085`).
      */
     playthrough: number;
     /** Whether F5 wrote it, rather than the menu's SAVE. */
@@ -215,7 +215,7 @@ export function formatSaveDate(savedAt: number): string {
 
 /**
  * Newest first. CSBWin ranks its four slots by `MODIFIEDTIME` and letters them oldest
- * to newest (`doc/CSBwin-src/CSBCode.cpp:9766-9800`); this is the same ordering shown
+ * to newest (`doc/CSBwin-src/CSBCode.cpp:9890-9924`); this is the same ordering shown
  * directly and the other way up, because the save you want is nearly always the last
  * one you made. Ties break on name so the order is stable.
  */

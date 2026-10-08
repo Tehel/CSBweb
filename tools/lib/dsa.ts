@@ -21,7 +21,7 @@ const VARIABLESTORE = 18;
 const GLOBALSTORE = 20;
 const AMPERSAND2 = 21;
 
-/** `LOAD_INTEGER32` (`DSA.cpp:1125-1137`): any 32-bit value, low word first. */
+/** `LOAD_INTEGER32` (`DSA.cpp:1126-1138`): any 32-bit value, low word first. */
 export const int = (value: number): number[] => [LOAD | (30 << 6), value & 0xffff, (value >>> 16) & 0xffff];
 export const op = (subcode: number): number =>
   subcode < 128 ? AMPERSAND | (subcode << 6) : AMPERSAND2 | ((subcode - 128) << 6);
@@ -59,7 +59,7 @@ export function withFilterDsas(esl: number, programs: FilterDsa[], host?: Partia
 
 /**
  * Make the filter at special location `esl` of `game`'s world
- * (`doc/CSBwin-src/CSB.h:1535-1550`) the first empty open square of the party's level,
+ * (`doc/CSBwin-src/CSB.h:1538-1553`) the first empty open square of the party's level,
  * holding one type-47 actuator per DSA, in order, each with the programs of a DSA of its
  * own, and the world's only DSAs and special location. The globals are `UNSET`.
  */

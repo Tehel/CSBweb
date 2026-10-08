@@ -34,7 +34,7 @@ export class CharacterSystem {
   constructor(private readonly ctx: GameContext) {}
 
   /**
-   * `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1822-1930`) — empty a
+   * `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1827-1935`) — empty a
    * slot and undo what wearing or holding the object did.
    *
    * Round the neck an Illumulet gets `value(0)` and takes `d.Word1074[2]` off
@@ -47,8 +47,8 @@ export class CharacterSystem {
    *
    * The light changes are followed by `SelectPaletteForLightLevel`. A chest or a scroll
    * out of the selected champion's weapon hand sets `CHARFLAG_chestOrScroll`
-   * (`:1906-1921`), which the `DrawCharacterState` every caller makes next draws
-   * (`doc/CSBwin-src/DSA.cpp:1674-1675`, `doc/CSBwin-src/CSBCode.cpp:6995-6998`); the
+   * (`:1911-1926`), which the `DrawCharacterState` every caller makes next draws
+   * (`doc/CSBwin-src/DSA.cpp:1675-1676`, `doc/CSBwin-src/CSBCode.cpp:7054-7057`); the
    * port draws it as the call ends. No counterpart here: `DrawEightHands`,
    * `DisplayBackpackItem` and the other `charFlags` redraw bits (the panels are derived
    * from live state every frame); `load` (`CharacterStats.characterLoad` re-sums it). The chest slots (30 and up) are `d.rnChestContents`, the open
@@ -75,7 +75,7 @@ export class CharacterSystem {
     }
     if (slot < 2) {
       if (slot === 1) {
-        // `if (d.AttackingCharacterOrdinal == chIdx+1) TAG01b1c0();` (`:1888-1891`)
+        // `if (d.AttackingCharacterOrdinal == chIdx+1) TAG01b1c0();` (`:1893-1896`)
         this.ctx.host.closeAttackMenuOf(chIdx);
         if (objNID5 >= OBJNI_OPEN_SCROLL && objNID5 <= OBJNI_SCROLL) {
           this.ctx.dungeon.getScrollRecord(objRemoved)!.open = false;
@@ -85,7 +85,7 @@ export class CharacterSystem {
         this.ctx.dungeon.getWeaponRecord(objRemoved)!.litTorch = false;
         selectPaletteForLightLevel(this.ctx);
       }
-      // `LOCAL_2`, `chIdx+1 == d.SelectedCharacterOrdinal` (`:1856`, `:1906-1921`).
+      // `LOCAL_2`, `chIdx+1 == d.SelectedCharacterOrdinal` (`:1861`, `:1935-1950`).
       if (chIdx === this.ctx.party.state.selectedCharacterIndex && slot === 1) {
         if (objNID5 === OBJNI_CHEST) {
           this.ctx.host.repackChest();
@@ -100,16 +100,16 @@ export class CharacterSystem {
   }
 
   /**
-   * `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1936-2037`) — put an object
+   * `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1941-2042`) — put an object
    * in a slot, which its caller has found empty, and do what wearing or holding it does.
    *
    * Into the weapon hand, the attack menu closes if it is this champion's and a scroll
-   * opens; into either hand an unlit torch (`NameIndex == Torch_a`, `:1988`) is lit.
+   * opens; into either hand an unlit torch (`NameIndex == Torch_a`, `:1993`) is lit.
    * Round the neck an Illumulet gets `value(1)` and adds `d.Word1074[2]` to
    * `d.Brightness`, a Jewel Symal gets `value(1)`. A light change is followed by
    * `SelectPaletteForLightLevel`. A chest or a scroll into the selected champion's
-   * weapon hand sets `CHARFLAG_chestOrScroll` (`:1997-2004`), drawn as the call ends
-   * (`doc/CSBwin-src/DSA.cpp:2075-2076`, `doc/CSBwin-src/Magic.cpp:1377-1378`). The rest
+   * weapon hand sets `CHARFLAG_chestOrScroll` (`:2002-2009`), drawn as the call ends
+   * (`doc/CSBwin-src/DSA.cpp:2076-2077`, `doc/CSBwin-src/Magic.cpp:1379-1380`). The rest
    * has no counterpart here, as in `removeCharacterPossession`. A chest slot (30 and up)
    * is the inventory click's.
    */
@@ -122,7 +122,7 @@ export class CharacterSystem {
     this.adjustStatsForItemCarried(champion, place, 1, object);
     if (place < 2) {
       if (place === 1) {
-        // `if (d.AttackingCharacterOrdinal == chIdx+1) TAG01b1c0();` (`:1977-1980`)
+        // `if (d.AttackingCharacterOrdinal == chIdx+1) TAG01b1c0();` (`:1982-1985`)
         this.ctx.host.closeAttackMenuOf(chIdx);
         if (objNID4 >= OBJNI_OPEN_SCROLL && objNID4 <= OBJNI_SCROLL) {
           this.ctx.dungeon.getScrollRecord(object)!.open = true;
@@ -135,7 +135,7 @@ export class CharacterSystem {
         chIdx === this.ctx.party.state.selectedCharacterIndex && place === 1
         && (objNID4 === OBJNI_CHEST || (objNID4 >= OBJNI_OPEN_SCROLL && objNID4 <= OBJNI_SCROLL))
       ) {
-        // `bool_2`, `chIdx+1 == d.SelectedCharacterOrdinal` (`:1969`).
+        // `bool_2`, `chIdx+1 == d.SelectedCharacterOrdinal` (`:1974`).
         champion.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
       }
     } else if (place === 10) {
@@ -152,7 +152,7 @@ export class CharacterSystem {
   }
 
   /**
-   * `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2499-2520`) — everything a
+   * `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2504-2525`) — everything a
    * dying champion carried falls into the party's cell, slot by slot in
    * `d.DropOrder` order, each taken out through `RemoveCharacterPossession`, turned
    * to the champion's corner and set down with `MoveObject(obj, -1, 0, partyX,
@@ -178,7 +178,7 @@ export class CharacterSystem {
   }
 
   /**
-   * `CHARDESC::SetPossession(index, newObject, true)` (`doc/CSBwin-src/Character.cpp:2917-2998`),
+   * `CHARDESC::SetPossession(index, newObject, true)` (`doc/CSBwin-src/Character.cpp:2922-3003`),
    * the pair's slot write: the equip filter's DSA sees the object leaving and the one
    * arriving, then the slot is written.
    */
@@ -191,14 +191,14 @@ export class CharacterSystem {
 
   /**
    * `CHARDESC::SetPossession(…, false)`, the bare slot write, with no filter: CSBWin's
-   * temporary hand swap, where the object is put back at once (`doc/CSBwin-src/Mouse.cpp:699-706`).
+   * temporary hand swap, where the object is put back at once (`doc/CSBwin-src/Mouse.cpp:700-707`).
    */
   setPossessionDirect(champion: Champion, slot: number, value: ObjectID): void {
     if (slot >= 0 && slot < champion.possessions.length) champion.possessions[slot] = value;
   }
 
   /**
-   * `TAG0153c2` (`doc/CSBwin-src/Character.cpp:1521`) — is what is in `slot` the right
+   * `TAG0153c2` (`doc/CSBwin-src/Character.cpp:1526`) — is what is in `slot` the right
    * ammunition for the launcher in the fighting hand? Weapon classes 16-31 fire
    * class-10 objects (arrows), 32-47 fire class-11 (slingstones).
    */
@@ -219,9 +219,9 @@ export class CharacterSystem {
   }
 
   /**
-   * `TAG0115ee` (`doc/CSBwin-src/CSBCode.cpp:6251`) — put a weapon back into the hand
-   * a throw emptied, from slot 12 first and then slots 7-9 (`:6263-6270`, each through
-   * `TAG011594`, `:6231`). Only a weapon: a thrown apple does not come back.
+   * `TAG0115ee` (`doc/CSBwin-src/CSBCode.cpp:6310`) — put a weapon back into the hand
+   * a throw emptied, from slot 12 first and then slots 7-9 (`:6322-6329`, each through
+   * `TAG011594`, `:6290`). Only a weapon: a thrown apple does not come back.
    */
   refillPossessionSlot(chIdx: number, slot: number): void {
     const champion = this.ctx.party.state.champions[chIdx];
@@ -237,7 +237,7 @@ export class CharacterSystem {
   }
 
   /**
-   * `BringCharacterToLife` (`doc/CSBwin-src/Character.cpp:804`).
+   * `BringCharacterToLife` (`doc/CSBwin-src/Character.cpp:805`).
    *
    * The order matters and is CSBWin's: the corner is settled **before** the champion
    * is alive again, because `CharacterAtPosition` ignores the dead — so the champion
@@ -262,13 +262,13 @@ export class CharacterSystem {
     const reducedMax = Math.max(25, (maxHealth - Math.floor(maxHealth / 64) - 1) | 0);
     champ.attributes.maxHealth = reducedMax;
     champ.attributes.health = Math.floor(reducedMax / 2);
-    // `pcA3->facing = (ui8)d.partyFacing` (`:823`) — a champion who comes back looks
+    // `pcA3->facing = (ui8)d.partyFacing` (`:824`) — a champion who comes back looks
     // the way the party is looking, not the way they died.
     champ.facing = party.facing;
   }
 
   /**
-   * `_ExecuteAttack`'s engine half (`doc/CSBwin-src/Character.cpp:4944`): run the
+   * `_ExecuteAttack`'s engine half (`doc/CSBwin-src/Character.cpp:4969`): run the
    * attack, and record the type on the champion so `EnableCharacterAction` can undo
    * its defence penalty and refill a bow's quiver when the busy timer expires.
    * The attack menu's half — `d.AttackingCharacterOrdinal`, `d.PossibleAttackTypes`,
@@ -281,7 +281,7 @@ export class CharacterSystem {
     // champion is free again. Mostly negative: swinging leaves you open.
     champion.attackStatModifier = this.attackStatModifier(attackType);
     const result = this.ctx.systems.attack.attack(chIdx, attackType);
-    // The fusion's `Attack(_1_, …)` never returns (`Character.cpp:4972`): see `AttackSystem`.
+    // The fusion's `Attack(_1_, …)` never returns (`Character.cpp:4997`): see `AttackSystem`.
     if (this.ctx.systems.mainLoop.isRunningScript()) return result;
     champion.attackType = attackType;
     return result;

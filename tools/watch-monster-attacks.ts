@@ -107,7 +107,7 @@ async function main(): Promise<void> {
   // ---- Wounds are rare by design; prove the mechanism fires at all -------
   // `DamageCharacter` only marks a body part when the blow exceeds a
   // vitality-scaled threshold, then doubles the threshold and may mark another
-  // (doc/CSBwin-src/Character.cpp:2789-2803). Small hits should almost never wound;
+  // (doc/CSBwin-src/Character.cpp:2794-2808). Small hits should almost never wound;
   // large ones should. Driven directly, since an ordinary fight rarely lands one.
   const probe = champion(0, 'PROBE');
   probe.attributes.health = 100000;

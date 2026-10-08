@@ -2,8 +2,8 @@
  * `ExtendPortraits`: the Hall of Champions mirrors put into CSBWin's own form after a read.
  *
  * `_ReadEntireGame` calls it once the whole file is read, unless the file's Extended
- * Features block carried `ExpandedPortraits` (`doc/CSBwin-src/SaveGame.cpp:1402-1426`,
- * `:1827`, the flag reset at `:1462` and read at `:403`). It zeroes `word4` bits 0-11 and
+ * Features block carried `ExpandedPortraits` (`doc/CSBwin-src/SaveGame.cpp:1503-1527`,
+ * `:2030`, the flag reset at `:1563` and read at `:405`). It zeroes `word4` bits 0-11 and
  * the whole of `word6` of every live type-127 actuator.
  *
  * - `dm-atari/dungeon.dat` has no block, so its 24 mirrors are cleaned: every one carries

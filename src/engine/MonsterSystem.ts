@@ -2,11 +2,11 @@
  * Monster group lifecycle: the `ITEM16` pool, and the AI timers that hang off it.
  *
  * Ports the monster-lifecycle half of CSBWin's `CSBCode.cpp` —
- * `AttachItem16ToMonster` (:6024), `DetachItem16` (:6117), `TAG00bd40` (:6141),
- * `ProcessMonstersOnLevel` (:6158), `InitializeItem16` (:6193),
- * `NextMonsterUpdateTime` (:5842) and `StartMonsterMovementTimers` (:5988) — plus
+ * `AttachItem16ToMonster` (:6083), `DetachItem16` (:6176), `TAG00bd40` (:6200),
+ * `ProcessMonstersOnLevel` (:6217), `InitializeItem16` (:6252),
+ * `NextMonsterUpdateTime` (:5907) and `StartMonsterMovementTimers` (:6047) — plus
  * `EnsureItem16Available` and `DeleteMonsterMovementTimers` from `Monster.cpp`
- * (:83 and :1297).
+ * (:83 and :1301).
  *
  * See `doc/CSBWIN_MONSTERS_REFERENCE.md` for the record layouts and the "Group
  * lifecycle" section that this file implements.
@@ -38,10 +38,10 @@ import {
   monsterWord4Bit10,
 } from '../data/tables/MonsterDesc';
 
-/** `d.MaxITEM16` starts at 60 (`doc/CSBwin-src/CSBCode.cpp:6195`). */
+/** `d.MaxITEM16` starts at 60 (`doc/CSBwin-src/CSBCode.cpp:6254`). */
 const INITIAL_MAX_ITEM16 = 60;
 
-/** `AttachItem16ToMonster` grows the pool by 50 at a time, up to 1050 (`CSBCode.cpp:6055-6078`). */
+/** `AttachItem16ToMonster` grows the pool by 50 at a time, up to 1050 (`CSBCode.cpp:6114-6137`). */
 const ITEM16_GROWTH = 50;
 const ITEM16_HARD_MAX = 1050;
 
@@ -52,10 +52,10 @@ const ITEM16_HARD_MAX = 1050;
  */
 const ITEM16_SOFT_MAX = 240;
 
-/** Sound ordinal 16, played when a Deth Knight flips its attack sprite (`CSBCode.cpp:5906`). */
+/** Sound ordinal 16, played when a Deth Knight flips its attack sprite (`CSBCode.cpp:5971`). */
 const SOUND_ORDINAL_DETH_KNIGHT_FLIP = 16;
 
-/** `soundTELEPORT` (`doc/CSBwin-src/CSB.h:625`). */
+/** `soundTELEPORT` (`doc/CSBwin-src/CSB.h:628`). */
 const SOUND_ORDINAL_TELEPORT = 17;
 
 /** The out-of-range `groupIndex` sentinels for a monster with no `ITEM16`. */
@@ -67,10 +67,10 @@ export type MonsterDesignOptions = Pick<RulesOptions, 'invisibleMonsters' | 'dra
 
 /**
  * `DB4::invisible()`, `drawAsSize4()`, `Unique()` and `Poisoned()`
- * (`doc/CSBwin-src/CSB.h:1125-1132`): bits 11 to 14 of `word14`, each only if its design
+ * (`doc/CSBwin-src/CSB.h:1128-1135`): bits 11 to 14 of `word14`, each only if its design
  * option is set, `invisibleMonsters` for the first and `drawAsSize4Monsters` for the
  * other three. Both options come from a save's extended-features block
- * (`SaveGame.cpp:394-400`) and default to `false` (`data.cpp:77-78`). Every reader of the
+ * (`SaveGame.cpp:396-402`) and default to `false` (`data.cpp:78-79`). Every reader of the
  * four goes through these; the raw bits are only written (`&MONSTER!`, a new group).
  */
 export function monsterInvisible(options: MonsterDesignOptions, monster: CreatureRecord): boolean {
@@ -90,7 +90,7 @@ export class MonsterSystem {
   /** `d.ITEM16QueLen` — how many slots are in use. */
   private item16QueLen = 0;
 
-  /** The same counter, for `GAMEBLOCK2` offset 30 (`doc/CSBwin-src/SaveGame.cpp:1028`). */
+  /** The same counter, for `GAMEBLOCK2` offset 30 (`doc/CSBwin-src/SaveGame.cpp:1053`). */
   getItem16QueLen(): number {
     return this.item16QueLen;
   }
@@ -116,7 +116,7 @@ export class MonsterSystem {
   /* ------------------------------------------------------------------ pool ---- */
 
   /**
-   * `InitializeItem16` (`doc/CSBwin-src/CSBCode.cpp:6193`) — allocate the pool with
+   * `InitializeItem16` (`doc/CSBwin-src/CSBCode.cpp:6252`) — allocate the pool with
    * every slot marked free.
    */
   private initializeItem16(): void {
@@ -158,7 +158,7 @@ export class MonsterSystem {
   }
 
   /**
-   * `AttachItem16ToMonster` (`doc/CSBwin-src/CSBCode.cpp:6024`).
+   * `AttachItem16ToMonster` (`doc/CSBwin-src/CSBCode.cpp:6083`).
    *
    * Claims the first free slot, growing the pool by 50 if there is none (capped at
    * 1050 — a different cap from `ensureItem16Available`'s, as in CSBWin). The order
@@ -205,7 +205,7 @@ export class MonsterSystem {
   }
 
   /**
-   * `DetachItem16` (`doc/CSBwin-src/CSBCode.cpp:6117`) — hand a slot back, restoring
+   * `DetachItem16` (`doc/CSBwin-src/CSBCode.cpp:6176`) — hand a slot back, restoring
    * the two packed bytes onto the DB4 and clearing a high fear state.
    */
   detachItem16(index: number): void {
@@ -234,7 +234,7 @@ export class MonsterSystem {
     if (this.item16QueLen > 0) this.item16QueLen--;
   }
 
-  /** `TAG00bd40` (`doc/CSBwin-src/CSBCode.cpp:6141`) — detach every active group. */
+  /** `TAG00bd40` (`doc/CSBwin-src/CSBCode.cpp:6200`) — detach every active group. */
   detachAllItem16(): void {
     const pool = this.pool;
     for (let i = 0; i < pool.length && this.item16QueLen !== 0; i++) {
@@ -245,13 +245,13 @@ export class MonsterSystem {
   /* ------------------------------------------------------------ level load ---- */
 
   /**
-   * `LoadPartyLevel` (`doc/CSBwin-src/CSBCode.cpp:785`), minus the graphics: detach
+   * `LoadPartyLevel` (`doc/CSBwin-src/CSBCode.cpp:795`), minus the graphics: detach
    * everything, re-attach the new level's monsters, then `SelectPaletteForLightLevel`
-   * (`:818-819`).
+   * (`:828-829`).
    *
    * CSBWin reaches this from the main loop via `d.newPartyLevel`, which `MoveObject`
    * sets when the party lands on a different level — and it runs *before*
-   * `ProcessTimers` (`doc/CSBwin-src/CSBCode.cpp:618-635`). `Game.loadNewPartyLevel` is
+   * `ProcessTimers` (`doc/CSBwin-src/CSBCode.cpp:628-645`). `Game.loadNewPartyLevel` is
    * that call.
    */
   loadPartyLevel(level: number): void {
@@ -267,7 +267,7 @@ export class MonsterSystem {
    * Restoring replaces the whole `ITEM16` pool, so the in-use count here is stale
    * and the slots the save recorded may not match the level the party is now on.
    * CSBWin's game start does the same, `TAG00bd40()` then `ProcessMonstersOnLevel()`
-   * through `LoadPartyLevel(d.partyLevel)` (`doc/CSBwin-src/CSBCode.cpp:10491`, `:795`, `:818`).
+   * through `LoadPartyLevel(d.partyLevel)` (`doc/CSBwin-src/CSBCode.cpp:10615`, `:805`, `:828`).
    */
   reloadAfterSaveGame(): void {
     const pool = this.pool;
@@ -279,7 +279,7 @@ export class MonsterSystem {
   /**
    * Re-attach everything once a save is written: `TAG00bd40()` then
    * `ProcessMonstersOnLevel()`, after the file is closed
-   * (`doc/CSBwin-src/SaveGame.cpp:1237-1245`). A restore re-attaches the same way
+   * (`doc/CSBwin-src/SaveGame.cpp:1335-1343`). A restore re-attaches the same way
    * (`reloadAfterSaveGame`), so the game played on after a save is the one a load of it
    * gives back: the movement timers re-created and the `singleMonsterStatus` bits
    * re-rolled, drawing from the random stream as the load does.
@@ -307,7 +307,7 @@ export class MonsterSystem {
   }
 
   /**
-   * `ProcessMonstersOnLevel` (`doc/CSBwin-src/CSBCode.cpp:6158`).
+   * `ProcessMonstersOnLevel` (`doc/CSBwin-src/CSBCode.cpp:6217`).
    *
    * Walks every cell of the loaded level and, for each cell that has objects, finds
    * the **first** monster in the chain and gives it a slot and a timer. It then stops
@@ -336,7 +336,7 @@ export class MonsterSystem {
   /* ---------------------------------------------------------------- timers ---- */
 
   /**
-   * `StartMonsterMovementTimers` (`doc/CSBwin-src/CSBCode.cpp:5988`).
+   * `StartMonsterMovementTimers` (`doc/CSBwin-src/CSBCode.cpp:6047`).
    *
    * Schedules the group's first turn as a `TT_MONSTER_Bgroup` at `d.Time + 1`, with
    * `uByte5` holding `255 - timePerMove` — the inverted form the timer queue's
@@ -357,7 +357,7 @@ export class MonsterSystem {
     }
     // CSBWin asserts here when no monster is found, and leaves uByte5 at 255 — which
     // happened for real in the prison when the last champion starved
-    // (doc/CSBwin-src/CSBCode.cpp:6005-6011).
+    // (doc/CSBwin-src/CSBCode.cpp:6064-6070).
 
     this.timers.createTimerWithUByte5(
       TimerFunction.TT_MONSTER_BGROUP,
@@ -372,7 +372,7 @@ export class MonsterSystem {
   }
 
   /**
-   * `NextMonsterUpdateTime` (`doc/CSBwin-src/CSBCode.cpp:5842`).
+   * `NextMonsterUpdateTime` (`doc/CSBwin-src/CSBCode.cpp:5907`).
    *
    * Two jobs at once: it re-rolls each member's `singleMonsterStatus` — the two
    * signed walk offsets, the mirror flag and the attacking flag — and returns the
@@ -423,7 +423,7 @@ export class MonsterSystem {
           const wasAttacking = (sms & SMS_ATTACKING) !== 0;
           if (wasAttacking && monster.creatureType === MonsterType.mon_DethKnight) {
             // A Deth Knight already mid-attack flips its sprite on a coin toss, and
-            // makes a noise doing it (doc/CSBwin-src/CSBCode.cpp:5900-5908).
+            // makes a noise doing it (doc/CSBwin-src/CSBCode.cpp:5965-5973).
             if (this.random.bool()) {
               sms ^= SMS_MIRROR;
               this.ctx.sounds.queueSound(SOUND_ORDINAL_DETH_KNIGHT_FLIP, monsterX, monsterY, 1, level);
@@ -459,38 +459,38 @@ export class MonsterSystem {
   /* ------------------------------------------------------------ moving ------- */
 
   /**
-   * `MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:2796-3424`).
+   * `MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:2831-3459`).
    *
    * Moves a group from one square to another (`oldX < 0`: places it from nowhere;
    * `newX < 0`: lifts it off its square and returns 0 before the monster branch, as
-   * `DeleteMonster` does, `:3257-3297`, `:1038`), taking the destination through
+   * `DeleteMonster` does, `:3292-3332`, `:1073`), taking the destination through
    * teleporter chains, pit falls and stairs, and keeping the `ITEM16` and the AI timers
    * in step with the result. A group that ends on the square
    * it started on is left alone and the move returns 0 — which is what `WiggleEverything`
    * relies on when it moves a group onto its own square (`Timer.cpp:2446-2450`).
    *
    * A group the fall killed, or one that ends on a level its type may not live on, is
-   * deleted before anything else moves (`:3147-3176`): its remains are dropped where it
+   * deleted before anything else moves (`:3182-3211`): its remains are dropped where it
    * ended, and it is taken off its old square. A group placed from nowhere is not
    * deleted — CSBWin's `DeleteMonster` needs a square — and its record stays allocated.
    *
    * A group that does not levitate is lifted and set down through
-   * `PlaceOrRemoveObjectInRoom` (`:3287`, `:3392`), so it presses and
+   * `PlaceOrRemoveObjectInRoom` (`:3322`, `:3427`), so it presses and
    * releases pressure pads: leaving, `unchangedRoom` is whether the party stands on the
    * square; arriving, it is always false. A levitating one uses `RemoveObjectFromRoom`
-   * / `AddObjectToRoom` (`:3274`, `:3386`) and presses nothing. The group
+   * / `AddObjectToRoom` (`:3309`, `:3421`) and presses nothing. The group
    * leaves its square before the destination is checked, so a group that goes into
-   * abeyance has released its pad (`:3257-3296`, `:3335-3358`).
+   * abeyance has released its pad (`:3292-3331`, `:3370-3393`).
    *
    * Nothing here touches the group's other AI timers when its `ITEM16` did not
-   * change: the AI caller re-aims only the timer it is processing (`Monster.cpp:1711`,
-   * `:2105`, `:2440`, `:2908`), and a DSA's cell move re-aims the rest itself
+   * change: the AI caller re-aims only the timer it is processing (`Monster.cpp:1715`,
+   * `:2109`, `:2444`, `:2912`), and a DSA's cell move re-aims the rest itself
    * (`MoveObject.cpp:539-571`, `DsaSystem.findCellDestination`). Nor does it touch the
    * `ITEM16`'s `uByte10`/`uByte11` — only `AttachItem16ToMonster` sets them
-   * (`CSBCode.cpp:6088-6090`), and a frightened group heads back there
-   * (`Monster.cpp:2273-2277`) — or its `ubPrevX`/`ubPrevY`, which the AI caller sets.
+   * (`CSBCode.cpp:6147-6149`), and a frightened group heads back there
+   * (`Monster.cpp:2277-2281`) — or its `ubPrevX`/`ubPrevY`, which the AI caller sets.
    *
-   * The stairs turn the group's corner (`:3124-3130`). CSBWin keeps the corner beside the
+   * The stairs turn the group's corner (`:3128-3134`). CSBWin keeps the corner beside the
    * record, so the turn follows the group wherever it goes, and the group is set down,
    * or parked, under the turned ID here. A caller still holding the ID it passed reaches
    * the same group through `rnEquals`. `cornerAfter` is a DSA's `object.pos(p)` after its
@@ -499,14 +499,14 @@ export class MonsterSystem {
    *
    * `mmr` is `pmmr`, the record of the group's turn, which `ProcessTimers29to41` hands
    * down and every other caller leaves out. It follows the group: lifted, it is nowhere
-   * (`RemoveObjectFromRoom`, `CSBCode.cpp:5185-5188`), set down, it is on its square
-   * (`AddObjectToRoom`, `:432-435`), and refused by the level, its level is -1 and
-   * `MoveObject_NotAllowedOnLevel` is set (`:3152-3156`).
+   * (`RemoveObjectFromRoom`, `CSBCode.cpp:5250-5253`), set down, it is on its square
+   * (`AddObjectToRoom`, `:442-445`), and refused by the level, its level is -1 and
+   * `MoveObject_NotAllowedOnLevel` is set (`:3187-3191`).
    *
    * Returns `code`, CSBWin's return value, and `position`, its `d.NewX`, `d.NewY` and
-   * `d.NewLevel` (`:3174-3176`) — where the group ended up. Every caller that goes on
-   * after a move does so only when `code` is 0 (`Monster.cpp:1711`, `:2105`, `:2440`,
-   * `:2908`, `MoveObject.cpp:547`, `Monster.cpp:222`):
+   * `d.NewLevel` (`:3209-3211`) — where the group ended up. Every caller that goes on
+   * after a move does so only when `code` is 0 (`Monster.cpp:1715`, `:2109`, `:2444`,
+   * `:2912`, `MoveObject.cpp:547`, `Monster.cpp:222`):
    *
    * - 0: the group is on the square it was sent to, or the one a pit dropped it on,
    *   and its `ITEM16` did not change.
@@ -514,9 +514,9 @@ export class MonsterSystem {
    *   refused it, the square was taken and it went into abeyance); or it teleported;
    *   or it left the party's level, or arrived on it from nowhere.
    * - `LOCAL_14` > 1: `TeleportMonster`'s `groupIndex + 2` for a fear-state-6 group
-   *   (`:2377-2384`), or a teleport onto the party's level (1) plus the attach
-   *   (`LOCAL_14++`, `:3376`). Either way `ClearAttacking_DeleteMovementTimers` runs on
-   *   `d.Item16[LOCAL_14 - 2]` (`:3411-3413`) — slot 0 in the second case, a CSBWin
+   *   (`:2412-2419`), or a teleport onto the party's level (1) plus the attach
+   *   (`LOCAL_14++`, `:3411`). Either way `ClearAttacking_DeleteMovementTimers` runs on
+   *   `d.Item16[LOCAL_14 - 2]` (`:3446-3448`) — slot 0 in the second case, a CSBWin
    *   quirk kept as it is.
    */
   moveMonster(
@@ -537,13 +537,13 @@ export class MonsterSystem {
     const partyLevel = party.z | 0;
     const fromDungeon = oldX >= 0;
     // "Proper level && oldX >= 0 means an ITEM16 exists"
-    // (doc/CSBwin-src/Code11f52.cpp:2864).
+    // (doc/CSBwin-src/Code11f52.cpp:2899).
     const item16Attached = level === partyLevel && fromDungeon;
-    // `Levitating(objD7)` (`:2841`, `:2417-2437`): a flying monster.
+    // `Levitating(objD7)` (`:2876`, `:2452-2472`): a flying monster.
     const desc = this.ctx.tables.monsterDesc[monster.creatureType];
     const levitated = desc !== undefined && monsterLevitating(desc);
 
-    // A monster leaving a square may run into a missile sitting in it (`:2843-2849`).
+    // A monster leaving a square may run into a missile sitting in it (`:2878-2884`).
     if (fromDungeon && level === partyLevel) {
       const hit = this.ctx.systems.missileEncounter.checkMonsterMoveFromMissile(
         new Position(oldX, oldY, level),
@@ -554,7 +554,7 @@ export class MonsterSystem {
       if (hit) return { code: 1, position: requested };
     }
 
-    // Lifted and not set down again (`:3297`).
+    // Lifted and not set down again (`:3332`).
     if (newX < 0) {
       if (fromDungeon) this.liftMonster(monsterRn, oldX, oldY, level, levitated, mmr);
       return { code: 0, position: requested };
@@ -568,7 +568,7 @@ export class MonsterSystem {
     let code = resolved.code;
     const placed = this.dungeon.rnMaps.setPos(monsterRn, cornerAfter ?? resolved.corner);
 
-    // Killed by the fall, or not allowed where it landed: gone (`:3147-3176`). The delete
+    // Killed by the fall, or not allowed where it landed: gone (`:3182-3211`). The delete
     // monster filter runs at the group's old square, on the level it left.
     if (resolved.groupDied || !this.dungeon.monsterAllowedOnLevel(monster.creatureType, destLevel)) {
       const monsterDamage = this.ctx.systems.monsterDamage;
@@ -587,7 +587,7 @@ export class MonsterSystem {
     }
 
     // Still on the square it started on, in the same corner: nothing is lifted, pressed
-    // or set down (`:3183-3213`). Only the stairs turn a monster's corner (`:3124-3130`),
+    // or set down (`:3218-3248`). Only the stairs turn a monster's corner (`:3159-3165`),
     // and they always take it to another square, so the square alone decides.
     if (destLevel === level && destination.x === oldX && destination.y === oldY) {
       return { code: 0, position: destination };
@@ -609,7 +609,7 @@ export class MonsterSystem {
       return { code: 1, position: destination };
     }
 
-    // Crossing on or off the party's level detaches or attaches the slot (`:3364-3378`).
+    // Crossing on or off the party's level detaches or attaches the slot (`:3399-3413`).
     if (item16Attached && destLevel !== partyLevel) {
       this.detachItem16(monster.groupIndex);
       code = 1;
@@ -618,7 +618,7 @@ export class MonsterSystem {
       code++;
     }
 
-    // Set it down (`:3384-3399`): "Not current room. Room changed."
+    // Set it down (`:3419-3434`): "Not current room. Room changed."
     this.dungeon.addObjectToCell(destination, placed);
     mmr?.objectAdded(placed, destLevel, destination.x, destination.y);
     if (!levitated) this.ctx.systems.actuators.triggerObjectMove(destination, placed, true, false, this.ctx.party.state.facing);
@@ -640,7 +640,7 @@ export class MonsterSystem {
   }
 
   /**
-   * The removal half of `MoveObject` for a group (`doc/CSBwin-src/Code11f52.cpp:3257-3296`):
+   * The removal half of `MoveObject` for a group (`doc/CSBwin-src/Code11f52.cpp:3292-3331`):
    * a levitating group through `RemoveObjectFromRoom`, any other through
    * `PlaceOrRemoveObjectInRoom` with `unchangedRoom` = "the party stands here".
    */
@@ -662,7 +662,7 @@ export class MonsterSystem {
   }
 
   /**
-   * `ClearAttacking_DeleteMovementTimers` (`doc/CSBwin-src/Code11f52.cpp:667`) — a
+   * `ClearAttacking_DeleteMovementTimers` (`doc/CSBwin-src/Code11f52.cpp:702`) — a
    * group that has just been teleported is no longer mid-attack.
    */
   clearAttackingAndDeleteMovementTimers(slotIndex: number, mapX: number, mapY: number, level: number): void {
@@ -676,12 +676,12 @@ export class MonsterSystem {
   }
 
   /**
-   * `CreateMovementTimer` (`doc/CSBwin-src/Code11f52.cpp:2446`) — park a monster that
+   * `CreateMovementTimer` (`doc/CSBwin-src/Code11f52.cpp:2481`) — park a monster that
    * could not be placed, to retry later.
    *
    * With 31 or more timers of the same kind already waiting on that square, the object
    * is deleted instead — unless it is a monster that is `Unique()` or carries something
-   * (`:2473-2512`). CSBWin's `static bool error` only guarded a message box that is
+   * (`:2508-2547`). CSBWin's `static bool error` only guarded a message box that is
    * commented out, so nothing of it is ported.
    */
   createMovementTimer(monsterRn: ObjectID, destination: Position, audible: boolean): void {
@@ -868,7 +868,7 @@ export class MonsterSystem {
     monster.groupIndex = positions & 0xff;
 
     // `MoveObject` returns 1 for a group placed on the party's level, which the attach
-    // makes non-zero (`Code11f52.cpp:3376`), so that is `RNnul` too, with no sound: a
+    // makes non-zero (`Code11f52.cpp:3411`), so that is `RNnul` too, with no sound: a
     // generator queues its own when it is audible (`Timer.cpp:1797-1800`).
     const placed = this.moveMonster(rn, -1, 0, options.mapX, options.mapY, options.level);
     if (placed.code !== 0) return null;
@@ -876,7 +876,7 @@ export class MonsterSystem {
     return rn;
   }
 
-  /** `FindEmptyDB4Entry` (`doc/CSBwin-src/CSBCode.cpp:4974`) — a free creature record. */
+  /** `FindEmptyDB4Entry` (`doc/CSBwin-src/CSBCode.cpp:5039`) — a free creature record. */
   private findEmptyCreatureEntry(): ObjectID | null {
     const rn = this.dungeon.findEmptyDBEntry('creatures', {
       nextObject: OBJECT_ID_EOF,

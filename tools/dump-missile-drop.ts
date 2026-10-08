@@ -6,7 +6,7 @@
  * .pos()), -2, 0, mapX, mapY, NULL, NULL)`, the exact same teleporter/pit-resolution
  * loop `DropObject` uses (see `tools/dump-teleporter-drop.ts`), which in turn places
  * the object through `PlaceOrRemoveObjectInRoom`
- * (`doc/CSBwin-src/Code11f52.cpp:3438-3446`) — the function that fires a pressure
+ * (`doc/CSBwin-src/Code11f52.cpp:3473-3481`) — the function that fires a pressure
  * plate under whatever just arrived. `TimerSystem.dropMissileObject` used to skip
  * both: a thrown object landing at the end of its flight went straight into
  * `DungeonState.addObjectToCell` at the raw landing cell, with no teleporter
@@ -35,7 +35,7 @@
  * landed item sits at that exact corner — not the one `objectPos` would have used.
  *
  * A fourth scenario covers the sound that plays on that same impact.
- * `ProcessMissileEncounter`'s shared ending (`doc/CSBwin-src/Code11f52.cpp:2101-2121`)
+ * `ProcessMissileEncounter`'s shared ending (`doc/CSBwin-src/Code11f52.cpp:2136-2156`)
  * calls `QueueSound` with an *ordinal* into the sound table — 0 for a weapon, 4 for
  * anything else physical (food, a scroll, …) — not a raw SND item number.
  * `playMissileImpactSound` used to skip that table and call `playSound`

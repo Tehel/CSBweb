@@ -1,5 +1,5 @@
 /**
- * `die(errorNum, msg)` (`doc/CSBwin-src/CSBCode.cpp:86-112`): CSBWin's "System Error"
+ * `die(errorNum, msg)` (`doc/CSBwin-src/CSBCode.cpp:96-122`): CSBWin's "System Error"
  * message box, then the program's end. The page ends its game instead, and prints the
  * message on the canvas (`showFatalMessage`, `src/ui/fatalMessage.ts`).
  */

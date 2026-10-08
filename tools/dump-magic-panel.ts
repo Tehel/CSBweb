@@ -4,20 +4,20 @@
  * `CastMagic`.
  *
  * 1. The cost of a rune after the first is `(base * Byte19016[first - 96]) >> 3`
- *    (`doc/CSBwin-src/CSBCode.cpp:8973-8979`): a product with a remainder costs the
+ *    (`doc/CSBwin-src/CSBCode.cpp:9078-9084`): a product with a remainder costs the
  *    truncated whole, never a fraction of a point of mana.
  * 2. The caster tabs are hit-tested by `_HandleMagicClick`'s fixed x ranges for each caster
- *    (`doc/CSBwin-src/Magic.cpp:596-699`); the gaps between tabs, and the caster's own tab,
+ *    (`doc/CSBwin-src/Magic.cpp:599-702`); the gaps between tabs, and the caster's own tab,
  *    pick nobody; `clickX` 512-515 name a champion; `SelectMagicCaster` refuses a dead one
- *    (`:724`), and a click past the last champion does nothing (`:692`).
- * 3. The cast button acts whenever `incantation[0]` is not zero (`:556-567`), and
- *    `CastMagic` clears the runes unless `CastSpell` returned 3 (`:949-955`).
+ *    (`:727`), and a click past the last champion does nothing (`:695`).
+ * 3. The cast button acts whenever `incantation[0]` is not zero (`:559-570`), and
+ *    `CastMagic` clears the runes unless `CastSpell` returned 3 (`:952-958`).
  * 4. The two deliberate divergences (`DEBT.md` → H): a fifth rune is refused, and a champion
  *    with no mana has no tab to click.
  * 5. Where the runes and the incantation are drawn: `DrawSpellMenuCharacters` from
- *    `D6W = 225` at `D6W += 14`, y 58 (`doc/CSBwin-src/CSBCode.cpp:8946-8960`), and
+ *    `D6W = 225` at `D6W += 14`, y 58 (`doc/CSBwin-src/CSBCode.cpp:9051-9065`), and
  *    `DisplayMagicSelection` from `D6W = 232` at `D6W += 9`, y 70
- *    (`doc/CSBwin-src/Magic.cpp:776-796`), a glyph starting at the pen.
+ *    (`doc/CSBwin-src/Magic.cpp:779-799`), a glyph starting at the pen.
  *
  * Run: `npx tsx tools/dump-magic-panel.ts`
  */
@@ -113,7 +113,7 @@ async function main(): Promise<void> {
 
   // ---- 2. The caster tabs.
   // Each champion's tab as `DrawSpellControls` draws it with `caster` casting
-  // (`doc/CSBwin-src/Character.cpp:5002-5085`).
+  // (`doc/CSBwin-src/Character.cpp:5027-5110`).
   const tab = (caster: number, box: number): [number, number] =>
     box === caster ? [233 + 14 * box, 277 + 14 * box]
       : box < caster ? [233 + 14 * box, 244 + 14 * box] : [266 + 14 * box, 277 + 14 * box];

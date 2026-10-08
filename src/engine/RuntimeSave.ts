@@ -98,27 +98,27 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
  * `HandleMouseEvents`' `lastTime = 0` (`Game.applyRuntimeSaveState`).
  */
 export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState): void {
-    // `d.PartySleeping = 0` wherever a game starts (doc/CSBwin-src/CSBCode.cpp:10479):
+    // `d.PartySleeping = 0` wherever a game starts (doc/CSBwin-src/CSBCode.cpp:10603):
     // CSBWin never saves it. Loading over a sleeping party must hand the UI its
     // adventure button lists back, whatever the restored state says.
     const wasSleeping = ctx.party.state.sleeping;
     ctx.party.setState(save.party);
     ctx.party.state.sleeping = false;
     if (wasSleeping) ctx.host.sleepChanged(false);
-    // `d.HandChar = b.gb2.handChar` (doc/CSBwin-src/SaveGame.cpp:1636): the cursor
+    // `d.HandChar = b.gb2.handChar` (doc/CSBwin-src/SaveGame.cpp:1760): the cursor
     // owner is part of the saved state. `setState` carries it, and this repairs the
     // states written before it was ever set.
     ensureHandOwner(ctx.party.state, ctx.host);
 
     // `scrollingText.ResetTime(b.gb2.Time); d.Time = b.gb2.Time;`
-    // (doc/CSBwin-src/SaveGame.cpp:1623-1624): CSBWin saves no message state, and the
+    // (doc/CSBwin-src/SaveGame.cpp:1747-1748): CSBWin saves no message state, and the
     // rows on screen stay, their timeouts rebased onto the loaded clock.
     ctx.host.messages.resetTime(save.game.tickCount, ctx.state.tickCount);
     ctx.state.tickCount = save.game.tickCount;
-    // `parameterMessageSequence = 0;` (doc/CSBwin-src/SaveGame.cpp:1625).
+    // `parameterMessageSequence = 0;` (doc/CSBwin-src/SaveGame.cpp:1749).
     ctx.systems.dsa.parameterMessageSequence = 0;
     // Asleep, `d.Speed` was 0. Awake again, the top of the next tick puts it back with
-    // `SetNewSpeed(d.Speed, …)` (`CSBCode.cpp:612-616`).
+    // `SetNewSpeed(d.Speed, …)` (`CSBCode.cpp:622-626`).
     if (wasSleeping) ctx.host.messages.setNewSpeed(0, VBL_PER_TICK, ctx.state.tickCount);
     ctx.random.setSeed(save.game.randomSeed);
     ctx.state.gameWon = save.game.gameWon;
@@ -145,7 +145,7 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     applySaveGameState(ctx.state.dungeon, item16, missiles);
     // The restore replaced the ITEM16 pool wholesale; re-derive which groups are
     // active, as CSBWin's game start does after its own restore
-    // (`LoadPartyLevel(d.partyLevel)`, doc/CSBwin-src/CSBCode.cpp:10491).
+    // (`LoadPartyLevel(d.partyLevel)`, doc/CSBwin-src/CSBCode.cpp:10615).
     ctx.footprints.restore(save.game.footprints);
     ctx.systems.monsters.reloadAfterSaveGame();
 }
@@ -170,7 +170,7 @@ function applySaveGameState(dungeon: DungeonData, item16: Item16Record[], missil
 /**
  * Which byte pair of `TIMER` holds an object reference, by timer function.
  *
- * `ConvertTimers` (`doc/CSBwin-src/SaveGame.cpp:2027-2050`): 48 and 49 — the missile
+ * `ConvertTimers` (`doc/CSBwin-src/SaveGame.cpp:2239-2262`): 48 and 49 — the missile
  * in flight — keep it in bytes 6-7, and 24, 25, 60 and 61 in bytes 8-9. Every other
  * function reads both pairs as plain numbers.
  */
@@ -186,7 +186,7 @@ function objectBytesOf(timerFunction: number): 6 | 8 | null {
  *
  * `TIMER` has one pair of bytes at 6-7 and one at 8-9, and CSBWin reads each pair
  * either as two bytes or as a word depending on the timer function
- * (`timerObj6()`, `timerWord8()`, `doc/CSBwin-src/CSB.h:1818-1860`). This port's
+ * (`timerObj6()`, `timerWord8()`, `doc/CSBwin-src/CSB.h:1881-1923`). This port's
  * live `TimerEntry` carries *both* readings side by side, plus an `object` field
  * that has no byte at all — convenient in the engine, and three things where the
  * file has one. So the collapse has to happen somewhere, and this is the boundary.

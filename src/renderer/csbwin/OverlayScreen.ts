@@ -1,6 +1,6 @@
 /**
  * The viewport as CSBWin's `display` draws it: through `OVERLAYDATA::CreateOverlayTable`
- * (`doc/CSBwin-src/Graphics.cpp:2978-3090`) and `UpdateScreenArea`
+ * (`doc/CSBwin-src/Graphics.cpp:3005-3117`) and `UpdateScreenArea`
  * (`doc/CSBwin-src/WinScreen.cpp:1008-1344`), which `display` calls for the viewport with
  * `useOverlay` in `VM_ADVENTURE` only (`:1515-1527`). The table, indexed by an overlay
  * byte and an Atari colour, gives a 16-bit RGB555 pixel: the colour through the overlay
@@ -14,7 +14,7 @@ import type { Overlay } from '../../engine/Overlay';
 import { OVERLAY_HEIGHT, OVERLAY_WIDTH } from '../../engine/Overlay';
 import { identityOverlayPalette } from '../../engine/OverlayPalette';
 
-/** `m_table`: 8192 bytes, 256 overlay bytes by 16 Atari colours (`Graphics.cpp:2951-2952`). */
+/** `m_table`: 8192 bytes, 256 overlay bytes by 16 Atari colours (`Graphics.cpp:2978-2979`). */
 export const OVERLAY_TABLE_SIZE = 256 * 16;
 
 /** The viewport's area of the screen, `display`'s `0, 0x21, 0xe0, 0xa9-0x21` (`WinScreen.cpp:1517-1520`). */

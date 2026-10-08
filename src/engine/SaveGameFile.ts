@@ -41,7 +41,7 @@ export interface SaveFileOptions {
  * every champion, `GAMEBLOCK2.ObjectInHand` and the object a timer is carrying — is a
  * slot of the world's object indirect index, and block 0 carries the index's two maps
  * as the world holds them (`objectIndexOf`), as CSBWin writes `dataTypeMap` and
- * `dataIndexMap` (`doc/CSBwin-src/SaveGame.cpp:927-933`, `:985-986`).
+ * `dataIndexMap` (`doc/CSBwin-src/SaveGame.cpp:952-958`, `:1010-1011`).
  */
 function buildFileBlocks(
     game: Game,
@@ -71,18 +71,18 @@ function buildFileBlocks(
         );
     }
     // The DSA global variables go into their `EXPOOL` records before the databases are
-    // written (`doc/CSBwin-src/SaveGame.cpp:1141-1148`), in the running world as CSBWin's.
+    // written (`doc/CSBwin-src/SaveGame.cpp:1205-1213`), in the running world as CSBWin's.
     const expool = new Expool(dungeon);
     if (!expool.storeGlobalVariables(runtime.game.dsaGlobals)) {
         game.ctx.host.trace('Error saving global variables');
     }
-    // Then the overlay palette's 24 records (`:1151-1164`), and the record of
-    // `disableSaves` (`:1200-1201`).
+    // Then the overlay palette's 24 records (`:1216-1231`), and the record of
+    // `disableSaves` (`:1293-1295`).
     expool.storeOverlayPalette(runtime.game.overlayPalette);
     if (runtime.game.disableSaves) expool.writeDisableSaves();
 
     const party = runtime.party;
-    // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`doc/CSBwin-src/SaveGame.cpp:1033`):
+    // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`doc/CSBwin-src/SaveGame.cpp:1058`):
     // an empty cursor is `RNnul`, never `RNempty` (0), which CSBWin would load as an object.
     const objectInHand = party.objectInHand & 0xffff;
 
@@ -119,7 +119,7 @@ function buildFileBlocks(
 /**
  * The save file of the game as it stands: all sixteen blocks. The `SaveGameState` half
  * mirrors what `LoadGame` reads back out of `GAMEBLOCK2`
- * (`doc/CSBwin-src/SaveGame.cpp:1636-1637`).
+ * (`doc/CSBwin-src/SaveGame.cpp:1760-1761`).
  */
 export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8Array {
     const runtime = game.getRuntimeSaveState();
@@ -162,7 +162,7 @@ export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8A
 
 /**
  * `GAMEBLOCK1`'s fields, from the live game, as `SaveGame` fills them
- * (`doc/CSBwin-src/SaveGame.cpp:1058-1072`). `SaveOption` is 1, "SAVE AND PLAY" (`:893`):
+ * (`doc/CSBwin-src/SaveGame.cpp:1083-1097`). `SaveOption` is 1, "SAVE AND PLAY" (`:917`):
  * the port saves and plays on, and has no "SAVE AND QUIT".
  */
 function buildBlock1FromGame(runtime: RuntimeSaveState): Block1 {
@@ -183,7 +183,7 @@ function buildBlock1FromGame(runtime: RuntimeSaveState): Block1 {
  * `GAMEBLOCK2`, from the live game: all twenty-one fields.
  *
  * `SaveGame` assigns each of these from a live counter immediately before it checksums
- * the block (`doc/CSBwin-src/SaveGame.cpp:1010-1031`); this is the same list in the same
+ * the block (`doc/CSBwin-src/SaveGame.cpp:1035-1056`); this is the same list in the same
  * order, against this port's equivalents.
  *
  * `ObjectInHand` (8) is an RN, a slot of the object indirect index block 0 carries
@@ -227,7 +227,7 @@ function buildBlock2FromGame(game: Game, runtime: RuntimeSaveState): Block2 {
  * created, who carries `portraitGraphic` (a cell of basic graphic 26, or past 23 a
  * portrait of `CSBgraphics.dat`) because the engine holds no graphics to blit from.
  * `AddCharacter` blits that portrait into the character record once
- * (`doc/CSBwin-src/Character.cpp:484-508`); this is where the
+ * (`doc/CSBwin-src/Character.cpp:485-509`); this is where the
  * port finally does the same.
  */
 function buildCharacterBlock(

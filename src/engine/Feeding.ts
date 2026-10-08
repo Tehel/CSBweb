@@ -1,6 +1,6 @@
 /**
  * `FEEDPARAMETERS` and the apply half of `_FeedCharacter`
- * (`doc/CSBwin-src/Character.cpp:3939-4497`).
+ * (`doc/CSBwin-src/Character.cpp:3956-4514`).
  *
  * CSBWin does not touch the champion while it works out what an object is worth. It
  * fills in a `FEEDPARAMETERS` block, hands the whole block to the feeding filter's DSAs
@@ -11,7 +11,7 @@
  * the engine (`CurePoison`, `AdjustStamina`, `KillCharacter`, the shield timer) through
  * the context.
  *
- * The order below is CSBWin's own (`:4348-4423`) and matters: attributes, poison,
+ * The order below is CSBWin's own (`:4365-4440`) and matters: attributes, poison,
  * stamina, shield, mana, hit points, wounds, then water and food, then the
  * stamina/HP ceilings. A champion killed by the hit-point step never reaches the
  * wound heal.
@@ -25,14 +25,14 @@ import type { GameContext } from './GameContext';
 import { CHARFLAG_PORTRAIT_CHANGED, type Champion } from './gameTypes';
 import { drawCharacterState } from './Party';
 
-/** `MAXMANA` (`doc/CSBwin-src/Character.cpp:4396`). */
+/** `MAXMANA` (`doc/CSBwin-src/Character.cpp:4413`). */
 const MAX_MANA = 900;
-/** `LIMIT(-1023, …, 2048)` on food and water (`doc/CSBwin-src/Character.cpp:4423`). */
+/** `LIMIT(-1023, …, 2048)` on food and water (`doc/CSBwin-src/Character.cpp:4440`). */
 const FOOD_WATER_MIN = -1023;
 const FOOD_WATER_MAX = 2048;
 
 /**
- * `FEEDPARAMETERS` (`doc/CSBwin-src/Character.cpp:3939-3966`).
+ * `FEEDPARAMETERS` (`doc/CSBwin-src/Character.cpp:3956-3983`).
  *
  * `potionType`/`potionStrength` are marked readonly in CSBWin — the filter may look
  * at them but changing them does nothing, because the switch that reads them has
@@ -71,7 +71,7 @@ export interface FeedParameters {
   antiFireAdjust: number;
 }
 
-/** `FEEDPARAMETERS::Clear` (`doc/CSBwin-src/Character.cpp:3969-3997`). */
+/** `FEEDPARAMETERS::Clear` (`doc/CSBwin-src/Character.cpp:3986-4014`). */
 export function clearFeedParameters(): FeedParameters {
   return {
     performFeeding: false,
@@ -104,13 +104,13 @@ export function clearFeedParameters(): FeedParameters {
   };
 }
 
-/** `sizeof(fp) / 4` (`doc/CSBwin-src/Character.cpp:4334`): the 27 longwords of `FEEDPARAMETERS`. */
+/** `sizeof(fp) / 4` (`doc/CSBwin-src/Character.cpp:4351`): the 27 longwords of `FEEDPARAMETERS`. */
 export const FEED_PARAMETER_WORDS = 27;
 
 /**
- * `memcpy(pDSAparameters + 1, &fp, sizeof(fp))` (`doc/CSBwin-src/Character.cpp:4333`): the
+ * `memcpy(pDSAparameters + 1, &fp, sizeof(fp))` (`doc/CSBwin-src/Character.cpp:4350`): the
  * block as the feeding filter's DSA sees it, a longword per field in the struct's order
- * (`:3936-3966`), a `bool32` 1 or 0.
+ * (`:3953-3983`), a `bool32` 1 or 0.
  */
 export function feedParametersToWords(fp: FeedParameters): number[] {
   const flag = (value: boolean): number => (value ? 1 : 0);
@@ -126,7 +126,7 @@ export function feedParametersToWords(fp: FeedParameters): number[] {
 }
 
 /**
- * `memcpy(&fp, pDSAparameters + 1, sizeof(fp))` (`doc/CSBwin-src/Character.cpp:4336`): the
+ * `memcpy(&fp, pDSAparameters + 1, sizeof(fp))` (`doc/CSBwin-src/Character.cpp:4353`): the
  * block back from the feeding filter's DSA, `word(i)` its longword `i`. A `bool32` is
  * true when it is not 0, as CSBWin's tests of it read it.
  */
@@ -164,7 +164,7 @@ export function feedParametersFromWords(word: (index: number) => number): FeedPa
 }
 
 /**
- * What a potion is worth (`doc/CSBwin-src/Character.cpp:4142-4268`).
+ * What a potion is worth (`doc/CSBwin-src/Character.cpp:4159-4285`).
  *
  * The three derived terms come straight from the record's `strength`, and each potion
  * uses a different one, so they are computed up front exactly as CSBWin does:
@@ -263,7 +263,7 @@ export function derivePotionFeeding(
 
 /**
  * The "Now we do the actual changes to the character's stats" block
- * (`doc/CSBwin-src/Character.cpp:4348-4430`).
+ * (`doc/CSBwin-src/Character.cpp:4365-4447`).
  *
  * `chIdx` is the caller's, not `fp.characterIndex`: CSBWin resolves `pcA2` and `chIdx`
  * *before* handing the block to the filter and never re-reads them, so a filter that
@@ -290,25 +290,25 @@ export function applyFeedParameters(
   adjustCurrentAttribute(stats[AttributeIndex.AntiMagic], fp.antiMagicAdjust);
   adjustCurrentAttribute(stats[AttributeIndex.AntiFire], fp.antiFireAdjust);
 
-  // `CurePoison` (`doc/CSBwin-src/Character.cpp:3007`).
+  // `CurePoison` (`doc/CSBwin-src/Character.cpp:3012`).
   if (fp.antiVenin) ctx.systems.monsterAttack.curePoison(chIdx);
-  // `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4413`), negated: `staminaAdjust` is a
+  // `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4451`), negated: `staminaAdjust` is a
   // gain, `AdjustStamina` takes a cost.
   ctx.systems.monsterAttack.adjustStamina(chIdx, -fp.staminaAdjust);
 
   if (fp.shieldStrengthAdjust !== 0) {
-    // `shieldStrengthAdjust` is a `ui32` (`:3953`), so the sum `:4366` tests is unsigned and
+    // `shieldStrengthAdjust` is a `ui32` (`:3970`), so the sum `:4404` tests is unsigned and
     // never below 0: a negative adjustment, which only the filter makes, wraps to 16 bits.
     champ.shieldStrength = (champ.shieldStrength + fp.shieldStrengthAdjust) & 0xffff;
-    // The `TT_72` shield-expiry timer (`doc/CSBwin-src/Character.cpp:4386-4391`).
+    // The `TT_72` shield-expiry timer (`doc/CSBwin-src/Character.cpp:4403-4408`).
     ctx.systems.timer.scheduleChampionShieldExpiry(
       chIdx,
       fp.shieldStrengthAdjust,
       fp.shieldDuration,
       party.position.z,
     );
-    // `CHARFLAG_portraitChanged` (`:4393`), which the `DrawCharacterState` that ends the
-    // feeding draws (`:4492`); nothing in between shows on the champion's box.
+    // `CHARFLAG_portraitChanged` (`:4410`), which the `DrawCharacterState` that ends the
+    // feeding draws (`:4509`); nothing in between shows on the champion's box.
     drawCharacterState(party, chIdx, CHARFLAG_PORTRAIT_CHANGED, ctx.host);
   }
 
@@ -317,7 +317,7 @@ export function applyFeedParameters(
   if (party.potentialChampionIndex !== chIdx) {
     champ.attributes.mana = limit(0, (champ.attributes.mana | 0) + fp.manaAdjust, MAX_MANA);
     if ((champ.attributes.health | 0) + fp.hitpointAdjust <= 0) {
-      // `KillCharacter` (`doc/CSBwin-src/Character.cpp:2526`).
+      // `KillCharacter` (`doc/CSBwin-src/Character.cpp:2531`).
       ctx.systems.monsterAttack.killCharacter(chIdx);
     } else {
       champ.attributes.health = (champ.attributes.health | 0) + fp.hitpointAdjust;
@@ -339,7 +339,7 @@ export function applyFeedParameters(
 }
 
 /**
- * The wound heal of a Vi potion (`doc/CSBwin-src/Character.cpp:4404-4419`).
+ * The wound heal of a Vi potion (`doc/CSBwin-src/Character.cpp:4421-4436`).
  *
  * Not "heal N wounds": the wound mask is AND-ed with `healCount` fresh random words,
  * so each pass clears roughly half the remaining bits per draw. Up to ten passes are

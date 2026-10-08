@@ -70,7 +70,7 @@ const OBJECT_DATABASES: ReadonlySet<DBType> = new Set([
 ]);
 
 /**
- * `RN::DescIndex` (`doc/CSBwin-src/data.cpp:568`). -1 for anything that has no row: a
+ * `RN::DescIndex` (`doc/CSBwin-src/data.cpp:569`). -1 for anything that has no row: a
  * door, a monster, `RNeof`, `RNnul`, or `RNempty` (0). It reads the record's index only
  * once `dbType()` has named a database with a row, as CSBWin's does, so an `RNVAL` is
  * `dbUNKNOWN` and never read as a slot.
@@ -121,7 +121,7 @@ export function DescIndexOfRecord(category: DBType, record: DatabaseRecord | nul
 }
 
 /**
- * `GetBasicObjectType` (`doc/CSBwin-src/CSBCode.cpp:1245`). `OBJNI_NOT_AN_OBJECT` for
+ * `GetBasicObjectType` (`doc/CSBwin-src/CSBCode.cpp:1255`). `OBJNI_NOT_AN_OBJECT` for
  * `RNnul` and for anything `DescIndex` has no row for.
  */
 export function GetBasicObjectType(
@@ -135,7 +135,7 @@ export function GetBasicObjectType(
   return objDescObjectType[objDI] ?? OBJNI_NOT_AN_OBJECT;
 }
 
-/** `RN::NameIndex` (`doc/CSBwin-src/data.cpp:612`). `partyFacing` is `d.partyFacing`. */
+/** `RN::NameIndex` (`doc/CSBwin-src/data.cpp:613`). `partyFacing` is `d.partyFacing`. */
 export function NameIndex(
   dungeon: DungeonState,
   tables: ObjectIndexTables,
@@ -171,7 +171,7 @@ export function NameIndex(
     objNID7 === OBJNI_ILLUMULET_A ||
     objNID7 === OBJNI_JEWEL_SYMAL_A
   ) {
-    // `value()`, `BITS14_15(word2)` (`doc/CSBwin-src/CSB.h:1273`).
+    // `value()`, `BITS14_15(word2)` (`doc/CSBwin-src/CSB.h:1276`).
     if (dungeon.getMiscRecord(object)?.specialState) objNID7++;
     return objNID7;
   }
@@ -188,7 +188,7 @@ export function NameIndex(
   return objNID7;
 }
 
-/** `RN::IsAKey` (`doc/CSBwin-src/data.cpp:686-694`) — a misc object named as a key. */
+/** `RN::IsAKey` (`doc/CSBwin-src/data.cpp:687-695`) — a misc object named as a key. */
 export function IsAKey(
   dungeon: DungeonState,
   tables: ObjectIndexTables,

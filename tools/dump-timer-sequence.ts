@@ -2,9 +2,9 @@
  * `SetTimer`'s sequence stamp across the 16-bit wrap, and across a save.
  *
  * `SetTimer` stamps each timer it queues with `m_timerSequence++`
- * (`doc/CSBwin-src/Timer.cpp:1189`), a `ui16` (`Data.h:1542`) that breaks ties between
- * timers due on the same tick (`TIMER::operator<`, `:787`, `:804`). The timer that finds
- * the counter at 0xffff first repacks the stamps in use (`:1136-1188`): stamps are cut
+ * (`doc/CSBwin-src/Timer.cpp:1189`), a `ui16` (`Data.h:1557`) that breaks ties between
+ * timers due on the same tick (`TIMER::operator<`, `:802`, `:819`). The timer that finds
+ * the counter at 0xffff first repacks the stamps in use (`:1151-1203`): stamps are cut
  * into pages of 32, the pages in use are renumbered 0, 1, 2… in their order, and each
  * stamp keeps its offset in its page. The counter is not reset, so that timer takes
  * 0xffff and the next one 0, which sorts before every repacked stamp.

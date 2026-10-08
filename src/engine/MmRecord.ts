@@ -1,5 +1,5 @@
 /**
- * `MMRECORD` (`doc/CSBwin-src/CSB.h:2884-2897`): what one group's turn tells its monster
+ * `MMRECORD` (`doc/CSBwin-src/CSB.h:2943-2956`): what one group's turn tells its monster
  * move filter. `ProcessTimers29to41` makes one per turn and hands it down, as `pmmr`, to
  * the `MoveObject`, `DeleteMonster`, `DamageMonster(Group)`, `CreateCloud`,
  * `CheckMoveFromMissile` and `ProcessMissileEncounter` the turn calls, which follow the
@@ -10,7 +10,7 @@ import { OBJECT_ID_NULL, type LocationRel, type ObjectID } from '../core/types';
 import { DsaVars } from './DsaSystem';
 import type { TimerEntry } from './TimerQueue';
 
-/** `MONSTEREVENTS` (`doc/CSBwin-src/CSB.h:2815-2868`): the turn's flags, by bit. */
+/** `MONSTEREVENTS` (`doc/CSBwin-src/CSB.h:2874-2927`): the turn's flags, by bit. */
 export enum MonsterEvents {
   MDF6TI_turnMonsterTowardParty = 0,
   TMAG_tunrMonsterGroup = 1,
@@ -87,12 +87,12 @@ export class MmRecord {
     return (this.flgs[f >>> 5]! & (1 << (f & 31))) !== 0;
   }
 
-  /** `AddObjectToRoom` putting `object` on a square (`doc/CSBwin-src/Code11f52.cpp:432-435`). */
+  /** `AddObjectToRoom` putting `object` on a square (`doc/CSBwin-src/Code11f52.cpp:467-470`). */
   objectAdded(object: ObjectID, level: number, mapX: number, mapY: number): void {
     if (object === this.objMonster) this.finalLocr = { l: level, x: mapX, y: mapY, p: 0 };
   }
 
-  /** `RemoveObjectFromRoom` taking `object` off its square (`doc/CSBwin-src/CSBCode.cpp:5185-5188`). */
+  /** `RemoveObjectFromRoom` taking `object` off its square (`doc/CSBwin-src/CSBCode.cpp:5250-5253`). */
   objectRemoved(object: ObjectID): void {
     if (object === this.objMonster) this.finalLocr = { l: -1, x: 0, y: 0, p: 0 };
   }

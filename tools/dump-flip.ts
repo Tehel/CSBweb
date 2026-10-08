@@ -1,7 +1,7 @@
 /**
- * The FLIP attack's message (`doc/CSBwin-src/Attack.cpp:1914-1924`): "IT COMES UP HEADS"
+ * The FLIP attack's message (`doc/CSBwin-src/Attack.cpp:1915-1925`): "IT COMES UP HEADS"
  * or "TAILS" through `PrintWithSubstitution(…, 4, true)`, so one print-queue entry, its
- * linefeed first, in colour 4 (`Graphics.cpp:1540-1596`). The print queue gives one entry
+ * linefeed first, in colour 4 (`Graphics.cpp:1564-1620`). The print queue gives one entry
  * a pass, so a linefeed queued on its own would show the text a pass later. The
  * translation is `DEBT.md` G21's.
  *

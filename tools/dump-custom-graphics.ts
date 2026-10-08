@@ -1,8 +1,8 @@
 /**
  * What a skin's program draws of its own graphics:
  * `DrawCustomGraphic` through `ApplyBackground` and `ApplyBackground3`, and
- * `DrawCustomDecoration` through `ApplyDecoration` (`doc/CSBwin-src/Viewport.cpp:3063-3082`,
- * `:3102-3115`, `:6124-6541`; `src/renderer/bytecode/ApplyBackground.ts`).
+ * `DrawCustomDecoration` through `ApplyDecoration` (`doc/CSBwin-src/Viewport.cpp:3070-3089`,
+ * `:3109-3122`, `:6131-6548`; `src/renderer/bytecode/ApplyBackground.ts`).
  *
  * The reference here is the blit the routines mean: each pixel the mask selects, from
  * (`srcX + c`, `srcY + r`) of the bitmap to (`dstX + c`, `dstY + r`) of the viewport,

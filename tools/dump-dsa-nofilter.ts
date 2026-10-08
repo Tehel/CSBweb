@@ -1,6 +1,6 @@
 /**
- * `NOFILTER` (`doc/CSBwin-src/DSA.cpp:462`): an operation that changes the dungeon, run by
- * a filter's DSA, says "Filter Modifying Dungeon" (`NoFilter`, `:457-460`), and does what
+ * `NOFILTER` (`doc/CSBwin-src/DSA.cpp:463`): an operation that changes the dungeon, run by
+ * a filter's DSA, says "Filter Modifying Dungeon" (`NoFilter`, `:458-461`), and does what
  * it does all the same. Each operation below runs as the one DSA of the cursor filter
  * (`CursorFilter`, `MoveObject.cpp:797-865`), whose runs are a filter's, and as an
  * ordinary DSA's program, against a genuine save (`csbgame7.dat`). Its operands make it
@@ -18,7 +18,7 @@ import type { Game } from '../src/engine/Game';
 import { freshGame, int, op, run, withFilterDsas } from './lib/dsa';
 import { check, finish } from './lib/check';
 
-/** `ESL_CURSORFILTER` (`doc/CSBwin-src/CSB.h:1544`). */
+/** `ESL_CURSORFILTER` (`doc/CSBwin-src/CSB.h:1547`). */
 const ESL_CURSORFILTER = 9;
 const SAID = 'Filter Modifying Dungeon';
 

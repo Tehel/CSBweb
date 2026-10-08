@@ -121,7 +121,7 @@ export interface GameScreenDeps {
   ctx: GameContext;
   csbGraphicsLoader?: CSBGraphicsLoader;
   /**
-   * The message area, CSBWin's global `scrollingText` (`doc/CSBwin-src/CSBCode.cpp:1352`):
+   * The message area, CSBWin's global `scrollingText` (`doc/CSBwin-src/CSBCode.cpp:1362`):
    * the one the engine writes through its host's `messages`.
    */
   messages: ScrollingText;
@@ -220,7 +220,7 @@ export class GameScreen {
 
   /**
    * A click on the Reincarnate name-entry screen. That screen reads the mouse itself and
-   * does its own geometry (`doc/CSBwin-src/Code13ea4.cpp:114-212`) — it never consults a
+   * does its own geometry (`doc/CSBwin-src/Code13ea4.cpp:118-224`) — it never consults a
    * button list, and while it is up nothing else may act on a click.
    */
   handleReincarnateClick(x: number, y: number): void {
@@ -240,7 +240,7 @@ export class GameScreen {
     return isReincarnateScreenOpen(this.ui);
   }
 
-  /** `ReIncarnate(pcA3)` (`doc/CSBwin-src/CSBCode.cpp:6738`) — open the screen. */
+  /** `ReIncarnate(pcA3)` (`doc/CSBwin-src/CSBCode.cpp:6797`) — open the screen. */
   openReincarnateScreen(chIdx: number): void {
     openReincarnateScreen(this.ui, chIdx);
   }
@@ -270,7 +270,7 @@ export class GameScreen {
     return this.ui.displayResurrectChestOrScroll;
   }
 
-  /** `ShowHideInventory` (`doc/CSBwin-src/CSBCode.cpp:7419`) — the host's `showHideInventory`. */
+  /** `ShowHideInventory` (`doc/CSBwin-src/CSBCode.cpp:7478`) — the host's `showHideInventory`. */
   showHideInventory(chIdx: number): void {
     handleInventoryToggle(this.ui, chIdx);
   }
@@ -280,17 +280,17 @@ export class GameScreen {
     releaseEyeOrMouth(this.ui);
   }
 
-  /** `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`) — the host's `repackChest`. */
+  /** `RepackChest` (`doc/CSBwin-src/Character.cpp:3113`) — the host's `repackChest`. */
   repackChest(): void {
     repackOpenChest(this.ui);
   }
 
-  /** `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108`) — the host's `tag02076e`. */
+  /** `TAG02076e` (`doc/CSBwin-src/Character.cpp:5133`) — the host's `tag02076e`. */
   tag02076e(): void {
     tag02076e(this.ui);
   }
 
-  /** `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934`) — the host's `tag0207cc`. */
+  /** `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:10058`) — the host's `tag0207cc`. */
   tag0207cc(): void {
     tag0207cc(this.ui);
   }
@@ -306,7 +306,7 @@ export class GameScreen {
   /**
    * A button `Game.handleMouseEvents` took off the mouse queue and does not handle itself.
    * `DiskMenuNeeded` is raised by the disk icon's handler and acted on by whoever called
-   * `HandleMouseEvents` — the main loop in CSBWin (`doc/CSBwin-src/CSBCode.cpp:762`), this
+   * `HandleMouseEvents` — the main loop in CSBWin (`doc/CSBwin-src/CSBCode.cpp:772`), this
    * method here. The deferral is the whole reason the flag exists. The Oracle's button
    * and the Sleepsave raise flags of their own, acted on here the same way.
    */
@@ -349,7 +349,7 @@ export class GameScreen {
     return this.ui.hintOracleUp;
   }
 
-  /** The button-up, `0x0add` (`doc/CSBwin-src/Mouse.cpp:1523-1549`). */
+  /** The button-up, `0x0add` (`doc/CSBwin-src/Mouse.cpp:1662-1688`). */
   handleMouseUnclick(): void {
     handleMouseUnclick(this.ui);
   }
@@ -405,7 +405,7 @@ export class GameScreen {
    * `AddCharacter`'s portrait blit, deferred to save time.
    *
    * CSBWin copies a cell of basic graphic 26 into the character record the moment a
-   * champion joins (`doc/CSBwin-src/Character.cpp:486-495`), so `CHARDESC` always holds
+   * champion joins (`doc/CSBwin-src/Character.cpp:487-496`), so `CHARDESC` always holds
    * pixels. This engine holds no graphics, so a champion it created carries the cell
    * *index* instead and the pixels are resolved here — the save writer asks for them
    * when it packs block 4.
@@ -419,7 +419,7 @@ export class GameScreen {
     // Another party is another game, loaded or begun, which CSBWin draws afresh: nothing
     // `TAG02076e` shaded survives it (a quick-load over a sleeping party, which no
     // `TAG0207cc` follows).
-    // Nor does a champion in hand (`d.Word23144 = 0`, `doc/CSBwin-src/CSBCode.cpp:10485`).
+    // Nor does a champion in hand (`d.Word23144 = 0`, `doc/CSBwin-src/CSBCode.cpp:10609`).
     if (state !== this.ui.partyState) {
       this.ui.shadedByTag02076e = false;
       this.ui.arrowCursorShape = false;
@@ -443,7 +443,7 @@ export class GameScreen {
   /**
    * Whether the pointer has moved since the cursor was last drawn: a redraw is due.
    * CSBWin's cursor is drawn by the VBL handler and by nothing else
-   * (`doc/CSBwin-src/CSBCode.cpp:1040-1043`), where `checkVBL` last found the mouse
+   * (`doc/CSBwin-src/CSBCode.cpp:1050-1053`), where `checkVBL` last found the mouse
    * (`system.cpp:596-616`), so it moves once a VBL at most, however many moves the mouse
    * reports in between.
    */
@@ -466,8 +466,8 @@ export class GameScreen {
   }
 
   /**
-   * `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8799`), which CSBWin's main loop calls
-   * once per game tick (`:685`), after the tick's `DrawViewport` (`:638`). The port runs
+   * `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8904`), which CSBWin's main loop calls
+   * once per game tick (`:695`), after the tick's `DrawViewport` (`:648`). The port runs
    * it just before its one redraw of the whole screen, so what it changes on the
    * panels shows in the same frame.
    */
@@ -520,7 +520,7 @@ export class GameScreen {
    */
   initializePlayState(): void {
     // `Cleanup(false)`'s `backgroundLib.Cleanup` and `CleanupAltMonCache`, before the game
-    // that follows a lost one (`doc/CSBwin-src/Code1f9e6.cpp:302`, `Graphics.cpp:2204-2206`).
+    // that follows a lost one (`doc/CSBwin-src/Code1f9e6.cpp:302`, `Graphics.cpp:2230-2232`).
     // The first game starts with the screen's own, empty.
     this.viewport.context.backgroundLib?.Cleanup();
     this.viewport.context.altMonCache?.CleanupAltMonCache();
@@ -533,10 +533,10 @@ export class GameScreen {
   }
 
   /**
-   * `DrawViewport(facing, x, y)` (doc/CSBwin-src/Viewport.cpp:6694) for the party at
+   * `DrawViewport(facing, x, y)` (doc/CSBwin-src/Viewport.cpp:6701) for the party at
    * `position`, then the interface over it. `word1868` is the engine's `d.Word1868`
    * (`GameState.word1868`). CSBWin calls it from the main loop's tick
-   * (`CSBCode.cpp:638`), a script's tick (`Attack.cpp:2205`) and the prison door's
+   * (`CSBCode.cpp:648`), a script's tick (`Attack.cpp:2207`) and the prison door's
    * interior (`renderPrisonInterior`), and the port nowhere else: `DrawViewport` runs
    * `GraphicRandom` and the viewport's own random numbers, so a draw off the tick moves
    * the teleporter's shimmer. Everything else composes the screen again with
@@ -564,11 +564,11 @@ export class GameScreen {
     drawStaticUIFrame(this.ui);
     const inventoryOpen = this.ui.partyState.selectedCharacterIndex >= 0;
     // The inventory is drawn into the viewport bitmap (`TAG022a60(17, d.pViewportBMP)`,
-    // doc/CSBwin-src/CSBCode.cpp:7493), so the freeze's flood covers it, and nothing draws
+    // doc/CSBwin-src/CSBCode.cpp:7552), so the freeze's flood covers it, and nothing draws
     // it again until the thaw's `TAG0207cc` shows it.
     const frozen = this.isFrozen();
-    // Frozen, no tick runs (doc/CSBwin-src/CSBCode.cpp:765), so nothing draws over "GAME
-    // FROZEN". Asleep, the tick draws no viewport (`:637`), and `DisplaySleepScreen` holds
+    // Frozen, no tick runs (doc/CSBwin-src/CSBCode.cpp:775), so nothing draws over "GAME
+    // FROZEN". Asleep, the tick draws no viewport (`:647`), and `DisplaySleepScreen` holds
     // it. Both screens stay in the viewport until the next `DrawViewport`.
     if (frozen) displayFrozenScreen(this.ui);
     else if (this.ui.partyState.sleeping) displaySleepScreen(this.ui);
@@ -601,7 +601,7 @@ export class GameScreen {
     drawMessageLines(this.ui, this.messages);
     if (this.ui.shadedByTag02076e) {
       // `TAG02076e` shades the movement-arrow area, unless an inventory is open, then the
-      // magic and weapon-ready areas (`doc/CSBwin-src/Character.cpp:5118-5132`), until
+      // magic and weapon-ready areas (`doc/CSBwin-src/Character.cpp:5143-5157`), until
       // `TAG0207cc` redraws them (`tag02076e` lists the callers).
       if (!inventoryOpen) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
       shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
@@ -614,8 +614,8 @@ export class GameScreen {
     }
     // The button flash's inversion (`vblFlashButn`), for as long as `d.Word11776` says it
     // stands. The cursor goes over it: the VBL takes the cursor off before a flash right
-    // of `x = 192`, where every flashed button is (doc/CSBwin-src/CSBCode.cpp:883-884),
-    // and draws it back after (`:1039-1042`).
+    // of `x = 192`, where every flashed button is (doc/CSBwin-src/CSBCode.cpp:893-894),
+    // and draws it back after (`:1049-1052`).
     const flashed = flashedButton(this.ui.ctx);
     if (flashed) vblFlashButn(this.screen, flashed);
     drawCursorItem(this.ui, !inventoryOpen);
@@ -683,7 +683,7 @@ export class GameScreen {
     return this.getViewportPalette()?.slice() ?? null;
   }
 
-  /** `d.Palette552[d.CurrentPalette]`, as the VBL handler loads it (`doc/CSBwin-src/CSBCode.cpp:1011-1014`). */
+  /** `d.Palette552[d.CurrentPalette]`, as the VBL handler loads it (`doc/CSBwin-src/CSBCode.cpp:1021-1024`). */
   private getViewportPalette(): number[] | null {
     const palettes = this.viewport.viewportPalettes;
     if (!palettes || palettes.length === 0) return null;
@@ -754,7 +754,7 @@ export class GameScreen {
    * the screen, which the entrance's host presents with its cursor on it.
    *
    * `_ReadEntireGame` reaches the chooser through `SelectSaveGame(_9_, 1, 1, 1)`
-   * (`doc/CSBwin-src/SaveGame.cpp:1563`), whose leading 1 is `_DoMenu`'s `FadeOldScreen` /
+   * (`doc/CSBwin-src/SaveGame.cpp:1688`), whose leading 1 is `_DoMenu`'s `FadeOldScreen` /
    * `ClearOldScreen` pair (`doc/CSBwin-src/Menu.cpp:285-291`): the screen under the chooser
    * is cleared, which `drawSaveMenu` does for either menu.
    */

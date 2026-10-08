@@ -4,16 +4,16 @@
  *
  * 1. **A read keeps them**: `csbgame7.dat` given a key and four canary signatures, its
  *    block's checksum made again, is read (`ReadExtendedFeatures`,
- *    `doc/CSBwin-src/SaveGame.cpp:378-382`): the key is the world's, and the signatures
+ *    `doc/CSBwin-src/SaveGame.cpp:380-384`): the key is the world's, and the signatures
  *    the game's.
- * 2. **A save writes them back** (`SaveGame.cpp:936-941`), and the file it writes reads
+ * 2. **A save writes them back** (`SaveGame.cpp:961-966`), and the file it writes reads
  *    back into another game with all five.
  * 3. **A file without a block**: a new game from `dm-atari/dungeon.dat`, which has none,
  *    leaves the key zero, as `ReadExtendedFeatures` zeroes it before it looks for a block
- *    (`:314`), and the signatures as they were, which it never clears. Its save writes
+ *    (`:316`), and the signatures as they were, which it never clears. Its save writes
  *    zeros for the key and the canaries for the signatures.
  * 4. **The Oracle reads `hcsb.hct` under the key** (`SETENCIPHERED`,
- *    `doc/CSBwin-src/Hint.cpp:5401-5405`, `system.cpp:274-286`): the retail file,
+ *    `doc/CSBwin-src/Hint.cpp:6145-6149`, `system.cpp:274-286`): the retail file,
  *    enciphered under the key, reads under the world's key as the plain file reads; with
  *    no key it fails the first header check, and a key whose first byte is 0 reads the
  *    plain file plain.

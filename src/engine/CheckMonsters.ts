@@ -1,8 +1,8 @@
 /**
- * `CheckMonsters` and `CheckMonster` (`doc/CSBwin-src/SaveGame.cpp:1279-1365`): cut every
+ * `CheckMonsters` and `CheckMonster` (`doc/CSBwin-src/SaveGame.cpp:1380-1466`): cut every
  * group to what its creatures' size lets share a cell.
  *
- * `_ReadEntireGame` calls `CheckMonsters` once the whole file is read (`:1826`), a new
+ * `_ReadEntireGame` calls `CheckMonsters` once the whole file is read (`:2029`), a new
  * game's and a save's alike, with no gate, between `CheckCelltypes` and `ExtendPortraits`
  * (both in `src/data/CsbwinDungeonConversions.ts`, run by `DungeonLoader`). It needs
  * `MonsterDescriptor`'s sizes, so it runs where the tables are: `Game`'s constructor, for
@@ -11,10 +11,10 @@
  *
  * It reads `groupIndex` as the packed positions, but in a save a group on the party's
  * level holds its `ITEM16` index there: CSBWin writes the file before it detaches them
- * (`:1243`), and reads the pool back before this runs (`:1668-1675`). So a fix to such a
+ * (`:1341`), and reads the pool back before this runs (`:1793-1801`). So a fix to such a
  * group writes a position byte over the index. The game's start undoes it:
- * `LoadPartyLevel` detaches every slot first (`CSBCode.cpp:795`), and `DetachItem16`
- * writes `groupIndex` and `facing` back from the slot (`CSBCode.cpp:6127-6131`);
+ * `LoadPartyLevel` detaches every slot first (`CSBCode.cpp:805`), and `DetachItem16`
+ * writes `groupIndex` and `facing` back from the slot (`CSBCode.cpp:6186-6190`);
  * `reloadAfterSaveGame` is that call here. What stays is the cut `numMonM1`.
  */
 import { DBType, OBJECT_ID_EOF, Position } from '../core/types';
@@ -30,7 +30,7 @@ export type MessageBox = (line: string) => void;
 let warning4Issued = false;
 let warning2Issued = false;
 
-/** `FindNextMonster` (`doc/CSBwin-src/Code11f52.cpp:544-550`). */
+/** `FindNextMonster` (`doc/CSBwin-src/Code11f52.cpp:579-585`). */
 function FindNextMonster(dungeon: DungeonState, obj: ObjectID): ObjectID {
   for (obj = dungeon.getDBRecordLink(obj);
        obj !== OBJECT_ID_EOF && dungeon.rnMaps.dbType(obj) !== DBType.CREATURE;
@@ -38,7 +38,7 @@ function FindNextMonster(dungeon: DungeonState, obj: ObjectID): ObjectID {
   return obj;
 }
 
-/** `CheckMonster` (`doc/CSBwin-src/SaveGame.cpp:1279-1340`). */
+/** `CheckMonster` (`doc/CSBwin-src/SaveGame.cpp:1380-1441`). */
 export function CheckMonster(
   dungeon: DungeonState, monsterDesc: ArrayLike<MonsterDesc>, obj: ObjectID, messageBox: MessageBox,
 ): void {
@@ -92,7 +92,7 @@ export function CheckMonster(
   }
 }
 
-/** `CheckMonsters` (`doc/CSBwin-src/SaveGame.cpp:1342-1365`): every group on every level. */
+/** `CheckMonsters` (`doc/CSBwin-src/SaveGame.cpp:1443-1466`): every group on every level. */
 export function CheckMonsters(dungeon: DungeonState, monsterDesc: ArrayLike<MonsterDesc>, messageBox: MessageBox): void {
   const numLevel = dungeon.getData().maps.length;
   for (let level = 0; level < numLevel; level++) {

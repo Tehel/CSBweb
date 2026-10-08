@@ -18,8 +18,8 @@ program, not to the dungeon. It is not ported.)
 
 The icon is not hit-tested by any special code. It is entry 1 of the inventory panel's
 secondary button list, which `ShowHideInventory` installs on open
-(`doc/CSBwin-src/CSBCode.cpp:7518` — `d.SecondaryButtonList = d.Buttons17760;`, swapped
-back to `d.Buttons17304` on close at `:7481`).
+(`doc/CSBwin-src/CSBCode.cpp:7577` — `d.SecondaryButtonList = d.Buttons17760;`, swapped
+back to `d.Buttons17304` on close at `:7540`).
 
 **(from data)** `buttons17760[1] = { word0: 140, x 174..182, y 36..44, button: 2 }` — an
 8×8 left-click-only hot spot in screen coordinates. Its neighbours in the same list are
@@ -32,7 +32,7 @@ This port already installs `buttons17760`: `syncInventoryButtons`
 (`src/renderer/ui/Mouse.ts`). Until the save menu existed, id 140 simply fell through
 `handleMouseButton` unhandled.
 
-The dispatch is a **deferral**, not a call (`doc/CSBwin-src/Mouse.cpp:1708-1727`):
+The dispatch is a **deferral**, not a call (`doc/CSBwin-src/Mouse.cpp:1847-1866`):
 
 ```c
   if (D6W == 140)
@@ -49,9 +49,9 @@ The dispatch is a **deferral**, not a call (`doc/CSBwin-src/Mouse.cpp:1708-1727`
 ```
 
 `DiskMenuNeeded` is cleared at the top of every `HandleMouseEvents`
-(`doc/CSBwin-src/Mouse.cpp:1370`) and acted on by each of its callers — the main loop
-(`CSBCode.cpp:762`), `_WaitForMenuSelect` itself (`Menu.cpp:75`, so the menu can be
-re-opened from inside a menu), the prison-door loop (`CSBCode.cpp:9532`) and the
+(`doc/CSBwin-src/Mouse.cpp:1471`) and acted on by each of its callers — the main loop
+(`CSBCode.cpp:772`), `_WaitForMenuSelect` itself (`Menu.cpp:75`, so the menu can be
+re-opened from inside a menu), the prison-door loop (`CSBCode.cpp:9654`) and the
 death/restart loop (`Code1f9e6.cpp:273`).
 
 Both guards matter: **no champion in the party**, or a champion only provisionally in it
@@ -62,7 +62,7 @@ Both guards matter: **no champion in the party**, or a champion only provisional
 
 `_DoMenu` opens with `ExpandGraphic((i8*)d.compressedGraphic0, d.pViewportBMP, 0, 0)`
 (`doc/CSBwin-src/Menu.cpp:268`). `d.compressedGraphic0` is filled by `ReadGraphic(0, …)`
-(`doc/CSBwin-src/Graphics.cpp:2002-2005`), so it is **item 0 of `graphics.dat`** —
+(`doc/CSBwin-src/Graphics.cpp:2028-2031`), so it is **item 0 of `graphics.dat`** —
 239 bytes after the file's own decompression, expanding to **224×136**, one byte per
 pixel. `GraphicsLoader.getImage(0)` produces exactly that, so the port needs no separate
 `ExpandGraphic`.
@@ -103,7 +103,7 @@ All four rectangles are **(from data)**, `graphics.dat` item 0x231, already extr
 ```
 
 A fixed 6-pixel cell, so centring is `x - 3*len`; **fg 9 on bg 5**. The glyph cell starts
-at `y-4` and is 6 rows tall (`doc/CSBwin-src/Graphics.cpp:317`, `:210`) — which is
+at `y-4` and is 6 rows tall (`doc/CSBwin-src/Graphics.cpp:318`, `:211`) — which is
 already `drawTextLineIndex`'s convention in `src/renderer/csbwin/TextRenderer.ts`.
 
 Titles (`Menu.cpp:352-449`) start at **y = 29**, or **21** when `SplitLongLine` split
@@ -132,7 +132,7 @@ empty — CSBWin does not fall back to a hard break.
 (`Menu.cpp:450-465`.) With `I1 == 0` the bitmap stays in the viewport, which is already at
 screen **(0,33)**; with `I1 != 0` it is blitted to screen **(47,33)**, centred. The
 in-game disk menu uses `I1 == 0`, so the portraits and panels stay visible beside it; the
-boot-time load screen and "GAME LOADED, READY TO PLAY." (`CSBCode.cpp:10499-10508`) use
+boot-time load screen and "GAME LOADED, READY TO PLAY." (`CSBCode.cpp:10623-10632`) use
 `I1 == 1`.
 
 `videoMode` becomes `VM_CENTERMENU` when `ClearOldScreen` is set and `VM_LEFTMENU`
@@ -150,7 +150,7 @@ rectangles below are already in screen space, and why the two sets differ by exa
 
 ## The button rectangles
 
-`d.pButn18970[2][4]` is wired at `doc/CSBwin-src/CSBCode.cpp:304-311`;
+`d.pButn18970[2][4]` is wired at `doc/CSBwin-src/CSBCode.cpp:314-321`;
 `_WaitForMenuSelect` picks `d.pButn18970[P2][numButton-1]` (`Menu.cpp:64`). Set 0 is the
 in-viewport menu, set 1 the centred one. Every entry is left-button (`button = 2`) and the
 ids are **210..213**. **(from data)**, all screen coordinates:
@@ -182,7 +182,7 @@ whole input mapping and restoring it afterwards:
   d.Word11764 = 99;
 ```
 
-`d.Word11764` is written in one place only (`doc/CSBwin-src/Mouse.cpp:1792-1796`):
+`d.Word11764` is written in one place only (`doc/CSBwin-src/Mouse.cpp:1931-1935`):
 `if ((D6W >= 210) && (D6W <= 213)) d.Word11764 = sw(D6W - 209);`. Everything else in the
 panel is unreachable because both lists were replaced. Keyboard: **no key selects a
 button.** Key translation is off, and the one-button arm that reads a key calls
@@ -193,16 +193,16 @@ button lists and both `pKeyXlate`s are restored and `DiscardAllInput()` is calle
 ### Nothing pauses the clock
 
 There is no pause flag. `d.Time++` occurs in exactly two places — the main loop
-(`doc/CSBwin-src/CSBCode.cpp:660`, which also drives `scrollingText.ClockTick`, the timer
+(`doc/CSBwin-src/CSBCode.cpp:670`, which also drives `scrollingText.ClockTick`, the timer
 processing in `TAG01b29a`, `TenSecondUpdate` and `NinetySecondUpdate`) and
-`doc/CSBwin-src/Attack.cpp:2208`. While the menu loop is running, control never returns
-to `CSBCode.cpp:660`: the inner loop only does `HandleMouseEvents` + `wvbl`
+`doc/CSBwin-src/Attack.cpp:2210`. While the menu loop is running, control never returns
+to `CSBCode.cpp:670`: the inner loop only does `HandleMouseEvents` + `wvbl`
 (`Menu.cpp:68-98`). So the clock, the timers and the monsters are frozen as a
 side-effect of the loop structure.
 
 (The separate *freeze game* button, id 147, is a real clock stop: `d.ClockRunning = 0`,
 `videoMode = VM_FROZEN`, `"GAME FROZEN"` at (81,69) fg 4 / bg 0, and
-`d.PrimaryButtonList = d.Buttons17832` so only id 148 thaws it — `Mouse.cpp:1731-1773`,
+`d.PrimaryButtonList = d.Buttons17832` so only id 148 thaws it — `Mouse.cpp:1870-1912`,
 `doc/PROVEN_FACTS.md` → "The freeze". It is *not* what the disk menu uses.)
 
 Since nothing in this port can block, the loop is turned inside out exactly as
@@ -234,9 +234,9 @@ screen holds. Evidence: `tools/dump-save-menu.ts`, "the press animation".
 
 ## Entering and leaving
 
-`TAG02076e` (`doc/CSBwin-src/Character.cpp:5108`) runs *before* the menu
-(`SaveGame.cpp:860`), and on the way to sleep (`Mouse.cpp:1691`), at the freeze (`:1736`)
-and once a Hall of Champions candidate's inventory is shown (`Character.cpp:797`):
+`TAG02076e` (`doc/CSBwin-src/Character.cpp:5133`) runs *before* the menu
+(`SaveGame.cpp:877`), and on the way to sleep (`Mouse.cpp:1830`), at the freeze (`:1875`)
+and once a Hall of Champions candidate's inventory is shown (`Character.cpp:798`):
 
 ```c
   if (d.PartySleeping) return;
@@ -253,36 +253,36 @@ and once a Hall of Champions candidate's inventory is shown (`Character.cpp:797`
 Note the either/or: an **open** inventory gets its chest repacked, a **closed** one gets
 the movement arrows shaded. The repack is what puts the chest's objects in the save: an
 open chest's objects are in `d.rnChestContents`, out of its chain: `ShowChestContents`
-clears their links and the chest's `contents` (`Character.cpp:3088-3101`), and `RepackChest` links them
-back (`:3108-3154`). `SetCursorShape(0)` clears `d.Word23146`, the object cursor,
-and sets `d.CursorShape` to 0, the arrow (`CSBCode.cpp:1963-1972`), and the cursor draw
-takes the arrow for both (`CSBCode.cpp:2254-2255`).
+clears their links and the chest's `contents` (`Character.cpp:3093-3106`), and `RepackChest` links them
+back (`:3113-3159`). `SetCursorShape(0)` clears `d.Word23146`, the object cursor,
+and sets `d.CursorShape` to 0, the arrow (`CSBCode.cpp:1992-2001`), and the cursor draw
+takes the arrow for both (`CSBCode.cpp:2287-2288`).
 
 The arrow lasts only until the cursor is set from the hand again, and `TAG0207cc` is not
-the only thing that does it. `RemoveObjectFromHand` calls `TAG002572` (`Mouse.cpp:636`),
+the only thing that does it. `RemoveObjectFromHand` calls `TAG002572` (`Mouse.cpp:637`),
 and `ObjectToCursor` with its second argument 0 calls `CreateObjectCursor`
-(`CSBCode.cpp:6864-6871`), which sets `d.Word23146` again (`:1976-1984`). Both run under the
+(`CSBCode.cpp:6923-6930`), which sets `d.Word23146` again (`:2005-2013`). Both run under the
 Hall of Champions' `TAG02076e`, whose candidate's inventory takes clicks:
 `HandleClothingClick` empties the hand with the first and fills it with
-`ObjectToCursor(objD4, 0)` (`:6974-6992`), and feeding empties it with the first
-(`Character.cpp:4480`). So an object taken from the candidate's inventory is on the cursor,
+`ObjectToCursor(objD4, 0)` (`:7033-7051`), and feeding empties it with the first
+(`Character.cpp:4497`). So an object taken from the candidate's inventory is on the cursor,
 and the three areas stay shaded.
 
-`TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934-9968`) is the mirror, called on the way out
-(`SaveGame.cpp:1274`, and at `:854` after "SAVES ARE DISABLED", which skipped
-`TAG02076e`), at the thaw (`Mouse.cpp:1765`), last in `WakeUp` (`CSBCode.cpp:7061`), and
-by `_ResurrectReincarnateCancel` once the candidate's inventory is hidden (`:6657`,
-`:6808`). The main loop's call of the pair is dead (`doc/PROVEN_FACTS.md` →
-"`d.Word11722` is always zero"). Asleep it only redraws the sleep screen (`:9938-9942`). Otherwise it selects
+`TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:10058-10092`) is the mirror, called on the way out
+(`SaveGame.cpp:1375`, and at `:871` after "SAVES ARE DISABLED", which skipped
+`TAG02076e`), at the thaw (`Mouse.cpp:1904`), last in `WakeUp` (`CSBCode.cpp:7120`), and
+by `_ResurrectReincarnateCancel` once the candidate's inventory is hidden (`:6716`,
+`:6867`). The main loop's call of the pair is dead (`doc/PROVEN_FACTS.md` →
+"`d.Word11722` is always zero"). Asleep it only redraws the sleep screen (`:10062-10066`). Otherwise it selects
 the magic caster again through `SelectMagicCaster` with `d.MagicCaster` set to -1 first,
-which refuses a dead champion (`Magic.cpp:723-724`) and so leaves none; sets
-`d.Word20252 = 1`, the attack buttons, when no attack menu is open (`:9948-9951`); redraws
+which refuses a dead champion (`Magic.cpp:726-727`) and so leaves none; sets
+`d.Word20252 = 1`, the attack buttons, when no attack menu is open (`:10072-10075`); redraws
 the legal attack types; either shuts the open inventory without a repack
 (`d.SelectedCharacterOrdinal = 0`) and shows it again with `ShowHideInventory(D7W-1)`, or
-redraws the viewport and movement buttons (`:9953-9964`); then `TAG002572` puts the cursor
-back from the hand (`:2030-2050`).
+redraws the viewport and movement buttons (`:10077-10088`); then `TAG002572` puts the cursor
+back from the hand (`:2059-2079`).
 
-`_ReadEntireGame` (`SaveGame.cpp:1435`), the load at the entrance, calls neither.
+`_ReadEntireGame` (`SaveGame.cpp:1536`), the load at the entrance, calls neither.
 
 The port: `tag02076e` and `tag0207cc` in `src/renderer/ui/Mouse.ts`, which `SaveMenu.ts`
 calls around its full screen and not its load-only one, the freeze around its frozen game,
@@ -299,29 +299,29 @@ latter also for the candidate's object on the cursor.
 
 ## What the disk menu itself does
 
-`_DisplayDiskMenu` (`doc/CSBwin-src/SaveGame.cpp:817`):
+`_DisplayDiskMenu` (`doc/CSBwin-src/SaveGame.cpp:825`):
 
-- `:847` `DiskMenuNeeded = false;`
-- `:848-856` if saves are disabled: `DoMenu(…, "SAVES ARE DISABLED", "OK", …)` and return.
-- `:870-877` the three-button menu — title2 `"READY TO SAVE GAME"`, options
+- `:855` `DiskMenuNeeded = false;`
+- `:856-873` if saves are disabled: `DoMenu(…, "SAVES ARE DISABLED", "OK", …)` and return.
+- `:889-901` the three-button menu — title2 `"READY TO SAVE GAME"`, options
   `"SAVE AND PLAY"`, `"SAVE AND QUIT"`, `"CANCEL"`, then `WaitForMenuSelect(3, 0, 0, 0)`.
-- `:891` result 3 (CANCEL) jumps to the exit; otherwise `D6W = (D5W == 1)` records
-  "and play" and `SelectSaveGame(0, 0, 1)` (`:896`) chooses the slot.
-- `:901` `DoMenu(…, "SAVING GAME . . .", 0, …)` — a title-only menu with no buttons, left
-  on screen during the write; `:902-908` rotates the `.BAK`; `:1266-1268`
+- `:915` result 3 (CANCEL) jumps to the exit; otherwise `D6W = (D5W == 1)` records
+  "and play" and `SelectSaveGame(0, 0, 1)` (`:920`) chooses the slot.
+- `:925` `DoMenu(…, "SAVING GAME . . .", 0, …)` — a title-only menu with no buttons, left
+  on screen during the write; `:926-932` rotates the `.BAK`; `:1363-1369`
   `"UNABLE TO SAVE GAME!"` + `"OK"` on failure.
-- `:1248-1252` "save and quit" runs `ShowCredits`.
-- `:1271-1275` the exit path: `FreeTempMemory(512); InsertDisk(…); TAG0207cc();`.
+- `:1346-1350` "save and quit" runs `ShowCredits`.
+- `:1372-1376` the exit path: `FreeTempMemory(512); InsertDisk(…); TAG0207cc();`.
 
-The load side is `_ReadEntireGame` (`:1435`): `DoMenu(…, "LOAD SAVED GAME", "CANCEL",
-NULL, NULL, 1, 1, 1)` at `:1549` — note `I1 = ClearOldScreen = FadeOldScreen = 1`, the
+The load side is `_ReadEntireGame` (`:1536`): `DoMenu(…, "LOAD SAVED GAME", "CANCEL",
+NULL, NULL, 1, 1, 1)` at `:1665` — note `I1 = ClearOldScreen = FadeOldScreen = 1`, the
 centred, full-screen variant — then `WaitForMenuSelect(2, 1, 2, 1)` and
-`SelectSaveGame(1, 1, 1)` at `:1563`.
+`SelectSaveGame(1, 1, 1)` at `:1688`.
 
 ### The four slots
 
-`_SelectSaveGame` (`doc/CSBwin-src/CSBCode.cpp:9738`). The limit is literally
-`char fNames[4][20]` (`:9744-9761`) holding `"  CSBGAME.DAT"`, `"  CSBGAME2.DAT"`,
+`_SelectSaveGame` (`doc/CSBwin-src/CSBCode.cpp:9862`). The limit is literally
+`char fNames[4][20]` (`:9868-9885`) holding `"  CSBGAME.DAT"`, `"  CSBGAME2.DAT"`,
 `"  CSBGAME3.DAT"`, `"  CSBGAME4.DAT"` — two leading spaces reserved for a rank letter.
 
 ```c
@@ -337,8 +337,8 @@ centred, full-screen variant — then `WaitForMenuSelect(2, 1, 2, 1)` and
     };
 ```
 
-(`:9766-9800`.) So each existing file is prefixed by its recency rank — **'A' is the
-oldest, 'D' the newest** — and the list *is* the four-button menu (`:9804-9816`). There is
+(`:9890-9924`.) So each existing file is prefixed by its recency rank — **'A' is the
+oldest, 'D' the newest** — and the list *is* the four-button menu (`:9928-9940`). There is
 no scrolling list widget anywhere in CSBWin, and the only per-slot information shown is
 the filename and that letter. `P1` doubles as `I1`, `ClearOldScreen`, `FadeOldScreen`
 *and* as the button-set selector.
@@ -374,11 +374,11 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    SAVE, EXPORT and CANCEL. A frame takes the rectangle CSBWin's table gives graphic 0's
    own, the frame less six pixels a side, and its label where `_DoMenu` centres one
    (`buttonRect` and `buttonLabelAt`, `src/renderer/ui/SaveMenu.ts`); a button that can
-   do nothing has no label, as CSBWin's empty slot has none (`CSBCode.cpp:9772`).
+   do nothing has no label, as CSBWin's empty slot has none (`CSBCode.cpp:9896`).
 
    **The screen under it is cleared**, in the game too. The disk menu's `_DoMenu` gets 0
    for `ClearOldScreen` and leaves the picture around the viewport
-   (`SaveGame.cpp:870-877`); the dialog would leave an 8-pixel ring of it.
+   (`SaveGame.cpp:889-901`); the dialog would leave an 8-pixel ring of it.
 2. **Per-save day, time and level, under its playthrough's party**, where CSBWin shows a
    filename and a rank letter. The rank letter is what the date replaces; the ordering
    rule within a playthrough is the same one (`modifiedTime`), only shown directly and
@@ -403,14 +403,14 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    MODIFIED VERSION OF" over the dungeon's name, with CONFIRM and CANCEL. A save of
    another dungeon, or of an unknown one, is refused in a one-option menu, under OK. A
    file that does not read is the dialog's message, CSBWin's own "SAVED GAME DAMAGED!"
-   (`SaveGame.cpp:1906`).
+   (`SaveGame.cpp:2118`).
 6. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
    addition, not a changed behaviour, as are the list's other keys (the arrows, Home
    and End, Page Up and Down, Enter for LOAD), the wheel, and a double click on a save,
    which is LOAD. The entrance's chooser takes them as the disk menu does.
 7. **A question before a load or a save across playthroughs.** CSBWin's four slots are
    one directory's, and it tests `d.RandomGameID` only when a lost game is read again,
-   where it refuses the save: "THAT'S NOT THE SAME GAME" (`SaveGame.cpp:1604-1606`). The
+   where it refuses the save: "THAT'S NOT THE SAME GAME" (`SaveGame.cpp:1729-1731`). The
    port's list holds every playthrough of the data set, so LOAD and SAVE on a save of
    another playthrough than the running game's, and LOAD on its heading, put that line
    up as a two-option
@@ -418,12 +418,12 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    the first. Esc and a right-click there cancel the question alone. The load-only
    chooser never asks.
 8. **No "GAME LOADED, READY TO PLAY."** After a load at the entrance, CSBWin's
-   `_TAG021028` loops on that menu, PLAY GAME over ASCII DUMP (`CSBCode.cpp:10493-10515`).
+   `_TAG021028` loops on that menu, PLAY GAME over ASCII DUMP (`CSBCode.cpp:10617-10639`).
    The port puts none up: a loaded game is played at once, and `AsciiDump` is unported
    (`DEBT.md` G14). What the menu did to the chooser's picture is kept, the fade to
    black and the cleared screen (`tag021028`, `src/renderer/intro/BootSequence.ts`).
 9. **The dialog while saves are disabled.** After a DSA's `&DISABLESAVES`, CSBWin's disk
-   menu is only "SAVES ARE DISABLED" over OK (`SaveGame.cpp:848-856`): it did nothing
+   menu is only "SAVES ARE DISABLED" over OK (`SaveGame.cpp:856-873`): it did nothing
    but save. The port's dialog loads and exports too, so it opens as ever with that
    line as its message, SAVE inert and unlabelled, and no "NEW SAVE" row
    (`savesDisabled`, `src/renderer/ui/SaveMenu.ts`). F5 says the same line and saves

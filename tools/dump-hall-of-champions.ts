@@ -2,10 +2,10 @@
  * The Hall of Champions: adding a champion at a mirror, then Resurrect, Reincarnate or
  * Cancel.
  *
- * `AddCharacter` (`doc/CSBwin-src/Character.cpp:456`) does not finish the job — it puts
+ * `AddCharacter` (`doc/CSBwin-src/Character.cpp:457`) does not finish the job — it puts
  * the champion in the party *provisionally*, marked by `d.PotentialCharacterOrdinal`,
  * and leaves their possessions still linked in the mirror's cell.
- * `_ResurrectReincarnateCancel` (`doc/CSBwin-src/CSBCode.cpp:6615`) is what commits or
+ * `_ResurrectReincarnateCancel` (`doc/CSBwin-src/CSBCode.cpp:6674`) is what commits or
  * undoes that, and none of it is visible on a golden frame.
  *
  * This drives the real click path — `MouseSystem.handleWallClick` on the real level-0 mirrors
@@ -169,7 +169,7 @@ function portraitActuatorTypes(game: Game, mirror: Position, wall: number): numb
 }
 
 /**
- * Draw champion `chIdx`'s attack hand, `DrawAttackButton` (`doc/CSBwin-src/Character.cpp:4815`),
+ * Draw champion `chIdx`'s attack hand, `DrawAttackButton` (`doc/CSBwin-src/Character.cpp:4832`),
  * and say whether it came out shaded. `ShadeRectangleInScreen(&LOCAL_8, 0)` blacks every
  * pixel of the box whose x + y is odd, and an unshaded box has its blue border there.
  */
@@ -213,7 +213,7 @@ function main(): void {
   check(clicked === false, 'the portrait actuator reports no switch action (it only adds a champion)');
   console.log(`pair: ${JSON.stringify(pairCalls)}`);
   check(pairCalls.join() === 'TAG02076e inventory 0 champions 1',
-    "TAG02076e once the candidate's inventory is shown (Character.cpp:796-797)");
+    "TAG02076e once the candidate's inventory is shown (Character.cpp:797-798)");
   check(party.champions.length === 1, 'HALK is in the party after the wall click');
 
   const champ = party.champions[0];
@@ -258,7 +258,7 @@ function main(): void {
   check(party.cursorOwner === 0, 'the first champion in the party gets the cursor');
   console.log(`attack hand shaded: ${attackHandShaded(game, 0)}`);
   check(attackHandShaded(game, 0),
-    "the candidate's attack hand is shaded while d.PotentialCharacterOrdinal is set (Character.cpp:4876)");
+    "the candidate's attack hand is shaded while d.PotentialCharacterOrdinal is set (Character.cpp:4893)");
 
   /* ------------------------------------ 2. possessions, and where they still are - */
 
@@ -293,15 +293,15 @@ function main(): void {
   game.systems.hallOfChampions.resurrectReincarnateCancel(CANCEL);
   console.log(`pair: ${JSON.stringify(pairCalls)}`);
   check(pairCalls.join() === 'TAG0207cc inventory -1 champions 0',
-    'TAG0207cc once the inventory is hidden and the champion gone (CSBCode.cpp:6657)');
+    'TAG0207cc once the inventory is hidden and the champion gone (CSBCode.cpp:6716)');
   console.log(`champions ${party.champions.length}, potential ${party.potentialChampionIndex}, cursorOwner ${party.cursorOwner}, inventory ${party.selectedCharacterIndex}`);
   check(party.champions.length === 0, 'Cancel takes the champion back out of the party');
   check(party.potentialChampionIndex === -1, 'and clears the provisional marker');
   check(party.cursorOwner === -1, 'SetHandOwner(-1), because that was the only champion');
   check(party.selectedCharacterIndex === -1, 'the inventory is hidden again');
-  check(game.ctx.loop.clockTick, "and ShowHideInventory(4)'s d.clockTick = 1 makes a tick due (CSBCode.cpp:6634, :7441)");
+  check(game.ctx.loop.clockTick, "and ShowHideInventory(4)'s d.clockTick = 1 makes a tick due (CSBCode.cpp:6693, :7500)");
   check(party.vacantCharacters[0] === champ,
-    "the candidate's record stays in slot 0, which d.NumCharacter-- only stops counting (CSBCode.cpp:6640)");
+    "the candidate's record stays in slot 0, which d.NumCharacter-- only stops counting (CSBCode.cpp:6699)");
 
   const mirrorAfterCancel = cellObjects(game, mirror);
   check(mirrorAfterCancel.length === mirrorBefore.length
@@ -327,7 +327,7 @@ function main(): void {
   const tickDueAfterResurrect = game.ctx.loop.clockTick;
   console.log(`pair: ${JSON.stringify(pairCalls)}`);
   check(pairCalls.join() === 'TAG0207cc inventory -1 champions 1',
-    'TAG0207cc once the inventory is hidden (CSBCode.cpp:6807-6808)');
+    'TAG0207cc once the inventory is hidden (CSBCode.cpp:6866-6867)');
 
   const mirrorAfterResurrect = cellObjects(game, mirror);
   console.log(`mirror now holds ${mirrorAfterResurrect.length} objects (was ${mirrorBefore.length})`);
@@ -336,7 +336,7 @@ function main(): void {
 
   check(party.potentialChampionIndex === -1, 'the champion is fully in the party now');
   check(party.selectedCharacterIndex === -1, 'and the menu screen is gone');
-  check(tickDueAfterResurrect, "ShowHideInventory(4)'s d.clockTick = 1 makes a tick due (CSBCode.cpp:6807, :7441)");
+  check(tickDueAfterResurrect, "ShowHideInventory(4)'s d.clockTick = 1 makes a tick due (CSBCode.cpp:6866, :7500)");
   check(
     possessionsBeforeResurrect.every((rn) => !mirrorAfterResurrect.includes(rn)),
     'RemoveObjectFromRoom unlinked every possession from the mirror',
@@ -405,7 +405,7 @@ function main(): void {
   game.systems.hallOfChampions.reincarnateNamed(screenOpenedFor, 'ZED', 'THE RENAMED');
   console.log(`pair: ${JSON.stringify(pairCalls)}`);
   check(pairCalls.join() === 'TAG0207cc inventory -1 champions 2',
-    'TAG0207cc once the answered menu is hidden (CSBCode.cpp:6807-6808)');
+    'TAG0207cc once the answered menu is hidden (CSBCode.cpp:6866-6867)');
   check(wizard.name === 'ZED', 'the typed name replaces the hero text\'s');
   check(wizard.title === 'THE RENAMED', 'and the typed title');
 
@@ -452,7 +452,7 @@ function main(): void {
 
   /* ------------------------------------------- 5b. Reincarnate under DM_rules ---- */
 
-  // `if (!DM_rules)` guards both penalties (`doc/CSBwin-src/CSBCode.cpp:6740`, `:6761`):
+  // `if (!DM_rules)` guards both penalties (`doc/CSBwin-src/CSBCode.cpp:6799`, `:6820`):
   // the same champion, reincarnated in a game with DM rules on, keeps every attribute
   // and stat, and only the twelve random points and the wiped skills remain.
   console.log('');
@@ -538,10 +538,10 @@ function portraitActuators(game: Game, mirror: Position, wall: number): Actuator
 
 /**
  * A portrait's `DisableMessage` (`word4` bits 6-7): when Resurrect or Reincarnate
- * disables it, `PortraitTranslateDisable` (`doc/CSBwin-src/CSBCode.cpp:6589-6612`) sends
+ * disables it, `PortraitTranslateDisable` (`doc/CSBwin-src/CSBCode.cpp:6648-6671`) sends
  * set (1), clear (2) or toggle (3) to the mirror's own cell, at the wall its `Position`
  * (`word6` bits 12-13) names, as `QueueDSASwitchAction(0, action, d.LoadedLevel, x, y,
- * pos, 'M')` (`DSA.cpp:485-532`): a stone cell's timer, `TT_STONEROOM`, due now, with
+ * pos, 'M')` (`DSA.cpp:486-533`): a stone cell's timer, `TT_STONEROOM`, due now, with
  * action 0, 1 or 2. The shipped mirrors carry none (`ExtendPortraits` clears the field),
  * so each case sets it on HALK's.
  */
@@ -599,7 +599,7 @@ function disableMessageSection(): void {
 
 /**
  * A mirror seen from an angle — the `srcOffsetX` arm of `DrawWallDecoration`
- * (`doc/CSBwin-src/CSBCode.cpp:3538-3562`).
+ * (`doc/CSBwin-src/CSBCode.cpp:3599-3623`).
  *
  * Positions 7 and 9 are the F2 front walls one cell to the left and right. Both are
  * scaled to the width of the F2 *centre* rectangle (`[8]`) and then drawn into a
@@ -668,7 +668,7 @@ function edgeDecorationSection(): void {
  * The portrait a mirror shows: `SummarizeRoomInfo`'s `championPortraitOrdinal`
  * (`doc/CSBwin-src/Codea59a.cpp:154-167`) and the `Byte2546` rectangle the
  * `relativePosition == 12` arm of `DrawWallDecoration` blits into
- * (`doc/CSBwin-src/CSBCode.cpp:3686-3716`).
+ * (`doc/CSBwin-src/CSBCode.cpp:3751-3781`).
  */
 function portraitSection(): void {
   const probe = makeGame();
@@ -686,7 +686,7 @@ function portraitSection(): void {
   console.log('=== the portrait rectangle, extracted from graphics.dat item 0x22e ===');
   const rect = viewportTables.championPortraitRect;
   console.log(`Byte2546 = { x1: ${rect.x1}, x2: ${rect.x2}, y1: ${rect.y1}, y2: ${rect.y2} }`);
-  // Canary: CSBWin's own comment at `doc/CSBwin-src/CSBCode.cpp:3695` records this rect
+  // Canary: CSBWin's own comment at `doc/CSBwin-src/CSBCode.cpp:3760` records this rect
   // as 0x60,0x7f,0x23,0x3f. Reading those four bytes back is what proves the offset,
   // since any neighbouring skip would give a different quadruple.
   check(rect.x1 === 0x60 && rect.x2 === 0x7f && rect.y1 === 0x23 && rect.y2 === 0x3f,
@@ -773,7 +773,7 @@ function portraitSection(): void {
 
   /* ------------------------------------------- facing3 at a mirror not facing 0 ---- */
 
-  // `pcA3->facing3 = (ui8)d.partyFacing` (`doc/CSBwin-src/Character.cpp:531`): the way a
+  // `pcA3->facing3 = (ui8)d.partyFacing` (`doc/CSBwin-src/Character.cpp:532`): the way a
   // hit turns the portrait, and byte 40 of the saved CHARDESC. `ClearMemory` would leave
   // it 0, so only a party facing some other way can tell the two apart.
   const turned = heroes.find((h) => ((h.location.wall + 2) & 3) !== 0);
@@ -785,16 +785,16 @@ function portraitSection(): void {
     const added = g.ctx.party.state.champions[0];
     console.log(`${turned.name}: party facing ${at.facing}, facing3 ${added?.damageFromDirection}`);
     check(added !== undefined && added.damageFromDirection === at.facing,
-      `${turned.name}'s facing3 starts as the party's facing, ${at.facing} (Character.cpp:531)`);
+      `${turned.name}'s facing3 starts as the party's facing, ${at.facing} (Character.cpp:532)`);
   }
 
   /* --------------------------------------- the candidate's objects on the cursor ---- */
 
-  // `TAG02076e` puts up the arrow, `SetCursorShape(0)` (`doc/CSBwin-src/Character.cpp:5133`),
+  // `TAG02076e` puts up the arrow, `SetCursorShape(0)` (`doc/CSBwin-src/Character.cpp:5158`),
   // but an object taken from the candidate's inventory goes on the cursor all the same:
   // `HandleClothingClick`'s `ObjectToCursor(objD4, 0)` makes its cursor at once
-  // (`CSBCode.cpp:6992`, `:6864-6871`), and putting it back, `RemoveObjectFromHand`, sets
-  // the cursor from the hand (`Mouse.cpp:636`, `TAG002572`). The shading stays.
+  // (`CSBCode.cpp:7051`, `:6923-6930`), and putting it back, `RemoveObjectFromHand`, sets
+  // the cursor from the hand (`Mouse.cpp:637`, `TAG002572`). The shading stays.
   {
     const g = makeGame();
     const hero = heroByName(g, 'HALK');
@@ -824,9 +824,9 @@ function portraitSection(): void {
     const empty = cursorPixels();
     console.log(`HALK's slot ${slot}: arrow after TAG02076e ${arrowUp}; taken ${held !== OBJECT_ID_NULL}, ` +
       `cursor ${withObject === arrow ? 'the arrow' : 'changed'}; put back ${putBack}, cursor ${empty === arrow ? 'the arrow' : 'from the hand'}`);
-    check(arrowUp, "TAG02076e's SetCursorShape(0) puts up the arrow (Character.cpp:5133)");
+    check(arrowUp, "TAG02076e's SetCursorShape(0) puts up the arrow (Character.cpp:5158)");
     check(held !== OBJECT_ID_NULL && !arrowAfterPick && withObject !== arrow,
-      "an object taken from the candidate's inventory is on the cursor (ObjectToCursor, CSBCode.cpp:6992)");
+      "an object taken from the candidate's inventory is on the cursor (ObjectToCursor, CSBCode.cpp:7051)");
     check(shadedAfterPick, 'and the movement, magic and weapon-ready areas stay shaded');
     check(putBack && empty !== withObject, 'put back, the cursor is set from the empty hand (RemoveObjectFromHand, TAG002572)');
     g.systems.hallOfChampions.resurrectReincarnateCancel(CANCEL);
@@ -836,7 +836,7 @@ function portraitSection(): void {
   /* ------------------------------------------------ CSB's prison, every mirror ---- */
 
   // `AddCharacter` reads the title to the *second* line break, its two lines joined
-  // (`doc/CSBwin-src/Character.cpp:568-590`). Three of the prison's texts split the title
+  // (`doc/CSBwin-src/Character.cpp:569-591`). Three of the prison's texts split the title
   // over both lines, so the mirrors are found from their actuators, not from the
   // extractor's list, and each one clicked.
   console.log('');

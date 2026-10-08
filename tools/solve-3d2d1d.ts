@@ -10,16 +10,16 @@
  * through the real `Game`.
  *
  * Modelled from CSBWin:
- *  - `MoveParty` (`doc/CSBwin-src/CSBCode.cpp:7944-8350`): the move history
- *    (`:8041-8077`), the sideways and vertical arms (`:8168-8221`) and the wall bump
- *    (`:8222-8290`).
- *  - `GravityMove` (`doc/CSBwin-src/Mouse.cpp:1258-1342`).
- *  - Teleporters (`Code11f52.cpp:2915-2990`) and the type-9 pads (`:3805-3809`).
- *  - Wall clicks (`TouchWall`, `Mouse.cpp:290`), `QueueSwitchAction`
- *    (`Code11f52.cpp:3566-3636`), the DSA dispatch of `ProcessTT_STONEROOM`
+ *  - `MoveParty` (`doc/CSBwin-src/CSBCode.cpp:8031-8437`): the move history
+ *    (`:8128-8164`), the sideways and vertical arms (`:8255-8308`) and the wall bump
+ *    (`:8309-8377`).
+ *  - `GravityMove` (`doc/CSBwin-src/Mouse.cpp:1259-1370`).
+ *  - Teleporters (`Code11f52.cpp:2950-3025`) and the type-9 pads (`:3840-3844`).
+ *  - Wall clicks (`TouchWall`, `Mouse.cpp:291`), `QueueSwitchAction`
+ *    (`Code11f52.cpp:3601-3671`), the DSA dispatch of `ProcessTT_STONEROOM`
  *    (`Timer.cpp:2222`) and `ProcessTT_TELEPORTER`.
  *  - The four DSA commands the dungeon uses: MESSAGE, OVERRIDE, COPYTELEPORTER and GOSUB
- *    (`DSA.cpp`, layouts at `Data.h:1889-2125`).
+ *    (`DSA.cpp`, layouts at `Data.h:1904-2140`).
  *
  * Not modelled: the monsters' AI (a search pins the Screamers to one square), timing
  * beyond order, stamina, food and the party's move delay. None of these changes where a
@@ -112,7 +112,7 @@ function cloneWorld(w: World): World {
   };
 }
 
-/** `GetCellFlags`: off the map is stone (`CSBCode.cpp:4612-4660`). */
+/** `GetCellFlags`: off the map is stone (`CSBCode.cpp:4677-4725`). */
 function flagsAt(w: World, l: number, x: number, y: number): number {
   if (l < 0 || l >= NLEV || x < 0 || y < 0 || x >= width(l) || y >= height(l)) return 0;
   return w.flags[l]![x]![y]!;
@@ -143,7 +143,7 @@ const noEvents = (): Events => ({ bumps: 0 });
 /** `MoveParty` for an absolute direction. `gravity` is CSBWin's `gravityMove`. */
 function moveParty(w: World, p: Party, dir: number, gravity: boolean, ev: Events): void {
   if (!gravity) {
-    // `CSBCode.cpp:8041-8077`: axis and sign recorded before anything is tested.
+    // `CSBCode.cpp:8128-8164`: axis and sign recorded before anything is tested.
     const axis = dir <= 3 ? (dir + 1) & 1 : 2;
     const delta = dir <= 3 ? ((dir + 1) & 2) >> 1 : (dir & 1) ^ 1;
     p.signs |= 1 << axis;
@@ -235,7 +235,7 @@ function queueSwitchAction(w: World, l: number, rec: ActuatorRecord): void {
   queue(w, l, x, y, getActuatorTargetPos(rec), getActuatorAction(rec));
 }
 
-/** A message is addressed to a corner only in stone or a false wall (`Code11f52.cpp:3566-3636`). */
+/** A message is addressed to a corner only in stone or a false wall (`Code11f52.cpp:3601-3671`). */
 function queue(w: World, l: number, x: number, y: number, pos: number, action: ActuatorAction): void {
   const t = roomType(flagsAt(w, l, x, y));
   pending.push({ l, x, y, pos: t === RoomType.STONE || t === RoomType.FALSEWALL ? pos : 0, action });
@@ -458,7 +458,7 @@ const PLAYTHROUGH: Part[] = [
 
 const startParty = (): Party => ({
   l: data.header.startPosition.z, x: data.header.startPosition.x, y: data.header.startPosition.y,
-  facing: data.header.facing, order: [0, 1, 2], signs: 0, // `moveHistory`'s initial value (`data.cpp:245`)
+  facing: data.header.facing, order: [0, 1, 2], signs: 0, // `moveHistory`'s initial value (`data.cpp:246`)
 });
 const atGoal = (p: Party, g: Goal): boolean => p.l === g[0] && p.x === g[1] && p.y === g[2];
 const token = (s: Step): string => `${DIRECTION[s.dir]}${s.bumps ? '!' : ''}→${s.end}`;

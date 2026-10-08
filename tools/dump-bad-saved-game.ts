@@ -1,6 +1,6 @@
 /**
  * `tag01efee`: where every failed read of `_ReadEntireGame` ends
- * (`doc/CSBwin-src/SaveGame.cpp:1741-1742`, `:1895-1907`).
+ * (`doc/CSBwin-src/SaveGame.cpp:1911-1912`, `:2098-2119`).
  *
  * 1. **The chooser hands the failure over.** The boot's load-only chooser is
  *    `_ReadEntireGame`'s, so a save that fails its read closes it and reaches
@@ -15,7 +15,7 @@
  * 3. **At the boot** (0): CSBWin's `die(0xbad)`. The author's divergence (`DEBT.md` H): the
  *    same menu with the one line and OK, and the click throws `BadSavedGame`, which
  *    `runBootSequence` catches to start again from the title.
- * 4. **A new game's read** ends there too in CSBWin (`SaveGame.cpp:1740-1742`); in the
+ * 4. **A new game's read** ends there too in CSBWin (`SaveGame.cpp:1910-1912`); in the
  *    port it ends the game, the author's decision for a game file (`DEBT.md` H). The page
  *    builds its `Game` over an empty world and reads `dungeon.dat` once the entrance's doors
  *    have opened (`Game.readDungeonDat`). CSB's prison with a byte of its compressed image
@@ -23,7 +23,7 @@
  *    `ReadDatabases`' first `READ`; either is `die(0xbad)` with the reason, and leaves the
  *    empty world as it was.
  * 5. **A save that read** goes on to `_TAG021028`'s hand-off
- *    (`doc/CSBwin-src/CSBCode.cpp:10493-10537`), where CSBWin puts up "GAME LOADED, READY
+ *    (`doc/CSBwin-src/CSBCode.cpp:10617-10661`), where CSBWin puts up "GAME LOADED, READY
  *    TO PLAY." and the port, deliberately, nothing: the chooser's picture fades to black,
  *    the screen is cleared, and no click is waited for. A new game's hand-off draws
  *    nothing there.
@@ -294,8 +294,8 @@ async function checkHandOff(): Promise<void> {
   const cleared = loaded.host.screen.pixels.every((p) => p === 0);
   console.log(`  resume: ${compact(loaded.log)}; colour registers ${black ? 'black' : 'NOT BLACK'}, screen ${cleared ? 'cleared' : 'NOT CLEARED'}`);
   check(compact(loaded.log) === '1x8, 4',
-    'one fade and wvbl(4) (CSBCode.cpp:10535): no cursor, and no wait for a click on a menu');
-  check(black && cleared, 'the chooser\'s picture is faded to black, Palette11914, and the screen cleared (:10536)');
+    'one fade and wvbl(4) (CSBCode.cpp:10659): no cursor, and no wait for a click on a menu');
+  check(black && cleared, 'the chooser\'s picture is faded to black, Palette11914, and the screen cleared (:10660)');
 
   const entered = scriptedHost([]);
   await Boot.tag021028(entered.host, 'enter');

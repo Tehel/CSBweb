@@ -12,8 +12,8 @@
  *
  * **One structural divergence, deliberate.** CSBWin caches the carried weight in
  * `CHARDESC.load` and adjusts it at each of its eight possession writers
- * (`Character.cpp:1926`, `:1965`, `Mouse.cpp:642`, `:1224`, `CSBCode.cpp:4467`,
- * `:6877`, `Magic.cpp:1255`). `characterLoad()` here re-sums the possessions instead.
+ * (`Character.cpp:1931`, `:1970`, `Mouse.cpp:643`, `:1225`, `CSBCode.cpp:4532`,
+ * `:6936`, `Magic.cpp:1257`). `characterLoad()` here re-sums the possessions instead.
  * The value is the same — the cache is only ever the running sum of those weights —
  * and a recomputation cannot drift out of step with the inventory the way a cache
  * spread across the UI and the engine can. Recorded in PLAN.md.
@@ -34,7 +34,7 @@ const MISC_WATERSKIN = 1;
 /**
  * The chest's own weight before its contents. CSBWin reads it from the expansion pool
  * (`EDBT_ObjectWeights`) and falls back to 50 when a dungeon does not override it
- * (`doc/CSBwin-src/Mouse.cpp:64-67`); the shipped DM dungeon does not override it.
+ * (`doc/CSBwin-src/Mouse.cpp:65-68`); the shipped DM dungeon does not override it.
  */
 const DEFAULT_CHEST_WEIGHT = 50;
 
@@ -42,7 +42,7 @@ export class CharacterStats {
   constructor(private readonly ctx: GameContext) {}
 
   /**
-   * `GetObjectWeight` / `TAG0091e6` (`doc/CSBwin-src/Mouse.cpp:29`) — in tenths of a
+   * `GetObjectWeight` / `TAG0091e6` (`doc/CSBwin-src/Mouse.cpp:30`) — in tenths of a
    * kilogram. Recursive for chests.
    *
    * `visited` is ours, not CSBWin's: the C++ walks the contents chain with no cycle
@@ -112,7 +112,7 @@ export class CharacterStats {
   }
 
   /**
-   * `MaxLoad` (`doc/CSBwin-src/Code11f52.cpp:4280`) — what the champion can carry
+   * `MaxLoad` (`doc/CSBwin-src/Code11f52.cpp:4318`) — what the champion can carry
    * before slowing down, rounded down to a multiple of 10.
    */
   maxLoad(champ: Champion): number {
@@ -137,7 +137,7 @@ export class CharacterStats {
   }
 
   /**
-   * `TimeToMove` (`doc/CSBwin-src/CSBCode.cpp:7003`) — the ticks this champion needs
+   * `TimeToMove` (`doc/CSBwin-src/CSBCode.cpp:7062`) — the ticks this champion needs
    * between steps. 2 unladen, 3 past five-eighths of `MaxLoad`, and past `MaxLoad`
    * 4 plus a quarter-load per excess `MaxLoad`; a wounded foot (`ouches & 32`) adds 1,
    * or 2 when overloaded, and Boots of Speed take 1 off.
@@ -163,7 +163,7 @@ export class CharacterStats {
   }
 
   /**
-   * `DetermineThrowingDistance` (`doc/CSBwin-src/Character.cpp:2267`) — 0 to 100.
+   * `DetermineThrowingDistance` (`doc/CSBwin-src/Character.cpp:2272`) — 0 to 100.
    *
    * Not only a throw statistic: `TAG01680a` adds it to the protection a shield held
    * in that hand gives, so it is really "how well this champion is handling what is
@@ -214,7 +214,7 @@ export class CharacterStats {
   }
 
   /**
-   * `Quickness` (`doc/CSBwin-src/Character.cpp:2209`) — roughly
+   * `Quickness` (`doc/CSBwin-src/Character.cpp:2214`) — roughly
    * `0.5 * Dexterity * (1 - load/maxLoad/2)`, with random limits near 5 and 95.
    */
   quickness(champ: Champion, partySleeping: boolean): number {
@@ -243,7 +243,7 @@ export class CharacterStats {
 
   /**
    * `DetermineMastery(chIdx, skill)` with **no flag bits**: CSBWin's throwing chain
-   * passes the plain skill number (`doc/CSBwin-src/Character.cpp:2333`), so the
+   * passes the plain skill number (`doc/CSBwin-src/Character.cpp:2338`), so the
    * temporary adjustment and the Firestaff/pendant possession bonuses both count.
    */
   private mastery(champ: Champion, skill: number, partySleeping: boolean): number {
@@ -255,7 +255,7 @@ export class CharacterStats {
 }
 
 /**
- * `StaminaAdjustedAttribute` (`doc/CSBwin-src/Code11f52.cpp:4253`) — below half
+ * `StaminaAdjustedAttribute` (`doc/CSBwin-src/Code11f52.cpp:4291`) — below half
  * stamina an attribute is halved and then scaled by how much stamina is left.
  *
  * Free-standing because the renderer's load display needs it too, and because it

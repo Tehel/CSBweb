@@ -5,7 +5,7 @@
  * Nothing shows a pool on screen, and a wrong one fails quietly: a record is simply not
  * found. The genuine saves give the port something exact to be compared with, because
  * `SaveGame` leaves 24 palette records in every file, each `Read` out and `Write`n back
- * (`doc/CSBwin-src/SaveGame.cpp:1152-1164`):
+ * (`doc/CSBwin-src/SaveGame.cpp:1218-1231`):
  *
  *   - **Built from nothing.** A save of a game started on `dungeon.dat`, where nothing
  *     else wrote a record, holds a pool that is those 24 `Write`s and no more. The same
@@ -32,7 +32,7 @@ import { EXPOOL_RECORD_SIZE, Expool, type ExpoolDatabase } from '../src/data/Csb
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
 
-/** `EDT_Palette` (`doc/CSBwin-src/CSB.h:1564`). */
+/** `EDT_Palette` (`doc/CSBwin-src/CSB.h:1567`). */
 const EDT_PALETTE = 7;
 
 const same = (a: Uint8Array, b: Uint8Array): boolean =>

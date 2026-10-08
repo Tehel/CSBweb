@@ -240,7 +240,7 @@ async function main(): Promise<void> {
 
   // `buttons17760`'s first entry, button 11 for the right button over the whole screen.
   // A tick first: the refused click was the queue's one entry since the last
-  // (`doc/CSBwin-src/Mouse.cpp:1463-1476`).
+  // (`doc/CSBwin-src/Mouse.cpp:1591-1604`).
   runVbl(s.game, TICK_DUE);
   const rightId = click(s, box.x1 + 4, box.y1 + 4, 1);
   check(rightId === 11 && s.ui.partyState.selectedCharacterIndex === -1 && s.opened.length === opened,

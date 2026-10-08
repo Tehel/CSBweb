@@ -1,5 +1,5 @@
 /**
- * `GraphicRandom`'s LCG (`doc/CSBwin-src/CSBCode.cpp:564`), against an exact oracle.
+ * `GraphicRandom`'s LCG (`doc/CSBwin-src/CSBCode.cpp:574`), against an exact oracle.
  *
  * `r = r * ui32(0xbb40e62d) + 11;` is a free 32-bit-wraparound multiply in C. Plain
  * JS `*` is not: both operands run up to ~2^32, so their exact product needs up to

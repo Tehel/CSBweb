@@ -2,17 +2,17 @@
  * Only a monster's attack sets `d.LastMonsterAttackTime`.
  *
  * CSBWin has exactly one writer outside the save code: `MonsterAttacks`
- * (`doc/CSBwin-src/Monster.cpp:982`), `d.LastMonsterAttackTime = d.Time`, before it
+ * (`doc/CSBwin-src/Monster.cpp:986`), `d.LastMonsterAttackTime = d.Time`, before it
  * decides what the attack is. A missile reaching the party goes through
  * `ProcessMissileEncounter`'s party arm and `DamageCharacter`, and neither touches it.
  * The port used to stamp it from the missile path as well — a stand-in from before
  * monster AI existed — so any missile, even a champion's own spell bouncing back, told
- * `AdjustSkills` (`Magic.cpp:222`, `:245`) and the facing reset (`Code17818.cpp:420`)
+ * `AdjustSkills` (`Magic.cpp:225`, `:248`) and the facing reset (`Code17818.cpp:420`)
  * that a monster had just attacked.
  *
  * And a save carries it signed. `GAMEBLOCK2.LastMonsterAttackTime` is an `i32`
- * (`doc/CSBwin-src/SaveGame.cpp:125`), and a game no monster has attacked holds the
- * start value, -200 (`CSBCode.cpp:353`), which the file writes as `ff ff ff 38`. Read
+ * (`doc/CSBwin-src/SaveGame.cpp:126`), and a game no monster has attacked holds the
+ * start value, -200 (`CSBCode.cpp:363`), which the file writes as `ff ff ff 38`. Read
  * unsigned it is 4294967096, later than any `d.Time`, and `AdjustSkills` then takes
  * every skill gain for one made under attack: doubled, and never halved.
  *

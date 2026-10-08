@@ -5,7 +5,7 @@
  * Crack Switch (In) and rotates the actuator list (local action 1); the second shows
  * Crack Switch (Out) and opens the grid at (13,28). A wall shows its *last* actuator's
  * ornament (`doc/CSBwin-src/Codea59a.cpp:136-139`), so the button is out until the click,
- * and `RotateActuatorList` (`doc/CSBwin-src/Code11f52.cpp:3465`) then brings the "In"
+ * and `RotateActuatorList` (`doc/CSBwin-src/Code11f52.cpp:3500`) then brings the "In"
  * actuator last.
  *
  * CSBWin's `graphics.dat` (`dm-windows/`) gives the two ornaments different coordinate

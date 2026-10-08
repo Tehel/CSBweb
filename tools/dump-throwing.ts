@@ -17,7 +17,7 @@
  *  - Throwing distance *rises* with weight up to a sixteenth of what the champion can
  *    carry — heft helps — and only collapses past the turn. Writing this tool the
  *    other way round produced a failing check and a re-read of
- *    `doc/CSBwin-src/Character.cpp:2295`, where the sign is plain.
+ *    `doc/CSBwin-src/Character.cpp:2300`, where the sign is plain.
  *  - A wounded hand halves the throw made with it, and only with it.
  *  - A shot's busy timer reloads the bow from the quiver, and a spell's busy timer after
  *    it does not: `EnableCharacterAction` forgets the attack (section 8).
@@ -177,7 +177,7 @@ async function main(): Promise<void> {
   // the only thing moving is weight. A *weak* champion, so the shipped misc weights
   // span the whole curve.
   //
-  // CSBWin's shape is not "heavier throws shorter" (`doc/CSBwin-src/Character.cpp:2295`).
+  // CSBWin's shape is not "heavier throws shorter" (`doc/CSBwin-src/Character.cpp:2300`).
   // Up to MaxLoad/16 the weight is *added* — heft helps. Between there and
   // `(MaxLoad/16 - 12)/2 + MaxLoad/16` it still helps, at half rate. Only past that
   // does it subtract, at double rate, so a boulder is hopeless.
@@ -420,7 +420,7 @@ async function main(): Promise<void> {
   // `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638`) reloads the bow from the
   // quiver only while the attack in progress is a shot, and ends with
   // `attackType = -1` (`:2680`). So the busy timer a spell sets later, through
-  // `DisableCharacterAction` (`Magic.cpp:502`), frees the champion without touching the
+  // `DisableCharacterAction` (`Magic.cpp:505`), frees the champion without touching the
   // quiver, even with hand 0 empty.
   console.log('');
   console.log('=== 8. EnableCharacterAction forgets the attack (TT_11 after a shot, then a spell) ===');
@@ -437,7 +437,7 @@ async function main(): Promise<void> {
   };
   // The rock's and the club's TT_11s are still queued for slot 0, which this tool has
   // since given to the archer. CSBWin never queues two for one champion
-  // (`DisableCharacterAction` deletes the old one first, `Magic.cpp:513-525`), so drop
+  // (`DisableCharacterAction` deletes the old one first, `Magic.cpp:516-528`), so drop
   // them: the timer that frees the archer below is the archer's own.
   for (const timer of [...game.ctx.timers.getTimers()]) {
     if (timer.function === 11 && timer.index !== archer.busyTimerIndex) game.ctx.timers.deleteTimer(timer.index);
@@ -472,10 +472,10 @@ async function main(): Promise<void> {
 
   /* -------------------------- 9. DisableCharacterAction for 0 ticks -------------- */
 
-  // `DisableCharacterAction` (`doc/CSBwin-src/Magic.cpp:502-537`) has no guard on the
+  // `DisableCharacterAction` (`doc/CSBwin-src/Magic.cpp:505-540`) has no guard on the
   // delay. Idle, 0 ticks queues a TT_11 due at d.Time. Busy, the busy timer is replaced by
-  // one due at `D6 + 0 / 2` (`:514-525`), whose uByte6, the slot a throw refills, is 0
-  // (`:512`).
+  // one due at `D6 + 0 / 2` (`:517-528`), whose uByte6, the slot a throw refills, is 0
+  // (`:515`).
   console.log('');
   console.log('=== 9. DisableCharacterAction for 0 ticks, idle and busy ===');
   game.ctx.systems.magic.disableCharacterAction(0, 0);

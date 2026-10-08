@@ -69,7 +69,7 @@ takes every event the engine makes as the page sent it.
    otherwise): the player is a UUID, the build a token, the set one of the manifest's,
    every number an integer in its range, at most four champions, a champion's id `null` or
    an `i16`, a won game's masteries four, and a champion's name 7 characters at most
-   (`CHARDESC.name[8]`, `doc/CSBwin-src/CSB.h:2486`).
+   (`CHARDESC.name[8]`, `doc/CSBwin-src/CSB.h:2545`).
 
 An event stored answers 204.
 

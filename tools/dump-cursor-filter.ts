@@ -1,37 +1,37 @@
 /**
  * The cursor filter (`doc/CSBwin-src/MoveObject.cpp:797-865`) at its six `TouchWall` sites
- * (`Mouse.cpp:421-583`), run through `ActuatorSystem.touchWall` with DSAs on its square,
+ * (`Mouse.cpp:422-584`), run through `ActuatorSystem.touchWall` with DSAs on its square,
  * against a genuine save (`csbgame7.dat`). Each test square holds actuators on its side 0,
  * and the hand or the square the object they want.
  *
- * 1. **A dungeon with no filter takes the key** off the hand, and deletes it (`:561-568`).
+ * 1. **A dungeon with no filter takes the key** off the hand, and deletes it (`:562-569`).
  * 2. **Every DSA at the location runs**, each with a count of 6 and the
- *    `CURSORFILTER_PACKET` (`CSB.h:1517-1526`): the object, the type, the level, the wall's
- *    square and the side touched (`Mouse.cpp:552-559`).
+ *    `CURSORFILTER_PACKET` (`CSB.h:1520-1529`): the object, the type, the level, the wall's
+ *    square and the side touched (`Mouse.cpp:553-560`).
  * 3. **A DSA's rewrite is what the next one sees, and what the site does**: a `type` of
- *    `CURSORFILTER_Cancel` (20) leaves the key in the hand (`:560`).
+ *    `CURSORFILTER_Cancel` (20) leaves the key in the hand (`:561`).
  * 4. **The DSAs run on the caller's parameters**: `CursorFilter` has no
  *    `NEWDSAPARAMETERS`, so the last packet is left there.
  * 5. **The torch holder's two**: `TakeFromTorchHolder` (12) for the object it holds, and
  *    `PlaceInTorchHolder` (13) for the one in the hand, each cancelled to nothing done
- *    (`:421-450`).
+ *    (`:422-451`).
  * 6. **The swap's two**: `SwapRemove` (14) for the hand's object, which cancels the swap,
- *    then `SwapReplace` (15) for the square's, which cannot (`:479-507`).
+ *    then `SwapReplace` (15) for the square's, which cannot (`:480-508`).
  * 7. **The gift's**: `GiftFromGod` (16) on an empty hand, `RNnul` (0xFFFF), cancelled to
- *    no gift (`:575-589`); and after a key taken by the same touch, `RNempty` (0), the
- *    local `objectInHand` the key leaves (`:567`).
+ *    no gift (`:576-590`); and after a key taken by the same touch, `RNempty` (0), the
+ *    local `objectInHand` the key leaves (`:568`).
  * 8. **Nobody owns the cursor**, a party with no champion yet on the shipped dungeon: a
- *    pushbutton and a gift answer nothing, only a portrait would (`:357-360`).
+ *    pushbutton and a gift answer nothing, only a portrait would (`:358-361`).
  *
  * And the hand's three, each cancelled to nothing done:
  *
  * 9. **The throw**: `Throw` (5) for the hand's object, with the side thrown to and no
- *    square (`Mouse.cpp:689-694`), run through `MouseSystem.throwObjectFromCursor`.
+ *    square (`Mouse.cpp:690-695`), run through `MouseSystem.throwObjectFromCursor`.
  * 10. **The pick-up**: `PickFromFloor` (2) for the object clicked, the level, its square
- *    and the viewport button, its position relative to the party (`:827-835`), run
- *    through `tryPickViewportObject`. A cancel makes no tick due (`:840`).
+ *    and the viewport button, its position relative to the party (`:828-836`), run
+ *    through `tryPickViewportObject`. A cancel makes no tick due (`:841`).
  * 11. **The drop**: `DropObject` (7) for the hand's object, the level, the square it falls
- *    on and its absolute position (`:874-882`), run through
+ *    on and its absolute position (`:875-883`), run through
  *    `MouseSystem.dropObjectFromCursor`: on the party's square, and in the alcove ahead,
  *    which is the square ahead's facing side.
  *
@@ -39,33 +39,33 @@
  *
  * 12. **The clothing click**: `PlaceOnCharacter` (3) for the hand's object, `RNnul` when
  *    it is empty, with the champion and the slot; a cancel leaves both as they were
- *    (`CSBCode.cpp:6966-6972`). Once the slot is emptied, `PickFromCharacter` (4) for what
- *    it held, whose cancel nothing reads (`:6982-6991`). Run through
+ *    (`CSBCode.cpp:7025-7031`). Once the slot is emptied, `PickFromCharacter` (4) for what
+ *    it held, whose cancel nothing reads (`:7041-7050`). Run through
  *    `handleClothingClick`, on champion 0's ready hand.
  * 13. **The mouth**: `Eat` (8) for the object eaten, whose cancel nothing reads
- *    (`Character.cpp:4471-4479`), run through `handleMouthPress`.
+ *    (`Character.cpp:4488-4496`), run through `handleMouthPress`.
  *
  * And the DSA's four, sent from inside a running DSA, an ordinary one on another square,
  * none of which can be cancelled:
  *
- * 14. **`&DEL` of the hand**: `DSA_DEL` (10) for the hand's object (`DSA.cpp:1657-1665`).
- *    **`&ADD` to the hand**: `DSA_ADD` (11) for the copy (`:2062-2071`). **`&MOVE` from
+ * 14. **`&DEL` of the hand**: `DSA_DEL` (10) for the hand's object (`DSA.cpp:1658-1666`).
+ *    **`&ADD` to the hand**: `DSA_ADD` (11) for the copy (`:2063-2072`). **`&MOVE` from
  *    the hand**, to a champion's slot: `DSA_MoveFrom` (18) for the hand's object
  *    (`MoveObject.cpp:130-143`); **and back**: `DSA_MoveTo` (19) for it
  *    (`:449-455`). Each with no `p1` to `p4`.
  * 15. **The running DSA after the filter's**: its parameters are the packet the filter
  *    left (`CursorFilter` has no `NEWDSAPARAMETERS`); its stack and its variables are its
  *    own, untouched (`ProcessDSATimer6` runs the filter's on a `DSADBANK` of its own,
- *    `DSA.cpp:5350-5353`); an `OVERRIDE` it set before is gone (`:5416`).
+ *    `DSA.cpp:5351-5354`); an `OVERRIDE` it set before is gone (`:5417`).
  *
  * And the game's, `TAG0138ec`'s two as the loop starts (`Game.start`), neither of which
  * reads the packet back, and `_ReadEntireGame`'s two, which run no DSA:
  *
  * 16. **A new game**, read from `dungeon.dat` after a save: `EnteringPrison` (6) for
- *    `RNnul`, with no `p1` to `p4`, then the hand emptied (`CSBCode.cpp:6364-6371`). The
+ *    `RNnul`, with no `p1` to `p4`, then the hand emptied (`CSBCode.cpp:6423-6430`). The
  *    read itself sends nothing.
  * 17. **A saved game**: `ResumeSavedGame` (9) for the object in the hand, with no `p1` to
- *    `p4`, which stays there (`:6311-6322`); nothing for an empty hand. The read itself
+ *    `p4`, which stays there (`:6370-6381`); nothing for an empty hand. The read itself
  *    sends nothing.
  * 18. **A save read in play**, which only the port has: `ResumeSavedGame` at once, once the
  *    read is in (`Game.savedGameRead`).
@@ -93,7 +93,7 @@ import { newGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 
-/** `ESL_CURSORFILTER` (`doc/CSBwin-src/CSB.h:1544`). */
+/** `ESL_CURSORFILTER` (`doc/CSBwin-src/CSB.h:1547`). */
 const ESL_CURSORFILTER = 9;
 const WORDS = 6;
 /** `MISSILE_TYPE_ROCK`, a gift that is a rock (`src/engine/missileHelpers.ts`). */
@@ -487,7 +487,7 @@ const dsaPacket = (type: number, rn: number): string => [WORDS, rn, type, 0, 0, 
   const party = game.ctx.party.state;
   const held = misc(game);
   party.objectInHand = held;
-  /** `EX_OVERRIDE` (`DSA.cpp:1037-1072`): `what` 1, corner 3, the same state. */
+  /** `EX_OVERRIDE` (`DSA.cpp:1038-1073`): `what` 1, corner 3, the same state. */
   const override3 = 2 | (1 << 6) | (3 << 9);
   const at = runDsa(game, (at) => [
     ...int(77), varStore(10), ...int(1234),

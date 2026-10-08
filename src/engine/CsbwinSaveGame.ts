@@ -9,7 +9,7 @@
  * already knows how to restore.
  *
  * The save's world becomes the running game's (`Game.installWorld`), structure and all,
- * as `_ReadEntireGame` reads it (`doc/CSBwin-src/SaveGame.cpp:2324`), so a save of any
+ * as `_ReadEntireGame` reads it (`doc/CSBwin-src/SaveGame.cpp:2536`), so a save of any
  * dungeon loads into any running game. The rest goes through `RuntimeSaveState`, the
  * shape every read restores, whose snapshot then puts back what the world already
  * holds.
@@ -18,17 +18,17 @@
  *
  * | Field | Source |
  * | --- | --- |
- * | Party position, facing, level, clock, `d.RandomNumber`, hand owner, magic caster, object in hand | `GAMEBLOCK2` (`doc/CSBwin-src/SaveGame.cpp:1617-1650`) |
+ * | Party position, facing, level, clock, `d.RandomNumber`, hand owner, magic caster, object in hand | `GAMEBLOCK2` (`doc/CSBwin-src/SaveGame.cpp:1741-1774`) |
  * | The four champions | block 4's `CHARDESC[4]` |
- * | Brightness, the three shields, the footprint ring, `freezeLifeTimer`, invisibility | block 4's 128-byte party tail (`doc/CSBwin-src/Data.h:766-782`) |
+ * | Brightness, the three shields, the footprint ring, `freezeLifeTimer`, invisibility | block 4's 128-byte party tail (`doc/CSBwin-src/Data.h:781-797`) |
  * | The header, every level's descriptor and tables, cell flags, object chains, column index, every database record, the text arrays | the dungeon image, installed |
  * | `dsaLevelIndex`, `dsaIndex`, `specialLocations`, the extended-feature flags | the Extended Features block and `EXPOOL`, added to the same snapshot |
  * | `ITEM16`, missiles | blocks 3 and the image, through `RuntimeSave`'s `applySaveGameState` |
  * | The timer table and the queue that orders it | blocks 5 and 6, through `Game.restoreTimerQueue` |
  * | `d.RandomGameID`, `totalMoveCount`, `d.Byte22808`, `d.Word22592`-`d.Word22598` | `GAMEBLOCK1` (`buildBlock1State`) |
- * | The DSA global variables, and their number | `EXPOOL` (`readGlobalVariables`, `doc/CSBwin-src/SaveGame.cpp:1746-1760`) |
- * | The overlay palette | `EXPOOL` (`readOverlayPalette`, `doc/CSBwin-src/SaveGame.cpp:1761-1789`), the identity without it |
- * | `disableSaves` | `EXPOOL` (`readDisableSaves`, `doc/CSBwin-src/SaveGame.cpp:1791-1793`) |
+ * | The DSA global variables, and their number | `EXPOOL` (`readGlobalVariables`, `doc/CSBwin-src/SaveGame.cpp:1916-1930`) |
+ * | The overlay palette | `EXPOOL` (`readOverlayPalette`, `doc/CSBwin-src/SaveGame.cpp:1931-1959`), the identity without it |
+ * | `disableSaves` | `EXPOOL` (`readDisableSaves`, `doc/CSBwin-src/SaveGame.cpp:1962-1964`) |
  *
  * **What is not restored.** A save is the file alone (`SaveGameFile.ts`), so this is
  * everything a save and a load lose. `tools/dump-save-roundtrip.ts` plays a game, saves
@@ -40,7 +40,7 @@
  *   taken off the HP), `d.SelectedCharacterOrdinal` (the open inventory),
  *   `d.PotentialCharacterOrdinal` and `d.GameIsLost` (`buildPartyState`). CSBWin's disk
  *   menu does not open on a champion who is still being chosen
- *   (`doc/CSBwin-src/Mouse.cpp:1716-1718`), and the port's quick-save takes the same
+ *   (`doc/CSBwin-src/Mouse.cpp:1855-1857`), and the port's quick-save takes the same
  *   guard (`GameSaves.quickSave`), so the candidate never reaches a file.
  *
  * And what comes back in the file's form, the same game told otherwise:
@@ -56,7 +56,7 @@
  *   the Extended Features block's, written out where a game from `dungeon.dat` had none.
  * - A free record keeps only its link: the object a deleted scroll named, what a
  *   deleted monster carried or a deleted chest held, is not written
- *   (`doc/CSBwin-src/data.cpp:993-1015`).
+ *   (`doc/CSBwin-src/data.cpp:995-1017`).
  */
 import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
 import { readExpectedSignatures, readRulesOptions } from '../data/CsbwinExtendedFeatures';
@@ -78,7 +78,7 @@ import type { Block1State, PartyState } from './gameTypes';
  * Build the party state out of `GAMEBLOCK2` and block 4.
  *
  * `LoadGame` assigns `d.HandChar` and `d.MagicCaster` **straight** from `GAMEBLOCK2`
- * rather than through `SetHandOwner`/`SelectMagicCaster` (`:1636-1637`), so this does
+ * rather than through `SetHandOwner`/`SelectMagicCaster` (`:1760-1761`), so this does
  * too — the setters would validate a champion and rewrite their facing, and a save is
  * restoring a state that was already valid.
  */
@@ -90,10 +90,10 @@ function buildPartyState(world: CsbwinWorld): PartyState {
     const party = readCsbwinParty(block, gb2.numCharacter);
     const tail = readCsbwinPartyTail(block);
 
-    // `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`:1642`) — the cursor's
+    // `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`:1645`) — the cursor's
     // object is an indirect slot number like every other RN in the file. `RNempty` is 0;
     // the port keeps `RNnul` as its one empty value. The `CURSORFILTER_ReadGame` that follows
-    // (`:1650-1655`) runs no DSA (`Game.readNewGame`).
+    // (`:1774-1779`) runs no DSA (`Game.readNewGame`).
     const rawInHand = gb2.objectInHand & 0xffff;
     const objectInHand =
         rawInHand === 0 || rawInHand === 0xffff || rawInHand === 0xfffe
@@ -110,7 +110,7 @@ function buildPartyState(world: CsbwinWorld): PartyState {
         cursorOwner: gb2.handChar,
         selectedCharacterIndex: -1,
         // None of the three is in the file's party blocks. `LoadGame` clears
-        // `d.GameIsLost` (doc/CSBwin-src/SaveGame.cpp:1891); the other two take
+        // `d.GameIsLost` (doc/CSBwin-src/SaveGame.cpp:2095); the other two take
         // `initialPartyState`'s values, as they did before they were required.
         potentialChampionIndex: -1,
         gameIsLost: false,
@@ -129,13 +129,13 @@ function buildPartyState(world: CsbwinWorld): PartyState {
         lastMonsterAttackTime: gb2.lastMonsterAttackTime,
         freezeLifeTimer: tail.freezeLifeTimer,
         // `d.partyMoveDisableTimer = b.gb2.partyMoveDisableTimer`, `d.Word11712`,
-        // `d.Word11714` (doc/CSBwin-src/SaveGame.cpp:1645-1647).
+        // `d.Word11714` (doc/CSBwin-src/SaveGame.cpp:1769-1771).
         partyMoveDisableTimer: gb2.partyMoveDisableTimer,
         word11712: gb2.word11712,
         word11714: gb2.word11714,
         // `UnscrambleStream` reads all four records, the slots past the party with the
-        // rest (doc/CSBwin-src/SaveGame.cpp:1676). A champion's own slot is held as
-        // `AddCharacter` leaves it before filling it, cleared (`Character.cpp:481`).
+        // rest (doc/CSBwin-src/SaveGame.cpp:1802). A champion's own slot is held as
+        // `AddCharacter` leaves it before filling it, cleared (`Character.cpp:482`).
         vacantCharacters: Array.from({ length: 4 }, (_, i) => i < party.length
             ? new Uint8Array(CHARDESC_SIZE)
             : block.slice(i * CHARDESC_SIZE, (i + 1) * CHARDESC_SIZE)),
@@ -144,12 +144,12 @@ function buildPartyState(world: CsbwinWorld): PartyState {
 
 /**
  * `GAMEBLOCK1` into `d.`, as `LoadGame` takes it. `_ReadEntireGame` first sets the four
- * words to 2, 1, 1 and 13 (`doc/CSBwin-src/SaveGame.cpp:1467-1470`); the load copies
- * `totalMoveCount`, `RandomGameID` and `Byte22808` (`:1603`, `:1610-1611`), then
- * `Word22598` from its byte (`:1859-1860`). A save whose `Byte22596` is 1 is an Atari DM
+ * words to 2, 1, 1 and 13 (`doc/CSBwin-src/SaveGame.cpp:1568-1571`); the load copies
+ * `totalMoveCount`, `RandomGameID` and `Byte22808` (`:1728`, `:1734-1735`), then
+ * `Word22598` from its byte (`:2063-2064`). A save whose `Byte22596` is 1 is an Atari DM
  * save, whose `Word22592` is set from the dungeon it holds: 10 for fourteen levels and a
- * sentinel of 99, 13 for ten levels and 76, otherwise 0 (`:1861-1877`). Any other save
- * brings its own three words (`:1878-1881`).
+ * sentinel of 99, 13 for ten levels and 76, otherwise 0 (`:2065-2081`). Any other save
+ * brings its own three words (`:2082-2085`).
  */
 function buildBlock1State(world: CsbwinWorld): Block1State {
     const gb1 = world.save.block1;
@@ -192,9 +192,9 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
     return {
         party: buildPartyState(world),
         game: {
-            // `d.Time = d.Long11732 = b.gb2.Time` (`:1622`) — the game clock, in ticks.
+            // `d.Time = d.Long11732 = b.gb2.Time` (`:1746`) — the game clock, in ticks.
             tickCount: gb2.time,
-            // `d.RandomNumber = b.gb2.ranseed` (`:1624`), so the stream continues where
+            // `d.RandomNumber = b.gb2.ranseed` (`:1748`), so the stream continues where
             // the saved game left it rather than being reseeded from the host clock.
             randomSeed: gb2.ranseed >>> 0,
             gameWon: false,
@@ -209,7 +209,7 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
             dsaGlobals: readGlobalVariables(world.dungeon),
             // The palette `d.Initialize()` cleared stays when a record is missing.
             overlayPalette: readOverlayPalette(world.dungeon) ?? identityOverlayPalette(),
-            // `disableSaves`'s records leave the pool as they are read (`:1791-1793`).
+            // `disableSaves`'s records leave the pool as they are read (`:1962-1964`).
             disableSaves: readDisableSaves(world.dungeon),
             block1: buildBlock1State(world),
         },
@@ -237,11 +237,11 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
 /**
  * `_ReadEntireGame`'s read of a save's world, installed as the running game's
  * (`Game.installWorld`): the image, structure and all, with the six the save carries
- * beside it, its rules and signatures, and `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:1826). The save
+ * beside it, its rules and signatures, and `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:2029). The save
  * restores its state over it (`applyCsbwinSave`).
  */
 function installCsbwinWorld(game: Game, world: CsbwinWorld): void {
-    // `LoadGame`'s end (doc/CSBwin-src/SaveGame.cpp:1795-1822), before anything is installed.
+    // `LoadGame`'s end (doc/CSBwin-src/SaveGame.cpp:1966-2025), before anything is installed.
     readFileSignatures(game.ctx, world.dungeon);
     // Before `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
     CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc, (line) => game.ctx.host.trace(line));

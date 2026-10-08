@@ -2,69 +2,69 @@
  * The viewing filter at `DescribeObject`'s two sites, with two DSAs on its square, run
  * through `DsaSystem.processViewingFilter` against a genuine save (`csbgame7.dat`).
  *
- * 1. **Every DSA at the location runs** (`doc/CSBwin-src/Character.cpp:3476-3518`,
- *    `:3736-3770`): each loop goes on with `continue`, a filter call apiece, the second
+ * 1. **Every DSA at the location runs** (`doc/CSBwin-src/Character.cpp:3490-3532`,
+ *    `:3753-3787`): each loop goes on with `continue`, a filter call apiece, the second
  *    DSA after the first.
- * 2. **The description's parameter 0 is the phrase mask as it stands** (`:3762`): the
+ * 2. **The description's parameter 0 is the phrase mask as it stands** (`:3779`): the
  *    second DSA sees the bit the first one's `&DESCRIBE` cleared (`ModifyDescription`,
- *    `:3797-3830`).
+ *    `:3814-3847`).
  * 3. **No parameter comes back into the mask**: a DSA that stores into parameter 0, with
- *    no `&DESCRIBE`, leaves the mask as it was (`:3766-3770` read nothing back).
+ *    no `&DESCRIBE`, leaves the mask as it was (`:3783-3787` read nothing back).
  * 4. **At the scroll site, an object a DSA leaves in parameter 1 becomes the loop's own**
- *    (`:3509-3518`), and the loop goes on down that object's chain. The scroll it was
+ *    (`:3523-3532`), and the loop goes on down that object's chain. The scroll it was
  *    given is such an object, so a DSA after the first runs only when the first stores an
- *    invalid object there; it then sees parameter 0 as 0 (`:3502`), whatever a
+ *    invalid object there; it then sees parameter 0 as 0 (`:3516`), whatever a
  *    `&DESCRIBE` did, and the scroll drawn is the one given.
  * 5. **A scroll a DSA names is the one drawn**, and the loop goes on down its chain.
  * 6. **`&DESCRIBE` with a location sets the phrase from every text at it** whose corner
- *    matches (`ModifyDescription`, `:3816-3830`), so the last wins, a hidden one and an
+ *    matches (`ModifyDescription`, `:3833-3847`), so the last wins, a hidden one and an
  *    empty one included, each read by `GetText` (`doc/CSBwin-src/AsciiDump.cpp:362-456`).
- * 7. **`GetText` is `DecodeText` at type `0x8001`** (`doc/CSBwin-src/CSBCode.cpp:5487-5668`),
+ * 7. **`GetText` is `DecodeText` at type `0x8001`** (`doc/CSBwin-src/CSBCode.cpp:5552-5733`),
  *    before its substitution, on every text in use in `dm-atari` and Conflux, but for the line
  *    feed `DecodeText` puts in front and code 28: `/` to `GetText`, a space to
  *    `DecodeText`, or a line feed in place of that space for a second one in a row.
  *
  * 8. **The eye clicked with an empty hand runs it too** (`TAG019036`,
- *    `doc/CSBwin-src/Character.cpp:4524-4578`, from `_ClickOnEye`, `Viewport.cpp:7257-7290`):
+ *    `doc/CSBwin-src/Character.cpp:4541-4595`, from `_ClickOnEye`, `Viewport.cpp:7264-7297`):
  *    every DSA at the location, each seeing parameter 0 as 0, the object as -1 and the
  *    champion whose inventory is open. Once a press: a second press while the eye is held
  *    runs nothing, and the next press after the release runs it again. With an object in
  *    hand the eye describes it instead, and this site runs nothing: the DSA sees the
  *    object, which the description's site passes.
  * 9. **With an object in hand it runs once a press, at the press** (`DescribeObject`, from
- *    `_ClickOnEye`, `Viewport.cpp:7286`): CSBWin draws the description or the scroll once,
+ *    `_ClickOnEye`, `Viewport.cpp:7293`): CSBWin draws the description or the scroll once,
  *    so the inventory composed again and again while the eye is held runs no DSA, and the
  *    next press after the release runs it again.
  * 10. **A scroll in the weapon hand of the inventory open is read** (`TAG0189d4`,
- *    `doc/CSBwin-src/Character.cpp:3849-3897`), in the scroll's site, at the events that
+ *    `doc/CSBwin-src/Character.cpp:3866-3914`), in the scroll's site, at the events that
  *    draw that panel: the inventory's opening (`ShowHideInventory`,
- *    `doc/CSBwin-src/CSBCode.cpp:7504-7514`), the scroll entering the hand
- *    (`AddCharacterPossession`, `Character.cpp:1997-2004`), and the eye's release
- *    (`QuitPressingEye`, `CSBCode.cpp:7399-7414`); not at a compose, not with the
+ *    `doc/CSBwin-src/CSBCode.cpp:7563-7573`), the scroll entering the hand
+ *    (`AddCharacterPossession`, `Character.cpp:2002-2009`), and the eye's release
+ *    (`QuitPressingEye`, `CSBCode.cpp:7458-7473`); not at a compose, not with the
  *    inventory closed, and not at the ten-second update while the scroll shows
  *    (`doc/CSBwin-src/Code17818.cpp:435-443`). With the eye held and an empty hand, the
- *    ten-second update and poison run the eye's own site again (`Character.cpp:1478-1497`,
- *    `CSBCode.cpp:7220-7225`). In that hand the scroll is drawn rolled
- *    (`DisplayBackpackItem`, `Character.cpp:1183-1189`).
+ *    ten-second update and poison run the eye's own site again (`Character.cpp:1483-1502`,
+ *    `CSBCode.cpp:7279-7284`). In that hand the scroll is drawn rolled
+ *    (`DisplayBackpackItem`, `Character.cpp:1188-1194`).
  * 11. **The mouth held with an empty hand shows food and water over the scroll**
- *    (`_FeedCharacter`, `doc/CSBwin-src/Character.cpp:4041-4058`), and runs nothing;
+ *    (`_FeedCharacter`, `doc/CSBwin-src/Character.cpp:4058-4075`), and runs nothing;
  *    `d.DisplayResurrectChestOrScroll` stays 2. While it is held the ten-second update
- *    draws food and water again (`Character.cpp:1478-1481`, `Code17818.cpp:435-443`) and
- *    the inventory will not close (`CSBCode.cpp:7439`); the release is `QuitPressingMouth`
- *    (`CSBCode.cpp:7390-7395`), whose `TAG0189d4` reads the scroll again. With food and
+ *    draws food and water again (`Character.cpp:1483-1486`, `Code17818.cpp:435-443`) and
+ *    the inventory will not close (`CSBCode.cpp:7498`); the release is `QuitPressingMouth`
+ *    (`CSBCode.cpp:7449-7454`), whose `TAG0189d4` reads the scroll again. With food and
  *    water already shown, the mouth is not held.
  * 12. **The held eye and mouth hide the pointer** until the release: `STHideCursor(HC47)`
- *    in `_ClickOnEye` (`doc/CSBwin-src/Viewport.cpp:7275`) and `STShowCursor(HC47)` in
- *    `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7413`); `HC5` for the mouth
- *    (`Character.cpp:4054-4055`, `CSBCode.cpp:7395`). The hide count `d.Word23118` is
- *    back to 0 after each (`doc/CSBwin-src/Mouse.cpp:1818-1863`).
+ *    in `_ClickOnEye` (`doc/CSBwin-src/Viewport.cpp:7282`) and `STShowCursor(HC47)` in
+ *    `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7472`); `HC5` for the mouth
+ *    (`Character.cpp:4071-4072`, `CSBCode.cpp:7454`). The hide count `d.Word23118` is
+ *    back to 0 after each (`doc/CSBwin-src/Mouse.cpp:1957-2002`).
  * 13. **A champion's death lets go of the held eye or mouth** when their inventory is
- *    open, and closes it (`KillCharacter`, `Character.cpp:2597-2622`): the pointer is
+ *    open, and closes it (`KillCharacter`, `Character.cpp:2602-2627`): the pointer is
  *    back, and the buttons after 81 are not swallowed any more.
  * 14. **The eye held over an object clears the held object's name** (`ClearHeldObjectName`,
- *    `doc/CSBwin-src/Viewport.cpp:7284`: `wRectPos624` filled with colour 0,
- *    `:3306-3316`), and the release draws it again (`QuitPressingEye`,
- *    `doc/CSBwin-src/CSBCode.cpp:7409-7412`).
+ *    `doc/CSBwin-src/Viewport.cpp:7291`: `wRectPos624` filled with colour 0,
+ *    `:3313-3323`), and the release draws it again (`QuitPressingEye`,
+ *    `doc/CSBwin-src/CSBCode.cpp:7468-7471`).
  *
  * Run: `npx tsx tools/dump-viewing-filter.ts`
  */
@@ -88,7 +88,7 @@ import type { UIState } from '../src/renderer/ui/UIState';
 import { OBJNI_OPEN_SCROLL, OBJNI_SCROLL } from '../src/core/objectNameIndex';
 import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
 
-/** `ESL_VIEWINGFILTER` (`doc/CSBwin-src/CSB.h:1538`). */
+/** `ESL_VIEWINGFILTER` (`doc/CSBwin-src/CSB.h:1541`). */
 const ESL_VIEWINGFILTER = 3;
 
 /** Parameters 0 and 1 into globals `to` and `to + 1`. */
@@ -100,7 +100,7 @@ const describe = (locr: number, index: number, color: number): number[] =>
   [...int(locr), ...int(index), ...int(color), op(StkOp.DESCRIBE)];
 /**
  * `value` into parameter `index`: `&PARAM!` copies variables 0 to `index` into the
- * parameters from 0 (`doc/CSBwin-src/DSA.cpp:3000-3020`), and the ones left undefined
+ * parameters from 0 (`doc/CSBwin-src/DSA.cpp:3001-3021`), and the ones left undefined
  * keep their parameters.
  */
 const paramStore = (index: number, value: number): number[] =>
@@ -604,7 +604,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     + `${shownBefore ? 'drawn' : 'blank'}, the eye held ${clearedHeld ? 'clears it' : 'leaves it'}, `
     + `released ${shownAfter ? 'draws it' : 'leaves it blank'}`);
   // Canary: the rectangle starts at `DrawNameOfHeldObject`'s pen x, 0xe9
-  // (`doc/CSBwin-src/Code11f52.cpp:66-74`).
+  // (`doc/CSBwin-src/Code11f52.cpp:101-109`).
   check(r.x1 === 0xe9 && r.x2 === 319 && r.y1 === 33 && r.y2 === 38, 'wRectPos624 is the name line, from x 0xe9');
   check(shownBefore, "with a weapon in hand, its name is drawn");
   check(clearedHeld, "the eye held over it clears the name (ClearHeldObjectName)");

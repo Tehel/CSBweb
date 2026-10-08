@@ -8,31 +8,31 @@ entire viewport uses the same palette index. UI text/portraits use a
 separate palette and are not dimmed by the dungeon light level.
 
 Primary sources:
-- `doc/CSBwin-src/CSBCode.cpp:7242+` `SelectPaletteForLightLevel`
+- `doc/CSBwin-src/CSBCode.cpp:7301+` `SelectPaletteForLightLevel`
 - `doc/CSBwin-src/Timer.cpp:2835+` `ProcessLightLevelTimer`
-- `doc/CSBwin-src/Magic.cpp:828+` `SetBrightnessTimer`
-- `doc/CSBwin-src/CSBCode.cpp:980+` VBL palette swap
-- `doc/CSBwin-src/Data.h:922+`, `1422+`, `1464+` data layout
+- `doc/CSBwin-src/Magic.cpp:831+` `SetBrightnessTimer`
+- `doc/CSBwin-src/CSBCode.cpp:990+` VBL palette swap
+- `doc/CSBwin-src/Data.h:937+`, `1422+`, `1464+` data layout
 
 ## Core Data Fields (from Data.h)
 
 - `d.Brightness` (i16): ambient light accumulator (save-game state)
-  - `doc/CSBwin-src/Data.h:767`
+  - `doc/CSBwin-src/Data.h:782`
 - `d.Word1074[16]`: brightness lookup table
   - Used by torches and timed brightness decay
-  - `doc/CSBwin-src/Data.h:1424`, swapped in `CSBCode.cpp:10213`
+  - `doc/CSBwin-src/Data.h:1439`, swapped in `CSBCode.cpp:10337`
 - `d.PaletteBrightness[6]`: brightness thresholds for selecting palette index
-  - `doc/CSBwin-src/Data.h:1422`, swapped in `CSBCode.cpp:10212`
+  - `doc/CSBwin-src/Data.h:1437`, swapped in `CSBCode.cpp:10336`
 - `d.Palette552[6]`: the six 16-color palettes (lightest to darkest)
-  - `doc/CSBwin-src/Data.h:1464`, swapped in `CSBCode.cpp:10225`
+  - `doc/CSBwin-src/Data.h:1479`, swapped in `CSBCode.cpp:10349`
 - `d.CurrentPalette`: index into `Palette552` (0..5)
-  - `doc/CSBwin-src/Data.h:922`
+  - `doc/CSBwin-src/Data.h:937`
 - `d.Word11778`: VBL flag that triggers palette update
-  - `doc/CSBwin-src/Data.h:879`, set in `SelectPaletteForLightLevel`
+  - `doc/CSBwin-src/Data.h:894`, set in `SelectPaletteForLightLevel`
 
 The palette tables above are loaded via the expanded graphic block
 `0x232` and byte-swapped during initialization
-(`doc/CSBwin-src/CSBCode.cpp:10190-10230`).
+(`doc/CSBwin-src/CSBCode.cpp:10314-10354`).
 
 ## How Light Level Is Computed
 
@@ -41,7 +41,7 @@ The palette tables above are loaded via the expanded graphic block
 (4 characters x 2 hands = 8 slots) and uses the **four brightest**
 torches to influence the total light:
 
-- Source: `doc/CSBwin-src/CSBCode.cpp:7242-7322`
+- Source: `doc/CSBwin-src/CSBCode.cpp:7301-7381`
 - Torch detection: `objNI_Torch_a`..`objNI_Torch_d`
 - Charge value: `DB5::charges()`
 
@@ -60,40 +60,40 @@ for first 5 entries in LOCAL_26:
 
 Note: the comment says "Find four brightest torches" but the code sums
 **five** entries after sorting the first four; this appears to be a
-legacy quirk in CSBWin (`CSBCode.cpp:7283+`).
+legacy quirk in CSBWin (`CSBCode.cpp:7342+`).
 
 Torch charge burn-down:
 - `NinetySecondUpdate` decrements torch charges in hands and calls
   `SelectPaletteForLightLevel` afterward
-  (`doc/CSBwin-src/CSBCode.cpp:7339-7387`). It runs every 512 ticks,
-  `(d.Time & 511) == 0` (`doc/CSBwin-src/CSBCode.cpp:680-683`), and skips a Hall of
+  (`doc/CSBwin-src/CSBCode.cpp:7398-7446`). It runs every 512 ticks,
+  `(d.Time & 511) == 0` (`doc/CSBwin-src/CSBCode.cpp:690-693`), and skips a Hall of
   Champions recruit — see `doc/PROVEN_FACTS.md` → "Torches burn down every 512 ticks".
 
 ### 2) Ambient Brightness (`d.Brightness`)
 After summing torch contributions, CSBWin adds `d.Brightness`:
 
 - `totalLight += d.Brightness`
-- `doc/CSBwin-src/CSBCode.cpp:7308`
+- `doc/CSBwin-src/CSBCode.cpp:7367`
 
 `d.Brightness` is adjusted by:
 
 - **Illumulet** on equip/unequip
   - Add/subtract `Word1074[2]`
-  - `doc/CSBwin-src/Character.cpp:1866-2017`
+  - `doc/CSBwin-src/Character.cpp:1871-2022`
 - **Light/Darkness spells**
   - Increase/decrease `d.Brightness` and schedule decay
-  - `doc/CSBwin-src/Magic.cpp:1288-1312`
+  - `doc/CSBwin-src/Magic.cpp:1290-1314`
 - **Light attack (torch action)**
   - `d.Brightness += Word1074[2]`, decay over time
-  - `doc/CSBwin-src/Attack.cpp:2068-2082`
+  - `doc/CSBwin-src/Attack.cpp:2070-2084`
 
 ### 3) Palette Selection (Thresholding)
 Once `totalLight` is computed, CSBWin selects one of 6 palettes:
 
 - If current level's `experienceMultiplier == 0`, force palette 0
-  (full brightness): `doc/CSBwin-src/CSBCode.cpp:7248-7258`
+  (full brightness): `doc/CSBwin-src/CSBCode.cpp:7307-7317`
   - `experienceMultiplier` is `LEVELDESC.word12` bits 12-15
-    (`doc/CSBwin-src/CSB.h:2108-2135`). In our TS loader this is exposed
+    (`doc/CSBwin-src/CSB.h:2171-2198`). In our TS loader this is exposed
     as `MapDescriptor.difficulty`.
 - Else compare to `PaletteBrightness[6]`:
 
@@ -106,14 +106,14 @@ else:
 CurrentPalette = D4W
 ```
 
-- `doc/CSBwin-src/CSBCode.cpp:7309-7322`
+- `doc/CSBwin-src/CSBCode.cpp:7368-7381`
 
 ### 4) Apply Palette in VBL
 `SelectPaletteForLightLevel` sets `d.Word11778 = 1`. During the VBL
 handler, CSBWin copies the selected palette into the active viewport
 palette:
 
-- `doc/CSBwin-src/CSBCode.cpp:1004-1024`
+- `doc/CSBwin-src/CSBCode.cpp:1014-1034`
 
 ```
 if Word11778:
@@ -123,7 +123,7 @@ if Word11778:
 
 `Palette11946` is the palette used for viewport drawing when
 `DynamicPaletteSwitching` is enabled, while portraits/text use
-`Palette11978` (`doc/CSBwin-src/Data.h:894-899`).
+`Palette11978` (`doc/CSBwin-src/Data.h:909-914`).
 
 ## Timed Brightness Decay
 
@@ -131,7 +131,7 @@ if Word11778:
 `SetBrightnessTimer(deltaSteps, timeDelay)` creates a `TT_LIGHT` timer
 and calls `SelectPaletteForLightLevel` immediately:
 
-- `doc/CSBwin-src/Magic.cpp:828-839`
+- `doc/CSBwin-src/Magic.cpp:831-842`
 
 ### TT_LIGHT Timer Processing
 On timer fire, CSBWin runs:
@@ -144,7 +144,7 @@ by *difference* between two `Word1074[]` entries, then reschedules
 another `TT_LIGHT` in 4 time units if steps remain:
 
 - `doc/CSBwin-src/Timer.cpp:2835-2868`
-- `doc/CSBwin-src/CSBCode.cpp:6514-6519`
+- `doc/CSBwin-src/CSBCode.cpp:6573-6578`
 
 This is how spells and other effects fade smoothly after their delay.
 
@@ -170,13 +170,13 @@ This is how spells and other effects fade smoothly after their delay.
   - `d.Brightness -= Word1074[D6W]`
   - `SetBrightnessTimer(D6W, 98)`
 
-Source: `doc/CSBwin-src/Magic.cpp:1288-1312`
+Source: `doc/CSBwin-src/Magic.cpp:1290-1314`
 
 ## Notes / Open Questions
 
 - **Torch types**: `SelectPaletteForLightLevel` accepts
   `objNI_Torch_a..objNI_Torch_d`, but `AddCharacterPossession` only
-  auto-lights `objNI_Torch_a` on pickup (`Character.cpp:1988-2001`).
+  auto-lights `objNI_Torch_a` on pickup (`Character.cpp:1993-2006`).
   It is unclear whether the other torch types are intended to contribute
   brightness differently or simply represent variants.
 - **"Four brightest" vs five**: selection-sort runs for four entries but

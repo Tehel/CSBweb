@@ -2,16 +2,16 @@
  * Keyboard bindings for the DM interface.
  *
  * CSBWin's own keys are the four `KeyXlate` tables in graphics.dat `0x231`, which
- * `TAG0196da` searches (`doc/CSBwin-src/CSBCode.cpp:8428-8475`, `translateKey` below):
+ * `TAG0196da` searches (`doc/CSBwin-src/CSBCode.cpp:8515-8574`, `translateKey` below):
  * awake, F1-F4 open the inventories, Ctrl-S the disk menu and Esc freezes; Insert and
  * Clr/Home turn, and the four arrows step and strafe. Every other key is `config.txt`'s:
- * `ReadConfigFile` (`doc/CSBwin-src/CSBUI.cpp:741`) reads it into a `KEYXLATE` table
- * (`doc/CSBwin-src/CSBUI.cpp:514`), which is also what turns a PC key into the Atari
- * keyscan the tables hold (`SCAN`, `:1120-1139`) — `KEYSCAN` below is the port's stand-in
+ * `ReadConfigFile` (`doc/CSBwin-src/CSBUI.cpp:761`) reads it into a `KEYXLATE` table
+ * (`doc/CSBwin-src/CSBUI.cpp:534`), which is also what turns a PC key into the Atari
+ * keyscan the tables hold (`SCAN`, `:1141-1160`) — `KEYSCAN` below is the port's stand-in
  * for that half. An `MSCAN` line binds one scancode to a screen point and a mouse button
- * (`doc/CSBwin-src/CSBUI.cpp:783-796`), and `UIM_KEYDOWN` turns the key into a click
+ * (`doc/CSBwin-src/CSBUI.cpp:803-816`), and `UIM_KEYDOWN` turns the key into a click
  * there — `OnMouseSwitchAction(2, x, y)` followed by `OnMouseSwitchAction(0)`
- * (`doc/CSBwin-src/CSBUI.cpp:1140-1158`), exactly the pair `UIM_LEFT_BUTTON_DOWN` and
+ * (`doc/CSBwin-src/CSBUI.cpp:1161-1179`), exactly the pair `UIM_LEFT_BUTTON_DOWN` and
  * `UIM_LEFT_BUTTON_UP` raise. So every such binding is a click on a panel, and the
  * panel's own handler decides what it means.
  *
@@ -23,7 +23,7 @@
  * of the runtime button lists to say the same thing. The guards below are therefore
  * lifted from `handleMouseButton` (`src/renderer/ui/Mouse.ts`) so the two routes stay
  * equivalent — in particular `d.PotentialCharacterOrdinal` makes every panel inert
- * (`doc/CSBwin-src/Mouse.cpp:1578-1650`).
+ * (`doc/CSBwin-src/Mouse.cpp:1717-1789`).
  *
  * The attack keys are a column per champion — Q/A/Z for the first, W/S/X, E/D/C and
  * R/F/V for the others — one key per attack row. With that champion's menu open a key
@@ -93,7 +93,7 @@ function isUIKey(k: string): boolean {
 /**
  * The Atari keyscan of a `KeyboardEvent.key`, in the form `TAG0196da` compares: the ASCII
  * code in the low byte, or, for a key with none, the scancode in the high byte
- * (`if ((key&0xffff) == 0) key >>= 8`, `doc/CSBwin-src/CSBCode.cpp:8438`). These are the
+ * (`if ((key&0xffff) == 0) key >>= 8`, `doc/CSBwin-src/CSBCode.cpp:8525`). These are the
  * keys the graphics.dat tables bind; `tools/dump-key-bindings.ts` proves every table entry
  * has one here.
  */
@@ -123,11 +123,11 @@ export function keyScanOf(key: string, ctrl = false): number {
 }
 
 /**
- * The table half of `TAG0196da` (`doc/CSBwin-src/CSBCode.cpp:8428-8475`): the button
+ * The table half of `TAG0196da` (`doc/CSBwin-src/CSBCode.cpp:8515-8574`): the button
  * `d.pKeyXlate2`, then `d.pKeyXlate1`, binds `keyscan` to, or 0. With no `pKeyXlate2`,
  * no key is anything. CSBWin goes on past a match: every `pKeyXlate1` match is written
  * too, one queue slot further back each time, so a key bound twice would leave only the
- * last match queued, over the entry queued before it (`:8446-8475`). No keyscan is bound
+ * last match queued, over the entry queued before it (`:8533-8574`). No keyscan is bound
  * twice in either pair of tables (`tools/dump-key-bindings.ts`), so the first match is
  * what CSBWin queues.
  */
@@ -159,7 +159,7 @@ export function handleUIKey(ui: UIState, key: string): boolean {
   const k = key.length === 1 ? key.toLowerCase() : key;
   // While a script holds the loop, CSBWin's pass is suspended in `wvbl`
   // (doc/CSBwin-src/system.cpp:639-661) and its UI only queues: the key becomes a click
-  // (`UIM_KEYDOWN`, `CSBUI.cpp:1120-1164`) that the first pass after the script takes. So
+  // (`UIM_KEYDOWN`, `CSBUI.cpp:1141-1185`) that the first pass after the script takes. So
   // the key is claimed, and does nothing: a known loss (`DEBT.md` H, "Three inputs bypass
   // the mouse queue"). After the fusion no pass comes before the credits, so nothing is
   // lost there. After `_MagicSelection`, which holds the loop three VBLs (about 50 ms) for
@@ -259,7 +259,7 @@ function selectCaster(ui: UIState, chIdx: number): void {
   const party = ui.partyState;
   if (championPending(ui)) return;
   const champion = party.champions[chIdx];
-  // `SelectMagicCaster` refuses a champion whose `HP()` is 0 (`doc/CSBwin-src/Magic.cpp:724`).
+  // `SelectMagicCaster` refuses a champion whose `HP()` is 0 (`doc/CSBwin-src/Magic.cpp:727`).
   if (!champion || (champion.attributes.health | 0) === 0) return;
   if (champion.attributes.maxMana === 0) return;
   selectMagicCaster(party, chIdx);

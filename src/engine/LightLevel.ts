@@ -1,18 +1,18 @@
 /**
- * `SelectPaletteForLightLevel` (`doc/CSBwin-src/CSBCode.cpp:7242-7336`, `TAG017fa8`): how
+ * `SelectPaletteForLightLevel` (`doc/CSBwin-src/CSBCode.cpp:7301-7395`, `TAG017fa8`): how
  * bright the party's level is, as `d.CurrentPalette`, the index of the viewport palette
  * the screen draws with (0 the brightest, 5 the darkest) and what shortens a monster's
  * sight in the dark (`Monster.cpp:577-581`).
  *
  * CSBWin calls it where the light changes, and so does the port: a torch into or out of
- * a hand and an Illumulet on or off the neck (`CharacterSystem`, `Character.cpp:1867`,
- * `:1903`, `:1992`, `:2017`), a `TT_LIGHT` timer (`TimerSystem`, `CSBCode.cpp:6517`), a
- * level loaded (`MonsterSystem.loadPartyLevel`, `:819`), the torches burning down
- * (`ninetySecondUpdate`, `:7384`), a light timer set (`MagicSystem.setBrightnessTimer`,
- * `Magic.cpp:839`) and the fusion (`AttackSystem`, `Attack.cpp:2275`).
+ * a hand and an Illumulet on or off the neck (`CharacterSystem`, `Character.cpp:1872`,
+ * `:1908`, `:1997`, `:2022`), a `TT_LIGHT` timer (`TimerSystem`, `CSBCode.cpp:6576`), a
+ * level loaded (`MonsterSystem.loadPartyLevel`, `:829`), the torches burning down
+ * (`ninetySecondUpdate`, `:7443`), a light timer set (`MagicSystem.setBrightnessTimer`,
+ * `Magic.cpp:842`) and the fusion (`AttackSystem`, `Attack.cpp:2277`).
  *
- * `d.Word11778 = 1`, which tells the VBL handler to load the new palette (`:7335`,
- * `:1011-1014`), has no counterpart: the screen reads `d.CurrentPalette` whenever it
+ * `d.Word11778 = 1`, which tells the VBL handler to load the new palette (`:7394`,
+ * `:1021-1024`), has no counterpart: the screen reads `d.CurrentPalette` whenever it
  * presents.
  */
 import { OBJNI_TORCH_A, OBJNI_TORCH_D } from '../core/objectNameIndex';

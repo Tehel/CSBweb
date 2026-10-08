@@ -1,6 +1,6 @@
 /**
  * What an `RN` names: CSBWin's `dataTypeMap` and `dataIndexMap`, and the accessors of
- * `class RN` that read and write them (`doc/CSBwin-src/CSBTypes.h:268-370`).
+ * `class RN` that read and write them (`doc/CSBwin-src/CSBTypes.h:274-376`).
  *
  * CSBWin's `RN` is a slot number. The slot's database and the corner of its cell are in
  * `dataTypeMap[slot]` (`(pos << 4) | dbNum`), its record index in `dataIndexMap[slot]`;
@@ -17,7 +17,7 @@
  * refuses 0 (`doc/PROVEN_FACTS.md` -> "An `RNVAL` read as a slot is `dbUNKNOWN`").
  * For such an RN `dbType()` is `dbUNKNOWN`, as in CSBWin. `pos()` and `idx()` throw,
  * where CSBWin's read outside the maps once its message box is dismissed, and its debug
- * build dies (`doc/CSBwin-src/data.cpp:518-527`): a caller asks only for a slot.
+ * build dies (`doc/CSBwin-src/data.cpp:519-528`): a caller asks only for a slot.
  */
 import { DBType, OBJECT_ID_NULL, type ObjectID, type TilePosition } from './types';
 
@@ -74,25 +74,25 @@ export class RnMaps {
         this.dataMapLength = typeMap.length;
     }
 
-    /** `RN::checkIndirectIndex(i)` (`doc/CSBwin-src/data.cpp:529-534`). */
+    /** `RN::checkIndirectIndex(i)` (`doc/CSBwin-src/data.cpp:530-535`). */
     checkIndirectIndex(i: number): boolean {
         return i < this.dataMapLength && i > 0;
     }
 
-    /** `RN::dbType` (`CSBTypes.h:324-330`): `dbUNKNOWN` for a free slot or no slot at all. */
+    /** `RN::dbType` (`CSBTypes.h:330-336`): `dbUNKNOWN` for a free slot or no slot at all. */
     dbType(rn: ObjectID): DBType {
         if (!this.checkIndirectIndex(rn)) return DBType.UNKNOWN;
         if (this.indexMap[rn] === 0xffff) return DBType.UNKNOWN;
         return (this.typeMap[rn] & 0x0f) as DBType;
     }
 
-    /** `RN::pos()` (`CSBTypes.h:331-335`): the corner of its cell. */
+    /** `RN::pos()` (`CSBTypes.h:337-341`): the corner of its cell. */
     pos(rn: ObjectID): TilePosition {
         this.check(rn);
         return ((this.typeMap[rn] >> 4) & 3) as TilePosition;
     }
 
-    /** `RN::idx` (`CSBTypes.h:343-347`): the record within its database. */
+    /** `RN::idx` (`CSBTypes.h:349-353`): the record within its database. */
     idx(rn: ObjectID): number {
         this.check(rn);
         return this.indexMap[rn];
@@ -104,7 +104,7 @@ export class RnMaps {
     }
 
     /**
-     * `RN::pos(p)` (`CSBTypes.h:336-342`): moves the object to corner `p`, in the map, and
+     * `RN::pos(p)` (`CSBTypes.h:342-348`): moves the object to corner `p`, in the map, and
      * gives back the same RN. Every copy of the RN sees the new corner.
      */
     setPos(rn: ObjectID, p: number): ObjectID {
@@ -114,7 +114,7 @@ export class RnMaps {
     }
 
     /**
-     * `RN(DBTYPE dbType, ui32 dbIndex)` (`doc/CSBwin-src/data.cpp:455-504`): the slot that
+     * `RN(DBTYPE dbType, ui32 dbIndex)` (`doc/CSBwin-src/data.cpp:456-505`): the slot that
      * names the record, if one does; else the lowest free slot, or one whose record of
      * the same database is free; else a new one.
      */
@@ -142,7 +142,7 @@ export class RnMaps {
     }
 
     /**
-     * `AllocateIndirectIndex` (`doc/CSBwin-src/SaveGame.cpp:2120-2140`): the lowest free
+     * `AllocateIndirectIndex` (`doc/CSBwin-src/SaveGame.cpp:2332-2352`): the lowest free
      * slot, or the first one whose record of the same database is free, or a new one; -1
      * when the maps are full.
      */
@@ -169,7 +169,7 @@ export class RnMaps {
     }
 
     /**
-     * `FindEmptyDBEntry`'s walk of the index (`doc/CSBwin-src/data.cpp:933-953`): the
+     * `FindEmptyDBEntry`'s walk of the index (`doc/CSBwin-src/data.cpp:935-955`): the
      * first slot of database `db` whose record is free, and that record, which may be
      * record 0; else the lowest free slot, or -1, and -1 for the record.
      */
@@ -189,7 +189,7 @@ export class RnMaps {
     }
 
     /**
-     * The end of `FindEmptyDBEntry` (`doc/CSBwin-src/data.cpp:973-988`): slot
+     * The end of `FindEmptyDBEntry` (`doc/CSBwin-src/data.cpp:975-990`): slot
      * `emptyIndexEntry`, or a new one when it is -1, names record `dbIndex` of `db` at
      * corner 0. `RNnul` when a new slot is wanted and the index is all but full, unless
      * the object is `important`.
@@ -205,7 +205,7 @@ export class RnMaps {
     }
 
     /**
-     * `DeleteDBEntry`'s walk of the index (`doc/CSBwin-src/data.cpp:993-1015`): frees the
+     * `DeleteDBEntry`'s walk of the index (`doc/CSBwin-src/data.cpp:995-1017`): frees the
      * slot naming record `dbIndex` of `db`, if one does, and says whether the record is
      * to be freed. It is not, and no slot is freed, when two slots name it or its slot
      * carries bit 0x80, "Cloned!!!". The walk starts at slot 0, which names door 0.
@@ -227,7 +227,7 @@ export class RnMaps {
     }
 
     /**
-     * `ConvertListOfObjects`' slot for one packed RN (`doc/CSBwin-src/SaveGame.cpp:1947-1981`):
+     * `ConvertListOfObjects`' slot for one packed RN (`doc/CSBwin-src/SaveGame.cpp:2159-2193`):
      * the first slot already naming the record when `duplicateOK`, else a new one carrying
      * the packed RN's corner. Slot 0 is left unused. Returns the slot and whether it was
      * already there.
@@ -256,7 +256,7 @@ export class RnMaps {
     private append(): number {
         this.reserve(this.dataMapLength + 2);
         if (this.dataMapLength === 0) {
-            // "Don't use entry zero." (`doc/CSBwin-src/SaveGame.cpp:1968-1973`)
+            // "Don't use entry zero." (`doc/CSBwin-src/SaveGame.cpp:2180-2185`)
             this.typeMap[0] = 0;
             this.indexMap[0] = 0;
             this.dataMapLength = 1;

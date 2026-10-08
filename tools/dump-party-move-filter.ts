@@ -1,22 +1,22 @@
 /**
- * The party move filter (`CallPartyMoveFilter`, `doc/CSBwin-src/CSBCode.cpp:7788-7848`),
+ * The party move filter (`CallPartyMoveFilter`, `doc/CSBwin-src/CSBCode.cpp:7875-7935`),
  * at its three sites, with two DSAs on its square, against a genuine save (`csbgame7.dat`).
- * Only the first DSA runs (`break`, `:7842`), on parameters of its own (`NEWDSAPARAMETERS`,
- * `:7805`), a count of 13 and `PARTYMOVEDATA`'s longwords (`:7835-7836`), and the move
- * obeys the block it leaves (`:7839`).
+ * Only the first DSA runs (`break`, `:7929`), on parameters of its own (`NEWDSAPARAMETERS`,
+ * `:7892`), a count of 13 and `PARTYMOVEDATA`'s longwords (`:7922-7923`), and the move
+ * obeys the block it leaves (`:7926`).
  *
  * 1. **A dungeon with no filter**: a step costs stamina and sets the move delay.
- * 2. **`PM_ATTEMPTMOVE`** (`:8104-8121`): the step's block, whose `toLocation` is the
+ * 2. **`PM_ATTEMPTMOVE`** (`:8191-8208`): the step's block, whose `toLocation` is the
  *    party's square, and four stamina adjustments, -1 past the party. The second DSA does
  *    not run, and the caller's parameters are as they were after it.
  * 3. **`PM_INHIBITMOVE`** refuses the step: the party stays, pays nothing, and the input
- *    is not discarded (`:8120`).
+ *    is not discarded (`:8207`).
  * 4. **The stamina adjustments** the filter leaves are what each champion pays, and
- *    **`PM_SETDELAY`** sets the delay (`:8123-8135`, `:8344`), even for a step into a wall.
- * 5. **`PM_ADDDELAY`** adds its delay to the one the party had (`:8338-8341`).
- * 6. **`PM_BEGINTURN`** (`_TurnParty`, `:7870-7894`): either turn's `toLocation` faces left
+ *    **`PM_SETDELAY`** sets the delay (`:8210-8222`, `:8431`), even for a step into a wall.
+ * 5. **`PM_ADDDELAY`** adds its delay to the one the party had (`:8425-8428`).
+ * 6. **`PM_BEGINTURN`** (`_TurnParty`, `:7957-7981`): either turn's `toLocation` faces left
  *    of the party, and a refusal turns nothing and flashes no arrow.
- * 7. **`PM_STAIRWAY`** (`TraverseStairway`, `:7751-7771`): a step into stairs runs the
+ * 7. **`PM_STAIRWAY`** (`TraverseStairway`, `:7838-7858`): a step into stairs runs the
  *    filter twice, and the stairway's block has the stairs and the square past them.
  * 8. A filter that refuses only the stairway leaves the party on the stairs.
  *
@@ -32,7 +32,7 @@ import { UNSET, globalStore, int, op, varFetch, varStore, withFilterDsas } from 
 import { check, finish } from './lib/check';
 import { savePath } from './lib/saves';
 
-/** `ESL_PARTYMOVEFILTER` (`doc/CSBwin-src/CSB.h:1549`). */
+/** `ESL_PARTYMOVEFILTER` (`doc/CSBwin-src/CSB.h:1552`). */
 const ESL_PARTYMOVEFILTER = 14;
 const WORDS = 13;
 

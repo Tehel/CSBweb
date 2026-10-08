@@ -3,30 +3,30 @@
  * `WaitForButtonFlash`, which has the next VBL put it back.
  *
  * - `_FlashButton` stores the rectangle, sets `d.FlashButnActive` and waits a VBL
- *   (doc/CSBwin-src/CSBCode.cpp:7713-7730). The VBL clears `d.FlashButnActive`, toggles
- *   `d.Word11776` and inverts the rectangle (`:1028-1038`). The port's pass does not stop
+ *   (doc/CSBwin-src/CSBCode.cpp:7800-7817). The VBL clears `d.FlashButnActive`, toggles
+ *   `d.Word11776` and inverts the rectangle (`:1038-1048`). The port's pass does not stop
  *   for the VBL: the rectangle is inverted at once, before the rest of the pass.
  * - `WaitForButtonFlash` sets `d.FlashButnActive` again while `d.Word11776` is set
- *   (`:8561-8601`), so the next VBL puts the rectangle back. The main loop calls it at
- *   `tag000730`, after the tick's `DrawViewport` (`:638`, `:655`), and on a pass without a
- *   tick (`:763`). So the tick after a move draws the arrow inverted, and the next VBL puts
+ *   (`:8666-8706`), so the next VBL puts the rectangle back. The main loop calls it at
+ *   `tag000730`, after the tick's `DrawViewport` (`:648`, `:665`), and on a pass without a
+ *   tick (`:773`). So the tick after a move draws the arrow inverted, and the next VBL puts
  *   it back: one frame of flash.
  * - `_TurnParty` flashes `(0xea, 0x0105, 0x7d, 0x91)` for a turn left and `(0x123, 0x13e,
- *   0x7d, 0x91)` for a turn right (`:7896-7903`); `HandleMouseEvents` flashes the step
- *   arrow `d.MoveButn18496[button - 3]` that `MoveParty` returns (`Mouse.cpp:1556-1567`,
- *   `CSBCode.cpp:8137-8139`), even a step a wall refuses, which brings no tick (`:8310-8314`).
- * - `TAG01b29a` comes after `d.Time++` and `d.freezeLifeTimer--` (`:660-685`), and after
+ *   0x7d, 0x91)` for a turn right (`:7983-7990`); `HandleMouseEvents` flashes the step
+ *   arrow `d.MoveButn18496[button - 3]` that `MoveParty` returns (`Mouse.cpp:1695-1706`,
+ *   `CSBCode.cpp:8224-8226`), even a step a wall refuses, which brings no tick (`:8397-8401`).
+ * - `TAG01b29a` comes after `d.Time++` and `d.freezeLifeTimer--` (`:670-695`), and after
  *   the put-back `WaitForButtonFlash` waits for: a tick that asked for one paints nothing
  *   more in its VBL (`Game.paintHeld`), and the put-back's redraw paints `TAG01b29a`.
- * - `CastMagic` calls `WaitForButtonFlash` first (`Magic.cpp:939`).
- * - `_MagicSelection` is `RESTARTABLE` and waits (`Magic.cpp:545-581`): the cast flashes
+ * - `CastMagic` calls `WaitForButtonFlash` first (`Magic.cpp:942`).
+ * - `_MagicSelection` is `RESTARTABLE` and waits (`Magic.cpp:548-584`): the cast flashes
  *   `(0xea, 0x12f, 0x3f, 0x49)`, then `CastMagic` waits the flash out and casts; a rune or
  *   the take-back flashes `d.Word18552[4 * (button - 101)]`, waits a VBL, waits the flash
  *   out, and only then changes the incantation. The port runs it as a script.
  * - `_TAG019fac` flashes the attack menu's PASS `(0x11d, 0x13f, 0x4d, 0x53)` and its three
  *   options `(0xea, 0x13e, 0x56, 0x60)`, `(…, 0x62, 0x6c)`, `(…, 0x6e, 0x78)`, each before its
- *   `ExecuteAttack` (`Character.cpp:4677-4717`). The attack's tick draws the option
- *   inverted, and the next VBL puts it back; a PASS brings no tick, and `:763`'s wait puts
+ *   `ExecuteAttack` (`Character.cpp:4694-4734`). The attack's tick draws the option
+ *   inverted, and the next VBL puts it back; a PASS brings no tick, and `:764`'s wait puts
  *   it back. An attack key flashes its row as the click would.
  * - `vblFlashButn` flips bit plane 2 over the rectangle, corners included (`VBL.cpp:60-122`),
  *   which is bit 2 of the pixel's index (`WinScreen.cpp:314-330`).
@@ -189,8 +189,8 @@ async function main(): Promise<void> {
   check(same(step.tick ?? null, moveButtons[0]!) && step.after[1] === null,
     'a step forward should flash d.MoveButn18496[0] in its tick, and the next VBL put it back');
   // Next to the map's edge, some of these run into a wall: the step is refused, with
-  // `d.clockTick = 0` and no tick (`CSBCode.cpp:8310-8314`), but `MoveParty` has its
-  // button by then (`:8139`), and the pass's `WaitForButtonFlash` (`:763`) asks for the
+  // `d.clockTick = 0` and no tick (`CSBCode.cpp:8397-8401`), but `MoveParty` has its
+  // button by then (`:8226`), and the pass's `WaitForButtonFlash` (`:773`) asks for the
   // put-back as the tick's would.
   let refused = 0;
   for (const [num, action] of [[4, MovementAction.STRAFE_RIGHT], [5, MovementAction.MOVE_BACKWARD], [6, MovementAction.STRAFE_LEFT]] as const) {
@@ -202,7 +202,7 @@ async function main(): Promise<void> {
   }
   check(refused > 0, 'the scene should have a refused step, to cover the flash without a tick');
 
-  // ---- a pass without a tick puts it back too (:763) -----------------------------
+  // ---- a pass without a tick puts it back too (:773) -----------------------------
   reset();
   flashButton(game.ctx, TURN_RIGHT.x1, TURN_RIGHT.x2, TURN_RIGHT.y1, TURN_RIGHT.y2);
   const standing = same(flashedButton(game.ctx), TURN_RIGHT) && !loop.flashButnActive;
@@ -215,8 +215,8 @@ async function main(): Promise<void> {
   check(askedWithoutTick && backWithoutTick, 'a pass without a tick should ask for the put-back, and the next VBL make it');
 
   // ---- TAG01b29a after d.Time++, painted in its tick unless a put-back waits --------
-  // `DrawViewport` (:638), `WaitForButtonFlash` (:655), `d.Time++` (:660),
-  // `d.freezeLifeTimer--` (:684), `TAG01b29a` (:685). CSBWin's `WaitForButtonFlash` holds
+  // `DrawViewport` (:648), `WaitForButtonFlash` (:665), `d.Time++` (:670),
+  // `d.freezeLifeTimer--` (:694), `TAG01b29a` (:695). CSBWin's `WaitForButtonFlash` holds
   // the pass until the put-back, so what `TAG01b29a` draws is on screen only after it.
   game.onTick(() => hostLog.push(`DrawViewport d.Time ${game.ctx.state.tickCount} freezeLifeTimer ${party.freezeLifeTimer}`));
   const tickOrder = (flash: boolean): { time: number; log: string[]; held: boolean; next: { inverted: Rect | null; changed: boolean; held: boolean } } => {
@@ -238,7 +238,7 @@ async function main(): Promise<void> {
   const plain = tickOrder(false);
   console.log(`a tick: ${plain.log.join(' | ')}; paint held ${plain.held}`);
   check(plain.log.join(' | ') === `DrawViewport d.Time ${plain.time} freezeLifeTimer 5 | TAG01b29a d.Time ${plain.time + 1} freezeLifeTimer 4 | paint`,
-    'TAG01b29a should run after DrawViewport, d.Time++ and d.freezeLifeTimer-- (CSBCode.cpp:638-685), and be painted in its tick, with no second DrawViewport');
+    'TAG01b29a should run after DrawViewport, d.Time++ and d.freezeLifeTimer-- (CSBCode.cpp:648-695), and be painted in its tick, with no second DrawViewport');
   check(!plain.held, 'a tick that asked for no put-back should not hold the paint');
   const flashed = tickOrder(true);
   console.log(`a flash, then its tick: ${flashed.log.join(' | ')}; paint held ${flashed.held}; ` +
@@ -279,7 +279,7 @@ async function main(): Promise<void> {
   flashButton(game.ctx, TURN_LEFT.x1, TURN_LEFT.x2, TURN_LEFT.y1, TURN_LEFT.y2);
   game.systems.magic.castSpellFromUi(0);
   console.log(`CastMagic with a flash standing: put-back asked ${loop.flashButnActive}`);
-  check(loop.flashButnActive, 'CastMagic should ask for the put-back of a standing flash (Magic.cpp:939)');
+  check(loop.flashButnActive, 'CastMagic should ask for the put-back of a standing flash (Magic.cpp:942)');
   frame();
 
   // ---- the spell panel: `_MagicSelection` holds the loop through its waits ---------------
@@ -364,14 +364,14 @@ async function main(): Promise<void> {
   prepareAttack(ui, 0);
   const pass = flashOf('PASS', clickAt(attackRect(112)));
   check(pass.tick === undefined && same(pass.after[0]!, PASS) && pass.after[1] === null && pass.after[2] === null,
-    'PASS should flash (0x11d, 0x13f, 0x4d, 0x53) with no tick, and the next VBL put it back (:763)');
+    'PASS should flash (0x11d, 0x13f, 0x4d, 0x53) with no tick, and the next VBL put it back (:766)');
   check(ui.attackingCharacterOrdinal === 0, 'PASS should close the menu');
 
   prepareAttack(ui, 0);
   const offered = ui.word20248;
   const air = flashOf('option 113 at the air', clickAt(attackRect(113)));
   check(air.tick === undefined && same(air.after[0]!, OPTIONS[0]!) && air.after[1] === null,
-    'a blow at the air (0, d.clockTick = 0) should flash the option with no tick, and the next VBL put it back (:763)');
+    'a blow at the air (0, d.clockTick = 0) should flash the option with no tick, and the next VBL put it back (:773)');
   // A blow that lands returns 1, which makes a tick due. Whether one lands is the attack
   // tools' business: here a stand-in for the engine's `Attack` decides it.
   game.systems.character.executeAttack = () => 1;

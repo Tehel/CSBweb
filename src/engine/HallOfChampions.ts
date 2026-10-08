@@ -1,7 +1,7 @@
 /**
  * `HallOfChampions` — recruiting a champion from a mirror: `AddCharacter`
- * (`doc/CSBwin-src/Character.cpp:456`), `_ResurrectReincarnateCancel`
- * (`CSBCode.cpp:6615`) and the tail of `ReIncarnate` (`Code13ea4.cpp:155-160`). The hero
+ * (`doc/CSBwin-src/Character.cpp:457`), `_ResurrectReincarnateCancel`
+ * (`CSBCode.cpp:6674`) and the tail of `ReIncarnate` (`Code13ea4.cpp:167-172`). The hero
  * text parsing and the possession sorting are `AddCharacter.ts`'s free functions.
  *
  * One system for three CSBWin files, not one per file (`DEBT.md` E2): the three share
@@ -65,8 +65,8 @@ export class HallOfChampions {
   /**
    * A champion built outside a mirror joins the party — how the tools' champions join.
    * `AddCharacter`'s two steps such a champion still needs: the fingerprint, given once,
-   * on joining (doc/CSBwin-src/Character.cpp:513-516), and `if (d.NumCharacter == 1)
-   * SetHandOwner(0)` — the first champion to join gets the cursor (`:706-710`). Every
+   * on joining (doc/CSBwin-src/Character.cpp:514-517), and `if (d.NumCharacter == 1)
+   * SetHandOwner(0)` — the first champion to join gets the cursor (`:707-711`). Every
    * inventory click is gated on someone owning it.
    */
   addChampion(champion: Champion): boolean {
@@ -81,7 +81,7 @@ export class HallOfChampions {
   }
 
   /**
-   * `AddCharacter` (`doc/CSBwin-src/Character.cpp:456`) — a click on a Hall of
+   * `AddCharacter` (`doc/CSBwin-src/Character.cpp:457`) — a click on a Hall of
    * Champions mirror.
    *
    * `charID` picks the portrait bitmap and nothing else: the name, title, stats and
@@ -92,14 +92,14 @@ export class HallOfChampions {
    */
   addCharacter(charID: number): boolean {
     const party = this.ctx.party.state;
-    // `if (d.EmptyHanded == 0) return; if (d.NumCharacter == 4) return;` (`:477-479`)
+    // `if (d.EmptyHanded == 0) return; if (d.NumCharacter == 4) return;` (`:478-480`)
     if (party.objectInHand !== OBJECT_ID_NULL) return false;
     if (party.champions.length >= 4) return false;
     // One mirror at a time: a second click while the menu is up would push a
     // champion that `_ResurrectReincarnateCancel` can no longer reach.
     if (party.potentialChampionIndex >= 0) return false;
 
-    // `:535-549`: the first `dbTEXT` in the party's cell, read through `DecodeText`, or
+    // `:536-550`: the first `dbTEXT` in the party's cell, read through `DecodeText`, or
     // `legalHero` when there is none. The penalties it gives wait for
     // `_ResurrectReincarnateCancel`, as CSBWin's globals do.
     const hero = readHeroText(this.heroTextInPartyCell());
@@ -113,7 +113,7 @@ export class HallOfChampions {
       findFreeCharPosition(party.champions, party.facing),
       possessions,
     );
-    // `pcA3->facing = pcA3->facing3 = d.partyFacing` (`:522`, `:531`) — the corner
+    // `pcA3->facing = pcA3->facing3 = d.partyFacing` (`:523`, `:532`) — the corner
     // the champion stands in is chosen above, but they face the way the party does.
     champion.facing = party.facing;
     champion.damageFromDirection = party.facing;
@@ -124,14 +124,14 @@ export class HallOfChampions {
       party.position.x,
       party.position.y,
     );
-    // `(STRandom() & 0xff) + 1500` twice (`:533-534`).
+    // `(STRandom() & 0xff) + 1500` twice (`:534-535`).
     champion.food = (this.ctx.random.next() & 0xff) + 1500;
     champion.water = (this.ctx.random.next() & 0xff) + 1500;
-    // `if (pcA3->HP() == 0) return;` (`:703`): a text whose health reads zero.
+    // `if (pcA3->HP() == 0) return;` (`:704`): a text whose health reads zero.
     if (champion.attributes.maxHealth === 0) return false;
 
     if (!this.ctx.party.addChampion(champion)) return false;
-    // `d.PotentialCharacterOrdinal = LOCAL_2 + 1; d.NumCharacter++;` (`:704-705`).
+    // `d.PotentialCharacterOrdinal = LOCAL_2 + 1; d.NumCharacter++;` (`:705-706`).
     party.potentialChampionIndex = index;
     if (party.champions.length === 1) {
       setHandOwner(party, 0, this.ctx.host);
@@ -139,20 +139,20 @@ export class HallOfChampions {
 
     this.collectMirrorPossessions(index, possessions);
 
-    // `ShowHideInventory(LOCAL_2)` (`:796`) — the inventory opens on the new
+    // `ShowHideInventory(LOCAL_2)` (`:797`) — the inventory opens on the new
     // champion, and `potentialChampionIndex` turns its eye panel into the
     // Resurrect/Reincarnate/Cancel menu, and sets `videoMode = VM_INVENTORY`
-    // (`CSBCode.cpp:7487`). Then `TAG02076e()` (`:797`).
+    // (`CSBCode.cpp:7546`). Then `TAG02076e()` (`:807`).
     party.selectedCharacterIndex = index;
     this.ctx.loop.videoMode = 'VM_INVENTORY';
-    // Its `DiscardAllInput()` (`CSBCode.cpp:7520`).
+    // Its `DiscardAllInput()` (`CSBCode.cpp:7579`).
     this.ctx.mouseQueue.discardAllInput();
     this.ctx.host.tag02076e();
     return true;
   }
 
   /**
-   * `_ResurrectReincarnateCancel` (`doc/CSBwin-src/CSBCode.cpp:6615`). `button` is
+   * `_ResurrectReincarnateCancel` (`doc/CSBwin-src/CSBCode.cpp:6674`). `button` is
    * CSBWin's own id from `Buttons18372`: 160 Resurrect, 161 Reincarnate, 162 Cancel.
    */
   resurrectReincarnateCancel(button: number): boolean {
@@ -166,10 +166,10 @@ export class HallOfChampions {
     party.potentialChampionIndex = -1;
 
     if (button === 162) {
-      // Cancel (`:6629-6658`): hide the inventory and take the champion back out.
+      // Cancel (`:6688-6717`): hide the inventory and take the champion back out.
       // Their possessions were never removed from the mirror, so they stay there.
-      // `ShowHideInventory(4)` sets `d.clockTick = 1` (`:7441`) and `videoMode =
-      // VM_ADVENTURE` (`:7453`), and ends in `DiscardAllInput()` (`:7480`).
+      // `ShowHideInventory(4)` sets `d.clockTick = 1` (`:7500`) and `videoMode =
+      // VM_ADVENTURE` (`:7512`), and ends in `DiscardAllInput()` (`:7539`).
       party.selectedCharacterIndex = -1;
       this.ctx.loop.videoMode = 'VM_ADVENTURE';
       setClockTick(this.ctx, 1);
@@ -180,12 +180,12 @@ export class HallOfChampions {
       // `d.NumCharacter--` and no more: the record stays in its slot, possessions and all.
       party.vacantCharacters[party.champions.length - 1] = champion;
       party.champions.pop();
-      this.ctx.host.tag0207cc(); // `:6657`
+      this.ctx.host.tag0207cc(); // `:6716`
       return true;
     }
 
     const mirror = this.getMirrorCell();
-    // `RemoveObjectFromRoom` for each possession (`:6668-6677`). `AddCharacter` left
+    // `RemoveObjectFromRoom` for each possession (`:6727-6736`). `AddCharacter` left
     // them linked in the mirror's cell *as well as* on the champion; this is where
     // the room finally lets go of them.
     for (const value of champion.possessions) {
@@ -196,7 +196,7 @@ export class HallOfChampions {
     this.disableMirrorActuators(mirror);
 
     if (button === 161) {
-      // `ReIncarnate(_2_, pcA3)` (`:6738`) is the *first* thing this branch does,
+      // `ReIncarnate(_2_, pcA3)` (`:6797`) is the *first* thing this branch does,
       // and in CSBWin it blocks until the player has typed a name. Here it opens
       // a modal screen and returns, so everything after it — the skill wipe, the
       // penalties, the tail below — is deferred to `finishReincarnate`, which the
@@ -212,7 +212,7 @@ export class HallOfChampions {
 
   /**
    * `_ResurrectReincarnateCancel` from `ReIncarnate`'s return to the end
-   * (`doc/CSBwin-src/CSBCode.cpp:6739-6800`).
+   * (`doc/CSBwin-src/CSBCode.cpp:6798-6859`).
    */
   private finishResurrectReincarnate(champion: Champion, button: number): void {
     const party = this.ctx.party.state;
@@ -220,7 +220,7 @@ export class HallOfChampions {
       this.reincarnate(champion);
     }
 
-    // `:6786-6793`
+    // `:6845-6852`
     if (party.champions.length === 1) {
       setHandOwner(party, 0, this.ctx.host);
       selectMagicCaster(party, 0);
@@ -232,9 +232,9 @@ export class HallOfChampions {
     messages.quePrintLines(color, champion.name);
     messages.quePrintLines(color, button === 160 ? ' RESURRECTED' : ' REINCARNATED');
 
-    // `ShowHideInventory(4)` (`:6807`), with its `d.clockTick = 1` (`:7441`) and
-    // `videoMode = VM_ADVENTURE` (`:7453`) and `DiscardAllInput()` (`:7480`), then
-    // `TAG0207cc()` (`:6808`).
+    // `ShowHideInventory(4)` (`:6866`), with its `d.clockTick = 1` (`:7500`) and
+    // `videoMode = VM_ADVENTURE` (`:7512`) and `DiscardAllInput()` (`:7539`), then
+    // `TAG0207cc()` (`:6867`).
     party.selectedCharacterIndex = -1;
     this.ctx.loop.videoMode = 'VM_ADVENTURE';
     setClockTick(this.ctx, 1);
@@ -244,7 +244,7 @@ export class HallOfChampions {
   }
 
   /**
-   * The name-entry screen has been answered (`doc/CSBwin-src/Code13ea4.cpp:155-160`).
+   * The name-entry screen has been answered (`doc/CSBwin-src/Code13ea4.cpp:167-172`).
    * The champion takes the typed name and title, and the rest of the Reincarnate
    * branch runs — including the message, which prints the **new** name.
    */
@@ -257,7 +257,7 @@ export class HallOfChampions {
   }
 
   /**
-   * The Reincarnate half of `_ResurrectReincarnateCancel` (`:6739-6784`), everything
+   * The Reincarnate half of `_ResurrectReincarnateCancel` (`:6798-6843`), everything
    * after `ReIncarnate` has returned a name.
    */
   private reincarnate(champion: Champion): void {
@@ -271,7 +271,7 @@ export class HallOfChampions {
     const attributePenalty = hero?.reincarnateAttributePenalty ?? 2;
     const statPenalty = hero?.reincarnateStatPenalty ?? 8;
 
-    // Both penalties only `if (!DM_rules)` (`:6740`, `:6761`). Attributes 1..6 only — Luck
+    // Both penalties only `if (!DM_rules)` (`:6799`, `:6820`). Attributes 1..6 only — Luck
     // (0) is left alone.
     if (!this.ctx.rules.dmRules) {
       for (let index = 1; index <= 6; index++) {
@@ -296,7 +296,7 @@ export class HallOfChampions {
       stats.maxMana = scale(stats.maxMana);
     }
 
-    // Twelve random attribute points, Current and Maximum together (`:6777-6783`).
+    // Twelve random attribute points, Current and Maximum together (`:6836-6842`).
     // CSBWin parses a `randomPoints` field out of the hero text and then ignores it
     // here; twelve is hardcoded.
     for (let i = 0; i < 12; i++) {
@@ -319,7 +319,7 @@ export class HallOfChampions {
   }
 
   /**
-   * `doc/CSBwin-src/Character.cpp:715-790` — every object at the mirror's wall becomes
+   * `doc/CSBwin-src/Character.cpp:716-791` — every object at the mirror's wall becomes
    * a possession. CSBWin does *not* unlink them from the room here: they stay in the
    * cell until Resurrect or Reincarnate is pressed, so a Cancel leaves them there.
    */
@@ -344,15 +344,15 @@ export class HallOfChampions {
       });
     }
 
-    // Each object goes in with `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:789`),
+    // Each object goes in with `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:790`),
     // so a recruit arrives with the bonuses of what they carry, their torch lit and their
-    // Illumulet lighting the party. Cancel undoes none of it (`CSBCode.cpp:6629-6658`).
+    // Illumulet lighting the party. Cancel undoes none of it (`CSBCode.cpp:6688-6717`).
     assignAddCharacterPossessions(items, this.addCharacterTables, possessions,
       (rn, slot) => this.ctx.systems.character.addCharacterPossession(chIdx, rn, slot));
   }
 
   /**
-   * `doc/CSBwin-src/CSBCode.cpp:6679-6734` — disable the first *active* portrait
+   * `doc/CSBwin-src/CSBCode.cpp:6738-6793` — disable the first *active* portrait
    * actuator on the mirror's wall, then, unless it blocks disables, every actuator
    * on that wall. Each portrait disabled sends its `DisableMessage` first
    * (`portraitTranslateDisable`).
@@ -393,7 +393,7 @@ export class HallOfChampions {
   }
 
   /**
-   * `PortraitTranslateDisable` (`doc/CSBwin-src/CSBCode.cpp:6589-6612`): an active
+   * `PortraitTranslateDisable` (`doc/CSBwin-src/CSBCode.cpp:6648-6671`): an active
    * portrait whose `DisableMessage` is set, clear or toggle sends it to its own cell, at
    * the wall its `Position` names, through the DSA's `QueueDSASwitchAction` with no
    * delay. CSBWin passes `d.LoadedLevel`, the party's level at a click. No portrait in
@@ -413,7 +413,7 @@ export class HallOfChampions {
   }
 
   /**
-   * The hero text `AddCharacter` reads (`doc/CSBwin-src/Character.cpp:535-549`): the
+   * The hero text `AddCharacter` reads (`doc/CSBwin-src/Character.cpp:536-550`): the
    * first `dbTEXT` in the party's own cell, at any corner, as `DecodeText(…, 0x8002, 990)`
    * makes it with the game's escape tables. Null when the cell holds none.
    */

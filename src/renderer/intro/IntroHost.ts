@@ -2,10 +2,10 @@
  * What the pre-game screens need from the machine underneath them.
  *
  * CSBWin's title animation, dungeon entrance and credits scroll all run *before* there is
- * a party, a level or a main loop: `_AskWhatToDo` (`doc/CSBwin-src/CSBCode.cpp:11338`)
+ * a party, a level or a main loop: `_AskWhatToDo` (`doc/CSBwin-src/CSBCode.cpp:11573`)
  * calls `_DisplayChaosStrikesBack`, then `_StartCSB` -> `_ShowPrisonDoor` -> `_GameSetup`
  * -> `_TAG01f746`. `_ShowCredits`, the end of the game, runs once `MainLoop` has returned
- * (`:11325`). They talk to the Atari hardware directly — the logical screen base, the
+ * (`:11560`). They talk to the Atari hardware directly — the logical screen base, the
  * shifter's sixteen colour registers, the VBL counter, the sound chip — and nothing else.
  *
  * This interface is that hardware. `BootSequence` builds it over `GameScreen`, the other
@@ -44,7 +44,7 @@ export interface IntroHost {
   readonly font: FontData;
   /**
    * The shifter's sixteen colour registers (`globalPalette` in `_FadeToPalette`,
-   * `doc/CSBwin-src/Graphics.cpp:1609`). Mutated in place by `fadeToPalette`; `present`
+   * `doc/CSBwin-src/Graphics.cpp:1633`). Mutated in place by `fadeToPalette`; `present`
    * reads it.
    */
   readonly globalPalette: number[];
@@ -65,7 +65,7 @@ export interface IntroHost {
   startSound(graphicNum: number, rateIdx: number): void;
   /**
    * `DrawViewport(2, 2, 0)` over the synthetic 5x5 level `_TAG01f5ea` builds
-   * (`doc/CSBwin-src/CSBCode.cpp:9556-9576`). Returns `d.pViewportBMP`: the 224x136
+   * (`doc/CSBwin-src/CSBCode.cpp:9678-9698`). Returns `d.pViewportBMP`: the 224x136
    * dungeon interior seen through the prison doorway.
    */
   drawPrisonInterior(): IndexedBitmap;
@@ -77,14 +77,14 @@ export interface IntroHost {
    * still sees it.
    */
   takeClick(): IntroEvent | null;
-  /** `DiscardAllInput()`: the queue emptied, and `d.MouseSwitches = 0` (`CSBCode.cpp:7532-7542`). */
+  /** `DiscardAllInput()`: the queue emptied, and `d.MouseSwitches = 0` (`CSBCode.cpp:7591-7601`). */
   discardAllInput(): void;
   /** `d.MouseSwitches`: the buttons held down now, in CSBWin's mask. */
   mouseSwitches(): number;
   /** `UI_CONSTAT()`: whether a key waits, unread. */
   keyWaiting(): boolean;
   /**
-   * `STShowCursor` / `STHideCursor` (`doc/CSBwin-src/Mouse.cpp:1818`, `:1839`).
+   * `STShowCursor` / `STHideCursor` (`doc/CSBwin-src/Mouse.cpp:1957`, `:1978`).
    *
    * CSBWin's cursor is drawn by the VBL handler over whatever the screen already holds and
    * lifted again before the next frame, so it is never part of the picture. `present` here
@@ -95,18 +95,18 @@ export interface IntroHost {
 }
 
 /**
- * `d.Palette11914` (`doc/CSBwin-src/Data.h:868`). Nothing in the whole CSBWin tree ever
+ * `d.Palette11914` (`doc/CSBwin-src/Data.h:883`). Nothing in the whole CSBWin tree ever
  * writes it — the only references are its declaration and five `FadeToPalette` reads — and
  * `d` is a zero-initialised global, so "fade to `Palette11914`" means **fade to black**.
  */
 export const PALETTE_11914: readonly number[] = new Array(16).fill(0);
 
 /**
- * `DrawCursor` and `RemoveCursor` in one (`doc/CSBwin-src/CSBCode.cpp:2399`, `:2198`).
+ * `DrawCursor` and `RemoveCursor` in one (`doc/CSBwin-src/CSBCode.cpp:2432`, `:2231`).
  *
  * The arrow's hot spot is its top-left corner — `d.Word23156` and `d.Word23158`, the two
  * offsets `CreateCursorBitmap` subtracts, are both 0 for the arrow and only become 8 for the
- * object cursor (`CSBCode.cpp:2260`, `:2094`). Colour 12 is transparent.
+ * object cursor (`CSBCode.cpp:2293`, `:2123`). Colour 12 is transparent.
  */
 export function withCursor(
   screen: PaletteIndexViewportBuffer,
@@ -134,7 +134,7 @@ export function withCursor(
   for (const { index, value } of saved) screen.pixels[index] = value;
 }
 
-/** `Flood(d.CursorBitmap, 12, …)` (`doc/CSBwin-src/CSBCode.cpp:2276`). */
+/** `Flood(d.CursorBitmap, 12, …)` (`doc/CSBwin-src/CSBCode.cpp:2309`). */
 export const CURSOR_TRANSPARENT = 12;
 
 /** A blank off-screen buffer, the shape `allocateMemory` + `TAG0088b2` expect. */
@@ -143,13 +143,13 @@ export function createIndexedBitmap(width: number, height: number): IndexedBitma
 }
 
 /**
- * `_FadeToPalette` (`doc/CSBwin-src/Graphics.cpp:1601`).
+ * `_FadeToPalette` (`doc/CSBwin-src/Graphics.cpp:1625`).
  *
  * Eight vertical blanks, and on each one every colour register steps at most one unit
  * closer to the target in each of its three 3-bit components. Always exactly eight steps,
  * so a large jump does not finish — which is deliberate: the callers that want a hard cut
  * set the target and call it twice, and the ones that want "just delay"
- * (`doc/CSBwin-src/CSBCode.cpp:9342`) pass a palette that is already current.
+ * (`doc/CSBwin-src/CSBCode.cpp:9448`) pass a palette that is already current.
  */
 export async function fadeToPalette(
   host: Pick<IntroHost, 'globalPalette' | 'vbl' | 'present'>,
@@ -178,10 +178,10 @@ export async function fadeToPalette(
  * argument, turned into an index into this port's per-sound rate list.
  *
  * CSBWin **drops** that argument — `StartSound(ui8*, i32 /*timerData*\/, i32 highVolume)`
- * (`doc/CSBwin-src/Sound.cpp:647`) and then hard-codes 6000 Hz in `SoundDecode`
- * (`doc/CSBwin-src/Sound.cpp:293`). This port does not, because the rate is audible: the
+ * (`doc/CSBwin-src/Sound.cpp:652`) and then hard-codes 6000 Hz in `SoundDecode`
+ * (`doc/CSBwin-src/Sound.cpp:298`). This port does not, because the rate is audible: the
  * prison door grinds open at timer 145 and the latch clicks at timer 112
- * (`doc/CSBwin-src/CSBCode.cpp:9399`, `:9536`).
+ * (`doc/CSBwin-src/CSBCode.cpp:9509`, `:9658`).
  *
  * The two numbers reduce to the rates this project already ships. With the MFP's 1:4
  * prescaler the sample rate is `2457600 / 4 / timerData`, so 112 -> 5485.7 Hz and

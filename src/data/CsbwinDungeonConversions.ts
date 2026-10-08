@@ -5,14 +5,14 @@
  * `dungeon.dat`-shaped image into the shape a save file is written in. There are three
  * of them and each is gated on a flag the Extended Features block declares, so a save —
  * which already carries the converted form — is read straight through
- * (`doc/CSBwin-src/SaveGame.cpp:2345-2346` skips the preamble for
+ * (`doc/CSBwin-src/SaveGame.cpp:2557-2558` skips the preamble for
  * `GAMESTATE_ResumeSavedGame`, and the flags are false only for an original dungeon):
  *
  * | Conversion | Gate | Called at |
  * | --- | --- | --- |
- * | `MakeBigActuators` | `!bigActuators` | `:2604-2607`, while the ACTUATOR database is being read |
- * | `ConvertToIndirectText` | `!indirectText` | `:2645-2648`, after the last database |
- * | `convertScrolls` | `ExtendedFeaturesVersion < 'B'` | `:2768-2772`, last of all |
+ * | `MakeBigActuators` | `!bigActuators` | `:2816-2819`, while the ACTUATOR database is being read |
+ * | `ConvertToIndirectText` | `!indirectText` | `:2857-2860`, after the last database |
+ * | `convertScrolls` | `ExtendedFeaturesVersion < 'B'` | `:2981-2985`, last of all |
  *
  * **Why this matters to the writer.** A game started from `dungeon.dat` holds a
  * `dungeon.dat`-shaped world, and there is no way to write that world into a save file:
@@ -45,7 +45,7 @@ export interface DungeonImageShape {
 }
 
 /**
- * `ComputeTextLength` (`doc/CSBwin-src/SaveGame.cpp:2202-2217`) — the number of 16-bit
+ * `ComputeTextLength` (`doc/CSBwin-src/SaveGame.cpp:2414-2429`) — the number of 16-bit
  * words in one text entry, counting the word that carries the 31 terminator.
  *
  * CSBWin's loop has no bound, because its input is always a valid text array. Ours must
@@ -66,7 +66,7 @@ export function ComputeTextLength(words: readonly ui16[], startWord: number): nu
 }
 
 /**
- * `ConvertToIndirectText` (`doc/CSBwin-src/SaveGame.cpp:2221-2276`).
+ * `ConvertToIndirectText` (`doc/CSBwin-src/SaveGame.cpp:2433-2488`).
  *
  * Walks the TEXT database in record order, copies each live record's entry out of the
  * raw text array into a freshly packed `compressedText`, and records where it landed in
@@ -75,12 +75,12 @@ export function ComputeTextLength(words: readonly ui16[], startWord: number): nu
  *
  * Two overwrites make it a conversion rather than a derivation, and both are load-bearing:
  *
- * - `pDB2->index(newIndex)` (`:2270`) — the record's own index word stops being a word
+ * - `pDB2->index(newIndex)` (`:2482`) — the record's own index word stops being a word
  *   offset into the text array and becomes an entry number in the new index. That word
  *   is `TextRecord.textOffset` here, and it is what the image writer emits, so a record
  *   left unconverted writes a word offset into a file whose reader will treat it as an
  *   entry number.
- * - `NumWordsInTextArray(indirectIndexLen)` (`:2274`) — the header word that sized the
+ * - `NumWordsInTextArray(indirectIndexLen)` (`:2486`) — the header word that sized the
  *   raw text array now holds the *length of the index*. Measured: `dungeon.dat` declares
  *   1749 and every committed save declares 125, which is exactly this port's index
  *   length for the same dungeon.
@@ -100,7 +100,7 @@ export function ConvertToIndirectText(data: DungeonData): void {
 
         const oldIndex = record.textOffset;
         // `if (oldIndex > NumWordsInTextArray())` — CSBWin puts a message box up and
-        // zeroes the index (`:2246-2254`). There is no message box here; the record is
+        // zeroes the index (`:2458-2466`). There is no message box here; the record is
         // left pointing at entry 0, as CSBWin leaves it.
         if (oldIndex > data.header.textDataSize || oldIndex >= words.length) {
             record.textOffset = 0;
@@ -123,16 +123,16 @@ export function ConvertToIndirectText(data: DungeonData): void {
 }
 
 /**
- * `MakeBigActuators` (`doc/CSBwin-src/SaveGame.cpp:2287-2314`) and the `DB3::MakeBig`
- * (`doc/CSBwin-src/data.cpp:1327-1334`) it calls on every record.
+ * `MakeBigActuators` (`doc/CSBwin-src/SaveGame.cpp:2499-2526`) and the `DB3::MakeBig`
+ * (`doc/CSBwin-src/data.cpp:1329-1336`) it calls on every record.
  *
  * The eight-byte record grows to ten. The two new bytes are not simply zero: for a DSA
  * actuator — type 47 — `MakeBig` lifts the top bits of `word4` and `word6` into the new
  * `word8` and masks them off, because the ten-byte form widens both parameters from 14
- * bits to 16 (`DB3::ParameterA`/`ParameterB`, `data.cpp:1337-1345`).
+ * bits to 16 (`DB3::ParameterA`/`ParameterB`, `data.cpp:1339-1347`).
  *
  * **A knowing divergence, and why it cannot bite here.** CSBWin calls this *before*
- * `db.swap(dbACTUATOR)` (`SaveGame.cpp:2604-2608`), so on the little-endian build it
+ * `db.swap(dbACTUATOR)` (`SaveGame.cpp:2816-2820`), so on the little-endian build it
  * shipping reads `actuatorType()` out of a word that still holds the file's byte order —
  * bits 8-14 of the true `word2` rather than bits 0-6. This port's records are already
  * decoded, so it reads the type CSBWin meant. The two agree for any dungeon with no
@@ -152,15 +152,15 @@ export function MakeBigActuators(data: DungeonData): void {
 }
 
 /**
- * `convertScrolls` (`doc/CSBwin-src/SaveGame.cpp:2144-2166`).
+ * `convertScrolls` (`doc/CSBwin-src/SaveGame.cpp:2356-2378`).
  *
  * The four-byte scroll holds a 10-bit index into the TEXT **database** and a six-bit
  * flag above it; the six-byte scroll holds an RN to that text record and a word whose
- * bit 0 is `open`. The RN is `AllocateIndirectIndex(dbTEXT, index)` (`:2153`), which
+ * bit 0 is `open`. The RN is `AllocateIndirectIndex(dbTEXT, index)` (`:2365`), which
  * mints a **new** slot rather than look for the one `ConvertListOfObjects` may already
  * have given the record, so a text record a scroll names can have two slots. The slot's
  * position bits are 0: `AllocateIndirectIndex` writes the database number alone into
- * `dataTypeMap` (`:2141`).
+ * `dataTypeMap` (`:2353`).
  *
  * **`m_word4`'s upper bits cannot be reproduced and are written as zero.**
  * `pScroll->open(...)` writes bit 0 over whatever the record already held, and the two
@@ -186,7 +186,7 @@ export function convertScrolls(data: DungeonData): void {
  * CSBWin's own order.
  *
  * The order is not cosmetic: the object references are numbered after the text
- * conversion (`:2714-2746`, after `:2648`) and before `convertScrolls` (`:2770`), whose
+ * conversion (`:2927-2959`, after `:2860`) and before `convertScrolls` (`:2983`), whose
  * `AllocateIndirectIndex` takes the slots after theirs; and `convertScrolls` runs after
  * `ConvertToIndirectText`, so the text record index a scroll's new RN names is the
  * post-conversion one.
@@ -199,12 +199,12 @@ export function convertOriginalDungeon(data: DungeonData, shape: Partial<Dungeon
 }
 
 /**
- * `ConvertListOfObjects` (`doc/CSBwin-src/SaveGame.cpp:1916-2018`): number one chain's
+ * `ConvertListOfObjects` (`doc/CSBwin-src/SaveGame.cpp:2128-2230`): number one chain's
  * packed RNs into slots, and the chains its chests, monsters and missiles hold.
  *
  * `at` reads and writes the word that holds the chain's first RN. A reference to a record
- * past its database ends the chain there (`*pRN = RNeof`, `:1936-1944`), and an empty
- * or spell reference in a chain is a corrupt file (`:1925-1930`). A record is converted
+ * past its database ends the chain there (`*pRN = RNeof`, `:2148-2156`), and an empty
+ * or spell reference in a chain is a corrupt file (`:2137-2142`). A record is converted
  * once: a second reference to it, which only a missile's flying object may be
  * (`duplicateOK`), takes the slot already made, corner and all.
  */
@@ -250,9 +250,9 @@ function field<K extends string>(record: { [key in K]?: ObjectID }, key: K): { g
 
 /**
  * The object references of an original dungeon, numbered into slots: every cell's chain
- * in level, column and row order (`doc/CSBwin-src/SaveGame.cpp:2714-2744`). CSBWin goes
- * on to the timers and the champions' possessions (`:2745-2746`) and the object in hand
- * (`:2753-2761`), which a `dungeon.dat` does not hold.
+ * in level, column and row order (`doc/CSBwin-src/SaveGame.cpp:2927-2957`). CSBWin goes
+ * on to the timers and the champions' possessions (`:2958-2959`) and the object in hand
+ * (`:2966-2974`), which a `dungeon.dat` does not hold.
  */
 export function convertObjectReferences(data: DungeonData): void {
     for (let level = 0; level < data.maps.length; level++) {
@@ -274,19 +274,19 @@ export function convertObjectReferences(data: DungeonData): void {
 }
 
 /**
- * `ExtendPortraits` (`doc/CSBwin-src/SaveGame.cpp:1402-1426`): give every Hall of
+ * `ExtendPortraits` (`doc/CSBwin-src/SaveGame.cpp:1503-1527`): give every Hall of
  * Champions mirror CSBWin's own portrait fields.
  *
  * Not one of `ReadDatabases`' three. `_ReadEntireGame` calls it once the whole file is
- * read (`:1827`), for a new game and a save alike, and it does nothing when the file's
- * Extended Features block carried `ExpandedPortraits` (`:403`). The flag is reset at the
- * start of every read (`:1462`), so a file with no block is always cleaned: DM's
+ * read (`:2030`), for a new game and a save alike, and it does nothing when the file's
+ * Extended Features block carried `ExpandedPortraits` (`:405`). The flag is reset at the
+ * start of every read (`:1563`), so a file with no block is always cleaned: DM's
  * `dungeon.dat`, whose 24 mirrors carry leftover bits in these fields, and CSB's
  * Atari-era saves. A file either program writes carries the flag.
  *
  * For every live actuator of type 127 it zeroes `ClearResponses`, `SetResponses`,
  * `ToggleResponses`, the two unused bits, `State`, `BlockDisables`, `DisableMessage` and
- * `Position` (`CSB.h:1055-1069`): `word4` bits 0-11 and the whole of `word6`. The
+ * `Position` (`CSB.h:1058-1072`): `word4` bits 0-11 and the whole of `word6`. The
  * wall graphic ordinal and the type/value word are kept.
  */
 export function ExtendPortraits(data: DungeonData): void {
@@ -305,10 +305,10 @@ export function ExtendPortraits(data: DungeonData): void {
 }
 
 /**
- * `CheckCelltypes` (`doc/CSBwin-src/SaveGame.cpp:1367-1400`): turn every cell whose room
+ * `CheckCelltypes` (`doc/CSBwin-src/SaveGame.cpp:1468-1501`): turn every cell whose room
  * type is above `roomDOOR`'s 6 into open floor, keeping the low five bits.
  *
- * `_ReadEntireGame` calls it once the whole file is read (`:1825`), a new game's and a
+ * `_ReadEntireGame` calls it once the whole file is read (`:2028`), a new game's and a
  * save's alike, with no gate. DM's cells are all 0-6, so it changes nothing there.
  * `CheckMonsters`, which `_ReadEntireGame` runs between this and `ExtendPortraits`, needs
  * the monster table and runs where that is (`src/engine/CheckMonsters.ts`); the three

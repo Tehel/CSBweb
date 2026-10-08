@@ -1,25 +1,25 @@
 /**
- * `MoveObject`'s stairs arm (`doc/CSBwin-src/Code11f52.cpp:3108-3131`).
+ * `MoveObject`'s stairs arm (`doc/CSBwin-src/Code11f52.cpp:3143-3166`).
  *
  * A monster or an object — not the party, not a missile — that `MoveObject` sets down on
  * a stairs square goes one level down when bit 2 of the cell is clear (`IncrementLevel`,
- * `:3114-3118`), then one square out through `ExitStairsDirection` (`:290-325`) on the
- * level it is now on, and its corner turns to face the stairs (`:3124-3130`). The loop
+ * `:3149-3153`), then one square out through `ExitStairsDirection` (`:325-360`) on the
+ * level it is now on, and its corner turns to face the stairs (`:3159-3165`). The loop
  * goes on from there.
  *
  *  1. An item set down on stairs going down lands beside the stairs one level below.
  *  2. An item set down on stairs going up stays on its level, beside the stairs.
  *  3. A monster moved onto stairs going down goes the same way, and its corner turns.
- *     `RN::pos` writes the corner beside the record (`CSBTypes.h:336-341`), so the group
+ *     `RN::pos` writes the corner beside the record (`CSBTypes.h:342-347`), so the group
  *     lies at the exit in the turned corner, and the ID it came with still lifts it:
- *     `RN ==` ignores the corner (`:349-356`).
+ *     `RN ==` ignores the corner (`:355-362`).
  *  4. A DSA that moves a group onto the stairs gives it the DSA's corner after the move,
  *     whatever the stairs made of it (`MoveObject(object, -1, 0, x, y)`, then
  *     `object.pos(p)`, `MoveObject.cpp:537-538`).
- *  5. The party is not moved by the arm (`:3111`).
- *  6. The party's own step into the stairs (`TraverseStairway`, `CSBCode.cpp:7775-7781`)
+ *  5. The party is not moved by the arm (`:3146`).
+ *  6. The party's own step into the stairs (`TraverseStairway`, `CSBCode.cpp:7862-7868`)
  *     leaves it on its old level at the new x and y; the next tick loads the new level
- *     (`LoadPartyLevel`, `:621`) before its `DrawViewport` (`:638`). So the tick's redraw
+ *     (`LoadPartyLevel`, `:631`) before its `DrawViewport` (`:648`). So the tick's redraw
  *     (`Game.onTick`) sees the party at the new x and y *on the new level*, never the new
  *     square on the level it left.
  *
@@ -117,7 +117,7 @@ function findStairs(game: Game, down: boolean, accept: (s: Stairs) => boolean = 
   throw new Error(`no ${down ? 'down' : 'up'} stairs with an open exit`);
 }
 
-/** `:3124-3130`: the corner turned to face back towards the stairs. */
+/** `:3180-3186`: the corner turned to face back towards the stairs. */
 function turnedCorner(corner: number, dir: number): number {
   const back = (dir + 2) & 3;
   return ((((corner - back + 1) & 2) >> 1) + back) & 3;
@@ -171,7 +171,7 @@ function main(): void {
   /* ------------------------------------ 3-4. a monster moved onto stairs ---- */
   /**
    * A group beside stairs going down, in a corner the stairs turn: neither of the two
-   * corners they can leave it in (`:3124-3130`), so a group set down unturned shows.
+   * corners they can leave it in (`:3180-3186`), so a group set down unturned shows.
    */
   const monsterBesideStairs = (): { game: Game; stairs: Stairs; rn: ObjectID; corner: number; type: number } => {
     const game = makeGame();

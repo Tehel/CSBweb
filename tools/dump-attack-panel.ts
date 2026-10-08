@@ -1,19 +1,19 @@
 /**
  * What the attack panel shows between CSBWin's redraws of it.
  *
- * CSBWin draws the panel only at `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8718`)
+ * CSBWin draws the panel only at `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8823`)
  * and `FlashAttackDamage` (`doc/CSBwin-src/Attack.cpp:949`); between them the screen keeps
  * the last drawing. The port composes the panel from state every frame
  * (`drawAttackPanel`, `src/renderer/ui/Attack.ts`), so the state must say what that last
- * drawing was. `TAG01b1c0` (`doc/CSBwin-src/Character.cpp:4887-4897`) closes the menu and
+ * drawing was. `TAG01b1c0` (`doc/CSBwin-src/Character.cpp:4904-4922`) closes the menu and
  * draws nothing, so the menu stays up until the next tick's `TAG01b29a`
- * (`CSBCode.cpp:8843-8854`) draws the damage or the champions' buttons over it.
+ * (`CSBCode.cpp:8948-8959`) draws the damage or the champions' buttons over it.
  *
  * The panel is drawn with the real graphics and font; each row of the output is a state
  * and a hash of the panel's pixels, and the checks compare the states' pixels.
  *
  * The last block is `TAG01b29a`'s other job, the flinch, which it skips while a
- * candidate stands at a mirror as it does asleep (`CSBCode.cpp:8808-8816`).
+ * candidate stands at a mirror as it does asleep (`CSBCode.cpp:8913-8921`).
  *
  * Run: `npx tsx tools/dump-attack-panel.ts`
  */
@@ -100,9 +100,9 @@ async function main(): Promise<void> {
 
   executeAttack(ui, -1);
   check(render('PASS, before the tick') === menu,
-    'a PASS draws nothing: the menu stays on the panel (TAG01b1c0, Character.cpp:4887-4897)');
+    'a PASS draws nothing: the menu stays on the panel (TAG01b1c0, Character.cpp:4904-4922)');
   attackPanelTick(ui);
-  check(render('the tick') === buttons, "the tick's TAG01b29a draws the buttons over it (CSBCode.cpp:8849-8853)");
+  check(render('the tick') === buttons, "the tick's TAG01b29a draws the buttons over it (CSBCode.cpp:8954-8958)");
 
   prepareAttack(ui, 1);
   const menu2 = render("champion 2's menu");
@@ -163,7 +163,7 @@ async function main(): Promise<void> {
   ui.attackFlashValue = 0;
 
   console.log('');
-  console.log('=== the flinch, with a candidate at the mirror (CSBCode.cpp:8808-8837) ===');
+  console.log('=== the flinch, with a candidate at the mirror (CSBCode.cpp:8913-8942) ===');
   const champ = party.state.champions[0]!;
   party.state.cursorOwner = -1;
   const flinch = (label: string): void => console.log([label, `facing ${champ.facing}`,
@@ -183,7 +183,7 @@ async function main(): Promise<void> {
   check(champ.facing === facing && champ.maxRecentDamage === 12,
     'while the candidate stands, nobody turns, and the damage is kept');
   render('candidate: the panel, its buttons shaded');
-  check(ui.word20250 === 0 && ui.word20252 === 1, 'but the buttons are drawn again (CSBCode.cpp:8849-8853)');
+  check(ui.word20250 === 0 && ui.word20252 === 1, 'but the buttons are drawn again (CSBCode.cpp:8954-8958)');
   party.state.potentialChampionIndex = -1;
   attackPanelTick(ui);
   flinch('candidate gone: tick');

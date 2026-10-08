@@ -1,11 +1,11 @@
 /**
- * `MakeMoreRoomInDB` (`doc/CSBwin-src/Character.cpp:182-358`): a new object in a full
+ * `MakeMoreRoomInDB` (`doc/CSBwin-src/Character.cpp:183-359`): a new object in a full
  * database takes the record of one thrown out of the dungeon. A database is full at
- * `db.Max` records (`CSB.h:1646`), so each section pads one to that with records no
+ * `db.Max` records (`CSB.h:1649`), so each section pads one to that with records no
  * object names, then asks `findEmptyDBEntry` for one more.
  *
  *  0. Short of `db.Max`, a database with no free record `Enlarge`s instead
- *     (`data.cpp:813-876`): 100 cleared records, link `RNnul` but the first's `RNeof`,
+ *     (`data.cpp:814-877`): 100 cleared records, link `RNnul` but the first's `RNeof`,
  *     the header's size with them, and the new object at the old size, past record 1023
  *     as well. The next new object takes the next cleared record. At `db.Max`, 8000
  *     records, it grows no more.

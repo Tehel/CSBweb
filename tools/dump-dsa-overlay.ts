@@ -7,24 +7,24 @@
  * 1. **`ReadOverlay`** (`doc/CSBwin-src/Bitmaps.cpp:572-630`): overlay 1, a 224x136
  *    bitmap of 256 colours, is its file's pixel bytes and colours, as stored. A missing
  *    one reads nothing, and says "Cannot find overlay" once.
- * 2. **`&OVERLAY`** (`DSA.cpp:2919-2930`, `SelectOverlay`, `Bitmaps.cpp:687-720`): pops
+ * 2. **`&OVERLAY`** (`DSA.cpp:2920-2931`, `SelectOverlay`, `Bitmaps.cpp:687-720`): pops
  *    the overlay number, then `p4` to `p1`, reads the overlay and draws it; `p3` is its
  *    end, from `d.Time`. Bit 1 of `p1` mirrors each line, and turned off again mirrors it
  *    back without a read. A missing overlay is not drawn.
- * 3. **The end** (`CSBCode.cpp:675`): the tick after `d.Time` passes `m_p3` puts it down.
- * 4. **`&PALETTE`** (`DSA.cpp:2932-2944`, `SetOverlayPalette`, `Bitmaps.cpp:651-685`):
+ * 3. **The end** (`CSBCode.cpp:685`): the tick after `d.Time` passes `m_p3` puts it down.
+ * 4. **`&PALETTE`** (`DSA.cpp:2933-2945`, `SetOverlayPalette`, `Bitmaps.cpp:651-685`):
  *    pops the density, the number and two words it does not read. Density 100 makes the
  *    overlay palette section 1's 512 RGB555 words, each 5-bit intensity widened to 8;
  *    density 50 blends half of it into what was there, rounded; a negative number gives
  *    the identity back (`ClearOverlayPalette`).
- * 5. **`&JITTER`** (`DSA.cpp:4903-4930`): pops `yOverlay`, `xOverlay`, `yGraphic`,
+ * 5. **`&JITTER`** (`DSA.cpp:4904-4931`): pops `yOverlay`, `xOverlay`, `yGraphic`,
  *    `xGraphic`.
- * 6. **A save** (`SaveGame.cpp:968-976`, read back at `:421-430`): a game never shown an
+ * 6. **A save** (`SaveGame.cpp:993-1001`, read back at `:425-438`): a game never shown an
  *    overlay writes ordinal 0 and the flag clear; one shown overlay 5 mirrored writes
  *    `OverlayActive`, ordinal 6 and its parameters, its end as a `d.Time`, and a load
  *    selects it again, mirrored, ending at the same `d.Time`. An overlay that has ended is
  *    saved without the flag and comes back up at the load, until the next tick.
- * 7. **`ReadCSBgraphic`'s first failure** (`Graphics.cpp:3220-3228`, `:3253-3262`): a file
+ * 7. **`ReadCSBgraphic`'s first failure** (`Graphics.cpp:3247-3255`, `:3280-3289`): a file
  *    that will not open puts the overlay down, at its first failure only; a missing
  *    section first, and it never does.
  *

@@ -18,11 +18,11 @@ import type { MonsterGraphicDesc } from './tables/ObjectTables';
 
 /** `NUM_DERIVED_GRAPHIC`, and the length of `ALTMONGRAPH.graphicOffsets`. */
 export const NUM_DERIVED_GRAPHIC = 10;
-/** `sizeof(MONSTERDESC)`, packed (`doc/CSBwin-src/CSB.h:18`, `:2256-2363`). */
+/** `sizeof(MONSTERDESC)`, packed (`doc/CSBwin-src/CSB.h:18`, `:2319-2422`). */
 const MONSTERDESC_SIZE = 26;
-/** `sizeof(ITEM12)` (`doc/CSBwin-src/CSB.h:2155-2169`). */
+/** `sizeof(ITEM12)` (`doc/CSBwin-src/CSB.h:2218-2232`). */
 const ITEM12_SIZE = 12;
-/** `sizeof(ITEM110)`: eleven relative cells of five positions (`doc/CSBwin-src/CSB.h:2375-2383`). */
+/** `sizeof(ITEM110)`: eleven relative cells of five positions (`doc/CSBwin-src/CSB.h:2434-2442`). */
 const ITEM110_SIZE = 110;
 /** `ALTMONGRAPH.graphic`'s offset: the three tables and `graphicOffsets`. */
 export const ALTMONGRAPH_GRAPHIC = MONSTERDESC_SIZE + ITEM12_SIZE + ITEM110_SIZE + 4 * NUM_DERIVED_GRAPHIC;

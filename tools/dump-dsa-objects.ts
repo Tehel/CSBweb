@@ -4,15 +4,15 @@
  * genuine save (`csbgame7.dat`).
  *
  * 1. **The getters** `&CHARGES@`, `&CURSE@`, `&BROKEN@`, `&POISONED@`, `&SUBTYPE@`
- *    (`doc/CSBwin-src/DSA.cpp:3411-3439`, `:3458-3483`, `:3511-3536`, `:3564-3595`,
- *    `:3629-3651`): a potion's charges are its strength, a misc object's its `value()`;
+ *    (`doc/CSBwin-src/DSA.cpp:3412-3440`, `:3459-3484`, `:3512-3537`, `:3565-3596`,
+ *    `:3630-3652`): a potion's charges are its strength, a misc object's its `value()`;
  *    only a weapon is poisoned, only a misc object has a subtype; a database without the
  *    field, or an invalid slot, reads 0.
- * 2. **The setters** `&CHARGES!`, `&BROKEN!`, `&POISONED!`, `&SUBTYPE!` (`:3484-3510`,
- *    `:3537-3563`, `:3596-3628`, `:3652-3675`) cut the value to the field's width
- *    (`SETWBITS`, `CSB.h:746-774`), and touch neither the other bits nor another
+ * 2. **The setters** `&CHARGES!`, `&BROKEN!`, `&POISONED!`, `&SUBTYPE!` (`:3485-3511`,
+ *    `:3538-3564`, `:3597-3629`, `:3653-3676`) cut the value to the field's width
+ *    (`SETWBITS`, `CSB.h:749-777`), and touch neither the other bits nor another
  *    database.
- * 3. **`&CURSE!`** is `SetCursed` (`Character.cpp:1782-1816`): on a carried weapon it
+ * 3. **`&CURSE!`** is `SetCursed` (`Character.cpp:1787-1821`): on a carried weapon it
  *    costs 3 Luck at once, and gives it back when lifted. CSBWin does so only for the
  *    last champion, whose slot its search alone keeps; the port for every champion
  *    (`DEBT.md` H), so a curse laid and the weapon taken off leaves the Luck as it was.

@@ -2,7 +2,7 @@
  * Prove the party cannot walk through a monster.
  *
  * `MoveParty` treats a monster in the destination cell exactly as it treats a wall —
- * it sets the same inhibit flag (`doc/CSBwin-src/CSBCode.cpp:8286-8304`) — but the
+ * it sets the same inhibit flag (`doc/CSBwin-src/CSBCode.cpp:8373-8391`) — but the
  * two are not otherwise alike, and the differences are what this checks:
  *
  * - the wall bump queues sound 18; the monster bump is **silent**;
@@ -12,15 +12,15 @@
  *   the party even though it does not stop a closing door.
  * - the whole block is gated on `d.NumCharacter != 0`.
  * - a wall bump hurts up to two champions on the wall side, and the sound is queued only
- *   if one of them was hurt (`:8263-8291`).
+ *   if one of them was hurt (`:8350-8378`).
  * - either bump discards all queued input and postpones a due tick by a frame
- *   (`:8310-8314`).
+ *   (`:8397-8401`).
  * - every attempted step costs each champion `3 * load / MaxLoad + 1` stamina, bump or
- *   not (`:8088-8101`, `:8129-8135`); a turn costs nothing.
+ *   not (`:8175-8188`, `:8216-8222`); a turn costs nothing.
  * - a step sets a move delay, in ticks, from the slowest living champion's `TimeToMove`;
  *   a throw locks steps in its direction for 4 ticks; one turn or step per tick, and each
- *   brings its own tick on at once, "Extra Ticks" being on (`:8326-8349`, `:7866-7869`,
- *   `:8084-8087`, `Mouse.cpp:1468-1496`).
+ *   brings its own tick on at once, "Extra Ticks" being on (`:8413-8436`, `:7953-7956`,
+ *   `:8171-8174`, `Mouse.cpp:1596-1630`).
  *
  * None of that is visible in `tools/check-frames.sh` — the party either arrives in a
  * cell or does not, and until this was ported it always arrived.
@@ -183,7 +183,7 @@ async function main(): Promise<void> {
   // ---- Case 4: the bump gives the group a turn ----------------------------
   // `ProcessTimers29to41(..., TT_M1, 0)` is the whole reason a bump is not a no-op:
   // `InitialChecks` turns `TT_M1` into a `TT_31` timer one tick out
-  // (`doc/CSBwin-src/Monster.cpp:3026-3055`), and CSB.h names that timer
+  // (`doc/CSBwin-src/Monster.cpp:3030-3059`), and CSB.h names that timer
   // `TT_31 = 31, // When Party ran into monster` — this mechanism and no other.
   //
   // One timer per bump is correct, not a leak: `SetTimer`'s duplicate suppression
@@ -236,12 +236,12 @@ async function main(): Promise<void> {
   console.log('');
 
   // ---- Case 5: a wall bump hurts the champions on the wall side -----------
-  // `MoveParty`'s inhibited-move arm (doc/CSBwin-src/CSBCode.cpp:8263-8291): the side of
+  // `MoveParty`'s inhibited-move arm (doc/CSBwin-src/CSBCode.cpp:8350-8378): the side of
   // the new cell being crossed is `direction + partyFacing + 2`, and
   // `GetCharacterToDamage` on that corner and the next picks up to two champions for
   // `DamageCharacter(ch, 1, 24, 2)`. Sound 18 is queued only if one of them was hurt.
   // With `P4 == 2` and no armour a blow of 1 comes out as `1 * (130 - 0) >> 6 = 2`
-  // (`Character.cpp:2780-2789`), on the legs and feet (mask 24).
+  // (`Character.cpp:2785-2794`), on the legs and feet (mask 24).
   let wallHurt: { front: number[]; back: number[]; soundId: number | undefined; moved: boolean } | null = null;
   let emptyWall: { moved: boolean; soundId: number | undefined } | null = null;
   if (wall) {
@@ -284,11 +284,11 @@ async function main(): Promise<void> {
 
   // ---- Case 6: an inhibited move discards all input and postpones the tick --
   // `if (D5W != 0) { DiscardAllInput(); d.clockTick = 0; }`
-  // (doc/CSBwin-src/CSBCode.cpp:8310-8314), for a wall and for a monster alike.
-  // `DiscardAllInput` empties the key queue and the mouse queue (`:7532`); the port's
+  // (doc/CSBwin-src/CSBCode.cpp:8397-8401), for a wall and for a monster alike.
+  // `DiscardAllInput` empties the key queue and the mouse queue (`:7591`); the port's
   // one input queue is `Game`'s mouse queue. `d.clockTick = 0` cancels a tick that was due:
   // the VBL sets it again on the next VBL, since `vblCount` is still `>= d.Speed`
-  // (`:1066-1077`), so the tick runs one frame later.
+  // (`:1076-1087`), so the tick runs one frame later.
   type Internals = { lastInputTime: number };
   const internals = game as unknown as Internals;
   /** `d.LoadedLevel`'s party half: the level whose groups `LoadPartyLevel` attached. */
@@ -340,8 +340,8 @@ async function main(): Promise<void> {
 
   // ---- Case 7: every attempted step costs stamina --------------------------
   // `sw((3*load)/MaxLoad + 1)` for each champion, charged after the party-move filter and
-  // before the destination is looked at (doc/CSBwin-src/CSBCode.cpp:8088-8101,
-  // `:8129-8135`), so a bump pays as much as a step. A turn is `TurnParty`: free.
+  // before the destination is looked at (doc/CSBwin-src/CSBCode.cpp:8175-8188,
+  // `:8216-8222`), so a bump pays as much as a step. A turn is `TurnParty`: free.
   // `AdjustStamina` turns whatever overshoots zero into `DamageCharacter(ch, over/2, 0, 0)`.
   let stamina: {
     bump: number[]; turn: number[]; loaded: number; loadedCost: number; exhaustedHp: number; exhaustedSt: number;
@@ -400,12 +400,12 @@ async function main(): Promise<void> {
 
   // ---- Case 8: the move delay is counted in ticks ---------------------------
   // A step sets `d.partyMoveDisableTimer` to the slowest living champion's `TimeToMove`
-  // (doc/CSBwin-src/CSBCode.cpp:8326-8347), each tick counts it down (`:689-692`), and
+  // (doc/CSBwin-src/CSBCode.cpp:8413-8434), each tick counts it down (`:699-702`), and
   // `HandleMouseEvents` holds a queued *step* while it is non-zero, or while a throw's
   // `d.Word11712` lock is on and the step heads in direction `d.Word11714`
-  // (Mouse.cpp:1482-1496). Any turn or step also waits for the next tick
-  // (`d.Time < lastTime + 1`, `:1468-1476`), and brings that tick on at once
-  // (`if (extraTicks) d.clockTick = 1;`, CSBCode.cpp:7866-7869, :8084-8087), so the tick
+  // (Mouse.cpp:1606-1630). Any turn or step also waits for the next tick
+  // (`d.Time < lastTime + 1`, `:1596-1604`), and brings that tick on at once
+  // (`if (extraTicks) d.clockTick = 1;`, CSBCode.cpp:7953-7956, :8171-8174), so the tick
   // after a step runs in the step's own VBL and takes one off its delay. A turn ignores
   // the move delay.
   {
@@ -477,7 +477,7 @@ async function main(): Promise<void> {
       party.word11712 = 0;
       game.discardAllInput();
 
-      // `TimeToMove` (CSBCode.cpp:7003) and the slowest-living rule.
+      // `TimeToMove` (CSBCode.cpp:7062) and the slowest-living rule.
       const stats = game.systems.characterStats;
       const realLoad = stats.characterLoad.bind(stats);
       const c0 = party.champions[0];
@@ -532,8 +532,8 @@ async function main(): Promise<void> {
 
   // ---- Case 9: seven moves wait, not eight --------------------------------
   // `TAG0196da` puts a key into the mouse queue only if `MouseQEnd + 2 != MouseQStart`
-  // (doc/CSBwin-src/CSBCode.cpp:8439-8443), and `MOUSEQLEN` is 8 (Data.h:1517 — the 3 on
-  // `:1515` is behind `NoKeyQue`, which `:1513` leaves undefined). The clicks that share
+  // (doc/CSBwin-src/CSBCode.cpp:8526-8530), and `MOUSEQLEN` is 8 (Data.h:1532 — the 3 on
+  // `:1530` is behind `NoKeyQue`, which `:1528` leaves undefined). The clicks that share
   // the queue are `tools/dump-mouse-queue.ts`'.
   {
     game.discardAllInput();
@@ -547,11 +547,11 @@ async function main(): Promise<void> {
   // ---- Case 10: a level change discards all input, at the next tick ---------
   // CSBWin sets `d.newPartyLevel` when the party changes level and, at the top of the
   // next tick, `LoadPartyLevel(...); MoveObject(...); d.newPartyLevel = -1;
-  // DiscardAllInput();` (doc/CSBwin-src/CSBCode.cpp:615-623). The step brings that tick on
-  // in its own VBL (`extraTicks`, `:8084-8087`), before the queue's next entry is looked
+  // DiscardAllInput();` (doc/CSBwin-src/CSBCode.cpp:625-633). The step brings that tick on
+  // in its own VBL (`extraTicks`, `:8171-8174`), before the queue's next entry is looked
   // at, so a turn queued behind a step onto the stairs is lost at once. Until that tick,
   // `TraverseStairway` leaves the party on the new level's square with `d.partyLevel`
-  // still the old one (`:7775-7781`).
+  // still the old one (`:7862-7868`).
   {
     let stairs: { px: number; py: number; dir: number } | null = null;
     for (let x = 0; x < width && !stairs; x++) {
@@ -627,7 +627,7 @@ async function main(): Promise<void> {
 
   // ---- Case 11: room type 7 is entered -------------------------------------
   // `MoveParty` inhibits a move only into stone, a shut door or a solid false wall
-  // (doc/CSBwin-src/CSBCode.cpp:8224-8261); any other room type is walked into. No
+  // (doc/CSBwin-src/CSBCode.cpp:8311-8348); any other room type is walked into. No
   // dungeon or save this port loads has a type-7 cell, so the case makes one.
   {
     let spot: { px: number; py: number; dir: number } | null = null;
@@ -663,13 +663,13 @@ async function main(): Promise<void> {
 
   // ---- Case 12: a level change inside ProcessTimers is loaded in the same tick
   // The main loop runs `ProcessTimers()` and then `if (d.newPartyLevel != -1) goto
-  // tag0006a4;` (doc/CSBwin-src/CSBCode.cpp:635): a pit a timer opens under the party has
+  // tag0006a4;` (doc/CSBwin-src/CSBCode.cpp:645): a pit a timer opens under the party has
   // the new level loaded, the input discarded and `ProcessTimers` run again, all before
-  // the tick ends (`:615-635`). A turn queued before the pit opened is lost, and never
+  // the tick ends (`:625-645`). A turn queued before the pit opened is lost, and never
   // runs on the new level. `ProcessTimers` does not test `d.newPartyLevel`, so a timer due
   // in the same pass after the pit's runs with the party on the new level's square and
   // `d.partyLevel` still the old one, nothing of the new level loaded
-  // (`Code11f52.cpp:3319-3324`).
+  // (`Code11f52.cpp:3354-3359`).
   {
     let pit: { x: number; y: number } | null = null;
     for (let x = 0; x < width && !pit; x++) {
@@ -695,12 +695,12 @@ async function main(): Promise<void> {
       game.discardAllInput();
       game.ctx.loop.newPartyLevel = -1;
       // An event was handled this tick, so the turn waits for the next one
-      // (`Mouse.cpp:1468-1476`) — past the tick in which the pit opens.
+      // (`Mouse.cpp:1596-1604`) — past the tick in which the pit opens.
       internals.lastInputTime = game.ctx.state.tickCount;
       game.enqueueMovement(MovementAction.TURN_LEFT);
       const facingBefore = party.facing;
       // `TT_PIT` with `uByte9 = 0` (set: open), due at the next tick: it runs its timers on
-      // the `d.Time` the handlers see now (`CSBCode.cpp:626`, `:660`).
+      // the `d.Time` the handlers see now (`CSBCode.cpp:636`, `:670`).
       game.ctx.timers.addTimer({
         index: 0, function: TimerFunction.TT_PIT, time: game.ctx.state.tickCount, level,
         uByte5: 0, uByte6: pit.x, uByte7: pit.y, uByte8: 0, uByte9: 0,
@@ -746,7 +746,7 @@ async function main(): Promise<void> {
       check(
         saw !== null && saw.x === below.x && saw.y === below.y && saw.level === level &&
           saw.pending === below.z && saw.loaded === level,
-        "a timer after the pit's sees the new square, the old d.partyLevel and the old level loaded (Code11f52.cpp:3319-3324)",
+        "a timer after the pit's sees the new square, the old d.partyLevel and the old level loaded (Code11f52.cpp:3354-3359)",
       );
       frame(false);
       const turned = party.facing !== facingBefore;
@@ -756,7 +756,7 @@ async function main(): Promise<void> {
       );
       console.log('');
       check(newLevel !== level, 'the pit timer should drop the party a level');
-      check(loadedAfterTick === 'loaded' && owedAfterTick === -1, 'the new level should be loaded in the tick the timer ran (CSBCode.cpp:635)');
+      check(loadedAfterTick === 'loaded' && owedAfterTick === -1, 'the new level should be loaded in the tick the timer ran (CSBCode.cpp:645)');
       check(queuedAfterTick === 0, 'the queued turn should be discarded in that same tick');
       check(!turned, 'the queued turn should never run on the new level');
       setCell(saved);
@@ -767,7 +767,7 @@ async function main(): Promise<void> {
 
   // ---- Case 1: no champions — CSBWin's `d.NumCharacter != 0` gate is off ----
   // The empty party walks onto the monster, and `MoveObject` deletes a monster where the
-  // party lands (`doc/CSBwin-src/Code11f52.cpp:3298-3308`).
+  // party lands (`doc/CSBwin-src/Code11f52.cpp:3333-3343`).
   const champions = game.ctx.party.state.champions;
   game.ctx.party.state.champions = [];
   const thereBefore = monsterAt(scene.mx, scene.my);

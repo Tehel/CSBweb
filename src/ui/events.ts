@@ -141,10 +141,10 @@ export function bindUIEvents(): void {
         });
 
         // CSBWin's "DM Rules" menu item: `DM_rules = !DM_rules`, at any time
-        // (doc/CSBwin-src/CSBUI.cpp:912-914). It is the game's, not the page's: a save
+        // (doc/CSBwin-src/CSBUI.cpp:933-935). It is the game's, not the page's: a save
         // carries it and a read game or the boot may set it, so it is not a UI setting. The
         // menu reads its check mark afresh each time it opens (`WM_INITMENUPOPUP`,
-        // doc/CSBwin-src/CSBwin.cpp:1116, :1162-1166); the button is always in view, so it
+        // doc/CSBwin-src/CSBwin.cpp:1120, :1166-1170); the button is always in view, so it
         // reads it every tick.
         const showDMRules = (): void => {
             dmRulesButton?.classList.toggle('is-pressed', ctx.game.ctx.rules.dmRules);

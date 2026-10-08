@@ -1,5 +1,5 @@
 /**
- * Chaos Strikes Back's Hint Oracle — `_StartHint`, `doc/CSBwin-src/Hint.cpp:6454`.
+ * Chaos Strikes Back's Hint Oracle — `_StartHint`, `doc/CSBwin-src/Hint.cpp:7231`.
  *
  * CSBWin runs it from its launcher's HINT choice, as a program of its own (`HINT.FTL` on
  * the utility disk). Here it opens on a square, the party's, and its first screen is the
@@ -7,15 +7,15 @@
  * draws straight to the screen over an `IntroHost`, and every `await` on a VBL is one of
  * `Hint.cpp`'s `RESTART` labels.
  *
- * What is ported, in `_StartHint`'s loop (`:6513-6633`), which keeps the screen in `w_4`:
+ * What is ported, in `_StartHint`'s loop (`:7299-7419`), which keeps the screen in `w_4`:
  *
- * - 2, the title list (`_TAG00799a_6`, `:5979-6053`), or "There are no clues for this
- *   location." with DONE alone (`:6553`). DONE closes the Oracle.
+ * - 2, the title list (`_TAG00799a_6`, `:6737-6811`), or "There are no clues for this
+ *   location." with DONE alone (`:7339`). DONE closes the Oracle.
  * - 4, a hint's page (`_TAG007fdc_36`), with NEXT while pages remain and LAST past the
- *   first. DONE goes back to the title list (`:6584-6602`).
+ *   first. DONE goes back to the title list (`:7370-7388`).
  *
  * Not ported: the load screen with its floppy prompts and the save chooser, which only
- * lead to the square (`TAG006c7e_9(501)`, `:6529`); the save's checksums; Dump and
+ * lead to the square (`TAG006c7e_9(501)`, `:7315`); the save's checksums; Dump and
  * `HINTDUMP.TXT`; and the OK/CANCEL error screen, which `UI_Die` makes unreachable. The
  * screen starts at the load's own window (`_TAG0051c2_1`) and the lookup
  * (`_TAG00799a_9`). See `doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "The screen".
@@ -36,14 +36,14 @@ import type { IntroHost } from './IntroHost';
 /** What the Oracle asks of the machine: the screen, the colour registers, the VBL and the mouse. */
 export type HintOracleHost = Pick<IntroHost, 'screen' | 'globalPalette' | 'present' | 'vbl' | 'takeClick' | 'discardAllInput'>;
 
-/** The square the Oracle answers for: `partyLevel`, `partyX` and `partyY` (`Hint.cpp:6100-6105`). */
+/** The square the Oracle answers for: `partyLevel`, `partyX` and `partyY` (`Hint.cpp:6858-6863`). */
 export interface HintSquare {
   level: number;
   x: number;
   y: number;
 }
 
-/** `struct TEXT` (`Hint.cpp:106`): a string drawn wrapped in a rectangle, centred when `w14 & 1`. */
+/** `struct TEXT` (`Hint.cpp:227`): a string drawn wrapped in a rectangle, centred when `w14 & 1`. */
 interface Text {
   pnt2: string;
   rectPos6: Rect;
@@ -51,8 +51,8 @@ interface Text {
 }
 
 /**
- * `struct S20` (`Hint.cpp:85`), one of `s20_16208`'s buttons. `w0` is read by nothing,
- * and `w12`, the key word, is 0 in every row, so `TAG008c40_3` registers no key (`:6824`).
+ * `struct S20` (`Hint.cpp:179`), one of `s20_16208`'s buttons. `w0` is read by nothing,
+ * and `w12`, the key word, is 0 in every row, so `TAG008c40_3` registers no key (`:7615`).
  */
 interface S20 {
   /** The button's id, the number `_StartHint` switches on. */
@@ -68,7 +68,7 @@ interface S20 {
 const s20 = (b2: number, x1: number, x2: number, y1: number, y2: number, pnt14: string | null, w18: number): S20 =>
   ({ b2, b3: 0, rectPos4: { x1, x2, y1, y2 }, pnt14, w18 });
 
-/** `s20_16208` (`Hint.cpp:417-439`). */
+/** `s20_16208` (`Hint.cpp:546-568`). */
 const S20_16208: readonly S20[] = [
   s20(0x01, 0x7f, 0x0c2, 0xb3, 0xc0, 'LOAD', 1),
   s20(0x03, 0x21, 0x064, 0xb3, 0xc0, 'LAST', 1),
@@ -106,14 +106,14 @@ export function hintButtonRect(id: number): Rect | null {
   return S20_16208.find((b) => b.b2 === id)?.rectPos4 ?? null;
 }
 
-/** `text15024[4]` (`Hint.cpp:474-485`), the screen of a square with no hints. */
+/** `text15024[4]` (`Hint.cpp:602-613`), the screen of a square with no hints. */
 const TEXT_NO_CLUES: Text = { pnt2: 'There are no clues for this location.', rectPos6: { x1: 0x1f, x2: 0x122, y1: 0x46, y2: 0x96 }, w14: 1 };
 
-/** `rectPos14516` (`Hint.cpp:514`): the whole screen, the rectangle `TAG004a22_16` gives a new text. */
+/** `rectPos14516` (`Hint.cpp:658`): the whole screen, the rectangle `TAG004a22_16` gives a new text. */
 const RECT_POS_14516: Rect = { x1: 0, x2: 0x13f, y1: 0, y2: 0xc7 };
 
 /**
- * `byte16544` (`Hint.cpp:389`): the colour map the ink is set through, ten times the
+ * `byte16544` (`Hint.cpp:518`): the colour map the ink is set through, ten times the
  * colour, as `ShrinkBLT` reads it. A static in CSBWin, which a second run of the Oracle
  * finds as the first left it, with `word15708`; the port starts each run afresh. Either
  * way the font's glyphs end up in the current ink, because `byte16544[9]` holds the
@@ -122,21 +122,21 @@ const RECT_POS_14516: Rect = { x1: 0, x2: 0x13f, y1: 0, y2: 0xc7 };
  */
 const BYTE16544: readonly number[] = [0x00, 0x0a, 0x14, 0x1e, 0x28, 0x32, 0x3c, 0x46, 0x50, 0x5a, 0x64, 0x6e, 0x78, 0x82, 0x8c, 0x96];
 
-/** `byte16528` (`Hint.cpp:395`): `byte16544` with colour 12 sent to 9, for the title lines. */
+/** `byte16528` (`Hint.cpp:524`): `byte16544` with colour 12 sent to 9, for the title lines. */
 const BYTE16528: readonly number[] = [0x00, 0x0a, 0x14, 0x1e, 0x28, 0x32, 0x3c, 0x46, 0x50, 0x5a, 0x64, 0x6e, 0x5a, 0x82, 0x8c, 0x96];
 
-/** `word16494` and `word16488` (`Hint.cpp:401-402`): each component's mask, and its unit. */
+/** `word16494` and `word16488` (`Hint.cpp:530-531`): each component's mask, and its unit. */
 const WORD16494 = [0x700, 0x070, 0x007];
 const WORD16488 = [0x100, 0x010, 0x001];
 
-/** The font's width, 256, and its transparent colour (`TAG004962`, `Hint.cpp:3466-3473`). */
+/** The font's width, 256, and its transparent colour (`TAG004962`, `Hint.cpp:4158-4165`). */
 const FONT_WIDTH = 256;
 const FONT_TRANSPARENT = 12;
 /** `TAG004962`'s glyph: 8 wide, 9 high, 9 apart along a line. */
 const GLYPH_WIDTH = 8;
 const GLYPH_HEIGHT = 9;
 const GLYPH_ADVANCE = 9;
-/** `_DisplayText`'s lines, 11 apart, the first 11 below the rectangle's top (`:3524`, `:3599`). */
+/** `_DisplayText`'s lines, 11 apart, the first 11 below the rectangle's top (`:4216`, `:4291`). */
 const LINE_PITCH = 11;
 
 /** A page of `f.pBook14608[9]`, the texts the next build draws (`TAG00978a_27`). */
@@ -154,7 +154,7 @@ interface S6 {
   w4: number;
 }
 
-/** `T12` (`Hint.cpp:77`), an enabled button of `t12_14106`. */
+/** `T12` (`Hint.cpp:158`), an enabled button of `t12_14106`. */
 interface T12 {
   b0: number;
   b1: number;
@@ -162,10 +162,10 @@ interface T12 {
   w10: number;
 }
 
-/** `clickMap13914.b0` (`Hint.cpp:535`), which `TAG001dde` hands back as a click's high byte. */
+/** `clickMap13914.b0` (`Hint.cpp:683`), which `TAG001dde` hands back as a click's high byte. */
 const CLICK_MAP_B0 = 0x0a;
 
-/** The Oracle's state, CSBWin's `f` (`Hint.cpp:187-382`), for one run. */
+/** The Oracle's state, CSBWin's `f` (`Hint.cpp:309-511`), for one run. */
 export class HintOracleScreen {
   /** `f.Segment1_16872`, item 0's fifty words. */
   private readonly seg: readonly number[];
@@ -311,7 +311,7 @@ export class HintOracleScreen {
     this.pointer12798.set(this.backdrop.subarray(0, this.pointer12798.length));
   }
 
-  /** `TAG0051c2_35` (`Hint.cpp:4256`): the screen drawn is shown, and the other gets the backdrop. */
+  /** `TAG0051c2_35` (`Hint.cpp:4984`): the screen drawn is shown, and the other gets the backdrop. */
   private tag0051c2_35(): void {
     this.word16498 = this.word16498 === 0 ? 1 : 0;
     this.present();
@@ -319,18 +319,18 @@ export class HintOracleScreen {
     this.drawBackdrop();
   }
 
-  /** `TAG0051c2_36` (`:4316`): draw on the screen shown. */
+  /** `TAG0051c2_36` (`:5044`): draw on the screen shown. */
   private tag0051c2_36(): void {
     this.pointer12798 = this.front();
   }
 
-  /** `TAG0051c2_37` (`:4338`): draw on the other. */
+  /** `TAG0051c2_37` (`:5066`): draw on the other. */
   private tag0051c2_37(): void {
     this.pointer12798 = this.pointer16506[this.word16498];
   }
 
   /**
-   * `_FadePalette` (`Hint.cpp:4576-4660`) with the screen's palette as the start and the
+   * `_FadePalette` (`Hint.cpp:5304-5388`) with the screen's palette as the start and the
    * mask 273, all three components: `steps` steps, each moving every component one unit
    * toward `target`, then `delay` VBLs.
    */
@@ -352,7 +352,7 @@ export class HintOracleScreen {
   }
 
   /**
-   * `_TAG0051c2_1` (`Hint.cpp:3989-4100`), past the read of `hcsb.dat`: the font's first
+   * `_TAG0051c2_1` (`Hint.cpp:4709-4828`), past the read of `hcsb.dat`: the font's first
    * ink, a fade to black (`f.Palette16640`, which nothing writes), the backdrop on both
    * screens, and a fade to item 3. The two fades take 2 and 7 as constants.
    */
@@ -367,7 +367,7 @@ export class HintOracleScreen {
   }
 
   /**
-   * `_TAG0051c2_31` (`Hint.cpp:4171-4251`), a screen built: the labels drawn, the old
+   * `_TAG0051c2_31` (`Hint.cpp:4899-4979`), a screen built: the labels drawn, the old
    * screen faded with item 0's slot (word 0) at word 1, a swap, the labels again and list
    * 9's texts, the slot at word 3, at least word 9's VBLs since the swap, another swap,
    * and the fades to the new screen.
@@ -405,7 +405,7 @@ export class HintOracleScreen {
   }
 
   /**
-   * `TAG005f9a_1(rect, colour, -1)` (`Hint.cpp:4666-4737`): a frame one pixel wide just
+   * `TAG005f9a_1(rect, colour, -1)` (`Hint.cpp:5394-5465`): a frame one pixel wide just
    * outside `rect`, in `colour`.
    */
   private tag005f9a_1(rect: Rect, colour: number): void {
@@ -418,7 +418,7 @@ export class HintOracleScreen {
   }
 
   /**
-   * `TAG0062a2(rect, map)` (`Hint.cpp:4785-4802`): the rectangle copied out of the screen
+   * `TAG0062a2(rect, map)` (`Hint.cpp:5513-5530`): the rectangle copied out of the screen
    * drawn on, through `map` with `ShrinkBLT`, and back.
    *
    * The copy's lines are `TAG0088b8`'s, `(w + 16) / 16` sixteen-pixel groups for a
@@ -447,7 +447,7 @@ export class HintOracleScreen {
   /* -------------------------------------------------------------- the text ---- */
 
   /**
-   * `TAG004a22_26(P1, nP2, nP3)` (`Hint.cpp:3694-3734`), the ink: the current ink's slot
+   * `TAG004a22_26(P1, nP2, nP3)` (`Hint.cpp:4397-4438`), the ink: the current ink's slot
    * of `byte16544` gets the new colour, and the font is passed through the map in place
    * (`TAG0025a0`, `ShrinkBLT` at full size). The first call, with no ink yet, sets slot
    * `nP2` to `nP3` and makes `nP3` current.
@@ -464,7 +464,7 @@ export class HintOracleScreen {
   }
 
   /**
-   * `TAG004962(x, y, line)` (`Hint.cpp:3446-3477`): a line of glyphs with its baseline at
+   * `TAG004962(x, y, line)` (`Hint.cpp:4138-4169`): a line of glyphs with its baseline at
    * `y`, 9 apart, colour 12 transparent. A space draws nothing.
    */
   private tag004962(p1: number, p2: number, line: number[]): void {
@@ -484,13 +484,13 @@ export class HintOracleScreen {
     }
   }
 
-  /** `TAG0049fe` (`Hint.cpp:3482`): the width of characters `p2` to `p3`, 9 for none. */
+  /** `TAG0049fe` (`Hint.cpp:4174`): the width of characters `p2` to `p3`, 9 for none. */
   private static tag0049fe(p2: number, p3: number): number {
     return p3 >= p2 ? GLYPH_ADVANCE * (p3 - p2 + 1) : GLYPH_ADVANCE;
   }
 
   /**
-   * `_DisplayText` (`Hint.cpp:3497-3608`): `text` wrapped at its rectangle's width, a
+   * `_DisplayText` (`Hint.cpp:4189-4300`): `text` wrapped at its rectangle's width, a
    * line `LINE_PITCH` below the last, `/` breaking a line, centred if `w14 & 1`, a line
    * below the rectangle not drawn, and a byte outside 32-127 drawn as `_`. Then a VBL.
    */
@@ -538,7 +538,7 @@ export class HintOracleScreen {
     await this.wvbl();
   }
 
-  /** `TAG004e4c_6(P1, text)` (`Hint.cpp:3739-3784`): a screen of one text. */
+  /** `TAG004e4c_6(P1, text)` (`Hint.cpp:4443-4490`): a screen of one text. */
   private async tag004e4c_6(text: Text): Promise<void> {
     this.book9.push({ i4: 34, pText8: text, i12: 6 });
     await this.tag0051c2_31();
@@ -546,18 +546,18 @@ export class HintOracleScreen {
 
   /* ----------------------------------------------------------- the buttons ---- */
 
-  /** `TAG008c40_12(P1, id, 0)` (`Hint.cpp:7008`): the id's row of `s20_16208`, or -1. */
+  /** `TAG008c40_12(P1, id, 0)` (`Hint.cpp:7799`): the id's row of `s20_16208`, or -1. */
   private rowOf(id: number): number {
     return this.s20.findIndex((b) => b.b2 === id);
   }
 
-  /** `TAG008c40_1` (`Hint.cpp:6756`): no buttons, and `EnableButtons`' `ClearKeyboard`. */
+  /** `TAG008c40_1` (`Hint.cpp:7542`): no buttons, and `EnableButtons`' `ClearKeyboard`. */
   private tag008c40_1(): void {
     this.t12 = [];
     this.clearKeyboard();
   }
 
-  /** `TAG008c40_3(P1, id, 0)` (`Hint.cpp:6793-6832`): the button enabled. */
+  /** `TAG008c40_3(P1, id, 0)` (`Hint.cpp:7583-7623`): the button enabled. */
   private tag008c40_3(id: number): void {
     const row = this.rowOf(id);
     if (row < 0) return;
@@ -565,7 +565,7 @@ export class HintOracleScreen {
     if (b.rectPos4.x1 !== 0 && b.rectPos4.x2 !== 0) this.t12.push({ b0: b.b2, b1: b.b3, rectPos2: { ...b.rectPos4 }, w10: 1 });
   }
 
-  /** `_TAG008c40_6(P1, 0)` (`Hint.cpp:6911-6946`): every enabled button's label, `_TAG0089b0`. */
+  /** `_TAG008c40_6(P1, 0)` (`Hint.cpp:7702-7737`): every enabled button's label, `_TAG0089b0`. */
   private async tag008c40_6(): Promise<void> {
     for (const t of this.t12) {
       const b = this.s20[this.rowOf(t.b0)]!;
@@ -574,7 +574,7 @@ export class HintOracleScreen {
     }
   }
 
-  /** `ClearKeyboard` (`Hint.cpp:1937`): the keys read, and the click queue emptied. */
+  /** `ClearKeyboard` (`Hint.cpp:2196`): the keys read, and the click queue emptied. */
   private clearKeyboard(): void {
     this.host.discardAllInput();
     this.word14204 = 0;
@@ -582,8 +582,8 @@ export class HintOracleScreen {
   }
 
   /**
-   * `TAG001afe(x, y, mask)` (`Hint.cpp:1975-2021`): a click queued as the first enabled
-   * button under it, if any. Either mouse button gives mask 1 (`CSBUI.cpp:1194-1220`),
+   * `TAG001afe(x, y, mask)` (`Hint.cpp:2241-2296`): a click queued as the first enabled
+   * button under it, if any. Either mouse button gives mask 1 (`CSBUI.cpp:1215-1241`),
    * which every button takes. A queue of five whose full test never holds: a sixth click
    * unread writes over the first.
    */
@@ -598,7 +598,7 @@ export class HintOracleScreen {
     Object.assign(this.s6_14190[d5]!, { b0: hit.b0, b1: 0, w2: x, w4: y });
   }
 
-  /** `_TAG001dde` (`Hint.cpp:2153-2205`): a VBL, then the oldest click, `(map << 8) | id`, or 0. */
+  /** `_TAG001dde` (`Hint.cpp:2439-2499`): a VBL, then the oldest click, `(map << 8) | id`, or 0. */
   private async tag001dde(): Promise<number> {
     await this.wvbl();
     let d7 = this.word14202 + 1;
@@ -611,7 +611,7 @@ export class HintOracleScreen {
   }
 
   /**
-   * `_TAG008c40_5(P1, screen)` (`Hint.cpp:6837-6903`): the wait for a button. On the
+   * `_TAG008c40_5(P1, screen)` (`Hint.cpp:7628-7694`): the wait for a button. On the
    * title list item 0's slot (word 8) steps through the cycle's colours, words 36 on, at
    * most once every 20 VBLs; a button pressed puts it back at word 36.
    */
@@ -644,7 +644,7 @@ export class HintOracleScreen {
   }
 
   /**
-   * `_TAG008c40_8(P1, id)` (`Hint.cpp:6951-7003`): the button's label drawn on the
+   * `_TAG008c40_8(P1, id)` (`Hint.cpp:7742-7794`): the button's label drawn on the
    * screen shown in word 7's ink, 21 VBLs, then again in the button's own, and every
    * button put down.
    *
@@ -675,14 +675,14 @@ export class HintOracleScreen {
 
   /* ------------------------------------------------------------- the hints ---- */
 
-  /** `_TAG00799a_9` (`Hint.cpp:6071-6124`), past its read of the save: the hints at the square. */
+  /** `_TAG00799a_9` (`Hint.cpp:6829-6882`), past its read of the save: the hints at the square. */
   private tag00799a_9(): void {
     this.hintIndices10530 = hintsAtPosition(this.oracle, this.square.level, this.square.x, this.square.y);
     this.numHint10552 = this.hintIndices10530.length;
   }
 
   /**
-   * `_TAG00799a_6(2)` (`Hint.cpp:5979-6053`), the title list: each title a button and a
+   * `_TAG00799a_6(2)` (`Hint.cpp:6737-6811`), the title list: each title a button and a
    * text of list 9 framed in word 6's colour, item 0's slot (word 8) at word 36, and once
    * the screen is up, colour 12 of each title line sent to 9 (`TAG0062a2`).
    */
@@ -710,13 +710,13 @@ export class HintOracleScreen {
   }
 
   /**
-   * `_TAG007fdc_36(P1, line, delta)` (`Hint.cpp:6355-6392`): the hint of title line
+   * `_TAG007fdc_36(P1, line, delta)` (`Hint.cpp:7132-7169`): the hint of title line
    * `line` from its first page, or the page `delta` from the one shown, with DONE, NEXT
    * while pages remain, and LAST past the first.
    *
    * `_TAG007fdc_7` keeps the page's text and the hint's title as `TEXT`s, and puts the
-   * page in list 9 (`:6276-6353`); the title it never draws. `_TAG00799a_12` dies on a
-   * line or a page past the end (`:6146-6157`), which no button offers.
+   * page in list 9 (`:7053-7130`); the title it never draws. `_TAG00799a_12` dies on a
+   * line or a page past the end (`:6908-6919`), which no button offers.
    */
   private async tag007fdc_36(line: number, delta: number): Promise<void> {
     if (delta === 0) {

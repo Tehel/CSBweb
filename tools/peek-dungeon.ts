@@ -181,9 +181,9 @@ const ACTION = { [ActuatorAction.SET]: 'set', [ActuatorAction.CLEAR]: 'clear', [
  * The object an actuator compares its `value` with, as `GetBasicObjectType` of that
  * object, or null for a type whose value is something else. The same type means different
  * things on a floor and in a wall: a pad is judged by `PressurePadOrAlcove`
- * (`doc/CSBwin-src/Code11f52.cpp:3785-3804`), a wall by `TouchWall` when clicked
- * (`doc/CSBwin-src/Mouse.cpp:378-480`) and by `PressurePadOrAlcove` when something is put
- * in its alcove (`doc/CSBwin-src/Code11f52.cpp:3826-3838`). A normally closed actuator
+ * (`doc/CSBwin-src/Code11f52.cpp:3820-3839`), a wall by `TouchWall` when clicked
+ * (`doc/CSBwin-src/Mouse.cpp:379-481`) and by `PressurePadOrAlcove` when something is put
+ * in its alcove (`doc/CSBwin-src/Code11f52.cpp:3861-3873`). A normally closed actuator
  * fires on the opposite outcome.
  */
 function actuatorNeeds(a: ActuatorRecord, room: number | undefined, names: Namer): string | null {
@@ -221,7 +221,7 @@ function describe(world: World, names: Namer, rn: ObjectID, indent: string, out:
   switch (category) {
     case DBType.DOOR: {
       const d = rec as DoorRecord;
-      // CSBWin's `DB0` accessor names (`doc/CSBwin-src/CSB.h:818-848`).
+      // CSBWin's `DB0` accessor names (`doc/CSBwin-src/CSB.h:821-851`).
       out.push(`${head} doorSwitch=${d.hasButton} canOpenWithAxe=${d.destructibleByChop} canOpenWithFireball=${d.destructibleByFireball}`);
       return;
     }
@@ -303,7 +303,7 @@ function describe(world: World, names: Namer, rn: ObjectID, indent: string, out:
 
 /**
  * The flag byte's attribute bits, as `CSBTypes.h` documents them per room type
- * (`doc/CSBwin-src/CSBTypes.h:177-209`); open floor's bit 3 is the random floor
+ * (`doc/CSBwin-src/CSBTypes.h:182-214`); open floor's bit 3 is the random floor
  * decoration (`doc/CSBWIN_DECORATIONS_REFERENCE.md`).
  */
 function describeFlag(flag: number): string {

@@ -2,10 +2,10 @@
  * CSBWin's random number generator.
  *
  * A plain 32-bit LCG — `seed = seed * 0xbb40e62d + 11` — whose callers read bits 8
- * and up (`doc/CSBwin-src/CSBCode.cpp:1182-1217`). The seed lives in game state as
+ * and up (`doc/CSBwin-src/CSBCode.cpp:1192-1227`). The seed lives in game state as
  * `d.RandomNumber`, is initialised from the host `rand()`
- * (`doc/CSBwin-src/CSBCode.cpp:351`) and is round-tripped through save games as
- * `gb2.ranseed` (`doc/CSBwin-src/SaveGame.cpp:1626`).
+ * (`doc/CSBwin-src/CSBCode.cpp:361`) and is round-tripped through save games as
+ * `gb2.ranseed` (`doc/CSBwin-src/SaveGame.cpp:1750`).
  *
  * This exists rather than `Math.random()` for one reason: the monster AI consumes
  * randomness pervasively and in a fixed order, so reproducing CSBWin's sequence is
@@ -18,7 +18,7 @@
  *
  * CSBWin keeps a second, separate stream for the viewport: `DrawViewport` saves
  * `d.RandomNumber`, swaps in `viewportRandom`, and restores it afterwards so that
- * drawing "doesn't upset the game" (`doc/CSBwin-src/Viewport.cpp:6706-6707`). Any
+ * drawing "doesn't upset the game" (`doc/CSBwin-src/Viewport.cpp:6713-6714`). Any
  * render-time randomness therefore belongs in its own `CsbRandom` instance, never in
  * the game one.
  */
@@ -61,14 +61,14 @@ export class CsbRandom {
     return this.seed;
   }
 
-  /** `STRandom(void)` — 24 bits (`doc/CSBwin-src/CSBCode.cpp:1182`). */
+  /** `STRandom(void)` — 24 bits (`doc/CSBwin-src/CSBCode.cpp:1192`). */
   next(): number {
     return (this.advance() >>> 8) & 0xffffff;
   }
 
   /**
    * `STRandom(num)` — `(STRandom() & 0xffff) % num`, masked to 16 bits before the
-   * modulo "to be exactly like Atari" (`doc/CSBwin-src/CSBCode.cpp:1194`). CSBWin
+   * modulo "to be exactly like Atari" (`doc/CSBwin-src/CSBCode.cpp:1204`). CSBWin
    * returns 0 for `num == 0` rather than dividing by zero.
    */
   below(num: number): number {
@@ -76,12 +76,12 @@ export class CsbRandom {
     return (this.next() & 0xffff) % num;
   }
 
-  /** `STRandomBool()` — one bit (`doc/CSBwin-src/CSBCode.cpp:1201`). */
+  /** `STRandomBool()` — one bit (`doc/CSBwin-src/CSBCode.cpp:1211`). */
   bool(): number {
     return (this.advance() >>> 8) & 1;
   }
 
-  /** `STRandom0_3()` — two bits (`doc/CSBwin-src/CSBCode.cpp:1211`). */
+  /** `STRandom0_3()` — two bits (`doc/CSBwin-src/CSBCode.cpp:1221`). */
   zeroTo3(): number {
     return (this.advance() >>> 8) & 3;
   }

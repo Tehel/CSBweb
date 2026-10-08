@@ -4,8 +4,8 @@
  * When the cell a missile leaves its own for is off the map, `MissileTimer` makes its room
  * `roomEXTERIOR` (`doc/CSBwin-src/Timer.cpp:323-330`), which counts as stone (`:340`), so
  * the missile meets it through `ProcessMissileEncounter(roomEXTERIOR, …)` (`:351-364`).
- * That runs filter 6 (`Code11f52.cpp:1841-1843`) and goes on into the shared tail
- * (`:2044-2121`), where a spell becomes its cloud (`CreateCloud`, `:2099`) in the square it
+ * That runs filter 6 (`Code11f52.cpp:1876-1878`) and goes on into the shared tail
+ * (`:2079-2156`), where a spell becomes its cloud (`CreateCloud`, `:2134`) in the square it
  * was flying from.
  *
  * This finds an open square on a map's border, flies a fireball out of it over the edge,
@@ -84,8 +84,8 @@ for (; tick <= 3 && filters.length === 0; tick++) processTimersAt(game, tick);
 
 const here = categoriesAt(game, at);
 console.log(`tick ${tick - 1}: filters run: ${filters.join(', ') || 'none'}; in the square: ${here.map((c) => DBType[c]).join(', ') || 'nothing'}`);
-check(filters.includes(6), 'the exterior wall runs missile filter 6 (Code11f52.cpp:1841-1843)');
-check(here.includes(DBType.CLOUD), "the fireball explodes into its cloud in the square it flew from (CreateCloud, :2099)");
+check(filters.includes(6), 'the exterior wall runs missile filter 6 (Code11f52.cpp:1876-1878)');
+check(here.includes(DBType.CLOUD), "the fireball explodes into its cloud in the square it flew from (CreateCloud, :2134)");
 check(!here.includes(DBType.MISSILE), 'the missile is gone');
 
 finish();

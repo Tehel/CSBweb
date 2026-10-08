@@ -6,14 +6,14 @@
  *
  * Two things are pinned here, and only one of them can be pinned by a round trip.
  *
- * **The fields.** `GAMEBLOCK2` (`doc/CSBwin-src/SaveGame.cpp:107-133`) carries
+ * **The fields.** `GAMEBLOCK2` (`doc/CSBwin-src/SaveGame.cpp:108-134`) carries
  * `handChar` at offset 20 and `MagicCaster` at 22, which `LoadGame` assigns straight to
- * `d.HandChar` and `d.MagicCaster` (`:1636-1637`). `parseBlock2` used to read only
+ * `d.HandChar` and `d.MagicCaster` (`:1760-1761`). `parseBlock2` used to read only
  * `maxTimers` and `maxItem16`, so a cursor owner restored from a binary save was
  * whatever `ensureHandOwner` guessed.
  *
  * **The byte order.** This is the part a round trip cannot see. The blocks are
- * big-endian (`doc/CSBwin-src/CSBCode.cpp:9057` reads every word through `LE16`, which
+ * big-endian (`doc/CSBwin-src/CSBCode.cpp:9162` reads every word through `LE16`, which
  * is a swap on the little-endian build CSBWin ships as); this port used to read and
  * write them little-endian. Reader and writer agreed, every checksum matched, and
  * `saveSaveGameState` → `loadSaveGameState` round-tripped perfectly — in a format no

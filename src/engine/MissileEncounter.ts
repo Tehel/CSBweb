@@ -1,17 +1,17 @@
 /**
  * `MissileEncounter` — a missile meeting something: `ProcessMissileEncounter`
- * (`doc/CSBwin-src/Code11f52.cpp:1711`) with `MissileEncounterFilter` (`:1626`), and its
- * other entry point, `CheckMoveFromMissile` (`:2530`), for a party or a monster that walks
+ * (`doc/CSBwin-src/Code11f52.cpp:1746`) with `MissileEncounterFilter` (`:1661`), and its
+ * other entry point, `CheckMoveFromMissile` (`:2565`), for a party or a monster that walks
  * into a missile. With them is what an encounter sets off, which `Code11f52.cpp` keeps
- * beside them: `CreateCloud` (`:1376`), `CreateFluxcage` (`:1515`), `HitDoor` (`:2263`) and
- * `DetermineMagicDamage` (`:1557`).
+ * beside them: `CreateCloud` (`:1411`), `CreateFluxcage` (`:1550`), `HitDoor` (`:2298`) and
+ * `DetermineMagicDamage` (`:1592`).
  *
  * The flight is `TimerSystem`'s, as `Timer.cpp` is: `MissileTimer` calls the encounter,
  * and the encounter spends a missile through `ProcessObjectFromMissile` (`Timer.cpp:129`).
  * The port's copy of `d.Time` stays there too, reached through `ctx.systems.timer`, and
  * `missileFilterObject` / `missileFilterTimer` (`Timer.cpp:176-177`) are the timer queue's,
  * whose `getTimer` answers the copy as `GameTimers::pTimer` does. `d.MonsterDamageResult`
- * (`Data.h:851`) is here, where three of its four writers are; the fourth,
+ * (`Data.h:866`) is here, where three of its four writers are; the fourth,
  * `CheckMonsterVersusMissiles`, is `MonsterAI`'s.
  */
 import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
@@ -47,10 +47,10 @@ const WEAPON_THROWING_STAR = 32;
 
 /**
  * The wound mask a missile carries, a literal at `DamageCharacter(objectPos, D5W, 12,
- * …)` (`doc/CSBwin-src/Code11f52.cpp:2046`). Bits 2 and 3 are the torso and the legs.
+ * …)` (`doc/CSBwin-src/Code11f52.cpp:2081`). Bits 2 and 3 are the torso and the legs.
  *
  * (The champion *wound sound*, ordinal `chIdx + 9`, belongs to the monster's melee
- * attack — `doc/CSBwin-src/Monster.cpp:4584`, ported in `MonsterAttack`. A missile
+ * attack — `doc/CSBwin-src/Monster.cpp:4597`, ported in `MonsterAttack`. A missile
  * strike queues no sound of its own.)
  */
 const MISSILE_WOUND_MASK = 12;
@@ -72,7 +72,7 @@ export class MissileEncounter {
    * CSBWin keeps this in globals because `CheckMoveFromMissile` needs to know whether
    * the encounter it just resolved wiped out the whole group, and the call chain
    * between them does not carry a return value
-   * (`doc/CSBwin-src/Code11f52.cpp:2742`).
+   * (`doc/CSBwin-src/Code11f52.cpp:2777`).
    */
   monsterDamageResult: MonsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
 
@@ -102,7 +102,7 @@ export class MissileEncounter {
     if (movedObject === null) {
       for (const champion of party.champions) {
         // `CharacterAtPosition`, which skips a champion whose `HP()` is 0
-        // (`doc/CSBwin-src/Code11f52.cpp:2566`, `:4064`).
+        // (`doc/CSBwin-src/Code11f52.cpp:2601`, `:4102`).
         if ((champion.attributes.health | 0) === 0) continue;
         const pos = champion.partyPosition & 0x3;
         whoLeavesCell[pos] = (pos + 1) & 0xff;
@@ -183,7 +183,7 @@ export class MissileEncounter {
             this.timers.deleteTimer(missile.timerIndex);
             if (this.groupWasWipedOut()) {
               // The whole group died to the missile, so the thing being moved no
-              // longer exists (doc/CSBwin-src/Code11f52.cpp:2740-2746).
+              // longer exists (doc/CSBwin-src/Code11f52.cpp:2775-2781).
               this.movedObjectWasDestroyed = true;
               return;
             }
@@ -209,7 +209,7 @@ export class MissileEncounter {
 
   /**
    * `CheckMoveFromMissile` for the party leaving a square. Its `return 1` reads the
-   * global `d.MonsterDamageResult` for the party too (`Code11f52.cpp:2743`), so it
+   * global `d.MonsterDamageResult` for the party too (`Code11f52.cpp:2778`), so it
    * answers true when a missile the party met wiped out a group on the way.
    */
   checkPartyMoveFromMissile(from: Position, to: Position | null): boolean {
@@ -227,8 +227,8 @@ export class MissileEncounter {
   }
 
   /**
-   * `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1711`). CSBWin works on
-   * `d.LoadedLevel` (`missileLocr.l = d.LoadedLevel`, `:1765`, and every map lookup after
+   * `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1746`). CSBWin works on
+   * `d.LoadedLevel` (`missileLocr.l = d.LoadedLevel`, `:1800`, and every map lookup after
    * it), which this takes as `level`: the missile timer's level, the level of the move
    * `checkMoveFromMissile` checks, or the level of the monster whose turn it is.
    */
@@ -247,10 +247,10 @@ export class MissileEncounter {
     if (!missile) return false;
     const position = new Position(missileX, missileY, level);
     const filterProjectile = (missile.projectileObject & 0xffff) as ObjectID;
-    // `d.MonsterDamageResult = NO_MONSTER_DIED;` (`doc/CSBwin-src/Code11f52.cpp:1770`).
+    // `d.MonsterDamageResult = NO_MONSTER_DIED;` (`doc/CSBwin-src/Code11f52.cpp:1805`).
     this.monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
     // `RNprojectile` stays the potion all through the switch below: a Ven or Ful potion
-    // becomes its cloud (`obj_26`) only in the shared tail (`:2060-2063`), so the blow it
+    // becomes its cloud (`obj_26`) only in the shared tail (`:2095-2098`), so the blow it
     // lands first — on a champion, a monster or a door — is a thrown object's.
     const projectile = (missile.projectileObject & 0xffff) as ObjectID;
     const projectileDbType = isMagicSpellRn(projectile)
@@ -299,7 +299,7 @@ export class MissileEncounter {
         this.missileEncounterFilter(6, position, objectPos, missileRn, filterProjectile, -1);
         break;
       case RoomType.DOOR: {
-        // `doc/CSBwin-src/Code11f52.cpp:1844-1935`.
+        // `doc/CSBwin-src/Code11f52.cpp:1879-1970`.
         const map = this.dungeon.getMap(position.z);
         if (!map) return false;
         const cellFlag = map.cellFlags[objX]?.[objY] ?? 0;
@@ -344,7 +344,7 @@ export class MissileEncounter {
       }
       case -2: {
         // `objectPos = CharacterAtPosition(objectPos); if (objectPos < 0) return 0;`
-        // (`doc/CSBwin-src/Code11f52.cpp:1948-1952`). The corner the missile arrived at
+        // (`doc/CSBwin-src/Code11f52.cpp:1983-1987`). The corner the missile arrived at
         // names the champion, and an empty one — or one holding only a corpse, since
         // `CharacterAtPosition` skips the dead — lets the missile fly on. From here on
         // `objectPos` *is* a champion index, including in the filter call below.
@@ -355,7 +355,7 @@ export class MissileEncounter {
         }
         // `D5W = DetermineMagicDamage(pDBmissile, RNprojectile); D4W = D5W;` — the
         // party is the only arm that sets `D4W`, which is what makes the shared tail
-        // at `:2044` a party-only `DamageCharacter`.
+        // at `:2079` a party-only `DamageCharacter`.
         const magic = this.determineMagicDamage(missile, projectile);
         if (magic.damage !== 0) {
           this.applyMissileDamageToParty({
@@ -370,7 +370,7 @@ export class MissileEncounter {
         return this.finishMissileEncounter(missileRn, missile, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY, mmr);
       }
       case -1: {
-        // The monster arm (`doc/CSBwin-src/Code11f52.cpp:1960-2042`).
+        // The monster arm (`doc/CSBwin-src/Code11f52.cpp:1995-2077`).
         const monsterRn = this.dungeon.findFirstMonster(position);
         if (monsterRn === OBJECT_ID_EOF) return false;
         const monster = this.dungeon.getCreatureRecord(monsterRn);
@@ -390,7 +390,7 @@ export class MissileEncounter {
         if (!desc) return false;
 
         // A fireball feeds a Black Flame: `hitPoints6 = Smaller(1000, hp + magic)`, and
-        // the missile is simply gone — no damage, no sound, no explosion (`:1976-1996`).
+        // the missile is simply gone — no damage, no sound, no explosion (`:2011-2031`).
         // CSBWin's potion bookkeeping in this branch is unreachable: `RNprojectile` is
         // the potion itself, never `RNFireball`, while a bomb is in flight.
         if (projectile === RN_FIREBALL && monsterType === MonsterType.mon_BlackFlame) {
@@ -403,7 +403,7 @@ export class MissileEncounter {
         if (monsterNonMaterial(desc) && projectile !== RN_DISPELL_MISSILE) return false;
 
         // `D0L = 64 * (DetermineMagicDamage(...) & 0xffff); D5W = (D0L & 0xffff) / D1W`,
-        // with `D1W = defense08`, 0 read as 1 (`:2006-2012`). A blow that rounds to 0
+        // with `D1W = defense08`, 0 read as 1 (`:2041-2047`). A blow that rounds to 0
         // skips `DamageMonster` but the missile still lands.
         const magic = this.determineMagicDamage(missile, projectile);
         const defense = desc.defense08 === 0 ? 1 : desc.defense08;
@@ -427,7 +427,7 @@ export class MissileEncounter {
           }
           this.monsterDamageResult = result;
           // A dagger, arrow, slayer, poison dart or throwing star sticks in a monster
-          // that absorbs them — but only if nobody died of the blow (`:2031-2042`).
+          // that absorbs them — but only if nobody died of the blow (`:2066-2077`).
           if (
             !nonPoisonSpell &&
             result === MonsterDamageResult.NO_MONSTER_DIED &&
@@ -463,7 +463,7 @@ export class MissileEncounter {
     projectile: ObjectID,
     index: number,
   ): number {
-    // `BITS10_11(missileFilterTimer.timerWord8())` (`doc/CSBwin-src/Code11f52.cpp:1681`): the
+    // `BITS10_11(missileFilterTimer.timerWord8())` (`doc/CSBwin-src/Code11f52.cpp:1716`): the
     // direction of the last missile `MissileTimer` ran, also for an encounter it did not
     // cause, a party or a monster walking away from a missile.
     const direction = ((this.timers.missileFilterTimer?.timerWord8 ?? 0) >> 10) & 0x3;
@@ -496,7 +496,7 @@ export class MissileEncounter {
 
   /**
    * The tail of `ProcessMissileEncounter`'s party arm
-   * (`doc/CSBwin-src/Code11f52.cpp:2044-2056`):
+   * (`doc/CSBwin-src/Code11f52.cpp:2079-2091`):
    *
    * ```cpp
    * if (D4W != 0) {
@@ -523,7 +523,7 @@ export class MissileEncounter {
     poisonStrength: number;
   }): void {
     // No `d.LastMonsterAttackTime` here: only `MonsterAttacks` sets it
-    // (`doc/CSBwin-src/Monster.cpp:982`), and this port does so in `MonsterAttack`.
+    // (`doc/CSBwin-src/Monster.cpp:986`), and this port does so in `MonsterAttack`.
     const dealt = this.ctx.systems.monsterAttack.damageCharacter(
       options.chIdx,
       options.damage | 0,
@@ -551,7 +551,7 @@ export class MissileEncounter {
     objY: number,
     mmr: MmRecord | undefined,
   ): boolean {
-    // `pDBmissile`, read before the switch (`doc/CSBwin-src/Code11f52.cpp:1761`): a
+    // `pDBmissile`, read before the switch (`doc/CSBwin-src/Code11f52.cpp:1796`): a
     // filter can delete the missile meanwhile, and the tail goes on with its record.
     const dest: MissileDropTarget = destMonster !== null ? { monster: destMonster } : null;
 
@@ -581,7 +581,7 @@ export class MissileEncounter {
 
   /**
    * The tail of `ProcessMissileEncounter`'s shared ending (`doc/CSBwin-src/
-   * Code11f52.cpp:2101-2121`) — the sound for a plain object's impact, when nothing
+   * Code11f52.cpp:2136-2156`) — the sound for a plain object's impact, when nothing
    * spawned a cloud. These `soundNum` values are **ordinals** into `d.sound1772`
    * (`graphic232`'s sound table), not raw SND item numbers — `queueSound` is what
    * resolves an ordinal to the actual sample and its distance falloff. A `SoundIndex`
@@ -601,7 +601,7 @@ export class MissileEncounter {
   }
 
   /**
-   * `CreateCloud`'s own sound (`doc/CSBwin-src/Code11f52.cpp:1432-1447`) —
+   * `CreateCloud`'s own sound (`doc/CSBwin-src/Code11f52.cpp:1467-1482`) —
    * `QueueSound(size>80 ? 5 : 20, missileX, missileY, 1)` for a fireball, poison
    * bolt or lightning bolt, `QueueSound(13, ...)` for anything else (skipping a
    * monster-death cloud, which is silent). Ordinals 5 and 20 both resolve to the
@@ -620,7 +620,7 @@ export class MissileEncounter {
 
   /**
    * Public entry to `CreateCloud` for the monster death cloud
-   * (`doc/CSBwin-src/Code11f52.cpp:1376`, called from `DamageMonster`). The cloud
+   * (`doc/CSBwin-src/Code11f52.cpp:1411`, called from `DamageMonster`). The cloud
    * machinery lives here because that is where every other cloud is made.
    */
   createDeathCloud(projectile: ObjectID, size: number, position: Position, posInCell: number, mmr?: MmRecord): void {
@@ -628,7 +628,7 @@ export class MissileEncounter {
   }
 
   /**
-   * `CreateFluxcage` (`doc/CSBwin-src/Code11f52.cpp:1515`).
+   * `CreateFluxcage` (`doc/CSBwin-src/Code11f52.cpp:1550`).
    *
    * Not `CreateCloud`: a Fluxcage gets no `TT_25` life of its own — it never shrinks
    * and does no damage — only a single `TT_24` that removes it after 100 ticks. It
@@ -655,7 +655,7 @@ export class MissileEncounter {
   }
 
   /**
-   * `CreateCloud` / `TAG00dea8` (`doc/CSBwin-src/Code11f52.cpp:1376`).
+   * `CreateCloud` / `TAG00dea8` (`doc/CSBwin-src/Code11f52.cpp:1411`).
    *
    * The cloud is a DB15 record in the cell plus a `TT_25` timer that gives it its
    * life. Without the timer the record would sit in the cell at full size for the rest
@@ -674,7 +674,7 @@ export class MissileEncounter {
     mmr?: MmRecord,
   ): void {
     if (objX < 0 || objY < 0) return;
-    // `P1.GetSpellType()` (doc/CSBwin-src/Code11f52.cpp:1428).
+    // `P1.GetSpellType()` (doc/CSBwin-src/Code11f52.cpp:1463).
     const rn = this.createCloudRecord(projectile & 0x7f, size, posInCell);
     if (rn === null) return;
     this.playCloudSound(projectile, size, position);
@@ -726,7 +726,7 @@ export class MissileEncounter {
 
   private createCloudRecord(cloudType: number, size: number, posInCell: number): ObjectID | null {
     const bit7 = (posInCell & 0xff) === 255;
-    // `FindEmptyDB15Entry` (`doc/CSBwin-src/CSBCode.cpp:5073`).
+    // `FindEmptyDB15Entry` (`doc/CSBwin-src/CSBCode.cpp:5138`).
     const rn = this.dungeon.findEmptyDBEntry('clouds', {
       nextObject: OBJECT_ID_EOF,
       value: size & 0xff,
@@ -737,7 +737,7 @@ export class MissileEncounter {
   }
 
   /**
-   * `HitDoor` (`doc/CSBwin-src/Code11f52.cpp:2263`) — a blow that may burst a door open.
+   * `HitDoor` (`doc/CSBwin-src/Code11f52.cpp:2298`) — a blow that may burst a door open.
    *
    * `explosion` picks which of the door's two "destructible by" flags is consulted:
    * a fireball's blast tests `canOpenWithFireball`, an axe blow `canOpenWithAxe`. The
@@ -772,7 +772,7 @@ export class MissileEncounter {
   }
 
   /**
-   * `DetermineMagicDamage` (`doc/CSBwin-src/Code11f52.cpp:1557`) — how hard a missile
+   * `DetermineMagicDamage` (`doc/CSBwin-src/Code11f52.cpp:1592`) — how hard a missile
    * lands, and the two globals that go with it.
    *
    * CSBWin returns the damage and leaves `d.Word12962` (a poison strength) and

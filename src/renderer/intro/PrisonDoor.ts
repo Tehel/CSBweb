@@ -1,7 +1,7 @@
 /**
- * The dungeon entrance — `_TAG01f746`, `doc/CSBwin-src/CSBCode.cpp:9459` — with the screen
- * it draws (`_TAG01f5ea`, `:9545`), the door-opening animation (`_OpenPrisonDoors`,
- * `:9379`) and the credits scroll behind the hidden button (`_TAG01f928`, `:9629`).
+ * The dungeon entrance — `_TAG01f746`, `doc/CSBwin-src/CSBCode.cpp:9577` — with the screen
+ * it draws (`_TAG01f5ea`, `:9667`), the door-opening animation (`_OpenPrisonDoors`,
+ * `:9485`) and the credits scroll behind the hidden button (`_TAG01f928`, `:9753`).
  *
  * The screen is `graphics.dat` item 4, a full 320x200 painting of the prison front with the
  * two labels and the little scroll already engraved into it — none of that is text drawn at
@@ -11,7 +11,7 @@
  * the doors is the dungeon renderer, and when the doors slide apart you are looking at a
  * genuinely drawn corridor.
  *
- * Three buttons, from `d.Buttons16932` (`:9474`): 200 enters, 201 resumes a saved game,
+ * Three buttons, from `d.Buttons16932` (`:9592`): 200 enters, 201 resumes a saved game,
  * 202 is the scroll. Full spec, geometry and citations:
  * `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`. A data set with a `mini.dat` has a fourth, the
  * port's own: RISE (`RISE_BUTTON`).
@@ -38,7 +38,7 @@ const GRAPHIC_CREDITS = 5;      // d.Pointer22960 — the scroll
 const GRAPHIC_SOUND_LATCH = 534;// d.Pointer22968 — the click as the doors unlock
 const GRAPHIC_SOUND_DOORS = 535;// d.Pointer22964 — the grind as they slide
 
-/** `StartSound(…, 112, 1)` (`:9536`) and `StartSound(…, 145, 1)` (`:9399`). */
+/** `StartSound(…, 112, 1)` (`:9658`) and `StartSound(…, 145, 1)` (`:9509`). */
 const TIMER_DATA_LATCH = 112;
 const TIMER_DATA_DOORS = 145;
 
@@ -50,7 +50,7 @@ const GAMESTATE_202 = 202;
 /** The port's own, for RISE: no `d.gameState` of CSBWin's. */
 const GAMESTATE_RISE = 203;
 
-/** The eight 128x161 door buffers `_TAG01f746` pre-shifts (`:9478-9517`). */
+/** The eight 128x161 door buffers `_TAG01f746` pre-shifts (`:9596-9639`). */
 export const DOOR_SLOT_WIDTH = 128;
 export const DOOR_SLOT_HEIGHT = 161;
 /** `d.Pointer22920` / `d.Pointer22916`, 20608 bytes = 256x161 at one byte per pixel. */
@@ -58,13 +58,13 @@ export const INTERIOR_WIDTH = 256;
 export const INTERIOR_HEIGHT = 161;
 /** The `Word84` save starts at screen row 30, and the animation writes back to the same. */
 export const INTERIOR_SCREEN_Y = 30;
-/** Only 232 of the 256 columns ever reach the screen — the `112 + 4*2` bytes at `:9439`. */
+/** Only 232 of the 256 columns ever reach the screen — the `112 + 4*2` bytes at `:9557`. */
 export const INTERIOR_VISIBLE_WIDTH = 232;
-/** `for (D7W = 1; D7W != 32; D7W++)` (`:9392`). */
+/** `for (D7W = 1; D7W != 32; D7W++)` (`:9501`). */
 export const DOOR_STEPS = 31;
-/** `for (i=0; i<6; i++) { CheckSoundQueue(); wvbl(_1_); }` (`:9432`). */
+/** `for (i=0; i<6; i++) { CheckSoundQueue(); wvbl(_1_); }` (`:9550`). */
 const DOOR_STEP_VBLS = 6;
-/** `VBLDelay(_3_, 20)` between the latch click and the doors moving (`:9537`). */
+/** `VBLDelay(_3_, 20)` between the latch click and the doors moving (`:9659`). */
 const LATCH_TO_DOORS_VBLS = 20;
 
 /**
@@ -72,7 +72,7 @@ const LATCH_TO_DOORS_VBLS = 20;
  *
  * `ReadTablesFromGraphicsFile` asserts item 0x231 is 0x804 or 0x7d4 bytes and, when it is
  * the short one, overwrites the list with these four entries
- * (`doc/CSBwin-src/CSBCode.cpp:10135-10157`). DM's is the short one, and CSB's the long one,
+ * (`doc/CSBwin-src/CSBCode.cpp:10259-10281`). DM's is the short one, and CSB's the long one,
  * whose four are these, word for word (`tools/dump-data-sets.ts`).
  */
 export const MISSING_PRISON_DOOR_BUTTONS: UIButton[] = [
@@ -82,7 +82,7 @@ export const MISSING_PRISON_DOOR_BUTTONS: UIButton[] = [
   { word0: 0, x1: 0, x2: 0, y1: 0, y2: 0, button: 0, name: 'end' },
 ];
 
-/** What the player chose. `_GameSetup` reads it as `d.gameState` (`:10626-10641`). */
+/** What the player chose. `_GameSetup` reads it as `d.gameState` (`:10750-10765`). */
 export type PrisonDoorChoice = 'enter' | 'resume' | 'rise';
 
 /* ------------------------------------------------------------------- RISE ---- */
@@ -182,7 +182,7 @@ export interface PrisonDoorAssets {
 }
 
 /**
- * `:9478-9517`. The eight buffers exist so the animation only ever blits whole 16-pixel
+ * `:9596-9639`. The eight buffers exist so the animation only ever blits whole 16-pixel
  * words: the `D7W & 3` slot supplies the sub-word shift and the source x offset supplies
  * the rest.
  */
@@ -215,7 +215,7 @@ export function loadAssets(host: IntroHost, rise = false): PrisonDoorAssets {
 }
 
 /**
- * `_TAG01f5ea` (`:9545`) — fade out, paint the entrance, draw the corridor through it,
+ * `_TAG01f5ea` (`:9667`) — fade out, paint the entrance, draw the corridor through it,
  * shut the doors over the opening, fade in.
  *
  * The corridor is the expensive half and it is what makes this screen worth porting
@@ -227,20 +227,20 @@ export async function drawPrisonDoor(host: IntroHost, assets: PrisonDoorAssets):
 
   await fadeToPalette(host, PALETTE_11914);
 
-  // "Entrance to prison without door." (`:9582`)
+  // "Entrance to prison without door." (`:9704`)
   tag0088b2Index(assets.entrance, host.screen, { x1: 0, x2: SCREEN_WIDTH - 1, y1: 0, y2: SCREEN_HEIGHT - 1, srcX: 0, srcY: 0, srcStride: assets.entrance.width }, -1);
 
-  // `DrawViewport(2, 2, 0)` and the VBL copy `MarkViewportUpdated(0)` forces (`:9583`,
-  // `doc/CSBwin-src/Viewport.cpp:7169`).
+  // `DrawViewport(2, 2, 0)` and the VBL copy `MarkViewportUpdated(0)` forces (`:9705`,
+  // `doc/CSBwin-src/Viewport.cpp:7176`).
   const viewport = host.drawPrisonInterior();
   assets.viewport = viewport;
   tag0088b2Index(viewport, host.screen, { x1: VIEWPORT_X, x2: VIEWPORT_X + viewport.width - 1, y1: VIEWPORT_Y, y2: VIEWPORT_Y + viewport.height - 1, srcX: 0, srcY: 0, srcStride: viewport.width }, -1);
 
-  // "Save interior prison entrance" (`:9588`) — screen rows 30..190 into the 256-wide
+  // "Save interior prison entrance" (`:9710`) — screen rows 30..190 into the 256-wide
   // working buffer the door animation restores from every frame.
   tag0088b2Index(host.screen, assets.interior, { ...rects.word84, srcX: 0, srcY: INTERIOR_SCREEN_Y, srcStride: host.screen.width }, -1);
 
-  // The two halves, shut. (`:9595`, `:9598`)
+  // The two halves, shut. (`:9717`, `:9720`)
   tag0088b2Index(assets.slots[0], host.screen, { ...rects.word92, srcX: 0, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
   tag0088b2Index(assets.slots[4], host.screen, { ...rects.word100, srcX: 0, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
 
@@ -248,7 +248,7 @@ export async function drawPrisonDoor(host: IntroHost, assets: PrisonDoorAssets):
 }
 
 /**
- * `_TAG01f928` (`:9629`) — the scroll at the bottom right. A still picture and a wait.
+ * `_TAG01f928` (`:9753`) — the scroll at the bottom right. A still picture and a wait.
  *
  * CSBWin's wait is `do { wvbl(); if (--LOCAL_2 == 0) break; if (d.MouseSwitches) break; }
  * while (UI_CONSTAT()==0)`, where `LOCAL_2` is a function-static initialised to zero and
@@ -260,7 +260,7 @@ export async function drawPrisonDoor(host: IntroHost, assets: PrisonDoorAssets):
  */
 export async function showCreditsScroll(host: IntroHost, assets: PrisonDoorAssets): Promise<void> {
   const rects = host.uiTables.graphic232;
-  host.setCursorVisible(false);         // `STHideCursor(HC34)` (`:9638`)
+  host.setCursorVisible(false);         // `STHideCursor(HC34)` (`:9762`)
   await fadeToPalette(host, PALETTE_11914);
   tag0088b2Index(assets.credits, host.screen, { x1: 0, x2: SCREEN_WIDTH - 1, y1: 0, y2: SCREEN_HEIGHT - 1, srcX: 0, srcY: 0, srcStride: assets.credits.width }, -1);
   await fadeToPalette(host, rects.palette328);
@@ -268,7 +268,7 @@ export async function showCreditsScroll(host: IntroHost, assets: PrisonDoorAsset
 }
 
 /**
- * `_OpenPrisonDoors` (`:9379`) — thirty-one frames, six vertical blanks each, the doors
+ * `_OpenPrisonDoors` (`:9485`) — thirty-one frames, six vertical blanks each, the doors
  * sliding four pixels apart per frame and the grind restarting every third one.
  *
  * Each frame is composed in a 256-pixel-wide working buffer: the pristine interior, then
@@ -291,7 +291,7 @@ export async function openPrisonDoors(host: IntroHost, assets: PrisonDoorAssets)
       host.startSound(GRAPHIC_SOUND_DOORS, timerDataToRateIndex(TIMER_DATA_DOORS));
     }
 
-    work.pixels.set(assets.interior.pixels);       // `MemMove(22920 -> 22916)` (`:9403`)
+    work.pixels.set(assets.interior.pixels);       // `MemMove(22920 -> 22916)` (`:9515`)
     if (assets.viewport) {
       tag0088b2Index(assets.viewport, work, { ...rects.word60, srcX: 0, srcY: 0, srcStride: assets.viewport.width }, -1);
     }
@@ -331,12 +331,12 @@ export async function openPrisonDoors(host: IntroHost, assets: PrisonDoorAssets)
  * `_TAG01f746`'s two nested loops: the inner one polls the mouse while `d.gameState` is
  * `GAMESTATE_AtPrisonDoor`, the outer one redraws the whole screen whenever the credits
  * scroll set `GAMESTATE_202` on its way out. The latch click and the twenty-blank pause
- * happen either way; the doors only open on a fresh game (`:9539`).
+ * happen either way; the doors only open on a fresh game (`:9661`).
  *
- * `DiskMenuNeeded` is not ported here. CSBWin checks it in this loop (`:9532`) so the disk
+ * `DiskMenuNeeded` is not ported here. CSBWin checks it in this loop (`:9654`) so the disk
  * icon can raise the save menu from the entrance, but that flag can only be set by button
  * 140, which is not in `d.Buttons16932` and additionally demands `d.NumCharacter > 0`
- * (`doc/CSBwin-src/Mouse.cpp:1713-1728`). It is unreachable from this screen.
+ * (`doc/CSBwin-src/Mouse.cpp:1852-1867`). It is unreachable from this screen.
  */
 export async function showPrisonDoor(
   host: IntroHost,
@@ -350,7 +350,7 @@ export async function showPrisonDoor(
 
   do {
     await drawPrisonDoor(host, assets);
-    host.setCursorVisible(true);        // `STShowCursor(HC50)` (`:9521`)
+    host.setCursorVisible(true);        // `STShowCursor(HC50)` (`:9643`)
     host.discardAllInput();
     gameState = GAMESTATE_AT_PRISON_DOOR;
 
@@ -358,7 +358,7 @@ export async function showPrisonDoor(
       const event = await host.nextEvent();
       if (event.kind !== 'click') continue;
       const id = searchButtonList(list, event.x, event.y, event.buttons);
-      // `doc/CSBwin-src/Mouse.cpp:1774-1791`.
+      // `doc/CSBwin-src/Mouse.cpp:1913-1930`.
       if (id === 200) gameState = GAMESTATE_ENTER_PRISON;
       else if (id === 201) gameState = GAMESTATE_RESUME_SAVED_GAME;
       else if (id === RISE_BUTTON_ID) gameState = GAMESTATE_RISE;
@@ -371,7 +371,7 @@ export async function showPrisonDoor(
 
   host.startSound(GRAPHIC_SOUND_LATCH, timerDataToRateIndex(TIMER_DATA_LATCH));
   await host.vbl(LATCH_TO_DOORS_VBLS);
-  host.setCursorVisible(false);         // `STHideCursor(HC33)` (`:9538`)
+  host.setCursorVisible(false);         // `STHideCursor(HC33)` (`:9660`)
 
   // RISE goes on as RESUME does: it ends in a save read, through the doors still shut.
   const choice: PrisonDoorChoice = gameState === GAMESTATE_RESUME_SAVED_GAME ? 'resume'
@@ -379,7 +379,7 @@ export async function showPrisonDoor(
   if (choice === 'enter') await openPrisonDoors(host, assets);
 
   // `_GameSetup`'s `for (;;) { ReadEntireGame(); if (i16Result == 1) break; TAG01f746(); }`
-  // (`:10634-10641`): `dungeon.dat` or the chosen save. A read that fails, or a load
+  // (`:10758-10765`): `dungeon.dat` or the chosen save. A read that fails, or a load
   // that is cancelled, puts the entrance back up.
   if (await readEntireGame(choice)) return choice;
   return showPrisonDoor(host, buttons, readEntireGame, rise);

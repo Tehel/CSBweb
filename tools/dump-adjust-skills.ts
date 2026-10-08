@@ -1,16 +1,16 @@
 /**
- * `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:185`) is one function for every caller: each
- * one runs the Adjust Skills Filter DSA (`:252-311`), and a mastery gained calls `LevelUp`,
+ * `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:188`) is one function for every caller: each
+ * one runs the Adjust Skills Filter DSA (`:255-314`), and a mastery gained calls `LevelUp`,
  * which prints "<NAME> JUST GAINED A <SKILL> LEVEL" in the champion's colour
- * (`:172-176`). `DetermineMastery` reports 1 while the party sleeps
+ * (`:175-179`). `DetermineMastery` reports 1 while the party sleeps
  * (`doc/CSBwin-src/Code17818.cpp:28-35`), so a sleeping champion never levels up.
  *
  * The case that tells them apart is a monster's blow (`MonsterDamagesCharacter`,
- * `doc/CSBwin-src/Monster.cpp:4535`), which trains the Fighter's defence skill 7: it must
+ * `doc/CSBwin-src/Monster.cpp:4548`), which trains the Fighter's defence skill 7: it must
  * go through the filter and announce the level like any other caller.
  *
  * A filter may answer another champion or skill, but CSBWin has already taken the
- * champion, the skill it credits and the old mastery (`Magic.cpp:233-250`): only the basic
+ * champion, the skill it credits and the old mastery (`Magic.cpp:236-253`): only the basic
  * skill's `skillNumber >= 4` test, the new mastery and `LevelUp` see the answer.
  *
  *   npx tsx tools/dump-adjust-skills.ts
@@ -107,7 +107,7 @@ if (monster && blowType >= 0) {
   check(filtered.join() === String(AdjustSkillsWhy.MonsterDamagesCharacter),
     'the blow runs the Adjust Skills Filter once, with ASW_MonsterDamagesCharacter');
   check(announced() === levelLine, `LevelUp announces "${levelLine}"`);
-  check(printed[0] === '\n', 'after a linefeed (Magic.cpp:172)');
+  check(printed[0] === '\n', 'after a linefeed (Magic.cpp:175)');
   check(colours.length === 4 && colours.every((c) => c === ctx.tables.byte1386[0]),
     'in the champion\'s own colour, d.Byte1386[0]');
 }
@@ -132,7 +132,7 @@ for (const sleeping of [false, true]) {
 }
 
 // --- a filter that retargets: the experience stays where `psA3` and `pcA2` point ---
-// (`Magic.cpp:233-250` before the filter, `:304-305` its answer, `:332`/`:341`/`:354` after.)
+// (`Magic.cpp:236-253` before the filter, `:307-308` its answer, `:335`/`:344`/`:357` after.)
 game.systems.hallOfChampions.addChampion(champion(1));
 const skillsOf = (i: number): number[] => party.champions[i].skills.map((s) => s.experience);
 const retarget = (answer: { chIdx: number; skillNumber: number }, champ1Fighter: number): ReturnType<typeof adjustSkills> => {

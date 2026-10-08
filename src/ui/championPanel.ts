@@ -24,7 +24,7 @@ const PARTY_SIZE = 4;
 /** How long, in game ticks, a cell stays highlighted after its value changed. */
 const FLASH_TICKS = 12;
 
-/** `#define Luck 0 … #define AntiFire 6` (`doc/CSBwin-src/CSB.h:628-634`). */
+/** `#define Luck 0 … #define AntiFire 6` (`doc/CSBwin-src/CSB.h:631-637`). */
 const ATTRIBUTE_NAMES = ['Luck', 'Strength', 'Dexterity', 'Wisdom', 'Vitality', 'Anti-magic', 'Anti-fire'];
 const BASE_SKILL_NAMES = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const SUBSKILL_NAMES = [
@@ -232,7 +232,7 @@ function skillRow(skill: number): RowDef {
 
 /**
  * The three factors `AdjustSkills` applies to every gain, as they stand this tick
- * (`doc/CSBwin-src/Magic.cpp:200-260`, see `doc/TRAINING.md`).
+ * (`doc/CSBwin-src/Magic.cpp:203-263`, see `doc/TRAINING.md`).
  */
 function describeTrainingContext(): string {
     const ctx = getUIContext();

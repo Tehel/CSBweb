@@ -17,7 +17,7 @@
  *     #549 (value 0: every input bit clear matches) fires its local action 1 with its
  *     own square as the switch's (`doc/CSBwin-src/Timer.cpp:2331-2346`), and the
  *     `RotateActuatorList` that ends `ProcessTT_STONEROOM` (`:2382`,
- *     `doc/CSBwin-src/Code11f52.cpp:3465-3525`) moves #550 behind it. The face then shows
+ *     `doc/CSBwin-src/Code11f52.cpp:3500-3560`) moves #550 behind it. The face then shows
  *     #550's ornament, an alcove. The port handed the local action the bits of #549's
  *     `localActionType` read as a target square, and never rotated after a stone timer.
  *

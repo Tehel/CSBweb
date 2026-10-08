@@ -1,7 +1,7 @@
 /**
  * Eating and drinking: what every potion is worth, and what applying it does.
  *
- * `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4020-4497`) is two halves that never
+ * `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4037-4514`) is two halves that never
  * touch: it derives a `FEEDPARAMETERS` block from the object on the cursor, then
  * applies the block. This drives both halves against the **real potion records in
  * `dungeon.dat`**, so the strengths in the table below are the ones the shipped dungeon

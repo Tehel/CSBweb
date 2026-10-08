@@ -1,14 +1,14 @@
 /**
  * `&DEL` in a DSA defers its deletes to the end of the run (`doc/CSBwin-src/DSA.cpp`).
  *
- *  1. `EX_DEL` does not free anything: `DSADBANK::DeleteObject` (`:157-163`) pushes the
+ *  1. `EX_DEL` does not free anything: `DSADBANK::DeleteObject` (`:158-164`) pushes the
  *     record on `m_objectDeleteList` through its own link, so the record is still
  *     allocated for the rest of the run. The port called `deleteDBEntry` at once.
- *  2. `ConsumateDeletes` (`:178-191`), after `PutState` (`:5483`), frees the lot and
+ *  2. `ConsumateDeletes` (`:179-192`), after `PutState` (`:5484`), frees the lot and
  *     reports whether the DSA's own actuator was among it; `ProcessDSATimer6` returns
- *     that (`:5486`), and the timer walks that ran it stop walking the cell's chain
+ *     that (`:5487`), and the timer walks that ran it stop walking the cell's chain
  *     (`Timer.cpp:1433`, `:1757`, `:2230`). The port always returned false.
- *  3. A scroll takes its text with it, the text condemned first (`DSA.cpp:1715-1722`).
+ *  3. A scroll takes its text with it, the text condemned first (`DSA.cpp:1716-1723`).
  *
  * No dungeon this project loads defines a DSA, so the tool builds one: a single state
  * whose column-0 program is `LOAD objId, LOAD location, &DEL`.

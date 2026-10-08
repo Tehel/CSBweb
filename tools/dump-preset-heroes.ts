@@ -1,6 +1,6 @@
 /**
  * The heroes behind every data set's mirrors, read as `AddCharacter` reads them
- * (`doc/CSBwin-src/Character.cpp:535-701`): the first `dbTEXT` in the cell the mirror faces,
+ * (`doc/CSBwin-src/Character.cpp:536-702`): the first `dbTEXT` in the cell the mirror faces,
  * through `DecodeText(…, 0x8002, 990)` with the data set's own escape tables, then the
  * hero text's checks, with `legalHero` in place of a text that fails one.
  *
@@ -69,7 +69,7 @@ const syraFr = all['dm-atari-1.3-fr']!.find((h) => h.name === 'SYRA');
 check(syraFr?.title === 'L}ENFANT DE SAUVAGE',
   `1.3-fr SYRA's title is "L}ENFANT DE SAUVAGE", nineteen characters (got ${JSON.stringify(syraFr?.title)})`);
 
-// The limits (`Character.cpp:558`, `:580`, `:591-688`), on texts as `DecodeText` leaves them.
+// The limits (`Character.cpp:559`, `:581`, `:592-689`), on texts as `DecodeText` leaves them.
 console.log('');
 const text = (s: string): Uint8Array => Uint8Array.from(s + '\0', (c) => c.charCodeAt(0));
 const hero = (name: string, title1: string, title2 = '', tail = 'CCCCCCCCCCCCCCCC'): Uint8Array =>

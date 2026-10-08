@@ -54,7 +54,7 @@ export function extractPresetHeroes(data: DungeonData, tables: TextDecodeTables)
           if (!actuator || getActuatorType(actuator) !== 127) continue;
 
           // The party clicks the mirror from the cell its wall faces, and `AddCharacter`
-          // reads the text in that cell (`doc/CSBwin-src/Character.cpp:535-549`).
+          // reads the text in that cell (`doc/CSBwin-src/Character.cpp:536-550`).
           const pos = decoded.position;
           const textRef = firstText(data, map, mapIndex, x + DELTA_X[pos], y + DELTA_Y[pos]);
           const text = textRef ? DecodeText(data, textRef.record, 0x8002, 990, tables) : null;
@@ -139,7 +139,7 @@ function getDBRecordLink(data: DungeonData, rn: ObjectID): ObjectID {
   }
 }
 
-/** The first `dbTEXT` in the cell's chain, at any corner (`Character.cpp:535-541`). */
+/** The first `dbTEXT` in the cell's chain, at any corner (`Character.cpp:536-542`). */
 function firstText(
   data: DungeonData,
   map: MapData,

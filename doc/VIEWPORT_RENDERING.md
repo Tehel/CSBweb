@@ -154,9 +154,9 @@ To properly port this system:
 
 These are CSBWin-specific and source-backed:
 
-- Wall/door set base: `firstWallGraphic = 77 + 13 * newWallGraphicSet` (`CSBCode.cpp:2877`)
-- Door bitmaps loaded from `firstWallGraphic + 0..6` (`CSBCode.cpp:2878-2881`)
-- Wall bitmaps loaded from `firstWallGraphic + 7..12` (`CSBCode.cpp:2882-2885`)
-- `pWallBitmaps[6]` is created by mirroring `pWallBitmaps[5]` (`CSBCode.cpp:2893-2896`)
-- Floor/Ceiling templates loaded as `P1*2 + 75` and `P1*2 + 76` (`CSBCode.cpp:2864-2865`)
-- Viewport coordinate tables (including `wallRectangles[14]`) are loaded from `graphics.dat` “graphic `0x22e`” into `d.Byte7248+2` (`CSBCode.cpp:10125`, `Data.h:1109+`)
+- Wall/door set base: `firstWallGraphic = 77 + 13 * newWallGraphicSet` (`CSBCode.cpp:2933`)
+- Door bitmaps loaded from `firstWallGraphic + 0..6` (`CSBCode.cpp:2934-2937`)
+- Wall bitmaps loaded from `firstWallGraphic + 7..12` (`CSBCode.cpp:2938-2941`)
+- `pWallBitmaps[6]` is created by mirroring `pWallBitmaps[5]` (`CSBCode.cpp:2949-2952`)
+- Floor/Ceiling templates loaded as `P1*2 + 75` and `P1*2 + 76` (`CSBCode.cpp:2920-2921`)
+- Viewport coordinate tables (including `wallRectangles[14]`) are loaded from `graphics.dat` “graphic `0x22e`” into `d.Byte7248+2` (`CSBCode.cpp:10249`, `Data.h:1124+`)

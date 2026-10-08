@@ -1,13 +1,13 @@
 /**
  * The damage a champion takes, from the blow to the red figure over their name.
  *
- * `DamageCharacter` (`doc/CSBwin-src/Character.cpp:2703`) takes nothing off the HP: it
- * adds the blow to `d.PendingDamage` (`:2900`) and its wounds to `d.PendingOuches`
- * (`:2803`). Once a main-loop tick, after the viewport is drawn,
- * `DisplayCharacterDamage` (`doc/CSBwin-src/CSBCode.cpp:7084`, called at `:657`) ORs the
+ * `DamageCharacter` (`doc/CSBwin-src/Character.cpp:2708`) takes nothing off the HP: it
+ * adds the blow to `d.PendingDamage` (`:2905`) and its wounds to `d.PendingOuches`
+ * (`:2808`). Once a main-loop tick, after the viewport is drawn,
+ * `DisplayCharacterDamage` (`doc/CSBwin-src/CSBCode.cpp:7143`, called at `:667`) ORs the
  * wounds into `ouches`, takes the sum off the HP or kills, and blits graphic 15 over the
  * name — graphic 16 over the portrait of an open inventory — with the figure on it. A
- * `TT_12` five ticks on (`:7172-7202`) runs `TAG011366` (`doc/CSBwin-src/Timer.cpp:2686`),
+ * `TT_12` five ticks on (`:7231-7261`) runs `TAG011366` (`doc/CSBwin-src/Timer.cpp:2686`),
  * which draws the name or the portrait back over it.
  *
  *   1. The engine: pending damage and wounds, the HP, the `TT_12`, the host's two calls,
@@ -112,7 +112,7 @@ console.log('=== DamageCharacter and DisplayCharacterDamage ===');
   console.log(`two blows of 7 and 5: returned ${a} and ${b}, HP ${hero.attributes.health}, `
     + `pending ${g.ctx.party.state.pendingDamage.join(',')}`);
   check(a === 7 && b === 5, 'DamageCharacter returns what it dealt');
-  check(hero.attributes.health === 200, 'and takes nothing off the HP (Character.cpp:2900)');
+  check(hero.attributes.health === 200, 'and takes nothing off the HP (Character.cpp:2905)');
   check(g.ctx.party.state.pendingDamage[0] === 12, 'the blows add up in d.PendingDamage');
 
   // Wounds wait too. A 300-point blow over mask 0x3f wounds on this seed.
@@ -124,9 +124,9 @@ console.log('=== DamageCharacter and DisplayCharacterDamage ===');
   const woundsAfter = probe.ctx.party.state.champions[0]!.wounds;
   console.log(`a 300-point blow: pending ouches 0x${pendingOuches.toString(16)}, `
     + `wounds 0x${woundsBefore.toString(16)} -> 0x${woundsAfter.toString(16)}`);
-  check(pendingOuches !== 0 && woundsBefore === 0, 'wounds wait in d.PendingOuches (Character.cpp:2803)');
+  check(pendingOuches !== 0 && woundsBefore === 0, 'wounds wait in d.PendingOuches (Character.cpp:2808)');
   check(woundsAfter === pendingOuches && probe.ctx.party.state.pendingOuches[0] === 0,
-    'DisplayCharacterDamage ORs them into ouches and clears them (CSBCode.cpp:7098-7100)');
+    'DisplayCharacterDamage ORs them into ouches and clears them (CSBCode.cpp:7157-7159)');
 
   g.systems.monsterAttack.displayCharacterDamage();
   const timers = tt12s(g);
@@ -136,7 +136,7 @@ console.log('=== DamageCharacter and DisplayCharacterDamage ===');
     'the sum comes off the HP once, and the pending damage is cleared');
   check(calls.join(';') === 'display 0 12', 'the screen is asked to show 12 over champion 0');
   check(timers.length === 1 && timers[0]!.time === 105 && timers[0]!.chIdx === 0,
-    'a TT_12 for champion 0, five ticks on (CSBCode.cpp:7176-7190)');
+    'a TT_12 for champion 0, five ticks on (CSBCode.cpp:7235-7249)');
   check(hero.timerIndex === timers[0]!.index, "and it is the champion's timerIndex");
 
   // Another blow two ticks later moves the same timer rather than adding one.
@@ -146,7 +146,7 @@ console.log('=== DamageCharacter and DisplayCharacterDamage ===');
   const moved = tt12s(g);
   console.log(`a blow of 3 at 102: TT_12 ${JSON.stringify(moved)}, calls [${calls.join('; ')}]`);
   check(moved.length === 1 && moved[0]!.index === timers[0]!.index && moved[0]!.time === 107,
-    'a second loss moves the TT_12 to five ticks after it (CSBCode.cpp:7194-7201)');
+    'a second loss moves the TT_12 to five ticks after it (CSBCode.cpp:7253-7260)');
   check(calls[1] === 'display 0 3', 'and shows the new loss, not the sum');
 
   // Nothing is due until then.
@@ -165,7 +165,7 @@ console.log('=== DamageCharacter and DisplayCharacterDamage ===');
   g.systems.monsterAttack.displayCharacterDamage();
   console.log(`a blow of 250 on champion 1: alive ${g.ctx.party.state.champions[1]!.attributes.health !== 0}, calls [${calls.join('; ')}], `
     + `TT_12 ${tt12s(g).length}`);
-  check(g.ctx.party.state.champions[1]!.attributes.health === 0, 'DisplayCharacterDamage kills (CSBCode.cpp:7110-7114)');
+  check(g.ctx.party.state.champions[1]!.attributes.health === 0, 'DisplayCharacterDamage kills (CSBCode.cpp:7169-7173)');
   check(calls.length === 0 && tt12s(g).length === 0, 'and shows nothing and arms nothing for the dead');
 
   // A TT_12 that falls due after its champion died redraws nothing (Timer.cpp:2692).
@@ -181,7 +181,7 @@ console.log('=== DamageCharacter and DisplayCharacterDamage ===');
   check(late.ctx.party.state.champions[0]!.timerIndex === -1, 'but still clears timerIndex');
 
   // The recruit in a Hall of Champions mirror: `DamageCharacter` refuses them, and a
-  // pending sum is dropped, not taken (CSBCode.cpp:7101-7104).
+  // pending sum is dropped, not taken (CSBCode.cpp:7160-7163).
   const hall = makeGame(2, calls);
   calls.length = 0;
   hall.ctx.party.state.pendingDamage[1] = 30;
@@ -196,7 +196,7 @@ console.log('');
 console.log("=== Game's tick ===");
 {
   // A blow inside `ProcessTimers`. The tick draws (`onTick`, `DrawViewport` at
-  // CSBCode.cpp:638) with the HP untouched; `DisplayCharacterDamage` follows (`:657`).
+  // CSBCode.cpp:648) with the HP untouched; `DisplayCharacterDamage` follows (`:667`).
   const calls: string[] = [];
   const g = makeGame(1, calls);
   g.systems.timer.processTimers = () => { g.systems.monsterAttack.damageCharacter(0, 9, 0, 0); return false; };
@@ -218,28 +218,28 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
   const party = g.ctx.party.state;
   const host = g.ctx.host;
   console.log(`the first champion joining: [${draws.join('; ')}]`);
-  check(draws.join(';') === '0 cursor', "AddCharacter's SetHandOwner(0) draws the new owner's name (CSBCode.cpp:8422-8423)");
+  check(draws.join(';') === '0 cursor', "AddCharacter's SetHandOwner(0) draws the new owner's name (CSBCode.cpp:8509-8510)");
 
   draws.length = 0;
   setHandOwner(party, 1, host);
   console.log(`SetHandOwner(1) from 0: [${draws.join('; ')}]`);
   check(draws.join(';') === '0 cursor;1 cursor',
-    'SetHandOwner draws the old owner\'s name, then the new one\'s (CSBCode.cpp:8401-8407, :8422-8423)');
+    'SetHandOwner draws the old owner\'s name, then the new one\'s (CSBCode.cpp:8488-8494, :8509-8510)');
 
   draws.length = 0;
   setHandOwner(party, 1, host);
-  check(draws.length === 0, 'and nothing when the owner does not change (:8395)');
+  check(draws.length === 0, 'and nothing when the owner does not change (:8482)');
 
   party.potentialChampionIndex = 2;
   setHandOwner(party, 2, host);
   console.log(`SetHandOwner(2), the recruit in a mirror: [${draws.join('; ')}], owner ${party.cursorOwner}`);
   check(draws.join(';') === '1 cursor' && party.cursorOwner === 2,
-    'the recruit takes the cursor and is not drawn (:8421)');
+    'the recruit takes the cursor and is not drawn (:8508)');
   party.potentialChampionIndex = -1;
 
   draws.length = 0;
   setHandOwner(party, -1, host);
-  check(draws.join(';') === '2 cursor' && party.cursorOwner === -1, 'SetHandOwner(-1) draws the old owner only (:8409-8413)');
+  check(draws.join(';') === '2 cursor' && party.cursorOwner === -1, 'SetHandOwner(-1) draws the old owner only (:8496-8500)');
   setHandOwner(party, 0, host);
 
   // The spell and fire shields: `MagicShield` starts one, its `TT_77` / `TT_78` ends it.
@@ -255,7 +255,7 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
     processTimersAt(g, 200 + 320);
     const down = isSpellShield ? party.spellShield : party.fireShield;
     console.log(`its ${timer}: shield ${down}, [${draws.join('; ')}]`);
-    check(down === 0 && draws.join(';') === all, `and its ${timer} too (CSBCode.cpp:6565-6571)`);
+    check(down === 0 && draws.join(';') === all, `and its ${timer} too (CSBCode.cpp:6624-6630)`);
     g.ctx.state.tickCount = 200;
   }
 
@@ -265,11 +265,11 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
   draws.length = 0;
   processTimersAt(g, 250);
   console.log(`a party shield's TT_74: shield ${party.partyShield}, [${draws.join('; ')}]`);
-  check(party.partyShield === 0 && draws.join(';') === all, "a party shield's TT_74 is MarkAllPortraitsChanged (CSBCode.cpp:6550-6553)");
+  check(party.partyShield === 0 && draws.join(';') === all, "a party shield's TT_74 is MarkAllPortraitsChanged (CSBCode.cpp:6609-6612)");
 
   // No floor: a timer that takes back more than is there leaves the counter below zero
-  // (`CSBCode.cpp:6519`, `:6549-6572`). `_FusionSequence` writes 100 over what the spells
-  // had added (`Attack.cpp:2276-2278`), while their timers still hold their amounts.
+  // (`CSBCode.cpp:6578`, `:6608-6631`). `_FusionSequence` writes 100 over what the spells
+  // had added (`Attack.cpp:2278-2280`), while their timers still hold their amounts.
   g.ctx.state.tickCount = 260;
   party.partyShield = 100;
   party.spellShield = 100;
@@ -288,11 +288,11 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
     + `fire ${party.fireShield}, invisible ${party.invisible}, see-through ${party.seeThruWalls}, `
     + `footprints ${party.magicFootprintsActive}`);
   check(party.partyShield === -30 && party.spellShield === -10 && party.fireShield === -25,
-    'TT_74, TT_77 and TT_78 take a shield below zero (CSBCode.cpp:6551, :6566, :6569)');
+    'TT_74, TT_77 and TT_78 take a shield below zero (CSBCode.cpp:6610, :6625, :6628)');
   check(party.invisible === -1 && party.seeThruWalls === -1 && party.magicFootprintsActive === -1,
-    'TT_71, TT_73 and TT_79 take their counter below zero (CSBCode.cpp:6519, :6549, :6572)');
+    'TT_71, TT_73 and TT_79 take their counter below zero (CSBCode.cpp:6578, :6608, :6631)');
 
-  // The three counters are `i8` (`Data.h:768-769`, `:783`), and the shields `i16`.
+  // The three counters are `i8` (`Data.h:783-784`, `:798`), and the shields `i16`.
   party.invisible = -128;
   party.spellShield = -32768;
   g.systems.magic.queueUtilityTimer(TimerFunction.TT_71, 10, 0);
@@ -302,7 +302,7 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
   check(party.invisible === 127 && party.spellShield === 32767, 'an i8 counter and an i16 shield wrap round');
 
   // A save keeps them signed: block 4's tail holds the three counters as bytes and the
-  // shields as words (`Data.h:768-772`, `:783`).
+  // shields as words (`Data.h:783-787`, `:798`).
   {
     const block = new Uint8Array(CHARACTER_BLOCK_SIZE);
     writeCsbwinPartyTail(block, {
@@ -318,8 +318,8 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
   }
 
   // `DamageCharacter` takes a shield as it stands: it subtracts the spell or the fire
-  // shield from the blow (`Character.cpp:2768`, `:2775`) and adds the party's to the
-  // armour (`:2456`).
+  // shield from the blow (`Character.cpp:2773`, `:2780`) and adds the party's to the
+  // armour (`:2461`).
   for (const [kind, name] of [[5, 'spell'], [1, 'fire']] as const) {
     const dealt = [0, -10].map((shield) => {
       const probe = makeGame(1, []);
@@ -345,10 +345,10 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
       return probe.systems.monsterAttack.armourStrength(hero, 2, false);
     });
     console.log(`armour with 80 of the champion's own: ${armour[0]} with the party shield at 0, ${armour[1]} with it at -30`);
-    check(armour[0] === 40 && armour[1] === 25, 'a party shield below zero takes off the armour (Character.cpp:2453-2457, :2486)');
+    check(armour[0] === 40 && armour[1] === 25, 'a party shield below zero takes off the armour (Character.cpp:2458-2462, :2491)');
   }
 
-  // `TAG01680a`'s tail (`Character.cpp:2478-2486`): a wounded part loses
+  // `TAG01680a`'s tail (`Character.cpp:2483-2491`): a wounded part loses
   // `STRandom0_3() + 8`, a sleeping party's total is halved, and then comes the halving
   // every total gets. The draws are replayed from the seed: `STRandom` for the Vitality
   // term, and one more for a wounded part.
@@ -391,11 +391,11 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
   applyFeedParameters(g.ctx, 1, fp);
   console.log(`a Ya potion: shieldStrength ${drinker.shieldStrength} for ${fp.shieldDuration} ticks, [${draws.join('; ')}]`);
   check(drinker.shieldStrength === fp.shieldStrengthAdjust && fp.shieldStrengthAdjust > 0 && draws.join(';') === '1 portraitChanged',
-    "a Ya potion draws the drinker's box afresh, and no other (Character.cpp:4393, :4492)");
+    "a Ya potion draws the drinker's box afresh, and no other (Character.cpp:4410, :4509)");
   draws.length = 0;
   processTimersAt(g, 300 + fp.shieldDuration);
   console.log(`its TT_72: shieldStrength ${drinker.shieldStrength}, [${draws.join('; ')}]`);
-  check(drinker.shieldStrength === 0 && draws.join(';') === '1 portraitChanged', 'and so does its TT_72 (CSBCode.cpp:6545-6547)');
+  check(drinker.shieldStrength === 0 && draws.join(';') === '1 portraitChanged', 'and so does its TT_72 (CSBCode.cpp:6604-6606)');
 
   // A potion with no shield in it draws nothing over the box.
   const vi = clearFeedParameters();
@@ -524,14 +524,14 @@ console.log('=== drawPartyStatus ===');
   figures(true);
   setHandOwner(party.state, 0, ui.ctx.host);
   console.log(`champion 1's inventory open, the hand passing from 1 to 0: shown [${shown()}]`);
-  check(shown() === '- 6 - -', "CHARFLAG_cursor leaves the figure over an open inventory's portrait (Character.cpp:1322-1339)");
+  check(shown() === '- 6 - -', "CHARFLAG_cursor leaves the figure over an open inventory's portrait (Character.cpp:1327-1344)");
 
   // `CHARFLAG_portraitChanged` fills the whole box, in either mode.
   figures(true);
   drawCharacterState(ui, 0, CHARFLAG_PORTRAIT_CHANGED);
   drawCharacterState(ui, 1, CHARFLAG_PORTRAIT_CHANGED);
   console.log(`CHARFLAG_portraitChanged on both: shown [${shown()}]`);
-  check(shown() === '- - - -', 'CHARFLAG_portraitChanged takes the figure off the name and off the portrait (Character.cpp:1255-1297)');
+  check(shown() === '- - - -', 'CHARFLAG_portraitChanged takes the figure off the name and off the portrait (Character.cpp:1260-1302)');
   party.state.selectedCharacterIndex = -1;
 }
 

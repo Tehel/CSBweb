@@ -3,7 +3,7 @@
  * recovers or consumes while simply standing there. None of it shows on a golden
  * frame until minutes of play have passed.
  *
- *   1. Cadence: every 64 ticks awake, 16 asleep (`doc/CSBwin-src/CSBCode.cpp:686-688`).
+ *   1. Cadence: every 64 ticks awake, 16 asleep (`doc/CSBwin-src/CSBCode.cpp:696-698`).
  *   2. Attributes: Current steps one point toward Maximum every 256 ticks (64 asleep),
  *      which is what clears the red a level gain leaves on the stats panel. Above
  *      Maximum it falls by `Current / Maximum`.
@@ -68,7 +68,7 @@ function runTicks(game: Game, from: number, to: number): void {
 }
 
 function main(): void {
-  console.log('=== cadence (CSBCode.cpp:686-688) ===');
+  console.log('=== cadence (CSBCode.cpp:696-698) ===');
   {
     const game = makeGame();
     const champ = game.ctx.party.state.champions[0]!;
@@ -96,7 +96,7 @@ function main(): void {
     const game = makeGame();
     const champ = game.ctx.party.state.champions[0]!;
     const str = champ.attributes.stats[AttributeIndex.Strength];
-    incrAttributeMaximum(str, 3); // what LevelUp does (Magic.cpp:98-148)
+    incrAttributeMaximum(str, 3); // what LevelUp does (Magic.cpp:101-151)
     const trace: string[] = [];
     for (let t = 64; t <= 1024; t += 64) {
       runTicks(game, t - 63, t);

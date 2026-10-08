@@ -36,7 +36,7 @@ export enum RoomType {
     TELEPORTER = 5, // Teleporter
     FALSEWALL = 6,  // Trick wall
     EMPTY = 7,      // Empty (DM II only)
-    EXTERIOR = 20,  // `roomEXTERIOR` (CSB.h:571): off the map, the dungeon's exterior wall
+    EXTERIOR = 20,  // `roomEXTERIOR` (CSB.h:574): off the map, the dungeon's exterior wall
 }
 
 /**
@@ -110,7 +110,7 @@ export interface PositionOriented extends Position {
  * - 0xFFFE: End of linked list
  * - 0xFFFF: Null/empty
  *
- * A distinct type, as CSBWin's `RN` is a class (doc/CSBwin-src/CSBTypes.h:269): a plain
+ * A distinct type, as CSBWin's `RN` is a class (doc/CSBwin-src/CSBTypes.h:275): a plain
  * number becomes one only through an explicit `as ObjectID`, the port's
  * `RN(RNVAL)` / `ConstructFromInteger`. An `ObjectID` reads as a number freely.
  */
@@ -121,7 +121,7 @@ export const OBJECT_ID_EOF = 0xFFFE as ObjectID;
 export const OBJECT_ID_NULL = 0xFFFF as ObjectID;
 
 /**
- * `RN ==` (doc/CSBwin-src/CSBTypes.h:349-356), and `IsSameObjectAs` (`:362`): the same
+ * `RN ==` (doc/CSBwin-src/CSBTypes.h:355-362), and `IsSameObjectAs` (`:368`): the same
  * slot, so the same object whatever corner it is in.
  */
 export function rnEquals(a: ObjectID, b: ObjectID): boolean {
@@ -140,12 +140,12 @@ export interface LocationRel {
     p: number;
 }
 
-/** `LOCATIONREL::Integer(void)` (doc/CSBwin-src/DSA.cpp:292) — pack into 18 bits. */
+/** `LOCATIONREL::Integer(void)` (doc/CSBwin-src/DSA.cpp:293) — pack into 18 bits. */
 export function locationRelToInteger(locr: LocationRel): number {
     return ((locr.p & 3) << 16) | ((locr.l & 0x3f) << 10) | ((locr.x & 0x1f) << 5) | (locr.y & 0x1f);
 }
 
-/** `LOCATIONREL::Integer(i32)` (doc/CSBwin-src/DSA.cpp:301) — unpack from 18 bits. */
+/** `LOCATIONREL::Integer(i32)` (doc/CSBwin-src/DSA.cpp:302) — unpack from 18 bits. */
 export function locationRelFromInteger(t: number): LocationRel {
     return {
         p: (t >> 16) & 3,

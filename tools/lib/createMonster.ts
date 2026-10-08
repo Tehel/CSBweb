@@ -3,7 +3,7 @@
  *
  * `MonsterSystem.createMonster` returns what CSBWin's `CreateMonster` does, which is
  * `RNnul` for every group placed on the party's level: `MoveObject` attaches its
- * `ITEM16` there and returns 1 (`doc/CSBwin-src/Code11f52.cpp:3376`,
+ * `ITEM16` there and returns 1 (`doc/CSBwin-src/Code11f52.cpp:3411`,
  * `Monster.cpp:222-231`). A scenario wants the group either way, so this looks for it
  * on the square it was asked for.
  */

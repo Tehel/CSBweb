@@ -43,7 +43,7 @@ async function main(): Promise<void> {
   const dungeon = game.ctx.dungeon;
   const pool = dungeon.getItem16Pool();
   // Where a group stands. Not its ITEM16's uByte10/11: only AttachItem16ToMonster sets
-  // those (doc/CSBwin-src/CSBCode.cpp:6088-6090), and MoveObject leaves them behind.
+  // those (doc/CSBwin-src/CSBCode.cpp:6147-6149), and MoveObject leaves them behind.
   const map = dungeon.getMap(level)!;
   const where = (db4: number): { x: number; y: number } => {
     for (let x = 0; x < map.descriptor.width; x++) {

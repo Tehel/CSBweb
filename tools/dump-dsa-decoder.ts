@@ -3,16 +3,16 @@
  * `EX_*`), each run through `DsaSystem.execute` as one program of a test DSA.
  *
  * 1. **`IsMaxState`** is `nextState == -MAXSTATE` in every command
- *    (`doc/CSBwin-src/Data.h:1889-2384`). An `&` whose 3-bit field holds -4 reads no
+ *    (`doc/CSBwin-src/Data.h:1904-2399`). An `&` whose 3-bit field holds -4 reads no
  *    extra word, and the command after it runs. `QUESTION`'s field of -2 does read it,
- *    unsigned (`DSA.cpp:858-866`: `m_PC` is a `ui16 *`, `:250`), so a word of 0xffff
+ *    unsigned (`DSA.cpp:859-867`: `m_PC` is a `ui16 *`, `:251`), so a word of 0xffff
  *    takes the state to 65535.
- * 2. **`LOAD_INTEGER` (26)** pushes its word unsigned (`:1099-1106`); `LOAD` 29
- *    (`LOAD_ABS32`) pushes nothing (`:1138-1143`).
- * 3. **`STORE` above 25** pops nothing, and leaves the next state (`:1328-1332`), as does
- *    an `OVERRIDE` whose `what` is not 1 (`:1045-1058`).
- * 4. **`GLOBALFETCH` past the last variable** pushes 0xcdcdcdcd (`:1302-1306`).
- * 5. **An explicit message delay** is the word unsigned (`:662`): 0x8000 ticks from now.
+ * 2. **`LOAD_INTEGER` (26)** pushes its word unsigned (`:1100-1107`); `LOAD` 29
+ *    (`LOAD_ABS32`) pushes nothing (`:1139-1144`).
+ * 3. **`STORE` above 25** pops nothing, and leaves the next state (`:1329-1333`), as does
+ *    an `OVERRIDE` whose `what` is not 1 (`:1046-1059`).
+ * 4. **`GLOBALFETCH` past the last variable** pushes 0xcdcdcdcd (`:1303-1307`).
+ * 5. **An explicit message delay** is the word unsigned (`:663`): 0x8000 ticks from now.
  *
  * No dungeon this project plays defines a DSA, so the tool builds one, `localState` 1,
  * whose state is the DSA's own `state`. Global variable 0 is what each program reports.

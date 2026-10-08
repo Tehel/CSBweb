@@ -1,7 +1,7 @@
 /**
  * Dropping an object onto an active teleporter.
  *
- * `DropObject` (`doc/CSBwin-src/Mouse.cpp:882`) does not just link the dropped
+ * `DropObject` (`doc/CSBwin-src/Mouse.cpp:883`) does not just link the dropped
  * object into the target cell — it calls `MoveObject(objD4, -1, 0, D6W, D5W, NULL,
  * NULL)`, the same function a walking party or monster goes through, so an object
  * landing on an active teleporter is immediately carried to the teleporter's

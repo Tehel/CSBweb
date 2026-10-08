@@ -116,7 +116,7 @@ function loadWorld(): Game {
  * Basic graphic 26, the sheet of 24 standard portraits, as a grid of 32x29 cells.
  *
  * `AddCharacter` cuts it at `(charID&7)<<5` by `(charID>>3)*29`
- * (`doc/CSBwin-src/Character.cpp:486-495`), which is this grid.
+ * (`doc/CSBwin-src/Character.cpp:487-496`), which is this grid.
  */
 function portraitCells(): number[][] {
   const graphics = new GraphicsLoader();
@@ -226,7 +226,7 @@ function main(): void {
     // `applyRuntimeSaveState` ends in `reloadAfterSaveGame`, which re-creates every
     // monster group's movement timer and draws from the stream doing it — as CSBWin's
     // own `InitializeTimers` does after the same assignment
-    // (`doc/CSBwin-src/SaveGame.cpp:1655-1659`). The seed the load *starts* from is
+    // (`doc/CSBwin-src/SaveGame.cpp:1779-1783`). The seed the load *starts* from is
     // what `gb2.ranseed` fixes.
     check(
       buildCsbwinRuntimeState(world).game.randomSeed === (gb2.ranseed >>> 0),
@@ -290,9 +290,9 @@ function main(): void {
     }
 
     // The fingerprint, `AddCharacter`'s `(partyLevel << 10) | (partyX << 5) | partyY`
-    // (`doc/CSBwin-src/Character.cpp:514-518`). Every committed save's champions were
+    // (`doc/CSBwin-src/Character.cpp:515-519`). Every committed save's champions were
     // taken in the Hall of Champions, on level 0, so it names a square of that level.
-    // `swapCharacter` stops at `shieldStrength` (`doc/CSBwin-src/SaveGame.cpp:490-521`),
+    // `swapCharacter` stops at `shieldStrength` (`doc/CSBwin-src/SaveGame.cpp:498-529`),
     // so the word is little-endian in the file: read big-endian, IAIDO's 0x0144 is
     // 0x4401, a square of level 17. Written back, it is the file's two bytes again.
     const hall = world.dungeon.maps[0]!.descriptor;

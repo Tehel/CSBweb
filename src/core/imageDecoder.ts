@@ -26,7 +26,7 @@ export interface DecodedImage extends ImageDimensions {
 /**
  * `ExpandGraphic` — the `graphics.dat` image codec.
  *
- * A transcription of `doc/CSBwin-src/CSBCode.cpp:10836`. The 68000 original writes into
+ * A transcription of `doc/CSBwin-src/CSBCode.cpp:10961`. The 68000 original writes into
  * Atari planar memory through 16-pixel groups and a running bit mask; this works in chunky
  * bytes, which is the only liberty taken. Every opcode, count and fall-through is the C++'s.
  *
@@ -41,7 +41,7 @@ export interface DecodedImage extends ImageDimensions {
  * Four bytes of `width`, `height`, then a byte-oriented opcode stream. Pixels are 4-bit
  * palette indices written left to right, top to bottom, into a buffer whose line pitch is
  * rounded **up to a whole 16-pixel group** — `D7W = ((width+15)>>1) & 0x7ff8` bytes
- * (`CSBCode.cpp:10857`). Every image in `graphics.dat` happens to be a multiple of 16 wide,
+ * (`CSBCode.cpp:10995`). Every image in `graphics.dat` happens to be a multiple of 16 wide,
  * so the padding never shows; it is here because the "copy the previous line" opcode is
  * defined in terms of that pitch.
  *
@@ -58,11 +58,11 @@ export interface DecodedImage extends ImageDimensions {
  * Bit `0x40` is "the count is 16-bit" and bits `0x30` pick the mode: `0x00` and `0x20` are
  * both a solid run, `0x10` is the literal stream, `0x30` copies the line above. That is why
  * `0xA` behaves as `0x8` and `0xE` as `0xC` — the `0x20` bit is simply not consulted on that
- * branch (`CSBCode.cpp:10891-10894`).
+ * branch (`CSBCode.cpp:11052-11060`).
  *
  * The trailing pixel on `0xB`/`0xF` is a **fall-through**, not a separate opcode: the copy
  * loop at `tag0214e4` runs off its end into `tag0214f2`, which is the same "place one pixel"
- * subroutine the single-pixel opcode uses (`CSBCode.cpp:10917-10924`).
+ * subroutine the single-pixel opcode uses (`CSBCode.cpp:11084-11091`).
  */
 export function decodeIMG(data: Uint8Array, format: ImageFormat = ImageFormat.IMG1): DecodedImage {
     const width = format === ImageFormat.IMG1

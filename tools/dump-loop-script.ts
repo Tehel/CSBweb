@@ -4,19 +4,19 @@
  *
  * 1. **The waits.** A script runs at once up to its first `VBLDelay`, and `runFrame` runs
  *    the rest: each `VBLDelay(n)` is `n` VBLs, each with its `vblInterrupt` and the frame
- *    callbacks, and a `VBLDelay(0)` waits for none (doc/CSBwin-src/CSBCode.cpp:1137-1147).
+ *    callbacks, and a `VBLDelay(0)` waits for none (doc/CSBwin-src/CSBCode.cpp:1147-1157).
  *    Meanwhile the loop makes no pass: no mouse entry is taken, no tick runs however late
- *    it is, and no print-queue entry is taken (`CSBCode.cpp:714-765`). In the VBL the
+ *    it is, and no print-queue entry is taken (`CSBCode.cpp:724-775`). In the VBL the
  *    script ends, the pass it held goes on where it stopped: no further mouse entry, then
- *    the tick if one is due and a print-queue entry (`:747-765`, `:714-721`).
+ *    the tick if one is due and a print-queue entry (`:757-775`, `:724-731`).
  * 2. **A script started by a mouse handler**, as `atk_FUSE` starts `_FusionSequence`
- *    (`Attack.cpp:1971`, `:259`) and a click on the spell panel `_MagicSelection`
- *    (`Magic.cpp:545-581`): the pass that took the click is held inside it, so the entries
+ *    (`Attack.cpp:1973`, `:259`) and a click on the spell panel `_MagicSelection`
+ *    (`Magic.cpp:548-584`): the pass that took the click is held inside it, so the entries
  *    behind it stay queued and no tick runs until the script's last VBL, where the pass
  *    goes on. They are taken in the VBL after, once `d.Time` has moved on.
- * 3. **`_ProcessTimersViewportAndSound`** (`Attack.cpp:2192-2213`): one `ProcessTimers`,
+ * 3. **`_ProcessTimersViewportAndSound`** (`Attack.cpp:2194-2215`): one `ProcessTimers`,
  *    then one `d.Time++` and one `scrollingText.ClockTick()`, and no VBL goes by.
- * 4. **A win inside it** (`:2199-2204`): `VBLDelay(300)`, then `ShowCredits(1)`, which
+ * 4. **A win inside it** (`:2201-2206`): `VBLDelay(300)`, then `ShowCredits(1)`, which
  *    never returns, so the script is never resumed; `d.CanRestartFromSavegame` is cleared
  *    by the stone-room timer that won (`Timer.cpp:2370-2371`), which `tools/dump-show-credits.ts`
  *    covers with a real type-18 actuator. Here `ProcessTimers` is made to report a win.
@@ -95,7 +95,7 @@ function frame(w: Watched): void {
 /* ------------------------------------------------------------ 1. the waits ---- */
 
 function checkWaits(): void {
-  console.log('=== the waits: VBLDelay(31), VBLDelay(0), VBLDelay(2) (CSBCode.cpp:1137-1147) ===');
+  console.log('=== the waits: VBLDelay(31), VBLDelay(0), VBLDelay(2) (CSBCode.cpp:1147-1157) ===');
   const w = watchedGame();
   const game = w.game;
   for (let n = 0; n < 3; n++) frame(w);
@@ -132,7 +132,7 @@ function checkWaits(): void {
   check(!game.isRunningScript(), 'and holds the loop no longer');
   check(w.vbls - vbls === 33 && w.frameCallbacks - callbacks === 33, 'each of its 33 VBLs runs vblInterrupt and the frame callbacks, once');
   check(game.ctx.state.tickCount === tick + 1 && w.printed === printed + 1,
-    'the pass it held goes on in the VBL it ends: the due tick runs and a print-queue entry is taken (CSBCode.cpp:747-765)');
+    'the pass it held goes on in the VBL it ends: the due tick runs and a print-queue entry is taken (CSBCode.cpp:757-775)');
   check(handled.length === 0 && game.ctx.mouseQueue.count() === 1, 'with no further mouse entry: the click queued meanwhile waits');
   frame(w);
   console.log(`  the frame after: tick ${game.ctx.state.tickCount}; handled ${JSON.stringify(handled)}`);
@@ -144,7 +144,7 @@ function checkWaits(): void {
 
 function checkFromHandler(): void {
   console.log('');
-  console.log('=== a script started by a mouse handler (Attack.cpp:1971, :259) ===');
+  console.log('=== a script started by a mouse handler (Attack.cpp:1973, :259) ===');
   const w = watchedGame();
   const game = w.game;
   frame(w);
@@ -178,7 +178,7 @@ function checkFromHandler(): void {
   console.log(`  log ${w.log.join(' ')}; handled ${JSON.stringify(handled)}; tick ${game.ctx.state.tickCount}`);
   check(w.log.join(' ') === `resumed@${held + 5}` && !game.isRunningScript(), 'it resumes 5 VBLs later, and ends');
   check(game.ctx.state.tickCount === tick + 1 && handled.join() === '20',
-    'the held pass goes on in that VBL: the tick runs, and the entries behind the click stay, its result being 0 (CSBCode.cpp:761)');
+    'the held pass goes on in that VBL: the tick runs, and the entries behind the click stay, its result being 0 (CSBCode.cpp:771)');
   frame(w);
   console.log(`  the frame after: handled ${JSON.stringify(handled)}`);
   check(handled.join() === `20,${0x0add},21`, 'the next pass takes them, d.Time having moved: the button-up, and the click it lets follow');
@@ -188,7 +188,7 @@ function checkFromHandler(): void {
 
 function checkProcessTimersViewportAndSound(): void {
   console.log('');
-  console.log('=== _ProcessTimersViewportAndSound (Attack.cpp:2192-2213) ===');
+  console.log('=== _ProcessTimersViewportAndSound (Attack.cpp:2194-2215) ===');
   const w = watchedGame();
   const game = w.game;
   frame(w);

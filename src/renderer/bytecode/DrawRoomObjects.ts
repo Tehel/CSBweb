@@ -4,7 +4,7 @@
  * missiles, `DrawClouds` with the cell under the party and `TAG005088` — and
  * `GetGraphicClass`, how a flying object is drawn. The bytecode's `StdDrawRoomObjects`
  * pops its arguments and calls `DrawRoomObjects`, as CSBWin's `Interpret` does
- * (`doc/CSBwin-src/Viewport.cpp:2909-2916`).
+ * (`doc/CSBwin-src/Viewport.cpp:2916-2923`).
  */
 
 import { DescIndex } from '../../engine/objectIndex';
@@ -78,7 +78,7 @@ enum SideOfDoor {
 }
 
 export function mapColorValue(colorMap: Uint8Array, index: number): number {
-  // CSBWin ShrinkBLT expects color-map entries scaled by 10 (Graphics.cpp:406-476).
+  // CSBWin ShrinkBLT expects color-map entries scaled by 10 (Graphics.cpp:410-485).
   const raw = colorMap[index] ?? index;
   return Math.floor(raw / 10);
 }
@@ -1050,7 +1050,7 @@ function drawCloudUnderParty(
   if (!src) return;
   // CSBWin shrinks 48×32 to 48×32 — a pure recolour. The graphics are 48×31, and
   // `GetBasicGraphicAddress(n, 48, 32)` pads the buffer with a garbage row
-  // (`doc/CSBwin-src/Graphics.cpp:2560-2570`), which the tiling never reaches: it wraps
+  // (`doc/CSBwin-src/Graphics.cpp:2586-2596`), which the tiling never reaches: it wraps
   // within 90 groups, 30 rows. Recolouring at the graphic's own size keeps every row.
   if (poison) src = shrinkBlt(src, src.width, src.height, src.width, src.height, tables.cloudColorMap);
 

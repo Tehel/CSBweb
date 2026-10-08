@@ -244,7 +244,7 @@ async function main(): Promise<void> {
   // The column-index mutation. A second appended record, dropped into a cell that had
   // nothing in it, so `addObjectToCell` takes its insert branch: it splices a new entry
   // into `objectList` and decrements/increments every later `columnIndex` entry
-  // (CSBWin does the same, `doc/CSBwin-src/CSBCode.cpp:5211-5224`).
+  // (CSBWin does the same, `doc/CSBwin-src/CSBCode.cpp:5276-5289`).
   const loneCountBefore = playedData.databases.misc.records.length;
   playedData.databases.misc.records.push({
     nextObject: OBJECT_ID_EOF,

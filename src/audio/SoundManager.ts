@@ -3,14 +3,14 @@ import { div } from '../core/intCast';
 import type { GraphicsLoader } from '../data/GraphicsLoader';
 import { buildSoundCatalog, ratesDefault, type SoundInfo, type SoundTableEntry } from './soundsIndex';
 
-/** `SNDHEAD`'s `nSamplesPerSecond` in `SOUNDDATA::Decode` (`doc/CSBwin-src/Sound.cpp:338`). */
+/** `SNDHEAD`'s `nSamplesPerSecond` in `SOUNDDATA::Decode` (`doc/CSBwin-src/Sound.cpp:343`). */
 const CUSTOM_SOUND_RATE = 11025;
 
 /**
- * `SOUNDDATA::Decode(volume)`'s samples (`doc/CSBwin-src/Sound.cpp:315-359`), without
+ * `SOUNDDATA::Decode(volume)`'s samples (`doc/CSBwin-src/Sound.cpp:320-364`), without
  * DirectX: each unsigned 8-bit sample through the volume table, which divides its
  * distance from 128 by `volume`, rounded to the nearest, a half away from 128
- * (`:321-329`).
+ * (`:326-334`).
  */
 export function soundDataDecode(sound: Uint8Array, volume: number): Uint8Array {
   const volTable = new Uint8Array(256);
@@ -120,8 +120,8 @@ export class SoundManager {
   }
 
   /**
-   * `StartSound(SoundBytes, timerData, highVolume)` (`doc/CSBwin-src/Sound.cpp:647`): a
-   * quiet sound, `highVolume` 0, is attenuated 18 times (`:663`). `QueueSound` decides
+   * `StartSound(SoundBytes, timerData, highVolume)` (`doc/CSBwin-src/Sound.cpp:652`): a
+   * quiet sound, `highVolume` 0, is attenuated 18 times (`:668`). `QueueSound` decides
    * which from its ordinal's table entry; a direct `StartSound` plays loud.
    */
   playSound(id: number, rateIdx = 0, highVolume = 1): void {
@@ -148,7 +148,7 @@ export class SoundManager {
   }
 
   /**
-   * `PlayCustomSound`'s sound of `CSBgraphics.dat` (`doc/CSBwin-src/Sound.cpp:1055-1058`),
+   * `PlayCustomSound`'s sound of `CSBgraphics.dat` (`doc/CSBwin-src/Sound.cpp:1064-1067`),
    * which plays nothing with the sound off: `Decode(volume)`'s samples (`soundDataDecode`)
    * at its 11025 Hz.
    */

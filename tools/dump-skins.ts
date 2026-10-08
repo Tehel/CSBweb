@@ -1,18 +1,18 @@
 /**
- * Skins: `SKIN_CACHE` (`doc/CSBwin-src/data.cpp:2058-2171`,
+ * Skins: `SKIN_CACHE` (`doc/CSBwin-src/data.cpp:2062-2175`,
  * `src/engine/SkinCache.ts`) and the DSA operations on it, `&GETSKIN` and `&SETSKIN`
- * (`doc/CSBwin-src/DSA.cpp:3107-3135`).
+ * (`doc/CSBwin-src/DSA.cpp:3108-3136`).
  *
  * 1. **The skins in the bytes.** Each `(EDT_Skins << 24) + (level << 4) + (x / 2)` record
  *    of Conflux 3.5's and The Towers of Chaos 3.3's pools, decoded here a byte at a time,
  *    is what `GetSkin` reads at every cell, and no skin lies past its level. The canary
- *    is the byte order. Read little-endian (`DB11::swap`, `data.cpp:1458-1467`), 13% of
+ *    is the byte order. Read little-endian (`DB11::swap`, `data.cpp:1461-1470`), 13% of
  *    Conflux's skinned cells are solid rock, which is two thirds of its cells: a skin
  *    dresses the cells the party sees. Read big-endian, which moves each skin to the
  *    other corner of its two by two, 45% are. The Towers of Chaos skins two by two
  *    blocks, which the order does not tell apart. The default skins' record,
  *    `(EDT_Skins << 24) + 0x800000`, is a byte a level.
- * 2. **Off the level** (`data.cpp:2088-2112`): `GetSkin` says 0 for a level, column or
+ * 2. **Off the level** (`data.cpp:2092-2116`): `GetSkin` says 0 for a level, column or
  *    row below 0 or past the level's last, and for a level past the dungeon's.
  * 3. **`&GETSKIN` and `&SETSKIN`** on `csbgame7.dat`, which has no skins: a location's
  *    level, column and row from its bits, the skin's low byte kept, the record's bytes

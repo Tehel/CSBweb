@@ -3,20 +3,20 @@
  * often a dungeon's programs call each one.
  *
  * 1. **CSBWin's list.** `StkOp` (`src/engine/DsaSystem.ts`) is `STKOP`
- *    (`doc/CSBwin-src/Data.h:1721-1861`), 138 values: 0 to 126 and 129 to 139.
- *    `EX_AMPERSAND`'s switch (`doc/CSBwin-src/DSA.cpp:2392-4982`) has a case for every one
- *    but four. `I_Indirect` is unpacked before the switch (`:2345-2391`), so it is an
+ *    (`doc/CSBwin-src/Data.h:1736-1876`), 138 values: 0 to 126 and 129 to 139.
+ *    `EX_AMPERSAND`'s switch (`doc/CSBwin-src/DSA.cpp:2393-4983`) has a case for every one
+ *    but four. `I_Indirect` is unpacked before the switch (`:2346-2392`), so it is an
  *    operation all the same. `Noop` (0), `2Dup` (23) and `I_FilteredCast` (120) have no
- *    case, and reach the default's "Illegal subcode in EX_AMPERSAND" (`:4979-4981`): they
+ *    case, and reach the default's "Illegal subcode in EX_AMPERSAND" (`:4980-4982`): they
  *    are not operations, and the port owes them nothing. `I_FilteredCast` is only a word
- *    of a parameter record that `I_Indirect` runs as `FilteredCast` (`:2358`), which no
+ *    of a parameter record that `I_Indirect` runs as `FilteredCast` (`:2359`), which no
  *    operation writes. That leaves 135.
  * 2. **The port's list** is the `case StkOp.…` labels of `executeAmpersand`. What it lacks
  *    is pinned below in `LEFT`, which is empty: the port has every operation, and an
  *    operation taken out fails here.
  * 3. **The census.** Every program of the dungeon decodes to its exact length with
- *    CSBWin's operand layout, read off `EX_*` (`DSA.cpp:574-1340`, `:1491-1515`,
- *    `:4986`) and the command words (`Data.h:1879-2384`). A field is a relative state
+ *    CSBWin's operand layout, read off `EX_*` (`DSA.cpp:575-1341`, `:1492-1516`,
+ *    `:4987`) and the command words (`Data.h:1894-2399`). A field is a relative state
  *    unless `IsMaxState`, which compares it with `-MAXSTATE`: in every command but
  *    `QUESTION` that value is out of the field's signed range, so CSBWin never reads the
  *    extra word. The default dungeon is Conflux 3.5's.
@@ -39,8 +39,8 @@ const LEFT: readonly string[] = [];
 const NOT_OPERATIONS = new Set<number>([StkOp.NOOP, StkOp.TWO_DUP, StkOp.I_FILTERED_CAST]);
 
 /**
- * `DSACOMMAND` (`Data.h:1695`): each command's relative-state field and its `MAXSTATE`
- * (`Data.h:1889-2384`), and the operand words its `EX_*` reads after the command word.
+ * `DSACOMMAND` (`Data.h:1710`): each command's relative-state field and its `MAXSTATE`
+ * (`Data.h:1904-2399`), and the operand words its `EX_*` reads after the command word.
  */
 interface CommandLayout {
   name: string;
@@ -50,7 +50,7 @@ interface CommandLayout {
   operands(word: number, program: Uint16Array, pc: number): number;
 }
 
-/** `GetTarget` (`DSA.cpp:592-633`): `TARGET_ABS` reads one word, two when 32-bit. */
+/** `GetTarget` (`DSA.cpp:593-634`): `TARGET_ABS` reads one word, two when 32-bit. */
 function targetWords(target: number, thirtyTwo: boolean): number {
   return target === 2 ? (thirtyTwo ? 2 : 1) : 0;
 }
@@ -74,7 +74,7 @@ const COMMANDS: Record<number, CommandLayout> = {
   5: { name: 'GOSUB', stateShift: 13, stateBits: 3, maxState: -4, operands: rowColumn },
   6: {
     name: 'LOAD', stateShift: 11, stateBits: 5, maxState: -16,
-    // LOAD_INTEGER 26 and LOAD_ABS 27 read a word, LOAD_INTEGER32 30 two (`DSA.cpp:1099-1136`).
+    // LOAD_INTEGER 26 and LOAD_ABS 27 read a word, LOAD_INTEGER32 30 two (`DSA.cpp:1100-1137`).
     operands: (word) => {
       const where = (word >> 6) & 0x1f;
       return where === 26 || where === 27 ? 1 : where === 30 ? 2 : 0;
@@ -84,7 +84,7 @@ const COMMANDS: Record<number, CommandLayout> = {
   8: { name: 'EQUAL', stateShift: 6, stateBits: 10, maxState: -512, operands: none },
   9: {
     name: 'QUESTION', stateShift: 6, stateBits: 4, maxState: 2,
-    // Both branches' words are stepped over whichever is taken (`DSA.cpp:868-927`).
+    // Both branches' words are stepped over whichever is taken (`DSA.cpp:869-928`).
     operands: (word) => (((word >> 11) & 3) !== 0 ? 1 : 0) + ((word >> 10) & 1)
       + (((word >> 14) & 3) !== 0 ? 1 : 0) + ((word >> 13) & 1),
   },
@@ -93,7 +93,7 @@ const COMMANDS: Record<number, CommandLayout> = {
   13: { name: 'STORE', stateShift: 11, stateBits: 5, maxState: -16, operands: none },
   14: { name: 'COPYTELEPORTER32', stateShift: 10, stateBits: 6, maxState: -32, operands: copyTeleporter(true) },
   15: { name: 'MESSAGE32', stateShift: 12, stateBits: 4, maxState: -8, operands: message(true) },
-  // `numCase`, then four words a case (`DSA.cpp:1002-1032`).
+  // `numCase`, then four words a case (`DSA.cpp:1003-1033`).
   16: { name: 'CASE', stateShift: 6, stateBits: 10, maxState: -512, operands: (_w, p, pc) => 1 + 4 * (p[pc] ?? 0) },
   17: { name: 'VARIABLEFETCH', stateShift: 13, stateBits: 3, maxState: -4, operands: none },
   18: { name: 'VARIABLESTORE', stateShift: 13, stateBits: 3, maxState: -4, operands: none },

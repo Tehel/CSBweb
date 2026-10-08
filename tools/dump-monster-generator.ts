@@ -2,10 +2,10 @@
  * A monster generator (actuator type 6) fired by its timer.
  *
  * `ProcessTimers` loads the timer's level before it runs the timer
- * (`doc/CSBwin-src/CSBCode.cpp:6416-6417`), so the generator works on its own level
+ * (`doc/CSBwin-src/CSBCode.cpp:6475-6476`), so the generator works on its own level
  * whatever the party's: the hit-point multiplier is the actuator's, or that level's
  * `experienceMultiplier()` when the actuator's is 0 (`Timer.cpp:1782-1786`), and
- * `CreateMonster`'s `MoveObject` puts the group on `d.LoadedLevel` (`Code11f52.cpp:2857`),
+ * `CreateMonster`'s `MoveObject` puts the group on `d.LoadedLevel` (`Code11f52.cpp:2892`),
  * at the generator's x and y. Each member's hit points are
  * `baseHealth * multiplier + STRandom() % (baseHealth / 4 + 1)` (`Monster.cpp:207`).
  *

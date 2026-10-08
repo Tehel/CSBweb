@@ -1,6 +1,6 @@
 /**
  * `SubstituteCharacterNames`, the end of every `DecodeText`
- * (`doc/CSBwin-src/CSBCode.cpp:5367-5482`, called at `:5666`).
+ * (`doc/CSBwin-src/CSBCode.cpp:5432-5547`, called at `:5731`).
  *
  * 1. **The rules**, on texts built here: `.Q.A` is the champion holding the cursor,
  *    `.Q.B` to `.Q.E` the first to fourth, `.Q.F` to `.Q.K` nothing; `.R.` and four

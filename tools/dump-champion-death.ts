@@ -1,7 +1,7 @@
 /**
  * However a champion dies, they must leave bones.
  *
- * `KillCharacter` (`doc/CSBwin-src/Character.cpp:2526`) is the *only* way a champion's
+ * `KillCharacter` (`doc/CSBwin-src/Character.cpp:2531`) is the *only* way a champion's
  * hit points reach zero in CSBWin, and everything that matters afterwards hangs off it:
  * the possessions drop, a `misc_BonesOfHero` with `value(2)` appears in the champion's
  * corner, the expool records the bones↔fingerprint pairing the Altar of Vi resolves
@@ -12,10 +12,10 @@
  * Two paths in this port used to do exactly that, so a champion killed by exhaustion or
  * by a missile was unresurrectable and a party wiped by either did not lose the game:
  *
- *   - `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4413`) turns an overshoot below
+ *   - `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4451`) turns an overshoot below
  *     zero into `DamageCharacter(chIdx, overshoot/2, 0, 0)` — mask and kind both zero,
  *     so exhaustion bypasses armour and cannot wound, but it can kill;
- *   - `ProcessMissileEncounter`'s party arm (`:1947-1958`, `:2044-2056`) resolves the
+ *   - `ProcessMissileEncounter`'s party arm (`:1982-1993`, `:2079-2091`) resolves the
  *     corner to a champion, asks `DetermineMagicDamage` for the blow, and applies it
  *     with `DamageCharacter(chIdx, damage, 12, kind)`.
  *
@@ -24,7 +24,7 @@
  * projectile kinds, where the interesting part is not the numbers — they are random —
  * but which *arm* each projectile takes, which the `kind` and poison columns give away.
  *
- * Last, it checks `DamageCharacter`'s early guards (`Character.cpp:2712-2717`): the
+ * Last, it checks `DamageCharacter`'s early guards (`Character.cpp:2717-2722`): the
  * recruit in a Hall of Champions mirror and a won game are unhurtable, and the blow is
  * cut to 16 bits first.
  *
@@ -293,7 +293,7 @@ function report(label: string, a: Aftermath): void {
   check(a.expoolRecord, `${label}: and an expool record, so the Altar of Vi can resolve them`);
   check(a.dropped, `${label}: every possession was dropped`);
   check(a.gameIsLost, `${label}: with nobody left alive, the game is lost`);
-  // `pcA3->facing = (ui8)d.partyFacing` (`doc/CSBwin-src/Character.cpp:2650`).
+  // `pcA3->facing = (ui8)d.partyFacing` (`doc/CSBwin-src/Character.cpp:2655`).
   check(a.facesParty, `${label}: and the dead champion faces the party's way`);
 }
 
@@ -429,7 +429,7 @@ function main(): void {
 
     // The non-obvious one: `RNPoison` is handled *before* the kind is ever changed, so
     // a poison cloud keeps the default kind 3 while every other spell does not
-    // (`doc/CSBwin-src/Code11f52.cpp:1585-1591`).
+    // (`doc/CSBwin-src/Code11f52.cpp:1620-1626`).
     const poison = of('poison cloud', RN_POISON);
     check(poison.kind === 3, 'a poison cloud keeps the default kind 3, unlike every other spell');
     check(poison.poisonStrength >= 10 && poison.poisonStrength <= 25, 'and its poison strength is (0..15) + 10');
@@ -438,7 +438,7 @@ function main(): void {
 
   /* ------------------------------------ 6. who cannot be hurt ------------------- */
   //
-  // `DamageCharacter`'s early guards (`doc/CSBwin-src/Character.cpp:2712-2717`), in
+  // `DamageCharacter`'s early guards (`doc/CSBwin-src/Character.cpp:2717-2722`), in
   // order: no champion, the recruit standing in a Hall of Champions mirror
   // (`return chIdx+1`), a won game (`return d.Word11694`), and a blow that is not
   // positive once cut to 16 bits (`D7W = sw(damage)`). The first two return non-zero,
@@ -476,10 +476,10 @@ function main(): void {
 
   /* ------------------------------------ 7. DropAllPossessions -------------------- */
   //
-  // `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2499-2520`) empties the slots in
+  // `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2504-2525`) empties the slots in
   // `d.DropOrder` order, through `RemoveCharacterPossession`, and sets each object down
   // with `MoveObject(obj, -1, 0, partyX, partyY)`. `AddObjectToRoom` appends
-  // (`doc/CSBwin-src/Code11f52.cpp:392`), so the cell's chain must list the dropped
+  // (`doc/CSBwin-src/Code11f52.cpp:427`), so the cell's chain must list the dropped
   // objects in `DropOrder` order, not slot order — and on an open pit they fall.
   console.log('');
   console.log('=== DropAllPossessions ===');
@@ -531,7 +531,7 @@ function main(): void {
       check(at.length === 1 && at[0]!.z > pit.z, 'a possession dropped over an open pit falls through it');
 
       // C31: `KillCharacter` sets the bones down with the same `MoveObject(objD4, -1, 0,
-      // partyX, partyY)` (`doc/CSBwin-src/Character.cpp:2636-2645`), so they fall too, and
+      // partyX, partyY)` (`doc/CSBwin-src/Character.cpp:2641-2650`), so they fall too, and
       // `expool.AddChampionBonesRecord(objD4, …)` still pairs them wherever they land.
       const bones = everyBones(g2);
       console.log('the bones are at '
@@ -548,10 +548,10 @@ function main(): void {
   /* ------------------------------ 8. RemoveCharacterPossession ------------------ */
   //
   // C30. `DropAllPossessions` takes every slot out through `RemoveCharacterPossession`
-  // (`doc/CSBwin-src/Character.cpp:1822-1930`), which undoes what wearing or holding an
+  // (`doc/CSBwin-src/Character.cpp:1827-1935`), which undoes what wearing or holding an
   // object did: round the neck an Illumulet gets `value(0)` and takes `d.Word1074[2]` off
-  // `d.Brightness`, a Jewel Symal gets `value(0)` (`:1860-1876`); in the weapon hand a
-  // scroll closes (`:1891-1895`); in either hand a torch goes out (`:1897-1904`).
+  // `d.Brightness`, a Jewel Symal gets `value(0)` (`:1865-1881`); in the weapon hand a
+  // scroll closes (`:1896-1900`); in either hand a torch goes out (`:1902-1909`).
   console.log('');
   console.log('=== RemoveCharacterPossession ===');
   {
@@ -574,7 +574,7 @@ function main(): void {
     const scroll = newRecord(g, DBType.SCROLL, { open: true, textReference: 0 });
     const illumulet = newRecord(g, DBType.MISC, { specialState: 1, important: false, miscType: illumuletType });
     const symal = newRecord(g, DBType.MISC, { specialState: 1, important: false, miscType: symalType });
-    // What `AddCharacterPossession` would have left (`:2006-2022`): worn, so `value(1)`,
+    // What `AddCharacterPossession` would have left (`:2011-2027`): worn, so `value(1)`,
     // and the Illumulet's step added to the party's light.
     const before = g.ctx.party.state.brightness;
     g.ctx.party.state.brightness = before + step;
@@ -601,9 +601,9 @@ function main(): void {
 
   /* ------------------------------ the killing blow's tick draws before it ends ---- */
   // A monster's blow lands inside `ProcessTimers`, but only as `d.PendingDamage`. The
-  // tick draws the viewport (`doc/CSBwin-src/CSBCode.cpp:638`), then
-  // `DisplayCharacterDamage` (`:657`) takes the blow off the HP and kills, and the tick
-  // finds the game lost and returns (`:658`, `:778`). So the frame is drawn with the
+  // tick draws the viewport (`doc/CSBwin-src/CSBCode.cpp:648`), then
+  // `DisplayCharacterDamage` (`:667`) takes the blow off the HP and kills, and the tick
+  // finds the game lost and returns (`:668`, `:788`). So the frame is drawn with the
   // champion still standing; the dead box is `KillCharacter`'s own blit.
   {
     console.log('');

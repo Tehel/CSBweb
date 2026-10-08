@@ -96,12 +96,12 @@ function clampInt(value: number, min: number, max: number): number {
 /**
  * `d.IdentityColorMap`: the colour map that leaves every colour as it is. `ShrinkBLT`'s
  * colour maps hold ten times the colour, the value its `switch (D5W/10)` decodes into
- * bit planes (`doc/CSBwin-src/Graphics.cpp:457-476`).
+ * bit planes (`doc/CSBwin-src/Graphics.cpp:466-485`).
  */
 export const IDENTITY_COLOR_MAP = new Uint8Array([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]);
 
 /**
- * `ShrinkBLT` (`doc/CSBwin-src/Graphics.cpp:380`) for chunky pixels.
+ * `ShrinkBLT` (`doc/CSBwin-src/Graphics.cpp:381`) for chunky pixels.
  *
  * The 68000 version walks the source with a 16.16 fixed-point accumulator and picks the
  * nearest source pixel: it is a nearest-neighbour minifier, with the colour map applied
@@ -154,7 +154,7 @@ export function shrinkBlt(
 }
 
 /**
- * `Mirror` (`doc/CSBwin-src/CSBCode.cpp:4361`): the bitmap flipped left to right. CSBWin
+ * `Mirror` (`doc/CSBwin-src/CSBCode.cpp:4426`): the bitmap flipped left to right. CSBWin
  * flips the buffer in place; this returns a new one.
  */
 export function mirrorBitmap(src: IndexedBitmap): IndexedBitmap {
@@ -205,7 +205,7 @@ function normalizeRectInclusive(rect: RectPos, dstWidth: number, dstHeight: numb
 /**
  * Semantic port of CSBWin `TAG0088b2` for palette-index buffers.
  *
- * CSBWin signature (Graphics.cpp:559):
+ * CSBWin signature (Graphics.cpp:571):
  *   TAG0088b2(src, dst, dstRect, srcOffsetX, srcOffsetY, srcByteWidth, dstByteWidth, transparentColor)
  *
  * Here we treat all coordinates as pixels:
@@ -289,7 +289,7 @@ export function tag0088b2Index(
 }
 
 /**
- * CSBWin `TAG0088b2` with its own argument list (`doc/CSBwin-src/Graphics.cpp:559`), for the
+ * CSBWin `TAG0088b2` with its own argument list (`doc/CSBwin-src/Graphics.cpp:571`), for the
  * callers that pass explicit offsets and line widths instead of a `RectPos`'s source bytes.
  * Widths are CSBWin's bytes per line (two pixels a byte). The source is addressed as CSBWin
  * addresses it, `src + srcY*srcByteWidth + srcX/2`, so an `srcX` past a line's end reads on
@@ -330,12 +330,12 @@ export function bltShapeToViewportIndex(
   dst: PaletteIndexViewportBuffer,
   rect: RectPos
 ): void {
-  // CSBWin `BltShapeToViewport()` (CSBCode.cpp:2930) uses transparentColor=10.
+  // CSBWin `BltShapeToViewport()` (CSBCode.cpp:2986) uses transparentColor=10.
   tag0088b2Index(src, dst, rect, 10);
 }
 
 /**
- * CSBWin `TAG008c98` (`doc/CSBwin-src/Graphics.cpp:1169-1316`). It fills a temporary bitmap
+ * CSBWin `TAG008c98` (`doc/CSBwin-src/Graphics.cpp:1193-1340`). It fills a temporary bitmap
  * as wide as `rect` in whole 16-pixel groups, `w_2 = (x2 - x1) / 16 + 1`, and as tall, then
  * blits it into `rect` through `TAG0088b2` with `P10`/`P11` as the source offsets and `P9` as
  * the transparent colour. `P8` is the destination's bytes per line.
@@ -400,7 +400,7 @@ function groupPixel(bitmap: IndexedBitmap, group: number, i: number): number {
 /**
  * The canvas's 8-bit channel for each Atari intensity, 0 to 7: the intensity times 36.
  * CSBWin's straight palette is RGB555, each intensity five bits `(i << 2) | (i >> 1)`
- * (`CreateOverlayTable`, `doc/CSBwin-src/Graphics.cpp:3069-3090`), which Windows widens to
+ * (`CreateOverlayTable`, `doc/CSBwin-src/Graphics.cpp:3096-3117`), which Windows widens to
  * eight; only the viewport through the overlay is shown so (`OverlayScreen.ts`). A
  * deliberate divergence (`DEBT.md` H).
  */

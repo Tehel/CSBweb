@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "node tools/run-checks.mjs",
-    "fetch-csbwin-src": "node tools/fetch-csbwin-src.mjs",
+    "fetch-csbwin-src": "tsx tools/fetch-csbwin-src.ts",
     "preview": "vite preview",
     "start": "node server/server.ts",
     "deploy": "utils/deploy.sh"

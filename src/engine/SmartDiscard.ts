@@ -3,12 +3,12 @@
  * (weapons, clothing, misc) has three quarters of its maximum in use, throw away the
  * objects least worth keeping, one per tick.
  *
- * The main loop calls it with `false` on every tick (`CSBCode.cpp:678`), and it does one
+ * The main loop calls it with `false` on every tick (`CSBCode.cpp:688`), and it does one
  * step of a cycle through the three databases: count fifty records a step; if the count
- * reaches `Max * 3/4` (6000, `CSB.h:1646`), scan the dungeon fifty objects a step into a
+ * reaches `Max * 3/4` (6000, `CSB.h:1649`), scan the dungeon fifty objects a step into a
  * list of the 200 most discardable; then discard one a step, highest priority first,
- * until the count drops below the limit. A game read (`CSBCode.cpp:10636`) and the tail
- * of a save (`SaveGame.cpp:1245`) call it with `true`, which starts it over.
+ * until the count drops below the limit. A game read (`CSBCode.cpp:10760`) and the tail
+ * of a save (`SaveGame.cpp:1343`) call it with `true`, which starts it over.
  *
  * The file's statics are CSBWin's module state, not `d.`, and no save carries them: they
  * are `ctx.smartDiscard` here.

@@ -3,8 +3,8 @@
  * before the boot.
  *
  * CSBWin plays whatever its directory holds: the command line's `directory=` or
- * `config.txt`'s `DIRECTORY` (doc/CSBwin-src/CSBUI.cpp:2032, :799), read before
- * `_AskWhatToDo`, which offers no dungeon (doc/CSBwin-src/CSBCode.cpp:11338-11444). Its
+ * `config.txt`'s `DIRECTORY` (doc/CSBwin-src/CSBUI.cpp:2057, :819), read before
+ * `_AskWhatToDo`, which offers no dungeon (doc/CSBwin-src/CSBCode.cpp:11573-11679). Its
  * code does not branch on the game: the tables, the title and the credits all come from
  * the directory's `graphics.dat`, so everything the page builds comes from the set.
  *
@@ -29,7 +29,7 @@ export interface DataSet {
     dir: string;
     /**
      * Whether the folder holds a `CSBgraphics.dat`, CSBWin's extensions' overlay, which it
-     * opens only on demand (doc/CSBwin-src/Graphics.cpp:1840-1858, :3201-3273). The CSB
+     * opens only on demand (doc/CSBwin-src/Graphics.cpp:1864-1882, :3228-3300). The CSB
      * package ships none, and neither does the DM Windows one.
      */
     csbGraphics: boolean;

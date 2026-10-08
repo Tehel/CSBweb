@@ -3,7 +3,7 @@
  * with its ornament (`TAG004b26`), `DrawDoorSwitch`, and `DrawTeleporter` with
  * `GraphicRandom`, the stream its shimmer reads. The bytecode's `StdDrawDoor`,
  * `StdDrawDoorSwitch` and `StdDrawTeleporter` pop their arguments and call these, as
- * CSBWin's `Interpret` does (`doc/CSBwin-src/Viewport.cpp:2589-2610`, `:2886-2896`).
+ * CSBWin's `Interpret` does (`doc/CSBwin-src/Viewport.cpp:2596-2617`, `:2893-2903`).
  */
 
 import type { RectPos } from '../../data/tables/UITables';
@@ -19,7 +19,7 @@ import {
 import { viewportRandom, type ViewportDraw } from './ViewportDraw';
 
 /**
- * `DrawDoor` (`doc/CSBwin-src/CSBCode.cpp:4134`): door record `db0Index` in `doorState`
+ * `DrawDoor` (`doc/CSBwin-src/CSBCode.cpp:4199`): door record `db0Index` in `doorState`
  * (0 open … 4 closed, 5 bashed), from `graphicNum`, the two door-type graphics of
  * `d.DoorGraphic` at this distance, `nearness` 0 F3, 1 F2, 2 F1, into `rect`, the door's
  * ten rectangles.
@@ -53,12 +53,12 @@ export function DrawDoor(
   if (s === 0) return; // fully open
 
   // `DrawDoor` copies the door's graphic into `tempBitmap` and draws on the copy
-  // (`doc/CSBwin-src/CSBCode.cpp:4151-4154`). The port copies only when an ornament is
+  // (`doc/CSBwin-src/CSBCode.cpp:4216-4219`). The port copies only when an ornament is
   // drawn, and again after a mirror or a flip, whose result is cached and shared.
   let bitmap: IndexedBitmap = graphic;
   let ownBitmap = false;
   const drawOrnament = (ornament: number, near: number) => {
-    if (ornament === 0) return; // `TAG004b26` returns at once (`:4002`)
+    if (ornament === 0) return; // `TAG004b26` returns at once (`:4067`)
     if (!ownBitmap) {
       bitmap = { width: bitmap.width, height: bitmap.height, pixels: bitmap.pixels.slice() };
       ownBitmap = true;
@@ -66,14 +66,14 @@ export function DrawDoor(
     TAG004b26(draw, bitmap, ornament, near);
   };
 
-  drawOrnament(record.ornateNumber, nearness); // `:4155`
+  drawOrnament(record.ornateNumber, nearness); // `:4220`
 
   // A "lightning door" (`d.DoorTOC[doorType] & 0x400`) redraws with a random
   // mirror and a random vertical flip every frame it isn't bashed
-  // (`doc/CSBwin-src/CSBCode.cpp:4156-4166`) — CSBWin's cheap energy-field
+  // (`doc/CSBwin-src/CSBCode.cpp:4221-4231`) — CSBWin's cheap energy-field
   // shimmer. `STRandomBool()` there reads whatever stream is currently swapped
   // into `d.RandomNumber`, which `DrawViewport` sets to a viewport-only stream for
-  // exactly this reason (`doc/CSBwin-src/Viewport.cpp:6706-6707`) — rendering must
+  // exactly this reason (`doc/CSBwin-src/Viewport.cpp:6713-6714`) — rendering must
   // never perturb the game's own RNG, so this draws from a dedicated instance.
   const isLightningDoor = ((draw.context.doorTOC?.[doorType] ?? 0) & 0x400) !== 0;
   if (isLightningDoor && s !== 5) {
@@ -87,7 +87,7 @@ export function DrawDoor(
     }
   }
 
-  // The near door under See-Thru-Walls (`:4168-4174`).
+  // The near door under See-Thru-Walls (`:4175-4181`).
   if (rect === draw.context.doorRects?.F1 && draw.context.seeThroughWalls) drawOrnament(17, 2);
 
   const blit = (r: RectPos | undefined) => {
@@ -96,7 +96,7 @@ export function DrawDoor(
   };
 
   if (s === 4 || s === 5) {
-    if (s === 5) drawOrnament(16, nearness); // bashed (`:4184`)
+    if (s === 5) drawOrnament(16, nearness); // bashed (`:4191`)
     blit(rect[0]);
     return;
   }
@@ -112,7 +112,7 @@ export function DrawDoor(
 }
 
 /**
- * `TAG004b26` (`doc/CSBwin-src/CSBCode.cpp:3993-4059`): draws door ornament `ornament`,
+ * `TAG004b26` (`doc/CSBwin-src/CSBCode.cpp:4058-4124`): draws door ornament `ornament`,
  * slot `ornament - 1` of `d.Word2514`, onto `door`, a copy of the door's graphic at
  * `nearness` (0 F3, 1 F2, 2 F1), with colour 9 transparent. At F1 the ornament is its
  * graphic; nearer than that it is shrunk from its F1 size to the rectangle's through
@@ -155,7 +155,7 @@ function TAG004b26(draw: ViewportDraw, door: IndexedBitmap, ornament: number, ne
 }
 
 /**
- * `DrawDoorSwitch` (`doc/CSBwin-src/CSBCode.cpp:4065`): door switch `doorSwitchId` (0 none)
+ * `DrawDoorSwitch` (`doc/CSBwin-src/CSBCode.cpp:4130`): door switch `doorSwitchId` (0 none)
  * at `distance` (3 the nearest), graphic `315 + doorSwitchId - 1`. The nearest is
  * recorded in `doorSwitchRects`, where a click finds it.
  */
@@ -201,7 +201,7 @@ export function DrawDoorSwitch(draw: ViewportDraw, doorSwitchId: number, distanc
 }
 
 /**
- * `GraphicRandom`'s state (`doc/CSBwin-src/CSBCode.cpp:566`): a C function-static, which
+ * `GraphicRandom`'s state (`doc/CSBwin-src/CSBCode.cpp:576`): a C function-static, which
  * lives for the whole process rather than one call. The teleporter's shimmer is this
  * counter advancing frame over frame, not the caller re-seeding it, so it lives at module
  * level, past the one `BytecodeInterpreter` each redraw builds, or every frame would
@@ -210,7 +210,7 @@ export function DrawDoorSwitch(draw: ViewportDraw, doorSwitchId: number, distanc
 export const graphicRandomState = { r: 12345 };
 
 /**
- * `GraphicRandom` (`doc/CSBwin-src/CSBCode.cpp:564`).
+ * `GraphicRandom` (`doc/CSBwin-src/CSBCode.cpp:574`).
  *
  * `r = r * ui32(0xbb40e62d) + 11;` is a 32-bit-wraparound multiply in C — free.
  * JS's `*` operator is not: `r` and `0xbb40e62d` are each up to ~2^32, so their
@@ -228,7 +228,7 @@ export function GraphicRandom(maxExclusive: number): number {
 }
 
 /**
- * `DrawTeleporter` (`doc/CSBwin-src/CSBCode.cpp:4266-4302`): the shimmer over `wallRect`,
+ * `DrawTeleporter` (`doc/CSBwin-src/CSBCode.cpp:4331-4367`): the shimmer over `wallRect`,
  * `TAG008c98` from graphic `73 + x1` of `teleporterRect`, masked by graphic
  * `69 + (y2 & 0x7f)` (mirrored with bit 7 set) unless `y2` is 0xff, with `y1` as `P9` and
  * `uByte6` as the source's x offset. The mask is the graphic's first `uByte4 * uByte5`

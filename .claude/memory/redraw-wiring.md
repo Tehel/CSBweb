@@ -9,7 +9,7 @@ The port has no per-animation-frame render. `DrawViewport` (`renderView` in `src
 `GameScreen.drawViewport`) runs only where CSBWin calls it:
 
 - once per main-loop tick, from `game.onTick` in `wire()`, skipped while an inventory is
-  open or the party sleeps (`CSBCode.cpp:636-637`);
+  open or the party sleeps (`CSBCode.cpp:646-647`);
 - a script's tick, through `GameHost.drawViewport`.
 
 A game's first view (start, restart, a load) is the tick `MainLoop` opens with:
@@ -27,7 +27,7 @@ moved (`takeCursorMoved`), as CSBWin's VBL handler alone draws the cursor. A red
 screen takes about as long.
 
 `Game.gameTick` runs `onTickCallbacks` where CSBWin's tick calls `DrawViewport`
-(`doc/CSBwin-src/CSBCode.cpp:638`): after the timers and after `loadNewPartyLevel`,
+(`doc/CSBwin-src/CSBCode.cpp:648`): after the timers and after `loadNewPartyLevel`,
 before the game-lost check.
 
 **Why:** a frame that shows a state one tick early or late is decided by where these
@@ -35,4 +35,4 @@ hooks fire inside `gameTick`, and that is not visible from the renderer. A `Draw
 off the tick advances `GraphicRandom` and changes the teleporter's shimmer.
 
 **How to apply:** for a timing symptom on screen, open `Game.gameTick` next to
-`CSBCode.cpp:600-778` first. See [[one-tick-late-is-ordering]] and [[two-step-level-change]].
+`CSBCode.cpp:610-788` first. See [[one-tick-late-is-ordering]] and [[two-step-level-change]].

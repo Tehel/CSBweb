@@ -2,16 +2,16 @@
  * The DSA `I_` operations (the indirect family), each run through
  * `DsaSystem.execute` as a program of a test DSA on a genuine save (`csbgame7.dat`).
  *
- * 1. **No `ESL_INDIRECTACTIONS`, no action** (`Indirect`, `doc/CSBwin-src/DSA.cpp:2109-2120`):
+ * 1. **No `ESL_INDIRECTACTIONS`, no action** (`Indirect`, `doc/CSBwin-src/DSA.cpp:2110-2121`):
  *    in a dungeon with no such location an `I_` operation does nothing, not even pop.
- * 2. **The record and its timer** (`:2131-2191`, the counts at `:4957-4971`): the operands
+ * 2. **The record and its timer** (`:2132-2192`, the counts at `:4958-4972`): the operands
  *    popped into `[type, numVar, the values, array, its variables, numParam, the
  *    parameters]`, in `EXPOOL` under a `TT_ParameterMessage` timer to the location,
  *    corner 0, message type 0, due now, `parameterMessageSequence` in `uByte5`. An array
  *    of more than 20 sends nothing, once popped.
- * 3. **`&%DELAY`** (`:4972-4978`, `:2175-2179`): a delay above 0 puts off the next record
- *    only, and lasts no longer than its run (`:5355`).
- * 4. **`&%INDIRECT`** (`:2345-2391`): a record back on the stack, in the variables from
+ * 3. **`&%DELAY`** (`:4973-4979`, `:2176-2180`): a delay above 0 puts off the next record
+ *    only, and lasts no longer than its run (`:5356`).
+ * 4. **`&%INDIRECT`** (`:2346-2392`): a record back on the stack, in the variables from
  *    the index it names, and in the first parameters, whose count stays the record's; then
  *    its operation runs. A record that names no `I_` operation does nothing.
  * 5. **End to end**: the test square is the location, so its DSA receives what it sent.
@@ -32,7 +32,7 @@ import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { globalStore, int, op, run, varFetch, varStore } from './lib/dsa';
 import { check, finish } from './lib/check';
 
-/** `(EDT_SpecialLocations << 24) | ESL_INDIRECTACTIONS` (`doc/CSBwin-src/CSB.h:1534`, `:1540`). */
+/** `(EDT_SpecialLocations << 24) | ESL_INDIRECTACTIONS` (`doc/CSBwin-src/CSB.h:1537`, `:1543`). */
 const INDIRECT_ACTIONS_KEY = (3 << 24) | 5;
 
 const here = (at: Position): number => locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 });

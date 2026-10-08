@@ -4,7 +4,7 @@
  * CSBWin's `m_timerQueue` is a min-heap over `TIMER::operator<`
  * (`doc/CSBwin-src/Timer.cpp:765-810`), kept by `AdjustTimerQueue` (`:831-896`) as
  * `SetTimer`, `DeleteTimer` and `GetNextTimerEntry` change it, and a save carries the
- * array as it stood (`SaveGame.cpp:1693-1699`). What is invisible without this:
+ * array as it stood (`SaveGame.cpp:1819-1825`). What is invisible without this:
  *
  * 1. **CSBWin's own heaps.** Every committed save's queue is checked with `CheckTimers`'
  *    test (`Timer.cpp:932-953`) under the port's `timerLess`. The saves were written by
@@ -23,7 +23,7 @@
  *    IAIDO's action, due at the saved `d.Time`, is gone.
  * 5. **The table's size.** A new game's table is 100 slots, and one per record of the
  *    monster database and of the missile and cloud ones, each the file's count plus
- *    `d.Byte7302`'s extra records (`SaveGame.cpp:2549`, `:2556-2564`, `:2612-2616`). Every
+ *    `d.Byte7302`'s extra records (`SaveGame.cpp:2761`, `:2768-2776`, `:2824-2828`). Every
  *    committed save of the stock dungeon was written with that table, so each file's
  *    `gb2.MaxTimers` is the canary for `Byte7302`'s offset in graphics.dat item 0x22f.
  *    Then a table filled by hand: within five of full, `SetTimer` moves the cursor to
@@ -248,7 +248,7 @@ function checkLoadedGames(files: string[]): void {
       ? before.find((t) => t.function === TimerFunction.TT_11 && t.time === saved)
       : undefined;
     // The first tick runs its timers on the saved `d.Time`, then turns the clock
-    // (`LoadGame`, SaveGame.cpp:1624; CSBCode.cpp:626, :660).
+    // (`LoadGame`, SaveGame.cpp:1748; CSBCode.cpp:636, :670).
     const now = game.ctx.state.tickCount;
     game.systems.timer.processTimers();
     game.ctx.state.tickCount++;

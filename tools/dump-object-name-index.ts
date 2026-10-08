@@ -91,7 +91,7 @@ const EXPECTED: Array<[keyof typeof OBJNI, string]> = [
  *
  * `objNI_FirstModifiableObject` and `objNI_LastModifiableObject` are aliases of
  * `objNI_Compass_N` and `objNI_Scroll` (`Objects.h:440`, `:472`), and `RN::NameIndex`
- * is one `if` over the pair (`doc/CSBwin-src/data.cpp:617-622`): an index inside it
+ * is one `if` over the pair (`doc/CSBwin-src/data.cpp:618-623`): an index inside it
  * gets the dynamic treatment — the compass turns with the party, a torch reads its
  * burn state — and one outside is returned as it stands. Get either end wrong and the
  * *other* objects misbehave, which is why they are pinned to their aliases rather than
@@ -145,7 +145,7 @@ function main(): void {
 
   // The strongest canary here. Every modifiable object owns two or three *consecutive*
   // slots that all carry the same string — the name does not change when the item is
-  // charged, only the icon does (`doc/CSBwin-src/data.cpp:627-660`). So an `_a`
+  // charged, only the icon does (`doc/CSBwin-src/data.cpp:628-661`). So an `_a`
   // constant must be the **first** slot of such a run: its name repeats forwards and
   // differs from the slot before it. That is what an off-by-one cannot survive, and it
   // is what catches a slip inside a group, where the shared string alone would not.
@@ -170,7 +170,7 @@ function main(): void {
     check(names[i] !== names[i - 1], `and ${constant} is the first of that run, not inside it`);
   }
 
-  // The full-flask window is a range test in `RN::NameIndex` (`data.cpp:623-626`), so
+  // The full-flask window is a range test in `RN::NameIndex` (`data.cpp:624-627`), so
   // both ends have to bracket flasks and nothing else.
   const first = OBJNI.OBJNI_FIRST_FULL_FLASK;
   const last = OBJNI.OBJNI_LAST_FULL_FLASK;

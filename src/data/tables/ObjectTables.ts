@@ -17,10 +17,10 @@ export type ViewportPositionTable = { x: number; y: number }[][][]; // [3][10][5
 export type MonsterPositionTable = { x: number; y: number }[][][]; // [3][11][5]
 
 /**
- * `WEAPONDESC` (doc/CSBwin-src/CSB.h:1349) — one 6-byte record per weapon type.
+ * `WEAPONDESC` (doc/CSBwin-src/CSB.h:1352) — one 6-byte record per weapon type.
  *
  * `uByte1` is a class number that decides which skill a throw draws on
- * (`DetermineThrowingDistance`, doc/CSBwin-src/Character.cpp:2331-2353): 0 or 2 adds
+ * (`DetermineThrowingDistance`, doc/CSBwin-src/Character.cpp:2336-2358): 0 or 2 adds
  * mastery of skill 4, below 16 adds skill 10, 16-111 adds skill 11. `uByte2` is added
  * straight to the throwing distance, and `uByte3` is the throw's damage contribution.
  */
@@ -76,20 +76,20 @@ export interface ObjectTables {
   monsterGraphics: MonsterGraphicDesc[]; // d.Item6414[27]
   uByte9672: Uint8Array; // d.uByte9672[8]
   /**
-   * `d.DoorCharacteristics[4]` (doc/CSBwin-src/Data.h:1073). A level picks two of
+   * `d.DoorCharacteristics[4]` (doc/CSBwin-src/Data.h:1088). A level picks two of
    * these by its `doorType0Index`/`doorType1Index` to form `d.DoorTOC[2]`
-   * (doc/CSBwin-src/CSBCode.cpp:5780-5783). The low byte is the force needed to bash
+   * (doc/CSBwin-src/CSBCode.cpp:5845-5848). The low byte is the force needed to bash
    * the door; bit 8 marks a door monsters may walk through
    * (doc/CSBwin-src/Monster.cpp:320).
    */
   doorCharacteristics: Int16Array;
-  /** `d.MonsterDroppings[40]` (doc/CSBwin-src/Data.h:1074). */
+  /** `d.MonsterDroppings[40]` (doc/CSBwin-src/Data.h:1089). */
   monsterDroppings: Int16Array;
   /**
-   * `d.Byte10340[4]` (doc/CSBwin-src/Data.h:1069) — the first four bytes of graphic
+   * `d.Byte10340[4]` (doc/CSBwin-src/Data.h:1084) — the first four bytes of graphic
    * `0x22f`, holding `0x00 0x55 0xaa 0xff`. Each entry is a facing replicated into
    * all four 2-bit fields, used as the facing byte for a group that has no `ITEM16`
-   * and therefore faces one way as a whole (doc/CSBwin-src/Code11f52.cpp:229).
+   * and therefore faces one way as a whole (doc/CSBwin-src/Code11f52.cpp:264).
    */
   byte10340: Uint8Array;
   missileGraphics: MissileGraphicDesc[]; // d.struct5688[14]
@@ -117,14 +117,14 @@ export interface ObjectTables {
   objDescWord4: Uint16Array; // d.ObjDesc[180].word4 (carry locations mask)
   objDescObjectType: Uint16Array; // d.ObjDesc[180].objectType (object name index)
   /**
-   * `d.Byte7302[16]` (doc/CSBwin-src/Data.h:1099): the extra records a new game gives each
-   * database (`doc/CSBwin-src/SaveGame.cpp:2556-2564`), read as unsigned there.
+   * `d.Byte7302[16]` (doc/CSBwin-src/Data.h:1114): the extra records a new game gives each
+   * database (`doc/CSBwin-src/SaveGame.cpp:2768-2776`), read as unsigned there.
    */
   byte7302: Uint8Array;
   objectNames: string[]; // d.ObjectNames[199]
   weaponWeights: Uint8Array; // d.weapons[46].weight
   /**
-   * `d.weapons[46]` — the whole `WEAPONDESC` (doc/CSBwin-src/CSB.h:1349), which
+   * `d.weapons[46]` — the whole `WEAPONDESC` (doc/CSBwin-src/CSB.h:1352), which
    * `TAG0099d2` (doc/CSBwin-src/Code51a4.cpp:2875) looks up by weapon type. Only
    * `weight` was read before, so everything downstream of `uByte1`/`uByte2`/`uByte3`
    * — throwing distance, throw damage, the throw skill gain — had to be estimated.
@@ -133,14 +133,14 @@ export interface ObjectTables {
   clothingWeights: Uint8Array; // d.ClothingDesc[58].weight
   /**
    * `d.ClothingDesc[58].uByte1` — the armour strength a garment contributes
-   * (doc/CSBwin-src/CSB.h:1700, read by `TAG009470`,
-   * doc/CSBwin-src/Character.cpp:167).
+   * (doc/CSBwin-src/CSB.h:1703, read by `TAG009470`,
+   * doc/CSBwin-src/Character.cpp:168).
    */
   clothingArmour: Uint8Array;
   /**
    * `d.ClothingDesc[58].uByte2` — flags. Bit 7 marks a shield, i.e. a garment that
    * counts when held in a hand rather than worn
-   * (doc/CSBwin-src/Character.cpp:2415).
+   * (doc/CSBwin-src/Character.cpp:2420).
    */
   clothingFlags: Uint8Array;
   byte8946: Uint8Array; // d.Byte8946[54]
@@ -150,40 +150,40 @@ export interface ObjectTables {
   wallDecorationRectSets: DecorationDesc[][]; // d.wallDecorationPosition[8][13]
   wallDecorationRectSetIndex: Uint8Array; // d.Byte4100[60]
 
-  // Wall text helpers (DrawWallDecoration, CSBCode.cpp:3258+)
+  // Wall text helpers (DrawWallDecoration, CSBCode.cpp:3319+)
   wallTextRect: RectPos; // d.Byte4192 rect for mortar joint removal
   wallTextLineY2: Uint8Array; // d.Byte4196[4]
   /**
    * `d.Byte4212[16]`: the bottom of a wall text's plaque seen from afar, by distance and
    * line count, `[3 * wallDecorationDerivedGraphicOffset[relativePosition] + numLine - 1]`
-   * for one to three lines (`doc/CSBwin-src-20230608/CSBCode.cpp:3649-3660`).
+   * for one to three lines (`doc/CSBwin-src/CSBCode.cpp:3649-3660`).
    */
   wallTextPlaqueY2: Uint8Array;
   /** `d.WallDecorationDerivedGraphicOffset[12]`: which of five distances a relative position is. */
   wallDecorationDerivedGraphicOffset: Uint8Array;
 
-  // Wall decoration alcove markers (CSBCode.cpp:205-219, Data.h:1174-1177)
+  // Wall decoration alcove markers (CSBCode.cpp:215-229, Data.h:1189-1192)
   alcoveDecorationIndices: Uint8Array; // d.Byte4038[4]
   fountainDecorationIndex: number; // d.Word4040[0]
 
-  // Door switch helpers (DrawDoorSwitch, CSBCode.cpp:4065+)
+  // Door switch helpers (DrawDoorSwitch, CSBCode.cpp:4130+)
   doorSwitchRectIndex: Uint8Array; // d.Byte4124[2]
   doorSwitchRectSets: DecorationDesc[][]; // d.Byte5094[?][4]
   doorSwitchSourceDescSets: DecorationDesc[][]; // d.Byte5076[?][4]
 
-  // Door ornaments (TAG004b26, doc/CSBwin-src/CSBCode.cpp:3993-4059)
+  // Door ornaments (TAG004b26, doc/CSBwin-src/CSBCode.cpp:4058-4124)
   /**
    * `d.Byte5070[18*set + 6*nearness]`: where an ornament goes on the door's bitmap, per
    * position set and nearness (0 F3, 1 F2, 2 F1). `Byte5070[12]` is declared short, and
    * `TAG004b26` reads its four 18-byte sets on into `Byte5058[60]`, which follows it
-   * (`Data.h:1149-1150`); `Byte5058[18*set]`, the source size of a shrink, is set's F1 entry.
+   * (`Data.h:1164-1165`); `Byte5058[18*set]`, the source size of a shrink, is set's F1 entry.
    */
   doorOrnamentRectSets: DecorationDesc[][];
   doorOrnamentRectSetIndex: Uint8Array; // d.Byte4122[12], a door ornament's position set
   doorOrnamentColorMapF3: Uint8Array; // d.Byte4172[16]
   doorOrnamentColorMapF2: Uint8Array; // d.Byte4188[16]
 
-  // Floor decorations (DrawFloorDecorations, CSBCode.cpp:3780+)
+  // Floor decorations (DrawFloorDecorations, CSBCode.cpp:3845+)
   floorDecorationDescSets: DecorationDesc[][]; // d.floorDecorDesc[3][9]
   floorDecorationRectSetIndex: Uint8Array; // d.Byte4110[10]
   relativeCellGraphicIncrement: Uint8Array; // d.RelativeCellGraphicIncrement[10]
@@ -195,7 +195,7 @@ export interface ObjectTables {
 }
 
 /**
- * `DecodeText`'s escape strings (`doc/CSBwin-src/CSBCode.cpp:5559-5574`): `d.Byte10080`
+ * `DecodeText`'s escape strings (`doc/CSBwin-src/CSBCode.cpp:5624-5639`): `d.Byte10080`
  * after code 29, `d.Byte10336` (wall text) or `d.Byte10016` (any other) after 30.
  */
 export interface TextDecodeTables {
@@ -213,7 +213,7 @@ const GRAPHIC_22F_INDEX = 0x22f; // 559
 const ABS_WALL_RECTANGLES = 3074;
 const ABS_WORD7246 = 7246;
 const ABS_WORD7222 = 7222;
-const ABS_WORD2530 = 2530; // Word2530[2], the last 4 bytes of graphic 0x22e (Data.h:1316)
+const ABS_WORD2530 = 2530; // Word2530[2], the last 4 bytes of graphic 0x22e (Data.h:1331)
 const ABS_WORD7162 = 7162;
 const ABS_WORD7042 = 7042;
 const ABS_S6982 = 6982; // ITEM110[3]
@@ -593,7 +593,7 @@ function readMonsterDesc22f(raw: Uint8Array): MonsterDesc[] {
       word2: readU16BE(raw, base + 2),
       word4: readU16BE(raw, base + 4),
       // CSBWin rejects a zero time-per-move and forces it to 1, with a message box
-      // (doc/CSBwin-src/CSBCode.cpp:10163-10173). A zero would divide by nothing in
+      // (doc/CSBwin-src/CSBCode.cpp:10287-10297). A zero would divide by nothing in
       // NextMonsterUpdateTime, so keep the clamp.
       movementTicks06: Math.max(1, raw[base + 6] ?? 0),
       attackTicks07: raw[base + 7] ?? 0,
@@ -844,7 +844,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   }
   const doorSwitchRectSets = readDecorationDescSets(raw22e, doorSwitchRectOffset, doorSwitchSetCount, 4);
   const doorSwitchSourceDescSets = readDecorationDescSets(raw22e, doorSwitchSourceDescOffset, doorSwitchSetCount, 4);
-  // Four sets: `TAG004b26` asserts the set is below 4 (`CSBCode.cpp:4021`).
+  // Four sets: `TAG004b26` asserts the set is below 4 (`CSBCode.cpp:4086`).
   const doorOrnamentRectSets = readDecorationDescSets(raw22e, doorOrnamentRectOffset, 4, 3);
   const doorOrnamentRectSetIndex = raw22e.slice(doorOrnamentRectSetIndexOffset, doorOrnamentRectSetIndexOffset + 12);
   const doorOrnamentColorMapF3 = raw22e.slice(doorOrnamentColorMapF3Offset, doorOrnamentColorMapF3Offset + 16);

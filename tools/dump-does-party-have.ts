@@ -1,7 +1,7 @@
 /**
  * `DoesPartyHave` — actuator type 8's test — looks inside carried chests and at the cursor.
  *
- * `doc/CSBwin-src/Code11f52.cpp:3622-3680`: for every champion with `HP() != 0`, each of
+ * `doc/CSBwin-src/Code11f52.cpp:3657-3715`: for every champion with `HP() != 0`, each of
  * the 30 possessions is compared by `GetBasicObjectType` with the actuator's value, and a
  * possession that is a chest (`objNI_Chest`, 0x90) has its `contents()` chain compared too.
  * Then a `goto` back into the loop does the same for `d.objectInHand`, whoever holds it.

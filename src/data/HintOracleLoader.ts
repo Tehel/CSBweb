@@ -1,8 +1,8 @@
 /**
  * `hcsb.hct` and `hcsb.dat`, the data of Chaos Strikes Back's Hint Oracle.
  *
- * CSBWin's HINT choice (`_StartHint`, `doc/CSBwin-src/Hint.cpp:6454`) reads it in
- * `_TAG006c7e_xxx` (`:5395-5505`); `doc/CSBWIN_HINT_ORACLE_REFERENCE.md` has the format.
+ * CSBWin's HINT choice (`_StartHint`, `doc/CSBwin-src/Hint.cpp:7231`) reads it in
+ * `_TAG006c7e_xxx` (`:6139-6249`); `doc/CSBWIN_HINT_ORACLE_REFERENCE.md` has the format.
  * In short, all words big-endian:
  *
  * ```
@@ -19,7 +19,7 @@
  * `pageCount - 1` chunk lengths after it are 0.
  *
  * CSBWin deciphers the file with `RC4.cpp`'s cipher when the save's `hintKey` is set
- * (`:5401-5405`), and `readHintOracle` does too, under the running world's key. Every save
+ * (`:6145-6149`), and `readHintOracle` does too, under the running world's key. Every save
  * this project has carries a zero key (`doc/PROVEN_FACTS.md` → "The Extended Features
  * header a live game writes"), and the shipped file is plain.
  *
@@ -35,7 +35,7 @@ import { GraphicsLoader } from './GraphicsLoader';
 /** `#define MAXHINTINDICES 9` (`doc/CSBwin-src/Hint.cpp:11`): the titles the menu shows. */
 export const MAXHINTINDICES = 9;
 
-/** `sizeof(f.Byte12792)` (`Hint.cpp:333`): the buffer a hint's pages are expanded into. */
+/** `sizeof(f.Byte12792)` (`Hint.cpp:461`): the buffer a hint's pages are expanded into. */
 export const HINT_TEXT_BUFFER_SIZE = 2240;
 
 /** A location record's x and y both 0xff: the hint applies anywhere on its level. */
@@ -90,7 +90,7 @@ function hintKeyStream(hintKey: Uint8Array): Uint8Array {
 /**
  * `hcsb.hct` as the Oracle reads it under `hintKey`: plain when the key's first byte is 0,
  * and otherwise deciphered, each byte by its place in the file, as every `READ` of a file
- * `SETENCIPHERED` gives it (`doc/CSBwin-src/Hint.cpp:5401-5405`, `:5625-5629`,
+ * `SETENCIPHERED` gives it (`doc/CSBwin-src/Hint.cpp:6145-6149`, `:6375-6379`,
  * `system.cpp:301-313`). The cipher is a XOR, so this also enciphers a plain file. Throws
  * on anything `_TAG006c7e_xxx` would reject.
  */
@@ -112,7 +112,7 @@ export function parseHintOracle(file: Uint8Array): HintOracle {
         if (at + 2 > file.length) throw new Error(`hcsb.hct: truncated at ${at}`);
         return readU16BE(file, at);
     };
-    // Error 55 and 81 (`Hint.cpp:5409-5415`).
+    // Error 55 and 81 (`Hint.cpp:6153-6159`).
     if (word(0) !== 2) throw new Error('hcsb.hct: first word is not 2 (enciphered?)');
     if (word(2) !== 13) throw new Error('hcsb.hct: second word is not 13');
     let at = 2 * word(4);
@@ -175,9 +175,9 @@ export function parseHintOracle(file: Uint8Array): HintOracle {
 /**
  * The hints the Oracle offers a party on `level` at (`x`, `y`), in menu order.
  *
- * `_TAG00799a_9` (`doc/CSBwin-src/Hint.cpp:6108-6120`): a record applies when its level is
+ * `_TAG00799a_9` (`doc/CSBwin-src/Hint.cpp:6866-6878`): a record applies when its level is
  * the party's and its square is the party's or is (0xff, 0xff). The list is not cut, but
- * the menu shows only the first `MAXHINTINDICES` (`_TAG00799a_6`, `:5998`).
+ * the menu shows only the first `MAXHINTINDICES` (`_TAG00799a_6`, `:6756`).
  */
 export function hintsAtPosition(oracle: HintOracle, level: number, x: number, y: number): number[] {
     const found: number[] = [];
@@ -190,7 +190,7 @@ export function hintsAtPosition(oracle: HintOracle, level: number, x: number, y:
 }
 
 /**
- * `hcsb.dat`'s four items, as `_TAG0051c2_1` reads them (`Hint.cpp:4028-4054`).
+ * `hcsb.dat`'s four items, as `_TAG0051c2_1` reads them (`Hint.cpp:4748-4774`).
  * What each word of `segment1` does is in `doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Item 0".
  */
 export interface HcsbDat {
@@ -204,7 +204,7 @@ export interface HcsbDat {
     palette: number[];
 }
 
-/** `i16 Segment1_16872[50]` (`Hint.cpp:246`). */
+/** `i16 Segment1_16872[50]` (`Hint.cpp:374`). */
 export const HCSB_SEGMENT1_WORDS = 50;
 
 /** Parse `hcsb.dat`. Throws where `ReadDatSeg` would read past an item into its buffer. */

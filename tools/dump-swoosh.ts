@@ -195,7 +195,7 @@ const SCRIPT_BY_VBL: readonly (readonly [number, readonly (readonly [number, num
   [30, [[15, 0x770], [14, 0x770]]],
 ];
 const FINAL_PALETTE = [0x000, 0x777, 0x777, 0x777, 0x777, 0x777, 0x777, 0x777, 0x000, 0x777, 0x555, 0x777, 0x555, 0x222, 0x770, 0x770];
-/** `_FadeToPalette`'s eight VBLs (`doc/CSBwin-src/Graphics.cpp:1601`). */
+/** `_FadeToPalette`'s eight VBLs (`doc/CSBwin-src/Graphics.cpp:1625`). */
 const FADE_VBLS = 8;
 
 async function checkScript(swoosh: Swoosh): Promise<void> {

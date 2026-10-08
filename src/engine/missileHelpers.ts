@@ -103,7 +103,7 @@ export function constructPredefinedMissile(dungeon: DungeonState, missileType: n
 
 /**
  * A missile timer's `timerWord8`, as `LaunchMissile` packs it
- * (`doc/CSBwin-src/Magic.cpp:64-69`): the cell in bits 0-4 and 5-9, the direction in
+ * (`doc/CSBwin-src/Magic.cpp:67-72`): the cell in bits 0-4 and 5-9, the direction in
  * 10-11, and in 12-15 the decay rate, the energy each step costs.
  */
 export function decodeMissileTimerWord8(word8: number): { x: number; y: number; dir: number; deltaEnergy: number } {

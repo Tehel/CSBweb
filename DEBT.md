@@ -42,8 +42,8 @@ and no session picks one up unless the author names it:
 - **A save of a dungeon the port does not know** (G22).
 - **CSBWin's debugging features** that are not part of the game: the ASCII dump, and the
   DSA trace, whose flags `WriteDSAs` follows the DSAs with, an `EDBT_DSAtraces` record
-  (`DSAIndex.WriteTracing()`, `doc/CSBwin-src/SaveGame.cpp:989-993`) that a read takes
-  back (`DSAINDEX::ReadTracing`, `DSA.cpp:5553-5576`). The port writes none.
+  (`DSAIndex.WriteTracing()`, `doc/CSBwin-src/SaveGame.cpp:1014-1018`) that a read takes
+  back (`DSAINDEX::ReadTracing`, `DSA.cpp:5554-5577`). The port writes none.
 - **Comparing frames against CSBWin's own screenshots** (`PLAN.md` → Phase 15, step 5):
   staging the same scene in CSBWin, without cheats, costs more than it proves.
 - **X — Extras**: gameplay features CSBWin does not have, wanted by the author once the
@@ -184,7 +184,7 @@ non-negotiable rule", once the author has seen it in play (the inventory's Oracl
 button makes it reachable, in the `csb` set) and judged whether it is worth it.
 
 Once a title list is up, each title line goes through `TAG0062a2` with `byte16528`,
-colour 12 to 9 (`doc/CSBwin-src/Hint.cpp:4785-4802`). Slot 9 is the one the title list
+colour 12 to 9 (`doc/CSBwin-src/Hint.cpp:5513-5530`). Slot 9 is the one the title list
 cycles through shades of red, so the line's background and its frame pulse together.
 `TAG0062a2` copies the rectangle with `TAG0088b8`'s lines, `(w + 16) / 16` sixteen-pixel
 groups for `w + 1` pixels, but passes `ShrinkBLT` `w` by `h`, whose lines are
@@ -206,11 +206,11 @@ The decision is the author's, after a look in play:
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 
-Not a divergence yet: the port does what CSBWin's source does. Recorded because the
-20230608 binary the author plays may do otherwise (`.claude/memory/csbwin-binary-newer-than-source.md`).
+Not a divergence yet: the port does what CSBWin's source does. Recorded because only play
+can tell whether the binary the author plays, CSBWin 20230608, does what its source says.
 
 Conflux 3.5 calls `&JITTER` seven times. It pops `yOverlay`, `xOverlay`, `yGraphic` and
-`xGraphic` (`doc/CSBwin-src/DSA.cpp:4903-4930`), and six of the calls push 0 for both
+`xGraphic` (`doc/CSBwin-src/DSA.cpp:4904-4931`), and six of the calls push 0 for both
 overlay values. The seventh, DSA 125 ("Jitter S0: P1x, P2y, P3 ticks …"), state 0 and 1,
 action 7, pushes its variables 0 and 1 and `&OVER`s them both, so the overlay jitter is the
 graphic jitter. Four actuators select DSA 125: level 29 (15,16), and level 39 (30,16),
@@ -219,23 +219,22 @@ graphic jitter. Four actuators select DSA 125: level 29 (15,16), and level 39 (3
 With the overlay up and `xOverlayJitter` other than 0, `UpdateViewportArea` stops in
 `NotImplemented`, the game's end (`doc/CSBwin-src/WinScreen.cpp:1121-1196`), and so does
 the port (`UpdateViewportArea`, `src/renderer/csbwin/OverlayScreen.ts`); `yOverlayJitter`
-is read nowhere. The 20230608 source is the same at both places (`UpdateViewportArea` and
-`&JITTER`, `doc/CSBwin-src-20230608/WinScreen.cpp`, `DSA.cpp`), so that build stops too
-unless it was not built from its own source. Paying it: the author plays those squares in
-CSBWin 20230608, and if the game goes on there, ports what that binary draws.
+is read nowhere. The 2016 source is the same at both places, so every build stops there
+unless the binary was not built from its source. Paying it: the author plays those squares
+in CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
 ### CSBWin's changes from 2016 to 2023
 
-Paul Stevens went on changing CSBWin after the source the port follows, up to the build
-the author plays. `doc/CSBwin-src/` is `CSBwin_SRC_20160923.zip` from
-dianneandpaul.net/CSBwin/, "Version 15.9" (`CSBwin.rc:322`), with the author's cosmetic
-edits in `CSBCode.cpp`, `RC4.cpp`, `SaveGame.cpp` and `Data.h`. 15.9 is a side branch of
+`doc/CSBwin-src/` is `CSBwin_SRC_20230608.7z` from dianneandpaul.net/CSBwin/, the main
+line's last source and the build the author plays ("Version 2023.06.08", `CSBwin.rc:313`),
+CRLF turned to LF and nothing else changed. `doc/CSBwin-src-20160923/` is the previous
+reference, `CSBwin_SRC_20160923.zip`, "Version 15.9", with the author's cosmetic edits in
+`CSBCode.cpp`, `RC4.cpp`, `SaveGame.cpp` and `Data.h`: a side branch of
 `CSBwin_SRC_20160325` (15.8) whose only change is accessors for a monster's `word20`, so it
-behaves as 15.8. `doc/CSBwin-src-20230608/` is `CSBwin_SRC_20230608.7z`, the main line's
-last source (gitignored like the other, CRLF turned to LF, nothing else changed).
+behaves as 15.8. It is gitignored, in git history as `doc/CSBwin-src/`, and stays until
+C157's review list is worked through.
 
-Every change of that diff that alters what the port has is ported, citing the 2023 file
-and line, with no H entry, since C157 makes that source the reference. The rest changes
+Every change between the two that alters what the port has is ported. The rest changes
 nothing the port has: the 64-bit port (`uintptr_t`,
 and typed structs in `Chaos.cpp` and `Hint.cpp`, whose allocator fixes are in code the port
 never had), `TranslateLanguage` hooks (G21), the playfile (G29), and the Linux and
@@ -248,18 +247,30 @@ Raspberry Pi front-ends. Two changes are not taken:
 
 ### C157 ⏳ CSBWin 20230608 becomes the reference
 
-Steps:
+`doc/CSBwin-src/` is the 2023 tree, `doc/CSBWIN_SYMBOL_INDEX.tsv` is built from it, and
+every citation of a 2016 line was mapped to its 2023 line through the diff by
+`tools/recite-csbwin.py`, which maps every unchanged line exactly. Two steps are left:
 
-1. **Swap the trees.** `doc/CSBwin-src-20230608/` replaces `doc/CSBwin-src/`, and
-   `node tools/gen-csbwin-index.mjs` rebuilds `doc/CSBWIN_SYMBOL_INDEX.tsv`.
-2. **Re-cite.** About 3,400 `doc/CSBwin-src/<File>:<line>` citations in 360 files (code
-   comments, `doc/`, tools, this file) point at 2016 lines. Map each line through the diff
-   by script, not by hand. A line whose code changed is checked by eye, and its fact
-   rewritten if 2023 changed it.
-3. **Review every divergence.** Each H entry, each C entry and each `CLAUDE.md` exception
-   is checked against 2023: one that 2023 fixed is no longer a divergence. The
-   `memmove-source-first` memory and `CLAUDE.md` → "The one non-negotiable rule" name the
-   tree; the `csbwin-binary-newer-than-source` memory is deleted.
+1. **The review list**, `doc/C157-review.tsv`: the citations the script could not settle
+   alone, one a row, with the line it is on (`where`; the row's `text` finds it if lines
+   moved), the citation as it now reads and the 2016 one it came from (read against
+   `doc/CSBwin-src-20160923/`). Two kinds:
+   - `changed` (about 470): the cited 2016 lines changed in 2023. Read both. If the fact
+     changed, rewrite it, and a behaviour the port lacks is a C entry; otherwise nothing.
+   - `file` (about 450): a `:N` whose file is not named beside it. The script took the
+     file its quoted identifiers point at, else the nearest; `note` gives the other
+     candidates, which map elsewhere. Confirm the file from the text, or map the 2016 line
+     from the right one.
+
+   Work it a document at a time, deleting each row once settled, about 150 rows a session.
+   `doc/PROVEN_FACTS.md` holds a quarter. When the list is empty, delete it,
+   `tools/recite-csbwin.py` and `doc/CSBwin-src-20160923/`, and the `CLAUDE.md` row that
+   names the last.
+2. **Review every divergence.** Each H entry, each C entry and each `CLAUDE.md` exception
+   is checked against 2023: one that 2023 fixed is no longer a divergence. The two changes
+   not taken ("CSBWin's changes from 2016 to 2023" above) become H entries or are ported.
+   The `memmove-source-first` memory and `CLAUDE.md` → "The one non-negotiable rule" name
+   the tree.
 
 Size L.
 
@@ -304,7 +315,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 184 checks sequentially (`spawnSync`, `:333`), each a
+`tools/run-checks.mjs` spawns its 184 checks sequentially (`spawnSync`, `:346`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and
@@ -323,18 +334,18 @@ postponed ones follow, under their own heading (see "Priority").
 `src/engine/Chaos.ts` refuses both, so a file of either form makes no adventure:
 
 - `_ReadSavedGame` unscrambles `GAMEBLOCK1` with word 29 and, if that fails, with word
-  10 (`doc/CSBwin-src/Chaos.cpp:2359-2378`), a form whose block keeps the hashes at 310
+  10 (`doc/CSBwin-src/Chaos.cpp:2964-2992`), a form whose block keeps the hashes at 310
   and the checksums at 342, and whose `TAG00260e` and `TAG002724` branches read other
-  offsets (`:2531-2538`, `:2602-2617`). Nothing else in CSBWin reads that form, the
+  offsets (`:3215-3229`, `:3314-3335`). Nothing else in CSBWin reads that form, the
   port's reader does not, and no file of it is here. `ReadSavedGame` reports it as
   damaged (message 14).
 - `_TAG000fc4` writes a new Extended Features block when `mini.dat` opened with one
-  (`:1738-1793`), from the globals the read left, with `BigActuators` set whatever the
+  (`:2141-2200`), from the globals the read left, with `BigActuators` set whatever the
   file had and no `cellFlagArraySize`. CSB's `mini.dat` has none. `TAG000fc4` throws.
 
 CSBWin 20230608 reads the word-10 form but stops when it writes its adventure: the branch
 is `NotImplemented(0xfc4)` unless `impfc4` is defined, and nothing defines it
-(`doc/CSBwin-src-20230608/Chaos.cpp:2103-2113`).
+(`doc/CSBwin-src/Chaos.cpp:2103-2113`).
 
 Paying it needs a file of each form, or the author's decision to port them unchecked.
 
@@ -347,18 +358,16 @@ Not taken in order; the author names one to start it (see "Priority").
 The messages the executable prints are string literals in CSBWin: " MUMBLES A MEANINGLESS
 SPELL.", " RESURRECTED", "HEALTH", the skill titles, the menus. `ReadTranslationFile` reads
 `Translation.txt` from the game directory: one pair of quoted strings a line, English then
-translation, and `//` comment lines (`doc/CSBwin-src/Translation.cpp:14-58`, called at
-`CSBUI.cpp:906`). `TranslateLanguage` swaps a literal for its pair, and returns it unchanged
+translation, and `//` comment lines (`doc/CSBwin-src/Translation.cpp:131-175`, called at
+`CSBUI.cpp:927`). `TranslateLanguage` swaps a literal for its pair, and returns it unchanged
 when it has none. The port prints the English literals, so the French 1.3 set
 (`dm-atari-1.3-fr`) plays with French objects, scrolls and walls, and English messages.
 
-The 2016 source translates at 24 call sites, and some messages not at all: " JUST GAINED A "
-(`Magic.cpp:175`). CSBWin 20230608 translates at about a hundred. It adds `QuePrintLines`'s
-`translate` argument, the level gain, the menu titles (`Menu.cpp`), the inventory's labels
-and object descriptions, scrolls and floor texts, and wall texts in their 5-bit code
-(`TranslateWallLanguage`, `doc/CSBwin-src-20230608/Translation.cpp`). It also reads the
-file into a table hashed on the first two characters. So the port follows 2023's call
-sites, after C157.
+CSBWin translates at about a hundred call sites: `QuePrintLines`'s `translate` argument
+(" JUST GAINED A ", `Magic.cpp:178`), the level gain, the menu titles (`Menu.cpp`), the
+inventory's labels and object descriptions, scrolls and floor texts, and wall texts in
+their 5-bit code (`TranslateWallLanguage`, `doc/CSBwin-src/Translation.cpp`). It reads the
+file into a table hashed on the first two characters.
 
 A French file exists: `TranslationFrench.txt` on dianneandpaul.net/CSBwin/ (2018, 201
 lines, UTF-8 with a BOM, no accents since the font has none). It is a player's work in
@@ -394,7 +403,7 @@ their own. A save is its dungeon's whole world and already loads into any runnin
 (`installCsbwinWorld`), so what is missing is what the file does not hold: the graphics
 and the tables read from `graphics.dat`, which the player would pick from the known
 dungeons' (the signatures an Extended Features block may carry,
-`doc/CSBwin-src/SaveGame.cpp:378-379`, could suggest one); a `dungeon.dat` for "RESTART
+`doc/CSBwin-src/SaveGame.cpp:380-381`, could suggest one); a `dungeon.dat` for "RESTART
 THIS GAME", so a lost game can only load a save; and a data set to list its saves under,
 which its signature can stand for.
 
@@ -402,21 +411,21 @@ which its signature can stand for.
 
 CSBWin can record a game and play it back:
 
-- **The recorder** (`RECORDFILE`, `doc/CSBwin-src/Recording.cpp:820-1080`) is the
-  "Record" menu item (`CSBUI.cpp:945-958`). It writes `logs/RecordNNNNN.log`: a version
+- **The recorder** (`RECORDFILE`, `doc/CSBwin-src/Recording.cpp:864-1300`) is the
+  "Record" menu item (`CSBUI.cpp:966-979`). It writes `logs/RecordNNNNN.log`: a version
   line, `#` option lines (`#DMRules`, `#ExtraTicks`, …), then one line per input event,
-  `time x y num random` in hex (`Recording.cpp:1054`). The `d.RandomNumber` on each line
+  `time x y num random` in hex (`Recording.cpp:1265`). The `d.RandomNumber` on each line
   is what shows that a playback has drifted. A click in the viewport is recorded by
-  `HandleClickInViewport` (`Mouse.cpp:1031`) with fewer coordinates, and every other entry
-  of the mouse queue by `_HandleMouseEvents` (`:1500-1506`).
-- **The player** (`PLAYFILE`, `Recording.cpp:152-805`) is the "Playback" menu item
-  (`CSBUI.cpp:959-966`), which turns `extraTicks` off. It reads `Playfile.log` and feeds
+  `HandleClickInViewport` (`Mouse.cpp:1032`) with fewer coordinates, and every other entry
+  of the mouse queue by `_HandleMouseEvents` (`:1634-1645`).
+- **The player** (`PLAYFILE`, `Recording.cpp:152-849`) is the "Playback" menu item
+  (`CSBUI.cpp:980-987`), which turns `extraTicks` off. It reads `Playfile.log` and feeds
   its events into the mouse queue at their ticks. It does so from the top of
-  `_HandleMouseEvents` (`Mouse.cpp:1393`), except while gravity runs.
+  `_HandleMouseEvents` (`Mouse.cpp:1494`), except while gravity runs.
 
 Conflux 3.5's Extended Features block sets `AutoRecord` (0x10), `RecordDesignOption`
-(`doc/CSBwin-src/SaveGame.cpp:401-402`): a game read from it records unless the command
-line or the menu says not to (`:2376-2391`). The port has neither, and no way to start either. It keeps only the recorder's count,
+(`doc/CSBwin-src/SaveGame.cpp:403-404`): a game read from it records unless the command
+line or the menu says not to (`:2588-2603`). The port has neither, and no way to start either. It keeps only the recorder's count,
 `totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:873-876`).
 `extraTicks` is always on (`src/engine/MovementSystem.ts:119-122`).
 
@@ -451,9 +460,9 @@ Rules for all of them:
 
 CSBWin's fountain is a wall decoration, not an actuator: the renderer sets
 `d.FacingWaterFountain` when the decoration in front is `d.Word4040[0]`
-(`doc/CSBwin-src/CSBCode.cpp:3302-3308`), and a click on viewport button 5 with it set
+(`doc/CSBwin-src/CSBCode.cpp:3363-3369`), and a click on viewport button 5 with it set
 fills a waterskin or an empty flask held in the cursor, and does nothing else
-(`doc/CSBwin-src/Mouse.cpp:1194-1225`). The port has the same thing in
+(`doc/CSBwin-src/Mouse.cpp:1195-1226`). The port has the same thing in
 `tryUseFrontWallItem` (`src/renderer/ui/ViewportPicking.ts:138`), which returns at once
 when the hand is empty.
 
@@ -518,10 +527,10 @@ monster, walk onto the cell, and check the inventory, the floor chain and the lo
 `doc/3D2D1D.md` has the whole account. The 3D2D1D dungeon (data set `3d2d1d`) loads but
 cannot be played as designed. It needs two features that `doc/CSBwin-src/` contains but
 hardwires off: `ThreeDMovements` and `GravityGame` are `false` and never assigned
-(`doc/CSBwin-src/data.cpp:239-240`).
+(`doc/CSBwin-src/data.cpp:240-241`).
 
 CSBWin 20230608 sets them from `efb.extendedFlags` bits `0x400` and `0x200`
-(`doc/CSBwin-src-20230608/SaveGame.cpp:427-430`), as the 2019 `CSBwin.exe` shipped with
+(`doc/CSBwin-src/SaveGame.cpp:427-430`), as the 2019 `CSBwin.exe` shipped with
 the dungeon does, and so does the port: `bThreeDMovements` and `bGravityGame` in
 `ctx.rules` (`readRulesOptions`, `src/data/CsbwinExtendedFeatures.ts`), which a save
 writes back (H → "A save keeps the dungeon's three 2023 flags"). Nothing reads them yet.
@@ -537,26 +546,26 @@ Two steps:
    `=` (`KeyboardEvent.code` `Minus` and `Equal`, scancodes `0x0c`/`0x0d` in
    `config.txt`) to keyscans `0x4900`/`0x4a00`. Queue them as buttons
    `0x1124`/`0x1125` when `bThreeDMovements` is set (`TAG0196da`,
-   `doc/CSBwin-src/CSBCode.cpp:8476-8490`). Hand those two buttons to the move in
-   `Game.handleMouseEvents` (`Mouse.cpp:1556-1570`). Then port `MoveParty`'s
-   `direction > 3` arm (`CSBCode.cpp:8168-8290`) into `MovementSystem`: the pit rule,
+   `doc/CSBwin-src/CSBCode.cpp:8575-8595`). Hand those two buttons to the move in
+   `Game.handleMouseEvents` (`Mouse.cpp:1695-1709`). Then port `MoveParty`'s
+   `direction > 3` arm (`CSBCode.cpp:8255-8377`) into `MovementSystem`: the pit rule,
    `TraverseStairway(direction-4, false)`, and the wall bump.
 2. **Gravity** (M). `moveHistory`, `gravityMove` and `nextGravityMoveTime`, updated in
-   `MoveParty` (`CSBCode.cpp:8041-8083`). `GravityMove` (`Mouse.cpp:1258-1342`) and its
-   hook at the head of `_HandleMouseEvents` (`:1381-1390`), which empties the queue while
-   gravity runs. CSBWin does not save the three variables (`data.cpp:245-247`), so
+   `MoveParty` (`CSBCode.cpp:8128-8170`). `GravityMove` (`Mouse.cpp:1259-1370`) and its
+   hook at the head of `_HandleMouseEvents` (`:1482-1491`), which empties the queue while
+   gravity runs. CSBWin does not save the three variables (`data.cpp:246-248`), so
    neither does the port. Two consequences, both CSBWin's own:
 
    - **No save during a slide.** While `gravityMove` is set, `_HandleMouseEvents` empties
-     the queue each pass (`Mouse.cpp:1482-1491`), so the disk icon's click is lost and
+     the queue each pass (`Mouse.cpp:1606-1625`), so the disk icon's click is lost and
      CSBWin saves only at rest. The port's F5 does not go through the queue (`GameInput`,
      `src/renderer/GameInput.ts`), so it must refuse during a slide: "CANNOT SAVE NOW", as
      for a script holding the loop (`doc/SAVES.md` → "The two keys"). The Sleepsave comes
      from a click, so the queue drops it as it drops the disk icon's.
    - **The axis history is lost.** `moveHistory` holds the order of the last three axes
      moved and the direction last moved along each (`MoveParty`,
-     `CSBCode.cpp:8128-8163`). `GravityMove` tries the axes in that order
-     (`Mouse.cpp:1260-1300`). It is initialised once, `{0,1,2,0}`, and never on a load, so
+     `CSBCode.cpp:8215-8250`). `GravityMove` tries the axes in that order
+     (`Mouse.cpp:1261-1301`). It is initialised once, `{0,1,2,0}`, and never on a load, so
      CSBWin starts from its default after a restart, or from the last game's history
      after a load. The first slide after a load may take another way than it would have.
      Three moves of the player's, one along each axis, restore it. The port starts every
@@ -622,7 +631,7 @@ Two steps, one commit each:
    - **Where.** On the source's `CHARDESC`s, with `writePortrait`, before `TAG002724`
      copies them into `mini.dat` (`makeNewAdventure`, `src/engine/Chaos.ts`). That is
      where the utility's `TAG00439e` swaps the editor's portraits in
-     (`doc/CSBwin-src/Chaos.cpp:3796-3815`), so the portraits are what the original
+     (`doc/CSBwin-src/Chaos.cpp:4632-4656`), so the portraits are what the original
      writes after a LOAD → PORTRAIT of each champion's `.CMP`. Names and titles are never
      touched, whatever the `.CMP` holds: the author's rule (what the original editor does
      to them is not established). `Chaos.ts` stays CSBWin's: the portraits come in as an
@@ -654,7 +663,7 @@ Recorded so that nobody "fixes" them.
 - 🚫 **A save keeps the dungeon's three 2023 flags.** CSBWin 20230608 reads
   `SupressDSAWarning` 0x100, `GravityGame` 0x200 and `ThreeDMovements` 0x400 from a file's
   `extendedFlags` into `SupressDSAWarningOption`, `bGravityGame` and `bThreeDMovements`
-  (`doc/CSBwin-src-20230608/SaveGame.cpp:415-416`, `:427-430`), and its `SaveGame` writes
+  (`doc/CSBwin-src/SaveGame.cpp:415-416`, `:427-430`), and its `SaveGame` writes
   none of them back (`:955-993`); the utility's `mini.dat` writes only the first
   (`Chaos.cpp:2168-2171`). So a 3D2D1D game saved in CSBWin reloads with neither the
   vertical moves nor gravity, and cannot be finished, and a dungeon that stops the
@@ -667,7 +676,7 @@ Recorded so that nobody "fixes" them.
   is the only dungeon here that sets any of them.
 - 🚫 **The canvas shows an Atari intensity times 36, not RGB555.** CSBWin hands Windows
   RGB555 pixels, its straight palette each intensity `i` as five bits `(i << 2) | (i >> 1)`
-  (`CreateOverlayTable`, `doc/CSBwin-src/Graphics.cpp:3069-3090`), which Windows widens to
+  (`CreateOverlayTable`, `doc/CSBwin-src/Graphics.cpp:3096-3117`), which Windows widens to
   8 bits as `(v << 3) | (v >> 2)`: intensities 0-7 show as 0 33 74 107 148 181 222 255.
   The port's canvas shows them as `i * 36`, 0 36 72 108 144 180 216 252
   (`atariIntensity`, `src/renderer/csbwin/CanvasBlitter.ts`, and `atariToRGB`,
@@ -696,19 +705,19 @@ Recorded so that nobody "fixes" them.
   graphics the two cannot differ on screen, and the golden frames stay as they are.
 - 🚫 **The mirrored far-right sidewalls' `srcOffsetX`.** CSBWin's third arm,
   `srcOffsetX = 15 - (finalBitmapWidth & 15)` for positions 1 and 6
-  (`doc/CSBwin-src/CSBCode.cpp:3542`), compensates for `MakeMirror` reversing a
+  (`doc/CSBwin-src/CSBCode.cpp:3603`), compensates for `MakeMirror` reversing a
   byte-aligned buffer. `getMirroredBitmap` reverses the exact bitmap, so applying it would
   shift a correctly aligned image. The reasoning is in the code.
 - 🚫 **`MakeBigActuators` reads the actuator's type, not CSBWin's byte-order slip.** CSBWin
   converts the actuators of a file without the `BigActuators` flag before their byte swap
-  (`doc/CSBwin-src/SaveGame.cpp:2601-2608`), so it takes bits 8-14 of `word2` for the
+  (`doc/CSBwin-src/SaveGame.cpp:2813-2820`), so it takes bits 8-14 of `word2` for the
   type where the port takes the type itself (`doc/PROVEN_FACTS.md` → "`MakeBigActuators`
   runs before the byte swap"). The two differ only for a type-47 actuator under either
   reading: DM has none, Conflux's file has the flag, and `tools/dump-dungeon-conversions.ts`
   fails for a dungeon that has one.
 - 🚫 **A kill of `alternateGraphics` 4 to 7 is counted nowhere.** `ProcessMonsterDeleteFilter`
   indexes the kill statistics' four longwords with the three-bit subtype unchecked
-  (`doc/CSBwin-src/Code11f52.cpp:955`, `:960`): a new record's count goes into the stack past
+  (`doc/CSBwin-src/Code11f52.cpp:990`, `:995`): a new record's count goes into the stack past
   its array, an existing one's into the pool past the record. The port writes the record
   of zeros and raises no count (`MonsterDamage.processMonsterDeleteFilter`).
 - 🚫 **`CHARDESC.load` is recomputed** from the possessions, rather than cached and adjusted
@@ -750,7 +759,7 @@ Recorded so that nobody "fixes" them.
   text, 600 after "THE END.", 4713 in all on the shipped dungeon. The reason: what CSBWin
   shows is a side effect of its making the strip a queue. `RemoveTimedOutText` and
   `PrintLines` still carry, commented out, the waits that held the caller until a scroll
-  was over (`doc/CSBwin-src/CSBCode.cpp:1498-1502`, `:1682-1685`). That the Atari
+  was over (`doc/CSBwin-src/CSBCode.cpp:1508-1512`, `:1699-1702`). That the Atari
   original, with those waits, showed every text is an inference, not a verified fact. No
   other script's wait runs the clock, and no other message is placed sooner than
   CSBWin's. `tools/dump-fusion.ts` checks it from a strip that has printed nothing and
@@ -762,12 +771,12 @@ Recorded so that nobody "fixes" them.
   `handleAttackAreaClick`, `src/renderer/ui/Attack.ts`). `_MagicSelection`'s callers
   (`handleMagicClick`, `handleUIKey`) do nothing after it, and the rest of the pass it
   holds runs in the VBL the script ends (`Game.runFrame`). What is left is `HandleMouseEvents`' `lastTime = d.Time`
-  (`doc/CSBwin-src/Mouse.cpp:1647-1649`), stamped at the click, which nothing reads after
+  (`doc/CSBwin-src/Mouse.cpp:1786-1788`), stamped at the click, which nothing reads after
   the credits.
 - 🚫 **A champion carried into a new adventure keeps their sex.** `TAG002724` masks
   `charFlags` with `LE16(LE16(wordGear(+48) & 16))`, which on the little-endian build
   keeps 0x1000 of the file's word and clears `CHARFLAG_male`
-  (`doc/CSBwin-src/Chaos.cpp:2644`). Nothing in CSBWin reads the flag, so it shows
+  (`doc/CSBwin-src/Chaos.cpp:3381`). Nothing in CSBWin reads the flag, so it shows
   nowhere; the author's decision is to keep it all the same. The port keeps
   `CHARFLAG_male` and clears the rest, as the mask reads (`TAG002724`,
   `src/engine/Chaos.ts`; `tools/dump-new-adventure.ts`).
@@ -777,15 +786,15 @@ Recorded so that nobody "fixes" them.
   the marching order"). The port writes them to no one and does the rest: whoever stood on
   the target square still moves (`tag0025a6`, `src/renderer/ui/Mouse.ts`).
 - 🚫 **A fifth rune is refused.** `TAG01b990` writes the rune at `byte33`, then sets
-  `byte33 = (byte33 + 1) & 3` (`doc/CSBwin-src/CSBCode.cpp:8985-8988`), so after four
+  `byte33 = (byte33 + 1) & 3` (`doc/CSBwin-src/CSBCode.cpp:9090-9093`), so after four
   runes CSBWin's keypad shows the first row again and the next rune starts a new
   incantation over the old one. The author's decision: the port refuses any rune past the
   fourth, and the keypad keeps showing the fourth row (`tag01b990` and
   `drawSpellPanel`, `src/renderer/ui/MagicPanel.ts`). A save still carries `byte33` as
   CSBWin's writers leave it, `strlen(incantation) & 3` (`CsbwinCharacters.ts`).
 - 🚫 **No caster tab without mana.** `DrawSpellControls` draws a tab for every champion
-  whose `HP()` is not zero (`doc/CSBwin-src/Character.cpp:4994-5087`), and
-  `_HandleMagicClick` picks among them (`Magic.cpp:596-699`). The author's decision: the
+  whose `HP()` is not zero (`doc/CSBwin-src/Character.cpp:5019-5112`), and
+  `_HandleMagicClick` picks among them (`Magic.cpp:599-702`). The author's decision: the
   port draws no tab for a champion whose maximum mana is zero, and neither a click nor a
   key selects one (`drawSpellControls` and `handleMagicClick`,
   `src/renderer/ui/MagicPanel.ts`; `selectCaster`, `src/renderer/ui/Keyboard.ts`). The tab
@@ -806,22 +815,22 @@ Recorded so that nobody "fixes" them.
   length and `drawFoodWaterPanel` reads each label at its own width. Every other set gets
   CSBWin's numbers (`doc/PROVEN_FACTS.md` → "The French 1.3 `graphics.dat`: longer
   words").
-- 🚫 **The vertical-move guard** in `MoveParty` (`CSBCode.cpp:8200-8204`) is not ported,
+- 🚫 **The vertical-move guard** in `MoveParty` (`CSBCode.cpp:8287-8291`) is not ported,
   because nothing in the port reaches it. Move Up / Down (`0x1124` / `0x1125`) come only
   from the 3DMaze extension's `ThreeDMovements` keys and `GravityMove`, which X5 ports with
   the guard. The 2016 source cannot reach it either: its flags are initialised `false`
-  (`data.cpp:239-240`) and assigned nowhere in the tree.
+  (`data.cpp:240-241`) and assigned nowhere in the tree.
 - 🚫 **The main loop makes one pass a VBL, not one a message.** CSBWin's loop makes a pass
-  for every message the UI hands it (`doc/CSBwin-src/CSBUI.cpp:1253-1272`): each VBL's
+  for every message the UI hands it (`doc/CSBwin-src/CSBUI.cpp:1274-1293`): each VBL's
   `UIM_VBL` (`system.cpp:624-630`), and a mouse button going down, which pushes a message
-  of its own (`CSBUI.cpp:1185-1201`, `:1207-1222`). Every pass runs `HandleMouseEvents`,
-  the tick if `d.clockTick` is set, and takes one print-queue entry (`CSBCode.cpp:714-765`).
+  of its own (`CSBUI.cpp:1206-1222`, `:1228-1243`). Every pass runs `HandleMouseEvents`,
+  the tick if `d.clockTick` is set, and takes one print-queue entry (`CSBCode.cpp:724-775`).
   The port's `Game.runFrame` is one pass a VBL, and `onMouseClick` only queues: a click
   waits for the next VBL, at worst about 17 ms, and takes no print-queue entry of its own.
   The author's decision: the delay is too small to matter.
 - 🚫 **`WaitForButtonFlash` does not hold the main loop's pass.** CSBWin's waits a VBL for
-  the flashed rectangle to be put back (`doc/CSBwin-src/CSBCode.cpp:8561-8601`), and so
-  does `_FlashButton` for it to be inverted (`:7713-7730`), while the port's pass never
+  the flashed rectangle to be put back (`doc/CSBwin-src/CSBCode.cpp:8666-8706`), and so
+  does `_FlashButton` for it to be inverted (`:7800-7817`), while the port's pass never
   stops between VBLs. There, `flashButton` runs its VBL's share at once, so the rectangle
   is inverted where CSBWin's is, before the rest of the pass; `waitForButtonFlash` leaves
   the put-back to the next VBL (`src/engine/LoopState.ts`). Waiting there too would put
@@ -841,7 +850,7 @@ Recorded so that nobody "fixes" them.
   so the credits picture stays up (`src/renderer/intro/ShowCredits.ts`).
 - 🚫 **A damaged save at the boot goes back to the title.** There `tag01efee` prints
   "SAVED GAME DAMAGED!" and calls `die(0xbad)`, which ends CSBWin
-  (`doc/CSBwin-src/SaveGame.cpp:1905-1907`). A page cannot end itself, so the author's
+  (`doc/CSBwin-src/SaveGame.cpp:2117-2119`). A page cannot end itself, so the author's
   decision is a one-button menu with the line and OK, whose click goes back to the title
   animation (`tag01efee` and `runBootSequence`, `src/renderer/intro/BootSequence.ts`).
   After a lost game `tag01efee` is CSBWin's own.
@@ -860,10 +869,10 @@ Recorded so that nobody "fixes" them.
   developer affordance with no CSBWin counterpart, kept deliberately: thirteen of the sixteen golden
   frames boot through it.
 - 🚫 **The `d.Word11750` countdown** in `TenSecondUpdate` is not ported. It is a
-  cursor-redraw counter set only by `CSBCode.cpp:959-965`, which has no counterpart here, so
+  cursor-redraw counter set only by `CSBCode.cpp:969-975`, which has no counterpart here, so
   the branch is dead (`src/engine/PeriodicUpdates.ts:91`).
 - 🚫 **A drawn `RandomGameID` is never 0, nor a stored save's.** CSBWin keeps the
-  product of its two draws whatever it is (`doc/CSBwin-src/SaveGame.cpp:1523-1532`), and
+  product of its two draws whatever it is (`doc/CSBwin-src/SaveGame.cpp:1638-1647`), and
   it is 0 when either low word is, about one new game in 32768. The author's decision:
   the port draws the next pair instead (`drawRandomGameID`, `src/engine/GameContext.ts`),
   which in that case leaves the stream two draws further on than CSBWin's. 0 is what a
@@ -876,7 +885,7 @@ Recorded so that nobody "fixes" them.
   checked by `tools/dump-save-menu.ts` on a store that holds a pinned stream's first ids.
 - 🚫 **A `CSBgraphics.dat` sound plays its WAV file's `data` chunk.** `ReadSound` takes the
   sample count from byte 40 and the samples from byte 44
-  (`doc/CSBwin-src/Sound.cpp:1015-1024`), which are the `data` chunk's only after a
+  (`doc/CSBwin-src/Sound.cpp:1024-1033`), which are the `data` chunk's only after a
   16-byte `fmt ` chunk. Sound 705 (`coat`) of
   both files here has a 4-byte `fact` chunk there, so CSBWin plays its four bytes, a
   click at most; the port plays the `data` chunk after it, its 4574 samples, the count
@@ -915,35 +924,35 @@ Recorded so that nobody "fixes" them.
   (`tools/dump-move-from-missile.ts`, section 3).
 - 🚫 **An index CSBWin does not bound reads nobody.** `&CHAR@`, `&TALENTS@` and
   `&TALENTS!` take an index of 0x20000 or more with bit 16 clear as `d.CH16482 + charIdx`
-  (`doc/CSBwin-src/DSA.cpp:4196`, `:4274`, `:4325`), a record over 100 MB past `d`;
+  (`doc/CSBwin-src/DSA.cpp:4197`, `:4275`, `:4326`), a record over 100 MB past `d`;
   `&CHAR@` of a champion in the wings takes `d.PendingDamage[charIdx]` off their HP, bit
-  16 and all, 128 KB past that array of four (`:4200`), and the port takes nothing; and
+  16 and all, 128 KB past that array of four (`:4201`), and the port takes nothing; and
   `&EXPERIENCE+` reads the HP of a negative one from the `d.` variables before the array,
-  then hands it to `AddToSkill` (`:4552`). The port reads zeros, leaves the talents and
+  then hands it to `AddToSkill` (`:4553`). The port reads zeros, leaves the talents and
   adds nothing (`executeAmpersand`, `src/engine/DsaSystem.ts`). A slot from 0 to 3 that no
   champion fills is a different case, and is read as CSBWin reads it
   (`PartyState.vacantCharacters`). Two more reads past an array go the same way:
   `DSADBANK::GetText` takes a text index past 9 once a text is set
-  (`doc/CSBwin-src/DSA.cpp:207-212`), and `PrintWithSubstitution`'s `@p` with no attack
-  menu open names `d.CH16482[-1]` (`Graphics.cpp:1567`); the port reads "" for both
+  (`doc/CSBwin-src/DSA.cpp:208-213`), and `PrintWithSubstitution`'s `@p` with no attack
+  menu open names `d.CH16482[-1]` (`Graphics.cpp:1591`); the port reads "" for both
   (`DsaBank.getText`, `src/engine/PrintWithSubstitution.ts`). `&LOC2ABSCOORD` of a level
   that is not there and `&MULTIPLIER@` of a negative one read a level descriptor past
-  the array (`DSA.cpp:323-324`, `:3984`): the port reads zeros. And `&VSET` with a count
+  the array (`DSA.cpp:324-325`, `:3985`): the port reads zeros. And `&VSET` with a count
   whose sum with `dst` or `src` wraps past 2^32 writes past the 100 variables
-  (`:4862`, `:4881`): the port stops at the last (`DsaSystem.vset`). `RemoveCharacter`,
+  (`:4863`, `:4882`): the port stops at the last (`DsaSystem.vset`). `RemoveCharacter`,
   with no other champion living, hands the cursor and the magic tab to slot
-  `d.NumCharacter` (`Character.cpp:5318-5335`), which `SetHandOwner` and
+  `d.NumCharacter` (`Character.cpp:5343-5360`), which `SetHandOwner` and
   `SelectMagicCaster` take when its HP is not zero: the record a slot past the party
   keeps, or, the party being four, `d.PartyFootprints[19]` past the array. The port's
   refuse any slot past the party (`removeCharacter`, `src/engine/SwapCharacter.ts`).
 - 🚫 **The Hint Oracle's ink after a button's flash is item 0's word 5.** `_TAG008c40_8`
   resets the ink from `Long16864`, which CSBWin's own comment puts at byte 8 of
-  `f.Segment1_16872`, words 4-5 (`doc/CSBwin-src/Hint.cpp:247`), but reads as
-  `f.Segment1_16872+8`, an `i16` array plus 8, words 8-9 (`:6995`): a byte offset taken
+  `f.Segment1_16872`, words 4-5 (`doc/CSBwin-src/Hint.cpp:375`), but reads as
+  `f.Segment1_16872+8`, an `i16` array plus 8, words 8-9 (`:7786`): a byte offset taken
   as a word index. The port keeps the low word of words 4-5, word 5 (9), where CSBWin
   keeps word 9's (3) (`HintOracleScreen.tag008c40_8`,
   `doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Item 0"). No pixel differs: every text is
-  drawn after an ink set of its own (`:4192-4213`, `:6985-6991`).
+  drawn after an ink set of its own (`:4920-4941`, `:7776-7782`).
 - 🚫 **The inventory's close box is the Hint Oracle's button**, in a data set with the
   Oracle's files (`csb`). CSBWin reaches the Oracle only from its launcher's HINT choice,
   which reads a saved game's square. The port has no launcher, and a button of its own
@@ -955,7 +964,7 @@ Recorded so that nobody "fixes" them.
   close box is CSBWin's (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "In the port: the
   inventory's button"; `tools/dump-hint-oracle-button.ts`).
 - 🚫 **DONE on the Hint Oracle's title list closes it.** CSBWin's goes back to the load
-  screen (`w_4 = 1`, `doc/CSBwin-src/Hint.cpp:6589-6602`), whose floppy prompts and save
+  screen (`w_4 = 1`, `doc/CSBwin-src/Hint.cpp:7375-7388`), whose floppy prompts and save
   chooser only lead to a square, and the port's Oracle has the party's
   (`HintOracleScreen.run`, `src/renderer/intro/HintOracle.ts`).
 - **Not debt** (listed so it is not raised again):

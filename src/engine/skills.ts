@@ -177,7 +177,7 @@ export function determineMastery(
 }
 
 /**
- * `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:185`). As in CSBWin, every caller gets the
+ * `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:188`). As in CSBWin, every caller gets the
  * Adjust Skills Filter DSA and, when a mastery is gained, `LevelUp` and its message.
  *
  * `experienceMultiplier` is CSBWin's `d.pCurLevelDesc->experienceMultiplier()`, the loaded
@@ -221,9 +221,9 @@ export function adjustSkills(
   }
 
   // `pcA2`, `basicSkill`, `oldMastery` and `psA3` are all taken before the filter
-  // (`Magic.cpp:233-250`), and the experience goes where they point whatever the filter
+  // (`Magic.cpp:236-253`), and the experience goes where they point whatever the filter
   // answers. Only the `skillNumber >= 4` test, `newMastery` and `LevelUp` see its
-  // `chIdx` and `skillNumber` (`:332`, `:341`, `:354`).
+  // `chIdx` and `skillNumber` (`:335`, `:344`, `:357`).
   const basicSkill = skillNumber >= 4 ? Math.floor((skillNumber - 4) / 4) : skillNumber;
   const oldMastery = determineMastery(champ, basicSkill | 0xc000, { partySleeping });
   const skills = ensureSkills(champ.skills ?? []);
@@ -271,9 +271,9 @@ export function adjustSkills(
 }
 
 /**
- * `AddToSkill` (`doc/CSBwin-src/Magic.cpp:360`): `AdjustSkills` without the time terms, the
- * multiplier or the filter. Its one caller is `&EXPERIENCE+` (`DSA.cpp:4542-4557`). The
- * experience is added as `(UI16)(experience)` (`Magic.cpp:409`, `:425`).
+ * `AddToSkill` (`doc/CSBwin-src/Magic.cpp:363`): `AdjustSkills` without the time terms, the
+ * multiplier or the filter. Its one caller is `&EXPERIENCE+` (`DSA.cpp:4543-4558`). The
+ * experience is added as `(UI16)(experience)` (`Magic.cpp:412`, `:428`).
  */
 export function addToSkill(
   ctx: GameContext,
@@ -315,7 +315,7 @@ export function addToSkill(
 }
 
 /**
- * The tail of CSBWin `LevelUp` (`doc/CSBwin-src/Magic.cpp:172-176`): a linefeed, then four
+ * The tail of CSBWin `LevelUp` (`doc/CSBwin-src/Magic.cpp:175-179`): a linefeed, then four
  * fragments in the champion's own colour, `d.Byte1386[chIdx]`, flowing onto one line.
  */
 function printLevelUp(ctx: GameContext, chIdx: number, basicSkill: number): void {
@@ -332,7 +332,7 @@ function printLevelUp(ctx: GameContext, chIdx: number, basicSkill: number): void
 
 export function levelUp(champion: Champion, basicSkill: number, rng: CsbRandom): void {
   // CSBWin's `LevelUp` draws from three different generators, in a fixed order
-  // (doc/CSBwin-src/Magic.cpp:79-160). They are not interchangeable — each advances
+  // (doc/CSBwin-src/Magic.cpp:82-163). They are not interchangeable — each advances
   // the seed once but keeps different bits — so the mapping is kept explicit here.
   const randInt = (maxExclusive: number): number => rng.below(maxExclusive); // STRandom(n)
   const randBool = (): number => rng.bool(); // STRandomBool()
@@ -349,7 +349,7 @@ export function levelUp(champion: Champion, basicSkill: number, rng: CsbRandom):
 
   // `IncrMaximum`, not `IncrCurrent`: a level gain raises the ceiling and leaves the
   // current value where it was, which is exactly what turns the stats line and the box
-  // around the eye red (`doc/CSBwin-src/Magic.cpp:98-148`).
+  // around the eye red (`doc/CSBwin-src/Magic.cpp:101-151`).
   incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Vitality], maxVitalityIncrement);
 
   const antiFireIncrement = randBool() & (~newMastery);
@@ -423,7 +423,7 @@ function clampMax(value: number, max: number): number {
 
 /**
  * `pChar->Possession(slot).NameIndex()`. An empty slot holds `RNnul`, whose `NameIndex`
- * is `objNI_NotAnObject` (`doc/CSBwin-src/CSBCode.cpp:1249`), so no guard is needed.
+ * is `objNI_NotAnObject` (`doc/CSBwin-src/CSBCode.cpp:1259`), so no guard is needed.
  */
 function getPossessionNameIndex(
   champion: Champion,

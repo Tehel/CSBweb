@@ -6,7 +6,7 @@
  * The engine of it, and not the utility's screen: the page offers it as RISE on CSB's
  * entrance (`GameSaves.makeNewAdventure`, `src/renderer/intro/PrisonDoor.ts`).
  * `makeNewAdventure` is button 13 of
- * `_TAG004518` (`:3949-3973`) on a source save `_ReadSavedGame(0)` has read, from file
+ * `_TAG004518` (`:4806-4833`) on a source save `_ReadSavedGame(0)` has read, from file
  * bytes to file bytes. Like CSBWin's, it works on the blocks as the file holds them, and
  * every field below is read and written at its `GAMEBLOCK1`, `GAMEBLOCK2` or `CHARDESC`
  * offset in the file's byte order, with CSBWin's own byte-order slips kept (`TAG002724`).
@@ -29,11 +29,11 @@ import { buildImageChecksum } from '../data/CsbwinDungeonImageWriter';
 import { computeDungeonImageLayout } from '../data/SaveGameLoader';
 import { CHARFLAG_MALE } from './gameTypes';
 
-/** `UtilityDiskMessages` (`doc/CSBwin-src/Chaos.cpp:275-318`), the ones this file shows. */
+/** `UtilityDiskMessages` (`doc/CSBwin-src/Chaos.cpp:518-561`), the ones this file shows. */
 export const UtilityDiskMessages = {
     14: '\nSAVED GAME ERROR',
     20: '\nEACH CHAMPION MUST\nHAVE A UNIQUE FIRST NAME!',
-    /** `_ReadSavedGame(1)` when `mini.dat` will not open (`:2245-2251`): the page's fetch. */
+    /** `_ReadSavedGame(1)` when `mini.dat` will not open (`:2835-2843`): the page's fetch. */
     24: 'CAN\'T FIND\nNEW ADVENTURE\nMINI.DAT',
     25: '\nTHE NEW ADVENTURE\nIS DAMAGED',
     29: 'THE NEW ADVENTURE\nCAN ONLY BE MADE AFTER\nA SAVED GAME IS LOADED.',
@@ -48,12 +48,12 @@ const BLOCK2_SIZE = 128;
 const CHARACTERS_SIZE = 3328;
 
 /**
- * One of `e.Pnt24812`'s two records, as `_ReadSavedGame` fills it (`:2207-2496`), in the
+ * One of `e.Pnt24812`'s two records, as `_ReadSavedGame` fills it (`:2789-3164`), in the
  * file's byte order.
  *
  * Only CSBWin's own form is read, the one whose `GAMEBLOCK1` unscrambles with word 29
  * (`wordGear(A4+2) == 2`). `_ReadSavedGame` falls back to word 10, a form whose block
- * keeps its hashes two bytes lower (`:2359-2378`), and which nothing else in CSBWin or
+ * keeps its hashes two bytes lower (`:2964-2992`), and which nothing else in CSBWin or
  * the port reads (`DEBT.md` G28).
  */
 export interface UtilityGame {
@@ -74,7 +74,7 @@ export interface UtilityGame {
     /**
      * `ExtendedFeaturesVersion != '@'`: whether the file opened with an Extended Features
      * block. `ReadExtendedFeatures` sets the global for the file just read
-     * (`doc/CSBwin-src/SaveGame.cpp:298-420`), so at `_TAG000fc4` it is `mini.dat`'s.
+     * (`doc/CSBwin-src/SaveGame.cpp:299-424`), so at `_TAG000fc4` it is `mini.dat`'s.
      */
     extendedFeatures: boolean;
 }
@@ -85,7 +85,7 @@ function numCharacter(game: UtilityGame): number {
 }
 
 /**
- * `_ReadSavedGame` (`doc/CSBwin-src/Chaos.cpp:2207-2496`), past the dialogs that choose
+ * `_ReadSavedGame` (`doc/CSBwin-src/Chaos.cpp:2789-3164`), past the dialogs that choose
  * the file: the record of `bytes`, or the refusal `_ReadSavedGame` shows, message 14 for
  * the saved game (`P1` 0) and 25 for `mini.dat` (`P1` 1).
  */
@@ -98,7 +98,7 @@ export function ReadSavedGame(bytes: Uint8Array, P1: 0 | 1): UtilityGame {
 }
 
 function readGame(file: Uint8Array): UtilityGame {
-    // `ReadExtendedFeatures(e.GameFile)` (`:2354`) marks an enciphered file's handle, so
+    // `ReadExtendedFeatures(e.GameFile)` (`:2957`) marks an enciphered file's handle, so
     // every read after it is deciphered.
     const extended = readExtendedFeatures(file);
     const bytes = extended.data;
@@ -118,7 +118,7 @@ function readGame(file: Uint8Array): UtilityGame {
     const item16 = stream(16 * readU16BE(block2, 46), 314, 346);
     const characters = stream(CHARACTERS_SIZE, 316, 348);
     // A name is 8 bytes and a title 20, and whatever follows a name's or a title's first
-    // zero is cleared, for each of the `numcharacter` champions (`:2405-2436`).
+    // zero is cleared, for each of the `numcharacter` champions (`:3043-3079`).
     const count = readU16BE(block2, 10);
     for (let w2 = 0; w2 < count; w2++) {
         const base = CHARDESC_SIZE * w2;
@@ -140,7 +140,7 @@ function clearAfterTerminator(buf: Uint8Array, at: number, length: number): void
 }
 
 /**
- * `TAG00142e` (`doc/CSBwin-src/Chaos.cpp:1961-2078`): the dungeon's sections, each byte
+ * `TAG00142e` (`doc/CSBwin-src/Chaos.cpp:2424-2602`): the dungeon's sections, each byte
  * summed into a word, which the word after the cell flags must equal. A file that ends
  * before that word is taken, as `ReadGameFile`'s failure there returns 1.
  */
@@ -177,7 +177,7 @@ function cString(buf: Uint8Array, at: number): string {
 }
 
 /**
- * `_CheckChampionNames` (`doc/CSBwin-src/Chaos.cpp:1434-1462`): every one of the saved
+ * `_CheckChampionNames` (`doc/CSBwin-src/Chaos.cpp:1774-1812`): every one of the saved
  * game's `e.Word24814` champions has a name, and no two the same.
  */
 export function CheckChampionNames(source: UtilityGame): void {
@@ -194,7 +194,7 @@ export function CheckChampionNames(source: UtilityGame): void {
 }
 
 /**
- * `_TAG00260e` (`doc/CSBwin-src/Chaos.cpp:2501-2546`): whether a new adventure may be
+ * `_TAG00260e` (`doc/CSBwin-src/Chaos.cpp:3169-3238`): whether a new adventure may be
  * made from the saved game. One with no party is message 29. One that is neither an
  * Atari Dungeon Master save (`Byte22596` 1) nor has `Word22594` 1, or whose
  * `Word22592` is past 13, is message 30, "ALREADY UTILIZED". Then the names.
@@ -210,7 +210,7 @@ export function TAG00260e(source: UtilityGame): void {
 }
 
 /**
- * `_TAG0026c4` (`doc/CSBwin-src/Chaos.cpp:2551-2566`): `mini.dat` is the new adventure,
+ * `_TAG0026c4` (`doc/CSBwin-src/Chaos.cpp:3243-3259`): `mini.dat` is the new adventure,
  * its `Byte22596` 2 or more and its `Word22592` 13; message 30 otherwise.
  */
 export function TAG0026c4(mini: UtilityGame): void {
@@ -219,14 +219,14 @@ export function TAG0026c4(mini: UtilityGame): void {
 }
 
 /**
- * `TAG002724` (`doc/CSBwin-src/Chaos.cpp:2571-2680`): the saved game's party copied into
+ * `TAG002724` (`doc/CSBwin-src/Chaos.cpp:3264-3451`): the saved game's party copied into
  * `mini.dat`'s record, in place.
  *
  * Three of its writes read a big-endian field as the little-endian build holds it in
  * memory. Two are ported as they run there:
  *
  * - `RandomGameID` is `LoadLong(+308) + 1`, and `LoadLong` reads the four bytes
- *   low-first (`:809-821`), so the 1 is added to the file's first byte, the field's
+ *   low-first (`:1078-1090`), so the 1 is added to the file's first byte, the field's
  *   highest.
  * - `Word22594` is set to 1 by `wordGear(+376) = 1` for an Atari save
  *   (`Byte22596` 1), which leaves the bytes `01 00`: 256, read back.
@@ -292,12 +292,12 @@ export function TAG002724(source: UtilityGame, mini: UtilityGame, random: CsbRan
 }
 
 /**
- * `_TAG000fc4(1)` (`doc/CSBwin-src/Chaos.cpp:1643-1898`): the new adventure's record
+ * `_TAG000fc4(1)` (`doc/CSBwin-src/Chaos.cpp:2001-2327`): the new adventure's record
  * written as a save file, past the dialog that names it.
  *
  * `SaveOption`'s neighbour `Byte22598` becomes 2, the sixteen hash words from 312 are
  * zeroed (`totalMoveCount` among them), each block's checksum is taken with hash 0, and
- * `GAMEBLOCK1` is written as `WriteFirstBlock` does (`:1376-1418`), which is
+ * `GAMEBLOCK1` is written as `WriteFirstBlock` does (`:1716-1758`), which is
  * `ScrambleAndWrite`'s fold. The dungeon goes out as it was read, and the word after it
  * is its byte sum.
  *
@@ -331,7 +331,7 @@ export function TAG000fc4(source: UtilityGame, mini: UtilityGame): Uint8Array {
 }
 
 /**
- * "MAKE NEW ADVENTURE" (`_TAG004518`'s button 13, `doc/CSBwin-src/Chaos.cpp:3949-3973`):
+ * "MAKE NEW ADVENTURE" (`_TAG004518`'s button 13, `doc/CSBwin-src/Chaos.cpp:4806-4833`):
  * the saved game `source` checked, `mini.dat` read and checked, the party copied in, and
  * the new adventure's save file. A refusal throws a `UtilityError` with the message
  * CSBWin shows. `random` is CSBWin's `STRandom`, which draws the food and water.

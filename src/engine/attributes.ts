@@ -1,7 +1,7 @@
 /**
  * `ATTRIBUTE` — the (maximum, current, minimum) triple CSBWin keeps for each of a
- * champion's seven attributes (`doc/CSBwin-src/CSB.h:2409-2435`, stored as
- * `CHARDESC.Attributes[7]` at `doc/CSBwin-src/CSB.h:2565`).
+ * champion's seven attributes (`doc/CSBwin-src/CSB.h:2468-2494`, stored as
+ * `CHARDESC.Attributes[7]` at `doc/CSBwin-src/CSB.h:2624`).
  *
  * The three are not decoration. Nearly everything in the champion lifecycle reads or
  * writes a *specific* one of them:
@@ -9,25 +9,25 @@
  * - **Current** is what the game plays with — `MaxLoad`, `Quickness`, spell success,
  *   `IsCharacterLucky`, the numbers in the stats panel.
  * - **Maximum** is what a level gain raises (`LevelUp` calls `IncrMaximum`, never
- *   `IncrCurrent`, `doc/CSBwin-src/Magic.cpp:98-148`), and what Current is compared
+ *   `IncrCurrent`, `doc/CSBwin-src/Magic.cpp:101-151`), and what Current is compared
  *   against to colour the stats panel red and to light the red box around the eye
- *   (`doc/CSBwin-src/Character.cpp:1379-1392`, `:4613-4626`).
+ *   (`doc/CSBwin-src/Character.cpp:1384-1397`, `:4630-4643`).
  * - **Minimum** is the floor a drain cannot push Current below
- *   (`AdjustCurrentAttribute`, `doc/CSBwin-src/Character.cpp:3900-3934`), and it is
+ *   (`AdjustCurrentAttribute`, `doc/CSBwin-src/Character.cpp:3917-3951`), and it is
  *   itself moved by worn items — a cursed object drops the Luck minimum by three
- *   (`doc/CSBwin-src/Character.cpp:1774-1776`).
+ *   (`doc/CSBwin-src/Character.cpp:1779-1781`).
  *
  * All three are stored as *unsigned bytes that are allowed to wrap*. CSBWin's own
  * comment explains why: four cursed objects take the Luck minimum of 10 below zero,
  * and the byte wraps to something enormous. The setters therefore wrap and the
  * getters return 0 for anything above 240 — that is the "it went negative" test, and
  * the wrapped value still exports to an Atari save file bit-for-bit
- * (`doc/CSBwin-src/data.cpp:1695-1741`).
+ * (`doc/CSBwin-src/data.cpp:1698-1744`).
  */
 import type { ui8 } from '../core/types';
 import type { Champion } from './gameTypes';
 
-/** `#define Luck 0 … #define AntiFire 6` (`doc/CSBwin-src/CSB.h:628-634`). */
+/** `#define Luck 0 … #define AntiFire 6` (`doc/CSBwin-src/CSB.h:631-637`). */
 export enum AttributeIndex {
   Luck = 0,
   Strength = 1,
@@ -52,7 +52,7 @@ const ub = (value: number): number => value & 0xff;
 
 /**
  * The getters' negative test: `if (ub > 240) return 0`
- * (`doc/CSBwin-src/data.cpp:1710-1726`). Note it is 240, not 128 — values between
+ * (`doc/CSBwin-src/data.cpp:1713-1729`). Note it is 240, not 128 — values between
  * 241 and 255 are read as zero even though nothing ever legitimately reaches them.
  */
 const readByte = (value: ui8): number => (value > 240 ? 0 : value);
@@ -99,7 +99,7 @@ export function makeAttribute(maximum: number, current: number, minimum: number)
 
 /**
  * The seven attributes as `AddCharacter` builds them for a new champion
- * (`doc/CSBwin-src/Character.cpp:640-659`): every value is capped at 224 and becomes
+ * (`doc/CSBwin-src/Character.cpp:641-660`): every value is capped at 224 and becomes
  * both Maximum and Current, the minimum is 30 — except Luck, whose minimum is 10.
  */
 export const ADD_CHARACTER_ATTRIBUTE_MINIMUM = 30;
@@ -119,8 +119,8 @@ export function makeAddCharacterAttributes(values: ArrayLike<number>): Attribute
 
 /**
  * Set Current to `value` held inside the attribute's own floor and ceiling —
- * `ApplyLimits(Minimum(), value, Maximum())` (`doc/CSBwin-src/CSB.h:3110`), the shape
- * `IsCharacterLucky` uses when it spends luck (`doc/CSBwin-src/Character.cpp:2194`).
+ * `ApplyLimits(Minimum(), value, Maximum())` (`doc/CSBwin-src/CSB.h:3169`), the shape
+ * `IsCharacterLucky` uses when it spends luck (`doc/CSBwin-src/Character.cpp:2199`).
  */
 export function setAttributeCurrentWithinLimits(attr: Attribute, value: number): void {
   const min = attributeMinimum(attr);
@@ -129,7 +129,7 @@ export function setAttributeCurrentWithinLimits(attr: Attribute, value: number):
 }
 
 /**
- * `AdjustCurrentAttribute` (`doc/CSBwin-src/Character.cpp:3900-3934`) — how a potion,
+ * `AdjustCurrentAttribute` (`doc/CSBwin-src/Character.cpp:3917-3951`) — how a potion,
  * or anything else, moves one attribute's Current value.
  *
  * It is deliberately lopsided. A *gain* is taxed once Current is already high — halved

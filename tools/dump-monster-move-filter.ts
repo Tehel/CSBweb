@@ -1,40 +1,40 @@
 /**
- * The monster move filter before a group's turn (`doc/CSBwin-src/Monster.cpp:3311-3357`),
+ * The monster move filter before a group's turn (`doc/CSBwin-src/Monster.cpp:3319-3365`),
  * which `ProcessTimers29to41` runs once it has cleared `monsterMoveInhibit`, with a DSA at
  * its location, against a genuine save (`csbgame7.dat`): a group on the party's level takes
  * its turn as a `TT_MONSTER_Bgroup` timer.
  *
  * 0. **Conflux's level keys are read**: its `EXPOOL` names a location for level 29's own
  *    filter, keyed with `(level + 1) << 8` (`MONSTERMOVEFILTERCACHE::GetLocation`,
- *    `:3088-3089`), beside the dungeon's.
+ *    `:3092-3093`), beside the dungeon's.
  * 1. **The DSA runs before the turn**, on parameters of its own, a count of 7: the level,
- *    the group's square, the group, and the party's level and square (`:3340-3347`), with
- *    `monsterMoveFilterActive` set, so `&MONL&D` reads them (`DSA.cpp:4768-4790`), and
+ *    the group's square, the group, and the party's level and square (`:3348-3355`), with
+ *    `monsterMoveFilterActive` set, so `&MONL&D` reads them (`DSA.cpp:4769-4791`), and
  *    cleared after. The caller's parameters are as they were.
- * 2. **Only the first type-47 actuator at the location runs** (`:3116`).
+ * 2. **Only the first type-47 actuator at the location runs** (`:3117`).
  * 3. **`&MONBLK` survives into the turn**: the turn cleared `monsterMoveInhibit` before
- *    the filter, not after (`:3306-3309`).
- * 4. **When it runs** (`:3312-3319`): never for a reaction (`TT_M1`), only within
+ *    the filter, not after (`:3314-3317`).
+ * 4. **When it runs** (`:3313-3320`): never for a reaction (`TT_M1`), only within
  *    `maxDistance` of the party, squared distances compared, and with `partyLevelOnly`
  *    set only on the party's level.
  * 5. **A level's own record comes first**, the dungeon's is the fallback, and a level
- *    whose record names a square without a DSA has no filter (`:3079-3162`).
- * 6. **The location is looked up once per level** (`:3079`), and kept.
- * 7. **The post-move filter** (`ProcessPostMonsterMoveFilter`, `:3169-3233`), which every
+ *    whose record names a square without a DSA has no filter (`:3080-3163`).
+ * 6. **The location is looked up once per level** (`:3080`), and kept.
+ * 7. **The post-move filter** (`ProcessPostMonsterMoveFilter`, `:3173-3237`), which every
  *    `return` of the turn runs: the same DSA's column 1, its timer function 1, on the
  *    variables the pre-move filter left, with a count of 9: where the group ended, the
  *    group, the party's level and square, and the turn's two words of flags. Only after
  *    a pre-move filter that ran.
  * 8. **`finalLocr` follows the group** through the turn's `MMRECORD`: a step puts it on
- *    the new square and sets `MonMove_differentCell` (`:3177-3183`); a group the turn's
- *    `InitialChecks` kills (`Monster.cpp:2795-2835`) is nowhere, level -1
- *    (`RemoveObjectFromRoom`, `CSBCode.cpp:5185-5188`); a step onto a level that refuses
- *    the group also sets `MoveObject_NotAllowedOnLevel` (`Code11f52.cpp:3152-3156`).
+ *    the new square and sets `MonMove_differentCell` (`:3181-3187`); a group the turn's
+ *    `InitialChecks` kills (`Monster.cpp:2799-2839`) is nowhere, level -1
+ *    (`RemoveObjectFromRoom`, `CSBCode.cpp:5250-5253`); a step onto a level that refuses
+ *    the group also sets `MoveObject_NotAllowedOnLevel` (`Code11f52.cpp:3187-3191`).
  * 9. **The turn's flags**, the 53 `Setflg`s of `ProcessTimers29to41` and its helpers
- *    (`MONSTEREVENTS`, `CSB.h:2815-2868`), as the post-move filter sees them: the exact
+ *    (`MONSTEREVENTS`, `CSB.h:2874-2927`), as the post-move filter sees them: the exact
  *    set of a turn whose path is staged, and what any of the group's ordinary turns
  *    implies of its flags. `IC29to41_damageMonsterFailed` is never set: CSBWin tests a
- *    flag nothing sets (`Monster.cpp:2835-2836`).
+ *    flag nothing sets (`Monster.cpp:2839-2840`).
  *
  * Run: `npx tsx tools/dump-monster-move-filter.ts`
  */
@@ -52,7 +52,7 @@ import { SMS_ATTACKING } from '../src/data/dungeonTypes';
 import { UNSET, globalStore, int, op, varFetch, varStore, withFilterDsas, type FilterDsa } from './lib/dsa';
 import { check, finish } from './lib/check';
 
-/** `ESL_MONSTERMOVEFILTER` (`doc/CSBwin-src/CSB.h:1537`), and its keys. */
+/** `ESL_MONSTERMOVEFILTER` (`doc/CSBwin-src/CSB.h:1540`), and its keys. */
 const ESL_MONSTERMOVEFILTER = 2;
 const DUNGEON_KEY = (3 << 24) | ESL_MONSTERMOVEFILTER;
 const levelKey = (level: number): number => (DUNGEON_KEY | ((level + 1) << 8)) >>> 0;
@@ -421,7 +421,7 @@ for (const [what, got, want] of exact) {
 {
   // Off the party's level, the leader's turn is a random step, or none. CSBWin's "failed"
   // is `MoveObject` answering 0, the group on its new square; "succeeded" is any other
-  // answer, the group gone, teleported or off the level (`Monster.cpp:2908-2929`).
+  // answer, the group gone, teleported or off the level (`Monster.cpp:2912-2933`).
   const got = stagedTurn(TimerFunction.TT_MONSTER_BGROUP, (game) => {
     game.ctx.party.state.position.z += 1;
   });

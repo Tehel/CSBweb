@@ -3,23 +3,23 @@
  * through `DsaSystem.execute` as a program of a test DSA on a genuine save
  * (`csbgame7.dat`).
  *
- * 1. **`&LOC2ABSCOORD`** (`doc/CSBwin-src/DSA.cpp:3253-3269`, `LOCATIONABS::operator =`,
- *    `:320-327`): the level, the column and row plus the level's offsets, the corner.
- * 2. **`&ECF@` and `&ECF!`** (`DSA.cpp:3270-3327`): eight flags of a cell, one bit of each
+ * 1. **`&LOC2ABSCOORD`** (`doc/CSBwin-src/DSA.cpp:3254-3270`, `LOCATIONABS::operator =`,
+ *    `:321-328`): the level, the column and row plus the level's offsets, the corner.
+ * 2. **`&ECF@` and `&ECF!`** (`DSA.cpp:3271-3328`): eight flags of a cell, one bit of each
  *    of a column's eight longwords in the `EXPOOL` record
  *    `(EDT_ExtendedCellFlags << 24) | (l << 5) | x`.
- * 3. **`&MULTIPLIER@`** (`DSA.cpp:3974-3990`): a level's experience multiplier, 1 past the
+ * 3. **`&MULTIPLIER@`** (`DSA.cpp:3975-3991`): a level's experience multiplier, 1 past the
  *    last level.
- * 4. **`&PARTYDISTANCE`** (`DSA.cpp:4057-4073`): steps on the party's level, minus the
+ * 4. **`&PARTYDISTANCE`** (`DSA.cpp:4058-4074`): steps on the party's level, minus the
  *    levels between otherwise.
- * 5. **`&J*` and `&G*`** (`DSA.cpp:4737-4767`): a jump and a call to a state and column
+ * 5. **`&J*` and `&G*`** (`DSA.cpp:4738-4768`): a jump and a call to a state and column
  *    taken from the stack.
- * 6. **`&THISDSAID` and `&DSAINFO@`** (`DSA.cpp:4822-4828`, `:2439-2470`): the DSA's own
+ * 6. **`&THISDSAID` and `&DSAINFO@`** (`DSA.cpp:4823-4829`, `:2440-2471`): the DSA's own
  *    actuator, and a type-47 actuator's selector, state and parameters, -1 for any other.
- * 7. **`&BITCOUNT`** (`DSA.cpp:4832-4849`).
- * 8. **`&VSET`** (`DSA.cpp:4850-4897`): variables set to a constant or copied, their states
+ * 7. **`&BITCOUNT`** (`DSA.cpp:4833-4850`).
+ * 8. **`&VSET`** (`DSA.cpp:4851-4898`): variables set to a constant or copied, their states
  *    with them.
- * 9. **`&THISCELL` and `&NEIGHBORS`** (`ExamineCell`, `DSA.cpp:2200-2320`).
+ * 9. **`&THISCELL` and `&NEIGHBORS`** (`ExamineCell`, `DSA.cpp:2201-2321`).
  *
  * Run: `npx tsx tools/dump-dsa-dungeon.ts`
  */
@@ -183,7 +183,7 @@ console.log('6. &THISDSAID and &DSAINFO@');
   const dungeon = game.ctx.dungeon;
   const rn = dungeon.findFirstObject(at);
   const rec = dungeon.getActuatorRecord(rn)!;
-  // Selector 5, state 3, A 0x2abcd and B 0x31234 through word8's high bits (`data.cpp:1336-1344`).
+  // Selector 5, state 3, A 0x2abcd and B 0x31234 through word8's high bits (`data.cpp:1338-1346`).
   rec.word2 = 47 | (5 << 7) | (3 << 12);
   rec.word4 = 0xabcd;
   rec.word6 = 0x1234;

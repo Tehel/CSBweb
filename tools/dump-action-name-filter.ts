@@ -1,20 +1,20 @@
 /**
- * The action name filter, `ActionNameFilter` (`doc/CSBwin-src/CSBCode.cpp:8634-8713`), which
- * `DrawLegalAttackTypes` calls for each attack option it offers (`:8777`), run through
+ * The action name filter, `ActionNameFilter` (`doc/CSBwin-src/CSBCode.cpp:8739-8818`), which
+ * `DrawLegalAttackTypes` calls for each attack option it offers (`:8882`), run through
  * `prepareAttack` with DSAs on its square, against a genuine save (`csbgame7.dat`).
  *
  * 1. **A dungeon with no filter names each option by its attack** (`GetAttackTypeName`).
  * 2. **The first DSA at the location runs, once per option offered, and only it**
- *    (`:8669-8670`), with five parameters (`:8691-8696`): the champion, the option, -1, the
+ *    (`:8774-8775`), with five parameters (`:8796-8801`): the champion, the option, -1, the
  *    option count and the attack type. It runs on the caller's parameters, which keep the
- *    last option's (the `NEWDSAPARAMETERS` is in the search's block, `:8653`).
- * 3. **Parameter 2 below 0x10000 names the option with that global text** (`:8700-8711`);
+ *    last option's (the `NEWDSAPARAMETERS` is in the search's block, `:8758`).
+ * 3. **Parameter 2 below 0x10000 names the option with that global text** (`:8805-8816`);
  *    one at or above 0x10000, or with no record, leaves the attack's name.
- * 4. **Parameter 4 is the option's attack from then on** (`:8699`), its name still the
+ * 4. **Parameter 4 is the option's attack from then on** (`:8804`), its name still the
  *    attack's it was.
- * 5. **The DSA is found once** (`actionNameDSA`, `:8638`): a filter location moved after
+ * 5. **The DSA is found once** (`actionNameDSA`, `:8743`): a filter location moved after
  *    the first menu does not move it.
- * 6. **The panel draws the names the filter chose**, not the attacks' (`:8779-8787`).
+ * 6. **The panel draws the names the filter chose**, not the attacks' (`:8884-8892`).
  *
  * Run: `npx tsx tools/dump-action-name-filter.ts`
  */
@@ -31,9 +31,9 @@ import { check, finish } from './lib/check';
 import { stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 
-/** `ESL_ACTIONNAMEFILTER` (`doc/CSBwin-src/CSB.h:1545`). */
+/** `ESL_ACTIONNAMEFILTER` (`doc/CSBwin-src/CSB.h:1548`). */
 const ESL_ACTIONNAMEFILTER = 10;
-/** `DSACMD_GLOBALFETCH` (`doc/CSBwin-src/Data.h:1715`). */
+/** `DSACMD_GLOBALFETCH` (`doc/CSBwin-src/Data.h:1730`). */
 const globalFetch = (index: number): number => 19 | (index << 6);
 
 /** The parameter count, then the five parameters, into globals `to` on; global 40 counts the runs. */

@@ -67,12 +67,12 @@ import { PARTY_MOVE_DATA_WORDS, partyMoveDataFromWords, partyMoveDataToWords, ty
 
 /** Which of CSBWin's viewing-filter sites runs the filter (`doc/CSBwin-src/Character.cpp`). */
 export enum ViewingFilterSite {
-  /** `DescribeObject`'s description (`:3766`): parameter 0 is the phrase mask as it stands. */
+  /** `DescribeObject`'s description (`:3783`): parameter 0 is the phrase mask as it stands. */
   DESCRIPTION,
-  /** `DescribeObject`'s scroll (`:3506`): parameter 0 is 0, and a DSA may name another scroll. */
+  /** `DescribeObject`'s scroll (`:3520`): parameter 0 is 0, and a DSA may name another scroll. */
   SCROLL,
   /**
-   * `TAG019036`'s, the eye clicked with an empty hand (`:4524-4578`): parameter 0 is 0
+   * `TAG019036`'s, the eye clicked with an empty hand (`:4541-4595`): parameter 0 is 0
    * and the object -1, whatever `objectId` says, and nothing the DSAs leave is read.
    */
   ATTRIBUTES,
@@ -143,8 +143,8 @@ enum DsaVarType {
   NonParameter = 2,
 }
 
-/** `STKOP` (`doc/CSBwin-src/Data.h:1721-1861`): every `&` operation, in CSBWin's order. */
-/** `CURSORFILTER_TYPE` (`doc/CSBwin-src/CSB.h:1395-1514`): what is about to happen to the object. */
+/** `STKOP` (`doc/CSBwin-src/Data.h:1736-1876`): every `&` operation, in CSBWin's order. */
+/** `CURSORFILTER_TYPE` (`doc/CSBwin-src/CSB.h:1398-1517`): what is about to happen to the object. */
 export enum CursorFilterType {
   Unknown = 0,
   ReadGame = 1,
@@ -171,7 +171,7 @@ export enum CursorFilterType {
 }
 
 /**
- * `CURSORFILTER_PACKET` (`doc/CSBwin-src/CSB.h:1517-1526`), six `int`s. `object` is the RN
+ * `CURSORFILTER_PACKET` (`doc/CSBwin-src/CSB.h:1520-1529`), six `int`s. `object` is the RN
  * as `ConvertToInteger` gives it, `RNnul` 0xFFFF for none; `p1` to `p4` are the type's
  * own, 0 when it has none: for an actuator's, the level, the square and the wall side.
  */
@@ -326,7 +326,7 @@ export enum StkOp {
 }
 
 const EDT_SPECIAL_LOCATIONS = 3;
-/** `gameVolume`'s default (`doc/CSBwin-src/Data.h:42`, `data.cpp:277`). */
+/** `gameVolume`'s default (`doc/CSBwin-src/Data.h:42`, `data.cpp:278`). */
 const VOLUME_FULL = 0;
 const ESL_MISSILE_ENCOUNTER_FILTER = 13;
 const ESL_ADJUST_SKILLS_FILTER = 6;
@@ -350,7 +350,7 @@ const ESL_INDIRECT_ACTIONS = 5;
 const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
 
 /**
- * `EX_AMPERSAND`'s unpacking of `I_Indirect` (`doc/CSBwin-src/DSA.cpp:2350-2369`): the
+ * `EX_AMPERSAND`'s unpacking of `I_Indirect` (`doc/CSBwin-src/DSA.cpp:2351-2370`): the
  * operation a parameter record's first word names, and the one it runs. `I_FilteredCast`
  * is here though no operation packs it: it has no case of its own in `EX_AMPERSAND`.
  */
@@ -419,7 +419,7 @@ const enum DsaMoveError {
   DER_NoCloudsPlease = -15,
 }
 
-/** `DSAVARS` (`doc/CSBwin-src/CSB.h:2877-2882`): a DSA run's variables. */
+/** `DSAVARS` (`doc/CSBwin-src/CSB.h:2936-2941`): a DSA run's variables. */
 export class DsaVars {
   definedFlags: Uint8Array;
   values: Int32Array;
@@ -502,12 +502,12 @@ class DsaBank {
   filter = false;
   indirectActionDelay = -1;
   /**
-   * `m_objectDeleteList` (`doc/CSBwin-src/DSA.cpp:132`) — what `&DEL` has condemned,
+   * `m_objectDeleteList` (`doc/CSBwin-src/DSA.cpp:133`) — what `&DEL` has condemned,
    * chained through the records' own links, freed only once the run is over.
    */
   objectDeleteList: ObjectID = OBJECT_ID_EOF;
   /**
-   * `numText` and `textStrings` (`doc/CSBwin-src/DSA.cpp:126-127`): the run's ten texts,
+   * `numText` and `textStrings` (`doc/CSBwin-src/DSA.cpp:127-128`): the run's ten texts,
    * which `&TEXT@` and `&CHARNAME@` set, none until the first is.
    */
   private texts: Array<string | null> | null = null;
@@ -515,7 +515,7 @@ class DsaBank {
   /** `trace` says what CSBWin's `NoValue` asks in its message box. */
   constructor(public vars: DsaVars, private readonly trace: (line: string) => void) {}
 
-  /** `DSADBANK::SetText` (`doc/CSBwin-src/DSA.cpp:194-205`): an index past 9 sets nothing. */
+  /** `DSADBANK::SetText` (`doc/CSBwin-src/DSA.cpp:195-206`): an index past 9 sets nothing. */
   setText(text: string, index: number): void {
     if (index > 9) return;
     this.texts ??= new Array<string | null>(10).fill(null);
@@ -523,7 +523,7 @@ class DsaBank {
   }
 
   /**
-   * `DSADBANK::GetText` (`doc/CSBwin-src/DSA.cpp:207-212`): "" for a text never set. An
+   * `DSADBANK::GetText` (`doc/CSBwin-src/DSA.cpp:208-213`): "" for a text never set. An
    * index past 9 reads past CSBWin's array once any text is set; here it reads "".
    */
   getText(index: number): string {
@@ -532,7 +532,7 @@ class DsaBank {
   }
 
   /**
-   * `DSADBANK::Var(i)` (`doc/CSBwin-src/DSA.cpp:141`): a variable not well defined, never
+   * `DSADBANK::Var(i)` (`doc/CSBwin-src/DSA.cpp:142`): a variable not well defined, never
    * set or past a short `&PARAM@`, is zeroed by the read (`NoValue`).
    */
   getVar(index: number): number {
@@ -545,7 +545,7 @@ class DsaBank {
   }
 
   /**
-   * `DSADBANK::NoValue` (`doc/CSBwin-src/DSA.cpp:227-238`): the variable is zeroed, and
+   * `DSADBANK::NoValue` (`doc/CSBwin-src/DSA.cpp:228-239`): the variable is zeroed, and
    * the message box CSBWin raises, until its player answers "yes" to suppress it, is a
    * trace each time.
    */
@@ -561,7 +561,7 @@ class DsaBank {
   }
 
   /**
-   * `DSADBANK::SetVarBit` (`doc/CSBwin-src/DSA.cpp:143`): a variable not well defined is
+   * `DSADBANK::SetVarBit` (`doc/CSBwin-src/DSA.cpp:144`): a variable not well defined is
    * zeroed (`NoValue`) before the bit goes in, and is still not well defined after.
    * `&CELL@`, its one caller, has set the variable to 0 first.
    */
@@ -602,7 +602,7 @@ interface ExecutionPacket {
 
 /**
  * The timer a filter site hands `ProcessDSAFilter`: the filter's square on its level, with
- * function and position 0 (`doc/CSBwin-src/CSBCode.cpp:8683-8689`, `Sound.cpp:724-727`).
+ * function and position 0 (`doc/CSBwin-src/CSBCode.cpp:8788-8794`, `Sound.cpp:729-732`).
  */
 function filterTimer(position: Position): TimerEntry {
   return {
@@ -640,7 +640,7 @@ function signExtend(value: number, bits: number): number {
 }
 
 /**
- * `IsMaxState` (`doc/CSBwin-src/Data.h:1889-2384`): every command compares its
+ * `IsMaxState` (`doc/CSBwin-src/Data.h:1904-2399`): every command compares its
  * relative-state field with `-MAXSTATE`. For all but `QUESTION`, whose `MAXSTATE` is 2,
  * that value is out of the signed field's range, so no other command reads the word.
  */
@@ -653,13 +653,13 @@ function readSignedWord(word: number): number {
   return value & 0x8000 ? value - 0x10000 : value;
 }
 
-/** `bitCounts` (`doc/CSBwin-src/DSA.cpp:45`): the set bits of a nibble. */
+/** `bitCounts` (`doc/CSBwin-src/DSA.cpp:46`): the set bits of a nibble. */
 const BIT_COUNTS = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
 
-/** `teleporterBit` (`doc/CSBwin-src/DSA.cpp:2208`): `ExamineCell`'s bit for a teleporter's `what`. */
+/** `teleporterBit` (`doc/CSBwin-src/DSA.cpp:2209`): `ExamineCell`'s bit for a teleporter's `what`. */
 const TELEPORTER_BIT = [11, 15, 13, 17];
 
-/** `JUMP*`'s transfer, which `execute` takes as `EX_JUMP`'s (`doc/CSBwin-src/DSA.cpp:4737-4745`). */
+/** `JUMP*`'s transfer, which `execute` takes as `EX_JUMP`'s (`doc/CSBwin-src/DSA.cpp:4738-4746`). */
 interface GearJump {
   state: number;
   col: number;
@@ -668,7 +668,7 @@ interface GearJump {
 /** `talents`' offset in a `CHARDESC`, a longword `swapCharacter` leaves little-endian. */
 const CHARDESC_TALENTS = 276;
 
-/** `LIMIT(min, x, max)` (`doc/CSBwin-src/CSB.h:3109`): `max` is tested first. */
+/** `LIMIT(min, x, max)` (`doc/CSBwin-src/CSB.h:3168`): `max` is tested first. */
 function limit(min: number, x: number, max: number): number {
   return x > max ? max : x < min ? min : x;
 }
@@ -692,33 +692,33 @@ export class DsaSystem {
    */
   private globalVariables: Int32Array;
   /**
-   * `monsterMoveFilterActive` (`doc/CSBwin-src/data.cpp:85`), which `ProcessDSAFilter`
-   * sets while the monster move filter runs (`Monster.cpp:3229`, `:3355`) and
+   * `monsterMoveFilterActive` (`doc/CSBwin-src/data.cpp:86`), which `ProcessDSAFilter`
+   * sets while the monster move filter runs (`Monster.cpp:3233`, `:3363`) and
    * `&MONL&D` reads: before a group's turn and after it.
    */
   monsterMoveFilterActive = false;
   /**
-   * `monsterMoveFilterCache` (`doc/CSBwin-src/Monster.cpp:3059`): each level's
+   * `monsterMoveFilterCache` (`doc/CSBwin-src/Monster.cpp:3063`): each level's
    * `MONSTERMOVEFILTERLOCATION` once a turn on it has looked, and the dungeon's, which
    * every level without a key of its own copies. Nothing empties it (`Clear`,
    * `CSB.h:458`, has no body and no caller), so it holds for as long as the system lives.
    */
   private readonly monsterMoveFilterLocations = new Map<number, MonsterMoveFilterLocation>();
   private monsterMoveFilterGlobal: MonsterMoveFilterLocation | null = null;
-  /** `SoundFilter`'s `filterActive` (`doc/CSBwin-src/Sound.cpp:672`): its DSAs are running. */
+  /** `SoundFilter`'s `filterActive` (`doc/CSBwin-src/Sound.cpp:677`): its DSAs are running. */
   private soundFilterActive = false;
   /**
-   * `actionNameDSA` (`doc/CSBwin-src/CSBCode.cpp:8631`): `OBJECT_ID_NULL` until
+   * `actionNameDSA` (`doc/CSBwin-src/CSBCode.cpp:8736`): `OBJECT_ID_NULL` until
    * `actionNameFilter` first looks, then the filter's DSA, or `OBJECT_ID_EOF` for none, for
-   * as long as the system lives. `actionNameFilterPos` is `actionNameFilterLocr` (`:8630`).
+   * as long as the system lives. `actionNameFilterPos` is `actionNameFilterLocr` (`:8735`).
    */
   private actionNameDsa: ObjectID = OBJECT_ID_NULL;
   private actionNameFilterPos: Position | null = null;
   /**
-   * `parameterMessageSequence` (`doc/CSBwin-src/data.cpp:88`): the `uByte5` of the next
+   * `parameterMessageSequence` (`doc/CSBwin-src/data.cpp:89`): the `uByte5` of the next
    * `TT_ParameterMessage` timer, so that two set at one time run in the order they were
    * set (`TIMER::operator<`, `Timer.cpp:779-791`). Back to 0 at every `d.Time++`
-   * (`CSBCode.cpp:676`, `Attack.cpp:2210`) and at a load (`SaveGame.cpp:1625`).
+   * (`CSBCode.cpp:686`, `Attack.cpp:2212`) and at a load (`SaveGame.cpp:1749`).
    */
   parameterMessageSequence = 0;
   /**
@@ -775,7 +775,7 @@ export class DsaSystem {
   }
 
   /**
-   * `NEWDSAPARAMETERS` (`doc/CSBwin-src/CSB.h:4220-4235`): `fn` runs on a parameter array
+   * `NEWDSAPARAMETERS` (`doc/CSBwin-src/CSB.h:4286-4301`): `fn` runs on a parameter array
    * of its own, whose count is 0, and the caller's is back once it returns. Every filter
    * but the party attack's is called so, and so is a DSA that `ActivateDSA` starts
    * (`doc/CSBwin-src/Timer.cpp:1525`); a program that runs one, `&EXPERIENCE+` reaching
@@ -799,16 +799,16 @@ export class DsaSystem {
 
   /**
    * The DSAs of the filter at special location `esl`, as CSBWin's looping filter sites run
-   * them (`SoundFilter`'s, `doc/CSBwin-src/Sound.cpp:681-748`, is one): `EXPOOL`'s record
+   * them (`SoundFilter`'s, `doc/CSBwin-src/Sound.cpp:686-753`, is one): `EXPOOL`'s record
    * `(EDT_SpecialLocations << 24) | esl` names the location, and every type-47 actuator on
    * its square runs in turn, a filter call apiece (`ProcessDSAFilter`), on a timer that
    * names the square with function and position 0, and on the current parameters: a site
    * with a `NEWDSAPARAMETERS` calls this inside `newDsaParameters`. `each` sets a DSA's
    * parameters, calls `run`, and reads back what it needs. False when none ran. A site
-   * that `break`s once its DSA has run (`KillCharacter`'s, `Character.cpp:2586`) passes
-   * `firstOnly`, and only the first runs. Each DSA has its `DSAVARS` (`Sound.cpp:721`),
+   * that `break`s once its DSA has run (`KillCharacter`'s, `Character.cpp:2591`) passes
+   * `firstOnly`, and only the first runs. Each DSA has its `DSAVARS` (`Sound.cpp:726`),
    * which every `run` of it shares: `SetPossession` calls one DSA twice, the second time
-   * with timer function 0 after the first's 1 (`Character.cpp:2975-2986`).
+   * with timer function 0 after the first's 1 (`Character.cpp:2980-2991`).
    */
   private forEachFilterDsa(esl: number, each: (run: (timerFunction?: number) => void) => void, firstOnly = false): boolean {
     const special = this.dungeon.getSpecialLocation((EDT_SPECIAL_LOCATIONS << 24) | esl);
@@ -846,18 +846,18 @@ export class DsaSystem {
   }
 
   /**
-   * `SoundFilter` (`doc/CSBwin-src/Sound.cpp:670-756`), which `QueueSound` calls with the
-   * volume it chose, -1 for a sound out of earshot (`doc/CSBwin-src/CSBCode.cpp:1877`), and
+   * `SoundFilter` (`doc/CSBwin-src/Sound.cpp:675-761`), which `QueueSound` calls with the
+   * volume it chose, -1 for a sound out of earshot (`doc/CSBwin-src/CSBCode.cpp:1906`), and
    * the sound's square on its level. Every DSA at `ESL_SOUNDFILTER`'s location runs, and
    * plays the sound if it pleases (`&SOUND`). 0 when one ran, and the sound is theirs; 1
    * when none did; 2 while they run, so a sound queued meanwhile plays on.
    *
-   * The nine parameters (`:730-739`): the sound's ordinal plus 1, the volume, the squared
+   * The nine parameters (`:740-749`): the sound's ordinal plus 1, the volume, the squared
    * distance to the party, the level, x and y, `gameVolume`, `NoSound`, and the distance in
    * hundredths, three Newton steps from the larger of `dx` and `dy`. The port has no volume
-   * menu and no recording's `#NoSound` (`doc/CSBwin-src/Recording.cpp:321`): its page sets
+   * menu and no recording's `#NoSound` (`doc/CSBwin-src/Recording.cpp:327`): its page sets
    * its own volume, so the two are CSBWin's defaults, `VOLUME_FULL` (0) and false
-   * (`doc/CSBwin-src/data.cpp:249`, `:277`).
+   * (`doc/CSBwin-src/data.cpp:250`, `:278`).
    */
   soundFilter(soundNumber: number, highVolume: number, level: number, x: number, y: number): number {
     if (this.soundFilterActive) return 2;
@@ -883,10 +883,10 @@ export class DsaSystem {
   }
 
   /**
-   * The feeding filter (`doc/CSBwin-src/Character.cpp:4288-4344`), which `_FeedCharacter`
+   * The feeding filter (`doc/CSBwin-src/Character.cpp:4305-4361`), which `_FeedCharacter`
    * runs once it has worked out what the object is worth, and before anything changes:
    * every DSA at `ESL_FEEDINGFILTER`'s location in turn, each on the block as the DSA
-   * before it left it, a count of 27 and the block's longwords (`:4333-4336`). Back comes
+   * before it left it, a count of 27 and the block's longwords (`:4350-4353`). Back comes
    * the block, which is what the feeding then does. `_FeedCharacter` has no
    * `NEWDSAPARAMETERS`, so the DSAs run on the caller's parameters and leave them theirs.
    */
@@ -923,7 +923,7 @@ export class DsaSystem {
   }
 
   /**
-   * The character death filter (`doc/CSBwin-src/Character.cpp:2535-2589`), which
+   * The character death filter (`doc/CSBwin-src/Character.cpp:2540-2594`), which
    * `KillCharacter` runs before it touches the champion: the first DSA at
    * `ESL_CHARDEATHFILTER`'s location, on parameters of its own, a count of 1 and the
    * champion's index. Nothing comes back.
@@ -936,13 +936,13 @@ export class DsaSystem {
   }
 
   /**
-   * The equip filter (`doc/CSBwin-src/Character.cpp:2917-2998`), which
+   * The equip filter (`doc/CSBwin-src/Character.cpp:2922-3003`), which
    * `CHARDESC::SetPossession` runs before it writes slot `slot` of champion `chIdx`: the
    * first DSA at `ESL_EQUIPFILTER`'s location, on parameters of its own, a count of 4 and
-   * the champion's index, the slot, an object and 0, set once (`:2968-2971`). It runs
+   * the champion's index, the slot, an object and 0, set once (`:2973-2976`). It runs
    * twice on the same variables and parameters, only the object (`pDSAparameters[3]`) set
    * again: with timer function 1 for `leaving`, what the slot holds, and with 0 for
-   * `arriving`, each when it is not `RNnul` (`:2975-2986`). Nothing comes back.
+   * `arriving`, each when it is not `RNnul` (`:2980-2991`). Nothing comes back.
    */
   equipFilter(chIdx: number, slot: number, leaving: ObjectID, arriving: ObjectID): void {
     this.newDsaParameters(() => this.forEachFilterDsa(ESL_EQUIP_FILTER, (run) => {
@@ -959,10 +959,10 @@ export class DsaSystem {
   }
 
   /**
-   * `CallPartyMoveFilter` (`doc/CSBwin-src/CSBCode.cpp:7788-7848`), which `_TurnParty`,
+   * `CallPartyMoveFilter` (`doc/CSBwin-src/CSBCode.cpp:7875-7935`), which `_TurnParty`,
    * `MoveParty` and `TraverseStairway` run before the party moves: the first DSA at
    * `ESL_PARTYMOVEFILTER`'s location, on parameters of its own, a count of 13 and the
-   * block's longwords (`:7835-7836`). Back comes the block, all of it (`:7839`), which
+   * block's longwords (`:7922-7923`). Back comes the block, all of it (`:7926`), which
    * the move then obeys; `pmd` when no DSA stands there.
    */
   partyMoveFilter(pmd: PartyMoveData): PartyMoveData {
@@ -976,12 +976,12 @@ export class DsaSystem {
   }
 
   /**
-   * The monster attack filter (`doc/CSBwin-src/Monster.cpp:1125-1171`), which
+   * The monster attack filter (`doc/CSBwin-src/Monster.cpp:1129-1175`), which
    * `MonsterAttacks` runs once the block is filled and before it acts on it: every DSA at
    * `ESL_MONSTERATTACKFILTER`'s location in turn, each on the block as the DSA before it
-   * left it, a count of 20 and the block's longwords (`:1164-1165`), and on parameters of
-   * its own, a `NEWDSAPARAMETERS` apiece (`:1153`). Back comes the whole block, into `p`
-   * (`:1167`).
+   * left it, a count of 20 and the block's longwords (`:1168-1169`), and on parameters of
+   * its own, a `NEWDSAPARAMETERS` apiece (`:1157`). Back comes the whole block, into `p`
+   * (`:1171`).
    */
   monsterAttackFilter(p: AttackParameters): void {
     this.forEachFilterDsa(ESL_MONSTER_ATTACK_FILTER, (run) => this.newDsaParameters(() => {
@@ -992,11 +992,11 @@ export class DsaSystem {
   }
 
   /**
-   * The delete monster filter (`doc/CSBwin-src/Code11f52.cpp:965-1019`), which
+   * The delete monster filter (`doc/CSBwin-src/Code11f52.cpp:1000-1054`), which
    * `ProcessMonsterDeleteFilter` runs once it has counted the kill: every DSA at
    * `ESL_DELETEMONSTERFILTER`'s location in turn, each on the block as the DSA before it
-   * left it, a count of 8 and the block's longwords (`:1011-1012`). Back comes the whole
-   * block, into `p` (`:1014`). The function has one `NEWDSAPARAMETERS` (`:928`), so the
+   * left it, a count of 8 and the block's longwords (`:1046-1047`). Back comes the whole
+   * block, into `p` (`:1049`). The function has one `NEWDSAPARAMETERS` (`:963`), so the
    * DSAs run on parameters of their own, which they share.
    */
   deleteMonsterFilter(p: DeleteMonsterParameters): void {
@@ -1008,7 +1008,7 @@ export class DsaSystem {
   }
 
   /**
-   * `MONSTERMOVEFILTERCACHE::GetLocation` (`doc/CSBwin-src/Monster.cpp:3077-3166`): the
+   * `MONSTERMOVEFILTERCACHE::GetLocation` (`doc/CSBwin-src/Monster.cpp:3081-3170`): the
    * level's own record, keyed with `(level + 1) << 8`, and failing that the dungeon's,
    * looked up once. The record's bits 0-17 are the location, bit 18 `partyLevelOnly` and
    * bits 19-23 `maxDistance`. A level with a record of its own keeps it even when no
@@ -1037,7 +1037,7 @@ export class DsaSystem {
   }
 
   /**
-   * The monster move filter before a group's turn (`doc/CSBwin-src/Monster.cpp:3311-3357`),
+   * The monster move filter before a group's turn (`doc/CSBwin-src/Monster.cpp:3319-3365`),
    * which `ProcessTimers29to41` runs once it has cleared `monsterMoveInhibit`, for the
    * group `monster` at `mapX, mapY` on `level`, whose timer function is `timerFunction`.
    * It runs when that function is above 0, so never for a reaction (`TT_M1` to `TT_M3`),
@@ -1046,10 +1046,10 @@ export class DsaSystem {
    * party, squared distances compared.
    *
    * Only `filterObj` runs, on parameters of its own, a count of 7: the level, the group's
-   * square, the group, and the party's level and square (`:3340-3347`). Its timer has
+   * square, the group, and the party's level and square (`:3348-3355`). Its timer has
    * function and position 0, the level, and the group's square with x in `uByte7` and y
-   * in `uByte6` (`:3324-3329`), the other way round from every other filter's, so the
-   * DSA's master stands at `(y, x)` (`ProcessDSATimer6`, `DSA.cpp:5408-5413`). The timer,
+   * in `uByte6` (`:3332-3337`), the other way round from every other filter's, so the
+   * DSA's master stands at `(y, x)` (`ProcessDSATimer6`, `DSA.cpp:5409-5414`). The timer,
    * the group, its square and the DSA's variables go into `mmr`, the turn's record, for
    * the post-move filter, which runs only when this one did.
    */
@@ -1081,8 +1081,8 @@ export class DsaSystem {
   }
 
   /**
-   * `ProcessPostMonsterMoveFilter` (`doc/CSBwin-src/Monster.cpp:3169-3233`), which every
-   * `return` of `ProcessTimers29to41` runs, from `:3373` to `:4448`: the same DSA again,
+   * `ProcessPostMonsterMoveFilter` (`doc/CSBwin-src/Monster.cpp:3173-3237`), which every
+   * `return` of `ProcessTimers29to41` runs, from `:3381` to `:4461`: the same DSA again,
    * when the pre-move filter ran, on the record's timer with function 1, so the DSA's
    * column 1, and the record's variables.
    *
@@ -1120,12 +1120,12 @@ export class DsaSystem {
   }
 
   /**
-   * The damage filter (`doc/CSBwin-src/Character.cpp:2829-2893`), which `DamageCharacter`
+   * The damage filter (`doc/CSBwin-src/Character.cpp:2834-2898`), which `DamageCharacter`
    * runs on the damage it is about to add to `d.PendingDamage`: the first DSA at
    * `ESL_DAMAGECHARFILTER`'s location, on parameters of its own, a count of 7 and the
    * champion's index and fingerprint, the damage asked for, the damage worked out, the
-   * wound mask, the kind, and 0 (`:2876-2883`). Back comes word 3, the damage worked out,
-   * as a whole longword, of which `DamageCharacter` uses the low word (`:2886`, `:2900`);
+   * wound mask, the kind, and 0 (`:2881-2888`). Back comes word 3, the damage worked out,
+   * as a whole longword, of which `DamageCharacter` uses the low word (`:2891`, `:2905`);
    * `dealt` when no DSA stands there.
    */
   damageCharFilter(chIdx: number, fingerprint: number, damage: number, dealt: number, mask: number, kind: number): number {
@@ -1139,19 +1139,19 @@ export class DsaSystem {
   }
 
   /**
-   * `ActionNameFilter` (`doc/CSBwin-src/CSBCode.cpp:8634-8713`), which `DrawLegalAttackTypes`
-   * calls for each option it offers (`:8777`): champion `charIndex`'s option
+   * `ActionNameFilter` (`doc/CSBwin-src/CSBCode.cpp:8739-8818`), which `DrawLegalAttackTypes`
+   * calls for each option it offers (`:8882`): champion `charIndex`'s option
    * `actionNumber`, of `numAttackOption`, whose attack type is `attackType`. The first
-   * type-47 actuator at `ESL_ACTIONNAMEFILTER`'s location runs, and only it (`:8669-8670`),
+   * type-47 actuator at `ESL_ACTIONNAMEFILTER`'s location runs, and only it (`:8774-8775`),
    * found at the first call and kept from then on (`actionNameDsa`).
    *
-   * Its five parameters (`:8691-8696`): the champion, the option, -1, the option count and
+   * Its five parameters (`:8796-8801`): the champion, the option, -1, the option count and
    * the attack type. Back come parameter 4, the option's attack type from now on, as an
-   * `i8` (`:8699`), and parameter 2, which below 0x10000 names a global text to show
-   * instead of the attack's name, if there is such a record (`:8700-8711`); `name` is null
+   * `i8` (`:8804`), and parameter 2, which below 0x10000 names a global text to show
+   * instead of the attack's name, if there is such a record (`:8805-8816`); `name` is null
    * otherwise. Null when there is no DSA.
    *
-   * The `NEWDSAPARAMETERS` is in the block that looks for the DSA (`:8653`), and gone when
+   * The `NEWDSAPARAMETERS` is in the block that looks for the DSA (`:8758`), and gone when
    * it runs, so the DSA runs on the caller's parameters and leaves them its own.
    */
   actionNameFilter(
@@ -1217,12 +1217,12 @@ export class DsaSystem {
   /**
    * The viewing filter at one of `DescribeObject`'s sites: every type-47 actuator at
    * `ESL_VIEWINGFILTER`'s location runs in turn, a filter call apiece
-   * (`doc/CSBwin-src/Character.cpp:3476-3518`, `:3736-3770`). No parameter comes back
-   * into the mask, which only `&DESCRIBE` changes (`ModifyDescription`, `:3797-3830`).
+   * (`doc/CSBwin-src/Character.cpp:3490-3532`, `:3753-3787`). No parameter comes back
+   * into the mask, which only `&DESCRIBE` changes (`ModifyDescription`, `:3814-3847`).
    * At the scroll site, an object a DSA names in parameter 1 becomes the loop's own `obj`,
    * so the loop goes on down that object's chain, and is drawn if it is a scroll
-   * (`:3509-3518`). `TAG019036`'s site runs them as the description's does, with
-   * parameter 0 always 0 (`:4566-4569`). Null when no DSA stands there.
+   * (`:3523-3532`). `TAG019036`'s site runs them as the description's does, with
+   * parameter 0 always 0 (`:4583-4586`). Null when no DSA stands there.
    */
   processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
     const special = this.dungeon.getSpecialLocation(VIEWING_FILTER_KEY);
@@ -1480,7 +1480,7 @@ export class DsaSystem {
 
     const currentState = this.getState(masterRecord, masterDsa);
     const msgType = 3 * (timer.uByte8 & 3) + action;
-    // An `OVERRIDE` no operation used dies with its run (`doc/CSBwin-src/DSA.cpp:5416`),
+    // An `OVERRIDE` no operation used dies with its run (`doc/CSBwin-src/DSA.cpp:5417`),
     // and a run nested in another's clears the caller's.
     this.overrideP = false;
 
@@ -1509,14 +1509,14 @@ export class DsaSystem {
     if (nextState >= 0) {
       this.putState(masterRecord, masterDsa, nextState);
     }
-    // `ProcessDSATimer6` returns `deletedSlave` (`doc/CSBwin-src/DSA.cpp:5483-5486`),
+    // `ProcessDSATimer6` returns `deletedSlave` (`doc/CSBwin-src/DSA.cpp:5484-5487`),
     // and every timer walk that runs a DSA breaks out of the cell's chain on it
     // (`Timer.cpp:1433`, `:1757`, `:2230`) — the slave's link is no longer the cell's.
     return this.consumateDeletes(bank, rn);
   }
 
   /**
-   * `DSADBANK::DeleteObject` (`doc/CSBwin-src/DSA.cpp:157-163`) — condemn a record by
+   * `DSADBANK::DeleteObject` (`doc/CSBwin-src/DSA.cpp:158-164`) — condemn a record by
    * pushing it on the run's delete list through its own link. Nothing is freed yet.
    */
   private deleteObject(bank: DsaBank, rn: ObjectID): void {
@@ -1525,9 +1525,9 @@ export class DsaSystem {
   }
 
   /**
-   * `DSADBANK::ConsumateDeletes` (`doc/CSBwin-src/DSA.cpp:178-191`) — free everything
+   * `DSADBANK::ConsumateDeletes` (`doc/CSBwin-src/DSA.cpp:179-192`) — free everything
    * `&DEL` condemned during the run, and say whether the DSA's own actuator was among
-   * it. `==` on an `RN` compares the indirect index alone (`CSBTypes.h:349`).
+   * it. `==` on an `RN` compares the indirect index alone (`CSBTypes.h:355`).
    */
   private consumateDeletes(bank: DsaBank, rnSlave: ObjectID): boolean {
     let result = false;
@@ -1805,8 +1805,8 @@ export class DsaSystem {
             }
             nextState = curState + relState;
             const where = (word >> 6) & 0x1f;
-            // `m_PC` is a `ui16 *` (`doc/CSBwin-src/DSA.cpp:250`): LOAD_INTEGER pushes the
-            // word unsigned (`:1099-1106`).
+            // `m_PC` is a `ui16 *` (`doc/CSBwin-src/DSA.cpp:251`): LOAD_INTEGER pushes the
+            // word unsigned (`:1100-1107`).
             if (where === 26) {
               const next = program[pc++] ?? 0;
               wordsRemaining--;
@@ -1827,11 +1827,11 @@ export class DsaSystem {
               bank.stack.push(value);
             }
             // 29 (`LOAD_ABS32`) and 31 are "Illegal DSA load command", and push nothing
-            // (`:1138-1143`).
+            // (`:1139-1144`).
             break;
           }
           case DsaCommand.STORE: {
-            // `EX_STORE` (`doc/CSBwin-src/DSA.cpp:1317-1386`): a `where` above 25 is
+            // `EX_STORE` (`doc/CSBwin-src/DSA.cpp:1318-1387`): a `where` above 25 is
             // "Illegal DSA store command", which pops nothing and leaves the next state.
             const where = (word >> 6) & 0x1f;
             if (where > 25) break;
@@ -1879,7 +1879,7 @@ export class DsaSystem {
             nextState = curState + relState;
             const index = (word >> 6) & 0x7f;
             const value = bank.stack.pop();
-            // `DSA.cpp:1268-1275`.
+            // `DSA.cpp:1269-1276`.
             if (index >= this.globalVariables.length) {
               this.ctx.host.trace('Global Store to non-existent variable');
             } else {
@@ -1897,7 +1897,7 @@ export class DsaSystem {
             nextState = curState + relState;
             const index = (word >> 6) & 0x7f;
             // Past the last variable, "Gloal fetch from non-existent variable" pushes
-            // 0xcdcdcdcd (`doc/CSBwin-src/DSA.cpp:1302-1306`).
+            // 0xcdcdcdcd (`doc/CSBwin-src/DSA.cpp:1303-1307`).
             if (index >= this.globalVariables.length) this.ctx.host.trace('Gloal fetch from non-existent variable');
             const value = index < this.globalVariables.length ? this.globalVariables[index] : 0xcdcdcdcd;
             bank.stack.push(value);
@@ -1955,7 +1955,7 @@ export class DsaSystem {
             break;
           }
           case DsaCommand.OVERRIDE: {
-            // `EX_OVERRIDE` (`doc/CSBwin-src/DSA.cpp:1037-1072`): any `what` but 1 is
+            // `EX_OVERRIDE` (`doc/CSBwin-src/DSA.cpp:1038-1073`): any `what` but 1 is
             // "Illegal DSA override command", which leaves the next state.
             const what = (word >> 6) & 0x7;
             const value = (word >> 9) & 0x7;
@@ -2053,7 +2053,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.DEL_MON: {
-        // `doc/CSBwin-src/DSA.cpp:2496-2503`, `EX_DELMON` (`:1741-1748`).
+        // `doc/CSBwin-src/DSA.cpp:2497-2504`, `EX_DELMON` (`:1742-1749`).
         this.noFilter(bank);
         const indx = bank.stack.pop();
         const locr = locationRelFromInteger(bank.stack.pop());
@@ -2061,7 +2061,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.INS_MON: {
-        // `DSA.cpp:2504-2511`, `EX_INSMON` (`:1750-1757`).
+        // `DSA.cpp:2505-2512`, `EX_INSMON` (`:1751-1758`).
         this.noFilter(bank);
         const posMask = bank.stack.pop();
         const locr = locationRelFromInteger(bank.stack.pop());
@@ -2089,7 +2089,7 @@ export class DsaSystem {
           const party = this.ctx.party.state;
           if (!party) break;
           // `CURSORFILTER_DSA_ADD` for the copy, which cannot cancel; `ObjectToCursor`
-          // then fills the hand, whatever the filter put there (`DSA.cpp:2062-2071`).
+          // then fills the hand, whatever the filter put there (`DSA.cpp:2063-2072`).
           this.cursorFilter({ object: cloned, type: CursorFilterType.DSA_ADD, p1: 0, p2: 0, p3: 0, p4: 0 });
           party.objectInHand = cloned;
         } else if (location > -1000) {
@@ -2105,7 +2105,7 @@ export class DsaSystem {
           if (monsterId === null) break;
           const monster = this.dungeon.getCreatureRecord(monsterId);
           if (!monster) break;
-          // `doc/CSBwin-src/DSA.cpp:2083-2085`: the copy, its link already `RNeof`,
+          // `doc/CSBwin-src/DSA.cpp:2084-2086`: the copy, its link already `RNeof`,
           // heads an empty chain, else `AddObjectToRoom(newObj, *pDest, -1, 0, NULL)`.
           if (monster.possession === OBJECT_ID_EOF) monster.possession = cloned;
           else this.dungeon.addObjectToChain(cloned, monster.possession);
@@ -2184,7 +2184,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.MESSAGE: {
-        // `STKOP_Message` (`doc/CSBwin-src/DSA.cpp:3045-3089`): a `TT_ParameterMessage`
+        // `STKOP_Message` (`doc/CSBwin-src/DSA.cpp:3046-3090`): a `TT_ParameterMessage`
         // timer to the target, and the first `numParam` DSA parameters in `EXPOOL` under
         // its index, for the DSAs it reaches (`readRoomTimerParameters`).
         const delay = bank.stack.pop() >>> 0;
@@ -2205,7 +2205,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.SOUND: {
-        // `STKOP_Sound` (`doc/CSBwin-src/DSA.cpp:4612-4624`).
+        // `STKOP_Sound` (`doc/CSBwin-src/DSA.cpp:4613-4625`).
         bank.stack.pop(); // flags, which `PlayCustomSound` does not use
         const volume = bank.stack.pop();
         const soundNum = bank.stack.pop();
@@ -2317,7 +2317,7 @@ export class DsaSystem {
       case StkOp.RANDOM: {
         let v = bank.stack.pop();
         if (v === 0) v = 1;
-        // `(ui32)STRandom() % V` (doc/CSBwin-src/DSA.cpp:2729) — the full 24-bit
+        // `(ui32)STRandom() % V` (doc/CSBwin-src/DSA.cpp:2730) — the full 24-bit
         // draw modulo V, *not* `STRandom(V)`, which masks to 16 bits first.
         const result = this.random.next() % v;
         bank.stack.push(result);
@@ -2410,7 +2410,7 @@ export class DsaSystem {
         bank.forceState = bank.stack.pop();
         break;
       case StkOp.PARAM_FETCH: {
-        // `i`, `n` and `j` are `ui32` (`doc/CSBwin-src/DSA.cpp:2956-2985`), so the count is
+        // `i`, `n` and `j` are `ui32` (`doc/CSBwin-src/DSA.cpp:2957-2986`), so the count is
         // compared unsigned: a count of -1, a parameter message whose record is gone, is
         // never short, and the words are copied as they stand.
         const index = bank.stack.pop() >>> 0;
@@ -2423,7 +2423,7 @@ export class DsaSystem {
         if (n > paramCount) {
           this.ctx.host.trace('DSA &PARAM@ non-existent parameter');
           for (let j = paramCount; j < n; j++) {
-            // `pdsaDbank->Var(j)` (`doc/CSBwin-src-20230608/DSA.cpp:2978`): a read of the
+            // `pdsaDbank->Var(j)` (`doc/CSBwin-src/DSA.cpp:2978`): a read of the
             // parameter's number, where the variable marked is `index + j`.
             bank.getVar(j);
             bank.setVarState(index + j, DsaVarType.NonParameter);
@@ -2436,7 +2436,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.PARAM_STORE: {
-        // `doc/CSBwin-src/DSA.cpp:3000-3020`, signed.
+        // `doc/CSBwin-src/DSA.cpp:3001-3021`, signed.
         const index = bank.stack.pop();
         const n = bank.stack.pop();
         if (n > 100) {
@@ -2462,7 +2462,7 @@ export class DsaSystem {
         const arraySize = bank.stack.pop();
         const arrayIndex = bank.stack.pop();
         if (arrayIndex < 0 || arrayIndex + arraySize > 100) break;
-        // `Var(arrayIndex+j, 0)` (doc/CSBwin-src/DSA.cpp:3690-3693): every variable of the
+        // `Var(arrayIndex+j, 0)` (doc/CSBwin-src/DSA.cpp:3691-3694): every variable of the
         // array is well defined from here, so `SetVarBit` below never zeroes one.
         for (let i = 0; i < arraySize; i++) {
           bank.setVar(arrayIndex + i, 0);
@@ -2479,7 +2479,7 @@ export class DsaSystem {
         if (arraySize < 2) break;
         switch (roomType) {
           // `Var(arrayIndex+1, Var(arrayIndex+1) | bit)` for these four; `SetVarBit` for a
-          // pit, a false wall and a door (doc/CSBwin-src/DSA.cpp:3704-3810).
+          // pit, a false wall and a door (doc/CSBwin-src/DSA.cpp:3705-3811).
           case RoomType.STONE:
             if (cellFlag & 0x8) bank.setVar(arrayIndex + 1, bank.getVar(arrayIndex + 1) | 0x01);
             if (cellFlag & 0x4) bank.setVar(arrayIndex + 1, bank.getVar(arrayIndex + 1) | 0x02);
@@ -2640,7 +2640,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.MODIFY_MESSAGE: {
-        // Popped `unsigned int` and capped at 3, no action (`doc/CSBwin-src/DSA.cpp:4935-4943`).
+        // Popped `unsigned int` and capped at 3, no action (`doc/CSBwin-src/DSA.cpp:4936-4944`).
         const s = Math.min(bank.stack.pop() >>> 0, 3);
         const c = Math.min(bank.stack.pop() >>> 0, 3);
         const t = Math.min(bank.stack.pop() >>> 0, 3);
@@ -2654,7 +2654,7 @@ export class DsaSystem {
         bank.stack.push(this.parameters[0] ?? 0);
         break;
       case StkOp.CH_POSS: {
-        // `doc/CSBwin-src/DSA.cpp:3330-3357`.
+        // `doc/CSBwin-src/DSA.cpp:3331-3358`.
         const party = this.ctx.party.state;
         let possIndex = bank.stack.pop() >>> 0;
         let chIndex = bank.stack.pop();
@@ -2677,7 +2677,7 @@ export class DsaSystem {
         this.monPoss(bank);
         break;
       case StkOp.MASTERY: {
-        // `DSA.cpp:3389-3410`. The indices are `ui32`, so a negative one is out of range.
+        // `DSA.cpp:3390-3411`. The indices are `ui32`, so a negative one is out of range.
         const party = this.ctx.party.state;
         const flags = bank.stack.pop();
         let skillIndex = bank.stack.pop() >>> 0;
@@ -2703,7 +2703,7 @@ export class DsaSystem {
         this.monsterStore(bank);
         break;
       case StkOp.PARTY_FETCH: {
-        // `DSA.cpp:4127-4165`.
+        // `DSA.cpp:4128-4166`.
         const party = this.ctx.party.state;
         const num = bank.stack.pop() >>> 0;
         const index = bank.stack.pop() >>> 0;
@@ -2727,7 +2727,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.CHAR_FETCH: {
-        // `DSA.cpp:4166-4241`.
+        // `DSA.cpp:4167-4242`.
         const party = this.ctx.party.state;
         const num = bank.stack.pop() >>> 0;
         const index = bank.stack.pop() >>> 0;
@@ -2778,7 +2778,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.TALENTS_FETCH: {
-        // `DSA.cpp:4242-4290`. Bit 16 is a fingerprint in the wings.
+        // `DSA.cpp:4243-4291`. Bit 16 is a fingerprint in the wings.
         const party = this.ctx.party.state;
         let charIdx = bank.stack.pop();
         if (charIdx === 4) charIdx = party.cursorOwner;
@@ -2792,7 +2792,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.TALENTS_STORE: {
-        // `DSA.cpp:4291-4347`. Bit 16 is a fingerprint in the wings, whose copy is saved
+        // `DSA.cpp:4292-4348`. Bit 16 is a fingerprint in the wings, whose copy is saved
         // back when the talents change.
         const party = this.ctx.party.state;
         let charIdx = bank.stack.pop();
@@ -2811,7 +2811,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.CAUSE_POISON: {
-        // `DSA.cpp:4348-4362`.
+        // `DSA.cpp:4349-4363`.
         const charIdx = bank.stack.pop();
         const val = bank.stack.pop();
         this.noFilter(bank);
@@ -2821,7 +2821,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.WHO_HAS_TALENT: {
-        // `DSA.cpp:4363-4382`.
+        // `DSA.cpp:4364-4383`.
         const talents = bank.stack.pop() >>> 0;
         let val = 0;
         this.ctx.party.state.champions.forEach((champ, charIdx) => {
@@ -2831,7 +2831,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.WHERE_IS_CHAR: {
-        // `DSA.cpp:4383-4412`: the last champion with the fingerprint, else 5 when the
+        // `DSA.cpp:4384-4413`: the last champion with the fingerprint, else 5 when the
         // wings hold its first record, else 4.
         const fingerPrint = bank.stack.pop();
         let val = 4;
@@ -2843,7 +2843,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.SWAP_CHARACTER: {
-        // `DSA.cpp:4413-4425`.
+        // `DSA.cpp:4414-4426`.
         this.noFilter(bank);
         const fingerPrint = bank.stack.pop();
         const index = bank.stack.pop();
@@ -2854,7 +2854,7 @@ export class DsaSystem {
         this.charStore(bank);
         break;
       case StkOp.SAY: {
-        // `DSA.cpp:3137-3160`: the first text of the square, at any corner.
+        // `DSA.cpp:3138-3161`: the first text of the square, at any corner.
         const color = bank.stack.pop();
         const locr = locationRelFromInteger(bank.stack.pop());
         if (!this.dungeon.isValidLocation(locr)) break;
@@ -2870,11 +2870,11 @@ export class DsaSystem {
         break;
       }
       case StkOp.DISCARD_TEXT:
-        // `DSA.cpp:3161-3167`.
+        // `DSA.cpp:3162-3168`.
         this.ctx.host.messages.discardText();
         break;
       case StkOp.TEXT_FETCH: {
-        // `DSA.cpp:3168-3193`.
+        // `DSA.cpp:3169-3194`.
         const textIndex = bank.stack.pop() >>> 0;
         const objIndex = bank.stack.pop();
         if (textIndex > 9) break;
@@ -2886,14 +2886,14 @@ export class DsaSystem {
         break;
       }
       case StkOp.GLOBAL_TEXT_STORE: {
-        // `DSA.cpp:3194-3202`.
+        // `DSA.cpp:3195-3203`.
         const globalIndex = bank.stack.pop();
         const localIndex = bank.stack.pop();
         this.setGlobalText(bank.getText(localIndex), globalIndex);
         break;
       }
       case StkOp.CHAR_NAME_FETCH: {
-        // `DSA.cpp:3204-3237`: the first champion with the fingerprint, else the one in
+        // `DSA.cpp:3205-3238`: the first champion with the fingerprint, else the one in
         // the wings (`LocateInWings`).
         // `SetText(pName, 8, index)` copies nine bytes, the name's eight and a ninth:
         // only a name of eight letters, which runs on into the title, would show it.
@@ -2907,14 +2907,14 @@ export class DsaSystem {
         break;
       }
       case StkOp.TEXT_SAY: {
-        // `DSA.cpp:3239-3252`.
+        // `DSA.cpp:3240-3253`.
         const color = bank.stack.pop();
         const index = bank.stack.pop();
         printWithSubstitution(this.ctx, bank.getText(index), color);
         break;
       }
       case StkOp.EXPERIENCE_PLUS: {
-        // `DSA.cpp:4542-4557`. A negative index reads nobody (`DEBT.md` H).
+        // `DSA.cpp:4543-4558`. A negative index reads nobody (`DEBT.md` H).
         const experience = bank.stack.pop();
         const skillnum = bank.stack.pop();
         const charnum = bank.stack.pop();
@@ -2923,7 +2923,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.MON_BLK: {
-        // `DSA.cpp:4625-4638`.
+        // `DSA.cpp:4626-4639`.
         const flags = bank.stack.pop();
         const inhibit = this.ctx.systems.monsterAI.monsterMoveInhibit;
         inhibit[0] = flags & 1;
@@ -2955,7 +2955,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.THROW: {
-        // `DSA.cpp:4558-4582`.
+        // `DSA.cpp:4559-4583`.
         const delta = bank.stack.pop();
         const damage = bank.stack.pop();
         const range = bank.stack.pop();
@@ -2970,18 +2970,18 @@ export class DsaSystem {
       }
       case StkOp.CAST:
       case StkOp.FILTERED_CAST:
-        // `DSA.cpp:3091-3106`.
+        // `DSA.cpp:3092-3107`.
         this.noFilter(bank);
         this.ctx.systems.magic.dsaCastSpell(subcode === StkOp.FILTERED_CAST);
         break;
       case StkOp.GET_SKIN: {
-        // `DSA.cpp:3107-3121`: `y` in bits 0-4, `x` in 5-9, the level in 10-15.
+        // `DSA.cpp:3108-3122`: `y` in bits 0-4, `x` in 5-9, the level in 10-15.
         const loc = bank.stack.pop();
         bank.stack.push(this.dungeon.skinCache.GetSkin((loc >> 10) & 63, (loc >> 5) & 31, loc & 31));
         break;
       }
       case StkOp.SET_SKIN: {
-        // `DSA.cpp:3122-3135`: the location, then the skin, of which `SetSkin` takes the
+        // `DSA.cpp:3123-3136`: the location, then the skin, of which `SetSkin` takes the
         // low byte.
         const loc = bank.stack.pop();
         const skin = bank.stack.pop();
@@ -2998,7 +2998,7 @@ export class DsaSystem {
         this.missileInfoStore(bank);
         break;
       case StkOp.COUNT_INJURY: {
-        // `DSA.cpp:4798-4818`.
+        // `DSA.cpp:4799-4819`.
         const injuryMask = bank.stack.pop();
         let chMask = bank.stack.pop();
         let count = 0;
@@ -3014,7 +3014,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.LOC_TO_ABS_COORD: {
-        // `doc/CSBwin-src/DSA.cpp:3253-3269`, `LOCATIONABS::operator =` (`:320-327`): the
+        // `doc/CSBwin-src/DSA.cpp:3254-3270`, `LOCATIONABS::operator =` (`:321-328`): the
         // level's offsets added, read past the descriptors for a level that is not there.
         const locr = locationRelFromInteger(bank.stack.pop());
         const descriptor = this.dungeon.getMap(locr.l)?.descriptor;
@@ -3025,7 +3025,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.FETCH_EX_CELL_FLG: {
-        // `doc/CSBwin-src/DSA.cpp:3270-3297`: the cell's bit of each of the eight flags,
+        // `doc/CSBwin-src/DSA.cpp:3271-3298`: the cell's bit of each of the eight flags,
         // flag 0 in bit 0, all clear without a record of eight.
         const locr = locationRelFromInteger(bank.stack.pop());
         const record = this.dungeon.locateExpoolRecord(extendedCellFlagsKey(locr));
@@ -3041,7 +3041,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.STORE_EX_CELL_FLG: {
-        // `doc/CSBwin-src/DSA.cpp:3298-3327`: the record is taken out, its cell's bits
+        // `doc/CSBwin-src/DSA.cpp:3299-3328`: the record is taken out, its cell's bits
         // set from the low eight of `flags`, and written back; a missing or short record
         // starts at zero.
         const loc = bank.stack.pop();
@@ -3060,7 +3060,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.MULTIPLIER_FETCH: {
-        // `doc/CSBwin-src/DSA.cpp:3974-3990`: `level` is signed, so a negative one reads
+        // `doc/CSBwin-src/DSA.cpp:3975-3991`: `level` is signed, so a negative one reads
         // before the descriptors, and 1 past the last.
         const level = bank.stack.pop();
         if (level < this.dungeon.getMapCount()) {
@@ -3071,7 +3071,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.PARTY_DISTANCE: {
-        // `doc/CSBwin-src/DSA.cpp:4057-4073`: steps on the party's level, minus the levels
+        // `doc/CSBwin-src/DSA.cpp:4058-4074`: steps on the party's level, minus the levels
         // between otherwise.
         const locr = locationRelFromInteger(bank.stack.pop());
         const party = this.ctx.party.state.position;
@@ -3083,13 +3083,13 @@ export class DsaSystem {
         break;
       }
       case StkOp.JUMP_GEAR: {
-        // `doc/CSBwin-src/DSA.cpp:4737-4745`: the state, then the column, from the stack.
+        // `doc/CSBwin-src/DSA.cpp:4738-4746`: the state, then the column, from the stack.
         const state = bank.stack.pop();
         const col = bank.stack.pop();
         return { state, col };
       }
       case StkOp.GOSUB_GEAR: {
-        // `doc/CSBwin-src/DSA.cpp:4746-4767`: `EX_GOSUB`'s call, the master's program.
+        // `doc/CSBwin-src/DSA.cpp:4747-4768`: `EX_GOSUB`'s call, the master's program.
         const state = bank.stack.pop();
         const msg = bank.stack.pop();
         this.execute({
@@ -3105,14 +3105,14 @@ export class DsaSystem {
         this.examineCell(4, 4, bank);
         break;
       case StkOp.THIS_DSA_ID:
-        // `doc/CSBwin-src/DSA.cpp:4822-4828`: the slave's RN, `ConvertToInteger`.
+        // `doc/CSBwin-src/DSA.cpp:4823-4829`: the slave's RN, `ConvertToInteger`.
         bank.stack.push(exPkt.rnSlave);
         break;
       case StkOp.NEIGHBORS:
         this.examineCell(0, 3, bank);
         break;
       case StkOp.BIT_COUNT: {
-        // `doc/CSBwin-src/DSA.cpp:4832-4849`.
+        // `doc/CSBwin-src/DSA.cpp:4833-4850`.
         const v = bank.stack.pop() >>> 0;
         let count = 0;
         for (let shift = 0; shift < 32; shift += 4) count += BIT_COUNTS[(v >>> shift) & 0x0f]!;
@@ -3123,7 +3123,7 @@ export class DsaSystem {
         this.vset(bank);
         break;
       case StkOp.OVERLAY: {
-        // `doc/CSBwin-src/DSA.cpp:2919-2930`.
+        // `doc/CSBwin-src/DSA.cpp:2920-2931`.
         const onum = bank.stack.pop();
         const p4 = bank.stack.pop();
         const p3 = bank.stack.pop();
@@ -3133,7 +3133,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.PALETTE: {
-        // `doc/CSBwin-src/DSA.cpp:2932-2944`.
+        // `doc/CSBwin-src/DSA.cpp:2933-2945`.
         const density = bank.stack.pop();
         const onum = bank.stack.pop();
         bank.stack.pop(); // p2, which `SetOverlayPalette` does not read
@@ -3142,7 +3142,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.JITTER: {
-        // `doc/CSBwin-src/DSA.cpp:4903-4930`.
+        // `doc/CSBwin-src/DSA.cpp:4904-4931`.
         const yOverlay = bank.stack.pop();
         const xOverlay = bank.stack.pop();
         const yGraphic = bank.stack.pop();
@@ -3151,11 +3151,11 @@ export class DsaSystem {
         break;
       }
       case StkOp.DISABLE_SAVES:
-        // `doc/CSBwin-src/DSA.cpp:2945-2955`.
+        // `doc/CSBwin-src/DSA.cpp:2946-2956`.
         this.disableSaves = bank.stack.pop() !== 0;
         break;
       case StkOp.DSA_INFO_FETCH: {
-        // `doc/CSBwin-src/DSA.cpp:2439-2470`: a type-47 actuator's selector, state and
+        // `doc/CSBwin-src/DSA.cpp:2440-2471`: a type-47 actuator's selector, state and
         // parameters, -1 for each otherwise.
         let dsaType = -1;
         let dsaState = -1;
@@ -3178,7 +3178,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.I_INDIRECT: {
-        // `doc/CSBwin-src/DSA.cpp:2345-2391`: the parameter record `indirect` packed, back
+        // `doc/CSBwin-src/DSA.cpp:2346-2392`: the parameter record `indirect` packed, back
         // on the stack, in the variables and in the parameters, and its operation run. A
         // record that names none does nothing. A count past the array reads outside
         // CSBWin's, where the port reads 0 and stops at 100.
@@ -3200,7 +3200,7 @@ export class DsaSystem {
         for (let i = 0; i < n; i++) p[1 + i] = word(r++);
         return this.executeAmpersand(operation, bank, exPkt);
       }
-      // `DSA.cpp:4957-4971`: each `I_` operation's operands, sent to the DSA at
+      // `DSA.cpp:4958-4972`: each `I_` operation's operands, sent to the DSA at
       // `ESL_INDIRECTACTIONS` (`indirect`).
       case StkOp.I_DEL: this.indirect(bank, subcode, false, 2, 0); break;
       case StkOp.I_DEL_MON: this.indirect(bank, subcode, false, 2, 0); break;
@@ -3218,7 +3218,7 @@ export class DsaSystem {
       case StkOp.I_THROW: this.indirect(bank, subcode, false, 7, 0); break;
       case StkOp.I_SWAP_CHARACTER: this.indirect(bank, subcode, false, 2, 0); break;
       case StkOp.I_DELAY:
-        // `DSA.cpp:4972-4978`: the delay of the next `indirect`, this run only.
+        // `DSA.cpp:4973-4979`: the delay of the next `indirect`, this run only.
         bank.indirectActionDelay = bank.stack.pop();
         break;
       default:
@@ -3231,7 +3231,7 @@ export class DsaSystem {
   }
 
   /**
-   * `Indirect` (`doc/CSBwin-src/DSA.cpp:2093-2192`): an `I_` operation's operands in a
+   * `Indirect` (`doc/CSBwin-src/DSA.cpp:2094-2193`): an `I_` operation's operands in a
    * parameter record, `[type, numVar, the numVar popped, array, its variables, numParam,
    * the first numParam DSA parameters]`, which a `TT_ParameterMessage` timer takes to the
    * DSA at `ESL_INDIRECTACTIONS`, corner 0, message type 0, due now or `&%DELAY` ticks on.
@@ -3272,11 +3272,11 @@ export class DsaSystem {
   }
 
   /**
-   * `NOFILTER` (`doc/CSBwin-src/DSA.cpp:457-462`): an operation that changes the dungeon,
+   * `NOFILTER` (`doc/CSBwin-src/DSA.cpp:458-463`): an operation that changes the dungeon,
    * run from a filter, warns the dungeon's author.
    */
   /**
-   * `ExamineCell` (`doc/CSBwin-src/DSA.cpp:2210-2320`), `&THISCELL` and `&NEIGHBORS`:
+   * `ExamineCell` (`doc/CSBwin-src/DSA.cpp:2211-2321`), `&THISCELL` and `&NEIGHBORS`:
    * a result bit for each cell from `first` to `last` (0 to 3 the four neighbours, north
    * first and clockwise; 4 the cell itself) that has one of the mask's bits of what it is
    * (0 to 24) and one of what is on it (29 to 31).
@@ -3349,7 +3349,7 @@ export class DsaSystem {
     bank.stack.push(result);
   }
 
-  /** `Contents` (`doc/CSBwin-src/DSA.cpp:2200-2205`): the party, else a monster, else nothing. */
+  /** `Contents` (`doc/CSBwin-src/DSA.cpp:2201-2206`): the party, else a monster, else nothing. */
   private cellContents(locr: LocationRel): number {
     const party = this.ctx.party.state.position;
     if (party.z === locr.l && party.x === locr.x && party.y === locr.y) return 1 << 29;
@@ -3358,7 +3358,7 @@ export class DsaSystem {
   }
 
   /**
-   * `&VSET` (`doc/CSBwin-src/DSA.cpp:4850-4897`): `n` variables from `dst` set to `-src`
+   * `&VSET` (`doc/CSBwin-src/DSA.cpp:4851-4898`): `n` variables from `dst` set to `-src`
    * for a negative `src`, to `src - 100` past 99, and otherwise copied from the variables
    * at `src`, their states with them. `n` and `dst` are unsigned, `src` signed. A count
    * whose sum with `dst` or `src` wraps past 2^32 runs CSBWin past its 100 variables; the
@@ -3387,7 +3387,7 @@ export class DsaSystem {
   }
 
   /**
-   * `STKOP_CreateCloud` (`doc/CSBwin-src/DSA.cpp:2740-2787`): a cloud of one of five
+   * `STKOP_CreateCloud` (`doc/CSBwin-src/DSA.cpp:2741-2788`): a cloud of one of five
    * spells, or a Fluxcage, made at a location of any level, as a missile's would be. A
    * type with no spell is "Illegal cloud type", and makes nothing. CSBWin does not check
    * the location, and runs `LoadLevel` and `AddObjectToRoom` off their tables for one
@@ -3421,7 +3421,7 @@ export class DsaSystem {
   }
 
   /**
-   * `STKOP_MissileInfoFetch` (`doc/CSBwin-src/DSA.cpp:2795-2823`): a missile's contents,
+   * `STKOP_MissileInfoFetch` (`doc/CSBwin-src/DSA.cpp:2796-2824`): a missile's contents,
    * range, damage and direction, the last from its timer's `timerWord8` bits 10-11; -1 for
    * each when the slot is not a missile. CSBWin reads the timer slot the missile names
    * whatever it holds; the port finds no timer there only for a record no launch made,
@@ -3450,7 +3450,7 @@ export class DsaSystem {
   }
 
   /**
-   * `STKOP_MissileInfoStore` (`doc/CSBwin-src/DSA.cpp:2824-2851`): a missile's range and
+   * `STKOP_MissileInfoStore` (`doc/CSBwin-src/DSA.cpp:2825-2852`): a missile's range and
    * damage, cut to their bytes, and its timer's direction. The three values are popped
    * only when the slot is valid, so an invalid one leaves them on the stack.
    */
@@ -3470,7 +3470,7 @@ export class DsaSystem {
   }
 
   /**
-   * `STKOP_MonPoss` (`doc/CSBwin-src/DSA.cpp:3358-3388`): the slot of the group's
+   * `STKOP_MonPoss` (`doc/CSBwin-src/DSA.cpp:3359-3389`): the slot of the group's
    * `possindex`th possession, counted from 0, or -1 past the last. When the slot popped is
    * no group, `object` keeps the default `RN`, `RNnul`, and its integer 0xffff is pushed.
    */
@@ -3489,7 +3489,7 @@ export class DsaSystem {
   }
 
   /**
-   * `STKOP_MonsterFetch` (`doc/CSBwin-src/DSA.cpp:3992-4056`): up to `num` of eight words
+   * `STKOP_MonsterFetch` (`doc/CSBwin-src/DSA.cpp:3993-4057`): up to `num` of eight words
    * about the group at a slot, into the variables from `index` on: how many it is, its
    * type, the four hit points, the flags (1 invisible, 2 drawn as size 4, 4 unique, 8
    * poisoned, each through its gated `DB4` accessor) and the alternate graphics. A slot
@@ -3517,7 +3517,7 @@ export class DsaSystem {
   }
 
   /**
-   * `STKOP_MonsterStore` (`doc/CSBwin-src/DSA.cpp:4075-4126`): the hit points, flags and
+   * `STKOP_MonsterStore` (`doc/CSBwin-src/DSA.cpp:4076-4127`): the hit points, flags and
    * alternate graphics `&MONSTER@` reads, written back from the variables from `index`
    * on, as far as `num` reaches; the count and the type are not. The flags are written
    * whatever the design options. `num` is unsigned, so `num - 2` of 0 or 1 lets all four
@@ -3543,7 +3543,7 @@ export class DsaSystem {
   }
 
   /**
-   * `STKOP_MonLandD` (`doc/CSBwin-src/DSA.cpp:4768-4790`): in the monster move filter, the
+   * `STKOP_MonLandD` (`doc/CSBwin-src/DSA.cpp:4769-4791`): in the monster move filter, the
    * group's location as `1024 * level + 32 * x + y` and its distance to the party less
    * one, from the filter's parameters, into variables `idx` and `idx + 1`. Outside that
    * filter it does nothing, not even pop.
@@ -3559,7 +3559,7 @@ export class DsaSystem {
   }
 
   /**
-   * `STKOP_CharStore` (`doc/CSBwin-src/DSA.cpp:4426-4541`): the variables from `index` on
+   * `STKOP_CharStore` (`doc/CSBwin-src/DSA.cpp:4427-4542`): the variables from `index` on
    * written back over the fields `&CHAR@` reads, but for those CSBWin leaves alone.
    * `CHARFLAG_statsChanged` and `DrawCharacterState` have no counterpart: the panels are
    * redrawn every frame.
@@ -3605,7 +3605,7 @@ export class DsaSystem {
   }
 
   /**
-   * `EX_IsCarried` (`doc/CSBwin-src/DSA.cpp:1613-1641`). An object ID asks where that
+   * `EX_IsCarried` (`doc/CSBwin-src/DSA.cpp:1614-1642`). An object ID asks where that
    * object is: `256 * chIdx` plus its slot, 255 for the hand, or -1. A negative one is a
    * basic object type, -1 for type 0, and asks how many such objects are carried. A chest
    * is searched, and so is what it holds. Champion 4 is the hand's owner, 5 every
@@ -3613,8 +3613,8 @@ export class DsaSystem {
    */
   /**
    * `&CURSE@`, `&BROKEN@`, `&POISONED@`, `&CHARGES@` and `&SUBTYPE@`
-   * (`doc/CSBwin-src/DSA.cpp:3411-3439`, `:3458-3483`, `:3511-3536`, `:3564-3595`,
-   * `:3629-3651`): the field of the object at slot `objIndex`, 0 for an invalid slot or a
+   * (`doc/CSBwin-src/DSA.cpp:3412-3440`, `:3459-3484`, `:3512-3537`, `:3565-3596`,
+   * `:3630-3652`): the field of the object at slot `objIndex`, 0 for an invalid slot or a
    * database without it. A potion's charges are its strength, a misc object's its
    * `value()`; only a weapon has a poison bit, and only a misc object a subtype.
    */
@@ -3643,9 +3643,9 @@ export class DsaSystem {
 
   /**
    * `&CURSE!`, `&BROKEN!`, `&POISONED!`, `&CHARGES!` and `&SUBTYPE!`
-   * (`doc/CSBwin-src/DSA.cpp:3440-3457`, `:3484-3510`, `:3537-3563`, `:3596-3628`,
-   * `:3652-3675`): the setters of `getObjectField`'s fields, each value cut to its
-   * field's width by `SETWBITS` (`CSB.h:746-774`), a flag set by any non-zero value.
+   * (`doc/CSBwin-src/DSA.cpp:3441-3458`, `:3485-3511`, `:3538-3564`, `:3597-3629`,
+   * `:3653-3676`): the setters of `getObjectField`'s fields, each value cut to its
+   * field's width by `SETWBITS` (`CSB.h:749-777`), a flag set by any non-zero value.
    * A curse goes through `SetCursed`.
    */
   private setObjectField(subcode: number, objIndex: number, value: number): void {
@@ -3679,7 +3679,7 @@ export class DsaSystem {
   }
 
   /**
-   * `SetCursed` (`doc/CSBwin-src/Character.cpp:1782-1816`): the curse bracketed by
+   * `SetCursed` (`doc/CSBwin-src/Character.cpp:1787-1821`): the curse bracketed by
    * `AdjustStatsForItemCarried`'s -1 and +1 on the champion carrying the object, at the
    * slot it is in. CSBWin's search leaves only its inner loop, so it passes that slot
    * only when the bearer is the last champion, and slot 30 for any other; the port's
@@ -3728,7 +3728,7 @@ export class DsaSystem {
   }
 
   /**
-   * `ForEach` with `IsCarriedCallback` (`doc/CSBwin-src/DSA.cpp:1520-1611`), true to end the
+   * `ForEach` with `IsCarriedCallback` (`doc/CSBwin-src/DSA.cpp:1521-1612`), true to end the
    * search. `thisObj` below 0 is champion `-thisObj - 1`: a find replaces the count on the
    * stack with the slot.
    */
@@ -3812,8 +3812,8 @@ export class DsaSystem {
   }
 
   /**
-   * `FindMaster` (`doc/CSBwin-src/DSA.cpp:534-547`). CSBWin implements no slave DSA: a
-   * DSA is its own master unless its `LocalState()` is 3 (`IsMaster`, `Data.h:2464-2467`),
+   * `FindMaster` (`doc/CSBwin-src/DSA.cpp:535-548`). CSBWin implements no slave DSA: a
+   * DSA is its own master unless its `LocalState()` is 3 (`IsMaster`, `Data.h:2479-2482`),
    * and for one that is, it warns and runs the slave as its master all the same. The
    * slave's master coordinates are then left unset, so the port takes the timer's, as
    * for a master. No dungeon here has a DSA whose local state is 3.
@@ -3901,11 +3901,11 @@ export class DsaSystem {
   }
 
   /**
-   * `QueueDSASwitchAction` (`doc/CSBwin-src/DSA.cpp:485-532`): a set, clear or toggle
+   * `QueueDSASwitchAction` (`doc/CSBwin-src/DSA.cpp:486-533`): a set, clear or toggle
    * (`tmrAct` 0, 1, 2) sent `delay` ticks on to a cell, as the timer its room type takes
    * (`'M'`), or as a `TT_DESSAGE` (`'D'`). A DSA's `MESSAGE` sends it, and so does a
    * portrait the Hall of Champions disables (`PortraitTranslateDisable`,
-   * `CSBCode.cpp:6589-6612`).
+   * `CSBCode.cpp:6648-6671`).
    */
   queueDsaSwitchAction(
     delay: number,
@@ -4079,9 +4079,9 @@ export class DsaSystem {
     }
   }
 
-  /** `RN::checkIndirectIndex(i)` (`doc/CSBwin-src/data.cpp:529-534`): a slot of the maps. */
+  /** `RN::checkIndirectIndex(i)` (`doc/CSBwin-src/data.cpp:530-535`): a slot of the maps. */
   /**
-   * `SetGlobalText` (`doc/CSBwin-src/CSBCode.cpp:5295-5307`): the text, at most 99 bytes
+   * `SetGlobalText` (`doc/CSBwin-src/CSBCode.cpp:5360-5372`): the text, at most 99 bytes
    * and its zero, as the `EXPOOL` record `(EDT_GlobalText << 24) | index`, four bytes to a
    * longword in memory order. The record is `(len + 4) / 4` longwords; CSBWin fills the
    * bytes past the zero from an uninitialised buffer, the port with zeros. A new record
@@ -4089,7 +4089,7 @@ export class DsaSystem {
    */
   /**
    * `(char *)pRecord` of the `EXPOOL`'s global text `index`, as the action name filter reads
-   * it (`doc/CSBwin-src/CSBCode.cpp:8702-8710`): its bytes, in memory order, up to the first
+   * it (`doc/CSBwin-src/CSBCode.cpp:8807-8815`): its bytes, in memory order, up to the first
    * 0. Null when there is no such record, or an empty one.
    */
   private globalText(index: number): string | null {
@@ -4132,7 +4132,7 @@ export class DsaSystem {
     if (location === -1) {
       if (party.objectInHand === OBJECT_ID_NULL) return null;
       // `CURSORFILTER_DSA_DEL`, which cannot cancel; `RemoveObjectFromHand` then takes
-      // whatever the hand holds once it returns (`doc/CSBwin-src/DSA.cpp:1657-1665`).
+      // whatever the hand holds once it returns (`doc/CSBwin-src/DSA.cpp:1658-1666`).
       this.cursorFilter({ object: party.objectInHand, type: CursorFilterType.DSA_DEL, p1: 0, p2: 0, p3: 0, p4: 0 });
       const removed = party.objectInHand;
       if (removed === OBJECT_ID_NULL) return null;
@@ -4150,7 +4150,7 @@ export class DsaSystem {
     return this.ctx.systems.character.removeCharacterPossession(loc.chIdx, loc.posIdx);
   }
 
-  /** `EX_DEL`'s scroll arm (`doc/CSBwin-src/DSA.cpp:1715-1722`): its text goes first. */
+  /** `EX_DEL`'s scroll arm (`doc/CSBwin-src/DSA.cpp:1716-1723`): its text goes first. */
   private deleteLinkedScrollText(rn: ObjectID, bank: DsaBank): void {
     if (!this.isValidObjectId(rn)) return;
     const { category } = this.dungeon.rnMaps.decode(rn);
@@ -4367,7 +4367,7 @@ export class DsaSystem {
    * cloud's `TT_25` (or a Fluxcage's `TT_24`) and returns it as `hTimer` for
    * `FindCellDestination` to retarget, or `SER_BadCloudTimer` when there is none.
    * `TIMER_SEARCH` walks the slots in order, so the lowest slot wins, and `RN`'s `!=`
-   * compares the indirect index only (`CSBTypes.h:353`) — the corner is not part of it.
+   * compares the indirect index only (`CSBTypes.h:359`) — the corner is not part of it.
    */
   private findCellSource(
     srcObjMsk: number,
@@ -4550,7 +4550,7 @@ export class DsaSystem {
    *
    * CSBWin sets the cloud timer's corner from `d.NewPos` and then `object.pos(p)`
    * overwrites it, because the corner lives in the indirect-index table rather than in
-   * the `RN` (`CSBTypes.h:336-341`). Here the corner is part of the ID, so both timers
+   * the `RN` (`CSBTypes.h:342-347`). Here the corner is part of the ID, so both timers
    * are handed the placed ID outright — the one `ProcessTT_25` and the missile's
    * removal will look for.
    */
@@ -4648,7 +4648,7 @@ export class DsaSystem {
   }
 
   /**
-   * The two halves of CSBWin's low-level `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2796`)
+   * The two halves of CSBWin's low-level `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2831`)
    * a DSA cell move goes through: `WorldMove.moveObject`, and its monster branch,
    * `MonsterSystem.moveMonster`.
    */
@@ -4865,7 +4865,7 @@ export class DsaSystem {
       if ((m & (1 << p)) !== 0) positions.push(p as TilePosition);
     }
     if (positions.length === 0) return fallback;
-    const idx = this.random.below(positions.length); // STRandom(n), doc/CSBwin-src/DSA.cpp:2042
+    const idx = this.random.below(positions.length); // STRandom(n), doc/CSBwin-src/DSA.cpp:2043
     return positions[idx] ?? fallback;
   }
 
@@ -4873,7 +4873,7 @@ export class DsaSystem {
     if (!this.isValidObjectId(objectId)) return null;
     const { category, index, position } = this.dungeon.rnMaps.decode(objectId);
     const data = this.dungeon.getData();
-    // Each copy takes a record through `FindEmptyDB<n>Entry(true)` (`DSA.cpp:1773-1868`,
+    // Each copy takes a record through `FindEmptyDB<n>Entry(true)` (`DSA.cpp:1774-1869`,
     // `DungeonState.findEmptyDBEntry`).
     const placed = (rn: ObjectID): ObjectID | null =>
       rn === OBJECT_ID_NULL ? null : this.dungeon.rnMaps.setPos(rn, position);
@@ -4911,7 +4911,7 @@ export class DsaSystem {
         // The copy must not inherit the original's ITEM16 slot. CSBWin parks it at
         // 0xd8, or 0xff for a monster that fills the whole cell, so that every
         // `groupIndex() < d.MaxITEM16` test reads it as unattached
-        // (doc/CSBwin-src/DSA.cpp:1884-1887).
+        // (doc/CSBwin-src/DSA.cpp:1885-1888).
         return placed(this.dungeon.findEmptyDBEntry('creatures', {
           ...rec,
           nextObject: OBJECT_ID_EOF,
@@ -4942,7 +4942,7 @@ export class DsaSystem {
   }
 
   /**
-   * `STKOP_TeleportParty` (doc/CSBwin-src/DSA.cpp:4583): the party moved by a pretend
+   * `STKOP_TeleportParty` (doc/CSBwin-src/DSA.cpp:4584): the party moved by a pretend
    * teleporter — `what(2)`, party and objects — through the world `MoveObject`, which
    * resolves whatever the destination does to them.
    */

@@ -4,9 +4,9 @@
  * `MissileTimer` moves its missile into the next cell with the world
  * `MoveObject(missileFilterObject, origMapX, origMapY, curMapX, curMapY, NULL, NULL)`
  * (`doc/CSBwin-src/Timer.cpp:382-397`), which reads the direction, `d.NewDir`, off the
- * timer the missile's record names (`Code11f52.cpp:2891-2898`): inside `MissileTimer` that
+ * timer the missile's record names (`Code11f52.cpp:2926-2933`): inside `MissileTimer` that
  * is timer 0xffff, the copy (`Timer.cpp:224-226`, `:700-714`). Each teleporter on the way
- * turns it through `TeleportMissile` (`Code11f52.cpp:2392-2411`): an absolute one sets the
+ * turns it through `TeleportMissile` (`Code11f52.cpp:2427-2446`): an absolute one sets the
  * direction to its rotation and leaves the corner, a relative one adds its rotation to
  * both. `MissileTimer` then writes `d.NewX`, `d.NewY` and `d.NewDir` into the timer's
  * word 8, `d.NewPos` into the missile, and `d.NewLevel` into the timer.
@@ -119,7 +119,7 @@ for (const c of cases) {
   processTimersAt(game, game.ctx.state.tickCount + 1);
 
   // `MissileTimer`: the corner it enters the next cell by (`Timer.cpp:370-377`), then
-  // `TeleportMissile` (`Code11f52.cpp:2392-2411`).
+  // `TeleportMissile` (`Code11f52.cpp:2427-2446`).
   const entering = (site.direction & 1) === (c.corner & 1) ? (c.corner + 3) & 3 : (c.corner + 1) & 3;
   const wantCorner = c.absolute ? entering : (entering + c.rotation) & 3;
   const wantDir = c.absolute ? c.rotation : (site.direction + c.rotation) & 3;

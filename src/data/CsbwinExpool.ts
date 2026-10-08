@@ -1,25 +1,25 @@
 /**
  * `EXPOOL`, database 11: CSBWin's expandable pool of keyed records
- * (`class EXPOOL`, `doc/CSBwin-src/CSB.h:1581`; `doc/CSBwin-src/data.cpp:1507-1675`).
+ * (`class EXPOOL`, `doc/CSBwin-src/CSB.h:1584`; `doc/CSBwin-src/data.cpp:1510-1678`).
  *
- * The database is an array of 256-byte blocks (`DB11`, `CSB.h:1280-1288`: the link word,
+ * The database is an array of 256-byte blocks (`DB11`, `CSB.h:1283-1291`: the link word,
  * `size`, and 63 longwords), which CSBWin addresses as one array of longwords, `m`, 64 to
  * a block. Here `m` is read and written in place in the file's bytes, big-endian, so a
  * block's first longword holds its link in the high word and its `size` in the low one
- * (`DB11::swap`, `data.cpp:1458-1467`).
+ * (`DB11::swap`, `data.cpp:1461-1470`).
  *
- * - **Block 0** is the directory (`EXPOOL::Setup`, `:1507-1522`): `m[2]` to `m[31]` head
+ * - **Block 0** is the directory (`EXPOOL::Setup`, `:1510-1525`): `m[2]` to `m[31]` head
  *   the free lists, one for each record length, and `m[32]` to `m[63]` the hash chains.
  * - **Every other block** holds records of one length, its `size`: the link to the next
  *   record of its chain or free list, the key, then `size - 2` longwords of data
- *   (`EXPOOL::enlarge`, `:1610-1633`).
+ *   (`EXPOOL::enlarge`, `:1613-1636`).
  *
- * A key's top byte is its `EXPOOL_DATA_TYPE` (`CSB.h:1529`). Two records may share a key:
+ * A key's top byte is its `EXPOOL_DATA_TYPE` (`CSB.h:1532`). Two records may share a key:
  * `Write` puts the new one at the head of its chain, and `Read` and `Locate` take the
  * first they meet.
  *
  * `Setup` runs at the first `Write`, where CSBWin's runs at the end of `ReadDatabases`
- * (`doc/CSBwin-src/SaveGame.cpp:2773`). The pool is the same from that record on, and
+ * (`doc/CSBwin-src/SaveGame.cpp:2986`). The pool is the same from that record on, and
  * every save writes one, the overlay palette's (`storeOverlayPalette`), so every file
  * has the directory block as CSBWin's does. Only a world in play that nothing has
  * written a record to has no block yet, as `dungeon.dat` has none.
@@ -28,39 +28,39 @@ import { readU32BE, writeU32BE } from '../core/bytes';
 import { DBType } from '../core/types';
 import type { RuntimeFileSignatures } from './FileSignature';
 
-/** `sizeof(DB11)`, an `EXPOOL` block (`doc/CSBwin-src/CSB.h:1280-1288`). */
+/** `sizeof(DB11)`, an `EXPOOL` block (`doc/CSBwin-src/CSB.h:1283-1291`). */
 export const EXPOOL_RECORD_SIZE = 256;
 /** The longwords of one block. */
 const EXPOOL_WORDS_PER_BLOCK = 64;
-/** `RNeof`, every block's link (`doc/CSBwin-src/data.cpp:1514`, `:1623`). */
+/** `RNeof`, every block's link (`doc/CSBwin-src/data.cpp:1517`, `:1626`). */
 const RN_EOF = 0xfffe;
-/** `EDT_MessageParameters` (`doc/CSBwin-src/CSB.h:1531`). */
+/** `EDT_MessageParameters` (`doc/CSBwin-src/CSB.h:1534`). */
 const EDT_MESSAGE_PARAMETERS = 1;
-/** `EDT_SpecialLocations` (`doc/CSBwin-src/CSB.h:1534`). */
+/** `EDT_SpecialLocations` (`doc/CSBwin-src/CSB.h:1537`). */
 const EDT_SPECIAL_LOCATIONS = 3;
-/** The last `ESL_*`, `ESL_DAMAGECHARFILTER` (`doc/CSBwin-src/CSB.h:1550`). */
+/** The last `ESL_*`, `ESL_DAMAGECHARFILTER` (`doc/CSBwin-src/CSB.h:1553`). */
 const ESL_SPECIAL_LOCATION_MAX = 15;
-/** `ESL_MONSTERMOVEFILTER` (`doc/CSBwin-src/CSB.h:1537`), which a level may have its own of. */
+/** `ESL_MONSTERMOVEFILTER` (`doc/CSBwin-src/CSB.h:1540`), which a level may have its own of. */
 const ESL_MONSTER_MOVE_FILTER = 2;
 /** `MONSTERMOVEFILTERCACHE`'s levels (`doc/CSBwin-src/CSB.h:451`). */
 const MONSTER_MOVE_FILTER_LEVELS = 64;
-/** `EDT_Database` (`doc/CSBwin-src/CSB.h:1552`). */
+/** `EDT_Database` (`doc/CSBwin-src/CSB.h:1555`). */
 const EDT_DATABASE = 5;
-/** `EDBT_RuntimeFileSignatures` (`doc/CSBwin-src/CSB.h:1555`). */
+/** `EDBT_RuntimeFileSignatures` (`doc/CSBwin-src/CSB.h:1558`). */
 const EDBT_RUNTIME_FILE_SIGNATURES = 2;
-/** `EDBT_Debuging` (`doc/CSBwin-src/CSB.h:1556`). */
+/** `EDBT_Debuging` (`doc/CSBwin-src/CSB.h:1559`). */
 const EDBT_DEBUGING = 3;
-/** `EDBT_GlobalVariables` (`doc/CSBwin-src/CSB.h:1557`). */
+/** `EDBT_GlobalVariables` (`doc/CSBwin-src/CSB.h:1560`). */
 const EDBT_GLOBAL_VARIABLES = 4;
-/** `EDBT_DisableSaves` (`doc/CSBwin-src/CSB.h:1558`). */
+/** `EDBT_DisableSaves` (`doc/CSBwin-src/CSB.h:1561`). */
 const EDBT_DISABLE_SAVES = 5;
-/** `EDBT_AltMonGraphics` (`doc/CSBwin-src/CSB.h:1561`). */
+/** `EDBT_AltMonGraphics` (`doc/CSBwin-src/CSB.h:1564`). */
 const EDBT_ALT_MON_GRAPHICS = 8;
-/** `EDT_Palette` (`doc/CSBwin-src/CSB.h:1564`). */
+/** `EDT_Palette` (`doc/CSBwin-src/CSB.h:1567`). */
 const EDT_PALETTE = 7;
-/** The overlay palette's records, of sixteen longwords each (`doc/CSBwin-src/SaveGame.cpp:1158`). */
+/** The overlay palette's records, of sixteen longwords each (`doc/CSBwin-src/SaveGame.cpp:1224`). */
 const OVERLAY_PALETTE_RECORDS = 24;
-/** `EDT_ChampionBones` (`doc/CSBwin-src/CSB.h:1571`). */
+/** `EDT_ChampionBones` (`doc/CSBwin-src/CSB.h:1574`). */
 const EDT_CHAMPION_BONES = 9;
 
 /**
@@ -106,9 +106,9 @@ function overlayPaletteKey(i: number): number {
 
 /**
  * The `i`th record of the overlay palette (`src/engine/OverlayPalette.ts`): its bytes from
- * `64 * i`, as `SaveGame` hands them to `Write` (`doc/CSBwin-src/SaveGame.cpp:1163`).
+ * `64 * i`, as `SaveGame` hands them to `Write` (`doc/CSBwin-src/SaveGame.cpp:1230`).
  * CSBWin copies the bytes into its pool's native longwords, which `DB11::swap` writes
- * with `LE32` (`doc/CSBwin-src/data.cpp:1458-1467`), so each longword here is its four
+ * with `LE32` (`doc/CSBwin-src/data.cpp:1461-1470`), so each longword here is its four
  * bytes taken little-endian.
  */
 function overlayPaletteRecord(palette: Uint8Array, i: number): number[] {
@@ -121,7 +121,7 @@ function overlayPaletteRecord(palette: Uint8Array, i: number): number[] {
 
 /**
  * `(EDT_MessageParameters << 24) + timerID`, the key of the parameters a DSA's `&MESSAGE`
- * gives the timer it sets (`doc/CSBwin-src/DSA.cpp:3087`), which the timer reads back
+ * gives the timer it sets (`doc/CSBwin-src/DSA.cpp:3088`), which the timer reads back
  * (`doc/CSBwin-src/Timer.cpp:1401`, `:1701`, `:2180`).
  */
 export function messageParametersKey(timerIndex: number): number {
@@ -151,7 +151,7 @@ export class Expool {
         return (this.db.expool?.length ?? 0) / EXPOOL_RECORD_SIZE;
     }
 
-    /** `EXPOOL::Setup` (`doc/CSBwin-src/data.cpp:1507-1522`): the directory block. */
+    /** `EXPOOL::Setup` (`doc/CSBwin-src/data.cpp:1510-1525`): the directory block. */
     private setup(): void {
         if (this.numBlock() !== 0) return;
         this.db.expool = new Uint8Array(EXPOOL_RECORD_SIZE);
@@ -190,7 +190,7 @@ export class Expool {
         return this.m((p & 0xffffffc0) >>> 0) & 0xffff;
     }
 
-    /** `EXPOOL::Write` (`doc/CSBwin-src/data.cpp:1530-1547`). */
+    /** `EXPOOL::Write` (`doc/CSBwin-src/data.cpp:1533-1550`). */
     write(key: number, record: readonly number[]): void {
         const size = record.length;
         if (size > 29) throw new Error(`EXPOOL: a record of ${size} longwords (29 at most)`);
@@ -206,7 +206,7 @@ export class Expool {
     }
 
     /**
-     * `EXPOOL::Read` (`doc/CSBwin-src/data.cpp:1549-1575`): `key`'s first record, taken
+     * `EXPOOL::Read` (`doc/CSBwin-src/data.cpp:1552-1578`): `key`'s first record, taken
      * out of the pool, or null where CSBWin returns -1. The array's length is the size
      * CSBWin returns; its `max` bounds the caller's buffer, which an array does not need.
      */
@@ -224,7 +224,7 @@ export class Expool {
     }
 
     /**
-     * `EXPOOL::Locate` (`doc/CSBwin-src/data.cpp:1582-1608`): a copy of `key`'s first
+     * `EXPOOL::Locate` (`doc/CSBwin-src/data.cpp:1585-1611`): a copy of `key`'s first
      * record, which stays in the pool, or null where CSBWin returns -1.
      */
     locate(key: number): number[] | null {
@@ -264,7 +264,7 @@ export class Expool {
     }
 
     /**
-     * `EXPOOL::enlarge` (`doc/CSBwin-src/data.cpp:1610-1633`): one more block, cut into
+     * `EXPOOL::enlarge` (`doc/CSBwin-src/data.cpp:1613-1636`): one more block, cut into
      * records of `size` longwords and put at the head of that length's free list.
      */
     private enlarge(size: number): void {
@@ -308,7 +308,7 @@ export class Expool {
 
     /**
      * `SaveGame`'s copy of the DSA global variables into their records
-     * (`doc/CSBwin-src/SaveGame.cpp:1141-1148`): sixteen to a record, each written
+     * (`doc/CSBwin-src/SaveGame.cpp:1205-1213`): sixteen to a record, each written
      * through `Locate`'s pointer, so it keeps its place in the pool. False, where CSBWin
      * says "Error saving global variables", for a record missing or shorter than
      * sixteen; that one is left as it was.
@@ -329,7 +329,7 @@ export class Expool {
 
     /**
      * `SaveGame`'s copy of the overlay palette into its 24 records
-     * (`doc/CSBwin-src/SaveGame.cpp:1151-1164`), at every save: each record is `Read` out
+     * (`doc/CSBwin-src/SaveGame.cpp:1216-1231`), at every save: each record is `Read` out
      * of the pool, and the palette's sixteen longwords `Write`n in its place.
      */
     storeOverlayPalette(palette: Uint8Array): void {
@@ -341,26 +341,26 @@ export class Expool {
 
     /**
      * `SaveGame`'s record of `disableSaves`, written while it is set
-     * (`doc/CSBwin-src/SaveGame.cpp:1200-1201`): a record of no data, in the running
+     * (`doc/CSBwin-src/SaveGame.cpp:1293-1295`): a record of no data, in the running
      * world's pool, as every save writes one more.
      */
     writeDisableSaves(): void {
         this.write(DISABLE_SAVES_KEY, []);
     }
 
-    /** `EXPOOL::AddChampionBonesRecord` (`doc/CSBwin-src/data.cpp:1636-1643`). */
+    /** `EXPOOL::AddChampionBonesRecord` (`doc/CSBwin-src/data.cpp:1639-1646`). */
     addChampionBonesRecord(bonesObject: number, fingerprint: number): void {
         this.write(championBonesKey(bonesObject), [fingerprint & 0xffff]);
     }
 
-    /** `EXPOOL::CopyChampionBonesRecord` (`doc/CSBwin-src/data.cpp:1655-1665`), or null. */
+    /** `EXPOOL::CopyChampionBonesRecord` (`doc/CSBwin-src/data.cpp:1658-1668`), or null. */
     copyChampionBonesRecord(bonesObject: number): number | null {
         const record = this.locate(championBonesKey(bonesObject));
         return record?.length === 1 ? record[0] : null;
     }
 
     /**
-     * `EXPOOL::GetChampionBonesRecord` (`doc/CSBwin-src/data.cpp:1667-1675`), or null.
+     * `EXPOOL::GetChampionBonesRecord` (`doc/CSBwin-src/data.cpp:1670-1678`), or null.
      * The record leaves the pool.
      */
     getChampionBonesRecord(bonesObject: number): number | null {
@@ -370,7 +370,7 @@ export class Expool {
 }
 
 /**
- * `LoadGame`'s read of the DSA global variables (`doc/CSBwin-src/SaveGame.cpp:1746-1760`):
+ * `LoadGame`'s read of the DSA global variables (`doc/CSBwin-src/SaveGame.cpp:1916-1930`):
  * sixteen from each record, from the first up to one missing or shorter than sixteen.
  * Their number is `numGlobalVariables`, 0 for a pool with none.
  */
@@ -386,7 +386,7 @@ export function readGlobalVariables(db: ExpoolDatabase): number[] {
 }
 
 /**
- * `LoadGame`'s read of the overlay palette (`doc/CSBwin-src/SaveGame.cpp:1761-1789`): the
+ * `LoadGame`'s read of the overlay palette (`doc/CSBwin-src/SaveGame.cpp:1931-1959`): the
  * 24 records' bytes, or null when one is missing or shorter than sixteen longwords, where
  * CSBWin keeps the palette it has.
  */
@@ -404,7 +404,7 @@ export function readOverlayPalette(db: ExpoolDatabase): Uint8Array | null {
 }
 
 /**
- * `LoadGame`'s `disableSaves` (`doc/CSBwin-src/SaveGame.cpp:1791-1793`): whether the pool
+ * `LoadGame`'s `disableSaves` (`doc/CSBwin-src/SaveGame.cpp:1962-1964`): whether the pool
  * holds a record that disables saves. Every such record is read, so it leaves the pool.
  */
 export function readDisableSaves(db: ExpoolDatabase): boolean {
@@ -416,7 +416,7 @@ export function readDisableSaves(db: ExpoolDatabase): boolean {
 
 /**
  * `LoadGame`'s `EDBT_Debuging_data`, `EDBT_CSBGraphicsSignature_data` and
- * `EDBT_GraphicsSignature_data` (`doc/CSBwin-src/SaveGame.cpp:1795-1820`): each 0 unless
+ * `EDBT_GraphicsSignature_data` (`doc/CSBwin-src/SaveGame.cpp:1966-2023`): each 0 unless
  * the pool holds its record with a longword or more (`Locate` greater than 0), then that
  * record's first. The two signatures are read only when `EDBT_Debuging_data` is 0. Their
  * keys are `EDBT_RuntimeFileSignatures`' 0 and 1.
@@ -445,7 +445,7 @@ export function specialLocationsFromExpool(bytes: Uint8Array): Record<number, nu
     };
     for (let esl = 0; esl <= ESL_SPECIAL_LOCATION_MAX; esl++) read(((EDT_SPECIAL_LOCATIONS << 24) | esl) >>> 0);
     // A level's own monster move filter, keyed with `(level + 1) << 8`
-    // (`MONSTERMOVEFILTERCACHE::GetLocation`, doc/CSBwin-src/Monster.cpp:3090).
+    // (`MONSTERMOVEFILTERCACHE::GetLocation`, doc/CSBwin-src/Monster.cpp:3094).
     for (let level = 0; level < MONSTER_MOVE_FILTER_LEVELS; level++) {
         read(((EDT_SPECIAL_LOCATIONS << 24) | ESL_MONSTER_MOVE_FILTER | ((level + 1) << 8)) >>> 0);
     }

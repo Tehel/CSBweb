@@ -9,43 +9,43 @@ import type { GameContext } from './GameContext';
 export interface LoopFlags {
   /**
    * `d.clockTick`: a tick is due, and the main loop's pass that finds it set runs one
-   * (doc/CSBwin-src/CSBCode.cpp:763-765). The VBL sets it on every VBL once
-   * `vblCount >= d.Speed` (`vblInterrupt`, `:1066-1077`). Handlers set it too: to 1 in
-   * `WakeUp` (`:7050`), a door button (`Mouse.cpp:1078`), a wall switch that fired
-   * (`TouchWallF1`, `:788`), a pick-up (`:840`), a drop (`:964`), `ShowHideInventory`
-   * (`CSBCode.cpp:7441`), a turn or a step (`:7866-7869`, `:8084-8087`), or an attack or
+   * (doc/CSBwin-src/CSBCode.cpp:773-775). The VBL sets it on every VBL once
+   * `vblCount >= d.Speed` (`vblInterrupt`, `:1076-1087`). Handlers set it too: to 1 in
+   * `WakeUp` (`:7109`), a door button (`Mouse.cpp:1079`), a wall switch that fired
+   * (`TouchWallF1`, `:789`), a pick-up (`:841`), a drop (`:965`), `ShowHideInventory`
+   * (`CSBCode.cpp:7500`), a turn or a step (`:7953-7956`, `:8171-8174`), or an attack or
    * a cast that went through (`setClockTick`), so a tick is due at once, whatever the VBL
-   * count; to 0 on an inhibited move (`:8313`), a touch of the wall that fired nothing
-   * (`Mouse.cpp:788`), or an attack or a cast that returned 0, which puts off a tick that
+   * count; to 0 on an inhibited move (`:8400`), a touch of the wall that fired nothing
+   * (`Mouse.cpp:789`), or an attack or a cast that returned 0, which puts off a tick that
    * was due until the next VBL sets it again. The tick itself clears it at its end
-   * (`CSBCode.cpp:704`), so a party woken by a blow during `ProcessTimers` gets no extra
+   * (`CSBCode.cpp:714`), so a party woken by a blow during `ProcessTimers` gets no extra
    * tick.
    */
   clockTick: boolean;
   /**
    * `d.vblCount`, the VBLs since the top of the last tick: each VBL adds one
-   * (`vblInterrupt`, doc/CSBwin-src/CSBCode.cpp:1065), and the top of every tick zeroes it
-   * (`:617`).
+   * (`vblInterrupt`, doc/CSBwin-src/CSBCode.cpp:1075), and the top of every tick zeroes it
+   * (`:627`).
    */
   vblCount: number;
   /**
    * `d.newPartyLevel`: -1, or the level the party has just reached, which the top of the
    * next tick loads (`Game.loadNewPartyLevel`). A `MoveObject` of the party that ends on
-   * another level sets it (doc/CSBwin-src/Code11f52.cpp:3319-3324), and so does
-   * `TraverseStairway` (`CSBCode.cpp:7775`). Until then the party's square is the new
+   * another level sets it (doc/CSBwin-src/Code11f52.cpp:3354-3359), and so does
+   * `TraverseStairway` (`CSBCode.cpp:7862`). Until then the party's square is the new
    * level's and its level the old one (`d.partyX`, `d.partyY` and `d.partyLevel`).
    */
   newPartyLevel: number;
   /**
-   * `d.ClockRunning`, 1 from the game start (doc/CSBwin-src/CSBCode.cpp:10549) and 0 while
-   * the game is frozen: `if (d.ClockRunning == 0) goto tag0007b4;` (`:765`), so a tick
+   * `d.ClockRunning`, 1 from the game start (doc/CSBwin-src/CSBCode.cpp:10673) and 0 while
+   * the game is frozen: `if (d.ClockRunning == 0) goto tag0007b4;` (`:775`), so a tick
    * that falls due waits, still due, until the thaw.
    */
   clockRunning: boolean;
   /**
    * `gameFrozen` (a `Mouse.cpp` global): `HandleMouseEvents` throws away every entry but
-   * 148, and lets 148 through whenever it comes (doc/CSBwin-src/Mouse.cpp:1433-1444,
-   * `:1463-1476`).
+   * 148, and lets 148 through whenever it comes (doc/CSBwin-src/Mouse.cpp:1548-1565,
+   * `:1591-1604`).
    */
   gameFrozen: boolean;
   /**
@@ -68,10 +68,10 @@ export interface LoopFlags {
    * `videoMode` (a global of `data.cpp`), which the viewport is drawn through the overlay
    * in only when it is `VM_ADVENTURE` (`GameScreen.isAdventureVideoMode`). It is set where
    * CSBWin sets it: an inventory shown or hidden (`ShowHideInventory`,
-   * doc/CSBwin-src/CSBCode.cpp:7453, `:7487`), `TAG0207cc` (`:9957`), `WakeUp` (`:7062`),
-   * the freeze and the thaw (`Mouse.cpp:1735`, `:1764`), sleep (`:1703`) and a menu
+   * doc/CSBwin-src/CSBCode.cpp:7512, `:7546`), `TAG0207cc` (`:10081`), `WakeUp` (`:7121`),
+   * the freeze and the thaw (`Mouse.cpp:1874`, `:1903`), sleep (`:1842`) and a menu
    * (`Menu.cpp:465-472`). The top of every tick puts any other mode back to
-   * `VM_ADVENTURE`, awake and with no inventory open (`CSBCode.cpp:603-611`): a menu
+   * `VM_ADVENTURE`, awake and with no inventory open (`CSBCode.cpp:613-621`): a menu
    * closed shows the straight viewport until then.
    */
   videoMode: VideoMode;
@@ -87,8 +87,8 @@ export type VideoMode =
 
 /**
  * A `RESTARTABLE` sequence that holds the main loop inside one of its calls, as
- * `_FusionSequence` does (doc/CSBwin-src/Attack.cpp:2220) and `MainLoop`'s wait after the
- * CSB win (`CSBCode.cpp:627-633`). It yields the length of each `VBLDelay`, in VBLs, and
+ * `_FusionSequence` does (doc/CSBwin-src/Attack.cpp:2222) and `MainLoop`'s wait after the
+ * CSB win (`CSBCode.cpp:637-643`). It yields the length of each `VBLDelay`, in VBLs, and
  * does its work between them. `MainLoop.runScript` starts one, and `Game.runFrame` runs it in
  * place of the loop's pass, and in the VBL it returns goes on with the pass it held, as
  * CSBWin's does after `_MagicSelection`. A generator rather than the intro's `async` (`IntroHost`) because
@@ -105,7 +105,7 @@ export interface MainLoop {
   runScript(script: LoopScript): void;
   /** Whether a script holds the loop. */
   isRunningScript(): boolean;
-  /** `_ProcessTimersViewportAndSound` (doc/CSBwin-src/Attack.cpp:2192). */
+  /** `_ProcessTimersViewportAndSound` (doc/CSBwin-src/Attack.cpp:2194). */
   processTimersViewportAndSound(): LoopScript;
   /** `ShowCredits(n, 1)` from inside the loop, which never returns. */
   showCreditsAndEnd(): LoopScript;
@@ -115,9 +115,9 @@ export interface MainLoop {
 
 export function createLoopFlags(): LoopFlags {
   // `d.FlashButnActive = 0; d.Word11776 = 0;` at the game start
-  // (doc/CSBwin-src/CSBCode.cpp:10477-10478). A game starts from the prison door
-  // (`VM_PRISONDOOR`, `:9579`), a menu or "THE END", never in `VM_ADVENTURE`: its first
-  // tick sets that (`:603-611`). `VM_DEFAULT` stands for all of them.
+  // (doc/CSBwin-src/CSBCode.cpp:10601-10602). A game starts from the prison door
+  // (`VM_PRISONDOOR`, `:9701`), a menu or "THE END", never in `VM_ADVENTURE`: its first
+  // tick sets that (`:613-621`). `VM_DEFAULT` stands for all of them.
   return {
     clockTick: false, vblCount: 0, newPartyLevel: -1, clockRunning: true, gameFrozen: false,
     flashButnActive: false, flashButn: { x1: 0, x2: 0, y1: 0, y2: 0 }, word11776: false, flashChanged: false,
@@ -126,7 +126,7 @@ export function createLoopFlags(): LoopFlags {
 }
 
 /**
- * The vertical blank's share of the button flash (doc/CSBwin-src/CSBCode.cpp:1028-1038):
+ * The vertical blank's share of the button flash (doc/CSBwin-src/CSBCode.cpp:1038-1048):
  * `d.FlashButnActive = 0`, `d.Word11776 ^= 0xffff`, and `vblFlashButn` inverts the
  * rectangle.
  */
@@ -138,7 +138,7 @@ export function vblFlashButton(loop: LoopFlags): void {
 }
 
 /**
- * `_FlashButton(x1, x2, y1, y2)` (doc/CSBwin-src/CSBCode.cpp:7713-7730): wait out a pending
+ * `_FlashButton(x1, x2, y1, y2)` (doc/CSBwin-src/CSBCode.cpp:7800-7817): wait out a pending
  * flash, store the rectangle, set `d.FlashButnActive` and wait a VBL, whose handler inverts
  * it. The main loop's pass does not stop for VBLs, so each wait runs its VBL's share at
  * once: the rectangle is inverted where CSBWin's is, before the rest of the pass. A
@@ -191,7 +191,7 @@ export function* waitForButtonFlashScript(ctx: GameContext): LoopScript {
 }
 
 /**
- * `WaitForButtonFlash` (doc/CSBwin-src/CSBCode.cpp:8561-8601): an inverted rectangle is
+ * `WaitForButtonFlash` (doc/CSBwin-src/CSBCode.cpp:8666-8706): an inverted rectangle is
  * handed to the next VBL to put back (`d.FlashButnActive = 1`), and CSBWin waits for that
  * VBL. The main loop's pass does not wait: the next VBL puts it back, and the frame this
  * pass draws still shows it, which is the one frame a flash is seen (`DEBT.md` H). A
@@ -212,24 +212,24 @@ export function setClockTick(ctx: GameContext, value: number): void {
 
 /**
  * `speedTable[gameSpeed].vblPerTick` at CSBWin's default `SPEED_NORMAL`
- * (doc/CSBwin-src/data.cpp:275, `CSBwin.cpp:180`), the port's only game speed.
+ * (doc/CSBwin-src/data.cpp:276, `CSBwin.cpp:181`), the port's only game speed.
  */
 export const VBL_PER_TICK = 15;
 
 /**
- * `d.Speed`, the VBLs per tick: 0 while the party sleeps (doc/CSBwin-src/Mouse.cpp:1697),
- * `VBL_PER_TICK` awake (`CSBCode.cpp:7054`). The top of every tick sets it again while
- * awake, with a `SetNewSpeed` (`:612-616`) that the port's one speed makes a no-op.
+ * `d.Speed`, the VBLs per tick: 0 while the party sleeps (doc/CSBwin-src/Mouse.cpp:1836),
+ * `VBL_PER_TICK` awake (`CSBCode.cpp:7113`). The top of every tick sets it again while
+ * awake, with a `SetNewSpeed` (`:622-626`) that the port's one speed makes a no-op.
  */
 export function speed(ctx: GameContext): number {
   return ctx.party.state.sleeping ? 0 : VBL_PER_TICK;
 }
 
 /**
- * The tick's share of the VBL handler (doc/CSBwin-src/CSBCode.cpp:1065-1077), after the
+ * The tick's share of the VBL handler (doc/CSBwin-src/CSBCode.cpp:1075-1087), after the
  * message strip's scroll and the button flash: `d.vblCount += 1`, and once it has reached
  * `d.Speed`, `d.clockTick = 1`. It runs on every VBL, while a script holds the loop and
- * while the game is frozen. `NoSpeedLimit` and the "Player Clock" arm (`:1067-1087`) are
+ * while the game is frozen. `NoSpeedLimit` and the "Player Clock" arm (`:1077-1097`) are
  * the speed menu's, which is not ported.
  */
 export function vblInterrupt(ctx: GameContext): void {
@@ -239,12 +239,12 @@ export function vblInterrupt(ctx: GameContext): void {
 }
 
 /**
- * `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7047) — button 146, or any blow that lands on a
- * sleeping party (`Monster.cpp:4531`, `Character.cpp:2809-2812`). `d.clockTick = 1`,
+ * `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7106) — button 146, or any blow that lands on a
+ * sleeping party (`Monster.cpp:4544`, `Character.cpp:2814-2817`). `d.clockTick = 1`,
  * `d.PartySleeping = 0`, the message timeouts rescaled to the game speed
- * (`scrollingText.SetNewSpeed(d.Speed, …)`, `:7053`), the adventure button lists back (the
- * host's listeners), `DiscardAllInput()`, `TAG0207cc` (`:7061`), and `videoMode =
- * VM_ADVENTURE` last (`:7062`).
+ * (`scrollingText.SetNewSpeed(d.Speed, …)`, `:7112`), the adventure button lists back (the
+ * host's listeners), `DiscardAllInput()`, `TAG0207cc` (`:7120`), and `videoMode =
+ * VM_ADVENTURE` last (`:7121`).
  */
 export function wakeUp(ctx: GameContext): void {
   const oldSpeed = speed(ctx);
@@ -258,7 +258,7 @@ export function wakeUp(ctx: GameContext): void {
 }
 
 /**
- * The engine's half of button 147, the freeze (doc/CSBwin-src/Mouse.cpp:1731-1759):
+ * The engine's half of button 147, the freeze (doc/CSBwin-src/Mouse.cpp:1870-1898):
  * `d.ClockRunning = 0`, `gameFrozen = true`, `videoMode = VM_FROZEN`,
  * `DiscardAllInput()`. The screen's half is `handleMouseButton`'s.
  */
@@ -270,7 +270,7 @@ export function freeze(ctx: GameContext): void {
 }
 
 /**
- * The engine's half of button 148, the thaw (doc/CSBwin-src/Mouse.cpp:1760-1773):
+ * The engine's half of button 148, the thaw (doc/CSBwin-src/Mouse.cpp:1899-1912):
  * `videoMode = VM_ADVENTURE` before `TAG0207cc`, which shows an open inventory again.
  */
 export function thaw(ctx: GameContext): void {

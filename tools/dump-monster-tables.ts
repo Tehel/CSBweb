@@ -2,8 +2,8 @@
  * Dump the monster and attack tables extracted at runtime from `graphics.dat`.
  *
  * Phase 12 widened `MONSTERDESC` from 4 fields to the full 26-byte record
- * (doc/CSBwin-src/CSB.h:2256) and reached into the attack tables that
- * `parseGraphic230` used to skip past (doc/CSBwin-src/Data.h:638-651). Neither is
+ * (doc/CSBwin-src/CSB.h:2319) and reached into the attack tables that
+ * `parseGraphic230` used to skip past (doc/CSBwin-src/Data.h:647-660). Neither is
  * verifiable by eye in the running game, so this prints them for inspection.
  *
  * The attack names are the canary: if the graphic 0x230 offsets are right they read

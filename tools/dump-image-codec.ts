@@ -8,7 +8,7 @@
  * C++, and three of its opcodes disagreed:
  *
  * - `0xA` was "add (nib2+1) transparent pixels" and did not consume its count byte at all;
- *   CSBWin has a plain colour run with an 8-bit count (`CSBCode.cpp:10891`).
+ *   CSBWin has a plain colour run with an 8-bit count (`CSBCode.cpp:11052`).
  * - `0xE` was a family of "extended transparent" sub-modes; CSBWin has the same colour run
  *   with a 16-bit count.
  * - `0xD` threw.
@@ -127,7 +127,7 @@ function checkOpcodes(): void {
     '0x0X places one pixel; 0x1X..0x7X place (high nibble + 1)');
 
   // 0x8X / 0xAX — a colour run with an 8-bit count. 0xA is 0x8 with the unconsulted 0x20
-  // bit set (`doc/CSBwin-src/CSBCode.cpp:10891-10894`), and this is the opcode that was
+  // bit set (`doc/CSBwin-src/CSBCode.cpp:11052-11060`), and this is the opcode that was
   // wrong: it used to mean "transparent" and did not even read its count byte.
   check(pixelsOf(stream(16, 1, 0x85, 0x0f)).join('') === '5555555555555555',
     '0x8X runs (byte + 1) pixels of colour X');

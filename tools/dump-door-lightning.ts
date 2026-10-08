@@ -1,7 +1,7 @@
 /**
  * The "lightning door" energy shimmer — a random mirror and a random vertical flip
  * applied to the door bitmap on every redraw it isn't bashed
- * (`doc/CSBwin-src/CSBCode.cpp:4156-4166`).
+ * (`doc/CSBwin-src/CSBCode.cpp:4221-4231`).
  *
  * This was never ported at all: `opStdDrawDoor` drew the same bitmap every time,
  * with no notion of `d.DoorTOC`'s bit 10 or the `STRandomBool()` calls CSBWin makes

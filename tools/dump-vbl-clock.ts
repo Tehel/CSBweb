@@ -2,16 +2,16 @@
  * The loop's one clock: VBLs, and a tick every `d.Speed` of them.
  *
  * - The VBL handler adds one to `d.vblCount` and raises `d.clockTick` once it has reached
- *   `d.Speed` (doc/CSBwin-src/CSBCode.cpp:1065-1077); the top of a tick zeroes the count
- *   (`:617`). `d.Speed` is 15 at `SPEED_NORMAL` (`CSBwin.cpp:180`), 0 while the party
- *   sleeps (`Mouse.cpp:1697`). So awake a tick comes every fifteenth VBL, asleep on every
- *   VBL, and `WakeUp`'s `d.clockTick = 1` (`CSBCode.cpp:7050`) brings one on at once.
- * - The handler runs on every VBL: frozen, the tick due waits (`:765`) and runs in the
+ *   `d.Speed` (doc/CSBwin-src/CSBCode.cpp:1075-1087); the top of a tick zeroes the count
+ *   (`:627`). `d.Speed` is 15 at `SPEED_NORMAL` (`CSBwin.cpp:181`), 0 while the party
+ *   sleeps (`Mouse.cpp:1836`). So awake a tick comes every fifteenth VBL, asleep on every
+ *   VBL, and `WakeUp`'s `d.clockTick = 1` (`CSBCode.cpp:7109`) brings one on at once.
+ * - The handler runs on every VBL: frozen, the tick due waits (`:775`) and runs in the
  *   first pass after the thaw; held in a script's `VBLDelay`, the count goes on, and the
- *   pass the script held ticks in the VBL the script ends (`:747-765`).
- * - `_MainLoop` goes straight to `tag000698`, the top of a tick (`:586-601`): a started
+ *   pass the script held ticks in the VBL the script ends (`:757-775`).
+ * - `_MainLoop` goes straight to `tag000698`, the top of a tick (`:596-611`): a started
  *   game ticks in its first VBL, and so does one restarted after the credits
- *   (`Game.resumeMainLoop`, `:11320-11327`) or read in play, which only the port has. The
+ *   (`Game.resumeMainLoop`, `:11555-11562`) or read in play, which only the port has. The
  *   count starts from that tick.
  * - The page paces VBLs from the wall clock (`Game.gameLoop`): a call runs as many as the
  *   time since the last holds, up to a second's worth, so a timer held to one call a
@@ -55,7 +55,7 @@ function tickingVbls(game: Game, ticks: () => number, count: number): number[] {
 }
 
 function checkTheCount(): void {
-  console.log('=== a tick every d.Speed VBLs (CSBCode.cpp:617, :1065-1077) ===');
+  console.log('=== a tick every d.Speed VBLs (CSBCode.cpp:627, :1075-1087) ===');
   const { game, ticks } = freshGame();
   const awake = tickingVbls(game, ticks, 60);
   console.log(`awake, 60 VBLs from the start: ticks in VBLs ${awake.join(' ')}`);
@@ -75,7 +75,7 @@ function checkTheCount(): void {
 
 function checkHeldTicks(): void {
   console.log('');
-  console.log('=== the count runs on, frozen and in a script (CSBCode.cpp:765, :1137-1147) ===');
+  console.log('=== the count runs on, frozen and in a script (CSBCode.cpp:775, :1147-1157) ===');
   const { game, ticks } = freshGame();
   tickingVbls(game, ticks, 15);
   freeze(game.ctx);
@@ -105,7 +105,7 @@ function checkHeldTicks(): void {
 
 function checkTheFirstTick(): void {
   console.log('');
-  console.log('=== MainLoop opens with a tick (CSBCode.cpp:586-601) ===');
+  console.log('=== MainLoop opens with a tick (CSBCode.cpp:596-611) ===');
   const started = freshGame();
   started.game.start();
   started.game.stop();

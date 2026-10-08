@@ -16,7 +16,7 @@ import { flashButtonScript, waitForButtonFlashScript, type LoopScript } from '..
 
 /**
  * The caster tabs `DrawSpellControls` inverts, as CSBWin writes them
- * (`doc/CSBwin-src/Character.cpp:5002-5085`): `[selected caster][champion]` is
+ * (`doc/CSBwin-src/Character.cpp:5027-5110`): `[selected caster][champion]` is
  * `[x1, x2, y2]`, all from `y1 = 0x2a`. The caster's own tab is the wide one.
  */
 const SPELL_CONTROL_TABS: ReadonlyArray<ReadonlyArray<readonly [number, number, number]>> = [
@@ -27,7 +27,7 @@ const SPELL_CONTROL_TABS: ReadonlyArray<ReadonlyArray<readonly [number, number, 
 ];
 
 /**
- * `DrawSpellControls` (`doc/CSBwin-src/Character.cpp:4984-5087`). The panel's strip is
+ * `DrawSpellControls` (`doc/CSBwin-src/Character.cpp:5009-5112`). The panel's strip is
  * cleared to 0, then `vblFlashButn` inverts plane 2 of each tab, which over the black is
  * index 4: the caster's own, with the name in it at `(x1 + 2, 0x30)`, and every other
  * champion's whose `HP()` is not zero. No caster, no tabs (`chIdx != 3`'s return).
@@ -108,7 +108,7 @@ export function drawSpellPanel(ui: UIState): void {
 }
 
 /**
- * `DrawSpellMenuCharacters` (`doc/CSBwin-src/CSBCode.cpp:8946-8960`): the six runes of
+ * `DrawSpellMenuCharacters` (`doc/CSBwin-src/CSBCode.cpp:9051-9065`): the six runes of
  * the current step, from `D6W = 225`, each at `D6W += 14`.
  */
 export function drawSpellMenuCharacters(ui: UIState, step: number): void {
@@ -121,7 +121,7 @@ export function drawSpellMenuCharacters(ui: UIState, step: number): void {
 }
 
 /**
- * `DisplayMagicSelection` (`doc/CSBwin-src/Magic.cpp:776-796`): the incantation so far,
+ * `DisplayMagicSelection` (`doc/CSBwin-src/Magic.cpp:779-799`): the incantation so far,
  * from `D6W = 232`, each at `D6W += 9`, blanks past its end.
  */
 export function drawMagicIncantation(ui: UIState, incantation: number[]): void {
@@ -134,7 +134,7 @@ export function drawMagicIncantation(ui: UIState, incantation: number[]): void {
 }
 
 /**
- * `_MagicSelection` (`doc/CSBwin-src/Magic.cpp:545-575`): buttons 101-106 are the runes,
+ * `_MagicSelection` (`doc/CSBwin-src/Magic.cpp:548-578`): buttons 101-106 are the runes,
  * 107 takes the last one back and 108 casts. The cast needs only a first rune, and
  * `CastMagic` is the engine's (`MagicSystem.castSpellFromUi`), which sets `d.clockTick` and clears
  * the incantation. The function is `RESTARTABLE` and waits for VBLs around its flashes, so
@@ -153,16 +153,16 @@ export function magicSelection(ui: UIState, button: number): void {
 
 /**
  * `_MagicSelection` from its first flash on. The cast flashes its button
- * (`FlashButton(0xea, 0x12f, 0x3f, 0x49)`, `Magic.cpp:561`) and casts. A rune or the
+ * (`FlashButton(0xea, 0x12f, 0x3f, 0x49)`, `Magic.cpp:564`) and casts. A rune or the
  * take-back flashes `d.Word18552[4 * (button - 101)]`, waits a VBL, waits for the flash to
- * be put back, and only then changes the incantation (`:568-581`), so the keypad shows the
+ * be put back, and only then changes the incantation (`:571-584`), so the keypad shows the
  * pressed rune inverted, not the next step's.
  */
 function* magicSelectionScript(ui: UIState, button: number): LoopScript {
   const party = ui.partyState!;
   if (button === 108) {
     yield* flashButtonScript(ui.ctx, 0xea, 0x12f, 0x3f, 0x49);
-    // `CastMagic`'s first act is `WaitForButtonFlash()` (`Magic.cpp:939`), which is waited
+    // `CastMagic`'s first act is `WaitForButtonFlash()` (`Magic.cpp:942`), which is waited
     // out here, where a VBL can pass. The engine's own call then finds the button put back.
     yield* waitForButtonFlashScript(ui.ctx);
     ui.ctx.systems.magic.castSpellFromUi(party.magicCasterIndex);
@@ -184,7 +184,7 @@ function* magicSelectionScript(ui: UIState, button: number): LoopScript {
 }
 
 /**
- * `TAG01b990` (`doc/CSBwin-src/CSBCode.cpp:8963-8995`): add rune `button` of the current
+ * `TAG01b990` (`doc/CSBwin-src/CSBCode.cpp:9068-9100`): add rune `button` of the current
  * step. It costs `Byte19010[6 * step + button]` (`spellBaseMana`), and after the first
  * rune that times `Byte19016[first - 96]` (`spellFirstRuneScale`), shifted right by 3.
  * `byte33` is the step: every CSBWin writer keeps it at `strlen(incantation) & 3`.
@@ -195,7 +195,7 @@ export function tag01b990(ui: UIState, button: number): void {
   const pcA3 = party.champions[party.magicCasterIndex];
   if (!pcA3) return;
   // A deliberate divergence (`DEBT.md` → H, "A fifth rune is refused"): CSBWin wraps
-  // `byte33` and starts a new incantation (`doc/CSBwin-src/CSBCode.cpp:8985-8988`).
+  // `byte33` and starts a new incantation (`doc/CSBwin-src/CSBCode.cpp:9090-9093`).
   if (pcA3.incantation.length > 3) return;
   const D7 = pcA3.incantation.length & 3;
   let D6 = ui.uiTables.graphic230.spellBaseMana[6 * D7 + button]!;
@@ -210,7 +210,7 @@ export function tag01b990(ui: UIState, button: number): void {
 }
 
 /**
- * `BackspaceMagicSelection` (`doc/CSBwin-src/Magic.cpp:806-822`): the rune before
+ * `BackspaceMagicSelection` (`doc/CSBwin-src/Magic.cpp:809-825`): the rune before
  * `byte33` goes. Its mana is not given back.
  */
 export function backspaceMagicSelection(ui: UIState): void {
@@ -222,7 +222,7 @@ export function backspaceMagicSelection(ui: UIState): void {
 }
 
 /**
- * `_HandleMagicClick` (`doc/CSBwin-src/Magic.cpp:589-709`). A click at `y <= 48` is on
+ * `_HandleMagicClick` (`doc/CSBwin-src/Magic.cpp:592-712`). A click at `y <= 48` is on
  * the caster tabs, which CSBWin hit-tests by fixed x ranges for each caster, not by the
  * rectangles it draws: with the fourth champion casting, everything left of 245 is the
  * first champion's. `clickX` 512-515 name a champion outright. Either way nothing below

@@ -2,30 +2,30 @@
  * A save of a dungeon with DSAs: the DSAs themselves, and what
  * they keep in `EXPOOL`, the global variables and the record that disables saves.
  *
- * 1. **`WriteDSAs`** (`doc/CSBwin-src/SaveGame.cpp:767-780`, `DSA::Write`,
- *    `doc/CSBwin-src/DSA.cpp:5672-5695`): `buildDsaSection` over the DSAs read from
+ * 1. **`WriteDSAs`** (`doc/CSBwin-src/SaveGame.cpp:775-788`, `DSA::Write`,
+ *    `doc/CSBwin-src/DSA.cpp:5673-5696`): `buildDsaSection` over the DSAs read from
  *    Conflux 3.5's `dungeon.dat` gives that file's DSA section back, byte for byte.
- * 2. **The global variables at a read** (`LoadGame`, `SaveGame.cpp:1746-1760`): sixteen
+ * 2. **The global variables at a read** (`LoadGame`, `SaveGame.cpp:1916-1930`): sixteen
  *    to each `(EDT_Database << 24) | (EDBT_GlobalVariables << 16) | i` record, from the
  *    first up to one missing. A game on Conflux has its two records' 32; a game on
  *    `csbgame7.dat`, which has none, has none, and `GLOBALSTORE` refuses every index.
  *    Conflux keeps older records under both keys, and the first of each chain is read.
- * 3. **The global variables at a save** (`SaveGame.cpp:1141-1148`): copied into their
+ * 3. **The global variables at a save** (`SaveGame.cpp:1205-1213`): copied into their
  *    records, which keep their place in the pool, so a second save leaves its size.
  * 4. **The round trip**: `csbgame7.dat` given three DSAs, one of them with its state
  *    moved in play, and two records of globals, saved and loaded into another game. The
  *    DSAs and the globals come back as they were.
  * 5. **3D2D1D**, a dungeon with six DSAs and no globals, saved and loaded.
  * 6. **Conflux 3.5**, saved and loaded: its 64 levels, which `ReadDatabases` reads with no
- *    bound (`doc/CSBwin-src/SaveGame.cpp:2411-2427`), its 131 DSAs and its 32 globals.
- * 7. **`&DISABLESAVES`** (`doc/CSBwin-src/DSA.cpp:2945-2955`): a program's nonzero sets
+ *    bound (`doc/CSBwin-src/SaveGame.cpp:2623-2639`), its 131 DSAs and its 32 globals.
+ * 7. **`&DISABLESAVES`** (`doc/CSBwin-src/DSA.cpp:2946-2956`): a program's nonzero sets
  *    `disableSaves` and its 0 clears it. A save writes the record of no data that says so
- *    into the running pool (`SaveGame.cpp:1200-1201`), one more at each save, and a load
+ *    into the running pool (`SaveGame.cpp:1293-1295`), one more at each save, and a load
  *    sets `disableSaves` from it and reads every such record out of the loaded pool
- *    (`:1791-1793`); a save with it clear writes none, and loads with it clear.
- * 8. **The overlay palette** (`SaveGame.cpp:1151-1164`, `:1761-1789`): every save `Read`s
+ *    (`:1962-1964`); a save with it clear writes none, and loads with it clear.
+ * 8. **The overlay palette** (`SaveGame.cpp:1216-1231`, `:1931-1959`): every save `Read`s
  *    and `Write`s its 24 records into the pool. The identity, which `ClearOverlayPalette`
- *    makes (`doc/CSBwin-src/data.cpp:117-145`), is what every genuine save holds, and
+ *    makes (`doc/CSBwin-src/data.cpp:118-146`), is what every genuine save holds, and
  *    written into an empty pool it is the pool of each that holds nothing else, byte for
  *    byte. So a save of a game on `dungeon.dat`, which has no pool, is CSBWin's pool. A
  *    palette changed in play comes back from a save, and a world without all 24 records,
@@ -60,7 +60,7 @@ const same = (a: unknown, b: unknown): boolean =>
   JSON.stringify(b, (_k, v) => (v instanceof Uint16Array ? Array.from(v) : v));
 const countOf = (index: { entries: unknown[] } | undefined): number => (index?.entries ?? []).filter((d) => d).length;
 const globalsKey = (i: number): number => ((5 << 24) | (4 << 16) | i) >>> 0;
-/** `(EDT_Database << 24) | (EDBT_DisableSaves << 16)` (`doc/CSBwin-src/CSB.h:1552`, `:1558`). */
+/** `(EDT_Database << 24) | (EDBT_DisableSaves << 16)` (`doc/CSBwin-src/CSB.h:1555`, `:1561`). */
 const disableSavesKey = ((5 << 24) | (5 << 16)) >>> 0;
 
 console.log('1. WriteDSAs');

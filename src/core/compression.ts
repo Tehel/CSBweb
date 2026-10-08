@@ -297,8 +297,8 @@ export function decompressGraphics(
 }
 
 /**
- * `ExpandData` (`TAG0206f8`, doc/CSBwin-src/CSBCode.cpp:9864-9929), with its `getBits`
- * (`:9846-9862`): a compressed `dungeon.dat`'s body, the file past its 8-byte header,
+ * `ExpandData` (`TAG0206f8`, doc/CSBwin-src/CSBCode.cpp:9988-10053), with its `getBits`
+ * (`:9970-9986`): a compressed `dungeon.dat`'s body, the file past its 8-byte header,
  * expanded into `dstSize` bytes.
  *
  * The body opens with two tables, 4 bytes then 16, and goes on as big-endian words read

@@ -123,14 +123,14 @@ function checkRectangles(ui: UITables): void {
     console.log(`  ${name.padEnd(40)} ${size(rect)}`);
   }
 
-  // `d.Pointer22920 = allocateMemory(20608,0)` (`doc/CSBwin-src/CSBCode.cpp:9484`) and the
-  // copy-out loop runs 161 scanlines of 112+4*2 bytes (`:9436-9447`): 232x161 pixels.
+  // `d.Pointer22920 = allocateMemory(20608,0)` (`doc/CSBwin-src/CSBCode.cpp:9603`) and the
+  // copy-out loop runs 161 scanlines of 112+4*2 bytes (`:9554-9565`): 232x161 pixels.
   check(
     g.word84.x1 === 0 && g.word84.x2 === 231 && g.word84.y1 === 0 && g.word84.y2 === 160,
     `Word84 saves 232x161 to match the 20608-byte interior buffer (got ${size(g.word84)})`,
   );
 
-  // `TAG0088b2(d.pViewportBMP, …, d.Word60, 0, 0, 112, 128, -1)` (`:9406`) — 112 bytes per
+  // `TAG0088b2(d.pViewportBMP, …, d.Word60, 0, 0, 112, 128, -1)` (`:9519`) — 112 bytes per
   // line is 224 pixels, and the viewport is 224x136.
   check(
     g.word60.x2 - g.word60.x1 + 1 === VIEWPORT_WIDTH && g.word60.y2 - g.word60.y1 + 1 === VIEWPORT_HEIGHT,
@@ -155,7 +155,7 @@ function checkRectangles(ui: UITables): void {
   for (const [name, rect] of [['Word36', g.word36], ['Word44', g.word44], ['Word52', g.word52]] as const) {
     check(rect.x1 === 0 && rect.x2 === SCREEN_WIDTH - 1, `${name} spans the full screen width (got ${size(rect)})`);
   }
-  // `pGraphic += 9120; // =57 * 160` (`doc/CSBwin-src/CSBCode.cpp:9270`).
+  // `pGraphic += 9120; // =57 * 160` (`doc/CSBwin-src/CSBCode.cpp:9376`).
   check(g.word44.y2 - g.word44.y1 + 1 === 57, `Word44 is the 57 scanlines CSBWin budgets 9120 bytes for`);
   check(
     g.word36.y2 - g.word36.y1 + 1 === g.word44.y2 - g.word44.y1 + 1,
@@ -177,7 +177,7 @@ function checkButtons(ui: UITables): void {
   console.log('\n=== d.Buttons16932 ===');
   console.log(`  extracted from item 0x231: ${extracted.length} entries`);
 
-  // `ASSERT(size == 0x804 || size == 0x7d4)` (`doc/CSBwin-src/CSBCode.cpp:10142`); the
+  // `ASSERT(size == 0x804 || size == 0x7d4)` (`doc/CSBwin-src/CSBCode.cpp:10266`); the
   // short one is missing exactly the four 12-byte buttons.
   check(extracted.length === 0, 'DM\'s item 0x231 is the short 0x7d4 variant, so the table is absent');
 
@@ -207,7 +207,7 @@ function checkButtons(ui: UITables): void {
   check(buttons[2].y2 <= SCREEN_HEIGHT - 1 && buttons[2].y1 > panelMid.y2,
     'the scroll is below both panels, at the bottom of the screen');
 
-  // Hit-testing is half-open on the maxima (`doc/CSBwin-src/CSBCode.cpp:7562-7570`), which
+  // Hit-testing is half-open on the maxima (`doc/CSBwin-src/CSBCode.cpp:7621-7629`), which
   // `searchButtonList` already implements; pin the three live spots and one dead one.
   check(searchButtonList(buttons, 260, 50, 2) === 200, 'a left click at (260,50) enters the dungeon');
   check(searchButtonList(buttons, 260, 85, 2) === 201, 'a left click at (260,85) resumes');

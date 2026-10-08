@@ -185,7 +185,7 @@ function checkScrollConversion(raw: DungeonData, converted: DungeonData, saves: 
       // A **free** record's secondary RN is not comparable and never was. CSBWin
       // converts one like any other — `convertScrolls` walks the whole database — but
       // `DeleteDBEntry` frees the slot it names without touching the word
-      // (`doc/CSBwin-src/data.cpp:993-1015`), so this port's reader drops it rather
+      // (`doc/CSBwin-src/data.cpp:995-1017`), so this port's reader drops it rather
       // than resolve a freed slot, and the writer puts `RNnul` back. Scroll 33 of DM is
       // the one such record. The same exemption `tools/dump-dungeon-image-blocks.ts`
       // makes, by name.
@@ -235,7 +235,7 @@ function checkActuatorConversion(raw: DungeonData, converted: DungeonData, saves
 
   // `MakeBig`'s own arithmetic, on a record built for it, since the shipped dungeon has
   // none. `word8 = ((word6 >> 12) & 0xc0) | ((word4 >> 14) & 0x03)`, then both masked to
-  // 14 bits (`doc/CSBwin-src/data.cpp:1327-1334`).
+  // 14 bits (`doc/CSBwin-src/data.cpp:1329-1336`).
   const probe = readRaw();
   probe.databases.actuators.records = [
     { nextObject: OBJECT_ID_NULL, word2: 47, word4: 0xc123, word6: 0xf456 },
@@ -305,7 +305,7 @@ function checkTheGate(saves: Map<string, DungeonData>, converted: DungeonData): 
 
   // `convertScrolls` a second time names the same text records, from `textReference`,
   // which it never overwrites, but in new slots: `AllocateIndirectIndex` mints one per
-  // scroll (`doc/CSBwin-src/SaveGame.cpp:2153`), so each run grows the maps by the
+  // scroll (`doc/CSBwin-src/SaveGame.cpp:2365`), so each run grows the maps by the
   // database's size. `MakeBigActuators` is worse, and the probe below shows it.
   const twice = readConverted();
   const slotsBefore = twice.rnMaps.length;

@@ -44,8 +44,8 @@ import type { Champion } from './gameTypes';
 
 /**
  * How `_ReadEntireGame` came out on the chooser's path: 1 once a save is in, -1 when the
- * chooser was cancelled (`tag01ec56`, `doc/CSBwin-src/SaveGame.cpp:1556-1559`), or a
- * failed read, which ends at `tag01efee` (`:1895`). On RISE's, a new adventure that
+ * chooser was cancelled (`tag01ec56`, `doc/CSBwin-src/SaveGame.cpp:1681-1684`), or a
+ * failed read, which ends at `tag01efee` (`:2098`). On RISE's, a new adventure that
  * `makeNewAdventure` refused, with the `UtilityDiskMessages` text it threw.
  */
 export type SavedGameRead = 'loaded' | 'cancelled' | 'damaged' | { refused: string };
@@ -67,7 +67,7 @@ export interface GameSavesScreen {
      * writer: the screen's, since only it holds graphic 26 (`SaveFileOptions`).
      */
     portraitOf(champion: Champion): number[] | undefined;
-    /** `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`), the screen's open chest. */
+    /** `RepackChest` (`doc/CSBwin-src/Character.cpp:3113`), the screen's open chest. */
     repackOpenChest(): void;
     /**
      * Ask "BEGIN THE ADVENTURE?" in the prison (`GameSaves.inPrison`), YES making the new
@@ -79,7 +79,7 @@ export interface GameSavesScreen {
 
 /**
  * Whether the game runs on while a save is written. The disk menu has stopped the clock
- * and repacked an open chest (`TAG02076e`, `doc/CSBwin-src/Character.cpp:5116-5125`); F5
+ * and repacked an open chest (`TAG02076e`, `doc/CSBwin-src/Character.cpp:5141-5150`); F5
  * and the Sleepsave have done neither.
  */
 export type SaveClock = 'running' | 'stopped';
@@ -98,7 +98,7 @@ export interface ImportedFile {
     /**
      * Milliseconds since the epoch: when the file was last written, where the page knows
      * it. It is the row's date, as CSBWin ranks its slots by their files' `MODIFIEDTIME`
-     * (`doc/CSBwin-src/CSBCode.cpp:9766-9800`).
+     * (`doc/CSBwin-src/CSBCode.cpp:9890-9924`).
      */
     modifiedAt?: number;
 }
@@ -113,11 +113,11 @@ export type ImportResult =
 
 /**
  * The line for a file that does not read as a save: CSBWin's own for a failed read
- * (`doc/CSBwin-src/SaveGame.cpp:1906`).
+ * (`doc/CSBwin-src/SaveGame.cpp:2118`).
  */
 export const SAVED_GAME_DAMAGED = 'SAVED GAME DAMAGED!';
 
-/** What CSBWin's disk menu says while a DSA has disabled saves (`doc/CSBwin-src/SaveGame.cpp:850`). */
+/** What CSBWin's disk menu says while a DSA has disabled saves (`doc/CSBwin-src/SaveGame.cpp:858`). */
 export const SAVES_ARE_DISABLED = 'SAVES ARE DISABLED';
 
 /** The colour of F5's and F9's lines in the message area: white, as a wall's text is. */
@@ -125,7 +125,7 @@ const SAVE_MESSAGE_COLOR = 15;
 
 /**
  * The name a new save gets. CSBWin has four fixed filenames and rotates a `.BAK`
- * (`doc/CSBwin-src/CSBCode.cpp:9744-9761`); this port saves as often as asked, so the
+ * (`doc/CSBwin-src/CSBCode.cpp:9868-9885`); this port saves as often as asked, so the
  * name has to be unique instead, among `taken`. Sortable, and readable as a file's name.
  */
 export function makeSaveFileName(savedAt: number, taken: ReadonlySet<string> = new Set()): string {
@@ -259,7 +259,7 @@ export class GameSaves {
      *
      * With the clock stopped, the save's tail (`Game.saveWritten`) runs once the file is
      * written, and a write that fails skips it, as CSBWin's `SaveError` jumps past it
-     * (`doc/CSBwin-src/SaveGame.cpp:1264`).
+     * (`doc/CSBwin-src/SaveGame.cpp:1361`).
      *
      * With the clock running, an open chest's objects are out of its chain
      * (`doc/PROVEN_FACTS.md` → "The disk menu saves an open chest packed"), so it is
@@ -310,11 +310,11 @@ export class GameSaves {
      * for the menu's status.
      *
      * The game's playthrough is the file's `RandomGameID` as it is, as in CSBWin
-     * (`doc/CSBwin-src/SaveGame.cpp:1610`).
+     * (`doc/CSBwin-src/SaveGame.cpp:1734`).
      *
      * The entrance's Resume needs to know whether a save came back: CSBWin loops on
      * `ReadEntireGame`'s result and shows the door again when it did not
-     * (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
+     * (`doc/CSBwin-src/CSBCode.cpp:10758-10765`).
      *
      * The game's play time is the row's (`SaveEntry.playTime`), which no file holds: the
      * player's count goes on from where the save left it.
@@ -415,7 +415,7 @@ export class GameSaves {
      *
      * The row is named after the source's, `-csb` before its `.dat` and a number after
      * that while a save has the name (`importedFileName`), where CSBWin's player picks
-     * one of its four slots (`_TAG000ede`, `doc/CSBwin-src/Chaos.cpp:1467-1541`). Its
+     * one of its four slots (`_TAG000ede`, `doc/CSBwin-src/Chaos.cpp:1817-1891`). Its
      * playthrough is the file's, the source's `RandomGameID` with its first byte one
      * higher (`TAG002724`), so a source made into an adventure twice makes two saves of
      * one playthrough, as CSBWin writes the same id twice. It counts no time played: the
@@ -483,15 +483,15 @@ export class GameSaves {
     /**
      * F5: the playthrough's quick-save, written over the last. Not with an empty party,
      * nor while a champion is still being chosen: the disk icon does nothing then
-     * (`doc/CSBwin-src/Mouse.cpp:1716-1718`), and a file has no place for
+     * (`doc/CSBwin-src/Mouse.cpp:1855-1857`), and a file has no place for
      * `d.PotentialCharacterOrdinal`, so the candidate would load as a member. Nor while a
      * script holds the loop, which a save could not resume. The icon is silent then; a
      * key that saved nothing says so. Nor while a DSA has disabled saves
      * (`DsaSystem.disableSaves`), when the key says what CSBWin's disk menu says
-     * (`doc/CSBwin-src/SaveGame.cpp:848-856`).
+     * (`doc/CSBwin-src/SaveGame.cpp:856-873`).
      *
      * A write that fails is `SaveError`'s "UNABLE TO SAVE GAME!"
-     * (`doc/CSBwin-src/SaveGame.cpp:1266`). One that is written in the prison asks
+     * (`doc/CSBwin-src/SaveGame.cpp:1363`). One that is written in the prison asks
      * "BEGIN THE ADVENTURE?" (`inPrison`), of any party.
      */
     async quickSave(): Promise<void> {
@@ -521,7 +521,7 @@ export class GameSaves {
      * The Sleepsave: the playthrough's slot of its own (`'sleep'`), apart from F5's,
      * written when the party lies down, button 145, and written over when the player
      * wakes it, button 146. A blow that wakes the party (`WakeUp` from
-     * `doc/CSBwin-src/Monster.cpp:4531` and `Character.cpp:2811`) writes nothing, so the
+     * `doc/CSBwin-src/Monster.cpp:4544` and `Character.cpp:2816`) writes nothing, so the
      * slot keeps the moment the party lay down. Both are player's clicks, after which the
      * screen calls this (`UIState.sleepSaveNeeded`); neither does anything in CSBWin.
      *
@@ -549,7 +549,7 @@ export class GameSaves {
      * script holds the loop: it would run on in the loaded world.
      *
      * A playthrough with no save is `_ReadEntireGame`'s "CAN'T FIND SAVED GAME!"
-     * (`doc/CSBwin-src/SaveGame.cpp:1585`), whatever the data set's other playthroughs
+     * (`doc/CSBwin-src/SaveGame.cpp:1710`), whatever the data set's other playthroughs
      * hold: a new game not saved yet. A file that does not read is its `SaveFileError`'s
      * line, the one the disk menu shows.
      */

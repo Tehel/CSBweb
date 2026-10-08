@@ -5,7 +5,7 @@
  * functions are `doc/CSBwin-src/Menu.cpp:245` and `:33`.
  *
  * Neither CSBWin function draws a button frame. The frames are painted into **graphic 0**
- * (224x136, `d.compressedGraphic0` = item 0 of `graphics.dat`, `Graphics.cpp:2002-2005`),
+ * (224x136, `d.compressedGraphic0` = item 0 of `graphics.dat`, `Graphics.cpp:2028-2031`),
  * which carries a title panel, one full-width frame and a split pair below it. The four
  * layouts differ only in which part of that bitmap is blitted over itself:
  *
@@ -35,7 +35,7 @@ import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { searchButtonList } from './HitTest';
 import type { UIState } from './UIState';
 
-/** Item 0 of `graphics.dat` — `d.compressedGraphic0` (`Graphics.cpp:2005`). */
+/** Item 0 of `graphics.dat` — `d.compressedGraphic0` (`Graphics.cpp:2031`). */
 export const MENU_GRAPHIC = 0;
 export const MENU_WIDTH = 224;
 export const MENU_HEIGHT = 136;
@@ -294,7 +294,7 @@ export function drawMenuTitles(
  * `FadeOldScreen` are the caller's, since only a pre-game screen owns the colour
  * registers: the boot's "SAVED GAME DAMAGED!" does both around this
  * (`doMenuCentred`, `src/renderer/intro/BootSequence.ts`), and the disk menu passes 0 for
- * all three (`SaveGame.cpp:870-877`).
+ * all three (`SaveGame.cpp:889-901`).
  */
 export function doMenu(
   ui: UIState,
@@ -312,7 +312,7 @@ export function doMenu(
 }
 
 /**
- * `d.pButn18970[set][count-1]` (`CSBCode.cpp:304-311`, picked at `Menu.cpp:64`). Set 0
+ * `d.pButn18970[set][count-1]` (`CSBCode.cpp:314-321`, picked at `Menu.cpp:64`). Set 0
  * is the in-viewport menu, set 1 the centred one; the ids are 210..213 and every entry
  * is left-click only.
  */
@@ -330,7 +330,7 @@ export function menuButtonList(ui: UIState, count: number, centred: boolean): UI
  * and both `pKeyXlate`s and replacing `PrimaryButtonList`; here the caller simply does
  * not consult any other list while its menu is up.
  *
- * Returns the 1-based choice `d.Word11764` would hold (`Mouse.cpp:1792-1796`), or 0.
+ * Returns the 1-based choice `d.Word11764` would hold (`Mouse.cpp:1931-1935`), or 0.
  */
 export function menuHitTest(buttons: UIButton[], x: number, y: number, mouseButtons: number): number {
   const id = searchButtonList(buttons, x, y, mouseButtons);

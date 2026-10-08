@@ -5,14 +5,14 @@
  * fields: those are `SaveGameLoader.ts`'s.
  *
  * Every word is big-endian, as CSBWin's `LE16()` reads it on the little-endian build
- * (`doc/CSBwin-src/CSBTypes.h:146`).
+ * (`doc/CSBwin-src/CSBTypes.h:151`).
  */
 import { readU16BE, writeU16BE } from '../core/bytes';
 
 /** `sizeof(GAMEBLOCK1)`: 256 bytes of fold and 256 scrambled. */
 export const BLOCK1_SIZE = 512;
 
-/** `GenChecksum` (`doc/CSBwin-src/SaveGame.cpp:642-656`). */
+/** `GenChecksum` (`doc/CSBwin-src/SaveGame.cpp:650-664`). */
 export function genChecksum(buf: Uint8Array, initialHash: number, numWords: number): number {
     let result = initialHash & 0xffff;
     let hash = initialHash & 0xffff;
@@ -31,7 +31,7 @@ export function genChecksum(buf: Uint8Array, initialHash: number, numWords: numb
 
 /**
  * A block scrambled in place, as `WriteScrambled` scrambles it before the write
- * (`doc/CSBwin-src/SaveGame.cpp:662-677`).
+ * (`doc/CSBwin-src/SaveGame.cpp:670-685`).
  */
 export function scramble(buf: Uint8Array, initialHash: number, numWords: number): number {
     let d7 = initialHash & 0xffff;
@@ -52,7 +52,7 @@ export function scramble(buf: Uint8Array, initialHash: number, numWords: number)
     return d5 & 0xffff;
 }
 
-/** `Unscramble` (`doc/CSBwin-src/CSBCode.cpp:9047-9067`), in place; the block's checksum. */
+/** `Unscramble` (`doc/CSBwin-src/CSBCode.cpp:9152-9172`), in place; the block's checksum. */
 function unscramble(buf: Uint8Array, initialHash: number, numWords: number): number {
     let d7 = initialHash & 0xffff;
     let d6 = numWords & 0xffff;
@@ -74,7 +74,7 @@ function unscramble(buf: Uint8Array, initialHash: number, numWords: number): num
 
 /**
  * `GAMEBLOCK1`'s first half folded as `ReadUnscrambleBlock` folds it, its 128 words by
- * turns of add, xor, subtract and xor (`doc/CSBwin-src/CSBCode.cpp:9167-9196`).
+ * turns of add, xor, subtract and xor (`doc/CSBwin-src/CSBCode.cpp:9272-9301`).
  */
 function foldBlock1(buf: Uint8Array): number {
     let d6 = 0;
@@ -99,7 +99,7 @@ function sumBlock1(buf: Uint8Array): number {
     return d5;
 }
 
-/** `ReadUnscrambleBlock` (`doc/CSBwin-src/CSBCode.cpp:9167-9196`): `GAMEBLOCK1`, checked and plain. */
+/** `ReadUnscrambleBlock` (`doc/CSBwin-src/CSBCode.cpp:9272-9301`): `GAMEBLOCK1`, checked and plain. */
 export function readUnscrambleBlock(data: Uint8Array, offset: number): { buf: Uint8Array; next: number } {
     const end = offset + BLOCK1_SIZE;
     if (end > data.length) throw new Error('savegame block1 truncated');
@@ -133,7 +133,7 @@ export function rescrambleBlock1(block1: Uint8Array): void {
     scramble(block1.subarray(256), readU16BE(block1, 58), 128);
 }
 
-/** `UnscrambleStream` (`doc/CSBwin-src/CSBCode.cpp:9070-9079`): one of blocks 2 to 6, checked and plain. */
+/** `UnscrambleStream` (`doc/CSBwin-src/CSBCode.cpp:9175-9184`): one of blocks 2 to 6, checked and plain. */
 export function unscrambleStream(
     data: Uint8Array,
     offset: number,
@@ -152,7 +152,7 @@ export function unscrambleStream(
 }
 
 /**
- * `ScrambleAndWrite` (`doc/CSBwin-src/SaveGame.cpp:706-751`), over `GAMEBLOCK1` in place:
+ * `ScrambleAndWrite` (`doc/CSBwin-src/SaveGame.cpp:714-759`), over `GAMEBLOCK1` in place:
  * `D5` sums the second half's words, the first 127 words are zeroed and folded into `D6`
  * by turns of add, xor, subtract and xor, and word 127 is `D5 ^ D6`, so the reader's
  * fold over all 128 words ends at `D5`. The second half is then scrambled with word 29

@@ -5,11 +5,11 @@
  * `TimerSystem.wiggleMonster` hand-rolled it and missed most of it (DEBT.md C23):
  *
  *  1. A group teleported off a square that switched on gets its AI timers started where
- *     it lands, and loses those at the square it left (`Code11f52.cpp:3401-3421`).
- *  2. Teleported to another level, it gives its `ITEM16` back (`DetachItem16`, `:3364-3369`).
- *  3. Teleported to a level its type may not live on, it is deleted (`:3147-3176`).
+ *     it lands, and loses those at the square it left (`Code11f52.cpp:3436-3456`).
+ *  2. Teleported to another level, it gives its `ITEM16` back (`DetachItem16`, `:3399-3404`).
+ *  3. Teleported to a level its type may not live on, it is deleted (`:3182-3211`).
  *  4. A teleporter that sends it back to its own square leaves it alone — nothing is
- *     lifted, pressed or set down (`:3183-3213`). `wiggleMonster` lifted it and set it
+ *     lifted, pressed or set down (`:3218-3248`). `wiggleMonster` lifted it and set it
  *     down again through two `PlaceOrRemoveObjectInRoom` calls.
  *
  * The teleporter is a real record from `dungeon.dat`, re-aimed onto a real open square,

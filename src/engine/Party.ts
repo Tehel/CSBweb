@@ -24,7 +24,7 @@ export function initialPartyState(position: Position, facing: Direction): PartyS
         position,
         facing,
         magicCasterIndex: -1,
-        // `d.PotentialCharacterOrdinal` 0 — none (doc/CSBwin-src/Data.h:933).
+        // `d.PotentialCharacterOrdinal` 0 — none (doc/CSBwin-src/Data.h:948).
         potentialChampionIndex: -1,
         gameIsLost: false,
         pendingDamage: [0, 0, 0, 0],
@@ -32,7 +32,7 @@ export function initialPartyState(position: Position, facing: Direction): PartyS
         cursorOwner: -1,
         selectedCharacterIndex: -1,
         objectInHand: OBJECT_ID_NULL,
-        // `d.PartyShield`, `d.FireShield`, `d.SpellShield` (doc/CSBwin-src/Data.h:770-772).
+        // `d.PartyShield`, `d.FireShield`, `d.SpellShield` (doc/CSBwin-src/Data.h:785-787).
         partyShield: 0,
         fireShield: 0,
         spellShield: 0,
@@ -67,7 +67,7 @@ export class Party {
         if (this.state.champions.length >= 4) {
             return false; // Party full
         }
-        // `ClearMemory((ui8 *)pcA3, 800)` (doc/CSBwin-src/Character.cpp:481): the slot's
+        // `ClearMemory((ui8 *)pcA3, 800)` (doc/CSBwin-src/Character.cpp:482): the slot's
         // record is the champion's now, and what was left there is gone.
         this.state.vacantCharacters[this.state.champions.length] = new Uint8Array(CHARDESC_SIZE);
         this.state.champions.push(champion);
@@ -156,7 +156,7 @@ export class Party {
 
     /**
      * Turn the party, rotating every champion with it
-     * (`doc/CSBwin-src/Code11f52.cpp:4085`).
+     * (`doc/CSBwin-src/Code11f52.cpp:4123`).
      *
      * Both champion fields move by the same delta: `charPosition`, so the champion who
      * was on the party's left is still on its left afterwards, and `facing`, which is
@@ -196,25 +196,25 @@ export class Party {
 }
 
 /**
- * `SetHandOwner` (`doc/CSBwin-src/CSBCode.cpp:8390`) — hand champion `chIdx` the mouse
+ * `SetHandOwner` (`doc/CSBwin-src/CSBCode.cpp:8477`) — hand champion `chIdx` the mouse
  * cursor, or -1 to leave it unowned.
  *
  * This is not cosmetic: CSBWin gates every inventory click on `d.HandChar != -1`
- * (`doc/CSBwin-src/Mouse.cpp:1600-1606`), and so does this port, so nobody can pick an
+ * (`doc/CSBwin-src/Mouse.cpp:1739-1745`), and so does this port, so nobody can pick an
  * object up until a champion owns the cursor. CSBWin therefore gives it away as soon as
- * the party has a first champion (`doc/CSBwin-src/Character.cpp:706-710` and
- * `doc/CSBwin-src/CSBCode.cpp:6787-6791`), moves it to a living champion when the owner
- * dies (`doc/CSBwin-src/Character.cpp:2684-2688`), takes it back when the last champion
- * is cancelled out of the mirror (`doc/CSBwin-src/CSBCode.cpp:6641-6644`), and saves and
- * restores it with the game (`doc/CSBwin-src/SaveGame.cpp:1020` and `:1636`).
+ * the party has a first champion (`doc/CSBwin-src/Character.cpp:707-711` and
+ * `doc/CSBwin-src/CSBCode.cpp:6846-6850`), moves it to a living champion when the owner
+ * dies (`doc/CSBwin-src/Character.cpp:2689-2693`), takes it back when the last champion
+ * is cancelled out of the mirror (`doc/CSBwin-src/CSBCode.cpp:6700-6703`), and saves and
+ * restores it with the game (`doc/CSBwin-src/SaveGame.cpp:1045` and `:1760`).
  *
  * The `load` arithmetic CSBWin does here has no counterpart: this port recomputes a
  * champion's load from its possessions instead of tracking it incrementally
  * (`computeLoadWeight`), and counts the object in hand against whoever owns the cursor.
  *
  * Both champions' names are drawn again in their new colour, `CHARFLAG_cursor` and
- * `DrawCharacterState` (`doc/CSBwin-src/CSBCode.cpp:8401-8407`, `:8422-8423`), which is
- * the host's: the recruit in a mirror, who is given the cursor, is not redrawn (`:8421`).
+ * `DrawCharacterState` (`doc/CSBwin-src/CSBCode.cpp:8488-8494`, `:8509-8510`), which is
+ * the host's: the recruit in a mirror, who is given the cursor, is not redrawn (`:8508`).
  */
 export function setHandOwner(party: PartyState, chIdx: number, host: Pick<GameHost, 'drawCharacterState'>): void {
     const current = party.cursorOwner ?? -1;
@@ -222,14 +222,14 @@ export function setHandOwner(party: PartyState, chIdx: number, host: Pick<GameHo
     if (chIdx !== -1) {
         const champion = getPartyChampion(party, chIdx);
         if (!champion) return;
-        // `if ( (chIdx != -1) && (d.CH16482[chIdx].HP()==0) ) return;` (`doc/CSBwin-src/CSBCode.cpp:8397`).
+        // `if ( (chIdx != -1) && (d.CH16482[chIdx].HP()==0) ) return;` (`doc/CSBwin-src/CSBCode.cpp:8484`).
         if ((champion.attributes?.health ?? 0) === 0) return;
     }
     party.cursorOwner = -1;
     if (current !== -1) drawCharacterState(party, current, CHARFLAG_CURSOR, host);
     if (chIdx === -1) return;
     party.cursorOwner = chIdx;
-    // `pcA3->facing = (ui8)d.partyFacing` (doc/CSBwin-src/CSBCode.cpp:8417).
+    // `pcA3->facing = (ui8)d.partyFacing` (doc/CSBwin-src/CSBCode.cpp:8504).
     const champion = getPartyChampion(party, chIdx);
     if (champion) champion.facing = party.facing;
     if (chIdx === party.potentialChampionIndex) return;
@@ -237,9 +237,9 @@ export function setHandOwner(party: PartyState, chIdx: number, host: Pick<GameHo
 }
 
 /**
- * `DrawCharacterState(chIdx)` (`doc/CSBwin-src/Character.cpp:1229`): the host draws
+ * `DrawCharacterState(chIdx)` (`doc/CSBwin-src/Character.cpp:1234`): the host draws
  * `charFlags`, the flags just set, with the champion's `CHARFLAG_CHEST_OR_SCROLL`, which
- * is cleared as `:1514` clears every graphic flag. Nothing set, nothing is drawn (`:1251`).
+ * is cleared as `:1519` clears every graphic flag. Nothing set, nothing is drawn (`:1256`).
  */
 export function drawCharacterState(
     party: PartyState, chIdx: number, charFlags: number, host: Pick<GameHost, 'drawCharacterState'>,
@@ -253,7 +253,7 @@ export function drawCharacterState(
 }
 
 /**
- * `DrawAllCharacterState` (`doc/CSBwin-src/CSBCode.cpp:6826-6836`), for the flags the
+ * `DrawAllCharacterState` (`doc/CSBwin-src/CSBCode.cpp:6885-6895`), for the flags the
  * champions hold.
  */
 export function drawAllCharacterState(party: PartyState, host: Pick<GameHost, 'drawCharacterState'>): void {
@@ -261,7 +261,7 @@ export function drawAllCharacterState(party: PartyState, host: Pick<GameHost, 'd
 }
 
 /**
- * `MarkAllPortraitsChanged` (`doc/CSBwin-src/CSBCode.cpp:6276`): `CHARFLAG_portraitChanged`
+ * `MarkAllPortraitsChanged` (`doc/CSBwin-src/CSBCode.cpp:6335`): `CHARFLAG_portraitChanged`
  * on every champion and `DrawAllCharacterState`, which a party shield, a spell shield or
  * a fire shield changing calls for, the dots around each box being theirs.
  */
@@ -303,7 +303,7 @@ export function ensureHandOwner(party: PartyState, host: Pick<GameHost, 'drawCha
  *
  * Exported because the UI needs the same lookup: every click that names a champion —
  * a portrait box, an inventory slot, a magic tab — names a *box*, and CSBWin resolves
- * it as `d.CH16482[chIdx]` (`doc/CSBwin-src/CSBCode.cpp:6956`).
+ * it as `d.CH16482[chIdx]` (`doc/CSBwin-src/CSBCode.cpp:7015`).
  */
 export function getPartyChampion(party: PartyState, chIdx: number): Champion | null {
     if (chIdx < 0) return null;
@@ -312,9 +312,9 @@ export function getPartyChampion(party: PartyState, chIdx: number): Champion | n
 
 /**
  * The first champion of the party with `fingerprint`'s low word, or -1: the party half of
- * `CHARDESC::CopyCharacter` (`doc/CSBwin-src/Character.cpp:5239-5251`), and the loop
+ * `CHARDESC::CopyCharacter` (`doc/CSBwin-src/Character.cpp:5264-5276`), and the loop
  * `ProcessTT_ViAltar` and `&CHARNAME@` spell out (`Timer.cpp:2752-2755`,
- * `DSA.cpp:3215-3222`).
+ * `DSA.cpp:3216-3223`).
  */
 export function findChampionByFingerprint(party: PartyState, fingerprint: number): number {
     const wanted = fingerprint & 0xffff;
@@ -327,7 +327,7 @@ export function findChampionByFingerprint(party: PartyState, fingerprint: number
 }
 
 /**
- * `CHARDESC::CopyCharacter` (`doc/CSBwin-src/Character.cpp:5239-5251`): the first champion
+ * `CHARDESC::CopyCharacter` (`doc/CSBwin-src/Character.cpp:5264-5276`): the first champion
  * of the party with `fingerprint`'s low word, else a copy of the one in the wings
  * (`GetFromWings`, testing only), else null. The party's is the champion itself.
  */
@@ -339,7 +339,7 @@ export function copyCharacter(party: PartyState, pool: WingsPool, fingerprint: n
 }
 
 /**
- * `SelectMagicCaster` (`doc/CSBwin-src/Magic.cpp:716-740`) — move the magic tab to
+ * `SelectMagicCaster` (`doc/CSBwin-src/Magic.cpp:719-743`) — move the magic tab to
  * another champion.
  *
  * Only the state half is ported; the rest of CSBWin's function redraws the rune
@@ -359,7 +359,7 @@ export function selectMagicCaster(party: PartyState, chIdx: number): void {
 
 /**
  * Turn the party, rotating every champion with it
- * (`doc/CSBwin-src/Code11f52.cpp:4085`).
+ * (`doc/CSBwin-src/Code11f52.cpp:4123`).
  *
  * Both champion fields move by the same delta: `charPosition`, so the champion who was
  * on the party's left is still on its left afterwards, and `facing`, which is what the

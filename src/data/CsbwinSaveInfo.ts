@@ -13,7 +13,7 @@
 import { loadSaveGameState } from './SaveGameLoader';
 
 /**
- * `CHARDESC` is 800 bytes (`doc/CSBwin-src/CSB.h:2483-2594`, whose last member is
+ * `CHARDESC` is 800 bytes (`doc/CSBwin-src/CSB.h:2542-2653`, whose last member is
  * `FILL337[800-337]`), and block 4 holds four of them followed by 128 bytes of party
  * state.
  */
@@ -23,7 +23,7 @@ export const CHARDESC_SIZE = 800;
  * `name` is `char[8]` at offset 0 and the title runs from 8 to 27 — **20 bytes, not the
  * 16 the struct declares**. `AddCharacter` proves the span: it refuses a title character
  * at `D6W >= 19` and then writes `title[D6W] = 0`, so index 19 is a legal write
- * (`doc/CSBwin-src/Character.cpp:578-587`), and the next member, `facing`, sits at
+ * (`doc/CSBwin-src/Character.cpp:579-588`), and the next member, `facing`, sits at
  * offset 28.
  */
 export const CHARDESC_NAME_OFFSET = 0;
@@ -33,17 +33,17 @@ export const CHARDESC_TITLE_SIZE = 20;
 
 /**
  * Names and titles are plain `char` arrays — `swapCharacter` never touches them
- * (`doc/CSBwin-src/SaveGame.cpp:490-521`) — so they need no byte-swapping. A byte
+ * (`doc/CSBwin-src/SaveGame.cpp:498-529`) — so they need no byte-swapping. A byte
  * outside printable ASCII becomes `?`, which is what makes a misread block obvious
  * instead of plausible.
  *
  * **They are C strings, and the first NUL ends them.** `AddCharacter` terminates both
- * (`doc/CSBwin-src/Character.cpp:567,587`) and the game prints them with
- * `TextToViewport(…, pcA3->title, false)` (`:1338`), which stops there. This reader used
+ * (`doc/CSBwin-src/Character.cpp:568,588`) and the game prints them with
+ * `TextToViewport(…, pcA3->title, false)` (`:1343`), which stops there. This reader used
  * to *skip* zero bytes and go on, which is why some genuine saves appeared to hold a
  * title of `\0HE DEVIL`: CSBWin shows those champions a **blank** title, and so must we.
  * The stray NUL is written by `EditCharacterName`'s insert branch
- * (`doc/CSBwin-src/Chaos.cpp:5323-5324`), whose shift loop starts at `max_len` (7) rather
+ * (`doc/CSBwin-src/Chaos.cpp:6539-6540`), whose shift loop starts at `max_len` (7) rather
  * than at the name's length, so its first move is `name[8] = name[7]` — and `name` is
  * `char[8]`, so `name[8]` *is* `title[0]`. See `doc/PROVEN_FACTS.md` → "A champion's
  * title can lose its first character".
@@ -61,7 +61,7 @@ export function decodeCharField(bytes: Uint8Array): string {
  * The inverse: a `char` field of exactly `size` bytes, NUL-terminated and zero-filled.
  *
  * `AddCharacter` writes the characters and then its terminator into a record
- * `ClearMemory` has already zeroed (`doc/CSBwin-src/Character.cpp:478,567,587`), so
+ * `ClearMemory` has already zeroed (`doc/CSBwin-src/Character.cpp:479,568,588`), so
  * every byte past the terminator is 0 — which is what the committed saves hold, with
  * one exception that this function cannot express and callers must handle: a title
  * whose first byte was zeroed by the editor bug still carries its text after the
@@ -102,7 +102,7 @@ export interface CsbwinSaveInfo {
     champions: string[];
     /** `gb2.Time`, the virtual clock — not a wall-clock date; a CSBWin save carries none. */
     time: number;
-    /** `d.RandomGameID`, `GAMEBLOCK1`'s (`doc/CSBwin-src/SaveGame.cpp:1060`): the game the file is a save of. */
+    /** `d.RandomGameID`, `GAMEBLOCK1`'s (`doc/CSBwin-src/SaveGame.cpp:1085`): the game the file is a save of. */
     randomGameID: number;
 }
 

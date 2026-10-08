@@ -5,7 +5,7 @@
  * and a file on its way into the store is checked against the running one by it
  * (`doc/SAVES.md` → "An import is checked against the dungeon"). CSBWin has no such
  * check: it keeps a game's saves in that game's directory
- * (`doc/CSBwin-src/CSBCode.cpp:9747-9756`).
+ * (`doc/CSBwin-src/CSBCode.cpp:9871-9880`).
  *
  * The signature is one digest per level, of the level's walls: its width, its height,
  * and a bit per cell, stone or anything else. Nothing finer goes in. What a release

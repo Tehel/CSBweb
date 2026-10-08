@@ -2,9 +2,9 @@
  * The text the party finds on a square it enters.
  *
  * `PlaceOrRemoveObjectInRoom` decodes a text on the square with `DecodeText(text, …, 1,
- * 990)` and queues it with `QuePrintLines(15, text)` (`doc/CSBwin-src/Code11f52.cpp:3950-3963`).
+ * 990)` and queues it with `QuePrintLines(15, text)` (`doc/CSBwin-src/Code11f52.cpp:3985-3998`).
  * `DecodeText` expands codes 29 and 30 through `d.Byte10080` and `d.Byte10016` for any
- * text but a wall's (`doc/CSBwin-src/CSBCode.cpp:5559-5574`), which is how the dungeon
+ * text but a wall's (`doc/CSBwin-src/CSBCode.cpp:5624-5639`), which is how the dungeon
  * stores "THE ", "YOU " and "!".
  *
  * In `dm-atari/dungeon.dat` the one visible text on a square that is not a wall is on
@@ -74,6 +74,6 @@ for (const { color, text } of queued) console.log(`queued (colour ${color}): ${J
 check(queued.length === 1 && queued[0]!.color === 15, 'entering it queues one text, in colour 15');
 check(queued[0]?.text === '\nIT IS TOO BAD YOU DID NOT DISCOVER THE TRUE SECRET OF THE FIRESTAFF. ' +
   'NOW THAT I HAVE IT I HAVE NO FURTHER NEED FOR YOU!',
-  'with its linefeed first, and the two "THE "s and the "!" its escapes stand for (CSBCode.cpp:5559-5574)');
+  'with its linefeed first, and the two "THE "s and the "!" its escapes stand for (CSBCode.cpp:5624-5639)');
 
 finish();

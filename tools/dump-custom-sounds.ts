@@ -1,21 +1,21 @@
 /**
  * The sounds of `CSBgraphics.dat` a DSA's `&SOUND` plays with a number from 0 up
- * (`PlayCustomSound`, `doc/CSBwin-src/Sound.cpp:1039-1062`), through
+ * (`PlayCustomSound`, `doc/CSBwin-src/Sound.cpp:1048-1071`), through
  * `SoundQueue.playCustomSound` on a game with each file here.
  *
- * 1. **Every `CGT_Sound` section plays** (`SOUNDDATA::ReadSound`, `:989-1025`): its bytes
+ * 1. **Every `CGT_Sound` section plays** (`SOUNDDATA::ReadSound`, `:998-1034`): its bytes
  *    summed with the one before, the count at byte 40, the samples from 44. The canary is
  *    the header the sum leaves: a WAV file's, mono, 8-bit, at 11025 Hz, `Decode`'s rate
- *    (`:338`), and its `data` chunk's size the count. One section of each file, 705, has a
+ *    (`:343`), and its `data` chunk's size the count. One section of each file, 705, has a
  *    `fact` chunk there instead, and plays its `data` chunk, after the `fact` one: a
  *    deliberate divergence from CSBWin, which plays the `fact` chunk's four bytes
  *    (`DEBT.md` H).
  * 2. **A section that is not there** plays nothing, "Cannot find Sound" the first time
- *    only (`:1003-1008`).
+ *    only (`:1012-1017`).
  * 3. **A section shorter than its count** plays nothing, "Sound too short" every time
- *    (`:1016-1020`).
- * 4. **The volume is `Decode`'s divisor**, 1 for a volume of 0 (`:1057`), and
- *    `soundDataDecode` its table (`:321-329`), wrapping to a byte as `(ui8)` does.
+ *    (`:1025-1029`).
+ * 4. **The volume is `Decode`'s divisor**, 1 for a volume of 0 (`:1066`), and
+ *    `soundDataDecode` its table (`:326-334`), wrapping to a byte as `(ui8)` does.
  *
  * Run: `npx tsx tools/dump-custom-sounds.ts`
  */

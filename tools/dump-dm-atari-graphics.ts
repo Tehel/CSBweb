@@ -21,8 +21,8 @@
  * CSBWin's, and the committed file is the splice.
  *
  * `graphics.dat` has no checksum. CSBWin's graphics signature (an MD5 of the file,
- * `doc/CSBwin-src/data.cpp:1943`) is checked only when a save or a dungeon states an
- * expected one (`doc/CSBwin-src/Graphics.cpp:1784-1805`), and DM's never do.
+ * `doc/CSBwin-src/data.cpp:1946`) is checked only when a save or a dungeon states an
+ * expected one (`doc/CSBwin-src/Graphics.cpp:1808-1829`), and DM's never do.
  *
  * Run: `npx tsx tools/dump-dm-atari-graphics.ts` (checks), `… --write` (rebuilds the file).
  */

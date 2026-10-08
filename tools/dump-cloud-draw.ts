@@ -15,7 +15,7 @@
  *     srcX = x1 != 0 ? LOCAL_30 : Larger(LOCAL_30, LOCAL_22 - x - 1);
  *
  * `STRandomBool()` inside `DrawViewport` reads the viewport's own stream
- * (`Viewport.cpp:6706-6707`), seeded once with `0x34175432` (`:6697`), not `GraphicRandom`, which only `DrawTeleporter` calls.
+ * (`Viewport.cpp:6713-6714`), seeded once with `0x34175432` (`:6704`), not `GraphicRandom`, which only `DrawTeleporter` calls.
  * The port used to roll `graphicRandom(2)` twice, mirror first — the wrong stream,
  * the wrong bit (`>> 7` instead of `>> 8`) and the flags swapped.
  *
@@ -36,7 +36,7 @@
  *     `d.Word7222` for cells 7-9, shrunk through the identity map (`:139-170`);
  *  7. the cell under the party (`RelativeCellNumber == 12`, `:178-218`): graphic
  *     `351 + 3·D4W + (value>>5 != 0) + (value>>5 > 3)`, tiled over `d.Word2530` by
- *     `TAG008c98` (`Graphics.cpp:1169`) from group `STRandom() & 63`, wrapping at
+ *     `TAG008c98` (`Graphics.cpp:1193`) from group `STRandom() & 63`, wrapping at
  *     `STRandom0_3() + 87`.
  *  8. a Fluxcage (type 50): no cloud, but the teleporter's shimmer over its cell from cell 4
  *     on, which `d.Word1868` takes away (`Code51a4.cpp:2769-2782`).
@@ -151,7 +151,7 @@ const flipped = (rows: number[][]) => [...rows].reverse();
 
 // 0. The stream's seed is CSBWin's static initialiser, not a host random value.
 check(viewportRandom.getSeed() === 0x34175432,
-  'viewportRandom starts at 0x34175432 (Viewport.cpp:6697)');
+  'viewportRandom starts at 0x34175432 (Viewport.cpp:6704)');
 
 // 1. The stream. Two draws from the viewport's own stream, none from GraphicRandom.
 {
@@ -227,7 +227,7 @@ check(realTables.cloudScaleBase[6] === realTables.cloudScaleBase[4] && realTable
 for (let n = 351; n <= 359; n++) {
   const img = graphics.getImage(n);
   // CSBWin asks for 48×32 and pads the missing row: "This error occurs in the standard
-  // Graphic.dat" (Graphics.cpp:2560). The tiling never reads it (see 7).
+  // Graphic.dat" (Graphics.cpp:2586). The tiling never reads it (see 7).
   check(img.width === 48 && img.height === 31, `graphic ${n} is 48×31 (${img.width}×${img.height})`);
 }
 {
@@ -393,7 +393,7 @@ for (const [cloudType, value, graphic] of [[0, 0, 351], [0, 40, 352], [2, 200, 3
 // 8. A Fluxcage (type 50) draws no cloud, but `DrawRoomObjects` draws a teleporter's
 // shimmer over its cell, from its teleporter rectangle one pixel on (`x1 + 1`), from
 // cell 4 on and not from the far side of a door, and only while `d.Word1868` is clear
-// (`doc/CSBwin-src/Code51a4.cpp:2769-2782`); `_FusionSequence` sets it (`Attack.cpp:2367`).
+// (`doc/CSBwin-src/Code51a4.cpp:2769-2782`); `_FusionSequence` sets it (`Attack.cpp:2369`).
 console.log('\nthe Fluxcage\'s shimmer (Code51a4.cpp:2769-2782):');
 for (const word1868 of [false, true]) {
   for (const relativeCell of [0, 1, 4]) {

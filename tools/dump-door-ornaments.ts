@@ -1,7 +1,7 @@
 /**
  * The door ornament tables, and the canaries that place them in `graphics.dat` item 0x22e.
  *
- * `TAG004b26` (`doc/CSBwin-src/CSBCode.cpp:3993-4059`) draws a door's ornament onto the
+ * `TAG004b26` (`doc/CSBwin-src/CSBCode.cpp:4058-4124`) draws a door's ornament onto the
  * door's bitmap from four tables: `d.Byte5070` (with `Byte5058` after it), an ornament's
  * rectangle per position set and nearness; `d.Byte4122`, an ornament's position set; and
  * the colour maps `d.Byte4172` (F3) and `d.Byte4188` (F2). None of them names its bytes,
@@ -9,7 +9,7 @@
  *
  * - each ornament's F1 rectangle is exactly its graphic's size, 303 + the ornament
  *   (`Code390e.cpp:278-284`), and slots 15 and 16, graphics 301 and 302, use set 1
- *   (`CSBCode.cpp:10251-10262`);
+ *   (`CSBCode.cpp:10375-10386`);
  * - set 1 is the whole door: its three rectangles are the three door graphics' sizes;
  * - both colour maps keep colour 9, the transparent one, as 9.
  *

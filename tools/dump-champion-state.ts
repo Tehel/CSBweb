@@ -3,14 +3,14 @@
  * golden frame: `AdjustStamina`, poison as a real timer, and the tail of
  * `KillCharacter`.
  *
- *   1. `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4413`) — clamps at both ends,
+ *   1. `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4451`) — clamps at both ends,
  *      and turns whatever a decrement overshot by into unmitigated damage at half
  *      rate. That is the path by which exhaustion kills.
- *   2. `PoisonCharacter` (`doc/CSBwin-src/CSBCode.cpp:7211`) + `TT_75`
- *      (`:6554`) + `CurePoison` (`doc/CSBwin-src/Character.cpp:3007`) — poison is a
+ *   2. `PoisonCharacter` (`doc/CSBwin-src/CSBCode.cpp:7270`) + `TT_75`
+ *      (`:6613`) + `CurePoison` (`doc/CSBwin-src/Character.cpp:3012`) — poison is a
  *      chain of timers 36 ticks apart, not a number that sits on the champion. Before
  *      this, `poisonCount` only ever went up.
- *   3. `KillCharacter`'s tail (`doc/CSBwin-src/Character.cpp:2670-2694`) — the cursor
+ *   3. `KillCharacter`'s tail (`doc/CSBwin-src/Character.cpp:2675-2699`) — the cursor
  *      and the magic tab move to a living champion, and `d.GameIsLost` is set when
  *      there is none.
  *
@@ -85,7 +85,7 @@ function poisonTimersFor(game: Game, chIdx: number): number {
 function main(): void {
   /* --------------------------------------------------- 1. AdjustStamina --------- */
 
-  console.log('=== AdjustStamina (doc/CSBwin-src/Code11f52.cpp:4413) ===');
+  console.log('=== AdjustStamina (doc/CSBwin-src/Code11f52.cpp:4451) ===');
   console.log(['stamina', 'decrement', 'stamina after', 'health after', 'note'].join('\t'));
 
   const staminaCase = (
@@ -130,7 +130,7 @@ function main(): void {
   /* --------------------------------------------------- 2. poison ---------------- */
 
   console.log('');
-  console.log('=== PoisonCharacter and TT_75 (doc/CSBwin-src/CSBCode.cpp:7211, :6554) ===');
+  console.log('=== PoisonCharacter and TT_75 (doc/CSBwin-src/CSBCode.cpp:7270, :6613) ===');
   console.log(['tick', 'poisonCount', 'health', 'TT_75 queued', 'event'].join('\t'));
 
   const game = withParty(2);
@@ -200,7 +200,7 @@ function main(): void {
   /* --------------------------------------------- 3. KillCharacter's tail -------- */
 
   console.log('');
-  console.log('=== KillCharacter tail (doc/CSBwin-src/Character.cpp:2670-2694) ===');
+  console.log('=== KillCharacter tail (doc/CSBwin-src/Character.cpp:2675-2699) ===');
   console.log(['case', 'cursor owner', 'magic caster', 'gameIsLost'].join('\t'));
 
   {

@@ -1,23 +1,23 @@
 /**
  * The timer-type modifier, `timerTypeModifier` (`doc/CSBwin-src/CSBCode.cpp:21`): the
  * action each of SET, CLEAR and TOGGLE stands for, which a DSA's `&MODIFYMESSAGE`
- * (`doc/CSBwin-src/DSA.cpp:4931-4947`) changes. Each case runs a test DSA through
+ * (`doc/CSBwin-src/DSA.cpp:4932-4948`) changes. Each case runs a test DSA through
  * `tools/lib/dsa.ts` on `csbgame7.dat`, then a timer to its square at the next tick.
  *
- * 1. **It is reset before every timer** (`CSBCode.cpp:6412-6414`): a modifier the DSA set
+ * 1. **It is reset before every timer** (`CSBCode.cpp:6471-6473`): a modifier the DSA set
  *    on its last run does not pick its column at the next timer.
  * 2. **A room timer reads it afresh at each object** (`ProcessTT_OPENROOM`,
  *    `doc/CSBwin-src/Timer.cpp:1712`, `OperateCounterActuator`, `:1609`, `:1624`): a counter
  *    after the DSA on the square counts the way the DSA made the message mean, and a 3
- *    ends the square. `&MODIFYMESSAGE` caps an action at 3, unsigned (`DSA.cpp:4935-4943`).
- * 3. **A pit reads it after the square's DSAs** (`ProcessTT_PITROOM`, `:2526-2550`): a SET
+ *    ends the square. `&MODIFYMESSAGE` caps an action at 3, unsigned (`DSA.cpp:4936-4944`).
+ * 3. **A pit reads it after the square's DSAs** (`ProcessTT_PITROOM`, `:2527-2551`): a SET
  *    the DSA makes a TOGGLE closes an open pit.
  * 4. **So does a teleporter, twice** (`ProcessTT_TELEPORTER`, `:2390-2414`): its TOGGLE
  *    writes SET into `uByte9`, which is read through the modifier again, so a SET the DSA
  *    made a TOGGLE leaves a closed teleporter closed.
  * 5. **So does a door** (`ProcessTT_DOOR`, `:1556-1586`): a SET the DSA makes a TOGGLE
  *    closes an open door, where a SET leaves it alone.
- * 6. **A door timer runs the square's DSAs before it looks at the square** (`:1563-1569`):
+ * 6. **A door timer runs the square's DSAs before it looks at the square** (`:1564-1570`):
  *    on a bashed door, and on a square that is no door.
  *
  * Run: `npx tsx tools/dump-timer-modifier.ts`

@@ -14,8 +14,8 @@
  *
  * - `columnIndex` looks structural and is not. `DungeonState.addObjectToCell` and
  *   `removeObjectFromCell` rewrite every later entry whenever a cell gains or loses its
- *   last object, as CSBWin does (`doc/CSBwin-src/CSBCode.cpp:5211-5224`), and CSBWin
- *   saves the array beside the object list (`doc/CSBwin-src/SaveGame.cpp:1178`).
+ *   last object, as CSBWin does (`doc/CSBwin-src/CSBCode.cpp:5276-5289`), and CSBWin
+ *   saves the array beside the object list (`doc/CSBwin-src/SaveGame.cpp:1252`).
  *   Restoring `objectList` without it makes `GetObjectListIndex` read every cell's chain
  *   at the wrong offset, so objects vanish from the cells that hold them and surface in
  *   cells that do not. `levelIndex` really is structural: `DungeonLoader.buildLevelIndex`
@@ -73,7 +73,7 @@ export const DUNGEON_DATA_SOURCES = {
         facing: 'loaded',
         // The mutations that edit `objectList` and the databases maintain both
         // (`DungeonState.addObjectToCell`, `findEmptyDBEntry`), and CSBWin saves the
-        // 44-byte header (`doc/CSBwin-src/SaveGame.cpp:1168`).
+        // 44-byte header (`doc/CSBwin-src/SaveGame.cpp:1236`).
         objectListSize: 'snapshot',
         objectCounts: 'snapshot',
     },

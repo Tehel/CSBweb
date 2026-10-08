@@ -3,23 +3,23 @@
  * each run through `DsaSystem.execute` as a program of a test DSA on a genuine save
  * (`csbgame7.dat`).
  *
- * 1. **`&MESSAGE`** (`doc/CSBwin-src/DSA.cpp:3045-3089`): a `TT_ParameterMessage` timer to
+ * 1. **`&MESSAGE`** (`doc/CSBwin-src/DSA.cpp:3046-3090`): a `TT_ParameterMessage` timer to
  *    the target, due `delay` ticks on, the message type in `uByte9` and
  *    `parameterMessageSequence` in `uByte5`; the first `numParam` DSA parameters in
  *    `EXPOOL` under `(EDT_MessageParameters << 24) + timerID`. Nothing past 29 parameters.
  * 2. **The timer hands them to the square's DSAs** (`ProcessTT_OPENROOM`,
  *    `doc/CSBwin-src/Timer.cpp:1699-1707`, or `ProcessTT_STONEROOM`, `:2178-2186`, by the
- *    target's room type, `CSBCode.cpp:6445-6458`): the count and the words, which leave
+ *    target's room type, `CSBCode.cpp:6504-6517`): the count and the words, which leave
  *    the pool; a count of -1 when the record is gone. The sequence is back to 0 at the
- *    next tick (`Attack.cpp:2210`).
+ *    next tick (`Attack.cpp:2212`).
  * 3. **Any other room timer gives a count of 0** (`Timer.cpp:1704-1707`).
- * 4. **`&SOUND`** (`DSA.cpp:4612-4624`, `PlayCustomSound`, `Sound.cpp:1039-1062`): a
+ * 4. **`&SOUND`** (`DSA.cpp:4613-4625`, `PlayCustomSound`, `Sound.cpp:1048-1071`): a
  *    negative number plays `d.sound1772`'s entry `-n - 1`, quiet for a volume of 0, none
  *    past the 22nd; a number from 0 up is `CSBgraphics.dat`'s, which, in a game with no
  *    such file, plays nothing and is reported once (the sounds themselves are
  *    `tools/dump-custom-sounds.ts`'s).
  * 5. **An `OVERRIDE` no operation used dies with its run**: `ProcessDSATimer6` clears
- *    `Override_P` before every DSA it runs (`DSA.cpp:5416`), so the next run's `&MESSAGE`
+ *    `Override_P` before every DSA it runs (`DSA.cpp:5417`), so the next run's `&MESSAGE`
  *    goes to the corner its location names.
  *
  * Run: `npx tsx tools/dump-dsa-message.ts`
@@ -152,7 +152,7 @@ for (const room of ['open', 'stone'] as const) {
 
 /* ----------------------------- 5. an OVERRIDE left unused ------------------------- */
 {
-  /** `EX_OVERRIDE` (`DSA.cpp:1037-1072`): `what` 1, corner 3, the same state. */
+  /** `EX_OVERRIDE` (`DSA.cpp:1038-1073`): `what` 1, corner 3, the same state. */
   const override3 = 2 | (1 << 6) | (3 << 9);
   const { game, again, at } = run((_game, at) => [
     ...int(here(at)), ...int(0), ...int(0), ...int(DELAY), op(StkOp.MESSAGE),

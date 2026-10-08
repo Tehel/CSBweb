@@ -4,25 +4,25 @@
  * - Button 145, the sleep icon, lives in the inventory list `buttons17760`. It closes the
  *   inventory (`ShowHideInventory(4)`), sets `d.PartySleeping`, installs `Buttons17796`
  *   with no secondary list, and `DiscardAllInput()`s — refused while a champion is only
- *   provisionally joined (doc/CSBwin-src/Mouse.cpp:1683-1708).
+ *   provisionally joined (doc/CSBwin-src/Mouse.cpp:1822-1847).
  * - `Buttons17796` is the viewport, either mouse button, as button 146; nothing else can
  *   be clicked. The key table `Byte18440` binds Return to 146 (read from graphics.dat).
- * - Asleep, `d.Speed = 0`, and a tick is due on every VBL (`CSBCode.cpp:1066-1077`).
- * - `TAG02076e` on the way to sleep (`Mouse.cpp:1691`) shades the interface and shows the
- *   arrow cursor until `WakeUp`'s `TAG0207cc` (`CSBCode.cpp:7061`).
- * - `WakeUp` (`CSBCode.cpp:7047`): `d.clockTick = 1` — the tick runs in the very frame —
+ * - Asleep, `d.Speed = 0`, and a tick is due on every VBL (`CSBCode.cpp:1076-1087`).
+ * - `TAG02076e` on the way to sleep (`Mouse.cpp:1830`) shades the interface and shows the
+ *   arrow cursor until `WakeUp`'s `TAG0207cc` (`CSBCode.cpp:7120`).
+ * - `WakeUp` (`CSBCode.cpp:7106`): `d.clockTick = 1` — the tick runs in the very frame —
  *   and the adventure lists back. A blow wakes the party from `MonsterDamagesCharacter`
- *   *before* its dodge test (`Monster.cpp:4531-4536`), and from `DamageCharacter` only
- *   on its armour branch, `P4 != 0` (`Character.cpp:2809-2812`). The tick then clears
- *   `clockTick` (`CSBCode.cpp:704`), so a blow buys no extra tick.
- * - `DisplaySleepScreen` (`CSBCode.cpp:8542`): colour 0 and "WAKE UP" in colour 4 at
- *   viewport (93, 65), 65 being the bottom row (`Graphics.cpp:320`).
- * - A game never starts asleep (`CSBCode.cpp:10479`), a quick-save included.
- * - `SetNewSpeed` (`CSBCode.cpp:1598`): falling asleep multiplies what is left of each
- *   message row's timeout by 16 (`d.Speed` 15 -> 0, `Mouse.cpp:1696`), and `WakeUp` divides
- *   it by 16, rounding up (0 -> 15, `CSBCode.cpp:7053`).
+ *   *before* its dodge test (`Monster.cpp:4544-4549`), and from `DamageCharacter` only
+ *   on its armour branch, `P4 != 0` (`Character.cpp:2814-2817`). The tick then clears
+ *   `clockTick` (`CSBCode.cpp:714`), so a blow buys no extra tick.
+ * - `DisplaySleepScreen` (`CSBCode.cpp:8647`): colour 0 and "WAKE UP" in colour 4 at
+ *   viewport (93, 65), 65 being the bottom row (`Graphics.cpp:321`).
+ * - A game never starts asleep (`CSBCode.cpp:10603`), a quick-save included.
+ * - `SetNewSpeed` (`CSBCode.cpp:1608`): falling asleep multiplies what is left of each
+ *   message row's timeout by 16 (`d.Speed` 15 -> 0, `Mouse.cpp:1835`), and `WakeUp` divides
+ *   it by 16, rounding up (0 -> 15, `CSBCode.cpp:7112`).
  * - A load keeps the rows on screen and rebases their timeouts onto the loaded clock
- *   (`ResetTime`, `SaveGame.cpp:1623-1624`); CSBWin saves no message state.
+ *   (`ResetTime`, `SaveGame.cpp:1747-1748`); CSBWin saves no message state.
  *
  * Run: `npx tsx tools/dump-sleep.ts`
  */
@@ -134,7 +134,7 @@ async function main(): Promise<void> {
   const iconY = icon ? (icon.y1 + icon.y2) >> 1 : 0;
 
   console.log('');
-  console.log('=== button 145 (Mouse.cpp:1683-1708) ===');
+  console.log('=== button 145 (Mouse.cpp:1822-1847) ===');
   {
     party.potentialChampionIndex = 1;
     party.selectedCharacterIndex = 0;
@@ -155,7 +155,7 @@ async function main(): Promise<void> {
     check(game.isPartySleeping(), 'the party is asleep');
     check(notified.join() === 'true', 'the listeners heard it once');
     check(party.selectedCharacterIndex === -1, 'ShowHideInventory(4): the inventory is closed');
-    check(ui.shadedByTag02076e, 'TAG02076e (Mouse.cpp:1691): the interface shaded, the arrow cursor');
+    check(ui.shadedByTag02076e, 'TAG02076e (Mouse.cpp:1830): the interface shaded, the arrow cursor');
     check(ui.primaryButtons === lists.buttons17796 && ui.secondaryButtons === null,
       'PrimaryButtonList = Buttons17796, SecondaryButtonList = NULL');
     check(game.ctx.mouseQueue.count() === 0 && !handled.includes(1), 'DiscardAllInput(): the turn behind it is gone');
@@ -175,7 +175,7 @@ async function main(): Promise<void> {
   }
 
   console.log('');
-  console.log('=== WakeUp by click (CSBCode.cpp:7047) ===');
+  console.log('=== WakeUp by click (CSBCode.cpp:7106) ===');
   {
     notified.length = 0;
     internals.lastInputTime = 0;
@@ -187,7 +187,7 @@ async function main(): Promise<void> {
     check(notified.join() === 'false', 'the listeners heard it');
     check(ui.primaryButtons === lists.buttons17196 && ui.secondaryButtons === lists.buttons17304,
       'the adventure lists are back');
-    check(!ui.shadedByTag02076e, 'TAG0207cc last (CSBCode.cpp:7061): the interface and cursor restored');
+    check(!ui.shadedByTag02076e, 'TAG0207cc last (CSBCode.cpp:7120): the interface and cursor restored');
     check(game.ctx.state.tickCount - before === 1, 'd.clockTick = 1: the tick runs in the same frame');
     const awake = game.ctx.state.tickCount;
     for (let i = 0; i < 10; i++) frame(-1);
@@ -206,7 +206,7 @@ async function main(): Promise<void> {
   }
 
   console.log('');
-  console.log('=== SetNewSpeed (CSBCode.cpp:1598): a message row across a sleep ===');
+  console.log('=== SetNewSpeed (CSBCode.cpp:1608): a message row across a sleep ===');
   {
     const t0 = game.ctx.state.tickCount;
     messages.quePrintLines(15, 'HELLO');
@@ -221,7 +221,7 @@ async function main(): Promise<void> {
     wakeUp(game.ctx);
     const again = messages.timeouts()[0]!;
     console.log(`placed at ${t0}: ${placed}; asleep: ${asleep}; woken at ${t1}: ${awake}; again: ${again}; row 1: ${messages.timeouts()[1]}`);
-    check(placed === t0 + 70, 'awake, a row lasts 70 ticks (CSBCode.cpp:1552)');
+    check(placed === t0 + 70, 'awake, a row lasts 70 ticks (CSBCode.cpp:1562)');
     check(asleep === t0 + 70 * 16, 'SetNewSpeed(15, 0): the 70 ticks left become 70 * 16');
     check(t1 === t0 + 100 && awake === t1 + Math.ceil((asleep - t1) / 16),
       'SetNewSpeed(0, 15): the 1020 left become ceil(1020 / 16) = 64');
@@ -234,7 +234,7 @@ async function main(): Promise<void> {
   {
     game.systems.mouse.sleep();
     game.systems.monsterAttack.damageCharacter(0, 40, 0, 0);
-    check(game.isPartySleeping(), 'DamageCharacter with P4 == 0 does not wake (Character.cpp:2809 is on the armour branch)');
+    check(game.isPartySleeping(), 'DamageCharacter with P4 == 0 does not wake (Character.cpp:2814 is on the armour branch)');
     const hp = party.champions[0]!.attributes.health;
     game.systems.monsterAttack.damageCharacter(0, 40, 1, 2);
     console.log(`P4 == 2: health ${hp} -> ${party.champions[0]!.attributes.health}, sleeping=${game.isPartySleeping()}`);
@@ -260,7 +260,7 @@ async function main(): Promise<void> {
   }
 
   console.log('');
-  console.log('=== DisplaySleepScreen (CSBCode.cpp:8542) ===');
+  console.log('=== DisplaySleepScreen (CSBCode.cpp:8647) ===');
   {
     const width = 224;
     const height = 136;
@@ -282,7 +282,7 @@ async function main(): Promise<void> {
     }
     console.log(`ink=${ink} box=(${minX},${minY})-(${maxX},${maxY}) other=${other}`);
     check(other === 0, 'only colours 0 and 4');
-    // `A3 += (D6W - 4) * destWidth` (doc/CSBwin-src/Graphics.cpp:320): y is the glyphs'
+    // `A3 += (D6W - 4) * destWidth` (doc/CSBwin-src/Graphics.cpp:321): y is the glyphs'
     // bottom row, not their top.
     check(ink > 0 && minX >= 93 && minY === 65 - 4 && maxY === 65 && maxX < 93 + 7 * 6,
       '"WAKE UP" sits in rows 61-65 from x 93, seven 6-pixel cells wide');
@@ -324,7 +324,7 @@ async function main(): Promise<void> {
   }
 
   console.log('');
-  console.log('=== never restored asleep (CSBCode.cpp:10479) ===');
+  console.log('=== never restored asleep (CSBCode.cpp:10603) ===');
   {
     game.systems.mouse.sleep();
     const save = game.getRuntimeSaveState();
@@ -337,7 +337,7 @@ async function main(): Promise<void> {
   }
 
   console.log('');
-  console.log('=== a load keeps the message rows (SaveGame.cpp:1623-1624) ===');
+  console.log('=== a load keeps the message rows (SaveGame.cpp:1747-1748) ===');
   {
     const save = game.getRuntimeSaveState();
     const saved = save.game.tickCount;
@@ -354,7 +354,7 @@ async function main(): Promise<void> {
     check(row >= 0 && messages.snapshot()[row]!.includes('LOADED'), 'the row is still on screen');
     check(after === saved + 70, 'ResetTime: its 70 ticks left count from the loaded clock');
 
-    // Loaded over a sleeping party, the next tick's SetNewSpeed(0, 15) (CSBCode.cpp:612-616).
+    // Loaded over a sleeping party, the next tick's SetNewSpeed(0, 15) (CSBCode.cpp:622-626).
     game.systems.mouse.sleep();
     const stretched = messages.timeouts()[row]!;
     game.applyRuntimeSaveState(save);

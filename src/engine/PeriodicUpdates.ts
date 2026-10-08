@@ -1,7 +1,7 @@
 /**
  * The two periodic updates the main loop runs: `NinetySecondUpdate` (`CSBCode.cpp`) and
  * `TenSecondUpdate` (`Code17818.cpp`). The cadence tests are the loop's
- * (`doc/CSBwin-src/CSBCode.cpp:680-688`) and `Game.gameTick` makes them; they are here,
+ * (`doc/CSBwin-src/CSBCode.cpp:690-698`) and `Game.gameTick` makes them; they are here,
  * beside the bodies, so that the tools test the same two predicates the tick does.
  * Neither update has state of its own, so they are functions over the context, as
  * `wakeUp` is. Moved out of `Game` by `DEBT.md` E2.
@@ -23,22 +23,22 @@ import { drawAllCharacterState } from './Party';
 import { GetBasicObjectType } from './objectIndex';
 import { determineMastery, ensureSkills } from './skills';
 
-/** `(d.Time&511)==0` — the loop's test for `NinetySecondUpdate` (doc/CSBwin-src/CSBCode.cpp:680). */
+/** `(d.Time&511)==0` — the loop's test for `NinetySecondUpdate` (doc/CSBwin-src/CSBCode.cpp:690). */
 export function isNinetySecondTick(time: number): boolean {
     return (time & 511) === 0;
 }
 
 /**
  * `(d.Time & (d.PartySleeping ? 15 : 63)) == 0` — the loop's test for `TenSecondUpdate`
- * (doc/CSBwin-src/CSBCode.cpp:686-688).
+ * (doc/CSBwin-src/CSBCode.cpp:696-698).
  */
 export function isTenSecondTick(time: number, sleeping: boolean): boolean {
     return (time & (sleeping ? 15 : 63)) === 0;
 }
 
 /**
- * `NinetySecondUpdate` (`doc/CSBwin-src/CSBCode.cpp:7339-7387`), called from the
- * game tick whenever `(d.Time & 511) == 0` (`doc/CSBwin-src/CSBCode.cpp:680-683`) —
+ * `NinetySecondUpdate` (`doc/CSBwin-src/CSBCode.cpp:7398-7446`), called from the
+ * game tick whenever `(d.Time & 511) == 0` (`doc/CSBwin-src/CSBCode.cpp:690-693`) —
  * every 512 ticks, about 85 seconds, despite the name.
  *
  * Each torch in a champion's hands loses one charge, and one that burns out loses its
@@ -48,7 +48,7 @@ export function isTenSecondTick(time: number, sleeping: boolean): boolean {
  * empty anyway).
  *
  * Then `SelectPaletteForLightLevel` and `DrawEightHands`, whether or not a torch
- * changed (`:7384-7385`). `DrawEightHands` has no counterpart here: the hands are drawn
+ * changed (`:7443-7444`). `DrawEightHands` has no counterpart here: the hands are drawn
  * from live state every frame.
  */
 export function ninetySecondUpdate(ctx: GameContext): void {
@@ -79,22 +79,22 @@ export function ninetySecondUpdate(ctx: GameContext): void {
 /**
  * `TenSecondUpdate` (`doc/CSBwin-src/Code17818.cpp:160-436`), called from the game
  * tick whenever `(d.Time & (d.PartySleeping ? 15 : 63)) == 0`
- * (`doc/CSBwin-src/CSBCode.cpp:686-688`) — every 16 s awake, 4 s asleep, despite
+ * (`doc/CSBwin-src/CSBCode.cpp:696-698`) — every 16 s awake, 4 s asleep, despite
  * the name.
  *
  * Per living champion: mana regeneration, `tempAdjust` decay, food and water
  * consumption paid for in stamina, HP regeneration, and — every 256 ticks (64
  * asleep) — one point of each attribute's Current drawn back toward its Maximum.
  * That last step is what clears the red a level gain paints on the stats panel:
- * `LevelUp` raises only Maximum (`doc/CSBwin-src/Magic.cpp:98-148`).
+ * `LevelUp` raises only Maximum (`doc/CSBwin-src/Magic.cpp:101-151`).
  *
  * Not ported: the `d.Word11750` countdown (`:375-383`). It is a cursor-redraw
- * counter armed only by `CSBCode.cpp:959-965`, which this port has no equivalent
+ * counter armed only by `CSBCode.cpp:969-975`, which this port has no equivalent
  * of, so it is always zero and the branch is dead. The trailing
  * `charFlags |= CHARFLAG_statsChanged` has no counterpart either: the panels are
  * redrawn from live state every frame. `CHARFLAG_chestOrScroll` has, for the champion
  * whose inventory is open with the eye held or food and water in its panel
- * (`:435-443`), and `DrawAllCharacterState` draws it (`:448`).
+ * (`:445-453`), and `DrawAllCharacterState` draws it (`:448`).
  */
 export function tenSecondUpdate(ctx: GameContext): void {
     const party = ctx.party.state;

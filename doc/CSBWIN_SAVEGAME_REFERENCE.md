@@ -23,21 +23,21 @@ CSBWin never states the save file's byte order outright. It states it three time
 by construction, all of which assume the Atari's big-endian words:
 
 - `Unscramble` runs its hash arithmetic on `LE16(wordGear(A3))` and XORs with
-  `LE16(D7W)` (`doc/CSBwin-src/CSBCode.cpp:9057-9061`).
+  `LE16(D7W)` (`doc/CSBwin-src/CSBCode.cpp:9162-9166`).
 - `ReadUnscrambleBlock` sums the block-1 header the same way, through `LE16`
-  (`doc/CSBwin-src/CSBCode.cpp:9176-9192`).
+  (`doc/CSBwin-src/CSBCode.cpp:9281-9297`).
 - `swapBlock1` / `swapBlock2` / `swapCharacter` / `swapITEM16s` then `BO()` every field
-  (`doc/CSBwin-src/SaveGame.cpp:455-500`), and `BO` is `LE16`/`LE32`.
+  (`doc/CSBwin-src/SaveGame.cpp:463-508`), and `BO` is `LE16`/`LE32`.
 
 `LE16` is a byte swap on a little-endian build and the identity on a big-endian one
-(`doc/CSBwin-src/CSBTypes.h:140-152`), so on the PC build CSBWin ships as, all of those
+(`doc/CSBwin-src/CSBTypes.h:145-157`), so on the PC build CSBWin ships as, all of those
 are swaps: **GAMEBLOCK1, GAMEBLOCK2, `ITEM16`, the characters, the timers and the timer
 queue are big-endian in the file**, and the scramble keystream is applied to the
 big-endian word.
 
 The exception is the CSB-era **"Extended Features" block, which is little-endian** —
 `SwapExtendedFeaturesBlock` has a body only `#ifdef _bigEndian`
-(`doc/CSBwin-src/SaveGame.cpp:183-200`), so on the shipping build it does nothing and
+(`doc/CSBwin-src/SaveGame.cpp:184-201`), so on the shipping build it does nothing and
 the block keeps native PC order. A swap function also leaves out whatever it does not
 name: `swapCharacter` stops at `shieldStrength`, so a `CHARDESC`'s `talents`,
 `fingerPrint`, `causeOfDamage` and `monsterCausingDamage` (276-285) are little-endian
@@ -48,13 +48,13 @@ and those four fields (`src/data/CsbwinCharacters.ts`), `readU16BE` everywhere e
 
 ## GAMEBLOCK1 (512 bytes)
 
-`doc/CSBwin-src/SaveGame.cpp:60-104` gives every offset; `SaveGame` fills the block at
-`:1058-1107` and `LoadGame` reads it at `:1603-1614` and `:1859-1881`. Byte order is
-big-endian except the two fields `swapBlock1` leaves alone (`:435-453`).
+`doc/CSBwin-src/SaveGame.cpp:61-105` gives every offset; `SaveGame` fills the block at
+`:1083-1144` and `LoadGame` reads it at `:1728-1738` and `:2063-2085`. Byte order is
+big-endian except the two fields `swapBlock1` leaves alone (`:443-461`).
 
 | Off | Field | Order | Written from | Read into |
 | --- | --- | --- | --- | --- |
-| 0 | `Byte740[300]` | — | words 0-127 by `ScrambleAndWrite`: zeros, then word 127 balancing the second half's sum (`:706-750`); 256-299 never | — |
+| 0 | `Byte740[300]` | — | words 0-127 by `ScrambleAndWrite`: zeros, then word 127 balancing the second half's sum (`:714-758`); 256-299 never | — |
 | 300 | `Byte22598` | byte | `(i8)d.Word22598` | `d.Word22598` |
 | 301 | `Byte22596` | byte | `ub(d.Word22596)` | `d.Word22596`, or 1: an Atari DM save |
 | 302 | `FILL438[4]` | — | never | — |
@@ -79,8 +79,8 @@ mouse-queue entry `HandleMouseEvents` takes, once".
 
 ## GAMEBLOCK2 (128 bytes)
 
-`doc/CSBwin-src/SaveGame.cpp:107-133` gives every offset; `LoadGame` assigns them at
-`:1617-1650`. Offsets are byte offsets into the block.
+`doc/CSBwin-src/SaveGame.cpp:108-134` gives every offset; `LoadGame` assigns them at
+`:1741-1774`. Offsets are byte offsets into the block.
 
 | Off | Field | Restored to |
 | --- | --- | --- |
@@ -126,7 +126,7 @@ A load restores every one of them (`buildCsbwinRuntimeState`, `src/engine/Csbwin
 
 ## What a save file contains, in write order
 
-`SaveGame` writes the whole file in one pass (`doc/CSBwin-src/SaveGame.cpp:1110-1225`).
+`SaveGame` writes the whole file in one pass (`doc/CSBwin-src/SaveGame.cpp:1152-1323`).
 The first six blocks are **scrambled** (`WriteScrambled`, each with its own hash and
 checksum recorded in GAMEBLOCK1); everything after them is plain, accumulated into a
 single running checksum by `WriteAndChecksum` and closed by one final word.
@@ -134,45 +134,45 @@ single running checksum by `WriteAndChecksum` and closed by one final word.
 | # | Block | Size | Written at |
 | --- | --- | --- | --- |
 | 0 | "Extended Features" block, `dataTypeMap`/`dataIndexMap`, DSA blocks, DSA level index | 512 + variable | prefix, CSB-era only |
-| 1 | GAMEBLOCK1 | 512 | `:1111` |
-| 2 | GAMEBLOCK2 | 128 | `:1116` |
-| 3 | `d.Item16` | 16 × `MaxITEM16` | `:1121` |
-| 4 | `d.CH16482` — characters **and party state** | 3328 | `:1126` |
-| 5 | `gameTimers.pTimer(0)` | `sizeof(TIMER)` × `MaxTimer` | `:1131` |
-| 6 | `gameTimers.TimerQueue()` | 2 × `MaxTimer` | `:1136` |
-| 7 | `d.dungeonDatIndex` | 44 | `:1168` |
-| 8 | `d.pLevelDescriptors` | 16 × `NumLevel` | `:1173` |
-| 9 | `d.objectListIndex` | 2 × `numColumnPointers` | `:1178` |
-| 10 | `d.objectList` | 2 × `ObjectListLength()` | `:1183` |
-| 11 | `d.indirectTextIndex` | 4 × `NumWordsInTextArray()` | `:1188` |
-| 12 | `d.sizeOfCompressedText` + `d.compressedText` | 4 + 2 × size | `:1193`, `:1197` |
-| 13 | all 16 databases' records | `DBSize(n)` × `dbEntrySizes[n]` | `:1203-1215` |
-| 14 | `d.cellFlagArray` | `cellflagArraySize` | `:1216` |
-| 15 | final checksum word | 2 | `:1222` |
+| 1 | GAMEBLOCK1 | 512 | `:1153` |
+| 2 | GAMEBLOCK2 | 128 | `:1159` |
+| 3 | `d.Item16` | 16 × `MaxITEM16` | `:1168` |
+| 4 | `d.CH16482` — characters **and party state** | 3328 | `:1177` |
+| 5 | `gameTimers.pTimer(0)` | `sizeof(TIMER)` × `MaxTimer` | `:1186` |
+| 6 | `gameTimers.TimerQueue()` | 2 × `MaxTimer` | `:1195` |
+| 7 | `d.dungeonDatIndex` | 44 | `:1236` |
+| 8 | `d.pLevelDescriptors` | 16 × `NumLevel` | `:1242` |
+| 9 | `d.objectListIndex` | 2 × `numColumnPointers` | `:1252` |
+| 10 | `d.objectList` | 2 × `ObjectListLength()` | `:1262` |
+| 11 | `d.indirectTextIndex` | 4 × `NumWordsInTextArray()` | `:1271` |
+| 12 | `d.sizeOfCompressedText` + `d.compressedText` | 4 + 2 × size | `:1280`, `:1286` |
+| 13 | all 16 databases' records | `DBSize(n)` × `dbEntrySizes[n]` | `:1297-1313` |
+| 14 | `d.cellFlagArray` | `cellflagArraySize` | `:1314` |
+| 15 | final checksum word | 2 | `:1320` |
 
 Block 11's index and block 12's size longword are **little-endian**, alone with the
 Extended Features header in an otherwise big-endian file: both go out through `BE32`
-(`:174-181`, `:1192-1194`), which is the identity on the little-endian build CSBWin ships
-as. The compressed text words after the size are written with no swap at all (`:1197`) —
+(`:175-182`, `:1279-1284`), which is the identity on the little-endian build CSBWin ships
+as. The compressed text words after the size are written with no swap at all (`:1286`) —
 they are the Atari-era 5-bit text array, big-endian in memory and big-endian in the file.
 `NumWordsInTextArray` (header `word6`) counts block 11's **index entries**, not text
-words: `ConvertToIndirectText` overwrites it with the index length (`:2274`), which is why
+words: `ConvertToIndirectText` overwrites it with the index length (`:2486`), which is why
 a save says 125 where `dungeon.dat` says 1749.
 
 Block 15 is the sum of every **byte** of blocks 7-14 modulo 65536 — `WriteAndChecksum`
 accumulates each section's bytes into a `ui16` from zero and adds that into a running
-total (`:679-698`), which is reset to 0 just before block 7 (`:1166`) — written
+total (`:687-706`), which is reset to 0 just before block 7 (`:1234`) — written
 big-endian.
 
 Blocks 7-14 are the dungeon image, and they are the bulk of the file.
 
 Two things are written to EXPOOL (block 13's `dbEXPOOL`) just before, rather than to a
 block of their own: the DSA **global variables**, sixteen at a time into the records
-`(EDT_Database<<24)|(EDBT_GlobalVariables<<16)|i` the dungeon has (`:1141-1148`), whose
+`(EDT_Database<<24)|(EDBT_GlobalVariables<<16)|i` the dungeon has (`:1205-1213`), whose
 number a read takes as theirs (`doc/PROVEN_FACTS.md` → "The DSA global variables are the
 `EXPOOL` records a read finds"), and the 24 overlay
-**palette** records under `(EDT_Palette<<24)+i` (`:1151-1164`), each `Read` out and
-`Write`n back, which a read takes when all 24 are there (`:1761-1789`;
+**palette** records under `(EDT_Palette<<24)+i` (`:1216-1231`), each `Read` out and
+`Write`n back, which a read takes when all 24 are there (`:1931-1959`;
 `doc/PROVEN_FACTS.md` → "`EXPOOL` is a directory block, free lists by record length, and
 32 hash chains").
 
@@ -181,8 +181,8 @@ number a read takes as theirs (`doc/PROVEN_FACTS.md` → "The DSA global variabl
 The 3328 bytes starting at `d.CH16482` are `CHARDESC[4]` — 800 bytes each, so 3200 —
 followed by **128 bytes of party-wide state** that happens to sit next to them in
 `Data.h`. The struct comments mark the span exactly: `// 3328 bytes read into byte16482`
-at `doc/CSBwin-src/Data.h:765` opens it and
-`///////////// End of Character portion of save file /////////////` at `:783` closes it.
+at `doc/CSBwin-src/Data.h:780` opens it and
+`///////////// End of Character portion of save file /////////////` at `:798` closes it.
 What rides along in those 128 bytes:
 
 `Brightness`, `SeeThruWalls`, `MagicFootprintsActive`, `PartyShield`, `FireShield`,
@@ -321,9 +321,9 @@ bug the port's reader and writer share cannot satisfy them.
 ## The dungeon image in a save
 
 The image is plain and uncompressed — `LoadGame` calls `ReadDatabases()`
-after the timer queue (`doc/CSBwin-src/SaveGame.cpp:1739`) with
+after the timer queue (`doc/CSBwin-src/SaveGame.cpp:1909`) with
 `d.gameState == GAMESTATE_ResumeSavedGame`, which skips that function's own
-extended-features/compression preamble (`:2345-2374`); the `ExpandData` path with magic
+extended-features/compression preamble (`:2557-2586`); the `ExpandData` path with magic
 `33028` belongs to `dungeon.dat`, not to saves.
 
 The full section layout, the two record sizes that differ from `dungeon.dat`
@@ -354,7 +354,7 @@ by 82 to 733 cells, rising with how far into the game they were taken.
 `[position:2][category:4][index:10]`**. `class RN` holds a single `ui16` and resolves it
 through two global arrays, `dataTypeMap` and `dataIndexMap`, which travel in the save's
 Extended Features block immediately after the 512-byte header
-(`ReadExtendedFeatures`, `doc/CSBwin-src/SaveGame.cpp:355-376`). The full account, with
+(`ReadExtendedFeatures`, `doc/CSBwin-src/SaveGame.cpp:357-378`). The full account, with
 the byte order, the free-slot marker and the slots that alias, is `doc/PROVEN_FACTS.md`
 → "An RN in a save file is an indirect index". The port's RN is the same slot: the
 world keeps the file's maps as its `RnMaps` (`src/core/RnMaps.ts`,

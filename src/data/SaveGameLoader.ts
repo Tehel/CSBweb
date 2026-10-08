@@ -70,10 +70,10 @@ export interface SaveGameState {
   hintKey?: Uint8Array;
   /**
    * `gb2.handChar` — the champion index holding the cursor, -1 for nobody.
-   * `LoadGame` restores `d.HandChar` from it (`doc/CSBwin-src/SaveGame.cpp:1636`).
+   * `LoadGame` restores `d.HandChar` from it (`doc/CSBwin-src/SaveGame.cpp:1760`).
    */
   handChar?: number;
-  /** `gb2.MagicCaster`, restored on the next line of the same function (`:1637`). */
+  /** `gb2.MagicCaster`, restored on the next line of the same function (`:1761`). */
   magicCaster?: number;
   /**
    * `GAMEBLOCK1` less the five blocks' hashes and checksums, which the writer computes.
@@ -82,7 +82,7 @@ export interface SaveGameState {
   block1?: Block1;
   /**
    * The rest of `GAMEBLOCK2`, as `LoadGame` reads it
-   * (`doc/CSBwin-src/SaveGame.cpp:1617-1650`). Present when the block was parsed.
+   * (`doc/CSBwin-src/SaveGame.cpp:1741-1774`). Present when the block was parsed.
    */
   block2?: Block2;
   /**
@@ -102,7 +102,7 @@ export interface SaveGameState {
    */
   gameInfo?: Uint8Array;
   /**
-   * `ExtendedFeaturesSize` (`doc/CSBwin-src/SaveGame.cpp:1597`) — how many bytes of
+   * `ExtendedFeaturesSize` (`doc/CSBwin-src/SaveGame.cpp:1722`) — how many bytes of
    * block 0 precede GAMEBLOCK1, and so where block 1 starts. Zero for a file with no
    * Extended Features prefix at all.
    */
@@ -110,10 +110,10 @@ export interface SaveGameState {
   /**
    * Byte offset at which the plain, unscrambled dungeon image begins — immediately
    * after the timer queue. `LoadGame` calls `ReadDatabases()` there
-   * (`doc/CSBwin-src/SaveGame.cpp:1739`), and because a save is loaded with
+   * (`doc/CSBwin-src/SaveGame.cpp:1909`), and because a save is loaded with
    * `d.gameState == GAMESTATE_ResumeSavedGame` that function skips its own
    * extended-features/compression preamble and reads straight on from the current
-   * file position (`doc/CSBwin-src/SaveGame.cpp:2345-2346`).
+   * file position (`doc/CSBwin-src/SaveGame.cpp:2557-2558`).
    */
   dungeonImageOffset?: number;
   /** Where every section of the dungeon image sits. Absent if the header did not parse. */
@@ -135,7 +135,7 @@ export interface SaveGameState {
    * The raw, unscrambled 3328-byte block 4. It is **not** only the four champions:
    * `CHARDESC[4]` is 3200 bytes and the remaining 128 are party-wide state
    * (`Brightness`, `SeeThruWalls`, the shield timers, `PartyFootprints[24]`,
-   * `Invisible`, …), bracketed in `doc/CSBwin-src/Data.h:765-783`. Handed over raw
+   * `Invisible`, …), bracketed in `doc/CSBwin-src/Data.h:780-798`. Handed over raw
    * because it is the unit both halves work in: `src/data/CsbwinCharacters.ts`
    * unpacks it on the way in and packs it on the way out, and `saveSaveGameState`
    * writes whatever is here into block 4 verbatim.
@@ -158,12 +158,12 @@ export interface SaveGameState {
 /**
  * `GAMEBLOCK1`'s own fields: the 512 bytes less `Byte740`, which `ScrambleAndWrite`
  * overwrites, and the ten hashes and checksums of blocks 2-6
- * (`doc/CSBwin-src/SaveGame.cpp:60-104`). `SaveGame` fills them from `d.` at
- * `:1058-1064` and `:1072`, and `LoadGame` reads them back at `:1603-1614` and
- * `:1859-1881`.
+ * (`doc/CSBwin-src/SaveGame.cpp:61-105`). `SaveGame` fills them from `d.` at
+ * `:1073-1079` and `:1097`, and `LoadGame` reads them back at `:1728-1738` and
+ * `:2063-2085`.
  *
  * `swapBlock1` byte-swaps `RandomGameID`, the hashes, the checksums, `Word22594` and
- * `Word22592` and nothing else (`:435-453`), so on the little-endian build CSBWin ships
+ * `Word22592` and nothing else (`:443-461`), so on the little-endian build CSBWin ships
  * as those are big-endian in the file and **`SaveOption` and `totalMoveCount` are
  * little-endian**: every committed save holds `SaveOption` 1 as `01 00`.
  */
@@ -172,9 +172,9 @@ export interface Block1 {
   byte22598: number;
   /** `Byte22596` (301): `ub(d.Word22596)`. 1 marks an Atari DM save to `LoadGame`. */
   byte22596: number;
-  /** `SaveOption` (306, little-endian): 1 for "SAVE AND PLAY", 0 for "SAVE AND QUIT" (`:893`). */
+  /** `SaveOption` (306, little-endian): 1 for "SAVE AND PLAY", 0 for "SAVE AND QUIT" (`:917`). */
   saveOption: number;
-  /** `RandomGameID` (308): `d.RandomGameID`, drawn when a new game is read (`:1523-1532`). */
+  /** `RandomGameID` (308): `d.RandomGameID`, drawn when a new game is read (`:1638-1647`). */
   randomGameID: number;
   /** `totalMoveCount` (322, little-endian): the recorded mouse-queue entries. */
   totalMoveCount: number;
@@ -211,7 +211,7 @@ interface Block1Hashes {
 /**
  * The fields of `GAMEBLOCK2` this port reads. The block is 128 bytes and every offset
  * in it is spelled out in CSBWin's own struct comments
- * (`doc/CSBwin-src/SaveGame.cpp:107-133`); what is missing here is missing because
+ * (`doc/CSBwin-src/SaveGame.cpp:108-134`); what is missing here is missing because
  * nothing consumes it yet, not because the layout is unknown.
  */
 export interface Block2 {
@@ -237,7 +237,7 @@ export interface Block2 {
   item16QueLen: number;
   /**
    * `gb2.LastMonsterAttackTime` (offset 32), an `i32`: -200 until a monster first
-   * attacks (`doc/CSBwin-src/CSBCode.cpp:353`).
+   * attacks (`doc/CSBwin-src/CSBCode.cpp:363`).
    */
   lastMonsterAttackTime: number;
   lastPartyMoveTime: number;
@@ -271,10 +271,10 @@ const CHARACTER_SIZE = 3328;
  * Every word of GAMEBLOCK1, GAMEBLOCK2, `ITEM16`, the characters and the timers is
  * **big-endian**, inherited from the Atari. CSBWin never says so outright; it says it
  * by reading each word through `LE16()`, which on the little-endian build it ships
- * as is a byte swap (`doc/CSBwin-src/CSBTypes.h:146`). So `Unscramble`'s hash
- * arithmetic runs on `LE16(wordGear(A3))` (`doc/CSBwin-src/CSBCode.cpp:9057-9061`),
- * `ReadUnscrambleBlock` sums `LE16(wordGear(...))` (`:9167-9196`), and `swapBlock2`
- * `BO()`s every field afterwards (`doc/CSBwin-src/SaveGame.cpp:455-478`) — three
+ * as is a byte swap (`doc/CSBwin-src/CSBTypes.h:151`). So `Unscramble`'s hash
+ * arithmetic runs on `LE16(wordGear(A3))` (`doc/CSBwin-src/CSBCode.cpp:9162-9166`),
+ * `ReadUnscrambleBlock` sums `LE16(wordGear(...))` (`:9272-9301`), and `swapBlock2`
+ * `BO()`s every field afterwards (`doc/CSBwin-src/SaveGame.cpp:463-486`) — three
  * statements of the same fact.
  *
  * What is *not* big-endian is CSBWin's own additions, written in the PC's native order:
@@ -290,7 +290,7 @@ const CHARACTER_SIZE = 3328;
  * The image is blocks 7-14 of the save (`doc/CSBWIN_SAVEGAME_REFERENCE.md`), written
  * plain by `WriteAndChecksum` and read back plain by `ReadDatabases` — a save is
  * loaded with `d.gameState == GAMESTATE_ResumeSavedGame`, which skips that function's
- * compression preamble (`doc/CSBwin-src/SaveGame.cpp:2345-2374`).
+ * compression preamble (`doc/CSBwin-src/SaveGame.cpp:2557-2586`).
  *
  * Two record sizes are not the `dungeon.dat` ones, which is what made this arithmetic
  * fail for years' worth of guesses:
@@ -298,13 +298,13 @@ const CHARACTER_SIZE = 3328;
  * - **ACTUATOR is 2 bytes larger** unless the file predates big actuators.
  *   `ReadDatabases` spells it as a subtraction from the *big* size —
  *   `if ((D6W==dbACTUATOR) & !bigActuators) D4W -= 2;`
- *   (`doc/CSBwin-src/SaveGame.cpp:2571-2575`) — so `dbEntrySizes[dbACTUATOR]` is the
+ *   (`doc/CSBwin-src/SaveGame.cpp:2783-2787`) — so `dbEntrySizes[dbACTUATOR]` is the
  *   big one and the small one is the special case.
  * - **SCROLL is 2 bytes larger** from extended-features version `'B'` on.
  *   `readScrollDatabase` branches to `readNewScrollDatabase` at `>= 'B'`, and its own
  *   comment says why: "The old version had a 10-bit index into the text database. The
  *   new version has an RN reference to the text."
- *   (`doc/CSBwin-src/SaveGame.cpp:2189-2200`).
+ *   (`doc/CSBwin-src/SaveGame.cpp:2401-2412`).
  *
  * And the indirect-text block is **little-endian** — both the index and the
  * `sizeOfCompressedText` word after it — while every other word in the image is
@@ -337,7 +337,7 @@ export function computeDungeonImageLayout(
 
   const numMaps = data[startOffset + 4] ?? 0;
   // `ReadDatabases` reads `16 * NumLevel()` bytes of descriptors, whatever the byte says
-  // (`doc/CSBwin-src/SaveGame.cpp:2411-2427`): Conflux 3.5 has 64 levels.
+  // (`doc/CSBwin-src/SaveGame.cpp:2623-2639`): Conflux 3.5 has 64 levels.
   if (numMaps < 1) return null;
   const textDataSize = readU16BE(data, startOffset + 6);
   const objectListSize = readU16BE(data, startOffset + 10);
@@ -363,7 +363,7 @@ export function computeDungeonImageLayout(
   let databaseStart: number;
   if (options.indirectText) {
     // `NumWordsInTextArray` is repurposed by `ConvertToIndirectText`, which assigns it
-    // the index length (`doc/CSBwin-src/SaveGame.cpp:2272`), so in a save it counts
+    // the index length (`doc/CSBwin-src/SaveGame.cpp:2484`), so in a save it counts
     // index entries, not text words.
     const sizeOffset = text + textDataSize * 4;
     if (sizeOffset + 4 > data.length) return null;
@@ -460,7 +460,7 @@ function parseBlock1(buf: Uint8Array): Block1 {
 }
 
 /**
- * `GAMEBLOCK2`, read as `LoadGame` reads it (`doc/CSBwin-src/SaveGame.cpp:1617-1650`).
+ * `GAMEBLOCK2`, read as `LoadGame` reads it (`doc/CSBwin-src/SaveGame.cpp:1741-1774`).
  *
  * `handChar` and `MagicCaster` are stored as `i16` and CSBWin assigns them straight to
  * `d.HandChar` / `d.MagicCaster`, where -1 means "nobody" — so they are sign-extended
@@ -494,10 +494,10 @@ function parseBlock2(buf: Uint8Array): Block2 {
 }
 
 /**
- * Read the `ITEM16[]` block (CSBWin `CSB.h:2190`).
+ * Read the `ITEM16[]` block (CSBWin `CSB.h:2253`).
  *
  * `word0` is the one swapped field: CSBWin byte-swaps it on load with
- * `d.Item16[i].word0 = LE16(d.Item16[i].word0)` (doc/CSBwin-src/SaveGame.cpp:486),
+ * `d.Item16[i].word0 = LE16(d.Item16[i].word0)` (doc/CSBwin-src/SaveGame.cpp:494),
  * so it is little-endian in the file while the rest of the record is plain bytes.
  */
 function parseItem16(buf: Uint8Array, maxItem16: number): Item16Record[] {
@@ -533,7 +533,7 @@ function parseItem16(buf: Uint8Array, maxItem16: number): Item16Record[] {
  * `LoadGame` reads `MaxTimer * timerSize` bytes and then upgrades them in place —
  * `ConvertToSequencedTimers` if the file predates sequenced timers,
  * `ConvertToExtendedTimers` if it predates extended ones
- * (`doc/CSBwin-src/SaveGame.cpp:1687-1723`). Both conversions run over the *unswapped*
+ * (`doc/CSBwin-src/SaveGame.cpp:1813-1879`). Both conversions run over the *unswapped*
  * big-endian bytes and say so in their own comments
  * (`doc/CSBwin-src/Timer.cpp:2878-2919`), which is why `ConvertToExtendedTimers` can
  * pull the level out with `time & 0xff`: on a little-endian host that byte is the
@@ -571,8 +571,8 @@ function parseTimers(buf: Uint8Array, maxTimers: number, timerSize: number): Tim
 /**
  * The timer *queue*: `MaxTimer` big-endian words, of which the first `NumTimer` are
  * live, each the index of a timer in the table above
- * (`doc/CSBwin-src/SaveGame.cpp:1694-1699`, `GameTimers::swapTimerQue`,
- * `doc/CSBwin-src/Data.h:1582`). The order is the array of CSBWin's binary heap, which
+ * (`doc/CSBwin-src/SaveGame.cpp:1820-1825`, `GameTimers::swapTimerQue`,
+ * `doc/CSBwin-src/Data.h:1597`). The order is the array of CSBWin's binary heap, which
  * `LoadGame` restores verbatim (`doc/PROVEN_FACTS.md` → "CSBWin's timer queue is a
  * binary heap").
  */
@@ -695,7 +695,7 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState {
     imageLayout: layout ?? undefined,
     // A file with no Extended Features block declares no size, and `ReadDatabases` then
     // takes the image header's `LegacyCellFlagArraySize`, its word 2
-    // (`doc/CSBwin-src/SaveGame.cpp:2412-2415`, `CSB.h:2072`): the Atari-era saves.
+    // (`doc/CSBwin-src/SaveGame.cpp:2624-2627`, `CSB.h:2135`): the Atari-era saves.
     cellFlagArraySize: extended.cellFlagArraySize || readU16BE(saveData, afterTimerQueue + 2),
     objectIndex: extended.objectIndex,
     timerQueue,
@@ -706,11 +706,11 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState {
 /**
  * `GAMEBLOCK2`, packed — the exact inverse of `parseBlock2`.
  *
- * Every offset is `GAMEBLOCK2`'s own (`doc/CSBwin-src/SaveGame.cpp:107-133`) and every
+ * Every offset is `GAMEBLOCK2`'s own (`doc/CSBwin-src/SaveGame.cpp:108-134`) and every
  * field is big-endian, because `SaveGame` runs `swapBlock2` over the struct immediately
- * before it checksums and writes it (`:1102-1104`, `:1117`).
+ * before it checksums and writes it (`:1136-1141`, `:1160`).
  *
- * Bytes 50-127 are `FILL180`, which `SaveGame` clears before writing (`:1030`), so they
+ * Bytes 50-127 are `FILL180`, which `SaveGame` clears before writing (`:1055`), so they
  * are left as the zeros `new Uint8Array` supplies.
  */
 export function buildBlock2(b: Block2): Uint8Array {
@@ -750,7 +750,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
     ...(save.block2 ?? emptyBlock2()),
     // The six the rest of `SaveGameState` carries in their own right. `SaveGame` takes
     // each of them from the live counter rather than from a stored block
-    // (`doc/CSBwin-src/SaveGame.cpp:1020-1027`), so a caller that has the counters and
+    // (`doc/CSBwin-src/SaveGame.cpp:1045-1052`), so a caller that has the counters and
     // no block 2 still gets them right, and a caller that has both agrees with itself.
     numTimer: save.timerQueue?.length ?? save.block2?.numTimer ?? 0,
     maxTimers,
@@ -802,7 +802,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
     if (!rec) continue;
     // In the 16-byte form the time is the whole longword and the level has its own
     // byte; in the shorter forms the level rides in the top byte of the time
-    // (`doc/CSBwin-src/CSB.h:1818-1821`).
+    // (`doc/CSBwin-src/CSB.h:1881-1884`).
     const time = extendedTimers
       ? rec.time >>> 0
       : (((rec.level & 0xff) << 24) | (rec.time & 0xffffff)) >>> 0;
@@ -817,11 +817,11 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
     if (extendedTimers) {
       timers[base + 12] = rec.level & 0xff;
       // `unused13[3]`, the three padding bytes that round `TIMER` up to 16
-      // (`doc/CSBwin-src/CSB.h:2011`). They are not zero in a real file: `GameTimers::
+      // (`doc/CSBwin-src/CSB.h:2074`). They are not zero in a real file: `GameTimers::
       // Allocate` memsets a new slot to 0 (`doc/CSBwin-src/Timer.cpp:678-683`), but
       // `SetTimer` then fills the slot with `memcpy(A0, A1, sizeof(TIMER))` from a
       // stack `TIMER` whose constructor sets every trailing byte to **0xcd**
-      // (`doc/CSBwin-src/CSB.h:1805-1816`, `Timer.cpp:1132`). So a slot that has ever
+      // (`doc/CSBwin-src/CSB.h:1868-1879`, `Timer.cpp:1132`). So a slot that has ever
       // held a timer carries 0xcd there and one that never has carries 0 — measured on
       // all eight committed saves, with no third value.
       //
@@ -852,8 +852,8 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   const timersChecksum = genChecksum(timers, timersHash, timers.length / 2);
   const timerQueueChecksum = genChecksum(timerQueue, timerQueueHash, timerQueue.length / 2);
 
-  // `SaveGame` memsets the block (`doc/CSBwin-src/SaveGame.cpp:864-865`) and fills it
-  // from `d.` (`:1058-1072`); `swapBlock1` then turns the fields it lists big-endian
+  // `SaveGame` memsets the block (`doc/CSBwin-src/SaveGame.cpp:881-882`) and fills it
+  // from `d.` (`:1073-1087`); `swapBlock1` then turns the fields it lists big-endian
   // and leaves `SaveOption` and `totalMoveCount` native (see `Block1`).
   const b1 = save.block1 ?? emptyBlock1();
   const block1Plain = new Uint8Array(BLOCK1_SIZE);
@@ -887,7 +887,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   // Block 0: the Extended Features prefix, when the caller has one. `SaveGame` writes
   // it before GAMEBLOCK1 and only for a CSB-era file — a plain Atari-era save has none,
   // and `ReadExtendedFeatures` seeks back and returns 0 for such a file
-  // (`doc/CSBwin-src/SaveGame.cpp:918-998`, `:322-324`).
+  // (`doc/CSBwin-src/SaveGame.cpp:944-1023`, `:324-326`).
   const prefix = save.extendedFeatures
     ? buildExtendedFeaturesPrefix({
         header: save.extendedFeatures,
@@ -901,7 +901,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
 
   // Blocks 7-14 and then block 15, the one word that closes the file. `WriteAndChecksum`
   // sums the bytes of every section it writes into a `ui16` from zero
-  // (`doc/CSBwin-src/SaveGame.cpp:679-698`) and the total goes out big-endian (`:1222`).
+  // (`doc/CSBwin-src/SaveGame.cpp:687-706`) and the total goes out big-endian (`:1320`).
   const image = save.dungeonImage ?? new Uint8Array(0);
   const checksum = image.length > 0 ? buildImageChecksum(image) : new Uint8Array(0);
 
@@ -928,7 +928,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   out.set(checksum, offset);
   // `SaveGame` sets `SimpleEncryption` when it has marked the file enciphered, and every
   // `WRITE` then enciphers by the position in the file, the block included
-  // (`doc/CSBwin-src/SaveGame.cpp:914-920`, `:943-946`, `system.cpp:315-329`).
+  // (`doc/CSBwin-src/SaveGame.cpp:939-946`, `:968-971`, `system.cpp:315-329`).
   if (save.extendedFeatures && (save.extendedFeatures.flags & EF_FLAGS.SimpleEncryption) !== 0) {
     return simpleEncipher(out);
   }
@@ -937,7 +937,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
 
 /**
  * A copy of a save file with `randomGameID` for its `d.RandomGameID`, and nothing else
- * of the game changed: `GAMEBLOCK1`'s field (`doc/CSBwin-src/SaveGame.cpp:1060`), and
+ * of the game changed: `GAMEBLOCK1`'s field (`doc/CSBwin-src/SaveGame.cpp:1085`), and
  * the word of the block's first half that is its checksum (`rescrambleBlock1`). No other
  * block's hash or checksum covers the field, nor does the word that closes the file.
  *
@@ -951,8 +951,8 @@ export function stampRandomGameID(saveData: Uint8Array, randomGameID: number): U
  * Does the file hold 0 in all four of `GAMEBLOCK1`'s `Byte22598`, `Byte22596`,
  * `Word22594` and `Word22592`? CSBWin never writes that: `_ReadEntireGame` sets
  * `d.Word22596`, `Word22598`, `Word22594` and `Word22592` to 2, 1, 1 and 13 before either
- * read (`doc/CSBwin-src/SaveGame.cpp:1467-1470`), and a load replaces them only with a
- * file's own (`:1859-1860`, `:1878-1881`). An early build of the port wrote it.
+ * read (`doc/CSBwin-src/SaveGame.cpp:1568-1571`), and a load replaces them only with a
+ * file's own (`:2063-2064`, `:2082-2085`). An early build of the port wrote it.
  *
  * Throws on a file whose `GAMEBLOCK1` does not read.
  */
@@ -964,7 +964,7 @@ export function holdsNoBlock1Words(file: Uint8Array): boolean {
 
 /**
  * A copy of a save file with `_ReadEntireGame`'s 1, 2, 1 and 13 for its `Byte22598`,
- * `Byte22596`, `Word22594` and `Word22592` (`doc/CSBwin-src/SaveGame.cpp:1467-1470`), the
+ * `Byte22596`, `Word22594` and `Word22592` (`doc/CSBwin-src/SaveGame.cpp:1568-1571`), the
  * four words a game read from a file that holds none would carry, and nothing else of
  * the game changed: the fields, and the word of the block's first half that is its
  * checksum (`rescrambleBlock1`), as `stampRandomGameID`. `swapBlock1` turns the two

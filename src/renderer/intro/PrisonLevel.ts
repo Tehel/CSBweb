@@ -1,7 +1,7 @@
 /**
  * The five-by-five level behind the prison doors.
  *
- * `_TAG01f5ea` (`doc/CSBwin-src/CSBCode.cpp:9556-9576`) does not paint the corridor you see
+ * `_TAG01f5ea` (`doc/CSBwin-src/CSBCode.cpp:9678-9698`) does not paint the corridor you see
  * through the doorway — it builds a dungeon out of two stack arrays and runs the real
  * viewport renderer over it:
  *
@@ -28,7 +28,7 @@
  * The zeroed `LEVELDESC` is what makes the rest work: wall style 0, floor/ceiling style 0,
  * no wall decorations and no doors — which matches the bitmaps `_GameSetup` has loaded at
  * that point, `ReadWallBitmaps(0)` and `ReadFloorAndCeilingBitmaps(0)`
- * (`doc/CSBwin-src/CSBCode.cpp:10606-10607`).
+ * (`doc/CSBwin-src/CSBCode.cpp:10730-10731`).
  *
  * No cell has the `hasObjects` bit, so `SummarizeRoomInfo` never walks an object chain and
  * the stubs below are never reached. They throw rather than lie: if a future change makes
@@ -42,9 +42,9 @@ import type { MapData } from '../../data/dungeonTypes';
 export const PRISON_LEVEL_SIZE = 5;
 /** `d.partyLevel = 255`, which is also what tells `DrawViewport` to skip its VBL repaint. */
 export const PRISON_LEVEL_INDEX = 255;
-/** `DrawViewport(2, 2, 0)` is `(facing, x, y)` — `doc/CSBwin-src/Viewport.cpp:6694`. */
+/** `DrawViewport(2, 2, 0)` is `(facing, x, y)` — `doc/CSBwin-src/Viewport.cpp:6701`. */
 export const PRISON_PARTY_POSITION = { x: 2, y: 0, facing: 2 } as const;
-/** `roomOPEN << 5` (`doc/CSBwin-src/CSB.h:558-566`). */
+/** `roomOPEN << 5` (`doc/CSBwin-src/CSB.h:561-569`). */
 const CELL_OPEN = 32;
 
 /** The `LOCAL_154` array, `[x][y]`. */
@@ -124,7 +124,7 @@ export function createPrisonDungeonState(randomSeed: number): DungeonState {
       return unreachable('a DSA level index');
     },
     // CSBWin asks the skins of `d.LoadedLevel`, not of the prison, and draws the prison
-    // before a game is read or after a read that failed (`doc/CSBwin-src/CSBCode.cpp:10624-10639`),
+    // before a game is read or after a read that failed (`doc/CSBwin-src/CSBCode.cpp:10748-10763`),
     // from whatever its pool holds then, which the port does not keep. A placeholder: every
     // cell is skin 0, drawn by the standard programs.
     skinCache: {

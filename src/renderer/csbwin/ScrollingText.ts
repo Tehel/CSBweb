@@ -1,8 +1,8 @@
 /**
  * CSBWin `SCROLLING_TEXT` — the 4-row scrolling message area at the bottom of the screen.
  *
- * Port of `doc/CSBwin-src/CSBCode.cpp:1274-1600` (SCROLLING_TEXT / LINEQUEUE) and the
- * `PrintLines` tokenizer at `doc/CSBwin-src/CSBCode.cpp:1674`.
+ * Port of `doc/CSBwin-src/CSBCode.cpp:1284-1610` (SCROLLING_TEXT / LINEQUEUE) and the
+ * `PrintLines` tokenizer at `doc/CSBwin-src/CSBCode.cpp:1691`.
  * Full spec and citations: `doc/CSBWIN_MESSAGES_REFERENCE.md`.
  *
  * Architecture, as in CSBWin: callers never draw. They enqueue fragments with
@@ -46,7 +46,7 @@ const TEXT_TIMEOUT_TICKS_SLEEPING = 700;
 
 const LF = 10;
 
-/** CSBWin `PIECE_OF_TEXT` (`doc/CSBwin-src/Data.h:1623`). */
+/** CSBWin `PIECE_OF_TEXT` (`doc/CSBwin-src/Data.h:1638`). */
 interface TextPiece {
   row: number;
   col: number;
@@ -88,7 +88,7 @@ export class ScrollingText {
   private printRow = 0;
   /** The `static i32 printLinesCount` inside CSBWin's `PrintLines`. */
   private printLinesCounter = 0;
-  /** `printQueue` (`doc/CSBwin-src/CSBCode.cpp:200`). */
+  /** `printQueue` (`doc/CSBwin-src/CSBCode.cpp:210`). */
   private printQueue: QueuedFragment[] = [];
   /** `d.PartySleeping`. */
   private partySleeping = false;
@@ -97,7 +97,7 @@ export class ScrollingText {
   /**
    * `d.TextScanlineScrollCount`: the scanlines the strip has moved up in the scroll under
    * way, 0-6, or -1 once it has moved all seven, and before any scroll
-   * (`doc/CSBwin-src/CSBCode.cpp:352`).
+   * (`doc/CSBwin-src/CSBCode.cpp:362`).
    */
   private textScanlineScrollCount = -1;
   /** The pieces of the row a scroll pushes off the top, until they have gone. */
@@ -107,14 +107,14 @@ export class ScrollingText {
 
   // ---------------------------------------------------------------- enqueueing
 
-  /** CSBWin `QuePrintLines()` (`doc/CSBwin-src/CSBCode.cpp:1654`). */
+  /** CSBWin `QuePrintLines()` (`doc/CSBwin-src/CSBCode.cpp:1664`). */
   quePrintLines(color: number, text: string): void {
     if (!text) return;
     this.printQueue.push({ color: color | 0, text });
   }
 
   /**
-   * CSBWin `PrintLinefeed()` (`doc/CSBwin-src/CSBCode.cpp:1744`) — queues the two-byte
+   * CSBWin `PrintLinefeed()` (`doc/CSBwin-src/CSBCode.cpp:1761`) — queues the two-byte
    * `d.Byte1830` string, which holds a newline, with colour 0.
    */
   printLinefeed(): void {
@@ -124,7 +124,7 @@ export class ScrollingText {
   // ------------------------------------------------------------------ pumping
 
   /**
-   * `tag0007c8` (`doc/CSBwin-src/CSBCode.cpp:714-721`): the main loop takes one `printQueue`
+   * `tag0007c8` (`doc/CSBwin-src/CSBCode.cpp:724-731`): the main loop takes one `printQueue`
    * entry a pass, whether or not a tick ran in it, and prints it.
    */
   printNextQueued(time: number): void {
@@ -133,7 +133,7 @@ export class ScrollingText {
   }
 
   /**
-   * The message strip's share of `vblInterrupt` (`doc/CSBwin-src/CSBCode.cpp:971-1004`).
+   * The message strip's share of `vblInterrupt` (`doc/CSBwin-src/CSBCode.cpp:981-1014`).
    * While a scroll runs, the strip moves up a scanline and the count goes up; once it has
    * moved seven the count turns to -1, and the next VBL clears `d.PushTextUp`. CSBWin moves
    * the pixels and copies the blank `d.newTextLine` in at the bottom; `draw` offsets the rows
@@ -154,7 +154,7 @@ export class ScrollingText {
   }
 
   /**
-   * CSBWin `PrintLines()` (`doc/CSBwin-src/CSBCode.cpp:1674`): tokenize into words,
+   * CSBWin `PrintLines()` (`doc/CSBwin-src/CSBCode.cpp:1691`): tokenize into words,
    * word-wrap at `MAX_COLUMNS`, honour explicit linefeeds.
    */
   printLines(color: number, text: string, time: number): void {
@@ -200,9 +200,9 @@ export class ScrollingText {
   }
 
   /**
-   * CSBWin `SCROLLING_TEXT::Printf()` (`doc/CSBwin-src/CSBCode.cpp:1611`) plus the
+   * CSBWin `SCROLLING_TEXT::Printf()` (`doc/CSBwin-src/CSBCode.cpp:1621`) plus the
    * `d.PrintColumn` advance that `LINEQUEUE::AddText()` performs
-   * (`doc/CSBwin-src/CSBCode.cpp:1387`).
+   * (`doc/CSBwin-src/CSBCode.cpp:1397`).
    */
   private printf(color: number, text: string, printLinesCount: number): void {
     this.futureLines.push({
@@ -215,7 +215,7 @@ export class ScrollingText {
     this.printColumn += text.length;
   }
 
-  /** CSBWin `SCROLLING_TEXT::CreateNewTextRow()` (`doc/CSBwin-src/CSBCode.cpp:1571`). */
+  /** CSBWin `SCROLLING_TEXT::CreateNewTextRow()` (`doc/CSBwin-src/CSBCode.cpp:1581`). */
   private createNewTextRow(printLinesCount: number): void {
     if (this.printRow < NUM_ROWS - 1) {
       this.printRow++;
@@ -231,13 +231,13 @@ export class ScrollingText {
     });
   }
 
-  /** CSBWin `LINEQUEUE::MaxPrintLinesCount()` (`doc/CSBwin-src/CSBCode.cpp:1378`). */
+  /** CSBWin `LINEQUEUE::MaxPrintLinesCount()` (`doc/CSBwin-src/CSBCode.cpp:1388`). */
   private maxPrintLinesCount(): number {
     if (this.futureLines.length === 0) return -1;
     return this.futureLines[this.futureLines.length - 1].printLinesCount;
   }
 
-  /** CSBWin `SCROLLING_TEXT::ClockTick()` (`doc/CSBwin-src/CSBCode.cpp:1519`). */
+  /** CSBWin `SCROLLING_TEXT::ClockTick()` (`doc/CSBwin-src/CSBCode.cpp:1529`). */
   clockTick(time: number): void {
     this.removeTimedOutText(time);
 
@@ -276,7 +276,7 @@ export class ScrollingText {
     }
   }
 
-  /** CSBWin `SCROLLING_TEXT::RemoveTimedOutText()` (`doc/CSBwin-src/CSBCode.cpp:1479`). */
+  /** CSBWin `SCROLLING_TEXT::RemoveTimedOutText()` (`doc/CSBwin-src/CSBCode.cpp:1489`). */
   private removeTimedOutText(time: number): void {
     for (let row = 0; row < NUM_ROWS; row++) {
       if (this.textTimeout[row] === -1) continue;
@@ -289,7 +289,7 @@ export class ScrollingText {
     }
   }
 
-  /** CSBWin `SCROLLING_TEXT::ScrollUp()` (`doc/CSBwin-src/CSBCode.cpp:1583`). */
+  /** CSBWin `SCROLLING_TEXT::ScrollUp()` (`doc/CSBwin-src/CSBCode.cpp:1593`). */
   private scrollUp(): void {
     this.pushTextUp = 1;
     this.textScanlineScrollCount = 0; // Start the scrolling process
@@ -304,7 +304,7 @@ export class ScrollingText {
   }
 
   /**
-   * CSBWin `SCROLLING_TEXT::DiscardText()` (`doc/CSBwin-src/CSBCode.cpp:1441-1464`): the
+   * CSBWin `SCROLLING_TEXT::DiscardText()` (`doc/CSBwin-src/CSBCode.cpp:1451-1474`): the
    * pieces waiting and the pixels go, and the scroll stops. The print queue, the timeouts
    * and `d.PrintColumn` are left as they are.
    */
@@ -325,16 +325,16 @@ export class ScrollingText {
    * (`doc/CSBwin-src/Code1f9e6.cpp:302-316`):
    *
    * - `Cleanup(false)` → `CleanupGraphics` → `scrollingText.Cleanup()`
-   *   (`data.cpp:2015`, `Graphics.cpp:2207`, `CSBCode.cpp:1434-1439`): the pieces waiting go.
-   * - `d.Initialize()` zeroes `d` (`CSBCode.cpp:329`), `d.PushTextUp` and `d.PartySleeping`
-   *   among it, and sets `d.TextScanlineScrollCount = -1` (`:352`).
-   * - `GameSetup`'s `TAG001c6e` (`:10608`, `:1773-1779`): `SetPrintPosition(0, 0)` and the
+   *   (`data.cpp:2019`, `Graphics.cpp:2233`, `CSBCode.cpp:1444-1449`): the pieces waiting go.
+   * - `d.Initialize()` zeroes `d` (`CSBCode.cpp:339`), `d.PushTextUp` and `d.PartySleeping`
+   *   among it, and sets `d.TextScanlineScrollCount = -1` (`:362`).
+   * - `GameSetup`'s `TAG001c6e` (`:10732`, `:1802-1808`): `SetPrintPosition(0, 0)` and the
    *   four `d.TextTimeout` -1.
    * - `TAG021028` fills the strip with colour 0, or clears the screen after a load
-   *   (`:10536`, `:10543`), and sets `d.PartySleeping = 0` (`:10479`).
+   *   (`:10660`, `:10667`), and sets `d.PartySleeping = 0` (`:10603`).
    *
-   * `m_printLinesCount`, `PrintLines`' static count and `printQueue` (`:200`), which only
-   * the main loop drains (`:716`), are left as they are.
+   * `m_printLinesCount`, `PrintLines`' static count and `printQueue` (`:210`), which only
+   * the main loop drains (`:726`), are left as they are.
    */
   restart(): void {
     this.futureLines = [];
@@ -349,7 +349,7 @@ export class ScrollingText {
     this.changed = true;
   }
 
-  /** CSBWin `SCROLLING_TEXT::ResetTime()` (`doc/CSBwin-src/CSBCode.cpp:1564`). */
+  /** CSBWin `SCROLLING_TEXT::ResetTime()` (`doc/CSBwin-src/CSBCode.cpp:1574`). */
   resetTime(newTime: number, currentTime: number): void {
     for (let row = 0; row < NUM_ROWS; row++) {
       if (this.textTimeout[row] === -1) continue;
@@ -358,7 +358,7 @@ export class ScrollingText {
   }
 
   /**
-   * CSBWin `SCROLLING_TEXT::SetNewSpeed()` (`doc/CSBwin-src/CSBCode.cpp:1598`): what is left
+   * CSBWin `SCROLLING_TEXT::SetNewSpeed()` (`doc/CSBwin-src/CSBCode.cpp:1608`): what is left
    * of each live timeout, counted from `time`, rescaled from `oldSpeed` to `newSpeed` VBLs
    * per tick.
    */
@@ -380,7 +380,7 @@ export class ScrollingText {
 
   /**
    * Render the four rows into the screen index buffer at CSBWin's geometry.
-   * Text at `x = col*6`, `y = row*7 + 177` (`doc/CSBwin-src/CSBCode.cpp:1537`). While a scroll
+   * Text at `x = col*6`, `y = row*7 + 177` (`doc/CSBwin-src/CSBCode.cpp:1547`). While a scroll
    * runs, every row sits `7 - count` scanlines below its place, and the row scrolling out
    * sits above row 0, cut off at the top of the strip.
    */

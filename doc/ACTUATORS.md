@@ -6,7 +6,7 @@ This document summarizes how actuators work in CSBWin based on the original C++ 
 
 **Primary definition**: `doc/CSBwin-src/CSB.h` class `DB3` (Actuator) and its field comments.
 
-Key fields and helpers (all from `DB3` in `doc/CSBwin-src/CSB.h:927-1075`):
+Key fields and helpers (all from `DB3` in `doc/CSBwin-src/CSB.h:930-1078`):
 - `word2`:
   - bits 0-6: `actuatorType()` (see type list below).
   - bits 7-15: `value()` (type-specific value).
@@ -32,7 +32,7 @@ Key fields and helpers (all from `DB3` in `doc/CSBwin-src/CSB.h:927-1075`):
 
 ## 2) Actuator type meanings (from CSB.h comments)
 
-CSBWin documents actuatorType values in the DB3 comments (`doc/CSBwin-src/CSB.h:927-1045`). These meanings are authoritative:
+CSBWin documents actuatorType values in the DB3 comments (`doc/CSBwin-src/CSB.h:930-1048`). These meanings are authoritative:
 - `0`: no-op.
 - `1`: simple wall switch (can be pressed with anything).
 - `2`: unspecified (DB3 comment notes "?").
@@ -55,7 +55,7 @@ CSBWin documents actuatorType values in the DB3 comments (`doc/CSBwin-src/CSB.h:
 
 ## 3) Trigger evaluation (press/step logic)
 
-**Core routine**: `PressurePadOrAlcove()` in `doc/CSBwin-src/Code11f52.cpp:3660-3890`.
+**Core routine**: `PressurePadOrAlcove()` in `doc/CSBwin-src/Code11f52.cpp:3695-3925`.
 
 High-level behavior:
 - Split by **actuator location**:
@@ -81,7 +81,7 @@ High-level behavior:
 
 ## 4) QueueSwitchAction: "anything can act on anything"
 
-**Core routine**: `QueueSwitchAction()` in `doc/CSBwin-src/Code11f52.cpp:3566-3636`.
+**Core routine**: `QueueSwitchAction()` in `doc/CSBwin-src/Code11f52.cpp:3601-3671`.
 
 Key behavior:
 - If `onceOnly()` is set, actuator type is cleared (`actuatorType(0)`).
@@ -90,7 +90,7 @@ Key behavior:
 - Otherwise:
   - Read target room type from `d.LevelCellFlags[targetX][targetY]`.
   - For stone or false wall, use `targetPos()`; otherwise position is forced to 0.
-  - Map room type to timer function using `d.Byte1596[targetRoomType]` (`doc/CSBwin-src/Data.h:1403`).
+  - Map room type to timer function using `d.Byte1596[targetRoomType]` (`doc/CSBwin-src/Data.h:1418`).
   - If mapping is 0, `WarnIllegalTimer()` is called and no timer is created.
   - Otherwise `CreateTimer()` is called with (function, x, y, pos, action, time).
 
@@ -106,7 +106,7 @@ The mapping table appears in code comments in both `QueueSwitchAction()` and `Qu
 
 ## 5) CreateTimer and timer fields
 
-**CreateTimer**: `doc/CSBwin-src/Mouse.cpp:176-206`.
+**CreateTimer**: `doc/CSBwin-src/Mouse.cpp:177-207`.
 
 Creates a `TIMER` with:
 - `Time = actionTime`, `Level = d.LoadedLevel`.
@@ -114,7 +114,7 @@ Creates a `TIMER` with:
 - `timerUByte6/7 = x/y`, `timerUByte8 = pos`, `timerUByte9 = action`.
 - Enqueues into `gameTimers`.
 
-The TIMER struct and per-function comments are in `doc/CSBwin-src/CSB.h:1799-1980`.
+The TIMER struct and per-function comments are in `doc/CSBwin-src/CSB.h:1862-2043`.
 
 ## 6) Room-type timer handlers (core effects)
 
@@ -131,12 +131,12 @@ Key handlers in `doc/CSBwin-src/Timer.cpp` show the "anything can act on anythin
 - `ProcessTT_DOOR` (`Timer.cpp:1565+`):
   - Calls `ActivateDSA()` on DSA actuators at (x,y,pos).
   - May queue follow-up door timers based on `timerTypeModifier`.
-- `TT_TELEPORTER` and `TT_PIT` effects are described in the `TIMER` comments as toggling cellflag bits and calling `ProcessNewlyActiveRoom()` for teleporters (`doc/CSBwin-src/CSB.h:1860-1888`).
+- `TT_TELEPORTER` and `TT_PIT` effects are described in the `TIMER` comments as toggling cellflag bits and calling `ProcessNewlyActiveRoom()` for teleporters (`doc/CSBwin-src/CSB.h:1923-1951`).
 
 Additional room-type effects are described in the TIMER comments:
-- Timer function 6 ("fiddle with DB2 and DB3") affects DB2 show flags and DB3 actuators (see `doc/CSBwin-src/CSB.h:1847-1865`).
-- Timer function 8 toggles teleporter active bit `0x08` and calls `ProcessNewlyActiveRoom` when set (see `doc/CSBwin-src/CSB.h:1866-1876`).
-- Timer function 7 toggles false wall invisibility bit `0x04` (see `doc/CSBwin-src/CSB.h:1860-1865`).
+- Timer function 6 ("fiddle with DB2 and DB3") affects DB2 show flags and DB3 actuators (see `doc/CSBwin-src/CSB.h:1910-1928`).
+- Timer function 8 toggles teleporter active bit `0x08` and calls `ProcessNewlyActiveRoom` when set (see `doc/CSBwin-src/CSB.h:1929-1939`).
+- Timer function 7 toggles false wall invisibility bit `0x04` (see `doc/CSBwin-src/CSB.h:1923-1928`).
 
 Many handlers consult `timerTypeModifier[timerUByte9]` for SET/CLEAR/TOGGLE and skip work when it equals 3 (`doc/CSBwin-src/Timer.cpp`, `doc/CSBwin-src/DSA.cpp`).
 
@@ -147,31 +147,31 @@ Many handlers consult `timerTypeModifier[timerUByte9]` for SET/CLEAR/TOGGLE and 
 - Counters do not increment when the value is zero (explicit guard).
 
 **Monster generators**:
-- Type 6 in open rooms is a monster generator (described in DB3 comments, `doc/CSBwin-src/CSB.h:927-1045`), with disable-time handling via `word6`.
+- Type 6 in open rooms is a monster generator (described in DB3 comments, `doc/CSBwin-src/CSB.h:930-1048`), with disable-time handling via `word6`.
 
 **Missile launchers**:
-- Types 7-10, 14-15 are missile launchers (described in DB3 comments, `doc/CSBwin-src/CSB.h:927-1045`).
+- Types 7-10, 14-15 are missile launchers (described in DB3 comments, `doc/CSBwin-src/CSB.h:930-1048`).
 - Timer handling and object ejection are in `TriggerMissileLauncher()` (`doc/CSBwin-src/Timer.cpp:1883+`).
 
 ## 8) DSA (type 47)
 
 DSA integration points:
 - Actuator type 47 is explicitly handled in `PressurePadOrAlcove()` and timer handlers (`doc/CSBwin-src/Code11f52.cpp`, `doc/CSBwin-src/Timer.cpp`).
-- `QueueDSASwitchAction()` mirrors `QueueSwitchAction()` but can create `TT_DESSAGE` or mapped room timers (`doc/CSBwin-src/DSA.cpp:470-540`).
-- DSA state/selector/parameters are stored in DB3 (`DSAselector()`, `DSAstate()`, `ParameterA/B()` in `doc/CSBwin-src/CSB.h:927-1075`).
+- `QueueDSASwitchAction()` mirrors `QueueSwitchAction()` but can create `TT_DESSAGE` or mapped room timers (`doc/CSBwin-src/DSA.cpp:471-541`).
+- DSA state/selector/parameters are stored in DB3 (`DSAselector()`, `DSAstate()`, `ParameterA/B()` in `doc/CSBwin-src/CSB.h:930-1078`).
 
 ## 9) Local actions and delayed actuator rotation
 
 **Local actions**:
-- `localActionOnly()` routes to `PerformLocalAction()` (`doc/CSBwin-src/Mouse.cpp:222-260`).
+- `localActionOnly()` routes to `PerformLocalAction()` (`doc/CSBwin-src/Mouse.cpp:223-261`).
 - `PerformLocalAction()` directly handles localActionType 10 (skill increaser) and otherwise populates `DelayedActuatorAction*` globals.
 
 **DelayedActuatorAction**:
-- `RotateActuatorList()` consumes delayed action state and rotates actuator ordering at a location (`doc/CSBwin-src/Code11f52.cpp:3471-3525`).
+- `RotateActuatorList()` consumes delayed action state and rotates actuator ordering at a location (`doc/CSBwin-src/Code11f52.cpp:3506-3560`).
 
 ## 10) Notable limits and guardrails
 
 All from CSBWin source:
-- **Illegal target**: `WarnIllegalTimer()` is called when room-type -> timer mapping yields 0 (`doc/CSBwin-src/Code11f52.cpp:3566-3636`).
+- **Illegal target**: `WarnIllegalTimer()` is called when room-type -> timer mapping yields 0 (`doc/CSBwin-src/Code11f52.cpp:3601-3671`).
 - **DSA activation level**: `ActivateDSA()` only handles the loaded level and calls `NotImplemented` otherwise (`doc/CSBwin-src/Timer.cpp:1465-1525`).
 - **Counter increment guard**: counters do not increment when value is zero (`doc/CSBwin-src/Timer.cpp:1589-1665`).

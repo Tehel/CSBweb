@@ -8,7 +8,7 @@ This document captures verified movement/collision rules from the CSBWin C++ sou
 
 ## Monsters block the party
 
-`MoveParty` (`doc/CSBwin-src/CSBCode.cpp:7944`) treats a monster in the destination
+`MoveParty` (`doc/CSBwin-src/CSBCode.cpp:8031`) treats a monster in the destination
 cell with the same inhibit flag (`D5W`) it uses for a wall, but the two paths differ:
 
 ```c
@@ -34,7 +34,7 @@ if (D5W != 0) { DiscardAllInput(); d.clockTick = 0; }
 else { MoveObject(...); /* …party actually moves… */ }
 ```
 
-(`doc/CSBwin-src/CSBCode.cpp:8286-8313`)
+(`doc/CSBwin-src/CSBCode.cpp:8373-8400`)
 
 Verified facts:
 
@@ -47,14 +47,14 @@ Verified facts:
   and only when a champion actually took damage).
 - The monster block calls `ProcessTimers29to41(newX, newY, TT_M1, 0)`, so being walked
   into gives the group a turn. `InitialChecks` maps `TT_M1` to a `TT_31` timer one tick
-  out (`doc/CSBwin-src/Monster.cpp:3026-3055`); `CSB.h:1768` names it
+  out (`doc/CSBwin-src/Monster.cpp:3030-3059`); `CSB.h:1831` names it
   `TT_31 = 31, // When Party ran into monster`.
 - One `TT_31` per bump is correct. `SetTimer`'s duplicate suppression covers only
   `TT_MAP_FIRST..TT_MAP_LAST` (5..10) plus `TT_1` / `TT_DOOR` / `TT_BASH_DOOR`
   (`doc/CSBwin-src/Timer.cpp:1011-1052`), and 31 is outside that range.
 - A **vertical** move (`direction > 3`, the Move Up / Move Down buttons) refuses
   outright when the destination holds a monster — an early `return result` with no
-  timer poke and no sound (`doc/CSBwin-src/CSBCode.cpp:8200-8204`).
+  timer poke and no sound (`doc/CSBwin-src/CSBCode.cpp:8287-8291`).
 
 Not yet ported (see `PLAN.md`): the terrain block's `DamageCharacter(…, 1, 24, 2)`
 wall-bump damage and its sound-18 gate, the `DiscardAllInput()` / `d.clockTick = 0`
@@ -104,7 +104,7 @@ Verified facts:
   wrong in play, not just on paper.
 - The party arm is additionally gated on `d.NumCharacter > 0`, and the sound only
   plays when `DamageAllCharacters` reports somebody was actually hurt.
-- `soundDOOROPENING` is 18 (`doc/CSBwin-src/CSB.h:626`); the monster rebound queues
+- `soundDOOROPENING` is 18 (`doc/CSBwin-src/CSB.h:629`); the monster rebound queues
   ordinal 4.
 - `FindFirstMonster` consults only the **first** monster in the cell chain, and an
   immaterial one is skipped entirely — the door closes through a ghost.

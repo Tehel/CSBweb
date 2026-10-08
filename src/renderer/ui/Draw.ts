@@ -41,10 +41,10 @@ export function blitBasicGraphicToViewport(ui: UIState, index: number, rect: Rec
 }
 
 /**
- * `DisplaySleepScreen` (`doc/CSBwin-src/CSBCode.cpp:8542`): the viewport flooded with
+ * `DisplaySleepScreen` (`doc/CSBwin-src/CSBCode.cpp:8647`): the viewport flooded with
  * colour 0 and `TextOut_OneLine(d.pViewportBMP, 112, 93, 65, 4, 0, "WAKE UP", …)` —
  * viewport coordinates, colour 4 on 0. It stands in for `DrawViewport`, which the main
- * loop skips while the party sleeps (`:637`).
+ * loop skips while the party sleeps (`:647`).
  */
 export function displaySleepScreen(ui: UIState): void {
   const viewport = ui.context.viewportIndexBuffer;
@@ -54,7 +54,7 @@ export function displaySleepScreen(ui: UIState): void {
 }
 
 /**
- * The freeze's screen, button 147 (`doc/CSBwin-src/Mouse.cpp:1737-1746`): the viewport
+ * The freeze's screen, button 147 (`doc/CSBwin-src/Mouse.cpp:1876-1885`): the viewport
  * flooded with colour 0 and `TextOut_OneLine(d.pViewportBMP, 112, 81, 69, 4, 0,
  * "GAME FROZEN", …)`. No tick runs while the game is frozen, so nothing draws the
  * viewport again until the thaw.
@@ -95,7 +95,7 @@ export function shadeRectIndex(ui: UIState, rect: Rect, color: number): void {
 
 /**
  * Where icon `objectNameIndex` is drawn from, found as `DrawItem`
- * (`doc/CSBwin-src/Character.cpp:31`) and `GetIconGraphic` (`Code11f52.cpp:82`) find it:
+ * (`doc/CSBwin-src/Character.cpp:32`) and `GetIconGraphic` (`Code11f52.cpp:117`) find it:
  * the last group of `d.Word612` that starts at or below it picks graphic `42 + group`, and
  * the offset into the group picks a 16x16 cell, sixteen to a row.
  */
@@ -264,7 +264,7 @@ export const BOX_GRAPHIC_MARKED = 34;
 export const BOX_GRAPHIC_ATTACKING = 35;
 
 /**
- * `DrawCharacterPossession`'s `LOCAL_20` (`doc/CSBwin-src/Character.cpp:1150-1204`): the
+ * `DrawCharacterPossession`'s `LOCAL_20` (`doc/CSBwin-src/Character.cpp:1155-1209`): the
  * box behind a body part, slots 0 to 5, marked while the part is wounded (`ouches`),
  * with an object in it or not. Every other slot has none, -1. The weapon hand of the
  * champion whose attack menu is open has the cyan box instead.
@@ -272,7 +272,7 @@ export const BOX_GRAPHIC_ATTACKING = 35;
  * The screen is composed from state each frame, so the cyan box goes the moment
  * `TAG01b1c0` clears `d.AttackingCharacterOrdinal`, a PASS or an attack of no delay
  * included: CSBWin 20230608's order, which clears it before its redraw
- * (`doc/CSBwin-src-20230608/Character.cpp:4904-4923`).
+ * (`doc/CSBwin-src/Character.cpp:4904-4923`).
  */
 export function possessionBoxGraphic(ui: UIState, chIdx: number, champion: Champion, slot: number): number {
   let box = -1;
@@ -282,7 +282,7 @@ export function possessionBoxGraphic(ui: UIState, chIdx: number, champion: Champ
 }
 
 /**
- * `DrawCharacterPossession`'s box (`doc/CSBwin-src/Character.cpp:1205-1216`): `graphic`
+ * `DrawCharacterPossession`'s box (`doc/CSBwin-src/Character.cpp:1210-1221`): `graphic`
  * (`possessionBoxGraphic`) over the slot's 18x18 frame, `x-1..x+16`, with colour 12
  * transparent, before the icon.
  */

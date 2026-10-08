@@ -2,14 +2,14 @@
  * The box behind each hand in the champion bar and each body part in the inventory.
  *
  * `DrawCharacterPossession` draws a box behind slots 0 to 5 before the icon, the graphic
- * it keeps in `LOCAL_20` (`doc/CSBwin-src/Character.cpp:1150-1216`): 34 while the part is
+ * it keeps in `LOCAL_20` (`doc/CSBwin-src/Character.cpp:1155-1221`): 34 while the part is
  * wounded, else 33, and 35, the cyan box, for the weapon hand of the champion whose attack
  * menu is open. It does so for the two hands in the champion bar as for the six body
  * parts of the open inventory, with an object in the slot or not.
  *
  * The cyan box goes as `TAG01b1c0` closes the menu, after a PASS or an attack, before the
  * tick that draws the buttons over the menu: CSBWin 20230608 clears the ordinal before
- * `TAG01b1c0`'s redraw so that it does (`doc/CSBwin-src-20230608/Character.cpp:4904-4923`).
+ * `TAG01b1c0`'s redraw so that it does (`doc/CSBwin-src/Character.cpp:4904-4923`).
  *
  * The screen is drawn with the real graphics; each slot's box is read back from the ring
  * of pixels around its icon and named by the graphic whose ring it is.
@@ -121,10 +121,10 @@ async function main(): Promise<void> {
   check(show('all well', bar()) === '33 33 33 33', 'an unwounded hand has the plain box');
   c1!.wounds = 0b10;
   check(show("champion 2's weapon hand wounded", bar()) === '33 33 33 34',
-    'a wounded hand has the marked box, as in the inventory (Character.cpp:1190-1199)');
+    'a wounded hand has the marked box, as in the inventory (Character.cpp:1195-1204)');
   c0!.wounds = 0b01;
   c1!.wounds = 0;
-  check(show("champion 1's ready hand wounded", bar()) === '34 33 33 33', 'an empty-handed wound too (:1150-1162)');
+  check(show("champion 1's ready hand wounded", bar()) === '34 33 33 33', 'an empty-handed wound too (:1155-1167)');
 
   console.log('');
   console.log("=== champion 1's inventory: slots 0-5 ===");
@@ -138,7 +138,7 @@ async function main(): Promise<void> {
   console.log('=== the attack menu ===');
   prepareAttack(ui, 0);
   check(ui.attackingCharacterOrdinal === 1, "champion 1's menu is open");
-  check(show("champion 1's menu", bar()) === '33 35 33 33', 'the weapon hand of the attacker is boxed in cyan (:1202-1204)');
+  check(show("champion 1's menu", bar()) === '33 35 33 33', 'the weapon hand of the attacker is boxed in cyan (:1207-1209)');
   check(show("champion 1's inventory, menu open", inventory(0)) === '33 35 33 33 33 33',
     'in the inventory too: D7W == 1 whichever screen the slot is on');
   c0!.wounds = 0b10;

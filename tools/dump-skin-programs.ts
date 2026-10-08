@@ -1,15 +1,15 @@
 /**
  * A skin's program run: `DrawViewport` runs a skinned cell's own
  * program from `CSBgraphics.dat`, on CSBWin's two stacks, through subroutine calls
- * (`doc/CSBwin-src/Viewport.cpp:6765-6818`, `:2215-2247`, `:2473-2474`, `:3017-3021`, `:3292-3301`).
+ * (`doc/CSBwin-src/Viewport.cpp:6772-6825`, `:2215-2247`, `:2473-2474`, `:3024-3028`, `:3299-3308`).
  *
  * 1. **The machine.** Hand-written code through `Interpret`: every stack word against
- *    CSBWin's C (`:3116-3186`), whose `LESS` and `GREATER` compare the top with the word
+ *    CSBWin's C (`:3123-3193`), whose `LESS` and `GREATER` compare the top with the word
  *    under it, a subroutine call and its `Return`, a jump back, `ToR` and `RTo`, a word
  *    `pop` reads signed, the data stack kept from one `Interpret` to the next, and
  *    `FloorDecorationID`, which has no case in `Interpret`: it ends the program, its
  *    sentinel left on the return stack.
- * 2. **The skin's reads** (`:3028-3062`, `:3187-3208`, `:3278-3290`), on Conflux 3.5's
+ * 2. **The skin's reads** (`:3035-3069`, `:3194-3215`, `:3285-3297`), on Conflux 3.5's
  *    files: the cell's skin, another cell's and the cell's number; the nine IDs of each
  *    skin's definition, and none for a skin popped as -1; a mask's header, read off its
  *    bytes, and nothing pushed for a mask past the section's count; whether a mask is

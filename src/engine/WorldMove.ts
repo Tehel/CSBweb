@@ -1,11 +1,11 @@
 /**
  * `WorldMove` — the world `MoveObject(object, oldX, oldY, newX, newY, …)`
- * (`doc/CSBwin-src/Code11f52.cpp:2796-3457`), as the port cuts it up: `moveObject` for
+ * (`doc/CSBwin-src/Code11f52.cpp:2831-3492`), as the port cuts it up: `moveObject` for
  * anything but the party and a monster set down, `moveParty` for the party,
  * `resolveMonsterDestination` for `MonsterSystem.moveMonster`, all three through the one
  * teleporter / pit / stairs loop, `resolveCellEffects`. With it are what only that loop
- * calls: `TeleportMonster` (`:2308`), `Levitating` (`:2417`) and `PitGoesSomewhere`
- * (`:2777`), and `d.SupressPitDamage`.
+ * calls: `TeleportMonster` (`:2343`), `Levitating` (`:2452`) and `PitGoesSomewhere`
+ * (`:2812`), and `d.SupressPitDamage`.
  *
  * Not the DSA's ten-argument `MoveObject` (`MoveObject.cpp:721`), which is
  * `DsaSystem.moveObjectDsa`. A monster lifted on the party's level first meets the
@@ -24,12 +24,12 @@ import { decodeMissileTimerWord8 } from './missileHelpers';
 import type { TimerQueue } from './TimerQueue';
 import type { MmRecord } from './MmRecord';
 
-/** `soundTELEPORT` (`doc/CSBwin-src/CSB.h:625`). */
+/** `soundTELEPORT` (`doc/CSBwin-src/CSB.h:628`). */
 const SOUND_TELEPORT = 17;
 
 /**
  * What `MoveObject`'s loop knows about a monster group it is moving
- * (`doc/CSBwin-src/Code11f52.cpp:2796-3131`): where it stands (`oldX < 0`: nowhere
+ * (`doc/CSBwin-src/Code11f52.cpp:2831-3166`): where it stands (`oldX < 0`: nowhere
  * yet), the level its `ITEM16` belongs to (`AttachedLevel_4`), and whether it has none
  * (`!item16Attached`).
  */
@@ -39,7 +39,7 @@ interface MonsterMove {
   oldY: number;
   attachedLevel: number;
   noItem16: boolean;
-  /** `MoveObject`'s `pmmr`, which the fall's `DamageMonsterGroup` takes (`:3097`). */
+  /** `MoveObject`'s `pmmr`, which the fall's `DamageMonsterGroup` takes (`:3132`). */
   mmr: MmRecord | undefined;
 }
 
@@ -54,23 +54,23 @@ export class WorldMove {
 
   /**
    * `MoveObject(RNnul, oldX, oldY, newX, newY, pPretendTeleporter, NULL)`
-   * (`doc/CSBwin-src/Code11f52.cpp:2796-3325`): the party moved on its own level, which
+   * (`doc/CSBwin-src/Code11f52.cpp:2831-3360`): the party moved on its own level, which
    * every caller has loaded (`d.LoadedLevel == d.partyLevel`). `oldX < 0` places the
    * party from nowhere (a step out of a stairwell, the arrival on a level), `newX < 0`
    * lifts it (the stairs). In CSBWin's order:
    *
    * - the missiles in the corners it leaves, `CheckMoveFromMissile(oldX, oldY, newX,
-   *   newY)` with the cells as passed (`:2847-2853`), which end the move when one of
+   *   newY)` with the cells as passed (`:2882-2888`), which end the move when one of
    *   them wiped out a group;
    * - the party set on the new square and taken through the teleporter and pit loop,
-   *   its square and facing following every jump and fall (`:2854-3135`);
-   * - nothing more when it is back on its square facing the same way (`:3194-3201`);
-   * - a footprint when it left its square (`:3224-3247`);
-   * - the old square's pads (`:3258-3268`), a monster where it landed deleted
-   *   (`:3298-3308`), then the new square's pads (`:3309-3317`).
+   *   its square and facing following every jump and fall (`:2889-3170`);
+   * - nothing more when it is back on its square facing the same way (`:3229-3236`);
+   * - a footprint when it left its square (`:3259-3282`);
+   * - the old square's pads (`:3293-3303`), a monster where it landed deleted
+   *   (`:3333-3343`), then the new square's pads (`:3344-3352`).
    *
    * On another level, CSBWin presses no pads there: it sets `d.newPartyLevel`
-   * (`:3319-3324`), and the top of the next tick loads the level and places the party on
+   * (`:3354-3359`), and the top of the next tick loads the level and places the party on
    * it (`Game.loadNewPartyLevel`). Until then `d.partyLevel` is the level it left.
    * Inside the move, the party's level follows every jump and fall, as `d.LoadedLevel`
    * does, so a champion the fall kills leaves their bones on the level they reach.
@@ -115,7 +115,7 @@ export class WorldMove {
     if (at.z === level) {
       actuators.triggerObjectMove(at, OBJECT_ID_NULL, true, unchangedRoom, party.facing);
     } else {
-      // `LoadLevel(AttachedLevel_4); d.newPartyLevel = sw(curLevel);` (`:3321-3323`).
+      // `LoadLevel(AttachedLevel_4); d.newPartyLevel = sw(curLevel);` (`:3356-3358`).
       party.position = new Position(at.x, at.y, level);
       this.ctx.loop.newPartyLevel = at.z;
     }
@@ -123,29 +123,29 @@ export class WorldMove {
 
   /**
    * `MoveObject(object, oldX, oldY, newX, newY, NULL, NULL)`
-   * (`doc/CSBwin-src/Code11f52.cpp:2796-3457`) for anything that is not the party, on
+   * (`doc/CSBwin-src/Code11f52.cpp:2831-3492`) for anything that is not the party, on
    * level `level` (`d.LoadedLevel`, CSBWin's `AttachedLevel_4`). `oldX < 0` places an
    * object that lies nowhere, `newX < 0` lifts one without placing it.
    *
    * A monster may be lifted here — `CheckMoveFromMissile` on the party's level
-   * (`:2847-2853`), then the removal (`:3258-3296`); nothing of the monster branch runs
-   * for `newX < 0` (`:3297`). *Placing* a monster is that branch
-   * (`:3327-3424`), which is `MonsterSystem.moveMonster`; it is refused here.
+   * (`:2882-2888`), then the removal (`:3293-3331`); nothing of the monster branch runs
+   * for `newX < 0` (`:3332`). *Placing* a monster is that branch
+   * (`:3362-3459`), which is `MonsterSystem.moveMonster`; it is refused here.
    *
    * What is placed goes through the teleporter / pit loop (`resolveCellEffects`); a
    * levitating thing — a missile, a flying monster — neither falls nor presses a pad
    * (`RemoveObjectFromRoom` / `AddObjectToRoom` instead of `PlaceOrRemoveObjectInRoom`,
-   * `:3272-3274`, `:3427-3429`), and a cloud is not levitating (`Levitating`,
-   * `:2417-2437`), so it falls. `PlaceOrRemoveObjectInRoom`'s `unchangedRoom` is whether
-   * the party stands on the square (`:3278-3293`, `:3433-3448`). A teleporter turns an
-   * object's corner only when `oldX != -1` (`:3000-3006`); stairs take anything but a
-   * missile down and out, and turn its corner whatever `oldX` is (`:3108-3131`). The
+   * `:3307-3309`, `:3462-3464`), and a cloud is not levitating (`Levitating`,
+   * `:2452-2472`), so it falls. `PlaceOrRemoveObjectInRoom`'s `unchangedRoom` is whether
+   * the party stands on the square (`:3313-3328`, `:3468-3483`). A teleporter turns an
+   * object's corner only when `oldX != -1` (`:3035-3041`); stairs take anything but a
+   * missile down and out, and turn its corner whatever `oldX` is (`:3143-3166`). The
    * missile's timer is its caller's business.
    *
    * Returns CSBWin's `1` as `removed` when `CheckMoveFromMissile` destroyed the group,
    * and otherwise the ID as it was placed and where, or `null` for a lift or an
-   * unchanged room (`:3180-3215`). For a missile, `newDir` is `d.NewDir`: its timer's
-   * direction as `TeleportMissile` left it (`:2891-2898`, `:2392-2411`). The timer is
+   * unchanged room (`:3215-3250`). For a missile, `newDir` is `d.NewDir`: its timer's
+   * direction as `TeleportMissile` left it (`:2926-2933`, `:2427-2446`). The timer is
    * the one its record names, which inside `MissileTimer` is the copy
    * (`TimerQueue.getTimer`).
    */
@@ -215,24 +215,24 @@ export class WorldMove {
   }
 
   /**
-   * The loop of `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2896-3131`) for a monster,
+   * The loop of `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2931-3166`) for a monster,
    * for `MonsterSystem.moveMonster`: the destination taken through teleporter chains, pit
    * falls and stairs by the same `resolveCellEffects` the party and every object go through.
    *
    * `oldX, oldY` on `level` is where the group stands (`oldX < 0`: it is being placed
    * from nowhere). Its `ITEM16` is attached when that is the party's level and the group
-   * is in the dungeon (`item16Attached`, `:2864`), and every teleporter of a chain
-   * rotates the group through that `ITEM16`, however far the chain has taken it (`:2988`).
+   * is in the dungeon (`item16Attached`, `:2899`), and every teleporter of a chain
+   * rotates the group through that `ITEM16`, however far the chain has taken it (`:3023`).
    *
    * The result is CSBWin's locals at the end of the loop:
    *
-   * - `code` is `LOCAL_14`, set only by `TeleportMonster` (`:2988`): `groupIndex + 2`
+   * - `code` is `LOCAL_14`, set only by `TeleportMonster` (`:3023`): `groupIndex + 2`
    *   for a fear-state-6 group on the party's level, 1 for any other teleport, 0 when
    *   none happened. A pit fall leaves it alone.
-   * - `audible` is `LOCAL_26`, whether the last teleporter buzzed (`:2965`).
-   * - `groupDied` is `LOCAL_18` (`:3099-3100`): the fall killed the whole group, and
+   * - `audible` is `LOCAL_26`, whether the last teleporter buzzed (`:3000`).
+   * - `groupDied` is `LOCAL_18` (`:3134-3135`): the fall killed the whole group, and
    *   the loop stopped at the square below.
-   * - `corner` is `objD7.pos()`: the stairs turn it (`:3124-3130`), nothing else does.
+   * - `corner` is `objD7.pos()`: the stairs turn it (`:3159-3165`), nothing else does.
    */
   resolveMonsterDestination(
     destination: Position,
@@ -274,7 +274,7 @@ export class WorldMove {
     allowFall: boolean,
     monster?: MonsterMove,
     pretendTeleporter?: TeleporterRecord,
-    /** `MoveObject`'s `oldX`: -1 keeps an item's corner through a teleporter (`:3000-3006`). */
+    /** `MoveObject`'s `oldX`: -1 keeps an item's corner through a teleporter (`:3035-3041`). */
     oldX?: number,
   ): {
     position: Position;
@@ -296,7 +296,7 @@ export class WorldMove {
     let teleportCode = 0;
     let groupDied = false;
     // `LOCAL_26 = DB1A2->audible()` — remembered because it decides TT_60 vs TT_61
-    // if the monster then has to wait for its destination (Code11f52.cpp:2965).
+    // if the monster then has to wait for its destination (Code11f52.cpp:3000).
     let teleportAudible = false;
     let forcedTeleporter = pretendTeleporter ?? null;
 
@@ -324,7 +324,7 @@ export class WorldMove {
         } else if (objectType === DBType.CREATURE) {
           teleportAudible = teleporter.sound;
           // `QueueSound(17, newX, newY, 1)` before `TeleportMonster`, on the destination
-          // level that `LoadLevel` has just loaded (`:2955`, `:2983-2986`).
+          // level that `LoadLevel` has just loaded (`:2990`, `:3018-3021`).
           if (teleporter.sound) this.ctx.sounds.queueSound(SOUND_TELEPORT, destination.x, destination.y, 1, destination.z);
           const result = monster ? this.teleportMonster(monster, teleporter) : null;
           if (result) {
@@ -342,7 +342,7 @@ export class WorldMove {
         position = destination;
         moved = true;
         // `d.partyX = newX; d.partyY = newY;`, the buzz at the party's new square, and
-        // `SetPartyFacing` at every jump (`:2958-2977`).
+        // `SetPartyFacing` at every jump (`:2993-3012`).
         if (objectType === -1) {
           this.ctx.party.state.position = position;
           if (teleporter.sound) this.ctx.sounds.queueSound(SOUND_TELEPORT, position.x, position.y, 0, position.z);
@@ -353,16 +353,16 @@ export class WorldMove {
       }
 
       if (allowFall && this.isActivePitAt(position)) {
-        // `PitGoesSomewhere` (`doc/CSBwin-src/Code11f52.cpp:2777`) is exactly this
+        // `PitGoesSomewhere` (`doc/CSBwin-src/Code11f52.cpp:2812`) is exactly this
         // test: a pit with nothing under it is not a pit.
         const next = this.dungeon.incrementLevel(position, 1);
         if (!next) break;
         position = next;
         moved = true;
-        // `d.partyX = newX; d.partyY = newY;` (`:3053-3056`), so a champion the fall kills
+        // `d.partyX = newX; d.partyY = newY;` (`:3088-3091`), so a champion the fall kills
         // drops what they carry where the party landed.
         if (objectType === -1) this.ctx.party.state.position = position;
-        // The fall hurts (`doc/CSBwin-src/Code11f52.cpp:3053-3106`). A group is hurt
+        // The fall hurts (`doc/CSBwin-src/Code11f52.cpp:3088-3141`). A group is hurt
         // at `oldX, oldY`, where it is still linked: nothing has moved in the database yet.
         if (objectType === -1) this.partyFallsIntoPit();
         else if (objectType === DBType.CREATURE && monster) {
@@ -376,7 +376,7 @@ export class WorldMove {
         continue;
       }
 
-      // The stairs (`:3108-3131`): a monster or an object — not the party, not a missile
+      // The stairs (`:3143-3166`): a monster or an object — not the party, not a missile
       // — goes one level down unless bit 2 says the stairs go up, then one square out
       // through `ExitStairsDirection`, its corner turned to face the stairs. The loop
       // goes on from the square it lands on.
@@ -449,7 +449,7 @@ export class WorldMove {
   }
 
   /**
-   * `d.SupressPitDamage` (`doc/CSBwin-src/Data.h:790`) — set for the length of one
+   * `d.SupressPitDamage` (`doc/CSBwin-src/Data.h:805`) — set for the length of one
    * deliberate climb down a rope, which costs stamina instead of blood.
    */
   private supressPitDamage = false;
@@ -465,7 +465,7 @@ export class WorldMove {
   }
 
   /**
-   * The party falls (`doc/CSBwin-src/Code11f52.cpp:3057-3086`).
+   * The party falls (`doc/CSBwin-src/Code11f52.cpp:3092-3121`).
    *
    * A climb down costs each living champion stamina in proportion to how loaded they
    * are — `25 * load / MaxLoad + 1` — which `AdjustStamina` turns into real damage
@@ -501,12 +501,12 @@ export class WorldMove {
   }
 
   /**
-   * A monster group falls (`doc/CSBwin-src/Code11f52.cpp:3088-3104`):
+   * A monster group falls (`doc/CSBwin-src/Code11f52.cpp:3123-3139`):
    * `DamageMonsterGroup(pDB4, oldX, oldY, 20, 0, !item16Attached)` on the level its
    * `ITEM16` belongs to. `P5 = 0` defers the last member's death to `MoveObject`, which
    * deletes the group after the loop, and a dead member's droppings to `TAG00b522`,
    * which drops them where the group landed. A group placed from nowhere (`oldX < 0`)
-   * is hurt at `(-1, 0)`, so its death clouds are not made (`CreateCloud`, `:1400`).
+   * is hurt at `(-1, 0)`, so its death clouds are not made (`CreateCloud`, `:1435`).
    */
   private monsterFallsIntoPit(monster: MonsterMove): number {
     return this.ctx.systems.monsterDamage.damageMonsterGroup(
@@ -533,15 +533,15 @@ export class WorldMove {
   }
 
   /**
-   * `TeleportMonster` (`doc/CSBwin-src/Code11f52.cpp:2308-2387`) — turn the group, and
+   * `TeleportMonster` (`doc/CSBwin-src/Code11f52.cpp:2343-2422`) — turn the group, and
    * each member's corner, as the teleporter says. The facing and position bytes are
    * the `ITEM16`'s unless `noItem16`, whatever level the chain has reached: CSBWin
-   * passes `AttachedLevel_4` and `!item16Attached` for every teleporter (`:2988`).
+   * passes `AttachedLevel_4` and `!item16Attached` for every teleporter (`:3023`).
    *
    * Returns `groupIndex() + 2` for a fear-state-6 group whose attached level is the
    * party's — read after the write, so with `noItem16` it is the new position byte —
    * and 1 otherwise. Whether the monster may live on the destination level is not
-   * this function's business: `MoveObject` asks after the loop (`:3147`).
+   * this function's business: `MoveObject` asks after the loop (`:3182`).
    */
   private teleportMonster(
     move: MonsterMove,

@@ -1,5 +1,5 @@
 /**
- * `PrintWithSubstitution` (`doc/CSBwin-src/Graphics.cpp:1540-1596`), `TAG01ab88`: a text
+ * `PrintWithSubstitution` (`doc/CSBwin-src/Graphics.cpp:1564-1620`), `TAG01ab88`: a text
  * queued as one print-queue entry, a linefeed first, with its `@` escapes replaced.
  *
  * `@p` is the name of the champion whose attack menu is open (`d.AttackingCharacterOrdinal`)
@@ -7,7 +7,7 @@
  * before it, unless it starts a line, and one after it. The replacement is a pointer
  * that each one copies to its end: `@N` copies whatever it was left at, which before any
  * other escape is "HUH???" and after one is nothing. A text that comes out empty queues
- * nothing (`:1592-1595`).
+ * nothing (`:1616-1619`).
  */
 import { sw } from '../core/intCast';
 import type { GameContext } from './GameContext';

@@ -1,18 +1,18 @@
 /**
  * The wings: champions who have left the party, each kept in `EXPOOL` as the 800-byte
  * `CHARDESC` they were (`CHARDESC::SaveToWings`, `GetFromWings`, `LocateInWings`,
- * `doc/CSBwin-src/Character.cpp:5149-5236`).
+ * `doc/CSBwin-src/Character.cpp:5174-5261`).
  *
  * A champion is eight records of 25 longwords, record `i` keyed
  * `(EDT_Character << 24) | (i << 16) | fingerPrint`. CSBWin writes the `CHARDESC` as it
  * sits in the little-endian build's memory, which is the file's form with
- * `swapCharacter`'s fields reversed (`doc/CSBwin-src/SaveGame.cpp:490-521`), and a
+ * `swapCharacter`'s fields reversed (`doc/CSBwin-src/SaveGame.cpp:498-529`), and a
  * longword of the pool is four of those bytes taken little-endian, as the overlay
  * palette's are (`src/data/CsbwinExpool.ts`). Here a champion in the wings is handed in
  * and out in the file's form, the form `readCsbwinCharacter` and `writeCsbwinCharacter`
  * read and write.
  *
- * Only `SwapCharacter` (`Character.cpp:5472`), a DSA's `&SWAPCHARACTER`, puts a champion
+ * Only `SwapCharacter` (`Character.cpp:5497`), a DSA's `&SWAPCHARACTER`, puts a champion
  * in the wings, so the retail game never has one. A save carries them with the pool.
  */
 import { readU16LE, readU32LE, writeU32LE } from '../core/bytes';
@@ -21,7 +21,7 @@ import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import type { DungeonState } from './DungeonState';
 import type { Champion } from './gameTypes';
 
-/** `EDT_Character` (`doc/CSBwin-src/CSB.h:1568`). */
+/** `EDT_Character` (`doc/CSBwin-src/CSB.h:1571`). */
 const EDT_CHARACTER = 8;
 /** The records of one champion, and the longwords of each. */
 const WINGS_RECORDS = 8;
@@ -38,7 +38,7 @@ function wingsKey(i: number, fingerprint: number): number {
 }
 
 /**
- * `CHARDESC::SaveToWings` (`doc/CSBwin-src/Character.cpp:5149-5169`): `character`, an
+ * `CHARDESC::SaveToWings` (`doc/CSBwin-src/Character.cpp:5174-5194`): `character`, an
  * 800-byte `CHARDESC` in the file's form, as the eight records of its own fingerprint,
  * each after a `Read` of its key that takes an older one out.
  */
@@ -55,7 +55,7 @@ export function saveToWings(pool: WingsPool, character: Uint8Array): void {
 }
 
 /**
- * `CHARDESC::GetFromWings` (`doc/CSBwin-src/Character.cpp:5171-5218`): the champion with
+ * `CHARDESC::GetFromWings` (`doc/CSBwin-src/Character.cpp:5196-5243`): the champion with
  * `fingerprint`, in the file's form, or null. The records leave the pool (`Read`), or,
  * `testOnly`, stay there (`Locate`). It fails at the first record missing or not 25
  * longwords long, the records before it having left already, and on a record 0 whose
@@ -79,7 +79,7 @@ export function getFromWings(pool: WingsPool, fingerprint: number, testOnly: boo
 }
 
 /**
- * `CHARDESC::LocateInWings` (`doc/CSBwin-src/Character.cpp:5220-5236`): the first record
+ * `CHARDESC::LocateInWings` (`doc/CSBwin-src/Character.cpp:5245-5261`): the first record
  * of the champion with `fingerprint`, its 100 bytes as the little-endian build holds them,
  * or null. They hold the name, which `swapCharacter` does not touch, and CSBWin reads
  * nothing else of them.

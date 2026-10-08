@@ -5,18 +5,18 @@
  * yet the triple is what the whole champion lifecycle is built on — so this tool
  * stands the real rules up against `doc/CSBwin-src`:
  *
- *   1. the byte semantics (`doc/CSBwin-src/data.cpp:1695-1741`) — setters wrap,
+ *   1. the byte semantics (`doc/CSBwin-src/data.cpp:1698-1744`) — setters wrap,
  *      getters read anything above 240 as zero;
  *   2. `AddCharacter`'s initial values from the real Hall of Champions mirrors
- *      (`doc/CSBwin-src/Character.cpp:640-659`) — minimum 30, 10 for Luck, cap 224,
+ *      (`doc/CSBwin-src/Character.cpp:641-660`) — minimum 30, 10 for Luck, cap 224,
  *      Maximum == Current;
  *   3. `LevelUp` raising **Maximum** and leaving Current behind
- *      (`doc/CSBwin-src/Magic.cpp:98-148`) — the bug this triple was added to fix;
+ *      (`doc/CSBwin-src/Magic.cpp:101-151`) — the bug this triple was added to fix;
  *   4. `AdjustCurrentAttribute`'s lopsided curve
- *      (`doc/CSBwin-src/Character.cpp:3900-3934`) — taxed gains, a 170 ceiling, and a
+ *      (`doc/CSBwin-src/Character.cpp:3917-3951`) — taxed gains, a 170 ceiling, and a
  *      loss that stops at the attribute's own Minimum;
  *   5. `IsCharacterLucky` spending luck inside Minimum..Maximum
- *      (`doc/CSBwin-src/Character.cpp:2194`).
+ *      (`doc/CSBwin-src/Character.cpp:2199`).
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -52,7 +52,7 @@ function row(label: string, cells: (string | number)[]): void {
 function main(): void {
   /* ------------------------------------------------- 1. byte semantics ---------- */
 
-  console.log('=== ATTRIBUTE byte semantics (doc/CSBwin-src/data.cpp:1710-1741) ===');
+  console.log('=== ATTRIBUTE byte semantics (doc/CSBwin-src/data.cpp:1713-1744) ===');
   console.log(['stored', 'reads as', 'note'].join('\t'));
 
   const boundaries: [number, string][] = [
@@ -120,7 +120,7 @@ function main(): void {
   /* ------------------------------------------------- 3. LevelUp ----------------- */
 
   console.log('');
-  console.log('=== LevelUp raises Maximum, never Current (doc/CSBwin-src/Magic.cpp:98-148) ===');
+  console.log('=== LevelUp raises Maximum, never Current (doc/CSBwin-src/Magic.cpp:101-151) ===');
   console.log(['skill', 'attribute', 'before cur/max', 'after cur/max'].join('\t'));
 
   let sawARaise = false;
@@ -156,7 +156,7 @@ function main(): void {
   /* ------------------------------- 4. AdjustCurrentAttribute -------------------- */
 
   console.log('');
-  console.log('=== AdjustCurrentAttribute (doc/CSBwin-src/Character.cpp:3900-3934) ===');
+  console.log('=== AdjustCurrentAttribute (doc/CSBwin-src/Character.cpp:3917-3951) ===');
   console.log(['current', 'minimum', 'adjust', 'result', 'why'].join('\t'));
 
   const adjustCase = (current: number, minimum: number, adjust: number, why: string): number => {

@@ -9,15 +9,15 @@
  * the force field.
  *
  *  1. A type 17 that matches unlinks itself from the square and `DeleteDBEntry`s itself
- *     (`doc/CSBwin-src/Mouse.cpp:389-398`), and takes the spell from the hand like a
- *     type 4 (`:549-568`). The wall then shows #146's ornament.
+ *     (`doc/CSBwin-src/Mouse.cpp:390-399`), and takes the spell from the hand like a
+ *     type 4 (`:550-569`). The wall then shows #146's ornament.
  *  2. A type 16 does nothing while an actuator follows it on that face
- *     (`remainingActuators[actuatorPos] != 0`, `Mouse.cpp:473-474`). With #535 gone, the
+ *     (`remainingActuators[actuatorPos] != 0`, `Mouse.cpp:474-475`). With #535 gone, the
  *     empty Firestaff in hand is swapped for the first drawable object on the square,
- *     the complete one (`:475-506`).
+ *     the complete one (`:476-507`).
  *  3. Before the spell, the Firestaff does nothing: #535 still follows #146.
  *  4. A type 17 first on its square has no `previousListObject` to unlink from, and
- *     `break`s out of the switch with its type unchanged (`Mouse.cpp:391`): it fires,
+ *     `break`s out of the switch with its type unchanged (`Mouse.cpp:392`): it fires,
  *     takes the key, and stays to fire again.
  *
  * Run: `npx tsx tools/dump-zokathra-wall.ts`

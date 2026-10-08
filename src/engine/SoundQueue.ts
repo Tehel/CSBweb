@@ -2,7 +2,7 @@
  * `QueueSound` — the engine's way of asking for a sound.
  *
  * Port of CSBWin's `QueueSound(soundNum, mapX, mapY, deltaTime)`
- * (`doc/CSBwin-src/CSBCode.cpp:1819`). The engine names sounds by **ordinal** into
+ * (`doc/CSBwin-src/CSBCode.cpp:1848`). The engine names sounds by **ordinal** into
  * `graphic232`'s sound table, not by raw SND item — `d.sound1772[soundNum]` — and
  * the table entry supplies the item number, the playback rate and the two distance
  * thresholds that decide how loud it is (or whether it plays at all). Every engine
@@ -10,13 +10,13 @@
  *
  * CSBWin's sound is on `d.LoadedLevel`, the level its caller has loaded. The port loads
  * no level, so every caller passes it as `level`: a timer's own level for anything a
- * timer does (`ProcessTimers` loads it, `doc/CSBwin-src/CSBCode.cpp:6416-6417`), the
+ * timer does (`ProcessTimers` loads it, `doc/CSBwin-src/CSBCode.cpp:6475-6476`), the
  * square's for a missile or a group, the party's for a mouse handler.
  *
  * `deltaTime > 1` does not play the sound: it sets a `TT_20` timer, which
  * `TimerSystem` answers with `QueueSound(ordinal, x, y, 1)` on the timer's level.
  *
- * `SoundFilter` (`doc/CSBwin-src/Sound.cpp:670`) may hand the sound to the dungeon's DSAs
+ * `SoundFilter` (`doc/CSBwin-src/Sound.cpp:675`) may hand the sound to the dungeon's DSAs
  * instead (`DsaSystem.soundFilter`).
  *
  * `PlayCustomSound`, a DSA's `&SOUND`, plays here too, at once and at no distance, a
@@ -66,12 +66,12 @@ export class SoundQueue {
    * `QueueSound(ordinal, mapX, mapY, deltaTime)`, on `level`, CSBWin's `d.LoadedLevel`.
    *
    * A non-zero `deltaTime` means the sound is only audible when the loaded level is
-   * the party's (`doc/CSBwin-src/CSBCode.cpp:1827-1830`). The volume, `LOCAL_12`, comes
+   * the party's (`doc/CSBwin-src/CSBCode.cpp:1856-1859`). The volume, `LOCAL_12`, comes
    * from the total *orthogonal* distance `|dx| + |dy|` against the ordinal's own entry:
    * loud at or below `byte6`, quiet above it, silent at or above `byte7`
-   * (`:1867-1876`). The sound filter sees that choice, a silent sound included, and plays
-   * nothing here if its DSAs took the sound (`:1877`). The host is handed the choice, not
-   * the distance (`:1894-1896`).
+   * (`:1896-1905`). The sound filter sees that choice, a silent sound included, and plays
+   * nothing here if its DSAs took the sound (`:1906`). The host is handed the choice, not
+   * the distance (`:1923-1925`).
    */
   queueSound(ordinal: number, mapX: number, mapY: number, deltaTime: number, level: number): void {
     const entry = this.sound1772[ordinal];
@@ -80,7 +80,7 @@ export class SoundQueue {
     if (deltaTime !== 0 && level !== this.party.state.position.z) return;
 
     if (deltaTime > 1) {
-      // `doc/CSBwin-src/CSBCode.cpp:1832-1848`: due at `d.Time + deltaTime - 1`, the
+      // `doc/CSBwin-src/CSBCode.cpp:1861-1877`: due at `d.Time + deltaTime - 1`, the
       // entry's `byte4` in `timerUByte5`, the ordinal in `timerWord8` (bytes 8-9).
       const time = (this.state.tickCount + (deltaTime & 0xffff) - 1) >>> 0;
       this.timers.createTimerWithUByte5(
@@ -101,17 +101,17 @@ export class SoundQueue {
     if (!soundId) return;
     // `rateIdx` selects among the decoded variants a SND item may have; it is not
     // CSBWin's `byte3` playback rate, which `StartSound` consumes inside the audio
-    // layer (doc/CSBwin-src/Sound.cpp:647). Everything else in the port passes 0.
+    // layer (doc/CSBwin-src/Sound.cpp:652). Everything else in the port passes 0.
     this.host.playSound(soundId, 0, highVolume);
   }
 
   /**
-   * `PlayCustomSound(soundNum, volume, flags)` (`doc/CSBwin-src/Sound.cpp:1039-1062`), a
+   * `PlayCustomSound(soundNum, volume, flags)` (`doc/CSBwin-src/Sound.cpp:1048-1071`), a
    * DSA's `&SOUND`. A negative number is `d.sound1772`'s entry `-soundNum - 1`, none past
-   * the 22nd, played by `StartSound`, loud unless `volume` is 0 (`:647-667`). `flags` is
+   * the 22nd, played by `StartSound`, loud unless `volume` is 0 (`:652-672`). `flags` is
    * unused. A number from 0 up is a sound of `CSBgraphics.dat` (`readSound`), played
    * through `SOUNDDATA::Decode` with `volume` as its divisor, 1 for a volume of 0
-   * (`:1057`). The game's volume and `NoSound` are the host's, which CSBWin checks
+   * (`:1066`). The game's volume and `NoSound` are the host's, which CSBWin checks
    * after the read, so a sound that cannot be read is said even with the sound off.
    */
   playCustomSound(soundNum: number, volume: number): void {
@@ -129,7 +129,7 @@ export class SoundQueue {
   }
 
   /**
-   * `SOUNDDATA::ReadSound(soundNum)` (`doc/CSBwin-src/Sound.cpp:989-1025`): the
+   * `SOUNDDATA::ReadSound(soundNum)` (`doc/CSBwin-src/Sound.cpp:998-1034`): the
    * `CGT_Sound` section `soundNum`, of at least 44 bytes, each byte summed with the one
    * before it as that one now stands; the sample count is the word at byte 40, and the
    * samples follow from byte 44. Every such section of the two `CSBgraphics.dat` here is a

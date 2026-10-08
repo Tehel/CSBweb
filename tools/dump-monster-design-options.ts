@@ -3,14 +3,14 @@
  * process-wide flags that make a creature's bits 11 to 14 mean anything at all.
  *
  * - `ReadExtendedFeatures` sets them from `extendedFlags & InvisibleMonsters` (0x02) and
- *   `& DrawAsSize4Monsters` (0x04) (`doc/CSBwin-src/SaveGame.cpp:394-400`), and `SaveGame`
- *   writes them back (`:947-948`, `:958-959`). Conflux 3.5's `dungeon.dat` sets both.
+ *   `& DrawAsSize4Monsters` (0x04) (`doc/CSBwin-src/SaveGame.cpp:396-402`), and `SaveGame`
+ *   writes them back (`:972-973`, `:983-984`). Conflux 3.5's `dungeon.dat` sets both.
  * - `DB4::invisible()` is `invisibleMonsters && bit 11`, and `drawAsSize4()`, `Unique()` and
- *   `Poisoned()` are `drawAsSize4Monsters && bits 12, 13, 14` (`CSB.h:1125-1132`). Off, every
+ *   `Poisoned()` are `drawAsSize4Monsters && bits 12, 13, 14` (`CSB.h:1128-1135`). Off, every
  *   reader sees false whatever the bit says; on, the bit counts:
  *   - a group drawn as size 4 that dies one member at a time leaves no droppings
- *     (`Code11f52.cpp:1126-1127`), and shows a death cloud only for its last member, the
- *     size of the cell (`:1258-1264`);
+ *     (`Code11f52.cpp:1161-1162`), and shows a death cloud only for its last member, the
+ *     size of the cell (`:1293-1299`);
  *   - an invisible creature is not drawn (`Code51a4.cpp:2205`), and a group drawn as size 4
  *     is drawn once, centred, as the member `DrawSize4Index` picks (`:323-348`, `:420-441`);
  *   - the missile half is in `tools/dump-missile-monster.ts`, scenario 2.
@@ -120,12 +120,12 @@ function main(): void {
     const conflux = quiet(() => new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(resolve(CONFLUX)))));
     readRulesOptions(rules, conflux.extendedFeatures, conflux.simpleEncipher);
     console.log(`  Conflux: extendedFlags 0x${conflux.extendedFeatures?.extendedFlags.toString(16)}: ${options(rules)}`);
-    check(rules.invisibleMonsters && rules.drawAsSize4Monsters, 'Conflux sets both options (SaveGame.cpp:394-400)');
+    check(rules.invisibleMonsters && rules.drawAsSize4Monsters, 'Conflux sets both options (SaveGame.cpp:396-402)');
     readRulesOptions(rules, undefined, false);
     check(rules.invisibleMonsters && rules.drawAsSize4Monsters, 'a file with no block leaves them as they were');
     const fresh = dmGame();
     check(!fresh.ctx.rules.invisibleMonsters && !fresh.ctx.rules.drawAsSize4Monsters,
-      'both are off at start, and DM\'s dungeon.dat, which has no block, leaves them off (data.cpp:77-78)');
+      'both are off at start, and DM\'s dungeon.dat, which has no block, leaves them off (data.cpp:78-79)');
 
     for (const [invisibleMonsters, drawAsSize4Monsters] of [[false, false], [true, false], [false, true], [true, true]]) {
       const source = dmGame();
@@ -136,7 +136,7 @@ function main(): void {
       console.log(`  ${options(source.ctx.rules)}: extendedFlags 0x${extendedFlags.toString(16)}`);
       check((extendedFlags & EF_EXTENDED_FLAGS.InvisibleMonsters) !== 0 === invisibleMonsters
         && (extendedFlags & EF_EXTENDED_FLAGS.DrawAsSize4Monsters) !== 0 === drawAsSize4Monsters,
-        '  the save carries InvisibleMonsters and DrawAsSize4Monsters for them (SaveGame.cpp:947, :958)');
+        '  the save carries InvisibleMonsters and DrawAsSize4Monsters for them (SaveGame.cpp:972, :983)');
       const target = dmGame();
       target.ctx.rules.invisibleMonsters = !invisibleMonsters;
       target.ctx.rules.drawAsSize4Monsters = !drawAsSize4Monsters;
@@ -174,8 +174,8 @@ function main(): void {
         + `droppings ${drops}, death clouds ${JSON.stringify(clouds)}`);
       const size4 = option;
       if (members === 2) {
-        check((drops > 0) === !size4, `  ${size4 ? 'no droppings: the group is drawn as size 4' : 'droppings: the bit means nothing with the option off'} (Code11f52.cpp:1126-1127)`);
-        check(clouds.length === (size4 ? 0 : 1), `  ${size4 ? 'no death cloud while a member lives' : 'a death cloud for the member'} (:1258-1269)`);
+        check((drops > 0) === !size4, `  ${size4 ? 'no droppings: the group is drawn as size 4' : 'droppings: the bit means nothing with the option off'} (Code11f52.cpp:1161-1162)`);
+        check(clouds.length === (size4 ? 0 : 1), `  ${size4 ? 'no death cloud while a member lives' : 'a death cloud for the member'} (:1293-1304)`);
       } else {
         check(clouds.length === 1 && (size4 ? clouds[0]!.size === 255 && clouds[0]!.posInCell === 255 : clouds[0]!.size === 110),
           `  the last member's cloud is ${size4 ? 'the cell\'s, size 255 in no corner' : 'a corner\'s, size 110'}`);

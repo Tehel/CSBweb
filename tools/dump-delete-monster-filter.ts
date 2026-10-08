@@ -1,24 +1,24 @@
 /**
- * `ProcessMonsterDeleteFilter` (`doc/CSBwin-src/Code11f52.cpp:926-1020`), which every site
+ * `ProcessMonsterDeleteFilter` (`doc/CSBwin-src/Code11f52.cpp:961-1055`), which every site
  * that deletes a group, or kills a member of one, runs first, against a genuine save
  * (`csbgame7.dat`), with DSAs at the filter's location.
  *
  * 1. **The kill is counted** in `expool`'s record `(EDT_Statistics << 24) |
  *    (ESTAT_NumMonsterKilled << 16) | (why << 8) | monsterType`, a longword per
- *    `alternateGraphics` (`:943-962`): a record of four when there is none, else the
+ *    `alternateGraphics` (`:978-997`): a record of four when there is none, else the
  *    count is raised where the record stands, and the pool keeps its size.
  * 2. **Every DSA at the location runs**, each with a count of 8 and the block
- *    (`:1011-1012`): the group's RN, its level and square, the reason, `dropResidue`,
- *    `deathCloud`, and the member's index, -1 for the whole group (`CSB.h:2940-2947`).
- *    The second sees the block the first rewrote (`:1014`), and both run on parameters of
- *    their own (`NEWDSAPARAMETERS`, `:928`).
+ *    (`:1046-1047`): the group's RN, its level and square, the reason, `dropResidue`,
+ *    `deathCloud`, and the member's index, -1 for the whole group (`CSB.h:2999-3006`).
+ *    The second sees the block the first rewrote (`:1017`), and both run on parameters of
+ *    their own (`NEWDSAPARAMETERS`, `:963`).
  * 3. **`deathCloud` 2 shows no cloud, `dropResidue` 2 drops no remains**
- *    (`:1114`, `:1124`, `:1115`, `:1131`). The group's last member drops them only for a
+ *    (`:1149`, `:1127`, `:1118`, `:1134`). The group's last member drops them only for a
  *    `dropResidue` below 2, another member for anything but 2: so 3 drops a member's and
  *    not the last one's.
  * 4. **Each site gives its reason**: the party landing on a group (`DMW_Movement2`,
- *    `:3304`), a group on a level its type may not live on (`DMW_Movement1`, at its old
- *    square, `:3151-3159`), and `MakeMoreRoomInDB` (`DMW_MakeRoom`, `Character.cpp:280`).
+ *    `:3339`), a group on a level its type may not live on (`DMW_Movement1`, at its old
+ *    square, `:3186-3194`), and `MakeMoreRoomInDB` (`DMW_MakeRoom`, `Character.cpp:281`).
  *
  * Run: `npx tsx tools/dump-delete-monster-filter.ts`
  */
@@ -33,7 +33,7 @@ import { MonsterType } from '../src/engine/monsterTypes';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
 import { check, finish } from './lib/check';
 
-/** `ESL_DELETEMONSTERFILTER` (`doc/CSBwin-src/CSB.h:1542`). */
+/** `ESL_DELETEMONSTERFILTER` (`doc/CSBwin-src/CSB.h:1545`). */
 const ESL_DELETEMONSTERFILTER = 7;
 const WORDS = 8;
 const DROP_RESIDUE = 5;
@@ -51,7 +51,7 @@ const setWord = (index: number, value: number): number[] => [
   ...int(value), varStore(10 + index), ...int(WORDS), ...int(10), op(StkOp.PARAM_STORE),
 ];
 
-/** The kill statistics' key (`doc/CSBwin-src/Code11f52.cpp:951`). */
+/** The kill statistics' key (`doc/CSBwin-src/Code11f52.cpp:986`). */
 const statsKey = (why: number, type: number): number => ((6 << 24) + (0 << 16) + (why << 8) + type) >>> 0;
 
 /** Every group on the party's level: its RN and square. */

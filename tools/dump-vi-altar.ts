@@ -15,22 +15,22 @@
  * Resolving the champion has two arms, and this tool drives both, because the
  * difference between them is where the port was wrong. Bones made by a **death** carry
  * an expool record holding the champion's fingerprint, and their `value` is the *kind*
- * of bones — 2, "a dead champion's" (`doc/CSBwin-src/CSB.h:1264`). Bones placed by the
+ * of bones — 2, "a dead champion's" (`doc/CSBwin-src/CSB.h:1267`). Bones placed by the
  * **dungeon** carry no record, and there `value` *is* the champion index
- * (`Timer.cpp:2788`, `Mouse.cpp:934`). The port used to have no second arm at all: it
+ * (`Timer.cpp:2788`, `Mouse.cpp:935`). The port used to have no second arm at all: it
  * guessed, resurrecting the single dead champion if there was exactly one and refusing
  * outright if there were two, and the drop handler rejected any bones whose `value`
  * was not 2 — which is every dungeon-authored bones object aimed at a champion other
  * than index 2.
  *
- * The last case is `BringCharacterToLife`'s corner search (`Character.cpp:804`). A
+ * The last case is `BringCharacterToLife`'s corner search (`Character.cpp:805`). A
  * champion is revived into a corner someone living already stands in, and must be
  * moved; the champion themselves is still dead while that is decided, which is why
- * `CharacterAtPosition` skipping the dead (`Code11f52.cpp:4062`) is load-bearing
+ * `CharacterAtPosition` skipping the dead (`Code11f52.cpp:4100`) is load-bearing
  * rather than a detail.
  *
  * And the pair has to outlast the game that made it. The record is one of `EXPOOL`'s,
- * database 11, keyed by the bones' RN (`doc/CSBwin-src/data.cpp:1636-1643`), and an RN
+ * database 11, keyed by the bones' RN (`doc/CSBwin-src/data.cpp:1639-1646`), and an RN
  * in a file is a slot of that file's object indirect index. So the last case saves a
  * game with bones on the floor and reads the file's own pool: the record is there, under
  * the bones' slot, and a game that loads the file resurrects from it.
@@ -72,7 +72,7 @@ import { readCsbwinCharacter, writeCsbwinCharacter } from '../src/data/CsbwinCha
 import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { getFromWings, saveToWings } from '../src/engine/Wings';
 
-/** `EDT_ChampionBones` (`doc/CSBwin-src/CSB.h:1571`). */
+/** `EDT_ChampionBones` (`doc/CSBwin-src/CSB.h:1574`). */
 const EDT_CHAMPION_BONES = 9;
 
 /** `if (decorationIndex == 2) d.OrnateAlcoveGraphicIndex = D5W` (`Code390e.cpp:218`). */
@@ -164,7 +164,7 @@ function makeDungeonBones(game: Game, chIdx: number, posInCell: number): ObjectI
  *
  * `d.OrnateAlcoveGraphicIndex` is the level's decoration slot whose global decoration
  * index is **2** (`doc/CSBwin-src/Code390e.cpp:218`), and `d.FacingViAltar` is set only
- * while the party is looking straight at one (`doc/CSBwin-src/CSBCode.cpp:3301`). The
+ * while the party is looking straight at one (`doc/CSBwin-src/CSBCode.cpp:3362`). The
  * decoration lives on an actuator inside the *wall* cell, with `pos` naming which face
  * it is on, so the party stands in the neighbouring cell and faces it: a wall object is
  * in front when `(pos - facing) & 3 == 2`, hence `facing = (pos + 2) & 3`.
@@ -320,7 +320,7 @@ function main(): void {
   /* ---------------------------------------- 1b. a fingerprint of 0 --------------- */
 
   // `expool.AddChampionBonesRecord(objD4, pcA3->fingerPrint)` is unconditional
-  // (doc/CSBwin-src/Character.cpp:2646): 0 is a fingerprint like any other — the one
+  // (doc/CSBwin-src/Character.cpp:2651): 0 is a fingerprint like any other — the one
   // `AddCharacter` gives a champion recruited at level 0, (0, 0).
   console.log('');
   console.log('=== a fingerprint of 0 still pairs the bones with the champion ===');
@@ -508,7 +508,7 @@ function main(): void {
         const nameIndex = resolveObjectNameIndex(ui, bones);
 
         // The gate that decides whether a click in the alcove is an altar offering at
-        // all (`src/renderer/ui/ViewportPicking.ts`, `doc/CSBwin-src/Mouse.cpp:898`).
+        // all (`src/renderer/ui/ViewportPicking.ts`, `doc/CSBwin-src/Mouse.cpp:899`).
         // `OBJNI_BONES_A` had been transcribed as decimal 93 out of a hex comment, so
         // this read 147 !== 93 and the altar was never offered anything.
         console.log('');
@@ -519,7 +519,7 @@ function main(): void {
 
         // What the player reads. Both places CSBWin prints a bones name put the dead
         // champion's name in front of it, through `DescribeChampionBones`'s "% BONES"
-        // (doc/CSBwin-src-20230608/Code11f52.cpp:29-60).
+        // (doc/CSBwin-src/Code11f52.cpp:29-60).
         const shown = getObjectDisplayName(ui, bones, nameIndex);
         const inHand = heldObjectName(ui, bones);
         console.log(['name shown for the bones', shown].join('\t'));
@@ -568,7 +568,7 @@ function main(): void {
       g.systems.monsterAttack.killCharacter(1);
 
       // `if (value != 0)` — bones whose value is 0 are scenery, not anybody's remains
-      // (`doc/CSBwin-src/Code11f52.cpp:44`, `doc/CSBwin-src/CSB.h:1258-1264`). The
+      // (`doc/CSBwin-src/Code11f52.cpp:79`, `doc/CSBwin-src/CSB.h:1261-1267`). The
       // altar's `value`-as-index arm must not read that 0 as "champion 0".
       const inert = makeDungeonBones(g, 0, 0);
       g.ctx.dungeon.getMiscRecord(inert)!.specialState = 0;
@@ -632,7 +632,7 @@ function main(): void {
         console.log(["which the file's index names (db:idx)", named].join('\t'));
         console.log(["the record, and the champion's fingerprint", `${filePool.copyChampionBonesRecord(slot)}, ${fingerprint}`].join('\t'));
         // The bones' block is the pool's first after the directory, written at the death;
-        // the save's overlay palette records fill eight more (`SaveGame.cpp:1151-1164`).
+        // the save's overlay palette records fill eight more (`SaveGame.cpp:1216-1231`).
         check(blocks === 10, "the file's EXPOOL: the directory, a block of bones records, and the palette's eight");
         check(slots.length === 1, 'holding one bones record');
         check(slot === bones, "keyed by the bones' RN, a slot of the object index");

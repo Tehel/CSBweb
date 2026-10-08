@@ -25,7 +25,7 @@
  *    and 4 of the CSBWin file a save is, the port's or a genuine one. Asserted against
  *    real files.
  * 6. **Entering and leaving.** The disk menu is bracketed by `TAG02076e` and `TAG0207cc`
- *    (`doc/CSBwin-src/SaveGame.cpp:860`, `:1274`). The first repacks a chest open in the
+ *    (`doc/CSBwin-src/SaveGame.cpp:877`, `:1375`). The first repacks a chest open in the
  *    inventory, which is what puts its objects in the save; the second shows the
  *    inventory again and brings the attack buttons back. Run over a real chest, with a
  *    real save restored into a fresh game. The port's quick-save repacks the chest too.
@@ -865,7 +865,7 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   SaveMenu.openSaveMenu(ui);
   console.log(`  menu up: open chest ${ui.openChestId}, the chest holds ${chestContents(game, chest)}`);
   check(ui.openChestId === null && chestContents(game, chest) === packed,
-    'TAG02076e repacks it (Character.cpp:5116-5125): the chest holds its objects again');
+    'TAG02076e repacks it (Character.cpp:5141-5150): the chest holds its objects again');
 
   const fresh = await loadGame();
   applySaveBytes(fresh, buildSaveFile(game));
@@ -876,10 +876,10 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   SaveMenu.closeSaveMenu(ui);
   console.log(`  menu gone: inventory ${party.selectedCharacterIndex}, caster ${party.magicCasterIndex}, word20252 ${ui.word20252}, word20250 ${ui.word20250}`);
   check(party.selectedCharacterIndex === 0 && party.magicCasterIndex === 0,
-    'TAG0207cc shows the inventory again and keeps the living caster (CSBCode.cpp:9945-9958)');
+    'TAG0207cc shows the inventory again and keeps the living caster (CSBCode.cpp:10069-10082)');
   check(ui.word20252 === 1, 'and, with no attack menu open, brings the attack buttons back (d.Word20252 = 1)');
   check(ui.word20250 === 0,
-    'its DrawLegalAttackTypes owes the panel nothing more, so no damage is flashed at the next tick (CSBCode.cpp:8793)');
+    'its DrawLegalAttackTypes owes the panel nothing more, so no damage is flashed at the next tick (CSBCode.cpp:8898)');
   draw();
   check(ui.openChestId === chest && chestContents(game, chest) === 0, 'the next draw opens the chest again');
 
@@ -1016,7 +1016,7 @@ function checkPressAnimation(graphics: GraphicsLoader): void {
 /**
  * `GameSaves.save` as the disk menu calls it (the clock stopped) and as F5 does (the
  * clock running). The tail is seen through `d.CanRestartFromSavegame`, which a new game
- * has at 0 and `SaveGame`'s tail sets (`doc/CSBwin-src/SaveGame.cpp:1260`). Then one
+ * has at 0 and `SaveGame`'s tail sets (`doc/CSBwin-src/SaveGame.cpp:1358`). Then one
  * store under two games of two data sets.
  */
 async function checkSaveCall(): Promise<void> {
@@ -1059,7 +1059,7 @@ async function checkSaveCall(): Promise<void> {
     const first = await menu.saves.save('stopped', 'new');
     console.log(`  clock stopped: tail run at the write ${menu.tailAtWrite()}, after it ${menu.game.canRestartFromSavegame()}`);
     check(menu.tailAtWrite() === false && menu.game.canRestartFromSavegame(),
-      'the menu\'s save runs its tail once the file is written (SaveGame.cpp:1245-1260)');
+      'the menu\'s save runs its tail once the file is written (SaveGame.cpp:1343-1358)');
     const second = await menu.saves.save('stopped', 'new');
     const third = await menu.saves.save('running', 'quick');
     console.log(`  names: ${first.name}, ${second.name}, ${third.name}`);
@@ -1130,7 +1130,7 @@ async function checkSaveCall(): Promise<void> {
     const refused = await attempt(menuFails.saves.save('stopped', 'new'));
     console.log(`  clock stopped, the write fails: ${refused}, tail run ${menuFails.game.canRestartFromSavegame()}`);
     check(refused !== 'written' && !menuFails.game.canRestartFromSavegame(),
-      'a failed write skips the tail, as SaveError jumps past it (SaveGame.cpp:1264)');
+      'a failed write skips the tail, as SaveError jumps past it (SaveGame.cpp:1361)');
 
     const quick = await stage(false);
     await quick.saves.save('running', 'quick');
@@ -1163,12 +1163,12 @@ async function checkSaveCall(): Promise<void> {
     const afterFailure = reader.saves.consumeSavedGameRead();
     console.log(`  the chooser's read: ${afterRead}, then ${afterFailure}, then ${reader.saves.consumeSavedGameRead()}; d.CanRestartFromSavegame ${reader.game.canRestartFromSavegame()}`);
     check(afterRead === 'loaded' && reader.game.canRestartFromSavegame(),
-      'a read restores the save into the game (SaveGame.cpp:1883) and is \'loaded\'');
+      'a read restores the save into the game (SaveGame.cpp:2087) and is \'loaded\'');
     check(afterFailure === 'damaged' && reader.saves.consumeSavedGameRead() === 'cancelled',
       'a failed one is \'damaged\', and each is forgotten once asked for');
     check(told.length === 0 && reports.length === 0, 'none of it is told in the message area: only F5 and F9 are');
 
-    // F5 where the disk icon does nothing (`doc/CSBwin-src/Mouse.cpp:1716-1718`): a
+    // F5 where the disk icon does nothing (`doc/CSBwin-src/Mouse.cpp:1855-1857`): a
     // champion still being chosen, whom a file would bring back as a member, or no party.
     // And F5 and F9 while a script holds the loop. Each says so in the message area.
     const choosing = await stage(false);
@@ -1206,7 +1206,7 @@ async function checkSaveCall(): Promise<void> {
     await unwritable.saves.quickSave();
     console.log(`  F5 where the store cannot be written: ${toldSince(beforeFailure)} (${reports[4]})`);
     check(toldSince(beforeFailure) === '/15:UNABLE TO SAVE GAME!' && reports.length === 5 && reports[4] === 'Quick-save failed',
-      'a write that fails is SaveError\'s line (SaveGame.cpp:1266), and its error is reported');
+      'a write that fails is SaveError\'s line (SaveGame.cpp:1363), and its error is reported');
 
     // F5 while a DSA has disabled saves: CSBWin's disk menu's words, and no save.
     const disabled = await stage(false);
@@ -1283,7 +1283,7 @@ async function checkSaveCall(): Promise<void> {
     console.log(`  F9 in another playthrough of ${DEFAULT_DATA_SET.id}, then in dm-windows: ${toldSince(beforeNone)}`);
     check(toldSince(beforeNone) === '/15:CAN\'T FIND SAVED GAME!/15:CAN\'T FIND SAVED GAME!'
       && stranger.game.ctx.party.state.champions[0]!.name === 'WUUF' && empty.game.ctx.party.state.champions[0]!.name === 'DAROO',
-      'F9 in a playthrough with no save finds none (SaveGame.cpp:1585), whatever the others hold, and loads nothing');
+      'F9 in a playthrough with no save finds none (SaveGame.cpp:1710), whatever the others hold, and loads nothing');
 
     // Each playthrough's F5 has its own slot.
     const strangerQuick = await stranger.saves.save('running', 'quick');
@@ -1871,7 +1871,7 @@ async function checkTwoLevels(graphics: GraphicsLoader): Promise<void> {
     later();
 
     // A game whose DSA has disabled saves (`&DISABLESAVES`): CSBWin's disk menu says only
-    // "SAVES ARE DISABLED" (`doc/CSBwin-src/SaveGame.cpp:848-856`). The dialog says it,
+    // "SAVES ARE DISABLED" (`doc/CSBwin-src/SaveGame.cpp:856-873`). The dialog says it,
     // and saves nothing, with no "new save" row though the game has no save; LOAD loads.
     const shut = await menuRig(graphics, store, 'TIGGY');
     shut.game.systems.dsa.disableSaves = true;
@@ -3118,7 +3118,7 @@ async function checkUpgrade(): Promise<void> {
     'a file holds none of the four only when all four are 0: an Atari save\'s Byte22596 1 is one');
   check(/ALREADY UTILIZED/.test(rise(earlyBytes)), 'RISE refuses the early file, as CSBWin\'s utility would');
   check(earlyStamped.length === csbwinBytes.length && earlyStamped.every((b, i) => b === csbwinBytes[i]),
-    'stamped, it is byte for byte the file the game writes with _ReadEntireGame\'s 1, 2, 1 and 13 (SaveGame.cpp:1467-1470)');
+    'stamped, it is byte for byte the file the game writes with _ReadEntireGame\'s 1, 2, 1 and 13 (SaveGame.cpp:1568-1571)');
   check(rise(earlyStamped) === 'TAKEN', 'and RISE takes it');
   check(earlyNow.id === 'early' && earlyNow.quick && earlyNow.usedAt === 400 && earlyNow.playTime === 5000
     && earlyNow.playthrough === 0x2d431dd2 && earlyNow.champions.join('/') === pair.join('/') && earlyNow.level === 9,

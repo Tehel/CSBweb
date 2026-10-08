@@ -1,20 +1,20 @@
 /**
- * The sound filter, `SoundFilter` (`doc/CSBwin-src/Sound.cpp:670-756`), which `QueueSound`
- * calls once it has chosen the volume (`doc/CSBwin-src/CSBCode.cpp:1877`), run through
+ * The sound filter, `SoundFilter` (`doc/CSBwin-src/Sound.cpp:675-761`), which `QueueSound`
+ * calls once it has chosen the volume (`doc/CSBwin-src/CSBCode.cpp:1906`), run through
  * `SoundQueue.queueSound` with two DSAs on its square, against a genuine save
  * (`csbgame7.dat`).
  *
  * 1. **A dungeon with no filter plays the sound** (`SoundFilter` returns 1).
  * 2. **Every DSA at the location runs**, the second after the first, a filter call apiece
- *    (`:705-747`), and the sound is theirs: nothing plays (`QueueSound` returns at `:1877`).
- * 3. **The nine parameters** (`:730-739`): the ordinal plus 1, the volume, the squared
+ *    (`:715-757`), and the sound is theirs: nothing plays (`QueueSound` returns at `:1906`).
+ * 3. **The nine parameters** (`:740-749`): the ordinal plus 1, the volume, the squared
  *    distance, the sound's level, x and y, `gameVolume` and `NoSound` (CSBWin's defaults,
  *    0 and 0), and the distance in hundredths, three integer Newton steps from
  *    `100 * max(dx, dy)`: 141 for a step of (1, 1), 500 for (3, 4), 0 on the party's square.
- * 4. **A sound out of earshot reaches the filter too**, with volume -1 (`:1876-1878`).
+ * 4. **A sound out of earshot reaches the filter too**, with volume -1 (`:1905-1907`).
  * 5. **A DSA plays the sound if it pleases**, with `&SOUND` (`PlayCustomSound`,
- *    `Sound.cpp:1039-1062`).
- * 6. **A sound queued while the DSAs run plays on** (`filterActive`, `:672-676`): the
+ *    `Sound.cpp:1048-1071`).
+ * 6. **A sound queued while the DSAs run plays on** (`filterActive`, `:677-681`): the
  *    filter does not run for it.
  *
  * Run: `npx tsx tools/dump-sound-filter.ts`
@@ -24,7 +24,7 @@ import type { Game } from '../src/engine/Game';
 import { UNSET, freshGame, globalStore, int, op, varFetch, withFilterDsas } from './lib/dsa';
 import { check, finish } from './lib/check';
 
-/** `ESL_SOUNDFILTER` (`doc/CSBwin-src/CSB.h:1543`). */
+/** `ESL_SOUNDFILTER` (`doc/CSBwin-src/CSB.h:1546`). */
 const ESL_SOUNDFILTER = 8;
 
 /** The filter's parameter count, then its first `n` parameters, into globals `to` on. */

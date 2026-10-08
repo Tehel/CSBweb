@@ -42,7 +42,7 @@ import { CursorFilterType } from './DsaSystem';
 export const MSG_COLOR_SPELL = 4;
 export const MSG_COLOR_ROOM_TEXT = 15;
 
-/** `soundPRESSUREPAD` (`doc/CSBwin-src/CSB.h:623`). */
+/** `soundPRESSUREPAD` (`doc/CSBwin-src/CSB.h:626`). */
 const SOUND_PRESSURE_PAD = 1;
 
 export class ActuatorSystem {
@@ -51,7 +51,7 @@ export class ActuatorSystem {
   /** `d.Byte1596`, the room-type timer functions. */
   private readonly byte1596: ArrayLike<number>;
   private readonly objDescObjectType: ArrayLike<number>;
-  /** Per-champion message colour, CSBWin `d.Byte1386[4]` (`doc/CSBwin-src/Data.h:1416`). */
+  /** Per-champion message colour, CSBWin `d.Byte1386[4]` (`doc/CSBwin-src/Data.h:1431`). */
   private readonly byte1386: ArrayLike<number>;
   private delayedAction = -1;
   private delayedActionX = 0;
@@ -77,9 +77,9 @@ export class ActuatorSystem {
   }
 
   /**
-   * `PlaceOrRemoveObjectInRoom` (`doc/CSBwin-src/Code11f52.cpp:3882`): every actuator in
+   * `PlaceOrRemoveObjectInRoom` (`doc/CSBwin-src/Code11f52.cpp:3917`): every actuator in
    * the cell gets `PressurePadOrAlcove`. `facing` stands in for the `d.partyFacing` that
-   * `PressurePadOrAlcove` reads (`:3776`), and only matters when the party itself moves.
+   * `PressurePadOrAlcove` reads (`:3811`), and only matters when the party itself moves.
    */
   triggerObjectMove(
     position: Position,
@@ -134,9 +134,9 @@ export class ActuatorSystem {
   }
 
   /**
-   * `TouchWall` (doc/CSBwin-src/Mouse.cpp:290): the party's hand on side
+   * `TouchWall` (doc/CSBwin-src/Mouse.cpp:291): the party's hand on side
    * `touchedPosition` of the wall at `position`. True when a switch fired, CSBWin's
-   * `result = 1` (`:537-539`), which `TouchWallF1` makes `d.clockTick`
+   * `result = 1` (`:538-540`), which `TouchWallF1` makes `d.clockTick`
    * (`MouseSystem.handleWallClick`).
    */
   touchWall(position: Position, touchedPosition: number): boolean {
@@ -169,7 +169,7 @@ export class ActuatorSystem {
           continue;
         }
         // With nobody owning the cursor, `d.HandChar == -1`, only a portrait answers
-        // (`Mouse.cpp:357-360`). Read at each actuator, as a recruit gives it an owner.
+        // (`Mouse.cpp:358-361`). Read at each actuator, as a recruit gives it an owner.
         if ((party.cursorOwner ?? -1) === -1 && actuatorType !== 127) {
           continue;
         }
@@ -206,7 +206,7 @@ export class ActuatorSystem {
             if (!switchOpen && actuatorType === 11) {
               this.performLocalAction(2, position.x, position.y, position.z, actuatorPos);
             }
-            // A type 17 takes itself off the wall (`Mouse.cpp:389-398`): unlinked and
+            // A type 17 takes itself off the wall (`Mouse.cpp:390-399`): unlinked and
             // deleted, so the actuators before it no longer count it as remaining and
             // the wall shows the ornament of the one now last. The loop goes on from
             // `previous`, whose link is now the deleted one's. One first on the square
@@ -301,7 +301,7 @@ export class ActuatorSystem {
             const placed = this.dungeon.rnMaps.setPos(objectInHand, actuatorPos);
             this.dungeon.addObjectToCell(position, placed);
             this.applyCursorFilter(CursorFilterType.SwapReplace, firstObject, position, actuatorPos);
-            // `ObjectToCursor` (`Mouse.cpp:507`) fills the hand, not the local
+            // `ObjectToCursor` (`Mouse.cpp:508`) fills the hand, not the local
             // `objectInHand`, which stays the object now on the wall. No later actuator
             // of this touch reads it: a type 16 is the last of its side.
             party.objectInHand = firstObject;
@@ -318,7 +318,7 @@ export class ActuatorSystem {
               skip = true;
               break;
             }
-            // A click on a Hall of Champions mirror (`doc/CSBwin-src/Mouse.cpp:513`).
+            // A click on a Hall of Champions mirror (`doc/CSBwin-src/Mouse.cpp:514`).
             if (emptyHanded) {
               const added = this.ctx.systems.hallOfChampions.addCharacter(getActuatorValue(rec));
               if (added) characterAdded = true;
@@ -346,7 +346,7 @@ export class ActuatorSystem {
               if (allow) {
                 const deleted = objectInHand;
                 party.objectInHand = OBJECT_ID_NULL;
-                // `RNempty`, which a gift's packet carries after it (`Mouse.cpp:567`).
+                // `RNempty`, which a gift's packet carries after it (`Mouse.cpp:568`).
                 objectInHand = 0 as ObjectID;
                 emptyHanded = true;
                 if (deleted !== OBJECT_ID_NULL) {
@@ -477,13 +477,13 @@ export class ActuatorSystem {
       this.ctx.sounds.queueSound(SOUND_PRESSURE_PAD, position.x, position.y, 1, position.z);
     }
 
-    // Always -1, an alcove's wall position included (doc/CSBwin-src/Code11f52.cpp:3875).
+    // Always -1, an alcove's wall position included (doc/CSBwin-src/Code11f52.cpp:3910).
     this.queueSwitchAction(rec, padAction, position, -1);
     return true;
   }
 
   /**
-   * `QueueSwitchAction` (doc/CSBwin-src/Code11f52.cpp:3566-3605). `source` and `mapPos` are
+   * `QueueSwitchAction` (doc/CSBwin-src/Code11f52.cpp:3601-3640). `source` and `mapPos` are
    * where the switch is, and a local action is all they are read for: `PerformLocalAction`
    * gets them, and `RotateActuatorList` then rotates that square's actuators.
    */
@@ -555,7 +555,7 @@ export class ActuatorSystem {
           const text = rec ? this.dungeon.decodeMessageText(rec, this.ctx.tables.textDecode) : null;
           // CSBWin: `QuePrintLines(15, text)` with no preceding PrintLinefeed() — the
           // decoder prepends the linefeed itself for typeOfText 1
-          // (doc/CSBwin-src/Code11f52.cpp:3962, doc/CSBwin-src/CSBCode.cpp:5510).
+          // (doc/CSBwin-src/Code11f52.cpp:3997, doc/CSBwin-src/CSBCode.cpp:5575).
           if (text) {
             this.ctx.host.messages.quePrintLines(MSG_COLOR_ROOM_TEXT, text);
           }
@@ -589,7 +589,7 @@ export class ActuatorSystem {
   }
 
   /**
-   * `DoesPartyHave` (`doc/CSBwin-src/Code11f52.cpp:3622-3680`), for actuator type 8: the 30
+   * `DoesPartyHave` (`doc/CSBwin-src/Code11f52.cpp:3657-3715`), for actuator type 8: the 30
    * possessions of every champion with hit points, then the cursor — which the `goto` back
    * into the loop checks whoever holds it — and, for each one that is a chest, the chest's
    * contents too.
@@ -618,7 +618,7 @@ export class ActuatorSystem {
 
   private performLocalAction(localActionType: number, mapX: number, mapY: number, mapZ: number, mapPos: number): void {
     if (localActionType === 10) {
-      // SkillIncreaser(8, 300, mapPos == -1 ? 0 : 1) (doc/CSBwin-src/Mouse.cpp:209-230).
+      // SkillIncreaser(8, 300, mapPos == -1 ? 0 : 1) (doc/CSBwin-src/Mouse.cpp:210-231).
       let adjustment = 300;
       const party = this.ctx.party.state;
       const experienceMultiplier = this.dungeon.getMap(mapZ)?.descriptor.difficulty ?? 0;
@@ -634,7 +634,7 @@ export class ActuatorSystem {
       adjustment = Math.trunc(adjustment / (party.champions.length || 1));
       for (let i = 0; i < party.champions.length; i++) {
         const champ = party.champions[i];
-        // `if (d.CH16482[D7W].HP() != 0)` (`doc/CSBwin-src/Mouse.cpp:225`).
+        // `if (d.CH16482[D7W].HP() != 0)` (`doc/CSBwin-src/Mouse.cpp:226`).
         if ((champ.attributes.health | 0) === 0) continue;
         this.applySkillIncrease(champ, i, 8, adjustment, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser2);
       }
@@ -661,7 +661,7 @@ export class ActuatorSystem {
   }
 
   /**
-   * `RotateActuatorList` (doc/CSBwin-src/Code11f52.cpp:3465-3525): the local action 1 or 2
+   * `RotateActuatorList` (doc/CSBwin-src/Code11f52.cpp:3500-3560): the local action 1 or 2
    * that `PerformLocalAction` put off moves the first actuator at its square (and
    * position) behind the last. Called where CSBWin calls it: the end of
    * `PlaceOrRemoveObjectInRoom`, `TouchWall` and `ProcessTT_STONEROOM`.
@@ -736,7 +736,7 @@ export class ActuatorSystem {
 
   /**
    * `CursorFilter` on a packet of `type` for `object`, with `TouchWall`'s four words: the
-   * level, the wall's square and the side touched (`doc/CSBwin-src/Mouse.cpp:421-429`).
+   * level, the wall's square and the side touched (`doc/CSBwin-src/Mouse.cpp:422-430`).
    * False when a DSA cancelled.
    */
   private applyCursorFilter(

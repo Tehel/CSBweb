@@ -4,8 +4,8 @@
  *
  * `CHARDESC` carries the **picture**, not an index to one: `AddCharacter` blits a cell
  * of basic graphic 26 into the character record once
- * (`doc/CSBwin-src/Character.cpp:486-508`), and every later draw copies those 464 bytes
- * back out with `CharacterPortraitToStatusBox` (`:4644`). A champion restored from a
+ * (`doc/CSBwin-src/Character.cpp:487-509`), and every later draw copies those 464 bytes
+ * back out with `CharacterPortraitToStatusBox` (`:4661`). A champion restored from a
  * save therefore has pixels and no index at all, where a champion this engine created
  * carries the port's `portraitGraphic` until a save writes the pixels.
  *
@@ -76,7 +76,7 @@ const SCREEN_H = 200;
 
 /**
  * Where champion `chIdx`'s portrait lands: `chIdx*69+7` by 0, 32 wide and 29 tall
- * (`CharacterPortraitToStatusBox`, `doc/CSBwin-src/Character.cpp:4648-4651`).
+ * (`CharacterPortraitToStatusBox`, `doc/CSBwin-src/Character.cpp:4665-4668`).
  */
 function portraitOrigin(chIdx: number): { x: number; y: number } {
   return { x: chIdx * 69 + 7, y: 0 };
@@ -127,7 +127,7 @@ function main(): void {
   function render(champions: Champion[], chIdx: number): Uint8Array {
     const party = new Party(new Position(1, 1, 0), Direction.NORTH);
     for (const champion of champions) party.addChampion(champion);
-    // `inventoryOpen = ((chIdx+1) == d.SelectedCharacterOrdinal)` (`:1253`) — the
+    // `inventoryOpen = ((chIdx+1) == d.SelectedCharacterOrdinal)` (`:1258`) — the
     // portrait goes to the status box only for the champion whose inventory is open.
     party.state.selectedCharacterIndex = chIdx;
     ui.partyState = party.state;

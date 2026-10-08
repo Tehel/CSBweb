@@ -4,7 +4,7 @@
  * `DrawFloorDecorations`, with the extended (CSB graphics) decorations each draws. The
  * bytecode's `StdDrawWallDecoration`, `StdDrawWallText` and `StdDrawFloorDecoration` pop
  * their arguments and call these, as CSBWin's `Interpret` does
- * (`doc/CSBwin-src/Viewport.cpp:2925-2949`).
+ * (`doc/CSBwin-src/Viewport.cpp:2932-2956`).
  */
 
 import { OBJECT_ID_EOF, type ObjectID } from '../../core/types';
@@ -15,13 +15,13 @@ import { bltShapeToViewportIndex, cropBitmap, tag0088b2Explicit, tag0088b2Index 
 import type { ViewportDraw } from './ViewportDraw';
 
 /**
- * `DrawWallDecoration` (`doc/CSBwin-src/CSBCode.cpp:3133`) — the picture frame, and
+ * `DrawWallDecoration` (`doc/CSBwin-src/CSBCode.cpp:3189`) — the picture frame, and
  * then the champion portrait inside it.
  *
  * The two halves are independent: `PORTRAIT_HideGraphic` leaves `graphicOrdinal` at 0
  * with a portrait still to draw, and every other decoration has no portrait, so
- * CSBWin bails only when *both* are absent (`:3191`) and draws the frame only when
- * `graphicIndex >= 0` (`:3673`).
+ * CSBWin bails only when *both* are absent (`:3247`) and draws the frame only when
+ * `graphicIndex >= 0` (`:3738`).
  *
  * `expandedText` is a wall text's `ExpandedText`, decoded by `drawWallText`, which passes
  * `d.NumWallDecoration+1` to draw it from afar as its plaque.
@@ -39,7 +39,7 @@ export function DrawWallDecoration(
     ? drawWallDecorationGraphic(draw, graphicOrdinal, relativePosition, expandedText)
     : false;
 
-  // `if (relativePosition == 12)` (`:3685`) — only the wall the party stands against
+  // `if (relativePosition == 12)` (`:3750`) — only the wall the party stands against
   // is close enough to show a face.
   if (relativePosition === 12) {
     drawChampionPortrait(draw, championPortraitOrdinal);
@@ -73,7 +73,7 @@ function drawWallDecorationGraphic(
   const map = dungeon.getMap(draw.context.frameMapIndex ?? 0);
   if (!map?.wallDecorationTOC) return false;
 
-  // CSBWin: `graphicIndex = graphicOrdinal-1` (CSBCode.cpp:3179-3183)
+  // CSBWin: `graphicIndex = graphicOrdinal-1` (CSBCode.cpp:3235-3239)
   const graphicIndex = (graphicOrdinal - 1) | 0;
   const numWallDecoration = draw.context.numWallDecoration ?? 0;
   if (graphicIndex < 0 || graphicIndex > numWallDecoration) return false;
@@ -97,7 +97,7 @@ function drawWallDecorationGraphic(
   if (dstW <= 0 || dstH <= 0) return isAlcove;
 
   // `LOCAL_22`, CSBWin 20230608's copy of `pWDP`'s rectangle, the one blitted. A text of one
-  // to three lines cuts its plaque short (`doc/CSBwin-src-20230608/CSBCode.cpp:3625-3660`,
+  // to three lines cuts its plaque short (`doc/CSBwin-src/CSBCode.cpp:3625-3660`,
   // `:3743`). Position 12 shows the words instead, in `drawWallText`.
   let blitY2 = y2;
   if (graphicIndex === numWallDecoration && expandedText) {
@@ -108,7 +108,7 @@ function drawWallDecorationGraphic(
     }
   }
 
-  // CSBWin: `relativePosition % 5 > 1` selects front view; otherwise side view (CSBCode.cpp:3171-3176).
+  // CSBWin: `relativePosition % 5 > 1` selects front view; otherwise side view (CSBCode.cpp:3227-3232).
   const frontView = (relativePosition % 5) > 1;
   const graphicNum = 121 + 2 * decorationIndex + (frontView ? 1 : 0);
 
@@ -164,7 +164,7 @@ function drawWallDecorationGraphic(
 
   const scaled = draw.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, desc.height | 0, colorMap, mirror);
 
-  // `srcOffsetX` (`doc/CSBwin-src/CSBCode.cpp:3538-3562`). Positions 7 and 9 scale the
+  // `srcOffsetX` (`doc/CSBwin-src/CSBCode.cpp:3599-3623`). Positions 7 and 9 scale the
   // decoration to the width of the F2 *centre* rectangle (`rectSet[8]`, chosen above),
   // which is wider than the slot they are drawn into, because a decoration at the edge
   // of the screen is only partly visible. Which part depends on the side:
@@ -172,7 +172,7 @@ function drawWallDecorationGraphic(
   //   - position 9 (F2 front-right) runs off the *right* edge, so it shows its left
   //     end and the offset is 0;
   //   - position 7 (F2 front-left) runs off the *left* edge, so it must show its
-  //     **right** end — CSBWin's "Jst ahead to the left. Truncate graphic" (`:3551`).
+  //     **right** end — CSBWin's "Jst ahead to the left. Truncate graphic" (`:3612`).
   //
   // Without this, position 7 drew its left end into a slot flush against the left
   // border: cropped on the wrong side, and with the transparent margin that should
@@ -182,7 +182,7 @@ function drawWallDecorationGraphic(
     srcOffsetX = finalBitmapWidth - ((desc.x2 | 0) - (desc.x1 | 0));
   }
   // CSBWin also sets `srcOffsetX = 15 - (finalBitmapWidth & 15)` for the mirrored
-  // far-right sidewalls (positions 1 and 6, `:3536`). That is **not** ported, and
+  // far-right sidewalls (positions 1 and 6, `:3597`). That is **not** ported, and
   // deliberately: it compensates for `MakeMirror` reversing a byte-aligned buffer of
   // `pWDP->width` bytes, which leaves the image `ceil16(w) - w` pixels from the left.
   // `getMirroredBitmap` reverses the exact `finalBitmapWidth + 1` bitmap, so ours is
@@ -193,7 +193,7 @@ function drawWallDecorationGraphic(
 }
 
 /**
- * `DrawWallDecoration`'s count of a text's lines (`doc/CSBwin-src-20230608/CSBCode.cpp:3631-3639`):
+ * `DrawWallDecoration`'s count of a text's lines (`doc/CSBwin-src/CSBCode.cpp:3631-3639`):
  * one for each byte of 128 or more, up to the 129 that ends the text, which counts too.
  */
 function countWallTextLines(text: Uint8Array): number {
@@ -207,12 +207,12 @@ function countWallTextLines(text: Uint8Array): number {
 }
 
 /**
- * The portrait half of `DrawWallDecoration` (`doc/CSBwin-src/CSBCode.cpp:3686-3716`).
+ * The portrait half of `DrawWallDecoration` (`doc/CSBwin-src/CSBCode.cpp:3751-3781`).
  *
  * `championPortraitOrdinal` is 1-based, so 0 means "no portrait" and the ordinal is
  * decremented to CSBWin's `charID` before use. Graphic 26 is a 256x87 sheet of 32x29
  * cells, 8 per row: `srcX = (charID & 7) << 5`, `srcY = 29 * (charID >> 3)`; past 23,
- * the portrait is `CSBgraphics.dat`'s (`:3700-3709`). The transparent colour is **1**,
+ * the portrait is `CSBgraphics.dat`'s (`:3765-3774`). The transparent colour is **1**,
  * not the 10 that `BltShapeToViewport` uses, so the mirror's glass shows around the head.
  */
 function drawChampionPortrait(draw: ViewportDraw, championPortraitOrdinal: number): void {
@@ -225,7 +225,7 @@ function drawChampionPortrait(draw: ViewportDraw, championPortraitOrdinal: numbe
   if (!viewport || !rect || !getGraphic) return;
 
   if (charID > 23) {
-    // `GetExternalPortraitAddress` (`:3706`): the 32x29 portrait itself, from its corner.
+    // `GetExternalPortraitAddress` (`:3771`): the 32x29 portrait itself, from its corner.
     const portrait = getExternalPortraitAddress(draw.context.csbGraphics, charID);
     tag0088b2Index(
       portrait,
@@ -354,7 +354,7 @@ function drawExtendedWallDecoration(
 
 /**
  * The text half of `DrawWallDecoration`: CSBWin's `StdDrawWallText` calls it with
- * `d.NumWallDecoration+1` and the text's RN (`doc/CSBwin-src/Viewport.cpp:2925-2937`).
+ * `d.NumWallDecoration+1` and the text's RN (`doc/CSBwin-src/Viewport.cpp:2932-2944`).
  * Only the wall the party stands against shows the words; farther walls show the
  * inscription's graphic.
  */
@@ -425,7 +425,7 @@ export function drawWallText(draw: ViewportDraw, textRN: ObjectID, relativePosit
     let x = 112 - 4 * lineLen;
 
     // `TAG0088b2(font, viewport, &rect, 8*code, 0, 144, 112, 10)`
-    // (`doc/CSBwin-src/CSBCode.cpp:3278-3285`), with no check of `code` against the
+    // (`doc/CSBwin-src/CSBCode.cpp:3339-3346`), with no check of `code` against the
     // font's 36 glyphs: a code past them reads on into the rows below.
     for (let i = 0; i < lineLen; i++) {
       const code = textBytes[lineStart + i] ?? 0;
@@ -469,7 +469,7 @@ export function DrawFloorDecorations(draw: ViewportDraw, graphicOrdinal: number,
   const drawSingle = (ord: number) => {
     if (ord === 0) return;
     const graphicIndex = (ord - 1) | 0;
-    // `d.LoadedFloorDecorations[graphicIndex]` (`doc/CSBwin-src/CSBCode.cpp:3871-3892`).
+    // `d.LoadedFloorDecorations[graphicIndex]` (`doc/CSBwin-src/CSBCode.cpp:3936-3957`).
     const slot = loaded[graphicIndex];
     if (!slot) return;
     if (relativeCell < 0 || relativeCell >= tables.floorDecorationDescSets[0].length) return;

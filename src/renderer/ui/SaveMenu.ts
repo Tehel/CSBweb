@@ -4,7 +4,7 @@
  * This is **not** a port of `_DisplayDiskMenu`. It keeps `_DoMenu`'s art, colours, text
  * metrics and press animation, and replaces CSBWin's four-slot chooser, which is a
  * `char fNames[4][20]` on the stack shown as a four-button menu
- * (`doc/CSBwin-src/CSBCode.cpp:9744-9816`). Every divergence is listed in
+ * (`doc/CSBwin-src/CSBCode.cpp:9868-9940`). Every divergence is listed in
  * `doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port". In short: a
  * dialog of its own over the screen, an unbounded scrolling list of the data set's saves
  * under their playthroughs' headings, a date per save and a roster per playthrough
@@ -28,7 +28,7 @@
  * animation take the rectangle CSBWin's table gives a frame (`buttonRect`,
  * `buttonLabelAt`). A button that can do nothing is drawn with **no label at all**, which
  * is what CSBWin does to an empty save slot: `strcpy(fNames[i],"   ")` blanks the name
- * and the button sits there inert (`doc/CSBwin-src/CSBCode.cpp:9772`).
+ * and the button sits there inert (`doc/CSBwin-src/CSBCode.cpp:9896`).
  *
  * ## The list
  *
@@ -42,7 +42,7 @@
  * playthrough, the first, is the one unfolded; the others are folded.
  *
  * SAVE writes over the selected save, as CSBWin's writes over the slot chosen
- * (`_SelectSaveGame`, `:9738`). A save of its own is made from the heading of the
+ * (`_SelectSaveGame`, `:9862`). A save of its own is made from the heading of the
  * running game's playthrough. A game with no save yet has no heading: the full menu then
  * has a first row, "NEW SAVE", for it, and opens on it when the data set has no save at
  * all. On another playthrough's heading SAVE is inert: a file holds the running game's
@@ -105,7 +105,7 @@
  * the other would write this game over a save of another. The question is `_DoMenu`'s
  * two-option menu, centred, in the dialog's place, under CSBWin's own line for a save of
  * another `d.RandomGameID`, "THAT'S NOT THE SAME GAME"
- * (`doc/CSBwin-src/SaveGame.cpp:1605-1606`, where it refuses the save outright), with the
+ * (`doc/CSBwin-src/SaveGame.cpp:1730-1731`, where it refuses the save outright), with the
  * action and CANCEL. The load-only chooser has no game to leave and never asks.
  *
  * ## The prison's question
@@ -126,7 +126,7 @@
  * to the main loop, so `d.Time` stops. Here the click comes **straight from the DOM
  * event** rather than through the game's mouse queue, which is the same exclusivity.
  * This port's loop keeps running, so the clock is stopped explicitly, with
- * `ctx.state.paused` (`d.Time++` is the main loop's, `doc/CSBwin-src/CSBCode.cpp:660`).
+ * `ctx.state.paused` (`d.Time++` is the main loop's, `doc/CSBwin-src/CSBCode.cpp:670`).
  */
 import type { OpenedSave, Playthrough, SaveEntry } from '../../data/saves';
 import { SAVES_ARE_DISABLED, type ImportResult, type ImportedFile } from '../../engine/GameSaves';
@@ -407,12 +407,12 @@ export function isSaveMenuOpen(ui: UIState): boolean {
  * no SAVE button.
  *
  * The full screen is the disk menu, `_DisplayDiskMenu`, so `TAG02076e` runs first
- * (`doc/CSBwin-src/SaveGame.cpp:860`) and `TAG0207cc` last (`:1274`): `tag02076e` and
- * `tag0207cc`. The load-only one is `_ReadEntireGame` (`:1435`), which calls neither.
+ * (`doc/CSBwin-src/SaveGame.cpp:877`) and `TAG0207cc` last (`:1375`): `tag02076e` and
+ * `tag0207cc`. The load-only one is `_ReadEntireGame` (`:1536`), which calls neither.
  * `_DoMenu` sets `videoMode` (`Menu.cpp:465-472`): `VM_LEFTMENU` for the disk menu's
- * `ClearOldScreen` of 0 (`SaveGame.cpp:870`), `VM_CENTERMENU` for `_ReadEntireGame`'s 1
- * (`:1549`). Closing the menu leaves it, until `TAG0207cc` shows an open inventory again
- * or the next tick's top (`CSBCode.cpp:603-611`).
+ * `ClearOldScreen` of 0 (`SaveGame.cpp:889`), `VM_CENTERMENU` for `_ReadEntireGame`'s 1
+ * (`:1665`). Closing the menu leaves it, until `TAG0207cc` shows an open inventory again
+ * or the next tick's top (`CSBCode.cpp:613-621`).
  */
 export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
   if (ui.saveMenu) return;
@@ -509,7 +509,7 @@ export function wrapMessage(message: string, maxChars: number): string[] {
 /**
  * Whether the disk menu saves nothing: a DSA has disabled saves, and CSBWin's
  * `_DisplayDiskMenu` would show "SAVES ARE DISABLED" in its place
- * (`doc/CSBwin-src/SaveGame.cpp:848-856`).
+ * (`doc/CSBwin-src/SaveGame.cpp:856-873`).
  */
 function savesDisabled(ui: UIState, state: SaveMenuState): boolean {
   return state.mode === 'full' && ui.ctx.systems.dsa.disableSaves;
@@ -1117,7 +1117,7 @@ async function doLoad(ui: UIState, state: SaveMenuState): Promise<void> {
  *
  * A read that fails in the full menu throws, and its message is the dialog's
  * (`runPending`). The load-only chooser is `_ReadEntireGame`'s, where every failed read
- * ends at `tag01efee` instead (`doc/CSBwin-src/SaveGame.cpp:1741-1742`, `:1895`): it
+ * ends at `tag01efee` instead (`doc/CSBwin-src/SaveGame.cpp:1911-1912`, `:2098`): it
  * closes, and `onRestoreFailed` hands the failure to its caller
  * (`src/renderer/intro/BootSequence.ts`).
  */

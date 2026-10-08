@@ -1,10 +1,10 @@
 /**
  * A new object takes a freed record (`DATABASES::FindEmptyDBEntry`,
- * `doc/CSBwin-src/data.cpp:919-993`).
+ * `doc/CSBwin-src/data.cpp:921-995`).
  *
- *  1. The lowest record from index 1 whose link is `RNnul` (`:954-966`). `dungeon.dat`
+ *  1. The lowest record from index 1 whose link is `RNnul` (`:956-968`). `dungeon.dat`
  *     ships a few: weapon 105, misc 8 and 116, and a new game's spares follow the
- *     file's records, cleared (`ReadDatabases`, `SaveGame.cpp:2556-2564`): weapons from
+ *     file's records, cleared (`ReadDatabases`, `SaveGame.cpp:2768-2776`): weapons from
  *     107, misc from 280. So the first arrow a wall shoots is weapon 105, the next 107.
  *  2. The walk of the records starts at 1. A new game's missiles are all spares, handed
  *     out from record 1, and record 0, free all along, is never reached.
@@ -13,8 +13,8 @@
  *     declares — stay the number of records. A full database's `Enlarge` is
  *     `tools/dump-make-more-room.ts`'s.
  *  4. The indirect index. `DeleteDBEntry` frees the record's slot with it, `0xff`/`0xffff`
- *     (`:993-1015`), and the next new object, of any database, takes the lowest free
- *     slot (`:933-953`, `:986-988`). A slot that names a free record of the database is
+ *     (`:995-1017`), and the next new object, of any database, takes the lowest free
+ *     slot (`:958-978`, `:1011-1013`). A slot that names a free record of the database is
  *     taken with its record, first, record 0 included. A record two slots name, or
  *     whose slot carries bit 0x80, is "Cloned!!!": deleting it changes nothing. Slot 0
  *     names door 0, so door 0 is such a record as soon as a cell's chain holds it.
@@ -112,7 +112,7 @@ async function main(): Promise<void> {
       dungeon.deleteDBEntry(rn);
     };
     // Each index is read as the record is handed out: a slot whose record is freed is
-    // the one `RN(DBTYPE, dbIndex)` reuses (`doc/CSBwin-src/data.cpp:476-480`), so a
+    // the one `RN(DBTYPE, dbIndex)` reuses (`doc/CSBwin-src/data.cpp:477-481`), so a
     // freed missile's RN may name another record afterwards.
     const m0 = launch();
     const i0 = index(dungeon, m0);
