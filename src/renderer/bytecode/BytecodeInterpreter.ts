@@ -1706,7 +1706,8 @@ export class BytecodeInterpreter {
     return mapping[opcode] ?? StdRectPtr.RECT_StdWallRectangleF3;
   }
 
-  private resolveStdRectanglePointer(ptr: number): RectPos | RectPos[] | null {
+  /** Public so that `tools/` can stand in fixed rectangles for a context without them. */
+  resolveStdRectanglePointer(ptr: number): RectPos | RectPos[] | null {
     // Direct port of CSBWin's StdRectanglePointers() (Viewport.cpp:2298+),
     // but returning TS references instead of raw pointers.
     switch (ptr) {

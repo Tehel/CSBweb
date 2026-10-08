@@ -238,18 +238,18 @@ builds around them is its own:
 
 - 40 tools spell out `addCharacterDefaults()`, most inside a champion-building function
   of their own; 145 construct a `DungeonLoader`, most to read `dm-atari/dungeon.dat`.
-- 7 tools stand in for an engine call by assigning over the system's method
+- 8 tools stand in for an engine call by assigning over the system's method
   (`executeAttack`, `castSpellFromUi`, `consumeAttackDamageToDisplay`,
-  `reincarnateNamed`, `dump-missile-door`'s `hitDoor`), which nothing types as a
-  stand-in or puts back. Two more hang a
+  `reincarnateNamed`, `dump-missile-door`'s `hitDoor`, `dump-door-lightning`'s
+  `resolveStdRectanglePointer`), which nothing types as a stand-in or puts back. Two more hang a
   stand-in on `Game` itself: `dump-hall-of-champions` stores its messages in a property
   `Game` does not have, and `dump-game-events` replaces `reincarnating`. 31 tools extract
   the UI tables again (`graphicsTablesOf(…).ui`) beside the `UIState` that
   `tools/lib/ui.ts` builds them into.
 - 23 tools make 38 `as unknown as` casts, into a private member (`CSBGraphicsLoader`'s
-  `opened`) or to build a partial record; 3 more
-  tools cast through `as any`, two of them into privates (`getMissileRecord`,
-  `resolveStdRectanglePointer`). `tsc` checks none of them. A renamed member leaves the tool
+  `opened`) or to build a partial record; 2 more tools cast through `as any`, to stand
+  a partial record in for `getMissileRecord`'s (`dump-missile-draw`) or for a
+  `ViewportDraw`'s context (`dump-teleporter-shimmer`). `tsc` checks none of them. A renamed member leaves the tool
   compiling, and a write to it then sets a new property: the tool goes on passing while
   testing nothing.
 
@@ -263,10 +263,10 @@ context a tool stages by assigning its fields.
    the reason in its comment, or the tool reaches it through the public path the engine
    uses. One system per commit. `DsaSystem`, `TimerSystem`, `ActuatorSystem`,
    `MagicSystem`, `WorldMove`, `AttackSystem`, `MonsterAI`, `MonsterSystem` and
-   `MissileEncounter` are done. Left: `BytecodeInterpreter`, and
-   `CSBGraphicsLoader`'s `opened` (`dump-dsa-overlay`).
+   `MissileEncounter` and `BytecodeInterpreter` are done. Left: `CSBGraphicsLoader`'s
+   `opened` (`dump-dsa-overlay`).
 4. **The stand-ins**: a `tools/lib` helper that replaces a member with a typed stand-in
-   and puts it back, for the seven method stand-ins and `Game`'s two. One commit.
+   and puts it back, for the eight method stand-ins and `Game`'s two. One commit.
 5. **The stock dungeon and a test champion** as `tools/lib` helpers, and the tools moved
    to them, a few tools per commit.
 6. **What is left**: every remaining cast either goes, or builds a stand-in value the

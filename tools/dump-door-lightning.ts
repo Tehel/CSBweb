@@ -55,7 +55,7 @@ const context: any = {
   },
 };
 
-const interp = new BytecodeInterpreter(context) as any;
+const interp = new BytecodeInterpreter(context);
 // Rectangle-pointer resolution is proven by the other opcode tools; here it would
 // only need real `graphics.dat` geometry to reach the code this tool cares about,
 // so it is stubbed to a fixed door rect set.
