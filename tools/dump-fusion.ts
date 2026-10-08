@@ -35,18 +35,12 @@
  *
  * Run: `npx tsx tools/dump-fusion.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { CloudType } from '../src/engine/cloudTypes';
 import type { Game } from '../src/engine/Game';
 import { createGameHost, type MessageSink } from '../src/engine/GameHost';
-import { CHARFLAG_PORTRAIT_CHANGED, emptyPossessions, type Champion } from '../src/engine/gameTypes';
+import { CHARFLAG_PORTRAIT_CHANGED, type Champion } from '../src/engine/gameTypes';
 import { DELTA_X, DELTA_Y } from '../src/engine/MonsterPerception';
 import { AttackType, MonsterType } from '../src/engine/monsterTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
@@ -54,7 +48,8 @@ import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
 import { check, finish } from './lib/check';
 import { wrapMember } from './lib/standIn';
 import { createMonsterAt } from './lib/createMonster';
-import { newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
+import { newGame, stockGraphics, runVbl, TICK_DUE, stockDungeon } from './lib/game';
+import { testChampion } from './lib/champion';
 
 const LEVEL = 12;
 /** The only centres on level 12 with no object within three squares: (5-6, 13-14). */
@@ -63,18 +58,10 @@ const CY = 13;
 const DIRECTION = ['north', 'east', 'south', 'west'];
 
 function champion(): Champion {
-  return {
-    ...addCharacterDefaults(),
+  return testChampion(0, {
     name: 'FUSER',
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 200, maxStamina: 200, mana: 200, maxMana: 200,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: 0,
-  };
+    attributes: { stamina: 200, maxStamina: 200, mana: 200, maxMana: 200 },
+  });
 }
 
 interface Arena {
@@ -130,10 +117,7 @@ function scrolledStrip(): ScrollingText {
 }
 
 function arena(withLordChaos: boolean, strip: ScrollingText | null = null): Arena {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const hooks = { credits: [] as boolean[], drawn: (): void => {} };
   const sink: MessageSink = strip ?? createGameHost().messages;
   const game = newGame(data, stockGraphics(), {

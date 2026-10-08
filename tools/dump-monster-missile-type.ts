@@ -20,23 +20,17 @@
  *
  * Run: `npx tsx tools/dump-monster-missile-type.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_POISON, RN_POISON_CLOUD, RN_ZO_SPELL,
 } from '../src/core/spellRn';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Item16Record } from '../src/data/dungeonTypes';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
-import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
+import { type Champion } from '../src/engine/gameTypes';
 import { MonsterType } from '../src/engine/monsterTypes';
-import { newGame } from './lib/game';
+import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
+import { testChampion } from './lib/champion';
 
 /** The missiles each thrower may pick (`doc/CSBwin-src/Monster.cpp:1046-1079`). */
 const THROWS: ReadonlyMap<number, readonly number[]> = new Map([
@@ -50,18 +44,7 @@ const THROWS: ReadonlyMap<number, readonly number[]> = new Map([
 ]);
 
 function champion(i: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `HERO${i}`,
-    attributes: {
-      health: 999, maxHealth: 999, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
+  return testChampion(i, { attributes: { health: 999, maxHealth: 999, mana: 0, maxMana: 0 } });
 }
 
 const hex = (v: number): string => '0x' + (v >>> 0).toString(16).padStart(4, '0');
@@ -79,12 +62,8 @@ function missilesIn(game: ReturnType<typeof newGame>, at: Position): Map<ObjectI
 }
 
 function main(): void {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const data = stockDungeon();
+  const graphics = stockGraphics();
 
   const game = newGame(data, graphics);
   // A fixed seed, so the throwers' picks repeat run to run.

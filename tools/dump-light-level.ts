@@ -25,29 +25,21 @@
  *    and sees the party in full light is checked against `d.CurrentPalette`, as the AI
  *    reads it: at least one loses sight of it, none gains it, and a torch gives it back.
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { OBJNI_ILLUMULET_A, OBJNI_TORCH_A } from '../src/core/objectNameIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { monsterCanSeeInDark } from '../src/data/tables/MonsterDesc';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
-import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { distanceBetweenPoints } from '../src/engine/MonsterPerception';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import { ninetySecondUpdate } from '../src/engine/PeriodicUpdates';
-import { newGame, processTimersAt, stockGraphics } from './lib/game';
+import { newGame, processTimersAt, stockGraphics, stockDungeon } from './lib/game';
 import { check, finish } from './lib/check';
+import { testChampion } from './lib/champion';
 
 const graphics = stockGraphics();
-const loader = new DungeonLoader();
-loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-const data = loader.getData();
-if (!data) throw new Error('dungeon.dat did not load');
+const data = stockDungeon();
 
 const game: Game = newGame(data, graphics);
 game.setRandomSeed(0x12345678);
@@ -55,18 +47,13 @@ const ctx = game.ctx;
 const party = ctx.party.state;
 const { word1074, paletteBrightness } = ctx.tables;
 
-const hero: Champion = {
-  ...addCharacterDefaults(),
+const hero = testChampion(0, {
   name: 'HERO',
   attributes: {
     health: 50, maxHealth: 50, stamina: 50, maxStamina: 50, mana: 10, maxMana: 10,
     stats: makeAddCharacterAttributes([40, 40, 40, 40, 40, 40, 40]),
   },
-  incantation: [], food: 1500, water: 1500,
-  skills: [],
-  possessions: emptyPossessions(),
-  partyPosition: 0,
-};
+});
 party.champions = [hero];
 
 /** The palette CSBWin's search gives for `totalLight`. */

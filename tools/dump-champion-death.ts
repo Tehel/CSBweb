@@ -34,45 +34,30 @@
  *
  * Run: `npx tsx tools/dump-champion-death.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { MISC_BONES_OF_HERO } from '../src/core/constants';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
 import type { Direction, ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { DescIndexOfRecord } from '../src/engine/objectIndex';
 import type { DatabaseRecord } from '../src/data/dungeonTypes';
 import { OBJNI_ILLUMULET_A, OBJNI_JEWEL_SYMAL_A, OBJNI_TORCH_A } from '../src/core/objectNameIndex';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
 import { standIn } from './lib/standIn';
 import { check, fail, finish } from './lib/check';
-import { emptyPossessions, getChampionPossession } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { getChampionPossession } from '../src/engine/gameTypes';
 import { RN_FIREBALL, RN_POISON, RN_LIGHTNING, RN_DISPELL_MISSILE, RN_POISON_BOLT } from '../src/core/spellRn';
+import { testChampion } from './lib/champion';
 
 /**
  * Low hit points so a single blow is fatal, and one real possession so the drop is
  * visible. Stamina is small for the same reason on the exhaustion path.
  */
 function champion(i: number, name: string): Champion {
-  const possessions = emptyPossessions();
-  return {
-    ...addCharacterDefaults(),
+  return testChampion(i, {
     name,
-    attributes: {
-      health: 20, maxHealth: 20, stamina: 12, maxStamina: 12, mana: 0, maxMana: 0,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions,
-    partyPosition: i,
-  };
+    attributes: { health: 20, maxHealth: 20, stamina: 12, maxStamina: 12, mana: 0, maxMana: 0 },
+  });
 }
 
 /** `d.DropOrder[30]` as the last `makeGame` extracted it. */
@@ -82,13 +67,9 @@ let objDescObjectType: ArrayLike<number> = [];
 let word1074: number[] = [];
 
 function makeGame(championCount: number): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
 
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
   const uiTables = graphicsTablesOf(graphics).ui;
   dropOrder = uiTables.graphic232.dropOrder;

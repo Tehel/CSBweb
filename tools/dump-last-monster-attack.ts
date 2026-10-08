@@ -19,48 +19,24 @@
  * Run: `npx tsx tools/dump-last-monster-attack.ts`
  */
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import { Position, RoomType } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { Game } from '../src/engine/Game';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
-import { newGame, processTimersAt } from './lib/game';
+import { processTimersAt, stockGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { savePath } from './lib/saves';
-import { emptyPossessions } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { RN_FIREBALL } from '../src/core/spellRn';
+import { testChampion } from './lib/champion';
 
 function champion(i: number, name: string): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name,
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
+  return testChampion(i, { name, attributes: { mana: 0, maxMana: 0 } });
 }
 
 function makeGame(): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
-
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-
-  const game = newGame(data, graphics);
+  const game = stockGame();
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i, `HERO${i}`));
   return game;

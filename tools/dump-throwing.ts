@@ -24,51 +24,37 @@
  *
  * Run: `npx tsx tools/dump-throwing.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { CsbRandom } from '../src/core/random';
 import { DBType, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { CharacterStats } from '../src/engine/CharacterStats';
 import { DungeonState } from '../src/engine/DungeonState';
 import type { Champion } from '../src/engine/gameTypes';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { AttackType } from '../src/engine/monsterTypes';
-import { graphicsTablesOf, newContext, newGame } from './lib/game';
+import { graphicsTablesOf, newContext, newGame, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
-import { CHARFLAG_ATTACK_DISABLE, emptyPossessions, getChampionPossession } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { CHARFLAG_ATTACK_DISABLE, getChampionPossession } from '../src/engine/gameTypes';
+import { testChampion } from './lib/champion';
 
 /** Enough samples that the `random()&15` in the distance formula averages out. */
 const SAMPLES = 400;
 
 function champion(over: Partial<Champion['attributes']> & { strength?: number } = {}): Champion {
   const { strength = 50, ...attrOver } = over;
-  return {
-    ...addCharacterDefaults(),
+  return testChampion(0, {
     name: 'TEST',
     attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
+      mana: 0, maxMana: 0,
       stats: makeAddCharacterAttributes([50, strength, 50, 50, 50, 0, 0]),
       ...attrOver,
     },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: 0,
-  };
+  });
 }
 
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
 
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
 
   const dungeon = new DungeonState(data);
@@ -286,10 +272,7 @@ async function main(): Promise<void> {
   // `estimateThrowRange/Damage/Decay` used to feed.
   console.log('=== ThrowByCharacter through the real engine ===');
 
-  const loader2 = new DungeonLoader();
-  await loader2.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data2 = loader2.getData();
-  if (!data2) throw new Error('dungeon.dat did not load');
+  const data2 = stockDungeon();
 
   const game = newGame(data2, graphics);
   game.setRandomSeed(0x12345678);

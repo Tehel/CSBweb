@@ -26,32 +26,22 @@
  *
  * Run: `npx tsx tools/dump-clouds.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { SoundQueue } from '../src/engine/SoundQueue';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
-import { newGame, processTimersAt } from './lib/game';
+import { newGame, processTimersAt, stockDungeon, stockGraphics } from './lib/game';
 import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
-import { emptyPossessions } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { RN_FIREBALL, RN_POISON_CLOUD, RN_MONSTER_DEATH } from '../src/core/spellRn';
+import { testChampion } from './lib/champion';
 
 
 async function main(): Promise<void> {
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
 
   const makeGame = async (): Promise<Game> => {
-    const loader = new DungeonLoader();
-    await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-    const data = loader.getData();
-    if (!data) throw new Error('dungeon.dat did not load');
+    const data = stockDungeon();
     const game = newGame(data, graphics);
     // Fixed seed, so the numbers below repeat run to run. This used to sit *after* a
     // `return new Game(...)` — dead code, so every run of this tool was unseeded
@@ -157,18 +147,10 @@ async function main(): Promise<void> {
   console.log('');
   const gameP = await makeGame();
   const party = gameP.ctx.party.state;
-  party.champions = [{
-    ...addCharacterDefaults(),
+  party.champions = [testChampion(0, {
     name: 'VICTIM',
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
-      stats: makeAddCharacterAttributes([50, 50, 50, 50, 50, 0, 0]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: 0,
-  }];
+    attributes: { mana: 0, maxMana: 0, stats: makeAddCharacterAttributes([50, 50, 50, 50, 50, 0, 0]) },
+  })];
   const here = new Position(party.position.x, party.position.y, party.position.z);
   const healthBefore = party.champions[0]!.attributes.health;
   gameP.systems.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 255, here, 255);

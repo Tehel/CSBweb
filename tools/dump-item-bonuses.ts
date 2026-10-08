@@ -24,40 +24,31 @@
  *    round the neck, and the two notices to the UI: the attack menu closes on any change
  *    to the weapon hand, and the open inventory's chest is repacked when it leaves it.
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import * as NI from '../src/core/objectNameIndex';
 import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import type { GameHost } from '../src/engine/GameHost';
 import type { DatabaseRecord } from '../src/data/dungeonTypes';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { AdjustStatsForItemCarried } from '../src/engine/AdjustStatsForItemCarried';
 import { Game } from '../src/engine/Game';
 import {
   AttributeIndex, attributeMinimum, makeAddCharacterAttributes, type Attribute,
 } from '../src/engine/attributes';
-import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
+import { type Champion } from '../src/engine/gameTypes';
 import { DescIndexOfRecord, NameIndex, OBJDI_CAPE, OBJDI_COMPASS, OBJDI_EYE_OF_TIME } from '../src/engine/objectIndex';
 import { type UIState } from '../src/renderer/ui/UIState';
-import { graphicsTablesOf, newGame, presetHeroesOfGame } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOfGame, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { handleClothingClick } from '../src/renderer/ui/Mouse';
+import { testChampion } from './lib/champion';
 
-const graphics = new GraphicsLoader();
-graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+const graphics = stockGraphics();
 const objectTables = graphicsTablesOf(graphics).objects;
 const uiTables = graphicsTablesOf(graphics).ui;
 
 function makeGame(host?: Partial<GameHost>): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const game = newGame(data, graphics, host);
   game.setRandomSeed(0x12345678);
   return game;
@@ -79,18 +70,12 @@ function firstRecord(g: Game, category: DBType.SCROLL | DBType.CHEST): ObjectID 
 }
 
 function champion(i: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `HERO${i}`,
+  return testChampion(i, {
     attributes: {
       health: 20, maxHealth: 20, stamina: 12, maxStamina: 12, mana: 7, maxMana: 20,
       stats: makeAddCharacterAttributes([40, 41, 42, 43, 44, 45, 46]),
     },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
+  });
 }
 
 type Kind = DBType.WEAPON | DBType.CLOTHING | DBType.MISC;

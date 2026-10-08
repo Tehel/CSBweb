@@ -42,16 +42,11 @@
  *
  * Run: `npx tsx tools/dump-vi-altar.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { MISC_BONES_OF_HERO } from '../src/core/constants';
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { heldObjectName } from '../src/renderer/ui/Character';
 import { getObjectDisplayName, resolveObjectNameIndex } from '../src/renderer/ui/Objects';
@@ -61,14 +56,13 @@ import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { EXPOOL_RECORD_SIZE, Expool } from '../src/data/CsbwinExpool';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
-import { newGame } from './lib/game';
+import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, fail, finish } from './lib/check';
-import { emptyPossessions } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { readCsbwinCharacter, writeCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { getFromWings, saveToWings } from '../src/engine/Wings';
+import { testChampion } from './lib/champion';
 
 /** `EDT_ChampionBones` (`doc/CSBwin-src/CSB.h:1574`). */
 const EDT_CHAMPION_BONES = 9;
@@ -78,28 +72,13 @@ const ORNATE_ALCOVE_DECORATION = 2;
 
 /** Every champion starts at 200/200, so a `MaxHP/64` cut is visible without rounding. */
 function champion(i: number, name: string): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name,
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
+  return testChampion(i, { name, attributes: { mana: 0, maxMana: 0 } });
 }
 
 function makeGame(): { game: Game; graphics: GraphicsLoader } {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
 
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
 
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);

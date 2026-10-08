@@ -35,16 +35,10 @@
  *
  * Run: `npx tsx tools/dump-show-credits.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { Position } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
 import type { MessageSink } from '../src/engine/GameHost';
-import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
+import { type Champion } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { type UITables } from '../src/data/tables/UITables';
@@ -67,7 +61,8 @@ import { setActuatorType } from '../src/data/actuatorHelpers';
 import { WON_GAME_VBLS } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics, runVbl, TICK_DUE, stockDungeon } from './lib/game';
+import { testChampion } from './lib/champion';
 
 /** The hooks of a lost game: `_StartCSB` has turned palette switching off. */
 const LOST = { word11694: false, champions: [], palette11946: null };
@@ -75,18 +70,7 @@ const LOST = { word11694: false, champions: [], palette11946: null };
 /* ------------------------------------------------ 1. the tick of death ---- */
 
 function champion(i: number, health: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `HERO${i}`,
-    attributes: {
-      health, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
+  return testChampion(i, { attributes: { health } });
 }
 
 interface Watched {
@@ -99,10 +83,7 @@ interface Watched {
 }
 
 function watchedGame(healths: number[]): Watched {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const w = { credits: [] as boolean[], clockTicks: 0, vbls: 0, frames: 0 } as Watched;
   const messages: MessageSink = {
     printLinefeed: () => {},

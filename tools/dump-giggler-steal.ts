@@ -16,37 +16,25 @@
  *
  * Run: `npx tsx tools/dump-giggler-steal.ts [ticks]`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
-import { emptyPossessions } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';
-import { newGame, processTimersAt } from './lib/game';
+import { newGame, processTimersAt, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
+import { testChampion } from './lib/champion';
 
 const HELD_SLOTS = [0, 1, 13];
 
 function champion(i: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `HERO${i}`,
+  return testChampion(i, {
     attributes: {
       health: 500, maxHealth: 500, stamina: 200, maxStamina: 200, mana: 0, maxMana: 0,
       // Low dexterity and luck, so the steal gets its tries.
       stats: makeAddCharacterAttributes([10, 60, 10, 50, 50, 20, 20]),
     },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
+  });
 }
 
 function newDagger(game: Game): ObjectID {
@@ -61,12 +49,8 @@ function newDagger(game: Game): ObjectID {
 }
 
 function main(): void {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const data = stockDungeon();
+  const graphics = stockGraphics();
   const ticks = Number(process.argv[2] ?? 60);
 
   const game = newGame(data, graphics);

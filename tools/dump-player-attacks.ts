@@ -23,13 +23,8 @@
  *
  * Run: `npx tsx tools/dump-player-attacks.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { AttackType, MonsterType, StateOfFear } from '../src/engine/monsterTypes';
@@ -37,10 +32,9 @@ import { TimerFunction } from '../src/engine/TimerQueue';
 import type { Champion } from '../src/engine/gameTypes';
 import { monsterInvincible, monsterNonMaterial } from '../src/data/tables/MonsterDesc';
 import { determineMastery } from '../src/engine/skills';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
-import { emptyPossessions } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { testChampion } from './lib/champion';
 
 /** `weapon_Sword` (`doc/CSBwin-src/Objects.h:51`). */
 const WEAPON_SWORD = 10;
@@ -50,27 +44,20 @@ const WEAPON_DESC_BASE = 23;
 const ATTACK_CLASS_EMPTY_HAND = 2;
 
 function champion(i: number, name: string, fighterExp: number): Champion {
-  return {
-    ...addCharacterDefaults(),
+  return testChampion(i, {
     name,
     attributes: {
-      health: 200, maxHealth: 200, stamina: 200, maxStamina: 200, mana: 60, maxMana: 60,
+      stamina: 200, maxStamina: 200, mana: 60, maxMana: 60,
       stats: makeAddCharacterAttributes([60, 90, 90, 50, 50, 20, 20]),
     },
-    incantation: [], food: 1500, water: 1500,
     // Skill 4 is the fighter base; 5-11 are its subskills. `determineMastery` reads the
     // base for anything above index 3, so this is what a champion's competence is.
     skills: Array.from({ length: 20 }, () => ({ tempAdjust: 0, experience: fighterExp })),
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
+  });
 }
 
 async function main(): Promise<void> {
-  const dungeonBytes = new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat')));
-
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
   const uiTables = graphicsTablesOf(graphics).ui;
   const g230 = uiTables.graphic230;
@@ -79,11 +66,7 @@ async function main(): Promise<void> {
   // killed, a creature type overwritten — so every case gets its own freshly parsed
   // copy. Sharing one made case 6 quietly test the monster case 5 had rewritten.
   const makeGame = async (): Promise<Game> => {
-    const loader = new DungeonLoader();
-    await loader.loadFromArray(dungeonBytes.slice());
-    const data = loader.getData();
-    if (!data) throw new Error('dungeon.dat did not load');
-    const game = newGame(data, graphics);
+    const game = newGame(stockDungeon(), graphics);
     // Fixed seed: without it every rate in the tables below drifts run to run and the
     // novice-versus-veteran comparison can flip on noise alone.
     game.setRandomSeed(0x12345678);

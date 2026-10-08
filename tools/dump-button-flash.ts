@@ -33,26 +33,20 @@
  *
  * Run: `npx tsx tools/dump-button-flash.ts [level]`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { emptyPossessions, MovementAction, type Champion } from '../src/engine/gameTypes';
 import { flashButton, flashedButton, setClockTick, waitForButtonFlash } from '../src/engine/LoopState';
 import { createPaletteIndexViewportBuffer, vblFlashButn } from '../src/renderer/csbwin/CanvasBlitter';
 import { handleAttackAreaClick, prepareAttack } from '../src/renderer/ui/Attack';
 import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
 import type { Rect } from '../src/data/tables/UITables';
-import { newGame, runVbl, TICK_DUE } from './lib/game';
+import { newGame, runVbl, TICK_DUE, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { ButtonsAt } from './lib/clicks';
 import { standIn, wrapMember } from './lib/standIn';
 import { handleUIKey } from '../src/renderer/ui/Keyboard';
+import { testChampion } from './lib/champion';
 
 /** The button each queued click is taken as (`ButtonsAt`). */
 const clicks = new ButtonsAt();
@@ -65,12 +59,8 @@ const same = (a: Rect | null, b: Rect): boolean =>
   a !== null && a.x1 === b.x1 && a.x2 === b.x2 && a.y1 === b.y1 && a.y2 === b.y2;
 
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const data = stockDungeon();
+  const graphics = stockGraphics();
 
   const level = Number(process.argv[2] ?? 1);
   // The tick's `TAG01b29a` and the paint after it, as the host sees them. The host's
@@ -262,18 +252,7 @@ async function main(): Promise<void> {
 
   // ---- CastMagic waits for the flash first ------------------------------------------
   reset();
-  const caster: Champion = {
-    ...addCharacterDefaults(),
-    name: 'HERO',
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: 0,
-  };
+  const caster = testChampion(0, { name: 'HERO' });
   party.champions = [caster];
   flashButton(game.ctx, TURN_LEFT.x1, TURN_LEFT.x2, TURN_LEFT.y1, TURN_LEFT.y2);
   game.systems.magic.castSpellFromUi(0);

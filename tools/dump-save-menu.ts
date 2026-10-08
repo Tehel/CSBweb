@@ -99,7 +99,7 @@ import { basename, resolve } from 'node:path';
 
 import { CsbRandom } from '../src/core/random';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
-import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
+import { emptyDungeonData } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { readCsbwinSaveInfo } from '../src/data/CsbwinSaveInfo';
 import {
@@ -126,7 +126,6 @@ import { KNOWN_DUNGEONS } from '../src/data/DungeonSignature';
 import { Game } from '../src/engine/Game';
 import type { GameHost, MessageSink } from '../src/engine/GameHost';
 import { freeze, thaw, type LoopScript } from '../src/engine/LoopState';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { drawRandomGameID } from '../src/engine/GameContext';
 import { GameSaves, SAVED_GAME_DAMAGED, drawPlaythrough, importedFileName, makeSaveFileName } from '../src/engine/GameSaves';
@@ -151,14 +150,13 @@ import {
 import { type UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { DEFAULT_DATA_SET, dataSetNamed } from './lib/dataSets';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, stockGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { SAVE_DIR, genuineSaves, memoryStore, savePath } from './lib/saves';
-import { emptyPossessions } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
 import * as Inventory from '../src/renderer/ui/Inventory';
+import { testChampion } from './lib/champion';
 
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
@@ -694,29 +692,11 @@ function checkListLogic(): void {
 /* ------------------------------------------------------------- 5. the metadata ---- */
 
 function healthyChampion(name: string): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name,
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: 0,
-  };
+  return testChampion(0, { name, attributes: { mana: 0, maxMana: 0 } });
 }
 
 async function loadGame(host?: Partial<GameHost>): Promise<Game> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
-
-  const graphics = loadGraphics();
-
-  return newGame(data, graphics, host);
+  return stockGame(host);
 }
 
 /**

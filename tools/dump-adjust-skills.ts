@@ -15,40 +15,24 @@
  *
  *   npx tsx tools/dump-adjust-skills.ts
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { Position } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
-import { emptyPossessions } from '../src/engine/gameTypes';
 import type { MessageSink } from '../src/engine/GameHost';
 import { adjustSkills, AdjustSkillsWhy, createEmptySkills, determineMastery } from '../src/engine/skills';
 import { monsterWord16_8_11 } from '../src/data/tables/MonsterDesc';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, stockDungeon } from './lib/game';
 import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
+import { testChampion } from './lib/champion';
 
 function champion(i: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `HERO${i}`,
-    attributes: {
-      health: 999, maxHealth: 999, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
+  return testChampion(i, {
+    attributes: { health: 999, maxHealth: 999 },
     skills: createEmptySkills(),
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
+  });
 }
 
-const loader = new DungeonLoader();
-loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-const data = loader.getData();
-if (!data) throw new Error('dungeon.dat did not load');
+const data = stockDungeon();
 const graphics = stockGraphics();
 
 const printed: string[] = [];

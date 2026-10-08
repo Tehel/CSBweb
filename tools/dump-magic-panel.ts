@@ -21,46 +21,29 @@
  *
  * Run: `npx tsx tools/dump-magic-panel.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
-import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
+import { type Champion } from '../src/engine/gameTypes';
 import { ensureSkills } from '../src/engine/skills';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { drawTextLineIndexRaw, loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { drawMagicIncantation, drawSpellMenuCharacters, handleMagicClick } from '../src/renderer/ui/MagicPanel';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
+import { testChampion } from './lib/champion';
 
 function champion(name: string): Champion {
-  return {
-    ...addCharacterDefaults(),
+  return testChampion(0, {
     name,
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 90, maxMana: 90,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
+    attributes: { mana: 90, maxMana: 90 },
     // Every skill mastered, so no cast fails on the dice.
     skills: ensureSkills([]).map((skill) => ({ ...skill, experience: 1 << 24 })),
-    possessions: emptyPossessions(),
-    partyPosition: 0,
-  };
+  });
 }
 
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const data = stockDungeon();
+  const graphics = stockGraphics();
   const uiTables = graphicsTablesOf(graphics).ui;
   const base = uiTables.graphic230.spellBaseMana;
   const scale = uiTables.graphic230.spellFirstRuneScale;

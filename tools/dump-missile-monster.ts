@@ -36,19 +36,13 @@
  *
  * Run: `npx tsx tools/dump-missile-monster.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { PotionType } from '../src/core/constants';
 import { sw } from '../src/core/intCast';
 import { RN_FIREBALL } from '../src/core/spellRn';
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import type { CreatureRecord } from '../src/data/dungeonTypes';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { MonsterDamageResult } from '../src/engine/MonsterDamage';
@@ -64,43 +58,27 @@ import {
   monsterWord2Bit4,
   type MonsterDesc,
 } from '../src/data/tables/MonsterDesc';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { wrapMember } from './lib/standIn';
 import { createMonsterAt } from './lib/createMonster';
-import { emptyPossessions } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { testChampion } from './lib/champion';
 
 const WEAPON_FALCHION = 9;
 const EAST = 1;
 
 function champion(i: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `HERO${i}`,
-    attributes: {
-      health: 500, maxHealth: 500, stamina: 500, maxStamina: 500, mana: 0, maxMana: 0,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
+  return testChampion(i, {
+    attributes: { health: 500, maxHealth: 500, stamina: 500, maxStamina: 500, mana: 0, maxMana: 0 },
+  });
 }
 
-const loader = new DungeonLoader();
-loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-const graphics = new GraphicsLoader();
-graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+const graphics = stockGraphics();
 const objectTables = graphicsTablesOf(graphics).objects;
 
 function makeGame(): Game {
   // A fresh copy of the dungeon each time: every scenario mutates it.
-  const fresh = new DungeonLoader();
-  fresh.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = fresh.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const game = newGame(data, graphics);
   game.setRandomSeed(0x2468ace0);
   game.systems.hallOfChampions.addChampion(champion(0));

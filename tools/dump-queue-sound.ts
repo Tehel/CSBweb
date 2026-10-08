@@ -66,9 +66,6 @@
  *
  * Run: `npx tsx tools/dump-queue-sound.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { PotionType } from '../src/core/constants';
 import { RN_FFE4, RN_FIREBALL } from '../src/core/spellRn';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
@@ -80,19 +77,17 @@ import {
   isActuatorAudible,
   isActuatorOnceOnly,
 } from '../src/data/actuatorHelpers';
-import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { TeleporterRecord } from '../src/data/dungeonTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
-import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
+import { type Champion } from '../src/engine/gameTypes';
 import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { handleMouthPress } from '../src/renderer/ui/Feeding';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
-import { gameTablesOf, newGame, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, stockGraphics, stockDungeon } from './lib/game';
 import { newUIState } from './lib/ui';
 import { wrapMember } from './lib/standIn';
+import { testChampion } from './lib/champion';
 
 /** North, east, south, west: `DELTA_X` / `DELTA_Y`. */
 const DELTAS: ReadonlyArray<readonly [number, number]> = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -108,25 +103,11 @@ interface Scene {
 }
 
 function champion(i: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `C${i}`,
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
+  return testChampion(i, { name: `C${i}`, attributes: { mana: 0, maxMana: 0 } });
 }
 
 function scene(): Scene {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const played: number[][] = [];
   const game = newGame(data, graphics, {
     playSound: (soundId, rateIdx, highVolume) => played.push([soundId, rateIdx ?? 0, highVolume ?? -1]),

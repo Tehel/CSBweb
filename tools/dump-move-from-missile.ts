@@ -28,41 +28,22 @@
  *
  * Run: `npx tsx tools/dump-move-from-missile.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { MISSILE_FILTER_TIMER_INDEX, TimerFunction } from '../src/engine/TimerQueue';
 import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { RN_FIREBALL } from '../src/core/spellRn';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
-import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
-import { newGame, stockGraphics, processTimersAt } from './lib/game';
+import { type Champion } from '../src/engine/gameTypes';
+import { newGame, stockGraphics, processTimersAt, stockDungeon } from './lib/game';
 import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
+import { testChampion } from './lib/champion';
 
 function champion(i: number): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: `HERO${i}`,
-    attributes: {
-      health: 500, maxHealth: 500, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: i,
-  };
+  return testChampion(i, { attributes: { health: 500, maxHealth: 500, mana: 0, maxMana: 0 } });
 }
 
 function makeGame(): Game {
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
   const game = newGame(data, stockGraphics());
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i));

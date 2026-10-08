@@ -39,14 +39,8 @@
  *
  * Run: `npx tsx tools/dump-mouse-queue.ts [level]`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { ActuatorAction, getActuatorAction, getActuatorType } from '../src/data/actuatorHelpers';
-import { DungeonLoader } from '../src/data/DungeonLoader';
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { MovementAction } from '../src/engine/gameTypes';
 import type { Champion } from '../src/engine/gameTypes';
 import type { InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';
@@ -54,43 +48,27 @@ import { tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import { setHandOwner } from '../src/engine/Party';
 import { ensureSkills } from '../src/engine/skills';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { graphicsTablesOf, newGame, runVbl, TICK_DUE } from './lib/game';
+import { graphicsTablesOf, newGame, runVbl, TICK_DUE, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { ButtonsAt } from './lib/clicks';
 import { standIn, wrapMember } from './lib/standIn';
-import { emptyPossessions } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { freeze, thaw } from '../src/engine/LoopState';
 import { handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
+import { testChampion } from './lib/champion';
 
 /** The button each queued click is taken as (`ButtonsAt`). */
 const buttonsAt = new ButtonsAt();
 
 /** A plain champion: the disk icon wants a party, the eye a champion to look through. */
 function champion(): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: 'HERO',
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: 0,
-  };
+  return testChampion(0, { name: 'HERO' });
 }
 
 async function main(): Promise<void> {
-  const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
-  const data = loader.getData();
-  if (!data) throw new Error('dungeon.dat did not load');
+  const data = stockDungeon();
 
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
   const uiTables = graphicsTablesOf(graphics).ui;
 
   const level = Number(process.argv[2] ?? 1);

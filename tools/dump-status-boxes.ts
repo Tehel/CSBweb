@@ -25,41 +25,23 @@
  *
  * Run: `npx tsx tools/dump-status-boxes.ts`
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
-import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { AttributeIndex, setAttributeCurrent } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { BOX_GRAPHIC_MARKED, BOX_GRAPHIC_PLAIN } from '../src/renderer/ui/Draw';
 import { eyeBoxGraphic, mouthBoxGraphic } from '../src/renderer/ui/Inventory';
 import { check, finish } from './lib/check';
-import { emptyPossessions } from '../src/engine/gameTypes';
-import { addCharacterDefaults } from '../src/engine/AddCharacter';
-import { graphicsTablesOf } from './lib/game';
+import { graphicsTablesOf, stockGraphics } from './lib/game';
+import { testChampion } from './lib/champion';
 
 /** A champion with nothing wrong: fed, watered, unpoisoned, no attribute drained. */
 function healthyChampion(): Champion {
-  return {
-    ...addCharacterDefaults(),
-    name: 'HERO',
-    attributes: {
-      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
-      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-    },
-    incantation: [], food: 1500, water: 1500,
-    skills: [],
-    possessions: emptyPossessions(),
-    partyPosition: 0,
-  };
+  return testChampion(0, { name: 'HERO', attributes: { mana: 0, maxMana: 0 } });
 }
 
 const ATTRIBUTE_NAMES = ['Luck', 'Strength', 'Dexterity', 'Wisdom', 'Vitality', 'AntiMagic', 'AntiFire'];
 
 function main(): void {
-  const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const graphics = stockGraphics();
   const g232 = graphicsTablesOf(graphics).ui.graphic232;
 
   /* ---------------------------------------- the geometry ------------------------- */
