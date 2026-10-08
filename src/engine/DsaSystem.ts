@@ -852,7 +852,7 @@ export class DsaSystem {
    * plays the sound if it pleases (`&SOUND`). 0 when one ran, and the sound is theirs; 1
    * when none did; 2 while they run, so a sound queued meanwhile plays on.
    *
-   * The nine parameters (`:740-749`): the sound's ordinal plus 1, the volume, the squared
+   * The nine parameters (`:735-744`): the sound's ordinal plus 1, the volume, the squared
    * distance to the party, the level, x and y, `gameVolume`, `NoSound`, and the distance in
    * hundredths, three Newton steps from the larger of `dx` and `dy`. The port has no volume
    * menu and no recording's `#NoSound` (`doc/CSBwin-src/Recording.cpp:327`): its page sets

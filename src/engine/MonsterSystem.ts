@@ -490,7 +490,7 @@ export class MonsterSystem {
    * (`CSBCode.cpp:6147-6149`), and a frightened group heads back there
    * (`Monster.cpp:2277-2281`) — or its `ubPrevX`/`ubPrevY`, which the AI caller sets.
    *
-   * The stairs turn the group's corner (`:3128-3134`). CSBWin keeps the corner beside the
+   * The stairs turn the group's corner (`Code11f52.cpp:3159-3165`). CSBWin keeps the corner beside the
    * record, so the turn follows the group wherever it goes, and the group is set down,
    * or parked, under the turned ID here. A caller still holding the ID it passed reaches
    * the same group through `rnEquals`. `cornerAfter` is a DSA's `object.pos(p)` after its

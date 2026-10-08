@@ -328,11 +328,11 @@ export class MovementSystem {
         // directions 0-3 (see `getRelativeDirection`), so the `direction <= 3` test is
         // always true at this point. CSBWin's `direction > 3` arm — Move Up / Move
         // Down, which refuse outright rather than poking the group (`:8287-8291`) — is
-        // unreachable in our CSBWin source too: only the 3DMaze flags `ThreeDMovements`
-        // and `GravityGame` produce those moves, and both are `false` and never assigned
-        // (doc/CSBwin-src/data.cpp:240-241). CSBWin 20230608 reads them from the dungeon,
-        // as the port does (`ctx.rules.bThreeDMovements`, `bGravityGame`), and 3D2D1D
-        // sets both; nothing here produces those moves until `DEBT.md` X5.
+        // unreachable here: only the 3DMaze flags `bThreeDMovements` and `bGravityGame`
+        // produce those moves (doc/CSBwin-src/data.cpp:240-241). CSBWin reads them from
+        // the dungeon's Extended Features (doc/CSBwin-src/SaveGame.cpp:427-430), as the
+        // port does (`ctx.rules.bThreeDMovements`, `bGravityGame`), and 3D2D1D sets both;
+        // nothing here produces those moves until `DEBT.md` X5.
         if (this.party.state.champions.length !== 0) {
             if (this.dungeon.findFirstMonster(newPosition) !== OBJECT_ID_EOF) {
                 // `ProcessTimers29to41(newX, newY, TT_M1, 0)` (doc/CSBwin-src/CSBCode.cpp:8389).

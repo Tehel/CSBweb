@@ -964,7 +964,7 @@ export class Game implements MainLoop {
     /**
      * The tail of CSBWin's `SaveGame`, once the file is written
      * (`MonsterSystem.reattachAfterSave`). A save that fails skips it: CSBWin's
-     * `SaveError` jumps past it (`doc/CSBwin-src/SaveGame.cpp:1361`). The same tail
+     * `goto tag01e4f0` jumps past it (`doc/CSBwin-src/SaveGame.cpp:1361`). The same tail
      * starts `SmartDiscard` over (`:1343`), and ends in `d.CanRestartFromSavegame = 1`
      * (`:1358`).
      */

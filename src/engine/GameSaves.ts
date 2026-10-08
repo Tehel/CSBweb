@@ -258,7 +258,7 @@ export class GameSaves {
      * slot written over is its slot no longer and the next save to it makes another.
      *
      * With the clock stopped, the save's tail (`Game.saveWritten`) runs once the file is
-     * written, and a write that fails skips it, as CSBWin's `SaveError` jumps past it
+     * written, and a write that fails skips it, as CSBWin's `goto tag01e4f0` jumps past it
      * (`doc/CSBwin-src/SaveGame.cpp:1361`).
      *
      * With the clock running, an open chest's objects are out of its chain
@@ -490,7 +490,7 @@ export class GameSaves {
      * (`DsaSystem.disableSaves`), when the key says what CSBWin's disk menu says
      * (`doc/CSBwin-src/SaveGame.cpp:856-873`).
      *
-     * A write that fails is `SaveError`'s "UNABLE TO SAVE GAME!"
+     * A write that fails is `tag01e4f0`'s "UNABLE TO SAVE GAME!"
      * (`doc/CSBwin-src/SaveGame.cpp:1363`). One that is written in the prison asks
      * "BEGIN THE ADVENTURE?" (`inPrison`), of any party.
      */

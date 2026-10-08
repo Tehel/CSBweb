@@ -95,7 +95,8 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C157 | CSBWin 20230608 becomes the reference | L | ⏳ |
-| G28 | The utility's two untried forms: a word-10 saved game, a `mini.dat` with an Extended Features block | S | ⏳ |
+| C161 | A saved game that unscrambles only with word 10 stops CSBWin's utility, and the port calls it damaged | S | ⏳ |
+| G28 | The utility's untried form: a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
 | F13 | `npm test` runs its tools one at a time | S | ⏳ |
@@ -124,7 +125,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C161 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C162 · D17 · E22 · F14 · G30 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -223,6 +224,22 @@ is read nowhere. The 2016 source is the same at both places, so every build stop
 unless the binary was not built from its source. Paying it: the author plays those squares
 in CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
+### C161 ⏳ A saved game that unscrambles only with word 10 stops CSBWin's utility, and the port calls it damaged
+
+`_ReadSavedGame` unscrambles `GAMEBLOCK1` with word 29 and, if that fails, with word 10
+(`doc/CSBwin-src/Chaos.cpp:2966-2981`). A block that only word 10 opens sets
+`word_0002` to 1, and CSBWin then stops in `NotImplemented(0x1868)`, whose message box
+ends the program (`:2984-2999`, `system.cpp:177-190`): the code that read that form,
+`impReadSavedGame`, is defined nowhere. `TAG00260e` and `TAG002724` stop the same way on
+it (`imp260e`, `:3215-3228`; `alternateFormat`, `:3314-3334`), past the first stop.
+The port reads only the word-29 form, so `ReadSavedGame` reports such a file as
+damaged, message 14 (`src/engine/Chaos.ts`).
+
+Paying it: `ReadSavedGame` stops where CSBWin does, through the page's
+`notImplemented`, as `UpdateViewportArea` does (`src/renderer/csbwin/OverlayScreen.ts`),
+and `tools/dump-new-adventure.ts` checks it on a block scrambled with word 10. No file of
+that form is here, so the check builds one.
+
 ### CSBWin's changes from 2016 to 2023
 
 `doc/CSBwin-src/` is `CSBwin_SRC_20230608.7z` from dianneandpaul.net/CSBwin/, the main
@@ -234,16 +251,16 @@ reference, `CSBwin_SRC_20160923.zip`, "Version 15.9", with the author's cosmetic
 behaves as 15.8. It is gitignored, in git history as `doc/CSBwin-src/`, and stays until
 C157's review list is worked through.
 
-Every change between the two that alters what the port has is ported. The rest changes
-nothing the port has: the 64-bit port (`uintptr_t`,
-and typed structs in `Chaos.cpp` and `Hint.cpp`, whose allocator fixes are in code the port
-never had), `TranslateLanguage` hooks (G21), the playfile (G29), and the Linux and
-Raspberry Pi front-ends. Two changes are not taken:
+Every change between the two that alters what the port has is ported, but for the
+utility's stop on a word-10 saved game (C161) and one change not taken, below. The rest
+changes nothing the port has: the 64-bit port (`uintptr_t`, and typed structs in
+`Chaos.cpp` and `Hint.cpp`, whose allocator fixes are in code the port never had),
+`TranslateLanguage` hooks (G21), the playfile (G29), and the Linux and Raspberry Pi
+front-ends.
 
 - "CAN'T REACH" and "NEED AMMO" are centred on x 272 with five-pixel characters
   (`TextOutToScreen_Centered`, `Attack.cpp:972-980`, `CSBCode.cpp:1785`), which puts them
   2 and 3 pixels right of the original's 242 and 248. It serves translations.
-- The utility's word-10 save form, whose adventure write is left `NotImplemented` (G28).
 
 ### C157 ⏳ CSBWin 20230608 becomes the reference
 
@@ -255,20 +272,24 @@ every citation of a 2016 line was mapped to its 2023 line through the diff by
    alone, one a row, with the line it is on (`where`; the row's `text` finds it if lines
    moved), the citation as it now reads and the 2016 one it came from (read against
    `doc/CSBwin-src-20160923/`). Two kinds:
-   - `changed` (about 470): the cited 2016 lines changed in 2023. Read both. If the fact
+   - `changed` (about 390): the cited 2016 lines changed in 2023. Read both. If the fact
      changed, rewrite it, and a behaviour the port lacks is a C entry; otherwise nothing.
-   - `file` (about 450): a `:N` whose file is not named beside it. The script took the
+   - `file` (about 405): a `:N` whose file is not named beside it. The script took the
      file its quoted identifiers point at, else the nearest; `note` gives the other
      candidates, which map elsewhere. Confirm the file from the text, or map the 2016 line
      from the right one.
 
    Work it a document at a time, deleting each row once settled, about 150 rows a session.
-   `doc/PROVEN_FACTS.md` holds a quarter. When the list is empty, delete it,
+   `doc/PROVEN_FACTS.md` holds a third. Most `changed` rows are cosmetic: the 64-bit
+   rewrite keeps each old line as a `//` comment beside its typed one, and braces, casts
+   and `TranslateLanguage` wrappers move. Comparing the two ranges' tokens, without
+   comments, braces and `;`, leaves what really changed. `POST_TRANSLATE_CLICK` is
+   defined (`CSB.h:1716`), so its `#ifdef` branches are the live ones. When the list is empty, delete it,
    `tools/recite-csbwin.py` and `doc/CSBwin-src-20160923/`, and the `CLAUDE.md` row that
    names the last.
 2. **Review every divergence.** Each H entry, each C entry and each `CLAUDE.md` exception
-   is checked against 2023: one that 2023 fixed is no longer a divergence. The two changes
-   not taken ("CSBWin's changes from 2016 to 2023" above) become H entries or are ported.
+   is checked against 2023: one that 2023 fixed is no longer a divergence. The change not
+   taken ("CSBWin's changes from 2016 to 2023" above) becomes an H entry or is ported.
    The `memmove-source-first` memory and `CLAUDE.md` → "The one non-negotiable rule" name
    the tree.
 
@@ -329,25 +350,16 @@ Things CSBWin does that the port has not built. These are not defects in existin
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
 
-### G28 ⏳ The utility's two untried forms: a saved game unscrambled with word 10, and a `mini.dat` with an Extended Features block
+### G28 ⏳ The utility's untried form: a `mini.dat` with an Extended Features block
 
-`src/engine/Chaos.ts` refuses both, so a file of either form makes no adventure:
+`src/engine/Chaos.ts` refuses it, so such a `mini.dat` makes no adventure.
+`_TAG000fc4` writes a new Extended Features block when `mini.dat` opened with one
+(`doc/CSBwin-src/Chaos.cpp:2141-2200`), from the globals the read left, with
+`BigActuators` set whatever the file had, `SupressDSAWarning` from
+`SupressDSAWarningOption`, and no `cellFlagArraySize`. CSB's `mini.dat` has none.
+`TAG000fc4` throws (`tools/dump-new-adventure.ts`).
 
-- `_ReadSavedGame` unscrambles `GAMEBLOCK1` with word 29 and, if that fails, with word
-  10 (`doc/CSBwin-src/Chaos.cpp:2964-2992`), a form whose block keeps the hashes at 310
-  and the checksums at 342, and whose `TAG00260e` and `TAG002724` branches read other
-  offsets (`:3215-3229`, `:3314-3335`). Nothing else in CSBWin reads that form, the
-  port's reader does not, and no file of it is here. `ReadSavedGame` reports it as
-  damaged (message 14).
-- `_TAG000fc4` writes a new Extended Features block when `mini.dat` opened with one
-  (`:2141-2200`), from the globals the read left, with `BigActuators` set whatever the
-  file had and no `cellFlagArraySize`. CSB's `mini.dat` has none. `TAG000fc4` throws.
-
-CSBWin 20230608 reads the word-10 form but stops when it writes its adventure: the branch
-is `NotImplemented(0xfc4)` unless `impfc4` is defined, and nothing defines it
-(`doc/CSBwin-src/Chaos.cpp:2103-2113`).
-
-Paying it needs a file of each form, or the author's decision to port them unchecked.
+Paying it needs such a file, or the author's decision to port the branch unchecked.
 
 ### Postponed until the default dungeon is validated
 

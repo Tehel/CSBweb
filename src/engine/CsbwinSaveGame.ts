@@ -90,7 +90,7 @@ function buildPartyState(world: CsbwinWorld): PartyState {
     const party = readCsbwinParty(block, gb2.numCharacter);
     const tail = readCsbwinPartyTail(block);
 
-    // `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`:1645`) — the cursor's
+    // `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`SaveGame.cpp:1773`) — the cursor's
     // object is an indirect slot number like every other RN in the file. `RNempty` is 0;
     // the port keeps `RNnul` as its one empty value. The `CURSORFILTER_ReadGame` that follows
     // (`:1774-1779`) runs no DSA (`Game.readNewGame`).

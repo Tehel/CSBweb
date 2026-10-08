@@ -297,7 +297,7 @@ export function applyFeedParameters(
   ctx.systems.monsterAttack.adjustStamina(chIdx, -fp.staminaAdjust);
 
   if (fp.shieldStrengthAdjust !== 0) {
-    // `shieldStrengthAdjust` is a `ui32` (`:3970`), so the sum `:4404` tests is unsigned and
+    // `shieldStrengthAdjust` is a `ui32` (`:3970`), so the sum `:4383` tests is unsigned and
     // never below 0: a negative adjustment, which only the filter makes, wraps to 16 bits.
     champ.shieldStrength = (champ.shieldStrength + fp.shieldStrengthAdjust) & 0xffff;
     // The `TT_72` shield-expiry timer (`doc/CSBwin-src/Character.cpp:4403-4408`).

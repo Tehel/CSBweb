@@ -94,7 +94,7 @@ export function ninetySecondUpdate(ctx: GameContext): void {
  * `charFlags |= CHARFLAG_statsChanged` has no counterpart either: the panels are
  * redrawn from live state every frame. `CHARFLAG_chestOrScroll` has, for the champion
  * whose inventory is open with the eye held or food and water in its panel
- * (`:445-453`), and `DrawAllCharacterState` draws it (`:448`).
+ * (`:433-443`), and `DrawAllCharacterState` draws it (`:448`).
  */
 export function tenSecondUpdate(ctx: GameContext): void {
     const party = ctx.party.state;

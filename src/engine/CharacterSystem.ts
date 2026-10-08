@@ -85,7 +85,7 @@ export class CharacterSystem {
         this.ctx.dungeon.getWeaponRecord(objRemoved)!.litTorch = false;
         selectPaletteForLightLevel(this.ctx);
       }
-      // `LOCAL_2`, `chIdx+1 == d.SelectedCharacterOrdinal` (`:1861`, `:1935-1950`).
+      // `LOCAL_2`, `chIdx+1 == d.SelectedCharacterOrdinal` (`:1861`, `:1911-1926`).
       if (chIdx === this.ctx.party.state.selectedCharacterIndex && slot === 1) {
         if (objNID5 === OBJNI_CHEST) {
           this.ctx.host.repackChest();

@@ -1,9 +1,5 @@
 kind	where	now	2016	note	text
 changed	.claude/memory/memmove-source-first.md:8	CSBCode.cpp:834	CSBCode.cpp:824		CSBWin's `MemMove(ui8 *src, ui8 *dest, i32 byteCount)` (`doc/CSBwin-src/CSBCode.cpp:834`)
-changed	DEBT.md:337	Chaos.cpp:2964-2992	Chaos.cpp:2359-2378		10 (`doc/CSBwin-src/Chaos.cpp:2964-2992`), a form whose block keeps the hashes at 310
-changed	DEBT.md:339	Chaos.cpp:3215-3229	Chaos.cpp:2531-2538		offsets (`:3215-3229`, `:3314-3335`). Nothing else in CSBWin reads that form, the
-changed	DEBT.md:339	Chaos.cpp:3314-3335	Chaos.cpp:2602-2617		offsets (`:3215-3229`, `:3314-3335`). Nothing else in CSBWin reads that form, the
-changed	DEBT.md:343	Chaos.cpp:2141-2200	Chaos.cpp:1738-1793		(`:2141-2200`), from the globals the read left, with `BigActuators` set whatever the
 changed	DEBT.md:361	Translation.cpp:131-175	Translation.cpp:14-58		translation, and `//` comment lines (`doc/CSBwin-src/Translation.cpp:131-175`, called at
 changed	DEBT.md:414	Recording.cpp:864-1300	Recording.cpp:820-1080		- **The recorder** (`RECORDFILE`, `doc/CSBwin-src/Recording.cpp:864-1300`) is the
 changed	DEBT.md:420	Mouse.cpp:1634-1645	Mouse.cpp:1500-1506		of the mouse queue by `_HandleMouseEvents` (`:1634-1645`).
@@ -241,7 +237,6 @@ file	doc/PROVEN_FACTS.md:2970	Graphics.cpp:1889-1895	Graphics.cpp:1865-1871	no f
 changed	doc/PROVEN_FACTS.md:2995	SaveGame.cpp:1177	SaveGame.cpp:1126		party tail (`SaveGame.cpp:1177`, `:1802`).
 file	doc/PROVEN_FACTS.md:3119	CSBUI.cpp:1168-1178	CSBUI.cpp:1147-1157	no file named in its paragraph; or CSBCode.cpp:1147, Viewport.cpp:1147, CSB.h:1147	(`:1168-1178`). That is the same pair `UIM_LEFT_BUTTON_DOWN` raises for a real click
 file	doc/PROVEN_FACTS.md:3159	SaveGame.cpp:2824-2828	SaveGame.cpp:2612-2616	or Timer.cpp:2612-2616	(`:2824-2828`), a record count being the file's count plus `d.Byte7302[db]` extra ones
-changed	doc/PROVEN_FACTS.md:3172	SaveGame.cpp:1361	SaveGame.cpp:1264		one a restore of it gives back; a save that fails jumps past it, to `SaveError` (`:1361`).
 changed	doc/PROVEN_FACTS.md:3221	SaveGame.cpp:1195	SaveGame.cpp:1136		`MaxTimer` words of `m_timerQueue` (`doc/CSBwin-src/SaveGame.cpp:1195`) and `LoadGame`
 file	doc/PROVEN_FACTS.md:3297	CSB.h:1179-1195	CSB.h:1176-1192	after None, named at line 3296	| `DB6` clothing | `word2` bits 14-15 (`:1179-1195`) | no |
 file	doc/PROVEN_FACTS.md:3298	CSB.h:1202-1209	CSB.h:1199-1206	after None, named at line 3296	| `DB7` scroll, 4-byte form | `word2` bits 10-15, the old `b10_15()` (`:1202-1209`) | **yes** — bit 10 |
@@ -442,7 +437,6 @@ changed	doc/SAVES.md:217	SaveGame.cpp:1730-1731	SaveGame.cpp:1605-1606		THE SAME
 changed	doc/SAVES.md:302	SaveGame.cpp:856-873	SaveGame.cpp:848-856		disk menu is only "SAVES ARE DISABLED" and OK (`doc/CSBwin-src/SaveGame.cpp:856-873`),
 changed	doc/SAVES.md:313	CSBCode.cpp:10617-10661	CSBCode.cpp:10493-10537		(`doc/CSBwin-src/CSBCode.cpp:10617-10661`), so its absence is an entry of
 changed	doc/SAVES.md:325	SaveGame.cpp:856-873	SaveGame.cpp:848-856		CSBWin's disk menu's "SAVES ARE DISABLED" (`doc/CSBwin-src/SaveGame.cpp:856-873`) while a
-changed	doc/SAVES.md:327	SaveGame.cpp:1363	SaveGame.cpp:1266		CSBWin's own "UNABLE TO SAVE GAME!" (`doc/CSBwin-src/SaveGame.cpp:1363`) and "CAN'T FIND
 changed	doc/SAVES.md:328	SaveGame.cpp:1710	SaveGame.cpp:1585		SAVED GAME!" (`:1710`) for a write that failed and for no save at all; a file that does
 changed	doc/TRAINING.md:164	Attack.cpp:1834-1839	Attack.cpp:1834-1838		halves both the experience and the busy time (`doc/CSBwin-src/Attack.cpp:1834-1839`). A wall
 changed	doc/UI_MODULE_MAP.md:48	CSBCode.cpp:8823-8967	CSBCode.cpp:8718-8862		| `ui/Attack.ts` | `Character.cpp` (attack half), `CSBCode.cpp:8823-8967` | The attack buttons and the attack menu: legal options, the per-tick panel state, the damage flash |
@@ -511,124 +505,6 @@ changed	src/data/SaveGameLoader.ts:931	system.cpp:315-329	system.cpp:315-329		//
 changed	src/data/dungeonTypes.ts:539	SaveGame.cpp:1205-1231	SaveGame.cpp:1141-1164		* there just before the image (`doc/CSBwin-src/SaveGame.cpp:1205-1231`,
 changed	src/data/tables/MonsterDesc.ts:3	CSB.h:2319-2422	CSB.h:2256-2363		* (doc/CSBwin-src/CSB.h:2319-2422, `d.MonsterDescriptor[27]` at doc/CSBwin-src/Data.h:1091).
 changed	src/data/tables/MonsterDesc.ts:62	CSB.h:2410-2421	CSB.h:2348-2362		* `word14` / `word16` / `word18` / `word20` bitfields (doc/CSBwin-src/CSB.h:2410-2421).
-file	src/engine/AddCharacter.ts:313	Character.cpp:559-568	Character.cpp:558-567	no file named in its paragraph; or CSB.h:558, Code11f52.cpp:558, CSBCode.cpp:558	// The name, to the first line break, at most seven characters (`:559-568`).
-file	src/engine/AddCharacter.ts:320	Character.cpp:571-591	Character.cpp:570-590	no file named in its paragraph; or CSB.h:570, Code11f52.cpp:570, CSBCode.cpp:570	// them (CSB's "SPELLWEAVER OF KE" and "LT"), at most nineteen characters (`:571-591`).
-file	src/engine/AddCharacter.ts:332	Character.cpp:592-601	Character.cpp:591-600	no file named in its paragraph; or CSB.h:591, Code11f52.cpp:591, CSBCode.cpp:591	// `:592-601`
-file	src/engine/AddCharacter.ts:336	Character.cpp:602-641	Character.cpp:601-640	no file named in its paragraph; or CSB.h:601, Code11f52.cpp:601, CSBCode.cpp:601	// `:602-641`: each of the three is illegal past its maximum, and as -1 (a letter
-file	src/engine/AddCharacter.ts:347	Character.cpp:642-657	Character.cpp:641-656	no file named in its paragraph; or CSB.h:641, Code11f52.cpp:641, CSBCode.cpp:641	// `:642-657`: two letters each, above 224 held at 224.
-file	src/engine/AddCharacter.ts:356	Character.cpp:662-681	Character.cpp:661-680	no file named in its paragraph; or CSB.h:661, Code11f52.cpp:661, CSBCode.cpp:661	// `:662-681`: 'A' is no experience, 'B'..'R' are levels 1 to 17, anything else illegal.
-changed	src/engine/Chaos.ts:9	Chaos.cpp:4806-4833	Chaos.cpp:3949-3973		* `_TAG004518` (`:4806-4833`) on a source save `_ReadSavedGame(0)` has read, from file
-file	src/engine/Chaos.ts:9	Chaos.cpp:4806-4833	Chaos.cpp:3949-3973	after src/renderer/intro/PrisonDoor.ts, named at line 7	* `_TAG004518` (`:4806-4833`) on a source save `_ReadSavedGame(0)` has read, from file
-changed	src/engine/Chaos.ts:36	Chaos.cpp:2835-2843	Chaos.cpp:2245-2251		/** `_ReadSavedGame(1)` when `mini.dat` will not open (`:2835-2843`): the page's fetch. */
-changed	src/engine/Chaos.ts:51	Chaos.cpp:2789-3164	Chaos.cpp:2207-2496		* One of `e.Pnt24812`'s two records, as `_ReadSavedGame` fills it (`:2789-3164`), in the
-changed	src/engine/Chaos.ts:56	Chaos.cpp:2964-2992	Chaos.cpp:2359-2378		* keeps its hashes two bytes lower (`:2964-2992`), and which nothing else in CSBWin or
-changed	src/engine/Chaos.ts:77	SaveGame.cpp:299-424	SaveGame.cpp:298-420		* (`doc/CSBwin-src/SaveGame.cpp:299-424`), so at `_TAG000fc4` it is `mini.dat`'s.
-changed	src/engine/Chaos.ts:88	Chaos.cpp:2789-3164	Chaos.cpp:2207-2496		* `_ReadSavedGame` (`doc/CSBwin-src/Chaos.cpp:2789-3164`), past the dialogs that choose
-changed	src/engine/Chaos.ts:121	Chaos.cpp:3043-3079	Chaos.cpp:2405-2436		// zero is cleared, for each of the `numcharacter` champions (`:3043-3079`).
-file	src/engine/Chaos.ts:121	Chaos.cpp:3043-3079	Chaos.cpp:2405-2436	no file named in its paragraph; or SaveGame.cpp:2405	// zero is cleared, for each of the `numcharacter` champions (`:3043-3079`).
-changed	src/engine/Chaos.ts:143	Chaos.cpp:2424-2602	Chaos.cpp:1961-2078		* `TAG00142e` (`doc/CSBwin-src/Chaos.cpp:2424-2602`): the dungeon's sections, each byte
-changed	src/engine/Chaos.ts:180	Chaos.cpp:1774-1812	Chaos.cpp:1434-1462		* `_CheckChampionNames` (`doc/CSBwin-src/Chaos.cpp:1774-1812`): every one of the saved
-changed	src/engine/Chaos.ts:197	Chaos.cpp:3169-3238	Chaos.cpp:2501-2546		* `_TAG00260e` (`doc/CSBwin-src/Chaos.cpp:3169-3238`): whether a new adventure may be
-changed	src/engine/Chaos.ts:213	Chaos.cpp:3243-3259	Chaos.cpp:2551-2566		* `_TAG0026c4` (`doc/CSBwin-src/Chaos.cpp:3243-3259`): `mini.dat` is the new adventure,
-changed	src/engine/Chaos.ts:222	Chaos.cpp:3264-3451	Chaos.cpp:2571-2680		* `TAG002724` (`doc/CSBwin-src/Chaos.cpp:3264-3451`): the saved game's party copied into
-changed	src/engine/Chaos.ts:229	Chaos.cpp:1078-1090	Chaos.cpp:809-821		*   low-first (`:1078-1090`), so the 1 is added to the file's first byte, the field's
-changed	src/engine/Chaos.ts:295	Chaos.cpp:2001-2327	Chaos.cpp:1643-1898		* `_TAG000fc4(1)` (`doc/CSBwin-src/Chaos.cpp:2001-2327`): the new adventure's record
-changed	src/engine/Chaos.ts:334	Chaos.cpp:4806-4833	Chaos.cpp:3949-3973		* "MAKE NEW ADVENTURE" (`_TAG004518`'s button 13, `doc/CSBwin-src/Chaos.cpp:4806-4833`):
-file	src/engine/CharacterSystem.ts:88	CSBCode.cpp:1935-1950	CSBCode.cpp:1906-1921	or DSA.cpp:1906-1921, Character.cpp:1906-1921	// `LOCAL_2`, `chIdx+1 == d.SelectedCharacterOrdinal` (`:1861`, `:1935-1950`).
-changed	src/engine/CharacterSystem.ts:181	Character.cpp:2922-3003	Character.cpp:2917-2998		* `CHARDESC::SetPossession(index, newObject, true)` (`doc/CSBwin-src/Character.cpp:2922-3003`),
-file	src/engine/CheckMonsters.ts:14	SaveGame.cpp:1341	SaveGame.cpp:1243	after src/data/CsbwinDungeonConversions.ts, named at line 7	* (`:1341`), and reads the pool back before this runs (`:1793-1801`). So a fix to such a
-changed	src/engine/CheckMonsters.ts:14	SaveGame.cpp:1793-1801	SaveGame.cpp:1668-1675		* (`:1341`), and reads the pool back before this runs (`:1793-1801`). So a fix to such a
-file	src/engine/CheckMonsters.ts:14	SaveGame.cpp:1793-1801	SaveGame.cpp:1668-1675	no file named in its paragraph; or CSBCode.cpp:1668, Code11f52.cpp:1668	* (`:1341`), and reads the pool back before this runs (`:1793-1801`). So a fix to such a
-changed	src/engine/CsbwinSaveGame.ts:31	SaveGame.cpp:1962-1964	SaveGame.cpp:1791-1793		* | `disableSaves` | `EXPOOL` (`readDisableSaves`, `doc/CSBwin-src/SaveGame.cpp:1962-1964`) |
-file	src/engine/CsbwinSaveGame.ts:93	data.cpp:1645	data.cpp:1642	no file named in its paragraph; or Mouse.cpp:1642, SaveGame.cpp:1642, Data.h:1642	// `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`:1645`) — the cursor's
-changed	src/engine/CsbwinSaveGame.ts:212	SaveGame.cpp:1962-1964	SaveGame.cpp:1791-1793		// `disableSaves`'s records leave the pool as they are read (`:1962-1964`).
-changed	src/engine/CsbwinSaveGame.ts:244	SaveGame.cpp:1966-2025	SaveGame.cpp:1795-1822		// `LoadGame`'s end (doc/CSBwin-src/SaveGame.cpp:1966-2025), before anything is installed.
-file	src/engine/DsaSystem.ts:855	CSBCode.cpp:740-749	CSBCode.cpp:730-739	or Sound.cpp:730-739	* The nine parameters (`:740-749`): the sound's ordinal plus 1, the volume, the squared
-changed	src/engine/DsaSystem.ts:939	Character.cpp:2922-3003	Character.cpp:2917-2998		* The equip filter (`doc/CSBwin-src/Character.cpp:2922-3003`), which
-changed	src/engine/DsaSystem.ts:942	Character.cpp:2973-2976	Character.cpp:2968-2971		* the champion's index, the slot, an object and 0, set once (`:2973-2976`). It runs
-changed	src/engine/DsaSystem.ts:2413	DSA.cpp:2957-2986	DSA.cpp:2956-2985		// `i`, `n` and `j` are `ui32` (`doc/CSBwin-src/DSA.cpp:2957-2986`), so the count is
-changed	src/engine/DsaSystem.ts:2877	DSA.cpp:3169-3194	DSA.cpp:3168-3193		// `DSA.cpp:3169-3194`.
-changed	src/engine/DsaSystem.ts:4084	CSBCode.cpp:5360-5372	CSBCode.cpp:5295-5307		* `SetGlobalText` (`doc/CSBwin-src/CSBCode.cpp:5360-5372`): the text, at most 99 bytes
-changed	src/engine/DungeonSnapshot.ts:18	SaveGame.cpp:1252	SaveGame.cpp:1178		*   saves the array beside the object list (`doc/CSBwin-src/SaveGame.cpp:1252`).
-file	src/engine/DungeonState.ts:584	data.cpp:956-968	data.cpp:954-966	or CSBCode.cpp:954-966	* 1 for a free one (`:956-968`), and gives the record that slot, or a new one, at
-changed	src/engine/DungeonState.ts:1001	Code11f52.cpp:3995-4002	Code11f52.cpp:3960-3964		* `DecodeText` returns -1 (`doc/CSBwin-src/Code11f52.cpp:3995-4002`).
-file	src/engine/Feeding.ts:14	Character.cpp:4365-4440	Character.cpp:4348-4423	no file named in its paragraph; or Code11f52.cpp:4348	* The order below is CSBWin's own (`:4365-4440`) and matters: attributes, poison,
-file	src/engine/Feeding.ts:300	Code11f52.cpp:4404	Code11f52.cpp:4366	no file named in its paragraph; or Character.cpp:4366	// `shieldStrengthAdjust` is a `ui32` (`:3970`), so the sum `:4404` tests is unsigned and
-changed	src/engine/FileSignatures.ts:25	SaveGame.cpp:1966-2025	SaveGame.cpp:1795-1822		* The end of `LoadGame` (`doc/CSBwin-src/SaveGame.cpp:1966-2025`) for the world a read
-file	src/engine/FileSignatures.ts:54	Graphics.cpp:1909-1918	Graphics.cpp:1885-1894	no file named in its paragraph; or SaveGame.cpp:1885, CSBCode.cpp:1885	*   not 0 (`:1889-1895`, `:1909-1918`): `die(0x3c6c)`. A fold of 0 counts as 1. Before any read both are
-changed	src/engine/Game.ts:257	SaveGame.cpp:1579-1594	SaveGame.cpp:1480-1494		* the path a save takes (doc/CSBwin-src/SaveGame.cpp:1579-1594). `data` must be a
-changed	src/engine/Game.ts:272	SaveGame.cpp:1966-2025	SaveGame.cpp:1795-1822		// `LoadGame`'s end (doc/CSBwin-src/SaveGame.cpp:1966-2025): the world must name no
-changed	src/engine/Game.ts:283	SaveGame.cpp:1962-1964	SaveGame.cpp:1791-1793		// (`doc/CSBwin-src/SaveGame.cpp:1648`, `:1962-1964`).
-changed	src/engine/Game.ts:812	Mouse.cpp:1591-1604	Mouse.cpp:1463-1476		*   (`thawCommand`, `:1591-1604`): no tick runs while frozen, so the thaw is never
-changed	src/engine/Game.ts:856	Recording.cpp:1091-1114	Recording.cpp:1011-1019		// the entry's one count in `totalMoveCount` (`Recording.cpp:1091-1114`). A viewport
-changed	src/engine/Game.ts:900	Recording.cpp:1091-1114	Recording.cpp:1011-1019		* The count in `RECORDFILE::Record(MouseQueueEnt *)` (doc/CSBwin-src/Recording.cpp:1091-1114):
-changed	src/engine/Game.ts:967	SaveGame.cpp:1361	SaveGame.cpp:1264		* `SaveError` jumps past it (`doc/CSBwin-src/SaveGame.cpp:1361`). The same tail
-changed	src/engine/GameContext.ts:168	SaveGame.cpp:939-946	SaveGame.cpp:914-920		* (`SaveGame.cpp:939-946`, `:968-971`). Set by an enciphered file, cleared by none.
-file	src/engine/GameContext.ts:227	SaveGame.cpp:2562-2570	SaveGame.cpp:2350-2358	after None, named at line 227	* `dungeon.dat` and staying 13 for a plain one (`:2562-2570`, `DungeonData.word22592`),
-changed	src/engine/GameHost.ts:20	CSBCode.cpp:1664	CSBCode.cpp:1654		* `QuePrintLines(color, text)` pair (`doc/CSBwin-src/CSBCode.cpp:1664`, `:1761`).
-file	src/engine/GameHost.ts:124	Character.cpp:797-798	Character.cpp:796-797	or Attack.cpp:796-797, CSBCode.cpp:796-797, Sound.cpp:796-797	* candidate's inventory is shown (`:797-798`).
-file	src/engine/GameHost.ts:174	Character.cpp:1260-1312	Character.cpp:1255-1307	or Timer.cpp:1255-1307, CSBCode.cpp:1255-1307, Attack.cpp:1255-1307	* the whole box (`:1260-1312`), and `CHARFLAG_CURSOR` the name of a champion whose
-file	src/engine/GameHost.ts:175	Character.cpp:1315-1361	Character.cpp:1310-1356	or Timer.cpp:1310-1356, CSBCode.cpp:1310-1356, Attack.cpp:1310-1356	* inventory is closed (`:1315-1361`). CSBWin draws at once wherever it sets either, so
-file	src/engine/GameHost.ts:177	Character.cpp:1483-1502	Character.cpp:1478-1497	or Timer.cpp:1478-1497, CSBCode.cpp:1478-1497, Attack.cpp:1478-1497	* fills the open inventory's eye panel again (`:1483-1502`), which runs the viewing
-changed	src/engine/GameSaves.ts:116	SaveGame.cpp:2118	SaveGame.cpp:1906		* (`doc/CSBwin-src/SaveGame.cpp:2118`).
-changed	src/engine/GameSaves.ts:120	SaveGame.cpp:858	SaveGame.cpp:850		/** What CSBWin's disk menu says while a DSA has disabled saves (`doc/CSBwin-src/SaveGame.cpp:858`). */
-changed	src/engine/GameSaves.ts:262	SaveGame.cpp:1361	SaveGame.cpp:1264		* (`doc/CSBwin-src/SaveGame.cpp:1361`).
-changed	src/engine/GameSaves.ts:418	Chaos.cpp:1817-1891	Chaos.cpp:1467-1541		* one of its four slots (`_TAG000ede`, `doc/CSBwin-src/Chaos.cpp:1817-1891`). Its
-changed	src/engine/GameSaves.ts:491	SaveGame.cpp:856-873	SaveGame.cpp:848-856		* (`doc/CSBwin-src/SaveGame.cpp:856-873`).
-changed	src/engine/GameSaves.ts:494	SaveGame.cpp:1363	SaveGame.cpp:1266		* (`doc/CSBwin-src/SaveGame.cpp:1363`). One that is written in the prison asks
-changed	src/engine/GameSaves.ts:552	SaveGame.cpp:1710	SaveGame.cpp:1585		* (`doc/CSBwin-src/SaveGame.cpp:1710`), whatever the data set's other playthroughs
-file	src/engine/HallOfChampions.ts:116	Character.cpp:532	Character.cpp:531	no file named in its paragraph; or CSBCode.cpp:531	// `pcA3->facing = pcA3->facing3 = d.partyFacing` (`:523`, `:532`) — the corner
-changed	src/engine/HallOfChampions.ts:215	CSBCode.cpp:6798-6859	CSBCode.cpp:6739-6800		* (`doc/CSBwin-src/CSBCode.cpp:6798-6859`).
-changed	src/engine/LoopState.ts:47	Mouse.cpp:1548-1565	Mouse.cpp:1433-1444		* 148, and lets 148 through whenever it comes (doc/CSBwin-src/Mouse.cpp:1548-1565,
-changed	src/engine/LoopState.ts:48	Mouse.cpp:1591-1604	Mouse.cpp:1463-1476		* `:1591-1604`).
-changed	src/engine/LoopState.ts:261	Mouse.cpp:1870-1898	Mouse.cpp:1731-1759		* The engine's half of button 147, the freeze (doc/CSBwin-src/Mouse.cpp:1870-1898):
-file	src/engine/MissileEncounter.ts:430	Code11f52.cpp:2066-2077	Code11f52.cpp:2031-2042	no file named in its paragraph; or Monster.cpp:2031, Data.h:2031, Timer.cpp:2031	// that absorbs them — but only if nobody died of the blow (`:2066-2077`).
-changed	src/engine/MonsterAI.ts:312	Monster.cpp:3417-4475	Monster.cpp:3409-4462		* (`doc/CSBwin-src/Monster.cpp:3417-4475`).
-changed	src/engine/MonsterAI.ts:418	Monster.cpp:3615-3762	Monster.cpp:3607-3752		* Timer types 32-36 — the "A" family (`doc/CSBwin-src/Monster.cpp:3615-3762`).
-changed	src/engine/MonsterAI.ts:507	Monster.cpp:3784-4119	Monster.cpp:3770-4106		* (`doc/CSBwin-src/Monster.cpp:3784-4119`).
-file	src/engine/MonsterAttack.ts:103	Monster.cpp:921-942	Monster.cpp:917-938	or Data.h:917-938	* it, a longword per field in the struct's order (`:921-942`).
-file	src/engine/MonsterSystem.ts:493	Monster.cpp:3128-3134	Monster.cpp:3124-3130	or CSBCode.cpp:3124-3130, Code11f52.cpp:3124-3130	* The stairs turn the group's corner (`:3128-3134`). CSBWin keeps the corner beside the
-file	src/engine/MonsterSystem.ts:546	Code11f52.cpp:2878-2884	Code11f52.cpp:2843-2849	no file named in its paragraph; or Monster.cpp:2843, CSBCode.cpp:2843, Timer.cpp:2843	// A monster leaving a square may run into a missile sitting in it (`:2878-2884`).
-file	src/engine/MonsterSystem.ts:557	Code11f52.cpp:3332	Code11f52.cpp:3297	no file named in its paragraph; or Monster.cpp:3297, CSBCode.cpp:3297, CSB.h:3297	// Lifted and not set down again (`:3332`).
-file	src/engine/MonsterSystem.ts:571	Code11f52.cpp:3182-3211	Code11f52.cpp:3147-3176	no file named in its paragraph; or Monster.cpp:3147, CSBCode.cpp:3147, CSB.h:3147	// Killed by the fall, or not allowed where it landed: gone (`:3182-3211`). The delete
-file	src/engine/MonsterSystem.ts:590	Code11f52.cpp:3218-3248	Code11f52.cpp:3183-3213	no file named in its paragraph; or Monster.cpp:3183, CSBCode.cpp:3183, CSB.h:3183	// or set down (`:3218-3248`). Only the stairs turn a monster's corner (`:3159-3165`),
-file	src/engine/MonsterSystem.ts:590	Code11f52.cpp:3159-3165	Code11f52.cpp:3124-3130	no file named in its paragraph; or Monster.cpp:3124, CSBCode.cpp:3124, CSB.h:3124	// or set down (`:3218-3248`). Only the stairs turn a monster's corner (`:3159-3165`),
-file	src/engine/MonsterSystem.ts:612	Code11f52.cpp:3399-3413	Code11f52.cpp:3364-3378	no file named in its paragraph; or Monster.cpp:3364, CSBCode.cpp:3364, CSB.h:3364	// Crossing on or off the party's level detaches or attaches the slot (`:3399-3413`).
-file	src/engine/MonsterSystem.ts:621	Code11f52.cpp:3419-3434	Code11f52.cpp:3384-3399	no file named in its paragraph; or Monster.cpp:3384, CSBCode.cpp:3384, CSB.h:3384	// Set it down (`:3419-3434`): "Not current room. Room changed."
-changed	src/engine/MouseQueue.ts:22	CSBCode.cpp:7653	CSBCode.cpp:7594		/** The button-up `OnMouseUnClick` queues (doc/CSBwin-src/CSBCode.cpp:7653). */
-changed	src/engine/MovementSystem.ts:226	CSBCode.cpp:8031-8439	CSBCode.cpp:7944-8352		* `MoveParty`'s four moves (doc/CSBwin-src/CSBCode.cpp:8031-8439). The destination and
-changed	src/engine/MovementSystem.ts:333	data.cpp:240-241	data.cpp:239-240		// (doc/CSBwin-src/data.cpp:240-241). CSBWin 20230608 reads them from the dungeon,
-changed	src/engine/PartyFootprints.ts:8	CSBCode.cpp:3281-3308	CSBCode.cpp:3225-3247		* appended to on every party move (`:3281-3308`).
-changed	src/engine/PartyFootprints.ts:134	CSBCode.cpp:834	CSBCode.cpp:824		* (`MemMove(src, dest, byteCount)`, `doc/CSBwin-src/CSBCode.cpp:834`), so
-file	src/engine/PeriodicUpdates.ts:97	CSBCode.cpp:445-453	CSBCode.cpp:435-443	or Magic.cpp:435-443, Code17818.cpp:435-443	* (`:445-453`), and `DrawAllCharacterState` draws it (`:448`).
-file	src/engine/PeriodicUpdates.ts:151	Code17818.cpp:291-344	Code17818.cpp:291-344	no file named in its paragraph; or CSBCode.cpp:291, Magic.cpp:291	// Food and water (`:291-344`). D6 grows by 2 for each halving of
-file	src/engine/PeriodicUpdates.ts:194	Code17818.cpp:350-372	Code17818.cpp:350-372	no file named in its paragraph; or CSBCode.cpp:350, Magic.cpp:350	// HP regeneration (`:350-372`).
-file	src/engine/PeriodicUpdates.ts:209	Code17818.cpp:384-414	Code17818.cpp:384-414	no file named in its paragraph; or CSBCode.cpp:384, Magic.cpp:384	// Attributes drift back to Maximum, one point at a time (`:384-414`).
-file	src/engine/PeriodicUpdates.ts:223	Code17818.cpp:416-430	Code17818.cpp:416-430	no file named in its paragraph; or CSBCode.cpp:416, Magic.cpp:416	// monster has struck for 60 ticks (`:416-430`).
-changed	src/engine/PrintWithSubstitution.ts:2	Graphics.cpp:1564-1620	Graphics.cpp:1540-1596		* `PrintWithSubstitution` (`doc/CSBwin-src/Graphics.cpp:1564-1620`), `TAG01ab88`: a text
-changed	src/engine/PrintWithSubstitution.ts:10	Graphics.cpp:1616-1619	Graphics.cpp:1592-1595		* nothing (`:1616-1619`).
-changed	src/engine/SaveGameFile.ts:74	SaveGame.cpp:1205-1213	SaveGame.cpp:1141-1148		// written (`doc/CSBwin-src/SaveGame.cpp:1205-1213`), in the running world as CSBWin's.
-changed	src/engine/SaveGameFile.ts:79	SaveGame.cpp:1216-1231	SaveGame.cpp:1151-1164		// Then the overlay palette's 24 records (`:1216-1231`), and the record of
-changed	src/engine/SaveGameFile.ts:80	SaveGame.cpp:1293-1295	SaveGame.cpp:1200-1201		// `disableSaves` (`:1293-1295`).
-changed	src/engine/TimerQueue.ts:363	SaveGame.cpp:1813-1879	SaveGame.cpp:1687-1723		* (`doc/CSBwin-src/SaveGame.cpp:1813-1879`): the queue is the heap as the save left it,
-changed	src/engine/TimerSystem.ts:473	Timer.cpp:1688-1829	Timer.cpp:1688-1829		* `ProcessTT_OPENROOM` (`doc/CSBwin-src/Timer.cpp:1688-1829`). A `TT_DESSAGE` or a
-file	src/engine/TimerSystem.ts:486	Timer.cpp:1712	Timer.cpp:1712	no file named in its paragraph; or Character.cpp:1712, CSBCode.cpp:1712, DSA.cpp:1712	// The action is read afresh at each object: a DSA before it may have changed it (`:1712`, `:1720`).
-file	src/engine/TimerSystem.ts:486	Timer.cpp:1720	Timer.cpp:1720	no file named in its paragraph; or Character.cpp:1720, CSBCode.cpp:1720, DSA.cpp:1720	// The action is read afresh at each object: a DSA before it may have changed it (`:1712`, `:1720`).
-changed	src/engine/TimerSystem.ts:494	Timer.cpp:1735-1743	Timer.cpp:1735-1743		// A text shown on the party's own square is read out (`:1735-1743`), whatever
-file	src/engine/TimerSystem.ts:494	Timer.cpp:1735-1743	Timer.cpp:1735-1743	no file named in its paragraph; or Character.cpp:1735, CSBCode.cpp:1735, DSA.cpp:1735	// A text shown on the party's own square is read out (`:1735-1743`), whatever
-file	src/engine/TimerSystem.ts:532	Timer.cpp:2195	Timer.cpp:2195	no file named in its paragraph; or Character.cpp:2195, CSBCode.cpp:2195, DSA.cpp:2195	// The action is read afresh at each object, as `ProcessTT_OPENROOM` does (`:2195`, `:2202`, `:2258`).
-file	src/engine/TimerSystem.ts:532	Timer.cpp:2202	Timer.cpp:2202	no file named in its paragraph; or Character.cpp:2202, CSBCode.cpp:2202, DSA.cpp:2202	// The action is read afresh at each object, as `ProcessTT_OPENROOM` does (`:2195`, `:2202`, `:2258`).
-file	src/engine/TimerSystem.ts:532	Timer.cpp:2258	Timer.cpp:2258	no file named in its paragraph; or Character.cpp:2258, CSBCode.cpp:2258, DSA.cpp:2258	// The action is read afresh at each object, as `ProcessTT_OPENROOM` does (`:2195`, `:2202`, `:2258`).
-file	src/engine/TimerSystem.ts:606	Timer.cpp:1439	Timer.cpp:1439	no file named in its paragraph; or Character.cpp:1439, CSBCode.cpp:1439, DSA.cpp:1439	// Read after the square's DSAs (`:1439`). Only CLEAR clears: a 3 that reaches here, on
-changed	src/engine/Wings.ts:9	SaveGame.cpp:498-529	SaveGame.cpp:490-521		* `swapCharacter`'s fields reversed (`doc/CSBwin-src/SaveGame.cpp:498-529`), and a
-file	src/engine/WorldMove.ts:327	Code11f52.cpp:3018-3021	Code11f52.cpp:2983-2986	no file named in its paragraph; or CSB.h:2983	// level that `LoadLevel` has just loaded (`:2990`, `:3018-3021`).
-file	src/engine/WorldMove.ts:379	Code11f52.cpp:3143-3166	Code11f52.cpp:3108-3131	no file named in its paragraph; or CSB.h:3108	// The stairs (`:3143-3166`): a monster or an object — not the party, not a missile
-changed	src/engine/gameTypes.ts:184	Character.cpp:4995	Character.cpp:4970		* (`doc/CSBwin-src/Character.cpp:4995`). Mostly negative: swinging leaves you
-file	src/engine/gameTypes.ts:265	Data.h:783	Data.h:768	or Character.cpp:768	* `d.Invisible` and `d.SeeThruWalls` (`doc/CSBwin-src/Data.h:798`, `:783`): the spells
-changed	src/engine/gameTypes.ts:296	Mouse.cpp:1606-1625	Mouse.cpp:1482-1491		* while it is non-zero (`doc/CSBwin-src/Mouse.cpp:1606-1625`). Turns ignore it.
-changed	src/engine/gameTypes.ts:320	CSBCode.cpp:333-340	CSBCode.cpp:323-330		* (`doc/CSBwin-src/CSBCode.cpp:333-340`), so the possessions read RN 0, not `RNnul`; a
-changed	src/engine/gameTypes.ts:423	Recording.cpp:1091-1114	Recording.cpp:1011-1019		* (`doc/CSBwin-src/Recording.cpp:1091-1114`). Not `d.`'s, so a new game keeps it.
-changed	src/engine/skills.ts:318	Magic.cpp:175-179	Magic.cpp:172-176		* The tail of CSBWin `LevelUp` (`doc/CSBwin-src/Magic.cpp:175-179`): a linefeed, then four
 changed	src/main.ts:240	SaveGame.cpp:1579-1594	SaveGame.cpp:1480-1494		* `_ReadEntireGame` for a new game (doc/CSBwin-src/SaveGame.cpp:1579-1594): the data set's
 changed	src/main.ts:242	SaveGame.cpp:1579-1586	SaveGame.cpp:1480-1486		* (`:1579-1586`), and so is one that fails its read `die(0xbad)` (`Game.readDungeonDat`).
 file	src/main.ts:242	SaveGame.cpp:1579-1586	SaveGame.cpp:1480-1486	after None, named at line 241	* (`:1579-1586`), and so is one that fails its read `die(0xbad)` (`Game.readDungeonDat`).
@@ -897,8 +773,6 @@ file	tools/dump-save-menu.ts:1000	Menu.cpp:153-157	Menu.cpp:153-157	no file name
 file	tools/dump-save-menu.ts:1001	Menu.cpp:158-163	Menu.cpp:158-163	no file named in its paragraph; or CSBCode.cpp:158, Character.cpp:158, SaveGame.cpp:158	check(count(passB, x1 - 1, x2 + 2, y2 + 2, y2 + 2, 13) === 0, 'second pass: the highlight below is colour 13 (:158-163)');
 file	tools/dump-save-menu.ts:1002	Menu.cpp:164-168	Menu.cpp:164-168	no file named in its paragraph; or CSBCode.cpp:164, Character.cpp:164, SaveGame.cpp:164	check(count(passB, x2 + 3, x2 + 3, y1, y2 + 2, 13) === 0, 'second pass: the highlight to the right is colour 13 (:164-168)');
 file	tools/dump-save-menu.ts:1011	Menu.cpp:170-179	Menu.cpp:170-179	no file named in its paragraph; or CSBCode.cpp:170, Character.cpp:170, SaveGame.cpp:170	check(changed(after) === 0, 'after both passes nothing is painted: the saved screen is back (:170-179)');
-changed	tools/dump-save-menu.ts:1133	SaveGame.cpp:1361	SaveGame.cpp:1264		'a failed write skips the tail, as SaveError jumps past it (SaveGame.cpp:1361)');
-changed	tools/dump-save-menu.ts:1209	SaveGame.cpp:1363	SaveGame.cpp:1266		'a write that fails is SaveError\'s line (SaveGame.cpp:1363), and its error is reported');
 changed	tools/dump-save-menu.ts:1286	SaveGame.cpp:1710	SaveGame.cpp:1585		'F9 in a playthrough with no save finds none (SaveGame.cpp:1710), whatever the others hold, and loads nothing');
 changed	tools/dump-save-menu.ts:1874	SaveGame.cpp:856-873	SaveGame.cpp:848-856		// "SAVES ARE DISABLED" (`doc/CSBwin-src/SaveGame.cpp:856-873`). The dialog says it,
 changed	tools/dump-show-credits.ts:398	Code1f9e6.cpp:240-348	Code1f9e6.cpp:240-348		console.log('=== RESTART THIS GAME, with d.CanRestartFromSavegame (Code1f9e6.cpp:240-348) ===');

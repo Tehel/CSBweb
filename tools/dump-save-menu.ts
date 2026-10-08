@@ -1130,7 +1130,7 @@ async function checkSaveCall(): Promise<void> {
     const refused = await attempt(menuFails.saves.save('stopped', 'new'));
     console.log(`  clock stopped, the write fails: ${refused}, tail run ${menuFails.game.canRestartFromSavegame()}`);
     check(refused !== 'written' && !menuFails.game.canRestartFromSavegame(),
-      'a failed write skips the tail, as SaveError jumps past it (SaveGame.cpp:1361)');
+      'a failed write skips the tail, as goto tag01e4f0 jumps past it (SaveGame.cpp:1361)');
 
     const quick = await stage(false);
     await quick.saves.save('running', 'quick');
@@ -1206,7 +1206,7 @@ async function checkSaveCall(): Promise<void> {
     await unwritable.saves.quickSave();
     console.log(`  F5 where the store cannot be written: ${toldSince(beforeFailure)} (${reports[4]})`);
     check(toldSince(beforeFailure) === '/15:UNABLE TO SAVE GAME!' && reports.length === 5 && reports[4] === 'Quick-save failed',
-      'a write that fails is SaveError\'s line (SaveGame.cpp:1363), and its error is reported');
+      'a write that fails is tag01e4f0\'s line (SaveGame.cpp:1363), and its error is reported');
 
     // F5 while a DSA has disabled saves: CSBWin's disk menu's words, and no save.
     const disabled = await stage(false);

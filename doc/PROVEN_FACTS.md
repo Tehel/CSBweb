@@ -3169,7 +3169,7 @@ level. The game start calls `LoadPartyLevel(d.partyLevel)`
 (`doc/CSBwin-src/CSBCode.cpp:10615`), which runs `TAG00bd40` to detach every group and then
 `ProcessMonstersOnLevel` (`:805`, `:828`). A save does the same once the file is closed
 (`doc/CSBwin-src/SaveGame.cpp:1335-1343`), so that the game played on after a save is the
-one a restore of it gives back; a save that fails jumps past it, to `SaveError` (`:1361`).
+one a restore of it gives back; a save that fails jumps past it, to `tag01e4f0` (`:1361`).
 `tools/dump-save-roundtrip.ts` steps the two side by side and asserts they agree on every
 tick (`Game.saveWritten`, which the disk menu calls once its write succeeds). Without slot reuse every load
 abandons one slot per re-created timer — two per save/load cycle on `csbgame7.dat`,
