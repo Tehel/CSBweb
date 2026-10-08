@@ -81,11 +81,7 @@ async function main(): Promise<void> {
   });
   game.ctx.party.state.position = new Position(2, 2, 0);
 
-  type Internals = {
-    castSpell(chIdx: number, p: SpellParameters): number;
-    fillSpellParameters(chIdx: number, incantation: number[], party: unknown): SpellParameters;
-  };
-  const internals = game.systems.magic as unknown as Internals;
+  const magic = game.systems.magic;
 
   /** One cast from a fresh party with the same seed, under `overrides`. */
   const cast = (overrides: Partial<SpellParameters>, setup?: (c: Champion) => void) => {
@@ -96,8 +92,8 @@ async function main(): Promise<void> {
     c.incantation = [POWER_RUNE, SPELL_RUNE];
     setup?.(c);
     printed.length = 0;
-    const params = { ...internals.fillSpellParameters(0, c.incantation, game.ctx.party.state), ...overrides };
-    const result = internals.castSpell(0, params);
+    const params = { ...magic.fillSpellParameters(0, c.incantation, game.ctx.party.state), ...overrides };
+    const result = magic.castSpell(0, params);
     const skills = c.skills as unknown as Array<{ experience: number }>;
     return {
       result,

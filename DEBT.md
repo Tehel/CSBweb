@@ -245,9 +245,9 @@ builds around them is its own:
   `Game` does not have, and `dump-game-events` replaces `reincarnating`. 31 tools extract
   the UI tables again (`graphicsTablesOf(…).ui`) beside the `UIState` that
   `tools/lib/ui.ts` builds them into.
-- 25 tools make 46 `as unknown as` casts, into the systems' private members
-  (`MonsterAI`'s `stepOrDefer`, `AttackSystem`'s `climbDownIntoPit`, `MagicSystem`'s
-  `castMagic`, `MonsterSystem`'s `loadedLevel`, …) or to build a partial record; 4 more
+- 25 tools make 44 `as unknown as` casts, into the systems' private members
+  (`MonsterAI`'s `stepOrDefer`, `AttackSystem`'s `climbDownIntoPit`, `WorldMove`'s
+  `partyFallsIntoPit`, `MonsterSystem`'s `loadedLevel`, …) or to build a partial record; 4 more
   tools cast through `as any`, three of them into privates (`getMissileRecord`,
   `resolveStdRectanglePointer`, `MissileEncounter`'s). `tsc` checks none of them. A renamed member leaves the tool
   compiling, and a write to it then sets a new property: the tool goes on passing while
@@ -261,8 +261,8 @@ context a tool stages by assigning its fields.
 
 3. **Other systems' privates.** Each private a tool drives either becomes public, with
    the reason in its comment, or the tool reaches it through the public path the engine
-   uses. One system per commit. `DsaSystem`, `TimerSystem` and `ActuatorSystem` are
-   done. Left: `MagicSystem`, `MonsterAI`, `MonsterSystem` (`loadedLevel`),
+   uses. One system per commit. `DsaSystem`, `TimerSystem`, `ActuatorSystem` and
+   `MagicSystem` are done. Left: `MonsterAI`, `MonsterSystem` (`loadedLevel`),
    `MissileEncounter`, `WorldMove`, `AttackSystem`, `BytecodeInterpreter`, and
    `CSBGraphicsLoader`'s `opened` (`dump-dsa-overlay`).
 4. **The stand-ins**: a `tools/lib` helper that replaces a member with a typed stand-in

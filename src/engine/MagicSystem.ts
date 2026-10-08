@@ -158,7 +158,11 @@ export class MagicSystem {
     this.castSpell(0, params);
   }
 
-  private fillSpellParameters(casterIdx: number, incantation: number[], party: PartyState): SpellParameters {
+  /**
+   * The spell's parameters as `CastMagic` fills them for an incantation. Public so that
+   * `tools/` can cast with parameters of their own (`castSpell`).
+   */
+  fillSpellParameters(casterIdx: number, incantation: number[], party: PartyState): SpellParameters {
     let value = 0;
     let multiplier = 1000;
     for (let i = 0; i < 4 && multiplier > 0; i += 1, multiplier = Math.floor(multiplier / 10)) {
@@ -188,8 +192,9 @@ export class MagicSystem {
    * `CastSpell` (`doc/CSBwin-src/Magic.cpp:1092`). A spell filter's `action` is handled
    * before the caster is even looked at (`:1112-1151`), so its message prints for a
    * dead caster too; an `action` with no message (0, or 8 and up) casts normally.
+   * Public so that `tools/` can cast with parameters of their own, as a spell filter would.
    */
-  private castSpell(chIdx: number, spellParameters: SpellParameters): number {
+  castSpell(chIdx: number, spellParameters: SpellParameters): number {
     let casterIdx = chIdx;
     if (spellParameters.chIdx !== -1) casterIdx = spellParameters.chIdx & 0xffff;
     const champion = this.ctx.party.state.champions[casterIdx];

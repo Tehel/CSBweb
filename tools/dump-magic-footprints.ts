@@ -81,7 +81,7 @@ function scenario(save: string, power: number): void {
   for (const skill of caster.skills as unknown as Array<{ experience: number }>) skill.experience = 500000;
   caster.incantation = [0x5f + power, ...YA_BRO_ROS];
   const atCast = prints.getCount();
-  const cast = (game.systems.magic as unknown as { castMagic(i: number): number }).castMagic(0);
+  const cast = game.systems.magic.castSpellFromUi(0);
   const first = prints.getIndexOfFirstMagicFootprint();
   const lastAtCast = prints.getIndexOfLastMagicFootprint();
   console.log(`${label}: cast=${cast} active=${party.magicFootprintsActive} count=${atCast} ` +
