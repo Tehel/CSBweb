@@ -59,6 +59,7 @@ import { SoundQueue } from '../src/engine/SoundQueue';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { newGame, processTimersAt } from './lib/game';
+import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -294,17 +295,17 @@ function main(): void {
 
         let triggerSeen = false;
         const originalTrigger = ActuatorSystem.prototype.triggerObjectMove;
-        ActuatorSystem.prototype.triggerObjectMove = function (position, object, place, unchangedRoom, facing) {
+        const restoreTrigger = standIn(ActuatorSystem.prototype, 'triggerObjectMove', function (this: ActuatorSystem, position, object, place, unchangedRoom, facing) {
           if (place && position.x === plate.x && position.y === plate.y && position.z === plate.z) triggerSeen = true;
           return originalTrigger.call(this, position, object, place, unchangedRoom, facing);
-        };
+        });
 
         const launched = game.systems.magic.launchThrownMissile(item.rn, party.position, 0, 0, 5, 100, 5, 0);
         check(launched, 'the throw launches');
 
         for (let t = 1; t <= 6; t++) processTimersAt(game, t);
 
-        ActuatorSystem.prototype.triggerObjectMove = originalTrigger;
+        restoreTrigger();
 
         check(findsObjectAt(game, plate, item.rn), 'the thrown object lands on the actuator cell');
         check(triggerSeen, 'landing on the actuator cell fires the pressure-plate trigger');
@@ -378,13 +379,13 @@ function main(): void {
 
       let ordinal: number | null = null;
       const original = SoundQueue.prototype.queueSound;
-      SoundQueue.prototype.queueSound = function (this: SoundQueue, o, mapX, mapY, deltaTime, level) {
+      const restore = standIn(SoundQueue.prototype, 'queueSound', function (this: SoundQueue, o, mapX, mapY, deltaTime, level) {
         if (mapX === door.at.x && mapY === door.at.y) ordinal = o;
         return original.call(this, o, mapX, mapY, deltaTime, level);
-      };
+      });
       game.systems.magic.launchThrownMissile(item.rn, party.position, 0, 0, 40, 100, 5, 0);
       for (let t = 1; t <= 20; t++) processTimersAt(game, t);
-      SoundQueue.prototype.queueSound = original;
+      restore();
       return ordinal;
     };
 

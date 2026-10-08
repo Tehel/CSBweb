@@ -21,6 +21,7 @@ import { RN_FIREBALL } from '../src/core/spellRn';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
 import { newGame, stockGraphics, processTimersAt } from './lib/game';
+import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 function makeGame(): Game {
@@ -66,12 +67,10 @@ const { at, direction } = findBorderSquare(game);
 console.log(`an open square on the border at ${at.z}(${at.x},${at.y}), leaving the map heading ${direction}`);
 
 const filters: number[] = [];
-const encounter = game.systems.missileEncounter;
-const filter = encounter.missileEncounterFilter.bind(encounter);
-encounter.missileEncounterFilter = (type, ...rest) => {
+wrapMember(game.systems.missileEncounter, 'missileEncounterFilter', (filter) => (type, ...rest) => {
   filters.push(type);
   return filter(type, ...rest);
-};
+});
 
 // The corner facing the edge (`leavingThisCell`, `Timer.cpp:306-308`), so the first move
 // leaves the square.

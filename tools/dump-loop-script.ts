@@ -34,6 +34,7 @@ import type { LoopScript } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
 import { ButtonsAt } from './lib/clicks';
+import { wrapMember } from './lib/standIn';
 
 /** The button each queued click is taken as (`ButtonsAt`). */
 const clicks = new ButtonsAt();
@@ -77,12 +78,10 @@ function watchedGame(): Watched {
   w.game.setRandomSeed(0x12345678);
   w.game.ctx.party.state.position = new Position(6, 14, 2);
   w.game.onFrame(() => { w.frameCallbacks++; });
-  const timers = w.game.systems.timer;
-  const processTimers = timers.processTimers.bind(timers);
-  timers.processTimers = (): boolean => {
+  wrapMember(w.game.systems.timer, 'processTimers', (processTimers) => (): boolean => {
     w.timerPasses.push(w.game.ctx.state.tickCount);
     return processTimers() || w.win;
-  };
+  });
   return w;
 }
 

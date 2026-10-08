@@ -32,6 +32,7 @@ import { DrawRoomObjects, mapColorValue } from '../src/renderer/bytecode/DrawRoo
 import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
+import { standIn, wrapMember } from './lib/standIn';
 import { graphicsTablesOf, stockGraphics } from './lib/game';
 import { RnMaps } from '../src/core/RnMaps';
 
@@ -92,11 +93,10 @@ function draw(group: Group, relativeCell: number, drawOrder: number): Sprite[] {
     },
   };
   const draw = new ViewportDraw(context);
-  const blit = draw.blitShapeToViewportIndexWithTransparent.bind(draw);
-  draw.blitShapeToViewportIndexWithTransparent = (src: any, rect: any, t: number) => {
+  wrapMember(draw, 'blitShapeToViewportIndexWithTransparent', (blit) => (src, rect, t) => {
     blits.push({ x1: rect.x1, x2: rect.x2, y2: rect.y2, w: src.width >> 1, graphic: lastGraphic });
     blit(src, rect, t);
-  };
+  });
   DrawRoomObjects(draw, monsterRn, 0, 0, 0, relativeCell, drawOrder);
 
   // The set entry each sprite was drawn at: x1 = x - w + 1 and x2 = x + w, each within
@@ -192,7 +192,7 @@ function frontMirrored(type: number, relativeCell: number, status: number): bool
   };
   const draw = new ViewportDraw(context);
   const unmirroredFirst = (map: Uint8Array | null) => (map ? mapColorValue(map, left!) : left);
-  draw.blitShapeToViewportIndexWithTransparent = (src: any) => { first = src.pixels[0]; };
+  standIn(draw, 'blitShapeToViewportIndexWithTransparent', (src) => { first = src.pixels[0]; });
   DrawRoomObjects(draw, monsterRn, 0, 0, 0, relativeCell, ORDER_3421);
   if (first === null) return null;
   const map = relativeCell >= 6 ? null : relativeCell >= 3 ? tables.monsterColorMapMedium : tables.monsterColorMapFar;

@@ -32,6 +32,7 @@ import { drawMissilesAtPosition, GetGraphicClass } from '../src/renderer/bytecod
 import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
+import { standIn } from './lib/standIn';
 import { graphicsTablesOf, stockGraphics } from './lib/game';
 
 async function main(): Promise<void> {
@@ -86,8 +87,8 @@ async function main(): Promise<void> {
   console.log(`dagger: struct5688 uByte0=${md.uByte0} half-width=${md.widthBytes} height=${md.height} word4=0x${md.word4.toString(16)}`);
 
   const view: DungeonState = Object.create(dungeon);
-  view.getDBRecordLink = () => OBJECT_ID_EOF;
-  view.getTimerWord8 = () => 0; // flying north, as the party faces
+  standIn(view, 'getDBRecordLink', () => OBJECT_ID_EOF);
+  standIn(view, 'getTimerWord8', () => 0); // flying north, as the party faces
   const missile = { projectileObject: weaponRn as ObjectID, timerIndex: 0, rangeRemaining: 255 };
   (view as any).getMissileRecord = () => missile;
 

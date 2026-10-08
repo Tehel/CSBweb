@@ -35,6 +35,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { newGame } from './lib/game';
+import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 /** The missiles each thrower may pick (`doc/CSBwin-src/Monster.cpp:1046-1079`). */
@@ -168,15 +169,15 @@ function main(): void {
   /** `attack` with `STRandomBool` giving `bools`, `STRandom0_3` `quarters`, then 0; the `STRandom(n)` draws. */
   const scripted = (bools: number[], quarters: number[], attack: () => void): number => {
     let belowDraws = 0;
-    random.bool = () => bools.shift() ?? 0;
-    random.zeroTo3 = () => quarters.shift() ?? 0;
-    random.below = () => { belowDraws++; return 0; };
+    const restore = [
+      standIn(random, 'bool', () => bools.shift() ?? 0),
+      standIn(random, 'zeroTo3', () => quarters.shift() ?? 0),
+      standIn(random, 'below', () => { belowDraws++; return 0; }),
+    ];
     try {
       attack();
     } finally {
-      delete (random as Partial<typeof random>).bool;
-      delete (random as Partial<typeof random>).zeroTo3;
-      delete (random as Partial<typeof random>).below;
+      for (const r of restore) r();
     }
     return belowDraws;
   };

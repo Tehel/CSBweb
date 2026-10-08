@@ -66,6 +66,7 @@ import {
 } from '../src/data/tables/MonsterDesc';
 import { graphicsTablesOf, newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
+import { wrapMember } from './lib/standIn';
 import { createMonsterAt } from './lib/createMonster';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -191,25 +192,21 @@ type Hit = { index: number; damage: number };
 /** Record what the encounter asks for, as the real engine asks it. */
 function spy(game: Game): { magic: Magic[]; poison: number[]; hits: Hit[] } {
   const log = { magic: [] as Magic[], poison: [] as number[], hits: [] as Hit[] };
-  const me = game.systems.missileEncounter;
-  const magic = me.determineMagicDamage.bind(me);
-  me.determineMagicDamage = (missile, projectile) => {
+  wrapMember(game.systems.missileEncounter, 'determineMagicDamage', (magic) => (missile, projectile) => {
     const r = magic(missile, projectile);
     log.magic.push({ projectile, damage: r.damage, poisonStrength: r.poisonStrength });
     return r;
-  };
+  });
   const md = game.systems.monsterDamage;
-  const poison = md.determinePoisonDamage.bind(md);
-  md.determinePoisonDamage = (type, strength) => {
+  wrapMember(md, 'determinePoisonDamage', (poison) => (type, strength) => {
     const r = poison(type, strength);
     log.poison.push(r);
     return r;
-  };
-  const damage = md.damageMonster.bind(md);
-  md.damageMonster = (monster, index, ...rest) => {
+  });
+  wrapMember(md, 'damageMonster', (damage) => (monster, index, ...rest) => {
     log.hits.push({ index, damage: rest[3] });
     return damage(monster, index, ...rest);
-  };
+  });
   return log;
 }
 
@@ -380,13 +377,12 @@ function main(): void {
       `${MonsterType[group.creatureType]} always passes the sidestep's die test, so no roll decides the scenario`);
 
     const encounter = game.systems.missileEncounter;
-    const process = encounter.processMissileEncounter.bind(encounter);
     let leftByEncounter = -1;
-    encounter.processMissileEncounter = (...args) => {
+    wrapMember(encounter, 'processMissileEncounter', (process) => (...args) => {
       const hit = process(...args);
       leftByEncounter = slot.positions;
       return hit;
-    };
+    });
 
     // Facing north (0) from corner 2, the member turns to corner 1, which is empty
     // (Monster.cpp:3954-3972).

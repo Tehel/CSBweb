@@ -36,6 +36,7 @@ import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../src/renderer/ViewportRenderer';
 import { check, fail, finish } from './lib/check';
+import { standIn, wrapMember } from './lib/standIn';
 import { createMonsterAt } from './lib/createMonster';
 import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 
@@ -162,12 +163,10 @@ function main(): void {
       const group = placeGroup(game, arena, members);
       group.drawAsSize4 = true;
       const clouds: { size: number; posInCell: number }[] = [];
-      const me = game.systems.missileEncounter;
-      me.createDeathCloud = (_projectile, size, _position, posInCell) => { clouds.push({ size, posInCell }); };
+      standIn(game.systems.missileEncounter, 'createDeathCloud', (_projectile, size, _position, posInCell) => { clouds.push({ size, posInCell }); });
       let drops = 0;
       const md = game.systems.monsterDamage;
-      const drop = md.createAndDropObject.bind(md);
-      md.createAndDropObject = (...args) => { drops++; return drop(...args); };
+      wrapMember(md, 'createAndDropObject', (drop) => (...args) => { drops++; return drop(...args); });
       const { target } = arena;
       md.damageMonster(group, 0, target.z, target.x, target.y, 9999, true, false);
       console.log(`  ${MonsterType[arena.type]} x${members}, drawAsSize4Monsters ${option}: `

@@ -31,6 +31,7 @@ import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import type { GameContext } from '../src/engine/GameContext';
 import { Party } from '../src/engine/Party';
 import { graphicsTablesOf, newContext, presetHeroesOf } from './lib/game';
+import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 const SKILL = 8;
@@ -112,7 +113,7 @@ async function main(): Promise<void> {
   {
     const { actuators, ctx } = makeParty(0);
     const seen: number[] = [];
-    actuators.performLocalAction = (_type, _x, _y, _z, mapPos) => { seen.push(mapPos); };
+    standIn(actuators, 'performLocalAction', (_type, _x, _y, _z, mapPos) => { seen.push(mapPos); });
     // Wall actuator type 1 (any object), local-action only, local type 10, action SET.
     const rec = { nextObject: OBJECT_ID_EOF, word2: 1, word4: 0x800, word6: 10 << 4 };
     const rnMaps = ctx.dungeon.rnMaps;

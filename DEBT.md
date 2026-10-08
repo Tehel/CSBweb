@@ -74,9 +74,10 @@ default, so with it off the game is CSBWin's and the golden frames do not move.
    moves. Better still, and expected for any split of a module: every tool's full output is
    byte-identical before and after (only `dump-save-menu`, by one byte, and
    `dump-savegame`, by its payload's size, vary on their own: both carry the save's
-   wall-clock date, and `dump-new-game` and `dump-game-events`, by the random game ids
-   they print), and the
-   author's runtime saves hash the same after load and
+   wall-clock date; `dump-new-game` and `dump-game-events`, by the random game ids
+   they print; and `dump-monster-design-options`, whose unseeded games draw their seed
+   from `Math.random`, so it compares only with `Math.random` pinned, through
+   `npx tsx --import`), and the author's runtime saves hash the same after load and
    after 600 ticks. A refactor that uncovers a divergence records it in tier C. If it is
    fixed at all, the fix goes in a **separate** commit, so every commit is either
    behaviour-neutral or a fix, never both.
@@ -239,13 +240,10 @@ builds around them is its own:
 
 - 40 tools spell out `addCharacterDefaults()`, most inside a champion-building function
   of their own; 145 construct a `DungeonLoader`, most to read `dm-atari/dungeon.dat`.
-- 20 tools stand in for an engine or renderer method by assigning over it, which
-  nothing marks as a stand-in or puts back: `dump-local-action`, `-loop-die`,
-  `-loop-script`, `-missile-draw`, `-missile-drop`, `-missile-exterior`,
-  `-missile-monster`, `-monster-design-options`, `-monster-draw`,
-  `-monster-missile-type`, `-monster-move-code`, `-monster-pad`, `-move-from-missile`,
-  `-party-collision`, `-party-move`, `-queue-sound`, `-viewport-click`,
-  `-wiggle-monster`, `-wiggle-objects`, and `watch-smart-discard`. A member that is a
+- 10 tools stand in for an engine or renderer method by assigning over it, which
+  nothing marks as a stand-in or puts back: `dump-monster-move-code`, `-monster-pad`,
+  `-move-from-missile`, `-party-collision`, `-party-move`, `-queue-sound`,
+  `-viewport-click`, `-wiggle-monster`, `-wiggle-objects`, and `watch-smart-discard`. A member that is a
   hook by design is not one of them: `GameHost`'s, `CSBGraphicsLoader`'s `opener` and
   `cannotOpen`, `BackgroundLib.messageBox`, the interpreter context's `graphicTrace`, a
   `UIState`'s `getGraphicBitmap`; nor are the globals (`Date.now`, `Math.random`,
@@ -269,12 +267,14 @@ comment, so no tool casts into a private; and `tools/lib/standIn.ts` (`standIn`,
 back, for `dump-adjust-skills`, `-alt-mon-draw`, `-attack-panel`, `-button-flash`,
 `-cast-spell`, `-champion-death`, `-character-damage`, `-clouds`,
 `-delete-monster-filter`, `-door-lightning`, `-drop-move-object`, `-dsa-delete`,
-`-fusion`, `-key-bindings`, `-magic-panel`, `-missile-door`, `-mouse-queue` and
-`-reincarnate-entry`. What a tool
+`-fusion`, `-key-bindings`, `-local-action`, `-loop-die`, `-loop-script`,
+`-magic-panel`, `-missile-door`, `-missile-draw`, `-missile-drop`,
+`-missile-exterior`, `-missile-monster`, `-monster-design-options`, `-monster-draw`,
+`-monster-missile-type`, `-mouse-queue` and `-reincarnate-entry`. What a tool
 keeps beside a `Game` is in a `WeakMap` of its own (`dump-game-events`,
 `dump-hall-of-champions`).
 
-5. **The other stand-ins**: the twenty tools above moved to `standIn` and `wrapMember`,
+5. **The other stand-ins**: the ten tools above moved to `standIn` and `wrapMember`,
    a few tools per commit.
 6. **The stock dungeon and a test champion** as `tools/lib` helpers, and the tools moved
    to them, a few tools per commit.

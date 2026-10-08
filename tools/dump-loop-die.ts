@@ -14,6 +14,7 @@ import { resolve } from 'node:path';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { createGameHost } from '../src/engine/GameHost';
 import { newGame, stockGraphics } from './lib/game';
+import { standIn } from './lib/standIn';
 
 let failures = 0;
 function check(ok: boolean, what: string): void {
@@ -32,9 +33,9 @@ async function run(failOn: number): Promise<{ frames: number; died: unknown[]; t
   const game = newGame(data, stockGraphics(), { die: (error) => died.push(error) });
   const thrown = new Error(`die(45) on frame ${failOn}`);
   let frames = 0;
-  game.runFrame = () => {
+  standIn(game, 'runFrame', () => {
     if (++frames === failOn) throw thrown;
-  };
+  });
   game.start();
   // The frames up to the throw, then 150 ms more: a loop that went on would run nine.
   await wait(1000 / 60 * failOn + 150);
