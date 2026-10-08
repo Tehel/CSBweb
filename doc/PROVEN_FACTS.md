@@ -250,15 +250,16 @@ and the title is nineteen characters, the most `AddCharacter` accepts (`:581`). 
 
 Every text goes through the escape tables, whatever its type (`CSBCode.cpp:5624-5639`),
 the text the party finds on a square it enters included: `PlaceOrRemoveObjectInRoom`
-decodes it with `DecodeText(text, …, 1, 990)` and queues it with `QuePrintLines(15, text)`
-(`Code11f52.cpp:3995-3998`). In `dm-atari/dungeon.dat` the one visible such text is on
+decodes it with `DecodeText(text, …, 1, 990)` and queues it with `QuePrintLines(15, text,
+false)`, through `TranslateLanguage` first, which with no translation changes nothing
+(`Code11f52.cpp:3995-4001`). In `dm-atari/dungeon.dat` the one visible such text is on
 level 0 at (9, 1), and three of its pieces are escapes: "IT IS TOO BAD YOU DID NOT DISCOVER
 THE TRUE SECRET OF THE FIRESTAFF. NOW THAT I HAVE IT I HAVE NO FURTHER NEED FOR YOU!"
 (`tools/dump-room-text.ts`).
 
 A timer shows a text too. `ProcessTT_OPENROOM` sets, clears or toggles a text's `show`
 bit, and when that shows a hidden text on the party's own square it decodes it with
-`DecodeText(…, 1, 990)` and queues it with `QuePrintLines(15, text)`, whatever
+`DecodeText(…, 1, 990)` and queues it with `QuePrintLines(15, text, true)`, whatever
 `DecodeText` returns (`Timer.cpp:1712-1743`). A `TT_DESSAGE` or a parameter message
 leaves the square's texts alone (`:1715-1716`), and of its actuators reaches only the
 DSAs (`:1760-1761`). In `dm-atari/dungeon.dat` the floor actuator on level 0 at (1, 4)
@@ -266,7 +267,7 @@ shows the text under it that way, "WELCOME BACK BRAVE ADVENTURERS."
 (`tools/dump-open-room-text.ts`).
 
 Every `DecodeText` ends in `SubstituteCharacterNames` (`CSBCode.cpp:5729-5732`,
-`:6111-6226`), which replaces three escapes written in the text's own letters: `.Q.A` is
+`:5432-5547`), which replaces three escapes written in the text's own letters: `.Q.A` is
 the champion holding the cursor (`d.HandChar`), `.Q.B` to `.Q.E` the first to fourth
 champion, and `.Q.F` to `.Q.K` print nothing; `.R.` and four hex digits is a global text,
 the `EXPOOL` record `(EDT_GlobalText << 24) | index` (`EDT_GlobalText` is 10,
@@ -418,7 +419,7 @@ mapping, asserted in `tools/dump-intro.ts`.
 
 ## `ExpandGraphic`'s `0x20` opcode bit is never consulted
 
-The image codec's extended opcodes (`doc/CSBwin-src/CSBCode.cpp:11045-11062`) branch like
+The image codec's extended opcodes (`doc/CSBwin-src/CSBCode.cpp:11086-11097`) branch like
 this:
 
 ```c
@@ -430,7 +431,7 @@ tag0214d0:
   D1W += 1;
   if ((D3W&0x10)==0) goto tag021482;   // a solid colour run
   if ((D3W&0x20)==0) goto tag021558;   // literal nibbles
-  A2 = A1-D7W;                          // copy the line above
+  A2 = A1-destBytesPerLine;             // copy the line above
 ```
 
 `0x40` is "the count is 16-bit" and `0x10` splits run from not-run. **`0x20` is only tested
@@ -914,7 +915,7 @@ void AddFootprintEntry(i32 /*newX*/,i32 /*newY*/, ui16 deltaTime)
 It is nonetheless the only writer of `d.Byte13220`, the age bytes that
 `GetBestMonsterFacingP1` reads to decide whether a footprint is fresh enough to follow
 (`doc/CSBwin-src/Monster.cpp:617-620`). Its loop overwrites every entry it walks past with one
-value, and never reaches entry 0 (`while (index-- != 1)`, `:4355`). It is ported as written.
+value, and never reaches entry 0 (`while (index-- != 1)`, `:4394`). It is ported as written.
 
 ## A full trail is the last 24 squares walked: `MemMove` takes its source first
 
@@ -967,7 +968,7 @@ marks nothing either, and the first move makes both the same. The timer's end,
 
 `SummarizeRoomInfo` tests only a cell whose `cfD4` the room-type switch left non-zero
 (`doc/CSBwin-src/Codea59a.cpp:401`): an open floor, a teleporter and a door set it to 1
-(`tag00a85c`, `:308`), an open false wall too, since it falls through into `roomOPEN`
+(`tag00a85c`, `:306-307`), an open false wall too, since it falls through into `roomOPEN`
 (`:293-308`), and a pit keeps its flag bit 0 when bit 3 is set, else counts as open floor
 (`:263-275`). Stairs clear it (`:373`), and a stone or closed false wall returns before the
 test. It takes only the newest print on the cell, `SearchFootprints`' 1-based index less
@@ -1163,7 +1164,7 @@ party arrives on its square:
 
 `DropMonsterRemains` (`:865`) drops one dropping per group member only for a monster type
 whose descriptor `leavesDroppings()` (`:887`), so a rock pile leaves boulders and a mummy
-nothing. Then it drops whatever the group was carrying (`:895`).
+nothing. Then it drops whatever the group was carrying (`:930`).
 
 ## Monster AI timers are addressed by map square, and only a DSA move re-aims them all
 
@@ -1722,7 +1723,7 @@ the tabs: for `clickY <= 48` it picks a champion from literal x ranges for each
 so the caster's own wide tab and the two-pixel gaps pick nobody. With the fourth champion
 casting, the first champion's range is `clickX <= 244`. `clickX` 512-515 name champions 0-3.
 Either way the click returns without reaching the keypad, and the pick counts only below
-`d.NumCharacter` and past `SelectMagicCaster`'s dead-champion refusal (`:725`).
+`d.NumCharacter` and past `SelectMagicCaster`'s dead-champion refusal (`:727`).
 
 ## Every inventory click is gated on `d.HandChar`, and the party always owns it
 
@@ -2196,7 +2197,7 @@ Dropping into an empty cell is the mirror image. So an ordinary pick-up or drop 
 the array, and it is state that play changes.
 
 `SaveGame` writes it accordingly, between the level descriptors and the object list it
-indexes (`doc/CSBwin-src/SaveGame.cpp:1252`):
+indexes (`doc/CSBwin-src/SaveGame.cpp:1252-1255`):
 
 ```
     D0W = WriteAndChecksum((ui8 *)d.objectListIndex, pwA3, 2*d.numColumnPointers);
@@ -2526,7 +2527,7 @@ free record's other RNs as `RNnul`.
 
 **Two slots may name the same `(db, idx)`.** `ConvertListOfObjects` reuses a record's slot
 only for a missile's flying object (`DuplicateOK`, `:2130`), but `convertScrolls` gives
-every scroll's text a slot of its own (`AllocateIndirectIndex`, `:2157`) beside any the
+every scroll's text a slot of its own (`AllocateIndirectIndex`, `:2371`) beside any the
 chains gave it. In DM's `dungeon.dat` the free scroll 33 names text 123, which is a wall's
 text in a chain, so the port's conversion of it holds one such pair, slots 1779 and 1945.
 
@@ -2675,7 +2676,7 @@ else
 The shift loop starts at `max_len` unconditionally rather than at the string's length.
 For the name field `max_len == 7` (`:6503`), so the **first iteration is
 `name[8] = name[7]`** — and `name` is `char[8]` immediately followed by the title
-(`name` at `+772`, title at `+780`, confirmed by `doc/CSBwin-src/Chaos.cpp:4859`), so
+(`name` at `+772`, title at `+780`, confirmed by `doc/CSBwin-src/Chaos.cpp:4859-4860`), so
 `name[8]` *is* `title[0]`, and for any well-formed name the value copied is zero. It
 fires only when the caret is clicked *inside* the name (`:4840-4848`; clicking past the
 end clamps to the length and takes the safe append path), and the `max_len = 18` title
@@ -2798,7 +2799,7 @@ with 256 colours; `UpdateScreenArea` reads line `135 - line`, the file's bottom-
   for an ordinal above 0, calls `SelectOverlay` again (`:425-438`), which puts the overlay up
   whatever the flag said. `d.Initialize()` has set `d.Time` to 0 before the read
   (`CSBCode.cpp:356`), so the saved `m_p3` comes back as the same `d.Time`. A file without
-  the block leaves `overlayActive` as it was (`:323`, `:351`).
+  the block leaves `overlayActive` as it was (`:325`, `:343`).
 - `ReadCSBgraphic`'s `static bool firstTime` is one for all its failures: the first, if it
   is a file that will not open, also sets `overlayActive = false` (`Graphics.cpp:3247-3255`);
   a missing section asked with `mustExist` clears it too (`:3280-3289`), and every caller
@@ -2889,7 +2890,7 @@ graphics from byte 188, each offset counted from there. Nothing is swapped, so t
 are the PC's, little-endian, where `graphics.dat`'s tables are swapped from big-endian as
 they are read. The alternate `DrawMonster` reads `monsterDesc.word4`'s view and mirror
 bits alone of the `MONSTERDESC`, the `ITEM12`'s sizes and transparent colour, and the
-`ITEM110`'s positions (`:1217-1219`, `:1373`); the graphics are `graphicNum0` 0 (front),
+`ITEM110`'s positions (`:1214-1216`, `:1370`); the graphics are `graphicNum0` 0 (front),
 then side, back and attack as `word4` names them (`:1377-1489`). The section is graphic
 `3 * mt + n - 1` for alternate graphic `n` of type `mt`, unless the level's `EXPOOL`
 record `(EDT_Database << 24) | (EDBT_AltMonGraphics << 16) | (level << 8) | mt`, of four
@@ -2923,7 +2924,7 @@ read from the section, and the group's size still read from its type's `MONSTERD
   attack's after it as `word4` has them, then the mirrored front: `2 + 2 * (side + back +
   attack)` beside the party, one more at three rows and two more at two. Further away, the
   picture is shrunk into a graphic that `AllocateAlternateDerivedGraphic` makes once and
-  keeps (`:1620-1638`, `:1068-1082`), and a view that is mirrored is mirrored in a copy, so
+  keeps (`:1620-1638`, `:1044-1058`), and a view that is mirrored is mirrored in a copy, so
   the graphic kept is never mirrored. With a mirrored front and all three other views
   that number reaches 10, past `pDerivedGraphic[10]`.
 - **Beside the party, a front view with a mirror ends the program.** The branch asks
@@ -2992,7 +2993,7 @@ The port: `src/data/FileSignature.ts`, `readRuntimeFileSignatures`
   takes one off `d.NumCharacter` and clears nothing (`CSBCode.cpp:6688-6699`), so the
   record stays, possessions and all; those objects are still in the mirror's cell.
 - **A save's own after a load**: the file carries all four records, 3328 bytes with the
-  party tail (`SaveGame.cpp:1177`, `:1802`).
+  party tail (`SaveGame.cpp:1177-1181`, `:1802`).
 - **The last champion, after a DSA's `&SWAPCHARACTER` deleted one.** `CharacterDelete`
   copies each champion after the one who left a slot down, takes one off
   `d.NumCharacter` and sets the HP of the slot it leaves to 0, and nothing else
@@ -3218,7 +3219,7 @@ way. `tools/dump-save-blocks-vs-file.ts` asserts every other byte of block 5 aga
 file and exempts these three in freed slots by name.
 
 **The timer queue past `NumTimer` is the same kind of debris.** CSBWin writes all
-`MaxTimer` words of `m_timerQueue` (`doc/CSBwin-src/SaveGame.cpp:1195`) and `LoadGame`
+`MaxTimer` words of `m_timerQueue` (`doc/CSBwin-src/SaveGame.cpp:1195-1199`) and `LoadGame`
 believes only the first `NumTimer` of them; the rest are what a longer queue left behind
 — 34 stale indices in `csbgame7.dat`. The writer zeroes them.
 
@@ -3298,7 +3299,7 @@ original bytes to preserve.
 | `DB7` scroll, 4-byte form | `word2` bits 10-15, the old `b10_15()` (`:1202-1209`) | **yes** — bit 10 |
 | `DB7` scroll, 6-byte form | `m_word4` bits 1-15, and `m_RNtext`'s position and category (`:1198-1219`) | **yes** — arbitrary values, see below |
 | `DB9` chest | all of `m_word4` but bits 1-2, and `m_uByte6[2]` (`:1239-1253`) | **yes** — bits 0 and 3-7 of `m_word4` |
-| `DB10` misc | `cursed()` bit 8 and `subType()` bits 9-13 (`:1303-1308`) | no |
+| `DB10` misc | `cursed()` bit 8 and `subType()` bits 9-13 (`:1274-1279`) | no |
 
 "Set in the data?" is measured over `dungeon.dat` and the eight committed saves, and it
 is the difference between a field a canary can prove and one it cannot: blanking any of
@@ -3570,10 +3571,10 @@ blocks as the file holds them, unscrambled but not byte-swapped.
   minimum becomes 30, Luck's 10; each skill's temporary adjustment is 0, its experience
   kept; the thirty possession slots are `RNnul`, and load and shield 0.
 - **Three writes read a big-endian field as the little-endian build holds it.**
-  `LoadLong` and `StoreLong` take the low word first (`:1058-1090`), so "`RandomGameID` + 1"
-  adds 1 to the file's first byte, the field's highest. An Atari save's `Word22594` is
-  set by `wordGear(+376) = 1` (`:3305`), which leaves the bytes `01 00`, 256. And
-  `charFlags` is `LE16(LE16(wordGear(+48) & 16))` (`:2644`): the mask falls on the word
+  The record's fields are native words, low byte first (`ulong_308 + 1`, `:3299`), so
+  "`RandomGameID` + 1" adds 1 to the file's first byte, the field's highest. An Atari
+  save's `Word22594` is set by `uword_376 = 1` (`:3306`), which leaves the bytes `01 00`,
+  256. And `charFlags` is `LE16(LE16(uWord_48 & 16))` (`:3392`): the mask falls on the word
   as memory holds it, so of the file's word it keeps 0x1000 and clears 0x10,
   `CHARFLAG_male`. 0x1000 is `CHARFLAG_portraitChanged` (`CSB.h:2530`), and nothing in
   CSBWin reads `CHARFLAG_male`: `AddCharacter` sets it (`Character.cpp:595`) and that is
@@ -3655,7 +3656,7 @@ The flag does not outlive a read: `_ReadEntireGame` sets it `false` before anyth
 (`:1563`, marked 20150806), and only `ReadExtendedFeatures` assigns it, from
 `flags & ExpandedPortraits` (0x20, `:405`). So every file with no Extended Features block
 is cleaned (DM's `dm-atari/dungeon.dat`, CSB's prison and its Atari-era saves), and so is
-a block without the flag. `SaveGame` always sets it (`:966`), so a file CSBWin writes is
+a block without the flag. `SaveGame` always sets it (`:988`), so a file CSBWin writes is
 never cleaned again.
 
 In `dm-atari/dungeon.dat` all 24 mirrors carry leftover bits there (`word4` 0xa080, and
@@ -3691,7 +3692,7 @@ preparation is from RC4" (`doc/CSBwin-src/RC4.cpp:2-4`), and it is so:
   step of RC4's output over the first 256 and XORs that byte into `state[counter]`.
 - `swap_byte` is the XOR swap (`:19`), so an entry swapped with itself becomes 0: the
   first 256 bytes are not a permutation (32 of them are 0 under the simple key).
-- `RC4_encipher(buffer, len, position)` (`:65-76`) XORs the buffer with
+- `RC4_encipher(buffer, len, position)` (`:63-76`) XORs the buffer with
   `state[(position + i) % 8192]`: the state is the stream, and it repeats every 8192
   bytes of the file.
 
@@ -4046,14 +4047,14 @@ evidence.
 `d.LoadedLevel` (`doc/CSBwin-src/CSBCode.cpp:1854`, `:1906-1907`); a 0 back means the
 filter took the sound, and `QueueSound` plays nothing. `SoundFilter`
 (`doc/CSBwin-src/Sound.cpp:675-761`) runs every type-47 actuator at `ESL_SOUNDFILTER`'s
-location (8, `CSB.h:1546`), each with `continue` (`:747`), under one `NEWDSAPARAMETERS`.
-Each sees nine parameters (`:733-742`): the ordinal plus 1, the volume, `dx*dx + dy*dy`
+location (8, `CSB.h:1546`), each with `continue` (`:749`), under one `NEWDSAPARAMETERS`.
+Each sees nine parameters (`:735-744`): the ordinal plus 1, the volume, `dx*dx + dy*dy`
 from the party's square, the sound's level, x and y, `gameVolume`, `NoSound`, and the
 distance in hundredths, three integer Newton steps from `100 * max(dx, dy)` when the
-squared distance is not 0 (`:701-707`): 141 for (1, 1), 500 for (3, 4). It returns 0 when a
+squared distance is not 0 (`:703-709`): 141 for (1, 1), 500 for (3, 4). It returns 0 when a
 DSA ran, 1 when none did, and 2 at once while its DSAs run (`filterActive`, `:677-681`,
-`:752-757`), so a sound they queue plays on. The DSA plays the sound if it pleases, with
-`&SOUND` (`PlayCustomSound`, `:1042-1065`). `gameVolume` is the volume menu's
+`:754-759`), so a sound they queue plays on. The DSA plays the sound if it pleases, with
+`&SOUND` (`PlayCustomSound`, `:1048-1071`). `gameVolume` is the volume menu's
 (`VOLUME_FULL`, 0, by default) and `NoSound` a recording's `#NoSound` line (false by
 default, `doc/CSBwin-src/data.cpp:250`, `:278`, `Recording.cpp:327-334`).
 `tools/dump-sound-filter.ts`.
@@ -4080,7 +4081,7 @@ for a retyped row is the type it had. `tools/dump-action-name-filter.ts`.
 `_FeedCharacter` works out what the object on the cursor is worth into a `FEEDPARAMETERS`
 block (`doc/CSBwin-src/Character.cpp:3953-4014`, `:4049-4302`) and then, before anything
 changes, runs every type-47 actuator at `ESL_FEEDINGFILTER`'s location (1, `CSB.h:1539`),
-each with `continue` (`:5160-5227`): the count is `sizeof(fp) / 4`, 27, and the words are
+each with `continue` (`:4302-4358`): the count is `sizeof(fp) / 4`, 27, and the words are
 the block's 27 longwords in the struct's order, a `bool32` as 1 or 0, copied in before each
 DSA and back after it (`:4350-4353`), so each DSA sees the block the one before left. The
 feeding then does what the block says, `performFeeding` first (`:4367`). The block's
@@ -4111,7 +4112,7 @@ the swap is half made, cannot. `GiftFromGod`'s object is `TouchWall`'s local
 touch has taken a key (`:568`). The hand's three can all be cancelled: `ThrowByCharacter`'s
 `Throw`, for the hand's object, with the side thrown to as `p1` and no square
 (`Mouse.cpp:690-695`); `TAG01a148`'s `PickFromFloor`, for the object under the button, with
-the level, its square and the button, the position relative to the party (`:830-838`); and
+the level, its square and the button, the position relative to the party (`:828-836`); and
 `DropObject`'s, for the hand's object, with the level, the square it falls on and its
 absolute position, `(partyFacing + pos) & 3` once an alcove's 4 is 2 (`:871-883`).
 `HandleClothingClick` sends `PlaceOnCharacter` for the hand's object, `RNnul` when the hand
@@ -4233,14 +4234,14 @@ port gives them 0. `tools/dump-party-move-filter.ts`.
 `MonsterAttacks` runs the filter once the block is filled and before it acts on it
 (`doc/CSBwin-src/Monster.cpp:1129-1175`). It walks the chain at `ESL_MONSTERATTACKFILTER`'s
 location (0, `doc/CSBwin-src/CSB.h:1538`) and runs every type-47 actuator (`continue`,
-`:1172`), each in a scope with a `NEWDSAPARAMETERS` (`:1157`), so each DSA runs on
+`:1173`), each in a scope with a `NEWDSAPARAMETERS` (`:1157`), so each DSA runs on
 parameters of its own and the caller's are untouched. Each gets a count of 20,
 `sizeof(attackParameters)/4`, then the block's longwords in the struct's order
 (`:1168-1169`; `:921-942`): `monsterID`, `monsterType`, `monsterIndex`, `monsterLevel`,
 `monsterX`, `monsterY`, `monsterPos`, `missileOriginPosition`, `missileRange`,
 `missileDamage`, `missileDecayRate`, `directionToParty`, `distanceToParty`, `missileType`,
 `monsterShouldLaunchMissile`, `monsterShouldSteal`, `heroToDamage`, `attackSoundOrdinal`,
-`disableTime`, `supressPoison`. The whole block comes back (`:1170`), and the next DSA sees
+`disableTime`, `supressPoison`. The whole block comes back (`:1171`), and the next DSA sees
 it as the last one left it.
 
 What follows reads the block as it stands. A launch throws `missileType` only if it is one
@@ -4249,7 +4250,7 @@ a launch of anything else strikes no blow either, and the attack still returns t
 `heroToDamage` 4 is `d.HandChar`, the champion holding the cursor, 5 a random live
 champion and 6 the nearest, and anything outside 0-6 returns false (`:1212-1233`).
 The block is a file-scope global, and `MonsterAttacks` writes every field of it again but
-`disableTime`, which no C++ reads (`:989-1125`), so a filter sees the `disableTime` the last
+`disableTime`, which no C++ reads (`:990-1126`), so a filter sees the `disableTime` the last
 one left. `tools/dump-monster-attack-filter.ts`.
 
 ## The delete monster filter counts the kill, then runs every DSA at its location
@@ -4276,9 +4277,9 @@ count of 8 and the block in the class's order (`:1014-1015`, `CSB.h:2999-3006`):
 `monsterID`, `level`, `x`, `y`, `why`, `dropResidue`, `deathCloud`, `index`. The whole block
 comes back (`:1017`), and the next DSA sees it as the last one left it.
 
-Two fields are read back. `deathCloud` 2 shows no death cloud (`:1149`, `:1127`, `:1261`).
+Two fields are read back. `deathCloud` 2 shows no death cloud (`:1149`, `:1159`, `:1293`).
 `dropResidue` is read two ways: `DropMonsterRemains` gets `dropResidue < 2`, so 0 and 1
-drop and 2 and 3 do not (`:1150`, `:3230`, `:3371`, `Character.cpp:283`), while a member other than the
+drop and 2 and 3 do not (`:1150`, `:3200`, `:3341`, `Character.cpp:283`), while a member other than the
 last drops its remains for anything but 2 (`:1307`), so 3 drops them there. The fusion reads
 neither. `tools/dump-delete-monster-filter.ts`.
 
@@ -4289,7 +4290,7 @@ level's filter once, the first time a turn on that level asks (`partyLevelOnly` 
 `:3083`), and keeps it: nothing empties the cache, whose `Clear` is declared
 (`CSB.h:458`) with no body and no caller. It first reads `expool`'s record
 `(EDT_SpecialLocations << 24) | ESL_MONSTERMOVEFILTER | ((level + 1) << 8)` (2,
-`CSB.h:1540`; `:3147-3148`), the level's own; with none, the dungeon's, without the level
+`CSB.h:1540`; `:3092-3093`), the level's own; with none, the dungeon's, without the level
 bits, read once for every level (`global`, `:3126-3166`). A record's bits 0-17 are the
 location, bit 18 `partyLevelOnly` and bits 19-23 `maxDistance`; the filter is the first
 type-47 actuator at the location (`break`, `:3120`). A level with a record of its own
@@ -4304,7 +4305,7 @@ the reactions `TT_M1` to `TT_M3`; the level has a filter; `partyLevelOnly` is 0 
 group is on the party's level; and `dx² + dy² <= maxDistance²`, the group's square against
 the party's, whatever the party's level. The DSA runs on parameters of its own
 (`NEWDSAPARAMETERS`, `:3329`), a count of 7: the level, the group's x and y, the group's RN,
-and the party's level, x and y (`:3405-3412`). `ProcessDSAFilter` sets
+and the party's level, x and y (`:3348-3355`). `ProcessDSAFilter` sets
 `monsterMoveFilterActive` while it runs (`DSA.cpp:5322-5324`), so its `&MONL&D` reads
 them, and its `&MONBLK` is what the turn's `PossibleMove` then refuses.
 
@@ -4679,7 +4680,7 @@ is empty, and `numEnt = (MouseQEnd - MouseQStart + 1 + MOUSEQLEN) % MOUSEQLEN`.
   (`TranslateMouseClick`, `doc/CSBwin-src/Mouse.cpp:1374-1442`; the loop at
   `:1510-1528`). The button is written into the entry, so a click held to the next tick
   keeps it. The 2016 source translated at the queueing, and queued only a click that hit
-  a button (`doc/CSBwin-src/CSBCode.cpp:7670-7783`).
+  a button, as the dead `#else` branch still does (`doc/CSBwin-src/CSBCode.cpp:7711-7776`).
 - **The button-up** is `0x0add`, queued while `numEnt < MOUSEQLEN-1` (`OnMouseUnClick`,
   `:7640-7663`), whether or not its click was.
 - **A key** is translated to its button by `TAG0196da` and refused only when
@@ -4798,18 +4799,18 @@ off the stairs (`CSBCode.cpp:8299`, `:7861`). A turn off the stairs is not a `Mo
    `return 1`, which ends the move, reads the global `d.MonsterDamageResult == 2`
    (`:2778`), for the party too.
 2. With `newX >= 0`, `d.partyX`/`d.partyY` are set to the new square (`:2903-2904`) and
-   follow every teleporter jump (`:3016-3017`, with `SetPartyFacing`, `:3002-3012`) and
-   every pit fall (`:3111-3112`), so a fall hurts, and a champion it kills drops what
+   follow every teleporter jump (`:2995-2996`, with `SetPartyFacing`, `:3002-3012`) and
+   every pit fall (`:3090-3091`), so a fall hurts, and a champion it kills drops what
    they carry, on the square the party fell into.
-3. Back on its square facing as it did, nothing more happens (`:3250-3257`). Otherwise a
-   footprint is left when it left its square (`:3280-3308`).
+3. Back on its square facing as it did, nothing more happens (`:3229-3236`). Otherwise a
+   footprint is left when it left its square (`:3259-3282`).
 4. With `oldX >= 0`, the old square's pads (`:3293-3303`). With `newX < 0`, that is all
    (`:3332`).
 5. A monster on the square the party landed on is deleted: `DropMonsterRemains(…, 1, …)`
    and `DeleteMonster` (`:3333-3343`). The step refuses a square with a monster only for a
    party with champions (`CSBCode.cpp:8373-8391`), so an empty party walks onto one and
    deletes it.
-6. On its level, the new square's pads (`:3370-3378`); on another, `d.newPartyLevel`
+6. On its level, the new square's pads (`:3344-3352`); on another, `d.newPartyLevel`
    (`:3354-3359`), and the next section.
 
 Evidence: `tools/dump-party-move.ts`, and `tools/dump-party-collision.ts` case 1.
@@ -4883,8 +4884,8 @@ It counts the text's lines, one for each byte of 128 or more up to the 129 that 
 lines sets its bottom to `d.Byte4212[3 * d.WallDecorationDerivedGraphicOffset[relativePosition]
 + numLine - 1]` (`:3650-3660`): the scaled plaque is drawn from its top, so a short text
 shows fewer of its rows. CSBWin 15.9 sets that bottom in a copy of 8 bytes from the text's
-end and blits with the rectangle itself, so its plaque is always whole
-(`doc/CSBwin-src/CSBCode.cpp:3652-3660`, `:3741-3743`).
+end and blits with the rectangle itself, so its plaque is always whole: its lines stay in
+20230608 as comments (`doc/CSBwin-src/CSBCode.cpp:3652`, `:3659`, `:3743`).
 
 Both tables are graphic 0x22e's, the same in `dm-atari`, `dm-atari-1.3-fr` and `csb`:
 `WallDecorationDerivedGraphicOffset` = `0,0,1,1,1,2,2,3,3,3,4,4`, the five distances of
@@ -5184,18 +5185,18 @@ the tail of a save (`SaveGame.cpp:1343`) by setting misc as the current database
 `RNnul` (`:799-876`). Once all are counted, a count below `db.Max(n) * 3/4` moves on to the
 next database (`:807-815`). `db.Max` is 8000 for every database but actuators (16000) and
 database 15 (768) (`CSB.h:1649`), so the limit is 6000. At or above it the dungeon is scanned,
-fifty objects a step (`:880-886`, `:625-663`), into a heap of the 200 highest priorities
+fifty objects a step (`:877-883`, `:622-660`), into a heap of the 200 highest priorities
 (`:11`, `:173-201`), and then one object is discarded per step, highest first, until the
-count is back below 6000 (`:887-903`, `:665-735`). The count drops by one for every attempt,
+count is back below 6000 (`:884-900`, `:662-732`). The count drops by one for every attempt,
 including a failed one.
 
 The priority is `20 + |level - partyLevel|` off the party's level and the square distance
 `|x - partyX| + |y - partyY|` on it. The Nth object of a type on a corner adds N, plus
 `N - 20` more past twenty, or ten times that for clothing (`:517-607`). An object whose
 `important()` bit is set is never listed. On a cell whose chain has an actuator of type 1-9
-or 16 before the object, neither is the first of each type on each corner (`:491-513`,
-`:546-549`). Before it discards, `DiscardObject` scans the cell again and goes ahead only if
-the object is still listed at a priority no lower (`:715-717`, `:345-356`). The discard is
+or 16 before the object, neither is the first of each type on each corner (`:491-510`,
+`:543-546`). Before it discards, `DiscardObject` scans the cell again and goes ahead only if
+the object is still listed at a priority no lower (`:712-714`, `:345-356`). The discard is
 `MoveObject(obj, x, y, -1, 0)` on the object's level, then `DeleteDBEntry` (`:716-721`).
 
 `dungeon.dat` sets `important()` (bit 7 of `word2` for `DB5`, `DB6` and `DB10`,
@@ -5209,10 +5210,10 @@ Every `FindEmptyDB<n>Entry` (`doc/CSBwin-src/CSBCode.cpp:5007-5149`) falls back 
 `MakeMoreRoomInDB` (`Character.cpp:183-359`) when `FindEmptyDBEntry` returns `RNnul`, and
 reuses the record it returns. It first tries `Enlarge` again (`:215-219`), and for the cloud
 database gives up (`:221-224`). Then it sweeps: from `d.LevelCleared[db]` (`Data.h:956`, zero
-at the start), stepping past the party's level (`:260-267`), square by square, column by
-column, through each square's floor chain (`:233-340`). On the party's level it skips any
+at the start), stepping past the party's level (`:226-233`), square by square, column by
+column, through each square's floor chain (`:234-332`). On the party's level it skips any
 square within 5 of the party on both axes, `uw(x - partyX + 5) <= 10` (`:251-257`). In a
-chain, an actuator of type 0 is passed and any other ends the square (`:260-264`). The first
+chain, an actuator of type 0 is passed and any other ends the square (`:261-265`). The first
 object of the database that is not `important()` is taken (`:269-328`):
 
 - a monster group: `DropMonsterRemains(x, y, rn, -1, level, dropResidue < 2)`, which drops
@@ -6404,7 +6405,7 @@ and fills it from `d.`: `SaveOption` (306) is 1 for "SAVE AND PLAY" and 0 for "S
 QUIT" (`:917`, `:1083`), then `Byte22808[132]` (380), `RandomGameID` (308), `Byte22596`
 (301, `ub(d.Word22596)`), `Byte22598` (300, `(i8)d.Word22598`), `Word22594` (376) and
 `Word22592` (378) (`:1084-1089`), the five hashes 0 and `totalMoveCount` (322)
-(`:1092-1097`), and the five checksums (`:1116-1144`). `swapBlock1` byte-swaps
+(`:1092-1097`), and the five checksums (`:1116-1147`). `swapBlock1` byte-swaps
 `RandomGameID`, the hashes, the checksums, `Word22594` and `Word22592` and nothing else
 (`:443-461`), so on the little-endian build **`SaveOption` and `totalMoveCount` are
 little-endian in the file**. Measured on all eight committed saves: `SaveOption` reads

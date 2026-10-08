@@ -1,135 +1,4 @@
 kind	where	now	2016	note	text
-changed	doc/PROVEN_FACTS.md:254	Code11f52.cpp:3995-3998	Code11f52.cpp:3960-3963		(`Code11f52.cpp:3995-3998`). In `dm-atari/dungeon.dat` the one visible such text is on
-changed	doc/PROVEN_FACTS.md:262	Timer.cpp:1712-1743	Timer.cpp:1712-1743		`DecodeText` returns (`Timer.cpp:1712-1743`). A `TT_DESSAGE` or a parameter message
-changed	doc/PROVEN_FACTS.md:269	Hint.cpp:6111-6226	Hint.cpp:5367-5482		`:6111-6226`), which replaces three escapes written in the text's own letters: `.Q.A` is
-changed	doc/PROVEN_FACTS.md:339	data.cpp:1946-1979	data.cpp:1943-1975		the file (`doc/CSBwin-src/data.cpp:1946-1979`), is checked only against an expected value
-changed	doc/PROVEN_FACTS.md:421	CSBCode.cpp:11045-11062	CSBCode.cpp:10884-10896		The image codec's extended opcodes (`doc/CSBwin-src/CSBCode.cpp:11045-11062`) branch like
-changed	doc/PROVEN_FACTS.md:519	Magic.cpp:175-179	Magic.cpp:172-176		" LEVEL", all in `d.Byte1386[chIdx]` (`:175-179`). So a monster's blow, which trains
-changed	doc/PROVEN_FACTS.md:567	Attack.cpp:1834-1839	Attack.cpp:1834-1838		(`doc/CSBwin-src/Attack.cpp:1834-1839`). A wall is no different from empty air.
-file	doc/PROVEN_FACTS.md:722	CSBCode.cpp:7340-7353	CSBCode.cpp:7281-7294	no file named in its paragraph; or Hint.cpp:7281	summed, is whatever the swaps left there (`:7340-7353`).
-file	doc/PROVEN_FACTS.md:728	CSBCode.cpp:7377-7380	CSBCode.cpp:7318-7321	no file named in its paragraph; or Hint.cpp:7318	total of 0 or less is palette 5 (`:7377-7380`).
-changed	doc/PROVEN_FACTS.md:796	Monster.cpp:681-707	Monster.cpp:681-703		`doc/CSBwin-src/Monster.cpp:681-707`. Bit 0 of the cell flag marks a *fake* pit or false wall,
-changed	doc/PROVEN_FACTS.md:818	Magic.cpp:17-73	Magic.cpp:17-70		(`doc/CSBwin-src/Magic.cpp:17-73`). A monster's spell reaches it as the bare `RNFireball`
-file	doc/PROVEN_FACTS.md:917	DSA.cpp:4355	DSA.cpp:4354	or Chaos.cpp:4354	value, and never reaches entry 0 (`while (index-- != 1)`, `:4355`). It is ported as written.
-changed	doc/PROVEN_FACTS.md:922	CSBCode.cpp:834-837	CSBCode.cpp:824-827		(`doc/CSBwin-src/CSBCode.cpp:834-837`): the source is the **first** argument. So
-file	doc/PROVEN_FACTS.md:970	SaveGame.cpp:308	SaveGame.cpp:307	or Code13ea4.cpp:307, Bitmaps.cpp:307, CSBUI.cpp:307	(`tag00a85c`, `:308`), an open false wall too, since it falls through into `roomOPEN`
-file	doc/PROVEN_FACTS.md:998	CSBCode.cpp:4049-4052	CSBCode.cpp:3984-3987	no file named in its paragraph; or Viewport.cpp:3984, Code11f52.cpp:3984, Character.cpp:3984	(`:4049-4052`), and alone when the ordinal is otherwise 0 (`:3877-3883`). The canary for
-file	doc/PROVEN_FACTS.md:998	CSBCode.cpp:3877-3883	CSBCode.cpp:3812-3818	no file named in its paragraph; or Viewport.cpp:3812, Code11f52.cpp:3812, Character.cpp:3812	(`:4049-4052`), and alone when the ordinal is otherwise 0 (`:3877-3883`). The canary for
-file	doc/PROVEN_FACTS.md:1158	Code11f52.cpp:2995	Code11f52.cpp:2960	no file named in its paragraph; or CSBCode.cpp:2960, Viewport.cpp:2960, CSB.h:2960	- a teleporter, the party's own (`:2995`) or one switched on under it (`WiggleEverything`
-file	doc/PROVEN_FACTS.md:1160	Code11f52.cpp:3090	Code11f52.cpp:3055	or CSBCode.cpp:3055, Viewport.cpp:3055, CSB.h:3055, Character.cpp:3055, Graphics.cpp:3055, Monster.cpp:3055, DSA.cpp:3055, Chaos.cpp:3055, Hint.cpp:3055	- a fall through a pit (`:3090`);
-file	doc/PROVEN_FACTS.md:1166	Attack.cpp:895	Attack.cpp:895	no file named in its paragraph; or Code11f52.cpp:895, CSBCode.cpp:895, CSB.h:895	nothing. Then it drops whatever the group was carrying (`:895`).
-file	doc/PROVEN_FACTS.md:1335	Monster.cpp:990-1126	Monster.cpp:986-1122	or CSB.h:986-1122, Data.h:986-1122	(`:990-1126`): the side of a group in a heap (`positions` 255), whether to launch, which
-changed	doc/PROVEN_FACTS.md:1500	SaveGame.cpp:1218-1231	SaveGame.cpp:1152-1164		`(EDT_Palette << 24) + i`, into the pool at every save (`SaveGame.cpp:1218-1231`), so
-changed	doc/PROVEN_FACTS.md:1529	SaveGame.cpp:1205-1213	SaveGame.cpp:1141-1148		(`SaveGame.cpp:1205-1213`), so a record keeps its place in the pool and a save adds
-changed	doc/PROVEN_FACTS.md:1573	SaveGame.cpp:498-529	SaveGame.cpp:490-521		file's form with `swapCharacter`'s fields reversed (`SaveGame.cpp:498-529`), four bytes
-changed	doc/PROVEN_FACTS.md:1665	Character.cpp:3563-3597	Character.cpp:3549-3580		panel (`doc/CSBwin-src/Character.cpp:3563-3597`) and `DrawNameOfHeldObject`
-changed	doc/PROVEN_FACTS.md:1666	Code11f52.cpp:65-94	Code11f52.cpp:31-59		(`doc/CSBwin-src/Code11f52.cpp:65-94`), the 14-character line at screen (0xe9, 0x25) naming
-file	doc/PROVEN_FACTS.md:1684	CSBTypes.h:244	CSBTypes.h:238	or data.cpp:238	**0x0000** (`doc/CSBwin-src/CSBTypes.h:255`) — not `RNnul` (0xffff, `:244`) nor `RNeof`
-file	doc/PROVEN_FACTS.md:1725	Character.cpp:725	Character.cpp:724	or Magic.cpp:724	`d.NumCharacter` and past `SelectMagicCaster`'s dead-champion refusal (`:725`).
-file	doc/PROVEN_FACTS.md:1817	Character.cpp:2372-2377	Character.cpp:2367-2372	no file named in its paragraph; or CSBCode.cpp:2367, Viewport.cpp:2367, CSB.h:2367	(`:2372-2377`) — halves it. Measured: a rock throws 31.4 from a healthy fighting hand,
-file	doc/PROVEN_FACTS.md:1866	Timer.cpp:597	Timer.cpp:597	no file named in its paragraph; or CSBCode.cpp:597, CSB.h:597, Code11f52.cpp:597	The poison cut-off is tested **before** the subtraction (`:597`), so the last value a
-changed	doc/PROVEN_FACTS.md:1986	CSBCode.cpp:8824-8899	CSBCode.cpp:8719-8794		(`doc/CSBwin-src/CSBCode.cpp:8824-8899`), which fills it black and draws the buttons if
-changed	doc/PROVEN_FACTS.md:1988	Attack.cpp:949-1042	Attack.cpp:949-1042		(`doc/CSBwin-src/Attack.cpp:949-1042`), which draws the damage and waits `VBLDelay(15)`.
-changed	doc/PROVEN_FACTS.md:1992	Character.cpp:4904-4922	Character.cpp:4887-4897		it sets `d.AttackingCharacterOrdinal = 0` and `d.Word20250 = 1` (`:4904-4922`). So the
-changed	doc/PROVEN_FACTS.md:2109	Code11f52.cpp:101-109	Code11f52.cpp:66-74		`DrawNameOfHeldObject` (`doc/CSBwin-src/Code11f52.cpp:101-109`). `QuitPressingEye` draws the
-changed	doc/PROVEN_FACTS.md:2157	Character.cpp:3616-3632	Character.cpp:3599-3615		(`doc/CSBwin-src/Character.cpp:3616-3632`). When the selected champion's priest mastery,
-changed	doc/PROVEN_FACTS.md:2199	SaveGame.cpp:1252	SaveGame.cpp:1178		indexes (`doc/CSBwin-src/SaveGame.cpp:1252`):
-file	doc/PROVEN_FACTS.md:2207	SaveGame.cpp:1236	SaveGame.cpp:1168	no file named in its paragraph; or CSBCode.cpp:1168, Data.h:1168, Viewport.cpp:1168	The 44-byte header goes out with it (`:1236`), carrying `ObjectListLength()` and the
-changed	doc/PROVEN_FACTS.md:2228	CSB.h:463-514	CSB.h:463-511		(`doc/CSBwin-src/CSB.h:463-514`). Byte offsets:
-changed	doc/PROVEN_FACTS.md:2285	SaveGame.cpp:498-529	SaveGame.cpp:490-521		are not among them (`doc/CSBwin-src/SaveGame.cpp:498-529`) — so both are read as plain
-changed	doc/PROVEN_FACTS.md:2310	SaveGame.cpp:498-529	SaveGame.cpp:490-521		`shieldStrength` (274) and stops there (`doc/CSBwin-src/SaveGame.cpp:498-529`). The four
-file	doc/PROVEN_FACTS.md:2498	SaveGame.cpp:2180-2185	SaveGame.cpp:1968-1973	no file named in its paragraph; or CSBCode.cpp:1968, Viewport.cpp:1968, CSB.h:1968	**Slot 0 is never used** ("Don't use entry zero", `:2180-2185`). Values from `0xff00` up
-file	doc/PROVEN_FACTS.md:2529	data.cpp:2157	data.cpp:2153	no file named in its paragraph; or SaveGame.cpp:2153, CSBCode.cpp:2153, Viewport.cpp:2153	every scroll's text a slot of its own (`AllocateIndirectIndex`, `:2157`) beside any the
-changed	doc/PROVEN_FACTS.md:2546	SaveGame.cpp:1813-1879	SaveGame.cpp:1687-1723		before it does anything else with them (`doc/CSBwin-src/SaveGame.cpp:1813-1879`). The
-changed	doc/PROVEN_FACTS.md:2678	Chaos.cpp:4859	Chaos.cpp:3997		(`name` at `+772`, title at `+780`, confirmed by `doc/CSBwin-src/Chaos.cpp:4859`), so
-changed	doc/PROVEN_FACTS.md:2680	Chaos.cpp:4840-4848	Chaos.cpp:3979-3986		fires only when the caret is clicked *inside* the name (`:4840-4848`; clicking past the
-changed	doc/PROVEN_FACTS.md:2692	SaveGame.cpp:498-550	SaveGame.cpp:490-542		(`doc/CSBwin-src/SaveGame.cpp:498-550`).
-changed	doc/PROVEN_FACTS.md:2731	SaveGame.cpp:498-529	SaveGame.cpp:490-521		and the portrait is not among them (`doc/CSBwin-src/SaveGame.cpp:498-529`), so a save
-changed	doc/PROVEN_FACTS.md:2798	SaveGame.cpp:425-438	SaveGame.cpp:421-430		for an ordinal above 0, calls `SelectOverlay` again (`:425-438`), which puts the overlay up
-file	doc/PROVEN_FACTS.md:2801	Bitmaps.cpp:323	Bitmaps.cpp:323	or Data.h:323, system.cpp:323	the block leaves `overlayActive` as it was (`:323`, `:351`).
-changed	doc/PROVEN_FACTS.md:2813	WinScreen.cpp:1493-1527	WinScreen.cpp:1493-1527		`d.Palette11946` while `d.DynamicPaletteSwitching` is on (`doc/CSBwin-src/WinScreen.cpp:1493-1527`).
-file	doc/PROVEN_FACTS.md:2832	Graphics.cpp:3096-3117	Graphics.cpp:3069-3090	no file named in its paragraph; or CSBCode.cpp:3069, Viewport.cpp:3069, CSB.h:3069	`(i << 2) | (i >> 1)` (`:3096-3117`).
-file	doc/PROVEN_FACTS.md:2834	Graphics.cpp:3076-3095	Graphics.cpp:3049-3068	no file named in its paragraph; or CSBCode.cpp:3049, Viewport.cpp:3049, CSB.h:3049	`rrrgggbbb` with each channel `& 0xf8` (`:3076-3095`). Through the identity overlay
-file	doc/PROVEN_FACTS.md:2849	WinScreen.cpp:1121-1196	WinScreen.cpp:1121-1196	or Graphics.cpp:1121-1196	`NotImplemented`, whose message box ends the program (`:1121-1196`, `system.cpp:177-190`).
-file	doc/PROVEN_FACTS.md:2892	CSB.h:1217-1219	CSB.h:1214-1216	no file named in its paragraph; or Code51a4.cpp:1214, CSBCode.cpp:1214, Viewport.cpp:1214	`ITEM110`'s positions (`:1217-1219`, `:1373`); the graphics are `graphicNum0` 0 (front),
-file	doc/PROVEN_FACTS.md:2892	CSB.h:1373	CSB.h:1370	no file named in its paragraph; or Code51a4.cpp:1370, CSBCode.cpp:1370, Viewport.cpp:1370	`ITEM110`'s positions (`:1217-1219`, `:1373`); the graphics are `graphicNum0` 0 (front),
-file	doc/PROVEN_FACTS.md:2926	Graphics.cpp:1068-1082	Graphics.cpp:1044-1058	no file named in its paragraph; or Code51a4.cpp:1044, CSBCode.cpp:1044, Viewport.cpp:1044	keeps (`:1620-1638`, `:1068-1082`), and a view that is mirrored is mirrored in a copy, so
-changed	doc/PROVEN_FACTS.md:2939	data.cpp:1956-1979	data.cpp:1953-1975		`Signature` (`doc/CSBwin-src/data.cpp:1956-1979`) is a file's MD5, RSA's reference code
-changed	doc/PROVEN_FACTS.md:2946	SaveGame.cpp:1966-2023	SaveGame.cpp:1795-1820		What a world names is read at the end of `LoadGame` (`SaveGame.cpp:1966-2023`):
-file	doc/PROVEN_FACTS.md:2963	Graphics.cpp:1868-1872	Graphics.cpp:1844-1848	no file named in its paragraph; or CSBCode.cpp:1844, data.cpp:1844, CSB.h:1844	`ReadCSBgraphic` (`:3246`); once open it is only rewound (`:1868-1872`). A file that is
-file	doc/PROVEN_FACTS.md:2965	Graphics.cpp:1877-1888	Graphics.cpp:1853-1864	no file named in its paragraph; or CSBCode.cpp:1853, data.cpp:1853, CSB.h:1853	if the expected pair is not 0 (`:1877-1888`). Otherwise, under an
-file	doc/PROVEN_FACTS.md:2968	Graphics.cpp:1896-1908	Graphics.cpp:1872-1884	no file named in its paragraph; or CSBCode.cpp:1872, data.cpp:1872, CSB.h:1872	Signature = %d")` (`:1909-1918`). The comparison against the expected pair (`:1896-1908`)
-file	doc/PROVEN_FACTS.md:2970	Graphics.cpp:1889-1895	Graphics.cpp:1865-1871	no file named in its paragraph; or CSBCode.cpp:1865, data.cpp:1865, CSB.h:1865	whenever the pair is not 0 (`:1889-1895`), and a signature is never 0: it never runs.
-changed	doc/PROVEN_FACTS.md:2995	SaveGame.cpp:1177	SaveGame.cpp:1126		party tail (`SaveGame.cpp:1177`, `:1802`).
-file	doc/PROVEN_FACTS.md:3119	CSBUI.cpp:1168-1178	CSBUI.cpp:1147-1157	no file named in its paragraph; or CSBCode.cpp:1147, Viewport.cpp:1147, CSB.h:1147	(`:1168-1178`). That is the same pair `UIM_LEFT_BUTTON_DOWN` raises for a real click
-file	doc/PROVEN_FACTS.md:3159	SaveGame.cpp:2824-2828	SaveGame.cpp:2612-2616	or Timer.cpp:2612-2616	(`:2824-2828`), a record count being the file's count plus `d.Byte7302[db]` extra ones
-changed	doc/PROVEN_FACTS.md:3221	SaveGame.cpp:1195	SaveGame.cpp:1136		`MaxTimer` words of `m_timerQueue` (`doc/CSBwin-src/SaveGame.cpp:1195`) and `LoadGame`
-file	doc/PROVEN_FACTS.md:3297	CSB.h:1179-1195	CSB.h:1176-1192	after None, named at line 3296	| `DB6` clothing | `word2` bits 14-15 (`:1179-1195`) | no |
-file	doc/PROVEN_FACTS.md:3298	CSB.h:1202-1209	CSB.h:1199-1206	after None, named at line 3296	| `DB7` scroll, 4-byte form | `word2` bits 10-15, the old `b10_15()` (`:1202-1209`) | **yes** — bit 10 |
-file	doc/PROVEN_FACTS.md:3301	CSB.h:1303-1308	CSB.h:1300-1305	no file named in its paragraph; or CSBCode.cpp:1300, Viewport.cpp:1300, Code11f52.cpp:1300	| `DB10` misc | `cursed()` bit 8 and `subType()` bits 9-13 (`:1303-1308`) | no |
-changed	doc/PROVEN_FACTS.md:3324	SaveGame.cpp:1205-1231	SaveGame.cpp:1141-1164		records into EXPOOL immediately before the image (`doc/CSBwin-src/SaveGame.cpp:1205-1231`).
-changed	doc/PROVEN_FACTS.md:3336	SaveGame.cpp:1318-1320	SaveGame.cpp:1220-1222		in it, and it is written through `LE16` (`:1318-1320`) — a byte swap on the little-endian
-file	doc/PROVEN_FACTS.md:3368	SaveGame.cpp:2949	SaveGame.cpp:2736	no file named in its paragraph; or CSBCode.cpp:2736, Viewport.cpp:2736, CSB.h:2736	1. **Every cell chain** — one call per column pointer, `:2949`.
-changed	doc/PROVEN_FACTS.md:3542	Chaos.cpp:4806-4833	Chaos.cpp:3949-3973		The UTILITY's button 13 (`_TAG004518`, `doc/CSBwin-src/Chaos.cpp:4806-4833`) reads a saved
-changed	doc/PROVEN_FACTS.md:3544	Chaos.cpp:2789-3164	Chaos.cpp:2207-2496		(`_ReadSavedGame`, `:2789-3164`), copies the party with `TAG002724` (`:3264-3451`) and
-changed	doc/PROVEN_FACTS.md:3544	Chaos.cpp:3264-3451	Chaos.cpp:2571-2680		(`_ReadSavedGame`, `:2789-3164`), copies the party with `TAG002724` (`:3264-3451`) and
-changed	doc/PROVEN_FACTS.md:3545	Chaos.cpp:2001-2327	Chaos.cpp:1643-1898		writes the second record as a new file with `_TAG000fc4` (`:2001-2327`). It works on the
-changed	doc/PROVEN_FACTS.md:3550	Chaos.cpp:3169-3238	Chaos.cpp:2501-2546		(`_TAG00260e`, `:3169-3238`); a Dungeon Master save CSBWin wrote has 2, 1 and 13, and a
-changed	doc/PROVEN_FACTS.md:3553	Chaos.cpp:1774-1812	Chaos.cpp:1434-1462		equal with `strcmp`, is message 20 (`_CheckChampionNames`, `:1774-1812`). `mini.dat`
-changed	doc/PROVEN_FACTS.md:3554	Chaos.cpp:3243-3259	Chaos.cpp:2551-2566		must have `Byte22596` 2 or more and `Word22592` 13 (`_TAG0026c4`, `:3243-3259`).
-changed	doc/PROVEN_FACTS.md:3566	Chaos.cpp:1058-1090	Chaos.cpp:789-821		`LoadLong` and `StoreLong` take the low word first (`:1058-1090`), so "`RandomGameID` + 1"
-changed	doc/PROVEN_FACTS.md:3568	Chaos.cpp:3305	Chaos.cpp:2595		set by `wordGear(+376) = 1` (`:3305`), which leaves the bytes `01 00`, 256. And
-file	doc/PROVEN_FACTS.md:3568	Chaos.cpp:3305	Chaos.cpp:2595	or CSBCode.cpp:2595	set by `wordGear(+376) = 1` (`:3305`), which leaves the bytes `01 00`, 256. And
-changed	doc/PROVEN_FACTS.md:3592	SaveGame.cpp:1799-1823	SaveGame.cpp:1673-1697		(`doc/CSBwin-src/SaveGame.cpp:1726`, `:1745`, `:1799-1823`), `ReadDatabases` returning 0 (`:1911-1912`), and
-changed	doc/PROVEN_FACTS.md:3593	SaveGame.cpp:2027-2035	SaveGame.cpp:1824-1831		the checks after it (`:2027-2035`). `tag01efee` fades to `d.Palette11978`, then branches on
-changed	doc/PROVEN_FACTS.md:3594	SaveGame.cpp:2098-2119	SaveGame.cpp:1895-1907		`d.PartyHasDied` (`:2098-2119`):
-changed	doc/PROVEN_FACTS.md:3608	SaveGame.cpp:1579-1586	SaveGame.cpp:1480-1486		opened on ENTER: it opens `dungeon.dat` (`SaveGame.cpp:1579-1586`), where a file that will
-file	doc/PROVEN_FACTS.md:3648	SaveGame.cpp:1563	SaveGame.cpp:1462	or CSBUI.cpp:1462	(`:1563`, marked 20150806), and only `ReadExtendedFeatures` assigns it, from
-file	doc/PROVEN_FACTS.md:3651	CSB.h:966	CSB.h:963	no file named in its paragraph; or SaveGame.cpp:963, CSBCode.cpp:963, Viewport.cpp:963	a block without the flag. `SaveGame` always sets it (`:966`), so a file CSBWin writes is
-changed	doc/PROVEN_FACTS.md:3680	RC4.cpp:2-4	RC4.cpp:1-3		preparation is from RC4" (`doc/CSBwin-src/RC4.cpp:2-4`), and it is so:
-changed	doc/PROVEN_FACTS.md:3682	RC4.cpp:25-61	RC4.cpp:20-48		- `RC4_prepare_key` (`:25-61`) fills 8192 bytes of state with `(unsigned char)counter`,
-changed	doc/PROVEN_FACTS.md:3687	RC4.cpp:65-76	RC4.cpp:52-55		- `RC4_encipher(buffer, len, position)` (`:65-76`) XORs the buffer with
-changed	doc/PROVEN_FACTS.md:3697	system.cpp:301-313	system.cpp:301-313		in the file (`doc/CSBwin-src/system.cpp:301-313`), and `WRITE` enciphers the same way
-changed	doc/PROVEN_FACTS.md:3698	system.cpp:315-329	system.cpp:315-329		(`:315-329`). The whole file is enciphered, the block included.
-changed	doc/PROVEN_FACTS.md:3709	SaveGame.cpp:939-946	SaveGame.cpp:914-920		file enciphered with the same key (`SaveGame.cpp:939-946`) and sets `SimpleEncryption`
-file	doc/PROVEN_FACTS.md:3730	SaveGame.cpp:325	SaveGame.cpp:323	no file named in its paragraph; or CSBCode.cpp:323, Viewport.cpp:323, CSB.h:323	- fewer than 512 bytes were read (`:325`);
-file	doc/PROVEN_FACTS.md:3741	SaveGame.cpp:2560-2562	SaveGame.cpp:2348-2350	no file named in its paragraph; or CSBCode.cpp:2348, Viewport.cpp:2348, CSB.h:2348	first eight bytes (`:2560-2562`). A damaged block is therefore never an error of its own.
-changed	doc/PROVEN_FACTS.md:3746	SaveGame.cpp:306-317	SaveGame.cpp:305-315		(`:306-317`), so a file given up on is read in the original shapes. The two errors the
-changed	doc/PROVEN_FACTS.md:3768	SaveGame.cpp:1793-1801	SaveGame.cpp:1668-1675		`_ReadEntireGame` reads the pool back (`:1793-1801`) before these run (`:2028-2029`). So
-file	doc/PROVEN_FACTS.md:3768	SaveGame.cpp:1793-1801	SaveGame.cpp:1668-1675	no file named in its paragraph; or CSBCode.cpp:1668, Viewport.cpp:1668, CSB.h:1668	`_ReadEntireGame` reads the pool back (`:1793-1801`) before these run (`:2028-2029`). So
-file	doc/PROVEN_FACTS.md:3768	SaveGame.cpp:2028-2029	SaveGame.cpp:1825-1826	no file named in its paragraph; or CSBCode.cpp:1825, Viewport.cpp:1825, CSB.h:1825	`_ReadEntireGame` reads the pool back (`:1793-1801`) before these run (`:2028-2029`). So
-file	doc/PROVEN_FACTS.md:3840	SaveGame.cpp:2449	SaveGame.cpp:2237	no file named in its paragraph; or CSBCode.cpp:2237, Viewport.cpp:2237, CSB.h:2237	A record whose link is `RNnul` is skipped outright (`:2449`) and keeps its old index, so
-changed	doc/PROVEN_FACTS.md:3886	SaveGame.cpp:941-1005	SaveGame.cpp:915-980		(`doc/CSBwin-src/SaveGame.cpp:941-1005`); everything it does not assign is genuinely zero
-file	doc/PROVEN_FACTS.md:3912	SaveGame.cpp:380-384	SaveGame.cpp:378-382	no file named in its paragraph; or CSBCode.cpp:378, Viewport.cpp:378, CSB.h:378	block (`:316`), and takes it and the signatures from one (`:380-384`). It never clears the
-file	doc/PROVEN_FACTS.md:3973	Timer.cpp:411	Timer.cpp:411	no file named in its paragraph; or CSBCode.cpp:411, Code11f52.cpp:411, SaveGame.cpp:411	parameter (`:411`) — used there for `MissileEncounterFilter` and, for a shattered potion,
-file	doc/PROVEN_FACTS.md:4042	CSB.h:747	CSB.h:744	or Sound.cpp:744, CSBCode.cpp:744	location (8, `CSB.h:1546`), each with `continue` (`:747`), under one `NEWDSAPARAMETERS`.
-file	doc/PROVEN_FACTS.md:4043	CSB.h:733-742	CSB.h:730-739	or Sound.cpp:730-739, CSBCode.cpp:730-739	Each sees nine parameters (`:733-742`): the ordinal plus 1, the volume, `dx*dx + dy*dy`
-file	doc/PROVEN_FACTS.md:4046	CSB.h:701-707	CSB.h:698-704	or Sound.cpp:698-704, CSBCode.cpp:698-704	squared distance is not 0 (`:701-707`): 141 for (1, 1), 500 for (3, 4). It returns 0 when a
-file	doc/PROVEN_FACTS.md:4048	CSB.h:752-757	CSB.h:749-754	or Sound.cpp:749-754, CSBCode.cpp:749-754	`:752-757`), so a sound they queue plays on. The DSA plays the sound if it pleases, with
-file	doc/PROVEN_FACTS.md:4049	CSB.h:1042-1065	CSB.h:1039-1062	or CSBCode.cpp:1039-1062	`&SOUND` (`PlayCustomSound`, `:1042-1065`). `gameVolume` is the volume menu's
-changed	doc/PROVEN_FACTS.md:4076	Chaos.cpp:5160-5227	Chaos.cpp:4288-4344		each with `continue` (`:5160-5227`): the count is `sizeof(fp) / 4`, 27, and the words are
-file	doc/PROVEN_FACTS.md:4107	CSB.h:830-838	CSB.h:827-835	or Timer.cpp:827-835	the level, its square and the button, the position relative to the party (`:830-838`); and
-changed	doc/PROVEN_FACTS.md:4146	SaveGame.cpp:1911-2034	SaveGame.cpp:1741-1830		`tag01efee` (`SaveGame.cpp:1911-2034`).
-file	doc/PROVEN_FACTS.md:4154	Character.cpp:2540-2601	Character.cpp:2535-2596	or CSB.h:2535-2596	thing, before the champion's HP are set to 0 (`:2540-2601`), with a count of 1 and the
-file	doc/PROVEN_FACTS.md:4158	Character.cpp:2881-2888	Character.cpp:2876-2883	or CSB.h:2876-2883	the wound mask, the kind (`P4`) and 0 (`:2881-2888`). Its word 3 comes back into `D7L`
-file	doc/PROVEN_FACTS.md:4159	Character.cpp:2905-2906	Character.cpp:2900-2901	or CSB.h:2900-2901	(`:2891`), and the low word is what is added and returned (`:2905-2906`), so a DSA may deal
-file	doc/PROVEN_FACTS.md:4161	Character.cpp:2819-2822	Character.cpp:2814-2817	or CSBCode.cpp:2814-2817, Chaos.cpp:2814-2817	before it (`:2819-2822`) never fires: every path to it has returned on a damage of 0 or
-changed	doc/PROVEN_FACTS.md:4170	Character.cpp:2973-2976	Character.cpp:2968-2971		0, set once (`:2973-2976`), and calls the DSA up to twice with the same `DSAVARS`
-file	doc/PROVEN_FACTS.md:4170	Character.cpp:2973-2976	Character.cpp:2968-2971	or CSB.h:2968-2971	0, set once (`:2973-2976`), and calls the DSA up to twice with the same `DSAVARS`
-file	doc/PROVEN_FACTS.md:4171	Character.cpp:2980-2985	Character.cpp:2975-2980	or CSB.h:2975-2980	(`:2962`): with timer function 1 and the object the slot holds, if any (`:2980-2985`),
-file	doc/PROVEN_FACTS.md:4172	Character.cpp:2986-2991	Character.cpp:2981-2986	or CSB.h:2981-2986	then with timer function 0 and the object arriving, if any (`:2986-2991`). Only the object
-file	doc/PROVEN_FACTS.md:4178	Character.cpp:1845	Character.cpp:1840	or DSA.cpp:1840, CSB.h:1840	(30 and up) is written without it (`:1845`, `:1953`), and so is the throw's temporary
-file	doc/PROVEN_FACTS.md:4178	Character.cpp:1953	Character.cpp:1948	or DSA.cpp:1948, CSB.h:1948	(30 and up) is written without it (`:1845`, `:1953`), and so is the throw's temporary
-file	doc/PROVEN_FACTS.md:4229	CSB.h:1172	CSB.h:1169	or Monster.cpp:1169	`:1172`), each in a scope with a `NEWDSAPARAMETERS` (`:1157`), so each DSA runs on
-file	doc/PROVEN_FACTS.md:4236	CSB.h:1170	CSB.h:1167	or Monster.cpp:1167	`disableTime`, `supressPoison`. The whole block comes back (`:1170`), and the next DSA sees
-file	doc/PROVEN_FACTS.md:4245	CSB.h:989-1125	CSB.h:986-1122	or Magic.cpp:986-1122	`disableTime`, which no C++ reads (`:989-1125`), so a filter sees the `disableTime` the last
-file	doc/PROVEN_FACTS.md:4272	CSB.h:1127	CSB.h:1124	no file named in its paragraph; or Attack.cpp:1124, Character.cpp:1124, Code11f52.cpp:1124	Two fields are read back. `deathCloud` 2 shows no death cloud (`:1149`, `:1127`, `:1261`).
-file	doc/PROVEN_FACTS.md:4272	CSB.h:1261	CSB.h:1258	no file named in its paragraph; or Attack.cpp:1258, Character.cpp:1258, Code11f52.cpp:1258	Two fields are read back. `deathCloud` 2 shows no death cloud (`:1149`, `:1127`, `:1261`).
-file	doc/PROVEN_FACTS.md:4274	CSB.h:3230	CSB.h:3165	no file named in its paragraph; or Character.cpp:3165, Code11f52.cpp:3165, CSBCode.cpp:3165	drop and 2 and 3 do not (`:1150`, `:3230`, `:3371`, `Character.cpp:283`), while a member other than the
-file	doc/PROVEN_FACTS.md:4274	CSB.h:3371	CSB.h:3306	no file named in its paragraph; or Character.cpp:3306, Code11f52.cpp:3306, CSBCode.cpp:3306	drop and 2 and 3 do not (`:1150`, `:3230`, `:3371`, `Character.cpp:283`), while a member other than the
-file	doc/PROVEN_FACTS.md:4285	CSB.h:3147-3148	CSB.h:3088-3089	or Monster.cpp:3088-3089	`CSB.h:1540`; `:3147-3148`), the level's own; with none, the dungeon's, without the level
-file	doc/PROVEN_FACTS.md:4288	Monster.cpp:3120	Monster.cpp:3116	or Viewport.cpp:3116	type-47 actuator at the location (`break`, `:3120`). A level with a record of its own
-file	doc/PROVEN_FACTS.md:4300	CSB.h:3405-3412	CSB.h:3340-3347	no file named in its paragraph; or Monster.cpp:3340, CSBCode.cpp:3340, Viewport.cpp:3340	and the party's level, x and y (`:3405-3412`). `ProcessDSAFilter` sets
 file	doc/PROVEN_FACTS.md:4347	Monster.cpp:1666-1722	Monster.cpp:1662-1718	or CSB.h:1662-1718	`Turn_Monsters_As_Group` (`:1577`), `PIn` `Process_Invincible` (`:1666-1722`), `SF`
 file	doc/PROVEN_FACTS.md:4348	Monster.cpp:1794-1881	Monster.cpp:1790-1877	or CSB.h:1790-1877	`Standard_Finish` (`:1794-1881`), `PIAF` `Process_Invincible_And_Finish` (`:1954`,
 file	doc/PROVEN_FACTS.md:4349	Monster.cpp:1976	Monster.cpp:1972	or CSB.h:1972	`:1976`), `T524` `Try_Directions_D5_To_D4` (`:2437-2529`), `IC` `InitialChecks`
@@ -140,12 +9,8 @@ file	doc/PROVEN_FACTS.md:4362	Monster.cpp:2922-2933	Monster.cpp:2918-2929	no fil
 file	doc/PROVEN_FACTS.md:4477	Character.cpp:2730	Character.cpp:2725	or Graphics.cpp:2725	`D7W <= 0` returns 0. Only then is `HP() == 0` checked (`:2730`). `d.Word11694` is "set when
 file	doc/PROVEN_FACTS.md:4532	Character.cpp:1348-1360	Character.cpp:1343-1355	or CSBCode.cpp:1343-1355, Attack.cpp:1343-1355, Magic.cpp:1343-1355	`x 69*chIdx..+42, y 0..6`, and prints the name (`:1348-1360`). Graphic 15's columns 43
 file	doc/PROVEN_FACTS.md:4534	Character.cpp:1327-1344	Character.cpp:1322-1339	or CSBCode.cpp:1322-1339, Attack.cpp:1322-1339, Magic.cpp:1322-1339	inventory open the name goes into the viewport instead (`:1327-1344`) and the figure
-changed	doc/PROVEN_FACTS.md:4596	Mouse.cpp:1606-1630	Mouse.cpp:1482-1496		`((d.partyFacing + button - 3) & 3) == d.Word11714` (`:1606-1630`). Every event it handles
 file	doc/PROVEN_FACTS.md:4625	CSBwin.cpp:767	CSBwin.cpp:765	or CSBCode.cpp:765, system.cpp:765	that falls due while the loop cannot run it (frozen, `:767`, or held in a sequence) stays
 file	doc/PROVEN_FACTS.md:4651	CSBUI.cpp:724	CSBUI.cpp:704	or CSBCode.cpp:704	tick only when it is non-zero (`:773-774`) and clears it after each (`:724`); the VBL
-changed	doc/PROVEN_FACTS.md:4675	CSBCode.cpp:7670-7783	CSBCode.cpp:7607-7696		a button (`doc/CSBwin-src/CSBCode.cpp:7670-7783`).
-changed	doc/PROVEN_FACTS.md:4677	CSBCode.cpp:7640-7663	CSBCode.cpp:7581-7600		`:7640-7663`), whether or not its click was.
-changed	doc/PROVEN_FACTS.md:4687	Mouse.cpp:1689-1946	Mouse.cpp:1550-1807		(`Mouse.cpp:1662-1688`). Every other button stamps `lastTime = d.Time` (`:1689-1946`):
 file	doc/PROVEN_FACTS.md:4728	Mouse.cpp:316	Mouse.cpp:315	or Attack.cpp:315, CSBCode.cpp:315, SaveGame.cpp:315	(`:538-540`), and 0 otherwise (`:316`). So a switch makes a tick due at once, and a
 file	doc/PROVEN_FACTS.md:4760	Mouse.cpp:820	Mouse.cpp:819	or Character.cpp:819, CSBCode.cpp:819	(`:820`), and a cursor filter's cancel (`:836`). The test for an object in the slot
 file	doc/PROVEN_FACTS.md:4760	Mouse.cpp:836	Mouse.cpp:835	or Character.cpp:835, CSBCode.cpp:835	(`:820`), and a cursor filter's cancel (`:836`). The test for an object in the slot
@@ -154,11 +19,8 @@ file	doc/PROVEN_FACTS.md:4767	Character.cpp:4980-4984	Character.cpp:4955-4959	or
 file	doc/PROVEN_FACTS.md:4794	CSBCode.cpp:3016-3017	CSBCode.cpp:2960-2961	no file named in its paragraph; or DSA.cpp:2960, Code11f52.cpp:2960, Viewport.cpp:2960	follow every teleporter jump (`:3016-3017`, with `SetPartyFacing`, `:3002-3012`) and
 file	doc/PROVEN_FACTS.md:4795	CSBCode.cpp:3111-3112	CSBCode.cpp:3055-3056	no file named in its paragraph; or DSA.cpp:3055, Code11f52.cpp:3055, Viewport.cpp:3055	every pit fall (`:3111-3112`), so a fall hurts, and a champion it kills drops what
 file	doc/PROVEN_FACTS.md:4797	CSBCode.cpp:3250-3257	CSBCode.cpp:3194-3201	no file named in its paragraph; or DSA.cpp:3194, Code11f52.cpp:3194, Viewport.cpp:3194	3. Back on its square facing as it did, nothing more happens (`:3250-3257`). Otherwise a
-changed	doc/PROVEN_FACTS.md:4798	CSBCode.cpp:3280-3308	CSBCode.cpp:3224-3247		footprint is left when it left its square (`:3280-3308`).
 file	doc/PROVEN_FACTS.md:4798	CSBCode.cpp:3280-3308	CSBCode.cpp:3224-3247	no file named in its paragraph; or DSA.cpp:3224, Code11f52.cpp:3224, Viewport.cpp:3224	footprint is left when it left its square (`:3280-3308`).
 file	doc/PROVEN_FACTS.md:4831	SaveGame.cpp:643-647	SaveGame.cpp:635-639	or CSBCode.cpp:635-639, Code11f52.cpp:635-639	is dropped. The viewport is drawn only after the check (`:643-647`). Evidence:
-changed	doc/PROVEN_FACTS.md:4880	CSBCode.cpp:3652-3660	CSBCode.cpp:3590-3598		(`doc/CSBwin-src/CSBCode.cpp:3652-3660`, `:3741-3743`).
-changed	doc/PROVEN_FACTS.md:4880	CSBCode.cpp:3741-3743	CSBCode.cpp:3676-3678		(`doc/CSBwin-src/CSBCode.cpp:3652-3660`, `:3741-3743`).
 file	doc/PROVEN_FACTS.md:4884	CSBCode.cpp:3716	CSBCode.cpp:3654	no file named in its paragraph; or Viewport.cpp:3654, CSB.h:3654, Code11f52.cpp:3654	positions 0 to 11 as CSBWin's comment gives them (`:3716`), and `Byte4212` =
 file	doc/PROVEN_FACTS.md:4920	Code51a4.cpp:29	Code51a4.cpp:29	no file named in its paragraph; or CSBCode.cpp:29, Code11f52.cpp:29, Character.cpp:29	- **Size.** `TAG005088(type, scale)` clamps the *scale* to 32 (`:29`), then half-width
 file	doc/PROVEN_FACTS.md:4930	Code51a4.cpp:151-160	Code51a4.cpp:151-160	no file named in its paragraph; or CSBCode.cpp:151, Code11f52.cpp:151, SaveGame.cpp:151	except in cell 9 (`:151-160`). `Word7246` is declared 12 words, but cells 3-9 index it up
@@ -174,30 +36,11 @@ file	doc/PROVEN_FACTS.md:5030	Code51a4.cpp:2223-2224	Code51a4.cpp:2223-2224	no f
 file	doc/PROVEN_FACTS.md:5030	Code51a4.cpp:2301-2302	Code51a4.cpp:2301-2302	no file named in its paragraph; or CSBCode.cpp:2301, CSB.h:2301, Code11f52.cpp:2301	`:2223-2224`, `:2301-2302`), from the set's cells 9 and 10 (`:562-566`), 100 pixels to
 file	doc/PROVEN_FACTS.md:5030	Code51a4.cpp:562-566	Code51a4.cpp:562-566	no file named in its paragraph; or CSBCode.cpp:562, CSB.h:562, Code11f52.cpp:562	`:2223-2224`, `:2301-2302`), from the set's cells 9 and 10 (`:562-566`), 100 pixels to
 file	doc/PROVEN_FACTS.md:5033	Code51a4.cpp:592-864	Code51a4.cpp:592-864	no file named in its paragraph; or CSBCode.cpp:592, CSB.h:592, Code11f52.cpp:592	The mirror (`:592-864`): near (cells 6+), a side view facing right, an attack view with the
-file	doc/PROVEN_FACTS.md:5177	SmartDiscard.cpp:799-876	SmartDiscard.cpp:799-876	or data.cpp:799-876	`RNnul` (`:799-876`). Once all are counted, a count below `db.Max(n) * 3/4` moves on to the
-file	doc/PROVEN_FACTS.md:5178	SmartDiscard.cpp:807-815	SmartDiscard.cpp:807-815	or SaveGame.cpp:807-815, CSBCode.cpp:807-815	next database (`:807-815`). `db.Max` is 8000 for every database but actuators (16000) and
-file	doc/PROVEN_FACTS.md:5180	CSB.h:880-886	CSB.h:877-883	or SmartDiscard.cpp:877-883, SaveGame.cpp:877-883, CSBCode.cpp:877-883	fifty objects a step (`:880-886`, `:625-663`), into a heap of the 200 highest priorities
-file	doc/PROVEN_FACTS.md:5180	CSB.h:625-663	CSB.h:622-660	or SmartDiscard.cpp:622-660, SaveGame.cpp:622-660, CSBCode.cpp:622-660	fifty objects a step (`:880-886`, `:625-663`), into a heap of the 200 highest priorities
-file	doc/PROVEN_FACTS.md:5181	CSB.h:173-201	CSB.h:173-201	or SmartDiscard.cpp:173-201, SaveGame.cpp:173-201, CSBCode.cpp:173-201	(`:11`, `:173-201`), and then one object is discarded per step, highest first, until the
-file	doc/PROVEN_FACTS.md:5182	CSB.h:887-903	CSB.h:884-900	or SmartDiscard.cpp:884-900, SaveGame.cpp:884-900, CSBCode.cpp:884-900	count is back below 6000 (`:887-903`, `:665-735`). The count drops by one for every attempt,
-file	doc/PROVEN_FACTS.md:5182	CSB.h:665-735	CSB.h:662-732	or SmartDiscard.cpp:662-732, SaveGame.cpp:662-732, CSBCode.cpp:662-732	count is back below 6000 (`:887-903`, `:665-735`). The count drops by one for every attempt,
-file	doc/PROVEN_FACTS.md:5187	SmartDiscard.cpp:517-607	SmartDiscard.cpp:517-607	or Character.cpp:517-607, Mouse.cpp:517-607, Monster.cpp:517-607	`N - 20` more past twenty, or ten times that for clothing (`:517-607`). An object whose
-changed	doc/PROVEN_FACTS.md:5189	CSB.h:491-513	CSB.h:491-510		or 16 before the object, neither is the first of each type on each corner (`:491-513`,
-file	doc/PROVEN_FACTS.md:5189	CSB.h:491-513	CSB.h:491-510	no file named in its paragraph; or SmartDiscard.cpp:491, SaveGame.cpp:491, CSBCode.cpp:491	or 16 before the object, neither is the first of each type on each corner (`:491-513`,
-file	doc/PROVEN_FACTS.md:5190	CSB.h:546-549	CSB.h:543-546	no file named in its paragraph; or SmartDiscard.cpp:543, SaveGame.cpp:543, CSBCode.cpp:543	`:546-549`). Before it discards, `DiscardObject` scans the cell again and goes ahead only if
-file	doc/PROVEN_FACTS.md:5191	CSB.h:715-717	CSB.h:712-714	no file named in its paragraph; or SmartDiscard.cpp:712, SaveGame.cpp:712, CSBCode.cpp:712	the object is still listed at a priority no lower (`:715-717`, `:345-356`). The discard is
-file	doc/PROVEN_FACTS.md:5191	CSB.h:345-356	CSB.h:345-356	no file named in its paragraph; or SaveGame.cpp:345, CSBCode.cpp:345, Code11f52.cpp:345	the object is still listed at a priority no lower (`:715-717`, `:345-356`). The discard is
-file	doc/PROVEN_FACTS.md:5205	Code11f52.cpp:260-267	Code11f52.cpp:225-232	or AsciiDump.cpp:225-232, Sound.cpp:225-232	at the start), stepping past the party's level (`:260-267`), square by square, column by
-changed	doc/PROVEN_FACTS.md:5206	Data.h:233-340	Data.h:233-331		column, through each square's floor chain (`:233-340`). On the party's level it skips any
-file	doc/PROVEN_FACTS.md:5206	Data.h:233-340	Data.h:233-331	or Character.cpp:233-331, CSBCode.cpp:233-331	column, through each square's floor chain (`:233-340`). On the party's level it skips any
-changed	doc/PROVEN_FACTS.md:5208	Data.h:260-264	Data.h:260-264		chain, an actuator of type 0 is passed and any other ends the square (`:260-264`). The first
-file	doc/PROVEN_FACTS.md:5208	Data.h:260-264	Data.h:260-264	or Character.cpp:260-264, CSBCode.cpp:260-264	chain, an actuator of type 0 is passed and any other ends the square (`:260-264`). The first
 file	doc/PROVEN_FACTS.md:5248	Timer.cpp:1433	Timer.cpp:1433	or DSA.cpp:1433, Hint.cpp:1433, CSBwin.cpp:1433	DSA — `TT_5` (`Timer.cpp:1757`), `TT_6` (`:2230`) and `TT_7` (`:1433`) — `break` out of
 file	doc/PROVEN_FACTS.md:5267	DSA.cpp:447-461	DSA.cpp:446-460	or Attack.cpp:446-460	up "Filter Modifying Dungeon" through `message` (`:447-461`) and returns: the operation
 file	doc/PROVEN_FACTS.md:5377	Character.cpp:1122	Character.cpp:1117	or Graphics.cpp:1117, Mouse.cpp:1117	`:1122`): the open chest is drawn there, and the scroll, opened by entering the weapon hand
 file	doc/PROVEN_FACTS.md:5418	CSBTypes.h:377	CSBTypes.h:371	or DSA.cpp:371, Monster.cpp:371	(`DSA.cpp:3365`, `:3386`, `CSBTypes.h:306`, `:377`); `&MONSTER!`'s `num` is a `ui32`, so
 file	doc/PROVEN_FACTS.md:5431	Code11f52.cpp:1900	Code11f52.cpp:1865	or Graphics.cpp:1865, Monster.cpp:1865	2. A door that is broken (5) or open (0, 1) lets the missile on (`return 0`, `:1900`).
-changed	doc/PROVEN_FACTS.md:5496	SaveGame.cpp:1994-1994	SaveGame.cpp:1802-1804		`data.cpp:65`; a save may set it, `SaveGame.cpp:1994-1994`): the first matching **map timer
 file	doc/PROVEN_FACTS.md:5636	CSBCode.cpp:1120	CSBCode.cpp:1110	no file named in its paragraph; or Code11f52.cpp:1110, Viewport.cpp:1110, CSB.h:1110	(`:1120`) and dead members' droppings wait in `d.Byte13050` for `TAG00b522`, which drops
 file	doc/PROVEN_FACTS.md:5638	CSBCode.cpp:3156	CSBCode.cpp:3100	no file named in its paragraph; or Code11f52.cpp:3100, Viewport.cpp:3100, CSB.h:3100	first (`d.Word13046 = 0`, `:1368`). If the whole group died the loop stops (`:3156`). After the
 file	doc/PROVEN_FACTS.md:5702	Character.cpp:1911-1919	Character.cpp:1906-1914	no file named in its paragraph; or CSBCode.cpp:1906, Viewport.cpp:1906, CSB.h:1906	- slot 1 with this champion's inventory open: a chest is repacked (`:1911-1919`).
@@ -206,7 +49,6 @@ file	doc/PROVEN_FACTS.md:5757	Character.cpp:1863	Character.cpp:1858	no file name
 file	doc/PROVEN_FACTS.md:5757	Character.cpp:1806	Character.cpp:1801	no file named in its paragraph; or CSBCode.cpp:1801, Viewport.cpp:1801, CSB.h:1801	(`:1975`, `+1`), `RemoveCharacterPossession` (`:1863`, `-1`), and `SetCursed` (`:1806`,
 file	doc/PROVEN_FACTS.md:5758	Character.cpp:1820	Character.cpp:1815	no file named in its paragraph; or CSBCode.cpp:1815, Viewport.cpp:1815, CSB.h:1815	`:1820`), which brackets the curse change. The bonus is baked in, so a save stores the
 file	doc/PROVEN_FACTS.md:5807	CSBCode.cpp:2090-2142	CSBCode.cpp:2061-2113	or DSA.cpp:2061-2113	(`:2090-2142`). `DrawCharacterState` leaves that square alone while `d.Word23144` names it
-changed	doc/PROVEN_FACTS.md:5825	CSBCode.cpp:2184-2228	CSBCode.cpp:2155-2195		`d.Pointer23178` back into the square (`CSBCode.cpp:948-955`, `:2184-2228`). The button -1
 file	doc/PROVEN_FACTS.md:5873	CSBCode.cpp:362	CSBCode.cpp:352	or CSBUI.cpp:352, system.cpp:352	(`:1593-1606`); the count starts the game at -1 (`:362`). Each VBL moves the strip up a
 file	doc/PROVEN_FACTS.md:5876	CSBCode.cpp:1536-1537	CSBCode.cpp:1526-1527	or CSBUI.cpp:1526-1527	nothing (`:1536-1537`) and `RemoveTimedOutText` removes nothing (`:1515-1518`).
 file	doc/PROVEN_FACTS.md:5876	CSBCode.cpp:1515-1518	CSBCode.cpp:1505-1508	or CSBUI.cpp:1505-1508	nothing (`:1536-1537`) and `RemoveTimedOutText` removes nothing (`:1515-1518`).
@@ -216,18 +58,10 @@ file	doc/PROVEN_FACTS.md:5952	CSBCode.cpp:967	CSBCode.cpp:957	or system.cpp:957	
 file	doc/PROVEN_FACTS.md:5952	CSBCode.cpp:873	CSBCode.cpp:863	or system.cpp:863	it to `TAG000bb0`, which takes the cursor off the screen (`:957-958`, `:967`, `:873`,
 file	doc/PROVEN_FACTS.md:5953	CSBCode.cpp:897-899	CSBCode.cpp:887-889	or system.cpp:887-889	`:897-899`), and then calls `DrawCursor` (`:1050-1053`), which draws at
 file	doc/PROVEN_FACTS.md:5955	CSBCode.cpp:1052	CSBCode.cpp:1042	or system.cpp:1042	`DrawCursor` has two callers, both in the VBL handler (`:978`, `:1052`).
-changed	doc/PROVEN_FACTS.md:5978	CSBCode.cpp:8533-8574	CSBCode.cpp:8446-8475		`d.MouseQEnd` with it (`CSBCode.cpp:8533-8574`): a key bound twice would leave only the
-changed	doc/PROVEN_FACTS.md:5989	CSBCode.cpp:8515-8574	CSBCode.cpp:8428-8475		then `d.pKeyXlate1` (`doc/CSBwin-src/CSBCode.cpp:8515-8574`), `KeyXlate` pairs
-changed	doc/PROVEN_FACTS.md:5997	Mouse.cpp:1870-1898	Mouse.cpp:1731-1759		- **Button 147** (`Mouse.cpp:1870-1898`), after the pressed-eye and pressed-mouth returns
-changed	doc/PROVEN_FACTS.md:6007	Mouse.cpp:1548-1565	Mouse.cpp:1433-1444		148, one per call, without stamping `lastTime` (`Mouse.cpp:1548-1565`), and exempts 148
-changed	doc/PROVEN_FACTS.md:6008	Mouse.cpp:1591-1604	Mouse.cpp:1463-1476		from the one-entry-per-tick limit (`thawCommand`, `:1591-1604`), since no tick can come.
 file	doc/PROVEN_FACTS.md:6064	Code17818.cpp:215-240	Code17818.cpp:215-240	or CSBCode.cpp:215-240, Mouse.cpp:215-240, Character.cpp:215-240, Monster.cpp:215-240, Graphics.cpp:215-240, CSBwin.cpp:215-240	(`:215-240`).
 file	doc/PROVEN_FACTS.md:6071	Mouse.cpp:1054-1096	Mouse.cpp:1053-1095	or AsciiDump.cpp:1053-1095	door-switch test at `:1054-1096`, loops `D5W` over `ViewportObjectButtons[0..5]` and acts
 file	doc/PROVEN_FACTS.md:6094	Viewport.cpp:1167-1180	Viewport.cpp:1167-1180	or Mouse.cpp:1167-1180, CSBCode.cpp:1167-1180	Then only the two near drop areas and button 5 answer (`:1167-1180`), with no throw.
-changed	doc/PROVEN_FACTS.md:6125	Timer.cpp:2647-2653	Timer.cpp:2647-2653		is recorded (`:2647-2653`), and reloads the bow from slot 12, then 7-9, only while that
 file	doc/PROVEN_FACTS.md:6182	CSBCode.cpp:1016-1020	CSBCode.cpp:1006-1010	or Character.cpp:1006-1010	(`:2972-2973`, `:1016-1020`). So `_ShowCredits` takes its fade to black, not the `Darken`
-changed	doc/PROVEN_FACTS.md:6183	Code1f9e6.cpp:148-170	Code1f9e6.cpp:148-170		steps (`doc/CSBwin-src/Code1f9e6.cpp:148-170`), from `globalPalette`, which the VBL kept
-changed	doc/PROVEN_FACTS.md:6199	SaveGame.cpp:1729-1731	SaveGame.cpp:1604-1606		(`doc/CSBwin-src/SaveGame.cpp:1729-1731`), never runs: every save loads after a restart.
 file	doc/PROVEN_FACTS.md:6213	CSBCode.cpp:726	CSBCode.cpp:716	or Graphics.cpp:716, data.cpp:716	(`:726`), so an entry queued before the death is printed in the new game's first pass.
 file	doc/PROVEN_FACTS.md:6267	Attack.cpp:150-157	Attack.cpp:150-157	no file named in its paragraph; or CSBCode.cpp:150, Code11f52.cpp:150, SaveGame.cpp:150	- A square off the loaded level returns before anything (`:150-157`). Otherwise a dispell
 file	doc/PROVEN_FACTS.md:6269	Attack.cpp:159-160	Attack.cpp:159-160	no file named in its paragraph; or CSBCode.cpp:159, Code11f52.cpp:159, SaveGame.cpp:159	Lord Chaos or not; without him `_Fusion` returns there (`:159-160`).
@@ -239,21 +73,12 @@ file	doc/PROVEN_FACTS.md:6291	Code1f9e6.cpp:259	Code1f9e6.cpp:259	or CSBwin.cpp:
 file	doc/PROVEN_FACTS.md:6314	Code11f52.cpp:2362-2387	Code11f52.cpp:2327-2352	or Character.cpp:2327-2352, Attack.cpp:2327-2352, CSBCode.cpp:2327-2352	VBLs: twelve views, and the last four type changes are never shown (`:2362-2387`).
 file	doc/PROVEN_FACTS.md:6321	Code51a4.cpp:2388-2389	Code51a4.cpp:2388-2389	or Code11f52.cpp:2388-2389	`DMW_Fusion` (`:2372-2389`), 31 VBLs (`:2388-2389`).
 file	doc/PROVEN_FACTS.md:6370	Attack.cpp:1682-1685	Attack.cpp:1682-1685	no file named in its paragraph; or CSBCode.cpp:1682, CSB.h:1682, Code11f52.cpp:1682	`:1682-1685`).
-changed	doc/PROVEN_FACTS.md:6400	SaveGame.cpp:1116-1144	SaveGame.cpp:1091-1107		(`:1092-1097`), and the five checksums (`:1116-1144`). `swapBlock1` byte-swaps
 file	doc/PROVEN_FACTS.md:6409	SaveGame.cpp:714-758	SaveGame.cpp:706-750	no file named in its paragraph; or CSBCode.cpp:706, Viewport.cpp:706, CSB.h:706	scrambles the second half with word 29, which is 0, as its hash (`:714-758`). The reader's
 file	doc/PROVEN_FACTS.md:6422	SaveGame.cpp:2562-2570	SaveGame.cpp:2350-2358	no file named in its paragraph; or CSBCode.cpp:2350, Viewport.cpp:2350, CSB.h:2350	`dungeon.dat` (first word 33028) changes `Word22592`, to its word 3 (`:2562-2570`). A new
 file	doc/PROVEN_FACTS.md:6425	SaveGame.cpp:1734-1735	SaveGame.cpp:1610-1611	no file named in its paragraph; or CSBCode.cpp:1610, Viewport.cpp:1610, CSB.h:1610	(`:1728`, `:1734-1735`) and `Word22598` from its byte (`:2063-2064`); when `Byte22596` is 1,
 file	doc/PROVEN_FACTS.md:6428	SaveGame.cpp:2082-2085	SaveGame.cpp:1878-1881	no file named in its paragraph; or CSBCode.cpp:1878, Viewport.cpp:1878, CSB.h:1878	otherwise it copies all three words (`:2082-2085`). Every committed save holds 1, 2, 1
-changed	doc/PROVEN_FACTS.md:6437	Recording.cpp:1091-1114	Recording.cpp:1011-1019		open (`doc/CSBwin-src/Recording.cpp:1091-1114`, `doc/CSBwin-src/data.cpp:254`).
-changed	doc/PROVEN_FACTS.md:6439	Mouse.cpp:1547-1645	Mouse.cpp:1432-1506		the held-step test, button 80 excepted (`doc/CSBwin-src/Mouse.cpp:1547-1645`). Button 80
 file	doc/PROVEN_FACTS.md:6441	Mouse.cpp:1872	Mouse.cpp:1733	or data.cpp:1733	while the game is frozen (`:1872`, `:1901`), when the entry was discarded before this point.
 file	doc/PROVEN_FACTS.md:6441	Mouse.cpp:1901	Mouse.cpp:1762	or data.cpp:1762	while the game is frozen (`:1872`, `:1901`), when the entry was discarded before this point.
 file	doc/PROVEN_FACTS.md:6443	Mouse.cpp:702-705	Mouse.cpp:701-704	or data.cpp:701-704, Recording.cpp:701-704	throw from the hand records in `ThrowByCharacter`, which then returns 1 (`:702-705`, `:757`), after which the
 file	doc/PROVEN_FACTS.md:6443	Mouse.cpp:757	Mouse.cpp:756	or data.cpp:756, Recording.cpp:756	throw from the hand records in `ThrowByCharacter`, which then returns 1 (`:702-705`, `:757`), after which the
-changed	doc/PROVEN_FACTS.md:6446	Code13ea4.cpp:157-165	Code13ea4.cpp:149-153		The keyboard mode's entries are 0x4444 (`doc/CSBwin-src/Code13ea4.cpp:157-165`, `:240-248`) and a new
-changed	doc/PROVEN_FACTS.md:6446	Code13ea4.cpp:240-248	Code13ea4.cpp:228-232		The keyboard mode's entries are 0x4444 (`doc/CSBwin-src/Code13ea4.cpp:157-165`, `:240-248`) and a new
-changed	doc/PROVEN_FACTS.md:6447	SaveGame.cpp:1623-1635	SaveGame.cpp:1515-1520		game's is 0x3333 (`SaveGame.cpp:1623-1635`), neither of which counts. `totalMoveCount` is
-changed	doc/PROVEN_FACTS.md:6533	Character.cpp:2458-2462	Character.cpp:2453-2457		3. `+ word64 + shieldStrength + d.PartyShield` and the shields' term (`:2458-2462`);
 file	doc/PROVEN_FACTS.md:6534	Character.cpp:2468-2482	Character.cpp:2463-2477	no file named in its paragraph; or CSBCode.cpp:2463, Viewport.cpp:2463, CSB.h:2463	4. for a part above 1, the garment worn there (`:2468-2482`);
-changed	doc/PROVEN_FACTS.md:6575	DSA.cpp:2957-2999	DSA.cpp:2956-2998		`STKOP_ParamFetch` (`doc/CSBwin-src/DSA.cpp:2957-2999`) pops `i` and `n` as `ui32`. An `n`
-changed	doc/PROVEN_FACTS.md:6580	DSA.cpp:2976-2980	DSA.cpp:2975-2979		are marked `DVT_NonParameter` (`:2976-2980`) and keep their values, but any read of a
