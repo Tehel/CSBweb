@@ -195,7 +195,9 @@ function nameAttackOptions(ui: UIState): void {
 /**
  * `TAG01b1c0` (`doc/CSBwin-src/Character.cpp:4886`) — close the menu again, and ask for
  * the panel to be redrawn on the next tick. It draws nothing there, so the menu stays on
- * the screen until `TAG01b29a` draws the damage or the buttons over it.
+ * the screen until `TAG01b29a` draws the damage or the buttons over it. Its redraw of the
+ * attacker's hands is the frame's, which no longer boxes the weapon hand in cyan
+ * (`possessionBoxGraphic`).
  */
 export function closeAttackMenu(ui: UIState): void {
   if (ui.attackingCharacterOrdinal === 0) return;

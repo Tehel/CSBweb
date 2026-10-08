@@ -82,7 +82,7 @@ export function drawInventoryScreen(ui: UIState): void {
     }
     const rect = getInventorySlotRect(iconSlots, slot);
     if (!rect) continue;
-    const box = possessionBoxGraphic(champion, slot);
+    const box = possessionBoxGraphic(ui, selected, champion, slot);
     if (box !== -1) drawPossessionBox(ui, rect, box);
     if (objectIndex >= 0) {
       drawObjectIcon(ui, rect, objectIndex, word612);

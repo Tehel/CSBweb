@@ -94,7 +94,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C154 | The attacker's hand may keep its cyan border after a PASS or a zero-delay attack | S | ⏳ |
 | C155 | The Extended Features block's bits 0x100, 0x200 and 0x400 | S | ⏳ |
 | C156 | A champion's bones read "NAMEBONES"; CSBWin 20230608 puts a space between | S | ⏳ |
 | C159 | `&CELL@`'s pit, false wall and door bits leave their variable undefined in CSBWin | S | ⏳ |
@@ -117,7 +116,7 @@ In payoff order: the first row is the next item.
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G29 are the active list.
-C154-C157 are CSBWin's changes from 2016 to 2023 (see "CSBWin's changes from 2016 to
+C155-C157 are CSBWin's changes from 2016 to 2023 (see "CSBWin's changes from 2016 to
 2023" in tier C), taken first. `F3` is a phase, whose
 status is `PLAN.md`'s, and its row only marks its place. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
@@ -230,7 +229,7 @@ CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
 ### CSBWin's changes from 2016 to 2023
 
-C154-C156 are changes Paul Stevens made after the source the port follows and before the
+C155 and C156 are changes Paul Stevens made after the source the port follows and before the
 build the author plays. `doc/CSBwin-src/` is `CSBwin_SRC_20160923.zip` from
 dianneandpaul.net/CSBwin/, "Version 15.9" (`CSBwin.rc:322`), with the author's cosmetic
 edits in `CSBCode.cpp`, `RC4.cpp`, `SaveGame.cpp` and `Data.h`. 15.9 is a side branch of
@@ -250,17 +249,6 @@ Raspberry Pi front-ends. Two changes are not taken:
   (`TextOutToScreen_Centered`, `Attack.cpp:972-980`, `CSBCode.cpp:1785`), which puts them
   2 and 3 pixels right of the original's 242 and 248. It serves translations.
 - The utility's word-10 save form, whose adventure write is left `NotImplemented` (G28).
-
-### C154 ⏳ The attacker's hand may keep its cyan border after a PASS or a zero-delay attack
-
-`TAG01b1c0` redraws the attacker with `AttackingCharacterOrdinal` still set
-(`doc/CSBwin-src/Character.cpp:4886-4897`), and the hand is drawn with the cyan border
-when `chIdx + 1 == AttackingCharacterOrdinal`. CSBWin 20230608 decrements the ordinal first,
-so the redraw goes without it (`Character.cpp:4904-4923`; the reason in its comment). The
-port's `closeAttackMenu` draws nothing and lets the next draw do it
-(`src/renderer/ui/Attack.ts`), so it may not show the border at all. Paying it: check in
-play or with `probe-ui`. If the border stays, port 2023's order; if not, delete this
-entry. Size S.
 
 ### C155 ⏳ The Extended Features block's bits 0x100, 0x200 and 0x400
 
@@ -332,7 +320,7 @@ Size S.
 
 ### C157 ⏳ CSBWin 20230608 becomes the reference
 
-After C154-C156. Steps:
+After C155 and C156. Steps:
 
 1. **Swap the trees.** `doc/CSBwin-src-20230608/` replaces `doc/CSBwin-src/`, and
    `node tools/gen-csbwin-index.mjs` rebuilds `doc/CSBWIN_SYMBOL_INDEX.tsv`.

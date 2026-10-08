@@ -258,18 +258,27 @@ export function computeBarHeight(current: number, max: number, allowOverMax: boo
   return Math.min(25, Math.ceil((25 * current) / max));
 }
 
-/** The plain box, and the one that marks something wrong. */
+/** The plain box, the one that marks something wrong, and the attacker's cyan one. */
 export const BOX_GRAPHIC_PLAIN = 33;
 export const BOX_GRAPHIC_MARKED = 34;
+export const BOX_GRAPHIC_ATTACKING = 35;
 
 /**
  * `DrawCharacterPossession`'s `LOCAL_20` (`doc/CSBwin-src/Character.cpp:1150-1204`): the
  * box behind a body part, slots 0 to 5, marked while the part is wounded (`ouches`),
- * with an object in it or not. Every other slot has none, -1.
+ * with an object in it or not. Every other slot has none, -1. The weapon hand of the
+ * champion whose attack menu is open has the cyan box instead.
+ *
+ * The screen is composed from state each frame, so the cyan box goes the moment
+ * `TAG01b1c0` clears `d.AttackingCharacterOrdinal`, a PASS or an attack of no delay
+ * included: CSBWin 20230608's order, which clears it before its redraw
+ * (`doc/CSBwin-src-20230608/Character.cpp:4904-4923`).
  */
-export function possessionBoxGraphic(champion: Champion, slot: number): number {
-  if (slot > 5) return -1;
-  return (champion.wounds & (1 << slot)) !== 0 ? BOX_GRAPHIC_MARKED : BOX_GRAPHIC_PLAIN;
+export function possessionBoxGraphic(ui: UIState, chIdx: number, champion: Champion, slot: number): number {
+  let box = -1;
+  if (slot <= 5) box = (champion.wounds & (1 << slot)) !== 0 ? BOX_GRAPHIC_MARKED : BOX_GRAPHIC_PLAIN;
+  if (slot === 1 && chIdx + 1 === ui.attackingCharacterOrdinal) box = BOX_GRAPHIC_ATTACKING;
+  return box;
 }
 
 /**

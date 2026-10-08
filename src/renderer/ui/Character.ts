@@ -617,7 +617,7 @@ export function drawTopBarHandIcons(ui: UIState): void {
       if (!icon) continue;
 
       const rect = { x1: icon.pixelX, y1: icon.pixelY, x2: icon.pixelX + 15, y2: icon.pixelY + 15 };
-      drawPossessionBox(ui, rect, possessionBoxGraphic(champion, hand));
+      drawPossessionBox(ui, rect, possessionBoxGraphic(ui, chIdx, champion, hand));
       const held = champion ? getChampionPossession(champion, hand) : OBJECT_ID_NULL;
       const objectNameIndex = held === OBJECT_ID_NULL ? -1 : resolveObjectNameIndex(ui, held);
 

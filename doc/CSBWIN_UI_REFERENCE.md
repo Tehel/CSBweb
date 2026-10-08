@@ -70,7 +70,7 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 - `DrawItem` uses `IconDisplay.pixelX/pixelY` to create a 16x16 destination rect for each slot (`doc/CSBwin-src/Character.cpp:35`, `doc/CSBwin-src/Character.cpp:41`).
 - Slots < 8 draw into `d.LogicalScreenBase`, slots >= 8 draw into `d.pViewportBMP` (inventory view) (`doc/CSBwin-src/Character.cpp:61`, `doc/CSBwin-src/Character.cpp:71`).
 - `Word612[7]` selects the graphic group for object icons (`doc/CSBwin-src/Data.h:1454`, `doc/CSBwin-src/Character.cpp:48`).
-- Body part slots (0..5) draw an 18×18 frame before the icon using basic graphic `33` (healthy) or `34` (wounded), with rect expanded to `x-1..x+17` and transparency color `12` (`doc/CSBwin-src/Character.cpp:1147-1214`).
+- Body part slots (0..5) draw an 18×18 frame before the icon using basic graphic `33` (healthy) or `34` (wounded), with rect expanded to `x-1..x+17` and transparency color `12` (`doc/CSBwin-src/Character.cpp:1147-1214`), in the champion bar's hands as in the inventory. The weapon hand (slot 1) of the champion whose attack menu is open (`d.AttackingCharacterOrdinal`) has graphic `35`, the cyan box, instead (`:1202-1204`). CSBWin 20230608's `TAG01b1c0` clears the ordinal before it redraws the attacker, so the cyan box goes when the menu closes, after a PASS or an attack of no delay too (`doc/CSBwin-src-20230608/Character.cpp:4904-4923`); the 2016 source redraws first, and its comment says the box then stayed. `tools/dump-hand-boxes.ts` checks all three boxes.
 
 ## Chest view and slots
 

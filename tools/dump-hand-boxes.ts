@@ -3,8 +3,13 @@
  *
  * `DrawCharacterPossession` draws a box behind slots 0 to 5 before the icon, the graphic
  * it keeps in `LOCAL_20` (`doc/CSBwin-src/Character.cpp:1150-1216`): 34 while the part is
- * wounded, else 33. It does so for the two hands in the champion bar as for the six body
+ * wounded, else 33, and 35, the cyan box, for the weapon hand of the champion whose attack
+ * menu is open. It does so for the two hands in the champion bar as for the six body
  * parts of the open inventory, with an object in the slot or not.
+ *
+ * The cyan box goes as `TAG01b1c0` closes the menu, after a PASS or an attack, before the
+ * tick that draws the buttons over the menu: CSBWin 20230608 clears the ordinal before
+ * `TAG01b1c0`'s redraw so that it does (`doc/CSBwin-src-20230608/Character.cpp:4904-4923`).
  *
  * The screen is drawn with the real graphics; each slot's box is read back from the ring
  * of pixels around its icon and named by the graphic whose ring it is.
@@ -21,6 +26,7 @@ import { Party } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
+import { closeAttackMenu, executeAttack, prepareAttack, takeAttackOption } from '../src/renderer/ui/Attack';
 import { drawTopBarHandIcons } from '../src/renderer/ui/Character';
 import { drawPossessionBox } from '../src/renderer/ui/Draw';
 import { drawInventoryScreen, getInventorySlotRect } from '../src/renderer/ui/Inventory';
@@ -30,7 +36,7 @@ import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
 import { newUIState } from './lib/ui';
 
-const BOXES = [33, 34];
+const BOXES = [33, 34, 35];
 
 async function main(): Promise<void> {
   const loader = new DungeonLoader();
@@ -76,7 +82,7 @@ async function main(): Promise<void> {
     drawPossessionBox(ui, probe, box);
     rings.set(ring(screen.pixels, probe), box);
   }
-  check(rings.size === BOXES.length, 'graphics 33 and 34 have rings of their own');
+  check(rings.size === BOXES.length, 'graphics 33, 34 and 35 have rings of their own');
 
   function boxAt(pixels: Uint8Array, rect: Rect): string {
     return String(rings.get(ring(pixels, rect)) ?? 'none');
@@ -127,6 +133,28 @@ async function main(): Promise<void> {
     'the inventory marks the wounded parts');
   c0!.wounds = 0;
   check(show('all well', inventory(0)) === '33 33 33 33 33 33', 'and boxes every other one plainly');
+
+  console.log('');
+  console.log('=== the attack menu ===');
+  prepareAttack(ui, 0);
+  check(ui.attackingCharacterOrdinal === 1, "champion 1's menu is open");
+  check(show("champion 1's menu", bar()) === '33 35 33 33', 'the weapon hand of the attacker is boxed in cyan (:1202-1204)');
+  check(show("champion 1's inventory, menu open", inventory(0)) === '33 35 33 33 33 33',
+    'in the inventory too: D7W == 1 whichever screen the slot is on');
+  c0!.wounds = 0b10;
+  check(show('the attacking hand wounded', bar()) === '33 35 33 33', 'the cyan box wins over the wound');
+  c0!.wounds = 0;
+  executeAttack(ui, -1);
+  check(show('PASS, before the tick', bar()) === '33 33 33 33',
+    'a PASS takes the cyan box away at once (Character.cpp:4904-4923, 2023)');
+  prepareAttack(ui, 1);
+  check(show("champion 2's menu", bar()) === '33 33 33 35', "champion 2's menu boxes champion 2's hand");
+  takeAttackOption(ui, 0);
+  check(ui.attackingCharacterOrdinal === 0, 'the attack closed the menu');
+  check(show('attack, before the tick', bar()) === '33 33 33 33', 'and took the cyan box away');
+  prepareAttack(ui, 0);
+  closeAttackMenu(ui);
+  check(show('closed by TAG01b1c0 from elsewhere', bar()) === '33 33 33 33', 'any close does');
 
   finish();
 }
