@@ -78,7 +78,8 @@ does. The HTML controls beside the canvas are dev/debug affordances only.
 ```bash
 npm run dev            # Vite dev server on :9000
 npm run build          # tsc && vite build
-npm test               # the gate: tsc + every asserting tool  (~80s, DEBT.md F13)
+npm test               # the gate: tsc + every asserting tool  (~75s, a worker per core)
+npm test -- --only=dsa,save  # tsc + the tools whose name holds any of these
 npm test -- --frames   # …and the golden frames               (~40s more)
 npm start              # the deployed server, server/, over dist/  (Node >= 22.18)
 bash tools/check-image.sh  # the golden frames against the Docker image (Docker, ~2 min)

@@ -39,6 +39,11 @@ A tool is in the suite because it is listed in `tools/run-checks.mjs`. **Add you
 that list**, with the arguments the assertions were written for — several tools take a
 level, and the wrong level activates no monsters and quietly checks nothing.
 
+The runner keeps a worker per core busy and prints in the list's order. While working,
+`npm test -- --only=dsa,save` runs `tsc` and only the tools whose name holds any of the
+words; the whole suite still runs before the commit. `--jobs=1` runs one tool at a time,
+for a tool's own timing.
+
 ## Assertions
 
 Import the shared helper — do not hand-roll `check()`:

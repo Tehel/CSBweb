@@ -9,11 +9,17 @@
 //                                  dev server and a headless Chrome, which the script
 //                                  starts for itself).
 //
+// Gates 1 and 2 run in a pool of workers, one per core, and print in the lists' order.
+// The frames run after them, alone: a browser beside the pool would time out its waits.
+//
 // Usage:
-//   npm test                # gates 1 and 2   (~80s, one tool at a time: DEBT.md F13)
-//   npm test -- --frames    # all three       (adds ~40s and needs google-chrome)
-//   npm test -- --only=ai   # just the tools whose name contains "ai"
-import { spawnSync } from 'node:child_process';
+//   npm test                     # gates 1 and 2   (~75s on four cores)
+//   npm test -- --frames         # all three       (adds ~40s and needs google-chrome)
+//   npm test -- --only=ai        # just the tools whose name contains "ai" (and tsc)
+//   npm test -- --only=dsa,save  # …or any of several
+//   npm test -- --jobs=1         # one at a time; a tool's own time is then its own
+import { spawn, spawnSync } from 'node:child_process';
+import { availableParallelism } from 'node:os';
 import { existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -335,22 +341,30 @@ const SMOKE = [
 
 const argv = process.argv.slice(2);
 const withFrames = argv.includes('--frames');
-const only = argv.find((a) => a.startsWith('--only='))?.slice('--only='.length);
+const only = argv.find((a) => a.startsWith('--only='))?.slice('--only='.length).split(',').filter(Boolean);
+const jobsArg = argv.find((a) => a.startsWith('--jobs='))?.slice('--jobs='.length);
+const jobs = jobsArg ? Math.max(1, Number.parseInt(jobsArg, 10) || 1) : availableParallelism();
 
 const results = [];
 let failed = 0;
 
-function run(name, cmd, args, opts = {}) {
-  process.stdout.write(`  ${name.padEnd(34)}`);
-  const started = Date.now();
-  const r = spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts });
-  const ms = Date.now() - started;
-  const out = (r.stdout ?? '') + (r.stderr ?? '');
+function record(name, r, ms) {
   const ok = r.status === 0 && !r.error;
-  console.log(`${ok ? 'ok  ' : 'FAIL'}  ${String(ms).padStart(6)} ms`);
-  results.push({ name, ok, out, ms });
+  console.log(`  ${name.padEnd(34)}${ok ? 'ok  ' : 'FAIL'}  ${String(ms).padStart(6)} ms`);
+  results.push({ name, ok, out: (r.error ? `${r.error}\n` : '') + r.out, ms });
   if (!ok) failed++;
-  return ok;
+}
+
+function runAsync(cmd, args) {
+  return new Promise((done) => {
+    const started = Date.now();
+    const child = spawn(cmd, args, { cwd: ROOT });
+    const chunks = [];
+    child.stdout.on('data', (c) => chunks.push(c));
+    child.stderr.on('data', (c) => chunks.push(c));
+    child.on('error', (error) => done({ status: null, error, out: '', ms: Date.now() - started }));
+    child.on('close', (status) => done({ status, out: Buffer.concat(chunks).toString('utf8'), ms: Date.now() - started }));
+  });
 }
 
 if (!existsSync(TSX)) {
@@ -358,26 +372,52 @@ if (!existsSync(TSX)) {
   process.exit(1);
 }
 
-console.log('\ntypes');
-run('tsc --noEmit', TSC, ['--noEmit']);
-// The server as Node strips it: erasable syntax only (server/tsconfig.json).
-run('tsc --noEmit -p server', TSC, ['--noEmit', '-p', 'server']);
+const wanted = ({ tool }) => !only || only.some((o) => tool.includes(o));
+const tool = ({ tool, args = [] }) => ({ name: tool, cmd: TSX, args: [resolve(ROOT, 'tools', tool), ...args] });
+const sections = [
+  ['types', [
+    { name: 'tsc --noEmit', cmd: TSC, args: ['--noEmit'] },
+    // The server as Node strips it: erasable syntax only (server/tsconfig.json).
+    { name: 'tsc --noEmit -p server', cmd: TSC, args: ['--noEmit', '-p', 'server'] },
+  ]],
+  ['checks', CHECKS.filter(wanted).map(tool)],
+  ['smoke (crash only)', SMOKE.filter(wanted).map(tool)],
+];
 
-console.log('\nchecks');
-for (const { tool, args = [] } of CHECKS) {
-  if (only && !tool.includes(only)) continue;
-  run(tool, TSX, [resolve(ROOT, 'tools', tool), ...args]);
+// Every job starts as soon as a worker is free; each result prints once the jobs listed
+// before it have printed, so the output reads in the lists' order whatever finished first.
+const started = Date.now();
+const pending = sections.flatMap(([, list]) => list).map((job) => ({ job, result: null }));
+let next = 0;
+let printed = 0;
+let section = 0;
+let sectionEnd = 0;
+function flush() {
+  while (printed < pending.length && pending[printed].result) {
+    while (printed === sectionEnd) {
+      const [title, list] = sections[section++];
+      console.log(`\n${title}`);
+      sectionEnd += list.length;
+    }
+    const { job, result } = pending[printed++];
+    record(job.name, result, result.ms);
+  }
 }
-
-console.log('\nsmoke (crash only)');
-for (const { tool, args = [] } of SMOKE) {
-  if (only && !tool.includes(only)) continue;
-  run(tool, TSX, [resolve(ROOT, 'tools', tool), ...args]);
+async function worker() {
+  while (next < pending.length) {
+    const slot = pending[next++];
+    slot.result = await runAsync(slot.job.cmd, slot.job.args);
+    flush();
+  }
 }
+await Promise.all(Array.from({ length: Math.min(jobs, pending.length) }, worker));
+for (; section < sections.length; section++) console.log(`\n${sections[section][0]}`);
 
 if (withFrames) {
   console.log('\nframes');
-  run('check-frames.sh', 'bash', [resolve(ROOT, 'tools/check-frames.sh')]);
+  const t = Date.now();
+  const r = spawnSync('bash', [resolve(ROOT, 'tools/check-frames.sh')], { cwd: ROOT, encoding: 'utf8' });
+  record('check-frames.sh', { status: r.status, error: r.error, out: (r.stdout ?? '') + (r.stderr ?? '') }, Date.now() - t);
 } else {
   console.log('\nframes                                skipped (pass --frames)');
 }
@@ -389,6 +429,7 @@ for (const r of results.filter((x) => !x.ok)) {
   console.log(r.out.trimEnd());
 }
 
-const total = results.reduce((a, r) => a + r.ms, 0);
-console.log(`\n${results.length - failed}/${results.length} passed in ${(total / 1000).toFixed(1)}s`);
+const wall = (Date.now() - started) / 1000;
+const total = results.reduce((a, r) => a + r.ms, 0) / 1000;
+console.log(`\n${results.length - failed}/${results.length} passed in ${wall.toFixed(1)}s (${total.toFixed(1)}s of work, ${jobs} at a time)`);
 process.exit(failed === 0 ? 0 : 1);

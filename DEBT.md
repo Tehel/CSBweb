@@ -99,7 +99,6 @@ In payoff order: the first row is the next item.
 | G28 | The utility's untried form: a `mini.dat` with an Extended Features block | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
-| F13 | `npm test` runs its tools one at a time | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C145 | The Hint Oracle's title boxes keep colour 12 on their last line and a half | S | ⏸️ waits on the author |
@@ -338,14 +337,6 @@ Paying it: `tools/lib` helpers for the stock dungeon and a test champion, beside
 legitimately drive, the input gate's clock (`lastInputTime`) and a tick (a VBL is
 `runFrame`, and `runVbl` sets its count); then the casts go,
 one tool per commit, each tool's output byte-identical.
-
-### F13 ⏳ `npm test` runs its tools one at a time
-
-`tools/run-checks.mjs` spawns its 184 checks sequentially (`spawnSync`, `:346`), each a
-`tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
-and the runner's header give). Most sessions run it several times. Paying it means a pool
-of workers the size of the machine, the output still printed in the list's order, and
-those timings updated.
 
 ---
 
