@@ -290,7 +290,7 @@ async function main(): Promise<void> {
   // the VBL sets it again on the next VBL, since `vblCount` is still `>= d.Speed`
   // (`:1076-1087`), so the tick runs one frame later.
   /** `d.LoadedLevel`'s party half: the level whose groups `LoadPartyLevel` attached. */
-  const loadedLevel = (): number | null => (game.systems.monsters as unknown as { loadedLevel: number | null }).loadedLevel;
+  const loadedLevel = (): number | null => game.systems.monsters.getLoadedLevel();
   let discard: {
     wallQueue: number; tickHeld: boolean; tickNextFrame: boolean; facingKept: boolean;
     monsterQueue: number; turnQueue: number;

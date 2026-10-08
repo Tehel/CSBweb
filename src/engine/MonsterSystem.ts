@@ -102,6 +102,11 @@ export class MonsterSystem {
    */
   private loadedLevel: number | null = null;
 
+  /** The same level, read; public so that `tools/` can see a level change land. */
+  getLoadedLevel(): number | null {
+    return this.loadedLevel;
+  }
+
   private readonly dungeon: DungeonState;
   private readonly timers: TimerQueue;
   private readonly random: CsbRandom;
