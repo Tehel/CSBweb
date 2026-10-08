@@ -96,9 +96,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E15 | The page shell | L | ⏳ with the page redesign |
-| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | L | ⏳ step 2 of 6 |
+| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | L | ⏳ step 3 of 6 |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
+| E15 | The page shell | L | ⏳ with the page redesign |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C145 | The Hint Oracle's title boxes keep colour 12 on their last line and a half | S | ⏸️ waits on the author |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
@@ -239,26 +239,26 @@ builds around them is its own:
 - 40 tools spell out `addCharacterDefaults()`, most inside a champion-building function
   of their own; 145 construct a `DungeonLoader`, most to read `dm-atari/dungeon.dat`.
 - 6 tools stand in for an engine call the UI makes by assigning over the system's method
-  (`executeAttack`, `castSpellFromUi`, `consumeAttackDamageToDisplay`, `reincarnateNamed`), which nothing
-  types as a stand-in or puts back. Two more hang a stand-in on `Game` itself:
-  `dump-hall-of-champions` stores its messages in a property `Game` does not have, and
-  `dump-game-events` replaces `reincarnating`. 31 tools extract the UI tables again
-  (`graphicsTablesOf(…).ui`) beside the `UIState` that `tools/lib/ui.ts` builds them into.
-- 27 tools make 53 `as unknown as` casts: into the systems' private members
-  (`DsaSystem`'s `teleportParty`,
-  `wiggleEverything`, `stepOrDefer`, `climbDownIntoPit`, `castMagic`, `dispatch`,
-  `dropMissileObject`, …), and to pass partial `UIState` literals (1, in 1 tool); 9
-  more tools reach privates through `as any` (`moveObjectDsa`, `performLocalAction`,
+  (`executeAttack`, `castSpellFromUi`, `consumeAttackDamageToDisplay`,
+  `reincarnateNamed`), which nothing types as a stand-in or puts back. Two more hang a
+  stand-in on `Game` itself: `dump-hall-of-champions` stores its messages in a property
+  `Game` does not have, and `dump-game-events` replaces `reincarnating`. 31 tools extract
+  the UI tables again (`graphicsTablesOf(…).ui`) beside the `UIState` that
+  `tools/lib/ui.ts` builds them into.
+- 26 tools make 52 `as unknown as` casts, into the systems' private members
+  (`DsaSystem`'s `teleportParty`, `wiggleEverything`, `stepOrDefer`, `climbDownIntoPit`,
+  `castMagic`, `dispatch`, `dropMissileObject`, …) or to build a partial record; 9 more
+  tools reach privates through `as any` (`moveObjectDsa`, `performLocalAction`,
   `doesPartyHave`, `getMissileRecord`, …). `tsc` checks none of them. A renamed member
   leaves the tool compiling, and a write to it then sets a new property: the tool goes on
   passing while testing nothing.
 
 Paid in six steps, each tool's whole output byte-identical across every commit
-("How to work this list", point 3). Step 1 is done: `Game`'s seam for the tools is
-public, `gameTick` and `lastInputTime` beside `runFrame`, and no tool casts into `Game`.
+("How to work this list", point 3). Steps 1 and 2 are done: `Game`'s seam for the tools
+is public, `gameTick` and `lastInputTime` beside `runFrame`, and no tool casts into
+`Game`; every `UIState` a tool drives is `newUIState`'s (`tools/lib/ui.ts`), whose
+context a tool stages by assigning its fields.
 
-2. **The partial `UIState` literals** go to `newUIState` (`tools/lib/ui.ts`), or to the
-   tables it holds, one tool per commit. Left: `dump-sleep`.
 3. **Other systems' privates.** Each private a tool drives either becomes public, with
    the reason in its comment, or the tool reaches it through the public path the engine
    uses. One system per commit.
