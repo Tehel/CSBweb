@@ -258,6 +258,16 @@ back (`:3108-3154`). `SetCursorShape(0)` clears `d.Word23146`, the object cursor
 and sets `d.CursorShape` to 0, the arrow (`CSBCode.cpp:1963-1972`), and the cursor draw
 takes the arrow for both (`CSBCode.cpp:2254-2255`).
 
+The arrow lasts only until the cursor is set from the hand again, and `TAG0207cc` is not
+the only thing that does it. `RemoveObjectFromHand` calls `TAG002572` (`Mouse.cpp:636`),
+and `ObjectToCursor` with its second argument 0 calls `CreateObjectCursor`
+(`CSBCode.cpp:6864-6871`), which sets `d.Word23146` again (`:1976-1984`). Both run under the
+Hall of Champions' `TAG02076e`, whose candidate's inventory takes clicks:
+`HandleClothingClick` empties the hand with the first and fills it with
+`ObjectToCursor(objD4, 0)` (`:6974-6992`), and feeding empties it with the first
+(`Character.cpp:4480`). So an object taken from the candidate's inventory is on the cursor,
+and the three areas stay shaded.
+
 `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934-9968`) is the mirror, called on the way out
 (`SaveGame.cpp:1274`, and at `:854` after "SAVES ARE DISABLED", which skipped
 `TAG02076e`), at the thaw (`Mouse.cpp:1765`), last in `WakeUp` (`CSBCode.cpp:7061`), and
@@ -279,9 +289,12 @@ calls around its full screen and not its load-only one, the freeze around its fr
 and the sleep click before the engine's `sleep`. The engine's callers, `wakeUp` and
 `HallOfChampions`, reach them through `GameHost`'s `tag02076e` and `tag0207cc`. The redraws are the frame's: `tag02076e` sets `UIState.shadedByTag02076e` and
 `tag0207cc` clears it, and while it is set `GameScreen.presentViewport` shades the three
-areas and `drawCursorItem` draws the arrow. No inventory is drawn while the menu is up.
+areas. The arrow is `UIState.arrowCursorShape`, which `tag02076e` sets and `tag002572` clears
+(`tag0207cc`, `handleClothingClick` and the feeding call it); while it is set
+`drawCursorItem` draws the arrow. No inventory is drawn while the menu is up.
 Evidence: `tools/dump-save-menu.ts`, "the disk menu over an open chest";
-`tools/dump-sleep.ts` and `tools/dump-hall-of-champions.ts` for the other callers.
+`tools/dump-sleep.ts` and `tools/dump-hall-of-champions.ts` for the other callers, the
+latter also for the candidate's object on the cursor.
 
 
 ## What the disk menu itself does

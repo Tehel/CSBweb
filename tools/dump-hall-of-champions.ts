@@ -39,6 +39,8 @@ import { attackButtonRect, drawAttackButton } from '../src/renderer/ui/Attack';
 import { ImageFormat } from '../src/core/imageDecoder';
 import { graphicsTablesOf, newGame, presetHeroesOfGame } from './lib/game';
 import { newUIState } from './lib/ui';
+import { drawCursorItem, handleClothingClick, tag02076e, tag0207cc } from '../src/renderer/ui/Mouse';
+import type { UIState } from '../src/renderer/ui/UIState';
 import { check, fail, finish } from './lib/check';
 
 const DELTA_X = [0, 1, 0, -1];
@@ -57,6 +59,8 @@ let reincarnateScreen: (chIdx: number) => void = () => {};
  * inventory open at the time (`selectedCharacterIndex`) and the party's size.
  */
 const pairCalls: string[] = [];
+/** A screen the games' pair runs on as well, `tag02076e` / `tag0207cc`, when a scenario sets it. */
+let pairUi: UIState | null = null;
 
 function makeGame(): Game {
   const loader = new DungeonLoader();
@@ -95,8 +99,8 @@ function gameOn(data: DungeonData, graphics: GraphicsLoader): Game {
       discardText: () => {},
     },
     openReincarnateScreen: (chIdx) => reincarnateScreen(chIdx),
-    tag02076e: () => pairCalls.push(pairCall(game, 'TAG02076e')),
-    tag0207cc: () => pairCalls.push(pairCall(game, 'TAG0207cc')),
+    tag02076e: () => { pairCalls.push(pairCall(game, 'TAG02076e')); if (pairUi) tag02076e(pairUi); },
+    tag0207cc: () => { pairCalls.push(pairCall(game, 'TAG0207cc')); if (pairUi) tag0207cc(pairUi); },
   });
   game.setRandomSeed(0x12345678);
   (game as unknown as { probeMessages: typeof messages }).probeMessages = messages;
@@ -782,6 +786,51 @@ function portraitSection(): void {
     console.log(`${turned.name}: party facing ${at.facing}, facing3 ${added?.damageFromDirection}`);
     check(added !== undefined && added.damageFromDirection === at.facing,
       `${turned.name}'s facing3 starts as the party's facing, ${at.facing} (Character.cpp:531)`);
+  }
+
+  /* --------------------------------------- the candidate's objects on the cursor ---- */
+
+  // `TAG02076e` puts up the arrow, `SetCursorShape(0)` (`doc/CSBwin-src/Character.cpp:5133`),
+  // but an object taken from the candidate's inventory goes on the cursor all the same:
+  // `HandleClothingClick`'s `ObjectToCursor(objD4, 0)` makes its cursor at once
+  // (`CSBCode.cpp:6992`, `:6864-6871`), and putting it back, `RemoveObjectFromHand`, sets
+  // the cursor from the hand (`Mouse.cpp:636`, `TAG002572`). The shading stays.
+  {
+    const g = makeGame();
+    const hero = heroByName(g, 'HALK');
+    standAtMirror(g, hero);
+    const ui = newUIState(sharedGraphics!, g.ctx);
+    ui.partyState = g.ctx.party.state;
+    pairUi = ui;
+    g.systems.mouse.handleWallClick();
+    const candidate = g.ctx.party.state.champions[0]!;
+    const slot = candidate.possessions.findIndex((rn) => rn !== OBJECT_ID_NULL);
+    // A point of the viewport, in the zone where the cursor takes its shape from the hand.
+    ui.hoverPoint = { x: 100, y: 80 };
+    const cursorPixels = (): string => {
+      ui.screenIndexBuffer.pixels.fill(0);
+      drawCursorItem(ui, false);
+      return Array.from(ui.screenIndexBuffer.pixels).join();
+    };
+    const arrow = cursorPixels();
+    const arrowUp = ui.arrowCursorShape;
+    handleClothingClick(ui, 8 + slot);
+    const held = g.ctx.party.state.objectInHand;
+    const withObject = cursorPixels();
+    const arrowAfterPick = ui.arrowCursorShape;
+    const shadedAfterPick = ui.shadedByTag02076e;
+    handleClothingClick(ui, 8 + slot);
+    const putBack = g.ctx.party.state.objectInHand === OBJECT_ID_NULL && candidate.possessions[slot] === held;
+    const empty = cursorPixels();
+    console.log(`HALK's slot ${slot}: arrow after TAG02076e ${arrowUp}; taken ${held !== OBJECT_ID_NULL}, ` +
+      `cursor ${withObject === arrow ? 'the arrow' : 'changed'}; put back ${putBack}, cursor ${empty === arrow ? 'the arrow' : 'from the hand'}`);
+    check(arrowUp, "TAG02076e's SetCursorShape(0) puts up the arrow (Character.cpp:5133)");
+    check(held !== OBJECT_ID_NULL && !arrowAfterPick && withObject !== arrow,
+      "an object taken from the candidate's inventory is on the cursor (ObjectToCursor, CSBCode.cpp:6992)");
+    check(shadedAfterPick, 'and the movement, magic and weapon-ready areas stay shaded');
+    check(putBack && empty !== withObject, 'put back, the cursor is set from the empty hand (RemoveObjectFromHand, TAG002572)');
+    g.systems.hallOfChampions.resurrectReincarnateCancel(CANCEL);
+    pairUi = null;
   }
 
   /* ------------------------------------------------ CSB's prison, every mirror ---- */

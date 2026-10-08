@@ -422,6 +422,7 @@ export class GameScreen {
     // Nor does a champion in hand (`d.Word23144 = 0`, `doc/CSBwin-src/CSBCode.cpp:10485`).
     if (state !== this.ui.partyState) {
       this.ui.shadedByTag02076e = false;
+      this.ui.arrowCursorShape = false;
       this.ui.word23144 = 0;
     }
     this.ui.partyState = state;

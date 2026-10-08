@@ -15,7 +15,7 @@ import { DBType, OBJECT_ID_NULL, ObjectID, locationRelToInteger } from '../../co
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
 import { descIndexForObject, resolveObjectNameIndex } from './Objects';
-import { UIState, nowMs, stHideCursor } from './UIState';
+import { UIState, nowMs, stHideCursor, tag002572 } from './UIState';
 
 /** The swallow, sound ordinal 8 (`fp.gulp = 8`, `doc/CSBwin-src/Character.cpp:4111`). */
 const SOUND_GULP = 8;
@@ -154,7 +154,9 @@ export function handleMouthPress(ui: UIState): void {
     if (inHand !== OBJECT_ID_NULL) {
       ui.ctx.systems.dsa.cursorFilter({ object: inHand, type: CursorFilterType.Eat, p1: 0, p2: 0, p3: 0, p4: 0 });
     }
+    // `RemoveObjectFromHand()` (`:4480`), and its `TAG002572`.
     ui.partyState.objectInHand = OBJECT_ID_NULL;
+    tag002572(ui);
     ui.ctx.dungeon.deleteDBEntry(objectId as ObjectID);
   }
 

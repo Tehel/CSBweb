@@ -20,7 +20,7 @@ import { handleMagicClick } from './MagicPanel';
 import { drawLegalAttackTypes, handleAttackAreaClick } from './Attack';
 import { isChestRecord, resolveObjectNameIndex } from './Objects';
 import { OBJECT_ID_NULL } from '../../core/types';
-import { UIMode, UIState, stHideCursor, stShowCursor } from './UIState';
+import { UIMode, UIState, stHideCursor, stShowCursor, tag002572 } from './UIState';
 import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
 import { characterAtPosition } from '../../engine/AddCharacter';
@@ -373,7 +373,8 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
  * (`d.DisplayResurrectChestOrScroll == 4`) has it repacked (`:5116-5125`), so the save
  * finds the chest's objects in the chest. Asleep, it does nothing (`:5111`). The drawing
  * half is `shadedByTag02076e`, which `GameScreen.presentViewport` reads for the three
- * shaded areas and `drawCursorItem` for the arrow cursor of `SetCursorShape(0)` (`:5133`).
+ * shaded areas, and `arrowCursorShape`, which `drawCursorItem` reads for the arrow cursor of
+ * `SetCursorShape(0)` (`:5133`).
  */
 export function tag02076e(ui: UIState): void {
   const party = ui.partyState;
@@ -382,6 +383,7 @@ export function tag02076e(ui: UIState): void {
   waitForButtonFlash(ui.ctx);
   if (party.selectedCharacterIndex >= 0 && ui.displayResurrectChestOrScroll === 4) repackOpenChest(ui);
   ui.shadedByTag02076e = true;
+  ui.arrowCursorShape = true;
 }
 
 /**
@@ -412,6 +414,7 @@ export function tag0207cc(ui: UIState): void {
     ui.ctx.loop.videoMode = 'VM_ADVENTURE';
     handleInventoryToggle(ui, selected);
   }
+  tag002572(ui); // `:9965`
 }
 
 export function syncInventoryButtons(ui: UIState): void {
@@ -470,6 +473,9 @@ export function handleClothingClick(ui: UIState, button: number): void {
   // slot is `d.rnChestContents`, which is ours, and all the pair does past slot 29 is
   // write it (`CharacterSystem.removeCharacterPossession`).
   const character = ui.ctx.systems.character;
+  // `RemoveObjectFromHand` and `ObjectToCursor(objD4, 0)` each set the cursor from the hand
+  // (`:6976-6992`), whichever runs.
+  tag002572(ui);
   if (objectInHand !== OBJECT_ID_NULL) {
     ui.partyState.objectInHand = OBJECT_ID_NULL;
   }
@@ -647,9 +653,9 @@ export function drawCursorItem(ui: UIState, dynamicPaletteSwitching: boolean): v
     drawMarchingOrderCursor(ui, Math.floor(ui.hoverPoint.x), Math.floor(ui.hoverPoint.y), dynamicPaletteSwitching);
     return;
   }
-  if (ui.shadedByTag02076e) {
-    // `tag02076e`'s `SetCursorShape(0)`: the arrow, and no object, until `TAG0207cc`'s
-    // `TAG002572` (`doc/CSBwin-src/CSBCode.cpp:2030`) sets the cursor from the hand again.
+  if (ui.arrowCursorShape) {
+    // `tag02076e`'s `SetCursorShape(0)`: the arrow, and no object, until a `TAG002572`
+    // (`doc/CSBwin-src/CSBCode.cpp:2030`) sets the cursor from the hand again.
     const arrow = getCursorArrowBitmap(ui);
     if (arrow) drawCursorBitmap(ui, arrow, Math.floor(ui.hoverPoint.x), Math.floor(ui.hoverPoint.y), 12);
     return;

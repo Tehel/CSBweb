@@ -73,13 +73,20 @@ export interface UIState {
   modeBeforeFreeze: UIMode;
   /**
    * `TAG02076e` has run and `TAG0207cc` has not: the movement-arrow, magic and weapon-ready
-   * areas stay shaded, and `SetCursorShape(0)` keeps the arrow cursor
-   * (`doc/CSBwin-src/Character.cpp:5118-5133`) until `TAG0207cc` redraws the areas and
-   * its `TAG002572` sets the cursor from the hand again (`CSBCode.cpp:9934-9966`). CSBWin
-   * draws these once and the screen holds them; this port redraws every frame, so it
-   * keeps the state.
+   * areas stay shaded (`doc/CSBwin-src/Character.cpp:5118-5132`) until `TAG0207cc` redraws
+   * them (`CSBCode.cpp:9934-9966`). CSBWin draws these once and the screen holds them;
+   * this port redraws every frame, so it keeps the state.
    */
   shadedByTag02076e: boolean;
+  /**
+   * `SetCursorShape(0)`, the arrow, is the cursor: `TAG02076e` set it
+   * (`doc/CSBwin-src/Character.cpp:5133`), and nothing has set the cursor from the hand
+   * since. `TAG002572` does (`CSBCode.cpp:2030-2051`): `TAG0207cc`'s (`:9965`) and
+   * `RemoveObjectFromHand`'s (`Mouse.cpp:636`), and so does `ObjectToCursor`'s
+   * `CreateObjectCursor` (`CSBCode.cpp:6864-6871`). An object moved in a Hall of Champions
+   * candidate's inventory is therefore on the cursor, under the shading (`tag002572`).
+   */
+  arrowCursorShape: boolean;
 
   /* ---- interaction state ---- */
   /**
@@ -313,7 +320,7 @@ export interface UIState {
 
 /** The fields of `UIState` that a game in play sets, and a restart clears. */
 type PlayState = Pick<UIState,
-  | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'reincarnate' | 'diskMenuNeeded' | 'hintOracleNeeded' | 'sleepSaveNeeded'
+  | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'arrowCursorShape' | 'reincarnate' | 'diskMenuNeeded' | 'hintOracleNeeded' | 'sleepSaveNeeded'
   | 'pressingEye' | 'pressingMouth' | 'describedObject' | 'weaponHandScroll' | 'word23144' | 'word23118' | 'pointer23178' | 'pointer23182'
   | 'attackingCharacterOrdinal' | 'possibleAttackTypes' | 'byte20256' | 'word20248'
   | 'word20250' | 'word20252' | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
@@ -330,6 +337,7 @@ function initialPlayState(): PlayState {
     uiMode: UIMode.Adventure,
     modeBeforeFreeze: UIMode.Adventure,
     shadedByTag02076e: false,
+    arrowCursorShape: false,
     reincarnate: null,
     diskMenuNeeded: false,
     hintOracleNeeded: false,
@@ -408,6 +416,18 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
 
     ...hooks,
   };
+}
+
+/**
+ * `TAG002572` (`doc/CSBwin-src/CSBCode.cpp:2030-2051`): the cursor set from the hand, the
+ * hand or the arrow for an empty one, the object's cursor for a full one. The port draws
+ * those from the hand every frame (`drawCursorItem`), so what is left of it is the end of
+ * the arrow `TAG02076e`'s `SetCursorShape(0)` put up. `RemoveObjectFromHand` calls it
+ * (`Mouse.cpp:636`), and `ObjectToCursor`'s `CreateObjectCursor` has the same effect
+ * (`CSBCode.cpp:6864-6871`, `:1976-1984`).
+ */
+export function tag002572(ui: UIState): void {
+  ui.arrowCursorShape = false;
 }
 
 /**
