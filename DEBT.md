@@ -97,7 +97,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | E15 | The page shell | L | ⏳ with the page redesign |
-| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
+| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | L | ⏳ step 1 of 6 |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C145 | The Hint Oracle's title boxes keep colour 12 on their last line and a half | S | ⏸️ waits on the author |
@@ -236,28 +236,42 @@ The table-extraction round-trip checks are a live phase, so they stay in `PLAN.m
 `tools/lib/game.ts` gives every tool the same `Game` and tables (`E1a`). What each tool
 builds around them is its own:
 
-- 35 tools define a champion-building function of their own, and 38 spell out
-  `addCharacterDefaults()`; 106 construct a `DungeonLoader` and 85 read
-  `dm-atari/dungeon.dat` themselves.
+- 40 tools spell out `addCharacterDefaults()`, most inside a champion-building function
+  of their own; 145 construct a `DungeonLoader`, most to read `dm-atari/dungeon.dat`.
 - 5 tools stand in for an engine call the UI makes by assigning over the system's method
   (`executeAttack`, `castSpellFromUi`, `consumeAttackDamageToDisplay`), which nothing
-  types as a stand-in or puts back; 28 extract the UI tables again
-  (`graphicsTablesOf(…).ui`) beside the `UIState` that `tools/lib/ui.ts` builds them
-  into.
-- 33 tools make 72 `as unknown as` casts: into `Game`'s private members (`lastInputTime`,
-  5; `gameTick`, 6), into other systems' (`DsaSystem`'s
-  `teleportParty` and `findCharacterSource`, `wiggleEverything`, `stepOrDefer`,
-  `climbDownIntoPit`, …), and to pass partial `UIState` literals (17); three more reach
-  `DsaSystem`'s privates through `as any` (`moveObjectDsa`, `executeAmpersand`). `tsc`
-  checks none of them. A renamed member leaves the tool compiling, and a write to it then
-  sets a new property: a tool that pins `lastInputTime` would go on passing while testing
-  nothing.
+  types as a stand-in or puts back. Two more hang a stand-in on `Game` itself:
+  `dump-hall-of-champions` stores its messages in a property `Game` does not have, and
+  `dump-game-events` replaces `reincarnating`. 32 tools extract the UI tables again
+  (`graphicsTablesOf(…).ui`) beside the `UIState` that `tools/lib/ui.ts` builds them into.
+- 37 tools make 79 `as unknown as` casts: into `Game`'s private members (`lastInputTime`,
+  5 tools; `gameTick`, 6), into other systems' (`DsaSystem`'s `teleportParty`,
+  `wiggleEverything`, `stepOrDefer`, `climbDownIntoPit`, `castMagic`, `dispatch`,
+  `dropMissileObject`, …), and to pass partial `UIState` literals (16, in 7 tools); 9
+  more tools reach privates through `as any` (`moveObjectDsa`, `performLocalAction`,
+  `doesPartyHave`, `getMissileRecord`, …). `tsc` checks none of them. A renamed member
+  leaves the tool compiling, and a write to it then sets a new property: a tool that pins
+  `lastInputTime` would go on passing while testing nothing.
 
-Paying it: `tools/lib` helpers for the stock dungeon and a test champion, beside
-`newUIState` (`tools/lib/ui.ts`), which the 17 partial `UIState` literals move to; a narrow public seam for what the tools
-legitimately drive, the input gate's clock (`lastInputTime`) and a tick (a VBL is
-`runFrame`, and `runVbl` sets its count); then the casts go,
-one tool per commit, each tool's output byte-identical.
+Paid in six steps, each tool's whole output byte-identical across every commit
+("How to work this list", point 3):
+
+1. **`Game`'s seam.** `gameTick` and `lastInputTime` become public members, documented
+   as what the tools drive (a VBL is already `runFrame`, and `runVbl` sets its count),
+   and the tools that cast into them name them. One commit.
+2. **The partial `UIState` literals** go to `newUIState` (`tools/lib/ui.ts`), or to the
+   tables it holds, one tool per commit.
+3. **Other systems' privates.** Each private a tool drives either becomes public, with
+   the reason in its comment, or the tool reaches it through the public path the engine
+   uses. One system per commit.
+4. **The stand-ins**: a `tools/lib` helper that replaces a member with a typed stand-in
+   and puts it back, for the five method stand-ins and `Game`'s two. One commit.
+5. **The stock dungeon and a test champion** as `tools/lib` helpers, and the tools moved
+   to them, a few tools per commit.
+6. **What is left**: every remaining cast either goes, or builds a stand-in value the
+   tool cannot type otherwise (a partial record, a fake `ImageData`), with a comment that
+   says so. The item is paid when no tool reaches a private through a cast and no `as any`
+   is left.
 
 ---
 
