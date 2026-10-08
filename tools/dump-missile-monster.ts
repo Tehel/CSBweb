@@ -405,10 +405,7 @@ function main(): void {
       xDistance: 0, yDistance: 1, attackDistance: 1, timerFunction: TimerFunction.TT_MONSTER_B0,
       fearFactorIs6: false, processingATimer: true, mmr: new MmRecord(),
     };
-    const ai = game.ctx.systems.monsterAI as unknown as {
-      sidestepBeforeMeleeing(frame: AiFrame, c: AiConst, member: number, preferredDirection: number): boolean;
-    };
-    const turnOver = ai.sidestepBeforeMeleeing(frame, c, 0, 0);
+    const turnOver = game.ctx.systems.monsterAI.sidestepBeforeMeleeing(frame, c, 0, 0);
     console.log(`result ${encounter.monsterDamageResult}, members left ${(group.numMonM1 & 3) + 1}, ` +
       `positions after the encounter ${leftByEncounter}, after the sidestep ${slot.positions}`);
     check(turnOver, 'the sidestep ends the turn');
@@ -447,9 +444,7 @@ function main(): void {
       xDistance: 0, yDistance: 1, attackDistance: 0, timerFunction: TimerFunction.TT_MONSTER_B0,
       fearFactorIs6: false, processingATimer: true, mmr: new MmRecord(),
     };
-    const ai = game.ctx.systems.monsterAI as unknown as {
-      checkMonsterVersusMissiles(c: AiConst): boolean;
-    };
+    const ai = game.ctx.systems.monsterAI;
     const log = spy(game);
     // `objD6.pos() != position` (Monster.cpp:4491): RN::pos() is 0-3, so only a byte whose
     // bits 2-7 are all 0 can equal it. 255 is a centred lone monster, as the shuffle at

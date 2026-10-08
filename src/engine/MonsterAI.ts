@@ -634,8 +634,10 @@ export class MonsterAI {
    * A monster about to melee that is standing in the wrong corner shifts sideways
    * first (`doc/CSBwin-src/Monster.cpp:3939-4013`). Returns true when it did, in
    * which case the turn is over.
+   *
+   * Public so that `tools/` can sidestep a group an encounter has just thinned.
    */
-  private sidestepBeforeMeleeing(
+  sidestepBeforeMeleeing(
     frame: AiFrame,
     c: AiConst,
     member: number,
@@ -1172,8 +1174,10 @@ export class MonsterAI {
    * note that not enough time has passed and let the caller reschedule.
    *
    * Returns false when the group left the dungeon and the turn must end immediately.
+   *
+   * Public so that `tools/` can take an AI step onto a square of its choosing.
    */
-  private stepOrDefer(frame: AiFrame, c: AiConst, newX: number, newY: number): boolean {
+  stepOrDefer(frame: AiFrame, c: AiConst, newX: number, newY: number): boolean {
     const remaining = frame.timePerMove / 2 - frame.sinceLastUpdate;
     frame.bool36 = remaining <= 0;
     if (!frame.bool36) {
@@ -1231,8 +1235,10 @@ export class MonsterAI {
    * Returns true when that wiped out the group, in which case the turn ends. The
    * encounter leaves `d.MonsterDamageResult` in `MissileEncounter.monsterDamageResult`,
    * where the caller reads it.
+   *
+   * Public so that `tools/` can run the scan against a positions byte of its choosing.
    */
-  private checkMonsterVersusMissiles(c: AiConst): boolean {
+  checkMonsterVersusMissiles(c: AiConst): boolean {
     const encounter = this.ctx.systems.missileEncounter;
     const { mapX, mapY, level } = c;
     const position = c.slot.positions;

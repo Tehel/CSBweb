@@ -153,8 +153,7 @@ async function main(): Promise<void> {
     const timer = { uByte6: from.x, uByte7: from.y, level: z } as AiFrame['timer'];
     const frame = { timer, timePerMove: 0, sinceLastUpdate: 0, bool36: false } as unknown as AiFrame;
     const c = { monsterRn: rn2, monster, slot, mapX: from.x, mapY: from.y, level: z } as unknown as AiConst;
-    const ai = game2.systems.monsterAI as unknown as { stepOrDefer(f: AiFrame, c: AiConst, x: number, y: number): boolean };
-    const goOn = ai.stepOrDefer(frame, c, tp.x, tp.y);
+    const goOn = game2.systems.monsterAI.stepOrDefer(frame, c, tp.x, tp.y);
     console.log(`2. the AI steps onto it: goes on ${goOn}, timer_70 at (${timer.uByte6},${timer.uByte7}), `
       + `ubPrev (${slot.ubPrevX},${slot.ubPrevY})`);
     check(!goOn, 'the AI stops on a non-zero MoveObject');
