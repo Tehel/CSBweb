@@ -84,7 +84,7 @@ function makeGame(): { game: Game; log: string[] } {
     log.push(`missile ${at(from)}->${to ? at(to) : 'none'}`);
     return check(from, to);
   };
-  const wm = game.systems.worldMove as unknown as { partyFallsIntoPit(): void };
+  const wm = game.systems.worldMove;
   const fall = wm.partyFallsIntoPit.bind(wm);
   wm.partyFallsIntoPit = () => {
     log.push(`fall at ${at(party.position)}`);

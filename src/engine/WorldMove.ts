@@ -474,8 +474,10 @@ export class WorldMove {
    *
    * CSBWin clears the flag here, not at the call site, because one climb can fall
    * through a whole chain of pits and only the first drop is free.
+   *
+   * Public so that `tools/` can watch the party fall.
    */
-  private partyFallsIntoPit(): void {
+  partyFallsIntoPit(): void {
     const party = this.ctx.party.state;
     if (party.champions.length === 0) return;
 
