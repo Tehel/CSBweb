@@ -53,18 +53,16 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
-import type { ObjectTables } from '../src/data/tables/ObjectTables';
-import type { UITables } from '../src/data/tables/UITables';
 import { heldObjectName } from '../src/renderer/ui/Character';
 import { getObjectDisplayName, resolveObjectNameIndex } from '../src/renderer/ui/Objects';
-import type { UIState } from '../src/renderer/ui/UIState';
 import { OBJNI_BONES_A } from '../src/core/objectNameIndex';
 import { getActuatorWallGraphicOrdinal } from '../src/data/actuatorHelpers';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { EXPOOL_RECORD_SIZE, Expool } from '../src/data/CsbwinExpool';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, fail, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -94,7 +92,7 @@ function champion(i: number, name: string): Champion {
   };
 }
 
-function makeGame(): { game: Game; objectTables: ObjectTables; uiTables: UITables } {
+function makeGame(): { game: Game; graphics: GraphicsLoader } {
   const loader = new DungeonLoader();
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
@@ -102,29 +100,11 @@ function makeGame(): { game: Game; objectTables: ObjectTables; uiTables: UITable
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const objectTables = graphicsTablesOf(graphics).objects;
-  const uiTables = graphicsTablesOf(graphics).ui;
 
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i, `HERO${i}`));
-  return { game, objectTables, uiTables };
-}
-
-/**
- * Just enough `UIState` for the two naming functions.
- *
- * Both read only the dungeon, the party and the object tables; nothing here draws, so
- * no buffers, fonts or graphics are needed. Building it by hand keeps this tool out of
- * the renderer while still exercising the code the player actually reads on screen.
- */
-function makeUI(g: Game, objectTables: ObjectTables, uiTables: UITables): UIState {
-  return {
-    ctx: g.ctx,
-    partyState: g.ctx.party.state,
-    objectTables,
-    uiTables,
-  } as unknown as UIState;
+  return { game, graphics };
 }
 
 /** Any ordinary walkable cell — the altar itself is a wall decoration, not a room type. */
@@ -481,7 +461,7 @@ function main(): void {
   console.log('');
   console.log('=== a real Altar of Vi: pick the bones up, drop them in, wait ===');
   {
-    const { game: g, objectTables, uiTables } = makeGame();
+    const { game: g, graphics } = makeGame();
     const altars = findViAltars(g);
     console.log(['level', 'alcove', 'party stands', 'facing'].join('\t'));
     for (const a of altars) {
@@ -504,7 +484,7 @@ function main(): void {
       if (bones === undefined) {
         fail('the death left no bones to carry');
       } else {
-        const ui = makeUI(g, objectTables, uiTables);
+        const ui = newUIState(graphics, g.ctx);
         const nameIndex = resolveObjectNameIndex(ui, bones);
 
         // The gate that decides whether a click in the alcove is an altar offering at
@@ -689,7 +669,7 @@ function main(): void {
     // HERO1 dies by the altar, and leaves the party for the wings as `CharacterDelete`
     // would: their record saved, the champions after them a slot down.
     const inWings = (dead: boolean) => {
-      const { game: g, objectTables, uiTables } = makeGame();
+      const { game: g, graphics } = makeGame();
       const altar = findViAltars(g).find((a) => a.alcove.z === 0)!;
       g.ctx.party.state.position = altar.party;
       g.ctx.party.state.facing = altar.facing as Champion['facing'] & number;
@@ -702,7 +682,7 @@ function main(): void {
       saveToWings(g.ctx.dungeon, record);
       g.ctx.party.state.champions.splice(1, 1);
       g.ctx.party.state.cursorOwner = 0;
-      return { g, objectTables, uiTables, bones: bonesAt(g, altar.party)[0], altar, fingerprint: left.fingerprint };
+      return { g, graphics, bones: bonesAt(g, altar.party)[0], altar, fingerprint: left.fingerprint };
     };
     const hp = (g: Game, fingerprint: number): string => {
       const record = getFromWings(g.ctx.dungeon, fingerprint, true);
@@ -713,8 +693,8 @@ function main(): void {
     if (dead.bones === undefined) {
       fail('the death left no bones');
     } else {
-      const { g, objectTables, uiTables, bones, altar, fingerprint } = dead;
-      const name = getObjectDisplayName(makeUI(g, objectTables, uiTables), bones, OBJNI_BONES_A);
+      const { g, graphics, bones, altar, fingerprint } = dead;
+      const name = getObjectDisplayName(newUIState(graphics, g.ctx), bones, OBJNI_BONES_A);
       console.log(['name shown for the bones', name].join('\t'));
       check(name === 'HERO1 BONES', 'CopyCharacter names the bones from the wings');
 
