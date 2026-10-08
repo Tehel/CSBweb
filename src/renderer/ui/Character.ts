@@ -15,7 +15,7 @@ import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, PaletteIndexViewportBuffer, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
-import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon } from './Draw';
+import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon, drawPossessionBox, possessionBoxGraphic } from './Draw';
 import { descIndexForObject, getBonesChampion, getInventoryPlaceholderIndex, getRoleMastery, resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 import type { Rect } from '../../data/tables/UITables';
@@ -617,24 +617,7 @@ export function drawTopBarHandIcons(ui: UIState): void {
       if (!icon) continue;
 
       const rect = { x1: icon.pixelX, y1: icon.pixelY, x2: icon.pixelX + 15, y2: icon.pixelY + 15 };
-      const frame = ui.getGraphicBitmap(33);
-      if (frame) {
-        tag0088b2Index(
-          frame,
-          ui.screenIndexBuffer,
-          {
-            x1: rect.x1 - 1,
-            y1: rect.y1 - 1,
-            x2: rect.x2 + 1,
-            y2: rect.y2 + 1,
-            srcX: 0,
-            srcY: 0,
-            srcStride: frame.width,
-            srcHeight: frame.height,
-          },
-          12
-        );
-      }
+      drawPossessionBox(ui, rect, possessionBoxGraphic(champion, hand));
       const held = champion ? getChampionPossession(champion, hand) : OBJECT_ID_NULL;
       const objectNameIndex = held === OBJECT_ID_NULL ? -1 : resolveObjectNameIndex(ui, held);
 

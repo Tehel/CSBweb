@@ -83,6 +83,7 @@ const CHECKS = [
   { tool: 'dump-hidden-alcove.ts' },
   { tool: 'dump-door-ornaments.ts' },
   { tool: 'dump-status-boxes.ts' },
+  { tool: 'dump-hand-boxes.ts' },
   { tool: 'dump-mastery-panel.ts' },
   { tool: 'dump-reincarnate-entry.ts' },
   { tool: 'dump-pit-fall.ts' },

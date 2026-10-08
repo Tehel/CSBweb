@@ -16,7 +16,7 @@ import { tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { Rect } from '../../data/tables/UITables';
 import { drawAttributePanel, drawFoodWaterPanel, drawVitalsAndLoad, getInventoryItemIndex } from './Character';
-import { blitBasicGraphicToViewport, drawObjectIcon, drawWoundedOutline } from './Draw';
+import { BOX_GRAPHIC_MARKED, BOX_GRAPHIC_PLAIN, blitBasicGraphicToViewport, drawObjectIcon, drawPossessionBox, possessionBoxGraphic } from './Draw';
 import { drawMouthChewAnimation } from './Feeding';
 import { applyViewingFilter, drawItemDescriptionLine, getInventoryPlaceholderIndex, getObjectDescriptionLines, getObjectDisplayName, isChestRecord, resolveObjectNameIndex } from './Objects';
 import { DescribedObject, UIState, emptyChestContents } from './UIState';
@@ -82,10 +82,8 @@ export function drawInventoryScreen(ui: UIState): void {
     }
     const rect = getInventorySlotRect(iconSlots, slot);
     if (!rect) continue;
-    const wounds = champion.wounds;
-    if (slot <= 5 && (wounds & (1 << slot)) !== 0) {
-      drawWoundedOutline(ui, rect);
-    }
+    const box = possessionBoxGraphic(champion, slot);
+    if (box !== -1) drawPossessionBox(ui, rect, box);
     if (objectIndex >= 0) {
       drawObjectIcon(ui, rect, objectIndex, word612);
       continue;
@@ -219,10 +217,6 @@ export function drawMouthAndEyeBoxes(ui: UIState, champion: Champion): void {
   blitBasicGraphicToViewport(ui, mouthBoxGraphic(champion), g232.word1398, 32, 12);
   blitBasicGraphicToViewport(ui, eyeBoxGraphic(champion), g232.word1406, 32, 12);
 }
-
-/** The plain box, and the one that marks something wrong. */
-export const BOX_GRAPHIC_PLAIN = 33;
-export const BOX_GRAPHIC_MARKED = 34;
 
 /**
  * `if (food < 0 || water < 0 || poisonCount != 0)` (`doc/CSBwin-src/Character.cpp:1363`).

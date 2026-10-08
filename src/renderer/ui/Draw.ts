@@ -5,10 +5,11 @@
  * RGBA happens once at present time, as in CSBWin.
  */
 import { Rect } from '../../data/tables/UITables';
-import { IndexedBitmap, createPaletteIndexViewportBuffer, drawRectOutlineIndex, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
+import { IndexedBitmap, createPaletteIndexViewportBuffer, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import type { ScrollingText } from '../csbwin/ScrollingText';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
+import type { Champion } from '../../engine/gameTypes';
 import type { UIState } from './UIState';
 
 export function drawHorzBar(ui: UIState, x0: number, y0: number, width: number, color: number): void {
@@ -257,20 +258,30 @@ export function computeBarHeight(current: number, max: number, allowOverMax: boo
   return Math.min(25, Math.ceil((25 * current) / max));
 }
 
-export function drawWoundedOutline(ui: UIState, rect: Rect): void {
-  const graphic = ui.getGraphicBitmap(34);
-  if (!graphic) {
-    drawRectOutlineIndex(ui.screenIndexBuffer, {
-      x1: rect.x1 - 1,
-      y1: rect.y1 - 1,
-      x2: rect.x2 + 1,
-      y2: rect.y2 + 1,
-    }, 8);
-    return;
-  }
+/** The plain box, and the one that marks something wrong. */
+export const BOX_GRAPHIC_PLAIN = 33;
+export const BOX_GRAPHIC_MARKED = 34;
 
+/**
+ * `DrawCharacterPossession`'s `LOCAL_20` (`doc/CSBwin-src/Character.cpp:1150-1204`): the
+ * box behind a body part, slots 0 to 5, marked while the part is wounded (`ouches`),
+ * with an object in it or not. Every other slot has none, -1.
+ */
+export function possessionBoxGraphic(champion: Champion, slot: number): number {
+  if (slot > 5) return -1;
+  return (champion.wounds & (1 << slot)) !== 0 ? BOX_GRAPHIC_MARKED : BOX_GRAPHIC_PLAIN;
+}
+
+/**
+ * `DrawCharacterPossession`'s box (`doc/CSBwin-src/Character.cpp:1205-1216`): `graphic`
+ * (`possessionBoxGraphic`) over the slot's 18x18 frame, `x-1..x+16`, with colour 12
+ * transparent, before the icon.
+ */
+export function drawPossessionBox(ui: UIState, rect: Rect, graphic: number): void {
+  const bitmap = ui.getGraphicBitmap(graphic);
+  if (!bitmap) return;
   tag0088b2Index(
-    graphic,
+    bitmap,
     ui.screenIndexBuffer,
     {
       x1: rect.x1 - 1,
@@ -279,9 +290,9 @@ export function drawWoundedOutline(ui: UIState, rect: Rect): void {
       y2: rect.y2 + 1,
       srcX: 0,
       srcY: 0,
-      srcStride: graphic.width,
-      srcWidth: graphic.width,
-      srcHeight: graphic.height,
+      srcStride: bitmap.width,
+      srcWidth: bitmap.width,
+      srcHeight: bitmap.height,
     },
     12
   );

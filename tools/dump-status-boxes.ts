@@ -32,12 +32,8 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { AttributeIndex, setAttributeCurrent } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
-import {
-  BOX_GRAPHIC_MARKED,
-  BOX_GRAPHIC_PLAIN,
-  eyeBoxGraphic,
-  mouthBoxGraphic,
-} from '../src/renderer/ui/Inventory';
+import { BOX_GRAPHIC_MARKED, BOX_GRAPHIC_PLAIN } from '../src/renderer/ui/Draw';
+import { eyeBoxGraphic, mouthBoxGraphic } from '../src/renderer/ui/Inventory';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
