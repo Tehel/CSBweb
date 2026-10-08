@@ -1,5 +1,5 @@
 /**
- * The deployed game's server (PLAN.md Phase 17, steps 3 and 5): `node server/server.ts`,
+ * The deployed game's server (`doc/DEPLOYMENT.md`, `doc/STATISTICS.md`): `node server/server.ts`,
  * on Node 24, which strips the types. No dependency: `node:http` serves the page, the game
  * files and the API (`app.ts`), and `node:sqlite` keeps the statistics (`stats.ts`).
  *

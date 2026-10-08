@@ -1,4 +1,4 @@
-# The deployed game (PLAN.md Phase 17, step 6): `server/` on Node 24, over the built page.
+# The deployed game (`doc/DEPLOYMENT.md`): `server/` on Node 24, over the built page.
 # The game files and the statistics are mounted, never in the image:
 #
 #   /data/gamefiles   the data sets and their manifest, read-only

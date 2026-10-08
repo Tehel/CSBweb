@@ -44,6 +44,7 @@ Corollaries:
 | `doc/CSBWIN_REFERENCE_INDEX.md` | Index of the per-topic CSBWin reference docs. |
 | `doc/PROVEN_FACTS.md` | Verified facts with `File.cpp:line` citations. |
 | `doc/SAVES.md` | The port's own save design: the store, the playthrough, the dialog, F5 and F9. |
+| `doc/DEPLOYMENT.md` | The deployed game: the server, the image, the VPS, deploying and backups. `doc/STATISTICS.md`: what it counts. |
 | `doc/CSBWIN_SYMBOL_INDEX.tsv` | Every CSBWin symbol → `File.cpp:line`. Grep this before grepping the tree. |
 | `NOTES.md` | The author's personal scratchpad. **Do not edit.** Flag problems instead. |
 | `doc/CSBwin-src/` | The C++ reference (gitignored, not ours): `CSBwin_SRC_20160923`, Version 15.9. |

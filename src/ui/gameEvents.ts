@@ -1,5 +1,5 @@
 /**
- * The game's events for the server's statistics (`PLAN.md` Phase 17, step 4): a game
+ * The game's events for the server's statistics (`doc/STATISTICS.md`): a game
  * started, a champion joined, a game won or lost. The engine sends nothing: the page
  * reports what its hooks see, and a failure to send is ignored, so nothing here delays or
  * breaks the game.

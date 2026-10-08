@@ -21,7 +21,7 @@ export default defineConfig(({ command }) => ({
   base: './',
   // The dev server serves `static/` as it stands: the game files and the manuals. A build
   // ships none of it. The page's own files are modules under `src/assets/`, which the
-  // build hashes, and the game files are served beside the page (PLAN.md Phase 17).
+  // build hashes, and the game files are served beside the page (`doc/DEPLOYMENT.md`).
   publicDir: command === 'serve' ? 'static' : false,
   define: {
     __CSBWEB_BUILD__: JSON.stringify(buildId()),

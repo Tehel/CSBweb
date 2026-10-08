@@ -1,5 +1,5 @@
 /**
- * The statistics' store and what it accepts (PLAN.md Phase 17, step 5): `server/events.ts`,
+ * The statistics' store and what it accepts (`doc/STATISTICS.md`): `server/events.ts`,
  * which checks an event and rebuilds it, and `server/stats.ts`, the SQLite file and its
  * aggregates. `dump-server` asks the same over HTTP; `dump-game-events` passes the real
  * engine's events through the same check.

@@ -1,6 +1,6 @@
 # The build context is what the image's build stage needs and nothing else: the page's
 # sources, the tools `tsc` checks beside them, and the server. Everything else, the game
-# files above all, stays out (PLAN.md Phase 17, step 6).
+# files above all, stays out (`doc/DEPLOYMENT.md`).
 *
 !package.json
 !package-lock.json

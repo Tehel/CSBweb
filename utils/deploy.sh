@@ -1,13 +1,13 @@
 #!/bin/bash
-# Build the image, ship it to the VPS and restart the stack there (PLAN.md Phase 17,
-# step 6). The author runs it by hand, after `npm test`.
+# Build the image, ship it to the VPS and restart the stack there (`doc/DEPLOYMENT.md`).
+# The author runs it by hand, after `npm test`.
 #
 # The target is read from a gitignored `.env` at the repository's root, so the repository
 # names no host, login or path:
 #
 #   DEPLOY_HOST=<user>@<host>   the SSH destination
-#   DEPLOY_DIR=<path>           the stack's folder there: app/, gamefiles/ and stats/
-#                               (`docker-compose.yaml`)
+#   DEPLOY_DIR=<path>           the stack's folder there, absolute: the compose file, its
+#                               .env, gamefiles/ and stats/ (`docker-compose.yaml`)
 #
 # The VPS's Compose v1 cannot recreate a container, so the image goes over as a file and
 # the stack is taken down and brought up again. The compose file goes with every deploy,

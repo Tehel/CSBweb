@@ -1,7 +1,8 @@
 # The stack on the VPS. `utils/deploy.sh` copies this file to
 # `<DEPLOY_DIR>/` and loads the image beside it, so the folders are:
 #
-#   <DEPLOY_DIR>/        this file, and an optional `.env` with CSBWEB_PORT
+#   <DEPLOY_DIR>/            this file, and its `.env`: required, even empty, since it is
+#                            also the container's `env_file` (CSBWEB_PORT, optional)
 #   <DEPLOY_DIR>/gamefiles/  the data sets, `swoosh/` and `manifest.json`, uploaded separately
 #   <DEPLOY_DIR>/stats/      stats.db, which a deploy's `down` leaves alone
 #

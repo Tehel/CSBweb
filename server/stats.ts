@@ -1,5 +1,5 @@
 /**
- * The statistics store (PLAN.md Phase 17, step 5): one SQLite file, through `node:sqlite`,
+ * The statistics store (`doc/STATISTICS.md`): one SQLite file, through `node:sqlite`,
  * holding one `events` table, and the aggregates `api/stats` makes of it. No address and
  * nothing the server has not checked is stored (`events.ts`).
  *

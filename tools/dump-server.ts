@@ -1,5 +1,5 @@
 /**
- * The deployed server (PLAN.md Phase 17, steps 3 and 5, `server/`), stood up on a free port
+ * The deployed server (`doc/DEPLOYMENT.md`, `server/`), stood up on a free port
  * over a scratch build, scratch game files and a scratch statistics store, and asked what a
  * browser, a curious visitor, the page's beacon and the compose healthcheck would ask.
  *

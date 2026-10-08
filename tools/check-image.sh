@@ -1,5 +1,5 @@
 #!/bin/bash
-# The golden frames against the image (PLAN.md Phase 17, step 6): proof that the built
+# The golden frames against the image (`doc/DEPLOYMENT.md`): proof that the built
 # page, served by `server/` in its container, draws what the dev server draws.
 #
 # Builds the image with CSBWEB_PROBE=1 (the probes' handle, which a deployed image never

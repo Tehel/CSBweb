@@ -1,5 +1,5 @@
 /**
- * The statistics' events (`src/ui/gameEvents.ts`, `PLAN.md` Phase 17 step 4), built from
+ * The statistics' events (`src/ui/gameEvents.ts`, `doc/STATISTICS.md`), built from
  * the real engine: the Hall of Champions' joins on `dm-atari`'s level 0, a new game's
  * first tick, a won and a lost game, and a genuine CSBWin save whose champions this page
  * never saw join.

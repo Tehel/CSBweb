@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copy the statistics' snapshots off the VPS (PLAN.md Phase 17, step 7): the cron job's
+# Copy the statistics' snapshots off the VPS (`doc/DEPLOYMENT.md`): the cron job's
 # `server/backup.ts` writes them into `<DEPLOY_DIR>/stats/backups/`, and this pulls the
 # folder to `BACKUP_PULL_DIR` (`../backups/csbweb/`, beside the checkout). The target is
 # `.env`'s, as for `deploy.sh`.

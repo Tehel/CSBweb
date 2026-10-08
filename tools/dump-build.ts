@@ -1,5 +1,5 @@
 /**
- * What a build ships (PLAN.md Phase 17, step 2): the page, and none of `static/`.
+ * What a build ships (`doc/DEPLOYMENT.md`): the page, and none of `static/`.
  *
  * Builds with the project's own `vite.config.mts` (the CLI, as `npm run build` does) into a
  * scratch folder, lists every file,

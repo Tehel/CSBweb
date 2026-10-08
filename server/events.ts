@@ -1,5 +1,5 @@
 /**
- * What `api/event` accepts (PLAN.md Phase 17, step 5): the events the page's `GameEvents`
+ * What `api/event` accepts (`doc/STATISTICS.md`): the events the page's `GameEvents`
  * sends (`src/ui/gameEvents.ts`), checked field by field and rebuilt from what passed, so
  * that nothing the server has not checked reaches the store. The player is a UUID, the
  * build a short token, the set one of the manifest's, every number an integer in its

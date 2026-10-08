@@ -94,7 +94,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| Phase 17 | Deployment: the Docker image, the data sets' manifest, the statistics | L | in `PLAN.md` |
 | C151 | A click is matched to its button when it is queued, not when it is taken | M | ⏳ |
 | C152 | A wall text seen from afar shows its plaque at full height | M | ⏳ |
 | C153 | `&PARAM@` reads variable 0 for each missing parameter | S | ⏳ |
@@ -120,8 +119,8 @@ In payoff order: the first row is the next item.
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G29 are the active list. C151-C157 are CSBWin's changes from 2016 to 2023
-(see "CSBWin's changes from 2016 to 2023" in tier C), taken right after Phase 17. `F3` and `Phase 17` are phases, whose status is
-`PLAN.md`'s: deployment is not debt, and its row only marks its place. One row sits
+(see "CSBWin's changes from 2016 to 2023" in tier C), taken first. `F3` is a phase, whose
+status is `PLAN.md`'s, and its row only marks its place. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
 row meanwhile. The F
@@ -165,8 +164,8 @@ Paying it is the redesign's first step: settings as a model the page renders, th
 module of its own, and a `static/` holding only what the dev server needs.
 The redesigned page also links to two pages:
 
-- **A static FAQ.** Among its answers is one paragraph on the statistics Phase 17
-  collects, and why:
+- **A static FAQ.** Among its answers is one paragraph on the statistics the server
+  collects (`doc/STATISTICS.md`), and why:
   - to check that the game is actually played;
   - a leaderboard of the preferred champions;
   - where parties die most often.
@@ -174,7 +173,7 @@ The redesigned page also links to two pages:
   It insists that the statistics are anonymous: no player's name, no IP address, no
   browser profiling. A random id, drawn in the browser, is used only for counting
   players. Champions go by the names they carry, which a player can type.
-- **The public statistics**, drawn from Phase 17's `api/stats`.
+- **The public statistics**, drawn from the server's `api/stats`.
 
 ---
 
@@ -240,7 +239,7 @@ edits in `CSBCode.cpp`, `RC4.cpp`, `SaveGame.cpp` and `Data.h`. 15.9 is a side b
 behaves as 15.8. `doc/CSBwin-src-20230608/` is `CSBwin_SRC_20230608.7z`, the main line's
 last source (gitignored like the other, CRLF turned to LF, nothing else changed).
 
-They are taken once Phase 17 is done, then C157. A port of one cites the 2023 file and line,
+They are taken first, then C157. A port of one cites the 2023 file and line,
 and needs no H entry, since C157 makes that source the reference.
 
 The rest of the 2016-2023 diff changes nothing the port has: the 64-bit port (`uintptr_t`,
