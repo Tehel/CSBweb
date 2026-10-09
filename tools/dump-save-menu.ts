@@ -96,7 +96,11 @@
  *    graphic 0 spaces its panels, holding eleven whole rows; LOAD labelled RISE; no
  *    EXPORT on any row, nor a click on it; the rows' clicks and PageDown on the eleven;
  *    no drop taken, the store left alone, and no import's hint over the preview's panel
- *    or EXPORT's frame.
+ *    or EXPORT's frame. In EXPORT's frame, for a set with the utility's portraits, the
+ *    toggle: NEW FACE whenever the dialog opens, its eight characters inside the frame's
+ *    bevels; a click on it OLD FACE, another NEW FACE again; LOAD passes what it shows
+ *    to the new adventure. For a set without them, and in the other modes, there is
+ *    none.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -375,7 +379,7 @@ function checkLayout(graphics: GraphicsLoader): void {
 
   const blank: SaveMenu.SaveMenuState = {
     mode: 'full', entries: [], unfolded: new Set(), rows: [], selected: -1, scrollTop: 0, busy: true, message: '',
-    press: null, pending: null, confirm: null, dropped: null, adventure: null, frameHandle: null, lastSaveClick: null, pointer: null,
+    press: null, pending: null, confirm: null, dropped: null, adventure: null, frameHandle: null, lastSaveClick: null, pointer: null, newFace: null,
   };
   ui.saveMenu = blank;
   ui.screenIndexBuffer!.pixels.fill(7);
@@ -1340,7 +1344,10 @@ const RIGHT = 1;
  * A game of one champion and its disk menu, the menu's hooks on a `GameSaves` over
  * `store`, with the clicks a tool makes on it.
  */
-async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: string) {
+async function menuRig(
+  graphics: GraphicsLoader, store: SaveStore, champion: string,
+  hooks: Partial<Pick<UIState, 'onHasNewFaces' | 'onMakeNewAdventure'>> = {},
+) {
   const game = await loadGame();
   game.systems.hallOfChampions.addChampion(healthyChampion(champion));
   const saves = new GameSaves(game, DEFAULT_DATA_SET, store, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
@@ -1357,6 +1364,7 @@ async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: str
     onExportSave: async (listed) => { exported.push({ name: listed.name, bytes: (await saves.open(listed)).bytes }); },
     onImportSave: (file, confirmed) => saves.importSave(file, confirmed),
     onRestoreSave: (save) => saves.read(save),
+    ...hooks,
   });
   const g = SaveMenu.SAVE_MENU_GEOMETRY;
   return {
@@ -2545,10 +2553,14 @@ async function checkRise(graphics: GraphicsLoader): Promise<void> {
       return label;
     });
     const selected = SaveMenu.selectedEntry(state);
-    await rig.click(g.exportButtonId);
-    console.log(`  EXPORT's label on each of the ${state.rows.length} rows: ${exportLabels.join(', ')} pixels; a click on it on ${selected?.name}: ${rig.exported.length} files, press ${state.press ? 'UP' : 'none'}`);
-    check(state.rows.some((row) => row.kind === 'save') && exportLabels.every((n) => n === 0), 'EXPORT has no label, on a heading or a save');
-    check(selected !== null && rig.exported.length === 0 && state.press === null && SaveMenu.isSaveMenuOpen(ui), 'and a click on it does nothing');
+    const buttonIds = SaveMenu.saveMenuButtons(state).map((b) => b.word0);
+    await rig.click(g.faceButtonId);
+    console.log(`  EXPORT's label on each of the ${state.rows.length} rows: ${exportLabels.join(', ')} pixels; a click on its frame on ${selected?.name}: ${rig.exported.length} files, press ${state.press ? 'UP' : 'none'}, toggle ${state.newFace}`);
+    check(state.rows.some((row) => row.kind === 'save') && exportLabels.every((n) => n === 0),
+      'with no utility portraits, EXPORT\'s frame has no label, on a heading or a save');
+    check(!buttonIds.includes(g.exportButtonId), 'and no EXPORT button');
+    check(selected !== null && rig.exported.length === 0 && state.press === null && state.newFace === null && SaveMenu.isSaveMenuOpen(ui),
+      'and a click on the frame does nothing');
 
     // No import: a drop is not taken, and no hint says one would be.
     const rows = JSON.stringify(await store.list(null));
@@ -2599,6 +2611,89 @@ async function checkRise(graphics: GraphicsLoader): Promise<void> {
       'the disk menu and the load-only chooser keep their fifteen rows');
   } finally {
     Date.now = realNow;
+  }
+}
+
+/**
+ * RISE's NEW FACE / OLD FACE, in EXPORT's frame, for a set with the utility's portraits:
+ * what it reads, what a click does, and what LOAD passes on.
+ */
+async function checkRiseFaces(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== RISE\'s NEW FACE ===');
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  const frame = g.buttonFrames.export;
+  const store = memoryStore();
+  const made: boolean[] = [];
+  const rig = await menuRig(graphics, store, 'DAROO', {
+    onHasNewFaces: async () => true,
+    onMakeNewAdventure: async (_source, newFaces) => { made.push(newFaces === true); throw new Error('stop here'); },
+  });
+  const { ui } = rig;
+  await rig.saves.save('stopped', 'new');
+  rig.game.ctx.state.paused = false;
+
+  const at = SaveMenu.buttonLabelAt(frame);
+  const band = (): number[] => {
+    const pixels: number[] = [];
+    for (let y = at.y - 4; y <= at.y + 1; y++) for (let x = frame.x1 + 6; x <= frame.x2 - 6; x++) pixels.push(pixelAt(ui, x, y));
+    return pixels;
+  };
+  const labelIs = (label: string): boolean => {
+    SaveMenu.drawSaveMenu(ui);
+    const shown = band();
+    const saved = Uint8Array.from(ui.screenIndexBuffer!.pixels);
+    for (let y = at.y - 4; y <= at.y + 1; y++) for (let x = frame.x1 + 6; x <= frame.x2 - 6; x++) ui.screenIndexBuffer!.pixels[y * SCREEN_WIDTH + x] = MENU_PANEL_COLOR;
+    drawTextLineIndex(ui.screenIndexBuffer!, ui.fontData, at.x - 3 * label.length, at.y, MENU_OPTION_COLOR, MENU_PANEL_COLOR, label);
+    const expected = band();
+    ui.screenIndexBuffer!.pixels.set(saved);
+    return shown.every((pixel, i) => pixel === expected[i]);
+  };
+
+  const state = await rig.open('rise');
+  SaveMenu.drawSaveMenu(ui);
+  let left = SCREEN_WIDTH;
+  let right = -1;
+  for (let y = at.y - 4; y <= at.y + 1; y++) {
+    for (let x = frame.x1; x <= frame.x2; x++) {
+      if (pixelAt(ui, x, y) === MENU_OPTION_COLOR) {
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+      }
+    }
+  }
+  console.log(`  opened: ${state.newFace ? 'NEW FACE' : String(state.newFace)}, its ink in columns ${left}..${right} of the frame's ${frame.x1 + 6}..${frame.x2 - 6} between its bevels`);
+  check(state.newFace === true && labelIs(SaveMenu.NEW_FACE_LABEL), 'it opens on, and reads NEW FACE');
+  check(SaveMenu.NEW_FACE_LABEL.length === 8 && SaveMenu.OLD_FACE_LABEL.length === 8 && left >= frame.x1 + 6 && right <= frame.x2 - 6,
+    'its eight characters stand between the frame\'s six-column bevels');
+
+  await rig.click(g.faceButtonId);
+  const off = state.newFace;
+  const offReads = labelIs(SaveMenu.OLD_FACE_LABEL);
+  await rig.click(g.faceButtonId);
+  console.log(`  a click: ${off ? 'NEW FACE' : 'OLD FACE'}; another: ${state.newFace ? 'NEW FACE' : 'OLD FACE'}`);
+  check(off === false && offReads, 'a click turns it off, and it reads OLD FACE');
+  check(state.newFace === true && labelIs(SaveMenu.NEW_FACE_LABEL), 'another turns it back on');
+
+  await rig.click(g.faceButtonId);
+  const entry = state.entries[0]!;
+  rig.select(entry.id);
+  await rig.click(g.loadButtonId);
+  const reopened = await rig.open('rise');
+  const reopenedOn = reopened.newFace;
+  rig.select(entry.id);
+  await rig.click(g.loadButtonId);
+  console.log(`  LOAD under OLD FACE, then reopened (${reopenedOn ? 'NEW FACE' : 'OLD FACE'}) and LOAD: newFaces ${made.join(', ')}`);
+  check(made.join() === 'false,true', 'LOAD passes what the toggle shows to the new adventure');
+  check(reopenedOn === true, 'and the dialog opens on NEW FACE again');
+  SaveMenu.closeSaveMenu(ui);
+
+  for (const mode of ['full', 'loadOnly'] as const) {
+    const other = await rig.open(mode);
+    const ids = SaveMenu.saveMenuButtons(other).map((b) => b.word0);
+    check(other.newFace === null && !ids.includes(g.faceButtonId) && ids.includes(g.exportButtonId),
+      `the ${mode} dialog has EXPORT and no toggle`);
+    SaveMenu.closeSaveMenu(ui);
   }
 }
 
@@ -3347,6 +3442,7 @@ async function main(): Promise<void> {
   await checkPlayTime(graphics);
   await checkUpgrade();
   await checkRise(graphics);
+  await checkRiseFaces(graphics);
   finish();
 }
 

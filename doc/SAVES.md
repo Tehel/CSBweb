@@ -91,6 +91,22 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   no dialog up, and the import's hint never shows (`saveMenuTakesDrops`). The dialog
   raises a party from a save already stored: a DM save from CSBWin is imported in a DM
   set first, and a CSB one through RESUME's chooser.
+
+  In EXPORT's frame is a toggle, on whenever the dialog opens: NEW FACE while on, OLD
+  FACE while off. On, each DM champion raised gets the CSB utility disk's redrawn
+  portrait of them, which the original utility's champion editor put on a champion by
+  hand and CSBWin does not port (`doc/ATARI_ST_DISK_REFERENCE.md` → "The portraits").
+  A champion is known by their portrait, never by their name, which REINCARNATE may
+  have changed: one whose portrait is cell `charID` of DM's graphic 26, pixel for
+  pixel, gets cell `charID` of `utility-portraits.dat` (`src/data/UtilityPortraits.ts`).
+  A portrait that is no DM champion's, the prison's or one drawn in an editor, stays,
+  and names and titles are never touched. The new portraits are written into the
+  source's `CHARDESC`s where the utility's `TAG00439e` swaps the editor's in, before
+  `TAG002724` copies them (`swapInNewFaces`, `src/engine/Chaos.ts`), so they are in
+  the file, and CSBWin shows them too. Off, the adventure is CSBWin's, byte for byte.
+  The toggle is the port's own, outside the extras' setting, and a set without
+  `utility-portraits.dat` has none. The prison's "BEGIN THE ADVENTURE?" asks for no
+  faces: its party's are CSB's own.
   The new file is a row of the running set, named after the source's with `-csb` before
   its `.dat`, and a number after that while a save has the name; its playthrough is the
   file's, the source's `RandomGameID` with its first byte one higher, so a source raised
@@ -394,7 +410,8 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
 - **RISE**: `tools/dump-rise.ts` (the row a new adventure is stored as, again, and a
   refusal; the chooser's `rise` mode over every set's saves, its LOAD and a refusal, and
   `tools/dump-save-menu.ts` its title, its eleven rows, RISE, no EXPORT, no drop taken
-  and no hint; the
+  and no hint, and NEW FACE: what it reads, a click, what LOAD passes on; the
+  portraits a DM party is raised with, a renamed champion's, and the prison's kept; the
   prison's question: which game is the prison, four champions recruited at its mirrors
   of whom only the fourth asks, the prison's save taken by the utility, F5's question,
   YES and NOT YET in a dialog raised alone and over the disk menu's SAVE, and no question

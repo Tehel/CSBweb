@@ -136,7 +136,8 @@ core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             RN::dbType, pos, idx), intCast (sw, div, ApplyLimits), objectNameIndex
             (OBJNI_* constants)
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor,
-            HintOracleLoader (CSB's `hcsb.hct`), SwooshLoader (the Atari disk's `swoosh.img`)
+            HintOracleLoader (CSB's `hcsb.hct`), SwooshLoader (the Atari disk's `swoosh.img`),
+            UtilityPortraits (the CSB utility disk's faces, RISE's NEW FACE)
   saves/    The saves behind the disk icon: SaveStore (a save's row, the CSBWin file
             beside what a list needs), BrowserSaveStore (IndexedDB, the one store),
             legacyRows (the store's upgrade from its first version), downloadSaveFile

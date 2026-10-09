@@ -122,7 +122,18 @@
  * new adventure from the save just written, or, after the fourth champion, from a
  * quick-save it writes first, and reads it, as the entrance's RISE does
  * (`UIState.onMakeNewAdventure`); a refusal is the dialog's message. NOT YET goes back to
- * the list, or closes the dialog when it was raised for the question alone.
+ * the list, or closes the dialog when it was raised for the question alone. The prison's
+ * party has CSB's own faces, so YES asks for no new ones.
+ *
+ * ## RISE
+ *
+ * The entrance's RISE opens the load-only chooser over every data set's saves, under a
+ * title that says what it does, its LOAD labelled RISE: it makes a new adventure from the
+ * chosen save and reads that. It has no EXPORT and takes no dropped file. In EXPORT's
+ * frame, when the data set has the utility disk's portraits (`UIState.onHasNewFaces`), is
+ * a two-state button, on whenever the dialog opens: NEW FACE while on, the DM champions
+ * raised with the utility's portraits of them, and OLD FACE while off, the adventure
+ * CSBWin's utility makes (`swapInNewFaces`, `src/engine/Chaos.ts`).
  *
  * ## Modality and the clock
  *
@@ -298,6 +309,12 @@ const CANCEL_LABEL = 'CANCEL';
 const ACTION_LABELS = { load: 'LOAD', save: 'SAVE' } as const;
 /** LOAD's label in RISE's dialog: the entrance's button that opened it. */
 const RISE_LABEL = 'RISE';
+/**
+ * RISE's toggle, on and off. Eight characters is the most a button's face holds: 52
+ * pixels between graphic 0's two six-column bevels, and a ninth character takes 53.
+ */
+export const NEW_FACE_LABEL = 'NEW FACE';
+export const OLD_FACE_LABEL = 'OLD FACE';
 const EXPORT_LABEL = 'EXPORT';
 /** The dialog's message once a save's file has been handed to the player. */
 export const SAVE_MENU_EXPORTED = 'SAVE EXPORTED';
@@ -345,6 +362,7 @@ const BTN_CANCEL = 902;
 const BTN_SCROLL_UP = 903;
 const BTN_SCROLL_DOWN = 904;
 const BTN_EXPORT = 905;
+const BTN_FACE = 906;
 const BTN_ROW0 = 910;
 
 /**
@@ -393,6 +411,7 @@ export const SAVE_MENU_GEOMETRY = {
   loadButtonId: BTN_LOAD,
   saveButtonId: BTN_SAVE,
   exportButtonId: BTN_EXPORT,
+  faceButtonId: BTN_FACE,
   cancelButtonId: BTN_CANCEL,
 } as const;
 
@@ -403,7 +422,7 @@ export const SAVE_MENU_GEOMETRY = {
  * or the entrance's RISE (`rise`): the load-only chooser over every data set's saves,
  * whose LOAD makes a new adventure from the chosen one and reads that
  * (`src/renderer/intro/PrisonDoor.ts`). RISE's says so in a title over its list, labels
- * LOAD RISE, and has no EXPORT.
+ * LOAD RISE, and has NEW FACE in EXPORT's place (see "RISE").
  */
 export type SaveMenuMode = 'full' | 'loadOnly' | 'rise';
 
@@ -452,6 +471,8 @@ export interface SaveMenuState {
   lastSaveClick: { id: string; atMs: number } | null;
   /** Where the pointer is, in screen coordinates, or `null` off the canvas (`saveMenuPointer`). */
   pointer: { x: number; y: number } | null;
+  /** RISE's toggle, NEW FACE (`true`) or OLD FACE, or `null` where there is none (see "RISE"). */
+  newFace: boolean | null;
 }
 
 export function isSaveMenuOpen(ui: UIState): boolean {
@@ -492,6 +513,7 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
     frameHandle: null,
     lastSaveClick: null,
     pointer: ui.hoverPoint,
+    newFace: null,
   };
   void refreshSaveMenu(ui);
 }
@@ -528,6 +550,7 @@ export async function refreshSaveMenu(ui: UIState): Promise<void> {
   ui.renderLastFrame();
   try {
     state.entries = await (state.mode === 'rise' ? ui.onListEverySave() : ui.onListSaves());
+    if (state.mode === 'rise' && state.newFace === null && await ui.onHasNewFaces()) state.newFace = true;
     selectLastUsed(ui, state);
   } catch (error) {
     state.entries = [];
@@ -639,6 +662,11 @@ function canSave(ui: UIState, state: SaveMenuState): boolean {
  */
 function canExport(state: SaveMenuState): boolean {
   return !state.busy && state.mode !== 'rise' && selectedEntry(state) !== null;
+}
+
+/** RISE's NEW FACE / OLD FACE, in EXPORT's frame: a save need not be selected. */
+function canToggleFace(state: SaveMenuState): boolean {
+  return !state.busy && state.mode === 'rise' && state.newFace !== null;
 }
 
 /**
@@ -913,6 +941,7 @@ export function drawSaveMenu(ui: UIState): void {
   if (canLoad(state)) drawLabel(ui, state.mode === 'rise' ? RISE_LABEL : ACTION_LABELS.load, BUTTON_FRAMES.load);
   if (canSave(ui, state)) drawLabel(ui, ACTION_LABELS.save, BUTTON_FRAMES.save);
   if (canExport(state)) drawLabel(ui, EXPORT_LABEL, BUTTON_FRAMES.export);
+  if (canToggleFace(state)) drawLabel(ui, state.newFace ? NEW_FACE_LABEL : OLD_FACE_LABEL, BUTTON_FRAMES.export);
   if (!state.busy) drawLabel(ui, CANCEL_LABEL, BUTTON_FRAMES.cancel);
 
   if (state.press) drawMenuPress(ui, state.press, nowMs());
@@ -967,7 +996,9 @@ export function saveMenuButtons(state: SaveMenuState): UIButton[] {
   const buttons: UIButton[] = [
     { word0: BTN_LOAD, ...buttonRect(BUTTON_FRAMES.load), button: 2, name: 'saveMenu.load' },
     { word0: BTN_SAVE, ...buttonRect(BUTTON_FRAMES.save), button: 2, name: 'saveMenu.save' },
-    { word0: BTN_EXPORT, ...buttonRect(BUTTON_FRAMES.export), button: 2, name: 'saveMenu.export' },
+    state.mode === 'rise'
+      ? { word0: BTN_FACE, ...buttonRect(BUTTON_FRAMES.export), button: 2, name: 'saveMenu.face' }
+      : { word0: BTN_EXPORT, ...buttonRect(BUTTON_FRAMES.export), button: 2, name: 'saveMenu.export' },
     { word0: BTN_CANCEL, ...buttonRect(BUTTON_FRAMES.cancel), button: 2, name: 'saveMenu.cancel' },
   ];
   const list = saveMenuList(state.mode);
@@ -1056,6 +1087,12 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
   if (id === BTN_SAVE && canSave(ui, state)) pressAction(ui, state, 'save');
   if (id === BTN_EXPORT && canExport(state)) {
     beginPress(ui, state, saveMenuButtons(state), BTN_EXPORT, () => void runPending(ui, 'export'));
+  }
+  if (id === BTN_FACE && canToggleFace(state)) {
+    beginPress(ui, state, saveMenuButtons(state), BTN_FACE, () => {
+      state.newFace = !state.newFace;
+      ui.renderLastFrame();
+    });
   }
 }
 
@@ -1215,7 +1252,7 @@ async function doLoad(ui: UIState, state: SaveMenuState): Promise<void> {
   // failed read is the boot's.
   let adventure: OpenedSave;
   try {
-    adventure = await ui.onMakeNewAdventure(entry);
+    adventure = await ui.onMakeNewAdventure(entry, state.newFace === true);
   } catch (error) {
     ui.onRestoreFailed(error);
     closeSaveMenu(ui);

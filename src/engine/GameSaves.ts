@@ -32,6 +32,7 @@ import { loadCsbwinWorld } from '../data/CsbwinDungeonImage';
 import type { DataSet } from '../data/DataSets';
 import { checkDungeon, dungeonSignature, type DungeonCheck } from '../data/DungeonSignature';
 import { readsGameBlock1, stampRandomGameID } from '../data/SaveGameLoader';
+import type { UtilityPortraits } from '../data/UtilityPortraits';
 import {
     SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields, slotOf,
     type OpenedSave, type SaveEntry, type SaveSlot, type SaveStore,
@@ -431,10 +432,11 @@ export class GameSaves {
      * higher (`TAG002724`), so a source made into an adventure twice makes two saves of
      * one playthrough, as CSBWin writes the same id twice. It counts no time played: the
      * adventure is a new game, whose own clock starts. Its food and water are drawn from
-     * the store's stream, as an import's playthrough is: the game's is the game's.
+     * the store's stream, as an import's playthrough is: the game's is the game's. With
+     * `newFaces`, RISE's NEW FACE, its DM champions have the utility disk's portraits.
      */
-    async makeNewAdventure(source: SaveEntry, mini: Uint8Array): Promise<OpenedSave> {
-        const bytes = makeNewAdventure(await this.store.read(source.id), mini, this.fileRandom);
+    async makeNewAdventure(source: SaveEntry, mini: Uint8Array, newFaces: UtilityPortraits | null = null): Promise<OpenedSave> {
+        const bytes = makeNewAdventure(await this.store.read(source.id), mini, this.fileRandom, newFaces);
         const fields = readSaveFileFields(bytes);
         if (!fields) throw new UtilityError(UtilityDiskMessages[25]);
         await this.marked;

@@ -101,6 +101,7 @@ export type GameScreenHooks = Pick<UIState,
   | 'onListEverySave'
   | 'onReadSave'
   | 'onMakeNewAdventure'
+  | 'onHasNewFaces'
   | 'onSaveGame'
   | 'isPrison'
   | 'onExportSave'
@@ -206,6 +207,7 @@ export class GameScreen {
       onListEverySave: hooks.onListEverySave,
       onReadSave: hooks.onReadSave,
       onMakeNewAdventure: hooks.onMakeNewAdventure,
+      onHasNewFaces: hooks.onHasNewFaces,
       onSaveGame: hooks.onSaveGame,
       isPrison: hooks.isPrison,
       onExportSave: hooks.onExportSave,

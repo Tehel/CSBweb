@@ -106,7 +106,6 @@ In payoff order: the first row is the next item.
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | G30 | 3D2D1D's vertical moves and gravity | L | ⏸️ |
-| X8 | Extra: the utility disk's portraits on DM's champions, raised by RISE | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G29 are the active list. `E15` waits for the page redesign to start: a
@@ -370,78 +369,13 @@ Rules for all of them:
     the party arrives on the square it lies on, never what the cursor threw
     (`src/engine/ThrownWeapons.ts`, checked by `tools/watch-thrown-weapons.ts`).
 
-  The coloured object cursor is the exception: the author wants it on by default, so it
-  is recorded under H.
+  The coloured object cursor and RISE's NEW FACE are the exceptions: the author wants
+  them on by default, so they are recorded under H.
 - **None of them is saved.** What an extra keeps in memory is lost on a save and a load,
   in the port's runtime save as in a CSBWin file, and that is acceptable: no save format
   changes.
 - **Each ships with its `tools/` check**, run with the setting on, and its entry here is
   deleted as for any paid item.
-
-### X8 ⏸️ The utility disk's portraits on DM's champions, raised by RISE
-
-RISE (`src/renderer/intro/PrisonDoor.ts`, `doc/SAVES.md` → "RISE makes a save of its own")
-is CSBWin's UTILITY → "MAKE NEW ADVENTURE". The original utility could also give a
-champion one of 24 redrawn portraits of DM's champions, the `.CMP` files of its disk's
-`PORTRAIT\` folder. That was the champion editor's LOAD → PORTRAIT, by hand, one champion at
-a time (`doc/ATARI_ST_DISK_REFERENCE.md` → "The Chaos Strikes Back utility disk"). CSBWin
-does not port the editor, and the port will not: the 68000 binary is its only source. The
-extra does the editor's work for the player: a DM champion raised into CSB gets the
-redrawn portrait of the champion they are.
-
-The X rules' setting does not apply. RISE is the port's own, and the author wants the
-upgrade on by default, so it is a toggle in RISE's dialog, on whenever the dialog
-opens, not `UISettings.extras`. Off, RISE makes CSBWin's adventure byte for byte, as
-it does now. The upgrade is saved: the portraits are in the new file, in CSBWin's own
-`CHARDESC` field, so CSBWin shows them too.
-
-RISE's dialog (`SaveMenu`'s `rise` mode, `src/renderer/ui/SaveMenu.ts`) already says
-what it does, and leaves EXPORT's frame empty, for the toggle. What is left is one commit:
-
-- **The data.** `static/gamefiles/csb/utility-portraits.dat`
-  (`tools/gen-utility-portraits.ts`) is a `graphics.dat` whose item 0 is laid out like
-  DM's graphic 26. Cell `charID` is the redrawn face of the champion whose DM portrait
-  is cell `charID`. The generator also writes item 1: DM's graphic 26 itself, copied
-  from `dm-atari/graphics.dat`, the reference the match below needs, so that RISE in
-  the `csb` set reads one 16 KB file rather than DM's whole `graphics.dat` (272 KB).
-  The page reads it with `GraphicsLoader` from the running set's folder, beside
-  `mini.dat` (`readMiniDat`, `src/main.ts`). A set without the file shows no toggle.
-- **Which champion: by portrait, never by name.** REINCARNATE lets the player give
-  a champion a new name and title, so a name proves nothing. A champion's portrait
-  is a cell of DM's graphic 26, pixel for pixel (`tools/dump-csbwin-load.ts`). The
-  champion whose decoded portrait (`readCsbwinCharacter`) is exactly cell `charID`
-  gets cell `charID` of the new file. A champion that matches no cell keeps their
-  portrait: the prison's champions, whose faces are CSB's own graphic 26, and any
-  portrait drawn in an editor. The reference is DM's graphic 26 from
-  `dm-atari/graphics.dat` (the new file's item 1), not the source save's set. It is
-  byte-identical in every DM set and in `kids-dungeon-24`, but `3D2D1D` and Conflux
-  have their own faces in those cells.
-- **Where.** On the source's `CHARDESC`s, with `writePortrait`, before `TAG002724`
-  copies them into `mini.dat` (`makeNewAdventure`, `src/engine/Chaos.ts`). That is
-  where the utility's `TAG00439e` swaps the editor's portraits in
-  (`doc/CSBwin-src/Chaos.cpp:4632-4656`), so the portraits are what the original
-  writes after a LOAD → PORTRAIT of each champion's `.CMP`. Names and titles are never
-  touched, whatever the `.CMP` holds: the author's rule (what the original editor does
-  to them is not established). `Chaos.ts` stays CSBWin's: the portraits come in as an
-  argument, and `GameSaves.makeNewAdventure` passes them only when the toggle is on.
-- **The toggle.** In `rise` mode only, a two-state button in the EXPORT frame, on
-  whenever the dialog opens: NEW FACE while on, OLD FACE while off. Eight characters
-  is the most a button's face holds: it is 52 pixels between graphic 0's two
-  six-column bevels, and a ninth character would take 53. The prison's "BEGIN THE
-  ADVENTURE?" (`askBeginAdventure`) needs no toggle: its party is the prison's, whose
-  faces match no DM cell.
-
-The check, in `tools/dump-rise.ts`:
-
-- **`csbgame7.dat`, on:** every champion has the new file's cell for their DM
-  portrait, with the same name and title; every other byte matches the toggle-off
-  adventure.
-- **`csbgame7.dat`, off:** the same bytes as now.
-- **`csbgame-early-2hero-renamed.dat`:** the renamed champion is upgraded by portrait,
-  and keeps their new name.
-- **The prison's four:** their portraits are unchanged either way.
-
-`doc/SAVES.md`'s RISE paragraph then describes the toggle.
 
 ---
 
@@ -575,6 +509,14 @@ Recorded so that nobody "fixes" them.
   nowhere; the author's decision is to keep it all the same. The port keeps
   `CHARFLAG_male` and clears the rest, as the mask reads (`TAG002724`,
   `src/engine/Chaos.ts`; `tools/dump-new-adventure.ts`).
+- 🚫 **RISE raises DM's champions with the utility disk's portraits** (X8). CSBWin's
+  utility copies a champion's portrait as the saved game holds it (`TAG002724`,
+  `doc/CSBwin-src/Chaos.cpp:3264-3451`), and only its unported champion editor gave one
+  a `.CMP` of the utility disk. RISE's dialog has NEW FACE on whenever it opens, and a
+  champion whose portrait is a cell of DM's graphic 26 is raised with the utility's
+  redrawn face of them (`swapInNewFaces`, `src/engine/Chaos.ts`; `doc/SAVES.md` → "RISE
+  makes a save of its own"). OLD FACE makes CSBWin's adventure, byte for byte
+  (`tools/dump-rise.ts`).
 - 🚫 **A saved game the utility cannot read is damaged, not the program's end.** On a
   `GAMEBLOCK1` that opens only with word 10, CSBWin stops in `NotImplemented(0x1868)`
   (`doc/CSBwin-src/Chaos.cpp:2966-2999`); the port refuses it with message 14. No known

@@ -17,6 +17,7 @@
 import { readU16BE, readU32LE, writeU16BE, writeU32LE } from '../core/bytes';
 import type { CsbRandom } from '../core/random';
 import { readExtendedFeatures } from '../data/CsbwinExtendedFeatures';
+import { readCsbwinCharacter, writePortrait } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import {
     genChecksum,
@@ -27,6 +28,7 @@ import {
 } from '../data/CsbwinSaveStream';
 import { buildImageChecksum } from '../data/CsbwinDungeonImageWriter';
 import { computeDungeonImageLayout } from '../data/SaveGameLoader';
+import type { UtilityPortraits } from '../data/UtilityPortraits';
 import { CHARFLAG_MALE } from './gameTypes';
 
 /** `UtilityDiskMessages` (`doc/CSBwin-src/Chaos.cpp:518-561`), the ones this file shows. */
@@ -292,6 +294,23 @@ export function TAG002724(source: UtilityGame, mini: UtilityGame, random: CsbRan
 }
 
 /**
+ * The port's own step, in `TAG00439e`'s place (`doc/CSBwin-src/Chaos.cpp:4632-4656`),
+ * which swaps the portraits the utility's champion editor loaded into the saved game's
+ * `CHARDESC`s before `TAG002724` copies them, and back after. CSBWin does not port the
+ * editor, so its `characterImages` are the champions' own and the swap changes nothing.
+ * Here each DM champion's portrait becomes the utility disk's redrawn face of them, what
+ * the editor's LOAD → PORTRAIT of their `.CMP` would have put there; a portrait that is
+ * no DM champion's stays, and so do the names and titles. The source is this call's own
+ * copy, so nothing is swapped back.
+ */
+export function swapInNewFaces(source: UtilityGame, portraits: UtilityPortraits): void {
+    for (let d7 = 0; d7 < numCharacter(source); d7++) {
+        const face = portraits.newFaceFor(readCsbwinCharacter(source.characters, d7).champion.portrait);
+        if (face) writePortrait(source.characters, CHARDESC_SIZE * d7, face);
+    }
+}
+
+/**
  * `_TAG000fc4(1)` (`doc/CSBwin-src/Chaos.cpp:2001-2327`): the new adventure's record
  * written as a save file, past the dialog that names it.
  *
@@ -335,13 +354,18 @@ export function TAG000fc4(source: UtilityGame, mini: UtilityGame): Uint8Array {
  * "MAKE NEW ADVENTURE" (`_TAG004518`'s button 13, `doc/CSBwin-src/Chaos.cpp:4806-4833`):
  * the saved game `source` checked, `mini.dat` read and checked, the party copied in, and
  * the new adventure's save file. A refusal throws a `UtilityError` with the message
- * CSBWin shows. `random` is CSBWin's `STRandom`, which draws the food and water.
+ * CSBWin shows. `random` is CSBWin's `STRandom`, which draws the food and water. With
+ * `newFaces`, the DM champions get the utility disk's portraits of them
+ * (`swapInNewFaces`); without, the adventure is CSBWin's.
  */
-export function makeNewAdventure(source: Uint8Array, mini: Uint8Array, random: CsbRandom): Uint8Array {
+export function makeNewAdventure(
+    source: Uint8Array, mini: Uint8Array, random: CsbRandom, newFaces: UtilityPortraits | null = null,
+): Uint8Array {
     const saved = ReadSavedGame(source, 0);
     TAG00260e(saved);
     const adventure = ReadSavedGame(mini, 1);
     TAG0026c4(adventure);
+    if (newFaces) swapInNewFaces(saved, newFaces);
     TAG002724(saved, adventure, random);
     return TAG000fc4(saved, adventure);
 }

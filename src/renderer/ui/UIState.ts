@@ -263,10 +263,16 @@ export interface UIState {
   readonly onListEverySave: () => Promise<SaveEntry[]>;
   /**
    * RISE's LOAD: a new adventure made from a listed save, stored and opened, to be
-   * restored as any opened save is (`GameSaves.makeNewAdventure`). Throws the
+   * restored as any opened save is (`GameSaves.makeNewAdventure`), its DM champions
+   * with the utility disk's portraits when `newFaces` (RISE's NEW FACE). Throws the
    * utility's refusal, which goes to `onRestoreFailed`.
    */
-  readonly onMakeNewAdventure: (source: SaveEntry) => Promise<OpenedSave>;
+  readonly onMakeNewAdventure: (source: SaveEntry, newFaces?: boolean) => Promise<OpenedSave>;
+  /**
+   * Whether the data set has the utility disk's portraits (`UTILITY_PORTRAITS_FILE`,
+   * `src/data/UtilityPortraits.ts`): RISE's dialog has its NEW FACE toggle only then.
+   */
+  readonly onHasNewFaces: () => Promise<boolean>;
   /** A listed save out of the store (`GameSaves.open`). */
   readonly onReadSave: (entry: SaveEntry) => Promise<OpenedSave>;
   /**
@@ -387,7 +393,7 @@ export type UISources = Pick<UIState,
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
-  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave'>;
+  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onHasNewFaces' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {

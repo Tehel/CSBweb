@@ -12,6 +12,7 @@ import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
 import { parseHcsbDat } from './data/HintOracleLoader';
 import { BrowserSaveStore, downloadSaveFile, type OpenedSave } from './data/saves';
+import { UTILITY_PORTRAITS_FILE, UtilityPortraits } from './data/UtilityPortraits';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
 import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
@@ -262,6 +263,22 @@ async function readMiniDat(): Promise<Uint8Array> {
     return new Uint8Array(await response.arrayBuffer());
 }
 
+/**
+ * The data set's `utility-portraits.dat`, for RISE's NEW FACE (`src/data/UtilityPortraits.ts`),
+ * read once; `null` for a set without it, which has no toggle.
+ */
+let utilityPortraits: Promise<UtilityPortraits | null> | null = null;
+function readUtilityPortraits(): Promise<UtilityPortraits | null> {
+    utilityPortraits ??= (async () => {
+        const response = await fetch(`${dataSet.dir}/${UTILITY_PORTRAITS_FILE}`).catch(() => null);
+        if (!response?.ok) return null;
+        const file = new GraphicsLoader();
+        file.loadFromArray(new Uint8Array(await response.arrayBuffer()));
+        return new UtilityPortraits(file);
+    })();
+    return utilityPortraits;
+}
+
 /** The sound manager, unlocked by the first click or key: browsers keep audio locked until then. */
 function createSoundManager(graphicsLoader: GraphicsLoader, tables: GameTables): SoundManager {
     const sound = new SoundManager(graphicsLoader);
@@ -428,7 +445,9 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         onListEverySave: () => saves.listEverySet(),
         onReadSave: (entry) => saves.open(entry),
         // RISE, on the entrance: a new adventure from a save of any set.
-        onMakeNewAdventure: async (source) => (adventure = await saves.makeNewAdventure(source, await readMiniDat())),
+        onMakeNewAdventure: async (source, newFaces) => (adventure = await saves.makeNewAdventure(
+            source, await readMiniDat(), newFaces ? await readUtilityPortraits() : null)),
+        onHasNewFaces: async () => (await readUtilityPortraits()) !== null,
         onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
         isPrison: () => saves.inPrison(),
         // EXPORT: the row's file as the store holds it, downloaded under the row's name.

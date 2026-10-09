@@ -391,12 +391,14 @@ that champion: none is any cell of graphic 26, and the nearest cell differs in 1
 745 of 928 pixels. Many are armed or armoured: Halk, for one, wears a horned helmet and
 carries a shield.
 
-`static/gamefiles/csb/utility-portraits.dat` holds them for the port. It is a
-`graphics.dat` of one item, stored uncompressed, and `GraphicsLoader` reads it. Item 0 is
-a 256x87 IMG1 picture laid out like graphic 26, so cell `charID` is the drawing of the
-champion whose DM portrait is cell `charID`. `tools/gen-utility-portraits.ts` builds the
-file from the disk image, and checks that every cell decodes to its `.CMP`'s pixels and
-goes back, through `writePortrait`, to its 464 bytes. Graphic 26 is byte-identical in the
+`static/gamefiles/csb/utility-portraits.dat` holds them for the port, RISE's NEW FACE
+(`doc/SAVES.md`). It is a `graphics.dat` of two items, which `GraphicsLoader` reads.
+Item 0, stored uncompressed, is a 256x87 IMG1 picture laid out like graphic 26, so cell
+`charID` is the drawing of the champion whose DM portrait is cell `charID`. Item 1 is
+graphic 26 itself, copied as `dm-atari/graphics.dat` stores it, which the champions'
+portraits are matched against. `tools/gen-utility-portraits.ts` builds the file from the
+disk image, and checks that every cell decodes to its `.CMP`'s pixels and goes back,
+through `writePortrait`, to its 464 bytes, and that item 1 decodes to graphic 26. Graphic 26 is byte-identical in the
 `graphics.dat` of `dm-atari`, `dm-atari-1.2`, `dm-atari-1.3-fr`, `dm-windows` and
 `kids-dungeon-24`. It is not in `3D2D1D`'s or Conflux's.
 

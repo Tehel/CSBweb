@@ -48,6 +48,7 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     onListEverySave: async () => [],
     onReadSave: () => { throw new Error('no save to read in this tool'); },
     onMakeNewAdventure: () => { throw new Error('no save to make an adventure from in this tool'); },
+    onHasNewFaces: async () => false,
     onSaveGame: () => { throw new Error('no world to save in this tool'); },
     isPrison: () => false,
     onExportSave: () => { throw new Error('no save to export in this tool'); },

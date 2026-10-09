@@ -32,6 +32,13 @@
  *    restores that. The disk menu's SAVE asks in the prison, NOT YET goes back to the
  *    list, and YES makes the adventure from the save just written; outside the prison
  *    SAVE asks nothing.
+ * 7. **NEW FACE.** `utility-portraits.dat` holds the utility disk's faces and, as its
+ *    item 1, DM's graphic 26. `csbgame7.dat` raised with them: each champion has the
+ *    file's cell for the cell of graphic 26 their portrait is, under the same name and
+ *    title, and every other byte of the adventure is the one without them, which is
+ *    `makeNewAdventure`'s as ever. `csbgame-early-2hero-renamed.dat`'s renamed champion
+ *    is known by their portrait, and keeps the new name. The prison's four, CSB's own
+ *    faces, keep their portraits either way.
  *
  * Run: `npx tsx tools/dump-rise.ts`
  */
@@ -44,8 +51,12 @@ import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { OpenedSave, SaveEntry } from '../src/data/saves';
 import { readSaveFileFields } from '../src/data/saves/SaveStore';
-import { UtilityDiskMessages, UtilityError, makeNewAdventure } from '../src/engine/Chaos';
+import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH, readCsbwinCharacter } from '../src/data/CsbwinCharacters';
+import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
+import { UTILITY_PORTRAITS_FILE, UtilityPortraits } from '../src/data/UtilityPortraits';
+import { ReadSavedGame, UtilityDiskMessages, UtilityError, makeNewAdventure, type UtilityGame } from '../src/engine/Chaos';
 import type { Game } from '../src/engine/Game';
+import type { Champion } from '../src/engine/gameTypes';
 import { GameSaves, PRISON_WORD22592 } from '../src/engine/GameSaves';
 import { utilityMenuTitles } from '../src/renderer/intro/BootSequence';
 import {
@@ -69,7 +80,7 @@ import * as SaveMenu from '../src/renderer/ui/SaveMenu';
 import type { UIButton } from '../src/data/tables/UITables';
 import { dataSetNamed } from './lib/dataSets';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, presetHeroesOf } from './lib/game';
+import { graphicsTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { memoryStore, savePath } from './lib/saves';
 import { newUIState } from './lib/ui';
 
@@ -340,13 +351,17 @@ const PRISON_HEROES = presetHeroesOf(PRISON, graphics);
 const undated = (text: string): string => text.replace(/csbweb-\d{8}-\d{6}(-\d+)?/g, 'csbweb-<date>');
 
 /** The prison's game, under `dataSet`, its saves in `store`, and what asked the question. */
-function prisonGame(store: ReturnType<typeof memoryStore>, dataSet = 'csb') {
+function prisonGame(
+  store: ReturnType<typeof memoryStore>, dataSet = 'csb', portraitOf: (champion: Champion) => number[] | undefined = () => undefined,
+) {
   const asked: Array<string | null> = [];
   let saves: GameSaves | null = null;
-  const game: Game = newGame(PRISON, graphics, { championJoined: () => saves?.championJoined() });
+  // Its own copy of the prison: a champion recruited empties their mirror in the data.
+  const prison = new DungeonLoader().loadDungeonDat(read(resolve(CSB, 'dungeon.dat')));
+  const game: Game = newGame(prison, graphics, { championJoined: () => saves?.championJoined() });
   game.setRandomSeed(SEED);
   saves = new GameSaves(game, dataSetNamed(dataSet), store, {
-    portraitOf: () => undefined,
+    portraitOf,
     repackOpenChest: () => {},
     askBeginAdventure: (source) => { asked.push(source?.name ?? null); },
   }, () => {}, new CsbRandom(SEED));
@@ -485,6 +500,150 @@ async function checkPrison(): Promise<void> {
   check(dmUi.saveMenu!.message === 'GAME SAVED' && !dmUi.saveMenu!.adventure, 'outside the prison SAVE asks nothing');
 }
 
+/* ------------------------------------------------------------- 7. NEW FACE ---- */
+
+const PORTRAIT_OFFSET = 336;
+const PORTRAIT_END = 800;
+
+/** Cell `charID` of a sheet laid out like graphic 26. */
+function cellOf(sheet: { width: number; pixels: Uint8Array }, charID: number): number[] {
+  const cell: number[] = [];
+  for (let y = 0; y < PORTRAIT_HEIGHT; y++) {
+    for (let x = 0; x < PORTRAIT_WIDTH; x++) {
+      cell.push(sheet.pixels[((charID >> 3) * PORTRAIT_HEIGHT + y) * sheet.width + ((charID & 7) << 5) + x]!);
+    }
+  }
+  return cell;
+}
+
+/** A save's champions: name, title, and their portrait's pixels. */
+function championsOf(game: UtilityGame): { name: string; title: string; portrait: string }[] {
+  const out = [];
+  for (let i = 0; i < readU16(game.block2, 10); i++) {
+    const { champion } = readCsbwinCharacter(game.characters, i);
+    out.push({ name: champion.name, title: champion.title, portrait: (champion.portrait ?? []).join() });
+  }
+  return out;
+}
+
+function readU16(bytes: Uint8Array, at: number): number {
+  return (bytes[at]! << 8) | bytes[at + 1]!;
+}
+
+/**
+ * Where two adventures' records differ, as `block:offset` ranges: a portrait's 464 bytes
+ * are `characters:<champion>.portrait`.
+ */
+function differences(a: UtilityGame, b: UtilityGame): string[] {
+  const out = new Set<string>();
+  for (const block of ['block1', 'block2', 'item16', 'characters', 'timers', 'timerQueue', 'image'] as const) {
+    const x = a[block];
+    const y = b[block];
+    if (x.length !== y.length) out.add(`${block}:length`);
+    for (let i = 0; i < Math.min(x.length, y.length); i++) {
+      if (x[i] === y[i]) continue;
+      const champion = Math.floor(i / CHARDESC_SIZE);
+      const inPortrait = block === 'characters' && champion < 4 && i % CHARDESC_SIZE >= PORTRAIT_OFFSET && i % CHARDESC_SIZE < PORTRAIT_END;
+      out.add(inPortrait ? `characters:${champion}.portrait` : `${block}:${i}`);
+    }
+  }
+  return [...out];
+}
+
+function checkNewFaces(): UtilityPortraits {
+  console.log('');
+  console.log('=== NEW FACE ===');
+  const file = new GraphicsLoader();
+  file.loadFromArray(read(resolve(CSB, UTILITY_PORTRAITS_FILE)));
+  const portraits = new UtilityPortraits(file);
+  const newFaces = file.getImage(0);
+  const dm26 = stockGraphics().getImage(26);
+  const reference = file.getImage(1);
+  console.log(`  ${UTILITY_PORTRAITS_FILE}: ${file.getItemCount()} items, ${newFaces.width}x${newFaces.height} and ${reference.width}x${reference.height}`);
+  check(file.getItemCount() === 2 && reference.width === dm26.width && reference.height === dm26.height
+    && reference.pixels.every((p, i) => p === dm26.pixels[i]), 'its item 1 is DM\'s graphic 26');
+  const dmCells = [...Array(24).keys()].map((charID) => cellOf(dm26, charID).join());
+
+  /** The adventure from `source`, without the faces and with them, and the source's champions. */
+  const raise = (source: Uint8Array) => {
+    const off = makeNewAdventure(source, MINI, new CsbRandom(SEED));
+    const offNull = makeNewAdventure(source, MINI, new CsbRandom(SEED), null);
+    const on = makeNewAdventure(source, MINI, new CsbRandom(SEED), portraits);
+    return {
+      before: championsOf(ReadSavedGame(source, 0)),
+      off: ReadSavedGame(off, 0),
+      on: ReadSavedGame(on, 0),
+      offSame: same(off, offNull),
+    };
+  };
+  /** What a champion's portrait should be raised as: the file's cell for their DM cell, or theirs. */
+  const expected = (portrait: string): { cell: number; portrait: string } => {
+    const cell = dmCells.indexOf(portrait);
+    return { cell, portrait: cell < 0 ? portrait : cellOf(newFaces, cell).join() };
+  };
+  const report = (label: string, r: ReturnType<typeof raise>) => {
+    const on = championsOf(r.on);
+    const off = championsOf(r.off);
+    const diff = differences(r.off, r.on);
+    const rows = r.before.map((c, i) => {
+      const want = expected(c.portrait);
+      return {
+        cell: want.cell,
+        upgraded: on[i]!.portrait === want.portrait,
+        changed: on[i]!.portrait !== c.portrait,
+        offKept: off[i]!.portrait === c.portrait,
+        named: on[i]!.name === c.name && on[i]!.title === c.title,
+      };
+    });
+    console.log(`  ${label}: ${r.before.map((c, i) => `${c.name}${c.title ? ` ${c.title}` : ''} (DM cell ${rows[i]!.cell}${rows[i]!.changed ? ', NEW FACE' : ''})`).join(', ')}`);
+    console.log(`    on against off: ${diff.length ? diff.join(', ') : 'identical'}`);
+    return { rows, diff };
+  };
+
+  const seven = raise(CSBGAME7);
+  const s7 = report('csbgame7.dat', seven);
+  check(seven.offSame, 'off, the adventure is makeNewAdventure\'s with no portraits, CSBWin\'s');
+  check(s7.rows.every((r) => r.offKept), 'and every champion keeps their portrait in it');
+  check(s7.rows.length === 4 && s7.rows.every((r) => r.cell >= 0 && r.upgraded && r.changed),
+    'on, each DM champion has the file\'s cell for their cell of graphic 26');
+  check(s7.rows.every((r) => r.named), 'under the same name and title');
+  // `GAMEBLOCK1`'s word 174 is the characters' checksum, and word 127 the fold over
+  // the block's second half, which holds it (`scrambleAndWrite`).
+  const sums = ['block1:254', 'block1:255', 'block1:348', 'block1:349'];
+  const portraitsOnly = (diff: string[]): boolean => diff.every((d) => sums.includes(d) || d.endsWith('.portrait'));
+  check(s7.diff.length === sums.length + 4 && portraitsOnly(s7.diff),
+    'and every other byte is the same, but for the characters\' checksum and the fold that holds it');
+
+  const renamedSave = read(savePath('csbgame-early-2hero-renamed.dat'));
+  const renamed = raise(renamedSave);
+  const rn = report('csbgame-early-2hero-renamed.dat', renamed);
+  const dmNames = new Set(presetHeroesOf(stockDungeon(), stockGraphics()).map((h) => h.name));
+  const renamedIndex = renamed.before.findIndex((c) => !dmNames.has(c.name));
+  check(renamedIndex >= 0 && rn.rows[renamedIndex]!.cell >= 0, 'a champion there is renamed, and has a DM portrait');
+  check(rn.rows.every((r) => r.upgraded && r.changed && r.named), 'each is upgraded by portrait, and keeps their name and title');
+  check(portraitsOnly(rn.diff), 'and nothing else changes');
+  return portraits;
+}
+
+/** The prison's four, saved with CSB's faces, raised with the utility's portraits and without. */
+async function checkPrisonFaces(portraits: UtilityPortraits): Promise<void> {
+  const csb26 = graphics.getImage(26);
+  const store = memoryStore();
+  const { game, saves } = prisonGame(store, 'csb', (champion) => cellOf(csb26, champion.portraitGraphic!));
+  for (let i = 0; i < 4; i++) recruit(game, i);
+  const save = await saves.save('running', 'quick');
+  const bytes = await store.read(save.id);
+  const before = championsOf(ReadSavedGame(bytes, 0));
+  const [off, on] = [null, portraits].map((p) => championsOf(ReadSavedGame(makeNewAdventure(bytes, MINI, new CsbRandom(SEED), p), 0)));
+  const dmCells = [...Array(24).keys()].map((charID) => cellOf(stockGraphics().getImage(26), charID).join());
+  console.log(`  the prison's four: ${before.map((c) => `${c.name} (DM cell ${dmCells.indexOf(c.portrait)})`).join(', ')}`);
+  check(before.length === 4 && before.every((c, i) => c.portrait === cellOf(csb26, game.ctx.party.state.champions[i]!.portraitGraphic!).join()),
+    'they are saved with their cells of CSB\'s graphic 26');
+  check(before.every((c) => dmCells.indexOf(c.portrait) < 0), 'which are no DM champion\'s');
+  check([off!, on!].every((raised) => raised.every((c, i) => c.portrait === before[i]!.portrait)),
+    'and keep their portraits, the faces on or off');
+}
+
 async function main(): Promise<void> {
   checkCarving();
   checkButtons();
@@ -492,6 +651,7 @@ async function main(): Promise<void> {
   await checkChooser();
   checkTitles();
   await checkPrison();
+  await checkPrisonFaces(checkNewFaces());
   finish();
 }
 
