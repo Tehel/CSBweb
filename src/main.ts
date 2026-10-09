@@ -312,7 +312,7 @@ async function loadSwooshFiles(sound: SoundManager, settings: UISettings): Promi
  * which the engine writes and the screen draws.
  */
 function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager): Built {
-    const messages = new ScrollingText();
+    const messages = new ScrollingText(tables.byte1830);
     const playSound = (soundId: number, rateIdx?: number, highVolume?: number) => sound.playSound(soundId, rateIdx, highVolume);
     // The screen is built second, over the engine's dungeon, so the engine→UI notices
     // reach it through this variable.

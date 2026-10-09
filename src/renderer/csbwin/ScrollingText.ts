@@ -75,6 +75,9 @@ interface PlacedPiece {
 }
 
 export class ScrollingText {
+  /** `byte1830`: `d.Byte1830`, graphic `0x232`'s linefeed (`GameTables.byte1830`). */
+  constructor(private readonly byte1830: string) {}
+
   /** `m_futureLines` — pieces waiting to be placed. */
   private futureLines: TextPiece[] = [];
   /** Pieces currently on each row (our stand-in for the persistent screen pixels). */
@@ -114,11 +117,11 @@ export class ScrollingText {
   }
 
   /**
-   * CSBWin `PrintLinefeed()` (`doc/CSBwin-src/CSBCode.cpp:1761`) — queues the two-byte
-   * `d.Byte1830` string, which holds a newline, with colour 0.
+   * CSBWin `PrintLinefeed()` (`doc/CSBwin-src/CSBCode.cpp:1761-1765`) — queues the
+   * `d.Byte1830` string, a newline in every data set, with colour 0.
    */
   printLinefeed(): void {
-    this.printQueue.push({ color: 0, text: '\n' });
+    this.printQueue.push({ color: 0, text: this.byte1830 });
   }
 
   // ------------------------------------------------------------------ pumping

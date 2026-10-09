@@ -33,7 +33,7 @@ import { determineMastery } from '../src/engine/skills';
 import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
-import { newGame, presetHeroesOfGame, runVbl, stockDungeon, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, presetHeroesOfGame, runVbl, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { wakeUp } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
@@ -46,7 +46,7 @@ async function main(): Promise<void> {
   const graphics = stockGraphics();
   // The host's `sleepChanged`, wired as `main.ts` wires it (the UI half is built below).
   const notified: boolean[] = [];
-  const messages = new ScrollingText();
+  const messages = new ScrollingText(gameTablesOf(graphics).byte1830);
   const game = newGame(data, graphics, {
     messages,
     sleepChanged: (sleeping) => {

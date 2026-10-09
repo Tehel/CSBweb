@@ -1069,9 +1069,9 @@ export class AttackSystem {
         break;
       }
     }
-    messages.printLines(0, '\n', this.ctx.state.tickCount);
+    messages.printLines(0, this.ctx.tables.byte1830, this.ctx.state.tickCount);
     messages.printLines(15, 'THE END.', this.ctx.state.tickCount);
-    messages.printLines(0, '\n', this.ctx.state.tickCount);
+    messages.printLines(0, this.ctx.tables.byte1830, this.ctx.state.tickCount);
     yield* this.vblDelayPlacingText(600);
     mainLoop.clearCanRestartFromSavegame();
     yield* mainLoop.showCreditsAndEnd();

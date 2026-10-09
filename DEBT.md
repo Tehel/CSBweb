@@ -100,7 +100,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C164 | A linefeed is the port's `'\n'`, where CSBWin prints graphic `0x232`'s `Byte1830` | S | ⏳ |
 | F14 | The golden frames compare colours, not palette indices | M | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | G29 | Recording a game and playing it back | — | ⏸️ |
@@ -175,19 +174,6 @@ The redesigned page also links to two pages:
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C164 ⏳ A linefeed is the port's `'\n'`, where CSBWin prints graphic `0x232`'s `Byte1830`
-
-CSBWin's linefeed is a string of the table item, not a constant: `PrintLinefeed` queues
-`d.Byte1830` (`doc/CSBwin-src/CSBCode.cpp:1761-1765`), and the end of the game prints it
-on either side of "THE END." (`Attack.cpp:2426-2428`). It is the first two bytes of graphic
-`0x232`, `"\n"` and its terminator in every data set (`doc/PROVEN_FACTS.md` → "Items
-`0x230`, `0x231` and `0x232` are laid out exactly as `Data.h` declares their spans"). The
-port writes `'\n'` in both places (`ScrollingText.printLinefeed`,
-`src/renderer/csbwin/ScrollingText.ts`; `AttackSystem`'s end of the game,
-`src/engine/AttackSystem.ts:1072-1074`), and `parseGraphic232` skips the two bytes. No
-data set prints differently; the fix is to read the string and hand it to both, and
-`tools/dump-graphics-tables.ts` then writes it back.
 
 ### C145 ⏸️ The Hint Oracle's title boxes keep colour 12 on their last line and a half
 

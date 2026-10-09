@@ -124,6 +124,8 @@ export interface UITables {
     };
   };
   graphic232: {
+    /** `d.Byte1830`, a C string: the linefeed `PrintLinefeed` queues (`doc/CSBwin-src/CSBCode.cpp:1764`). */
+    byte1830: string;
     long1828: number[];
     long1812: number[];
     wRectPos1796: WordRect;
@@ -616,8 +618,10 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   const view = makeView(raw);
   let off = 0;
 
-  // Byte1830[2]
+  // Byte1830[2], printed as a C string, so up to its terminator.
   requireSize(raw, off, 2, '0x232 Byte1830');
+  let byte1830 = '';
+  for (let i = off; i < raw.length && raw[i] !== 0; i++) byte1830 += String.fromCharCode(raw[i]!);
   off += 2;
 
   const long1828 = readI32Array(view, off, 4); off += 4 * 4;
@@ -774,6 +778,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   const word12 = wordRects[16];
 
   return {
+    byte1830,
     uByte590,
     byte586,
     long1828,

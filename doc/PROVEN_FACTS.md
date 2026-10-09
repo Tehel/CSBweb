@@ -496,11 +496,12 @@ words are high byte first, as CSBWin swaps them all at load (`CSBCode.cpp:10176-
 `:10279-10284`, `:10322-10370`), but `Long1828` and `Long1812`, which it swaps where it reads
 them (`LE32`, `Graphics.cpp:356-359`).
 
+`Byte1830` is `"\n"` and its terminator in every data set: the linefeed, the string
+`PrintLinefeed` queues and the end of the game prints (`CSBCode.cpp:1764`,
+`Attack.cpp:2426-2428`), which the port reads as `GameTables.byte1830`.
+
 The bytes no table reads:
 
-- `Byte1830`, `"\n"` in every data set, the string `PrintLinefeed` and the end of the
-  game print (`CSBCode.cpp:1764`, `Attack.cpp:2426-2428`). The port prints a newline of its
-  own (`DEBT.md` C164).
 - `Byte1416`, `" "`: CSBWin writes the letter typed over its first byte before printing it,
   and its second is the string's terminator, 0 in every data set (`Code13ea4.cpp:267-275`).
 - `Word1588`, which CSBWin only writes (`CSBCode.cpp:1916`), and `Unused19218`, `Unused918`,

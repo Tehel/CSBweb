@@ -449,6 +449,7 @@ function regions232(t: GraphicsTables): Region[] {
   const out: Region[] = [];
   const put = (table: string, field: string, b: number[], runsOn?: string) => out.push({ table, field, at: 0, bytes: b, runsOn });
 
+  put('byte1830', 'Byte1830', [...Array.from(u.byte1830, (c) => c.charCodeAt(0)), 0]);
   put('long1828', 'Long1828', u.long1828.flatMap(long));
   put('long1812', 'Long1812', u.long1812.flatMap(long));
   put('wRectPos1796', 'wRectPos1796', wordRect(u.wRectPos1796));

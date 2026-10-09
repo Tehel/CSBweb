@@ -47,7 +47,7 @@ import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
 import { check, finish } from './lib/check';
 import { wrapMember } from './lib/standIn';
 import { createMonsterAt } from './lib/createMonster';
-import { newGame, stockGraphics, runVbl, TICK_DUE, stockDungeon } from './lib/game';
+import { gameTablesOf, newGame, stockGraphics, runVbl, TICK_DUE, stockDungeon } from './lib/game';
 import { testChampion } from './lib/champion';
 
 /** North, east, south, west: the steps the tool expects of `d.DeltaX` / `d.DeltaY`. */
@@ -97,6 +97,9 @@ function shown(strip: ScrollingText | null): string {
   return strip.snapshot().map((row) => row.trim()).filter((row) => row !== '').join(' ').replace(/ +/g, ' ');
 }
 
+/** `d.Byte1830`, the strip's linefeed. */
+const LINEFEED = gameTablesOf(stockGraphics()).byte1830;
+
 /** The VBLs of one scroll: seven scanlines, and the VBL that clears `d.PushTextUp`. */
 const SCROLL_VBLS = 8;
 
@@ -105,7 +108,7 @@ const SCROLL_VBLS = 8;
  * (`d.PrintRow` 3), and every row timed out since.
  */
 function scrolledStrip(): ScrollingText {
-  const strip = new ScrollingText();
+  const strip = new ScrollingText(LINEFEED);
   for (let line = 0; line < 5; line++) {
     strip.printLines(15, `\nLINE ${line}`, 0);
     for (let vbl = 0; vbl < SCROLL_VBLS; vbl++) {
@@ -340,7 +343,7 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fre
   console.log('=== 6. boxed in: toast (Attack.cpp:213), and _FusionSequence (:2222) to the credits,'
     + ` ${inventoryOpen ? 'the inventory open' : 'no inventory open'}${withoutB ? ', the "B" text taken off cell (0, 0)' : ''}`
     + `${stripState === null ? '' : `, onto a strip that has ${stripState === 'fresh' ? 'printed nothing' : 'scrolled, its rows timed out'}`} ===`);
-  const strip = stripState === null ? null : stripState === 'fresh' ? new ScrollingText() : scrolledStrip();
+  const strip = stripState === null ? null : stripState === 'fresh' ? new ScrollingText(LINEFEED) : scrolledStrip();
   const a = arena(true, strip);
   const game = a.game;
   if (withoutB) game.ctx.dungeon.removeObjectFromCell(new Position(0, 0, LEVEL), game.ctx.dungeon.rnMaps.rn(DBType.TEXT, ENDING_TEXTS.B!.idx));

@@ -24,7 +24,7 @@ import { Position } from '../src/core/types';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { newGame, runVbl, TICK_DUE, stockDungeon, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, runVbl, TICK_DUE, stockDungeon, stockGraphics } from './lib/game';
 import { freeze, thaw } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
 
@@ -37,7 +37,7 @@ function main(): void {
   const graphics = stockGraphics();
   const font = loadFontData(graphics);
 
-  const messages = new ScrollingText();
+  const messages = new ScrollingText(gameTablesOf(graphics).byte1830);
   const game = newGame(data, graphics, { messages });
   game.setRandomSeed(0x12345678);
   game.ctx.party.state.position = new Position(6, 14, 2);
@@ -194,6 +194,16 @@ function main(): void {
   frame();
   check(rows()[0] === 'KEPT' && messages.timeouts()[0] === game.ctx.state.tickCount + 70,
     'the next pass prints it at (0, 0), awake: SetPrintPosition(0, 0), d.PartySleeping 0');
+
+  console.log('');
+  console.log('=== PrintLinefeed queues d.Byte1830, whatever it holds (CSBCode.cpp:1761-1765) ===');
+  check(gameTablesOf(graphics).byte1830 === '\n', "dm-atari's d.Byte1830 is a newline");
+  // The canary: a linefeed that also prints, so the strip shows which string was queued.
+  const canary = new ScrollingText('\nLF');
+  canary.printLinefeed();
+  canary.printNextQueued(0);
+  console.log(`a strip handed "\\nLF": ${JSON.stringify(canary.snapshot())}`);
+  check(canary.snapshot().some((line) => line.trim() === 'LF'), 'printLinefeed prints the string the strip was handed');
 
   finish();
 }

@@ -87,6 +87,11 @@ export interface GameTables {
   readonly byte1412: ArrayLike<number>;
   /** `d.Byte1386[4]` — each champion's message colour. */
   readonly byte1386: ArrayLike<number>;
+  /**
+   * `d.Byte1830` — the linefeed, the string `PrintLinefeed` queues and the end of the game
+   * prints (`doc/CSBwin-src/CSBCode.cpp:1761-1765`, `Attack.cpp:2426-2428`).
+   */
+  readonly byte1830: string;
 
   // --- Attacks and spells: graphic `0x230`, indexed by `ATTACKTYPE` (`Data.h:647-660`).
   //     CSBWin names most of them after their addresses, and so do we: nothing in the C++
@@ -173,6 +178,7 @@ export function buildGameTables(graphics: GraphicsTables): GameTables {
     byte586: g232.byte586,
     byte1412: g232.byte1412,
     byte1386: g232.byte1386,
+    byte1830: g232.byte1830,
 
     experienceForAttacking: g230.experienceForAttacking,
     skillNumber: g230.skillNumber,
