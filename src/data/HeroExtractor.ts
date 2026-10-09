@@ -22,6 +22,7 @@ import type {
   TextRecord,
 } from './dungeonTypes';
 import type { TextDecodeTables } from './tables/ObjectTables';
+import type { DirectionTables } from '../engine/RelativeXY';
 
 /** A mirror's hero: what its text gives, the portrait it names, and what lies in its wall. */
 export interface PresetHero extends HeroText {
@@ -32,10 +33,7 @@ export interface PresetHero extends HeroText {
   inventory: HeroInventoryItem[];
 }
 
-const DELTA_X = [0, 1, 0, -1];
-const DELTA_Y = [-1, 0, 1, 0];
-
-export function extractPresetHeroes(data: DungeonData, tables: TextDecodeTables): PresetHero[] {
+export function extractPresetHeroes(data: DungeonData, tables: TextDecodeTables, directions: DirectionTables): PresetHero[] {
   const heroes: PresetHero[] = [];
   const seen = new Set<string>();
 
@@ -56,7 +54,7 @@ export function extractPresetHeroes(data: DungeonData, tables: TextDecodeTables)
           // The party clicks the mirror from the cell its wall faces, and `AddCharacter`
           // reads the text in that cell (`doc/CSBwin-src/Character.cpp:536-550`).
           const pos = decoded.position;
-          const textRef = firstText(data, map, mapIndex, x + DELTA_X[pos], y + DELTA_Y[pos]);
+          const textRef = firstText(data, map, mapIndex, x + directions.deltaX[pos]!, y + directions.deltaY[pos]!);
           const text = textRef ? DecodeText(data, textRef.record, 0x8002, 990, tables) : null;
           const textRecordIndex = textRef ? textRef.index : -1;
 

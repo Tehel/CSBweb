@@ -159,7 +159,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             written to the store, or read back: the disk menu's, the boot's and F5/F9's),
             Chaos (the UTILITY's "MAKE NEW ADVENTURE": a saved game's party into
             `mini.dat`), FileSignatures (the graphics files checked against what a
-            read names), Die (CSBWin's `die`), skills, AddCharacter, objectIndex
+            read names), Die (CSBWin's `die`), RelativeXY (a square counted in steps
+            through `d.DeltaX`), skills, AddCharacter, objectIndex
             (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
             GameInput (where a click or a key goes once the page has read it),

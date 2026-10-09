@@ -44,7 +44,6 @@ import {
 import type { GameContext } from './GameContext';
 import { emptyPossessions, type Champion } from './gameTypes';
 import { setClockTick } from './LoopState';
-import { DELTA_X, DELTA_Y } from './MonsterPerception';
 import { selectMagicCaster, setHandOwner } from './Party';
 
 export class HallOfChampions {
@@ -312,8 +311,8 @@ export class HallOfChampions {
     const party = this.ctx.party.state;
     const facing = party.facing & 3;
     return new Position(
-      party.position.x + DELTA_X[facing],
-      party.position.y + DELTA_Y[facing],
+      party.position.x + this.ctx.tables.deltaX[facing],
+      party.position.y + this.ctx.tables.deltaY[facing],
       party.position.z,
     );
   }

@@ -29,8 +29,6 @@ import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
 import { StateOfFear } from './monsterTypes';
 import { MonsterDamageResult } from './MonsterDamage';
 import {
-  DELTA_X,
-  DELTA_Y,
   distanceBetweenPoints,
   getPrimaryAndSecondaryDirection,
   type MoveProbeState,
@@ -806,8 +804,8 @@ export class MonsterAI {
     let direction = start;
 
     do {
-      const newX = c.mapX + (DELTA_X[direction] ?? 0);
-      const newY = c.mapY + (DELTA_Y[direction] ?? 0);
+      const newX = c.mapX + (this.ctx.tables.deltaX[direction] ?? 0);
+      const newY = c.mapY + (this.ctx.tables.deltaY[direction] ?? 0);
 
       let skip = false;
       if (c.slot.ubPrevX === newX && c.slot.ubPrevY === newY) {
@@ -906,8 +904,8 @@ export class MonsterAI {
       if (this.processInvincible(frame, c, preferredDirection)) return;
     } else {
       frame.d5 = dir;
-      const newX = c.mapX + (DELTA_X[dir] ?? 0);
-      const newY = c.mapY + (DELTA_Y[dir] ?? 0);
+      const newX = c.mapX + (this.ctx.tables.deltaX[dir] ?? 0);
+      const newY = c.mapY + (this.ctx.tables.deltaY[dir] ?? 0);
       if (!this.stepOrDefer(frame, c, newX, newY)) return;
     }
 
@@ -1069,8 +1067,8 @@ export class MonsterAI {
     }
 
     frame.d5 = dir;
-    const newX = c.mapX + 2 * (DELTA_X[dir] ?? 0);
-    const newY = c.mapY + 2 * (DELTA_Y[dir] ?? 0);
+    const newX = c.mapX + 2 * (this.ctx.tables.deltaX[dir] ?? 0);
+    const newY = c.mapY + 2 * (this.ctx.tables.deltaY[dir] ?? 0);
     this.ctx.systems.monsters.playTeleportSound(newX, newY, c.level);
 
     const remaining = frame.timePerMove / 2 - frame.sinceLastUpdate;
@@ -1389,8 +1387,8 @@ export class MonsterAI {
         `      MAI Not on party level. PossibleMove(Random()=${direction}) returned ${probe.possible}.`,
       );
       if (probe.possible) {
-        const newX = mapX + (DELTA_X[direction] ?? 0);
-        const newY = mapY + (DELTA_Y[direction] ?? 0);
+        const newX = mapX + (this.ctx.tables.deltaX[direction] ?? 0);
+        const newY = mapY + (this.ctx.tables.deltaY[direction] ?? 0);
         const moved = this.ctx.systems.monsters.moveMonster(monsterRn, mapX, mapY, newX, newY, level, undefined, mmr);
         this.trace(`      MAI MoveObject to (${newX},${newY}) returned ${moved.code}`);
         if (moved.code !== 0) {

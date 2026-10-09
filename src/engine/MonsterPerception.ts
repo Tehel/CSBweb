@@ -42,27 +42,11 @@ import {
 } from '../data/tables/MonsterDesc';
 import { setPackedBits } from './MonsterSystem';
 import { CloudType } from './cloudTypes';
-
-/** `d.DeltaX` / `d.DeltaY`, indexed by direction (N, E, S, W). */
-export const DELTA_X = [0, 1, 0, -1];
-export const DELTA_Y = [-1, 0, 1, 0];
-
+import { RelativeXY } from './RelativeXY';
+import { sw } from '../core/intCast';
 
 /** `PossibleMove`'s minimum `word16_12_15` before a monster will use a teleporter. */
 const TELEPORTER_WILLINGNESS = 10;
-
-/**
- * `RelativeXY` (`doc/CSBwin-src/CSBCode.cpp:4636`) — step `forward` cells along
- * `facing` and `right` cells along `facing + 1`.
- */
-export function relativeXY(facing: number, forward: number, right: number, mapX: number, mapY: number): { x: number; y: number } {
-  const f = facing & 0x3;
-  const r = (facing + 1) & 0x3;
-  return {
-    x: mapX + forward * (DELTA_X[f] ?? 0) + right * (DELTA_X[r] ?? 0),
-    y: mapY + forward * (DELTA_Y[f] ?? 0) + right * (DELTA_Y[r] ?? 0),
-  };
-}
 
 /** `DistanceBetweenPoints` (`doc/CSBwin-src/Monster.cpp:4519`) — orthogonal, "crow". */
 export function distanceBetweenPoints(x1: number, y1: number, x2: number, y2: number): number {
@@ -434,7 +418,7 @@ export class MonsterPerception {
     // `timePerMove == 255` means the monster never moves at all.
     if (desc.movementTicks06 === 255) return probe;
 
-    const step = relativeXY(dir, 1, 0, mapX, mapY);
+    const step = RelativeXY(this.ctx.tables, dir, 1, 0, mapX, mapY);
     const map = this.dungeon.getMap(level);
     if (!map) return probe;
     if (step.x < 0 || step.x >= map.descriptor.width) return probe;
@@ -554,8 +538,8 @@ export class MonsterPerception {
       monsterRn,
       desc,
       level,
-      mapX + (DELTA_X[dir] ?? 0),
-      mapY + (DELTA_Y[dir] ?? 0),
+      sw(mapX + this.ctx.tables.deltaX[dir]!),
+      sw(mapY + this.ctx.tables.deltaY[dir]!),
       dir,
       false,
       state,

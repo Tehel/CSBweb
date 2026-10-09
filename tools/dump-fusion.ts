@@ -41,7 +41,6 @@ import { CloudType } from '../src/engine/cloudTypes';
 import type { Game } from '../src/engine/Game';
 import { createGameHost, type MessageSink } from '../src/engine/GameHost';
 import { CHARFLAG_PORTRAIT_CHANGED, type Champion } from '../src/engine/gameTypes';
-import { DELTA_X, DELTA_Y } from '../src/engine/MonsterPerception';
 import { AttackType, MonsterType } from '../src/engine/monsterTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
@@ -50,6 +49,10 @@ import { wrapMember } from './lib/standIn';
 import { createMonsterAt } from './lib/createMonster';
 import { newGame, stockGraphics, runVbl, TICK_DUE, stockDungeon } from './lib/game';
 import { testChampion } from './lib/champion';
+
+/** North, east, south, west: the steps the tool expects of `d.DeltaX` / `d.DeltaY`. */
+const DELTA_X = [0, 1, 0, -1];
+const DELTA_Y = [-1, 0, 1, 0];
 
 const LEVEL = 12;
 /** The only centres on level 12 with no object within three squares: (5-6, 13-14). */

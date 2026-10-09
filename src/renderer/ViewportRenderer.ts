@@ -318,7 +318,7 @@ export class ViewportRenderer {
     this.context.frameFacing = facing;
 
     // Execute the main viewport drawing function (writes to index buffer via interpreter)
-    DrawViewport(this.context, dungeonState, position, facing);
+    DrawViewport(this.context, dungeonState, position, facing, this.objectTables);
   }
 
   private getBitmapsSet(wallGraphicSet: number): WallBitmapSet {

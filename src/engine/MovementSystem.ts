@@ -10,6 +10,7 @@ import type { DungeonState } from './DungeonState';
 import type { MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, getRoomType, locationRelToInteger } from '../core/types';
+import { RelativeXY } from './RelativeXY';
 import { div, sw } from '../core/intCast';
 import type { GameContext } from './GameContext';
 import { flashButton, setClockTick } from './LoopState';
@@ -243,7 +244,9 @@ export class MovementSystem {
         let cellFlagsTo = cellFlagsFrom;
         let roomTypeTo: number = RoomType.STAIRS;
         if (!(startingInStairwell && relDirection === 2)) {
-            newPosition = this.party.calculateNewPosition(action);
+            const { tables } = this.ctx;
+            const to = RelativeXY(tables, party.facing, tables.word18560[relDirection]!, tables.word18568[relDirection]!, position.x, position.y);
+            newPosition = new Position(to.x, to.y, position.z);
             cellFlagsTo = this.dungeon.getCellFlag(newPosition);
             roomTypeTo = (cellFlagsTo >> 5) & 0x7;
         }
@@ -476,7 +479,7 @@ export class MovementSystem {
                 blocked: true,
             };
         }
-        const newFacing = this.dungeon.getExitStairsDirection(next, facing);
+        const newFacing = this.dungeon.getExitStairsDirection(next, facing, this.ctx.tables);
 
         // The party move filter, `PM_STAIRWAY` (doc/CSBwin-src/CSBCode.cpp:7838-7858). Both
         // directions are `UpOrDown + 2`, and every caller passes `cellFlags & 4`, so they

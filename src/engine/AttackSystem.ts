@@ -46,7 +46,6 @@ import { characterAtPosition } from './AddCharacter';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_POISON_BOLT, RN_POISON_CLOUD,
 } from '../core/spellRn';
-import { DELTA_X, DELTA_Y } from './MonsterPerception';
 import { AdjustSkillsWhy, determineMastery } from './skills';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import {
@@ -919,8 +918,8 @@ export class AttackSystem {
     const x1: number[] = [], y1: number[] = [], x2: number[] = [], y2: number[] = [];
     const fluxCageOrWall: boolean[] = [], empty1: boolean[] = [], empty2: boolean[] = [];
     for (let i = 0; i < 4; i++) {
-      const dx = DELTA_X[direction[i]!]!;
-      const dy = DELTA_Y[direction[i]!]!;
+      const dx = this.ctx.tables.deltaX[direction[i]!]!;
+      const dy = this.ctx.tables.deltaY[direction[i]!]!;
       x1[i] = x + dx;
       y1[i] = y + dy;
       x2[i] = x + 2 * dx;
@@ -983,8 +982,8 @@ export class AttackSystem {
     party.fireShield = 100;
     markAllPortraitsChanged(party, this.ctx.host);
     yield* mainLoop.processTimersViewportAndSound();
-    const w4 = sw(party.position.x + DELTA_X[party.facing & 3]!);
-    const w6 = sw(party.position.y + DELTA_Y[party.facing & 3]!);
+    const w4 = sw(party.position.x + this.ctx.tables.deltaX[party.facing & 3]!);
+    const w6 = sw(party.position.y + this.ctx.tables.deltaY[party.facing & 3]!);
     const monster = this.ctx.dungeon.getCreatureRecord(this.findFirstMonsterAt(w4, w6));
     if (!monster) throw new Error('_FusionSequence: no monster in front of the party');
     monster.hp[0] = 10000;
@@ -1195,8 +1194,8 @@ export class AttackSystem {
     params.attackType = initialAttackType;
 
     const facing = (pChar.facing ?? party.facing) & 3;
-    params.attackX = party.position.x + DELTA_X[facing];
-    params.attackY = party.position.y + DELTA_Y[facing];
+    params.attackX = party.position.x + this.ctx.tables.deltaX[facing];
+    params.attackY = party.position.y + this.ctx.tables.deltaY[facing];
 
     const tables = this.ctx.tables;
     const attackName = tables.attackNames[initialAttackType] ?? String(initialAttackType);
@@ -1371,8 +1370,8 @@ export class AttackSystem {
 
       case AttackType.atk_FUSE:
         this.setCharToPartyFacing(pChar);
-        params.attackX = party.position.x + DELTA_X[party.facing & 3];
-        params.attackY = party.position.y + DELTA_Y[party.facing & 3];
+        params.attackX = party.position.x + this.ctx.tables.deltaX[party.facing & 3];
+        params.attackY = party.position.y + this.ctx.tables.deltaY[party.facing & 3];
         params.dataType = AttackDataType.ADT_Fusion;
         this.callAttackFilter(filter, params, 1);
         this.fusion(params.attackX, params.attackY);
@@ -1422,8 +1421,8 @@ export class AttackSystem {
       }
 
       case AttackType.atk_CLIMBDOWN: {
-        params.attackX = party.position.x + DELTA_X[party.facing & 3];
-        params.attackY = party.position.y + DELTA_Y[party.facing & 3];
+        params.attackX = party.position.x + this.ctx.tables.deltaX[party.facing & 3];
+        params.attackY = party.position.y + this.ctx.tables.deltaY[party.facing & 3];
         const target = new Position(params.attackX, params.attackY, party.position.z);
         const roomType = (this.ctx.dungeon.getCellFlag(target) & 0xff) >> 5;
         // Climbing down is only possible into an empty pit; anything in it and the

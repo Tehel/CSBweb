@@ -98,7 +98,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C163 | `d.DeltaX` / `d.DeltaY` are constants, not read from `0x22f` | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | G29 | Recording a game and playing it back | — | ⏸️ |
@@ -174,21 +173,6 @@ The redesigned page also links to two pages:
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C163 ⏳ `d.DeltaX` / `d.DeltaY` are constants, not read from `0x22f`
-
-CSBWin's direction steps are a table of graphic `0x22f`, `DeltaX[4]` and `DeltaY[4]`
-(`doc/CSBwin-src/Data.h:1117-1118`), swapped at load (`CSBCode.cpp:10303-10307`). The
-port writes them out as constants, three times: `DELTA_X` / `DELTA_Y` in
-`src/engine/MonsterPerception.ts:47-48` (imported by `HallOfChampions`, `WorldMove` and
-`AttackSystem`), again in `src/data/HeroExtractor.ts:35-36`, and inline in
-`src/engine/DungeonState.ts:261-262`. That breaks `CLAUDE.md`'s "tables are extracted at
-runtime, never hardcoded", though not the game: `tools/dump-graphics-tables.ts` writes the
-constants back over every data set's `DeltaX` and `DeltaY` bytes, and they match.
-
-Paying it: `ObjectTables` reads both arrays, the engine's `GameTables` carries them, and
-every user reads them there; the three copies go. `dump-graphics-tables` then writes back
-`ObjectTables`' arrays instead of the constants.
 
 ### C145 ⏸️ The Hint Oracle's title boxes keep colour 12 on their last line and a half
 
@@ -456,9 +440,9 @@ run when the panel is drawn. Lost on a save, the line just goes back to colour 1
 An idea from *Legend of Grimrock*. Only a weapon thrown by an **attack action** is
 gathered back, never one thrown from the cursor:
 
-- **THROW** (`atk_THROW`, `src/engine/AttackSystem.ts:1482`) throws the weapon-hand object,
+- **THROW** (`atk_THROW`, `src/engine/AttackSystem.ts:1481`) throws the weapon-hand object,
   slot 1, through `MouseSystem.throwFromWeaponHand` (`src/engine/MouseSystem.ts:43`).
-- **SHOOT** (`attackWithShoot`, `src/engine/AttackSystem.ts:1580`) fires the ammunition
+- **SHOOT** (`attackWithShoot`, `src/engine/AttackSystem.ts:1579`) fires the ammunition
   held in slot 0 through `MagicSystem.launchObject` (`src/engine/MagicSystem.ts:572`).
   `launchObject` also launches spells, so the object is tagged in the attack, not there.
 

@@ -79,7 +79,7 @@ function findStairs(game: Game, down: boolean, accept: (s: Stairs) => boolean = 
         if (((flag >> 5) & 7) !== RoomType.STAIRS || ((flag & 4) === 0) !== down) continue;
         const exitLevel = down ? dungeon.incrementLevel(at, 1) : at;
         if (!exitLevel || exitLevel.z === game.ctx.party.state.position.z) continue;
-        const dir = dungeon.getExitStairsDirection(exitLevel, game.ctx.party.state.facing);
+        const dir = dungeon.getExitStairsDirection(exitLevel, game.ctx.party.state.facing, game.ctx.tables);
         const exit = new Position(exitLevel.x + DX[dir]!, exitLevel.y + DY[dir]!, exitLevel.z);
         if (!emptyOpen(game, exit)) continue;
         let beside: Position | null = null;

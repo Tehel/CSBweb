@@ -12,6 +12,7 @@ import { BytecodeInterpreter, InterpreterContext } from './bytecode/BytecodeInte
 import { GraphicRoomType, RoomType, SummarizeRoomData } from './bytecode/Types';
 import { BytecodePrograms } from './bytecode/BytecodePrograms';
 import type { DungeonState } from '../engine/DungeonState';
+import { RelativeXY, type DirectionTables } from '../engine/RelativeXY';
 import { summarizeRoomInfoCsbwin } from './csbwin/SummarizeRoomInfo';
 import { Position } from '../core/types';
 import { readU16LE } from '../core/bytes';
@@ -29,44 +30,6 @@ export const relativeX: number[] = [ -2, 2, -2, 2, -1, 1, 0, -1, 1, 0, -2, 2, -1
 export const relativeY: number[] = [ 4, 4, 3, 3, 4, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 1, 1, 1, 0, 0, 0 ];
 
 /**
- * Calculate absolute x,y position from relative coordinates
- * Port from CSBWin Viewport.cpp (find in source)
- */
-export function RelativeXY(
-  facing: number,
-  relY: number,
-  relX: number,
-  x: number,
-  y: number
-): { x: number; y: number } {
-  // Port of CSBWin RelativeXY function
-  // Transforms relative cell coordinates based on party facing
-  let newX = x;
-  let newY = y;
-
-  switch (facing) {
-    case 0: // North
-      newX = x + relX;
-      newY = y - relY;
-      break;
-    case 1: // East
-      newX = x + relY;
-      newY = y + relX;
-      break;
-    case 2: // South
-      newX = x - relX;
-      newY = y + relY;
-      break;
-    case 3: // West
-      newX = x - relY;
-      newY = y - relX;
-      break;
-  }
-
-  return { x: newX, y: newY };
-}
-
-/**
  * Main DrawViewport function
  * Port from CSBWin Viewport.cpp line 6694
  *
@@ -75,12 +38,14 @@ export function RelativeXY(
  * @param facing - Party facing direction (0=N, 1=E, 2=S, 3=W)
  * @param x - Party X position in dungeon
  * @param y - Party Y position in dungeon
+ * @param directions - `d.DeltaX` / `d.DeltaY`, which `RelativeXY` steps through
  */
 export function DrawViewport(
   context: InterpreterContext,
   dungeonState: DungeonState,
   position: Position,
   facing: number,
+  directions: DirectionTables,
 ): void {
   // The floor/ceiling background is composed by the caller before this runs, so the cell
   // programs below blit on top of it — see `ViewportRenderer.drawViewportFrame`, which mirrors
@@ -98,7 +63,7 @@ export function DrawViewport(
   // First pass: Calculate positions and gather room data for all cells
   for (let cellNum = 0; cellNum < 21; cellNum++) {
     // Calculate absolute position for this cell
-    const pos = RelativeXY(facing, relativeY[cellNum], relativeX[cellNum], position.x, position.y);
+    const pos = RelativeXY(directions, facing, relativeY[cellNum], relativeX[cellNum], position.x, position.y);
 
     // The cell's skin, else the level's default, on `d.LoadedLevel`, the level drawn
     // (`doc/CSBwin-src/Viewport.cpp:6784-6793`).

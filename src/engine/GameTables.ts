@@ -66,6 +66,10 @@ export interface GameTables {
   readonly byte1596: ArrayLike<number>;
   /** `d.Byte7302[16]` — the extra records a new game gives each database (`Data.h:1114`). */
   readonly byte7302: ArrayLike<number>;
+  /** `d.DeltaX[4]` — the step along x for each direction, north, east, south and west (`Data.h:1118`). */
+  readonly deltaX: ArrayLike<number>;
+  /** `d.DeltaY[4]` — the step along y for each direction (`Data.h:1117`). */
+  readonly deltaY: ArrayLike<number>;
   /** `d.Word1074[16]` — the light table; entry 2 is an Illumulet's brightness and the LIGHT attack's step (`Data.h:1439`). */
   readonly word1074: number[];
   /** `d.PaletteBrightness[6]` — the least light each viewport palette needs, brightest first (`Data.h:1437`). */
@@ -114,6 +118,12 @@ export interface GameTables {
    * and left (`doc/CSBwin-src/Data.h:708`), which `FlashButton` flashes.
    */
   readonly moveButtons: readonly Rect[];
+  /**
+   * `d.Word18568[4]` and `d.Word18560[4]` — the steps right and forward of the four moves,
+   * in `moveButtons`' order (`Data.h:705-706`), which `MoveParty` hands `RelativeXY`.
+   */
+  readonly word18568: ArrayLike<number>;
+  readonly word18560: ArrayLike<number>;
 
   // --- Sound ---
 
@@ -153,6 +163,8 @@ export function buildGameTables(graphics: GraphicsTables): GameTables {
     doorCharacteristics: objects.doorCharacteristics,
     byte1596: g232.byte1596,
     byte7302: objects.byte7302,
+    deltaX: objects.deltaX,
+    deltaY: objects.deltaY,
     word1074: g232.word1074,
     paletteBrightness: g232.paletteBrightness,
     textDecode: objects.textDecode,
@@ -173,6 +185,8 @@ export function buildGameTables(graphics: GraphicsTables): GameTables {
     spells: g230.spells,
 
     moveButtons: ui.graphic231.moveButtons,
+    word18568: ui.graphic231.word18568,
+    word18560: ui.graphic231.word18560,
 
     sound1772: g232.sound1772,
 

@@ -70,14 +70,15 @@ export function gameTablesOf(graphics: GraphicsLoader): GameTables {
   return tables;
 }
 
-/** The heroes behind `data`'s mirrors, read with `graphics`' escape tables. */
+/** The heroes behind `data`'s mirrors, read with `graphics`' escape and direction tables. */
 export function presetHeroesOf(data: DungeonData, graphics: GraphicsLoader): PresetHero[] {
-  return extractPresetHeroes(data, gameTablesOf(graphics).textDecode);
+  const tables = gameTablesOf(graphics);
+  return extractPresetHeroes(data, tables.textDecode, tables);
 }
 
 /** The heroes behind the mirrors of `game`'s dungeon as it stands, read with its own tables. */
 export function presetHeroesOfGame(game: Game): PresetHero[] {
-  return extractPresetHeroes(game.ctx.dungeon.getData(), game.ctx.tables.textDecode);
+  return extractPresetHeroes(game.ctx.dungeon.getData(), game.ctx.tables.textDecode, game.ctx.tables);
 }
 
 /** A `Game` over `data` with every table from `graphics`, and the parts of `host` the tool listens to. */

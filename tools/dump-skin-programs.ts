@@ -52,7 +52,8 @@ import {
 import { Opcode } from '../src/renderer/bytecode/Opcodes';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
-import { RelativeXY, cellNames, relativeX, relativeY, skinProgramStart } from '../src/renderer/DrawViewport';
+import { cellNames, relativeX, relativeY, skinProgramStart } from '../src/renderer/DrawViewport';
+import { RelativeXY } from '../src/engine/RelativeXY';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../src/renderer/ViewportRenderer';
 import { check, finish } from './lib/check';
@@ -299,7 +300,7 @@ function views(): void {
           for (let facing = 0; facing < 4; facing++) {
             const expected: string[] = [];
             for (let c = 0; c < 21; c++) {
-              const pos = RelativeXY(facing, relativeY[c], relativeX[c], x, y);
+              const pos = RelativeXY(renderer.objectTables, facing, relativeY[c], relativeX[c], x, y);
               let skin = dungeon.skinCache.GetSkin(z, pos.x, pos.y);
               if (skin === 0) skin = dungeon.skinCache.GetDefaultSkin(z);
               if (skin !== 0 && lib.GetCode(skin) !== null) expected.push(`  Draw Cell ${c} skin ${skin}`);

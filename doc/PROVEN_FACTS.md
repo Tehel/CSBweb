@@ -449,8 +449,12 @@ its address, in its name or as a bare number in its comment (`//9760`), sits at
 `CLOTHINGDESC`, 4, and `MONSTERDESC`, 26 (`CSB.h:1352-1360`, `:1672-1715`, `:2295-2422`).
 
 Every data set's `0x22f` is 3086 bytes, and every table the port reads from it writes
-back over its bytes at that offset (`tools/dump-graphics-tables.ts`), the port's
-`DELTA_X` and `DELTA_Y` constants included. CSBWin forces a zero `movementTicks06` to 1
+back over its bytes at that offset (`tools/dump-graphics-tables.ts`). `DeltaX` and
+`DeltaY`, which every step in a direction reads (`RelativeXY`, `CSBCode.cpp:4636-4659`), are
+`0 1 0 -1` and `-1 0 1 0` for north, east, south and west in every data set; so are
+graphic `0x231`'s `Word18568` and `Word18560`, the steps right and forward that `MoveParty`
+gives each move (`CSBCode.cpp:8111-8116`): `0 1 0 -1` and `1 0 -1 0` for forward, right,
+backward and left. CSBWin forces a zero `movementTicks06` to 1
 (`CSBCode.cpp:10287-10297`), and no data set has one. The bytes no table reads are
 `Unused8892`, `unusedDBEntrySize[16]` and each `CLOTHINGDESC`'s fourth byte, which CSBWin
 never reads either: neither field is named outside `Data.h`, and `m_uByte3` has no

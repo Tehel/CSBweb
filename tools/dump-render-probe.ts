@@ -56,13 +56,13 @@ import { BytecodePrograms } from '../src/renderer/bytecode/BytecodePrograms';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import {
-  RelativeXY,
   cellNames,
   getBytecodeProgram,
   relativeX,
   relativeY,
   roomTypeNames,
 } from '../src/renderer/DrawViewport';
+import { RelativeXY, type DirectionTables } from '../src/engine/RelativeXY';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../src/renderer/ViewportRenderer';
 import { check, fail, finish } from './lib/check';
@@ -159,7 +159,7 @@ function main(): void {
         if (!BytecodePrograms[name]) fallbacks++;
         const before = warnings.length;
         renderer.buffer.pixels.fill(UNDRAWN);
-        renderer.context.roomData = roomDataFor(start, passFacing, cell, type as GraphicRoomType, doorIndex);
+        renderer.context.roomData = roomDataFor(renderer.objectTables, start, passFacing, cell, type as GraphicRoomType, doorIndex);
         const stacks = interpreterStackPointers();
         new BytecodeInterpreter(renderer.context).interpret(program, 0, cell);
         check(warnings.length === before, `${pass} ${name} runs without a warning: ${warnings.slice(before).join('; ')}`);
@@ -229,7 +229,7 @@ function seeThruWalls(renderer: ViewportRenderer, start: Position, facing: numbe
       if (!program) continue;
       const before = warnings.length;
       renderer.buffer.pixels.fill(UNDRAWN);
-      ctx.roomData = roomDataFor(start, facing, cell, type as GraphicRoomType, doorIndex);
+      ctx.roomData = roomDataFor(renderer.objectTables, start, facing, cell, type as GraphicRoomType, doorIndex);
       new BytecodeInterpreter(ctx).interpret(program, 0, cell);
       check(warnings.length === before, `see-thru ${cellNames[cell]}_${roomTypeNames[type]} runs without a warning: ${warnings.slice(before).join('; ')}`);
     }
@@ -240,7 +240,7 @@ function seeThruWalls(renderer: ViewportRenderer, start: Position, facing: numbe
   const drawF1Stone = (seeThru: boolean): Uint8Array => {
     ctx.seeThroughWalls = seeThru;
     renderer.buffer.pixels.set(pattern);
-    ctx.roomData = roomDataFor(start, facing, f1, GraphicRoomType.STONE, doorIndex);
+    ctx.roomData = roomDataFor(renderer.objectTables, start, facing, f1, GraphicRoomType.STONE, doorIndex);
     new BytecodeInterpreter(ctx).interpret(getBytecodeProgram(f1, GraphicRoomType.STONE)!, 0, f1);
     return Uint8Array.from(renderer.buffer.pixels);
   };
@@ -272,7 +272,7 @@ function seeThruWalls(renderer: ViewportRenderer, start: Position, facing: numbe
 
   const f0 = cellNames.indexOf('F0');
   renderer.buffer.pixels.fill(UNDRAWN);
-  ctx.roomData = roomDataFor(start, facing, f0, GraphicRoomType.DOOR_EDGE, doorIndex);
+  ctx.roomData = roomDataFor(renderer.objectTables, start, facing, f0, GraphicRoomType.DOOR_EDGE, doorIndex);
   new BytecodeInterpreter(ctx).interpret(getBytecodeProgram(f0, GraphicRoomType.DOOR_EDGE)!, 0, f0);
   const edge = renderer.buffer.pixels.filter((p) => p !== UNDRAWN).length;
   check(edge > 0, `under See-Thru-Walls F0 DoorEdge still draws its frame (${edge} pixels)`);
@@ -294,9 +294,9 @@ function firstDoorIndex(dungeon: ReturnType<typeof newGame>['ctx']['dungeon'], z
 }
 
 /** Every cell open and empty, and `target` given the fixed summary for `type`. */
-function roomDataFor(position: Position, facing: number, target: number, type: GraphicRoomType, doorIndex: number): SummarizeRoomData[] {
+function roomDataFor(directions: DirectionTables, position: Position, facing: number, target: number, type: GraphicRoomType, doorIndex: number): SummarizeRoomData[] {
   return Array.from({ length: 21 }, (_, cell): SummarizeRoomData => {
-    const { x, y } = RelativeXY(facing, relativeY[cell], relativeX[cell], position.x, position.y);
+    const { x, y } = RelativeXY(directions, facing, relativeY[cell], relativeX[cell], position.x, position.y);
     const graphicRoomType = cell === target ? type : GraphicRoomType.OPEN;
     const decorations: [number, number, number] = [0, 0, 0];
     if (cell === target) {

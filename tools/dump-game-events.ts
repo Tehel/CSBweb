@@ -23,7 +23,6 @@ import type { PresetHero } from '../src/data/HeroExtractor';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import type { Game } from '../src/engine/Game';
 import type { JoinedChampion } from '../src/engine/GameHost';
-import { DELTA_X, DELTA_Y } from '../src/engine/MonsterPerception';
 import { determineMastery } from '../src/engine/skills';
 import { GameEvents, type GameEvent, type LostPayload, type PartyPayload, type WonPayload } from '../src/ui/gameEvents';
 import { checkEvent } from '../server/events.ts';
@@ -31,6 +30,10 @@ import { check, finish } from './lib/check';
 import { dataSetNamed } from './lib/dataSets';
 import { newGame, presetHeroesOfGame, stockGraphics } from './lib/game';
 import { savePath } from './lib/saves';
+
+/** North, east, south, west: the steps the tool expects of `d.DeltaX` / `d.DeltaY`. */
+const DELTA_X = [0, 1, 0, -1];
+const DELTA_Y = [-1, 0, 1, 0];
 
 const RESURRECT = 160;
 const REINCARNATE = 161;

@@ -36,11 +36,14 @@ import {
 import { RN_FIREBALL } from '../src/core/spellRn';
 import type { Game } from '../src/engine/Game';
 import { MovementAction, type Champion } from '../src/engine/gameTypes';
-import { DELTA_X, DELTA_Y } from '../src/engine/MonsterPerception';
 import { newGame, stockGraphics, stockDungeon } from './lib/game';
 import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { testChampion } from './lib/champion';
+
+/** North, east, south, west: the steps the tool expects of `d.DeltaX` / `d.DeltaY`. */
+const DELTA_X = [0, 1, 0, -1];
+const DELTA_Y = [-1, 0, 1, 0];
 
 function champion(i: number): Champion {
   return testChampion(i, { attributes: { health: 500, maxHealth: 500, mana: 0, maxMana: 0 } });

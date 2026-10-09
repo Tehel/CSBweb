@@ -16,7 +16,7 @@ import {
   OBJECT_ID_NULL,
   RoomType,
   type ObjectID,
-  type Position,
+  Position,
 } from '../core/types';
 import { ActuatorAction } from '../data/actuatorHelpers';
 import { CursorFilterType } from './DsaSystem';
@@ -77,12 +77,10 @@ export class MouseSystem {
     if (dropPos === 4) dropPos = 2;
 
     const facing = party.facing & 0x3;
+    const { deltaX, deltaY } = this.ctx.tables;
     const target =
       dropPos > 1
-        ? facing === 0 ? party.position.north
-          : facing === 1 ? party.position.east
-            : facing === 2 ? party.position.south
-              : party.position.west
+        ? new Position(party.position.x + deltaX[facing]!, party.position.y + deltaY[facing]!, party.position.z)
         : party.position;
 
     const map = this.ctx.dungeon.getMap(target.z);
@@ -294,7 +292,7 @@ export class MouseSystem {
     const party = this.ctx.party.state;
     const facing = party.facing & 0x3;
     const pos = party.position;
-    const touched = facing === 0 ? pos.north : facing === 1 ? pos.east : facing === 2 ? pos.south : pos.west;
+    const touched = new Position(pos.x + this.ctx.tables.deltaX[facing]!, pos.y + this.ctx.tables.deltaY[facing]!, pos.z);
     const map = this.ctx.dungeon.getMap(pos.z);
     if (!map) return false;
     if (touched.x < 0 || touched.x >= map.descriptor.width) return false;
@@ -326,7 +324,7 @@ export class MouseSystem {
 
     const facing = party.facing & 0x3;
     const pos = party.position;
-    const target = facing === 0 ? pos.north : facing === 1 ? pos.east : facing === 2 ? pos.south : pos.west;
+    const target = new Position(pos.x + this.ctx.tables.deltaX[facing]!, pos.y + this.ctx.tables.deltaY[facing]!, pos.z);
     const map = this.ctx.dungeon.getMap(target.z);
     if (!map) return false;
     const cellFlag = map.cellFlags[target.x]?.[target.y];

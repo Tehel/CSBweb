@@ -12,7 +12,6 @@ import type { GameHost } from './GameHost';
 import { addCharacterDefaults } from './AddCharacter';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import { getFromWings, wingsChampion, type WingsPool } from './Wings';
-import { Direction as Dir } from '../core/types';
 
 /**
  * The one initializer of `PartyState`. `Party.setState` fills from it any field an older
@@ -72,66 +71,6 @@ export class Party {
         this.state.vacantCharacters[this.state.champions.length] = new Uint8Array(CHARDESC_SIZE);
         this.state.champions.push(champion);
         return true;
-    }
-
-    /**
-     * Calculate new position based on movement action
-     *
-     * @param action - Movement action
-     * @returns New coordinates (not validated against map)
-     */
-    calculateNewPosition(action: MovementAction): Position {
-        const { position, facing } = this.state;
-        let newX = position.x;
-        let newY = position.y;
-
-        switch (action) {
-            case MovementAction.MOVE_FORWARD:
-                // Move in facing direction
-                switch (facing) {
-                    case Dir.NORTH: newY--; break;
-                    case Dir.EAST: newX++; break;
-                    case Dir.SOUTH: newY++; break;
-                    case Dir.WEST: newX--; break;
-                }
-                break;
-
-            case MovementAction.MOVE_BACKWARD:
-                // Move opposite to facing direction
-                switch (facing) {
-                    case Dir.NORTH: newY++; break;
-                    case Dir.EAST: newX--; break;
-                    case Dir.SOUTH: newY--; break;
-                    case Dir.WEST: newX++; break;
-                }
-                break;
-
-            case MovementAction.STRAFE_LEFT:
-                // Move left relative to facing
-                switch (facing) {
-                    case Dir.NORTH: newX--; break;
-                    case Dir.EAST: newY--; break;
-                    case Dir.SOUTH: newX++; break;
-                    case Dir.WEST: newY++; break;
-                }
-                break;
-
-            case MovementAction.STRAFE_RIGHT:
-                // Move right relative to facing
-                switch (facing) {
-                    case Dir.NORTH: newX++; break;
-                    case Dir.EAST: newY++; break;
-                    case Dir.SOUTH: newX--; break;
-                    case Dir.WEST: newY--; break;
-                }
-                break;
-
-            default:
-                // Turn actions don't change position
-                return position;
-        }
-
-        return new Position(newX, newY, position.z);
     }
 
     /**

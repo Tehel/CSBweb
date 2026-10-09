@@ -41,7 +41,6 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { extractGraphicsTables, type GraphicsTables } from '../src/data/tables/GraphicsTables';
 import type { DecorationDesc } from '../src/data/tables/ObjectTables';
 import type { RectPos } from '../src/data/tables/UITables';
-import { DELTA_X, DELTA_Y } from '../src/engine/MonsterPerception';
 import { check, finish } from './lib/check';
 
 const DATA_H = readFileSync(resolve('doc/CSBwin-src/Data.h'), 'utf8').split('\n');
@@ -284,7 +283,7 @@ function regions22e(t: GraphicsTables): Region[] {
   return out;
 }
 
-/** Item `0x22f`, as `ObjectTables` reads it, and the directions the engine keeps as constants (DEBT.md C163). */
+/** Item `0x22f`, as `ObjectTables` reads it. */
 function regions22f(t: GraphicsTables): Region[] {
   const o = t.objects;
   const out: Region[] = [];
@@ -314,8 +313,8 @@ function regions22f(t: GraphicsTables): Region[] {
     ...word(o.objDescObjectType[i]), o.objDescGraphicClass[i], o.objDescAttackClass[i] & 0xff, ...word(o.objDescWord4[i]),
   ]));
   put('byte7302', 'Byte7302', bytes(o.byte7302));
-  put('DELTA_X (MonsterPerception.ts)', 'DeltaX', words(DELTA_X));
-  put('DELTA_Y (MonsterPerception.ts)', 'DeltaY', words(DELTA_Y));
+  put('deltaX', 'DeltaX', words(o.deltaX));
+  put('deltaY', 'DeltaY', words(o.deltaY));
   return out;
 }
 

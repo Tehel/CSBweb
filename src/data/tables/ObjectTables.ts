@@ -121,6 +121,9 @@ export interface ObjectTables {
    * database (`doc/CSBwin-src/SaveGame.cpp:2768-2776`), read as unsigned there.
    */
   byte7302: Uint8Array;
+  /** `d.DeltaX[4]` / `d.DeltaY[4]` (doc/CSBwin-src/Data.h:1117-1118), the end of `0x22f`. */
+  deltaX: Int16Array;
+  deltaY: Int16Array;
   objectNames: string[]; // d.ObjectNames[199]
   weaponWeights: Uint8Array; // d.weapons[46].weight
   /**
@@ -257,6 +260,8 @@ const ABS_FLOOR_COLOR_MAP_FAR = 4140; // FarColorMapping[16]
 const ABS_22F_START = 10340; // Byte10340[4] - start of graphic 0x22f
 const ABS_OBJDESC = 8382; // ObjDesc[180]
 const ABS_BYTE7302 = 7302; // Byte7302[16], right after ObjDesc[180]
+const ABS_DELTA_Y = 7270; // DeltaY[4]
+const ABS_DELTA_X = 7262; // DeltaX[4], the last of graphic 0x22f
 const ABS_WEAPONS = 8658; // weapons[46]
 const ABS_CLOTHING = 8890; // ClothingDesc[58]
 const ABS_FOOD_VALUE = 8962; // FoodValue[8]
@@ -627,6 +632,20 @@ function readDoorCharacteristics22f(raw: Uint8Array): Int16Array {
   return out;
 }
 
+/**
+ * `d.DeltaX[4]` or `d.DeltaY[4]`: the step along x or y for each direction, north, east,
+ * south and west. The graphic's words are big-endian, swapped at load
+ * (doc/CSBwin-src/CSBCode.cpp:10303-10307).
+ */
+function readDelta22f(raw: Uint8Array, abs: number, name: string): Int16Array {
+  const start = ABS_22F_START - abs;
+  const count = 4;
+  if (start < 0 || start + count * 2 > raw.length) throw new Error(`graphics.dat item 0x22f too small for ${name}[4]`);
+  const out = new Int16Array(count);
+  for (let i = 0; i < count; i++) out[i] = readI16BE(raw, start + i * 2);
+  return out;
+}
+
 function readMonsterDroppings22f(raw: Uint8Array): Int16Array {
   const start = ABS_22F_START - ABS_MONSTER_DROPPINGS;
   const count = 40;
@@ -819,6 +838,8 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const objDescObjectType = readObjDescObjectType22f(raw22f);
   const objDescWord4 = readObjDescWord4_22f(raw22f);
   const byte7302 = readByte7302_22f(raw22f);
+  const deltaX = readDelta22f(raw22f, ABS_DELTA_X, 'DeltaX');
+  const deltaY = readDelta22f(raw22f, ABS_DELTA_Y, 'DeltaY');
   const objectNames = readObjectNames22c(raw22c);
   const weaponWeights = readWeaponWeights22f(raw22f);
   const clothingWeights = readClothingWeights22f(raw22f);
@@ -922,6 +943,8 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     objDescWord4,
     objDescObjectType,
     byte7302,
+    deltaX,
+    deltaY,
     objectNames,
     weaponWeights,
     clothingWeights,

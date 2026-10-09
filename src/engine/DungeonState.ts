@@ -29,6 +29,7 @@ import type {
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, rnEquals } from '../core/types';
 import type { TextRecord } from '../data/dungeonTypes';
 import type { TextDecodeTables } from '../data/tables/ObjectTables';
+import type { DirectionTables } from './RelativeXY';
 import { DecodeText, SubstituteCharacterNames, type TextSubstitution } from '../data/DecodeText';
 import { Expool } from '../data/CsbwinExpool';
 import { SkinCache } from './SkinCache';
@@ -253,17 +254,14 @@ export class DungeonState {
      *
      * Ported from CSBWin `ExitStairsDirection()` (doc/CSBwin-src/Code11f52.cpp:325-360).
      */
-    getExitStairsDirection(position: Position, fallback: Direction): Direction {
+    getExitStairsDirection(position: Position, fallback: Direction, tables: DirectionTables): Direction {
         const { x, y, z } = position;
         const map = this.getMap(position.z);
         if (!map) return fallback;
 
-        const deltaX = [0, 1, 0, -1];
-        const deltaY = [-1, 0, 1, 0];
-
         for (let direction = 0; direction < 4; direction++) {
-            const newX = x + deltaX[direction];
-            const newY = y + deltaY[direction];
+            const newX = x + tables.deltaX[direction]!;
+            const newY = y + tables.deltaY[direction]!;
             if (newX < 0 || newY < 0 || newX >= map.descriptor.width || newY >= map.descriptor.height) continue;
 
             const cellFlag = this.getCellFlag(new Position(newX, newY, z));

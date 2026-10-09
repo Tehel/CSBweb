@@ -17,7 +17,6 @@ import { monsterHorizontalSize, monsterLevitating } from '../data/tables/Monster
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { DeleteMonsterWhy, MonsterDamageResult, deleteMonsterParameters } from './MonsterDamage';
-import { DELTA_X, DELTA_Y } from './MonsterPerception';
 import { setPackedBits } from './MonsterSystem';
 import { StateOfFear } from './monsterTypes';
 import { decodeMissileTimerWord8 } from './missileHelpers';
@@ -389,8 +388,8 @@ export class WorldMove {
           if (!below) break;
           position = below;
         }
-        const exit = this.dungeon.getExitStairsDirection(position, this.ctx.party.state.facing as Direction);
-        position = new Position(position.x + DELTA_X[exit]!, position.y + DELTA_Y[exit]!, position.z);
+        const exit = this.dungeon.getExitStairsDirection(position, this.ctx.party.state.facing as Direction, this.ctx.tables);
+        position = new Position(position.x + this.ctx.tables.deltaX[exit]!, position.y + this.ctx.tables.deltaY[exit]!, position.z);
         const back = (exit + 2) & 0x3;
         curPos = ((((curPos - back + 1) & 2) >> 1) + back) & 0x3;
         moved = true;

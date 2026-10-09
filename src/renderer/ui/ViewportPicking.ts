@@ -201,11 +201,7 @@ export function testThrow(clickX: number, clickY: number, doorFacing: boolean): 
 export function isFrontCellStoneOrVisibleFalseWall(ui: UIState): boolean {
   const facing = ui.partyState.facing & 0x3;
   const pos = ui.partyState.position;
-  const target =
-    facing === 0 ? pos.north :
-    facing === 1 ? pos.east :
-    facing === 2 ? pos.south :
-    pos.west;
+  const target = new Position(pos.x + ui.ctx.tables.deltaX[facing]!, pos.y + ui.ctx.tables.deltaY[facing]!, pos.z);
   const map = ui.ctx.dungeon.getMap(target.z);
   if (!map) return true;
   if (target.x < 0 || target.y < 0 || target.x >= map.descriptor.width || target.y >= map.descriptor.height) return true;
@@ -249,11 +245,7 @@ export function getPickupCellForRelativePos(ui: UIState, relativeLocation: numbe
   const facing = ui.partyState.facing & 0x3;
   let target = ui.partyState.position;
   if (relativeLocation >= 2) {
-    target =
-      facing === 0 ? target.north :
-      facing === 1 ? target.east :
-      facing === 2 ? target.south :
-      target.west;
+    target = new Position(target.x + ui.ctx.tables.deltaX[facing]!, target.y + ui.ctx.tables.deltaY[facing]!, target.z);
   }
   return target;
 }

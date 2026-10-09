@@ -78,6 +78,13 @@ export interface UITables {
     rect18584: WordRect;
     rect18576: WordRect;
     /**
+     * `d.Word18568[4]` / `d.Word18560[4]`: the steps right and forward of `MoveParty`'s
+     * four moves, forward, right, backward and left, which it hands `RelativeXY`
+     * (`doc/CSBwin-src/Data.h:705-706`, `CSBCode.cpp:8111-8116`).
+     */
+    word18568: number[];
+    word18560: number[];
+    /**
      * `d.Word18552[28]`: the rectangles `_MagicSelection` flashes for magic buttons
      * 101-107, the six runes and the take-back, four words each, `x1, x2, y1, y2`
      * (`doc/CSBwin-src/Magic.cpp:571-573`).
@@ -510,9 +517,9 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
   const rect18584 = readWordRect(view, off, 'rect18584'); off += 8;
   const rect18576 = readWordRect(view, off, 'rect18576'); off += 8;
 
-  // Word18568[4], Word18560[4]
-  off += 4 * 2;
-  off += 4 * 2;
+  requireSize(raw, off, 2 * 4 * 2, '0x231 Word18568, Word18560');
+  const word18568 = readI16Array(view, off, 4); off += 4 * 2;
+  const word18560 = readI16Array(view, off, 4); off += 4 * 2;
   const word18552 = readWordRects(view, off, 7, 'word18552'); off += 7 * 8;
 
   const moveButtons = readWordRects(view, off, 4, 'moveBtn'); off += 4 * 8;
@@ -573,6 +580,8 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
     rect18592,
     rect18584,
     rect18576,
+    word18568,
+    word18560,
     word18552,
     moveButtons,
     dropAreas,

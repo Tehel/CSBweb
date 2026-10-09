@@ -1342,8 +1342,8 @@ export class TimerSystem {
     }
 
     const dir = timerPos & 0x3;
-    const launchX = timer.uByte6 + (dir === 1 ? 1 : dir === 3 ? -1 : 0);
-    const launchY = timer.uByte7 + (dir === 2 ? 1 : dir === 0 ? -1 : 0);
+    const launchX = timer.uByte6 + this.ctx.tables.deltaX[dir]!;
+    const launchY = timer.uByte7 + this.ctx.tables.deltaY[dir]!;
     if (launchX < 0 || launchY < 0 || launchX >= map.descriptor.width || launchY >= map.descriptor.height) return;
 
     const launchLevel = timer.level;
@@ -1451,8 +1451,8 @@ export class TimerSystem {
       curMapY = origMapY;
 
       if (leavingThisCell) {
-        curMapX += missileDir === 1 ? 1 : missileDir === 3 ? -1 : 0;
-        curMapY += missileDir === 2 ? 1 : missileDir === 0 ? -1 : 0;
+        curMapX += this.ctx.tables.deltaX[missileDir]!;
+        curMapY += this.ctx.tables.deltaY[missileDir]!;
 
         // Off the map, `GetCellFlags` answers a stone cell (doc/CSBwin-src/CSBCode.cpp:4674)
         // and the room is `roomEXTERIOR`, which counts as stone (Timer.cpp:321-340), so the
