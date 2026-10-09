@@ -1,10 +1,11 @@
 #!/bin/bash
 # Re-run the golden-frame probe and compare against tools/frames/.
 #
-# The frames are the 320x200 game canvas, read back as pixels, and the comparison decodes
-# both sides and compares pixels. Neither end depends on the host's fonts, widget theme,
-# window size, GPU or PNG encoder, so a baseline captured on one machine is checkable on
-# another. See the header of tools/probe-frames.mjs.
+# The frames are the 320x200 screen as CSBWin draws it: its palette slots, and the
+# palettes they were shown through. The comparison decodes both sides and compares what
+# each pixel showed. Neither end depends on the host's fonts, widget theme, window size,
+# GPU or PNG encoder, so a baseline captured on one machine is checkable on another, nor
+# on how an Atari colour is shown on the canvas. See the header of tools/probe-frames.mjs.
 #
 # This used to require two daemons started by hand — `npm run dev` on :9000 and a
 # headless Chrome on :9222 — which meant it was never actually run before a commit.
@@ -127,8 +128,8 @@ fi
 out="$(mktemp -d)"
 node "$root/tools/probe-frames.mjs" "$out" || { rm -rf "$out"; exit 1; }
 echo "--- frame comparison ---"
-# Pixels, not bytes: `cmp` here used to make this a test of Chrome's PNG encoder, which is
-# why the same rendering on another machine failed on every frame.
+# What the pixels showed, not bytes: `cmp` here used to make this a test of Chrome's PNG
+# encoder, which is why the same rendering on another machine failed on every frame.
 node "$root/tools/compare-frames.mjs" "$root/tools/frames" "$out"
 rc=$?
 [ "$rc" = 0 ] && rm -rf "$out"

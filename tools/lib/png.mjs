@@ -1,5 +1,5 @@
 /**
- * RGBA PNG read and write, for the golden frames.
+ * PNG read and write, for the golden frames.
  *
  * The golden frames used to be whatever PNG `Page.captureScreenshot` handed back, compared
  * with `cmp`. That made the check a test of the *browser*: a full-page shot carries the DOM
@@ -9,18 +9,17 @@
  * row filters and IDAT chunking. Frames captured on one machine could not be checked on
  * another.
  *
- * So the project now owns both ends: `probe-frames.mjs` reads the 320x200 canvas back as
- * pixels and encodes them here, and `compare-frames.mjs` decodes both sides and compares
- * *pixels*. Nothing in the comparison can vary with the host any more, and the encoder does
- * not even have to be deterministic — only correct.
+ * So the project owns both ends: `probe-frames.mjs` encodes the frames here and
+ * `compare-frames.mjs` decodes them and compares what they hold, never their bytes. A frame
+ * is a paletted PNG whose pixels are the screen's palette slots and whose `tEXt` chunk
+ * says what the slots stood for (`probe-frames.mjs`); its `PLTE` is only there to view it.
  *
  * This is deliberately separate from `lib/png.ts`, which reads *paletted* PNGs for
  * `dump-image-codec.ts`. This one is plain ESM because the CDP drivers are plain node
- * scripts, and it works in RGBA because a frame mixes two palettes (the viewport band is
- * presented through its own light-level palette) and so has no single PLTE.
+ * scripts.
  *
- * Deliberately minimal: 8-bit RGB and RGBA, no interlace. Anything else throws rather
- * than guessing.
+ * Deliberately minimal: 8-bit RGB, RGBA and paletted, no interlace. Anything else throws
+ * rather than guessing.
  */
 import { readFileSync } from 'node:fs';
 import zlib from 'node:zlib';
@@ -53,41 +52,49 @@ function chunk(type, data) {
 }
 
 /**
- * Encode `rgba` (width*height*4 bytes) as an 8-bit RGBA PNG.
- *
- * Every row is written with filter 0. A filter that predicts from the neighbours would
- * compress a little better, but these are 320x200 and the files are already a few KB;
- * unfiltered rows keep the writer short enough to be obviously correct.
+ * Encode `indices` (width*height bytes) as an 8-bit paletted PNG, `plte` its colours as
+ * `[r, g, b]`, and each of `text`'s entries a `tEXt` chunk.
  */
-export function encodePng(width, height, rgba) {
-  if (rgba.length !== width * height * 4)
-    throw new Error(`expected ${width * height * 4} bytes of RGBA, got ${rgba.length}`);
+export function encodeIndexedPng(width, height, indices, plte, text = {}) {
+  if (indices.length !== width * height)
+    throw new Error(`expected ${width * height} indices, got ${indices.length}`);
+  if (plte.length === 0 || plte.length > 256) throw new Error(`a palette of ${plte.length} colours`);
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8;   // bit depth
-  ihdr[9] = 6;   // colour type: RGBA
-  const src = Buffer.isBuffer(rgba) ? rgba : Buffer.from(rgba.buffer, rgba.byteOffset, rgba.length);
-  const stride = width * 4;
-  const raw = Buffer.alloc(height * (stride + 1));
+  ihdr[9] = 3;   // colour type: paletted
+  const raw = Buffer.alloc(height * (width + 1));
   for (let y = 0; y < height; y++) {
-    raw[y * (stride + 1)] = 0;   // filter 0
-    src.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
+    raw[y * (width + 1)] = 0;   // filter 0
+    for (let x = 0; x < width; x++) {
+      const v = indices[y * width + x];
+      if (v >= plte.length) throw new Error(`index ${v} past a palette of ${plte.length}`);
+      raw[y * (width + 1) + 1 + x] = v;
+    }
   }
   return Buffer.concat([
     SIGNATURE,
     chunk('IHDR', ihdr),
+    chunk('PLTE', Buffer.from(plte.flat())),
+    ...Object.entries(text).map(([k, v]) => chunk('tEXt', Buffer.from(`${k}\0${v}`, 'latin1'))),
     chunk('IDAT', zlib.deflateSync(raw, { level: 9 })),
     chunk('IEND', Buffer.alloc(0)),
   ]);
 }
 
-/** Read an 8-bit RGB or RGBA PNG, returning `{ width, height, rgba }`. */
+/**
+ * Read an 8-bit RGB, RGBA or paletted PNG, returning `{ width, height, rgba, indices,
+ * text }`: `indices` the paletted one's pixels (`null` for the others), and `text` its
+ * `tEXt` chunks by keyword.
+ */
 export function decodePng(path) {
   const buf = readFileSync(path);
   if (!buf.subarray(0, 8).equals(SIGNATURE)) throw new Error(`${path}: not a PNG`);
   let off = 8, width = 0, height = 0, depth = 0, ctype = 0, interlace = 0;
   const idat = [];
+  const text = {};
+  let plte = null;
   while (off + 8 <= buf.length) {
     const len = buf.readUInt32BE(off);
     const type = buf.toString('ascii', off + 4, off + 8);
@@ -96,14 +103,21 @@ export function decodePng(path) {
       width = data.readUInt32BE(0); height = data.readUInt32BE(4);
       depth = data[8]; ctype = data[9]; interlace = data[12];
     } else if (type === 'IDAT') idat.push(Buffer.from(data));
+    else if (type === 'PLTE') plte = Buffer.from(data);
+    else if (type === 'tEXt') {
+      const nul = data.indexOf(0);
+      text[data.toString('latin1', 0, nul)] = data.toString('latin1', nul + 1);
+    }
     else if (type === 'IEND') break;
     off += 12 + len;
   }
   if (depth !== 8) throw new Error(`${path}: bit depth ${depth}, only 8 is supported`);
-  if (ctype !== 2 && ctype !== 6) throw new Error(`${path}: colour type ${ctype}, only 2 (RGB) and 6 (RGBA) are supported`);
+  if (ctype !== 2 && ctype !== 3 && ctype !== 6)
+    throw new Error(`${path}: colour type ${ctype}, only 2 (RGB), 3 (paletted) and 6 (RGBA) are supported`);
+  if (ctype === 3 && !plte) throw new Error(`${path}: paletted, with no PLTE`);
   if (interlace !== 0) throw new Error(`${path}: interlaced`);
 
-  const channels = ctype === 6 ? 4 : 3;
+  const channels = ctype === 6 ? 4 : ctype === 3 ? 1 : 3;
   const stride = width * channels;
   const raw = zlib.inflateSync(Buffer.concat(idat));
   const flat = new Uint8Array(height * stride);
@@ -136,10 +150,17 @@ export function decodePng(path) {
   // Normalise to RGBA so callers never have to branch on the colour type.
   const rgba = new Uint8Array(width * height * 4);
   for (let n = 0; n < width * height; n++) {
+    if (ctype === 3) {
+      const v = flat[n];
+      if (v * 3 >= plte.length) throw new Error(`${path}: index ${v} past its PLTE`);
+      rgba.set(plte.subarray(v * 3, v * 3 + 3), n * 4);
+      rgba[n * 4 + 3] = 0xff;
+      continue;
+    }
     rgba[n * 4] = flat[n * channels];
     rgba[n * 4 + 1] = flat[n * channels + 1];
     rgba[n * 4 + 2] = flat[n * channels + 2];
     rgba[n * 4 + 3] = channels === 4 ? flat[n * channels + 3] : 0xff;
   }
-  return { width, height, rgba };
+  return { width, height, rgba, indices: ctype === 3 ? flat : null, text };
 }

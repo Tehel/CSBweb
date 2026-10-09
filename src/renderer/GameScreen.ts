@@ -25,6 +25,7 @@ import {
   updateImageDataFromIndexWithViewportPalette,
   reconvertThroughPalette,
 } from './csbwin/CanvasBlitter';
+import { PresentedFrame, type PresentedFrameCapture } from './csbwin/PresentedFrame';
 import { CreateOverlayTable, OVERLAY_TABLE_SIZE, overlayDrawsNothing, UpdateViewportArea } from './csbwin/OverlayScreen';
 import { die } from '../engine/Die';
 import type { GraphicsTables } from '../data/tables/GraphicsTables';
@@ -129,6 +130,14 @@ export interface GameScreenDeps {
   hintOracle?: HintOracleFiles | null;
 }
 
+/** The viewport's rectangle of the screen, ends inclusive, as the conversion takes it. */
+const VIEWPORT_SPAN = {
+  x1: VIEWPORT_X,
+  y1: VIEWPORT_Y,
+  x2: VIEWPORT_X + VIEWPORT_WIDTH - 1,
+  y2: VIEWPORT_Y + VIEWPORT_HEIGHT - 1,
+} as const;
+
 export class GameScreen {
   /** Everything the UI modules share. See `ui/UIState.ts`. */
   private readonly ui: UIState;
@@ -136,6 +145,8 @@ export class GameScreen {
   private readonly canvas: HTMLCanvasElement;
   private readonly screenCtx: CanvasRenderingContext2D;
   private readonly screenImageData: ImageData; // RGBA staging for present
+  /** What the canvas was last given, as palette indices (`presentedFrame`). */
+  private readonly presented = new PresentedFrame(SCREEN_WIDTH, SCREEN_HEIGHT);
   /** `d.LogicalScreenBase`, the whole screen as palette indices. */
   private readonly screen: ScreenIndexBuffer;
   private readonly uiPalette: number[];
@@ -623,27 +634,33 @@ export class GameScreen {
 
     const uiPalette = this.uiPalette;
     const viewportPalette = inventoryOpen ? uiPalette : (this.getViewportPalette() ?? uiPalette);
+    const footprint = this.ui.objectCursorFootprint;
+    let throughViewportPalette = false;
     if (!inventoryOpen && viewportPalette !== uiPalette) {
-      updateImageDataFromIndexWithViewportPalette(
-        this.screenImageData,
-        this.screen,
-        {
-          x1: VIEWPORT_X,
-          y1: VIEWPORT_Y,
-          x2: VIEWPORT_X + VIEWPORT_WIDTH - 1,
-          y2: VIEWPORT_Y + VIEWPORT_HEIGHT - 1,
-        },
-        viewportPalette,
-        uiPalette,
-      );
-      if (this.ui.objectCursorFootprint) {
-        reconvertThroughPalette(this.screenImageData, this.screen, this.ui.objectCursorFootprint, 12, uiPalette);
-      }
+      updateImageDataFromIndexWithViewportPalette(this.screenImageData, this.screen, VIEWPORT_SPAN, viewportPalette, uiPalette);
+      if (footprint) reconvertThroughPalette(this.screenImageData, this.screen, footprint, 12, uiPalette);
+      throughViewportPalette = true;
     } else {
       updateImageDataFromIndex(this.screenImageData, this.screen, uiPalette);
     }
-    if (this.isAdventureVideoMode()) this.drawViewportThroughOverlay(viewportPalette);
+    const overlaid = this.isAdventureVideoMode() && this.drawViewportThroughOverlay(viewportPalette);
+    this.presented.record(
+      this.screen.pixels,
+      uiPalette,
+      throughViewportPalette ? { palette: viewportPalette, span: VIEWPORT_SPAN } : null,
+      overlaid ? VIEWPORT_SPAN : null,
+      throughViewportPalette || overlaid ? footprint : null,
+      12,
+    );
     this.screenCtx.putImageData(this.screenImageData, 0, 0);
+  }
+
+  /**
+   * The screen the canvas was last given, as palette indices and the palettes they were
+   * shown through: the golden frames (`tools/probe-frames.mjs`).
+   */
+  presentedFrame(): PresentedFrameCapture {
+    return this.presented.capture(this.screenImageData.data);
   }
 
   /**
@@ -662,9 +679,9 @@ export class GameScreen {
    * first (`doc/CSBwin-src/WinScreen.cpp:1064`). The object in hand of the coloured cursor
    * is shown through the interface palette after, as the straight path shows it.
    */
-  private drawViewportThroughOverlay(viewportPalette: number[]): void {
+  private drawViewportThroughOverlay(viewportPalette: number[]): boolean {
     const { overlay, overlayPalette, host } = this.ui.ctx;
-    if (overlayDrawsNothing(overlay, overlayPalette)) return;
+    if (overlayDrawsNothing(overlay, overlayPalette)) return false;
     overlay.current.Allocate();
     CreateOverlayTable(this.overlayTable, viewportPalette, true, overlay, overlayPalette);
     UpdateViewportArea(this.screenImageData.data, this.screen.pixels, this.overlayTable, overlay, true,
@@ -672,6 +689,7 @@ export class GameScreen {
     if (this.ui.objectCursorFootprint) {
       reconvertThroughPalette(this.screenImageData, this.screen, this.ui.objectCursorFootprint, 12, this.uiPalette);
     }
+    return true;
   }
 
   /**
@@ -736,11 +754,11 @@ export class GameScreen {
   /** Push the screen buffer to the canvas through an explicit palette. */
   presentScreen(palette: number[], palette11946: number[] | null = null): void {
     if (palette11946) {
-      const viewport = { x1: VIEWPORT_X, y1: VIEWPORT_Y, x2: VIEWPORT_X + VIEWPORT_WIDTH - 1, y2: VIEWPORT_Y + VIEWPORT_HEIGHT - 1 };
-      updateImageDataFromIndexWithViewportPalette(this.screenImageData, this.screen, viewport, palette11946, palette);
+      updateImageDataFromIndexWithViewportPalette(this.screenImageData, this.screen, VIEWPORT_SPAN, palette11946, palette);
     } else {
       updateImageDataFromIndex(this.screenImageData, this.screen, palette);
     }
+    this.presented.record(this.screen.pixels, palette, palette11946 ? { palette: palette11946, span: VIEWPORT_SPAN } : null, null, null, 12);
     this.screenCtx.putImageData(this.screenImageData, 0, 0);
   }
 

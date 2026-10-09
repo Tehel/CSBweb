@@ -100,7 +100,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F14 | The golden frames compare colours, not palette indices | M | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C145 | The Hint Oracle's title boxes keep colour 12 on their last line and a half | S | ⏸️ waits on the author |
@@ -114,11 +113,10 @@ In payoff order: the first row is the next item.
 | X8 | Extra: RISE's own dialog, and the utility disk's portraits on DM's champions | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G29 are the active list. One row sits
-out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
-redesign to start: a session that reaches it first asks the author, and takes the next
-row meanwhile. The F
-rows are independent of the rest ("Priority", point 4), so they can be taken anywhere.
+The rows above G29 are the active list. `E15` waits for the page redesign to start: a
+session that reaches it first asks the author, and takes the next active row meanwhile. A
+new row takes its tier's place above it. The F rows are independent of the rest
+("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
@@ -226,15 +224,7 @@ in CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
 ## F — Verification debt
 
-### F14 ⏳ The golden frames compare colours, not palette indices
-
-The screen is a palette-index buffer, converted to RGBA when it is presented, as CSBWin's
-is. The probe reads the converted canvas back (`tools/probe-frames.mjs`), so the frames
-hold colours: wherever two palette slots hold the same colour, a renderer change that draws
-the wrong one of them passes, and a change to the conversion alone (`atariIntensity`,
-`src/renderer/csbwin/CanvasBlitter.ts`) moves every frame. Comparing the palette-index
-buffer rather than the canvas, the screen CSBWin draws, makes the frames a test of the
-drawing alone.
+New verification debt goes here; it can be taken anywhere ("Priority", point 4).
 
 ---
 
@@ -574,12 +564,13 @@ Recorded so that nobody "fixes" them.
   8 bits as `(v << 3) | (v >> 2)`: intensities 0-7 show as 0 33 74 107 148 181 222 255.
   The port's canvas shows them as `i * 36`, 0 36 72 108 144 180 216 252
   (`atariIntensity`, `src/renderer/csbwin/CanvasBlitter.ts`, and `atariToRGB`,
-  `src/core/types.ts`), up to 6 a channel apart, and the golden frames are taken so. Only
+  `src/core/types.ts`), up to 6 a channel apart. Only
   the viewport through an overlay, a tint or a jitter is CSBWin's RGB555 widened
   (`src/renderer/csbwin/OverlayScreen.ts`), so while one is up the viewport and the panels
   show the same Atari colour up to 6 a channel apart. `tools/dump-overlay-screen.ts` prints
   both. To revisit when frames are compared with CSBWin's ("Priority", postponed):
-  RGB555 on every screen would move every golden frame once.
+  the golden frames hold palette slots, not colours (`tools/lib/frames.mjs`), so RGB555
+  on every screen would move none of them.
 - 🚫 **An object in hand keeps its colours over the dungeon view** (X4). CSBWin draws the
   cursor rows from screen row 29 down as the object's colour-4 silhouette while the view
   is shown (`doc/PROVEN_FACTS.md` → "An object in hand is a colour-4 silhouette over the

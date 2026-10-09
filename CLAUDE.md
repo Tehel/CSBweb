@@ -98,8 +98,9 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   server and headless Chrome, so it needs no setup (on Node 20 it turns on
   `--experimental-websocket` itself; `probe-ui.mjs` needs that flag, or Node 22). It is
   out of the default run only because it costs a browser and ~40s. Run it before any renderer or UI commit. A frame is
-  the 320x200 canvas read back as pixels, and the comparison is pixel-wise, so a baseline
-  captured on one machine is checkable on another. The probe also asserts on the spot what
+  the 320x200 screen as CSBWin draws it, its palette slots and the palettes they were shown
+  through (`tools/lib/frames.mjs`), not the canvas's colours: a slot drawn for another of
+  the same colour fails, and a baseline captured on one machine is checkable on another. The probe also asserts on the spot what
   no frame shows: the CRT effect, which needs a Chrome that gives WebGL, the wheel
   and the keys reaching a save menu, at the entrance as in play, a move of the pointer
   painting nothing until the VBL's frame, the download its EXPORT starts, and a file

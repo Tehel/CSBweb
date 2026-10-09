@@ -91,8 +91,9 @@ frames against CSBWin's own screenshots. The retail dungeon uses none of them. F
 
 1. **Golden frames.** `tools/probe-frames.mjs` and `tools/check-frames.sh` drive the real
    app over the DevTools Protocol and compare the screen states in `tools/frames/`. The
-   probe reads the 320x200 canvas back and `tools/compare-frames.mjs` compares pixels, so
-   nothing depends on the host machine. It also fails a baseline that holds two identical
+   probe reads the 320x200 screen back as its palette slots and the palettes they were
+   shown through, and `tools/compare-frames.mjs` compares those, so nothing depends on the
+   host machine or on how an Atari colour is shown on the canvas. It also fails a baseline that holds two identical
    frames, so a frame that can no longer fail is caught.
 2. **Verification tools.** `tools/run-checks.mjs` is the one list of them; don't copy it
    anywhere. They load the real game files, drive the real engine with a fixed RNG seed,

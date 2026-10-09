@@ -30,8 +30,8 @@ a change works is `tsc` passing, there is no evidence.
    without checking them).
 2. **Every `tools/*.ts` that has assertions**, re-run. They are the regression suite.
    Adding a table or changing a shared record breaks them silently otherwise.
-3. `npm test -- --frames` adds `tools/check-frames.sh`: fourteen live screen states
-   compared pixel by pixel. It starts its own dev server and headless Chrome (reusing yours if
+3. `npm test -- --frames` adds `tools/check-frames.sh`: nineteen live screen states
+   compared pixel by pixel, as palette slots and the palettes they were shown through. It starts its own dev server and headless Chrome (reusing yours if
    they are already up), so there is nothing to set up. Always run it for a renderer
    or UI change.
 

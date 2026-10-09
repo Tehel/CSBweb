@@ -5,15 +5,17 @@
 // it, open the attack menu —
 // and writes a PNG per state.
 //
-// What it captures is the **320x200 game canvas**, read back with `getImageData` — not a
-// screenshot of the page. The page around the canvas is DOM debug chrome (buttons, a
-// slider, a scrollbar, the log panel), all of it drawn with the host's fonts and widget
-// theme, so a full-page shot could only ever be compared on the machine that took it. The
-// canvas is written solely by `putImageData` (the CRT effect is a separate GL canvas, fed
-// from a copy, and it is off unless switched on), which makes the read-back exact and
-// host-independent.
-// `compare-frames.mjs` then compares decoded *pixels*, so the PNG encoder does not enter
-// into it either.
+// What it captures is the **320x200 screen as CSBWin draws it**, not a screenshot of the
+// page, nor even the canvas's colours: the palette-index buffer the canvas was last given,
+// and the palette each pixel went through (`GameScreen.presentedFrame`,
+// `src/renderer/csbwin/PresentedFrame.ts`), written as `tools/lib/frames.mjs` says. A
+// renderer that draws a slot holding the same colour as the right one fails, and a change
+// to how an Atari colour is shown on the canvas alone fails nothing. The page around the
+// canvas is DOM debug chrome, drawn with the host's fonts and widget theme, and enters into
+// nothing. `compare-frames.mjs` then compares what the frames hold, so the PNG encoder does
+// not enter into it either. Each frame is checked against the canvas as it is taken: every
+// pixel of one code showed the same colour there, which is the colour the file keeps to be
+// looked at.
 //
 // `Math.random` is seeded and localStorage cleared on every load, so the frames are
 // identical run to run.
@@ -43,7 +45,7 @@
 // caught nothing during the Phase 14 split, which is exactly what it was there to do.
 import { writeFileSync } from 'node:fs';
 import { BUILD_PARTY } from './lib/buildParty.mjs';
-import { encodePng } from './lib/png.mjs';
+import { encodeFrame } from './lib/frames.mjs';
 
 const PORT = Number(process.env.CDP_PORT ?? 9222);
 const DEV_PORT = Number(process.env.DEV_PORT ?? 9000);
@@ -85,16 +87,32 @@ const CAPTURE_CANVAS = `(() => {
     s += String.fromCharCode.apply(null, d.subarray(i, Math.min(i + 0x8000, d.length)));
   return { width: c.width, height: c.height, data: btoa(s) };
 })()`;
+// The screen as last presented, and the canvas's colour for each of its codes, with the
+// first pixel whose colour is not its code's.
+const CAPTURE_FRAME = `(() => {
+  const frame = window.__probe.screen.presentedFrame();
+  const c = document.getElementById('game-canvas');
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  const colours = {};
+  let stray = null;
+  frame.codes.forEach((code, i) => {
+    const rgb = [d[i * 4], d[i * 4 + 1], d[i * 4 + 2]];
+    const was = colours[code];
+    if (!was) colours[code] = rgb;
+    else if (!stray && was.some((v, k) => v !== rgb[k])) stray = { x: i % frame.width, y: Math.floor(i / frame.width), code, was, rgb };
+  });
+  return { frame, colours, stray };
+})()`;
 
-/** Writes the frame, and returns its pixels for the checks made on the spot. */
-const shot = async (name) => {
-  const cap = await evaluate(CAPTURE_CANVAS);
-  const rgba = Buffer.from(cap.data, 'base64');
-  writeFileSync(`${process.argv[2]}/${name}.png`, encodePng(cap.width, cap.height, rgba));
-  console.log('  wrote', name + '.png', `(${cap.width}x${cap.height})`);
-  return cap.data;
-};
 const canvasPixels = async () => (await evaluate(CAPTURE_CANVAS)).data;
+/** Writes the frame, and returns the canvas's pixels for the checks made on the spot. */
+const shot = async (name) => {
+  const { frame, colours, stray } = await evaluate(CAPTURE_FRAME);
+  if (stray) check(false, `${name}: code ${stray.code} shows ${stray.was} on the canvas, and ${stray.rgb} at (${stray.x},${stray.y})`);
+  writeFileSync(`${process.argv[2]}/${name}.png`, encodeFrame(frame, colours));
+  console.log('  wrote', name + '.png', `(${frame.width}x${frame.height})`);
+  return canvasPixels();
+};
 const failures = [];
 const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${what}`); if (!ok) failures.push(what); };
 // The CRT effect is glfx's WebGL canvas, `#game-canvas_gl` (`createCrtController`,
