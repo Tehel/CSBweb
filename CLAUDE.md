@@ -103,8 +103,9 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   the same colour fails, and a baseline captured on one machine is checkable on another. The probe also asserts on the spot what
   no frame shows: the CRT effect, which needs a Chrome that gives WebGL, the wheel
   and the keys reaching a save menu, at the entrance as in play, a move of the pointer
-  painting nothing until the VBL's frame, the download its EXPORT starts, and a file
-  dropped on it.
+  painting nothing until the VBL's frame, the download its EXPORT starts, a file
+  dropped on it, and a finger on a touch screen: a tap one click, the eye held while it
+  is down.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`

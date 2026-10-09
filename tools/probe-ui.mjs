@@ -154,8 +154,8 @@ const click = async (spec) => {
   const b = btn === 'right' ? 2 : 0;
   await evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
     const sx=r.left+${Number(x)}*r.width/320, sy=r.top+${Number(y)}*r.height/200;
-    for (const t of ['mousedown','mouseup'])
-      c.dispatchEvent(new MouseEvent(t,{clientX:sx,clientY:sy,button:${b},buttons:${b === 2 ? 2 : 1},bubbles:true}));
+    for (const t of ['pointerdown','pointerup'])
+      c.dispatchEvent(new PointerEvent(t,{isPrimary:true,pointerType:'mouse',clientX:sx,clientY:sy,button:${b},buttons:${b === 2 ? 2 : 1},bubbles:true}));
     return 1;})()`);
   await wait(400);
 };

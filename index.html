@@ -56,6 +56,12 @@
             height: 600px;
             image-rendering: pixelated;
             cursor: none;
+            /* A touch is the game's, not a scroll's or a zoom's (`bindCanvasEvents`,
+               src/ui/events.ts), nor a long press's callout or selection. */
+            touch-action: none;
+            -webkit-touch-callout: none;
+            user-select: none;
+            -webkit-user-select: none;
         }
         #side {
             display: flex;

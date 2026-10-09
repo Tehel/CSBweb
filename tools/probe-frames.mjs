@@ -130,7 +130,7 @@ const wheelTaken = () => evaluate(`(()=>{const e=new WheelEvent('wheel',{deltaY:
 // button: 0 = left (DM mask 2), 2 = right (DM mask 1)
 const canvasClick = (x, y, button = 0) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   const sx=r.left+${x}*r.width/320, sy=r.top+${y}*r.height/200;
-  for (const t of ['mousedown','mouseup']) c.dispatchEvent(new MouseEvent(t,{clientX:sx,clientY:sy,button:${button},buttons:${button===2?2:1},bubbles:true}));
+  for (const t of ['pointerdown','pointerup']) c.dispatchEvent(new PointerEvent(t,{isPrimary:true,pointerType:'mouse',clientX:sx,clientY:sy,button:${button},buttons:${button===2?2:1},bubbles:true}));
   return 1;})()`);
 // A click as a player makes it: CDP's own mouse events at a point of the page, which the
 // browser hit-tests, where `canvasClick` hands its events to the game canvas whatever lies
@@ -234,10 +234,10 @@ check(await wheelTaken(), 'the disk menu takes the wheel, for its list');
 // leaves again, so that no later frame holds a cursor.
 const moves = await evaluate(`(async()=>{const {screen}=window.__probe;const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   let paints=0; const own=screen.presentViewport; screen.presentViewport=function(){paints++; return own.call(this);};
-  for (let i=0;i<50;i++) c.dispatchEvent(new MouseEvent('mousemove',{clientX:r.left+(100.5+i)*r.width/320,clientY:r.top+100.5*r.height/200,bubbles:true}));
+  for (let i=0;i<50;i++) c.dispatchEvent(new PointerEvent('pointermove',{isPrimary:true,pointerType:'mouse',clientX:r.left+(100.5+i)*r.width/320,clientY:r.top+100.5*r.height/200,bubbles:true}));
   const during=paints; await new Promise(r=>setTimeout(r,200));
   const at=screen.ui.hoverPoint; delete screen.presentViewport;
-  c.dispatchEvent(new MouseEvent('mouseleave')); await new Promise(r=>setTimeout(r,200));
+  c.dispatchEvent(new PointerEvent('pointerleave',{isPrimary:true,pointerType:'mouse'})); await new Promise(r=>setTimeout(r,200));
   return {during, after:paints, at, left:screen.ui.hoverPoint===null};})()`);
 console.log('  fifty moves of the pointer:', JSON.stringify(moves));
 check(moves.during === 0, 'a move of the pointer paints nothing itself');
@@ -275,7 +275,7 @@ check(await wheelTaken(), 'the entrance\'s chooser takes the wheel, for its list
 // (`doc/CSBwin-src/SaveGame.cpp:1687-1689`): after a notch of the wheel and two keys, the
 // arrow is still where the click that opened it left it, and the pointer leaving the
 // canvas takes it off. The pointer stays off for the comparisons below.
-const leaveCanvas = () => evaluate(`document.getElementById('game-canvas').dispatchEvent(new MouseEvent('mouseleave')),1`);
+const leaveCanvas = () => evaluate(`document.getElementById('game-canvas').dispatchEvent(new PointerEvent('pointerleave',{isPrimary:true,pointerType:'mouse'})),1`);
 await key('ArrowUp');   await wait(200);
 await key('ArrowDown'); await wait(200);
 const withArrow = await canvasPixels();
@@ -397,6 +397,26 @@ await canvasClick(124, 10, 0); await wait(600);
 check(await selected() === 1, 'a left click on a champion\'s bars opens the inventory');
 await canvasClick(124, 10, 0); await wait(600);
 check(await selected() === -1, 'and a second one closes it');
+// A finger, through CDP's touch events, which Chrome delivers to the page as a touch
+// screen's: pointer events as it presses and lifts, and its mouse events only after the
+// lift (`bindCanvasEvents`, `src/ui/events.ts`). So the eye (12-27 x 46-61) is held while
+// the finger is down, and a tap is one click.
+const touch = async (type, x, y) => {
+  const p = await evaluate(`(()=>{const r=document.getElementById('game-canvas').getBoundingClientRect();
+    return {x:r.left+(${x}+0.5)*r.width/320, y:r.top+(${y}+0.5)*r.height/200};})()`);
+  await send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y }] });
+};
+const pressingEye = () => evaluate(`window.__probe.screen.ui.pressingEye`);
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+await touch('touchStart', 124, 10); await touch('touchEnd', 124, 10); await wait(600);
+check(await selected() === 1, 'a tap on a champion\'s bars opens the inventory, once');
+await touch('touchStart', 19, 53); await wait(600);
+check(await pressingEye(), 'a finger held on the eye keeps it pressed');
+await touch('touchEnd', 19, 53); await wait(600);
+check(!(await pressingEye()), 'and lifting it lets go');
+await touch('touchStart', 124, 10); await touch('touchEnd', 124, 10); await wait(600);
+check(await selected() === -1, 'a second tap closes the inventory');
+await send('Emulation.setTouchEmulationEnabled', { enabled: false });
 
 // The Hint Oracle's button (`src/renderer/ui/HintOracleButton.ts`), CSB's set only: the
 // inventory's close box is the Oracle's `?`, and a real click on it opens the Oracle on the

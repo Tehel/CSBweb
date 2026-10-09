@@ -121,7 +121,10 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
       y: Math.floor(((e.clientY - rect.top) * canvas.height) / rect.height),
     };
   };
-  const onMouseDown = (e: MouseEvent): void => {
+  // Pointer events, as in play (`bindCanvasEvents`, `src/ui/events.ts`): only the primary
+  // pointer, and a finger's lift is not the pointer leaving.
+  const onMouseDown = (e: PointerEvent): void => {
+    if (!e.isPrimary) return;
     const { x, y } = pointAt(e);
     pointerX = x;
     pointerY = y;
@@ -130,13 +133,15 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     mouseSwitches = buttons;
     push({ kind: 'click', x, y, buttons });
   };
-  const onMouseUp = (): void => {
+  const onMouseUp = (e: PointerEvent): void => {
+    if (!e.isPrimary) return;
     mouseSwitches = 0;
   };
   // The screens between animations are static, so nothing would repaint and the arrow
   // would sit where it was drawn. CSBWin has the VBL handler for this; here the move is
   // the repaint.
-  const onMouseMove = (e: MouseEvent): void => {
+  const onMouseMove = (e: PointerEvent): void => {
+    if (!e.isPrimary) return;
     const { x, y } = pointAt(e);
     if (x === pointerX && y === pointerY) return;
     pointerX = x;
@@ -145,7 +150,8 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     if (gameScreen.isSaveMenuOpen() && gameScreen.moveSaveMenuPointer({ x, y })) return;
     if (cursorVisible) host.present();
   };
-  const onMouseLeave = (): void => {
+  const onMouseLeave = (e: PointerEvent): void => {
+    if (!e.isPrimary || e.pointerType !== 'mouse') return;
     pointerX = -100;
     pointerY = -100;
     if (gameScreen.isSaveMenuOpen() && gameScreen.moveSaveMenuPointer(null)) return;
@@ -168,10 +174,11 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     e.preventDefault();
   };
 
-  canvas.addEventListener('mousedown', onMouseDown);
-  window.addEventListener('mouseup', onMouseUp);
-  canvas.addEventListener('mousemove', onMouseMove);
-  canvas.addEventListener('mouseleave', onMouseLeave);
+  canvas.addEventListener('pointerdown', onMouseDown);
+  window.addEventListener('pointerup', onMouseUp);
+  window.addEventListener('pointercancel', onMouseUp);
+  canvas.addEventListener('pointermove', onMouseMove);
+  canvas.addEventListener('pointerleave', onMouseLeave);
   canvas.addEventListener('contextmenu', onContextMenu);
   canvas.addEventListener('wheel', onWheel, { passive: false });
   window.addEventListener('keydown', onKeyDown);
@@ -226,10 +233,11 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
   return {
     host,
     detach: () => {
-      canvas.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('mouseup', onMouseUp);
-      canvas.removeEventListener('mousemove', onMouseMove);
-      canvas.removeEventListener('mouseleave', onMouseLeave);
+      canvas.removeEventListener('pointerdown', onMouseDown);
+      window.removeEventListener('pointerup', onMouseUp);
+      window.removeEventListener('pointercancel', onMouseUp);
+      canvas.removeEventListener('pointermove', onMouseMove);
+      canvas.removeEventListener('pointerleave', onMouseLeave);
       canvas.removeEventListener('contextmenu', onContextMenu);
       canvas.removeEventListener('wheel', onWheel);
       window.removeEventListener('keydown', onKeyDown);
