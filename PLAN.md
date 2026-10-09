@@ -176,12 +176,25 @@ never carried out, because the project has **no test framework**.
    table regressions surface immediately. Part-paid by Phase 16: `tools/dump-image-codec.ts`
    decodes every image in both data sets and asserts each one fills its own buffer exactly,
    which is what caught the codec bug's blast radius, and checks each opcode on a hand-built
-   stream. The *table* extraction (`0x22e`..`0x232`) still has no round-trip check beyond the
-   canaries individual tools assert.
+   stream. `dungeon.dat` is written again and held up against its own bytes by
+   `tools/dump-dungeon-image-blocks.ts`. The *table* extraction (`0x22e`..`0x232`) still
+   has no round-trip check beyond the canaries individual tools assert. It is paid in
+   three sub-steps, one tool, `tools/dump-graphics-tables.ts`, in every data set that has
+   a `graphics.dat`:
+   - ⏳ **4a. The layout, and `0x22e`.** The tool reads each graphic's span of
+     `doc/CSBwin-src/Data.h` (`Start of graphic 0x…` to its end), and lays its fields
+     out from their declared types and counts. The span's size must be the one
+     `ReadAndExpandGraphic`'s `ASSERT` demands (`CSBCode.cpp:10248-10320`) and every data
+     set's item, and every field that carries its address (`Word7246`, `//Byte6652`)
+     must sit where the address puts it. Then every table `ViewportTables` and
+     `ObjectTables` read from `0x22e` is encoded back, field by field, and compared with
+     the item's bytes at its `Data.h` offset. What no table reads is printed, not failed.
+   - ⏳ **4b. `0x22f`**, `ObjectTables`' other half.
+   - ⏳ **4c. `0x230`, `0x231` (both sizes) and `0x232`**, `UITables`.
 5. ⏸️ Compare against CSBWin screenshots for a few known scenes (Phase 7's skipped
    validation). Postponed, perhaps for good: staging the same scene in CSBWin without
    cheats costs more than it would prove, and the golden frames and the render probe
    already catch any pixel that changes unintentionally. When it is taken, the canvas's
    colours go with it: an Atari intensity times 36, not CSBWin's RGB555 (`DEBT.md` H).
 
-Status: 🔄 in progress — steps 1, 2 and 3 done, 4 part-done; 5 postponed.
+Status: 🔄 in progress — steps 1, 2 and 3 done, 4 part-done (4a next); 5 postponed.
