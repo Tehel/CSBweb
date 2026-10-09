@@ -34,3 +34,14 @@ export function wrapMember<T extends object, K extends MethodKey<T>>(
   const real = (target[key] as (...args: unknown[]) => unknown).bind(target) as T[K];
   return standIn(target, key, wrap(real));
 }
+
+/**
+ * A stand-in for a whole `T` that has only `members`: a partial record, a context or a
+ * system holding just what the call under test reaches. `tsc` checks each member given
+ * against `T`'s, and `Partial` admits no private, so a renamed member fails to compile
+ * rather than leave the tool testing nothing. Any other member is absent, and a call
+ * that reaches one throws.
+ */
+export function standInOf<T>(members: Partial<T>): T {
+  return members as T;
+}

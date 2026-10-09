@@ -31,8 +31,11 @@ import { DBType, OBJECT_ID_EOF } from '../src/core/types';
 import { DrawRoomObjects, mapColorValue } from '../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
+import type { CreatureRecord } from '../src/data/dungeonTypes';
+import type { DungeonState } from '../src/engine/DungeonState';
+import type { InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { check, finish } from './lib/check';
-import { standIn, wrapMember } from './lib/standIn';
+import { standIn, wrapMember, standInOf } from './lib/standIn';
 import { graphicsTablesOf, stockGraphics } from './lib/game';
 import { RnMaps } from '../src/core/RnMaps';
 
@@ -74,10 +77,10 @@ function draw(group: Group, relativeCell: number, drawOrder: number): Sprite[] {
   const positions = group.corners === 255 ? 255
     : group.corners.reduce((acc, c, i) => acc | (c << (2 * i)), 0);
   const facings = [0, 1, 2, 3].reduce((acc, i) => acc | (group.facing << (2 * i)), 0);
-  const record = { creatureType: group.type, numMonM1: group.numMonM1 };
+  const record = standInOf<CreatureRecord>({ creatureType: group.type, numMonM1: group.numMonM1 });
   const blits: Array<{ x1: number; x2: number; y2: number; w: number; graphic: number }> = [];
   let lastGraphic = -1;
-  const context: any = {
+  const context = standInOf<InterpreterContext>({
     viewportIndexBuffer: createPaletteIndexViewportBuffer(224, 136, 0),
     objectTables: tables,
     getGraphicBitmap: (n: number) => {
@@ -85,13 +88,13 @@ function draw(group: Group, relativeCell: number, drawOrder: number): Sprite[] {
       const img = graphics.getImage(n);
       return { width: img.width, height: img.height, pixels: new Uint8Array(img.width * img.height).fill(1) };
     },
-    dungeonState: {
+    dungeonState: standInOf<DungeonState>({
       rnMaps,
       getDBRecordLink: () => OBJECT_ID_EOF,
       getCreatureRecord: () => record,
       getMonsterRenderState: () => ({ positions, facings, statuses: STATUSES }),
-    },
-  };
+    }),
+  });
   const draw = new ViewportDraw(context);
   wrapMember(draw, 'blitShapeToViewportIndexWithTransparent', (blit) => (src, rect, t) => {
     blits.push({ x1: rect.x1, x2: rect.x2, y2: rect.y2, w: src.width >> 1, graphic: lastGraphic });
@@ -171,11 +174,11 @@ expect('a mummy at the far right of F0L', { type: MUMMY, numMonM1: 0, corners: [
 // graphic is one colour on its left half and another on its right, so the first pixel of
 // the sprite blitted says whether it was mirrored.
 function frontMirrored(type: number, relativeCell: number, status: number): boolean | null {
-  const record = { creatureType: type, numMonM1: 0 };
+  const record = standInOf<CreatureRecord>({ creatureType: type, numMonM1: 0 });
   const transparent = tables.monsterGraphics[type]!.uByte10 & 15;
   const [left, right] = [1, 2, 3, 4, 5].filter((c) => c !== transparent);
   let first: number | null = null;
-  const context: any = {
+  const context = standInOf<InterpreterContext>({
     viewportIndexBuffer: createPaletteIndexViewportBuffer(224, 136, 0),
     objectTables: tables,
     getGraphicBitmap: (n: number) => {
@@ -183,13 +186,13 @@ function frontMirrored(type: number, relativeCell: number, status: number): bool
       const pixels = new Uint8Array(img.width * img.height).map((_, i) => ((i % img.width) < img.width / 2 ? left! : right!));
       return { width: img.width, height: img.height, pixels };
     },
-    dungeonState: {
+    dungeonState: standInOf<DungeonState>({
       rnMaps,
       getDBRecordLink: () => OBJECT_ID_EOF,
       getCreatureRecord: () => record,
       getMonsterRenderState: () => ({ positions: 255, facings: 0xaa, statuses: new Uint8Array([status, 0, 0, 0]) }),
-    },
-  };
+    }),
+  });
   const draw = new ViewportDraw(context);
   const unmirroredFirst = (map: Uint8Array | null) => (map ? mapColorValue(map, left!) : left);
   standIn(draw, 'blitShapeToViewportIndexWithTransparent', (src) => { first = src.pixels[0]; });

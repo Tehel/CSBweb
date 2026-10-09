@@ -31,13 +31,15 @@ import { RnMaps } from '../src/core/RnMaps';
 import { getActuatorType, getActuatorValue } from '../src/data/actuatorHelpers';
 import { AltGraphicMapping, AltMonCache, readAltMonGraph, type AltMonGraph } from '../src/data/AltMonGraphics';
 import { CSBGraphicType, CSBGraphicsLoader, decodePlanar, type IndexedBitmap } from '../src/data/CSBGraphicsLoader';
-import type { ExpoolDatabase } from '../src/data/CsbwinExpool';
+import type { CreatureRecord, DungeonData, DungeonHeader } from '../src/data/dungeonTypes';
 import { Die } from '../src/engine/Die';
 import { DrawRoomObjects, mapColorValue } from '../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, mirrorBitmap, shrinkBlt } from '../src/renderer/csbwin/CanvasBlitter';
+import type { DungeonState } from '../src/engine/DungeonState';
+import type { InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { check, finish } from './lib/check';
-import { wrapMember } from './lib/standIn';
+import { wrapMember, standInOf } from './lib/standIn';
 import { graphicsTablesOf, stockGraphics, stockDungeon } from './lib/game';
 
 const graphics = stockGraphics();
@@ -45,7 +47,7 @@ const tables = graphicsTablesOf(graphics).objects;
 const csbGraphics = new CSBGraphicsLoader();
 csbGraphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/conflux-3.5-b8/CSBgraphics.dat'))));
 /** A pool without records: every graphic is the section `3 * mt + n - 1`. */
-const NO_POOL: ExpoolDatabase = { header: { objectCounts: new Array(16).fill(0) } };
+const NO_POOL = standInOf<DungeonData>({ header: standInOf<DungeonHeader>({ objectCounts: new Array(16).fill(0) }) });
 
 const MUMMY = 10; // one corner; section 30 has a side, a back and an attack view
 const TYPE_3 = 3; // one corner; section 10, its graphic 2, has an ITEM110 of its own
@@ -77,10 +79,10 @@ interface Scene {
 
 /** The sprites `DrawRoomObjects` blits for one monster on the far left corner of `cell`. */
 function drawScene(scene: Scene, cache: AltMonCache, files: Pick<CSBGraphicsLoader, 'readSection'> = csbGraphics): { blits: Blit[]; ownGraphics: number[] } {
-  const record = { creatureType: scene.type ?? MUMMY, numMonM1: 0, alternateGraphics: scene.alternateGraphics };
+  const record = standInOf<CreatureRecord>({ creatureType: scene.type ?? MUMMY, numMonM1: 0, alternateGraphics: scene.alternateGraphics });
   const blits: Blit[] = [];
   const ownGraphics: number[] = [];
-  const context: any = {
+  const context = standInOf<InterpreterContext>({
     viewportIndexBuffer: createPaletteIndexViewportBuffer(224, 136, 0),
     objectTables: tables,
     getGraphicBitmap: (n: number) => {
@@ -88,17 +90,17 @@ function drawScene(scene: Scene, cache: AltMonCache, files: Pick<CSBGraphicsLoad
       const img = graphics.getImage(n);
       return { width: img.width, height: img.height, pixels: img.pixels };
     },
-    csbGraphics: files,
+    csbGraphics: standInOf<CSBGraphicsLoader>(files),
     altMonCache: cache,
     frameMapIndex: 1,
-    dungeonState: {
+    dungeonState: standInOf<DungeonState>({
       rnMaps,
       getData: () => NO_POOL,
       getDBRecordLink: () => OBJECT_ID_EOF,
       getCreatureRecord: () => record,
       getMonsterRenderState: () => ({ positions: 0, facings: scene.facing * 0x55, statuses: new Uint8Array([scene.status ?? 0, 0, 0, 0]) }),
-    },
-  };
+    }),
+  });
   const draw = new ViewportDraw(context);
   wrapMember(draw, 'blitShapeToViewportIndexWithTransparent', (blit) => (src, rect, t) => {
     blits.push({ src, x1: rect.x1, x2: rect.x2, y2: rect.y2, transparent: t });

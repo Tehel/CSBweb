@@ -21,12 +21,14 @@
  * Run: `npx tsx tools/dump-teleporter-shimmer.ts`
  */
 import type { RectPos } from '../src/data/tables/UITables';
+import type { InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { DrawTeleporter, GraphicRandom, graphicRandomState } from '../src/renderer/bytecode/DrawDoor';
 import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, mirrorBitmap, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, stockGraphics } from './lib/game';
+import { standInOf } from './lib/standIn';
 
 const graphics = stockGraphics();
 const viewportTables = graphicsTablesOf(graphics).viewport;
@@ -132,7 +134,7 @@ for (const { what, teleporter: t, wall } of cases) {
   for (const seed of SEEDS) {
     const port = createPaletteIndexViewportBuffer(224, 136, BACKGROUND);
     graphicRandomState.r = seed;
-    DrawTeleporter(new ViewportDraw({ viewportIndexBuffer: port, getGraphicBitmap: graphic } as any), t, wall);
+    DrawTeleporter(new ViewportDraw(standInOf<InterpreterContext>({ viewportIndexBuffer: port, getGraphicBitmap: graphic })), t, wall);
     const after = graphicRandomState.r;
 
     const want = createPaletteIndexViewportBuffer(224, 136, BACKGROUND).pixels;

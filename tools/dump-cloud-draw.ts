@@ -57,9 +57,12 @@ import { ViewportDraw, viewportRandom } from '../src/renderer/bytecode/ViewportD
 import { createPaletteIndexViewportBuffer, shrinkBlt, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../src/renderer/ViewportRenderer';
+import type { DungeonState } from '../src/engine/DungeonState';
+import type { InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
 import { RnMaps } from '../src/core/RnMaps';
+import { standInOf } from './lib/standIn';
 
 const graphics = stockGraphics();
 const viewportTables = graphicsTablesOf(graphics).viewport;
@@ -105,16 +108,16 @@ function drawCloudAt(px: number, py: number, viewportSeed: number): Drawn {
   cloudPositions7042[REL_CELL * 2] = px;
   cloudPositions7042[REL_CELL * 2 + 1] = py;
   const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
-  const context: any = {
+  const context = standInOf<InterpreterContext>({
     viewportIndexBuffer,
     objectTables: { ...realTables, cloudPositions7042, cloudScaleBase, cloudScale },
     getGraphicBitmap: () => cloudBitmap,
-    dungeonState: {
+    dungeonState: standInOf<DungeonState>({
       rnMaps,
       getDBRecordLink: () => OBJECT_ID_EOF,
       getCloudRecord: () => cloud,
-    },
-  };
+    }),
+  });
   viewportRandom.setSeed(viewportSeed);
   DrawClouds(new ViewportDraw(context), RELATIVE_CELL, cloudRn, 0, 0);
 
@@ -256,7 +259,7 @@ function fakeGraphic(id: number) {
   }
   return b;
 }
-const shrink = (src: any, w: number, h: number, map: Uint8Array) => shrinkBlt(src, src.width, src.height, w, h, map);
+const shrink = (src: IndexedBitmap, w: number, h: number, map: Uint8Array) => shrinkBlt(src, src.width, src.height, w, h, map);
 
 interface Scene {
   relCell: number; // CSBWin's RelativeCellNumber
@@ -275,12 +278,12 @@ function drawScene(sc: Scene): SceneResult {
   const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
   const requested: number[] = [];
   const rec = { nextObject: OBJECT_ID_EOF, value: sc.value, cloudType: sc.cloudType, bit7: true };
-  const context: any = {
+  const context = standInOf<InterpreterContext>({
     viewportIndexBuffer,
     objectTables: { ...realTables, cloudPositions7042 },
     getGraphicBitmap: (n: number) => { requested.push(n); return fakeGraphic(n); },
-    dungeonState: { rnMaps, getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
-  };
+    dungeonState: standInOf<DungeonState>({ rnMaps, getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec }),
+  });
   viewportRandom.setSeed(sc.seed ?? seedFor(false, false));
   DrawClouds(new ViewportDraw(context), sc.relCell - 3, cloudRn, 0, 0);
   const { width, pixels } = viewportIndexBuffer;
@@ -393,15 +396,16 @@ console.log('\nthe Fluxcage\'s shimmer (Code51a4.cpp:2769-2782):');
 for (const word1868 of [false, true]) {
   for (const relativeCell of [0, 1, 4]) {
     const rec = { nextObject: OBJECT_ID_EOF, value: 0, cloudType: 50, bit7: false };
-    const context: any = {
-      viewportIndexBuffer: createPaletteIndexViewportBuffer(224, 136, 0),
+    const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
+    const context = standInOf<InterpreterContext>({
+      viewportIndexBuffer,
       objectTables: realTables,
       wallRectangles: viewportTables.wallRectangles,
       teleporterRectangles: viewportTables.teleporterRectangles,
       getGraphicBitmap: (n: number) => fakeGraphic(n),
-      dungeonState: { rnMaps, getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
+      dungeonState: standInOf<DungeonState>({ rnMaps, getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec }),
       word1868,
-    };
+    });
     const seed = 0x2468ace;
     graphicRandomState.r = seed;
     // Position list 1: the cell's first position, at the cloud's (0) with facing 0.
@@ -414,7 +418,7 @@ for (const word1868 of [false, true]) {
     const expected = createPaletteIndexViewportBuffer(224, 136, 0);
     graphicRandomState.r = seed;
     DrawTeleporter(new ViewportDraw({ ...context, viewportIndexBuffer: expected }), { ...teleporter, x1: teleporter.x1 + 1 }, wall);
-    const pixels: Uint8Array = context.viewportIndexBuffer.pixels;
+    const pixels: Uint8Array = viewportIndexBuffer.pixels;
     const untouched = after === seed && pixels.every((p) => p === 0);
     const drawn = after === graphicRandomState.r && expected.pixels.some((p) => p !== 0)
       && Buffer.compare(pixels, expected.pixels) === 0;
@@ -437,12 +441,12 @@ for (const facing of [0, 1, 2, 3]) {
   for (const [cloudType, pos] of [[100, (facing + 2) & 3], [101, (facing + 2) & 3], [100, facing]]) {
     const rec = { nextObject: OBJECT_ID_EOF, value: 0, cloudType, bit7: false };
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
-    const context: any = {
+    const context = standInOf<InterpreterContext>({
       viewportIndexBuffer,
       objectTables: realTables,
       getGraphicBitmap: (n: number) => fakeGraphic(n),
-      dungeonState: { rnMaps, getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
-    };
+      dungeonState: standInOf<DungeonState>({ rnMaps, getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec }),
+    });
     const rn = rnMaps.setPos(cloudRn, pos);
     // Relative cell 6 is CSBWin's 9: the wall straight ahead, where the altar stands.
     DrawRoomObjects(new ViewportDraw(context), rn, facing, 0, 0, 6, 0);

@@ -22,13 +22,15 @@
  */
 import { DBType, OBJECT_ID_EOF, type ObjectID } from '../src/core/types';
 import { RN_FIREBALL, RN_LIGHTNING } from '../src/core/spellRn';
+import type { MissileRecord } from '../src/data/dungeonTypes';
 import { DungeonState } from '../src/engine/DungeonState';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
+import type { InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { drawMissilesAtPosition, GetGraphicClass } from '../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
-import { standIn } from './lib/standIn';
+import { standIn, standInOf } from './lib/standIn';
 import { graphicsTablesOf, stockGraphics, stockDungeon } from './lib/game';
 
 async function main(): Promise<void> {
@@ -82,15 +84,15 @@ async function main(): Promise<void> {
   const view: DungeonState = Object.create(dungeon);
   standIn(view, 'getDBRecordLink', () => OBJECT_ID_EOF);
   standIn(view, 'getTimerWord8', () => 0); // flying north, as the party faces
-  const missile = { projectileObject: weaponRn as ObjectID, timerIndex: 0, rangeRemaining: 255 };
-  (view as any).getMissileRecord = () => missile;
+  const missile = standInOf<MissileRecord>({ projectileObject: weaponRn as ObjectID, timerIndex: 0, rangeRemaining: 255 });
+  standIn(view, 'getMissileRecord', () => missile);
 
   // Solid synthetic graphics of each requested graphic's real size; the viewport starts at 0.
   interface Drawn { asked: number[]; x1: number; y1: number; x2: number; y2: number }
   const draw = (relativeCell: number, relativeLocation: number): Drawn => {
     const asked: number[] = [];
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
-    const context: any = {
+    const context = standInOf<InterpreterContext>({
       viewportIndexBuffer,
       objectTables: tables,
       dungeonState: view,
@@ -99,7 +101,7 @@ async function main(): Promise<void> {
         const w = md.widthBytes * 2;
         return { width: w, height: md.height, pixels: new Uint8Array(w * md.height).fill(5) };
       },
-    };
+    });
     drawMissilesAtPosition(
       new ViewportDraw(context), view, tables, dungeon.rnMaps.setPos(dungeon.rnMaps.rn(DBType.MISSILE, 0), relativeLocation), relativeLocation, 0, 0, 0, relativeCell, relativeLocation, 1,
     );

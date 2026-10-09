@@ -22,12 +22,14 @@
  *
  * Run: `npx tsx tools/dump-door-lightning.ts`
  */
-import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
+import { BytecodeInterpreter, type InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { Opcode } from '../src/renderer/bytecode/Opcodes';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
+import type { DoorRecord } from '../src/data/dungeonTypes';
+import type { DungeonState } from '../src/engine/DungeonState';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, stockGraphics } from './lib/game';
-import { standIn } from './lib/standIn';
+import { standIn, standInOf } from './lib/standIn';
 
 const graphics = stockGraphics();
 const objectTables = graphicsTablesOf(graphics).objects;
@@ -41,16 +43,16 @@ check(lightningIndex >= 0, 'the shipped dungeon.dat defines at least one lightni
 const doorGraphicBitmap = { width: 8, height: 8, pixels: new Uint8Array(64).map((_, i) => (i % 8) + Math.floor(i / 8)) };
 const viewportIndexBuffer = createPaletteIndexViewportBuffer(320, 200, 0);
 
-const context: any = {
+const context = standInOf<InterpreterContext>({
   viewportIndexBuffer,
   roomData: [],
   doorGraphics: [[0, 0], [0, 0], [0, 0]],
   doorTOC: [objectTables.doorCharacteristics[lightningIndex] ?? 0, 0],
   getGraphicBitmap: () => doorGraphicBitmap,
-  dungeonState: {
-    getDoorRecordByIndex: () => ({ doorType: 0, vertical: false }),
-  },
-};
+  dungeonState: standInOf<DungeonState>({
+    getDoorRecordByIndex: () => standInOf<DoorRecord>({ doorType: 0, vertical: false }),
+  }),
+});
 
 const interp = new BytecodeInterpreter(context);
 // Rectangle-pointer resolution is proven by the other opcode tools; here it would

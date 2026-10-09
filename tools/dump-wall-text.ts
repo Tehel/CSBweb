@@ -42,8 +42,12 @@ import { drawWallText } from '../src/renderer/bytecode/DrawDecorations';
 import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
+import type { MapData, TextRecord } from '../src/data/dungeonTypes';
+import type { DungeonState } from '../src/engine/DungeonState';
+import type { InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { standInOf } from './lib/standIn';
 
 const GLYPHS = 36;
 /** The viewport cleared to 16, which is no colour, so every pixel drawn shows. */
@@ -95,12 +99,15 @@ for (const set of ['dm-atari', 'dm-atari-1.3-fr']) {
 
   const draw = (bytes: Uint8Array | null, rn: ObjectID): Uint8Array => {
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, UNDRAWN);
-    const context: any = {
+    const context = standInOf<InterpreterContext>({
       viewportIndexBuffer,
       objectTables: tables,
       getGraphicBitmap,
-      dungeonState: bytes === null ? dungeon : { getTextRecord: () => ({}), decodeWallTextBytes: () => bytes },
-    };
+      dungeonState: bytes === null ? dungeon : standInOf<DungeonState>({
+        getTextRecord: () => standInOf<TextRecord>({}),
+        decodeWallTextBytes: () => bytes,
+      }),
+    });
     drawWallText(new ViewportDraw(context), rn, 12, false);
     return viewportIndexBuffer.pixels;
   };
@@ -194,17 +201,17 @@ for (const set of ['dm-atari', 'dm-atari-1.3-fr']) {
     const bytes: number[] = [];
     for (let line = 0; line < lines; line++) bytes.push(0, line === lines - 1 ? 129 : 128);
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, UNDRAWN);
-    const context: any = {
+    const context = standInOf<InterpreterContext>({
       viewportIndexBuffer,
       objectTables: tables,
       getGraphicBitmap,
       numWallDecoration: 0,
-      dungeonState: {
-        getMap: () => ({ wallDecorationTOC: [] }),
-        getTextRecord: () => ({}),
+      dungeonState: standInOf<DungeonState>({
+        getMap: () => standInOf<MapData>({ wallDecorationTOC: [] }),
+        getTextRecord: () => standInOf<TextRecord>({}),
         decodeWallTextBytes: () => Uint8Array.from(bytes),
-      },
-    };
+      }),
+    });
     drawWallText(new ViewportDraw(context), dungeon.rnMaps.rn(DBType.TEXT, 0), position, false);
     return viewportIndexBuffer.pixels;
   };
