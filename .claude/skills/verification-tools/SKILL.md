@@ -177,6 +177,11 @@ rather than calling an extractor itself. A champion's carry tables are the game'
 (`gameTablesOf(graphics)`). Never
 mutate the shared set.
 
+**A `Game` plays over the `DungeonData` it is built on, in place.** A champion recruited
+empties their mirror in it, so a second game over the
+same `DungeonData` starts where the first left off. Load the file again for each game
+(`prisonGame`, `tools/dump-rise.ts`).
+
 **Find a genuine save through `tools/lib/saves.ts`.** The CSBWin saves are in
 `tools/fixtures/`, beside the golden frames: seven made to order for a check (a party
 one step in, a door in motion, a sword in flight) and `csbgame7.dat`, the one save of
