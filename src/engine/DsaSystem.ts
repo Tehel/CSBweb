@@ -50,6 +50,7 @@ import { monsterDrawAsSize4, monsterInvisible, monsterPoisoned, monsterUnique } 
 import { printWithSubstitution } from './PrintWithSubstitution';
 import { findChampionByFingerprint } from './Party';
 import { swapCharacter } from './SwapCharacter';
+import { forgetThrownWeapon } from './ThrownWeapons';
 import { getFromWings, locateInWings, saveToWings, wingsChampion } from './Wings';
 import { readU32LE, writeU32LE } from '../core/bytes';
 import { decodeCharField } from '../data/CsbwinSaveInfo';
@@ -4527,7 +4528,10 @@ export class DsaSystem {
     if (carryMask === null || (carryMask & slotMask) === 0) {
       return DsaMoveError.DER_IllegalObjectForCarryLocation;
     }
-    if (doit) this.ctx.systems.character.addCharacterPossession(chIdx, object, carryLoc);
+    if (doit) {
+      forgetThrownWeapon(this.ctx, object);
+      this.ctx.systems.character.addCharacterPossession(chIdx, object, carryLoc);
+    }
     return DsaMoveError.DER_OK;
   }
 
@@ -4542,6 +4546,7 @@ export class DsaSystem {
         this.cursorFilter({ object, type: CursorFilterType.DSA_MoveTo, p1: 0, p2: 0, p3: 0, p4: 0 });
       }
       party.objectInHand = object;
+      forgetThrownWeapon(this.ctx, object);
     }
     return DsaMoveError.DER_OK;
   }

@@ -16,6 +16,7 @@ import { resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 import { setClockTick } from '../../engine/LoopState';
 import { CursorFilterType } from '../../engine/DsaSystem';
+import { forgetThrownWeapon } from '../../engine/ThrownWeapons';
 
 const POTION_WATER_FLASK = 15;
 
@@ -91,6 +92,7 @@ export function tryPickViewportObject(ui: UIState, x: number, y: number): boolea
   ui.ctx.systems.mouse.triggerObjectMove(target, hit.rn, false, false, ui.partyState.facing & 0x3);
 
   ui.partyState.objectInHand = hit.rn;
+  forgetThrownWeapon(ui.ctx, hit.rn);
   return true;
 }
 

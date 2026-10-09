@@ -148,6 +148,8 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     // (`LoadPartyLevel(d.partyLevel)`, doc/CSBwin-src/CSBCode.cpp:10615).
     ctx.footprints.restore(save.game.footprints);
     ctx.systems.monsters.reloadAfterSaveGame();
+    // An extra's, never saved (`ThrownWeapons`).
+    ctx.thrownWeapons.clear();
 }
 
 /**

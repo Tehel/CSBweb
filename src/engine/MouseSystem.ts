@@ -23,6 +23,7 @@ import { CursorFilterType } from './DsaSystem';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { setClockTick, speed } from './LoopState';
 import type { Champion } from './gameTypes';
+import { tagThrownWeapon } from './ThrownWeapons';
 import { copyCharacter } from './Party';
 import { AdjustSkillsWhy, determineMastery } from './skills';
 import { TimerFunction } from './TimerQueue';
@@ -55,9 +56,9 @@ export class MouseSystem {
     );
     const obj = this.ctx.systems.character.removeCharacterPossession(options.chIdx, 1);
     if (obj === OBJECT_ID_NULL) return 0;
-    return this.throwByCharacter(
-      options.chIdx, champion, obj, options.side, throwingDistance, options,
-    ) ? 1 : 0;
+    if (!this.throwByCharacter(options.chIdx, champion, obj, options.side, throwingDistance, options)) return 0;
+    tagThrownWeapon(this.ctx, obj, options.chIdx, 1);
+    return 1;
   }
 
   /**

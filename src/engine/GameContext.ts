@@ -30,6 +30,7 @@ import { identityOverlayPalette } from './OverlayPalette';
 import { createSmartDiscardState, type SmartDiscardState } from './SmartDiscard';
 import { SoundQueue } from './SoundQueue';
 import { TimerQueue } from './TimerQueue';
+import type { ThrownWeaponTags } from './ThrownWeapons';
 import type { ActuatorSystem } from './ActuatorSystem';
 import type { AttackSystem } from './AttackSystem';
 import type { CharacterStats } from './CharacterStats';
@@ -135,6 +136,13 @@ export interface GameContext {
   readonly overlay: Overlay;
   /** Every table from `graphics.dat`. */
   readonly tables: GameTables;
+  /**
+   * The extras (`DEBT.md` X), the page's Extras button (`GameScreen.setExtras`): what
+   * CSBWin does not have. Off, the game is CSBWin's.
+   */
+  extras: boolean;
+  /** What THROW and SHOOT sent off, for the extra that gathers it back (`ThrownWeapons`). */
+  readonly thrownWeapons: ThrownWeaponTags;
   /** What only the host can do: play a sample, trace, tell the UI something. */
   readonly host: GameHost;
   /** The subsystems, filled by `Game` as it builds them. */
@@ -292,6 +300,8 @@ export function createGameContext(
     overlayPalette,
     overlay: new Overlay(overlayPalette, (line) => host.trace(line)),
     tables,
+    extras: false,
+    thrownWeapons: new Map(),
     host,
     // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.
     systems: {} as GameSystems,

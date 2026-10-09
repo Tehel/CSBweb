@@ -106,7 +106,6 @@ In payoff order: the first row is the next item.
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | G30 | 3D2D1D's vertical moves and gravity | L | ⏸️ |
-| X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
 | X8 | Extra: RISE's own dialog, and the utility disk's portraits on DM's champions | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -360,13 +359,16 @@ Rules for all of them:
 - **One setting, off by default**: `UISettings.extras` (`src/ui/settings.ts`), the page's
   Extras button, which they all share. With it off, the game is CSBWin's: every
   tool's output and every golden frame stay the same. The FTL logo before the title
-  (`src/renderer/intro/Swoosh.ts`) is behind it, and in play the interface reads it as
-  `UIState.extras`, which `GameScreen.setExtras` sets at every press of the button:
+  (`src/renderer/intro/Swoosh.ts`) is behind it, and in play the game reads it as
+  `GameContext.extras`, which `GameScreen.setExtras` sets at every press of the button:
   - an empty hand drinking at a water fountain (`drinkAtWaterFountain`,
     `src/renderer/ui/Feeding.ts`, checked by `tools/dump-fountain.ts`);
   - a mastery just gained drawn in colour 7 on the attribute panel until every attribute
     its level gain raised is back at its new maximum (`src/engine/MasteryGains.ts`,
-    checked by `tools/dump-mastery-panel.ts`).
+    checked by `tools/dump-mastery-panel.ts`);
+  - what a champion's THROW or SHOOT sent off gathered back into their possessions when
+    the party arrives on the square it lies on, never what the cursor threw
+    (`src/engine/ThrownWeapons.ts`, checked by `tools/watch-thrown-weapons.ts`).
 
   The coloured object cursor is the exception: the author wants it on by default, so it
   is recorded under H.
@@ -375,42 +377,6 @@ Rules for all of them:
   changes.
 - **Each ships with its `tools/` check**, run with the setting on, and its entry here is
   deleted as for any paid item.
-
-### X3 ⏸️ Thrown weapons gathered back when the party walks over them
-
-An idea from *Legend of Grimrock*. Only a weapon thrown by an **attack action** is
-gathered back, never one thrown from the cursor:
-
-- **THROW** (`atk_THROW`, `src/engine/AttackSystem.ts:1481`) throws the weapon-hand object,
-  slot 1, through `MouseSystem.throwFromWeaponHand` (`src/engine/MouseSystem.ts:43`).
-- **SHOOT** (`attackWithShoot`, `src/engine/AttackSystem.ts:1579`) fires the ammunition
-  held in slot 0 through `MagicSystem.launchObject` (`src/engine/MagicSystem.ts:572`).
-  `launchObject` also launches spells, so the object is tagged in the attack, not there.
-
-A thrown object keeps its `ObjectID` all the way: in the missile's `projectileObject`,
-on the floor where it lands, and in a monster's possessions when a hit absorbs it
-(`MissileEncounter.ts:444`), which the monster drops when it dies. So a tag table
-`ObjectID → { champion, slot }`, filled at the throw, follows it without any further
-work.
-
-Needed:
-
-- **The trigger.** When the party arrives on a cell, after that cell's actuators have
-  fired, take every tagged object lying there. Arrival covers the stairs, pits and
-  teleporters (`src/engine/WorldMove.ts`) as well as a step.
-- **Taking it the proper way.** The object comes off the floor through the same
-  remove-from-cell path as a pickup by hand, so a pressure plate under it still fires.
-- **Putting it back.** Into the slot it left if that is empty and the object's carry
-  mask allows it there (`objDescWord4`). Otherwise into the first free slot that
-  allows it (quiver, then pack). The load is recomputed from the possessions (H). If the
-  thrower is dead or has no room, the object stays on the floor, keeping its tag.
-- **Dropping tags.** A tag goes when the object is picked up by hand, and when its
-  record is freed (`deleteDBEntry`, `SmartDiscard`, `MakeMoreRoomInDB`). A freed record
-  handed out again must not inherit it. Every writer of `objectInHand` and every caller
-  of `deleteDBEntry` is found by grep, as for any empty value (`CLAUDE.md` → "Object IDs").
-
-A `watch-*.ts` tool proves it: throw and shoot at a wall and at a monster, kill the
-monster, walk onto the cell, and check the inventory, the floor chain and the load.
 
 ### X8 ⏸️ RISE's own dialog, and the utility disk's portraits on DM's champions
 

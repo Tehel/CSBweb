@@ -682,6 +682,18 @@ export class DungeonState {
     }
 
     /**
+     * The record `rn` names, of whatever database, or null. Only `findEmptyDBEntry` puts a
+     * new record object in a slot, so the same object means the same record.
+     */
+    getRecord(rn: ObjectID): DatabaseRecord | null {
+        if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return null;
+        const { category, index } = this.rnMaps.decode(rn);
+        const key = DATABASE_KEY[category];
+        if (key === undefined) return null;
+        return (this.data.databases[key] as Database<DatabaseRecord>).records[index] ?? null;
+    }
+
+    /**
      * Find the first DOOR record RN in a cell, or `OBJECT_ID_EOF`.
      *
      * Ported from CSBWin `FindFirstDoor()` semantics (doc/CSBwin-src/Code11f52.cpp:614+).

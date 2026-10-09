@@ -92,6 +92,7 @@ const CHECKS = [
   { tool: 'dump-status-boxes.ts' },
   { tool: 'dump-hand-boxes.ts' },
   { tool: 'dump-mastery-panel.ts' },
+  { tool: 'watch-thrown-weapons.ts' },
   { tool: 'dump-reincarnate-entry.ts' },
   { tool: 'dump-pit-fall.ts' },
   { tool: 'dump-teleporter-drop.ts' },

@@ -436,10 +436,10 @@ async function main(): Promise<void> {
     return out;
   };
   console.log(['state', fighter, ninja].join('\t'));
-  ui.extras = false;
+  ui.ctx.extras = false;
   let [f, n] = row('extras off');
   check(f === 'colour 13' && n === 'colour 13', 'extras off: every mastery line is colour 13, as in CSBWin');
-  ui.extras = true;
+  ui.ctx.extras = true;
   [f, n] = row('extras on');
   check(f === 'green (7)', 'extras on: the mastery just gained is green while what it raised is below its maximum');
   check(n === 'colour 13', 'extras on: a mastery gained no level ago stays colour 13');
@@ -452,7 +452,7 @@ async function main(): Promise<void> {
   stats[AttributeIndex.Strength]!.current = stats[AttributeIndex.Strength]!.maximum - 5;
   [f] = row('Strength drained later');
   check(f === 'colour 13', 'extras on: a later drop is not a level gain, so the line stays colour 13');
-  ui.extras = false;
+  ui.ctx.extras = false;
   console.log('');
 
   finish();

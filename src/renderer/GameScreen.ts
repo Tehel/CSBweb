@@ -442,7 +442,7 @@ export class GameScreen {
 
   /** The extras setting (`DEBT.md` X), as the page's Extras button leaves it. */
   setExtras(enabled: boolean): void {
-    this.ui.extras = enabled;
+    this.ui.ctx.extras = enabled;
   }
 
   /**

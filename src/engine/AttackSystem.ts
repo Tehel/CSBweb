@@ -33,6 +33,7 @@ import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectI
 import { div, sb, sw } from '../core/intCast';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion } from './gameTypes';
+import { tagThrownWeapon } from './ThrownWeapons';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { getPartyChampion, markAllPortraitsChanged } from './Party';
 import { DeleteMonsterWhy, MonsterDamageResult, deleteMonsterParameters } from './MonsterDamage';
@@ -1619,13 +1620,14 @@ export class AttackSystem {
     params.attdep.shoot.success = 1;
     this.callAttackFilter(filter, params, 1);
     if (projectile === OBJECT_ID_NULL) return 1;
-    this.ctx.systems.magic.launchObject(
+    const launched = this.ctx.systems.magic.launchObject(
       params.charIdx,
       projectile,
       params.attdep.shoot.range,
       params.attdep.shoot.damage,
       params.attdep.shoot.damage,
     );
+    if (launched) tagThrownWeapon(this.ctx, projectile, params.charIdx, 0);
     return 1;
   }
 

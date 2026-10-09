@@ -90,7 +90,7 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
       VIEWPORT_Y + lineY,
       // An extra (`DEBT.md` X): a mastery just gained, in the green of an attribute
       // above its maximum, until what it raised has climbed back (`MasteryGains.ts`).
-      ui.extras && masteryGainPending(champion, role) ? 7 : 13,
+      ui.ctx.extras && masteryGainPending(champion, role) ? 7 : 13,
       null,
       `${masteryLabel} ${ROLE_LABELS[role]}`
     );

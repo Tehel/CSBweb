@@ -18,6 +18,7 @@ import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { DeleteMonsterWhy, MonsterDamageResult, deleteMonsterParameters } from './MonsterDamage';
 import { setPackedBits } from './MonsterSystem';
+import { gatherThrownWeapons } from './ThrownWeapons';
 import { StateOfFear } from './monsterTypes';
 import { decodeMissileTimerWord8 } from './missileHelpers';
 import type { TimerQueue } from './TimerQueue';
@@ -113,6 +114,7 @@ export class WorldMove {
     }
     if (at.z === level) {
       actuators.triggerObjectMove(at, OBJECT_ID_NULL, true, unchangedRoom, party.facing);
+      if (!unchangedRoom) gatherThrownWeapons(this.ctx, at);
     } else {
       // `LoadLevel(AttachedLevel_4); d.newPartyLevel = sw(curLevel);` (`:3356-3358`).
       party.position = new Position(at.x, at.y, level);

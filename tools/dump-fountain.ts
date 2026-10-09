@@ -138,7 +138,7 @@ function main(): void {
   console.log(['extras', 'fountain', 'owner health', 'water before', 'after', 'sounds', 'wall touched'].join('\t'));
   const drink = (extras: boolean, fountain: boolean, water: number, health = 200): Scene & { after: number } => {
     const s = scene(fountain);
-    s.ui.extras = extras;
+    s.ui.ctx.extras = extras;
     const champ = s.game.ctx.party.state.champions[0]!;
     champ.water = water;
     champ.attributes.health = health;
