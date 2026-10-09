@@ -460,6 +460,54 @@ backward and left. CSBWin forces a zero `movementTicks06` to 1
 never reads either: neither field is named outside `Data.h`, and `m_uByte3` has no
 accessor (`CSB.h:1709`).
 
+## Items `0x230`, `0x231` and `0x232` are laid out exactly as `Data.h` declares their spans
+
+CSBWin reads each of them whole, two bytes past a `d.` field that is not part of it:
+`0x231` into `d.Byte18938+2`, `0x230` into `d.Byte20244+2` and `0x232` into
+`d.Byte1832+2` (`doc/CSBwin-src/CSBCode.cpp:10268`, `:10278`, `:10321`). Each span runs
+from its marker to the next (`Data.h:638-691`, `:692-727`, `:1409-1502`), and every
+declaration in it that names its address, in its name (`Word12`, `fill639`) or its
+comment (`//916`, `//uw296`), sits at the span's first address minus its offset. With no
+padding, the declarations come to the sizes the `ASSERT`s demand: `0x230` 1256 bytes
+(`0x4e8`, `:10277`), `0x231` 2052 (`0x804`, `:10266-10267`), `0x232` 1826 (`0x722`,
+`:10320`). The structs are `btn`, six words, `MOVEBUTN`, four, `KeyXlate`, two, `SPELL`, a
+long, two bytes and a word, `SOUND`, a word and six bytes, `PALETTE`, sixteen words, and
+`ICONDISPLAY`, three words (`CSB.h:652-663`, `:1382-1386`, `:1654-1670`, `:1786-1798`,
+`:2196-2205`, `:2657-2660`), and `LEGALATTACKS`, eight bytes (`Data.h:225-229`).
+`FILL(a,b)` is `a - b` bytes (`Data.h:213`). The longs sit on words only, as the 68000
+lays them out: `Long1828` two bytes into `0x232`, `Spells` 1026 into `0x230`.
+
+Every data set's items are those sizes, but for two cases, and every table the port reads
+from them writes back over their bytes at those offsets (`tools/dump-graphics-tables.ts`):
+
+- `0x231` is the short `0x7d4`, 2004 bytes, everything but `Buttons16932`, in `dm-atari`,
+  `dm-windows`, 1.2, the French 1.3, the Kids dungeon and Conflux; CSBWin then fills the
+  buttons itself (`CSBCode.cpp:10259-10276`). It is 2052 bytes in CSB, 3D2D1D and the
+  Towers of Chaos, and the port reads `Buttons16932` from it exactly then.
+- The French 1.3 `0x230` is 100 bytes longer, all of them in `AttackNames` (see "The French
+  1.3 `graphics.dat`: longer words").
+
+Each of the four `KeyXlate` tables ends with its `mouse == 0` terminator inside its own
+field in every data set, so neither `SwapKeyXlate` (`CSBCode.cpp:10144-10153`) nor
+`TAG0196da` (`:8533`) reads past it. The one read past its field is `Byte640[1]`, which
+`RN::NameIndex` indexes with a torch's charges, four bits (`d.Byte640[D0W]`,
+`data.cpp:644`; `CSB.h:1164`), through the 15 bytes of `FILL(639,624)`. The port's
+words are high byte first, as CSBWin swaps them all at load (`CSBCode.cpp:10176-10211`,
+`:10279-10284`, `:10322-10370`), but `Long1828` and `Long1812`, which it swaps where it reads
+them (`LE32`, `Graphics.cpp:356-359`).
+
+The bytes no table reads:
+
+- `Byte1830`, `"\n"` in every data set, the string `PrintLinefeed` and the end of the
+  game print (`CSBCode.cpp:1764`, `Attack.cpp:2426-2428`). The port prints a newline of its
+  own (`DEBT.md` C164).
+- `Byte1416`, `" "`: CSBWin writes the letter typed over its first byte before printing it,
+  and its second is the string's terminator, 0 in every data set (`Code13ea4.cpp:267-275`).
+- `Word1588`, which CSBWin only writes (`CSBCode.cpp:1916`), and `Unused19218`, `Unused918`,
+  `unused554`, `FILL(616,612)` and `FILL(598,590)`, never named outside `Data.h` but in
+  comments.
+- Each `KeyXlate` terminator's `keyscan`.
+
 ## `ExpandGraphic`'s `0x20` opcode bit is never consulted
 
 The image codec's extended opcodes (`doc/CSBwin-src/CSBCode.cpp:11086-11097`) branch like
@@ -6516,7 +6564,7 @@ count, and `tools/dump-new-game.ts` the restart.
 
 `ReadTablesFromGraphicsFile` asserts item 0x231 is 0x804 or 0x7d4 bytes, and fills
 `d.Buttons16932` from its hardcoded `missingButtons` only for the short one
-(`doc/CSBwin-src/CSBCode.cpp:10259-10275`). DM's `graphics.dat` (the Atari file, and the DM
+(`doc/CSBwin-src/CSBCode.cpp:10259-10276`). DM's `graphics.dat` (the Atari file, and the DM
 Windows package's, which is the same file) is 0x7d4 bytes there. The CSB Windows package's
 is 0x804, and its last 48 bytes are `missingButtons` word for word: `ENTER` (0xc8, x
 244-298, y 45-58), `RESUME` (0xc9, 244-298, 76-93) and the credits (0xca, 248-293,

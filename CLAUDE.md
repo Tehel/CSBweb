@@ -90,7 +90,7 @@ succeed on broken code, because esbuild strips types without checking them, so i
 nothing. The project once sat with a broken `tsc` for months, and a genuine runtime bug
 was hiding among the type errors.
 
-There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is a runner
+There is still **no test framework** (`PLAN.md` → "The evidence") — `npm test` is a runner
 (`tools/run-checks.mjs`) over two standing forms of evidence, and both must pass:
 
 - `tools/check-frames.sh` compares nineteen live screen states against `tools/frames/` — the

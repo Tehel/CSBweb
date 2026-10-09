@@ -46,8 +46,10 @@ and no session picks one up unless the author names it:
   DSA trace, whose flags `WriteDSAs` follows the DSAs with, an `EDBT_DSAtraces` record
   (`DSAIndex.WriteTracing()`, `doc/CSBwin-src/SaveGame.cpp:1014-1018`) that a read takes
   back (`DSAINDEX::ReadTracing`, `DSA.cpp:5554-5577`). The port writes none.
-- **Comparing frames against CSBWin's own screenshots** (`PLAN.md` → Phase 15, step 5):
-  staging the same scene in CSBWin, without cheats, costs more than it proves.
+- **Comparing frames against CSBWin's own screenshots**: staging the same scene in
+  CSBWin, without cheats, costs more than it proves, and the golden frames and the render
+  probe already catch any pixel that changes unintentionally. When it is taken, the
+  canvas's colours go with it: an Atari intensity times 36, not CSBWin's RGB555 (H).
 - **X — Extras**: gameplay features CSBWin does not have, wanted by the author once the
   faithful game is complete.
 
@@ -98,7 +100,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F3 | Phase 15 step 4 | — | in `PLAN.md` |
+| C164 | A linefeed is the port's `'\n'`, where CSBWin prints graphic `0x232`'s `Byte1830` | S | ⏳ |
+| F14 | The golden frames compare colours, not palette indices | M | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C145 | The Hint Oracle's title boxes keep colour 12 on their last line and a half | S | ⏸️ waits on the author |
@@ -112,8 +115,7 @@ In payoff order: the first row is the next item.
 | X8 | Extra: RISE's own dialog, and the utility disk's portraits on DM's champions | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G29 are the active list. `F3` is a phase, whose
-status is `PLAN.md`'s, and its row only marks its place. One row sits
+The rows above G29 are the active list. One row sits
 out of its tier's place on purpose: `E15` below the G rows, because it waits for the page
 redesign to start: a session that reaches it first asks the author, and takes the next
 row meanwhile. The F
@@ -122,7 +124,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C164 · D17 · E22 · F14 · G31 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C165 · D17 · E22 · F15 · G31 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -173,6 +175,19 @@ The redesigned page also links to two pages:
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C164 ⏳ A linefeed is the port's `'\n'`, where CSBWin prints graphic `0x232`'s `Byte1830`
+
+CSBWin's linefeed is a string of the table item, not a constant: `PrintLinefeed` queues
+`d.Byte1830` (`doc/CSBwin-src/CSBCode.cpp:1761-1765`), and the end of the game prints it
+on either side of "THE END." (`Attack.cpp:2426-2428`). It is the first two bytes of graphic
+`0x232`, `"\n"` and its terminator in every data set (`doc/PROVEN_FACTS.md` → "Items
+`0x230`, `0x231` and `0x232` are laid out exactly as `Data.h` declares their spans"). The
+port writes `'\n'` in both places (`ScrollingText.printLinefeed`,
+`src/renderer/csbwin/ScrollingText.ts`; `AttackSystem`'s end of the game,
+`src/engine/AttackSystem.ts:1072-1074`), and `parseGraphic232` skips the two bytes. No
+data set prints differently; the fix is to read the string and hand it to both, and
+`tools/dump-graphics-tables.ts` then writes it back.
 
 ### C145 ⏸️ The Hint Oracle's title boxes keep colour 12 on their last line and a half
 
@@ -225,12 +240,15 @@ in CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
 ## F — Verification debt
 
-### F3 — Phase 15 step 4 stays in `PLAN.md`
+### F14 ⏳ The golden frames compare colours, not palette indices
 
-The table-extraction round-trip checks are a live phase, so they stay in `PLAN.md` →
-"Phase 15" rather than being copied here. The never-executed validation steps of phases 2,
-4 and 7 are folded into it. Step 5, the comparison against CSBWin screenshots, is postponed
-(see "Priority").
+The screen is a palette-index buffer, converted to RGBA when it is presented, as CSBWin's
+is. The probe reads the converted canvas back (`tools/probe-frames.mjs`), so the frames
+hold colours: wherever two palette slots hold the same colour, a renderer change that draws
+the wrong one of them passes, and a change to the conversion alone (`atariIntensity`,
+`src/renderer/csbwin/CanvasBlitter.ts`) moves every frame. Comparing the palette-index
+buffer rather than the canvas, the screen CSBWin draws, makes the frames a test of the
+drawing alone.
 
 ---
 
@@ -574,7 +592,7 @@ Recorded so that nobody "fixes" them.
   the viewport through an overlay, a tint or a jitter is CSBWin's RGB555 widened
   (`src/renderer/csbwin/OverlayScreen.ts`), so while one is up the viewport and the panels
   show the same Atari colour up to 6 a channel apart. `tools/dump-overlay-screen.ts` prints
-  both. To revisit when frames are compared with CSBWin's (`PLAN.md` → Phase 15, step 5):
+  both. To revisit when frames are compared with CSBWin's ("Priority", postponed):
   RGB555 on every screen would move every golden frame once.
 - 🚫 **An object in hand keeps its colours over the dungeon view** (X4). CSBWin draws the
   cursor rows from screen row 29 down as the object's colour-4 silhouette while the view

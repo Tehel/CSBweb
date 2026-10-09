@@ -6,7 +6,7 @@
  *
  * Item 0x231 is 0x7d4 bytes in DM's `graphics.dat` and 0x804 in CSB's, whose tail is
  * `d.Buttons16932`; CSBWin supplies four hardcoded buttons for the short form only
- * (doc/CSBwin-src/CSBCode.cpp:10259-10275). The canary: CSB's four, read from its file,
+ * (doc/CSBwin-src/CSBCode.cpp:10259-10276). The canary: CSB's four, read from its file,
  * are CSBWin's four word for word, so the long form's tail sits where `parseGraphic231`
  * reads it, after every table before it.
  *

@@ -516,7 +516,7 @@ async function waitForMenuSelect(host: IntroHost, gameScreen: MenuScreen, numBut
 /**
  * `d.Buttons16932`. Dungeon Master's `graphics.dat` stops 48 bytes short of carrying it,
  * and CSBWin patches in a hardcoded copy for exactly that case
- * (`doc/CSBwin-src/CSBCode.cpp:10272-10280`); `extractUITables` returns an empty list
+ * (`doc/CSBwin-src/CSBCode.cpp:10259-10276`); `extractUITables` returns an empty list
  * under the same condition.
  */
 function prisonDoorButtons(host: IntroHost): UIButton[] {

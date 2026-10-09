@@ -16,7 +16,7 @@
  *    No field may need padding: a word at an odd offset would mean the C++ is not laid out
  *    the way this reads it.
  * 2. **Every data set.** Each `graphics.dat` the manifest lists holds the item at a size
- *    the `ASSERT` accepts.
+ *    the `ASSERT` accepts, but where `WIDER` names the one field that is longer.
  * 3. **The round trip.** Every table the port extracted from the item is encoded back,
  *    field by field, and compared with the item's bytes at the `Data.h` field it was read
  *    from. A wrong offset, width, count or byte order is a diff. A table read past its own
@@ -25,12 +25,14 @@
  *
  * Words are encoded high byte first: CSBWin swaps every word it uses from these items,
  * at load (`swapNwords`, `LE16`, `CSBCode.cpp:10250-10257`) or where it reads them
- * (`LE16(d.specialColors…)`, `CSBCode.cpp:2902`).
+ * (`LE16(d.specialColors…)`, `CSBCode.cpp:2902`; `LE32(d.Long1812…)`, `Graphics.cpp:356`).
  *
- * Covered: item `0x22e` (`ViewportTables`, and the half of `ObjectTables` it holds) and
- * item `0x22f` (`ObjectTables`' other half). `Data.h` marks only where `0x22f` starts, so
- * its span ends where the `ASSERT`'s size puts it, and the declaration after it must name
- * that address. `PLAN.md` → Phase 15, step 4, has what is left.
+ * Covered: every table item. `0x22e` holds `ViewportTables` and half of `ObjectTables`,
+ * `0x22f` the other half, and `0x230` to `0x232` are `UITables`. `Data.h` marks only where
+ * `0x22f` starts, so its span ends where the `ASSERT`'s size puts it, and the declaration
+ * after it must name that address. Two data sets' items differ from the span, each as
+ * `fitLayout` says: `0x231` lacks its last field where it is the short size, and the French
+ * 1.3 file's `0x230` has longer attack names.
  *
  * Run: `npx tsx tools/dump-graphics-tables.ts`
  */
@@ -40,7 +42,7 @@ import { resolve } from 'node:path';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { extractGraphicsTables, type GraphicsTables } from '../src/data/tables/GraphicsTables';
 import type { DecorationDesc } from '../src/data/tables/ObjectTables';
-import type { RectPos } from '../src/data/tables/UITables';
+import type { KeyXlate, Rect, RectPos, UIButton } from '../src/data/tables/UITables';
 import { check, finish } from './lib/check';
 
 const DATA_H = readFileSync(resolve('doc/CSBwin-src/Data.h'), 'utf8').split('\n');
@@ -53,6 +55,8 @@ const TYPES: Record<string, { size: number; align: number }> = {
   char: { size: 1, align: 1 },
   i16: { size: 2, align: 2 },
   ui16: { size: 2, align: 2 },
+  // Aligned as the 68000 needs it, on a word: `Long1828` sits two bytes into `0x232`.
+  i32: { size: 4, align: 2 },
   // `wordRectPos` or `byteRectPos`, eight bytes either way (`CSB.h:1370-1380`).
   RectPos: { size: 8, align: 2 },
   // `ITEM110s s[11]`, ten bytes each (`CSB.h:2434-2442`).
@@ -76,6 +80,22 @@ const TYPES: Record<string, { size: number; align: number }> = {
   // Two bytes, two words, eight bytes, four words and four bytes; `word4` is a
   // `MONSTERDESC_WORD4`, one `ui16` (`CSB.h:2295-2316`, `:2319-2422`).
   MONSTERDESC: { size: 26, align: 2 },
+  // Eight bytes (`Data.h:225-229`).
+  LEGALATTACKS: { size: 8, align: 1 },
+  // A long, two bytes and a word (`CSB.h:1786-1798`).
+  SPELL: { size: 8, align: 2 },
+  // Six words (`CSB.h:1662-1670`).
+  btn: { size: 12, align: 2 },
+  // Four words (`CSB.h:1654-1660`).
+  MOVEBUTN: { size: 8, align: 2 },
+  // Two words (`CSB.h:1382-1386`).
+  KeyXlate: { size: 4, align: 2 },
+  // A word and six bytes (`CSB.h:2196-2205`).
+  SOUND: { size: 8, align: 2 },
+  // Sixteen words (`CSB.h:2657-2660`).
+  PALETTE: { size: 32, align: 2 },
+  // Three words (`CSB.h:652-663`).
+  ICONDISPLAY: { size: 6, align: 2 },
 };
 
 interface Field {
@@ -92,6 +112,8 @@ interface Layout {
   graphic: number;
   fields: Map<string, Field>;
   size: number;
+  /** The sizes `CSBCode.cpp` asserts the item may have. */
+  asserted: number[];
 }
 
 /**
@@ -99,10 +121,10 @@ interface Layout {
  * one, named (`//Byte6652[24]`) or bare (`//9760`).
  */
 function addressOf(name: string, comment: string): number | null {
-  const own = /(\d{4,5})$/.exec(name);
+  const own = /(\d{2,5})$/.exec(name);
   if (own) return Number(own[1]);
   for (const part of comment.split('//')) {
-    const m = /^\s*(?:[a-z]\w*\s+)?[A-Za-z]*(\d{4,5})\b/.exec(part);
+    const m = /^\s*(?:[a-z]\w*\s+)?[A-Za-z]*(\d{3,5})\b/.exec(part);
     if (m) return Number(m[1]);
   }
   return null;
@@ -114,12 +136,16 @@ function declarationAt(i: number): { type: string; name: string; dims: string; c
   const cut = text.indexOf('//');
   const code = (cut >= 0 ? text.slice(0, cut) : text).trim();
   if (code === '') return null;
-  const m = /^(\w+)\s+(\w+)\s*((?:\[\s*\d+\s*\])*)\s*;$/.exec(code);
+  const comment = cut >= 0 ? text.slice(cut) : '';
+  // `#define FILL(a,b) i8 fill##a[a-b];` (`Data.h:213`).
+  const fill = /^FILL\((\d+),(\d+)\)$/.exec(code);
+  if (fill) return { type: 'i8', name: `fill${fill[1]}`, dims: `[${Number(fill[1]) - Number(fill[2])}]`, comment };
+  const m =/^(\w+)\s+(\w+)\s*((?:\[\s*\d+\s*\])*)\s*;$/.exec(code);
   if (!m) {
     check(false, `Data.h:${i + 1}: a declaration this tool can lay out (${code})`);
     return null;
   }
-  return { type: m[1], name: m[2], dims: m[3], comment: cut >= 0 ? text.slice(cut) : '' };
+  return { type: m[1], name: m[2], dims: m[3], comment };
 }
 
 /**
@@ -172,7 +198,45 @@ function layoutOf(graphic: number, startMarker: string, endMarker?: RegExp): Lay
   }
   check(asserted.includes(offset), `graphic ${hex}: Data.h's span is ${offset} bytes, a size CSBCode.cpp asserts (${asserted.join(', ')})`);
   console.log(`graphic ${hex}: ${fields.size} fields, ${offset} bytes from address ${start}`);
-  return { graphic, fields, size: offset };
+  return { graphic, fields, size: offset, asserted };
+}
+
+/**
+ * The data sets whose item is longer than CSBWin's struct, in one field: the French 1.3
+ * file's attack names take 400 bytes, not `AttackNames[300]`'s (`DEBT.md` H, "Word sizes
+ * from the file"; `doc/PROVEN_FACTS.md` → "The French 1.3 `graphics.dat`: longer words").
+ */
+const WIDER: Record<string, { graphic: number; field: string; by: number }> = {
+  'dm-atari-1.3-fr': { graphic: 0x230, field: 'AttackNames', by: 100 },
+};
+
+/**
+ * The layout of one data set's item, `size` bytes: the span itself, the span without its
+ * last field when that is the other size `CSBCode.cpp` asserts (`0x231`'s `0x7d4`, which
+ * lacks `Buttons16932`, `CSBCode.cpp:10259-10276`), or a field widened as `WIDER` says.
+ */
+function fitLayout(id: string, layout: Layout, size: number): Layout {
+  const hex = `0x${layout.graphic.toString(16)}`;
+  const wider = WIDER[id]?.graphic === layout.graphic ? WIDER[id] : undefined;
+  if (wider) {
+    const widened = layout.fields.get(wider.field);
+    check(widened !== undefined, `${id}: ${wider.field} is a field of graphic ${hex}`);
+    const fields = new Map<string, Field>();
+    for (const f of layout.fields.values()) {
+      if (f === widened) fields.set(f.name, { ...f, size: f.size + wider.by });
+      else fields.set(f.name, widened && f.offset > widened.offset ? { ...f, offset: f.offset + wider.by } : f);
+    }
+    check(size === layout.size + wider.by, `${id}: graphic ${hex} is ${size} bytes, Data.h's ${layout.size} with ${wider.field} ${wider.by} bytes longer`);
+    return { ...layout, fields, size };
+  }
+  const last = [...layout.fields.values()].at(-1);
+  if (last && size !== layout.size && size === last.offset && layout.asserted.includes(size)) {
+    const fields = new Map(layout.fields);
+    fields.delete(last.name);
+    return { ...layout, fields, size };
+  }
+  check(size === layout.size, `${id}: graphic ${hex} is ${size} bytes, Data.h's ${layout.size}`);
+  return layout;
 }
 
 /** Bytes put back at a field of the item, from one table. */
@@ -190,7 +254,9 @@ interface Region {
 const word = (v: number): number[] => [(v >> 8) & 0xff, v & 0xff];
 const words = (a: ArrayLike<number>): number[] => Array.from(a).flatMap(word);
 const bytes = (a: ArrayLike<number>): number[] => Array.from(a, (b) => b & 0xff);
+const long = (v: number): number[] => [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff];
 const rect4 = (r: RectPos): number[] => [r.x1, r.x2, r.y1, r.y2];
+const wordRect = (r: Rect): number[] => words([r.x1, r.x2, r.y1, r.y2]);
 /** A byte `RectPos` as `toRectPos` read it: `uByte4` is half both `srcWidth` and `srcStride`. */
 const rect8 = (r: RectPos): number[] => [
   ...rect4(r),
@@ -318,6 +384,120 @@ function regions22f(t: GraphicsTables): Region[] {
   return out;
 }
 
+/** Item `0x230`, as `UITables` reads it. */
+function regions230(t: GraphicsTables): Region[] {
+  const u = t.ui.graphic230;
+  const out: Region[] = [];
+  const put = (table: string, field: string, b: number[]) => out.push({ table, field, at: 0, bytes: b });
+
+  put('word20242', 'Word20242', wordRect(u.word20242));
+  put('wRectPos20234', 'wRectPos20234', wordRect(u.wRectPos20234));
+  put('wRectPos20226', 'wRectPos20226', wordRect(u.wRectPos20226));
+  put('wRectPos20218', 'wRectPos20218', wordRect(u.wRectPos20218));
+  put('wRectPos20210', 'wRectPos20210', wordRect(u.wRectPos20210));
+  put('wRectPos20202', 'wRectPos20202', wordRect(u.wRectPos20202));
+  put('shrinkColorMap', 'Byte20194', bytes(u.shrinkColorMap));
+  put('experienceForAttacking', 'experienceForAttacking', bytes(u.experienceForAttacking));
+  put('skillNumber', 'SkillNumber', bytes(u.skillNumber));
+  put('byte20090', 'Byte20090', bytes(u.byte20090));
+  put('byte20046', 'Byte20046', bytes(u.byte20046));
+  put('byte20002', 'Byte20002', bytes(u.byte20002));
+  put('byte19958', 'Byte19958', bytes(u.byte19958));
+  put('byte19914', 'Byte19914', bytes(u.byte19914));
+  // Each name and its terminator: a last name without one would run past the field.
+  put('attackNames', 'AttackNames', u.attackNames.flatMap((n) => [...Array.from(n, (c) => c.charCodeAt(0)), 0]));
+  put('legalAttacks', 'legalAttacks', u.legalAttacks.flatMap((l) => bytes(l)));
+  put('spells', 'Spells', u.spells.flatMap((s) => [...long(s.spellId), s.skillRequired, s.byte5, ...word(s.word6)]));
+  put('spellFirstRuneScale', 'Byte19016', bytes(u.spellFirstRuneScale));
+  put('spellBaseMana', 'Byte19010', bytes(u.spellBaseMana));
+  return out;
+}
+
+/** Item `0x231`, as `UITables` reads it. */
+function regions231(t: GraphicsTables): Region[] {
+  const u = t.ui.graphic231;
+  const out: Region[] = [];
+  const put = (table: string, field: string, b: number[]) => out.push({ table, field, at: 0, bytes: b });
+  const buttons = (list: UIButton[]) => list.flatMap((b) => words([b.word0, b.x1, b.x2, b.y1, b.y2, b.button]));
+  // The keys up to the terminating `mouse == 0` both readers stop at (`SwapKeyXlate`,
+  // `CSBCode.cpp:10144-10153`, and `TAG0196da`, `:8533`), which must lie in the field.
+  const keys = (list: KeyXlate[]) => [...list.flatMap((k) => words([k.mouse, k.keyscan])), 0, 0];
+
+  for (const [key, list] of Object.entries(u.buttons)) {
+    // `buttons16932` is empty when the item lacks it, and so is no field of its layout.
+    if (list.length > 0) put(`buttons.${key}`, `Buttons${key.slice('buttons'.length)}`, buttons(list));
+  }
+  put('rect18600', 'Byte18600', wordRect(u.rect18600));
+  put('rect18592', 'Byte18592', wordRect(u.rect18592));
+  put('rect18584', 'Byte18584', wordRect(u.rect18584));
+  put('rect18576', 'Byte18576', wordRect(u.rect18576));
+  put('word18568', 'Word18568', words(u.word18568));
+  put('word18560', 'Word18560', words(u.word18560));
+  put('word18552', 'Word18552', u.word18552.flatMap(wordRect));
+  put('moveButtons', 'MoveButn18496', u.moveButtons.flatMap(wordRect));
+  put('dropAreas', 'DropAreas', u.dropAreas.flatMap((r) => [r.x1, r.x2, r.y1, r.y2]));
+  put('keys.byte18448', 'Byte18448', keys(u.keys.byte18448));
+  put('keys.byte18440', 'Byte18440', keys(u.keys.byte18440));
+  put('keys.byte18428', 'Byte18428', keys(u.keys.byte18428));
+  put('keys.byte18400', 'Byte18400', keys(u.keys.byte18400));
+  return out;
+}
+
+/** Item `0x232`, as `UITables` reads it. */
+function regions232(t: GraphicsTables): Region[] {
+  const u = t.ui.graphic232;
+  const out: Region[] = [];
+  const put = (table: string, field: string, b: number[], runsOn?: string) => out.push({ table, field, at: 0, bytes: b, runsOn });
+
+  put('long1828', 'Long1828', u.long1828.flatMap(long));
+  put('long1812', 'Long1812', u.long1812.flatMap(long));
+  put('wRectPos1796', 'wRectPos1796', wordRect(u.wRectPos1796));
+  put('wRectPos1788', 'wRectPos1788', wordRect(u.wRectPos1788));
+  put('wRectPos1780', 'wRectPos1780', wordRect(u.wRectPos1780));
+  put('sound1772', 'sound1772', u.sound1772.flatMap((s) => [...word(s.word0), s.byte2, s.byte3, s.byte4, s.byte5, s.byte6, s.byte7]));
+  put('byte1596', 'Byte1596', bytes(u.byte1596));
+  put('dropOrder', 'DropOrder', words(u.dropOrder));
+  put('word1526', 'Word1526', words(u.word1526.flat()));
+  put('word1502', 'Word1502', words(u.word1502.flat()));
+  put('wRectPos1454', 'wRectPos1454', u.wRectPos1454.flatMap(wordRect));
+  put('specialChars', 'SpecialChars', bytes(u.specialChars));
+  put('byte1414', 'Byte1414', bytes(u.byte1414));
+  put('byte1412', 'Byte1412', bytes(u.byte1412));
+  put('word1406', 'Word1406', wordRect(u.word1406));
+  put('word1398', 'Word1398', wordRect(u.word1398));
+  put('byte1390', 'Byte1390', bytes(u.byte1390));
+  put('byte1386', 'Byte1386', bytes(u.byte1386));
+  put('cursorColorMapLight', 'Byte1382', bytes(u.cursorColorMapLight));
+  put('cursorColorMapDark', 'Byte1366', bytes(u.cursorColorMapDark));
+  put('cursorHand', 'Byte1350', bytes(u.cursorHand));
+  put('cursorArrow', 'Byte1222', bytes(u.cursorArrow));
+  put('byte1094', 'Byte1094', wordRect(u.byte1094));
+  put('paletteBrightness', 'PaletteBrightness', words(u.paletteBrightness));
+  put('word1074', 'Word1074', words(u.word1074));
+  put('carryLocation', 'CarryLocation', words(u.carryLocation));
+  put('wRectPos966', 'wRectPos966', wordRect(u.wRectPos966));
+  put('wRectPos958', 'wRectPos958', wordRect(u.wRectPos958));
+  put('wRectPos950', 'wRectPos950', wordRect(u.wRectPos950));
+  put('wRectPos942', 'wRectPos942', wordRect(u.wRectPos942));
+  put('wRectPos934', 'wRectPos934', wordRect(u.wRectPos934));
+  put('wRectPos926', 'wRectPos926', wordRect(u.wRectPos926));
+  put('iconDisplay', 'IconDisplay', u.iconDisplay.flatMap((i) => words([i.pixelX, i.pixelY, i.objectType])));
+  put('byte640', 'Byte640', bytes(u.byte640), 'd.Byte640[charges], data.cpp:644');
+  put('wRectPos624', 'wRectPos624', wordRect(u.wRectPos624));
+  put('word612', 'Word612', words(u.word612));
+  put('uByte590', 'uByte590', bytes(u.uByte590));
+  put('byte586', 'Byte586', bytes(u.byte586.flat()));
+  put('palette552', 'Palette552', words(u.palette552.flat()));
+  put('palette360', 'Palette360', words(u.palette360));
+  put('palette328', 'Palette328', words(u.palette328));
+  put('defaultGraphicList', 'DefaultGraphicList', words(u.defaultGraphicList));
+  put('identityColorMap', 'IdentityColorMap', bytes(u.identityColorMap));
+  for (const n of [140, 132, 124, 116, 108, 100, 92, 84, 76, 68, 60, 52, 44, 36, 28, 20, 12] as const) {
+    put(`word${n}`, `Word${n}`, wordRect(u[`word${n}`]));
+  }
+  return out;
+}
+
 /**
  * Hold a table's regions up against the item. Returns the bytes they covered, for the
  * report of what nothing reads.
@@ -375,7 +555,13 @@ function main(): void {
   const last22f = [...layout22f.fields.values()].at(-1);
   check(last22f !== undefined && DATA_H[last22f.line - 1].includes('End of 22f'),
     `Data.h's own "End of 22f" sits on the span's last field (${last22f?.name})`);
-  const items: [Layout, (t: GraphicsTables) => Region[]][] = [[layout22e, regions22e], [layout22f, regions22f]];
+  const items: [Layout, (t: GraphicsTables) => Region[]][] = [
+    [layout22e, regions22e],
+    [layout22f, regions22f],
+    [layoutOf(0x230, 'Start of graphic 0x230', /Last part of graphic 0x230/), regions230],
+    [layoutOf(0x231, 'Start of graphic 0x231', /End of graphic 0x231/), regions231],
+    [layoutOf(0x232, 'Start of graphic 0x232', /End of graphic 0x232/), regions232],
+  ];
 
   const manifest = JSON.parse(readFileSync(resolve('static/gamefiles/manifest.json'), 'utf8')) as {
     dataSets: { id: string; dir: string }[];
@@ -387,16 +573,18 @@ function main(): void {
     const tables = extractGraphicsTables(graphics);
     check(tables.viewport.wallRectanglesOffset === layout22e.fields.get('wallRectangles')?.offset,
       `${id}: ViewportTables puts wallRectangles at Data.h's offset (${tables.viewport.wallRectanglesOffset})`);
-    for (const [layout, regionsOf] of items) {
-      const hex = `0x${layout.graphic.toString(16)}`;
-      const raw = graphics.getRawGraphic(layout.graphic);
-      check(raw.length === layout.size, `${id}: graphic ${hex} is ${raw.length} bytes, Data.h's ${layout.size}`);
+    for (const [span, regionsOf] of items) {
+      const hex = `0x${span.graphic.toString(16)}`;
+      const raw = graphics.getRawGraphic(span.graphic);
+      const layout = fitLayout(id, span, raw.length);
       const regions = regionsOf(tables);
       const covered = roundTrip(id, layout, raw, regions);
       const written = regions.reduce((n, r) => n + r.bytes.filter((b) => b !== null).length, 0);
       console.log(`${id.padEnd(16)} ${hex}: ${regions.length} tables written back, ${written} bytes`);
       if (first) printUnread(layout, covered);
     }
+    check((tables.ui.graphic231.buttons.buttons16932.length > 0) === (graphics.getRawGraphic(0x231).length === 0x804),
+      `${id}: UITables reads Buttons16932 exactly when graphic 0x231 holds it`);
     first = false;
   }
   finish();

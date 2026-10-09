@@ -22,18 +22,15 @@ any verified fact into `doc/`; then delete the phase's body and add its line to
 
 ## Current priority: a working game on the default dungeon
 
-The goal is a complete, faithful game on `dm-atari`. The work, in order:
-
-1. **`DEBT.md`'s active rows**: the unported CSBWin features the default dungeon and
-   Chaos Strikes Back reach (`DEBT.md` → "Priority"). `DEBT.md` says how
-   to work an item. **One item per commit, a few per session**, then `/clear`. Its index is
-   the live status; its first row is the next item.
-2. Phase 15 step 4 interleaves anywhere.
+The goal is a complete, faithful game on `dm-atari`. The work is **`DEBT.md`'s active
+rows**: the unported CSBWin features the default dungeon and Chaos Strikes Back reach
+(`DEBT.md` → "Priority"). `DEBT.md` says how to work an item. **One item per commit, a few
+per session**, then `/clear`. Its index is the live status; its first row is the next item.
 
 ⏸️ **Postponed until the default dungeon is validated**: a save of a dungeon the port does
-not know (`DEBT.md` G22), CSBWin's debugging features (G14, the ASCII dump), and Phase 15
-step 5. The retail dungeon uses none of them. Features of **Chaos Strikes
-Back** are not postponed: it is the next dungeon to try.
+not know (`DEBT.md` G22), CSBWin's debugging features (G14, the ASCII dump), and comparing
+frames against CSBWin's own screenshots. The retail dungeon uses none of them. Features of
+**Chaos Strikes Back** are not postponed: it is the next dungeon to try.
 
 ## Ground rules
 
@@ -86,9 +83,6 @@ Back** are not postponed: it is the next dungeon to try.
   F9 or the Sleepsave did at info level.
 
 **Incomplete:**
-- ⚠️ **Validation.** Several completed phases listed validation steps (render tests, render
-  probes, pixel comparisons against CSBWin screenshots) that were never carried out.
-  Phase 15 gathers them.
 - Everything in `DEBT.md`: the technical debt, the known divergences from CSBWin, and the
   unported CSBWin features (tier G).
 
@@ -104,8 +98,7 @@ Back** are not postponed: it is the next dungeon to try.
    anywhere. They load the real game files, drive the real engine with a fixed RNG seed,
    print a human-readable table and assert invariants through `tools/lib/check.ts`, whose
    `finish()` also fails a run that made no checks. They are the regression suite for
-   everything the frames cannot see. The pattern is in `.claude/skills/verification-tools/`;
-   what Phase 15 still owes is shared fixtures.
+   everything the frames cannot see. The pattern is in `.claude/skills/verification-tools/`.
 
 ## Completed phases
 
@@ -134,71 +127,10 @@ notes of the phases closed up to 2026-09-26; for a phase closed later, its line 
 | 12 | Monsters: AI, movement, combat |
 | 13 | Champion lifecycle |
 | 14 | Structural cleanup |
+| 15 | Verification: the test runner, the golden frames, the render probe, the table items round-tripped |
 | 16 | Title screen and dungeon entrance |
 | 17 | Deployment: the game on the author's VPS (`doc/DEPLOYMENT.md`, `doc/STATISTICS.md`) |
 
 ## Next Steps (Phased)
 
 Only the phases with work left in them.
-
-### Phase 15 — Verification
-
-Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation steps that were
-never carried out, because the project has **no test framework**.
-
-1. ✅ **Test runner.** `npm test` → `tools/run-checks.mjs`: `tsc --noEmit`, then the
-   asserting tools, then the frames with `--frames`. ~14s, ~33s with frames.
-   `tools/` is inside the type gate. Shared helpers in `tools/lib/check.ts`.
-   <sub>How it went, and the two real bugs it surfaced: `doc/PLAN_ARCHIVE.md` → "Phase 15".</sub>
-2. ⚠️ **Golden-frame rendering tests.** `tools/check-frames.sh` starts its own dev server
-   and headless Chrome and takes `--update`. Fourteen frames: the first six load
-   the app with `?intro=0`, and `07-entrance` / `08-credits` / `12-game-loaded` load it
-   again without, which is the only standing evidence that the corridor behind the prison
-   doors actually renders. The rest boot with `?intro=0` once more and stand the party on
-   a fixed square (`FACE` in `tools/probe-frames.mjs`): a pressed crack switch
-   (`doc/PROVEN_FACTS.md`, "`dm-atari/graphics.dat` is CSBWin's with three items from the 1.2 disk"), two door ornaments, and a
-   mirror on each F2 edge wall, positions 7 and 9 of `DrawWallDecoration`. Still owed to
-   make it a real test: comparing the palette-index buffer rather than the RGBA canvas it
-   is converted to.
-   <sub>Baseline re-capture story: `doc/PLAN_ARCHIVE.md` → "Phase 15".</sub>
-
-3. ✅ **Render probe.** `tools/dump-render-probe.ts` runs every cell program of
-   `pStdDrawCode` on its own, headless, over hand-built room data, against the real
-   `graphics.dat` and `dm-atari` level 0, in both mirror parities. It asserts that the
-   port's table is null in exactly CSBWin's 46 `NOP` slots, that no program warns or
-   writes a pixel outside the 16 colours, and that all 244 renders hash as
-   `tools/reference/render-probe.tsv` records. A deliberate renderer change looks with
-   `--png` (one contact sheet per parity in `tools/output/`) and rewrites the baseline
-   with `--update`. Each slot is tried with one summary per room type (a closed door, a
-   visible pit and teleporter, no decorations or objects), so wall and floor decorations,
-   text, objects and the other door states are still seen only by the golden frames.
-4. 🔄 **Parser round-trip checks** for `dungeon.dat` / `graphics.dat` table extraction, so
-   table regressions surface immediately. Part-paid by Phase 16: `tools/dump-image-codec.ts`
-   decodes every image in both data sets and asserts each one fills its own buffer exactly,
-   which is what caught the codec bug's blast radius, and checks each opcode on a hand-built
-   stream. `dungeon.dat` is written again and held up against its own bytes by
-   `tools/dump-dungeon-image-blocks.ts`. The *table* extraction (`0x22e`..`0x232`) is
-   round-tripped by `tools/dump-graphics-tables.ts`, in every data set of the manifest, in
-   three sub-steps:
-   - ✅ **4a. The layout, and `0x22e`.** The tool lays out the item's span of
-     `doc/CSBwin-src/Data.h` from its declared types and counts, and checks its size
-     against `ReadAndExpandGraphic`'s `ASSERT` (read from `CSBCode.cpp`) and every data
-     set's item, and every address a declaration carries against its offset. Then every
-     table `ViewportTables` and `ObjectTables` read from `0x22e` is encoded back and
-     compared with the item's bytes at its `Data.h` field; a read past its field must cite
-     the CSBWin read that does the same. What no table reads is printed, not failed
-     (`doc/PROVEN_FACTS.md` → "Item `0x22e` is laid out exactly as `Data.h` declares its
-     span").
-   - ✅ **4b. `0x22f`**, `ObjectTables`' other half. `Data.h` marks only its start, so
-     the span ends where the `ASSERT`'s `0xc0e` bytes put it, and the declaration after it
-     must name that address (`doc/PROVEN_FACTS.md` → "Item `0x22f` is laid out exactly as
-     `Data.h` declares its span").
-   - ⏳ **4c. `0x230`, `0x231` (both sizes, `0x7d4` lacking the four buttons CSBWin
-     supplies, `CSBCode.cpp:10259-10275`) and `0x232`**, `UITables`.
-5. ⏸️ Compare against CSBWin screenshots for a few known scenes (Phase 7's skipped
-   validation). Postponed, perhaps for good: staging the same scene in CSBWin without
-   cheats costs more than it would prove, and the golden frames and the render probe
-   already catch any pixel that changes unintentionally. When it is taken, the canvas's
-   colours go with it: an Atari intensity times 36, not CSBWin's RGB555 (`DEBT.md` H).
-
-Status: 🔄 in progress — steps 1, 2 and 3 done, 4 part-done (4a and 4b done, 4c next); 5 postponed.
