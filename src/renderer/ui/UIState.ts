@@ -177,6 +177,11 @@ export interface UIState {
    */
   colouredObjectCursor: boolean;
   /**
+   * The extras of `DEBT.md` X, the page's one setting: what CSBWin does not have. Off by
+   * default, and off in every tool that does not turn it on.
+   */
+  extras: boolean;
+  /**
    * Where that extra drew the object this frame, for the screen to show through the
    * interface palette rather than the viewport's; `null` when it drew none.
    */
@@ -407,6 +412,7 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
     keyXlate1: null,
 
     colouredObjectCursor: true,
+    extras: false,
     objectCursorFootprint: null,
     cursorArrowBitmap: null,
     cursorHandBitmap: null,

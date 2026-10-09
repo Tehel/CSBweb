@@ -49,18 +49,21 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, input: GameInput): v
 
 /**
  * The Extras button, bound before the intro and not with the rest in `bindUIEvents`: the
- * one extra so far is the FTL logo, which the boot shows, so the entrance is where it is
- * switched, for the next load. Until the game is wired the other settings are only the
- * saved ones, which `readUISettings` cannot read off the page: the saved set is written
- * back with this one flag changed.
+ * FTL logo is an extra, which the boot shows, so the entrance is where it is switched, for
+ * the next load. The extras in play take the setting at once: `onChange` is told it now
+ * and at every press. Until the game is wired the other settings are only the saved ones,
+ * which `readUISettings` cannot read off the page: the saved set is written back with this
+ * one flag changed.
  */
-export function bindExtrasToggle(): void {
-    if (!extrasButton) return;
+export function bindExtrasToggle(onChange: (enabled: boolean) => void): void {
     setExtrasEnabled(loadUISettings().extras);
+    onChange(isExtrasEnabled());
+    if (!extrasButton) return;
     extrasButton.classList.toggle('is-pressed', isExtrasEnabled());
     extrasButton.addEventListener('click', () => {
         const next = !isExtrasEnabled();
         setExtrasEnabled(next);
+        onChange(next);
         extrasButton.classList.toggle('is-pressed', next);
         console.info(next ? 'Extras enabled' : 'Extras disabled');
         saveUISettings({ ...loadUISettings(), extras: next });

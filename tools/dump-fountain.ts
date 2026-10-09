@@ -8,6 +8,11 @@
  * it is. Then, whatever was in hand and whether or not it was filled, `TouchWallF1`
  * (`:1228-1229`): the wall is touched, as it is by a click on any other wall.
  *
+ * With an empty hand, button 5 of a wall that is no alcove touches the wall
+ * (`:1124-1129`), fountain or not. With the extras on (`DEBT.md` X), the cursor owner
+ * drinks there first: 800 water, a full waterskin's gulp, capped as any drink is, and the
+ * swallow queued. A dead cursor owner drinks nothing, and with the extras off nobody does.
+ *
  * The view is staged by hand, as in `dump-viewport-click.ts`: what is under test is the
  * dispatch, not the renderer that sets `d.FacingWaterFountain`. The objects are real
  * records of `dungeon.dat`: its first empty flask and its first waterskin.
@@ -40,6 +45,8 @@ interface Scene {
   ui: UIState;
   /** How many times `TouchWallF1` ran. */
   wallTouches: number;
+  /** Every sound queued, by ordinal. */
+  sounds: number[];
 }
 
 /** A party of one before a stone wall whose button 5 is drawn, a fountain or not. */
@@ -61,8 +68,9 @@ function scene(fountain: boolean): Scene {
     viewportObjectRNs: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
     roomData,
   });
-  const s: Scene = { game, ui, wallTouches: 0 };
+  const s: Scene = { game, ui, wallTouches: 0, sounds: [] };
   wrapMember(game.systems.mouse, 'handleWallClick', (original) => () => { s.wallTouches++; return original(); });
+  wrapMember(game.ctx.sounds, 'queueSound', (original) => (ordinal, ...rest) => { s.sounds.push(ordinal); original(ordinal, ...rest); });
   return s;
 }
 
@@ -122,6 +130,46 @@ function main(): void {
     console.log(['empty flask', false, `potion type ${type}`, s.wallTouches].join('\t'));
     check(type === PotionType.EMPTY_FLASK, 'another wall fills nothing');
     check(s.wallTouches === 1, 'and is touched');
+  }
+
+  /* ------------------------------------------- an empty hand: the extra ---- */
+
+  console.log('');
+  console.log(['extras', 'fountain', 'owner health', 'water before', 'after', 'sounds', 'wall touched'].join('\t'));
+  const drink = (extras: boolean, fountain: boolean, water: number, health = 200): Scene & { after: number } => {
+    const s = scene(fountain);
+    s.ui.extras = extras;
+    const champ = s.game.ctx.party.state.champions[0]!;
+    champ.water = water;
+    champ.attributes.health = health;
+    click(s);
+    console.log([extras, fountain, health, water, champ.water, s.sounds.join(' ') || '-', s.wallTouches].join('\t'));
+    return { ...s, after: champ.water };
+  };
+  const SOUND_GULP = 8;
+  {
+    const s = drink(false, true, 1000);
+    check(s.after === 1000 && s.sounds.length === 0, 'extras off: an empty hand drinks nothing (CSBWin)');
+    check(s.wallTouches === 1, 'extras off: the wall is touched');
+  }
+  {
+    const s = drink(true, true, 1000);
+    check(s.after === 1800, "extras on: the cursor owner drinks a full waterskin's gulp, 800");
+    check(s.sounds.length === 1 && s.sounds[0] === SOUND_GULP, 'extras on: the swallow is queued');
+    check(s.wallTouches === 1, 'extras on: and the wall is touched after');
+  }
+  {
+    const s = drink(true, true, 1900);
+    check(s.after === 2048, "extras on: the drink is capped at 2048, as every drink's water is");
+  }
+  {
+    const s = drink(true, true, 1000, 0);
+    check(s.after === 1000 && s.sounds.length === 0, 'extras on: a dead cursor owner drinks nothing');
+    check(s.wallTouches === 1, 'extras on: the wall is still touched');
+  }
+  {
+    const s = drink(true, false, 1000);
+    check(s.after === 1000 && s.sounds.length === 0, 'extras on: another wall gives nothing to drink');
   }
 
   finish();

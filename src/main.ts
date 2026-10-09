@@ -651,7 +651,6 @@ async function init() {
         dataSet = chooseDataSet(manifest);
         swooshDir = manifest.swooshDir;
         bindDataSetChooser(manifest, dataSet);
-        bindExtrasToggle();
         const files = await loadGameFiles();
         // Every graphics.dat table, read once: the engine's set is built from it, and the
         // screen is handed the same object.
@@ -661,6 +660,7 @@ async function init() {
         const built = construct(files, graphicsTables, tables, sound);
         game = built.game;
         screen = built.screen;
+        bindExtrasToggle((enabled) => built.screen.setExtras(enabled));
         await createCrt();
         // The saved effect and sound before the intro, which is drawn through one and
         // heard through the other; `wire` applies the rest of the settings once the

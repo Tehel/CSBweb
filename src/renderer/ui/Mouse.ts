@@ -12,7 +12,7 @@ import { IndexedBitmap, createPaletteIndexViewportBuffer, tag0088b2Index } from 
 import { decodeCursorBitmap } from '../../data/tables/UITables';
 import { canPlaceInSlot, drawPositionSquare } from './Character';
 import { objectIconBitmap } from './Draw';
-import { handleMouthPress } from './Feeding';
+import { drinkAtWaterFountain, handleMouthPress } from './Feeding';
 import { HINT_ORACLE_BUTTON, inventoryButtonList } from './HintOracleButton';
 import { searchButtonList } from './HitTest';
 import { describeObject, getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest, tag0189d4, tag019036 } from './Inventory';
@@ -66,7 +66,10 @@ function handleClickInViewport(ui: UIState, x: number, y: number): void {
   } else if (!hasCursorObject(ui)) {
     const target = resolveEmptyHandedViewportClick(ui, x, y);
     if (target === 'doorSwitch') mouse.handleDoorSwitchClick();
-    else if (target === 'wall') mouse.handleWallClick();
+    else if (target === 'wall') {
+      if (ui.extras) drinkAtWaterFountain(ui);
+      mouse.handleWallClick();
+    }
     else if (target === 'object') tryPickViewportObject(ui, x, y);
     else if (target === 'stone') mouse.handleStoneClick();
   }

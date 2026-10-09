@@ -440,6 +440,11 @@ export class GameScreen {
     syncInventoryButtons(this.ui);
   }
 
+  /** The extras setting (`DEBT.md` X), as the page's Extras button leaves it. */
+  setExtras(enabled: boolean): void {
+    this.ui.extras = enabled;
+  }
+
   /**
    * Where the pointer is, `d.CurMouseX` and `d.CurMouseY`. Nothing is drawn from here:
    * the cursor is the VBL's to draw (`takeCursorMoved`).

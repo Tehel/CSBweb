@@ -223,8 +223,8 @@ them is not established, so that video does not give a hold time the port could 
 
 An extra (`DEBT.md` X): with `UISettings.extras` on, the page's Extras button, the boot
 shows the logo before the title animation, and with it off the boot is CSBWin's. The
-button is live from the start of the page, the entrance included (`bindExtrasToggle`), and
-the next load follows it.
+button is live once the game's files are read, the entrance included (`bindExtrasToggle`),
+and the next load follows it.
 
 - `main.ts` fetches `swoosh.img` and `swoosh.wav` from the folder the data sets' manifest
   names (`"swoosh"`, `src/data/DataSets.ts`), as it does a game's files. Without a folder or

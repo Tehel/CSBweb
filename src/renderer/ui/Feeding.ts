@@ -168,6 +168,28 @@ export function handleMouthPress(ui: UIState): void {
   drawCharacterState(ui.partyState, selected, 0, ui.ctx.host);
 }
 
+/**
+ * An extra (`DEBT.md` X), not CSBWin's: an empty hand on a water fountain, and the cursor
+ * owner drinks what one gulp of a full waterskin gives (`computeFeedParameters`), 800
+ * water and the swallow, through `applyFeedParameters`, so the cap is CSBWin's own. A
+ * dead or absent cursor owner drinks nothing. The wall is touched afterwards either way,
+ * as by a fill (`fillAtWaterFountain`).
+ */
+export function drinkAtWaterFountain(ui: UIState): void {
+  if (!ui.context.facingWaterFountain) return;
+  const chIdx = ui.partyState.cursorOwner;
+  const champ = ui.partyState.champions[chIdx];
+  if (!champ || (champ.attributes.health | 0) === 0) return;
+  const fp = clearFeedParameters();
+  fp.characterIndex = chIdx;
+  fp.waterValue = 800;
+  fp.gulp = SOUND_GULP;
+  fp.performFeeding = true;
+  if (!applyFeedParameters(ui.ctx, chIdx, fp)) return;
+  const pos = ui.partyState.position;
+  ui.ctx.sounds.queueSound(fp.gulp, pos.x, pos.y, 0, pos.z);
+}
+
 export function getFoodValue(ui: UIState, nameIndex: number): number {
   const values = ui.objectTables.foodValue;
   if (!values) return 0;

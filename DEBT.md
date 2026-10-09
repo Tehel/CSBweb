@@ -106,7 +106,6 @@ In payoff order: the first row is the next item.
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | G30 | 3D2D1D's vertical moves and gravity | L | ⏸️ |
-| X1 | Extra: drinking from a fountain with an empty hand | S | ⏸️ |
 | X2 | Extra: a mastery just gained shown in green | S | ⏸️ |
 | X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
 | X8 | Extra: RISE's own dialog, and the utility disk's portraits on DM's champions | M | ⏸️ |
@@ -362,28 +361,16 @@ Rules for all of them:
 - **One setting, off by default**: `UISettings.extras` (`src/ui/settings.ts`), the page's
   Extras button, which they all share. With it off, the game is CSBWin's: every
   tool's output and every golden frame stay the same. The FTL logo before the title
-  (`src/renderer/intro/Swoosh.ts`) is behind it. The coloured object cursor is the
-  exception: the author wants it on by default, so it is recorded under H.
+  (`src/renderer/intro/Swoosh.ts`) is behind it, and in play the interface reads it as
+  `UIState.extras`, which `GameScreen.setExtras` sets at every press of the button: an
+  empty hand drinking at a water fountain (`drinkAtWaterFountain`,
+  `src/renderer/ui/Feeding.ts`, checked by `tools/dump-fountain.ts`). The coloured object
+  cursor is the exception: the author wants it on by default, so it is recorded under H.
 - **None of them is saved.** What an extra keeps in memory is lost on a save and a load,
   in the port's runtime save as in a CSBWin file, and that is acceptable: no save format
   changes.
 - **Each ships with its `tools/` check**, run with the setting on, and its entry here is
   deleted as for any paid item.
-
-### X1 ⏸️ Drinking from a fountain with an empty hand
-
-CSBWin's fountain is a wall decoration, not an actuator: the renderer sets
-`d.FacingWaterFountain` when the decoration in front is `d.Word4040[0]`
-(`doc/CSBwin-src/CSBCode.cpp:3363-3369`), and a click on viewport button 5 with it set
-fills a waterskin or an empty flask held in the cursor, and does nothing else
-(`doc/CSBwin-src/Mouse.cpp:1195-1226`). The port has the same thing in
-`tryUseFrontWallItem` (`src/renderer/ui/ViewportPicking.ts:138`), which returns at once
-when the hand is empty.
-
-The extra: with an empty hand, the **cursor owner** drinks. That is the same drink as one
-gulp from a full waterskin: `waterValue = 800` and `SOUND_GULP` (`computeFeedParameters`,
-`src/renderer/ui/Feeding.ts:60-69`), applied through `applyFeedParameters`, so the water cap
-and the sound are CSBWin's own. A dead or absent cursor owner drinks nothing.
 
 ### X2 ⏸️ A mastery just gained shown in green
 
