@@ -436,6 +436,26 @@ run past their own field, each as CSBWin's does: `Word7246` (`Code51a4.cpp:143`)
 `:2406`). The only bytes of the item no table reads are `Word4012`'s, which CSBWin sets
 at run time (`d.Word4012 = 3217`, `CSBCode.cpp:7585`).
 
+## Item `0x22f` is laid out exactly as `Data.h` declares its span
+
+CSBWin reads item `0x22f` whole into `d.Byte10340` onwards
+(`doc/CSBwin-src/CSBCode.cpp:10286`), after `ASSERT`ing it is `0xc0e` bytes (`:10285`).
+`Data.h` marks only its start (`Start graphic 0x22f`, `doc/CSBwin-src/Data.h:1082`). From
+there, 18 declarations laid out from their types and counts, with no padding, come to the
+3086 bytes exactly at `DeltaX[4]`, whose comment says "End of 22f" (`Data.h:1118`), and
+the next declaration is `Word7254` (`:1120`), `10340 - 3086`. Every declaration that names
+its address, in its name or as a bare number in its comment (`//9760`), sits at
+`10340 - address`. The structs are `OBJDESC` and `WEAPONDESC`, 6 bytes each,
+`CLOTHINGDESC`, 4, and `MONSTERDESC`, 26 (`CSB.h:1352-1360`, `:1672-1715`, `:2295-2422`).
+
+Every data set's `0x22f` is 3086 bytes, and every table the port reads from it writes
+back over its bytes at that offset (`tools/dump-graphics-tables.ts`), the port's
+`DELTA_X` and `DELTA_Y` constants included. CSBWin forces a zero `movementTicks06` to 1
+(`CSBCode.cpp:10287-10297`), and no data set has one. The bytes no table reads are
+`Unused8892`, `unusedDBEntrySize[16]` and each `CLOTHINGDESC`'s fourth byte, which CSBWin
+never reads either: neither field is named outside `Data.h`, and `m_uByte3` has no
+accessor (`CSB.h:1709`).
+
 ## `ExpandGraphic`'s `0x20` opcode bit is never consulted
 
 The image codec's extended opcodes (`doc/CSBwin-src/CSBCode.cpp:11086-11097`) branch like

@@ -189,10 +189,10 @@ never carried out, because the project has **no test framework**.
      the CSBWin read that does the same. What no table reads is printed, not failed
      (`doc/PROVEN_FACTS.md` → "Item `0x22e` is laid out exactly as `Data.h` declares its
      span").
-   - ⏳ **4b. `0x22f`**, `ObjectTables`' other half. `Data.h` marks only its start
-     (`Start graphic 0x22f`, `Data.h:1082`, read in at `d.Byte10340`, `CSBCode.cpp:10286`),
-     so its end is where the `ASSERT`'s `0xc0e` bytes put it. The tool's type table grows by the structs it declares
-     (`OBJDESC`, `WEAPONDESC`, `MONSTERDESC`, …).
+   - ✅ **4b. `0x22f`**, `ObjectTables`' other half. `Data.h` marks only its start, so
+     the span ends where the `ASSERT`'s `0xc0e` bytes put it, and the declaration after it
+     must name that address (`doc/PROVEN_FACTS.md` → "Item `0x22f` is laid out exactly as
+     `Data.h` declares its span").
    - ⏳ **4c. `0x230`, `0x231` (both sizes, `0x7d4` lacking the four buttons CSBWin
      supplies, `CSBCode.cpp:10259-10275`) and `0x232`**, `UITables`.
 5. ⏸️ Compare against CSBWin screenshots for a few known scenes (Phase 7's skipped
@@ -201,4 +201,4 @@ never carried out, because the project has **no test framework**.
    already catch any pixel that changes unintentionally. When it is taken, the canvas's
    colours go with it: an Atari intensity times 36, not CSBWin's RGB555 (`DEBT.md` H).
 
-Status: 🔄 in progress — steps 1, 2 and 3 done, 4 part-done (4a done, 4b next); 5 postponed.
+Status: 🔄 in progress — steps 1, 2 and 3 done, 4 part-done (4a and 4b done, 4c next); 5 postponed.
