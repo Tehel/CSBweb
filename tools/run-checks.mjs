@@ -82,6 +82,7 @@ const CHECKS = [
   // byte for byte, and put through CSBWin's own save loop unchanged.
   { tool: 'dump-expool.ts' },
   { tool: 'dump-viewport-click.ts' },
+  { tool: 'dump-fountain.ts' },
   { tool: 'dump-queue-sound.ts' },
   { tool: 'dump-crack-switch.ts' },
   { tool: 'dump-dm-atari-graphics.ts' },

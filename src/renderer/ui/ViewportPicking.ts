@@ -135,33 +135,24 @@ export function resolveViewportCursorAction(ui: UIState, x: number, y: number): 
   return null;
 }
 
-export function tryUseFrontWallItem(ui: UIState, x: number, y: number): boolean {
-  if (ui.partyState.cursorOwner < 0) return false;
-  if (!isViewportButtonHit(ui, 5, x, y)) return false;
-  if (ui.context.facingAlcove) return false;
-  if (!ui.context.facingWaterFountain) return false;
+/**
+ * `HandleClickInViewport`'s fountain (`doc/CSBwin-src/Mouse.cpp:1195-1227`): button 5 of a
+ * wall that is no alcove, with a waterskin or an empty flask in hand, before a fountain
+ * fills it. The caller touches the wall afterwards either way (`TouchWallF1`, `:1228-1229`).
+ */
+export function fillAtWaterFountain(ui: UIState): void {
+  if (!ui.context.facingWaterFountain) return;
 
   const objectId = ui.partyState.objectInHand;
-  if (objectId === OBJECT_ID_NULL) return false;
-
   const objectNameIndex = resolveObjectNameIndex(ui, objectId);
-  if (objectNameIndex < 0) return false;
 
   if (objectNameIndex >= OBJNI_WATERSKIN && objectNameIndex <= OBJNI_WATER) {
     const misc = ui.ctx.dungeon.getMiscRecord(objectId as ObjectID);
-    if (!misc) return false;
-    misc.specialState = 3;
-    return true;
-  }
-
-  if (objectNameIndex === OBJNI_EMPTY_FLASK) {
+    if (misc) misc.specialState = 3;
+  } else if (objectNameIndex === OBJNI_EMPTY_FLASK) {
     const potion = ui.ctx.dungeon.getPotionRecord(objectId as ObjectID);
-    if (!potion) return false;
-    potion.potionType = POTION_WATER_FLASK;
-    return true;
+    if (potion) potion.potionType = POTION_WATER_FLASK;
   }
-
-  return false;
 }
 
 export function findDropAreaHit(ui: UIState, x: number, y: number, count: number): number | null {

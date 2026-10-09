@@ -701,6 +701,15 @@ d.partyY, NULL, NULL)` between a `LoadLevel(d.partyLevel)` and a `LoadLevel(oldL
 `unchangedRoom` true because the party stands there. When no misc record is free, nothing
 is made (`:1359`). Evidence: `tools/dump-cast-spell.ts`.
 
+## A fountain fills, then the wall is touched
+
+With an object in hand, a click on button 5 of a wall that is no alcove and is a water
+fountain (`d.FacingWaterFountain`) fills a waterskin (`value(3)`) or turns an empty flask
+into a water flask, and leaves anything else as it is
+(`doc/CSBwin-src/Mouse.cpp:1195-1227`). Every one of those paths then reaches
+`tag01a69a: TouchWallF1()` (`:1228-1229`), so the wall is touched whether or not
+something was filled, as by a click on any other wall. Evidence: `tools/dump-fountain.ts`.
+
 ## Blocked movement has no message
 
 CSBWin answers a blocked move with a **sound only**. Verified by grep over the whole of

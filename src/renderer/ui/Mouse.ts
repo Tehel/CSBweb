@@ -31,7 +31,7 @@ import {
   resolveEmptyHandedViewportClick,
   resolveViewportCursorAction,
   tryPickViewportObject,
-  tryUseFrontWallItem,
+  fillAtWaterFountain,
 } from './ViewportPicking';
 
 export { decodeCursorBitmap };
@@ -60,9 +60,8 @@ function handleClickInViewport(ui: UIState, x: number, y: number): void {
     if (cursorAction.kind === 'drop') mouse.dropObjectFromCursor(cursorAction.pos, { viAltar: cursorAction.viAltar });
     else if (cursorAction.kind === 'throw') mouse.throwObjectFromCursor(cursorAction.side);
     else if (cursorAction.kind === 'wall') {
-      if (!tryUseFrontWallItem(ui, x, y)) {
-        mouse.handleWallClick();
-      }
+      fillAtWaterFountain(ui);
+      mouse.handleWallClick();
     }
   } else if (!hasCursorObject(ui)) {
     const target = resolveEmptyHandedViewportClick(ui, x, y);
