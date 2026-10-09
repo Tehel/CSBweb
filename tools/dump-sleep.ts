@@ -33,7 +33,7 @@ import { determineMastery } from '../src/engine/skills';
 import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
-import { graphicsTablesOf, newGame, presetHeroesOfGame, runVbl, stockDungeon, stockGraphics } from './lib/game';
+import { newGame, presetHeroesOfGame, runVbl, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { wakeUp } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
@@ -44,20 +44,6 @@ import { testChampion } from './lib/champion';
 async function main(): Promise<void> {
   const data = stockDungeon();
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const lists = uiTables.graphic231.buttons;
-
-  console.log('=== the button lists (graphics.dat 0x231) ===');
-  const icon = lists.buttons17760.find((b) => b.word0 === 145);
-  console.log(`sleep icon: ${JSON.stringify(icon)}`);
-  check(icon !== undefined, 'button 145 is in the inventory list buttons17760');
-  const sleepList = lists.buttons17796.filter((b) => b.word0 !== 0);
-  console.log(`Buttons17796: ${JSON.stringify(sleepList)}`);
-  check(sleepList.length === 2 && sleepList.every((b) =>
-    b.word0 === 146 && b.x1 === 0 && b.x2 === 223 && b.y1 === 33 && b.y2 === 168),
-  'asleep, the viewport and only the viewport is button 146');
-  check((sleepList[0]!.button | sleepList[1]!.button) === 3, 'either mouse button wakes');
-
   // The host's `sleepChanged`, wired as `main.ts` wires it (the UI half is built below).
   const notified: boolean[] = [];
   const messages = new ScrollingText();
@@ -82,6 +68,20 @@ async function main(): Promise<void> {
   const ui: UIState = newUIState(graphics, game.ctx);
   ui.partyState = party;
   Mouse.updateButtonLists(ui);
+
+  const lists = ui.uiTables.graphic231.buttons;
+
+  console.log('=== the button lists (graphics.dat 0x231) ===');
+  const icon = lists.buttons17760.find((b) => b.word0 === 145);
+  console.log(`sleep icon: ${JSON.stringify(icon)}`);
+  check(icon !== undefined, 'button 145 is in the inventory list buttons17760');
+  const sleepList = lists.buttons17796.filter((b) => b.word0 !== 0);
+  console.log(`Buttons17796: ${JSON.stringify(sleepList)}`);
+  check(sleepList.length === 2 && sleepList.every((b) =>
+    b.word0 === 146 && b.x1 === 0 && b.x2 === 223 && b.y1 === 33 && b.y2 === 168),
+  'asleep, the viewport and only the viewport is button 146');
+  check((sleepList[0]!.button | sleepList[1]!.button) === 3, 'either mouse button wakes');
+
   const handled: number[] = [];
   game.setMouseEventHandlers({
     translate: (x, y, buttons) => Mouse.searchMouseButtons(ui, x, y, buttons),

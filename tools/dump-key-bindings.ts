@@ -18,12 +18,11 @@
  */
 import { setHandOwner } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
-import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import type { Champion, PartyState } from '../src/engine/gameTypes';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { CHARFLAG_ATTACK_DISABLE } from '../src/engine/gameTypes';
 import type { LoopScript } from '../src/engine/LoopState';
-import { graphicsTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
@@ -53,12 +52,7 @@ async function main(): Promise<void> {
   const data = stockDungeon();
 
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const objectTables = graphicsTablesOf(graphics).objects;
-  const addTables: AddCharacterTables = {
-    carryLocation: uiTables.graphic232.carryLocation,
-    objDescWord4: objectTables.objDescWord4,
-  };
+  const addTables = gameTablesOf(graphics);
 
   // Real champions out of the Hall of Champions, and the spell keys need someone who
   // can actually cast: `drawSpellControls` gives no tab to a champion with no mana, and

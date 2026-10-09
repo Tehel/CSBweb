@@ -290,7 +290,8 @@ function checkButtonTables(graphics: GraphicsLoader): void {
  * Graphic 0 and the self-blit rectangles `_DoMenu` patches it with, then the real draw.
  */
 function checkLayout(graphics: GraphicsLoader): void {
-  const g231 = graphicsTablesOf(graphics).ui.graphic231;
+  const ui = makeDrawingUI(graphics);
+  const g231 = ui.uiTables.graphic231;
   const image = graphics.getImage(0);
 
   console.log('');
@@ -320,7 +321,6 @@ function checkLayout(graphics: GraphicsLoader): void {
   /* ---- the pieces, each drawn at its own size: the art itself ---- */
 
   const g = SaveMenu.SAVE_MENU_GEOMETRY;
-  const ui = makeDrawingUI(graphics);
   const size = (r: { x1: number; y1: number; x2: number; y2: number }): string => `${r.x2 - r.x1 + 1}x${r.y2 - r.y1 + 1}`;
   /** How many pixels of `piece`, drawn at its own size and place, are not graphic 0's. */
   const ownSize = (piece: SaveMenu.DialogPiece, within: (x: number, y: number) => boolean): number => {

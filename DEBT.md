@@ -236,16 +236,13 @@ The table-extraction round-trip checks are a live phase, so they stay in `PLAN.m
 ### F12 ⏳ The tools' scaffolding is copied, and reaches privates through unchecked casts
 
 `tools/lib/game.ts` gives every tool the same `Game` and tables (`E1a`). What each tool
-builds around them is its own:
-
-- 31 tools extract the UI tables again (`graphicsTablesOf(…).ui`), 19 of them beside the
-  `UIState` that `tools/lib/ui.ts` builds them into.
-- 20 tools make 33 `as unknown as` casts: to build a partial record, or to read a
-  record's fields by name. 2 more tools cast through `as any`, to stand a partial record
-  in for `getMissileRecord`'s (`dump-missile-draw`, whose `draw` context is an `any` as
-  well) or for a `ViewportDraw`'s context (`dump-teleporter-shimmer`).
-  `tsc` checks none of them. A renamed member leaves the tool compiling, and a write to
-  it then sets a new property: the tool goes on passing while testing nothing.
+builds around them is its own: 20 tools make 33 `as unknown as` casts, to build a partial
+record or to read a record's fields by name. 2 more tools cast through `as any`, to
+stand a partial record in for `getMissileRecord`'s (`dump-missile-draw`, whose `draw`
+context is an `any` as well) or for a `ViewportDraw`'s context
+(`dump-teleporter-shimmer`). `tsc` checks none of them. A renamed member leaves the tool
+compiling, and a write to it then sets a new property: the tool goes on passing while
+testing nothing.
 
 Paid in seven steps, each tool's whole output byte-identical across every commit
 ("How to work this list", point 3). Steps 1 to 6 are done: `Game`'s seam for the tools
@@ -273,11 +270,15 @@ default of its own argument (`dump-defined-items`, `-level-items`, `-object-defi
 (`-compressed-dungeon`, `-image-checksum`, `-file-signatures`), and the file it builds
 (`-dm-atari-graphics`).
 
-7. **What is left**: a tool with a `UIState` reads the UI tables off it rather than
-   extracting them again; and every remaining cast either goes, or builds a stand-in
-   value the tool cannot type otherwise (a partial record, a fake `ImageData`), with a
-   comment that says so. The item is paid when no tool reaches a private through a cast
-   and no `as any` is left.
+A tool reads the UI tables off its `UIState` (`ui.uiTables`), and a champion's carry
+tables off the game's (`gameTablesOf`, `ctx.tables`). It extracts them only where no
+`UIState` is in scope: the table offsets checked on their own (`dump-rise`,
+`-save-menu`), an intro host (`dump-bad-saved-game`), a tool with no interface.
+
+7. **What is left**: every remaining cast either goes, or builds a stand-in value the
+   tool cannot type otherwise (a partial record, a fake `ImageData`), with a comment that
+   says so. The item is paid when no tool reaches a private through a cast and no
+   `as any` is left.
 
 ---
 

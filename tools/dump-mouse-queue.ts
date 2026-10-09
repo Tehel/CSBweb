@@ -48,7 +48,7 @@ import { tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import { setHandOwner } from '../src/engine/Party';
 import { ensureSkills } from '../src/engine/skills';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { graphicsTablesOf, newGame, runVbl, TICK_DUE, stockDungeon, stockGraphics } from './lib/game';
+import { newGame, runVbl, TICK_DUE, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { ButtonsAt } from './lib/clicks';
@@ -69,7 +69,6 @@ async function main(): Promise<void> {
   const data = stockDungeon();
 
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
 
   const level = Number(process.argv[2] ?? 1);
   const game = newGame(data, graphics);
@@ -523,7 +522,7 @@ async function main(): Promise<void> {
     if (!b) throw new Error(`no button ${id} in the list`);
     return [(b.x1 + b.x2) >> 1, (b.y1 + b.y2) >> 1];
   };
-  const buttons = uiTables.graphic231.buttons;
+  const buttons = ui.uiTables.graphic231.buttons;
   let onClick: () => void = () => {};
   game.setMouseEventHandlers({ translate: buttonsAt.translate, button: () => onClick(), unclick: () => {} });
   /** A fresh party of one, at the scene, holding the cursor and the magic tab. */

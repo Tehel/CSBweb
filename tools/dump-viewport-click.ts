@@ -38,7 +38,7 @@ import { Game } from '../src/engine/Game';
 import { resolveEmptyHandedViewportClick, findDropAreaHit, resolveViewportCursorAction, testThrow, tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import type { UIState } from '../src/renderer/ui/UIState';
 import type { RectPos } from '../src/data/tables/UITables';
-import { graphicsTablesOf, newGame, stockGraphics, stockDungeon } from './lib/game';
+import { newGame, stockGraphics, stockDungeon } from './lib/game';
 import { newUIState } from './lib/ui';
 import { wrapMember } from './lib/standIn';
 import { check, fail, finish } from './lib/check';
@@ -207,7 +207,7 @@ function main(): void {
   // (`Mouse.cpp:1166`): stone ahead offers the two near drop areas and button 5, and
   // anything else the throw and all four drop areas. The closed imaginary false wall is
   // stone here, as it is to `SummarizeRoomInfo`. The object is the alcove's, still in hand.
-  const dropAreas = graphicsTablesOf(stockGraphics()).ui.graphic231.dropAreas;
+  const dropAreas = ui.uiTables.graphic231.dropAreas;
   const [nearX, nearY] = [(dropAreas[0]!.x1 + dropAreas[0]!.x2) >> 1, (dropAreas[0]!.y1 + dropAreas[0]!.y2) >> 1];
   const [farX, farY] = [(dropAreas[2]!.x1 + dropAreas[2]!.x2) >> 1, (dropAreas[2]!.y1 + dropAreas[2]!.y2) >> 1];
   console.log('');

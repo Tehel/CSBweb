@@ -17,10 +17,9 @@
 import { DBType, Direction, OBJECT_ID_NULL, Position } from '../src/core/types';
 import { Party, ensureHandOwner, initialPartyState, setHandOwner } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
-import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { getChampionPossession, type Champion, type PartyState } from '../src/engine/gameTypes';
 import { type UIState } from '../src/renderer/ui/UIState';
-import { graphicsTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { handleClothingClick } from '../src/renderer/ui/Mouse';
@@ -38,12 +37,7 @@ async function main(): Promise<void> {
   const data = stockDungeon();
 
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const objectTables = graphicsTablesOf(graphics).objects;
-  const addTables: AddCharacterTables = {
-    carryLocation: uiTables.graphic232.carryLocation,
-    objDescWord4: objectTables.objDescWord4,
-  };
+  const addTables = gameTablesOf(graphics);
 
   // The real champions from the Hall of Champions, with the possessions the mirrors
   // hand them — no synthesised heroes. Not every hero starts with something: DAROOU's

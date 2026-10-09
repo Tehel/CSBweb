@@ -45,7 +45,6 @@ import { testChampion } from './lib/champion';
 
 const graphics = stockGraphics();
 const objectTables = graphicsTablesOf(graphics).objects;
-const uiTables = graphicsTablesOf(graphics).ui;
 
 function makeGame(host?: Partial<GameHost>): Game {
   const data = stockDungeon();
@@ -164,7 +163,7 @@ async function main(): Promise<void> {
   const dungeon = game.ctx.dungeon;
   const nameIndex = (rn: ObjectID): number => NameIndex(
     dungeon,
-    { objDescObjectType: objectTables.objDescObjectType, byte640: uiTables.graphic232.byte640 },
+    game.ctx.tables,
     0,
     rn,
   );
@@ -273,7 +272,7 @@ async function main(): Promise<void> {
     c.possessions[2] = helm;
     const gNameIndex = (rn: ObjectID): number => NameIndex(
       g.ctx.dungeon,
-      { objDescObjectType: objectTables.objDescObjectType, byte640: uiTables.graphic232.byte640 }, 0, rn,
+      g.ctx.tables, 0, rn,
     );
     AdjustStatsForItemCarried(c, 1, 1, staff, g.ctx.dungeon, gNameIndex);
     AdjustStatsForItemCarried(c, 2, 1, helm, g.ctx.dungeon, gNameIndex);
@@ -354,7 +353,7 @@ async function main(): Promise<void> {
     const weapons = g.ctx.dungeon.getData().databases.weapons.records;
     const gNameIndex = (rn: ObjectID): number => NameIndex(
       g.ctx.dungeon,
-      { objDescObjectType: objectTables.objDescObjectType, byte640: uiTables.graphic232.byte640 }, 0, rn,
+      g.ctx.tables, 0, rn,
     );
 
     // A torch refilled into an empty hand from the backpack (`TAG011594`,
@@ -390,7 +389,7 @@ async function main(): Promise<void> {
     // Round the neck an Illumulet gets `value(1)` and adds `d.Word1074[2]` to the party's
     // light (`:2016-2024`); a Jewel Symal gets `value(1)` (`:2027-2033`).
     const misc = g.ctx.dungeon.getData().databases.misc.records;
-    const step = uiTables.graphic232.word1074[2]!;
+    const step = g.ctx.tables.word1074[2]!;
     const brightness = party.brightness;
     const illumulet = newObject(g, NI.OBJNI_ILLUMULET_A);
     party.objectInHand = illumulet;

@@ -34,7 +34,7 @@ import {
 } from '../src/renderer/ui/ReIncarnate';
 import type { UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { standIn } from './lib/standIn';
 
@@ -75,9 +75,9 @@ const BACKSPACE = { x: 140, y: 151 };
 
 function main(): void {
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const special = uiTables.graphic232.specialChars;
   const gridUI = makeHarness(graphics, []).ui;
+  const uiTables = gridUI.uiTables;
+  const special = uiTables.graphic232.specialChars;
 
   /* ---------------------------------------- the tables it needs ------------------ */
 

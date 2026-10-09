@@ -35,7 +35,7 @@ import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasB
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { drawCharacterState, drawPartyStatus } from '../src/renderer/ui/Character';
 import { type UIState } from '../src/renderer/ui/UIState';
-import { graphicsTablesOf, newGame, presetHeroesOf, processTimersAt, stockDungeon, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, presetHeroesOf, processTimersAt, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
@@ -388,15 +388,10 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
 console.log('');
 console.log('=== drawPartyStatus ===');
 {
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const objectTables = graphicsTablesOf(graphics).objects;
   const heroes = presetHeroesOf(data!, graphics).filter((h) => (h.inventory?.length ?? 0) > 0);
   const party = new Party(new Position(1, 1, 0), Direction.NORTH);
   for (let i = 0; i < 2; i++) {
-    party.addChampion(createChampionFromPreset(heroes[i]!, i, assignPresetHeroPossessions(heroes[i]!.inventory, {
-      carryLocation: uiTables.graphic232.carryLocation,
-      objDescWord4: objectTables.objDescWord4,
-    })));
+    party.addChampion(createChampionFromPreset(heroes[i]!, i, assignPresetHeroPossessions(heroes[i]!.inventory, gameTablesOf(graphics))));
   }
   const cache = new Map();
   // The host's `drawCharacterState` is the screen's, as `main.ts` wires it.

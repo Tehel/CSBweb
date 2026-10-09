@@ -26,7 +26,7 @@ import { ensureSkills } from '../src/engine/skills';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { drawTextLineIndexRaw, loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { drawMagicIncantation, drawSpellMenuCharacters, handleMagicClick } from '../src/renderer/ui/MagicPanel';
-import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
+import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { wrapMember } from './lib/standIn';
 import { check, finish } from './lib/check';
@@ -44,15 +44,14 @@ function champion(name: string): Champion {
 async function main(): Promise<void> {
   const data = stockDungeon();
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const base = uiTables.graphic230.spellBaseMana;
-  const scale = uiTables.graphic230.spellFirstRuneScale;
 
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   const party = game.ctx.party.state;
   const ui = newUIState(graphics, game.ctx);
   ui.partyState = party;
+  const base = ui.uiTables.graphic230.spellBaseMana;
+  const scale = ui.uiTables.graphic230.spellFirstRuneScale;
   // The engine's `CastMagic`, the UI's call, wrapped to read its result.
   const magic = game.systems.magic;
   let castResult = -99;
@@ -64,7 +63,7 @@ async function main(): Promise<void> {
     castResult = -99;
   };
   const button = (id: number): void => {
-    const b = uiTables.graphic231.buttons.buttons18060.find((entry) => entry.word0 === id);
+    const b = ui.uiTables.graphic231.buttons.buttons18060.find((entry) => entry.word0 === id);
     if (!b) throw new Error(`no magic button ${id}`);
     handleMagicClick(ui, (b.x1 + b.x2) >> 1, (b.y1 + b.y2) >> 1);
     // `_MagicSelection` holds the loop for its flashes (`magicSelectionScript`): its VBLs

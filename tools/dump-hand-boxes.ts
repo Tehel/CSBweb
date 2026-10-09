@@ -28,7 +28,7 @@ import { drawInventoryScreen, getInventorySlotRect } from '../src/renderer/ui/In
 import { type UIState } from '../src/renderer/ui/UIState';
 import type { Rect } from '../src/data/tables/UITables';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 
 const BOXES = [33, 34, 35];
@@ -37,17 +37,12 @@ async function main(): Promise<void> {
   const data = stockDungeon();
 
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const objectTables = graphicsTablesOf(graphics).objects;
 
   const heroes = presetHeroesOf(data, graphics).filter((h) => (h.inventory?.length ?? 0) > 0);
   if (heroes.length < 2) throw new Error('dungeon.dat carries fewer than two equipped preset heroes');
   const party = new Party(new Position(1, 1, 0), Direction.NORTH);
   for (let i = 0; i < 2; i++) {
-    party.addChampion(createChampionFromPreset(heroes[i], i, assignPresetHeroPossessions(heroes[i].inventory, {
-      carryLocation: uiTables.graphic232.carryLocation,
-      objDescWord4: objectTables.objDescWord4,
-    })));
+    party.addChampion(createChampionFromPreset(heroes[i], i, assignPresetHeroPossessions(heroes[i].inventory, gameTablesOf(graphics))));
   }
 
   const cache = new Map();
@@ -56,7 +51,7 @@ async function main(): Promise<void> {
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
   });
   ui.partyState = party.state;
-  const iconSlots = uiTables.graphic232.iconDisplay;
+  const iconSlots = ui.uiTables.graphic232.iconDisplay;
 
   /** The 18x18 frame's outer ring around a 16x16 icon at `rect`. */
   function ring(pixels: Uint8Array, rect: Rect): string {

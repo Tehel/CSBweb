@@ -31,7 +31,7 @@ import { type UIState } from '../src/renderer/ui/UIState';
 import { objectIconBitmap } from '../src/renderer/ui/Draw';
 import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
+import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import * as mouse from '../src/renderer/ui/Mouse';
 
@@ -43,8 +43,6 @@ const CATEGORY_JUNK = 10;
 async function main(): Promise<void> {
   const data = stockDungeon();
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const objectTables = graphicsTablesOf(graphics).objects;
 
   const party = new Party(new Position(1, 1, 0), Direction.NORTH);
   const bitmaps = new Map<number, IndexedBitmap>();
@@ -62,7 +60,7 @@ async function main(): Promise<void> {
   ui.partyState = party.state;
 
   // ---- A copper coin from the dungeon, in hand.
-  check(objectTables.objectNames[COPPER_COIN] === 'COPPER COIN', `name index ${COPPER_COIN} should be the copper coin`);
+  check(ui.objectTables.objectNames[COPPER_COIN] === 'COPPER COIN', `name index ${COPPER_COIN} should be the copper coin`);
   let coin = -1;
   const junk = data.databases.misc.records;
   for (let i = 0; i < junk.length && coin < 0; i++) {
@@ -73,7 +71,7 @@ async function main(): Promise<void> {
   check(coin >= 0, 'dungeon.dat should hold a copper coin');
   if (coin < 0) return finish();
   party.state.objectInHand = coin as ObjectID;
-  const icon = objectIconBitmap(ui, COPPER_COIN, uiTables.graphic232.word612)!;
+  const icon = objectIconBitmap(ui, COPPER_COIN, ui.uiTables.graphic232.word612)!;
   let colour9 = 0;
   for (const p of icon.pixels) if (p === 9) colour9++;
   console.log(`copper coin RN 0x${coin.toString(16)}, icon ${COPPER_COIN}: ${colour9} of 256 pixels colour 9`);
@@ -171,9 +169,9 @@ async function main(): Promise<void> {
   // A level whose monsters give colour 9 another scheme (`ModifyPalettes(9, 0)`): the
   // coin's colour-9 pixels must come out as the interface palette's colour 9.
   draw(100, 100, true);
-  const uiPalette = uiTables.graphic232.palette552[0];
+  const uiPalette = ui.uiTables.graphic232.palette552[0];
   const viewportPalette = uiPalette.slice();
-  viewportPalette[9] = objectTables.specialColors[0].paletteEntries[0];
+  viewportPalette[9] = ui.objectTables.specialColors[0].paletteEntries[0];
   check(viewportPalette[9] !== uiPalette[9], 'the test palette should change colour 9');
   const rgb = (c: number): number[] => [((c >> 8) & 7) * 36, ((c >> 4) & 7) * 36, (c & 7) * 36];
   const image = { width: 320, height: 200, data: new Uint8ClampedArray(320 * 200 * 4) } as unknown as ImageData;

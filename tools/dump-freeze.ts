@@ -21,7 +21,7 @@
  */
 import { Position } from '../src/core/types';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
-import { graphicsTablesOf, newGame, runVbl, TICK_DUE, stockDungeon, stockGraphics } from './lib/game';
+import { newGame, runVbl, TICK_DUE, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { wakeUp } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
@@ -33,9 +33,27 @@ import { testChampion } from './lib/champion';
 async function main(): Promise<void> {
   const data = stockDungeon();
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const lists = uiTables.graphic231.buttons;
-  const keys = uiTables.graphic231.keys;
+  const game = newGame(data, graphics, {
+    sleepChanged: (sleeping) => {
+      ui.uiMode = sleeping ? UIMode.Sleeping : UIMode.Adventure;
+      Mouse.updateButtonLists(ui);
+      Mouse.syncInventoryButtons(ui);
+    },
+  });
+  game.setRandomSeed(0x12345678);
+  game.systems.hallOfChampions.addChampion(testChampion(0));
+  game.systems.hallOfChampions.addChampion(testChampion(1));
+  const party = game.ctx.party.state;
+  party.position = new Position(6, 14, 2);
+  game.systems.monsters.loadPartyLevel(2);
+
+  // The UI half, wired as `GameInput.install` wires it.
+  const ui: UIState = newUIState(graphics, game.ctx);
+  ui.partyState = party;
+  Mouse.updateButtonLists(ui);
+
+  const lists = ui.uiTables.graphic231.buttons;
+  const keys = ui.uiTables.graphic231.keys;
 
   console.log('=== the key tables and button lists (graphics.dat 0x231) ===');
   const show = (table: { mouse: number; keyscan: number }[]): string =>
@@ -60,24 +78,6 @@ async function main(): Promise<void> {
   check(corner !== undefined && corner.x1 === 0 && corner.x2 === 1 && corner.y1 === 198 && corner.y2 === 199
     && corner.button === 2, 'adventuring, a left click on the pixel x 0, y 198 is 147');
 
-  const game = newGame(data, graphics, {
-    sleepChanged: (sleeping) => {
-      ui.uiMode = sleeping ? UIMode.Sleeping : UIMode.Adventure;
-      Mouse.updateButtonLists(ui);
-      Mouse.syncInventoryButtons(ui);
-    },
-  });
-  game.setRandomSeed(0x12345678);
-  game.systems.hallOfChampions.addChampion(testChampion(0));
-  game.systems.hallOfChampions.addChampion(testChampion(1));
-  const party = game.ctx.party.state;
-  party.position = new Position(6, 14, 2);
-  game.systems.monsters.loadPartyLevel(2);
-
-  // The UI half, wired as `GameInput.install` wires it.
-  const ui: UIState = newUIState(graphics, game.ctx);
-  ui.partyState = party;
-  Mouse.updateButtonLists(ui);
   const handled: number[] = [];
   game.setMouseEventHandlers({
     translate: (x, y, buttons) => Mouse.searchMouseButtons(ui, x, y, buttons),

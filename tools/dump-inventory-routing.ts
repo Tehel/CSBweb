@@ -25,11 +25,10 @@
 import { Direction, OBJECT_ID_NULL, Position } from '../src/core/types';
 import { initialPartyState, setHandOwner, setPartyFacing } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
-import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { getChampionPossession, type Champion, type PartyState } from '../src/engine/gameTypes';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
-import { graphicsTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { handleClothingClick } from '../src/renderer/ui/Mouse';
@@ -65,12 +64,7 @@ async function main(): Promise<void> {
   const data = stockDungeon();
 
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const objectTables = graphicsTablesOf(graphics).objects;
-  const addTables: AddCharacterTables = {
-    carryLocation: uiTables.graphic232.carryLocation,
-    objDescWord4: objectTables.objDescWord4,
-  };
+  const addTables = gameTablesOf(graphics);
 
   // Four real preset heroes, each carrying something, one per box.
   const heroes = presetHeroesOf(data, graphics).filter((h) => (h.inventory?.length ?? 0) > 0);

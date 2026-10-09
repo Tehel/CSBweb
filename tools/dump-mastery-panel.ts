@@ -46,7 +46,6 @@
 import { DBType, Direction, OBJECT_ID_NULL, Position, TilePosition, type ObjectID } from '../src/core/types';
 import { initialPartyState } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
-import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import type { Champion } from '../src/engine/gameTypes';
 import { ensureSkills, determineMastery } from '../src/engine/skills';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
@@ -59,7 +58,7 @@ import { drawInventoryScreen, drawObjectInfoPanel } from '../src/renderer/ui/Inv
 import { getObjectDisplayName, getObjectName, resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { OBJNI_EMPTY_FLASK, OBJNI_WATER_FLASK } from '../src/core/objectNameIndex';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
-import { graphicsTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 
@@ -125,8 +124,6 @@ async function main(): Promise<void> {
   const data = stockDungeon();
 
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const objectTables = graphicsTablesOf(graphics).objects;
   const font = loadFontData(graphics);
 
   // ---------------------------------------------------------------- the label table
@@ -154,10 +151,7 @@ async function main(): Promise<void> {
   // ---------------------------------------------------------------- a real champion
   const heroes = presetHeroesOf(data, graphics).filter((h) => (h.inventory?.length ?? 0) > 0);
   if (heroes.length < 1) throw new Error('dungeon.dat carries no equipped preset hero');
-  const addTables: AddCharacterTables = {
-    carryLocation: uiTables.graphic232.carryLocation,
-    objDescWord4: objectTables.objDescWord4,
-  };
+  const addTables = gameTablesOf(graphics);
   const champion: Champion = createChampionFromPreset(
     heroes[0],
     0,

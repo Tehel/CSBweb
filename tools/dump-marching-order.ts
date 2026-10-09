@@ -17,13 +17,12 @@
 import { Direction, Position } from '../src/core/types';
 import { Party } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
-import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import type { PartyState } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { drawPartyStatus, drawPositionSquare } from '../src/renderer/ui/Character';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import * as mouse from '../src/renderer/ui/Mouse';
 
@@ -34,13 +33,7 @@ function positions(party: PartyState): string {
 async function main(): Promise<void> {
   const data = stockDungeon();
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const objectTables = graphicsTablesOf(graphics).objects;
-  const addTables: AddCharacterTables = {
-    carryLocation: uiTables.graphic232.carryLocation,
-    objDescWord4: objectTables.objDescWord4,
-  };
-  const g232 = uiTables.graphic232;
+  const addTables = gameTablesOf(graphics);
 
   // Three of the Hall of Champions' heroes, at positions 0, 1 and 2, all facing west
   // while the party faces north, so a champion put down visibly turns.
@@ -66,6 +59,7 @@ async function main(): Promise<void> {
     },
   });
   ui.partyState = state;
+  const g232 = ui.uiTables.graphic232;
 
   mouse.updateButtonLists(ui);
 

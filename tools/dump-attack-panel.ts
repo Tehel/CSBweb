@@ -29,7 +29,7 @@ import {
 import { VBL_PER_TICK } from '../src/engine/LoopState';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { standIn } from './lib/standIn';
 
@@ -37,17 +37,12 @@ async function main(): Promise<void> {
   const data = stockDungeon();
 
   const graphics = stockGraphics();
-  const uiTables = graphicsTablesOf(graphics).ui;
-  const objectTables = graphicsTablesOf(graphics).objects;
 
   const heroes = presetHeroesOf(data, graphics).filter((h) => (h.inventory?.length ?? 0) > 0);
   if (heroes.length < 2) throw new Error('dungeon.dat carries fewer than two equipped preset heroes');
   const party = new Party(new Position(1, 1, 0), Direction.NORTH);
   for (let i = 0; i < 2; i++) {
-    party.addChampion(createChampionFromPreset(heroes[i], i, assignPresetHeroPossessions(heroes[i].inventory, {
-      carryLocation: uiTables.graphic232.carryLocation,
-      objDescWord4: objectTables.objDescWord4,
-    })));
+    party.addChampion(createChampionFromPreset(heroes[i], i, assignPresetHeroPossessions(heroes[i].inventory, gameTablesOf(graphics))));
   }
 
   const cache = new Map();
@@ -68,7 +63,7 @@ async function main(): Promise<void> {
   });
 
   /** Draw the panel over a screen of 7s and hand back its rectangle's pixels. */
-  const panel = uiTables.graphic232.word20;
+  const panel = ui.uiTables.graphic232.word20;
   function render(label: string): string {
     const screen = createPaletteIndexViewportBuffer(320, 200, 7);
     ui.screenIndexBuffer = screen;
@@ -140,7 +135,7 @@ async function main(): Promise<void> {
   // where the digits are (`D5W = 274`, Attack.cpp:1027). The two smaller ones are it
   // shrunk to 64x37 and 42x37, so they centre there too and their rectangle's edge cuts
   // none of them; a crop of the big one instead would sit right of 274 and be cut.
-  const g230 = uiTables.graphic230;
+  const g230 = ui.uiTables.graphic230;
   for (const [value, rect, name] of [
     [50, g230.wRectPos20202, 'wRectPos20202'],
     [20, g230.wRectPos20226, 'wRectPos20226'],
