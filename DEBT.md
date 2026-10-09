@@ -390,8 +390,8 @@ extra does the editor's work for the player: a DM champion raised into CSB gets 
 redrawn portrait of the champion they are.
 
 The X rules' setting does not apply. RISE is the port's own, and the author wants the
-upgrade on by default, so it is a checkbox in RISE's dialog, checked whenever the dialog
-opens, not `UISettings.extras`. Unchecked, RISE makes CSBWin's adventure byte for byte, as
+upgrade on by default, so it is a toggle in RISE's dialog, on whenever the dialog
+opens, not `UISettings.extras`. Off, RISE makes CSBWin's adventure byte for byte, as
 it does now. The upgrade is saved: the portraits are in the new file, in CSBWin's own
 `CHARDESC` field, so CSBWin shows them too.
 
@@ -401,20 +401,31 @@ Two steps, one commit each:
    (`src/renderer/ui/SaveMenu.ts`): the load-only chooser over every data set's saves.
    Nothing in it says what RISE does, and it offers EXPORT whenever a save is selected
    (`canExport` does not look at the mode), though exporting has nothing to do with raising
-   a party. In `rise` mode: no EXPORT, and a text saying what LOAD does. It makes a new
-   Chaos Strikes Back adventure with the chosen save's party, a finished DM game's or the
-   prison's. The adventure is stored as a new save (`-csb`), and the source is left as it
-   is. Where the text goes (the title panel, or the preview panel before a save is chosen),
-   and whether LOAD's label should name the action, are the author's to decide before this
-   is taken. `tools/dump-save-menu.ts` checks the mode, and so do the golden frames if one
-   shows the dialog.
+   a party. LOAD makes a new Chaos Strikes Back adventure with the chosen save's party, a
+   finished DM game's or the prison's; the adventure is stored as a new save (`-csb`), and
+   the source is left as it is. In `rise` mode, the author's design:
+   - **A title panel over the list**, a `PANEL_PIECE` as wide as the list's, holding two
+     lines: RAISE A PARTY INTO A NEW / CHAOS STRIKES BACK ADVENTURE. The list panel starts
+     graphic 0's ten pixels below it and keeps the whole rows that fit, about eleven of
+     its fifteen; its scrollbar, its rows' rectangles and their hit test follow it. The
+     preview panel keeps its full height. The other modes do not change.
+   - **LOAD reads RISE**, the entrance's button that opened the dialog.
+   - **No EXPORT.** Its frame stays empty, for step 2.
+
+   The dialog never opens on "nothing selected" (`selectLastUsed` picks the last save
+   used), so the text cannot wait for the selection to be empty: it is up for as long as
+   the dialog is. `tools/dump-save-menu.ts` checks the mode: the title's two lines, the
+   list's rows inside its shorter panel and a click on each, RISE's label, and no EXPORT
+   whatever is selected. No golden frame shows this dialog.
 2. **The portraits.**
    - **The data.** `static/gamefiles/csb/utility-portraits.dat`
      (`tools/gen-utility-portraits.ts`) is a `graphics.dat` whose item 0 is laid out like
      DM's graphic 26. Cell `charID` is the redrawn face of the champion whose DM portrait
-     is cell `charID`. The page reads it with `GraphicsLoader` from the running set's
-     folder, beside `mini.dat` (`readMiniDat`, `src/main.ts`). A set without the file
-     shows no checkbox.
+     is cell `charID`. The generator also writes item 1: DM's graphic 26 itself, copied
+     from `dm-atari/graphics.dat`, the reference the match below needs, so that RISE in
+     the `csb` set reads one 16 KB file rather than DM's whole `graphics.dat` (272 KB).
+     The page reads it with `GraphicsLoader` from the running set's folder, beside
+     `mini.dat` (`readMiniDat`, `src/main.ts`). A set without the file shows no toggle.
    - **Which champion: by portrait, never by name.** REINCARNATE lets the player give
      a champion a new name and title, so a name proves nothing. A champion's portrait
      is a cell of DM's graphic 26, pixel for pixel (`tools/dump-csbwin-load.ts`). The
@@ -422,9 +433,9 @@ Two steps, one commit each:
      gets cell `charID` of the new file. A champion that matches no cell keeps their
      portrait: the prison's champions, whose faces are CSB's own graphic 26, and any
      portrait drawn in an editor. The reference is DM's graphic 26 from
-     `dm-atari/graphics.dat`, not the source save's set. It is byte-identical in every DM
-     set and in `kids-dungeon-24`, but `3D2D1D` and Conflux have their own faces in those
-     cells.
+     `dm-atari/graphics.dat` (the new file's item 1), not the source save's set. It is
+     byte-identical in every DM set and in `kids-dungeon-24`, but `3D2D1D` and Conflux
+     have their own faces in those cells.
    - **Where.** On the source's `CHARDESC`s, with `writePortrait`, before `TAG002724`
      copies them into `mini.dat` (`makeNewAdventure`, `src/engine/Chaos.ts`). That is
      where the utility's `TAG00439e` swaps the editor's portraits in
@@ -432,24 +443,25 @@ Two steps, one commit each:
      writes after a LOAD → PORTRAIT of each champion's `.CMP`. Names and titles are never
      touched, whatever the `.CMP` holds: the author's rule (what the original editor does
      to them is not established). `Chaos.ts` stays CSBWin's: the portraits come in as an
-     argument, and `GameSaves.makeNewAdventure` passes them only when the box is
-     checked.
-   - **The checkbox.** In `rise` mode only, checked whenever the dialog opens. For
-     example, a two-state button in the EXPORT frame that step 1 frees, reading UPGRADE
-     PORTRAITS or KEEP PORTRAITS; its look is the author's call. The prison's "BEGIN THE
-     ADVENTURE?" (`askBeginAdventure`) needs none: its party is the prison's, whose faces
-     match no DM cell.
+     argument, and `GameSaves.makeNewAdventure` passes them only when the toggle is on.
+   - **The toggle.** In `rise` mode only, a two-state button in the EXPORT frame that
+     step 1 frees, on whenever the dialog opens: NEW FACE while on, OLD FACE while off.
+     Eight characters is the most a button's face holds: it is 52 pixels between graphic
+     0's two six-column bevels, and a ninth character would take 53. In `rise` mode the
+     import's hint shows on the preview's panel only, not over that frame
+     (`pointsAtImportHint`). The prison's "BEGIN THE ADVENTURE?" (`askBeginAdventure`)
+     needs no toggle: its party is the prison's, whose faces match no DM cell.
 
    The check, in `tools/dump-rise.ts`:
-   - **`csbgame7.dat`, checked:** every champion has the new file's cell for their DM
-     portrait, with the same name and title; every other byte matches the unchecked
+   - **`csbgame7.dat`, on:** every champion has the new file's cell for their DM
+     portrait, with the same name and title; every other byte matches the toggle-off
      adventure.
-   - **`csbgame7.dat`, unchecked:** the same bytes as now.
+   - **`csbgame7.dat`, off:** the same bytes as now.
    - **`csbgame-early-2hero-renamed.dat`:** the renamed champion is upgraded by portrait,
      and keeps their new name.
    - **The prison's four:** their portraits are unchanged either way.
 
-   `doc/SAVES.md`'s RISE paragraph then describes the checkbox.
+   `doc/SAVES.md`'s RISE paragraph then describes the title and the toggle.
 
 ---
 
