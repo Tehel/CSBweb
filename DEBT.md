@@ -102,7 +102,6 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | G29 | Recording a game and playing it back | — | ⏸️ |
-| C145 | The Hint Oracle's title boxes keep colour 12 on their last line and a half | S | ⏸️ waits on the author |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
@@ -172,34 +171,6 @@ The redesigned page also links to two pages:
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C145 ⏸️ The Hint Oracle's title boxes keep colour 12 on their last line and a half
-
-Not a divergence yet: the port draws what CSBWin draws. Recorded because it looks like a
-bug of the original that the port might fix, under `CLAUDE.md` → "The one
-non-negotiable rule", once the author has seen it in play (the inventory's Oracle
-button makes it reachable, in the `csb` set) and judged whether it is worth it.
-
-Once a title list is up, each title line goes through `TAG0062a2` with `byte16528`,
-colour 12 to 9 (`doc/CSBwin-src/Hint.cpp:5513-5530`). Slot 9 is the one the title list
-cycles through shades of red, so the line's background and its frame pulse together.
-`TAG0062a2` copies the rectangle with `TAG0088b8`'s lines, `(w + 16) / 16` sixteen-pixel
-groups for `w + 1` pixels, but passes `ShrinkBLT` `w` by `h`, whose lines are
-`(w + 15) / 16` groups. On a title line (x 40-280, y 13 lines) the remap covers 240 by
-12 pixels over lines of 256: the first eleven lines whole, 64 pixels of the twelfth, and
-none of the thirteenth. While the cycle runs, the bottom of each box stays `0x310`
-(`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "The title list"; `HintOracleScreen.tag0062a2`,
-`src/renderer/intro/HintOracle.ts`). `tools/dump-hint-oracle-screen.ts` asserts the notch.
-
-The arithmetic is consistent in the C++, so it is most likely `HINT.FTL`'s own rather
-than a slip of CSBWin's translation. Passing `ShrinkBLT` `w + 1` by `h + 1` would remap
-the whole line. Its lines would then be the copy's own, `(w + 16) / 16` groups.
-
-The decision is the author's, after a look in play:
-
-- **Keep it** (CSBWin's picture): delete this entry; the reference doc already says why.
-- **Fix it**: `ShrinkBLT` gets `w + 1` by `h + 1`, the tool's check of the twelfth line
-  becomes "every line holds no colour 12", and an H entry gives both readings.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 

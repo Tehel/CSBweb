@@ -275,7 +275,10 @@ and copies the whole `w + 1` by `h + 1` back. On a title line (x 40-280, y 13 li
 remap covers 240 by 12 pixels laid end to end over lines of 256. That is the first
 eleven lines whole and 64 pixels of the twelfth; the rest of the twelfth and the
 thirteenth keep their colour 12. While the cycle runs, the bottom of each title's box
-stays `0x310`.
+stays `0x310`. The port draws it so, since the C++ is consistent and the strip barely
+shows: colour 12 is a third of the box's dithered pixels, and the cycle (`310 300 410 400
+510 500 510 400 410 300`) is more than a step from `0x310` only around `0x510`, where
+the strip is no darker than the box's own darkest rows.
 
 ### Waiting for a button
 
