@@ -389,6 +389,14 @@ check((await canvasPixels()) === edgeRight, 'the overlay hidden and the view shi
 // the cut at every position; this frame pins it in a real view.
 await evaluate(FACE(8, 3, 0, 2)); await wait(500);
 console.log('state: wall text at F2');   await shot('19-wall-text-f2');
+// A left click on a portrait box's bars, where CSBWin has no left button, is the box's
+// right click (`searchMouseButtons`, `src/renderer/ui/Mouse.ts`): champion 1's inventory
+// opens, and a second click closes it. Nothing is drawn, so this is no frame.
+const selected = () => evaluate(`window.__probe.screen.ui.partyState.selectedCharacterIndex`);
+await canvasClick(124, 10, 0); await wait(600);
+check(await selected() === 1, 'a left click on a champion\'s bars opens the inventory');
+await canvasClick(124, 10, 0); await wait(600);
+check(await selected() === -1, 'and a second one closes it');
 
 // The Hint Oracle's button (`src/renderer/ui/HintOracleButton.ts`), CSB's set only: the
 // inventory's close box is the Oracle's `?`, and a real click on it opens the Oracle on the

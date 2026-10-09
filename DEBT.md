@@ -775,6 +775,17 @@ Recorded so that nobody "fixes" them.
   with a right click (entry 0, button 11) or the champion's name. Without the files the
   close box is CSBWin's (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "In the port: the
   inventory's button"; `tools/dump-hint-oracle-button.ts`).
+- 🚫 **A left click on a champion's bars opens the inventory.** DM opens one with the
+  right button only: a portrait box's, `buttons17196`'s buttons 7-10, or anywhere below
+  the portraits for the leader, `buttons17304`'s 83. A finger or a stylus has none. The
+  right button's other uses need no stand-in: the thaw and the wake-up take either
+  button (`buttons17832`, `buttons17796`), and an open inventory closes on the champion's
+  name. In a portrait box, `buttons17196` gives the left button the name and the hands
+  (12-15, x 0-41 of the box) and nothing on the health, stamina and mana bars. So a
+  left click that no list takes, in a box, is searched as the box's right click
+  (`searchMouseButtons`, `src/renderer/ui/Mouse.ts`), on every platform. Nothing is drawn.
+  Asleep or frozen the primary list has no 7-10, and the bars stay dead.
+  `tools/probe-frames.mjs` checks that a click opens and closes an inventory.
 - 🚫 **DONE on the Hint Oracle's title list closes it.** CSBWin's goes back to the load
   screen (`w_4 = 1`, `doc/CSBwin-src/Hint.cpp:7375-7388`), whose floppy prompts and save
   chooser only lead to a square, and the port's Oracle has the party's

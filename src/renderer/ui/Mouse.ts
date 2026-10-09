@@ -39,11 +39,20 @@ export { decodeCursorBitmap };
 /**
  * `TranslateMouseClick`'s button search (doc/CSBwin-src/Mouse.cpp:1393-1404): the
  * primary list, then the secondary. 0 for a click that hit no button, which the queue drops.
+ *
+ * Then the port's own last chance (`DEBT.md` H): a left click that hit no button, on a
+ * portrait box, is that box's right click, `buttons17196`'s 7-10, which opens or closes
+ * the champion's inventory. Only the bars right of the name and hands are left without a
+ * left button, and a pointer with no right button (a finger, a stylus) opens an
+ * inventory there. Asleep or frozen the primary list has no 7-10, so nothing changes.
  */
 export function searchMouseButtons(ui: UIState, x: number, y: number, buttons: number): number {
   const id = searchButtonList(ui.primaryButtons, x, y, buttons);
   if (id !== 0) return id;
-  return searchButtonList(ui.secondaryButtons, x, y, buttons);
+  const secondary = searchButtonList(ui.secondaryButtons, x, y, buttons);
+  if (secondary !== 0 || (buttons & 2) === 0) return secondary;
+  const portrait = searchButtonList(ui.primaryButtons, x, y, 1);
+  return portrait >= 7 && portrait <= 10 ? portrait : 0;
 }
 
 /**
