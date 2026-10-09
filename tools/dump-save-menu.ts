@@ -91,6 +91,10 @@
  *    dungeon's and an unknown one's refused under OK; a file that is no save, and one
  *    that does not read, in the dialog's message; and the load-only chooser taking a
  *    drop as the disk menu does.
+ * 20. **RISE's dialog.** The chooser in `rise` mode: a title panel of graphic 0 over
+ *    the list, its two lines on clean panel; the list panel ten rows below it, as
+ *    graphic 0 spaces its panels, holding eleven whole rows; LOAD labelled RISE; no
+ *    EXPORT on any row, nor a click on it; the rows' clicks and PageDown on the eleven.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -139,6 +143,7 @@ import { holdsNoBlock1Words, loadSaveGameState, readsGameBlock1, stampRandomGame
 import { ReadSavedGame, TAG00260e } from '../src/engine/Chaos';
 import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
+import { drawTextLineIndex } from '../src/renderer/csbwin/TextRenderer';
 import {
   MENU_HEIGHT,
   MENU_OPTION_COLOR,
@@ -1343,6 +1348,7 @@ async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: str
     getGraphicBitmap: graphicBitmaps(graphics),
     renderLastFrame: () => { if (!ui.saveMenu) drawsWithNoMenu++; },
     onListSaves: () => saves.list(),
+    onListEverySave: () => saves.listEverySet(),
     onReadSave: (listed) => saves.open(listed),
     onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
     // As the page's, with the download kept instead of made.
@@ -1378,7 +1384,8 @@ async function menuRig(graphics: GraphicsLoader, store: SaveStore, champion: str
     },
     /** A click on row `row` of the list, which is in view. */
     clickRow(row: number): void {
-      SaveMenu.saveMenuClick(ui, g.textX, g.rowFirstY + (row - ui.saveMenu!.scrollTop) * g.rowStep, LEFT);
+      const { rowFirstY } = SaveMenu.saveMenuList(ui.saveMenu!.mode);
+      SaveMenu.saveMenuClick(ui, g.textX, rowFirstY + (row - ui.saveMenu!.scrollTop) * g.rowStep, LEFT);
     },
     /** The row of a playthrough's heading, as the menu lists it now. */
     headingOf(playthrough: number): number {
@@ -2437,6 +2444,140 @@ async function checkExport(graphics: GraphicsLoader): Promise<void> {
   }
 }
 
+/* ---------------------------------------------------------- 20. RISE's dialog ---- */
+
+/**
+ * The chooser in `rise` mode: its title over a shorter list, measured on the pixels as
+ * the full dialog's panels are (`checkLayout`), and driven by its own clicks and keys.
+ */
+async function checkRise(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== RISE\'s dialog ===');
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  const full = SaveMenu.saveMenuList('full');
+  const list = SaveMenu.saveMenuList('rise');
+  const title = g.riseTitlePanel;
+  const store = memoryStore();
+  const rig = await menuRig(graphics, store, 'DAROO');
+  const { ui } = rig;
+
+  // The panels, from the art.
+  ui.screenIndexBuffer!.pixels.fill(7);
+  SaveMenu.drawDialog(ui, 'rise');
+  const panelOf = (r: { x1: number; y1: number; x2: number; y2: number }): number =>
+    countNot(ui, r.x1 + 2, r.x2 - 2, r.y1 + 2, r.y2 - 2, MENU_PANEL_COLOR);
+  const gap = list.panel.y1 - title.y2 - 1;
+  console.log(`  title panel (${title.x1},${title.y1})-(${title.x2},${title.y2}), list panel (${list.panel.x1},${list.panel.y1})-(${list.panel.x2},${list.panel.y2}), ${gap} rows between`);
+  check(panelOf(title) === 0 && panelOf(list.panel) === 0 && pixelAt(ui, title.x1, title.y1) !== MENU_PANEL_COLOR,
+    'the title panel and the list\'s are graphic 0\'s panel, edged and clean inside');
+  check(title.x1 === full.panel.x1 && title.x2 === full.panel.x2 && title.y1 === full.panel.y1
+    && list.panel.x1 === full.panel.x1 && list.panel.x2 === full.panel.x2 && list.panel.y2 === full.panel.y2,
+    'the two stand in the full list\'s column, from its top to its bottom');
+  let unlike = 0;
+  for (let y = 0; y < gap; y++) {
+    for (let x = title.x1; x <= title.x2; x++) if (pixelAt(ui, x, title.y2 + 1 + y) !== pixelAt(ui, x, list.panel.y2 + 1 + y)) unlike++;
+  }
+  check(gap === 10 && unlike === 0,
+    `with ten rows of the frame between them, as between the panels and the buttons (${unlike} pixels differ)`);
+  const bar = list.scrollbar;
+  check(bar.x2 === list.panel.x2 - 1 && bar.y1 === list.panel.y1 + 2 && bar.y2 === list.panel.y2 - 1,
+    'the scrollbar stands against the shorter list\'s right edge, over the whole height of its interior');
+  const above = list.rowFirstY - 5 - (list.panel.y1 + 2);
+  const below = list.panel.y2 - 1 - (list.rowFirstY + (list.rows - 1) * g.rowStep + 2);
+  console.log(`  ${list.rows} rows of ${g.rowStep}: ${above} pixels of panel above the first, ${below} below the last`);
+  check(list.rows === 11 && above === 2 && below === 2, 'eleven whole rows fill it, two pixels of panel above the first and below the last');
+
+  // The title, on clean panel inside its edges.
+  const realNow = Date.now;
+  let now = new Date(2026, 8, 13, 14, 5, 6).getTime();
+  Date.now = () => now;
+  try {
+    for (let n = 0; n < 14; n++) {
+      now += 60_000;
+      await rig.saves.save('stopped', 'new');
+    }
+    const state = await rig.open('rise');
+    ui.screenIndexBuffer!.pixels.fill(7);
+    SaveMenu.drawSaveMenu(ui);
+    const inner = { x1: title.x1 + 2, y1: title.y1 + 2, x2: title.x2 - 2, y2: title.y2 - 2 };
+    let ink = 0;
+    let stray = 0;
+    let top = SCREEN_HEIGHT;
+    let bottom = -1;
+    for (let y = inner.y1; y <= inner.y2; y++) {
+      for (let x = inner.x1; x <= inner.x2; x++) {
+        const here = pixelAt(ui, x, y);
+        if (here === MENU_TITLE1_COLOR) {
+          ink++;
+          top = Math.min(top, y);
+          bottom = Math.max(bottom, y);
+        } else if (here !== MENU_PANEL_COLOR) stray++;
+      }
+    }
+    const firstCell = g.riseTitleFirstY - 4;
+    const lastCell = g.riseTitleFirstY + (SaveMenu.RISE_TITLE.length - 1) * g.rowStep + 1;
+    console.log(`  the title: "${SaveMenu.RISE_TITLE.join(' / ')}", ${ink} pixels of ink in rows ${top}..${bottom}, its cells ${firstCell}..${lastCell} of ${inner.y1}..${inner.y2}`);
+    check(ink > 0 && stray === 0 && top >= firstCell && bottom <= lastCell,
+      'its two lines are drawn in the title\'s colour, on clean panel');
+    check(firstCell - inner.y1 === 2 && inner.y2 - lastCell === 2, 'with two pixels of panel above the first line\'s cells and below the last\'s');
+    check(SaveMenu.RISE_TITLE.every((line) => line.length * 6 - 1 <= inner.x2 - inner.x1 + 1), 'each line fits its panel');
+
+    // RISE where LOAD is, and no EXPORT.
+    console.log(rig.list());
+    const at = SaveMenu.buttonLabelAt(g.buttonFrames.load);
+    const band = (): number[] => {
+      const pixels: number[] = [];
+      for (let y = at.y - 4; y <= at.y + 1; y++) for (let x = at.x - 18; x <= at.x + 17; x++) pixels.push(pixelAt(ui, x, y));
+      return pixels;
+    };
+    SaveMenu.drawSaveMenu(ui);
+    const shown = band();
+    ui.screenIndexBuffer!.pixels.fill(MENU_PANEL_COLOR);
+    drawTextLineIndex(ui.screenIndexBuffer!, ui.fontData, at.x - 12, at.y, MENU_OPTION_COLOR, MENU_PANEL_COLOR, 'RISE');
+    const rise = band();
+    check(shown.every((pixel, i) => pixel === rise[i]), 'LOAD\'s button reads RISE');
+    SaveMenu.saveMenuKey(ui, 'Home');
+    const exportLabels = state.rows.map(() => {
+      const label = labelOf(ui, g.buttonFrames.export);
+      SaveMenu.saveMenuKey(ui, 'ArrowDown');
+      return label;
+    });
+    const selected = SaveMenu.selectedEntry(state);
+    await rig.click(g.exportButtonId);
+    console.log(`  EXPORT's label on each of the ${state.rows.length} rows: ${exportLabels.join(', ')} pixels; a click on it on ${selected?.name}: ${rig.exported.length} files, press ${state.press ? 'UP' : 'none'}`);
+    check(state.rows.some((row) => row.kind === 'save') && exportLabels.every((n) => n === 0), 'EXPORT has no label, on a heading or a save');
+    check(selected !== null && rig.exported.length === 0 && state.press === null && SaveMenu.isSaveMenuOpen(ui), 'and a click on it does nothing');
+
+    // The eleven rows: a click on each selects it, the heading last, which folds its
+    // saves; and PageDown moves by eleven.
+    SaveMenu.saveMenuKey(ui, 'Home');
+    const listed = state.rows.length;
+    const rowButtons = SaveMenu.saveMenuButtons(state).filter((b) => b.name?.startsWith('saveMenu.row'));
+    const picked: number[] = [];
+    for (const row of [...Array(list.rows).keys()].slice(1).concat(0)) {
+      rig.clickRow(row);
+      picked.push(state.selected);
+    }
+    const folded = state.rows.length;
+    console.log(`  ${listed} rows listed, ${rowButtons.length} row buttons in y ${rowButtons[0]?.y1}..${rowButtons.at(-1)?.y2}, the clicks select rows ${picked.join(',')}, the heading's folds the list to ${folded}`);
+    check(listed > list.rows && rowButtons.length === list.rows && rowButtons.every((b) => b.y1 > list.panel.y1 && b.y2 <= list.panel.y2),
+      'a list longer than the panel shows eleven rows, all inside it');
+    check(picked.join(',') === [...Array(list.rows).keys()].slice(1).concat(0).join(',') && folded === 1, 'and a click on each selects it');
+    rig.clickRow(0);
+    const from = state.selected;
+    SaveMenu.saveMenuKey(ui, 'PageDown');
+    console.log(`  PageDown from row ${from}: row ${state.selected}, the list from row ${state.scrollTop}`);
+    check(state.selected === from + list.rows && state.selected - state.scrollTop === list.rows - 1, 'PageDown moves by the eleven rows shown, and scrolls to the selection');
+    SaveMenu.closeSaveMenu(ui);
+
+    // The other modes keep the whole column.
+    check(SaveMenu.saveMenuList('loadOnly') === full && full.rows === SaveMenu.SAVE_MENU_ROWS && full.panel === g.listPanel,
+      'the disk menu and the load-only chooser keep their fifteen rows');
+  } finally {
+    Date.now = realNow;
+  }
+}
+
 /* ---------------------------------------------------------------- 18. the import ---- */
 
 /** A save of Chaos Strikes Back, and the save its game starts from (`doc/SAVES.md` → "RISE makes a save of its own"). */
@@ -3181,6 +3322,7 @@ async function main(): Promise<void> {
   await checkDrop(graphics);
   await checkPlayTime(graphics);
   await checkUpgrade();
+  await checkRise(graphics);
   finish();
 }
 

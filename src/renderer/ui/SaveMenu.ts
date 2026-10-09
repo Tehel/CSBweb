@@ -200,10 +200,23 @@ const BUTTON_FRAMES = {
 } as const;
 
 /**
+ * RISE's title panel, over its list: its two lines centred on the list's width, two
+ * pixels of the panel's colour above and below them, and graphic 0's ten pixels between
+ * it and the list panel, which is that much shorter (`RISE_LIST`).
+ */
+const RISE_TITLE_PANEL: Rect = { x1: LIST_PANEL.x1, y1: LIST_PANEL.y1, x2: LIST_PANEL.x2, y2: 39 };
+/** What RISE does, on its title panel's two lines. */
+export const RISE_TITLE = ['RAISE A PARTY INTO A NEW', 'CHAOS STRIKES BACK ADVENTURE'] as const;
+const RISE_TITLE_FIRST_Y = RISE_TITLE_PANEL.y1 + 8;
+
+/**
  * The scrollbar: eleven columns against the list panel's right edge, from the top of its
  * clean interior, past its two rows of edge, to the bottom, short of its one.
  */
-const SCROLLBAR: Rect = { x1: LIST_PANEL.x2 - 11, y1: LIST_PANEL.y1 + 2, x2: LIST_PANEL.x2 - 1, y2: LIST_PANEL.y2 - 1 };
+function scrollbarOf(panel: Rect): Rect {
+  return { x1: panel.x2 - 11, y1: panel.y1 + 2, x2: panel.x2 - 1, y2: panel.y2 - 1 };
+}
+const SCROLLBAR = scrollbarOf(LIST_PANEL);
 /** An arrow's box is as tall as the bar is wide, its outline included. */
 const ARROW_BOX = SCROLLBAR.x2 - SCROLLBAR.x1 + 1;
 /**
@@ -235,6 +248,32 @@ const ROW_STEP = 8;
 /** The rows fill the panel: two pixels of it above the first, and two below the last. */
 export const SAVE_MENU_ROWS = 15;
 
+/** A list's panel, its scrollbar, and its rows: where the first is, and how many fit. */
+export interface SaveMenuList {
+  panel: Rect;
+  scrollbar: Rect;
+  rowFirstY: number;
+  rows: number;
+}
+
+function listOf(panel: Rect): SaveMenuList {
+  return {
+    panel,
+    scrollbar: scrollbarOf(panel),
+    rowFirstY: panel.y1 + (ROW_FIRST_Y - LIST_PANEL.y1),
+    rows: SAVE_MENU_ROWS - (panel.y1 - LIST_PANEL.y1) / ROW_STEP,
+  };
+}
+
+const FULL_LIST = listOf(LIST_PANEL);
+/** RISE's list: graphic 0's ten pixels under its title panel, and eleven rows. */
+const RISE_LIST = listOf({ ...LIST_PANEL, y1: RISE_TITLE_PANEL.y2 + 11 });
+
+/** The list of a mode: RISE's is under its title panel, the others' fills the column. */
+export function saveMenuList(mode: SaveMenuMode): SaveMenuList {
+  return mode === 'rise' ? RISE_LIST : FULL_LIST;
+}
+
 /** The preview's lines are on the list's rows: ten characters between its panel's edges. */
 const PREVIEW_TEXT_X = PREVIEW_PANEL.x1 + 4;
 const PREVIEW_MAX_CHARS = 10;
@@ -257,6 +296,8 @@ const NEW_SAVE_LABEL = 'NEW SAVE';
 export const SAVE_MENU_QUESTION = 'THAT\'S NOT THE SAME GAME';
 const CANCEL_LABEL = 'CANCEL';
 const ACTION_LABELS = { load: 'LOAD', save: 'SAVE' } as const;
+/** LOAD's label in RISE's dialog: the entrance's button that opened it. */
+const RISE_LABEL = 'RISE';
 const EXPORT_LABEL = 'EXPORT';
 /** The dialog's message once a save's file has been handed to the player. */
 export const SAVE_MENU_EXPORTED = 'SAVE EXPORTED';
@@ -333,6 +374,8 @@ export const SAVE_MENU_GEOMETRY = {
   buttonPiece: BUTTON_PIECE,
   dialog: DIALOG,
   listPanel: LIST_PANEL,
+  riseTitlePanel: RISE_TITLE_PANEL,
+  riseTitleFirstY: RISE_TITLE_FIRST_Y,
   previewPanel: PREVIEW_PANEL,
   buttonFrames: BUTTON_FRAMES,
   listInnerX1: LIST_INNER_X1,
@@ -359,7 +402,8 @@ export const SAVE_MENU_GEOMETRY = {
  * The disk menu (`full`), the entrance's RESUME and a lost game's restart (`loadOnly`),
  * or the entrance's RISE (`rise`): the load-only chooser over every data set's saves,
  * whose LOAD makes a new adventure from the chosen one and reads that
- * (`src/renderer/intro/PrisonDoor.ts`).
+ * (`src/renderer/intro/PrisonDoor.ts`). RISE's says so in a title over its list, labels
+ * LOAD RISE, and has no EXPORT.
  */
 export type SaveMenuMode = 'full' | 'loadOnly' | 'rise';
 
@@ -589,9 +633,12 @@ function canSave(ui: UIState, state: SaveMenuState): boolean {
     && (row.kind !== 'heading' || row.playthrough.id === runningPlaythrough(ui));
 }
 
-/** EXPORT hands out the selected save's file; a heading and "new save" have none. */
+/**
+ * EXPORT hands out the selected save's file; a heading and "new save" have none. RISE's
+ * dialog has no EXPORT: it raises a party, and hands nothing out.
+ */
 function canExport(state: SaveMenuState): boolean {
-  return !state.busy && selectedEntry(state) !== null;
+  return !state.busy && state.mode !== 'rise' && selectedEntry(state) !== null;
 }
 
 /**
@@ -642,7 +689,7 @@ function setFolded(ui: UIState, state: SaveMenuState, playthrough: Playthrough, 
 
 /** Keep the list on its rows: no further down than its last page. */
 function clampScroll(state: SaveMenuState): void {
-  const maxTop = Math.max(0, state.rows.length - SAVE_MENU_ROWS);
+  const maxTop = Math.max(0, state.rows.length - saveMenuList(state.mode).rows);
   if (state.scrollTop > maxTop) state.scrollTop = maxTop;
   if (state.scrollTop < 0) state.scrollTop = 0;
 }
@@ -650,10 +697,11 @@ function clampScroll(state: SaveMenuState): void {
 /** Scroll the list to the selection, by as little as shows it: what a move of it does. */
 function showSelection(state: SaveMenuState): void {
   clampScroll(state);
+  const { rows } = saveMenuList(state.mode);
   if (state.selected >= 0) {
     if (state.selected < state.scrollTop) state.scrollTop = state.selected;
-    else if (state.selected >= state.scrollTop + SAVE_MENU_ROWS) {
-      state.scrollTop = state.selected - SAVE_MENU_ROWS + 1;
+    else if (state.selected >= state.scrollTop + rows) {
+      state.scrollTop = state.selected - rows + 1;
     }
   }
 }
@@ -666,11 +714,12 @@ function showSelection(state: SaveMenuState): void {
  * has the whole track for a slider.
  */
 export function scrollSlider(state: SaveMenuState): { y1: number; y2: number } {
-  const top = SCROLLBAR.y1 + ARROW_BOX - 1;
-  const track = SCROLLBAR.y2 - ARROW_BOX + 1 - top + 1;
-  const maxTop = state.rows.length - SAVE_MENU_ROWS;
+  const { scrollbar, rows } = saveMenuList(state.mode);
+  const top = scrollbar.y1 + ARROW_BOX - 1;
+  const track = scrollbar.y2 - ARROW_BOX + 1 - top + 1;
+  const maxTop = state.rows.length - rows;
   if (maxTop <= 0) return { y1: top, y2: top + track - 1 };
-  const height = Math.max(SLIDER_MIN, Math.round((track * SAVE_MENU_ROWS) / state.rows.length));
+  const height = Math.max(SLIDER_MIN, Math.round((track * rows) / state.rows.length));
   const y1 = top + Math.round(((track - height) * Math.min(state.scrollTop, maxTop)) / maxTop);
   return { y1, y2: y1 + height - 1 };
 }
@@ -711,11 +760,20 @@ export function drawPiece(ui: UIState, piece: DialogPiece, box: Rect): void {
 }
 
 /** The dialog with nothing in it: the frame, the two panels and the four button frames. */
-export function drawDialog(ui: UIState): void {
+export function drawDialog(ui: UIState, mode: SaveMenuMode = 'full'): void {
   drawPiece(ui, FRAME_PIECE, DIALOG);
-  drawPiece(ui, PANEL_PIECE, LIST_PANEL);
+  if (mode === 'rise') drawPiece(ui, PANEL_PIECE, RISE_TITLE_PANEL);
+  drawPiece(ui, PANEL_PIECE, saveMenuList(mode).panel);
   drawPiece(ui, PANEL_PIECE, PREVIEW_PANEL);
   for (const frame of Object.values(BUTTON_FRAMES)) drawPiece(ui, BUTTON_PIECE, frame);
+}
+
+/** RISE's title, each line centred on its panel as a button's label is. */
+function drawRiseTitle(ui: UIState): void {
+  const x = buttonLabelAt(RISE_TITLE_PANEL).x;
+  RISE_TITLE.forEach((line, i) => {
+    text(ui, line, x - 3 * line.length, RISE_TITLE_FIRST_Y + i * ROW_STEP, MENU_TITLE1_COLOR, MENU_PANEL_COLOR);
+  });
 }
 
 function text(ui: UIState, s: string, x: number, y: number, color: number, background: number): void {
@@ -741,8 +799,8 @@ export function rowText(state: SaveMenuState, row: SaveMenuRow): string {
 }
 
 /** The rectangle of the list's row `row`, counted from the first one shown. */
-function rowRect(row: number): Rect {
-  const y = ROW_FIRST_Y + row * ROW_STEP;
+function rowRect(list: SaveMenuList, row: number): Rect {
+  const y = list.rowFirstY + row * ROW_STEP;
   return { x1: LIST_INNER_X1, y1: y - 5, x2: LIST_INNER_X2, y2: y + 2 };
 }
 
@@ -753,9 +811,10 @@ function rowRect(row: number): Rect {
  */
 function drawScrollbar(ui: UIState, state: SaveMenuState): void {
   const buf = ui.screenIndexBuffer;
-  const { x1, y1, x2, y2 } = SCROLLBAR;
+  const { scrollbar } = saveMenuList(state.mode);
+  const { x1, y1, x2, y2 } = scrollbar;
   const line = (y: number): void => fillRectIndex(buf, { x1, y1: y, x2, y2: y }, MENU_OPTION_COLOR);
-  fillRectIndex(buf, SCROLLBAR, MENU_PANEL_COLOR);
+  fillRectIndex(buf, scrollbar, MENU_PANEL_COLOR);
   fillRectIndex(buf, { x1, y1, x2: x1, y2 }, MENU_OPTION_COLOR);
   fillRectIndex(buf, { x1: x2, y1, x2, y2 }, MENU_OPTION_COLOR);
   for (const y of [y1, y1 + ARROW_BOX - 1, y2 - ARROW_BOX + 1, y2]) line(y);
@@ -810,19 +869,21 @@ export function drawSaveMenu(ui: UIState): void {
     return;
   }
 
-  drawDialog(ui);
+  drawDialog(ui, state.mode);
+  if (state.mode === 'rise') drawRiseTitle(ui);
 
   // The rows, and their scrollbar.
+  const list = saveMenuList(state.mode);
   clampScroll(state);
   drawScrollbar(ui, state);
-  for (let row = 0; row < SAVE_MENU_ROWS; row++) {
+  for (let row = 0; row < list.rows; row++) {
     const index = state.scrollTop + row;
     if (index >= state.rows.length) break;
     const highlighted = index === state.selected;
     const color = highlighted ? MENU_PANEL_COLOR : MENU_OPTION_COLOR;
     const background = highlighted ? MENU_OPTION_COLOR : MENU_PANEL_COLOR;
-    const y = ROW_FIRST_Y + row * ROW_STEP;
-    if (highlighted) fillRectIndex(ui.screenIndexBuffer, rowRect(row), MENU_OPTION_COLOR);
+    const y = list.rowFirstY + row * ROW_STEP;
+    if (highlighted) fillRectIndex(ui.screenIndexBuffer, rowRect(list, row), MENU_OPTION_COLOR);
     text(ui, rowText(state, state.rows[index]), TEXT_X, y, color, background);
   }
 
@@ -830,7 +891,7 @@ export function drawSaveMenu(ui: UIState): void {
     // An empty list has to say so, which the load-only menu's can be; when the store
     // could not be listed, the message says why, and repeating that here would only
     // crowd the panel.
-    text(ui, 'NO SAVED GAMES HERE', TEXT_X, ROW_FIRST_Y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
+    text(ui, 'NO SAVED GAMES HERE', TEXT_X, list.rowFirstY, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
   }
 
   // The preview's panel: the save LOAD would read, and on its last lines the message,
@@ -849,7 +910,7 @@ export function drawSaveMenu(ui: UIState): void {
 
   // A button that can do nothing is left unlabelled, as CSBWin leaves an empty save
   // slot unlabelled.
-  if (canLoad(state)) drawLabel(ui, ACTION_LABELS.load, BUTTON_FRAMES.load);
+  if (canLoad(state)) drawLabel(ui, state.mode === 'rise' ? RISE_LABEL : ACTION_LABELS.load, BUTTON_FRAMES.load);
   if (canSave(ui, state)) drawLabel(ui, ACTION_LABELS.save, BUTTON_FRAMES.save);
   if (canExport(state)) drawLabel(ui, EXPORT_LABEL, BUTTON_FRAMES.export);
   if (!state.busy) drawLabel(ui, CANCEL_LABEL, BUTTON_FRAMES.cancel);
@@ -908,14 +969,16 @@ export function saveMenuButtons(state: SaveMenuState): UIButton[] {
     { word0: BTN_EXPORT, ...buttonRect(BUTTON_FRAMES.export), button: 2, name: 'saveMenu.export' },
     { word0: BTN_CANCEL, ...buttonRect(BUTTON_FRAMES.cancel), button: 2, name: 'saveMenu.cancel' },
   ];
+  const list = saveMenuList(state.mode);
+  const { scrollbar } = list;
   const arrow = (id: number, y1: number, name: string): UIButton => (
-    { word0: id, x1: SCROLLBAR.x1, x2: SCROLLBAR.x2 + 1, y1, y2: y1 + ARROW_BOX, button: 2, name }
+    { word0: id, x1: scrollbar.x1, x2: scrollbar.x2 + 1, y1, y2: y1 + ARROW_BOX, button: 2, name }
   );
-  buttons.push(arrow(BTN_SCROLL_UP, SCROLLBAR.y1, 'saveMenu.scrollUp'));
-  buttons.push(arrow(BTN_SCROLL_DOWN, SCROLLBAR.y2 - ARROW_BOX + 1, 'saveMenu.scrollDown'));
-  const visible = Math.min(SAVE_MENU_ROWS, Math.max(0, state.rows.length - state.scrollTop));
+  buttons.push(arrow(BTN_SCROLL_UP, scrollbar.y1, 'saveMenu.scrollUp'));
+  buttons.push(arrow(BTN_SCROLL_DOWN, scrollbar.y2 - ARROW_BOX + 1, 'saveMenu.scrollDown'));
+  const visible = Math.min(list.rows, Math.max(0, state.rows.length - state.scrollTop));
   for (let row = 0; row < visible; row++) {
-    const r = rowRect(row);
+    const r = rowRect(list, row);
     buttons.push({ word0: BTN_ROW0 + row, x1: r.x1, x2: r.x2 + 1, y1: r.y1, y2: r.y2 + 1, button: 2, name: `saveMenu.row${row}` });
   }
   return buttons;
@@ -970,7 +1033,7 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
     scrollBy(ui, state, id === BTN_SCROLL_UP ? -1 : 1);
     return;
   }
-  if (id >= BTN_ROW0 && id < BTN_ROW0 + SAVE_MENU_ROWS) {
+  if (id >= BTN_ROW0 && id < BTN_ROW0 + saveMenuList(state.mode).rows) {
     const index = state.scrollTop + (id - BTN_ROW0);
     const row = state.rows[index];
     if (row) {
@@ -1311,10 +1374,10 @@ export function saveMenuKey(ui: UIState, key: string): boolean {
       foldSelection(ui, state, true);
       return true;
     case 'PageUp':
-      moveSelection(ui, state, -SAVE_MENU_ROWS);
+      moveSelection(ui, state, -saveMenuList(state.mode).rows);
       return true;
     case 'PageDown':
-      moveSelection(ui, state, SAVE_MENU_ROWS);
+      moveSelection(ui, state, saveMenuList(state.mode).rows);
       return true;
     case 'Home':
       moveSelection(ui, state, -state.rows.length);

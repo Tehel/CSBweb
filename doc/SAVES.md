@@ -85,6 +85,9 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   CSB's, RISE opens the chooser over every data set's saves (`SaveMenu`'s `rise` mode,
   `src/renderer/intro/PrisonDoor.ts`), and its LOAD is CSBWin's UTILITY → "MAKE NEW
   ADVENTURE" on the save chosen (`GameSaves.makeNewAdventure`, `src/engine/Chaos.ts`).
+  The dialog says so: a title panel over the list reads RAISE A PARTY INTO A NEW / CHAOS
+  STRIKES BACK ADVENTURE, the list below it holds eleven rows, LOAD reads RISE, and
+  there is no EXPORT.
   The new file is a row of the running set, named after the source's with `-csb` before
   its `.dat`, and a number after that while a save has the name; its playthrough is the
   file's, the source's `RandomGameID` with its first byte one higher, so a source raised
@@ -386,7 +389,8 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
 `BrowserSaveStore.markUsed`.
 
 - **RISE**: `tools/dump-rise.ts` (the row a new adventure is stored as, again, and a
-  refusal; the chooser's `rise` mode over every set's saves, its LOAD and a refusal; the
+  refusal; the chooser's `rise` mode over every set's saves, its LOAD and a refusal, and
+  `tools/dump-save-menu.ts` its title, its eleven rows, RISE and no EXPORT; the
   prison's question: which game is the prison, four champions recruited at its mirrors
   of whom only the fourth asks, the prison's save taken by the utility, F5's question,
   YES and NOT YET in a dialog raised alone and over the disk menu's SAVE, and no question

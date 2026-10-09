@@ -281,7 +281,8 @@ async function checkChooser(): Promise<void> {
     const listed = state.entries.map((x) => `${x.name} (${x.dataSet})`).join(', ');
     // The save's own row, its heading clicked first when its playthrough is folded.
     const g = SaveMenu.SAVE_MENU_GEOMETRY;
-    const clickRow = (i: number): void => SaveMenu.saveMenuClick(ui, g.textX, g.rowFirstY + (i - state.scrollTop) * g.rowStep, LEFT);
+    const { rowFirstY } = SaveMenu.saveMenuList('rise');
+    const clickRow = (i: number): void => SaveMenu.saveMenuClick(ui, g.textX, rowFirstY + (i - state.scrollTop) * g.rowStep, LEFT);
     const rowOf = (): number => state.rows.findIndex((r) => r.kind === 'save' && r.entry.id === sourceId);
     const playthrough = state.entries.find((x) => x.id === sourceId)!.playthrough;
     if (rowOf() < 0) clickRow(state.rows.findIndex((r) => r.kind === 'heading' && r.playthrough.id === playthrough));
