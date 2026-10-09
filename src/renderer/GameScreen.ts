@@ -77,6 +77,7 @@ import {
   openSaveMenu,
   saveMenuClick,
   saveMenuDrop,
+  saveMenuTakesDrops,
   saveMenuKey,
   saveMenuPointer,
   saveMenuWheel,
@@ -401,6 +402,11 @@ export class GameScreen {
 
   handleSaveMenuWheel(delta: number): boolean {
     return saveMenuWheel(this.ui, delta);
+  }
+
+  /** Whether a file dropped on the page now is the save screen's import: not in RISE's. */
+  takesSaveDrops(): boolean {
+    return saveMenuTakesDrops(this.ui);
   }
 
   /** A file dropped on the page while the save screen is up: its import. Says whether it was taken. */

@@ -932,11 +932,12 @@ function inside(point: { x: number; y: number }, rect: Rect): boolean {
 /**
  * Whether the pointer is where the import's hint shows: on the preview's panel, or on
  * EXPORT's frame, labelled or not. Nothing on the dialog says a dropped file is
- * imported, and a hint always up would take lines the preview needs.
+ * imported, and a hint always up would take lines the preview needs. RISE's dialog
+ * imports nothing (`saveMenuTakesDrops`), so it has no hint.
  */
 function pointsAtImportHint(state: SaveMenuState): boolean {
   const at = state.pointer;
-  return at !== null && (inside(at, PREVIEW_PANEL) || inside(at, BUTTON_FRAMES.export));
+  return state.mode !== 'rise' && at !== null && (inside(at, PREVIEW_PANEL) || inside(at, BUTTON_FRAMES.export));
 }
 
 /**
@@ -1295,12 +1296,22 @@ async function doExport(ui: UIState, state: SaveMenuState): Promise<void> {
 }
 
 /**
+ * Whether a file dropped on the page is the dialog's import: in the disk menu and the
+ * load-only chooser. RISE's dialog raises a party from a save already stored; a DM save
+ * is imported in a DM set, and a CSB one through the entrance's RESUME.
+ */
+export function saveMenuTakesDrops(ui: UIState): boolean {
+  return ui.saveMenu !== null && ui.saveMenu.mode !== 'rise';
+}
+
+/**
  * A file dropped on the page while the dialog is up: the import. Says whether the dialog
- * took it, which it does not while it is working, pressing a button or asking.
+ * took it, which it does not while it is working, pressing a button or asking, nor ever
+ * in RISE's dialog.
  */
 export function saveMenuDrop(ui: UIState, file: ImportedFile): boolean {
   const state = ui.saveMenu;
-  if (!state || state.busy || state.press || state.confirm || state.dropped || state.adventure) return false;
+  if (!state || !saveMenuTakesDrops(ui) || state.busy || state.press || state.confirm || state.dropped || state.adventure) return false;
   void runImport(ui, file, false);
   return true;
 }

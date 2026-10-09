@@ -57,7 +57,7 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   them, under the row's name (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`).
   What the row alone holds, its date, its play time and whether it is F5's or the
   Sleepsave, stays behind. **Import** is a `.dat` dropped on the page while the dialog is up, the disk
-  menu's or the entrance's chooser (`bindSaveDrop`, `src/ui/saveDrop.ts`): the whole
+  menu's or RESUME's chooser, never RISE's (`bindSaveDrop`, `src/ui/saveDrop.ts`): the whole
   page, since the CRT effect shows a canvas of its own over the game's, and a file
   dropped with no dialog up is swallowed rather than opened by the browser. There is
   no file picker. The row keeps the file's name, numbered while a save has it, and
@@ -87,7 +87,10 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   ADVENTURE" on the save chosen (`GameSaves.makeNewAdventure`, `src/engine/Chaos.ts`).
   The dialog says so: a title panel over the list reads RAISE A PARTY INTO A NEW / CHAOS
   STRIKES BACK ADVENTURE, the list below it holds eleven rows, LOAD reads RISE, and
-  there is no EXPORT.
+  there is no EXPORT. Nor is there an import: a file dropped on it is refused as with
+  no dialog up, and the import's hint never shows (`saveMenuTakesDrops`). The dialog
+  raises a party from a save already stored: a DM save from CSBWin is imported in a DM
+  set first, and a CSB one through RESUME's chooser.
   The new file is a row of the running set, named after the source's with `-csb` before
   its `.dat`, and a number after that while a save has the name; its playthrough is the
   file's, the source's `RandomGameID` with its first byte one higher, so a source raised
@@ -293,7 +296,7 @@ opens the same one, load-only.
   dropped file is imported, and a hint always up would be in the way. In play, the
   VBL's frame a pointer move asks for draws it; at the entrance, whose chooser no VBL
   draws again, the move that brings it up or takes it down redraws the chooser
-  (`GameScreen.moveSaveMenuPointer`).
+  (`GameScreen.moveSaveMenuPointer`). RISE's dialog, which imports nothing, has no hint.
 - **LOAD, SAVE, EXPORT**, and a drop for the import. No delete, no quit and no "SAVE AND
   QUIT": loading another playthrough's save is how a player leaves a game. **A dropped
   save of the dungeon is listed at once**, selected, under "SAVE IMPORTED", and nothing
@@ -390,7 +393,8 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
 
 - **RISE**: `tools/dump-rise.ts` (the row a new adventure is stored as, again, and a
   refusal; the chooser's `rise` mode over every set's saves, its LOAD and a refusal, and
-  `tools/dump-save-menu.ts` its title, its eleven rows, RISE and no EXPORT; the
+  `tools/dump-save-menu.ts` its title, its eleven rows, RISE, no EXPORT, no drop taken
+  and no hint; the
   prison's question: which game is the prison, four champions recruited at its mirrors
   of whom only the fourth asks, the prison's save taken by the utility, F5's question,
   YES and NOT YET in a dialog raised alone and over the disk menu's SAVE, and no question

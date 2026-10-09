@@ -425,11 +425,11 @@ what it does, and leaves EXPORT's frame empty, for the toggle. What is left is o
   to them is not established). `Chaos.ts` stays CSBWin's: the portraits come in as an
   argument, and `GameSaves.makeNewAdventure` passes them only when the toggle is on.
 - **The toggle.** In `rise` mode only, a two-state button in the EXPORT frame, on
-  whenever the dialog opens: NEW FACE while on, OLD FACE while off. Eight characters is the most a button's face holds: it is 52 pixels between graphic
-  0's two six-column bevels, and a ninth character would take 53. In `rise` mode the
-  import's hint shows on the preview's panel only, not over that frame
-  (`pointsAtImportHint`). The prison's "BEGIN THE ADVENTURE?" (`askBeginAdventure`)
-  needs no toggle: its party is the prison's, whose faces match no DM cell.
+  whenever the dialog opens: NEW FACE while on, OLD FACE while off. Eight characters
+  is the most a button's face holds: it is 52 pixels between graphic 0's two
+  six-column bevels, and a ninth character would take 53. The prison's "BEGIN THE
+  ADVENTURE?" (`askBeginAdventure`) needs no toggle: its party is the prison's, whose
+  faces match no DM cell.
 
 The check, in `tools/dump-rise.ts`:
 

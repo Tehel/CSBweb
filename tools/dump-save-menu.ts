@@ -94,7 +94,9 @@
  * 20. **RISE's dialog.** The chooser in `rise` mode: a title panel of graphic 0 over
  *    the list, its two lines on clean panel; the list panel ten rows below it, as
  *    graphic 0 spaces its panels, holding eleven whole rows; LOAD labelled RISE; no
- *    EXPORT on any row, nor a click on it; the rows' clicks and PageDown on the eleven.
+ *    EXPORT on any row, nor a click on it; the rows' clicks and PageDown on the eleven;
+ *    no drop taken, the store left alone, and no import's hint over the preview's panel
+ *    or EXPORT's frame.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -2548,6 +2550,25 @@ async function checkRise(graphics: GraphicsLoader): Promise<void> {
     check(state.rows.some((row) => row.kind === 'save') && exportLabels.every((n) => n === 0), 'EXPORT has no label, on a heading or a save');
     check(selected !== null && rig.exported.length === 0 && state.press === null && SaveMenu.isSaveMenuOpen(ui), 'and a click on it does nothing');
 
+    // No import: a drop is not taken, and no hint says one would be.
+    const rows = JSON.stringify(await store.list(null));
+    const takes = SaveMenu.saveMenuTakesDrops(ui);
+    const taken = await rig.drop('CSBGAME7.DAT', new Uint8Array(readFileSync(resolve(savePath('csbgame7.dat')))));
+    console.log(`  a genuine DM save dropped: ${taken ? 'TAKEN' : 'not taken'}, ${store.files.size} files stored, message "${state.message}"`);
+    check(!takes && !taken && JSON.stringify(await store.list(null)) === rows && state.message === '' && state.dropped === null && !state.busy,
+      'a drop is not taken, and nothing is stored or said');
+    const drawn = (): number[] => { SaveMenu.drawSaveMenu(ui); return Array.from(ui.screenIndexBuffer!.pixels); };
+    SaveMenu.saveMenuPointer(ui, null);
+    const bare = drawn();
+    const hinted = [g.previewPanel, g.buttonFrames.export].map((r) => {
+      const changed = SaveMenu.saveMenuPointer(ui, { x: (r.x1 + r.x2) >> 1, y: (r.y1 + r.y2) >> 1 });
+      const pixels = drawn();
+      return changed || pixels.some((p, i) => p !== bare[i]);
+    });
+    SaveMenu.saveMenuPointer(ui, null);
+    console.log(`  the pointer on the preview's panel, then EXPORT's frame: ${hinted.map((h) => (h ? 'A HINT' : 'nothing')).join(', ')}`);
+    check(hinted.every((h) => !h), 'the pointer on the preview\'s panel or EXPORT\'s frame brings up no import\'s hint');
+
     // The eleven rows: a click on each selects it, the heading last, which folds its
     // saves; and PageDown moves by eleven.
     SaveMenu.saveMenuKey(ui, 'Home');
@@ -2570,7 +2591,10 @@ async function checkRise(graphics: GraphicsLoader): Promise<void> {
     check(state.selected === from + list.rows && state.selected - state.scrollTop === list.rows - 1, 'PageDown moves by the eleven rows shown, and scrolls to the selection');
     SaveMenu.closeSaveMenu(ui);
 
-    // The other modes keep the whole column.
+    // The other modes keep the whole column, and take drops.
+    const loadOnly = await rig.open('loadOnly');
+    check(SaveMenu.saveMenuTakesDrops(ui) && loadOnly.mode === 'loadOnly', 'the load-only chooser takes drops');
+    SaveMenu.closeSaveMenu(ui);
     check(SaveMenu.saveMenuList('loadOnly') === full && full.rows === SaveMenu.SAVE_MENU_ROWS && full.panel === g.listPanel,
       'the disk menu and the load-only chooser keep their fifteen rows');
   } finally {
