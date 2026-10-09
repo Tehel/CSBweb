@@ -63,8 +63,15 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   no file picker. The row keeps the file's name, numbered while a save has it, and
   the file's date, as CSBWin ranks its slots by their files' `MODIFIEDTIME`
   (`doc/CSBwin-src/CSBCode.cpp:9890-9924`); it counts no time played, and is the last
-  save used (`GameSaves.importSave`, `src/engine/GameSaves.ts`). A file that does not
-  read is CSBWin's "SAVED GAME DAMAGED!" (`SaveGame.cpp:2117`).
+  save used (`GameSaves.importSave`, `src/engine/GameSaves.ts`). A file with no
+  `GAMEBLOCK1` where CSBWin reads one, the first thing `_ReadEntireGame` checks
+  (`doc/CSBwin-src/SaveGame.cpp:1724-1726`, `ReadUnscrambleBlock` at
+  `CSBCode.cpp:9272-9300`), is "NOT A SAVED GAME" (`readsGameBlock1`,
+  `src/data/SaveGameLoader.ts`): a `dungeon.dat`, a `graphics.dat`, any other file, and
+  a save cut short before the end of that block. CSB's `mini.dat` holds one, and is a
+  save. A file that has one and does not read past it is CSBWin's "SAVED GAME DAMAGED!"
+  (`SaveGame.cpp:2117`). CSBWin says that line of both, as it only ever reads its own
+  four names: the second line is the port's, for a file the player chose.
 - **A save knows its dungeon.** A row carries its data set's id, and the list shows the
   running data set's saves only (`GameSaves.dataSet`). The filter is the list's
   parameter, not its rule: RISE lists every set's (below), since a DM save feeds a CSB
@@ -276,6 +283,14 @@ opens the same one, load-only.
   lines of the preview's panel, in the title's colour: wrapped at the panel's width
   (`wrapMessage`, `src/renderer/ui/SaveMenu.ts`), five lines at most, over whatever
   lines of the preview it needs. A move of the selection takes it down.
+- **The import's hint**, "DROP .DAT TO IMPORT", is in the message's place while there is
+  none and the pointer is on the preview's panel or EXPORT's frame, labelled or not
+  (`SAVE_MENU_IMPORT_HINT`, `src/renderer/ui/SaveMenu.ts`): two lines, the two under a
+  full preview's thirteen, so it covers none of it. Nothing else on the dialog says a
+  dropped file is imported, and a hint always up would be in the way. In play, the
+  VBL's frame a pointer move asks for draws it; at the entrance, whose chooser no VBL
+  draws again, the move that brings it up or takes it down redraws the chooser
+  (`GameScreen.moveSaveMenuPointer`).
 - **LOAD, SAVE, EXPORT**, and a drop for the import. No delete, no quit and no "SAVE AND
   QUIT": loading another playthrough's save is how a player leaves a game. **A dropped
   save of the dungeon is listed at once**, selected, under "SAVE IMPORTED", and nothing
@@ -286,7 +301,8 @@ opens the same one, load-only.
   dungeon's name, with CONFIRM and CANCEL; and under OK alone, "THIS LOOKS LIKE A SAVE
   OF" the other dungeon, with "SWITCH TO IT TO IMPORT IT" or, for a dungeon no data set
   plays, "NOT SUPPORTED YET", or "THIS IS A SAVE OF AN UNKNOWN DUNGEON". Esc and a
-  right-click dismiss either. A file that does not read is the dialog's message.
+  right-click dismiss either. A file that is no save, or does not read, is the dialog's
+  message.
   **EXPORT is
   for the selected save**, and has no label on a heading or on "NEW SAVE", where none
   is: a heading's preview is of the save LOAD would read, and EXPORT does not take it.

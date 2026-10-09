@@ -402,8 +402,11 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    `_DoMenu` menu, centred, in the dialog's place: "THIS LOOKS LIKE A SAVE FROM A
    MODIFIED VERSION OF" over the dungeon's name, with CONFIRM and CANCEL. A save of
    another dungeon, or of an unknown one, is refused in a one-option menu, under OK. A
-   file that does not read is the dialog's message, CSBWin's own "SAVED GAME DAMAGED!"
-   (`SaveGame.cpp:2117`).
+   file with no `GAMEBLOCK1` is the dialog's message "NOT A SAVED GAME", the port's own
+   line; one that has it and does not read past it, CSBWin's own "SAVED GAME DAMAGED!"
+   (`SaveGame.cpp:2117`). The dialog says how to import, "DROP .DAT TO IMPORT", while
+   the pointer is on the preview's panel or EXPORT's frame (`doc/SAVES.md` → "The
+   import's hint").
 6. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
    addition, not a changed behaviour, as are the list's other keys (the arrows, Home
    and End, Page Up and Down, Enter for LOAD), the wheel, and a double click on a save,

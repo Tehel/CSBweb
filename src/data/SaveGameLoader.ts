@@ -948,6 +948,24 @@ export function stampRandomGameID(saveData: Uint8Array, randomGameID: number): U
 }
 
 /**
+ * Does the file open as a saved game: is there a `GAMEBLOCK1` where `_ReadEntireGame`
+ * reads one, past the Extended Features block when the file opens with one, whose
+ * second half sums to the fold of its first (`ReadUnscrambleBlock`,
+ * `doc/CSBwin-src/CSBCode.cpp:9272-9300`)? It is the first thing CSBWin checks of a save
+ * (`SaveGame.cpp:1724-1726`). A file that is no save, a `dungeon.dat`, a `graphics.dat`
+ * or any other, passes it only by a 16-bit sum's chance.
+ */
+export function readsGameBlock1(file: Uint8Array): boolean {
+  try {
+    const { offset, data } = readExtendedFeatures(file);
+    readUnscrambleBlock(data, offset);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Does the file hold 0 in all four of `GAMEBLOCK1`'s `Byte22598`, `Byte22596`,
  * `Word22594` and `Word22592`? CSBWin never writes that: `_ReadEntireGame` sets
  * `d.Word22596`, `Word22598`, `Word22594` and `Word22592` to 2, 1, 1 and 13 before either

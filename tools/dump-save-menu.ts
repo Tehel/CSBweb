@@ -65,7 +65,9 @@
  *    party, its level, its play time and its date, a line each on the list's rows. The
  *    lines are drawn for real and the panel read back: which rows hold ink, that none
  *    leaves the panel's interior, that a heading shows its last save used and "NEW
- *    SAVE" nothing, and that the dialog's message takes the panel's last lines.
+ *    SAVE" nothing, and that the dialog's message takes the panel's last lines; and
+ *    the import's hint on the two a full preview leaves, while the pointer is on the
+ *    panel or EXPORT's frame and no message is up.
  * 15. **The scrolling.** A list longer than the panel, and its scrollbar read back from
  *    the screen: the slider's place and height, the dither of the track around it, the
  *    two arrows. A click on an arrow and a notch of the wheel scroll a row, neither
@@ -80,13 +82,15 @@
  *    the data set's own dungeon stored under the file's name, date and playthrough, and
  *    a file that names none joined to its party's playthrough or given a new one; a
  *    modified dungeon stored only once confirmed, as an unofficial row, which the saves
- *    of a game read from it are too; another dungeon's, an unknown one's and a file that
- *    does not read never stored.
+ *    of a game read from it are too; another dungeon's, an unknown one's, a file with no
+ *    `GAMEBLOCK1` ("NOT A SAVED GAME") and a save that does not read past it ("SAVED
+ *    GAME DAMAGED!") never stored.
  * 19. **The drop.** A file dropped on the dialog, by the menu's own entry and clicks: a
  *    save of the dungeon listed and selected with nothing loaded; a modified dungeon's
  *    asked about in `_DoMenu`'s two-option menu and stored on CONFIRM alone; another
- *    dungeon's and an unknown one's refused under OK; a file that does not read in the
- *    dialog's message; and the load-only chooser taking a drop as the disk menu does.
+ *    dungeon's and an unknown one's refused under OK; a file that is no save, and one
+ *    that does not read, in the dialog's message; and the load-only chooser taking a
+ *    drop as the disk menu does.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -128,9 +132,10 @@ import type { GameHost, MessageSink } from '../src/engine/GameHost';
 import { freeze, thaw, type LoopScript } from '../src/engine/LoopState';
 import type { Champion } from '../src/engine/gameTypes';
 import { drawRandomGameID } from '../src/engine/GameContext';
-import { GameSaves, SAVED_GAME_DAMAGED, drawPlaythrough, importedFileName, makeSaveFileName } from '../src/engine/GameSaves';
+import { GameSaves, NOT_A_SAVED_GAME, SAVED_GAME_DAMAGED, drawPlaythrough, importedFileName, makeSaveFileName } from '../src/engine/GameSaves';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
-import { holdsNoBlock1Words, loadSaveGameState, stampRandomGameID } from '../src/data/SaveGameLoader';
+import { readExtendedFeatures } from '../src/data/CsbwinExtendedFeatures';
+import { holdsNoBlock1Words, loadSaveGameState, readsGameBlock1, stampRandomGameID } from '../src/data/SaveGameLoader';
 import { ReadSavedGame, TAG00260e } from '../src/engine/Chaos';
 import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
@@ -159,6 +164,7 @@ import * as Inventory from '../src/renderer/ui/Inventory';
 import { testChampion } from './lib/champion';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
+const GRAPHICS_DAT = 'static/gamefiles/dm-atari/graphics.dat';
 
 
 /* ------------------------------------------------------------------------------- */
@@ -362,7 +368,7 @@ function checkLayout(graphics: GraphicsLoader): void {
 
   const blank: SaveMenu.SaveMenuState = {
     mode: 'full', entries: [], unfolded: new Set(), rows: [], selected: -1, scrollTop: 0, busy: true, message: '',
-    press: null, pending: null, confirm: null, dropped: null, adventure: null, frameHandle: null, lastSaveClick: null,
+    press: null, pending: null, confirm: null, dropped: null, adventure: null, frameHandle: null, lastSaveClick: null, pointer: null,
   };
   ui.saveMenu = blank;
   ui.screenIndexBuffer!.pixels.fill(7);
@@ -2000,6 +2006,39 @@ async function checkPreview(graphics: GraphicsLoader): Promise<void> {
       'and five lines at most, whatever its length');
     state2.message = '';
 
+    // The import's hint: on the two lines a full preview leaves, while the pointer is on
+    // the preview's panel or EXPORT's frame.
+    const hint = SaveMenu.wrapMessage(SaveMenu.SAVE_MENU_IMPORT_HINT, g.previewMaxChars);
+    const offHint = inked();
+    const onPreview = SaveMenu.saveMenuPointer(ui, { x: panel.x1 + 30, y: panel.y1 + 60 });
+    const hinted = drawn();
+    console.log(`  the pointer on the preview: the hint ${JSON.stringify(hint)}, lines ${inked()}`);
+    check(hint.join('|') === 'DROP .DAT|TO IMPORT' && secondLines.length + hint.length <= g.rows,
+      'the hint is two lines, which fit under the thirteen of a full preview');
+    check(onPreview && inked() === expected(firstLines, hint.length) && inkOf(MENU_TITLE1_COLOR, g.rows - 2, g.rows - 1) > 0
+      && inkOf(MENU_TITLE1_COLOR, 0, g.rows - 3) === 0 && inked().slice(0, g.rows - 2) === offHint.slice(0, g.rows - 2) && stray() === 0,
+      "the pointer on the preview's panel brings it up, on the panel's last two lines, in the title's colour, the preview's lines left as they were");
+    const moves = [
+      SaveMenu.saveMenuPointer(ui, { x: panel.x1, y: panel.y2 }),
+      SaveMenu.saveMenuPointer(ui, { x: g.buttonFrames.export.x1, y: g.buttonFrames.export.y2 }),
+    ];
+    check(moves.every((changed) => !changed) && drawn() === hinted,
+      "it stays from one corner of the panel to EXPORT's frame, and says nothing changed");
+    const onList = SaveMenu.saveMenuPointer(ui, { x: panel.x1 - 1, y: panel.y1 + 60 });
+    check(onList && inked() === offHint, 'a column left of the panel, it goes, and says so');
+    check(!SaveMenu.saveMenuPointer(ui, { x: g.buttonFrames.cancel.x1 + 4, y: g.buttonFrames.cancel.y1 + 4 })
+      && SaveMenu.saveMenuPointer(ui, { x: g.buttonFrames.export.x2, y: g.buttonFrames.export.y1 }) && inked() === expected(firstLines, hint.length)
+      && SaveMenu.saveMenuPointer(ui, null) && inked() === offHint,
+      'not on CANCEL\'s frame; on EXPORT\'s, unlabelled or not; and off the canvas, gone');
+    SaveMenu.saveMenuPointer(ui, { x: panel.x1 + 30, y: panel.y1 + 60 });
+    state2.message = SaveMenu.SAVE_MENU_EXPORTED;
+    const messageOnly = inked();
+    check(!SaveMenu.saveMenuPointer(ui, { x: panel.x1 - 1, y: panel.y1 }) && inked() === messageOnly
+      && messageOnly === expected(firstLines, SaveMenu.wrapMessage(SaveMenu.SAVE_MENU_EXPORTED, g.previewMaxChars).length),
+      'the dialog\'s message takes its place, and the pointer moving off changes nothing then');
+    state2.message = '';
+    SaveMenu.saveMenuPointer(ui, null);
+
     // The heading again: the last save used is now the second.
     rig.clickRow(0);
     check(SaveMenu.loadTarget(ui.saveMenu!)?.id === second.id && drawn() === secondDrawn,
@@ -2577,20 +2616,28 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
     check(none.kind === 'unknown', 'a save no level of which is a known dungeon\'s is not stored either');
     check((await rowsOf()) === stored, 'none of them has written a row');
 
-    // What does not read.
+    // What does not read: a save whose later blocks fail, and a file that is no save.
     const flipped = genuine.slice();
     flipped[flipped.length - 100] ^= 0x01;
-    const unread: Array<[string, Uint8Array]> = [
-      ['a save with one bit of its dungeon image flipped', flipped],
-      ['the first 1000 bytes of a save', genuine.slice(0, 1000)],
-      ['a JSON text', new TextEncoder().encode('{"raw":"AAAA"}')],
-      ['an empty file', new Uint8Array(0)],
+    // GAMEBLOCK1 is the 512 bytes past the Extended Features block.
+    const block1End = readExtendedFeatures(genuine).offset + 512;
+    const unread: Array<[string, Uint8Array, string]> = [
+      ['a save with one bit of its dungeon image flipped', flipped, SAVED_GAME_DAMAGED],
+      [`a save cut after its GAMEBLOCK1, at ${block1End} bytes`, genuine.slice(0, block1End), SAVED_GAME_DAMAGED],
+      ['a save cut a byte short of that', genuine.slice(0, block1End - 1), NOT_A_SAVED_GAME],
+      ['the dungeon.dat', read(DUNGEON), NOT_A_SAVED_GAME],
+      ['the graphics.dat', read(GRAPHICS_DAT), NOT_A_SAVED_GAME],
+      ['a JSON text', new TextEncoder().encode('{"raw":"AAAA"}'), NOT_A_SAVED_GAME],
+      ['an empty file', new Uint8Array(0), NOT_A_SAVED_GAME],
     ];
-    for (const [what, bytes] of unread) {
+    for (const [what, bytes, line] of unread) {
       const at = logged.length;
       const outcome = await saves.importSave({ name: 'damaged.dat', bytes }, true).then(refusal, (error: Error) => `throws "${error.message}"`);
       console.log(`  ${what}: ${outcome}; logged "${logged.slice(at).join(' | ')}"`);
-      check(outcome === `throws "${SAVED_GAME_DAMAGED}"` && logged.length === at + 1, `${what} is CSBWin's "${SAVED_GAME_DAMAGED}", its reason logged`);
+      check(outcome === `throws "${line}"` && logged.length === at + 1 && readsGameBlock1(bytes) === (line === SAVED_GAME_DAMAGED),
+        line === SAVED_GAME_DAMAGED
+          ? `${what} holds a GAMEBLOCK1 and is CSBWin's "${SAVED_GAME_DAMAGED}", its reason logged`
+          : `${what} holds no GAMEBLOCK1 and is "${NOT_A_SAVED_GAME}", its reason logged`);
     }
     check((await rowsOf()) === stored, 'and none of them is stored');
 
@@ -2731,9 +2778,15 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
     // A file that does not read, and a drop while the dialog is at something else.
     await daroo.drop('notes.txt', new TextEncoder().encode('not a save'));
     console.log(`  a text file dropped: "${state.message}"`);
-    check(state.message === SAVED_GAME_DAMAGED && !state.busy && state.dropped === null && SaveMenu.isSaveMenuOpen(ui) && (await rowsOf()) === held,
-      `a file that does not read is the dialog's message, CSBWin's "${SAVED_GAME_DAMAGED}", and the list stays`);
-    check(wrapMessageFits(SAVED_GAME_DAMAGED), 'which fits the preview\'s panel');
+    check(state.message === NOT_A_SAVED_GAME && !state.busy && state.dropped === null && SaveMenu.isSaveMenuOpen(ui) && (await rowsOf()) === held,
+      `a file that is no save is the dialog's message, "${NOT_A_SAVED_GAME}", and the list stays`);
+    const damaged = genuine.slice();
+    damaged[damaged.length - 100] ^= 0x01;
+    await daroo.drop('damaged.dat', damaged);
+    console.log(`  a save with a bit flipped dropped: "${state.message}"`);
+    check(state.message === SAVED_GAME_DAMAGED && (await rowsOf()) === held,
+      `a save that does not read is CSBWin's "${SAVED_GAME_DAMAGED}"`);
+    check(wrapMessageFits(SAVED_GAME_DAMAGED) && wrapMessageFits(NOT_A_SAVED_GAME), 'both fit the preview\'s panel');
     const rect = menuButtonRect(SaveMenu.saveMenuButtons(state), SaveMenu.SAVE_MENU_GEOMETRY.exportButtonId)!;
     SaveMenu.saveMenuClick(ui, rect.x1 + 1, rect.y1 + 1, LEFT);
     const pressing = state.press !== null;

@@ -31,7 +31,7 @@ import { CsbRandom } from '../core/random';
 import { loadCsbwinWorld } from '../data/CsbwinDungeonImage';
 import type { DataSet } from '../data/DataSets';
 import { checkDungeon, dungeonSignature, type DungeonCheck } from '../data/DungeonSignature';
-import { stampRandomGameID } from '../data/SaveGameLoader';
+import { readsGameBlock1, stampRandomGameID } from '../data/SaveGameLoader';
 import {
     SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields, slotOf,
     type OpenedSave, type SaveEntry, type SaveSlot, type SaveStore,
@@ -116,6 +116,12 @@ export type ImportResult =
  * (`doc/CSBwin-src/SaveGame.cpp:2118`).
  */
 export const SAVED_GAME_DAMAGED = 'SAVED GAME DAMAGED!';
+
+/**
+ * The line for a dropped file that does not open as a save at all (`readsGameBlock1`),
+ * where CSBWin, which reads only its own four names, has its line for a failed read too.
+ */
+export const NOT_A_SAVED_GAME = 'NOT A SAVED GAME';
 
 /** What CSBWin's disk menu says while a DSA has disabled saves (`doc/CSBwin-src/SaveGame.cpp:858`). */
 export const SAVES_ARE_DISABLED = 'SAVES ARE DISABLED';
@@ -348,9 +354,10 @@ export class GameSaves {
      *   only once the player has `confirmed` it, and then marked `unofficial`;
      * - another dungeon's, or an unknown one's: never stored.
      *
-     * What is not stored comes back as the check, for the dialog to say. A file whose
-     * blocks or dungeon image do not read has no signature, and throws a `SaveFileError`
-     * with CSBWin's line for a failed read.
+     * What is not stored comes back as the check, for the dialog to say. A file with no
+     * `GAMEBLOCK1` is no save at all, and throws a `SaveFileError` that says so; one whose
+     * later blocks or dungeon image do not read has no signature, and throws one with
+     * CSBWin's line for a failed read.
      *
      * The row keeps the file's name, made unique in the store, and its date where the
      * page has one (`ImportedFile.modifiedAt`), today's otherwise; it counts no time
@@ -364,6 +371,10 @@ export class GameSaves {
      * a save of another that drew the same id.
      */
     async importSave(file: ImportedFile, confirmed = false): Promise<ImportResult> {
+        if (!readsGameBlock1(file.bytes)) {
+            this.log(`${file.name} has no GAMEBLOCK1: not a saved game`);
+            throw new SaveFileError(NOT_A_SAVED_GAME);
+        }
         let signature: string[];
         try {
             signature = await dungeonSignature(loadCsbwinWorld(file.bytes).dungeon);

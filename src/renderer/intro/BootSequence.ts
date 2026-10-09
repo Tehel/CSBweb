@@ -141,11 +141,14 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     if (x === pointerX && y === pointerY) return;
     pointerX = x;
     pointerY = y;
+    // The chooser's import hint follows the pointer; a redraw for it presents the screen.
+    if (gameScreen.isSaveMenuOpen() && gameScreen.moveSaveMenuPointer({ x, y })) return;
     if (cursorVisible) host.present();
   };
   const onMouseLeave = (): void => {
     pointerX = -100;
     pointerY = -100;
+    if (gameScreen.isSaveMenuOpen() && gameScreen.moveSaveMenuPointer(null)) return;
     if (cursorVisible) host.present();
   };
   const onContextMenu = (e: Event): void => e.preventDefault();

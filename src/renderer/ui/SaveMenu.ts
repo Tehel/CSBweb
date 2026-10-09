@@ -94,9 +94,14 @@
  * menu in the dialog's place: "THIS LOOKS LIKE A SAVE FROM A MODIFIED VERSION OF" over
  * the dungeon's name, with CONFIRM and CANCEL (`importMenu`). A save of another dungeon,
  * or of none the port knows, is refused in `_DoMenu`'s one-option menu, under OK, with
- * the dungeon named and whether a data set plays it. A file that does not read is the
- * dialog's message, CSBWin's "SAVED GAME DAMAGED!". CSBWin has no import: a file put in
- * the game's directory under one of its four names is a save of that game.
+ * the dungeon named and whether a data set plays it. A file with no `GAMEBLOCK1` is the
+ * dialog's message "NOT A SAVED GAME", and one that has it and does not read past it
+ * CSBWin's "SAVED GAME DAMAGED!". CSBWin has no import: a file put in the game's
+ * directory under one of its four names is a save of that game.
+ *
+ * Nothing else on the dialog says a file is imported so: the message's place shows
+ * "DROP .DAT TO IMPORT" while there is no message and the pointer is on the preview's
+ * panel or EXPORT's frame (`saveMenuPointer`).
  *
  * ## The question
  *
@@ -236,6 +241,11 @@ const PREVIEW_MAX_CHARS = 10;
 /** The most lines a message takes at the foot of the preview's panel. */
 const MESSAGE_MAX_LINES = 5;
 const WORKING_MESSAGE = 'WORKING...';
+/**
+ * The import's hint, in the message's place while the pointer is on the preview's panel
+ * or EXPORT's frame (`pointsAtImportHint`): two lines, the two a full preview leaves free.
+ */
+export const SAVE_MENU_IMPORT_HINT = 'DROP .DAT TO IMPORT';
 
 /** How long after a click on a save a second one on it is LOAD, in milliseconds. */
 export const SAVE_MENU_DOUBLE_CLICK_MS = 500;
@@ -396,6 +406,8 @@ export interface SaveMenuState {
   frameHandle: number | null;
   /** The save a click last selected, and when (`nowMs`): a second click on it soon after is LOAD. */
   lastSaveClick: { id: string; atMs: number } | null;
+  /** Where the pointer is, in screen coordinates, or `null` off the canvas (`saveMenuPointer`). */
+  pointer: { x: number; y: number } | null;
 }
 
 export function isSaveMenuOpen(ui: UIState): boolean {
@@ -435,6 +447,7 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
     adventure: null,
     frameHandle: null,
     lastSaveClick: null,
+    pointer: ui.hoverPoint,
   };
   void refreshSaveMenu(ui);
 }
@@ -821,8 +834,8 @@ export function drawSaveMenu(ui: UIState): void {
   }
 
   // The preview's panel: the save LOAD would read, and on its last lines the message,
-  // whatever went wrong or what was done.
-  const message = wrapMessage(state.busy ? WORKING_MESSAGE : state.message, PREVIEW_MAX_CHARS).slice(0, MESSAGE_MAX_LINES);
+  // whatever went wrong or what was done, or else the import's hint.
+  const message = wrapMessage(shownMessage(state), PREVIEW_MAX_CHARS).slice(0, MESSAGE_MAX_LINES);
   const messageRow = SAVE_MENU_ROWS - message.length;
   const previewed = loadTarget(state);
   if (previewed) {
@@ -842,6 +855,43 @@ export function drawSaveMenu(ui: UIState): void {
   if (!state.busy) drawLabel(ui, CANCEL_LABEL, BUTTON_FRAMES.cancel);
 
   if (state.press) drawMenuPress(ui, state.press, nowMs());
+}
+
+/** The message at the foot of the preview's panel: "WORKING...", the dialog's, or the import's hint. */
+function shownMessage(state: SaveMenuState): string {
+  if (state.busy) return WORKING_MESSAGE;
+  if (state.message) return state.message;
+  return pointsAtImportHint(state) ? SAVE_MENU_IMPORT_HINT : '';
+}
+
+function inside(point: { x: number; y: number }, rect: Rect): boolean {
+  return point.x >= rect.x1 && point.x <= rect.x2 && point.y >= rect.y1 && point.y <= rect.y2;
+}
+
+/**
+ * Whether the pointer is where the import's hint shows: on the preview's panel, or on
+ * EXPORT's frame, labelled or not. Nothing on the dialog says a dropped file is
+ * imported, and a hint always up would take lines the preview needs.
+ */
+function pointsAtImportHint(state: SaveMenuState): boolean {
+  const at = state.pointer;
+  return at !== null && (inside(at, PREVIEW_PANEL) || inside(at, BUTTON_FRAMES.export));
+}
+
+/**
+ * The pointer moved, to `point` or off the canvas. Nothing is drawn here: says whether
+ * what the dialog shows changed, the import's hint come up or gone, for the entrance's
+ * chooser, which no VBL's frame draws again (`GameScreen.moveSaveMenuPointer`). In play,
+ * the frame a moved pointer asks for draws the dialog anyway.
+ */
+export function saveMenuPointer(ui: UIState, point: { x: number; y: number } | null): boolean {
+  const state = ui.saveMenu;
+  if (!state) return false;
+  const shown = shownMessage(state);
+  state.pointer = point;
+  // A question in the dialog's place shows no message.
+  if (state.confirm || state.dropped || state.adventure) return false;
+  return shownMessage(state) !== shown;
 }
 
 /* ------------------------------------------------------------------ hit test ---- */

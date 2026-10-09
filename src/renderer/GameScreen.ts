@@ -78,6 +78,7 @@ import {
   saveMenuClick,
   saveMenuDrop,
   saveMenuKey,
+  saveMenuPointer,
   saveMenuWheel,
   type SaveMenuMode,
 } from './ui/SaveMenu';
@@ -453,6 +454,7 @@ export class GameScreen {
     const at = this.ui.hoverPoint;
     if (point?.x !== at?.x || point?.y !== at?.y) this.cursorMoved = true;
     this.ui.hoverPoint = point;
+    saveMenuPointer(this.ui, point);
     if (point) marchingOrderPointerMoved(this.ui, Math.floor(point.x), Math.floor(point.y));
   }
 
@@ -783,6 +785,17 @@ export class GameScreen {
    */
   drawSaveMenuOnly(): void {
     drawSaveMenu(this.ui);
+  }
+
+  /**
+   * The pointer over the entrance's chooser, or off the canvas: the chooser is drawn
+   * again, and presented, when that brings the import's hint up or takes it down
+   * (`saveMenuPointer`). Says whether it was.
+   */
+  moveSaveMenuPointer(point: { x: number; y: number } | null): boolean {
+    if (!saveMenuPointer(this.ui, point)) return false;
+    this.renderLastFrame();
+    return true;
   }
 
   /** `_DoMenu`'s drawing into the screen (`ui/Menu.ts`), for a menu a pre-game screen raises. */
