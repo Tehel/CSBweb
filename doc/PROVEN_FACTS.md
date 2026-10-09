@@ -417,6 +417,25 @@ on the same pair is as close to a proof as this project gets that the divergence
 index 1 is timer 145**. `timerDataToRateIndex` (`src/renderer/intro/IntroHost.ts`) is that
 mapping, asserted in `tools/dump-intro.ts`.
 
+## Item `0x22e` is laid out exactly as `Data.h` declares its span
+
+CSBWin reads item `0x22e` whole into `d.Word7246` onwards
+(`ReadAndExpandGraphic(0x8000|0x22e, (ui8 *)d.Byte7248+2, 0,0)`,
+`doc/CSBwin-src/CSBCode.cpp:10249`). The span from `Start of graphic 0x22e` to its end
+(`doc/CSBwin-src/Data.h:1125-1333`) is 67 declarations. Laid out from their types and
+counts, with no padding anywhere, they come to 4720 bytes, the `0x1270` the `ASSERT` at
+`CSBCode.cpp:10248` demands, and every declaration that names its address, in its name or
+its comment, sits at `7246 - address`. So a field's offset in the item is `7246` minus its
+`Data.h` address: `wallRectangles` (`Byte3074`) at 4172, `Word2530` the last four bytes.
+
+Every data set's `0x22e` is 4720 bytes, and every table the port reads from it writes
+back over its bytes at that offset (`tools/dump-graphics-tables.ts`). Six of those reads
+run past their own field, each as CSBWin's does: `Word7246` (`Code51a4.cpp:143`),
+`Byte5070` (`CSBCode.cpp:4073`), `Byte5094` and `Byte5076` (`:4142`, `:4164`), and
+`uByte2542` and `SeeThruWallsRect + 4` as whole `RectPos`es (`Viewport.cpp:2587`,
+`:2406`). The only bytes of the item no table reads are `Word4012`'s, which CSBWin sets
+at run time (`d.Word4012 = 3217`, `CSBCode.cpp:7585`).
+
 ## `ExpandGraphic`'s `0x20` opcode bit is never consulted
 
 The image codec's extended opcodes (`doc/CSBwin-src/CSBCode.cpp:11086-11097`) branch like

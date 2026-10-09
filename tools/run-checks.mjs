@@ -312,6 +312,9 @@ const CHECKS = [
   // CSBWin screen capture plus a hand-built stream per opcode. Three opcodes were wrong
   // and only one image in the data used them, so nothing else could have caught it.
   { tool: 'dump-image-codec.ts' },
+  // Every table read from graphics.dat's table items, written back over the item's own
+  // bytes at the offsets Data.h's declarations give it, in every data set.
+  { tool: 'dump-graphics-tables.ts' },
   { tool: 'dump-graphic-random.ts' },
   { tool: 'dump-teleporter-shimmer.ts' },
   { tool: 'dump-door-lightning.ts' },
