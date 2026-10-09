@@ -106,7 +106,6 @@ In payoff order: the first row is the next item.
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | G30 | 3D2D1D's vertical moves and gravity | L | ⏸️ |
-| X2 | Extra: a mastery just gained shown in green | S | ⏸️ |
 | X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
 | X8 | Extra: RISE's own dialog, and the utility disk's portraits on DM's champions | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
@@ -362,30 +361,20 @@ Rules for all of them:
   Extras button, which they all share. With it off, the game is CSBWin's: every
   tool's output and every golden frame stay the same. The FTL logo before the title
   (`src/renderer/intro/Swoosh.ts`) is behind it, and in play the interface reads it as
-  `UIState.extras`, which `GameScreen.setExtras` sets at every press of the button: an
-  empty hand drinking at a water fountain (`drinkAtWaterFountain`,
-  `src/renderer/ui/Feeding.ts`, checked by `tools/dump-fountain.ts`). The coloured object
-  cursor is the exception: the author wants it on by default, so it is recorded under H.
+  `UIState.extras`, which `GameScreen.setExtras` sets at every press of the button:
+  - an empty hand drinking at a water fountain (`drinkAtWaterFountain`,
+    `src/renderer/ui/Feeding.ts`, checked by `tools/dump-fountain.ts`);
+  - a mastery just gained drawn in colour 7 on the attribute panel until every attribute
+    its level gain raised is back at its new maximum (`src/engine/MasteryGains.ts`,
+    checked by `tools/dump-mastery-panel.ts`).
+
+  The coloured object cursor is the exception: the author wants it on by default, so it
+  is recorded under H.
 - **None of them is saved.** What an extra keeps in memory is lost on a save and a load,
   in the port's runtime save as in a CSBWin file, and that is acceptable: no save format
   changes.
 - **Each ships with its `tools/` check**, run with the setting on, and its entry here is
   deleted as for any paid item.
-
-### X2 ⏸️ A mastery just gained shown in green
-
-A level gain raises attribute **maximums** only (`IncrMaximum`, `src/engine/skills.ts:350`
-onwards), and the current values climb to them over time. Meanwhile the attribute panel
-already prints those values in red (`drawAttributePanel`,
-`src/renderer/ui/Character.ts:104-107`). The mastery lines above them are always drawn in
-colour 13 (`:80-88`).
-
-The extra: when a role's mastery rises, remember, per champion and per role, which
-attributes that level gain raised. Draw the role's line in colour 7 (the green the panel
-already uses for an attribute above its maximum) until every one of them has reached its
-new maximum again. The panel cannot work this out on its own, because a drop below the
-maximum from a level gain looks the same as one from damage or a potion. The check can
-run when the panel is drawn. Lost on a save, the line just goes back to colour 13.
 
 ### X3 ⏸️ Thrown weapons gathered back when the party walks over them
 

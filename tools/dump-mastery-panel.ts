@@ -32,9 +32,13 @@
  * A later section draws the whole inventory of a Hall of Champions candidate: the held
  * eye must put the panel over the Resurrect menu, as `_ClickOnEye` does.
  *
- * The last section is the object panel, where the same rune glyphs prefix a potion's name
- * with its power once the champion is past mastery 1 as a priest
+ * Then the object panel, where the same rune glyphs prefix a potion's name with its power
+ * once the champion is past mastery 1 as a priest
  * (`doc/CSBwin-src/Character.cpp:3616-3632`), and must reach the font raw as well.
+ *
+ * The last section is an extra (`DEBT.md` X), with the extras on: a mastery just gained
+ * is drawn in colour 7 until every attribute its level gain raised is back at its new
+ * maximum (`src/engine/MasteryGains.ts`), and in CSBWin's colour 13 with them off.
  *
  * What to look for in the output: a line for every role whose mastery exceeds 1, at
  * x=108 / y=58+7n in viewport coordinates, matching the string spelled out here
@@ -47,7 +51,8 @@ import { DBType, Direction, OBJECT_ID_NULL, Position, TilePosition, type ObjectI
 import { initialPartyState } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { Champion } from '../src/engine/gameTypes';
-import { ensureSkills, determineMastery } from '../src/engine/skills';
+import { addToSkill, ensureSkills, determineMastery } from '../src/engine/skills';
+import { AttributeIndex } from '../src/engine/attributes';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import type { FontData } from '../src/renderer/csbwin/TextRenderer';
@@ -103,10 +108,10 @@ function lineStrip(pixels: Uint8Array, lineIndex: number, widthChars: number): s
 }
 
 /** The same strip, drawn on its own from a string spelled out in this tool. */
-function expectedStrip(font: FontData, lineIndex: number, text: string, raw: boolean): string {
+function expectedStrip(font: FontData, lineIndex: number, text: string, raw: boolean, colour = 13): string {
   const buffer = createPaletteIndexViewportBuffer(SCREEN_W, SCREEN_H, 0);
   const draw = raw ? drawTextLineIndexRaw : drawTextLineIndex;
-  draw(buffer, font, LINE_X, VIEWPORT_Y + LINE_Y0 + lineIndex * LINE_DY, 13, null, text);
+  draw(buffer, font, LINE_X, VIEWPORT_Y + LINE_Y0 + lineIndex * LINE_DY, colour, null, text);
   return lineStrip(buffer.pixels, lineIndex, text.length);
 }
 
@@ -401,6 +406,53 @@ async function main(): Promise<void> {
     check(nameOk, `power ${power} draws "${expected}" glyph for glyph at (134, 68)`);
   }
   potion.power = savedPower;
+  console.log('');
+
+  // ------------------------------------------------ the extra: a mastery just gained
+  console.log('=== the extra: a mastery just gained, in green ===');
+  ui.getGraphicBitmap = () => null;
+  check(party.state.champions[0] === champion, 'the panel draws the party\'s own champion');
+  const stats = champion.attributes.stats;
+  for (const attr of stats) attr.current = attr.maximum;
+  setRoleExperience(0, experienceForMastery(3) - 1);
+  champion.skills![1]!.experience = experienceForMastery(2);
+  const before = stats.map((a) => a.maximum);
+  const gained = addToSkill(game.ctx, 0, 0, 1);
+  check(gained.leveledUp, 'one more point of fighter experience gains a level');
+  const raised = stats.map((a, i) => (a.maximum > before[i]! ? i : -1)).filter((i) => i >= 0);
+  console.log(`attributes raised: ${raised.join(' ')}`);
+  check(raised.includes(AttributeIndex.Strength), "a fighter's level always raises Strength");
+  const fighter = `${MASTERY_LABELS[3]} ${ROLES[0]}`;
+  const ninja = `${MASTERY_LABELS[2]} ${ROLES[1]}`;
+  const colourOf = (line: number, text: string): string => {
+    const got = lineStrip(renderPanel(), line, text.length);
+    if (got === expectedStrip(font, line, text, true, 7)) return 'green (7)';
+    if (got === expectedStrip(font, line, text, true, 13)) return 'colour 13';
+    return 'NEITHER';
+  };
+  const row = (when: string): [string, string] => {
+    const out: [string, string] = [colourOf(0, fighter), colourOf(1, ninja)];
+    console.log([when, ...out].join('\t'));
+    return out;
+  };
+  console.log(['state', fighter, ninja].join('\t'));
+  ui.extras = false;
+  let [f, n] = row('extras off');
+  check(f === 'colour 13' && n === 'colour 13', 'extras off: every mastery line is colour 13, as in CSBWin');
+  ui.extras = true;
+  [f, n] = row('extras on');
+  check(f === 'green (7)', 'extras on: the mastery just gained is green while what it raised is below its maximum');
+  check(n === 'colour 13', 'extras on: a mastery gained no level ago stays colour 13');
+  for (const i of raised.slice(1)) stats[i]!.current = stats[i]!.maximum;
+  [f] = row('all but Strength back');
+  check(f === 'green (7)', 'extras on: still green while one raised attribute is short');
+  stats[AttributeIndex.Strength]!.current = stats[AttributeIndex.Strength]!.maximum;
+  [f] = row('all back');
+  check(f === 'colour 13', 'extras on: colour 13 once every raised attribute has reached its maximum');
+  stats[AttributeIndex.Strength]!.current = stats[AttributeIndex.Strength]!.maximum - 5;
+  [f] = row('Strength drained later');
+  check(f === 'colour 13', 'extras on: a later drop is not a level gain, so the line stays colour 13');
+  ui.extras = false;
   console.log('');
 
   finish();

@@ -4,6 +4,7 @@ import type { GameContext } from './GameContext';
 import type { ObjectID } from '../core/types';
 import { applyLimits } from '../core/intCast';
 import { AttributeIndex, incrAttributeMaximum } from './attributes';
+import { recordMasteryGain } from './MasteryGains';
 import {
     OBJNI_EKKHARD_CROSS,
     OBJNI_GEM_OF_AGES,
@@ -262,7 +263,7 @@ export function adjustSkills(
   const target = champions[chIdx];
   let leveledUp = false;
   if (target && determineMastery(target, basicSkill | 0xc000, { partySleeping }) > oldMastery) {
-    levelUp(target, basicSkill, ctx.random);
+    recordMasteryGain(target, basicSkill, levelUp(target, basicSkill, ctx.random));
     printLevelUp(ctx, chIdx, basicSkill);
     leveledUp = true;
   }
@@ -306,7 +307,7 @@ export function addToSkill(
 
   let leveledUp = false;
   if (newMastery > oldMastery) {
-    levelUp(champ, basicSkill, ctx.random);
+    recordMasteryGain(champ, basicSkill, levelUp(champ, basicSkill, ctx.random));
     printLevelUp(ctx, chIdx, basicSkill);
     leveledUp = true;
   }
@@ -330,13 +331,24 @@ function printLevelUp(ctx: GameContext, chIdx: number, basicSkill: number): void
   messages.quePrintLines(color, ' LEVEL');
 }
 
-export function levelUp(champion: Champion, basicSkill: number, rng: CsbRandom): void {
+/**
+ * CSBWin's `LevelUp` (`doc/CSBwin-src/Magic.cpp:82`) before its message (`printLevelUp`). Returns the
+ * attributes whose maximum it raised, a bit per `AttributeIndex` (`recordMasteryGain`).
+ */
+export function levelUp(champion: Champion, basicSkill: number, rng: CsbRandom): number {
   // CSBWin's `LevelUp` draws from three different generators, in a fixed order
   // (doc/CSBwin-src/Magic.cpp:82-163). They are not interchangeable — each advances
   // the seed once but keeps different bits — so the mapping is kept explicit here.
   const randInt = (maxExclusive: number): number => rng.below(maxExclusive); // STRandom(n)
   const randBool = (): number => rng.bool(); // STRandomBool()
   const rand0_3 = (): number => rng.zeroTo3(); // STRandom0_3()
+
+  // The attributes whose maximum the gain raised, for an extra (`MasteryGains.ts`).
+  let raised = 0;
+  const raise = (index: AttributeIndex, increment: number): void => {
+    incrAttributeMaximum(champion.attributes.stats[index], increment);
+    if (increment > 0) raised |= 1 << index;
+  };
 
   let newMastery = determineMastery(champion, basicSkill | 0xc000, {});
   let maxManaIncrement = newMastery;
@@ -350,39 +362,39 @@ export function levelUp(champion: Champion, basicSkill: number, rng: CsbRandom):
   // `IncrMaximum`, not `IncrCurrent`: a level gain raises the ceiling and leaves the
   // current value where it was, which is exactly what turns the stats line and the box
   // around the eye red (`doc/CSBwin-src/Magic.cpp:101-151`).
-  incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Vitality], maxVitalityIncrement);
+  raise(AttributeIndex.Vitality, maxVitalityIncrement);
 
   const antiFireIncrement = randBool() & (~newMastery);
-  incrAttributeMaximum(champion.attributes.stats[AttributeIndex.AntiFire], antiFireIncrement);
+  raise(AttributeIndex.AntiFire, antiFireIncrement);
 
   let maxStaminaIncrement = 0;
   switch (basicSkill) {
     case 0: {
       maxStaminaIncrement = Math.trunc(champion.attributes.maxStamina / 16);
       newMastery = newMastery * 3;
-      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Strength], majorAttributeMaxIncrement);
-      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Dexterity], minorAttributeMaxIncrement);
+      raise(AttributeIndex.Strength, majorAttributeMaxIncrement);
+      raise(AttributeIndex.Dexterity, minorAttributeMaxIncrement);
       break;
     }
     case 1: {
       maxStaminaIncrement = Math.trunc(champion.attributes.maxStamina / 21);
       newMastery = newMastery * 2;
-      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Strength], minorAttributeMaxIncrement);
-      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Dexterity], majorAttributeMaxIncrement);
+      raise(AttributeIndex.Strength, minorAttributeMaxIncrement);
+      raise(AttributeIndex.Dexterity, majorAttributeMaxIncrement);
       break;
     }
     case 2: {
       maxStaminaIncrement = Math.trunc(champion.attributes.maxStamina / 25);
       champion.attributes.maxMana = clampMax(champion.attributes.maxMana + newMastery, MAX_MANA);
       newMastery = newMastery + Math.trunc((newMastery + 1) / 2);
-      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Wisdom], minorAttributeMaxIncrement);
+      raise(AttributeIndex.Wisdom, minorAttributeMaxIncrement);
       maxManaIncrement = Math.min(rand0_3(), maxManaIncrement - 1);
       if (champion.attributes.maxMana + maxManaIncrement > MAX_MANA) {
         champion.attributes.maxMana = MAX_MANA;
       } else {
         champion.attributes.maxMana += maxManaIncrement;
       }
-      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.AntiMagic], randInt(3));
+      raise(AttributeIndex.AntiMagic, randInt(3));
       break;
     }
     case 3: {
@@ -393,14 +405,14 @@ export function levelUp(champion: Champion, basicSkill: number, rng: CsbRandom):
       } else {
         champion.attributes.maxMana = MAX_MANA;
       }
-      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Wisdom], majorAttributeMaxIncrement);
+      raise(AttributeIndex.Wisdom, majorAttributeMaxIncrement);
       maxManaIncrement = Math.min(rand0_3(), maxManaIncrement - 1);
       if (champion.attributes.maxMana + maxManaIncrement > MAX_MANA) {
         champion.attributes.maxMana = MAX_MANA;
       } else {
         champion.attributes.maxMana += maxManaIncrement;
       }
-      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.AntiMagic], randInt(3));
+      raise(AttributeIndex.AntiMagic, randInt(3));
       break;
     }
   }
@@ -414,6 +426,7 @@ export function levelUp(champion: Champion, basicSkill: number, rng: CsbRandom):
     maxStaminaIncrement += randInt(Math.trunc(maxStaminaIncrement / 2)) + 1;
   }
   champion.attributes.maxStamina = clampMax(champion.attributes.maxStamina + maxStaminaIncrement, MAX_STAMINA);
+  return raised;
 }
 
 function clampMax(value: number, max: number): number {

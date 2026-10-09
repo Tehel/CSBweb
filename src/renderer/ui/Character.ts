@@ -12,6 +12,7 @@ import { getExternalPortraitAddress } from '../../data/CSBGraphicsLoader';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
 import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, getChampionPossession, Champion } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
+import { masteryGainPending } from '../../engine/MasteryGains';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, PaletteIndexViewportBuffer, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
@@ -87,7 +88,9 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
       ui.fontData,
       VIEWPORT_X + 108,
       VIEWPORT_Y + lineY,
-      13,
+      // An extra (`DEBT.md` X): a mastery just gained, in the green of an attribute
+      // above its maximum, until what it raised has climbed back (`MasteryGains.ts`).
+      ui.extras && masteryGainPending(champion, role) ? 7 : 13,
       null,
       `${masteryLabel} ${ROLE_LABELS[role]}`
     );
