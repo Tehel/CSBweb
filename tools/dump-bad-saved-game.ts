@@ -49,6 +49,7 @@ import { newUIState } from './lib/ui';
 import { savePath } from './lib/saves';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
 import * as Boot from '../src/renderer/intro/BootSequence';
+import { standInOf } from './lib/standIn';
 
 const SAVE = savePath('csbgame7.dat');
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
@@ -121,7 +122,7 @@ function scriptedHost(events: IntroEvent[]): Scripted {
   const uiTables = graphicsTablesOf(graphics).ui;
   const screen = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
   screen.pixels.fill(3);
-  const r: Scripted = { log: [], shown: null, queue: [...events] } as unknown as Scripted;
+  const r = standInOf<Scripted>({ log: [], shown: null, queue: [...events] });
   r.host = {
     screen,
     uiTables,
@@ -200,8 +201,8 @@ async function checkTag01efee(): Promise<void> {
   if (!ok) return;
   const at = { x: (ok.x1 + ok.x2) >> 1, y: (ok.y1 + ok.y2) >> 1 };
   const click = (x: number, y: number, buttons: number): IntroEvent => ({ kind: 'click', x, y, buttons });
-  const script = [
-    { kind: 'key', x: 0, y: 0, buttons: 0 } as IntroEvent,
+  const script: IntroEvent[] = [
+    { kind: 'key', x: 0, y: 0, buttons: 0 },
     click(at.x, at.y, 1),                  // the right button: the list is left-click only
     click(5, 5, 2),                        // off the button
     click(at.x, at.y, 2),

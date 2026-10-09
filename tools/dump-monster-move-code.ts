@@ -35,7 +35,7 @@ import type { AiConst, AiFrame } from '../src/engine/MonsterAI';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { monsterLevitating } from '../src/data/tables/MonsterDesc';
 import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
-import { wrapMember } from './lib/standIn';
+import { wrapMember, standInOf } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { rigTeleporter } from './lib/teleporter';
@@ -142,9 +142,9 @@ async function main(): Promise<void> {
     const slot = game2.ctx.dungeon.getAttachedItem16(monster)!;
     slot.ubPrevX = 77;
     slot.ubPrevY = 77;
-    const timer = { uByte6: from.x, uByte7: from.y, level: z } as AiFrame['timer'];
-    const frame = { timer, timePerMove: 0, sinceLastUpdate: 0, bool36: false } as unknown as AiFrame;
-    const c = { monsterRn: rn2, monster, slot, mapX: from.x, mapY: from.y, level: z } as unknown as AiConst;
+    const timer = standInOf<AiFrame['timer']>({ uByte6: from.x, uByte7: from.y, level: z });
+    const frame = standInOf<AiFrame>({ timer, timePerMove: 0, sinceLastUpdate: 0, bool36: false });
+    const c = standInOf<AiConst>({ monsterRn: rn2, monster, slot, mapX: from.x, mapY: from.y, level: z });
     const goOn = game2.systems.monsterAI.stepOrDefer(frame, c, tp.x, tp.y);
     console.log(`2. the AI steps onto it: goes on ${goOn}, timer_70 at (${timer.uByte6},${timer.uByte7}), `
       + `ubPrev (${slot.ubPrevX},${slot.ubPrevY})`);

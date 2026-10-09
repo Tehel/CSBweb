@@ -98,7 +98,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | L | ⏳ step 7 of 7 |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | G29 | Recording a game and playing it back | — | ⏸️ |
@@ -232,57 +231,6 @@ The table-extraction round-trip checks are a live phase, so they stay in `PLAN.m
 "Phase 15" rather than being copied here. The never-executed validation steps of phases 2,
 4 and 7 are folded into it. Step 5, the comparison against CSBWin screenshots, is postponed
 (see "Priority").
-
-### F12 ⏳ The tools' scaffolding is copied, and reaches privates through unchecked casts
-
-`tools/lib/game.ts` gives every tool the same `Game` and tables (`E1a`). What each tool
-builds around them is its own: 20 tools make 33 `as unknown as` casts, to build a partial
-record or to read a record's fields by name. `tsc` checks none of them. A renamed member
-leaves the tool compiling, and a write to it then sets a new property: the tool goes on
-passing while testing nothing.
-
-Paid in seven steps, each tool's whole output byte-identical across every commit
-("How to work this list", point 3). Steps 1 to 6 are done: `Game`'s seam for the tools
-is public, `gameTick` and `lastInputTime` beside `runFrame`; every `UIState` a tool
-drives is `newUIState`'s (`tools/lib/ui.ts`), whose context a tool stages by assigning
-its fields; every other private a tool drove is public, with the reason in its
-comment, so no tool casts into a private; and `tools/lib/standIn.ts` (`standIn`,
-`wrapMember`) replaces a public member with a stand-in typed as the member and puts it
-back, for every tool that stands in for an engine or renderer method. A member that is
-a hook by design is assigned directly: `GameHost`'s, `CSBGraphicsLoader`'s `opener` and
-`cannotOpen`, `BackgroundLib.messageBox`, the interpreter context's `graphicTrace`, a
-`UIState`'s `getGraphicBitmap`; and so are the globals (`Date.now`, `Math.random`,
-`console`). What a tool keeps beside a `Game` is in a `WeakMap` of its own
-(`dump-game-events`, `dump-hall-of-champions`).
-
-Every tool's stock dungeon, graphics and game are `stockDungeon`, `stockGraphics` and
-`stockGame`'s (`tools/lib/game.ts`), and every champion is `testChampion`'s
-(`tools/lib/champion.ts`). A tool names the stock files only where the path is the
-default of its own argument (`dump-defined-items`, `-level-items`, `-object-definitions`,
-`peek-dungeon`), or where the file's bytes are its subject: a file cut short
-(`dump-bad-saved-game`), the bytes `Game.readDungeonDat` reads (`-cursor-filter`,
-`-save-menu`), the image unconverted or read with a flag (`-dungeon-conversions`,
-`-dungeon-image-blocks`, `-extend-portraits`), the Extended Features block
-(`-extended-dungeon`, `-hint-key`), the compression, the checksum and the signatures
-(`-compressed-dungeon`, `-image-checksum`, `-file-signatures`), and the file it builds
-(`-dm-atari-graphics`).
-
-A partial record, context or dungeon a tool stands in with is `standInOf`'s
-(`tools/lib/standIn.ts`), whose members `tsc` checks against the whole type's: every
-drawing context a tool builds, and the dungeon and records behind it. The two
-source-table walkers (`dump-savegame`, `dump-csbwin-load`) take `any`, as they read a
-world's fields by the names the table gives; `dump-savegame` fails on a field of the
-world the table does not place.
-
-A tool reads the UI tables off its `UIState` (`ui.uiTables`), and a champion's carry
-tables off the game's (`gameTablesOf`, `ctx.tables`). It extracts them only where no
-`UIState` is in scope: the table offsets checked on their own (`dump-rise`,
-`-save-menu`), an intro host (`dump-bad-saved-game`), a tool with no interface.
-
-7. **What is left**: every `as unknown as` either goes, through `standInOf` for a
-   partial value, or reads fields by name where nothing else can, with a comment that
-   says so. The item is paid when no tool reaches a private through a cast and no
-   `as any` is left.
 
 ---
 

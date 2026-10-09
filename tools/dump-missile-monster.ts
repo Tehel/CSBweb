@@ -41,7 +41,7 @@ import { sw } from '../src/core/intCast';
 import { RN_FIREBALL } from '../src/core/spellRn';
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
-import type { CreatureRecord } from '../src/data/dungeonTypes';
+import type { CreatureRecord, Database } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import type { Champion } from '../src/engine/gameTypes';
 import { MonsterType } from '../src/engine/monsterTypes';
@@ -201,8 +201,7 @@ function monsterBlow(magic: number, defense08: number): number {
   return sw(Math.trunc(((64 * (magic & 0xffff)) & 0xffff) / (defense08 === 0 ? 1 : defense08)));
 }
 
-function newRecord<T>(game: Game, db: 'weapons' | 'potions', category: number, record: T): ObjectID {
-  const database = game.ctx.dungeon.getData().databases[db] as unknown as { records: T[]; count: number };
+function newRecord<T>(game: Game, database: Database<T>, category: number, record: T): ObjectID {
   database.records.push(record);
   database.count++;
   return game.ctx.dungeon.rnMaps.rn(category, database.records.length - 1);
@@ -227,7 +226,7 @@ function main(): void {
     // flying east along the north row arrives.
     game.ctx.dungeon.getAttachedItem16(group)!.positions = 3 | (0 << 2);
     const log = spy(game);
-    const falchion = newRecord(game, 'weapons', DBType.WEAPON, {
+    const falchion = newRecord(game, game.ctx.dungeon.getData().databases.weapons, DBType.WEAPON, {
       nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
       cursed: false, important: false, weaponType: WEAPON_FALCHION,
     });
@@ -255,7 +254,7 @@ function main(): void {
     // Both members on the south row: the north row is empty.
     game.ctx.dungeon.getAttachedItem16(group)!.positions = 3 | (2 << 2);
     const log = spy(game);
-    const falchion = newRecord(game, 'weapons', DBType.WEAPON, {
+    const falchion = newRecord(game, game.ctx.dungeon.getData().databases.weapons, DBType.WEAPON, {
       nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
       cursed: false, important: false, weaponType: WEAPON_FALCHION,
     });
@@ -273,7 +272,7 @@ function main(): void {
     group.drawAsSize4 = true;
     game.ctx.rules.drawAsSize4Monsters = option;
     const log = spy(game);
-    const falchion = newRecord(game, 'weapons', DBType.WEAPON, {
+    const falchion = newRecord(game, game.ctx.dungeon.getData().databases.weapons, DBType.WEAPON, {
       nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
       cursed: false, important: false, weaponType: WEAPON_FALCHION,
     });
@@ -307,7 +306,7 @@ function main(): void {
   {
     const arena = makeArena(1)!;
     const { game, group, desc, launch } = arena;
-    const bomb = newRecord(game, 'potions', DBType.POTION, {
+    const bomb = newRecord(game, game.ctx.dungeon.getData().databases.potions, DBType.POTION, {
       nextObject: OBJECT_ID_EOF, important: false, potionType: PotionType.FUL_BOMB, power: 40,
     });
     const log = spy(game);
@@ -326,7 +325,7 @@ function main(): void {
     game.ctx.party.state.position = range.target;
     game.systems.monsters.loadPartyLevel(range.target.z);
     game.ctx.party.state.champions[0]!.partyPosition = 0;
-    const bomb = newRecord(game, 'potions', DBType.POTION, {
+    const bomb = newRecord(game, game.ctx.dungeon.getData().databases.potions, DBType.POTION, {
       nextObject: OBJECT_ID_EOF, important: false, potionType: PotionType.FUL_BOMB, power: 40,
     });
     const log = spy(game);
@@ -346,7 +345,7 @@ function main(): void {
     // scan compares a missile's corner with (scenario 6).
     slot.positions = 2 | (0 << 2);
     group.hp[0] = 1;
-    const falchion = newRecord(game, 'weapons', DBType.WEAPON, {
+    const falchion = newRecord(game, game.ctx.dungeon.getData().databases.weapons, DBType.WEAPON, {
       nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
       cursed: false, important: false, weaponType: WEAPON_FALCHION,
     });
@@ -397,7 +396,7 @@ function main(): void {
     const arena = makeArena(1)!;
     const { game, group, desc, target } = arena;
     const slot = game.ctx.dungeon.getAttachedItem16(group)!;
-    const falchion = newRecord(game, 'weapons', DBType.WEAPON, {
+    const falchion = newRecord(game, game.ctx.dungeon.getData().databases.weapons, DBType.WEAPON, {
       nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
       cursed: false, important: false, weaponType: WEAPON_FALCHION,
     });

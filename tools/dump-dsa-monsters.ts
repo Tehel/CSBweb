@@ -28,7 +28,7 @@
 import { DBType, OBJECT_ID_EOF, Position, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
-import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
+import { TimerFunction } from '../src/engine/TimerQueue';
 import { globalStore, int, op, report, run, varFetch, varStore } from './lib/dsa';
 import { check, finish } from './lib/check';
 
@@ -69,7 +69,7 @@ function addTimer(game: Game, at: Position, fn: number): void {
   game.ctx.timers.addTimer({
     index: 0, time: game.ctx.state.tickCount + 50, level: at.z, function: fn, uByte5: 0, uByte6: at.x, uByte7: at.y,
     uByte8: 0, uByte9: 0, sequence: 0, timerWord8: 0, timerWord6: 0,
-  } as TimerEntry);
+  });
 }
 
 /* ------------------------------------------ 1. &MONSTER@ and &MONSTER! ---------- */

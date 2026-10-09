@@ -30,7 +30,7 @@ import type { LoopScript } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics, runVbl, TICK_DUE, stockDungeon } from './lib/game';
 import { ButtonsAt } from './lib/clicks';
-import { wrapMember } from './lib/standIn';
+import { wrapMember, standInOf } from './lib/standIn';
 
 /** The button each queued click is taken as (`ButtonsAt`). */
 const clicks = new ButtonsAt();
@@ -52,10 +52,10 @@ interface Watched {
 
 function watchedGame(): Watched {
   const data = stockDungeon();
-  const w = {
+  const w = standInOf<Watched>({
     log: [], vbls: 0, frameCallbacks: 0, clockTicks: 0, printed: 0, credits: [], handled: [],
     timerPasses: [], frames: 0, win: false,
-  } as unknown as Watched;
+  });
   const messages: MessageSink = {
     printLinefeed: () => {},
     quePrintLines: () => {},

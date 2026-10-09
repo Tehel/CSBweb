@@ -34,6 +34,7 @@ import { check, finish } from './lib/check';
 import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import * as mouse from '../src/renderer/ui/Mouse';
+import { standInOf } from './lib/standIn';
 
 /** The copper coin's name index: an icon mostly of colour 9. */
 const COPPER_COIN = 125;
@@ -174,7 +175,7 @@ async function main(): Promise<void> {
   viewportPalette[9] = ui.objectTables.specialColors[0].paletteEntries[0];
   check(viewportPalette[9] !== uiPalette[9], 'the test palette should change colour 9');
   const rgb = (c: number): number[] => [((c >> 8) & 7) * 36, ((c >> 4) & 7) * 36, (c & 7) * 36];
-  const image = { width: 320, height: 200, data: new Uint8ClampedArray(320 * 200 * 4) } as unknown as ImageData;
+  const image = standInOf<ImageData>({ width: 320, height: 200, data: new Uint8ClampedArray(320 * 200 * 4) });
   const viewportRect = { x1: 0, y1: 33, x2: 223, y2: 168 };
   const colour9Rgb = (): { ui: number; viewport: number } => {
     const counts = { ui: 0, viewport: 0 };

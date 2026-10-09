@@ -28,7 +28,7 @@ import * as NI from '../src/core/objectNameIndex';
 import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import type { GameHost } from '../src/engine/GameHost';
-import type { DatabaseRecord } from '../src/data/dungeonTypes';
+import type { ClothingRecord, MiscRecord, WeaponRecord } from '../src/data/dungeonTypes';
 import { AdjustStatsForItemCarried } from '../src/engine/AdjustStatsForItemCarried';
 import { Game } from '../src/engine/Game';
 import {
@@ -42,6 +42,7 @@ import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { handleClothingClick } from '../src/renderer/ui/Mouse';
 import { testChampion } from './lib/champion';
+import { standInOf } from './lib/standIn';
 
 const graphics = stockGraphics();
 const objectTables = graphicsTablesOf(graphics).objects;
@@ -89,9 +90,9 @@ function typeNamed(objNI: number): { category: Kind; type: number } | null {
   ];
   for (const [category, count] of ranges) {
     for (let t = 0; t < count; t++) {
-      const record = category === DBType.WEAPON ? { weaponType: t }
-        : category === DBType.CLOTHING ? { clothingType: t } : { miscType: t };
-      if (table[DescIndexOfRecord(category, record as unknown as DatabaseRecord)] === objNI) {
+      const record = category === DBType.WEAPON ? standInOf<WeaponRecord>({ weaponType: t })
+        : category === DBType.CLOTHING ? standInOf<ClothingRecord>({ clothingType: t }) : standInOf<MiscRecord>({ miscType: t });
+      if (table[DescIndexOfRecord(category, record)] === objNI) {
         return { category, type: t };
       }
     }

@@ -26,6 +26,7 @@ import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';
 import type { PartyState } from '../src/engine/gameTypes';
 import { graphicsTablesOf, newContext, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
+import { standInOf } from './lib/standIn';
 
 function objectsInCell(dungeon: DungeonState, pos: Position): string[] {
   const out: string[] = [];
@@ -44,7 +45,7 @@ async function main(): Promise<void> {
 
   const dungeon = new DungeonState(data);
   const level = Number(process.argv[2] ?? 3);
-  const party = { position: { x: 0, y: 0, z: level }, champions: [], brightness: 0 } as unknown as PartyState;
+  const party = standInOf<PartyState>({ position: new Position(0, 0, level), champions: [], brightness: 0 });
   const timers = new TimerQueue();
   const random = new CsbRandom(0xc0ffee);
   const time = 100;
@@ -62,12 +63,12 @@ async function main(): Promise<void> {
   // and no delete monster filter runs.
   ctx.systems.monsters = monsters;
   ctx.systems.monsterDamage = damage;
-  ctx.systems.missileEncounter = {
+  ctx.systems.missileEncounter = standInOf<MissileEncounter>({
     createDeathCloud: () => { clouds++; },
     checkMonsterMoveFromMissile: () => false,
-  } as unknown as MissileEncounter;
-  ctx.systems.actuators = { triggerObjectMove: () => {} } as unknown as ActuatorSystem;
-  ctx.systems.dsa = { deleteMonsterFilter: () => {} } as unknown as DsaSystem;
+  });
+  ctx.systems.actuators = standInOf<ActuatorSystem>({ triggerObjectMove: () => false });
+  ctx.systems.dsa = standInOf<DsaSystem>({ deleteMonsterFilter: () => {} });
 
   const pool = dungeon.getItem16Pool();
   const active = pool.map((slot, i) => ({ slot, i })).filter((e) => e.slot.word0 >= 0);

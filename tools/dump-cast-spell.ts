@@ -24,7 +24,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import type { SpellParameters } from '../src/engine/magicTypes';
 import { newGame, stockDungeon, stockGraphics } from './lib/game';
-import { wrapMember } from './lib/standIn';
+import { wrapMember, standInOf } from './lib/standIn';
 import { check, finish } from './lib/check';
 import { CHARFLAG_PORTRAIT_CHANGED, emptyPossessions } from '../src/engine/gameTypes';
 
@@ -38,7 +38,7 @@ function champion(i: number): Champion {
   const skills = Array.from({ length: 20 }, () => ({ experience: 0, tempAdjust: 0 }));
   skills[3].experience = 2000;
   skills[16].experience = 2000;
-  return {
+  return standInOf<Champion>({
     name: `HERO${i}`,
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
@@ -48,7 +48,7 @@ function champion(i: number): Champion {
     skills,
     possessions: emptyPossessions(),
     partyPosition: i,
-  } as unknown as Champion;
+  });
 }
 
 async function main(): Promise<void> {
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     printed.length = 0;
     const params = { ...magic.fillSpellParameters(0, c.incantation, game.ctx.party.state), ...overrides };
     const result = magic.castSpell(0, params);
-    const skills = c.skills as unknown as Array<{ experience: number }>;
+    const skills = c.skills;
     return {
       result,
       experience: skills[16].experience - 2000,

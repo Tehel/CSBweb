@@ -142,7 +142,8 @@ behaviour with an extra case explaining why it looks like an omission.
 builds it as `GameScreen` does: the tables and font, a blank 320x200 screen, and a fresh
 `ViewportRenderer`'s interpreter context, with every hook a no-op unless passed. Assign
 `partyState`, `screenIndexBuffer` or `context` afterwards to stage a party, a buffer or a
-view.
+view. Read the tables off it (`ui.uiTables`, `ui.objectTables`) rather than extracting
+them again.
 
 **Build a `Game` through `tools/lib/game.ts`.** `newGame(data, graphics, options?)`
 gives the game every table in `GameTables` — built as `main.ts` builds it, from the one
@@ -150,9 +151,14 @@ gives the game every table in `GameTables` — built as `main.ts` builds it, fro
 stands one subsystem up without a `Game` (pass your own `dungeon`, `party`, `timers` or
 seeded `random` in `parts`; set `ctx.state.tickCount` for the clock). Subsystems call
 each other through `ctx.systems` (`DEBT.md` E1c), which such a context leaves empty: fill
-what the path under test reaches, with the real system or a cast stand-in
-(`ctx.systems.missileEncounter = { createDeathCloud: () => { clouds++; } } as unknown as MissileEncounter`,
+what the path under test reaches, with the real system or a stand-in
+(`ctx.systems.missileEncounter = standInOf<MissileEncounter>({ createDeathCloud: () => { clouds++; } })`,
 `dump-monster-damage.ts`). A missing one fails loudly on `undefined`, never silently.
+Any partial value is `standInOf<T>({ … })`'s (`tools/lib/standIn.ts`): a record, a
+drawing context, a dungeon with the three members a draw reaches. `tsc` checks each
+member given against `T`'s; an `as unknown as` checks nothing, and a renamed member then
+leaves the tool compiling and passing while it tests nothing. A tool makes no
+`as unknown as` and no `as any`.
 To intercept a call inside a whole `Game`, replace the method on the instance with
 `standIn(target, 'member', replacement)`, or `wrapMember(target, 'member', (real) => …)`
 for one that calls the real method (`tools/lib/standIn.ts`): every caller goes through
@@ -165,8 +171,10 @@ table goes into `GameTables` and `buildGameTables`, and every tool has it. A too
 needs a *different* table builds its game over a copy:
 `new Game(data, { ...gameTablesOf(graphics), doorCharacteristics: [...] })`
 (`dump-missile-door.ts`). A tool that reads the screen's tables (`UITables`,
-`ObjectTables`, `ViewportTables`) takes them from `graphicsTablesOf(graphics)`, the same
-extraction its `GameTables` came from, rather than calling an extractor itself. Never
+`ObjectTables`, `ViewportTables`) takes them off its `UIState` if it has one, and from
+`graphicsTablesOf(graphics)` otherwise, the same extraction its `GameTables` came from,
+rather than calling an extractor itself. A champion's carry tables are the game's
+(`gameTablesOf(graphics)`). Never
 mutate the shared set.
 
 **Find a genuine save through `tools/lib/saves.ts`.** The CSBWin saves are in

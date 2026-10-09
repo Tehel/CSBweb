@@ -152,8 +152,10 @@ function main(): void {
   // graphics.dat changes, and in no other. The file's signature is not a table, and is
   // left out: it differs between any two files.
   const tableKeys = (tables: Record<string, unknown>) => Object.keys(tables).filter((k) => k !== 'graphicsSignature');
-  const dm = tablesOf.get('dm-atari') as unknown as Record<string, unknown>;
-  const csb = tablesOf.get('csb') as unknown as Record<string, unknown>;
+  // The tables by name, to compare every one of them without naming it.
+  const byName = (set: string): Record<string, unknown> => ({ ...tablesOf.get(set) });
+  const dm = byName('dm-atari');
+  const csb = byName('csb');
   const differing = tableKeys(dm).filter((k) => JSON.stringify(dm[k]) !== JSON.stringify(csb[k]));
   console.log(`== tables that differ between dm-atari and csb: ${differing.join(', ')} ==`);
   const expected = ['monsterDesc', 'textDecode', 'experienceForAttacking', 'skillNumber', 'byte20046', 'spells'];
@@ -163,13 +165,13 @@ function main(): void {
   // The French 1.3 file is 1.2's translated: its 0x230 is 100 bytes longer, all of it
   // attack names, so its spells and legal attacks, read after them, must be 1.2's (the
   // canary for the names' length), and only the words differ.
-  const en = tablesOf.get('dm-atari-1.2') as unknown as Record<string, unknown>;
-  const fr = tablesOf.get('dm-atari-1.3-fr') as unknown as Record<string, unknown>;
+  const en = byName('dm-atari-1.2');
+  const fr = byName('dm-atari-1.3-fr');
   const translated = tableKeys(en).filter((k) => JSON.stringify(en[k]) !== JSON.stringify(fr[k]));
   console.log(`== tables that differ between dm-atari-1.2 and dm-atari-1.3-fr: ${translated.join(', ')} ==`);
   check(translated.length === 2 && translated.includes('attackNames') && translated.includes('textDecode'),
     'dm-atari-1.3-fr differs from 1.2 in its attack names and text decoding only: its spells are 1.2\'s');
-  const names = fr['attackNames'] as string[];
+  const names = tablesOf.get('dm-atari-1.3-fr')!.attackNames;
   check(names[1] === 'FENDRE' && names[43] === 'FUSIONNER' && names.length === 44 + 20,
     'dm-atari-1.3-fr: 44 attack names, FENDRE to FUSIONNER, then the padding');
 

@@ -26,6 +26,7 @@ import type { Game } from '../src/engine/Game';
 import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { stockGame } from './lib/game';
 import { check, finish } from './lib/check';
+import { standInOf } from './lib/standIn';
 
 const OVERRIDE = 2;
 const NOOP = 3;
@@ -86,7 +87,7 @@ function run(program: number[], state = 0): Run {
   for (let s = 1; s <= state; s++) dsa.states[s] = dsa.states[0]!;
 
   game.systems.dsa.setGlobalVariables([0x5a5a]);
-  const timer = { uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: 0, level: at.z, time: 0 } as TimerEntry;
+  const timer = standInOf<TimerEntry>({ uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: 0, level: at.z, time: 0 });
   game.systems.dsa.processTimer5(rn, timer, at);
   return { game, dsa, global0: game.systems.dsa.getGlobalVariables()[0]!, at };
 }

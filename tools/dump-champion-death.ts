@@ -40,10 +40,10 @@ import type { Direction, ObjectID } from '../src/core/types';
 import { Game } from '../src/engine/Game';
 import type { Champion } from '../src/engine/gameTypes';
 import { DescIndexOfRecord } from '../src/engine/objectIndex';
-import type { DatabaseRecord } from '../src/data/dungeonTypes';
+import type { MiscRecord, WeaponRecord } from '../src/data/dungeonTypes';
 import { OBJNI_ILLUMULET_A, OBJNI_JEWEL_SYMAL_A, OBJNI_TORCH_A } from '../src/core/objectNameIndex';
 import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
-import { standIn } from './lib/standIn';
+import { standIn, standInOf } from './lib/standIn';
 import { check, fail, finish } from './lib/check';
 import { getChampionPossession } from '../src/engine/gameTypes';
 import { RN_FIREBALL, RN_POISON, RN_LIGHTNING, RN_DISPELL_MISSILE, RN_POISON_BOLT } from '../src/core/spellRn';
@@ -142,8 +142,8 @@ function newDagger(game: Game): ObjectID {
 /** The first weapon or misc type whose `ObjDesc` row names `objNI`. */
 function typeNamed(category: DBType.WEAPON | DBType.MISC, objNI: number): number {
   for (let t = 0; t < 128; t++) {
-    const record = category === DBType.WEAPON ? { weaponType: t } : { miscType: t };
-    const di = DescIndexOfRecord(category, record as unknown as DatabaseRecord);
+    const record = category === DBType.WEAPON ? standInOf<WeaponRecord>({ weaponType: t }) : standInOf<MiscRecord>({ miscType: t });
+    const di = DescIndexOfRecord(category, record);
     if (objDescObjectType[di] === objNI) return t;
   }
   throw new Error(`no ${DBType[category]} type is named ${objNI}`);

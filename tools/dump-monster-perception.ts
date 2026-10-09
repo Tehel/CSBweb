@@ -30,6 +30,7 @@ import { monsterSightDistance } from '../src/data/tables/MonsterDesc';
 import { graphicsTablesOf, newContext, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 import type { PartyState } from '../src/engine/gameTypes';
+import { standInOf } from './lib/standIn';
 
 const DIRS = ['N', 'E', 'S', 'W'];
 
@@ -44,7 +45,7 @@ async function main(): Promise<void> {
   const map = dungeon.getMap(level);
   if (!map) throw new Error(`no level ${level}`);
 
-  const party = { position: { x: 0, y: 0, z: level }, champions: [], brightness: 0 } as unknown as PartyState;
+  const party = standInOf<PartyState>({ position: new Position(0, 0, level), champions: [], brightness: 0 });
   const random = new CsbRandom(0x12345678);
   const timers = new TimerQueue();
   const footprints = new PartyFootprints();
@@ -63,7 +64,7 @@ async function main(): Promise<void> {
   if (!first) { console.log(`level ${level} has no monsters`); return; }
   const px = Number(process.argv[3] ?? first.slot.uByte10);
   const py = Number(process.argv[4] ?? first.slot.uByte11 + 1);
-  party.position = { x: px, y: py, z: level } as Position;
+  party.position = standInOf<Position>({ x: px, y: py, z: level });
 
   console.log(`level ${level}, party at (${px},${py}), ${active.length} group(s)`);
   console.log('');

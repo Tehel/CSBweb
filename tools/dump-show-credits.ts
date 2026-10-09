@@ -63,6 +63,7 @@ import { TimerFunction } from '../src/engine/TimerQueue';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame, stockGraphics, runVbl, TICK_DUE, stockDungeon } from './lib/game';
 import { testChampion } from './lib/champion';
+import { standInOf } from './lib/standIn';
 
 /** The hooks of a lost game: `_StartCSB` has turned palette switching off. */
 const LOST = { word11694: false, champions: [], palette11946: null };
@@ -84,7 +85,7 @@ interface Watched {
 
 function watchedGame(healths: number[]): Watched {
   const data = stockDungeon();
-  const w = { credits: [] as boolean[], clockTicks: 0, vbls: 0, frames: 0 } as Watched;
+  const w = standInOf<Watched>({ credits: [], clockTicks: 0, vbls: 0, frames: 0 });
   const messages: MessageSink = {
     printLinefeed: () => {},
     quePrintLines: () => {},
@@ -193,7 +194,7 @@ function recordingHost(ui: UITables, input: { heldAfterPolls: number; keyAfterPo
   const graphics = stockGraphics();
   const screen = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
   screen.pixels.fill(9); // The adventure's last frame, as far as this screen cares.
-  const r: Recorder = { steps: [], theEnd: null } as unknown as Recorder;
+  const r = standInOf<Recorder>({ steps: [], theEnd: null });
   let polls = 0;
   r.host = {
     screen,
@@ -307,7 +308,7 @@ function scriptedHost(ui: UITables, arrive: (time: number, vbls: number) => Intr
   const graphics = stockGraphics();
   const screen = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
   screen.pixels.fill(9);
-  const r = { log: [], buttons: [] } as unknown as Scripted;
+  const r = standInOf<Scripted>({ log: [], buttons: [] });
   let queue: IntroEvent[] = [];
   let cursor = false;
   let time = -1;

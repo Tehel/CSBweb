@@ -52,7 +52,7 @@ import { newGame, runVbl, TICK_DUE, stockDungeon, stockGraphics } from './lib/ga
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { ButtonsAt } from './lib/clicks';
-import { standIn, wrapMember } from './lib/standIn';
+import { standIn, wrapMember, standInOf } from './lib/standIn';
 import { freeze, thaw } from '../src/engine/LoopState';
 import { handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
 import { testChampion } from './lib/champion';
@@ -617,10 +617,10 @@ async function main(): Promise<void> {
   }
   const unset = { x1: 255, y1: 0, x2: 0, y2: 0 };
   const drawnView = ui.context;
-  ui.context = {
+  ui.context = standInOf<InterpreterContext>({
     viewportObjectButtons: [{ x1: 10, y1: 10, x2: 30, y2: 30 }, unset, unset, unset, unset, unset],
     viewportObjectRNs: [floorItem, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
-  } as unknown as InterpreterContext;
+  });
   const pickFrames = framesToTick(() => tryPickViewportObject(ui, 20, 20 + 33));
   const picked = party.objectInHand === floorItem;
   row('TAG01a148 (pick-up)', picked ? 'picked up' : 'left', pickFrames, '-', 'set');

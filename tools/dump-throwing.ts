@@ -25,7 +25,7 @@
  * Run: `npx tsx tools/dump-throwing.ts`
  */
 import { CsbRandom } from '../src/core/random';
-import { DBType, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
 import { CharacterStats } from '../src/engine/CharacterStats';
 import { DungeonState } from '../src/engine/DungeonState';
 import type { Champion } from '../src/engine/gameTypes';
@@ -64,9 +64,9 @@ async function main(): Promise<void> {
   const makeWeapon = (weaponType: number): ObjectID => {
     const db = data.databases.weapons;
     db.records.push({
-      nextObject: 0xfffe, weaponType, charges: 0, litTorch: false,
+      nextObject: OBJECT_ID_EOF, weaponType, charges: 0, litTorch: false,
       important: false, cursed: false, poisoned: false, broken: false,
-    } as unknown as (typeof db.records)[number]);
+    });
     db.count++;
     return dungeon.rnMaps.rn(DBType.WEAPON, db.records.length - 1);
   };
@@ -75,8 +75,8 @@ async function main(): Promise<void> {
   const makeMisc = (miscType: number): ObjectID => {
     const db = data.databases.misc;
     db.records.push({
-      nextObject: 0xfffe, miscType, specialState: 0, important: false,
-    } as unknown as (typeof db.records)[number]);
+      nextObject: OBJECT_ID_EOF, miscType, specialState: 0, important: false,
+    });
     db.count++;
     return dungeon.rnMaps.rn(DBType.MISC, db.records.length - 1);
   };
@@ -287,9 +287,9 @@ async function main(): Promise<void> {
   const throwRock = (): { range: number; damage: number } | null => {
     const db = data2.databases.weapons;
     db.records.push({
-      nextObject: 0xfffe, weaponType: 30, charges: 0, litTorch: false,
+      nextObject: OBJECT_ID_EOF, weaponType: 30, charges: 0, litTorch: false,
       important: false, cursed: false, poisoned: false, broken: false,
-    } as unknown as (typeof db.records)[number]);
+    });
     db.count++;
     party.objectInHand = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, db.records.length - 1);
 
@@ -343,9 +343,9 @@ async function main(): Promise<void> {
   const makeWeapon2 = (weaponType: number): ObjectID => {
     const db = data2.databases.weapons;
     db.records.push({
-      nextObject: 0xfffe, weaponType, charges: 0, litTorch: false,
+      nextObject: OBJECT_ID_EOF, weaponType, charges: 0, litTorch: false,
       important: false, cursed: false, poisoned: false, broken: false,
-    } as unknown as (typeof db.records)[number]);
+    });
     db.count++;
     return game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, db.records.length - 1);
   };

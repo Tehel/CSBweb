@@ -134,7 +134,7 @@ function portedOperations(): Set<number> {
   const end = source.indexOf('\n  private ', start + 1);
   const ported = new Set<number>();
   for (const [, name] of source.slice(start, end).matchAll(/case StkOp\.(\w+):/g)) {
-    const value = (StkOp as unknown as Record<string, number>)[name!];
+    const value = StkOp[name as keyof typeof StkOp];
     check(value !== undefined, `executeAmpersand names StkOp.${name}`);
     if (value !== undefined) ported.add(value);
   }

@@ -73,7 +73,7 @@ function scenario(save: string, power: number): void {
 
   // A caster who masters the spell at any power: no fizzle, no random draw.
   const caster = party.champions[0]!;
-  for (const skill of caster.skills as unknown as Array<{ experience: number }>) skill.experience = 500000;
+  for (const skill of caster.skills) skill.experience = 500000;
   caster.incantation = [0x5f + power, ...YA_BRO_ROS];
   const atCast = prints.getCount();
   const cast = game.systems.magic.castSpellFromUi(0);

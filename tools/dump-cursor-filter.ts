@@ -91,6 +91,7 @@ import { UNSET, freshGame, globalStore, int, op, placeFilterDsas, save, varFetch
 import { newGame, stockGraphics, stockDungeon } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
+import { standInOf } from './lib/standIn';
 
 /** `ESL_CURSORFILTER` (`doc/CSBwin-src/CSB.h:1547`). */
 const ESL_CURSORFILTER = 9;
@@ -421,7 +422,7 @@ function runDsa(game: Game, words: (at: Position) => number[]): Position {
   data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47 | ((selectors.length - 1) << 7), word4: 0, word6: 0 });
   const rn = dungeon.rnMaps.rn(DBType.ACTUATOR, data.databases.actuators.records.length - 1);
   dungeon.addObjectToCell(at, rn);
-  const timer = { uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: 0, level: at.z, time: 0 } as TimerEntry;
+  const timer = standInOf<TimerEntry>({ uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: 0, level: at.z, time: 0 });
   game.systems.dsa.processTimer5(rn, timer, at);
   return at;
 }

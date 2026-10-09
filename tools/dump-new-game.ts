@@ -60,13 +60,16 @@ function stateHash(game: Game): string {
 
 /** The top-level parts of the runtime state that differ, to say where a mismatch is. */
 function differingParts(a: Game, b: Game): string[] {
-  const sa = a.getRuntimeSaveState() as unknown as Record<string, Record<string, unknown>>;
-  const sb = b.getRuntimeSaveState() as unknown as Record<string, Record<string, unknown>>;
+  const sa = a.getRuntimeSaveState();
+  const sb = b.getRuntimeSaveState();
   const out: string[] = [];
-  for (const part of ['party', 'game', 'dungeon']) {
-    for (const key of Object.keys({ ...sa[part], ...sb[part] })) {
+  for (const part of ['party', 'game', 'dungeon'] as const) {
+    // The part's fields by name, to compare every one of them without naming it.
+    const pa: Record<string, unknown> = { ...sa[part] };
+    const pb: Record<string, unknown> = { ...sb[part] };
+    for (const key of Object.keys({ ...pa, ...pb })) {
       if (key === 'block1') continue;
-      if (JSON.stringify(sa[part]?.[key]) !== JSON.stringify(sb[part]?.[key])) out.push(`${part}.${key}`);
+      if (JSON.stringify(pa[key]) !== JSON.stringify(pb[key])) out.push(`${part}.${key}`);
     }
   }
   return out;

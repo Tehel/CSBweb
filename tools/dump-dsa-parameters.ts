@@ -30,6 +30,7 @@ import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { AdjustSkillsWhy, adjustSkills } from '../src/engine/skills';
 import { globalStore, int, op, report, run, varFetch, varStore } from './lib/dsa';
 import { check, finish } from './lib/check';
+import { standInOf } from './lib/standIn';
 
 /** `(EDT_SpecialLocations << 24) | ESL_ADJUSTSKILLSFILTER` (`doc/CSBwin-src/Magic.cpp:262`). */
 const ADJUST_SKILLS_FILTER_KEY = (3 << 24) | 6;
@@ -73,7 +74,7 @@ const ADJUST_SKILLS_FILTER_KEY = (3 << 24) | 6;
  * for null, a count of -1 and the words left as they are.
  */
 function message(game: Game, words: number[] | null): void {
-  const timer = { function: TimerFunction.TT_PARAMETER_MESSAGE, index: 999 } as TimerEntry;
+  const timer = standInOf<TimerEntry>({ function: TimerFunction.TT_PARAMETER_MESSAGE, index: 999 });
   if (words) game.ctx.dungeon.writeExpoolRecord(messageParametersKey(timer.index), words);
   game.systems.dsa.readRoomTimerParameters(timer);
 }

@@ -25,7 +25,7 @@ import { OBJECT_ID_NULL } from '../src/core/types';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { getActuatorPosition, getActuatorState, getActuatorType } from '../src/data/actuatorHelpers';
-import type { ActuatorRecord, DungeonData } from '../src/data/dungeonTypes';
+import type { ActuatorRecord, Database, DungeonData } from '../src/data/dungeonTypes';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
 
@@ -82,9 +82,11 @@ check(getActuatorState(c286) === 0, `mirror ${MIRROR_286}'s State is 0 once clea
 
 // Everything but the mirrors is untouched.
 const mirrorSet = new Set(found);
-for (const [name, db] of Object.entries(kept.databases)) {
-  const theirs = (cleaned.databases as unknown as Record<string, { records: unknown[] }>)[name];
-  const ours = db as { records: unknown[] };
+// The databases by name, to compare every one of them without naming it.
+const theirDatabases: Record<string, Database> = { ...cleaned.databases };
+const ourDatabases: Record<string, Database> = { ...kept.databases };
+for (const [name, ours] of Object.entries(ourDatabases)) {
+  const theirs = theirDatabases[name]!;
   let moved = 0;
   ours.records.forEach((r, i) => {
     if (name === 'actuators' && mirrorSet.has(i)) return;

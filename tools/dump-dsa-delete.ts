@@ -22,7 +22,7 @@ import type { DungeonData } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import type { TimerEntry } from '../src/engine/TimerQueue';
 import { newGame, stockDungeon, stockGraphics } from './lib/game';
-import { wrapMember } from './lib/standIn';
+import { wrapMember, standInOf } from './lib/standIn';
 import { check, finish } from './lib/check';
 
 const OP_LOAD = 6;
@@ -123,7 +123,7 @@ async function main(): Promise<void> {
       if (subcode === STK_DEL) for (const rn of watch) midRun.push(link(game, rn));
       return jump;
     });
-    const timer = { uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: 0, level: at.z, time: 0 } as TimerEntry;
+    const timer = standInOf<TimerEntry>({ uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: 0, level: at.z, time: 0 });
     const result = dsa.processTimer5(slave, timer, at);
     restore();
     return { result, midRun };

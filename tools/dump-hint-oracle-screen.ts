@@ -28,6 +28,7 @@ import type { IntroEvent } from '../src/renderer/intro/IntroHost';
 import { HINT_BUTTON, HintOracleScreen, hintButtonRect, type HintOracleHost, type HintSquare } from '../src/renderer/intro/HintOracle';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
+import { standInOf } from './lib/standIn';
 
 const oracle = parseHintOracle(new Uint8Array(readFileSync(resolve('static/gamefiles/csb/hcsb.hct'))));
 const dat = parseHcsbDat(new Uint8Array(readFileSync(resolve('static/gamefiles/csb/hcsb.dat'))));
@@ -53,7 +54,7 @@ interface Run {
 /** Run the Oracle on `square`, answering each wait with the next step's click. */
 async function runOracle(square: HintSquare, steps: Step[], waitVbls = 0): Promise<Run> {
   const screen = { width: SCREEN_WIDTH, height: SCREEN_HEIGHT, pixels: new Uint8Array(SCREEN_WIDTH * SCREEN_HEIGHT).fill(GAME_SCREEN) };
-  const run = { screen: screen.pixels, palette: new Array(16).fill(0x777), cycle: [], flashes: [] } as unknown as Run;
+  const run = standInOf<Run>({ screen: screen.pixels, palette: new Array(16).fill(0x777), cycle: [], flashes: [] });
   const queue: IntroEvent[] = [];
   let step = 0;
   let waited = 0;

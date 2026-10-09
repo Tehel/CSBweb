@@ -8,6 +8,7 @@
  *
  * Run: `npx tsx tools/dump-monster-activation.ts [level]`  (default: level 3)
  */
+import { Position } from '../src/core/types';
 import { DungeonState } from '../src/engine/DungeonState';
 import { MonsterSystem } from '../src/engine/MonsterSystem';
 import { TimerQueue, TimerFunction } from '../src/engine/TimerQueue';
@@ -16,6 +17,7 @@ import { MonsterType } from '../src/engine/monsterTypes';
 import type { PartyState } from '../src/engine/gameTypes';
 import { graphicsTablesOf, newContext, stockDungeon, stockGraphics } from './lib/game';
 import { check, fail, finish } from './lib/check';
+import { standInOf } from './lib/standIn';
 
 async function main(): Promise<void> {
   const data = stockDungeon();
@@ -28,7 +30,7 @@ async function main(): Promise<void> {
   // so the no-argument run used to activate nothing and check nothing.
   const level = process.argv[2] !== undefined ? Number(process.argv[2]) : 3;
 
-  const party = { position: { x: start.x, y: start.y, z: level }, champions: [], brightness: 0 } as unknown as PartyState;
+  const party = standInOf<PartyState>({ position: new Position(start.x, start.y, level), champions: [], brightness: 0 });
   const timers = new TimerQueue();
   // A fixed seed: the point is a repeatable listing, not a realistic game.
   const ctx = newContext(data, graphics, { dungeon, timers, random: new CsbRandom(0x12345678) });
