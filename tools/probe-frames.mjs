@@ -115,10 +115,10 @@ const shot = async (name) => {
 };
 const failures = [];
 const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${what}`); if (!ok) failures.push(what); };
-// The CRT effect is glfx's WebGL canvas, `#game-canvas_gl` (`createCrtController`,
-// `src/main.ts`): absent where Chrome gives no WebGL context. Nothing about the effect can
+// The CRT effect is a WebGL canvas, `#crt-canvas` (`createCrtEffect`, `src/lib/crt.ts`):
+// absent where Chrome gives no WebGL context. Nothing about the effect can
 // be checked then, and that fails the run rather than pass it unseen.
-const crtEffect = () => evaluate(`(()=>{const gl=document.getElementById('game-canvas_gl');
+const crtEffect = () => evaluate(`(()=>{const gl=document.getElementById('crt-canvas');
   return !gl ? 'unavailable' : getComputedStyle(gl).display === 'none' ? 'off' : 'on';})()`);
 const key = (k) => evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},bubbles:true})),1`);
 const click = (sel) => evaluate(`document.querySelector(${JSON.stringify(sel)}).click(),1`);
@@ -190,15 +190,28 @@ console.log('state: party built');       await shot('02-party');
 await canvasClick(15, 15, 2);  await wait(700);
 console.log('state: inventory');
 const inventory = await shot('03-inventory');
-// The effect is shown the game canvas and paints nothing on it. Its scanlines go on a copy:
-// painted on the canvas itself, they would darken a screen with every pass, and a screen
-// that does not repaint (the entrance, the credits) would be black in seconds.
+// The effect is shown the game canvas and paints nothing on it: its curve and scanlines are
+// drawn on its own canvas, at the size it is shown. The pointer is read through the same
+// curve, so a point of the tube is the screen pixel it shows: the middle stays where it is,
+// and a point towards a corner shows a pixel nearer the corner, the picture being shrunk
+// into the glass. Without the effect, the pointer is the plain scaling.
+const hoverAt = (u, v) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
+  c.dispatchEvent(new PointerEvent('pointermove',{isPrimary:true,pointerType:'mouse',clientX:r.left+${u}*r.width,clientY:r.top+${v}*r.height,bubbles:true}));
+  const p=window.__probe.screen.ui.hoverPoint; return p ? p.x+','+p.y : 'none';})()`);
 await click('#btn-crt'); await wait(500);
 const crtInPlay = await crtEffect();
-check(crtInPlay !== 'unavailable', 'the CRT effect exists (without it this Chrome gives glfx no WebGL context, and nothing below is checked)');
+check(crtInPlay !== 'unavailable', 'the CRT effect exists (without it this Chrome gives no WebGL context, and nothing below is checked)');
 check(crtInPlay === 'on', 'the CRT button turns the effect on');
 check(await canvasPixels() === inventory, 'CRT effect on: the game canvas keeps its pixels');
+const tubeSize = await evaluate(`(()=>{const t=document.getElementById('crt-canvas');return t.width+'x'+t.height;})()`);
+check(tubeSize === '960x600', `the effect is drawn at the size it is shown, 960x600 (${tubeSize})`);
+check(await hoverAt(0.5, 0.5) === '160,100', 'CRT effect on: the tube\'s middle is the screen\'s');
+const curved = (await hoverAt(0.1, 0.1)).split(',').map(Number);
+check(curved[0] < 32 && curved[1] < 20, `CRT effect on: the pointer at (32,20)'s place shows a pixel nearer the corner (${curved})`);
+check(await hoverAt(0.002, 0.002) === '0,0', 'CRT effect on: a point of the tube\'s black corner is the screen\'s corner');
 await click('#btn-crt'); await wait(200);
+check(await hoverAt(0.1, 0.1) === '32,20', 'CRT effect off: the pointer is the plain scaling');
+await evaluate(`document.getElementById('game-canvas').dispatchEvent(new PointerEvent('pointerleave',{isPrimary:true,pointerType:'mouse'})),1`);
 // Take an item out of the inventory. (41,66) is button id 30, body slot 2, which the Hall
 // of Champions fills for HALK with object 39027; selecting moves it out of the grid and
 // into the cursor, so this frame differs from 03 by the vacated slot.

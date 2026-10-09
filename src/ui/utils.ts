@@ -1,13 +1,10 @@
+import { canvasPoint } from '../lib/crt';
 import type { DungeonData } from '../data/dungeonTypes';
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../renderer/ViewportGraphics';
 
+/** The canvas pixel a pointer event is over, through the CRT effect's curve where it is on. */
 export function getEventPosition(canvas: HTMLCanvasElement, e: MouseEvent): { x: number, y: number } {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = Math.floor((e.clientX - rect.left) * scaleX);
-    const y = Math.floor((e.clientY - rect.top) * scaleY);
-    return { x, y };
+    return canvasPoint(canvas, e);
 }
 
 export function getMapPreviewLayout(canvas: HTMLCanvasElement, map: DungeonData['maps'][number]) {

@@ -140,15 +140,9 @@ What the redesign will replace, and what it should not carry across:
   to know what to save (`src/ui/settings.ts`), and the element lookups are written twice
   (`events.ts:11-21`, `settings.ts:63-75`). A `UIContext` module singleton
   (`src/ui/context.ts`) is how the panels reach the game.
-- **`main.ts` holds the page's features**: the 100-line CRT controller (`:42-150`) and
-  the end-of-game flow.
-- **`static/` holds files nothing loads**: `static/glfx.js` and
-  `static/glfx-latest-minified.js` (the page loads `src/lib/`'s copy),
-  `QPN59-1400x1000.png` and `QPN59-320x200-cropped.png`. It is the dev server's
-  `publicDir` only, so a build ships none of them (`vite.config.mts`).
+- **`main.ts` holds the page's features**: the end-of-game flow.
 
-Paying it is the redesign's first step: settings as a model the page renders, the CRT in a
-module of its own, and a `static/` holding only what the dev server needs.
+Paying it is the redesign's first step: settings as a model the page renders.
 The redesigned page also links to two pages:
 
 - **A static FAQ.** Among its answers is one paragraph on the statistics the server

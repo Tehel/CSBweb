@@ -19,8 +19,7 @@ import { extractGraphicsTables, type GraphicsTables } from './data/tables/Graphi
 import { UtilityDiskMessages, UtilityError } from './engine/Chaos';
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
-import { loadGlfx } from './lib/glfx-loader';
-import crtScanlinesUrl from './assets/crt-scanlines.png';
+import { createCrtEffect, type CrtEffect } from './lib/crt';
 import { GameScreen } from './renderer/GameScreen';
 import { bindDataSetChooser, bindExtrasToggle, bindSaveDrop, bindUIContext, drawMapPreview, showFatalMessage } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
@@ -41,7 +40,7 @@ console.log('Dungeon Master Web - Initializing...');
 // Global game instance
 let game: Game | null = null;
 let screen: GameScreen | null = null;
-let crtController: CrtController | null = null;
+let crtController: CrtEffect | null = null;
 
 /** The folder of the games and their manifest, relative to the page as every fetch is. */
 const GAMEFILES_DIR = 'gamefiles';
@@ -52,110 +51,8 @@ const GAMEFILES_DIR = 'gamefiles';
 let dataSet!: DataSet;
 /** The FTL logo's folder, the manifest's, or `null` where it names none. */
 let swooshDir: string | null = null;
-const CRT_UPDATE_INTERVAL_MS = 1000 / 20;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
-
-interface CrtController {
-    isAvailable: () => boolean;
-    isEnabled: () => boolean;
-    setEnabled: (enabled: boolean) => boolean;
-}
-
-function createCrtController(canvas: HTMLCanvasElement): CrtController {
-    let enabled = false;
-    let intervalId: number | null = null;
-    let glcanvas: GLFXCanvas | null = null;
-    let texture: GLFXTexture | null = null;
-    let lines: HTMLImageElement | null = null;
-
-    const available = !!fx && typeof fx.canvas === 'function';
-    if (!available)
-        return { isAvailable: () => false, isEnabled: () => false, setEnabled: () => false };
-
-    try {
-        glcanvas = fx.canvas();
-    } catch (e) {
-        console.warn('glfx failed to initialize; CRT effect disabled');
-        return { isAvailable: () => false, isEnabled: () => false, setEnabled: () => false };
-    }
-
-    const parent = canvas.parentNode;
-    if (!parent)
-        return { isAvailable: () => false, isEnabled: () => false, setEnabled: () => false };
-
-    glcanvas.width = canvas.width;
-    glcanvas.height = canvas.height;
-    glcanvas.className = canvas.className;
-    glcanvas.id = `${canvas.id}_gl`;
-    glcanvas.style.display = 'none';
-    parent.appendChild(glcanvas);
-
-    lines = new Image();
-    lines.src = crtScanlinesUrl;
-    // What the effect is given: the game canvas with the scanlines over it, composed on a
-    // canvas of its own. Only the game paints the game canvas: scanlines painted there
-    // would darken it with every pass, and a screen that does not repaint (the entrance,
-    // the credits) would be black in seconds.
-    const composed = document.createElement('canvas');
-    composed.width = canvas.width;
-    composed.height = canvas.height;
-    texture = glcanvas.texture(composed);
-
-    const draw = (): void => {
-        const ctx = composed.getContext('2d');
-        if (!ctx || !glcanvas || !texture || !lines) return;
-        const w = canvas.width;
-        const h = canvas.height;
-        ctx.drawImage(canvas, 0, 0);
-        if (lines.complete && lines.naturalWidth > 0) {
-            ctx.drawImage(lines, 0, 0, w, h);
-        }
-        texture.loadContentsOf(composed);
-
-        const hw = w / 2;
-        const hh = h / 2;
-        const w75 = w * 0.75;
-        glcanvas
-            .draw(texture)
-            .bulgePinch(hw, hh, w75, 0.12)
-            .vignette(0.25, 0.74)
-            .update();
-    };
-
-    const start = (): void => {
-        if (intervalId !== null) return;
-        intervalId = window.setInterval(draw, CRT_UPDATE_INTERVAL_MS);
-    };
-
-    const stop = (): void => {
-        if (intervalId === null) return;
-        window.clearInterval(intervalId);
-        intervalId = null;
-    };
-
-    return {
-        isAvailable: () => true,
-        isEnabled: () => enabled,
-        setEnabled: (next: boolean) => {
-            if (next === enabled) return enabled;
-            if (!glcanvas) return false;
-            // The effect's canvas lies over the game canvas and takes no input
-            // (`#game-canvas_gl`, index.html): the game canvas is the one input surface,
-            // with the effect or without.
-            if (next) {
-                start();
-                glcanvas.style.display = '';
-            } else {
-                stop();
-                glcanvas.style.display = 'none';
-            }
-            enabled = next;
-            return enabled;
-        },
-    };
-}
-
 
 function setCrtEnabled(enabled: boolean): boolean {
     if (!crtController) return false;
@@ -543,12 +440,9 @@ function wonChampions(game: Game, screen: GameScreen): WonChampion[] {
     }));
 }
 
-/** The optional CRT effect over the canvas. Without glfx, the button reports it unavailable. */
-async function createCrt(): Promise<void> {
-    await loadGlfx().catch((err) => {
-        console.warn('glfx failed to load; CRT effect disabled', err);
-    });
-    crtController = createCrtController(gameCanvasEl);
+/** The optional CRT effect over the canvas (`src/lib/crt.ts`). Without WebGL, the button reports it unavailable. */
+function createCrt(): void {
+    crtController = createCrtEffect(gameCanvasEl);
 }
 
 /**
@@ -680,7 +574,7 @@ async function init() {
         game = built.game;
         screen = built.screen;
         bindExtrasToggle((enabled) => built.screen.setExtras(enabled));
-        await createCrt();
+        createCrt();
         // The saved effect and sound before the intro, which is drawn through one and
         // heard through the other; `wire` applies the rest of the settings once the
         // intro is over.

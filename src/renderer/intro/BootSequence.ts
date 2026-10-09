@@ -29,6 +29,7 @@ import type { Swoosh } from '../../data/SwooshLoader';
 import { readHintOracle } from '../../data/HintOracleLoader';
 import type { HintOracleFiles } from '../ui/HintOracleButton';
 import { Die } from '../../engine/Die';
+import { canvasPoint } from '../../lib/crt';
 import type { SavedGameRead } from '../../engine/GameSaves';
 import type { GameScreen } from '../GameScreen';
 import { decodeCursorBitmap, type UIButton } from '../../data/tables/UITables';
@@ -114,13 +115,8 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
   };
 
   // CSBWin's mask: 2 = left, 1 = right (`doc/CSBwin-src/CSB.h:1662-1670`).
-  const pointAt = (e: MouseEvent): { x: number; y: number } => {
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: Math.floor(((e.clientX - rect.left) * canvas.width) / rect.width),
-      y: Math.floor(((e.clientY - rect.top) * canvas.height) / rect.height),
-    };
-  };
+  // Through the CRT effect's curve where it is on (`canvasPoint`), as in play.
+  const pointAt = (e: MouseEvent): { x: number; y: number } => canvasPoint(canvas, e);
   // Pointer events, as in play (`bindCanvasEvents`, `src/ui/events.ts`): only the primary
   // pointer, and a finger's lift is not the pointer leaving.
   const onMouseDown = (e: PointerEvent): void => {

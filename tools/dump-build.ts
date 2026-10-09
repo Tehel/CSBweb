@@ -7,8 +7,6 @@
  *   - every file is `index.html` or under `assets/`, of a type the page itself is made of:
  *     no `.dat`, no `.pdf`, nothing of `static/`;
  *   - every local `href` and `src` in `index.html` names a file the build holds;
- *   - the CRT's scanlines are in the bundle, not fetched by a name the build no longer
- *     serves;
  *   - the bundle hands the probes no `window.__probe`, which only a build made with
  *     `CSBWEB_PROBE=1` does (`vite.config.mts`): the image the golden frames check.
  *
@@ -68,8 +66,6 @@ async function main(): Promise<void> {
         check(missing.length === 0, `every file index.html names is in the build${missing.length ? `: not ${missing.join(', ')}` : ''}`);
 
         const bundle = files.filter((f) => f.endsWith('.js')).map((f) => readFileSync(join(outDir, f), 'utf8')).join('');
-        check(!bundle.includes('QPN59'), 'the bundle fetches no scanlines by their old name');
-        check(/data:image\/png;base64,|crt-scanlines-[\w-]+\.png/.test(bundle), 'the CRT scanlines are in the bundle, inlined or hashed');
         check(!bundle.includes('__probe'), 'the bundle hands the probes no handle');
     } finally {
         rmSync(outDir, { recursive: true, force: true });
