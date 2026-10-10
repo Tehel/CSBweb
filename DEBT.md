@@ -101,6 +101,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | E15 | The page shell | L | ⏳ with the page redesign |
+| E22 | The screen's size: its ratio, and filling the screen | M | ⏳ after E15 |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
@@ -108,15 +109,16 @@ In payoff order: the first row is the next item.
 | G30 | 3D2D1D's vertical moves and gravity | L | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G29 are the active list. `E15` waits for the page redesign to start: a
-session that reaches it first asks the author, and takes the next active row meanwhile. A
+The rows above G29 are the active list. `E15` waits for the page redesign to start, and
+`E22` for E15: a session that reaches either first asks the author, and takes the next
+active row meanwhile. A
 new row takes its tier's place above it. The F rows are independent of the rest
 ("Priority", point 4), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C166 · D17 · E22 · F15 · G31 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C166 · D17 · E23 · F15 · G31 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -130,7 +132,8 @@ New state-representation debt goes here, and jumps the queue.
 ## E — Architecture
 
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
-of "How to work this list", point 3, apply, byte-identical tool output included.
+of "How to work this list", point 3, apply, byte-identical tool output included. What the
+page redesign adds is the exception: E15's pages, and E22, which builds on its settings.
 
 ### E15 ⏳ The page shell
 
@@ -155,6 +158,43 @@ The redesigned page also links to two pages:
   browser profiling. A random id, drawn in the browser, is used only for counting
   players. Champions go by the names they carry, which a player can type.
 - **The public statistics**, drawn from the server's `api/stats`.
+
+### E22 ⏳ The screen's size: its ratio, and filling the screen
+
+The screen is shown at one size: `.screen` (`index.html:51-56`) scales the 320x200 game
+canvas to 960x600, a 16/10 picture of square pixels. The page will offer the player:
+
+- **The ratio**: 16/10, as now, or 4/3, the ST's monitor, whose 320x200 picture has
+  pixels taller than wide.
+- **Filling the screen**, at the chosen ratio.
+
+Both are settings of E15's model, so this follows E15. What the change must look after:
+
+1. **The CRT effect's canvas follows the game canvas only through CSS.** `createCrtEffect`
+   (`src/lib/crt.ts`) copies the game canvas's class once, when it is built, and
+   `#crt-canvas` (`index.html:43`) is pinned to the top left of `#game`. A size set inline
+   on the game canvas, a class changed later, or a canvas centred between bars leaves the
+   effect the wrong size or in the wrong place, while the pointer, read from the game
+   canvas's own rect (`canvasPoint`), stays right: a picture off its clicks. Both canvases
+   take their size and place from one source. The effect's canvas already redraws at
+   whatever size it is shown, in device pixels, and its shader stretches to any ratio.
+2. **The scanlines are exact only at a whole number of screen pixels per line.** The beam
+   is sampled at each pixel's centre (`line` and `beam` in the shader, `src/lib/crt.ts`).
+   At 600 pixels, three per line, every gap falls alike; at 720 (3.6) or 1080 (5.4) each
+   line is sampled at another phase, a faint uneven banding, worst between two and four
+   pixels per line, and below two the lines are noise. The beam is integrated over each
+   pixel's height instead of sampled, and the scanlines fade out below about 2.5 pixels
+   per line.
+3. **Filling the screen through the Fullscreen API takes `#game`, not the game canvas**:
+   the effect's canvas is the game canvas's sibling, and would be left out.
+4. **Without the effect, a size that is not a whole multiple of 320x200 draws uneven
+   pixels** under `image-rendering: pixelated`, some a screen pixel wider than others. The
+   Smooth button (`src/ui/events.ts:112-115`) blurs them instead; filling the screen may
+   also offer the largest whole multiple that fits.
+5. **The probe pins the default.** `tools/probe-frames.mjs` checks that the effect is
+   drawn at 960x600 (`:207`) and maps its clicks through the canvas's rect in a 1600x1000
+   window (`:154`). It also checks, at 4/3 and filling the window, that the effect's
+   canvas covers the game canvas exactly and that the pointer is read through the curve.
 
 ---
 
