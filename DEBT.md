@@ -118,7 +118,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C167 · D17 · E23 · F15 · G31 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C168 · D17 · E23 · F15 · G31 · X9. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -462,9 +462,13 @@ Recorded so that nobody "fixes" them.
   graphics the two cannot differ on screen, and the golden frames stay as they are.
 - 🚫 **The mirrored far-right sidewalls' `srcOffsetX`.** CSBWin's third arm,
   `srcOffsetX = 15 - (finalBitmapWidth & 15)` for positions 1 and 6
-  (`doc/CSBwin-src/CSBCode.cpp:3603`), compensates for `MakeMirror` reversing a
-  byte-aligned buffer. `getMirroredBitmap` reverses the exact bitmap, so applying it would
-  shift a correctly aligned image. The reasoning is in the code.
+  (`doc/CSBwin-src/CSBCode.cpp:3603`), compensates for `MakeMirror` reversing a buffer
+  of whole groups of 16 pixels. `getMirroredBitmap` reverses the exact bitmap, so applying
+  it would shift a correctly aligned image. Neither a basic decoration nor a
+  `CSBgraphics.dat` one applies it (`DrawWallDecoration` and
+  `drawExtendedWallDecoration`, `src/renderer/bytecode/DrawDecorations.ts`), and each of
+  Conflux's draws at 1, 6 and 11 the mirror image of itself at 0, 5 and 10, as CSBWin's
+  does (`tools/dump-extended-decorations.ts`, section 3).
 - 🚫 **`MakeBigActuators` reads the actuator's type, not CSBWin's byte-order slip.** CSBWin
   converts the actuators of a file without the `BigActuators` flag before their byte swap
   (`doc/CSBwin-src/SaveGame.cpp:2813-2820`), so it takes bits 8-14 of `word2` for the

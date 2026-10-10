@@ -332,10 +332,13 @@ function drawExtendedWallDecoration(
   const colorMap = distanceBand === 0 ? tables.floorColorMapFar : tables.floorColorMapMedium;
   let derived = draw.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, pWDP.height | 0, colorMap);
 
+  // CSBWin's `srcOffsetX = 15 - (finalBitmapWidth & 15)` for positions 1 and 6 skips the
+  // padding its mirror of a whole-groups buffer moves to the left (`:3597-3604`).
+  // `getMirroredBitmap` mirrors the bitmap at its width, so the port starts at 0, as for a
+  // basic decoration (`DEBT.md` H).
   let srcOffsetX = 0;
   if (farRightSidewall) {
     derived = draw.getMirroredBitmap(derived);
-    srcOffsetX = 15 - (finalBitmapWidth & 15);
   } else if (relativePosition === 7) {
     const w = (pWDP.x2 | 0) - (pWDP.x1 | 0);
     srcOffsetX = finalBitmapWidth - w;
