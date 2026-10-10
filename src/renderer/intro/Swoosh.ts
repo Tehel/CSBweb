@@ -1,5 +1,5 @@
 /**
- * The FTL logo, before the title: an extra, since CSBWin never had it.
+ * The FTL logo, before the title, which CSBWin never had (`DEBT.md` H).
  *
  * The Atari ST disk boots into `SWOOSH.IMG`, which draws the logo while the palette is
  * black, starts its sound, and shows the picture's sixteen colours in turn from a script

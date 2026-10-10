@@ -32,7 +32,7 @@ import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
 import { applySaveBytes } from './engine/SaveGameFile';
-import { loadUISettings, type UISettings } from './ui/settings';
+import { loadUISettings } from './ui/settings';
 import { GameEvents, playerId, sendBeacon } from './ui/gameEvents';
 
 console.log('Dungeon Master Web - Initializing...');
@@ -196,12 +196,11 @@ const SWOOSH_RECORDING = 'swoosh';
 
 /**
  * The FTL logo for the boot, read from `swoosh.img` as any game file is, or `null`
- * without it: the logo is an extra (`DEBT.md` X), so the boot shows none with the setting
- * off, and none where the file is not served. Its sound is `swoosh.wav`; the logo is shown
- * silent without that file.
+ * where the file is not served. The boot always shows it when it is (`DEBT.md` H). Its
+ * sound is `swoosh.wav`; the logo is shown silent without that file.
  */
-async function loadSwooshFiles(sound: SoundManager, settings: UISettings): Promise<{ image: Swoosh; startSound: () => void } | null> {
-    if (!settings.extras || swooshDir === null) return null;
+async function loadSwooshFiles(sound: SoundManager): Promise<{ image: Swoosh; startSound: () => void } | null> {
+    if (swooshDir === null) return null;
     const dir = swooshDir;
     const fetchFile = async (name: string): Promise<ArrayBuffer | null> => {
         const response = await fetch(`${dir}/${name}`).catch(() => null);
@@ -450,17 +449,11 @@ function createCrt(): void {
  * (`src/renderer/intro/BootSequence.ts`). It runs before `wire` so the adventure
  * screen's own canvas handlers cannot see the entrance's clicks.
  *
- * `?intro=0` skips it, and so does Debug: that mode quick-loads straight into a
- * saved game, where an entrance screen would only be in the way. The golden-frame
- * probe passes the query parameter.
- *
- * With the extras on, the FTL logo comes first (`loadSwooshFiles`).
+ * The FTL logo comes first (`loadSwooshFiles`). `?intro=0` skips all of it, for the
+ * golden-frame probe and `tools/probe-ui.mjs`.
  */
 async function runIntro({ game, screen, saves, events }: Built, sound: SoundManager): Promise<PrisonDoorChoice> {
-    const settings = loadUISettings();
-    const skipIntro =
-        new URLSearchParams(window.location.search).get('intro') === '0'
-        || settings.debug;
+    const skipIntro = new URLSearchParams(window.location.search).get('intro') === '0';
     return runBootSequence({
         canvas: gameCanvasEl,
         gameScreen: screen,
@@ -468,7 +461,7 @@ async function runIntro({ game, screen, saves, events }: Built, sound: SoundMana
         consumeSavedGameRead: () => saves.consumeSavedGameRead(),
         readNewGame: () => readNewGame(game, saves, events),
         rise: dataSet.miniDat,
-        swoosh: skipIntro ? null : await loadSwooshFiles(sound, settings),
+        swoosh: skipIntro ? null : await loadSwooshFiles(sound),
         skip: skipIntro,
     });
 }

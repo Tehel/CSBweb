@@ -19,8 +19,8 @@
  * This module is the two ends of that: it builds the `IntroHost` the screens draw through —
  * the screen buffer, the colour registers, the VBL clock, the sound and the input queue —
  * and it runs `displayChaosStrikesBack` then `showPrisonDoor`. The screens themselves are
- * `TitleSequence.ts` and `PrisonDoor.ts`. Before them, as an extra, the Atari ST disk's FTL
- * logo (`Swoosh.ts`), which is not CSBWin's.
+ * `TitleSequence.ts` and `PrisonDoor.ts`. Before them, the Atari ST disk's FTL logo
+ * (`Swoosh.ts`), which is not CSBWin's (`DEBT.md` H).
  *
  * The launcher menu is deliberately absent. CSBWin needs it because one binary runs the
  * dungeon, the utility and the hint oracle; this one runs the dungeon.
@@ -66,8 +66,8 @@ export interface BootSequenceDeps {
    */
   rise: boolean;
   /**
-   * The FTL logo to show before the title, with its sound: the extra, when it is on and
-   * `swoosh.img` is served. Absent, the boot is CSBWin's.
+   * The FTL logo to show before the title, with its sound, when `swoosh.img` is served.
+   * Absent, the boot is CSBWin's.
    */
   swoosh?: { image: Swoosh; startSound: () => void } | null;
   /** Skip the logo, the title animation and the entrance and boot straight into the dungeon. */

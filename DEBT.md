@@ -415,8 +415,7 @@ Rules for all of them:
 
 - **One setting, off by default**: `UISettings.extras` (`src/ui/settings.ts`), the page's
   Extras button, which they all share. With it off, the game is CSBWin's: every
-  tool's output and every golden frame stay the same. The FTL logo before the title
-  (`src/renderer/intro/Swoosh.ts`) is behind it, and in play the game reads it as
+  tool's output and every golden frame stay the same. The game reads it as
   `GameContext.extras`, which `GameScreen.setExtras` sets at every press of the button:
   - an empty hand drinking at a water fountain (`drinkAtWaterFountain`,
     `src/renderer/ui/Feeding.ts`, checked by `tools/dump-fountain.ts`);
@@ -427,8 +426,8 @@ Rules for all of them:
     the party arrives on the square it lies on, never what the cursor threw
     (`src/engine/ThrownWeapons.ts`, checked by `tools/watch-thrown-weapons.ts`).
 
-  The coloured object cursor and RISE's NEW FACE are the exceptions: the author wants
-  them on by default, so they are recorded under H.
+  The coloured object cursor, RISE's NEW FACE and the FTL logo are the exceptions: the
+  author wants them on by default, so they are recorded under H.
 - **None of them is saved.** What an extra keeps in memory is lost on a save and a load,
   in the port's runtime save as in a CSBWin file, and that is acceptable: no save format
   changes.
@@ -669,9 +668,17 @@ Recorded so that nobody "fixes" them.
   a data set's `CSBgraphics.dat` that does not load or parse, which CSBWin would meet
   only at a read; and a `dungeon.dat` that does not read, which CSBWin's `tag01efee`
   takes as a damaged save (`die(0xbad)` at the boot, the menu after a lost game).
-- 🚫 **`?intro=0`, and Debug in the saved UI settings, skip the whole intro.** This is a
-  developer affordance with no CSBWin counterpart, kept deliberately: thirteen of the sixteen golden
-  frames boot through it.
+- 🚫 **The boot shows the Atari ST disk's FTL logo before the title**, which CSBWin
+  never had: `SWOOSH.IMG`'s picture, palette script and sound
+  (`src/renderer/intro/Swoosh.ts`, `doc/ATARI_ST_DISK_REFERENCE.md` → "The logo in the
+  port"), whenever the manifest's `"swoosh"` folder serves `swoosh.img`. It is not an
+  extra: the author wants it on every boot. There is no setting yet; a future game
+  setting is to turn off the intro animations together, the logo and the title
+  animation from `graphics.dat`.
+- 🚫 **`?intro=0` skips the whole intro**: the logo, the title animation and the
+  entrance. This is a developer affordance with no CSBWin counterpart, kept deliberately:
+  most of the golden frames boot through it, and so does `tools/probe-ui.mjs --boot`. The
+  page's Debug setting does not skip it.
 - 🚫 **The `d.Word11750` countdown** in `TenSecondUpdate` is not ported. It is a
   cursor-redraw counter set only by `CSBCode.cpp:969-975`, which has no counterpart here, so
   the branch is dead (`src/engine/PeriodicUpdates.ts:91`).

@@ -177,7 +177,7 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
   intro/    Everything before the party is in the dungeon: the title animation, the
             dungeon entrance, the door animation, the credits scroll. And the end of
             the game (`ShowCredits`), on the same host. See
-            doc/CSBWIN_TITLE_SCREEN_REFERENCE.md. Before the title, as an extra, the
+            doc/CSBWIN_TITLE_SCREEN_REFERENCE.md. Before the title, the
             Atari disk's FTL logo (`Swoosh`, doc/ATARI_ST_DISK_REFERENCE.md). And CSB's
             Hint Oracle (`HintOracle`), a program of its own in CSBWin
             (doc/CSBWIN_HINT_ORACLE_REFERENCE.md).

@@ -665,8 +665,7 @@ inventory open (`GameScreen.palette11946`). `tools/dump-show-credits.ts` checks 
 
 ## Skipping it
 
-`?intro=0` skips the title animation and the entrance entirely and boots straight into a fresh
-dungeon, and so does having Debug on in the saved UI settings — that mode quick-loads into a
-saved game, where an entrance screen would only be in the way. `tools/probe-frames.mjs` passes
+`?intro=0` skips the FTL logo, the title animation and the entrance entirely and boots straight
+into a fresh dungeon (`DEBT.md` H). The page's Debug setting does not. `tools/probe-frames.mjs` passes
 the query parameter for its first six frames and then loads the app again without it for the
 entrance and the credits.

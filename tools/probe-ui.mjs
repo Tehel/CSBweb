@@ -52,8 +52,8 @@ if (argv.includes('--help') || argv.length === 0) {
   node tools/probe-ui.mjs [actions...] ['expression']
 
 Actions, applied in the order given:
-  --boot              reload with a cleared localStorage and a seeded Math.random,
-                      switch Debug on, and build the golden frames' party
+  --boot              load ?intro=0 with a cleared localStorage and a seeded
+                      Math.random, switch Debug on, and build the golden frames' party
                       at the Hall of Champions mirrors
   --key <K>           dispatch a keydown, e.g. --key ArrowUp
   --click X,Y[,right] click canvas pixel X,Y (0..319, 0..199); 'right' opens inventory
@@ -143,7 +143,8 @@ const boot = async () => {
     let seed = 0x2545f491;
     Math.random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
                           return ((seed >>> 0) % 1000000) / 1000000; };` });
-  await send('Page.reload', { ignoreCache: true });
+  // `?intro=0`: straight into the dungeon, with no logo, title or entrance.
+  await send('Page.navigate', { url: `http://localhost:${APP}/?intro=0` });
   await wait(3500);
   // The golden frames' party, from the Hall of Champions mirrors.
   console.error('party:', await evaluate(BUILD_PARTY));

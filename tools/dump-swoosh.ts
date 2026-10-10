@@ -1,5 +1,5 @@
 /**
- * The FTL logo before the title (`SWOOSH.IMG`), an extra: what its picture decodes to and
+ * The FTL logo before the title (`SWOOSH.IMG`): what its picture decodes to and
  * what its palette script does, both read from the file.
  *
  * Nothing on screen says whether a decoder that produces *a* logo is the disk's. What

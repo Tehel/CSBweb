@@ -260,16 +260,17 @@ check(moves.left, 'the pointer gone, no cursor is left for the frames that follo
 // entrance below.
 await canvasClick(120, 168, 0); await wait(1200);
 
-// The dungeon entrance, with the intro left on. The wait has to cover the whole title
-// animation — about 116 vertical blanks — plus the entrance's own fade; once that fade
-// finishes the screen is static until the player clicks, so the capture is stable.
+// The dungeon entrance, with the intro left on. The wait has to cover the FTL logo — 98
+// vertical blanks — and the whole title animation — about 116 — plus the entrance's own
+// fade; once that fade finishes the screen is static until the player clicks, so the
+// capture is stable.
 //
 // This is the only evidence that the corridor behind the doors actually renders. It is
 // drawn by the real viewport renderer over a synthetic 5x5 level
 // (`src/renderer/intro/PrisonLevel.ts`), and `tools/dump-intro.ts` can check the level and
 // the compositing but not the pixels the bytecode programs produce.
 await send('Page.navigate', { url: `${APP}?keepsaves` });
-await wait(7000);
+await wait(9000);
 console.log('state: entrance');
 const entrance = await shot('07-entrance');
 // The scroll at the bottom of the button column (button id 202).
@@ -485,7 +486,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   try { localStorage.setItem('csbweb_ui_settings_v1', JSON.stringify({ crt: true })); } catch (e) {}
 ` });
 await send('Page.navigate', { url: `${APP}?keepsaves` });
-await wait(7000);
+await wait(9000);
 console.log('state: entrance, CRT effect saved on');
 check(await crtEffect() === 'on', 'the effect is on at the entrance');
 check(await canvasPixels() === entrance, 'the entrance is frame 07');
