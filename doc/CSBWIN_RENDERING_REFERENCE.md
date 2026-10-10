@@ -689,14 +689,14 @@ rectpos.w.x2 = 270;  // Right edge of viewport on screen
 **Location**: `CSBCode.cpp`
 
 - `ReadWallDecoration` calls `ReadCSBgraphic(CGT_WallDecoration, id, 92, ...)`.
-- Extended wall decorations (flag `graphicOrdinal & 0x10000`) use the CSBgraphics.dat data layout: 13 `DECORATION_DESC` placements, then a 2-byte pad, then side bitmap bytes (size `desc[11].width * desc[11].height`), then front bitmap bytes (size `desc[12].width * desc[12].height`), with `desc[11]` and `desc[12]` serving as source size descriptors.
+- Extended wall decorations (flag `graphicOrdinal & 0x10000`) use the CSBgraphics.dat data layout: 13 `DECORATION_DESC` placements, then a 2-byte pad, then side bitmap bytes (size `desc[11].width * desc[11].height`), then front bitmap bytes (size `desc[12].width * desc[12].height`), with `desc[11]` and `desc[12]` serving as source size descriptors. The bitmaps are Atari bitplanes, as a `graphics.dat` graphic is in memory (`doc/PROVEN_FACTS.md` → "A `CSBgraphics.dat` wall or floor decoration's bitmaps are Atari bitplanes").
 
 ### ReadFloorDecoration
 
 **Location**: `CSBCode.cpp`
 
 - `ReadFloorDecoration` reads `CGT_FloorDecoration` (minimum size 92).
-- Extended floor decorations (flag `graphicOrdinal & 0x4000`) use 9 `DECORATION_DESC` entries followed by a 16-bit `mirrorFlags` and the bitmap data at `&desc[9] + 2`.
+- Extended floor decorations (flag `graphicOrdinal & 0x4000`) use 9 `DECORATION_DESC` entries followed by a 16-bit `mirrorFlags` and the bitmap, bitplanes as a wall's, at `&desc[9] + 2` (`doc/CSBwin-src/CSBCode.cpp:3898`).
 - `DrawFloorDecorations` mirrors when `(((mirrorFlags >> (d.partyFacing + 9)) ^ (mirrorFlags >> relativeCell)) & 1) != 0`.
 
 ---

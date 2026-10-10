@@ -476,6 +476,13 @@ console.log('state: overlay');           await shot('17-overlay');
 await setInputs({ 'overlay-jitter-x': 0 });
 await click('#btn-overlay-hide'); await click('#btn-overlay-jitter'); await wait(500);
 check((await canvasPixels()) === confluxStart, 'the overlay hidden and the view shifted back, it is frame 18 again');
+// Wall decorations of Conflux's `CSBgraphics.dat`, their bitmaps read as bitplanes
+// (`tools/dump-extended-decorations.ts`), from level 0 (14,14) facing south: on the west
+// faces of the squares to the left, decoration 5, a bookshelf, drawn as it stands at F1
+// (15,15), and decoration 11, a ladder, its side view scaled by `ShrinkBLT` to F2 (15,16).
+await evaluate(FACE(14, 14, 0, 2)); await wait(500);
+await leaveCanvas(); await wait(200);
+console.log('state: Conflux bookshelf'); await shot('20-conflux-bookshelf');
 
 // The CRT effect's input surface. The effect's canvas is shown over the game canvas, and
 // the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,

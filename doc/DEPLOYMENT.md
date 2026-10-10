@@ -217,7 +217,7 @@ answers 502.
 
 `tools/check-image.sh` builds the image with `CSBWEB_PROBE=1` as `csbweb:probe`, runs it over
 the checkout's game files and a throwaway stats folder, and runs
-`tools/check-frames.sh --url` against it: the nineteen golden frames, drawn by the built
+`tools/check-frames.sh --url` against it: the twenty golden frames, drawn by the built
 page as the container serves it, must match the dev server's. The probe image is never
 deployed.
 

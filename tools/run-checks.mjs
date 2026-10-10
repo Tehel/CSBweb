@@ -135,6 +135,7 @@ const CHECKS = [
   { tool: 'dump-background-lib.ts' },
   { tool: 'dump-skin-programs.ts' },
   { tool: 'dump-custom-graphics.ts' },
+  { tool: 'dump-extended-decorations.ts' },
   { tool: 'dump-virtual-graphics.ts' },
   { tool: 'watch-conflux-start.ts' },
   { tool: 'dump-dsa-overlay.ts' },

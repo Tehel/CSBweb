@@ -2879,6 +2879,27 @@ Verified, not inferred: seven of them, ids 44, 46, 47, 49, 50, 146 and 148 in bo
 decode this way to cells 14, 12, 8, 4, 7, 23 and 22 of CSB's basic graphic 26, pixel for
 pixel (`tools/dump-portraits.ts`). Top-down rows or swapped nibbles would match none.
 
+## A `CSBgraphics.dat` wall or floor decoration's bitmaps are Atari bitplanes
+
+`DrawWallDecoration` takes an extended decoration's bitmap from its section as it stands:
+`pExtendedBitmap` is `&pExtWallRects[13] + 2`, the side view, and past its
+`pExtWallRects[11].width * height` bytes the front view (`doc/CSBwin-src/CSBCode.cpp:3263-3267`).
+It becomes `pFinalBitmap` where a basic decoration's is `GetBasicGraphicAddress`
+(`:3383-3392`), and `ShrinkBLT`'s source where a basic one's is (`:3524-3533`).
+`DrawFloorDecorations` does the same with `pGraphic = &pDesc[9] + 2` (`:3898`, `:3967`).
+So both are drawn as a `graphics.dat` graphic is held in memory: each line in groups of 16
+pixels, a group four big-endian words, one per plane (`ShrinkBLT` reads a group as two
+longwords, `doc/CSBwin-src/Graphics.cpp:452-453`). A descriptor's `width` is the line's
+length in bytes.
+
+In both files here, the tools fixture and Conflux 3.5's, every source descriptor (a wall's
+`desc[10]` to `desc[12]`, a floor's `desc[7]`) is whole groups, its rectangle's width taken
+to a group, and read as bitplanes every bitmap is a picture: wall decoration 5 ("biblio")
+a bookshelf, floor decoration 61 ("flood11") a breaking wave. Read as packed nibbles, each
+is noise in vertical bands, with fewer pixels like their right neighbour in every one of
+the 144 bitmaps of each file (`tools/dump-extended-decorations.ts`; golden frame
+`20-conflux-bookshelf`).
+
 ## A viewport overlay is a 224x136 bitmap of bytes, and its end is a `d.Time`
 
 `OVERLAYDATA::ReadOverlay` reads a `CGT_ViewportOverlay` section of `CSBgraphics.dat`

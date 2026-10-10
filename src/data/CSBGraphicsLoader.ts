@@ -162,21 +162,6 @@ function readDecorationDesc(data: Uint8Array, off: number): DecorationDesc {
   };
 }
 
-function decodePacked4bpp(data: Uint8Array, widthBytes: number, height: number): Uint8Array {
-  const widthPixels = widthBytes * 2;
-  const out = new Uint8Array(widthPixels * height);
-  let src = 0;
-  let dst = 0;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < widthBytes; x++) {
-      const b = data[src++] ?? 0;
-      out[dst++] = (b >> 4) & 0x0f;
-      out[dst++] = b & 0x0f;
-    }
-  }
-  return out;
-}
-
 class OvlDecode {
   private codes: Uint32Array;
   private chars: Uint8Array;
@@ -396,8 +381,10 @@ export class CSBGraphicsLoader {
     const sideRaw = raw.subarray(bitmapOffset, bitmapOffset + sideSize);
     const frontRaw = raw.subarray(bitmapOffset + sideSize, bitmapOffset + sideSize + frontSize);
 
-    const sidePixels = decodePacked4bpp(sideRaw, sideDesc.widthBytes, sideDesc.height);
-    const frontPixels = decodePacked4bpp(frontRaw, frontDesc.widthBytes, frontDesc.height);
+    // Bitplanes, as `DrawWallDecoration` hands them to `ShrinkBLT` and `TAG0088b2`
+    // (`doc/CSBwin-src/CSBCode.cpp:3263-3267`, `:3383-3392`).
+    const sidePixels = decodePlanar(sideRaw, sideDesc.widthBytes * 2, sideDesc.height);
+    const frontPixels = decodePlanar(frontRaw, frontDesc.widthBytes * 2, frontDesc.height);
 
     const sideBitmap: IndexedBitmap = {
       width: sideDesc.widthBytes * 2,
@@ -435,7 +422,9 @@ export class CSBGraphicsLoader {
     if (bitmapOffset + bitmapSize > raw.length) return null;
 
     const bitmapRaw = raw.subarray(bitmapOffset, bitmapOffset + bitmapSize);
-    const pixels = decodePacked4bpp(bitmapRaw, baseDesc.widthBytes, baseDesc.height);
+    // Bitplanes, as `DrawFloorDecorations` hands them to `ShrinkBLT` and `TAG0088b2`
+    // (`doc/CSBwin-src/CSBCode.cpp:3898`).
+    const pixels = decodePlanar(bitmapRaw, baseDesc.widthBytes * 2, baseDesc.height);
     const bitmap: IndexedBitmap = {
       width: baseDesc.widthBytes * 2,
       height: baseDesc.height,

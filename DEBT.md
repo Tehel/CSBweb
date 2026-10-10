@@ -100,7 +100,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C166 | `CSBgraphics.dat`'s wall and floor decorations are read as packed nibbles, not bitplanes | S | ⏳ |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | E22 | The screen's size: its ratio, and filling the screen | M | ⏳ after E15 |
 | G29 | Recording a game and playing it back | — | ⏸️ |
@@ -202,29 +201,6 @@ Both are settings of E15's model, so this follows E15. What the change must look
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C166 ⏳ `CSBgraphics.dat`'s wall and floor decorations are read as packed nibbles, not bitplanes
-
-An extended decoration (a `graphicOrdinal` past `0x10000` for a wall, a floor ordinal's
-`& 0x7fff`) is drawn scrambled: Conflux 3.5's wall decorations show it in play.
-
-CSBWin draws the section's bitmap as it stands, through the same code as a `graphics.dat`
-graphic, which in its memory is Atari bitplanes: for a wall, `pExtendedBitmap` is
-`&pExtWallRects[13] + 2`, the side view, or past it the front (`doc/CSBwin-src/CSBCode.cpp:3263-3267`),
-and becomes `pFinalBitmap` where a basic decoration's is `GetBasicGraphicAddress`
-(`:3383-3392`, and `:3524-3533`); for a floor, `pGraphic` is `&pDesc[9] + 2`
-(`:3866`, `:3898`) where a basic one's is `GetBasicGraphicAddress` (`:3967`). The port
-decodes both as packed nibbles, high nibble first (`decodePacked4bpp` in
-`getWallDecoration` and `getFloorDecoration`, `src/data/CSBGraphicsLoader.ts`).
-Decoded as bitplanes (`decodePlanar`, same file), `tools/fixtures/csbgraphics/CSBgraphics.dat`'s wall
-decoration 5 ("biblio") is a bookshelf and floor decoration 61 ("flood11") a breaking
-wave; as nibbles they are noise in vertical bands.
-
-Paying it: decode the bitmaps with `decodePlanar`, at `2 * widthBytes` pixels, and check
-that `DrawDecorations.ts`'s cropping and scaling, written against the nibble decode, still
-match CSBWin's (`:3388-3540`, `:3898-3967`). Evidence: a `tools/` check that a section's
-bitmap reads as CSBWin's memory does, and a golden frame of an extended wall decoration
-in Conflux.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 
