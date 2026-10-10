@@ -1614,6 +1614,26 @@ the directory, the eight blocks of three records, every link and chain. `csbgame
 holds them among others, and CSBWin's loop run over each of the eight leaves its bytes as
 they were.
 
+## CSBWin carries an `EXPOOL` record of a type it does not know through a load and a save
+
+The type of a key is its top byte, an `EXPOOL_DATA_TYPE` from 1 to 10
+(`doc/CSBwin-src/CSB.h:1533-1577`), and every key CSBWin builds has one of those types:
+every `Locate`, the read's included (`SaveGame.cpp:1916-2019`), and every `Read` and
+`Write`: the save's palette and `DisableSaves` (`SaveGame.cpp:1229-1230`, `:1295`), the
+DSAs' message parameters, extended cell flags and traces (`DSA.cpp:2191-2192`,
+`:3088-3089`, `:3310-3328`, `:5583`), a champion in the wings (`Character.cpp:5191-5192`,
+`:5229`), the kill statistics (`Code11f52.cpp:986-991`), the global text
+(`CSBCode.cpp:5367-5370`) and a skin's columns (`data.cpp:2157-2173`). `Read` deletes only
+the record of its own key (`data.cpp:1552-1576`), and the one clear of the whole pool is
+`Cleanup`'s, the teardown before a game is read (`data.cpp:2004`, `:2030`). The pool is
+database 11, written whole with the other fifteen into block 13
+(`SaveGame.cpp:1297-1313`).
+
+So a record of type 11 or above is read with the pool, never looked at, and written back
+by CSBWin's next save as it was. A record holds 1 to 29 longwords (`EXPOOL::Write`'s
+`ASSERT(size <= 29)`, `data.cpp:1538`). The port's extras keep what they save in types
+from `0xF0` up (`DEBT.md` X).
+
 ## The DSA global variables are the `EXPOOL` records a read finds
 
 `numGlobalVariables` is not a constant. Every game read, a new game's from `dungeon.dat`

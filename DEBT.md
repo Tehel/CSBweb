@@ -107,6 +107,8 @@ In payoff order: the first row is the next item.
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | G30 | 3D2D1D's vertical moves and gravity | L | ⏸️ |
+| X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
+| X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G29 are the active list. `E15` waits for the page redesign to start, and
@@ -118,7 +120,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C168 · D17 · E23 · F15 · G31 · X9. An ID recorded and paid in one commit has no
+Next free IDs: C168 · D17 · E23 · F15 · G31 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -404,11 +406,72 @@ Rules for all of them:
 
   The coloured object cursor, RISE's NEW FACE and the FTL logo are the exceptions: the
   author wants them on by default, so they are recorded under H.
-- **None of them is saved.** What an extra keeps in memory is lost on a save and a load,
-  in the port's runtime save as in a CSBWin file, and that is acceptable: no save format
-  changes.
+- **What an extra saves goes in `EXPOOL`, under a type of its own**, from `0xF0` up, and
+  nowhere else in the file. CSBWin reads such a record with the pool, never looks at it,
+  and writes it back unchanged (`doc/PROVEN_FACTS.md` → "CSBWin carries an `EXPOOL`
+  record of a type it does not know through a load and a save"), so the file stays a
+  CSBWin save both ways. A record holds at most 29 longwords; more takes several keys
+  that differ only in their index, as CSBWin's DSA global variables do. The extra writes
+  its records only with the setting on, so with it off every save is byte-for-byte what
+  it was. Before writing, it `Read`s (which deletes) its old records from index 0 until one
+  is missing, then `Write`s the new ones, as CSBWin's save does with its palette
+  (`doc/CSBwin-src/SaveGame.cpp:1229-1230`). A load reads them whatever the setting.
+  A record can come back from a game CSBWin played on without updating it, so a load
+  checks every value against the world and drops what does not hold. The types in use
+  are listed in the entries below. The shipped extras above save nothing: a save and a
+  load forget what they keep.
 - **Each ships with its `tools/` check**, run with the setting on, and its entry here is
   deleted as for any paid item.
+
+### X9 ⏸️ Thrown weapons' tags kept across a save
+
+The tags of `src/engine/ThrownWeapons.ts` live only in memory, `GameContext.thrownWeapons`,
+and a load clears them (`src/engine/RuntimeSave.ts:152`). A tag holds the record it was
+made for, and `tagOf` keeps it only while the object's RN still names that very
+`DatabaseRecord`. A loaded world has new records, so that check cannot survive a save.
+
+- **The records**: type `0xF0`, subtype 0, index from 0. Two longwords a tag, so fourteen
+  to a record:
+  - the object's `ObjectID`, the thrower's index and the slot the object left;
+  - where it is at the save: the level, x and y of the chain that holds it, on the
+    floor or in the missile or monster group there that holds it. That longword also
+    carries the object's `DescIndex`.
+- **The load** keeps a tag only if that chain still holds the RN and the RN's object
+  still has that `DescIndex`. This drops the tag of an object CSBWin moved, gave a
+  champion, or whose slot it freed and handed to another object, as
+  `findEmptyDBEntry` does in the port. A tag kept takes the object's new record as its
+  `record`.
+- **The check**: `tools/watch-thrown-weapons.ts` goes on through a save and a load: a
+  weapon thrown, then the file saved and read back, then the party on its square gathers
+  it. The same file with the weapon moved to another square by hand loads with no tag,
+  and with the records deleted, it loads as if nothing had been thrown.
+
+### X10 ⏸️ The cells the party has seen, kept across a save for an automap
+
+Nothing records which cells the party has seen. This item records them and saves them;
+drawing a map from them is a separate item, entered when the author names it.
+
+- **Seen means drawn, and the cell keeps the aspect it was drawn with.** The cells
+  `DrawViewport` summarises at a tick (`SummarizeRoomInfo`,
+  `src/renderer/csbwin/SummarizeRoomInfo.ts`) are recorded with what the summary made of
+  them, not what the map holds. A fake wall seen closed is stone. A hidden pit is
+  floor, since the summary makes it `OPEN`. An invisible teleporter is floor too: its
+  `decorations[0]` is 0, so it is not drawn. Nothing a designer hid is given away. The latest view of a cell replaces the
+  earlier one. Recording runs whatever the setting, so a map is there when the extras are
+  turned on.
+- **Four bits a cell.** Codes 0 to 7, to settle when the item starts: unknown, stone,
+  floor, pit, stairs up, stairs down (the summary's `decorations[0]`, `cellFlags & 4`),
+  door, teleporter. 8 to 15 are free for what comes up along the way.
+- **Still to decide**: what a cell is when the viewport is too dark to show it, and
+  whether the cell the party stands on counts as seen without being drawn.
+- **The records**: type `0xF1`, subtype the level, index the chunk: the level's cells in
+  the map's own order, eight to a longword, 29 longwords (232 cells) to a record. A chunk
+  that is all unknown is not written. The default dungeon's 12087 cells make about 6 KB
+  of data, about 55 records.
+- **The check**: a new `tools/dump-automap.ts` walks a route on the default dungeon and
+  prints each level's codes as a map. It asserts a fake wall seen as stone and a hidden
+  pit seen as floor, saves, loads, and compares every code. The same file with the
+  records deleted loads with every cell unknown.
 
 ---
 
