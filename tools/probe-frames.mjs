@@ -437,21 +437,6 @@ await evaluate(`(async()=>{
   return party.champions.map((c) => c.name).join(', ');
 })()`).then(names => console.log('  csb party:', names));
 await wait(600);
-// A viewport overlay (`src/renderer/csbwin/OverlayScreen.ts`), through the page's dev
-// control as a DSA's `&OVERLAY` and `&JITTER` would put it up: overlay 1 of CSB's
-// `CSBgraphics.dat` over this view, half of each pixel the overlay's, its colour 0
-// transparent, and the view shifted four pixels right under it. Hidden and shifted back
-// after, the view is as it was.
-await leaveCanvas(); await wait(200);
-const csbView = await canvasPixels();
-const setInputs = (values) => evaluate(`(()=>{for (const [id, v] of Object.entries(${JSON.stringify(values)}))
-  document.getElementById(id).value = String(v); return 1;})()`);
-await setInputs({ 'overlay-number': 1, 'overlay-p1': 1, 'overlay-p2': 50, 'overlay-p3': 0, 'overlay-p4': 0, 'overlay-jitter-x': 4, 'overlay-jitter-y': 0 });
-await click('#btn-overlay-show'); await click('#btn-overlay-jitter'); await wait(500);
-console.log('state: overlay');           await shot('17-overlay');
-await setInputs({ 'overlay-jitter-x': 0 });
-await click('#btn-overlay-hide'); await click('#btn-overlay-jitter'); await wait(500);
-check((await canvasPixels()) === csbView, 'the overlay hidden and the view shifted back, it is the view again');
 await canvasClick(15, 15, 2);  await wait(700);
 await leaveCanvas(); await wait(200);
 console.log('state: CSB inventory');
@@ -476,7 +461,20 @@ check(!(await evaluate(`window.__probe.screen.isHintOracleUp()`)) && (await canv
 await send('Page.navigate', { url: `${APP}?intro=0&dungeon=conflux` });
 await wait(3500);
 await leaveCanvas(); await wait(200);
-console.log('state: Conflux start');     await shot('18-conflux-start');
+console.log('state: Conflux start');     const confluxStart = await shot('18-conflux-start');
+// A viewport overlay (`src/renderer/csbwin/OverlayScreen.ts`), through the page's dev
+// control as a DSA's `&OVERLAY` and `&JITTER` would put it up: overlay 1 of Conflux's
+// `CSBgraphics.dat` over this view, half of each pixel the overlay's, its colour 0
+// transparent, and the view shifted four pixels right under it. Hidden and shifted back
+// after, the view is frame 18.
+const setInputs = (values) => evaluate(`(()=>{for (const [id, v] of Object.entries(${JSON.stringify(values)}))
+  document.getElementById(id).value = String(v); return 1;})()`);
+await setInputs({ 'overlay-number': 1, 'overlay-p1': 1, 'overlay-p2': 50, 'overlay-p3': 0, 'overlay-p4': 0, 'overlay-jitter-x': 4, 'overlay-jitter-y': 0 });
+await click('#btn-overlay-show'); await click('#btn-overlay-jitter'); await wait(500);
+console.log('state: overlay');           await shot('17-overlay');
+await setInputs({ 'overlay-jitter-x': 0 });
+await click('#btn-overlay-hide'); await click('#btn-overlay-jitter'); await wait(500);
+check((await canvasPixels()) === confluxStart, 'the overlay hidden and the view shifted back, it is frame 18 again');
 
 // The CRT effect's input surface. The effect's canvas is shown over the game canvas, and
 // the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,

@@ -31,8 +31,10 @@ export interface DataSet {
     dir: string;
     /**
      * Whether the folder holds a `CSBgraphics.dat`, CSBWin's extensions' overlay, which it
-     * opens only on demand (doc/CSBwin-src/Graphics.cpp:1864-1882, :3228-3300). No DM set
-     * here holds one.
+     * opens only on demand (doc/CSBwin-src/Graphics.cpp:1864-1882, :3228-3300). It is a
+     * library of resources for dungeon designers, which varies from release to release, so
+     * a dungeon that uses it ships its own: Conflux and The Towers of Chaos do. DM and CSB
+     * use none. `tools/fixtures/csbgraphics/CSBgraphics.dat` is one such library, for the tools.
      */
     csbGraphics: boolean;
     /**

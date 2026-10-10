@@ -37,7 +37,7 @@ const CONFLUX = 'static/gamefiles/conflux-3.5-b8';
 /** The two `CSBgraphics.dat` here, with how many alternate monster graphics each holds. */
 const FILES: [string, number][] = [
   [`${CONFLUX}/CSBgraphics.dat`, 123],
-  ['static/gamefiles/csb/CSBgraphics.dat', 123],
+  ['tools/fixtures/csbgraphics/CSBgraphics.dat', 123],
 ];
 
 function quiet<T>(fn: () => T): T {

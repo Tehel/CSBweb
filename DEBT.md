@@ -216,7 +216,7 @@ and becomes `pFinalBitmap` where a basic decoration's is `GetBasicGraphicAddress
 (`:3866`, `:3898`) where a basic one's is `GetBasicGraphicAddress` (`:3967`). The port
 decodes both as packed nibbles, high nibble first (`decodePacked4bpp` in
 `getWallDecoration` and `getFloorDecoration`, `src/data/CSBGraphicsLoader.ts`).
-Decoded as bitplanes (`decodePlanar`, same file), `csb/CSBgraphics.dat`'s wall
+Decoded as bitplanes (`decodePlanar`, same file), `tools/fixtures/csbgraphics/CSBgraphics.dat`'s wall
 decoration 5 ("biblio") is a bookshelf and floor decoration 61 ("flood11") a breaking
 wave; as nibbles they are noise in vertical bands.
 
