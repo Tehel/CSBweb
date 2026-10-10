@@ -382,19 +382,7 @@ console.log('state: door lock, F2');     await shot('11-door-lock-f2');
 await evaluate(FACE(17, 9, 0, 0)); await wait(500);
 console.log('state: F2 front-left wall'); await shot('13-edge-decoration-left');
 await evaluate(FACE(15, 9, 0, 0)); await wait(500);
-console.log('state: F2 front-right wall'); const edgeRight = await shot('14-edge-decoration-right');
-// A viewport overlay (`src/renderer/csbwin/OverlayScreen.ts`), through the page's dev
-// control as a DSA's `&OVERLAY` and `&JITTER` would put it up: `dm-atari`'s overlay 1 over
-// the same view, half of each pixel the overlay's, its colour 0 transparent, and the view
-// shifted four pixels right under it. Hidden and shifted back after, the view is frame 14.
-const setInputs = (values) => evaluate(`(()=>{for (const [id, v] of Object.entries(${JSON.stringify(values)}))
-  document.getElementById(id).value = String(v); return 1;})()`);
-await setInputs({ 'overlay-number': 1, 'overlay-p1': 1, 'overlay-p2': 50, 'overlay-p3': 0, 'overlay-p4': 0, 'overlay-jitter-x': 4, 'overlay-jitter-y': 0 });
-await click('#btn-overlay-show'); await click('#btn-overlay-jitter'); await wait(500);
-console.log('state: overlay');           await shot('17-overlay');
-await setInputs({ 'overlay-jitter-x': 0 });
-await click('#btn-overlay-hide'); await click('#btn-overlay-jitter'); await wait(500);
-check((await canvasPixels()) === edgeRight, 'the overlay hidden and the view shifted back, it is frame 14 again');
+console.log('state: F2 front-right wall'); await shot('14-edge-decoration-right');
 // A wall text seen from afar is its plaque, cut short for a text of one to three lines
 // (`doc/CSBwin-src/CSBCode.cpp:3625-3660`). "HALL OF / CHAMPIONS", on the north
 // face of level 0 (8,5), seen from (8,3) facing south: two lines at F2 centre, so the
@@ -449,6 +437,21 @@ await evaluate(`(async()=>{
   return party.champions.map((c) => c.name).join(', ');
 })()`).then(names => console.log('  csb party:', names));
 await wait(600);
+// A viewport overlay (`src/renderer/csbwin/OverlayScreen.ts`), through the page's dev
+// control as a DSA's `&OVERLAY` and `&JITTER` would put it up: overlay 1 of CSB's
+// `CSBgraphics.dat` over this view, half of each pixel the overlay's, its colour 0
+// transparent, and the view shifted four pixels right under it. Hidden and shifted back
+// after, the view is as it was.
+await leaveCanvas(); await wait(200);
+const csbView = await canvasPixels();
+const setInputs = (values) => evaluate(`(()=>{for (const [id, v] of Object.entries(${JSON.stringify(values)}))
+  document.getElementById(id).value = String(v); return 1;})()`);
+await setInputs({ 'overlay-number': 1, 'overlay-p1': 1, 'overlay-p2': 50, 'overlay-p3': 0, 'overlay-p4': 0, 'overlay-jitter-x': 4, 'overlay-jitter-y': 0 });
+await click('#btn-overlay-show'); await click('#btn-overlay-jitter'); await wait(500);
+console.log('state: overlay');           await shot('17-overlay');
+await setInputs({ 'overlay-jitter-x': 0 });
+await click('#btn-overlay-hide'); await click('#btn-overlay-jitter'); await wait(500);
+check((await canvasPixels()) === csbView, 'the overlay hidden and the view shifted back, it is the view again');
 await canvasClick(15, 15, 2);  await wait(700);
 await leaveCanvas(); await wait(200);
 console.log('state: CSB inventory');

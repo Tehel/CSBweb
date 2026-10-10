@@ -806,7 +806,7 @@ and the creators of `src/data/BackgroundLib.ts`, checked by `tools/dump-virtual-
 
 - **Conflux 3.5** has skins on 11407 cells, 42 different ones, and a default skin on most levels: 11, which has no graphics and runs program 64, so nearly every view of Conflux runs a skin's program. Its `CSBgraphics.dat` has 51 skins, 90 background sections and four programs (61 to 64). Its DSAs never call `&GETSKIN` or `&SETSKIN` (`tools/dump-skins.ts`, `tools/dump-background-lib.ts`).
 - **The Towers of Chaos 3.3** has skins 1, 2, 3, 5 and 6 on 4530 cells, and its default skins are all 0. Its `CSBgraphics.dat` has 38 skins, 21 background sections and one program (64), which uses a subset of Conflux's skin opcodes, the virtual graphics among them.
-- **`dm-atari`'s `CSBgraphics.dat`** also holds 90 background sections, but DM's dungeon has no skins. 3D2D1D's file has the default skins record, all 0.
+- **`csb`'s `CSBgraphics.dat`** also holds 90 background sections, but CSB's dungeon has no skins. 3D2D1D's file has the default skins record, all 0.
 - Of the skin opcodes (60302 to 60362) the programs use 33, among them the three that make virtual graphics, and not `DrawCustomDecoration`, `WallDecorationID` or `FloorDecorationID` (`tools/dump-skin-programs.ts`).
 
 ---

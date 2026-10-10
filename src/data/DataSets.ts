@@ -31,8 +31,8 @@ export interface DataSet {
     dir: string;
     /**
      * Whether the folder holds a `CSBgraphics.dat`, CSBWin's extensions' overlay, which it
-     * opens only on demand (doc/CSBwin-src/Graphics.cpp:1864-1882, :3228-3300). The CSB
-     * package ships none, and neither does the DM Windows one.
+     * opens only on demand (doc/CSBwin-src/Graphics.cpp:1864-1882, :3228-3300). No DM set
+     * here holds one.
      */
     csbGraphics: boolean;
     /**
