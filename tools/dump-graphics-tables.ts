@@ -44,6 +44,7 @@ import { extractGraphicsTables, type GraphicsTables } from '../src/data/tables/G
 import type { DecorationDesc } from '../src/data/tables/ObjectTables';
 import type { KeyXlate, Rect, RectPos, UIButton } from '../src/data/tables/UITables';
 import { check, finish } from './lib/check';
+import { DATA_SETS } from './lib/dataSets';
 
 const DATA_H = readFileSync(resolve('doc/CSBwin-src/Data.h'), 'utf8').split('\n');
 const CSBCODE = readFileSync(resolve('doc/CSBwin-src/CSBCode.cpp'), 'utf8');
@@ -564,13 +565,10 @@ function main(): void {
     [layoutOf(0x232, 'Start of graphic 0x232', /End of graphic 0x232/), regions232],
   ];
 
-  const manifest = JSON.parse(readFileSync(resolve('static/gamefiles/manifest.json'), 'utf8')) as {
-    dataSets: { id: string; dir: string }[];
-  };
   let first = true;
-  for (const { id, dir } of manifest.dataSets) {
+  for (const { id, dir } of DATA_SETS) {
     const graphics = new GraphicsLoader();
-    graphics.loadFromArray(new Uint8Array(readFileSync(resolve(`static/gamefiles/${dir}/graphics.dat`))));
+    graphics.loadFromArray(new Uint8Array(readFileSync(resolve(`${dir}/graphics.dat`))));
     const tables = extractGraphicsTables(graphics);
     check(tables.viewport.wallRectanglesOffset === layout22e.fields.get('wallRectangles')?.offset,
       `${id}: ViewportTables puts wallRectangles at Data.h's offset (${tables.viewport.wallRectanglesOffset})`);
