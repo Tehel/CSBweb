@@ -85,7 +85,7 @@ function scratchFiles(scratch: string): ServerOptions {
     writeFileSync(join(distDir, 'assets', 'index-AbC123.js'), 'console.log(1);');
     writeFileSync(join(gamefilesDir, 'manifest.json'), JSON.stringify({
         default: 'a', swoosh: 'logo',
-        dataSets: [{ id: 'a', name: 'A', dir: 'set-a', csbGraphics: false, miniDat: false, hintOracle: false }],
+        dataSets: [{ id: 'a', name: 'A', dir: 'set-a' }],
     }));
     writeFileSync(join(gamefilesDir, 'set-a', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
     writeFileSync(join(gamefilesDir, 'set-a', '.hidden'), 'hidden');
@@ -115,7 +115,7 @@ function checkStartUp(scratch: string, options: ServerOptions): void {
     check(notJson.includes('is not JSON'), 'a manifest that does not parse is refused, by the page\'s parser');
     writeFileSync(join(bad, 'manifest.json'), JSON.stringify({
         default: 'a', swoosh: 'gone-logo',
-        dataSets: [{ id: 'a', name: 'A', dir: 'gone', csbGraphics: false, miniDat: false, hintOracle: false }],
+        dataSets: [{ id: 'a', name: 'A', dir: 'gone' }],
     }));
     const missing = refusal({ ...options, gamefilesDir: bad });
     console.log(`  missing folders: ${missing}`);

@@ -42,14 +42,17 @@ function refusal(text: string): string | null {
 /** The parser: folders resolved under the manifest's, and each kind of malformed manifest refused, saying why. */
 function checkParser(): void {
   const set = (fields: Record<string, unknown> = {}) =>
-    ({ id: 'a', name: 'A', dir: 'a', csbGraphics: false, miniDat: true, hintOracle: false, ...fields });
+    ({ id: 'a', name: 'A', ...fields });
   const manifest = (fields: Record<string, unknown> = {}) => JSON.stringify({ default: 'a', dataSets: [set()], ...fields });
 
-  const parsed = parseManifest(manifest({ swoosh: 'logo/st', dataSets: [set(), set({ id: 'b', dir: 'b/c' })] }), 'gamefiles');
+  const parsed = parseManifest(manifest({ swoosh: 'logo/st', dataSets: [set({ miniDat: true, hintOracle: false }), set({ id: 'b', dir: 'b/c' })] }), 'gamefiles');
   console.log(`  parsed: ${parsed.dataSets.map((s) => `${s.id} in ${s.dir}`).join(', ')}; default ${parsed.defaultSet.id}; FTL logo in ${parsed.swooshDir}`);
   check(parsed.dataSets[1]!.dir === 'gamefiles/b/c' && parsed.swooshDir === 'gamefiles/logo/st' && parsed.defaultSet === parsed.dataSets[0],
     'a folder is resolved under the manifest\'s, and the default is one of the sets');
-  check(parsed.dataSets[0]!.miniDat && !parsed.dataSets[0]!.csbGraphics, 'the flags are read as written');
+  check(parsed.dataSets[0]!.miniDat && !parsed.dataSets[0]!.hintOracle, 'the flags are read as written');
+  const bare = parsed.dataSets[1]!;
+  check(parsed.dataSets[0]!.dir === 'gamefiles/a' && !bare.csbGraphics && !bare.miniDat && !bare.hintOracle && !bare.hidden,
+    'a set\'s "dir" left out is its "id", and a flag left out is false');
   check(parseManifest(manifest(), '').swooshDir === null && parseManifest(manifest({ swoosh: null }), '').swooshDir === null,
     'a manifest that names no FTL logo, or null, has none');
   check(dataSetFor(parsed, null) === parsed.defaultSet && dataSetFor(parsed, 'nowhere') === parsed.defaultSet
@@ -74,7 +77,8 @@ function checkParser(): void {
     [manifest({ dataSets: [set({ dir: '/gamefiles/a' })] }), `data set 'a' has no "dir"`],
     [manifest({ dataSets: [set({ dir: '../a' })] }), `data set 'a' has no "dir"`],
     [manifest({ dataSets: [set({ dir: 'a/' })] }), `data set 'a' has no "dir"`],
-    [manifest({ dataSets: [set({ hintOracle: 'yes' })] }), `data set 'a' has no "hintOracle"`],
+    [manifest({ dataSets: [set({ dir: null })] }), `data set 'a' has no "dir"`],
+    [manifest({ dataSets: [set({ hintOracle: 'yes' })] }), `data set 'a' has a "hintOracle" that is neither true nor false`],
     [manifest({ dataSets: [set({ hidden: 'yes' })] }), `data set 'a' has a "hidden" that is neither true nor false`],
     [manifest({ dataSets: [set(), set({ dir: 'b' })] }), `two data sets are 'a'`],
     [manifest({ default: 'b' }), '"default" names none'],

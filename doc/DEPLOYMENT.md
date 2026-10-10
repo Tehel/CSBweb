@@ -70,7 +70,8 @@ The page ships as it is, debug chrome included. Every URL in it is relative to t
 
 `static/gamefiles/manifest.json`, committed with the files it describes, lists each set
 (its `dir` relative to the manifest), the default set's id and the FTL logo's folder, or
-none. `src/data/DataSets.ts` parses it, for the page, the tools and the server. The page
+none. A set names only what differs from the defaults: `dir` left out is the set's `id`,
+and each flag (`csbGraphics`, `miniDat`, `hintOracle`, `hidden`) left out is `false`. `src/data/DataSets.ts` parses it, for the page, the tools and the server. The page
 fetches it first (`loadManifest`, `src/main.ts`), and one that is missing or malformed ends
 the boot on `fatalMessage`, saying why. The tools read it through `tools/lib/dataSets.ts`,
 and `tools/dump-data-sets.ts` asserts the parser's refusals and that every folder holds the

@@ -13,12 +13,14 @@
  * offers the games its folder holds. This module parses it, for the page and the tools:
  *
  *     { "default": "dm-atari", "swoosh": "swoosh",
- *       "dataSets": [{ "id": "dm-atari", "name": "Dungeon Master", "dir": "dm-atari",
- *                      "csbGraphics": true, "miniDat": false, "hintOracle": false }, …] }
+ *       "dataSets": [{ "id": "dm-atari", "name": "Dungeon Master", "csbGraphics": true },
+ *                    { "id": "conflux", "name": "Conflux 3.5", "dir": "conflux-3.5-b8" }, …] }
  *
- * A folder is named relative to the manifest. `swoosh`, the FTL logo's folder, may be
- * `null` or left out. A set with `"hidden": true` is left out of the chooser and plays all
- * the same by its `?dungeon=` (`chooserSets`); `hidden` may be left out, for `false`.
+ * A folder is named relative to the manifest. A set's `dir` may be left out, for its `id`.
+ * `swoosh`, the FTL logo's folder, may be `null` or left out. The flags `csbGraphics`,
+ * `miniDat`, `hintOracle` and `hidden` may each be left out, for `false`, and the manifest
+ * names one only where it is true. A set with `"hidden": true` is left out of the chooser
+ * and plays all the same by its `?dungeon=` (`chooserSets`).
  */
 
 export interface DataSet {
@@ -69,7 +71,7 @@ export interface DataSetManifest {
 /** The manifest's name, in the folder that holds the sets. */
 export const MANIFEST_NAME = 'manifest.json';
 
-const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle'] as const;
+const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'hidden'] as const;
 
 /**
  * `text`, the manifest read from the folder `base` (`gamefiles` for the page,
@@ -91,18 +93,17 @@ export function parseManifest(text: string, base: string): DataSetManifest {
     const dataSets = list.map((entry: unknown, i): DataSet => {
         const where = `data set ${i}`;
         if (!isRecord(entry)) throw manifestError(`${where} is not an object`);
-        const { id, name, dir } = entry;
+        const { id, name } = entry;
         if (!isText(id)) throw manifestError(`${where} has no "id"`);
         if (!isText(name)) throw manifestError(`data set '${id}' has no "name"`);
+        const dir = entry.dir === undefined ? id : entry.dir;
         if (!isFolder(dir)) throw manifestError(`data set '${id}' has no "dir", a folder relative to the manifest`);
-        const flags = FLAGS.map((flag) => {
-            const value = entry[flag];
-            if (typeof value !== 'boolean') throw manifestError(`data set '${id}' has no "${flag}", true or false`);
+        const [csbGraphics, miniDat, hintOracle, hidden] = FLAGS.map((flag) => {
+            const value = entry[flag] ?? false;
+            if (typeof value !== 'boolean') throw manifestError(`data set '${id}' has a "${flag}" that is neither true nor false`);
             return value;
-        });
-        const hidden = entry.hidden ?? false;
-        if (typeof hidden !== 'boolean') throw manifestError(`data set '${id}' has a "hidden" that is neither true nor false`);
-        return { id, name, dir: under(base, dir), csbGraphics: flags[0]!, miniDat: flags[1]!, hintOracle: flags[2]!, hidden };
+        }) as [boolean, boolean, boolean, boolean];
+        return { id, name, dir: under(base, dir), csbGraphics, miniDat, hintOracle, hidden };
     });
     const twice = dataSets.find((set, i) => dataSets.findIndex((other) => other.id === set.id) !== i);
     if (twice) throw manifestError(`two data sets are '${twice.id}'`);
