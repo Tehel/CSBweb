@@ -108,6 +108,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| E15 | The page shell | L | ⚠️ step 1 of 6 next |
+| E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
@@ -145,8 +147,7 @@ In payoff order: the first row is the next item.
 | E31 | Late wiring with silent defaults, and long parameter lists | M | ⏳ |
 | E32 | Four ways to read bytes, and eight graphics caches | M | ⏳ |
 | E33 | What a frame costs | S | ⏳ |
-| E30 | One presenter and one input router | M | ⏳ before E15 |
-| E15 | The page shell | L | ⏳ with the page redesign |
+| E30 | One presenter and one input router | M | ⏳ |
 | E22 | The screen's ratio, and a fractional fill | M | ⏳ after E15 |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C178 | No save keeps the dungeon's game information | S | ⏳ |
@@ -176,16 +177,16 @@ In payoff order: the first row is the next item.
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G29 are the active list. `E15` waits for the page redesign to start, and
-`E22` for E15: a session that reaches either first asks the author, and takes the next
-active row meanwhile. A
+The rows above G29 are the active list. `E39` waits for the author's design, and `E22`
+for E15: a session that reaches either first asks the author, and takes the next active
+row meanwhile. A
 new row takes its tier's place above it. The F rows are independent of the rest
 ("Priority", point 5), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C182 · D22 · E39 · F21 · G31 · R15 · U11 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E40 · F21 · G31 · R15 · U11 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -492,7 +493,7 @@ latest or best N wins a set, the top N champions), `api/stats` under a rate limi
 - **Names**: `checkChampions` asks only that a name be a string of at most `MAX_NAME`
   characters (`server/events.ts:99`), so control characters, bidi overrides, NUL (which
   `json_extract` cuts), markup and the empty name are stored, and published by
-  `api/stats`, which E15's public statistics page will draw.
+  `api/stats`, which E39's public statistics will draw.
 
 Paying it: a `POST` whose `Origin` or `Sec-Fetch-Site` names another site is refused; a
 name is made of the characters the game's font has (A to Z, the accented letters, space,
@@ -511,7 +512,7 @@ playthrough (`INSERT OR IGNORE`); IPv6 counted by its /64; a size check.
 
 ### W5 ⏳ The statistics are pseudonymous, not anonymous
 
-`doc/STATISTICS.md` says no address is stored, and E15's FAQ is to insist the statistics
+`doc/STATISTICS.md` says no address is stored, and E39's FAQ is to insist the statistics
 are anonymous. But the nginx block `doc/DEPLOYMENT.md` gives (`:54-60`) sets no
 `access_log`, so nginx's default logs the address and user agent of every
 `POST /api/event`; `events.time` is to the millisecond (`server/stats.ts`); and the
@@ -601,7 +602,7 @@ sides read; the chest opened and repacked at the events where CSBWin calls `TAG0
 `RepackChest` (an inventory toggled, the hand's object or the weapon hand changing, the eye
 and the mouth: `doc/CSBwin-src/CSBCode.cpp:7452-7517`, `Character.cpp:1915`, `:3464`,
 `:4532`, `:5149`); `presentViewport` only reads; `GameHost` keeps only what leaves the
-engine. No pixel moves. Before E15.
+engine. No pixel moves.
 
 ### D19 ⏳ `RuntimeSaveState` is neither strict nor a snapshot
 
@@ -683,7 +684,7 @@ view), shared by the loader, the writer, `Chaos`, `legacyRows` and `CsbwinSaveIn
 
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included. What the
-page redesign adds is the exception: E15's pages, and E22, which builds on its settings.
+page redesign adds is the exception: E15's welcome page, E39's pages, and E22.
 
 The structure need no longer follow CSBWin's files (the author's decision): a module may
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
@@ -924,7 +925,7 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:208-223`).
 
 Paying it: one rAF presenter with a dirty flag that the VBL and the animations set, the CRT
 drawing only after a present; one input router, with a focus policy once the page has
-controls again. E15 and E22 build
+controls again. E22 builds
 on both: resizing, dialogs over the canvas.
 
 ### E31 ⏳ Late wiring with silent defaults, and long parameter lists
@@ -1096,28 +1097,82 @@ lengths checked once in `parseHcsbDat`, not by 54 `!`; `noUncheckedIndexedAccess
 module by module where data comes from files (the intro, the renderer, the loaders), in a
 `tsconfig` that `npm test` runs; an `OBJECT_ID_EMPTY` constant; the two free flags on.
 
-### E15 ⏳ The page shell
+### E15 ⚠️ The page shell
 
-What the redesign will replace, and what it should not carry across:
+The page is the canvas alone, and its data set is chosen by `?dungeon=` (`chooseDataSet`,
+`src/main.ts`), the manifest's default where it names none. E15 gives the page a welcome
+page, design artboard 1 ("Arrival: choose a dungeon", `project/Main.dc.html`,
+`.claude/memory/design-canvas-files.md`), cut down as the author asked:
 
-- **`main.ts` holds the page's features**: the end-of-game flow.
-- **A teleport sends events.** On a page opened with `?dev`, a click on the map dialog's
-  square teleports the party by replacing its state (`setPartyState({ ...state,
-  position })`, `onTeleport`, `src/main.ts`), with no test of the square (into stone, if
-  clicked there) and no `MoveObject`; the game it plays reaches the statistics' "where
-  parties die" like any other. A game a teleport touched should send no events.
-- **Two input stacks** (E30). The welcome page's controls, once there are some, give the
-  keyboard's focus back to the game: a button that keeps it is pressed again by Space or
-  ENTER, which `GameInput.keyDown` leaves to the page when nothing binds them, and a
-  focused `<select>` changes on a letter.
-- **The data-set chooser** lists `chooserSets` (`src/data/DataSets.ts`), and a change of
-  game asks first.
+- **It is the page without `?dungeon=`**: HTML, no game canvas, nothing of the game
+  built. With `?dungeon=` the page is the game, as now.
+- **At the top, "CSBweb"** centred, a medium-sized logo in the game's font. The design's
+  header goes, with its SETTINGS and CONTROLS links.
+- **A grid of the data sets** (`chooserSets`, `src/data/DataSets.ts`), each tile its
+  title screen, its name and a line under it. A set the store holds saves of is
+  highlighted, the others dimmed. A click selects a tile, a golden border round it
+  (the kit's `.pick`).
+- **Under the grid, PLAY and CONTINUE**, the kit's `.btn`, centred side by side. PLAY is
+  disabled until a set is selected, and starts its game: `?dungeon=<id>`, the title
+  animation, then the entrance. CONTINUE is disabled while the store holds no save. It
+  reads the last save used (`lastUsedSave`, `src/data/saves/SaveStore.ts`) of the
+  selected set, or of every set when none is selected, straight into play: the page
+  opens `?dungeon=<id>&save=<row id>`, and the boot reads that row as F9 reads one,
+  without the title or the entrance. A box right of CONTINUE previews that save: its
+  party, its level and when it was saved.
+- **The bottom as the design has it**: the line under the hero, the four columns, and
+  the footer, whose links are ABOUT, SOURCE and CREDITS. ABOUT and CREDITS are E39's
+  pages. Where SOURCE leads is the author's to say: the repository is not public, so
+  until then the link is drawn and goes nowhere.
+- **Fonts**: the game's font for the logo, the grid, the buttons, the preview and the
+  columns' yellow headings, as the design's kit draws it (artboard 10, "The game's
+  font"). The prose, the line under the hero and the columns' paragraphs, is the
+  design's Spectral, served with the page rather than from Google Fonts, whose every
+  request gives Google the player's address (W5).
 
-Paying it is the redesign's first step: a page that renders the settings model
-(`src/settings/Settings.ts`) and owns nothing of its own.
-The redesigned page also links to two pages:
+The steps, one commit each:
 
-- **A static FAQ.** Among its answers is one paragraph on the statistics the server
+1. ⏳ **The welcome page.** Without `?dungeon=`, `index.html` builds the welcome page
+   instead of the game: the logo, the grid as text tiles, the selection, PLAY, CONTINUE
+   enabled or not by the store with its preview box, and the bottom of the page, in
+   the kit's colours and bevels (`project/dm-kit.css`) and a monospace font. A
+   `?dungeon=` naming no set is the welcome page too. The manifest's `default` is then
+   what the tools play. The probes and every tool or skill that opens the page without
+   `?dungeon=` name `dungeon=dm-atari`. Its check: a `tools/probe-frames.mjs` block on
+   the welcome page, the tiles, the disabled buttons and where PLAY goes.
+2. ⏳ **CONTINUE.** `?save=<row id>`: the boot reads the row into the game as F9 does,
+   skipping the title and the entrance; a row that is not the set's, or is not there,
+   falls back to the entrance. Its check: the probe continues a stored save and finds
+   its party in play.
+3. ⏳ **The title screens.** Each tile's picture is its set's title, decoded from its
+   `graphics.dat` at run time as the boot's title is (`src/renderer/intro/`), so the
+   page fetches every listed set's `graphics.dat` (270 to 460 KB each), which the
+   browser then has for the game.
+4. ⏳ **The fonts.** The game's font, read from the default set's `graphics.dat` and
+   made a `FontFace` at run time (a TrueType font of one square contour per lit pixel
+   run, built in memory), so the page's labels stay HTML text; Spectral, OFL, as files
+   under `src/assets/`.
+5. ⏳ **EXIT.** The settings dialog's EXIT (`src/renderer/ui/SettingsDialog.ts`), drawn
+   inert, goes live: it asks first in `_DoMenu`'s two-option menu, as what has not been
+   saved is lost, then opens the page without `?dungeon=`.
+6. ⏳ **What the shell leaves.**
+   - **`main.ts` holds the page's features**: the end-of-game flow.
+   - **A teleport sends events.** On a page opened with `?dev`, a click on the map
+     dialog's square teleports the party by replacing its state
+     (`setPartyState({ ...state, position })`, `onTeleport`, `src/main.ts`), with no
+     test of the square (into stone, if clicked there) and no `MoveObject`; the game it
+     plays reaches the statistics' "where parties die" like any other. A game a
+     teleport touched should send no events.
+
+The welcome page and the game are two loads of the page, so E30's two input stacks never
+meet the welcome page's controls: PLAY, CONTINUE and EXIT each load the page anew.
+
+### E39 ⏳ The About and Credits pages
+
+The welcome page's footer (E15) links to ABOUT and CREDITS, two pages to be designed with
+the author before any code. What they are to hold:
+
+- **ABOUT, with a FAQ.** Among its answers is one paragraph on the statistics the server
   collects (`doc/STATISTICS.md`), and why:
   - to check that the game is actually played;
   - a leaderboard of the preferred champions;
@@ -1126,7 +1181,9 @@ The redesigned page also links to two pages:
   It insists that the statistics are anonymous: no player's name, no IP address, no
   browser profiling. A random id, drawn in the browser, is used only for counting
   players. Champions go by the names they carry, which a player can type.
-- **The public statistics**, drawn from the server's `api/stats`.
+- **The public statistics**, drawn from the server's `api/stats`, on ABOUT or a page of
+  their own.
+- **CREDITS**: FTL's games, CSBWin and Paul R. Stevens, the data sets' authors.
 
 ### E22 ⏳ The screen's ratio, and a fractional fill
 
@@ -1140,7 +1197,8 @@ picture of square pixels either way. The page will offer the player:
 - **A fractional fill**: fullscreen filling the screen at the chosen ratio, rather than
   the whole multiple.
 
-Both are settings of E15's model, so this follows E15. What the change must look after:
+Both are DISPLAY's settings (`src/settings/Settings.ts`), and the screen's place on the page
+is the shell's, so this follows E15. What the change must look after:
 
 1. **One source for both canvases.** The CRT effect's canvas shares `#game`'s grid cell
    and the `.screen` class with the game canvas, so it covers it only while both take
