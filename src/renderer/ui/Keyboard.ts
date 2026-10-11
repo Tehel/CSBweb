@@ -124,12 +124,13 @@ const KEYSCAN: Readonly<Record<string, number>> = {
 };
 
 /**
- * `key`'s keyscan in CSBWin's key tables, or 0 for a key they cannot hold. With Ctrl, a
- * letter is its ASCII control code, the letter's code less 0x40 — Ctrl-S is 0x13 — and
- * any other key is nothing.
+ * `key`'s keyscan in CSBWin's key tables, or 0 for a key they cannot hold. No key gives
+ * `Byte18400`'s Ctrl-S, `0x13`: CSBWin's shipped `config.txt` has no `key 1` line for it,
+ * and `UIM_CHAR` queues only a character a line translates
+ * (`doc/CSBwin-src/CSBUI.cpp:1099-1135`), so the disk menu is the disk icon's alone, there
+ * as here.
  */
-export function keyScanOf(key: string, ctrl = false): number {
-  if (ctrl) return /^[a-z]$/i.test(key) ? key.toUpperCase().charCodeAt(0) & 0x1f : 0;
+export function keyScanOf(key: string): number {
   return KEYSCAN[key] ?? 0;
 }
 
@@ -153,9 +154,9 @@ export function translateKey(ui: UIState, keyscan: number): number {
  * The button the current key tables bind a `KeyboardEvent.key` to, or 0 — but 0 for the
  * caster keys, which `config.txt` takes before the tables (`CASTER_KEYS`).
  */
-export function tableKeyButton(ui: UIState, key: string, ctrl = false): number {
-  if (!ctrl && CASTER_KEYS.includes(key)) return 0;
-  return translateKey(ui, keyScanOf(key, ctrl));
+export function tableKeyButton(ui: UIState, key: string): number {
+  if (CASTER_KEYS.includes(key)) return 0;
+  return translateKey(ui, keyScanOf(key));
 }
 
 /**

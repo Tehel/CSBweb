@@ -697,9 +697,9 @@ slot at once.
 
 Paying it: one table from a named action (`attack.<champion>.<row>`, `inventory.<n>`,
 `rune.<n>`, `runeBack`, `cast`, `pass`, `caster.<n>`, the six moves, `quickSave`,
-`quickLoad`) to two slots, each a `KeyboardEvent.code` and its modifiers or empty; the
-reverse map from a code to its action built from it; `handleUIKey` and `portKeyAction`
-dispatching on the action. The default preset is CSBWin's shipped `config.txt` plus 7-0.
+`quickLoad`) to two slots, each a `KeyboardEvent.code` or empty, and none with a modifier,
+which stays the browser's (`GameInput.keyDown`); the reverse map from a code to its action
+built from it; `handleUIKey` and `portKeyAction` dispatching on the action. The default preset is CSBWin's shipped `config.txt` plus 7-0.
 The table is what the rebinding screen, its presets and its stored setting read and write.
 What the screen will need from it: a label for a code, which is the `key` captured with it
 (`navigator.keyboard.getLayoutMap` is Chromium's only), and a code already bound elsewhere
@@ -707,7 +707,7 @@ found from the reverse map. After R13, whose codes it holds.
 
 ### E38 ⏳ The keys the graphics.dat tables bind cannot be rebound
 
-Ctrl-S, Esc, Enter, Insert, Clr/Home and the arrows reach their buttons through `KEYSCAN`
+Esc, Enter, Insert, Clr/Home and the arrows reach their buttons through `KEYSCAN`
 (`src/renderer/ui/Keyboard.ts`), a fixed map from a browser key to an Atari keyscan, which
 `translateKey` looks up in the graphics.dat tables. In CSBWin that first half is
 `config.txt`'s: its `SCAN` and `KEY` lines turn a PC key into an Atari keyscan
@@ -716,7 +716,7 @@ the tables never change. The shipped file sends K J L M , . and the keypad's 4-9
 way, to the arrows' keyscans; the port's `PORT_KEYS` reach the moves directly.
 
 Paying it: these keys as E37's actions too, each named for the Atari keyscan it sends
-(`move.forward` is `0x4800`, `freeze` is `0x1b`, `diskMenu` is Ctrl-S's `0x13`), so a code
+(`move.forward` is `0x4800`, `freeze` is `0x1b`, `wake` is Return's `0x0d`), so a code
 bound to one goes through `translateKey` and the tables, read from graphics.dat, still
 decide the button in each mode. The port's moves then take the same route, a second slot
 of the arrows' actions, as the shipped `config.txt` sends them. After E37.

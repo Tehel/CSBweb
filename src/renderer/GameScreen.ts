@@ -528,8 +528,8 @@ export class GameScreen {
    * `TAG0196da`'s table half: the button the current key tables bind `key` to, or 0 — and
    * 0 for F1-F4, the port's caster keys (`tableKeyButton`).
    */
-  translateKey(key: string, ctrl = false): number {
-    return tableKeyButton(this.ui, key, ctrl);
+  translateKey(key: string): number {
+    return tableKeyButton(this.ui, key);
   }
 
   setUIMode(mode: UIMode): void {

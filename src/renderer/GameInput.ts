@@ -155,21 +155,21 @@ export class GameInput {
       this.host.refreshScreen();
       return true;
     }
-    // The key tables first, `TAG0196da` (doc/CSBwin-src/CSBCode.cpp:8515): awake,
-    // `Byte18400` and `Byte18428` bind Ctrl-S, Esc, Insert, Clr/Home and the arrows,
-    // and F1-F4, which `config.txt` takes first for the caster (`tableKeyButton`); asleep `Byte18440` binds Return and Esc, and frozen `Byte18448` Esc
-    // alone (doc/CSBwin-src/Mouse.cpp:1839-1840, :1893-1894). A bound key is queued
-    // as its button, like a click.
-    if (!mods.metaKey && !mods.altKey) {
-      const button = screen.translateKey(key, mods.ctrlKey);
-      if (button !== 0) {
-        game.enqueueKeyButton(button);
-        return true;
-      }
-    }
-    // A browser or OS shortcut keeps its key: nothing below is bound with a
-    // modifier, so Ctrl-R still reloads rather than opening a rune keypad.
+    // A browser or OS shortcut keeps its key: no key is bound with a modifier, so
+    // Ctrl-R still reloads rather than opening a rune keypad. That leaves out
+    // `Byte18400`'s Ctrl-S, as CSBWin's shipped `config.txt` does (`tableKeyButton`).
     if (modified) return false;
+    // The key tables first, `TAG0196da` (doc/CSBwin-src/CSBCode.cpp:8515): awake,
+    // `Byte18400` and `Byte18428` bind Esc, Insert, Clr/Home and the arrows, and F1-F4,
+    // which `config.txt` takes first for the caster (`tableKeyButton`); asleep
+    // `Byte18440` binds Return and Esc, and frozen `Byte18448` Esc alone
+    // (doc/CSBwin-src/Mouse.cpp:1839-1840, :1893-1894). A bound key is queued as its
+    // button, like a click.
+    const button = screen.translateKey(key);
+    if (button !== 0) {
+      game.enqueueKeyButton(button);
+      return true;
+    }
     // Asleep or frozen, every key the table does not bind is dead, the movement
     // keys and the panel bindings included.
     if (game.isPartySleeping() || game.isFrozen()) return true;

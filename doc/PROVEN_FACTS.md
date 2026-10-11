@@ -6181,7 +6181,9 @@ themselves, and that the next VBL's frame has the cursor where the pointer last 
 The port: `keyScanOf` and `translateKey` (`src/renderer/ui/Keyboard.ts`), queued by
 `GameInput.keyDown` (`src/renderer/GameInput.ts`) before the port's own bindings, except
 F1-F4, which the shipped `config.txt` makes caster clicks before any table sees them
-("CSBWin has no keyboard controls", above). Evidence: `tools/dump-key-bindings.ts`.
+("CSBWin has no keyboard controls", above), and Ctrl-S, which it never sends: `UIM_CHAR`
+queues a character only through a `key` line (`doc/CSBwin-src/CSBUI.cpp:1099-1135`), and
+the file has none for `0x13`. Evidence: `tools/dump-key-bindings.ts`.
 
 ## The freeze: button 147 in, button 148 out, no tick in between
 

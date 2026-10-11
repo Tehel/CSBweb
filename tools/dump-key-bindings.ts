@@ -327,18 +327,16 @@ async function main(): Promise<void> {
 
   // ---- 9. The graphics.dat key tables `TAG0196da` searches (doc/CSBwin-src/CSBCode.cpp:
   //         8428-8475), a row per entry, in each mode's pair (`updateButtonLists`). Every
-  //         entry has a browser key, and none is bound twice in a pair, so the first match
-  //         `translateKey` returns is what CSBWin queues.
+  //         entry but Ctrl-S has a browser key, and none is bound twice in a pair, so the
+  //         first match `translateKey` returns is what CSBWin queues. Ctrl-S, `0x13`, has
+  //         none: CSBWin's shipped config.txt never sends it (`keyScanOf`).
   const keyOf = (keyscan: number): string | undefined =>
-    TABLE_KEYS.find((key) => keyScanOf(key) === keyscan)
-    ?? CTRL_LETTERS.map((letter) => `Ctrl-${letter}`).find((name) => keyScanOf(name.slice(5), true) === keyscan);
-  const pressed = (name: string): number => name.startsWith('Ctrl-')
-    ? translateKey(ui, keyScanOf(name.slice(5), true))
-    : translateKey(ui, keyScanOf(name));
+    TABLE_KEYS.find((key) => keyScanOf(key) === keyscan);
+  const pressed = (name: string): number => translateKey(ui, keyScanOf(name));
   const expected: Record<string, Record<string, number>> = {
     // Awake, the author's roles for the arrows are CSBWin's: left and right strafe.
     Adventure: {
-      F1: 7, F2: 8, F3: 9, F4: 10, 'Ctrl-S': 140, Escape: 147,
+      F1: 7, F2: 8, F3: 9, F4: 10, Escape: 147,
       Insert: 1, Home: 2, ArrowUp: 3, ArrowRight: 4, ArrowDown: 5, ArrowLeft: 6,
     },
     Sleeping: { Enter: 146, Escape: 147 },
@@ -356,7 +354,8 @@ async function main(): Promise<void> {
       for (const entry of table) {
         const key = keyOf(entry.keyscan);
         console.log([mode, name, entry.mouse, `0x${entry.keyscan.toString(16)}`, key ?? '-'].join('\t'));
-        check(key !== undefined, `${mode}: keyscan 0x${entry.keyscan.toString(16)} should have a browser key`);
+        check(key !== undefined || (mode === 'Adventure' && entry.keyscan === 0x13 && entry.mouse === 140),
+          `${mode}: keyscan 0x${entry.keyscan.toString(16)} should have a browser key, Ctrl-S's alone excepted`);
         if (key === undefined) continue;
         bound[key] = entry.mouse;
         check(pressed(key) === entry.mouse, `${mode}: ${key} should queue button ${entry.mouse}`);
@@ -367,13 +366,13 @@ async function main(): Promise<void> {
   }
   ui.uiMode = UIMode.Adventure;
   updateButtonLists(ui);
-  check(pressed('Ctrl-R') === 0 && pressed('F5') === 0 && pressed('k') === 0,
-    'a key no table binds is left to the browser and the port');
+  check(pressed('F5') === 0 && pressed('k') === 0 && pressed('s') === 0,
+    'a key no table binds is left to the browser and the port, and S is not Ctrl-S');
   for (const key of CASTER_KEYS) {
     check(pressed(key) !== 0 && tableKeyButton(ui, key) === 0,
       `${key} is bound in Byte18400, and left to the caster binding config.txt gives it`);
   }
-  check(tableKeyButton(ui, 'ArrowLeft') === 6 && tableKeyButton(ui, 's', true) === 140,
+  check(tableKeyButton(ui, 'ArrowLeft') === 6 && tableKeyButton(ui, 'Escape') === 147,
     'every other table key goes through the tables');
 
   finish();
@@ -384,7 +383,5 @@ const TABLE_KEYS = ['Enter', 'Escape', 'F1', 'F2', 'F3', 'F4', 'Home', 'ArrowUp'
   'ArrowDown', 'Insert'];
 /** The table keys config.txt takes for the caster. */
 const CASTER_KEYS = ['F1', 'F2', 'F3', 'F4'];
-/** And the letters it gives one with Ctrl. */
-const CTRL_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 main();
