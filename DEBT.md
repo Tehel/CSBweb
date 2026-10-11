@@ -108,7 +108,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| U7 | The champion table is a page panel | M | ⏳ |
+| U10 | GAME and DISPLAY as toggle buttons, two a line | S | ⏳ |
+| U7 | The champion table is a page panel | M | ⏳ after U10 |
 | U8 | No fullscreen | M | ⏳ |
 | U9 | The side panel | S | ⏳ after U7, U8 |
 | F20 | A tool is run without its types checked | S | ⏳ |
@@ -189,7 +190,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C182 · D22 · E39 · F21 · G31 · R15 · U10 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E39 · F21 · G31 · R15 · U11 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -224,6 +225,30 @@ None of it changes the game: with every new setting at its default, every tool's
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a
 golden frame for what it draws, and a probe or a `tools/` assertion for what it does.
 
+### U10 ⏳ GAME and DISPLAY as toggle buttons, two a line
+
+GAME's and DISPLAY's settings are each a line: the name on the names' panel, and an ON
+and OFF toggle in the controls' column (`drawSettingLines`,
+`src/renderer/ui/SettingsDialog.ts`). GAME's five fill the panel (`SETTING_LINES`), and
+U7's CHAMPION VIEW has no room.
+
+Paying it, as the author asks: on GAME and DISPLAY, each setting is one large button
+holding its name, pressed when on and raised when off, two buttons a line
+(`framesAcross` over the line). No ON or OFF is drawn. Two frames across the lines' width
+are 145 pixels each, a face of 133 inside the bevels, and the longest name, GATHER
+THROWN WEAPONS, is 126 pixels in the 6-pixel font, so every name fits. GAME then takes
+three lines with CHAMPION VIEW and DISPLAY one. The help line still names the setting
+under the pointer. SOUND keeps its lines: its VOLUME is a slider.
+
+A setting that cannot work, CRT EFFECT without WebGL (`UIState.isCrtAvailable`), keeps
+its name: raised and unlit, its label drawn in a dim grey of the UI palette, and the help
+line says why. That look is new to the kit (`Widgets.ts`): an inert button there has no
+label, and stays so where it means a button with nothing to do (EXIT, an empty save row).
+
+The check: golden frames 21 and 22 redrawn; `tools/dump-settings-dialog.ts`'s layout
+(every name inside its button) and its clicks on the buttons, a click on a pressed one
+turning it off.
+
 ### U7 ⏳ The champion table is a page panel
 
 `src/ui/championPanel.ts` builds a table on the page, one column per champion: the levels
@@ -235,9 +260,8 @@ columns, on two tabs (the levels, maxima and attributes; then the skills), since
 lines do not fit one screen. Nothing is highlighted, since the clock is held while the
 dialog is up. It opens by its key action, CHAMPIONS, which it adds to the KEYS tab's
 list unbound, and by a long press on a champion's stat
-bars, and only with CHAMPION VIEW on, a setting of the settings dialog. GAME's five lines
-are its panel's all, so the setting takes a sixth line, the panel grown to hold it, or a
-tab of its own. The dialog then marks that champion's column.
+bars, and only with CHAMPION VIEW on, a toggle button of the settings dialog's GAME tab,
+where U10 leaves room for it. The dialog then marks that champion's column.
 
 The long press opens no inventory. A single click on the bars does: the bars have no
 left button, so a left click there becomes the box's right click, 7-10
