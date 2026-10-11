@@ -23,7 +23,7 @@ import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import { createCrtEffect, type CrtEffect } from './lib/crt';
 import { NO_FULLSCREEN, createFullscreen } from './lib/fullscreen';
 import { GameScreen } from './renderer/GameScreen';
-import { bindDataSetChooser, bindSaveDrop, bindSettingsControls, bindUIContext, drawMapPreview, showFatalMessage } from './ui';
+import { bindSaveDrop, bindUIEvents, showFatalMessage } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { runBootSequence, runHintOracle, runShowCredits } from './renderer/intro/BootSequence';
@@ -90,10 +90,6 @@ readKeyboardLayout();
 function setCrtEnabled(enabled: boolean): boolean {
     if (!crtController) return false;
     return crtController.setEnabled(enabled);
-}
-
-function isCrtEnabled(): boolean {
-    return crtController?.isEnabled() ?? false;
 }
 
 /**
@@ -476,7 +472,6 @@ async function showEndOfGame({ game, screen, saves, messages, events }: Built, s
     screen.initializePlayState();
     game.resumeMainLoop();
     game.start();
-    drawMapPreview(game.ctx.party.state.position.z);
 }
 
 /** `d.CH16482[0 … d.NumCharacter - 1]` as the won screen shows them (`Code1f9e6.cpp:176-215`). */
@@ -492,7 +487,7 @@ function wonChampions(game: Game, screen: GameScreen): WonChampion[] {
     }));
 }
 
-/** The optional CRT effect over the canvas (`src/lib/crt.ts`). Without WebGL, the button reports it unavailable. */
+/** The optional CRT effect over the canvas (`src/lib/crt.ts`). Without WebGL, the settings' CRT is inert. */
 function createCrt(): void {
     crtController = createCrtEffect(gameCanvasEl);
 }
@@ -522,9 +517,9 @@ async function runIntro({ game, screen, saves, events }: Built, sound: SoundMana
     });
 }
 
-/** The page's side of play: its input and debug chrome, and a redraw per move and per tick. */
+/** The page's side of play: its input, and a redraw per move and per tick. */
 function wire({ game, screen, saves, messages, events }: Built): void {
-    bindUIContext({
+    bindUIEvents({
         screen,
         game,
         refreshScreen,
@@ -539,7 +534,6 @@ function wire({ game, screen, saves, messages, events }: Built): void {
     // A move draws nothing: it brings a tick on at once (`d.clockTick = 1`), and CSBWin
     // draws the viewport only in the tick, once a new party level is loaded
     // (doc/CSBwin-src/CSBCode.cpp:628-649).
-    let mapPreviewAt = '';
     game.onTick(() => {
         events.tick();
         // `if (d.SelectedCharacterOrdinal != 0) goto tag000730; if (d.PartySleeping != 0)
@@ -547,11 +541,6 @@ function wire({ game, screen, saves, messages, events }: Built): void {
         // inventory is open or the party sleeps.
         const { selectedCharacterIndex, sleeping } = game.ctx.party.state;
         if (selectedCharacterIndex < 0 && !sleeping) renderView();
-        const { x, y, z } = game.ctx.party.state.position;
-        if (`${x},${y},${z}` !== mapPreviewAt) {
-            mapPreviewAt = `${x},${y},${z}`;
-            drawMapPreview(z);
-        }
     });
 
     // The engine drives the message strip (`GameHost.messages`), a scanline of its scroll
@@ -583,8 +572,6 @@ function start(game: Game): void {
     console.log('✓ Starting position:', game.getPositionInfo());
     // The game is read, new or resumed: where CSBWin's boot forces DM rules.
     game.forceDMRulesAtBoot();
-
-    drawMapPreview(game.ctx.party.state.position.z);
 }
 
 /**
@@ -611,7 +598,6 @@ async function init() {
         const manifest = await loadManifest();
         dataSet = chooseDataSet(manifest);
         swooshDir = manifest.swooshDir;
-        bindDataSetChooser(manifest, dataSet);
         const files = await loadGameFiles();
         // Every graphics.dat table, read once: the engine's set is built from it, and the
         // screen is handed the same object.
@@ -626,20 +612,17 @@ async function init() {
         game.ctx.rules.dmRulesDesignOption = dataSet.dmRules;
         createCrt();
         // The settings before the FTL logo, which is drawn through the CRT effect and
-        // heard through the sound, and at every change; then the page's buttons show
-        // them, the CRT effect as applied.
+        // heard through the sound, and at every change.
         settings.subscribe((values) => applySettings(built, sound, values));
-        bindSettingsControls(settings, isCrtEnabled);
         console.log('✓ Game engine and screen constructed');
         // The probes' handle. `tools/probe-ui.mjs` and `tools/probe-frames.mjs` drive the
         // live app through this over CDP — see the `probe-app` skill. Module scope is
         // invisible to the DevTools protocol, so a bug that only shows on screen is
         // otherwise unreachable without hand-patching this file.
         //
-        // Guarded on a build-time flag rather than the page's Debug setting, which any
-        // player can turn on: `__CSBWEB_PROBE__` is the dev server's, and a build's only
-        // with `CSBWEB_PROBE=1` (`vite.config.mts`), so the handle cannot reach a deployed
-        // bundle.
+        // Guarded on a build-time flag, which no player can turn on: `__CSBWEB_PROBE__` is
+        // the dev server's, and a build's only with `CSBWEB_PROBE=1` (`vite.config.mts`),
+        // so the handle cannot reach a deployed bundle.
         if (__CSBWEB_PROBE__) {
             // `presetHeroes`: the heroes behind the dungeon's mirrors, for `tools/lib/buildParty.mjs`.
             const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);

@@ -72,7 +72,8 @@ Vanilla TypeScript (strict, `noUnusedLocals`/`noUnusedParameters`) + Vite. No fr
 A single 320×200 `<canvas>` is the whole screen, CSS-scaled to 960×600 with
 `image-rendering: pixelated`. Everything — viewport, inventory, panels, cursor, messages —
 is blitted into one palette-index buffer and converted to RGBA at present time, as CSBWin
-does. The HTML controls beside the canvas are dev/debug affordances only.
+does. The page holds nothing beside the canvas: the settings, the map and the champions
+are dialogs drawn in it.
 
 ```bash
 npm run dev            # Vite dev server on :9000
@@ -189,7 +190,8 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
   ui/       The DM interface, one module per CSBWin file — Mouse, Inventory, Character,
             MagicPanel, Feeding, Objects, Draw, HitTest, ViewportPicking, all over
             a shared UIState. See doc/UI_MODULE_MAP.md.
-ui/         DOM-side debug chrome (settings, map preview, champion panel), saveDrop
+ui/         The page's DOM side: events (the canvas's and the keyboard's listeners,
+            handing over to `GameInput`), saveDrop
             (the save menu's import: a file dropped on the page), fatalMessage (the
             screen an error that ends the game leaves), and gameEvents (what the
             server's statistics are told: a game started, joined, won or lost)

@@ -20,7 +20,8 @@
  * `swoosh`, the FTL logo's folder, may be `null` or left out. The flags `csbGraphics`,
  * `miniDat`, `hintOracle`, `dmRules` and `hidden` may each be left out, for `false`, and the manifest
  * names one only where it is true. A set with `"hidden": true` is left out of the chooser
- * and plays all the same by its `?dungeon=` (`chooserSets`).
+ * (`chooserSets`, which E15's welcome page will list) and plays all the same by its
+ * `?dungeon=`.
  */
 
 export interface DataSet {

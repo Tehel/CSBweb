@@ -1,12 +1,7 @@
-import { GameInput } from '../renderer/GameInput';
-import { getUIContext } from './context';
-import { handleMapCanvasClick } from './mapPreview';
-import { updateChampionPanel } from './championPanel';
+import { GameInput, type GameInputHost } from '../renderer/GameInput';
 import { getEventPosition } from './utils';
 
 let uiBound = false;
-
-const mapCanvasEl = document.getElementById('map-canvas') as HTMLCanvasElement | null;
 
 /**
  * The canvas's pointer, read through pointer events rather than mouse events. A browser
@@ -65,11 +60,9 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, input: GameInput): v
     });
 }
 
-export function bindUIEvents(): void {
-    const ctx = getUIContext();
-    if (!ctx) return;
-
-    const input = new GameInput(ctx);
+/** The page's listeners, on the game canvas and the document, handing over to the game's input path. */
+export function bindUIEvents(host: GameInputHost): void {
+    const input = new GameInput(host);
     const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement | null;
     bindCanvasEvents(gameCanvasEl, input);
 
@@ -78,19 +71,8 @@ export function bindUIEvents(): void {
 
         input.install();
 
-        document.getElementById('btn-qsave')?.addEventListener('click', () => ctx.onQuickSave());
-        document.getElementById('btn-qload')?.addEventListener('click', () => ctx.onQuickLoad());
-
-        // Once per game tick, which is when skills and attributes can change. The panel
-        // does nothing while it is hidden.
-        ctx.game.onTick(() => updateChampionPanel());
-
         document.addEventListener('keydown', (e) => {
             if (input.keyDown(e)) e.preventDefault();
-        });
-
-        mapCanvasEl?.addEventListener('click', (e) => {
-            handleMapCanvasClick(e);
         });
     }
 }

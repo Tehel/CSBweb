@@ -79,12 +79,10 @@ frames against CSBWin's own screenshots. The retail dungeon uses none of them. F
 - The deployed game, at `https://csbweb.looten.net/`: a Docker container on the author's
   VPS, its server's statistics and their nightly backup (`doc/DEPLOYMENT.md`,
   `doc/STATISTICS.md`).
-- Debug scaffolding is the chrome beside the canvas (`src/ui/`): the settings' buttons,
-  which show and change the player's settings (`src/settings/Settings.ts`), the map
-  preview and the champion panel. Its teleport by a click on the map and its cursor
-  filter trace are behind `isDebugFeaturesEnabled()`; the map dialog's teleport is
-  behind `?dev`. It has no log of its own: what
-  the page reports goes to the console, a move's position at debug level, what F5,
+- The page holds nothing beside the canvas (`index.html`): the settings, the map and
+  the champions are dialogs drawn in it (`DEBT.md` U), and the data set is chosen by
+  `?dungeon=`. The map dialog's teleport is behind `?dev`. The page has no log of its
+  own: what it reports goes to the console, a move's position at debug level, what F5,
   F9 or the Sleepsave did at info level.
 
 **Incomplete:**

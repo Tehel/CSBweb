@@ -40,8 +40,8 @@ console.log('=== the defaults ===');
   check(JSON.stringify(values) === JSON.stringify(DEFAULT_SETTINGS), 'an empty storage gives the defaults');
   check(values.sound && values.volume === 0.8 && !values.crt && values.startupAnimations,
     'sound on at 0.8, no CRT effect, the startup animations shown');
-  check(values.statistics && !values.mapView && !values.championView && !values.debug,
-    'the statistics sent; the map, the champions and the debug chrome off');
+  check(values.statistics && !values.mapView && !values.championView,
+    'the statistics sent; the map and the champions off');
   check(JSON.stringify(values.extras) === JSON.stringify(NO_EXTRAS), 'every extra off');
   check(values.keyPreset === 'csbwin' && values.keyBindings === DEFAULT_KEY_BINDINGS, "the keys are CSBWIN's preset");
   check(new Settings(null).values === DEFAULT_SETTINGS, 'no storage at all gives the defaults');
@@ -57,8 +57,8 @@ console.log('\n=== the earlier record, read once ===');
   const values = new Settings(storage).values;
   console.log(JSON.stringify({ ...values, keyBindings: '…' }));
   check(!values.sound && values.volume === 0.25 && values.crt, 'the sound, its volume and the CRT effect carried over');
-  check(values.mapView && values.championView && values.debug && !values.statistics,
-    'the map, the champions, the debug chrome and the statistics carried over');
+  check(values.mapView && values.championView && !values.statistics && !('debug' in values),
+    'the map, the champions and the statistics carried over, and its debug chrome dropped');
   check(Object.values(values.extras).every(Boolean), 'the one Extras flag turned every extra on');
   check(values.startupAnimations, 'the startup animations, which it did not have, are the default');
   check(stored(storage)?.crt === true, 'it is written under the new key at once');

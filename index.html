@@ -19,11 +19,6 @@
             color: #fff;
             display: flex;
             justify-content: center;
-            /* Top-aligned on purpose: the debug panels beside the canvas change height as
-               the mouse moves, and a centred layout then slides the canvas up and down
-               under the pointer. That desynchronised the drawn cursor from the pixel a
-               click was mapped to, which made small targets — floor items are ~6px tall —
-               unpickable. */
             align-items: flex-start;
             min-height: 100vh;
             padding: 20px;
@@ -66,139 +61,12 @@
             user-select: none;
             -webkit-user-select: none;
         }
-        #side {
-            display: flex;
-            flex-direction: column;
-            margin-left: 5px;
-            background-color: #444;
-        }
-        #settings {
-            background-color: #666;
-        }
-        #map {
-            background-color: #888;
-        }
-        /* Fixed width: the table is always four champion columns, and a panel that
-           changed width would reflow the canvas beside it. */
-        #champions {
-            --bar: #7a9a6a;
-            background-color: #bbb;
-            color: #000;
-            width: 360px;
-            font-size: 10px;
-            padding: 2px;
-        }
-        #champions table {
-            width: 100%;
-            table-layout: fixed;
-            border-collapse: collapse;
-        }
-        #champions col.label-col {
-            width: 76px;
-        }
-        #champions th,
-        #champions td {
-            overflow: hidden;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-            padding: 0 2px;
-            text-align: right;
-        }
-        #champions td:first-child {
-            text-align: left;
-        }
-        #champions tr.group-start td {
-            border-top: 1px solid #888;
-        }
-        #champions tr.base td {
-            font-weight: bold;
-        }
-        #champions .lvl {
-            float: left;
-            font-weight: bold;
-        }
-        #champions .changed {
-            color: #a00000;
-        }
-        #champions .dead {
-            color: #666;
-            text-decoration: line-through;
-        }
-        #champions .training-context {
-            white-space: pre-wrap;
-            padding-top: 2px;
-            border-top: 1px solid #888;
-        }
-
-        #map-canvas {
-            background-color: black;
-        }
-
-        button {
-            /* background-color: #444; */
-            /* color: #fff; */
-            /* border: 2px solid #666; */
-            padding: 3px 5px;
-            margin: 3px;
-            cursor: pointer;
-            /* font-family: inherit; */
-            /* font-size: 16px; */
-        }
-
-        button:hover {
-            background-color: #555;
-        }
-
-        button:active {
-            background-color: #333;
-        }
-
-        .toggle-button {
-            background-color: #666;
-            border: 2px solid #888;
-            color: #fff;
-            box-shadow: 0 2px 0 #333;
-        }
-
-        .toggle-button.is-pressed {
-            background-color: #555;
-            border-color: #444;
-            box-shadow: inset 0 2px 0 #222;
-        }
-
-        #data-set {
-            margin: 3px;
-        }
-
-        #sound-volume {
-            width: 120px;
-            vertical-align: middle;
-        }
     </style>
 </head>
 <body>
     <div id="app">
         <div id="game">
             <canvas id="game-canvas" width="320" height="200" class="screen"></canvas>
-        </div>
-        <div id="side">
-            <div id="settings">
-                <select id="data-set" title="The game to play: the page reloads with it"></select><br>
-                <button id="btn-qsave">Quick Save (F5)</button>
-                <button id="btn-qload">Quick Load (F9)</button><br>
-                <button id="btn-crt" class="toggle-button">CRT</button>
-                <button id="btn-sound" class="toggle-button is-pressed">Sound</button>
-                <input id="sound-volume" type="range" min="0" max="100" value="80">
-                <br>
-                <button id="btn-map" class="toggle-button">Map</button>
-                <button id="btn-champions" class="toggle-button">Champions</button>
-                <button id="btn-debug" class="toggle-button">Debug</button>
-                <button id="btn-extras" class="toggle-button" title="Extras, which CSBWin does not have">Extras</button>
-            </div>
-            <div id="map" style="display: none">
-                <canvas id="map-canvas" width="360" height="360"></canvas>
-            </div>
-            <div id="champions" style="display: none"></div>
         </div>
     </div>
 

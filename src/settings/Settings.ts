@@ -2,7 +2,7 @@
  * The player's settings: one model, outside the page and its DOM, that the page, the game
  * and the dialogs read and change through it (`DEBT.md` U). A change is saved at once and
  * told to every listener; `main.ts` applies it to the sound and the CRT effect, and to the
- * game (`applyToGame`), and the page's buttons show it (`bindSettingsControls`).
+ * game (`applyToGame`), and the settings dialog shows it (`SettingsDialog.ts`).
  *
  * It is kept in `localStorage` under `SETTINGS_KEY`. Where that key is absent, the page's
  * earlier settings (`OLD_SETTINGS_KEY`) are read once and written under the new key. A
@@ -27,18 +27,10 @@ export interface SettingsValues {
   readonly startupAnimations: boolean;
   /** The statistics' events (`doc/STATISTICS.md`): on unless the player turns them off. */
   readonly statistics: boolean;
-  /**
-   * The map of the party's level: the map dialog opens (`MapDialog.ts`), and the page's
-   * panel beside the game is shown.
-   */
+  /** The map of the party's level: the map dialog opens (`MapDialog.ts`). */
   readonly mapView: boolean;
-  /**
-   * The champions' table: the champion dialog opens (`ChampionDialog.ts`), and the page's
-   * panel beside the game is shown.
-   */
+  /** The champions' table: the champion dialog opens (`ChampionDialog.ts`). */
   readonly championView: boolean;
-  /** The page's debug chrome: a click on the map moves the party. */
-  readonly debug: boolean;
   /** The extras (`DEBT.md` X), each off by default: with all off, the game is CSBWin's. */
   readonly extras: Extras;
   /** The key table's preset, or `custom` for one changed by hand. */
@@ -57,7 +49,6 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   statistics: true,
   mapView: false,
   championView: false,
-  debug: false,
   extras: { gatherThrownWeapons: false, drinkAtFountain: false, colourNewMastery: false },
   keyPreset: 'csbwin',
   keyBindings: KEY_PRESETS.csbwin,
@@ -155,7 +146,6 @@ export function parseSettings(raw: unknown): SettingsValues {
     statistics: bool(record.statistics, defaults.statistics),
     mapView: bool(record.mapView, defaults.mapView),
     championView: bool(record.championView, defaults.championView),
-    debug: bool(record.debug, defaults.debug),
     extras: {
       gatherThrownWeapons: bool(extras.gatherThrownWeapons, defaults.extras.gatherThrownWeapons),
       drinkAtFountain: bool(extras.drinkAtFountain, defaults.extras.drinkAtFountain),
@@ -184,7 +174,6 @@ export function fromOldSettings(raw: unknown): Record<string, unknown> {
     statistics: old.statistics,
     mapView: old.mapVisible ?? true,
     championView: old.championsVisible,
-    debug: old.debug,
     extras,
   };
 }

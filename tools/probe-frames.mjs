@@ -126,7 +126,6 @@ const crtEffect = () => evaluate(`(()=>{const gl=document.getElementById('crt-ca
   return !gl ? 'unavailable' : getComputedStyle(gl).display === 'none' ? 'off' : 'on';})()`);
 // A named key's `code` is its `key`; the bindings match the code, the save menu the key.
 const key = (k) => evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},code:${JSON.stringify(k)},bubbles:true})),1`);
-const click = (sel) => evaluate(`document.querySelector(${JSON.stringify(sel)}).click(),1`);
 // Whether the game takes a notch of the wheel over the canvas, rather than leave it to the
 // page: a save menu's list does, the disk menu's and the entrance's chooser's, and nothing
 // else. That it scrolls the list is `tools/dump-save-menu.ts`'s to show.
@@ -190,10 +189,6 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
 await send('Page.navigate', { url: `${APP}?intro=0` });
 await wait(3500);
 console.log('state: booted');            await shot('01-boot');
-// Ensure Debug is ON (it persists in localStorage, so toggle only when needed).
-await evaluate(`(()=>{const b=document.getElementById('btn-debug');
-  if(!b.classList.contains('is-pressed')) b.click(); return b.classList.contains('is-pressed');})()`);
-await wait(200);
 // The four champions, from the Hall of Champions mirrors (`tools/lib/buildParty.mjs`).
 await evaluate(BUILD_PARTY).then(names => console.log('  party:', names));
 await wait(600);
@@ -210,10 +205,20 @@ const inventory = await shot('03-inventory');
 const hoverAt = (u, v) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   c.dispatchEvent(new PointerEvent('pointermove',{isPrimary:true,pointerType:'mouse',clientX:r.left+${u}*r.width,clientY:r.top+${v}*r.height,bubbles:true}));
   const p=window.__probe.screen.ui.hoverPoint; return p ? p.x+','+p.y : 'none';})()`);
-await click('#btn-crt'); await wait(500);
+// DISPLAY's CRT (85,71), in the settings dialog: Esc opens it, the tab is DISPLAY
+// (120,45), and Esc closes it again over the inventory.
+const toggleCrt = async () => {
+  await key('Escape'); await wait(300);
+  await canvasClick(120, 45, 0); await wait(300);
+  await canvasClick(85, 71, 0); await wait(300);
+  await key('Escape'); await wait(300);
+  await evaluate(`document.getElementById('game-canvas').dispatchEvent(new PointerEvent('pointerleave',{isPrimary:true,pointerType:'mouse'})),1`);
+  await wait(200);
+};
+await toggleCrt();
 const crtInPlay = await crtEffect();
 check(crtInPlay !== 'unavailable', 'the CRT effect exists (without it this Chrome gives no WebGL context, and nothing below is checked)');
-check(crtInPlay === 'on', 'the CRT button turns the effect on');
+check(crtInPlay === 'on', 'DISPLAY\'s CRT turns the effect on');
 check(await canvasPixels() === inventory, 'CRT effect on: the game canvas keeps its pixels');
 const tubeSize = await evaluate(`(()=>{const t=document.getElementById('crt-canvas');return t.width+'x'+t.height;})()`);
 check(tubeSize === '960x600', `the effect is drawn at the size it is shown, 960x600 (${tubeSize})`);
@@ -221,7 +226,7 @@ check(await hoverAt(0.5, 0.5) === '160,100', 'CRT effect on: the tube\'s middle 
 const curved = (await hoverAt(0.1, 0.1)).split(',').map(Number);
 check(curved[0] < 32 && curved[1] < 20, `CRT effect on: the pointer at (32,20)'s place shows a pixel nearer the corner (${curved})`);
 check(await hoverAt(0.002, 0.002) === '0,0', 'CRT effect on: a point of the tube\'s black corner is the screen\'s corner');
-await click('#btn-crt'); await wait(200);
+await toggleCrt();
 check(await hoverAt(0.1, 0.1) === '32,20', 'CRT effect off: the pointer is the plain scaling');
 await evaluate(`document.getElementById('game-canvas').dispatchEvent(new PointerEvent('pointerleave',{isPrimary:true,pointerType:'mouse'})),1`);
 // Take an item out of the inventory. (41,66) is button id 30, body slot 2, which the Hall
@@ -554,8 +559,7 @@ await cdpMouse('mouseMoved', 400, 92); await cdpMouse('mouseReleased', 400, 92);
 check((await settingsValues()).volume === 1, 'dragged off the canvas, to its right, the volume is 1');
 await pointerAt(200, 92); await wait(200);
 check((await settingsValues()).volume === 1, 'released there, a move drags nothing');
-// SOUND's OFF, read back after a reload: the setting is kept, and the page's own button
-// shows it. Then a double click on the message area opens the dialog, and a right click
+// SOUND's OFF, read back after a reload: the setting is kept. Then a double click on the message area opens the dialog, and a right click
 // closes it, off KEYS' slots.
 await canvasClick(284, 71, 0); await wait(300);
 check((await settingsValues()).sound === false, 'SOUND\'s OFF turns the sound off');
@@ -574,7 +578,6 @@ await send('Page.navigate', { url: `${APP}?intro=0&keepsaves&keepsettings` });
 await wait(3500);
 const kept = await settingsValues();
 check(kept.sound === false && kept.volume === 1, 'after a reload, the sound is still off, at full volume');
-check(!(await evaluate(`document.getElementById('btn-sound').classList.contains('is-pressed')`)), 'and the page\'s Sound button shows it');
 await canvasClick(100, 185, 0); await canvasClick(150, 190, 0); await wait(300);
 check(await settingsUp(), 'a double click on the message area opens the settings');
 await canvasClick(160, 100, 2); await wait(300);

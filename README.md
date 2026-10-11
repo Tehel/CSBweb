@@ -40,7 +40,7 @@ csbweb/
 │   ├── engine/            # the game: CSBWin's d., its systems, the main loop
 │   ├── renderer/          # the 320x200 screen: viewport bytecode, the DM interface
 │   ├── audio/             # samples
-│   ├── ui/                # the debug chrome beside the canvas
+│   ├── ui/                # the page's DOM side: the listeners, a dropped save, the fatal screen
 │   └── main.ts            # the page's bootstrap
 ├── tools/                 # verification tools (dump-*.ts), the golden frames
 ├── static/gamefiles/      # the original game data files, one directory per data set, and manifest.json

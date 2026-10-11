@@ -57,7 +57,7 @@ if (argv.includes('--help') || argv.length === 0) {
 
 Actions, applied in the order given:
   --boot              load ?intro=0 with a cleared localStorage and a seeded
-                      Math.random, switch Debug on, and build the golden frames' party
+                      Math.random, MAP VIEW on, and build the golden frames' party
                       at the Hall of Champions mirrors
   --key <K>           dispatch a keydown, e.g. --key ArrowUp, --key q: K is the key, and
                       its code the one a US keyboard gives
@@ -127,7 +127,7 @@ await send('Runtime.enable');
 await send('Page.enable');
 
 const probed = (expr) => `(() => { const p = window.__probe;
-  if (!p) throw new Error('window.__probe missing — is Debug enabled? try --boot');
+  if (!p) throw new Error('window.__probe missing — is this the dev server? try --boot');
   const { game, screen, renderView } = p;
   return JSON.parse(JSON.stringify((${expr}) ?? null, (k, v) =>
     typeof v === 'bigint' ? String(v) : v instanceof Map ? Object.fromEntries(v) : v));
@@ -135,14 +135,13 @@ const probed = (expr) => `(() => { const p = window.__probe;
 
 const boot = async () => {
   await send('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false });
-  // Seed the settings rather than clearing them, before the reload: no sound, and the map
-  // shown with Debug on, so a click on it moves the party. Then seed Math.random so a
-  // boot is reproducible.
+  // Seed the settings rather than clearing them, before the reload: no sound, and MAP
+  // VIEW on, so the map dialog opens. Then seed Math.random so a boot is reproducible.
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `
     try {
       localStorage.clear();
       localStorage.setItem('csbweb_settings_v2', JSON.stringify({
-        mapView: true, debug: true, crt: false, sound: false }));
+        mapView: true, crt: false, sound: false }));
     } catch (e) {}
     let seed = 0x2545f491;
     Math.random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
