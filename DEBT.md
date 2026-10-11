@@ -18,8 +18,8 @@ Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not sta
 unported features it needs come next, and whatever it does not need waits. Two pieces
 of work follow it, the author's next challenges: a redesigned page, and a second dungeon
 (Chaos Strikes Back first). Tiers D and E hold what the
-code needs before them: a base solid enough to build them on. `E15` is the page
-redesign's first step.
+code needs before them: a base solid enough to build them on. The page redesign has
+begun: tier U is its first part, and `E15` the next.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, a data set
 (`conflux`) whose first ticks play (`tools/watch-conflux-start.ts`) and whose start is a
@@ -27,6 +27,11 @@ golden frame. What waits on the author for it is C150. Its `dungeon.dat` is enci
 (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is `RC4.cpp`'s own cipher"). Its
 skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets"). Every DSA operation CSBWin has is ported, not only Conflux's share
 (`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
+
+**Before the rest, at the author's request: U — the interface in the canvas.** The
+page's settings, map and champion views become dialogs drawn in the game's own screen,
+from the game's own art, so the public build has nothing beside the canvas. It is the
+page redesign's first part, and comes before every other tier.
 
 The order, then:
 
@@ -103,6 +108,15 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| U1 | Settings are read back from the page, and the extras share one flag | M | ⏳ |
+| U2 | The save menu's widgets are its own | M | ⏳ |
+| U3 | The save menu is the only dialog over the game | S | ⏳ |
+| U4 | The settings dialog: Esc, its tabs, GAME, DISPLAY and SOUND | M | ⏳ |
+| U5 | The settings' KEYS tab | M | ⏳ |
+| U6 | The map is a page panel | M | ⏳ |
+| U7 | The champion table is a page panel | M | ⏳ |
+| U8 | No fullscreen | M | ⏳ |
+| U9 | The side panel | S | ⏳ after U4-U8 |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
 | R2 | Every store upgrade re-runs every step, and drops a row that does not parse | S | ⏳ |
@@ -180,8 +194,232 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C182 · D22 · E39 · F20 · G31 · R15 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E39 · F20 · G31 · R15 · U10 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
+
+---
+
+## U — The interface in the canvas
+
+Everything the page offers beside the canvas today moves into it, as dialogs drawn in the
+game's 320x200 buffer like the save menu: the settings, the map, the champion table. The
+look is the save menu's, cut from graphic 0 and drawn in the UI palette's sixteen
+colours, and the design canvas "DMweb page flow"
+(`https://claude.ai/artifact/DiNNPrFfCkphD9LRNBckSG`) shows it: artboard 10, the widget
+kit, and artboard 5, the settings dialog. At 320x200 there is one font size, so a
+setting is one line, and its description goes in a help line at the dialog's foot. Being
+in the buffer, the dialogs are under the CRT effect and in fullscreen, and the golden
+frames see them.
+
+None of it changes the game: with every new setting at its default, every tool's output
+and every golden frame stay the same, the dialogs aside. Each item owes its check: a
+golden frame for what it draws, and a probe or a `tools/` assertion for what it does.
+
+### U1 ⏳ Settings are read back from the page, and the extras share one flag
+
+`UISettings` (`src/ui/settings.ts`) is not a model: `readUISettings` reads the page's
+buttons and panels back to know what to save, `applyUISettings` sets them, and nothing
+before `wire` applies any of it (E15). The three extras share `UISettings.extras`, the
+page's Extras button, which `GameContext.extras` mirrors (`src/engine/GameContext.ts:143`).
+`statistics` has no control. The key bindings are `DEFAULT_KEY_BINDINGS`, read once at
+import into `ACTION_OF_CODE` (`src/renderer/ui/Keyboard.ts`). The startup animations are
+skipped only by `?intro=0`, which skips the entrance too (`src/main.ts:457`).
+
+Paying it: one settings model, outside `src/ui/` and its DOM, that the page, the game and
+the dialogs read and change through it, and that tells its listeners of a change:
+
+- sound on, and its volume; the CRT effect; the startup animations (the FTL logo and the
+  title; the entrance stays, since it is where a game is chosen);
+- the statistics; the map view (U6) and the champion view (U7), off by default;
+- one flag per extra, each off by default: the thrown weapons gathered back, an empty
+  hand drinking at a fountain, a new mastery in colour. `GameContext` takes the three,
+  and X's first rule becomes "one setting each";
+- the key bindings: a preset's name and the table, which `keyAction`, `keyScanOf` and
+  `portKeyAction` read live.
+
+It is stored in `localStorage` under a new key, the old key read once. It is applied at
+boot, before the logo, which pays E15's "The controls are dead before the game". The
+page's buttons stay until U9, rendering the model. A new `tools/dump-settings.ts`: the
+defaults, the old key read, a field of the wrong type replaced by its default, a binding
+table's round trip, and each extra's flag reaching `GameContext` alone.
+
+### U2 ⏳ The save menu's widgets are its own
+
+The save menu draws its dialog from three pieces of graphic 0 (`drawPiece`,
+`src/renderer/ui/SaveMenu.ts`): the grey frame, the sunken title panel and a button frame,
+each stretched by repeating the row and column inside its corners. With them come its
+label placement, the inert button drawn with no label, the press animation, the list's
+rows and its scrollbar. All of it is private to the menu.
+
+Paying it: a widget kit under `src/renderer/ui/`, drawn from those pieces and the UI
+palette only: the plate, the panel, a button (raised, pressed, inert) at the save menu's
+height or a lower one that fits a title line, a list with its
+scrollbar, a line of text. It adds what the new dialogs need, made from the same pieces
+and inventing no art: a row of tabs whose selected tab is drawn pressed, a toggle (two
+buttons, the chosen one pressed), a slider (a sunken track and a small raised knob), and
+the help line. Each widget hit-tests itself. The save menu is drawn through the kit. The
+save menu's move is a refactor: `npm test -- --frames` and `dump-save-menu` unchanged.
+The new widgets are proved by U4's frames.
+
+### U3 ⏳ The save menu is the only dialog over the game
+
+The save menu is the one dialog: `GameInput` asks `isSaveMenuOpen` before giving a click,
+the wheel or a key to anything else (`src/renderer/GameInput.ts`), the loop holds the
+pass and leaves its VBLs out of the play time while it is up (`src/engine/Game.ts:479-487`,
+`:525`), and the screen composes it over a cleared screen (`GameScreen.ts:636`).
+
+Paying it: one dialog slot in the screen, which the save menu is the first to use, and
+which any dialog fills: its drawing, its click, its key, its wheel and a drag. While any
+dialog is up the clock is held as for the save menu, and the keyboard is the dialog's.
+A drag needs the pointer captured, which pays R10's first bullet in a commit of its own.
+The rest is a refactor: the save menu behaves as it does now, its right-click while busy
+included (R11).
+
+### U4 ⏳ The settings dialog: Esc, its tabs, GAME, DISPLAY and SOUND
+
+The settings are the page's buttons beside the canvas (`index.html`, `src/ui/events.ts`).
+
+Paying it: a dialog over the whole screen, in U3's slot, from U2's kit. Height is what
+200 lines lack, so nothing takes a row of its own that can share one:
+
+- **The title line** holds SETTINGS, and CLOSE and EXIT at its right, as buttons lower
+  than the save menu's (U2's kit has the low button).
+- **A row of tabs**: GAME, DISPLAY, SOUND, KEYS, the selected one pressed.
+- **The tab's settings**, one per line.
+- **The help line** at the foot names what the pointer is over: a setting, a tab, CLOSE
+  or EXIT. It follows the pointer, drawn by the VBL's frame as the cursor is. A touch
+  screen has no hover, so there it names the last control touched.
+
+Every change goes to U1's model at once.
+
+- **GAME**: the three extras, SEND STATISTICS, and, as U6 and U7 land, MAP VIEW and
+  CHAMPION VIEW.
+- **DISPLAY**: CRT, shown inert where WebGL is unavailable; FULLSCREEN, from U8;
+  STARTUP ANIMATIONS.
+- **SOUND**: SOUND ON/OFF, and the VOLUME slider.
+- **KEYS**: U5.
+- **EXIT** leaves for the welcome page (artboard 1), which E15 builds. Until then it is
+  drawn inert. Once live, it asks first in `_DoMenu`'s two-option menu, as what has not
+  been saved is lost.
+
+**Opening it.** Esc opens it in play, the inventory and the sleep and freeze screens
+included, but not over the save menu, the Reincarnate screen, the Hint Oracle or the
+credits. Esc again, CLOSE or a right-click close it. The `freeze` action keeps
+keyscan 0x1b, CSBWin's Esc in the tables (freezing awake, waking asleep, thawing frozen),
+and its default key becomes Pause. This is a deliberate divergence, recorded in H when
+paid. A double click on the message area (a double tap on a touch screen) opens it too.
+The item first checks, in every mode, that no button list covers the message area, so
+the first click is nothing to the game and the gesture delays no click.
+
+The check: a golden frame per tab; the probe opens it with Esc and with a double click on
+the message area, holds the tick count while it is up, changes a setting, and reads it
+back after a reload.
+
+### U5 ⏳ The settings' KEYS tab
+
+No screen shows or changes a binding.
+
+Paying it: the KEYS tab lists every `KeyAction` under a name (MOVE FORWARD, CHAMPION 2
+ATTACK 3, RUNE 4, CASTER 1, QUICK SAVE, …) with its two slots, in a list that scrolls by
+the wheel, its scrollbar and the arrow keys.
+
+- **Binding a key.** A click on a slot shows PRESS A KEY. The next key pressed without a
+  modifier fills the slot and is taken out of any other slot. Esc cancels, and cannot
+  be bound: it is the dialog's. A right-click on a slot empties it.
+- **The key's label** is what the player's keyboard prints, read through
+  `navigator.keyboard.getLayoutMap()` where the browser has it. Elsewhere a QWERTY/AZERTY
+  switch on the tab picks the labels. Only the labels change: a binding is the physical
+  key (`KeyboardEvent.code`, R13), so no layout needs other bindings. A key the game's
+  font cannot draw is named in letters (SPACE, TAB, KP 8, F1).
+- **Presets**: CSBWIN, `DEFAULT_KEY_BINDINGS`; KEYPAD, the moves on the keypad alone;
+  ARROWS, the moves on the arrow keys, whose turn and strafe keys are settled when the
+  item is paid. A table changed by hand is shown as CUSTOM. Saving and loading a CUSTOM
+  table is not part of this item.
+- U6 and U7 add their actions, MAP and CHAMPIONS, unbound by default.
+
+The check: `tools/dump-key-bindings.ts` goes on to assert that after any rebinding a code
+is in one slot at most, that Esc is refused, that a preset restores its table, and the
+labels from a US and a French layout map.
+
+### U6 ⏳ The map is a page panel
+
+`src/ui/mapPreview.ts` draws the party's level whole into a canvas of the page, beside the
+game: stone, floor, doors, stairs, pits, teleporters and false walls. With Debug on, a
+click on it teleports the party by replacing its state (`:65`), which E15 asks to put
+behind a developer's switch.
+
+Paying it: a map dialog in U3's slot. It draws the party's level at the largest whole cell
+size that fits, in the UI palette, with the party's square and facing, the level's
+number, and CLOSE. It opens by its key action (U5) and by a long press on the message
+area, and only with MAP VIEW on (U4). The teleport stays only behind `?dev`. A map of
+only the cells the party has seen is X10's data and a later mode of this dialog. The
+check: a golden frame of the dialog over a fixture save's level; the probe opens it by
+the long press, and finds it shut with MAP VIEW off.
+
+### U7 ⏳ The champion table is a page panel
+
+`src/ui/championPanel.ts` builds a table on the page, one column per champion: the levels
+of the four classes, the maxima of health, stamina and mana, the seven attributes and
+the twenty skills' mastery, refreshed at every tick, with a changed cell highlighted.
+
+Paying it: a champion dialog in U3's slot, the same readings in the game's font, four
+columns, on two tabs (the levels, maxima and attributes; then the skills), since thirty
+lines do not fit one screen. Nothing is highlighted, since the clock is held while the
+dialog is up. It opens by its key action (U5) and by a long press on a champion's stat
+bars, and only with CHAMPION VIEW on (U4). The dialog then marks that champion's column.
+
+The long press opens no inventory. A single click on the bars does: the bars have no
+left button, so a left click there becomes the box's right click, 7-10
+(`searchMouseButtons`, `src/renderer/ui/Mouse.ts:42-47`). So with CHAMPION VIEW on, a
+left press on the bars is held back:
+
+- released before the long press's threshold, it was a click: it is queued at the
+  release, and the inventory opens;
+- held to the threshold, it opens the dialog, and nothing is queued.
+
+The click is late by the time the press lasts, under a tenth of a second for a tap. A
+right click on the bars is CSBWin's own button and is never held, nor is a click on the
+portrait or the hands. With the setting off, nothing is held.
+
+⚠️ **The gesture is a trial, not a settled choice.** If the late click is felt in play,
+these are the other ways in:
+
+- **A double click on the bars**: every left click there then waits out the double-click
+  interval, about 300 ms after the click, before it is queued.
+- **A CHAMPIONS button in the settings dialog**, on its title line: no click is held, and
+  a touch screen takes two steps, a double tap on the message area, then CHAMPIONS.
+- **The long press on the message area**, shared with the map (U6) through a small
+  chooser: no click is held, and the gesture names neither view.
+- **The press acting at once**: the inventory opens on the press, and the long press
+  opens the dialog over it. No delay, but the inventory is left open, and undoing it is
+  not a toggle, since the press may have replaced another champion's inventory.
+
+The check: a golden frame of each tab from a fixture save; the probe opens it by a long
+press, with every inventory still closed, and opens an inventory by a tap, at its
+release.
+
+### U8 ⏳ No fullscreen
+
+Nothing fills the screen.
+
+Paying it: DISPLAY's FULLSCREEN puts `#game` in fullscreen, both canvases, at the largest
+whole multiple of 320x200 that fits, centred on black. This pays E22's points 1, 3 and
+4; E22 keeps the 4:3 ratio and a fractional fill. A browser leaves fullscreen on Esc and
+may not pass the key on, so the item finds out whether the Keyboard Lock API
+(`navigator.keyboard.lock(['Escape'])`) keeps Esc for the settings, and where it does
+not, the double click on the message area is the way in. The probe checks the effect's
+canvas over the game canvas and a click read through it, in fullscreen.
+
+### U9 ⏳ The side panel
+
+With U4 to U8 in, nothing on `#side` (`index.html`) is needed by a player. The data-set
+chooser, Quick Save and Quick Load, CRT, Sound and its volume, Map, Champions, Debug,
+Extras, and the map and champion panels all go, with the code in `src/ui/` that only they
+use. The data set is chosen by `?dungeon=` until E15's welcome page. The teleport and
+`#overlay-control` go behind `?dev`. This pays R9, since no control is left to keep the
+focus, and E15's bullets on settings in the DOM, elements looked up at import, and the
+debug chrome; their entries are rewritten when it lands. The probe and the golden frames
+that press a page button press its dialog or its key instead.
 
 ---
 
