@@ -33,6 +33,7 @@ import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
 import { applySaveBytes } from './engine/SaveGameFile';
 import { Settings, applyToGame, type SettingsValues } from './settings/Settings';
+import type { KeyboardLayoutMap } from './renderer/ui/KeyLabels';
 import { GameEvents, playerId, sendBeacon } from './ui/gameEvents';
 
 console.log('Dungeon Master Web - Initializing...');
@@ -65,6 +66,18 @@ const settings = new Settings((() => {
         return null;
     }
 })());
+
+/**
+ * What this keyboard prints on each key, where the browser says
+ * (`navigator.keyboard.getLayoutMap()`, Chromium's alone), read once at the start; `null`
+ * until then, and where it does not say. DOM's types do not have it yet.
+ */
+let keyboardLayout: KeyboardLayoutMap | null = null;
+function readKeyboardLayout(): void {
+    const keyboard = (navigator as { keyboard?: { getLayoutMap?: () => Promise<KeyboardLayoutMap> } }).keyboard;
+    keyboard?.getLayoutMap?.().then((map) => { keyboardLayout = map; }, () => {});
+}
+readKeyboardLayout();
 
 function setCrtEnabled(enabled: boolean): boolean {
     if (!crtController) return false;
@@ -383,6 +396,9 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // applies (`applySettings`); its CRT toggle is inert without WebGL.
         settings,
         isCrtAvailable: () => crtController?.isAvailable() ?? false,
+        // The KEYS tab labels a key with what this keyboard prints on it, where the
+        // browser says (`readKeyboardLayout`).
+        keyboardLayout: () => keyboardLayout,
         // The Hint Oracle's button: the screen has stopped the clock and shaded the
         // interface, and the Oracle has the canvas until it closes.
         onOpenHintOracle: (square) => {

@@ -13,13 +13,13 @@
  *   low buttons.
  * - **A row of tabs**: GAME, DISPLAY, SOUND and KEYS, the selected one pressed.
  * - **The tab's settings**, one a line: its name on a panel, and beside it a toggle, ON
- *   and OFF, the chosen one pressed, or a slider. The panel holds five lines.
+ *   and OFF, the chosen one pressed, or a slider. The panel holds five lines. KEYS has
+ *   its presets, its labels' layout and the list of the keys instead (`SettingsKeys.ts`).
  * - **The help line**, at the foot (`helpText`).
  *
- * KEYS (`DEBT.md` U5) and EXIT, which leaves for the welcome page (E15), are drawn inert,
- * unlabelled, as the kit draws a button that can do nothing. So is the CRT effect's
- * toggle where the browser gives no WebGL (`UIState.isCrtAvailable`); the help line
- * then says why.
+ * EXIT, which leaves for the welcome page (E15), is drawn inert, unlabelled, as the kit
+ * draws a button that can do nothing. So is the CRT effect's toggle where the browser
+ * gives no WebGL (`UIState.isCrtAvailable`); the help line then says why.
  *
  * Every change goes to the settings model at once, which saves it and tells its
  * listeners: the page applies it to the sound, the CRT effect and the game.
@@ -37,7 +37,8 @@
  *
  * Esc opens it in play, over the inventory and the sleep and freeze screens too, and so
  * does a double click on the message area (`GameInput`). Esc again, CLOSE or a right click
- * close it. While it is up the clock is held, as under every dialog, and the game is left
+ * close it, unless KEYS takes them: Esc while a slot waits for its key, a right click on
+ * a slot. While it is up the clock is held, as under every dialog, and the game is left
  * as it was: no `TAG02076e`, nothing repacked or shaded.
  *
  * ## The palette
@@ -53,6 +54,10 @@ import type { SettingsValues } from '../../settings/Settings';
 import { closeDialog, openDialog, type Dialog, type DialogPoint } from './Dialog';
 import { searchButtonList } from './HitTest';
 import { MENU_TITLE1_COLOR } from './Menu';
+import {
+  drawKeysTab, keysTabButtons, keysTabClick, keysTabHelp, keysTabHoverButtons, keysTabKey, keysTabRightClick,
+  keysTabWheel, newKeysTabState, type KeysArea, type KeysTabState,
+} from './SettingsKeys';
 import type { UIState } from './UIState';
 import {
   BUTTON_GAP,
@@ -100,6 +105,8 @@ const NAME_PANEL: Rect = { x1: 10, y1: LINES_Y1, x2: 190, y2: LINES_Y1 + SETTING
 const CONTROL_X1 = NAME_PANEL.x2 + 10;
 const CONTROL_X2 = 309;
 export const HELP_LINE: Rect = { x1: 10, y1: 175, x2: 309, y2: 189 };
+/** KEYS' lines: the five lines, and down to six rows of the plate above the help line. */
+export const KEYS_AREA: KeysArea = { x1: NAME_PANEL.x1, y1: LINES_Y1, x2: CONTROL_X2, y2: HELP_LINE.y1 - 7, controlX1: CONTROL_X1 };
 
 /** Line `line`'s rectangle across the dialog: the names' panel and the controls' column. */
 function lineRect(line: number): Rect {
@@ -141,8 +148,8 @@ const extra = (key: keyof SettingsValues['extras']) => ({
   set: (values: SettingsValues, on: boolean) => ({ extras: { ...values.extras, [key]: on } }),
 });
 
-/** The tabs, in their row's order: a label, the help line's words, and the settings, or `null` for one drawn inert. */
-export const TABS: ReadonlyArray<{ readonly tab: SettingsTab; readonly label: string; readonly help: string; readonly settings: readonly Setting[] | null }> = [
+/** The tabs, in their row's order: a label, the help line's words, and the settings, which KEYS has none of. */
+export const TABS: ReadonlyArray<{ readonly tab: SettingsTab; readonly label: string; readonly help: string; readonly settings: readonly Setting[] }> = [
   {
     tab: 'game',
     label: 'GAME',
@@ -203,7 +210,7 @@ export const TABS: ReadonlyArray<{ readonly tab: SettingsTab; readonly label: st
       },
     ],
   },
-  { tab: 'keys', label: 'KEYS', help: '', settings: null },
+  { tab: 'keys', label: 'KEYS', help: 'THE KEYS, AND WHAT EACH ONE DOES', settings: [] },
 ];
 
 export const TITLE = 'SETTINGS';
@@ -219,6 +226,8 @@ export interface SettingsDialogState {
   pointer: DialogPoint;
   /** The line whose slider a click took and the button still holds, or `null`. */
   sliding: number | null;
+  /** KEYS' list and the slot waiting for its key, kept across the tabs while the dialog is up. */
+  keys: KeysTabState;
 }
 
 export function isSettingsDialogOpen(ui: UIState): boolean {
@@ -229,8 +238,11 @@ const SETTINGS_DIALOG: Dialog = {
   uiPalette: true,
   draw: (ui) => drawSettingsDialog(ui),
   click: (ui, x, y, buttons) => settingsDialogClick(ui, x, y, buttons),
-  key: (ui, key) => settingsDialogKey(ui, key),
-  wheel: () => {},
+  key: (ui, key, code) => settingsDialogKey(ui, key, code),
+  wheel: (ui, deltaY) => {
+    const state = ui.settingsDialog;
+    if (state?.tab === 'keys') keysTabWheel(state.keys, KEYS_AREA, deltaY);
+  },
   pointer: (ui, point) => settingsDialogPointer(ui, point),
   drag: (ui, x) => settingsDialogDrag(ui, x),
   release: (ui) => {
@@ -242,7 +254,7 @@ const SETTINGS_DIALOG: Dialog = {
 export function openSettingsDialog(ui: UIState): void {
   if (ui.dialog) return;
   openDialog(ui, SETTINGS_DIALOG);
-  ui.settingsDialog = { tab: 'game', pointer: ui.hoverPoint, sliding: null };
+  ui.settingsDialog = { tab: 'game', pointer: ui.hoverPoint, sliding: null, keys: newKeysTabState() };
 }
 
 export function closeSettingsDialog(ui: UIState): void {
@@ -265,7 +277,7 @@ function tabOf(state: SettingsDialogState) {
 }
 
 function settingsOf(state: SettingsDialogState): readonly Setting[] {
-  return tabOf(state).settings ?? [];
+  return tabOf(state).settings;
 }
 
 function inert(ui: UIState, setting: Setting): boolean {
@@ -274,13 +286,12 @@ function inert(ui: UIState, setting: Setting): boolean {
 
 /**
  * The dialog's button list, in the form of CSBWin's (`x2` and `y2` exclusive): CLOSE, the
- * tabs, and each line's toggle or slider. An inert control has none.
+ * tabs, and each line's toggle or slider, or KEYS' controls. An inert control has none.
  */
 export function settingsDialogButtons(ui: UIState, state: SettingsDialogState): UIButton[] {
   const buttons = [buttonOf(CLOSE_FRAME, BTN_CLOSE, 'settings.close')];
-  TABS.forEach((t, i) => {
-    if (t.settings) buttons.push(buttonOf(TAB_FRAMES[i], BTN_TAB0 + i, `settings.tab.${t.tab}`));
-  });
+  TABS.forEach((t, i) => buttons.push(buttonOf(TAB_FRAMES[i], BTN_TAB0 + i, `settings.tab.${t.tab}`)));
+  if (state.tab === 'keys') buttons.push(...keysTabButtons(ui, state.keys, KEYS_AREA));
   settingsOf(state).forEach((setting, line) => {
     if (inert(ui, setting)) return;
     const id = BTN_LINE0 + 3 * line;
@@ -296,6 +307,9 @@ export function settingsDialogButtons(ui: UIState, state: SettingsDialogState): 
 
 /** The buttons, then every line's whole width: what the help line names under the pointer. */
 function hoverButtons(ui: UIState, state: SettingsDialogState): UIButton[] {
+  if (state.tab === 'keys') {
+    return [...settingsDialogButtons(ui, state).slice(0, 1 + TABS.length), ...keysTabHoverButtons(ui, state.keys, KEYS_AREA)];
+  }
   const lines = settingsOf(state).map((_setting, line): UIButton => {
     const r = lineRect(line);
     return { word0: BTN_NAME0 + line, x1: r.x1, y1: r.y1, x2: r.x2 + 1, y2: r.y2 + 1, button: 2, name: `settings.line${line}` };
@@ -311,7 +325,7 @@ function hovered(ui: UIState, state: SettingsDialogState): number {
 
 /** The line a control's id stands for, or -1. */
 function lineOf(id: number): number {
-  if (id >= BTN_NAME0) return id - BTN_NAME0;
+  if (id >= BTN_NAME0) return id < BTN_NAME0 + SETTING_LINES ? id - BTN_NAME0 : -1;
   return id >= BTN_LINE0 ? Math.floor((id - BTN_LINE0) / 3) : -1;
 }
 
@@ -319,6 +333,10 @@ function lineOf(id: number): number {
 export function helpText(ui: UIState, state: SettingsDialogState): string {
   const id = hovered(ui, state);
   if (id === BTN_CLOSE) return CLOSE_HELP;
+  if (state.tab === 'keys') {
+    const keys = keysTabHelp(ui, state.keys, id);
+    if (keys !== undefined) return keys;
+  }
   if (id >= BTN_TAB0 && id < BTN_TAB0 + TABS.length) return TABS[id - BTN_TAB0].help;
   const setting = settingsOf(state)[lineOf(id)];
   if (!setting) return '';
@@ -340,10 +358,19 @@ export function drawSettingsDialog(ui: UIState): void {
   drawButton(ui, CLOSE_FRAME, CLOSE_LABEL, look(BTN_CLOSE));
   drawButton(ui, EXIT_FRAME, '', 'inert');
 
-  TABS.forEach((t, i) => {
-    drawButton(ui, TAB_FRAMES[i], t.label, t.settings ? look(BTN_TAB0 + i, t.tab === state.tab) : 'inert');
-  });
+  TABS.forEach((t, i) => drawButton(ui, TAB_FRAMES[i], t.label, look(BTN_TAB0 + i, t.tab === state.tab)));
 
+  if (state.tab === 'keys') {
+    drawKeysTab(ui, state.keys, KEYS_AREA, over);
+  } else {
+    drawSettingLines(ui, state, look);
+  }
+
+  drawHelpLine(ui, HELP_LINE, helpText(ui, state));
+}
+
+/** A tab's settings, one a line: its name on the names' panel, and its toggle or slider. */
+function drawSettingLines(ui: UIState, state: SettingsDialogState, look: (id: number, pressed?: boolean) => ButtonLook): void {
   drawPanel(ui, NAME_PANEL);
   const values = ui.settings.values;
   settingsOf(state).forEach((setting, line) => {
@@ -359,27 +386,30 @@ export function drawSettingsDialog(ui: UIState): void {
       drawButton(ui, frame, TOGGLE_LABELS[i], inert(ui, setting) ? 'inert' : look(id + i, on === (i === 0)));
     });
   });
-
-  drawHelpLine(ui, HELP_LINE, helpText(ui, state));
 }
 
 /* ------------------------------------------------------------------- the input ---- */
 
-/** A click: a right one closes it; a left one on a control acts at once. */
+/** A click: a right one closes it, but on KEYS' slots; a left one on a control acts at once. */
 export function settingsDialogClick(ui: UIState, x: number, y: number, buttons: number): void {
   const state = ui.settingsDialog;
   if (!state) return;
+  const id = searchButtonList(settingsDialogButtons(ui, state), Math.floor(x), Math.floor(y), buttons);
   if ((buttons & 1) !== 0) {
-    closeSettingsDialog(ui);
+    if (state.tab !== 'keys' || !keysTabRightClick(ui, state.keys, id)) closeSettingsDialog(ui);
     return;
   }
-  const id = searchButtonList(settingsDialogButtons(ui, state), Math.floor(x), Math.floor(y), buttons);
   if (id === BTN_CLOSE) {
     closeSettingsDialog(ui);
     return;
   }
+  state.keys.capture = null;
   if (id >= BTN_TAB0 && id < BTN_TAB0 + TABS.length) {
     state.tab = TABS[id - BTN_TAB0].tab;
+    return;
+  }
+  if (state.tab === 'keys') {
+    keysTabClick(ui, state.keys, KEYS_AREA, id);
     return;
   }
   const line = lineOf(id);
@@ -405,9 +435,12 @@ function settingsDialogDrag(ui: UIState, x: number): void {
   if (value !== setting.get(ui.settings.values)) ui.settings.update(setting.set(ui.settings.values, value));
 }
 
-/** Esc closes it; no other key does anything. */
-export function settingsDialogKey(ui: UIState, key: string): void {
-  if (key === 'Escape') closeSettingsDialog(ui);
+/** KEYS takes its keys (`keysTabKey`); else Esc closes it, and no other key does anything. */
+export function settingsDialogKey(ui: UIState, _key: string, code: string): void {
+  const state = ui.settingsDialog;
+  if (!state) return;
+  if (state.tab === 'keys' && keysTabKey(ui, state.keys, KEYS_AREA, code)) return;
+  if (code === 'Escape') closeSettingsDialog(ui);
 }
 
 /**

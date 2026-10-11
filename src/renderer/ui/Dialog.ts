@@ -29,8 +29,11 @@ export interface Dialog {
   draw(ui: UIState): void;
   /** A button pressed: `buttons` is CSBWin's mask, 1 the right button and 2 the left. */
   click(ui: UIState, x: number, y: number, buttons: number): void;
-  /** A key pressed with no modifier, as `KeyboardEvent.key` names it. */
-  key(ui: UIState, key: string): void;
+  /**
+   * A key pressed with no modifier: `key` the character it types, as `KeyboardEvent.key`
+   * names it, and `code` the physical key, which a binding is.
+   */
+  key(ui: UIState, key: string, code: string): void;
   /** A notch of the wheel, `WheelEvent.deltaY`. */
   wheel(ui: UIState, deltaY: number): void;
   /** The pointer moved. Says whether the dialog is drawn differently for it. */

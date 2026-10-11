@@ -166,11 +166,43 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   quickLoad: ['F9', ''],
 };
 
+/** The default preset's moves on the keypad alone: K , J L M . free. */
+export const KEYPAD_KEY_BINDINGS: KeyBindings = {
+  ...DEFAULT_KEY_BINDINGS,
+  'move.forward': ['Numpad8', ''],
+  'move.backward': ['Numpad5', ''],
+  'move.turnLeft': ['Numpad7', ''],
+  'move.turnRight': ['Numpad9', ''],
+  'move.strafeLeft': ['Numpad4', ''],
+  'move.strafeRight': ['Numpad6', ''],
+};
+
 /**
- * The named key tables a player can pick: CSBWIN is `DEFAULT_KEY_BINDINGS`. A table
- * changed by hand is `custom`, and is its own.
+ * The moves on the arrows, as the Atari's cursor block has them (`TABLE_KEYSCAN`): up
+ * steps forward, down back, left and right strafe. The Atari turns on Insert and
+ * Clr/Home, the keys above its left and right arrows; here Delete and Page Down, the
+ * keys above the PC's. The keypad stays the second key, as the default preset's.
  */
-export const KEY_PRESETS = { csbwin: DEFAULT_KEY_BINDINGS } as const satisfies Record<string, KeyBindings>;
+export const ARROWS_KEY_BINDINGS: KeyBindings = {
+  ...DEFAULT_KEY_BINDINGS,
+  'move.forward': ['ArrowUp', 'Numpad8'],
+  'move.backward': ['ArrowDown', 'Numpad5'],
+  'move.turnLeft': ['Delete', 'Numpad7'],
+  'move.turnRight': ['PageDown', 'Numpad9'],
+  'move.strafeLeft': ['ArrowLeft', 'Numpad4'],
+  'move.strafeRight': ['ArrowRight', 'Numpad6'],
+};
+
+/**
+ * The named key tables a player can pick: CSBWIN is `DEFAULT_KEY_BINDINGS`, KEYPAD and
+ * ARROWS move it to the keypad alone or to the arrows. A table changed by hand is
+ * `custom`, and is its own.
+ */
+export const KEY_PRESETS = {
+  csbwin: DEFAULT_KEY_BINDINGS,
+  keypad: KEYPAD_KEY_BINDINGS,
+  arrows: ARROWS_KEY_BINDINGS,
+} as const satisfies Record<string, KeyBindings>;
 
 /** A preset's name, or `custom` for a table of the player's. */
 export type KeyPreset = keyof typeof KEY_PRESETS | 'custom';
@@ -186,6 +218,33 @@ export function actionsByCode(bindings: KeyBindings): ReadonlyMap<string, KeyAct
     for (const code of slots) if (code !== '' && !byCode.has(code)) byCode.set(code, action);
   }
   return byCode;
+}
+
+/** Whether an action can take `code`: Esc is the settings' (`GameInput.keyDown`), and no code is no key. */
+export function isBindableKey(code: string): boolean {
+  return code !== '' && code !== 'Escape';
+}
+
+/**
+ * `bindings` with `code` in `action`'s slot `slot`, and taken out of every other slot, so
+ * a code is one action's at most. A code no action can take changes nothing.
+ */
+export function bindKey(bindings: KeyBindings, action: KeyAction, slot: 0 | 1, code: string): KeyBindings {
+  if (!isBindableKey(code)) return bindings;
+  return mapSlots(bindings, (a, i, bound) => (a === action && i === slot ? code : bound === code ? '' : bound));
+}
+
+/** `bindings` with `action`'s slot `slot` emptied. */
+export function clearKey(bindings: KeyBindings, action: KeyAction, slot: 0 | 1): KeyBindings {
+  return mapSlots(bindings, (a, i, bound) => (a === action && i === slot ? '' : bound));
+}
+
+function mapSlots(bindings: KeyBindings, slotCode: (action: KeyAction, slot: 0 | 1, code: string) => string): KeyBindings {
+  const table = {} as Record<KeyAction, KeySlots>;
+  for (const [action, [first, second]] of Object.entries(bindings) as Array<[KeyAction, KeySlots]>) {
+    table[action] = [slotCode(action, 0, first), slotCode(action, 1, second)];
+  }
+  return table;
 }
 
 /** The bindings in force, which every key is looked up in: the player's (`setKeyBindings`). */

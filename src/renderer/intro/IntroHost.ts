@@ -33,6 +33,8 @@ export interface IntroEvent {
    * every other screen a key is a key.
    */
   key?: string;
+  /** The physical key, `KeyboardEvent.code`, where `key` is one: what the chooser passes on with it. */
+  code?: string;
 }
 
 export interface IntroHost {

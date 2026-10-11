@@ -61,6 +61,7 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     onSleepSave: () => {},
     settings: new Settings(null),
     isCrtAvailable: () => true,
+    keyboardLayout: () => null,
     ...hooks,
     getGraphicBitmap,
   });

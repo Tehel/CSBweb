@@ -10,6 +10,7 @@
  * still gives a whole set.
  */
 import type { Extras, GameContext } from '../engine/GameContext';
+import { KEY_LABEL_LAYOUTS, type KeyLabelLayout } from '../renderer/ui/KeyLabels';
 import { KEY_PRESETS, setKeyBindings, type KeyAction, type KeyBindings, type KeyPreset, type KeySlots } from '../renderer/ui/Keyboard';
 
 export interface SettingsValues {
@@ -38,6 +39,8 @@ export interface SettingsValues {
   readonly keyPreset: KeyPreset;
   /** The keys the game answers: a preset's table, or the player's own. */
   readonly keyBindings: KeyBindings;
+  /** The layout the keys are labelled in where the browser does not say (`KeyLabels.ts`). */
+  readonly keyLabels: KeyLabelLayout;
 }
 
 export const DEFAULT_SETTINGS: SettingsValues = {
@@ -52,6 +55,7 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   extras: { gatherThrownWeapons: false, drinkAtFountain: false, colourNewMastery: false },
   keyPreset: 'csbwin',
   keyBindings: KEY_PRESETS.csbwin,
+  keyLabels: 'qwerty',
 };
 
 /** Where the settings are kept. */
@@ -154,6 +158,7 @@ export function parseSettings(raw: unknown): SettingsValues {
     keyPreset: typeof preset === 'string' && (preset === 'custom' || preset in KEY_PRESETS)
       ? preset as KeyPreset : defaults.keyPreset,
     keyBindings: parseKeyBindings(record.keyBindings),
+    keyLabels: KEY_LABEL_LAYOUTS.find((layout) => layout === record.keyLabels) ?? defaults.keyLabels,
   });
 }
 

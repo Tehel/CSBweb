@@ -18,7 +18,12 @@
  * 5. **Opening it**, through `GameInput` over the interface's real lists: Esc, awake, asleep
  *    and frozen, but not over the Reincarnate screen; Pause freezes; a double click on
  *    the message area, not a slow one, not one on the freeze's pixel, and never in a
- *    frozen game, whose first click thaws it.
+ *    frozen game, whose first click thaws it. A key reaches KEYS by its code.
+ * 6. **KEYS** (`SettingsKeys.ts`): its layout; a slot clicked waits for its key, which
+ *    fills it and leaves every other slot, Esc cancelling and never bound; a right click
+ *    empties a slot; the presets, CUSTOM inert until a key is changed; the labels'
+ *    layout, inert where the browser gives the keyboard's; the list scrolled by the wheel,
+ *    its arrows and the keys. `tools/dump-key-bindings.ts` checks the tables and labels.
  *
  * Run: `npx tsx tools/dump-settings-dialog.ts`
  */
@@ -33,10 +38,17 @@ import { DEFAULT_KEY_BINDINGS, keyAction, tableKeyButton } from '../src/renderer
 import { MENU_GRAPHIC } from '../src/renderer/ui/Menu';
 import { searchMouseButtons, syncInventoryButtons, updateButtonLists } from '../src/renderer/ui/Mouse';
 import {
-  CLOSE_FRAME, EXIT_FRAME, HELP_LINE, SETTING_LINES, TABS, TAB_FRAMES, closeSettingsDialog, drawSettingsDialog,
+  CLOSE_FRAME, EXIT_FRAME, HELP_LINE, KEYS_AREA, SETTING_LINES, TABS, TAB_FRAMES, closeSettingsDialog, drawSettingsDialog,
   helpText, openSettingsDialog, settingsDialogButtons, settingsDialogClick, settingsDialogKey, settingsDialogPointer,
   sliderRect, toggleFrames,
 } from '../src/renderer/ui/SettingsDialog';
+import {
+  CAPTURE_HELP, CAPTURE_LABEL, KEY_ACTION_NAMES, LABELS_FROM_KEYBOARD_HELP, LABELS_HELP, LABELS_NAME, PRESETS, SLOT_HELP,
+  keysList, labelsNamePanel, layoutFrames, presetFrames, slotLabel, slotRect,
+} from '../src/renderer/ui/SettingsKeys';
+import { KEY_LABEL_CHARS } from '../src/renderer/ui/KeyLabels';
+import { KEYPAD_KEY_BINDINGS } from '../src/renderer/ui/Keyboard';
+import { arrowBox, listTextX } from '../src/renderer/ui/Widgets';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { CHAR_WIDTH, buttonRect } from '../src/renderer/ui/Widgets';
 import { Settings } from '../src/settings/Settings';
@@ -48,11 +60,12 @@ const graphics = stockGraphics();
 const image = graphics.getImage(MENU_GRAPHIC);
 const menuBitmap = { width: image.width, height: image.height, pixels: Uint8Array.from(image.pixels) };
 
-function freshUI(crt = true): UIState {
+function freshUI(crt = true, layoutMap: ReadonlyMap<string, string> | null = null): UIState {
   return newUIState(graphics, newGame(emptyDungeonData(), graphics).ctx, {
     getGraphicBitmap: (n) => (n === MENU_GRAPHIC ? menuBitmap : null),
     settings: new Settings(null),
     isCrtAvailable: () => crt,
+    keyboardLayout: () => layoutMap,
   });
 }
 
@@ -149,13 +162,14 @@ console.log('\n=== 3. the controls ===');
   check(state.sliding === null && values().volume === middle, 'released, a move drags nothing');
 
   click(ui, TAB_FRAMES[3]);
-  check(state.tab === 'sound', 'KEYS\' tab is inert');
+  check(state.tab === 'keys', 'KEYS\' tab selects it');
   click(ui, EXIT_FRAME);
   check(isDialogOpen(ui), 'EXIT is inert');
 
-  settingsDialogKey(ui, 'Enter');
+  click(ui, TAB_FRAMES[0]);
+  settingsDialogKey(ui, 'Enter', 'Enter');
   check(isDialogOpen(ui), 'a key other than Esc does nothing');
-  settingsDialogKey(ui, 'Escape');
+  settingsDialogKey(ui, 'Escape', 'Escape');
   check(!isDialogOpen(ui) && !ui.ctx.state.paused, 'Esc closes it, and the clock runs');
   openSettingsDialog(ui);
   settingsDialogClick(ui, 100, 100, 1);
@@ -211,7 +225,7 @@ console.log('\n=== 5. opening it ===');
     isDialogOpen: () => isDialogOpen(ui),
     openSettings: () => openSettingsDialog(ui),
     handleDialogClick: (x: number, y: number, b: number) => ui.dialog?.click(ui, x, y, b),
-    handleDialogKey: (key: string) => ui.dialog?.key(ui, key),
+    handleDialogKey: (key: string, code: string) => ui.dialog?.key(ui, key, code),
     isReincarnateScreenOpen: () => reincarnate,
     handleReincarnateKey: () => {},
     handleReincarnateClick: () => {},
@@ -279,6 +293,146 @@ console.log('\n=== 5. opening it ===');
   input.mouseDown(100, 185, 0);
   input.mouseDown(100, 185, 0);
   check(!isDialogOpen(ui) && queued.length === 2, 'frozen, both clicks are the thaw\'s, and open nothing');
+
+  // KEYS binds the physical key: AZERTY's A is the code KeyQ.
+  mode(UIMode.Adventure);
+  input.keyDown(press('Escape'));
+  const keys = ui.settingsDialog!;
+  keys.tab = 'keys';
+  const slot = centre(slotRect(keysList(KEYS_AREA), 0, 1));
+  input.mouseDown(slot.x, slot.y, 0);
+  check(keys.keys.capture?.action === 'move.forward', 'a click on MOVE FORWARD\'s second slot waits for its key');
+  check(!input.keyDown({ key: 'a', code: 'KeyA', ctrlKey: true, metaKey: false, altKey: false }) && keys.keys.capture !== null,
+    'a key with Ctrl is the browser\'s, and the slot still waits');
+  check(input.keyDown({ key: 'a', code: 'KeyQ', ctrlKey: false, metaKey: false, altKey: false }), 'a key without one is the dialog\'s');
+  check(ui.settings.values.keyBindings['move.forward'][1] === 'KeyQ' && ui.settings.values.keyBindings['attack.0.0'][0] === '',
+    'its code fills the slot, and leaves attack 1 of champion 1');
+  input.mouseDown(slot.x, slot.y, 0);
+  input.keyDown(press('Escape'));
+  check(isDialogOpen(ui) && keys.keys.capture === null, 'Esc while the slot waits cancels, and the dialog stays up');
+  input.keyDown(press('Escape'));
+  check(!isDialogOpen(ui), 'Esc again closes it');
+}
+
+console.log('\n=== 6. KEYS ===');
+{
+  const interior: Rect = { x1: 10, y1: 10, x2: 309, y2: 189 };
+  const list = keysList(KEYS_AREA);
+  const frames: Array<[string, Rect]> = [
+    ...TAB_FRAMES.map((f, i): [string, Rect] => [`tab ${TABS[i].label}`, f]),
+    ...presetFrames(KEYS_AREA).map((f, i): [string, Rect] => [`preset ${PRESETS[i].label}`, f]),
+    ['labels name', labelsNamePanel(KEYS_AREA)],
+    ...layoutFrames(KEYS_AREA).map((f, i): [string, Rect] => [`layout ${i}`, f]),
+    ['list', list.panel], ['help line', HELP_LINE],
+  ];
+  check(frames.every(([, f]) => inside(f, interior)), 'every frame inside the plate\'s interior');
+  const clashes = frames.flatMap(([a, fa], i) => frames.slice(i + 1).filter(([, fb]) => overlap(fa, fb)).map(([b]) => `${a}/${b}`));
+  check(clashes.length === 0, `no frame over another${clashes.length ? `: ${clashes.join(', ')}` : ''}`);
+  const first = slotRect(list, 0, 0);
+  const second = slotRect(list, 0, 1);
+  check(second.x1 > first.x2 && second.x2 < list.scrollbar.x1, 'the slots side by side, short of the scrollbar');
+  check(KEY_ACTION_NAMES.every(([, name]) => listTextX(list) + name.length * CHAR_WIDTH <= first.x1 - 2),
+    'every action\'s name ends before its first slot');
+  check(KEY_LABEL_CHARS * CHAR_WIDTH + 2 <= first.x2 - first.x1 + 1 && CAPTURE_LABEL.length <= KEY_LABEL_CHARS,
+    `a slot holds ${KEY_LABEL_CHARS} characters, PRESS A KEY among them`);
+  check(LABELS_NAME.length * CHAR_WIDTH + 4 < labelsNamePanel(KEYS_AREA).x2 - labelsNamePanel(KEYS_AREA).x1, 'KEY LABELS fits its panel');
+  console.log(`  the list shows ${list.rows} of ${KEY_ACTION_NAMES.length} actions`);
+  check(list.rows >= 7, 'the list shows seven rows at least');
+  const helpChars = Math.floor((HELP_LINE.x2 - 1 - (HELP_LINE.x1 + 4) + 1) / CHAR_WIDTH);
+  const helps = [...PRESETS.map((p) => p.help), LABELS_HELP, LABELS_FROM_KEYBOARD_HELP, SLOT_HELP, CAPTURE_HELP];
+  check(helps.every((h) => h.length <= helpChars), `every help line fits, ${helpChars} characters`);
+
+  const ui = freshUI();
+  openSettingsDialog(ui);
+  const state = ui.settingsDialog!;
+  click(ui, TAB_FRAMES[3]);
+  const values = () => ui.settings.values;
+  const slotAt = (row: number, slot: 0 | 1) => centre(slotRect(list, row, slot));
+  const clickSlot = (row: number, slot: 0 | 1, buttons = 2) => {
+    const at = slotAt(row, slot);
+    settingsDialogClick(ui, at.x, at.y, buttons);
+  };
+  const presetIds = settingsDialogButtons(ui, state).filter((b) => b.name?.startsWith('settings.keys.preset')).map((b) => b.name);
+  check(presetIds.join() === 'settings.keys.preset.csbwin,settings.keys.preset.keypad,settings.keys.preset.arrows',
+    'CSBWIN, KEYPAD and ARROWS take a click, and CUSTOM none');
+  check(values().keyPreset === 'csbwin', 'CSBWIN is in force');
+
+  // MOVE FORWARD is the first row: K, then keypad 8.
+  check(slotLabel(ui, values().keyBindings['move.forward'][0]) === 'K', 'MOVE FORWARD\'s first slot shows K');
+  clickSlot(0, 0);
+  check(state.keys.capture?.action === 'move.forward' && state.keys.capture.slot === 0, 'a click on it waits for its key');
+  settingsDialogPointer(ui, { x: 5, y: 5 });
+  check(helpText(ui, state) === CAPTURE_HELP, 'and the help line says to press it');
+  settingsDialogKey(ui, 'Escape', 'Escape');
+  check(state.keys.capture === null && isDialogOpen(ui) && values().keyBindings['move.forward'][0] === 'KeyK',
+    'Esc cancels, and binds nothing');
+  clickSlot(0, 0);
+  settingsDialogKey(ui, 'w', 'KeyW');
+  check(values().keyBindings['move.forward'][0] === 'KeyW' && values().keyBindings['attack.1.0'][0] === '',
+    'W fills it, and is no longer champion 2\'s first attack');
+  check(values().keyPreset === 'custom', 'the table is now CUSTOM');
+  check(state.keys.capture === null, 'the slot waits no more');
+  clickSlot(0, 1);
+  clickSlot(1, 0);
+  check(state.keys.capture?.action === 'move.backward', 'a click on another slot moves the wait there');
+  click(ui, TAB_FRAMES[3]);
+  check(state.keys.capture === null, 'and any other click cancels it');
+
+  clickSlot(0, 1, 1);
+  check(isDialogOpen(ui) && values().keyBindings['move.forward'][1] === '', 'a right click on a slot empties it');
+  check(slotLabel(ui, '') === '-', 'and it shows a dash');
+  settingsDialogPointer(ui, slotAt(0, 1));
+  check(helpText(ui, state) === SLOT_HELP, 'the help line names what a slot does');
+
+  click(ui, presetFrames(KEYS_AREA)[1]);
+  check(values().keyPreset === 'keypad' && values().keyBindings === KEYPAD_KEY_BINDINGS, 'KEYPAD puts its table in force');
+  click(ui, presetFrames(KEYS_AREA)[0]);
+  check(values().keyPreset === 'csbwin' && values().keyBindings === DEFAULT_KEY_BINDINGS, 'and CSBWIN its own back');
+
+  // The labels: QWERTY by default, AZERTY at a click; Champion 1's first attack is KeyQ.
+  const attackRow = KEY_ACTION_NAMES.findIndex(([action]) => action === 'attack.0.0');
+  check(slotLabel(ui, values().keyBindings['attack.0.0'][0]) === 'Q', 'on QWERTY, champion 1\'s first attack is Q');
+  click(ui, layoutFrames(KEYS_AREA)[1]);
+  check(values().keyLabels === 'azerty' && slotLabel(ui, 'KeyQ') === 'A', 'AZERTY names the same key A');
+  check(values().keyBindings['attack.0.0'][0] === 'KeyQ', 'and binds nothing new');
+  settingsDialogPointer(ui, centre(labelsNamePanel(KEYS_AREA)));
+  check(helpText(ui, state) === LABELS_HELP, 'the help line names KEY LABELS');
+
+  // The list, a row an action, scrolled by the wheel, its arrows and the keys.
+  const maxTop = KEY_ACTION_NAMES.length - list.rows;
+  ui.dialog?.wheel(ui, 100);
+  check(state.keys.scrollTop === 1, 'a notch of the wheel down scrolls a row');
+  settingsDialogKey(ui, 'End', 'End');
+  check(state.keys.scrollTop === maxTop, 'End shows the last page');
+  ui.dialog?.wheel(ui, 100);
+  check(state.keys.scrollTop === maxTop, 'and the wheel goes no further');
+  settingsDialogKey(ui, 'PageUp', 'PageUp');
+  check(state.keys.scrollTop === maxTop - list.rows, 'Page Up scrolls a page');
+  settingsDialogKey(ui, 'Home', 'Home');
+  settingsDialogKey(ui, 'ArrowDown', 'ArrowDown');
+  check(state.keys.scrollTop === 1, 'Home, then Down, shows from the second row');
+  const down = { x: centre(list.scrollbar).x, y: list.scrollbar.y2 - (arrowBox(list) >> 1) };
+  settingsDialogClick(ui, down.x, down.y, 2);
+  check(state.keys.scrollTop === 2, 'the scrollbar\'s down arrow scrolls a row');
+  state.keys.scrollTop = attackRow;
+  clickSlot(0, 0);
+  check(state.keys.capture?.action === 'attack.0.0', 'scrolled, a slot is its row\'s action');
+  settingsDialogKey(ui, 'Escape', 'Escape');
+  settingsDialogKey(ui, 'Escape', 'Escape');
+  check(!isDialogOpen(ui), 'with no slot waiting, Esc closes the dialog');
+
+  // Where the browser gives the layout, the toggle is inert and the names are the map's.
+  const french = new Map([['KeyQ', 'a'], ['Digit2', 'é'], ['Quote', 'ù'], ['Semicolon', 'm']]);
+  const mapped = freshUI(true, french);
+  openSettingsDialog(mapped);
+  mapped.settingsDialog!.tab = 'keys';
+  check(!settingsDialogButtons(mapped, mapped.settingsDialog!).some((b) => b.name?.startsWith('settings.keys.layout')),
+    'with the keyboard\'s layout, KEY LABELS\' toggle has no button');
+  settingsDialogPointer(mapped, centre(layoutFrames(KEYS_AREA)[0]));
+  check(helpText(mapped, mapped.settingsDialog!) === LABELS_FROM_KEYBOARD_HELP, 'and the help line says the names are the keyboard\'s');
+  check(slotLabel(mapped, 'KeyQ') === 'A' && slotLabel(mapped, 'Semicolon') === 'M', 'the names are the map\'s');
+  drawSettingsDialog(mapped);
+  check(mapped.screenIndexBuffer.pixels.some((p) => p !== 0), 'it draws');
 }
 
 finish();

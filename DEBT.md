@@ -108,11 +108,10 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| U5 | The settings' KEYS tab | M | ⏳ |
 | U6 | The map is a page panel | M | ⏳ |
 | U7 | The champion table is a page panel | M | ⏳ |
 | U8 | No fullscreen | M | ⏳ |
-| U9 | The side panel | S | ⏳ after U5-U8 |
+| U9 | The side panel | S | ⏳ after U6-U8 |
 | F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
@@ -212,40 +211,14 @@ dialog's foot. Being in the buffer, the dialogs are under the CRT effect and in
 fullscreen, and the golden frames see them.
 
 The settings dialog (`src/renderer/ui/SettingsDialog.ts`) is the first: Esc or a double
-click on the message area opens it, and its GAME, DISPLAY and SOUND tabs set the player's
-settings. Its KEYS tab (U5) and its EXIT, which leaves for E15's welcome page, are drawn
-inert until then; once live, EXIT asks first in `_DoMenu`'s two-option menu, as what has
-not been saved is lost. Its panel holds five lines (`SETTING_LINES`), and GAME has four.
+click on the message area opens it. Its GAME, DISPLAY and SOUND tabs set the player's
+settings, and KEYS binds the keys (`src/renderer/ui/SettingsKeys.ts`). Its EXIT, which
+leaves for E15's welcome page, is drawn inert until then; once live, EXIT asks first in
+`_DoMenu`'s two-option menu, as what has not been saved is lost. Its panel holds five lines (`SETTING_LINES`), and GAME has four.
 
 None of it changes the game: with every new setting at its default, every tool's output
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a
 golden frame for what it draws, and a probe or a `tools/` assertion for what it does.
-
-### U5 ⏳ The settings' KEYS tab
-
-No screen shows or changes a binding: the settings dialog's KEYS tab is drawn inert.
-
-Paying it: the KEYS tab lists every `KeyAction` under a name (MOVE FORWARD, CHAMPION 2
-ATTACK 3, RUNE 4, CASTER 1, QUICK SAVE, …) with its two slots, in a list that scrolls by
-the wheel, its scrollbar and the arrow keys.
-
-- **Binding a key.** A click on a slot shows PRESS A KEY. The next key pressed without a
-  modifier fills the slot and is taken out of any other slot. Esc cancels, and cannot
-  be bound: it is the dialog's. A right-click on a slot empties it.
-- **The key's label** is what the player's keyboard prints, read through
-  `navigator.keyboard.getLayoutMap()` where the browser has it. Elsewhere a QWERTY/AZERTY
-  switch on the tab picks the labels. Only the labels change: a binding is the physical
-  key (`KeyboardEvent.code`, R13), so no layout needs other bindings. A key the game's
-  font cannot draw is named in letters (SPACE, TAB, KP 8, F1).
-- **Presets**: CSBWIN, `DEFAULT_KEY_BINDINGS`; KEYPAD, the moves on the keypad alone;
-  ARROWS, the moves on the arrow keys, whose turn and strafe keys are settled when the
-  item is paid. A table changed by hand is shown as CUSTOM. Saving and loading a CUSTOM
-  table is not part of this item.
-- U6 and U7 add their actions, MAP and CHAMPIONS, unbound by default.
-
-The check: `tools/dump-key-bindings.ts` goes on to assert that after any rebinding a code
-is in one slot at most, that Esc is refused, that a preset restores its table, and the
-labels from a US and a French layout map.
 
 ### U6 ⏳ The map is a page panel
 
@@ -256,7 +229,8 @@ behind a developer's switch.
 
 Paying it: a map dialog in the dialog slot. It draws the party's level at the largest whole cell
 size that fits, in the UI palette, with the party's square and facing, the level's
-number, and CLOSE. It opens by its key action (U5) and by a long press on the message
+number, and CLOSE. It opens by its key action, MAP, which it adds to the KEYS tab's list
+unbound, and by a long press on the message
 area, and only with MAP VIEW on, a setting of the settings dialog's GAME tab. The teleport stays only behind `?dev`. A map of
 only the cells the party has seen is X10's data and a later mode of this dialog. GAME
 has room for one more line ("U — The interface in the canvas"): whichever of U6 and U7
@@ -273,7 +247,8 @@ the twenty skills' mastery, refreshed at every tick, with a changed cell highlig
 Paying it: a champion dialog in the dialog slot, the same readings in the game's font, four
 columns, on two tabs (the levels, maxima and attributes; then the skills), since thirty
 lines do not fit one screen. Nothing is highlighted, since the clock is held while the
-dialog is up. It opens by its key action (U5) and by a long press on a champion's stat
+dialog is up. It opens by its key action, CHAMPIONS, which it adds to the KEYS tab's
+list unbound, and by a long press on a champion's stat
 bars, and only with CHAMPION VIEW on, a setting of the settings dialog's GAME tab. The dialog then marks that champion's column.
 
 The long press opens no inventory. A single click on the bars does: the bars have no
@@ -323,7 +298,7 @@ canvas over the game canvas and a click read through it, in fullscreen.
 
 ### U9 ⏳ The side panel
 
-With the settings dialog and U5 to U8 in, nothing on `#side` (`index.html`) is needed by a player. The data-set
+With the settings dialog and U6 to U8 in, nothing on `#side` (`index.html`) is needed by a player. The data-set
 chooser, Quick Save and Quick Load, CRT, Sound and its volume, Map, Champions, Debug,
 Extras, and the map and champion panels all go, with the code in `src/ui/` that only they
 use. The data set is chosen by `?dungeon=` until E15's welcome page. The teleport and
@@ -1893,7 +1868,9 @@ Recorded so that nobody "fixes" them.
   arrows keypad 8, 4 and 6, Home keypad 7 and PgUp keypad 9 (the moves keep two keys, a
   letter and the keypad, and the arrows have no turns); and the letters are bound by
   position, where the file's `key` lines bind characters. Return wakes no one, as under
-  the file. `tools/dump-key-bindings.ts` checks every default key.
+  the file. The settings' KEYS tab offers two other presets, KEYPAD and ARROWS
+  (`KEY_PRESETS`), and a table of the player's own, kept with the settings.
+  `tools/dump-key-bindings.ts` checks every default key.
 - 🚫 **Esc opens the settings, and Pause freezes.** CSBWin's tables bind the Atari
   keyscan of Esc, 0x1b: awake and asleep to the freeze, 147, and frozen to the thaw,
   148 (`Byte18400`, `Byte18440`, `Byte18448`, `doc/CSBwin-src/Mouse.cpp:1870-1912`), and

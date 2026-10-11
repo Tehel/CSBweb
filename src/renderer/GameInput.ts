@@ -198,7 +198,7 @@ export class GameInput {
     // save menu's list.
     if (screen.isDialogOpen()) {
       if (modified) return false;
-      screen.handleDialogKey(key);
+      screen.handleDialogKey(key, code);
       this.host.refreshScreen();
       return true;
     }

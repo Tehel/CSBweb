@@ -173,6 +173,10 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   if (!location.search.includes('keepsaves')) {
     try { indexedDB.deleteDatabase('csbweb-saves'); } catch (e) {}
   }
+  // The KEYS tab labels a key with what the machine's keyboard prints, where the browser
+  // says (\`navigator.keyboard.getLayoutMap()\`): without it, a frame shows QWERTY's labels
+  // on every machine.
+  try { Object.defineProperty(Navigator.prototype, 'keyboard', { get: () => undefined, configurable: true }); } catch (e) {}
   let seed = 0x2545f491;
   Math.random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
                         return ((seed >>> 0) % 1000000) / 1000000; };
@@ -508,8 +512,8 @@ console.log('state: Conflux bookshelf'); await shot('20-conflux-bookshelf');
 // The settings dialog (`src/renderer/ui/SettingsDialog.ts`), over the default dungeon's
 // first view: Esc opens it, over the whole screen, on GAME, and the clock is held while it
 // is up. A frame a tab: GAME's with the pointer on DRINK AT FOUNTAINS' name, so the help
-// line names it and the cursor is drawn, DISPLAY's and SOUND's with it off the canvas.
-// KEYS is inert until it has its keys (`DEBT.md` U5).
+// line names it and the cursor is drawn, DISPLAY's and SOUND's with it off the canvas,
+// and KEYS' with MOVE FORWARD's first slot waiting for its key.
 await send('Page.navigate', { url: `${APP}?intro=0&keepsaves` });
 await wait(3500);
 const settingsUp = () => evaluate(`window.__probe.screen.ui.settingsDialog !== null`);
@@ -549,9 +553,18 @@ await pointerAt(200, 92); await wait(200);
 check((await settingsValues()).volume === 1, 'released there, a move drags nothing');
 // SOUND's OFF, read back after a reload: the setting is kept, and the page's own button
 // shows it. Then a double click on the message area opens the dialog, and a right click
-// closes it.
+// closes it, off KEYS' slots.
 await canvasClick(284, 71, 0); await wait(300);
 check((await settingsValues()).sound === false, 'SOUND\'s OFF turns the sound off');
+// KEYS (`src/renderer/ui/SettingsKeys.ts`): a click on MOVE FORWARD's first slot waits
+// for its key, and a key pressed fills it by its code, AZERTY's Z being KeyW.
+await canvasClick(275, 45, 0); await wait(300);
+await canvasClick(190, 111, 0); await wait(300);
+console.log('state: settings, KEYS');    await shot('24-settings-keys');
+await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'z',code:'KeyW',bubbles:true})),1`); await wait(300);
+const rebound = await settingsValues();
+check(rebound.keyBindings['move.forward'][0] === 'KeyW' && rebound.keyBindings['attack.1.0'][0] === '' && rebound.keyPreset === 'custom',
+  'a key pressed fills the slot by its code, leaves the slot it was in, and the table is CUSTOM');
 await canvasClick(160, 100, 2); await wait(300);
 check(!(await settingsUp()), 'a right click closes the settings');
 await send('Page.navigate', { url: `${APP}?intro=0&keepsaves&keepsettings` });

@@ -26,6 +26,7 @@ import type { SaveMenuState } from './SaveMenu';
 import type { SettingsDialogState } from './SettingsDialog';
 import type { Settings } from '../../settings/Settings';
 import type { Dialog } from './Dialog';
+import type { KeyboardLayoutMap } from './KeyLabels';
 
 /** Eight empty chest slots, each `RNnul`. */
 export function emptyChestContents(): ObjectID[] {
@@ -331,6 +332,12 @@ export interface UIState {
   readonly settings: Settings;
   /** Whether the browser can show the CRT effect: it gives WebGL (`src/lib/crt.ts`). */
   readonly isCrtAvailable: () => boolean;
+  /**
+   * What the player's keyboard prints on each key, as the browser gives it
+   * (`navigator.keyboard.getLayoutMap()`), or `null` where it does not: the KEYS tab's
+   * labels (`KeyLabels.ts`).
+   */
+  readonly keyboardLayout: () => KeyboardLayoutMap | null;
 
   /* ---- back into the renderer ---- */
   getGraphicBitmap(graphicNum: number, format?: ImageFormat): IndexedBitmap | null;
@@ -408,7 +415,7 @@ export type UISources = Pick<UIState,
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
   | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onHasNewFaces' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave'
-  | 'settings' | 'isCrtAvailable'>;
+  | 'settings' | 'isCrtAvailable' | 'keyboardLayout'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {

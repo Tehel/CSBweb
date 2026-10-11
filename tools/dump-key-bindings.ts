@@ -11,8 +11,10 @@
  * attack menu is up (0 for none), `inv` is `selectedCharacterIndex`, and `runes` is the
  * incantation being assembled. The replace-not-stack rule is the point of the middle
  * block — a second attack or inventory key must move the panel, never leave two open.
- * The last block is a row per entry of the graphics.dat key tables: the mode, the table,
- * the button, the keyscan and the code that reaches it.
+ * Block 9 is a row per entry of the graphics.dat key tables: the mode, the table,
+ * the button, the keyscan and the code that reaches it. Block 10 is the settings' KEYS
+ * tab's half (`SettingsKeys.ts`): the presets, a key rebound, and the labels, a row per
+ * key of a US and a French keyboard.
  *
  * Run: `npx tsx tools/dump-key-bindings.ts`
  */
@@ -27,8 +29,12 @@ import { newUIState } from './lib/ui';
 import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 import {
-  actionsByCode, DEFAULT_KEY_BINDINGS, handleUIKey, keyScanOf, portKeyAction, tableKeyButton, translateKey,
+  actionsByCode, ARROWS_KEY_BINDINGS, bindKey, clearKey, DEFAULT_KEY_BINDINGS, handleUIKey, KEY_PRESETS, KEYPAD_KEY_BINDINGS,
+  keyScanOf, portKeyAction, setKeyBindings, tableKeyButton, translateKey, type KeyAction, type KeyBindings,
 } from '../src/renderer/ui/Keyboard';
+import { KEY_LABEL_CHARS, LAYOUT_CHARS, fontDraws, keyLabel } from '../src/renderer/ui/KeyLabels';
+import { KEY_ACTION_NAMES } from '../src/renderer/ui/SettingsKeys';
+import { Settings } from '../src/settings/Settings';
 import { attackPanelTick, closeAttackMenu, handleAttackAreaClick } from '../src/renderer/ui/Attack';
 import { updateButtonLists } from '../src/renderer/ui/Mouse';
 
@@ -404,6 +410,90 @@ async function main(): Promise<void> {
   check(buttonOf('Frozen', 'Pause') === 148 && buttonOf('Frozen', 'KeyK') === 0, 'frozen, Pause is 148, and K nothing');
   ui.uiMode = UIMode.Adventure;
   updateButtonLists(ui);
+
+  // ---- 10. The KEYS tab's half. Every action is listed once, and every preset binds no
+  //          code twice. KEYPAD frees the letters; ARROWS steps and strafes on the arrows,
+  //          as the Atari's tables bind them, and turns on Delete and Page Down.
+  const actions = Object.keys(DEFAULT_KEY_BINDINGS).sort();
+  check(JSON.stringify(KEY_ACTION_NAMES.map(([action]) => action).sort()) === JSON.stringify(actions),
+    'the KEYS tab lists every action once');
+  const boundOnce = (table: KeyBindings): boolean => {
+    const bound = Object.values(table).flat().filter((code) => code !== '');
+    return new Set(bound).size === bound.length;
+  };
+  for (const [name, table] of Object.entries(KEY_PRESETS)) {
+    check(boundOnce(table) && JSON.stringify(Object.keys(table).sort()) === JSON.stringify(actions),
+      `${name}: every action, and no code twice`);
+  }
+  check(Object.values(KEYPAD_KEY_BINDINGS).flat().every((code) => !['KeyK', 'Comma', 'KeyJ', 'KeyL', 'KeyM', 'Period'].includes(code)),
+    'KEYPAD binds none of K , J L M .');
+  setKeyBindings(ARROWS_KEY_BINDINGS);
+  const arrows: Record<string, number> = {
+    ArrowUp: 3, ArrowDown: 5, ArrowLeft: 6, ArrowRight: 4, Delete: 1, PageDown: 2, Numpad8: 3, KeyK: 0,
+  };
+  for (const [code, button] of Object.entries(arrows)) {
+    check(buttonOf('Adventure', code) === button, `ARROWS: ${code} queues button ${button}`);
+  }
+  setKeyBindings(DEFAULT_KEY_BINDINGS);
+
+  // A key rebound is in one slot at most, whichever slot it was in; Esc is refused.
+  const pool = ['KeyQ', 'KeyK', 'Numpad8', 'Space', 'F5', 'ArrowUp', 'Digit1', 'Backquote', 'Tab'];
+  const order = Object.keys(DEFAULT_KEY_BINDINGS) as KeyAction[];
+  let table: KeyBindings = DEFAULT_KEY_BINDINGS;
+  let seed = 7;
+  let once = true;
+  for (let i = 0; i < 400; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const action = order[seed % order.length];
+    const slot = ((seed >> 8) & 1) as 0 | 1;
+    const code = pool[(seed >> 10) % pool.length];
+    table = (seed >> 20) % 5 === 0 ? clearKey(table, action, slot) : bindKey(table, action, slot, code);
+    once &&= boundOnce(table) && (code === '' || (seed >> 20) % 5 === 0 || table[action][slot] === code);
+  }
+  check(once, 'after 400 rebindings, every code is in one slot at most, and each lands where it was put');
+  check(bindKey(DEFAULT_KEY_BINDINGS, 'cast', 1, 'Escape') === DEFAULT_KEY_BINDINGS, 'Esc cannot be bound');
+  check(bindKey(DEFAULT_KEY_BINDINGS, 'cast', 1, '') === DEFAULT_KEY_BINDINGS, 'nor no key');
+  const moved = bindKey(DEFAULT_KEY_BINDINGS, 'move.forward', 1, 'KeyK');
+  check(moved['move.forward'].join() === ',KeyK', 'a key moved to the other slot of its own action leaves the first');
+
+  const settings = new Settings(null);
+  settings.update({ keyBindings: table });
+  check(settings.values.keyPreset === 'custom', 'a table changed by hand is CUSTOM');
+  for (const preset of ['arrows', 'keypad', 'csbwin'] as const) {
+    settings.update({ keyPreset: preset });
+    check(settings.values.keyBindings === KEY_PRESETS[preset], `${preset} restores its table`);
+  }
+
+  // The labels. A US and a French keyboard's maps, as `getLayoutMap()` gives them: the
+  // character each code types unshifted. Each matches the QWERTY or AZERTY table.
+  const us = new Map<string, string>([...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].map((c) => [`Key${c}`, c.toLowerCase()]));
+  [...'1234567890'].forEach((d, i) => us.set(`Digit${(i + 1) % 10}`, d));
+  Object.entries({ Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\',
+    Semicolon: ';', Quote: '\'', Comma: ',', Period: '.', Slash: '/' }).forEach(([code, c]) => us.set(code, c));
+  const fr = new Map(us);
+  Object.entries({ KeyQ: 'a', KeyA: 'q', KeyW: 'z', KeyZ: 'w', KeyM: ',', Semicolon: 'm', Quote: 'ù', Backquote: '²',
+    Minus: ')', BracketLeft: '^', BracketRight: '$', Backslash: '*', Comma: ';', Period: ':', Slash: '!',
+    Digit1: '&', Digit2: 'é', Digit3: '"', Digit4: '\'', Digit5: '(', Digit6: '-', Digit7: 'è', Digit8: '_', Digit9: 'ç',
+    Digit0: 'à' }).forEach(([code, c]) => fr.set(code, c));
+  console.log(['code', 'US', 'FR', 'qwerty', 'azerty'].join('\t'));
+  let tablesAgree = true;
+  for (const code of [...us.keys(), 'Numpad8', 'Space', 'Tab', 'F5', 'ArrowUp', 'Delete', 'PageDown', 'Pause', 'IntlRo']) {
+    const labels = [keyLabel(code, 'qwerty', us), keyLabel(code, 'qwerty', fr), keyLabel(code, 'qwerty', null), keyLabel(code, 'azerty', null)];
+    console.log([code, ...labels].join('\t'));
+    check(labels.every((label) => label.length >= 1 && label.length <= KEY_LABEL_CHARS && fontDraws(label)),
+      `${code}: every label is drawn, and fits a slot`);
+    tablesAgree &&= labels[0] === labels[2] && labels[1] === labels[3];
+  }
+  check(tablesAgree, 'the QWERTY and AZERTY tables name every key as the US and French maps do');
+  const named: Array<[string, string, string]> = [
+    ['KeyQ', 'Q', 'A'], ['KeyM', 'M', ','], ['Semicolon', ';', 'M'], ['Digit2', '2', '2'], ['Backquote', 'BACKQUOTE', 'SQUARE'],
+    ['Quote', '\'', 'U GRAVE'], ['Numpad8', 'KP 8', 'KP 8'], ['Space', 'SPACE', 'SPACE'], ['F5', 'F5', 'F5'], ['ArrowUp', 'UP', 'UP'],
+  ];
+  for (const [code, onUs, onFr] of named) {
+    check(keyLabel(code, 'qwerty', us) === onUs && keyLabel(code, 'qwerty', fr) === onFr, `${code} is ${onUs} on US, ${onFr} on French`);
+  }
+  check(LAYOUT_CHARS.azerty.get('KeyQ') === 'a', 'AZERTY\'s table has A where QWERTY has Q');
+  check(keyLabel('', 'qwerty', null) === '', 'no key has no label');
 
   finish();
 }

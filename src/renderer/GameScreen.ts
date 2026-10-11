@@ -109,6 +109,7 @@ export type GameScreenHooks = Pick<UIState,
   | 'onSleepSave'
   | 'settings'
   | 'isCrtAvailable'
+  | 'keyboardLayout'
 >;
 
 /** What the screen reads: the graphics, and the game it shows. */
@@ -215,6 +216,7 @@ export class GameScreen {
       onSleepSave: hooks.onSleepSave,
       settings: hooks.settings,
       isCrtAvailable: hooks.isCrtAvailable,
+      keyboardLayout: hooks.keyboardLayout,
     });
     ui.hintOracle = deps.hintOracle ?? null;
     this.ui = ui;
@@ -383,8 +385,8 @@ export class GameScreen {
     this.ui.dialog?.click(this.ui, x, y, buttons);
   }
 
-  handleDialogKey(key: string): void {
-    this.ui.dialog?.key(this.ui, key);
+  handleDialogKey(key: string, code: string): void {
+    this.ui.dialog?.key(this.ui, key, code);
   }
 
   handleDialogWheel(deltaY: number): void {

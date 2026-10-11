@@ -164,7 +164,7 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     // The chooser's keys are its own, as the disk menu's are in play: an arrow moves
     // its selection, and does not scroll the page as well.
     if (key && gameScreen.isDialogOpen()) e.preventDefault();
-    push({ kind: 'key', x: 0, y: 0, buttons: 0, key });
+    push({ kind: 'key', x: 0, y: 0, buttons: 0, key, code: key ? e.code : '' });
   };
   // The wheel is the chooser's list's, as it is the disk menu's in play
   // (`GameInput.wheel`), and no other pre-game screen's. It is no event of the queue,
@@ -307,7 +307,7 @@ async function openLoadMenu(
     const event = await Promise.race([host.nextEvent(), closed]);
     if (!event) break;
     if (event.kind === 'click') gameScreen.handleDialogClick(event.x, event.y, event.buttons);
-    else if (event.key) gameScreen.handleDialogKey(event.key);
+    else if (event.key) gameScreen.handleDialogKey(event.key, event.code ?? '');
     draw();
   }
 
