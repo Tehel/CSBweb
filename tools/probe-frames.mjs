@@ -290,7 +290,8 @@ await canvasClick(120, 168, 0); await wait(1200);
 // the compositing but not the pixels the bytecode programs produce.
 // The welcome page (`src/ui/welcomePage.ts`): the page with no known `?dungeon=`, HTML and
 // no game. The store holds the one save made above, of dm-atari, so its tile is bright and
-// the others dimmed, and CONTINUE reads that save while no set is selected. A click
+// the others dimmed, and CONTINUE reads that save while no set is selected. Each tile
+// shows its set's thumbnail, and the page fetches no game file to draw them. A click
 // selects a tile, and PLAY opens its set; a click on another set, with no save, leaves
 // CONTINUE disabled; a click on the selected tile selects none. Then PLAY's own click,
 // as a player makes it, is the way into the entrance below.
@@ -301,7 +302,10 @@ const welcome = () => evaluate(`(()=>{const q=(s)=>[...document.querySelectorAll
     tiles: q('.pick').map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
     play: document.getElementById('welcome-play').getAttribute('href'),
     resume: document.getElementById('welcome-continue').getAttribute('href'),
-    preview: q('.welcome-preview > *').map(e=>e.textContent) };})()`);
+    preview: q('.welcome-preview > *').map(e=>e.textContent),
+    pictures: q('.pick').map(t=>{const i=t.querySelector('.pick-picture img');
+      return i && i.complete && i.naturalWidth===320 && i.naturalHeight===200 && i.src.endsWith('/'+t.dataset.set+'-thumbnail.png');}),
+    gameFiles: performance.getEntriesByType('resource').map(e=>e.name).filter(n=>/\.dat$/i.test(n)).length };})()`);
 const clickOn = async (selector) => {
   const p = await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
     return {x:r.left+r.width/2, y:r.top+r.height/2};})()`);
@@ -315,6 +319,8 @@ console.log('  ', JSON.stringify(atWelcome));
 const saveId = /[?&]save=([^&]+)/.exec(atWelcome.resume ?? '')?.[1];
 check(!atWelcome.canvas && atWelcome.tiles === 'dm-atari*,csb,kids-dungeon,conflux,towers-of-chaos',
   'an unknown ?dungeon= is the welcome page, no game canvas, its tiles the sets not hidden, the one with a save bright');
+check(atWelcome.pictures.length === 5 && atWelcome.pictures.every(Boolean) && atWelcome.gameFiles === 0,
+  'each tile shows its set\'s 320x200 thumbnail, <id>-thumbnail.png, and the page fetches no .dat');
 check(atWelcome.play === null && /dungeon=dm-atari/.test(atWelcome.resume ?? '') && saveId !== undefined,
   'none selected: PLAY is disabled, CONTINUE reads the last save used, of any set');
 check(atWelcome.preview.length === 3 && atWelcome.preview[0] === 'Dungeon Master' && atWelcome.preview[1].split(' · ').length === 4

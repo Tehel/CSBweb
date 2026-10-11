@@ -312,6 +312,9 @@ const CHECKS = [
   // graphics.dat forces, the synthetic 5x5 level behind the doors, the 31-frame slide and
   // ShrinkBLT's fixed point are all invisible to them.
   { tool: 'dump-intro.ts' },
+  // The welcome page's thumbnails, each set's `<id>-thumbnail.png`: the title's last frame,
+  // played from the set's graphics.dat, pixel for pixel and colour for colour.
+  { tool: 'gen-thumbnails.ts', args: ['--check'] },
   // The FTL logo before the title, not CSBWin's: `swoosh.img`'s picture decoded (2306 bytes
   // for 64000 pixels, and a reference picture pixel for pixel) and its palette script run
   // on a headless host, each colour at its VBL.

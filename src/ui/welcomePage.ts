@@ -4,9 +4,11 @@
  * of the game built: PLAY and CONTINUE are links that load the page again, with the
  * data set, and CONTINUE's save, in its query.
  *
- * - **The grid**: a tile for each set `chooserSets` lists, in the manifest's order. A set
- *   the store holds a save of is drawn bright, the others dimmed. A click selects a tile,
- *   and a click on the selected one leaves none selected.
+ * - **The grid**: a tile for each set `chooserSets` lists, in the manifest's order, its
+ *   picture the set's thumbnail (`thumbnailPath`), its title's last frame at half size,
+ *   or a blank box where the folder holds none. A set the store holds a save of is drawn
+ *   bright, the others dimmed. A click selects a tile, and a click on the selected one
+ *   leaves none selected.
  * - **PLAY** opens the selected set (`?dungeon=<id>`): its title, then its entrance. With
  *   no set selected it is disabled.
  * - **CONTINUE** opens the last save used (`lastUsedSave`) of the selected set, or of every
@@ -22,7 +24,7 @@
  */
 import './welcomePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
-import { chooserSets, type DataSet, type DataSetManifest } from '../data/DataSets';
+import { chooserSets, thumbnailPath, type DataSet, type DataSetManifest } from '../data/DataSets';
 import { formatSaveDate, formatSaveTime, lastUsedSave, type SaveEntry, type SaveStore } from '../data/saves';
 
 /** The page's static half: the logo, the places the grid and the buttons go, and the bottom. */
@@ -89,7 +91,7 @@ export async function showWelcomePage(body: HTMLElement, manifest: DataSetManife
         tile.className = saves > 0 ? 'pick' : 'pick dim';
         tile.dataset.set = set.id;
         tile.append(
-            line('pick-picture', ''),
+            picture(set),
             line('pick-name px px2', set.name),
             line('pick-saves px px2', saves === 0 ? 'No saved game' : saves === 1 ? '1 saved game' : `${saves} saved games`),
         );
@@ -116,6 +118,19 @@ export async function showWelcomePage(body: HTMLElement, manifest: DataSetManife
         ]));
     }
     update();
+}
+
+/** `set`'s picture: its thumbnail, in a box that stays blank if it does not load. */
+function picture(set: DataSet): HTMLElement {
+    const box = line('pick-picture', '');
+    const image = document.createElement('img');
+    image.src = thumbnailPath(set);
+    image.alt = '';
+    image.width = 160;
+    image.height = 100;
+    image.addEventListener('error', () => image.remove());
+    box.append(image);
+    return box;
 }
 
 /** An element of one line of text. */

@@ -80,6 +80,7 @@ body.welcome {
     height: 100px;
     background: var(--navy);
 }
+.pick-picture img { display: block; }
 .pick-name { color: var(--p15); padding: 0 3px; }
 .pick-saves { padding: 0 3px 3px; }
 .pick-saves { color: var(--p2); }

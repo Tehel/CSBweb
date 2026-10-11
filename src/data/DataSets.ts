@@ -22,6 +22,11 @@
  * `miniDat`, `hintOracle`, `dmRules` and `hidden` may each be left out, for `false`, and the manifest
  * names one only where it is true. A set with `"hidden": true` is left out of the welcome
  * page's grid (`chooserSets`) and plays all the same by its `?dungeon=`.
+ *
+ * A set's folder may also hold its thumbnail, `<id>-thumbnail.png` (`thumbnailPath`): the
+ * last frame of its title, which the welcome page's tile shows. `tools/gen-thumbnails.ts`
+ * writes it from the folder's `graphics.dat`, so the page fetches no game file to draw the
+ * grid. A folder without one leaves its tile's picture blank.
  */
 
 export interface DataSet {
@@ -137,6 +142,11 @@ export function parseManifest(text: string, base: string): DataSetManifest {
 /** The sets the welcome page lists, in the manifest's order: every set but the hidden ones. */
 export function chooserSets(manifest: DataSetManifest): DataSet[] {
     return manifest.dataSets.filter((set) => !set.hidden);
+}
+
+/** The file of `set`'s thumbnail, in its folder: `dm-atari/dm-atari-thumbnail.png`. */
+export function thumbnailPath(set: DataSet): string {
+    return `${set.dir}/${set.id}-thumbnail.png`;
 }
 
 /**

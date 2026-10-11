@@ -88,6 +88,13 @@ server will not start on it. To take a set off the welcome page without deleting
 its files are served, and its events are taken. Keys the parser does not know are
 ignored, so a note can go in a key of its own, such as `"_note"`.
 
+Each set's folder holds its thumbnail, `<id>-thumbnail.png` (`dm-atari/dm-atari-thumbnail.png`,
+`kids-dungeon-24/kids-dungeon-thumbnail.png`): the last frame of its title, which the
+welcome page's tile shows, so the page fetches no game file to draw its grid.
+`npx tsx tools/gen-thumbnails.ts` writes every set's from its `graphics.dat`, and `npm test`
+checks the committed ones (`--check`). A set added to the manifest needs its thumbnail
+written before it is uploaded; without one, its tile's picture is a blank box.
+
 The game files are not part of a deploy. They are uploaded once, and again when they
 change. **Everything in `gamefiles/` can be downloaded**, readmes and stray folders
 included, since the server serves the folder as it stands.

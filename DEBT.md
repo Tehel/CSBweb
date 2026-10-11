@@ -108,7 +108,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E15 | The page shell | L | ⚠️ step 3 of 6 next |
+| E15 | The page shell | L | ⚠️ step 4 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
@@ -1141,11 +1141,12 @@ The steps, one commit each:
    a row that is not the set's, or not there, or does not read, leaves the entrance.
    `tools/probe-frames.mjs` continues a stored save, and finds its party and the
    screen the entrance's LOAD showed of it, and a missing row's entrance.
-3. ⏳ **The title screens.** Each tile's picture, a navy 160x100 box meanwhile, is its
-   set's 320x200 title at half size, decoded from its
-   `graphics.dat` at run time as the boot's title is (`src/renderer/intro/`), so the
-   page fetches every listed set's `graphics.dat` (270 to 460 KB each), which the
-   browser then has for the game.
+3. ✅ **The title screens.** Each tile's picture is its set's thumbnail, the last frame
+   of its title at half size, a file in its folder (`thumbnailPath`,
+   `src/data/DataSets.ts`) that `tools/gen-thumbnails.ts` writes from the set's
+   `graphics.dat`, so the page fetches no game file. `npm test` checks every committed
+   thumbnail against the title's frame, and `tools/probe-frames.mjs` that each tile
+   shows its own and that the page fetched no `.dat`.
 4. ⏳ **The fonts.** The game's font is the browser's monospace meanwhile
    (`'DM Screen', monospace`, `src/ui/welcomePage.css`), and the prose Georgia. The
    game's font is to be read from the default set's `graphics.dat` and made a
