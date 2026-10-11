@@ -10,7 +10,7 @@ where CSBWin has four files in a directory and nothing to say.
 Everything goes through `GameSaves` (`src/engine/GameSaves.ts`), which is built with the
 game, its data set and the store. It is where every save is built and written to the
 store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are read back into the game
-(LOAD, the boot's chooser and F9).
+(LOAD, the boot's chooser, F9 and the welcome page's CONTINUE).
 
 ## What a save is
 
@@ -366,6 +366,15 @@ CSBWin's own "UNABLE TO SAVE GAME!" (`doc/CSBwin-src/SaveGame.cpp:1363`) and "CA
 SAVED GAME!" (`:1710`) for a write that failed and for no save at all; a file that does
 not read gives the line the dialog's message would be. Each outcome is also a line for
 the console, with the save's name, and with the error behind a failure.
+
+## CONTINUE
+
+The welcome page's CONTINUE (`src/ui/welcomePage.ts`) opens the game's page with the
+last save used in its query, `?dungeon=<id>&save=<row id>`, and the boot reads that row
+into the game as F9 reads one (`continueSave`, `src/main.ts`): straight into play, with
+neither the FTL logo, the title nor the entrance, and the row the last save used. A row
+that is not the set's, or is not in the store, or whose file does not read, leaves the
+entrance, without the logo and the title, and the console says why.
 
 ## The Sleepsave
 

@@ -501,10 +501,18 @@ function createCrt(): void {
  * The FTL logo comes first (`loadSwooshFiles`). With the startup animations off, neither
  * it nor the title is shown, and the entrance is. `?intro=0` skips all of it, for the
  * golden-frame probe and `tools/probe-ui.mjs`.
+ *
+ * The welcome page's CONTINUE opens the page with `?save=<row id>` (`src/ui/welcomePage.ts`),
+ * and that save is read straight into play (`continueSave`), with neither the title nor
+ * the entrance. One that is not read leaves the entrance, without the logo or the title.
  */
-async function runIntro({ game, screen, saves, events }: Built, sound: SoundManager): Promise<PrisonDoorChoice> {
-    const skipIntro = new URLSearchParams(window.location.search).get('intro') === '0';
-    const animations = !skipIntro && settings.values.startupAnimations;
+async function runIntro(built: Built, sound: SoundManager): Promise<PrisonDoorChoice> {
+    const { game, screen, saves, events } = built;
+    const params = new URLSearchParams(window.location.search);
+    const save = params.get('save');
+    if (save !== null && await continueSave(built, save)) return 'resume';
+    const skipIntro = params.get('intro') === '0';
+    const animations = !skipIntro && save === null && settings.values.startupAnimations;
     return runBootSequence({
         canvas: gameCanvasEl,
         gameScreen: screen,
@@ -516,6 +524,30 @@ async function runIntro({ game, screen, saves, events }: Built, sound: SoundMana
         title: animations,
         skip: skipIntro,
     });
+}
+
+/**
+ * CONTINUE's save: the data set's row `id` read into the game as F9 reads one
+ * (`GameSaves.read`), the save then the last one used. Resolves to whether it is in. A
+ * row that is not the data set's, or is not in the store, is not read, and a file that
+ * does not read leaves the game for the entrance to read anew; either way the console
+ * says why.
+ */
+async function continueSave({ saves, events }: Built, id: string): Promise<boolean> {
+    try {
+        const entry = (await saves.list()).find((row) => row.id === id);
+        if (!entry) {
+            console.warn(`No saved game '${id}' of ${dataSet.id}: the entrance instead`);
+            return false;
+        }
+        saves.read(await saves.open(entry));
+        events.savedGameRead();
+        console.log(`✓ Continued ${entry.name}`);
+        return true;
+    } catch (error) {
+        console.warn(`Saved game '${id}' could not be read: the entrance instead`, error);
+        return false;
+    }
 }
 
 /** The page's side of play: its input, and a redraw per move and per tick. */

@@ -108,7 +108,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E15 | The page shell | L | ⚠️ step 2 of 6 next |
+| E15 | The page shell | L | ⚠️ step 3 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
@@ -1136,11 +1136,11 @@ The steps, one commit each:
    logo, the grid as text tiles, the selection, PLAY, CONTINUE with its preview box, and
    the bottom of the page. `tools/probe-frames.mjs` checks the tiles, the selection and
    where PLAY and CONTINUE lead, and enters the entrance by PLAY's click.
-2. ⏳ **CONTINUE.** CONTINUE already opens `?dungeon=<id>&save=<row id>`, but the boot
-   reads nothing of `save=` and shows the title and the entrance. It is to read the row
-   into the game as F9 does, skipping the title and the entrance; a row that is not
-   the set's, or is not there, falls back to the entrance. Its check: the probe
-   continues a stored save and finds its party in play.
+2. ✅ **CONTINUE.** The boot reads `?save=`'s row into the game as F9 does, with no
+   title and no entrance (`continueSave`, `src/main.ts`; `doc/SAVES.md` → "CONTINUE");
+   a row that is not the set's, or not there, or does not read, leaves the entrance.
+   `tools/probe-frames.mjs` continues a stored save, and finds its party and the
+   screen the entrance's LOAD showed of it, and a missing row's entrance.
 3. ⏳ **The title screens.** Each tile's picture, a navy 160x100 box meanwhile, is its
    set's 320x200 title at half size, decoded from its
    `graphics.dat` at run time as the boot's title is (`src/renderer/intro/`), so the

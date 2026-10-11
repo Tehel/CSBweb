@@ -28,7 +28,8 @@
 // opened by a long press, but not with MAP VIEW off, the champion dialog opened by a
 // long press on the bars, where a tap opens the inventory, and fullscreen, entered by a
 // tap and a click, the screen and the effect sized and placed in it, and the welcome
-// page: its tiles, its selection, and where PLAY and CONTINUE go. See `check` below.
+// page: its tiles, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
+// straight into play. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -394,7 +395,25 @@ await leaveCanvas(); await wait(200);
 check((await canvasPixels()) === chooserUp, 'its OK brings the chooser back, with nothing more listed');
 await canvasClick(100, 27, 0);  await wait(300);
 await canvasClick(48, 168, 0);  await wait(1500);
-console.log('state: game loaded');       await shot('12-game-loaded');
+console.log('state: game loaded');       const loaded = await shot('12-game-loaded');
+
+// The welcome page's CONTINUE, as its link reads (`?dungeon=dm-atari&save=<row id>`): the
+// boot reads that save straight into play (`continueSave`, `src/main.ts`), with no
+// title and no entrance, so the screen is the one the entrance's LOAD showed of it, its
+// party the four the welcome page's box named. A row the store does not hold leaves the
+// entrance instead, without the title.
+const continued = async (search) => {
+  await send('Page.navigate', { url: `${APP}${search}` });
+  await wait(3500);
+  await leaveCanvas(); await wait(200);
+  return evaluate(`(()=>{const p=window.__probe; return p ? p.game.ctx.party.state.champions.map(c=>c.name.trim()).join(' · ') : null;})()`);
+};
+const continuedParty = await continued(`?dungeon=dm-atari&save=${saveId}&keepsaves`);
+console.log('  continued party:', continuedParty);
+check(continuedParty === atWelcome.preview[1] && (await canvasPixels()) === loaded,
+  'CONTINUE reads its save straight into play: the screen the entrance\'s LOAD showed, the party the box named');
+await continued('?dungeon=dm-atari&save=nowhere&keepsaves');
+check((await canvasPixels()) === entrance, 'a save the store does not hold leaves the entrance, without the title');
 
 // A pressed crack switch (`doc/PROVEN_FACTS.md`, "Crack Switch (In) placement"): level 4,
 // (14,29) facing west, after the click. The pushed-in crack must sit low on the wall where
