@@ -160,7 +160,7 @@ export function bindUIEvents(): void {
         ctx.game.onTick(() => updateChampionPanel());
 
         document.addEventListener('keydown', (e) => {
-            if (input.keyDown(e.key, e)) e.preventDefault();
+            if (input.keyDown(e)) e.preventDefault();
         });
 
         mapCanvasEl?.addEventListener('click', (e) => {

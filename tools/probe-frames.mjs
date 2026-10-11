@@ -120,7 +120,8 @@ const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${what}`);
 // be checked then, and that fails the run rather than pass it unseen.
 const crtEffect = () => evaluate(`(()=>{const gl=document.getElementById('crt-canvas');
   return !gl ? 'unavailable' : getComputedStyle(gl).display === 'none' ? 'off' : 'on';})()`);
-const key = (k) => evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},bubbles:true})),1`);
+// A named key's `code` is its `key`; the bindings match the code, the save menu the key.
+const key = (k) => evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},code:${JSON.stringify(k)},bubbles:true})),1`);
 const click = (sel) => evaluate(`document.querySelector(${JSON.stringify(sel)}).click(),1`);
 // Whether the game takes a notch of the wheel over the canvas, rather than leave it to the
 // page: a save menu's list does, the disk menu's and the entrance's chooser's, and nothing

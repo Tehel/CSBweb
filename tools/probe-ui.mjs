@@ -28,6 +28,10 @@ import { BUILD_PARTY } from './lib/buildParty.mjs';
 const CDP = Number(process.env.CDP_PORT ?? 9222);
 const APP = Number(process.env.DEV_PORT ?? 9000);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+/** The `KeyboardEvent.code` of `key` on a US keyboard: the game's bindings match codes. */
+const usCode = (key) => /^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}`
+  : /^[0-9]$/.test(key) ? `Digit${key}`
+  : ({ ' ': 'Space', '`': 'Backquote', '~': 'Backquote', ',': 'Comma', '.': 'Period' })[key] ?? key;
 const up = async (port, path = '/') => {
   try {
     const c = new AbortController();
@@ -55,7 +59,8 @@ Actions, applied in the order given:
   --boot              load ?intro=0 with a cleared localStorage and a seeded
                       Math.random, switch Debug on, and build the golden frames' party
                       at the Hall of Champions mirrors
-  --key <K>           dispatch a keydown, e.g. --key ArrowUp
+  --key <K>           dispatch a keydown, e.g. --key ArrowUp, --key q: K is the key, and
+                      its code the one a US keyboard gives
   --click X,Y[,right] click canvas pixel X,Y (0..319, 0..199); 'right' opens inventory
   --wait <ms>         pause
   --shot <file.png>   screenshot to file
@@ -165,7 +170,7 @@ let expr = null;
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === '--boot') await boot();
-  else if (a === '--key') { await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(argv[++i])},bubbles:true})),1`); await wait(400); }
+  else if (a === '--key') { const k = argv[++i]; await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},code:${JSON.stringify(usCode(k))},bubbles:true})),1`); await wait(400); }
   else if (a === '--click') await click(argv[++i]);
   else if (a === '--wait') await wait(Number(argv[++i]));
   else if (a === '--shot') {

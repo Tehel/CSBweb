@@ -3313,9 +3313,21 @@ F1-F4 select the caster, and `Byte18400`'s binding of them to the inventories (b
 "The key tables: CSBWin's own keys") is only reached under a `config.txt` without these
 lines.
 
-The port binds the same keys to the same buttons (`src/renderer/ui/Keyboard.ts`,
-`tools/dump-key-bindings.ts`), and adds 7-0 for the inventories, which the file leaves
-unbound.
+Its movement keys are `key` lines, characters, which follow the layout: `k`/`K` forward,
+`,` back, `j`/`J` turn left, `l`/`L` turn right, `m`/`M` and `.` strafe. Its keypad lines
+are `scan` lines: Windows hands `UIM_KEYDOWN` the virtual key in `p1` and the scancode,
+without its extended bit, in `p2` (`doc/CSBwin-src/CSBwin.cpp:1062-1067`), and the `scan`
+search reads `p2&0xff` (`CSBUI.cpp:1147`). Keypad 8 (`0x48`) steps forward, 5 (`0x4c`)
+back, 7 (`0x47`) turns left, 9 (`0x49`) right, 4 (`0x4b`) and 6 (`0x4d`) strafe, whatever
+NumLock says. The arrows, Home and PgUp share those scancodes, so up, left and right are
+keypad 8, 4 and 6, Home turns left and PgUp right; down (`0x50`) and Insert (`0x52`) have
+no line, nor has Return (`0x0d`) in mode 1.
+
+The port binds the same physical keys, as `KeyboardEvent.code`s, to the same buttons
+(`src/renderer/ui/Keyboard.ts`, `tools/dump-key-bindings.ts`): the keys sit where
+CSBWin's sit on a US keyboard, as a virtual key or a scancode does on any layout. It adds
+7-0 for the inventories, which the file leaves unbound, and binds the movement letters
+by position, not by character.
 
 ## The timer array has a size and a free list, and a save carries both
 

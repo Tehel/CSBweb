@@ -367,8 +367,8 @@ async function main(): Promise<void> {
     frame();
     return result;
   };
-  const opened = keyRow('w');
-  const third = keyRow('x');
+  const opened = keyRow('KeyW');
+  const third = keyRow('KeyX');
   console.log(`attack keys: W opens (menu ${opened.ordinal}, inverted ${show(opened.inverted)}); ` +
     `X, row 3 of ${offered}, inverted ${show(third.inverted)}, menu ${third.ordinal}`);
   check(opened.ordinal === 2 && opened.inverted === null, "W should open champion 1's menu and flash nothing");

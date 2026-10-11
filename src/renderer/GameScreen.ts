@@ -312,8 +312,8 @@ export class GameScreen {
    * Offer a key to the interface's own bindings (`src/renderer/ui/Keyboard.ts`).
    * Returns whether it was claimed. The modal screens must be offered the key first.
    */
-  handleUIKey(key: string): boolean {
-    return handleUIKey(this.ui, key);
+  handleUIKey(code: string): boolean {
+    return handleUIKey(this.ui, code);
   }
 
   /**
@@ -525,11 +525,12 @@ export class GameScreen {
   }
 
   /**
-   * `TAG0196da`'s table half: the button the current key tables bind `key` to, or 0 — and
-   * 0 for F1-F4, the port's caster keys (`tableKeyButton`).
+   * `TAG0196da`'s table half: the button the current key tables bind `code`, a
+   * `KeyboardEvent.code`, to, or 0 — and 0 for F1-F4, the port's caster keys
+   * (`tableKeyButton`).
    */
-  translateKey(key: string): number {
-    return tableKeyButton(this.ui, key);
+  translateKey(code: string): number {
+    return tableKeyButton(this.ui, code);
   }
 
   setUIMode(mode: UIMode): void {

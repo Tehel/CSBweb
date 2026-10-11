@@ -2,7 +2,7 @@
  * The game's input path: where a pointer event or a key goes once the page has read it.
  *
  * The page's listeners (`src/ui/events.ts`) hand over a screen point and a button, or a
- * `KeyboardEvent.key` and its modifiers, and nothing else of the DOM. From here a click is
+ * key press, and nothing else of the DOM. From here a click is
  * a modal screen's, or a button searched in the interface's lists and queued on the
  * game's one mouse queue; a key is a modal screen's, a key table's button queued the same
  * way (`TAG0196da`), a panel key (`handleUIKey`), or one of the port's own keys
@@ -26,8 +26,14 @@ export interface GameInputHost {
   onQuickLoad(): void;
 }
 
-/** A key's modifiers, as a `KeyboardEvent` has them. */
-export interface KeyModifiers {
+/**
+ * A key pressed, as a `KeyboardEvent` has it: `key` is the character it types, which the
+ * text screens read, and `code` the physical key, which every binding matches
+ * (`src/renderer/ui/Keyboard.ts`).
+ */
+export interface KeyPress {
+  key: string;
+  code: string;
   ctrlKey: boolean;
   metaKey: boolean;
   altKey: boolean;
@@ -125,13 +131,14 @@ export class GameInput {
     this.host.screen.setHoverPoint(null);
   }
 
-  /** A key pressed: `key` is `KeyboardEvent.key`. Says whether the game took it. */
-  keyDown(key: string, mods: KeyModifiers): boolean {
+  /** A key pressed. Says whether the game took it. */
+  keyDown(press: KeyPress): boolean {
     const { game, screen } = this.host;
+    const { key, code } = press;
     // `_ShowCredits` has emptied `d.pKeyXlate1` and `d.pKeyXlate2`
     // (`doc/CSBwin-src/Code1f9e6.cpp:120-121`): no key is the adventure's any more.
     if (this.ended()) return false;
-    const modified = mods.ctrlKey || mods.metaKey || mods.altKey;
+    const modified = press.ctrlKey || press.metaKey || press.altKey;
     // The Oracle takes no key (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Waiting for a
     // button"), and the adventure gets none while it is up; a browser shortcut keeps its.
     if (this.oracleUp()) return !modified;
@@ -165,7 +172,7 @@ export class GameInput {
     // `Byte18440` binds Return and Esc, and frozen `Byte18448` Esc alone
     // (doc/CSBwin-src/Mouse.cpp:1839-1840, :1893-1894). A bound key is queued as its
     // button, like a click.
-    const button = screen.translateKey(key);
+    const button = screen.translateKey(code);
     if (button !== 0) {
       game.enqueueKeyButton(button);
       return true;
@@ -176,11 +183,11 @@ export class GameInput {
     // Then the port's own bindings, which claim no other key a table binds: the
     // panel keys, which claim theirs whatever the game state, so the movement keys
     // below never see one.
-    if (screen.handleUIKey(key)) {
+    if (screen.handleUIKey(code)) {
       this.host.refreshScreen();
       return true;
     }
-    const action = portKeyAction(key);
+    const action = portKeyAction(code);
     if (action === null) return false;
     if (action === 'quickSave') {
       this.host.onQuickSave();
