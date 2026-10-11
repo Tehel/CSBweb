@@ -1,6 +1,7 @@
 /**
  * The dialog over the game: the one slot a dialog fills while it is up (`UIState.dialog`).
- * The save menu (`SaveMenu.ts`) and the settings (`SettingsDialog.ts`) use it.
+ * The save menu (`SaveMenu.ts`), the settings (`SettingsDialog.ts`) and the map
+ * (`MapDialog.ts`) use it.
  *
  * A dialog is drawn into the screen over what the screen composed, under the button
  * flash and the cursor (`GameScreen`), and it is modal the way `_WaitForMenuSelect` is

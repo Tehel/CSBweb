@@ -93,6 +93,8 @@ type TableAction = keyof typeof TABLE_KEYSCAN;
  * - `move.*`, `freeze`, `wake`: a keyscan sent to the tables (`TABLE_KEYSCAN`), which
  *   queue the step or turn, the freeze or the waking their button stands for.
  * - `quickSave`, `quickLoad`: what F5 and F9 ask of the page.
+ * - `map`: the map dialog, opened or closed (`MapDialog.ts`), with MAP VIEW on. No preset
+ *   binds it.
  */
 export type KeyAction =
   | `attack.${Champion}.${0 | 1 | 2}`
@@ -104,7 +106,8 @@ export type KeyAction =
   | `caster.${Champion}`
   | TableAction
   | 'quickSave'
-  | 'quickLoad';
+  | 'quickLoad'
+  | 'map';
 
 /** An action's two keys, each a `KeyboardEvent.code`, or `''` for none. */
 export type KeySlots = readonly [string, string];
@@ -164,6 +167,7 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   wake: ['', ''],
   quickSave: ['F5', ''],
   quickLoad: ['F9', ''],
+  map: ['', ''],
 };
 
 /** The default preset's moves on the keypad alone: K , J L M . free. */
@@ -264,18 +268,22 @@ function isTableAction(action: KeyAction): action is TableAction {
   return action in TABLE_KEYSCAN;
 }
 
-/** Whether `action` is a panel's: an attack, an inventory, the magic or PASS. */
-function isPanelAction(action: KeyAction): boolean {
-  return !isTableAction(action) && action !== 'quickSave' && action !== 'quickLoad';
+/** What one of the port's own keys asks of the page: F5's quick-save, F9's quick-load, and the map. */
+export type PortKeyAction = 'quickSave' | 'quickLoad' | 'map';
+
+function isPortAction(action: KeyAction): action is PortKeyAction {
+  return action === 'quickSave' || action === 'quickLoad' || action === 'map';
 }
 
-/** What one of the port's own keys asks of the page: F5's quick-save and F9's quick-load. */
-export type PortKeyAction = 'quickSave' | 'quickLoad';
+/** Whether `action` is a panel's: an attack, an inventory, the magic or PASS. */
+function isPanelAction(action: KeyAction): boolean {
+  return !isTableAction(action) && !isPortAction(action);
+}
 
-/** What a `KeyboardEvent.code` asks of the page, or null for a key bound to neither. */
+/** What a `KeyboardEvent.code` asks of the page, or null for a key bound to none of the port's actions. */
 export function portKeyAction(code: string): PortKeyAction | null {
   const action = keyAction(code);
-  return action === 'quickSave' || action === 'quickLoad' ? action : null;
+  return action !== null && isPortAction(action) ? action : null;
 }
 
 /**

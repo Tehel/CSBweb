@@ -108,10 +108,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| U6 | The map is a page panel | M | ⏳ |
 | U7 | The champion table is a page panel | M | ⏳ |
 | U8 | No fullscreen | M | ⏳ |
-| U9 | The side panel | S | ⏳ after U6-U8 |
+| U9 | The side panel | S | ⏳ after U7, U8 |
 | F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
@@ -214,29 +213,16 @@ The settings dialog (`src/renderer/ui/SettingsDialog.ts`) is the first: Esc or a
 click on the message area opens it. Its GAME, DISPLAY and SOUND tabs set the player's
 settings, and KEYS binds the keys (`src/renderer/ui/SettingsKeys.ts`). Its EXIT, which
 leaves for E15's welcome page, is drawn inert until then; once live, EXIT asks first in
-`_DoMenu`'s two-option menu, as what has not been saved is lost. Its panel holds five lines (`SETTING_LINES`), and GAME has four.
+`_DoMenu`'s two-option menu, as what has not been saved is lost. Its panel holds five lines (`SETTING_LINES`), and GAME has five.
+
+The map dialog (`src/renderer/ui/MapDialog.ts`) is the second: with GAME's MAP VIEW on,
+the MAP key, which no preset binds, or a long press on the message area opens it. It
+draws the party's level whole; a page opened with `?dev` moves the party by a click on a
+square.
 
 None of it changes the game: with every new setting at its default, every tool's output
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a
 golden frame for what it draws, and a probe or a `tools/` assertion for what it does.
-
-### U6 ⏳ The map is a page panel
-
-`src/ui/mapPreview.ts` draws the party's level whole into a canvas of the page, beside the
-game: stone, floor, doors, stairs, pits, teleporters and false walls. With Debug on, a
-click on it teleports the party by replacing its state (`:65`), which E15 asks to put
-behind a developer's switch.
-
-Paying it: a map dialog in the dialog slot. It draws the party's level at the largest whole cell
-size that fits, in the UI palette, with the party's square and facing, the level's
-number, and CLOSE. It opens by its key action, MAP, which it adds to the KEYS tab's list
-unbound, and by a long press on the message
-area, and only with MAP VIEW on, a setting of the settings dialog's GAME tab. The teleport stays only behind `?dev`. A map of
-only the cells the party has seen is X10's data and a later mode of this dialog. GAME
-has room for one more line ("U — The interface in the canvas"): whichever of U6 and U7
-lands second finds its setting another place, a sixth line or a tab of its own. The
-check: a golden frame of the dialog over a fixture save's level; the probe opens it by
-the long press, and finds it shut with MAP VIEW off.
 
 ### U7 ⏳ The champion table is a page panel
 
@@ -249,7 +235,9 @@ columns, on two tabs (the levels, maxima and attributes; then the skills), since
 lines do not fit one screen. Nothing is highlighted, since the clock is held while the
 dialog is up. It opens by its key action, CHAMPIONS, which it adds to the KEYS tab's
 list unbound, and by a long press on a champion's stat
-bars, and only with CHAMPION VIEW on, a setting of the settings dialog's GAME tab. The dialog then marks that champion's column.
+bars, and only with CHAMPION VIEW on, a setting of the settings dialog. GAME's five lines
+are its panel's all, so the setting takes a sixth line, the panel grown to hold it, or a
+tab of its own. The dialog then marks that champion's column.
 
 The long press opens no inventory. A single click on the bars does: the bars have no
 left button, so a left click there becomes the box's right click, 7-10
@@ -271,14 +259,11 @@ these are the other ways in:
   interval, about 300 ms after the click, before it is queued.
 - **A CHAMPIONS button in the settings dialog**, on its title line: no click is held, and
   a touch screen takes two steps, a double tap on the message area, then CHAMPIONS.
-- **The long press on the message area**, shared with the map (U6) through a small
+- **The long press on the message area**, shared with the map (`MapDialog.ts`) through a small
   chooser: no click is held, and the gesture names neither view.
 - **The press acting at once**: the inventory opens on the press, and the long press
   opens the dialog over it. No delay, but the inventory is left open, and undoing it is
   not a toggle, since the press may have replaced another champion's inventory.
-
-GAME has room for one more line: whichever of U6 and U7 lands second finds its setting
-another place (U6).
 
 The check: a golden frame of each tab from a fixture save; the probe opens it by a long
 press, with every inventory still closed, and opens an inventory by a tap, at its
@@ -298,11 +283,12 @@ canvas over the game canvas and a click read through it, in fullscreen.
 
 ### U9 ⏳ The side panel
 
-With the settings dialog and U6 to U8 in, nothing on `#side` (`index.html`) is needed by a player. The data-set
+With the settings and map dialogs and U7 and U8 in, nothing on `#side` (`index.html`) is needed by a player. The data-set
 chooser, Quick Save and Quick Load, CRT, Sound and its volume, Map, Champions, Debug,
 Extras, and the map and champion panels all go, with the code in `src/ui/` that only they
-use. The data set is chosen by `?dungeon=` until E15's welcome page. The teleport and
-`#overlay-control` go behind `?dev`. This pays R9, since no control is left to keep the
+use. The data set is chosen by `?dungeon=` until E15's welcome page. The page map's
+teleport goes with it, the map dialog's being behind `?dev` already, and
+`#overlay-control` goes behind `?dev`. This pays R9, since no control is left to keep the
 focus, and E15's bullets on settings in the DOM, elements looked up at import, and the
 debug chrome; their entries are rewritten when it lands. The probe and the golden frames
 that press a page button press its dialog or its key instead.
@@ -321,17 +307,17 @@ list", point 4), its check included.
 ### R1 ⏳ A game read in play leaves the screen on the old world
 
 A read replaces `ctx.party.state` (`Party.setState`, `src/engine/Party.ts:118-126`) and the
-world, and tells the screen nothing. `ui.partyState` (`src/renderer/ui/UIState.ts:67`), the
+world, and tells the screen nothing. `ui.partyState` (`src/renderer/ui/UIState.ts:71`), the
 open chest (`ui.openChestId`, `ui.openChestContents`), the attack menu
 (`ui.possibleAttackTypes`) and the Reincarnate screen (`ui.reincarnate`) stay the old
 world's until the next `refreshScreen`, and what runs before it acts on them:
 
 - **F9 with a chest open loses an object.** The next compose's `syncOpenChest(ui, null)`
-  (`src/renderer/GameScreen.ts:613-615`) repacks the old world's open contents into the
+  (`src/renderer/GameScreen.ts:630-633`) repacks the old world's open contents into the
   loaded world's chest (`repackOpenChest`, `src/renderer/ui/Inventory.ts:376-399`). An
   object taken from the chest into the hand before F9 is then in no chain of the loaded
   world; one put into it is linked twice, which cuts the chain it lies in. F9 is taken
-  with an inventory open (`GameInput.keyDown`, `src/renderer/GameInput.ts:195-201`). The
+  with an inventory open (`GameInput.keyDown`, `src/renderer/GameInput.ts:279-288`). The
   disk menu's LOAD loses nothing: opening the menu runs `TAG02076e`, which repacks first.
 - **The disk menu's LOAD runs `TAG0207cc` on the old party.** `restoreChosenSave` reads,
   then `closeSaveMenu` calls `tag0207cc(ui)` (`src/renderer/ui/SaveMenu.ts:1099-1112`,
@@ -369,9 +355,9 @@ says how to test one.
 
 ### R3 ⏳ After a fatal error the page still saves
 
-`reportError` (`src/main.ts:614-619`) stops the game and puts up the message, and nothing
+`reportError` (`src/main.ts:659`) stops the game and puts up the message, and nothing
 else. `GameInput` still takes the keys (its `ended()` is `mainLoopHasReturned()`, which
-`stop` does not set, `src/renderer/GameInput.ts:48-50`), `quickSave` does not ask whether
+`stop` does not set, `src/renderer/GameInput.ts:67-69`), `quickSave` does not ask whether
 the game runs (`src/engine/GameSaves.ts:510-531`), and the page's Quick Save button calls
 it directly (`src/ui/events.ts:108`). So F5 after a VBL that threw writes the half-updated
 world over the playthrough's quick save, the one F9 reads after the reload the message asks
@@ -404,7 +390,7 @@ champion is chosen; the script checked again after the awaits.
 `openSaveDatabase` (`src/data/saves/idb.ts:59-81`) sets no `onblocked`, and no connection
 closes on `versionchange`. An open tab of the build before a `DB_VERSION` bump keeps its
 connection, so a new tab's open never settles: ENTER awaits `readNewGame`, which awaits
-`saves.newGameRead()` and `list()` (`src/main.ts:143-151`), and the game never starts; F5,
+`saves.newGameRead()` and `list()` (`src/main.ts:169-177`), and the game never starts; F5,
 F9 and the disk menu wait for ever. Two more gaps in the store:
 
 - nothing asks `navigator.storage.persist()`, so the browser may evict the only copy of
@@ -468,11 +454,11 @@ with `npm test -- --frames`.
 
 ### R8 ⏳ An optional feature's failure ends the game, or the session
 
-- **The Hint Oracle** runs with `.catch(reportError)` (`src/main.ts:374`), so any error in
+- **The Hint Oracle** runs with `.catch(reportError)` (`src/main.ts:418`), so any error in
   it ends the game with whatever was not saved. `readHintOracle` throws for a world whose
   `hintKey` does not decipher `hcsb.hct`, such as an imported save of a modified CSB.
 - **RISE's NEW FACE**: `utilityPortraits ??=` caches a promise that rejects when
-  `arrayBuffer()` or the parse fails (`src/main.ts:167-177`), and `refreshSaveMenu`'s
+  `arrayBuffer()` or the parse fails (`src/main.ts:195-201`), and `refreshSaveMenu`'s
   `await ui.onHasNewFaces()` then throws into the catch that empties the list
   (`src/renderer/ui/SaveMenu.ts:504-509`): RISE lists nothing until a reload.
 
@@ -494,7 +480,7 @@ Paying it: the page's controls give the focus back (`blur` after a click, or
 ### R10 ⏳ Pointer, touch and WebGL
 
 - **Touch screens likely stay silent.** Audio is unlocked on the canvas's first
-  `pointerdown`, once (`src/main.ts:180-188`), which is a user activation for a mouse and
+  `pointerdown`, once (`src/main.ts:209-217`), which is a user activation for a mouse and
   not for a touch: `resume()` fails, the listener is gone, and only the Sound button
   brings the sound back.
 - **A lost WebGL context keeps the curve.** On `webglcontextlost` the tube is hidden but
@@ -643,9 +629,9 @@ New state-representation debt goes here, and jumps the queue.
 ### D17 ⏳ The screen keeps the party it last drew
 
 `Party.setState` builds a new object (`src/engine/Party.ts:118-126`), and the screen keeps
-its own reference, `ui.partyState` (`src/renderer/ui/UIState.ts:67`, about 125 uses), set
+its own reference, `ui.partyState` (`src/renderer/ui/UIState.ts:71`, about 125 uses), set
 again only by `GameScreen.setPartyState` from `renderView` and `refreshScreen`
-(`src/main.ts:77`, `:84`). Whatever runs between a read and the next of those reads the old
+(`src/main.ts:103`, `:110`). Whatever runs between a read and the next of those reads the old
 party (R1), and "another game" is detected by the object changing (`setPartyState`'s
 `state !== this.ui.partyState`). The freeze has two owners the same way:
 `GameScreen.isFrozen()` reads `ui.uiMode`, `Game.isFrozen()` reads `ctx.loop.gameFrozen`.
@@ -659,21 +645,21 @@ generation count; one owner for the freeze.
 CSBWin's interface state is `d.`: the open chest and its contents, the attack menu
 (`d.AttackingCharacterOrdinal`, `Word20250`, `Word20252`), `PressingEye`, `PressingMouth`,
 `DisplayResurrectChestOrScroll`. The port keeps them in `UIState`
-(`src/renderer/ui/UIState.ts:189-236`), and the engine reads them back through `GameHost`
+(`src/renderer/ui/UIState.ts:198-238`), and the engine reads them back through `GameHost`
 queries (`pressingEye`, `pressingMouth`, `displayResurrectChestOrScroll`,
 `attackingCharacterOrdinal`, `src/engine/GameHost.ts:47-198`, answered as
-`screen?.…() ?? 0` in `src/main.ts:253-259`), beside calls into the UI named by CSBWin
+`screen?.…() ?? 0` in `src/main.ts:282-285`), beside calls into the UI named by CSBWin
 address (`tag02076e`, `tag0207cc`, `tag01b29a`, `tag011366`). So:
 
 - **Composing the screen opens and repacks chests.** `presentViewport` runs
   `syncOpenChest(this.ui, null)` and zeroes `displayResurrectChestOrScroll`
-  (`src/renderer/GameScreen.ts:613-616`), and `drawInventoryScreen` opens the chest through
+  (`src/renderer/GameScreen.ts:630-633`), and `drawInventoryScreen` opens the chest through
   `syncOpenChest(ui, chestView)` (`src/renderer/ui/Inventory.ts:41`), which unlinks its
   objects from the database (`:363-368`). A compose runs at every refresh, up to 60 a
   second while the pointer moves, so what the engine finds in a chest depends on when the
   screen was last composed. The save repacks by hand first (`GameSaves.ts:289`), and the
   compose skips the inventory under the disk menu so as not to open it again
-  (`GameScreen.ts:624-628`). CSBWin opens the chest while drawing too, but only at events
+  (`GameScreen.ts:641-645`). CSBWin opens the chest while drawing too, but only at events
   (`TAG0189d4`).
 - A headless `Game` has none of this state, and a read does not reset it (R1).
 
@@ -977,7 +963,7 @@ the canvas's output (`putImageData`), the order of the compose, the palettes' ch
 façade over the UI and the boot (`getScreenBuffer`, `doMenu`, `setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can
 build one, and `tools/lib/ui.ts` copies its wiring (F19). Each page hook is named four
 times: in `UIState`, `UIHooks`, `GameScreenHooks` and the constructor's copy
-(`GameScreen.ts:90-105`, `:197-214`, `UIState.ts:397-399`).
+(`GameScreen.ts:96-117`, `:193-226`, `UIState.ts:423-426`).
 
 Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the palettes,
 `PresentedFrame`, `presentViewport`'s order) and a thin canvas presenter; one factory for the
@@ -993,7 +979,7 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:208-223`).
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
   `refreshScreen`'s `setPartyState` and its `mainLoopHasReturned()` test
-  (`GameScreen.ts:736-742`, `src/main.ts:82-86`), so a chew still running when the game ends
+  (`GameScreen.ts:755-761`, `src/main.ts:108-112`), so a chew still running when the game ends
   draws the adventure over the credits' wait; `initializePlayState` cancels neither loop.
 - The CRT uploads the canvas and runs its shader at device pixels at every display frame,
   changed or not: about 2.3 million pixels a frame at a device ratio of 2, up to 120 times a
@@ -1057,7 +1043,7 @@ loader's cache keyed by format, or the parameter dropped with the dead fallback.
   where a 16-entry `Uint32` table a palette, written through a `Uint32Array` view, takes
   0.14 ms (`updateImageDataFromIndex*`, `src/renderer/csbwin/CanvasBlitter.ts:409-483`). It
   always takes the two-palette path while adventuring: `viewportPalette !== uiPalette`
-  compares two separate copies (`GameScreen.ts:664-670`). Its body is written three times
+  compares two separate copies (`GameScreen.ts:680-683`). Its body is written three times
   in `CanvasBlitter`, and the cursor's footprint loop twice (`reconvertThroughPalette`,
   `PresentedFrame.capture`).
 - **Every monster turn allocates** an `MmRecord` and with it a `DsaVars` of two 100-entry
@@ -1191,11 +1177,12 @@ What the redesign will replace, and what it should not carry across:
   document.getElementById('champions')` at the top of a module, `src/ui/`), so no module
   can be tested or drawn later.
 - **The debug chrome is on the public page.** Any player can press Debug, and then a click
-  on the map teleports the party by replacing its state (`setPartyState({ ...state,
+  on the page's map teleports the party by replacing its state (`setPartyState({ ...state,
   position })`, `src/ui/mapPreview.ts:65`), with no test of the square (into stone, if
   clicked there) and no `MoveObject`; the game it plays reaches the statistics' "where
-  parties die" like any other. The overlay controls (`#overlay-control`) need no Debug at
-  all. Both go behind a developer's switch (`?debug`, or the build flag `main.ts:584`
+  parties die" like any other. The map dialog's click does the same on a page opened
+  with `?dev` (`onTeleport`, `src/main.ts`). The overlay controls (`#overlay-control`) need no Debug at
+  all. Both go behind a developer's switch (`?debug`, or the build flag `main.ts:634`
   uses), and a game a teleport touched sends no events.
 - **Two input stacks** (E30) and the page's controls keeping the focus (R9).
 
@@ -1594,7 +1581,7 @@ full run shows the error before its first tool result.
 ### F19 ⏳ The tools' screen is wired by hand, and has drifted
 
 `tools/lib/ui.ts:21-34` builds the `ViewportRenderer` as `GameScreen`'s constructor does
-(`src/renderer/GameScreen.ts:171-185`), without `gameState`, `rules` and
+(`src/renderer/GameScreen.ts:177-192`), without `gameState`, `rules` and
 `csbGraphicsLoader`. So a view a tool draws has `invisibleMonsters` and
 `drawAsSize4Monsters` off whatever the dungeon says, no `d.Time` for the magic footprints,
 and no CSB graphics.

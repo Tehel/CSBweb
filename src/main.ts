@@ -5,6 +5,7 @@
 
 import { SoundManager } from './audio/SoundManager';
 import { CsbRandom } from './core/random';
+import { Position } from './core/types';
 import { CSBGraphicsLoader } from './data/CSBGraphicsLoader';
 import { extractPresetHeroes } from './data/HeroExtractor';
 import { MANIFEST_NAME, dataSetFor, parseManifest, type DataSet, type DataSetManifest } from './data/DataSets';
@@ -399,6 +400,13 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // The KEYS tab labels a key with what this keyboard prints on it, where the
         // browser says (`readKeyboardLayout`).
         keyboardLayout: () => keyboardLayout,
+        // A click on the map dialog's square moves the party there, on a page opened with
+        // `?dev` alone. A script holding the loop (the fusion) runs on the party where it stands.
+        onTeleport: new URLSearchParams(window.location.search).has('dev') ? (x, y) => {
+            if (game.isRunningScript()) return;
+            const state = game.ctx.party.state;
+            game.setPartyState({ ...state, position: new Position(x, y, state.position.z) });
+        } : null,
         // The Hint Oracle's button: the screen has stopped the clock and shaded the
         // interface, and the Oracle has the canvas until it closes.
         onOpenHintOracle: (square) => {

@@ -24,6 +24,7 @@ import type { HintOracleFiles } from './HintOracleButton';
 import type { ReincarnateState } from './ReIncarnate';
 import type { SaveMenuState } from './SaveMenu';
 import type { SettingsDialogState } from './SettingsDialog';
+import type { MapDialogState } from './MapDialog';
 import type { Settings } from '../../settings/Settings';
 import type { Dialog } from './Dialog';
 import type { KeyboardLayoutMap } from './KeyLabels';
@@ -110,6 +111,8 @@ export interface UIState {
   saveMenu: SaveMenuState | null;
   /** The settings dialog's state while it is the dialog (`src/renderer/ui/SettingsDialog.ts`). */
   settingsDialog: SettingsDialogState | null;
+  /** The map dialog's state while it is the dialog (`src/renderer/ui/MapDialog.ts`). */
+  mapDialog: MapDialogState | null;
   /**
    * `DiskMenuNeeded` (`doc/CSBwin-src/Data.h:159`). The disk icon's handler cannot open
    * the menu itself — CSBWin because that would recurse into `HandleMouseEvents`
@@ -338,6 +341,11 @@ export interface UIState {
    * labels (`KeyLabels.ts`).
    */
   readonly keyboardLayout: () => KeyboardLayoutMap | null;
+  /**
+   * Move the party to the square `(x, y)` of its level, or `null` where the page does not
+   * let a click on the map dialog do it: only a page opened with `?dev` does.
+   */
+  readonly onTeleport: ((x: number, y: number) => void) | null;
 
   /* ---- back into the renderer ---- */
   getGraphicBitmap(graphicNum: number, format?: ImageFormat): IndexedBitmap | null;
@@ -415,7 +423,7 @@ export type UISources = Pick<UIState,
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
   | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onHasNewFaces' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave'
-  | 'settings' | 'isCrtAvailable' | 'keyboardLayout'>;
+  | 'settings' | 'isCrtAvailable' | 'keyboardLayout' | 'onTeleport'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {
@@ -425,6 +433,7 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
     dialog: null,
     saveMenu: null,
     settingsDialog: null,
+    mapDialog: null,
     hintOracle: null,
     hintOracleUp: false,
     hoverPoint: null,

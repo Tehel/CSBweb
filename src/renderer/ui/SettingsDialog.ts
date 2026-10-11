@@ -153,11 +153,18 @@ export const TABS: ReadonlyArray<{ readonly tab: SettingsTab; readonly label: st
   {
     tab: 'game',
     label: 'GAME',
-    help: 'THE EXTRAS, AND THE STATISTICS',
+    help: 'THE EXTRAS, THE MAP AND THE STATISTICS',
     settings: [
       { name: 'GATHER THROWN WEAPONS', help: 'WALK OVER A THROWN WEAPON TO TAKE IT BACK', ...extra('gatherThrownWeapons') },
       { name: 'DRINK AT FOUNTAINS', help: 'AN EMPTY HAND ON A FOUNTAIN DRINKS FROM IT', ...extra('drinkAtFountain') },
       { name: 'COLOUR NEW MASTERY', help: 'A MASTERY JUST GAINED SHOWN IN COLOUR', ...extra('colourNewMastery') },
+      {
+        name: 'MAP VIEW',
+        help: 'THE MAP: A LONG PRESS ON THE MESSAGES, OR ITS KEY',
+        kind: 'toggle',
+        get: (values) => values.mapView,
+        set: (_values, on) => ({ mapView: on }),
+      },
       {
         name: 'SEND STATISTICS',
         help: 'TELL THE SITE A GAME STARTED, WON OR LOST',

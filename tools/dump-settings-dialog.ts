@@ -144,7 +144,9 @@ console.log('\n=== 3. the controls ===');
   check(values().extras.gatherThrownWeapons && !values().extras.drinkAtFountain, 'GATHER THROWN WEAPONS\' ON turns that extra on, alone');
   click(ui, toggleFrames(0)[0]);
   check(updates === 1, 'a click on the side already chosen changes nothing');
-  click(ui, toggleFrames(3)[1]);
+  click(ui, toggleFrames(3)[0]);
+  check(values().mapView, 'MAP VIEW\'s ON turns the map on');
+  click(ui, toggleFrames(4)[1]);
   check(!values().statistics, 'SEND STATISTICS\' OFF turns them off');
 
   click(ui, TAB_FRAMES[2]);
@@ -224,6 +226,8 @@ console.log('\n=== 5. opening it ===');
   const screen = {
     isDialogOpen: () => isDialogOpen(ui),
     openSettings: () => openSettingsDialog(ui),
+    // MAP VIEW is off: a press held on the message area opens nothing (`tools/dump-map-dialog.ts`).
+    openMap: () => false,
     handleDialogClick: (x: number, y: number, b: number) => ui.dialog?.click(ui, x, y, b),
     handleDialogKey: (key: string, code: string) => ui.dialog?.key(ui, key, code),
     isReincarnateScreenOpen: () => reincarnate,

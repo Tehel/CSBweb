@@ -8,7 +8,8 @@
  * buffer of its own or to stage a view. The hooks do nothing unless the tool passes its
  * own; the save/load screen lists no save, and `onReadSave`, `onMakeNewAdventure`,
  * `onSaveGame`, `onExportSave` and `onImportSave` throw, as there is no store and no world to serialize.
- * The settings are the defaults, kept nowhere, and the CRT effect can be shown.
+ * The settings are the defaults, kept nowhere, and the CRT effect can be shown. The map
+ * dialog moves no party, as on a page opened without `?dev`.
  */
 import type { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import type { GameContext } from '../../src/engine/GameContext';
@@ -62,6 +63,7 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     settings: new Settings(null),
     isCrtAvailable: () => true,
     keyboardLayout: () => null,
+    onTeleport: null,
     ...hooks,
     getGraphicBitmap,
   });

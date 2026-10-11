@@ -27,7 +27,10 @@ export interface SettingsValues {
   readonly startupAnimations: boolean;
   /** The statistics' events (`doc/STATISTICS.md`): on unless the player turns them off. */
   readonly statistics: boolean;
-  /** The map of the party's level beside the game. */
+  /**
+   * The map of the party's level: the map dialog opens (`MapDialog.ts`), and the page's
+   * panel beside the game is shown.
+   */
   readonly mapView: boolean;
   /** The champions' table beside the game. */
   readonly championView: boolean;

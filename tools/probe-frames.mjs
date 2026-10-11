@@ -24,7 +24,8 @@
 // shows them: the CRT effect, which screens take the mouse wheel, a move of the pointer
 // left to the VBL's frame to paint, the keys of the entrance's chooser, the download its
 // EXPORT starts, a file dropped on it, a finger held on the eye, a mouse released off
-// the canvas, and the settings dialog opened, held, changed and read back. See `check` below.
+// the canvas, the settings dialog opened, held, changed and read back, and the map dialog
+// opened by a long press, but not with MAP VIEW off. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -575,6 +576,30 @@ check(!(await evaluate(`document.getElementById('btn-sound').classList.contains(
 await canvasClick(100, 185, 0); await canvasClick(150, 190, 0); await wait(300);
 check(await settingsUp(), 'a double click on the message area opens the settings');
 await canvasClick(160, 100, 2); await wait(300);
+
+// The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
+// where the save left it: a press held on the message area opens it, with MAP VIEW on
+// alone. A frame of it with the pointer off the canvas; a right click closes it.
+await send('Page.navigate', { url: `${APP}?intro=0&dungeon=csb` });
+await wait(3500);
+await evaluate(`(async()=>{
+  const { game, applySaveBytes } = window.__probe;
+  applySaveBytes(game, new Uint8Array(await (await fetch('/gamefiles/csb/csbgame2.dat')).arrayBuffer()));
+  return 1;
+})()`);
+await wait(600);
+const mapUp = () => evaluate(`window.__probe.screen.ui.mapDialog !== null`);
+await cdpMouse('mousePressed', 100, 185); await wait(900); await cdpMouse('mouseReleased', 100, 185); await wait(300);
+check(!(await mapUp()), 'with MAP VIEW off, a long press on the message area opens no map');
+await evaluate(`window.__probe.screen.ui.settings.update({ mapView: true }), 1`);
+await cdpMouse('mousePressed', 100, 185); await wait(900);
+check(await mapUp(), 'with MAP VIEW on, it opens the map while the press is held');
+await cdpMouse('mouseReleased', 100, 185); await wait(300);
+check(await mapUp(), 'and the release leaves it up');
+await leaveCanvas(); await wait(200);
+console.log('state: map');               await shot('25-map');
+await canvasClick(160, 100, 2); await wait(300);
+check(!(await mapUp()), 'a right click closes the map');
 
 // The CRT effect's input surface. The effect's canvas is shown over the game canvas, and
 // the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,

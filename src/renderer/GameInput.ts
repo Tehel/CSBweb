@@ -8,7 +8,8 @@
  * modal screen's, a key table's button queued the same way (`TAG0196da`), a panel key
  * (`handleUIKey`), or one of the port's own keys
  * (`portKeyAction`). Esc and a double click on the message area open the settings
- * (`src/renderer/ui/SettingsDialog.ts`). The queued buttons come back through `Game.handleMouseEvents` in
+ * (`src/renderer/ui/SettingsDialog.ts`); the MAP key and a long press there, the map
+ * (`src/renderer/ui/MapDialog.ts`). The queued buttons come back through `Game.handleMouseEvents` in
  * their turn, and `install` hands them to the interface's dispatcher, `handleMouseButton`.
  */
 import type { Game } from '../engine/Game';
@@ -19,6 +20,8 @@ import { nowMs } from './ui/UIState';
 
 /** How soon after a click on the message area a second one opens the settings, in milliseconds. */
 export const MESSAGE_DOUBLE_CLICK_MS = 500;
+/** How long a press on the message area is held to open the map, in milliseconds. */
+export const MESSAGE_LONG_PRESS_MS = 500;
 
 /** What the input path asks of the page. */
 export interface GameInputHost {
@@ -51,6 +54,8 @@ export class GameInput {
   private dragging = false;
   /** When the last click on the message area that hit no button came, or `null`. */
   private messageClickMs: number | null = null;
+  /** The long press on the message area under way: its timer, or `null`. */
+  private messagePress: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly host: GameInputHost) {}
 
@@ -99,6 +104,7 @@ export class GameInput {
     if (this.ended() || this.oracleUp()) return;
     this.host.screen.setHoverPoint({ x, y });
     if (this.dragging) this.host.screen.handleDialogDrag(x, y);
+    if (this.messagePress !== null && !inMessageArea(x, y)) this.releaseMessagePress();
   }
 
   /** A button pressed: `button` is `MouseEvent.button`'s number. */
@@ -121,10 +127,14 @@ export class GameInput {
       this.host.refreshScreen();
       return;
     }
-    if (buttonMask === 2 && this.messageAreaDoubleClick(x, y)) {
-      screen.openSettings();
-      this.host.refreshScreen();
-      return;
+    if (buttonMask === 2) {
+      const free = this.messageAreaFree(x, y);
+      if (this.messageAreaDoubleClick(free)) {
+        screen.openSettings();
+        this.host.refreshScreen();
+        return;
+      }
+      if (free) this.holdMessagePress();
     }
     // Queued, not handled: `Game.handleMouseEvents` takes it off the queue in its turn,
     // behind any key or click already waiting, matches it to the button the screen has
@@ -133,17 +143,21 @@ export class GameInput {
   }
 
   /**
-   * Whether a left click on the message area is the second of a double click there, the
-   * settings' gesture. A click counts only where it hits no button of the lists in force
-   * (`searchMouseButtons`), so the first is nothing to the game, and is queued as any
-   * click is, and the gesture holds back no click. Only two things take a left click
-   * there (`tools/dump-settings-dialog.ts`): the freeze, on the pixel x 0, y 198 of
+   * Whether a left click at `(x, y)` is on the message area and hits no button of the
+   * lists in force (`searchMouseButtons`): what the settings' double click and the map's
+   * long press count. Such a click is nothing to the game, and is queued as any click is,
+   * so neither gesture holds a click back. Only two things take a left click there
+   * (`tools/dump-settings-dialog.ts`): the freeze, on the pixel x 0, y 198 of
    * `Buttons17196`, and frozen, the thaw, `Buttons17832`'s whole screen. So a frozen
    * game's first click thaws it, as CSBWin's does, and opens nothing.
    */
-  private messageAreaDoubleClick(x: number, y: number): boolean {
-    const inArea = x >= MESSAGE_AREA.x1 && x < MESSAGE_AREA.x2 + 1 && y >= MESSAGE_AREA.y1 && y < MESSAGE_AREA.y2 + 1;
-    if (!inArea || this.host.screen.searchMouseButtons(x, y, 2) !== 0) {
+  private messageAreaFree(x: number, y: number): boolean {
+    return inMessageArea(x, y) && this.host.screen.searchMouseButtons(x, y, 2) === 0;
+  }
+
+  /** Whether a free left click on the message area (`free`) is the second of a double click there. */
+  private messageAreaDoubleClick(free: boolean): boolean {
+    if (!free) {
       this.messageClickMs = null;
       return false;
     }
@@ -153,9 +167,32 @@ export class GameInput {
     return second;
   }
 
+  /**
+   * A free press on the message area: held `MESSAGE_LONG_PRESS_MS`, on the area, it opens
+   * the map, where MAP VIEW is on. The press was queued as a click; its release is queued
+   * then, as the dialog takes the real one.
+   */
+  private holdMessagePress(): void {
+    this.releaseMessagePress();
+    this.messagePress = setTimeout(() => {
+      this.messagePress = null;
+      if (this.ended() || this.oracleUp() || !this.host.screen.openMap()) return;
+      this.messageClickMs = null;
+      this.host.game.onMouseUnClick();
+      this.host.refreshScreen();
+    }, MESSAGE_LONG_PRESS_MS);
+  }
+
+  private releaseMessagePress(): void {
+    if (this.messagePress === null) return;
+    clearTimeout(this.messagePress);
+    this.messagePress = null;
+  }
+
   mouseUp(): void {
     const dragged = this.dragging;
     this.dragging = false;
+    this.releaseMessagePress();
     if (this.ended() || this.oracleUp()) return;
     if (this.host.screen.isDialogOpen()) {
       if (dragged) this.host.screen.handleDialogRelease();
@@ -173,6 +210,7 @@ export class GameInput {
 
   /** The pointer gone from the canvas: no cursor, from the next VBL's frame, as a move's. */
   mouseLeave(): void {
+    this.releaseMessagePress();
     if (this.ended() || this.oracleUp()) return;
     this.host.screen.setHoverPoint(null);
   }
@@ -240,8 +278,17 @@ export class GameInput {
     }
     const action = portKeyAction(code);
     if (action === null) return false;
-    if (action === 'quickSave') this.host.onQuickSave();
-    else this.host.onQuickLoad();
+    if (action === 'quickSave') {
+      this.host.onQuickSave();
+    } else if (action === 'quickLoad') {
+      this.host.onQuickLoad();
+    } else if (screen.openMap()) {
+      this.host.refreshScreen();
+    }
     return true;
   }
+}
+
+function inMessageArea(x: number, y: number): boolean {
+  return x >= MESSAGE_AREA.x1 && x < MESSAGE_AREA.x2 + 1 && y >= MESSAGE_AREA.y1 && y < MESSAGE_AREA.y2 + 1;
 }

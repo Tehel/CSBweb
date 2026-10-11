@@ -80,6 +80,7 @@ import {
 } from './ui/SaveMenu';
 import { isDialogOpen, type DialogPoint } from './ui/Dialog';
 import { openSettingsDialog } from './ui/SettingsDialog';
+import { openMapDialog } from './ui/MapDialog';
 import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
 import type { SaveEntry } from '../data/saves';
 import type { ImportedFile } from '../engine/GameSaves';
@@ -110,6 +111,7 @@ export type GameScreenHooks = Pick<UIState,
   | 'settings'
   | 'isCrtAvailable'
   | 'keyboardLayout'
+  | 'onTeleport'
 >;
 
 /** What the screen reads: the graphics, and the game it shows. */
@@ -217,6 +219,7 @@ export class GameScreen {
       settings: hooks.settings,
       isCrtAvailable: hooks.isCrtAvailable,
       keyboardLayout: hooks.keyboardLayout,
+      onTeleport: hooks.onTeleport,
     });
     ui.hintOracle = deps.hintOracle ?? null;
     this.ui = ui;
@@ -406,6 +409,14 @@ export class GameScreen {
   /** The settings dialog (`ui/SettingsDialog.ts`): Esc, or a double click on the message area. */
   openSettings(): void {
     openSettingsDialog(this.ui);
+  }
+
+  /**
+   * The map dialog (`ui/MapDialog.ts`): its key, or a long press on the message area. Says
+   * whether it opened, which it does only with MAP VIEW on and no dialog up.
+   */
+  openMap(): boolean {
+    return openMapDialog(this.ui);
   }
 
   /* The save/load screen; the work is in `ui/SaveMenu.ts`. */
