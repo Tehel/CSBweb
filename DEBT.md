@@ -113,6 +113,7 @@ In payoff order: the first row is the next item.
 | U7 | The champion table is a page panel | M | ⏳ |
 | U8 | No fullscreen | M | ⏳ |
 | U9 | The side panel | S | ⏳ after U5-U8 |
+| F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
 | R2 | Every store upgrade re-runs every step, and drops a row that does not parse | S | ⏳ |
@@ -190,7 +191,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C182 · D22 · E39 · F20 · G31 · R15 · U10 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E39 · F21 · G31 · R15 · U10 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -202,7 +203,9 @@ game's 320x200 buffer like the save menu: the settings, the map, the champion ta
 look is the save menu's, cut from graphic 0 and drawn in the UI palette's sixteen
 colours, and the design canvas "DMweb page flow"
 (`https://claude.ai/artifact/DiNNPrFfCkphD9LRNBckSG`) shows it: artboard 10, the widget
-kit, and artboard 5, the settings dialog. The kit is the look to follow; the screens,
+kit, and artboard 5, the settings dialog. Reading the canvas's URL gives only its shell
+page; each artboard is a published file of it, `project/Kit.dc.html` and
+`project/Settings.dc.html` among them (`.claude/memory/design-canvas-files.md`). The kit is the look to follow; the screens,
 artboard 5 among them, are brainstorm material, not final designs. At 320x200 there is
 one font size, so a setting is one line, and its description goes in a help line at the
 dialog's foot. Being in the buffer, the dialogs are under the CRT effect and in
@@ -1594,6 +1597,24 @@ crash-loops the container; only the optional `tools/check-image.sh` would see it
 Paying it: the server on `module` and `moduleResolution` `"nodenext"`, an ES `lib` and
 Node's types; `src/` without Node's; `dump-server` running the server from a scratch
 folder laid out as the image is.
+
+### F20 ⏳ A tool is run without its types checked
+
+`tsx` strips types without checking them, as esbuild does for `vite build`, so a tool
+run on its own with `npx tsx tools/<name>.ts`, the way `CLAUDE.md`, the
+`verification-tools` skill and every tool's own header say to run it, passes with type
+errors in it or in what it imports. They come out only in `npm test`, whose `tsc
+--noEmit` is the gate, and there late: the runner schedules `tsc` with every tool and
+prints a failure's output only after the whole run (`tools/run-checks.mjs`, "Failures
+print their whole output"), so a type error in a new tool is learnt ~150 s after the
+run started. `npm test -- --only=<name>` runs `tsc` and the tool in a few seconds, but
+nothing points to it for one tool.
+
+Paying it: one tool is run through the runner, `npm test -- --only=<name>`, in
+`CLAUDE.md`, the skill and the tools' `Run:` lines, so its types are checked every
+time; and the runner prints a failed `tsc`'s errors as soon as it ends, without waiting
+for the tools. The check: a tool with a planted type error fails `--only` on it, and the
+full run shows the error before its first tool result.
 
 ### F19 ⏳ The tools' screen is wired by hand, and has drifted
 

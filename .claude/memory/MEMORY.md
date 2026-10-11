@@ -17,3 +17,7 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Past the MVP](past-the-mvp.md) — a 🚫 "not wanted" CSBWin feature in DEBT.md H means "not yet": retire it into the active item
 - [Saves mutually compatible](saves-mutually-compatible.md) — every CSBWin save imports and every export loads in CSBWin; no reader special case for port-only files
 - [Monster groups in tools](monster-groups-in-tools.md) — `csbgame7.dat`'s groups of several are on levels 5 and 7; `loadPartyLevelIfChanged` gives them an ITEM16; `getAttachedItem16` alone lies off the party's level
+- [UI hook plumbing](ui-hook-plumbing.md) — a new page→interface hook touches six places: `UIState`, `UIHooks`, `GameScreenHooks`, the constructor, `main.ts`, `tools/lib/ui.ts`
+- [Probe storage flags](probe-frames-storage-flags.md) — `probe-frames.mjs` wipes localStorage/IndexedDB per load unless `keepsettings`/`keepsaves`; new blocks go before the CRT section, with their own helpers
+- [New golden frame needs --update](new-golden-frame-needs-update.md) — `check-frames.sh` ignores frames not in the baseline; `--update`, then only `??` PNGs in `git status`
+- [Design canvas files](design-canvas-files.md) — reading the canvas URL gives "Loading…"; list its files and read `project/<Artboard>.dc.html`
