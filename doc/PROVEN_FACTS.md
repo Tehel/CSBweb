@@ -3324,10 +3324,12 @@ keypad 8, 4 and 6, Home turns left and PgUp right; down (`0x50`) and Insert (`0x
 no line, nor has Return (`0x0d`) in mode 1.
 
 The port binds the same physical keys, as `KeyboardEvent.code`s, to the same buttons
-(`src/renderer/ui/Keyboard.ts`, `tools/dump-key-bindings.ts`): the keys sit where
-CSBWin's sit on a US keyboard, as a virtual key or a scancode does on any layout. It adds
-7-0 for the inventories, which the file leaves unbound, and binds the movement letters
-by position, not by character.
+(`DEFAULT_KEY_BINDINGS`, `src/renderer/ui/Keyboard.ts`, `tools/dump-key-bindings.ts`):
+the keys sit where CSBWin's sit on a US keyboard, as a virtual key or a scancode does on
+any layout. A move, Esc and the waking send their keyscan to the tables, as the file's
+`key` and `scan` lines do. It adds 7-0 for the inventories, which the file leaves
+unbound, binds the movement letters by position, not by character, and leaves the
+arrows, Home and PgUp unbound (`DEBT.md` H, "The keys are the port's table").
 
 ## The timer array has a size and a free list, and a save carries both
 
@@ -6191,11 +6193,12 @@ themselves, and that the next VBL's frame has the cursor where the pointer last 
   pair of tables.
 
 The port: `keyScanOf` and `translateKey` (`src/renderer/ui/Keyboard.ts`), queued by
-`GameInput.keyDown` (`src/renderer/GameInput.ts`) before the port's own bindings, except
-F1-F4, which the shipped `config.txt` makes caster clicks before any table sees them
-("CSBWin has no keyboard controls", above), and Ctrl-S, which it never sends: `UIM_CHAR`
-queues a character only through a `key` line (`doc/CSBwin-src/CSBUI.cpp:1099-1135`), and
-the file has none for `0x13`. Evidence: `tools/dump-key-bindings.ts`.
+`GameInput.keyDown` (`src/renderer/GameInput.ts`) before the port's own bindings. No
+default key sends F1-F4's keyscans, which the shipped `config.txt` makes caster clicks
+before any table sees them ("CSBWin has no keyboard controls", above), nor Ctrl-S, which
+it never sends: `UIM_CHAR` queues a character only through a `key` line
+(`doc/CSBwin-src/CSBUI.cpp:1099-1135`), and the file has none for `0x13`. Evidence:
+`tools/dump-key-bindings.ts`.
 
 ## The freeze: button 147 in, button 148 out, no tick in between
 

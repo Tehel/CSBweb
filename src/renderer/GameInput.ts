@@ -164,11 +164,11 @@ export class GameInput {
     }
     // A browser or OS shortcut keeps its key: no key is bound with a modifier, so
     // Ctrl-R still reloads rather than opening a rune keypad. That leaves out
-    // `Byte18400`'s Ctrl-S, as CSBWin's shipped `config.txt` does (`tableKeyButton`).
+    // `Byte18400`'s Ctrl-S, as CSBWin's shipped `config.txt` does (`keyScanOf`).
     if (modified) return false;
-    // The key tables first, `TAG0196da` (doc/CSBwin-src/CSBCode.cpp:8515): awake,
-    // `Byte18400` and `Byte18428` bind Esc, Insert, Clr/Home and the arrows, and F1-F4,
-    // which `config.txt` takes first for the caster (`tableKeyButton`); asleep
+    // The key tables first, `TAG0196da` (doc/CSBwin-src/CSBCode.cpp:8515), for a key
+    // bound to a keyscan, a move, the freeze or the waking (`keyScanOf`): awake,
+    // `Byte18400` and `Byte18428` bind Esc, Insert, Clr/Home and the arrows; asleep
     // `Byte18440` binds Return and Esc, and frozen `Byte18448` Esc alone
     // (doc/CSBwin-src/Mouse.cpp:1839-1840, :1893-1894). A bound key is queued as its
     // button, like a click.
@@ -177,25 +177,18 @@ export class GameInput {
       game.enqueueKeyButton(button);
       return true;
     }
-    // Asleep or frozen, every key the table does not bind is dead, the movement
-    // keys and the panel bindings included.
+    // Asleep or frozen, every key the table does not bind is dead, the panel keys
+    // included.
     if (game.isPartySleeping() || game.isFrozen()) return true;
-    // Then the port's own bindings, which claim no other key a table binds: the
-    // panel keys, which claim theirs whatever the game state, so the movement keys
-    // below never see one.
+    // Then the panel keys, which claim theirs whatever the game state, and F5 and F9.
     if (screen.handleUIKey(code)) {
       this.host.refreshScreen();
       return true;
     }
     const action = portKeyAction(code);
     if (action === null) return false;
-    if (action === 'quickSave') {
-      this.host.onQuickSave();
-    } else if (action === 'quickLoad') {
-      this.host.onQuickLoad();
-    } else {
-      game.enqueueMovement(action);
-    }
+    if (action === 'quickSave') this.host.onQuickSave();
+    else this.host.onQuickLoad();
     return true;
   }
 }

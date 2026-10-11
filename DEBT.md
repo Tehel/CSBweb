@@ -103,7 +103,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E38 | The keys the graphics.dat tables bind cannot be rebound | S | ⏳ waits on the author |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
 | R2 | Every store upgrade re-runs every step, and drops a row that does not parse | S | ⏳ |
@@ -652,38 +651,6 @@ The structure need no longer follow CSBWin's files (the author's decision): a mo
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
-
-### E38 ⏳ The keys the graphics.dat tables bind cannot be rebound
-
-Esc, Enter, Insert, Clr/Home and the arrows reach their buttons through `KEYSCAN`
-(`src/renderer/ui/Keyboard.ts`), a fixed map from a `KeyboardEvent.code` to an Atari
-keyscan, which `translateKey` looks up in the graphics.dat tables. In CSBWin that first
-half is `config.txt`'s: its `SCAN` and `KEY` lines turn a PC key into an Atari keyscan
-(`doc/CSBwin-src/CSBUI.cpp:796-802`, `:1141-1160`), so a player rebinds these keys there
-and the tables never change. The shipped file sends K J L M , . and the keypad's 4-9 the
-same way, to the arrows' keyscans; the port's `move.*` actions (`DEFAULT_KEY_BINDINGS`,
-two slots each: the letter and the keypad) queue a movement directly.
-
-Paying it: these keys as actions of `DEFAULT_KEY_BINDINGS` too, each named for the Atari
-keyscan it sends (`move.forward` is `0x4800`, `freeze` is `0x1b`, `wake` is Return's
-`0x0d`), so a code bound to one goes through `translateKey` and the tables, read from
-graphics.dat, still decide the button in each mode. The `move.*` actions then take the
-same route, as the shipped `config.txt` sends them, and `KEYSCAN` goes.
-
-Waiting on the author, since the default preset is the shipped `config.txt`
-(`doc/PROVEN_FACTS.md` → "CSBWin has no keyboard controls"):
-
-1. **Three keys a move.** The file binds scancodes, and the arrows share the keypad's
-   (ArrowUp is keypad 8's line), so in CSBWin one line moves both. As codes, `move.forward`
-   is ArrowUp, Numpad8 and KeyK: three, where an action has two slots. Options: (a) three
-   slots for every action; (b) two slots, and the arrows and the keypad one slot that
-   holds both codes, as CSBWin's scancode does; (c) two slots, and the keypad dropped from
-   the default preset (a player binds it in place of the letters).
-2. **Atari's keys or the file's.** `KEYSCAN` binds Atari's: Insert turns left, Home turns
-   right, the down arrow steps back and Return wakes. Under the shipped file Home turns
-   left, PgUp turns right, and the down arrow, Insert and Return do nothing. Options:
-   (a) the file's exactly; (b) the file's plus Atari's where the file binds nothing
-   (down, Insert, Return), with Home as the file has it; (c) Atari's, as today.
 
 ### E23 ⏳ One game read, whole or not at all
 
@@ -1757,6 +1724,18 @@ drawing a map from them is a separate item, entered when the author names it.
 
 Recorded so that nobody "fixes" them.
 
+- 🚫 **The keys are the port's table, not a `config.txt`.** CSBWin's keys are whatever
+  its `config.txt` says (`doc/PROVEN_FACTS.md` → "CSBWin has no keyboard controls"). The
+  port's are `DEFAULT_KEY_BINDINGS` (`src/renderer/ui/Keyboard.ts`): two
+  `KeyboardEvent.code`s an action, and a key bound to no action does nothing, the
+  Reincarnate screen's typing and the save menu's keys aside. Its default is the shipped
+  file's keys at their places on a US keyboard, with three differences, the author's
+  choice: 7-0 open the inventories, which the file leaves unbound; the arrows, Home and
+  PgUp are not moves, where the file's keypad scancodes make the up, left and right
+  arrows keypad 8, 4 and 6, Home keypad 7 and PgUp keypad 9 (the moves keep two keys, a
+  letter and the keypad, and the arrows have no turns); and the letters are bound by
+  position, where the file's `key` lines bind characters. Return wakes no one, as under
+  the file. `tools/dump-key-bindings.ts` checks every default key.
 - 🚫 **A save keeps the dungeon's three 2023 flags.** CSBWin 20230608 reads
   `SupressDSAWarning` 0x100, `GravityGame` 0x200 and `ThreeDMovements` 0x400 from a file's
   `extendedFlags` into `SupressDSAWarningOption`, `bGravityGame` and `bThreeDMovements`

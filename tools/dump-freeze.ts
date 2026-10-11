@@ -126,7 +126,7 @@ async function main(): Promise<void> {
     check(ui.keyXlate2 === keys.byte18448 && ui.keyXlate1 === null, 'pKeyXlate2 = Byte18448, pKeyXlate1 = NULL');
     check(ui.shadedByTag02076e, 'TAG02076e: the three areas shaded, the arrow cursor');
     check(Keyboard.translateKey(ui, Keyboard.keyScanOf('Escape')) === 148, 'Esc is now 148');
-    check(Keyboard.translateKey(ui, Keyboard.keyScanOf('Enter')) === 0, 'and Return nothing');
+    check(Keyboard.translateKey(ui, 0x0d) === 0, 'and Return nothing');
   }
 
   console.log('');
@@ -192,7 +192,7 @@ async function main(): Promise<void> {
   console.log('=== asleep: Esc freezes, and the thaw goes back to sleep ===');
   {
     game.systems.mouse.sleep();
-    check(Keyboard.translateKey(ui, Keyboard.keyScanOf('Enter')) === 146, 'asleep, Return is 146');
+    check(Keyboard.translateKey(ui, 0x0d) === 146, 'asleep, Return is 146');
     game.lastInputTime = 0;
     check(press('Escape') === 147, 'and Esc 147');
     frame(-1);

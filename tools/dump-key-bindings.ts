@@ -28,9 +28,7 @@ import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 import {
   actionsByCode, DEFAULT_KEY_BINDINGS, handleUIKey, keyScanOf, portKeyAction, tableKeyButton, translateKey,
-  type PortKeyAction,
 } from '../src/renderer/ui/Keyboard';
-import { MovementAction } from '../src/engine/gameTypes';
 import { attackPanelTick, closeAttackMenu, handleAttackAreaClick } from '../src/renderer/ui/Attack';
 import { updateButtonLists } from '../src/renderer/ui/Mouse';
 
@@ -237,38 +235,24 @@ async function main(): Promise<void> {
   //         their codes are Digit1-Digit0 and Backquote all the same, so the runes above
   //         answered unshifted. A character is no binding, Shift's or not, and the keypad's
   //         digits are not the number row's. `GameInput.keyDown` routes the unclaimed keys
-  //         to movement, so a bound key leaking through would walk the party instead.
+  //         to the key tables and the page: the moves and the freeze go to the tables
+  //         (section 9), F5 and F9 to the page.
   for (const key of ['q', 'Q', '1', '&', '~', '`', '²', ' ', 'Numpad1', 'Numpad7']) {
     check(!handleUIKey(ui, key), `'${key}' is no panel binding`);
   }
   check(ui.attackingCharacterOrdinal === 0 && party.state.selectedCharacterIndex === -1,
     'and opened no menu or inventory');
 
-  const moves: Record<string, PortKeyAction> = {
-    KeyK: MovementAction.MOVE_FORWARD, Comma: MovementAction.MOVE_BACKWARD,
-    KeyJ: MovementAction.TURN_LEFT, KeyL: MovementAction.TURN_RIGHT,
-    KeyM: MovementAction.STRAFE_LEFT, Period: MovementAction.STRAFE_RIGHT,
-    Numpad8: MovementAction.MOVE_FORWARD, Numpad5: MovementAction.MOVE_BACKWARD,
-    Numpad7: MovementAction.TURN_LEFT, Numpad9: MovementAction.TURN_RIGHT,
-    Numpad4: MovementAction.STRAFE_LEFT, Numpad6: MovementAction.STRAFE_RIGHT,
-    F5: 'quickSave', F9: 'quickLoad',
-  };
-  for (const [key, action] of Object.entries(moves)) {
-    check(!handleUIKey(ui, key), `'${key}' must be left for the movement and debug keys`);
-    check(portKeyAction(key) === action, `'${key}' should be ${action}, as config.txt binds it`);
+  for (const key of [...MOVE_KEYS, 'Escape', 'F5', 'F9']) {
+    check(!handleUIKey(ui, key), `'${key}' must be left for the key tables and the page`);
   }
-  for (const key of ['k', 'K', ',', 'Numpad1', 'Numpad2', 'Numpad0', 'ArrowUp']) {
-    check(portKeyAction(key) === null, `'${key}' is none of the port's keys`);
+  check(portKeyAction('F5') === 'quickSave' && portKeyAction('F9') === 'quickLoad', 'F5 and F9 are the page\'s');
+  for (const key of ['KeyK', 'Numpad8', 'Escape', 'k', 'ArrowUp']) {
+    check(portKeyAction(key) === null, `'${key}' asks nothing of the page`);
   }
-  // The default preset binds no code twice, so the reverse map loses none, and none of
-  // its codes is a table key the tables would take first (F1-F4 aside, `tableKeyButton`).
+  // The default preset binds no code twice, so the reverse map loses none.
   const codes = Object.values(DEFAULT_KEY_BINDINGS).flat().filter((code) => code !== '');
   check(actionsByCode(DEFAULT_KEY_BINDINGS).size === codes.length, 'the default preset binds no code twice');
-  check(codes.every((code) => keyScanOf(code) === 0 || CASTER_KEYS.includes(code)),
-    'and binds no table key but the caster keys');
-  for (const key of TABLE_KEYS.filter((key) => !CASTER_KEYS.includes(key))) {
-    check(!handleUIKey(ui, key), `'${key}' must be left for the key tables`);
-  }
 
   // ---- 6. `d.PotentialCharacterOrdinal` makes every panel inert
   //         (`doc/CSBwin-src/Mouse.cpp:1717-1789`), keys included.
@@ -355,65 +339,77 @@ async function main(): Promise<void> {
     'with no script, the same click closes the menu and makes a tick due');
 
   // ---- 9. The graphics.dat key tables `TAG0196da` searches (doc/CSBwin-src/CSBCode.cpp:
-  //         8428-8475), a row per entry, in each mode's pair (`updateButtonLists`). Every
-  //         entry but Ctrl-S has a code, and none is bound twice in a pair, so the
-  //         first match `translateKey` returns is what CSBWin queues. Ctrl-S, `0x13`, has
-  //         none: CSBWin's shipped config.txt never sends it (`keyScanOf`).
-  const keyOf = (keyscan: number): string | undefined =>
-    TABLE_KEYS.find((key) => keyScanOf(key) === keyscan);
-  const pressed = (name: string): number => translateKey(ui, keyScanOf(name));
-  const expected: Record<string, Record<string, number>> = {
+  //         8428-8475), a row per entry, in each mode's pair (`updateButtonLists`), with
+  //         the default preset's codes that send its keyscan. No keyscan is bound twice in
+  //         a pair, so the first match `translateKey` returns is what CSBWin queues. No
+  //         default code sends Ctrl-S, which CSBWin's shipped config.txt never sends
+  //         (`keyScanOf`), nor Return, F1-F4's inventories, the arrows, Insert or Clr/Home,
+  //         which it sends only as the keypad's scancodes.
+  const codesOf = (keyscan: number): string[] => codes.filter((code) => keyScanOf(code) === keyscan);
+  const expected: Record<string, Record<number, number>> = {
     // Awake, the author's roles for the arrows are CSBWin's: left and right strafe.
     Adventure: {
-      F1: 7, F2: 8, F3: 9, F4: 10, Escape: 147,
-      Insert: 1, Home: 2, ArrowUp: 3, ArrowRight: 4, ArrowDown: 5, ArrowLeft: 6,
+      0x3b00: 7, 0x3c00: 8, 0x3d00: 9, 0x3e00: 10, 0x13: 140, 0x1b: 147,
+      0x5200: 1, 0x4700: 2, 0x4800: 3, 0x4d00: 4, 0x5000: 5, 0x4b00: 6,
     },
-    Sleeping: { Enter: 146, Escape: 147 },
-    Frozen: { Escape: 148 },
+    Sleeping: { 0x0d: 146, 0x1b: 147 },
+    Frozen: { 0x1b: 148 },
   };
-  console.log(['mode', 'table', 'button', 'keyscan', 'code'].join('\t'));
+  console.log(['mode', 'table', 'button', 'keyscan', 'codes'].join('\t'));
   for (const mode of ['Adventure', 'Sleeping', 'Frozen'] as const) {
     ui.uiMode = UIMode[mode];
     updateButtonLists(ui);
     const pair = [['pKeyXlate2', ui.keyXlate2 ?? []], ['pKeyXlate1', ui.keyXlate1 ?? []]] as const;
     const scans = pair.flatMap(([, table]) => table.map((entry) => entry.keyscan));
     check(new Set(scans).size === scans.length, `${mode}: no keyscan is bound twice`);
-    const bound: Record<string, number> = {};
+    const bound: Record<number, number> = {};
     for (const [name, table] of pair) {
       for (const entry of table) {
-        const key = keyOf(entry.keyscan);
-        console.log([mode, name, entry.mouse, `0x${entry.keyscan.toString(16)}`, key ?? '-'].join('\t'));
-        check(key !== undefined || (mode === 'Adventure' && entry.keyscan === 0x13 && entry.mouse === 140),
-          `${mode}: keyscan 0x${entry.keyscan.toString(16)} should have a code, Ctrl-S's alone excepted`);
-        if (key === undefined) continue;
-        bound[key] = entry.mouse;
-        check(pressed(key) === entry.mouse, `${mode}: ${key} should queue button ${entry.mouse}`);
+        const sent = codesOf(entry.keyscan);
+        console.log([mode, name, entry.mouse, `0x${entry.keyscan.toString(16)}`, sent.join(' ') || '-'].join('\t'));
+        bound[entry.keyscan] = entry.mouse;
+        check(translateKey(ui, entry.keyscan) === entry.mouse,
+          `${mode}: keyscan 0x${entry.keyscan.toString(16)} should queue button ${entry.mouse}`);
+        for (const code of sent) {
+          check(tableKeyButton(ui, code) === entry.mouse, `${mode}: ${code} should queue button ${entry.mouse}`);
+        }
       }
     }
     check(JSON.stringify(Object.entries(bound).sort()) === JSON.stringify(Object.entries(expected[mode]).sort()),
       `${mode}: the tables should bind ${JSON.stringify(expected[mode])}`);
   }
-  ui.uiMode = UIMode.Sleeping;
-  updateButtonLists(ui);
-  check(pressed('NumpadEnter') === 146, "asleep, the keypad's Enter is Return too");
+
+  // The default preset's moves, at the buttons `Game`'s movement takes (1 turns left, 2
+  // right, 3 steps forward, 4 strafes right, 5 steps back, 6 strafes left), and Esc.
+  // Every other key is nothing to the tables: the arrows, Insert, Clr/Home, Return and
+  // F1-F4 among them.
+  const buttonOf = (mode: 'Adventure' | 'Sleeping' | 'Frozen', code: string): number => {
+    ui.uiMode = UIMode[mode];
+    updateButtonLists(ui);
+    return tableKeyButton(ui, code);
+  };
+  const awake: Record<string, number> = {
+    KeyJ: 1, Numpad7: 1, KeyL: 2, Numpad9: 2, KeyK: 3, Numpad8: 3,
+    Period: 4, Numpad6: 4, Comma: 5, Numpad5: 5, KeyM: 6, Numpad4: 6, Escape: 147,
+  };
+  for (const [code, button] of Object.entries(awake)) {
+    check(buttonOf('Adventure', code) === button, `awake, ${code} should queue button ${button}`);
+  }
+  for (const code of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Insert', 'Home', 'PageUp', 'Enter',
+    'NumpadEnter', 'F1', 'F5', 'KeyS', 'Numpad2', 'Numpad0']) {
+    check(buttonOf('Adventure', code) === 0, `awake, ${code} sends the tables nothing`);
+  }
+  check(buttonOf('Sleeping', 'Escape') === 147 && buttonOf('Sleeping', 'Enter') === 0
+    && buttonOf('Sleeping', 'KeyK') === 0, 'asleep, Esc is 147, and Return and K nothing');
+  check(buttonOf('Frozen', 'Escape') === 148 && buttonOf('Frozen', 'KeyK') === 0, 'frozen, Esc is 148, and K nothing');
   ui.uiMode = UIMode.Adventure;
   updateButtonLists(ui);
-  check(pressed('F5') === 0 && pressed('KeyK') === 0 && pressed('KeyS') === 0 && pressed('Enter') === 0,
-    'a key no table binds is left to the browser and the port, and S is not Ctrl-S');
-  for (const key of CASTER_KEYS) {
-    check(pressed(key) !== 0 && tableKeyButton(ui, key) === 0,
-      `${key} is bound in Byte18400, and left to the caster binding config.txt gives it`);
-  }
-  check(tableKeyButton(ui, 'ArrowLeft') === 6 && tableKeyButton(ui, 'Escape') === 147,
-    'every other table key goes through the tables');
 
   finish();
 }
 
-/** Every code `keyScanOf` gives a keyscan. */
-const TABLE_KEYS = ['Enter', 'NumpadEnter', 'Escape', 'F1', 'F2', 'F3', 'F4', 'Home', 'ArrowUp', 'ArrowLeft', 'ArrowRight',
-  'ArrowDown', 'Insert'];
-/** The table keys config.txt takes for the caster. */
-const CASTER_KEYS = ['F1', 'F2', 'F3', 'F4'];
+/** The default preset's moves: K , J L M . and the keypad's 4-9. */
+const MOVE_KEYS = ['KeyK', 'Comma', 'KeyJ', 'KeyL', 'KeyM', 'Period',
+  'Numpad8', 'Numpad5', 'Numpad7', 'Numpad9', 'Numpad4', 'Numpad6'];
 
 main();

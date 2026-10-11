@@ -3,22 +3,25 @@
  *
  * CSBWin's own keys are the four `KeyXlate` tables in graphics.dat `0x231`, which
  * `TAG0196da` searches (`doc/CSBwin-src/CSBCode.cpp:8515-8574`, `translateKey` below):
- * awake, F1-F4 open the inventories, Ctrl-S the disk menu and Esc freezes; Insert and
- * Clr/Home turn, and the four arrows step and strafe. Every other key is `config.txt`'s:
+ * they bind Atari keyscans. Awake, F1-F4 open the inventories, Ctrl-S the disk menu and
+ * Esc freezes; Insert and Clr/Home turn, and the four arrows step and strafe; asleep,
+ * Return and Esc wake. No PC key is any of these until `config.txt` says so:
  * `ReadConfigFile` (`doc/CSBwin-src/CSBUI.cpp:761`) reads it into a `KEYXLATE` table
- * (`doc/CSBwin-src/CSBUI.cpp:534`), which is also what turns a PC key into the Atari
- * keyscan the tables hold (`SCAN`, `:1141-1160`) — `KEYSCAN` below is the port's stand-in
- * for that half. An `MSCAN` line binds one scancode to a screen point and a mouse button
+ * (`doc/CSBwin-src/CSBUI.cpp:534`), whose `KEY` and `SCAN` lines turn a PC key into the
+ * Atari keyscan the tables hold (`:1099-1160`). Here that half is the actions named for
+ * a keyscan (`TABLE_KEYSCAN`): a key bound to one goes through the tables, which decide
+ * its button in each mode. An `MSCAN` line binds one scancode to a screen point and a mouse button
  * (`doc/CSBwin-src/CSBUI.cpp:803-816`), and `UIM_KEYDOWN` turns the key into a click
  * there — `OnMouseSwitchAction(2, x, y)` followed by `OnMouseSwitchAction(0)`
  * (`doc/CSBwin-src/CSBUI.cpp:1161-1179`), exactly the pair `UIM_LEFT_BUTTON_DOWN` and
  * `UIM_LEFT_BUTTON_UP` raise. So every such binding is a click on a panel, and the
  * panel's own handler decides what it means.
  *
- * `handleUIKey`'s bindings are the port's `config.txt`. They claim no key a table binds but
- * F1-F4, which select the caster: the shipped `config.txt` makes them clicks on the caster
- * tabs, so `Byte18400`, which has them open the inventories (buttons 7-10), never sees
- * them, and `tableKeyButton` leaves them to `handleUIKey`. They call the handlers a click reaches rather than synthesising coordinates: the
+ * `DEFAULT_KEY_BINDINGS` is the port's `config.txt`, and the only keys the game answers:
+ * a key bound to no action does nothing, the Reincarnate screen's and the save menu's
+ * typing aside. F1-F4 select the caster, as the shipped `config.txt` makes them clicks on
+ * the caster tabs, so `Byte18400`'s binding of them to the inventories (buttons 7-10) is
+ * never reached. The panel actions call the handlers a click reaches rather than synthesising coordinates: the
  * coordinates in a `config.txt` are hardcoded, and ours would have to be read back out
  * of the runtime button lists to say the same thing. The guards below are therefore
  * lifted from `handleMouseButton` (`src/renderer/ui/Mouse.ts`) so the two routes stay
@@ -47,7 +50,6 @@
  * champion buttons (`handleAttackAreaClick`) — so there is no click to synthesise.
  */
 import { selectMagicCaster } from '../../engine/Party';
-import { MovementAction } from '../../engine/gameTypes';
 import { attackMenuButton, prepareAttack } from './Attack';
 import { magicSelection } from './MagicPanel';
 import { handleInventoryToggle } from './Mouse';
@@ -56,16 +58,25 @@ import { UIState } from './UIState';
 /** A champion's place in the party, 0-3. */
 type Champion = 0 | 1 | 2 | 3;
 
-/** The six moves the port binds outside the tables, and the movement each one queues. */
-const MOVES = {
-  'move.forward': MovementAction.MOVE_FORWARD,
-  'move.backward': MovementAction.MOVE_BACKWARD,
-  'move.turnLeft': MovementAction.TURN_LEFT,
-  'move.turnRight': MovementAction.TURN_RIGHT,
-  'move.strafeLeft': MovementAction.STRAFE_LEFT,
-  'move.strafeRight': MovementAction.STRAFE_RIGHT,
+/**
+ * The actions a key sends to the graphics.dat tables, as the shipped `config.txt`'s `KEY`
+ * and `SCAN` lines do: each one's Atari keyscan, in the form `TAG0196da` compares, the
+ * ASCII code in the low byte or, for a key with none, the scancode in the high byte
+ * (`if ((key&0xffff) == 0) key >>= 8`, `doc/CSBwin-src/CSBCode.cpp:8525`). The moves are
+ * the arrows', Insert's and Clr/Home's, the keyscans the file sends for K , J L M . and
+ * the keypad.
+ */
+const TABLE_KEYSCAN = {
+  'move.forward': 0x4800,
+  'move.backward': 0x5000,
+  'move.turnLeft': 0x5200,
+  'move.turnRight': 0x4700,
+  'move.strafeLeft': 0x4b00,
+  'move.strafeRight': 0x4d00,
+  freeze: 0x1b,
+  wake: 0x0d,
 } as const;
-type MoveAction = keyof typeof MOVES;
+type TableAction = keyof typeof TABLE_KEYSCAN;
 
 /**
  * What a key can be bound to.
@@ -78,7 +89,8 @@ type MoveAction = keyof typeof MOVES;
  * - `pass`: PASS, button 112 of the attack menu.
  * - `caster.<champion>`: the champion who casts, `config.txt`'s clicks at x 512-515, which
  *   `_HandleMagicClick` takes as champion 0-3 (`doc/CSBwin-src/Magic.cpp:600-690`).
- * - `move.*`: a movement queued, beside the arrows, Insert and Clr/Home the tables bind.
+ * - `move.*`, `freeze`, `wake`: a keyscan sent to the tables (`TABLE_KEYSCAN`), which
+ *   queue the step or turn, the freeze or the waking their button stands for.
  * - `quickSave`, `quickLoad`: what F5 and F9 ask of the page.
  */
 export type KeyAction =
@@ -89,7 +101,7 @@ export type KeyAction =
   | 'cast'
   | 'pass'
   | `caster.${Champion}`
-  | MoveAction
+  | TableAction
   | 'quickSave'
   | 'quickLoad';
 
@@ -104,8 +116,11 @@ export type KeyBindings = Readonly<Record<KeyAction, KeySlots>>;
  * and 7-0 for the inventories. The attacks are a column per champion, one key per row.
  * The moves are K , J L M . and the keypad's 4-9 as the file's `scan` lines bind them,
  * which NumLock does not change: keypad 7 turns left, 9 right, 8 and 5 step forward and
- * back, 4 and 6 strafe. The rune key is virtual key 0xc0, left of 1, which types `` ` ``
- * and `~` on a US keyboard.
+ * back, 4 and 6 strafe. The arrows are not moves, where the file's scancodes make them
+ * keypad 8, 4 and 6 (`DEBT.md` H, "The keys are the port's table"). Esc freezes, as the
+ * file's one other `KEY` line says; Return wakes no one, since the file has no line for
+ * it. The rune key is virtual key 0xc0, left of 1, which types `` ` `` and `~` on a US
+ * keyboard.
  */
 export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   'attack.0.0': ['KeyQ', ''],
@@ -143,6 +158,8 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   'move.turnRight': ['KeyL', 'Numpad9'],
   'move.strafeLeft': ['KeyM', 'Numpad4'],
   'move.strafeRight': ['Period', 'Numpad6'],
+  freeze: ['Escape', ''],
+  wake: ['', ''],
   quickSave: ['F5', ''],
   quickLoad: ['F9', ''],
 };
@@ -167,61 +184,34 @@ export function keyAction(code: string): KeyAction | null {
   return ACTION_OF_CODE.get(code) ?? null;
 }
 
-function isMove(action: KeyAction): action is MoveAction {
-  return action in MOVES;
+function isTableAction(action: KeyAction): action is TableAction {
+  return action in TABLE_KEYSCAN;
 }
 
 /** Whether `action` is a panel's: an attack, an inventory, the magic or PASS. */
 function isPanelAction(action: KeyAction): boolean {
-  return !isMove(action) && action !== 'quickSave' && action !== 'quickLoad';
+  return !isTableAction(action) && action !== 'quickSave' && action !== 'quickLoad';
 }
 
-/**
- * What one of the port's own keys outside the panels does: a movement, or the quick-save
- * and quick-load that F5 and F9 ask of the page.
- */
-export type PortKeyAction = MovementAction | 'quickSave' | 'quickLoad';
+/** What one of the port's own keys asks of the page: F5's quick-save and F9's quick-load. */
+export type PortKeyAction = 'quickSave' | 'quickLoad';
 
-/** What a `KeyboardEvent.code` does outside the panels, or null for a key bound to none of it. */
+/** What a `KeyboardEvent.code` asks of the page, or null for a key bound to neither. */
 export function portKeyAction(code: string): PortKeyAction | null {
   const action = keyAction(code);
-  if (action === null) return null;
-  if (isMove(action)) return MOVES[action];
   return action === 'quickSave' || action === 'quickLoad' ? action : null;
 }
 
 /**
- * The Atari keyscan of a `KeyboardEvent.code`, in the form `TAG0196da` compares: the ASCII
- * code in the low byte, or, for a key with none, the scancode in the high byte
- * (`if ((key&0xffff) == 0) key >>= 8`, `doc/CSBwin-src/CSBCode.cpp:8525`). These are the
- * keys the graphics.dat tables bind; `tools/dump-key-bindings.ts` proves every table entry
- * has one here.
- */
-const KEYSCAN: Readonly<Record<string, number>> = {
-  Enter: 0x0d,
-  NumpadEnter: 0x0d,
-  Escape: 0x1b,
-  F1: 0x3b00,
-  F2: 0x3c00,
-  F3: 0x3d00,
-  F4: 0x3e00,
-  Home: 0x4700, // Clr/Home
-  ArrowUp: 0x4800,
-  ArrowLeft: 0x4b00,
-  ArrowRight: 0x4d00,
-  ArrowDown: 0x5000,
-  Insert: 0x5200,
-};
-
-/**
- * `code`'s keyscan in CSBWin's key tables, or 0 for a key they cannot hold. No key gives
- * `Byte18400`'s Ctrl-S, `0x13`: CSBWin's shipped `config.txt` has no `key 1` line for it,
- * and `UIM_CHAR` queues only a character a line translates
- * (`doc/CSBwin-src/CSBUI.cpp:1099-1135`), so the disk menu is the disk icon's alone, there
- * as here.
+ * The keyscan a `KeyboardEvent.code` sends the key tables, or 0 for a key bound to no
+ * table action. No action sends `Byte18400`'s Ctrl-S, `0x13`: CSBWin's shipped
+ * `config.txt` has no `key 1` line for it, and `UIM_CHAR` queues only a character a line
+ * translates (`doc/CSBwin-src/CSBUI.cpp:1099-1135`), so the disk menu is the disk icon's
+ * alone, there as here.
  */
 export function keyScanOf(code: string): number {
-  return KEYSCAN[code] ?? 0;
+  const action = keyAction(code);
+  return action !== null && isTableAction(action) ? TABLE_KEYSCAN[action] : 0;
 }
 
 /**
@@ -240,12 +230,8 @@ export function translateKey(ui: UIState, keyscan: number): number {
   return 0;
 }
 
-/**
- * The button the current key tables bind a `KeyboardEvent.code` to, or 0 — but 0 for the
- * caster keys, which `config.txt` takes before the tables (`caster.<champion>`).
- */
+/** The button the current key tables bind a `KeyboardEvent.code`'s keyscan to, or 0. */
 export function tableKeyButton(ui: UIState, code: string): number {
-  if (keyAction(code)?.startsWith('caster.')) return 0;
   return translateKey(ui, keyScanOf(code));
 }
 
