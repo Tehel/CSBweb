@@ -17,12 +17,11 @@
  * `_DoMenu` draws graphic 0, 224x136, in the viewport's place, and each of its four
  * layouts is that bitmap blitted over itself (`Menu.ts`). A list of saves beside a
  * preview needs more room than the bitmap has, so the dialog is 304x184 on a screen
- * cleared to black, and is drawn from three pieces of graphic 0 (`drawPiece`): the grey
- * frame, the sunken title panel and a button frame. A piece drawn at another size keeps
- * its corners and repeats the column and the row just inside them, so no art is
- * invented. Two panels, the list's and the preview's, stand over a row of four button
- * frames: LOAD, SAVE and EXPORT under the list, CANCEL under the preview. The list's is
- * 32 characters and its scrollbar wide, and the preview's ten characters.
+ * cleared to black, and is drawn from the dialogs' widget kit (`Widgets.ts`), whose
+ * widgets are pieces of graphic 0: the plate, two panels, a list and four buttons. Two
+ * panels, the list's and the preview's, stand over a row of four buttons: LOAD, SAVE and
+ * EXPORT under the list, CANCEL under the preview. The list's is 32 characters and its
+ * scrollbar wide, and the preview's ten characters.
  *
  * A label sits in its frame where `_DoMenu` puts one, and a click and the press
  * animation take the rectangle CSBWin's table gives a frame (`buttonRect`,
@@ -58,7 +57,7 @@
  * included; a heading has no such shortcut, since a click folds it.
  *
  * The panel shows fifteen rows, which fill it, beside a scrollbar in the manner of a GEM
- * window's, in the dialog's two colours (`drawScrollbar`): a boxed arrow at each end, and
+ * window's, in the dialog's two colours (`drawList`): a boxed arrow at each end, and
  * between them a slider, plain, for the rows shown, in a track that is dithered where
  * rows lie beyond them. A click on an arrow scrolls the list by a row, as a notch of the
  * wheel does; the slider and the track take no click. Scrolling does not move the
@@ -147,14 +146,10 @@
 import type { OpenedSave, Playthrough, SaveEntry } from '../../data/saves';
 import { SAVES_ARE_DISABLED, type ImportResult, type ImportedFile } from '../../engine/GameSaves';
 import { formatPlaythroughRow, formatSavePreview, formatSaveRow, lastUsedSave, playthroughsOf } from '../../data/saves';
-import { clearIndex, fillRectIndex } from '../csbwin/CanvasBlitter';
-import { drawTextLineIndex } from '../csbwin/TextRenderer';
+import { clearIndex } from '../csbwin/CanvasBlitter';
 import type { Rect, UIButton } from '../../data/tables/UITables';
 import { searchButtonList } from './HitTest';
 import {
-  MENU_GRAPHIC,
-  MENU_OPTION_COLOR,
-  MENU_PANEL_COLOR,
   MENU_PRESS_PHASE_MS,
   MENU_TITLE1_COLOR,
   doMenu,
@@ -167,29 +162,34 @@ import {
 } from './Menu';
 import { tag02076e, tag0207cc } from './Mouse';
 import { nowMs, type UIState } from './UIState';
+import {
+  BUTTON_PIECE,
+  LINE_STEP,
+  PANEL_PIECE,
+  PLATE_PIECE,
+  SCROLL_SLIDER_MIN,
+  arrowBox,
+  buttonLabelAt,
+  buttonOf,
+  clampScrollTop,
+  contains,
+  drawButtonFrame,
+  drawButtonLabel,
+  drawCentredText,
+  drawList,
+  drawPanel,
+  drawPlate,
+  drawText,
+  listButtons,
+  listIn,
+  listInner,
+  listTextX,
+  scrollSlider as listSlider,
+  scrollToRow,
+  type ListWidget,
+} from './Widgets';
 
 /* ------------------------------------------------------------------ geometry ---- */
-
-/**
- * A rectangle of graphic 0, and how much of each side is kept as it is when the piece is
- * drawn at another size (`drawPiece`).
- */
-export interface DialogPiece extends Rect {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
-
-/** The grey frame: graphic 0 whole, whose edges are plain as far as its panel, at 10. */
-const FRAME_PIECE: DialogPiece = { x1: 0, y1: 0, x2: 223, y2: 135, left: 9, top: 9, right: 9, bottom: 9 };
-/** The title panel: two rows and two columns of edge around the panel colour. */
-const PANEL_PIECE: DialogPiece = { x1: 10, y1: 10, x2: 213, y2: 51, left: 2, top: 2, right: 2, bottom: 2 };
-/**
- * The left frame of the bottom pair. Its bevels are six columns each; its rows are all
- * kept, so it is drawn at its own height alone.
- */
-const BUTTON_PIECE: DialogPiece = { x1: 10, y1: 99, x2: 107, y2: 125, left: 6, top: 13, right: 6, bottom: 14 };
 
 /**
  * All in screen coordinates. The margins are graphic 0's own: ten pixels of frame around
@@ -220,65 +220,23 @@ const RISE_TITLE_PANEL: Rect = { x1: LIST_PANEL.x1, y1: LIST_PANEL.y1, x2: LIST_
 export const RISE_TITLE = ['RAISE A PARTY INTO A NEW', 'CHAOS STRIKES BACK ADVENTURE'] as const;
 const RISE_TITLE_FIRST_Y = RISE_TITLE_PANEL.y1 + 8;
 
-/**
- * The scrollbar: eleven columns against the list panel's right edge, from the top of its
- * clean interior, past its two rows of edge, to the bottom, short of its one.
- */
-function scrollbarOf(panel: Rect): Rect {
-  return { x1: panel.x2 - 11, y1: panel.y1 + 2, x2: panel.x2 - 1, y2: panel.y2 - 1 };
-}
-const SCROLLBAR = scrollbarOf(LIST_PANEL);
-/** An arrow's box is as tall as the bar is wide, its outline included. */
-const ARROW_BOX = SCROLLBAR.x2 - SCROLLBAR.x1 + 1;
-/**
- * The up arrow, hollow and on a stem as a GEM window's is, in the nine columns and rows
- * inside its box; the down arrow is the same rows from the last to the first.
- */
-const ARROW_UP = [
-  '.........',
-  '....#....',
-  '...#.#...',
-  '..#...#..',
-  '.###.###.',
-  '...#.#...',
-  '...#.#...',
-  '...###...',
-  '.........',
-];
-/** The least a slider is tall, its two outlines included. */
-const SLIDER_MIN = 7;
+const FULL_LIST = listIn(LIST_PANEL);
+/** RISE's list: graphic 0's ten pixels under its title panel, and eleven rows. */
+const RISE_LIST = listIn({ ...LIST_PANEL, y1: RISE_TITLE_PANEL.y2 + 11 });
 
-/** The rows' clean interior: past the panel's two columns of edge, as far as the scrollbar. */
-const LIST_INNER_X1 = LIST_PANEL.x1 + 2;
-const LIST_INNER_X2 = SCROLLBAR.x1 - 1;
+const SCROLLBAR = FULL_LIST.scrollbar;
+const ARROW_BOX = arrowBox(FULL_LIST);
+const LIST_INNER = listInner(FULL_LIST);
 
-const TEXT_X = LIST_PANEL.x1 + 4;
+const TEXT_X = listTextX(FULL_LIST);
 const TEXT_MAX_CHARS = 32;
-const ROW_FIRST_Y = LIST_PANEL.y1 + 9;
-const ROW_STEP = 8;
+const ROW_FIRST_Y = FULL_LIST.rowFirstY;
+const ROW_STEP = LINE_STEP;
 /** The rows fill the panel: two pixels of it above the first, and two below the last. */
-export const SAVE_MENU_ROWS = 15;
+export const SAVE_MENU_ROWS = FULL_LIST.rows;
 
 /** A list's panel, its scrollbar, and its rows: where the first is, and how many fit. */
-export interface SaveMenuList {
-  panel: Rect;
-  scrollbar: Rect;
-  rowFirstY: number;
-  rows: number;
-}
-
-function listOf(panel: Rect): SaveMenuList {
-  return {
-    panel,
-    scrollbar: scrollbarOf(panel),
-    rowFirstY: panel.y1 + (ROW_FIRST_Y - LIST_PANEL.y1),
-    rows: SAVE_MENU_ROWS - (panel.y1 - LIST_PANEL.y1) / ROW_STEP,
-  };
-}
-
-const FULL_LIST = listOf(LIST_PANEL);
-/** RISE's list: graphic 0's ten pixels under its title panel, and eleven rows. */
-const RISE_LIST = listOf({ ...LIST_PANEL, y1: RISE_TITLE_PANEL.y2 + 11 });
+export type SaveMenuList = ListWidget;
 
 /** The list of a mode: RISE's is under its title panel, the others' fills the column. */
 export function saveMenuList(mode: SaveMenuMode): SaveMenuList {
@@ -366,28 +324,11 @@ const BTN_FACE = 906;
 const BTN_ROW0 = 910;
 
 /**
- * The rectangle a click on a button frame takes, and its press animation grows from, as
- * the table holds one: the frame less six pixels a side, `x2` and `y2` exclusive, which
- * is what `d.pButn18970` gives graphic 0's own frames.
- */
-export function buttonRect(frame: Rect): Rect {
-  return { x1: frame.x1 + 6, y1: frame.y1 + 6, x2: frame.x2 - 6, y2: frame.y2 - 6 };
-}
-
-/**
- * Where a label is centred in a button frame: where `_DoMenu` centres one in graphic 0's
- * own, (59,114) and (166,114) in its bottom pair (`doc/CSBwin-src/Menu.cpp:339-346`).
- */
-export function buttonLabelAt(frame: Rect): { x: number; y: number } {
-  return { x: ((frame.x1 + frame.x2) >> 1) + 1, y: frame.y1 + 15 };
-}
-
-/**
  * Everything the layout depends on, in one place, so `tools/dump-save-menu.ts` can
  * check it against the art instead of against a copy of these numbers.
  */
 export const SAVE_MENU_GEOMETRY = {
-  framePiece: FRAME_PIECE,
+  framePiece: PLATE_PIECE,
   panelPiece: PANEL_PIECE,
   buttonPiece: BUTTON_PIECE,
   dialog: DIALOG,
@@ -396,8 +337,8 @@ export const SAVE_MENU_GEOMETRY = {
   riseTitleFirstY: RISE_TITLE_FIRST_Y,
   previewPanel: PREVIEW_PANEL,
   buttonFrames: BUTTON_FRAMES,
-  listInnerX1: LIST_INNER_X1,
-  listInnerX2: LIST_INNER_X2,
+  listInnerX1: LIST_INNER.x1,
+  listInnerX2: LIST_INNER.x2,
   textX: TEXT_X,
   textMaxChars: TEXT_MAX_CHARS,
   rowFirstY: ROW_FIRST_Y,
@@ -407,7 +348,7 @@ export const SAVE_MENU_GEOMETRY = {
   previewMaxChars: PREVIEW_MAX_CHARS,
   scrollbar: SCROLLBAR,
   arrowBox: ARROW_BOX,
-  sliderMin: SLIDER_MIN,
+  sliderMin: SCROLL_SLIDER_MIN,
   loadButtonId: BTN_LOAD,
   saveButtonId: BTN_SAVE,
   exportButtonId: BTN_EXPORT,
@@ -717,39 +658,17 @@ function setFolded(ui: UIState, state: SaveMenuState, playthrough: Playthrough, 
 
 /** Keep the list on its rows: no further down than its last page. */
 function clampScroll(state: SaveMenuState): void {
-  const maxTop = Math.max(0, state.rows.length - saveMenuList(state.mode).rows);
-  if (state.scrollTop > maxTop) state.scrollTop = maxTop;
-  if (state.scrollTop < 0) state.scrollTop = 0;
+  state.scrollTop = clampScrollTop(saveMenuList(state.mode), state.rows.length, state.scrollTop);
 }
 
 /** Scroll the list to the selection, by as little as shows it: what a move of it does. */
 function showSelection(state: SaveMenuState): void {
-  clampScroll(state);
-  const { rows } = saveMenuList(state.mode);
-  if (state.selected >= 0) {
-    if (state.selected < state.scrollTop) state.scrollTop = state.selected;
-    else if (state.selected >= state.scrollTop + rows) {
-      state.scrollTop = state.selected - rows + 1;
-    }
-  }
+  state.scrollTop = scrollToRow(saveMenuList(state.mode), state.rows.length, state.scrollTop, state.selected);
 }
 
-/**
- * The scrollbar's slider, its first and last rows on screen, which are its outlines. It
- * moves in the track between the arrows' boxes, whose inner outlines its own lie on at
- * either end. Its height is to the track's as the rows shown are to the list's, and its
- * place as the first row shown is to the last it can be; a list that fits its panel
- * has the whole track for a slider.
- */
+/** The scrollbar's slider over the list as it is scrolled (`Widgets.scrollSlider`). */
 export function scrollSlider(state: SaveMenuState): { y1: number; y2: number } {
-  const { scrollbar, rows } = saveMenuList(state.mode);
-  const top = scrollbar.y1 + ARROW_BOX - 1;
-  const track = scrollbar.y2 - ARROW_BOX + 1 - top + 1;
-  const maxTop = state.rows.length - rows;
-  if (maxTop <= 0) return { y1: top, y2: top + track - 1 };
-  const height = Math.max(SLIDER_MIN, Math.round((track * rows) / state.rows.length));
-  const y1 = top + Math.round(((track - height) * Math.min(state.scrollTop, maxTop)) / maxTop);
-  return { y1, y2: y1 + height - 1 };
+  return listSlider(saveMenuList(state.mode), state.rows.length, state.scrollTop);
 }
 
 /** Scroll the list by `rows`, the selection left where it is, in the panel or out of it. */
@@ -761,57 +680,19 @@ function scrollBy(ui: UIState, state: SaveMenuState, rows: number): void {
 
 /* ------------------------------------------------------------------ drawing ---- */
 
-/**
- * Draw a piece of graphic 0 into `box`, at the box's size. The piece's corners are kept,
- * `left` by `top` and so on; between them every row repeats the column just inside the
- * left corner, and every column the row just inside the top one. `Menu.cpp` makes its
- * layouts out of graphic 0 blitted over itself (`rect18576` to `rect18600`); this makes
- * a larger one out of the same art.
- */
-export function drawPiece(ui: UIState, piece: DialogPiece, box: Rect): void {
-  const graphic = ui.getGraphicBitmap(MENU_GRAPHIC);
-  if (!graphic) return;
-  const buf = ui.screenIndexBuffer;
-  const width = box.x2 - box.x1 + 1;
-  const height = box.y2 - box.y1 + 1;
-  const pieceWidth = piece.x2 - piece.x1 + 1;
-  const pieceHeight = piece.y2 - piece.y1 + 1;
-  const along = (at: number, size: number, pieceSize: number, lead: number, trail: number): number =>
-    at < lead ? at : at >= size - trail ? pieceSize - (size - at) : lead;
-  for (let y = 0; y < height; y++) {
-    const srcRow = (piece.y1 + along(y, height, pieceHeight, piece.top, piece.bottom)) * graphic.width;
-    const dstRow = (box.y1 + y) * buf.width + box.x1;
-    for (let x = 0; x < width; x++) {
-      buf.pixels[dstRow + x] = graphic.pixels[srcRow + piece.x1 + along(x, width, pieceWidth, piece.left, piece.right)];
-    }
-  }
-}
-
 /** The dialog with nothing in it: the frame, the two panels and the four button frames. */
 export function drawDialog(ui: UIState, mode: SaveMenuMode = 'full'): void {
-  drawPiece(ui, FRAME_PIECE, DIALOG);
-  if (mode === 'rise') drawPiece(ui, PANEL_PIECE, RISE_TITLE_PANEL);
-  drawPiece(ui, PANEL_PIECE, saveMenuList(mode).panel);
-  drawPiece(ui, PANEL_PIECE, PREVIEW_PANEL);
-  for (const frame of Object.values(BUTTON_FRAMES)) drawPiece(ui, BUTTON_PIECE, frame);
+  drawPlate(ui, DIALOG);
+  if (mode === 'rise') drawPanel(ui, RISE_TITLE_PANEL);
+  drawPanel(ui, saveMenuList(mode).panel);
+  drawPanel(ui, PREVIEW_PANEL);
+  for (const frame of Object.values(BUTTON_FRAMES)) drawButtonFrame(ui, frame);
 }
 
 /** RISE's title, each line centred on its panel as a button's label is. */
 function drawRiseTitle(ui: UIState): void {
   const x = buttonLabelAt(RISE_TITLE_PANEL).x;
-  RISE_TITLE.forEach((line, i) => {
-    text(ui, line, x - 3 * line.length, RISE_TITLE_FIRST_Y + i * ROW_STEP, MENU_TITLE1_COLOR, MENU_PANEL_COLOR);
-  });
-}
-
-function text(ui: UIState, s: string, x: number, y: number, color: number, background: number): void {
-  drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, x, y, color, background, s);
-}
-
-/** A button's label, `CenteredText`'s way (`doc/CSBwin-src/Menu.cpp:192`). */
-function drawLabel(ui: UIState, s: string, frame: Rect): void {
-  const at = buttonLabelAt(frame);
-  text(ui, s, at.x - 3 * s.length, at.y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
+  RISE_TITLE.forEach((line, i) => drawCentredText(ui, line, x, RISE_TITLE_FIRST_Y + i * ROW_STEP, MENU_TITLE1_COLOR));
 }
 
 /** A row as the list shows it. */
@@ -824,48 +705,6 @@ export function rowText(state: SaveMenuState, row: SaveMenuRow): string {
     case 'save':
       return formatSaveRow(row.entry, TEXT_MAX_CHARS);
   }
-}
-
-/** The rectangle of the list's row `row`, counted from the first one shown. */
-function rowRect(list: SaveMenuList, row: number): Rect {
-  const y = list.rowFirstY + row * ROW_STEP;
-  return { x1: LIST_INNER_X1, y1: y - 5, x2: LIST_INNER_X2, y2: y + 2 };
-}
-
-/**
- * The list's scrollbar: an outline, the two arrows in their boxes, and between them the
- * slider (`scrollSlider`), plain between its two outlines, in a track dithered of the
- * outline's colour and the panel's.
- */
-function drawScrollbar(ui: UIState, state: SaveMenuState): void {
-  const buf = ui.screenIndexBuffer;
-  const { scrollbar } = saveMenuList(state.mode);
-  const { x1, y1, x2, y2 } = scrollbar;
-  const line = (y: number): void => fillRectIndex(buf, { x1, y1: y, x2, y2: y }, MENU_OPTION_COLOR);
-  fillRectIndex(buf, scrollbar, MENU_PANEL_COLOR);
-  fillRectIndex(buf, { x1, y1, x2: x1, y2 }, MENU_OPTION_COLOR);
-  fillRectIndex(buf, { x1: x2, y1, x2, y2 }, MENU_OPTION_COLOR);
-  for (const y of [y1, y1 + ARROW_BOX - 1, y2 - ARROW_BOX + 1, y2]) line(y);
-
-  const arrow = (top: number, rows: string[]): void => {
-    rows.forEach((row, dy) => {
-      for (let dx = 0; dx < row.length; dx++) {
-        if (row[dx] === '#') buf.pixels[(top + dy) * buf.width + x1 + 1 + dx] = MENU_OPTION_COLOR;
-      }
-    });
-  };
-  arrow(y1 + 1, ARROW_UP);
-  arrow(y2 - ARROW_BOX + 2, [...ARROW_UP].reverse());
-
-  const slider = scrollSlider(state);
-  for (let y = y1 + ARROW_BOX; y <= y2 - ARROW_BOX; y++) {
-    if (y >= slider.y1 && y <= slider.y2) continue;
-    for (let x = x1 + 1; x < x2; x++) {
-      if (((x + y) & 1) === 0) buf.pixels[y * buf.width + x] = MENU_OPTION_COLOR;
-    }
-  }
-  line(slider.y1);
-  line(slider.y2);
 }
 
 /**
@@ -903,23 +742,13 @@ export function drawSaveMenu(ui: UIState): void {
   // The rows, and their scrollbar.
   const list = saveMenuList(state.mode);
   clampScroll(state);
-  drawScrollbar(ui, state);
-  for (let row = 0; row < list.rows; row++) {
-    const index = state.scrollTop + row;
-    if (index >= state.rows.length) break;
-    const highlighted = index === state.selected;
-    const color = highlighted ? MENU_PANEL_COLOR : MENU_OPTION_COLOR;
-    const background = highlighted ? MENU_OPTION_COLOR : MENU_PANEL_COLOR;
-    const y = list.rowFirstY + row * ROW_STEP;
-    if (highlighted) fillRectIndex(ui.screenIndexBuffer, rowRect(list, row), MENU_OPTION_COLOR);
-    text(ui, rowText(state, state.rows[index]), TEXT_X, y, color, background);
-  }
+  drawList(ui, list, state.rows.length, state.scrollTop, state.selected, (index) => rowText(state, state.rows[index]));
 
   if (state.rows.length === 0 && !state.busy && !state.message) {
     // An empty list has to say so, which the load-only menu's can be; when the store
     // could not be listed, the message says why, and repeating that here would only
     // crowd the panel.
-    text(ui, 'NO SAVED GAMES HERE', TEXT_X, list.rowFirstY, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
+    drawText(ui, 'NO SAVED GAMES HERE', TEXT_X, list.rowFirstY);
   }
 
   // The preview's panel: the save LOAD would read, and on its last lines the message,
@@ -929,20 +758,20 @@ export function drawSaveMenu(ui: UIState): void {
   const previewed = loadTarget(state);
   if (previewed) {
     formatSavePreview(previewed, PREVIEW_MAX_CHARS).forEach((line, row) => {
-      if (line && row < messageRow) text(ui, line, PREVIEW_TEXT_X, ROW_FIRST_Y + row * ROW_STEP, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
+      if (line && row < messageRow) drawText(ui, line, PREVIEW_TEXT_X, ROW_FIRST_Y + row * ROW_STEP);
     });
   }
   message.forEach((line, i) => {
-    text(ui, line, PREVIEW_TEXT_X, ROW_FIRST_Y + (messageRow + i) * ROW_STEP, MENU_TITLE1_COLOR, MENU_PANEL_COLOR);
+    drawText(ui, line, PREVIEW_TEXT_X, ROW_FIRST_Y + (messageRow + i) * ROW_STEP, MENU_TITLE1_COLOR);
   });
 
   // A button that can do nothing is left unlabelled, as CSBWin leaves an empty save
   // slot unlabelled.
-  if (canLoad(state)) drawLabel(ui, state.mode === 'rise' ? RISE_LABEL : ACTION_LABELS.load, BUTTON_FRAMES.load);
-  if (canSave(ui, state)) drawLabel(ui, ACTION_LABELS.save, BUTTON_FRAMES.save);
-  if (canExport(state)) drawLabel(ui, EXPORT_LABEL, BUTTON_FRAMES.export);
-  if (canToggleFace(state)) drawLabel(ui, state.newFace ? NEW_FACE_LABEL : OLD_FACE_LABEL, BUTTON_FRAMES.export);
-  if (!state.busy) drawLabel(ui, CANCEL_LABEL, BUTTON_FRAMES.cancel);
+  if (canLoad(state)) drawButtonLabel(ui, BUTTON_FRAMES.load, state.mode === 'rise' ? RISE_LABEL : ACTION_LABELS.load);
+  if (canSave(ui, state)) drawButtonLabel(ui, BUTTON_FRAMES.save, ACTION_LABELS.save);
+  if (canExport(state)) drawButtonLabel(ui, BUTTON_FRAMES.export, EXPORT_LABEL);
+  if (canToggleFace(state)) drawButtonLabel(ui, BUTTON_FRAMES.export, state.newFace ? NEW_FACE_LABEL : OLD_FACE_LABEL);
+  if (!state.busy) drawButtonLabel(ui, BUTTON_FRAMES.cancel, CANCEL_LABEL);
 
   if (state.press) drawMenuPress(ui, state.press, nowMs());
 }
@@ -954,10 +783,6 @@ function shownMessage(state: SaveMenuState): string {
   return pointsAtImportHint(state) ? SAVE_MENU_IMPORT_HINT : '';
 }
 
-function inside(point: { x: number; y: number }, rect: Rect): boolean {
-  return point.x >= rect.x1 && point.x <= rect.x2 && point.y >= rect.y1 && point.y <= rect.y2;
-}
-
 /**
  * Whether the pointer is where the import's hint shows: on the preview's panel, or on
  * EXPORT's frame, labelled or not. Nothing on the dialog says a dropped file is
@@ -966,7 +791,7 @@ function inside(point: { x: number; y: number }, rect: Rect): boolean {
  */
 function pointsAtImportHint(state: SaveMenuState): boolean {
   const at = state.pointer;
-  return state.mode !== 'rise' && at !== null && (inside(at, PREVIEW_PANEL) || inside(at, BUTTON_FRAMES.export));
+  return state.mode !== 'rise' && at !== null && (contains(PREVIEW_PANEL, at) || contains(BUTTON_FRAMES.export, at));
 }
 
 /**
@@ -993,27 +818,16 @@ export function saveMenuPointer(ui: UIState, point: { x: number; y: number } | n
  * fresh on each click because the rows follow the scroll position.
  */
 export function saveMenuButtons(state: SaveMenuState): UIButton[] {
-  const buttons: UIButton[] = [
-    { word0: BTN_LOAD, ...buttonRect(BUTTON_FRAMES.load), button: 2, name: 'saveMenu.load' },
-    { word0: BTN_SAVE, ...buttonRect(BUTTON_FRAMES.save), button: 2, name: 'saveMenu.save' },
+  return [
+    buttonOf(BUTTON_FRAMES.load, BTN_LOAD, 'saveMenu.load'),
+    buttonOf(BUTTON_FRAMES.save, BTN_SAVE, 'saveMenu.save'),
     state.mode === 'rise'
-      ? { word0: BTN_FACE, ...buttonRect(BUTTON_FRAMES.export), button: 2, name: 'saveMenu.face' }
-      : { word0: BTN_EXPORT, ...buttonRect(BUTTON_FRAMES.export), button: 2, name: 'saveMenu.export' },
-    { word0: BTN_CANCEL, ...buttonRect(BUTTON_FRAMES.cancel), button: 2, name: 'saveMenu.cancel' },
+      ? buttonOf(BUTTON_FRAMES.export, BTN_FACE, 'saveMenu.face')
+      : buttonOf(BUTTON_FRAMES.export, BTN_EXPORT, 'saveMenu.export'),
+    buttonOf(BUTTON_FRAMES.cancel, BTN_CANCEL, 'saveMenu.cancel'),
+    ...listButtons(saveMenuList(state.mode), state.rows.length, state.scrollTop,
+      { up: BTN_SCROLL_UP, down: BTN_SCROLL_DOWN, row0: BTN_ROW0 }, 'saveMenu'),
   ];
-  const list = saveMenuList(state.mode);
-  const { scrollbar } = list;
-  const arrow = (id: number, y1: number, name: string): UIButton => (
-    { word0: id, x1: scrollbar.x1, x2: scrollbar.x2 + 1, y1, y2: y1 + ARROW_BOX, button: 2, name }
-  );
-  buttons.push(arrow(BTN_SCROLL_UP, scrollbar.y1, 'saveMenu.scrollUp'));
-  buttons.push(arrow(BTN_SCROLL_DOWN, scrollbar.y2 - ARROW_BOX + 1, 'saveMenu.scrollDown'));
-  const visible = Math.min(list.rows, Math.max(0, state.rows.length - state.scrollTop));
-  for (let row = 0; row < visible; row++) {
-    const r = rowRect(list, row);
-    buttons.push({ word0: BTN_ROW0 + row, x1: r.x1, x2: r.x2 + 1, y1: r.y1, y2: r.y2 + 1, button: 2, name: `saveMenu.row${row}` });
-  }
-  return buttons;
 }
 
 /**

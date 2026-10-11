@@ -266,8 +266,8 @@ opens the same one, load-only.
 - **The layout**: 304×184 at (8,8), on a screen cleared to black, in the game as at the
   entrance: an 8-pixel ring of the game's picture would show nothing whole. Three pieces
   of graphic 0 make it, each drawn at the size wanted by keeping its corners and
-  repeating its middle (`drawPiece`): the grey frame, the sunken panel and a button
-  frame. Two panels
+  repeating its middle (`drawPiece`, the dialogs' widget kit, `src/renderer/ui/Widgets.ts`):
+  the grey frame, the sunken panel and a button frame. Two panels
   side by side, the list's (210 wide: 32 characters a row and the scrollbar) and
   the preview's (65 wide, 10 characters), over one row of four buttons: LOAD, SAVE and
   EXPORT under the list, CANCEL under the preview. A button that can do nothing has no
@@ -287,7 +287,7 @@ opens the same one, load-only.
 - **The list scrolls** under its fifteen rows, which fill its panel with two pixels of
   it above and below, beside a scrollbar in the manner of a
   GEM window's, in the dialog's two colours, the option's orange on the panel's brown
-  (`drawScrollbar`, `src/renderer/ui/SaveMenu.ts`): eleven columns against the panel's
+  (`drawList`, `src/renderer/ui/Widgets.ts`): eleven columns against the panel's
   right edge, outlined; a hollow arrow on a stem in a box at each end; between them a
   slider, plain, whose height is to the track's as the rows shown are to the list's,
   in a track dithered of the two colours where rows lie beyond the panel. A list that

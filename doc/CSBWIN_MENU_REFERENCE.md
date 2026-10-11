@@ -373,7 +373,7 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    row). Two panels, the list's and the preview's, stand over four button frames: LOAD,
    SAVE, EXPORT and CANCEL. A frame takes the rectangle CSBWin's table gives graphic 0's
    own, the frame less six pixels a side, and its label where `_DoMenu` centres one
-   (`buttonRect` and `buttonLabelAt`, `src/renderer/ui/SaveMenu.ts`); a button that can
+   (`buttonRect` and `buttonLabelAt`, `src/renderer/ui/Widgets.ts`); a button that can
    do nothing has no label, as CSBWin's empty slot has none (`CSBCode.cpp:9896`).
 
    **The screen under it is cleared**, in the game too. The disk menu's `_DoMenu` gets 0

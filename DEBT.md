@@ -108,7 +108,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| U2 | The save menu's widgets are its own | M | ⏳ |
 | U3 | The save menu is the only dialog over the game | S | ⏳ |
 | U4 | The settings dialog: Esc, its tabs, GAME, DISPLAY and SOUND | M | ⏳ |
 | U5 | The settings' KEYS tab | M | ⏳ |
@@ -214,24 +213,6 @@ None of it changes the game: with every new setting at its default, every tool's
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a
 golden frame for what it draws, and a probe or a `tools/` assertion for what it does.
 
-### U2 ⏳ The save menu's widgets are its own
-
-The save menu draws its dialog from three pieces of graphic 0 (`drawPiece`,
-`src/renderer/ui/SaveMenu.ts`): the grey frame, the sunken title panel and a button frame,
-each stretched by repeating the row and column inside its corners. With them come its
-label placement, the inert button drawn with no label, the press animation, the list's
-rows and its scrollbar. All of it is private to the menu.
-
-Paying it: a widget kit under `src/renderer/ui/`, drawn from those pieces and the UI
-palette only: the plate, the panel, a button (raised, pressed, inert) at the save menu's
-height or a lower one that fits a title line, a list with its
-scrollbar, a line of text. It adds what the new dialogs need, made from the same pieces
-and inventing no art: a row of tabs whose selected tab is drawn pressed, a toggle (two
-buttons, the chosen one pressed), a slider (a sunken track and a small raised knob), and
-the help line. Each widget hit-tests itself. The save menu is drawn through the kit. The
-save menu's move is a refactor: `npm test -- --frames` and `dump-save-menu` unchanged.
-The new widgets are proved by U4's frames.
-
 ### U3 ⏳ The save menu is the only dialog over the game
 
 The save menu is the one dialog: `GameInput` asks `isSaveMenuOpen` before giving a click,
@@ -250,11 +231,12 @@ included (R11).
 
 The settings are the page's buttons beside the canvas (`index.html`, `src/ui/events.ts`).
 
-Paying it: a dialog over the whole screen, in U3's slot, from U2's kit. Height is what
+Paying it: a dialog over the whole screen, in U3's slot, from the widget kit
+(`src/renderer/ui/Widgets.ts`). Height is what
 200 lines lack, so nothing takes a row of its own that can share one:
 
 - **The title line** holds SETTINGS, and CLOSE and EXIT at its right, as buttons lower
-  than the save menu's (U2's kit has the low button).
+  than the save menu's (the kit's low button).
 - **A row of tabs**: GAME, DISPLAY, SOUND, KEYS, the selected one pressed.
 - **The tab's settings**, one per line.
 - **The help line** at the foot names what the pointer is over: a setting, a tab, CLOSE
@@ -419,8 +401,8 @@ world's until the next `refreshScreen`, and what runs before it acts on them:
   with an inventory open (`GameInput.keyDown`, `src/renderer/GameInput.ts:183-189`). The
   disk menu's LOAD loses nothing: opening the menu runs `TAG02076e`, which repacks first.
 - **The disk menu's LOAD runs `TAG0207cc` on the old party.** `restoreChosenSave` reads,
-  then `closeSaveMenu` calls `tag0207cc(ui)` (`src/renderer/ui/SaveMenu.ts:1274-1287`,
-  `:533-540`; `src/renderer/ui/Mouse.ts:413`), which opens the old party's inventory
+  then `closeSaveMenu` calls `tag0207cc(ui)` (`src/renderer/ui/SaveMenu.ts:1088-1101`,
+  `:474-481`; `src/renderer/ui/Mouse.ts:413`), which opens the old party's inventory
   again and leaves `ctx.loop.videoMode` at `'VM_INVENTORY'` while the loaded party has
   none open (`selectedCharacterIndex: -1`, `src/engine/CsbwinSaveGame.ts:111`). Nothing
   puts it back until an inventory is toggled (`Game.ts:550` resets only the other modes),
@@ -559,7 +541,7 @@ with `npm test -- --frames`.
 - **RISE's NEW FACE**: `utilityPortraits ??=` caches a promise that rejects when
   `arrayBuffer()` or the parse fails (`src/main.ts:167-177`), and `refreshSaveMenu`'s
   `await ui.onHasNewFaces()` then throws into the catch that empties the list
-  (`src/renderer/ui/SaveMenu.ts:552-557`): RISE lists nothing until a reload.
+  (`src/renderer/ui/SaveMenu.ts:493-498`): RISE lists nothing until a reload.
 
 Paying it: the Oracle closes on its own error with a line in the message area, and
 `reportError` is kept for `Die`; the faces' promise settles to `null` on any failure.
@@ -596,7 +578,7 @@ Paying it: pointer capture on `pointerdown`; the unlock on `pointerup`, `click` 
 
 ### R11 ⏳ Right-click closes the save menu while it saves or loads
 
-`saveMenuClick` closes the menu on a right button (`src/renderer/ui/SaveMenu.ts:1029-1033`)
+`saveMenuClick` closes the menu on a right button (`src/renderer/ui/SaveMenu.ts:843-847`)
 before it looks at `busy` (`:1034`). The clock starts again and `TAG0207cc` runs while
 `store.write` is pending; then `saveWritten` (`GameSaves.ts:288-312`) runs its monster
 re-attach and `SmartDiscard` on a world that has moved on, against "the game played on
@@ -1078,7 +1060,7 @@ Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the pa
 
 The screen is drawn by clocks that do not know each other: the engine's `setTimeout` VBL
 loop, and `requestAnimationFrame` loops for the chewing mouth
-(`src/renderer/ui/Feeding.ts:227-248`), a menu button's press (`SaveMenu.ts:1172-1218`), the
+(`src/renderer/ui/Feeding.ts:227-248`), a menu button's press (`SaveMenu.ts:986-1032`), the
 intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:210-225`).
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
@@ -1088,7 +1070,7 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:210-225`).
 - The CRT uploads the canvas and runs its shader at device pixels at every display frame,
   changed or not: about 2.3 million pixels a frame at a device ratio of 2, up to 120 times a
   second.
-- The rAF scheduler is written twice (`Feeding.ts:229-232`, `SaveMenu.ts:1172-1180`, each
+- The rAF scheduler is written twice (`Feeding.ts:229-232`, `SaveMenu.ts:986-994`, each
   with `as unknown as number`), and a menu's press runs on two clocks
   (`BootSequence.ts:507-510` passes made-up times).
 - Input has two stacks, `GameInput` on `document` and the intro's `IntroHost` on `window`,
@@ -1174,7 +1156,7 @@ palette codes, so none moves.
   (`skills.ts:44`, `:51`), `WALL_BITMAP_WIDTH` and `WALL_BITMAP_HEIGHT`
   (`ViewportGraphics.ts:43-44`), `drawRectOutlineIndex` (`CanvasBlitter.ts:52`),
   `startHint` (`HintOracle.ts:748`), `possibleAttackTypeNames` (`Attack.ts:519`),
-  `clampFoodWater` (`Feeding.ts:201`), `SAVE_MENU_PRESS_MS` (`SaveMenu.ts:1220`),
+  `clampFoodWater` (`Feeding.ts:201`), `SAVE_MENU_PRESS_MS` (`SaveMenu.ts:1034`),
   `isViewportPoint` (`src/ui/utils.ts:23`). About 280 more exports are used only in their
   own file, the 101 `StdDraw*` programs among them (E28).
 - **Dead members and code**: `TimerQueue.clear` (`:193`), `PartyFootprints.reset`

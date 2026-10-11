@@ -171,6 +171,7 @@ import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { SAVE_DIR, genuineSaves, memoryStore, savePath } from './lib/saves';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
+import * as Widgets from '../src/renderer/ui/Widgets';
 import * as Inventory from '../src/renderer/ui/Inventory';
 import { testChampion } from './lib/champion';
 
@@ -291,8 +292,8 @@ function checkButtonTables(graphics: GraphicsLoader): void {
   ];
   for (const { frame, table, label } of pair) {
     const onScreen = { x1: frame.x1 + VIEWPORT_X, y1: frame.y1 + VIEWPORT_Y, x2: frame.x2 + VIEWPORT_X, y2: frame.y2 + VIEWPORT_Y };
-    const rect = SaveMenu.buttonRect(onScreen);
-    const at = SaveMenu.buttonLabelAt(frame);
+    const rect = Widgets.buttonRect(onScreen);
+    const at = Widgets.buttonLabelAt(frame);
     check(
       rect.x1 === table.x1 && rect.x2 === table.x2 && rect.y1 === table.y1 && rect.y2 === table.y2,
       `button ${table.word0}'s rectangle is its frame less six pixels a side (${rect.x1}..${rect.x2}/${rect.y1}..${rect.y2})`,
@@ -340,9 +341,9 @@ function checkLayout(graphics: GraphicsLoader): void {
   const g = SaveMenu.SAVE_MENU_GEOMETRY;
   const size = (r: { x1: number; y1: number; x2: number; y2: number }): string => `${r.x2 - r.x1 + 1}x${r.y2 - r.y1 + 1}`;
   /** How many pixels of `piece`, drawn at its own size and place, are not graphic 0's. */
-  const ownSize = (piece: SaveMenu.DialogPiece, within: (x: number, y: number) => boolean): number => {
+  const ownSize = (piece: Widgets.DialogPiece, within: (x: number, y: number) => boolean): number => {
     ui.screenIndexBuffer!.pixels.fill(7);
-    SaveMenu.drawPiece(ui, piece, piece);
+    Widgets.drawPiece(ui, piece, piece);
     let wrong = 0;
     for (let y = piece.y1; y <= piece.y2; y++) {
       for (let x = piece.x1; x <= piece.x2; x++) {
@@ -455,7 +456,7 @@ function checkLayout(graphics: GraphicsLoader): void {
   // A label is six characters at most, and its cell has to lie on the button's face.
   let labelDirty = 0;
   for (const [, frame] of frames) {
-    const at = SaveMenu.buttonLabelAt(frame);
+    const at = Widgets.buttonLabelAt(frame);
     labelDirty += countNot(ui, at.x - 18, at.x + 17, at.y - 4, at.y + 1, MENU_PANEL_COLOR);
   }
   check(labelDirty === 0, `a six-character label lies on the face of every button (${labelDirty} stray pixels)`);
@@ -929,7 +930,7 @@ function checkPressAnimation(graphics: GraphicsLoader): void {
   console.log('=== the press animation (`doc/CSBwin-src/Menu.cpp:100-180`) ===');
   const ui = makeDrawingUI(graphics);
   const saveId = SaveMenu.SAVE_MENU_GEOMETRY.saveButtonId;
-  const rect = SaveMenu.buttonRect(SaveMenu.SAVE_MENU_GEOMETRY.buttonFrames.save);
+  const rect = Widgets.buttonRect(SaveMenu.SAVE_MENU_GEOMETRY.buttonFrames.save);
   const press = { buttonId: saveId, rect, startedMs: 0 };
   const SCREEN = 7;
   const frame = (elapsed: number): Uint8Array => {
@@ -1560,7 +1561,7 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
     check(store.files.size === 2 && SaveMenu.isSaveMenuOpen(ui), 'and its SAVE is inert');
 
     // CANCEL is a button like the others: its press plays first.
-    const cancel = SaveMenu.buttonRect(g.buttonFrames.cancel);
+    const cancel = Widgets.buttonRect(g.buttonFrames.cancel);
     SaveMenu.saveMenuClick(ui, cancel.x1, cancel.y1, LEFT);
     const pressed = chooser.press?.buttonId === g.cancelButtonId && SaveMenu.isSaveMenuOpen(ui);
     const drawsThen = rig.drawsWithNoMenu();
@@ -1734,7 +1735,7 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
 /** How many pixels of a button's label are up: none on a button that can do nothing. */
 function labelOf(ui: UIState, frame: { x1: number; y1: number; x2: number; y2: number }): number {
   SaveMenu.drawSaveMenu(ui);
-  const at = SaveMenu.buttonLabelAt(frame);
+  const at = Widgets.buttonLabelAt(frame);
   return countNot(ui, at.x - 18, at.x + 17, at.y - 4, at.y + 1, MENU_PANEL_COLOR);
 }
 
@@ -2534,7 +2535,7 @@ async function checkRise(graphics: GraphicsLoader): Promise<void> {
 
     // RISE where LOAD is, and no EXPORT.
     console.log(rig.list());
-    const at = SaveMenu.buttonLabelAt(g.buttonFrames.load);
+    const at = Widgets.buttonLabelAt(g.buttonFrames.load);
     const band = (): number[] => {
       const pixels: number[] = [];
       for (let y = at.y - 4; y <= at.y + 1; y++) for (let x = at.x - 18; x <= at.x + 17; x++) pixels.push(pixelAt(ui, x, y));
@@ -2633,7 +2634,7 @@ async function checkRiseFaces(graphics: GraphicsLoader): Promise<void> {
   await rig.saves.save('stopped', 'new');
   rig.game.ctx.state.paused = false;
 
-  const at = SaveMenu.buttonLabelAt(frame);
+  const at = Widgets.buttonLabelAt(frame);
   const band = (): number[] => {
     const pixels: number[] = [];
     for (let y = at.y - 4; y <= at.y + 1; y++) for (let x = frame.x1 + 6; x <= frame.x2 - 6; x++) pixels.push(pixelAt(ui, x, y));

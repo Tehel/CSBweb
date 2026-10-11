@@ -294,6 +294,7 @@ const CHECKS = [
   // of graphic 0's pieces, the row formatting, and the two metadata paths. Nothing here is
   // visible to the golden frames until there are saves to list.
   { tool: 'dump-save-menu.ts' },
+  { tool: 'dump-widgets.ts' },
   // The Sleepsave: a playthrough's slot apart from F5's, written when the party lies down
   // and when the player wakes it, never when a blow does; silent, and refused where F5 is.
   { tool: 'dump-sleep-save.ts' },
