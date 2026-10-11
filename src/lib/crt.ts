@@ -43,17 +43,15 @@ export function crtWarp(u: number, v: number): [number, number] {
 
 /**
  * The canvas pixel a pointer event is over. With the effect on over this canvas, the
- * pixel the tube shows there, and a point of its black corners is the nearest edge.
+ * pixel the tube shows there, and a point of its black corners is the nearest edge. A
+ * point off the canvas, which a captured pointer reports (`bindCanvasEvents`,
+ * `src/ui/events.ts`), is its nearest edge too.
  */
 export function canvasPoint(canvas: HTMLCanvasElement, e: MouseEvent): { x: number; y: number } {
     const rect = canvas.getBoundingClientRect();
-    if (canvas !== curvedCanvas) {
-        return {
-            x: Math.floor(((e.clientX - rect.left) * canvas.width) / rect.width),
-            y: Math.floor(((e.clientY - rect.top) * canvas.height) / rect.height),
-        };
-    }
-    const [u, v] = crtWarp((e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height);
+    let u = (e.clientX - rect.left) / rect.width;
+    let v = (e.clientY - rect.top) / rect.height;
+    if (canvas === curvedCanvas) [u, v] = crtWarp(u, v);
     return {
         x: Math.min(canvas.width - 1, Math.max(0, Math.floor(u * canvas.width))),
         y: Math.min(canvas.height - 1, Math.max(0, Math.floor(v * canvas.height))),

@@ -104,8 +104,8 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   no frame shows: the CRT effect, which needs a Chrome that gives WebGL, the wheel
   and the keys reaching a save menu, at the entrance as in play, a move of the pointer
   painting nothing until the VBL's frame, the download its EXPORT starts, a file
-  dropped on it, and a finger on a touch screen: a tap one click, the eye held while it
-  is down.
+  dropped on it, a finger on a touch screen: a tap one click, the eye held while it
+  is down, and the eye let go by a mouse released off the canvas.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`

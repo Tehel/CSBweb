@@ -224,7 +224,8 @@ pass and leaves its VBLs out of the play time while it is up (`src/engine/Game.t
 Paying it: one dialog slot in the screen, which the save menu is the first to use, and
 which any dialog fills: its drawing, its click, its key, its wheel and a drag. While any
 dialog is up the clock is held as for the save menu, and the keyboard is the dialog's.
-A drag needs the pointer captured, which pays R10's first bullet in a commit of its own.
+A drag has the pointer captured (`bindCanvasEvents`, `src/ui/events.ts`), so its moves
+and its release are the canvas's wherever the pointer goes.
 The rest is a refactor: the save menu behaves as it does now, its right-click while busy
 included (R11).
 
@@ -561,21 +562,16 @@ Paying it: the page's controls give the focus back (`blur` after a click, or
 
 ### R10 ⏳ Pointer, touch and WebGL
 
-- **A release outside the canvas is lost.** `pointerup` is heard on the canvas only, with
-  no `setPointerCapture` (`src/ui/events.ts:52-58`; the intro listens on `window`,
-  `src/renderer/intro/BootSequence.ts:174-175`). Holding the eye or the mouth, leaving the
-  canvas and letting go leaves `pressingEye` set, and the panels ignore every click until
-  the next one on the canvas.
 - **Touch screens likely stay silent.** Audio is unlocked on the canvas's first
   `pointerdown`, once (`src/main.ts:180-188`), which is a user activation for a mouse and
   not for a touch: `resume()` fails, the listener is gone, and only the Sound button
   brings the sound back.
 - **A lost WebGL context keeps the curve.** On `webglcontextlost` the tube is hidden but
-  `curvedCanvas` stays set (`src/lib/crt.ts:229-243`), so `canvasPoint` warps clicks over a
+  `curvedCanvas` stays set (`src/lib/crt.ts:227-241`), so `canvasPoint` warps clicks over a
   flat picture, about 3 pixels near the edges.
 
-Paying it: pointer capture on `pointerdown`; the unlock on `pointerup`, `click` and
-`touchend`, its listeners removed once the context runs; the curve cleared with the context.
+Paying it: the unlock on `pointerup`, `click` and `touchend`, its listeners removed once
+the context runs; the curve cleared with the context.
 
 ### R11 ⏳ Right-click closes the save menu while it saves or loads
 
@@ -1062,7 +1058,7 @@ Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the pa
 The screen is drawn by clocks that do not know each other: the engine's `setTimeout` VBL
 loop, and `requestAnimationFrame` loops for the chewing mouth
 (`src/renderer/ui/Feeding.ts:227-248`), a menu button's press (`SaveMenu.ts:986-1032`), the
-intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:210-225`).
+intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:208-223`).
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
   `refreshScreen`'s `setPartyState` and its `mainLoopHasReturned()` test

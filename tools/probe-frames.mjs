@@ -23,7 +23,8 @@
 // A few things are asserted on the spot rather than compared as frames, since no frame
 // shows them: the CRT effect, which screens take the mouse wheel, a move of the pointer
 // left to the VBL's frame to paint, the keys of the entrance's chooser, the download its
-// EXPORT starts, and a file dropped on it. See `check` below.
+// EXPORT starts, a file dropped on it, a finger held on the eye, and a mouse released off
+// the canvas. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -420,6 +421,23 @@ check(!(await pressingEye()), 'and lifting it lets go');
 await touch('touchStart', 124, 10); await touch('touchEnd', 124, 10); await wait(600);
 check(await selected() === -1, 'a second tap closes the inventory');
 await send('Emulation.setTouchEmulationEnabled', { enabled: false });
+// A mouse pressed on the eye, moved off the canvas and released there: the canvas has the
+// pointer captured (`bindCanvasEvents`), so the release is its, and the eye is let go. A
+// move names the button held, or Chrome takes it for a move with none, which ends the
+// capture.
+const realMouse = async (type, x, y) => {
+  const p = await evaluate(`(()=>{const r=document.getElementById('game-canvas').getBoundingClientRect();
+    return {x:r.left+(${x}+0.5)*r.width/320, y:r.top+(${y}+0.5)*r.height/200};})()`);
+  await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left',
+    buttons: type === 'mouseReleased' ? 0 : 1, clickCount: type === 'mouseMoved' ? 0 : 1 });
+};
+await canvasClick(124, 10, 0); await wait(600);
+await realMouse('mousePressed', 19, 53); await wait(300);
+check(await pressingEye(), 'a mouse held on the eye keeps it pressed');
+await realMouse('mouseMoved', 19, 215); await realMouse('mouseReleased', 19, 215); await wait(600);
+check(!(await pressingEye()), 'and released off the canvas, lets go');
+await canvasClick(124, 10, 0); await wait(600);
+check(await selected() === -1, 'the inventory closed again');
 
 // The Hint Oracle's button (`src/renderer/ui/HintOracleButton.ts`), CSB's set only: the
 // inventory's close box is the Oracle's `?`, and a real click on it opens the Oracle on the

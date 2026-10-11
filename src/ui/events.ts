@@ -19,6 +19,10 @@ const mapCanvasEl = document.getElementById('map-canvas') as HTMLCanvasElement |
  * A finger leaves the canvas as it lifts, and the cursor would go with it, the object in
  * hand included: only a mouse's leaving takes the cursor off. A finger is first seen as
  * it presses, so the press puts the cursor where it is.
+ *
+ * A press captures the pointer, so its release is the canvas's wherever it happens: the
+ * eye let go off the canvas is let go. Until then its moves are the canvas's too, at the
+ * nearest edge (`canvasPoint`), and it leaves the canvas only once released.
  */
 function bindCanvasEvents(canvas: HTMLCanvasElement | null, input: GameInput): void {
     if (!canvas) return;
@@ -36,6 +40,8 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, input: GameInput): v
         const { x, y } = getEventPosition(canvas, e);
         if (e.pointerType !== 'mouse') input.mouseMove(x, y);
         input.mouseDown(x, y, e.button);
+        // A synthetic event's pointer is none the browser tracks, and capturing it throws.
+        if (e.isTrusted) canvas.setPointerCapture(e.pointerId);
     });
 
     canvas.addEventListener('pointerup', (e) => {
