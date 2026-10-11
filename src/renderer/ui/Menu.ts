@@ -357,22 +357,14 @@ export function menuButtonRect(buttons: UIButton[], id: number): MenuPress['rect
  * then both, then nothing once the animation is over.
  */
 export function drawMenuPress(ui: UIState, press: MenuPress, nowMs: number): void {
+  const buf = ui.screenIndexBuffer;
   const elapsed = nowMs - press.startedMs;
   if (elapsed < 0 || elapsed >= MENU_PRESS_PHASE_MS * 2) return;
-  drawMenuPressPasses(ui, press.rect, elapsed >= MENU_PRESS_PHASE_MS ? 2 : 1);
-}
 
-/**
- * The press's edges around `rect`, a button's as the table holds it: pass A alone, or
- * both. Both is the picture a press shows last, and what a button held pressed shows
- * (`Widgets.ts`).
- */
-export function drawMenuPressPasses(ui: UIState, rect: MenuPress['rect'], passes: 1 | 2): void {
-  const buf = ui.screenIndexBuffer;
-  const x1 = rect.x1 - 3;
-  const x2 = rect.x2 + 3;
-  const y1 = rect.y1 - 3;
-  const y2 = rect.y2 + 4;
+  const x1 = press.rect.x1 - 3;
+  const x2 = press.rect.x2 + 3;
+  const y1 = press.rect.y1 - 3;
+  const y2 = press.rect.y2 + 4;
 
   const fill = (rx1: number, ry1: number, rx2: number, ry2: number, color: number): void => {
     const c = color & 0x0f;
@@ -391,7 +383,7 @@ export function drawMenuPressPasses(ui: UIState, rect: MenuPress['rect'], passes
   fill(x1, y1, x1, y2 - 1, 5);
   fill(x1 - 2, y2 - 1, x2, y2 - 1, 0);
   fill(x2, y1, x2, y2, 0);
-  if (passes === 2) {
+  if (elapsed >= MENU_PRESS_PHASE_MS) {
     // Pass B (`Menu.cpp:139-168`), over pass A: the inner edges, plus an outer highlight
     // in 13.
     fill(x1, y1 + 1, x2 - 2, y1 + 1, 5);

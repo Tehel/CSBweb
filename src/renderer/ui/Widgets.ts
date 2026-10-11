@@ -3,23 +3,25 @@
  * the save menu first (`SaveMenu.ts`).
  *
  * CSBWin has one dialog, `_DoMenu`'s graphic 0 (`Menu.ts`), and draws no widget of its
- * own. Every widget here is cut from that bitmap and drawn in the colours it uses, so no
- * art is invented: a piece of it drawn at another size keeps its corners and repeats the
- * column and the row just inside them (`drawPiece`).
+ * own. Every widget here is cut from that bitmap and drawn in the UI palette's colours,
+ * so no art is invented: a piece of it drawn at another size keeps its corners and
+ * repeats the column and the row just inside them (`drawPiece`). Which piece makes which
+ * widget, and the looks graphic 0 does not show (pressed, hover, the slider's track), are
+ * the design canvas's widget kit (`DEBT.md` → "U — The interface in the canvas").
  *
  * - **The plate**: graphic 0's grey frame, the dialog's ground (`drawPlate`).
  * - **The panel**: its sunken title panel, under a list or lines of text (`drawPanel`).
  * - **The button**: a frame of its bottom pair, at its own height (`BUTTON_HEIGHT`) or a
  *   lower one that fits a title line (`LOW_BUTTON_HEIGHT`), its face's rows repeated or
- *   left out. It is raised, pressed, or inert (`drawButton`). Pressed is the press
- *   animation's last picture held (`drawMenuPressPasses`); inert has no label, as CSBWin
- *   leaves an empty save slot's button unlabelled.
+ *   left out. It is raised, hovered, pressed, or inert (`drawButton`). Hovered lights its
+ *   label; pressed lights it too and turns its bevel over (`pressBevel`); inert has no
+ *   label, as CSBWin leaves an empty save slot's button unlabelled.
  * - **The list**: rows of text on a panel, the selected one inverted, beside a
  *   scrollbar in the manner of a GEM window's (`drawList`).
  * - **A row of tabs** and **a toggle**: buttons side by side, the chosen one pressed
  *   (`drawTabs`, `drawToggle`).
- * - **The slider**: a sunken track, a panel, and over it a small raised knob, the
- *   button's inner bevel around one column of its face (`drawSlider`).
+ * - **The slider**: a sunken black track, the panel's edge around black, and over it a
+ *   small raised knob, the button frame from its inner black ring in (`drawSlider`).
  * - **The help line**: a panel one row high, at a dialog's foot (`drawHelpLine`).
  * - **A line of text**, in the menu's font and colours (`drawText`).
  *
@@ -30,7 +32,7 @@
 import { fillRectIndex } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import type { Rect, UIButton } from '../../data/tables/UITables';
-import { MENU_GRAPHIC, MENU_OPTION_COLOR, MENU_PANEL_COLOR, drawMenuPressPasses } from './Menu';
+import { MENU_GRAPHIC, MENU_OPTION_COLOR, MENU_PANEL_COLOR, MENU_TITLE1_COLOR } from './Menu';
 import type { UIState } from './UIState';
 
 /* -------------------------------------------------------------------- pieces ---- */
@@ -61,10 +63,10 @@ export const BUTTON_PIECE: DialogPiece = { x1: 10, y1: 99, x2: 107, y2: 125, lef
  */
 export const LOW_BUTTON_PIECE: DialogPiece = { ...BUTTON_PIECE, top: 6, bottom: 6 };
 /**
- * The knob: the frame's inner bevel, three pixels a side, light at the top and left and
- * dark at the bottom and right, around its face.
+ * The knob: the frame from its inner row of black in, a black ring around its three-pixel
+ * bevel, light at the top and left and dark at the bottom and right, around its face.
  */
-export const KNOB_PIECE: DialogPiece = { x1: 13, y1: 102, x2: 104, y2: 122, left: 3, top: 3, right: 3, bottom: 3 };
+export const KNOB_PIECE: DialogPiece = { x1: 12, y1: 101, x2: 105, y2: 123, left: 4, top: 4, right: 4, bottom: 4 };
 
 /**
  * Draw a piece of graphic 0 into `box`, at the box's size. The piece's corners are kept,
@@ -129,13 +131,19 @@ export function drawCentredText(
 
 /* -------------------------------------------------------------------- button ---- */
 
+/** A lit label, a hovered or pressed button's: yellow, `_DoMenu`'s first title's colour. */
+export const LIT_COLOR = MENU_TITLE1_COLOR;
+
 /** A button at the save menu's height, graphic 0's own frame's. */
 export const BUTTON_HEIGHT = BUTTON_PIECE.y2 - BUTTON_PIECE.y1 + 1;
 /** The low button: its bevels around a face one row of text and a row above and below it high. */
 export const LOW_BUTTON_HEIGHT = LOW_BUTTON_PIECE.top + 1 + 6 + 1 + LOW_BUTTON_PIECE.bottom;
 
-/** Raised, ready for a click; pressed, the chosen tab or choice; inert, unlabelled. */
-export type ButtonLook = 'raised' | 'pressed' | 'inert';
+/**
+ * Raised, ready for a click; hovered, under the pointer; pressed, the chosen tab or
+ * choice; inert, unlabelled.
+ */
+export type ButtonLook = 'raised' | 'hover' | 'pressed' | 'inert';
 
 /**
  * The rectangle a click on a button frame takes, and its press animation grows from, as
@@ -165,17 +173,36 @@ export function drawButtonFrame(ui: UIState, frame: Rect): void {
   drawPiece(ui, frame.y2 - frame.y1 + 1 === BUTTON_HEIGHT ? BUTTON_PIECE : LOW_BUTTON_PIECE, frame);
 }
 
-/** A button's label, on its face. */
-export function drawButtonLabel(ui: UIState, frame: Rect, label: string): void {
+/** A button's label, on its face: option colour, or lit. */
+export function drawButtonLabel(ui: UIState, frame: Rect, label: string, color = MENU_OPTION_COLOR): void {
   const at = buttonLabelAt(frame);
-  drawCentredText(ui, label, at.x, at.y);
+  drawCentredText(ui, label, at.x, at.y, color);
 }
 
-/** A button: its frame, pressed or not, and its label, which an inert one has none of. */
+/** The colours a bevel turned over takes: its light and its shade change places. */
+const TURNED_OVER: ReadonlyMap<number, number> = new Map([[10, 3], [3, 10], [15, 12], [12, 15]]);
+
+/**
+ * A button's bevel turned over, as a pressed one's is: the three-pixel ring inside its
+ * black, light at the top and left, has its light and its shade change places. The ring
+ * keeps its shape, mitres and all.
+ */
+export function pressBevel(ui: UIState, frame: Rect): void {
+  const buf = ui.screenIndexBuffer;
+  for (let y = frame.y1 + 3; y <= frame.y2 - 3; y++) {
+    for (let x = frame.x1 + 3; x <= frame.x2 - 3; x++) {
+      if (x >= frame.x1 + 6 && x <= frame.x2 - 6 && y >= frame.y1 + 6 && y <= frame.y2 - 6) continue;
+      const i = y * buf.width + x;
+      buf.pixels[i] = TURNED_OVER.get(buf.pixels[i]) ?? buf.pixels[i];
+    }
+  }
+}
+
+/** A button: its frame, its bevel turned over if pressed, and its label, which an inert one has none of. */
 export function drawButton(ui: UIState, frame: Rect, label: string, look: ButtonLook = 'raised'): void {
   drawButtonFrame(ui, frame);
-  if (look === 'pressed') drawMenuPressPasses(ui, buttonRect(frame), 2);
-  if (look !== 'inert') drawButtonLabel(ui, frame, label);
+  if (look === 'pressed') pressBevel(ui, frame);
+  if (look !== 'inert') drawButtonLabel(ui, frame, label, look === 'raised' ? MENU_OPTION_COLOR : LIT_COLOR);
 }
 
 /** A button's entry in a button list: its `buttonRect`, for a left click. */
@@ -217,32 +244,45 @@ export function choiceButtons(frames: Rect[], firstId: number, name: string): UI
 
 /* -------------------------------------------------------------------- slider ---- */
 
-/** The knob's width: its two bevels and one column of face between them. */
-export const KNOB_WIDTH = KNOB_PIECE.left + 1 + KNOB_PIECE.right;
+/** The knob is square: its ring and bevel on either side of four pixels of face. */
+export const KNOB_SIZE = KNOB_PIECE.left + 4 + KNOB_PIECE.right;
+/** A slider is as tall as its knob, which stands three rows over the track above and below. */
+export const SLIDER_HEIGHT = KNOB_SIZE;
+const TRACK_INSET = 3;
 
-/** The knob over a track at `value`, 0 at the track's left end and 1 at its right. */
-export function sliderKnob(track: Rect, value: number): Rect {
-  const travel = track.x2 - track.x1 + 1 - KNOB_WIDTH;
-  const x1 = track.x1 + Math.round(travel * Math.max(0, Math.min(1, value)));
-  return { x1, y1: track.y1, x2: x1 + KNOB_WIDTH - 1, y2: track.y2 };
+/** The track, across a slider's rectangle: a row of edge either side of four of black. */
+export function sliderTrack(slider: Rect): Rect {
+  return { x1: slider.x1, y1: slider.y1 + TRACK_INSET, x2: slider.x2, y2: slider.y2 - TRACK_INSET };
 }
 
-/** A slider: a sunken track, and the knob at `value` over it. */
-export function drawSlider(ui: UIState, track: Rect, value: number): void {
+/** The knob over a slider at `value`, 0 at the track's left end and 1 at its right. */
+export function sliderKnob(slider: Rect, value: number): Rect {
+  const travel = slider.x2 - slider.x1 + 1 - KNOB_SIZE;
+  const x1 = slider.x1 + Math.round(travel * Math.max(0, Math.min(1, value)));
+  return { x1, y1: slider.y1, x2: x1 + KNOB_SIZE - 1, y2: slider.y2 };
+}
+
+/**
+ * A slider: a sunken black track, the panel's edge, dark at the top and left, around
+ * black, and the knob at `value` over it.
+ */
+export function drawSlider(ui: UIState, slider: Rect, value: number): void {
+  const track = sliderTrack(slider);
   drawPanel(ui, track);
-  drawPiece(ui, KNOB_PIECE, sliderKnob(track, value));
+  fillRectIndex(ui.screenIndexBuffer, { x1: track.x1 + 1, y1: track.y1 + 1, x2: track.x2 - 1, y2: track.y2 - 1 }, 0);
+  drawPiece(ui, KNOB_PIECE, sliderKnob(slider, value));
 }
 
 /** The value a click at `x` sets: the knob centred under it, as far as the track's ends. */
-export function sliderValueAt(track: Rect, x: number): number {
-  const travel = track.x2 - track.x1 + 1 - KNOB_WIDTH;
+export function sliderValueAt(slider: Rect, x: number): number {
+  const travel = slider.x2 - slider.x1 + 1 - KNOB_SIZE;
   if (travel <= 0) return 0;
-  return Math.max(0, Math.min(1, (x - track.x1 - (KNOB_WIDTH >> 1)) / travel));
+  return Math.max(0, Math.min(1, (x - slider.x1 - ((KNOB_SIZE - 1) >> 1)) / travel));
 }
 
-/** The slider's entry in a button list: the whole track. */
-export function sliderButton(track: Rect, id: number, name: string): UIButton {
-  return { word0: id, x1: track.x1, y1: track.y1, x2: track.x2 + 1, y2: track.y2 + 1, button: 2, name };
+/** The slider's entry in a button list: its whole rectangle, the knob's height. */
+export function sliderButton(slider: Rect, id: number, name: string): UIButton {
+  return { word0: id, x1: slider.x1, y1: slider.y1, x2: slider.x2 + 1, y2: slider.y2 + 1, button: 2, name };
 }
 
 /* ----------------------------------------------------------------- help line ---- */

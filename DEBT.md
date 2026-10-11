@@ -204,10 +204,11 @@ game's 320x200 buffer like the save menu: the settings, the map, the champion ta
 look is the save menu's, cut from graphic 0 and drawn in the UI palette's sixteen
 colours, and the design canvas "DMweb page flow"
 (`https://claude.ai/artifact/DiNNPrFfCkphD9LRNBckSG`) shows it: artboard 10, the widget
-kit, and artboard 5, the settings dialog. At 320x200 there is one font size, so a
-setting is one line, and its description goes in a help line at the dialog's foot. Being
-in the buffer, the dialogs are under the CRT effect and in fullscreen, and the golden
-frames see them.
+kit, and artboard 5, the settings dialog. The kit is the look to follow; the screens,
+artboard 5 among them, are brainstorm material, not final designs. At 320x200 there is
+one font size, so a setting is one line, and its description goes in a help line at the
+dialog's foot. Being in the buffer, the dialogs are under the CRT effect and in
+fullscreen, and the golden frames see them.
 
 None of it changes the game: with every new setting at its default, every tool's output
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a

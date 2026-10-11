@@ -4,15 +4,17 @@
  *
  * The save menu draws the plate, the panel, the button at graphic 0's height and the list
  * through the kit, and `dump-save-menu.ts` and the golden frames check those. The rest of
- * the kit waits for the settings dialog: the low button, a pressed button, the tabs and
- * the toggle, the slider and the help line. Each is drawn here for real, on a screen
+ * the kit waits for the settings dialog: the low button, a hovered and a pressed button,
+ * the tabs and the toggle, the slider and the help line. Their looks are the design
+ * canvas's widget kit (`DEBT.md` → "U — The interface in the canvas"). Each is drawn here for real, on a screen
  * filled with a colour graphic 0 does not use, and read back:
  *
  * 1. **The art.** The low button and the knob are pieces of graphic 0 drawn at other
  *    sizes; at their own size each is the art itself, so the rows and columns they
  *    repeat are plain.
  * 2. **The button's looks.** Raised has its label on a clean face; inert is the frame
- *    alone; pressed is the raised button with the press animation's last picture over it.
+ *    alone; hovered lights the label; pressed lights it and turns the bevel over, its
+ *    light and its shade changing places, and nothing else.
  * 3. **Staying in the box.** No widget draws a pixel outside its rectangle, and every
  *    pixel it draws is a colour graphic 0 has, or the ink `_DoMenu` writes on it.
  * 4. **The hit tests.** Each widget's button list finds it, and nothing in the gaps.
@@ -22,7 +24,7 @@ import { emptyDungeonData } from '../src/data/DungeonLoader';
 import type { Rect } from '../src/data/tables/UITables';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { searchButtonList } from '../src/renderer/ui/HitTest';
-import { MENU_GRAPHIC, MENU_OPTION_COLOR, MENU_PANEL_COLOR, MENU_TITLE1_COLOR, MENU_PRESS_PHASE_MS, drawMenuPress } from '../src/renderer/ui/Menu';
+import { MENU_GRAPHIC, MENU_OPTION_COLOR, MENU_PANEL_COLOR, MENU_TITLE1_COLOR } from '../src/renderer/ui/Menu';
 import type { UIState } from '../src/renderer/ui/UIState';
 import * as W from '../src/renderer/ui/Widgets';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
@@ -107,12 +109,12 @@ function main(): void {
     check(wrong === 0, `the ${name} at its own size is graphic 0's: what it repeats is plain`);
   }
   check(ownSize({ ...W.KNOB_PIECE, left: 2, top: 2, right: 2, bottom: 2 }) > 0, 'a knob kept two pixels a side would not be: the bevel is three');
-  console.log(`  button ${W.BUTTON_HEIGHT} rows, low button ${W.LOW_BUTTON_HEIGHT}, knob ${W.KNOB_WIDTH} columns, help line ${W.HELP_LINE_HEIGHT} rows`);
+  console.log(`  button ${W.BUTTON_HEIGHT} rows, low button ${W.LOW_BUTTON_HEIGHT}, knob ${W.KNOB_SIZE} square, help line ${W.HELP_LINE_HEIGHT} rows`);
 
   /* ---- 2. the button's looks ---- */
 
   console.log('');
-  console.log('=== the button: raised, inert, pressed, at both heights ===');
+  console.log('=== the button: raised, inert, hovered, pressed, at both heights ===');
   for (const height of [W.BUTTON_HEIGHT, W.LOW_BUTTON_HEIGHT]) {
     const frame: Rect = { x1: 40, y1: 60, x2: 103, y2: 60 + height - 1 };
     const label = 'NEW FACE';
@@ -137,10 +139,36 @@ function main(): void {
     W.drawButtonFrame(ui, frame);
     check(same(inert, pixels(ui)) && countNot(ui, face, MENU_PANEL_COLOR) === 0, 'an inert button is its frame alone, its face blank');
     check(!same(raised, inert), 'and a raised one is labelled');
+    // Each look against the raised button, pixel by pixel: the label's ink, the bevel's
+    // ring three pixels inside the frame, and everything else.
+    const ring = (x: number, y: number): boolean => W.contains({ x1: frame.x1 + 3, y1: frame.y1 + 3, x2: frame.x2 - 3, y2: frame.y2 - 3 }, { x, y })
+      && !W.contains(face, { x, y });
+    const turned: Record<number, number> = { 10: 3, 3: 10, 15: 12, 12: 15 };
+    const compare = (look: Uint8Array, bevelTurned: boolean): { ink: number; bevel: number; rest: number } => {
+      const wrong = { ink: 0, bevel: 0, rest: 0 };
+      for (let y = frame.y1; y <= frame.y2; y++) {
+        for (let x = frame.x1; x <= frame.x2; x++) {
+          const i = y * SCREEN_WIDTH + x;
+          if (W.contains(cell, { x, y }) && raised[i] === MENU_OPTION_COLOR) {
+            if (look[i] !== W.LIT_COLOR) wrong.ink++;
+          } else if (ring(x, y) && bevelTurned) {
+            if (look[i] !== (turned[raised[i]] ?? raised[i])) wrong.bevel++;
+          } else if (look[i] !== raised[i]) {
+            wrong.rest++;
+          }
+        }
+      }
+      return wrong;
+    };
+    const hover = compare(draw('hover'), false);
+    check(hover.ink + hover.bevel + hover.rest === 0, `a hovered button is the raised one, its label lit (${JSON.stringify(hover)} differ)`);
     const pressed = draw('pressed');
-    pixels(ui).set(raised);
-    drawMenuPress(ui, { buttonId: 0, rect: W.buttonRect(frame), startedMs: 0 }, MENU_PRESS_PHASE_MS);
-    check(same(pressed, pixels(ui)), 'a pressed button is the raised one under the press animation\'s last picture');
+    const press = compare(pressed, true);
+    check(press.ink + press.bevel + press.rest === 0, `a pressed button is the raised one, its label lit and its bevel turned over (${JSON.stringify(press)} differ)`);
+    const topLeft = pixels(ui)[(frame.y1 + 4) * SCREEN_WIDTH + frame.x1 + 20];
+    const bottomRight = pixels(ui)[(frame.y2 - 4) * SCREEN_WIDTH + frame.x1 + 20];
+    console.log(`  pressed: its bevel's top in ${topLeft}, its bottom in ${bottomRight}; raised: ${raised[(frame.y1 + 4) * SCREEN_WIDTH + frame.x1 + 20]} and ${raised[(frame.y2 - 4) * SCREEN_WIDTH + frame.x1 + 20]}`);
+    check(topLeft === 3 && bottomRight === 10, 'pressed, the shade is at the top and the light at the bottom');
   }
 
   /* ---- 3 and 4. tabs, a toggle, the slider and the help line ---- */
@@ -179,26 +207,37 @@ function main(): void {
 
   console.log('');
   console.log('=== the slider ===');
-  const track: Rect = { x1: 100, y1: 100, x2: 199, y2: 108 };
+  const slider: Rect = { x1: 100, y1: 100, x2: 199, y2: 100 + W.SLIDER_HEIGHT - 1 };
+  const track = W.sliderTrack(slider);
+  console.log(`  slider (${slider.x1},${slider.y1})-(${slider.x2},${slider.y2}), its track y ${track.y1}..${track.y2}`);
   for (const value of [0, 0.25, 0.8, 1]) {
     clear(ui);
-    W.drawSlider(ui, track, value);
-    const knob = W.sliderKnob(track, value);
-    const ss = strays(ui, track, colours);
-    const back = W.sliderValueAt(track, (knob.x1 + knob.x2) >> 1);
+    W.drawSlider(ui, slider, value);
+    const knob = W.sliderKnob(slider, value);
+    const ss = strays(ui, slider, colours);
+    const back = W.sliderValueAt(slider, (knob.x1 + knob.x2) >> 1);
     console.log(`  ${value}: knob x ${knob.x1}..${knob.x2}, a click on its middle sets ${back.toFixed(3)}`);
-    check(ss.outside === 0 && ss.foreign === 0, `the slider at ${value} stays on its track (${ss.outside} outside, ${ss.foreign} foreign)`);
-    check(Math.abs(back - value) <= 1 / (track.x2 - track.x1 + 1 - W.KNOB_WIDTH), `a click on the knob's middle sets ${value} again, to a column`);
+    check(ss.outside === 0, `the slider at ${value} stays in its rectangle (${ss.outside} outside)`);
+    check(Math.abs(back - value) <= 1 / (slider.x2 - slider.x1 + 1 - W.KNOB_SIZE), `a click on the knob's middle sets ${value} again, to a column`);
   }
-  check(W.sliderKnob(track, 0).x1 === track.x1 && W.sliderKnob(track, 1).x2 === track.x2, 'the knob runs from end to end of the track');
-  check(W.sliderValueAt(track, track.x1) === 0 && W.sliderValueAt(track, track.x2) === 1, 'a click at either end sets that end');
+  check(W.sliderKnob(slider, 0).x1 === slider.x1 && W.sliderKnob(slider, 1).x2 === slider.x2, 'the knob runs from end to end of the track');
+  check(W.sliderValueAt(slider, slider.x1) === 0 && W.sliderValueAt(slider, slider.x2) === 1, 'a click at either end sets that end');
   clear(ui);
-  W.drawSlider(ui, track, 0);
-  const knob0 = W.sliderKnob(track, 0);
-  check(at(ui, knob0.x1, knob0.y1) !== at(ui, knob0.x2, knob0.y2), 'the knob is lit at its top left and shaded at its bottom right');
-  const sliderList = [W.sliderButton(track, 400, 'volume')];
-  check(searchButtonList(sliderList, track.x1, track.y1, LEFT_CLICK) === 400 && searchButtonList(sliderList, track.x2, track.y2, LEFT_CLICK) === 400
-    && searchButtonList(sliderList, track.x2 + 1, track.y1, LEFT_CLICK) === 0, 'a click anywhere on the track finds the slider, and beside it nothing');
+  W.drawSlider(ui, slider, 1);
+  const knob1 = W.sliderKnob(slider, 1);
+  const bare = { x1: track.x1 + 1, y1: track.y1 + 1, x2: knob1.x1 - 1, y2: track.y2 - 1 };
+  check(countNot(ui, bare, 0) === 0 && countNot(ui, { ...bare, y1: track.y1, y2: track.y1 }, 12) === 0
+    && countNot(ui, { ...bare, y1: track.y2, y2: track.y2 }, 2) === 0 && at(ui, track.x1, track.y1 + 2) === 12,
+    'the track is black, under an edge dark at the top and left and lit at the bottom');
+  check(countNot(ui, { x1: slider.x1, y1: slider.y1, x2: knob1.x1 - 1, y2: track.y1 - 1 }, ground) === 0
+    && countNot(ui, { x1: slider.x1, y1: track.y2 + 1, x2: knob1.x1 - 1, y2: slider.y2 }, ground) === 0,
+    'beside the knob, the rows above and below the track are left alone');
+  check(at(ui, knob1.x1, knob1.y1) === 0 && at(ui, knob1.x1 + 1, knob1.y1 + 1) === 15 && at(ui, knob1.x1 + 2, knob1.y1 + 1) === 10
+    && at(ui, knob1.x2 - 1, knob1.y2 - 2) === 3,
+    'the knob is ringed in black, lit at its top left and shaded at its bottom right');
+  const sliderList = [W.sliderButton(slider, 400, 'volume')];
+  check(searchButtonList(sliderList, slider.x1, slider.y1, LEFT_CLICK) === 400 && searchButtonList(sliderList, slider.x2, slider.y2, LEFT_CLICK) === 400
+    && searchButtonList(sliderList, slider.x2 + 1, slider.y1, LEFT_CLICK) === 0, 'a click anywhere on the slider finds it, and beside it nothing');
 
   console.log('');
   console.log('=== the help line ===');
@@ -214,6 +253,7 @@ function main(): void {
   check(countNot(ui, line, MENU_PANEL_COLOR) > 0 && countNot(ui, { ...line, y1: help.y1 + 2, y2: help.y1 + 3 }, MENU_PANEL_COLOR) === 0
     && countNot(ui, { ...line, y1: help.y1 + 12, y2: help.y2 - 1 }, MENU_PANEL_COLOR) === 0,
     'its text sits on the panel as a list\'s row does, two rows of panel above and below');
+
 
   finish();
 }
