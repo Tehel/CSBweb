@@ -25,6 +25,12 @@
  * equivalent — in particular `d.PotentialCharacterOrdinal` makes every panel inert
  * (`doc/CSBwin-src/Mouse.cpp:1717-1789`).
  *
+ * The panel keys are those of the `config.txt` CSBWin's Windows build ships
+ * (`CSB_Windows_x86-32_20151213.zip`, `doc/PROVEN_FACTS.md` → "CSBWin has no keyboard
+ * controls"): Q/A/Z, W/S/X, E/D/C and R/F/V for the attacks, 1-6 for the runes, `~` to
+ * take one back, Space to cast, Tab to pass, and F1-F4 for the caster. The port adds 7-0
+ * for the inventories, which that file leaves unbound.
+ *
  * The attack keys are a column per champion — Q/A/Z for the first, W/S/X, E/D/C and
  * R/F/V for the others — one key per attack row. With that champion's menu open a key
  * performs its row; otherwise it opens the menu.
@@ -52,10 +58,15 @@ const RUNE_KEYS = ['1', '2', '3', '4', '5', '6'];
  * keeps them for the caster (`DEBT.md` H).
  */
 const CASTER_KEYS = ['F1', 'F2', 'F3', 'F4'];
-/** Magic button 107, the rune the incantation just took back. */
-const RUNE_BACK_KEY = '`';
+/**
+ * Magic button 107, the rune the incantation just took back. CSBWin's `config.txt` binds
+ * virtual key 0xc0, the key that types both `` ` `` and `~`, so either takes a rune back.
+ */
+const RUNE_BACK_KEYS = ['`', '~'];
 /** Magic button 108. */
-const CAST_KEY = 'Tab';
+const CAST_KEY = ' ';
+/** PASS, button 112 of the attack menu. */
+const PASS_KEY = 'Tab';
 
 /**
  * What one of the port's own keys outside the panels does: a movement, or the quick-save
@@ -87,7 +98,7 @@ export function portKeyAction(key: string): PortKeyAction | null {
 /** Whether `k`, lower-cased, is one of the panel bindings. */
 function isUIKey(k: string): boolean {
   return [...ATTACK_KEYS, INVENTORY_KEYS, RUNE_KEYS, CASTER_KEYS]
-    .some((keys) => keys.includes(k)) || k === RUNE_BACK_KEY || k === CAST_KEY;
+    .some((keys) => keys.includes(k)) || RUNE_BACK_KEYS.includes(k) || k === CAST_KEY || k === PASS_KEY;
 }
 
 /**
@@ -198,13 +209,18 @@ export function handleUIKey(ui: UIState, key: string): boolean {
     return true;
   }
 
-  if (k === RUNE_BACK_KEY) {
+  if (RUNE_BACK_KEYS.includes(k)) {
     magicButton(ui, 107);
     return true;
   }
 
   if (k === CAST_KEY) {
     magicButton(ui, 108);
+    return true;
+  }
+
+  if (k === PASS_KEY) {
+    pass(ui);
     return true;
   }
 
@@ -232,6 +248,17 @@ function attackKey(ui: UIState, chIdx: number, option: number): void {
     return;
   }
   prepareAttack(ui, chIdx);
+}
+
+/**
+ * PASS, which closes the open attack menu. `config.txt`'s TAB is a click at (0x131, 0x50),
+ * inside PASS; with no menu open the point is in the attack area above the four hands
+ * (`d.Buttons17952` start at y 86), so it does nothing.
+ */
+function pass(ui: UIState): void {
+  if (championPending(ui)) return;
+  if (ui.attackingCharacterOrdinal === 0) return;
+  attackMenuButton(ui, 112);
 }
 
 /** Button ids 7-10 — the same toggle, and the same "replace" the click path gives. */

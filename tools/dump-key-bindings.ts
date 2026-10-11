@@ -161,6 +161,17 @@ async function main(): Promise<void> {
       "'a' should perform champion 1's second attack");
   }
 
+  // ---- 2b. Tab is PASS (button 112): it closes the open menu and attacks nothing. With
+  //          no menu open its point is above the hands, and it does nothing.
+  attacks = [];
+  press('w');
+  check(ui.attackingCharacterOrdinal === 2, "'w' should open champion 2's menu");
+  check(press('Tab'), 'Tab should be claimed');
+  check(ui.attackingCharacterOrdinal === 0 && attacks.length === 0,
+    'Tab should close the menu without attacking');
+  check(press('Tab') && ui.attackingCharacterOrdinal === 0 && attacks.length === 0,
+    'Tab with no menu open should be claimed and do nothing');
+
   // ---- 3. The inventory keys, the same toggle `handleInventoryToggle` gives a click.
   press('7');
   check(party.state.selectedCharacterIndex === 0, "'7' should open champion 1's inventory");
@@ -199,18 +210,23 @@ async function main(): Promise<void> {
   check(caster.incantation.length === 2 && caster.incantation[1] === 96 + 6 + 2,
     "'3' should push the third rune of the second step");
 
+  press('~');
+  check(caster.incantation.length === 1, "'~' should take the last rune back");
+  press('3');
   press('`');
-  check(caster.incantation.length === 1, 'the backspace key should take the last rune back');
+  check(caster.incantation.length === 1, "'`', the same key unshifted, should take it back too");
 
   casts = [];
   press('Tab');
-  check(casts.length === 1, 'Tab should cast the incantation');
+  check(casts.length === 0 && caster.incantation.length === 1, 'Tab should not cast');
+  press(' ');
+  check(casts.length === 1, 'Space should cast the incantation');
   check(casts[0]?.chIdx === 0 && casts[0]?.incantation.length === 1,
     'the cast should carry the caster and the runes assembled');
 
   casts = [];
-  press('Tab');
-  check(casts.length === 0, 'Tab with an empty incantation should cast nothing');
+  press(' ');
+  check(casts.length === 0, 'Space with an empty incantation should cast nothing');
 
   // ---- 5. Case, and the keys the table does **not** claim: `GameInput.keyDown` routes those
   //         to movement, so a bound key leaking through would walk the party instead.
@@ -293,7 +309,7 @@ async function main(): Promise<void> {
   check(attacks.length === 1 && game.isRunningScript(), 'the click attacks, and the attack holds the loop');
   check(ui.attackingCharacterOrdinal === 1, 'the attack menu stays up: TAG01b1c0 does not run');
   check(clockTick() === 'not due', 'd.clockTick is not set');
-  const heldKeys = ['q', 'w', 'a', 'x', '7', 'F2', '1', 'Tab'].map((key) => press(key));
+  const heldKeys = ['q', 'w', 'a', 'x', '7', 'F2', '1', '~', ' ', 'Tab'].map((key) => press(key));
   check(heldKeys.every((taken) => taken), 'every panel key is still claimed');
   check(attacks.length === 1 && ui.attackingCharacterOrdinal === 1 && party.state.selectedCharacterIndex === -1
     && party.state.magicCasterIndex === 0 && runes(party.state) === '-',

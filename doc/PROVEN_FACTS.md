@@ -3284,6 +3284,28 @@ with one open the panel area is the option list (`handleAttackAreaClick`). And t
 `config.txt` is not part of the source tree — the bindings are the player's, not the
 game's.
 
+The `config.txt` CSBWin's Windows build ships (`CSB_Windows_x86-32_20151213.zip`, the
+same file as `DM_Windows_x86-32_20171117.zip`'s, in the author's git-ignored `archive/`)
+binds the panels with these `MSCAN` lines, all left button, points in hex:
+
+| Virtual key | Point | Its comment |
+| --- | --- | --- |
+| Q W E R | (f0/104/11c/138, 5c) | character 1-4 weapon / first attack |
+| A S D F | (…, 68) | second attack |
+| Z X C V | (…, 74) | third attack |
+| 1-6 | (f0, fe, 10a, 11d, 128, 136; 37) | the six runes |
+| `0xc0` (`` ` `` / `~` on a US layout) | (136, 43) | backspace rune |
+| `0x20` space | (10d, 41) | cast spell |
+| `0x09` TAB | (131, 50) | Pass (Cancel Attack) |
+| F1-F4 | (200-203, 2e) | the four magic casters |
+
+(0x131, 0x50) is inside PASS, button 112 of `d.Buttons17892` (x 285-318, y 77-83). With
+no attack menu open it is in the attack area, button 111 of `d.Buttons17196` (x 233-319,
+y 77-121), but above the four hands of `d.Buttons17952` (y 86-120), so TAB does nothing
+then. The port binds the same keys to the same buttons (`src/renderer/ui/Keyboard.ts`,
+`tools/dump-key-bindings.ts`), and adds 7-0 for the inventories, which the file leaves
+unbound.
+
 ## The timer array has a size and a free list, and a save carries both
 
 `m_firstAvailTimer` (`doc/CSBwin-src/Data.h:1555`) is the slot the next timer takes. Four
