@@ -12,22 +12,26 @@
  * - **The title line**: SETTINGS on a panel, and at its right CLOSE and EXIT, the kit's
  *   low buttons.
  * - **A row of tabs**: GAME, DISPLAY, SOUND and KEYS, the selected one pressed.
- * - **The tab's settings**, one a line: its name on a panel, and beside it a toggle, ON
- *   and OFF, the chosen one pressed, or a slider. The panel holds five lines. KEYS has
- *   its presets, its labels' layout and the list of the keys instead (`SettingsKeys.ts`).
+ * - **The tab's settings.** On GAME and DISPLAY, each is a button holding its name,
+ *   pressed when on and raised when off, two buttons a line (`settingButtonFrame`); a
+ *   click turns it over. On SOUND, each is a line: its name on a panel, and beside it a
+ *   toggle, ON and OFF, the chosen one pressed, or a slider. The panel holds five lines.
+ *   KEYS has its presets, its labels' layout and the list of the keys instead
+ *   (`SettingsKeys.ts`).
  * - **The help line**, at the foot (`helpText`).
  *
  * EXIT, which leaves for the welcome page (E15), is drawn inert, unlabelled, as the kit
- * draws a button that can do nothing. So is the CRT effect's toggle where the browser
- * gives no WebGL (`UIState.isCrtAvailable`); the help line then says why.
+ * draws a button that can do nothing. A setting that cannot work, the CRT effect where
+ * the browser gives no WebGL (`UIState.isCrtAvailable`), keeps its name: its button is
+ * raised, its label dim, it takes no click, and the help line says why.
  *
  * Every change goes to the settings model at once, which saves it and tells its
  * listeners: the page applies it to the sound, the CRT effect and the game.
  *
  * ## The help line
  *
- * It names what the pointer is over: a setting, its name or its control, a tab, or
- * CLOSE. A button under the pointer is lit, the kit's hovered look. The pointer's move
+ * It names what the pointer is over: a setting, its button, its name or its control, a
+ * tab, or CLOSE. A button under the pointer is lit, the kit's hovered look. The pointer's move
  * draws nothing: the VBL's frame draws the dialog again, as it draws the cursor
  * (`GameScreen.takeCursorMoved`). A touch screen has no hover, but its pointer stays where
  * the finger lifted (`bindCanvasEvents`, `src/ui/events.ts`), so the help line names the
@@ -114,6 +118,11 @@ function lineRect(line: number): Rect {
   return { x1: NAME_PANEL.x1, y1, x2: CONTROL_X2, y2: y1 + LOW_BUTTON_HEIGHT - 1 };
 }
 
+/** Setting `index`'s button on a tab of buttons: two a line, the first on the left. */
+export function settingButtonFrame(index: number): Rect {
+  return framesAcross(lineRect(index >> 1), 2)[index & 1];
+}
+
 /** A toggle's two frames on line `line`: ON, then OFF. */
 export function toggleFrames(line: number): [Rect, Rect] {
   const { y1, y2 } = lineRect(line);
@@ -148,12 +157,22 @@ const extra = (key: keyof SettingsValues['extras']) => ({
   set: (values: SettingsValues, on: boolean) => ({ extras: { ...values.extras, [key]: on } }),
 });
 
-/** The tabs, in their row's order: a label, the help line's words, and the settings, which KEYS has none of. */
-export const TABS: ReadonlyArray<{ readonly tab: SettingsTab; readonly label: string; readonly help: string; readonly settings: readonly Setting[] }> = [
+/**
+ * The tabs, in their row's order: a label, the help line's words, and the settings, which
+ * KEYS has none of. A tab of `buttons` has only toggles, each a button holding its name.
+ */
+export const TABS: ReadonlyArray<{
+  readonly tab: SettingsTab;
+  readonly label: string;
+  readonly help: string;
+  readonly buttons?: true;
+  readonly settings: readonly Setting[];
+}> = [
   {
     tab: 'game',
     label: 'GAME',
     help: 'THE EXTRAS, THE MAP AND THE STATISTICS',
+    buttons: true,
     settings: [
       { name: 'GATHER THROWN WEAPONS', help: 'WALK OVER A THROWN WEAPON TO TAKE IT BACK', ...extra('gatherThrownWeapons') },
       { name: 'DRINK AT FOUNTAINS', help: 'AN EMPTY HAND ON A FOUNTAIN DRINKS FROM IT', ...extra('drinkAtFountain') },
@@ -178,6 +197,7 @@ export const TABS: ReadonlyArray<{ readonly tab: SettingsTab; readonly label: st
     tab: 'display',
     label: 'DISPLAY',
     help: 'THE SCREEN',
+    buttons: true,
     settings: [
       {
         name: 'CRT EFFECT',
@@ -274,9 +294,15 @@ export function closeSettingsDialog(ui: UIState): void {
 
 const BTN_CLOSE = 1;
 const BTN_TAB0 = 10;
-/** Line `n`'s ON is `BTN_LINE0 + 3n`, its OFF the next, its slider the one after. */
+/**
+ * Line `n`'s ON is `BTN_LINE0 + 3n`, its OFF the next, its slider the one after. On a tab
+ * of buttons, setting `n`'s button is `BTN_LINE0 + 3n`.
+ */
 const BTN_LINE0 = 20;
-/** Line `n`'s name, which takes no click: the help line's alone (`hoverButtons`). */
+/**
+ * Line `n`'s name, or setting `n`'s button where it takes no click: the help line's
+ * alone (`hoverButtons`).
+ */
 const BTN_NAME0 = 60;
 
 function tabOf(state: SettingsDialogState) {
@@ -287,22 +313,30 @@ function settingsOf(state: SettingsDialogState): readonly Setting[] {
   return tabOf(state).settings;
 }
 
+function isButtonsTab(state: SettingsDialogState): boolean {
+  return tabOf(state).buttons === true;
+}
+
 function inert(ui: UIState, setting: Setting): boolean {
   return setting.unavailable?.when(ui) ?? false;
 }
 
 /**
  * The dialog's button list, in the form of CSBWin's (`x2` and `y2` exclusive): CLOSE, the
- * tabs, and each line's toggle or slider, or KEYS' controls. An inert control has none.
+ * tabs, and each setting's button, or each line's toggle or slider, or KEYS' controls. A
+ * control that cannot work has none.
  */
 export function settingsDialogButtons(ui: UIState, state: SettingsDialogState): UIButton[] {
   const buttons = [buttonOf(CLOSE_FRAME, BTN_CLOSE, 'settings.close')];
   TABS.forEach((t, i) => buttons.push(buttonOf(TAB_FRAMES[i], BTN_TAB0 + i, `settings.tab.${t.tab}`)));
   if (state.tab === 'keys') buttons.push(...keysTabButtons(ui, state.keys, KEYS_AREA));
+  const asButtons = isButtonsTab(state);
   settingsOf(state).forEach((setting, line) => {
     if (inert(ui, setting)) return;
     const id = BTN_LINE0 + 3 * line;
-    if (setting.kind === 'slider') {
+    if (asButtons) {
+      buttons.push(buttonOf(settingButtonFrame(line), id, `settings.button${line}`));
+    } else if (setting.kind === 'slider') {
       buttons.push(sliderButton(sliderRect(line), id + 2, `settings.line${line}.slider`));
     } else {
       const [on, off] = toggleFrames(line);
@@ -312,13 +346,17 @@ export function settingsDialogButtons(ui: UIState, state: SettingsDialogState): 
   return buttons;
 }
 
-/** The buttons, then every line's whole width: what the help line names under the pointer. */
+/**
+ * The buttons, then every line's whole width, or every setting's button frame: what the
+ * help line names under the pointer.
+ */
 function hoverButtons(ui: UIState, state: SettingsDialogState): UIButton[] {
   if (state.tab === 'keys') {
     return [...settingsDialogButtons(ui, state).slice(0, 1 + TABS.length), ...keysTabHoverButtons(ui, state.keys, KEYS_AREA)];
   }
+  const asButtons = isButtonsTab(state);
   const lines = settingsOf(state).map((_setting, line): UIButton => {
-    const r = lineRect(line);
+    const r = asButtons ? settingButtonFrame(line) : lineRect(line);
     return { word0: BTN_NAME0 + line, x1: r.x1, y1: r.y1, x2: r.x2 + 1, y2: r.y2 + 1, button: 2, name: `settings.line${line}` };
   });
   return [...settingsDialogButtons(ui, state), ...lines];
@@ -330,9 +368,9 @@ function hovered(ui: UIState, state: SettingsDialogState): number {
   return at ? searchButtonList(hoverButtons(ui, state), Math.floor(at.x), Math.floor(at.y), 2) : 0;
 }
 
-/** The line a control's id stands for, or -1. */
+/** The line, or on a tab of buttons the setting, a control's id stands for, or -1. */
 function lineOf(id: number): number {
-  if (id >= BTN_NAME0) return id < BTN_NAME0 + SETTING_LINES ? id - BTN_NAME0 : -1;
+  if (id >= BTN_NAME0) return id < BTN_NAME0 + 2 * SETTING_LINES ? id - BTN_NAME0 : -1;
   return id >= BTN_LINE0 ? Math.floor((id - BTN_LINE0) / 3) : -1;
 }
 
@@ -369,11 +407,23 @@ export function drawSettingsDialog(ui: UIState): void {
 
   if (state.tab === 'keys') {
     drawKeysTab(ui, state.keys, KEYS_AREA, over);
+  } else if (isButtonsTab(state)) {
+    drawSettingButtons(ui, state, look);
   } else {
     drawSettingLines(ui, state, look);
   }
 
   drawHelpLine(ui, HELP_LINE, helpText(ui, state));
+}
+
+/** A tab's settings, a button each holding its name: pressed when on, dim where it cannot work. */
+function drawSettingButtons(ui: UIState, state: SettingsDialogState, look: (id: number, pressed?: boolean) => ButtonLook): void {
+  const values = ui.settings.values;
+  settingsOf(state).forEach((setting, index) => {
+    if (setting.kind !== 'toggle') return;
+    const frame = settingButtonFrame(index);
+    drawButton(ui, frame, setting.name, inert(ui, setting) ? 'dim' : look(BTN_LINE0 + 3 * index, setting.get(values)));
+  });
 }
 
 /** A tab's settings, one a line: its name on the names' panel, and its toggle or slider. */
@@ -397,7 +447,10 @@ function drawSettingLines(ui: UIState, state: SettingsDialogState, look: (id: nu
 
 /* ------------------------------------------------------------------- the input ---- */
 
-/** A click: a right one closes it, but on KEYS' slots; a left one on a control acts at once. */
+/**
+ * A click: a right one closes it, but on KEYS' slots; a left one on a control acts at
+ * once, a setting's button turned over, a toggle's side chosen.
+ */
 export function settingsDialogClick(ui: UIState, x: number, y: number, buttons: number): void {
   const state = ui.settingsDialog;
   if (!state) return;
@@ -423,6 +476,10 @@ export function settingsDialogClick(ui: UIState, x: number, y: number, buttons: 
   const setting = settingsOf(state)[line];
   if (!setting) return;
   const values = ui.settings.values;
+  if (isButtonsTab(state)) {
+    if (setting.kind === 'toggle') ui.settings.update(setting.set(values, !setting.get(values)));
+    return;
+  }
   if (setting.kind === 'slider') {
     state.sliding = line;
     ui.settings.update(setting.set(values, sliderValueAt(sliderRect(line), x)));

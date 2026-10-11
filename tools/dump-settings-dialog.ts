@@ -9,11 +9,12 @@
  *    (x 0, y 198, `Buttons17196`) and the frozen game's thaw (`Buttons17832`, the whole
  *    screen) take a left click there.
  * 2. **The layout**: every control inside the plate's interior, none over another, every
- *    name inside its panel and every help line inside the help line.
- * 3. **The controls**: a tab, a toggle, the slider clicked, dragged past the track's end and
- *    released; a click on the chosen side of a toggle changes nothing; the CRT effect's
- *    toggle inert without WebGL, the help line saying why; Esc, CLOSE and a right click
- *    close it; the clock held while it is up.
+ *    name inside its button or its panel and every help line inside the help line.
+ * 3. **The controls**: a tab, a setting's button, which a click turns over, a toggle, the
+ *    slider clicked, dragged past the track's end and released; a click on the chosen side
+ *    of a toggle changes nothing; the CRT effect's button dim without WebGL, taking no
+ *    click, the help line saying why; Esc, CLOSE and a right click close it; the clock held
+ *    while it is up.
  * 4. **The help line** follows the pointer, and the pointer's move says when it changes.
  * 5. **Opening it**, through `GameInput` over the interface's real lists: Esc, awake, asleep
  *    and frozen, but not over the Reincarnate screen; Pause freezes; a double click on
@@ -40,7 +41,7 @@ import { searchMouseButtons, syncInventoryButtons, updateButtonLists } from '../
 import {
   CLOSE_FRAME, EXIT_FRAME, HELP_LINE, KEYS_AREA, SETTING_LINES, TABS, TAB_FRAMES, closeSettingsDialog, drawSettingsDialog,
   helpText, openSettingsDialog, settingsDialogButtons, settingsDialogClick, settingsDialogKey, settingsDialogPointer,
-  sliderRect, toggleFrames,
+  settingButtonFrame, sliderRect, toggleFrames,
 } from '../src/renderer/ui/SettingsDialog';
 import {
   CAPTURE_HELP, CAPTURE_LABEL, KEY_ACTION_NAMES, LABELS_FROM_KEYBOARD_HELP, LABELS_HELP, LABELS_NAME, PRESETS, SLOT_HELP,
@@ -50,7 +51,8 @@ import { KEY_LABEL_CHARS } from '../src/renderer/ui/KeyLabels';
 import { KEYPAD_KEY_BINDINGS } from '../src/renderer/ui/Keyboard';
 import { arrowBox, listTextX } from '../src/renderer/ui/Widgets';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
-import { CHAR_WIDTH, buttonRect } from '../src/renderer/ui/Widgets';
+import { CHAR_WIDTH, DIM_COLOR, LIT_COLOR, buttonLabelAt, buttonRect } from '../src/renderer/ui/Widgets';
+import { MENU_OPTION_COLOR } from '../src/renderer/ui/Menu';
 import { Settings } from '../src/settings/Settings';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics } from './lib/game';
@@ -110,20 +112,37 @@ console.log('=== 1. the message area\'s buttons ===');
 console.log('\n=== 2. the layout ===');
 {
   const interior: Rect = { x1: 10, y1: 10, x2: 309, y2: 189 };
-  const frames: Array<[string, Rect]> = [['CLOSE', CLOSE_FRAME], ['EXIT', EXIT_FRAME], ...TAB_FRAMES.map((f, i): [string, Rect] => [`tab ${TABS[i].label}`, f])];
+  const common: Array<[string, Rect]> = [
+    ['CLOSE', CLOSE_FRAME], ['EXIT', EXIT_FRAME], ...TAB_FRAMES.map((f, i): [string, Rect] => [`tab ${TABS[i].label}`, f]),
+    ['help line', HELP_LINE],
+  ];
+  const lineFrames: Array<[string, Rect]> = [];
   for (let line = 0; line < SETTING_LINES; line++) {
     const [on, off] = toggleFrames(line);
-    frames.push([`line ${line} ON`, on], [`line ${line} OFF`, off]);
+    lineFrames.push([`line ${line} ON`, on], [`line ${line} OFF`, off]);
   }
-  frames.push(['help line', HELP_LINE]);
-  check(frames.every(([, f]) => inside(f, interior)), 'every frame inside the plate\'s interior');
-  const clashes = frames.flatMap(([a, fa], i) => frames.slice(i + 1).filter(([, fb]) => overlap(fa, fb)).map(([b]) => `${a}/${b}`));
-  check(clashes.length === 0, `no frame over another${clashes.length ? `: ${clashes.join(', ')}` : ''}`);
+  const buttonFrames = Array.from({ length: 2 * SETTING_LINES }, (_, i): [string, Rect] => [`button ${i}`, settingButtonFrame(i)]);
+  for (const [layout, own] of [['lines', lineFrames], ['buttons', buttonFrames]] as const) {
+    const frames = [...common, ...own];
+    check(frames.every(([, f]) => inside(f, interior)), `${layout}: every frame inside the plate's interior`);
+    const clashes = frames.flatMap(([a, fa], i) => frames.slice(i + 1).filter(([, fb]) => overlap(fa, fb)).map(([b]) => `${a}/${b}`));
+    check(clashes.length === 0, `${layout}: no frame over another${clashes.length ? `: ${clashes.join(', ')}` : ''}`);
+  }
   const nameChars = Math.floor((toggleFrames(0)[0].x1 - 10 - 1 - 14 + 1) / CHAR_WIDTH);
   const helpChars = Math.floor((HELP_LINE.x2 - 1 - (HELP_LINE.x1 + 4) + 1) / CHAR_WIDTH);
   const settings = TABS.flatMap((t) => t.settings ?? []);
-  check(TABS.every((t) => (t.settings?.length ?? 0) <= SETTING_LINES), `no tab has more than ${SETTING_LINES} lines`);
-  check(settings.every((s) => s.name.length <= nameChars), `every name fits its panel, ${nameChars} characters`);
+  const lineCount = (t: (typeof TABS)[number]) => (t.buttons ? Math.ceil(t.settings.length / 2) : t.settings.length);
+  console.log(`  lines: ${TABS.map((t) => `${t.label} ${lineCount(t)}`).join(', ')}`);
+  check(TABS.every((t) => lineCount(t) <= SETTING_LINES), `no tab has more than ${SETTING_LINES} lines`);
+  check(TABS.every((t) => !t.buttons || t.settings.every((s) => s.kind === 'toggle')), 'a tab of buttons has only toggles');
+  const outside = TABS.filter((t) => t.buttons).flatMap((t) => t.settings.filter((s, i) => {
+    const frame = settingButtonFrame(i);
+    const x1 = buttonLabelAt(frame).x - (CHAR_WIDTH / 2) * s.name.length;
+    return x1 < frame.x1 + 6 || x1 + s.name.length * CHAR_WIDTH - 1 > frame.x2 - 6;
+  }).map((s) => s.name));
+  check(outside.length === 0, `every name inside its button's face${outside.length ? `: ${outside.join(', ')}` : ''}`);
+  check(TABS.filter((t) => !t.buttons).every((t) => t.settings.every((s) => s.name.length <= nameChars)),
+    `every line's name fits its panel, ${nameChars} characters`);
   const helps = [...settings.flatMap((s) => [s.help, s.unavailable?.help ?? '']), ...TABS.map((t) => t.help)];
   check(helps.every((h) => h.length <= helpChars), `every help line fits, ${helpChars} characters`);
 }
@@ -140,17 +159,31 @@ console.log('\n=== 3. the controls ===');
   let updates = 0;
   ui.settings.subscribe(() => updates++);
   updates = 0;
-  click(ui, toggleFrames(0)[0]);
-  check(values().extras.gatherThrownWeapons && !values().extras.drinkAtFountain, 'GATHER THROWN WEAPONS\' ON turns that extra on, alone');
-  click(ui, toggleFrames(0)[0]);
-  check(updates === 1, 'a click on the side already chosen changes nothing');
-  click(ui, toggleFrames(3)[0]);
-  check(values().mapView, 'MAP VIEW\'s ON turns the map on');
-  click(ui, toggleFrames(4)[1]);
-  check(!values().statistics, 'SEND STATISTICS\' OFF turns them off');
+  click(ui, settingButtonFrame(0));
+  check(values().extras.gatherThrownWeapons && !values().extras.drinkAtFountain, 'GATHER THROWN WEAPONS\' button turns that extra on, alone');
+  click(ui, settingButtonFrame(0));
+  check(updates === 2 && !values().extras.gatherThrownWeapons, 'a click on it pressed turns it off');
+  click(ui, settingButtonFrame(3));
+  check(values().mapView, 'MAP VIEW\'s button, below COLOUR NEW MASTERY\'s, turns the map on');
+  click(ui, settingButtonFrame(4));
+  check(!values().statistics, 'SEND STATISTICS\', pressed, turns them off');
+  const gaps = [
+    { x: settingButtonFrame(0).x2 + 4, y: centre(settingButtonFrame(0)).y },
+    { x: centre(settingButtonFrame(5)).x, y: centre(settingButtonFrame(5)).y },
+  ];
+  updates = 0;
+  for (const at of gaps) settingsDialogClick(ui, at.x, at.y, 2);
+  check(updates === 0, 'a click between two buttons, or where no sixth setting is, changes nothing');
 
   click(ui, TAB_FRAMES[2]);
   check(state.tab === 'sound', 'SOUND\'s tab selects it');
+  click(ui, toggleFrames(0)[1]);
+  check(!values().sound, 'SOUND, a line, has its toggle: OFF turns the sound off');
+  updates = 0;
+  click(ui, toggleFrames(0)[1]);
+  check(updates === 0, 'a click on the side already chosen changes nothing');
+  click(ui, toggleFrames(0)[0]);
+
   const track = sliderRect(1);
   settingsDialogClick(ui, track.x1, centre(track).y, 2);
   check(values().volume === 0 && state.sliding === 1, 'a click at the slider\'s left end sets the volume to 0, and holds the knob');
@@ -183,12 +216,26 @@ console.log('\n=== 3. the controls ===');
   const noWebGL = freshUI(false);
   openSettingsDialog(noWebGL);
   noWebGL.settingsDialog!.tab = 'display';
-  check(!settingsDialogButtons(noWebGL, noWebGL.settingsDialog!).some((b) => b.name?.startsWith('settings.line0')),
-    'without WebGL, the CRT effect\'s toggle has no button');
-  click(noWebGL, toggleFrames(0)[0]);
-  check(!noWebGL.settings.values.crt, 'and a click on its ON does nothing');
-  settingsDialogPointer(noWebGL, centre(toggleFrames(0)[0]));
+  const names = settingsDialogButtons(noWebGL, noWebGL.settingsDialog!).map((b) => b.name);
+  check(!names.includes('settings.button0') && names.includes('settings.button1'),
+    'without WebGL, the CRT effect has no button in the list, and STARTUP ANIMATIONS has');
+  click(noWebGL, settingButtonFrame(0));
+  check(!noWebGL.settings.values.crt, 'and a click on it does nothing');
+  settingsDialogPointer(noWebGL, centre(settingButtonFrame(0)));
   check(helpText(noWebGL, noWebGL.settingsDialog!) === 'THE CRT EFFECT NEEDS WEBGL', 'the help line says why');
+  // Its label is grey, and not lit under the pointer; STARTUP ANIMATIONS', on, is lit.
+  drawSettingsDialog(noWebGL);
+  const colours = (r: Rect) => {
+    const face = buttonRect(r);
+    const found = new Set<number>();
+    const buf = noWebGL.screenIndexBuffer;
+    for (let y = face.y1; y <= face.y2; y++) for (let x = face.x1; x <= face.x2; x++) found.add(buf.pixels[y * buf.width + x]);
+    return found;
+  };
+  const crt = colours(settingButtonFrame(0));
+  const startup = colours(settingButtonFrame(1));
+  check(crt.has(DIM_COLOR) && !crt.has(MENU_OPTION_COLOR) && !crt.has(LIT_COLOR), 'the CRT effect\'s label is dim, under the pointer');
+  check(startup.has(LIT_COLOR) && !startup.has(DIM_COLOR), 'STARTUP ANIMATIONS\', on, is pressed and lit');
 }
 
 console.log('\n=== 4. the help line ===');
@@ -197,13 +244,22 @@ console.log('\n=== 4. the help line ===');
   openSettingsDialog(ui);
   const state = ui.settingsDialog!;
   check(helpText(ui, state) === '', 'with the pointer off the canvas it says nothing');
-  check(settingsDialogPointer(ui, { x: 40, y: centre(toggleFrames(1)[0]).y }), 'the pointer onto a setting\'s name changes it');
+  check(settingsDialogPointer(ui, centre(settingButtonFrame(1))), 'the pointer onto a setting\'s button changes it');
   console.log(`  "${helpText(ui, state)}"`);
-  check(helpText(ui, state) === TABS[0].settings![1].help, 'it names the setting under the pointer');
-  check(settingsDialogPointer(ui, centre(buttonRect(toggleFrames(1)[1]))), 'onto its toggle\'s OFF, it changes: OFF is lit');
-  check(helpText(ui, state) === TABS[0].settings![1].help, 'and the help line still names the setting');
-  const off = buttonRect(toggleFrames(1)[1]);
-  check(!settingsDialogPointer(ui, { x: off.x1, y: off.y1 }), 'a move within OFF changes nothing');
+  check(helpText(ui, state) === TABS[0].settings[1].help, 'it names the setting under the pointer');
+  const drink = buttonRect(settingButtonFrame(1));
+  check(!settingsDialogPointer(ui, { x: drink.x1, y: drink.y1 }), 'a move within the button changes nothing');
+  check(settingsDialogPointer(ui, { x: settingButtonFrame(1).x1 + 2, y: centre(settingButtonFrame(1)).y }),
+    'onto its bevel, it changes: the button is no longer lit');
+  check(helpText(ui, state) === TABS[0].settings[1].help, 'and the help line still names the setting');
+  check(settingsDialogPointer(ui, centre(settingButtonFrame(4))), 'onto the third line\'s button, it changes');
+  check(helpText(ui, state) === TABS[0].settings[4].help, 'and names SEND STATISTICS');
+  state.tab = 'sound';
+  settingsDialogPointer(ui, { x: 40, y: centre(toggleFrames(0)[0]).y });
+  check(helpText(ui, state) === TABS[2].settings[0].help, 'on SOUND, a line\'s name names its setting');
+  check(settingsDialogPointer(ui, centre(buttonRect(toggleFrames(0)[1]))), 'onto its toggle\'s OFF, it changes: OFF is lit');
+  check(helpText(ui, state) === TABS[2].settings[0].help, 'and the help line still names the setting');
+  state.tab = 'game';
   settingsDialogPointer(ui, centre(buttonRect(TAB_FRAMES[1])));
   check(helpText(ui, state) === TABS[1].help, 'over a tab, the tab');
   settingsDialogPointer(ui, centre(buttonRect(CLOSE_FRAME)));

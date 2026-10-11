@@ -14,7 +14,7 @@
  *    repeat are plain.
  * 2. **The button's looks.** Raised has its label on a clean face; inert is the frame
  *    alone; hovered lights the label; pressed lights it and turns the bevel over, its
- *    light and its shade changing places, and nothing else.
+ *    light and its shade changing places, and nothing else; dim greys the label.
  * 3. **Staying in the box.** No widget draws a pixel outside its rectangle, and every
  *    pixel it draws is a colour graphic 0 has, or the ink `_DoMenu` writes on it.
  * 4. **The hit tests.** Each widget's button list finds it, and nothing in the gaps.
@@ -114,7 +114,7 @@ function main(): void {
   /* ---- 2. the button's looks ---- */
 
   console.log('');
-  console.log('=== the button: raised, inert, hovered, pressed, at both heights ===');
+  console.log('=== the button: raised, inert, hovered, pressed, dim, at both heights ===');
   for (const height of [W.BUTTON_HEIGHT, W.LOW_BUTTON_HEIGHT]) {
     const frame: Rect = { x1: 40, y1: 60, x2: 103, y2: 60 + height - 1 };
     const label = 'NEW FACE';
@@ -144,13 +144,13 @@ function main(): void {
     const ring = (x: number, y: number): boolean => W.contains({ x1: frame.x1 + 3, y1: frame.y1 + 3, x2: frame.x2 - 3, y2: frame.y2 - 3 }, { x, y })
       && !W.contains(face, { x, y });
     const turned: Record<number, number> = { 10: 3, 3: 10, 15: 12, 12: 15 };
-    const compare = (look: Uint8Array, bevelTurned: boolean): { ink: number; bevel: number; rest: number } => {
+    const compare = (look: Uint8Array, bevelTurned: boolean, ink = W.LIT_COLOR): { ink: number; bevel: number; rest: number } => {
       const wrong = { ink: 0, bevel: 0, rest: 0 };
       for (let y = frame.y1; y <= frame.y2; y++) {
         for (let x = frame.x1; x <= frame.x2; x++) {
           const i = y * SCREEN_WIDTH + x;
           if (W.contains(cell, { x, y }) && raised[i] === MENU_OPTION_COLOR) {
-            if (look[i] !== W.LIT_COLOR) wrong.ink++;
+            if (look[i] !== ink) wrong.ink++;
           } else if (ring(x, y) && bevelTurned) {
             if (look[i] !== (turned[raised[i]] ?? raised[i])) wrong.bevel++;
           } else if (look[i] !== raised[i]) {
@@ -169,6 +169,8 @@ function main(): void {
     const bottomRight = pixels(ui)[(frame.y2 - 4) * SCREEN_WIDTH + frame.x1 + 20];
     console.log(`  pressed: its bevel's top in ${topLeft}, its bottom in ${bottomRight}; raised: ${raised[(frame.y1 + 4) * SCREEN_WIDTH + frame.x1 + 20]} and ${raised[(frame.y2 - 4) * SCREEN_WIDTH + frame.x1 + 20]}`);
     check(topLeft === 3 && bottomRight === 10, 'pressed, the shade is at the top and the light at the bottom');
+    const dim = compare(draw('dim'), false, W.DIM_COLOR);
+    check(dim.ink + dim.bevel + dim.rest === 0, `a dim button is the raised one, its label grey (${JSON.stringify(dim)} differ)`);
   }
 
   /* ---- 3 and 4. tabs, a toggle, the slider and the help line ---- */

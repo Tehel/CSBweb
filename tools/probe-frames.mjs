@@ -512,8 +512,8 @@ console.log('state: Conflux bookshelf'); await shot('20-conflux-bookshelf');
 
 // The settings dialog (`src/renderer/ui/SettingsDialog.ts`), over the default dungeon's
 // first view: Esc opens it, over the whole screen, on GAME, and the clock is held while it
-// is up. A frame a tab: GAME's with the pointer on DRINK AT FOUNTAINS' name, so the help
-// line names it and the cursor is drawn, DISPLAY's and SOUND's with it off the canvas,
+// is up. A frame a tab: GAME's with the pointer on DRINK AT FOUNTAINS' button, so it is
+// lit, the help line names it and the cursor is drawn, DISPLAY's and SOUND's with it off the canvas,
 // and KEYS' with MOVE FORWARD's first slot waiting for its key.
 await send('Page.navigate', { url: `${APP}?intro=0&keepsaves` });
 await wait(3500);
@@ -526,7 +526,7 @@ await key('Escape'); await wait(300);
 check(await settingsUp(), 'Esc opens the settings in play');
 const heldAt = await ticks(); await wait(1000);
 check(await ticks() === heldAt, 'the clock is held while they are up');
-await pointerAt(40, 92); await wait(200);
+await pointerAt(236, 71); await wait(200);
 console.log('state: settings, GAME');    await shot('21-settings-game');
 await leaveCanvas(); await wait(200);
 await canvasClick(120, 45, 0); await wait(300);

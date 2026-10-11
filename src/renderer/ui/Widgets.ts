@@ -13,9 +13,10 @@
  * - **The panel**: its sunken title panel, under a list or lines of text (`drawPanel`).
  * - **The button**: a frame of its bottom pair, at its own height (`BUTTON_HEIGHT`) or a
  *   lower one that fits a title line (`LOW_BUTTON_HEIGHT`), its face's rows repeated or
- *   left out. It is raised, hovered, pressed, or inert (`drawButton`). Hovered lights its
- *   label; pressed lights it too and turns its bevel over (`pressBevel`); inert has no
- *   label, as CSBWin leaves an empty save slot's button unlabelled.
+ *   left out. It is raised, hovered, pressed, dim or inert (`drawButton`). Hovered lights
+ *   its label; pressed lights it too and turns its bevel over (`pressBevel`); dim, a
+ *   setting that cannot work, draws it grey; inert has no label, as CSBWin leaves an
+ *   empty save slot's button unlabelled.
  * - **The list**: rows of text on a panel, the selected one inverted, beside a
  *   scrollbar in the manner of a GEM window's (`drawList`).
  * - **A row of tabs** and **a toggle**: buttons side by side, the chosen one pressed
@@ -133,6 +134,8 @@ export function drawCentredText(
 
 /** A lit label, a hovered or pressed button's: yellow, `_DoMenu`'s first title's colour. */
 export const LIT_COLOR = MENU_TITLE1_COLOR;
+/** A dim label, a setting's that cannot work: the UI palette's grey 444, darker than the option colour. */
+export const DIM_COLOR = 2;
 
 /** A button at the save menu's height, graphic 0's own frame's. */
 export const BUTTON_HEIGHT = BUTTON_PIECE.y2 - BUTTON_PIECE.y1 + 1;
@@ -141,9 +144,10 @@ export const LOW_BUTTON_HEIGHT = LOW_BUTTON_PIECE.top + 1 + 6 + 1 + LOW_BUTTON_P
 
 /**
  * Raised, ready for a click; hovered, under the pointer; pressed, the chosen tab or
- * choice; inert, unlabelled.
+ * choice; dim, raised but its label grey, a control that cannot work; inert, unlabelled,
+ * a button with nothing to do.
  */
-export type ButtonLook = 'raised' | 'hover' | 'pressed' | 'inert';
+export type ButtonLook = 'raised' | 'hover' | 'pressed' | 'dim' | 'inert';
 
 /**
  * The rectangle a click on a button frame takes, and its press animation grows from, as
@@ -198,11 +202,15 @@ export function pressBevel(ui: UIState, frame: Rect): void {
   }
 }
 
+const LABEL_COLOR: Readonly<Record<Exclude<ButtonLook, 'inert'>, number>> = {
+  raised: MENU_OPTION_COLOR, hover: LIT_COLOR, pressed: LIT_COLOR, dim: DIM_COLOR,
+};
+
 /** A button: its frame, its bevel turned over if pressed, and its label, which an inert one has none of. */
 export function drawButton(ui: UIState, frame: Rect, label: string, look: ButtonLook = 'raised'): void {
   drawButtonFrame(ui, frame);
   if (look === 'pressed') pressBevel(ui, frame);
-  if (look !== 'inert') drawButtonLabel(ui, frame, label, look === 'raised' ? MENU_OPTION_COLOR : LIT_COLOR);
+  if (look !== 'inert') drawButtonLabel(ui, frame, label, LABEL_COLOR[look]);
 }
 
 /** A button's entry in a button list: its `buttonRect`, for a left click. */
