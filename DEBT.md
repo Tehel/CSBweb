@@ -215,13 +215,13 @@ keyboard controls"). A digit's virtual key is the number-row key whatever the sh
 state, so CSBWin's runes answer unshifted on AZERTY; a letter's follows the layout, the
 key printed Q.
 
-Paying it: the bindings matched on `KeyboardEvent.code`, passed beside `key`. Which rule
-the letters follow is the author's choice: `code` for every key keeps the attack keys a
-grid on any layout (A Z E R / Q S D F / W X C V on AZERTY), where CSBWin's rule, digits by
-position and letters by what is printed, scrambles the grid there. `~`'s key is
-`Backquote`, `²` on AZERTY. The text screens, the save menu's names and Reincarnate, keep
-`key`: they type characters. `tools/dump-key-bindings.ts` presses codes, AZERTY's digits
-among them. E37 then gathers the bindings into one table.
+Paying it: every binding matched on `KeyboardEvent.code`, the physical key, passed beside
+`key`; the author's decision, since the rebinding E37 prepares stores whatever code the
+player presses. The defaults are the positions of CSBWin's keys on a US keyboard, so the
+attack keys stay a grid on any layout (A Z E R / Q S D F / W X C V on AZERTY), the digits
+answer unshifted, and the rune key is `Backquote`, `²` on AZERTY. The text screens, the
+save menu's names and Reincarnate, keep `key`: they type characters.
+`tools/dump-key-bindings.ts` presses codes, AZERTY's digits among them.
 
 ### R1 ⏳ A game read in play leaves the screen on the old world
 
@@ -690,12 +690,20 @@ moves and F5/F9 are a third shape, `PORT_KEYS`, a map from key to action. A scre
 rebinds keys, for another layout or another taste, would have to read and write all of
 them.
 
+The rebinding the author intends is interactive: pick an action, press the key that should
+do it. Each action has two slots, as K J L M , . and the keypad both move the party in
+CSBWin's shipped `config.txt`, and whole presets (a layout, an ergonomics) set every
+slot at once.
+
 Paying it: one table from a named action (`attack.<champion>.<row>`, `inventory.<n>`,
 `rune.<n>`, `runeBack`, `cast`, `pass`, `caster.<n>`, the six moves, `quickSave`,
-`quickLoad`) to its keys, the defaults those of CSBWin's shipped `config.txt` plus 7-0; the
-reverse map built from it; `handleUIKey` and `portKeyAction` dispatching on the action.
-The table is what a rebinding screen and its stored setting read and write. After R13,
-whose key codes it holds.
+`quickLoad`) to two slots, each a `KeyboardEvent.code` and its modifiers or empty; the
+reverse map from a code to its action built from it; `handleUIKey` and `portKeyAction`
+dispatching on the action. The default preset is CSBWin's shipped `config.txt` plus 7-0.
+The table is what the rebinding screen, its presets and its stored setting read and write.
+What the screen will need from it: a label for a code, which is the `key` captured with it
+(`navigator.keyboard.getLayoutMap` is Chromium's only), and a code already bound elsewhere
+found from the reverse map. After R13, whose codes it holds.
 
 ### E38 ⏳ The keys the graphics.dat tables bind cannot be rebound
 
@@ -707,8 +715,11 @@ Ctrl-S, Esc, Enter, Insert, Clr/Home and the arrows reach their buttons through 
 the tables never change. The shipped file sends K J L M , . and the keypad's 4-9 the same
 way, to the arrows' keyscans; the port's `PORT_KEYS` reach the moves directly.
 
-Paying it: `KEYSCAN` as E37's table's second kind of entry, a key to an Atari keyscan,
-rebound the same way, and the tables still read from graphics.dat. After E37.
+Paying it: these keys as E37's actions too, each named for the Atari keyscan it sends
+(`move.forward` is `0x4800`, `freeze` is `0x1b`, `diskMenu` is Ctrl-S's `0x13`), so a code
+bound to one goes through `translateKey` and the tables, read from graphics.dat, still
+decide the button in each mode. The port's moves then take the same route, a second slot
+of the arrows' actions, as the shipped `config.txt` sends them. After E37.
 
 ### E23 ⏳ One game read, whole or not at all
 
