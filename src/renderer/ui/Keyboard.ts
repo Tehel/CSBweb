@@ -16,9 +16,9 @@
  * panel's own handler decides what it means.
  *
  * `handleUIKey`'s bindings are the port's `config.txt`. They claim no key a table binds but
- * F1-F4, which select the caster, where `Byte18400` has them open the inventories
- * (buttons 7-10) — the author's choice, and a `DEBT.md` H divergence: 7-0 open the
- * inventories instead, and `tableKeyButton` leaves F1-F4 to `handleUIKey`. They call the handlers a click reaches rather than synthesising coordinates: the
+ * F1-F4, which select the caster: the shipped `config.txt` makes them clicks on the caster
+ * tabs, so `Byte18400`, which has them open the inventories (buttons 7-10), never sees
+ * them, and `tableKeyButton` leaves them to `handleUIKey`. They call the handlers a click reaches rather than synthesising coordinates: the
  * coordinates in a `config.txt` are hardcoded, and ours would have to be read back out
  * of the runtime button lists to say the same thing. The guards below are therefore
  * lifted from `handleMouseButton` (`src/renderer/ui/Mouse.ts`) so the two routes stay
@@ -54,8 +54,8 @@ const INVENTORY_KEYS = ['7', '8', '9', '0'];
 /** The six runes of the current incantation step — magic buttons 101-106. */
 const RUNE_KEYS = ['1', '2', '3', '4', '5', '6'];
 /**
- * Select the champion who is casting. The tables bind these to the inventories; the port
- * keeps them for the caster (`DEBT.md` H).
+ * Select the champion who is casting: `config.txt`'s clicks at x 512-515, which
+ * `_HandleMagicClick` takes as champion 0-3 (`doc/CSBwin-src/Magic.cpp:600-690`).
  */
 const CASTER_KEYS = ['F1', 'F2', 'F3', 'F4'];
 /**
@@ -151,7 +151,7 @@ export function translateKey(ui: UIState, keyscan: number): number {
 
 /**
  * The button the current key tables bind a `KeyboardEvent.key` to, or 0 — but 0 for the
- * caster keys, which the port takes from the tables (`CASTER_KEYS`, `DEBT.md` H).
+ * caster keys, which `config.txt` takes before the tables (`CASTER_KEYS`).
  */
 export function tableKeyButton(ui: UIState, key: string, ctrl = false): number {
   if (!ctrl && CASTER_KEYS.includes(key)) return 0;

@@ -1824,12 +1824,6 @@ Recorded so that nobody "fixes" them.
   last is dropped; the author finds that acceptable, and `handleUIKey`'s comment has the
   two ways to keep such keys. The two screens open only from a pass, so neither is up
   while a script runs.
-- 🚫 **F1-F4 select the caster.** CSBWin's adventure key table `Byte18400` binds them to
-  buttons 7-10, the four inventories (`doc/PROVEN_FACTS.md` → "The key tables: CSBWin's own
-  keys"). The author finds the caster on F1-F4 and the inventories on 7-0 more convenient,
-  so `tableKeyButton` (`src/renderer/ui/Keyboard.ts`) leaves F1-F4 to `handleUIKey`. Every
-  other table key keeps CSBWin's role. A rebinding screen, if players ever disagree, would
-  make this a default rather than a divergence.
 - 🚫 **The ending's speech is shown whole.** CSBWin runs the strip's clock at a tick, at
   the end of `PrintLines` and in `_ProcessTimersViewportAndSound`, and never in
   `_VBLDelay`. So in `_FusionSequence` each text gets one scroll in its thirteen seconds,

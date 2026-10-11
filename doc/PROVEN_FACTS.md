@@ -3297,12 +3297,23 @@ binds the panels with these `MSCAN` lines, all left button, points in hex:
 | `0xc0` (`` ` `` / `~` on a US layout) | (136, 43) | backspace rune |
 | `0x20` space | (10d, 41) | cast spell |
 | `0x09` TAB | (131, 50) | Pass (Cancel Attack) |
-| F1-F4 | (200-203, 2e) | the four magic casters |
+| F1-F4 | (200-203, 2e) | first…forth magic caster |
 
 (0x131, 0x50) is inside PASS, button 112 of `d.Buttons17892` (x 285-318, y 77-83). With
 no attack menu open it is in the attack area, button 111 of `d.Buttons17196` (x 233-319,
 y 77-121), but above the four hands of `d.Buttons17952` (y 86-120), so TAB does nothing
-then. The port binds the same keys to the same buttons (`src/renderer/ui/Keyboard.ts`,
+then.
+
+F1-F4's x, 512-515, is off the screen on purpose. `SearchButtonList` folds it to 0xee
+before its search (`doc/CSBwin-src/CSBCode.cpp:7612`), which lands in the caster tabs, and
+`_HandleMagicClick` takes 512-515 as champion 0-3 whichever caster is selected
+(`doc/CSBwin-src/Magic.cpp:600-690`). Since the file has no `SCAN` line for F1-F4,
+`UIM_KEYDOWN` clicks there and never queues the key (`doc/CSBwin-src/CSBUI.cpp:1141-1183`):
+F1-F4 select the caster, and `Byte18400`'s binding of them to the inventories (below,
+"The key tables: CSBWin's own keys") is only reached under a `config.txt` without these
+lines.
+
+The port binds the same keys to the same buttons (`src/renderer/ui/Keyboard.ts`,
 `tools/dump-key-bindings.ts`), and adds 7-0 for the inventories, which the file leaves
 unbound.
 
@@ -6168,8 +6179,9 @@ themselves, and that the next VBL's frame has the cursor where the pointer last 
   pair of tables.
 
 The port: `keyScanOf` and `translateKey` (`src/renderer/ui/Keyboard.ts`), queued by
-`GameInput.keyDown` (`src/renderer/GameInput.ts`) before the port's own bindings, except F1-F4, which select the caster
-(`DEBT.md` H). Evidence: `tools/dump-key-bindings.ts`.
+`GameInput.keyDown` (`src/renderer/GameInput.ts`) before the port's own bindings, except
+F1-F4, which the shipped `config.txt` makes caster clicks before any table sees them
+("CSBWin has no keyboard controls", above). Evidence: `tools/dump-key-bindings.ts`.
 
 ## The freeze: button 147 in, button 148 out, no tick in between
 

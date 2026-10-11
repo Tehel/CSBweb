@@ -157,7 +157,7 @@ export class GameInput {
     }
     // The key tables first, `TAG0196da` (doc/CSBwin-src/CSBCode.cpp:8515): awake,
     // `Byte18400` and `Byte18428` bind Ctrl-S, Esc, Insert, Clr/Home and the arrows,
-    // and F1-F4, which the port keeps for the caster (`DEBT.md` H); asleep `Byte18440` binds Return and Esc, and frozen `Byte18448` Esc
+    // and F1-F4, which `config.txt` takes first for the caster (`tableKeyButton`); asleep `Byte18440` binds Return and Esc, and frozen `Byte18448` Esc
     // alone (doc/CSBwin-src/Mouse.cpp:1839-1840, :1893-1894). A bound key is queued
     // as its button, like a click.
     if (!mods.metaKey && !mods.altKey) {

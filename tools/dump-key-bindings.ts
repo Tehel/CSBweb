@@ -190,7 +190,8 @@ async function main(): Promise<void> {
   press('1');
   check(runes(party.state) === '-', 'a rune key with no caster selected should do nothing');
 
-  // F1-F4 select the caster, not the inventories `Byte18400` binds them to (`DEBT.md` H).
+  // F1-F4 select the caster, as config.txt's clicks do, not the inventories `Byte18400`
+  // binds them to.
   press('F1');
   check(party.state.magicCasterIndex === 0, 'F1 should select the first champion as caster');
   press('F2');
@@ -370,7 +371,7 @@ async function main(): Promise<void> {
     'a key no table binds is left to the browser and the port');
   for (const key of CASTER_KEYS) {
     check(pressed(key) !== 0 && tableKeyButton(ui, key) === 0,
-      `${key} is bound in Byte18400, and left to the caster binding (DEBT.md H)`);
+      `${key} is bound in Byte18400, and left to the caster binding config.txt gives it`);
   }
   check(tableKeyButton(ui, 'ArrowLeft') === 6 && tableKeyButton(ui, 's', true) === 140,
     'every other table key goes through the tables');
@@ -381,7 +382,7 @@ async function main(): Promise<void> {
 /** Every key `keyScanOf` gives a keyscan without Ctrl. */
 const TABLE_KEYS = ['Enter', 'Escape', 'F1', 'F2', 'F3', 'F4', 'Home', 'ArrowUp', 'ArrowLeft', 'ArrowRight',
   'ArrowDown', 'Insert'];
-/** The table keys the port keeps for the caster (`DEBT.md` H). */
+/** The table keys config.txt takes for the caster. */
 const CASTER_KEYS = ['F1', 'F2', 'F3', 'F4'];
 /** And the letters it gives one with Ctrl. */
 const CTRL_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
