@@ -70,6 +70,11 @@ export interface BootSequenceDeps {
    * Absent, the boot is CSBWin's.
    */
   swoosh?: { image: Swoosh; startSound: () => void } | null;
+  /**
+   * Whether the title animation plays before the entrance: the player's startup
+   * animations (`src/settings/Settings.ts`). Off, the entrance is the first screen.
+   */
+  title: boolean;
   /** Skip the logo, the title animation and the entrance and boot straight into the dungeon. */
   skip: boolean;
 }
@@ -552,7 +557,7 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
     if (deps.swoosh) await showSwoosh(host, deps.swoosh.image, deps.swoosh.startSound);
     for (;;) {
       try {
-        await displayChaosStrikesBack(host);
+        if (deps.title) await displayChaosStrikesBack(host);
         const choice = await showPrisonDoor(host, prisonDoorButtons(host), async (c) => {
           if (!(await readGame(c))) return false;
           read = c;
@@ -595,7 +600,7 @@ export type EndOfGame = PrisonDoorChoice | 'terminate';
  * (`doc/CSBwin-src/WinScreen.cpp:1493-1498`), and `_GameSetup` fills `Palette11978` from
  * `d.Palette552[0]` (`CSBCode.cpp:10747`).
  */
-export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks: ShowCreditsHooks): Promise<EndOfGame> {
+export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip' | 'title'>, hooks: ShowCreditsHooks): Promise<EndOfGame> {
   const uiTables = deps.gameScreen.getUITables();
   const palette11978 = uiTables.graphic232.palette552[0] ?? PALETTE_11914;
   const { host, detach } = createIntroHost(deps, palette11978);
@@ -615,7 +620,7 @@ export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks
  * with `d.PartyHasDied` set, so a failed read of `dungeon.dat` or a save goes back to the
  * entrance too.
  */
-async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDeps, 'skip'>): Promise<PrisonDoorChoice> {
+async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDeps, 'skip' | 'title'>): Promise<PrisonDoorChoice> {
   const readGame = readEntireGame(host, deps, true);
   const choice = (await readGame('resume')) ? 'resume' : await showPrisonDoor(host, prisonDoorButtons(host), readGame, deps.rise);
   await tag021028(host, choice);

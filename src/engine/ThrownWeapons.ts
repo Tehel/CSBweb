@@ -11,8 +11,8 @@
  * Taking the object into the hand or a champion's slot drops the tag
  * (`forgetThrownWeapon`).
  *
- * Tags are made whether or not the extras are on; only the gather reads them, and only
- * with them on. They are never saved: a load forgets them (`applyRuntimeSaveState`).
+ * Tags are made whether or not the extra is on; only the gather reads them, and only
+ * with it on. They are never saved: a load forgets them (`applyRuntimeSaveState`).
  */
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID, type Position } from '../core/types';
 import type { DatabaseRecord } from '../data/dungeonTypes';
@@ -87,7 +87,7 @@ function takes(ctx: GameContext, champion: Champion, slot: number, object: Objec
 }
 
 /**
- * The party has arrived on `at` and its pads have fired: with the extras on, every tagged
+ * The party has arrived on `at` and its pads have fired: with the extra on, every tagged
  * object lying there goes back to its thrower. It comes off the floor as a pick-up by
  * hand does (`tryPickViewportObject`), so a pad under it feels it go. Each goes first into
  * the slot it left, if that is free; then the rest, the one the fewest free slots take
@@ -96,7 +96,7 @@ function takes(ctx: GameContext, champion: Champion, slot: number, object: Objec
  * room, leaves it where it lies, still tagged.
  */
 export function gatherThrownWeapons(ctx: GameContext, at: Position): void {
-  if (!ctx.extras || ctx.thrownWeapons.size === 0) return;
+  if (!ctx.extras.gatherThrownWeapons || ctx.thrownWeapons.size === 0) return;
   const dungeon = ctx.dungeon;
   const party = ctx.party.state;
   const lying: { object: ObjectID; tag: ThrownWeaponTag; champion: Champion }[] = [];

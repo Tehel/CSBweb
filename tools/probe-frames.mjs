@@ -490,7 +490,7 @@ console.log('state: Conflux bookshelf'); await shot('20-conflux-bookshelf');
 // effect in the saved settings: the intro is drawn through it, and a real click on the
 // entrance's scroll brings up the credits, as the click for frame 08 did.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
-  try { localStorage.setItem('csbweb_ui_settings_v1', JSON.stringify({ crt: true })); } catch (e) {}
+  try { localStorage.setItem('csbweb_settings_v2', JSON.stringify({ crt: true })); } catch (e) {}
 ` });
 await send('Page.navigate', { url: `${APP}?keepsaves` });
 await wait(9000);

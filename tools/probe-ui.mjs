@@ -4,7 +4,7 @@
 // wrong champion, the object is in the chain but not drawn. `tools/dump-*.ts` cannot see
 // those — they stand the engine up headlessly, without the UI. This drives the real page
 // over the Chrome DevTools Protocol instead, through the `window.__probe` handle that
-// `src/main.ts` exposes under `isDebugFeaturesEnabled()`.
+// `src/main.ts` exposes under the dev server's `__CSBWEB_PROBE__`.
 //
 // It starts a dev server and a headless Chrome if they are not already up, and leaves them
 // running, so the second probe of a session costs one call instead of five.
@@ -135,15 +135,14 @@ const probed = (expr) => `(() => { const p = window.__probe;
 
 const boot = async () => {
   await send('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false });
-  // `window.__probe` is created during init under isDebugFeaturesEnabled(), so Debug has
-  // to be on *before* the reload — clicking the button afterwards is too late. Seed the
-  // settings rather than clearing them, then seed Math.random so a boot is reproducible.
+  // Seed the settings rather than clearing them, before the reload: no sound, and the map
+  // shown with Debug on, so a click on it moves the party. Then seed Math.random so a
+  // boot is reproducible.
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `
     try {
       localStorage.clear();
-      localStorage.setItem('csbweb_ui_settings_v1', JSON.stringify({
-        mapVisible: true, smooth: false,
-        debug: true, crt: false, soundEnabled: false, soundVolume: 0.8 }));
+      localStorage.setItem('csbweb_settings_v2', JSON.stringify({
+        mapView: true, debug: true, crt: false, sound: false }));
     } catch (e) {}
     let seed = 0x2545f491;
     Math.random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;

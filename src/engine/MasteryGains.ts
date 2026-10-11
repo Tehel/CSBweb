@@ -14,8 +14,8 @@
  * the panel is showing (`settleMasteryGains`), so a later drop cannot light it again.
  *
  * The note sits beside the champion and is never saved: a save and a load forget it, and
- * the line goes back to colour 13. It is kept whether or not the extras are on; only the
- * panel reads it, and only with them on.
+ * the line goes back to colour 13. It is kept whether or not the extra is on; only the
+ * panel reads it, and only with it on.
  */
 import { AttributeIndex, attributeCurrent, attributeMaximum } from './attributes';
 import type { Champion } from './gameTypes';

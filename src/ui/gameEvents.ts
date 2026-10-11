@@ -83,7 +83,7 @@ export interface GameEventsDeps {
     build: string;
     /** The player's id, read when an event is sent (`playerId`). */
     player: () => string;
-    /** Whether events are sent, read at each one: the player's setting (`UISettings.statistics`). */
+    /** Whether events are sent, read at each one: the player's setting (`SettingsValues.statistics`). */
     enabled: () => boolean;
     /** Where an event goes: `sendBeacon` in a production build, nowhere otherwise. */
     send: (event: GameEvent) => void;

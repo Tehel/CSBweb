@@ -188,6 +188,8 @@ ui/         DOM-side debug chrome (settings, map preview, champion panel), saveD
             (the save menu's import: a file dropped on the page), fatalMessage (the
             screen an error that ends the game leaves), and gameEvents (what the
             server's statistics are told: a game started, joined, won or lost)
+settings/   Settings: the player's settings, one model the page, the game and the dialogs
+            read and change, kept in `localStorage`
 lib/        crt (the CRT effect: a WebGL tube over the canvas, and the pointer read through it)
 main.ts     Bootstrap and wiring
 ```

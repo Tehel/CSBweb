@@ -1,20 +1,12 @@
 import { GameInput } from '../renderer/GameInput';
-import { getUIContext, isDebugFeaturesEnabled, isExtrasEnabled, setDebugFeaturesEnabled, setExtrasEnabled } from './context';
+import { getUIContext } from './context';
 import { handleMapCanvasClick } from './mapPreview';
 import { updateChampionPanel } from './championPanel';
-import { applyUISettings, loadUISettings, readUISettings, saveUISettings } from './settings';
 import { getEventPosition } from './utils';
 
 let uiBound = false;
 
 const mapCanvasEl = document.getElementById('map-canvas') as HTMLCanvasElement | null;
-const debugButton = document.getElementById('btn-debug') as HTMLButtonElement | null;
-const mapButton = document.getElementById('btn-map') as HTMLButtonElement | null;
-const championsButton = document.getElementById('btn-champions') as HTMLButtonElement | null;
-const crtButton = document.getElementById('btn-crt') as HTMLButtonElement | null;
-const soundButton = document.getElementById('btn-sound') as HTMLButtonElement | null;
-const soundVolume = document.getElementById('sound-volume') as HTMLInputElement | null;
-const extrasButton = document.getElementById('btn-extras') as HTMLButtonElement | null;
 
 /**
  * The canvas's pointer, read through pointer events rather than mouse events. A browser
@@ -67,28 +59,6 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, input: GameInput): v
     });
 }
 
-/**
- * The Extras button, bound before the intro and not with the rest in `bindUIEvents`, so it
- * is live at the entrance too. The extras in play take the setting at once: `onChange` is
- * told it now and at every press. Until the game is wired the other settings are only the
- * saved ones, which `readUISettings` cannot read off the page: the saved set is written
- * back with this one flag changed.
- */
-export function bindExtrasToggle(onChange: (enabled: boolean) => void): void {
-    setExtrasEnabled(loadUISettings().extras);
-    onChange(isExtrasEnabled());
-    if (!extrasButton) return;
-    extrasButton.classList.toggle('is-pressed', isExtrasEnabled());
-    extrasButton.addEventListener('click', () => {
-        const next = !isExtrasEnabled();
-        setExtrasEnabled(next);
-        onChange(next);
-        extrasButton.classList.toggle('is-pressed', next);
-        console.info(next ? 'Extras enabled' : 'Extras disabled');
-        saveUISettings({ ...loadUISettings(), extras: next });
-    });
-}
-
 export function bindUIEvents(): void {
     const ctx = getUIContext();
     if (!ctx) return;
@@ -105,56 +75,6 @@ export function bindUIEvents(): void {
         document.getElementById('btn-qsave')?.addEventListener('click', () => ctx.onQuickSave());
         document.getElementById('btn-qload')?.addEventListener('click', () => ctx.onQuickLoad());
 
-        crtButton?.addEventListener('click', () => {
-            const next = !ctx.isCrtEnabled();
-            const enabled = ctx.setCrtEnabled(next);
-            crtButton.classList.toggle('is-pressed', enabled);
-            if (next && !enabled) console.warn('CRT effect unavailable');
-            else console.info(enabled ? 'CRT effect enabled' : 'CRT effect disabled');
-            saveUISettings(readUISettings());
-        });
-
-        soundButton?.addEventListener('click', () => {
-            const next = !ctx.isSoundEnabled();
-            ctx.setSoundEnabled(next);
-            soundButton.classList.toggle('is-pressed', next);
-            console.info(next ? 'Sound enabled' : 'Sound disabled');
-            saveUISettings(readUISettings());
-        });
-
-        soundVolume?.addEventListener('input', () => {
-            const value = Math.max(0, Math.min(100, Number(soundVolume.value)));
-            ctx.setSoundVolume(value / 100);
-            saveUISettings(readUISettings());
-        });
-
-        debugButton?.addEventListener('click', () => {
-            const next = !isDebugFeaturesEnabled();
-            setDebugFeaturesEnabled(next);
-            debugButton.classList.toggle('is-pressed', next);
-            console.info(next ? 'Debug features enabled' : 'Debug features disabled');
-            saveUISettings(readUISettings());
-        });
-
-        mapButton?.addEventListener('click', () => {
-            const mapEl = document.getElementById('map');
-            if (!mapEl) return;
-            const visible = mapEl.style.display !== 'none';
-            mapEl.style.display = visible ? 'none' : 'block';
-            mapButton.classList.toggle('is-pressed', !visible);
-            saveUISettings(readUISettings());
-        });
-
-        championsButton?.addEventListener('click', () => {
-            const championsEl = document.getElementById('champions');
-            if (!championsEl) return;
-            const visible = championsEl.style.display !== 'none';
-            championsEl.style.display = visible ? 'none' : 'block';
-            championsButton.classList.toggle('is-pressed', !visible);
-            updateChampionPanel();
-            saveUISettings(readUISettings());
-        });
-
         // Once per game tick, which is when skills and attributes can change. The panel
         // does nothing while it is hidden.
         ctx.game.onTick(() => updateChampionPanel());
@@ -167,6 +87,4 @@ export function bindUIEvents(): void {
             handleMapCanvasClick(e);
         });
     }
-
-    applyUISettings(loadUISettings());
 }

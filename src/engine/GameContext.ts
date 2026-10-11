@@ -78,6 +78,19 @@ export interface GameSystems {
   mainLoop: MainLoop;
 }
 
+/** The extras (`DEBT.md` X): a flag each, every one off by default. */
+export interface Extras {
+  /** What a champion's THROW or SHOOT sent off, gathered back (`gatherThrownWeapons`). */
+  readonly gatherThrownWeapons: boolean;
+  /** An empty hand drinking at a water fountain (`drinkAtWaterFountain`). */
+  readonly drinkAtFountain: boolean;
+  /** A mastery just gained drawn in colour 7 on the attribute panel (`MasteryGains.ts`). */
+  readonly colourNewMastery: boolean;
+}
+
+/** Every extra off: the game is CSBWin's. */
+export const NO_EXTRAS: Extras = { gatherThrownWeapons: false, drinkAtFountain: false, colourNewMastery: false };
+
 export interface GameContext {
   /** The level data: the dungeon half of `d.`. */
   readonly dungeon: DungeonState;
@@ -137,10 +150,10 @@ export interface GameContext {
   /** Every table from `graphics.dat`. */
   readonly tables: GameTables;
   /**
-   * The extras (`DEBT.md` X), the page's Extras button (`GameScreen.setExtras`): what
-   * CSBWin does not have. Off, the game is CSBWin's.
+   * The extras (`DEBT.md` X), one flag each, as the player's settings leave them
+   * (`src/settings/Settings.ts`): what CSBWin does not have. All off, the game is CSBWin's.
    */
-  extras: boolean;
+  extras: Extras;
   /** What THROW and SHOOT sent off, for the extra that gathers it back (`ThrownWeapons`). */
   readonly thrownWeapons: ThrownWeaponTags;
   /** What only the host can do: play a sample, trace, tell the UI something. */
@@ -300,7 +313,7 @@ export function createGameContext(
     overlayPalette,
     overlay: new Overlay(overlayPalette, (line) => host.trace(line)),
     tables,
-    extras: false,
+    extras: NO_EXTRAS,
     thrownWeapons: new Map(),
     host,
     // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.

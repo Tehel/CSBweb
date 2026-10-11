@@ -76,7 +76,7 @@ function handleClickInViewport(ui: UIState, x: number, y: number): void {
     const target = resolveEmptyHandedViewportClick(ui, x, y);
     if (target === 'doorSwitch') mouse.handleDoorSwitchClick();
     else if (target === 'wall') {
-      if (ui.ctx.extras) drinkAtWaterFountain(ui);
+      if (ui.ctx.extras.drinkAtFountain) drinkAtWaterFountain(ui);
       mouse.handleWallClick();
     }
     else if (target === 'object') tryPickViewportObject(ui, x, y);

@@ -79,7 +79,8 @@ frames against CSBWin's own screenshots. The retail dungeon uses none of them. F
 - The deployed game, at `https://csbweb.looten.net/`: a Docker container on the author's
   VPS, its server's statistics and their nightly backup (`doc/DEPLOYMENT.md`,
   `doc/STATISTICS.md`).
-- Debug scaffolding is the chrome beside the canvas (`src/ui/`): the settings, the map
+- Debug scaffolding is the chrome beside the canvas (`src/ui/`): the settings' buttons,
+  which show and change the player's settings (`src/settings/Settings.ts`), the map
   preview and the champion panel. Its teleport by a click on the map and its cursor
   filter trace are behind `isDebugFeaturesEnabled()`. It has no log of its own: what
   the page reports goes to the console, a move's position at debug level, what F5,

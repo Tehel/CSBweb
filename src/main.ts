@@ -21,7 +21,7 @@ import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import { createCrtEffect, type CrtEffect } from './lib/crt';
 import { GameScreen } from './renderer/GameScreen';
-import { bindDataSetChooser, bindExtrasToggle, bindSaveDrop, bindUIContext, drawMapPreview, showFatalMessage } from './ui';
+import { bindDataSetChooser, bindSaveDrop, bindSettingsControls, bindUIContext, drawMapPreview, showFatalMessage } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { runBootSequence, runHintOracle, runShowCredits } from './renderer/intro/BootSequence';
@@ -32,7 +32,7 @@ import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
 import { applySaveBytes } from './engine/SaveGameFile';
-import { isStatisticsEnabled, loadUISettings } from './ui/settings';
+import { Settings, applyToGame, type SettingsValues } from './settings/Settings';
 import { GameEvents, playerId, sendBeacon } from './ui/gameEvents';
 
 console.log('Dungeon Master Web - Initializing...');
@@ -53,6 +53,18 @@ let dataSet!: DataSet;
 let swooshDir: string | null = null;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
+
+/**
+ * The player's settings (`src/settings/Settings.ts`), kept in `localStorage`, or for this
+ * page only where the browser forbids it.
+ */
+const settings = new Settings((() => {
+    try {
+        return window.localStorage;
+    } catch {
+        return null;
+    }
+})());
 
 function setCrtEnabled(enabled: boolean): boolean {
     if (!crtController) return false;
@@ -176,14 +188,17 @@ function readUtilityPortraits(): Promise<UtilityPortraits | null> {
     return utilityPortraits;
 }
 
-/** The sound manager, unlocked by the first click or key: browsers keep audio locked until then. */
+/**
+ * The sound manager, unlocked by the first press or key anywhere on the page, the Sound
+ * button's included: browsers keep audio locked until then.
+ */
 function createSoundManager(graphicsLoader: GraphicsLoader, tables: GameTables): SoundManager {
     const sound = new SoundManager(graphicsLoader);
     if (sound.isAvailable()) {
         const unlockAudio = (): void => {
             sound.unlock();
         };
-        if (gameCanvasEl) gameCanvasEl.addEventListener('pointerdown', unlockAudio, { once: true });
+        window.addEventListener('pointerdown', unlockAudio, { once: true });
         window.addEventListener('keydown', unlockAudio, { once: true });
     }
     sound.setSoundTable(tables.sound1772);
@@ -318,7 +333,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         set: dataSet.id,
         build: __CSBWEB_BUILD__,
         player: playerId,
-        enabled: isStatisticsEnabled,
+        enabled: () => settings.values.statistics,
         send: import.meta.env.PROD ? sendBeacon : (event) => console.debug('Event, not sent:', event),
     });
     // RISE's new adventure, which a read then makes the running game.
@@ -450,11 +465,13 @@ function createCrt(): void {
  * (`src/renderer/intro/BootSequence.ts`). It runs before `wire` so the adventure
  * screen's own canvas handlers cannot see the entrance's clicks.
  *
- * The FTL logo comes first (`loadSwooshFiles`). `?intro=0` skips all of it, for the
+ * The FTL logo comes first (`loadSwooshFiles`). With the startup animations off, neither
+ * it nor the title is shown, and the entrance is. `?intro=0` skips all of it, for the
  * golden-frame probe and `tools/probe-ui.mjs`.
  */
 async function runIntro({ game, screen, saves, events }: Built, sound: SoundManager): Promise<PrisonDoorChoice> {
     const skipIntro = new URLSearchParams(window.location.search).get('intro') === '0';
+    const animations = !skipIntro && settings.values.startupAnimations;
     return runBootSequence({
         canvas: gameCanvasEl,
         gameScreen: screen,
@@ -462,28 +479,20 @@ async function runIntro({ game, screen, saves, events }: Built, sound: SoundMana
         consumeSavedGameRead: () => saves.consumeSavedGameRead(),
         readNewGame: () => readNewGame(game, saves, events),
         rise: dataSet.miniDat,
-        swoosh: skipIntro ? null : await loadSwooshFiles(sound),
+        swoosh: animations ? await loadSwooshFiles(sound) : null,
+        title: animations,
         skip: skipIntro,
     });
 }
 
 /** The page's side of play: its input and debug chrome, and a redraw per move and per tick. */
-function wire({ game, screen, saves, messages, events }: Built, sound: SoundManager): void {
+function wire({ game, screen, saves, messages, events }: Built): void {
     bindUIContext({
         screen,
         game,
         refreshScreen,
         onQuickSave: () => { void saves.quickSave(); },
         onQuickLoad: () => { void saves.quickLoad(); },
-        setCrtEnabled,
-        isCrtEnabled,
-        setSoundEnabled: (enabled) => {
-            sound.unlock();
-            sound.setEnabled(enabled);
-        },
-        isSoundEnabled: () => sound.isEnabled(),
-        setSoundVolume: (volume) => sound.setVolume(volume),
-        getSoundVolume: () => sound.getVolume(),
     });
 
     game.onMove((success) => {
@@ -521,6 +530,14 @@ function wire({ game, screen, saves, messages, events }: Built, sound: SoundMana
         const moved = screen.takeCursorMoved();
         if (scrolled || flashed || moved) refreshScreen();
     });
+}
+
+/** The player's settings, applied to what plays: the effect, the sound, the extras and the keys. */
+function applySettings({ game }: Built, sound: SoundManager, values: SettingsValues): void {
+    setCrtEnabled(values.crt);
+    sound.setEnabled(values.sound);
+    sound.setVolume(values.volume);
+    applyToGame(game.ctx, values);
 }
 
 function start(game: Game): void {
@@ -570,26 +587,22 @@ async function init() {
         // The data set's rules, before any file is read: one with an Extended Features
         // block sets its own (`DataSet.dmRules`).
         game.ctx.rules.dmRulesDesignOption = dataSet.dmRules;
-        bindExtrasToggle((enabled) => built.screen.setExtras(enabled));
         createCrt();
-        // The saved effect and sound before the intro, which is drawn through one and
-        // heard through the other; `wire` applies the rest of the settings once the
-        // intro is over.
-        const settings = loadUISettings();
-        setCrtEnabled(settings.crt);
-        sound.setEnabled(settings.soundEnabled);
-        sound.setVolume(settings.soundVolume);
+        // The settings before the FTL logo, which is drawn through the CRT effect and
+        // heard through the sound, and at every change; then the page's buttons show
+        // them, the CRT effect as applied.
+        settings.subscribe((values) => applySettings(built, sound, values));
+        bindSettingsControls(settings, isCrtEnabled);
         console.log('✓ Game engine and screen constructed');
         // The probes' handle. `tools/probe-ui.mjs` and `tools/probe-frames.mjs` drive the
         // live app through this over CDP — see the `probe-app` skill. Module scope is
         // invisible to the DevTools protocol, so a bug that only shows on screen is
         // otherwise unreachable without hand-patching this file.
         //
-        // Guarded on a build-time flag rather than `isDebugFeaturesEnabled()`, which the
-        // rest of the Phase 14 scaffolding uses: that toggle is applied from the saved UI
-        // settings *after* this init runs, so it always reads false here.
-        // `__CSBWEB_PROBE__` is the dev server's, and a build's only with `CSBWEB_PROBE=1`
-        // (`vite.config.mts`), so the handle cannot reach a deployed bundle.
+        // Guarded on a build-time flag rather than the page's Debug setting, which any
+        // player can turn on: `__CSBWEB_PROBE__` is the dev server's, and a build's only
+        // with `CSBWEB_PROBE=1` (`vite.config.mts`), so the handle cannot reach a deployed
+        // bundle.
         if (__CSBWEB_PROBE__) {
             // `presetHeroes`: the heroes behind the dungeon's mirrors, for `tools/lib/buildParty.mjs`.
             const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);
@@ -598,7 +611,7 @@ async function init() {
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen);
         await runIntro(built, sound);
-        wire(built, sound);
+        wire(built);
         start(built.game);
     } catch (error) {
         reportError(error);

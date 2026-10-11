@@ -69,6 +69,7 @@ import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
+import { NO_EXTRAS } from '../src/engine/GameContext';
 
 const SCREEN_W = 320;
 const SCREEN_H = 200;
@@ -439,10 +440,10 @@ async function main(): Promise<void> {
     return out;
   };
   console.log(['state', fighter, ninja].join('\t'));
-  ui.ctx.extras = false;
+  ui.ctx.extras = NO_EXTRAS;
   let [f, n] = row('extras off');
   check(f === 'colour 13' && n === 'colour 13', 'extras off: every mastery line is colour 13, as in CSBWin');
-  ui.ctx.extras = true;
+  ui.ctx.extras = { ...NO_EXTRAS, colourNewMastery: true };
   [f, n] = row('extras on');
   check(f === 'green (7)', 'extras on: the mastery just gained is green while what it raised is below its maximum');
   check(n === 'colour 13', 'extras on: a mastery gained no level ago stays colour 13');
@@ -485,7 +486,7 @@ async function main(): Promise<void> {
   const n2 = colourOf(1, ninja);
   console.log(['met by the drift, then drained', '', n2].join('\t'));
   check(n2 === 'colour 13', 'extras on: a note met by the drift unseen stays met after a later drop');
-  ui.ctx.extras = false;
+  ui.ctx.extras = NO_EXTRAS;
   console.log('');
 
   finish();

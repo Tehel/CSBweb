@@ -63,7 +63,7 @@ const headerCells: HTMLTableCellElement[] = [];
 let contextEl: HTMLDivElement | null = null;
 let built = false;
 
-export function isChampionPanelVisible(): boolean {
+function isChampionPanelVisible(): boolean {
     return !!panelEl && panelEl.style.display !== 'none';
 }
 

@@ -34,6 +34,7 @@ import { testChampion } from './lib/champion';
 import { stockGame, stockGraphics } from './lib/game';
 import { wrapMember } from './lib/standIn';
 import { newUIState } from './lib/ui';
+import { NO_EXTRAS } from '../src/engine/GameContext';
 
 const BUTTON_5: RectPos = { x1: 64, x2: 159, y1: 36, y2: 91 };
 const UNSET: RectPos = { x1: 255, x2: 0, y1: 0, y2: 0 };
@@ -138,7 +139,7 @@ function main(): void {
   console.log(['extras', 'fountain', 'owner health', 'water before', 'after', 'sounds', 'wall touched'].join('\t'));
   const drink = (extras: boolean, fountain: boolean, water: number, health = 200): Scene & { after: number } => {
     const s = scene(fountain);
-    s.ui.ctx.extras = extras;
+    s.ui.ctx.extras = { ...NO_EXTRAS, drinkAtFountain: extras };
     const champ = s.game.ctx.party.state.champions[0]!;
     champ.water = water;
     champ.attributes.health = health;

@@ -67,8 +67,8 @@ active list, even if DM never reaches it.
 
 **H** is not debt: deliberate divergences, recorded so nobody "fixes" them.
 
-**X** is not a divergence either: every extra sits behind one setting that is off by
-default, so with it off the game is CSBWin's and the golden frames do not move.
+**X** is not a divergence either: every extra sits behind a setting of its own that is off
+by default, so with them off the game is CSBWin's and the golden frames do not move.
 
 ## How to work this list
 
@@ -108,7 +108,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| U1 | Settings are read back from the page, and the extras share one flag | M | ⏳ |
 | U2 | The save menu's widgets are its own | M | ⏳ |
 | U3 | The save menu is the only dialog over the game | S | ⏳ |
 | U4 | The settings dialog: Esc, its tabs, GAME, DISPLAY and SOUND | M | ⏳ |
@@ -215,34 +214,6 @@ None of it changes the game: with every new setting at its default, every tool's
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a
 golden frame for what it draws, and a probe or a `tools/` assertion for what it does.
 
-### U1 ⏳ Settings are read back from the page, and the extras share one flag
-
-`UISettings` (`src/ui/settings.ts`) is not a model: `readUISettings` reads the page's
-buttons and panels back to know what to save, `applyUISettings` sets them, and nothing
-before `wire` applies any of it (E15). The three extras share `UISettings.extras`, the
-page's Extras button, which `GameContext.extras` mirrors (`src/engine/GameContext.ts:143`).
-`statistics` has no control. The key bindings are `DEFAULT_KEY_BINDINGS`, read once at
-import into `ACTION_OF_CODE` (`src/renderer/ui/Keyboard.ts`). The startup animations are
-skipped only by `?intro=0`, which skips the entrance too (`src/main.ts:457`).
-
-Paying it: one settings model, outside `src/ui/` and its DOM, that the page, the game and
-the dialogs read and change through it, and that tells its listeners of a change:
-
-- sound on, and its volume; the CRT effect; the startup animations (the FTL logo and the
-  title; the entrance stays, since it is where a game is chosen);
-- the statistics; the map view (U6) and the champion view (U7), off by default;
-- one flag per extra, each off by default: the thrown weapons gathered back, an empty
-  hand drinking at a fountain, a new mastery in colour. `GameContext` takes the three,
-  and X's first rule becomes "one setting each";
-- the key bindings: a preset's name and the table, which `keyAction`, `keyScanOf` and
-  `portKeyAction` read live.
-
-It is stored in `localStorage` under a new key, the old key read once. It is applied at
-boot, before the logo, which pays E15's "The controls are dead before the game". The
-page's buttons stay until U9, rendering the model. A new `tools/dump-settings.ts`: the
-defaults, the old key read, a field of the wrong type replaced by its default, a binding
-table's round trip, and each extra's flag reaching `GameContext` alone.
-
 ### U2 ⏳ The save menu's widgets are its own
 
 The save menu draws its dialog from three pieces of graphic 0 (`drawPiece`,
@@ -290,7 +261,7 @@ Paying it: a dialog over the whole screen, in U3's slot, from U2's kit. Height i
   or EXIT. It follows the pointer, drawn by the VBL's frame as the cursor is. A touch
   screen has no hover, so there it names the last control touched.
 
-Every change goes to U1's model at once.
+Every change goes to the settings model (`src/settings/Settings.ts`) at once.
 
 - **GAME**: the three extras, SEND STATISTICS, and, as U6 and U7 land, MAP VIEW and
   CHAMPION VIEW.
@@ -1093,8 +1064,7 @@ pixel: `tools/dump-render-probe.ts`, `tools/dump-skin-programs.ts` and the golde
 
 `GameScreen` (839 lines, 71 methods, 51 of them one- or two-line forwarders into `ui/`) is
 the canvas's output (`putImageData`), the order of the compose, the palettes' choice, and a
-façade over the UI and the boot (`getScreenBuffer`, `doMenu`, `setBootFrameRenderer`,
-`setExtras`, which writes `ui.ctx.extras`). It needs an `HTMLCanvasElement`, so no tool can
+façade over the UI and the boot (`getScreenBuffer`, `doMenu`, `setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can
 build one, and `tools/lib/ui.ts` copies its wiring (F19). Each page hook is named four
 times: in `UIState`, `UIHooks`, `GameScreenHooks` and the constructor's copy
 (`GameScreen.ts:94-109`, `:201-218`, `UIState.ts:394-396`).
@@ -1304,15 +1274,9 @@ module by module where data comes from files (the intro, the renderer, the loade
 
 What the redesign will replace, and what it should not carry across:
 
-- **Settings live in the DOM.** `readUISettings` reads each panel's `style.display` back
-  to know what to save (`src/ui/settings.ts`), and the element lookups are written twice
-  (`events.ts:11-21`, `settings.ts:63-75`). A `UIContext` module singleton
-  (`src/ui/context.ts`) is how the panels reach the game.
+- **A `UIContext` module singleton** (`src/ui/context.ts`) is how the panels reach the
+  game, and the Debug setting reaches them through another (`isDebugFeaturesEnabled`).
 - **`main.ts` holds the page's features**: the end-of-game flow.
-- **The controls are dead before the game.** `bindUIEvents` runs only in `wire`, after the
-  logo, the title and the entrance, so Sound, CRT, Smooth, Map, Debug and Quick Save do
-  nothing there (the intro cannot be muted), and the buttons show `index.html`'s defaults
-  (`btn-sound` pressed) rather than the saved settings `init` has applied.
 - **Elements are looked up at import time** (`const panelEl =
   document.getElementById('champions')` at the top of a module, `src/ui/`), so no module
   can be tested or drawn later.
@@ -1325,7 +1289,8 @@ What the redesign will replace, and what it should not carry across:
   uses), and a game a teleport touched sends no events.
 - **Two input stacks** (E30) and the page's controls keeping the focus (R9).
 
-Paying it is the redesign's first step: settings as a model the page renders.
+Paying it is the redesign's first step: a page that renders the settings model
+(`src/settings/Settings.ts`) and owns nothing of its own.
 The redesigned page also links to two pages:
 
 - **A static FAQ.** Among its answers is one paragraph on the statistics the server
@@ -1871,17 +1836,18 @@ taken only when the author names one.
 
 Rules for all of them:
 
-- **One setting, off by default**: `UISettings.extras` (`src/ui/settings.ts`), the page's
-  Extras button, which they all share. With it off, the game is CSBWin's: every
-  tool's output and every golden frame stay the same. The game reads it as
-  `GameContext.extras`, which `GameScreen.setExtras` sets at every press of the button:
-  - an empty hand drinking at a water fountain (`drinkAtWaterFountain`,
+- **One setting each, off by default**: a flag of `SettingsValues.extras`
+  (`src/settings/Settings.ts`), which the game reads as `GameContext.extras` (`Extras`),
+  set at every change (`applyToGame`). With every extra off, the game is CSBWin's: every
+  tool's output and every golden frame stay the same. The page's one Extras button turns
+  them all on or off together until the settings dialog shows each (U4):
+  - `drinkAtFountain`: an empty hand drinking at a water fountain (`drinkAtWaterFountain`,
     `src/renderer/ui/Feeding.ts`, checked by `tools/dump-fountain.ts`);
-  - a mastery just gained drawn in colour 7 on the attribute panel until every attribute
+  - `colourNewMastery`: a mastery just gained drawn in colour 7 on the attribute panel until every attribute
     its level gain raised is back at the maximum that gain gave it, whatever another
     role's level raised since (`src/engine/MasteryGains.ts`,
     checked by `tools/dump-mastery-panel.ts`);
-  - what a champion's THROW or SHOOT sent off gathered back into their possessions when
+  - `gatherThrownWeapons`: what a champion's THROW or SHOOT sent off gathered back into their possessions when
     the party arrives on the square it lies on, never what the cursor threw: into the
     slot it left, else the quiver, its small-weapon slots first and the object fewest
     slots take first, so a club gathered with daggers keeps slot 12, then the pack
@@ -2018,8 +1984,8 @@ Recorded so that nobody "fixes" them.
   interface palette, so neither the light nor the level's monster colours reach it
   (`drawCursorItem`, `src/renderer/ui/Mouse.ts`, and `GameScreen.presentViewport`). The
   arrow over the right-hand panel and the message area is kept. It is
-  `UIState.colouredObjectCursor`, on by default. It becomes a `UISettings` toggle once the
-  port has a settings menu; `tools/dump-object-cursor.ts` checks it both ways.
+  `UIState.colouredObjectCursor`, on by default. It becomes one of the player's settings
+  (`src/settings/Settings.ts`) once the settings dialog has a place for it (U4); `tools/dump-object-cursor.ts` checks it both ways.
 - 🚫 **The right-hand panel is shown through the interface palette.** With
   `d.DynamicPaletteSwitching`, CSBWin converts the spell, weapon and movement panel,
   x 224-319 by rows 33-168, through the viewport's `d.Palette11946`, as it does the
@@ -2214,9 +2180,9 @@ Recorded so that nobody "fixes" them.
   never had: `SWOOSH.IMG`'s picture, palette script and sound
   (`src/renderer/intro/Swoosh.ts`, `doc/ATARI_ST_DISK_REFERENCE.md` → "The logo in the
   port"), whenever the manifest's `"swoosh"` folder serves `swoosh.img`. It is not an
-  extra: the author wants it on every boot. There is no setting yet; a future game
-  setting is to turn off the intro animations together, the logo and the title
-  animation from `graphics.dat`.
+  extra: the author wants it on every boot. The player's startup animations
+  (`SettingsValues.startupAnimations`, on by default) turn it off together with the title
+  animation from `graphics.dat`; the entrance is then the first screen.
 - 🚫 **`?intro=0` skips the whole intro**: the logo, the title animation and the
   entrance. This is a developer affordance with no CSBWin counterpart, kept deliberately:
   most of the golden frames boot through it, and so does `tools/probe-ui.mjs --boot`. The

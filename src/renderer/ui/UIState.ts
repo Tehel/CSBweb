@@ -172,8 +172,8 @@ export interface UIState {
   pointer23182: IndexedBitmap | null;
   /**
    * The extra of `DEBT.md` H: an object in hand shown in its own colours over the dungeon
-   * view, where CSBWin shows its colour-4 silhouette. On by default; a `UISettings` toggle
-   * once the port has a settings menu.
+   * view, where CSBWin shows its colour-4 silhouette. On by default; one of the player's settings
+   * (`src/settings/Settings.ts`) once the settings dialog has a place for it.
    */
   colouredObjectCursor: boolean;
   /**

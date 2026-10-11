@@ -1,7 +1,7 @@
 import type { UIContext } from './context';
 import { setUIContext } from './context';
 import { bindUIEvents } from './events';
-export { bindExtrasToggle } from './events';
+export { bindSettingsControls } from './settings';
 
 export { drawMapPreview } from './mapPreview';
 export { bindDataSetChooser } from './dataSetChooser';

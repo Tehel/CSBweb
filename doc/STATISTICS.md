@@ -51,12 +51,11 @@ portrait's pixels and no id, as in CSBWin. It is stored and not used yet: it is 
 portrait beside a name, which the page can draw from its own data files, or the manifest
 could list.
 
-**The player can turn them off.** The page's saved settings (`src/ui/settings.ts`,
-`csbweb_ui_settings_v1`) carry `statistics`, on by default: an opt-out. `GameEvents` reads it
-at each event (`GameEventsDeps.enabled`), so a change counts from the next one, and with it
-off nothing is read or sent, the player id not even drawn. `isStatisticsEnabled` and
-`setStatisticsEnabled` are the setting's two ends; no control on the page sets it yet, and
-the settings panel of the page's redesign (`DEBT.md` E15) is to carry one.
+**The player can turn them off.** The player's settings (`src/settings/Settings.ts`, kept
+in `localStorage` as `csbweb_settings_v2`) carry `statistics`, on by default: an opt-out.
+`GameEvents` reads it at each event (`GameEventsDeps.enabled`), so a change counts from the
+next one, and with it off nothing is read or sent, the player id not even drawn. No control
+on the page sets it yet: the settings dialog's GAME tab is to carry one (`DEBT.md` U4).
 
 Events are sent with `navigator.sendBeacon` to `api/event`, and a failure is ignored:
 nothing an event does delays or breaks the game. Only a production build sends them; dev

@@ -42,6 +42,7 @@ import { testChampion } from './lib/champion';
 import { createMonsterAt } from './lib/createMonster';
 import { stockGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
+import { NO_EXTRAS } from '../src/engine/GameContext';
 
 const WEAPON_DAGGER = 8;
 const WEAPON_BOW = 25;
@@ -61,7 +62,7 @@ function makeGame(extras = true, at = CORRIDOR): Game {
     name: 'THROWER',
     attributes: { health: 900, maxHealth: 900, stamina: 900, maxStamina: 900, mana: 0, maxMana: 0 },
   }));
-  game.ctx.extras = extras;
+  game.ctx.extras = { ...NO_EXTRAS, gatherThrownWeapons: extras };
   const party = game.ctx.party.state;
   party.position = at;
   game.ctx.party.setFacing(EAST);
@@ -209,7 +210,7 @@ const where = (p: Position | null): string => (p ? `(${p.x},${p.y}) map ${p.z}` 
   console.log(`off: on the floor ${onFloor(game, lying, dagger)}, tagged ${game.ctx.thrownWeapons.has(dagger)}`);
   check(game.ctx.party.state.position.x === lying.x && onFloor(game, lying, dagger), '3. off, the party stands on it and it stays');
   check(game.ctx.thrownWeapons.has(dagger), '3. off, it keeps its tag');
-  game.ctx.extras = true;
+  game.ctx.extras = { ...NO_EXTRAS, gatherThrownWeapons: true };
   step(game, lying.x - 1);
   step(game, lying.x);
   check(getChampionPossession(thrower(game), 1) === dagger, '3. on, the next arrival gathers it');
@@ -281,7 +282,7 @@ const where = (p: Position | null): string => (p ? `(${p.x},${p.y}) map ${p.z}` 
   // Laid down again by hand, it is a dropped object like any other.
   party.objectInHand = OBJECT_ID_NULL;
   game.ctx.dungeon.addObjectToCell(lying, dagger);
-  game.ctx.extras = true;
+  game.ctx.extras = { ...NO_EXTRAS, gatherThrownWeapons: true };
   step(game, lying.x - 1);
   step(game, lying.x);
   check(onFloor(game, lying, dagger), '7. and it is never gathered again');

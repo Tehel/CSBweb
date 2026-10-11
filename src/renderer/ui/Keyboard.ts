@@ -17,9 +17,10 @@
  * `UIM_LEFT_BUTTON_UP` raise. So every such binding is a click on a panel, and the
  * panel's own handler decides what it means.
  *
- * `DEFAULT_KEY_BINDINGS` is the port's `config.txt`, and the only keys the game answers:
- * a key bound to no action does nothing, the Reincarnate screen's and the save menu's
- * typing aside. F1-F4 select the caster, as the shipped `config.txt` makes them clicks on
+ * `DEFAULT_KEY_BINDINGS` is the port's `config.txt`, and the default of the player's
+ * settings, whose table holds the only keys the game answers (`setKeyBindings`): a key
+ * bound to no action does nothing, the Reincarnate screen's and the save menu's typing
+ * aside. F1-F4 select the caster, as the shipped `config.txt` makes them clicks on
  * the caster tabs, so `Byte18400`'s binding of them to the inventories (buttons 7-10) is
  * never reached. The panel actions call the handlers a click reaches rather than synthesising coordinates: the
  * coordinates in a `config.txt` are hardcoded, and ours would have to be read back out
@@ -165,6 +166,15 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
 };
 
 /**
+ * The named key tables a player can pick: CSBWIN is `DEFAULT_KEY_BINDINGS`. A table
+ * changed by hand is `custom`, and is its own.
+ */
+export const KEY_PRESETS = { csbwin: DEFAULT_KEY_BINDINGS } as const satisfies Record<string, KeyBindings>;
+
+/** A preset's name, or `custom` for a table of the player's. */
+export type KeyPreset = keyof typeof KEY_PRESETS | 'custom';
+
+/**
  * The action each code of `bindings` does: the reverse map a key press is looked up in,
  * and where a screen finds a code already bound elsewhere. A code in two slots is the
  * first action's, in the table's order.
@@ -177,11 +187,17 @@ export function actionsByCode(bindings: KeyBindings): ReadonlyMap<string, KeyAct
   return byCode;
 }
 
-const ACTION_OF_CODE = actionsByCode(DEFAULT_KEY_BINDINGS);
+/** The bindings in force, which every key is looked up in: the player's (`setKeyBindings`). */
+let actionOfCode = actionsByCode(DEFAULT_KEY_BINDINGS);
+
+/** The bindings every key is looked up in from now on: the player's settings set them. */
+export function setKeyBindings(bindings: KeyBindings): void {
+  actionOfCode = actionsByCode(bindings);
+}
 
 /** The action a `KeyboardEvent.code` is bound to, or null. */
 export function keyAction(code: string): KeyAction | null {
-  return ACTION_OF_CODE.get(code) ?? null;
+  return actionOfCode.get(code) ?? null;
 }
 
 function isTableAction(action: KeyAction): action is TableAction {
