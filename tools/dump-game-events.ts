@@ -57,7 +57,7 @@ interface Harness {
   sent: GameEvent[];
 }
 
-function harness(options: { send?: (event: GameEvent) => void } = {}): Harness {
+function harness(options: { send?: (event: GameEvent) => void; enabled?: () => boolean; player?: () => string } = {}): Harness {
   const sent: GameEvent[] = [];
   let events!: GameEvents;
   let reincarnating = -1;
@@ -70,7 +70,8 @@ function harness(options: { send?: (event: GameEvent) => void } = {}): Harness {
     game,
     set: DM.id,
     build: BUILD,
-    player: () => PLAYER,
+    player: options.player ?? (() => PLAYER),
+    enabled: options.enabled ?? (() => true),
     send: options.send ?? ((event) => { sent.push(event); everySent.push(event); }),
   });
   reincarnatingOf.set(game, () => reincarnating);
@@ -206,6 +207,26 @@ async function main(): Promise<void> {
       threw = true;
     }
     check(!threw, 'a send that throws reaches neither the game nor the page');
+  }
+
+  /* ------------------------------------------------- the player's setting ----- */
+  {
+    let enabled = false;
+    let playerRead = false;
+    const sent: GameEvent[] = [];
+    const { game, events } = harness({
+      enabled: () => enabled,
+      player: () => { playerRead = true; return PLAYER; },
+      send: (event) => { sent.push(event); },
+    });
+    join(game, heroNamed(game, 'HALK'), RESURRECT);
+    events.newGameRead();
+    events.tick();
+    events.ended(false);
+    check(sent.length === 0 && !playerRead, 'with the statistics off, nothing is sent and the player id is not read');
+    enabled = true;
+    events.ended(true);
+    check(sent.length === 1 && sent[0]!.type === 'won', 'turned on, the next event is sent');
   }
 
   /* ------------------------------------------------- the server's check ----- */

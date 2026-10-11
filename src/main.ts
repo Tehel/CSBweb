@@ -32,7 +32,7 @@ import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
 import { applySaveBytes } from './engine/SaveGameFile';
-import { loadUISettings } from './ui/settings';
+import { isStatisticsEnabled, loadUISettings } from './ui/settings';
 import { GameEvents, playerId, sendBeacon } from './ui/gameEvents';
 
 console.log('Dungeon Master Web - Initializing...');
@@ -312,12 +312,13 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     }, logSave, storeRandom);
 
     // The statistics' events: sent by a production build only, and shown on the console
-    // otherwise.
+    // otherwise; neither when the player has turned them off.
     const events = new GameEvents({
         game,
         set: dataSet.id,
         build: __CSBWEB_BUILD__,
         player: playerId,
+        enabled: isStatisticsEnabled,
         send: import.meta.env.PROD ? sendBeacon : (event) => console.debug('Event, not sent:', event),
     });
     // RISE's new adventure, which a read then makes the running game.

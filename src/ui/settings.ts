@@ -12,6 +12,11 @@ export interface UISettings {
     soundVolume: number;
     /** The extras (`DEBT.md` X): with it off, the game is CSBWin's. */
     extras: boolean;
+    /**
+     * The statistics' events (`doc/STATISTICS.md`): on unless the player turns them off.
+     * No control on the page sets it yet.
+     */
+    statistics: boolean;
 }
 
 export function loadUISettings(): UISettings {
@@ -27,6 +32,7 @@ export function loadUISettings(): UISettings {
             soundEnabled: parsed.soundEnabled ?? true,
             soundVolume: parsed.soundVolume ?? 0.8,
             extras: parsed.extras ?? false,
+            statistics: parsed.statistics ?? true,
         };
     } catch {
         return defaultUISettings();
@@ -48,6 +54,8 @@ export function readUISettings(): UISettings {
         soundEnabled: getUIContext()?.isSoundEnabled() ?? true,
         soundVolume: getUIContext()?.getSoundVolume() ?? 0.8,
         extras: isExtrasEnabled(),
+        // Nothing on the page shows it: the saved one stands.
+        statistics: loadUISettings().statistics,
     };
 }
 
@@ -92,5 +100,16 @@ function defaultUISettings(): UISettings {
         soundEnabled: true,
         soundVolume: 0.8,
         extras: false,
+        statistics: true,
     };
+}
+
+/** Whether the page sends the statistics' events: the saved setting, read at each event. */
+export function isStatisticsEnabled(): boolean {
+    return loadUISettings().statistics;
+}
+
+/** The statistics' setting, saved with the rest. The next event obeys it. */
+export function setStatisticsEnabled(enabled: boolean): void {
+    saveUISettings({ ...loadUISettings(), statistics: enabled });
 }

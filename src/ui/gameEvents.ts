@@ -9,6 +9,9 @@
  * the player is sent: no address, no browser fingerprint. A champion goes by their name as
  * it stands, a reincarnated one's included, and by their portrait's `charID` where the
  * page knows it (`ChampionReport.id`).
+ *
+ * The player can turn them off (`GameEventsDeps.enabled`): then nothing is read or sent,
+ * the player's id not even drawn.
  */
 
 import type { Game } from '../engine/Game';
@@ -80,6 +83,8 @@ export interface GameEventsDeps {
     build: string;
     /** The player's id, read when an event is sent (`playerId`). */
     player: () => string;
+    /** Whether events are sent, read at each one: the player's setting (`UISettings.statistics`). */
+    enabled: () => boolean;
     /** Where an event goes: `sendBeacon` in a production build, nowhere otherwise. */
     send: (event: GameEvent) => void;
 }
@@ -151,6 +156,7 @@ export class GameEvents {
     /** The event, read and sent now. Nothing it does can fail the game. */
     private emit(type: GameEventType, payload: () => GameEvent['payload']): void {
         try {
+            if (!this.deps.enabled()) return;
             const { set, build } = this.deps;
             const playthrough = this.deps.game.ctx.state.block1.randomGameID;
             this.deps.send({ type, player: this.deps.player(), set, playthrough, build, payload: payload() });
