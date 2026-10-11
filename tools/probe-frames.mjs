@@ -463,18 +463,17 @@ await send('Page.navigate', { url: `${APP}?intro=0&dungeon=conflux` });
 await wait(3500);
 await leaveCanvas(); await wait(200);
 console.log('state: Conflux start');     const confluxStart = await shot('18-conflux-start');
-// A viewport overlay (`src/renderer/csbwin/OverlayScreen.ts`), through the page's dev
-// control as a DSA's `&OVERLAY` and `&JITTER` would put it up: overlay 1 of Conflux's
-// `CSBgraphics.dat` over this view, half of each pixel the overlay's, its colour 0
-// transparent, and the view shifted four pixels right under it. Hidden and shifted back
-// after, the view is frame 18.
-const setInputs = (values) => evaluate(`(()=>{for (const [id, v] of Object.entries(${JSON.stringify(values)}))
-  document.getElementById(id).value = String(v); return 1;})()`);
-await setInputs({ 'overlay-number': 1, 'overlay-p1': 1, 'overlay-p2': 50, 'overlay-p3': 0, 'overlay-p4': 0, 'overlay-jitter-x': 4, 'overlay-jitter-y': 0 });
-await click('#btn-overlay-show'); await click('#btn-overlay-jitter'); await wait(500);
+// A viewport overlay (`src/renderer/csbwin/OverlayScreen.ts`), put up on the engine as a
+// DSA's `&OVERLAY` and `&JITTER` would: overlay 1 of Conflux's `CSBgraphics.dat` over this
+// view, half of each pixel the overlay's, its colour 0 transparent, and the view shifted
+// four pixels right under it. Hidden and shifted back after, the view is frame 18.
+const OVERLAY = `window.__probe.game.ctx.overlay`;
+await evaluate(`(()=>{const o = ${OVERLAY}; o.SelectOverlay(1, 1, 50, 0, 0, window.__probe.game.ctx.state.tickCount);
+  o.Jitter(4, 0, 0, 0); window.__probe.refreshScreen(); return o.active;})()`);
+await wait(500);
 console.log('state: overlay');           await shot('17-overlay');
-await setInputs({ 'overlay-jitter-x': 0 });
-await click('#btn-overlay-hide'); await click('#btn-overlay-jitter'); await wait(500);
+await evaluate(`(()=>{const o = ${OVERLAY}; o.active = false; o.Jitter(0, 0, 0, 0); window.__probe.refreshScreen(); return 1;})()`);
+await wait(500);
 check((await canvasPixels()) === confluxStart, 'the overlay hidden and the view shifted back, it is frame 18 again');
 // Wall decorations of Conflux's `CSBgraphics.dat`, their bitmaps read as bitplanes
 // (`tools/dump-extended-decorations.ts`), from level 0 (14,14) facing south: on the west

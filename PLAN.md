@@ -72,7 +72,8 @@ frames against CSBWin's own screenshots. The retail dungeon uses none of them. F
   and an import by a file dropped on the page; F5 and F9, and the Sleepsave
   (`doc/SAVES.md`).
 - Three data sets (`src/data/DataSets.ts`: `dm-atari`, the default, `dm-windows` and
-  `csb`), one chosen before the boot by `?dungeon=<id>`, and the DM Rules toggle.
+  `csb`), one chosen before the boot by `?dungeon=<id>`; the manifest's `dmRules` gives
+  a set without an Extended Features block DM's rules.
 - The deployed game, at `https://csbweb.looten.net/`: a Docker container on the author's
   VPS, its server's statistics and their nightly backup (`doc/DEPLOYMENT.md`,
   `doc/STATISTICS.md`).

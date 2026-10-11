@@ -4,7 +4,6 @@ import { handleMapCanvasClick } from './mapPreview';
 import { updateChampionPanel } from './championPanel';
 import { applyUISettings, loadUISettings, readUISettings, saveUISettings } from './settings';
 import { getEventPosition } from './utils';
-import { bindOverlayControl } from './overlayControl';
 
 let uiBound = false;
 
@@ -12,12 +11,10 @@ const mapCanvasEl = document.getElementById('map-canvas') as HTMLCanvasElement |
 const debugButton = document.getElementById('btn-debug') as HTMLButtonElement | null;
 const mapButton = document.getElementById('btn-map') as HTMLButtonElement | null;
 const championsButton = document.getElementById('btn-champions') as HTMLButtonElement | null;
-const smoothButton = document.getElementById('btn-smooth') as HTMLButtonElement | null;
 const crtButton = document.getElementById('btn-crt') as HTMLButtonElement | null;
 const soundButton = document.getElementById('btn-sound') as HTMLButtonElement | null;
 const soundVolume = document.getElementById('sound-volume') as HTMLInputElement | null;
 const extrasButton = document.getElementById('btn-extras') as HTMLButtonElement | null;
-const dmRulesButton = document.getElementById('btn-dm-rules') as HTMLButtonElement | null;
 
 /**
  * The canvas's pointer, read through pointer events rather than mouse events. A browser
@@ -108,13 +105,6 @@ export function bindUIEvents(): void {
         document.getElementById('btn-qsave')?.addEventListener('click', () => ctx.onQuickSave());
         document.getElementById('btn-qload')?.addEventListener('click', () => ctx.onQuickLoad());
 
-        smoothButton?.addEventListener('click', () => {
-            const style = ctx.screen.getCanvasStyle();
-            style.imageRendering = style.imageRendering === 'auto' ? 'pixelated' : 'auto';
-            smoothButton.classList.toggle('is-pressed', style.imageRendering === 'auto');
-            saveUISettings(readUISettings());
-        });
-
         crtButton?.addEventListener('click', () => {
             const next = !ctx.isCrtEnabled();
             const enabled = ctx.setCrtEnabled(next);
@@ -165,22 +155,6 @@ export function bindUIEvents(): void {
             saveUISettings(readUISettings());
         });
 
-        // CSBWin's "DM Rules" menu item: `DM_rules = !DM_rules`, at any time
-        // (doc/CSBwin-src/CSBUI.cpp:933-935). It is the game's, not the page's: a save
-        // carries it and a read game or the boot may set it, so it is not a UI setting. The
-        // menu reads its check mark afresh each time it opens (`WM_INITMENUPOPUP`,
-        // doc/CSBwin-src/CSBwin.cpp:1120, :1166-1170); the button is always in view, so it
-        // reads it every tick.
-        const showDMRules = (): void => {
-            dmRulesButton?.classList.toggle('is-pressed', ctx.game.ctx.rules.dmRules);
-        };
-        dmRulesButton?.addEventListener('click', () => {
-            ctx.game.ctx.rules.dmRules = !ctx.game.ctx.rules.dmRules;
-            showDMRules();
-            console.info(ctx.game.ctx.rules.dmRules ? 'DM Rules on' : 'DM Rules off');
-        });
-        ctx.game.onTick(showDMRules);
-
         // Once per game tick, which is when skills and attributes can change. The panel
         // does nothing while it is hidden.
         ctx.game.onTick(() => updateChampionPanel());
@@ -192,8 +166,6 @@ export function bindUIEvents(): void {
         mapCanvasEl?.addEventListener('click', (e) => {
             handleMapCanvasClick(e);
         });
-
-        bindOverlayControl(ctx);
     }
 
     applyUISettings(loadUISettings());

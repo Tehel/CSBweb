@@ -1130,9 +1130,8 @@ Both are settings of E15's model, so this follows E15. What the change must look
 3. **Filling the screen through the Fullscreen API takes `#game`, not the game canvas**:
    the effect's canvas is the game canvas's sibling, and would be left out.
 4. **Without the effect, a size that is not a whole multiple of 320x200 draws uneven
-   pixels** under `image-rendering: pixelated`, some a screen pixel wider than others. The
-   Smooth button (`src/ui/events.ts:112-115`) blurs them instead; filling the screen may
-   also offer the largest whole multiple that fits.
+   pixels** under `image-rendering: pixelated`, some a screen pixel wider than others.
+   Filling the screen may offer the largest whole multiple that fits instead.
 5. **The probe pins the default.** `tools/probe-frames.mjs` checks that the effect is
    drawn at 960x600 (`:207`) and maps its clicks through the canvas's rect in a 1600x1000
    window (`:154`). It also checks, at 4/3 and filling the window, that the effect's
@@ -1739,6 +1738,16 @@ Recorded so that nobody "fixes" them.
   `src/data/CsbwinExtendedFeatures.ts`), and a CSBWin 20230608 reads them back.
   `tools/dump-extended-dungeon.ts` checks that a 3D2D1D save keeps both of its own. 3D2D1D
   is the only dungeon here that sets any of them.
+- 🚫 **The data set chooses DM's rules, not the player.** CSBWin's "DM Rules" menu item
+  toggles `DM_rules` at any time (`doc/CSBwin-src/CSBUI.cpp:933-935`), and its Linux build
+  takes `--dmrules` at the launch (`LinCSBUI.cpp:677`). The port has no toggle: a file's
+  Extended Features block sets the rules (`readRulesOptions`), and where it has none the
+  manifest's `dmRules` gives `DMRulesDesignOption` its value at the start
+  (`DataSet.dmRules`, `src/data/DataSets.ts`), which the boot turns into `DM_rules`. The
+  three DM sets on the Atari files carry it, as CSBWin's own DM package carries `DMRules`
+  in its block (`doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…").
+  `tools/dump-dm-rules.ts` checks that `dm-atari` boots with `DM_rules` on, and
+  `tools/dump-data-sets.ts` that no set with a block is given the flag.
 - 🚫 **The canvas shows an Atari intensity times 36, not RGB555.** CSBWin hands Windows
   RGB555 pixels, its straight palette each intensity `i` as five bits `(i << 2) | (i >> 1)`
   (`CreateOverlayTable`, `doc/CSBwin-src/Graphics.cpp:3096-3117`), which Windows widens to

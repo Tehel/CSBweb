@@ -3955,13 +3955,16 @@ They are assigned in four places:
   `dm-atari/dungeon.dat`, and CSB's Atari-era saves. A new game on
   `dm-windows/dungeon.dat` gets `DMRulesDesignOption` and not `DM_rules`
   (`tools/dump-extended-dungeon.ts`). The port reads a new game's in
-  `Game.readNewGameRules`, a save's in `applyCsbwinSave`.
+  `Game.readNewGameRules`, a save's in `applyCsbwinSave`. What a file without a block
+  leaves is the data set's `dmRules`, the design option's value at the start
+  (`DataSet.dmRules`; `DEBT.md` H).
 - `_ShowPrisonDoor`, once `GameSetup(_1_, 1)` has read the game, new or resumed:
   `if (DMRulesDesignOption) DM_rules = true` (`CSBCode.cpp:10796-10800`). The restart
   after a lost game calls `GameSetup(_25_, 0)` straight (`Code1f9e6.cpp:310`), without it.
 - The player's "DM Rules" menu item toggles `DM_rules` (`CSBUI.cpp:933-935`), at any
   time. The menu's check mark is set from `DM_rules` each time the menu opens
-  (`WM_INITMENUPOPUP`, `CSBwin.cpp:1120`, `:1166-1170`).
+  (`WM_INITMENUPOPUP`, `CSBwin.cpp:1120`, `:1166-1170`). The port has no such toggle
+  (`DEBT.md` H).
 - Playback of a recording (`Recording.cpp:291`, `:297`).
 
 `SaveGame` writes both back (`SaveGame.cpp:975-980`). All eight committed saves carry

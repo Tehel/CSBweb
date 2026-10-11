@@ -145,7 +145,6 @@ export class GameScreen {
   /** Everything the UI modules share. See `ui/UIState.ts`. */
   private readonly ui: UIState;
   private readonly viewport: ViewportRenderer;
-  private readonly canvas: HTMLCanvasElement;
   private readonly screenCtx: CanvasRenderingContext2D;
   private readonly screenImageData: ImageData; // RGBA staging for present
   /** What the canvas was last given, as palette indices (`presentedFrame`). */
@@ -166,7 +165,6 @@ export class GameScreen {
     const { graphicsLoader } = deps;
     this.messages = deps.messages;
 
-    this.canvas = canvas;
     const screenCtx = canvas.getContext('2d');
     if (!screenCtx) throw new Error('Failed to create screen 2D context');
     this.screenCtx = screenCtx;
@@ -830,10 +828,5 @@ export class GameScreen {
    */
   setBootFrameRenderer(render: (() => void) | null): void {
     this.bootFrameRenderer = render;
-  }
-
-  /** The canvas's style, for the page's smoothing toggle. */
-  getCanvasStyle(): CSSStyleDeclaration {
-    return this.canvas.style;
   }
 }

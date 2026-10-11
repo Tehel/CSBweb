@@ -566,6 +566,9 @@ async function init() {
         const built = construct(files, graphicsTables, tables, sound);
         game = built.game;
         screen = built.screen;
+        // The data set's rules, before any file is read: one with an Extended Features
+        // block sets its own (`DataSet.dmRules`).
+        game.ctx.rules.dmRulesDesignOption = dataSet.dmRules;
         bindExtrasToggle((enabled) => built.screen.setExtras(enabled));
         createCrt();
         // The saved effect and sound before the intro, which is drawn through one and
@@ -589,7 +592,7 @@ async function init() {
         if (__CSBWEB_PROBE__) {
             // `presetHeroes`: the heroes behind the dungeon's mirrors, for `tools/lib/buildParty.mjs`.
             const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);
-            (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView, presetHeroes, applySaveBytes };
+            (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView, refreshScreen, presetHeroes, applySaveBytes };
         }
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen);

@@ -167,14 +167,6 @@
             margin: 3px;
         }
 
-        #overlay-control {
-            margin: 3px;
-        }
-
-        #overlay-control input {
-            width: 44px;
-        }
-
         #sound-volume {
             width: 120px;
             vertical-align: middle;
@@ -188,11 +180,9 @@
         </div>
         <div id="side">
             <div id="settings">
-                <select id="data-set" title="The game to play: the page reloads with it"></select>
-                <button id="btn-dm-rules" class="toggle-button" title="DM Rules: a reincarnated champion loses nothing">DM Rules</button><br>
+                <select id="data-set" title="The game to play: the page reloads with it"></select><br>
                 <button id="btn-qsave">Quick Save (F5)</button>
                 <button id="btn-qload">Quick Load (F9)</button><br>
-                <button id="btn-smooth" class="toggle-button">Smooth</button>
                 <button id="btn-crt" class="toggle-button">CRT</button>
                 <button id="btn-sound" class="toggle-button is-pressed">Sound</button>
                 <input id="sound-volume" type="range" min="0" max="100" value="80">
@@ -201,21 +191,6 @@
                 <button id="btn-champions" class="toggle-button">Champions</button>
                 <button id="btn-debug" class="toggle-button">Debug</button>
                 <button id="btn-extras" class="toggle-button" title="Extras, which CSBWin does not have">Extras</button>
-                <div id="overlay-control" title="A viewport overlay or an overlay palette from the data set's CSBgraphics.dat, as a DSA's &amp;OVERLAY, &amp;PALETTE and &amp;JITTER show them">
-                    Overlay <input id="overlay-number" type="number" value="1" title="The overlay's number">
-                    p1 <input id="overlay-p1" type="number" value="0" title="Bit 0: colour p4 is transparent; bit 1: mirrored">
-                    p2 <input id="overlay-p2" type="number" value="50" title="The graphic's share of a pixel, in percent">
-                    p3 <input id="overlay-p3" type="number" value="0" title="Ticks until it ends, 0 for never">
-                    p4 <input id="overlay-p4" type="number" value="0" title="The transparent colour">
-                    <button id="btn-overlay-show">Show</button>
-                    <button id="btn-overlay-hide">Hide</button><br>
-                    Palette <input id="overlay-palette-number" type="number" value="1" title="The overlay palette's number, negative for the identity">
-                    density <input id="overlay-palette-density" type="number" value="100" title="The section's share, in percent">
-                    <button id="btn-overlay-palette">Tint</button>
-                    Jitter x <input id="overlay-jitter-x" type="number" value="0" title="The graphic's shift to the right">
-                    y <input id="overlay-jitter-y" type="number" value="0" title="The graphic's shift down">
-                    <button id="btn-overlay-jitter">Shift</button>
-                </div>
             </div>
             <div id="map">
                 <canvas id="map-canvas" width="360" height="360"></canvas>

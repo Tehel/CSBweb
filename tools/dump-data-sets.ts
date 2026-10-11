@@ -45,13 +45,13 @@ function checkParser(): void {
     ({ id: 'a', name: 'A', ...fields });
   const manifest = (fields: Record<string, unknown> = {}) => JSON.stringify({ default: 'a', dataSets: [set()], ...fields });
 
-  const parsed = parseManifest(manifest({ swoosh: 'logo/st', dataSets: [set({ miniDat: true, hintOracle: false }), set({ id: 'b', dir: 'b/c' })] }), 'gamefiles');
+  const parsed = parseManifest(manifest({ swoosh: 'logo/st', dataSets: [set({ miniDat: true, hintOracle: false, dmRules: true }), set({ id: 'b', dir: 'b/c' })] }), 'gamefiles');
   console.log(`  parsed: ${parsed.dataSets.map((s) => `${s.id} in ${s.dir}`).join(', ')}; default ${parsed.defaultSet.id}; FTL logo in ${parsed.swooshDir}`);
   check(parsed.dataSets[1]!.dir === 'gamefiles/b/c' && parsed.swooshDir === 'gamefiles/logo/st' && parsed.defaultSet === parsed.dataSets[0],
     'a folder is resolved under the manifest\'s, and the default is one of the sets');
-  check(parsed.dataSets[0]!.miniDat && !parsed.dataSets[0]!.hintOracle, 'the flags are read as written');
+  check(parsed.dataSets[0]!.miniDat && !parsed.dataSets[0]!.hintOracle && parsed.dataSets[0]!.dmRules, 'the flags are read as written');
   const bare = parsed.dataSets[1]!;
-  check(parsed.dataSets[0]!.dir === 'gamefiles/a' && !bare.csbGraphics && !bare.miniDat && !bare.hintOracle && !bare.hidden,
+  check(parsed.dataSets[0]!.dir === 'gamefiles/a' && !bare.csbGraphics && !bare.miniDat && !bare.hintOracle && !bare.dmRules && !bare.hidden,
     'a set\'s "dir" left out is its "id", and a flag left out is false');
   check(parseManifest(manifest(), '').swooshDir === null && parseManifest(manifest({ swoosh: null }), '').swooshDir === null,
     'a manifest that names no FTL logo, or null, has none');
@@ -118,6 +118,10 @@ function main(): void {
       `${set.id}: hintOracle says whether the folder holds hcsb.hct and hcsb.dat`);
 
     const dungeon = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(fileOf(set, 'dungeon.dat'))));
+    // A block sets the rules its own way (`readRulesOptions`), so only a file without one
+    // takes the set's.
+    check(!set.dmRules || !dungeon.extendedFeatures,
+      `${set.id}: dmRules is given only where dungeon.dat has no Extended Features block`);
     const graphics = new GraphicsLoader();
     graphics.loadFromArray(new Uint8Array(readFileSync(fileOf(set, 'graphics.dat'))));
     const tables = gameTablesOf(graphics);

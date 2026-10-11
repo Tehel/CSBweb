@@ -10,6 +10,8 @@
  * - A file with no block leaves both as they were: `mini.dat`, CSB's Atari-era save.
  * - `_ShowPrisonDoor` forces `DM_rules` on from `DMRulesDesignOption` alone
  *   (`CSBCode.cpp:10796-10800`).
+ * - The data set's `dmRules` (`DataSet.dmRules`) is the design option's value before any
+ *   file is read: DM's Atari files, which have no block, boot with `DM_rules` on.
  * - `SaveGame` writes both back (`SaveGame.cpp:975-980`), and the port's own save carries
  *   them in its block through a load.
  * - `_ResurrectReincarnateCancel` charges the reincarnation penalties only
@@ -23,12 +25,14 @@ import { basename, resolve } from 'node:path';
 
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
+import { dataSetFor } from '../src/data/DataSets';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { Game } from '../src/engine/Game';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { newGame, stockGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
+import { MANIFEST } from './lib/dataSets';
 
 /** `fn` without the loaders' progress lines. */
 function quiet<T>(fn: () => T): T {
@@ -111,6 +115,18 @@ booted.ctx.rules.dmRulesDesignOption = true;
 booted.forceDMRulesAtBoot();
 console.log(`  ${rulesOf(booted)}`);
 check(booted.ctx.rules.dmRules, 'DMRules forces DM_rules on (CSBCode.cpp:10796-10800)');
+
+console.log('');
+console.log('=== the default data set, DM on the Atari files, plays by DM\'s rules ===');
+const dm = dataSetFor(MANIFEST, null);
+const ofSet = dmGame();
+ofSet.ctx.rules.dmRulesDesignOption = dm.dmRules;
+quiet(() => ofSet.readDungeonDat(new Uint8Array(readFileSync(resolve(dm.dir, 'dungeon.dat')))));
+ofSet.forceDMRulesAtBoot();
+console.log(`  ${dm.id}: dmRules ${dm.dmRules}; ${rulesOf(ofSet)}`);
+check(dm.id === 'dm-atari' && dm.dmRules, 'the manifest gives dm-atari dmRules');
+check(ofSet.ctx.rules.dmRules && ofSet.ctx.rules.dmRulesDesignOption,
+  'its new game keeps the design option through the read, and the boot turns DM_rules on');
 
 /* ------------------------------------------------- written and read back ----- */
 

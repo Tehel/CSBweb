@@ -18,7 +18,7 @@
  *
  * A folder is named relative to the manifest. A set's `dir` may be left out, for its `id`.
  * `swoosh`, the FTL logo's folder, may be `null` or left out. The flags `csbGraphics`,
- * `miniDat`, `hintOracle` and `hidden` may each be left out, for `false`, and the manifest
+ * `miniDat`, `hintOracle`, `dmRules` and `hidden` may each be left out, for `false`, and the manifest
  * names one only where it is true. A set with `"hidden": true` is left out of the chooser
  * and plays all the same by its `?dungeon=` (`chooserSets`).
  */
@@ -51,6 +51,18 @@ export interface DataSet {
      */
     hintOracle: boolean;
     /**
+     * Whether the game starts with `DMRulesDesignOption` on, which the boot turns into
+     * `DM_rules` (`Game.forceDMRulesAtBoot`): a reincarnated champion then keeps their
+     * attributes and their HP, stamina and mana (doc/CSBwin-src/CSBCode.cpp:6799, :6820).
+     * It is the flags' value at the start, as a launch option's would be (`--dmrules`,
+     * doc/CSBwin-src/LinCSBUI.cpp:677): a file with an Extended Features block sets both
+     * its own way, and one without leaves them (`readRulesOptions`). DM's Atari files have
+     * no block; CSBWin's DM package, converted from them, has `DMRules`
+     * (`doc/PROVEN_FACTS.md`, "`DM_rules` and `DMRulesDesignOption`…"), and so does a
+     * game of DM saved by the port, which writes the flag back.
+     */
+    dmRules: boolean;
+    /**
      * Whether the chooser leaves it out (`chooserSets`). It is played by its `?dungeon=` all
      * the same, and the server takes its events and serves its files as any other's.
      */
@@ -73,7 +85,7 @@ export interface DataSetManifest {
 /** The manifest's name, in the folder that holds the sets. */
 export const MANIFEST_NAME = 'manifest.json';
 
-const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'hidden'] as const;
+const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'hidden'] as const;
 
 /**
  * `text`, the manifest read from the folder `base` (`gamefiles` for the page,
@@ -100,12 +112,12 @@ export function parseManifest(text: string, base: string): DataSetManifest {
         if (!isText(name)) throw manifestError(`data set '${id}' has no "name"`);
         const dir = entry.dir === undefined ? id : entry.dir;
         if (!isFolder(dir)) throw manifestError(`data set '${id}' has no "dir", a folder relative to the manifest`);
-        const [csbGraphics, miniDat, hintOracle, hidden] = FLAGS.map((flag) => {
+        const [csbGraphics, miniDat, hintOracle, dmRules, hidden] = FLAGS.map((flag) => {
             const value = entry[flag] ?? false;
             if (typeof value !== 'boolean') throw manifestError(`data set '${id}' has a "${flag}" that is neither true nor false`);
             return value;
-        }) as [boolean, boolean, boolean, boolean];
-        return { id, name, dir: under(base, dir), csbGraphics, miniDat, hintOracle, hidden };
+        }) as [boolean, boolean, boolean, boolean, boolean];
+        return { id, name, dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, hidden };
     });
     const twice = dataSets.find((set, i) => dataSets.findIndex((other) => other.id === set.id) !== i);
     if (twice) throw manifestError(`two data sets are '${twice.id}'`);
