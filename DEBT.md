@@ -1641,7 +1641,8 @@ Rules for all of them:
   - an empty hand drinking at a water fountain (`drinkAtWaterFountain`,
     `src/renderer/ui/Feeding.ts`, checked by `tools/dump-fountain.ts`);
   - a mastery just gained drawn in colour 7 on the attribute panel until every attribute
-    its level gain raised is back at its new maximum (`src/engine/MasteryGains.ts`,
+    its level gain raised is back at the maximum that gain gave it, whatever another
+    role's level raised since (`src/engine/MasteryGains.ts`,
     checked by `tools/dump-mastery-panel.ts`);
   - what a champion's THROW or SHOOT sent off gathered back into their possessions when
     the party arrives on the square it lies on, never what the cursor threw

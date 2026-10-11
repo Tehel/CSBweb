@@ -38,7 +38,8 @@
  *
  * The last section is an extra (`DEBT.md` X), with the extras on: a mastery just gained
  * is drawn in colour 7 until every attribute its level gain raised is back at its new
- * maximum (`src/engine/MasteryGains.ts`), and in CSBWin's colour 13 with them off.
+ * maximum (`src/engine/MasteryGains.ts`), and in CSBWin's colour 13 with them off; a
+ * level in another role raising the same attribute again does not light it once more.
  *
  * What to look for in the output: a line for every role whose mastery exceeds 1, at
  * x=108 / y=58+7n in viewport coordinates, matching the string spelled out here
@@ -53,6 +54,8 @@ import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/en
 import type { Champion } from '../src/engine/gameTypes';
 import { addToSkill, ensureSkills, determineMastery } from '../src/engine/skills';
 import { AttributeIndex } from '../src/engine/attributes';
+import { recordMasteryGain } from '../src/engine/MasteryGains';
+import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import type { FontData } from '../src/renderer/csbwin/TextRenderer';
@@ -452,6 +455,36 @@ async function main(): Promise<void> {
   stats[AttributeIndex.Strength]!.current = stats[AttributeIndex.Strength]!.maximum - 5;
   [f] = row('Strength drained later');
   check(f === 'colour 13', 'extras on: a later drop is not a level gain, so the line stays colour 13');
+
+  // The roles share attributes: a note is held to the maximum its own gain gave, so a
+  // fighter level raising Strength again leaves alone a ninja note whose Strength is back,
+  // even one no panel has drawn since.
+  for (const attr of stats) attr.current = attr.maximum;
+  recordMasteryGain(champion, 1, 1 << AttributeIndex.Strength);
+  champion.skills![0]!.experience = experienceForMastery(4) - 1;
+  const strengthBefore = stats[AttributeIndex.Strength]!.maximum;
+  check(addToSkill(game.ctx, 0, 0, 1).leveledUp, 'a second fighter level is gained');
+  check(stats[AttributeIndex.Strength]!.maximum > strengthBefore, 'it raises Strength again');
+  const fighter4 = `${MASTERY_LABELS[4]} ${ROLES[0]}`;
+  const sharedRow = [colourOf(0, fighter4), colourOf(1, ninja)];
+  console.log(['fighter gain over a met ninja note', ...sharedRow].join('\t'));
+  check(sharedRow[0] === 'green (7)', 'extras on: the fighter level just gained is green');
+  check(sharedRow[1] === 'colour 13', "extras on: the fighter's Strength does not light the ninja line, whose own is back");
+
+  // A note met while no panel shows it is dropped by the drift that met it
+  // (`tenSecondUpdate`), so a drop after that does not light it again.
+  for (const attr of stats) attr.current = attr.maximum;
+  const dexterity = stats[AttributeIndex.Dexterity]!;
+  dexterity.current = dexterity.maximum - 1;
+  recordMasteryGain(champion, 1, 1 << AttributeIndex.Dexterity);
+  check(colourOf(1, ninja) === 'green (7)', 'extras on: a ninja gain short of its Dexterity is green');
+  game.ctx.state.tickCount = 256;
+  tenSecondUpdate(game.ctx);
+  check(dexterity.current === dexterity.maximum, 'the drift brings Dexterity back to its maximum');
+  dexterity.current = dexterity.maximum - 3;
+  const n2 = colourOf(1, ninja);
+  console.log(['met by the drift, then drained', '', n2].join('\t'));
+  check(n2 === 'colour 13', 'extras on: a note met by the drift unseen stays met after a later drop');
   ui.ctx.extras = false;
   console.log('');
 

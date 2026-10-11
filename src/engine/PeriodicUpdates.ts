@@ -21,6 +21,7 @@ import { CHARFLAG_CHEST_OR_SCROLL, getChampionPossession } from './gameTypes';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { drawAllCharacterState } from './Party';
 import { GetBasicObjectType } from './objectIndex';
+import { settleMasteryGains } from './MasteryGains';
 import { determineMastery, ensureSkills } from './skills';
 
 /** `(d.Time&511)==0` — the loop's test for `NinetySecondUpdate` (doc/CSBwin-src/CSBCode.cpp:690). */
@@ -217,6 +218,8 @@ export function tenSecondUpdate(ctx: GameContext): void {
                     incrAttributeCurrent(attr, -Math.trunc(current / (maximum === 0 ? 1 : maximum)));
                 }
             }
+            // An extra's note, not CSBWin's: a mastery gain whose attributes are back (`MasteryGains.ts`).
+            settleMasteryGains(champ);
         }
 
         // A champion left facing elsewhere turns back with the party once no
