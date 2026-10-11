@@ -53,6 +53,7 @@ const CHECKS = [
   { tool: 'dump-inventory-routing.ts' },
   { tool: 'dump-key-bindings.ts' },
   { tool: 'dump-settings.ts' },
+  { tool: 'dump-settings-dialog.ts' },
   { tool: 'dump-attack-panel.ts' },
   { tool: 'dump-magic-panel.ts' },
   { tool: 'dump-champion-state.ts' },

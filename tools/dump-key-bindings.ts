@@ -390,18 +390,18 @@ async function main(): Promise<void> {
   };
   const awake: Record<string, number> = {
     KeyJ: 1, Numpad7: 1, KeyL: 2, Numpad9: 2, KeyK: 3, Numpad8: 3,
-    Period: 4, Numpad6: 4, Comma: 5, Numpad5: 5, KeyM: 6, Numpad4: 6, Escape: 147,
+    Period: 4, Numpad6: 4, Comma: 5, Numpad5: 5, KeyM: 6, Numpad4: 6, Pause: 147,
   };
   for (const [code, button] of Object.entries(awake)) {
     check(buttonOf('Adventure', code) === button, `awake, ${code} should queue button ${button}`);
   }
-  for (const code of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Insert', 'Home', 'PageUp', 'Enter',
+  for (const code of ['Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Insert', 'Home', 'PageUp', 'Enter',
     'NumpadEnter', 'F1', 'F5', 'KeyS', 'Numpad2', 'Numpad0']) {
     check(buttonOf('Adventure', code) === 0, `awake, ${code} sends the tables nothing`);
   }
-  check(buttonOf('Sleeping', 'Escape') === 147 && buttonOf('Sleeping', 'Enter') === 0
-    && buttonOf('Sleeping', 'KeyK') === 0, 'asleep, Esc is 147, and Return and K nothing');
-  check(buttonOf('Frozen', 'Escape') === 148 && buttonOf('Frozen', 'KeyK') === 0, 'frozen, Esc is 148, and K nothing');
+  check(buttonOf('Sleeping', 'Pause') === 147 && buttonOf('Sleeping', 'Enter') === 0
+    && buttonOf('Sleeping', 'KeyK') === 0, 'asleep, Pause, the tables\' Esc, is 147, and Return and K nothing');
+  check(buttonOf('Frozen', 'Pause') === 148 && buttonOf('Frozen', 'KeyK') === 0, 'frozen, Pause is 148, and K nothing');
   ui.uiMode = UIMode.Adventure;
   updateButtonLists(ui);
 

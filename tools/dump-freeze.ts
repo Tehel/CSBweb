@@ -14,6 +14,8 @@
  * - Button 148 (`:1899-1912`): `d.ClockRunning = 1`, `TAG0207cc()`, the saved lists and
  *   key tables back, `DiscardAllInput()`. The tick that fell due while frozen runs in the
  *   frame that thaws.
+ * - The port's key for the tables' Esc is Pause (`DEFAULT_KEY_BINDINGS`): Esc opens the
+ *   settings (`DEBT.md` H).
  * - Asleep, `TAG02076e` does nothing and `TAG0207cc` only redraws the sleep screen
  *   (`Character.cpp:5136`, `CSBCode.cpp:10062-10066`): the thaw goes back to the sleep lists.
  *
@@ -112,7 +114,7 @@ async function main(): Promise<void> {
   {
     game.lastInputTime = 0;
     handled.length = 0;
-    check(press('Escape') === 147, 'Byte18400 turns Esc into 147');
+    check(press('Pause') === 147, 'Byte18400 turns Esc, which Pause sends, into 147');
     // Queued behind the freeze: `DiscardAllInput()` must lose it.
     game.enqueueKeyButton(1);
     const facing = party.facing;
@@ -125,7 +127,7 @@ async function main(): Promise<void> {
       'PrimaryButtonList = Buttons17832, SecondaryButtonList = NULL');
     check(ui.keyXlate2 === keys.byte18448 && ui.keyXlate1 === null, 'pKeyXlate2 = Byte18448, pKeyXlate1 = NULL');
     check(ui.shadedByTag02076e, 'TAG02076e: the three areas shaded, the arrow cursor');
-    check(Keyboard.translateKey(ui, Keyboard.keyScanOf('Escape')) === 148, 'Esc is now 148');
+    check(Keyboard.translateKey(ui, Keyboard.keyScanOf('Pause')) === 148, 'Esc, Pause, is now 148');
     check(Keyboard.translateKey(ui, 0x0d) === 0, 'and Return nothing');
   }
 
@@ -179,10 +181,10 @@ async function main(): Promise<void> {
     frame(-1);
     console.log(`${state()} selected=${party.selectedCharacterIndex}`);
     check(game.isFrozen(), 'frozen by the click');
-    check(press('Escape') === 148, 'Esc is queued as 148');
+    check(press('Pause') === 148, 'Pause is queued as 148');
     frame(-1);
     console.log(`${state()} selected=${party.selectedCharacterIndex}`);
-    check(!game.isFrozen(), 'thawed by Esc');
+    check(!game.isFrozen(), 'thawed by Pause');
     check(party.selectedCharacterIndex === 0 && ui.secondaryButtons === lists.buttons17760,
       'TAG0207cc shows the inventory again, and its list is back');
     Mouse.handleInventoryToggle(ui, 0);
@@ -194,7 +196,7 @@ async function main(): Promise<void> {
     game.systems.mouse.sleep();
     check(Keyboard.translateKey(ui, 0x0d) === 146, 'asleep, Return is 146');
     game.lastInputTime = 0;
-    check(press('Escape') === 147, 'and Esc 147');
+    check(press('Pause') === 147, 'and Esc, Pause, 147');
     frame(-1);
     console.log(`${state()} before=${ui.modeBeforeFreeze}`);
     check(game.isFrozen() && game.isPartySleeping(), 'frozen, and still asleep');
@@ -202,7 +204,7 @@ async function main(): Promise<void> {
     const before = game.ctx.state.tickCount;
     for (let i = 0; i < 5; i++) frame(1);
     check(game.ctx.state.tickCount === before, 'asleep, every frame is a tick, but frozen none is');
-    press('Escape');
+    press('Pause');
     frame(-1);
     console.log(`${state()} ticks=${game.ctx.state.tickCount - before}`);
     check(!game.isFrozen() && game.isPartySleeping() && ui.uiMode === UIMode.Sleeping, 'thawed, still asleep');

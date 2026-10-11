@@ -79,6 +79,7 @@ import {
   type SaveMenuMode,
 } from './ui/SaveMenu';
 import { isDialogOpen, type DialogPoint } from './ui/Dialog';
+import { openSettingsDialog } from './ui/SettingsDialog';
 import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
 import type { SaveEntry } from '../data/saves';
 import type { ImportedFile } from '../engine/GameSaves';
@@ -106,6 +107,8 @@ export type GameScreenHooks = Pick<UIState,
   | 'onRestoreFailed'
   | 'onOpenHintOracle'
   | 'onSleepSave'
+  | 'settings'
+  | 'isCrtAvailable'
 >;
 
 /** What the screen reads: the graphics, and the game it shows. */
@@ -210,6 +213,8 @@ export class GameScreen {
       onRestoreFailed: hooks.onRestoreFailed,
       onOpenHintOracle: hooks.onOpenHintOracle,
       onSleepSave: hooks.onSleepSave,
+      settings: hooks.settings,
+      isCrtAvailable: hooks.isCrtAvailable,
     });
     ui.hintOracle = deps.hintOracle ?? null;
     this.ui = ui;
@@ -394,6 +399,11 @@ export class GameScreen {
   /** The button of the dialog's click released (`Dialog.release`). */
   handleDialogRelease(): void {
     this.ui.dialog?.release?.(this.ui);
+  }
+
+  /** The settings dialog (`ui/SettingsDialog.ts`): Esc, or a double click on the message area. */
+  openSettings(): void {
+    openSettingsDialog(this.ui);
   }
 
   /* The save/load screen; the work is in `ui/SaveMenu.ts`. */
@@ -652,7 +662,9 @@ export class GameScreen {
     this.cursorMoved = false;
 
     const uiPalette = this.uiPalette;
-    const viewportPalette = inventoryOpen ? uiPalette : (this.getViewportPalette() ?? uiPalette);
+    // A dialog of the port's own is shown through the interface's palette whole (`Dialog.uiPalette`).
+    const uiPaletteOnly = this.ui.dialog?.uiPalette === true;
+    const viewportPalette = inventoryOpen || uiPaletteOnly ? uiPalette : (this.getViewportPalette() ?? uiPalette);
     const footprint = this.ui.objectCursorFootprint;
     let throughViewportPalette = false;
     if (!inventoryOpen && viewportPalette !== uiPalette) {
@@ -662,7 +674,7 @@ export class GameScreen {
     } else {
       updateImageDataFromIndex(this.screenImageData, this.screen, uiPalette);
     }
-    const overlaid = this.isAdventureVideoMode() && this.drawViewportThroughOverlay(viewportPalette);
+    const overlaid = !uiPaletteOnly && this.isAdventureVideoMode() && this.drawViewportThroughOverlay(viewportPalette);
     this.presented.record(
       this.screen.pixels,
       uiPalette,

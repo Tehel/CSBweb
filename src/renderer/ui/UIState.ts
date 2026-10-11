@@ -23,6 +23,8 @@ import type { HintSquare } from '../intro/HintOracle';
 import type { HintOracleFiles } from './HintOracleButton';
 import type { ReincarnateState } from './ReIncarnate';
 import type { SaveMenuState } from './SaveMenu';
+import type { SettingsDialogState } from './SettingsDialog';
+import type { Settings } from '../../settings/Settings';
 import type { Dialog } from './Dialog';
 
 /** Eight empty chest slots, each `RNnul`. */
@@ -105,6 +107,8 @@ export interface UIState {
   dialog: Dialog | null;
   /** The save/load screen's state while it is the dialog (`src/renderer/ui/SaveMenu.ts`). */
   saveMenu: SaveMenuState | null;
+  /** The settings dialog's state while it is the dialog (`src/renderer/ui/SettingsDialog.ts`). */
+  settingsDialog: SettingsDialogState | null;
   /**
    * `DiskMenuNeeded` (`doc/CSBwin-src/Data.h:159`). The disk icon's handler cannot open
    * the menu itself — CSBWin because that would recurse into `HandleMouseEvents`
@@ -320,6 +324,13 @@ export interface UIState {
    * as `sleepSaveNeeded` asks. Silent, and awaited by nobody.
    */
   readonly onSleepSave: () => void;
+  /**
+   * The player's settings (`src/settings/Settings.ts`), which the settings dialog reads
+   * and changes: the page applies a change as its every listener is told.
+   */
+  readonly settings: Settings;
+  /** Whether the browser can show the CRT effect: it gives WebGL (`src/lib/crt.ts`). */
+  readonly isCrtAvailable: () => boolean;
 
   /* ---- back into the renderer ---- */
   getGraphicBitmap(graphicNum: number, format?: ImageFormat): IndexedBitmap | null;
@@ -396,7 +407,8 @@ export type UISources = Pick<UIState,
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
-  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onHasNewFaces' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave'>;
+  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onHasNewFaces' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave'
+  | 'settings' | 'isCrtAvailable'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {
@@ -405,6 +417,7 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
     ...initialPlayState(),
     dialog: null,
     saveMenu: null,
+    settingsDialog: null,
     hintOracle: null,
     hintOracleUp: false,
     hoverPoint: null,

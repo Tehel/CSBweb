@@ -379,6 +379,10 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         },
         // The party lay down, or the player woke it: the playthrough's Sleepsave.
         onSleepSave: () => { void saves.sleepSave(); },
+        // The settings dialog reads and changes the player's settings, which this page
+        // applies (`applySettings`); its CRT toggle is inert without WebGL.
+        settings,
+        isCrtAvailable: () => crtController?.isAvailable() ?? false,
         // The Hint Oracle's button: the screen has stopped the clock and shaded the
         // interface, and the Oracle has the canvas until it closes.
         onOpenHintOracle: (square) => {

@@ -7,12 +7,18 @@
  * interface's lists and queued on the game's one mouse queue; a key is the dialog's, a
  * modal screen's, a key table's button queued the same way (`TAG0196da`), a panel key
  * (`handleUIKey`), or one of the port's own keys
- * (`portKeyAction`). The queued buttons come back through `Game.handleMouseEvents` in
+ * (`portKeyAction`). Esc and a double click on the message area open the settings
+ * (`src/renderer/ui/SettingsDialog.ts`). The queued buttons come back through `Game.handleMouseEvents` in
  * their turn, and `install` hands them to the interface's dispatcher, `handleMouseButton`.
  */
 import type { Game } from '../engine/Game';
 import type { GameScreen } from './GameScreen';
+import { MESSAGE_AREA } from './csbwin/ScrollingText';
 import { portKeyAction } from './ui/Keyboard';
+import { nowMs } from './ui/UIState';
+
+/** How soon after a click on the message area a second one opens the settings, in milliseconds. */
+export const MESSAGE_DOUBLE_CLICK_MS = 500;
 
 /** What the input path asks of the page. */
 export interface GameInputHost {
@@ -43,6 +49,8 @@ export interface KeyPress {
 export class GameInput {
   /** A click of the dialog's has its button held: the moves are its drag, until the release. */
   private dragging = false;
+  /** When the last click on the message area that hit no button came, or `null`. */
+  private messageClickMs: number | null = null;
 
   constructor(private readonly host: GameInputHost) {}
 
@@ -113,10 +121,36 @@ export class GameInput {
       this.host.refreshScreen();
       return;
     }
+    if (buttonMask === 2 && this.messageAreaDoubleClick(x, y)) {
+      screen.openSettings();
+      this.host.refreshScreen();
+      return;
+    }
     // Queued, not handled: `Game.handleMouseEvents` takes it off the queue in its turn,
     // behind any key or click already waiting, matches it to the button the screen has
     // there then, and hands it to `handleMouseButton`.
     game.onMouseClick(x, y, buttonMask);
+  }
+
+  /**
+   * Whether a left click on the message area is the second of a double click there, the
+   * settings' gesture. A click counts only where it hits no button of the lists in force
+   * (`searchMouseButtons`), so the first is nothing to the game, and is queued as any
+   * click is, and the gesture holds back no click. Only two things take a left click
+   * there (`tools/dump-settings-dialog.ts`): the freeze, on the pixel x 0, y 198 of
+   * `Buttons17196`, and frozen, the thaw, `Buttons17832`'s whole screen. So a frozen
+   * game's first click thaws it, as CSBWin's does, and opens nothing.
+   */
+  private messageAreaDoubleClick(x: number, y: number): boolean {
+    const inArea = x >= MESSAGE_AREA.x1 && x < MESSAGE_AREA.x2 + 1 && y >= MESSAGE_AREA.y1 && y < MESSAGE_AREA.y2 + 1;
+    if (!inArea || this.host.screen.searchMouseButtons(x, y, 2) !== 0) {
+      this.messageClickMs = null;
+      return false;
+    }
+    const now = nowMs();
+    const second = this.messageClickMs !== null && now - this.messageClickMs <= MESSAGE_DOUBLE_CLICK_MS;
+    this.messageClickMs = second ? null : now;
+    return second;
   }
 
   mouseUp(): void {
@@ -178,6 +212,13 @@ export class GameInput {
     // Ctrl-R still reloads rather than opening a rune keypad. That leaves out
     // `Byte18400`'s Ctrl-S, as CSBWin's shipped `config.txt` does (`keyScanOf`).
     if (modified) return false;
+    // Esc is the settings', in play, asleep and frozen too: the freeze CSBWin's tables
+    // bind it to is Pause's (`DEFAULT_KEY_BINDINGS`, `DEBT.md` H).
+    if (code === 'Escape') {
+      screen.openSettings();
+      this.host.refreshScreen();
+      return true;
+    }
     // The key tables first, `TAG0196da` (doc/CSBwin-src/CSBCode.cpp:8515), for a key
     // bound to a keyscan, a move, the freeze or the waking (`keyScanOf`): awake,
     // `Byte18400` and `Byte18428` bind Esc, Insert, Clr/Home and the arrows; asleep

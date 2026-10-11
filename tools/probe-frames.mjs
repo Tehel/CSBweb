@@ -23,8 +23,8 @@
 // A few things are asserted on the spot rather than compared as frames, since no frame
 // shows them: the CRT effect, which screens take the mouse wheel, a move of the pointer
 // left to the VBL's frame to paint, the keys of the entrance's chooser, the download its
-// EXPORT starts, a file dropped on it, a finger held on the eye, and a mouse released off
-// the canvas. See `check` below.
+// EXPORT starts, a file dropped on it, a finger held on the eye, a mouse released off
+// the canvas, and the settings dialog opened, held, changed and read back. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -160,7 +160,10 @@ await send('Emulation.setDeviceMetricsOverride', {
 // `AddCharacter` rolls food and water from it (`HallOfChampions.addCharacter`), so without the seed
 // the status bars would differ run to run.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
-  try { localStorage.clear(); } catch (e) {}
+  // A page opened with \`keepsettings\` keeps the settings a page before it changed.
+  if (!location.search.includes('keepsettings')) {
+    try { localStorage.clear(); } catch (e) {}
+  }
   // The save/load screen lists IndexedDB, so a frame of it would otherwise carry
   // whatever the last probe session saved. Both drivers of this script run Chrome on a
   // throwaway profile (probe-ui.mjs and check-frames.sh both pass --user-data-dir), so
@@ -501,6 +504,64 @@ check((await canvasPixels()) === confluxStart, 'the overlay hidden and the view 
 await evaluate(FACE(14, 14, 0, 2)); await wait(500);
 await leaveCanvas(); await wait(200);
 console.log('state: Conflux bookshelf'); await shot('20-conflux-bookshelf');
+
+// The settings dialog (`src/renderer/ui/SettingsDialog.ts`), over the default dungeon's
+// first view: Esc opens it, over the whole screen, on GAME, and the clock is held while it
+// is up. A frame a tab: GAME's with the pointer on DRINK AT FOUNTAINS' name, so the help
+// line names it and the cursor is drawn, DISPLAY's and SOUND's with it off the canvas.
+// KEYS is inert until it has its keys (`DEBT.md` U5).
+await send('Page.navigate', { url: `${APP}?intro=0&keepsaves` });
+await wait(3500);
+const settingsUp = () => evaluate(`window.__probe.screen.ui.settingsDialog !== null`);
+const settingsValues = () => evaluate(`window.__probe.screen.ui.settings.values`);
+const ticks = () => evaluate(`window.__probe.game.ctx.state.tickCount`);
+const pointerAt = (x, y) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
+  c.dispatchEvent(new PointerEvent('pointermove',{isPrimary:true,pointerType:'mouse',clientX:r.left+(${x}+0.5)*r.width/320,clientY:r.top+(${y}+0.5)*r.height/200,bubbles:true}));return 1;})()`);
+await key('Escape'); await wait(300);
+check(await settingsUp(), 'Esc opens the settings in play');
+const heldAt = await ticks(); await wait(1000);
+check(await ticks() === heldAt, 'the clock is held while they are up');
+await pointerAt(40, 92); await wait(200);
+console.log('state: settings, GAME');    await shot('21-settings-game');
+await leaveCanvas(); await wait(200);
+await canvasClick(120, 45, 0); await wait(300);
+console.log('state: settings, DISPLAY'); await shot('22-settings-display');
+await canvasClick(197, 45, 0); await wait(300);
+console.log('state: settings, SOUND');   await shot('23-settings-sound');
+// The VOLUME slider, dragged with CDP's own mouse from its left end, and released off the
+// canvas, right of it: the canvas has the pointer captured, so the moves off it come at
+// its edge, and the knob goes to the track's right end; the release is the canvas's too,
+// and a move after it drags nothing.
+const cdpMouse = async (type, x, y) => {
+  const p = await evaluate(`(()=>{const r=document.getElementById('game-canvas').getBoundingClientRect();
+    return {x:r.left+(${x}+0.5)*r.width/320, y:r.top+(${y}+0.5)*r.height/200};})()`);
+  await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left',
+    buttons: type === 'mouseReleased' ? 0 : 1, clickCount: type === 'mouseMoved' ? 0 : 1 });
+};
+await cdpMouse('mousePressed', 200, 92); await wait(200);
+check((await settingsValues()).volume === 0, 'a press at the VOLUME slider\'s left end sets it to 0');
+await cdpMouse('mouseMoved', 254, 92); await wait(200);
+const halfway = (await settingsValues()).volume;
+check(halfway > 0.4 && halfway < 0.6, `dragged to the track's middle, about a half (${halfway})`);
+await cdpMouse('mouseMoved', 400, 92); await cdpMouse('mouseReleased', 400, 92); await wait(200);
+check((await settingsValues()).volume === 1, 'dragged off the canvas, to its right, the volume is 1');
+await pointerAt(200, 92); await wait(200);
+check((await settingsValues()).volume === 1, 'released there, a move drags nothing');
+// SOUND's OFF, read back after a reload: the setting is kept, and the page's own button
+// shows it. Then a double click on the message area opens the dialog, and a right click
+// closes it.
+await canvasClick(284, 71, 0); await wait(300);
+check((await settingsValues()).sound === false, 'SOUND\'s OFF turns the sound off');
+await canvasClick(160, 100, 2); await wait(300);
+check(!(await settingsUp()), 'a right click closes the settings');
+await send('Page.navigate', { url: `${APP}?intro=0&keepsaves&keepsettings` });
+await wait(3500);
+const kept = await settingsValues();
+check(kept.sound === false && kept.volume === 1, 'after a reload, the sound is still off, at full volume');
+check(!(await evaluate(`document.getElementById('btn-sound').classList.contains('is-pressed')`)), 'and the page\'s Sound button shows it');
+await canvasClick(100, 185, 0); await canvasClick(150, 190, 0); await wait(300);
+check(await settingsUp(), 'a double click on the message area opens the settings');
+await canvasClick(160, 100, 2); await wait(300);
 
 // The CRT effect's input surface. The effect's canvas is shown over the game canvas, and
 // the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,

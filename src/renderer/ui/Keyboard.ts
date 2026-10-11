@@ -118,8 +118,9 @@ export type KeyBindings = Readonly<Record<KeyAction, KeySlots>>;
  * The moves are K , J L M . and the keypad's 4-9 as the file's `scan` lines bind them,
  * which NumLock does not change: keypad 7 turns left, 9 right, 8 and 5 step forward and
  * back, 4 and 6 strafe. The arrows are not moves, where the file's scancodes make them
- * keypad 8, 4 and 6 (`DEBT.md` H, "The keys are the port's table"). Esc freezes, as the
- * file's one other `KEY` line says; Return wakes no one, since the file has no line for
+ * keypad 8, 4 and 6 (`DEBT.md` H, "The keys are the port's table"). Pause freezes,
+ * which the file's one other `KEY` line gives Esc: Esc opens the settings
+ * (`GameInput.keyDown`, `DEBT.md` H). Return wakes no one, since the file has no line for
  * it. The rune key is virtual key 0xc0, left of 1, which types `` ` `` and `~` on a US
  * keyboard.
  */
@@ -159,7 +160,7 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   'move.turnRight': ['KeyL', 'Numpad9'],
   'move.strafeLeft': ['KeyM', 'Numpad4'],
   'move.strafeRight': ['Period', 'Numpad6'],
-  freeze: ['Escape', ''],
+  freeze: ['Pause', ''],
   wake: ['', ''],
   quickSave: ['F5', ''],
   quickLoad: ['F9', ''],

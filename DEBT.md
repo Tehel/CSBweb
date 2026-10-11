@@ -108,12 +108,11 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| U4 | The settings dialog: Esc, its tabs, GAME, DISPLAY and SOUND | M | ⏳ |
 | U5 | The settings' KEYS tab | M | ⏳ |
 | U6 | The map is a page panel | M | ⏳ |
 | U7 | The champion table is a page panel | M | ⏳ |
 | U8 | No fullscreen | M | ⏳ |
-| U9 | The side panel | S | ⏳ after U4-U8 |
+| U9 | The side panel | S | ⏳ after U5-U8 |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
 | R2 | Every store upgrade re-runs every step, and drops a row that does not parse | S | ⏳ |
@@ -209,56 +208,19 @@ one font size, so a setting is one line, and its description goes in a help line
 dialog's foot. Being in the buffer, the dialogs are under the CRT effect and in
 fullscreen, and the golden frames see them.
 
+The settings dialog (`src/renderer/ui/SettingsDialog.ts`) is the first: Esc or a double
+click on the message area opens it, and its GAME, DISPLAY and SOUND tabs set the player's
+settings. Its KEYS tab (U5) and its EXIT, which leaves for E15's welcome page, are drawn
+inert until then; once live, EXIT asks first in `_DoMenu`'s two-option menu, as what has
+not been saved is lost. Its panel holds five lines (`SETTING_LINES`), and GAME has four.
+
 None of it changes the game: with every new setting at its default, every tool's output
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a
 golden frame for what it draws, and a probe or a `tools/` assertion for what it does.
 
-### U4 ⏳ The settings dialog: Esc, its tabs, GAME, DISPLAY and SOUND
-
-The settings are the page's buttons beside the canvas (`index.html`, `src/ui/events.ts`).
-
-Paying it: a dialog over the whole screen, in the dialog slot (`src/renderer/ui/Dialog.ts`),
-from the widget kit (`src/renderer/ui/Widgets.ts`). Height is what 200 lines lack, so
-nothing takes a row of its own that can share one:
-
-- **The title line** holds SETTINGS, and CLOSE and EXIT at its right, as buttons lower
-  than the save menu's (the kit's low button).
-- **A row of tabs**: GAME, DISPLAY, SOUND, KEYS, the selected one pressed.
-- **The tab's settings**, one per line.
-- **The help line** at the foot names what the pointer is over: a setting, a tab, CLOSE
-  or EXIT. It follows the pointer, drawn by the VBL's frame as the cursor is. A touch
-  screen has no hover, so there it names the last control touched.
-
-Every change goes to the settings model (`src/settings/Settings.ts`) at once.
-
-- **GAME**: the three extras, SEND STATISTICS, and, as U6 and U7 land, MAP VIEW and
-  CHAMPION VIEW.
-- **DISPLAY**: CRT, shown inert where WebGL is unavailable; FULLSCREEN, from U8;
-  STARTUP ANIMATIONS.
-- **SOUND**: SOUND ON/OFF, and the VOLUME slider.
-- **KEYS**: U5.
-- **EXIT** leaves for the welcome page (artboard 1), which E15 builds. Until then it is
-  drawn inert. Once live, it asks first in `_DoMenu`'s two-option menu, as what has not
-  been saved is lost.
-
-**Opening it.** Esc opens it in play, the inventory and the sleep and freeze screens
-included, but not over the save menu, the Reincarnate screen, the Hint Oracle or the
-credits. Esc again, CLOSE or a right-click close it. The `freeze` action keeps
-keyscan 0x1b, CSBWin's Esc in the tables (freezing awake, waking asleep, thawing frozen),
-and its default key becomes Pause. This is a deliberate divergence, recorded in H when
-paid. A double click on the message area (a double tap on a touch screen) opens it too.
-The item first checks, in every mode, that no button list covers the message area, so
-the first click is nothing to the game and the gesture delays no click.
-
-The check: a golden frame per tab; the probe opens it with Esc and with a double click on
-the message area, holds the tick count while it is up, changes a setting, and reads it
-back after a reload. The VOLUME slider is the first control dragged (`Dialog.drag` and
-`Dialog.release`, which no dialog has before it), so the probe drags it with CDP's own
-mouse, and releases it off the canvas.
-
 ### U5 ⏳ The settings' KEYS tab
 
-No screen shows or changes a binding.
+No screen shows or changes a binding: the settings dialog's KEYS tab is drawn inert.
 
 Paying it: the KEYS tab lists every `KeyAction` under a name (MOVE FORWARD, CHAMPION 2
 ATTACK 3, RUNE 4, CASTER 1, QUICK SAVE, …) with its two slots, in a list that scrolls by
@@ -292,8 +254,10 @@ behind a developer's switch.
 Paying it: a map dialog in the dialog slot. It draws the party's level at the largest whole cell
 size that fits, in the UI palette, with the party's square and facing, the level's
 number, and CLOSE. It opens by its key action (U5) and by a long press on the message
-area, and only with MAP VIEW on (U4). The teleport stays only behind `?dev`. A map of
-only the cells the party has seen is X10's data and a later mode of this dialog. The
+area, and only with MAP VIEW on, a setting of the settings dialog's GAME tab. The teleport stays only behind `?dev`. A map of
+only the cells the party has seen is X10's data and a later mode of this dialog. GAME
+has room for one more line ("U — The interface in the canvas"): whichever of U6 and U7
+lands second finds its setting another place, a sixth line or a tab of its own. The
 check: a golden frame of the dialog over a fixture save's level; the probe opens it by
 the long press, and finds it shut with MAP VIEW off.
 
@@ -307,7 +271,7 @@ Paying it: a champion dialog in the dialog slot, the same readings in the game's
 columns, on two tabs (the levels, maxima and attributes; then the skills), since thirty
 lines do not fit one screen. Nothing is highlighted, since the clock is held while the
 dialog is up. It opens by its key action (U5) and by a long press on a champion's stat
-bars, and only with CHAMPION VIEW on (U4). The dialog then marks that champion's column.
+bars, and only with CHAMPION VIEW on, a setting of the settings dialog's GAME tab. The dialog then marks that champion's column.
 
 The long press opens no inventory. A single click on the bars does: the bars have no
 left button, so a left click there becomes the box's right click, 7-10
@@ -335,6 +299,9 @@ these are the other ways in:
   opens the dialog over it. No delay, but the inventory is left open, and undoing it is
   not a toggle, since the press may have replaced another champion's inventory.
 
+GAME has room for one more line: whichever of U6 and U7 lands second finds its setting
+another place (U6).
+
 The check: a golden frame of each tab from a fixture save; the probe opens it by a long
 press, with every inventory still closed, and opens an inventory by a tap, at its
 release.
@@ -353,7 +320,7 @@ canvas over the game canvas and a click read through it, in fullscreen.
 
 ### U9 ⏳ The side panel
 
-With U4 to U8 in, nothing on `#side` (`index.html`) is needed by a player. The data-set
+With the settings dialog and U5 to U8 in, nothing on `#side` (`index.html`) is needed by a player. The data-set
 chooser, Quick Save and Quick Load, CRT, Sound and its volume, Map, Champions, Debug,
 Extras, and the map and champion panels all go, with the code in `src/ui/` that only they
 use. The data set is chosen by `?dungeon=` until E15's welcome page. The teleport and
@@ -1804,8 +1771,9 @@ Rules for all of them:
 - **One setting each, off by default**: a flag of `SettingsValues.extras`
   (`src/settings/Settings.ts`), which the game reads as `GameContext.extras` (`Extras`),
   set at every change (`applyToGame`). With every extra off, the game is CSBWin's: every
-  tool's output and every golden frame stay the same. The page's one Extras button turns
-  them all on or off together until the settings dialog shows each (U4):
+  tool's output and every golden frame stay the same. The settings dialog's GAME tab
+  shows each (`src/renderer/ui/SettingsDialog.ts`), and the page's one Extras button
+  turns them all on or off together:
   - `drinkAtFountain`: an empty hand drinking at a water fountain (`drinkAtWaterFountain`,
     `src/renderer/ui/Feeding.ts`, checked by `tools/dump-fountain.ts`);
   - `colourNewMastery`: a mastery just gained drawn in colour 7 on the attribute panel until every attribute
@@ -1905,6 +1873,15 @@ Recorded so that nobody "fixes" them.
   letter and the keypad, and the arrows have no turns); and the letters are bound by
   position, where the file's `key` lines bind characters. Return wakes no one, as under
   the file. `tools/dump-key-bindings.ts` checks every default key.
+- 🚫 **Esc opens the settings, and Pause freezes.** CSBWin's tables bind the Atari
+  keyscan of Esc, 0x1b: awake and asleep to the freeze, 147, and frozen to the thaw,
+  148 (`Byte18400`, `Byte18440`, `Byte18448`, `doc/CSBwin-src/Mouse.cpp:1870-1912`), and
+  the shipped `config.txt`'s one other `KEY` line sends it from Esc. The port's `freeze`
+  action sends that keyscan from Pause (`DEFAULT_KEY_BINDINGS`), and Esc opens the
+  settings dialog, awake, asleep and frozen alike (`GameInput.keyDown`,
+  `src/renderer/ui/SettingsDialog.ts`). A left click on the pixel x 0, y 198 still
+  freezes, and a click anywhere still thaws. `tools/dump-settings-dialog.ts` and
+  `tools/dump-freeze.ts` check both keys.
 - 🚫 **A save keeps the dungeon's three 2023 flags.** CSBWin 20230608 reads
   `SupressDSAWarning` 0x100, `GravityGame` 0x200 and `ThreeDMovements` 0x400 from a file's
   `extendedFlags` into `SupressDSAWarningOption`, `bGravityGame` and `bThreeDMovements`
@@ -1950,7 +1927,7 @@ Recorded so that nobody "fixes" them.
   (`drawCursorItem`, `src/renderer/ui/Mouse.ts`, and `GameScreen.presentViewport`). The
   arrow over the right-hand panel and the message area is kept. It is
   `UIState.colouredObjectCursor`, on by default. It becomes one of the player's settings
-  (`src/settings/Settings.ts`) once the settings dialog has a place for it (U4); `tools/dump-object-cursor.ts` checks it both ways.
+  (`src/settings/Settings.ts`) once a tab of the settings dialog carries it; `tools/dump-object-cursor.ts` checks it both ways.
 - 🚫 **The right-hand panel is shown through the interface palette.** With
   `d.DynamicPaletteSwitching`, CSBWin converts the spell, weapon and movement panel,
   x 224-319 by rows 33-168, through the viewport's `d.Palette11946`, as it does the

@@ -32,6 +32,8 @@ const CHAR_WIDTH = 6;
 const ROW_CLEAR_TOP_Y = 172;
 /** The strip is scanlines 172-199. */
 const STRIP_HEIGHT = NUM_ROWS * ROW_HEIGHT;
+/** The strip on the screen, the whole width of scanlines 172-199. */
+export const MESSAGE_AREA = { x1: 0, y1: ROW_CLEAR_TOP_Y, x2: 319, y2: ROW_CLEAR_TOP_Y + STRIP_HEIGHT - 1 } as const;
 /** Text draw baseline for row 0 (`row*7 + 177`). */
 const TEXT_BASE_Y = 177;
 const SCREEN_LAST_X = 319;

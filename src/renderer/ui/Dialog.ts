@@ -1,6 +1,6 @@
 /**
  * The dialog over the game: the one slot a dialog fills while it is up (`UIState.dialog`).
- * The save menu (`SaveMenu.ts`) is the first to use it.
+ * The save menu (`SaveMenu.ts`) and the settings (`SettingsDialog.ts`) use it.
  *
  * A dialog is drawn into the screen over what the screen composed, under the button
  * flash and the cursor (`GameScreen`), and it is modal the way `_WaitForMenuSelect` is
@@ -19,6 +19,12 @@ import type { UIState } from './UIState';
 export type DialogPoint = { x: number; y: number } | null;
 
 export interface Dialog {
+  /**
+   * Shown through the interface's palette whole, the viewport's lines too, which the
+   * screen otherwise shows through the light level's palette, as CSBWin shows its menus
+   * (`SettingsDialog.ts` → "The palette").
+   */
+  readonly uiPalette?: boolean;
   /** Draw it into the screen. */
   draw(ui: UIState): void;
   /** A button pressed: `buttons` is CSBWin's mask, 1 the right button and 2 the left. */

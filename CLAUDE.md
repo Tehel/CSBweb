@@ -93,7 +93,7 @@ was hiding among the type errors.
 There is still **no test framework** (`PLAN.md` → "The evidence") — `npm test` is a runner
 (`tools/run-checks.mjs`) over two standing forms of evidence, and both must pass:
 
-- `tools/check-frames.sh` compares twenty live screen states against `tools/frames/` — the
+- `tools/check-frames.sh` compares twenty-three live screen states against `tools/frames/` — the
   cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
   server and headless Chrome, so it needs no setup (on Node 20 it turns on
   `--experimental-websocket` itself; `probe-ui.mjs` needs that flag, or Node 22). It is
@@ -105,7 +105,9 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   and the keys reaching a save menu, at the entrance as in play, a move of the pointer
   painting nothing until the VBL's frame, the download its EXPORT starts, a file
   dropped on it, a finger on a touch screen: a tap one click, the eye held while it
-  is down, and the eye let go by a mouse released off the canvas.
+  is down, and the eye let go by a mouse released off the canvas; and the settings dialog
+  opened by Esc and by a double click, the clock held under it, a setting kept across a
+  reload, and its slider dragged off the canvas.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`
