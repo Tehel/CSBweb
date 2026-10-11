@@ -312,7 +312,7 @@ opens the same one, load-only.
   dropped file is imported, and a hint always up would be in the way. In play, the
   VBL's frame a pointer move asks for draws it; at the entrance, whose chooser no VBL
   draws again, the move that brings it up or takes it down redraws the chooser
-  (`GameScreen.moveSaveMenuPointer`). RISE's dialog, which imports nothing, has no hint.
+  (`GameScreen.moveDialogPointer`). RISE's dialog, which imports nothing, has no hint.
 - **LOAD, SAVE, EXPORT**, and a drop for the import. No delete, no quit and no "SAVE AND
   QUIT": loading another playthrough's save is how a player leaves a game. **A dropped
   save of the dungeon is listed at once**, selected, under "SAVE IMPORTED", and nothing

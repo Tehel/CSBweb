@@ -148,14 +148,14 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     pointerX = x;
     pointerY = y;
     // The chooser's import hint follows the pointer; a redraw for it presents the screen.
-    if (gameScreen.isSaveMenuOpen() && gameScreen.moveSaveMenuPointer({ x, y })) return;
+    if (gameScreen.isDialogOpen() && gameScreen.moveDialogPointer({ x, y })) return;
     if (cursorVisible) host.present();
   };
   const onMouseLeave = (e: PointerEvent): void => {
     if (!e.isPrimary || e.pointerType !== 'mouse') return;
     pointerX = -100;
     pointerY = -100;
-    if (gameScreen.isSaveMenuOpen() && gameScreen.moveSaveMenuPointer(null)) return;
+    if (gameScreen.isDialogOpen() && gameScreen.moveDialogPointer(null)) return;
     if (cursorVisible) host.present();
   };
   const onContextMenu = (e: Event): void => e.preventDefault();
@@ -163,15 +163,15 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     const key = e.ctrlKey || e.metaKey || e.altKey ? '' : e.key;
     // The chooser's keys are its own, as the disk menu's are in play: an arrow moves
     // its selection, and does not scroll the page as well.
-    if (key && gameScreen.isSaveMenuOpen()) e.preventDefault();
+    if (key && gameScreen.isDialogOpen()) e.preventDefault();
     push({ kind: 'key', x: 0, y: 0, buttons: 0, key });
   };
   // The wheel is the chooser's list's, as it is the disk menu's in play
   // (`GameInput.wheel`), and no other pre-game screen's. It is no event of the queue,
   // where a screen waiting for a click or a key would take it for one.
   const onWheel = (e: WheelEvent): void => {
-    if (!gameScreen.isSaveMenuOpen()) return;
-    gameScreen.handleSaveMenuWheel(e.deltaY);
+    if (!gameScreen.isDialogOpen()) return;
+    gameScreen.handleDialogWheel(e.deltaY);
     e.preventDefault();
   };
 
@@ -287,7 +287,7 @@ async function openLoadMenu(
   // `STHideCursor` (`SaveGame.cpp:1687-1689`), as the VBL handler draws it over each frame.
   const draw = (): void => {
     if (gameScreen.isSaveMenuOpen()) {
-      gameScreen.drawSaveMenuOnly();
+      gameScreen.drawDialogOnly();
       shown = host.screen.pixels.slice();
       host.present();
       return;
@@ -306,8 +306,8 @@ async function openLoadMenu(
   while (gameScreen.isSaveMenuOpen()) {
     const event = await Promise.race([host.nextEvent(), closed]);
     if (!event) break;
-    if (event.kind === 'click') gameScreen.handleSaveMenuClick(event.x, event.y, event.buttons);
-    else if (event.key) gameScreen.handleSaveMenuKey(event.key);
+    if (event.kind === 'click') gameScreen.handleDialogClick(event.x, event.y, event.buttons);
+    else if (event.key) gameScreen.handleDialogKey(event.key);
     draw();
   }
 

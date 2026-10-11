@@ -23,6 +23,7 @@ import type { HintSquare } from '../intro/HintOracle';
 import type { HintOracleFiles } from './HintOracleButton';
 import type { ReincarnateState } from './ReIncarnate';
 import type { SaveMenuState } from './SaveMenu';
+import type { Dialog } from './Dialog';
 
 /** Eight empty chest slots, each `RNnul`. */
 export function emptyChestContents(): ObjectID[] {
@@ -96,11 +97,13 @@ export interface UIState {
    */
   reincarnate: ReincarnateState | null;
   /**
-   * The save/load screen while it is up (`src/renderer/ui/SaveMenu.ts`). Non-null means
+   * The dialog up over the game, or `null` (`src/renderer/ui/Dialog.ts`). Non-null means
    * modal in the same sense `_WaitForMenuSelect` is: the host routes every click and
-   * every key to that module and consults no other button list
+   * every key to it and consults no other button list
    * (`doc/CSBWIN_MENU_REFERENCE.md` -> "The modal loop").
    */
+  dialog: Dialog | null;
+  /** The save/load screen's state while it is the dialog (`src/renderer/ui/SaveMenu.ts`). */
   saveMenu: SaveMenuState | null;
   /**
    * `DiskMenuNeeded` (`doc/CSBwin-src/Data.h:159`). The disk icon's handler cannot open
@@ -400,6 +403,7 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
     ...sources,
     partyState: sources.ctx.party.state,
     ...initialPlayState(),
+    dialog: null,
     saveMenu: null,
     hintOracle: null,
     hintOracleUp: false,

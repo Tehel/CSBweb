@@ -108,7 +108,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| U3 | The save menu is the only dialog over the game | S | ⏳ |
 | U4 | The settings dialog: Esc, its tabs, GAME, DISPLAY and SOUND | M | ⏳ |
 | U5 | The settings' KEYS tab | M | ⏳ |
 | U6 | The map is a page panel | M | ⏳ |
@@ -214,28 +213,13 @@ None of it changes the game: with every new setting at its default, every tool's
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a
 golden frame for what it draws, and a probe or a `tools/` assertion for what it does.
 
-### U3 ⏳ The save menu is the only dialog over the game
-
-The save menu is the one dialog: `GameInput` asks `isSaveMenuOpen` before giving a click,
-the wheel or a key to anything else (`src/renderer/GameInput.ts`), the loop holds the
-pass and leaves its VBLs out of the play time while it is up (`src/engine/Game.ts:479-487`,
-`:525`), and the screen composes it over a cleared screen (`GameScreen.ts:636`).
-
-Paying it: one dialog slot in the screen, which the save menu is the first to use, and
-which any dialog fills: its drawing, its click, its key, its wheel and a drag. While any
-dialog is up the clock is held as for the save menu, and the keyboard is the dialog's.
-A drag has the pointer captured (`bindCanvasEvents`, `src/ui/events.ts`), so its moves
-and its release are the canvas's wherever the pointer goes.
-The rest is a refactor: the save menu behaves as it does now, its right-click while busy
-included (R11).
-
 ### U4 ⏳ The settings dialog: Esc, its tabs, GAME, DISPLAY and SOUND
 
 The settings are the page's buttons beside the canvas (`index.html`, `src/ui/events.ts`).
 
-Paying it: a dialog over the whole screen, in U3's slot, from the widget kit
-(`src/renderer/ui/Widgets.ts`). Height is what
-200 lines lack, so nothing takes a row of its own that can share one:
+Paying it: a dialog over the whole screen, in the dialog slot (`src/renderer/ui/Dialog.ts`),
+from the widget kit (`src/renderer/ui/Widgets.ts`). Height is what 200 lines lack, so
+nothing takes a row of its own that can share one:
 
 - **The title line** holds SETTINGS, and CLOSE and EXIT at its right, as buttons lower
   than the save menu's (the kit's low button).
@@ -268,7 +252,9 @@ the first click is nothing to the game and the gesture delays no click.
 
 The check: a golden frame per tab; the probe opens it with Esc and with a double click on
 the message area, holds the tick count while it is up, changes a setting, and reads it
-back after a reload.
+back after a reload. The VOLUME slider is the first control dragged (`Dialog.drag` and
+`Dialog.release`, which no dialog has before it), so the probe drags it with CDP's own
+mouse, and releases it off the canvas.
 
 ### U5 ⏳ The settings' KEYS tab
 
@@ -303,7 +289,7 @@ game: stone, floor, doors, stairs, pits, teleporters and false walls. With Debug
 click on it teleports the party by replacing its state (`:65`), which E15 asks to put
 behind a developer's switch.
 
-Paying it: a map dialog in U3's slot. It draws the party's level at the largest whole cell
+Paying it: a map dialog in the dialog slot. It draws the party's level at the largest whole cell
 size that fits, in the UI palette, with the party's square and facing, the level's
 number, and CLOSE. It opens by its key action (U5) and by a long press on the message
 area, and only with MAP VIEW on (U4). The teleport stays only behind `?dev`. A map of
@@ -317,7 +303,7 @@ the long press, and finds it shut with MAP VIEW off.
 of the four classes, the maxima of health, stamina and mana, the seven attributes and
 the twenty skills' mastery, refreshed at every tick, with a changed cell highlighted.
 
-Paying it: a champion dialog in U3's slot, the same readings in the game's font, four
+Paying it: a champion dialog in the dialog slot, the same readings in the game's font, four
 columns, on two tabs (the levels, maxima and attributes; then the skills), since thirty
 lines do not fit one screen. Nothing is highlighted, since the clock is held while the
 dialog is up. It opens by its key action (U5) and by a long press on a champion's stat
@@ -390,20 +376,20 @@ list", point 4), its check included.
 ### R1 ⏳ A game read in play leaves the screen on the old world
 
 A read replaces `ctx.party.state` (`Party.setState`, `src/engine/Party.ts:118-126`) and the
-world, and tells the screen nothing. `ui.partyState` (`src/renderer/ui/UIState.ts:66`), the
+world, and tells the screen nothing. `ui.partyState` (`src/renderer/ui/UIState.ts:67`), the
 open chest (`ui.openChestId`, `ui.openChestContents`), the attack menu
 (`ui.possibleAttackTypes`) and the Reincarnate screen (`ui.reincarnate`) stay the old
 world's until the next `refreshScreen`, and what runs before it acts on them:
 
 - **F9 with a chest open loses an object.** The next compose's `syncOpenChest(ui, null)`
-  (`src/renderer/GameScreen.ts:601-603`) repacks the old world's open contents into the
+  (`src/renderer/GameScreen.ts:613-615`) repacks the old world's open contents into the
   loaded world's chest (`repackOpenChest`, `src/renderer/ui/Inventory.ts:376-399`). An
   object taken from the chest into the hand before F9 is then in no chain of the loaded
   world; one put into it is linked twice, which cuts the chain it lies in. F9 is taken
-  with an inventory open (`GameInput.keyDown`, `src/renderer/GameInput.ts:183-189`). The
+  with an inventory open (`GameInput.keyDown`, `src/renderer/GameInput.ts:195-201`). The
   disk menu's LOAD loses nothing: opening the menu runs `TAG02076e`, which repacks first.
 - **The disk menu's LOAD runs `TAG0207cc` on the old party.** `restoreChosenSave` reads,
-  then `closeSaveMenu` calls `tag0207cc(ui)` (`src/renderer/ui/SaveMenu.ts:1088-1101`,
+  then `closeSaveMenu` calls `tag0207cc(ui)` (`src/renderer/ui/SaveMenu.ts:1099-1112`,
   `:474-481`; `src/renderer/ui/Mouse.ts:413`), which opens the old party's inventory
   again and leaves `ctx.loop.videoMode` at `'VM_INVENTORY'` while the loaded party has
   none open (`selectedCharacterIndex: -1`, `src/engine/CsbwinSaveGame.ts:111`). Nothing
@@ -440,7 +426,7 @@ says how to test one.
 
 `reportError` (`src/main.ts:614-619`) stops the game and puts up the message, and nothing
 else. `GameInput` still takes the keys (its `ended()` is `mainLoopHasReturned()`, which
-`stop` does not set, `src/renderer/GameInput.ts:44-46`), `quickSave` does not ask whether
+`stop` does not set, `src/renderer/GameInput.ts:48-50`), `quickSave` does not ask whether
 the game runs (`src/engine/GameSaves.ts:510-531`), and the page's Quick Save button calls
 it directly (`src/ui/events.ts:108`). So F5 after a VBL that threw writes the half-updated
 world over the playthrough's quick save, the one F9 reads after the reload the message asks
@@ -543,7 +529,7 @@ with `npm test -- --frames`.
 - **RISE's NEW FACE**: `utilityPortraits ??=` caches a promise that rejects when
   `arrayBuffer()` or the parse fails (`src/main.ts:167-177`), and `refreshSaveMenu`'s
   `await ui.onHasNewFaces()` then throws into the catch that empties the list
-  (`src/renderer/ui/SaveMenu.ts:493-498`): RISE lists nothing until a reload.
+  (`src/renderer/ui/SaveMenu.ts:504-509`): RISE lists nothing until a reload.
 
 Paying it: the Oracle closes on its own error with a line in the message area, and
 `reportError` is kept for `Die`; the faces' promise settles to `null` on any failure.
@@ -575,8 +561,8 @@ the context runs; the curve cleared with the context.
 
 ### R11 ⏳ Right-click closes the save menu while it saves or loads
 
-`saveMenuClick` closes the menu on a right button (`src/renderer/ui/SaveMenu.ts:843-847`)
-before it looks at `busy` (`:1034`). The clock starts again and `TAG0207cc` runs while
+`saveMenuClick` closes the menu on a right button (`src/renderer/ui/SaveMenu.ts:854-858`)
+before it looks at `busy` (`:859`). The clock starts again and `TAG0207cc` runs while
 `store.write` is pending; then `saveWritten` (`GameSaves.ts:288-312`) runs its monster
 re-attach and `SmartDiscard` on a world that has moved on, against "the game played on
 after a save is the one a load of it gives back". A LOAD that answers after the menu is
@@ -712,7 +698,7 @@ New state-representation debt goes here, and jumps the queue.
 ### D17 ⏳ The screen keeps the party it last drew
 
 `Party.setState` builds a new object (`src/engine/Party.ts:118-126`), and the screen keeps
-its own reference, `ui.partyState` (`src/renderer/ui/UIState.ts:66`, about 125 uses), set
+its own reference, `ui.partyState` (`src/renderer/ui/UIState.ts:67`, about 125 uses), set
 again only by `GameScreen.setPartyState` from `renderView` and `refreshScreen`
 (`src/main.ts:77`, `:84`). Whatever runs between a read and the next of those reads the old
 party (R1), and "another game" is detected by the object changing (`setPartyState`'s
@@ -728,7 +714,7 @@ generation count; one owner for the freeze.
 CSBWin's interface state is `d.`: the open chest and its contents, the attack menu
 (`d.AttackingCharacterOrdinal`, `Word20250`, `Word20252`), `PressingEye`, `PressingMouth`,
 `DisplayResurrectChestOrScroll`. The port keeps them in `UIState`
-(`src/renderer/ui/UIState.ts:186-233`), and the engine reads them back through `GameHost`
+(`src/renderer/ui/UIState.ts:189-236`), and the engine reads them back through `GameHost`
 queries (`pressingEye`, `pressingMouth`, `displayResurrectChestOrScroll`,
 `attackingCharacterOrdinal`, `src/engine/GameHost.ts:47-198`, answered as
 `screen?.…() ?? 0` in `src/main.ts:253-259`), beside calls into the UI named by CSBWin
@@ -736,13 +722,13 @@ address (`tag02076e`, `tag0207cc`, `tag01b29a`, `tag011366`). So:
 
 - **Composing the screen opens and repacks chests.** `presentViewport` runs
   `syncOpenChest(this.ui, null)` and zeroes `displayResurrectChestOrScroll`
-  (`src/renderer/GameScreen.ts:601-604`), and `drawInventoryScreen` opens the chest through
+  (`src/renderer/GameScreen.ts:613-616`), and `drawInventoryScreen` opens the chest through
   `syncOpenChest(ui, chestView)` (`src/renderer/ui/Inventory.ts:41`), which unlinks its
   objects from the database (`:363-368`). A compose runs at every refresh, up to 60 a
   second while the pointer moves, so what the engine finds in a chest depends on when the
   screen was last composed. The save repacks by hand first (`GameSaves.ts:289`), and the
   compose skips the inventory under the disk menu so as not to open it again
-  (`GameScreen.ts:612-616`). CSBWin opens the chest while drawing too, but only at events
+  (`GameScreen.ts:624-628`). CSBWin opens the chest while drawing too, but only at events
   (`TAG0189d4`).
 - A headless `Game` has none of this state, and a read does not reset it (R1).
 
@@ -1046,7 +1032,7 @@ the canvas's output (`putImageData`), the order of the compose, the palettes' ch
 façade over the UI and the boot (`getScreenBuffer`, `doMenu`, `setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can
 build one, and `tools/lib/ui.ts` copies its wiring (F19). Each page hook is named four
 times: in `UIState`, `UIHooks`, `GameScreenHooks` and the constructor's copy
-(`GameScreen.ts:94-109`, `:201-218`, `UIState.ts:394-396`).
+(`GameScreen.ts:90-105`, `:197-214`, `UIState.ts:397-399`).
 
 Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the palettes,
 `PresentedFrame`, `presentViewport`'s order) and a thin canvas presenter; one factory for the
@@ -1057,17 +1043,17 @@ Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the pa
 
 The screen is drawn by clocks that do not know each other: the engine's `setTimeout` VBL
 loop, and `requestAnimationFrame` loops for the chewing mouth
-(`src/renderer/ui/Feeding.ts:227-248`), a menu button's press (`SaveMenu.ts:986-1032`), the
+(`src/renderer/ui/Feeding.ts:227-248`), a menu button's press (`SaveMenu.ts:997-1043`), the
 intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:208-223`).
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
   `refreshScreen`'s `setPartyState` and its `mainLoopHasReturned()` test
-  (`GameScreen.ts:726-732`, `src/main.ts:82-86`), so a chew still running when the game ends
+  (`GameScreen.ts:736-742`, `src/main.ts:82-86`), so a chew still running when the game ends
   draws the adventure over the credits' wait; `initializePlayState` cancels neither loop.
 - The CRT uploads the canvas and runs its shader at device pixels at every display frame,
   changed or not: about 2.3 million pixels a frame at a device ratio of 2, up to 120 times a
   second.
-- The rAF scheduler is written twice (`Feeding.ts:229-232`, `SaveMenu.ts:986-994`, each
+- The rAF scheduler is written twice (`Feeding.ts:229-232`, `SaveMenu.ts:997-1005`, each
   with `as unknown as number`), and a menu's press runs on two clocks
   (`BootSequence.ts:507-510` passes made-up times).
 - Input has two stacks, `GameInput` on `document` and the intro's `IntroHost` on `window`,
@@ -1126,7 +1112,7 @@ loader's cache keyed by format, or the parameter dropped with the dead fallback.
   where a 16-entry `Uint32` table a palette, written through a `Uint32Array` view, takes
   0.14 ms (`updateImageDataFromIndex*`, `src/renderer/csbwin/CanvasBlitter.ts:409-483`). It
   always takes the two-palette path while adventuring: `viewportPalette !== uiPalette`
-  compares two separate copies (`GameScreen.ts:654-660`). Its body is written three times
+  compares two separate copies (`GameScreen.ts:664-670`). Its body is written three times
   in `CanvasBlitter`, and the cursor's footprint loop twice (`reconvertThroughPalette`,
   `PresentedFrame.capture`).
 - **Every monster turn allocates** an `MmRecord` and with it a `DsaVars` of two 100-entry
@@ -1153,7 +1139,7 @@ palette codes, so none moves.
   (`skills.ts:44`, `:51`), `WALL_BITMAP_WIDTH` and `WALL_BITMAP_HEIGHT`
   (`ViewportGraphics.ts:43-44`), `drawRectOutlineIndex` (`CanvasBlitter.ts:52`),
   `startHint` (`HintOracle.ts:748`), `possibleAttackTypeNames` (`Attack.ts:519`),
-  `clampFoodWater` (`Feeding.ts:201`), `SAVE_MENU_PRESS_MS` (`SaveMenu.ts:1034`),
+  `clampFoodWater` (`Feeding.ts:201`), `SAVE_MENU_PRESS_MS` (`SaveMenu.ts:1045`),
   `isViewportPoint` (`src/ui/utils.ts:23`). About 280 more exports are used only in their
   own file, the 101 `StdDraw*` programs among them (E28).
 - **Dead members and code**: `TimerQueue.clear` (`:193`), `PartyFootprints.reset`
@@ -1645,7 +1631,7 @@ folder laid out as the image is.
 ### F19 ⏳ The tools' screen is wired by hand, and has drifted
 
 `tools/lib/ui.ts:21-34` builds the `ViewportRenderer` as `GameScreen`'s constructor does
-(`src/renderer/GameScreen.ts:175-189`), without `gameState`, `rules` and
+(`src/renderer/GameScreen.ts:171-185`), without `gameState`, `rules` and
 `csbGraphicsLoader`. So a view a tool draws has `invisibleMonsters` and
 `drawAsSize4Monsters` off whatever the dungeon says, no `d.Time` for the magic footprints,
 and no CSB graphics.

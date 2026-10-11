@@ -72,17 +72,13 @@ import {
 import {
   askBeginAdventure,
   closeSaveMenu,
-  drawSaveMenu,
   isSaveMenuOpen,
   openSaveMenu,
-  saveMenuClick,
   saveMenuDrop,
   saveMenuTakesDrops,
-  saveMenuKey,
-  saveMenuPointer,
-  saveMenuWheel,
   type SaveMenuMode,
 } from './ui/SaveMenu';
+import { isDialogOpen, type DialogPoint } from './ui/Dialog';
 import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
 import type { SaveEntry } from '../data/saves';
 import type { ImportedFile } from '../engine/GameSaves';
@@ -367,6 +363,39 @@ export class GameScreen {
     handleMouseUnclick(this.ui);
   }
 
+  /* The dialog over the game; the slot is `ui/Dialog.ts`. */
+
+  isDialogOpen(): boolean {
+    return isDialogOpen(this.ui);
+  }
+
+  /**
+   * A click while a dialog is up, taken **straight from the DOM event** rather than
+   * through the mouse queue. That is CSBWin's modality: `_WaitForMenuSelect` replaces
+   * every button list while it runs.
+   */
+  handleDialogClick(x: number, y: number, buttons: number): void {
+    this.ui.dialog?.click(this.ui, x, y, buttons);
+  }
+
+  handleDialogKey(key: string): void {
+    this.ui.dialog?.key(this.ui, key);
+  }
+
+  handleDialogWheel(deltaY: number): void {
+    this.ui.dialog?.wheel(this.ui, deltaY);
+  }
+
+  /** The pointer moved with the button of the dialog's click held (`Dialog.drag`). */
+  handleDialogDrag(x: number, y: number): void {
+    this.ui.dialog?.drag?.(this.ui, x, y);
+  }
+
+  /** The button of the dialog's click released (`Dialog.release`). */
+  handleDialogRelease(): void {
+    this.ui.dialog?.release?.(this.ui);
+  }
+
   /* The save/load screen; the work is in `ui/SaveMenu.ts`. */
 
   isSaveMenuOpen(): boolean {
@@ -385,23 +414,6 @@ export class GameScreen {
   /** The prison's "BEGIN THE ADVENTURE?" (`GameSavesScreen.askBeginAdventure`). */
   askBeginAdventure(source: SaveEntry | null): void {
     askBeginAdventure(this.ui, source);
-  }
-
-  /**
-   * A click while the save screen is up, taken **straight from the DOM event** rather
-   * than through the mouse queue. That is CSBWin's modality: `_WaitForMenuSelect`
-   * replaces every button list while it runs.
-   */
-  handleSaveMenuClick(x: number, y: number, buttons: number): void {
-    saveMenuClick(this.ui, x, y, buttons);
-  }
-
-  handleSaveMenuKey(key: string): boolean {
-    return saveMenuKey(this.ui, key);
-  }
-
-  handleSaveMenuWheel(delta: number): boolean {
-    return saveMenuWheel(this.ui, delta);
   }
 
   /** Whether a file dropped on the page now is the save screen's import: not in RISE's. */
@@ -455,7 +467,7 @@ export class GameScreen {
     const at = this.ui.hoverPoint;
     if (point?.x !== at?.x || point?.y !== at?.y) this.cursorMoved = true;
     this.ui.hoverPoint = point;
-    saveMenuPointer(this.ui, point);
+    this.ui.dialog?.pointer(this.ui, point);
     if (point) marchingOrderPointerMoved(this.ui, Math.floor(point.x), Math.floor(point.y));
   }
 
@@ -627,11 +639,9 @@ export class GameScreen {
       shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
       shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word20, 0);
     }
-    if (isSaveMenuOpen(this.ui)) {
-      // The dialog takes the whole screen, cleared, where `_DoMenu` with `I1 == 0`
-      // would leave the picture around the viewport.
-      drawSaveMenu(this.ui);
-    }
+    // The dialog over the game (`ui/Dialog.ts`). The save menu takes the whole screen,
+    // cleared, where `_DoMenu` with `I1 == 0` would leave the picture around the viewport.
+    this.ui.dialog?.draw(this.ui);
     // The button flash's inversion (`vblFlashButn`), for as long as `d.Word11776` says it
     // stands. The cursor goes over it: the VBL takes the cursor off before a flash right
     // of `x = 192`, where every flashed button is (doc/CSBwin-src/CSBCode.cpp:893-894),
@@ -777,25 +787,25 @@ export class GameScreen {
   }
 
   /**
-   * The save/load screen alone on a cleared screen, for the entrance's "Resume": drawn into
-   * the screen, which the entrance's host presents with its cursor on it.
+   * The dialog alone, for the entrance's "Resume": drawn into the screen, which the
+   * entrance's host presents with its cursor on it.
    *
    * `_ReadEntireGame` reaches the chooser through `SelectSaveGame(_9_, 1, 1, 1)`
    * (`doc/CSBwin-src/SaveGame.cpp:1688`), whose leading 1 is `_DoMenu`'s `FadeOldScreen` /
    * `ClearOldScreen` pair (`doc/CSBwin-src/Menu.cpp:285-291`): the screen under the chooser
    * is cleared, which `drawSaveMenu` does for either menu.
    */
-  drawSaveMenuOnly(): void {
-    drawSaveMenu(this.ui);
+  drawDialogOnly(): void {
+    this.ui.dialog?.draw(this.ui);
   }
 
   /**
-   * The pointer over the entrance's chooser, or off the canvas: the chooser is drawn
-   * again, and presented, when that brings the import's hint up or takes it down
-   * (`saveMenuPointer`). Says whether it was.
+   * The pointer over a pre-game screen's dialog, or off the canvas: the dialog is drawn
+   * again, and presented, when that changes it (the chooser's import hint,
+   * `saveMenuPointer`). Says whether it was.
    */
-  moveSaveMenuPointer(point: { x: number; y: number } | null): boolean {
-    if (!saveMenuPointer(this.ui, point)) return false;
+  moveDialogPointer(point: DialogPoint): boolean {
+    if (!this.ui.dialog?.pointer(this.ui, point)) return false;
     this.renderLastFrame();
     return true;
   }

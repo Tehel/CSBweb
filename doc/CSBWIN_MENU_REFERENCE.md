@@ -208,8 +208,10 @@ side-effect of the loop structure.
 Since nothing in this port can block, the loop is turned inside out exactly as
 `ReIncarnate.ts` turns `_ReIncarnate` inside out: the state lives on `UIState`, the draw
 runs every frame from that state, and the click handler is one iteration of the loop
-body. The clock is then stopped explicitly by setting `ctx.state.paused`, which is the
-honest equivalent of "the main loop is not running".
+body. The save menu is the dialog over the game (`src/renderer/ui/Dialog.ts`), the slot
+every dialog of the port fills, which routes every click, key and notch of the wheel to
+it, and stops the clock explicitly by setting `ctx.state.paused`, the honest equivalent
+of "the main loop is not running".
 
 ### The press animation
 

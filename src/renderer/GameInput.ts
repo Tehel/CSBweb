@@ -2,10 +2,11 @@
  * The game's input path: where a pointer event or a key goes once the page has read it.
  *
  * The page's listeners (`src/ui/events.ts`) hand over a screen point and a button, or a
- * key press, and nothing else of the DOM. From here a click is
- * a modal screen's, or a button searched in the interface's lists and queued on the
- * game's one mouse queue; a key is a modal screen's, a key table's button queued the same
- * way (`TAG0196da`), a panel key (`handleUIKey`), or one of the port's own keys
+ * key press, and nothing else of the DOM. From here a click is the dialog's
+ * (`src/renderer/ui/Dialog.ts`), a modal screen's, or a button searched in the
+ * interface's lists and queued on the game's one mouse queue; a key is the dialog's, a
+ * modal screen's, a key table's button queued the same way (`TAG0196da`), a panel key
+ * (`handleUIKey`), or one of the port's own keys
  * (`portKeyAction`). The queued buttons come back through `Game.handleMouseEvents` in
  * their turn, and `install` hands them to the interface's dispatcher, `handleMouseButton`.
  */
@@ -40,6 +41,9 @@ export interface KeyPress {
 }
 
 export class GameInput {
+  /** A click of the dialog's has its button held: the moves are its drag, until the release. */
+  private dragging = false;
+
   constructor(private readonly host: GameInputHost) {}
 
   /**
@@ -86,6 +90,7 @@ export class GameInput {
   mouseMove(x: number, y: number): void {
     if (this.ended() || this.oracleUp()) return;
     this.host.screen.setHoverPoint({ x, y });
+    if (this.dragging) this.host.screen.handleDialogDrag(x, y);
   }
 
   /** A button pressed: `button` is `MouseEvent.button`'s number. */
@@ -93,11 +98,12 @@ export class GameInput {
     if (this.ended() || this.oracleUp()) return;
     const { game, screen } = this.host;
     const buttonMask = button === 2 ? 1 : button === 0 ? 2 : 0;
-    // The save/load screen is modal, the way `_WaitForMenuSelect` is modal: it
-    // replaces every button list while it runs, so nothing else may see the click
+    // A dialog is modal, the way `_WaitForMenuSelect` is modal: it replaces every
+    // button list while it runs, so nothing else may see the click
     // (`doc/CSBWIN_MENU_REFERENCE.md`).
-    if (buttonMask !== 0 && screen.isSaveMenuOpen()) {
-      screen.handleSaveMenuClick(x, y, buttonMask);
+    if (buttonMask !== 0 && screen.isDialogOpen()) {
+      this.dragging = true;
+      screen.handleDialogClick(x, y, buttonMask);
       this.host.refreshScreen();
       return;
     }
@@ -114,14 +120,20 @@ export class GameInput {
   }
 
   mouseUp(): void {
-    if (this.ended() || this.oracleUp() || this.host.screen.isSaveMenuOpen()) return;
+    const dragged = this.dragging;
+    this.dragging = false;
+    if (this.ended() || this.oracleUp()) return;
+    if (this.host.screen.isDialogOpen()) {
+      if (dragged) this.host.screen.handleDialogRelease();
+      return;
+    }
     this.host.game.onMouseUnClick();
   }
 
-  /** The wheel, which only the save/load screen's list takes. Says whether it took it. */
+  /** The wheel, which only a dialog takes. Says whether it took it. */
   wheel(deltaY: number): boolean {
-    if (this.ended() || !this.host.screen.isSaveMenuOpen()) return false;
-    this.host.screen.handleSaveMenuWheel(deltaY);
+    if (this.ended() || !this.host.screen.isDialogOpen()) return false;
+    this.host.screen.handleDialogWheel(deltaY);
     return true;
   }
 
@@ -147,12 +159,12 @@ export class GameInput {
     // it is up every key is a letter being typed, so none of the panel, movement
     // or debug keys below may see one. 'Q' would otherwise open an attack menu
     // while the player named their champion.
-    // The save/load screen takes the keyboard whole, for the reason the
-    // Reincarnate screen does: 'S' would otherwise open an attack menu while the
-    // player scrolled a list of saves.
-    if (screen.isSaveMenuOpen()) {
+    // A dialog takes the keyboard whole, for the reason the Reincarnate screen
+    // does: 'S' would otherwise open an attack menu while the player scrolled the
+    // save menu's list.
+    if (screen.isDialogOpen()) {
       if (modified) return false;
-      screen.handleSaveMenuKey(key);
+      screen.handleDialogKey(key);
       this.host.refreshScreen();
       return true;
     }

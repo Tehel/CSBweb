@@ -138,15 +138,17 @@
  *
  * `_WaitForMenuSelect` nulls `SecondaryButtonList` and both `pKeyXlate`s and replaces
  * `PrimaryButtonList`, so nothing outside the menu can be clicked, and it never returns
- * to the main loop, so `d.Time` stops. Here the click comes **straight from the DOM
- * event** rather than through the game's mouse queue, which is the same exclusivity.
- * This port's loop keeps running, so the clock is stopped explicitly, with
- * `ctx.state.paused` (`d.Time++` is the main loop's, `doc/CSBwin-src/CSBCode.cpp:670`).
+ * to the main loop, so `d.Time` stops. The menu is the dialog over the game
+ * (`Dialog.ts`), which has both: its click comes **straight from the DOM event** rather
+ * than through the game's mouse queue, which is the same exclusivity, and this port's
+ * loop keeps running, so the dialog stops the clock explicitly, with `ctx.state.paused`
+ * (`d.Time++` is the main loop's, `doc/CSBwin-src/CSBCode.cpp:670`).
  */
 import type { OpenedSave, Playthrough, SaveEntry } from '../../data/saves';
 import { SAVES_ARE_DISABLED, type ImportResult, type ImportedFile } from '../../engine/GameSaves';
 import { formatPlaythroughRow, formatSavePreview, formatSaveRow, lastUsedSave, playthroughsOf } from '../../data/saves';
 import { clearIndex } from '../csbwin/CanvasBlitter';
+import { closeDialog, openDialog, type Dialog } from './Dialog';
 import type { Rect, UIButton } from '../../data/tables/UITables';
 import { searchButtonList } from './HitTest';
 import {
@@ -420,6 +422,15 @@ export function isSaveMenuOpen(ui: UIState): boolean {
   return ui.saveMenu !== null;
 }
 
+/** The menu as the dialog over the game: what the slot asks of it. */
+const SAVE_MENU_DIALOG: Dialog = {
+  draw: (ui) => drawSaveMenu(ui),
+  click: (ui, x, y, buttons) => saveMenuClick(ui, x, y, buttons),
+  key: (ui, key) => saveMenuKey(ui, key),
+  wheel: (ui, deltaY) => saveMenuWheel(ui, deltaY),
+  pointer: (ui, point) => saveMenuPointer(ui, point),
+};
+
 /**
  * Raise the screen. `loadOnly` is what the title screen will want: the same list with
  * no SAVE button.
@@ -433,10 +444,10 @@ export function isSaveMenuOpen(ui: UIState): boolean {
  * or the next tick's top (`CSBCode.cpp:613-621`).
  */
 export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
-  if (ui.saveMenu) return;
+  if (ui.dialog) return;
   if (mode === 'full') tag02076e(ui);
   ui.ctx.loop.videoMode = mode === 'full' ? 'VM_LEFTMENU' : 'VM_CENTERMENU';
-  ui.ctx.state.paused = true;
+  openDialog(ui, SAVE_MENU_DIALOG);
   ui.saveMenu = {
     mode,
     entries: [],
@@ -476,7 +487,7 @@ export function closeSaveMenu(ui: UIState): void {
   const { mode } = ui.saveMenu;
   if (ui.saveMenu.frameHandle !== null) cancelFrame(ui.saveMenu.frameHandle);
   ui.saveMenu = null;
-  ui.ctx.state.paused = false;
+  closeDialog(ui);
   if (mode === 'full') tag0207cc(ui);
 }
 
@@ -797,7 +808,7 @@ function pointsAtImportHint(state: SaveMenuState): boolean {
 /**
  * The pointer moved, to `point` or off the canvas. Nothing is drawn here: says whether
  * what the dialog shows changed, the import's hint come up or gone, for the entrance's
- * chooser, which no VBL's frame draws again (`GameScreen.moveSaveMenuPointer`). In play,
+ * chooser, which no VBL's frame draws again (`GameScreen.moveDialogPointer`). In play,
  * the frame a moved pointer asks for draws the dialog anyway.
  */
 export function saveMenuPointer(ui: UIState, point: { x: number; y: number } | null): boolean {

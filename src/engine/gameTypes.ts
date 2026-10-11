@@ -370,7 +370,7 @@ export interface MovementResult {
 export interface GameState {
     dungeon: DungeonData;       // Dungeon data (maps, objects, etc.)
 
-    paused: boolean;            // The save menu holds the clock (`openSaveMenu`)
+    paused: boolean;            // A dialog holds the clock (`openDialog`), and the Hint Oracle
     tickCount: ui16;            // Number of game ticks elapsed
 
     /**
