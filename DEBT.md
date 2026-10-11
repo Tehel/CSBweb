@@ -30,11 +30,14 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 
 The order, then:
 
-1. **D and E.** New structural debt still goes into D or E and jumps the queue.
-2. **C — Known divergences from CSBWin.** A divergence found along the way goes here and is
+1. **R and W — what a player of the public site can meet today**, in what only the port
+   has: the page, the save store, F5 and F9, the files a player drops, the server. Some
+   lose a game, a save or the site, so they come first.
+2. **D and E.** New structural debt still goes into D or E and jumps the queue.
+3. **C — Known divergences from CSBWin.** A divergence found along the way goes here and is
    taken before the G items: a known bug outranks a missing feature.
-3. **G — Unported CSBWin features the default dungeon reaches**, in the index's order.
-4. **F — Verification debt** is independent of the rest. Interleave it anywhere.
+4. **G — Unported CSBWin features the default dungeon reaches**, in the index's order.
+5. **F — Verification debt** is independent of the rest. Interleave it anywhere.
 
 **Postponed (⏸️) until the default dungeon is validated.** These are not taken in order,
 and no session picks one up unless the author names it:
@@ -100,8 +103,65 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| W1 | An aborted download leaks a file descriptor | S | ⏳ |
+| R1 | A game read in play leaves the screen on the old world | M | ⏳ |
+| R2 | Every store upgrade re-runs every step, and drops a row that does not parse | S | ⏳ |
+| R3 | After a fatal error the page still saves | S | ⏳ |
+| R4 | The page's Quick Save and Quick Load skip the screen's checks | S | ⏳ |
+| R5 | Another tab holds the store: the new build hangs at ENTER | S | ⏳ |
+| W2 | `api/stats` is computed whole at every request | S | ⏳ |
+| W3 | `api/event` takes another site's posts, and any name | S | ⏳ |
+| R6 | A damaged file's counts size allocations and loops | M | ⏳ |
+| R7 | An index from a custom data set can throw | S | ⏳ |
+| R8 | An optional feature's failure ends the game, or the session | S | ⏳ |
+| R9 | The page's controls keep the keyboard's focus | S | ⏳ |
+| R10 | Pointer, touch and WebGL | S | ⏳ |
+| R11 | Right-click closes the save menu while it saves or loads | S | ⏳ |
+| W4 | The events table grows without bound | S | ⏳ |
+| W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
+| W6 | Security headers | S | ⏳ |
+| W7 | The container, the deploy and the Node version | S | ⏳ |
+| R12 | Listing the saves reads every save's bytes | M | ⏳ after R2 |
+| D17 | The screen keeps the party it last drew | S | ⏳ |
+| E23 | One game read, whole or not at all | L | ⏳ |
+| D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
+| D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
+| E34 | Dead code and duplicated types | S | ⏳ |
+| E24 | Two import cycles, and pure helpers in the systems | S | ⏳ |
+| E35 | Comments and documents that are stale, wrong, or tell the past | M | ⏳ |
+| E36 | Type escape hatches that check nothing | M | ⏳ |
+| E25 | One helper for each rule, where copies drift | M | ⏳ after C170, C171 |
+| E26 | Systems named after CSBWin's files, not what they do | M | ⏳ |
+| D20 | Three record-size tables and two image layouts | S | ⏳ |
+| D21 | A save has nine shapes | L | ⏳ |
+| E27 | `DsaSystem.ts` is one 5,000-line class | L | ⏳ after E24 |
+| E28 | The bytecode interpreter decodes through switches and maps built per call | M | ⏳ |
+| E29 | `GameScreen` is the canvas, the compose order, the palettes and a façade | L | ⏳ |
+| E31 | Late wiring with silent defaults, and long parameter lists | M | ⏳ |
+| E32 | Four ways to read bytes, and eight graphics caches | M | ⏳ |
+| E33 | What a frame costs | S | ⏳ |
+| E30 | One presenter and one input router | M | ⏳ before E15 |
 | E15 | The page shell | L | ⏳ with the page redesign |
 | E22 | The screen's size: its ratio, and filling the screen | M | ⏳ after E15 |
+| C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
+| C178 | No save keeps the dungeon's game information | S | ⏳ |
+| C171 | The Firestaff does not soften a monster's blow, and three mastery calls ignore sleep | S | ⏳ |
+| C168 | A monster north-west of the party never prefers west | S | ⏳ |
+| C169 | A monster's `timePerMove / 2` is not an integer division | S | ⏳ |
+| C170 | A blow at the party skips a living champion who shares a dead one's corner | S | ⏳ |
+| C172 | A dead monster's remains are linked onto the square, not moved there | S | ⏳ |
+| C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
+| C174 | DSA copies that are not whole | S | ⏳ |
+| C175 | The DSA's integer widths | S | ⏳ |
+| C176 | The DSA goes on where CSBWin stops | S | ⏳ |
+| C179 | A thrown object drawn as its floor picture is offset and never mirrored | S | ⏳ |
+| C180 | `AdjustSkills`' widths, and a gain of 0 | S | ⏳ |
+| C181 | What `d.Initialize()` zeroes survives a restart | S | ⏳ |
+| F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
+| F16 | A tool can pass having checked less than it says | S | ⏳ |
+| F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
+| F19 | The tools' screen is wired by hand, and has drifted | S | ⏳ with E29 |
+| F17 | The frame pipeline and the runner are untyped | M | ⏳ |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
@@ -115,19 +175,469 @@ The rows above G29 are the active list. `E15` waits for the page redesign to sta
 `E22` for E15: a session that reaches either first asks the author, and takes the next
 active row meanwhile. A
 new row takes its tier's place above it. The F rows are independent of the rest
-("Priority", point 4), so they can be taken anywhere.
+("Priority", point 5), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C168 · D17 · E23 · F15 · G31 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E37 · F20 · G31 · R13 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
+
+---
+
+## R — Robustness
+
+What a damaged or hostile file, a second tab, an error or the page's own controls can do to
+a game: bugs in what only the port has (the page, the save store, F5 and F9), and in how it
+takes untrusted data. A file the player drops on the page and a custom dungeon are
+untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
+the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
+list", point 4), its check included.
+
+### R1 ⏳ A game read in play leaves the screen on the old world
+
+A read replaces `ctx.party.state` (`Party.setState`, `src/engine/Party.ts:118-126`) and the
+world, and tells the screen nothing. `ui.partyState` (`src/renderer/ui/UIState.ts:66`), the
+open chest (`ui.openChestId`, `ui.openChestContents`), the attack menu
+(`ui.possibleAttackTypes`) and the Reincarnate screen (`ui.reincarnate`) stay the old
+world's until the next `refreshScreen`, and what runs before it acts on them:
+
+- **F9 with a chest open loses an object.** The next compose's `syncOpenChest(ui, null)`
+  (`src/renderer/GameScreen.ts:601-603`) repacks the old world's open contents into the
+  loaded world's chest (`repackOpenChest`, `src/renderer/ui/Inventory.ts:376-399`). An
+  object taken from the chest into the hand before F9 is then in no chain of the loaded
+  world; one put into it is linked twice, which cuts the chain it lies in. F9 is taken
+  with an inventory open (`GameInput.keyDown`, `src/renderer/GameInput.ts:183-189`). The
+  disk menu's LOAD loses nothing: opening the menu runs `TAG02076e`, which repacks first.
+- **The disk menu's LOAD runs `TAG0207cc` on the old party.** `restoreChosenSave` reads,
+  then `closeSaveMenu` calls `tag0207cc(ui)` (`src/renderer/ui/SaveMenu.ts:1274-1287`,
+  `:533-540`; `src/renderer/ui/Mouse.ts:413`), which opens the old party's inventory
+  again and leaves `ctx.loop.videoMode` at `'VM_INVENTORY'` while the loaded party has
+  none open (`selectedCharacterIndex: -1`, `src/engine/CsbwinSaveGame.ts:111`). Nothing
+  puts it back until an inventory is toggled (`Game.ts:550` resets only the other modes),
+  so `GameScreen.isAdventureVideoMode` is false and a dungeon's overlay is not drawn
+  (Conflux). CSBWin's `TAG0207cc` runs on the world just read.
+- **A Reincarnate screen or an attack menu up at F9** acts on the loaded party's champion
+  of the same index (R4).
+
+Paying it: every read in play tells the screen (one `GameHost` notice from
+`applySaveBytes`), which drops the chest view without a repack, closes the attack menu,
+the Reincarnate screen, the eye and the mouth, and sets `ui.partyState` before `TAG0207cc`
+runs. A `tools/` check: a chest open, an object taken out, F9; and a LOAD from an open
+inventory. D17 and D18 then remove the cause, two owners of the same state.
+
+### R2 ⏳ Every store upgrade re-runs every step, and drops a row that does not parse
+
+`upgradeRows` (`src/data/saves/idb.ts:44-54`) gates only version 1's step on `oldVersion`:
+every upgrade runs `stampSaveRecords` and `stampBlock1Rows` over every row, clears the
+store and writes back what they return. So at the next `DB_VERSION` bump, whatever it is
+for:
+
+- a file imported since, holding none of `GAMEBLOCK1`'s four words, is stamped, against
+  `doc/SAVES.md`'s rule that a file imported later is left as it is;
+- a row whose `GAMEBLOCK1` throws is dropped for good (`stampBlock1Rows`,
+  `src/data/saves/legacyRows.ts:159-170`), so a reader made stricter (R6) deletes the
+  player's saves, of which the store is the only copy.
+
+Paying it: each step gated on the version that introduced it, and a later step keeping a
+row it cannot read as it is. Before the next bump; `.claude/memory/live-tree-is-served.md`
+says how to test one.
+
+### R3 ⏳ After a fatal error the page still saves
+
+`reportError` (`src/main.ts:614-619`) stops the game and puts up the message, and nothing
+else. `GameInput` still takes the keys (its `ended()` is `mainLoopHasReturned()`, which
+`stop` does not set, `src/renderer/GameInput.ts:44-46`), `quickSave` does not ask whether
+the game runs (`src/engine/GameSaves.ts:510-531`), and the page's Quick Save button calls
+it directly (`src/ui/events.ts:108`). So F5 after a VBL that threw writes the half-updated
+world over the playthrough's quick save, the one F9 reads after the reload the message asks
+for. The CRT button also draws the detached canvas over the message (`setEnabled`,
+`src/lib/crt.ts`).
+
+Paying it: a fatal error leaves the page dead: one flag that `GameInput`, the three save
+paths and the page's buttons check, and the CRT controller off.
+
+### R4 ⏳ The page's Quick Save and Quick Load skip the screen's checks
+
+F5 and F9 as keys go through `GameInput.keyDown`, so the save menu, the Reincarnate screen
+and the Hint Oracle take them first. The page's buttons call `onQuickSave` and
+`onQuickLoad` directly (`src/ui/events.ts:108-109`), and `quickLoad` refuses only while a
+script runs (`GameSaves.ts:569-574`), not while a champion is being chosen, as `quickSave`
+does. Quick Load with Reincarnate's name screen up keeps `ui.reincarnate` over the loaded
+game: every key and click still goes to it while nothing draws it, and its ENTER renames
+the loaded party's champion of that index, clears their skills (`reincarnate`), and tells
+the server of a champion that game never had. With the save menu up, the button's read or
+write races the menu's own.
+
+`quickLoad` also checks for a script before its two awaits (`list`, `open`) and not after,
+so a script that starts while IndexedDB answers runs on into the loaded world.
+
+Paying it: the buttons go through `GameInput`, with the keys' checks; F9 refused while a
+champion is chosen; the script checked again after the awaits.
+
+### R5 ⏳ Another tab holds the store: the new build hangs at ENTER
+
+`openSaveDatabase` (`src/data/saves/idb.ts:59-81`) sets no `onblocked`, and no connection
+closes on `versionchange`. An open tab of the build before a `DB_VERSION` bump keeps its
+connection, so a new tab's open never settles: ENTER awaits `readNewGame`, which awaits
+`saves.newGameRead()` and `list()` (`src/main.ts:143-151`), and the game never starts; F5,
+F9 and the disk menu wait for ever. Two more gaps in the store:
+
+- nothing asks `navigator.storage.persist()`, so the browser may evict the only copy of
+  the player's saves;
+- `markUsed` reads and writes a row in two transactions
+  (`src/data/saves/BrowserSaveStore.ts:157-161`), so two tabs can write a stale row back.
+
+Paying it: close on `versionchange`; on `blocked`, a message asking to close the other
+tabs; `persist()` at the first save; `markUsed` in one `readwrite` transaction.
+
+### R6 ⏳ A damaged file's counts size allocations and loops
+
+A count read from a file sizes an array or bounds a loop before anything checks it:
+
+- **A dropped save can crash the tab.** `readDsa` sizes `states` from the file's
+  `numStates` (`src/data/CsbwinExtendedFeatures.ts:313-317`), and the DSA section's
+  checksum is compared only after every DSA is parsed. `readsGameBlock1`, the first thing
+  an import runs, reaches it: a `csbgame7.dat` whose header checksum holds and whose
+  `numStates` is 400 million is a V8 out-of-memory, and the tab dies. CSBWin's `DSA::Read`
+  fails its allocation and dies cleanly (`doc/CSBwin-src/DSA.cpp:5638-5671`). The writer
+  has the same `Array.from` (`:411`).
+- **The same in the game files' readers**: `ExpandData`'s `new Uint8Array(dstSize)`
+  (`src/core/compression.ts:313`), `CSBGraphicsLoader.readSection`'s `uncompressedSize`,
+  `importBitmap`'s size test through `Math.imul(...) >>> 0`, which wraps, `SNDexpand`'s
+  repeat count, and the LZW and `OvlDecode` chains, which loop for ever on a cyclic
+  dictionary.
+- **A skin program can hang the tab.** The bytecode interpreter's `for (;;)`
+  (`src/renderer/bytecode/BytecodeInterpreter.ts:400`) has no step limit, so a `Jump` to
+  itself in a `CSBgraphics.dat` program never returns, and no error reaches the fatal
+  screen.
+
+Paying it: a bound on every count that sizes something (a DSA's states at most 0xFFFF, a
+size at most the file's or a sane maximum), a cycle guard in the dictionary decoders, a
+step budget in the interpreter that ends in `die`. A tool feeds each reader a file with the
+count set absurdly and checks that it throws.
+
+### R7 ⏳ An index from a custom data set can throw
+
+The shipped data sets stay in range; a custom one need not (G22):
+
+- **Door ornaments**: `this.objectTables.doorOrnamentRectSetIndex[decoration]`
+  (`src/renderer/ViewportRenderer.ts:275`) reads a 12-entry table unchecked, and
+  `tables.doorOrnamentRectSets[set][nearness]` (`src/renderer/bytecode/DrawDoor.ts:127`,
+  `:139`) four sets without `?.`, where the floor decorations' path guards
+  (`rectSet?.[relativeCell]`). A door TOC entry of 12 or more, or a `Byte4122` value of 4
+  or more, throws in the draw and ends the game.
+- **The blitter clamps where it should clip.** `normalizeRectInclusive`
+  (`src/renderer/csbwin/CanvasBlitter.ts:188-203`) moves `x1`/`y1` without moving
+  `srcX`/`srcY`, and clamps a rectangle wholly off the right to `width - 1`: one partly off
+  the left draws the wrong columns, one wholly off the right a one-pixel sliver. Each
+  caller clips by hand, each its own way (`drawSingleObject` the low side only,
+  `drawMonsterAt`'s `x1 === 223`, `DrawClouds`). Its comment says `srcWidth` limits the
+  copy (`:214`); the body never reads it.
+- **`DsaSystem`'s `!` on record lookups**: `getCreatureRecord(id)!` (`:3484`, `:3507`,
+  `:3535`), `get{Weapon,Clothing,Misc}Record(obj)!` (`:3705-3707`), `getTextRecord(rn)!`
+  (`:4078`). An index map naming a record past its database throws, where the sibling
+  paths check (`findMonsterSource`).
+
+Paying it: the guards; a clipping `tag0088b2Index`, its callers' own clipping dropped,
+with `npm test -- --frames`.
+
+### R8 ⏳ An optional feature's failure ends the game, or the session
+
+- **The Hint Oracle** runs with `.catch(reportError)` (`src/main.ts:374`), so any error in
+  it ends the game with whatever was not saved. `readHintOracle` throws for a world whose
+  `hintKey` does not decipher `hcsb.hct`, such as an imported save of a modified CSB.
+- **RISE's NEW FACE**: `utilityPortraits ??=` caches a promise that rejects when
+  `arrayBuffer()` or the parse fails (`src/main.ts:167-177`), and `refreshSaveMenu`'s
+  `await ui.onHasNewFaces()` then throws into the catch that empties the list
+  (`src/renderer/ui/SaveMenu.ts:552-557`): RISE lists nothing until a reload.
+
+Paying it: the Oracle closes on its own error with a line in the message area, and
+`reportError` is kept for `Die`; the faces' promise settles to `null` on any failure.
+
+### R9 ⏳ The page's controls keep the keyboard's focus
+
+A button clicked keeps the focus, and `GameInput.keyDown` returns false for a key nothing
+binds, so `preventDefault` is skipped (`src/ui/events.ts:188-190`): Space or ENTER in play
+presses the last button clicked again, Quick Load (the game since the last save lost) or
+DM Rules (a rule the save then carries). With the data-set chooser focused, a letter selects
+a set by its name and `change` reloads the page (`src/ui/dataSetChooser.ts:19-23`); there is
+no `beforeunload` anywhere.
+
+Paying it: the page's controls give the focus back (`blur` after a click, or
+`tabindex=-1`), and a change of game asks first. E30's input router is the lasting home.
+
+### R10 ⏳ Pointer, touch and WebGL
+
+- **A release outside the canvas is lost.** `pointerup` is heard on the canvas only, with
+  no `setPointerCapture` (`src/ui/events.ts:52-58`; the intro listens on `window`,
+  `src/renderer/intro/BootSequence.ts:174-175`). Holding the eye or the mouth, leaving the
+  canvas and letting go leaves `pressingEye` set, and the panels ignore every click until
+  the next one on the canvas.
+- **Touch screens likely stay silent.** Audio is unlocked on the canvas's first
+  `pointerdown`, once (`src/main.ts:180-188`), which is a user activation for a mouse and
+  not for a touch: `resume()` fails, the listener is gone, and only the Sound button
+  brings the sound back.
+- **A lost WebGL context keeps the curve.** On `webglcontextlost` the tube is hidden but
+  `curvedCanvas` stays set (`src/lib/crt.ts:229-243`), so `canvasPoint` warps clicks over a
+  flat picture, about 3 pixels near the edges.
+
+Paying it: pointer capture on `pointerdown`; the unlock on `pointerup`, `click` and
+`touchend`, its listeners removed once the context runs; the curve cleared with the context.
+
+### R11 ⏳ Right-click closes the save menu while it saves or loads
+
+`saveMenuClick` closes the menu on a right button (`src/renderer/ui/SaveMenu.ts:1029-1033`)
+before it looks at `busy` (`:1034`). The clock starts again and `TAG0207cc` runs while
+`store.write` is pending; then `saveWritten` (`GameSaves.ts:288-312`) runs its monster
+re-attach and `SmartDiscard` on a world that has moved on, against "the game played on
+after a save is the one a load of it gives back". A LOAD that answers after the menu is
+opened again restores into the new menu.
+
+Paying it: a right-click while `busy` does nothing.
+
+### R12 ⏳ Listing the saves reads every save's bytes
+
+`BrowserSaveStore.list` is a `getAll` over whole rows, files included, and every F5,
+Sleepsave, menu save, F9, import and new game lists. A Conflux save is about 0.6 MB, and no
+row is ever deleted (the dialog has no delete). An import also parses its file three times,
+and an enciphered save is deciphered twice (`loadCsbwinWorld` again after
+`loadSaveGameState`).
+
+Paying it: the rows' fields and their files in two object stores, which bumps `DB_VERSION`:
+after R2. The deciphered data handed on by `loadSaveGameState`.
+
+---
+
+## W — The public server
+
+`server/`, the page's host at `https://csbweb.looten.net/` (`doc/DEPLOYMENT.md`), is on the
+open internet behind the VPS's nginx. Its weak point is availability: what an anonymous
+client can make it hold, compute or keep. What holds already: paths (`..`, `%2e%2e`,
+`%00`, dotfiles all refused), the body's size limit, events rebuilt from checked fields
+only, errors that leak nothing. Each item ships with its check in `tools/dump-server.ts`
+or `tools/dump-stats.ts`.
+
+### W1 ⏳ An aborted download leaks a file descriptor
+
+`serveFile` ends in `createReadStream(path)` and `stream.pipe(res)`
+(`server/app.ts:175-180`). When the client goes away, `pipe` unpipes and never destroys the
+stream, so its descriptor stays open until the process ends: 200 downloads of Conflux's 12 MB
+`CSBgraphics.dat`, each closed after its first byte, left 200 descriptors open on it. Enough
+of them and `statSync`, `createReadStream` and SQLite fail with `EMFILE`: the site is down
+until a restart. A player closing the tab during the first load does the same, a few at a
+time.
+
+Paying it: `pipeline(stream, res, …)` from `node:stream`, or `res.once('close', () =>
+stream.destroy())`; better, `open` the file and `fstat` the descriptor, which also closes
+the window between the `stat` and the open when a data set is replaced live. `dump-server`
+aborts a large download and checks that the process's descriptors come back.
+
+### W2 ⏳ `api/stats` is computed whole at every request
+
+Every `GET` or `HEAD` of `api/stats` runs `store.stats()` (`server/app.ts:110-114`): five
+aggregates over the whole events table through the synchronous `DatabaseSync`, with
+`json_each` over every payload and a correlated `MIN` for every win (`server/stats.ts:64-90`),
+returning every won game and every champion name ever. With 200,000 rows it takes 3.6 s,
+during which the server answers nothing, and returns 32 MB. A loop of requests is a denial
+of service.
+
+Paying it: the answer cached for a minute (or computed on a timer), the lists capped (the
+latest or best N wins a set, the top N champions), `api/stats` under a rate limit.
+
+### W3 ⏳ `api/event` takes another site's posts, and any name
+
+- **Cross-origin**: the page posts with `navigator.sendBeacon('api/event', …)`
+  (`src/ui/gameEvents.ts:187`), a `text/plain` simple request, and the server checks
+  neither `Origin` nor `Sec-Fetch-Site`. Any page can make each of its visitors' browsers
+  post invented events, each visitor a rate-limit bucket of their own.
+- **Names**: `checkChampions` asks only that a name be a string of at most `MAX_NAME`
+  characters (`server/events.ts:99`), so control characters, bidi overrides, NUL (which
+  `json_extract` cuts), markup and the empty name are stored, and published by
+  `api/stats`, which E15's public statistics page will draw.
+
+Paying it: a `POST` whose `Origin` or `Sec-Fetch-Site` names another site is refused; a
+name is made of the characters the game's font has (A to Z, the accented letters, space,
+punctuation) and is not empty. `dump-stats` checks the refusals.
+
+### W4 ⏳ The events table grows without bound
+
+The only limit is 30 events a minute per address (`EVENTS_PER_MINUTE`,
+`server/server.ts:25`; `RateLimit`, `server/events.ts`): no global budget, nothing refusing
+a second `won` of the same playthrough, no retention, and an IPv6 client has a /64 of
+addresses. One address can add 43,200 rows a day, about 10 MB, on a disk the VPS shares,
+and SQLite never shrinks.
+
+Paying it: a global budget a day; `started`, `won` and `lost` unique by type, data set and
+playthrough (`INSERT OR IGNORE`); IPv6 counted by its /64; a size check.
+
+### W5 ⏳ The statistics are pseudonymous, not anonymous
+
+`doc/STATISTICS.md` says no address is stored, and E15's FAQ is to insist the statistics
+are anonymous. But the nginx block `doc/DEPLOYMENT.md` gives (`:54-60`) sets no
+`access_log`, so nginx's default logs the address and user agent of every
+`POST /api/event`; `events.time` is to the millisecond (`server/stats.ts`); and the
+player's id lives in `localStorage` for ever, with no retention. The log's times link an
+address to a player's id.
+
+Paying it: `access_log off` (or a format without the address) for `location =
+/api/event`, in `doc/DEPLOYMENT.md` and on the VPS (the author's); the time stored to the
+minute or coarser; a retention period; the FAQ saying "pseudonymous", and how to reset the
+id.
+
+### W6 ⏳ Security headers
+
+Only a file's answer carries `X-Content-Type-Options: nosniff` (`serveFile`,
+`server/app.ts`); `send`, which answers the API and every error, sets none (`:253-258`). No
+answer carries `Content-Security-Policy`, `frame-ancestors`, `Referrer-Policy` or HSTS.
+
+Paying it: in `send` and `serveFile`, or in nginx: `default-src 'self'; style-src 'self'
+'unsafe-inline'` (the `<style>` in `index.html`), `img-src 'self' data: blob:;
+frame-ancestors 'none'; base-uri 'none'`, and `nosniff` on every answer.
+`tools/check-image.sh` checks the page still runs under it.
+
+### W7 ⏳ The container, the deploy and the Node version
+
+- `docker-compose.yaml` sets no `mem_limit`, `pids_limit`, `read_only`, `cap_drop` or
+  `no-new-privileges`, on a VPS shared with other projects (W2 can push the process to
+  hundreds of MB).
+- `utils/deploy.sh` builds and ships a working tree that differs from its commit, only
+  tagging the build `-dirty` (`:28-32`), and runs no check.
+- One Node version is not settled: the image is `node:24-alpine`, a floating tag
+  (`Dockerfile:13`, `:22`); `package.json` has no `engines` and `@types/node` `^22`; there
+  is no `.nvmrc`; `doc/DEPLOYMENT.md` says 22.18 or later; `CLAUDE.md` and
+  `tools/check-frames.sh:117-121` keep a Node 20 workaround, though `npm test` cannot pass
+  on Node 20 (`dump-server` runs `node server/server.ts`, type stripping from 22.18, and
+  `backup.ts` needs `node:sqlite`'s `backup`). The server is tested on Node 22 and runs on
+  24.
+
+Paying it: the limits in the compose file; `deploy.sh` refusing a dirty tree unless forced;
+one Node version (`engines`, `.nvmrc`, `@types/node`, the image pinned to a digest), the
+Node 20 notes gone.
 
 ---
 
 ## D — State representation
 
 New state-representation debt goes here, and jumps the queue.
+
+### D17 ⏳ The screen keeps the party it last drew
+
+`Party.setState` builds a new object (`src/engine/Party.ts:118-126`), and the screen keeps
+its own reference, `ui.partyState` (`src/renderer/ui/UIState.ts:66`, about 125 uses), set
+again only by `GameScreen.setPartyState` from `renderView` and `refreshScreen`
+(`src/main.ts:77`, `:84`). Whatever runs between a read and the next of those reads the old
+party (R1), and "another game" is detected by the object changing (`setPartyState`'s
+`state !== this.ui.partyState`). The freeze has two owners the same way:
+`GameScreen.isFrozen()` reads `ui.uiMode`, `Game.isFrozen()` reads `ctx.loop.gameFrozen`.
+
+Paying it: `Party.state` restored in place, as `TimerQueue.restore` and the footprints'
+are, or `ui.partyState` a getter over `ctx.party.state`; another game signalled by a
+generation count; one owner for the freeze.
+
+### D18 ⏳ The interface's `d.` lives in the screen, and composing the screen changes the world
+
+CSBWin's interface state is `d.`: the open chest and its contents, the attack menu
+(`d.AttackingCharacterOrdinal`, `Word20250`, `Word20252`), `PressingEye`, `PressingMouth`,
+`DisplayResurrectChestOrScroll`. The port keeps them in `UIState`
+(`src/renderer/ui/UIState.ts:186-233`), and the engine reads them back through `GameHost`
+queries (`pressingEye`, `pressingMouth`, `displayResurrectChestOrScroll`,
+`attackingCharacterOrdinal`, `src/engine/GameHost.ts:47-198`, answered as
+`screen?.…() ?? 0` in `src/main.ts:253-259`), beside calls into the UI named by CSBWin
+address (`tag02076e`, `tag0207cc`, `tag01b29a`, `tag011366`). So:
+
+- **Composing the screen opens and repacks chests.** `presentViewport` runs
+  `syncOpenChest(this.ui, null)` and zeroes `displayResurrectChestOrScroll`
+  (`src/renderer/GameScreen.ts:601-604`), and `drawInventoryScreen` opens the chest through
+  `syncOpenChest(ui, chestView)` (`src/renderer/ui/Inventory.ts:41`), which unlinks its
+  objects from the database (`:363-368`). A compose runs at every refresh, up to 60 a
+  second while the pointer moves, so what the engine finds in a chest depends on when the
+  screen was last composed. The save repacks by hand first (`GameSaves.ts:289`), and the
+  compose skips the inventory under the disk menu so as not to open it again
+  (`GameScreen.ts:612-616`). CSBWin opens the chest while drawing too, but only at events
+  (`TAG0189d4`).
+- A headless `Game` has none of this state, and a read does not reset it (R1).
+
+Paying it: the fields in an engine-owned `ctx.interface` beside `LoopState`, which both
+sides read; the chest opened and repacked at the events where CSBWin calls `TAG0189d4` and
+`RepackChest` (an inventory toggled, the hand's object or the weapon hand changing, the eye
+and the mouth: `doc/CSBwin-src/CSBCode.cpp:7452-7517`, `Character.cpp:1915`, `:3464`,
+`:4532`, `:5149`); `presentViewport` only reads; `GameHost` keeps only what leaves the
+engine. No pixel moves. Before E15.
+
+### D19 ⏳ `RuntimeSaveState` is neither strict nor a snapshot
+
+`RuntimeSaveState` is never a file (its header says so, as `DungeonSnapshot`'s does), yet
+keeps the shape of the JSON save it once was:
+
+- **Optional fields for an older save that cannot exist**: `item16?`, `timers?`,
+  `timerQueue?`, `timerSequence?`, `firstAvailTimer?`, `missiles?`
+  (`src/engine/RuntimeSave.ts:41-50`), read through `?? []` and `timerSequence ?? 0`
+  (`:135-142`); the snapshot's optional, `null` and `undefined` cases
+  (`src/engine/DungeonSnapshot.ts:171-194`, `:384-412`); `Party.setState`'s defaults for "a
+  field an older runtime save does not carry" (`Party.ts:115-126`) and `ensureHandOwner`'s
+  repair of quick-saves written before `setHandOwner` existed (`Party.ts:213-230`).
+- **Not a snapshot**: `getRuntimeSaveState` copies everything but the party, which it hands
+  over live (`party: ctx.party.state`, `RuntimeSave.ts:73`); `applySaveGameState` adopts
+  the caller's `item16` array (`:159-160`); `Party.setState` copies the champions one level
+  deep, so attributes, possessions and skills stay shared. `tools/dump-save-roundtrip.ts:242`
+  works round it with a JSON copy.
+- **The missiles are restored twice**: the snapshot refills them in place
+  (`DungeonSnapshot.ts:105`, source `'snapshot'`), then `applySaveGameState` replaces the
+  array with a hand copy of five fields (`RuntimeSave.ts:159-170`). A field added to
+  `MissileRecord` would be dropped there, and `DUNGEON_DATA_SOURCES` names the wrong source.
+- **A snapshot captured for nothing**: `buildSaveFile` calls `getRuntimeSaveState()`
+  (`src/engine/SaveGameFile.ts:125`), which captures the whole world, every record cloned
+  and every map in base64, and never reads it, at every F5, Sleepsave and menu save.
+
+Paying it: every field required, the old-save branches and their comments gone; the party
+and `item16` deep-copied both ways; the missiles from the snapshot only; a light capture for
+the save. Before G29, whose recording would hold such states.
+
+### D20 ⏳ Three record-size tables and two image layouts
+
+A database's record size is written three times: `DungeonLoader.getDatabaseRecordSize`
+(`src/data/DungeonLoader.ts:504-512`), `SaveGameLoader.ts:348` and
+`CsbwinDungeonImageWriter.databaseRecordSize` (`:275`). They disagree already: database 11
+is 256 bytes in one and 0 in another unless `options.expool`, where CSBWin's
+`dbEntrySizes[11]` is always `sizeof(DB11)`, 256 (`doc/CSBwin-src/data.cpp:395-413`). The
+image's layout is computed twice (`DungeonLoader.calculateOffsets` and
+`computeDungeonImageLayout`, which `Chaos` uses), and a save image's missiles and special
+locations are parsed twice (`parseMissileRecordsFromSaveData`,
+`DungeonLoader.parseMissileDatabase`).
+
+Paying it: one `dbEntrySize(db, shape)` and one image layout for the reader, the writer and
+`Chaos`; the missiles and EXPOOL taken from the `DungeonData`. Settling database 11 on
+CSBWin's 256 changes the read of a block-less `dungeon.dat` with EXPOOL records, which no
+known file is: a separate commit, as for any divergence a refactor finds.
+
+### D21 ⏳ A save has nine shapes
+
+What a save is passes through `ExtendedFeaturesBlock`, `readExtendedFeatures`'s result,
+`SaveGameState`, `Block1`/`Block2` and `Block1State`, `CsbwinWorld`, `UtilityGame`,
+`DungeonData`, `DungeonSnapshot` and `RuntimeSaveState`.
+
+- **`SaveGameState` is both the reader's output and the writer's input**: some 35 optional
+  fields, image contents beside block fields, fields given twice with precedence rules
+  (`timerQueue.length ?? block2.numTimer`, `handChar ?? block2.handChar`,
+  `sequencedTimers`/`extendedTimers` beside the header's `extendedFlags`). `objectInHand` is
+  set twice in `buildSaveFile`, and `block1?` defaults to `emptyBlock1()`, the four zero
+  words the utility refuses as "ALREADY UTILIZED".
+- **`Chaos` reads and writes the file again**: `Chaos.readGame` (`src/engine/Chaos.ts:102`)
+  walks blocks 1 to 6 with its own hash and checksum offsets, and `TAG000fc4` (`:327`)
+  writes the scramble and the checksum again.
+- **The records' codecs are inverses kept by hand**: thirteen `parse*Database` methods in
+  `DungeonLoader` read them, and `CsbwinDungeonImageWriter.writeRecord`'s switch of fourteen
+  `record as XRecord` casts writes them (`:388-528`); `DatabaseRecord` is a union with no
+  discriminant.
+- A load installs the world, then applies a snapshot of that same world over it
+  (`src/engine/CsbwinSaveGame.ts:265`).
+
+Paying it, in steps: a codec per database type, `{ size, read, write }` in a `DBType`-keyed
+table; one pure `SaveFile` codec with required fields (each block's bytes and its parsed
+view), shared by the loader, the writer, `Chaos`, `legacyRows` and `CsbwinSaveInfo`;
+`toSaveFile(game)` and `fromSaveFile(game, file)` on the engine's side, and
+`RuntimeSaveState` out of the save path. C178 is the kind of asymmetry it removes.
 
 ---
 
@@ -136,6 +646,421 @@ New state-representation debt goes here, and jumps the queue.
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included. What the
 page redesign adds is the exception: E15's pages, and E22, which builds on its settings.
+
+The structure need no longer follow CSBWin's files (the author's decision): a module may
+gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
+the behaviour, the names of ported functions, which keep the two codebases greppable
+against each other, and the file formats.
+
+### E23 ⏳ One game read, whole or not at all
+
+What a read does is spread over `Game.ts:273-337`, `GameContext.ts:206-215`, `:261-309`,
+`CsbwinSaveGame.ts:243-271`, `SaveGameFile.ts:275` and `GameSaves.read`:
+
+- **It is not atomic.** `installCsbwinWorld` sets `ctx.rules`, `ctx.signatures`, the
+  overlay and the world before `applyRuntimeSaveState` restores the rest
+  (`src/engine/CsbwinSaveGame.ts:243-271`), and `applySaveBytes` turns any error into a
+  `SaveFileError` (`src/engine/SaveGameFile.ts:275-283`), after which the full menu says so
+  and play goes on: in the new world with the old timers and footprints, when it throws late
+  (an `RnMaps.check` in `reloadAfterSaveGame`). CSBWin's `tag01efee` dies.
+- **Nothing holds a save against its world**: the party's level, x and y, `numCharacter`,
+  `handChar`, `MagicCaster`, the object in hand, the timers' indices. A `csbgame7.dat`
+  rewritten with the party on level 40, its checksums made right by the port's own writer,
+  installs with the party on level 40 of 14. `readCsbwinParty` drops an unoccupied slot
+  inside `numCharacter` and renumbers the rest (`src/data/CsbwinCharacters.ts:293-303`),
+  leaving `handChar`, `MagicCaster` and the positions naming other champions; CSBWin does
+  not renumber.
+- **A new game builds a scratch `Game`**, all seventeen systems, for its effects on the data
+  (`CheckMonsters`, `addNewGameSpares`), then takes its state through
+  `getRuntimeSaveState` and gives it back, the world encoded in base64 and decoded onto the
+  same object. A save builds a throwaway `DungeonState` for `CheckMonsters` alone. The
+  rules are read in two places, in two orders (`Game.readNewGameRules`,
+  `installCsbwinWorld`); `deleteDuplicateTimers` is set twice (`GameContext.ts:208`,
+  `Game.ts:324`); the world has two routes, `GameState.dungeon` and
+  `DungeonState.getData()` (typed `Readonly`, written through), which `installWorld` keeps
+  in step (`Game.ts:320-321`).
+- **What `d.Initialize()` zeroes is reset nowhere** (C181).
+- **A read in play** drops no running script (`Game.applyRuntimeSaveState`) and does not
+  empty the mouse queue, so clicks queued before F9 are translated against the loaded
+  screen.
+
+Paying it: one `readGame(world, runtimeState)` for `dungeon.dat` and saves alike, an
+ordered list of steps: validate (a pure `validateCsbwinWorld`), build every piece, then
+swap them in at once; an error after the swap is `die(0xbad)`, not a message. A new game's
+state from a pure function instead of a scratch `Game`; `GameState.dungeon` gone. The
+validation and the swap change what a damaged file does: commits of their own after the
+refactor, with a tool of damaged saves.
+
+### E24 ⏳ Two import cycles, and pure helpers in the systems
+
+`MonsterPerception`, `MonsterAttack`, `MonsterDamage`, `MonsterSystem`, `MmRecord` and
+`DsaSystem` import values from each other in a cycle, and so do `HintOracleButton` and
+`Mouse`. Nothing reads a value at load time today, so it works, but which module loads
+first depends on the entry point (a tool entering at `MonsterAttack`), and one table built
+at a module's top level would break some entries and not others. Every edge is a pure
+helper living in a system's module:
+
+- `MmRecord` imports `DsaVars` from `DsaSystem` (`MmRecord.ts:10`, `:80`), the edge that
+  closes the cycle;
+- `setPackedBits` and the `monsterDrawAsSize4`, `Invisible`, `Unique` and `Poisoned`
+  readers live in `MonsterSystem`, which six modules import for them;
+- `DsaSystem` imports the filters' parameter-block codecs from `Feeding`, `MonsterAttack`,
+  `MonsterDamage` and `MovementSystem` (`DsaSystem.ts:59-67`): the dependency points the
+  wrong way;
+- `MonsterSystem` imports `deleteMonsterParameters` and `DeleteMonsterWhy` from
+  `MonsterDamage`;
+- `HintOracleButton` imports `tag02076e` and `tag0207cc` from `Mouse`
+  (`HintOracleButton.ts:25`) for `openHintOracle` and `closeHintOracle`, which only
+  `GameScreen` calls.
+
+`src/data/` imports the engine five times: `AltMonGraphics` from `Die`, `CsbwinCharacters`
+from `gameTypes` and `attributes`, `HeroExtractor` from `AddCharacter` and `RelativeXY`.
+
+Paying it: `DsaVars`, `DsaVarType`, `StkOp` and the cursor and viewing filters' types in a
+leaf `dsa/DsaTypes.ts`; the packed-bit readers in `monsterTypes.ts`; the filters' codecs
+beside their interfaces in a `filterParameters.ts`; the two Oracle functions in `Mouse.ts`
+or `GameScreen`; what `src/data/` takes from the engine moved down. Then a check in
+`npm test` that fails on a value-import cycle.
+
+### E25 ⏳ One helper for each rule, where copies drift
+
+C170 and C171 are copies that drifted. The copies left:
+
+- **Mastery**: `determineMastery`'s options default to "awake" and "no possessions"
+  (`src/engine/skills.ts:116-121`, `:150`), and six callers build them by hand
+  (`CharacterStats`, `AttackSystem`, `src/renderer/ui/Attack.ts`, `MouseSystem`,
+  `DsaSystem`, `PeriodicUpdates`), some leaving them out (C171).
+- **`CharacterAtPosition`**: a third copy in `MonsterAttack.getCharacterToDamage` (C170),
+  beside the two `AttackSystem.ts:320-322` says had drifted. "Alive" is tested five ways:
+  `(health | 0) === 0`, `health === 0`, `health > 0`, `attributes?.health ?? 0`, `!== 0`.
+- **A level's difficulty**, `getMap(party.z)?.descriptor.difficulty ?? 0`, six times
+  (`AttackSystem.ts:307`, `MonsterAttack.ts:167`, `MagicSystem.ts:453`, `LightLevel.ts:28`,
+  `ActuatorSystem.ts:632`, `TimerSystem.ts:1215`).
+- **Skill gain on the party's level** is `MagicSystem.applySpellSkillGain` (`:450`), used
+  for blows, war cries and throws (`AttackSystem.ts:386`, `:704`, `:1533`,
+  `MouseSystem.ts:231`).
+- **A spell's RN**, `0xff80 + (x & 0x7f)`, at `TimerSystem.ts:993`, `:1637` and
+  `MagicSystem.ts:479-480`, beside `missileHelpers.spellObjectId` (`:26`);
+  `adjustSpellMissileRange` and `computeSpellLaunchPos` (`MagicSystem.ts:463-477`) repeat
+  `characterThrowsSpell` and `launchObject`; `DsaSystem.ts:4673-4676` repeats
+  `MonsterSystem.detachedGroupIndexFor`.
+- **The room type**, `(cellFlag >> 5) & 0x7`, written out 28 times beside 4 calls of
+  `getRoomType`; the facing byte packed at `WorldMove.ts:616` and `DungeonState.ts:928`.
+- **The database dispatch**, five times: two 13-case switches (`DungeonState.ts:460-572`),
+  ten `getXxxRecord` getters (`:775-856`), `SmartDiscard.ts:223-230`,
+  `objectIndex.ts:86-94` and `MakeMoreRoomInDB.ts:95-98`, beside `DATABASE_KEY` (`:62`)
+  and `getRecord` (`:688`).
+- **The global text's key**, `((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0`, at
+  `Game.ts:185`, `DsaSystem.ts:4098` and `:4113`, and its decode at `DsaSystem.ts:4100-4106`
+  and `DecodeText.ts:269-272`; `EDT_SPECIAL_LOCATIONS` and `ESL_MONSTER_MOVE_FILTER` both in
+  `CsbwinExpool.ts:40-44` and `DsaSystem.ts:329-351`, and the fifteen `ESL_*` loose
+  constants.
+
+Paying it: a module of rule helpers (`masteryOf(ctx, champ, skill)`,
+`characterAtPosition`, `isAlive`, `levelDifficulty(ctx)`, `adjustSkillsOnPartyLevel`,
+`spellObjectId`, `roomTypeOf`); one `recordsOf(db)` and a generic record getter; the text
+codec beside `messageParametersKey`, with an `Esl` enum. After C170 and C171, so that this
+commit changes no output.
+
+### E26 ⏳ Systems named after CSBWin's files, not what they do
+
+- **`MonsterAttack` is mostly the champions' health.** Of thirty calls into
+  `systems.monsterAttack` from twelve files, one is `monsterAttacks`; the rest are
+  `adjustStamina` (8), `damageAllCharacters` (4), `damageCharacter`, `poisonCharacter`,
+  `killCharacter`, `curePoison`, `tag011366`, `displayCharacterDamage`, `isCharacterLucky`
+  and `quickness`, from `Feeding`, `MovementSystem`, `PeriodicUpdates`, `SwapCharacter`,
+  `DsaSystem`…
+- **`AttackSystem` holds the end of the game**, `_FusionSequence` and the credits' script,
+  about 200 lines, and `applyMagicShield`, which `MagicSystem` calls.
+- **`MoveObject` is in two halves.** `WorldMove.ts:172-200` and `MonsterSystem.ts:552-560`,
+  `:652-667` each do the missile check, the removal and the pad's release, and the
+  levitation test is written twice (`WorldMove.isMonsterLevitating`,
+  `MonsterSystem.ts:549`).
+
+Paying it: a `ChampionDamage` system for `Character.cpp`'s damage, death, poison, armour
+and luck; `Fusion.ts` for the end; one `MoveObject`, the monster's half calling the shared
+parts.
+
+### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
+
+`DsaSystem.ts` (4,976 lines) holds the interpreter, seventeen filter sites, a port of
+`MoveObject` for `&MOVE`, and `executeAmpersand`, a single function of 1,231 lines
+(`:2003`). In `execute` (`:1544-2000`, 457 lines):
+
+- seventeen `isMaxState(...)` tests, sixteen of which can never fire, since only QUESTION's
+  MAXSTATE of 2 fits its field (`doc/CSBWIN_DSA_REFERENCE.md`, `tools/dump-dsa-census.ts`),
+  and with them all six `readSignedWord` calls;
+- `program[pc++] ?? 0` forty times and `wordsRemaining--` thirty-eight, though
+  `wordsRemaining` is always `program.length - pc`;
+- `ExecutionPacket`'s `program`, `pc`, `wordsRemaining`, `nextState`, `transferState` and
+  `transferCol` set (`:1492-1499`) and copied into every GOSUB's packet, and read by
+  nothing.
+
+Five doc comments sit over the wrong function (`:147` over `CursorFilterType`;
+`:3276-3279` over `examineCell`, not `noFilter`; `:3609-3615` over `getObjectField`, not
+`isCarried`; `:4084-4091` over `globalText`, not `setGlobalText` and `isValidObjectId`),
+and seven filter sites have none (`processMissileEncounterFilter`,
+`processAdjustSkillsFilter`, `processSpellFilter`, `processTimer5`, `6` and `7`). A spell's
+parameters are marshalled field by field both ways (`:1380-1412`, and again in
+`MagicSystem.ts:140-155`), where every other block has a codec.
+
+Paying it, in steps, into `src/engine/dsa/`: `DsaTypes.ts` (E24); `DsaMachine.ts`, the
+stack, the bank, `execute` over a `ProgramCursor` (`word()`, `nextState(word, shift, bits,
+maxState, signed)`) and the state look-ups; `DsaFilters.ts`, one `runFilter(esl, words,
+options)` the sites call with their codecs, the spell's included; `ops/` by domain (stack
+and arithmetic, objects, `&MOVE`, characters, monsters, the dungeon, text, messages), with
+`executeAmpersand` a dispatch over them; `DsaSystem.ts` the façade on `ctx.systems.dsa`.
+Each command's body keeps CSBWin's order and names. Two tools change with it:
+`tools/dump-dsa-census.ts:61-66` reads the ported operations from the text of
+`executeAmpersand` (an exported table instead), and `tools/dump-dsa-delete.ts:121` replaces
+`executeAmpersand` on the instance.
+
+### E28 ⏳ The bytecode interpreter decodes through switches and maps built per call
+
+- `executeOpcode` is a 510-line switch (`src/renderer/bytecode/BytecodeInterpreter.ts:414`),
+  `resolveStdRectanglePointer` a 208-line one (`:1710`).
+- Fifteen functions build an object-literal map at every call (`opWallBitmap`,
+  `getStdWallRectanglePointer`, `opFloorPitRectangle`, `opTeleporterRectangle`,
+  `opStairRectangle`, `opDoorBitmap`, `opDoorRects`, `opDoorFrameRectangle`, `opDrawOrder`,
+  `opWallPosition`, the four `relativeCellFrom*Opcode`…): of the 160 to 195 opcodes of a
+  `DrawViewport`, 64 to 70 allocate one.
+- A program is found by building `${cellName}_${roomTypeName}`, with an `_Any` fallback, in
+  a map of 101 exported `StdDraw*` constants nothing else imports
+  (`BytecodePrograms.ts:1962`, `src/renderer/DrawViewport.ts:192-211`), where CSBWin
+  indexes `pStdDrawCode[21][8]` (`doc/CSBwin-src/Viewport.cpp:1952`).
+- 38 commented-out debug lines (`// StdBltShape(bitmapPtr=${bitmapPtr}, ...)`).
+- `InterpreterContext` (`:35-155`) carries the drawing's inputs and the picking's outputs
+  alike (`viewportObjectButtons`, `viewportObjectRNs`, the `facing*` flags,
+  `doorSwitchRects`, written by `DrawDecorations`, `DrawRoomObjects` and `DrawDoor`, read by
+  `src/renderer/ui/ViewportPicking.ts`) in 49 optional fields, so 22
+  `if (!tables || !viewport || !getGraphic) return;` draw nothing and say nothing when a
+  dependency is missing; `floorBitmap` and `ceilingBitmap` are dead.
+- The drawing's state is module-wide: the interpreter's `stack`, `rstack`, `sp` and `rsp`,
+  `viewportRandom` (`ViewportDraw.ts:32`) and `graphicRandomState` (`DrawDoor.ts:210`),
+  which tools reseed by hand.
+- `selectLevel` writes the level's monster colours into the shared tables
+  (`tables.monsterColorMapMedium[...]`, `src/renderer/ViewportRenderer.ts:203-208`), the
+  game's one `GraphicsTables`, which tools cache per loader. Its comment (`:154-157`) says
+  they are applied "whether or not the view is drawn"; its one caller runs only when it is.
+- An unknown opcode is a `console.warn` (`:920`), where the renderer reports through
+  `GameHost.trace`.
+
+Paying it: one decode table built once (opcode to handler and operand), `pStdDrawCode` as a
+21-by-8 array, the rectangle pointers as a table; `draw()` returning the picking for the UI,
+the inputs required and a tool helper filling defaults; the drawing's state an object the
+`ViewportRenderer` owns; per-level copies of the two colour maps; a `trace` hook. Pixel for
+pixel: `tools/dump-render-probe.ts`, `tools/dump-skin-programs.ts` and the golden frames.
+
+### E29 ⏳ `GameScreen` is the canvas, the compose order, the palettes and a façade
+
+`GameScreen` (839 lines, 71 methods, 51 of them one- or two-line forwarders into `ui/`) is
+the canvas's output (`putImageData`), the order of the compose, the palettes' choice, and a
+façade over the UI and the boot (`getScreenBuffer`, `doMenu`, `setBootFrameRenderer`,
+`setExtras`, which writes `ui.ctx.extras`). It needs an `HTMLCanvasElement`, so no tool can
+build one, and `tools/lib/ui.ts` copies its wiring (F19). Each page hook is named four
+times: in `UIState`, `UIHooks`, `GameScreenHooks` and the constructor's copy
+(`GameScreen.ts:94-109`, `:201-218`, `UIState.ts:394-396`).
+
+Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the palettes,
+`PresentedFrame`, `presentViewport`'s order) and a thin canvas presenter; one factory for the
+`ViewportRenderer` and the `UIState`, which the tools use too; `main.ts`'s host calling
+`ui/` directly; the hooks spread once.
+
+### E30 ⏳ One presenter and one input router
+
+The screen is drawn by clocks that do not know each other: the engine's `setTimeout` VBL
+loop, and `requestAnimationFrame` loops for the chewing mouth
+(`src/renderer/ui/Feeding.ts:227-248`), a menu button's press (`SaveMenu.ts:1172-1218`), the
+intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:210-225`).
+
+- `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
+  `refreshScreen`'s `setPartyState` and its `mainLoopHasReturned()` test
+  (`GameScreen.ts:726-732`, `src/main.ts:82-86`), so a chew still running when the game ends
+  draws the adventure over the credits' wait; `initializePlayState` cancels neither loop.
+- The CRT uploads the canvas and runs its shader at device pixels at every display frame,
+  changed or not: about 2.3 million pixels a frame at a device ratio of 2, up to 120 times a
+  second.
+- The rAF scheduler is written twice (`Feeding.ts:229-232`, `SaveMenu.ts:1172-1180`, each
+  with `as unknown as number`), and a menu's press runs on two clocks
+  (`BootSequence.ts:507-510` passes made-up times).
+- Input has two stacks, `GameInput` on `document` and the intro's `IntroHost` on `window`,
+  and only `#overlay-control` stops its own keys.
+
+Paying it: one rAF presenter with a dirty flag that the VBL and the animations set, the CRT
+drawing only after a present; one input router with a focus policy (R9). E15 and E22 build
+on both: fullscreen, resizing, dialogs over the canvas.
+
+### E31 ⏳ Late wiring with silent defaults, and long parameter lists
+
+- `Game`'s constructor wires callbacks into objects built before it:
+  `DungeonState.makeMoreRoomInDB`, `textSubstitution` and `timerWord8Lookup`
+  (`DungeonState.ts:90`, `:95`, `:140`; `Game.ts:179-187`), and `SoundQueue.soundFilter`
+  (`= () => 1`, `SoundQueue.ts:48`); `TimerSystem`'s constructor writes into `ctx.dungeon`
+  (`:94`). A bare `createGameContext` gets, silently, a full database that refuses records,
+  untranslated texts and no sound filter, and `systems: {} as GameSystems`
+  (`GameContext.ts:307`) types every system as present.
+- `TimerQueue.createTimer` takes ten positional parameters and `createTimerWithUByte5`, its
+  near copy, eleven (`TimerQueue.ts:200-259`), at 26 call sites
+  (`createTimer(TT_LIGHT, 0, 0, 0, 0, time >>> 0, z, undefined, 0, deltaSteps)`,
+  `TimerSystem.ts:290`). `WorldMove.resolveCellEffects` takes nine, with
+  `objectType = -1` meaning the party (`WorldMove.ts:269-279`).
+
+Paying it: the callbacks as constructor dependencies, with a tool builder that fails on a
+missing one (or `GameSystems` partial for a bare context); named constructors per timer
+family or an options object; a `PARTY_OBJECT_TYPE` constant.
+
+### E32 ⏳ Four ways to read bytes, and eight graphics caches
+
+- **Bytes** are read through `BinaryFile`, `core/bytes`, `DataView` (`UITables`,
+  `CSBGraphicsLoader`) and inline shifts. Only `DungeonLoader` and `GraphicsLoader` use
+  `BinaryFile`, both big-endian: its little-endian mode, `RemoteBinaryFile`,
+  `readI8`/`readI16`/`readI32`, `peek`, `eof`, `remaining`, `tell`, `setEndianness` and
+  `DungeonLoader.load(url)` are unused, and `peekU32LE` exists because the mode is.
+  `CsbwinCharacters.setU16BE`/`setU32BE` (`:309-317`) repeat `writeU16BE`/`writeU32BE`;
+  `readI16Array` is in both `ObjectTables` and `UITables`; a planar decode is written three
+  times (`CSBGraphicsLoader.decodePlanar`, `CsbwinCharacters.readPortrait`/`writePortrait`,
+  `ApplyBackground`).
+- **Graphics** are cached in eight places with lifetimes of their own, one of them a
+  `Map<string, IndexedBitmap>` of four key spaces (`obj:`, `derived:`, `doorOrnament:`…)
+  that builds a string at every look-up, and `catch { return null; }` turns every decode
+  failure into "nothing drawn" (`src/renderer/ViewportGraphics.ts:22-37`).
+  `GraphicsLoader.getImage` caches by index alone and ignores its `format`
+  (`src/data/GraphicsLoader.ts:148-155`), so `getPortraitSheet`'s IMG2 fallback
+  (`src/renderer/ui/Character.ts:597`) gets the IMG1 decode back and is dead. `toU8` is
+  written three times (`ViewportGraphics.ts:78`, `:108`, `:141`).
+
+Paying it: `core/bytes` and a small cursor, the rest deleted; one typed graphics store with
+numeric keys, derived graphics under CSBWin's derived numbers, decode failures traced; the
+loader's cache keyed by format, or the parameter dropped with the dead fallback.
+
+### E33 ⏳ What a frame costs
+
+- **The palette-to-RGBA conversion is most of a compose**: 0.76 ms of `refreshOverlay`'s,
+  where a 16-entry `Uint32` table a palette, written through a `Uint32Array` view, takes
+  0.14 ms (`updateImageDataFromIndex*`, `src/renderer/csbwin/CanvasBlitter.ts:409-483`). It
+  always takes the two-palette path while adventuring: `viewportPalette !== uiPalette`
+  compares two separate copies (`GameScreen.ts:654-660`). Its body is written three times
+  in `CanvasBlitter`, and the cursor's footprint loop twice (`reconvertThroughPalette`,
+  `PresentedFrame.capture`).
+- **Every monster turn allocates** an `MmRecord` and with it a `DsaVars` of two 100-entry
+  arrays, in a dungeon without a filter DSA as in one with; every DSA run a `DsaBank`, a
+  `DsaStack` and a `DsaVars`; `newDsaParameters` an `Int32Array(101)`.
+- About 35 trace strings in `MonsterAI` and 30 in `AttackSystem` are built whether anything
+  traces or not.
+- `searchOrder()` copies and reverses the timer queue at every
+  `deleteMonsterMovementTimers`.
+
+Paying it: the look-up tables built once a present and shared by the three conversions;
+`DsaVars` allocated on first use; the traces behind a test or a closure. The frames record
+palette codes, so none moves.
+
+### E34 ⏳ Dead code and duplicated types
+
+- **Dead exports**, referenced nowhere but at their declaration: `RemoteBinaryFile`
+  (`src/core/BinaryFile.ts:200`), `PositionOriented` and `getCellAttributes`
+  (`src/core/types.ts:100`, `:185`), `setActuatorDsaSelector`, `getActuatorBlockDisables`
+  (which repeats `blocksDisables`) and `PORTRAIT_RESPONSE_NONE`
+  (`src/data/actuatorHelpers.ts:32`, `:112`, `:139`), `ObjectListEntry`
+  (`dungeonTypes.ts:510`), `monsterNibble0` (`MonsterDesc.ts:49`), `SLOT_SHIELD_HAND`
+  (`gameTypes.ts:18`), `AdjustSkillsFilterParams` and `AdjustSkillsFilterResult`
+  (`skills.ts:44`, `:51`), `WALL_BITMAP_WIDTH` and `WALL_BITMAP_HEIGHT`
+  (`ViewportGraphics.ts:43-44`), `drawRectOutlineIndex` (`CanvasBlitter.ts:52`),
+  `startHint` (`HintOracle.ts:748`), `possibleAttackTypeNames` (`Attack.ts:519`),
+  `clampFoodWater` (`Feeding.ts:201`), `SAVE_MENU_PRESS_MS` (`SaveMenu.ts:1220`),
+  `isViewportPoint` (`src/ui/utils.ts:23`). About 280 more exports are used only in their
+  own file, the 101 `StdDraw*` programs among them (E28).
+- **Dead members and code**: `TimerQueue.clear` (`:193`), `PartyFootprints.reset`
+  (`:213`), `MovementResult.stepped`, `.blocked` and `.newFacing` (`gameTypes.ts:346-358`),
+  `MonsterSystem.detachedGroupIndexFor` (`:911`), `MonsterAI.clearAttacking` (`:1696`),
+  `MonsterAttack`'s `RN_*` re-exports (`:39-49`), `BrowserSaveStore.remove` and
+  `idbDelete`, `GraphicEntry.image`, `getCacheStats`, `clearCache`, `const result = 0; …
+  return result | 1` (`Game.ts:838`), `offset = offset;` (`SaveGameLoader.ts:619-621`),
+  `x !== -1 ? x : -1` (`MonsterDamage.ts:368`).
+- **Tool-only code in the engine**: `DungeonState.applyDoorActionAtPosition` and
+  `applyDoorActionAt` (`:794`, `:937`), an instant door toggle CSBWin does not have, used
+  only by `tools/dump-savegame.ts`.
+- **Duplicated types**: `RoomType` in `src/core/types.ts:30` and
+  `src/renderer/bytecode/Types.ts:16`, the second with the view's 16 to 20
+  (`src/renderer/ui/ViewportPicking.ts` imports both, one as `SummaryRoomType`);
+  `SoundTableEntry` in `src/audio/soundsIndex.ts:8` and `src/data/tables/UITables.ts:42`;
+  `type RN = number` (`bytecode/Types.ts:10`), unbranded, for `rn2` and `text`, which forces
+  `as ObjectID` in the interpreter (`:1679`, `popRN`).
+
+Paying it: delete; one `RoomType` and a `ViewRoomType` for 16 to 20; one
+`SoundTableEntry`; `ObjectID` in `SummarizeRoomData`; the door toggle in `tools/lib`.
+
+### E35 ⏳ Comments and documents that are stale, wrong, or tell the past
+
+- **Paid debt IDs in the code**, which "How to work this list", point 5, says mean the debt
+  is open: E1, E1c, E1d and E2 (`Game.ts:6`, `GameContext.ts:2`, `:53`, `GameHost.ts:2`,
+  `LoopState.ts:3`, `MouseQueue.ts:12`, `MouseSystem.ts:9`, `PeriodicUpdates.ts:7`,
+  `MagicSystem.ts:9`, `CharacterSystem.ts:10`, `HallOfChampions.ts:7`, `:10`); in the tools
+  C14 (`dump-cloud-draw.ts:27`), C23 (`dump-wiggle-monster.ts:5`), C24
+  (`dump-monster-move-code.ts:3`), C27 (`dump-champion-death.ts:123`) and D1
+  (`dump-throwing.ts:338`).
+- **The past**: "Moved out of `Game` by `DEBT.md` E2" (`MagicSystem`, `MouseSystem`,
+  `PeriodicUpdates`), `Party.ts:103`, `:218`, `:305`, `RuntimeSave.ts:199-200`,
+  `CsbwinSaveGame.ts:4-9`, `:114`, `SaveGameLoader.ts:295-296`, `CsbwinSaveInfo.ts:42-44`,
+  `CsbwinDungeonImageWriter.ts:287-290`, `SaveGameFile.ts:229-231`, `MonsterAttack.ts:598`,
+  `MissileEncounter.ts:513`, `DrawDecorations.ts:177-179`, `src/main.ts:584-586` ("the rest
+  of the Phase 14 scaffolding"), `BytecodeInterpreter.ts:1590` ("Phase 5").
+- **Wrong**: `MagicSystem.ts:397` ("Spell effects are wired in subsequent magic parity
+  steps"); `MonsterAttack.ts:750-751` (`potentialChampionIndex` "still always -1 here",
+  which `HallOfChampions.ts:134` sets); `MonsterDamage.ts:452` (a branch without the hook
+  that does not exist), and `DamageMonster`'s comment over `damageMonsterGroup`
+  (`:480-489`); `SaveGameLoader.ts:501` (ITEM16's `word0` "little-endian in the file", read
+  big-endian, as `LE16` on the little-endian build means, `doc/CSBwin-src/CSBTypes.h:151`);
+  `CsbwinSaveInfo.ts:9` ("never touches the image"); `CsbwinSaveGame.ts:182`
+  (`buildCsbwinRuntimeState` "pure", where `readDisableSaves` removes records from the
+  world's `expool`); `DrawViewport.ts:5`, `:156`, `:163` ("the 3D first-person view", and
+  doubts on cells 3 and 10 that `relativeX`/`relativeY` settle); `CanvasBlitter.ts:214`
+  (R7); `getChampionMessageColor`'s `?? 13`, "the historical default", a guessed number
+  (`ActuatorSystem`).
+- **Documents**: `doc/CSBWIN_DSA_REFERENCE.md` says `&PARTY@` and `&CHAR@` write nothing
+  past 100, where `&CHAR@` zero-fills (`doc/CSBwin-src/DSA.cpp:4179-4227`; the port is
+  right), and its last four sections cite `DSA.cpp` without lines;
+  `doc/CSBWIN_SAVEGAME_REFERENCE.md:286` says `SimpleEncryption` is neither written nor read
+  past the header (the whole file is), and calls block 0 byte-identical with its game
+  information (only the round-trip tool's is, C178); `doc/UI_MODULE_MAP.md:40`
+  (`pointInRect`, gone), `:79` (the wrappers "delegate and do nothing else", where
+  `handleMouseButton`, `setPartyState` and `initializePlayState` hold logic), `:106` (nine
+  screen states and a server started by hand: twenty, and the probe starts its own);
+  `index.html:49-56` (a 4/3 comment over a 600-pixel height, among commented-out CSS); two
+  CSBWin ranges past their file's end, `MoveObject.cpp:797-865` (858 lines;
+  `DsaSystem.ts:905`, `doc/PROVEN_FACTS.md` and two tools) and `Sound.cpp:1048-1071`
+  (1069; `SoundQueue.ts`, `doc/CSBWIN_DSA_REFERENCE.md` and three tools).
+
+Paying it: each rewritten as the present rule, or deleted.
+
+### E36 ⏳ Type escape hatches that check nothing
+
+`noUncheckedIndexedAccess` is off (it would raise 1,573 errors), so an index's `!` asserts
+nothing, and a `?? 0` on a field that cannot be missing hides the type's contract:
+
+- about 76 `x[i]!` in the UI and the intro, 54 of them in
+  `src/renderer/intro/HintOracle.ts` (`seg[36]!`, `:629`), and 25 `stack[sp]!` in the
+  bytecode interpreter;
+- `??` and `?.` on fields that are not optional: `champion.food ?? 0` and
+  `attrs?.health ?? 0` (`src/renderer/ui/Character.ts:69-70`, `:153-158`),
+  `champion.skills ?? []` (`src/ui/championPanel.ts:207`), `party.cursorOwner ?? -1`
+  (`ActuatorSystem`), `(wallDecorationPos as 0 | 1 | 2) ?? 0`
+  (`BytecodeInterpreter.ts:1658`, `:1678`), `slot?.uByte4 ?? 0` hiding a missing ITEM16
+  (`MonsterAI.ts:1429`); `CharacterStats.getObjectWeight(item: ObjectID | number | null |
+  undefined)`;
+- `as ObjectID` on what already is one, which blurs the audit by which a cast marks a
+  conversion (`CLAUDE.md` → "Object IDs"): `DsaSystem.ts:1538`, `:1539`, `:2050`, `:4413`,
+  `:4616`, `:4628`, `ActuatorSystem.ts:607`, `TimerSystem.ts:1427`, `:1559`, `:1597`,
+  `objectIndex.ts` (`NameIndex`), `PeriodicUpdates.ts:67`, `MonsterSystem.ts:750`, `:757`;
+- CSBWin's `RNempty` written as `0 as ObjectID` (`ActuatorSystem.ts:350`) and `rn === 0`
+  (`objectIndex.ts:82`).
+
+Two compiler checks cost nothing: `noImplicitReturns` and `noImplicitOverride` raise no
+error today (`exactOptionalPropertyTypes` raises 34).
+
+Paying it: the casts and `??` removed where the type already says it; `hcsb.dat`'s segment
+lengths checked once in `parseHcsbDat`, not by 54 `!`; `noUncheckedIndexedAccess` turned on
+module by module where data comes from files (the intro, the renderer, the loaders), in a
+`tsconfig` that `npm test` runs; an `OBJECT_ID_EMPTY` constant; the two free flags on.
 
 ### E15 ⏳ The page shell
 
@@ -146,6 +1071,21 @@ What the redesign will replace, and what it should not carry across:
   (`events.ts:11-21`, `settings.ts:63-75`). A `UIContext` module singleton
   (`src/ui/context.ts`) is how the panels reach the game.
 - **`main.ts` holds the page's features**: the end-of-game flow.
+- **The controls are dead before the game.** `bindUIEvents` runs only in `wire`, after the
+  logo, the title and the entrance, so Sound, CRT, Smooth, Map, Debug and Quick Save do
+  nothing there (the intro cannot be muted), and the buttons show `index.html`'s defaults
+  (`btn-sound` pressed) rather than the saved settings `init` has applied.
+- **Elements are looked up at import time** (`const panelEl =
+  document.getElementById('champions')` at the top of a module, `src/ui/`), so no module
+  can be tested or drawn later.
+- **The debug chrome is on the public page.** Any player can press Debug, and then a click
+  on the map teleports the party by replacing its state (`setPartyState({ ...state,
+  position })`, `src/ui/mapPreview.ts:65`), with no test of the square (into stone, if
+  clicked there) and no `MoveObject`; the game it plays reaches the statistics' "where
+  parties die" like any other. The overlay controls (`#overlay-control`) need no Debug at
+  all. Both go behind a developer's switch (`?debug`, or the build flag `main.ts:584`
+  uses), and a game a teleport touched sends no events.
+- **Two input stacks** (E30) and the page's controls keeping the focus (R9).
 
 Paying it is the redesign's first step: settings as a model the page renders.
 The redesigned page also links to two pages:
@@ -204,6 +1144,235 @@ Both are settings of E15's model, so this follows E15. What the change must look
 
 A divergence found along the way goes here, with the next free ID.
 
+### C177 ⏳ An Atari-era save loads with its possessions, timers and hand unconverted
+
+For a file with no Extended Features block (`ExtendedFeaturesVersion == '@'`), CSBWin
+converts the cells' chains, then the timers' objects (`ConvertTimers`), the champions'
+thirty slots (`ConvertCharacters`) and the object in hand, each through
+`ConvertListOfObjects` (`doc/CSBwin-src/SaveGame.cpp:2927-2974`). The port converts the
+chains only (`convertOriginalDungeon`, `src/data/DungeonLoader.ts:296-303`), on the ground
+that a `dungeon.dat` holds no timer, champion or object in hand; a block-less save takes
+the same path and holds all three, and `readPossessions` reads the slots as slot numbers
+already (`src/data/CsbwinCharacters.ts:86-100`). The port imports a DM save from the Atari
+(`buildBlock1State`'s `Byte22596 == 1` branch; its signature matches DM's): a weapon in a
+champion's hand, packed `0x1403`, loads as slot `0x1403`, past the 2097 slots, and is gone.
+`tools/dump-atari-saves.ts`'s two files have champions who carry nothing.
+
+Paying it: for a file without `objectIndex`, `ConvertListOfObjects` over the timers that
+carry an object, each champion's thirty slots and the object in hand, in CSBWin's order
+after the chains; a fixture whose champions carry something.
+
+### C178 ⏳ No save keeps the dungeon's game information
+
+`readExtendedFeatures` reads the game-information string (`SaveGameState.gameInfo`),
+`DungeonData` has no field for it, and `buildLiveExtendedFeatures` writes
+`gameInfoSize: 0` (`src/data/CsbwinExtendedFeatures.ts:933`). So a save of the port's drops
+Conflux's 541 bytes of credits, Towers of Chaos's 89, 3D2D1D's 40 and `dm-windows`'s 32,
+where CSBWin carries the string from any read into every save
+(`doc/CSBwin-src/SaveGame.cpp:1002-1003`) and supplies "No game information was provided"
+for a size of 0 (`:249-264`). The comment there says the size was "measured zero" in the
+eight committed saves; they hold 32 and that line (`doc/PROVEN_FACTS.md:2393`).
+
+Paying it: the string and its signed size on `DungeonData`, as `hintKey` is, written back; a
+save round trip checks that Conflux's survives.
+
+### C171 ⏳ The Firestaff does not soften a monster's blow, and three mastery calls ignore sleep
+
+`MonsterDamagesCharacter` subtracts `2*DetermineMastery(chIdx, 7)`
+(`doc/CSBwin-src/Monster.cpp:4576`), without the 0x4000 flag, so the Firestaff in the weapon
+hand adds its levels. The port's `determineMastery(champ, 7, {})`
+(`src/engine/MonsterAttack.ts:471`) counts possessions only when its options carry
+`getObjectNameIndex` (`src/engine/skills.ts:116-121`, `:150`), so a champion holding the
+Firestaff takes 2 to 4 more before the floor test, which can then flip `damage <= 1` and
+the draws behind it. The same defaults leave out sleep: CSBWin's `DetermineMastery` returns
+1 while the party sleeps, and `MagicSystem.ts:249` (a DSA's `&CAST` can run then) and
+`CharacterStats.determineThrowingDistance(…, partySleeping = false)` do not ask.
+
+Paying it: the options at these sites (E25 then gives every site one `masteryOf`); a check of
+a Firestaff bearer hit with a fixed seed.
+
+### C168 ⏳ A monster north-west of the party never prefers west
+
+`GetPrimaryAndSecondaryDirection`, for a target off both axes, finds the first direction
+`dirD4` towards it from north and, when `dirD4 + 1` is not also towards it, tests
+`(dirD4 != 0) || (IsItInThisDirection(dirD4 + 3) == 0)`
+(`doc/CSBwin-src/Code11f52.cpp:2268-2276`): for north the `||` evaluates the west test, and
+a target to the north-west falls through to `STRandomBool`, which gives north then west or
+west then north. The port tests `dir + 3` only when `dir !== 0`
+(`getPrimaryAndSecondaryDirection`, `src/engine/MonsterPerception.ts:101-117`), where the
+loop has already ruled it out, and never for north. So a target to the north-west always
+gives north first, and half the time east second, away from the party. Every direction
+site of `MonsterAI` and the smell's path (`MonsterPerception.ts:370`) take it.
+`doc/PROVEN_FACTS.md:881-895` says the west test's result is discarded, which is the
+misreading. Both sides draw one number, so the random stream keeps its length.
+
+Paying it: the west test for north, its result deciding the branch; the fact corrected;
+`tools/dump-monster-perception.ts` checks (-1,-1), (-2,-1) and (-1,-2) against a
+transcription of the C.
+
+### C169 ⏳ A monster's `timePerMove / 2` is not an integer division
+
+`D4W = sw(timePerMove/2 - w_54)` divides an `i16` (`doc/CSBwin-src/Monster.cpp:1621`; used
+at `:1710`, `:2104`, `:2439`). The port writes `frame.timePerMove / 2 -
+frame.sinceLastUpdate` (`src/engine/MonsterAI.ts:1074`, and `stepOrDefer`, `:1179`), a
+float, and stores the remainder back into `frame.timePerMove` (`:1091`). For an odd move
+time, 15 of the 27 monster types (Skeleton 7, Mummy 17, Giggler 3…), a group whose wait is
+exactly half defers where CSBWin's moves, the rest of the turn runs with a time of x.5, and
+the random stream parts from CSBWin's. Every other division in the file truncates (`:932`,
+`:968`, `:990`).
+
+Paying it: `div(timePerMove, 2)` under `sw`; `Process_Invincible`'s tail (`:1074-1091`)
+calling `stepOrDefer` instead of repeating it; a check with a Skeleton deferred at
+`sinceLastUpdate` 3.
+
+### C170 ⏳ A blow at the party skips a living champion who shares a dead one's corner
+
+`getCharacterToDamage` takes the first champion whose `partyPosition` is the corner, and
+gives up on the corner if that one is dead (`src/engine/MonsterAttack.ts:932-936`). CSBWin
+asks `CharacterAtPosition`, the first *living* champion there
+(`doc/CSBwin-src/CSBCode.cpp:6966`; `Code11f52.cpp:4084`). A recruit takes a corner among
+the living only (`src/engine/AddCharacter.ts:67`), so a dead champion and a living one can
+share a corner, and the port then hits the next corner's champion. The party's bump into a
+wall takes the same path (`MovementSystem.ts:436-438`).
+
+Paying it: `characterAtPosition(party.champions, pos)` (`AddCharacter.ts:84`); a check with a
+dead champion and a recruit in one corner.
+
+### C172 ⏳ A dead monster's remains are linked onto the square, not moved there
+
+`CreateAndDropObject` and `DropMonsterRemains` put each dropped object and each possession
+on the square with `MoveObject(obj, -1, 0, x, y)` (`doc/CSBwin-src/Code11f52.cpp:832`,
+`:943`), so a pad under it fires, an open pit takes it and an object teleporter sends it
+on. The port links them with `addObjectToCell` (`src/engine/MonsterDamage.ts:277-283`,
+`:388-393`), which does none of these. `killCharacter`, `dropAllPossessions` and
+Zokathra's drop already go through `worldMove.moveObject`.
+
+Paying it: `ctx.systems.worldMove.moveObject(rnMaps.setPos(rn, pos), -1, 0, x, y, level)`
+at both; a check of a monster killed on a pad that reacts to objects, and of one killed on
+an object teleporter.
+
+### C173 ⏳ The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject`
+
+`&DEL` takes an object off its square with `MoveObject(thisObj, x, y, -1, 0)` and `&ADD`
+puts its copy on one with `MoveObject(newObj, -1, 0, x, y)`
+(`doc/CSBwin-src/DSA.cpp:1702`, `:2057`). The port does both by hand
+(`src/engine/DsaSystem.ts:2044-2053`, `:2080-2089`): `removeObjectFromCell` then
+`triggerObjectMove`; `setPos`, `triggerObjectMove`, then `addObjectToCell`. What that loses:
+
+- no pit or teleporter on the square is resolved (`WorldMove.resolveCellEffects`, which
+  `&MOVE` already uses, `:4413`, `:4606-4621`);
+- `unchangedRoom` is always false, where `MoveObject` passes whether the party stands there
+  (`Code11f52.cpp:3314-3328`, `:3458-3473`), so floor actuators of types 1 and 2 fire under
+  the party where CSBWin's do not;
+- the pads run before the object is in the cell, with the copy's new corner already set;
+- a monster group added on the party's level gets neither `AttachItem16ToMonster` nor
+  `StartMonsterMovementTimers` (`Code11f52.cpp:3410`, `:3439`) and stands inert;
+- `CopyItem`'s refusal when `d.ITEM16QueLen >= d.MaxITEM16 - 5` on the party's level
+  (`DSA.cpp:1867`) is missing.
+
+Conflux has some 32 `&ADD`, 42 indirect `&ADD`, 26 `&DEL` and 42 indirect `&DEL` sites;
+which of them meet a pit, a teleporter, the party's square or a monster is not traced.
+
+Paying it: both through the world `MoveObject` (`objectMover()`, as `findCellSource` and
+`findCellDestination` do), then `setPos`; a tool with a pit, a teleporter, the party's
+square, and a monster group added on the party's level.
+
+### C174 ⏳ DSA copies that are not whole
+
+- **`&ADD` of a monster group shares its hit points** with the original. The copy is
+  `{ ...rec, nextObject, possession, groupIndex }` (`src/engine/DsaSystem.ts:4916-4929`),
+  and `CreatureRecord.hp` is an array (`src/data/dungeonTypes.ts:205`) that damage writes in
+  place (`MonsterDamage.ts:569`, `:714`, `:831`, `MissileEncounter.ts:399`, `&MONSTER!`):
+  a hit on either group hurts both. CSBWin copies the record byte by byte
+  (`doc/CSBwin-src/DSA.cpp:1879`). No other record holds an array.
+- **`&COPY` of an actuator drops `word8`.** The port copies `word2`, `word4` and `word6`
+  (`DsaSystem.ts:2336-2343`); CSBWin copies the whole record past its link,
+  `memcpy(((ui8 *)pDst)+2, ((ui8 *)pSrc)+2, sizeof(*pSrc)-2)` (`DSA.cpp:4717`), and `DB3`
+  has a `word8` (`CSB.h:1025`), a big actuator's bits 16-17 of its parameters, which
+  `STORE` and `&PARAM` can set while the game runs. Conflux has `BigActuators` and about ten
+  `&COPY` sites.
+
+Paying it: `hp: [...rec.hp]`; `word8` copied when present; a `dump-dsa-*` check of each.
+
+### C175 ⏳ The DSA's integer widths
+
+- **`&*`** multiplies in doubles and truncates (`bank.stack.pop() * bank.stack.pop()`,
+  `src/engine/DsaSystem.ts:2235-2237`), where CSBWin's `i32 * i32` wraps
+  (`doc/CSBwin-src/DSA.cpp:2534-2540`). A product past 2^53 loses its low bits:
+  `0x7fffffff * 0x7fffffff` gives 0 for 1. Conflux has about 216 `&*`.
+- **`&RANDOM`** takes its divisor signed (`this.random.next() % v`, `:2319-2326`); CSBWin's
+  is `(ui32)STRandom() % V` with `ui32 V` (`DSA.cpp:2721-2733`), so `&RANDOM` of -1 gives
+  the draw itself, not 0.
+- **A DSA's state written back**: `void State(i32 s) { m_state = (ui16)s; }`
+  (`doc/CSBwin-src/Data.h:2483`), and `PutState` runs whatever the state
+  (`DSA.cpp:5464`). The port stores it unmasked (`putState`, `DsaSystem.ts:3853-3854`) and
+  skips a final state of -1 (`processTimer6Internal`, `:1510`), so a state of 65536 or more
+  lives unwrapped until a save wraps it, and a load changes what the game then does.
+- **`CASE`** takes the first match (`:1771-1783`), where CSBWin binary-searches in
+  unsigned order (`DSA.cpp:1007-1031`). They differ on an unsorted table, or on a key given
+  twice with two targets; Conflux's 781 tables give the same result both ways.
+
+Paying it: `Math.imul`; `(next() >>> 0) % (v >>> 0)`; `& 0xffff` and an unconditional put;
+the binary search. A check of each in a `dump-dsa-*` tool.
+
+### C176 ⏳ The DSA goes on where CSBWin stops
+
+- **An unknown command** is traced and skipped (`default: … break;`,
+  `src/engine/DsaSystem.ts:1980-1985`), and the loop reads its operands as commands. CSBWin
+  says "Unknown DSA command code" and returns the state it started with
+  (`doc/CSBwin-src/DSA.cpp:5265`). One `warnedOps` set serves both the commands and the `&`
+  operations, so an opcode of one hides the other's warning.
+- **The stack has no limit.** CSBWin's holds 100 values and dies on an overflow
+  (`0xdcd6`), an underflow (`0xdcd7`) and a pick, poke or roll out of range (`0xdcdb`,
+  `0xdcda`) (`DSA.cpp:370-424`). The port's grows without bound and gives 0 for an empty
+  pop or a pick out of range (`DsaStack`, `DsaSystem.ts:445-497`), silently, so a DSA that
+  pushes in a loop grows until the tab dies.
+
+Paying it: `return exPkt.curState`, and two warning sets; the limit, and `die` with
+CSBWin's codes (`src/engine/Die.ts`). A tool feeding each case.
+
+### C179 ⏳ A thrown object drawn as its floor picture is offset and never mirrored
+
+`DrawSingleObject` adds the small offsets only `if (!drawingMissiles)`
+(`doc/CSBwin-src/Code51a4.cpp:1907`), and works out the mirror (`LOCAL_36`) for missiles
+too, its missile call passing `LOCAL_34 = 0` (`:1810-1816`, `:2572-2578`). The port adds the
+offsets always (`drawSingleObject`, `src/renderer/bytecode/DrawRoomObjects.ts:340-346`) and
+passes `mirror = false` for every missile (`:758-772`). So an object in flight with no
+missile graphic (a torch, food, a potion, a shield) is drawn 2 pixels right and 3 up at
+distance 0 (1 and -2 at distance 1, 1 and -1 at 2, with the stock
+`smallOffsetIndices[0]`), and the types whose graphic class has `byte4 & 1` (classes 0, 63
+and 79) are not mirrored on the right.
+
+Paying it: the offsets behind `!drawingMissiles`, the mirror computed in `drawSingleObject`
+with `local34 = false` for missiles; `tools/dump-missile-draw.ts` checks a thrown torch's
+rectangle. A golden frame moves only if one shows an object in flight.
+
+### C180 ⏳ `AdjustSkills`' widths, and a gain of 0
+
+`AdjustSkills` adds `(UI16)(experience)` once the Adjust Skills Filter has run, and the
+filter can return up to 0xfffff (`doc/CSBwin-src/Magic.cpp:316-325`); the port adds the
+whole value (`src/engine/skills.ts:250`, `:258`). And CSBWin runs the filter for a gain of
+0, its only `return` for 0 coming after it, where `applySpellSkillGain` returns first on
+`experience <= 0` (`src/engine/MagicSystem.ts:451`), as for a failed cast whose
+`w4 >> diff` is 0. Only a dungeon with an Adjust Skills Filter DSA sees either.
+
+Paying it: `& 0xffff` on both additions, and a gain of 0 reaching `adjustSkills`; a check
+with a filter that returns more than 0xffff.
+
+### C181 ⏳ What `d.Initialize()` zeroes survives a restart
+
+"RESTART THIS GAME" runs `d.Initialize()` before `GameSetup`
+(`doc/CSBwin-src/Code1f9e6.cpp:309`), and its `memset (this, 0, sizeof (*this))` zeroes
+every `d.` field it does not set again (`DBank::Initialize`, `CSBCode.cpp:333-339`). The
+port reads the new game into the same context, and nothing resets `ctx.levelCleared`
+(`d.LevelCleared`, `src/engine/GameContext.ts:110-114`, written only by
+`MakeMoreRoomInDB`): after a restart, or a new game in the same page, the sweep of a full
+database starts from the last game's level. The other `d.` fields the context keeps are to
+check the same way.
+
+Paying it: one reset of the context's `d.` fields, called by every new game and restart
+(E23's pipeline); a check that a restart's `levelCleared` is zero.
+
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 
 Not a divergence yet: the port does what CSBWin's source does. Recorded because only play
@@ -227,7 +1396,81 @@ in CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
 ## F — Verification debt
 
-New verification debt goes here; it can be taken anywhere ("Priority", point 4).
+New verification debt goes here; it can be taken anywhere ("Priority", point 5).
+
+### F15 ⏳ Tools that read the wall clock, and a runner with no timeout
+
+- `tools/dump-vbl-clock.ts`'s "MainLoop opens with a tick" check can fail under load and
+  pass alone (it failed once in a full `npm test`, sixteen tools at a time). `Game.start`
+  sets `vblClockStart = Date.now()` and calls `gameLoop()` at once, which reads
+  `Date.now()` again (`src/engine/Game.ts:228`, `:237`, `:449`), so a stall of 17 ms between
+  the two runs a VBL inside `start` and spends the opening tick. The tool pins `Date.now`
+  for its pacing section (`:129-173`) and not for this one.
+- `tools/dump-loop-die.ts` waits `1000 / 60 * failOn + 150` real milliseconds, then checks
+  the frames counted (`:23`, `:36`): the same kind, not yet seen to fail.
+- `runAsync` waits for each tool's `close` with no limit (`tools/run-checks.mjs:365-375`), so
+  a tool left with a handle open hangs the whole suite.
+
+Paying it: both tools on a pinned clock, or the engine's clock taken from `GameHost`, which
+would retire the patching of globals; a timeout per tool, reported as a failure with the
+output so far.
+
+### F16 ⏳ A tool can pass having checked less than it says
+
+- A scenario that is not found is logged and skipped: `dump-missile-drop.ts:220`, `:227`,
+  `:255`, `:261`, `:295`, `:301`; `dump-player-attacks.ts:124`, `:171`, `:272`, `:305`;
+  `dump-monster-damage.ts:152`; one in `dump-ten-second-update.ts`. `finish()` fails only a
+  run with no check at all.
+- `collectSaves` returns `[]` for a folder that is not there (`tools/lib/saves.ts:31-33`),
+  its path resolved from the working directory, and eight tools loop over it without
+  asking for a single save (`dump-dsa-save`, `dump-file-signatures`, `dump-expool`,
+  `dump-dm-rules`, `dump-extend-portraits`, `dump-timer-heap`, `dump-save-menu`,
+  `dump-check-monsters`).
+- `dump-server.ts:43`, `dump-build.ts:24` and `dump-loop-die.ts:17` write their own
+  `check()` and skip `finish()`'s guard, which `tools/lib/check.ts` exists to give.
+
+Paying it: the skips become failures; the saves' folder resolved from `import.meta.dirname`,
+a missing one an error; the three tools on `lib/check`.
+
+### F17 ⏳ The frame pipeline and the runner are untyped
+
+The root `tsconfig.json` includes `src` and `tools` and checks no `.mjs`: `run-checks.mjs`,
+`probe-frames.mjs`, `probe-ui.mjs`, `compare-frames.mjs`, `lib/frames.mjs`, `lib/png.mjs` and
+`lib/buildParty.mjs`, 1,648 lines without `@ts-check`, nor `vite.config.mts`.
+`lib/buildParty.mjs:14-33` sends the page a string that calls the engine by name
+(`game.systems.hallOfChampions.resurrectReincarnateCancel(160)`,
+`game.systems.mouse.handleWallClick()`), so renaming either passes `npm test` and breaks only
+`--frames`. `lib/png.mjs` repeats `lib/png.ts`, because the drivers are plain Node scripts.
+
+Paying it: the scripts as `.ts` (Node runs them since 22.18, as it runs the server), under
+`tsc` with `vite.config.mts`; one PNG module; `buildParty` a typed function the probe
+serialises.
+
+### F18 ⏳ One `tsconfig` for the browser, the tools and the server
+
+`server/tsconfig.json` extends the root's, so the server is checked with
+`moduleResolution: "bundler"` and the DOM's types: a server file that imports `./lib`
+without its extension, or reads `document`, passes `tsc` and fails in Node with
+`ERR_MODULE_NOT_FOUND`. The other way, `src/` is checked with Node's types
+(`"types": ["node"]`), so a Node global in browser code passes. The image copies only
+`src/data/DataSets.ts` of `src/` (`Dockerfile:29`), while `dump-server` runs the server
+from the whole checkout, so an import added to `DataSets.ts` passes `npm test` and
+crash-loops the container; only the optional `tools/check-image.sh` would see it.
+
+Paying it: the server on `module` and `moduleResolution` `"nodenext"`, an ES `lib` and
+Node's types; `src/` without Node's; `dump-server` running the server from a scratch
+folder laid out as the image is.
+
+### F19 ⏳ The tools' screen is wired by hand, and has drifted
+
+`tools/lib/ui.ts:21-34` builds the `ViewportRenderer` as `GameScreen`'s constructor does
+(`src/renderer/GameScreen.ts:175-189`), without `gameState`, `rules` and
+`csbGraphicsLoader`. So a view a tool draws has `invisibleMonsters` and
+`drawAsSize4Monsters` off whatever the dungeon says, no `d.Time` for the magic footprints,
+and no CSB graphics.
+
+Paying it: one factory for both (E29); the tools whose output then changes checked against
+what the page draws.
 
 ---
 
@@ -835,8 +2078,8 @@ Recorded so that nobody "fixes" them.
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.
-  - The giant `switch`es in `DsaSystem.execute` / `executeAmpersand`,
-    `BytecodeInterpreter.executeOpcode` and `AttackSystem.attack` mirror the C++ switches
-    line by line, and should stay that way.
+  - Names like `tag0207cc`, `TAG02076e` and `_FusionSequence` are CSBWin's, kept wherever a
+    module gathers or splits the functions (E27, E28): the structure need no longer follow
+    CSBWin's files, but a ported function stays greppable against its C++.
   - `src/renderer/intro/PrisonLevel.ts` imitating part of `DungeonState`'s API is a
     deliberate, documented stand-in dungeon.
