@@ -10,7 +10,8 @@
  *    mastery its experience gives, the bar filled as far as that experience is from the
  *    mastery's start to the next's; stamina a tenth of the stored maximum, as the
  *    inventory shows it. Drawn, a column holds nothing but the panel and its colour: lit
- *    where marked, dim for a dead champion, and nothing for an empty slot.
+ *    where marked, dim for a dead champion, and nothing for an empty slot. The names, the
+ *    maxima and the attributes end on the bars' last column.
  * 3. **The dialog**: shut with CHAMPION VIEW off, and over another dialog; open, the clock
  *    held; Esc, the CHAMPIONS key, CLOSE and a right click close it; a tab shows its rows.
  * 4. **Opening it**, through `GameInput`: the CHAMPIONS key, unbound in every preset; a
@@ -31,7 +32,7 @@ import { BARS_LONG_PRESS_MS, GameInput, type KeyPress } from '../src/renderer/Ga
 import type { GameScreen } from '../src/renderer/GameScreen';
 import {
   BAR_X1, BAR_X2, CLOSE_FRAME, COLUMN_WIDTH, LABEL_CHARS, LABEL_X, PARTY_SIZE, TABLE_LINES, TABLE_PANEL, TABS, TAB_FRAMES,
-  VALUE_CHARS, barFill, barRect, championBarsAt, championDialogClick, championDialogPointer, closeChampionDialog, columnX,
+  VALUE_CHARS, barFill, barRect, championBarsAt, columnRight, championDialogClick, championDialogPointer, closeChampionDialog, columnX,
   drawChampionDialog, lineY, openChampionDialog, skillProgress,
 } from '../src/renderer/ui/ChampionDialog';
 import { isDialogOpen } from '../src/renderer/ui/Dialog';
@@ -156,6 +157,23 @@ console.log('\n=== 2. the readings ===');
     if (lit !== 2 + barFill(bar, reading.progress)) badBars.push(row!.label);
   });
   check(badBars.length === 0, `each level's bar filled as far as its progress${badBars.length ? `: not ${badBars.join(', ')}` : ''}`);
+
+  // The right edge: on each line, the column's last inked pixel.
+  const lastInk = (chIdx: number, y: number) => {
+    let last = -1;
+    for (let py = y - 4; py <= y; py++) {
+      for (let x = columnX(chIdx); x < columnX(chIdx) + COLUMN_WIDTH; x++) if (buf.pixels[py * buf.width + x] !== MENU_PANEL_COLOR) last = Math.max(last, x);
+    }
+    return last;
+  };
+  const ragged: string[] = [];
+  champions.forEach((champion, chIdx) => {
+    if (lastInk(chIdx, lineY(0)) !== columnRight(chIdx)) ragged.push(`${champion.name}'s name`);
+    TABS[0].rows.forEach((row, i) => {
+      if (row && lastInk(chIdx, lineY(2 + i)) !== columnRight(chIdx)) ragged.push(`${champion.name}'s ${row.label}`);
+    });
+  });
+  check(ragged.length === 0, `every name, level, maximum and attribute ends on the bars' last column${ragged.length ? `: not ${ragged.join(', ')}` : ''}`);
   closeChampionDialog(ui);
 
   const three = savedGame('csbgame-early-3hero-nospace.dat');

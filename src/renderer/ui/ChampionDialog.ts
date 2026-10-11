@@ -19,8 +19,10 @@
  * A level or a sub-skill is its mastery, as `DetermineMastery(chIdx, skill | 0xc000)`
  * counts it, with neither a potion's boost nor a held object's (`doc/TRAINING.md`), and
  * beside it a bar: how far the experience it counts has got towards the next mastery
- * (`skillProgress`). Stamina is shown as the inventory shows it, a tenth of the stored
- * value. A dead champion's column is dim; an empty slot's is blank.
+ * (`skillProgress`). A maximum or an attribute has no bar: its number ends where the bars
+ * do, as the champion's name over the column does, so they stand in a column of their
+ * own. Stamina is shown as the inventory shows it, a tenth of the stored value. A dead
+ * champion's column is dim; an empty slot's is blank.
  *
  * Nothing is highlighted as it changes: the clock is held while the dialog is up.
  *
@@ -52,7 +54,6 @@ import {
   LOW_BUTTON_HEIGHT,
   buttonOf,
   drawButton,
-  drawCentredText,
   drawPanel,
   drawPlate,
   drawText,
@@ -84,7 +85,7 @@ export const LABEL_CHARS = 10;
 /** The champions' four columns, right of the labels'. */
 export const COLUMN_X0 = LABEL_X + LABEL_CHARS * CHAR_WIDTH + 2;
 export const COLUMN_WIDTH = 57;
-/** A reading is right-aligned in the column's first three characters. */
+/** A level's or a sub-skill's mastery is right-aligned in the column's first three characters. */
 export const VALUE_CHARS = 3;
 /** The bar: right of the reading, a character's width short of the column's end. */
 export const BAR_X1 = VALUE_CHARS * CHAR_WIDTH + 3;
@@ -92,6 +93,19 @@ export const BAR_X2 = COLUMN_WIDTH - 1 - CHAR_WIDTH;
 
 export function columnX(chIdx: number): number {
   return COLUMN_X0 + chIdx * COLUMN_WIDTH;
+}
+
+/**
+ * Where a text starts so that its last character's ink ends on the column `right`: a
+ * glyph is inked on the first five of its six columns.
+ */
+export function rightAlignedX(right: number, text: string): number {
+  return right + 2 - text.length * CHAR_WIDTH;
+}
+
+/** The column's right end, the bars': where a name or a reading with no bar ends. */
+export function columnRight(chIdx: number): number {
+  return columnX(chIdx) + BAR_X2;
 }
 
 /** The bar beside a reading on the line whose baseline is `y`: as tall as a capital, outline and all. */
@@ -268,7 +282,7 @@ export function drawChampionDialog(ui: UIState): void {
     const champion = champions[chIdx];
     if (!champion) continue;
     const color = columnColor(state, champion, chIdx);
-    drawCentredText(ui, champion.name, columnX(chIdx) + (COLUMN_WIDTH >> 1), lineY(0), color);
+    drawText(ui, champion.name, rightAlignedX(columnRight(chIdx), champion.name), lineY(0), color);
     rows.forEach((row, i) => {
       if (row) drawReading(ui, chIdx, lineY(2 + i), row.read(champion), color);
     });
@@ -285,14 +299,18 @@ export function columnColor(state: ChampionDialogState, champion: Champion, chId
 }
 
 /**
- * A reading on the line whose baseline is `y`: its number right-aligned in the column's
- * first three characters, and a level's or a sub-skill's bar, an outline filled from the
- * left as far as its progress.
+ * A reading on the line whose baseline is `y`. A level or a sub-skill: its mastery
+ * right-aligned in the column's first three characters, and its bar, an outline filled
+ * from the left as far as its progress. A maximum or an attribute: its number ending where
+ * the bars do.
  */
 function drawReading(ui: UIState, chIdx: number, y: number, reading: Reading, color: number): void {
   const text = String(reading.value);
+  if (reading.progress === undefined) {
+    drawText(ui, text, rightAlignedX(columnRight(chIdx), text), y, color);
+    return;
+  }
   drawText(ui, text, columnX(chIdx) + (VALUE_CHARS - text.length) * CHAR_WIDTH, y, color);
-  if (reading.progress === undefined) return;
   const bar = barRect(chIdx, y);
   const buf = ui.screenIndexBuffer;
   fillRectIndex(buf, { x1: bar.x1, y1: bar.y1, x2: bar.x2, y2: bar.y1 }, color);

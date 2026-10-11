@@ -174,9 +174,9 @@ export const TABS: ReadonlyArray<{
     help: 'THE EXTRAS, THE VIEWS AND THE STATISTICS',
     buttons: true,
     settings: [
-      { name: 'GATHER THROWN WEAPONS', help: 'WALK OVER A THROWN WEAPON TO TAKE IT BACK', ...extra('gatherThrownWeapons') },
+      { name: 'GATHER THROWN WEAPONS', help: 'WALK OVER A THROWN WEAPON TAKES IT BACK', ...extra('gatherThrownWeapons') },
       { name: 'DRINK AT FOUNTAINS', help: 'AN EMPTY HAND ON A FOUNTAIN DRINKS FROM IT', ...extra('drinkAtFountain') },
-      { name: 'COLOUR NEW MASTERY', help: 'A MASTERY JUST GAINED SHOWN IN COLOUR', ...extra('colourNewMastery') },
+      { name: 'HIGHLIGHT NEW MASTERY', help: 'A MASTERY JUST GAINED SHOWN IN COLOUR', ...extra('colourNewMastery') },
       {
         name: 'MAP VIEW',
         help: 'THE MAP: A LONG PRESS ON THE MESSAGES, OR ITS KEY',
@@ -249,7 +249,7 @@ export const TABS: ReadonlyArray<{
 
 export const TITLE = 'SETTINGS';
 export const CLOSE_LABEL = 'CLOSE';
-export const CLOSE_HELP = 'BACK TO THE GAME, AS ESC AND A RIGHT CLICK ARE';
+export const CLOSE_HELP = 'BACK TO THE GAME, SAME AS ESC AND RIGHT CLICK';
 export const TOGGLE_LABELS = ['ON', 'OFF'] as const;
 
 /* --------------------------------------------------------------------- state ---- */
