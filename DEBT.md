@@ -108,7 +108,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E15 | The page shell | L | ⚠️ step 1 of 6 next |
+| E15 | The page shell | L | ⚠️ step 2 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
@@ -195,7 +195,7 @@ entry here, only its commit, so take the next ID from this line and move it on.
 
 The page holds nothing beside the canvas (`index.html`): what it offered moved into it,
 as dialogs drawn in the game's 320x200 buffer like the save menu: the settings, the map,
-the champion table. The data set is chosen by `?dungeon=` until E15's welcome page. The
+the champion table. The data set is chosen on E15's welcome page, which opens `?dungeon=`. The
 look is the save menu's, cut from graphic 0 and drawn in the UI palette's sixteen
 colours, and the design canvas "DMweb page flow"
 (`https://claude.ai/artifact/DiNNPrFfCkphD9LRNBckSG`) shows it: artboard 10, the widget
@@ -1099,13 +1099,13 @@ module by module where data comes from files (the intro, the renderer, the loade
 
 ### E15 ⚠️ The page shell
 
-The page is the canvas alone, and its data set is chosen by `?dungeon=` (`chooseDataSet`,
-`src/main.ts`), the manifest's default where it names none. E15 gives the page a welcome
-page, design artboard 1 ("Arrival: choose a dungeon", `project/Main.dc.html`,
-`.claude/memory/design-canvas-files.md`), cut down as the author asked:
+The page without a known `?dungeon=` is the welcome page (`src/ui/welcomePage.ts`,
+`chooseDataSet` in `src/main.ts`): design artboard 1 ("Arrival: choose a dungeon",
+`project/Main.dc.html`, `.claude/memory/design-canvas-files.md`), cut down as the
+author asked:
 
-- **It is the page without `?dungeon=`**: HTML, no game canvas, nothing of the game
-  built. With `?dungeon=` the page is the game, as now.
+- **It is HTML**, no game canvas, nothing of the game built. With a known `?dungeon=`
+  the page is the game.
 - **At the top, "CSBweb"** centred, a medium-sized logo in the game's font. The design's
   header goes, with its SETTINGS and CONTROLS links.
 - **A grid of the data sets** (`chooserSets`, `src/data/DataSets.ts`), each tile its
@@ -1132,24 +1132,23 @@ page, design artboard 1 ("Arrival: choose a dungeon", `project/Main.dc.html`,
 
 The steps, one commit each:
 
-1. ⏳ **The welcome page.** Without `?dungeon=`, `index.html` builds the welcome page
-   instead of the game: the logo, the grid as text tiles, the selection, PLAY, CONTINUE
-   enabled or not by the store with its preview box, and the bottom of the page, in
-   the kit's colours and bevels (`project/dm-kit.css`) and a monospace font. A
-   `?dungeon=` naming no set is the welcome page too. The manifest's `default` is then
-   what the tools play. The probes and every tool or skill that opens the page without
-   `?dungeon=` name `dungeon=dm-atari`. Its check: a `tools/probe-frames.mjs` block on
-   the welcome page, the tiles, the disabled buttons and where PLAY goes.
-2. ⏳ **CONTINUE.** `?save=<row id>`: the boot reads the row into the game as F9 does,
-   skipping the title and the entrance; a row that is not the set's, or is not there,
-   falls back to the entrance. Its check: the probe continues a stored save and finds
-   its party in play.
+1. ✅ **The welcome page**, in the kit's colours and bevels (`project/dm-kit.css`): the
+   logo, the grid as text tiles, the selection, PLAY, CONTINUE with its preview box, and
+   the bottom of the page. `tools/probe-frames.mjs` checks the tiles, the selection and
+   where PLAY and CONTINUE lead, and enters the entrance by PLAY's click.
+2. ⏳ **CONTINUE.** CONTINUE already opens `?dungeon=<id>&save=<row id>`, but the boot
+   reads nothing of `save=` and shows the title and the entrance. It is to read the row
+   into the game as F9 does, skipping the title and the entrance; a row that is not
+   the set's, or is not there, falls back to the entrance. Its check: the probe
+   continues a stored save and finds its party in play.
 3. ⏳ **The title screens.** Each tile's picture is its set's title, decoded from its
    `graphics.dat` at run time as the boot's title is (`src/renderer/intro/`), so the
    page fetches every listed set's `graphics.dat` (270 to 460 KB each), which the
    browser then has for the game.
-4. ⏳ **The fonts.** The game's font, read from the default set's `graphics.dat` and
-   made a `FontFace` at run time (a TrueType font of one square contour per lit pixel
+4. ⏳ **The fonts.** The game's font is the browser's monospace meanwhile
+   (`'DM Screen', monospace`, `src/ui/welcomePage.css`), and the prose Georgia. The
+   game's font is to be read from the default set's `graphics.dat` and made a
+   `FontFace` at run time (a TrueType font of one square contour per lit pixel
    run, built in memory), so the page's labels stay HTML text; Spectral, OFL, as files
    under `src/assets/`.
 5. ⏳ **EXIT.** The settings dialog's EXIT (`src/renderer/ui/SettingsDialog.ts`), drawn

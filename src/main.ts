@@ -1,5 +1,6 @@
 /**
- * Dungeon Master Web: the page's bootstrap. `init` loads the game files, constructs the
+ * Dungeon Master Web: the page's bootstrap. Without a known `?dungeon=`, `init` shows the
+ * welcome page and builds nothing else. With one, it loads the game files, constructs the
  * engine and the screen, runs the intro, wires the page to both, and starts the loop.
  */
 
@@ -8,7 +9,7 @@ import { CsbRandom } from './core/random';
 import { Position } from './core/types';
 import { CSBGraphicsLoader } from './data/CSBGraphicsLoader';
 import { extractPresetHeroes } from './data/HeroExtractor';
-import { MANIFEST_NAME, dataSetFor, parseManifest, type DataSet, type DataSetManifest } from './data/DataSets';
+import { MANIFEST_NAME, dataSetNamed, parseManifest, type DataSet, type DataSetManifest } from './data/DataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
 import { parseHcsbDat } from './data/HintOracleLoader';
@@ -23,7 +24,7 @@ import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import { createCrtEffect, type CrtEffect } from './lib/crt';
 import { NO_FULLSCREEN, createFullscreen } from './lib/fullscreen';
 import { GameScreen } from './renderer/GameScreen';
-import { bindSaveDrop, bindUIEvents, showFatalMessage } from './ui';
+import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { runBootSequence, runHintOracle, runShowCredits } from './renderer/intro/BootSequence';
@@ -585,18 +586,30 @@ async function loadManifest(): Promise<DataSetManifest> {
     return parseManifest(await response.text(), GAMEFILES_DIR);
 }
 
-/** The set `?dungeon=<id>` names, or the manifest's default. */
-function chooseDataSet(manifest: DataSetManifest): DataSet {
+/** The set `?dungeon=<id>` names, or `null` for none or an unknown one: the welcome page's. */
+function chooseDataSet(manifest: DataSetManifest): DataSet | null {
     const id = new URLSearchParams(window.location.search).get('dungeon');
-    const set = dataSetFor(manifest, id);
-    if (id !== null && set.id !== id) console.warn(`Unknown data set '${id}'; playing ${set.id}`);
+    const set = dataSetNamed(manifest, id);
+    if (id !== null && !set) console.warn(`Unknown data set '${id}'`);
     return set;
+}
+
+/**
+ * The welcome page (`src/ui/welcomePage.ts`), in the game's place: nothing of the game
+ * is built. It lists the store's saves, so it opens the store as the game does, whose
+ * upgrade may draw a playthrough for an older row.
+ */
+function openWelcomePage(manifest: DataSetManifest): Promise<void> {
+    const storeRandom = new CsbRandom();
+    return showWelcomePage(document.body, manifest, new BrowserSaveStore((rows) => drawPlaythrough(storeRandom, rows)));
 }
 
 async function init() {
     try {
         const manifest = await loadManifest();
-        dataSet = chooseDataSet(manifest);
+        const chosen = chooseDataSet(manifest);
+        if (!chosen) return await openWelcomePage(manifest);
+        dataSet = chosen;
         swooshDir = manifest.swooshDir;
         const files = await loadGameFiles();
         // Every graphics.dat table, read once: the engine's set is built from it, and the

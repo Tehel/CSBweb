@@ -15,7 +15,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { MANIFEST_NAME, chooserSets, dataSetFor, parseManifest, type DataSet } from '../src/data/DataSets';
+import { MANIFEST_NAME, chooserSets, dataSetNamed, parseManifest, type DataSet } from '../src/data/DataSets';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { GameTables } from '../src/engine/GameTables';
@@ -55,17 +55,17 @@ function checkParser(): void {
     'a set\'s "dir" left out is its "id", and a flag left out is false');
   check(parseManifest(manifest(), '').swooshDir === null && parseManifest(manifest({ swoosh: null }), '').swooshDir === null,
     'a manifest that names no FTL logo, or null, has none');
-  check(dataSetFor(parsed, null) === parsed.defaultSet && dataSetFor(parsed, 'nowhere') === parsed.defaultSet
-    && dataSetFor(parsed, 'b') === parsed.dataSets[1], 'no ?dungeon=, or an unknown one, plays the default; a known one plays itself');
+  check(dataSetNamed(parsed, null) === null && dataSetNamed(parsed, 'nowhere') === null
+    && dataSetNamed(parsed, 'b') === parsed.dataSets[1], 'no ?dungeon=, or an unknown one, is the welcome page; a known one plays itself');
 
-  // A hidden set: out of the chooser, but played by its ?dungeon=, and listed while it is.
+  // A hidden set: out of the welcome page's grid, but played by its ?dungeon=.
   const hiding = parseManifest(manifest({ dataSets: [set(), set({ id: 'b', dir: 'b', hidden: true }), set({ id: 'c', dir: 'c', hidden: false })] }), '');
   const [a, b, c] = hiding.dataSets as [DataSet, DataSet, DataSet];
-  const listed = (current: DataSet) => chooserSets(hiding, current).map((s) => s.id).join(',');
-  console.log(`  hidden: ${hiding.dataSets.map((s) => `${s.id} ${s.hidden}`).join(', ')}; the chooser lists ${listed(a)}, and ${listed(b)} while b is played`);
+  const listed = chooserSets(hiding).map((s) => s.id).join(',');
+  console.log(`  hidden: ${hiding.dataSets.map((s) => `${s.id} ${s.hidden}`).join(', ')}; the welcome page lists ${listed}`);
   check(!a.hidden && b.hidden && !c.hidden, '"hidden" is read as written, and left out it is false');
-  check(listed(a) === 'a,c' && listed(c) === 'a,c', 'the chooser leaves a hidden set out');
-  check(dataSetFor(hiding, 'b') === b && listed(b) === 'a,b,c', 'a hidden set is played by its ?dungeon=, and the chooser lists it while it is');
+  check(listed === 'a,c', 'the welcome page leaves a hidden set out');
+  check(dataSetNamed(hiding, 'b') === b, 'a hidden set is played by its ?dungeon=');
 
   const malformed: Array<[string, string]> = [
     ['{"default": "a", ', 'not JSON'],
@@ -100,14 +100,14 @@ function main(): void {
   checkParser();
 
   console.log(`== ${GAMEFILES_DIR}/${MANIFEST_NAME}: ${DATA_SETS.length} sets, default ${DEFAULT_DATA_SET.id}, FTL logo in ${MANIFEST.swooshDir} ==`);
-  check(DEFAULT_DATA_SET.id === 'dm-atari', 'no ?dungeon= plays dm-atari');
+  check(DEFAULT_DATA_SET.id === 'dm-atari', 'the tools play dm-atari where they name no set');
   check(MANIFEST.swooshDir !== null && existsSync(resolve(MANIFEST.swooshDir, 'swoosh.img')) && existsSync(resolve(MANIFEST.swooshDir, 'swoosh.wav')),
     'the FTL logo\'s folder holds swoosh.img and swoosh.wav');
 
   const tablesOf = new Map<string, GameTables>();
   for (const set of DATA_SETS) {
     console.log(`== ${set.id}: ${set.name}, ${set.dir} ==`);
-    check(dataSetFor(MANIFEST, set.id) === set, `?dungeon=${set.id} plays it`);
+    check(dataSetNamed(MANIFEST, set.id) === set, `?dungeon=${set.id} plays it`);
     check(existsSync(fileOf(set, 'graphics.dat')) && existsSync(fileOf(set, 'dungeon.dat')),
       `${set.id}: the folder holds a graphics.dat and a dungeon.dat`);
     check(existsSync(fileOf(set, 'CSBgraphics.dat')) === set.csbGraphics,

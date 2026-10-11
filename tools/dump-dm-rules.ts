@@ -25,7 +25,6 @@ import { basename, resolve } from 'node:path';
 
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
-import { dataSetFor } from '../src/data/DataSets';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { Game } from '../src/engine/Game';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
@@ -118,7 +117,7 @@ check(booted.ctx.rules.dmRules, 'DMRules forces DM_rules on (CSBCode.cpp:10796-1
 
 console.log('');
 console.log('=== the default data set, DM on the Atari files, plays by DM\'s rules ===');
-const dm = dataSetFor(MANIFEST, null);
+const dm = MANIFEST.defaultSet;
 const ofSet = dmGame();
 ofSet.ctx.rules.dmRulesDesignOption = dm.dmRules;
 quiet(() => ofSet.readDungeonDat(new Uint8Array(readFileSync(resolve(dm.dir, 'dungeon.dat')))));

@@ -27,7 +27,8 @@
 // the canvas, the settings dialog opened, held, changed and read back, the map dialog
 // opened by a long press, but not with MAP VIEW off, the champion dialog opened by a
 // long press on the bars, where a tap opens the inventory, and fullscreen, entered by a
-// tap and a click, the screen and the effect sized and placed in it. See `check` below.
+// tap and a click, the screen and the effect sized and placed in it, and the welcome
+// page: its tiles, its selection, and where PLAY and CONTINUE go. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -186,7 +187,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
 // `?intro=0` skips the title animation and the dungeon entrance
 // (`src/renderer/intro/BootSequence.ts`), so the six frames below still open on the
 // adventure screen. The entrance gets frames of its own at the end.
-await send('Page.navigate', { url: `${APP}?intro=0` });
+await send('Page.navigate', { url: `${APP}?intro=0&dungeon=dm-atari` });
 await wait(3500);
 console.log('state: booted');            await shot('01-boot');
 // The four champions, from the Hall of Champions mirrors (`tools/lib/buildParty.mjs`).
@@ -286,8 +287,51 @@ await canvasClick(120, 168, 0); await wait(1200);
 // drawn by the real viewport renderer over a synthetic 5x5 level
 // (`src/renderer/intro/PrisonLevel.ts`), and `tools/dump-intro.ts` can check the level and
 // the compositing but not the pixels the bytecode programs produce.
-await send('Page.navigate', { url: `${APP}?keepsaves` });
+// The welcome page (`src/ui/welcomePage.ts`): the page with no known `?dungeon=`, HTML and
+// no game. The store holds the one save made above, of dm-atari, so its tile is bright and
+// the others dimmed, and CONTINUE reads that save while no set is selected. A click
+// selects a tile, and PLAY opens its set; a click on another set, with no save, leaves
+// CONTINUE disabled; a click on the selected tile selects none. Then PLAY's own click,
+// as a player makes it, is the way into the entrance below.
+await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
+await wait(2500);
+const welcome = () => evaluate(`(()=>{const q=(s)=>[...document.querySelectorAll(s)];
+  return { canvas: !!document.getElementById('game-canvas'),
+    tiles: q('.pick').map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
+    play: document.getElementById('welcome-play').getAttribute('href'),
+    resume: document.getElementById('welcome-continue').getAttribute('href'),
+    preview: q('.welcome-preview > *').map(e=>e.textContent) };})()`);
+const clickOn = async (selector) => {
+  const p = await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
+    return {x:r.left+r.width/2, y:r.top+r.height/2};})()`);
+  for (const type of ['mousePressed', 'mouseReleased'])
+    await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
+  await wait(300);
+};
+console.log('state: welcome page');
+const atWelcome = await welcome();
+console.log('  ', JSON.stringify(atWelcome));
+const saveId = /[?&]save=([^&]+)/.exec(atWelcome.resume ?? '')?.[1];
+check(!atWelcome.canvas && atWelcome.tiles === 'dm-atari*,csb,kids-dungeon,conflux,towers-of-chaos',
+  'an unknown ?dungeon= is the welcome page, no game canvas, its tiles the sets not hidden, the one with a save bright');
+check(atWelcome.play === null && /dungeon=dm-atari/.test(atWelcome.resume ?? '') && saveId !== undefined,
+  'none selected: PLAY is disabled, CONTINUE reads the last save used, of any set');
+check(atWelcome.preview.length === 3 && atWelcome.preview[0] === 'Dungeon Master' && atWelcome.preview[1].split(' · ').length === 4
+  && /^Level \d+ · \d{4}-\d\d-\d\d \d\d:\d\d$/.test(atWelcome.preview[2]),
+  'the box beside CONTINUE shows its set, its party of four, its level and when it was saved');
+await clickOn('.pick[data-set="csb"]');
+const atCsb = await welcome();
+check(atCsb.tiles.includes('csb!') && /dungeon=csb/.test(atCsb.play ?? '') && !/save=/.test(atCsb.play ?? '')
+  && atCsb.resume === null && atCsb.preview.join() === 'No saved game of this dungeon',
+  'a set with no save selected: PLAY opens it, CONTINUE is disabled');
+await clickOn('.pick[data-set="csb"]');
+check((await welcome()).play === null, 'a click on the selected tile selects none');
+await clickOn('.pick[data-set="dm-atari"]');
+const atDm = await welcome();
+check(atDm.tiles.startsWith('dm-atari*!') && atDm.resume === atWelcome.resume, 'dm-atari selected: CONTINUE reads its last save');
+await clickOn('#welcome-play');
 await wait(9000);
+check(await evaluate(`location.search`) === '?dungeon=dm-atari&keepsaves=', 'PLAY opens the selected set, the page\'s other parameters kept');
 console.log('state: entrance');
 const entrance = await shot('07-entrance');
 // The scroll at the bottom of the button column (button id 202).
@@ -357,7 +401,7 @@ console.log('state: game loaded');       await shot('12-game-loaded');
 // the Out crack was, not at eye level where `graphics.dat`'s coordinate set would put it.
 // Built from a fresh `?intro=0` boot with the same party, since TouchWall needs a leader.
 // The click also opens the grid at (13,28), off to the right; the wait covers its opening.
-await send('Page.navigate', { url: `${APP}?intro=0` });
+await send('Page.navigate', { url: `${APP}?intro=0&dungeon=dm-atari` });
 await wait(3500);
 await evaluate(BUILD_PARTY);
 await evaluate(`(()=>{
@@ -522,7 +566,7 @@ console.log('state: Conflux bookshelf'); await shot('20-conflux-bookshelf');
 // is up. A frame a tab: GAME's with the pointer on DRINK AT FOUNTAINS' button, so it is
 // lit, the help line names it and the cursor is drawn, DISPLAY's and SOUND's with it off the canvas,
 // and KEYS' with MOVE FORWARD's first slot waiting for its key.
-await send('Page.navigate', { url: `${APP}?intro=0&keepsaves` });
+await send('Page.navigate', { url: `${APP}?intro=0&keepsaves&dungeon=dm-atari` });
 await wait(3500);
 const settingsUp = () => evaluate(`window.__probe.screen.ui.settingsDialog !== null`);
 const settingsValues = () => evaluate(`window.__probe.screen.ui.settings.values`);
@@ -574,7 +618,7 @@ check(rebound.keyBindings['move.forward'][0] === 'KeyW' && rebound.keyBindings['
   'a key pressed fills the slot by its code, leaves the slot it was in, and the table is CUSTOM');
 await canvasClick(160, 100, 2); await wait(300);
 check(!(await settingsUp()), 'a right click closes the settings');
-await send('Page.navigate', { url: `${APP}?intro=0&keepsaves&keepsettings` });
+await send('Page.navigate', { url: `${APP}?intro=0&keepsaves&keepsettings&dungeon=dm-atari` });
 await wait(3500);
 const kept = await settingsValues();
 check(kept.sound === false && kept.volume === 1, 'after a reload, the sound is still off, at full volume');
@@ -637,7 +681,7 @@ check((await selected()) === 0 && (await championsUp()) === null, 'and at its re
 // 1366x768. The pointer is read through the curve, a real click through the effect's
 // canvas reaches the dialog, and a real Esc, which the page locks in fullscreen, closes
 // and opens the settings and leaves fullscreen be.
-await send('Page.navigate', { url: `${APP}?intro=0&keepsaves` });
+await send('Page.navigate', { url: `${APP}?intro=0&keepsaves&dungeon=dm-atari` });
 await wait(3500);
 const screenLayout = () => evaluate(`(()=>{const g=document.getElementById('game-canvas').getBoundingClientRect();
   const t=document.getElementById('crt-canvas');const r=t.getBoundingClientRect();
@@ -696,7 +740,7 @@ await screenSize(1600, 1000);
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   try { localStorage.setItem('csbweb_settings_v2', JSON.stringify({ crt: true })); } catch (e) {}
 ` });
-await send('Page.navigate', { url: `${APP}?keepsaves` });
+await send('Page.navigate', { url: `${APP}?keepsaves&dungeon=dm-atari` });
 await wait(9000);
 console.log('state: entrance, CRT effect saved on');
 check(await crtEffect() === 'on', 'the effect is on at the entrance');

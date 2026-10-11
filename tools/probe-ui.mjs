@@ -87,7 +87,7 @@ if (!(await up(CDP, '/json/version'))) {
     '--headless=new', `--remote-debugging-port=${CDP}`,
     `--user-data-dir=${join(tmpdir(), 'csbweb-probe-profile')}`,
     '--no-first-run', '--no-default-browser-check', '--window-size=1600,1000',
-    `http://localhost:${APP}/`,
+    `http://localhost:${APP}/?dungeon=dm-atari`,
   ], { detached: true, stdio: 'ignore' }).unref();
   for (let i = 0; i < 40 && !(await up(CDP, '/json/version')); i++) await wait(500);
   if (!(await up(CDP, '/json/version'))) throw new Error(`chrome never came up on :${CDP}`);
@@ -147,7 +147,7 @@ const boot = async () => {
     Math.random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
                           return ((seed >>> 0) % 1000000) / 1000000; };` });
   // `?intro=0`: straight into the dungeon, with no logo, title or entrance.
-  await send('Page.navigate', { url: `http://localhost:${APP}/?intro=0` });
+  await send('Page.navigate', { url: `http://localhost:${APP}/?intro=0&dungeon=dm-atari` });
   await wait(3500);
   // The golden frames' party, from the Hall of Champions mirrors.
   console.error('party:', await evaluate(BUILD_PARTY));

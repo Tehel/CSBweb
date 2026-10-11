@@ -72,8 +72,9 @@ Vanilla TypeScript (strict, `noUnusedLocals`/`noUnusedParameters`) + Vite. No fr
 A single 320×200 `<canvas>` is the whole screen, CSS-scaled to 960×600 with
 `image-rendering: pixelated`. Everything — viewport, inventory, panels, cursor, messages —
 is blitted into one palette-index buffer and converted to RGBA at present time, as CSBWin
-does. The page holds nothing beside the canvas: the settings, the map and the champions
-are dialogs drawn in it.
+does. The game's page holds nothing beside the canvas: the settings, the map and the
+champions are dialogs drawn in it. Without a known `?dungeon=`, the page is the welcome
+page instead, HTML where the player chooses a game (`src/ui/welcomePage.ts`).
 
 ```bash
 npm run dev            # Vite dev server on :9000
@@ -111,7 +112,8 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   reload, and its slider dragged off the canvas, the map dialog opened by a long
   press, and only with MAP VIEW on, the champion dialog opened by a long press on
   the stat bars, where a tap opens the inventory at its release, and fullscreen, entered
-  by a tap and by a click, the screen and the effect sized and centred in it.
+  by a tap and by a click, the screen and the effect sized and centred in it; and the
+  welcome page's tiles, its selection, and where PLAY and CONTINUE lead.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`
@@ -194,7 +196,8 @@ ui/         The page's DOM side: events (the canvas's and the keyboard's listene
             handing over to `GameInput`), saveDrop
             (the save menu's import: a file dropped on the page), fatalMessage (the
             screen an error that ends the game leaves), and gameEvents (what the
-            server's statistics are told: a game started, joined, won or lost)
+            server's statistics are told: a game started, joined, won or lost), and
+            welcomePage (the page without a known `?dungeon=`: the games and the saves)
 settings/   Settings: the player's settings, one model the page, the game and the dialogs
             read and change, kept in `localStorage`
 lib/        crt (the CRT effect: a WebGL tube over the canvas, and the pointer read through it),

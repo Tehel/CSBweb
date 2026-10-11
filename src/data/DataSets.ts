@@ -1,6 +1,7 @@
 /**
  * The games the page can play: a folder of CSBWin data files each, one of them chosen
- * before the boot.
+ * before the boot: by `?dungeon=`, which the welcome page's PLAY and CONTINUE set
+ * (`src/ui/welcomePage.ts`).
  *
  * CSBWin plays whatever its directory holds: the command line's `directory=` or
  * `config.txt`'s `DIRECTORY` (doc/CSBwin-src/CSBUI.cpp:2057, :819), read before
@@ -19,9 +20,8 @@
  * A folder is named relative to the manifest. A set's `dir` may be left out, for its `id`.
  * `swoosh`, the FTL logo's folder, may be `null` or left out. The flags `csbGraphics`,
  * `miniDat`, `hintOracle`, `dmRules` and `hidden` may each be left out, for `false`, and the manifest
- * names one only where it is true. A set with `"hidden": true` is left out of the chooser
- * (`chooserSets`, which E15's welcome page will list) and plays all the same by its
- * `?dungeon=`.
+ * names one only where it is true. A set with `"hidden": true` is left out of the welcome
+ * page's grid (`chooserSets`) and plays all the same by its `?dungeon=`.
  */
 
 export interface DataSet {
@@ -72,9 +72,12 @@ export interface DataSet {
 
 /** What `manifest.json` says, its folders resolved. */
 export interface DataSetManifest {
-    /** In the manifest's order, which is the chooser's. */
+    /** In the manifest's order, which is the welcome page's. */
     dataSets: readonly DataSet[];
-    /** The set the page plays when `?dungeon=` names none, or an unknown one. */
+    /**
+     * The set the tools play where they name none (`tools/lib/dataSets.ts`). The page
+     * plays none until one is chosen: without a known `?dungeon=` it is the welcome page.
+     */
     defaultSet: DataSet;
     /**
      * The folder of the Atari ST disk's FTL logo and its sound, which every set shares
@@ -131,17 +134,17 @@ export function parseManifest(text: string, base: string): DataSetManifest {
     return { dataSets, defaultSet, swooshDir: isFolder(swoosh) ? under(base, swoosh) : null };
 }
 
-/**
- * The sets the chooser lists, in the manifest's order: every set but the hidden ones, and
- * `current` even when hidden, so that the chooser shows the set being played.
- */
-export function chooserSets(manifest: DataSetManifest, current: DataSet): DataSet[] {
-    return manifest.dataSets.filter((set) => !set.hidden || set === current);
+/** The sets the welcome page lists, in the manifest's order: every set but the hidden ones. */
+export function chooserSets(manifest: DataSetManifest): DataSet[] {
+    return manifest.dataSets.filter((set) => !set.hidden);
 }
 
-/** The set `?dungeon=<id>` names, hidden or not, or the default when it names none or an unknown one. */
-export function dataSetFor(manifest: DataSetManifest, id: string | null): DataSet {
-    return manifest.dataSets.find((s) => s.id === id) ?? manifest.defaultSet;
+/**
+ * The set `?dungeon=<id>` names, hidden or not, or `null` when it names none or an
+ * unknown one: the welcome page then, where the player chooses one.
+ */
+export function dataSetNamed(manifest: DataSetManifest, id: string | null): DataSet | null {
+    return manifest.dataSets.find((s) => s.id === id) ?? null;
 }
 
 function manifestError(why: string): Error {

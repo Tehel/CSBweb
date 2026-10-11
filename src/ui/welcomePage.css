@@ -1,0 +1,181 @@
+/* The welcome page (`src/ui/welcomePage.ts`), in the design kit's look: every colour an
+   entry of the game's UI palette (graphics.dat palette 552, entry 0), the bevels graphic
+   0's at three screen pixels to one. */
+body.welcome {
+    --p0: #000000; --p1: #6c6c6c; --p2: #909090; --p3: #6c2400;
+    --p5: #904800; --p7: #00d800; --p9: #fcb400; --p10: #d8906c;
+    --p11: #fcfc00; --p12: #484848; --p13: #b4b4b4; --p15: #fcfcfc;
+    --navy: #000048;
+    display: block;
+    padding: 0;
+    background: var(--p0);
+    color: var(--p13);
+    font-family: Spectral, Georgia, serif;
+}
+
+.welcome-page {
+    box-sizing: border-box;
+    min-height: 100vh;
+    max-width: 1344px;
+    margin: 0 auto;
+    padding: 48px 48px 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* The game's font: an em is 8 game pixels, so 24px is three to one. */
+.px {
+    font-family: 'DM Screen', monospace;
+    font-size: 24px;
+    line-height: 24px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    -webkit-font-smoothing: none;
+}
+.px2 { font-size: 16px; line-height: 16px; }
+.px6 { font-size: 48px; line-height: 48px; }
+
+.welcome-logo {
+    margin: 0 0 40px;
+    text-align: center;
+    color: var(--p11);
+}
+
+/* The data sets, a tile each, its picture 320x200 at one to one, the rows centred. */
+.welcome-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 18px;
+}
+.pick {
+    appearance: none;
+    box-sizing: border-box;
+    width: 344px;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 9px;
+    background: #0b0b16;
+    border: 3px solid #1d1d30;
+    cursor: pointer;
+    text-align: left;
+    color: var(--p15);
+}
+.pick:hover { border-color: var(--p1); }
+.pick[aria-pressed="true"] { border-color: var(--p9); background: #1a1106; }
+.pick:focus-visible { outline: 3px solid var(--p11); outline-offset: 3px; }
+/* A set the store holds no save of. */
+.pick.dim { opacity: 0.5; }
+.pick.dim:hover, .pick.dim[aria-pressed="true"] { opacity: 0.8; }
+.pick-picture {
+    box-sizing: border-box;
+    aspect-ratio: 16 / 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    background: var(--navy);
+    color: var(--p1);
+    text-align: center;
+}
+.pick-name { color: var(--p15); }
+.pick-saves { color: var(--p2); }
+.pick:not(.dim) .pick-saves { color: var(--p7); }
+
+/* PLAY and CONTINUE, and the save CONTINUE reads. */
+.welcome-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 24px;
+    margin-top: 36px;
+}
+/* Graphic 0's button frame: 12, two of 0, a three-pixel bevel 10 over 3, interior 5; label 9 on 5. */
+.btn {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 216px;
+    height: 66px;
+    margin: 9px;
+    padding: 0 12px;
+    background: var(--p5);
+    color: var(--p9);
+    border: 9px solid;
+    border-color: var(--p10) var(--p3) var(--p3) var(--p10);
+    box-shadow: 0 0 0 6px var(--p0), 0 0 0 9px var(--p12);
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.btn:hover { color: var(--p11); }
+.btn:active { border-color: var(--p3) var(--p10) var(--p10) var(--p3); color: var(--p11); }
+.btn:focus-visible { outline: 3px solid var(--p11); outline-offset: 12px; }
+.btn[aria-disabled="true"] { color: var(--p1); cursor: default; pointer-events: none; }
+.welcome-preview {
+    box-sizing: border-box;
+    min-width: 336px;
+    min-height: 84px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 9px;
+    padding: 12px 15px;
+    background: #0b0b16;
+    border: 3px solid #1d1d30;
+}
+.preview-set { color: var(--p15); }
+.preview-party { color: var(--p9); }
+.preview-when { color: var(--p2); }
+.preview-none { color: var(--p1); }
+
+/* The bottom of the page: the line under the title, the four columns, and the footer. */
+.welcome-about {
+    padding: 72px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 56px;
+}
+.welcome-lead {
+    margin: 0;
+    max-width: 1040px;
+    font-size: 30px;
+    line-height: 1.4;
+    font-style: italic;
+    color: #e4e0d4;
+}
+.welcome-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 48px;
+}
+.welcome-columns > div { display: flex; flex-direction: column; gap: 18px; }
+.welcome-columns h2 { margin: 0; color: var(--p11); }
+.welcome-columns p { margin: 0; font-size: 18px; line-height: 1.55; color: #bdbac8; }
+.welcome-footer {
+    margin-top: auto;
+    padding: 32px 0;
+    border-top: 3px solid #0e0e1e;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 32px 48px;
+}
+.welcome-footer p { margin: 0; max-width: 820px; font-size: 15px; line-height: 1.5; color: #8c8a99; }
+.welcome-footer nav { display: flex; gap: 32px; }
+.welcome-footer a { color: var(--p13); text-decoration: none; }
+.welcome-footer a[href]:hover { color: var(--p11); }
+.welcome-footer a:not([href]) { color: var(--p1); cursor: default; }
+
+@media (max-width: 640px) {
+    .welcome-page { padding: 24px 16px 0; }
+    .welcome-logo { font-size: 32px; line-height: 32px; margin-bottom: 24px; }
+    .welcome-preview { min-width: 0; width: 100%; }
+    .welcome-lead { font-size: 22px; }
+}
