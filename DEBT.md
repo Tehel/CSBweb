@@ -103,6 +103,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| R13 | On an AZERTY keyboard the digits need Shift, and no key takes a rune back | S | ⏳ |
+| E37 | The panel keys are seven constants, not one table of actions | S | ⏳ after R13 |
+| E38 | The keys the graphics.dat tables bind cannot be rebound | S | ⏳ after E37 |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
 | R2 | Every store upgrade re-runs every step, and drops a row that does not parse | S | ⏳ |
@@ -180,7 +183,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C182 · D22 · E37 · F20 · G31 · R13 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E39 · F20 · G31 · R14 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -193,6 +196,32 @@ takes untrusted data. A file the player drops on the page and a custom dungeon a
 untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
+
+### R13 ⏳ On an AZERTY keyboard the digits need Shift, and no key takes a rune back
+
+The panel keys and the port's own keys match `KeyboardEvent.key`, the character typed
+(`src/ui/events.ts:163`, `GameInput.keyDown`, then `handleUIKey` and `portKeyAction` in
+`src/renderer/ui/Keyboard.ts`). On a French AZERTY keyboard:
+
+- The number row types `& é " ' ( - è _ ç à` unshifted, so the runes (1-6) and the
+  inventories (7-0) answer only with Shift or Caps Lock. Strafing right, `.`, needs Shift
+  too.
+- `~` and `` ` `` are dead keys behind AltGr, which Windows reports as Ctrl+Alt:
+  `keyDown` leaves a modified key to the browser before `handleUIKey` sees it, so no key
+  takes a rune back.
+
+CSBWin's `config.txt` binds Windows virtual keys (`doc/PROVEN_FACTS.md` → "CSBWin has no
+keyboard controls"). A digit's virtual key is the number-row key whatever the shift
+state, so CSBWin's runes answer unshifted on AZERTY; a letter's follows the layout, the
+key printed Q.
+
+Paying it: the bindings matched on `KeyboardEvent.code`, passed beside `key`. Which rule
+the letters follow is the author's choice: `code` for every key keeps the attack keys a
+grid on any layout (A Z E R / Q S D F / W X C V on AZERTY), where CSBWin's rule, digits by
+position and letters by what is printed, scrambles the grid there. `~`'s key is
+`Backquote`, `²` on AZERTY. The text screens, the save menu's names and Reincarnate, keep
+`key`: they type characters. `tools/dump-key-bindings.ts` presses codes, AZERTY's digits
+among them. E37 then gathers the bindings into one table.
 
 ### R1 ⏳ A game read in play leaves the screen on the old world
 
@@ -651,6 +680,35 @@ The structure need no longer follow CSBWin's files (the author's decision): a mo
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
+
+### E37 ⏳ The panel keys are seven constants, not one table of actions
+
+`src/renderer/ui/Keyboard.ts` holds the panel bindings as `ATTACK_KEYS`, `INVENTORY_KEYS`,
+`RUNE_KEYS`, `CASTER_KEYS`, `RUNE_BACK_KEYS`, `CAST_KEY` and `PASS_KEY`, in four shapes;
+`handleUIKey` walks them one after another, and `isUIKey` lists them again. The port's
+moves and F5/F9 are a third shape, `PORT_KEYS`, a map from key to action. A screen that
+rebinds keys, for another layout or another taste, would have to read and write all of
+them.
+
+Paying it: one table from a named action (`attack.<champion>.<row>`, `inventory.<n>`,
+`rune.<n>`, `runeBack`, `cast`, `pass`, `caster.<n>`, the six moves, `quickSave`,
+`quickLoad`) to its keys, the defaults those of CSBWin's shipped `config.txt` plus 7-0; the
+reverse map built from it; `handleUIKey` and `portKeyAction` dispatching on the action.
+The table is what a rebinding screen and its stored setting read and write. After R13,
+whose key codes it holds.
+
+### E38 ⏳ The keys the graphics.dat tables bind cannot be rebound
+
+Ctrl-S, Esc, Enter, Insert, Clr/Home and the arrows reach their buttons through `KEYSCAN`
+(`src/renderer/ui/Keyboard.ts`), a fixed map from a browser key to an Atari keyscan, which
+`translateKey` looks up in the graphics.dat tables. In CSBWin that first half is
+`config.txt`'s: its `SCAN` and `KEY` lines turn a PC key into an Atari keyscan
+(`doc/CSBwin-src/CSBUI.cpp:796-802`, `:1141-1160`), so a player rebinds these keys there and
+the tables never change. The shipped file sends K J L M , . and the keypad's 4-9 the same
+way, to the arrows' keyscans; the port's `PORT_KEYS` reach the moves directly.
+
+Paying it: `KEYSCAN` as E37's table's second kind of entry, a key to an Atari keyscan,
+rebound the same way, and the tables still read from graphics.dat. After E37.
 
 ### E23 ⏳ One game read, whole or not at all
 
