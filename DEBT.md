@@ -1645,7 +1645,9 @@ Rules for all of them:
     role's level raised since (`src/engine/MasteryGains.ts`,
     checked by `tools/dump-mastery-panel.ts`);
   - what a champion's THROW or SHOOT sent off gathered back into their possessions when
-    the party arrives on the square it lies on, never what the cursor threw
+    the party arrives on the square it lies on, never what the cursor threw: into the
+    slot it left, else the quiver, its small-weapon slots first and the object fewest
+    slots take first, so a club gathered with daggers keeps slot 12, then the pack
     (`src/engine/ThrownWeapons.ts`, checked by `tools/watch-thrown-weapons.ts`).
 
   The coloured object cursor, RISE's NEW FACE and the FTL logo are the exceptions: the

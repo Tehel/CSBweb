@@ -10,7 +10,8 @@
  *     fell on, not before; it comes off the floor through the pads
  *     (`ActuatorSystem.triggerObjectMove`); the load is what it was.
  *  2. **SHOOT**: the bow reloads from the quiver as CSBWin's does, so the arrow shot finds
- *     the ready hand taken and goes back into the quiver.
+ *     the ready hand taken and goes back into the quiver, in slot 7, which only small
+ *     weapons fit, not 12, which a club fits too.
  *  3. **The extras off**: the game is CSBWin's, and the dagger stays on the floor, tagged.
  *     Turned on, the next arrival gathers it.
  *  4. **A dead thrower** gathers nothing; the dagger stays, tagged.
@@ -22,6 +23,9 @@
  *     gathers it there.
  * 10. **Arriving on a level** (`Game.loadNewPartyLevel`, as after stairs or a pit)
  *     gathers too.
+ * 11. **A club among daggers**, lying after them: each goes back to the slot it left
+ *     while that is free, then the club, which fits one quiver slot only, takes it, and
+ *     the daggers fill the three small ones before the pack.
  *
  * Run: `npx tsx tools/watch-thrown-weapons.ts`
  */
@@ -29,6 +33,7 @@ import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from
 import type { Game } from '../src/engine/Game';
 import { getChampionPossession, type Champion } from '../src/engine/gameTypes';
 import { AttackType } from '../src/engine/monsterTypes';
+import { DescIndex } from '../src/engine/objectIndex';
 import { tagThrownWeapon } from '../src/engine/ThrownWeapons';
 import { tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import { VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
@@ -42,6 +47,7 @@ const WEAPON_DAGGER = 8;
 const WEAPON_BOW = 25;
 const WEAPON_ARROW = 27;
 const WEAPON_ROCK = 30;
+const WEAPON_CLUB = 23;
 const MONSTER_MUMMY = 10;
 const EAST = 1;
 
@@ -188,7 +194,8 @@ const where = (p: Position | null): string => (p ? `(${p.x},${p.y}) map ${p.z}` 
   check(getChampionPossession(thrower(game), 0) === spare && getChampionPossession(thrower(game), 12) === OBJECT_ID_NULL,
     '2. the bow reloaded from the quiver');
   if (lying) walkTo(game, lying, arrow, lying);
-  check(getChampionPossession(thrower(game), 12) === arrow, '2. the ready hand taken, the arrow goes back into the quiver');
+  check(getChampionPossession(thrower(game), 7) === arrow,
+    '2. the ready hand taken, the arrow goes back into the quiver, its narrowest slot first');
   check(lying !== null && !onFloor(game, lying, arrow), '2. it is off the floor');
   check(load(game) === loadBefore, `2. the load is what it was (${load(game)})`);
 }
@@ -363,6 +370,40 @@ const where = (p: Position | null): string => (p ? `(${p.x},${p.y}) map ${p.z}` 
   console.log(`the party arrives on ${where(game.ctx.party.state.position)}`);
   check(game.ctx.party.state.position.z === 1, '10. the party is on map 1');
   check(getChampionPossession(thrower(game), 1) === dagger && !onFloor(game, square, dagger), '10. the arrival gathers the dagger');
+}
+
+/* ------------------------------------------------------ 11. a club among daggers --- */
+{
+  console.log('\n=== 11. a club among daggers ===');
+  const game = makeGame();
+  const dungeon = game.ctx.dungeon;
+  const tables = game.ctx.tables;
+  const club = weapon(game, WEAPON_CLUB);
+  const fits = (object: ObjectID, slot: number): boolean =>
+    ((tables.objDescWord4[DescIndex(dungeon, object)] ?? 0) & (tables.carryLocation[slot] ?? 0)) !== 0;
+  check(fits(club, 12) && ![7, 8, 9].some((slot) => fits(club, slot)), '11. the club fits quiver slot 12, not 7-9');
+  const daggers = Array.from({ length: 5 }, () => weapon(game, WEAPON_DAGGER));
+  check([7, 8, 9, 12].every((slot) => fits(daggers[0]!, slot)), '11. a dagger fits every quiver slot');
+  const square = new Position(CORRIDOR.x + 2, CORRIDOR.y, 0);
+  for (const object of [...daggers, club]) {
+    tagThrownWeapon(game.ctx, object, 0, 1);
+    dungeon.addObjectToCell(square, dungeon.rnMaps.setPos(object, 0));
+  }
+  const chain: ObjectID[] = [];
+  for (let rn = dungeon.findFirstObject(square); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) chain.push(rn);
+  check(chain.indexOf(club) > Math.max(...daggers.map((d) => chain.indexOf(d))), '11. the club lies after every dagger');
+  const slots = [1, 7, 8, 9, 12, 13];
+  check(slots.every((slot) => getChampionPossession(thrower(game), slot) === OBJECT_ID_NULL), '11. the hand, the quiver and the pack start empty');
+  step(game, square.x - 1);
+  step(game, square.x);
+  const held = slots.map((slot) => getChampionPossession(thrower(game), slot));
+  const name = (o: ObjectID): string => (o === club ? 'club' : o === OBJECT_ID_NULL ? '-' : `dagger ${daggers.indexOf(o) + 1}`);
+  console.log(slots.map((slot, i) => `${slot}: ${name(held[i]!)}`).join(', '));
+  check(![...daggers, club].some((o) => onFloor(game, square, o)), '11. all six are gathered');
+  check(held[0] === daggers[0], '11. the first dagger goes back to the hand it left');
+  check(held[4] === club, '11. the club takes quiver slot 12');
+  check([1, 2, 3].every((i) => daggers.slice(1, 4).includes(held[i]!)), '11. daggers 2-4 fill slots 7-9');
+  check(held[5] === daggers[4], '11. the last dagger goes to the pack');
 }
 
 finish();
