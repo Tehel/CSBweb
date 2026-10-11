@@ -3321,7 +3321,9 @@ search reads `p2&0xff` (`CSBUI.cpp:1147`). Keypad 8 (`0x48`) steps forward, 5 (`
 back, 7 (`0x47`) turns left, 9 (`0x49`) right, 4 (`0x4b`) and 6 (`0x4d`) strafe, whatever
 NumLock says. The arrows, Home and PgUp share those scancodes, so up, left and right are
 keypad 8, 4 and 6, Home turns left and PgUp right; down (`0x50`) and Insert (`0x52`) have
-no line, nor has Return (`0x0d`) in mode 1.
+no line, nor has Return (`0x0d`) in mode 1. Mode 2, the Reincarnate screen, has a `key`
+line for each of A-Z, a-z, backspace, `.` `,` `;` `:`, return and space, each to itself,
+and `UIM_CHAR` queues no character a line does not translate (`CSBUI.cpp:1099-1135`).
 
 The port binds the same physical keys, as `KeyboardEvent.code`s, to the same buttons
 (`DEFAULT_KEY_BINDINGS`, `src/renderer/ui/Keyboard.ts`, `tools/dump-key-bindings.ts`):

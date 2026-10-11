@@ -150,11 +150,15 @@ export function reincarnateKey(ui: UIState, key: string): boolean {
   const state = ui.reincarnate;
   if (!state) return false;
 
+  // The shipped `config.txt`'s mode-2 `key` lines pass A-Z, a-z, backspace, `.` `,` `;`
+  // `:`, return and space, and `UIM_CHAR` queues no other character
+  // (`doc/CSBwin-src/CSBUI.cpp:1099-1135`). `applyCharacterCode` takes the same set, so a
+  // character outside ASCII is dropped before it: its low byte would be another one's.
   let code: number;
   if (key === 'Enter') code = 13;
   else if (key === 'Backspace') code = 8;
-  else if (key.length === 1) code = key.charCodeAt(0) & 0xff;
-  else return true; // a modifier or an arrow: swallowed, as the modal loop swallows it
+  else if (key.length === 1 && key.charCodeAt(0) < 0x80) code = key.charCodeAt(0);
+  else return true; // a modifier, an arrow or a character no line passes: swallowed
 
   applyCharacterCode(state, code);
   return true;

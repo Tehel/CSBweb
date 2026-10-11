@@ -161,6 +161,12 @@ function main(): void {
     openReincarnateScreen(h2.ui, 1);
     type(h2, ' ');
     check(h2.ui.reincarnate?.name === '', 'a leading space is refused');
+    // Only the characters config.txt's mode-2 lines pass: no digit, and no character
+    // outside ASCII, whose low byte is another's (Ō is 0x14c, L's 0x4c; к 0x43a, :'s 0x3a).
+    type(h2, '1!é\u014c\u043a');
+    check(h2.ui.reincarnate?.name === '', 'a digit, ! and a character outside ASCII type nothing');
+    type(h2, 'a;');
+    check(h2.ui.reincarnate?.name === 'A;', 'a letter types its capital, and ; itself');
 
     // Seven characters fill the name and move to the title with no return needed.
     const h3 = makeHarness(graphics, ['HALK', 'BORIS']);
