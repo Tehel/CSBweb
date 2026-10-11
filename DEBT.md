@@ -103,8 +103,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E37 | The panel keys are seven constants, not one table of actions | S | ⏳ |
-| E38 | The keys the graphics.dat tables bind cannot be rebound | S | ⏳ after E37 |
+| E38 | The keys the graphics.dat tables bind cannot be rebound | S | ⏳ waits on the author |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
 | R2 | Every store upgrade re-runs every step, and drops a row that does not parse | S | ⏳ |
@@ -654,57 +653,37 @@ gather or split CSBWin's functions as the code's concerns ask. What still follow
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
 
-### E37 ⏳ The panel keys are seven constants, not one table of actions
-
-`src/renderer/ui/Keyboard.ts` holds the panel bindings as `ATTACK_KEYS`, `INVENTORY_KEYS`,
-`RUNE_KEYS`, `CASTER_KEYS`, `RUNE_BACK_KEY`, `CAST_KEY` and `PASS_KEY`, in four shapes;
-`handleUIKey` walks them one after another, and `isUIKey` lists them again. The port's
-moves and F5/F9 are a third shape, `PORT_KEYS`, a map from a code to an action. Every
-binding is a `KeyboardEvent.code`. A screen that
-rebinds keys, for another layout or another taste, would have to read and write all of
-them.
-
-The rebinding the author intends is interactive: pick an action, press the key that should
-do it. Each action has two slots, as K J L M , . and the keypad both move the party in
-CSBWin's shipped `config.txt`, and whole presets (a layout, an ergonomics) set every
-slot at once.
-
-Paying it: one table from a named action (`attack.<champion>.<row>`, `inventory.<n>`,
-`rune.<n>`, `runeBack`, `cast`, `pass`, `caster.<n>`, the six moves, `quickSave`,
-`quickLoad`) to two slots, each a `KeyboardEvent.code` or empty, and none with a modifier,
-which stays the browser's (`GameInput.keyDown`); the reverse map from a code to its action
-built from it; `handleUIKey` and `portKeyAction` dispatching on the action. The default preset is CSBWin's shipped `config.txt` plus 7-0.
-The table is what the rebinding screen, its presets and its stored setting read and write.
-What the screen will need from it: a label for a code, which is the `key` captured with it
-(`navigator.keyboard.getLayoutMap` is Chromium's only), and a code already bound elsewhere
-found from the reverse map.
-
 ### E38 ⏳ The keys the graphics.dat tables bind cannot be rebound
 
 Esc, Enter, Insert, Clr/Home and the arrows reach their buttons through `KEYSCAN`
-(`src/renderer/ui/Keyboard.ts`), a fixed map from a browser key to an Atari keyscan, which
-`translateKey` looks up in the graphics.dat tables. In CSBWin that first half is
-`config.txt`'s: its `SCAN` and `KEY` lines turn a PC key into an Atari keyscan
-(`doc/CSBwin-src/CSBUI.cpp:796-802`, `:1141-1160`), so a player rebinds these keys there and
-the tables never change. The shipped file sends K J L M , . and the keypad's 4-9 the same
-way, to the arrows' keyscans; the port's `PORT_KEYS` reach the moves directly.
+(`src/renderer/ui/Keyboard.ts`), a fixed map from a `KeyboardEvent.code` to an Atari
+keyscan, which `translateKey` looks up in the graphics.dat tables. In CSBWin that first
+half is `config.txt`'s: its `SCAN` and `KEY` lines turn a PC key into an Atari keyscan
+(`doc/CSBwin-src/CSBUI.cpp:796-802`, `:1141-1160`), so a player rebinds these keys there
+and the tables never change. The shipped file sends K J L M , . and the keypad's 4-9 the
+same way, to the arrows' keyscans; the port's `move.*` actions (`DEFAULT_KEY_BINDINGS`,
+two slots each: the letter and the keypad) queue a movement directly.
 
-Paying it: these keys as E37's actions too, each named for the Atari keyscan it sends
-(`move.forward` is `0x4800`, `freeze` is `0x1b`, `wake` is Return's `0x0d`), so a code
-bound to one goes through `translateKey` and the tables, read from graphics.dat, still
-decide the button in each mode. The port's moves then take the same route, a second slot
-of the arrows' actions, as the shipped `config.txt` sends them. After E37.
+Paying it: these keys as actions of `DEFAULT_KEY_BINDINGS` too, each named for the Atari
+keyscan it sends (`move.forward` is `0x4800`, `freeze` is `0x1b`, `wake` is Return's
+`0x0d`), so a code bound to one goes through `translateKey` and the tables, read from
+graphics.dat, still decide the button in each mode. The `move.*` actions then take the
+same route, as the shipped `config.txt` sends them, and `KEYSCAN` goes.
 
-Two things for the author to settle when it is taken, since the default preset is the
-shipped `config.txt` (`doc/PROVEN_FACTS.md` → "CSBWin has no keyboard controls"):
+Waiting on the author, since the default preset is the shipped `config.txt`
+(`doc/PROVEN_FACTS.md` → "CSBWin has no keyboard controls"):
 
-- The file binds scancodes, and the arrows share the keypad's: ArrowUp is keypad 8's
-  line. With a code per slot, `move.forward` needs three (ArrowUp, Numpad8, KeyK), where
-  the actions have two. Either three slots for the moves, or the arrows and the keypad as
-  one slot.
-- The port's `KEYSCAN` binds Atari's own keys, not the file's: Insert turns left, Home
-  turns right, the down arrow steps back and Return wakes. Under the shipped file Home
-  turns left, PgUp turns right, and down, Insert and Return do nothing.
+1. **Three keys a move.** The file binds scancodes, and the arrows share the keypad's
+   (ArrowUp is keypad 8's line), so in CSBWin one line moves both. As codes, `move.forward`
+   is ArrowUp, Numpad8 and KeyK: three, where an action has two slots. Options: (a) three
+   slots for every action; (b) two slots, and the arrows and the keypad one slot that
+   holds both codes, as CSBWin's scancode does; (c) two slots, and the keypad dropped from
+   the default preset (a player binds it in place of the letters).
+2. **Atari's keys or the file's.** `KEYSCAN` binds Atari's: Insert turns left, Home turns
+   right, the down arrow steps back and Return wakes. Under the shipped file Home turns
+   left, PgUp turns right, and the down arrow, Insert and Return do nothing. Options:
+   (a) the file's exactly; (b) the file's plus Atari's where the file binds nothing
+   (down, Insert, Return), with Home as the file has it; (c) Atari's, as today.
 
 ### E23 ⏳ One game read, whole or not at all
 

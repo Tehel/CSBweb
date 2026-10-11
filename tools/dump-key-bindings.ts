@@ -27,7 +27,8 @@ import { newUIState } from './lib/ui';
 import { standIn } from './lib/standIn';
 import { check, finish } from './lib/check';
 import {
-  handleUIKey, keyScanOf, portKeyAction, tableKeyButton, translateKey, type PortKeyAction,
+  actionsByCode, DEFAULT_KEY_BINDINGS, handleUIKey, keyScanOf, portKeyAction, tableKeyButton, translateKey,
+  type PortKeyAction,
 } from '../src/renderer/ui/Keyboard';
 import { MovementAction } from '../src/engine/gameTypes';
 import { attackPanelTick, closeAttackMenu, handleAttackAreaClick } from '../src/renderer/ui/Attack';
@@ -259,6 +260,12 @@ async function main(): Promise<void> {
   for (const key of ['k', 'K', ',', 'Numpad1', 'Numpad2', 'Numpad0', 'ArrowUp']) {
     check(portKeyAction(key) === null, `'${key}' is none of the port's keys`);
   }
+  // The default preset binds no code twice, so the reverse map loses none, and none of
+  // its codes is a table key the tables would take first (F1-F4 aside, `tableKeyButton`).
+  const codes = Object.values(DEFAULT_KEY_BINDINGS).flat().filter((code) => code !== '');
+  check(actionsByCode(DEFAULT_KEY_BINDINGS).size === codes.length, 'the default preset binds no code twice');
+  check(codes.every((code) => keyScanOf(code) === 0 || CASTER_KEYS.includes(code)),
+    'and binds no table key but the caster keys');
   for (const key of TABLE_KEYS.filter((key) => !CASTER_KEYS.includes(key))) {
     check(!handleUIKey(ui, key), `'${key}' must be left for the key tables`);
   }
