@@ -32,7 +32,10 @@ export interface SettingsValues {
    * panel beside the game is shown.
    */
   readonly mapView: boolean;
-  /** The champions' table beside the game. */
+  /**
+   * The champions' table: the champion dialog opens (`ChampionDialog.ts`), and the page's
+   * panel beside the game is shown.
+   */
   readonly championView: boolean;
   /** The page's debug chrome: a click on the map moves the party. */
   readonly debug: boolean;

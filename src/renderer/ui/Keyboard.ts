@@ -95,6 +95,8 @@ type TableAction = keyof typeof TABLE_KEYSCAN;
  * - `quickSave`, `quickLoad`: what F5 and F9 ask of the page.
  * - `map`: the map dialog, opened or closed (`MapDialog.ts`), with MAP VIEW on. No preset
  *   binds it.
+ * - `champions`: the champion dialog, opened or closed (`ChampionDialog.ts`), with
+ *   CHAMPION VIEW on. No preset binds it.
  */
 export type KeyAction =
   | `attack.${Champion}.${0 | 1 | 2}`
@@ -107,7 +109,8 @@ export type KeyAction =
   | TableAction
   | 'quickSave'
   | 'quickLoad'
-  | 'map';
+  | 'map'
+  | 'champions';
 
 /** An action's two keys, each a `KeyboardEvent.code`, or `''` for none. */
 export type KeySlots = readonly [string, string];
@@ -168,6 +171,7 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   quickSave: ['F5', ''],
   quickLoad: ['F9', ''],
   map: ['', ''],
+  champions: ['', ''],
 };
 
 /** The default preset's moves on the keypad alone: K , J L M . free. */
@@ -268,11 +272,14 @@ function isTableAction(action: KeyAction): action is TableAction {
   return action in TABLE_KEYSCAN;
 }
 
-/** What one of the port's own keys asks of the page: F5's quick-save, F9's quick-load, and the map. */
-export type PortKeyAction = 'quickSave' | 'quickLoad' | 'map';
+/**
+ * What one of the port's own keys asks of the page: F5's quick-save, F9's quick-load, the
+ * map and the champions.
+ */
+export type PortKeyAction = 'quickSave' | 'quickLoad' | 'map' | 'champions';
 
 function isPortAction(action: KeyAction): action is PortKeyAction {
-  return action === 'quickSave' || action === 'quickLoad' || action === 'map';
+  return action === 'quickSave' || action === 'quickLoad' || action === 'map' || action === 'champions';
 }
 
 /** Whether `action` is a panel's: an attack, an inventory, the magic or PASS. */

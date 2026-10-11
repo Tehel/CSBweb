@@ -208,6 +208,8 @@ console.log('\n=== 4. opening it ===');
     isDialogOpen: () => isDialogOpen(ui),
     openSettings: () => openSettingsDialog(ui),
     openMap: () => openMapDialog(ui),
+    // CHAMPION VIEW is off: no press is held back (`tools/dump-champion-dialog.ts`).
+    championBarsAt: () => -1,
     handleDialogClick: (x: number, y: number, b: number) => ui.dialog?.click(ui, x, y, b),
     handleDialogKey: (key: string, code: string) => ui.dialog?.key(ui, key, code),
     handleDialogRelease: () => {},

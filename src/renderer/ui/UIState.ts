@@ -25,6 +25,7 @@ import type { ReincarnateState } from './ReIncarnate';
 import type { SaveMenuState } from './SaveMenu';
 import type { SettingsDialogState } from './SettingsDialog';
 import type { MapDialogState } from './MapDialog';
+import type { ChampionDialogState } from './ChampionDialog';
 import type { Settings } from '../../settings/Settings';
 import type { Dialog } from './Dialog';
 import type { KeyboardLayoutMap } from './KeyLabels';
@@ -113,6 +114,8 @@ export interface UIState {
   settingsDialog: SettingsDialogState | null;
   /** The map dialog's state while it is the dialog (`src/renderer/ui/MapDialog.ts`). */
   mapDialog: MapDialogState | null;
+  /** The champion dialog's state while it is the dialog (`src/renderer/ui/ChampionDialog.ts`). */
+  championDialog: ChampionDialogState | null;
   /**
    * `DiskMenuNeeded` (`doc/CSBwin-src/Data.h:159`). The disk icon's handler cannot open
    * the menu itself — CSBWin because that would recurse into `HandleMouseEvents`
@@ -434,6 +437,7 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
     saveMenu: null,
     settingsDialog: null,
     mapDialog: null,
+    championDialog: null,
     hintOracle: null,
     hintOracleUp: false,
     hoverPoint: null,

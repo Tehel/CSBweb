@@ -81,6 +81,7 @@ import {
 import { isDialogOpen, type DialogPoint } from './ui/Dialog';
 import { openSettingsDialog } from './ui/SettingsDialog';
 import { openMapDialog } from './ui/MapDialog';
+import { championBarsAt, openChampionDialog } from './ui/ChampionDialog';
 import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
 import type { SaveEntry } from '../data/saves';
 import type { ImportedFile } from '../engine/GameSaves';
@@ -417,6 +418,23 @@ export class GameScreen {
    */
   openMap(): boolean {
     return openMapDialog(this.ui);
+  }
+
+  /**
+   * The champion dialog (`ui/ChampionDialog.ts`): its key, or a long press on a champion's
+   * stat bars, which marks `marked`'s column. Says whether it opened, which it does only
+   * with CHAMPION VIEW on and no dialog up.
+   */
+  openChampions(marked: number | null = null): boolean {
+    return openChampionDialog(this.ui, marked);
+  }
+
+  /**
+   * The champion whose stat bars a left press at `(x, y)` is on, where CHAMPION VIEW holds
+   * it back for the long press that opens the champion dialog (`GameInput`). Else -1.
+   */
+  championBarsAt(x: number, y: number): number {
+    return championBarsAt(this.ui, x, y);
   }
 
   /* The save/load screen; the work is in `ui/SaveMenu.ts`. */

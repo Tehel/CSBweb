@@ -167,13 +167,15 @@ console.log('\n=== 3. the controls ===');
   check(values().mapView, 'MAP VIEW\'s button, below COLOUR NEW MASTERY\'s, turns the map on');
   click(ui, settingButtonFrame(4));
   check(!values().statistics, 'SEND STATISTICS\', pressed, turns them off');
+  click(ui, settingButtonFrame(5));
+  check(values().championView, 'CHAMPION VIEW\'s, beside it, turns the champions on');
   const gaps = [
     { x: settingButtonFrame(0).x2 + 4, y: centre(settingButtonFrame(0)).y },
-    { x: centre(settingButtonFrame(5)).x, y: centre(settingButtonFrame(5)).y },
+    { x: centre(settingButtonFrame(6)).x, y: centre(settingButtonFrame(6)).y },
   ];
   updates = 0;
   for (const at of gaps) settingsDialogClick(ui, at.x, at.y, 2);
-  check(updates === 0, 'a click between two buttons, or where no sixth setting is, changes nothing');
+  check(updates === 0, 'a click between two buttons, or where no seventh setting is, changes nothing');
 
   click(ui, TAB_FRAMES[2]);
   check(state.tab === 'sound', 'SOUND\'s tab selects it');
@@ -284,6 +286,8 @@ console.log('\n=== 5. opening it ===');
     openSettings: () => openSettingsDialog(ui),
     // MAP VIEW is off: a press held on the message area opens nothing (`tools/dump-map-dialog.ts`).
     openMap: () => false,
+    // CHAMPION VIEW is off too: no press is held back (`tools/dump-champion-dialog.ts`).
+    championBarsAt: () => -1,
     handleDialogClick: (x: number, y: number, b: number) => ui.dialog?.click(ui, x, y, b),
     handleDialogKey: (key: string, code: string) => ui.dialog?.key(ui, key, code),
     isReincarnateScreenOpen: () => reincarnate,

@@ -55,6 +55,7 @@ const CHECKS = [
   { tool: 'dump-settings.ts' },
   { tool: 'dump-settings-dialog.ts' },
   { tool: 'dump-map-dialog.ts' },
+  { tool: 'dump-champion-dialog.ts' },
   { tool: 'dump-attack-panel.ts' },
   { tool: 'dump-magic-panel.ts' },
   { tool: 'dump-champion-state.ts' },

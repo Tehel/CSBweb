@@ -76,6 +76,7 @@ export const KEY_ACTION_NAMES: ReadonlyArray<readonly [KeyAction, string]> = [
   ['quickSave', 'QUICK SAVE'],
   ['quickLoad', 'QUICK LOAD'],
   ['map', 'MAP'],
+  ['champions', 'CHAMPIONS'],
 ];
 
 /** The presets' frames, in their row's order, and CUSTOM last. */

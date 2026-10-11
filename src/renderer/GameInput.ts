@@ -9,7 +9,8 @@
  * (`handleUIKey`), or one of the port's own keys
  * (`portKeyAction`). Esc and a double click on the message area open the settings
  * (`src/renderer/ui/SettingsDialog.ts`); the MAP key and a long press there, the map
- * (`src/renderer/ui/MapDialog.ts`). The queued buttons come back through `Game.handleMouseEvents` in
+ * (`src/renderer/ui/MapDialog.ts`); the CHAMPIONS key and a long press on a champion's
+ * stat bars, the champions (`src/renderer/ui/ChampionDialog.ts`). The queued buttons come back through `Game.handleMouseEvents` in
  * their turn, and `install` hands them to the interface's dispatcher, `handleMouseButton`.
  */
 import type { Game } from '../engine/Game';
@@ -22,6 +23,8 @@ import { nowMs } from './ui/UIState';
 export const MESSAGE_DOUBLE_CLICK_MS = 500;
 /** How long a press on the message area is held to open the map, in milliseconds. */
 export const MESSAGE_LONG_PRESS_MS = 500;
+/** How long a press on a champion's stat bars is held to open the champions: as long. */
+export const BARS_LONG_PRESS_MS = MESSAGE_LONG_PRESS_MS;
 
 /** What the input path asks of the page. */
 export interface GameInputHost {
@@ -56,6 +59,8 @@ export class GameInput {
   private messageClickMs: number | null = null;
   /** The long press on the message area under way: its timer, or `null`. */
   private messagePress: ReturnType<typeof setTimeout> | null = null;
+  /** The press on a champion's stat bars held back (`holdBarsPress`), or `null`. */
+  private barsPress: { x: number; y: number; chIdx: number; timer: ReturnType<typeof setTimeout> } | null = null;
 
   constructor(private readonly host: GameInputHost) {}
 
@@ -105,6 +110,7 @@ export class GameInput {
     this.host.screen.setHoverPoint({ x, y });
     if (this.dragging) this.host.screen.handleDialogDrag(x, y);
     if (this.messagePress !== null && !inMessageArea(x, y)) this.releaseMessagePress();
+    if (this.barsPress !== null && this.host.screen.championBarsAt(x, y) !== this.barsPress.chIdx) this.queueBarsPress();
   }
 
   /** A button pressed: `button` is `MouseEvent.button`'s number. */
@@ -128,6 +134,12 @@ export class GameInput {
       return;
     }
     if (buttonMask === 2) {
+      const chIdx = screen.championBarsAt(x, y);
+      if (chIdx >= 0) {
+        this.messageClickMs = null;
+        this.holdBarsPress(x, y, chIdx);
+        return;
+      }
       const free = this.messageAreaFree(x, y);
       if (this.messageAreaDoubleClick(free)) {
         screen.openSettings();
@@ -189,10 +201,38 @@ export class GameInput {
     this.messagePress = null;
   }
 
+  /**
+   * A left press on a champion's stat bars, with CHAMPION VIEW on, is held back, as the
+   * long press there is the champions'. Held `BARS_LONG_PRESS_MS`, it opens the champion
+   * dialog with that champion's column marked, and is nothing to the game. Released
+   * before, moved off the bars or with the pointer gone, it was a click, and is queued
+   * then (`queueBarsPress`): the inventory it opens opens late by as long as it was held.
+   */
+  private holdBarsPress(x: number, y: number, chIdx: number): void {
+    this.queueBarsPress();
+    const timer = setTimeout(() => {
+      this.barsPress = null;
+      if (this.ended() || this.oracleUp()) return;
+      if (this.host.screen.openChampions(chIdx)) this.host.refreshScreen();
+      else if (!this.host.screen.isDialogOpen()) this.host.game.onMouseClick(x, y, 2);
+    }, BARS_LONG_PRESS_MS);
+    this.barsPress = { x, y, chIdx, timer };
+  }
+
+  /** The press held back on the bars, a click after all: queued where it was pressed. */
+  private queueBarsPress(): void {
+    const press = this.barsPress;
+    if (press === null) return;
+    clearTimeout(press.timer);
+    this.barsPress = null;
+    if (!this.ended() && !this.oracleUp()) this.host.game.onMouseClick(press.x, press.y, 2);
+  }
+
   mouseUp(): void {
     const dragged = this.dragging;
     this.dragging = false;
     this.releaseMessagePress();
+    this.queueBarsPress();
     if (this.ended() || this.oracleUp()) return;
     if (this.host.screen.isDialogOpen()) {
       if (dragged) this.host.screen.handleDialogRelease();
@@ -211,6 +251,7 @@ export class GameInput {
   /** The pointer gone from the canvas: no cursor, from the next VBL's frame, as a move's. */
   mouseLeave(): void {
     this.releaseMessagePress();
+    this.queueBarsPress();
     if (this.ended() || this.oracleUp()) return;
     this.host.screen.setHoverPoint(null);
   }
@@ -282,7 +323,7 @@ export class GameInput {
       this.host.onQuickSave();
     } else if (action === 'quickLoad') {
       this.host.onQuickLoad();
-    } else if (screen.openMap()) {
+    } else if (action === 'map' ? screen.openMap() : screen.openChampions()) {
       this.host.refreshScreen();
     }
     return true;

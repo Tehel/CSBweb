@@ -24,8 +24,9 @@
 // shows them: the CRT effect, which screens take the mouse wheel, a move of the pointer
 // left to the VBL's frame to paint, the keys of the entrance's chooser, the download its
 // EXPORT starts, a file dropped on it, a finger held on the eye, a mouse released off
-// the canvas, the settings dialog opened, held, changed and read back, and the map dialog
-// opened by a long press, but not with MAP VIEW off. See `check` below.
+// the canvas, the settings dialog opened, held, changed and read back, the map dialog
+// opened by a long press, but not with MAP VIEW off, and the champion dialog opened by a
+// long press on the bars, where a tap opens the inventory. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -600,6 +601,28 @@ await leaveCanvas(); await wait(200);
 console.log('state: map');               await shot('25-map');
 await canvasClick(160, 100, 2); await wait(300);
 check(!(await mapUp()), 'a right click closes the map');
+
+// The champion dialog (`src/renderer/ui/ChampionDialog.ts`), over the same party: a press
+// held on the first champion's stat bars opens it, with CHAMPION VIEW on, that champion's
+// column marked and no inventory opened. A frame of each tab with the pointer off the
+// canvas; a right click closes it. Then a tap on the bars opens the inventory, at its release.
+const championsUp = () => evaluate(`window.__probe.screen.ui.championDialog?.marked ?? (window.__probe.screen.ui.championDialog ? 'none' : null)`);
+await evaluate(`window.__probe.screen.ui.settings.update({ championView: true }), 1`);
+await cdpMouse('mousePressed', 55, 14); await wait(900);
+check((await championsUp()) === 0 && (await selected()) === -1,
+  'with CHAMPION VIEW on, a press held on a champion\'s bars opens the champions, that champion marked, and no inventory');
+await cdpMouse('mouseReleased', 55, 14); await wait(300);
+check((await championsUp()) === 0 && (await selected()) === -1, 'and the release leaves it up, with no inventory');
+await leaveCanvas(); await wait(200);
+console.log('state: champions, ATTRIBUTES'); await shot('26-champions-attributes');
+await canvasClick(185, 19, 0); await leaveCanvas(); await wait(300);
+console.log('state: champions, SKILLS');  await shot('27-champions-skills');
+await canvasClick(160, 100, 2); await wait(300);
+check((await championsUp()) === null, 'a right click closes the champions');
+await cdpMouse('mousePressed', 55, 14); await wait(100);
+check((await selected()) === -1, 'a tap on the bars: nothing while it is down');
+await cdpMouse('mouseReleased', 55, 14); await wait(700);
+check((await selected()) === 0 && (await championsUp()) === null, 'and at its release, the champion\'s inventory, and no champions');
 
 // The CRT effect's input surface. The effect's canvas is shown over the game canvas, and
 // the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,

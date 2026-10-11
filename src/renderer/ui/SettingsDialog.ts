@@ -171,7 +171,7 @@ export const TABS: ReadonlyArray<{
   {
     tab: 'game',
     label: 'GAME',
-    help: 'THE EXTRAS, THE MAP AND THE STATISTICS',
+    help: 'THE EXTRAS, THE VIEWS AND THE STATISTICS',
     buttons: true,
     settings: [
       { name: 'GATHER THROWN WEAPONS', help: 'WALK OVER A THROWN WEAPON TO TAKE IT BACK', ...extra('gatherThrownWeapons') },
@@ -190,6 +190,13 @@ export const TABS: ReadonlyArray<{
         kind: 'toggle',
         get: (values) => values.statistics,
         set: (_values, on) => ({ statistics: on }),
+      },
+      {
+        name: 'CHAMPION VIEW',
+        help: 'THE CHAMPIONS: A LONG PRESS ON A BAR, OR ITS KEY',
+        kind: 'toggle',
+        get: (values) => values.championView,
+        set: (_values, on) => ({ championView: on }),
       },
     ],
   },
