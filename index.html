@@ -33,27 +33,30 @@
             display: flex;
             flex-direction: row;
         }
+        /* The game canvas and the CRT effect's share one cell, the effect's over the
+           game's, at one size: `.screen`'s, which fullscreen sets on `#game`
+           (src/lib/fullscreen.ts), centred on black. */
         #game {
-            /* text-align: center; */
+            display: grid;
             background-color: #222;
-            position: relative;
         }
-        /* The CRT effect's canvas (`createCrtEffect`, src/lib/crt.ts) lies over the game
-           canvas and lets every click and move through to it. */
+        #game > canvas {
+            grid-area: 1 / 1;
+        }
+        #game:fullscreen {
+            place-content: center;
+            background-color: #000;
+        }
+        /* The CRT effect's canvas (`createCrtEffect`, src/lib/crt.ts) lets every click and
+           move through to the game canvas. */
         #crt-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
             pointer-events: none;
         }
-        /* Scale the full screen canvas using CSS to get the original 4/3 ratio (rectangular pixels)
-           Internal resolution: 320×200, external 960×720 */
+        /* The 320x200 screen, three screen pixels to one, or in fullscreen the largest
+           whole multiple that fits. */
         .screen {
-            /* width: 640px;
-            height: 480px; */
-            width: 960px;
-            /* height: 720px; */
-            height: 600px;
+            width: var(--screen-width, 960px);
+            height: var(--screen-height, 600px);
             image-rendering: pixelated;
             cursor: none;
             /* A touch is the game's, not a scroll's or a zoom's (`bindCanvasEvents`,

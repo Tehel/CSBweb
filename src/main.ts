@@ -21,6 +21,7 @@ import { UtilityDiskMessages, UtilityError } from './engine/Chaos';
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import { createCrtEffect, type CrtEffect } from './lib/crt';
+import { NO_FULLSCREEN, createFullscreen } from './lib/fullscreen';
 import { GameScreen } from './renderer/GameScreen';
 import { bindDataSetChooser, bindSaveDrop, bindSettingsControls, bindUIContext, drawMapPreview, showFatalMessage } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
@@ -55,6 +56,12 @@ let dataSet!: DataSet;
 let swooshDir: string | null = null;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
+/**
+ * `#game` in fullscreen, as DISPLAY's FULLSCREEN asks (`src/lib/fullscreen.ts`). The
+ * browser's change redraws the screen, and the button with it.
+ */
+const fullscreen = gameCanvasEl.parentElement
+    ? createFullscreen(gameCanvasEl.parentElement, gameCanvasEl, () => refreshScreen()) : NO_FULLSCREEN;
 
 /**
  * The player's settings (`src/settings/Settings.ts`), kept in `localStorage`, or for this
@@ -394,9 +401,11 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // The party lay down, or the player woke it: the playthrough's Sleepsave.
         onSleepSave: () => { void saves.sleepSave(); },
         // The settings dialog reads and changes the player's settings, which this page
-        // applies (`applySettings`); its CRT toggle is inert without WebGL.
+        // applies (`applySettings`); its CRT toggle is inert without WebGL, and its
+        // FULLSCREEN where the browser gives none.
         settings,
         isCrtAvailable: () => crtController?.isAvailable() ?? false,
+        fullscreen,
         // The KEYS tab labels a key with what this keyboard prints on it, where the
         // browser says (`readKeyboardLayout`).
         keyboardLayout: () => keyboardLayout,

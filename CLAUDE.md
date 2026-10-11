@@ -108,8 +108,9 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   is down, and the eye let go by a mouse released off the canvas; and the settings dialog
   opened by Esc and by a double click, the clock held under it, a setting kept across a
   reload, and its slider dragged off the canvas, the map dialog opened by a long
-  press, and only with MAP VIEW on, and the champion dialog opened by a long press on
-  the stat bars, where a tap opens the inventory at its release.
+  press, and only with MAP VIEW on, the champion dialog opened by a long press on
+  the stat bars, where a tap opens the inventory at its release, and fullscreen, entered
+  by a tap and by a click, the screen and the effect sized and centred in it.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`
@@ -194,7 +195,8 @@ ui/         DOM-side debug chrome (settings, map preview, champion panel), saveD
             server's statistics are told: a game started, joined, won or lost)
 settings/   Settings: the player's settings, one model the page, the game and the dialogs
             read and change, kept in `localStorage`
-lib/        crt (the CRT effect: a WebGL tube over the canvas, and the pointer read through it)
+lib/        crt (the CRT effect: a WebGL tube over the canvas, and the pointer read through it),
+            fullscreen (`#game` at the largest whole multiple of 320x200, Esc locked)
 main.ts     Bootstrap and wiring
 ```
 

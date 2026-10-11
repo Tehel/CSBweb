@@ -25,8 +25,9 @@
 // left to the VBL's frame to paint, the keys of the entrance's chooser, the download its
 // EXPORT starts, a file dropped on it, a finger held on the eye, a mouse released off
 // the canvas, the settings dialog opened, held, changed and read back, the map dialog
-// opened by a long press, but not with MAP VIEW off, and the champion dialog opened by a
-// long press on the bars, where a tap opens the inventory. See `check` below.
+// opened by a long press, but not with MAP VIEW off, the champion dialog opened by a
+// long press on the bars, where a tap opens the inventory, and fullscreen, entered by a
+// tap and a click, the screen and the effect sized and placed in it. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -623,6 +624,66 @@ await cdpMouse('mousePressed', 55, 14); await wait(100);
 check((await selected()) === -1, 'a tap on the bars: nothing while it is down');
 await cdpMouse('mouseReleased', 55, 14); await wait(700);
 check((await selected()) === 0 && (await championsUp()) === null, 'and at its release, the champion\'s inventory, and no champions');
+
+// Fullscreen (`src/lib/fullscreen.ts`), DISPLAY's FULLSCREEN. A finger's press is no
+// gesture a browser enters fullscreen at, only its lift: a tap enters it, on a page no
+// mouse has pressed yet. With the CRT effect on, a mouse's press leaves it and enters it
+// again, on a 1920x1080 screen: `#game` is the fullscreen element, the game canvas the
+// largest whole multiple of 320x200 the screen holds, in device pixels, centred, and the
+// effect's canvas covers it exactly, drawn at its size; so again once the screen is
+// 1366x768. The pointer is read through the curve, a real click through the effect's
+// canvas reaches the dialog, and a real Esc, which the page locks in fullscreen, closes
+// and opens the settings and leaves fullscreen be.
+await send('Page.navigate', { url: `${APP}?intro=0&keepsaves` });
+await wait(3500);
+const screenLayout = () => evaluate(`(()=>{const g=document.getElementById('game-canvas').getBoundingClientRect();
+  const t=document.getElementById('crt-canvas');const r=t.getBoundingClientRect();
+  return {element:document.fullscreenElement?.id??null,w:innerWidth,h:innerHeight,ratio:devicePixelRatio,
+    game:[g.left,g.top,g.width,g.height],tube:[r.left,r.top,r.width,r.height],drawn:[t.width,t.height],
+    tab:window.__probe.screen.ui.settingsDialog?.tab??null};})()`);
+const realKey = async (code) => {
+  for (const type of ['rawKeyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: code, code, windowsVirtualKeyCode: 27 });
+};
+await key('Escape'); await wait(300);
+await canvasClick(120, 45, 0); await wait(300);
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+await touch('touchStart', 85, 92); await touch('touchEnd', 85, 92); await wait(800);
+check((await screenLayout()).element === 'game', 'a tap on FULLSCREEN puts #game in fullscreen, at the lift');
+await touch('touchStart', 85, 92); await touch('touchEnd', 85, 92); await wait(800);
+check((await screenLayout()).element === null, 'and a second tap leaves it');
+await send('Emulation.setTouchEmulationEnabled', { enabled: false });
+await canvasClick(85, 71, 0); await wait(300);
+const screenSize = (width, height) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+await screenSize(1920, 1080); await wait(300);
+await cdpMouse('mousePressed', 85, 92); await cdpMouse('mouseReleased', 85, 92); await wait(800);
+check((await screenLayout()).element === 'game', 'a mouse\'s press on FULLSCREEN, the CRT effect on, puts #game in fullscreen');
+for (const [width, height, expected] of [[1920, 1080, 5], [1366, 768, 3]]) {
+  if (width !== 1920) { await screenSize(width, height); await wait(800); }
+  const full = await screenLayout();
+  const scale = Math.floor(Math.min(full.w * full.ratio / 320, full.h * full.ratio / 200));
+  console.log(`state: fullscreen, ${full.w}x${full.h} at ${full.ratio}, the screen ${full.game.join(',')}, the effect drawn ${full.drawn.join('x')}`);
+  check(full.w === width && scale === expected && full.game[2] === 320 * scale / full.ratio && full.game[3] === 200 * scale / full.ratio,
+    `${width}x${height}: the game canvas is ${expected} times 320x200, the most that fit`);
+  check(Math.abs(full.game[0] - (full.w - full.game[2]) / 2) <= 0.5 && Math.abs(full.game[1] - (full.h - full.game[3]) / 2) <= 0.5,
+    'centred');
+  check(full.tube.every((v, i) => Math.abs(v - full.game[i]) < 0.01), 'the effect\'s canvas covers it exactly');
+  check(full.drawn[0] === Math.round(full.game[2] * full.ratio) && full.drawn[1] === Math.round(full.game[3] * full.ratio),
+    'and is drawn at its size');
+}
+check(await hoverAt(0.5, 0.5) === '160,100', 'in fullscreen, the tube\'s middle is the screen\'s');
+check(await hoverAt(0.002, 0.002) === '0,0', 'and a point of its black corner is the screen\'s corner');
+await realClick(197, 45); await wait(300);
+check((await screenLayout()).tab === 'sound', 'a real click through the effect\'s canvas selects SOUND');
+await realKey('Escape'); await wait(300);
+check(!(await settingsUp()) && (await screenLayout()).element === 'game', 'a real Esc closes the settings, in fullscreen still');
+await realKey('Escape'); await wait(300);
+check(await settingsUp(), 'and a second opens them');
+await canvasClick(120, 45, 0); await wait(300);
+await cdpMouse('mousePressed', 85, 92); await cdpMouse('mouseReleased', 85, 92); await wait(800);
+const windowed = await screenLayout();
+check(windowed.element === null && windowed.game[2] === 960 && windowed.game[3] === 600 && windowed.tube.every((v, i) => v === windowed.game[i]),
+  'FULLSCREEN again leaves it: the canvas and the effect\'s at 960x600');
+await screenSize(1600, 1000);
 
 // The CRT effect's input surface. The effect's canvas is shown over the game canvas, and
 // the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,

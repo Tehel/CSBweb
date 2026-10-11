@@ -22,11 +22,14 @@
  *
  * EXIT, which leaves for the welcome page (E15), is drawn inert, unlabelled, as the kit
  * draws a button that can do nothing. A setting that cannot work, the CRT effect where
- * the browser gives no WebGL (`UIState.isCrtAvailable`), keeps its name: its button is
- * raised, its label dim, it takes no click, and the help line says why.
+ * the browser gives no WebGL (`UIState.isCrtAvailable`) or FULLSCREEN where it gives no
+ * fullscreen (`UIState.fullscreen`), keeps its name: its button is raised, its label dim,
+ * it takes no click, and the help line says why.
  *
  * Every change goes to the settings model at once, which saves it and tells its
- * listeners: the page applies it to the sound, the CRT effect and the game.
+ * listeners: the page applies it to the sound, the CRT effect and the game. FULLSCREEN
+ * alone is no setting but the page's state, asked of the page (`src/lib/fullscreen.ts`)
+ * and kept by nobody: a browser enters fullscreen only at the player's gesture.
  *
  * ## The help line
  *
@@ -140,14 +143,20 @@ export function sliderRect(line: number): Rect {
 
 export type SettingsTab = 'game' | 'display' | 'sound' | 'keys';
 
-/** A setting: its name, what the help line says of it, and its control. */
+/**
+ * A setting: its name, what the help line says of it, and its control. A `page` toggle is
+ * the page's state, not a stored setting: fullscreen.
+ */
 type Setting = {
   readonly name: string;
   readonly help: string;
+  /** Where the help line says something else of it: fullscreen where Esc leaves it. */
+  readonly variant?: { readonly when: (ui: UIState) => boolean; readonly help: string };
   /** Where its control is inert, and what the help line says instead: the CRT effect without WebGL. */
   readonly unavailable?: { readonly when: (ui: UIState) => boolean; readonly help: string };
 } & (
   | { readonly kind: 'toggle'; readonly get: (values: SettingsValues) => boolean; readonly set: (values: SettingsValues, on: boolean) => Partial<SettingsValues> }
+  | { readonly kind: 'page'; readonly get: (ui: UIState) => boolean; readonly toggle: (ui: UIState) => void }
   | { readonly kind: 'slider'; readonly get: (values: SettingsValues) => number; readonly set: (values: SettingsValues, value: number) => Partial<SettingsValues> }
 );
 
@@ -220,6 +229,15 @@ export const TABS: ReadonlyArray<{
         kind: 'toggle',
         get: (values) => values.startupAnimations,
         set: (_values, on) => ({ startupAnimations: on }),
+      },
+      {
+        name: 'FULLSCREEN',
+        help: 'THE WHOLE SCREEN: HOLD ESC DOWN TO LEAVE IT',
+        variant: { when: (ui) => !ui.fullscreen.keepsEscape(), help: 'THE WHOLE SCREEN: ESC LEAVES IT' },
+        unavailable: { when: (ui) => !ui.fullscreen.isAvailable(), help: 'THE BROWSER GIVES NO FULLSCREEN' },
+        kind: 'page',
+        get: (ui) => ui.fullscreen.isOn(),
+        toggle: (ui) => ui.fullscreen.toggle(),
       },
     ],
   },
@@ -328,6 +346,17 @@ function inert(ui: UIState, setting: Setting): boolean {
   return setting.unavailable?.when(ui) ?? false;
 }
 
+/** Whether a toggle is on: a stored setting, or the page's state. */
+function isOn(ui: UIState, setting: Setting & { kind: 'toggle' | 'page' }): boolean {
+  return setting.kind === 'page' ? setting.get(ui) : setting.get(ui.settings.values);
+}
+
+/** A toggle turned over. */
+function turnOver(ui: UIState, setting: Setting & { kind: 'toggle' | 'page' }): void {
+  if (setting.kind === 'page') setting.toggle(ui);
+  else ui.settings.update(setting.set(ui.settings.values, !setting.get(ui.settings.values)));
+}
+
 /**
  * The dialog's button list, in the form of CSBWin's (`x2` and `y2` exclusive): CLOSE, the
  * tabs, and each setting's button, or each line's toggle or slider, or KEYS' controls. A
@@ -392,7 +421,8 @@ export function helpText(ui: UIState, state: SettingsDialogState): string {
   if (id >= BTN_TAB0 && id < BTN_TAB0 + TABS.length) return TABS[id - BTN_TAB0].help;
   const setting = settingsOf(state)[lineOf(id)];
   if (!setting) return '';
-  return inert(ui, setting) ? setting.unavailable?.help ?? '' : setting.help;
+  if (inert(ui, setting)) return setting.unavailable?.help ?? '';
+  return setting.variant?.when(ui) ? setting.variant.help : setting.help;
 }
 
 /* ------------------------------------------------------------------- drawing ---- */
@@ -425,11 +455,10 @@ export function drawSettingsDialog(ui: UIState): void {
 
 /** A tab's settings, a button each holding its name: pressed when on, dim where it cannot work. */
 function drawSettingButtons(ui: UIState, state: SettingsDialogState, look: (id: number, pressed?: boolean) => ButtonLook): void {
-  const values = ui.settings.values;
   settingsOf(state).forEach((setting, index) => {
-    if (setting.kind !== 'toggle') return;
+    if (setting.kind === 'slider') return;
     const frame = settingButtonFrame(index);
-    drawButton(ui, frame, setting.name, inert(ui, setting) ? 'dim' : look(BTN_LINE0 + 3 * index, setting.get(values)));
+    drawButton(ui, frame, setting.name, inert(ui, setting) ? 'dim' : look(BTN_LINE0 + 3 * index, isOn(ui, setting)));
   });
 }
 
@@ -445,7 +474,7 @@ function drawSettingLines(ui: UIState, state: SettingsDialogState, look: (id: nu
       return;
     }
     const frames = toggleFrames(line);
-    const on = setting.get(values);
+    const on = isOn(ui, setting);
     frames.forEach((frame, i) => {
       drawButton(ui, frame, TOGGLE_LABELS[i], inert(ui, setting) ? 'inert' : look(id + i, on === (i === 0)));
     });
@@ -482,18 +511,17 @@ export function settingsDialogClick(ui: UIState, x: number, y: number, buttons: 
   const line = lineOf(id);
   const setting = settingsOf(state)[line];
   if (!setting) return;
-  const values = ui.settings.values;
   if (isButtonsTab(state)) {
-    if (setting.kind === 'toggle') ui.settings.update(setting.set(values, !setting.get(values)));
+    if (setting.kind !== 'slider') turnOver(ui, setting);
     return;
   }
   if (setting.kind === 'slider') {
     state.sliding = line;
-    ui.settings.update(setting.set(values, sliderValueAt(sliderRect(line), x)));
+    ui.settings.update(setting.set(ui.settings.values, sliderValueAt(sliderRect(line), x)));
     return;
   }
   const on = (id - BTN_LINE0) % 3 === 0;
-  if (setting.get(values) !== on) ui.settings.update(setting.set(values, on));
+  if (isOn(ui, setting) !== on) turnOver(ui, setting);
 }
 
 /** The pointer moved with a slider's click held: the knob follows it, as far as the track's ends. */

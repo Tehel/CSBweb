@@ -13,13 +13,15 @@
  * 3. **The controls**: a tab, a setting's button, which a click turns over, a toggle, the
  *    slider clicked, dragged past the track's end and released; a click on the chosen side
  *    of a toggle changes nothing; the CRT effect's button dim without WebGL, taking no
- *    click, the help line saying why; Esc, CLOSE and a right click close it; the clock held
- *    while it is up.
+ *    click, the help line saying why; FULLSCREEN asking the page, changing no setting,
+ *    shown as the page says, its help line as Esc leaves it, and inert where the browser
+ *    has none; Esc, CLOSE and a right click close it; the clock held while it is up.
  * 4. **The help line** follows the pointer, and the pointer's move says when it changes.
  * 5. **Opening it**, through `GameInput` over the interface's real lists: Esc, awake, asleep
  *    and frozen, but not over the Reincarnate screen; Pause freezes; a double click on
  *    the message area, not a slow one, not one on the freeze's pixel, and never in a
- *    frozen game, whose first click thaws it. A key reaches KEYS by its code.
+ *    frozen game, whose first click thaws it. Esc held down, repeating, opens and closes
+ *    nothing. A key reaches KEYS by its code.
  * 6. **KEYS** (`SettingsKeys.ts`): its layout; a slot clicked waits for its key, which
  *    fills it and leaves every other slot, Esc cancelling and never bound; a right click
  *    empties a slot; the presets, CUSTOM inert until a key is changed; the labels'
@@ -54,6 +56,7 @@ import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { CHAR_WIDTH, DIM_COLOR, LIT_COLOR, buttonLabelAt, buttonRect } from '../src/renderer/ui/Widgets';
 import { MENU_OPTION_COLOR } from '../src/renderer/ui/Menu';
 import { Settings } from '../src/settings/Settings';
+import { NO_FULLSCREEN, type Fullscreen } from '../src/lib/fullscreen';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
@@ -62,13 +65,27 @@ const graphics = stockGraphics();
 const image = graphics.getImage(MENU_GRAPHIC);
 const menuBitmap = { width: image.width, height: image.height, pixels: Uint8Array.from(image.pixels) };
 
-function freshUI(crt = true, layoutMap: ReadonlyMap<string, string> | null = null): UIState {
+function freshUI(crt = true, layoutMap: ReadonlyMap<string, string> | null = null, fullscreen = NO_FULLSCREEN): UIState {
   return newUIState(graphics, newGame(emptyDungeonData(), graphics).ctx, {
     getGraphicBitmap: (n) => (n === MENU_GRAPHIC ? menuBitmap : null),
     settings: new Settings(null),
     isCrtAvailable: () => crt,
+    fullscreen,
     keyboardLayout: () => layoutMap,
   });
+}
+
+/** A page's fullscreen, which `toggle` turns over at once, as a browser does once it has. */
+function fakeFullscreen(keepsEscape: boolean): Fullscreen & { asked: number } {
+  let on = false;
+  const fullscreen = {
+    asked: 0,
+    isAvailable: () => true,
+    isOn: () => on,
+    toggle: () => { fullscreen.asked++; on = !on; },
+    keepsEscape: () => keepsEscape,
+  };
+  return fullscreen;
 }
 
 const centre = (r: Rect) => ({ x: (r.x1 + r.x2) >> 1, y: (r.y1 + r.y2) >> 1 });
@@ -134,7 +151,7 @@ console.log('\n=== 2. the layout ===');
   const lineCount = (t: (typeof TABS)[number]) => (t.buttons ? Math.ceil(t.settings.length / 2) : t.settings.length);
   console.log(`  lines: ${TABS.map((t) => `${t.label} ${lineCount(t)}`).join(', ')}`);
   check(TABS.every((t) => lineCount(t) <= SETTING_LINES), `no tab has more than ${SETTING_LINES} lines`);
-  check(TABS.every((t) => !t.buttons || t.settings.every((s) => s.kind === 'toggle')), 'a tab of buttons has only toggles');
+  check(TABS.every((t) => !t.buttons || t.settings.every((s) => s.kind !== 'slider')), 'a tab of buttons has only toggles');
   const outside = TABS.filter((t) => t.buttons).flatMap((t) => t.settings.filter((s, i) => {
     const frame = settingButtonFrame(i);
     const x1 = buttonLabelAt(frame).x - (CHAR_WIDTH / 2) * s.name.length;
@@ -143,7 +160,7 @@ console.log('\n=== 2. the layout ===');
   check(outside.length === 0, `every name inside its button's face${outside.length ? `: ${outside.join(', ')}` : ''}`);
   check(TABS.filter((t) => !t.buttons).every((t) => t.settings.every((s) => s.name.length <= nameChars)),
     `every line's name fits its panel, ${nameChars} characters`);
-  const helps = [...settings.flatMap((s) => [s.help, s.unavailable?.help ?? '']), ...TABS.map((t) => t.help)];
+  const helps = [...settings.flatMap((s) => [s.help, s.variant?.help ?? '', s.unavailable?.help ?? '']), ...TABS.map((t) => t.help)];
   check(helps.every((h) => h.length <= helpChars), `every help line fits, ${helpChars} characters`);
 }
 
@@ -238,6 +255,41 @@ console.log('\n=== 3. the controls ===');
   const startup = colours(settingButtonFrame(1));
   check(crt.has(DIM_COLOR) && !crt.has(MENU_OPTION_COLOR) && !crt.has(LIT_COLOR), 'the CRT effect\'s label is dim, under the pointer');
   check(startup.has(LIT_COLOR) && !startup.has(DIM_COLOR), 'STARTUP ANIMATIONS\', on, is pressed and lit');
+
+  // FULLSCREEN, DISPLAY's third button: the page's state, no setting.
+  check(!names.includes('settings.button2'), 'where the browser has no fullscreen, FULLSCREEN has no button in the list');
+  settingsDialogPointer(noWebGL, centre(settingButtonFrame(2)));
+  check(helpText(noWebGL, noWebGL.settingsDialog!) === 'THE BROWSER GIVES NO FULLSCREEN', 'and the help line says why');
+  for (const keepsEscape of [true, false]) {
+    const page = fakeFullscreen(keepsEscape);
+    const full = freshUI(true, null, page);
+    openSettingsDialog(full);
+    click(full, TAB_FRAMES[1]);
+    let changes = 0;
+    full.settings.subscribe(() => changes++);
+    changes = 0;
+    settingsDialogPointer(full, centre(settingButtonFrame(2)));
+    const help = helpText(full, full.settingsDialog!);
+    console.log(`  Esc ${keepsEscape ? 'kept' : 'not kept'}: "${help}"`);
+    check(help === (keepsEscape ? 'THE WHOLE SCREEN: HOLD ESC DOWN TO LEAVE IT' : 'THE WHOLE SCREEN: ESC LEAVES IT'),
+      `the help line says how fullscreen is left, Esc ${keepsEscape ? 'held down where the page keeps it' : 'where it does not'}`);
+    if (!keepsEscape) continue;
+    // Its label lit, with the pointer off the canvas: pressed.
+    const lit = () => {
+      settingsDialogPointer(full, null);
+      drawSettingsDialog(full);
+      const face = buttonRect(settingButtonFrame(2));
+      const buf = full.screenIndexBuffer;
+      for (let y = face.y1; y <= face.y2; y++) for (let x = face.x1; x <= face.x2; x++) if (buf.pixels[y * buf.width + x] === LIT_COLOR) return true;
+      return false;
+    };
+    check(!lit(), 'out of fullscreen, its button is raised');
+    click(full, settingButtonFrame(2));
+    check(page.asked === 1 && page.isOn() && changes === 0, 'a click on FULLSCREEN asks the page, and changes no setting');
+    check(lit(), 'in fullscreen, it is pressed and lit');
+    click(full, settingButtonFrame(2));
+    check(page.asked === 2 && !page.isOn(), 'a second click asks the page out of it');
+  }
 }
 
 console.log('\n=== 4. the help line ===');
@@ -317,6 +369,10 @@ console.log('\n=== 5. opening it ===');
     input.keyDown(press('Escape'));
     check(!isDialogOpen(ui), `${m}, Esc again closes it`);
   }
+  check(input.keyDown({ ...press('Escape'), repeat: true }) && !isDialogOpen(ui), 'Esc held down, repeating, does not open it');
+  input.keyDown(press('Escape'));
+  check(input.keyDown({ ...press('Escape'), repeat: true }) && isDialogOpen(ui), 'nor close it');
+  input.keyDown(press('Escape'));
   reincarnate = true;
   input.keyDown(press('Escape'));
   check(!isDialogOpen(ui), 'over the Reincarnate screen, Esc does not open it');

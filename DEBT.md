@@ -108,8 +108,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| U8 | No fullscreen | M | ⏳ |
-| U9 | The side panel | S | ⏳ after U8 |
+| U9 | The side panel | S | ⏳ |
 | F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
@@ -150,7 +149,7 @@ In payoff order: the first row is the next item.
 | E33 | What a frame costs | S | ⏳ |
 | E30 | One presenter and one input router | M | ⏳ before E15 |
 | E15 | The page shell | L | ⏳ with the page redesign |
-| E22 | The screen's size: its ratio, and filling the screen | M | ⏳ after E15 |
+| E22 | The screen's ratio, and a fractional fill | M | ⏳ after E15 |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C178 | No save keeps the dungeon's game information | S | ⏳ |
 | C171 | The Firestaff does not soften a monster's blow, and three mastery calls ignore sleep | S | ⏳ |
@@ -234,25 +233,21 @@ double-click interval), a CHAMPIONS button in the settings dialog, the message a
 long press shared with the map through a small chooser, or the press acting at once
 (the inventory opened on the press and left under the dialog).
 
+Fullscreen is DISPLAY's FULLSCREEN (`src/lib/fullscreen.ts`): `#game`, both canvases, at
+the largest whole multiple of 320x200 that fits, in device pixels, centred on black. It is
+the page's state, not a setting, as a browser enters fullscreen only at a gesture; a
+finger's gesture is its lift, so a tap waits for it. Where the browser has the Keyboard
+Lock API (Chromium's), Esc is locked in fullscreen and still opens the settings, and Esc
+held down leaves; elsewhere Esc leaves, and the double click on the message area opens
+them.
+
 None of it changes the game: with every new setting at its default, every tool's output
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a
 golden frame for what it draws, and a probe or a `tools/` assertion for what it does.
 
-### U8 ⏳ No fullscreen
-
-Nothing fills the screen.
-
-Paying it: DISPLAY's FULLSCREEN puts `#game` in fullscreen, both canvases, at the largest
-whole multiple of 320x200 that fits, centred on black. This pays E22's points 1, 3 and
-4; E22 keeps the 4:3 ratio and a fractional fill. A browser leaves fullscreen on Esc and
-may not pass the key on, so the item finds out whether the Keyboard Lock API
-(`navigator.keyboard.lock(['Escape'])`) keeps Esc for the settings, and where it does
-not, the double click on the message area is the way in. The probe checks the effect's
-canvas over the game canvas and a click read through it, in fullscreen.
-
 ### U9 ⏳ The side panel
 
-With the settings, map and champion dialogs and U8 in, nothing on `#side` (`index.html`) is needed by a player. The data-set
+With the settings, map and champion dialogs and fullscreen in, nothing on `#side` (`index.html`) is needed by a player. The data-set
 chooser, Quick Save and Quick Load, CRT, Sound and its volume, Map, Champions, Debug,
 Extras, and the map and champion panels all go, with the code in `src/ui/` that only they
 use. The data set is chosen by `?dungeon=` until E15's welcome page. The page map's
@@ -276,17 +271,17 @@ list", point 4), its check included.
 ### R1 ⏳ A game read in play leaves the screen on the old world
 
 A read replaces `ctx.party.state` (`Party.setState`, `src/engine/Party.ts:118-126`) and the
-world, and tells the screen nothing. `ui.partyState` (`src/renderer/ui/UIState.ts:72`), the
+world, and tells the screen nothing. `ui.partyState` (`src/renderer/ui/UIState.ts:73`), the
 open chest (`ui.openChestId`, `ui.openChestContents`), the attack menu
 (`ui.possibleAttackTypes`) and the Reincarnate screen (`ui.reincarnate`) stay the old
 world's until the next `refreshScreen`, and what runs before it acts on them:
 
 - **F9 with a chest open loses an object.** The next compose's `syncOpenChest(ui, null)`
-  (`src/renderer/GameScreen.ts:648-651`) repacks the old world's open contents into the
+  (`src/renderer/GameScreen.ts:650-653`) repacks the old world's open contents into the
   loaded world's chest (`repackOpenChest`, `src/renderer/ui/Inventory.ts:376-399`). An
   object taken from the chest into the hand before F9 is then in no chain of the loaded
   world; one put into it is linked twice, which cuts the chain it lies in. F9 is taken
-  with an inventory open (`GameInput.keyDown`, `src/renderer/GameInput.ts:320-329`). The
+  with an inventory open (`GameInput.keyDown`, `src/renderer/GameInput.ts:325-334`). The
   disk menu's LOAD loses nothing: opening the menu runs `TAG02076e`, which repacks first.
 - **The disk menu's LOAD runs `TAG0207cc` on the old party.** `restoreChosenSave` reads,
   then `closeSaveMenu` calls `tag0207cc(ui)` (`src/renderer/ui/SaveMenu.ts:1099-1112`,
@@ -324,9 +319,9 @@ says how to test one.
 
 ### R3 ⏳ After a fatal error the page still saves
 
-`reportError` (`src/main.ts:659`) stops the game and puts up the message, and nothing
+`reportError` (`src/main.ts:668`) stops the game and puts up the message, and nothing
 else. `GameInput` still takes the keys (its `ended()` is `mainLoopHasReturned()`, which
-`stop` does not set, `src/renderer/GameInput.ts:72-74`), `quickSave` does not ask whether
+`stop` does not set, `src/renderer/GameInput.ts:74-76`), `quickSave` does not ask whether
 the game runs (`src/engine/GameSaves.ts:510-531`), and the page's Quick Save button calls
 it directly (`src/ui/events.ts:108`). So F5 after a VBL that threw writes the half-updated
 world over the playthrough's quick save, the one F9 reads after the reload the message asks
@@ -359,7 +354,7 @@ champion is chosen; the script checked again after the awaits.
 `openSaveDatabase` (`src/data/saves/idb.ts:59-81`) sets no `onblocked`, and no connection
 closes on `versionchange`. An open tab of the build before a `DB_VERSION` bump keeps its
 connection, so a new tab's open never settles: ENTER awaits `readNewGame`, which awaits
-`saves.newGameRead()` and `list()` (`src/main.ts:169-177`), and the game never starts; F5,
+`saves.newGameRead()` and `list()` (`src/main.ts:176-184`), and the game never starts; F5,
 F9 and the disk menu wait for ever. Two more gaps in the store:
 
 - nothing asks `navigator.storage.persist()`, so the browser may evict the only copy of
@@ -423,11 +418,11 @@ with `npm test -- --frames`.
 
 ### R8 ⏳ An optional feature's failure ends the game, or the session
 
-- **The Hint Oracle** runs with `.catch(reportError)` (`src/main.ts:418`), so any error in
+- **The Hint Oracle** runs with `.catch(reportError)` (`src/main.ts:427`), so any error in
   it ends the game with whatever was not saved. `readHintOracle` throws for a world whose
   `hintKey` does not decipher `hcsb.hct`, such as an imported save of a modified CSB.
 - **RISE's NEW FACE**: `utilityPortraits ??=` caches a promise that rejects when
-  `arrayBuffer()` or the parse fails (`src/main.ts:195-201`), and `refreshSaveMenu`'s
+  `arrayBuffer()` or the parse fails (`src/main.ts:202-208`), and `refreshSaveMenu`'s
   `await ui.onHasNewFaces()` then throws into the catch that empties the list
   (`src/renderer/ui/SaveMenu.ts:504-509`): RISE lists nothing until a reload.
 
@@ -449,7 +444,7 @@ Paying it: the page's controls give the focus back (`blur` after a click, or
 ### R10 ⏳ Pointer, touch and WebGL
 
 - **Touch screens likely stay silent.** Audio is unlocked on the canvas's first
-  `pointerdown`, once (`src/main.ts:209-217`), which is a user activation for a mouse and
+  `pointerdown`, once (`src/main.ts:216-224`), which is a user activation for a mouse and
   not for a touch: `resume()` fails, the listener is gone, and only the Sound button
   brings the sound back.
 - **A lost WebGL context keeps the curve.** On `webglcontextlost` the tube is hidden but
@@ -598,9 +593,9 @@ New state-representation debt goes here, and jumps the queue.
 ### D17 ⏳ The screen keeps the party it last drew
 
 `Party.setState` builds a new object (`src/engine/Party.ts:118-126`), and the screen keeps
-its own reference, `ui.partyState` (`src/renderer/ui/UIState.ts:72`, about 125 uses), set
+its own reference, `ui.partyState` (`src/renderer/ui/UIState.ts:73`, about 125 uses), set
 again only by `GameScreen.setPartyState` from `renderView` and `refreshScreen`
-(`src/main.ts:103`, `:110`). Whatever runs between a read and the next of those reads the old
+(`src/main.ts:110`, `:110`). Whatever runs between a read and the next of those reads the old
 party (R1), and "another game" is detected by the object changing (`setPartyState`'s
 `state !== this.ui.partyState`). The freeze has two owners the same way:
 `GameScreen.isFrozen()` reads `ui.uiMode`, `Game.isFrozen()` reads `ctx.loop.gameFrozen`.
@@ -614,21 +609,21 @@ generation count; one owner for the freeze.
 CSBWin's interface state is `d.`: the open chest and its contents, the attack menu
 (`d.AttackingCharacterOrdinal`, `Word20250`, `Word20252`), `PressingEye`, `PressingMouth`,
 `DisplayResurrectChestOrScroll`. The port keeps them in `UIState`
-(`src/renderer/ui/UIState.ts:201-241`), and the engine reads them back through `GameHost`
+(`src/renderer/ui/UIState.ts:202-242`), and the engine reads them back through `GameHost`
 queries (`pressingEye`, `pressingMouth`, `displayResurrectChestOrScroll`,
 `attackingCharacterOrdinal`, `src/engine/GameHost.ts:47-198`, answered as
-`screen?.…() ?? 0` in `src/main.ts:282-285`), beside calls into the UI named by CSBWin
+`screen?.…() ?? 0` in `src/main.ts:289-292`), beside calls into the UI named by CSBWin
 address (`tag02076e`, `tag0207cc`, `tag01b29a`, `tag011366`). So:
 
 - **Composing the screen opens and repacks chests.** `presentViewport` runs
   `syncOpenChest(this.ui, null)` and zeroes `displayResurrectChestOrScroll`
-  (`src/renderer/GameScreen.ts:648-651`), and `drawInventoryScreen` opens the chest through
+  (`src/renderer/GameScreen.ts:650-653`), and `drawInventoryScreen` opens the chest through
   `syncOpenChest(ui, chestView)` (`src/renderer/ui/Inventory.ts:41`), which unlinks its
   objects from the database (`:363-368`). A compose runs at every refresh, up to 60 a
   second while the pointer moves, so what the engine finds in a chest depends on when the
   screen was last composed. The save repacks by hand first (`GameSaves.ts:289`), and the
   compose skips the inventory under the disk menu so as not to open it again
-  (`GameScreen.ts:659-663`). CSBWin opens the chest while drawing too, but only at events
+  (`GameScreen.ts:661-665`). CSBWin opens the chest while drawing too, but only at events
   (`TAG0189d4`).
 - A headless `Game` has none of this state, and a read does not reset it (R1).
 
@@ -932,7 +927,7 @@ the canvas's output (`putImageData`), the order of the compose, the palettes' ch
 façade over the UI and the boot (`getScreenBuffer`, `doMenu`, `setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can
 build one, and `tools/lib/ui.ts` copies its wiring (F19). Each page hook is named four
 times: in `UIState`, `UIHooks`, `GameScreenHooks` and the constructor's copy
-(`GameScreen.ts:97-118`, `:193-226`, `UIState.ts:426-429`).
+(`GameScreen.ts:97-119`, `:193-226`, `UIState.ts:432-435`).
 
 Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the palettes,
 `PresentedFrame`, `presentViewport`'s order) and a thin canvas presenter; one factory for the
@@ -948,7 +943,7 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:208-223`).
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
   `refreshScreen`'s `setPartyState` and its `mainLoopHasReturned()` test
-  (`GameScreen.ts:773-779`, `src/main.ts:108-112`), so a chew still running when the game ends
+  (`GameScreen.ts:775-781`, `src/main.ts:115-119`), so a chew still running when the game ends
   draws the adventure over the credits' wait; `initializePlayState` cancels neither loop.
 - The CRT uploads the canvas and runs its shader at device pixels at every display frame,
   changed or not: about 2.3 million pixels a frame at a device ratio of 2, up to 120 times a
@@ -961,7 +956,7 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:208-223`).
 
 Paying it: one rAF presenter with a dirty flag that the VBL and the animations set, the CRT
 drawing only after a present; one input router with a focus policy (R9). E15 and E22 build
-on both: fullscreen, resizing, dialogs over the canvas.
+on both: resizing, dialogs over the canvas.
 
 ### E31 ⏳ Late wiring with silent defaults, and long parameter lists
 
@@ -1012,7 +1007,7 @@ loader's cache keyed by format, or the parameter dropped with the dead fallback.
   where a 16-entry `Uint32` table a palette, written through a `Uint32Array` view, takes
   0.14 ms (`updateImageDataFromIndex*`, `src/renderer/csbwin/CanvasBlitter.ts:409-483`). It
   always takes the two-palette path while adventuring: `viewportPalette !== uiPalette`
-  compares two separate copies (`GameScreen.ts:698-701`). Its body is written three times
+  compares two separate copies (`GameScreen.ts:700-703`). Its body is written three times
   in `CanvasBlitter`, and the cursor's footprint loop twice (`reconvertThroughPalette`,
   `PresentedFrame.capture`).
 - **Every monster turn allocates** an `MmRecord` and with it a `DsaVars` of two 100-entry
@@ -1075,7 +1070,7 @@ Paying it: delete; one `RoomType` and a `ViewRoomType` for 16 to 20; one
   `PeriodicUpdates`), `Party.ts:103`, `:218`, `:305`, `RuntimeSave.ts:199-200`,
   `CsbwinSaveGame.ts:4-9`, `:114`, `SaveGameLoader.ts:295-296`, `CsbwinSaveInfo.ts:42-44`,
   `CsbwinDungeonImageWriter.ts:287-290`, `SaveGameFile.ts:229-231`, `MonsterAttack.ts:598`,
-  `MissileEncounter.ts:513`, `DrawDecorations.ts:177-179`, `src/main.ts:584-586` ("the rest
+  `MissileEncounter.ts:513`, `DrawDecorations.ts:177-179`, `src/main.ts:593-595` ("the rest
   of the Phase 14 scaffolding"), `BytecodeInterpreter.ts:1590` ("Phase 5").
 - **Wrong**: `MagicSystem.ts:397` ("Spell effects are wired in subsequent magic parity
   steps"); `MonsterAttack.ts:750-751` (`potentialChampionIndex` "still always -1 here",
@@ -1098,8 +1093,7 @@ Paying it: delete; one `RoomType` and a `ViewRoomType` for 16 to 20; one
   (`pointInRect`, gone), `:79` (the wrappers "delegate and do nothing else", where
   `handleMouseButton`, `setPartyState` and `initializePlayState` hold logic), `:106` (nine
   screen states and a server started by hand: twenty, and the probe starts its own);
-  `index.html:49-56` (a 4/3 comment over a 600-pixel height, among commented-out CSS); two
-  CSBWin ranges past their file's end, `MoveObject.cpp:797-865` (858 lines;
+  two CSBWin ranges past their file's end, `MoveObject.cpp:797-865` (858 lines;
   `DsaSystem.ts:905`, `doc/PROVEN_FACTS.md` and two tools) and `Sound.cpp:1048-1071`
   (1069; `SoundQueue.ts`, `doc/CSBWIN_DSA_REFERENCE.md` and three tools).
 
@@ -1151,7 +1145,7 @@ What the redesign will replace, and what it should not carry across:
   clicked there) and no `MoveObject`; the game it plays reaches the statistics' "where
   parties die" like any other. The map dialog's click does the same on a page opened
   with `?dev` (`onTeleport`, `src/main.ts`). The overlay controls (`#overlay-control`) need no Debug at
-  all. Both go behind a developer's switch (`?debug`, or the build flag `main.ts:634`
+  all. Both go behind a developer's switch (`?debug`, or the build flag `main.ts:643`
   uses), and a game a teleport touched sends no events.
 - **Two input stacks** (E30) and the page's controls keeping the focus (R9).
 
@@ -1170,25 +1164,28 @@ The redesigned page also links to two pages:
   players. Champions go by the names they carry, which a player can type.
 - **The public statistics**, drawn from the server's `api/stats`.
 
-### E22 ⏳ The screen's size: its ratio, and filling the screen
+### E22 ⏳ The screen's ratio, and a fractional fill
 
-The screen is shown at one size: `.screen` (`index.html:51-56`) scales the 320x200 game
-canvas to 960x600, a 16/10 picture of square pixels. The page will offer the player:
+The screen is shown at one ratio. `.screen` (`index.html:57-68`) sizes both canvases from
+`#game`'s `--screen-width` and `--screen-height`: 960x600 in the page, and in fullscreen
+the largest whole multiple of 320x200 that fits (`src/lib/fullscreen.ts`), a 16/10
+picture of square pixels either way. The page will offer the player:
 
 - **The ratio**: 16/10, as now, or 4/3, the ST's monitor, whose 320x200 picture has
   pixels taller than wide.
-- **Filling the screen**, at the chosen ratio.
+- **A fractional fill**: fullscreen filling the screen at the chosen ratio, rather than
+  the whole multiple.
 
 Both are settings of E15's model, so this follows E15. What the change must look after:
 
-1. **The CRT effect's canvas follows the game canvas only through CSS.** `createCrtEffect`
-   (`src/lib/crt.ts`) copies the game canvas's class once, when it is built, and
-   `#crt-canvas` (`index.html:43`) is pinned to the top left of `#game`. A size set inline
-   on the game canvas, a class changed later, or a canvas centred between bars leaves the
-   effect the wrong size or in the wrong place, while the pointer, read from the game
-   canvas's own rect (`canvasPoint`), stays right: a picture off its clicks. Both canvases
-   take their size and place from one source. The effect's canvas already redraws at
-   whatever size it is shown, in device pixels, and its shader stretches to any ratio.
+1. **One source for both canvases.** The CRT effect's canvas shares `#game`'s grid cell
+   and the `.screen` class with the game canvas, so it covers it only while both take
+   their size from `#game`'s two variables. A size set inline on one canvas, or a class
+   changed on one (`createCrtEffect` copies the class once, `src/lib/crt.ts`), leaves the
+   effect off the game canvas, while the pointer, read from the game canvas's own rect
+   (`canvasPoint`), stays right: a picture off its clicks. The effect's canvas already
+   redraws at whatever size it is shown, in device pixels, and its shader stretches to any
+   ratio.
 2. **The scanlines are exact only at a whole number of screen pixels per line.** The beam
    is sampled at each pixel's centre (`line` and `beam` in the shader, `src/lib/crt.ts`).
    At 600 pixels, three per line, every gap falls alike; at 720 (3.6) or 1080 (5.4) each
@@ -1196,15 +1193,15 @@ Both are settings of E15's model, so this follows E15. What the change must look
    pixels per line, and below two the lines are noise. The beam is integrated over each
    pixel's height instead of sampled, and the scanlines fade out below about 2.5 pixels
    per line.
-3. **Filling the screen through the Fullscreen API takes `#game`, not the game canvas**:
-   the effect's canvas is the game canvas's sibling, and would be left out.
-4. **Without the effect, a size that is not a whole multiple of 320x200 draws uneven
-   pixels** under `image-rendering: pixelated`, some a screen pixel wider than others.
-   Filling the screen may offer the largest whole multiple that fits instead.
-5. **The probe pins the default.** `tools/probe-frames.mjs` checks that the effect is
-   drawn at 960x600 (`:207`) and maps its clicks through the canvas's rect in a 1600x1000
-   window (`:154`). It also checks, at 4/3 and filling the window, that the effect's
-   canvas covers the game canvas exactly and that the pointer is read through the curve.
+3. **Without the effect, a size that is not a whole multiple of 320x200 draws uneven
+   pixels** under `image-rendering: pixelated`, some a screen pixel wider than others,
+   which is why fullscreen fills by a whole multiple.
+4. **The probe pins the default.** `tools/probe-frames.mjs` checks that the effect is
+   drawn at 960x600 and maps its clicks through the canvas's rect in a 1600x1000 window,
+   and in fullscreen, on a 1920x1080 and a 1366x768 screen, the whole multiple, centred,
+   the effect's canvas over it and the pointer read through the curve. It also checks, at
+   4/3 and at a fractional fill, that the effect's canvas covers the game canvas exactly
+   and that the pointer is read through the curve.
 
 ---
 
@@ -1549,8 +1546,8 @@ full run shows the error before its first tool result.
 
 ### F19 ⏳ The tools' screen is wired by hand, and has drifted
 
-`tools/lib/ui.ts:21-34` builds the `ViewportRenderer` as `GameScreen`'s constructor does
-(`src/renderer/GameScreen.ts:178-193`), without `gameState`, `rules` and
+`tools/lib/ui.ts:23-36` builds the `ViewportRenderer` as `GameScreen`'s constructor does
+(`src/renderer/GameScreen.ts:179-194`), without `gameState`, `rules` and
 `csbGraphicsLoader`. So a view a tool draws has `invisibleMonsters` and
 `drawAsSize4Monsters` off whatever the dungeon says, no `d.Time` for the magic footprints,
 and no CSB graphics.

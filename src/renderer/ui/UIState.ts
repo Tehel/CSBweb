@@ -27,6 +27,7 @@ import type { SettingsDialogState } from './SettingsDialog';
 import type { MapDialogState } from './MapDialog';
 import type { ChampionDialogState } from './ChampionDialog';
 import type { Settings } from '../../settings/Settings';
+import type { Fullscreen } from '../../lib/fullscreen';
 import type { Dialog } from './Dialog';
 import type { KeyboardLayoutMap } from './KeyLabels';
 
@@ -339,6 +340,11 @@ export interface UIState {
   /** Whether the browser can show the CRT effect: it gives WebGL (`src/lib/crt.ts`). */
   readonly isCrtAvailable: () => boolean;
   /**
+   * The page in fullscreen (`src/lib/fullscreen.ts`): DISPLAY's FULLSCREEN turns it over,
+   * and is inert where the browser cannot.
+   */
+  readonly fullscreen: Fullscreen;
+  /**
    * What the player's keyboard prints on each key, as the browser gives it
    * (`navigator.keyboard.getLayoutMap()`), or `null` where it does not: the KEYS tab's
    * labels (`KeyLabels.ts`).
@@ -426,7 +432,7 @@ export type UISources = Pick<UIState,
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
   | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onHasNewFaces' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave'
-  | 'settings' | 'isCrtAvailable' | 'keyboardLayout' | 'onTeleport'>;
+  | 'settings' | 'isCrtAvailable' | 'fullscreen' | 'keyboardLayout' | 'onTeleport'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {

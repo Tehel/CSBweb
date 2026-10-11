@@ -50,6 +50,8 @@ export interface KeyPress {
   ctrlKey: boolean;
   metaKey: boolean;
   altKey: boolean;
+  /** The key held down, repeating. */
+  repeat?: boolean;
 }
 
 export class GameInput {
@@ -267,6 +269,9 @@ export class GameInput {
     // The Oracle takes no key (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Waiting for a
     // button"), and the adventure gets none while it is up; a browser shortcut keeps its.
     if (this.oracleUp()) return !modified;
+    // Esc held down opens and closes nothing: in fullscreen, where the page locks it, it
+    // is how the player leaves (`src/lib/fullscreen.ts`).
+    if (code === 'Escape' && press.repeat === true) return !modified;
     // The Reincarnate name-entry screen is modal on the keyboard as well as
     // the mouse (`keyboardMode = 2`, `doc/CSBwin-src/Code13ea4.cpp:38`): while
     // it is up every key is a letter being typed, so none of the panel, movement

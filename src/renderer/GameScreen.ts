@@ -111,6 +111,7 @@ export type GameScreenHooks = Pick<UIState,
   | 'onSleepSave'
   | 'settings'
   | 'isCrtAvailable'
+  | 'fullscreen'
   | 'keyboardLayout'
   | 'onTeleport'
 >;
@@ -219,6 +220,7 @@ export class GameScreen {
       onSleepSave: hooks.onSleepSave,
       settings: hooks.settings,
       isCrtAvailable: hooks.isCrtAvailable,
+      fullscreen: hooks.fullscreen,
       keyboardLayout: hooks.keyboardLayout,
       onTeleport: hooks.onTeleport,
     });

@@ -8,11 +8,13 @@
  * buffer of its own or to stage a view. The hooks do nothing unless the tool passes its
  * own; the save/load screen lists no save, and `onReadSave`, `onMakeNewAdventure`,
  * `onSaveGame`, `onExportSave` and `onImportSave` throw, as there is no store and no world to serialize.
- * The settings are the defaults, kept nowhere, and the CRT effect can be shown. The map
+ * The settings are the defaults, kept nowhere, the CRT effect can be shown, and there is
+ * no fullscreen. The map
  * dialog moves no party, as on a page opened without `?dev`.
  */
 import type { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import type { GameContext } from '../../src/engine/GameContext';
+import { NO_FULLSCREEN } from '../../src/lib/fullscreen';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../../src/renderer/csbwin/TextRenderer';
 import { Settings } from '../../src/settings/Settings';
@@ -62,6 +64,7 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     onSleepSave: () => {},
     settings: new Settings(null),
     isCrtAvailable: () => true,
+    fullscreen: NO_FULLSCREEN,
     keyboardLayout: () => null,
     onTeleport: null,
     ...hooks,
