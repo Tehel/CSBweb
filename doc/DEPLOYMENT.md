@@ -100,8 +100,9 @@ asked for, so replacing a data set's files needs no restart.
 
 `npm run build` is `tsc && vite build`. `static/` is Vite's `publicDir` for the dev server
 only (`vite.config.mts`), so a build ships none of the game files, the manuals or anything
-else there. The page's own file is `src/assets/favicon.ico`, named by
-`index.html`, which the build hashes. A build is `index.html` and `assets/`, under 1 MB.
+else there. The page's own files are under `src/assets/`: `favicon.ico`, named by
+`index.html`, and the welcome page's logo, `csbweb-logo.jpg`, imported by
+`src/ui/welcomePage.ts`; the build hashes both. A build is `index.html` and `assets/`, under 1 MB.
 `tools/dump-build.ts` builds into a scratch folder and asserts it: only the page's own file
 types, nothing of `static/`, every file `index.html` names present, and no probe handle.
 

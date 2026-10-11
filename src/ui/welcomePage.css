@@ -39,25 +39,30 @@ body.welcome {
 .welcome-logo {
     margin: 0 0 40px;
     text-align: center;
-    color: var(--p11);
+}
+.welcome-logo img {
+    display: block;
+    width: 440px;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
 }
 
-/* The data sets, a tile each, its picture 320x200 at one to one, the rows centred. */
+/* The data sets, a tile each, its picture 320x200 at half size, the rows centred. */
 .welcome-grid {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 18px;
+    gap: 12px;
 }
 .pick {
     appearance: none;
     box-sizing: border-box;
-    width: 344px;
-    max-width: 100%;
+    width: 172px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 9px;
+    gap: 8px;
+    padding: 3px;
     background: #0b0b16;
     border: 3px solid #1d1d30;
     cursor: pointer;
@@ -71,17 +76,12 @@ body.welcome {
 .pick.dim { opacity: 0.5; }
 .pick.dim:hover, .pick.dim[aria-pressed="true"] { opacity: 0.8; }
 .pick-picture {
-    box-sizing: border-box;
-    aspect-ratio: 16 / 10;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 12px;
+    width: 160px;
+    height: 100px;
     background: var(--navy);
-    color: var(--p1);
-    text-align: center;
 }
-.pick-name { color: var(--p15); }
+.pick-name { color: var(--p15); padding: 0 3px; }
+.pick-saves { padding: 0 3px 3px; }
 .pick-saves { color: var(--p2); }
 .pick:not(.dim) .pick-saves { color: var(--p7); }
 
@@ -175,7 +175,7 @@ body.welcome {
 
 @media (max-width: 640px) {
     .welcome-page { padding: 24px 16px 0; }
-    .welcome-logo { font-size: 32px; line-height: 32px; margin-bottom: 24px; }
+    .welcome-logo { margin-bottom: 24px; }
     .welcome-preview { min-width: 0; width: 100%; }
     .welcome-lead { font-size: 22px; }
 }

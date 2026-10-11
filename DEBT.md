@@ -1106,10 +1106,10 @@ author asked:
 
 - **It is HTML**, no game canvas, nothing of the game built. With a known `?dungeon=`
   the page is the game.
-- **At the top, "CSBweb"** centred, a medium-sized logo in the game's font. The design's
-  header goes, with its SETTINGS and CONTROLS links.
+- **At the top, the CSBweb logo** centred (`src/assets/csbweb-logo.jpg`, the author's).
+  The design's header goes, with its SETTINGS and CONTROLS links.
 - **A grid of the data sets** (`chooserSets`, `src/data/DataSets.ts`), each tile its
-  title screen, its name and a line under it. A set the store holds saves of is
+  title screen at half size, its name and a line under it. A set the store holds saves of is
   highlighted, the others dimmed. A click selects a tile, a golden border round it
   (the kit's `.pick`).
 - **Under the grid, PLAY and CONTINUE**, the kit's `.btn`, centred side by side. PLAY is
@@ -1122,9 +1122,9 @@ author asked:
   party, its level and when it was saved.
 - **The bottom as the design has it**: the line under the hero, the four columns, and
   the footer, whose links are ABOUT, SOURCE and CREDITS. ABOUT and CREDITS are E39's
-  pages. Where SOURCE leads is the author's to say: the repository is not public, so
-  until then the link is drawn and goes nowhere.
-- **Fonts**: the game's font for the logo, the grid, the buttons, the preview and the
+  pages. SOURCE is drawn disabled until the repository moves to GitHub, once this
+  list is short enough.
+- **Fonts**: the game's font for the grid, the buttons, the preview and the
   columns' yellow headings, as the design's kit draws it (artboard 10, "The game's
   font"). The prose, the line under the hero and the columns' paragraphs, is the
   design's Spectral, served with the page rather than from Google Fonts, whose every
@@ -1141,7 +1141,8 @@ The steps, one commit each:
    into the game as F9 does, skipping the title and the entrance; a row that is not
    the set's, or is not there, falls back to the entrance. Its check: the probe
    continues a stored save and finds its party in play.
-3. ⏳ **The title screens.** Each tile's picture is its set's title, decoded from its
+3. ⏳ **The title screens.** Each tile's picture, a navy 160x100 box meanwhile, is its
+   set's 320x200 title at half size, decoded from its
    `graphics.dat` at run time as the boot's title is (`src/renderer/intro/`), so the
    page fetches every listed set's `graphics.dat` (270 to 460 KB each), which the
    browser then has for the game.

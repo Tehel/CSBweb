@@ -21,13 +21,14 @@
  * Every other parameter of the page's query is kept on the way to the game (`?dev`).
  */
 import './welcomePage.css';
+import logoUrl from '../assets/csbweb-logo.jpg';
 import { chooserSets, type DataSet, type DataSetManifest } from '../data/DataSets';
 import { formatSaveDate, formatSaveTime, lastUsedSave, type SaveEntry, type SaveStore } from '../data/saves';
 
 /** The page's static half: the logo, the places the grid and the buttons go, and the bottom. */
 const PAGE = `
 <main class="welcome-page">
-  <h1 class="welcome-logo px px6">CSBweb</h1>
+  <h1 class="welcome-logo"><img src="${logoUrl}" alt="CSBweb" width="550" height="307"></h1>
   <div class="welcome-grid" role="group" aria-label="Dungeons"></div>
   <div class="welcome-actions">
     <a class="btn px" id="welcome-play">Play</a>
@@ -88,7 +89,7 @@ export async function showWelcomePage(body: HTMLElement, manifest: DataSetManife
         tile.className = saves > 0 ? 'pick' : 'pick dim';
         tile.dataset.set = set.id;
         tile.append(
-            line('pick-picture px px2', set.name),
+            line('pick-picture', ''),
             line('pick-name px px2', set.name),
             line('pick-saves px px2', saves === 0 ? 'No saved game' : saves === 1 ? '1 saved game' : `${saves} saved games`),
         );

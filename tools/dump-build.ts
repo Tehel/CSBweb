@@ -18,7 +18,7 @@ import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const PAGE_TYPES = new Set(['.html', '.js', '.css', '.ico', '.png']);
+const PAGE_TYPES = new Set(['.html', '.js', '.css', '.ico', '.jpg', '.png']);
 
 let failures = 0;
 function check(ok: boolean, what: string): void {
