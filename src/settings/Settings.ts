@@ -1,8 +1,9 @@
 /**
  * The player's settings: one model, outside the page and its DOM, that the page, the game
  * and the dialogs read and change through it (`DEBT.md` U). A change is saved at once and
- * told to every listener; `main.ts` applies it to the sound and the CRT effect, and to the
- * game (`applyToGame`), and the settings dialog shows it (`SettingsDialog.ts`).
+ * told to every listener; `main.ts` applies it to the sound, the CRT effect and the
+ * screen's shape, and to the game (`applyToGame`), and the settings dialog shows it
+ * (`SettingsDialog.ts`).
  *
  * It is kept in `localStorage` under `SETTINGS_KEY`. Where that key is absent, the page's
  * earlier settings (`OLD_SETTINGS_KEY`) are read once and written under the new key. A
@@ -20,6 +21,11 @@ export interface SettingsValues {
   readonly volume: number;
   /** The CRT effect, where the browser gives WebGL (`src/lib/crt.ts`). */
   readonly crt: boolean;
+  /**
+   * The screen's shape: 16:10, its pixels square, or 4:3, as a monitor of the ST's showed
+   * the 320x200 screen, its pixels taller than wide (`src/lib/fullscreen.ts`).
+   */
+  readonly aspectRatio: AspectRatio;
   /**
    * The FTL logo and the title before the entrance. The entrance is shown either way, as
    * it is where a game is chosen.
@@ -41,10 +47,14 @@ export interface SettingsValues {
   readonly keyLabels: KeyLabelLayout;
 }
 
+export const ASPECT_RATIOS = ['16:10', '4:3'] as const;
+export type AspectRatio = (typeof ASPECT_RATIOS)[number];
+
 export const DEFAULT_SETTINGS: SettingsValues = {
   sound: true,
   volume: 0.8,
   crt: false,
+  aspectRatio: '16:10',
   startupAnimations: true,
   statistics: true,
   mapView: false,
@@ -142,6 +152,7 @@ export function parseSettings(raw: unknown): SettingsValues {
     volume: typeof record.volume === 'number' && Number.isFinite(record.volume)
       ? Math.max(0, Math.min(1, record.volume)) : defaults.volume,
     crt: bool(record.crt, defaults.crt),
+    aspectRatio: ASPECT_RATIOS.find((ratio) => ratio === record.aspectRatio) ?? defaults.aspectRatio,
     startupAnimations: bool(record.startupAnimations, defaults.startupAnimations),
     statistics: bool(record.statistics, defaults.statistics),
     mapView: bool(record.mapView, defaults.mapView),

@@ -48,7 +48,8 @@
             pointer-events: none;
         }
         /* The 320x200 screen, three screen pixels to one, or in fullscreen the largest
-           whole multiple that fits. */
+           whole multiple that fits, at the shape DISPLAY's ASPECT RATIO gives it
+           (src/lib/fullscreen.ts). */
         .screen {
             width: var(--screen-width, 960px);
             height: var(--screen-height, 600px);

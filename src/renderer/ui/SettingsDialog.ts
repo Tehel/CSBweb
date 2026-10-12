@@ -14,7 +14,8 @@
  * - **A row of tabs**: GAME, DISPLAY, SOUND and KEYS, the selected one pressed.
  * - **The tab's settings.** On GAME and DISPLAY, each is a button holding its name,
  *   pressed when on and raised when off, two buttons a line (`settingButtonFrame`); a
- *   click turns it over. On SOUND, each is a line: its name on a panel, and beside it a
+ *   click turns it over. ASPECT RATIO's is a choice of two and names the one chosen:
+ *   16:10 raised, the default, and 4:3 pressed. On SOUND, each is a line: its name on a panel, and beside it a
  *   toggle, ON and OFF, the chosen one pressed, or a slider. The panel holds five lines.
  *   KEYS has its presets, its labels' layout and the list of the keys instead
  *   (`SettingsKeys.ts`).
@@ -161,6 +162,8 @@ export type SettingsTab = 'game' | 'display' | 'sound' | 'keys';
  */
 type Setting = {
   readonly name: string;
+  /** The name it shows when on, where that is not `name`: a choice of two, the aspect ratio's. */
+  readonly onName?: string;
   readonly help: string;
   /** Where the help line says something else of it: fullscreen where Esc leaves it. */
   readonly variant?: { readonly when: (ui: UIState) => boolean; readonly help: string };
@@ -236,11 +239,12 @@ export const TABS: ReadonlyArray<{
         set: (_values, on) => ({ crt: on }),
       },
       {
-        name: 'STARTUP ANIMATIONS',
-        help: 'THE FTL LOGO AND THE TITLE BEFORE THE ENTRANCE',
+        name: 'ASPECT RATIO 16:10',
+        onName: 'ASPECT RATIO 4:3',
+        help: 'SQUARE PIXELS, OR 4:3 AS ON AN ST MONITOR',
         kind: 'toggle',
-        get: (values) => values.startupAnimations,
-        set: (_values, on) => ({ startupAnimations: on }),
+        get: (values) => values.aspectRatio === '4:3',
+        set: (_values, on) => ({ aspectRatio: on ? '4:3' : '16:10' }),
       },
       {
         name: 'FULLSCREEN',
@@ -250,6 +254,13 @@ export const TABS: ReadonlyArray<{
         kind: 'page',
         get: (ui) => ui.fullscreen.isOn(),
         toggle: (ui) => ui.fullscreen.toggle(),
+      },
+      {
+        name: 'STARTUP ANIMATIONS',
+        help: 'THE FTL LOGO AND THE TITLE BEFORE THE ENTRANCE',
+        kind: 'toggle',
+        get: (values) => values.startupAnimations,
+        set: (_values, on) => ({ startupAnimations: on }),
       },
     ],
   },
@@ -374,6 +385,11 @@ function isOn(ui: UIState, setting: Setting & { kind: 'toggle' | 'page' }): bool
   return setting.kind === 'page' ? setting.get(ui) : setting.get(ui.settings.values);
 }
 
+/** What a setting is called now: a choice of two, the one chosen. */
+function nameOf(ui: UIState, setting: Setting): string {
+  return setting.onName !== undefined && setting.kind !== 'slider' && isOn(ui, setting) ? setting.onName : setting.name;
+}
+
 /** A toggle turned over. */
 function turnOver(ui: UIState, setting: Setting & { kind: 'toggle' | 'page' }): void {
   if (setting.kind === 'page') setting.toggle(ui);
@@ -488,7 +504,7 @@ function drawSettingButtons(ui: UIState, state: SettingsDialogState, look: (id: 
   settingsOf(state).forEach((setting, index) => {
     if (setting.kind === 'slider') return;
     const frame = settingButtonFrame(index);
-    drawButton(ui, frame, setting.name, inert(ui, setting) ? 'dim' : look(BTN_LINE0 + 3 * index, isOn(ui, setting)));
+    drawButton(ui, frame, nameOf(ui, setting), inert(ui, setting) ? 'dim' : look(BTN_LINE0 + 3 * index, isOn(ui, setting)));
   });
 }
 
@@ -497,7 +513,7 @@ function drawSettingLines(ui: UIState, state: SettingsDialogState, look: (id: nu
   drawPanel(ui, NAME_PANEL);
   const values = ui.settings.values;
   settingsOf(state).forEach((setting, line) => {
-    drawText(ui, setting.name, NAME_PANEL.x1 + 4, buttonLabelAt(lineRect(line)).y);
+    drawText(ui, nameOf(ui, setting), NAME_PANEL.x1 + 4, buttonLabelAt(lineRect(line)).y);
     const id = BTN_LINE0 + 3 * line;
     if (setting.kind === 'slider') {
       drawSlider(ui, sliderRect(line), setting.get(values));

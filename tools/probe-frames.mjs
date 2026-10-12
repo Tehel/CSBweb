@@ -28,7 +28,8 @@
 // first and leading to the welcome page, the map dialog
 // opened by a long press, but not with MAP VIEW off, the champion dialog opened by a
 // long press on the bars, where a tap opens the inventory, and fullscreen, entered by a
-// tap and a click, the screen and the effect sized and placed in it, and the welcome
+// tap and a click, the screen and the effect sized and placed in it, at 16:10 and at 4:3,
+// in it and out of it, and the welcome
 // page: its tiles, its fonts, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
 // straight into play. See `check` below.
 // A failure there exits 1.
@@ -637,6 +638,16 @@ console.log('state: settings, GAME');    await shot('21-settings-game');
 await leaveCanvas(); await wait(200);
 await canvasClick(120, 45, 0); await wait(300);
 console.log('state: settings, DISPLAY'); await shot('22-settings-display');
+// DISPLAY's ASPECT RATIO (236,71): 4:3 shows the 320x200 canvas 960x720, a click still
+// landing on what it shows, and 16:10 again 960x600.
+const canvasSize = () => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
+  return [c.width,c.height,r.width,r.height].join('x');})()`);
+await canvasClick(236, 71, 0); await wait(300);
+check((await settingsValues()).aspectRatio === '4:3' && await canvasSize() === '320x200x960x720',
+  'ASPECT RATIO at 4:3 shows the 320x200 canvas 960x720');
+await canvasClick(236, 71, 0); await wait(300);
+check((await settingsValues()).aspectRatio === '16:10' && await canvasSize() === '320x200x960x600',
+  'a click on it there, where it is shown, makes it 16:10, 960x600');
 await canvasClick(197, 45, 0); await wait(300);
 console.log('state: settings, SOUND');   await shot('23-settings-sound');
 // The VOLUME slider, dragged with CDP's own mouse from its left end, and released off the
@@ -789,6 +800,19 @@ for (const [width, height, expected] of [[1920, 1080, 5], [1366, 768, 3]]) {
   check(full.drawn[0] === Math.round(full.game[2] * full.ratio) && full.drawn[1] === Math.round(full.game[3] * full.ratio),
     'and is drawn at its size');
 }
+// At 4:3, the largest whole multiple of 320x240 that fits, centred, the effect over it.
+await canvasClick(236, 71, 0); await wait(500);
+{
+  const full = await screenLayout();
+  const scale = Math.floor(Math.min(full.w * full.ratio / 320, full.h * full.ratio / 240));
+  console.log(`state: fullscreen at 4:3, the screen ${full.game.join(',')}`);
+  check(scale === 3 && full.game[2] === 320 * scale / full.ratio && full.game[3] === 240 * scale / full.ratio
+    && Math.abs(full.game[1] - (full.h - full.game[3]) / 2) <= 0.5 && full.tube.every((v, i) => Math.abs(v - full.game[i]) < 0.01),
+    `at 4:3, the game canvas is 3 times 320x240, centred, the effect over it`);
+}
+check(await hoverAt(0.5, 0.5) === '160,100', 'at 4:3, the tube\'s middle is the screen\'s');
+await canvasClick(236, 71, 0); await wait(500);
+check((await screenLayout()).game[3] === 600, 'and at 16:10 again, 3 times 320x200');
 check(await hoverAt(0.5, 0.5) === '160,100', 'in fullscreen, the tube\'s middle is the screen\'s');
 check(await hoverAt(0.002, 0.002) === '0,0', 'and a point of its black corner is the screen\'s corner');
 await realClick(197, 45); await wait(300);

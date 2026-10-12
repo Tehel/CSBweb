@@ -22,7 +22,7 @@ import { UtilityDiskMessages, UtilityError } from './engine/Chaos';
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import { createCrtEffect, type CrtEffect } from './lib/crt';
-import { NO_FULLSCREEN, createFullscreen } from './lib/fullscreen';
+import { NO_FULLSCREEN, createFullscreen, type PageFullscreen } from './lib/fullscreen';
 import { GameScreen } from './renderer/GameScreen';
 import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
@@ -58,11 +58,12 @@ let swooshDir: string | null = null;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
 /**
- * `#game` in fullscreen, as DISPLAY's FULLSCREEN asks (`src/lib/fullscreen.ts`). The
- * browser's change redraws the screen, and the button with it.
+ * `#game` in fullscreen, as DISPLAY's FULLSCREEN asks, and the screen at the shape its
+ * ASPECT RATIO asks (`src/lib/fullscreen.ts`). The browser's change redraws the screen,
+ * and the button with it.
  */
-const fullscreen = gameCanvasEl.parentElement
-    ? createFullscreen(gameCanvasEl.parentElement, gameCanvasEl, () => refreshScreen()) : NO_FULLSCREEN;
+const fullscreen: PageFullscreen = gameCanvasEl.parentElement
+    ? createFullscreen(gameCanvasEl.parentElement, gameCanvasEl, () => refreshScreen()) : { ...NO_FULLSCREEN, setAspect: () => {} };
 
 /**
  * The player's settings (`src/settings/Settings.ts`), kept in `localStorage`, or for this
@@ -593,9 +594,13 @@ function wire({ game, screen, saves, messages, events }: Built): void {
     });
 }
 
-/** The player's settings, applied to what plays: the effect, the sound, the extras and the keys. */
+/**
+ * The player's settings, applied to what plays: the effect, the screen's shape, the sound,
+ * the extras and the keys.
+ */
 function applySettings({ game }: Built, sound: SoundManager, values: SettingsValues): void {
     setCrtEnabled(values.crt);
+    fullscreen.setAspect(values.aspectRatio);
     sound.setEnabled(values.sound);
     sound.setVolume(values.volume);
     applyToGame(game.ctx, values);

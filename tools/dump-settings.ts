@@ -38,8 +38,8 @@ console.log('=== the defaults ===');
   const values = new Settings(new MapStorage()).values;
   console.log(JSON.stringify({ ...values, keyBindings: '…' }));
   check(JSON.stringify(values) === JSON.stringify(DEFAULT_SETTINGS), 'an empty storage gives the defaults');
-  check(values.sound && values.volume === 0.8 && !values.crt && values.startupAnimations,
-    'sound on at 0.8, no CRT effect, the startup animations shown');
+  check(values.sound && values.volume === 0.8 && !values.crt && values.aspectRatio === '16:10' && values.startupAnimations,
+    'sound on at 0.8, no CRT effect, the screen 16:10, the startup animations shown');
   check(values.statistics && !values.mapView && !values.championView,
     'the statistics sent; the map and the champions off');
   check(JSON.stringify(values.extras) === JSON.stringify(NO_EXTRAS), 'every extra off');
@@ -75,13 +75,14 @@ console.log('\n=== fields of the wrong type ===');
 {
   const storage = new MapStorage();
   storage.items.set(SETTINGS_KEY, JSON.stringify({
-    sound: 'yes', volume: 7, crt: 1, startupAnimations: false, mapView: null,
+    sound: 'yes', volume: 7, crt: 1, aspectRatio: '5:4', startupAnimations: false, mapView: null,
     extras: { gatherThrownWeapons: 'on', drinkAtFountain: true },
     keyPreset: 'qwertz', keyBindings: { 'move.forward': ['KeyW', ''] },
   }));
   const values = new Settings(storage).values;
   console.log(JSON.stringify({ ...values, keyBindings: '…' }));
   check(values.sound === true && values.crt === false && values.mapView === false, 'a field of the wrong type is its default');
+  check(values.aspectRatio === '16:10', 'an aspect ratio of no known shape is 16:10');
   check(values.volume === 1, 'a volume past 1 is 1');
   check(values.startupAnimations === false, 'a field of the right type is kept beside them');
   check(!values.extras.gatherThrownWeapons && values.extras.drinkAtFountain && !values.extras.colourNewMastery,
@@ -96,6 +97,9 @@ console.log('\n=== fields of the wrong type ===');
   const volume = new MapStorage();
   volume.items.set(SETTINGS_KEY, JSON.stringify({ volume: -3 }));
   check(new Settings(volume).values.volume === 0, 'a volume below 0 is 0');
+  const aspect = new MapStorage();
+  new Settings(aspect).update({ aspectRatio: '4:3' });
+  check(new Settings(aspect).values.aspectRatio === '4:3', 'an aspect ratio of 4:3 is read back');
 }
 
 console.log('\n=== a table of keys, saved and read back ===');

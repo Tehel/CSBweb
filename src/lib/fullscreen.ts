@@ -1,14 +1,21 @@
 /**
  * Fullscreen: `#game` (index.html) taken whole through the Fullscreen API, the game canvas
  * and the CRT effect's canvas with it, at the largest whole multiple of 320x200 that fits,
- * centred on black.
+ * centred on black. And the screen's shape, in fullscreen and out of it: DISPLAY's ASPECT
+ * RATIO.
  *
  * The two canvases share `#game`'s one grid cell and the `.screen` class, whose size is
- * `#game`'s `--screen-width` and `--screen-height`: set here in fullscreen, and absent, the
- * page's 960x600, out of it. So the effect's canvas covers the game canvas at any size, and
- * the pointer, read from the game canvas's rect (`canvasPoint`, `src/lib/crt.ts`), lands
- * on what is shown. The multiple is counted in device pixels, so every pixel of the screen
- * is as many of the display's as every other, under `image-rendering: pixelated`.
+ * `#game`'s `--screen-width` and `--screen-height`, set here: out of fullscreen, three
+ * screen pixels to one, 960x600, the page's own until they are set. So the effect's canvas
+ * covers the game canvas at any size, and the pointer, read from the game canvas's rect
+ * (`canvasPoint`, `src/lib/crt.ts`), lands on what is shown. The multiple is counted in
+ * device pixels, so every pixel of the screen is as many of the display's as every other,
+ * under `image-rendering: pixelated`.
+ *
+ * The screen is 320x200 whatever its shape. At 16:10 its pixels are square; at 4:3 it is
+ * shown 320x240, as a monitor of the ST's showed it, each line 6/5 of a pixel's width
+ * tall: 960x720, and in fullscreen the largest whole multiple of 320x240. Its lines are
+ * then not all as many of the display's rows as every other, but for a multiple of five.
  *
  * Esc leaves a browser's fullscreen, and the page does not see the key. Where the browser
  * has the Keyboard Lock API (Chromium's), Esc is locked while in fullscreen: it reaches
@@ -19,6 +26,8 @@
  * dialog takes its clicks at the press; a finger's press is not, only its lift, so where
  * the browser says the page has no gesture yet the request waits for the lift.
  */
+
+import type { AspectRatio } from '../settings/Settings';
 
 export interface Fullscreen {
     /** Whether the browser can put the page's element in fullscreen. */
@@ -38,6 +47,18 @@ export const NO_FULLSCREEN: Fullscreen = {
     keepsEscape: () => false,
 };
 
+/** The page's fullscreen, and the screen's shape, which the page sets from the settings. */
+export interface PageFullscreen extends Fullscreen {
+    /** The screen shown at `aspect`, in fullscreen or out of it. */
+    setAspect: (aspect: AspectRatio) => void;
+}
+
+/** Out of fullscreen, screen pixels to one of the screen's, across. */
+const WINDOW_SCALE = 3;
+
+/** The screen's height for its width, at each shape. */
+const HEIGHT_PER_WIDTH: Record<AspectRatio, number> = { '16:10': 10 / 16, '4:3': 3 / 4 };
+
 interface KeyboardLock {
     lock?: (codes: string[]) => Promise<void>;
     unlock?: () => void;
@@ -48,26 +69,33 @@ function keyboardLock(): KeyboardLock | undefined {
 }
 
 /**
- * `host` in fullscreen on `toggle`, `screen` sized in it, and `onChange` told at every
- * change, as the browser makes it.
+ * `host` in fullscreen on `toggle`, `screen` sized in it and out of it, and `onChange`
+ * told at every change, as the browser makes it.
  */
-export function createFullscreen(host: HTMLElement, screen: HTMLCanvasElement, onChange: () => void): Fullscreen {
-    if (!document.fullscreenEnabled) return NO_FULLSCREEN;
-    const isOn = (): boolean => document.fullscreenElement === host;
+export function createFullscreen(host: HTMLElement, screen: HTMLCanvasElement, onChange: () => void): PageFullscreen {
+    const enabled = document.fullscreenEnabled;
+    const isOn = (): boolean => enabled && document.fullscreenElement === host;
+    let heightPerWidth = HEIGHT_PER_WIDTH['16:10'];
 
     const fit = (): void => {
-        if (!isOn()) {
-            host.style.removeProperty('--screen-width');
-            host.style.removeProperty('--screen-height');
-            return;
+        const width = screen.width;
+        const height = width * heightPerWidth;
+        let scale = WINDOW_SCALE;
+        let ratio = 1;
+        if (isOn()) {
+            ratio = devicePixelRatio;
+            scale = Math.max(1, Math.min(
+                Math.floor(host.clientWidth * ratio / width),
+                Math.floor(host.clientHeight * ratio / height)));
         }
-        const ratio = devicePixelRatio;
-        const scale = Math.max(1, Math.min(
-            Math.floor(host.clientWidth * ratio / screen.width),
-            Math.floor(host.clientHeight * ratio / screen.height)));
-        host.style.setProperty('--screen-width', `${screen.width * scale / ratio}px`);
-        host.style.setProperty('--screen-height', `${screen.height * scale / ratio}px`);
+        host.style.setProperty('--screen-width', `${width * scale / ratio}px`);
+        host.style.setProperty('--screen-height', `${height * scale / ratio}px`);
     };
+    const setAspect = (aspect: AspectRatio): void => {
+        heightPerWidth = HEIGHT_PER_WIDTH[aspect];
+        fit();
+    };
+    if (!enabled) return { ...NO_FULLSCREEN, setAspect };
 
     document.addEventListener('fullscreenchange', () => {
         fit();
@@ -83,6 +111,7 @@ export function createFullscreen(host: HTMLElement, screen: HTMLCanvasElement, o
     };
 
     return {
+        setAspect,
         isAvailable: () => true,
         isOn,
         toggle: () => {

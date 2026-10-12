@@ -13,7 +13,8 @@
  * 3. **The controls**: a tab, a setting's button, which a click turns over, a toggle, the
  *    slider clicked, dragged past the track's end and released; a click on the chosen side
  *    of a toggle changes nothing; the CRT effect's button dim without WebGL, taking no
- *    click, the help line saying why; FULLSCREEN asking the page, changing no setting,
+ *    click, the help line saying why; ASPECT RATIO's button naming the shape chosen,
+ *    raised at 16:10 and pressed at 4:3; FULLSCREEN asking the page, changing no setting,
  *    shown as the page says, its help line as Esc leaves it, and inert where the browser
  *    has none; Esc, CLOSE and a right click close it; the clock held while it is up.
  * 3b. **EXIT** asks first, `_DoMenu`'s centred two-option menu on black, which takes no
@@ -57,7 +58,7 @@ import { KEY_LABEL_CHARS } from '../src/renderer/ui/KeyLabels';
 import { KEYPAD_KEY_BINDINGS } from '../src/renderer/ui/Keyboard';
 import { arrowBox, listTextX } from '../src/renderer/ui/Widgets';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
-import { CHAR_WIDTH, DIM_COLOR, LIT_COLOR, buttonLabelAt, buttonRect } from '../src/renderer/ui/Widgets';
+import { CHAR_WIDTH, DIM_COLOR, LIT_COLOR, buttonLabelAt, buttonRect, drawButton } from '../src/renderer/ui/Widgets';
 import { MENU_OPTION_COLOR } from '../src/renderer/ui/Menu';
 import { Settings } from '../src/settings/Settings';
 import { NO_FULLSCREEN, type Fullscreen } from '../src/lib/fullscreen';
@@ -157,13 +158,15 @@ console.log('\n=== 2. the layout ===');
   console.log(`  lines: ${TABS.map((t) => `${t.label} ${lineCount(t)}`).join(', ')}`);
   check(TABS.every((t) => lineCount(t) <= SETTING_LINES), `no tab has more than ${SETTING_LINES} lines`);
   check(TABS.every((t) => !t.buttons || t.settings.every((s) => s.kind !== 'slider')), 'a tab of buttons has only toggles');
-  const outside = TABS.filter((t) => t.buttons).flatMap((t) => t.settings.filter((s, i) => {
+  const outside = TABS.filter((t) => t.buttons).flatMap((t) => t.settings.flatMap((s, i) => {
     const frame = settingButtonFrame(i);
-    const x1 = buttonLabelAt(frame).x - (CHAR_WIDTH / 2) * s.name.length;
-    return x1 < frame.x1 + 6 || x1 + s.name.length * CHAR_WIDTH - 1 > frame.x2 - 6;
-  }).map((s) => s.name));
+    return [s.name, s.onName ?? s.name].filter((name) => {
+      const x1 = buttonLabelAt(frame).x - (CHAR_WIDTH / 2) * name.length;
+      return x1 < frame.x1 + 6 || x1 + name.length * CHAR_WIDTH - 1 > frame.x2 - 6;
+    });
+  }));
   check(outside.length === 0, `every name inside its button's face${outside.length ? `: ${outside.join(', ')}` : ''}`);
-  check(TABS.filter((t) => !t.buttons).every((t) => t.settings.every((s) => s.name.length <= nameChars)),
+  check(TABS.filter((t) => !t.buttons).every((t) => t.settings.every((s) => Math.max(s.name.length, s.onName?.length ?? 0) <= nameChars)),
     `every line's name fits its panel, ${nameChars} characters`);
   const helps = [EXIT_HELP, ...settings.flatMap((s) => [s.help, s.variant?.help ?? '', s.unavailable?.help ?? '']), ...TABS.map((t) => t.help)];
   check(helps.every((h) => h.length <= helpChars), `every help line fits, ${helpChars} characters`);
@@ -239,7 +242,7 @@ console.log('\n=== 3. the controls ===');
   openSettingsDialog(noWebGL);
   noWebGL.settingsDialog!.tab = 'display';
   const names = settingsDialogButtons(noWebGL, noWebGL.settingsDialog!).map((b) => b.name);
-  check(!names.includes('settings.button0') && names.includes('settings.button1'),
+  check(!names.includes('settings.button0') && names.includes('settings.button3'),
     'without WebGL, the CRT effect has no button in the list, and STARTUP ANIMATIONS has');
   click(noWebGL, settingButtonFrame(0));
   check(!noWebGL.settings.values.crt, 'and a click on it does nothing');
@@ -255,9 +258,46 @@ console.log('\n=== 3. the controls ===');
     return found;
   };
   const crt = colours(settingButtonFrame(0));
-  const startup = colours(settingButtonFrame(1));
+  const startup = colours(settingButtonFrame(3));
   check(crt.has(DIM_COLOR) && !crt.has(MENU_OPTION_COLOR) && !crt.has(LIT_COLOR), 'the CRT effect\'s label is dim, under the pointer');
   check(startup.has(LIT_COLOR) && !startup.has(DIM_COLOR), 'STARTUP ANIMATIONS\', on, is pressed and lit');
+
+  // ASPECT RATIO, DISPLAY's second button: a choice of two, its button named for the one
+  // chosen, raised at 16:10, the default, and pressed at 4:3; drawn as the kit draws a
+  // button of that name and look.
+  {
+    const ui = freshUI();
+    openSettingsDialog(ui);
+    click(ui, TAB_FRAMES[1]);
+    const frame = settingButtonFrame(1);
+    const face = (of: UIState) => {
+      const r = buttonRect(frame);
+      const buf = of.screenIndexBuffer;
+      const rows: number[] = [];
+      for (let y = r.y1; y <= r.y2; y++) for (let x = r.x1; x <= r.x2; x++) rows.push(buf.pixels[y * buf.width + x]);
+      return rows.join(',');
+    };
+    const drawnAs = (label: string, look: 'raised' | 'pressed') => {
+      const other = freshUI();
+      drawButton(other, frame, label, look);
+      return face(other);
+    };
+    const shown = () => {
+      settingsDialogPointer(ui, null);
+      drawSettingsDialog(ui);
+      return face(ui);
+    };
+    check(ui.settings.values.aspectRatio === '16:10' && shown() === drawnAs('ASPECT RATIO 16:10', 'raised'),
+      'ASPECT RATIO is 16:10 by default, its button raised and so named');
+    click(ui, frame);
+    check(ui.settings.values.aspectRatio === '4:3' && shown() === drawnAs('ASPECT RATIO 4:3', 'pressed'),
+      'a click makes it 4:3, its button pressed and so named');
+    click(ui, frame);
+    check(ui.settings.values.aspectRatio === '16:10' && shown() === drawnAs('ASPECT RATIO 16:10', 'raised'),
+      'a second click makes it 16:10 again');
+    settingsDialogPointer(ui, centre(frame));
+    check(helpText(ui, ui.settingsDialog!) === 'SQUARE PIXELS, OR 4:3 AS ON AN ST MONITOR', 'the help line names both');
+  }
 
   // FULLSCREEN, DISPLAY's third button: the page's state, no setting.
   check(!names.includes('settings.button2'), 'where the browser has no fullscreen, FULLSCREEN has no button in the list');
