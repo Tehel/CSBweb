@@ -28,6 +28,11 @@ golden frame. What waits on the author for it is C150. Its `dungeon.dat` is enci
 skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets"). Every DSA operation CSBWin has is ported, not only Conflux's share
 (`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
 
+**First, at the author's request: P — players' own data sets.** A player adds a dungeon
+from their own files to the welcome page and plays it (P1 to P5), then edits and publishes
+it (P6 to P8). They are not CSBWin features but the page's, and come before every other
+tier.
+
 **Before the rest, at the author's request: U — the interface in the canvas.** The
 page's settings, map and champion views become dialogs drawn in the game's own screen,
 from the game's own art, so the public build has nothing beside the canvas. It is the
@@ -108,6 +113,14 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| P1 | The local sets' store, and a set's files read from it | M | ⏳ |
+| P2 | The welcome page: the local sets, and "+ Add my own" | S | ⏳ after P1 |
+| P3 | The form that adds a set | L | ⏳ after P2 |
+| P4 | A thumbnail generated from the data | S | ⏳ after P3 |
+| P5 | A local set's saves import | S | ⏳ after P1 |
+| P6 | Editing and deleting a local set | M | ⏳ after P3, a decision of the author's |
+| P7 | The data sets in the server's database | L | ⏳ |
+| P8 | Publishing a local set | L | ⏳ after P6, P7 |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
@@ -186,8 +199,139 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C182 · D22 · E40 · F21 · G31 · R15 · U11 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E40 · F21 · G31 · P9 · R15 · U11 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
+
+---
+
+## P — Players' own data sets
+
+At the author's request, from the forum: a player adds a dungeon from their own files, plays
+it like any other, and later offers it to the site. It mirrors CSBWin, which plays whatever
+its `directory=` holds (`src/data/DataSets.ts`), so the engine does not change and nothing
+goes in H. Two phases: P1 to P5 keep a set in the player's browser, and P6 to P8 publish it.
+
+Decisions taken with the author, for every row:
+
+- **A local set's id is `local:<id>`**, the `<id>` chosen by the player and unique among
+  their local sets. No manifest id has the prefix, so a local set never shadows a site set.
+  Publishing (P8) drops the prefix and checks that the id is unique on the server.
+- **No `graphics.dat` given: the player chooses DM's or CSB's.** The set then reads that
+  set's file (`dm-atari` or `csb`) from its folder.
+- **No statistics for a local set**: `GameEvents` sends nothing. The server's
+  `events.ts` takes only manifest ids anyway.
+- **The `playerId` is a secret** (`src/ui/gameEvents.ts`). Ownership in P7 and P8 rests on
+  it alone, so the server never returns one, writes one in its logs or takes one in a URL's
+  query. A lost id is handled by hand on the forum for now.
+
+A custom dungeon reaches what the shipped ones do not. R7 and R8 matter more once P1 is
+in.
+
+### P1 ⏳ The local sets' store, and a set's files read from it
+
+- **The store**: a `dataSets` object store in `src/data/saves/idb.ts` (`DB_VERSION` 4 to
+  5; bump it last, `.claude/memory/live-tree-is-served.md`). A record has the id, name,
+  short description, list of authors, `dmRules` (the reincarnation rule), the base set
+  when it has no `graphics.dat`, the files as Blobs by name (`dungeon.dat`, and
+  optionally `graphics.dat`, `CSBgraphics.dat`, `hcsb.hct` with `hcsb.dat`, the
+  thumbnail), its dungeon's signature (`dungeonSignature`, for P5) and its creation date.
+- **Choosing the set**: `chooseDataSet` (`src/main.ts:631`) only knows the manifest. A
+  `?dungeon=local:<id>` is read from the store first, and builds a `DataSet` whose flags
+  follow from the record: `csbGraphics` and `hintOracle` from the files present,
+  `miniDat` false (no RISE), `hidden` false.
+- **Reading the files**: `loadGameFiles`, `loadHintOracle`, `readNewGame`, `readMiniDat`
+  and `readUtilityPortraits` (`src/main.ts:131-205`) each `fetch` `${dataSet.dir}/<name>`.
+  They read through a file source instead: the folder over HTTP, or the record's Blobs.
+  `GraphicsLoader` has `loadFromArray`. `CSBGraphicsLoader` has only `load(url)`
+  (`src/data/CSBGraphicsLoader.ts:341`), which needs a load from bytes.
+- **No events**: `GameEvents` stays silent for a local set.
+- **Evidence**: a tool that builds a local set in memory from a manifest set's files,
+  plays it through the file source, and checks the world matches the manifest set's.
+
+### P2 ⏳ The welcome page: the local sets, and "+ Add my own"
+
+- The grid shows the local sets beside the manifest's, under the same order
+  (`tileOrder`). A tile's picture is the record's thumbnail, through an object URL, or
+  the blank box.
+- A local set's saves count: `known` (`src/ui/welcomePage.ts:106`) holds the local ids
+  too.
+- A last tile, "+ Add my own", opens P3's form on a single click. It is never selected,
+  and PLAY never leads to it.
+- A golden frame or a `probe-frames.mjs` check covers the tile and a local set's tile.
+
+### P3 ⏳ The form that adds a set
+
+L, in steps: the form and the record written; then what the files hold, shown as they
+are dropped.
+
+- **Fields**: the id (the part after `local:`), the name, a short description, the
+  authors, the reincarnation rule (`dmRules`), and DM's or CSB's graphics when no
+  `graphics.dat` is given.
+- **Files**, each dropped or picked and each replaceable before confirming:
+  `dungeon.dat` (required), `graphics.dat`, `CSBgraphics.dat`, the Oracle's `hcsb.hct`
+  and `hcsb.dat` (both or neither), and a thumbnail image (or P4's button).
+- **Checks before CONFIRM**:
+  - `dungeon.dat` reads, enciphered or not.
+  - `graphics.dat` and `CSBgraphics.dat` parse.
+  - A dungeon whose extended features expect a `CSBgraphics.dat`
+    (`expectedCSBgraphicSignature1/2`, `src/data/CsbwinExtendedFeatures.ts:795`) gets
+    one, and its signature matches (`src/engine/FileSignatures.ts`). Otherwise the
+    boot ends in a `die(0xbad)`.
+  - The id is free.
+- **What the dungeon holds**, shown when it is dropped: levels, items by kind, monsters
+  and groups, DSAs and the operations they use. The DSA census is
+  `tools/dump-dsa-census.ts`'s, moved into `src/` so the page and the tool share it.
+- The page's look is the welcome page's (`welcomePage.css`).
+
+### P4 ⏳ A thumbnail generated from the data
+
+The form accepts a thumbnail file, and also offers "Generate from data", which draws the
+same thumbnail as `tools/gen-thumbnails.ts`: the last frame of the title, from the set's
+`graphics.dat` (the base set's when the player gave none). The tool's drawing moves into
+`src/`, shared by the page and the tool, and its `--check` still passes.
+
+### P5 ⏳ A local set's saves import
+
+`GameSaves` refuses a save of an `unknown` or `other` dungeon (`checkDungeon`,
+`src/engine/GameSaves.ts:388`). For a local set, the check is made first against the
+record's own signature: whole, the save is the set's own; partly, it is `modified`.
+Checking the local signature first covers a local set that holds a known dungeon (DM's
+`dungeon.dat` with other graphics), which `KNOWN_DUNGEONS` alone would call `other`.
+
+### P6 ⏳ Editing and deleting a local set
+
+The form reopens on a record. Every file but `dungeon.dat` can be removed, any file can
+be replaced, and the text fields and options can be changed. The id stays: saves are
+filed under it. Deleting a set that has saves needs a decision from the author (delete
+them, keep them, or refuse) before this row is taken.
+
+### P7 ⏳ The data sets in the server's database
+
+- **The table**: an SQLite table replaces `manifest.json`. A row holds a set's fields,
+  its folder, its status (approved or pending) and its owner's `playerId`.
+  `checkFiles` (`server/app.ts:72`) checks the table's folders at start-up instead.
+- **The manifest**, served per request: the approved sets to everyone, a pending set
+  also to its owner, and everything to the author, whose `playerId` is in the server's
+  `.env`. The `playerId` travels in a header or the body, never the query. The answer
+  holds no `playerId`, only a set's status.
+- **The tools** read `static/gamefiles/manifest.json` (`tools/lib/dataSets.ts`), so the
+  repository's manifest stays, and seeds the table. How the two stay in step is settled
+  with the author when this row is taken.
+- **Deployment**: `gamefiles` mounted read-write (`doc/DEPLOYMENT.md`), and `backup.ts`
+  covers the uploaded folders and the table.
+
+### P8 ⏳ Publishing a local set
+
+L.
+
+- **PUBLISH** in P6's form sends the record's files and fields with the `playerId`.
+- **The server**:
+  - drops `local:` and refuses an id already in the table;
+  - caps each file's size and each player's rate;
+  - parses `dungeon.dat` with the page's own reader;
+  - writes the folder under `gamefiles/<id>/` and the row as pending, owned by the sender.
+- **Approval**: an endpoint only the author's `playerId` may call. The pending set's tile
+  says that it is pending.
 
 ---
 
