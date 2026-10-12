@@ -28,7 +28,7 @@
 // opened by a long press, but not with MAP VIEW off, the champion dialog opened by a
 // long press on the bars, where a tap opens the inventory, and fullscreen, entered by a
 // tap and a click, the screen and the effect sized and placed in it, and the welcome
-// page: its tiles, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
+// page: its tiles, its fonts, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
 // straight into play. See `check` below.
 // A failure there exits 1.
 //
@@ -49,7 +49,9 @@
 //
 // This is the closest thing the project has to a rendering test (PLAN.md Phase 15) — it
 // caught nothing during the Phase 14 split, which is exactly what it was there to do.
+import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { BUILD_PARTY } from './lib/buildParty.mjs';
 import { encodeFrame } from './lib/frames.mjs';
 
@@ -326,6 +328,33 @@ check(atWelcome.play === null && /dungeon=dm-atari/.test(atWelcome.resume ?? '')
 check(atWelcome.preview.length === 3 && atWelcome.preview[0] === 'Dungeon Master' && atWelcome.preview[1].split(' · ').length === 4
   && /^Level \d+ · \d{4}-\d\d-\d\d \d\d:\d\d$/.test(atWelcome.preview[2]),
   'the box beside CONTINUE shows its set, its party of four, its level and when it was saved');
+// The page's fonts. Its labels are in 'DM Screen', the default set's `<id>-font.ttf`, and
+// the browser draws it as the game draws its font: every character, at ten screen pixels
+// to a font pixel, is its six rows of five pixels from graphics.dat (`gen-fonts.ts --rows`),
+// with nothing in the sixth column or the row above and below, and an advance of six.
+// Its prose is in Spectral, served with the page: no request leaves for Google Fonts.
+const fontRows = JSON.parse(execFileSync('npx', ['tsx', 'tools/gen-fonts.ts', '--rows'],
+  { encoding: 'utf8', cwd: fileURLToPath(new URL('..', import.meta.url)) }));
+const fonts = await evaluate(`(async()=>{await document.fonts.ready; await document.fonts.load('80px "DM Screen"');
+  const rows=${JSON.stringify(fontRows)}, P=10, wrong=[];
+  const c=document.createElement('canvas'); c.width=16*P*7; c.height=Math.ceil(rows.length/16)*P*9;
+  const g=c.getContext('2d',{willReadFrequently:true}); g.font='80px "DM Screen"'; g.textBaseline='alphabetic';
+  rows.forEach(([code],i)=>g.fillText(String.fromCharCode(code),(i%16)*P*7,Math.floor(i/16)*P*9+P*6));
+  const a=g.getImageData(0,0,c.width,c.height).data;
+  rows.forEach(([code,glyph],i)=>{const x=(i%16)*P*7, top=Math.floor(i/16)*P*9+P;
+    if(g.measureText(String.fromCharCode(code)).width!==6*P) wrong.push(code+' advance');
+    for(let r=-1;r<=6;r++) for(let col=0;col<6;col++){
+      const lit=a[((top+r*P+P/2)*c.width+x+col*P+P/2)*4+3]>127;
+      const want=r>=0&&r<6&&col<5&&((glyph[r]>>(4-col))&1)===1;
+      if(lit!==want){wrong.push(code+' '+r+','+col);return;}}});
+  const face=[...document.fonts].find(f=>f.family.replace(/"/g,'')==='DM Screen');
+  return {dm: face&&face.status, spectral: document.fonts.check('30px Spectral') && document.fonts.check('italic 30px Spectral'),
+    google: performance.getEntriesByType('resource').filter(e=>/googleapis|gstatic/.test(e.name)).length,
+    characters: rows.length, wrong};})()`);
+console.log('  ', JSON.stringify(fonts));
+check(fonts.dm === 'loaded' && fonts.characters > 90 && fonts.wrong.length === 0,
+  "the labels' font is the default set's font file, drawn as the game draws graphics.dat's font, every character");
+check(fonts.spectral && fonts.google === 0, 'the prose is in Spectral, regular and italic, served with the page');
 await clickOn('.pick[data-set="csb"]');
 const atCsb = await welcome();
 check(atCsb.tiles.includes('csb!') && /dungeon=csb/.test(atCsb.play ?? '') && !/save=/.test(atCsb.play ?? '')

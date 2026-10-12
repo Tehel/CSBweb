@@ -21,10 +21,15 @@
  * that cannot be read (IndexedDB refused) is a store with no save.
  *
  * Every other parameter of the page's query is kept on the way to the game (`?dev`).
+ *
+ * The labels are HTML text in the game's font: the default set's font file (`fontPath`),
+ * graphics.dat's font made a TrueType font by `tools/gen-fonts.ts`, so the page fetches
+ * no game file for it either. Until it loads, or where it does not, they are in the
+ * browser's monospace. The prose is in Spectral, served with the page.
  */
 import './welcomePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
-import { chooserSets, thumbnailPath, type DataSet, type DataSetManifest } from '../data/DataSets';
+import { chooserSets, fontPath, thumbnailPath, type DataSet, type DataSetManifest } from '../data/DataSets';
 import { formatSaveDate, formatSaveTime, lastUsedSave, type SaveEntry, type SaveStore } from '../data/saves';
 
 /** The page's static half: the logo, the places the grid and the buttons go, and the bottom. */
@@ -59,9 +64,10 @@ const PAGE = `
     </div>
   </section>
   <footer class="welcome-footer">
-    <p>Dungeon Master and Chaos Strikes Back are FTL Games titles; their data files are read as they were released. The engine follows CSBWin by Paul R. Stevens. A non-commercial fan port. [RIGHTS NOTICE TO SETTLE BEFORE LAUNCH]</p>
+    <p>Dungeon Master © 1987 and Chaos Strikes Back © 1989 FTL Games, Software Heaven, Inc. Their names, pictures, sounds and data files belong to their rights holders, and are served here only to be played. The other dungeons belong to their authors. The engine is a port of CSBWin by Paul R. Stevens. CSBweb is a free, non-commercial fan project, not affiliated with or endorsed by any of them. Rights holders: write to csbweb[at]looten.net, and whatever you ask is taken down.</p>
     <nav class="px px2" aria-label="Footer">
-      <a href="#about">About</a>
+      <a aria-disabled="true" href="#about">About</a>
+      <a aria-disabled="true">Stats</a>
       <a aria-disabled="true">Source</a>
       <a aria-disabled="true">Credits</a>
     </nav>
@@ -75,6 +81,10 @@ const PAGE = `
 export async function showWelcomePage(body: HTMLElement, manifest: DataSetManifest, store: Pick<SaveStore, 'list'>): Promise<void> {
     const known = new Set(manifest.dataSets.map((set) => set.id));
     const rows = (await store.list(null).catch(() => [] as SaveEntry[])).filter((row) => known.has(row.dataSet));
+
+    const font = new FontFace('DM Screen', `url(${fontPath(manifest.defaultSet)})`);
+    document.fonts.add(font);
+    font.load().catch(() => {});
 
     body.classList.add('welcome');
     body.innerHTML = PAGE;

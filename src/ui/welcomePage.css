@@ -1,6 +1,24 @@
 /* The welcome page (`src/ui/welcomePage.ts`), in the design kit's look: every colour an
    entry of the game's UI palette (graphics.dat palette 552, entry 0), the bevels graphic
    0's at three screen pixels to one. */
+
+/* The prose's face, served with the page: Spectral's Latin subset (SIL OFL 1.1,
+   `src/assets/spectral-OFL.txt`). The game's, 'DM Screen', is `welcomePage.ts`'s. */
+@font-face {
+    font-family: Spectral;
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../assets/spectral-regular.woff2') format('woff2');
+}
+@font-face {
+    font-family: Spectral;
+    font-style: italic;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../assets/spectral-italic.woff2') format('woff2');
+}
+
 body.welcome {
     --p0: #000000; --p1: #6c6c6c; --p2: #909090; --p3: #6c2400;
     --p5: #904800; --p7: #00d800; --p9: #fcb400; --p10: #d8906c;
@@ -23,7 +41,8 @@ body.welcome {
     flex-direction: column;
 }
 
-/* The game's font: an em is 8 game pixels, so 24px is three to one. */
+/* The game's font: an em is 8 game pixels, its six-pixel line in the middle, so 24px is
+   three to one. */
 .px {
     font-family: 'DM Screen', monospace;
     font-size: 24px;

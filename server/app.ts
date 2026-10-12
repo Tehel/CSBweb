@@ -54,8 +54,10 @@ const CONTENT_TYPES: Record<string, string> = {
     '.jpg': 'image/jpeg',
     '.png': 'image/png',
     '.svg': 'image/svg+xml',
+    '.ttf': 'font/ttf',
     '.txt': 'text/plain; charset=utf-8',
     '.wav': 'audio/wav',
+    '.woff2': 'font/woff2',
 };
 
 const NO_CACHE = 'no-cache';

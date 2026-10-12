@@ -113,7 +113,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   press, and only with MAP VIEW on, the champion dialog opened by a long press on
   the stat bars, where a tap opens the inventory at its release, and fullscreen, entered
   by a tap and by a click, the screen and the effect sized and centred in it; and the
-  welcome page's tiles, its selection, where PLAY and CONTINUE lead, and CONTINUE's
+  welcome page's tiles, its fonts, its selection, where PLAY and CONTINUE lead, and CONTINUE's
   save read straight into play.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for

@@ -108,7 +108,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E15 | The page shell | L | ⚠️ step 4 of 6 next |
+| E15 | The page shell | L | ⚠️ step 5 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
@@ -1147,12 +1147,16 @@ The steps, one commit each:
    `graphics.dat`, so the page fetches no game file. `npm test` checks every committed
    thumbnail against the title's frame, and `tools/probe-frames.mjs` that each tile
    shows its own and that the page fetched no `.dat`.
-4. ⏳ **The fonts.** The game's font is the browser's monospace meanwhile
-   (`'DM Screen', monospace`, `src/ui/welcomePage.css`), and the prose Georgia. The
-   game's font is to be read from the default set's `graphics.dat` and made a
-   `FontFace` at run time (a TrueType font of one square contour per lit pixel
-   run, built in memory), so the page's labels stay HTML text; Spectral, OFL, as files
-   under `src/assets/`.
+4. ✅ **The fonts.** The labels are HTML text in 'DM Screen', the default set's
+   `<id>-font.ttf` (`fontPath`, `src/data/DataSets.ts`), loaded as a `FontFace`: the
+   game's font, graphics.dat's item 0x22d, made a TrueType font by `tools/gen-fonts.ts`
+   (one rectangle per run of lit pixels, `tools/lib/ttf.ts`), a file in each set's
+   folder like its thumbnail, so the page fetches no game file. Its one glyph the game
+   lacks is the middle dot, the colon's dot a row down; the at sign, blank in the game's
+   font, is left to the browser's. The prose is Spectral's Latin subset, regular and
+   italic, under `src/assets/` with its OFL. `npm test` checks every committed font
+   against graphics.dat, and `tools/probe-frames.mjs` that the browser draws each of its
+   characters as the game draws it, and that no request goes to Google Fonts.
 5. ⏳ **EXIT.** The settings dialog's EXIT (`src/renderer/ui/SettingsDialog.ts`), drawn
    inert, goes live: it asks first in `_DoMenu`'s two-option menu, as what has not been
    saved is lost, then opens the page without `?dungeon=`.

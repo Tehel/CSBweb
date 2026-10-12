@@ -9,7 +9,7 @@
  *     there each stop it, saying why;
  *   - `/` and `/assets/…`: the page, `no-cache`, and the hashed files, `immutable`;
  *   - `/gamefiles/…`: ETag and Last-Modified, a 304 for either precondition, HEAD without
- *     a body, and the query ignored;
+ *     a body, the query ignored, and a set's font as `font/ttf`;
  *   - no path leaves the two folders, `..` and `.` raw, percent-encoded or behind a
  *     backslash, and no dot-file is served;
  *   - `/api/health`, and a 405 for a method that is not GET or HEAD;
@@ -88,6 +88,7 @@ function scratchFiles(scratch: string): ServerOptions {
         dataSets: [{ id: 'a', name: 'A', dir: 'set-a' }],
     }));
     writeFileSync(join(gamefilesDir, 'set-a', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
+    writeFileSync(join(gamefilesDir, 'set-a', 'a-font.ttf'), Buffer.from([0, 1, 0, 0]));
     writeFileSync(join(gamefilesDir, 'set-a', '.hidden'), 'hidden');
     writeFileSync(join(scratch, 'secret.txt'), 'SECRET');
     return { distDir, gamefilesDir };
@@ -158,6 +159,8 @@ async function checkAnswers(port: number): Promise<void> {
     check(head.status === 200 && head.body === '' && head.headers['content-length'] === '4', 'HEAD: the headers, no body');
     const manifest = await ask(port, '/gamefiles/manifest.json');
     check(manifest.status === 200 && String(manifest.headers['content-type']).startsWith('application/json'), 'the manifest, as JSON');
+    const font = await ask(port, '/gamefiles/set-a/a-font.ttf');
+    check(font.status === 200 && font.headers['content-type'] === 'font/ttf', `a set's font, as font/ttf (${font.headers['content-type']})`);
 
     console.log('\nPaths that would leave the folders:');
     for (const path of [

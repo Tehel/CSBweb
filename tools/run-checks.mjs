@@ -315,6 +315,10 @@ const CHECKS = [
   // The welcome page's thumbnails, each set's `<id>-thumbnail.png`: the title's last frame,
   // played from the set's graphics.dat, pixel for pixel and colour for colour.
   { tool: 'gen-thumbnails.ts', args: ['--check'] },
+  // The welcome page's font, each set's `<id>-font.ttf`: graphics.dat's font as a TrueType
+  // font, byte for byte what the tool writes. That the browser draws it as the game does is
+  // the frames' check.
+  { tool: 'gen-fonts.ts', args: ['--check'] },
   // The FTL logo before the title, not CSBWin's: `swoosh.img`'s picture decoded (2306 bytes
   // for 64000 pixels, and a reference picture pixel for pixel) and its palette script run
   // on a headless host, each colour at its VBL.
