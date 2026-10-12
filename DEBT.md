@@ -30,7 +30,7 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it and deletes it; what is left
-is publishing it (P8). They are not CSBWin features but the page's, and come before every other
+is publishing it, and moderating what is published (P9, P8). They are not CSBWin features but the page's, and come before every other
 tier.
 
 **Before the rest, at the author's request: U — the interface in the canvas.** The
@@ -113,7 +113,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P8 | Publishing a local set | L | ⏳ |
+| P9 | Moderators, and the sets only they see | S | ⏳ |
+| P8 | Publishing a local set, and moderating it | L | ⏳ after P9 |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
@@ -191,7 +192,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C182 · D22 · E40 · F21 · G31 · P9 · R15 · U11 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E40 · F21 · G31 · P10 · R15 · U11 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -264,23 +265,91 @@ Decisions taken with the author, for every row:
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
 
-### P8 ⏳ Publishing a local set
+### P9 ⏳ Moderators, and the sets only they see
 
-L.
+S, before P8, whose endpoint it gates. Decided with the author:
 
-- **PUBLISH** in the form opened by a set's pen sends the record's files and fields with the `playerId`.
-- **The server**:
-  - drops `local:` and refuses an id already in the table;
-  - caps each file's size and each player's rate;
-  - parses `dungeon.dat` with the page's own reader;
-  - refuses an id whose folder `gamefiles/<id>/` already exists (`swoosh/`, or a folder no
-    row names) or that starts with `.` (the server serves no such segment);
-  - writes the folder under `gamefiles/<id>/` whole, then the row as pending, owned by the
-    sender, and never changes the folder after: `backup.ts` copies each owned set's folder
-    once, the first night its row is in a snapshot (`doc/DEPLOYMENT.md` → "Backups").
-- **Approval**: an endpoint only the author's `playerId` may call. The pending set's tile
-  says that it is pending.
+- **Moderators, not one author.** `AUTHOR_PLAYER_ID` (`server/server.ts`, `server/app.ts`)
+  becomes `MODERATOR_PLAYER_IDS`, a comma-separated list of `playerId`s, so that the
+  burden can be shared: spaces around a comma are ignored, unset or empty is no moderator,
+  and an entry that is not a `playerId` stops the start. `DataSetViewer.author`
+  (`server/dataSets.ts`) becomes `moderator`. A set with no owner (`owner` NULL, the
+  manifest's, uploaded by hand) is the site's, not a moderator's.
+- **A moderator sees every set in the grid**, hidden and pending included. The answer to
+  `api/data-sets` says `"moderator": true` at its top level, to a moderator only, which
+  `parseManifest` reads into the manifest, and `chooserSets` then keeps the hidden sets.
+  It tells the asker nothing they do not hold: their own id is a moderator's.
+- **A tile's name says its set's state**: cyan for a local set (`--p4`, as now), red for a
+  pending one (needs attention: the UI palette's entry 8, `0700`, `#fc0000`), purple for a
+  hidden one, white otherwise (`--p15`). A pending set is red to its owner too, and red
+  wins over purple. The UI palette (graphics.dat palette 552, entry 0) holds no purple:
+  its colours are greys, browns, cyan, two greens, red, gold, flesh, yellow and blue
+  (`0007`, unreadable on black). Purple is therefore the one colour of the welcome page
+  outside it, said so in `welcomePage.css`: an Atari colour of cyan's intensity, `0606`
+  (`#d800d8`).
+- Evidence: `tools/dump-server.ts` (a list of two, each seeing every set and
+  `"moderator": true`, nobody else either; a malformed entry refusing the start),
+  `tools/dump-data-sets.ts` (the parser's flag, `chooserSets` with and without it), and
+  a `tools/probe-frames.mjs` block for the four colours. `doc/DEPLOYMENT.md` says the
+  `.env`'s new variable.
 
+### P8 ⏳ Publishing a local set, and moderating it
+
+L, after P9. Its first step writes the split.
+
+**The lifecycle.** A set is in one of four states, which its tile's name says (P9):
+
+| State | Kept | Seen by | Name |
+| --- | --- | --- | --- |
+| local | the player's browser, `local:<id>` (stands) | that player | cyan |
+| pending | the server: its folder `gamefiles/<id>/`, its row `pending`, owned by its uploader | its owner, the moderators | red |
+| approved | its row `approved` | everyone | white |
+| hidden | an approved row with `hidden` set | the moderators in the grid; anyone by `?dungeon=<id>` and CONTINUE | purple |
+
+The manifest's sets start approved, with no owner, and hidden where it says so.
+
+**The transitions needed**, each from a tile, as the pen is a local set's (it stays at the
+picture's top right, the others along the top edge beside it):
+
+| Transition | Who | Where | What the server does |
+| --- | --- | --- | --- |
+| local → pending: **publish** | the set's player | PUBLISH, in the form the pen opens | the checks below, the folder written whole, then the row |
+| pending → approved: **approve** | a moderator | a tick on a pending tile | `status` set to `approved` |
+| pending → gone: **reject**, or **withdraw** | a moderator, or the set's owner | a cross on a pending tile | the row deleted, then its folder |
+| approved ⇄ hidden: **hide**, **show** | a moderator | the eye on an approved tile, open or shut | `hidden` toggled |
+
+Not needed, and left to a moderator's hands on the VPS (`doc/DEPLOYMENT.md` will say how):
+
+- **Deleting an approved set.** Hiding it is the answer to a complaint, since its players
+  keep their saves and their way back; a deletion makes their saves count for nothing.
+- **Changing a published set's files.** A folder never changes once written, which the
+  backup relies on (`server/backup.ts`); a new version is published as a new id.
+- **Taking an approval back.** Hiding does that job without losing anything.
+- **The order of the sets and the default set**, a row's `position` and
+  `data_set_defaults`.
+
+**The endpoint**: `POST api/data-sets/<id>`, a JSON body `{"action": "approve" | "reject" |
+"hide" | "show"}`, the `X-Player-Id` header naming the asker. 403 unless the asker is a
+moderator, or the owner rejecting their own pending set; 404 for an id not in the table;
+409 for an action the set's state does not take (approve an approved set, hide a pending
+one). The page then asks `api/data-sets` again and redraws the grid. Publishing is its
+own route, which takes the files.
+
+**Publishing** (PUBLISH sends the record's files and fields with the `playerId`). The server:
+
+- drops `local:` and refuses an id already in the table;
+- refuses an id whose folder `gamefiles/<id>/` already exists (`swoosh/`, or a folder no
+  row names) or that starts with `.` (the server serves no such segment);
+- caps each file's size and each player's rate;
+- parses `dungeon.dat` with the page's own reader;
+- writes the folder under `gamefiles/<id>/` whole, then the row as pending, owned by the
+  sender, and never changes the folder after: `backup.ts` copies each owned set's folder
+  once, the first night its row is in a snapshot (`doc/DEPLOYMENT.md` → "Backups").
+
+**Waiting on the author:** what PUBLISH leaves of the local record. (a) It stays as it
+is, a cyan tile beside the red one: its saves are filed under `local:<id>`, and the
+player can go on building it. (b) It is deleted once the set is approved, its saves
+moved to `<id>`. (a) is recommended: it moves nothing, and (b) can follow.
 ---
 
 ## U — The interface in the canvas
