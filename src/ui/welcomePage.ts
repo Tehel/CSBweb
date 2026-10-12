@@ -4,17 +4,21 @@
  * of the game built: PLAY and CONTINUE are links that load the page again, with the
  * data set, and CONTINUE's save, in its query.
  *
- * - **The grid**: a tile for each set `chooserSets` lists, in the manifest's order, its
- *   picture the set's thumbnail (`thumbnailPath`), its title's last frame at half size,
- *   or a blank box where the folder holds none. A set the store holds a save of is drawn
- *   bright, the others dimmed. A click selects a tile, and a click on the selected one
- *   leaves none selected.
+ * - **The grid**: a tile for each set `chooserSets` lists, its picture the set's thumbnail
+ *   (`thumbnailPath`), its title's last frame at half size, or a blank box where the
+ *   folder holds none. The sets the store holds a save of come first, drawn bright, the
+ *   one saved last first; the others follow, dimmed, by name (`tileOrder`). A click
+ *   selects a tile, and a click on the selected one leaves none selected. With no save
+ *   at all, the manifest's default set is selected, so that PLAY is a first visit's way in.
  * - **PLAY** opens the selected set (`?dungeon=<id>`): its title, then its entrance. With
  *   no set selected it is disabled.
  * - **CONTINUE** opens the last save used (`lastUsedSave`) of the selected set, or of every
  *   set when none is selected (`?dungeon=<id>&save=<row id>`). With no such save it is
  *   disabled. The box beside it shows that save: its set, its party, its level, and when
  *   it was saved.
+ *
+ * The buttons and the box sit above the grid, which grows with the sets, so that they
+ * stay on the first screen.
  *
  * A save of a set the manifest no longer names cannot be played, so it counts for
  * nothing here. A hidden set's saves count: the set plays by its `?dungeon=`. A store
@@ -35,12 +39,12 @@ import { formatSaveDate, formatSaveTime, lastUsedSave, type SaveEntry, type Save
 const PAGE = `
 <main class="welcome-page">
   <h1 class="welcome-logo"><img src="${logoUrl}" alt="CSBweb" width="550" height="307"></h1>
-  <div class="welcome-grid" role="group" aria-label="Dungeons"></div>
   <div class="welcome-actions">
     <a class="btn px" id="welcome-play">Play</a>
     <a class="btn px" id="welcome-continue">Continue</a>
     <div class="welcome-preview px px2" aria-live="polite"></div>
   </div>
+  <div class="welcome-grid" role="group" aria-label="Dungeons"></div>
   <section class="welcome-about" id="about">
     <p class="welcome-lead">The 1987 dungeon, rebuilt one function at a time from CSBWin. There is nothing to install: open the page and go down the stairs.</p>
     <div class="welcome-columns">
@@ -109,8 +113,9 @@ export async function showWelcomePage(body: HTMLElement, manifest: DataSetManife
     const resume = body.querySelector<HTMLAnchorElement>('#welcome-continue')!;
     const preview = body.querySelector<HTMLElement>('.welcome-preview')!;
 
-    let selected: DataSet | null = null;
-    const tiles = chooserSets(manifest).map((set) => {
+    const sets = tileOrder(chooserSets(manifest), rows);
+    let selected: DataSet | null = rows.length === 0 && sets.includes(manifest.defaultSet) ? manifest.defaultSet : null;
+    const tiles = sets.map((set) => {
         const saves = rows.filter((row) => row.dataSet === set.id).length;
         const tile = document.createElement('button');
         tile.type = 'button';
@@ -119,7 +124,7 @@ export async function showWelcomePage(body: HTMLElement, manifest: DataSetManife
         tile.append(
             picture(set),
             line('pick-name px px2', set.name),
-            line('pick-saves px px2', saves === 0 ? 'No saved game' : saves === 1 ? '1 saved game' : `${saves} saved games`),
+            line('pick-saves px px2', saves === 0 ? 'No saves' : saves === 1 ? '1 save' : `${saves} saves`),
         );
         tile.addEventListener('click', () => {
             selected = selected === set ? null : set;
@@ -144,6 +149,16 @@ export async function showWelcomePage(body: HTMLElement, manifest: DataSetManife
         ]));
     }
     update();
+}
+
+/**
+ * `sets` in the grid's order: those `rows` holds a save of, the one with the latest save
+ * first, then the others by name.
+ */
+function tileOrder(sets: DataSet[], rows: SaveEntry[]): DataSet[] {
+    const lastSaved = new Map<string, number>();
+    for (const row of rows) lastSaved.set(row.dataSet, Math.max(lastSaved.get(row.dataSet) ?? 0, row.savedAt));
+    return [...sets].sort((a, b) => (lastSaved.get(b.id) ?? -1) - (lastSaved.get(a.id) ?? -1) || a.name.localeCompare(b.name));
 }
 
 /** `set`'s picture: its thumbnail, in a box that stays blank if it does not load. */

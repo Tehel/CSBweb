@@ -76,12 +76,14 @@ body.welcome {
     margin: 0 auto;
 }
 
-/* The data sets, a tile each, its picture 320x200 at half size, the rows centred. */
+/* The data sets, a tile each, its picture 320x200 at half size, the rows centred, under
+   the buttons. */
 .welcome-grid {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 12px;
+    margin-top: 36px;
 }
 .pick {
     appearance: none;
@@ -114,14 +116,13 @@ body.welcome {
 .pick-saves { color: var(--p2); }
 .pick:not(.dim) .pick-saves { color: var(--p7); }
 
-/* PLAY and CONTINUE, and the save CONTINUE reads. */
+/* PLAY and CONTINUE, and the save CONTINUE reads, above the grid. */
 .welcome-actions {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
     gap: 24px;
-    margin-top: 36px;
 }
 /* Graphic 0's button frame: 12, two of 0, a three-pixel bevel 10 over 3, interior 5; label 9 on 5. */
 .btn {
@@ -154,7 +155,7 @@ body.welcome {
     flex-direction: column;
     justify-content: center;
     gap: 9px;
-    padding: 12px 15px;
+    padding: 6px 15px;
     background: #0b0b16;
     border: 3px solid #1d1d30;
 }
@@ -172,7 +173,7 @@ body.welcome {
     gap: 56px;
 }
 .welcome-lead {
-    margin: 0;
+    margin: 0 auto;
     max-width: 1040px;
     font-size: 30px;
     line-height: 1.4;

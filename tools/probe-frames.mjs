@@ -30,7 +30,7 @@
 // long press on the bars, where a tap opens the inventory, and fullscreen, entered by a
 // tap and a click, the screen and the effect sized and placed in it, at 16:10 and at 4:3,
 // in it and out of it, and the welcome
-// page: its tiles, its fonts, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
+// page: its tiles and their order, its fonts, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
 // straight into play. See `check` below.
 // A failure there exits 1.
 //
@@ -189,6 +189,20 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   Math.random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
                         return ((seed >>> 0) % 1000000) / 1000000; };
 ` });
+// The welcome page (`src/ui/welcomePage.ts`) of a store with no save: the manifest's
+// default set, dm-atari, is selected, so PLAY opens it, and every tile is dimmed, by name.
+// The page with a save is checked further down.
+await send('Page.navigate', { url: `${APP}?dungeon=nowhere` });
+await wait(2500);
+const firstVisit = await evaluate(`({tiles: [...document.querySelectorAll('.pick')].map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
+  play: document.getElementById('welcome-play').getAttribute('href'),
+  resume: document.getElementById('welcome-continue').getAttribute('href'),
+  above: !!(document.querySelector('.welcome-actions').compareDocumentPosition(document.querySelector('.welcome-grid')) & Node.DOCUMENT_POSITION_FOLLOWING)})`);
+console.log('state: welcome page, no save');
+console.log('  ', JSON.stringify(firstVisit));
+check(firstVisit.tiles === 'csb,conflux-3.5,dm-atari!,kids-dungeon,towers-of-chaos' && /dungeon=dm-atari/.test(firstVisit.play ?? '')
+  && firstVisit.resume === null && firstVisit.above,
+  'no save: the tiles by name, dm-atari selected, PLAY opens it, CONTINUE disabled, the buttons above the grid');
 // `?intro=0` skips the title animation and the dungeon entrance
 // (`src/renderer/intro/BootSequence.ts`), so the six frames below still open on the
 // adventure screen. The entrance gets frames of its own at the end.
@@ -294,7 +308,7 @@ await canvasClick(120, 168, 0); await wait(1200);
 // the compositing but not the pixels the bytecode programs produce.
 // The welcome page (`src/ui/welcomePage.ts`): the page with no known `?dungeon=`, HTML and
 // no game. The store holds the one save made above, of dm-atari, so its tile is bright and
-// the others dimmed, and CONTINUE reads that save while no set is selected. Each tile
+// first, the others dimmed and by name, none is selected, and CONTINUE reads that save while no set is selected. Each tile
 // shows its set's thumbnail, and the page fetches no game file to draw them. A click
 // selects a tile, and PLAY opens its set; a click on another set, with no save, leaves
 // CONTINUE disabled; a click on the selected tile selects none. Then PLAY's own click,
@@ -321,8 +335,8 @@ console.log('state: welcome page');
 const atWelcome = await welcome();
 console.log('  ', JSON.stringify(atWelcome));
 const saveId = /[?&]save=([^&]+)/.exec(atWelcome.resume ?? '')?.[1];
-check(!atWelcome.canvas && atWelcome.tiles === 'dm-atari*,csb,kids-dungeon,conflux-3.5,towers-of-chaos',
-  'an unknown ?dungeon= is the welcome page, no game canvas, its tiles the sets not hidden, the one with a save bright');
+check(!atWelcome.canvas && atWelcome.tiles === 'dm-atari*,csb,conflux-3.5,kids-dungeon,towers-of-chaos',
+  'an unknown ?dungeon= is the welcome page, no game canvas, its tiles the sets not hidden, the one with a save bright and first, the others by name, none selected');
 check(atWelcome.pictures.length === 5 && atWelcome.pictures.every(Boolean) && atWelcome.gameFiles === 0,
   'each tile shows its set\'s 320x200 thumbnail, <id>-thumbnail.png, and the page fetches no .dat');
 check(atWelcome.play === null && /dungeon=dm-atari/.test(atWelcome.resume ?? '') && saveId !== undefined,

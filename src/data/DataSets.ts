@@ -77,11 +77,12 @@ export interface DataSet {
 
 /** What `manifest.json` says, its folders resolved. */
 export interface DataSetManifest {
-    /** In the manifest's order, which is the welcome page's. */
+    /** In the manifest's order. */
     dataSets: readonly DataSet[];
     /**
      * The set the tools play where they name none (`tools/lib/dataSets.ts`). The page
-     * plays none until one is chosen: without a known `?dungeon=` it is the welcome page.
+     * plays none until one is chosen: without a known `?dungeon=` it is the welcome page,
+     * which selects this one while the store holds no save.
      */
     defaultSet: DataSet;
     /**
@@ -139,7 +140,10 @@ export function parseManifest(text: string, base: string): DataSetManifest {
     return { dataSets, defaultSet, swooshDir: isFolder(swoosh) ? under(base, swoosh) : null };
 }
 
-/** The sets the welcome page lists, in the manifest's order: every set but the hidden ones. */
+/**
+ * The sets the welcome page lists, in the manifest's order: every set but the hidden ones.
+ * The page orders them itself (`src/ui/welcomePage.ts`).
+ */
 export function chooserSets(manifest: DataSetManifest): DataSet[] {
     return manifest.dataSets.filter((set) => !set.hidden);
 }
