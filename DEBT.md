@@ -113,7 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P7 | The data sets in the server's database | L | ⏳ |
+| P7 | The data sets in the server's database | L | ⏳ step 1 of 4 next |
 | P8 | Publishing a local set | L | ⏳ after P7 |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
@@ -261,20 +261,37 @@ A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more 
 
 ### P7 ⏳ The data sets in the server's database
 
-- **The table**: an SQLite table replaces `manifest.json`. A row holds a set's fields,
-  its folder, its status (approved or pending) and its owner's `playerId`.
-  `checkFiles` (`server/app.ts:72`) checks the table's folders at start-up instead.
-- **The manifest**, served per request: the approved sets to everyone, a pending set
-  also to its owner, and everything to the author, whose `playerId` is in the server's
-  `.env`. The `playerId` travels in a header or the body, never the query. The answer
-  holds no `playerId`, only a set's status.
-- **The tools** have a static manifest of their own, which lists only the sets they run
-  on, in the format `parseManifest` reads. It replaces `static/gamefiles/manifest.json` in
-  `tools/lib/dataSets.ts`. The server no longer reads a manifest file: the table is its
-  only list, filled once from the deployed `manifest.json`. `tools/dump-server.ts`
-  sets up its server's sets in the table rather than writing a `manifest.json`.
-- **Deployment**: `gamefiles` mounted read-write (`doc/DEPLOYMENT.md`), and `backup.ts`
-  covers the uploaded folders and the table.
+L, in four steps, one commit each. Step 1 is next.
+
+Decided with the author: the page asks **`api/data-sets`** for the list, in the format
+`parseManifest` reads. The site's server answers it from its table. The dev server
+(Vite), which the frames and the probes use, answers the same route from the
+repository's manifest, through a plugin of `vite.config.mts`, every set approved, so dev
+never needs the Node server; a pending set is proved through `tools/dump-server.ts`. The
+repository's manifest is **`tools/data-sets.json`**, its folders relative to
+`static/gamefiles/`: the dev server's and the tools' (`tools/lib/dataSets.ts`), and
+nobody else's.
+
+1. **The page asks `api/data-sets`.** `static/gamefiles/manifest.json` moves to
+   `tools/data-sets.json`. The page's `loadManifest` (`src/main.ts`) fetches the route;
+   the Vite plugin answers it from that file. The server answers it with its mounted
+   `manifest.json`, which it still reads at start-up (`checkFiles`), and serves no file
+   of that name under `gamefiles/` any more. `tools/dump-server.ts` asks the route.
+2. **The table.** A `data_sets` table in the store's SQLite file (`STATS_DB`), so that
+   `backup.ts` already covers it: a set's fields and flags, its folder, its place in the
+   order, its status (approved or pending) and its owner's `playerId` (`NULL` for the
+   author's), and the default set and the FTL logo's folder beside it. At start-up an
+   empty table is filled once from `GAMEFILES_DIR/manifest.json`; after that the server
+   reads no manifest file, and `checkFiles` checks the table's folders. `api/data-sets`
+   and `api/event`'s known sets come from the table, read per request, since P8 adds
+   sets while the server runs.
+3. **The answer per player.** The page sends its `playerId` (`src/ui/gameEvents.ts`) in
+   an `X-Player-Id` header, never the query. The approved sets go to everyone, a pending
+   set also to its owner, and everything to the author, whose `playerId` is the server's
+   `AUTHOR_PLAYER_ID` (the VPS's `.env`). The answer holds no `playerId`, only a pending
+   set's `"status": "pending"`, which `parseManifest` reads into the `DataSet`.
+4. **Deployment.** `gamefiles` mounted read-write, `backup.ts` covering the folders an
+   upload writes, and `doc/DEPLOYMENT.md` saying all of it.
 
 ### P8 ⏳ Publishing a local set
 
