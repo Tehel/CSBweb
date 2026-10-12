@@ -1,6 +1,6 @@
 ---
 name: probe-frames-storage-flags
-description: probe-frames.mjs wipes localStorage and IndexedDB on every load unless keepsettings/keepsaves; where a new block goes and which helpers it may use
+description: probe-frames.mjs wipes localStorage and IndexedDB on every load unless keepsettings/keepsaves, and hides the keyboard layout (KEYS shows KEY LABELS); where a new block goes and which helpers it may use
 metadata:
   type: project
 ---
@@ -15,6 +15,10 @@ the end adds one that saves `crt: true` on every later load.
 - A new block goes **before** "The CRT effect's input surface", after frame 20.
 - `realMouse`, `leaveCanvas`, `selected` are `const`s defined mid-file: a block placed
   above their definition hits the temporal dead zone. Define a local helper instead.
+- The injected script also hides `navigator.keyboard`: the frames probe sees no keyboard
+  layout, so KEYS shows KEY LABELS and its list starts lower. `probe-ui.mjs`'s Chrome
+  gives one, and there the same tab has no KEY LABELS: a coordinate found in a
+  `probe-ui` session can miss here (a slot click did, and cost a 4-minute run).
 - `canvasClick` dispatches mouse pointer events, which move no hover point (only a
   non-mouse press does, `bindCanvasEvents`); dispatch a `pointermove` for hover.
 

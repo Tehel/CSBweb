@@ -1,6 +1,6 @@
 ---
 name: redraw-wiring
-description: Where the port redraws the screen — the tick's DrawViewport vs. refreshScreen everywhere else; where to look for a frame one tick early or late
+description: Where the port redraws the screen — the tick's DrawViewport vs. refreshScreen everywhere else, a dialog's pointer and wheel drawn by the VBL; where to look for a frame one tick early or late, or a dialog that reacts late
 metadata:
   type: project
 ---
@@ -26,6 +26,14 @@ moved (`takeCursorMoved`), as CSBWin's VBL handler alone draws the cursor. A red
 `mousemove` saturates the page: a mouse reports every 8 ms or faster, and composing the
 screen takes about as long.
 
+In a dialog, a click and a key are redrawn by `GameInput` (`refreshScreen` right after
+`handleDialogClick` / `handleDialogKey`); the pointer and the wheel are not:
+`Dialog.pointer` and `Dialog.wheel` say whether the dialog is drawn differently, and the
+VBL's frame draws it (`takeCursorMoved`, `takeWheelTurned`). The save menu draws itself
+instead (`renderLastFrame` in its `scrollBy`), so its `wheel` returns `false`. A dialog
+input that says `false` (or returned `void`, as `wheel` once did) changes state that shows
+only at the next unrelated repaint: frozen, then a jump.
+
 `Game.gameTick` runs `onTickCallbacks` where CSBWin's tick calls `DrawViewport`
 (`doc/CSBwin-src/CSBCode.cpp:648`): after the timers and after `loadNewPartyLevel`,
 before the game-lost check.
@@ -34,5 +42,6 @@ before the game-lost check.
 hooks fire inside `gameTick`, and that is not visible from the renderer. A `DrawViewport`
 off the tick advances `GraphicRandom` and changes the teleporter's shimmer.
 
-**How to apply:** for a timing symptom on screen, open `Game.gameTick` next to
+**How to apply:** for a dialog that reacts late or in jumps, check that input's path to
+a redraw first. For a timing symptom on screen, open `Game.gameTick` next to
 `CSBCode.cpp:610-788` first. See [[one-tick-late-is-ordering]] and [[two-step-level-change]].

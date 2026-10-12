@@ -2,7 +2,7 @@
 
 One line per memory in this directory. Committed with the project; never shared.
 
-- [Redraw wiring](redraw-wiring.md) — `DrawViewport` only at the tick (`onTick`) and a script tick, a game's first view being its opening tick; everything else is `refreshScreen`, and a pointer move draws nothing (the VBL's frame does)
+- [Redraw wiring](redraw-wiring.md) — `DrawViewport` only at the tick (`onTick`) and a script tick, a game's first view being its opening tick; everything else is `refreshScreen`, and a pointer move draws nothing (the VBL's frame does), nor a dialog's wheel, which must say it changed
 - [Two-step level change](two-step-level-change.md) — after stairs or a pit, `position.z` is stale until `loadNewPartyLevel`
 - [Headless frame-timing probe](headless-frame-timing-probe.md) — `onTick` probe + `game.gameTick()` + stubbed `processTimers`
 - [One tick late is ordering](one-tick-late-is-ordering.md) — compare hook order with CSBWin's `MainLoop` before any formula
@@ -18,8 +18,9 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Saves mutually compatible](saves-mutually-compatible.md) — every CSBWin save imports and every export loads in CSBWin; no reader special case for port-only files
 - [Monster groups in tools](monster-groups-in-tools.md) — `csbgame7.dat`'s groups of several are on levels 5 and 7; `loadPartyLevelIfChanged` gives them an ITEM16; `getAttachedItem16` alone lies off the party's level
 - [UI hook plumbing](ui-hook-plumbing.md) — a new page→interface hook touches six places: `UIState`, `UIHooks`, `GameScreenHooks`, the constructor, `main.ts`, `tools/lib/ui.ts`
-- [Probe storage flags](probe-frames-storage-flags.md) — `probe-frames.mjs` wipes localStorage/IndexedDB per load unless `keepsettings`/`keepsaves`; new blocks go before the CRT section, with their own helpers
+- [Probe storage flags](probe-frames-storage-flags.md) — `probe-frames.mjs` wipes localStorage/IndexedDB per load unless `keepsettings`/`keepsaves`, and hides the keyboard layout (KEYS shows KEY LABELS, unlike `probe-ui`); new blocks go before the CRT section, with their own helpers
 - [New golden frame needs --update](new-golden-frame-needs-update.md) — `check-frames.sh` ignores frames not in the baseline; `--update`, then only `??` PNGs in `git status`
 - [Design canvas files](design-canvas-files.md) — reading the canvas URL gives "Loading…"; list its files and read `project/<Artboard>.dc.html`; ideas, not specs, optimistic about space
 - [Headless fullscreen](headless-fullscreen.md) — only CDP input grants activation, a touch only at its lift; the fullscreen viewport is the metrics override; a CDP Esc never leaves fullscreen
 - [Text changes, no tests](text-changes-no-tests.md) — copy-only welcome-page changes need a screenshot, not `npm test` or the frames
+- [Dialog layout moves probe clicks](dialog-layout-moves-probe-clicks.md) — a dialog's new geometry breaks `probe-frames.mjs`'s hard-coded clicks, some in the CRT section; a failed probe leaves no frames, reproduce in `probe-ui`
