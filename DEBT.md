@@ -30,7 +30,7 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it and deletes it; what is left
-is publishing it (P7, P8). They are not CSBWin features but the page's, and come before every other
+is publishing it (P8). They are not CSBWin features but the page's, and come before every other
 tier.
 
 **Before the rest, at the author's request: U — the interface in the canvas.** The
@@ -113,8 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P7 | The data sets in the server's database | L | ⚠️ step 4 of 4 next |
-| P8 | Publishing a local set | L | ⏳ after P7 |
+| P8 | Publishing a local set | L | ⏳ |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
@@ -202,7 +201,7 @@ entry here, only its commit, so take the next ID from this line and move it on.
 At the author's request, from the forum: a player adds a dungeon from their own files, plays
 it like any other, and later offers it to the site. It mirrors CSBWin, which plays whatever
 its `directory=` holds (`src/data/DataSets.ts`), so the engine does not change and nothing
-goes in H. Two phases: a set kept in the player's browser, which stands, and P7 and P8, which publish it.
+goes in H. Two phases: a set kept in the player's browser, which stands, and P8, which publishes it.
 
 What stands: a local set is a record of the store's `dataSets` object store
 (`BrowserDataSetStore`, `src/data/saves/`), `LocalDataSetRecord` in
@@ -239,6 +238,12 @@ those saves in one transaction (`BrowserDataSetStore.remove`).
 `tools/dump-local-data-set.ts` proves the check, the record and the census,
 `tools/probe-frames.mjs` drives the form, adding, editing and deleting a set.
 
+The server lists the site's sets from its store (`server/dataSets.ts`, `doc/DEPLOYMENT.md`
+→ "The game files and the manifest"): each row approved or pending, with its owner's
+`playerId` or none for the author's, `api/data-sets` answering each player the sets they
+may see. Its `gamefiles/` is mounted read-write, and `server/backup.ts` copies the folders
+of the sets with an owner beside the store's snapshots.
+
 The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase letters, digits, `.`, `-` and
 `_`, at most 40), since P8 makes it the set's folder on the server. No shipped dungeon
 names its `graphics.dat` or `CSBgraphics.dat`, nor expects a `CSBgraphics.dat`, so the
@@ -253,47 +258,11 @@ Decisions taken with the author, for every row:
   set's file (`dm-atari` or `csb`) from its folder.
 - **No statistics for a local set**: `GameEvents` sends nothing. The server's
   `events.ts` takes only manifest ids anyway.
-- **The `playerId` is a secret** (`src/ui/gameEvents.ts`). Ownership in P7 and P8 rests on
+- **The `playerId` is a secret** (`src/ui/gameEvents.ts`). Ownership on the server rests on
   it alone, so the server never returns one, writes one in its logs or takes one in a URL's
   query. A lost id is handled by hand on the forum for now.
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
-
-### P7 ⏳ The data sets in the server's database
-
-L, in four steps, one commit each. Steps 1 to 3 stand; step 4 is next.
-
-Decided with the author: the page asks **`api/data-sets`** for the list, in the format
-`parseManifest` reads. The site's server answers it from its table. The dev server
-(Vite), which the frames and the probes use, answers the same route from the
-repository's manifest, through a plugin of `vite.config.mts`, every set to every player, so dev
-never needs the Node server; a pending set is proved through `tools/dump-server.ts`. The
-repository's manifest is **`tools/data-sets.json`**, its folders relative to
-`static/gamefiles/`: the dev server's and the tools' (`tools/lib/dataSets.ts`), and
-nobody else's.
-
-1. ✅ **The page asks `api/data-sets`** (`DATA_SETS_ROUTE`, `src/data/DataSets.ts`;
-   `loadManifest`, `src/main.ts`). The Vite plugin answers it from `tools/data-sets.json`.
-   The server answers it with the manifest `checkFiles` read at start-up, its
-   `MANIFEST_FILE` (`/data/gamefiles/manifest.json` in the image), which it does not
-   serve as a file. `tools/dump-server.ts` asks the route.
-2. ✅ **The table** (`server/dataSets.ts`): `data_sets` and `data_set_defaults`, in the
-   store's SQLite file (`server/store.ts`, one connection beside `stats.ts`'s), so that
-   `backup.ts` covers them. `checkFiles` fills an empty table from `MANIFEST_FILE` once
-   its folders are found, and otherwise checks the table's folders and reads no manifest.
-   `api/data-sets` answers the approved sets (`manifestText`) and `api/event` takes any
-   set in the table (`hasSet`), both read per request. `tools/dump-server.ts` asserts it.
-   Until P8, `doc/DEPLOYMENT.md` says how to refill the table from a changed manifest.
-3. ✅ **The answer per player.** The page sends its kept `playerId` (`keptPlayerId`,
-   `src/ui/gameEvents.ts`, which draws none) in an `X-Player-Id` header
-   (`PLAYER_ID_HEADER`, `src/data/DataSets.ts`), never the query, whatever the statistics
-   setting. The approved sets go to everyone, a pending set also to its owner, and every
-   set to the author, whose `playerId` is the server's `AUTHOR_PLAYER_ID` (`manifestText`,
-   `server/dataSets.ts`). The answer holds no `playerId`, only a pending set's
-   `"status": "pending"`, which `parseManifest` reads into `DataSet.pending`.
-   `tools/dump-server.ts` and `tools/dump-data-sets.ts` assert it.
-4. **Deployment.** `gamefiles` mounted read-write, `backup.ts` covering the folders an
-   upload writes, and `doc/DEPLOYMENT.md` saying all of it.
 
 ### P8 ⏳ Publishing a local set
 
@@ -304,7 +273,11 @@ L.
   - drops `local:` and refuses an id already in the table;
   - caps each file's size and each player's rate;
   - parses `dungeon.dat` with the page's own reader;
-  - writes the folder under `gamefiles/<id>/` and the row as pending, owned by the sender.
+  - refuses an id whose folder `gamefiles/<id>/` already exists (`swoosh/`, or a folder no
+    row names) or that starts with `.` (the server serves no such segment);
+  - writes the folder under `gamefiles/<id>/` whole, then the row as pending, owned by the
+    sender, and never changes the folder after: `backup.ts` copies each owned set's folder
+    once, the first night its row is in a snapshot (`doc/DEPLOYMENT.md` → "Backups").
 - **Approval**: an endpoint only the author's `playerId` may call. The pending set's tile
   says that it is pending.
 

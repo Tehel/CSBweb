@@ -1,6 +1,7 @@
 #!/bin/bash
-# Copy the statistics' snapshots off the VPS (`doc/DEPLOYMENT.md`): the cron job's
-# `server/backup.ts` writes them into `<DEPLOY_DIR>/stats/backups/`, and this pulls the
+# Copy the store's snapshots off the VPS (`doc/DEPLOYMENT.md`): the cron job's
+# `server/backup.ts` writes them, and the copies of the folders players' sets were uploaded
+# to, into `<DEPLOY_DIR>/stats/backups/`, and this pulls the
 # folder to `BACKUP_PULL_DIR` (`../backups/csbweb/`, beside the checkout). The target is
 # `.env`'s, as for `deploy.sh`.
 set -euo pipefail

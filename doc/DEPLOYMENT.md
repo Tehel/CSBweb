@@ -18,7 +18,7 @@ behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 
 ```
 image      dist/ (the built page) + server/ (run by Node 24 as is) + src/data/DataSets.ts
-mounts     /data/gamefiles  :ro   the data sets, swoosh/, manifest.json
+mounts     /data/gamefiles        the data sets, swoosh/, manifest.json, and players' uploads
            /data/stats            stats.db (SQLite, WAL: the statistics and the data sets), backups/
 env        PORT (8085), DIST_DIR, GAMEFILES_DIR, MANIFEST_FILE, STATS_DB, AUTHOR_PLAYER_ID
 ```
@@ -29,13 +29,16 @@ On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
 ~/csbweb/
 ├── docker-compose.yaml   copied by every deploy, so it cannot drift from the repository
 ├── .env                  the stack's own, kept on the VPS (see below)
-├── gamefiles/            uploaded by hand; everything under it is public
+├── gamefiles/            uploaded by hand, and written by the container (uid 1000);
+│   │                     everything under it is public
 │   ├── manifest.json     the data sets that fill the store's empty table
 │   ├── swoosh/           the FTL logo, as the manifest names it
-│   └── dm-atari/, csb/, … one folder per data set the manifest lists
+│   ├── dm-atari/, csb/, … one folder per data set the manifest lists
+│   └── <id>/             one folder per set a player publishes, written by the server
 └── stats/                written by the container (uid 1000)
     ├── stats.db, stats.db-wal, stats.db-shm
-    ├── backups/          the nightly snapshots, 14 days of them
+    ├── backups/          the nightly snapshots, 14 days of them, and gamefiles/: the
+    │                     players' folders, each copied once and kept
     └── backup.log
 ```
 
@@ -209,8 +212,11 @@ build.
 - **`127.0.0.1:${CSBWEB_PORT:-8085}:8085`, loopback only.** A port published on `0.0.0.0`
   answers the whole internet whatever `ufw` says: Docker's published ports are rewritten in
   the `nat` table before `ufw`'s filter rules are consulted.
-- `./gamefiles:/data/gamefiles:ro` and `./stats:/data/stats`, bind mounts: the data lives
-  on the host, and a deploy's `down` loses nothing.
+- `./gamefiles:/data/gamefiles` and `./stats:/data/stats`, bind mounts: the data lives
+  on the host, and a deploy's `down` loses nothing. Both are read-write: a set a player
+  publishes is written under `gamefiles/`, as its row is in the store, so both folders must
+  belong to uid 1000 on the host, as the login user's do. `tools/check-image.sh` mounts the
+  checkout's game files read-only, since nothing publishes there.
 - `restart: unless-stopped`, a 10 s `stop_grace_period`, a healthcheck on `api/health`
   (busybox's `wget`), and `json-file` logs rotated at 3 × 10 MB.
 - `version: '3.8'`, for the VPS's Compose v1.
@@ -292,9 +298,18 @@ that set.
 The host's cron runs `server/backup.ts` in the container every night. It snapshots the
 store with `node:sqlite`'s `backup` while the server keeps serving, WAL included, into one
 self-contained file, `stats/backups/stats-<date>.db`, the data sets' tables with the
-events, and prints one JSON line. A `cp` of
-the live file would be unsafe: its WAL holds events the main file does not have yet. The
-crontab line deletes the snapshots older than 14 days:
+events. A `cp` of the live file would be unsafe: its WAL holds events the main file does
+not have yet.
+
+It then copies the folders the snapshot's sets with an owner live in, the sets players
+published, into `stats/backups/gamefiles/<dir>/`. The author's folders are not copied:
+they are uploaded by hand, from the author's own copy. A player's folder is whole before
+its row is written and never changes after, so each is copied once, through a `.partial`
+name renamed when whole, and kept for good, a deleted set's included, since a snapshot
+still names it. It prints one JSON line, `backup_ok` with the folders copied and the
+number kept, and exits with 1 when the store cannot be read or a folder cannot be copied
+(`backup_failed`). The crontab line deletes the snapshots older than 14 days, and only
+them:
 
 ```
 17 3 * * * cd /home/ubuntu/csbweb && /usr/bin/docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning server/backup.ts < /dev/null >> /home/ubuntu/csbweb/stats/backup.log 2>&1 && find /home/ubuntu/csbweb/stats/backups -name '*.db' -mtime +14 -delete
@@ -306,9 +321,10 @@ harmless, but in a script fed over `ssh` it swallows the rest of the script.
 `ls ~/csbweb/stats/backups/` is the check that the job runs: an empty or missing folder
 means it does not. `tools/dump-server.ts` asserts the script against a running server: the
 snapshot holds the events still in the WAL, the server keeps serving, and a missing store
-exits 1.
+exits 1; a player's folder is copied whole, the author's not, the next run keeps the copy,
+and a player's folder that is not there exits 1.
 
-`utils/pull-backups.sh` copies the snapshots off the VPS, with `rsync`, into
+`utils/pull-backups.sh` copies `stats/backups/` off the VPS, the snapshots and the players' folders, with `rsync`, into
 `../backups/csbweb/` beside the checkout (`BACKUP_PULL_DIR` overrides it), reading the
 target from the local `.env`.
 
@@ -319,8 +335,12 @@ cd ~/csbweb
 docker-compose stop
 cp stats/backups/stats-<date>.db stats/stats.db
 rm -f stats/stats.db-wal stats/stats.db-shm   # stale sidecars would bring the old state back
+cp -rn stats/backups/gamefiles/. gamefiles/   # the players' folders a lost gamefiles/ lacks
 docker-compose up -d
 ```
+
+The server will not start while a folder the table names is missing (`Not starting:`), so
+a restore that forgets the players' folders says so.
 
 ## Things that are true about restarts
 

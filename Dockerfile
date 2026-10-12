@@ -1,8 +1,10 @@
 # The deployed game (`doc/DEPLOYMENT.md`): `server/` on Node 24, over the built page.
 # The game files and the statistics are mounted, never in the image:
 #
-#   /data/gamefiles   the data sets and their manifest.json, read-only
-#   /data/stats       stats.db: the statistics, and the data sets, filled once from the manifest
+#   /data/gamefiles   the data sets and their manifest.json, and the folders players' sets are
+#                     uploaded to, written here
+#   /data/stats       stats.db: the statistics, and the data sets, filled once from the manifest;
+#                     backups/: its snapshots and the uploaded folders' copies
 #
 #   docker build --build-arg CSBWEB_BUILD=$(git rev-parse --short HEAD) -t csbweb .
 #
@@ -34,7 +36,7 @@ ENV PORT=8085 \
     MANIFEST_FILE=/data/gamefiles/manifest.json \
     STATS_DB=/data/stats/stats.db
 EXPOSE 8085
-# uid 1000, the VPS's own user, so the mounted stats folder is writable here and readable
+# uid 1000, the VPS's own user, so the mounted folders are writable here and readable
 # over SSH.
 USER node
 # The exec form: Node is PID 1 and receives SIGTERM. `node:sqlite` still warns that it is

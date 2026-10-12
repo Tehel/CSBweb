@@ -31,7 +31,9 @@
  *     from the table;
  *   - `backup.ts`, run beside that server: a snapshot in `backups/` holding the events
  *     still in the WAL and the data sets, the server serving throughout, and exit 1 on a
- *     missing store.
+ *     missing store; the folder of a set with an owner copied whole into
+ *     `backups/gamefiles/`, the author's not, kept by the next run rather than copied
+ *     again, and exit 1 on an owned set whose folder is not there.
  *
  * Usage: npx tsx tools/dump-server.ts
  */
@@ -347,6 +349,15 @@ function finish(child: ChildProcess, onLine: (line: string) => void = () => {}):
     }));
 }
 
+/** What `checkEntry` learnt of the first `backup.ts` run beside the server. */
+interface Backup {
+    code: number | null;
+    out: string;
+    events: number;
+    sets: number;
+    answering: boolean;
+}
+
 async function checkEntry(scratch: string, options: ServerOptions): Promise<void> {
     console.log('\nserver.ts:');
     const statsDb = join(scratch, 'stats', 'stats.db');
@@ -363,7 +374,9 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
 
     let healthy = false;
     let walHeld = false;
-    let backedUp: { code: number | null; out: string; events: number; sets: number; answering: boolean } | null = null;
+    let backedUp: Backup | null = null;
+    let again: { code: number | null; out: string } | null = null;
+    let noFolder: { code: number | null; out: string } | null = null;
     const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: statsDb });
     const ended = finish(child, (line) => {
         const listening = /^Listening on port (\d+)/.exec(line);
@@ -377,7 +390,13 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
                     JSON.stringify({ type: 'started', player: PLAYER, set: 'a', playthrough: 100 + i, build: 'test', payload: {} }));
             }
             walHeld = existsSync(`${statsDb}-wal`) && statSync(`${statsDb}-wal`).size > 0;
-            const run = await finish(startEntry({ STATS_DB: statsDb }, 'backup.ts'));
+            // A player's set, uploaded beside the author's while the server runs.
+            mkdirSync(join(options.gamefilesDir, 'set-b', 'sub'), { recursive: true });
+            writeFileSync(join(options.gamefilesDir, 'set-b', 'sub', 'dungeon.dat'), Buffer.from([5, 6, 7]));
+            const store = openStore(statsDb);
+            store.prepare("INSERT INTO data_sets (id, name, dir, position, status, owner) VALUES ('b', 'B', 'set-b', 1, 'pending', ?)").run(PLAYER);
+            store.close();
+            const run = await finish(startEntry({ STATS_DB: statsDb, GAMEFILES_DIR: options.gamefilesDir }, 'backup.ts'));
             const target = /"target":"([^"]+)"/.exec(run.out)?.[1];
             let events = -1;
             let sets = -1;
@@ -388,6 +407,8 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
                 copy.close();
             }
             backedUp = { code: run.code, out: run.out, events, sets, answering: (await ask(port, '/api/health')).status === 200 };
+            again = await finish(startEntry({ STATS_DB: statsDb, GAMEFILES_DIR: options.gamefilesDir }, 'backup.ts'));
+            noFolder = await finish(startEntry({ STATS_DB: statsDb, GAMEFILES_DIR: join(scratch, 'nowhere'), BACKUP_DIR: join(scratch, 'backups-elsewhere') }, 'backup.ts'));
         })().finally(() => child.kill('SIGTERM'));
     });
     const { code, out } = await ended;
@@ -395,28 +416,40 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
         if (!line.includes('ExperimentalWarning') && !line.includes('--trace-warnings')) console.log(`  | ${line.split(scratch).join('<scratch>')}`);
     }
     check(healthy, 'it listens on the PORT given, 0 for a free one, and answers /api/health');
-    const backup = backedUp as { code: number | null; out: string; events: number; sets: number; answering: boolean } | null;
-    console.log(`  backup.ts: exit ${backup?.code}, ${firstLine(backup?.out ?? '').split(scratch).join('<scratch>').replace(/stats-[\dTZ-]+\.db/, 'stats-<date>.db').replace(/"bytes":\d+/, '"bytes":<n>')}`);
+    const backup = backedUp as Backup | null;
+    const shown = (run: { code: number | null; out: string } | null) => `exit ${run?.code}, ${firstLine(run?.out ?? '').split(scratch).join('<scratch>').replace(/stats-[\dTZ-]+\.db/, 'stats-<date>.db').replace(/"bytes":\d+/, '"bytes":<n>')}`;
+    console.log(`  backup.ts: ${shown(backup)}`);
     check(backup?.code === 0 && /<scratch>\/stats\/backups\/stats-[\dTZ-]+\.db/.test((backup?.out ?? '').split(scratch).join('<scratch>')),
         'backup.ts, run beside the server, writes a snapshot into backups/ beside the store');
     check(walHeld && backup?.events === 3, 'the snapshot holds the events the server had in its WAL');
-    check(backup?.sets === 1, 'and the data sets\' table');
+    check(backup?.sets === 2, 'and the data sets\' table');
     check(backup?.answering === true, 'the server kept serving through the backup');
+    const folders = join(scratch, 'stats', 'backups', 'gamefiles');
+    const copy = join(folders, 'set-b', 'sub', 'dungeon.dat');
+    check((backup?.out ?? '').includes('"copied":["set-b"],"kept":0') && existsSync(copy) && readFileSync(copy).equals(Buffer.from([5, 6, 7])),
+        'the folder of the set with an owner is copied whole into backups/gamefiles/');
+    check(!existsSync(join(folders, 'set-a')) && !existsSync(join(folders, 'set-b.partial')), 'the author\'s is not, and no .partial is left');
+    const second = again as { code: number | null; out: string } | null;
+    console.log(`  backup.ts again: ${shown(second)}`);
+    check(second?.code === 0 && second.out.includes('"copied":[],"kept":1'), 'the next backup keeps that copy rather than copying it again');
     const noStore = await finish(startEntry({ STATS_DB: join(scratch, 'nowhere', 'stats.db') }, 'backup.ts'));
     check(noStore.code === 1 && noStore.out.includes('backup_failed'), 'backup.ts on a store that is not there exits 1');
+    const missing = noFolder as { code: number | null; out: string } | null;
+    check(missing?.code === 1 && missing.out.includes('backup_failed') && !existsSync(join(scratch, 'backups-elsewhere', 'gamefiles', 'set-b')),
+        'backup.ts on a set with an owner whose folder is not there exits 1');
     check(code === 0 && out.includes('SIGTERM: shutting down') && out.includes('Stopped'), 'SIGTERM stops it, with 0');
     check(existsSync(statsDb) && !existsSync(`${statsDb}-wal`), 'the store was made, its folder too, and closed with its WAL checkpointed');
     check(out.includes('(a, from the data_sets table, filled from <scratch>'.replace('<scratch>', scratch)), 'its table filled from the manifest');
 
-    let again = '';
+    let restartLine = '';
     const restart = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: join(scratch, 'nowhere.json'), STATS_DB: statsDb });
     const restarted = await finish(restart, (line) => {
         if (!line.startsWith('Listening on port')) return;
-        again = line.split(scratch).join('<scratch>').replace(/port \d+/, 'port <n>');
+        restartLine = line.split(scratch).join('<scratch>').replace(/port \d+/, 'port <n>');
         restart.kill('SIGTERM');
     });
-    console.log(`  again: ${again}`);
-    check(restarted.code === 0 && again.includes('(a, from the data_sets table);'), 'started again without a manifest, it serves the table\'s sets');
+    console.log(`  restarted: ${restartLine}`);
+    check(restarted.code === 0 && restartLine.includes('(a, b, from the data_sets table);'), 'started again without a manifest, it serves the table\'s sets');
 }
 
 async function main(): Promise<void> {

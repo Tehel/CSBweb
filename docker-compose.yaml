@@ -3,7 +3,9 @@
 #
 #   <DEPLOY_DIR>/            this file, and its `.env`: required, even empty, since it is
 #                            also the container's `env_file` (CSBWEB_PORT, optional)
-#   <DEPLOY_DIR>/gamefiles/  the data sets, `swoosh/` and `manifest.json`, uploaded separately
+#   <DEPLOY_DIR>/gamefiles/  the data sets, `swoosh/` and `manifest.json`, uploaded separately,
+#                            and the folders of the sets players publish, written by the
+#                            container (uid 1000), hence read-write
 #   <DEPLOY_DIR>/stats/      stats.db, the statistics and the data sets (filled once from
 #                            the manifest), which a deploy's `down` leaves alone
 #
@@ -18,7 +20,7 @@ services:
     ports:
       - '127.0.0.1:${CSBWEB_PORT:-8085}:8085'
     volumes:
-      - ./gamefiles:/data/gamefiles:ro
+      - ./gamefiles:/data/gamefiles
       - ./stats:/data/stats
     restart: unless-stopped
     # The server lets the requests in flight finish for 5 s, then closes the store.
