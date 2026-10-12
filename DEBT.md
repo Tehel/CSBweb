@@ -29,8 +29,8 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 (`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
-from their own files to the welcome page and plays it, its saves imported (P5), then edits
-and publishes it (P6 to P8). They are not CSBWin features but the page's, and come before every other
+from their own files to the welcome page and plays it; what is left is editing and
+publishing it (P6 to P8). They are not CSBWin features but the page's, and come before every other
 tier.
 
 **Before the rest, at the author's request: U — the interface in the canvas.** The
@@ -113,7 +113,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P5 | A local set's saves import | S | ⏳ |
 | P6 | Editing and deleting a local set | M | ⏳ |
 | P7 | The data sets in the server's database | L | ⏳ |
 | P8 | Publishing a local set | L | ⏳ after P6, P7 |
@@ -204,7 +203,7 @@ entry here, only its commit, so take the next ID from this line and move it on.
 At the author's request, from the forum: a player adds a dungeon from their own files, plays
 it like any other, and later offers it to the site. It mirrors CSBWin, which plays whatever
 its `directory=` holds (`src/data/DataSets.ts`), so the engine does not change and nothing
-goes in H. Two phases: up to P5 a set is kept in the player's browser, and P6 to P8 publish it.
+goes in H. Two phases: a set kept in the player's browser, which stands, and P6 to P8, which publish it.
 
 What stands: a local set is a record of the store's `dataSets` object store
 (`BrowserDataSetStore`, `src/data/saves/`), `LocalDataSetRecord` in
@@ -212,8 +211,10 @@ What stands: a local set is a record of the store's `dataSets` object store
 `src/main.ts`): its `DataSet` follows from its files (`localDataSet`), and the boot reads
 them by name through `recordFiles`, its base set's folder giving a `graphics.dat` it does
 not have, as a manifest set's are read through `folderFiles` (`src/data/DataSetFiles.ts`).
-It sends no statistics. `tools/dump-local-data-set.ts` plays such records against their
-manifest sets. The welcome page (`src/ui/welcomePage.ts`) shows the local sets beside the
+It sends no statistics. A save imported into it is checked against its record's
+`dungeonSignature` before the known dungeons (`DataSet.dungeonSignature`, `checkDungeon`):
+any level of it makes the save the set's. `tools/dump-local-data-set.ts` plays such
+records against their manifest sets. The welcome page (`src/ui/welcomePage.ts`) shows the local sets beside the
 manifest's, under the same order, a record's thumbnail as its tile's picture, and counts
 their saves; its last tile, "+ Add my own", opens the form that adds a set
 (`src/ui/addDataSetForm.ts`), a modal dialog on one screen. On its left, what the player
@@ -251,14 +252,6 @@ Decisions taken with the author, for every row:
   query. A lost id is handled by hand on the forum for now.
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
-
-### P5 ⏳ A local set's saves import
-
-`GameSaves` refuses a save of an `unknown` or `other` dungeon (`checkDungeon`,
-`src/engine/GameSaves.ts:388`). For a local set, the check is made first against the
-record's own signature: whole, the save is the set's own; partly, it is `modified`.
-Checking the local signature first covers a local set that holds a known dungeon (DM's
-`dungeon.dat` with other graphics), which `KNOWN_DUNGEONS` alone would call `other`.
 
 ### P6 ⏳ Editing and deleting a local set
 

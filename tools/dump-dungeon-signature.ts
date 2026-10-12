@@ -19,7 +19,8 @@
  *    nothing; a wall opened or a cell walled changes its level's digest alone, and the
  *    save is then most of Dungeon Master, not the whole of it.
  * 6. What a signature is to a data set (`checkDungeon`): the set's own dungeon, a
- *    modified version of it, another dungeon's, one the port cannot play, or none.
+ *    modified version of it, another dungeon's, one the port cannot play, or none; and
+ *    to a player's own set, whose own dungeon is checked first.
  *
  * With a path, the digests of that file, a `dungeon.dat` or a save, are printed first,
  * as the catalogue lists them: that is how a dungeon is added to it.
@@ -279,8 +280,8 @@ async function checkAgainstDataSet(): Promise<void> {
   const mini = await dungeonSignature(loadCsbwinWorld(read(MINI)).dungeon);
   const prison = await dungeonSignature(dungeonDat('static/gamefiles/csb/dungeon.dat'));
   const most = [...own.slice(0, 13), own[0]];
-  const say = (what: string, signature: readonly string[], set: string, known?: readonly KnownDungeon[]): string => {
-    const result = checkDungeon(signature, set, known);
+  const say = (what: string, signature: readonly string[], set: string, known?: readonly KnownDungeon[], own?: KnownDungeon): string => {
+    const result = checkDungeon(signature, set, known, own);
     const line = result.kind === 'unknown' ? 'unknown' : `${result.kind}, ${result.dungeon.name}`;
     console.log(`  ${what}, in ${set}: ${line}`);
     return line;
@@ -302,6 +303,20 @@ async function checkAgainstDataSet(): Promise<void> {
   check(say('a dungeon no data set plays', own, 'dm-atari', [unplayed]) === 'other, unplayed'
     && result.kind === 'other' && result.dungeon.dataSets.length === 0,
     'a known dungeon no data set plays is another dungeon\'s, with no set to switch to');
+
+  // A player's own set, its dungeon its record's (`DataSet.dungeonSignature`), checked first.
+  const LOCAL = 'local:mine';
+  const holdsDm: KnownDungeon = { name: 'My own', dataSets: [LOCAL], signature: own };
+  const holdsModified: KnownDungeon = { name: 'My own', dataSets: [LOCAL], signature: most };
+  check(say('a save of Dungeon Master', own, LOCAL) === `other, ${DM}`
+    && say('a save of Dungeon Master, the set holding it', own, LOCAL, undefined, holdsDm) === 'own, My own',
+    'a local set that holds Dungeon Master\'s dungeon has its saves, which the catalogue alone calls another dungeon\'s');
+  check(say('thirteen of its levels', most, LOCAL, undefined, holdsDm) === 'modified, My own'
+    && say('a save of Dungeon Master, the set holding thirteen of its levels', own, LOCAL, undefined, holdsModified) === 'modified, My own',
+    'part of the set\'s own is a modified version of it, even where the catalogue has the whole of another');
+  check(say('mini.dat', mini, LOCAL, undefined, holdsDm) === `other, ${CSB}`
+    && say('each level one further down', [own[13], ...own.slice(0, 13)], LOCAL, undefined, holdsDm) === 'unknown',
+    'no level of it, and the catalogue decides');
 }
 
 async function printFile(path: string): Promise<void> {

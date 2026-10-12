@@ -30,7 +30,7 @@
 import { CsbRandom } from '../core/random';
 import { loadCsbwinWorld } from '../data/CsbwinDungeonImage';
 import type { DataSet } from '../data/DataSets';
-import { checkDungeon, dungeonSignature, type DungeonCheck } from '../data/DungeonSignature';
+import { checkDungeon, dungeonSignature, KNOWN_DUNGEONS, type DungeonCheck } from '../data/DungeonSignature';
 import { readsGameBlock1, stampRandomGameID } from '../data/SaveGameLoader';
 import type { UtilityPortraits } from '../data/UtilityPortraits';
 import {
@@ -348,7 +348,8 @@ export class GameSaves {
      *
      * The file names no dungeon but holds one, and its walls are held against the known
      * dungeons' (`checkDungeon` over the signature of the file's world, `doc/SAVES.md`
-     * → "An import is checked against the dungeon"):
+     * → "An import is checked against the dungeon"), a local set's against its own first
+     * (`DataSet.dungeonSignature`):
      *
      * - the data set's own dungeon, whole: stored;
      * - most of the data set's own and not the whole, a modified version of it: stored
@@ -385,7 +386,9 @@ export class GameSaves {
         }
         const fields = readSaveFileFields(file.bytes);
         if (!fields) throw new SaveFileError(SAVED_GAME_DAMAGED);
-        const check = checkDungeon(signature, this.dataSet.id);
+        const set = this.dataSet;
+        const own = set.dungeonSignature ? { name: set.name, dataSets: [set.id], signature: set.dungeonSignature } : null;
+        const check = checkDungeon(signature, set.id, KNOWN_DUNGEONS, own);
         if (check.kind === 'other' || check.kind === 'unknown') return check;
         if (check.kind === 'modified' && !confirmed) return check;
 

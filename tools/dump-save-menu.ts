@@ -84,7 +84,8 @@
  *    modified dungeon stored only once confirmed, as an unofficial row, which the saves
  *    of a game read from it are too; another dungeon's, an unknown one's, a file with no
  *    `GAMEBLOCK1` ("NOT A SAVED GAME") and a save that does not read past it ("SAVED
- *    GAME DAMAGED!") never stored.
+ *    GAME DAMAGED!") never stored. A player's own set that holds Dungeon Master's
+ *    dungeon takes its saves, checked against its record's signature first.
  * 19. **The drop.** A file dropped on the dialog, by the menu's own entry and clicks: a
  *    save of the dungeon listed and selected with nothing loaded; a modified dungeon's
  *    asked about in `_DoMenu`'s two-option menu and stored on CONFIRM alone; another
@@ -136,7 +137,9 @@ import {
   type StoredSaveRecord,
 } from '../src/data/saves/SaveStore';
 import { ROWS_UPGRADED_VERSION, stampBlock1Rows, stampSaveRecords, upgradeSaveRecords, upgradeStoredRows } from '../src/data/saves/legacyRows';
-import { KNOWN_DUNGEONS } from '../src/data/DungeonSignature';
+import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
+import { dungeonSignature, KNOWN_DUNGEONS } from '../src/data/DungeonSignature';
+import { localDataSet } from '../src/data/LocalDataSets';
 import { Game } from '../src/engine/Game';
 import type { GameHost, MessageSink } from '../src/engine/GameHost';
 import { freeze, thaw, type LoopScript } from '../src/engine/LoopState';
@@ -2922,6 +2925,24 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
       'and a save of Dungeon Master is another dungeon\'s there');
     check((await saves.list()).every((row) => row.dataSet === DEFAULT_DATA_SET.id) && (await csbSaves.list()).length === 2,
       'each game lists its own set\'s');
+    now += 60_000;
+
+    // A player's own set that holds Dungeon Master's dungeon: its record's signature first.
+    const record = { id: 'local:mine', name: 'My own', description: '', authors: [], dmRules: false, baseSet: 'dm-atari',
+      files: {}, dungeonSignature: await dungeonSignature(loadCsbwinWorld(genuine).dungeon), createdAt: 0 };
+    const localSaves = new GameSaves(game, localDataSet(record), store, screen, log, new CsbRandom(SEED));
+    const inLocal = await localSaves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine });
+    if (inLocal.kind === 'stored') show('in a local set holding Dungeon Master', inLocal.entry);
+    check(inLocal.kind === 'stored' && inLocal.entry.dataSet === 'local:mine' && !inLocal.entry.unofficial
+      && (await localSaves.list()).length === 1,
+      'in a local set that holds Dungeon Master\'s dungeon, a save of it is the set\'s own, a row of that set');
+    const modifiedInLocal = await localSaves.importSave({ name: 'modified.dat', bytes: modified });
+    const csbInLocal = await localSaves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }, true);
+    console.log(`  a modified save, in it: ${refusal(modifiedInLocal)}; a save of Chaos Strikes Back: ${refusal(csbInLocal)}`);
+    check(modifiedInLocal.kind === 'modified' && modifiedInLocal.dungeon.name === 'My own' && modifiedInLocal.dungeon.dataSets.join() === 'local:mine',
+      'part of it is a modified version of the local set\'s, named as the set');
+    check(csbInLocal.kind === 'other' && csbInLocal.dungeon.name === 'Chaos Strikes Back' && (await localSaves.list()).length === 1,
+      'and a save of a dungeon it holds no level of is the catalogue\'s to name, and not stored');
   } finally {
     Date.now = realNow;
   }

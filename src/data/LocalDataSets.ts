@@ -57,7 +57,8 @@ export function isLocalDataSetId(id: string | null): boolean {
 /**
  * The set `record` plays. Its flags follow from its files: a `CSBgraphics.dat` is an
  * overlay to open, and the two Oracle files are the Hint Oracle. It has no folder: its
- * files are read through `recordFiles`.
+ * files are read through `recordFiles`. Its dungeon is its record's, which its saves are
+ * checked against (`checkDungeon`).
  */
 export function localDataSet(record: LocalDataSetRecord): DataSet {
     const { files } = record;
@@ -70,6 +71,7 @@ export function localDataSet(record: LocalDataSetRecord): DataSet {
         hintOracle: files['hcsb.hct'] !== undefined && files['hcsb.dat'] !== undefined,
         dmRules: record.dmRules,
         hidden: false,
+        dungeonSignature: record.dungeonSignature,
     };
 }
 

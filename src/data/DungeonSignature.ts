@@ -328,12 +328,21 @@ export type DungeonCheck =
 /**
  * `signature` against the data set `dataSet`, its `DataSet.id`: the dungeon it looks like
  * (`identifyDungeon`) is the set's when it lists the set, and a set may have two.
+ *
+ * A set with a dungeon of its own, `own`, a player's own set's (`DataSet.dungeonSignature`),
+ * is checked against it first: a level of it makes the file the set's, its `own` whole and
+ * `modified` partly, whatever the known dungeons say. So a local set that holds a known
+ * dungeon, DM's `dungeon.dat` with other graphics, takes that dungeon's saves, which the
+ * catalogue alone would call another dungeon's.
  */
 export function checkDungeon(
     signature: DungeonSignature,
     dataSet: string,
     known: readonly KnownDungeon[] = KNOWN_DUNGEONS,
+    own: KnownDungeon | null = null,
 ): DungeonCheck {
+    const mine = own && identifyDungeon(signature, [own]);
+    if (mine) return { kind: mine.whole ? 'own' : 'modified', dungeon: own };
     const match = identifyDungeon(signature, known);
     if (!match) return { kind: 'unknown' };
     if (!match.dungeon.dataSets.includes(dataSet)) return { kind: 'other', dungeon: match.dungeon };

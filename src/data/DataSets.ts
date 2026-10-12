@@ -28,7 +28,6 @@
  * writes it from the folder's `graphics.dat`, so the page fetches no game file to draw the
  * grid. A folder without one leaves its tile's picture blank.
  */
-
 export interface DataSet {
     /** The page's `?dungeon=` value. */
     id: string;
@@ -76,6 +75,13 @@ export interface DataSet {
      * the same, and the server takes its events and serves its files as any other's.
      */
     hidden: boolean;
+    /**
+     * A local set's `dungeon.dat`'s signature, its record's (`src/data/LocalDataSets.ts`),
+     * which a save imported into it is checked against before the known dungeons
+     * (`checkDungeon`). A manifest set has none: its dungeon is in `KNOWN_DUNGEONS`. A
+     * `DungeonSignature`, spelled out: the server compiles this file, and not that one's.
+     */
+    dungeonSignature?: readonly string[];
 }
 
 /** What `manifest.json` says, its folders resolved. */

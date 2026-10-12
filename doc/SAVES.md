@@ -166,7 +166,11 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   dungeon it looks like, and the row is marked unofficial (`SaveEntry.unofficial`),
   as are the saves of a game read from such a row; nothing reads the mark yet.
   Cancelled, nothing is stored. So "switch to it" never names
-  the dungeon a save is refused in (`checkDungeon`). That takes a catalogue of
+  the dungeon a save is refused in (`checkDungeon`). **A player's own set is checked
+  against its own dungeon first**, its record's signature (`DataSet.dungeonSignature`):
+  the whole of it is the set's own, part of it a modified version of it, named as the
+  set; with no level of it, the catalogue decides. So a local set that holds a known
+  dungeon, DM's `dungeon.dat` with other graphics, takes that dungeon's saves. That takes a catalogue of
   known dungeons' signatures (`KNOWN_DUNGEONS`), each with the data sets that play it,
   which may list dungeons the port cannot play: so the digests are committed, not read
   from the page's files, and a tool holds each to the file here. It lists seven: Dungeon
