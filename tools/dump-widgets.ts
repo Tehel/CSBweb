@@ -5,7 +5,7 @@
  * The save menu draws the plate, the panel, the button at graphic 0's height and the list
  * through the kit, and `dump-save-menu.ts` and the golden frames check those. The rest of
  * the kit waits for the settings dialog: the low button, a hovered and a pressed button,
- * the tabs and the toggle, the slider and the help line. Their looks are the design
+ * the toggle, the tabbed page, the slider and the help line. Their looks are the design
  * canvas's widget kit (`DEBT.md` → "U — The interface in the canvas"). Each is drawn here for real, on a screen
  * filled with a colour graphic 0 does not use, and read back:
  *
@@ -173,39 +173,55 @@ function main(): void {
     check(dim.ink + dim.bevel + dim.rest === 0, `a dim button is the raised one, its label grey (${JSON.stringify(dim)} differ)`);
   }
 
-  /* ---- 3 and 4. tabs, a toggle, the slider and the help line ---- */
+  /* ---- 3 and 4. a toggle, a tabbed page, the slider and the help line ---- */
 
   console.log('');
-  console.log('=== a row of tabs and a toggle ===');
-  const row: Rect = { x1: 18, y1: 30, x2: 301, y2: 30 + W.LOW_BUTTON_HEIGHT - 1 };
-  const tabs = W.framesAcross(row, 4);
-  console.log(`  ${tabs.map((f) => `${f.x1}..${f.x2}`).join(', ')}`);
-  check(tabs[0].x1 === row.x1 && tabs[3].x2 === row.x2 && tabs.slice(1).every((f, i) => f.x1 - tabs[i].x2 - 1 === W.BUTTON_GAP),
-    'four tabs span the row, graphic 0\'s nine columns apart');
-  clear(ui);
-  W.drawTabs(ui, tabs, ['GAME', 'DISPLAY', 'SOUND', 'KEYS'], 1);
-  const drawnTabs = Uint8Array.from(pixels(ui));
-  const st = strays(ui, tabs, colours);
-  check(st.outside === 0 && st.foreign === 0, `the tabs stay in their frames, the gaps left alone (${st.outside} outside, ${st.foreign} foreign)`);
-  clear(ui);
-  W.drawButton(ui, tabs[0], 'GAME');
-  W.drawButton(ui, tabs[1], 'DISPLAY', 'pressed');
-  W.drawButton(ui, tabs[2], 'SOUND');
-  W.drawButton(ui, tabs[3], 'KEYS');
-  check(same(drawnTabs, pixels(ui)), 'the selected tab is drawn pressed, the others raised');
-  const tabList = W.choiceButtons(tabs, 300, 'tab');
+  console.log('=== a toggle ===');
   const centre = (f: Rect): [number, number] => [(f.x1 + f.x2) >> 1, (f.y1 + f.y2) >> 1];
-  check(tabs.every((f, i) => searchButtonList(tabList, ...centre(f), LEFT_CLICK) === 300 + i)
-    && searchButtonList(tabList, tabs[0].x2 + 4, centre(tabs[0])[1], LEFT_CLICK) === 0,
-    'a click on a tab finds it, and one between two tabs nothing');
-
   const pair = W.framesAcross({ x1: 120, y1: 60, x2: 239, y2: 60 + W.LOW_BUTTON_HEIGHT - 1 }, 2) as [Rect, Rect];
+  check(pair[1].x1 - pair[0].x2 - 1 === W.BUTTON_GAP && pair[1].x2 === 239, 'its two frames span the row, graphic 0\'s nine columns apart');
   clear(ui);
   W.drawToggle(ui, pair, ['ON', 'OFF'], 1);
   const toggled = Uint8Array.from(pixels(ui));
+  const pt = strays(ui, pair, colours);
+  check(pt.outside === 0 && pt.foreign === 0, `the toggle stays in its frames, the gap left alone (${pt.outside} outside, ${pt.foreign} foreign)`);
   clear(ui);
-  W.drawTabs(ui, pair, ['ON', 'OFF'], 1);
-  check(same(toggled, pixels(ui)), 'a toggle is two tabs, the chosen one pressed');
+  W.drawButton(ui, pair[0], 'ON');
+  W.drawButton(ui, pair[1], 'OFF', 'pressed');
+  check(same(toggled, pixels(ui)), 'a toggle is two buttons, the chosen one pressed');
+  const pairList = W.choiceButtons(pair, 300, 'toggle');
+  check(pair.every((f, i) => searchButtonList(pairList, ...centre(f), LEFT_CLICK) === 300 + i)
+    && searchButtonList(pairList, pair[0].x2 + 4, centre(pair[0])[1], LEFT_CLICK) === 0,
+    'a click on a side finds it, and one between the two nothing');
+
+  console.log('');
+  console.log('=== a tabbed page ===');
+  const page: Rect = { x1: 5, y1: 60, x2: 314, y2: 150 };
+  const tabs = W.tabsOver(page, 4, 64);
+  console.log(`  ${tabs.map((f) => `${f.x1}..${f.x2}`).join(', ')}, y ${tabs[0].y1}..${tabs[0].y2}`);
+  check(tabs.every((t) => t.y2 === page.y1 + 1 && t.y2 - t.y1 + 1 === W.TAB_HEIGHT) && tabs[0].x1 === page.x1 + 4
+    && tabs.slice(1).every((t, i) => t.x1 - tabs[i].x2 - 1 === 2),
+    'the tabs stand on the page\'s top edge, from four columns into it, two apart');
+  clear(ui);
+  W.drawTabbedPage(ui, page, tabs, ['GAME', 'DISPLAY', 'SOUND', 'KEYS'], 1, 2);
+  const tp = strays(ui, [page, ...tabs.map((t, i) => (i === 1 ? t : { ...t, y1: t.y1 + 2 }))], colours);
+  check(tp.outside === 0 && tp.foreign === 0, `the page and its tabs stay in their rectangles (${tp.outside} outside, ${tp.foreign} foreign)`);
+  const [mid0] = centre(tabs[0]);
+  const [mid1] = centre(tabs[1]);
+  check(at(ui, mid1, page.y1) === W.PLATE_COLOR && at(ui, mid1, page.y1 + 1) === W.PLATE_COLOR && at(ui, mid1, tabs[1].y1) !== ground,
+    'the selected tab is open into the page, and full height');
+  check(at(ui, mid0, page.y1) !== W.PLATE_COLOR && at(ui, mid0, page.y1 + 1) !== W.PLATE_COLOR,
+    'another is closed by the page\'s edge');
+  check(at(ui, mid0, tabs[0].y1) === ground && at(ui, mid0, tabs[0].y1 + 1) === ground && at(ui, mid0, tabs[0].y1 + 2) !== ground,
+    'and stands two rows lower');
+  check(countNot(ui, { x1: page.x1 + 2, y1: page.y1 + 2, x2: page.x2 - 2, y2: page.y2 - 2 }, W.PLATE_COLOR) === 0, 'the page is the plate\'s grey');
+  const lit = (t: Rect) => countNot(ui, t, W.LIT_COLOR) < (t.x2 - t.x1 + 1) * (t.y2 - t.y1 + 1);
+  check(lit(tabs[1]) && lit(tabs[2]) && !lit(tabs[0]) && !lit(tabs[3]), 'the selected and the hovered tab are lit, the others not');
+  const tabList = W.tabButtons(tabs, 400, 'tab');
+  check(tabs.every((t, i) => searchButtonList(tabList, ...centre(t), LEFT_CLICK) === 400 + i)
+    && searchButtonList(tabList, tabs[0].x2 + 1, centre(tabs[0])[1], LEFT_CLICK) === 0
+    && searchButtonList(tabList, mid0, page.y1 + 4, LEFT_CLICK) === 0,
+    'a click on a tab finds it, and one between two tabs or on the page nothing');
 
   console.log('');
   console.log('=== the slider ===');

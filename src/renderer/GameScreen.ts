@@ -164,6 +164,8 @@ export class GameScreen {
   private viewportDrawn = false;
   /** The pointer has moved since the cursor was last drawn (`takeCursorMoved`). */
   private cursorMoved = false;
+  /** The wheel has changed the dialog since it was last drawn (`takeWheelTurned`). */
+  private wheelTurned = false;
   private bootFrameRenderer: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, deps: GameScreenDeps, hooks: GameScreenHooks) {
@@ -397,8 +399,9 @@ export class GameScreen {
     this.ui.dialog?.key(this.ui, key, code);
   }
 
+  /** The wheel, while a dialog is up. Nothing is drawn here: the VBL's frame draws what it changed (`takeWheelTurned`). */
   handleDialogWheel(deltaY: number): void {
-    this.ui.dialog?.wheel(this.ui, deltaY);
+    if (this.ui.dialog?.wheel(this.ui, deltaY)) this.wheelTurned = true;
   }
 
   /** The pointer moved with the button of the dialog's click held (`Dialog.drag`). */
@@ -527,6 +530,13 @@ export class GameScreen {
     const moved = this.cursorMoved;
     this.cursorMoved = false;
     return moved;
+  }
+
+  /** Whether the wheel has changed the dialog since it was last drawn: a redraw is due. */
+  takeWheelTurned(): boolean {
+    const turned = this.wheelTurned;
+    this.wheelTurned = false;
+    return turned;
   }
 
   /**

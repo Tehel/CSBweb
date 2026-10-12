@@ -18,9 +18,12 @@
  *   setting that cannot work, draws it grey; inert has no label, as CSBWin leaves an
  *   empty save slot's button unlabelled.
  * - **The list**: rows of text on a panel, the selected one inverted, beside a
- *   scrollbar in the manner of a GEM window's (`drawList`).
- * - **A row of tabs** and **a toggle**: buttons side by side, the chosen one pressed
- *   (`drawTabs`, `drawToggle`).
+ *   scrollbar in the manner of a GEM window's (`drawList`). The wheel scrolls it by its
+ *   travel, three rows a notch (`wheelRows`).
+ * - **A toggle**: buttons side by side, the chosen one pressed (`drawToggle`).
+ * - **A tabbed page**: the page an outline etched in the plate,
+ *   and over it a row of tabs outlined alike, the selected one open into it
+ *   (`drawTabbedPage`).
  * - **The slider**: a sunken black track, the panel's edge around black, and over it a
  *   small raised knob, the button frame from its inner black ring in (`drawSlider`).
  * - **The help line**: a panel one row high, at a dialog's foot (`drawHelpLine`).
@@ -235,19 +238,87 @@ export function framesAcross(row: Rect, count: number, gap = BUTTON_GAP): Rect[]
   });
 }
 
-/** A row of tabs: a button each, the selected one pressed. */
-export function drawTabs(ui: UIState, frames: Rect[], labels: readonly string[], selected: number): void {
-  frames.forEach((frame, i) => drawButton(ui, frame, labels[i], i === selected ? 'pressed' : 'raised'));
-}
-
 /** A toggle: two buttons, the chosen one pressed. */
 export function drawToggle(ui: UIState, frames: readonly [Rect, Rect], labels: readonly [string, string], chosen: 0 | 1): void {
-  drawTabs(ui, [...frames], labels, chosen);
+  frames.forEach((frame, i) => drawButton(ui, frame, labels[i], i === chosen ? 'pressed' : 'raised'));
 }
 
-/** The tabs' or the toggle's button list: `firstId` for the first, and on. */
+/** The toggle's button list: `firstId` for the first, and on. */
 export function choiceButtons(frames: Rect[], firstId: number, name: string): UIButton[] {
   return frames.map((frame, i) => buttonOf(frame, firstId + i, `${name}${i}`));
+}
+
+/* -------------------------------------------------------------- tabbed page ---- */
+
+/** The plate's grey, graphic 0's ground: a page's, and its tabs'. */
+export const PLATE_COLOR = 1;
+/** The plate's edge, dark at its top and left and light at its bottom and right. */
+const PLATE_DARK_COLOR = 2;
+const PLATE_LIGHT_COLOR = 12;
+/** A tab above its page: a row of text in a two-pixel edge, as the help line holds one. */
+export const TAB_HEIGHT = 2 + 2 + LINE_STEP + 2 + 1;
+/** A tab not selected stands this many rows lower, behind the page's edge. */
+const TAB_DROP = 2;
+const TAB_GAP = 2;
+
+/**
+ * `count` tabs `width` wide over `page`, from four columns into it: each the selected
+ * one's rectangle, whose last two rows are the page's top edge.
+ */
+export function tabsOver(page: Rect, count: number, width: number): Rect[] {
+  const y1 = page.y1 + 2 - TAB_HEIGHT;
+  return Array.from({ length: count }, (_, i) => {
+    const x1 = page.x1 + 4 + i * (width + TAB_GAP);
+    return { x1, y1, x2: x1 + width - 1, y2: page.y1 + 1 };
+  });
+}
+
+/** The tabs' button list, each tab whole above the page: `firstId` for the first, and on. */
+export function tabButtons(tabs: Rect[], firstId: number, name: string): UIButton[] {
+  return tabs.map((tab, i) => ({ word0: firstId + i, x1: tab.x1, y1: tab.y1, x2: tab.x2 + 1, y2: tab.y2 - 1, button: 2, name: `${name}${i}` }));
+}
+
+/**
+ * An outline etched in the plate in its edge's colours, a dark line and a light one
+ * inside it and a row and a column on, around the plate's grey, which the box is
+ * cleared to first: the two corners neither line reaches are the plate's.
+ */
+function drawOutline(ui: UIState, box: Rect, ground: Rect = { x1: box.x1 + 2, y1: box.y1 + 2, x2: box.x2 - 2, y2: box.y2 - 2 }): void {
+  const buf = ui.screenIndexBuffer;
+  const frame = (r: Rect, color: number): void => {
+    fillRectIndex(buf, { ...r, y2: r.y1 }, color);
+    fillRectIndex(buf, { ...r, y1: r.y2 }, color);
+    fillRectIndex(buf, { ...r, x2: r.x1 }, color);
+    fillRectIndex(buf, { ...r, x1: r.x2 }, color);
+  };
+  fillRectIndex(buf, box, PLATE_COLOR);
+  frame({ x1: box.x1, y1: box.y1, x2: box.x2 - 1, y2: box.y2 - 1 }, PLATE_DARK_COLOR);
+  frame({ x1: box.x1 + 1, y1: box.y1 + 1, x2: box.x2, y2: box.y2 }, PLATE_LIGHT_COLOR);
+  fillRectIndex(buf, ground, PLATE_COLOR);
+}
+
+/**
+ * A tabbed page: an outline the controls stand in, and the tabs over it. The selected
+ * one is open into the page, its label lit; the others stand lower, closed by the page's
+ * edge, their label lit under the pointer (`hovered`, or -1).
+ */
+export function drawTabbedPage(
+  ui: UIState, page: Rect, tabs: Rect[], labels: readonly string[], selected: number, hovered: number,
+): void {
+  const label = (i: number, y: number, color: number): void => {
+    const tab = tabs[i];
+    drawCentredText(ui, labels[i], ((tab.x1 + tab.x2) >> 1) + 1, y, color, PLATE_COLOR);
+  };
+  tabs.forEach((tab, i) => {
+    if (i === selected) return;
+    drawOutline(ui, { ...tab, y1: tab.y1 + TAB_DROP });
+    label(i, tab.y1 + TAB_DROP + 8, i === hovered ? LIT_COLOR : MENU_OPTION_COLOR);
+  });
+  drawOutline(ui, page);
+  const tab = tabs[selected];
+  if (!tab) return;
+  drawOutline(ui, tab, { x1: tab.x1 + 2, y1: tab.y1 + 2, x2: tab.x2 - 2, y2: tab.y2 });
+  label(selected, tab.y1 + 9, LIT_COLOR);
 }
 
 /* -------------------------------------------------------------------- slider ---- */
@@ -374,6 +445,31 @@ export function listRowRect(list: ListWidget, row: number): Rect {
   const y = list.rowFirstY + row * LINE_STEP;
   const inner = listInner(list);
   return { x1: inner.x1, y1: y - 5, x2: inner.x2, y2: y + 2 };
+}
+
+/**
+ * The wheel's travel a row scrolls, `WheelEvent.deltaY`'s units: a third of a notch of a
+ * mouse's wheel, which a browser reports as 100 pixels, so a notch is three rows, as a
+ * browser scrolls three lines.
+ */
+export const WHEEL_ROW_DELTA = 100 / 3;
+
+/** What a list keeps of the wheel's travel between its turns: what is not yet a row. */
+export interface WheelTravel {
+  wheelDelta: number;
+}
+
+/**
+ * The rows the wheel turned by `deltaY` scrolls a list, down positive: one for each
+ * `WHEEL_ROW_DELTA` of travel, what is left over kept in `travel` for the next turn, so a
+ * touchpad's small deltas add up to rows. A turn the other way drops what was kept.
+ */
+export function wheelRows(travel: WheelTravel, deltaY: number): number {
+  if (Math.sign(deltaY) !== Math.sign(travel.wheelDelta)) travel.wheelDelta = 0;
+  travel.wheelDelta += deltaY;
+  const rows = Math.trunc(travel.wheelDelta / WHEEL_ROW_DELTA);
+  travel.wheelDelta -= rows * WHEEL_ROW_DELTA;
+  return rows;
 }
 
 /** The first row shown, kept on the list's rows: no further down than its last page. */

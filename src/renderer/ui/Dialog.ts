@@ -35,8 +35,12 @@ export interface Dialog {
    * names it, and `code` the physical key, which a binding is.
    */
   key(ui: UIState, key: string, code: string): void;
-  /** A notch of the wheel, `WheelEvent.deltaY`. */
-  wheel(ui: UIState, deltaY: number): void;
+  /**
+   * The wheel turned, `WheelEvent.deltaY`. Says whether the dialog is drawn differently
+   * for it, which the VBL's frame then draws, as it draws a move of the pointer: a
+   * touchpad reports its travel faster than the screen is composed.
+   */
+  wheel(ui: UIState, deltaY: number): boolean;
   /** The pointer moved. Says whether the dialog is drawn differently for it. */
   pointer(ui: UIState, point: DialogPoint): boolean;
   /**

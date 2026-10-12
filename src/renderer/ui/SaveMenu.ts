@@ -59,8 +59,8 @@
  * The panel shows fifteen rows, which fill it, beside a scrollbar in the manner of a GEM
  * window's, in the dialog's two colours (`drawList`): a boxed arrow at each end, and
  * between them a slider, plain, for the rows shown, in a track that is dithered where
- * rows lie beyond them. A click on an arrow scrolls the list by a row, as a notch of the
- * wheel does; the slider and the track take no click. Scrolling does not move the
+ * rows lie beyond them. A click on an arrow scrolls the list by a row, and a notch of the
+ * wheel by three (`Widgets.wheelRows`); the slider and the track take no click. Scrolling does not move the
  * selection, which may leave the panel; a move of the selection brings the list back to
  * it (`showSelection`).
  *
@@ -188,7 +188,9 @@ import {
   listTextX,
   scrollSlider as listSlider,
   scrollToRow,
+  wheelRows,
   type ListWidget,
+  type WheelTravel,
 } from './Widgets';
 
 /* ------------------------------------------------------------------ geometry ---- */
@@ -378,7 +380,7 @@ export type SaveMenuRow =
   | { kind: 'heading'; playthrough: Playthrough }
   | { kind: 'save'; entry: SaveEntry };
 
-export interface SaveMenuState {
+export interface SaveMenuState extends WheelTravel {
   mode: SaveMenuMode;
   /** The running data set's saves, newest first (`UIState.onListSaves`); RISE's, every set's. */
   entries: SaveEntry[];
@@ -427,7 +429,11 @@ const SAVE_MENU_DIALOG: Dialog = {
   draw: (ui) => drawSaveMenu(ui),
   click: (ui, x, y, buttons) => saveMenuClick(ui, x, y, buttons),
   key: (ui, key) => saveMenuKey(ui, key),
-  wheel: (ui, deltaY) => saveMenuWheel(ui, deltaY),
+  // The menu draws itself at once (`scrollBy`), which leaves the VBL's frame nothing to draw.
+  wheel: (ui, deltaY) => {
+    saveMenuWheel(ui, deltaY);
+    return false;
+  },
   pointer: (ui, point) => saveMenuPointer(ui, point),
 };
 
@@ -455,6 +461,7 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
     rows: [],
     selected: -1,
     scrollTop: 0,
+    wheelDelta: 0,
     busy: true,
     message: '',
     press: null,
@@ -1290,11 +1297,12 @@ function foldSelection(ui: UIState, state: SaveMenuState, folded: boolean): void
   ui.renderLastFrame();
 }
 
-/** The wheel scrolls the list a row at a time, without moving the selection. */
+/** The wheel scrolls the list by its travel (`wheelRows`), without moving the selection. */
 export function saveMenuWheel(ui: UIState, delta: number): boolean {
   const state = ui.saveMenu;
   if (!state) return false;
   if (state.confirm || state.dropped || state.adventure) return true;
-  scrollBy(ui, state, delta > 0 ? 1 : -1);
+  const rows = wheelRows(state, delta);
+  if (rows !== 0) scrollBy(ui, state, rows);
   return true;
 }

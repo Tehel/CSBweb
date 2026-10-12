@@ -2,8 +2,9 @@
  * The champion dialog (`src/renderer/ui/ChampionDialog.ts`): everything about it the
  * golden frames cannot see.
  *
- * 1. **The layout**: CLOSE, the tabs and the table's panel inside the plate's interior,
- *    none over another; each tab's rows, the names and the blank line under them inside
+ * 1. **The layout**: CLOSE inside the plate's interior, clear of the page and its tabs;
+ *    the tabs on the page's top edge, left of CLOSE; the table's panel inside the page;
+ *    each tab's label inside it; each tab's rows, the names and the blank line under them inside
  *    the panel; every label inside its column, every name of the default dungeon's
  *    champions inside a champion's column, every reading and its bar inside it too.
  * 2. **The readings**, of `csbgame7.dat`'s four champions: a level or a sub-skill the
@@ -31,7 +32,7 @@ import { determineMastery, ensureSkills } from '../src/engine/skills';
 import { BARS_LONG_PRESS_MS, GameInput, type KeyPress } from '../src/renderer/GameInput';
 import type { GameScreen } from '../src/renderer/GameScreen';
 import {
-  BAR_X1, BAR_X2, CLOSE_FRAME, COLUMN_WIDTH, LABEL_CHARS, LABEL_X, PARTY_SIZE, TABLE_LINES, TABLE_PANEL, TABS, TAB_FRAMES,
+  BAR_X1, BAR_X2, CLOSE_FRAME, COLUMN_WIDTH, LABEL_CHARS, LABEL_X, PAGE, PARTY_SIZE, TABLE_LINES, TABLE_PANEL, TABS, TAB_FRAMES,
   VALUE_CHARS, barFill, barRect, championBarsAt, columnRight, championDialogClick, championDialogPointer, closeChampionDialog, columnX,
   drawChampionDialog, lineY, openChampionDialog, skillProgress,
 } from '../src/renderer/ui/ChampionDialog';
@@ -74,11 +75,13 @@ const bars = (chIdx: number) => ({ x: chIdx * 69 + 55, y: 14 });
 console.log('=== 1. the layout ===');
 {
   const interior: Rect = { x1: 10, y1: 10, x2: 309, y2: 189 };
-  const frames: Array<[string, Rect]> = [['CLOSE', CLOSE_FRAME], ...TAB_FRAMES.map((f, i): [string, Rect] => [TABS[i].label, f]), ['table', TABLE_PANEL]];
-  check(frames.every(([, f]) => inside(f, interior)), 'every frame inside the plate\'s interior');
-  const clashes = frames.flatMap(([a, fa], i) => frames.slice(i + 1).filter(([, fb]) => overlap(fa, fb)).map(([b]) => `${a}/${b}`));
-  check(clashes.length === 0, `no frame over another${clashes.length ? `: ${clashes.join(', ')}` : ''}`);
-  check(TABS.every((t, i) => t.label.length * CHAR_WIDTH <= TAB_FRAMES[i].x2 - TAB_FRAMES[i].x1 - 12), 'every tab\'s label fits its face');
+  const pageInterior: Rect = { x1: PAGE.x1 + 2, y1: PAGE.y1 + 2, x2: PAGE.x2 - 2, y2: PAGE.y2 - 2 };
+  check(inside(CLOSE_FRAME, interior) && !overlap(CLOSE_FRAME, PAGE) && TAB_FRAMES.every((t) => !overlap(CLOSE_FRAME, t)),
+    'CLOSE inside the plate\'s interior, clear of the page and its tabs');
+  check(TAB_FRAMES.every((t) => t.y2 === PAGE.y1 + 1 && t.x1 > PAGE.x1 && t.x2 < CLOSE_FRAME.x1) && PAGE.x1 > 0 && PAGE.x2 < 319 && PAGE.y2 < 199,
+    'the tabs stand on the page\'s top edge, left of CLOSE, the page inside the plate');
+  check(inside(TABLE_PANEL, pageInterior), 'the table\'s panel inside the page');
+  check(TABS.every((t, i) => t.label.length * CHAR_WIDTH <= TAB_FRAMES[i].x2 - TAB_FRAMES[i].x1 - 4), 'every tab\'s label fits inside its edge');
 
   const lines = TABS.map((t) => 2 + t.rows.length);
   check(lines.every((n) => n <= TABLE_LINES) && lineY(TABLE_LINES - 1) + 1 <= TABLE_PANEL.y2 - 2,

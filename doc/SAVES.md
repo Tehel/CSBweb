@@ -291,8 +291,9 @@ opens the same one, load-only.
   right edge, outlined; a hollow arrow on a stem in a box at each end; between them a
   slider, plain, whose height is to the track's as the rows shown are to the list's,
   in a track dithered of the two colours where rows lie beyond the panel. A list that
-  fits has the whole track for a slider. A click on an arrow scrolls a row, as a notch
-  of the wheel does; the slider is not dragged, and the track takes no click. Scrolling
+  fits has the whole track for a slider. A click on an arrow scrolls a row, and a notch
+  of the wheel three, a touchpad's small deltas added up (`Widgets.wheelRows`); the
+  slider is not dragged, and the track takes no click. Scrolling
   does not move the selection, which may leave the panel; a key that moves the
   selection scrolls the list back to it (`scrollBy`, `showSelection`).
 - **A preview** beside the list, of the save LOAD would read: the selected save, or

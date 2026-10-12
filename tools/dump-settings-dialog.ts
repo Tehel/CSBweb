@@ -8,8 +8,10 @@
  *    over the strip, from `graphics.dat` as the game reads it: only the freeze's pixel
  *    (x 0, y 198, `Buttons17196`) and the frozen game's thaw (`Buttons17832`, the whole
  *    screen) take a left click there.
- * 2. **The layout**: every control inside the plate's interior, none over another, every
- *    name inside its button or its panel and every help line inside the help line.
+ * 2. **The layout**: the title line and the help line inside the plate's interior, the
+ *    tabs on the page's top edge, every setting's control inside the page, none over
+ *    another, every name inside its button or its panel and every help line inside the
+ *    help line.
  * 3. **The controls**: a tab, a setting's button, which a click turns over, a toggle, the
  *    slider clicked, dragged past the track's end and released; a click on the chosen side
  *    of a toggle changes nothing; the CRT effect's button dim without WebGL, taking no
@@ -30,8 +32,9 @@
  * 6. **KEYS** (`SettingsKeys.ts`): its layout; a slot clicked waits for its key, which
  *    fills it and leaves every other slot, Esc cancelling and never bound; a right click
  *    empties a slot; the presets, CUSTOM inert until a key is changed; the labels'
- *    layout, inert where the browser gives the keyboard's; the list scrolled by the wheel,
- *    its arrows and the keys. `tools/dump-key-bindings.ts` checks the tables and labels.
+ *    layout, left out where the browser gives the keyboard's, the list taking its line;
+ *    the list scrolled by the wheel, three rows a notch and a touchpad's small deltas
+ *    added up, its arrows and the keys; the wheel's scroll says it is to be drawn. `tools/dump-key-bindings.ts` checks the tables and labels.
  *
  * Run: `npx tsx tools/dump-settings-dialog.ts`
  */
@@ -46,17 +49,17 @@ import { DEFAULT_KEY_BINDINGS, keyAction, tableKeyButton } from '../src/renderer
 import { MENU_GRAPHIC, MENU_PRESS_PHASE_MS, menuButtonList } from '../src/renderer/ui/Menu';
 import { searchMouseButtons, syncInventoryButtons, updateButtonLists } from '../src/renderer/ui/Mouse';
 import {
-  CLOSE_FRAME, EXIT_FRAME, EXIT_HELP, EXIT_LABEL, EXIT_QUESTION, EXIT_WARNING, HELP_LINE, KEYS_AREA, SETTING_LINES, TABS, TAB_FRAMES, closeSettingsDialog, drawSettingsDialog,
+  CLOSE_FRAME, EXIT_FRAME, EXIT_HELP, EXIT_LABEL, EXIT_QUESTION, EXIT_WARNING, HELP_LINE, KEYS_AREA, PAGE, SETTING_LINES, TABS, TAB_FRAMES, closeSettingsDialog, drawSettingsDialog,
   helpText, openSettingsDialog, settingsDialogButtons, settingsDialogClick, settingsDialogKey, settingsDialogPointer,
   settingButtonFrame, sliderRect, toggleFrames,
 } from '../src/renderer/ui/SettingsDialog';
 import {
-  CAPTURE_HELP, CAPTURE_LABEL, KEY_ACTION_NAMES, LABELS_FROM_KEYBOARD_HELP, LABELS_HELP, LABELS_NAME, PRESETS, SLOT_HELP,
+  CAPTURE_HELP, CAPTURE_LABEL, KEY_ACTION_NAMES, LABELS_HELP, LABELS_NAME, PRESETS, SLOT_HELP,
   keysList, labelsNamePanel, layoutFrames, presetFrames, slotLabel, slotRect,
 } from '../src/renderer/ui/SettingsKeys';
 import { KEY_LABEL_CHARS } from '../src/renderer/ui/KeyLabels';
 import { KEYPAD_KEY_BINDINGS } from '../src/renderer/ui/Keyboard';
-import { arrowBox, listTextX } from '../src/renderer/ui/Widgets';
+import { WHEEL_ROW_DELTA, arrowBox, listTextX } from '../src/renderer/ui/Widgets';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { CHAR_WIDTH, DIM_COLOR, LIT_COLOR, buttonLabelAt, buttonRect, drawButton } from '../src/renderer/ui/Widgets';
 import { MENU_OPTION_COLOR } from '../src/renderer/ui/Menu';
@@ -97,6 +100,17 @@ function fakeFullscreen(keepsEscape: boolean): Fullscreen & { asked: number } {
 const centre = (r: Rect) => ({ x: (r.x1 + r.x2) >> 1, y: (r.y1 + r.y2) >> 1 });
 const inside = (r: Rect, outer: Rect) => r.x1 >= outer.x1 && r.x2 <= outer.x2 && r.y1 >= outer.y1 && r.y2 <= outer.y2;
 const overlap = (a: Rect, b: Rect) => a.x1 <= b.x2 && b.x1 <= a.x2 && a.y1 <= b.y2 && b.y1 <= a.y2;
+/** The plate's interior, inside its ten pixels of frame; the page's, inside its two of outline. */
+const interior: Rect = { x1: 10, y1: 10, x2: 309, y2: 189 };
+const pageInterior: Rect = { x1: PAGE.x1 + 2, y1: PAGE.y1 + 2, x2: PAGE.x2 - 2, y2: PAGE.y2 - 2 };
+/** The title line and the help line inside the plate's interior, clear of the page and its tabs. */
+function checkDialogFrames(): void {
+  const common: Array<[string, Rect]> = [['CLOSE', CLOSE_FRAME], ['EXIT', EXIT_FRAME], ['help line', HELP_LINE]];
+  check(common.every(([, f]) => inside(f, interior) && !overlap(f, PAGE) && TAB_FRAMES.every((t) => !overlap(f, t))),
+    'CLOSE, EXIT and the help line inside the plate\'s interior, clear of the page and its tabs');
+  check(TAB_FRAMES.every((t) => t.y2 === PAGE.y1 + 1 && t.x1 > PAGE.x1 && t.x2 < PAGE.x2) && TAB_FRAMES[0].y1 > CLOSE_FRAME.y2,
+    'the tabs stand on the page\'s top edge, under the title line');
+}
 const click = (ui: UIState, r: Rect, buttons = 2) => {
   const at = centre(buttonRect(r));
   settingsDialogClick(ui, at.x, at.y, buttons);
@@ -134,20 +148,15 @@ console.log('=== 1. the message area\'s buttons ===');
 
 console.log('\n=== 2. the layout ===');
 {
-  const interior: Rect = { x1: 10, y1: 10, x2: 309, y2: 189 };
-  const common: Array<[string, Rect]> = [
-    ['CLOSE', CLOSE_FRAME], ['EXIT', EXIT_FRAME], ...TAB_FRAMES.map((f, i): [string, Rect] => [`tab ${TABS[i].label}`, f]),
-    ['help line', HELP_LINE],
-  ];
+  checkDialogFrames();
   const lineFrames: Array<[string, Rect]> = [];
   for (let line = 0; line < SETTING_LINES; line++) {
     const [on, off] = toggleFrames(line);
     lineFrames.push([`line ${line} ON`, on], [`line ${line} OFF`, off]);
   }
   const buttonFrames = Array.from({ length: 2 * SETTING_LINES }, (_, i): [string, Rect] => [`button ${i}`, settingButtonFrame(i)]);
-  for (const [layout, own] of [['lines', lineFrames], ['buttons', buttonFrames]] as const) {
-    const frames = [...common, ...own];
-    check(frames.every(([, f]) => inside(f, interior)), `${layout}: every frame inside the plate's interior`);
+  for (const [layout, frames] of [['lines', lineFrames], ['buttons', buttonFrames]] as const) {
+    check(frames.every(([, f]) => inside(f, pageInterior)), `${layout}: every frame inside the page`);
     const clashes = frames.flatMap(([a, fa], i) => frames.slice(i + 1).filter(([, fb]) => overlap(fa, fb)).map(([b]) => `${a}/${b}`));
     check(clashes.length === 0, `${layout}: no frame over another${clashes.length ? `: ${clashes.join(', ')}` : ''}`);
   }
@@ -521,7 +530,7 @@ console.log('\n=== 5. opening it ===');
   input.keyDown(press('Escape'));
   const keys = ui.settingsDialog!;
   keys.tab = 'keys';
-  const slot = centre(slotRect(keysList(KEYS_AREA), 0, 1));
+  const slot = centre(slotRect(keysList(ui, KEYS_AREA), 0, 1));
   input.mouseDown(slot.x, slot.y, 0);
   check(keys.keys.capture?.action === 'move.forward', 'a click on MOVE FORWARD\'s second slot waits for its key');
   check(!input.keyDown({ key: 'a', code: 'KeyA', ctrlKey: true, metaKey: false, altKey: false }) && keys.keys.capture !== null,
@@ -538,16 +547,16 @@ console.log('\n=== 5. opening it ===');
 
 console.log('\n=== 6. KEYS ===');
 {
-  const interior: Rect = { x1: 10, y1: 10, x2: 309, y2: 189 };
-  const list = keysList(KEYS_AREA);
+  const ui = freshUI();
+  const list = keysList(ui, KEYS_AREA);
   const frames: Array<[string, Rect]> = [
-    ...TAB_FRAMES.map((f, i): [string, Rect] => [`tab ${TABS[i].label}`, f]),
     ...presetFrames(KEYS_AREA).map((f, i): [string, Rect] => [`preset ${PRESETS[i].label}`, f]),
     ['labels name', labelsNamePanel(KEYS_AREA)],
     ...layoutFrames(KEYS_AREA).map((f, i): [string, Rect] => [`layout ${i}`, f]),
-    ['list', list.panel], ['help line', HELP_LINE],
+    ['list', list.panel],
   ];
-  check(frames.every(([, f]) => inside(f, interior)), 'every frame inside the plate\'s interior');
+  checkDialogFrames();
+  check(frames.every(([, f]) => inside(f, pageInterior)), 'every frame inside the page');
   const clashes = frames.flatMap(([a, fa], i) => frames.slice(i + 1).filter(([, fb]) => overlap(fa, fb)).map(([b]) => `${a}/${b}`));
   check(clashes.length === 0, `no frame over another${clashes.length ? `: ${clashes.join(', ')}` : ''}`);
   const first = slotRect(list, 0, 0);
@@ -561,10 +570,9 @@ console.log('\n=== 6. KEYS ===');
   console.log(`  the list shows ${list.rows} of ${KEY_ACTION_NAMES.length} actions`);
   check(list.rows >= 7, 'the list shows seven rows at least');
   const helpChars = Math.floor((HELP_LINE.x2 - 1 - (HELP_LINE.x1 + 4) + 1) / CHAR_WIDTH);
-  const helps = [...PRESETS.map((p) => p.help), LABELS_HELP, LABELS_FROM_KEYBOARD_HELP, SLOT_HELP, CAPTURE_HELP];
+  const helps = [...PRESETS.map((p) => p.help), LABELS_HELP, SLOT_HELP, CAPTURE_HELP];
   check(helps.every((h) => h.length <= helpChars), `every help line fits, ${helpChars} characters`);
 
-  const ui = freshUI();
   openSettingsDialog(ui);
   const state = ui.settingsDialog!;
   click(ui, TAB_FRAMES[3]);
@@ -622,12 +630,15 @@ console.log('\n=== 6. KEYS ===');
 
   // The list, a row an action, scrolled by the wheel, its arrows and the keys.
   const maxTop = KEY_ACTION_NAMES.length - list.rows;
-  ui.dialog?.wheel(ui, 100);
-  check(state.keys.scrollTop === 1, 'a notch of the wheel down scrolls a row');
+  check(ui.dialog?.wheel(ui, 100) === true && state.keys.scrollTop === 3, 'a notch of the wheel down scrolls three rows, and is to be drawn');
+  const touchpad = Array.from({ length: 8 }, () => ui.dialog?.wheel(ui, 4));
+  check(state.keys.scrollTop === 3 && touchpad.every((drawn) => drawn === false), 'a touchpad\'s small deltas scroll nothing, nor ask a redraw, short of a row');
+  check(ui.dialog?.wheel(ui, WHEEL_ROW_DELTA - 32) === true && state.keys.scrollTop === 4, 'and add up to one');
+  ui.dialog?.wheel(ui, 30);
+  check(ui.dialog?.wheel(ui, -100) === true && state.keys.scrollTop === 1, 'up, what was left of the way down is dropped: three rows back');
   settingsDialogKey(ui, 'End', 'End');
   check(state.keys.scrollTop === maxTop, 'End shows the last page');
-  ui.dialog?.wheel(ui, 100);
-  check(state.keys.scrollTop === maxTop, 'and the wheel goes no further');
+  check(ui.dialog?.wheel(ui, 100) === false && state.keys.scrollTop === maxTop, 'and the wheel goes no further, nothing to draw');
   settingsDialogKey(ui, 'PageUp', 'PageUp');
   check(state.keys.scrollTop === maxTop - list.rows, 'Page Up scrolls a page');
   settingsDialogKey(ui, 'Home', 'Home');
@@ -643,15 +654,20 @@ console.log('\n=== 6. KEYS ===');
   settingsDialogKey(ui, 'Escape', 'Escape');
   check(!isDialogOpen(ui), 'with no slot waiting, Esc closes the dialog');
 
-  // Where the browser gives the layout, the toggle is inert and the names are the map's.
+  // Where the browser gives the layout, KEY LABELS is left out, the list takes its line,
+  // and the names are the map's.
   const french = new Map([['KeyQ', 'a'], ['Digit2', 'é'], ['Quote', 'ù'], ['Semicolon', 'm']]);
   const mapped = freshUI(true, french);
   openSettingsDialog(mapped);
   mapped.settingsDialog!.tab = 'keys';
   check(!settingsDialogButtons(mapped, mapped.settingsDialog!).some((b) => b.name?.startsWith('settings.keys.layout')),
     'with the keyboard\'s layout, KEY LABELS\' toggle has no button');
-  settingsDialogPointer(mapped, centre(layoutFrames(KEYS_AREA)[0]));
-  check(helpText(mapped, mapped.settingsDialog!) === LABELS_FROM_KEYBOARD_HELP, 'and the help line says the names are the keyboard\'s');
+  settingsDialogPointer(mapped, centre(labelsNamePanel(KEYS_AREA)));
+  check(helpText(mapped, mapped.settingsDialog!) !== LABELS_HELP, 'and the help line does not name it');
+  const mappedList = keysList(mapped, KEYS_AREA);
+  console.log(`  without KEY LABELS, the list shows ${mappedList.rows} rows`);
+  check(mappedList.panel.y1 === presetFrames(KEYS_AREA)[0].y2 + 2 && mappedList.panel.y2 === list.panel.y2 && mappedList.rows > list.rows,
+    'the list starts under the presets, and shows more rows');
   check(slotLabel(mapped, 'KeyQ') === 'A' && slotLabel(mapped, 'Semicolon') === 'M', 'the names are the map\'s');
   drawSettingsDialog(mapped);
   check(mapped.screenIndexBuffer.pixels.some((p) => p !== 0), 'it draws');

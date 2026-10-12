@@ -379,7 +379,7 @@ function checkLayout(graphics: GraphicsLoader): void {
   /* ---- the dialog, drawn for real and then measured ---- */
 
   const blank: SaveMenu.SaveMenuState = {
-    mode: 'full', entries: [], unfolded: new Set(), rows: [], selected: -1, scrollTop: 0, busy: true, message: '',
+    mode: 'full', entries: [], unfolded: new Set(), rows: [], selected: -1, scrollTop: 0, wheelDelta: 0, busy: true, message: '',
     press: null, pending: null, confirm: null, dropped: null, adventure: null, frameHandle: null, lastSaveClick: null, pointer: null, newFace: null,
   };
   ui.saveMenu = blank;
@@ -1665,7 +1665,7 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
 
     SaveMenu.saveMenuClick(ui, VIEWPORT_X + 4, VIEWPORT_Y + 4, LEFT);
     SaveMenu.saveMenuKey(ui, 'Enter');
-    SaveMenu.saveMenuWheel(ui, 1);
+    SaveMenu.saveMenuWheel(ui, 100);
     await mine.settled();
     check(state.confirm === 'save' && state.press === null && state.scrollTop === 0,
       'a click off its buttons, Enter and the wheel leave it up');
@@ -2198,11 +2198,20 @@ async function checkScrolling(graphics: GraphicsLoader): Promise<void> {
       && rowKind(afterOne.y1 - 1) === 'dither' && ditherFaults() === 0,
       'the slider moves down by its share of the track, the same height, and the track above it is dithered too');
 
-    // The wheel: a row a notch, and the selection may leave the panel.
-    for (let n = 0; n < 3; n++) SaveMenu.saveMenuWheel(ui, 1);
-    console.log(`  the wheel, three notches down: ${where()}`);
-    check(state.scrollTop === 4 && state.selected === 1 && same(sliderDrawn(), SaveMenu.scrollSlider(state)) && state.scrollTop === 4,
-      'the wheel scrolls a row a notch; the selection is out of the panel, and drawing the list does not scroll it back');
+    // The wheel: three rows a notch, a touchpad's small deltas added up, and the selection
+    // may leave the panel.
+    for (let n = 0; n < 8; n++) SaveMenu.saveMenuWheel(ui, 4);
+    check(state.scrollTop === 1, 'a touchpad\'s small deltas scroll nothing short of a row');
+    SaveMenu.saveMenuWheel(ui, Widgets.WHEEL_ROW_DELTA - 32);
+    check(state.scrollTop === 2, 'and add up to one');
+    SaveMenu.saveMenuWheel(ui, -100);
+    check(state.scrollTop === 0, 'a notch up scrolls three rows back, as far as the top');
+    SaveMenu.saveMenuWheel(ui, 100);
+    check(state.scrollTop === 3, 'a notch down scrolls three rows');
+    SaveMenu.saveMenuWheel(ui, Widgets.WHEEL_ROW_DELTA);
+    console.log(`  the wheel, a notch and a row down: ${where()}`);
+    check(state.scrollTop === 4 && state.selected === 1 && same(sliderDrawn(), SaveMenu.scrollSlider(state)),
+      'and a third of one a row more; the selection is out of the panel, and drawing the list does not scroll it back');
 
     // The track and the slider take no click.
     const slider = sliderDrawn();
@@ -2236,7 +2245,7 @@ async function checkScrolling(graphics: GraphicsLoader): Promise<void> {
     check(state.rows.length === 1 && whole.y1 === trackTop && whole.y2 === trackBottom && rowKind(trackTop + 1) === 'plain' && rowKind(trackBottom - 1) === 'plain'
       && same(whole, SaveMenu.scrollSlider(state)), 'a list that fits its panel has the whole track for a slider, and no dither');
     clickArrow('saveMenu.scrollDown');
-    SaveMenu.saveMenuWheel(ui, 1);
+    SaveMenu.saveMenuWheel(ui, 100);
     check(state.scrollTop === 0, 'and neither the arrow nor the wheel scrolls it');
     SaveMenu.closeSaveMenu(ui);
 
@@ -2996,7 +3005,7 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
       `the question is _DoMenu's two-option menu, centred on the cleared screen: "${SaveMenu.SAVE_MENU_MODIFIED}" over "DUNGEON MASTER", CONFIRM, CANCEL`);
     SaveMenu.saveMenuClick(ui, VIEWPORT_X + 4, VIEWPORT_Y + 4, LEFT);
     SaveMenu.saveMenuKey(ui, 'Enter');
-    SaveMenu.saveMenuWheel(ui, 1);
+    SaveMenu.saveMenuWheel(ui, 100);
     const second = await daroo.drop('CSBGAME7.DAT', genuine);
     check(state.dropped?.refusal.kind === 'modified' && state.press === null && state.scrollTop === 0 && !second && (await rowsOf()) === before,
       'a click off its buttons, Enter, the wheel and another drop leave it up');

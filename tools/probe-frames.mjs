@@ -211,12 +211,12 @@ const inventory = await shot('03-inventory');
 const hoverAt = (u, v) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   c.dispatchEvent(new PointerEvent('pointermove',{isPrimary:true,pointerType:'mouse',clientX:r.left+${u}*r.width,clientY:r.top+${v}*r.height,bubbles:true}));
   const p=window.__probe.screen.ui.hoverPoint; return p ? p.x+','+p.y : 'none';})()`);
-// DISPLAY's CRT (85,71), in the settings dialog: Esc opens it, the tab is DISPLAY
+// DISPLAY's CRT (85,65), in the settings dialog: Esc opens it, the tab is DISPLAY
 // (120,45), and Esc closes it again over the inventory.
 const toggleCrt = async () => {
   await key('Escape'); await wait(300);
   await canvasClick(120, 45, 0); await wait(300);
-  await canvasClick(85, 71, 0); await wait(300);
+  await canvasClick(85, 65, 0); await wait(300);
   await key('Escape'); await wait(300);
   await evaluate(`document.getElementById('game-canvas').dispatchEvent(new PointerEvent('pointerleave',{isPrimary:true,pointerType:'mouse'})),1`);
   await wait(200);
@@ -633,7 +633,7 @@ await key('Escape'); await wait(300);
 check(await settingsUp(), 'Esc opens the settings in play');
 const heldAt = await ticks(); await wait(1000);
 check(await ticks() === heldAt, 'the clock is held while they are up');
-await pointerAt(236, 71); await wait(200);
+await pointerAt(236, 65); await wait(200);
 console.log('state: settings, GAME');    await shot('21-settings-game');
 await leaveCanvas(); await wait(200);
 await canvasClick(120, 45, 0); await wait(300);
@@ -642,10 +642,10 @@ console.log('state: settings, DISPLAY'); await shot('22-settings-display');
 // landing on what it shows, and 16:10 again 960x600.
 const canvasSize = () => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   return [c.width,c.height,r.width,r.height].join('x');})()`);
-await canvasClick(236, 71, 0); await wait(300);
+await canvasClick(236, 65, 0); await wait(300);
 check((await settingsValues()).aspectRatio === '4:3' && await canvasSize() === '320x200x960x720',
   'ASPECT RATIO at 4:3 shows the 320x200 canvas 960x720');
-await canvasClick(236, 71, 0); await wait(300);
+await canvasClick(236, 65, 0); await wait(300);
 check((await settingsValues()).aspectRatio === '16:10' && await canvasSize() === '320x200x960x600',
   'a click on it there, where it is shown, makes it 16:10, 960x600');
 await canvasClick(197, 45, 0); await wait(300);
@@ -660,28 +660,36 @@ const cdpMouse = async (type, x, y) => {
   await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left',
     buttons: type === 'mouseReleased' ? 0 : 1, clickCount: type === 'mouseMoved' ? 0 : 1 });
 };
-await cdpMouse('mousePressed', 200, 92); await wait(200);
+await cdpMouse('mousePressed', 200, 86); await wait(200);
 check((await settingsValues()).volume === 0, 'a press at the VOLUME slider\'s left end sets it to 0');
-await cdpMouse('mouseMoved', 254, 92); await wait(200);
+await cdpMouse('mouseMoved', 254, 86); await wait(200);
 const halfway = (await settingsValues()).volume;
 check(halfway > 0.4 && halfway < 0.6, `dragged to the track's middle, about a half (${halfway})`);
-await cdpMouse('mouseMoved', 400, 92); await cdpMouse('mouseReleased', 400, 92); await wait(200);
+await cdpMouse('mouseMoved', 400, 86); await cdpMouse('mouseReleased', 400, 86); await wait(200);
 check((await settingsValues()).volume === 1, 'dragged off the canvas, to its right, the volume is 1');
-await pointerAt(200, 92); await wait(200);
+await pointerAt(200, 86); await wait(200);
 check((await settingsValues()).volume === 1, 'released there, a move drags nothing');
 // SOUND's OFF, read back after a reload: the setting is kept. Then a double click on the message area opens the dialog, and a right click
 // closes it, off KEYS' slots.
-await canvasClick(284, 71, 0); await wait(300);
+await canvasClick(284, 65, 0); await wait(300);
 check((await settingsValues()).sound === false, 'SOUND\'s OFF turns the sound off');
-// KEYS (`src/renderer/ui/SettingsKeys.ts`): a click on MOVE FORWARD's first slot waits
-// for its key, and a key pressed fills it by its code, AZERTY's Z being KeyW.
-await canvasClick(275, 45, 0); await wait(300);
-await canvasClick(190, 111, 0); await wait(300);
+// KEYS (`src/renderer/ui/SettingsKeys.ts`), KEY LABELS shown, as the browser here gives
+// no layout: a click on MOVE FORWARD's first slot waits for its key, and a key pressed
+// fills it by its code, AZERTY's Z being KeyW.
+await canvasClick(240, 45, 0); await wait(300);
+await canvasClick(190, 105, 0); await wait(300);
 console.log('state: settings, KEYS');    await shot('24-settings-keys');
 await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'z',code:'KeyW',bubbles:true})),1`); await wait(300);
 const rebound = await settingsValues();
 check(rebound.keyBindings['move.forward'][0] === 'KeyW' && rebound.keyBindings['attack.1.0'][0] === '' && rebound.keyPreset === 'custom',
   'a key pressed fills the slot by its code, leaves the slot it was in, and the table is CUSTOM');
+// A notch of the wheel scrolls the list three rows, and the VBL's frame draws them, the
+// pointer still (`GameScreen.takeWheelTurned`).
+const screenSum = () => evaluate(`window.__probe.screen.ui.screenIndexBuffer.pixels.reduce((s,p,i)=>(s+p*(i%997+1))%1000000007,0)`);
+const unscrolled = await screenSum();
+await evaluate(`document.getElementById('game-canvas').dispatchEvent(new WheelEvent('wheel',{deltaY:100,cancelable:true,bubbles:true})),1`); await wait(300);
+check(await evaluate(`window.__probe.screen.ui.settingsDialog.keys.scrollTop`) === 3 && await screenSum() !== unscrolled,
+  'a notch of the wheel scrolls the keys three rows, drawn with the pointer still');
 await canvasClick(160, 100, 2); await wait(300);
 check(!(await settingsUp()), 'a right click closes the settings');
 await send('Page.navigate', { url: `${APP}?intro=0&keepsaves&keepsettings&dungeon=dm-atari` });
@@ -746,7 +754,7 @@ await cdpMouse('mouseReleased', 55, 14); await wait(300);
 check((await championsUp()) === 0 && (await selected()) === -1, 'and the release leaves it up, with no inventory');
 await leaveCanvas(); await wait(200);
 console.log('state: champions, ATTRIBUTES'); await shot('26-champions-attributes');
-await canvasClick(185, 19, 0); await leaveCanvas(); await wait(300);
+await canvasClick(133, 27, 0); await leaveCanvas(); await wait(300);
 console.log('state: champions, SKILLS');  await shot('27-champions-skills');
 await canvasClick(160, 100, 2); await wait(300);
 check((await championsUp()) === null, 'a right click closes the champions');
@@ -777,15 +785,15 @@ const realKey = async (code) => {
 await key('Escape'); await wait(300);
 await canvasClick(120, 45, 0); await wait(300);
 await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
-await touch('touchStart', 85, 92); await touch('touchEnd', 85, 92); await wait(800);
+await touch('touchStart', 85, 86); await touch('touchEnd', 85, 86); await wait(800);
 check((await screenLayout()).element === 'game', 'a tap on FULLSCREEN puts #game in fullscreen, at the lift');
-await touch('touchStart', 85, 92); await touch('touchEnd', 85, 92); await wait(800);
+await touch('touchStart', 85, 86); await touch('touchEnd', 85, 86); await wait(800);
 check((await screenLayout()).element === null, 'and a second tap leaves it');
 await send('Emulation.setTouchEmulationEnabled', { enabled: false });
-await canvasClick(85, 71, 0); await wait(300);
+await canvasClick(85, 65, 0); await wait(300);
 const screenSize = (width, height) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
 await screenSize(1920, 1080); await wait(300);
-await cdpMouse('mousePressed', 85, 92); await cdpMouse('mouseReleased', 85, 92); await wait(800);
+await cdpMouse('mousePressed', 85, 86); await cdpMouse('mouseReleased', 85, 86); await wait(800);
 check((await screenLayout()).element === 'game', 'a mouse\'s press on FULLSCREEN, the CRT effect on, puts #game in fullscreen');
 for (const [width, height, expected] of [[1920, 1080, 5], [1366, 768, 3]]) {
   if (width !== 1920) { await screenSize(width, height); await wait(800); }
@@ -801,7 +809,7 @@ for (const [width, height, expected] of [[1920, 1080, 5], [1366, 768, 3]]) {
     'and is drawn at its size');
 }
 // At 4:3, the largest whole multiple of 320x240 that fits, centred, the effect over it.
-await canvasClick(236, 71, 0); await wait(500);
+await canvasClick(236, 65, 0); await wait(500);
 {
   const full = await screenLayout();
   const scale = Math.floor(Math.min(full.w * full.ratio / 320, full.h * full.ratio / 240));
@@ -811,7 +819,7 @@ await canvasClick(236, 71, 0); await wait(500);
     `at 4:3, the game canvas is 3 times 320x240, centred, the effect over it`);
 }
 check(await hoverAt(0.5, 0.5) === '160,100', 'at 4:3, the tube\'s middle is the screen\'s');
-await canvasClick(236, 71, 0); await wait(500);
+await canvasClick(236, 65, 0); await wait(500);
 check((await screenLayout()).game[3] === 600, 'and at 16:10 again, 3 times 320x200');
 check(await hoverAt(0.5, 0.5) === '160,100', 'in fullscreen, the tube\'s middle is the screen\'s');
 check(await hoverAt(0.002, 0.002) === '0,0', 'and a point of its black corner is the screen\'s corner');
@@ -822,7 +830,7 @@ check(!(await settingsUp()) && (await screenLayout()).element === 'game', 'a rea
 await realKey('Escape'); await wait(300);
 check(await settingsUp(), 'and a second opens them');
 await canvasClick(120, 45, 0); await wait(300);
-await cdpMouse('mousePressed', 85, 92); await cdpMouse('mouseReleased', 85, 92); await wait(800);
+await cdpMouse('mousePressed', 85, 86); await cdpMouse('mouseReleased', 85, 86); await wait(800);
 const windowed = await screenLayout();
 check(windowed.element === null && windowed.game[2] === 960 && windowed.game[3] === 600 && windowed.tube.every((v, i) => v === windowed.game[i]),
   'FULLSCREEN again leaves it: the canvas and the effect\'s at 960x600');

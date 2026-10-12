@@ -8,9 +8,10 @@
  *
  * It takes the whole screen, 320x200, as the settings do. From the top:
  *
- * - **The title line**: two tabs, ATTRIBUTES and SKILLS, the selected one pressed, and at
- *   its right CLOSE.
- * - **The table**, on a panel down to the plate's foot: a line of the champions' names,
+ * - **The tabs**, ATTRIBUTES and SKILLS, over the page they open (`drawTabbedPage`), the
+ *   selected one open into it, the other behind its edge; at their right, above the
+ *   page, CLOSE, on the settings' title line.
+ * - **The table**, on a panel filling the page: a line of the champions' names,
  *   a blank line, then the tab's rows, each a label and four columns. ATTRIBUTES holds the
  *   levels of the four classes, the maxima of health, stamina and mana, and the seven
  *   attributes' maxima, Luck included, which the game never shows; SKILLS the sixteen
@@ -56,22 +57,29 @@ import {
   drawButton,
   drawPanel,
   drawPlate,
+  drawTabbedPage,
   drawText,
-  framesAcross,
+  tabButtons,
+  tabsOver,
   type ButtonLook,
 } from './Widgets';
 
 /* ------------------------------------------------------------------ geometry ---- */
 
-/** All in screen coordinates, the title line where the settings have theirs. */
+/** All in screen coordinates, CLOSE where the settings have theirs. */
 const DIALOG: Rect = { x1: 0, y1: 0, x2: 319, y2: 199 };
 const TITLE_Y1 = 10;
 const TITLE_Y2 = TITLE_Y1 + LOW_BUTTON_HEIGHT - 1;
 export const CLOSE_FRAME: Rect = { x1: 250, y1: TITLE_Y1, x2: 309, y2: TITLE_Y2 };
-/** The two tabs, as far as graphic 0's ten pixels short of CLOSE. */
-export const TAB_FRAMES = framesAcross({ x1: 10, y1: TITLE_Y1, x2: CLOSE_FRAME.x1 - 10, y2: TITLE_Y2 }, 2);
-/** The table's panel: six rows of the plate under the title line, down to the plate's frame. */
-export const TABLE_PANEL: Rect = { x1: 10, y1: TITLE_Y2 + 7, x2: 309, y2: 189 };
+/**
+ * The tabs' page, as wide as the settings' (`SettingsDialog.PAGE`): its top edge three
+ * rows under CLOSE, its foot five short of the screen's, as its sides are.
+ */
+export const PAGE: Rect = { x1: 5, y1: TITLE_Y2 + 4, x2: 314, y2: 194 };
+/** The two tabs on the page, left of CLOSE: as wide as ATTRIBUTES and five columns either side. */
+export const TAB_FRAMES = tabsOver(PAGE, 2, 10 * CHAR_WIDTH + 22);
+/** The table's panel: the page but for three rows and columns of it inside its edge. */
+export const TABLE_PANEL: Rect = { x1: PAGE.x1 + 5, y1: PAGE.y1 + 5, x2: PAGE.x2 - 5, y2: PAGE.y2 - 5 };
 /** The lines the panel holds, two pixels of it above the first and below the last, as a list's. */
 export const TABLE_LINES = Math.floor((TABLE_PANEL.y2 - TABLE_PANEL.y1 - 6) / LINE_STEP);
 /** Line `line`'s baseline. */
@@ -212,7 +220,7 @@ const CHAMPION_DIALOG: Dialog = {
   key: (ui, _key, code) => {
     if (code === 'Escape' || keyAction(code) === 'champions') closeChampionDialog(ui);
   },
-  wheel: () => {},
+  wheel: () => false,
   pointer: (ui, point) => championDialogPointer(ui, point),
 };
 
@@ -254,7 +262,7 @@ const BTN_TAB0 = 10;
 export function championDialogButtons(): UIButton[] {
   return [
     buttonOf(CLOSE_FRAME, BTN_CLOSE, 'champions.close'),
-    ...TABS.map((t, i) => buttonOf(TAB_FRAMES[i], BTN_TAB0 + i, `champions.tab.${t.tab}`)),
+    ...tabButtons(TAB_FRAMES, BTN_TAB0, 'champions.tab').map((b, i) => ({ ...b, name: `champions.tab.${TABS[i].tab}` })),
   ];
 }
 
@@ -269,11 +277,12 @@ export function drawChampionDialog(ui: UIState): void {
   const state = ui.championDialog;
   if (!state) return;
   const over = hovered(state);
-  const look = (id: number, pressed = false): ButtonLook => (pressed ? 'pressed' : over === id ? 'hover' : 'raised');
+  const look: ButtonLook = over === BTN_CLOSE ? 'hover' : 'raised';
 
   drawPlate(ui, DIALOG);
-  TABS.forEach((t, i) => drawButton(ui, TAB_FRAMES[i], t.label, look(BTN_TAB0 + i, t.tab === state.tab)));
-  drawButton(ui, CLOSE_FRAME, CLOSE_LABEL, look(BTN_CLOSE));
+  drawTabbedPage(ui, PAGE, TAB_FRAMES, TABS.map((t) => t.label), TABS.findIndex((t) => t.tab === state.tab),
+    over >= BTN_TAB0 && over < BTN_TAB0 + TABS.length ? over - BTN_TAB0 : -1);
+  drawButton(ui, CLOSE_FRAME, CLOSE_LABEL, look);
 
   drawPanel(ui, TABLE_PANEL);
   const champions = ui.ctx.party.state.champions;

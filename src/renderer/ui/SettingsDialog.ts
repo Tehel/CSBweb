@@ -11,8 +11,9 @@
  *
  * - **The title line**: SETTINGS on a panel, and at its right CLOSE and EXIT, the kit's
  *   low buttons.
- * - **A row of tabs**: GAME, DISPLAY, SOUND and KEYS, the selected one pressed.
- * - **The tab's settings.** On GAME and DISPLAY, each is a button holding its name,
+ * - **A row of tabs**: GAME, DISPLAY, SOUND and KEYS, over the page they open
+ *   (`drawTabbedPage`): the selected one open into it, the others behind its edge.
+ * - **The tab's settings**, on the page. On GAME and DISPLAY, each is a button holding its name,
  *   pressed when on and raised when off, two buttons a line (`settingButtonFrame`); a
  *   click turns it over. ASPECT RATIO's is a choice of two and names the one chosen:
  *   16:10 raised, the default, and 4:3 pressed. On SOUND, each is a line: its name on a panel, and beside it a
@@ -91,18 +92,25 @@ import {
   drawPanel,
   drawPlate,
   drawSlider,
+  drawTabbedPage,
   drawText,
   framesAcross,
   sliderButton,
   sliderValueAt,
+  TAB_HEIGHT,
+  tabButtons,
+  tabsOver,
   type ButtonLook,
 } from './Widgets';
 
 /* ------------------------------------------------------------------ geometry ---- */
 
 /**
- * All in screen coordinates. The plate's frame is ten pixels, as graphic 0's; between the
- * title line, the tabs and the settings are six rows of it, and nine above the help line.
+ * All in screen coordinates. The plate's frame is ten pixels, as graphic 0's; six rows of
+ * it under the title line, the tabs stand on the page, and five rows above the help line.
+ * The page is wider than the title and the help line by five columns a side, so its
+ * controls keep their places, ten columns from the plate's edges, eight rows under the
+ * page's top edge.
  */
 const DIALOG: Rect = { x1: 0, y1: 0, x2: 319, y2: 199 };
 const TITLE_Y1 = 10;
@@ -111,22 +119,24 @@ export const EXIT_FRAME: Rect = { x1: 250, y1: TITLE_Y1, x2: 309, y2: TITLE_Y2 }
 export const CLOSE_FRAME: Rect = { x1: EXIT_FRAME.x1 - BUTTON_GAP - 60, y1: TITLE_Y1, x2: EXIT_FRAME.x1 - BUTTON_GAP - 1, y2: TITLE_Y2 };
 /** SETTINGS, on a panel as far as graphic 0's ten pixels short of CLOSE. */
 const TITLE_PANEL: Rect = { x1: 10, y1: TITLE_Y1, x2: CLOSE_FRAME.x1 - 10, y2: TITLE_Y2 };
-const TAB_ROW: Rect = { x1: 10, y1: TITLE_Y2 + 7, x2: 309, y2: TITLE_Y2 + 6 + LOW_BUTTON_HEIGHT };
-export const TAB_FRAMES = framesAcross(TAB_ROW, 4);
+export const HELP_LINE: Rect = { x1: 10, y1: 175, x2: 309, y2: 189 };
+/** The tab's page, the tabs' rows above it. */
+export const PAGE: Rect = { x1: 5, y1: TITLE_Y2 + 6 + TAB_HEIGHT - 2, x2: 314, y2: HELP_LINE.y1 - 5 };
+/** A tab is as wide as DISPLAY and five columns either side. */
+export const TAB_FRAMES = tabsOver(PAGE, 4, 7 * 6 + 22);
 
 /** A line of settings is a low button high, a row of the plate between two. */
 const LINE_STEP = LOW_BUTTON_HEIGHT + 1;
 /** The most lines a tab has. */
 export const SETTING_LINES = 5;
-const LINES_Y1 = TAB_ROW.y2 + 7;
+const LINES_Y1 = PAGE.y1 + 8;
 /** The settings' names, on a panel as tall as the five lines. */
 const NAME_PANEL: Rect = { x1: 10, y1: LINES_Y1, x2: 190, y2: LINES_Y1 + SETTING_LINES * LINE_STEP - 2 };
 /** The controls' column, right of the names' panel by graphic 0's nine columns. */
 const CONTROL_X1 = NAME_PANEL.x2 + 10;
 const CONTROL_X2 = 309;
-export const HELP_LINE: Rect = { x1: 10, y1: 175, x2: 309, y2: 189 };
-/** KEYS' lines: the five lines, and down to six rows of the plate above the help line. */
-export const KEYS_AREA: KeysArea = { x1: NAME_PANEL.x1, y1: LINES_Y1, x2: CONTROL_X2, y2: HELP_LINE.y1 - 7, controlX1: CONTROL_X1 };
+/** KEYS' lines: the five lines, and down to six rows short of the page's foot. */
+export const KEYS_AREA: KeysArea = { x1: NAME_PANEL.x1, y1: LINES_Y1, x2: CONTROL_X2, y2: PAGE.y2 - 6, controlX1: CONTROL_X1 };
 
 /** Line `line`'s rectangle across the dialog: the names' panel and the controls' column. */
 function lineRect(line: number): Rect {
@@ -326,7 +336,7 @@ const SETTINGS_DIALOG: Dialog = {
   key: (ui, key, code) => settingsDialogKey(ui, key, code),
   wheel: (ui, deltaY) => {
     const state = ui.settingsDialog;
-    if (state?.tab === 'keys' && !state.exiting) keysTabWheel(state.keys, KEYS_AREA, deltaY);
+    return state?.tab === 'keys' && !state.exiting && keysTabWheel(ui, state.keys, KEYS_AREA, deltaY);
   },
   pointer: (ui, point) => settingsDialogPointer(ui, point),
   drag: (ui, x) => settingsDialogDrag(ui, x),
@@ -403,7 +413,7 @@ function turnOver(ui: UIState, setting: Setting & { kind: 'toggle' | 'page' }): 
  */
 export function settingsDialogButtons(ui: UIState, state: SettingsDialogState): UIButton[] {
   const buttons = [buttonOf(CLOSE_FRAME, BTN_CLOSE, 'settings.close'), buttonOf(EXIT_FRAME, BTN_EXIT, 'settings.exit')];
-  TABS.forEach((t, i) => buttons.push(buttonOf(TAB_FRAMES[i], BTN_TAB0 + i, `settings.tab.${t.tab}`)));
+  buttons.push(...tabButtons(TAB_FRAMES, BTN_TAB0, 'settings.tab').map((b, i) => ({ ...b, name: `settings.tab.${TABS[i].tab}` })));
   if (state.tab === 'keys') buttons.push(...keysTabButtons(ui, state.keys, KEYS_AREA));
   const asButtons = isButtonsTab(state);
   settingsOf(state).forEach((setting, line) => {
@@ -455,7 +465,7 @@ export function helpText(ui: UIState, state: SettingsDialogState): string {
   if (id === BTN_CLOSE) return CLOSE_HELP;
   if (id === BTN_EXIT) return EXIT_HELP;
   if (state.tab === 'keys') {
-    const keys = keysTabHelp(ui, state.keys, id);
+    const keys = keysTabHelp(state.keys, id);
     if (keys !== undefined) return keys;
   }
   if (id >= BTN_TAB0 && id < BTN_TAB0 + TABS.length) return TABS[id - BTN_TAB0].help;
@@ -486,7 +496,7 @@ export function drawSettingsDialog(ui: UIState): void {
   drawButton(ui, CLOSE_FRAME, CLOSE_LABEL, look(BTN_CLOSE));
   drawButton(ui, EXIT_FRAME, EXIT_LABEL, look(BTN_EXIT));
 
-  TABS.forEach((t, i) => drawButton(ui, TAB_FRAMES[i], t.label, look(BTN_TAB0 + i, t.tab === state.tab)));
+  drawTabbedPage(ui, PAGE, TAB_FRAMES, TABS.map((t) => t.label), TABS.findIndex((t) => t.tab === state.tab), over >= BTN_TAB0 && over < BTN_TAB0 + TABS.length ? over - BTN_TAB0 : -1);
 
   if (state.tab === 'keys') {
     drawKeysTab(ui, state.keys, KEYS_AREA, over);

@@ -584,13 +584,15 @@ function wire({ game, screen, saves, messages, events }: Built): void {
     // (doc/CSBwin-src/CSBCode.cpp:1013). A VBL that inverted a flashed button is drawn too,
     // unless its tick holds the paint until the put-back (`Game.paintHeld`). And so is one
     // the pointer has moved before: the VBL handler alone draws the cursor (`:1050-1053`),
-    // and a move of the pointer draws nothing itself (`GameInput.mouseMove`).
+    // and a move of the pointer draws nothing itself (`GameInput.mouseMove`), nor does
+    // the wheel in a dialog (`GameScreen.handleDialogWheel`).
     game.onFrame(() => {
         if (game.paintHeld()) return;
         const scrolled = messages.takeChanged();
         const flashed = game.takeFlashChanged();
         const moved = screen.takeCursorMoved();
-        if (scrolled || flashed || moved) refreshScreen();
+        const wheeled = screen.takeWheelTurned();
+        if (scrolled || flashed || moved || wheeled) refreshScreen();
     });
 }
 

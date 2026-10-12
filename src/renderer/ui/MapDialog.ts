@@ -133,7 +133,7 @@ const MAP_DIALOG: Dialog = {
   key: (ui, _key, code) => {
     if (code === 'Escape' || keyAction(code) === 'map') closeMapDialog(ui);
   },
-  wheel: () => {},
+  wheel: () => false,
   pointer: (ui, point) => mapDialogPointer(ui, point),
 };
 

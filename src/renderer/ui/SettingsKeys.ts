@@ -11,11 +11,12 @@
  *   frame, pressed; with a preset in force it is inert, as nothing makes a table custom
  *   but a key changed.
  * - **KEY LABELS**: QWERTY or AZERTY, the keyboard the keys are named for
- *   (`KeyLabels.ts`). Where the browser gives the keyboard's own layout, the toggle is
- *   inert, and the help line says the names are the keyboard's.
+ *   (`KeyLabels.ts`). Where the browser gives the keyboard's own layout, the keys are
+ *   named as it prints them, and the line is left out: the list takes its place.
  * - **The list**: a row an action, its name and its two keys, in a panel with a
  *   scrollbar. The wheel, the scrollbar's arrows, and the arrow keys, Page Up and Page
- *   Down, Home and End scroll it.
+ *   Down, Home and End scroll it, and so does the wheel, three rows a notch
+ *   (`Widgets.wheelRows`).
  *
  * ## Binding a key
  *
@@ -48,8 +49,10 @@ import {
   listIn,
   listInner,
   listRowRect,
+  wheelRows,
   type ButtonLook,
   type ListWidget,
+  type WheelTravel,
 } from './Widgets';
 
 /* ------------------------------------------------------------------ contents ---- */
@@ -89,7 +92,6 @@ export const PRESETS: ReadonlyArray<{ readonly preset: KeyPreset; readonly label
 
 export const LABELS_NAME = 'KEY LABELS';
 export const LABELS_HELP = 'THE KEYBOARD THE KEYS ARE NAMED FOR';
-export const LABELS_FROM_KEYBOARD_HELP = 'THE KEYS ARE NAMED AS YOUR KEYBOARD PRINTS THEM';
 export const LAYOUT_LABELS: Readonly<Record<KeyLabelLayout, string>> = { qwerty: 'QWERTY', azerty: 'AZERTY' };
 export const SLOT_HELP = 'CLICK A KEY TO CHANGE IT, RIGHT CLICK TO CLEAR';
 export const CAPTURE_HELP = 'PRESS THE NEW KEY, OR ESC TO CANCEL';
@@ -127,9 +129,10 @@ export function layoutFrames(area: KeysArea): Rect[] {
   return framesAcross({ ...labelsLine(area), x1: area.controlX1 }, KEY_LABEL_LAYOUTS.length);
 }
 
-/** The list, from a row of the plate under KEY LABELS to the area's foot. */
-export function keysList(area: KeysArea): ListWidget {
-  return listIn({ x1: area.x1, y1: labelsLine(area).y2 + 2, x2: area.x2, y2: area.y2 });
+/** The list, from a row of the plate under KEY LABELS, or under the presets without it, to the area's foot. */
+export function keysList(ui: UIState, area: KeysArea): ListWidget {
+  const above = hasLabelsLine(ui) ? labelsLine(area) : presetFrames(area)[0];
+  return listIn({ x1: area.x1, y1: above.y2 + 2, x2: area.x2, y2: area.y2 });
 }
 
 /** Slot `slot` of the list's row `row`, counted from the first shown: as wide as the longest label, the second against the scrollbar. */
@@ -142,7 +145,7 @@ export function slotRect(list: ListWidget, row: number, slot: 0 | 1): Rect {
 
 /* --------------------------------------------------------------------- state ---- */
 
-export interface KeysTabState {
+export interface KeysTabState extends WheelTravel {
   /** The list's first row shown. */
   scrollTop: number;
   /** The slot a click chose, waiting for its key, or `null`. */
@@ -150,7 +153,7 @@ export interface KeysTabState {
 }
 
 export function newKeysTabState(): KeysTabState {
-  return { scrollTop: 0, capture: null };
+  return { scrollTop: 0, capture: null, wheelDelta: 0 };
 }
 
 /* ---------------------------------------------------------------- the controls ---- */
@@ -167,13 +170,14 @@ const BTN_ROW0 = 300;
 /** KEY LABELS' name: the help line's alone. */
 const BTN_LABELS_NAME = 400;
 
-function layoutFromKeyboard(ui: UIState): boolean {
-  return ui.keyboardLayout() !== null;
+/** Whether KEY LABELS is shown: where the browser does not give the keyboard's layout. */
+function hasLabelsLine(ui: UIState): boolean {
+  return ui.keyboardLayout() === null;
 }
 
 /**
  * The tab's button list, in the form of CSBWin's: the presets but CUSTOM, the layout
- * toggle where it is not inert, the scrollbar's arrows, and the slots shown. A slot takes
+ * toggle where it is shown, the scrollbar's arrows, and the slots shown. A slot takes
  * the right button too, which empties it.
  */
 export function keysTabButtons(ui: UIState, state: KeysTabState, area: KeysArea): UIButton[] {
@@ -181,10 +185,10 @@ export function keysTabButtons(ui: UIState, state: KeysTabState, area: KeysArea)
   presetFrames(area).forEach((frame, i) => {
     if (PRESETS[i].preset !== 'custom') buttons.push(buttonOf(frame, BTN_PRESET0 + i, `settings.keys.preset.${PRESETS[i].preset}`));
   });
-  if (!layoutFromKeyboard(ui)) {
+  if (hasLabelsLine(ui)) {
     layoutFrames(area).forEach((frame, i) => buttons.push(buttonOf(frame, BTN_LAYOUT0 + i, `settings.keys.layout.${KEY_LABEL_LAYOUTS[i]}`)));
   }
-  const list = keysList(area);
+  const list = keysList(ui, area);
   buttons.push(...listButtons(list, KEY_ACTION_NAMES.length, state.scrollTop,
     { up: BTN_SCROLL_UP, down: BTN_SCROLL_DOWN, row0: BTN_ROW0 }, 'settings.keys').slice(0, 2));
   for (let row = 0; row < shownRows(list, state); row++) {
@@ -196,20 +200,19 @@ export function keysTabButtons(ui: UIState, state: KeysTabState, area: KeysArea)
   return buttons;
 }
 
-/** The buttons, then every row's whole width and KEY LABELS' name: what the help line names. */
+/** The buttons, then every row's whole width, CUSTOM and KEY LABELS' name: what the help line names. */
 export function keysTabHoverButtons(ui: UIState, state: KeysTabState, area: KeysArea): UIButton[] {
-  const list = keysList(area);
+  const list = keysList(ui, area);
   const rows = Array.from({ length: shownRows(list, state) }, (_, row): UIButton => {
     const r = listRowRect(list, row);
     return { word0: BTN_ROW0 + row, x1: r.x1, y1: r.y1, x2: r.x2 + 1, y2: r.y2 + 1, button: 2, name: `settings.keys.row${row}` };
   });
   const presets = presetFrames(area);
   const custom = presets[presets.length - 1];
-  const names: UIButton[] = [
-    buttonOf(custom, BTN_PRESET0 + presets.length - 1, 'settings.keys.preset.custom'),
-    { word0: BTN_LABELS_NAME, ...rectButton(labelsNamePanel(area)), button: 2, name: 'settings.keys.labels' },
-    ...layoutFrames(area).map((frame, i) => buttonOf(frame, BTN_LAYOUT0 + i, `settings.keys.layout.${KEY_LABEL_LAYOUTS[i]}`)),
-  ];
+  const names: UIButton[] = [buttonOf(custom, BTN_PRESET0 + presets.length - 1, 'settings.keys.preset.custom')];
+  if (hasLabelsLine(ui)) {
+    names.push({ word0: BTN_LABELS_NAME, ...rectButton(labelsNamePanel(area)), button: 2, name: 'settings.keys.labels' });
+  }
   return [...keysTabButtons(ui, state, area), ...rows, ...names];
 }
 
@@ -229,12 +232,10 @@ function slotOf(state: KeysTabState, id: number): { action: KeyAction; slot: 0 |
 }
 
 /** What the help line says of the control `id`, or `undefined` for none of the tab's. */
-export function keysTabHelp(ui: UIState, state: KeysTabState, id: number): string | undefined {
+export function keysTabHelp(state: KeysTabState, id: number): string | undefined {
   if (state.capture) return CAPTURE_HELP;
   if (id >= BTN_PRESET0 && id < BTN_PRESET0 + PRESETS.length) return PRESETS[id - BTN_PRESET0].help;
-  if (id === BTN_LABELS_NAME || (id >= BTN_LAYOUT0 && id < BTN_LAYOUT0 + KEY_LABEL_LAYOUTS.length)) {
-    return layoutFromKeyboard(ui) ? LABELS_FROM_KEYBOARD_HELP : LABELS_HELP;
-  }
+  if (id === BTN_LABELS_NAME || (id >= BTN_LAYOUT0 && id < BTN_LAYOUT0 + KEY_LABEL_LAYOUTS.length)) return LABELS_HELP;
   if (id >= BTN_SLOT0 && id < BTN_LABELS_NAME) return SLOT_HELP;
   return id >= BTN_SCROLL_UP && id <= BTN_SCROLL_DOWN ? '' : undefined;
 }
@@ -257,16 +258,17 @@ export function drawKeysTab(ui: UIState, state: KeysTabState, area: KeysArea, ov
     drawButton(ui, frame, label, preset === 'custom' && !chosen ? 'inert' : look(BTN_PRESET0 + i, chosen));
   });
 
-  const namePanel = labelsNamePanel(area);
-  drawPanel(ui, namePanel);
-  drawText(ui, LABELS_NAME, namePanel.x1 + 4, buttonLabelAt(namePanel).y);
-  const fromKeyboard = layoutFromKeyboard(ui);
-  layoutFrames(area).forEach((frame, i) => {
-    const layout = KEY_LABEL_LAYOUTS[i];
-    drawButton(ui, frame, LAYOUT_LABELS[layout], fromKeyboard ? 'inert' : look(BTN_LAYOUT0 + i, values.keyLabels === layout));
-  });
+  if (hasLabelsLine(ui)) {
+    const namePanel = labelsNamePanel(area);
+    drawPanel(ui, namePanel);
+    drawText(ui, LABELS_NAME, namePanel.x1 + 4, buttonLabelAt(namePanel).y);
+    layoutFrames(area).forEach((frame, i) => {
+      const layout = KEY_LABEL_LAYOUTS[i];
+      drawButton(ui, frame, LAYOUT_LABELS[layout], look(BTN_LAYOUT0 + i, values.keyLabels === layout));
+    });
+  }
 
-  const list = keysList(area);
+  const list = keysList(ui, area);
   drawPanel(ui, list.panel);
   drawList(ui, list, KEY_ACTION_NAMES.length, state.scrollTop, -1, (index) => KEY_ACTION_NAMES[index][1]);
   for (let row = 0; row < shownRows(list, state); row++) {
@@ -287,8 +289,8 @@ export function drawKeysTab(ui: UIState, state: KeysTabState, area: KeysArea, ov
 
 /* ------------------------------------------------------------------- the input ---- */
 
-function scrollBy(state: KeysTabState, area: KeysArea, delta: number): void {
-  state.scrollTop = clampScrollTop(keysList(area), KEY_ACTION_NAMES.length, state.scrollTop + delta);
+function scrollBy(ui: UIState, state: KeysTabState, area: KeysArea, delta: number): void {
+  state.scrollTop = clampScrollTop(keysList(ui, area), KEY_ACTION_NAMES.length, state.scrollTop + delta);
 }
 
 /**
@@ -304,7 +306,7 @@ export function keysTabClick(ui: UIState, state: KeysTabState, area: KeysArea, i
     const layout = KEY_LABEL_LAYOUTS[id - BTN_LAYOUT0];
     if (ui.settings.values.keyLabels !== layout) ui.settings.update({ keyLabels: layout });
   } else if (id === BTN_SCROLL_UP || id === BTN_SCROLL_DOWN) {
-    scrollBy(state, area, id === BTN_SCROLL_UP ? -1 : 1);
+    scrollBy(ui, state, area, id === BTN_SCROLL_UP ? -1 : 1);
   } else {
     state.capture = slotOf(state, id);
   }
@@ -340,17 +342,21 @@ export function keysTabKey(ui: UIState, state: KeysTabState, area: KeysArea, cod
     }
     return true;
   }
-  const page = keysList(area).rows;
+  const page = keysList(ui, area).rows;
   const delta: Readonly<Record<string, number>> = {
     ArrowUp: -1, ArrowDown: 1, PageUp: -page, PageDown: page,
     Home: -KEY_ACTION_NAMES.length, End: KEY_ACTION_NAMES.length,
   };
   if (!(code in delta)) return false;
-  scrollBy(state, area, delta[code]);
+  scrollBy(ui, state, area, delta[code]);
   return true;
 }
 
-/** A notch of the wheel scrolls the list a row. */
-export function keysTabWheel(state: KeysTabState, area: KeysArea, deltaY: number): void {
-  if (deltaY !== 0) scrollBy(state, area, deltaY > 0 ? 1 : -1);
+/** The wheel turned by `deltaY` scrolls the list (`wheelRows`). Says whether it scrolled. */
+export function keysTabWheel(ui: UIState, state: KeysTabState, area: KeysArea, deltaY: number): boolean {
+  const rows = wheelRows(state, deltaY);
+  if (rows === 0) return false;
+  const was = state.scrollTop;
+  scrollBy(ui, state, area, rows);
+  return state.scrollTop !== was;
 }
