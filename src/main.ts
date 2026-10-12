@@ -8,7 +8,7 @@ import { SoundManager } from './audio/SoundManager';
 import { CsbRandom } from './core/random';
 import { Position } from './core/types';
 import { extractPresetHeroes } from './data/HeroExtractor';
-import { DATA_SETS_ROUTE, dataSetNamed, parseManifest, type DataSet, type DataSetManifest } from './data/DataSets';
+import { DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, type DataSet, type DataSetManifest } from './data/DataSets';
 import { folderFiles, loadGameFiles, type DataSetFiles, type GameFiles } from './data/DataSetFiles';
 import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
@@ -36,7 +36,7 @@ import { determineMastery } from './engine/skills';
 import { applySaveBytes } from './engine/SaveGameFile';
 import { Settings, applyToGame, type SettingsValues } from './settings/Settings';
 import type { KeyboardLayoutMap } from './renderer/ui/KeyLabels';
-import { GameEvents, playerId, sendBeacon } from './ui/gameEvents';
+import { GameEvents, keptPlayerId, playerId, sendBeacon } from './ui/gameEvents';
 
 console.log('Dungeon Master Web - Initializing...');
 
@@ -569,13 +569,14 @@ function start(game: Game): void {
 }
 
 /**
- * The data sets' manifest (`src/data/DataSets.ts`), the server's answer, its folders under
- * `gamefiles/`. Without it the page cannot choose a game, so a manifest that is missing or
+ * The data sets' manifest (`src/data/DataSets.ts`), the server's answer for the player
+ * whose kept `playerId` it is sent, its folders under `gamefiles/`. Without it the page cannot choose a game, so a manifest that is missing or
  * malformed ends the boot, and the error says why.
  */
 async function loadManifest(): Promise<DataSetManifest> {
     const url = DATA_SETS_ROUTE;
-    const response = await fetch(url).catch(() => null);
+    const player = keptPlayerId();
+    const response = await fetch(url, player === null ? undefined : { headers: { [PLAYER_ID_HEADER]: player } }).catch(() => null);
     if (!response?.ok) throw new Error(`Cannot read the data sets' manifest '${url}'${response ? ` (HTTP ${response.status})` : ''}.`);
     return parseManifest(await response.text(), GAMEFILES_DIR);
 }

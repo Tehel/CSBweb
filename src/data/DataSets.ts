@@ -25,6 +25,10 @@
  * names one only where it is true. A set with `"hidden": true` is left out of the welcome
  * page's grid (`chooserSets`) and plays all the same by its `?dungeon=`.
  *
+ * A set's `status` may be `"pending"`, for a set uploaded and not yet approved, which the
+ * server offers its owner and the author only (`server/dataSets.ts`), or `"approved"`, or
+ * be left out, for `"approved"`.
+ *
  * A set's folder may also hold its thumbnail, `<id>-thumbnail.png` (`thumbnailPath`): the
  * last frame of its title, which the welcome page's tile shows. `tools/gen-thumbnails.ts`
  * writes it from the folder's `graphics.dat`, so the page fetches no game file to draw the
@@ -78,6 +82,11 @@ export interface DataSet {
      */
     hidden: boolean;
     /**
+     * Whether it awaits the author's approval: the manifest's `"status": "pending"`. The
+     * server offers such a set to its owner and the author only. A local set is not.
+     */
+    pending: boolean;
+    /**
      * A local set's `dungeon.dat`'s signature, its record's (`src/data/LocalDataSets.ts`),
      * which a save imported into it is checked against before the known dungeons
      * (`checkDungeon`). A manifest set has none: its dungeon is in `KNOWN_DUNGEONS`. A
@@ -116,6 +125,12 @@ export const LOCAL_DATA_SET_PREFIX = 'local:';
  */
 export const DATA_SETS_ROUTE = 'api/data-sets';
 
+/**
+ * The header in which the page names its player to `DATA_SETS_ROUTE`: their `playerId`
+ * (`src/ui/gameEvents.ts`), a secret, which a URL's query would leak into logs.
+ */
+export const PLAYER_ID_HEADER = 'X-Player-Id';
+
 const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'hidden'] as const;
 
 /**
@@ -149,7 +164,9 @@ export function parseManifest(text: string, base: string): DataSetManifest {
             if (typeof value !== 'boolean') throw manifestError(`data set '${id}' has a "${flag}" that is neither true nor false`);
             return value;
         }) as [boolean, boolean, boolean, boolean, boolean];
-        return { id, name, dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, hidden };
+        const status = entry.status ?? 'approved';
+        if (status !== 'approved' && status !== 'pending') throw manifestError(`data set '${id}' has a "status" that is neither "approved" nor "pending"`);
+        return { id, name, dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, hidden, pending: status === 'pending' };
     });
     const twice = dataSets.find((set, i) => dataSets.findIndex((other) => other.id === set.id) !== i);
     if (twice) throw manifestError(`two data sets are '${twice.id}'`);

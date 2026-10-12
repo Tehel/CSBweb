@@ -9,7 +9,8 @@
  *   /                 dist/index.html               no-cache
  *   /assets/…         dist/assets/…, hashed names   immutable
  *   /gamefiles/…      GAMEFILES_DIR/…               no-cache, with ETag and Last-Modified
- *   /api/data-sets    the page's list of sets, from the store's table (`dataSets.ts`)
+ *   /api/data-sets    the page's list of sets, from the store's table (`dataSets.ts`), for
+ *                     the player its `X-Player-Id` names
  *   /api/health       200, for the compose healthcheck
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
  *   /api/stats        the store's aggregates, as JSON
@@ -23,9 +24,9 @@ import { createReadStream, readFileSync, statSync, type Stats } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, join, resolve } from 'node:path';
 
-import { DATA_SETS_ROUTE, parseManifest, type DataSetManifest } from '../src/data/DataSets.ts';
-import { manifestText, type DataSetStore } from './dataSets.ts';
-import { checkEvent, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
+import { DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, type DataSetManifest } from '../src/data/DataSets.ts';
+import { manifestText, samePlayerId, type DataSetStore, type DataSetViewer } from './dataSets.ts';
+import { checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import type { StatsStore } from './stats.ts';
 
 export interface ServerOptions {
@@ -52,6 +53,8 @@ export interface CheckedFiles {
 export interface ApiOptions {
     /** `api/data-sets`'s sets, read at each request. */
     dataSets: DataSetStore;
+    /** The author's `playerId`, to whom `api/data-sets` offers every set, or `null` for no author. */
+    authorPlayerId: string | null;
     store: StatsStore;
     rules: EventRules;
     /** Events per address. */
@@ -136,7 +139,8 @@ function route({ distDir, gamefilesDir, manifestFile }: ServerOptions, api: ApiO
         if (segments.join('/') === DATA_SETS_ROUTE) {
             if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
             res.setHeader('Cache-Control', 'no-store');
-            return send(res, 200, manifestText(api.dataSets.read()), 'application/json; charset=utf-8');
+            res.setHeader('Vary', PLAYER_ID_HEADER);
+            return send(res, 200, manifestText(api.dataSets.read(), dataSetViewer(api, req)), 'application/json; charset=utf-8');
         }
         const name = segments.length === 2 ? segments[1] : undefined;
         if (name === 'event') {
@@ -253,6 +257,17 @@ async function receiveEvent(api: ApiOptions, req: IncomingMessage, res: ServerRe
     api.store.record(event, api.now());
     res.statusCode = 204;
     res.end();
+}
+
+/**
+ * Who asks `api/data-sets`: the `playerId` the page sends in `PLAYER_ID_HEADER`, where it
+ * has a `playerId`'s form, and whether it is the author's. It is never logged.
+ */
+function dataSetViewer(api: ApiOptions, req: IncomingMessage): DataSetViewer {
+    const header = req.headers[PLAYER_ID_HEADER.toLowerCase()];
+    const playerId = isPlayerId(header) ? header : null;
+    const author = playerId !== null && api.authorPlayerId !== null && samePlayerId(playerId, api.authorPlayerId);
+    return { playerId, author };
 }
 
 /**

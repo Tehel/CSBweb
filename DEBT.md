@@ -113,7 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P7 | The data sets in the server's database | L | ⚠️ step 3 of 4 next |
+| P7 | The data sets in the server's database | L | ⚠️ step 4 of 4 next |
 | P8 | Publishing a local set | L | ⏳ after P7 |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
@@ -261,12 +261,12 @@ A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more 
 
 ### P7 ⏳ The data sets in the server's database
 
-L, in four steps, one commit each. Steps 1 and 2 stand; step 3 is next.
+L, in four steps, one commit each. Steps 1 to 3 stand; step 4 is next.
 
 Decided with the author: the page asks **`api/data-sets`** for the list, in the format
 `parseManifest` reads. The site's server answers it from its table. The dev server
 (Vite), which the frames and the probes use, answers the same route from the
-repository's manifest, through a plugin of `vite.config.mts`, every set approved, so dev
+repository's manifest, through a plugin of `vite.config.mts`, every set to every player, so dev
 never needs the Node server; a pending set is proved through `tools/dump-server.ts`. The
 repository's manifest is **`tools/data-sets.json`**, its folders relative to
 `static/gamefiles/`: the dev server's and the tools' (`tools/lib/dataSets.ts`), and
@@ -284,11 +284,14 @@ nobody else's.
    `api/data-sets` answers the approved sets (`manifestText`) and `api/event` takes any
    set in the table (`hasSet`), both read per request. `tools/dump-server.ts` asserts it.
    Until P8, `doc/DEPLOYMENT.md` says how to refill the table from a changed manifest.
-3. **The answer per player.** The page sends its `playerId` (`src/ui/gameEvents.ts`) in
-   an `X-Player-Id` header, never the query. The approved sets go to everyone, a pending
-   set also to its owner, and everything to the author, whose `playerId` is the server's
-   `AUTHOR_PLAYER_ID` (the VPS's `.env`). The answer holds no `playerId`, only a pending
-   set's `"status": "pending"`, which `parseManifest` reads into the `DataSet`.
+3. ✅ **The answer per player.** The page sends its kept `playerId` (`keptPlayerId`,
+   `src/ui/gameEvents.ts`, which draws none) in an `X-Player-Id` header
+   (`PLAYER_ID_HEADER`, `src/data/DataSets.ts`), never the query, whatever the statistics
+   setting. The approved sets go to everyone, a pending set also to its owner, and every
+   set to the author, whose `playerId` is the server's `AUTHOR_PLAYER_ID` (`manifestText`,
+   `server/dataSets.ts`). The answer holds no `playerId`, only a pending set's
+   `"status": "pending"`, which `parseManifest` reads into `DataSet.pending`.
+   `tools/dump-server.ts` and `tools/dump-data-sets.ts` assert it.
 4. **Deployment.** `gamefiles` mounted read-write, `backup.ts` covering the folders an
    upload writes, and `doc/DEPLOYMENT.md` saying all of it.
 

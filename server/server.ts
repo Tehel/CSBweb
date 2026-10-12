@@ -12,10 +12,12 @@
  *                   read only to fill an empty `data_sets` table
  *   STATS_DB        the store's SQLite file (the checkout's `stats/stats.db`), created
  *                   with its folder when missing
+ *   AUTHOR_PLAYER_ID  the author's `playerId`, to whom `api/data-sets` offers every set,
+ *                   pending ones included; unset or empty for no author
  *
- * It opens the store and checks the files before it listens, and exits with 1 on a store
- * it cannot open, an empty table and a manifest that is missing or does not parse, or a
- * folder the sets name that is missing. It logs to stdout, and on SIGTERM or SIGINT stops
+ * It opens the store and checks the files before it listens, and exits with 1 on an
+ * `AUTHOR_PLAYER_ID` that is not a `playerId`, a store it cannot open, an empty table and
+ * a manifest that is missing or does not parse, or a folder the sets name that is missing. It logs to stdout, and on SIGTERM or SIGINT stops
  * listening, lets the requests in flight finish, closes the store, which checkpoints its
  * WAL, and exits with 0.
  */
@@ -25,7 +27,7 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import { checkFiles, createAppServer, type CheckedFiles, type ServerOptions } from './app.ts';
 import { DataSetStore } from './dataSets.ts';
-import { RateLimit } from './events.ts';
+import { isPlayerId, RateLimit } from './events.ts';
 import { StatsStore } from './stats.ts';
 import { openStore } from './store.ts';
 
@@ -43,12 +45,14 @@ const options: ServerOptions = {
 };
 const port = Number(process.env.PORT ?? 8085);
 const statsDb = process.env.STATS_DB ?? join(ROOT, 'stats', 'stats.db');
+const authorPlayerId = process.env.AUTHOR_PLAYER_ID || null;
 
 let db: DatabaseSync;
 let dataSets: DataSetStore;
 let store: StatsStore;
 let checked: CheckedFiles;
 try {
+    if (authorPlayerId !== null && !isPlayerId(authorPlayerId)) throw new Error('AUTHOR_PLAYER_ID is not a playerId, a lowercase UUID');
     mkdirSync(dirname(statsDb), { recursive: true });
     db = openStore(statsDb);
     dataSets = new DataSetStore(db);
@@ -61,6 +65,7 @@ try {
 
 const server = createAppServer(options, {
     dataSets,
+    authorPlayerId,
     store,
     rules: { hasSet: (id) => dataSets.hasSet(id) },
     rateLimit: new RateLimit(EVENTS_PER_MINUTE, 60_000),

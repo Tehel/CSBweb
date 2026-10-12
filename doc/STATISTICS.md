@@ -23,7 +23,9 @@ reincarnated.
 **The player id** (`playerId`) is a `crypto.randomUUID()` drawn at first start and kept in
 `localStorage` (`csbweb_player_v1`). If the player clears it, the page draws a new one, and
 that is accepted: the id is for counting players, not for knowing who they are. There is no
-`visit` event: the player id appears only with a game.
+`visit` event: the player id appears only with a game. It is also what says who owns a
+set uploaded to the site (`doc/DEPLOYMENT.md` → "The game files and the manifest"), so it
+is a secret: the server returns none and logs none.
 
 **A game is its playthrough** (`doc/SAVES.md` → "A playthrough"), `d.RandomGameID`, so one
 game's events link up across loads, sessions and imports. Each event is

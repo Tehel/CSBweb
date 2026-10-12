@@ -71,6 +71,7 @@ export function localDataSet(record: LocalDataSetRecord): DataSet {
         hintOracle: files['hcsb.hct'] !== undefined && files['hcsb.dat'] !== undefined,
         dmRules: record.dmRules,
         hidden: false,
+        pending: false,
         dungeonSignature: record.dungeonSignature,
     };
 }

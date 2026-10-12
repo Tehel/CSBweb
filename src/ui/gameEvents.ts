@@ -189,6 +189,20 @@ export function playerId(): string {
 
 let pagePlayerId: string | undefined;
 
+/**
+ * The player's id where one is kept, without drawing one: what the page sends to
+ * `api/data-sets` (`PLAYER_ID_HEADER`, `src/data/DataSets.ts`), so that the server offers
+ * the player their own pending sets. It is sent whatever the statistics setting, since it
+ * says who owns a set, not what they play, and the server stores nothing of that request.
+ */
+export function keptPlayerId(): string | null {
+    try {
+        return localStorage.getItem(PLAYER_ID_KEY) || null;
+    } catch {
+        return pagePlayerId ?? null;
+    }
+}
+
 /** Where the page's events go: the server's `api/event`, by `sendBeacon`, its failure ignored. */
 export function sendBeacon(event: GameEvent): void {
     try {

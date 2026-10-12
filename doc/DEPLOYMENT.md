@@ -20,7 +20,7 @@ behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 image      dist/ (the built page) + server/ (run by Node 24 as is) + src/data/DataSets.ts
 mounts     /data/gamefiles  :ro   the data sets, swoosh/, manifest.json
            /data/stats            stats.db (SQLite, WAL: the statistics and the data sets), backups/
-env        PORT (8085), DIST_DIR, GAMEFILES_DIR, MANIFEST_FILE, STATS_DB
+env        PORT (8085), DIST_DIR, GAMEFILES_DIR, MANIFEST_FILE, STATS_DB, AUTHOR_PLAYER_ID
 ```
 
 On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
@@ -72,7 +72,8 @@ The page ships as it is, debug chrome included. Every URL in it is relative to t
 
 A manifest lists each set (its `dir` relative to the game files' folder), the default
 set's id and the FTL logo's folder, or none. A set names only what differs from the defaults: `dir` left out is the set's `id`,
-and each flag (`csbGraphics`, `miniDat`, `hintOracle`, `hidden`) left out is `false`. `src/data/DataSets.ts` parses it, for the page, the tools and the server. The page
+each flag (`csbGraphics`, `miniDat`, `hintOracle`, `hidden`) left out is `false`, and
+`status` left out is `"approved"`. `src/data/DataSets.ts` parses it, for the page, the tools and the server. The page
 asks the server for it first, at `api/data-sets` (`loadManifest`, `src/main.ts`), and one
 that is missing or malformed ends the boot on `fatalMessage`, saying why.
 
@@ -109,10 +110,14 @@ keeps them in the store's SQLite file, beside the statistics, so the nightly bac
 them: a `data_sets` table, one row per set (its fields, flags and folder, its place in the
 list, its status, `approved` or `pending`, and its owner's `playerId`, `NULL` for the
 author's), and `data_set_defaults`, one row naming the default set and the FTL logo's
-folder. At start-up an empty table is filled from the manifest, every set approved and the
-author's, once its folders are found. After that the manifest is not read: changing it
-changes nothing. `api/data-sets` answers the approved sets, and `api/event` takes the
-events of any set in the table, both read at each request, so a row added while the server
+folder. At start-up an empty table is filled from the manifest, every set the author's
+and approved, unless it says `"status": "pending"`, once its folders are found. After that the manifest is not read: changing it
+changes nothing. `api/data-sets` answers each player the sets they may see: the approved
+ones to everyone, a pending one also to its owner, and every set to the author, a pending
+set saying `"status": "pending"` and none naming its owner. The page names its player in
+an `X-Player-Id` header, its kept `playerId` (`keptPlayerId`, `src/ui/gameEvents.ts`), and
+the author is the one whose id is `AUTHOR_PLAYER_ID`. `api/event` takes the events of any
+set in the table. Both read the table at each request, so a row added while the server
 runs is offered at once.
 
 To refill the table from a changed manifest, empty it and restart. This drops every row,
@@ -155,15 +160,16 @@ the server imports from `../src/data/`. `npm start` runs it locally, on Node 22.
 It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
 `static/gamefiles/`), `MANIFEST_FILE` (the checkout's `tools/data-sets.json`; the image's
 `/data/gamefiles/manifest.json`), read only to fill an empty table, and `STATS_DB` (the
-checkout's `stats/stats.db`, which git ignores),
-and serves (`server/app.ts`):
+checkout's `stats/stats.db`, which git ignores), and `AUTHOR_PLAYER_ID`, the author's
+`playerId`, to whom `api/data-sets` offers every set (unset, no one; one that is not a
+`playerId` stops the start), and serves (`server/app.ts`):
 
 | Path | What | Caching |
 | --- | --- | --- |
 | `/` | `dist/index.html` | `no-cache` |
 | `/assets/…` | `dist/assets/…`, hashed names | `immutable` |
 | `/gamefiles/…` | `GAMEFILES_DIR/…`, but the manifest | `no-cache`, ETag and Last-Modified |
-| `/api/data-sets` | the `data_sets` table's approved sets, as a manifest | `no-store` |
+| `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest | `no-store`, `Vary: X-Player-Id` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
 | `/api/stats` | the statistics' aggregates | `no-store` |
@@ -213,7 +219,10 @@ build.
 it. Compose reads it twice over: for `${CSBWEB_PORT}` in the compose file, and as the
 container's `env_file`. So it must exist, even empty, or Compose refuses to start the
 stack; and every variable in it reaches the container's environment, where it overrides
-the image's own `PORT`, `DIST_DIR`, `GAMEFILES_DIR` and `STATS_DB`. A change to it needs the
+the image's own `PORT`, `DIST_DIR`, `GAMEFILES_DIR` and `STATS_DB`. It holds
+`AUTHOR_PLAYER_ID`, the author's `playerId` (the browser's `localStorage` key
+`csbweb_player_v1`, on the site), a secret: whoever sends it sees every pending set. A
+change to it needs the
 container recreated (a deploy, or `down && up -d`): `docker-compose restart` keeps the old
 environment.
 

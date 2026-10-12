@@ -15,6 +15,11 @@ export type EventType = (typeof EVENT_TYPES)[number];
 
 /** `crypto.randomUUID()`'s form, which `playerId` draws. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** Whether `value` has a `playerId`'s form (`src/ui/gameEvents.ts`). */
+export function isPlayerId(value: unknown): value is string {
+    return typeof value === 'string' && UUID.test(value);
+}
 /** A commit, or the image's `CSBWEB_BUILD`. */
 const BUILD = /^[0-9A-Za-z._-]{1,40}$/;
 /** `CHARDESC.name[8]`, its last byte the terminating NUL (`doc/CSBwin-src/CSB.h:2545`). */
@@ -62,7 +67,7 @@ export function checkEvent(body: string, rules: EventRules): CheckedEvent | stri
     if (!isRecord(event)) return 'not an object';
     const { type, player, set, playthrough, build, payload } = event;
     if (!EVENT_TYPES.includes(type as EventType)) return 'unknown type';
-    if (typeof player !== 'string' || !UUID.test(player)) return 'player is not a UUID';
+    if (!isPlayerId(player)) return 'player is not a UUID';
     if (typeof set !== 'string' || !rules.hasSet(set)) return 'unknown set';
     if (!isInteger(playthrough, 0, 0xffffffff)) return 'bad playthrough';
     if (typeof build !== 'string' || !BUILD.test(build)) return 'bad build';

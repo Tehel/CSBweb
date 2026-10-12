@@ -4,9 +4,15 @@
  * `data_set_defaults`, one row naming the default set and the FTL logo's folder. `api/data-sets` and `api/event` read them at
  * each request (`app.ts`), so a set added while the server runs is offered at once.
  *
+ * A set is approved or pending. An approved set is offered to everyone; a pending one, a
+ * player's upload, to its owner and the author only (`manifestText`). Ownership rests on
+ * the `playerId` alone, a secret (`src/ui/gameEvents.ts`), so no answer holds one.
+ *
  * An empty table is filled once, at start-up, from the manifest (`checkFiles`, `app.ts`),
- * every set approved and the author's. After that the server reads no manifest file.
+ * every set the author's, and approved unless it says `"status": "pending"`. After that the
+ * server reads no manifest file.
  */
+import { timingSafeEqual } from 'node:crypto';
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 
 import type { DataSet, DataSetManifest } from '../src/data/DataSets.ts';
@@ -39,14 +45,25 @@ const FLAG_COLUMNS: readonly (readonly [Flag, string])[] = [
     ['csbGraphics', 'csb_graphics'], ['miniDat', 'mini_dat'], ['hintOracle', 'hint_oracle'], ['dmRules', 'dm_rules'], ['hidden', 'hidden'],
 ];
 
-export type DataSetStatus = 'approved' | 'pending';
-
-/** A row: the set, its folder relative to `GAMEFILES_DIR`, and who may see it. */
+/**
+ * A row: the set, its folder relative to `GAMEFILES_DIR`, and who may see it: everyone, or
+ * while it is `pending` (the `status` column's `'pending'`), its owner and the author.
+ */
 export interface StoredDataSet extends DataSet {
-    status: DataSetStatus;
     /** Its uploader's `playerId`, `null` for the author's. */
     owner: string | null;
 }
+
+/** Who asks `api/data-sets`. */
+export interface DataSetViewer {
+    /** Their `playerId`, from the request's `PLAYER_ID_HEADER`, or `null` for none or a malformed one. */
+    playerId: string | null;
+    /** Whether that id is the author's, the server's `AUTHOR_PLAYER_ID`. */
+    author: boolean;
+}
+
+/** Everyone: no `playerId`, not the author. */
+export const ANYONE: DataSetViewer = { playerId: null, author: false };
 
 /** Both tables, read. */
 export interface StoredDataSets {
@@ -74,7 +91,7 @@ export class DataSetStore {
         this.rows = db.prepare(`SELECT id, name, dir, status, owner, ${flags.join(', ')} FROM data_sets ORDER BY position`);
         this.defaults = db.prepare('SELECT default_set, swoosh FROM data_set_defaults');
         this.insert = db.prepare(
-            `INSERT INTO data_sets (id, name, dir, position, status, owner, ${flags.join(', ')}) VALUES (?, ?, ?, ?, 'approved', NULL, ${flags.map(() => '?').join(', ')})`);
+            `INSERT INTO data_sets (id, name, dir, position, status, owner, ${flags.join(', ')}) VALUES (?, ?, ?, ?, ?, NULL, ${flags.map(() => '?').join(', ')})`);
         this.insertDefaults = db.prepare('INSERT INTO data_set_defaults (only, default_set, swoosh) VALUES (1, ?, ?)');
     }
 
@@ -89,15 +106,15 @@ export class DataSetStore {
 
     /**
      * Fills the empty tables from `manifest`, parsed with its folders relative to
-     * `GAMEFILES_DIR` (`parseManifest(text, '')`): every set approved and the author's, in
-     * the manifest's order. All of it or nothing.
+     * `GAMEFILES_DIR` (`parseManifest(text, '')`): every set the author's, approved unless it
+     * says it is pending, in the manifest's order. All of it or nothing.
      */
     fill(manifest: DataSetManifest): void {
         if (!this.isEmpty()) throw new Error('the data_sets table is not empty');
         this.db.exec('BEGIN');
         try {
             manifest.dataSets.forEach((set, position) => {
-                this.insert.run(set.id, set.name, set.dir, position, ...FLAG_COLUMNS.map(([flag]) => (set[flag] ? 1 : 0)));
+                this.insert.run(set.id, set.name, set.dir, position, set.pending ? 'pending' : 'approved', ...FLAG_COLUMNS.map(([flag]) => (set[flag] ? 1 : 0)));
             });
             this.insertDefaults.run(manifest.defaultSet.id, manifest.swooshDir);
             this.db.exec('COMMIT');
@@ -114,7 +131,7 @@ export class DataSetStore {
             const set: StoredDataSet = {
                 id: row.id as string, name: row.name as string, dir: row.dir as string,
                 csbGraphics: false, miniDat: false, hintOracle: false, dmRules: false, hidden: false,
-                status: row.status as DataSetStatus, owner: row.owner as string | null,
+                pending: row.status === 'pending', owner: row.owner as string | null,
             };
             for (const [flag, column] of FLAG_COLUMNS) set[flag] = row[column] === 1;
             return set;
@@ -124,16 +141,28 @@ export class DataSetStore {
 }
 
 /**
- * The answer to `api/data-sets`: the approved sets of `stored`, as a manifest
- * `parseManifest` reads. A `dir` is left out where it is the id, and a flag where it is
- * false, as the repository's manifest does.
+ * The answer to `api/data-sets` for `viewer`: the sets of `stored` they may see, as a
+ * manifest `parseManifest` reads. Everyone sees the approved sets, a player also their own
+ * pending ones, and the author every set. A pending set says `"status": "pending"`, and no
+ * set says its owner. A `dir` is left out where it is the id, and a flag where it is false,
+ * as the repository's manifest does.
  */
-export function manifestText(stored: StoredDataSets): string {
-    const dataSets = stored.dataSets.filter((set) => set.status === 'approved').map((set) => {
+export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): string {
+    const visible = (set: StoredDataSet) => !set.pending || viewer.author
+        || (viewer.playerId !== null && set.owner !== null && samePlayerId(set.owner, viewer.playerId));
+    const dataSets = stored.dataSets.filter(visible).map((set) => {
         const entry: Record<string, string | boolean> = { id: set.id, name: set.name };
         if (set.dir !== set.id) entry.dir = set.dir;
         for (const [flag] of FLAG_COLUMNS) if (set[flag]) entry[flag] = true;
+        if (set.pending) entry.status = 'pending';
         return entry;
     });
     return JSON.stringify({ default: stored.defaultId, swoosh: stored.swooshDir, dataSets });
+}
+
+/** Whether two `playerId`s are the same, compared in a time that does not say how much of them matches. */
+export function samePlayerId(a: string, b: string): boolean {
+    const left = Buffer.from(a);
+    const right = Buffer.from(b);
+    return left.length === right.length && timingSafeEqual(left, right);
 }

@@ -10,8 +10,10 @@
  *     table that is not empty is read, with no manifest, a changed one left unread, and a
  *     folder it names that is not there stops it too;
  *   - `/api/data-sets`: the table's approved sets, as a manifest the page's parser reads
- *     as the one that filled it, as JSON, not cached, read at each request; and the
- *     manifest not served as a file under `gamefiles/`;
+ *     as the one that filled it, as JSON, not cached, read at each request; a pending set
+ *     offered, as pending, to its owner and the author only, as the `X-Player-Id` header
+ *     names them, and no owner named; and the manifest not served as a file under
+ *     `gamefiles/`;
  *   - `/` and `/assets/…`: the page, `no-cache`, and the hashed files, `immutable`, the
  *     fonts as `font/ttf` and `font/woff2`;
  *   - `/gamefiles/…`: ETag and Last-Modified, a 304 for either precondition, HEAD without
@@ -22,7 +24,8 @@
  *   - `/api/event`: POST only, an event stored (what is stored, `dump-stats` asserts), a bad
  *     one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
  *     forwarded address, 429; `/api/stats`: the store's aggregates, not cached;
- *   - `server.ts` itself, as Node runs it: a bad mount or a store it cannot open exits 1
+ *   - `server.ts` itself, as Node runs it: a bad mount, a store it cannot open or an
+ *     `AUTHOR_PLAYER_ID` that is not a `playerId` exits 1
  *     before it listens, and SIGTERM stops a listening server with 0, the store made, its
  *     table filled, and its WAL checkpointed; started again without a manifest, it plays
  *     from the table;
@@ -41,11 +44,11 @@ import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { checkFiles, createAppServer, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
-import { DataSetStore, manifestText } from '../server/dataSets.ts';
+import { ANYONE, DataSetStore, manifestText } from '../server/dataSets.ts';
 import { RateLimit } from '../server/events.ts';
 import { StatsStore } from '../server/stats.ts';
 import { openStore } from '../server/store.ts';
-import { parseManifest } from '../src/data/DataSets.ts';
+import { parseManifest, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
 import { GAMEFILES_DIR, MANIFEST_FILE } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -122,7 +125,7 @@ function checkStartUp(scratch: string, options: ServerOptions): void {
     const real = checkFiles({ distDir: options.distDir, gamefilesDir: GAMEFILES_DIR, manifestFile: MANIFEST_FILE }, repository);
     console.log(`  ${MANIFEST_FILE}: ${real.ids.join(', ')}`);
     check(real.filled && real.ids.length > 0, `the repository's ${MANIFEST_FILE} passes over ${GAMEFILES_DIR}, and fills the table`);
-    check(parsed(manifestText(repository.read())) === parsed(readFileSync(MANIFEST_FILE, 'utf8')),
+    check(parsed(manifestText(repository.read(), ANYONE)) === parsed(readFileSync(MANIFEST_FILE, 'utf8')),
         'the table answers as the manifest that filled it, every set, flag and folder');
     check(refusal(options) === '', 'the scratch files pass');
 
@@ -152,12 +155,12 @@ function checkStartUp(scratch: string, options: ServerOptions): void {
 
     const filled = emptyTable();
     checkFiles(options, filled);
-    const before = manifestText(filled.read());
+    const before = manifestText(filled.read(), ANYONE);
     const fromTable = checkFiles({ ...options, manifestFile: join(scratch, 'nowhere.json') }, filled);
     check(!fromTable.filled && fromTable.ids.join() === 'a', 'a table that is not empty is read, and the manifest is not: none is needed');
     const changed = join(scratch, 'changed.json');
     writeFileSync(changed, JSON.stringify({ default: 'z', dataSets: [{ id: 'z', name: 'Z', dir: 'set-a' }] }));
-    check(refusal({ ...options, manifestFile: changed }, filled) === '' && manifestText(filled.read()) === before,
+    check(refusal({ ...options, manifestFile: changed }, filled) === '' && manifestText(filled.read(), ANYONE) === before,
         'a manifest changed since is not read, and the table keeps what it holds');
     const tableMissing = refusal({ ...options, gamefilesDir: bad }, filled);
     console.log(`  table's folders: ${tableMissing.split(scratch).join('<scratch>')}`);
@@ -247,19 +250,36 @@ async function checkTableRead(port: number, db: DatabaseSync, manifest: string):
 
     check((await post('b')).status === 400, 'an event of a set the table lacks: 400');
     insert.run('p', 'Pending', 'set-a', 1, 'pending', PLAYER, 0);
-    const pending = await ask(port, '/api/data-sets');
-    check(parsed(pending.body) === parsed(manifest), 'a pending set is left out of the answer');
+    const as = async (player: string | null) => {
+        const answer = await ask(port, '/api/data-sets', 'GET', player === null ? {} : { [PLAYER_ID_HEADER]: player });
+        return { answer, sets: parseManifest(answer.body, '').dataSets };
+    };
+    const anyone = await as(null);
+    check(parsed(anyone.answer.body) === parsed(manifest), 'a pending set is left out of the answer to a page that names no player');
+    check(anyone.answer.headers.vary === PLAYER_ID_HEADER, `the answer varies with ${PLAYER_ID_HEADER} (Vary: ${anyone.answer.headers.vary})`);
+    check(parsed((await as(OTHER)).answer.body) === parsed(manifest), 'and to another player');
+    check(parsed((await as(AUTHOR.toUpperCase())).answer.body) === parsed(manifest), 'and to the author\'s id in another form: a playerId is lowercase');
+    const owner = await as(PLAYER);
+    console.log(`  to its owner: ${owner.answer.body}`);
+    check(owner.sets.map((set) => `${set.id}${set.pending ? ' pending' : ''}`).join() === 'a,p pending', 'its owner is offered it, in its place, and told it is pending');
+    check(!owner.answer.body.includes(PLAYER) && !owner.answer.body.includes('owner'), 'the answer names no owner, nor any playerId');
+    const author = await as(AUTHOR);
+    check(author.sets.map((set) => `${set.id}${set.pending ? ' pending' : ''}`).join() === 'a,p pending', 'the author is offered every set, another player\'s pending one too');
     check((await post('p')).status === 204, 'and its events are taken');
     insert.run('b', 'B', 'set-a', 2, 'approved', null, 1);
     const approved = parseManifest((await ask(port, '/api/data-sets')).body, '');
     const added = approved.dataSets.at(-1);
     console.log(`  added: ${JSON.stringify(added)}`);
-    check(approved.dataSets.map((set) => set.id).join() === 'a,b' && added?.dir === 'set-a' && added.dmRules && !added.hidden,
+    check(approved.dataSets.map((set) => set.id).join() === 'a,b' && added?.dir === 'set-a' && added.dmRules && !added.hidden && !added.pending,
         'an approved set is answered at the next request, in its place, with its folder and flags');
     check((await post('b')).status === 204, 'and its events are taken at once');
 }
 
 const PLAYER = '00000000-0000-4000-8000-000000000000';
+/** Another player, who owns nothing. */
+const OTHER = '11111111-1111-4111-8111-111111111111';
+/** The scratch server's `AUTHOR_PLAYER_ID`. */
+const AUTHOR = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 /** The scratch server's rate limit: events per address and window. */
 const EVENTS_PER_WINDOW = 5;
 
@@ -336,6 +356,10 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     const badStore = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: options.distDir }));
     console.log(`  bad store: exit ${badStore.code}, ${firstLine(badStore.out).replace(scratch, '<scratch>')}`);
     check(badStore.code === 1 && badStore.out.includes('Not starting:'), 'a store it cannot open exits 1 before it listens');
+    const badAuthor = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: join(scratch, 'author', 'stats.db'), AUTHOR_PLAYER_ID: 'the-author' }));
+    console.log(`  bad author: exit ${badAuthor.code}, ${firstLine(badAuthor.out)}`);
+    check(badAuthor.code === 1 && badAuthor.out.includes('AUTHOR_PLAYER_ID is not a playerId') && !existsSync(join(scratch, 'author')),
+        'an AUTHOR_PLAYER_ID that is not a playerId exits 1 before it opens the store');
 
     let healthy = false;
     let walHeld = false;
@@ -410,6 +434,7 @@ async function main(): Promise<void> {
         const manifest = readFileSync(options.manifestFile, 'utf8');
         const api: ApiOptions = {
             dataSets,
+            authorPlayerId: AUTHOR,
             store,
             rules: { hasSet: (id) => dataSets.hasSet(id) },
             rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),

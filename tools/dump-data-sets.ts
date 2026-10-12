@@ -67,6 +67,11 @@ function checkParser(): void {
   check(listed === 'a,c', 'the welcome page leaves a hidden set out');
   check(dataSetNamed(hiding, 'b') === b, 'a hidden set is played by its ?dungeon=');
 
+  // A pending set: the server's answer to its owner and the author (`server/dataSets.ts`).
+  const statuses = parseManifest(manifest({ dataSets: [set(), set({ id: 'b', status: 'pending' }), set({ id: 'c', status: 'approved' })] }), '');
+  console.log(`  status: ${statuses.dataSets.map((s) => `${s.id} ${s.pending ? 'pending' : 'approved'}`).join(', ')}`);
+  check(statuses.dataSets.map((s) => s.pending).join() === 'false,true,false', '"status" is read as written, and left out it is "approved"');
+
   const malformed: Array<[string, string]> = [
     ['{"default": "a", ', 'not JSON'],
     ['[]', 'not an object'],
@@ -80,6 +85,7 @@ function checkParser(): void {
     [manifest({ dataSets: [set({ dir: null })] }), `data set 'a' has no "dir"`],
     [manifest({ dataSets: [set({ hintOracle: 'yes' })] }), `data set 'a' has a "hintOracle" that is neither true nor false`],
     [manifest({ dataSets: [set({ hidden: 'yes' })] }), `data set 'a' has a "hidden" that is neither true nor false`],
+    [manifest({ dataSets: [set({ status: 'waiting' })] }), `data set 'a' has a "status" that is neither "approved" nor "pending"`],
     [manifest({ dataSets: [set(), set({ dir: 'b' })] }), `two data sets are 'a'`],
     [manifest({ default: 'b' }), '"default" names none'],
     [manifest({ default: undefined }), '"default" names none'],
