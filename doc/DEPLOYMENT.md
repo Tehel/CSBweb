@@ -95,11 +95,6 @@ welcome page's tile shows, so the page fetches no game file to draw its grid.
 checks the committed ones (`--check`). A set added to the manifest needs its thumbnail
 written before it is uploaded; without one, its tile's picture is a blank box.
 
-Each set's folder holds its font too, `<id>-font.ttf`: graphics.dat's font as a TrueType
-font, which the welcome page draws its labels in, the default set's.
-`npx tsx tools/gen-fonts.ts` writes every set's, and `npm test` checks them (`--check`).
-Without the default set's, the labels are in the browser's monospace.
-
 The game files are not part of a deploy. They are uploaded once, and again when they
 change. **Everything in `gamefiles/` can be downloaded**, readmes and stray folders
 included, since the server serves the folder as it stands.

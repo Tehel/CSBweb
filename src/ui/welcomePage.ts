@@ -22,14 +22,12 @@
  *
  * Every other parameter of the page's query is kept on the way to the game (`?dev`).
  *
- * The labels are HTML text in the game's font: the default set's font file (`fontPath`),
- * graphics.dat's font made a TrueType font by `tools/gen-fonts.ts`, so the page fetches
- * no game file for it either. Until it loads, or where it does not, they are in the
- * browser's monospace. The prose is in Spectral, served with the page.
+ * The labels are HTML text in the game's font, and the prose in Spectral, both served
+ * with the page (`welcomePage.css`).
  */
 import './welcomePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
-import { chooserSets, fontPath, thumbnailPath, type DataSet, type DataSetManifest } from '../data/DataSets';
+import { chooserSets, thumbnailPath, type DataSet, type DataSetManifest } from '../data/DataSets';
 import { formatSaveDate, formatSaveTime, lastUsedSave, type SaveEntry, type SaveStore } from '../data/saves';
 
 /** The page's static half: the logo, the places the grid and the buttons go, and the bottom. */
@@ -81,10 +79,6 @@ const PAGE = `
 export async function showWelcomePage(body: HTMLElement, manifest: DataSetManifest, store: Pick<SaveStore, 'list'>): Promise<void> {
     const known = new Set(manifest.dataSets.map((set) => set.id));
     const rows = (await store.list(null).catch(() => [] as SaveEntry[])).filter((row) => known.has(row.dataSet));
-
-    const font = new FontFace('DM Screen', `url(${fontPath(manifest.defaultSet)})`);
-    document.fonts.add(font);
-    font.load().catch(() => {});
 
     body.classList.add('welcome');
     body.innerHTML = PAGE;

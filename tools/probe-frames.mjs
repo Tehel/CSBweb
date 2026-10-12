@@ -328,12 +328,12 @@ check(atWelcome.play === null && /dungeon=dm-atari/.test(atWelcome.resume ?? '')
 check(atWelcome.preview.length === 3 && atWelcome.preview[0] === 'Dungeon Master' && atWelcome.preview[1].split(' · ').length === 4
   && /^Level \d+ · \d{4}-\d\d-\d\d \d\d:\d\d$/.test(atWelcome.preview[2]),
   'the box beside CONTINUE shows its set, its party of four, its level and when it was saved');
-// The page's fonts. Its labels are in 'DM Screen', the default set's `<id>-font.ttf`, and
-// the browser draws it as the game draws its font: every character, at ten screen pixels
-// to a font pixel, is its six rows of five pixels from graphics.dat (`gen-fonts.ts --rows`),
+// The page's fonts. Its labels are in 'DM Screen', `src/assets/dm-screen.ttf`, and the
+// browser draws it as the game draws its font: every character, at ten screen pixels to a
+// font pixel, is its six rows of five pixels from dm-atari's graphics.dat (`gen-font.ts --rows`),
 // with nothing in the sixth column or the row above and below, and an advance of six.
 // Its prose is in Spectral, served with the page: no request leaves for Google Fonts.
-const fontRows = JSON.parse(execFileSync('npx', ['tsx', 'tools/gen-fonts.ts', '--rows'],
+const fontRows = JSON.parse(execFileSync('npx', ['tsx', 'tools/gen-font.ts', '--rows'],
   { encoding: 'utf8', cwd: fileURLToPath(new URL('..', import.meta.url)) }));
 const fonts = await evaluate(`(async()=>{await document.fonts.ready; await document.fonts.load('80px "DM Screen"');
   const rows=${JSON.stringify(fontRows)}, P=10, wrong=[];
@@ -353,7 +353,7 @@ const fonts = await evaluate(`(async()=>{await document.fonts.ready; await docum
     characters: rows.length, wrong};})()`);
 console.log('  ', JSON.stringify(fonts));
 check(fonts.dm === 'loaded' && fonts.characters > 90 && fonts.wrong.length === 0,
-  "the labels' font is the default set's font file, drawn as the game draws graphics.dat's font, every character");
+  "the labels' font is DM's, drawn as the game draws graphics.dat's font, every character");
 check(fonts.spectral && fonts.google === 0, 'the prose is in Spectral, regular and italic, served with the page');
 await clickOn('.pick[data-set="csb"]');
 const atCsb = await welcome();

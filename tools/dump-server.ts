@@ -7,9 +7,10 @@
  *   - the start-up check: the repository's manifest passes, and a missing `index.html`, a
  *     missing manifest, a manifest that does not parse and a folder it names that is not
  *     there each stop it, saying why;
- *   - `/` and `/assets/…`: the page, `no-cache`, and the hashed files, `immutable`;
+ *   - `/` and `/assets/…`: the page, `no-cache`, and the hashed files, `immutable`, the
+ *     fonts as `font/ttf` and `font/woff2`;
  *   - `/gamefiles/…`: ETag and Last-Modified, a 304 for either precondition, HEAD without
- *     a body, the query ignored, and a set's font as `font/ttf`;
+ *     a body, and the query ignored;
  *   - no path leaves the two folders, `..` and `.` raw, percent-encoded or behind a
  *     backslash, and no dot-file is served;
  *   - `/api/health`, and a 405 for a method that is not GET or HEAD;
@@ -83,12 +84,13 @@ function scratchFiles(scratch: string): ServerOptions {
     mkdirSync(join(gamefilesDir, 'logo'), { recursive: true });
     writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
     writeFileSync(join(distDir, 'assets', 'index-AbC123.js'), 'console.log(1);');
+    writeFileSync(join(distDir, 'assets', 'font-AbC123.ttf'), Buffer.from([0, 1, 0, 0]));
+    writeFileSync(join(distDir, 'assets', 'font-AbC123.woff2'), Buffer.from([0x77, 0x4f, 0x46, 0x32]));
     writeFileSync(join(gamefilesDir, 'manifest.json'), JSON.stringify({
         default: 'a', swoosh: 'logo',
         dataSets: [{ id: 'a', name: 'A', dir: 'set-a' }],
     }));
     writeFileSync(join(gamefilesDir, 'set-a', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
-    writeFileSync(join(gamefilesDir, 'set-a', 'a-font.ttf'), Buffer.from([0, 1, 0, 0]));
     writeFileSync(join(gamefilesDir, 'set-a', '.hidden'), 'hidden');
     writeFileSync(join(scratch, 'secret.txt'), 'SECRET');
     return { distDir, gamefilesDir };
@@ -133,6 +135,10 @@ async function checkAnswers(port: number): Promise<void> {
     check(asset.status === 200 && asset.body === 'console.log(1);', 'a hashed asset is served');
     check(String(asset.headers['cache-control']).includes('immutable'), `a hashed asset is immutable (${asset.headers['cache-control']})`);
     check(String(asset.headers['content-type']).startsWith('text/javascript'), 'as text/javascript');
+    for (const [file, type] of [['font-AbC123.ttf', 'font/ttf'], ['font-AbC123.woff2', 'font/woff2']]) {
+        const font = await ask(port, `/assets/${file}`);
+        check(font.status === 200 && font.headers['content-type'] === type, `a font, as ${type} (${font.headers['content-type']})`);
+    }
     check((await ask(port, '/index.html')).headers['cache-control'] === 'no-cache', '/index.html is no-cache too');
     check((await ask(port, '/assets/nothing.js')).status === 404, 'a missing file is 404');
     check((await ask(port, '/assets')).status === 404, 'a folder is 404, not a listing');
@@ -159,8 +165,6 @@ async function checkAnswers(port: number): Promise<void> {
     check(head.status === 200 && head.body === '' && head.headers['content-length'] === '4', 'HEAD: the headers, no body');
     const manifest = await ask(port, '/gamefiles/manifest.json');
     check(manifest.status === 200 && String(manifest.headers['content-type']).startsWith('application/json'), 'the manifest, as JSON');
-    const font = await ask(port, '/gamefiles/set-a/a-font.ttf');
-    check(font.status === 200 && font.headers['content-type'] === 'font/ttf', `a set's font, as font/ttf (${font.headers['content-type']})`);
 
     console.log('\nPaths that would leave the folders:');
     for (const path of [

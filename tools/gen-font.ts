@@ -1,7 +1,8 @@
 /**
- * Write each data set's font, `<id>-font.ttf` in its folder (`fontPath`,
- * `src/data/DataSets.ts`): the game's font as a TrueType font, which the welcome page
- * draws its labels in (`src/ui/welcomePage.ts`), the default set's.
+ * Write the welcome page's font, `src/assets/dm-screen.ttf`, which its labels are drawn in
+ * (`src/ui/welcomePage.css`): the original Dungeon Master's font, from dm-atari's
+ * `graphics.dat`, as a TrueType font. It ships with the page, so the page fetches no game
+ * file for it.
  *
  * The glyphs are graphics.dat's font, item 0x22d (`loadFontData`,
  * `src/renderer/csbwin/TextRenderer.ts`), as the game draws it: six rows of five pixels a
@@ -17,31 +18,33 @@
  * Codes 0x20 to 0x5F are ASCII's space, punctuation, digits and capitals. The lower case
  * letters are their capitals', as the game upper-cases what it prints
  * (`drawTextLineIndex`), and a no-break space is the space. A code whose glyph is blank,
-the at sign in DM's and CSB's fonts, is left out, so the browser draws it in its own. The page's one character the
- * game's font lacks, the middle dot that separates its preview's fields, is the page's
- * own glyph: the colon's upper dot one row down, at the hyphen's height. The other codes,
- * the game's runes and symbols, are not text, and are left out.
+ * the at sign, is left out, so the browser draws it in its own. The page's one character
+ * the game's font lacks, the middle dot that separates its preview's fields, is the
+ * page's own glyph: the colon's upper dot one row down, at the hyphen's height. The other
+ * codes, the game's runes and symbols, are not text, and are left out.
  *
  * Run:
  *
- *   npx tsx tools/gen-fonts.ts [<id>…]            # write them
- *   npx tsx tools/gen-fonts.ts --check [<id>…]    # check them (npm test)
- *   npx tsx tools/gen-fonts.ts --rows [<id>]      # the default set's characters, as JSON
+ *   npx tsx tools/gen-font.ts            # write it
+ *   npx tsx tools/gen-font.ts --check    # check it (npm test)
+ *   npx tsx tools/gen-font.ts --rows     # its characters, as JSON
  *
- * `--check` writes nothing: it asserts that every set's file holds the bytes this tool
- * would write, and that the default set has one. That the browser draws the file as the
- * game's font, pixel for pixel, is `tools/probe-frames.mjs`'s check, which reads the
- * characters to expect from `--rows`: `[[codePoint, [six row bytes]], …]`.
+ * `--check` writes nothing: it asserts that the file holds the bytes this tool would
+ * write. That the browser draws the file as the game's font, pixel for pixel, is
+ * `tools/probe-frames.mjs`'s check, which reads the characters to expect from `--rows`:
+ * `[[codePoint, [six row bytes]], …]`.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
-import { fontPath, type DataSet } from '../src/data/DataSets';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { check, finish } from './lib/check';
-import { DATA_SETS, DEFAULT_DATA_SET } from './lib/dataSets';
+import { dataSetNamed } from './lib/dataSets';
 import { writeTtf, type TtfGlyph, type TtfRect } from './lib/ttf';
 
+/** The original Dungeon Master's data set. */
+const DM = dataSetNamed('dm-atari');
+const PATH = 'src/assets/dm-screen.ttf';
 const ROWS = 6;
 const ROW_STRIDE = 128;
 const GLYPH_WIDTH = 5;
@@ -80,12 +83,12 @@ function glyphOf(rows: readonly number[]): TtfGlyph {
 }
 
 /**
- * The characters of `set`'s font: each code point the font draws with its six row bytes,
+ * The characters of DM's font: each code point the font draws with its six row bytes,
  * and the codes 0x20 to 0x5F left out for a blank glyph.
  */
-function characters(set: DataSet): { drawn: Map<number, number[]>; missing: number[] } {
+function characters(): { drawn: Map<number, number[]>; missing: number[] } {
   const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(`${set.dir}/graphics.dat`)));
+  graphics.loadFromArray(new Uint8Array(readFileSync(`${DM.dir}/graphics.dat`)));
   const font = loadFontData(graphics).bytes;
   const rowsOf = (code: number): number[] => Array.from({ length: ROWS }, (_, row) => font[code + row * ROW_STRIDE]!);
 
@@ -105,9 +108,9 @@ function characters(set: DataSet): { drawn: Map<number, number[]>; missing: numb
   return { drawn, missing };
 }
 
-/** `set`'s font file, from its `graphics.dat`: a glyph for each distinct set of rows. */
-function fontFile(set: DataSet): { bytes: Uint8Array; glyphs: number; missing: number[] } {
-  const { drawn, missing } = characters(set);
+/** The font file: a glyph for each distinct set of rows. */
+function fontFile(): { bytes: Uint8Array; glyphs: number; missing: number[] } {
+  const { drawn, missing } = characters();
   const glyphs: TtfGlyph[] = [{ advance: ADVANCE * PIXEL, rects: [] }];
   const glyphOfRows = new Map<string, number>();
   const cmap = new Map<number, number>();
@@ -122,7 +125,7 @@ function fontFile(set: DataSet): { bytes: Uint8Array; glyphs: number; missing: n
 
   const bytes = writeTtf({
     family: 'DM Screen',
-    source: `The font of ${set.name}'s graphics.dat, item 0x22d`,
+    source: `The font of ${DM.name}'s graphics.dat, item 0x22d`,
     unitsPerEm: UNITS_PER_EM,
     ascent: (ROWS_ABOVE + 1) * PIXEL,
     descent: (UNITS_PER_EM / PIXEL - ROWS_ABOVE - 1) * PIXEL,
@@ -135,36 +138,23 @@ function fontFile(set: DataSet): { bytes: Uint8Array; glyphs: number; missing: n
 
 function main(): void {
   const args = process.argv.slice(2);
-  const checking = args.includes('--check');
-  const ids = args.filter((arg) => !arg.startsWith('--'));
   if (args.includes('--rows')) {
-    const set = ids.length === 0 ? DEFAULT_DATA_SET : DATA_SETS.find((s) => s.id === ids[0]);
-    if (!set) throw new Error(`the manifest has no data set ${ids[0]}`);
-    console.log(JSON.stringify([...characters(set).drawn]));
+    console.log(JSON.stringify([...characters().drawn]));
     return;
   }
-  const unknown = ids.filter((id) => !DATA_SETS.some((set) => set.id === id));
-  if (unknown.length > 0) throw new Error(`the manifest has no data set ${unknown.join(', ')}`);
-  const sets = ids.length === 0 ? DATA_SETS : DATA_SETS.filter((set) => ids.includes(set.id));
-
-  for (const set of sets) {
-    const path = fontPath(set);
-    const font = fontFile(set);
-    const left = font.missing.map((code) => String.fromCharCode(code)).join('');
-    console.log(`${set.id}: ${path}, ${font.glyphs} glyphs, ${font.bytes.length} bytes, blank and left out: ${left || 'none'}`);
-    check(!/[0-9A-Z]/.test(left), `${set.id}: every digit and capital is drawn`);
-    if (!checking) {
-      writeFileSync(path, font.bytes);
-      continue;
-    }
-    if (!existsSync(path)) {
-      check(set !== DEFAULT_DATA_SET, `${set.id}: the default set, whose font the welcome page draws in, has its font`);
-      continue;
-    }
-    const committed = new Uint8Array(readFileSync(path));
-    check(committed.length === font.bytes.length && committed.every((v, i) => v === font.bytes[i]),
-      `${set.id}: the font file holds the font read from graphics.dat`);
+  const font = fontFile();
+  const left = font.missing.map((code) => String.fromCharCode(code)).join('');
+  console.log(`${DM.id}: ${PATH}, ${font.glyphs} glyphs, ${font.bytes.length} bytes, blank and left out: ${left || 'none'}`);
+  check(!/[0-9A-Z]/.test(left), 'every digit and capital is drawn');
+  if (!args.includes('--check')) {
+    writeFileSync(PATH, font.bytes);
+    finish();
+    return;
   }
+  check(existsSync(PATH), `${PATH} is there`);
+  const committed = existsSync(PATH) ? new Uint8Array(readFileSync(PATH)) : new Uint8Array(0);
+  check(committed.length === font.bytes.length && committed.every((v, i) => v === font.bytes[i]),
+    'the font file holds the font read from graphics.dat');
   finish();
 }
 
