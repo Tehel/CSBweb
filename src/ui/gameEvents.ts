@@ -11,9 +11,11 @@
  * page knows it (`ChampionReport.id`).
  *
  * The player can turn them off (`GameEventsDeps.enabled`): then nothing is read or sent,
- * the player's id not even drawn.
+ * the player's id not even drawn. Nor is anything for a player's own set
+ * (`src/data/LocalDataSets.ts`), whose id the server would not take.
  */
 
+import { isLocalDataSetId } from '../data/LocalDataSets';
 import type { Game } from '../engine/Game';
 import type { JoinedChampion } from '../engine/GameHost';
 import type { Champion } from '../engine/gameTypes';
@@ -156,8 +158,8 @@ export class GameEvents {
     /** The event, read and sent now. Nothing it does can fail the game. */
     private emit(type: GameEventType, payload: () => GameEvent['payload']): void {
         try {
-            if (!this.deps.enabled()) return;
             const { set, build } = this.deps;
+            if (isLocalDataSetId(set) || !this.deps.enabled()) return;
             const playthrough = this.deps.game.ctx.state.block1.randomGameID;
             this.deps.send({ type, player: this.deps.player(), set, playthrough, build, payload: payload() });
         } catch {

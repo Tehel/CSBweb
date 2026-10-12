@@ -57,7 +57,7 @@ interface Harness {
   sent: GameEvent[];
 }
 
-function harness(options: { send?: (event: GameEvent) => void; enabled?: () => boolean; player?: () => string } = {}): Harness {
+function harness(options: { send?: (event: GameEvent) => void; enabled?: () => boolean; player?: () => string; set?: string } = {}): Harness {
   const sent: GameEvent[] = [];
   let events!: GameEvents;
   let reincarnating = -1;
@@ -68,7 +68,7 @@ function harness(options: { send?: (event: GameEvent) => void; enabled?: () => b
   game.setRandomSeed(0x12345678);
   events = new GameEvents({
     game,
-    set: DM.id,
+    set: options.set ?? DM.id,
     build: BUILD,
     player: options.player ?? (() => PLAYER),
     enabled: options.enabled ?? (() => true),
@@ -227,6 +227,22 @@ async function main(): Promise<void> {
     enabled = true;
     events.ended(true);
     check(sent.length === 1 && sent[0]!.type === 'won', 'turned on, the next event is sent');
+  }
+
+  /* ------------------------------------------------- a player's own set ----- */
+  {
+    let playerRead = false;
+    const sent: GameEvent[] = [];
+    const { game, events } = harness({
+      set: 'local:my-dungeon',
+      player: () => { playerRead = true; return PLAYER; },
+      send: (event) => { sent.push(event); },
+    });
+    join(game, heroNamed(game, 'HALK'), RESURRECT);
+    events.newGameRead();
+    events.tick();
+    events.ended(true);
+    check(sent.length === 0 && !playerRead, "a player's own set sends nothing, the statistics on, and the player id is not read");
   }
 
   /* ------------------------------------------------- the server's check ----- */

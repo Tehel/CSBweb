@@ -10,16 +10,21 @@ import type { DrawPlaythrough, StoredSaveRecord } from './SaveStore';
 
 const DB_NAME = 'csbweb-saves';
 /**
- * 4: no row's file holds 0 in all four of `GAMEBLOCK1`'s `Byte22598`, `Byte22596`,
- * `Word22594` and `Word22592`. 3: every row names a playthrough, its file's own. 2: a
- * row is a `SaveRecord`, with its data set, its playthrough and its quick flag, and its
- * bytes are a CSBWin file, which may name no playthrough. 1 had neither the three fields nor that rule, and a second
- * store for a directory handle.
+ * 5: a second store, `DATA_SETS_STORE`, the player's own data sets. 4: no row's file
+ * holds 0 in all four of `GAMEBLOCK1`'s `Byte22598`, `Byte22596`, `Word22594` and
+ * `Word22592`. 3: every row names a playthrough, its file's own. 2: a row is a
+ * `SaveRecord`, with its data set, its playthrough and its quick flag, and its bytes are
+ * a CSBWin file, which may name no playthrough. 1 had neither the three fields nor that
+ * rule, and a second store for a directory handle.
  */
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 /** The saves, one `SaveRecord` each, keyed by `id`. */
 export const SAVES_STORE = 'saves';
+/** The player's own data sets, one `LocalDataSetRecord` each, keyed by `id` (`BrowserDataSetStore`). */
+export const DATA_SETS_STORE = 'dataSets';
+/** The version that added `DATA_SETS_STORE`. */
+const DATA_SETS_VERSION = 5;
 /** Version 1's other store. */
 const HANDLES_STORE = 'handles';
 
@@ -68,6 +73,9 @@ export function openSaveDatabase(draw: DrawPlaythrough): Promise<IDBDatabase> {
             const db = request.result;
             if (event.oldVersion < 1) db.createObjectStore(SAVES_STORE, { keyPath: 'id' });
             else if (request.transaction) upgradeRows(db, request.transaction, event.oldVersion, draw);
+            if (event.oldVersion < DATA_SETS_VERSION && !db.objectStoreNames.contains(DATA_SETS_STORE)) {
+                db.createObjectStore(DATA_SETS_STORE, { keyPath: 'id' });
+            }
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error ?? new Error('IndexedDB open failed'));

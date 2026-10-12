@@ -7,13 +7,13 @@
 import { SoundManager } from './audio/SoundManager';
 import { CsbRandom } from './core/random';
 import { Position } from './core/types';
-import { CSBGraphicsLoader } from './data/CSBGraphicsLoader';
 import { extractPresetHeroes } from './data/HeroExtractor';
 import { MANIFEST_NAME, dataSetNamed, parseManifest, type DataSet, type DataSetManifest } from './data/DataSets';
+import { folderFiles, loadGameFiles, type DataSetFiles, type GameFiles } from './data/DataSetFiles';
+import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
-import { parseHcsbDat } from './data/HintOracleLoader';
-import { BrowserSaveStore, downloadSaveFile, type OpenedSave } from './data/saves';
+import { BrowserDataSetStore, BrowserSaveStore, downloadSaveFile, type OpenedSave } from './data/saves';
 import { UTILITY_PORTRAITS_FILE, UtilityPortraits } from './data/UtilityPortraits';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
@@ -30,7 +30,6 @@ import { UIMode } from './renderer/ui/UIState';
 import { runBootSequence, runHintOracle, runShowCredits } from './renderer/intro/BootSequence';
 import { Die } from './engine/Die';
 import { csbGraphicsOpener } from './engine/FileSignatures';
-import type { HintOracleFiles } from './renderer/ui/HintOracleButton';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
@@ -53,6 +52,8 @@ const GAMEFILES_DIR = 'gamefiles';
  * (`?dungeon=<id>`, `chooseDataSet`).
  */
 let dataSet!: DataSet;
+/** Where its files are read from: its folder, or a local set's record (`chooseDataSet`). */
+let setFiles!: DataSetFiles;
 /** The FTL logo's folder, the manifest's, or `null` where it names none. */
 let swooshDir: string | null = null;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -117,65 +118,16 @@ function refreshScreen() {
 }
 
 /**
- * What `init` reads from the server before anything is built. Not `dungeon.dat`: the boot
- * reads it once ENTER is chosen, as CSBWin does (`readNewGame`).
- */
-interface GameFiles {
-    graphicsLoader: GraphicsLoader;
-    /** `CSBgraphics.dat`, CSBWin's extensions' overlay, or its absence (`CSBGraphicsLoader`). */
-    csbGraphicsLoader: CSBGraphicsLoader;
-    /** The Hint Oracle's `hcsb.hct` and `hcsb.dat`, where the data set has them. */
-    hintOracle: HintOracleFiles | null;
-}
-
-async function loadGameFiles(): Promise<GameFiles> {
-    console.log(`Loading ${dataSet.name}: graphics.dat...`);
-    const graphicsLoader = new GraphicsLoader();
-    await graphicsLoader.load(`${dataSet.dir}/graphics.dat`);
-    console.log(`✓ Loaded graphics: ${graphicsLoader.getItemCount()} items`);
-
-    // A data set's file that does not load or parse throws, and the page refuses it
-    // (`reportError`).
-    const csbGraphicsLoader = new CSBGraphicsLoader();
-    if (dataSet.csbGraphics) {
-        await csbGraphicsLoader.load(`${dataSet.dir}/CSBgraphics.dat`);
-        console.log('✓ Loaded CSBgraphics.dat overlay');
-    }
-    return { graphicsLoader, csbGraphicsLoader, hintOracle: await loadHintOracle() };
-}
-
-/**
- * The Hint Oracle's two files, or `null` where the data set has none, or `hcsb.dat` does
- * not read: then the inventory's close box is CSBWin's (`src/renderer/ui/HintOracleButton.ts`).
- * `hcsb.hct` is read when the Oracle opens, under the running world's key.
- */
-async function loadHintOracle(): Promise<HintOracleFiles | null> {
-    if (!dataSet.hintOracle) return null;
-    const fetchFile = async (name: string): Promise<Uint8Array | null> => {
-        const response = await fetch(`${dataSet.dir}/${name}`).catch(() => null);
-        return response?.ok ? new Uint8Array(await response.arrayBuffer()) : null;
-    };
-    const [hct, dat] = await Promise.all([fetchFile('hcsb.hct'), fetchFile('hcsb.dat')]);
-    if (!hct || !dat) return null;
-    try {
-        return { hct, dat: parseHcsbDat(dat) };
-    } catch (error) {
-        console.warn('No Hint Oracle:', error);
-        return null;
-    }
-}
-
-/**
  * `_ReadEntireGame` for a new game (doc/CSBwin-src/SaveGame.cpp:1579-1594): the data set's
  * `dungeon.dat`, read into the running game. A file that will not open is `die(50)`
  * (`:1579-1586`), and so is one that fails its read `die(0xbad)` (`Game.readDungeonDat`).
  * The game's playthrough is then held against the store's (`GameSaves.newGameRead`).
  */
 async function readNewGame(game: Game, saves: GameSaves, events: GameEvents): Promise<void> {
-    const name = `${dataSet.dir}/dungeon.dat`;
-    const response = await fetch(name).catch(() => null);
-    if (!response?.ok) throw new Die(50, `Cannot open dungeon file '${name}'`);
-    game.readDungeonDat(new Uint8Array(await response.arrayBuffer()));
+    const name = setFiles.where('dungeon.dat');
+    const bytes = await setFiles.read('dungeon.dat');
+    if (!bytes) throw new Die(50, `Cannot open dungeon file '${name}'`);
+    game.readDungeonDat(bytes);
     console.log(`✓ Read ${name}: ${game.ctx.dungeon.getData().maps.length} levels`);
     await saves.newGameRead();
     events.newGameRead();
@@ -186,9 +138,9 @@ async function readNewGame(game: Game, saves: GameSaves, events: GameEvents): Pr
  * utility's "CAN'T FIND NEW ADVENTURE MINI.DAT" (doc/CSBwin-src/Chaos.cpp:2835-2843).
  */
 async function readMiniDat(): Promise<Uint8Array> {
-    const response = await fetch(`${dataSet.dir}/mini.dat`).catch(() => null);
-    if (!response?.ok) throw new UtilityError(UtilityDiskMessages[24]);
-    return new Uint8Array(await response.arrayBuffer());
+    const bytes = await setFiles.read('mini.dat');
+    if (!bytes) throw new UtilityError(UtilityDiskMessages[24]);
+    return bytes;
 }
 
 /**
@@ -198,10 +150,10 @@ async function readMiniDat(): Promise<Uint8Array> {
 let utilityPortraits: Promise<UtilityPortraits | null> | null = null;
 function readUtilityPortraits(): Promise<UtilityPortraits | null> {
     utilityPortraits ??= (async () => {
-        const response = await fetch(`${dataSet.dir}/${UTILITY_PORTRAITS_FILE}`).catch(() => null);
-        if (!response?.ok) return null;
+        const bytes = await setFiles.read(UTILITY_PORTRAITS_FILE);
+        if (!bytes) return null;
         const file = new GraphicsLoader();
-        file.loadFromArray(new Uint8Array(await response.arrayBuffer()));
+        file.loadFromArray(bytes);
         return new UtilityPortraits(file);
     })();
     return utilityPortraits;
@@ -627,12 +579,30 @@ async function loadManifest(): Promise<DataSetManifest> {
     return parseManifest(await response.text(), GAMEFILES_DIR);
 }
 
-/** The set `?dungeon=<id>` names, or `null` for none or an unknown one: the welcome page's. */
-function chooseDataSet(manifest: DataSetManifest): DataSet | null {
+/**
+ * The set `?dungeon=<id>` names and where its files are read from, or `null` for none or
+ * an unknown one: the welcome page's. A `local:` id is a record of the store's
+ * (`src/data/LocalDataSets.ts`), which plays its base set's `graphics.dat` where it has
+ * none; any other is the manifest's, read from its folder.
+ */
+async function chooseDataSet(manifest: DataSetManifest): Promise<{ set: DataSet; files: DataSetFiles } | null> {
     const id = new URLSearchParams(window.location.search).get('dungeon');
+    if (isLocalDataSetId(id)) {
+        const storeRandom = new CsbRandom();
+        const record = await new BrowserDataSetStore((rows) => drawPlaythrough(storeRandom, rows)).get(id!).catch((error: unknown) => {
+            console.warn(`The local data sets cannot be read: ${error instanceof Error ? error.message : String(error)}`);
+            return undefined;
+        });
+        if (!record) {
+            console.warn(`Unknown data set '${id}'`);
+            return null;
+        }
+        const base = record.baseSet === null ? null : dataSetNamed(manifest, record.baseSet);
+        return { set: localDataSet(record), files: recordFiles(record, base && folderFiles(base.dir)) };
+    }
     const set = dataSetNamed(manifest, id);
     if (id !== null && !set) console.warn(`Unknown data set '${id}'`);
-    return set;
+    return set && { set, files: folderFiles(set.dir) };
 }
 
 /**
@@ -648,11 +618,13 @@ function openWelcomePage(manifest: DataSetManifest): Promise<void> {
 async function init() {
     try {
         const manifest = await loadManifest();
-        const chosen = chooseDataSet(manifest);
+        const chosen = await chooseDataSet(manifest);
         if (!chosen) return await openWelcomePage(manifest);
-        dataSet = chosen;
+        ({ set: dataSet, files: setFiles } = chosen);
         swooshDir = manifest.swooshDir;
-        const files = await loadGameFiles();
+        console.log(`Loading ${dataSet.name}...`);
+        const files = await loadGameFiles(dataSet, setFiles);
+        console.log(`✓ Loaded graphics: ${files.graphicsLoader.getItemCount()} items${dataSet.csbGraphics ? ', and the CSBgraphics.dat overlay' : ''}`);
         // Every graphics.dat table, read once: the engine's set is built from it, and the
         // screen is handed the same object.
         const graphicsTables = extractGraphicsTables(files.graphicsLoader);

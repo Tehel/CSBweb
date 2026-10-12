@@ -50,7 +50,9 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   file imported later is left as it is, refused as CSBWin's utility refuses it.
 
   Each step runs on a store of a version before its own alone (`upgradeStoredRows`),
-  and a store at version 4 or past it is not read at all. The steps after version 2's
+  and a store at version 4 or past it is not read at all. Version 5 adds a second object
+  store to the database, `dataSets`, the player's own data sets
+  (`src/data/LocalDataSets.ts`, `BrowserDataSetStore`), and changes no row. The steps after version 2's
   keep a row they cannot read as it is: the store is a save's only copy, and a reader
   made stricter must not delete it.
   Nothing else in `src/` reads JSON. A
@@ -420,7 +422,7 @@ An unknown dungeon played from its save is `DEBT.md` G22.
 `tools/dump-save-menu.ts` drives `GameSaves` and the dialog over a store in memory; its
 sections are named below. Node has no IndexedDB, so no tool runs `BrowserSaveStore`
 itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
-`BrowserSaveStore.markUsed`.
+`BrowserSaveStore.markUsed`, nor `BrowserDataSetStore`.
 
 - **RISE**: `tools/dump-rise.ts` (the row a new adventure is stored as, again, and a
   refusal; the chooser's `rise` mode over every set's saves, its LOAD and a refusal, and

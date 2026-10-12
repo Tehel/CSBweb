@@ -145,13 +145,16 @@ core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             (LZW/RLE/SND), imageDecoder (IMG1/IMG2), md5, types, RnMaps (what an RN names:
             RN::dbType, pos, idx), intCast (sw, div, ApplyLimits), objectNameIndex
             (OBJNI_* constants)
-data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor,
+data/       DataSets (the manifest's sets), LocalDataSets (a player's own, a record of the
+            store's), DataSetFiles (a set's files read by name, from its folder or its record),
+            DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor,
             HintOracleLoader (CSB's `hcsb.hct`), SwooshLoader (the Atari disk's `swoosh.img`),
             UtilityPortraits (the CSB utility disk's faces, RISE's NEW FACE)
   saves/    The saves behind the disk icon: SaveStore (a save's row, the CSBWin file
             beside what a list needs), BrowserSaveStore (IndexedDB, the one store),
             legacyRows (the store's upgrade from its first version), downloadSaveFile
-            (the save menu's EXPORT)
+            (the save menu's EXPORT), BrowserDataSetStore (the player's own data sets, in
+            the same database)
   tables/   Runtime table extraction from graphics.dat: ObjectTables, UITables,
             ViewportTables, MonsterDesc, and GraphicsTables (all of them, read once)
 engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameHost (what

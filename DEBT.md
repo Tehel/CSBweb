@@ -29,7 +29,7 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 (`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
-from their own files to the welcome page and plays it (P1 to P5), then edits and publishes
+from their own files to the welcome page and plays it (P2 to P5), then edits and publishes
 it (P6 to P8). They are not CSBWin features but the page's, and come before every other
 tier.
 
@@ -113,11 +113,10 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P1 | The local sets' store, and a set's files read from it | M | ⏳ |
-| P2 | The welcome page: the local sets, and "+ Add my own" | S | ⏳ after P1 |
+| P2 | The welcome page: the local sets, and "+ Add my own" | S | ⏳ |
 | P3 | The form that adds a set | L | ⏳ after P2 |
 | P4 | A thumbnail generated from the data | S | ⏳ after P3 |
-| P5 | A local set's saves import | S | ⏳ after P1 |
+| P5 | A local set's saves import | S | ⏳ |
 | P6 | Editing and deleting a local set | M | ⏳ after P3 |
 | P7 | The data sets in the server's database | L | ⏳ |
 | P8 | Publishing a local set | L | ⏳ after P6, P7 |
@@ -208,7 +207,16 @@ entry here, only its commit, so take the next ID from this line and move it on.
 At the author's request, from the forum: a player adds a dungeon from their own files, plays
 it like any other, and later offers it to the site. It mirrors CSBWin, which plays whatever
 its `directory=` holds (`src/data/DataSets.ts`), so the engine does not change and nothing
-goes in H. Two phases: P1 to P5 keep a set in the player's browser, and P6 to P8 publish it.
+goes in H. Two phases: P2 to P5 keep a set in the player's browser, and P6 to P8 publish it.
+
+What stands: a local set is a record of the store's `dataSets` object store
+(`BrowserDataSetStore`, `src/data/saves/`), `LocalDataSetRecord` in
+`src/data/LocalDataSets.ts`. A `?dungeon=local:<id>` plays it (`chooseDataSet`,
+`src/main.ts`): its `DataSet` follows from its files (`localDataSet`), and the boot reads
+them by name through `recordFiles`, its base set's folder giving a `graphics.dat` it does
+not have, as a manifest set's are read through `folderFiles` (`src/data/DataSetFiles.ts`).
+It sends no statistics. `tools/dump-local-data-set.ts` plays such records against their
+manifest sets. Nothing writes a record yet but a script: P3's form is the first.
 
 Decisions taken with the author, for every row:
 
@@ -223,29 +231,7 @@ Decisions taken with the author, for every row:
   it alone, so the server never returns one, writes one in its logs or takes one in a URL's
   query. A lost id is handled by hand on the forum for now.
 
-A custom dungeon reaches what the shipped ones do not. R7 and R8 matter more once P1 is
-in.
-
-### P1 ⏳ The local sets' store, and a set's files read from it
-
-- **The store**: a `dataSets` object store in `src/data/saves/idb.ts` (`DB_VERSION` 4 to
-  5; bump it last, `.claude/memory/live-tree-is-served.md`). A record has the id, name,
-  short description, list of authors, `dmRules` (the reincarnation rule), the base set
-  when it has no `graphics.dat`, the files as Blobs by name (`dungeon.dat`, and
-  optionally `graphics.dat`, `CSBgraphics.dat`, `hcsb.hct` with `hcsb.dat`, the
-  thumbnail), its dungeon's signature (`dungeonSignature`, for P5) and its creation date.
-- **Choosing the set**: `chooseDataSet` (`src/main.ts:631`) only knows the manifest. A
-  `?dungeon=local:<id>` is read from the store first, and builds a `DataSet` whose flags
-  follow from the record: `csbGraphics` and `hintOracle` from the files present,
-  `miniDat` false (no RISE), `hidden` false.
-- **Reading the files**: `loadGameFiles`, `loadHintOracle`, `readNewGame`, `readMiniDat`
-  and `readUtilityPortraits` (`src/main.ts:131-205`) each `fetch` `${dataSet.dir}/<name>`.
-  They read through a file source instead: the folder over HTTP, or the record's Blobs.
-  `GraphicsLoader` has `loadFromArray`. `CSBGraphicsLoader` has only `load(url)`
-  (`src/data/CSBGraphicsLoader.ts:341`), which needs a load from bytes.
-- **No events**: `GameEvents` stays silent for a local set.
-- **Evidence**: a tool that builds a local set in memory from a manifest set's files,
-  plays it through the file source, and checks the world matches the manifest set's.
+A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
 
 ### P2 ⏳ The welcome page: the local sets, and "+ Add my own"
 
@@ -439,7 +425,7 @@ inventory. D17 and D18 then remove the cause, two owners of the same state.
 
 ### R3 ⏳ After a fatal error the page still saves
 
-`reportError` (`src/main.ts:651`) stops the game and puts up the message, and nothing
+`reportError` (`src/main.ts:677`) stops the game and puts up the message, and nothing
 else. `GameInput` still takes the keys (its `ended()` is `mainLoopHasReturned()`, which
 `stop` does not set, `src/renderer/GameInput.ts:74-76`), `quickSave` does not ask whether
 the game runs (`src/engine/GameSaves.ts:510-531`). So F5 after a VBL that threw writes the
@@ -465,10 +451,10 @@ awaits.
 
 ### R5 ⏳ Another tab holds the store: the new build hangs at ENTER
 
-`openSaveDatabase` (`src/data/saves/idb.ts:59-81`) sets no `onblocked`, and no connection
+`openSaveDatabase` (`src/data/saves/idb.ts:64-87`) sets no `onblocked`, and no connection
 closes on `versionchange`. An open tab of the build before a `DB_VERSION` bump keeps its
 connection, so a new tab's open never settles: ENTER awaits `readNewGame`, which awaits
-`saves.newGameRead()` and `list()` (`src/main.ts:172-180`), and the game never starts; F5,
+`saves.newGameRead()` and `list()` (`src/main.ts:126-134`), and the game never starts; F5,
 F9 and the disk menu wait for ever. Two more gaps in the store:
 
 - nothing asks `navigator.storage.persist()`, so the browser may evict the only copy of
@@ -532,11 +518,11 @@ with `npm test -- --frames`.
 
 ### R8 ⏳ An optional feature's failure ends the game, or the session
 
-- **The Hint Oracle** runs with `.catch(reportError)` (`src/main.ts:423`), so any error in
+- **The Hint Oracle** runs with `.catch(reportError)` (`src/main.ts:379`), so any error in
   it ends the game with whatever was not saved. `readHintOracle` throws for a world whose
   `hintKey` does not decipher `hcsb.hct`, such as an imported save of a modified CSB.
 - **RISE's NEW FACE**: `utilityPortraits ??=` caches a promise that rejects when
-  `arrayBuffer()` or the parse fails (`src/main.ts:198-204`), and `refreshSaveMenu`'s
+  `arrayBuffer()` or the parse fails (`src/main.ts:151-158`), and `refreshSaveMenu`'s
   `await ui.onHasNewFaces()` then throws into the catch that empties the list
   (`src/renderer/ui/SaveMenu.ts:504-509`): RISE lists nothing until a reload.
 
@@ -546,7 +532,7 @@ Paying it: the Oracle closes on its own error with a line in the message area, a
 ### R10 ⏳ Pointer, touch and WebGL
 
 - **Touch screens likely stay silent.** Audio is unlocked on the canvas's first
-  `pointerdown`, once (`src/main.ts:212-220`), which is a user activation for a mouse and
+  `pointerdown`, once (`src/main.ts:166-178`), which is a user activation for a mouse and
   not for a touch: `resume()` fails, the listener is gone, and only the settings'
   SOUND brings the sound back.
 - **A lost WebGL context keeps the curve.** On `webglcontextlost` the tube is hidden but
@@ -697,7 +683,7 @@ New state-representation debt goes here, and jumps the queue.
 `Party.setState` builds a new object (`src/engine/Party.ts:118-126`), and the screen keeps
 its own reference, `ui.partyState` (`src/renderer/ui/UIState.ts:73`, about 125 uses), set
 again only by `GameScreen.setPartyState` from `renderView` and `refreshScreen`
-(`src/main.ts:106`, `:113`). Whatever runs between a read and the next of those reads the old
+(`src/main.ts:108`, `:115`). Whatever runs between a read and the next of those reads the old
 party (R1), and "another game" is detected by the object changing (`setPartyState`'s
 `state !== this.ui.partyState`). The freeze has two owners the same way:
 `GameScreen.isFrozen()` reads `ui.uiMode`, `Game.isFrozen()` reads `ctx.loop.gameFrozen`.
@@ -714,7 +700,7 @@ CSBWin's interface state is `d.`: the open chest and its contents, the attack me
 (`src/renderer/ui/UIState.ts:202-242`), and the engine reads them back through `GameHost`
 queries (`pressingEye`, `pressingMouth`, `displayResurrectChestOrScroll`,
 `attackingCharacterOrdinal`, `src/engine/GameHost.ts:47-198`, answered as
-`screen?.…() ?? 0` in `src/main.ts:285-288`), beside calls into the UI named by CSBWin
+`screen?.…() ?? 0` in `src/main.ts:239-242`), beside calls into the UI named by CSBWin
 address (`tag02076e`, `tag0207cc`, `tag01b29a`, `tag011366`). So:
 
 - **Composing the screen opens and repacks chests.** `presentViewport` runs
@@ -1048,7 +1034,7 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:208-223`).
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
   `refreshScreen`'s `setPartyState` and its `mainLoopHasReturned()` test
-  (`GameScreen.ts:775-781`, `src/main.ts:111-115`), so a chew still running when the game ends
+  (`GameScreen.ts:775-781`, `src/main.ts:114-118`), so a chew still running when the game ends
   draws the adventure over the credits' wait; `initializePlayState` cancels neither loop.
 - The CRT uploads the canvas and runs its shader at device pixels at every display frame,
   changed or not: about 2.3 million pixels a frame at a device ratio of 2, up to 120 times a

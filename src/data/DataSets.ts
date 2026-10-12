@@ -33,7 +33,10 @@ export interface DataSet {
     /** The page's `?dungeon=` value. */
     id: string;
     name: string;
-    /** The folder that holds the files: the manifest's `dir`, under the manifest's folder. */
+    /**
+     * The folder that holds the files: the manifest's `dir`, under the manifest's folder.
+     * A local set has none, and `''` here (`src/data/LocalDataSets.ts`).
+     */
     dir: string;
     /**
      * Whether the folder holds a `CSBgraphics.dat`, CSBWin's extensions' overlay, which it
@@ -92,6 +95,13 @@ export interface DataSetManifest {
     swooshDir: string | null;
 }
 
+/**
+ * The prefix of a player's own set's id (`src/data/LocalDataSets.ts`), which no manifest
+ * set's may have. Here and not there: the server parses manifests, and reads nothing else
+ * of the page's.
+ */
+export const LOCAL_DATA_SET_PREFIX = 'local:';
+
 /** The manifest's name, in the folder that holds the sets. */
 export const MANIFEST_NAME = 'manifest.json';
 
@@ -119,6 +129,7 @@ export function parseManifest(text: string, base: string): DataSetManifest {
         if (!isRecord(entry)) throw manifestError(`${where} is not an object`);
         const { id, name } = entry;
         if (!isText(id)) throw manifestError(`${where} has no "id"`);
+        if (id.startsWith(LOCAL_DATA_SET_PREFIX)) throw manifestError(`data set '${id}' has an id of a player's own set`);
         if (!isText(name)) throw manifestError(`data set '${id}' has no "name"`);
         const dir = entry.dir === undefined ? id : entry.dir;
         if (!isFolder(dir)) throw manifestError(`data set '${id}' has no "dir", a folder relative to the manifest`);

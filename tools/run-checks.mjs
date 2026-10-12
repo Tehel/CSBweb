@@ -244,6 +244,9 @@ const CHECKS = [
   // The page's data sets: each loads, builds its own tables, and stands a Game up, and
   // CSB's long 0x231 carries CSBWin's four prison-door buttons (the canary).
   { tool: 'dump-data-sets.ts' },
+  // A player's own set, built from a manifest set's files and read through its record:
+  // the same files, the same game, tick for tick; its flags from its files; its prefix.
+  { tool: 'dump-local-data-set.ts' },
   { tool: 'dump-build.ts' },
   // The deployed server: its start-up check, caching, preconditions, refused paths, the
   // statistics' API, and server.ts itself, run as Node runs it, stopped by SIGTERM.
@@ -251,7 +254,8 @@ const CHECKS = [
   // The statistics: what api/event accepts and rebuilds, the SQLite store, its aggregates.
   { tool: 'dump-stats.ts' },
   // The statistics' events the page sends: a new game's first tick, the Hall's joins by
-  // name and charID, a won game's masteries, a lost game's square, all as the server takes them.
+  // name and charID, a won game's masteries, a lost game's square, all as the server takes
+  // them; none for a player's own set.
   { tool: 'dump-game-events.ts' },
   // A dungeon.dat behind an Extended Features block, the DM Windows package's: read in the
   // block's shape it is DM's dungeon converted, and a new game takes the block's rules.
