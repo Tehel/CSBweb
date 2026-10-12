@@ -91,7 +91,10 @@
  * once, selected, and the dialog says "SAVE IMPORTED"; nothing is loaded. One that is
  * most of that dungeon and not the whole is asked about first, in `_DoMenu`'s two-option
  * menu in the dialog's place: "THIS LOOKS LIKE A SAVE FROM A MODIFIED VERSION OF" over
- * the dungeon's name, with CONFIRM and CANCEL (`importMenu`). A save of another dungeon,
+ * the dungeon's name, with CONFIRM and CANCEL (`importMenu`). In a player's own set, a save
+ * that is not the whole of its dungeon is asked about in the same way, whatever dungeon it
+ * is: "THE WALL MAP OF THIS SAVE DOES NOT FULLY MATCH THE DUNGEON", "IMPORT IT ANYWAY?",
+ * so that its author keeps their saves while they build it. A save of another dungeon,
  * or of none the port knows, is refused in `_DoMenu`'s one-option menu, under OK, with
  * the dungeon named and whether a data set plays it. A file with no `GAMEBLOCK1` is the
  * dialog's message "NOT A SAVED GAME", and one that has it and does not read past it
@@ -285,6 +288,9 @@ export const SAVE_MENU_IMPORTED = 'SAVE IMPORTED';
 
 /** The question about a dropped save of a modified dungeon, over the dungeon's name. */
 export const SAVE_MENU_MODIFIED = 'THIS LOOKS LIKE A SAVE FROM A MODIFIED VERSION OF';
+/** The question about a dropped save that is not wholly a local set's dungeon, over `SAVE_MENU_ANYWAY`. */
+export const SAVE_MENU_MISMATCH = 'THE WALL MAP OF THIS SAVE DOES NOT FULLY MATCH THE DUNGEON';
+export const SAVE_MENU_ANYWAY = 'IMPORT IT ANYWAY?';
 const CONFIRM_LABEL = 'CONFIRM';
 const OK_LABEL = 'OK';
 
@@ -293,14 +299,17 @@ export type ImportRefusal = Exclude<ImportResult, { kind: 'stored' }>;
 
 /**
  * The menu about a dropped file that was not stored, `_DoMenu`'s: the question for a
- * save of a modified version of the data set's dungeon, whose first option stores it, or
- * the refusal of another dungeon's save, which names the dungeon and says whether a data
- * set plays it, and of an unknown one's, under one option.
+ * save of a modified version of the data set's dungeon, or for one that is not wholly a
+ * local set's, whose first option stores it (`importAsks`); or the refusal of another
+ * dungeon's save, which names the dungeon and says whether a data set plays it, and of an
+ * unknown one's, under one option.
  */
 export function importMenu(refusal: ImportRefusal): { title1: string; title2: string | null; options: string[] } {
   switch (refusal.kind) {
     case 'modified':
       return { title1: SAVE_MENU_MODIFIED, title2: refusal.dungeon.name.toUpperCase(), options: [CONFIRM_LABEL, CANCEL_LABEL] };
+    case 'mismatch':
+      return { title1: SAVE_MENU_MISMATCH, title2: SAVE_MENU_ANYWAY, options: [CONFIRM_LABEL, CANCEL_LABEL] };
     case 'other':
       return {
         title1: `THIS LOOKS LIKE A SAVE OF ${refusal.dungeon.name.toUpperCase()}`,
@@ -310,6 +319,11 @@ export function importMenu(refusal: ImportRefusal): { title1: string; title2: st
     case 'unknown':
       return { title1: 'THIS IS A SAVE OF AN UNKNOWN DUNGEON', title2: 'NOT SUPPORTED YET', options: [OK_LABEL] };
   }
+}
+
+/** Whether `refusal`'s menu is a question, whose CONFIRM stores the file. */
+export function importAsks(refusal: ImportRefusal): boolean {
+  return refusal.kind === 'modified' || refusal.kind === 'mismatch';
 }
 
 /** The prison's question (`askBeginAdventure`), and its two options. */
@@ -963,7 +977,7 @@ function answerDropped(ui: UIState, state: SaveMenuState, dropped: NonNullable<S
   if (choice < 1 || choice > options) return;
   beginPress(ui, state, menuButtonList(ui, options, true), 209 + choice, () => {
     state.dropped = null;
-    if (dropped.refusal.kind === 'modified' && choice === 1) void runImport(ui, dropped.file, true);
+    if (importAsks(dropped.refusal) && choice === 1) void runImport(ui, dropped.file, true);
     else ui.renderLastFrame();
   });
 }

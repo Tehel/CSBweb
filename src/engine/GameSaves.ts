@@ -348,13 +348,14 @@ export class GameSaves {
      *
      * The file names no dungeon but holds one, and its walls are held against the known
      * dungeons' (`checkDungeon` over the signature of the file's world, `doc/SAVES.md`
-     * → "An import is checked against the dungeon"), a local set's against its own first
+     * → "An import is checked against the dungeon"), a local set's against its own alone
      * (`DataSet.dungeonSignature`):
      *
      * - the data set's own dungeon, whole: stored;
-     * - most of the data set's own and not the whole, a modified version of it: stored
-     *   only once the player has `confirmed` it, and then marked `unofficial`;
-     * - another dungeon's, or an unknown one's: never stored.
+     * - most of the data set's own and not the whole, a modified version of it, or in a
+     *   local set anything but the whole of its own, a mismatch: stored only once the
+     *   player has `confirmed` it, and then marked `unofficial`;
+     * - in a manifest set, another dungeon's, or an unknown one's: never stored.
      *
      * What is not stored comes back as the check, for the dialog to say. A file with no
      * `GAMEBLOCK1` is no save at all, and throws a `SaveFileError` that says so; one whose
@@ -390,7 +391,7 @@ export class GameSaves {
         const own = set.dungeonSignature ? { name: set.name, dataSets: [set.id], signature: set.dungeonSignature } : null;
         const check = checkDungeon(signature, set.id, KNOWN_DUNGEONS, own);
         if (check.kind === 'other' || check.kind === 'unknown') return check;
-        if (check.kind === 'modified' && !confirmed) return check;
+        if ((check.kind === 'modified' || check.kind === 'mismatch') && !confirmed) return check;
 
         await this.marked;
         const rows = await this.store.list(null);
@@ -399,7 +400,7 @@ export class GameSaves {
         const entry: SaveEntry = {
             id: name, name, dataSet: this.dataSet.id, quick: false, sleep: false,
             savedAt: file.modifiedAt ?? now, usedAt: now, playTime: 0,
-            unofficial: check.kind === 'modified', ...fields,
+            unofficial: check.kind !== 'own', ...fields,
         };
         let { bytes } = file;
         if (entry.playthrough === 0) {

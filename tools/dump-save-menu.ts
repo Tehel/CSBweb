@@ -84,8 +84,9 @@
  *    modified dungeon stored only once confirmed, as an unofficial row, which the saves
  *    of a game read from it are too; another dungeon's, an unknown one's, a file with no
  *    `GAMEBLOCK1` ("NOT A SAVED GAME") and a save that does not read past it ("SAVED
- *    GAME DAMAGED!") never stored. A player's own set that holds Dungeon Master's
- *    dungeon takes its saves, checked against its record's signature first.
+ *    GAME DAMAGED!") never stored. A player's own set is checked against its record's
+ *    signature alone: one that holds Dungeon Master's dungeon takes its saves, and any
+ *    other save it takes once confirmed.
  * 19. **The drop.** A file dropped on the dialog, by the menu's own entry and clicks: a
  *    save of the dungeon listed and selected with nothing loaded; a modified dungeon's
  *    asked about in `_DoMenu`'s two-option menu and stored on CONFIRM alone; another
@@ -139,6 +140,7 @@ import {
 import { ROWS_UPGRADED_VERSION, stampBlock1Rows, stampSaveRecords, upgradeSaveRecords, upgradeStoredRows } from '../src/data/saves/legacyRows';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { dungeonSignature, KNOWN_DUNGEONS } from '../src/data/DungeonSignature';
+import type { DataSet } from '../src/data/DataSets';
 import { localDataSet } from '../src/data/LocalDataSets';
 import { Game } from '../src/engine/Game';
 import type { GameHost, MessageSink } from '../src/engine/GameHost';
@@ -1351,10 +1353,11 @@ const RIGHT = 1;
 async function menuRig(
   graphics: GraphicsLoader, store: SaveStore, champion: string,
   hooks: Partial<Pick<UIState, 'onHasNewFaces' | 'onMakeNewAdventure'>> = {},
+  dataSet: DataSet = DEFAULT_DATA_SET,
 ) {
   const game = await loadGame();
   game.systems.hallOfChampions.addChampion(healthyChampion(champion));
-  const saves = new GameSaves(game, DEFAULT_DATA_SET, store, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
+  const saves = new GameSaves(game, dataSet, store, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
   let drawsWithNoMenu = 0;
   const exported: { name: string; bytes: Uint8Array }[] = [];
   const ui: UIState = newUIState(graphics, game.ctx, {
@@ -2927,7 +2930,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
       'each game lists its own set\'s');
     now += 60_000;
 
-    // A player's own set that holds Dungeon Master's dungeon: its record's signature first.
+    // A player's own set that holds Dungeon Master's dungeon: its record's signature alone.
     const record = { id: 'local:mine', name: 'My own', description: '', authors: [], dmRules: false, baseSet: 'dm-atari',
       files: {}, dungeonSignature: await dungeonSignature(loadCsbwinWorld(genuine).dungeon), createdAt: 0 };
     const localSaves = new GameSaves(game, localDataSet(record), store, screen, log, new CsbRandom(SEED));
@@ -2936,13 +2939,19 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
     check(inLocal.kind === 'stored' && inLocal.entry.dataSet === 'local:mine' && !inLocal.entry.unofficial
       && (await localSaves.list()).length === 1,
       'in a local set that holds Dungeon Master\'s dungeon, a save of it is the set\'s own, a row of that set');
-    const modifiedInLocal = await localSaves.importSave({ name: 'modified.dat', bytes: modified });
-    const csbInLocal = await localSaves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }, true);
-    console.log(`  a modified save, in it: ${refusal(modifiedInLocal)}; a save of Chaos Strikes Back: ${refusal(csbInLocal)}`);
-    check(modifiedInLocal.kind === 'modified' && modifiedInLocal.dungeon.name === 'My own' && modifiedInLocal.dungeon.dataSets.join() === 'local:mine',
-      'part of it is a modified version of the local set\'s, named as the set');
-    check(csbInLocal.kind === 'other' && csbInLocal.dungeon.name === 'Chaos Strikes Back' && (await localSaves.list()).length === 1,
-      'and a save of a dungeon it holds no level of is the catalogue\'s to name, and not stored');
+    const asks = [
+      await localSaves.importSave({ name: 'modified.dat', bytes: modified }),
+      await localSaves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }),
+      await localSaves.importSave({ name: 'unknown.dat', bytes: unknown }),
+    ];
+    console.log(`  in it, a modified save, a save of Chaos Strikes Back and an unknown one: ${asks.map(refusal).join('; ')}`);
+    check(asks.every((result) => result.kind === 'mismatch' && result.dungeon.name === 'My own' && result.dungeon.dataSets.join() === 'local:mine')
+      && (await localSaves.list()).length === 1,
+      'in it, a save that is not the whole of its dungeon is a mismatch, whatever dungeon it is, and is not stored unconfirmed');
+    const forced = await localSaves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }, true);
+    if (forced.kind === 'stored') show('a save of Chaos Strikes Back, confirmed in it', forced.entry);
+    check(forced.kind === 'stored' && forced.entry.dataSet === 'local:mine' && forced.entry.unofficial && same(store.files.get(forced.entry.id), csb),
+      'confirmed, it is stored all the same, a row of the local set, unofficial');
   } finally {
     Date.now = realNow;
   }
@@ -2966,12 +2975,12 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
   const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));
   const rowsOf = async (): Promise<string> => JSON.stringify(await store.list(null));
   /** Whether the screen is `_DoMenu`'s centred menu of these titles and options, on the cleared screen. */
-  const isMenu = (title1: string, title2: string | null, options: string[]): boolean => {
-    SaveMenu.drawSaveMenu(ui);
-    const drawn = ui.screenIndexBuffer!.pixels.slice();
-    ui.screenIndexBuffer!.pixels.fill(0);
-    doMenu(ui, title1, title2, options, true);
-    return drawn.every((p, i) => p === ui.screenIndexBuffer!.pixels[i]);
+  const isMenu = (title1: string, title2: string | null, options: string[], on: UIState = ui): boolean => {
+    SaveMenu.drawSaveMenu(on);
+    const drawn = on.screenIndexBuffer!.pixels.slice();
+    on.screenIndexBuffer!.pixels.fill(0);
+    doMenu(on, title1, title2, options, true);
+    return drawn.every((p, i) => p === on.screenIndexBuffer!.pixels[i]);
   };
   /** The lines `_DoMenu` draws a menu's titles as. */
   const linesOf = (menu: { title1: string; title2: string | null }): string[] =>
@@ -2979,10 +2988,11 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
 
   // Every menu a known dungeon can bring up fits the title panel.
   for (const dungeon of KNOWN_DUNGEONS) {
-    const menus = [SaveMenu.importMenu({ kind: 'modified', dungeon }), SaveMenu.importMenu({ kind: 'other', dungeon })];
+    const menus = [SaveMenu.importMenu({ kind: 'modified', dungeon }), SaveMenu.importMenu({ kind: 'other', dungeon }),
+      SaveMenu.importMenu({ kind: 'mismatch', dungeon })];
     for (const menu of menus) console.log(`  ${dungeon.name}: ${linesOf(menu).join(' / ')}  [${menu.options.join(', ')}]`);
     check(menus.every((menu) => linesOf(menu).length <= 4 && linesOf(menu).every((line) => line.length > 0 && line.length <= TITLE_MAX_CHARS)),
-      `${dungeon.name}: both its menus are four lines at most, none wider than the title panel`);
+      `${dungeon.name}: its menus are four lines at most, none wider than the title panel`);
   }
   const unknownMenu = SaveMenu.importMenu({ kind: 'unknown' });
   console.log(`  an unknown dungeon: ${linesOf(unknownMenu).join(' / ')}  [${unknownMenu.options.join(', ')}]`);
@@ -3084,6 +3094,24 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
     const duringPress = await daroo.drop('CSBGAME7.DAT', genuine);
     check(pressing && !duringPress && (await rowsOf()) === held, 'a drop while a button is pressed is not taken');
     SaveMenu.closeSaveMenu(ui);
+
+    // A player's own set, which holds Dungeon Master's dungeon: a save of another is asked
+    // about, never refused, and CONFIRM stores it.
+    const record = { id: 'local:mine', name: 'My own', description: '', authors: [], dmRules: false, baseSet: 'dm-atari',
+      files: {}, dungeonSignature: await dungeonSignature(loadCsbwinWorld(genuine).dungeon), createdAt: 0 };
+    const builder = await menuRig(graphics, store, 'HALK', {}, localDataSet(record));
+    const inLocal = await builder.open();
+    await builder.drop('CSBGAME2.DAT', read(CSB_SAVE));
+    console.log(`  a Chaos Strikes Back save dropped in a local set: ${inLocal.dropped ? `asks (${inLocal.dropped.refusal.kind})` : 'NO QUESTION'}`);
+    check(inLocal.dropped?.refusal.kind === 'mismatch' && (await rowsOf()) === held
+      && isMenu(SaveMenu.SAVE_MENU_MISMATCH, SaveMenu.SAVE_MENU_ANYWAY, ['CONFIRM', 'CANCEL'], builder.ui),
+      `in a local set, a save that is not wholly its dungeon is asked about: "${SaveMenu.SAVE_MENU_MISMATCH}", "${SaveMenu.SAVE_MENU_ANYWAY}", CONFIRM, CANCEL`);
+    await builder.click(210, 2);
+    const forced = (await store.list('local:mine')).find((row) => row.id === 'CSBGAME2.DAT');
+    check(inLocal.dropped === null && inLocal.message === SaveMenu.SAVE_MENU_IMPORTED && forced?.unofficial === true
+      && SaveMenu.selectedEntry(inLocal)?.id === 'CSBGAME2.DAT',
+      'CONFIRM stores it, a row of the local set, unofficial, listed and selected');
+    SaveMenu.closeSaveMenu(builder.ui);
 
     // The load-only chooser takes a drop as the disk menu does.
     const leyla = await menuRig(graphics, store, 'LEYLA');

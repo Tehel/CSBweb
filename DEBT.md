@@ -211,9 +211,10 @@ What stands: a local set is a record of the store's `dataSets` object store
 `src/main.ts`): its `DataSet` follows from its files (`localDataSet`), and the boot reads
 them by name through `recordFiles`, its base set's folder giving a `graphics.dat` it does
 not have, as a manifest set's are read through `folderFiles` (`src/data/DataSetFiles.ts`).
-It sends no statistics. A save imported into it is checked against its record's
-`dungeonSignature` before the known dungeons (`DataSet.dungeonSignature`, `checkDungeon`):
-any level of it makes the save the set's. `tools/dump-local-data-set.ts` plays such
+It sends no statistics. It refuses no imported save: one whose walls are not all its
+record's `dungeonSignature` is asked about and stored on CONFIRM (`DataSet.dungeonSignature`,
+`checkDungeon`, `doc/SAVES.md` → "A player's own set refuses no save"), so that a set
+being built keeps its saves as its walls move. `tools/dump-local-data-set.ts` plays such
 records against their manifest sets. The welcome page (`src/ui/welcomePage.ts`) shows the local sets beside the
 manifest's, under the same order, a record's thumbnail as its tile's picture, and counts
 their saves; its last tile, "+ Add my own", opens the form that adds a set
@@ -257,7 +258,9 @@ A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more 
 
 The form reopens on a record. Every file but `dungeon.dat` can be removed, any file can
 be replaced, and the text fields and options can be changed. The id stays: saves are
-filed under it.
+filed under it. A new `dungeon.dat` gives the record its signature: the saves already
+stored stay, and load as before, since each holds its own world; an import is then
+checked against the new one.
 
 Deleting a set deletes its saves too. When the set has any, the confirmation says so:
 it gives how many will be deleted and suggests exporting them first (the save menu's

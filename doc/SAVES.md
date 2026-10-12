@@ -166,11 +166,7 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   dungeon it looks like, and the row is marked unofficial (`SaveEntry.unofficial`),
   as are the saves of a game read from such a row; nothing reads the mark yet.
   Cancelled, nothing is stored. So "switch to it" never names
-  the dungeon a save is refused in (`checkDungeon`). **A player's own set is checked
-  against its own dungeon first**, its record's signature (`DataSet.dungeonSignature`):
-  the whole of it is the set's own, part of it a modified version of it, named as the
-  set; with no level of it, the catalogue decides. So a local set that holds a known
-  dungeon, DM's `dungeon.dat` with other graphics, takes that dungeon's saves. That takes a catalogue of
+  the dungeon a save is refused in (`checkDungeon`). That takes a catalogue of
   known dungeons' signatures (`KNOWN_DUNGEONS`), each with the data sets that play it,
   which may list dungeons the port cannot play: so the digests are committed, not read
   from the page's files, and a tool holds each to the file here. It lists seven: Dungeon
@@ -179,6 +175,17 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   Towers of Chaos 3.3. A dungeon is added from what
   `tools/dump-dungeon-signature.ts` prints when given its file: the digests as the
   catalogue lists them.
+- **A player's own set refuses no save**, the author's decision: such a set is mostly a
+  dungeon being built and tested, whose walls move between versions, and its author
+  keeps their saves across them. It is checked against its own dungeon alone, its
+  record's signature (`DataSet.dungeonSignature`), and not the catalogue. The whole of
+  it is the set's own, and stored. Anything else, a few walls moved or another dungeon
+  entirely, is a `mismatch`, asked about in the same two-option menu: "THE WALL MAP OF
+  THIS SAVE DOES NOT FULLY MATCH THE DUNGEON", "IMPORT IT ANYWAY?", over CONFIRM and
+  CANCEL. Confirmed, it is stored as a row of the set, unofficial. So a local set that
+  holds a known dungeon, DM's `dungeon.dat` with other graphics, takes that dungeon's
+  saves at once. A save, once stored, holds its own world and loads whatever the set's
+  `dungeon.dat` has become since.
 - **Play time is the player's**: wall-clock time in the game, the frozen game and the
   open dialog left out. The file's `d.Time` is not it (sleep runs it fast). The game
   counts it in VBLs, sixty a second (`Game.playTime`, `src/engine/Game.ts`): the wall
