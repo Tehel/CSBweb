@@ -11,7 +11,9 @@
  *
  * Also: the id's prefix, which no manifest set may take; a set's flags from its files;
  * a record missing a file; and the form's check (`checkLocalDataSet`): the record it
- * writes is the one played here, and it refuses what the boot would die of, file by file. Node has no IndexedDB, so the store itself
+ * writes is the one played here, and it refuses what the boot would die of, file by file;
+ * and what it shows the dungeon holds (`dungeonCensus`), every record in use counted
+ * once, through a square's chain, a monster's possessions or a container. Node has no IndexedDB, so the store itself
  * (`BrowserDataSetStore`) is not run here.
  *
  *   npx tsx tools/dump-local-data-set.ts
@@ -31,6 +33,8 @@ import {
   checkLocalDataSet, isLocalDataSetId, localDataSet, recordFiles,
   type LocalDataSetDraft, type LocalDataSetFile, type LocalDataSetRecord,
 } from '../src/data/LocalDataSets';
+import type { DungeonData } from '../src/data/dungeonTypes';
+import { dungeonCensus, ITEM_KINDS, operationsUsed, type DungeonCensus } from '../src/engine/DungeonCensus';
 import type { Game } from '../src/engine/Game';
 import { csbGraphicsOpener } from '../src/engine/FileSignatures';
 import { check, finish } from './lib/check';
@@ -261,6 +265,54 @@ async function checkForm(): Promise<void> {
     'a file that is not an image is no thumbnail');
 }
 
+/** `census` on one line: levels, items by kind, monsters, DSAs. */
+function censusLine(census: DungeonCensus): string {
+  const { dsa } = census;
+  return `${census.maps} maps on ${census.levels} levels; ${ITEM_KINDS.map((kind) => `${kind} ${census.items[kind]}`).join(', ')}; `
+    + `${census.monsters} monsters in ${census.groups} groups of ${census.monsterTypes} types; `
+    + `${dsa.dsas} DSAs, ${dsa.programs} programs, ${dsa.undecoded} undecoded, ${operationsUsed(dsa).length} operations`;
+}
+
+/**
+ * The records of `data`'s item and monster databases whose link is not `RNnul`: a free
+ * slot's is (`DeleteDBEntry`), so these are the records the dungeon uses, counted without
+ * walking a chain.
+ */
+function inUse(data: DungeonData): string {
+  const { databases: db } = data;
+  const used = (records: { nextObject: number }[]): number => records.filter((record) => record.nextObject !== 0xffff).length;
+  return [db.weapons, db.clothing, db.scrolls, db.potions, db.containers, db.misc, db.creatures].map((d) => used(d.records)).join();
+}
+
+async function checkCensus(): Promise<void> {
+  console.log('=== what the dungeon holds ===');
+  const expected: Record<string, string> = {
+    'dm-atari': '14 maps on 14 levels; weapons 106, clothing 121, scrolls 34, potions 55, containers 12, misc 278; '
+      + '303 monsters in 182 groups of 25 types; 0 DSAs, 0 programs, 0 undecoded, 0 operations',
+    'conflux-3.5': '64 maps on 64 levels; weapons 478, clothing 310, scrolls 405, potions 621, containers 160, misc 1615; '
+      + '2289 monsters in 1252 groups of 27 types; 131 DSAs, 4646 programs, 0 undecoded, 118 operations',
+    'kids-dungeon': '3 maps on 3 levels; weapons 37, clothing 46, scrolls 3, potions 25, containers 3, misc 44; '
+      + '4 monsters in 4 groups of 2 types; 0 DSAs, 0 programs, 0 undecoded, 0 operations',
+  };
+  for (const [set, line] of Object.entries(expected)) {
+    const data = new DungeonLoader().loadDungeonDat((await diskFiles(dataSetNamed(set)).read('dungeon.dat'))!);
+    const census = dungeonCensus(data);
+    console.log(`  ${set}: ${censusLine(census)}`);
+    check(censusLine(census) === line, `${set}'s census`);
+    check(inUse(data) === [...ITEM_KINDS.map((kind) => census.items[kind]), census.groups].join(),
+      `${set}: every item and monster record in use is reached once, and nothing else`);
+  }
+  const dm = dataSetNamed('dm-atari');
+  const good = await draftOf(dm, 'mine', ['dungeon.dat']);
+  const taken = await checkLocalDataSet(good, new Set(['local:mine']), base, CREATED);
+  check(taken.record === null && taken.census !== null && censusLine(taken.census) === expected['dm-atari'],
+    'the form shows what a dungeon.dat holds wherever it reads, whatever else is wrong');
+  const unread = await checkLocalDataSet({ ...good, files: { 'dungeon.dat': (await draftOf(dm, 'x', ['graphics.dat'])).files['graphics.dat']! } },
+    new Set(), base, CREATED);
+  check(unread.census === null && (await checkLocalDataSet({ ...good, files: {} }, new Set(), base, CREATED)).census === null,
+    'and nothing where it does not read, or is not given');
+}
+
 async function main(): Promise<void> {
   console.log('=== the id ===');
   check(isLocalDataSetId('local:mine') && !isLocalDataSetId('dm-atari') && !isLocalDataSetId(null) && !isLocalDataSetId('LOCAL:mine'),
@@ -296,6 +348,7 @@ async function main(): Promise<void> {
   const withThumbnail = { ...bare, files: { ...bare.files, thumbnail: blobOf(new Uint8Array([0x89, 0x50, 0x4e, 0x47])) } };
   check(await recordFiles(withThumbnail, diskFiles(dm)).read('thumbnail') === null, 'the thumbnail is not one of the game\'s files');
   await checkForm();
+  await checkCensus();
   finish();
 }
 

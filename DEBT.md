@@ -29,7 +29,7 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 (`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
-from their own files to the welcome page and plays it (P3 to P5), then edits and publishes
+from their own files to the welcome page and plays it (P4 and P5), then edits and publishes
 it (P6 to P8). They are not CSBWin features but the page's, and come before every other
 tier.
 
@@ -113,10 +113,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P3 | The form that adds a set | L | ⚠️ step 2 of 2 next |
-| P4 | A thumbnail generated from the data | S | ⏳ after P3 |
+| P4 | A thumbnail generated from the data | S | ⏳ |
 | P5 | A local set's saves import | S | ⏳ |
-| P6 | Editing and deleting a local set | M | ⏳ after P3 |
+| P6 | Editing and deleting a local set | M | ⏳ |
 | P7 | The data sets in the server's database | L | ⏳ |
 | P8 | Publishing a local set | L | ⏳ after P6, P7 |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
@@ -206,7 +205,7 @@ entry here, only its commit, so take the next ID from this line and move it on.
 At the author's request, from the forum: a player adds a dungeon from their own files, plays
 it like any other, and later offers it to the site. It mirrors CSBWin, which plays whatever
 its `directory=` holds (`src/data/DataSets.ts`), so the engine does not change and nothing
-goes in H. Two phases: P3 to P5 keep a set in the player's browser, and P6 to P8 publish it.
+goes in H. Two phases: up to P5 a set is kept in the player's browser, and P6 to P8 publish it.
 
 What stands: a local set is a record of the store's `dataSets` object store
 (`BrowserDataSetStore`, `src/data/saves/`), `LocalDataSetRecord` in
@@ -217,8 +216,24 @@ not have, as a manifest set's are read through `folderFiles` (`src/data/DataSetF
 It sends no statistics. `tools/dump-local-data-set.ts` plays such records against their
 manifest sets. The welcome page (`src/ui/welcomePage.ts`) shows the local sets beside the
 manifest's, under the same order, a record's thumbnail as its tile's picture, and counts
-their saves; its last tile, "+ Add my own", opens P3's form, which checks the files as
-the boot will read them and writes the record (`src/ui/addDataSetForm.ts`).
+their saves; its last tile, "+ Add my own", opens the form that adds a set
+(`src/ui/addDataSetForm.ts`), a modal dialog on one screen. On its left, what the player
+gives: the name, the id (made from the name until the player writes one), a description,
+the authors, the reincarnation rule, DM's or CSB's graphics for a set without a
+`graphics.dat`, and one area that takes the files, dropped or picked, each going where its
+name says. On its right, the checklist of the name, the id and the six files, crossed or
+checked, a removable file on its row; under it, what the dungeon holds once its
+`dungeon.dat` reads (`dungeonCensus`, `src/engine/DungeonCensus.ts`, whose DSA half
+`tools/dump-dsa-census.ts` checks); and CANCEL and CONFIRM. `checkLocalDataSet` runs at
+every change with the boot's own readers and `src/engine/FileSignatures.ts`'s rules, and
+makes the record CONFIRM stores; the page then shows the set selected.
+`tools/dump-local-data-set.ts` proves the check, the record and the census,
+`tools/probe-frames.mjs` drives the form.
+
+The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase letters, digits, `.`, `-` and
+`_`, at most 40), since P8 makes it the set's folder on the server. No shipped dungeon
+names its `graphics.dat` or `CSBgraphics.dat`, nor expects a `CSBgraphics.dat`, so the
+signature checks are proven on dungeons the tool builds.
 
 Decisions taken with the author, for every row:
 
@@ -234,32 +249,6 @@ Decisions taken with the author, for every row:
   query. A lost id is handled by hand on the forum for now.
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
-
-### P3 ⚠️ The form that adds a set
-
-L, in two steps. **Step 1 stands**: the form, its check, and the record it writes.
-**Step 2 is next**: what the files hold, shown as they are dropped.
-
-What stands: "+ Add my own" (`addTile`, `src/ui/welcomePage.ts`) opens the form
-(`src/ui/addDataSetForm.ts`), a modal dialog in the welcome page's look
-(`welcomePage.css`), on one screen. On the left, what the player gives: the name, the id
-(made from the name until the player writes one), a description, the authors, the
-reincarnation rule, DM's or CSB's graphics for a set without a `graphics.dat`, and one
-area that takes the files, dropped or picked, each going where its name says. On the
-right, the checklist of the name, the id and the six files, crossed or checked, a
-removable file on its row, and CANCEL and CONFIRM under it. `checkLocalDataSet` (`src/data/LocalDataSets.ts`) runs at every change, with the boot's
-own readers and `src/engine/FileSignatures.ts`'s rules, and makes the record CONFIRM
-stores; the page then shows the set selected. `tools/dump-local-data-set.ts` proves the
-check and the record, `tools/probe-frames.mjs` drives the form.
-
-The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase
-letters, digits, `.`, `-` and `_`, at most 40), since P8 makes it the set's folder on the
-server. No shipped dungeon names its `graphics.dat` or `CSBgraphics.dat`, nor expects a
-`CSBgraphics.dat`, so the signature checks are proven on dungeons the tool builds.
-
-- **Step 2: what the dungeon holds**, shown in the form when it is dropped: levels, items
-  by kind, monsters and groups, DSAs and the operations they use. The DSA census is
-  `tools/dump-dsa-census.ts`'s, moved into `src/` so the page and the tool share it.
 
 ### P4 ⏳ A thumbnail generated from the data
 
@@ -964,7 +953,7 @@ options)` the sites call with their codecs, the spell's included; `ops/` by doma
 and arithmetic, objects, `&MOVE`, characters, monsters, the dungeon, text, messages), with
 `executeAmpersand` a dispatch over them; `DsaSystem.ts` the façade on `ctx.systems.dsa`.
 Each command's body keeps CSBWin's order and names. Two tools change with it:
-`tools/dump-dsa-census.ts:61-66` reads the ported operations from the text of
+`tools/dump-dsa-census.ts:37-48` reads the ported operations from the text of
 `executeAmpersand` (an exported table instead), and `tools/dump-dsa-delete.ts:121` replaces
 `executeAmpersand` on the instance.
 

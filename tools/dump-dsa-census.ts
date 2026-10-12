@@ -14,12 +14,9 @@
  * 2. **The port's list** is the `case StkOp.…` labels of `executeAmpersand`. What it lacks
  *    is pinned below in `LEFT`, which is empty: the port has every operation, and an
  *    operation taken out fails here.
- * 3. **The census.** Every program of the dungeon decodes to its exact length with
- *    CSBWin's operand layout, read off `EX_*` (`DSA.cpp:575-1341`, `:1492-1516`,
- *    `:4987`) and the command words (`Data.h:1894-2399`). A field is a relative state
- *    unless `IsMaxState`, which compares it with `-MAXSTATE`: in every command but
- *    `QUESTION` that value is out of the field's signed range, so CSBWin never reads the
- *    extra word. The default dungeon is Conflux 3.5's.
+ * 3. **The census** (`dsaCensus`, `src/engine/DungeonCensus.ts`, which the form that
+ *    adds a set shows): every program of the dungeon decodes to its exact length with
+ *    CSBWin's operand layout. The default dungeon is Conflux 3.5's.
  *
  * Run: `npx tsx tools/dump-dsa-census.ts [dungeon.dat]`
  */
@@ -28,104 +25,13 @@ import { resolve } from 'node:path';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { StkOp } from '../src/engine/DsaSystem';
+import { dsaCensus, NOT_OPERATIONS } from '../src/engine/DungeonCensus';
 import { check, finish } from './lib/check';
 
 const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
 
 /** What the port lacks, in `STKOP` order: nothing. */
 const LEFT: readonly string[] = [];
-
-/** The `STKOP` values that are no `case` of `EX_AMPERSAND`'s switch, nor `I_Indirect` (point 1). */
-const NOT_OPERATIONS = new Set<number>([StkOp.NOOP, StkOp.TWO_DUP, StkOp.I_FILTERED_CAST]);
-
-/**
- * `DSACOMMAND` (`Data.h:1710`): each command's relative-state field and its `MAXSTATE`
- * (`Data.h:1904-2399`), and the operand words its `EX_*` reads after the command word.
- */
-interface CommandLayout {
-  name: string;
-  stateShift: number;
-  stateBits: number;
-  maxState: number;
-  operands(word: number, program: Uint16Array, pc: number): number;
-}
-
-/** `GetTarget` (`DSA.cpp:593-634`): `TARGET_ABS` reads one word, two when 32-bit. */
-function targetWords(target: number, thirtyTwo: boolean): number {
-  return target === 2 ? (thirtyTwo ? 2 : 1) : 0;
-}
-
-const message = (thirtyTwo: boolean) => (word: number): number =>
-  (((word >> 8) & 3) === 3 ? 1 : 0) + targetWords((word >> 10) & 3, thirtyTwo);
-const copyTeleporter = (thirtyTwo: boolean) => (word: number): number =>
-  targetWords((word >> 6) & 3, thirtyTwo) + targetWords((word >> 8) & 3, thirtyTwo);
-const rowColumn = (word: number): number =>
-  (((word >> 6) & 0x3f) === 63 ? 1 : 0) + ((word >> 12) & 1);
-const none = (): number => 0;
-
-const COMMANDS: Record<number, CommandLayout> = {
-  1: { name: 'MESSAGE', stateShift: 12, stateBits: 4, maxState: -8, operands: message(false) },
-  2: {
-    name: 'OVERRIDE', stateShift: 12, stateBits: 4, maxState: -8,
-    operands: (word) => (((word >> 6) & 7) === 1 && ((word >> 9) & 7) === 7 ? 1 : 0),
-  },
-  3: { name: 'NOOP', stateShift: 6, stateBits: 10, maxState: -512, operands: none },
-  4: { name: 'COPYTELEPORTER', stateShift: 10, stateBits: 6, maxState: -32, operands: copyTeleporter(false) },
-  5: { name: 'GOSUB', stateShift: 13, stateBits: 3, maxState: -4, operands: rowColumn },
-  6: {
-    name: 'LOAD', stateShift: 11, stateBits: 5, maxState: -16,
-    // LOAD_INTEGER 26 and LOAD_ABS 27 read a word, LOAD_INTEGER32 30 two (`DSA.cpp:1100-1137`).
-    operands: (word) => {
-      const where = (word >> 6) & 0x1f;
-      return where === 26 || where === 27 ? 1 : where === 30 ? 2 : 0;
-    },
-  },
-  7: { name: 'FETCH', stateShift: 6, stateBits: 10, maxState: -512, operands: none },
-  8: { name: 'EQUAL', stateShift: 6, stateBits: 10, maxState: -512, operands: none },
-  9: {
-    name: 'QUESTION', stateShift: 6, stateBits: 4, maxState: 2,
-    // Both branches' words are stepped over whichever is taken (`DSA.cpp:869-928`).
-    operands: (word) => (((word >> 11) & 3) !== 0 ? 1 : 0) + ((word >> 10) & 1)
-      + (((word >> 14) & 3) !== 0 ? 1 : 0) + ((word >> 13) & 1),
-  },
-  11: { name: 'AMPERSAND', stateShift: 13, stateBits: 3, maxState: -4, operands: none },
-  12: { name: 'JUMP', stateShift: 13, stateBits: 3, maxState: -4, operands: rowColumn },
-  13: { name: 'STORE', stateShift: 11, stateBits: 5, maxState: -16, operands: none },
-  14: { name: 'COPYTELEPORTER32', stateShift: 10, stateBits: 6, maxState: -32, operands: copyTeleporter(true) },
-  15: { name: 'MESSAGE32', stateShift: 12, stateBits: 4, maxState: -8, operands: message(true) },
-  // `numCase`, then four words a case (`DSA.cpp:1003-1033`).
-  16: { name: 'CASE', stateShift: 6, stateBits: 10, maxState: -512, operands: (_w, p, pc) => 1 + 4 * (p[pc] ?? 0) },
-  17: { name: 'VARIABLEFETCH', stateShift: 13, stateBits: 3, maxState: -4, operands: none },
-  18: { name: 'VARIABLESTORE', stateShift: 13, stateBits: 3, maxState: -4, operands: none },
-  19: { name: 'GLOBALFETCH', stateShift: 13, stateBits: 3, maxState: -4, operands: none },
-  20: { name: 'GLOBALSTORE', stateShift: 13, stateBits: 3, maxState: -4, operands: none },
-  21: { name: 'AMPERSAND2', stateShift: 13, stateBits: 3, maxState: -4, operands: none },
-  22: { name: 'DESSAGE32', stateShift: 12, stateBits: 4, maxState: -8, operands: message(true) },
-};
-
-function signedField(word: number, shift: number, bits: number): number {
-  const sign = 1 << (bits - 1);
-  const value = (word >> shift) & ((1 << bits) - 1);
-  return (value & (sign - 1)) - (value & sign);
-}
-
-/** Decode one program: false when a word is no command or the operands overrun it. */
-function decode(program: Uint16Array, commands: Map<string, number>, operations: Map<number, number>): boolean {
-  let pc = 0;
-  while (pc < program.length) {
-    const word = program[pc++] ?? 0;
-    const layout = COMMANDS[word & 0x3f];
-    if (!layout) return false;
-    commands.set(layout.name, (commands.get(layout.name) ?? 0) + 1);
-    if (signedField(word, layout.stateShift, layout.stateBits) === -layout.maxState) pc++;
-    if (layout.name === 'AMPERSAND' || layout.name === 'AMPERSAND2') {
-      const subcode = ((word >> 6) & 0x7f) + (layout.name === 'AMPERSAND2' ? 128 : 0);
-      operations.set(subcode, (operations.get(subcode) ?? 0) + 1);
-    }
-    pc += layout.operands(word, program, pc);
-  }
-  return pc === program.length;
-}
 
 /** The `case StkOp.…` labels of `executeAmpersand`, the port's operations. */
 function portedOperations(): Set<number> {
@@ -155,21 +61,7 @@ function main(): void {
   const missing = owed.filter((op) => !ported.has(op));
   check([...ported].every((op) => !NOT_OPERATIONS.has(op)), 'the port gives no case to Noop, 2Dup or I_FilteredCast');
 
-  const commands = new Map<string, number>();
-  const operations = new Map<number, number>();
-  let dsas = 0;
-  let programs = 0;
-  let undecoded = 0;
-  for (const dsa of data.dsaIndex?.entries ?? []) {
-    if (!dsa) continue;
-    dsas++;
-    for (const state of dsa.states) {
-      for (const action of state?.actions ?? []) {
-        programs++;
-        if (!decode(action.program, commands, operations)) undecoded++;
-      }
-    }
-  }
+  const { dsas, programs, undecoded, commands, operations } = dsaCensus(data);
 
   console.log(`${path}: ${dsas} DSAs, ${programs} programs, ${undecoded} that do not decode`);
   console.log(`commands: ${[...commands].sort((a, b) => b[1] - a[1]).map(([n, c]) => `${n} ${c}`).join(', ')}`);

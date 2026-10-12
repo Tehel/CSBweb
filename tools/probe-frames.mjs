@@ -392,7 +392,8 @@ check(atWelcome.last === 'pick add +Add my own', 'the grid ends with "+ Add my o
 // (`src/data/LocalDataSets.ts`) is made through it: DM's dungeon.dat dropped with CSB's
 // thumbnail, hcsb.hct, and a file none of a dungeon's; the id made from the name, then
 // written; hcsb.hct alone crossing hcsb.dat and holding CONFIRM, until it is removed; a
-// graphics.dat given turning off the choice of graphics. The record is stored, and the
+// graphics.dat given turning off the choice of graphics. What the dropped dungeon holds
+// shows under the checklist, the form still on one screen. The record is stored, and the
 // page shows its tile selected. What the check refuses is `tools/dump-local-data-set.ts`'s.
 const form = () => evaluate(`(()=>{const d=document.querySelector('dialog.add-set');
   return d && { open: d.open, id: d.querySelector('[name=id]').value,
@@ -400,6 +401,7 @@ const form = () => evaluate(`(()=>{const d=document.querySelector('dialog.add-se
     dropped: d.querySelector('.add-set-dropped').textContent, confirm: !d.querySelector('#add-set-confirm').disabled,
     base: [...d.querySelectorAll('[name=baseSet]')].map(r=>r.value+(r.checked?'*':'')+(r.disabled?'-':'')).join(),
     problems: [...d.querySelectorAll('.add-set-problem')].map(p=>p.textContent).filter(Boolean),
+    holds: d.querySelector('.add-set-holds').hidden ? '' : [...d.querySelectorAll('.add-set-holds dd')].map(dd=>dd.textContent).join(' | '),
     height: d.getBoundingClientRect().height };})()`);
 const inForm = (body) => evaluate(`(async()=>{const d=document.querySelector('dialog.add-set');${body};return 1;})()`);
 const typeIn = (name, value) => inForm(`const i=d.querySelector('[name=${name}]');i.value=${JSON.stringify(value)};i.dispatchEvent(new Event('input'))`);
@@ -411,7 +413,7 @@ await clickOn('.pick.add');
 await wait(500);
 const opened = await form();
 console.log('  form:', JSON.stringify(opened));
-check(opened?.open === true && !opened.confirm && opened.base === 'dm-atari*,csb' && opened.problems.length === 0
+check(opened?.open === true && !opened.confirm && opened.base === 'dm-atari*,csb' && opened.problems.length === 0 && opened.holds === ''
   && opened.rows === 'namex,idx,dungeon.datx,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail',
   '"+ Add my own" opens the form: the name, the id and dungeon.dat crossed, DM\'s graphics.dat checked, CONFIRM held');
 check(opened.height <= 600, 'the form is on one screen');
@@ -441,6 +443,9 @@ check(ownGraphics.base === 'dm-atari*-,csb-' && ownGraphics.dropped === '' && re
 check(ready.rows === 'name+,id+,dungeon.dat+,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail+' && ready.id === 'mine'
   && ready.confirm && ready.problems.length === 0,
   'a row\'s × takes its file back, and with nothing wrong CONFIRM is given');
+check(filled.holds === '14 | Weapons 106Clothing 121Scrolls 34Potions 55Containers 12Misc 278 | 303 in 182 groups, of 25 kinds | None'
+  && ready.holds === filled.holds && ready.height <= 600,
+  'what the dungeon holds shows under the checklist, whatever else is wrong, and the form stays on one screen');
 await inForm(`d.querySelector('#add-set-confirm').click()`);
 await wait(2000);
 const stored = await evaluate(`new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');

@@ -22,6 +22,7 @@ import type { DungeonData } from './dungeonTypes';
 import { csbGraphicsSignatureRefused, graphicsSignatureRefused, Signature } from './FileSignature';
 import { GraphicsLoader } from './GraphicsLoader';
 import { extractGraphicsTables } from './tables/GraphicsTables';
+import { dungeonCensus, type DungeonCensus } from '../engine/DungeonCensus';
 import { buildGameTables } from '../engine/GameTables';
 import { parseHcsbDat } from './HintOracleLoader';
 
@@ -132,13 +133,16 @@ export const LOCAL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;
  *   (`src/engine/FileSignatures.ts`).
  * - The Hint Oracle is both its files or neither, and `hcsb.dat` parses.
  * - The thumbnail is an image.
+ *
+ * With them, what the dungeon holds (`dungeonCensus`) wherever its `dungeon.dat` reads,
+ * whatever else is wrong; `null` where it does not.
  */
 export async function checkLocalDataSet(
     draft: LocalDataSetDraft,
     takenIds: ReadonlySet<string>,
     base: (set: string) => DataSetFiles | null,
     createdAt: number,
-): Promise<{ problems: LocalDataSetProblem[]; record: LocalDataSetRecord | null }> {
+): Promise<{ problems: LocalDataSetProblem[]; record: LocalDataSetRecord | null; census: DungeonCensus | null }> {
     const problems: LocalDataSetProblem[] = [];
     const problem = (about: LocalDataSetField, text: string): void => {
         problems.push({ about, text });
@@ -212,9 +216,11 @@ export async function checkLocalDataSet(
     const thumbnail = files.thumbnail;
     if (thumbnail && !thumbnail.type.startsWith('image/')) problem('thumbnail', 'It is not an image.');
 
-    if (problems.length > 0 || !dungeon) return { problems, record: null };
+    const census = dungeon && dungeonCensus(dungeon);
+    if (problems.length > 0 || !dungeon) return { problems, record: null, census };
     return {
         problems,
+        census,
         record: {
             id,
             name: draft.name.trim(),

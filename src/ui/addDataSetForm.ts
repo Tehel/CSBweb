@@ -15,11 +15,16 @@
  *   verdict on each, run at every change: a green check where it is given and right, a
  *   red cross where it is needed and missing, or wrong, and nothing where it is optional
  *   and absent. A wrong one says why under it; each row's tooltip says what it is. A given
- *   file can be removed from its row. Under it, CANCEL and CONFIRM, which is enabled when
+ *   file can be removed from its row. Under it, what the dungeon holds, once its
+ *   `dungeon.dat` reads (`dungeonCensus`, `src/engine/DungeonCensus.ts`): its levels, its
+ *   items by kind, its monsters and their groups, and its DSAs with the operations they
+ *   use, named in the row's tooltip. Under that, CANCEL and CONFIRM, which is enabled when
  *   nothing is wrong and writes the record the check made.
  */
 import { folderFiles, type DataSetFiles } from '../data/DataSetFiles';
 import { dataSetNamed, type DataSetManifest } from '../data/DataSets';
+import { ITEM_KINDS, isIllegalSubcode, operationsUsed, type DungeonCensus } from '../engine/DungeonCensus';
+import { StkOp } from '../engine/DsaSystem';
 import {
     checkLocalDataSet,
     type LocalDataSetDraft, type LocalDataSetField, type LocalDataSetFile, type LocalDataSetProblem, type LocalDataSetRecord,
@@ -81,6 +86,7 @@ const FORM = `
     </div>
     <div class="add-set-have">
       <ul class="add-set-checklist" aria-label="What the dungeon has"></ul>
+      <dl class="add-set-holds" aria-label="What the dungeon holds" hidden></dl>
       <div class="add-set-buttons">
         <button type="button" class="btn px" id="add-set-cancel">Cancel</button>
         <button type="button" class="btn px" id="add-set-confirm" disabled>Confirm</button>
@@ -114,6 +120,7 @@ export function openAddDataSetForm(
     const baseBox = form.querySelector<HTMLFieldSetElement>('.add-set-base')!;
     const drop = form.querySelector<HTMLElement>('.add-set-drop')!;
     const picker = drop.querySelector('input')!;
+    const holds = form.querySelector<HTMLElement>('.add-set-holds')!;
 
     const files: Partial<Record<LocalDataSetFile, File>> = {};
     let idWritten = false;
@@ -258,7 +265,7 @@ export function openAddDataSetForm(
         const mine = ++generation;
         record = null;
         confirm.disabled = true;
-        void checkLocalDataSet(draft, takenIds, base, Date.now()).then(({ problems, record: made }) => {
+        void checkLocalDataSet(draft, takenIds, base, Date.now()).then(({ problems, record: made, census }) => {
             if (mine !== generation) return;
             for (const { row, item, given, remove, problem } of rows.values()) {
                 // The graphics' problems are about the file or, without it, about the base set.
@@ -273,6 +280,8 @@ export function openAddDataSetForm(
                 problem.textContent = value !== null || !row.needed ? own.map((p) => p.text).join(' ') : '';
                 item.title = [row.hint, ...own.map((p: LocalDataSetProblem) => p.text)].join('\n');
             }
+            holds.hidden = census === null;
+            holds.replaceChildren(...(census ? censusRows(census) : []));
             record = made;
             confirm.disabled = made === null;
         });
@@ -294,6 +303,39 @@ function valueOf(about: LocalDataSetField, draft: LocalDataSetDraft, files: Part
     const file = files[about];
     if (file) return file.name;
     return about === 'graphics.dat' ? `${baseName}'s` : null;
+}
+
+const ITEM_KIND_LABEL: Record<typeof ITEM_KINDS[number], string> = {
+    weapons: 'Weapons', clothing: 'Clothing', scrolls: 'Scrolls', potions: 'Potions', containers: 'Containers', misc: 'Misc',
+};
+
+/** `census` as the form shows it: a term and its line for each of the levels, the items, the monsters and the DSAs. */
+function censusRows(census: DungeonCensus): HTMLElement[] {
+    const { dsa } = census;
+    const used = operationsUsed(dsa);
+    const illegal = [...dsa.operations.keys()].filter(isIllegalSubcode).length;
+    const rows: [string, string | HTMLElement[], string?][] = [
+        ['Levels', census.maps === census.levels ? `${census.levels}` : `${plural(census.maps, 'map')} on ${plural(census.levels, 'level')}`],
+        ['Items', ITEM_KINDS.map((kind) => text('span', '', `${ITEM_KIND_LABEL[kind]} ${census.items[kind]}`))],
+        ['Monsters', census.groups === 0 ? 'None'
+            : `${census.monsters} in ${plural(census.groups, 'group')}, of ${plural(census.monsterTypes, 'kind')}`],
+        ['DSAs', dsa.dsas === 0 ? 'None' : [
+            `${dsa.dsas}, ${plural(dsa.programs, 'program')} calling ${plural(used.length, 'operation')}`,
+            dsa.undecoded > 0 ? `${plural(dsa.undecoded, 'program')} that do not decode` : '',
+            illegal > 0 ? `${plural(illegal, 'illegal subcode')}` : '',
+        ].filter(Boolean).join('; '), used.map((op) => StkOp[op]).join(', ')],
+    ];
+    return rows.flatMap(([term, line, title]) => {
+        const definition = text('dd', typeof line === 'string' ? '' : 'add-set-kinds', '');
+        definition.append(...(typeof line === 'string' ? [line] : line));
+        if (title) definition.title = title;
+        return [text('dt', 'px px2', term), definition];
+    });
+}
+
+/** `n` and `word`, made plural but for one. */
+function plural(n: number, word: string): string {
+    return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
 
 /** Where a file goes: the file of its name, whatever its case, or the thumbnail for an image. */
