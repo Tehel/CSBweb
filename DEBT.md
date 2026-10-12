@@ -29,7 +29,7 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 (`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
-from their own files to the welcome page and plays it (P2 to P5), then edits and publishes
+from their own files to the welcome page and plays it (P3 to P5), then edits and publishes
 it (P6 to P8). They are not CSBWin features but the page's, and come before every other
 tier.
 
@@ -113,8 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P2 | The welcome page: the local sets, and "+ Add my own" | S | ⏳ |
-| P3 | The form that adds a set | L | ⏳ after P2 |
+| P3 | The form that adds a set | L | ⏳ |
 | P4 | A thumbnail generated from the data | S | ⏳ after P3 |
 | P5 | A local set's saves import | S | ⏳ |
 | P6 | Editing and deleting a local set | M | ⏳ after P3 |
@@ -207,7 +206,7 @@ entry here, only its commit, so take the next ID from this line and move it on.
 At the author's request, from the forum: a player adds a dungeon from their own files, plays
 it like any other, and later offers it to the site. It mirrors CSBWin, which plays whatever
 its `directory=` holds (`src/data/DataSets.ts`), so the engine does not change and nothing
-goes in H. Two phases: P2 to P5 keep a set in the player's browser, and P6 to P8 publish it.
+goes in H. Two phases: P3 to P5 keep a set in the player's browser, and P6 to P8 publish it.
 
 What stands: a local set is a record of the store's `dataSets` object store
 (`BrowserDataSetStore`, `src/data/saves/`), `LocalDataSetRecord` in
@@ -216,7 +215,11 @@ What stands: a local set is a record of the store's `dataSets` object store
 them by name through `recordFiles`, its base set's folder giving a `graphics.dat` it does
 not have, as a manifest set's are read through `folderFiles` (`src/data/DataSetFiles.ts`).
 It sends no statistics. `tools/dump-local-data-set.ts` plays such records against their
-manifest sets. Nothing writes a record yet but a script: P3's form is the first.
+manifest sets. The welcome page (`src/ui/welcomePage.ts`) shows the local sets beside the
+manifest's, under the same order, a record's thumbnail as its tile's picture, and counts
+their saves; its last tile, "+ Add my own", is disabled until P3's form exists
+(`tools/probe-frames.mjs` checks both). Nothing writes a record yet but a script: P3's
+form is the first.
 
 Decisions taken with the author, for every row:
 
@@ -233,21 +236,15 @@ Decisions taken with the author, for every row:
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
 
-### P2 ⏳ The welcome page: the local sets, and "+ Add my own"
-
-- The grid shows the local sets beside the manifest's, under the same order
-  (`tileOrder`). A tile's picture is the record's thumbnail, through an object URL, or
-  the blank box.
-- A local set's saves count: `known` (`src/ui/welcomePage.ts:106`) holds the local ids
-  too.
-- A last tile, "+ Add my own", opens P3's form on a single click. It is never selected,
-  and PLAY never leads to it.
-- A golden frame or a `probe-frames.mjs` check covers the tile and a local set's tile.
-
 ### P3 ⏳ The form that adds a set
 
 L, in steps: the form and the record written; then what the files hold, shown as they
 are dropped.
+
+- **Its way in**: the welcome page's "+ Add my own" (`addTile`, `src/ui/welcomePage.ts`)
+  opens the form on a single click. Until the form exists the tile is disabled, and
+  `tools/probe-frames.mjs` checks that it is; the form's first step enables it and
+  changes that check.
 
 - **Fields**: the id (the part after `local:`), the name, a short description, the
   authors, the reincarnation rule (`dmRules`), and DM's or CSB's graphics when no

@@ -110,7 +110,12 @@ body.welcome {
     height: 100px;
     background: var(--navy);
 }
-.pick-picture img { display: block; }
+.pick-picture img { display: block; object-fit: contain; }
+/* "+ Add my own", the grid's last tile, disabled until the form that adds a set exists. */
+.pick.add .pick-picture { display: flex; align-items: center; justify-content: center; }
+.pick-plus { color: var(--p9); }
+.pick.add:disabled { opacity: 0.5; cursor: default; }
+.pick.add:disabled:hover { border-color: #1d1d30; }
 .pick-name { color: var(--p15); padding: 0 3px; }
 .pick-saves { padding: 0 3px 3px; }
 .pick-saves { color: var(--p2); }

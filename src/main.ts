@@ -13,7 +13,7 @@ import { folderFiles, loadGameFiles, type DataSetFiles, type GameFiles } from '.
 import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
-import { BrowserDataSetStore, BrowserSaveStore, downloadSaveFile, type OpenedSave } from './data/saves';
+import { BrowserDataSetStore, BrowserSaveStore, downloadSaveFile, type DrawPlaythrough, type OpenedSave } from './data/saves';
 import { UTILITY_PORTRAITS_FILE, UtilityPortraits } from './data/UtilityPortraits';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
@@ -612,7 +612,8 @@ async function chooseDataSet(manifest: DataSetManifest): Promise<{ set: DataSet;
  */
 function openWelcomePage(manifest: DataSetManifest): Promise<void> {
     const storeRandom = new CsbRandom();
-    return showWelcomePage(document.body, manifest, new BrowserSaveStore((rows) => drawPlaythrough(storeRandom, rows)));
+    const draw: DrawPlaythrough = (rows) => drawPlaythrough(storeRandom, rows);
+    return showWelcomePage(document.body, manifest, new BrowserSaveStore(draw), new BrowserDataSetStore(draw));
 }
 
 async function init() {

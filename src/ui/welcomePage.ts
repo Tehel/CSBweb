@@ -4,12 +4,16 @@
  * of the game built: PLAY and CONTINUE are links that load the page again, with the
  * data set, and CONTINUE's save, in its query.
  *
- * - **The grid**: a tile for each set `chooserSets` lists, its picture the set's thumbnail
- *   (`thumbnailPath`), its title's last frame at half size, or a blank box where the
- *   folder holds none. The sets the store holds a save of come first, drawn bright, the
- *   one saved last first; the others follow, dimmed, by name (`tileOrder`). A click
- *   selects a tile, and a click on the selected one leaves none selected. With no save
- *   at all, the manifest's default set is selected, so that PLAY is a first visit's way in.
+ * - **The grid**: a tile for each set `chooserSets` lists and each of the player's own
+ *   (`src/data/LocalDataSets.ts`), its picture the set's thumbnail, or a blank box where
+ *   it has none. A manifest set's is in its folder (`thumbnailPath`), its title's last
+ *   frame at half size; a local set's is its record's image. The sets the store holds a
+ *   save of come first, drawn bright, the one saved last first; the others follow,
+ *   dimmed, by name (`tileOrder`). A click selects a tile, and a click on the selected one
+ *   leaves none selected. With no save at all, the manifest's default set is selected, so
+ *   that PLAY is a first visit's way in.
+ * - **"+ Add my own"**, the grid's last tile, which is never selected. It stays disabled
+ *   until the form that adds a set exists (`DEBT.md` P3).
  * - **PLAY** opens the selected set (`?dungeon=<id>`): its title, then its entrance. With
  *   no set selected it is disabled.
  * - **CONTINUE** opens the last save used (`lastUsedSave`) of the selected set, or of every
@@ -20,9 +24,10 @@
  * The buttons and the box sit above the grid, which grows with the sets, so that they
  * stay on the first screen.
  *
- * A save of a set the manifest no longer names cannot be played, so it counts for
- * nothing here. A hidden set's saves count: the set plays by its `?dungeon=`. A store
- * that cannot be read (IndexedDB refused) is a store with no save.
+ * A save of a set neither the manifest nor the player's own sets name cannot be played,
+ * so it counts for nothing here. A hidden set's saves count: the set plays by its
+ * `?dungeon=`. A store that cannot be read (IndexedDB refused) is a store with no save
+ * and no set of the player's.
  *
  * Every other parameter of the page's query is kept on the way to the game (`?dev`), and
  * on the way back, by the settings dialog's EXIT (`welcomePageQuery`).
@@ -33,7 +38,11 @@
 import './welcomePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
 import { chooserSets, thumbnailPath, type DataSet, type DataSetManifest } from '../data/DataSets';
-import { formatSaveDate, formatSaveTime, lastUsedSave, type SaveEntry, type SaveStore } from '../data/saves';
+import { localDataSet, type LocalDataSetRecord } from '../data/LocalDataSets';
+import {
+    formatSaveDate, formatSaveTime, lastUsedSave,
+    type BrowserDataSetStore, type SaveEntry, type SaveStore,
+} from '../data/saves';
 
 /** The page's static half: the logo, the places the grid and the buttons go, and the bottom. */
 const PAGE = `
@@ -100,10 +109,18 @@ const PAGE = `
 
 /**
  * Show the welcome page in `body`, in place of whatever it held, for the sets of
- * `manifest` and the saves of `store`.
+ * `manifest` and of `localSets`, and the saves of `store`.
  */
-export async function showWelcomePage(body: HTMLElement, manifest: DataSetManifest, store: Pick<SaveStore, 'list'>): Promise<void> {
-    const known = new Set(manifest.dataSets.map((set) => set.id));
+export async function showWelcomePage(
+    body: HTMLElement,
+    manifest: DataSetManifest,
+    store: Pick<SaveStore, 'list'>,
+    localSets: Pick<BrowserDataSetStore, 'list'>,
+): Promise<void> {
+    const records = await localSets.list().catch(() => [] as LocalDataSetRecord[]);
+    const local = records.map((record) => ({ set: localDataSet(record), thumbnail: record.files.thumbnail ?? null }));
+    const allSets = [...manifest.dataSets, ...local.map(({ set }) => set)];
+    const known = new Set(allSets.map((set) => set.id));
     const rows = (await store.list(null).catch(() => [] as SaveEntry[])).filter((row) => known.has(row.dataSet));
 
     body.classList.add('welcome');
@@ -113,7 +130,11 @@ export async function showWelcomePage(body: HTMLElement, manifest: DataSetManife
     const resume = body.querySelector<HTMLAnchorElement>('#welcome-continue')!;
     const preview = body.querySelector<HTMLElement>('.welcome-preview')!;
 
-    const sets = tileOrder(chooserSets(manifest), rows);
+    const thumbnails = new Map<DataSet, string | Blob | null>([
+        ...chooserSets(manifest).map((set) => [set, thumbnailPath(set)] as const),
+        ...local.map(({ set, thumbnail }) => [set, thumbnail] as const),
+    ]);
+    const sets = tileOrder([...thumbnails.keys()], rows);
     let selected: DataSet | null = rows.length === 0 && sets.includes(manifest.defaultSet) ? manifest.defaultSet : null;
     const tiles = sets.map((set) => {
         const saves = rows.filter((row) => row.dataSet === set.id).length;
@@ -122,7 +143,7 @@ export async function showWelcomePage(body: HTMLElement, manifest: DataSetManife
         tile.className = saves > 0 ? 'pick' : 'pick dim';
         tile.dataset.set = set.id;
         tile.append(
-            picture(set),
+            picture(thumbnails.get(set) ?? null),
             line('pick-name px px2', set.name),
             line('pick-saves px px2', saves === 0 ? 'No saves' : saves === 1 ? '1 save' : `${saves} saves`),
         );
@@ -133,6 +154,7 @@ export async function showWelcomePage(body: HTMLElement, manifest: DataSetManife
         grid.append(tile);
         return { set, tile };
     });
+    grid.append(addTile());
 
     function update(): void {
         for (const { set, tile } of tiles) tile.setAttribute('aria-pressed', String(set === selected));
@@ -141,7 +163,7 @@ export async function showWelcomePage(body: HTMLElement, manifest: DataSetManife
         const save = lastUsedSave(set ? rows.filter((row) => row.dataSet === set.id) : rows);
         link(resume, save && pageQuery(save.dataSet, save.id));
         preview.replaceChildren(...(save ? [
-            line('preview-set', manifest.dataSets.find((set) => set.id === save.dataSet)!.name),
+            line('preview-set', allSets.find((set) => set.id === save.dataSet)!.name),
             line('preview-party', save.champions.map((name) => name.trim()).filter((name) => name !== '').join(' · ')),
             line('preview-when', `Level ${save.level} · ${formatSaveDate(save.savedAt)} ${formatSaveTime(save.savedAt)}`),
         ] : [
@@ -161,17 +183,37 @@ function tileOrder(sets: DataSet[], rows: SaveEntry[]): DataSet[] {
     return [...sets].sort((a, b) => (lastSaved.get(b.id) ?? -1) - (lastSaved.get(a.id) ?? -1) || a.name.localeCompare(b.name));
 }
 
-/** `set`'s picture: its thumbnail, in a box that stays blank if it does not load. */
-function picture(set: DataSet): HTMLElement {
+/**
+ * A set's picture: its thumbnail, a file's path or a local set's image, in a box that
+ * stays blank for `null` or if it does not load.
+ */
+function picture(thumbnail: string | Blob | null): HTMLElement {
     const box = line('pick-picture', '');
+    if (thumbnail === null) return box;
     const image = document.createElement('img');
-    image.src = thumbnailPath(set);
+    const src = typeof thumbnail === 'string' ? thumbnail : URL.createObjectURL(thumbnail);
+    image.src = src;
     image.alt = '';
     image.width = 160;
     image.height = 100;
     image.addEventListener('error', () => image.remove());
+    if (src !== thumbnail) {
+        for (const done of ['load', 'error']) image.addEventListener(done, () => URL.revokeObjectURL(src), { once: true });
+    }
     box.append(image);
     return box;
+}
+
+/** The grid's last tile, "+ Add my own": disabled until the form that adds a set exists (`DEBT.md` P3). */
+function addTile(): HTMLElement {
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'pick add';
+    tile.disabled = true;
+    const box = line('pick-picture', '');
+    box.append(line('pick-plus px px6', '+'));
+    tile.append(box, line('pick-name px px2', 'Add my own'));
+    return tile;
 }
 
 /** An element of one line of text. */

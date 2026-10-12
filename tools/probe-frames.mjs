@@ -194,7 +194,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
 // The page with a save is checked further down.
 await send('Page.navigate', { url: `${APP}?dungeon=nowhere` });
 await wait(2500);
-const firstVisit = await evaluate(`({tiles: [...document.querySelectorAll('.pick')].map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
+const firstVisit = await evaluate(`({tiles: [...document.querySelectorAll('.pick[data-set]')].map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
   play: document.getElementById('welcome-play').getAttribute('href'),
   resume: document.getElementById('welcome-continue').getAttribute('href'),
   above: !!(document.querySelector('.welcome-actions').compareDocumentPosition(document.querySelector('.welcome-grid')) & Node.DOCUMENT_POSITION_FOLLOWING)})`);
@@ -317,12 +317,16 @@ await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
 await wait(2500);
 const welcome = () => evaluate(`(()=>{const q=(s)=>[...document.querySelectorAll(s)];
   return { canvas: !!document.getElementById('game-canvas'),
-    tiles: q('.pick').map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
+    tiles: q('.pick[data-set]').map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
     play: document.getElementById('welcome-play').getAttribute('href'),
     resume: document.getElementById('welcome-continue').getAttribute('href'),
     preview: q('.welcome-preview > *').map(e=>e.textContent),
-    pictures: q('.pick').map(t=>{const i=t.querySelector('.pick-picture img');
-      return i && i.complete && i.naturalWidth===320 && i.naturalHeight===200 && i.src.endsWith('/'+t.dataset.set+'-thumbnail.png');}),
+    pictures: q('.pick[data-set]').map(t=>{const i=t.querySelector('.pick-picture img');
+      return i && i.complete && i.naturalWidth===320 && i.naturalHeight===200
+        && (i.src.endsWith('/'+t.dataset.set+'-thumbnail.png') || t.dataset.set.startsWith('local:') && i.src.startsWith('blob:'));}),
+    saves: q('.pick[data-set]').map(t=>t.querySelector('.pick-saves').textContent),
+    last: (()=>{const t=document.querySelector('.welcome-grid').lastElementChild;
+      return t.className+(t.disabled?' disabled':'')+(t.hasAttribute('aria-pressed')?' pressed':'')+' '+t.textContent;})(),
     gameFiles: performance.getEntriesByType('resource').map(e=>e.name).filter(n=>/\.dat$/i.test(n)).length };})()`);
 const clickOn = async (selector) => {
   const p = await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
@@ -381,6 +385,49 @@ check((await welcome()).play === null, 'a click on the selected tile selects non
 await clickOn('.pick[data-set="dm-atari"]');
 const atDm = await welcome();
 check(atDm.tiles.startsWith('dm-atari*!') && atDm.resume === atWelcome.resume, 'dm-atari selected: CONTINUE reads its last save');
+check(atWelcome.last === 'pick add disabled +Add my own',
+  'the grid ends with "+ Add my own", disabled until the form that adds a set exists, never selected');
+// The player's own sets (`src/data/LocalDataSets.ts`) beside the manifest's: a record put
+// in the store's `dataSets` as the form will write it, with a thumbnail, and a save filed
+// under its id, a copy of dm-atari's one save made a millisecond older. Its tile is bright
+// and second, its picture the record's image, and it counts its save; selected, PLAY and
+// CONTINUE lead to it. "+ Add my own" stays last, and a click on it selects nothing. Both
+// rows are taken out of the store again, so that the pages below see the one save.
+const saveDatabase = (body) => evaluate(`(async()=>{${body.before ?? ''}
+  return new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => { const db = open.result, tx = db.transaction(['saves', 'dataSets'], 'readwrite');
+      const saves = tx.objectStore('saves'), dataSets = tx.objectStore('dataSets');
+      ${body.write}
+      tx.oncomplete = () => { db.close(); resolve(true); }; tx.onerror = () => reject(tx.error); }; });})()`);
+await saveDatabase({
+  before: `const thumbnail = await (await fetch('/gamefiles/csb/csb-thumbnail.png')).blob();
+    const dungeon = await (await fetch('/gamefiles/dm-atari/dungeon.dat')).blob();`,
+  write: `dataSets.put({ id: 'local:mine', name: 'My Own Dungeon', description: 'A probe set.', authors: ['A Player'],
+      dmRules: false, baseSet: 'dm-atari', files: { 'dungeon.dat': dungeon, thumbnail }, dungeonSignature: [], createdAt: 1760000000000 });
+    const all = saves.getAll();
+    all.onsuccess = () => { const row = all.result[0];
+      saves.put({ ...row, id: 'probe-local-save', dataSet: 'local:mine', savedAt: row.savedAt - 1, usedAt: (row.usedAt ?? row.savedAt) - 1 }); };`,
+});
+await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
+await wait(2500);
+const withLocal = await welcome();
+console.log('  local set:', JSON.stringify(withLocal));
+check(withLocal.tiles === 'dm-atari*,local:mine*,csb,conflux-3.5,kids-dungeon,towers-of-chaos'
+  && withLocal.saves[1] === '1 save' && withLocal.pictures.length === 6 && withLocal.pictures.every(Boolean)
+  && withLocal.gameFiles === 0 && withLocal.last === atWelcome.last,
+  "a local set's tile: its save counted, bright, its picture the record's image, the add tile still last");
+await clickOn('.pick[data-set="local:mine"]');
+const atLocal = await welcome();
+check(atLocal.tiles.includes('local:mine*!') && /dungeon=local%3Amine/.test(atLocal.play ?? '')
+  && /dungeon=local%3Amine&.*save=probe-local-save/.test(atLocal.resume ?? '') && atLocal.preview[0] === 'My Own Dungeon',
+  'a local set selected: PLAY opens it, CONTINUE reads its save, the box names it');
+await clickOn('.pick.add');
+check((await welcome()).play === atLocal.play, 'a click on "+ Add my own" leaves the selection');
+await saveDatabase({ write: `dataSets.delete('local:mine'); saves.delete('probe-local-save');` });
+await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
+await wait(2500);
+await clickOn('.pick[data-set="dm-atari"]');
 await clickOn('#welcome-play');
 await wait(9000);
 check(await evaluate(`location.search`) === '?dungeon=dm-atari&keepsaves=', 'PLAY opens the selected set, the page\'s other parameters kept');
