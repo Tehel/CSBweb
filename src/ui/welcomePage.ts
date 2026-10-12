@@ -62,13 +62,34 @@ const PAGE = `
       </div>
     </div>
   </section>
+  <section class="welcome-credits" id="credits">
+    <h2 class="px px6">Credits</h2>
+    <div class="welcome-columns">
+      <div>
+        <h2 class="px">FTL Games</h2>
+        <p>Dungeon Master and Chaos Strikes Back, by FTL Games, Software Heaven, Inc.: Doug Bell (director), Dennis Walker (assistant director), Mike Newton (second unit director), Andy Jaros (graphics) and Wayne Holder (producer).</p>
+      </div>
+      <div>
+        <h2 class="px">CSBWin</h2>
+        <p><a href="http://www.dianneandpaul.net/CSBwin/">Paul R. Stevens</a>, for the crazy work of making CSBWin, the Atari ST game disassembled and rewritten in C++. Everything here is a port of it.</p>
+      </div>
+      <div>
+        <h2 class="px">Swoosh Construction Kit</h2>
+        <p>The people of the <a href="http://greatstone.free.fr/dm">Swoosh Construction Kit</a>, for the detailed reverse-engineering of every one of the data files' structures.</p>
+      </div>
+      <div>
+        <h2 class="px">The community</h2>
+        <p>The <a href="http://dmweb.free.fr">DMweb</a> community, for its love of the original game all these years, and the <a href="https://www.dungeon-master.com/">Dungeon Master forum</a>, where the fans still meet.</p>
+      </div>
+    </div>
+  </section>
   <footer class="welcome-footer">
     <p>Dungeon Master © 1987 and Chaos Strikes Back © 1989 FTL Games, Software Heaven, Inc. Their names, pictures, sounds and data files belong to their rights holders, and are served here only to be played. The other dungeons belong to their authors. The engine is a port of CSBWin by Paul R. Stevens. CSBweb is a free, non-commercial fan project, not affiliated with or endorsed by any of them. Rights holders: write to csbweb[at]looten.net, and whatever you ask is taken down.</p>
     <nav class="px px2" aria-label="Footer">
       <a aria-disabled="true" href="#about">About</a>
       <a aria-disabled="true">Stats</a>
       <a aria-disabled="true">Source</a>
-      <a aria-disabled="true">Credits</a>
+      <a href="#credits">Credits</a>
     </nav>
   </footer>
 </main>`;

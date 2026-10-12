@@ -1124,8 +1124,9 @@ author asked:
   without the title or the entrance. A box right of CONTINUE previews that save: its
   party, its level and when it was saved.
 - **The bottom as the design has it**: the line under the hero, the four columns, and
-  the footer, whose links are ABOUT, SOURCE and CREDITS. ABOUT and CREDITS are E39's
-  pages. SOURCE is drawn disabled until the repository moves to GitHub, once this
+  the footer, whose links are ABOUT, SOURCE and CREDITS. ABOUT is E39's page; CREDITS
+  leads to the credits block above the footer (`#credits`): FTL's team, CSBWin and Paul R.
+  Stevens, the Swoosh Construction Kit, DMweb and the Dungeon Master forum. SOURCE is drawn disabled until the repository moves to GitHub, once this
   list is short enough.
 - **Fonts**: the game's font for the grid, the buttons, the preview and the
   columns' yellow headings, as the design's kit draws it (artboard 10, "The game's
@@ -1193,7 +1194,8 @@ the author before any code. What they are to hold:
   players. Champions go by the names they carry, which a player can type.
 - **The public statistics**, drawn from the server's `api/stats`, on ABOUT or a page of
   their own.
-- **CREDITS**: FTL's games, CSBWin and Paul R. Stevens, the data sets' authors.
+- **CREDITS** is a block of the welcome page (E15). It does not name the data sets'
+  authors yet.
 
 ### E22 ⏳ The screen's ratio, and a fractional fill
 

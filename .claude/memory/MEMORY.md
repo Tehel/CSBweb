@@ -22,3 +22,4 @@ One line per memory in this directory. Committed with the project; never shared.
 - [New golden frame needs --update](new-golden-frame-needs-update.md) — `check-frames.sh` ignores frames not in the baseline; `--update`, then only `??` PNGs in `git status`
 - [Design canvas files](design-canvas-files.md) — reading the canvas URL gives "Loading…"; list its files and read `project/<Artboard>.dc.html`; ideas, not specs, optimistic about space
 - [Headless fullscreen](headless-fullscreen.md) — only CDP input grants activation, a touch only at its lift; the fullscreen viewport is the metrics override; a CDP Esc never leaves fullscreen
+- [Text changes, no tests](text-changes-no-tests.md) — copy-only welcome-page changes need a screenshot, not `npm test` or the frames

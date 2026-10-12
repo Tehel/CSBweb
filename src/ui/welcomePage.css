@@ -163,7 +163,8 @@ body.welcome {
 .preview-when { color: var(--p2); }
 .preview-none { color: var(--p1); }
 
-/* The bottom of the page: the line under the title, the four columns, and the footer. */
+/* The bottom of the page: the line under the title, the four columns, the credits, and the
+   footer. */
 .welcome-about {
     padding: 72px 0;
     display: flex;
@@ -186,6 +187,16 @@ body.welcome {
 .welcome-columns > div { display: flex; flex-direction: column; gap: 18px; }
 .welcome-columns h2 { margin: 0; color: var(--p11); }
 .welcome-columns p { margin: 0; font-size: 18px; line-height: 1.55; color: #bdbac8; }
+.welcome-columns a { color: var(--p13); }
+.welcome-columns a:hover { color: var(--p11); }
+/* The credits: a heading over four columns, as the columns above. */
+.welcome-credits {
+    padding: 0 0 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+}
+.welcome-credits > h2 { margin: 0; color: var(--p15); }
 .welcome-footer {
     margin-top: auto;
     padding: 32px 0;
