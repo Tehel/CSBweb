@@ -333,6 +333,12 @@ export interface UIState {
    */
   readonly onSleepSave: () => void;
   /**
+   * Leave the game for the welcome page, as the settings dialog's EXIT does once the
+   * player has answered: the page opens itself without `?dungeon=` (`welcomePageQuery`,
+   * `src/ui/welcomePage.ts`).
+   */
+  readonly onExit: () => void;
+  /**
    * The player's settings (`src/settings/Settings.ts`), which the settings dialog reads
    * and changes: the page applies a change as its every listener is told.
    */
@@ -431,7 +437,7 @@ export type UISources = Pick<UIState,
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
-  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onHasNewFaces' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave'
+  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onHasNewFaces' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave' | 'onExit'
   | 'settings' | 'isCrtAvailable' | 'fullscreen' | 'keyboardLayout' | 'onTeleport'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {

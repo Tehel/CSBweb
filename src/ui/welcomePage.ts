@@ -20,7 +20,8 @@
  * nothing here. A hidden set's saves count: the set plays by its `?dungeon=`. A store
  * that cannot be read (IndexedDB refused) is a store with no save.
  *
- * Every other parameter of the page's query is kept on the way to the game (`?dev`).
+ * Every other parameter of the page's query is kept on the way to the game (`?dev`), and
+ * on the way back, by the settings dialog's EXIT (`welcomePageQuery`).
  *
  * The labels are HTML text in the game's font, and the prose in Spectral, both served
  * with the page (`welcomePage.css`).
@@ -154,6 +155,18 @@ function link(anchor: HTMLAnchorElement, query: string | null | undefined): void
         anchor.removeAttribute('href');
         anchor.setAttribute('aria-disabled', 'true');
     }
+}
+
+/**
+ * The page's own query without the game's set and save: the welcome page's, where the
+ * settings dialog's EXIT leads (`UIState.onExit`). Every other parameter is kept.
+ */
+export function welcomePageQuery(): string {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('dungeon');
+    params.delete('save');
+    const query = `${params}`;
+    return query ? `?${query}` : window.location.pathname;
 }
 
 /** The page's own query, the game's set and, to continue, its save in it. */

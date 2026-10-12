@@ -16,6 +16,10 @@
  *    click, the help line saying why; FULLSCREEN asking the page, changing no setting,
  *    shown as the page says, its help line as Esc leaves it, and inert where the browser
  *    has none; Esc, CLOSE and a right click close it; the clock held while it is up.
+ * 3b. **EXIT** asks first, `_DoMenu`'s centred two-option menu on black, which takes no
+ *    key but Esc and no notch of the wheel; Esc, a right click and CANCEL put the
+ *    dialog back, CANCEL and EXIT once their button has flashed, and only EXIT leaves
+ *    for the welcome page (`UIState.onExit`), the clock held until the page goes.
  * 4. **The help line** follows the pointer, and the pointer's move says when it changes.
  * 5. **Opening it**, through `GameInput` over the interface's real lists: Esc, awake, asleep
  *    and frozen, but not over the Reincarnate screen; Pause freezes; a double click on
@@ -38,10 +42,10 @@ import type { GameScreen } from '../src/renderer/GameScreen';
 import { MESSAGE_AREA } from '../src/renderer/csbwin/ScrollingText';
 import { isDialogOpen } from '../src/renderer/ui/Dialog';
 import { DEFAULT_KEY_BINDINGS, keyAction, tableKeyButton } from '../src/renderer/ui/Keyboard';
-import { MENU_GRAPHIC } from '../src/renderer/ui/Menu';
+import { MENU_GRAPHIC, MENU_PRESS_PHASE_MS, menuButtonList } from '../src/renderer/ui/Menu';
 import { searchMouseButtons, syncInventoryButtons, updateButtonLists } from '../src/renderer/ui/Mouse';
 import {
-  CLOSE_FRAME, EXIT_FRAME, HELP_LINE, KEYS_AREA, SETTING_LINES, TABS, TAB_FRAMES, closeSettingsDialog, drawSettingsDialog,
+  CLOSE_FRAME, EXIT_FRAME, EXIT_HELP, EXIT_LABEL, EXIT_QUESTION, EXIT_WARNING, HELP_LINE, KEYS_AREA, SETTING_LINES, TABS, TAB_FRAMES, closeSettingsDialog, drawSettingsDialog,
   helpText, openSettingsDialog, settingsDialogButtons, settingsDialogClick, settingsDialogKey, settingsDialogPointer,
   settingButtonFrame, sliderRect, toggleFrames,
 } from '../src/renderer/ui/SettingsDialog';
@@ -65,8 +69,9 @@ const graphics = stockGraphics();
 const image = graphics.getImage(MENU_GRAPHIC);
 const menuBitmap = { width: image.width, height: image.height, pixels: Uint8Array.from(image.pixels) };
 
-function freshUI(crt = true, layoutMap: ReadonlyMap<string, string> | null = null, fullscreen = NO_FULLSCREEN): UIState {
+function freshUI(crt = true, layoutMap: ReadonlyMap<string, string> | null = null, fullscreen = NO_FULLSCREEN, onExit = () => {}): UIState {
   return newUIState(graphics, newGame(emptyDungeonData(), graphics).ctx, {
+    onExit,
     getGraphicBitmap: (n) => (n === MENU_GRAPHIC ? menuBitmap : null),
     settings: new Settings(null),
     isCrtAvailable: () => crt,
@@ -160,7 +165,7 @@ console.log('\n=== 2. the layout ===');
   check(outside.length === 0, `every name inside its button's face${outside.length ? `: ${outside.join(', ')}` : ''}`);
   check(TABS.filter((t) => !t.buttons).every((t) => t.settings.every((s) => s.name.length <= nameChars)),
     `every line's name fits its panel, ${nameChars} characters`);
-  const helps = [...settings.flatMap((s) => [s.help, s.variant?.help ?? '', s.unavailable?.help ?? '']), ...TABS.map((t) => t.help)];
+  const helps = [EXIT_HELP, ...settings.flatMap((s) => [s.help, s.variant?.help ?? '', s.unavailable?.help ?? '']), ...TABS.map((t) => t.help)];
   check(helps.every((h) => h.length <= helpChars), `every help line fits, ${helpChars} characters`);
 }
 
@@ -217,8 +222,6 @@ console.log('\n=== 3. the controls ===');
 
   click(ui, TAB_FRAMES[3]);
   check(state.tab === 'keys', 'KEYS\' tab selects it');
-  click(ui, EXIT_FRAME);
-  check(isDialogOpen(ui), 'EXIT is inert');
 
   click(ui, TAB_FRAMES[0]);
   settingsDialogKey(ui, 'Enter', 'Enter');
@@ -292,6 +295,65 @@ console.log('\n=== 3. the controls ===');
   }
 }
 
+console.log('\n=== 3b. EXIT ===');
+{
+  let exits = 0;
+  const ui = freshUI(true, null, NO_FULLSCREEN, () => exits++);
+  const pressOut = () => new Promise((resolve) => setTimeout(resolve, 2 * MENU_PRESS_PHASE_MS + 50));
+  const drawn = () => {
+    drawSettingsDialog(ui);
+    return ui.screenIndexBuffer.pixels;
+  };
+  const colours = (r: Rect) => {
+    const pixels = drawn();
+    const seen = new Set<number>();
+    for (let y = r.y1; y <= r.y2; y++) for (let x = r.x1; x <= r.x2; x++) seen.add(pixels[y * 320 + x]);
+    return seen;
+  };
+  const [exit, cancel] = menuButtonList(ui, 2, true);
+  const at = (b: { x1: number; y1: number; x2: number; y2: number }) => ({ x: (b.x1 + b.x2 - 1) >> 1, y: (b.y1 + b.y2 - 1) >> 1 });
+  const menuClick = (b: typeof exit, buttons = 2) => settingsDialogClick(ui, at(b).x, at(b).y, buttons);
+
+  openSettingsDialog(ui);
+  const state = ui.settingsDialog!;
+  check(settingsDialogButtons(ui, state).some((b) => b.name === 'settings.exit'), 'EXIT is in the dialog\'s button list');
+  check(colours(buttonRect(EXIT_FRAME)).has(MENU_OPTION_COLOR), `EXIT is labelled, "${EXIT_LABEL}"`);
+  click(ui, TAB_FRAMES[3]);
+  click(ui, EXIT_FRAME);
+  check(state.exiting && isDialogOpen(ui) && exits === 0, 'EXIT, from KEYS too, asks first: the question is up, and nothing has left');
+  const pixels = drawn();
+  check(pixels.slice(0, 320 * 33).every((p) => p === 0), 'the question is on black, the dialog gone');
+  check(colours({ x1: 47, y1: 33, x2: 47 + 223, y2: 33 + 135 }).size > 2, `"${EXIT_QUESTION}" / "${EXIT_WARNING}" is drawn centred, where _DoMenu puts it`);
+  check(!settingsDialogPointer(ui, centre(CLOSE_FRAME)), 'under the question, the pointer moved over CLOSE changes nothing drawn');
+
+  settingsDialogKey(ui, 'Enter', 'Enter');
+  ui.dialog?.wheel(ui, 100);
+  check(state.exiting && state.keys.scrollTop === 0, 'it takes no key but Esc, and no notch of the wheel');
+  settingsDialogKey(ui, 'Escape', 'Escape');
+  check(!state.exiting && isDialogOpen(ui) && state.tab === 'keys', 'Esc is CANCEL: the dialog is back, on its tab');
+  click(ui, EXIT_FRAME);
+  settingsDialogClick(ui, 5, 5, 1);
+  check(!state.exiting && isDialogOpen(ui), 'a right click is CANCEL too');
+
+  click(ui, EXIT_FRAME);
+  settingsDialogClick(ui, 5, 5, 2);
+  check(state.exiting && state.press === null, 'a click on neither button does nothing');
+  menuClick(cancel);
+  check(state.press?.buttonId === 211 && state.exiting, 'CANCEL flashes, the question still up');
+  settingsDialogKey(ui, 'Escape', 'Escape');
+  menuClick(exit);
+  check(state.press?.buttonId === 211, 'while it flashes, Esc and a click do nothing');
+  await pressOut();
+  check(!state.exiting && state.press === null && isDialogOpen(ui) && exits === 0, 'then the dialog is back, and nothing has left');
+
+  click(ui, EXIT_FRAME);
+  menuClick(exit);
+  check(state.press?.buttonId === 210 && exits === 0, 'EXIT flashes, and leaves nothing yet');
+  await pressOut();
+  check(exits === 1, 'then it asks the page to leave for the welcome page');
+  check(isDialogOpen(ui) && ui.ctx.state.paused, 'and the clock is held till the page goes');
+}
+
 console.log('\n=== 4. the help line ===');
 {
   const ui = freshUI();
@@ -319,7 +381,7 @@ console.log('\n=== 4. the help line ===');
   settingsDialogPointer(ui, centre(buttonRect(CLOSE_FRAME)));
   check(helpText(ui, state).startsWith('BACK TO THE GAME'), 'over CLOSE, what it does');
   settingsDialogPointer(ui, centre(buttonRect(EXIT_FRAME)));
-  check(helpText(ui, state) === '', 'over the inert EXIT, nothing');
+  check(helpText(ui, state) === EXIT_HELP, 'over EXIT, where it leads');
   drawSettingsDialog(ui);
   check(ui.screenIndexBuffer.pixels.some((p) => p !== 0), 'it draws');
   closeSettingsDialog(ui);

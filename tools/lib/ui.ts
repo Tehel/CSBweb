@@ -10,7 +10,7 @@
  * `onSaveGame`, `onExportSave` and `onImportSave` throw, as there is no store and no world to serialize.
  * The settings are the defaults, kept nowhere, the CRT effect can be shown, and there is
  * no fullscreen. The map
- * dialog moves no party, as on a page opened without `?dev`.
+ * dialog moves no party, as on a page opened without `?dev`, and EXIT leaves for nothing.
  */
 import type { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import type { GameContext } from '../../src/engine/GameContext';
@@ -62,6 +62,7 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     onRestoreFailed: () => {},
     onOpenHintOracle: () => {},
     onSleepSave: () => {},
+    onExit: () => {},
     settings: new Settings(null),
     isCrtAvailable: () => true,
     fullscreen: NO_FULLSCREEN,

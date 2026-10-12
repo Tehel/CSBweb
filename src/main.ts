@@ -24,7 +24,7 @@ import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import { createCrtEffect, type CrtEffect } from './lib/crt';
 import { NO_FULLSCREEN, createFullscreen } from './lib/fullscreen';
 import { GameScreen } from './renderer/GameScreen';
-import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage } from './ui';
+import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { runBootSequence, runHintOracle, runShowCredits } from './renderer/intro/BootSequence';
@@ -397,6 +397,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         },
         // The party lay down, or the player woke it: the playthrough's Sleepsave.
         onSleepSave: () => { void saves.sleepSave(); },
+        // The settings dialog's EXIT, answered: the welcome page, what is not saved lost.
+        onExit: () => window.location.assign(welcomePageQuery()),
         // The settings dialog reads and changes the player's settings, which this page
         // applies (`applySettings`); its CRT toggle is inert without WebGL, and its
         // FULLSCREEN where the browser gives none.

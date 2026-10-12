@@ -20,8 +20,7 @@
  *   (`SettingsKeys.ts`).
  * - **The help line**, at the foot (`helpText`).
  *
- * EXIT, which leaves for the welcome page (E15), is drawn inert, unlabelled, as the kit
- * draws a button that can do nothing. A setting that cannot work, the CRT effect where
+ * A setting that cannot work, the CRT effect where
  * the browser gives no WebGL (`UIState.isCrtAvailable`) or FULLSCREEN where it gives no
  * fullscreen (`UIState.fullscreen`), keeps its name: its button is raised, its label dim,
  * it takes no click, and the help line says why.
@@ -31,10 +30,20 @@
  * alone is no setting but the page's state, asked of the page (`src/lib/fullscreen.ts`)
  * and kept by nobody: a browser enters fullscreen only at the player's gesture.
  *
+ * ## EXIT
+ *
+ * EXIT leaves the game for the welcome page, and what has not been saved is lost, so it
+ * asks first: `_DoMenu`'s two-option menu, centred, in the dialog's place on a screen
+ * cleared to black, as the save menu asks (`SaveMenu.ts` → "The question"), "LEAVE THE
+ * GAME?" over "WHAT IS NOT SAVED IS LOST", with EXIT and CANCEL. The button chosen flashes
+ * as `_WaitForMenuSelect` flashes it (`playMenuPress`); then EXIT asks the page to open
+ * itself without `?dungeon=` (`UIState.onExit`), and CANCEL puts the dialog back. Esc or a
+ * right click is CANCEL, without the flash, and no other key does anything.
+ *
  * ## The help line
  *
  * It names what the pointer is over: a setting, its button, its name or its control, a
- * tab, or CLOSE. A button under the pointer is lit, the kit's hovered look. The pointer's move
+ * tab, CLOSE or EXIT. A button under the pointer is lit, the kit's hovered look. The pointer's move
  * draws nothing: the VBL's frame draws the dialog again, as it draws the cursor
  * (`GameScreen.takeCursorMoved`). A touch screen has no hover, but its pointer stays where
  * the finger lifted (`bindCanvasEvents`, `src/ui/events.ts`), so the help line names the
@@ -60,12 +69,15 @@ import type { Rect, UIButton } from '../../data/tables/UITables';
 import type { SettingsValues } from '../../settings/Settings';
 import { closeDialog, openDialog, type Dialog, type DialogPoint } from './Dialog';
 import { searchButtonList } from './HitTest';
-import { MENU_TITLE1_COLOR } from './Menu';
+import { clearIndex } from '../csbwin/CanvasBlitter';
+import {
+  MENU_TITLE1_COLOR, doMenu, drawMenuPress, menuButtonList, menuButtonRect, menuHitTest, playMenuPress, type MenuPress,
+} from './Menu';
 import {
   drawKeysTab, keysTabButtons, keysTabClick, keysTabHelp, keysTabHoverButtons, keysTabKey, keysTabRightClick,
   keysTabWheel, newKeysTabState, type KeysArea, type KeysTabState,
 } from './SettingsKeys';
-import type { UIState } from './UIState';
+import { nowMs, type UIState } from './UIState';
 import {
   BUTTON_GAP,
   LOW_BUTTON_HEIGHT,
@@ -268,6 +280,12 @@ export const TABS: ReadonlyArray<{
 export const TITLE = 'SETTINGS';
 export const CLOSE_LABEL = 'CLOSE';
 export const CLOSE_HELP = 'BACK TO THE GAME, SAME AS ESC AND RIGHT CLICK';
+export const EXIT_LABEL = 'EXIT';
+export const EXIT_HELP = 'LEAVE THE GAME FOR THE WELCOME PAGE';
+/** EXIT's question (see "EXIT"), and its two options: EXIT, then CANCEL. */
+export const EXIT_QUESTION = 'LEAVE THE GAME?';
+export const EXIT_WARNING = 'WHAT IS NOT SAVED IS LOST';
+export const EXIT_OPTIONS = [EXIT_LABEL, 'CANCEL'] as const;
 export const TOGGLE_LABELS = ['ON', 'OFF'] as const;
 
 /* --------------------------------------------------------------------- state ---- */
@@ -280,6 +298,10 @@ export interface SettingsDialogState {
   sliding: number | null;
   /** KEYS' list and the slot waiting for its key, kept across the tabs while the dialog is up. */
   keys: KeysTabState;
+  /** EXIT's question, up in the dialog's place (see "EXIT"). */
+  exiting: boolean;
+  /** The question's button flashing, or `null`. */
+  press: MenuPress | null;
 }
 
 export function isSettingsDialogOpen(ui: UIState): boolean {
@@ -293,7 +315,7 @@ const SETTINGS_DIALOG: Dialog = {
   key: (ui, key, code) => settingsDialogKey(ui, key, code),
   wheel: (ui, deltaY) => {
     const state = ui.settingsDialog;
-    if (state?.tab === 'keys') keysTabWheel(state.keys, KEYS_AREA, deltaY);
+    if (state?.tab === 'keys' && !state.exiting) keysTabWheel(state.keys, KEYS_AREA, deltaY);
   },
   pointer: (ui, point) => settingsDialogPointer(ui, point),
   drag: (ui, x) => settingsDialogDrag(ui, x),
@@ -306,7 +328,7 @@ const SETTINGS_DIALOG: Dialog = {
 export function openSettingsDialog(ui: UIState): void {
   if (ui.dialog) return;
   openDialog(ui, SETTINGS_DIALOG);
-  ui.settingsDialog = { tab: 'game', pointer: ui.hoverPoint, sliding: null, keys: newKeysTabState() };
+  ui.settingsDialog = { tab: 'game', pointer: ui.hoverPoint, sliding: null, keys: newKeysTabState(), exiting: false, press: null };
 }
 
 export function closeSettingsDialog(ui: UIState): void {
@@ -318,6 +340,7 @@ export function closeSettingsDialog(ui: UIState): void {
 /* ---------------------------------------------------------------- the controls ---- */
 
 const BTN_CLOSE = 1;
+const BTN_EXIT = 2;
 const BTN_TAB0 = 10;
 /**
  * Line `n`'s ON is `BTN_LINE0 + 3n`, its OFF the next, its slider the one after. On a tab
@@ -358,12 +381,12 @@ function turnOver(ui: UIState, setting: Setting & { kind: 'toggle' | 'page' }): 
 }
 
 /**
- * The dialog's button list, in the form of CSBWin's (`x2` and `y2` exclusive): CLOSE, the
- * tabs, and each setting's button, or each line's toggle or slider, or KEYS' controls. A
+ * The dialog's button list, in the form of CSBWin's (`x2` and `y2` exclusive): CLOSE, EXIT,
+ * the tabs, and each setting's button, or each line's toggle or slider, or KEYS' controls. A
  * control that cannot work has none.
  */
 export function settingsDialogButtons(ui: UIState, state: SettingsDialogState): UIButton[] {
-  const buttons = [buttonOf(CLOSE_FRAME, BTN_CLOSE, 'settings.close')];
+  const buttons = [buttonOf(CLOSE_FRAME, BTN_CLOSE, 'settings.close'), buttonOf(EXIT_FRAME, BTN_EXIT, 'settings.exit')];
   TABS.forEach((t, i) => buttons.push(buttonOf(TAB_FRAMES[i], BTN_TAB0 + i, `settings.tab.${t.tab}`)));
   if (state.tab === 'keys') buttons.push(...keysTabButtons(ui, state.keys, KEYS_AREA));
   const asButtons = isButtonsTab(state);
@@ -388,7 +411,7 @@ export function settingsDialogButtons(ui: UIState, state: SettingsDialogState): 
  */
 function hoverButtons(ui: UIState, state: SettingsDialogState): UIButton[] {
   if (state.tab === 'keys') {
-    return [...settingsDialogButtons(ui, state).slice(0, 1 + TABS.length), ...keysTabHoverButtons(ui, state.keys, KEYS_AREA)];
+    return [...settingsDialogButtons(ui, state).slice(0, 2 + TABS.length), ...keysTabHoverButtons(ui, state.keys, KEYS_AREA)];
   }
   const asButtons = isButtonsTab(state);
   const lines = settingsOf(state).map((_setting, line): UIButton => {
@@ -414,6 +437,7 @@ function lineOf(id: number): number {
 export function helpText(ui: UIState, state: SettingsDialogState): string {
   const id = hovered(ui, state);
   if (id === BTN_CLOSE) return CLOSE_HELP;
+  if (id === BTN_EXIT) return EXIT_HELP;
   if (state.tab === 'keys') {
     const keys = keysTabHelp(ui, state.keys, id);
     if (keys !== undefined) return keys;
@@ -430,6 +454,12 @@ export function helpText(ui: UIState, state: SettingsDialogState): string {
 export function drawSettingsDialog(ui: UIState): void {
   const state = ui.settingsDialog;
   if (!state) return;
+  if (state.exiting) {
+    clearIndex(ui.screenIndexBuffer, 0);
+    doMenu(ui, EXIT_QUESTION, EXIT_WARNING, [...EXIT_OPTIONS], true);
+    if (state.press) drawMenuPress(ui, state.press, nowMs());
+    return;
+  }
   const over = hovered(ui, state);
   const look = (id: number, pressed = false): ButtonLook => (pressed ? 'pressed' : over === id ? 'hover' : 'raised');
 
@@ -438,7 +468,7 @@ export function drawSettingsDialog(ui: UIState): void {
   const title = buttonLabelAt(TITLE_PANEL);
   drawCentredText(ui, TITLE, title.x, title.y, MENU_TITLE1_COLOR);
   drawButton(ui, CLOSE_FRAME, CLOSE_LABEL, look(BTN_CLOSE));
-  drawButton(ui, EXIT_FRAME, '', 'inert');
+  drawButton(ui, EXIT_FRAME, EXIT_LABEL, look(BTN_EXIT));
 
   TABS.forEach((t, i) => drawButton(ui, TAB_FRAMES[i], t.label, look(BTN_TAB0 + i, t.tab === state.tab)));
 
@@ -485,11 +515,16 @@ function drawSettingLines(ui: UIState, state: SettingsDialogState, look: (id: nu
 
 /**
  * A click: a right one closes it, but on KEYS' slots; a left one on a control acts at
- * once, a setting's button turned over, a toggle's side chosen.
+ * once, a setting's button turned over, a toggle's side chosen. EXIT's question takes its
+ * own (`exitQuestionClick`).
  */
 export function settingsDialogClick(ui: UIState, x: number, y: number, buttons: number): void {
   const state = ui.settingsDialog;
   if (!state) return;
+  if (state.exiting) {
+    exitQuestionClick(ui, state, x, y, buttons);
+    return;
+  }
   const id = searchButtonList(settingsDialogButtons(ui, state), Math.floor(x), Math.floor(y), buttons);
   if ((buttons & 1) !== 0) {
     if (state.tab !== 'keys' || !keysTabRightClick(ui, state.keys, id)) closeSettingsDialog(ui);
@@ -500,6 +535,10 @@ export function settingsDialogClick(ui: UIState, x: number, y: number, buttons: 
     return;
   }
   state.keys.capture = null;
+  if (id === BTN_EXIT) {
+    state.exiting = true;
+    return;
+  }
   if (id >= BTN_TAB0 && id < BTN_TAB0 + TABS.length) {
     state.tab = TABS[id - BTN_TAB0].tab;
     return;
@@ -524,6 +563,31 @@ export function settingsDialogClick(ui: UIState, x: number, y: number, buttons: 
   if (isOn(ui, setting) !== on) turnOver(ui, setting);
 }
 
+/**
+ * A click on EXIT's question: a right one is CANCEL, and a left one on EXIT or CANCEL,
+ * `_WaitForMenuSelect`'s 1 and 2, flashes it, then leaves the game or puts the dialog
+ * back. Nothing while a button flashes.
+ */
+function exitQuestionClick(ui: UIState, state: SettingsDialogState, x: number, y: number, buttons: number): void {
+  if (state.press) return;
+  if ((buttons & 1) !== 0) {
+    state.exiting = false;
+    return;
+  }
+  const list = menuButtonList(ui, EXIT_OPTIONS.length, true);
+  const choice = menuHitTest(list, Math.floor(x), Math.floor(y), buttons);
+  const rect = menuButtonRect(list, 209 + choice);
+  if (!rect) return;
+  const press: MenuPress = { buttonId: 209 + choice, rect, startedMs: nowMs() };
+  state.press = press;
+  playMenuPress(ui, press, () => ui.settingsDialog?.press === press, () => {
+    state.press = null;
+    if (choice === 1) ui.onExit();
+    else state.exiting = false;
+    ui.renderLastFrame();
+  });
+}
+
 /** The pointer moved with a slider's click held: the knob follows it, as far as the track's ends. */
 function settingsDialogDrag(ui: UIState, x: number): void {
   const state = ui.settingsDialog;
@@ -534,10 +598,17 @@ function settingsDialogDrag(ui: UIState, x: number): void {
   if (value !== setting.get(ui.settings.values)) ui.settings.update(setting.set(ui.settings.values, value));
 }
 
-/** KEYS takes its keys (`keysTabKey`); else Esc closes it, and no other key does anything. */
+/**
+ * KEYS takes its keys (`keysTabKey`); else Esc closes it, or is EXIT's question's CANCEL,
+ * and no other key does anything.
+ */
 export function settingsDialogKey(ui: UIState, _key: string, code: string): void {
   const state = ui.settingsDialog;
   if (!state) return;
+  if (state.exiting) {
+    if (code === 'Escape' && !state.press) state.exiting = false;
+    return;
+  }
   if (state.tab === 'keys' && keysTabKey(ui, state.keys, KEYS_AREA, code)) return;
   if (code === 'Escape') closeSettingsDialog(ui);
 }
@@ -551,5 +622,5 @@ export function settingsDialogPointer(ui: UIState, point: DialogPoint): boolean 
   if (!state) return false;
   const was = hovered(ui, state);
   state.pointer = point;
-  return hovered(ui, state) !== was;
+  return !state.exiting && hovered(ui, state) !== was;
 }

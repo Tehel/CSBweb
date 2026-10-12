@@ -109,6 +109,7 @@ export type GameScreenHooks = Pick<UIState,
   | 'onRestoreFailed'
   | 'onOpenHintOracle'
   | 'onSleepSave'
+  | 'onExit'
   | 'settings'
   | 'isCrtAvailable'
   | 'fullscreen'
@@ -218,6 +219,7 @@ export class GameScreen {
       onRestoreFailed: hooks.onRestoreFailed,
       onOpenHintOracle: hooks.onOpenHintOracle,
       onSleepSave: hooks.onSleepSave,
+      onExit: hooks.onExit,
       settings: hooks.settings,
       isCrtAvailable: hooks.isCrtAvailable,
       fullscreen: hooks.fullscreen,

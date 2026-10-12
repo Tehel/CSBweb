@@ -108,7 +108,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E15 | The page shell | L | ⚠️ step 5 of 6 next |
+| E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
@@ -794,10 +794,13 @@ C170 and C171 are copies that drifted. The copies left:
   and `DecodeText.ts:269-272`; `EDT_SPECIAL_LOCATIONS` and `ESL_MONSTER_MOVE_FILTER` both in
   `CsbwinExpool.ts:40-44` and `DsaSystem.ts:329-351`, and the fifteen `ESL_*` loose
   constants.
+- **A menu's press played out**: `playMenuPress` (`src/renderer/ui/Menu.ts`), which the
+  settings dialog's EXIT question uses, beside the save menu's own copy of it in
+  `beginPress`, `scheduleFrame` and `cancelFrame` (`src/renderer/ui/SaveMenu.ts`).
 
 Paying it: a module of rule helpers (`masteryOf(ctx, champ, skill)`,
 `characterAtPosition`, `isAlive`, `levelDifficulty(ctx)`, `adjustSkillsOnPartyLevel`,
-`spellObjectId`, `roomTypeOf`); one `recordsOf(db)` and a generic record getter; the text
+`spellObjectId`, `roomTypeOf`); the save menu's press through `playMenuPress`; one `recordsOf(db)` and a generic record getter; the text
 codec beside `messageParametersKey`, with an `Esl` enum. After C170 and C171, so that this
 commit changes no output.
 
@@ -1156,9 +1159,12 @@ The steps, one commit each:
    italic, under `src/assets/` with its OFL. `npm test` checks the committed font
    against graphics.dat, and `tools/probe-frames.mjs` that the browser draws each of its
    characters as the game draws it, and that no request goes to Google Fonts.
-5. ⏳ **EXIT.** The settings dialog's EXIT (`src/renderer/ui/SettingsDialog.ts`), drawn
-   inert, goes live: it asks first in `_DoMenu`'s two-option menu, as what has not been
-   saved is lost, then opens the page without `?dungeon=`.
+5. ✅ **EXIT.** The settings dialog's EXIT (`src/renderer/ui/SettingsDialog.ts` → "EXIT")
+   asks first in `_DoMenu`'s two-option menu, "LEAVE THE GAME?" over "WHAT IS NOT SAVED
+   IS LOST", EXIT and CANCEL, then opens the page without `?dungeon=` and `?save=`, its
+   other parameters kept (`UIState.onExit`, `welcomePageQuery`). `tools/dump-settings-dialog.ts`
+   checks the question and its answers, and `tools/probe-frames.mjs` that the question's
+   EXIT opens the welcome page; the question is golden frame 28.
 6. ⏳ **What the shell leaves.**
    - **`main.ts` holds the page's features**: the end-of-game flow.
    - **A teleport sends events.** On a page opened with `?dev`, a click on the map

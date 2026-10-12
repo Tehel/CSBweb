@@ -24,7 +24,8 @@
 // shows them: the CRT effect, which screens take the mouse wheel, a move of the pointer
 // left to the VBL's frame to paint, the keys of the entrance's chooser, the download its
 // EXPORT starts, a file dropped on it, a finger held on the eye, a mouse released off
-// the canvas, the settings dialog opened, held, changed and read back, the map dialog
+// the canvas, the settings dialog opened, held, changed and read back, its EXIT asking
+// first and leading to the welcome page, the map dialog
 // opened by a long press, but not with MAP VIEW off, the champion dialog opened by a
 // long press on the bars, where a tap opens the inventory, and fullscreen, entered by a
 // tap and a click, the screen and the effect sized and placed in it, and the welcome
@@ -678,7 +679,24 @@ const kept = await settingsValues();
 check(kept.sound === false && kept.volume === 1, 'after a reload, the sound is still off, at full volume');
 await canvasClick(100, 185, 0); await canvasClick(150, 190, 0); await wait(300);
 check(await settingsUp(), 'a double click on the message area opens the settings');
-await canvasClick(160, 100, 2); await wait(300);
+// EXIT asks first, in `_DoMenu`'s centred menu (a frame of it, the pointer off the
+// canvas); Esc puts the dialog back, and the question's EXIT, once it has flashed, opens
+// the welcome page, the page's other parameters kept.
+const exiting = () => evaluate(`window.__probe.screen.ui.settingsDialog?.exiting === true`);
+await canvasClick(279, 19, 0); await wait(300);
+check(await exiting(), 'EXIT asks first');
+await leaveCanvas(); await wait(200);
+console.log('state: settings, EXIT');    await shot('28-settings-exit');
+await key('Escape'); await wait(300);
+check(await settingsUp() && !(await exiting()), 'Esc on the question puts the settings back');
+await canvasClick(279, 19, 0); await wait(300);
+const exitButton = await evaluate(`(()=>{const b=window.__probe.screen.ui.uiTables.graphic231.buttons.buttons18828.find((e)=>e.word0===210);
+  return {x:(b.x1+b.x2-1)>>1, y:(b.y1+b.y2-1)>>1};})()`);
+await canvasClick(exitButton.x, exitButton.y, 0); await wait(2000);
+const left = await evaluate(`(()=>{const p=new URLSearchParams(location.search);
+  return {search: location.search, welcome: document.querySelector('.welcome-page') !== null,
+    query: !p.has('dungeon') && p.get('intro') === '0' && p.has('keepsaves') && p.has('keepsettings')};})()`);
+check(left.welcome && left.query, `the question's EXIT opens the welcome page, the other parameters kept (${left.search})`);
 
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
 // where the save left it: a press held on the message area opens it, with MAP VIEW on

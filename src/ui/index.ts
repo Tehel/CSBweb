@@ -1,4 +1,4 @@
 export { bindUIEvents } from './events';
 export { bindSaveDrop } from './saveDrop';
 export { showFatalMessage } from './fatalMessage';
-export { showWelcomePage } from './welcomePage';
+export { showWelcomePage, welcomePageQuery } from './welcomePage';

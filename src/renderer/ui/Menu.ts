@@ -33,7 +33,7 @@ import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import type { UIButton } from '../../data/tables/UITables';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { searchButtonList } from './HitTest';
-import type { UIState } from './UIState';
+import { nowMs, type UIState } from './UIState';
 
 /** Item 0 of `graphics.dat` — `d.compressedGraphic0` (`Graphics.cpp:2031`). */
 export const MENU_GRAPHIC = 0;
@@ -398,4 +398,24 @@ export function drawMenuPress(ui: UIState, press: MenuPress, nowMs: number): voi
 /** Whether the animation has run its two passes out. */
 export function menuPressFinished(press: MenuPress, nowMs: number): boolean {
   return nowMs - press.startedMs >= MENU_PRESS_PHASE_MS * 2;
+}
+
+/**
+ * Play `press` out, then `then`: `_WaitForMenuSelect` returns its choice only once the
+ * button has flashed (`Menu.cpp:100-180`). The clock is held under a dialog, so the
+ * frames are the page's own. `isLive` says whether the press is still the one up: once
+ * its menu is gone, nothing more is drawn and `then` never runs.
+ */
+export function playMenuPress(ui: UIState, press: MenuPress, isLive: () => boolean, then: () => void): void {
+  const frame = (): void => {
+    if (!isLive()) return;
+    if (menuPressFinished(press, nowMs())) {
+      then();
+      return;
+    }
+    ui.renderLastFrame();
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(frame);
+    else setTimeout(frame, 16);
+  };
+  frame();
 }
