@@ -113,7 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P7 | The data sets in the server's database | L | ⏳ step 1 of 4 next |
+| P7 | The data sets in the server's database | L | ⚠️ step 2 of 4 next |
 | P8 | Publishing a local set | L | ⏳ after P7 |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
@@ -261,7 +261,7 @@ A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more 
 
 ### P7 ⏳ The data sets in the server's database
 
-L, in four steps, one commit each. Step 1 is next.
+L, in four steps, one commit each. Step 1 stands; step 2 is next.
 
 Decided with the author: the page asks **`api/data-sets`** for the list, in the format
 `parseManifest` reads. The site's server answers it from its table. The dev server
@@ -272,17 +272,17 @@ repository's manifest is **`tools/data-sets.json`**, its folders relative to
 `static/gamefiles/`: the dev server's and the tools' (`tools/lib/dataSets.ts`), and
 nobody else's.
 
-1. **The page asks `api/data-sets`.** `static/gamefiles/manifest.json` moves to
-   `tools/data-sets.json`. The page's `loadManifest` (`src/main.ts`) fetches the route;
-   the Vite plugin answers it from that file. The server answers it with its mounted
-   `manifest.json`, which it still reads at start-up (`checkFiles`), and serves no file
-   of that name under `gamefiles/` any more. `tools/dump-server.ts` asks the route.
+1. ✅ **The page asks `api/data-sets`** (`DATA_SETS_ROUTE`, `src/data/DataSets.ts`;
+   `loadManifest`, `src/main.ts`). The Vite plugin answers it from `tools/data-sets.json`.
+   The server answers it with the manifest `checkFiles` read at start-up, its
+   `MANIFEST_FILE` (`/data/gamefiles/manifest.json` in the image), which it does not
+   serve as a file. `tools/dump-server.ts` asks the route.
 2. **The table.** A `data_sets` table in the store's SQLite file (`STATS_DB`), so that
    `backup.ts` already covers it: a set's fields and flags, its folder, its place in the
    order, its status (approved or pending) and its owner's `playerId` (`NULL` for the
    author's), and the default set and the FTL logo's folder beside it. At start-up an
-   empty table is filled once from `GAMEFILES_DIR/manifest.json`; after that the server
-   reads no manifest file, and `checkFiles` checks the table's folders. `api/data-sets`
+   empty table is filled once from `MANIFEST_FILE`; after that the server reads no
+   manifest file, and `checkFiles` checks the table's folders. `api/data-sets`
    and `api/event`'s known sets come from the table, read per request, since P8 adds
    sets while the server runs.
 3. **The answer per player.** The page sends its `playerId` (`src/ui/gameEvents.ts`) in

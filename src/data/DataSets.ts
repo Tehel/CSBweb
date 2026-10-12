@@ -9,9 +9,11 @@
  * code does not branch on the game: the tables, the title and the credits all come from
  * the directory's `graphics.dat`, so everything the page builds comes from the set.
  *
- * The sets are listed by `manifest.json`, in the folder that holds them
- * (`static/gamefiles/` here), which is served with the files it describes, so a server
- * offers the games its folder holds. This module parses it, for the page and the tools:
+ * The sets are listed by a manifest, which the page asks the server for (`DATA_SETS_ROUTE`):
+ * the deployed server answers it from the `manifest.json` beside the files it describes
+ * (`server/app.ts`), and the dev server from the repository's, `tools/data-sets.json`
+ * (`vite.config.mts`), which the tools read too. This module parses it, for the page, the
+ * tools and the server:
  *
  *     { "default": "dm-atari", "swoosh": "swoosh",
  *       "dataSets": [{ "id": "dm-atari", "name": "Dungeon Master", "csbGraphics": true },
@@ -108,14 +110,17 @@ export interface DataSetManifest {
  */
 export const LOCAL_DATA_SET_PREFIX = 'local:';
 
-/** The manifest's name, in the folder that holds the sets. */
-export const MANIFEST_NAME = 'manifest.json';
+/**
+ * Where the page asks for the manifest, relative to the page: the server's API, not a file
+ * under `gamefiles/`, since a server chooses what each player is offered.
+ */
+export const DATA_SETS_ROUTE = 'api/data-sets';
 
 const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'hidden'] as const;
 
 /**
- * `text`, the manifest read from the folder `base` (`gamefiles` for the page,
- * `static/gamefiles` for the tools), every folder it names resolved under `base`. A
+ * `text`, a manifest whose folders are relative to `base` (`gamefiles` for the page,
+ * `static/gamefiles` for the tools, `''` for the server), every one resolved under it. A
  * manifest that is not JSON, or does not say what the page needs, throws an error whose
  * message says why: the page cannot choose a game without it.
  */
@@ -179,7 +184,7 @@ export function dataSetNamed(manifest: DataSetManifest, id: string | null): Data
 }
 
 function manifestError(why: string): Error {
-    return new Error(`The data sets' ${MANIFEST_NAME} is not usable: ${why}.`);
+    return new Error(`The data sets' manifest is not usable: ${why}.`);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

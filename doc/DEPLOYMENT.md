@@ -20,7 +20,7 @@ behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 image      dist/ (the built page) + server/ (run by Node 24 as is) + src/data/DataSets.ts
 mounts     /data/gamefiles  :ro   the data sets, swoosh/, manifest.json
            /data/stats            stats.db (SQLite, WAL), backups/
-env        PORT (8085), DIST_DIR, GAMEFILES_DIR, STATS_DB
+env        PORT (8085), DIST_DIR, GAMEFILES_DIR, MANIFEST_FILE, STATS_DB
 ```
 
 On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
@@ -40,7 +40,9 @@ On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
 ```
 
 **The manifest is inside `gamefiles/`**, next to the folders it names. The server reads
-`/data/gamefiles/manifest.json`, and nothing outside the mounted folder is visible to it.
+`/data/gamefiles/manifest.json` (the image's `MANIFEST_FILE`), and nothing outside the
+mounted folder is visible to it. It answers the page's `api/data-sets` with it, and does
+not serve it as a file.
 
 ## The site
 
@@ -68,18 +70,20 @@ The page ships as it is, debug chrome included. Every URL in it is relative to t
 
 ## The game files and the manifest
 
-`static/gamefiles/manifest.json`, committed with the files it describes, lists each set
-(its `dir` relative to the manifest), the default set's id and the FTL logo's folder, or
-none. A set names only what differs from the defaults: `dir` left out is the set's `id`,
+A manifest lists each set (its `dir` relative to the game files' folder), the default
+set's id and the FTL logo's folder, or none. A set names only what differs from the defaults: `dir` left out is the set's `id`,
 and each flag (`csbGraphics`, `miniDat`, `hintOracle`, `hidden`) left out is `false`. `src/data/DataSets.ts` parses it, for the page, the tools and the server. The page
-fetches it first (`loadManifest`, `src/main.ts`), and one that is missing or malformed ends
-the boot on `fatalMessage`, saying why. The tools read it through `tools/lib/dataSets.ts`,
-and `tools/dump-data-sets.ts` asserts the parser's refusals and that every folder holds the
-files its flags promise.
+asks the server for it first, at `api/data-sets` (`loadManifest`, `src/main.ts`), and one
+that is missing or malformed ends the boot on `fatalMessage`, saying why.
 
-The repository's manifest keeps every set, because the tools need them all. The deployed
-one is the author's own copy, uploaded with the files: which sets the site offers is the
-author's choice. Today it is the repository's, all nine sets.
+The repository's manifest is `tools/data-sets.json`, its folders under `static/gamefiles/`.
+It keeps every set, because the tools need them all: they read it through
+`tools/lib/dataSets.ts`, and `tools/dump-data-sets.ts` asserts the parser's refusals and
+that every folder holds the files its flags promise. The dev server answers
+`api/data-sets` with it (`vite.config.mts`), and so does `npm start`. The deployed
+manifest is the author's own copy, `gamefiles/manifest.json`, uploaded with the files:
+which sets the site offers is the author's choice. Today it is the repository's, all nine
+sets.
 
 The manifest is strict JSON, read by `JSON.parse`: a comment makes it unreadable, and the
 server will not start on it. To take a set off the welcome page without deleting it, give it
@@ -98,10 +102,11 @@ written before it is uploaded; without one, its tile's picture is a blank box.
 
 The game files are not part of a deploy. They are uploaded once, and again when they
 change. **Everything in `gamefiles/` can be downloaded**, readmes and stray folders
-included, since the server serves the folder as it stands.
+included, since the server serves the folder as it stands; only the manifest is not.
 
-**The server checks the manifest only at start-up** (below). After changing the manifest,
-or the folders it names, restart the stack. A file the page asks for is read when it is
+**The server reads the manifest only at start-up** (below), and answers `api/data-sets`
+with what it read then. After changing the manifest, or the folders it names, restart the
+stack. A file the page asks for is read when it is
 asked for, so replacing a data set's files needs no restart.
 
 ## The build
@@ -131,14 +136,16 @@ runs `tsc` on it beside the root project. The package is an ES module
 the server imports from `../src/data/`. `npm start` runs it locally, on Node 22.18 or later.
 
 It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
-`static/gamefiles/`), and `STATS_DB` (the checkout's `stats/stats.db`, which git ignores),
+`static/gamefiles/`), `MANIFEST_FILE` (the checkout's `tools/data-sets.json`; the image's
+`/data/gamefiles/manifest.json`), and `STATS_DB` (the checkout's `stats/stats.db`, which git ignores),
 and serves (`server/app.ts`):
 
 | Path | What | Caching |
 | --- | --- | --- |
 | `/` | `dist/index.html` | `no-cache` |
 | `/assets/…` | `dist/assets/…`, hashed names | `immutable` |
-| `/gamefiles/…` | `GAMEFILES_DIR/…` | `no-cache`, ETag and Last-Modified |
+| `/gamefiles/…` | `GAMEFILES_DIR/…`, but the manifest | `no-cache`, ETag and Last-Modified |
+| `/api/data-sets` | the manifest checked at start-up | `no-store` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
 | `/api/stats` | the statistics' aggregates | `no-store` |
@@ -224,7 +231,8 @@ never takes that path, at the cost of a few seconds' outage per deploy, during w
 answers 502.
 
 `tools/check-image.sh` builds the image with `CSBWEB_PROBE=1` as `csbweb:probe`, runs it over
-the checkout's game files and a throwaway stats folder, and runs
+the checkout's game files, `tools/data-sets.json` as its `MANIFEST_FILE` and a throwaway
+stats folder, and runs
 `tools/check-frames.sh --url` against it: the twenty golden frames, drawn by the built
 page as the container serves it, must match the dev server's. The probe image is never
 deployed.
@@ -233,12 +241,12 @@ deployed.
 
 ```bash
 curl -s https://csbweb.looten.net/api/health                   # {"ok":true}
-curl -sI https://csbweb.looten.net/gamefiles/manifest.json      # 200
+curl -s https://csbweb.looten.net/api/data-sets                # the manifest
 ssh <host> 'cd ~/csbweb && docker-compose ps && docker-compose logs --tail 20'
 ```
 
 A healthy start logs one line, `Listening on port 8085: /app/dist, and /data/gamefiles
-(<the sets>); statistics in /data/stats/stats.db`.
+(<the sets>, from /data/gamefiles/manifest.json); statistics in /data/stats/stats.db`.
 
 **A container that fails to start is retried with a growing delay**: 13 s, 27 s, 51 s, then
 about a minute between attempts. While it waits, `docker-compose ps` says "Restarting", even
@@ -246,9 +254,9 @@ once the cause is fixed, so a fix seems not to work for up to a minute. `docker-
 restart` tries again at once. `docker-compose logs` shows each attempt's `Not starting:`
 line; a `down` deletes the container and its log with it.
 
-`api/health` answers as soon as the server listens; it does not re-read the files. A
-manifest moved away after a good start leaves a healthy container whose page cannot boot,
-which the second `curl` above catches.
+`api/health` answers as soon as the server listens; it does not re-read the files. A set's
+folder moved away after a good start leaves a healthy container whose page cannot play
+that set.
 
 ## Backups
 

@@ -1,7 +1,7 @@
 # The deployed game (`doc/DEPLOYMENT.md`): `server/` on Node 24, over the built page.
 # The game files and the statistics are mounted, never in the image:
 #
-#   /data/gamefiles   the data sets and their manifest, read-only
+#   /data/gamefiles   the data sets and their manifest.json, read-only
 #   /data/stats       stats.db
 #
 #   docker build --build-arg CSBWEB_BUILD=$(git rev-parse --short HEAD) -t csbweb .
@@ -31,6 +31,7 @@ COPY --from=build /app/dist/ dist/
 ENV PORT=8085 \
     DIST_DIR=/app/dist \
     GAMEFILES_DIR=/data/gamefiles \
+    MANIFEST_FILE=/data/gamefiles/manifest.json \
     STATS_DB=/data/stats/stats.db
 EXPOSE 8085
 # uid 1000, the VPS's own user, so the mounted stats folder is writable here and readable

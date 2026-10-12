@@ -7,6 +7,8 @@
  *   - the start-up check: the repository's manifest passes, and a missing `index.html`, a
  *     missing manifest, a manifest that does not parse and a folder it names that is not
  *     there each stop it, saying why;
+ *   - `/api/data-sets`: the manifest it checked, as JSON, not cached, and the manifest not
+ *     served as a file under `gamefiles/`;
  *   - `/` and `/assets/…`: the page, `no-cache`, and the hashed files, `immutable`, the
  *     fonts as `font/ttf` and `font/woff2`;
  *   - `/gamefiles/…`: ETag and Last-Modified, a 304 for either precondition, HEAD without
@@ -36,7 +38,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { checkFiles, createAppServer, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
 import { RateLimit } from '../server/events.ts';
 import { StatsStore } from '../server/stats.ts';
-import { GAMEFILES_DIR } from './lib/dataSets.ts';
+import { GAMEFILES_DIR, MANIFEST_FILE } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
 
@@ -93,39 +95,40 @@ function scratchFiles(scratch: string): ServerOptions {
     writeFileSync(join(gamefilesDir, 'set-a', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
     writeFileSync(join(gamefilesDir, 'set-a', '.hidden'), 'hidden');
     writeFileSync(join(scratch, 'secret.txt'), 'SECRET');
-    return { distDir, gamefilesDir };
+    return { distDir, gamefilesDir, manifestFile: join(gamefilesDir, 'manifest.json') };
 }
 
 function checkStartUp(scratch: string, options: ServerOptions): void {
     console.log('Start-up check:');
-    const real = checkFiles({ distDir: options.distDir, gamefilesDir: GAMEFILES_DIR });
-    console.log(`  ${GAMEFILES_DIR}: ${real.dataSets.map((set) => set.id).join(', ')}`);
-    check(real.dataSets.length > 0, `the repository's ${GAMEFILES_DIR} passes`);
+    const real = checkFiles({ distDir: options.distDir, gamefilesDir: GAMEFILES_DIR, manifestFile: MANIFEST_FILE }).manifest;
+    console.log(`  ${MANIFEST_FILE}: ${real.dataSets.map((set) => set.id).join(', ')}`);
+    check(real.dataSets.length > 0, `the repository's ${MANIFEST_FILE} passes over ${GAMEFILES_DIR}`);
     check(refusal(options) === '', 'the scratch files pass');
 
     const noPage = refusal({ ...options, distDir: join(scratch, 'nowhere') });
     console.log(`  no page        : ${noPage}`);
     check(noPage.includes('no index.html'), 'a build without index.html is refused');
-    const noManifest = refusal({ ...options, gamefilesDir: join(scratch, 'dist') });
-    console.log(`  no manifest    : ${noManifest}`);
-    check(noManifest.includes('holds no manifest.json'), 'a folder without a manifest is refused');
+    const noManifest = refusal({ ...options, manifestFile: join(scratch, 'nowhere.json') });
+    console.log(`  no manifest    : ${noManifest.replace(scratch, '<scratch>')}`);
+    check(noManifest.includes('there is no manifest'), 'a missing manifest is refused');
 
     const bad = join(scratch, 'bad');
     mkdirSync(bad);
     writeFileSync(join(bad, 'manifest.json'), '{ "dataSets": ');
-    const notJson = refusal({ ...options, gamefilesDir: bad });
+    const badManifest = { ...options, gamefilesDir: bad, manifestFile: join(bad, 'manifest.json') };
+    const notJson = refusal(badManifest);
     console.log(`  not JSON       : ${notJson}`);
     check(notJson.includes('is not JSON'), 'a manifest that does not parse is refused, by the page\'s parser');
     writeFileSync(join(bad, 'manifest.json'), JSON.stringify({
         default: 'a', swoosh: 'gone-logo',
         dataSets: [{ id: 'a', name: 'A', dir: 'gone' }],
     }));
-    const missing = refusal({ ...options, gamefilesDir: bad });
+    const missing = refusal(badManifest);
     console.log(`  missing folders: ${missing}`);
     check(missing.endsWith('does not hold: gone, gone-logo'), 'every folder the manifest names and the folder lacks is named');
 }
 
-async function checkAnswers(port: number): Promise<void> {
+async function checkAnswers(port: number, manifest: string): Promise<void> {
     console.log('\nThe page:');
     const page = await ask(port, '/?dungeon=csb');
     check(page.status === 200 && page.body.includes('<title>page</title>'), '/ is index.html, whatever the query');
@@ -163,8 +166,7 @@ async function checkAnswers(port: number): Promise<void> {
         'If-None-Match wins over If-Modified-Since');
     const head = await ask(port, '/gamefiles/set-a/dungeon.dat', 'HEAD');
     check(head.status === 200 && head.body === '' && head.headers['content-length'] === '4', 'HEAD: the headers, no body');
-    const manifest = await ask(port, '/gamefiles/manifest.json');
-    check(manifest.status === 200 && String(manifest.headers['content-type']).startsWith('application/json'), 'the manifest, as JSON');
+    check((await ask(port, '/gamefiles/manifest.json')).status === 404, 'the manifest, in the folder, is not served as a file');
 
     console.log('\nPaths that would leave the folders:');
     for (const path of [
@@ -181,6 +183,12 @@ async function checkAnswers(port: number): Promise<void> {
     console.log('\nThe API:');
     const health = await ask(port, '/api/health');
     check(health.status === 200 && health.body === '{"ok":true}' && health.headers['cache-control'] === 'no-store', '/api/health: 200, not cached');
+    const dataSets = await ask(port, '/api/data-sets?dungeon=a');
+    check(dataSets.status === 200 && dataSets.body === manifest, '/api/data-sets: the manifest checked at start-up');
+    check(String(dataSets.headers['content-type']).startsWith('application/json') && dataSets.headers['cache-control'] === 'no-store',
+        'as JSON, not cached');
+    check((await ask(port, '/api/data-sets', 'HEAD')).body === '', 'HEAD /api/data-sets: no body');
+    check((await ask(port, '/api/data-sets', 'POST')).status === 405, 'POST on /api/data-sets: 405');
     check((await ask(port, '/api/nothing')).status === 404, 'an unknown API is 404');
     const post = await ask(port, '/', 'POST');
     check(post.status === 405 && post.headers.allow === 'GET, HEAD', 'POST on a file: 405, with Allow');
@@ -258,17 +266,17 @@ function finish(child: ChildProcess, onLine: (line: string) => void = () => {}):
 async function checkEntry(scratch: string, options: ServerOptions): Promise<void> {
     console.log('\nserver.ts:');
     const statsDb = join(scratch, 'stats', 'stats.db');
-    const badMount = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: join(scratch, 'nowhere'), STATS_DB: statsDb }));
+    const badMount = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: join(scratch, 'nowhere'), MANIFEST_FILE: options.manifestFile, STATS_DB: statsDb }));
     console.log(`  bad mount: exit ${badMount.code}, ${firstLine(badMount.out).replace(scratch, '<scratch>')}`);
     check(badMount.code === 1 && badMount.out.includes('Not starting:'), 'a bad mount exits 1 before it listens');
-    const badStore = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: options.distDir }));
+    const badStore = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: options.distDir }));
     console.log(`  bad store: exit ${badStore.code}, ${firstLine(badStore.out).replace(scratch, '<scratch>')}`);
     check(badStore.code === 1 && badStore.out.includes('Not starting:'), 'a store it cannot open exits 1 before it listens');
 
     let healthy = false;
     let walHeld = false;
     let backedUp: { code: number | null; out: string; events: number; answering: boolean } | null = null;
-    const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: statsDb });
+    const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: statsDb });
     const ended = finish(child, (line) => {
         const listening = /^Listening on port (\d+)/.exec(line);
         if (!listening) return;
@@ -318,7 +326,9 @@ async function main(): Promise<void> {
         checkStartUp(scratch, options);
 
         store = new StatsStore(join(scratch, 'scratch-stats.db'));
+        const { text } = checkFiles(options);
         const api: ApiOptions = {
+            dataSets: text,
             store,
             rules: { sets: new Set(['a']) },
             rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
@@ -327,7 +337,7 @@ async function main(): Promise<void> {
         server = createAppServer(options, api);
         await new Promise<void>((done) => server!.listen(0, '127.0.0.1', done));
         const port = (server.address() as AddressInfo).port;
-        await checkAnswers(port);
+        await checkAnswers(port, text);
         await checkEvents(port, store);
 
         await checkEntry(scratch, options);

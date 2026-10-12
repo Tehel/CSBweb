@@ -15,13 +15,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { MANIFEST_NAME, chooserSets, dataSetNamed, parseManifest, type DataSet } from '../src/data/DataSets';
+import { chooserSets, dataSetNamed, parseManifest, type DataSet } from '../src/data/DataSets';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { GameTables } from '../src/engine/GameTables';
 import { MISSING_PRISON_DOOR_BUTTONS } from '../src/renderer/intro/PrisonDoor';
 import { check, finish } from './lib/check';
-import { DATA_SETS, DEFAULT_DATA_SET, GAMEFILES_DIR, MANIFEST } from './lib/dataSets';
+import { DATA_SETS, DEFAULT_DATA_SET, MANIFEST, MANIFEST_FILE } from './lib/dataSets';
 import { gameTablesOf, graphicsTablesOf, newGame } from './lib/game';
 
 /** A file of `set`. */
@@ -88,7 +88,7 @@ function checkParser(): void {
   for (const [text, why] of malformed) {
     const message = refusal(text);
     console.log(`  refused: ${message}`);
-    check(message !== null && message.startsWith(`The data sets' ${MANIFEST_NAME} is not usable: `) && message.includes(why),
+    check(message !== null && message.startsWith(`The data sets' manifest is not usable: `) && message.includes(why),
       `a manifest whose fault is "${why}" is refused, and the message says so`);
   }
 }
@@ -99,7 +99,7 @@ function main(): void {
   console.log('== the manifest\'s parser ==');
   checkParser();
 
-  console.log(`== ${GAMEFILES_DIR}/${MANIFEST_NAME}: ${DATA_SETS.length} sets, default ${DEFAULT_DATA_SET.id}, FTL logo in ${MANIFEST.swooshDir} ==`);
+  console.log(`== ${MANIFEST_FILE}: ${DATA_SETS.length} sets, default ${DEFAULT_DATA_SET.id}, FTL logo in ${MANIFEST.swooshDir} ==`);
   check(DEFAULT_DATA_SET.id === 'dm-atari', 'the tools play dm-atari where they name no set');
   check(MANIFEST.swooshDir !== null && existsSync(resolve(MANIFEST.swooshDir, 'swoosh.img')) && existsSync(resolve(MANIFEST.swooshDir, 'swoosh.wav')),
     'the FTL logo\'s folder holds swoosh.img and swoosh.wav');

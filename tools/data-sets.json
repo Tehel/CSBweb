@@ -1,0 +1,15 @@
+{
+  "default": "dm-atari",
+  "swoosh": "swoosh",
+  "dataSets": [
+    { "id": "dm-atari", "name": "Dungeon Master", "dmRules": true },
+    { "id": "dm-atari-1.2", "name": "Dungeon Master ST 1.2", "dmRules": true, "hidden": true },
+    { "id": "dm-atari-1.3-fr", "name": "Dungeon Master ST 1.3 French", "dmRules": true, "hidden": true },
+    { "id": "dm-windows", "name": "Dungeon Master (CSBWin)", "hidden": true },
+    { "id": "csb", "name": "Chaos Strikes Back", "miniDat": true, "hintOracle": true },
+    { "id": "kids-dungeon", "name": "Kids dungeon 24", "dir": "kids-dungeon-24", "dmRules": true },
+    { "id": "3d2d1d", "name": "3D2D1D", "dir": "3D2D1D", "hidden": true },
+    { "id": "conflux-3.5", "name": "Conflux 3.5", "dir": "conflux-3.5-b8", "csbGraphics": true },
+    { "id": "towers-of-chaos", "name": "The Towers of Chaos 3.3", "dir": "towers-of-chaos-3.3", "csbGraphics": true }
+  ]
+}

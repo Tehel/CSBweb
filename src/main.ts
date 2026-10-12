@@ -8,7 +8,7 @@ import { SoundManager } from './audio/SoundManager';
 import { CsbRandom } from './core/random';
 import { Position } from './core/types';
 import { extractPresetHeroes } from './data/HeroExtractor';
-import { MANIFEST_NAME, dataSetNamed, parseManifest, type DataSet, type DataSetManifest } from './data/DataSets';
+import { DATA_SETS_ROUTE, dataSetNamed, parseManifest, type DataSet, type DataSetManifest } from './data/DataSets';
 import { folderFiles, loadGameFiles, type DataSetFiles, type GameFiles } from './data/DataSetFiles';
 import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
@@ -45,7 +45,7 @@ let game: Game | null = null;
 let screen: GameScreen | null = null;
 let crtController: CrtEffect | null = null;
 
-/** The folder of the games and their manifest, relative to the page as every fetch is. */
+/** The folder of the games, relative to the page as every fetch is. */
 const GAMEFILES_DIR = 'gamefiles';
 /**
  * The game this page plays, chosen from the manifest before anything else is loaded
@@ -569,11 +569,12 @@ function start(game: Game): void {
 }
 
 /**
- * The data sets' manifest (`src/data/DataSets.ts`). Without it the page cannot choose a
- * game, so a manifest that is missing or malformed ends the boot, and the error says why.
+ * The data sets' manifest (`src/data/DataSets.ts`), the server's answer, its folders under
+ * `gamefiles/`. Without it the page cannot choose a game, so a manifest that is missing or
+ * malformed ends the boot, and the error says why.
  */
 async function loadManifest(): Promise<DataSetManifest> {
-    const url = `${GAMEFILES_DIR}/${MANIFEST_NAME}`;
+    const url = DATA_SETS_ROUTE;
     const response = await fetch(url).catch(() => null);
     if (!response?.ok) throw new Error(`Cannot read the data sets' manifest '${url}'${response ? ` (HTTP ${response.status})` : ''}.`);
     return parseManifest(await response.text(), GAMEFILES_DIR);

@@ -15,7 +15,7 @@ This port is based on the awesome CSBWin version by Paul R. Stevens, which was c
 - Node.js 20+ (22 for `tools/probe-ui.mjs` without a flag)
 - npm
 - The original game files under `static/gamefiles/`, one directory per data set, each
-  listed in `static/gamefiles/manifest.json` (parsed by `src/data/DataSets.ts`)
+  listed in `tools/data-sets.json` (parsed by `src/data/DataSets.ts`)
 
 ### Commands
 

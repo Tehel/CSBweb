@@ -9,31 +9,44 @@
  *   /                 dist/index.html               no-cache
  *   /assets/…         dist/assets/…, hashed names   immutable
  *   /gamefiles/…      GAMEFILES_DIR/…               no-cache, with ETag and Last-Modified
+ *   /api/data-sets    the manifest checked at start-up (`checkFiles`), the page's list of sets
  *   /api/health       200, for the compose healthcheck
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
  *   /api/stats        the store's aggregates, as JSON
  *
  * Every file answers a conditional GET with 304. A path with a `.` segment, a backslash or
  * a NUL, encoded or not, is refused before it reaches the disk, so no request leaves the
- * two folders.
+ * two folders. The manifest is not served as a file, even where it lies under
+ * `GAMEFILES_DIR`: the page asks `api/data-sets`.
  */
 import { createReadStream, readFileSync, statSync, type Stats } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { extname, join } from 'node:path';
+import { extname, join, resolve } from 'node:path';
 
-import { MANIFEST_NAME, parseManifest, type DataSetManifest } from '../src/data/DataSets.ts';
+import { DATA_SETS_ROUTE, parseManifest, type DataSetManifest } from '../src/data/DataSets.ts';
 import { checkEvent, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import type { StatsStore } from './stats.ts';
 
 export interface ServerOptions {
     /** The built page: `index.html` and `assets/`. */
     distDir: string;
-    /** The data sets and their `manifest.json`, served under `gamefiles/`. */
+    /** The data sets, served under `gamefiles/`. */
     gamefilesDir: string;
+    /** The data sets' manifest, its folders relative to `gamefilesDir`. */
+    manifestFile: string;
+}
+
+/** What `checkFiles` read. */
+export interface CheckedFiles {
+    manifest: DataSetManifest;
+    /** The manifest as it was read, which `api/data-sets` answers. */
+    text: string;
 }
 
 /** What the API needs beside the files. */
 export interface ApiOptions {
+    /** The answer to `api/data-sets`: the manifest `checkFiles` read. */
+    dataSets: string;
     store: StatsStore;
     rules: EventRules;
     /** Events per address. */
@@ -69,19 +82,19 @@ const IMMUTABLE = 'public, max-age=31536000, immutable';
  * that says what is missing, so a bad mount stops the container rather than the player's
  * boot.
  */
-export function checkFiles({ distDir, gamefilesDir }: ServerOptions): DataSetManifest {
+export function checkFiles({ distDir, gamefilesDir, manifestFile }: ServerOptions): CheckedFiles {
     if (!isFile(join(distDir, 'index.html'))) throw new Error(`${distDir} holds no index.html: is the page built?`);
     let text: string;
     try {
-        text = readFileSync(join(gamefilesDir, MANIFEST_NAME), 'utf8');
+        text = readFileSync(manifestFile, 'utf8');
     } catch {
-        throw new Error(`${gamefilesDir} holds no ${MANIFEST_NAME}`);
+        throw new Error(`there is no manifest ${manifestFile}`);
     }
     const manifest = parseManifest(text, '');
     const folders = [...manifest.dataSets.map((set) => set.dir), ...(manifest.swooshDir === null ? [] : [manifest.swooshDir])];
     const missing = folders.filter((dir) => !isDirectory(join(gamefilesDir, dir)));
-    if (missing.length > 0) throw new Error(`${MANIFEST_NAME} names folders ${gamefilesDir} does not hold: ${missing.join(', ')}`);
-    return manifest;
+    if (missing.length > 0) throw new Error(`${manifestFile} names folders ${gamefilesDir} does not hold: ${missing.join(', ')}`);
+    return { manifest, text };
 }
 
 /** The server, not yet listening. */
@@ -100,11 +113,16 @@ export function createAppServer(options: ServerOptions, api: ApiOptions): Server
     });
 }
 
-function route({ distDir, gamefilesDir }: ServerOptions, api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
+function route({ distDir, gamefilesDir, manifestFile }: ServerOptions, api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
     const segments = pathSegments(req.url ?? '');
     if (segments === null) return send(res, 400, 'Bad path');
 
     if (segments[0] === 'api') {
+        if (segments.join('/') === DATA_SETS_ROUTE) {
+            if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
+            res.setHeader('Cache-Control', 'no-store');
+            return send(res, 200, api.dataSets, 'application/json; charset=utf-8');
+        }
         const name = segments.length === 2 ? segments[1] : undefined;
         if (name === 'event') {
             if (req.method !== 'POST') return refuseMethod(res, 'POST');
@@ -120,7 +138,11 @@ function route({ distDir, gamefilesDir }: ServerOptions, api: ApiOptions, req: I
     }
 
     if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
-    if (segments[0] === GAMEFILES) return serveFile(req, res, join(gamefilesDir, ...segments.slice(1)), NO_CACHE);
+    if (segments[0] === GAMEFILES) {
+        const path = join(gamefilesDir, ...segments.slice(1));
+        if (resolve(path) === resolve(manifestFile)) return send(res, 404, 'Not found');
+        return serveFile(req, res, path, NO_CACHE);
+    }
     if (segments.length === 0) return serveFile(req, res, join(distDir, 'index.html'), NO_CACHE);
     return serveFile(req, res, join(distDir, ...segments), segments[0] === 'assets' ? IMMUTABLE : NO_CACHE);
 }

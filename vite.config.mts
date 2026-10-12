@@ -1,6 +1,9 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { resolve } from 'path';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+
+import { DATA_SETS_ROUTE } from './src/data/DataSets';
 
 /**
  * The build the page's events name (`src/ui/gameEvents.ts`): `CSBWEB_BUILD` where the
@@ -15,7 +18,33 @@ function buildId(): string {
   }
 }
 
+/**
+ * The dev server's `api/data-sets` (`src/data/DataSets.ts`): the repository's manifest,
+ * `tools/data-sets.json`, read at each request, every set in it offered to every player.
+ * The deployed server answers the same route its own way (`server/app.ts`).
+ */
+function dataSetsRoute(): Plugin {
+  const file = resolve(import.meta.dirname, 'tools', 'data-sets.json');
+  return {
+    name: 'csbweb-data-sets',
+    configureServer(server) {
+      server.middlewares.use(`/${DATA_SETS_ROUTE}`, (req, res, next) => {
+        if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          res.statusCode = 405;
+          res.setHeader('Allow', 'GET, HEAD');
+          return res.end();
+        }
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end(req.method === 'HEAD' ? undefined : readFileSync(file, 'utf8'));
+      });
+    },
+  };
+}
+
 export default defineConfig(({ command }) => ({
+  plugins: [dataSetsRoute()],
   root: '.',
   // Every URL relative to the page, so the game also runs under a sub-path.
   base: './',
