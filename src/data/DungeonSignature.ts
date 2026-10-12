@@ -143,7 +143,7 @@ export const KNOWN_DUNGEONS: readonly KnownDungeon[] = [
     },
     {
         name: 'Conflux 3.5',
-        dataSets: ['conflux'],
+        dataSets: ['conflux-3.5'],
         signature: [
             '38979e507c116f3ecd487bc787b54293ab5fabe005aaee9f0ff784ec0e23cc4d',
             '95a1e5aac338605d7cecc9fa338da1a6bd711bf2bb5a05c2d6fe4aec018641a9',

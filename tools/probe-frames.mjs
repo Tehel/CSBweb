@@ -319,7 +319,7 @@ console.log('state: welcome page');
 const atWelcome = await welcome();
 console.log('  ', JSON.stringify(atWelcome));
 const saveId = /[?&]save=([^&]+)/.exec(atWelcome.resume ?? '')?.[1];
-check(!atWelcome.canvas && atWelcome.tiles === 'dm-atari*,csb,kids-dungeon,conflux,towers-of-chaos',
+check(!atWelcome.canvas && atWelcome.tiles === 'dm-atari*,csb,kids-dungeon,conflux-3.5,towers-of-chaos',
   'an unknown ?dungeon= is the welcome page, no game canvas, its tiles the sets not hidden, the one with a save bright');
 check(atWelcome.pictures.length === 5 && atWelcome.pictures.every(Boolean) && atWelcome.gameFiles === 0,
   'each tile shows its set\'s 320x200 thumbnail, <id>-thumbnail.png, and the page fetches no .dat');
@@ -591,7 +591,7 @@ check(!(await evaluate(`window.__probe.screen.isHintOracleUp()`)) && (await canv
 // of it runs a skin's program from its `CSBgraphics.dat`, and its DSAs run from the first
 // tick (`tools/watch-conflux-start.ts`). The square in front is a wall, which its skin
 // paints with a picture, and nothing in view moves.
-await send('Page.navigate', { url: `${APP}?intro=0&dungeon=conflux` });
+await send('Page.navigate', { url: `${APP}?intro=0&dungeon=conflux-3.5` });
 await wait(3500);
 await leaveCanvas(); await wait(200);
 console.log('state: Conflux start');     const confluxStart = await shot('18-conflux-start');

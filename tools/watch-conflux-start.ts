@@ -1,5 +1,5 @@
 /**
- * Conflux 3.5's first ticks, as the page plays them (the manifest's `conflux`).
+ * Conflux 3.5's first ticks, as the page plays them (the manifest's `conflux-3.5`).
  *
  * 1. **Its files.** `dungeon.dat` reads enciphered, 64 levels and 131 DSAs, and the party
  *    starts on level 0 at (13,24) facing north, with no champion. `graphics.dat` is

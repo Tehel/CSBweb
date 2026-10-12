@@ -22,7 +22,7 @@ code needs before them: a base solid enough to build them on. The page redesign 
 begun: tier U is its first part, and `E15` the next.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, a data set
-(`conflux`) whose first ticks play (`tools/watch-conflux-start.ts`) and whose start is a
+(`conflux-3.5`) whose first ticks play (`tools/watch-conflux-start.ts`) and whose start is a
 golden frame. What waits on the author for it is C150. Its `dungeon.dat` is enciphered, and reads whole
 (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is `RC4.cpp`'s own cipher"). Its
 skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets"). Every DSA operation CSBWin has is ported, not only Conflux's share
