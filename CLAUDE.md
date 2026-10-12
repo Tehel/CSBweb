@@ -142,9 +142,9 @@ item or monster is, read from `dungeon.dat` or a save. The `peek-dungeon` skill 
 ```
 audio/      SoundManager (the samples, played through Web Audio) and soundsIndex
 core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
-            (LZW/RLE/SND), imageDecoder (IMG1/IMG2), md5, types, RnMaps (what an RN names:
-            RN::dbType, pos, idx), intCast (sw, div, ApplyLimits), objectNameIndex
-            (OBJNI_* constants)
+            (LZW/RLE/SND), imageDecoder (IMG1/IMG2), md5, png (a paletted PNG, written),
+            types, RnMaps (what an RN names: RN::dbType, pos, idx), intCast (sw, div,
+            ApplyLimits), objectNameIndex (OBJNI_* constants)
 data/       DataSets (the manifest's sets), LocalDataSets (a player's own, a record of the
             store's), DataSetFiles (a set's files read by name, from its folder or its record),
             DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor,
@@ -194,7 +194,8 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
             doc/CSBWIN_TITLE_SCREEN_REFERENCE.md. Before the title, the
             Atari disk's FTL logo (`Swoosh`, doc/ATARI_ST_DISK_REFERENCE.md). And CSB's
             Hint Oracle (`HintOracle`), a program of its own in CSBWin
-            (doc/CSBWIN_HINT_ORACLE_REFERENCE.md).
+            (doc/CSBWIN_HINT_ORACLE_REFERENCE.md). And a set's thumbnail, its title's last
+            frame (`TitleThumbnail`), which the welcome page shows.
   ui/       The DM interface, one module per CSBWin file — Mouse, Inventory, Character,
             MagicPanel, Feeding, Objects, Draw, HitTest, ViewportPicking, all over
             a shared UIState. See doc/UI_MODULE_MAP.md.

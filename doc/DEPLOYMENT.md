@@ -91,7 +91,8 @@ ignored, so a note can go in a key of its own, such as `"_note"`.
 Each set's folder holds its thumbnail, `<id>-thumbnail.png` (`dm-atari/dm-atari-thumbnail.png`,
 `kids-dungeon-24/kids-dungeon-thumbnail.png`): the last frame of its title, which the
 welcome page's tile shows, so the page fetches no game file to draw its grid.
-`npx tsx tools/gen-thumbnails.ts` writes every set's from its `graphics.dat`, and `npm test`
+`npx tsx tools/gen-thumbnails.ts` writes every set's from its `graphics.dat`, drawn as the form
+that adds a player's own set draws one (`src/renderer/intro/TitleThumbnail.ts`), and `npm test`
 checks the committed ones (`--check`). A set added to the manifest needs its thumbnail
 written before it is uploaded; without one, its tile's picture is a blank box.
 

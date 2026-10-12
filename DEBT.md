@@ -29,8 +29,8 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 (`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
-from their own files to the welcome page and plays it (P4 and P5), then edits and publishes
-it (P6 to P8). They are not CSBWin features but the page's, and come before every other
+from their own files to the welcome page and plays it, its saves imported (P5), then edits
+and publishes it (P6 to P8). They are not CSBWin features but the page's, and come before every other
 tier.
 
 **Before the rest, at the author's request: U — the interface in the canvas.** The
@@ -113,7 +113,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P4 | A thumbnail generated from the data | S | ⏳ |
 | P5 | A local set's saves import | S | ⏳ |
 | P6 | Editing and deleting a local set | M | ⏳ |
 | P7 | The data sets in the server's database | L | ⏳ |
@@ -222,7 +221,10 @@ gives: the name, the id (made from the name until the player writes one), a desc
 the authors, the reincarnation rule, DM's or CSB's graphics for a set without a
 `graphics.dat`, and one area that takes the files, dropped or picked, each going where its
 name says. On its right, the checklist of the name, the id and the six files, crossed or
-checked, a removable file on its row; under it, what the dungeon holds once its
+checked, a removable file on its row, and on the thumbnail's, while it has none, "Generate
+from data", which draws the site's sets' thumbnail, the title's last frame
+(`src/renderer/intro/TitleThumbnail.ts`, `tools/gen-thumbnails.ts`'s too), from the set's
+`graphics.dat` or its base set's; under it, what the dungeon holds once its
 `dungeon.dat` reads (`dungeonCensus`, `src/engine/DungeonCensus.ts`, whose DSA half
 `tools/dump-dsa-census.ts` checks); and CANCEL and CONFIRM. `checkLocalDataSet` runs at
 every change with the boot's own readers and `src/engine/FileSignatures.ts`'s rules, and
@@ -249,13 +251,6 @@ Decisions taken with the author, for every row:
   query. A lost id is handled by hand on the forum for now.
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
-
-### P4 ⏳ A thumbnail generated from the data
-
-The form accepts a thumbnail file, and also offers "Generate from data", which draws the
-same thumbnail as `tools/gen-thumbnails.ts`: the last frame of the title, from the set's
-`graphics.dat` (the base set's when the player gave none). The tool's drawing moves into
-`src/`, shared by the page and the tool, and its `--check` still passes.
 
 ### P5 ⏳ A local set's saves import
 

@@ -11,6 +11,9 @@
  *   the picker a click on it opens. A file goes where its name says, whatever its case:
  *   `dungeon.dat`, `graphics.dat`, `CSBgraphics.dat`, the Hint Oracle's `hcsb.hct` and
  *   `hcsb.dat`; an image is the thumbnail. A file given again replaces the one before.
+ *   Without a thumbnail, its row offers "Generate from data", which draws the one the site's
+ *   sets have, the last frame of the title (`TitleThumbnail.ts`), from the set's own
+ *   `graphics.dat` or its base set's.
  * - **The right column** is the checklist of everything the set has, `checkLocalDataSet`'s
  *   verdict on each, run at every change: a green check where it is given and right, a
  *   red cross where it is needed and missing, or wrong, and nothing where it is optional
@@ -23,8 +26,10 @@
  */
 import { folderFiles, type DataSetFiles } from '../data/DataSetFiles';
 import { dataSetNamed, type DataSetManifest } from '../data/DataSets';
+import { GraphicsLoader } from '../data/GraphicsLoader';
 import { ITEM_KINDS, isIllegalSubcode, operationsUsed, type DungeonCensus } from '../engine/DungeonCensus';
 import { StkOp } from '../engine/DsaSystem';
+import { lastTitleFrame, thumbnailPng } from '../renderer/intro/TitleThumbnail';
 import {
     checkLocalDataSet,
     type LocalDataSetDraft, type LocalDataSetField, type LocalDataSetFile, type LocalDataSetProblem, type LocalDataSetRecord,
@@ -50,7 +55,7 @@ const CHECKLIST: readonly ChecklistRow[] = [
     { about: 'CSBgraphics.dat', label: 'CSBgraphics.dat', needed: false, hint: "CSBWin's extra graphics, for a dungeon made with them." },
     { about: 'hcsb.hct', label: 'hcsb.hct', needed: false, hint: "The Hint Oracle's hints, with hcsb.dat." },
     { about: 'hcsb.dat', label: 'hcsb.dat', needed: false, hint: "The Hint Oracle's program, with hcsb.hct." },
-    { about: 'thumbnail', label: 'Thumbnail', needed: false, hint: "The welcome page's picture of it: an image, 320x200 at best." },
+    { about: 'thumbnail', label: 'Thumbnail', needed: false, hint: "The welcome page's picture of it: an image, 320x200 at best, or the last frame of its title, drawn from its graphics." },
 ];
 
 /** The files the drop area takes, by the name the game reads them under. */
@@ -126,6 +131,9 @@ export function openAddDataSetForm(
     let idWritten = false;
     let record: LocalDataSetRecord | null = null;
     let generation = 0;
+    /** Why the thumbnail could not be drawn, shown on its row until a thumbnail is given. */
+    let drawFailure = '';
+    let drawing = false;
 
     const bases = BASE_SETS.flatMap((set) => dataSetNamed(manifest, set) ?? []);
     let baseSet = bases[0]?.id ?? BASE_SETS[0];
@@ -182,6 +190,34 @@ export function openAddDataSetForm(
         checklist.append(item);
         return [row.about, { row, item, given, remove, problem }] as const;
     }));
+    const generate = document.createElement('button');
+    generate.type = 'button';
+    generate.className = 'add-set-generate';
+    generate.textContent = 'Generate from data';
+    generate.title = "The last frame of the dungeon's title, drawn from its graphics";
+    generate.addEventListener('click', async () => {
+        const own = files['graphics.dat'];
+        const set = baseSet;
+        drawing = true;
+        drawFailure = '';
+        changed();
+        try {
+            const bytes = own ? new Uint8Array(await own.arrayBuffer()) : await base(set)?.read('graphics.dat');
+            if (!bytes) throw new Error(`${set}'s graphics.dat could not be read`);
+            const graphics = new GraphicsLoader();
+            graphics.loadFromArray(bytes);
+            const png = await thumbnailPng(await lastTitleFrame(graphics));
+            // The graphics it was drawn from are still the set's, and no thumbnail came meanwhile.
+            if (files['graphics.dat'] === own && (own || baseSet === set) && !files.thumbnail) {
+                files.thumbnail = new File([png], 'title.png', { type: 'image/png' });
+            }
+        } catch (error) {
+            drawFailure = `It could not be drawn: ${error instanceof Error ? error.message : String(error)}`;
+        }
+        drawing = false;
+        changed();
+    });
+
     /** The global line under the checklist: what `store` threw. */
     const failure = text('p', 'add-set-problem add-set-failure', '');
     checklist.after(failure);
@@ -193,6 +229,7 @@ export function openAddDataSetForm(
             const where = fileRow(file);
             if (where) files[where] = file;
             else unknown.push(file.name);
+            if (where === 'thumbnail') drawFailure = '';
         }
         dropped.textContent = unknown.length > 0 ? `Not one of a dungeon's files: ${unknown.join(', ')}.` : '';
         changed();
@@ -278,6 +315,12 @@ export function openAddDataSetForm(
                 remove.hidden = !(row.about in files);
                 // A needed field left empty is shown by its cross alone; anything else wrong says why.
                 problem.textContent = value !== null || !row.needed ? own.map((p) => p.text).join(' ') : '';
+                if (row.about === 'thumbnail' && value === null) {
+                    // Drawn from graphics that read.
+                    generate.disabled = drawing || problems.some((p) => p.about === 'graphics.dat' || p.about === 'baseSet');
+                    given.replaceChildren(generate);
+                    problem.textContent = drawFailure;
+                }
                 item.title = [row.hint, ...own.map((p: LocalDataSetProblem) => p.text)].join('\n');
             }
             holds.hidden = census === null;

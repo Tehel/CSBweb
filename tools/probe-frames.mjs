@@ -392,9 +392,10 @@ check(atWelcome.last === 'pick add +Add my own', 'the grid ends with "+ Add my o
 // (`src/data/LocalDataSets.ts`) is made through it: DM's dungeon.dat dropped with CSB's
 // thumbnail, hcsb.hct, and a file none of a dungeon's; the id made from the name, then
 // written; hcsb.hct alone crossing hcsb.dat and holding CONFIRM, until it is removed; a
-// graphics.dat given turning off the choice of graphics. What the dropped dungeon holds
-// shows under the checklist, the form still on one screen. The record is stored, and the
-// page shows its tile selected. What the check refuses is `tools/dump-local-data-set.ts`'s.
+// graphics.dat given turning off the choice of graphics; the thumbnail removed, and drawn
+// again by "Generate from data" from DM's graphics. What the dropped dungeon holds
+// shows under the checklist, the form still on one screen. The record is stored, its
+// thumbnail the site's DM thumbnail pixel for pixel, and the page shows its tile selected. What the check refuses is `tools/dump-local-data-set.ts`'s.
 const form = () => evaluate(`(()=>{const d=document.querySelector('dialog.add-set');
   return d && { open: d.open, id: d.querySelector('[name=id]').value,
     rows: [...d.querySelectorAll('.add-set-checklist li')].map(li=>li.dataset.about+({right:'+',wrong:'x'}[li.className]??'')).join(),
@@ -402,6 +403,8 @@ const form = () => evaluate(`(()=>{const d=document.querySelector('dialog.add-se
     base: [...d.querySelectorAll('[name=baseSet]')].map(r=>r.value+(r.checked?'*':'')+(r.disabled?'-':'')).join(),
     problems: [...d.querySelectorAll('.add-set-problem')].map(p=>p.textContent).filter(Boolean),
     holds: d.querySelector('.add-set-holds').hidden ? '' : [...d.querySelectorAll('.add-set-holds dd')].map(dd=>dd.textContent).join(' | '),
+    generate: (b=>b?(b.disabled?'off':'on'):'')(d.querySelector('.add-set-generate')),
+    thumbnail: d.querySelector('.add-set-checklist li[data-about=thumbnail] .add-set-given').textContent,
     height: d.getBoundingClientRect().height };})()`);
 const inForm = (body) => evaluate(`(async()=>{const d=document.querySelector('dialog.add-set');${body};return 1;})()`);
 const typeIn = (name, value) => inForm(`const i=d.querySelector('[name=${name}]');i.value=${JSON.stringify(value)};i.dispatchEvent(new Event('input'))`);
@@ -414,8 +417,9 @@ await wait(500);
 const opened = await form();
 console.log('  form:', JSON.stringify(opened));
 check(opened?.open === true && !opened.confirm && opened.base === 'dm-atari*,csb' && opened.problems.length === 0 && opened.holds === ''
-  && opened.rows === 'namex,idx,dungeon.datx,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail',
-  '"+ Add my own" opens the form: the name, the id and dungeon.dat crossed, DM\'s graphics.dat checked, CONFIRM held');
+  && opened.rows === 'namex,idx,dungeon.datx,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail'
+  && opened.generate === 'on' && opened.thumbnail === 'Generate from data',
+  '"+ Add my own" opens the form: the name, the id and dungeon.dat crossed, DM\'s graphics.dat checked, the thumbnail offered from it, CONFIRM held');
 check(opened.height <= 600, 'the form is on one screen');
 await inForm(`d.querySelector('#add-set-cancel').click()`);
 check(await form() === null, 'CANCEL closes it');
@@ -443,22 +447,39 @@ check(ownGraphics.base === 'dm-atari*-,csb-' && ownGraphics.dropped === '' && re
 check(ready.rows === 'name+,id+,dungeon.dat+,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail+' && ready.id === 'mine'
   && ready.confirm && ready.problems.length === 0,
   'a row\'s × takes its file back, and with nothing wrong CONFIRM is given');
+await removeIn('thumbnail');
+await wait(500);
+const unthumbed = await form();
+await inForm(`d.querySelector('.add-set-generate').click()`);
+await wait(3000);
+const generated = await form();
+console.log('  generated:', JSON.stringify(generated));
+check(unthumbed.rows.endsWith(',thumbnail') && unthumbed.generate === 'on' && unthumbed.confirm
+  && generated.rows === ready.rows && generated.thumbnail === 'title.png' && generated.generate === '' && generated.confirm,
+  'without a thumbnail its row offers "Generate from data", which gives it title.png');
 check(filled.holds === '14 | Weapons 106Clothing 121Scrolls 34Potions 55Containers 12Misc 278 | 303 in 182 groups, of 25 kinds | None'
   && ready.holds === filled.holds && ready.height <= 600,
   'what the dungeon holds shows under the checklist, whatever else is wrong, and the form stays on one screen');
 await inForm(`d.querySelector('#add-set-confirm').click()`);
 await wait(2000);
-const stored = await evaluate(`new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
+const stored = await evaluate(`(async()=>{const r = await new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
   open.onerror = () => reject(open.error);
   open.onsuccess = () => { const get = open.result.transaction('dataSets').objectStore('dataSets').get('local:mine');
-    get.onsuccess = () => { const r = get.result; open.result.close();
-      resolve(r && { name: r.name, baseSet: r.baseSet, files: Object.keys(r.files).sort().join(), levels: r.dungeonSignature.length,
-        sizes: Object.values(r.files).map((f) => f.size) }); }; }; })`);
+    get.onsuccess = () => { open.result.close(); resolve(get.result); }; }; });
+  const pixels = async (blob) => { const bitmap = await createImageBitmap(blob), c = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const g = c.getContext('2d'); g.drawImage(bitmap, 0, 0); return [bitmap.width, bitmap.height, ...g.getImageData(0, 0, bitmap.width, bitmap.height).data]; };
+  const site = r && await pixels(await (await fetch('/gamefiles/dm-atari/dm-atari-thumbnail.png')).blob());
+  const mine = r?.files.thumbnail && await pixels(r.files.thumbnail);
+  return r && { name: r.name, baseSet: r.baseSet, files: Object.keys(r.files).sort().join(), levels: r.dungeonSignature.length,
+    sizes: Object.values(r.files).map((f) => f.size), thumbnail: r.files.thumbnail?.type,
+    sameThumbnail: !!mine && mine.length === site.length && mine.every((v, i) => v === site[i]) };})()`);
 const afterAdd = await welcome();
 console.log('  stored:', JSON.stringify(stored));
 check(await form() === null && stored?.name === 'My Own Dungeon' && stored.baseSet === 'dm-atari'
   && stored.files === 'dungeon.dat,thumbnail' && stored.levels === 14 && stored.sizes.every((size) => size > 0),
   'CONFIRM stores the record: its name, DM\'s graphics, its two files and its dungeon\'s signature, and closes the form');
+check(stored?.thumbnail === 'image/png' && stored.sameThumbnail,
+  'the thumbnail drawn from DM\'s graphics is the site\'s DM thumbnail, pixel for pixel');
 check(afterAdd.tiles.includes('local:mine!') && /dungeon=local%3Amine/.test(afterAdd.play ?? ''), 'the page shows the new set, selected');
 // A save filed under the new set's id, a copy of dm-atari's one save made a millisecond
 // older. Its tile is bright and second, its picture the record's image, and it counts its
