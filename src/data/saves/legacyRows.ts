@@ -8,7 +8,8 @@
  * caller's to give: a version-1 row names none.
  *
  * A row that holds no CSBWin file is dropped: no build could load it, and it has no row
- * here (`readSaveFileFields`).
+ * here (`readSaveFileFields`). The later steps keep a row they cannot read as it is: the
+ * store is the only copy of a save, and a reader made stricter must not delete it.
  *
  * **Version 2** (`stampSaveRecords`). A version-2 row is today's, but its file may name
  * no playthrough: an earlier build wrote `RandomGameID` 0. The upgrade gives each such
@@ -22,8 +23,10 @@
  * adventure of it (`doc/SAVES.md` → "What a save is"). A file imported later is
  * left as it is.
  *
- * All three are pure, so the tools run them (`tools/dump-save-menu.ts`,
- * `tools/dump-save-stamp.ts`); `idb.ts` calls them once, in the upgrade.
+ * Each step runs on a store of a version before its own alone (`upgradeStoredRows`), so a
+ * file imported since is left as it is. All three are pure, so the tools run them
+ * (`tools/dump-save-menu.ts`, `tools/dump-save-stamp.ts`); `idb.ts` calls them once, in
+ * the upgrade.
  */
 import { holdsNoBlock1Words, stampBlock1Words, stampRandomGameID } from '../SaveGameLoader';
 import {
@@ -127,24 +130,24 @@ export function upgradeSaveRecords(old: readonly unknown[], dataSet: string): Sa
  * party and data set that named none end up in one playthrough, in whatever order they
  * come.
  *
- * A row that names a playthrough is returned as it is. One whose file does not take the
- * stamp holds no CSBWin file, and is dropped as the first upgrade drops one.
+ * A row that names a playthrough is returned as it is, and so is one whose file does not
+ * take the stamp.
  */
 export function stampSaveRecords(rows: readonly StoredSaveRecord[], draw: DrawPlaythrough): StoredSaveRecord[] {
-    const kept: Array<StoredSaveRecord | null> = [...rows];
+    const kept: StoredSaveRecord[] = [...rows];
     for (let i = 0; i < kept.length; i++) {
-        const row = kept[i];
-        if (!row || row.playthrough !== 0) continue;
-        const others = kept.filter((other) => other !== null).map(saveEntryOf);
+        const row = kept[i]!;
+        if (row.playthrough !== 0) continue;
+        const others = kept.map(saveEntryOf);
         const playthrough = joinedPlaythrough(saveEntryOf(row), others)
             || draw(others.filter((other) => other.dataSet === row.dataSet));
         try {
             kept[i] = { ...row, playthrough, bytes: stampRandomGameID(new Uint8Array(row.bytes), playthrough).buffer };
         } catch {
-            kept[i] = null;
+            // Not read: kept as it is.
         }
     }
-    return kept.filter((row) => row !== null);
+    return kept;
 }
 
 /**
@@ -153,18 +156,31 @@ export function stampSaveRecords(rows: readonly StoredSaveRecord[], draw: DrawPl
  * that does takes `_ReadEntireGame`'s 1, 2, 1 and 13 (`stampBlock1Words`), and the rest
  * of the row is kept: the four are none of what the row reads from its file.
  *
- * A row whose file holds a word of the four is returned as it is. One whose file does
- * not read holds no CSBWin file, and is dropped as the first upgrade drops one.
+ * A row whose file holds a word of the four is returned as it is, and so is one whose
+ * file does not read.
  */
 export function stampBlock1Rows(rows: readonly StoredSaveRecord[]): StoredSaveRecord[] {
-    const kept: StoredSaveRecord[] = [];
-    for (const row of rows) {
+    return rows.map((row) => {
         try {
             const bytes = new Uint8Array(row.bytes);
-            kept.push(holdsNoBlock1Words(bytes) ? { ...row, bytes: stampBlock1Words(bytes).buffer } : row);
+            return holdsNoBlock1Words(bytes) ? { ...row, bytes: stampBlock1Words(bytes).buffer } : row;
         } catch {
-            // No CSBWin file: dropped.
+            return row;
         }
-    }
-    return kept;
+    });
+}
+
+/** The version the last step of the rows' makes a store: one at it or past it has no row to change. */
+export const ROWS_UPGRADED_VERSION = 4;
+
+/**
+ * A store's rows at `oldVersion` as today's: each step for a version after `oldVersion`,
+ * in turn, and none of the others. Version 1's rows are made `dataSet`'s, the one set
+ * there was; `draw` gives the new playthroughs (`stampSaveRecords`).
+ */
+export function upgradeStoredRows(rows: readonly unknown[], oldVersion: number, dataSet: string, draw: DrawPlaythrough): StoredSaveRecord[] {
+    let upgraded = oldVersion < 2 ? upgradeSaveRecords(rows, dataSet) : rows as readonly StoredSaveRecord[];
+    if (oldVersion < 3) upgraded = stampSaveRecords(upgraded, draw);
+    if (oldVersion < 4) upgraded = stampBlock1Rows(upgraded);
+    return [...upgraded];
 }

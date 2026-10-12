@@ -135,7 +135,7 @@ import {
   type SaveStore,
   type StoredSaveRecord,
 } from '../src/data/saves/SaveStore';
-import { stampBlock1Rows, stampSaveRecords, upgradeSaveRecords } from '../src/data/saves/legacyRows';
+import { ROWS_UPGRADED_VERSION, stampBlock1Rows, stampSaveRecords, upgradeSaveRecords, upgradeStoredRows } from '../src/data/saves/legacyRows';
 import { KNOWN_DUNGEONS } from '../src/data/DungeonSignature';
 import { Game } from '../src/engine/Game';
 import type { GameHost, MessageSink } from '../src/engine/GameHost';
@@ -3361,8 +3361,9 @@ async function checkUpgrade(): Promise<void> {
 
   // What takes no stamp is no CSBWin file.
   const broken: StoredSaveRecord = { ...held[2]!, bytes: buffer(new Uint8Array(64)) };
-  check(stampSaveRecords([broken, held[0]!], drawFrom(SEED)).map((r) => r.name).join() === 'pair, named, older',
-    'a row that names no playthrough and holds no CSBWin file is dropped, as the first upgrade drops one');
+  const keptBroken = stampSaveRecords([broken, held[0]!], drawFrom(SEED));
+  check(keptBroken.length === 2 && keptBroken[0] === broken && keptBroken[1] === held[0],
+    'a row that names no playthrough and holds no file it can read is kept as it is: the store is a save\'s only copy');
 
   // Version 4: a file that holds none of GAMEBLOCK1's four words of `_ReadEntireGame`
   // takes them, and RISE then takes it.
@@ -3417,13 +3418,30 @@ async function checkUpgrade(): Promise<void> {
     'a row whose file holds a word of the four is returned as it is, its file untouched');
   check(stampBlock1Rows(block1Stamped).every((r, i) => r === block1Stamped[i]), 'a store already stamped is left as it is');
   const brokenV3: StoredSaveRecord = { ...v3Rows[0]!, bytes: buffer(new Uint8Array(64)) };
-  check(stampBlock1Rows([brokenV3, v3Rows[1]!]).map((r) => r.name).join() === 'csbwin',
-    'a row whose file does not read is dropped, as the first upgrade drops one');
+  const keptBrokenV3 = stampBlock1Rows([brokenV3, v3Rows[1]!]);
+  check(keptBrokenV3.length === 2 && keptBrokenV3[0] === brokenV3 && keptBrokenV3[1] === v3Rows[1],
+    'a row whose file does not read is kept as it is');
   const loadedEarly = await loadGame();
   applySaveBytes(loadedEarly, earlyStamped);
   const loadedBlock1 = loadedEarly.ctx.state.block1;
   check(loadedBlock1.word22598 === 1 && loadedBlock1.word22596 === 2 && loadedBlock1.word22594 === 1 && loadedBlock1.word22592 === 13,
     'and a game read from it carries CSBWin\'s four words into its next save');
+
+  // Each step runs on a store of a version before its own alone.
+  console.log('');
+  console.log('=== the store\'s upgrade: each step on a store of a version before its own (`upgradeStoredRows`) ===');
+  const imported = v3('imported since', earlyBytes);
+  const nameless = held[2]!;
+  const later = [imported, nameless, brokenV3];
+  const steps = (oldVersion: number): string => {
+    const now = upgradeStoredRows(later, oldVersion, DEFAULT_DATA_SET.id, drawFrom(SEED));
+    return now.map((r, i) => now.length !== later.length ? 'DROPPED' : r === later[i] ? 'kept' : r.playthrough !== later[i]!.playthrough ? 'playthrough' : 'block 1').join(', ');
+  };
+  console.log(`  a file holding none of the four, a row naming no playthrough, a row not read: at 2 ${steps(2)}; at 3 ${steps(3)}; at ${ROWS_UPGRADED_VERSION} ${steps(ROWS_UPGRADED_VERSION)}`);
+  check(steps(2) === 'block 1, playthrough, kept', 'from version 2, both later steps run, and the row not read is kept');
+  check(steps(3) === 'block 1, kept, kept', 'from version 3, only the stamp of GAMEBLOCK1\'s four words');
+  check(steps(ROWS_UPGRADED_VERSION) === 'kept, kept, kept' && steps(ROWS_UPGRADED_VERSION + 1) === 'kept, kept, kept',
+    `from version ${ROWS_UPGRADED_VERSION} on, none: a file imported since is left as it is (doc/SAVES.md)`);
 }
 
 /* ------------------------------------------------------------------------------- */

@@ -48,6 +48,11 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   begun on that build holds them, and the utility's RISE refuses such a file as
   "ALREADY UTILIZED". The author's decision: the store's rows are stamped, once, and a
   file imported later is left as it is, refused as CSBWin's utility refuses it.
+
+  Each step runs on a store of a version before its own alone (`upgradeStoredRows`),
+  and a store at version 4 or past it is not read at all. The steps after version 2's
+  keep a row they cannot read as it is: the store is a save's only copy, and a reader
+  made stricter must not delete it.
   Nothing else in `src/` reads JSON. A
   `.dmweb.json` file on disk is converted by hand, outside the engine;
   `tools/peek-dungeon.ts` reads one.
@@ -430,7 +435,9 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
   (version-1 rows through both upgrades; which rows join a named save and which draw, in
   either order of the rows; each row's file holding the row's id; a stamped file being
   byte for byte the file the game writes under that id, and loading; a row's draw held
-  to its own data set's rows; a row that holds no CSBWin file dropped; an upgraded row
+  to its own data set's rows; a version-1 row that holds no CSBWin file dropped, and a
+  later row the later steps cannot read kept; each step run from the versions before
+  its own alone, a file imported since left as it is; an upgraded row
   counting no play time; a file holding the four `GAMEBLOCK1` words at 0 refused by
   RISE, then stamped into the file the game writes with CSBWin's, taken by RISE, and
   loading with them; a file that holds one of them left as it is).

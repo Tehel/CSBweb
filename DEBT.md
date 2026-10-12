@@ -126,7 +126,6 @@ In payoff order: the first row is the next item.
 | F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
-| R2 | Every store upgrade re-runs every step, and drops a row that does not parse | S | ⏳ |
 | R3 | After a fatal error the page still saves | S | ⏳ |
 | R4 | F9 reads over a champion being chosen, and over a script that starts during its read | S | ⏳ |
 | R5 | Another tab holds the store: the new build hangs at ENTER | S | ⏳ |
@@ -141,7 +140,7 @@ In payoff order: the first row is the next item.
 | W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
 | W6 | Security headers | S | ⏳ |
 | W7 | The container, the deploy and the Node version | S | ⏳ |
-| R12 | Listing the saves reads every save's bytes | M | ⏳ after R2 |
+| R12 | Listing the saves reads every save's bytes | M | ⏳ |
 | D17 | The screen keeps the party it last drew | S | ⏳ |
 | E23 | One game read, whole or not at all | L | ⏳ |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
@@ -438,23 +437,6 @@ the Reincarnate screen, the eye and the mouth, and sets `ui.partyState` before `
 runs. A `tools/` check: a chest open, an object taken out, F9; and a LOAD from an open
 inventory. D17 and D18 then remove the cause, two owners of the same state.
 
-### R2 ⏳ Every store upgrade re-runs every step, and drops a row that does not parse
-
-`upgradeRows` (`src/data/saves/idb.ts:44-54`) gates only version 1's step on `oldVersion`:
-every upgrade runs `stampSaveRecords` and `stampBlock1Rows` over every row, clears the
-store and writes back what they return. So at the next `DB_VERSION` bump, whatever it is
-for:
-
-- a file imported since, holding none of `GAMEBLOCK1`'s four words, is stamped, against
-  `doc/SAVES.md`'s rule that a file imported later is left as it is;
-- a row whose `GAMEBLOCK1` throws is dropped for good (`stampBlock1Rows`,
-  `src/data/saves/legacyRows.ts:159-170`), so a reader made stricter (R6) deletes the
-  player's saves, of which the store is the only copy.
-
-Paying it: each step gated on the version that introduced it, and a later step keeping a
-row it cannot read as it is. Before the next bump; `.claude/memory/live-tree-is-served.md`
-says how to test one.
-
 ### R3 ⏳ After a fatal error the page still saves
 
 `reportError` (`src/main.ts:651`) stops the game and puts up the message, and nothing
@@ -593,8 +575,8 @@ row is ever deleted (the dialog has no delete). An import also parses its file t
 and an enciphered save is deciphered twice (`loadCsbwinWorld` again after
 `loadSaveGameState`).
 
-Paying it: the rows' fields and their files in two object stores, which bumps `DB_VERSION`:
-after R2. The deciphered data handed on by `loadSaveGameState`.
+Paying it: the rows' fields and their files in two object stores, which bumps `DB_VERSION`.
+The deciphered data handed on by `loadSaveGameState`.
 
 ---
 

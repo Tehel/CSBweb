@@ -5,7 +5,7 @@
  * database and the cell flags, so one is comfortably past a megabyte, and `localStorage`
  * is a synchronous ~5 MB budget for the whole origin.
  */
-import { stampBlock1Rows, stampSaveRecords, upgradeSaveRecords } from './legacyRows';
+import { ROWS_UPGRADED_VERSION, upgradeStoredRows } from './legacyRows';
 import type { DrawPlaythrough, StoredSaveRecord } from './SaveStore';
 
 const DB_NAME = 'csbweb-saves';
@@ -33,23 +33,22 @@ const VERSION_1_DATA_SET = 'dm-atari';
 
 /**
  * An earlier version's rows made today's, in the upgrade's own transaction: all of them
- * or, if anything fails, none, and the database stays at the version it had.
- *
- * Version 1's rows are made version 2's first: a version-1 row names no data set, and
- * every one becomes `dm-atari`'s, the one set there was (`VERSION_1_DATA_SET`). Then each
- * row that names no playthrough is given one, stamped into its file (`stampSaveRecords`),
- * `draw` giving the new ones. Last, each file that holds none of `GAMEBLOCK1`'s four words
- * of `_ReadEntireGame` is given them (`stampBlock1Rows`).
+ * or, if anything fails, none, and the database stays at the version it had. Only the
+ * steps of the versions after `oldVersion` run (`upgradeStoredRows`): a version-1 row
+ * names no data set, and every one becomes `dm-atari`'s (`VERSION_1_DATA_SET`); a row that
+ * names no playthrough is given one, `draw` giving the new ones; and a file that holds
+ * none of `GAMEBLOCK1`'s four words of `_ReadEntireGame` is given them. A store at
+ * `ROWS_UPGRADED_VERSION` or past it is not read.
  */
 function upgradeRows(db: IDBDatabase, tx: IDBTransaction, oldVersion: number, draw: DrawPlaythrough): void {
     if (db.objectStoreNames.contains(HANDLES_STORE)) db.deleteObjectStore(HANDLES_STORE);
+    if (oldVersion >= ROWS_UPGRADED_VERSION) return;
     const saves = tx.objectStore(SAVES_STORE);
     const all = saves.getAll();
     all.onsuccess = () => {
-        const rows: StoredSaveRecord[] = oldVersion < 2 ? upgradeSaveRecords(all.result, VERSION_1_DATA_SET) : all.result;
-        const stamped = stampBlock1Rows(stampSaveRecords(rows, draw));
+        const rows: StoredSaveRecord[] = upgradeStoredRows(all.result, oldVersion, VERSION_1_DATA_SET, draw);
         saves.clear();
-        for (const record of stamped) saves.put(record);
+        for (const record of rows) saves.put(record);
     };
 }
 
