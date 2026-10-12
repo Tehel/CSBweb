@@ -185,7 +185,9 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   CANCEL. Confirmed, it is stored as a row of the set, unofficial. So a local set that
   holds a known dungeon, DM's `dungeon.dat` with other graphics, takes that dungeon's
   saves at once. A save, once stored, holds its own world and loads whatever the set's
-  `dungeon.dat` has become since.
+  `dungeon.dat` has become since. Deleting the set, from its form on the welcome page,
+  deletes every save filed under its id with the record, in one transaction
+  (`BrowserDataSetStore.remove`), once the confirmation has counted them.
 - **Play time is the player's**: wall-clock time in the game, the frozen game and the
   open dialog left out. The file's `d.Time` is not it (sleep runs it fast). The game
   counts it in VBLs, sixty a second (`Game.playTime`, `src/engine/Game.ts`): the wall

@@ -31,7 +31,7 @@
 // tap and a click, the screen and the effect sized and placed in it, at 16:10 and at 4:3,
 // in it and out of it, and the welcome
 // page: its tiles and their order, its fonts, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
-// straight into play. See `check` below.
+// straight into play, and its form adding, editing and deleting a player's own set. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -405,6 +405,9 @@ const form = () => evaluate(`(()=>{const d=document.querySelector('dialog.add-se
     holds: d.querySelector('.add-set-holds').hidden ? '' : [...d.querySelectorAll('.add-set-holds dd')].map(dd=>dd.textContent).join(' | '),
     generate: (b=>b?(b.disabled?'off':'on'):'')(d.querySelector('.add-set-generate')),
     thumbnail: d.querySelector('.add-set-checklist li[data-about=thumbnail] .add-set-given').textContent,
+    title: d.querySelector('#add-set-title').textContent, name: d.querySelector('[name=name]').value,
+    fixedId: d.querySelector('[name=id]').readOnly, dmRules: d.querySelector('[name=dmRules]').checked, deletable: !d.querySelector('.add-set-delete').hidden,
+    removable: [...d.querySelectorAll('.add-set-checklist li')].filter(li=>!li.querySelector('.add-set-remove').hidden).map(li=>li.dataset.about).join(),
     height: d.getBoundingClientRect().height };})()`);
 const inForm = (body) => evaluate(`(async()=>{const d=document.querySelector('dialog.add-set');${body};return 1;})()`);
 const typeIn = (name, value) => inForm(`const i=d.querySelector('[name=${name}]');i.value=${JSON.stringify(value)};i.dispatchEvent(new Event('input'))`);
@@ -416,10 +419,10 @@ await clickOn('.pick.add');
 await wait(500);
 const opened = await form();
 console.log('  form:', JSON.stringify(opened));
-check(opened?.open === true && !opened.confirm && opened.base === 'dm-atari*,csb' && opened.problems.length === 0 && opened.holds === ''
+check(opened?.open === true && !opened.confirm && opened.title === 'Add my own dungeon' && !opened.fixedId && !opened.deletable && opened.dmRules && opened.base === 'dm-atari*,csb' && opened.problems.length === 0 && opened.holds === ''
   && opened.rows === 'namex,idx,dungeon.datx,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail'
   && opened.generate === 'on' && opened.thumbnail === 'Generate from data',
-  '"+ Add my own" opens the form: the name, the id and dungeon.dat crossed, DM\'s graphics.dat checked, the thumbnail offered from it, CONFIRM held');
+  '"+ Add my own" opens the form, DM rules checked: the name, the id and dungeon.dat crossed, DM\'s graphics.dat checked, the thumbnail offered from it, CONFIRM held');
 check(opened.height <= 600, 'the form is on one screen');
 await inForm(`d.querySelector('#add-set-cancel').click()`);
 check(await form() === null, 'CANCEL closes it');
@@ -470,13 +473,13 @@ const stored = await evaluate(`(async()=>{const r = await new Promise((resolve, 
     const g = c.getContext('2d'); g.drawImage(bitmap, 0, 0); return [bitmap.width, bitmap.height, ...g.getImageData(0, 0, bitmap.width, bitmap.height).data]; };
   const site = r && await pixels(await (await fetch('/gamefiles/dm-atari/dm-atari-thumbnail.png')).blob());
   const mine = r?.files.thumbnail && await pixels(r.files.thumbnail);
-  return r && { name: r.name, baseSet: r.baseSet, files: Object.keys(r.files).sort().join(), levels: r.dungeonSignature.length,
-    sizes: Object.values(r.files).map((f) => f.size), thumbnail: r.files.thumbnail?.type,
+  return r && { name: r.name, dmRules: r.dmRules, baseSet: r.baseSet, files: Object.keys(r.files).sort().join(), levels: r.dungeonSignature.length,
+    sizes: Object.values(r.files).map((f) => f.size), thumbnail: r.files.thumbnail?.type, createdAt: r.createdAt,
     sameThumbnail: !!mine && mine.length === site.length && mine.every((v, i) => v === site[i]) };})()`);
 const afterAdd = await welcome();
 console.log('  stored:', JSON.stringify(stored));
 check(await form() === null && stored?.name === 'My Own Dungeon' && stored.baseSet === 'dm-atari'
-  && stored.files === 'dungeon.dat,thumbnail' && stored.levels === 14 && stored.sizes.every((size) => size > 0),
+  && stored.dmRules && stored.files === 'dungeon.dat,thumbnail' && stored.levels === 14 && stored.sizes.every((size) => size > 0),
   'CONFIRM stores the record: its name, DM\'s graphics, its two files and its dungeon\'s signature, and closes the form');
 check(stored?.thumbnail === 'image/png' && stored.sameThumbnail,
   'the thumbnail drawn from DM\'s graphics is the site\'s DM thumbnail, pixel for pixel');
@@ -484,8 +487,12 @@ check(afterAdd.tiles.includes('local:mine!') && /dungeon=local%3Amine/.test(afte
 // A save filed under the new set's id, a copy of dm-atari's one save made a millisecond
 // older. Its tile is bright and second, its picture the record's image, and it counts its
 // save; selected, PLAY and CONTINUE lead to it. "+ Add my own" stays last, and a click on
-// it opens the form and selects nothing. Both rows are taken out of the store again, so
-// that the pages below see the one save.
+// it opens the form and selects nothing.
+// Then the pen on the local set's picture, the only tile with one, opens the form on its
+// record: its name, its id fixed, dungeon.dat replaceable but not removable, and DELETE.
+// A new name confirmed is stored over the record, which keeps when it was added, and its
+// save stays. DELETE asks first, counting the save; CANCEL keeps the set, and DELETE
+// removes the record and its save, so that the pages below see the one save.
 const saveDatabase = (body) => evaluate(`(async()=>{${body.before ?? ''}
   return new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
     open.onerror = () => reject(open.error);
@@ -513,9 +520,62 @@ check(atLocal.tiles.includes('local:mine*!') && /dungeon=local%3Amine/.test(atLo
   'a local set selected: PLAY opens it, CONTINUE reads its save, the box names it');
 await clickOn('.pick.add');
 check((await welcome()).play === atLocal.play && (await form())?.open === true, 'a click on "+ Add my own" opens the form, and leaves the selection');
-await saveDatabase({ write: `dataSets.delete('local:mine'); saves.delete('probe-local-save');` });
-await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
-await wait(2500);
+await inForm(`d.querySelector('#add-set-cancel').click()`);
+const readStore = () => evaluate(`new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
+  open.onerror = () => reject(open.error);
+  open.onsuccess = () => { const tx = open.result.transaction(['saves', 'dataSets']);
+    const set = tx.objectStore('dataSets').get('local:mine'), saves = tx.objectStore('saves').getAllKeys();
+    tx.oncomplete = () => { open.result.close(); resolve({ name: set.result?.name ?? null, createdAt: set.result?.createdAt ?? null, saves: saves.result.sort().join() }); }; }; })`);
+const pen = await evaluate(`(()=>{const pens=[...document.querySelectorAll('.pick-edit')], p=pens[0], a=p.getBoundingClientRect();
+  const b=p.parentElement.querySelector('.pick[data-set] .pick-picture').getBoundingClientRect();
+  return { count: pens.length, of: p.parentElement.querySelector('.pick').dataset.set, label: p.getAttribute('aria-label'),
+    corner: a.left < b.right && a.right >= b.right && a.top <= b.top && a.bottom > b.top && a.width < b.width / 2,
+    rows: Object.values(Object.groupBy([...document.querySelectorAll('.pick')].map(t=>t.getBoundingClientRect()), r=>Math.round(r.top)))
+      .map(row=>[...new Set(row.map(r=>Math.round(r.height)))].join('/')).join(),
+    names: [...document.querySelectorAll('.pick[data-set]')].map(t=>t.dataset.set+' '+getComputedStyle(t.querySelector('.pick-name')).color).join('|') };})()`);
+check(pen.count === 1 && pen.of === 'local:mine' && pen.label === 'Edit My Own Dungeon' && pen.corner,
+  "only a local set's tile has the pen, over its picture's top right corner");
+console.log('  tile heights by row:', pen.rows);
+check(pen.rows.split(',').every((row) => !row.includes('/')), "a local set's tile is as tall as the others on its row");
+check(pen.names.split('|').every((name) => name.endsWith(name.startsWith('local:') ? ' rgb(0, 216, 216)' : ' rgb(252, 252, 252)')),
+  "a local set's name is in cyan, palette entry 4, the others' in white");
+await clickOn('.pick-edit');
+await wait(1500);
+const editing = await form();
+console.log('  editing:', JSON.stringify(editing));
+check(editing?.open === true && editing.title === 'Edit my own dungeon' && editing.name === 'My Own Dungeon' && editing.id === 'mine'
+  && editing.fixedId && editing.deletable && editing.base === 'dm-atari*,csb' && editing.removable === 'thumbnail'
+  && editing.rows === ready.rows && editing.thumbnail === 'title.png' && editing.confirm && editing.height <= 600,
+  'the pen opens the form on the record: its fields and files, its id fixed, dungeon.dat not removable, DELETE offered');
+await typeIn('name', 'My Edited Dungeon');
+await wait(1500);
+await inForm(`d.querySelector('#add-set-confirm').click()`);
+await wait(2000);
+const edited = await readStore();
+const afterEdit = await welcome();
+check(await form() === null && edited.name === 'My Edited Dungeon' && edited.createdAt === stored.createdAt
+  && edited.saves === ['probe-local-save', decodeURIComponent(saveId)].sort().join() && afterEdit.tiles.includes('local:mine*!'),
+  'CONFIRM stores the edited record over the old, when it was added kept, its save kept, and the page shows it selected');
+const confirmation = () => evaluate(`(()=>{const d=document.querySelector('dialog.delete-set');
+  return d && { open: d.open, title: d.querySelector('h2').textContent, text: d.querySelector('p').textContent };})()`);
+await clickOn('.pick-edit');
+await wait(1000);
+await inForm(`d.querySelector('.add-set-delete').click()`);
+const asked = await confirmation();
+console.log('  delete:', JSON.stringify(asked));
+await evaluate(`document.querySelector('#delete-set-cancel').click()`);
+await wait(300);
+const keptSet = { dialog: await confirmation(), form: await form(), store: await readStore() };
+check(asked?.open === true && asked.title === 'Delete My Edited Dungeon?' && /^Its saved game is deleted with it\. .*EXPORT/.test(asked.text)
+  && keptSet.dialog === null && keptSet.form?.open === true && keptSet.store.name === 'My Edited Dungeon' && keptSet.store.saves === edited.saves,
+  "DELETE asks first, counting the set's save and naming EXPORT; CANCEL keeps the set and its save");
+await inForm(`d.querySelector('.add-set-delete').click()`);
+await evaluate(`document.querySelector('#delete-set-confirm').click()`);
+await wait(1500);
+const deleted = { dialog: await confirmation(), form: await form(), store: await readStore(), page: await welcome() };
+check(deleted.dialog === null && deleted.form === null && deleted.store.name === null && deleted.store.saves === decodeURIComponent(saveId)
+  && deleted.page.tiles === atWelcome.tiles,
+  'its DELETE removes the record and every save filed under its id, and the page shows the sets without it');
 await clickOn('.pick[data-set="dm-atari"]');
 await clickOn('#welcome-play');
 await wait(9000);

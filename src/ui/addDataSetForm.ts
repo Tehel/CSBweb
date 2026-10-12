@@ -5,7 +5,7 @@
  *
  * - **The left column** is what the player gives: the name, the id (the `<id>` of
  *   `local:<id>`, made from the name until the player writes one), a short description,
- *   the authors, separated by commas, the reincarnation rule (`dmRules`), the graphics a
+ *   the authors, separated by commas, the reincarnation rule (`dmRules`, DM's at first), the graphics a
  *   dungeon without its own `graphics.dat` plays, DM's or CSB's, whichever the manifest
  *   has, and one area that takes the files: dropped there, several at once, or chosen in
  *   the picker a click on it opens. A file goes where its name says, whatever its case:
@@ -23,9 +23,19 @@
  *   items by kind, its monsters and their groups, and its DSAs with the operations they
  *   use, named in the row's tooltip. Under that, CANCEL and CONFIRM, which is enabled when
  *   nothing is wrong and writes the record the check made.
+ *
+ * The welcome page's pen on a local set's tile opens the form on its record, to edit it:
+ * every field and file is the record's, and the record CONFIRM writes keeps its id and
+ * when it was added. The id cannot be changed, since its saves are filed under it, and
+ * `dungeon.dat` cannot be removed, only replaced. A new `dungeon.dat` gives the record a
+ * new signature (`checkLocalDataSet`): the saves stored stay, and each loads its own
+ * world, but an import is checked against the new one. DELETE, beside the title, asks
+ * first: the confirmation says how many saves go with the set, where it has any, and
+ * that the save menu's EXPORT keeps them. Its DELETE removes the record and every save
+ * filed under its id; its CANCEL keeps both.
  */
 import { folderFiles, type DataSetFiles } from '../data/DataSetFiles';
-import { dataSetNamed, type DataSetManifest } from '../data/DataSets';
+import { dataSetNamed, LOCAL_DATA_SET_PREFIX, type DataSetManifest } from '../data/DataSets';
 import { GraphicsLoader } from '../data/GraphicsLoader';
 import { ITEM_KINDS, isIllegalSubcode, operationsUsed, type DungeonCensus } from '../engine/DungeonCensus';
 import { StkOp } from '../engine/DsaSystem';
@@ -67,7 +77,10 @@ const DM_RULES_HINT = 'Every reincarnation adds 12 random attribute points. With
 
 const FORM = `
 <form class="add-set-form">
-  <h2 class="px" id="add-set-title">Add my own dungeon</h2>
+  <div class="add-set-head">
+    <h2 class="px" id="add-set-title">Add my own dungeon</h2>
+    <button type="button" class="add-set-delete px px2" hidden>Delete</button>
+  </div>
   <div class="add-set-columns">
     <div class="add-set-give">
       <label class="add-set-field"><span class="px px2">Name</span>
@@ -78,7 +91,7 @@ const FORM = `
         <textarea name="description" rows="2" maxlength="300"></textarea></label>
       <label class="add-set-field"><span class="px px2">Authors</span>
         <input name="authors" maxlength="200" placeholder="Separated by commas" autocomplete="off"></label>
-      <label class="add-set-check" title="${DM_RULES_HINT}"><input type="checkbox" name="dmRules">
+      <label class="add-set-check" title="${DM_RULES_HINT}"><input type="checkbox" name="dmRules" checked>
         <span>DM rules: reincarnation raises attributes</span></label>
       <fieldset class="add-set-base" title="The graphics a dungeon plays when it has no graphics.dat of its own">
         <legend class="px px2">Without graphics.dat</legend>
@@ -100,17 +113,40 @@ const FORM = `
   </div>
 </form>`;
 
+/** The confirmation DELETE opens. */
+const CONFIRM_DELETE = `
+<form class="add-set-form">
+  <h2 class="px" id="delete-set-title"></h2>
+  <p class="delete-set-text"></p>
+  <div class="add-set-buttons">
+    <button type="button" class="btn px" id="delete-set-cancel">Cancel</button>
+    <button type="button" class="btn px" id="delete-set-confirm">Delete</button>
+  </div>
+</form>`;
+
+/** A record the form is opened on, to edit it, and what deleting it takes. */
+export interface EditedDataSet {
+    record: LocalDataSetRecord;
+    /** How many saves are filed under its id: deleting the set deletes them. */
+    saves: number;
+    /** Deletes the record and its saves. */
+    remove: () => Promise<void>;
+    /** Called once `remove` has deleted them, the form closed. */
+    removed: () => void;
+}
+
 /**
- * Open the form over the welcome page. `takenIds` are the player's sets' ids, which a new
- * one may not take. CONFIRM calls `store` with the record; once it has stored it, the form
- * closes and calls `added`. An error `store` throws is shown under the checklist, and the
- * form stays.
+ * Open the form over the welcome page, on `edited`'s record where it is given. `takenIds`
+ * are the player's other sets' ids, which a new one may not take. CONFIRM calls `store`
+ * with the record; once it has stored it, the form closes and calls `added`. An error
+ * `store` or `edited.remove` throws is shown under the checklist, and the form stays.
  */
 export function openAddDataSetForm(
     manifest: DataSetManifest,
     takenIds: ReadonlySet<string>,
     store: (record: LocalDataSetRecord) => Promise<void>,
     added: (record: LocalDataSetRecord) => void,
+    edited: EditedDataSet | null = null,
 ): void {
     const dialog = document.createElement('dialog');
     dialog.className = 'add-set';
@@ -128,7 +164,8 @@ export function openAddDataSetForm(
     const holds = form.querySelector<HTMLElement>('.add-set-holds')!;
 
     const files: Partial<Record<LocalDataSetFile, File>> = {};
-    let idWritten = false;
+    const editing = edited?.record ?? null;
+    let idWritten = editing !== null;
     let record: LocalDataSetRecord | null = null;
     let generation = 0;
     /** Why the thumbnail could not be drawn, shown on its row until a thumbnail is given. */
@@ -136,7 +173,20 @@ export function openAddDataSetForm(
     let drawing = false;
 
     const bases = BASE_SETS.flatMap((set) => dataSetNamed(manifest, set) ?? []);
-    let baseSet = bases[0]?.id ?? BASE_SETS[0];
+    let baseSet = editing?.baseSet ?? bases[0]?.id ?? BASE_SETS[0];
+    if (editing) {
+        form.querySelector('#add-set-title')!.textContent = 'Edit my own dungeon';
+        name.value = editing.name;
+        id.value = editing.id.slice(LOCAL_DATA_SET_PREFIX.length);
+        id.readOnly = true;
+        id.title = 'The id stays: its saves are filed under it.';
+        description.value = editing.description;
+        authors.value = editing.authors.join(', ');
+        dmRules.checked = editing.dmRules;
+        for (const [about, blob] of Object.entries(editing.files) as [LocalDataSetFile, Blob][]) {
+            files[about] = blob instanceof File ? blob : new File([blob], about, { type: blob.type });
+        }
+    }
     for (const set of bases) {
         const label = document.createElement('label');
         label.className = 'add-set-check';
@@ -285,6 +335,17 @@ export function openAddDataSetForm(
     });
     dialog.addEventListener('close', () => dialog.remove());
 
+    const deleteButton = form.querySelector<HTMLButtonElement>('.add-set-delete')!;
+    deleteButton.hidden = edited === null;
+    deleteButton.title = 'Delete this dungeon and its saves';
+    deleteButton.addEventListener('click', () => {
+        if (!edited) return;
+        failure.textContent = '';
+        confirmDelete(edited, dialog, (error) => {
+            failure.textContent = `It could not be deleted: ${error instanceof Error ? error.message : String(error)}`;
+        });
+    });
+
     /** The check again, after any change, and the checklist redrawn from its verdict. */
     function changed(): void {
         const ownGraphics = files['graphics.dat'] !== undefined;
@@ -302,7 +363,7 @@ export function openAddDataSetForm(
         const mine = ++generation;
         record = null;
         confirm.disabled = true;
-        void checkLocalDataSet(draft, takenIds, base, Date.now()).then(({ problems, record: made, census }) => {
+        void checkLocalDataSet(draft, takenIds, base, editing?.createdAt ?? Date.now()).then(({ problems, record: made, census }) => {
             if (mine !== generation) return;
             for (const { row, item, given, remove, problem } of rows.values()) {
                 // The graphics' problems are about the file or, without it, about the base set.
@@ -312,7 +373,8 @@ export function openAddDataSetForm(
                 item.className = state;
                 // The name and the id are in their fields beside it.
                 given.textContent = row.about === 'name' || row.about === 'id' ? '' : value ?? '';
-                remove.hidden = !(row.about in files);
+                // An edited set keeps a dungeon.dat: it can only be replaced.
+                remove.hidden = !(row.about in files) || (editing !== null && row.about === 'dungeon.dat');
                 // A needed field left empty is shown by its cross alone; anything else wrong says why.
                 problem.textContent = value !== null || !row.needed ? own.map((p) => p.text).join(' ') : '';
                 if (row.about === 'thumbnail' && value === null) {
@@ -333,6 +395,43 @@ export function openAddDataSetForm(
     document.body.append(dialog);
     dialog.showModal();
     changed();
+}
+
+/**
+ * The confirmation DELETE opens, over the form `form`: the set's name, how many of its
+ * saves go with it, and CANCEL and DELETE. DELETE closes it and the form once
+ * `edited.remove` has deleted them, and calls `edited.removed`; what it throws goes to
+ * `failed`, the form staying.
+ */
+function confirmDelete(edited: EditedDataSet, form: HTMLDialogElement, failed: (error: unknown) => void): void {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'add-set delete-set';
+    dialog.setAttribute('aria-labelledby', 'delete-set-title');
+    dialog.innerHTML = CONFIRM_DELETE;
+    dialog.querySelector('#delete-set-title')!.textContent = `Delete ${edited.record.name}?`;
+    const { saves } = edited;
+    dialog.querySelector('.delete-set-text')!.textContent = saves === 0
+        ? 'It has no saved game.'
+        : `Its ${saves === 1 ? 'saved game is' : `${saves} saved games are`} deleted with it. `
+            + `To keep ${saves === 1 ? 'it' : 'them'}, play it first and EXPORT ${saves === 1 ? 'it' : 'each'} from the save menu.`;
+    const remove = dialog.querySelector<HTMLButtonElement>('#delete-set-confirm')!;
+    dialog.querySelector('#delete-set-cancel')!.addEventListener('click', () => dialog.close());
+    remove.addEventListener('click', async () => {
+        remove.disabled = true;
+        try {
+            await edited.remove();
+        } catch (error) {
+            dialog.close();
+            failed(error);
+            return;
+        }
+        dialog.close();
+        form.close();
+        edited.removed();
+    });
+    dialog.addEventListener('close', () => dialog.remove());
+    document.body.append(dialog);
+    dialog.showModal();
 }
 
 /**

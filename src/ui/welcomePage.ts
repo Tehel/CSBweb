@@ -15,6 +15,9 @@
  * - **"+ Add my own"**, the grid's last tile, which is never selected. A click opens the
  *   form that adds a set (`src/ui/addDataSetForm.ts`); the set it adds is stored, and the
  *   page shows it, selected.
+ * - **A local set's tile** has its name in cyan, and **the pen** on its picture, at its
+ *   top right corner, which opens the same form on its record, to edit or delete it. The
+ *   page then shows the set edited, selected, or none, for a set deleted.
  * - **PLAY** opens the selected set (`?dungeon=<id>`): its title, then its entrance. With
  *   no set selected it is disabled.
  * - **CONTINUE** opens the last save used (`lastUsedSave`) of the selected set, or of every
@@ -118,11 +121,11 @@ export async function showWelcomePage(
     body: HTMLElement,
     manifest: DataSetManifest,
     store: Pick<SaveStore, 'list'>,
-    localSets: Pick<BrowserDataSetStore, 'list' | 'put'>,
+    localSets: Pick<BrowserDataSetStore, 'list' | 'put' | 'remove'>,
     select: string | null = null,
 ): Promise<void> {
     const records = await localSets.list().catch(() => [] as LocalDataSetRecord[]);
-    const local = records.map((record) => ({ set: localDataSet(record), thumbnail: record.files.thumbnail ?? null }));
+    const local = records.map((record) => ({ set: localDataSet(record), record, thumbnail: record.files.thumbnail ?? null }));
     const allSets = [...manifest.dataSets, ...local.map(({ set }) => set)];
     const known = new Set(allSets.map((set) => set.id));
     const rows = (await store.list(null).catch(() => [] as SaveEntry[])).filter((row) => known.has(row.dataSet));
@@ -156,15 +159,39 @@ export async function showWelcomePage(
             selected = selected === set ? null : set;
             update();
         });
-        grid.append(tile);
+        const record = local.find((l) => l.set === set)?.record;
+        if (record) tile.classList.add('local');
+        grid.append(record ? penned(tile, record, saves) : tile);
         return { set, tile };
     });
-    grid.append(addTile(() => openAddDataSetForm(
-        manifest,
-        new Set(records.map((record) => record.id)),
-        (record) => localSets.put(record),
-        (record) => void showWelcomePage(body, manifest, store, localSets, record.id),
-    )));
+    grid.append(addTile(() => openForm(null)));
+
+    /** The form that adds a set, or edits `edited`'s, with its `saves`; the page shown again after it. */
+    function openForm(edited: { record: LocalDataSetRecord; saves: number } | null): void {
+        const again = (select: string | null): void => void showWelcomePage(body, manifest, store, localSets, select);
+        openAddDataSetForm(
+            manifest,
+            new Set(records.map((record) => record.id).filter((id) => id !== edited?.record.id)),
+            (record) => localSets.put(record),
+            (record) => again(record.id),
+            edited && { ...edited, remove: () => localSets.remove(edited.record.id), removed: () => again(null) },
+        );
+    }
+
+    /** A local set's `tile` with the pen on its picture, which opens the form on `record`. */
+    function penned(tile: HTMLElement, record: LocalDataSetRecord, saves: number): HTMLElement {
+        const cell = document.createElement('div');
+        cell.className = 'pick-cell';
+        const pen = document.createElement('button');
+        pen.type = 'button';
+        pen.className = 'pick-edit';
+        pen.title = `Edit ${record.name}`;
+        pen.setAttribute('aria-label', pen.title);
+        pen.innerHTML = PEN;
+        pen.addEventListener('click', () => openForm({ record, saves }));
+        cell.append(tile, pen);
+        return cell;
+    }
 
     function update(): void {
         for (const { set, tile } of tiles) tile.setAttribute('aria-pressed', String(set === selected));
@@ -182,6 +209,29 @@ export async function showWelcomePage(
     }
     update();
 }
+
+/** The pen's pixels, 11 by 11, in the page's palette (`welcomePage.css`). */
+const PEN_PIXELS = [
+    '.........ee',
+    '........mee',
+    '.......Bme.',
+    '......Bbm..',
+    '.....Bbd...',
+    '....Bbd....',
+    '...Bbd.....',
+    '..Bbd......',
+    '.wbd.......',
+    'wwd........',
+    'tw.........',
+];
+const PEN_COLOURS: Record<string, string> = { e: 'p10', m: 'p13', B: 'p11', b: 'p9', d: 'p5', w: 'p13', t: 'p1' };
+
+/** The pen, an SVG of `PEN_PIXELS`, a path for each colour. */
+const PEN = `<svg viewBox="0 0 11 11" width="22" height="22" shape-rendering="crispEdges" aria-hidden="true">${
+    Object.entries(PEN_COLOURS).map(([key, colour]) => `<path fill="var(--${colour})" d="${
+        PEN_PIXELS.flatMap((row, y) => [...row].flatMap((pixel, x) => pixel === key ? [`M${x} ${y}h1v1h-1z`] : [])).join('')
+    }"/>`).join('')
+}</svg>`;
 
 /**
  * `sets` in the grid's order: those `rows` holds a save of, the one with the latest save

@@ -29,7 +29,7 @@
 }
 
 body.welcome {
-    --p0: #000000; --p1: #6c6c6c; --p2: #909090; --p3: #6c2400;
+    --p0: #000000; --p1: #6c6c6c; --p2: #909090; --p3: #6c2400; --p4: #00d8d8;
     --p5: #904800; --p7: #00d800; --p9: #fcb400; --p10: #d8906c;
     --p11: #fcfc00; --p12: #484848; --p13: #b4b4b4; --p15: #fcfcfc;
     --navy: #000048;
@@ -114,7 +114,24 @@ body.welcome {
 /* "+ Add my own", the grid's last tile, which opens the form that adds a set. */
 .pick.add .pick-picture { display: flex; align-items: center; justify-content: center; }
 .pick-plus { color: var(--p9); }
+/* A local set's tile, and the pen at its picture's top right corner, which edits it. */
+.pick-cell { position: relative; display: flex; }
+.pick-edit {
+    appearance: none;
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: flex;
+    padding: 4px;
+    background: #0b0b16;
+    border: 3px solid #1d1d30;
+    cursor: pointer;
+}
+.pick-edit:hover { border-color: var(--p9); }
+.pick-edit:focus-visible { outline: 3px solid var(--p11); outline-offset: 3px; }
 .pick-name { color: var(--p15); padding: 0 3px; }
+/* A player's own set, its name in cyan. */
+.pick.local .pick-name { color: var(--p4); }
 .pick-saves { padding: 0 3px 3px; }
 .pick-saves { color: var(--p2); }
 .pick:not(.dim) .pick-saves { color: var(--p7); }
@@ -234,6 +251,21 @@ body.welcome {
 .add-set::backdrop { background: rgb(0 0 0 / 0.75); }
 .add-set-form { display: flex; flex-direction: column; gap: 18px; padding: 21px 24px 24px; }
 .add-set h2 { margin: 0; color: var(--p11); }
+.add-set-head { display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+/* DELETE, beside the title of a set's form opened by its pen. */
+.add-set-delete {
+    appearance: none;
+    padding: 6px 9px;
+    background: #0b0b16;
+    border: 3px solid #1d1d30;
+    color: var(--p2);
+    cursor: pointer;
+}
+.add-set-delete:hover { border-color: #fc2400; color: #fc2400; }
+.add-set input[readonly] { color: var(--p2); }
+/* The confirmation DELETE opens. */
+.delete-set { width: min(560px, calc(100vw - 32px)); }
+.delete-set-text { margin: 0; font-size: 18px; line-height: 1.5; }
 .add-set-columns { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; }
 .add-set-give { display: flex; flex-direction: column; gap: 10px; }
 .add-set-field { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; }

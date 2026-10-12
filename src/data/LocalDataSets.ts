@@ -19,7 +19,7 @@ import type { DataSetFiles } from './DataSetFiles';
 import { DungeonLoader } from './DungeonLoader';
 import { dungeonSignature, type DungeonSignature } from './DungeonSignature';
 import type { DungeonData } from './dungeonTypes';
-import { csbGraphicsSignatureRefused, graphicsSignatureRefused, Signature } from './FileSignature';
+import { csbGraphicsSignatureRefused, graphicsSignatureRefused, Signature, type FileSignature } from './FileSignature';
 import { GraphicsLoader } from './GraphicsLoader';
 import { extractGraphicsTables } from './tables/GraphicsTables';
 import { dungeonCensus, type DungeonCensus } from '../engine/DungeonCensus';
@@ -138,6 +138,9 @@ export const LOCAL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;
  *
  * With them, what the dungeon holds (`dungeonCensus`) wherever its `dungeon.dat` reads,
  * whatever else is wrong; `null` where it does not.
+ *
+ * Each file is read, parsed and hashed once (`fileReads`), so that a check after a
+ * field's change costs only the fields'.
  */
 export async function checkLocalDataSet(
     draft: LocalDataSetDraft,
@@ -150,11 +153,6 @@ export async function checkLocalDataSet(
         problems.push({ about, text });
     };
     const { files } = draft;
-    const bytes = async (name: LocalDataSetFile): Promise<Uint8Array | null> => {
-        const blob = files[name];
-        return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
-    };
-    const why = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
     const id = `${LOCAL_DATA_SET_PREFIX}${draft.id}`;
     if (draft.id === '') problem('id', 'Give it an id.');
@@ -162,42 +160,33 @@ export async function checkLocalDataSet(
     else if (takenIds.has(id)) problem('id', 'One of your dungeons already has this id.');
     if (draft.name.trim() === '') problem('name', 'Give it a name.');
 
-    let dungeon: DungeonData | null = null;
-    const dungeonDat = await bytes('dungeon.dat');
+    const dungeonDat = files['dungeon.dat'];
+    const read = dungeonDat ? await readDungeon(dungeonDat) : null;
     if (!dungeonDat) problem('dungeon.dat', 'A dungeon.dat is needed.');
-    else {
-        try {
-            dungeon = new DungeonLoader().loadDungeonDat(dungeonDat);
-        } catch (error) {
-            problem('dungeon.dat', `It does not read: ${why(error)}`);
-        }
-    }
+    else if (read!.error !== null) problem('dungeon.dat', `It does not read: ${read!.error}`);
+    const dungeon = read?.dungeon ?? null;
     const runtime = dungeon && readRuntimeFileSignatures(dungeon);
 
-    const ownGraphics = await bytes('graphics.dat');
+    const ownGraphics = files['graphics.dat'];
     const graphicsAbout: LocalDataSetField = ownGraphics ? 'graphics.dat' : 'baseSet';
-    const graphics = ownGraphics ?? await base(draft.baseSet)?.read('graphics.dat') ?? null;
-    if (!graphics) problem('baseSet', `The graphics.dat of '${draft.baseSet}' cannot be read.`);
+    const graphicsSource = ownGraphics ?? await base(draft.baseSet)?.read('graphics.dat') ?? null;
+    if (!graphicsSource) problem('baseSet', `The graphics.dat of '${draft.baseSet}' cannot be read.`);
     else {
-        try {
-            const loader = new GraphicsLoader();
-            loader.loadFromArray(graphics);
-            buildGameTables(extractGraphicsTables(loader));
-            const refused = runtime && graphicsSignatureRefused(runtime, Signature(graphics));
+        const graphics = await readGraphics(graphicsSource);
+        if (graphics.error !== null) problem(graphicsAbout, `It is not a graphics.dat: ${graphics.error}`);
+        else {
+            const refused = runtime && graphicsSignatureRefused(runtime, graphics.signature!);
             if (refused !== null) problem(graphicsAbout, `The dungeon was made for another graphics.dat (signature ${runtime!.graphicsSignature}, this one's ${refused}).`);
-        } catch (error) {
-            problem(graphicsAbout, `It is not a graphics.dat: ${why(error)}`);
         }
     }
 
-    const csbGraphics = await bytes('CSBgraphics.dat');
-    if (csbGraphics) {
-        try {
-            new CSBGraphicsLoader().loadFromArray(csbGraphics);
-            const refused = runtime && csbGraphicsSignatureRefused(runtime, Signature(csbGraphics));
+    const csbGraphicsFile = files['CSBgraphics.dat'];
+    if (csbGraphicsFile) {
+        const csbGraphics = await readCsbGraphics(csbGraphicsFile);
+        if (csbGraphics.error !== null) problem('CSBgraphics.dat', `It is not a CSBgraphics.dat: ${csbGraphics.error}`);
+        else {
+            const refused = runtime && csbGraphicsSignatureRefused(runtime, csbGraphics.signature!);
             if (refused !== null) problem('CSBgraphics.dat', `The dungeon was made for another CSBgraphics.dat (signature ${runtime!.csbGraphicsSignature}, this one's ${refused}).`);
-        } catch (error) {
-            problem('CSBgraphics.dat', `It is not a CSBgraphics.dat: ${why(error)}`);
         }
     } else if (dungeon) {
         const expected = noExpectedSignatures();
@@ -205,20 +194,17 @@ export async function checkLocalDataSet(
         if (csbGraphicsExpected(expected)) problem('CSBgraphics.dat', 'The dungeon needs its CSBgraphics.dat.');
     }
 
-    const hct = files['hcsb.hct'], dat = await bytes('hcsb.dat');
+    const hct = files['hcsb.hct'], dat = files['hcsb.dat'];
     if (hct && !dat) problem('hcsb.dat', 'The Hint Oracle needs hcsb.dat beside hcsb.hct.');
     if (dat && !hct) problem('hcsb.hct', 'The Hint Oracle needs hcsb.hct beside hcsb.dat.');
     if (dat) {
-        try {
-            parseHcsbDat(dat);
-        } catch (error) {
-            problem('hcsb.dat', `It is not the Hint Oracle's hcsb.dat: ${why(error)}`);
-        }
+        const error = await readHcsbDat(dat);
+        if (error !== null) problem('hcsb.dat', `It is not the Hint Oracle's hcsb.dat: ${error}`);
     }
     const thumbnail = files.thumbnail;
     if (thumbnail && !thumbnail.type.startsWith('image/')) problem('thumbnail', 'It is not an image.');
 
-    const census = dungeon && dungeonCensus(dungeon);
+    const census = read?.census ?? null;
     if (problems.length > 0 || !dungeon) return { problems, record: null, census };
     return {
         problems,
@@ -231,8 +217,86 @@ export async function checkLocalDataSet(
             dmRules: draft.dmRules,
             baseSet: ownGraphics ? null : draft.baseSet,
             files: { ...files },
-            dungeonSignature: await dungeonSignature(dungeon),
+            dungeonSignature: read!.signature!,
             createdAt,
         },
     };
+}
+
+/**
+ * What the check reads of a file, worked out once for each Blob, or each `graphics.dat`
+ * a base set's folder gave, and each reading of it: the form checks at every key the
+ * player types, and a 10 MB `CSBgraphics.dat` is not read, parsed and hashed again for
+ * each. A Blob never changes, and nothing writes to the bytes a folder gave.
+ */
+const fileReads = new WeakMap<Blob | Uint8Array, Map<string, Promise<unknown>>>();
+
+function once<T>(file: Blob | Uint8Array, reading: string, work: () => Promise<T>): Promise<T> {
+    let reads = fileReads.get(file);
+    if (!reads) fileReads.set(file, reads = new Map());
+    if (!reads.has(reading)) reads.set(reading, work());
+    return reads.get(reading) as Promise<T>;
+}
+
+const why = (error: unknown): string => error instanceof Error ? error.message : String(error);
+
+const bytesOf = async (file: Blob | Uint8Array): Promise<Uint8Array> =>
+    file instanceof Uint8Array ? file : new Uint8Array(await file.arrayBuffer());
+
+/**
+ * `file` read as a `dungeon.dat`, enciphered or not (`DungeonLoader.loadDungeonDat`): the
+ * dungeon, what it holds (`dungeonCensus`) and its signature (`dungeonSignature`); or why
+ * it does not read.
+ */
+function readDungeon(file: Blob): Promise<{ dungeon: DungeonData | null; error: string | null; census: DungeonCensus | null; signature: DungeonSignature | null }> {
+    return once(file, 'dungeon.dat', async () => {
+        let dungeon: DungeonData;
+        try {
+            dungeon = new DungeonLoader().loadDungeonDat(await bytesOf(file));
+        } catch (error) {
+            return { dungeon: null, error: why(error), census: null, signature: null };
+        }
+        const census = dungeonCensus(dungeon);
+        return { dungeon, error: null, census, signature: await dungeonSignature(dungeon) };
+    });
+}
+
+/** `file` read as a `graphics.dat`, its tables built as the boot builds them, and its signature; or why it does not read. */
+function readGraphics(file: Blob | Uint8Array): Promise<{ signature: FileSignature | null; error: string | null }> {
+    return once(file, 'graphics.dat', async () => {
+        try {
+            const bytes = await bytesOf(file);
+            const loader = new GraphicsLoader();
+            loader.loadFromArray(bytes);
+            buildGameTables(extractGraphicsTables(loader));
+            return { signature: Signature(bytes), error: null };
+        } catch (error) {
+            return { signature: null, error: why(error) };
+        }
+    });
+}
+
+/** `file` parsed as a `CSBgraphics.dat`, and its signature; or why it does not parse. */
+function readCsbGraphics(file: Blob): Promise<{ signature: FileSignature | null; error: string | null }> {
+    return once(file, 'CSBgraphics.dat', async () => {
+        try {
+            const bytes = await bytesOf(file);
+            new CSBGraphicsLoader().loadFromArray(bytes);
+            return { signature: Signature(bytes), error: null };
+        } catch (error) {
+            return { signature: null, error: why(error) };
+        }
+    });
+}
+
+/** Why `file` does not parse as the Hint Oracle's `hcsb.dat`, or `null` where it does. */
+function readHcsbDat(file: Blob): Promise<string | null> {
+    return once(file, 'hcsb.dat', async () => {
+        try {
+            parseHcsbDat(await bytesOf(file));
+            return null;
+        } catch (error) {
+            return why(error);
+        }
+    });
 }

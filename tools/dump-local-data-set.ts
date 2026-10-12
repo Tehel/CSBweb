@@ -166,6 +166,31 @@ async function problemsOf(label: string, draft: LocalDataSetDraft, taken: string
 async function checkForm(): Promise<void> {
   console.log('=== the form\'s check ===');
   const dm = dataSetNamed('dm-atari'), conflux = dataSetNamed('conflux-3.5'), csb = dataSetNamed('csb');
+  {
+    // The form checks at every key the player types: each file is read once, whatever
+    // the fields do, and the same files give the same verdict.
+    const draft = await draftOf(conflux, 'counted', ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat']);
+    const reads = new Map<string, number>();
+    for (const [name, blob] of Object.entries(draft.files) as [LocalDataSetFile, Blob][]) {
+      const counted = new Blob([blob], { type: blob.type });
+      const arrayBuffer = counted.arrayBuffer.bind(counted);
+      counted.arrayBuffer = () => {
+        reads.set(name, (reads.get(name) ?? 0) + 1);
+        return arrayBuffer();
+      };
+      draft.files[name] = counted;
+    }
+    const first = await checkLocalDataSet(draft, new Set(), base, CREATED);
+    const second = await checkLocalDataSet({ ...draft, name: 'Another name', id: '' }, new Set(), base, CREATED);
+    const third = await checkLocalDataSet({ ...draft, name: 'A third name' }, new Set(), base, CREATED);
+    console.log(`  three checks of conflux's files: ${[...reads].map(([name, n]) => `${name} read ${n}`).join(', ')}`);
+    check(reads.size === 3 && [...reads.values()].every((n) => n === 1),
+      'three checks of the same files, the fields changed between them, read each file once');
+    check(first.record !== null && second.record === null && second.problems.map((p) => p.about).join() === 'id'
+      && digest({ ...third.record, name: first.record.name, files: Object.keys(third.record!.files) }) === digest({ ...first.record, files: Object.keys(first.record.files) })
+      && digest(third.census) === digest(first.census),
+      'and give the same verdict on them each time');
+  }
   for (const [from, names, baseSet] of [
     [dm, ['dungeon.dat'], 'dm-atari'],
     [conflux, ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat'], null],

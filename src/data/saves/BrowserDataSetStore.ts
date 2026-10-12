@@ -3,8 +3,8 @@
  * database: one record each, its files as Blobs, keyed by its `local:<id>`.
  */
 import type { LocalDataSetRecord } from '../LocalDataSets';
-import { DATA_SETS_STORE, idbDelete, idbGet, idbGetAll, idbPut, openSaveDatabase } from './idb';
-import type { DrawPlaythrough } from './SaveStore';
+import { DATA_SETS_STORE, SAVES_STORE, idbDone, idbGet, idbGetAll, idbPut, openSaveDatabase } from './idb';
+import type { DrawPlaythrough, StoredSaveRecord } from './SaveStore';
 
 export class BrowserDataSetStore {
     /** `drawPlaythrough` is the database's upgrade's, as `BrowserSaveStore`'s is: whichever store opens it first. */
@@ -30,7 +30,18 @@ export class BrowserDataSetStore {
         await idbPut(await this.db(), DATA_SETS_STORE, record);
     }
 
+    /** The set `id` names and every save filed under it, in one transaction: all of them, or none. */
     async remove(id: string): Promise<void> {
-        await idbDelete(await this.db(), DATA_SETS_STORE, id);
+        const tx = (await this.db()).transaction([DATA_SETS_STORE, SAVES_STORE], 'readwrite');
+        const done = idbDone(tx);
+        tx.objectStore(DATA_SETS_STORE).delete(id);
+        const rows = tx.objectStore(SAVES_STORE).openCursor();
+        rows.onsuccess = () => {
+            const row = rows.result;
+            if (!row) return;
+            if ((row.value as StoredSaveRecord).dataSet === id) row.delete();
+            row.continue();
+        };
+        await done;
     }
 }

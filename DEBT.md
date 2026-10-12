@@ -29,8 +29,8 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 (`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
-from their own files to the welcome page and plays it; what is left is editing and
-publishing it (P6 to P8). They are not CSBWin features but the page's, and come before every other
+from their own files to the welcome page, plays it, edits it and deletes it; what is left
+is publishing it (P7, P8). They are not CSBWin features but the page's, and come before every other
 tier.
 
 **Before the rest, at the author's request: U — the interface in the canvas.** The
@@ -113,9 +113,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P6 | Editing and deleting a local set | M | ⏳ |
 | P7 | The data sets in the server's database | L | ⏳ |
-| P8 | Publishing a local set | L | ⏳ after P6, P7 |
+| P8 | Publishing a local set | L | ⏳ after P7 |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
@@ -203,7 +202,7 @@ entry here, only its commit, so take the next ID from this line and move it on.
 At the author's request, from the forum: a player adds a dungeon from their own files, plays
 it like any other, and later offers it to the site. It mirrors CSBWin, which plays whatever
 its `directory=` holds (`src/data/DataSets.ts`), so the engine does not change and nothing
-goes in H. Two phases: a set kept in the player's browser, which stands, and P6 to P8, which publish it.
+goes in H. Two phases: a set kept in the player's browser, which stands, and P7 and P8, which publish it.
 
 What stands: a local set is a record of the store's `dataSets` object store
 (`BrowserDataSetStore`, `src/data/saves/`), `LocalDataSetRecord` in
@@ -220,7 +219,7 @@ manifest's, under the same order, a record's thumbnail as its tile's picture, an
 their saves; its last tile, "+ Add my own", opens the form that adds a set
 (`src/ui/addDataSetForm.ts`), a modal dialog on one screen. On its left, what the player
 gives: the name, the id (made from the name until the player writes one), a description,
-the authors, the reincarnation rule, DM's or CSB's graphics for a set without a
+the authors, the reincarnation rule (DM's at first), DM's or CSB's graphics for a set without a
 `graphics.dat`, and one area that takes the files, dropped or picked, each going where its
 name says. On its right, the checklist of the name, the id and the six files, crossed or
 checked, a removable file on its row, and on the thumbnail's, while it has none, "Generate
@@ -229,10 +228,16 @@ from data", which draws the site's sets' thumbnail, the title's last frame
 `graphics.dat` or its base set's; under it, what the dungeon holds once its
 `dungeon.dat` reads (`dungeonCensus`, `src/engine/DungeonCensus.ts`, whose DSA half
 `tools/dump-dsa-census.ts` checks); and CANCEL and CONFIRM. `checkLocalDataSet` runs at
-every change with the boot's own readers and `src/engine/FileSignatures.ts`'s rules, and
-makes the record CONFIRM stores; the page then shows the set selected.
+every change with the boot's own readers, each file read, parsed and hashed once and `src/engine/FileSignatures.ts`'s rules, and
+makes the record CONFIRM stores; the page then shows the set selected. A pen on a local
+set's picture reopens the form on its record: its id fixed, since its saves are filed
+under it, and its `dungeon.dat` replaceable but not removable; the record CONFIRM writes
+keeps when it was added, and a new `dungeon.dat` gives it a new signature, which the
+saves already stored do not need. The form's DELETE asks first, counting the saves that
+go with the set and pointing to the save menu's EXPORT, then removes the record and
+those saves in one transaction (`BrowserDataSetStore.remove`).
 `tools/dump-local-data-set.ts` proves the check, the record and the census,
-`tools/probe-frames.mjs` drives the form.
+`tools/probe-frames.mjs` drives the form, adding, editing and deleting a set.
 
 The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase letters, digits, `.`, `-` and
 `_`, at most 40), since P8 makes it the set's folder on the server. No shipped dungeon
@@ -253,19 +258,6 @@ Decisions taken with the author, for every row:
   query. A lost id is handled by hand on the forum for now.
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
-
-### P6 ⏳ Editing and deleting a local set
-
-The form reopens on a record. Every file but `dungeon.dat` can be removed, any file can
-be replaced, and the text fields and options can be changed. The id stays: saves are
-filed under it. A new `dungeon.dat` gives the record its signature: the saves already
-stored stay, and load as before, since each holds its own world; an import is then
-checked against the new one.
-
-Deleting a set deletes its saves too. When the set has any, the confirmation says so:
-it gives how many will be deleted and suggests exporting them first (the save menu's
-EXPORT, `src/data/saves/downloadSaveFile.ts`). It offers CANCEL, which keeps the set and
-its saves, and DELETE, which removes the record and every save filed under its id.
 
 ### P7 ⏳ The data sets in the server's database
 
@@ -288,7 +280,7 @@ its saves, and DELETE, which removes the record and every save filed under its i
 
 L.
 
-- **PUBLISH** in P6's form sends the record's files and fields with the `playerId`.
+- **PUBLISH** in the form opened by a set's pen sends the record's files and fields with the `playerId`.
 - **The server**:
   - drops `local:` and refuses an id already in the table;
   - caps each file's size and each player's rate;

@@ -105,7 +105,12 @@ export function idbGetAll<T>(db: IDBDatabase, store: string): Promise<T[]> {
 export async function idbPut(db: IDBDatabase, store: string, value: unknown): Promise<void> {
     const tx = db.transaction(store, 'readwrite');
     await promisify(tx.objectStore(store).put(value));
-    await new Promise<void>((resolve, reject) => {
+    await idbDone(tx);
+}
+
+/** `tx` committed, or its error. */
+export function idbDone(tx: IDBTransaction): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error ?? new Error('IndexedDB write failed'));
         tx.onabort = () => reject(tx.error ?? new Error('IndexedDB write aborted'));
