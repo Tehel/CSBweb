@@ -118,7 +118,7 @@ In payoff order: the first row is the next item.
 | P3 | The form that adds a set | L | ⏳ after P2 |
 | P4 | A thumbnail generated from the data | S | ⏳ after P3 |
 | P5 | A local set's saves import | S | ⏳ after P1 |
-| P6 | Editing and deleting a local set | M | ⏳ after P3, a decision of the author's |
+| P6 | Editing and deleting a local set | M | ⏳ after P3 |
 | P7 | The data sets in the server's database | L | ⏳ |
 | P8 | Publishing a local set | L | ⏳ after P6, P7 |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
@@ -302,8 +302,12 @@ Checking the local signature first covers a local set that holds a known dungeon
 
 The form reopens on a record. Every file but `dungeon.dat` can be removed, any file can
 be replaced, and the text fields and options can be changed. The id stays: saves are
-filed under it. Deleting a set that has saves needs a decision from the author (delete
-them, keep them, or refuse) before this row is taken.
+filed under it.
+
+Deleting a set deletes its saves too. When the set has any, the confirmation says so:
+it gives how many will be deleted and suggests exporting them first (the save menu's
+EXPORT, `src/data/saves/downloadSaveFile.ts`). It offers CANCEL, which keeps the set and
+its saves, and DELETE, which removes the record and every save filed under its id.
 
 ### P7 ⏳ The data sets in the server's database
 
@@ -314,9 +318,11 @@ them, keep them, or refuse) before this row is taken.
   also to its owner, and everything to the author, whose `playerId` is in the server's
   `.env`. The `playerId` travels in a header or the body, never the query. The answer
   holds no `playerId`, only a set's status.
-- **The tools** read `static/gamefiles/manifest.json` (`tools/lib/dataSets.ts`), so the
-  repository's manifest stays, and seeds the table. How the two stay in step is settled
-  with the author when this row is taken.
+- **The tools** have a static manifest of their own, which lists only the sets they run
+  on, in the format `parseManifest` reads. It replaces `static/gamefiles/manifest.json` in
+  `tools/lib/dataSets.ts`. The server no longer reads a manifest file: the table is its
+  only list, filled once from the deployed `manifest.json`. `tools/dump-server.ts`
+  sets up its server's sets in the table rather than writing a `manifest.json`.
 - **Deployment**: `gamefiles` mounted read-write (`doc/DEPLOYMENT.md`), and `backup.ts`
   covers the uploaded folders and the table.
 
