@@ -386,47 +386,61 @@ await clickOn('.pick[data-set="dm-atari"]');
 const atDm = await welcome();
 check(atDm.tiles.startsWith('dm-atari*!') && atDm.resume === atWelcome.resume, 'dm-atari selected: CONTINUE reads its last save');
 check(atWelcome.last === 'pick add +Add my own', 'the grid ends with "+ Add my own", never selected');
-// The form that adds a set (`src/ui/addDataSetForm.ts`), which "+ Add my own" opens. CANCEL
-// closes it. Then the player's own set (`src/data/LocalDataSets.ts`) is made through it:
-// DM's dungeon.dat dropped with CSB's thumbnail, hcsb.hct, and a file none of a dungeon's;
-// the id made from the name, then written; CONFIRM held while hcsb.hct is alone, and
-// given once it is removed. The record is stored, and the page shows its tile selected.
-// What the check refuses is `tools/dump-local-data-set.ts`'s to show.
+// The form that adds a set (`src/ui/addDataSetForm.ts`), which "+ Add my own" opens: its
+// checklist, a row each for the name, the id and the six files, crossed where needed and
+// missing or wrong, checked where right. CANCEL closes it. Then the player's own set
+// (`src/data/LocalDataSets.ts`) is made through it: DM's dungeon.dat dropped with CSB's
+// thumbnail, hcsb.hct, and a file none of a dungeon's; the id made from the name, then
+// written; hcsb.hct alone crossing hcsb.dat and holding CONFIRM, until it is removed; a
+// graphics.dat given turning off the choice of graphics. The record is stored, and the
+// page shows its tile selected. What the check refuses is `tools/dump-local-data-set.ts`'s.
 const form = () => evaluate(`(()=>{const d=document.querySelector('dialog.add-set');
-  return d && { open: d.open, id: d.querySelector('[name=id]').value, status: d.querySelector('.add-set-status').textContent,
+  return d && { open: d.open, id: d.querySelector('[name=id]').value,
+    rows: [...d.querySelectorAll('.add-set-checklist li')].map(li=>li.dataset.about+({right:'+',wrong:'x'}[li.className]??'')).join(),
     dropped: d.querySelector('.add-set-dropped').textContent, confirm: !d.querySelector('#add-set-confirm').disabled,
-    given: [...d.querySelectorAll('.add-set-files li')].filter(li=>li.querySelector('.has-file')).map(li=>li.dataset.about).join(),
-    base: d.querySelector('.add-set-base').hidden ? null : d.querySelector('[name=baseSet]:checked').value,
-    problems: [...d.querySelectorAll('.add-set-problem')].map(p=>p.textContent).filter(Boolean) };})()`);
+    base: [...d.querySelectorAll('[name=baseSet]')].map(r=>r.value+(r.checked?'*':'')+(r.disabled?'-':'')).join(),
+    problems: [...d.querySelectorAll('.add-set-problem')].map(p=>p.textContent).filter(Boolean),
+    height: d.getBoundingClientRect().height };})()`);
 const inForm = (body) => evaluate(`(async()=>{const d=document.querySelector('dialog.add-set');${body};return 1;})()`);
 const typeIn = (name, value) => inForm(`const i=d.querySelector('[name=${name}]');i.value=${JSON.stringify(value)};i.dispatchEvent(new Event('input'))`);
+const dropIn = (files) => inForm(`const dt=new DataTransfer();
+  for(const [path,name] of ${JSON.stringify(files)}){const b=await (await fetch(path)).blob(); dt.items.add(new File([b],name,{type:b.type}));}
+  d.querySelector('.add-set-drop').dispatchEvent(new DragEvent('drop',{dataTransfer:dt,bubbles:true,cancelable:true}))`);
+const removeIn = (about) => inForm(`d.querySelector('.add-set-checklist li[data-about="${about}"] .add-set-remove').click()`);
 await clickOn('.pick.add');
+await wait(500);
 const opened = await form();
 console.log('  form:', JSON.stringify(opened));
-check(opened?.open === true && !opened.confirm && opened.given === '' && opened.base === 'dm-atari'
-  && opened.status === 'Still to give: an id, a name, dungeon.dat.' && opened.problems.length === 0,
-  '"+ Add my own" opens the form: CONFIRM held until the set has a name, an id and a dungeon.dat, DM\'s graphics without a graphics.dat');
+check(opened?.open === true && !opened.confirm && opened.base === 'dm-atari*,csb' && opened.problems.length === 0
+  && opened.rows === 'namex,idx,dungeon.datx,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail',
+  '"+ Add my own" opens the form: the name, the id and dungeon.dat crossed, DM\'s graphics.dat checked, CONFIRM held');
+check(opened.height <= 600, 'the form is on one screen');
 await inForm(`d.querySelector('#add-set-cancel').click()`);
 check(await form() === null, 'CANCEL closes it');
 await clickOn('.pick.add');
-await inForm(`const dt=new DataTransfer();
-  for(const [path,name] of [['/gamefiles/dm-atari/dungeon.dat','DUNGEON.DAT'],['/gamefiles/csb/csb-thumbnail.png','title.png'],
-      ['/gamefiles/csb/hcsb.hct','hcsb.hct'],['/gamefiles/swoosh/swoosh.img','notes.txt']]){
-    const b=await (await fetch(path)).blob(); dt.items.add(new File([b],name,{type:b.type}));}
-  d.dispatchEvent(new DragEvent('drop',{dataTransfer:dt,bubbles:true,cancelable:true}))`);
+await dropIn([['/gamefiles/dm-atari/dungeon.dat', 'DUNGEON.DAT'], ['/gamefiles/csb/csb-thumbnail.png', 'title.png'],
+  ['/gamefiles/csb/hcsb.hct', 'hcsb.hct'], ['/gamefiles/swoosh/swoosh.img', 'notes.txt']]);
 await typeIn('name', 'My Own Dungeon');
 await wait(1500);
 const filled = await form();
 console.log('  form:', JSON.stringify(filled));
-check(filled.id === 'my-own-dungeon' && filled.given === 'dungeon.dat,hcsb.hct,thumbnail'
-  && filled.dropped === "Not one of a dungeon's files: notes.txt." && !filled.confirm && filled.status === 'Still to give: hcsb.dat.',
-  'dropped files go to the rows of their names, whatever the case, an image to the thumbnail\'s; the id is the name\'s; hcsb.hct alone holds CONFIRM');
-await inForm(`d.querySelector('.add-set-files li[data-about="hcsb.hct"]').querySelectorAll('button')[1].click()`);
+check(filled.id === 'my-own-dungeon' && filled.rows === 'name+,id+,dungeon.dat+,graphics.dat+,CSBgraphics.dat,hcsb.hct+,hcsb.datx,thumbnail+'
+  && filled.dropped === "Not one of a dungeon's files: notes.txt." && !filled.confirm
+  && filled.problems.join() === 'The Hint Oracle needs hcsb.dat beside hcsb.hct.',
+  'dropped files go where their names say, whatever the case, an image to the thumbnail; the id is the name\'s; hcsb.hct alone crosses hcsb.dat and holds CONFIRM');
+await dropIn([['/gamefiles/dm-atari/graphics.dat', 'GRAPHICS.DAT']]);
+await wait(1500);
+const ownGraphics = await form();
+await removeIn('graphics.dat');
+await removeIn('hcsb.hct');
 await typeIn('id', 'mine');
 await wait(1500);
 const ready = await form();
-check(ready.given === 'dungeon.dat,thumbnail' && ready.id === 'mine' && ready.confirm && ready.status === '' && ready.problems.length === 0,
-  'REMOVE takes a file back, and with nothing wrong CONFIRM is given');
+check(ownGraphics.base === 'dm-atari*-,csb-' && ownGraphics.dropped === '' && ready.base === 'dm-atari*,csb',
+  'a graphics.dat given turns the choice of graphics off, and its removal on');
+check(ready.rows === 'name+,id+,dungeon.dat+,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail+' && ready.id === 'mine'
+  && ready.confirm && ready.problems.length === 0,
+  'a row\'s × takes its file back, and with nothing wrong CONFIRM is given');
 await inForm(`d.querySelector('#add-set-confirm').click()`);
 await wait(2000);
 const stored = await evaluate(`new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');

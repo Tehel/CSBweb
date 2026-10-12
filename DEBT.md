@@ -242,10 +242,12 @@ L, in two steps. **Step 1 stands**: the form, its check, and the record it write
 
 What stands: "+ Add my own" (`addTile`, `src/ui/welcomePage.ts`) opens the form
 (`src/ui/addDataSetForm.ts`), a modal dialog in the welcome page's look
-(`welcomePage.css`): the name, the id (made from the name until the player writes one), a
-description, the authors, the reincarnation rule, the six files, each dropped or chosen
-and each replaceable or removable, and DM's or CSB's graphics without a `graphics.dat`.
-`checkLocalDataSet` (`src/data/LocalDataSets.ts`) runs at every change, with the boot's
+(`welcomePage.css`), on one screen. On the left, what the player gives: the name, the id
+(made from the name until the player writes one), a description, the authors, the
+reincarnation rule, DM's or CSB's graphics for a set without a `graphics.dat`, and one
+area that takes the files, dropped or picked, each going where its name says. On the
+right, the checklist of the name, the id and the six files, crossed or checked, a
+removable file on its row, and CANCEL and CONFIRM under it. `checkLocalDataSet` (`src/data/LocalDataSets.ts`) runs at every change, with the boot's
 own readers and `src/engine/FileSignatures.ts`'s rules, and makes the record CONFIRM
 stores; the page then shows the set selected. `tools/dump-local-data-set.ts` proves the
 check and the record, `tools/probe-frames.mjs` drives the form.

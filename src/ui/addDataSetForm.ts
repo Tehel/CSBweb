@@ -1,83 +1,99 @@
 /**
  * The form that adds a player's own data set (`src/data/LocalDataSets.ts`), opened by the
  * welcome page's "+ Add my own" (`src/ui/welcomePage.ts`): a modal dialog in the page's
- * look (`welcomePage.css`).
+ * look (`welcomePage.css`), on one screen, in two columns under its title.
  *
- * - **The fields**: the name, the id (the `<id>` of `local:<id>`, made from the name until
- *   the player writes one), a short description, the authors, separated by commas, and
- *   the reincarnation rule (`dmRules`).
- * - **The files**, each dropped on the dialog or chosen on its row, and each replaced or
- *   removed before CONFIRM: `dungeon.dat`, `graphics.dat`, `CSBgraphics.dat`, the Hint
- *   Oracle's `hcsb.hct` and `hcsb.dat`, and a thumbnail. A dropped file goes to the row of
- *   its name, whatever its case, an image to the thumbnail's; a chosen one goes to its row.
- *   Without a `graphics.dat`, the player chooses DM's or CSB's, whichever the manifest has.
- * - **The check**, `checkLocalDataSet`, runs at every change. A problem shows under its
- *   field once the player has given that field something; the line beside CONFIRM names
- *   the fields still to be given. CONFIRM is enabled when there is no problem, and writes
- *   the record the check made (`onConfirm`).
+ * - **The left column** is what the player gives: the name, the id (the `<id>` of
+ *   `local:<id>`, made from the name until the player writes one), a short description,
+ *   the authors, separated by commas, the reincarnation rule (`dmRules`), the graphics a
+ *   dungeon without its own `graphics.dat` plays, DM's or CSB's, whichever the manifest
+ *   has, and one area that takes the files: dropped there, several at once, or chosen in
+ *   the picker a click on it opens. A file goes where its name says, whatever its case:
+ *   `dungeon.dat`, `graphics.dat`, `CSBgraphics.dat`, the Hint Oracle's `hcsb.hct` and
+ *   `hcsb.dat`; an image is the thumbnail. A file given again replaces the one before.
+ * - **The right column** is the checklist of everything the set has, `checkLocalDataSet`'s
+ *   verdict on each, run at every change: a green check where it is given and right, a
+ *   red cross where it is needed and missing, or wrong, and nothing where it is optional
+ *   and absent. A wrong one says why under it; each row's tooltip says what it is. A given
+ *   file can be removed from its row. Under it, CANCEL and CONFIRM, which is enabled when
+ *   nothing is wrong and writes the record the check made.
  */
 import { folderFiles, type DataSetFiles } from '../data/DataSetFiles';
 import { dataSetNamed, type DataSetManifest } from '../data/DataSets';
 import {
     checkLocalDataSet,
-    type LocalDataSetDraft, type LocalDataSetField, type LocalDataSetFile, type LocalDataSetRecord,
+    type LocalDataSetDraft, type LocalDataSetField, type LocalDataSetFile, type LocalDataSetProblem, type LocalDataSetRecord,
 } from '../data/LocalDataSets';
 
 /** The sets a record without a `graphics.dat` may play the graphics of. */
 const BASE_SETS = ['dm-atari', 'csb'];
 
-/** The rows of files, in the form's order. */
-const FILE_ROWS: readonly { file: LocalDataSetFile; label: string; hint: string }[] = [
-    { file: 'dungeon.dat', label: 'dungeon.dat', hint: 'Needed' },
-    { file: 'graphics.dat', label: 'graphics.dat', hint: 'Or the graphics below' },
-    { file: 'CSBgraphics.dat', label: 'CSBgraphics.dat', hint: 'Where the dungeon has one' },
-    { file: 'hcsb.hct', label: 'hcsb.hct', hint: 'The Hint Oracle, with hcsb.dat' },
-    { file: 'hcsb.dat', label: 'hcsb.dat', hint: 'The Hint Oracle, with hcsb.hct' },
-    { file: 'thumbnail', label: 'Thumbnail', hint: 'An image, 320x200 at best' },
+/** A row of the checklist: the field or file it is about, and whether the set needs it. */
+interface ChecklistRow {
+    about: LocalDataSetField;
+    label: string;
+    needed: boolean;
+    /** What it is, the row's tooltip. */
+    hint: string;
+}
+
+const CHECKLIST: readonly ChecklistRow[] = [
+    { about: 'name', label: 'Name', needed: true, hint: 'The name the welcome page shows.' },
+    { about: 'id', label: 'Id', needed: true, hint: "Its place in the page's address and the key its saves are filed under: lowercase letters, digits, '.', '-' and '_'." },
+    { about: 'dungeon.dat', label: 'dungeon.dat', needed: true, hint: 'The dungeon itself.' },
+    { about: 'graphics.dat', label: 'graphics.dat', needed: true, hint: "The dungeon's graphics, or DM's or CSB's, chosen on the left." },
+    { about: 'CSBgraphics.dat', label: 'CSBgraphics.dat', needed: false, hint: "CSBWin's extra graphics, for a dungeon made with them." },
+    { about: 'hcsb.hct', label: 'hcsb.hct', needed: false, hint: "The Hint Oracle's hints, with hcsb.dat." },
+    { about: 'hcsb.dat', label: 'hcsb.dat', needed: false, hint: "The Hint Oracle's program, with hcsb.hct." },
+    { about: 'thumbnail', label: 'Thumbnail', needed: false, hint: "The welcome page's picture of it: an image, 320x200 at best." },
 ];
 
-/** What the line beside CONFIRM calls a field still to be given. */
-const FIELD_NAMES: Record<LocalDataSetField, string> = {
-    id: 'an id', name: 'a name', baseSet: 'the graphics', 'dungeon.dat': 'dungeon.dat', 'graphics.dat': 'graphics.dat',
-    'CSBgraphics.dat': 'CSBgraphics.dat', 'hcsb.hct': 'hcsb.hct', 'hcsb.dat': 'hcsb.dat', thumbnail: 'a thumbnail',
-};
+/** The files the drop area takes, by the name the game reads them under. */
+const NAMED_FILES: readonly LocalDataSetFile[] = ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat'];
+
+/** `doc/CSBwin-src/CSBCode.cpp:6796-6841`. */
+const DM_RULES_HINT = 'Every reincarnation adds 12 random attribute points. Without DM rules, as in CSB, the '
+    + 'attributes, HP, stamina and mana are first cut by a penalty, so a reincarnated champion ends weaker.';
 
 const FORM = `
 <form class="add-set-form">
   <h2 class="px" id="add-set-title">Add my own dungeon</h2>
-  <div class="add-set-fields">
-    <label class="add-set-field" data-about="name"><span class="px px2">Name</span>
-      <input name="name" maxlength="60" autocomplete="off"><span class="add-set-problem"></span></label>
-    <label class="add-set-field" data-about="id"><span class="px px2">Id</span>
-      <span class="add-set-id"><span class="px px2">local:</span><input name="id" maxlength="40" autocomplete="off" spellcheck="false"></span>
-      <span class="add-set-problem"></span></label>
-    <label class="add-set-field"><span class="px px2">Description</span>
-      <textarea name="description" rows="2" maxlength="300"></textarea></label>
-    <label class="add-set-field"><span class="px px2">Authors</span>
-      <input name="authors" maxlength="200" placeholder="Separated by commas" autocomplete="off"></label>
-    <label class="add-set-check"><input type="checkbox" name="dmRules">
-      <span>DM rules: a champion reincarnated keeps their attributes</span></label>
-  </div>
-  <h3 class="px px2">Files</h3>
-  <p class="add-set-hint">Drop the dungeon's files here, or choose each one.</p>
-  <ul class="add-set-files"></ul>
-  <p class="add-set-dropped" aria-live="polite"></p>
-  <fieldset class="add-set-base" data-about="baseSet">
-    <legend class="px px2">Without a graphics.dat</legend>
-    <span class="add-set-problem"></span>
-  </fieldset>
-  <div class="add-set-buttons">
-    <p class="add-set-status" aria-live="polite"></p>
-    <button type="button" class="btn px" id="add-set-cancel">Cancel</button>
-    <button type="button" class="btn px" id="add-set-confirm" disabled>Confirm</button>
+  <div class="add-set-columns">
+    <div class="add-set-give">
+      <label class="add-set-field"><span class="px px2">Name</span>
+        <input name="name" maxlength="60" autocomplete="off"></label>
+      <label class="add-set-field"><span class="px px2">Id</span>
+        <span class="add-set-id"><span class="px px2">local:</span><input name="id" maxlength="40" autocomplete="off" spellcheck="false"></span></label>
+      <label class="add-set-field"><span class="px px2">Description</span>
+        <textarea name="description" rows="2" maxlength="300"></textarea></label>
+      <label class="add-set-field"><span class="px px2">Authors</span>
+        <input name="authors" maxlength="200" placeholder="Separated by commas" autocomplete="off"></label>
+      <label class="add-set-check" title="${DM_RULES_HINT}"><input type="checkbox" name="dmRules">
+        <span>DM rules: reincarnation raises attributes</span></label>
+      <fieldset class="add-set-base" title="The graphics a dungeon plays when it has no graphics.dat of its own">
+        <legend class="px px2">Without graphics.dat</legend>
+      </fieldset>
+      <label class="add-set-drop" tabindex="0">
+        <input type="file" multiple hidden>
+        <span class="px px2">Drop files here</span>
+      </label>
+      <p class="add-set-dropped" aria-live="polite"></p>
+    </div>
+    <div class="add-set-have">
+      <ul class="add-set-checklist" aria-label="What the dungeon has"></ul>
+      <div class="add-set-buttons">
+        <button type="button" class="btn px" id="add-set-cancel">Cancel</button>
+        <button type="button" class="btn px" id="add-set-confirm" disabled>Confirm</button>
+      </div>
+    </div>
   </div>
 </form>`;
 
 /**
  * Open the form over the welcome page. `takenIds` are the player's sets' ids, which a new
  * one may not take. CONFIRM calls `store` with the record; once it has stored it, the form
- * closes and calls `added`. An error `store` throws is shown beside CONFIRM, and the form
- * stays.
+ * closes and calls `added`. An error `store` throws is shown under the checklist, and the
+ * form stays.
  */
 export function openAddDataSetForm(
     manifest: DataSetManifest,
@@ -93,14 +109,13 @@ export function openAddDataSetForm(
     const input = (name: string): HTMLInputElement => form.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
     const [name, id, authors, dmRules] = ['name', 'id', 'authors', 'dmRules'].map(input);
     const description = form.querySelector('textarea')!;
-    const status = form.querySelector<HTMLElement>('.add-set-status')!;
     const dropped = form.querySelector<HTMLElement>('.add-set-dropped')!;
     const confirm = form.querySelector<HTMLButtonElement>('#add-set-confirm')!;
     const baseBox = form.querySelector<HTMLFieldSetElement>('.add-set-base')!;
+    const drop = form.querySelector<HTMLElement>('.add-set-drop')!;
+    const picker = drop.querySelector('input')!;
 
-    const files: Partial<Record<LocalDataSetFile, Blob>> = {};
-    /** The fields the player has given something: their problems show. */
-    const touched = new Set<LocalDataSetField>();
+    const files: Partial<Record<LocalDataSetFile, File>> = {};
     let idWritten = false;
     let record: LocalDataSetRecord | null = null;
     let generation = 0;
@@ -117,10 +132,10 @@ export function openAddDataSetForm(
         radio.checked = set.id === baseSet;
         radio.addEventListener('change', () => {
             baseSet = set.id;
-            changed('baseSet');
+            changed();
         });
-        label.append(radio, text('span', '', `${set.name}'s graphics`));
-        baseBox.insertBefore(label, baseBox.querySelector('.add-set-problem'));
+        label.append(radio, text('span', '', set.name));
+        baseBox.append(label);
     }
     /** The base sets' files, each read once. */
     const baseReads = new Map<string, Promise<Uint8Array | null>>();
@@ -138,62 +153,74 @@ export function openAddDataSetForm(
         };
     };
 
-    const list = form.querySelector('.add-set-files')!;
-    const rows = new Map(FILE_ROWS.map(({ file, label, hint }) => {
-        const row = document.createElement('li');
-        row.dataset.about = file;
-        const picker = document.createElement('input');
-        picker.type = 'file';
-        picker.hidden = true;
-        if (file === 'thumbnail') picker.accept = 'image/*';
-        const choose = button('Choose', () => picker.click());
-        const remove = button('Remove', () => setFile(file, null));
-        picker.addEventListener('change', () => {
-            if (picker.files?.[0]) setFile(file, picker.files[0]);
-            picker.value = '';
+    const checklist = form.querySelector('.add-set-checklist')!;
+    const rows = new Map(CHECKLIST.map((row) => {
+        const item = document.createElement('li');
+        item.dataset.about = row.about;
+        const mark = text('span', 'add-set-mark', '');
+        mark.setAttribute('aria-hidden', 'true');
+        const given = text('span', 'add-set-given', '');
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'add-set-remove';
+        remove.textContent = '×';
+        remove.title = `Remove ${row.label}`;
+        remove.setAttribute('aria-label', remove.title);
+        remove.addEventListener('click', () => {
+            delete files[row.about as LocalDataSetFile];
+            changed();
         });
-        const given = text('span', 'add-set-given', hint);
-        row.append(text('span', 'px px2', label), given, choose, remove, picker, text('span', 'add-set-problem', ''));
-        list.append(row);
-        return [file, { given, remove, hint }] as const;
+        const problem = text('span', 'add-set-problem', '');
+        item.append(mark, text('span', 'px px2', row.label), given, remove, problem);
+        checklist.append(item);
+        return [row.about, { row, item, given, remove, problem }] as const;
     }));
+    /** The global line under the checklist: what `store` threw. */
+    const failure = text('p', 'add-set-problem add-set-failure', '');
+    checklist.after(failure);
 
-    function setFile(file: LocalDataSetFile, blob: File | null): void {
-        if (blob) files[file] = blob;
-        else delete files[file];
-        showFile(file, blob);
-        changed(file);
-    }
-    function showFile(file: LocalDataSetFile, blob: File | null): void {
-        const row = rows.get(file)!;
-        row.given.textContent = blob ? `${blob.name}, ${blob.size.toLocaleString('en')} bytes` : row.hint;
-        row.given.classList.toggle('has-file', blob !== null);
-        row.remove.hidden = blob === null;
-        baseBox.hidden = files['graphics.dat'] !== undefined;
-    }
-    for (const { file } of FILE_ROWS) showFile(file, null);
-
-    name.addEventListener('input', () => {
-        if (!idWritten) id.value = idFromName(name.value);
-        changed('name');
-    });
-    id.addEventListener('input', () => {
-        idWritten = id.value !== '';
-        changed('id');
-    });
-    for (const field of [description, authors, dmRules]) field.addEventListener('input', () => changed(null));
-
-    dialog.addEventListener('dragover', (event) => event.preventDefault());
-    dialog.addEventListener('drop', (event) => {
-        event.preventDefault();
+    /** `list`'s files, each where its name says; the names of those that go nowhere are shown. */
+    function take(list: Iterable<File>): void {
         const unknown: string[] = [];
-        for (const file of event.dataTransfer?.files ?? []) {
-            const row = fileRow(file);
-            if (row) setFile(row, file);
+        for (const file of list) {
+            const where = fileRow(file);
+            if (where) files[where] = file;
             else unknown.push(file.name);
         }
         dropped.textContent = unknown.length > 0 ? `Not one of a dungeon's files: ${unknown.join(', ')}.` : '';
+        changed();
+    }
+    drop.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        drop.classList.add('over');
     });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    dialog.addEventListener('dragover', (event) => event.preventDefault());
+    dialog.addEventListener('drop', (event) => {
+        event.preventDefault();
+        drop.classList.remove('over');
+        take(event.dataTransfer?.files ?? []);
+    });
+    drop.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            picker.click();
+        }
+    });
+    picker.addEventListener('change', () => {
+        take(picker.files ?? []);
+        picker.value = '';
+    });
+
+    name.addEventListener('input', () => {
+        if (!idWritten) id.value = idFromName(name.value);
+        changed();
+    });
+    id.addEventListener('input', () => {
+        idWritten = id.value !== '';
+        changed();
+    });
+    for (const field of [description, authors, dmRules]) field.addEventListener('input', changed);
 
     form.addEventListener('submit', (event) => event.preventDefault());
     form.querySelector('#add-set-cancel')!.addEventListener('click', () => dialog.close());
@@ -201,11 +228,11 @@ export function openAddDataSetForm(
         const made = record;
         if (!made) return;
         confirm.disabled = true;
-        status.textContent = 'Adding…';
+        failure.textContent = '';
         try {
             await store(made);
         } catch (error) {
-            status.textContent = `It could not be stored: ${error instanceof Error ? error.message : String(error)}`;
+            failure.textContent = `It could not be stored: ${error instanceof Error ? error.message : String(error)}`;
             confirm.disabled = false;
             return;
         }
@@ -214,9 +241,11 @@ export function openAddDataSetForm(
     });
     dialog.addEventListener('close', () => dialog.remove());
 
-    /** The check again, for a change of `field` (`null`: one with no check of its own). */
-    function changed(field: LocalDataSetField | null): void {
-        if (field) touched.add(field);
+    /** The check again, after any change, and the checklist redrawn from its verdict. */
+    function changed(): void {
+        const ownGraphics = files['graphics.dat'] !== undefined;
+        for (const radio of baseBox.querySelectorAll('input')) radio.disabled = ownGraphics;
+        baseBox.classList.toggle('disabled', ownGraphics);
         const draft: LocalDataSetDraft = {
             id: id.value.trim(),
             name: name.value,
@@ -231,14 +260,19 @@ export function openAddDataSetForm(
         confirm.disabled = true;
         void checkLocalDataSet(draft, takenIds, base, Date.now()).then(({ problems, record: made }) => {
             if (mine !== generation) return;
-            for (const element of form.querySelectorAll<HTMLElement>('[data-about]')) {
-                const about = element.dataset.about as LocalDataSetField;
-                const shown = touched.has(about) ? problems.filter((problem) => problem.about === about) : [];
-                element.querySelector('.add-set-problem')!.textContent = shown.map((problem) => problem.text).join(' ');
-                element.classList.toggle('has-problem', shown.length > 0);
+            for (const { row, item, given, remove, problem } of rows.values()) {
+                // The graphics' problems are about the file or, without it, about the base set.
+                const own = problems.filter((p) => p.about === row.about || (row.about === 'graphics.dat' && p.about === 'baseSet'));
+                const value = valueOf(row.about, draft, files, bases.find((set) => set.id === baseSet)?.name ?? baseSet);
+                const state = own.length > 0 ? 'wrong' : value !== null ? 'right' : row.needed ? 'wrong' : 'absent';
+                item.className = state;
+                // The name and the id are in their fields beside it.
+                given.textContent = row.about === 'name' || row.about === 'id' ? '' : value ?? '';
+                remove.hidden = !(row.about in files);
+                // A needed field left empty is shown by its cross alone; anything else wrong says why.
+                problem.textContent = value !== null || !row.needed ? own.map((p) => p.text).join(' ') : '';
+                item.title = [row.hint, ...own.map((p: LocalDataSetProblem) => p.text)].join('\n');
             }
-            const untouched = [...new Set(problems.filter((problem) => !touched.has(problem.about)).map((problem) => problem.about))];
-            status.textContent = untouched.length > 0 ? `Still to give: ${untouched.map((about) => FIELD_NAMES[about]).join(', ')}.` : '';
             record = made;
             confirm.disabled = made === null;
         });
@@ -246,28 +280,32 @@ export function openAddDataSetForm(
 
     document.body.append(dialog);
     dialog.showModal();
-    changed(null);
+    changed();
 }
 
-/** The row a dropped file goes to: its name's, whatever its case, or the thumbnail's for an image. */
+/**
+ * What the checklist shows `about` holds: a field's text, a file's name, the base set's
+ * graphics for a set without its own; `null` where it holds nothing.
+ */
+function valueOf(about: LocalDataSetField, draft: LocalDataSetDraft, files: Partial<Record<LocalDataSetFile, File>>, baseName: string): string | null {
+    if (about === 'name') return draft.name.trim() || null;
+    if (about === 'id') return draft.id || null;
+    if (about === 'baseSet') return null;
+    const file = files[about];
+    if (file) return file.name;
+    return about === 'graphics.dat' ? `${baseName}'s` : null;
+}
+
+/** Where a file goes: the file of its name, whatever its case, or the thumbnail for an image. */
 function fileRow(file: File): LocalDataSetFile | null {
-    const named = FILE_ROWS.find((row) => row.file !== 'thumbnail' && row.file.toLowerCase() === file.name.toLowerCase());
-    if (named) return named.file;
+    const named = NAMED_FILES.find((name) => name.toLowerCase() === file.name.toLowerCase());
+    if (named) return named;
     return file.type.startsWith('image/') ? 'thumbnail' : null;
 }
 
 /** An id made from `name`: lowercase, every run of other characters a '-', at most 40. */
 export function idFromName(name: string): string {
     return name.toLowerCase().replace(/[^a-z0-9._]+/g, '-').replace(/^[-._]+/, '').slice(0, 40).replace(/-+$/, '');
-}
-
-function button(label: string, onClick: () => void): HTMLButtonElement {
-    const element = document.createElement('button');
-    element.type = 'button';
-    element.className = 'add-set-button px px2';
-    element.textContent = label;
-    element.addEventListener('click', onClick);
-    return element;
 }
 
 function text(tag: string, className: string, content: string): HTMLElement {

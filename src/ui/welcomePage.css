@@ -217,11 +217,12 @@ body.welcome {
 .welcome-footer a[href]:hover { color: var(--p11); }
 .welcome-footer a:not([href]) { color: var(--p1); cursor: default; }
 
-/* The form that adds a set (`src/ui/addDataSetForm.ts`): a dialog over the page, its
-   fields and its rows of files in the tiles' box. */
+/* The form that adds a set (`src/ui/addDataSetForm.ts`): a dialog over the page, on one
+   screen. Its title over two columns: what the player gives, the fields and the drop area,
+   and the checklist of what the set has, its buttons under it. */
 .add-set {
     box-sizing: border-box;
-    width: min(760px, calc(100vw - 32px));
+    width: min(980px, calc(100vw - 32px));
     max-height: calc(100vh - 32px);
     margin: auto;
     padding: 0;
@@ -231,81 +232,92 @@ body.welcome {
     font-family: Spectral, Georgia, serif;
 }
 .add-set::backdrop { background: rgb(0 0 0 / 0.75); }
-.add-set-form {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    padding: 24px;
-}
-.add-set h2, .add-set h3 { margin: 0; color: var(--p11); }
-.add-set h3 { color: var(--p15); }
-.add-set-fields { display: flex; flex-direction: column; gap: 12px; }
-.add-set-field { display: grid; grid-template-columns: 190px 1fr; align-items: center; gap: 6px 12px; }
-.add-set-field > .add-set-problem { grid-column: 2; }
+.add-set-form { display: flex; flex-direction: column; gap: 18px; padding: 21px 24px 24px; }
+.add-set h2 { margin: 0; color: var(--p11); }
+.add-set-columns { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; }
+.add-set-give { display: flex; flex-direction: column; gap: 10px; }
+.add-set-field { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; }
 .add-set-field > .px, .add-set-base legend { color: var(--p9); }
 .add-set input:not([type]), .add-set textarea {
     box-sizing: border-box;
     width: 100%;
-    padding: 6px 9px;
+    padding: 4px 9px;
     background: #0b0b16;
     color: var(--p15);
     border: 3px solid #1d1d30;
-    font: 18px/1.4 Spectral, Georgia, serif;
+    font: 17px/1.4 Spectral, Georgia, serif;
+    resize: none;
 }
 .add-set input:focus-visible, .add-set textarea:focus-visible { outline: none; border-color: var(--p9); }
 .add-set-id { display: flex; align-items: center; gap: 6px; }
 .add-set-id .px { color: var(--p2); }
-.add-set-check { display: flex; align-items: center; gap: 9px; font-size: 18px; }
-.add-set-check input { accent-color: var(--p9); width: 18px; height: 18px; margin: 0; }
-.add-set-hint { margin: -9px 0 0; font-size: 16px; color: var(--p2); }
-.add-set-dropped { margin: -9px 0 0; font-size: 16px; color: var(--p9); }
-.add-set-dropped:empty { display: none; }
-.add-set-files { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
-.add-set-files li {
-    display: grid;
-    grid-template-columns: 190px 1fr auto auto;
+.add-set-check { display: flex; align-items: center; gap: 9px; font-size: 17px; }
+.add-set-check input { accent-color: var(--p9); width: 18px; height: 18px; margin: 0; flex: none; }
+.add-set-base { margin: 0; padding: 6px 12px 9px; border: 3px solid #1d1d30; display: flex; flex-wrap: wrap; gap: 6px 24px; }
+.add-set-base.disabled { opacity: 0.4; }
+.add-set-drop {
+    flex: 1 0 84px;
+    display: flex;
     align-items: center;
-    gap: 6px 12px;
-    padding: 6px 9px;
+    justify-content: center;
+    background: #0b0b16;
+    border: 3px dashed var(--p1);
+    color: var(--p13);
+    cursor: pointer;
+}
+.add-set-drop:hover, .add-set-drop.over { border-color: var(--p9); color: var(--p11); }
+.add-set-drop:focus-visible { outline: 3px solid var(--p11); outline-offset: 3px; }
+.add-set-dropped { margin: 0; font-size: 15px; color: var(--p9); }
+.add-set-dropped:empty { display: none; }
+/* The checklist: a mark, the name, what is given, and why it is wrong. */
+.add-set-have { display: flex; flex-direction: column; gap: 9px; }
+.add-set-checklist {
+    margin: 0;
+    padding: 6px 12px;
+    list-style: none;
     background: #0b0b16;
     border: 3px solid #1d1d30;
 }
-.add-set-files li > span.px { color: var(--p15); }
-.add-set-files li > .add-set-problem { grid-column: 1 / -1; }
-.add-set-given { font-size: 16px; color: var(--p1); overflow-wrap: anywhere; }
-.add-set-given.has-file { color: var(--p7); }
-.add-set-button {
+.add-set-checklist li {
+    display: grid;
+    grid-template-columns: 18px 150px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 9px;
+    min-height: 30px;
+}
+.add-set-checklist li > .px { color: var(--p15); }
+.add-set-checklist li.absent > .px { color: var(--p1); }
+.add-set-mark { font: 700 18px/1 sans-serif; text-align: center; }
+.right .add-set-mark::before { content: '✓'; color: var(--p7); }
+.wrong .add-set-mark::before { content: '✗'; color: #fc2400; }
+.add-set-given { font-size: 15px; color: var(--p2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.add-set-remove {
     appearance: none;
-    padding: 6px 9px;
-    background: var(--p5);
-    color: var(--p9);
-    border: 3px solid;
-    border-color: var(--p10) var(--p3) var(--p3) var(--p10);
+    padding: 0 6px;
+    background: none;
+    border: none;
+    color: var(--p1);
+    font: 700 18px/1 sans-serif;
     cursor: pointer;
 }
-.add-set-button:hover { color: var(--p11); }
-.add-set-button:active { border-color: var(--p3) var(--p10) var(--p10) var(--p3); }
-.add-set-button[hidden] { display: block; visibility: hidden; }
-.add-set-base { margin: 0; padding: 9px 12px; border: 3px solid #1d1d30; display: flex; flex-wrap: wrap; gap: 9px 24px; }
-.add-set-base[hidden] { display: none; }
-.add-set-base > .add-set-problem { flex-basis: 100%; }
-.add-set-problem { font-size: 16px; color: var(--p9); }
+.add-set-remove:hover { color: var(--p11); }
+.add-set-remove[hidden] { display: block; visibility: hidden; }
+.add-set-checklist .add-set-problem { grid-column: 2 / -1; padding-bottom: 4px; }
+.add-set-problem { font-size: 15px; line-height: 1.3; color: var(--p9); }
 .add-set-problem:empty { display: none; }
-.has-problem input, .has-problem textarea { border-color: var(--p3); }
-.add-set-buttons { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
-.add-set-status { flex: 1 1 200px; margin: 0; font-size: 16px; color: var(--p2); }
-.add-set .btn { min-width: 0; font: inherit; }
+.add-set-buttons { margin-top: auto; display: flex; justify-content: space-between; }
+.add-set .btn { min-width: 0; width: 162px; padding: 0; font: inherit; }
 .add-set .btn.px { font-family: 'DM Screen', monospace; font-size: 24px; line-height: 24px; }
 
 @media (max-width: 640px) {
-    .add-set-form { padding: 16px; }
-    .add-set-field { grid-template-columns: 1fr; }
-    .add-set-field > .add-set-problem { grid-column: 1; }
-    .add-set-files li { grid-template-columns: auto auto 1fr; }
-    .add-set-files li > span.px, .add-set-given { grid-column: 1 / -1; }
-    .add-set .btn { min-width: 120px; }
     .welcome-page { padding: 24px 16px 0; }
     .welcome-logo { margin-bottom: 24px; }
     .welcome-preview { min-width: 0; width: 100%; }
     .welcome-lead { font-size: 22px; }
+    .add-set-form { padding: 16px; }
+    .add-set-columns { grid-template-columns: 1fr; }
+    .add-set-field { grid-template-columns: 1fr; gap: 4px; }
+    .add-set-checklist li { grid-template-columns: 18px auto minmax(0, 1fr) auto; }
+    .add-set-buttons { gap: 6px; }
+    .add-set .btn { width: auto; flex: 1; }
 }
