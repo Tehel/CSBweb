@@ -805,6 +805,14 @@ export function noExpectedSignatures(): ExpectedSignatures {
 }
 
 /**
+ * Whether `expected` names a `CSBgraphics.dat`, so that `OpenCSBgraphicsFile` dies
+ * (`die(0xbad)`) where there is none (`doc/CSBwin-src/Graphics.cpp:1877-1888`).
+ */
+export function csbGraphicsExpected(expected: ExpectedSignatures): boolean {
+    return ((expected.expectedCSBgraphicSignature1 | expected.expectedCSBgraphicSignature2) >>> 0) !== 0;
+}
+
+/**
  * `ReadExtendedFeatures`' four signatures (`doc/CSBwin-src/SaveGame.cpp:380-383`), from a
  * file's block. A file with none (`header` undefined) assigns none.
  */

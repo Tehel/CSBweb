@@ -12,8 +12,9 @@
  *   dimmed, by name (`tileOrder`). A click selects a tile, and a click on the selected one
  *   leaves none selected. With no save at all, the manifest's default set is selected, so
  *   that PLAY is a first visit's way in.
- * - **"+ Add my own"**, the grid's last tile, which is never selected. It stays disabled
- *   until the form that adds a set exists (`DEBT.md` P3).
+ * - **"+ Add my own"**, the grid's last tile, which is never selected. A click opens the
+ *   form that adds a set (`src/ui/addDataSetForm.ts`); the set it adds is stored, and the
+ *   page shows it, selected.
  * - **PLAY** opens the selected set (`?dungeon=<id>`): its title, then its entrance. With
  *   no set selected it is disabled.
  * - **CONTINUE** opens the last save used (`lastUsedSave`) of the selected set, or of every
@@ -39,6 +40,7 @@ import './welcomePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
 import { chooserSets, thumbnailPath, type DataSet, type DataSetManifest } from '../data/DataSets';
 import { localDataSet, type LocalDataSetRecord } from '../data/LocalDataSets';
+import { openAddDataSetForm } from './addDataSetForm';
 import {
     formatSaveDate, formatSaveTime, lastUsedSave,
     type BrowserDataSetStore, type SaveEntry, type SaveStore,
@@ -109,13 +111,15 @@ const PAGE = `
 
 /**
  * Show the welcome page in `body`, in place of whatever it held, for the sets of
- * `manifest` and of `localSets`, and the saves of `store`.
+ * `manifest` and of `localSets`, and the saves of `store`, the set `select` names selected,
+ * where it names one.
  */
 export async function showWelcomePage(
     body: HTMLElement,
     manifest: DataSetManifest,
     store: Pick<SaveStore, 'list'>,
-    localSets: Pick<BrowserDataSetStore, 'list'>,
+    localSets: Pick<BrowserDataSetStore, 'list' | 'put'>,
+    select: string | null = null,
 ): Promise<void> {
     const records = await localSets.list().catch(() => [] as LocalDataSetRecord[]);
     const local = records.map((record) => ({ set: localDataSet(record), thumbnail: record.files.thumbnail ?? null }));
@@ -135,7 +139,8 @@ export async function showWelcomePage(
         ...local.map(({ set, thumbnail }) => [set, thumbnail] as const),
     ]);
     const sets = tileOrder([...thumbnails.keys()], rows);
-    let selected: DataSet | null = rows.length === 0 && sets.includes(manifest.defaultSet) ? manifest.defaultSet : null;
+    let selected: DataSet | null = sets.find((set) => set.id === select)
+        ?? (rows.length === 0 && sets.includes(manifest.defaultSet) ? manifest.defaultSet : null);
     const tiles = sets.map((set) => {
         const saves = rows.filter((row) => row.dataSet === set.id).length;
         const tile = document.createElement('button');
@@ -154,7 +159,12 @@ export async function showWelcomePage(
         grid.append(tile);
         return { set, tile };
     });
-    grid.append(addTile());
+    grid.append(addTile(() => openAddDataSetForm(
+        manifest,
+        new Set(records.map((record) => record.id)),
+        (record) => localSets.put(record),
+        (record) => void showWelcomePage(body, manifest, store, localSets, record.id),
+    )));
 
     function update(): void {
         for (const { set, tile } of tiles) tile.setAttribute('aria-pressed', String(set === selected));
@@ -204,12 +214,12 @@ function picture(thumbnail: string | Blob | null): HTMLElement {
     return box;
 }
 
-/** The grid's last tile, "+ Add my own": disabled until the form that adds a set exists (`DEBT.md` P3). */
-function addTile(): HTMLElement {
+/** The grid's last tile, "+ Add my own", which calls `open`. */
+function addTile(open: () => void): HTMLElement {
     const tile = document.createElement('button');
     tile.type = 'button';
     tile.className = 'pick add';
-    tile.disabled = true;
+    tile.addEventListener('click', open);
     const box = line('pick-picture', '');
     box.append(line('pick-plus px px6', '+'));
     tile.append(box, line('pick-name px px2', 'Add my own'));

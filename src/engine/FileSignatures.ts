@@ -17,7 +17,8 @@
  *   The expected pair counts only for a file that is not there.
  */
 import { readRuntimeFileSignatures, type ExpoolDatabase } from '../data/CsbwinExpool';
-import { foldedSignature, type FileSignature } from '../data/FileSignature';
+import { csbGraphicsExpected } from '../data/CsbwinExtendedFeatures';
+import { csbGraphicsSignatureRefused, graphicsSignatureRefused, type FileSignature } from '../data/FileSignature';
 import { die } from './Die';
 import type { GameContext } from './GameContext';
 
@@ -30,12 +31,9 @@ import type { GameContext } from './GameContext';
  */
 export function readFileSignatures(ctx: GameContext, world: ExpoolDatabase): void {
     const runtime = readRuntimeFileSignatures(world);
-    const named = runtime.graphicsSignature;
-    if (named !== 0xffffffff && named !== 0) {
-        const o = foldedSignature(ctx.tables.graphicsSignature);
-        // "Actuatl" is CSBWin's spelling.
-        if (named !== o) die(ctx.host, 0x3c6c, `Incorrect Graphics File signature\nActuatl Signature = ${o}`);
-    }
+    const o = graphicsSignatureRefused(runtime, ctx.tables.graphicsSignature);
+    // "Actuatl" is CSBWin's spelling.
+    if (o !== null) die(ctx.host, 0x3c6c, `Incorrect Graphics File signature\nActuatl Signature = ${o}`);
     Object.assign(ctx.runtimeFileSignatures, runtime);
 }
 
@@ -58,23 +56,16 @@ export function csbGraphicsOpener(ctx: GameContext): (signature: FileSignature |
     // `static bool errorMsg`.
     let errorMsg = false;
     return (signature) => {
-        const expected = ctx.signatures;
-        const m = (expected.expectedCSBgraphicSignature1 | expected.expectedCSBgraphicSignature2) >>> 0;
         if (!signature) {
             if (!errorMsg) {
                 ctx.host.trace("Cannot find 'CSBgraphics.dat'");
-                if (m !== 0) die(ctx.host, 0xbad, "Cannot find 'CSBgraphics.dat'");
+                if (csbGraphicsExpected(ctx.signatures)) die(ctx.host, 0xbad, "Cannot find 'CSBgraphics.dat'");
                 errorMsg = true;
             }
             return false;
         }
-        const { csbGraphicsSignature, debuging } = ctx.runtimeFileSignatures;
-        if (csbGraphicsSignature !== 0 && debuging === 0) {
-            const o = foldedSignature(signature) || 1;
-            if (o !== csbGraphicsSignature) {
-                die(ctx.host, 0x3c6c, `Incorrect CSBGraphics File signature\nActual Signature = ${o}`);
-            }
-        }
+        const o = csbGraphicsSignatureRefused(ctx.runtimeFileSignatures, signature);
+        if (o !== null) die(ctx.host, 0x3c6c, `Incorrect CSBGraphics File signature\nActual Signature = ${o}`);
         return true;
     };
 }

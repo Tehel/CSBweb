@@ -111,11 +111,9 @@ body.welcome {
     background: var(--navy);
 }
 .pick-picture img { display: block; object-fit: contain; }
-/* "+ Add my own", the grid's last tile, disabled until the form that adds a set exists. */
+/* "+ Add my own", the grid's last tile, which opens the form that adds a set. */
 .pick.add .pick-picture { display: flex; align-items: center; justify-content: center; }
 .pick-plus { color: var(--p9); }
-.pick.add:disabled { opacity: 0.5; cursor: default; }
-.pick.add:disabled:hover { border-color: #1d1d30; }
 .pick-name { color: var(--p15); padding: 0 3px; }
 .pick-saves { padding: 0 3px 3px; }
 .pick-saves { color: var(--p2); }
@@ -151,7 +149,7 @@ body.welcome {
 .btn:hover { color: var(--p11); }
 .btn:active { border-color: var(--p3) var(--p10) var(--p10) var(--p3); color: var(--p11); }
 .btn:focus-visible { outline: 3px solid var(--p11); outline-offset: 12px; }
-.btn[aria-disabled="true"] { color: var(--p1); cursor: default; pointer-events: none; }
+.btn[aria-disabled="true"], .btn:disabled { color: var(--p1); cursor: default; pointer-events: none; }
 .welcome-preview {
     box-sizing: border-box;
     min-width: 336px;
@@ -219,7 +217,93 @@ body.welcome {
 .welcome-footer a[href]:hover { color: var(--p11); }
 .welcome-footer a:not([href]) { color: var(--p1); cursor: default; }
 
+/* The form that adds a set (`src/ui/addDataSetForm.ts`): a dialog over the page, its
+   fields and its rows of files in the tiles' box. */
+.add-set {
+    box-sizing: border-box;
+    width: min(760px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    margin: auto;
+    padding: 0;
+    background: var(--p0);
+    color: var(--p13);
+    border: 3px solid var(--p12);
+    font-family: Spectral, Georgia, serif;
+}
+.add-set::backdrop { background: rgb(0 0 0 / 0.75); }
+.add-set-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 24px;
+}
+.add-set h2, .add-set h3 { margin: 0; color: var(--p11); }
+.add-set h3 { color: var(--p15); }
+.add-set-fields { display: flex; flex-direction: column; gap: 12px; }
+.add-set-field { display: grid; grid-template-columns: 190px 1fr; align-items: center; gap: 6px 12px; }
+.add-set-field > .add-set-problem { grid-column: 2; }
+.add-set-field > .px, .add-set-base legend { color: var(--p9); }
+.add-set input:not([type]), .add-set textarea {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 6px 9px;
+    background: #0b0b16;
+    color: var(--p15);
+    border: 3px solid #1d1d30;
+    font: 18px/1.4 Spectral, Georgia, serif;
+}
+.add-set input:focus-visible, .add-set textarea:focus-visible { outline: none; border-color: var(--p9); }
+.add-set-id { display: flex; align-items: center; gap: 6px; }
+.add-set-id .px { color: var(--p2); }
+.add-set-check { display: flex; align-items: center; gap: 9px; font-size: 18px; }
+.add-set-check input { accent-color: var(--p9); width: 18px; height: 18px; margin: 0; }
+.add-set-hint { margin: -9px 0 0; font-size: 16px; color: var(--p2); }
+.add-set-dropped { margin: -9px 0 0; font-size: 16px; color: var(--p9); }
+.add-set-dropped:empty { display: none; }
+.add-set-files { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.add-set-files li {
+    display: grid;
+    grid-template-columns: 190px 1fr auto auto;
+    align-items: center;
+    gap: 6px 12px;
+    padding: 6px 9px;
+    background: #0b0b16;
+    border: 3px solid #1d1d30;
+}
+.add-set-files li > span.px { color: var(--p15); }
+.add-set-files li > .add-set-problem { grid-column: 1 / -1; }
+.add-set-given { font-size: 16px; color: var(--p1); overflow-wrap: anywhere; }
+.add-set-given.has-file { color: var(--p7); }
+.add-set-button {
+    appearance: none;
+    padding: 6px 9px;
+    background: var(--p5);
+    color: var(--p9);
+    border: 3px solid;
+    border-color: var(--p10) var(--p3) var(--p3) var(--p10);
+    cursor: pointer;
+}
+.add-set-button:hover { color: var(--p11); }
+.add-set-button:active { border-color: var(--p3) var(--p10) var(--p10) var(--p3); }
+.add-set-button[hidden] { display: block; visibility: hidden; }
+.add-set-base { margin: 0; padding: 9px 12px; border: 3px solid #1d1d30; display: flex; flex-wrap: wrap; gap: 9px 24px; }
+.add-set-base[hidden] { display: none; }
+.add-set-base > .add-set-problem { flex-basis: 100%; }
+.add-set-problem { font-size: 16px; color: var(--p9); }
+.add-set-problem:empty { display: none; }
+.has-problem input, .has-problem textarea { border-color: var(--p3); }
+.add-set-buttons { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
+.add-set-status { flex: 1 1 200px; margin: 0; font-size: 16px; color: var(--p2); }
+.add-set .btn { min-width: 0; font: inherit; }
+.add-set .btn.px { font-family: 'DM Screen', monospace; font-size: 24px; line-height: 24px; }
+
 @media (max-width: 640px) {
+    .add-set-form { padding: 16px; }
+    .add-set-field { grid-template-columns: 1fr; }
+    .add-set-field > .add-set-problem { grid-column: 1; }
+    .add-set-files li { grid-template-columns: auto auto 1fr; }
+    .add-set-files li > span.px, .add-set-given { grid-column: 1 / -1; }
+    .add-set .btn { min-width: 120px; }
     .welcome-page { padding: 24px 16px 0; }
     .welcome-logo { margin-bottom: 24px; }
     .welcome-preview { min-width: 0; width: 100%; }

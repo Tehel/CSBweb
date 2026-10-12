@@ -113,7 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P3 | The form that adds a set | L | ⏳ |
+| P3 | The form that adds a set | L | ⚠️ step 2 of 2 next |
 | P4 | A thumbnail generated from the data | S | ⏳ after P3 |
 | P5 | A local set's saves import | S | ⏳ |
 | P6 | Editing and deleting a local set | M | ⏳ after P3 |
@@ -217,9 +217,8 @@ not have, as a manifest set's are read through `folderFiles` (`src/data/DataSetF
 It sends no statistics. `tools/dump-local-data-set.ts` plays such records against their
 manifest sets. The welcome page (`src/ui/welcomePage.ts`) shows the local sets beside the
 manifest's, under the same order, a record's thumbnail as its tile's picture, and counts
-their saves; its last tile, "+ Add my own", is disabled until P3's form exists
-(`tools/probe-frames.mjs` checks both). Nothing writes a record yet but a script: P3's
-form is the first.
+their saves; its last tile, "+ Add my own", opens P3's form, which checks the files as
+the boot will read them and writes the record (`src/ui/addDataSetForm.ts`).
 
 Decisions taken with the author, for every row:
 
@@ -236,34 +235,29 @@ Decisions taken with the author, for every row:
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
 
-### P3 ⏳ The form that adds a set
+### P3 ⚠️ The form that adds a set
 
-L, in steps: the form and the record written; then what the files hold, shown as they
-are dropped.
+L, in two steps. **Step 1 stands**: the form, its check, and the record it writes.
+**Step 2 is next**: what the files hold, shown as they are dropped.
 
-- **Its way in**: the welcome page's "+ Add my own" (`addTile`, `src/ui/welcomePage.ts`)
-  opens the form on a single click. Until the form exists the tile is disabled, and
-  `tools/probe-frames.mjs` checks that it is; the form's first step enables it and
-  changes that check.
+What stands: "+ Add my own" (`addTile`, `src/ui/welcomePage.ts`) opens the form
+(`src/ui/addDataSetForm.ts`), a modal dialog in the welcome page's look
+(`welcomePage.css`): the name, the id (made from the name until the player writes one), a
+description, the authors, the reincarnation rule, the six files, each dropped or chosen
+and each replaceable or removable, and DM's or CSB's graphics without a `graphics.dat`.
+`checkLocalDataSet` (`src/data/LocalDataSets.ts`) runs at every change, with the boot's
+own readers and `src/engine/FileSignatures.ts`'s rules, and makes the record CONFIRM
+stores; the page then shows the set selected. `tools/dump-local-data-set.ts` proves the
+check and the record, `tools/probe-frames.mjs` drives the form.
 
-- **Fields**: the id (the part after `local:`), the name, a short description, the
-  authors, the reincarnation rule (`dmRules`), and DM's or CSB's graphics when no
-  `graphics.dat` is given.
-- **Files**, each dropped or picked and each replaceable before confirming:
-  `dungeon.dat` (required), `graphics.dat`, `CSBgraphics.dat`, the Oracle's `hcsb.hct`
-  and `hcsb.dat` (both or neither), and a thumbnail image (or P4's button).
-- **Checks before CONFIRM**:
-  - `dungeon.dat` reads, enciphered or not.
-  - `graphics.dat` and `CSBgraphics.dat` parse.
-  - A dungeon whose extended features expect a `CSBgraphics.dat`
-    (`expectedCSBgraphicSignature1/2`, `src/data/CsbwinExtendedFeatures.ts:795`) gets
-    one, and its signature matches (`src/engine/FileSignatures.ts`). Otherwise the
-    boot ends in a `die(0xbad)`.
-  - The id is free.
-- **What the dungeon holds**, shown when it is dropped: levels, items by kind, monsters
-  and groups, DSAs and the operations they use. The DSA census is
+The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase
+letters, digits, `.`, `-` and `_`, at most 40), since P8 makes it the set's folder on the
+server. No shipped dungeon names its `graphics.dat` or `CSBgraphics.dat`, nor expects a
+`CSBgraphics.dat`, so the signature checks are proven on dungeons the tool builds.
+
+- **Step 2: what the dungeon holds**, shown in the form when it is dropped: levels, items
+  by kind, monsters and groups, DSAs and the operations they use. The DSA census is
   `tools/dump-dsa-census.ts`'s, moved into `src/` so the page and the tool share it.
-- The page's look is the welcome page's (`welcomePage.css`).
 
 ### P4 ⏳ A thumbnail generated from the data
 

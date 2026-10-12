@@ -48,3 +48,29 @@ export interface RuntimeFileSignatures {
 export function noRuntimeFileSignatures(): RuntimeFileSignatures {
     return { debuging: 0xffffffff, csbGraphicsSignature: 0xffffffff, graphicsSignature: 0xffffffff };
 }
+
+/**
+ * `openGraphicsFile`'s check of `graphics.dat` (`doc/CSBwin-src/Graphics.cpp:1830-1840`):
+ * the file's folded signature where the world `runtime` names another, which CSBWin dies
+ * of (`die(0x3c6c)`); `null` where it passes, as it does for a world naming none (0, or
+ * `0xffffffff`).
+ */
+export function graphicsSignatureRefused(runtime: RuntimeFileSignatures, signature: FileSignature): number | null {
+    const named = runtime.graphicsSignature;
+    if (named === 0xffffffff || named === 0) return null;
+    const o = foldedSignature(signature);
+    return named !== o ? o : null;
+}
+
+/**
+ * `OpenCSBgraphicsFile`'s check of `CSBgraphics.dat` (`doc/CSBwin-src/Graphics.cpp:1889-1895`,
+ * `:1909-1918`): the file's folded signature, a fold of 0 counting as 1, where the world
+ * `runtime` names another and `EDBT_Debuging_data` is 0, which CSBWin dies of
+ * (`die(0x3c6c)`); `null` where it passes.
+ */
+export function csbGraphicsSignatureRefused(runtime: RuntimeFileSignatures, signature: FileSignature): number | null {
+    const { csbGraphicsSignature, debuging } = runtime;
+    if (csbGraphicsSignature === 0 || debuging !== 0) return null;
+    const o = foldedSignature(signature) || 1;
+    return o !== csbGraphicsSignature ? o : null;
+}

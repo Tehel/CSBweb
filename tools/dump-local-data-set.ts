@@ -10,7 +10,8 @@
  * `main.ts` wires them, and play the same ticks from one seed.
  *
  * Also: the id's prefix, which no manifest set may take; a set's flags from its files;
- * a record missing a file. Node has no IndexedDB, so the store itself
+ * a record missing a file; and the form's check (`checkLocalDataSet`): the record it
+ * writes is the one played here, and it refuses what the boot would die of, file by file. Node has no IndexedDB, so the store itself
  * (`BrowserDataSetStore`) is not run here.
  *
  *   npx tsx tools/dump-local-data-set.ts
@@ -20,11 +21,15 @@ import { readFileSync } from 'node:fs';
 
 import { LOCAL_DATA_SET_PREFIX, parseManifest, type DataSet } from '../src/data/DataSets';
 import { loadGameFiles, type DataSetFiles, type GameFiles } from '../src/data/DataSetFiles';
+import { Expool } from '../src/data/CsbwinExpool';
+import { buildDungeonImage, buildImageChecksum } from '../src/data/CsbwinDungeonImageWriter';
+import { buildExtendedFeaturesPrefix, EF_FLAGS, readExtendedFeatures, type ExtendedFeaturesBlock } from '../src/data/CsbwinExtendedFeatures';
 import { dungeonSignature } from '../src/data/DungeonSignature';
-import { emptyDungeonData } from '../src/data/DungeonLoader';
+import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
+import { foldedSignature, Signature } from '../src/data/FileSignature';
 import {
-  isLocalDataSetId, localDataSet, recordFiles,
-  type LocalDataSetFile, type LocalDataSetRecord,
+  checkLocalDataSet, isLocalDataSetId, localDataSet, recordFiles,
+  type LocalDataSetDraft, type LocalDataSetFile, type LocalDataSetRecord,
 } from '../src/data/LocalDataSets';
 import type { Game } from '../src/engine/Game';
 import { csbGraphicsOpener } from '../src/engine/FileSignatures';
@@ -129,6 +134,133 @@ async function checkPlays(from: DataSet, names: LocalDataSetFile[], baseSet: str
     'the record\'s signature is its dungeon\'s');
 }
 
+
+/** A draft of `from`'s files `names`, as the form gives it: base set `baseSet` where `names` holds no graphics.dat. */
+async function draftOf(from: DataSet, id: string, names: LocalDataSetFile[], baseSet = 'dm-atari'): Promise<LocalDataSetDraft> {
+  const disk = diskFiles(from);
+  const files: Partial<Record<LocalDataSetFile, Blob>> = {};
+  for (const name of names) files[name] = blobOf((await disk.read(name))!);
+  return { id, name: ` My ${from.name} `, description: 'A test set.', authors: ['A Player', ' ', ' Another '], dmRules: from.dmRules, baseSet, files };
+}
+
+/** `(EDT_Database << 24) + (edbt << 16) + i` (`doc/CSBwin-src/CSB.h:1555-1559`): the records `readRuntimeFileSignatures` reads. */
+const CSB_GRAPHICS = ((5 << 24) + (2 << 16) + 0) >>> 0;
+const GRAPHICS = ((5 << 24) + (2 << 16) + 1) >>> 0;
+const DEBUGING = ((5 << 24) + (3 << 16) + 0) >>> 0;
+
+const base = (set: string): DataSetFiles | null => set === 'dm-atari' || set === 'csb' ? diskFiles(dataSetNamed(set)) : null;
+const CREATED = 1_760_000_000_000;
+
+/** What `checkLocalDataSet` says of `draft`, its problems as `about: text`, printed under `label`. */
+async function problemsOf(label: string, draft: LocalDataSetDraft, taken: string[] = []): Promise<string[]> {
+  const { problems, record } = await checkLocalDataSet(draft, new Set(taken), base, CREATED);
+  const lines = problems.map(({ about, text }) => `${about}: ${text}`);
+  console.log(`  ${label}: ${lines.length === 0 ? 'none' : lines.join(' | ')}${record ? ', a record' : ''}`);
+  return lines;
+}
+
+async function checkForm(): Promise<void> {
+  console.log('=== the form\'s check ===');
+  const dm = dataSetNamed('dm-atari'), conflux = dataSetNamed('conflux-3.5'), csb = dataSetNamed('csb');
+  for (const [from, names, baseSet] of [
+    [dm, ['dungeon.dat'], 'dm-atari'],
+    [conflux, ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat'], null],
+    [csb, ['dungeon.dat', 'graphics.dat', 'hcsb.hct', 'hcsb.dat'], null],
+  ] as const) {
+    const draft = await draftOf(from, `my-${from.id}`, [...names], baseSet ?? 'dm-atari');
+    const { problems, record } = await checkLocalDataSet(draft, new Set(['local:other']), base, CREATED);
+    const expected = await recordOf(from, `my-${from.id}`, [...names], baseSet);
+    console.log(`  ${from.id}: ${problems.length} problems, record ${record ? digest({ ...record, files: Object.keys(record.files) }) : 'none'}`);
+    check(problems.length === 0 && record !== null && digest({ ...record, name: expected.name, description: expected.description, authors: expected.authors, files: Object.keys(record.files) })
+      === digest({ ...expected, files: Object.keys(expected.files) }),
+      `${from.id}'s files make the record the games above play: its id, base set, flags and signature`);
+    check(record!.name === `My ${from.name}` && record!.authors.join() === 'A Player,Another' && Object.keys(record!.files).every((name) => record!.files[name as LocalDataSetFile] === draft.files[name as LocalDataSetFile]),
+      'its name and authors trimmed, the empty author dropped, its files the Blobs given');
+  }
+
+  const good = await draftOf(dm, 'mine', ['dungeon.dat']);
+  check((await problemsOf('no id', { ...good, id: '' })).join() === 'id: Give it an id.', 'an id is needed');
+  for (const id of ['Mine', 'my set', '-mine', 'a/b', '..', 'x'.repeat(41)]) {
+    check((await problemsOf(`id '${id.length > 20 ? `${id.slice(0, 8)}…` : id}'`, { ...good, id })).every((line) => line.startsWith('id: An id is')),
+      `'${id.length > 20 ? `${id.length} characters` : id}' is not an id`);
+  }
+  check((await problemsOf('id dm-atari-1.2', { ...good, id: 'dm-atari-1.2' })).length === 0, 'a manifest\'s id is an id: the prefix keeps them apart');
+  check((await problemsOf('a taken id', good, ['local:mine'])).join() === 'id: One of your dungeons already has this id.', 'an id one of the player\'s sets has is refused');
+  check((await problemsOf('no name', { ...good, name: '  ' })).join() === 'name: Give it a name.', 'a name is needed');
+
+  check((await problemsOf('no dungeon.dat', { ...good, files: {} })).join() === 'dungeon.dat: A dungeon.dat is needed.', 'a dungeon.dat is needed');
+  const notDungeon = await problemsOf('a graphics.dat as dungeon.dat', { ...good, files: { 'dungeon.dat': (await draftOf(dm, 'x', ['graphics.dat'])).files['graphics.dat']! } });
+  check(notDungeon.length === 1 && notDungeon[0].startsWith('dungeon.dat: It does not read: '), 'a dungeon.dat that does not read is refused: the boot\'s die(0xbad)');
+  const enciphered = await problemsOf('Conflux\'s enciphered dungeon.dat, with its files', await draftOf(conflux, 'cx', ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat']));
+  check(enciphered.length === 0, 'an enciphered dungeon.dat reads');
+
+  const notGraphics = await problemsOf('a dungeon.dat as graphics.dat', { ...good, files: { ...good.files, 'graphics.dat': good.files['dungeon.dat']! } });
+  check(notGraphics.length === 1 && notGraphics[0].startsWith('graphics.dat: It is not a graphics.dat: '), 'a graphics.dat that does not parse is refused');
+  check((await problemsOf('an unknown base set', { ...good, baseSet: 'nowhere' })).join() === "baseSet: The graphics.dat of 'nowhere' cannot be read.",
+    'without a graphics.dat, the base set\'s must read');
+  check((await problemsOf('Conflux on DM\'s graphics.dat', await draftOf(conflux, 'cx', ['dungeon.dat', 'CSBgraphics.dat']))).length === 0,
+    'a dungeon that names no graphics.dat plays any');
+  check((await problemsOf('Conflux without its CSBgraphics.dat', await draftOf(conflux, 'cx', ['dungeon.dat', 'graphics.dat']))).length === 0,
+    'a dungeon whose block expects no CSBgraphics.dat plays without one, as CSBWin does: the overlay does not open');
+
+  // What no shipped dungeon does: name its graphics files. dm-windows' dungeon.dat, its
+  // EXPOOL given `EDBT_RuntimeFileSignatures` records and written back behind its block;
+  // and a block expecting a CSBgraphics.dat, before CSB's compressed dungeon.dat.
+  const dmGraphics = (await diskFiles(dm).read('graphics.dat'))!;
+  const fold = foldedSignature(Signature(dmGraphics));
+  const fixtureBytes = new Uint8Array(readFileSync('tools/fixtures/csbgraphics/CSBgraphics.dat'));
+  const fixture = blobOf(fixtureBytes);
+  const csbFold = foldedSignature(Signature(fixtureBytes)) || 1;
+  const naming = (records: [number, number][]): Blob => {
+    const file = new Uint8Array(readFileSync('static/gamefiles/dm-windows/dungeon.dat'));
+    const ef = readExtendedFeatures(file);
+    const data = new DungeonLoader().loadDungeonDat(file);
+    for (const [key, value] of records) new Expool(data).write(key, [value]);
+    const image = buildDungeonImage(data, { bigActuators: ef.bigActuators, newScrolls: ef.version >= 0x42, indirectText: ef.indirectText });
+    return new Blob([file.slice(0, ef.offset), new Uint8Array(image), new Uint8Array(buildImageChecksum(image))]);
+  };
+  const named = (records: [number, number][], files: Partial<Record<LocalDataSetFile, Blob>> = {}, baseSet = 'dm-atari'): LocalDataSetDraft =>
+    ({ ...good, baseSet, files: { 'dungeon.dat': naming(records), ...files } });
+  check((await problemsOf('a dungeon naming DM\'s graphics.dat, on DM\'s', named([[GRAPHICS, fold]]))).length === 0,
+    'a dungeon naming its graphics.dat plays on it');
+  check((await problemsOf('…on CSB\'s', named([[GRAPHICS, fold]], {}, 'csb')))[0]?.startsWith('baseSet: The dungeon was made for another graphics.dat (signature '),
+    'and is refused another base set\'s: the boot\'s die(0x3c6c)');
+  check((await problemsOf('…on CSB\'s, given', named([[GRAPHICS, fold]], { 'graphics.dat': (await draftOf(csb, 'x', ['graphics.dat'])).files['graphics.dat']! })))[0]
+    ?.startsWith('graphics.dat: The dungeon was made for another graphics.dat'), 'or another graphics.dat given');
+  check((await problemsOf('…on CSB\'s, under EDBT_Debuging', named([[GRAPHICS, fold], [DEBUGING, 1]], {}, 'csb'))).length === 0,
+    'a nonzero EDBT_Debuging checks no signature');
+  check((await problemsOf('a dungeon naming the fixture\'s CSBgraphics.dat, with it', named([[CSB_GRAPHICS, csbFold]], { 'CSBgraphics.dat': fixture }))).length === 0,
+    'a dungeon naming its CSBgraphics.dat plays with it');
+  check((await problemsOf('…naming another', named([[CSB_GRAPHICS, csbFold ^ 1]], { 'CSBgraphics.dat': fixture })))[0]
+    ?.startsWith('CSBgraphics.dat: The dungeon was made for another CSBgraphics.dat'), 'and is refused another: the boot\'s die(0x3c6c)');
+  const header: ExtendedFeaturesBlock = {
+    version: 0x41, flags: EF_FLAGS.LevelDSAInfoPresent, numDSA: 0, editingOptions: 0, gameInfoSize: 0, cellFlagArraySize: 0,
+    graphicsSignature1: 0, graphicsSignature2: 0, spellFilterLocation: 0, extendedFlags: 0,
+    overlayOrdinal: 0, overlayP1: 0, overlayP2: 0, overlayP3: 0, overlayP4: 0,
+    csbGraphicsSignature1: 1, csbGraphicsSignature2: 0, hintKey: new Uint8Array(8),
+  };
+  const expecting = new Blob([new Uint8Array(buildExtendedFeaturesPrefix({ header, typeMap: new Uint8Array(0), indexMap: new Uint16Array(0) })),
+    readFileSync('static/gamefiles/csb/dungeon.dat')]);
+  check((await problemsOf('a block expecting a CSBgraphics.dat, without', { ...good, files: { 'dungeon.dat': expecting } })).join()
+    === 'CSBgraphics.dat: The dungeon needs its CSBgraphics.dat.', 'a dungeon whose block expects a CSBgraphics.dat needs one: the boot\'s die(0xbad)');
+  check((await problemsOf('…with one', { ...good, files: { 'dungeon.dat': expecting, 'CSBgraphics.dat': fixture } })).length === 0, 'and plays with one');
+  const notOverlay = await problemsOf('DM with a dungeon.dat as CSBgraphics.dat', { ...good, files: { ...good.files, 'CSBgraphics.dat': good.files['dungeon.dat']! } });
+  check(notOverlay.length === 1 && notOverlay[0].startsWith('CSBgraphics.dat: It is not a CSBgraphics.dat: '), 'a CSBgraphics.dat that does not parse is refused');
+
+  const csbFull = await draftOf(csb, 'c', ['dungeon.dat', 'graphics.dat', 'hcsb.hct', 'hcsb.dat']);
+  const { 'hcsb.dat': _dat, ...noDat } = csbFull.files;
+  const { 'hcsb.hct': _hct, ...noHct } = csbFull.files;
+  check((await problemsOf('hcsb.hct alone', { ...csbFull, files: noDat })).join() === 'hcsb.dat: The Hint Oracle needs hcsb.dat beside hcsb.hct.', 'hcsb.hct alone is refused');
+  check((await problemsOf('hcsb.dat alone', { ...csbFull, files: noHct })).join() === 'hcsb.hct: The Hint Oracle needs hcsb.hct beside hcsb.dat.', 'hcsb.dat alone is refused');
+  const notOracle = await problemsOf('a dungeon.dat as hcsb.dat', { ...csbFull, files: { ...csbFull.files, 'hcsb.dat': csbFull.files['dungeon.dat']! } });
+  check(notOracle.length === 1 && notOracle[0].startsWith("hcsb.dat: It is not the Hint Oracle's hcsb.dat: "), 'an hcsb.dat that does not parse is refused');
+
+  const png = new Blob([readFileSync('static/gamefiles/csb/csb-thumbnail.png')], { type: 'image/png' });
+  check((await problemsOf('a PNG thumbnail', { ...good, files: { ...good.files, thumbnail: png } })).length === 0, 'an image is a thumbnail');
+  check((await problemsOf('a .dat thumbnail', { ...good, files: { ...good.files, thumbnail: good.files['dungeon.dat']! } })).join() === 'thumbnail: It is not an image.',
+    'a file that is not an image is no thumbnail');
+}
+
 async function main(): Promise<void> {
   console.log('=== the id ===');
   check(isLocalDataSetId('local:mine') && !isLocalDataSetId('dm-atari') && !isLocalDataSetId(null) && !isLocalDataSetId('LOCAL:mine'),
@@ -163,6 +295,7 @@ async function main(): Promise<void> {
   check(!localDataSet(halfOracle).hintOracle, 'one of the Oracle\'s two files is no Hint Oracle');
   const withThumbnail = { ...bare, files: { ...bare.files, thumbnail: blobOf(new Uint8Array([0x89, 0x50, 0x4e, 0x47])) } };
   check(await recordFiles(withThumbnail, diskFiles(dm)).read('thumbnail') === null, 'the thumbnail is not one of the game\'s files');
+  await checkForm();
   finish();
 }
 

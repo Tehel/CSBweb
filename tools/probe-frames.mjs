@@ -385,14 +385,67 @@ check((await welcome()).play === null, 'a click on the selected tile selects non
 await clickOn('.pick[data-set="dm-atari"]');
 const atDm = await welcome();
 check(atDm.tiles.startsWith('dm-atari*!') && atDm.resume === atWelcome.resume, 'dm-atari selected: CONTINUE reads its last save');
-check(atWelcome.last === 'pick add disabled +Add my own',
-  'the grid ends with "+ Add my own", disabled until the form that adds a set exists, never selected');
-// The player's own sets (`src/data/LocalDataSets.ts`) beside the manifest's: a record put
-// in the store's `dataSets` as the form will write it, with a thumbnail, and a save filed
-// under its id, a copy of dm-atari's one save made a millisecond older. Its tile is bright
-// and second, its picture the record's image, and it counts its save; selected, PLAY and
-// CONTINUE lead to it. "+ Add my own" stays last, and a click on it selects nothing. Both
-// rows are taken out of the store again, so that the pages below see the one save.
+check(atWelcome.last === 'pick add +Add my own', 'the grid ends with "+ Add my own", never selected');
+// The form that adds a set (`src/ui/addDataSetForm.ts`), which "+ Add my own" opens. CANCEL
+// closes it. Then the player's own set (`src/data/LocalDataSets.ts`) is made through it:
+// DM's dungeon.dat dropped with CSB's thumbnail, hcsb.hct, and a file none of a dungeon's;
+// the id made from the name, then written; CONFIRM held while hcsb.hct is alone, and
+// given once it is removed. The record is stored, and the page shows its tile selected.
+// What the check refuses is `tools/dump-local-data-set.ts`'s to show.
+const form = () => evaluate(`(()=>{const d=document.querySelector('dialog.add-set');
+  return d && { open: d.open, id: d.querySelector('[name=id]').value, status: d.querySelector('.add-set-status').textContent,
+    dropped: d.querySelector('.add-set-dropped').textContent, confirm: !d.querySelector('#add-set-confirm').disabled,
+    given: [...d.querySelectorAll('.add-set-files li')].filter(li=>li.querySelector('.has-file')).map(li=>li.dataset.about).join(),
+    base: d.querySelector('.add-set-base').hidden ? null : d.querySelector('[name=baseSet]:checked').value,
+    problems: [...d.querySelectorAll('.add-set-problem')].map(p=>p.textContent).filter(Boolean) };})()`);
+const inForm = (body) => evaluate(`(async()=>{const d=document.querySelector('dialog.add-set');${body};return 1;})()`);
+const typeIn = (name, value) => inForm(`const i=d.querySelector('[name=${name}]');i.value=${JSON.stringify(value)};i.dispatchEvent(new Event('input'))`);
+await clickOn('.pick.add');
+const opened = await form();
+console.log('  form:', JSON.stringify(opened));
+check(opened?.open === true && !opened.confirm && opened.given === '' && opened.base === 'dm-atari'
+  && opened.status === 'Still to give: an id, a name, dungeon.dat.' && opened.problems.length === 0,
+  '"+ Add my own" opens the form: CONFIRM held until the set has a name, an id and a dungeon.dat, DM\'s graphics without a graphics.dat');
+await inForm(`d.querySelector('#add-set-cancel').click()`);
+check(await form() === null, 'CANCEL closes it');
+await clickOn('.pick.add');
+await inForm(`const dt=new DataTransfer();
+  for(const [path,name] of [['/gamefiles/dm-atari/dungeon.dat','DUNGEON.DAT'],['/gamefiles/csb/csb-thumbnail.png','title.png'],
+      ['/gamefiles/csb/hcsb.hct','hcsb.hct'],['/gamefiles/swoosh/swoosh.img','notes.txt']]){
+    const b=await (await fetch(path)).blob(); dt.items.add(new File([b],name,{type:b.type}));}
+  d.dispatchEvent(new DragEvent('drop',{dataTransfer:dt,bubbles:true,cancelable:true}))`);
+await typeIn('name', 'My Own Dungeon');
+await wait(1500);
+const filled = await form();
+console.log('  form:', JSON.stringify(filled));
+check(filled.id === 'my-own-dungeon' && filled.given === 'dungeon.dat,hcsb.hct,thumbnail'
+  && filled.dropped === "Not one of a dungeon's files: notes.txt." && !filled.confirm && filled.status === 'Still to give: hcsb.dat.',
+  'dropped files go to the rows of their names, whatever the case, an image to the thumbnail\'s; the id is the name\'s; hcsb.hct alone holds CONFIRM');
+await inForm(`d.querySelector('.add-set-files li[data-about="hcsb.hct"]').querySelectorAll('button')[1].click()`);
+await typeIn('id', 'mine');
+await wait(1500);
+const ready = await form();
+check(ready.given === 'dungeon.dat,thumbnail' && ready.id === 'mine' && ready.confirm && ready.status === '' && ready.problems.length === 0,
+  'REMOVE takes a file back, and with nothing wrong CONFIRM is given');
+await inForm(`d.querySelector('#add-set-confirm').click()`);
+await wait(2000);
+const stored = await evaluate(`new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
+  open.onerror = () => reject(open.error);
+  open.onsuccess = () => { const get = open.result.transaction('dataSets').objectStore('dataSets').get('local:mine');
+    get.onsuccess = () => { const r = get.result; open.result.close();
+      resolve(r && { name: r.name, baseSet: r.baseSet, files: Object.keys(r.files).sort().join(), levels: r.dungeonSignature.length,
+        sizes: Object.values(r.files).map((f) => f.size) }); }; }; })`);
+const afterAdd = await welcome();
+console.log('  stored:', JSON.stringify(stored));
+check(await form() === null && stored?.name === 'My Own Dungeon' && stored.baseSet === 'dm-atari'
+  && stored.files === 'dungeon.dat,thumbnail' && stored.levels === 14 && stored.sizes.every((size) => size > 0),
+  'CONFIRM stores the record: its name, DM\'s graphics, its two files and its dungeon\'s signature, and closes the form');
+check(afterAdd.tiles.includes('local:mine!') && /dungeon=local%3Amine/.test(afterAdd.play ?? ''), 'the page shows the new set, selected');
+// A save filed under the new set's id, a copy of dm-atari's one save made a millisecond
+// older. Its tile is bright and second, its picture the record's image, and it counts its
+// save; selected, PLAY and CONTINUE lead to it. "+ Add my own" stays last, and a click on
+// it opens the form and selects nothing. Both rows are taken out of the store again, so
+// that the pages below see the one save.
 const saveDatabase = (body) => evaluate(`(async()=>{${body.before ?? ''}
   return new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
     open.onerror = () => reject(open.error);
@@ -401,11 +454,7 @@ const saveDatabase = (body) => evaluate(`(async()=>{${body.before ?? ''}
       ${body.write}
       tx.oncomplete = () => { db.close(); resolve(true); }; tx.onerror = () => reject(tx.error); }; });})()`);
 await saveDatabase({
-  before: `const thumbnail = await (await fetch('/gamefiles/csb/csb-thumbnail.png')).blob();
-    const dungeon = await (await fetch('/gamefiles/dm-atari/dungeon.dat')).blob();`,
-  write: `dataSets.put({ id: 'local:mine', name: 'My Own Dungeon', description: 'A probe set.', authors: ['A Player'],
-      dmRules: false, baseSet: 'dm-atari', files: { 'dungeon.dat': dungeon, thumbnail }, dungeonSignature: [], createdAt: 1760000000000 });
-    const all = saves.getAll();
+  write: `const all = saves.getAll();
     all.onsuccess = () => { const row = all.result[0];
       saves.put({ ...row, id: 'probe-local-save', dataSet: 'local:mine', savedAt: row.savedAt - 1, usedAt: (row.usedAt ?? row.savedAt) - 1 }); };`,
 });
@@ -423,7 +472,7 @@ check(atLocal.tiles.includes('local:mine*!') && /dungeon=local%3Amine/.test(atLo
   && /dungeon=local%3Amine&.*save=probe-local-save/.test(atLocal.resume ?? '') && atLocal.preview[0] === 'My Own Dungeon',
   'a local set selected: PLAY opens it, CONTINUE reads its save, the box names it');
 await clickOn('.pick.add');
-check((await welcome()).play === atLocal.play, 'a click on "+ Add my own" leaves the selection');
+check((await welcome()).play === atLocal.play && (await form())?.open === true, 'a click on "+ Add my own" opens the form, and leaves the selection');
 await saveDatabase({ write: `dataSets.delete('local:mine'); saves.delete('probe-local-save');` });
 await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
 await wait(2500);
