@@ -2,7 +2,7 @@
  * What `api/event` accepts (`doc/STATISTICS.md`): the events the page's `GameEvents`
  * sends (`src/ui/gameEvents.ts`), checked field by field and rebuilt from what passed, so
  * that nothing the server has not checked reaches the store. The player is a UUID, the
- * build a short token, the set one of the manifest's, every number an integer in its
+ * build a short token, the set one of the `data_sets` table's, every number an integer in its
  * range, and the only text a modified page could store is a champion's name, of 7
  * characters at most.
  */
@@ -47,8 +47,8 @@ export interface CheckedEvent {
 }
 
 export interface EventRules {
-    /** The manifest's data sets' ids. */
-    sets: ReadonlySet<string>;
+    /** Whether `id` is a known data set's (`DataSetStore.hasSet`, `dataSets.ts`). */
+    hasSet(id: string): boolean;
 }
 
 /** The event `body` holds, or why it is refused. */
@@ -63,7 +63,7 @@ export function checkEvent(body: string, rules: EventRules): CheckedEvent | stri
     const { type, player, set, playthrough, build, payload } = event;
     if (!EVENT_TYPES.includes(type as EventType)) return 'unknown type';
     if (typeof player !== 'string' || !UUID.test(player)) return 'player is not a UUID';
-    if (typeof set !== 'string' || !rules.sets.has(set)) return 'unknown set';
+    if (typeof set !== 'string' || !rules.hasSet(set)) return 'unknown set';
     if (!isInteger(playthrough, 0, 0xffffffff)) return 'bad playthrough';
     if (typeof build !== 'string' || !BUILD.test(build)) return 'bad build';
     if (!isRecord(payload)) return 'payload is not an object';

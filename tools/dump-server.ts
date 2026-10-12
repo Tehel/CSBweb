@@ -1,14 +1,17 @@
 /**
  * The deployed server (`doc/DEPLOYMENT.md`, `server/`), stood up on a free port
- * over a scratch build, scratch game files and a scratch statistics store, and asked what a
- * browser, a curious visitor, the page's beacon and the compose healthcheck would ask.
+ * over a scratch build, scratch game files and a scratch store, and asked what a browser, a
+ * curious visitor, the page's beacon and the compose healthcheck would ask.
  *
  * Asserts:
- *   - the start-up check: the repository's manifest passes, and a missing `index.html`, a
- *     missing manifest, a manifest that does not parse and a folder it names that is not
- *     there each stop it, saying why;
- *   - `/api/data-sets`: the manifest it checked, as JSON, not cached, and the manifest not
- *     served as a file under `gamefiles/`;
+ *   - the start-up check: the repository's manifest passes, and fills an empty table; a
+ *     missing `index.html`, a missing manifest, a manifest that does not parse and a folder
+ *     it names that is not there each stop it, saying why, and leave the table empty; a
+ *     table that is not empty is read, with no manifest, a changed one left unread, and a
+ *     folder it names that is not there stops it too;
+ *   - `/api/data-sets`: the table's approved sets, as a manifest the page's parser reads
+ *     as the one that filled it, as JSON, not cached, read at each request; and the
+ *     manifest not served as a file under `gamefiles/`;
  *   - `/` and `/assets/…`: the page, `no-cache`, and the hashed files, `immutable`, the
  *     fonts as `font/ttf` and `font/woff2`;
  *   - `/gamefiles/…`: ETag and Last-Modified, a 304 for either precondition, HEAD without
@@ -17,18 +20,20 @@
  *     backslash, and no dot-file is served;
  *   - `/api/health`, and a 405 for a method that is not GET or HEAD;
  *   - `/api/event`: POST only, an event stored (what is stored, `dump-stats` asserts), a bad
- *     one 400, a body over 4 KB 413 whether it says so or not, and the rate limit per
+ *     one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
  *     forwarded address, 429; `/api/stats`: the store's aggregates, not cached;
  *   - `server.ts` itself, as Node runs it: a bad mount or a store it cannot open exits 1
- *     before it listens, and SIGTERM stops a listening server with 0, the store made and
- *     its WAL checkpointed;
+ *     before it listens, and SIGTERM stops a listening server with 0, the store made, its
+ *     table filled, and its WAL checkpointed; started again without a manifest, it plays
+ *     from the table;
  *   - `backup.ts`, run beside that server: a snapshot in `backups/` holding the events
- *     still in the WAL, the server serving throughout, and exit 1 on a missing store.
+ *     still in the WAL and the data sets, the server serving throughout, and exit 1 on a
+ *     missing store.
  *
  * Usage: npx tsx tools/dump-server.ts
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -36,8 +41,11 @@ import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { checkFiles, createAppServer, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
+import { DataSetStore, manifestText } from '../server/dataSets.ts';
 import { RateLimit } from '../server/events.ts';
 import { StatsStore } from '../server/stats.ts';
+import { openStore } from '../server/store.ts';
+import { parseManifest } from '../src/data/DataSets.ts';
 import { GAMEFILES_DIR, MANIFEST_FILE } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -68,10 +76,20 @@ function ask(port: number, path: string, method = 'GET', headers: Record<string,
     });
 }
 
+/** A store in memory, its tables empty. */
+function emptyTable(): DataSetStore {
+    return new DataSetStore(new DatabaseSync(':memory:'));
+}
+
+/** What `manifest` says, as the page's parser reads it, to compare. */
+function parsed(manifest: string): string {
+    return JSON.stringify(parseManifest(manifest, ''));
+}
+
 /** The error `checkFiles` throws, or `''`. */
-function refusal(options: ServerOptions): string {
+function refusal(options: ServerOptions, dataSets = emptyTable()): string {
     try {
-        checkFiles(options);
+        checkFiles(options, dataSets);
         return '';
     } catch (error) {
         return error instanceof Error ? error.message : String(error);
@@ -100,17 +118,20 @@ function scratchFiles(scratch: string): ServerOptions {
 
 function checkStartUp(scratch: string, options: ServerOptions): void {
     console.log('Start-up check:');
-    const real = checkFiles({ distDir: options.distDir, gamefilesDir: GAMEFILES_DIR, manifestFile: MANIFEST_FILE }).manifest;
-    console.log(`  ${MANIFEST_FILE}: ${real.dataSets.map((set) => set.id).join(', ')}`);
-    check(real.dataSets.length > 0, `the repository's ${MANIFEST_FILE} passes over ${GAMEFILES_DIR}`);
+    const repository = emptyTable();
+    const real = checkFiles({ distDir: options.distDir, gamefilesDir: GAMEFILES_DIR, manifestFile: MANIFEST_FILE }, repository);
+    console.log(`  ${MANIFEST_FILE}: ${real.ids.join(', ')}`);
+    check(real.filled && real.ids.length > 0, `the repository's ${MANIFEST_FILE} passes over ${GAMEFILES_DIR}, and fills the table`);
+    check(parsed(manifestText(repository.read())) === parsed(readFileSync(MANIFEST_FILE, 'utf8')),
+        'the table answers as the manifest that filled it, every set, flag and folder');
     check(refusal(options) === '', 'the scratch files pass');
 
     const noPage = refusal({ ...options, distDir: join(scratch, 'nowhere') });
-    console.log(`  no page        : ${noPage}`);
+    console.log(`  no page        : ${noPage.split(scratch).join('<scratch>')}`);
     check(noPage.includes('no index.html'), 'a build without index.html is refused');
     const noManifest = refusal({ ...options, manifestFile: join(scratch, 'nowhere.json') });
-    console.log(`  no manifest    : ${noManifest.replace(scratch, '<scratch>')}`);
-    check(noManifest.includes('there is no manifest'), 'a missing manifest is refused');
+    console.log(`  no manifest    : ${noManifest.split(scratch).join('<scratch>')}`);
+    check(noManifest.includes('there is no manifest'), 'a missing manifest is refused, while the table is empty');
 
     const bad = join(scratch, 'bad');
     mkdirSync(bad);
@@ -123,9 +144,25 @@ function checkStartUp(scratch: string, options: ServerOptions): void {
         default: 'a', swoosh: 'gone-logo',
         dataSets: [{ id: 'a', name: 'A', dir: 'gone' }],
     }));
-    const missing = refusal(badManifest);
-    console.log(`  missing folders: ${missing}`);
+    const unfilled = emptyTable();
+    const missing = refusal(badManifest, unfilled);
+    console.log(`  missing folders: ${missing.split(scratch).join('<scratch>')}`);
     check(missing.endsWith('does not hold: gone, gone-logo'), 'every folder the manifest names and the folder lacks is named');
+    check(unfilled.isEmpty(), 'and the table is left empty, for the next start to read the manifest again');
+
+    const filled = emptyTable();
+    checkFiles(options, filled);
+    const before = manifestText(filled.read());
+    const fromTable = checkFiles({ ...options, manifestFile: join(scratch, 'nowhere.json') }, filled);
+    check(!fromTable.filled && fromTable.ids.join() === 'a', 'a table that is not empty is read, and the manifest is not: none is needed');
+    const changed = join(scratch, 'changed.json');
+    writeFileSync(changed, JSON.stringify({ default: 'z', dataSets: [{ id: 'z', name: 'Z', dir: 'set-a' }] }));
+    check(refusal({ ...options, manifestFile: changed }, filled) === '' && manifestText(filled.read()) === before,
+        'a manifest changed since is not read, and the table keeps what it holds');
+    const tableMissing = refusal({ ...options, gamefilesDir: bad }, filled);
+    console.log(`  table's folders: ${tableMissing.split(scratch).join('<scratch>')}`);
+    check(tableMissing.startsWith('the data_sets table names folders') && tableMissing.endsWith('does not hold: set-a, logo'),
+        'every folder the table names and the folder lacks is named');
 }
 
 async function checkAnswers(port: number, manifest: string): Promise<void> {
@@ -184,7 +221,8 @@ async function checkAnswers(port: number, manifest: string): Promise<void> {
     const health = await ask(port, '/api/health');
     check(health.status === 200 && health.body === '{"ok":true}' && health.headers['cache-control'] === 'no-store', '/api/health: 200, not cached');
     const dataSets = await ask(port, '/api/data-sets?dungeon=a');
-    check(dataSets.status === 200 && dataSets.body === manifest, '/api/data-sets: the manifest checked at start-up');
+    console.log(`  /api/data-sets: ${dataSets.body}`);
+    check(dataSets.status === 200 && parsed(dataSets.body) === parsed(manifest), '/api/data-sets: the table, as the manifest that filled it');
     check(String(dataSets.headers['content-type']).startsWith('application/json') && dataSets.headers['cache-control'] === 'no-store',
         'as JSON, not cached');
     check((await ask(port, '/api/data-sets', 'HEAD')).body === '', 'HEAD /api/data-sets: no body');
@@ -193,6 +231,32 @@ async function checkAnswers(port: number, manifest: string): Promise<void> {
     const post = await ask(port, '/', 'POST');
     check(post.status === 405 && post.headers.allow === 'GET, HEAD', 'POST on a file: 405, with Allow');
     check((await ask(port, '/api/health', 'DELETE')).status === 405, 'DELETE on /api/health: 405');
+}
+
+/**
+ * Rows added to the table while the server runs, as P8's upload and approval will add them:
+ * each request reads them.
+ */
+async function checkTableRead(port: number, db: DatabaseSync, manifest: string): Promise<void> {
+    console.log('\nThe table, changed while the server runs:');
+    const insert = db.prepare(
+        'INSERT INTO data_sets (id, name, dir, position, status, owner, dm_rules) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    const event = (set: string) => JSON.stringify({ type: 'started', player: PLAYER, set, playthrough: 1, build: 'test', payload: {} });
+    let address = 0;
+    const post = (set: string) => ask(port, '/api/event', 'POST', { 'X-Real-IP': `10.2.0.${++address}` }, event(set));
+
+    check((await post('b')).status === 400, 'an event of a set the table lacks: 400');
+    insert.run('p', 'Pending', 'set-a', 1, 'pending', PLAYER, 0);
+    const pending = await ask(port, '/api/data-sets');
+    check(parsed(pending.body) === parsed(manifest), 'a pending set is left out of the answer');
+    check((await post('p')).status === 204, 'and its events are taken');
+    insert.run('b', 'B', 'set-a', 2, 'approved', null, 1);
+    const approved = parseManifest((await ask(port, '/api/data-sets')).body, '');
+    const added = approved.dataSets.at(-1);
+    console.log(`  added: ${JSON.stringify(added)}`);
+    check(approved.dataSets.map((set) => set.id).join() === 'a,b' && added?.dir === 'set-a' && added.dmRules && !added.hidden,
+        'an approved set is answered at the next request, in its place, with its folder and flags');
+    check((await post('b')).status === 204, 'and its events are taken at once');
 }
 
 const PLAYER = '00000000-0000-4000-8000-000000000000';
@@ -267,7 +331,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     console.log('\nserver.ts:');
     const statsDb = join(scratch, 'stats', 'stats.db');
     const badMount = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: join(scratch, 'nowhere'), MANIFEST_FILE: options.manifestFile, STATS_DB: statsDb }));
-    console.log(`  bad mount: exit ${badMount.code}, ${firstLine(badMount.out).replace(scratch, '<scratch>')}`);
+    console.log(`  bad mount: exit ${badMount.code}, ${firstLine(badMount.out).split(scratch).join('<scratch>')}`);
     check(badMount.code === 1 && badMount.out.includes('Not starting:'), 'a bad mount exits 1 before it listens');
     const badStore = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: options.distDir }));
     console.log(`  bad store: exit ${badStore.code}, ${firstLine(badStore.out).replace(scratch, '<scratch>')}`);
@@ -275,7 +339,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
 
     let healthy = false;
     let walHeld = false;
-    let backedUp: { code: number | null; out: string; events: number; answering: boolean } | null = null;
+    let backedUp: { code: number | null; out: string; events: number; sets: number; answering: boolean } | null = null;
     const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: statsDb });
     const ended = finish(child, (line) => {
         const listening = /^Listening on port (\d+)/.exec(line);
@@ -292,12 +356,14 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
             const run = await finish(startEntry({ STATS_DB: statsDb }, 'backup.ts'));
             const target = /"target":"([^"]+)"/.exec(run.out)?.[1];
             let events = -1;
+            let sets = -1;
             if (target) {
                 const copy = new DatabaseSync(target, { readOnly: true });
                 events = (copy.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number }).n;
+                sets = (copy.prepare('SELECT COUNT(*) AS n FROM data_sets').get() as { n: number }).n;
                 copy.close();
             }
-            backedUp = { code: run.code, out: run.out, events, answering: (await ask(port, '/api/health')).status === 200 };
+            backedUp = { code: run.code, out: run.out, events, sets, answering: (await ask(port, '/api/health')).status === 200 };
         })().finally(() => child.kill('SIGTERM'));
     });
     const { code, out } = await ended;
@@ -305,45 +371,61 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
         if (!line.includes('ExperimentalWarning') && !line.includes('--trace-warnings')) console.log(`  | ${line.split(scratch).join('<scratch>')}`);
     }
     check(healthy, 'it listens on the PORT given, 0 for a free one, and answers /api/health');
-    const backup = backedUp as { code: number | null; out: string; events: number; answering: boolean } | null;
+    const backup = backedUp as { code: number | null; out: string; events: number; sets: number; answering: boolean } | null;
     console.log(`  backup.ts: exit ${backup?.code}, ${firstLine(backup?.out ?? '').split(scratch).join('<scratch>').replace(/stats-[\dTZ-]+\.db/, 'stats-<date>.db').replace(/"bytes":\d+/, '"bytes":<n>')}`);
     check(backup?.code === 0 && /<scratch>\/stats\/backups\/stats-[\dTZ-]+\.db/.test((backup?.out ?? '').split(scratch).join('<scratch>')),
         'backup.ts, run beside the server, writes a snapshot into backups/ beside the store');
     check(walHeld && backup?.events === 3, 'the snapshot holds the events the server had in its WAL');
+    check(backup?.sets === 1, 'and the data sets\' table');
     check(backup?.answering === true, 'the server kept serving through the backup');
     const noStore = await finish(startEntry({ STATS_DB: join(scratch, 'nowhere', 'stats.db') }, 'backup.ts'));
     check(noStore.code === 1 && noStore.out.includes('backup_failed'), 'backup.ts on a store that is not there exits 1');
     check(code === 0 && out.includes('SIGTERM: shutting down') && out.includes('Stopped'), 'SIGTERM stops it, with 0');
     check(existsSync(statsDb) && !existsSync(`${statsDb}-wal`), 'the store was made, its folder too, and closed with its WAL checkpointed');
+    check(out.includes('(a, from the data_sets table, filled from <scratch>'.replace('<scratch>', scratch)), 'its table filled from the manifest');
+
+    let again = '';
+    const restart = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: join(scratch, 'nowhere.json'), STATS_DB: statsDb });
+    const restarted = await finish(restart, (line) => {
+        if (!line.startsWith('Listening on port')) return;
+        again = line.split(scratch).join('<scratch>').replace(/port \d+/, 'port <n>');
+        restart.kill('SIGTERM');
+    });
+    console.log(`  again: ${again}`);
+    check(restarted.code === 0 && again.includes('(a, from the data_sets table);'), 'started again without a manifest, it serves the table\'s sets');
 }
 
 async function main(): Promise<void> {
     const scratch = mkdtempSync(join(tmpdir(), 'csbweb-server-'));
     let server: Server | null = null;
-    let store: StatsStore | null = null;
+    let db: DatabaseSync | null = null;
     try {
         const options = scratchFiles(scratch);
         checkStartUp(scratch, options);
 
-        store = new StatsStore(join(scratch, 'scratch-stats.db'));
-        const { text } = checkFiles(options);
+        db = openStore(join(scratch, 'scratch-stats.db'));
+        const dataSets = new DataSetStore(db);
+        const store = new StatsStore(db);
+        checkFiles(options, dataSets);
+        const manifest = readFileSync(options.manifestFile, 'utf8');
         const api: ApiOptions = {
-            dataSets: text,
+            dataSets,
             store,
-            rules: { sets: new Set(['a']) },
+            rules: { hasSet: (id) => dataSets.hasSet(id) },
             rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
             now: Date.now,
         };
         server = createAppServer(options, api);
         await new Promise<void>((done) => server!.listen(0, '127.0.0.1', done));
         const port = (server.address() as AddressInfo).port;
-        await checkAnswers(port, text);
+        await checkAnswers(port, manifest);
         await checkEvents(port, store);
+        await checkTableRead(port, db, manifest);
 
         await checkEntry(scratch, options);
     } finally {
         server?.close();
-        store?.close();
+        db?.close();
         rmSync(scratch, { recursive: true, force: true });
     }
 

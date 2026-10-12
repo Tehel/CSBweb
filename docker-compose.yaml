@@ -4,7 +4,8 @@
 #   <DEPLOY_DIR>/            this file, and its `.env`: required, even empty, since it is
 #                            also the container's `env_file` (CSBWEB_PORT, optional)
 #   <DEPLOY_DIR>/gamefiles/  the data sets, `swoosh/` and `manifest.json`, uploaded separately
-#   <DEPLOY_DIR>/stats/      stats.db, which a deploy's `down` leaves alone
+#   <DEPLOY_DIR>/stats/      stats.db, the statistics and the data sets (filled once from
+#                            the manifest), which a deploy's `down` leaves alone
 #
 # The VPS runs Compose v1, hence the `version` key.
 version: '3.8'

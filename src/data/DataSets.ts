@@ -10,9 +10,9 @@
  * the directory's `graphics.dat`, so everything the page builds comes from the set.
  *
  * The sets are listed by a manifest, which the page asks the server for (`DATA_SETS_ROUTE`):
- * the deployed server answers it from the `manifest.json` beside the files it describes
- * (`server/app.ts`), and the dev server from the repository's, `tools/data-sets.json`
- * (`vite.config.mts`), which the tools read too. This module parses it, for the page, the
+ * the deployed server answers it from its store's table, which the `manifest.json` beside
+ * the files it describes fills once (`server/dataSets.ts`), and the dev server from the
+ * repository's, `tools/data-sets.json` (`vite.config.mts`), which the tools read too. This module parses it, for the page, the
  * tools and the server:
  *
  *     { "default": "dm-atari", "swoosh": "swoosh",

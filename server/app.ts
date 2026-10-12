@@ -9,7 +9,7 @@
  *   /                 dist/index.html               no-cache
  *   /assets/…         dist/assets/…, hashed names   immutable
  *   /gamefiles/…      GAMEFILES_DIR/…               no-cache, with ETag and Last-Modified
- *   /api/data-sets    the manifest checked at start-up (`checkFiles`), the page's list of sets
+ *   /api/data-sets    the page's list of sets, from the store's table (`dataSets.ts`)
  *   /api/health       200, for the compose healthcheck
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
  *   /api/stats        the store's aggregates, as JSON
@@ -24,6 +24,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, join, resolve } from 'node:path';
 
 import { DATA_SETS_ROUTE, parseManifest, type DataSetManifest } from '../src/data/DataSets.ts';
+import { manifestText, type DataSetStore } from './dataSets.ts';
 import { checkEvent, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import type { StatsStore } from './stats.ts';
 
@@ -32,21 +33,25 @@ export interface ServerOptions {
     distDir: string;
     /** The data sets, served under `gamefiles/`. */
     gamefilesDir: string;
-    /** The data sets' manifest, its folders relative to `gamefilesDir`. */
+    /**
+     * The data sets' manifest, its folders relative to `gamefilesDir`, which fills an empty
+     * `data_sets` table (`checkFiles`) and is read at no other time.
+     */
     manifestFile: string;
 }
 
-/** What `checkFiles` read. */
+/** What `checkFiles` found. */
 export interface CheckedFiles {
-    manifest: DataSetManifest;
-    /** The manifest as it was read, which `api/data-sets` answers. */
-    text: string;
+    /** The table's sets' ids, in its order. */
+    ids: string[];
+    /** Whether the table was empty, and filled from the manifest. */
+    filled: boolean;
 }
 
 /** What the API needs beside the files. */
 export interface ApiOptions {
-    /** The answer to `api/data-sets`: the manifest `checkFiles` read. */
-    dataSets: string;
+    /** `api/data-sets`'s sets, read at each request. */
+    dataSets: DataSetStore;
     store: StatsStore;
     rules: EventRules;
     /** Events per address. */
@@ -77,24 +82,34 @@ const NO_CACHE = 'no-cache';
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 
 /**
- * The game files' manifest, parsed by the page's own parser, with every folder it names
- * present in `gamefilesDir`, and the page's `index.html` in `distDir`. Throws an error
- * that says what is missing, so a bad mount stops the container rather than the player's
- * boot.
+ * The page's `index.html` in `distDir`, and the data sets, every folder they name present
+ * in `gamefilesDir`. An empty `data_sets` table is filled from the manifest, parsed by the
+ * page's own parser, once its folders are found, so a manifest that names a missing one
+ * leaves the table empty for the next start to read it again; a table that is not empty is
+ * read instead, and the manifest is not. Throws an error that says what is missing, so a
+ * bad mount stops the container rather than the player's boot.
  */
-export function checkFiles({ distDir, gamefilesDir, manifestFile }: ServerOptions): CheckedFiles {
+export function checkFiles({ distDir, gamefilesDir, manifestFile }: ServerOptions, dataSets: DataSetStore): CheckedFiles {
     if (!isFile(join(distDir, 'index.html'))) throw new Error(`${distDir} holds no index.html: is the page built?`);
+    const manifest = dataSets.isEmpty() ? readManifest(manifestFile) : null;
+    const { dataSets: sets, swooshDir } = manifest ?? dataSets.read();
+    const folders = [...sets.map((set) => set.dir), ...(swooshDir === null ? [] : [swooshDir])];
+    const missing = folders.filter((dir) => !isDirectory(join(gamefilesDir, dir)));
+    if (missing.length > 0) {
+        throw new Error(`${manifest ? manifestFile : 'the data_sets table'} names folders ${gamefilesDir} does not hold: ${missing.join(', ')}`);
+    }
+    if (manifest) dataSets.fill(manifest);
+    return { ids: dataSets.read().dataSets.map((set) => set.id), filled: manifest !== null };
+}
+
+function readManifest(manifestFile: string): DataSetManifest {
     let text: string;
     try {
         text = readFileSync(manifestFile, 'utf8');
     } catch {
-        throw new Error(`there is no manifest ${manifestFile}`);
+        throw new Error(`the data_sets table is empty, and there is no manifest ${manifestFile} to fill it`);
     }
-    const manifest = parseManifest(text, '');
-    const folders = [...manifest.dataSets.map((set) => set.dir), ...(manifest.swooshDir === null ? [] : [manifest.swooshDir])];
-    const missing = folders.filter((dir) => !isDirectory(join(gamefilesDir, dir)));
-    if (missing.length > 0) throw new Error(`${manifestFile} names folders ${gamefilesDir} does not hold: ${missing.join(', ')}`);
-    return { manifest, text };
+    return parseManifest(text, '');
 }
 
 /** The server, not yet listening. */
@@ -121,7 +136,7 @@ function route({ distDir, gamefilesDir, manifestFile }: ServerOptions, api: ApiO
         if (segments.join('/') === DATA_SETS_ROUTE) {
             if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
             res.setHeader('Cache-Control', 'no-store');
-            return send(res, 200, api.dataSets, 'application/json; charset=utf-8');
+            return send(res, 200, manifestText(api.dataSets.read()), 'application/json; charset=utf-8');
         }
         const name = segments.length === 2 ? segments[1] : undefined;
         if (name === 'event') {

@@ -2,7 +2,7 @@
 # The game files and the statistics are mounted, never in the image:
 #
 #   /data/gamefiles   the data sets and their manifest.json, read-only
-#   /data/stats       stats.db
+#   /data/stats       stats.db: the statistics, and the data sets, filled once from the manifest
 #
 #   docker build --build-arg CSBWEB_BUILD=$(git rev-parse --short HEAD) -t csbweb .
 #

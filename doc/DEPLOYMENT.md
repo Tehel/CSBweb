@@ -19,7 +19,7 @@ behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 ```
 image      dist/ (the built page) + server/ (run by Node 24 as is) + src/data/DataSets.ts
 mounts     /data/gamefiles  :ro   the data sets, swoosh/, manifest.json
-           /data/stats            stats.db (SQLite, WAL), backups/
+           /data/stats            stats.db (SQLite, WAL: the statistics and the data sets), backups/
 env        PORT (8085), DIST_DIR, GAMEFILES_DIR, MANIFEST_FILE, STATS_DB
 ```
 
@@ -30,7 +30,7 @@ On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
 ├── docker-compose.yaml   copied by every deploy, so it cannot drift from the repository
 ├── .env                  the stack's own, kept on the VPS (see below)
 ├── gamefiles/            uploaded by hand; everything under it is public
-│   ├── manifest.json     the data sets the page offers
+│   ├── manifest.json     the data sets that fill the store's empty table
 │   ├── swoosh/           the FTL logo, as the manifest names it
 │   └── dm-atari/, csb/, … one folder per data set the manifest lists
 └── stats/                written by the container (uid 1000)
@@ -41,8 +41,8 @@ On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
 
 **The manifest is inside `gamefiles/`**, next to the folders it names. The server reads
 `/data/gamefiles/manifest.json` (the image's `MANIFEST_FILE`), and nothing outside the
-mounted folder is visible to it. It answers the page's `api/data-sets` with it, and does
-not serve it as a file.
+mounted folder is visible to it, only to fill the store's empty `data_sets` table (below),
+and does not serve it as a file.
 
 ## The site
 
@@ -104,10 +104,27 @@ The game files are not part of a deploy. They are uploaded once, and again when 
 change. **Everything in `gamefiles/` can be downloaded**, readmes and stray folders
 included, since the server serves the folder as it stands; only the manifest is not.
 
-**The server reads the manifest only at start-up** (below), and answers `api/data-sets`
-with what it read then. After changing the manifest, or the folders it names, restart the
-stack. A file the page asks for is read when it is
-asked for, so replacing a data set's files needs no restart.
+**The server lists the sets from its store, not from the manifest.** `server/dataSets.ts`
+keeps them in the store's SQLite file, beside the statistics, so the nightly backup covers
+them: a `data_sets` table, one row per set (its fields, flags and folder, its place in the
+list, its status, `approved` or `pending`, and its owner's `playerId`, `NULL` for the
+author's), and `data_set_defaults`, one row naming the default set and the FTL logo's
+folder. At start-up an empty table is filled from the manifest, every set approved and the
+author's, once its folders are found. After that the manifest is not read: changing it
+changes nothing. `api/data-sets` answers the approved sets, and `api/event` takes the
+events of any set in the table, both read at each request, so a row added while the server
+runs is offered at once.
+
+To refill the table from a changed manifest, empty it and restart. This drops every row,
+a player's pending set included:
+
+```bash
+docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning -e "new (require('node:sqlite').DatabaseSync)('/data/stats/stats.db').exec('DELETE FROM data_set_defaults; DELETE FROM data_sets')" < /dev/null
+docker-compose restart
+```
+
+A file the page asks for is read when it is asked for, so replacing a data set's files
+needs no restart.
 
 ## The build
 
@@ -137,7 +154,8 @@ the server imports from `../src/data/`. `npm start` runs it locally, on Node 22.
 
 It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
 `static/gamefiles/`), `MANIFEST_FILE` (the checkout's `tools/data-sets.json`; the image's
-`/data/gamefiles/manifest.json`), and `STATS_DB` (the checkout's `stats/stats.db`, which git ignores),
+`/data/gamefiles/manifest.json`), read only to fill an empty table, and `STATS_DB` (the
+checkout's `stats/stats.db`, which git ignores),
 and serves (`server/app.ts`):
 
 | Path | What | Caching |
@@ -145,7 +163,7 @@ and serves (`server/app.ts`):
 | `/` | `dist/index.html` | `no-cache` |
 | `/assets/…` | `dist/assets/…`, hashed names | `immutable` |
 | `/gamefiles/…` | `GAMEFILES_DIR/…`, but the manifest | `no-cache`, ETag and Last-Modified |
-| `/api/data-sets` | the manifest checked at start-up | `no-store` |
+| `/api/data-sets` | the `data_sets` table's approved sets, as a manifest | `no-store` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
 | `/api/stats` | the statistics' aggregates | `no-store` |
@@ -154,9 +172,10 @@ Every file answers a conditional GET with 304, and only GET and HEAD are allowed
 `api/event`. A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
 decoded, is refused with 400 before it reaches the disk.
 
-**At start-up** it checks that `index.html` is built, that the manifest parses and that
-each folder it names exists, then opens the store (making it, and its folder, when
-missing). Any failure prints `Not starting: <why>` and exits with 1, so a bad mount fails
+**At start-up** it opens the store (making it, and its folder, when missing), checks
+that `index.html` is built, and that each folder the sets name exists: the table's, or,
+while the table is empty, those of the manifest, which must parse, and which then fills
+it. Any failure prints `Not starting: <why>` and exits with 1, so a bad mount fails
 the container rather than the player's boot. On SIGTERM it stops listening, lets the
 requests in flight finish (5 s at most), closes the store, which checkpoints the WAL into
 the file, and exits with 0. It logs to stdout. `tools/dump-server.ts` asserts all of it,
@@ -241,12 +260,13 @@ deployed.
 
 ```bash
 curl -s https://csbweb.looten.net/api/health                   # {"ok":true}
-curl -s https://csbweb.looten.net/api/data-sets                # the manifest
+curl -s https://csbweb.looten.net/api/data-sets                # the sets, as a manifest
 ssh <host> 'cd ~/csbweb && docker-compose ps && docker-compose logs --tail 20'
 ```
 
 A healthy start logs one line, `Listening on port 8085: /app/dist, and /data/gamefiles
-(<the sets>, from /data/gamefiles/manifest.json); statistics in /data/stats/stats.db`.
+(<the sets>, from the data_sets table); store in /data/stats/stats.db`, with `, filled
+from /data/gamefiles/manifest.json` after the table's name on the start that filled it.
 
 **A container that fails to start is retried with a growing delay**: 13 s, 27 s, 51 s, then
 about a minute between attempts. While it waits, `docker-compose ps` says "Restarting", even
@@ -262,7 +282,8 @@ that set.
 
 The host's cron runs `server/backup.ts` in the container every night. It snapshots the
 store with `node:sqlite`'s `backup` while the server keeps serving, WAL included, into one
-self-contained file, `stats/backups/stats-<date>.db`, and prints one JSON line. A `cp` of
+self-contained file, `stats/backups/stats-<date>.db`, the data sets' tables with the
+events, and prints one JSON line. A `cp` of
 the live file would be unsafe: its WAL holds events the main file does not have yet. The
 crontab line deletes the snapshots older than 14 days:
 
@@ -297,4 +318,4 @@ docker-compose up -d
 - **The rate limit's counts are in memory**, so a restart resets them, which is harmless.
 - **Nothing is lost**: every event is in `stats.db` before `api/event` answers 204, and a
   SIGTERM checkpoints the WAL. A `down` loses only the container's log.
-- **The manifest is read again** at every start, and only then.
+- **The manifest is read** only at a start that finds the `data_sets` table empty.

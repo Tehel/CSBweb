@@ -113,7 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P7 | The data sets in the server's database | L | ⚠️ step 2 of 4 next |
+| P7 | The data sets in the server's database | L | ⚠️ step 3 of 4 next |
 | P8 | Publishing a local set | L | ⏳ after P7 |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
@@ -261,7 +261,7 @@ A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more 
 
 ### P7 ⏳ The data sets in the server's database
 
-L, in four steps, one commit each. Step 1 stands; step 2 is next.
+L, in four steps, one commit each. Steps 1 and 2 stand; step 3 is next.
 
 Decided with the author: the page asks **`api/data-sets`** for the list, in the format
 `parseManifest` reads. The site's server answers it from its table. The dev server
@@ -277,14 +277,13 @@ nobody else's.
    The server answers it with the manifest `checkFiles` read at start-up, its
    `MANIFEST_FILE` (`/data/gamefiles/manifest.json` in the image), which it does not
    serve as a file. `tools/dump-server.ts` asks the route.
-2. **The table.** A `data_sets` table in the store's SQLite file (`STATS_DB`), so that
-   `backup.ts` already covers it: a set's fields and flags, its folder, its place in the
-   order, its status (approved or pending) and its owner's `playerId` (`NULL` for the
-   author's), and the default set and the FTL logo's folder beside it. At start-up an
-   empty table is filled once from `MANIFEST_FILE`; after that the server reads no
-   manifest file, and `checkFiles` checks the table's folders. `api/data-sets`
-   and `api/event`'s known sets come from the table, read per request, since P8 adds
-   sets while the server runs.
+2. ✅ **The table** (`server/dataSets.ts`): `data_sets` and `data_set_defaults`, in the
+   store's SQLite file (`server/store.ts`, one connection beside `stats.ts`'s), so that
+   `backup.ts` covers them. `checkFiles` fills an empty table from `MANIFEST_FILE` once
+   its folders are found, and otherwise checks the table's folders and reads no manifest.
+   `api/data-sets` answers the approved sets (`manifestText`) and `api/event` takes any
+   set in the table (`hasSet`), both read per request. `tools/dump-server.ts` asserts it.
+   Until P8, `doc/DEPLOYMENT.md` says how to refill the table from a changed manifest.
 3. **The answer per player.** The page sends its `playerId` (`src/ui/gameEvents.ts`) in
    an `X-Player-Id` header, never the query. The approved sets go to everyone, a pending
    set also to its owner, and everything to the author, whose `playerId` is the server's

@@ -72,16 +72,17 @@ takes every event the engine makes as the page sent it.
    is on loopback, and it is never stored.
 2. **A body of at most 4 KB** (413 otherwise).
 3. **`server/events.ts` checks it field by field** and rebuilds it from what passed (400
-   otherwise): the player is a UUID, the build a token, the set one of the manifest's,
-   every number an integer in its range, at most four champions, a champion's id `null` or
-   an `i16`, a won game's masteries four, and a champion's name 7 characters at most
-   (`CHARDESC.name[8]`, `doc/CSBwin-src/CSB.h:2545`).
+   otherwise): the player is a UUID, the build a token, the set one of the `data_sets`
+   table's (`doc/DEPLOYMENT.md`), every number an integer in its range, at most four
+   champions, a champion's id `null` or an `i16`, a won game's masteries four, and a
+   champion's name 7 characters at most (`CHARDESC.name[8]`, `doc/CSBwin-src/CSB.h:2545`).
 
 An event stored answers 204.
 
 ## The store
 
-`server/stats.ts`: SQLite through `node:sqlite`, one `events` table: when (the server's
+`server/stats.ts`: one `events` table, in the store's SQLite file (`server/store.ts`,
+through `node:sqlite`), beside the data sets' (`doc/DEPLOYMENT.md`): when (the server's
 clock), player, type, set, playthrough, build and the payload as JSON. The file is
 `STATS_DB` (the checkout's `stats/stats.db`, which git ignores), made with its folder and
 its schema when missing. In the container it is in the mounted `/data/stats`, never in the

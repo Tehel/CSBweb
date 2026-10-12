@@ -1,8 +1,8 @@
 /**
  * The statistics' store and what it accepts (`doc/STATISTICS.md`): `server/events.ts`,
- * which checks an event and rebuilds it, and `server/stats.ts`, the SQLite file and its
- * aggregates. `dump-server` asks the same over HTTP; `dump-game-events` passes the real
- * engine's events through the same check.
+ * which checks an event and rebuilds it, `server/store.ts`, the SQLite file, and
+ * `server/stats.ts`, its `events` table and their aggregates. `dump-server` asks the same
+ * over HTTP; `dump-game-events` passes the real engine's events through the same check.
  *
  * Asserts:
  *   - an event of each type passes, rebuilt from its checked fields only: what the page
@@ -26,13 +26,14 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { checkEvent, RateLimit, type CheckedEvent, type EventRules } from '../server/events.ts';
 import { StatsStore, type Stats } from '../server/stats.ts';
+import { openStore } from '../server/store.ts';
 import { check, finish } from './lib/check';
 
 const P1 = '11111111-1111-4111-8111-111111111111';
 const P2 = '22222222-2222-4222-8222-222222222222';
 const P3 = '33333333-3333-4333-8333-333333333333';
 
-const RULES: EventRules = { sets: new Set(['dm-atari', 'csb']) };
+const RULES: EventRules = { hasSet: (id) => ['dm-atari', 'csb'].includes(id) };
 
 /** A champion as the page reports one: its id a cell of graphic 26, or `null` from a save. */
 const ch = (name: string, id: number | null = 0, more: object = {}) => ({ name, id, ...more });
@@ -166,12 +167,13 @@ const EXPECTED: Stats = {
 function checkStore(scratch: string): void {
     console.log('\nThe store:');
     const path = join(scratch, 'stats.db');
-    let store = new StatsStore(path);
+    let db = openStore(path);
+    let store = new StatsStore(db);
     check(existsSync(path), 'a missing file is made');
     check(JSON.stringify(store.stats()) === '{"players":0,"weeks":[],"champions":[],"deaths":[],"wins":[]}', 'with the schema, and nothing in it');
     for (const [time, body] of FORTNIGHT) store.record(accepted(body), time);
     check(existsSync(`${path}-wal`), 'it writes ahead, in WAL mode');
-    store.close();
+    db.close();
     check(!existsSync(`${path}-wal`), 'close checkpoints the WAL into the file');
 
     const raw = new DatabaseSync(path, { readOnly: true });
@@ -180,9 +182,10 @@ function checkStore(scratch: string): void {
     raw.close();
     check(mode.journal_mode === 'wal' && rows === FORTNIGHT.length, `the file alone holds the ${rows} events, in ${mode.journal_mode} mode`);
 
-    store = new StatsStore(path);
+    db = openStore(path);
+    store = new StatsStore(db);
     const stats = store.stats();
-    store.close();
+    db.close();
     console.log('\nThe aggregates of the scripted fortnight:');
     for (const [key, value] of Object.entries(stats)) {
         if (!Array.isArray(value)) console.log(`  ${key}: ${value}`);

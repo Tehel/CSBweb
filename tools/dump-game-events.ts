@@ -247,7 +247,7 @@ async function main(): Promise<void> {
 
   /* ------------------------------------------------- the server's check ----- */
   {
-    const rules = { sets: new Set([DM.id]) };
+    const rules = { hasSet: (id: string) => id === DM.id };
     const types = new Set(everySent.map((event) => event.type));
     const changed = everySent.filter((event) => JSON.stringify(checkEvent(JSON.stringify(event), rules)) !== JSON.stringify(event));
     console.log(`\n=== the server's check: ${everySent.length} events (${[...types].join(', ')}), ${changed.length} refused or changed ===`);

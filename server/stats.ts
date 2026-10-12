@@ -1,13 +1,9 @@
 /**
- * The statistics store (`doc/STATISTICS.md`): one SQLite file, through `node:sqlite`,
- * holding one `events` table, and the aggregates `api/stats` makes of it. No address and
- * nothing the server has not checked is stored (`events.ts`).
- *
- * The file runs in WAL mode. `close` checkpoints the WAL into it, so the file alone is the
- * whole store once the server has stopped. A missing file, or a file without the table, is
- * given the schema.
+ * The statistics (`doc/STATISTICS.md`): the store's `events` table (`store.ts`), and the
+ * aggregates `api/stats` makes of it. No address and nothing the server has not checked is
+ * stored (`events.ts`). A store without the table is given it.
  */
-import { DatabaseSync, type StatementSync } from 'node:sqlite';
+import type { DatabaseSync, StatementSync } from 'node:sqlite';
 
 import type { CheckedChampion, CheckedEvent } from './events.ts';
 
@@ -49,9 +45,8 @@ export class StatsStore {
     private readonly db: DatabaseSync;
     private readonly insert: StatementSync;
 
-    constructor(path: string) {
-        this.db = new DatabaseSync(path);
-        this.db.exec('PRAGMA journal_mode = WAL');
+    constructor(db: DatabaseSync) {
+        this.db = db;
         this.db.exec(SCHEMA);
         this.insert = this.db.prepare(
             'INSERT INTO events (time, player, type, data_set, playthrough, build, payload) VALUES (?, ?, ?, ?, ?, ?, ?)');
@@ -88,9 +83,5 @@ export class StatsStore {
             return { set: row.set as string, week: row.week as string, gameTime, playTime, wallTime: row.wallTime as number | null, champions };
         });
         return { players, weeks, champions, deaths, wins };
-    }
-
-    close(): void {
-        if (this.db.isOpen) this.db.close();
     }
 }

@@ -1,5 +1,6 @@
 /**
- * A snapshot of the statistics store, taken while the server keeps serving
+ * A snapshot of the store (`store.ts`), the statistics and the data sets' tables, taken
+ * while the server keeps serving
  * (`doc/DEPLOYMENT.md` → "Backups"). The VPS's cron runs it in the container:
  *
  *   docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning server/backup.ts
