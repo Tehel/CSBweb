@@ -15,9 +15,13 @@
  * - **"+ Add my own"**, the grid's last tile, which is never selected. A click opens the
  *   form that adds a set (`src/ui/addDataSetForm.ts`); the set it adds is stored, and the
  *   page shows it, selected.
- * - **A local set's tile** has its name in cyan, and **the pen** on its picture, at its
- *   top right corner, which opens the same form on its record, to edit or delete it. The
- *   page then shows the set edited, selected, or none, for a set deleted.
+ * - **A tile's name says its set's state**: cyan for a local set, red for a pending one,
+ *   which awaits a moderator (to its owner and the moderators, the only ones it is
+ *   offered), purple for a hidden one (to a moderator, the only one it is listed for), and
+ *   white otherwise. Red wins over purple.
+ * - **A local set's tile** has **the pen** on its picture, at its top right corner, which
+ *   opens the same form on its record, to edit or delete it. The page then shows the set
+ *   edited, selected, or none, for a set deleted.
  * - **PLAY** opens the selected set (`?dungeon=<id>`): its title, then its entrance. With
  *   no set selected it is disabled.
  * - **CONTINUE** opens the last save used (`lastUsedSave`) of the selected set, or of every
@@ -161,6 +165,8 @@ export async function showWelcomePage(
         });
         const record = local.find((l) => l.set === set)?.record;
         if (record) tile.classList.add('local');
+        if (set.pending) tile.classList.add('pending');
+        if (set.hidden) tile.classList.add('hidden');
         grid.append(record ? penned(tile, record, saves) : tile);
         return { set, tile };
     });

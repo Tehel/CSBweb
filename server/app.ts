@@ -53,8 +53,8 @@ export interface CheckedFiles {
 export interface ApiOptions {
     /** `api/data-sets`'s sets, read at each request. */
     dataSets: DataSetStore;
-    /** The author's `playerId`, to whom `api/data-sets` offers every set, or `null` for no author. */
-    authorPlayerId: string | null;
+    /** The moderators' `playerId`s, to whom `api/data-sets` offers every set: none, or several. */
+    moderatorPlayerIds: readonly string[];
     store: StatsStore;
     rules: EventRules;
     /** Events per address. */
@@ -261,13 +261,13 @@ async function receiveEvent(api: ApiOptions, req: IncomingMessage, res: ServerRe
 
 /**
  * Who asks `api/data-sets`: the `playerId` the page sends in `PLAYER_ID_HEADER`, where it
- * has a `playerId`'s form, and whether it is the author's. It is never logged.
+ * has a `playerId`'s form, and whether it is a moderator's. It is never logged.
  */
 function dataSetViewer(api: ApiOptions, req: IncomingMessage): DataSetViewer {
     const header = req.headers[PLAYER_ID_HEADER.toLowerCase()];
     const playerId = isPlayerId(header) ? header : null;
-    const author = playerId !== null && api.authorPlayerId !== null && samePlayerId(playerId, api.authorPlayerId);
-    return { playerId, author };
+    const moderator = playerId !== null && api.moderatorPlayerIds.some((id) => samePlayerId(playerId, id));
+    return { playerId, moderator };
 }
 
 /**

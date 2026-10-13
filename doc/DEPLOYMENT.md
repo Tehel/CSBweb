@@ -20,7 +20,7 @@ behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 image      dist/ (the built page) + server/ (run by Node 24 as is) + src/data/DataSets.ts
 mounts     /data/gamefiles        the data sets, swoosh/, manifest.json, and players' uploads
            /data/stats            stats.db (SQLite, WAL: the statistics and the data sets), backups/
-env        PORT (8085), DIST_DIR, GAMEFILES_DIR, MANIFEST_FILE, STATS_DB, AUTHOR_PLAYER_ID
+env        PORT (8085), DIST_DIR, GAMEFILES_DIR, MANIFEST_FILE, STATS_DB, MODERATOR_PLAYER_IDS
 ```
 
 On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
@@ -112,14 +112,17 @@ included, since the server serves the folder as it stands; only the manifest is 
 keeps them in the store's SQLite file, beside the statistics, so the nightly backup covers
 them: a `data_sets` table, one row per set (its fields, flags and folder, its place in the
 list, its status, `approved` or `pending`, and its owner's `playerId`, `NULL` for the
-author's), and `data_set_defaults`, one row naming the default set and the FTL logo's
-folder. At start-up an empty table is filled from the manifest, every set the author's
-and approved, unless it says `"status": "pending"`, once its folders are found. After that the manifest is not read: changing it
+site's, which the author uploads by hand), and `data_set_defaults`, one row naming the
+default set and the FTL logo's folder. At start-up an empty table is filled from the
+manifest, every set the site's and approved, unless it says `"status": "pending"`, once its folders are found. After that the manifest is not read: changing it
 changes nothing. `api/data-sets` answers each player the sets they may see: the approved
-ones to everyone, a pending one also to its owner, and every set to the author, a pending
-set saying `"status": "pending"` and none naming its owner. The page names its player in
-an `X-Player-Id` header, its kept `playerId` (`keptPlayerId`, `src/ui/gameEvents.ts`), and
-the author is the one whose id is `AUTHOR_PLAYER_ID`. `api/event` takes the events of any
+ones to everyone, a pending one also to its owner, and every set to a moderator, a pending
+set saying `"status": "pending"` and none naming its owner. A moderator's answer also says
+`"moderator": true`, and the welcome page then lists the hidden sets too, each tile's name
+in its set's state's colour: red pending, purple hidden, cyan a player's own, white
+otherwise. The page names its player in an `X-Player-Id` header, its kept `playerId`
+(`keptPlayerId`, `src/ui/gameEvents.ts`), and the moderators are those whose ids
+`MODERATOR_PLAYER_IDS` lists. `api/event` takes the events of any
 set in the table. Both read the table at each request, so a row added while the server
 runs is offered at once.
 
@@ -163,9 +166,9 @@ the server imports from `../src/data/`. `npm start` runs it locally, on Node 22.
 It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
 `static/gamefiles/`), `MANIFEST_FILE` (the checkout's `tools/data-sets.json`; the image's
 `/data/gamefiles/manifest.json`), read only to fill an empty table, and `STATS_DB` (the
-checkout's `stats/stats.db`, which git ignores), and `AUTHOR_PLAYER_ID`, the author's
-`playerId`, to whom `api/data-sets` offers every set (unset, no one; one that is not a
-`playerId` stops the start), and serves (`server/app.ts`):
+checkout's `stats/stats.db`, which git ignores), and `MODERATOR_PLAYER_IDS`, the moderators'
+`playerId`s, comma-separated, spaces around a comma ignored, to whom `api/data-sets` offers
+every set (unset or empty, no one; an entry that is not a `playerId` stops the start), and serves (`server/app.ts`):
 
 | Path | What | Caching |
 | --- | --- | --- |
@@ -226,8 +229,9 @@ it. Compose reads it twice over: for `${CSBWEB_PORT}` in the compose file, and a
 container's `env_file`. So it must exist, even empty, or Compose refuses to start the
 stack; and every variable in it reaches the container's environment, where it overrides
 the image's own `PORT`, `DIST_DIR`, `GAMEFILES_DIR` and `STATS_DB`. It holds
-`AUTHOR_PLAYER_ID`, the author's `playerId` (the browser's `localStorage` key
-`csbweb_player_v1`, on the site), a secret: whoever sends it sees every pending set. A
+`MODERATOR_PLAYER_IDS`, the moderators' `playerId`s (each the browser's `localStorage`
+key `csbweb_player_v1`, on the site), comma-separated, secrets: whoever sends one sees
+every pending and hidden set. A
 change to it needs the
 container recreated (a deploy, or `down && up -d`): `docker-compose restart` keeps the old
 environment.
@@ -302,8 +306,8 @@ events. A `cp` of the live file would be unsafe: its WAL holds events the main f
 not have yet.
 
 It then copies the folders the snapshot's sets with an owner live in, the sets players
-published, into `stats/backups/gamefiles/<dir>/`. The author's folders are not copied:
-they are uploaded by hand, from the author's own copy. A player's folder is whole before
+published, into `stats/backups/gamefiles/<dir>/`. The site's folders, with no owner, are not
+copied: the author uploads them by hand, from their own copy. A player's folder is whole before
 its row is written and never changes after, so each is copied once, through a `.partial`
 name renamed when whole, and kept for good, a deleted set's included, since a snapshot
 still names it. It prints one JSON line, `backup_ok` with the folders copied and the
@@ -321,7 +325,7 @@ harmless, but in a script fed over `ssh` it swallows the rest of the script.
 `ls ~/csbweb/stats/backups/` is the check that the job runs: an empty or missing folder
 means it does not. `tools/dump-server.ts` asserts the script against a running server: the
 snapshot holds the events still in the WAL, the server keeps serving, and a missing store
-exits 1; a player's folder is copied whole, the author's not, the next run keeps the copy,
+exits 1; a player's folder is copied whole, the site's not, the next run keeps the copy,
 and a player's folder that is not there exits 1.
 
 `utils/pull-backups.sh` copies `stats/backups/` off the VPS, the snapshots and the players' folders, with `rsync`, into

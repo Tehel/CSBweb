@@ -11,8 +11,9 @@
  *     folder it names that is not there stops it too;
  *   - `/api/data-sets`: the table's approved sets, as a manifest the page's parser reads
  *     as the one that filled it, as JSON, not cached, read at each request; a pending set
- *     offered, as pending, to its owner and the author only, as the `X-Player-Id` header
- *     names them, and no owner named; and the manifest not served as a file under
+ *     offered, as pending, to its owner and the moderators only, as the `X-Player-Id`
+ *     header names them, and no owner named; `"moderator": true` said to each of two
+ *     moderators, and to nobody else; and the manifest not served as a file under
  *     `gamefiles/`;
  *   - `/` and `/assets/…`: the page, `no-cache`, and the hashed files, `immutable`, the
  *     fonts as `font/ttf` and `font/woff2`;
@@ -25,14 +26,14 @@
  *     one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
  *     forwarded address, 429; `/api/stats`: the store's aggregates, not cached;
  *   - `server.ts` itself, as Node runs it: a bad mount, a store it cannot open or an
- *     `AUTHOR_PLAYER_ID` that is not a `playerId` exits 1
- *     before it listens, and SIGTERM stops a listening server with 0, the store made, its
+ *     entry of `MODERATOR_PLAYER_IDS` that is not a `playerId` exits 1
+ *     before it listens; a list of two, spaces around the comma, makes both moderators; and SIGTERM stops a listening server with 0, the store made, its
  *     table filled, and its WAL checkpointed; started again without a manifest, it plays
  *     from the table;
  *   - `backup.ts`, run beside that server: a snapshot in `backups/` holding the events
  *     still in the WAL and the data sets, the server serving throughout, and exit 1 on a
  *     missing store; the folder of a set with an owner copied whole into
- *     `backups/gamefiles/`, the author's not, kept by the next run rather than copied
+ *     `backups/gamefiles/`, the site's not, kept by the next run rather than copied
  *     again, and exit 1 on an owned set whose folder is not there.
  *
  * Usage: npx tsx tools/dump-server.ts
@@ -260,13 +261,18 @@ async function checkTableRead(port: number, db: DatabaseSync, manifest: string):
     check(parsed(anyone.answer.body) === parsed(manifest), 'a pending set is left out of the answer to a page that names no player');
     check(anyone.answer.headers.vary === PLAYER_ID_HEADER, `the answer varies with ${PLAYER_ID_HEADER} (Vary: ${anyone.answer.headers.vary})`);
     check(parsed((await as(OTHER)).answer.body) === parsed(manifest), 'and to another player');
-    check(parsed((await as(AUTHOR.toUpperCase())).answer.body) === parsed(manifest), 'and to the author\'s id in another form: a playerId is lowercase');
+    check(parsed((await as(MODERATORS[0].toUpperCase())).answer.body) === parsed(manifest), 'and to a moderator\'s id in another form: a playerId is lowercase');
     const owner = await as(PLAYER);
     console.log(`  to its owner: ${owner.answer.body}`);
     check(owner.sets.map((set) => `${set.id}${set.pending ? ' pending' : ''}`).join() === 'a,p pending', 'its owner is offered it, in its place, and told it is pending');
     check(!owner.answer.body.includes(PLAYER) && !owner.answer.body.includes('owner'), 'the answer names no owner, nor any playerId');
-    const author = await as(AUTHOR);
-    check(author.sets.map((set) => `${set.id}${set.pending ? ' pending' : ''}`).join() === 'a,p pending', 'the author is offered every set, another player\'s pending one too');
+    for (const [i, moderator] of MODERATORS.entries()) {
+        const asked = await as(moderator);
+        console.log(`  to moderator ${i + 1}: ${asked.answer.body}`);
+        check(asked.sets.map((set) => `${set.id}${set.pending ? ' pending' : ''}`).join() === 'a,p pending' && JSON.parse(asked.answer.body).moderator === true,
+            `moderator ${i + 1} is offered every set, another player's pending one too, and told they moderate`);
+    }
+    check(!anyone.answer.body.includes('moderator') && !owner.answer.body.includes('moderator'), 'nobody else is told so, not even the set\'s owner');
     check((await post('p')).status === 204, 'and its events are taken');
     insert.run('b', 'B', 'set-a', 2, 'approved', null, 1);
     const approved = parseManifest((await ask(port, '/api/data-sets')).body, '');
@@ -280,8 +286,8 @@ async function checkTableRead(port: number, db: DatabaseSync, manifest: string):
 const PLAYER = '00000000-0000-4000-8000-000000000000';
 /** Another player, who owns nothing. */
 const OTHER = '11111111-1111-4111-8111-111111111111';
-/** The scratch server's `AUTHOR_PLAYER_ID`. */
-const AUTHOR = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+/** The scratch server's `MODERATOR_PLAYER_IDS`. */
+const MODERATORS = ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'] as const;
 /** The scratch server's rate limit: events per address and window. */
 const EVENTS_PER_WINDOW = 5;
 
@@ -367,30 +373,34 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     const badStore = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: options.distDir }));
     console.log(`  bad store: exit ${badStore.code}, ${firstLine(badStore.out).replace(scratch, '<scratch>')}`);
     check(badStore.code === 1 && badStore.out.includes('Not starting:'), 'a store it cannot open exits 1 before it listens');
-    const badAuthor = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: join(scratch, 'author', 'stats.db'), AUTHOR_PLAYER_ID: 'the-author' }));
-    console.log(`  bad author: exit ${badAuthor.code}, ${firstLine(badAuthor.out)}`);
-    check(badAuthor.code === 1 && badAuthor.out.includes('AUTHOR_PLAYER_ID is not a playerId') && !existsSync(join(scratch, 'author')),
-        'an AUTHOR_PLAYER_ID that is not a playerId exits 1 before it opens the store');
+    const badModerator = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: join(scratch, 'moderator', 'stats.db'), MODERATOR_PLAYER_IDS: `${MODERATORS[0]},the-moderator` }));
+    console.log(`  bad moderator: exit ${badModerator.code}, ${firstLine(badModerator.out)}`);
+    check(badModerator.code === 1 && badModerator.out.includes('MODERATOR_PLAYER_IDS holds an entry that is not a playerId') && !existsSync(join(scratch, 'moderator')),
+        'a MODERATOR_PLAYER_IDS entry that is not a playerId exits 1 before it opens the store');
 
     let healthy = false;
     let walHeld = false;
     let backedUp: Backup | null = null;
     let again: { code: number | null; out: string } | null = null;
     let noFolder: { code: number | null; out: string } | null = null;
-    const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: statsDb });
+    let moderated = '';
+    const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: statsDb,
+        MODERATOR_PLAYER_IDS: ` ${MODERATORS[0]} , ${MODERATORS[1]} ` });
     const ended = finish(child, (line) => {
         const listening = /^Listening on port (\d+)/.exec(line);
         if (!listening) return;
         const port = Number(listening[1]);
         (async () => {
             healthy = (await ask(port, '/api/health')).status === 200;
+            const told = async (player: string) => JSON.parse((await ask(port, '/api/data-sets', 'GET', { [PLAYER_ID_HEADER]: player })).body).moderator === true;
+            moderated = `${await told(MODERATORS[0])},${await told(MODERATORS[1])},${await told(PLAYER)}`;
             // Three events, which the running server holds in its WAL, then a backup beside it.
             for (let i = 0; i < 3; i++) {
                 await ask(port, '/api/event', 'POST', { 'Content-Type': 'text/plain;charset=UTF-8' },
                     JSON.stringify({ type: 'started', player: PLAYER, set: 'a', playthrough: 100 + i, build: 'test', payload: {} }));
             }
             walHeld = existsSync(`${statsDb}-wal`) && statSync(`${statsDb}-wal`).size > 0;
-            // A player's set, uploaded beside the author's while the server runs.
+            // A player's set, uploaded beside the site's while the server runs.
             mkdirSync(join(options.gamefilesDir, 'set-b', 'sub'), { recursive: true });
             writeFileSync(join(options.gamefilesDir, 'set-b', 'sub', 'dungeon.dat'), Buffer.from([5, 6, 7]));
             const store = openStore(statsDb);
@@ -416,6 +426,8 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
         if (!line.includes('ExperimentalWarning') && !line.includes('--trace-warnings')) console.log(`  | ${line.split(scratch).join('<scratch>')}`);
     }
     check(healthy, 'it listens on the PORT given, 0 for a free one, and answers /api/health');
+    console.log(`  moderator, as the two and a player: ${moderated}`);
+    check(moderated === 'true,true,false', 'MODERATOR_PLAYER_IDS, two ids and spaces around the comma, makes both moderators, and nobody else');
     const backup = backedUp as Backup | null;
     const shown = (run: { code: number | null; out: string } | null) => `exit ${run?.code}, ${firstLine(run?.out ?? '').split(scratch).join('<scratch>').replace(/stats-[\dTZ-]+\.db/, 'stats-<date>.db').replace(/"bytes":\d+/, '"bytes":<n>')}`;
     console.log(`  backup.ts: ${shown(backup)}`);
@@ -428,7 +440,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     const copy = join(folders, 'set-b', 'sub', 'dungeon.dat');
     check((backup?.out ?? '').includes('"copied":["set-b"],"kept":0') && existsSync(copy) && readFileSync(copy).equals(Buffer.from([5, 6, 7])),
         'the folder of the set with an owner is copied whole into backups/gamefiles/');
-    check(!existsSync(join(folders, 'set-a')) && !existsSync(join(folders, 'set-b.partial')), 'the author\'s is not, and no .partial is left');
+    check(!existsSync(join(folders, 'set-a')) && !existsSync(join(folders, 'set-b.partial')), 'the site\'s is not, and no .partial is left');
     const second = again as { code: number | null; out: string } | null;
     console.log(`  backup.ts again: ${shown(second)}`);
     check(second?.code === 0 && second.out.includes('"copied":[],"kept":1'), 'the next backup keeps that copy rather than copying it again');
@@ -467,7 +479,7 @@ async function main(): Promise<void> {
         const manifest = readFileSync(options.manifestFile, 'utf8');
         const api: ApiOptions = {
             dataSets,
-            authorPlayerId: AUTHOR,
+            moderatorPlayerIds: MODERATORS,
             store,
             rules: { hasSet: (id) => dataSets.hasSet(id) },
             rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),

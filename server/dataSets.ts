@@ -5,11 +5,12 @@
  * each request (`app.ts`), so a set added while the server runs is offered at once.
  *
  * A set is approved or pending. An approved set is offered to everyone; a pending one, a
- * player's upload, to its owner and the author only (`manifestText`). Ownership rests on
- * the `playerId` alone, a secret (`src/ui/gameEvents.ts`), so no answer holds one.
+ * player's upload, to its owner and the moderators only (`manifestText`). Ownership, and
+ * moderation, rest on the `playerId` alone, a secret (`src/ui/gameEvents.ts`), so no answer
+ * holds one.
  *
  * An empty table is filled once, at start-up, from the manifest (`checkFiles`, `app.ts`),
- * every set the author's, and approved unless it says `"status": "pending"`. After that the
+ * every set the site's, with no owner, and approved unless it says `"status": "pending"`. After that the
  * server reads no manifest file.
  */
 import { timingSafeEqual } from 'node:crypto';
@@ -24,7 +25,7 @@ CREATE TABLE IF NOT EXISTS data_sets (
     dir          TEXT    NOT NULL,     -- its folder, relative to GAMEFILES_DIR
     position     INTEGER NOT NULL UNIQUE,  -- its place in the list, ascending
     status       TEXT    NOT NULL CHECK (status IN ('approved', 'pending')),
-    owner        TEXT,                 -- its uploader's playerId, NULL for the author's
+    owner        TEXT,                 -- its uploader's playerId, NULL for the site's
     csb_graphics INTEGER NOT NULL DEFAULT 0,  -- DataSet's flags, 0 or 1
     mini_dat     INTEGER NOT NULL DEFAULT 0,
     hint_oracle  INTEGER NOT NULL DEFAULT 0,
@@ -47,10 +48,10 @@ const FLAG_COLUMNS: readonly (readonly [Flag, string])[] = [
 
 /**
  * A row: the set, its folder relative to `GAMEFILES_DIR`, and who may see it: everyone, or
- * while it is `pending` (the `status` column's `'pending'`), its owner and the author.
+ * while it is `pending` (the `status` column's `'pending'`), its owner and the moderators.
  */
 export interface StoredDataSet extends DataSet {
-    /** Its uploader's `playerId`, `null` for the author's. */
+    /** Its uploader's `playerId`, `null` for the site's: the manifest's, uploaded by hand. */
     owner: string | null;
 }
 
@@ -58,12 +59,12 @@ export interface StoredDataSet extends DataSet {
 export interface DataSetViewer {
     /** Their `playerId`, from the request's `PLAYER_ID_HEADER`, or `null` for none or a malformed one. */
     playerId: string | null;
-    /** Whether that id is the author's, the server's `AUTHOR_PLAYER_ID`. */
-    author: boolean;
+    /** Whether that id is a moderator's, one of the server's `MODERATOR_PLAYER_IDS`. */
+    moderator: boolean;
 }
 
-/** Everyone: no `playerId`, not the author. */
-export const ANYONE: DataSetViewer = { playerId: null, author: false };
+/** Everyone: no `playerId`, not a moderator. */
+export const ANYONE: DataSetViewer = { playerId: null, moderator: false };
 
 /** Both tables, read. */
 export interface StoredDataSets {
@@ -106,7 +107,7 @@ export class DataSetStore {
 
     /**
      * Fills the empty tables from `manifest`, parsed with its folders relative to
-     * `GAMEFILES_DIR` (`parseManifest(text, '')`): every set the author's, approved unless it
+     * `GAMEFILES_DIR` (`parseManifest(text, '')`): every set the site's, approved unless it
      * says it is pending, in the manifest's order. All of it or nothing.
      */
     fill(manifest: DataSetManifest): void {
@@ -143,12 +144,13 @@ export class DataSetStore {
 /**
  * The answer to `api/data-sets` for `viewer`: the sets of `stored` they may see, as a
  * manifest `parseManifest` reads. Everyone sees the approved sets, a player also their own
- * pending ones, and the author every set. A pending set says `"status": "pending"`, and no
+ * pending ones, and a moderator every set. A pending set says `"status": "pending"`, and no
  * set says its owner. A `dir` is left out where it is the id, and a flag where it is false,
- * as the repository's manifest does.
+ * as the repository's manifest does. A moderator's answer says `"moderator": true`, so that
+ * the page shows them the hidden sets too: it tells them nothing they do not hold.
  */
 export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): string {
-    const visible = (set: StoredDataSet) => !set.pending || viewer.author
+    const visible = (set: StoredDataSet) => !set.pending || viewer.moderator
         || (viewer.playerId !== null && set.owner !== null && samePlayerId(set.owner, viewer.playerId));
     const dataSets = stored.dataSets.filter(visible).map((set) => {
         const entry: Record<string, string | boolean> = { id: set.id, name: set.name };
@@ -157,7 +159,7 @@ export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): str
         if (set.pending) entry.status = 'pending';
         return entry;
     });
-    return JSON.stringify({ default: stored.defaultId, swoosh: stored.swooshDir, dataSets });
+    return JSON.stringify({ default: stored.defaultId, swoosh: stored.swooshDir, ...(viewer.moderator ? { moderator: true } : {}), dataSets });
 }
 
 /** Whether two `playerId`s are the same, compared in a time that does not say how much of them matches. */

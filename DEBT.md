@@ -30,7 +30,7 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it and deletes it; what is left
-is publishing it, and moderating what is published (P9, P8). They are not CSBWin features but the page's, and come before every other
+is publishing it, and moderating what is published (P8). They are not CSBWin features but the page's, and come before every other
 tier.
 
 **Before the rest, at the author's request: U — the interface in the canvas.** The
@@ -113,8 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P9 | Moderators, and the sets only they see | S | ⏳ |
-| P8 | Publishing a local set, and moderating it | L | ⏳ after P9 |
+| P8 | Publishing a local set, and moderating it | L | ⏳ |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
@@ -243,8 +242,12 @@ those saves in one transaction (`BrowserDataSetStore.remove`).
 
 The server lists the site's sets from its store (`server/dataSets.ts`, `doc/DEPLOYMENT.md`
 → "The game files and the manifest"): each row approved or pending, with its owner's
-`playerId` or none for the author's, `api/data-sets` answering each player the sets they
-may see. Its `gamefiles/` is mounted read-write, and `server/backup.ts` copies the folders
+`playerId` or none for the site's, `api/data-sets` answering each player the sets they
+may see. Its moderators are the `playerId`s `MODERATOR_PLAYER_IDS` lists: they are offered
+every set, told so (`"moderator": true`, `DataSetManifest.moderator`), and the welcome page
+lists them the hidden sets too (`chooserSets`). A tile's name says its set's state: cyan
+local, red pending, purple hidden (the one colour of the page outside the UI palette),
+white otherwise. Its `gamefiles/` is mounted read-write, and `server/backup.ts` copies the folders
 of the sets with an owner beside the store's snapshots.
 
 The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase letters, digits, `.`, `-` and
@@ -264,42 +267,16 @@ Decisions taken with the author, for every row:
 - **The `playerId` is a secret** (`src/ui/gameEvents.ts`). Ownership on the server rests on
   it alone, so the server never returns one, writes one in its logs or takes one in a URL's
   query. A lost id is handled by hand on the forum for now.
+- **Moderators, not one author**, so that the burden can be shared. A set with no owner
+  (the manifest's, uploaded by hand) is the site's, not a moderator's.
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
 
-### P9 ⏳ Moderators, and the sets only they see
-
-S, before P8, whose endpoint it gates. Decided with the author:
-
-- **Moderators, not one author.** `AUTHOR_PLAYER_ID` (`server/server.ts`, `server/app.ts`)
-  becomes `MODERATOR_PLAYER_IDS`, a comma-separated list of `playerId`s, so that the
-  burden can be shared: spaces around a comma are ignored, unset or empty is no moderator,
-  and an entry that is not a `playerId` stops the start. `DataSetViewer.author`
-  (`server/dataSets.ts`) becomes `moderator`. A set with no owner (`owner` NULL, the
-  manifest's, uploaded by hand) is the site's, not a moderator's.
-- **A moderator sees every set in the grid**, hidden and pending included. The answer to
-  `api/data-sets` says `"moderator": true` at its top level, to a moderator only, which
-  `parseManifest` reads into the manifest, and `chooserSets` then keeps the hidden sets.
-  It tells the asker nothing they do not hold: their own id is a moderator's.
-- **A tile's name says its set's state**: cyan for a local set (`--p4`, as now), red for a
-  pending one (needs attention: the UI palette's entry 8, `0700`, `#fc0000`), purple for a
-  hidden one, white otherwise (`--p15`). A pending set is red to its owner too, and red
-  wins over purple. The UI palette (graphics.dat palette 552, entry 0) holds no purple:
-  its colours are greys, browns, cyan, two greens, red, gold, flesh, yellow and blue
-  (`0007`, unreadable on black). Purple is therefore the one colour of the welcome page
-  outside it, said so in `welcomePage.css`: an Atari colour of cyan's intensity, `0606`
-  (`#d800d8`).
-- Evidence: `tools/dump-server.ts` (a list of two, each seeing every set and
-  `"moderator": true`, nobody else either; a malformed entry refusing the start),
-  `tools/dump-data-sets.ts` (the parser's flag, `chooserSets` with and without it), and
-  a `tools/probe-frames.mjs` block for the four colours. `doc/DEPLOYMENT.md` says the
-  `.env`'s new variable.
-
 ### P8 ⏳ Publishing a local set, and moderating it
 
-L, after P9, in five steps (below); none is taken yet.
+L, in five steps (below); none is taken yet.
 
-**The lifecycle.** A set is in one of four states, which its tile's name says (P9):
+**The lifecycle.** A set is in one of four states, which its tile's name says (`src/ui/welcomePage.ts`):
 
 | State | Kept | Seen by | Name |
 | --- | --- | --- | --- |

@@ -23,11 +23,14 @@
  * `swoosh`, the FTL logo's folder, may be `null` or left out. The flags `csbGraphics`,
  * `miniDat`, `hintOracle`, `dmRules` and `hidden` may each be left out, for `false`, and the manifest
  * names one only where it is true. A set with `"hidden": true` is left out of the welcome
- * page's grid (`chooserSets`) and plays all the same by its `?dungeon=`.
+ * page's grid (`chooserSets`), but for a moderator, and plays all the same by its `?dungeon=`.
  *
  * A set's `status` may be `"pending"`, for a set uploaded and not yet approved, which the
- * server offers its owner and the author only (`server/dataSets.ts`), or `"approved"`, or
+ * server offers its owner and the moderators only (`server/dataSets.ts`), or `"approved"`, or
  * be left out, for `"approved"`.
+ *
+ * `"moderator": true` says that the player asking is one of the site's moderators, which
+ * only the server's answer to a moderator says; it may be left out, for `false`.
  *
  * A set's folder may also hold its thumbnail, `<id>-thumbnail.png` (`thumbnailPath`): the
  * last frame of its title, which the welcome page's tile shows. `tools/gen-thumbnails.ts`
@@ -82,8 +85,8 @@ export interface DataSet {
      */
     hidden: boolean;
     /**
-     * Whether it awaits the author's approval: the manifest's `"status": "pending"`. The
-     * server offers such a set to its owner and the author only. A local set is not.
+     * Whether it awaits a moderator's approval: the manifest's `"status": "pending"`. The
+     * server offers such a set to its owner and the moderators only. A local set is not.
      */
     pending: boolean;
     /**
@@ -110,6 +113,11 @@ export interface DataSetManifest {
      * (`src/data/SwooshLoader.ts`), or `null` where the manifest names none.
      */
     swooshDir: string | null;
+    /**
+     * Whether the player asking is a moderator: the manifest's `"moderator": true`. The
+     * welcome page then lists the hidden sets too (`chooserSets`).
+     */
+    moderator: boolean;
 }
 
 /**
@@ -147,7 +155,7 @@ export function parseManifest(text: string, base: string): DataSetManifest {
         throw manifestError(`it is not JSON (${error instanceof Error ? error.message : String(error)})`);
     }
     if (!isRecord(json)) throw manifestError('it is not an object');
-    const { dataSets: list, default: defaultId, swoosh } = json;
+    const { dataSets: list, default: defaultId, swoosh, moderator = false } = json;
     if (!Array.isArray(list) || list.length === 0) throw manifestError('"dataSets" is not a list of data sets');
 
     const dataSets = list.map((entry: unknown, i): DataSet => {
@@ -176,15 +184,16 @@ export function parseManifest(text: string, base: string): DataSetManifest {
     if (swoosh !== undefined && swoosh !== null && !isFolder(swoosh)) {
         throw manifestError('"swoosh" is neither null nor a folder relative to the manifest');
     }
-    return { dataSets, defaultSet, swooshDir: isFolder(swoosh) ? under(base, swoosh) : null };
+    if (typeof moderator !== 'boolean') throw manifestError('"moderator" is neither true nor false');
+    return { dataSets, defaultSet, swooshDir: isFolder(swoosh) ? under(base, swoosh) : null, moderator };
 }
 
 /**
- * The sets the welcome page lists, in the manifest's order: every set but the hidden ones.
- * The page orders them itself (`src/ui/welcomePage.ts`).
+ * The sets the welcome page lists, in the manifest's order: every set but the hidden ones,
+ * or every set for a moderator. The page orders them itself (`src/ui/welcomePage.ts`).
  */
 export function chooserSets(manifest: DataSetManifest): DataSet[] {
-    return manifest.dataSets.filter((set) => !set.hidden);
+    return manifest.dataSets.filter((set) => !set.hidden || manifest.moderator);
 }
 
 /** The file of `set`'s thumbnail, in its folder: `dm-atari/dm-atari-thumbnail.png`. */

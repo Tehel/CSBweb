@@ -67,7 +67,15 @@ function checkParser(): void {
   check(listed === 'a,c', 'the welcome page leaves a hidden set out');
   check(dataSetNamed(hiding, 'b') === b, 'a hidden set is played by its ?dungeon=');
 
-  // A pending set: the server's answer to its owner and the author (`server/dataSets.ts`).
+  // A moderator's answer (`server/dataSets.ts`): the welcome page lists the hidden sets too.
+  const moderating = parseManifest(manifest({ moderator: true, dataSets: [set(), set({ id: 'b', dir: 'b', hidden: true })] }), '');
+  const moderated = chooserSets(moderating).map((s) => s.id).join(',');
+  console.log(`  moderator: ${hiding.moderator} without the flag, ${moderating.moderator} with it; the welcome page lists ${moderated}`);
+  check(!hiding.moderator && !parseManifest(manifest({ moderator: false }), '').moderator && moderating.moderator,
+    '"moderator" is read as written, and left out it is false');
+  check(moderated === 'a,b', 'to a moderator, the welcome page lists the hidden sets too');
+
+  // A pending set: the server's answer to its owner and the moderators (`server/dataSets.ts`).
   const statuses = parseManifest(manifest({ dataSets: [set(), set({ id: 'b', status: 'pending' }), set({ id: 'c', status: 'approved' })] }), '');
   console.log(`  status: ${statuses.dataSets.map((s) => `${s.id} ${s.pending ? 'pending' : 'approved'}`).join(', ')}`);
   check(statuses.dataSets.map((s) => s.pending).join() === 'false,true,false', '"status" is read as written, and left out it is "approved"');
@@ -87,6 +95,7 @@ function checkParser(): void {
     [manifest({ dataSets: [set({ hidden: 'yes' })] }), `data set 'a' has a "hidden" that is neither true nor false`],
     [manifest({ dataSets: [set({ status: 'waiting' })] }), `data set 'a' has a "status" that is neither "approved" nor "pending"`],
     [manifest({ dataSets: [set(), set({ dir: 'b' })] }), `two data sets are 'a'`],
+    [manifest({ moderator: 'yes' }), '"moderator" is neither true nor false'],
     [manifest({ default: 'b' }), '"default" names none'],
     [manifest({ default: undefined }), '"default" names none'],
     [manifest({ swoosh: '..' }), '"swoosh" is neither null nor a folder'],

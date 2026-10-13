@@ -31,7 +31,8 @@
 // tap and a click, the screen and the effect sized and placed in it, at 16:10 and at 4:3,
 // in it and out of it, and the welcome
 // page: its tiles and their order, its fonts, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
-// straight into play, and its form adding, editing and deleting a player's own set. See `check` below.
+// straight into play, its form adding, editing and deleting a player's own set, and each
+// tile's name in its set's state's colour, to a moderator. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -52,7 +53,7 @@
 // This is the closest thing the project has to a rendering test (PLAN.md Phase 15) — it
 // caught nothing during the Phase 14 split, which is exactly what it was there to do.
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { BUILD_PARTY } from './lib/buildParty.mjs';
 import { encodeFrame } from './lib/frames.mjs';
@@ -69,9 +70,12 @@ let id = 0;
 const pending = new Map();
 const logs = [];
 const downloads = [];
+// What answers a request `Fetch.enable` paused, while a block stands in for the server.
+let onPaused = null;
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
   if (m.method === 'Browser.downloadWillBegin') downloads.push(m.params.suggestedFilename);
+  if (m.method === 'Fetch.requestPaused') onPaused?.(m.params);
   if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
   if (m.method === 'Runtime.consoleAPICalled' && ['error','warning'].includes(m.params.type))
     logs.push(m.params.type + ': ' + m.params.args.map(a => a.value ?? a.description).join(' '));
@@ -577,6 +581,29 @@ const deleted = { dialog: await confirmation(), form: await form(), store: await
 check(deleted.dialog === null && deleted.form === null && deleted.store.name === null && deleted.store.saves === decodeURIComponent(saveId)
   && deleted.page.tiles === atWelcome.tiles,
   'its DELETE removes the record and every save filed under its id, and the page shows the sets without it');
+// A tile's name says its set's state, to a moderator (`server/dataSets.ts`), whose answer
+// the dev server's manifest stands in for here, with `"moderator": true`, kids-dungeon
+// pending and 3d2d1d, a hidden set, pending too: every set is listed, the hidden ones
+// included, a pending one's name red, palette entry 8, a hidden one's purple, red winning,
+// and the others' white. A local set's cyan is checked above.
+const moderated = JSON.parse(readFileSync(new URL('data-sets.json', import.meta.url), 'utf8'));
+moderated.moderator = true;
+for (const set of moderated.dataSets) if (set.id === 'kids-dungeon' || set.id === '3d2d1d') set.status = 'pending';
+onPaused = ({ requestId }) => send('Fetch.fulfillRequest', { requestId, responseCode: 200,
+  responseHeaders: [{ name: 'Content-Type', value: 'application/json; charset=utf-8' }],
+  body: Buffer.from(JSON.stringify(moderated)).toString('base64') });
+await send('Fetch.enable', { patterns: [{ urlPattern: '*/api/data-sets*' }] });
+await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
+await wait(2500);
+await send('Fetch.disable');
+onPaused = null;
+const states = await evaluate(`Object.fromEntries([...document.querySelectorAll('.pick[data-set]')]
+  .map(t=>[t.dataset.set, getComputedStyle(t.querySelector('.pick-name')).color]))`);
+console.log('  to a moderator:', JSON.stringify(states));
+const colourOf = (set) => set.status === 'pending' ? 'rgb(252, 0, 0)' : set.hidden ? 'rgb(216, 0, 216)' : 'rgb(252, 252, 252)';
+check(Object.keys(states).sort().join() === moderated.dataSets.map((set) => set.id).sort().join()
+  && moderated.dataSets.every((set) => states[set.id] === colourOf(set)),
+  "to a moderator, every set is listed, the hidden ones too, a pending set's name red, a hidden one's purple, red winning, the others' white");
 await clickOn('.pick[data-set="dm-atari"]');
 await clickOn('#welcome-play');
 await wait(9000);

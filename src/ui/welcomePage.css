@@ -1,6 +1,7 @@
 /* The welcome page (`src/ui/welcomePage.ts`), in the design kit's look: every colour an
-   entry of the game's UI palette (graphics.dat palette 552, entry 0), the bevels graphic
-   0's at three screen pixels to one. */
+   entry of the game's UI palette (graphics.dat palette 552, entry 0) but one, a hidden
+   set's purple, which it lacks (`--purple`), the bevels graphic 0's at three screen pixels
+   to one. */
 
 /* The faces, served with the page. The game's: the original Dungeon Master's font,
    dm-atari's graphics.dat item 0x22d, made a TrueType font by `tools/gen-font.ts`.
@@ -31,7 +32,10 @@
 body.welcome {
     --p0: #000000; --p1: #6c6c6c; --p2: #909090; --p3: #6c2400; --p4: #00d8d8;
     --p5: #904800; --p7: #00d800; --p9: #fcb400; --p10: #d8906c;
-    --p11: #fcfc00; --p12: #484848; --p13: #b4b4b4; --p15: #fcfcfc;
+    --p8: #fc0000; --p11: #fcfc00; --p12: #484848; --p13: #b4b4b4; --p15: #fcfcfc;
+    /* The one colour outside the UI palette, which holds no purple: an Atari 0606, of
+       cyan's intensity, for a hidden set's name. */
+    --purple: #d800d8;
     --navy: #000048;
     display: block;
     padding: 0;
@@ -130,8 +134,11 @@ body.welcome {
 .pick-edit:hover { border-color: var(--p9); }
 .pick-edit:focus-visible { outline: 3px solid var(--p11); outline-offset: 3px; }
 .pick-name { color: var(--p15); padding: 0 3px; }
-/* A player's own set, its name in cyan. */
+/* A tile's name says its set's state: a player's own in cyan, a hidden one (shown to a
+   moderator) in purple, and a pending one in red, which wins over purple. */
 .pick.local .pick-name { color: var(--p4); }
+.pick.hidden .pick-name { color: var(--purple); }
+.pick.pending .pick-name { color: var(--p8); }
 .pick-saves { padding: 0 3px 3px; }
 .pick-saves { color: var(--p2); }
 .pick:not(.dim) .pick-saves { color: var(--p7); }

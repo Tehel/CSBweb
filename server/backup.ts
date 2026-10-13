@@ -13,7 +13,7 @@
  * and `node:alpine` has no `sqlite3`. `node:sqlite`'s `backup` copies the database as a
  * connection sees it, WAL included, into one self-contained file.
  *
- * The folders are those of the snapshot's sets that have an owner: the author's are
+ * The folders are those of the snapshot's sets that have an owner: the site's are
  * uploaded by hand, and kept where they came from. A set's folder is complete before its row
  * is written, and never changes after, so each is copied once, into `gamefiles/<dir>/` under
  * `BACKUP_DIR`, through a `.partial` name renamed when whole, and kept: an older snapshot
