@@ -193,9 +193,9 @@ console.log('\n=== 3. the controls ===');
   let updates = 0;
   ui.settings.subscribe(() => updates++);
   updates = 0;
-  click(ui, settingButtonFrame(0));
+  click(ui, settingButtonFrame(2));
   check(values().extras.gatherThrownWeapons && !values().extras.drinkAtFountain, 'GATHER THROWN WEAPONS\' button turns that extra on, alone');
-  click(ui, settingButtonFrame(0));
+  click(ui, settingButtonFrame(2));
   check(updates === 2 && !values().extras.gatherThrownWeapons, 'a click on it pressed turns it off');
   click(ui, settingButtonFrame(3));
   check(values().mapView, 'MAP VIEW\'s button, below COLOUR NEW MASTERY\'s, turns the map on');
@@ -246,19 +246,33 @@ console.log('\n=== 3. the controls ===');
   openSettingsDialog(ui);
   click(ui, CLOSE_FRAME);
   check(!isDialogOpen(ui), 'CLOSE closes it');
+  // It opens again where it was closed: on its tab, KEYS' list scrolled as it was.
+  openSettingsDialog(ui);
+  click(ui, TAB_FRAMES[3]);
+  ui.settingsDialog!.keys.scrollTop = 6;
+  click(ui, CLOSE_FRAME);
+  openSettingsDialog(ui);
+  check(ui.settingsDialog!.tab === 'keys' && ui.settingsDialog!.keys.scrollTop === 6 && ui.settingsDialog!.keys.capture === null,
+    'closed on KEYS scrolled six rows, it opens there again, no slot waiting');
+  click(ui, TAB_FRAMES[2]);
+  settingsDialogKey(ui, 'Escape', 'Escape');
+  openSettingsDialog(ui);
+  check(ui.settingsDialog!.tab === 'sound' && ui.settingsDialog!.keys.scrollTop === 6, 'closed by Esc on SOUND, it opens on SOUND, KEYS still scrolled');
+  click(ui, CLOSE_FRAME);
+  check(freshUI().settingsDialogLast.tab === 'game', 'a new page opens it on GAME');
 
   const noWebGL = freshUI(false);
   openSettingsDialog(noWebGL);
   noWebGL.settingsDialog!.tab = 'display';
   const names = settingsDialogButtons(noWebGL, noWebGL.settingsDialog!).map((b) => b.name);
-  check(!names.includes('settings.button0') && !names.includes('settings.button1') && names.includes('settings.button3'),
+  check(!names.includes('settings.button3') && !names.includes('settings.button5') && names.includes('settings.button2'),
     'without WebGL, SCANLINES and SCREEN CURVE have no button in the list, and STARTUP ANIMATIONS has');
-  click(noWebGL, settingButtonFrame(0));
-  click(noWebGL, settingButtonFrame(1));
+  click(noWebGL, settingButtonFrame(3));
+  click(noWebGL, settingButtonFrame(5));
   check(!noWebGL.settings.values.scanlines && !noWebGL.settings.values.curve, 'and a click on either does nothing');
-  settingsDialogPointer(noWebGL, centre(settingButtonFrame(1)));
+  settingsDialogPointer(noWebGL, centre(settingButtonFrame(5)));
   check(helpText(noWebGL, noWebGL.settingsDialog!) === 'THE SCREEN CURVE NEEDS WEBGL', 'the help line says why');
-  settingsDialogPointer(noWebGL, centre(settingButtonFrame(0)));
+  settingsDialogPointer(noWebGL, centre(settingButtonFrame(3)));
   check(helpText(noWebGL, noWebGL.settingsDialog!) === 'THE SCANLINES NEED WEBGL', 'and of the scanlines');
   // Its label is grey, and not lit under the pointer; STARTUP ANIMATIONS', on, is lit.
   drawSettingsDialog(noWebGL);
@@ -269,19 +283,19 @@ console.log('\n=== 3. the controls ===');
     for (let y = face.y1; y <= face.y2; y++) for (let x = face.x1; x <= face.x2; x++) found.add(buf.pixels[y * buf.width + x]);
     return found;
   };
-  const crt = colours(settingButtonFrame(0));
-  const startup = colours(settingButtonFrame(3));
+  const crt = colours(settingButtonFrame(3));
+  const startup = colours(settingButtonFrame(2));
   check(crt.has(DIM_COLOR) && !crt.has(MENU_OPTION_COLOR) && !crt.has(LIT_COLOR), 'SCANLINES\' label is dim, under the pointer');
   check(startup.has(LIT_COLOR) && !startup.has(DIM_COLOR), 'STARTUP ANIMATIONS\', on, is pressed and lit');
 
-  // ASPECT RATIO, DISPLAY's last button: a choice of two, its button named for the one
+  // ASPECT RATIO, DISPLAY's second button: a choice of two, its button named for the one
   // chosen, raised at 16:10, the default, and pressed at 4:3; drawn as the kit draws a
   // button of that name and look.
   {
     const ui = freshUI();
     openSettingsDialog(ui);
     click(ui, TAB_FRAMES[1]);
-    const frame = settingButtonFrame(5);
+    const frame = settingButtonFrame(1);
     const face = (of: UIState) => {
       const r = buttonRect(frame);
       const buf = of.screenIndexBuffer;
@@ -311,9 +325,9 @@ console.log('\n=== 3. the controls ===');
     check(helpText(ui, ui.settingsDialog!) === 'SQUARE PIXELS, OR 4:3 AS ON AN ST MONITOR', 'the help line names both');
   }
 
-  // FULLSCREEN, DISPLAY's third button: the page's state, no setting.
-  check(!names.includes('settings.button2'), 'where the browser has no fullscreen, FULLSCREEN has no button in the list');
-  settingsDialogPointer(noWebGL, centre(settingButtonFrame(2)));
+  // FULLSCREEN, DISPLAY's first button: the page's state, no setting.
+  check(!names.includes('settings.button0'), 'where the browser has no fullscreen, FULLSCREEN has no button in the list');
+  settingsDialogPointer(noWebGL, centre(settingButtonFrame(0)));
   check(helpText(noWebGL, noWebGL.settingsDialog!) === 'THE BROWSER GIVES NO FULLSCREEN', 'and the help line says why');
   for (const keepsEscape of [true, false]) {
     const page = fakeFullscreen(keepsEscape);
@@ -323,7 +337,7 @@ console.log('\n=== 3. the controls ===');
     let changes = 0;
     full.settings.subscribe(() => changes++);
     changes = 0;
-    settingsDialogPointer(full, centre(settingButtonFrame(2)));
+    settingsDialogPointer(full, centre(settingButtonFrame(0)));
     const help = helpText(full, full.settingsDialog!);
     console.log(`  Esc ${keepsEscape ? 'kept' : 'not kept'}: "${help}"`);
     check(help === (keepsEscape ? 'THE WHOLE SCREEN: HOLD ESC DOWN TO LEAVE IT' : 'THE WHOLE SCREEN: ESC LEAVES IT'),
@@ -333,16 +347,16 @@ console.log('\n=== 3. the controls ===');
     const lit = () => {
       settingsDialogPointer(full, null);
       drawSettingsDialog(full);
-      const face = buttonRect(settingButtonFrame(2));
+      const face = buttonRect(settingButtonFrame(0));
       const buf = full.screenIndexBuffer;
       for (let y = face.y1; y <= face.y2; y++) for (let x = face.x1; x <= face.x2; x++) if (buf.pixels[y * buf.width + x] === LIT_COLOR) return true;
       return false;
     };
     check(!lit(), 'out of fullscreen, its button is raised');
-    click(full, settingButtonFrame(2));
+    click(full, settingButtonFrame(0));
     check(page.asked === 1 && page.isOn() && changes === 0, 'a click on FULLSCREEN asks the page, and changes no setting');
     check(lit(), 'in fullscreen, it is pressed and lit');
-    click(full, settingButtonFrame(2));
+    click(full, settingButtonFrame(0));
     check(page.asked === 2 && !page.isOn(), 'a second click asks the page out of it');
   }
 }
@@ -412,14 +426,14 @@ console.log('\n=== 4. the help line ===');
   openSettingsDialog(ui);
   const state = ui.settingsDialog!;
   check(helpText(ui, state) === '', 'with the pointer off the canvas it says nothing');
-  check(settingsDialogPointer(ui, centre(settingButtonFrame(1))), 'the pointer onto a setting\'s button changes it');
+  check(settingsDialogPointer(ui, centre(settingButtonFrame(0))), 'the pointer onto a setting\'s button changes it');
   console.log(`  "${helpText(ui, state)}"`);
-  check(helpText(ui, state) === TABS[0].settings[1].help, 'it names the setting under the pointer');
-  const drink = buttonRect(settingButtonFrame(1));
+  check(helpText(ui, state) === TABS[0].settings[0].help, 'it names the setting under the pointer');
+  const drink = buttonRect(settingButtonFrame(0));
   check(!settingsDialogPointer(ui, { x: drink.x1, y: drink.y1 }), 'a move within the button changes nothing');
-  check(settingsDialogPointer(ui, { x: settingButtonFrame(1).x1 + 2, y: centre(settingButtonFrame(1)).y }),
+  check(settingsDialogPointer(ui, { x: settingButtonFrame(0).x1 + 2, y: centre(settingButtonFrame(0)).y }),
     'onto its bevel, it changes: the button is no longer lit');
-  check(helpText(ui, state) === TABS[0].settings[1].help, 'and the help line still names the setting');
+  check(helpText(ui, state) === TABS[0].settings[0].help, 'and the help line still names the setting');
   check(settingsDialogPointer(ui, centre(settingButtonFrame(4))), 'onto the third line\'s button, it changes');
   check(helpText(ui, state) === TABS[0].settings[4].help, 'and names SEND STATISTICS');
   state.tab = 'sound';

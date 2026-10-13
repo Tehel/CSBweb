@@ -60,6 +60,10 @@
  * a slot. While it is up the clock is held, as under every dialog, and the game is left
  * as it was: no `TAG02076e`, nothing repacked or shaded.
  *
+ * It opens on GAME the first time, and after that where it was last closed: on its tab,
+ * KEYS' list scrolled as it was, no slot waiting (`UIState.settingsDialogLast`). That is
+ * kept for the page's life only, not with the settings.
+ *
  * ## The palette
  *
  * The screen is shown through the interface's palette whole while it is up
@@ -210,9 +214,9 @@ export const TABS: ReadonlyArray<{
     help: 'THE EXTRAS, THE VIEWS AND THE STATISTICS',
     buttons: true,
     settings: [
-      { name: 'GATHER THROWN WEAPONS', help: 'WALK OVER A THROWN WEAPON TAKES IT BACK', ...extra('gatherThrownWeapons') },
       { name: 'DRINK AT FOUNTAINS', help: 'AN EMPTY HAND ON A FOUNTAIN DRINKS FROM IT', ...extra('drinkAtFountain') },
       { name: 'HIGHLIGHT NEW MASTERY', help: 'A MASTERY JUST GAINED SHOWN IN COLOUR', ...extra('colourNewMastery') },
+      { name: 'GATHER THROWN WEAPONS', help: 'WALK OVER A THROWN WEAPON TAKES IT BACK', ...extra('gatherThrownWeapons') },
       {
         name: 'MAP VIEW',
         help: 'THE MAP: A LONG PRESS ON THE MESSAGES, OR ITS KEY',
@@ -243,22 +247,6 @@ export const TABS: ReadonlyArray<{
     buttons: true,
     settings: [
       {
-        name: 'SCANLINES',
-        help: 'THE LINES OF A TUBE, A DARK GAP BETWEEN THEM',
-        unavailable: { when: (ui) => !ui.isCrtAvailable(), help: 'THE SCANLINES NEED WEBGL' },
-        kind: 'toggle',
-        get: (values) => values.scanlines,
-        set: (_values, on) => ({ scanlines: on }),
-      },
-      {
-        name: 'SCREEN CURVE',
-        help: 'THE CURVED GLASS OF A TUBE',
-        unavailable: { when: (ui) => !ui.isCrtAvailable(), help: 'THE SCREEN CURVE NEEDS WEBGL' },
-        kind: 'toggle',
-        get: (values) => values.curve,
-        set: (_values, on) => ({ curve: on }),
-      },
-      {
         name: 'FULLSCREEN',
         help: 'THE WHOLE SCREEN: HOLD ESC DOWN TO LEAVE IT',
         variant: { when: (ui) => !ui.fullscreen.keepsEscape(), help: 'THE WHOLE SCREEN: ESC LEAVES IT' },
@@ -268,11 +256,27 @@ export const TABS: ReadonlyArray<{
         toggle: (ui) => ui.fullscreen.toggle(),
       },
       {
+        name: 'ASPECT RATIO 16:10',
+        onName: 'ASPECT RATIO 4:3',
+        help: 'SQUARE PIXELS, OR 4:3 AS ON AN ST MONITOR',
+        kind: 'toggle',
+        get: (values) => values.aspectRatio === '4:3',
+        set: (_values, on) => ({ aspectRatio: on ? '4:3' : '16:10' }),
+      },
+      {
         name: 'STARTUP ANIMATIONS',
         help: 'THE FTL LOGO AND THE TITLE BEFORE THE ENTRANCE',
         kind: 'toggle',
         get: (values) => values.startupAnimations,
         set: (_values, on) => ({ startupAnimations: on }),
+      },
+      {
+        name: 'SCANLINES',
+        help: 'THE LINES OF A TUBE, A DARK GAP BETWEEN THEM',
+        unavailable: { when: (ui) => !ui.isCrtAvailable(), help: 'THE SCANLINES NEED WEBGL' },
+        kind: 'toggle',
+        get: (values) => values.scanlines,
+        set: (_values, on) => ({ scanlines: on }),
       },
       {
         name: 'LEFT HANDED',
@@ -283,12 +287,12 @@ export const TABS: ReadonlyArray<{
         set: (_values, on) => ({ leftHanded: on }),
       },
       {
-        name: 'ASPECT RATIO 16:10',
-        onName: 'ASPECT RATIO 4:3',
-        help: 'SQUARE PIXELS, OR 4:3 AS ON AN ST MONITOR',
+        name: 'SCREEN CURVE',
+        help: 'THE CURVED GLASS OF A TUBE',
+        unavailable: { when: (ui) => !ui.isCrtAvailable(), help: 'THE SCREEN CURVE NEEDS WEBGL' },
         kind: 'toggle',
-        get: (values) => values.aspectRatio === '4:3',
-        set: (_values, on) => ({ aspectRatio: on ? '4:3' : '16:10' }),
+        get: (values) => values.curve,
+        set: (_values, on) => ({ curve: on }),
       },
     ],
   },
@@ -363,15 +367,19 @@ const SETTINGS_DIALOG: Dialog = {
   },
 };
 
-/** Put the dialog up, on GAME. Nothing, while another dialog is up. */
+/** Put the dialog up, where it was last closed (see "Opening and closing"). Nothing, while another dialog is up. */
 export function openSettingsDialog(ui: UIState): void {
   if (ui.dialog) return;
   openDialog(ui, SETTINGS_DIALOG);
-  ui.settingsDialog = { tab: 'game', pointer: ui.hoverPoint, sliding: null, keys: newKeysTabState(), exiting: false, press: null };
+  const { tab, scrollTop } = ui.settingsDialogLast;
+  const keys = { ...newKeysTabState(), scrollTop };
+  ui.settingsDialog = { tab, pointer: ui.hoverPoint, sliding: null, keys, exiting: false, press: null };
 }
 
 export function closeSettingsDialog(ui: UIState): void {
-  if (!ui.settingsDialog) return;
+  const state = ui.settingsDialog;
+  if (!state) return;
+  ui.settingsDialogLast = { tab: state.tab, scrollTop: state.keys.scrollTop };
   ui.settingsDialog = null;
   closeDialog(ui);
 }

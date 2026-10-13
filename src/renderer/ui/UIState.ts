@@ -23,7 +23,7 @@ import type { HintSquare } from '../intro/HintOracle';
 import type { HintOracleFiles } from './HintOracleButton';
 import type { ReincarnateState } from './ReIncarnate';
 import type { SaveMenuState } from './SaveMenu';
-import type { SettingsDialogState } from './SettingsDialog';
+import type { SettingsDialogState, SettingsTab } from './SettingsDialog';
 import type { MapDialogState } from './MapDialog';
 import type { ChampionDialogState } from './ChampionDialog';
 import type { Settings } from '../../settings/Settings';
@@ -113,6 +113,11 @@ export interface UIState {
   saveMenu: SaveMenuState | null;
   /** The settings dialog's state while it is the dialog (`src/renderer/ui/SettingsDialog.ts`). */
   settingsDialog: SettingsDialogState | null;
+  /**
+   * Where the settings dialog was when it last closed, its tab and KEYS' list scrolled:
+   * where it opens again, for the page's life and kept nowhere (`openSettingsDialog`).
+   */
+  settingsDialogLast: { readonly tab: SettingsTab; readonly scrollTop: number };
   /** The map dialog's state while it is the dialog (`src/renderer/ui/MapDialog.ts`). */
   mapDialog: MapDialogState | null;
   /** The champion dialog's state while it is the dialog (`src/renderer/ui/ChampionDialog.ts`). */
@@ -448,6 +453,7 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
     dialog: null,
     saveMenu: null,
     settingsDialog: null,
+    settingsDialogLast: { tab: 'game', scrollTop: 0 },
     mapDialog: null,
     championDialog: null,
     hintOracle: null,

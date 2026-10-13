@@ -229,10 +229,10 @@ const inventory = await shot('03-inventory');
 const hoverAt = (u, v) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   c.dispatchEvent(new PointerEvent('pointermove',{isPrimary:true,pointerType:'mouse',clientX:r.left+${u}*r.width,clientY:r.top+${v}*r.height,bubbles:true}));
   const p=window.__probe.screen.ui.hoverPoint; return p ? p.x+','+p.y : 'none';})()`);
-// DISPLAY's SCANLINES (85,65) and SCREEN CURVE (236,65), in the settings dialog: Esc
+// DISPLAY's SCANLINES (236,86) and SCREEN CURVE (236,107), in the settings dialog: Esc
 // opens it, the tab is DISPLAY (120,45), and Esc closes it again over the inventory.
-const SCANLINES = [85, 65];
-const CURVE = [236, 65];
+const SCANLINES = [236, 86];
+const CURVE = [236, 107];
 const toggleCrt = async ([x, y]) => {
   await key('Escape'); await wait(300);
   await canvasClick(120, 45, 0); await wait(300);
@@ -939,19 +939,19 @@ await key('Escape'); await wait(300);
 check(await settingsUp(), 'Esc opens the settings in play');
 const heldAt = await ticks(); await wait(1000);
 check(await ticks() === heldAt, 'the clock is held while they are up');
-await pointerAt(236, 65); await wait(200);
+await pointerAt(85, 65); await wait(200);
 console.log('state: settings, GAME');    await shot('21-settings-game');
 await leaveCanvas(); await wait(200);
 await canvasClick(120, 45, 0); await wait(300);
 console.log('state: settings, DISPLAY'); await shot('22-settings-display');
-// DISPLAY's ASPECT RATIO (236,107): 4:3 shows the 320x200 canvas 960x720, a click still
+// DISPLAY's ASPECT RATIO (236,65): 4:3 shows the 320x200 canvas 960x720, a click still
 // landing on what it shows, and 16:10 again 960x600.
 const canvasSize = () => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   return [c.width,c.height,r.width,r.height].join('x');})()`);
-await canvasClick(236, 107, 0); await wait(300);
+await canvasClick(236, 65, 0); await wait(300);
 check((await settingsValues()).aspectRatio === '4:3' && await canvasSize() === '320x200x960x720',
   'ASPECT RATIO at 4:3 shows the 320x200 canvas 960x720');
-await canvasClick(236, 107, 0); await wait(300);
+await canvasClick(236, 65, 0); await wait(300);
 check((await settingsValues()).aspectRatio === '16:10' && await canvasSize() === '320x200x960x600',
   'a click on it there, where it is shown, makes it 16:10, 960x600');
 await canvasClick(197, 45, 0); await wait(300);
@@ -1120,16 +1120,16 @@ const realKey = async (code) => {
 await key('Escape'); await wait(300);
 await canvasClick(120, 45, 0); await wait(300);
 await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
-await touch('touchStart', 85, 86); await touch('touchEnd', 85, 86); await wait(800);
+await touch('touchStart', 85, 65); await touch('touchEnd', 85, 65); await wait(800);
 check((await screenLayout()).element === 'game', 'a tap on FULLSCREEN puts #game in fullscreen, at the lift');
-await touch('touchStart', 85, 86); await touch('touchEnd', 85, 86); await wait(800);
+await touch('touchStart', 85, 65); await touch('touchEnd', 85, 65); await wait(800);
 check((await screenLayout()).element === null, 'and a second tap leaves it');
 await send('Emulation.setTouchEmulationEnabled', { enabled: false });
-await canvasClick(85, 65, 0); await wait(300);
-await canvasClick(236, 65, 0); await wait(300);
+await canvasClick(236, 86, 0); await wait(300);
+await canvasClick(236, 107, 0); await wait(300);
 const screenSize = (width, height) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
 await screenSize(1920, 1080); await wait(300);
-await cdpMouse('mousePressed', 85, 86); await cdpMouse('mouseReleased', 85, 86); await wait(800);
+await cdpMouse('mousePressed', 85, 65); await cdpMouse('mouseReleased', 85, 65); await wait(800);
 check((await screenLayout()).element === 'game', 'a mouse\'s press on FULLSCREEN, the CRT effect on, puts #game in fullscreen');
 for (const [width, height, expected] of [[1920, 1080, 5], [1366, 768, 3]]) {
   if (width !== 1920) { await screenSize(width, height); await wait(800); }
@@ -1145,7 +1145,7 @@ for (const [width, height, expected] of [[1920, 1080, 5], [1366, 768, 3]]) {
     'and is drawn at its size');
 }
 // At 4:3, the largest whole multiple of 320x240 that fits, centred, the effect over it.
-await canvasClick(236, 107, 0); await wait(500);
+await canvasClick(236, 65, 0); await wait(500);
 {
   const full = await screenLayout();
   const scale = Math.floor(Math.min(full.w * full.ratio / 320, full.h * full.ratio / 240));
@@ -1155,7 +1155,7 @@ await canvasClick(236, 107, 0); await wait(500);
     `at 4:3, the game canvas is 3 times 320x240, centred, the effect over it`);
 }
 check(await hoverAt(0.5, 0.5) === '160,100', 'at 4:3, the tube\'s middle is the screen\'s');
-await canvasClick(236, 107, 0); await wait(500);
+await canvasClick(236, 65, 0); await wait(500);
 check((await screenLayout()).game[3] === 600, 'and at 16:10 again, 3 times 320x200');
 check(await hoverAt(0.5, 0.5) === '160,100', 'in fullscreen, the tube\'s middle is the screen\'s');
 check(await hoverAt(0.002, 0.002) === '0,0', 'and a point of its black corner is the screen\'s corner');
@@ -1166,7 +1166,7 @@ check(!(await settingsUp()) && (await screenLayout()).element === 'game', 'a rea
 await realKey('Escape'); await wait(300);
 check(await settingsUp(), 'and a second opens them');
 await canvasClick(120, 45, 0); await wait(300);
-await cdpMouse('mousePressed', 85, 86); await cdpMouse('mouseReleased', 85, 86); await wait(800);
+await cdpMouse('mousePressed', 85, 65); await cdpMouse('mouseReleased', 85, 65); await wait(800);
 const windowed = await screenLayout();
 check(windowed.element === null && windowed.game[2] === 960 && windowed.game[3] === 600 && windowed.tube.every((v, i) => v === windowed.game[i]),
   'FULLSCREEN again leaves it: the canvas and the effect\'s at 960x600');
