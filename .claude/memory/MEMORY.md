@@ -24,3 +24,6 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Headless fullscreen](headless-fullscreen.md) — only CDP input grants activation, a touch only at its lift; the fullscreen viewport is the metrics override; a CDP Esc never leaves fullscreen
 - [Text changes, no tests](text-changes-no-tests.md) — copy-only welcome-page changes need a screenshot, not `npm test` or the frames
 - [Dialog layout moves probe clicks](dialog-layout-moves-probe-clicks.md) — a dialog's new geometry breaks `probe-frames.mjs`'s hard-coded clicks, some in the CRT section; a failed probe leaves no frames, reproduce in `probe-ui`
+- [Screen regions](screen-regions.md) — five regions placed by CSBWin's code; gaps x 224-232 and 274-280 are not always black (Conflux's flame); `PROVEN_FACTS.md` and `LeftHanded.ts` hold the detail
+- [GameScreen stubs in tools](gamescreen-stubs-in-tools.md) — three dialog tools cast a stub `as unknown as GameScreen`: a new method `GameInput` calls passes `tsc` and crashes them; add it to each stub
+- [Probe party changes dialog cursor](probe-party-changes-dialog-cursor.md) — `BUILD_PARTY` makes the cursor over later dialogs the hand; build a party last on its page
