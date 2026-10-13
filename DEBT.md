@@ -135,6 +135,7 @@ In payoff order: the first row is the next item.
 | W6 | Security headers | S | ⏳ |
 | W7 | The container, the deploy and the Node version | S | ⏳ |
 | R12 | Listing the saves reads every save's bytes | M | ⏳ |
+| U11 | The cursor over a dialog takes the game's shapes | S | ⏳ |
 | D17 | The screen keeps the party it last drew | S | ⏳ |
 | E23 | One game read, whole or not at all | L | ⏳ |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
@@ -192,7 +193,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C182 · D22 · E40 · F21 · G31 · P11 · R16 · U11 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E40 · F21 · G31 · P11 · R16 · U12 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -465,6 +466,28 @@ them.
 None of it changes the game: with every new setting at its default, every tool's output
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a
 golden frame for what it draws, and a probe or a `tools/` assertion for what it does.
+
+### U11 ⏳ The cursor over a dialog takes the game's shapes
+
+Every dialog over the game takes the whole screen: the settings, the map, the champions,
+the save menu cleared around it, and EXIT's question. The cursor over one is still
+`drawCursorItem`'s (`src/renderer/ui/Mouse.ts:662`), whose shape follows CSBWin's zones
+on the game's screen (`inCursorShapeZone`, `:788`): with a champion owning the cursor,
+the pointer left of x 224 and above row 169, or on a portrait, shows the hand, or the
+object in hand, over a dialog that has neither viewport nor portraits there. Without a
+party it is the arrow throughout, which is why no golden frame shows it; the KEYS frame
+(24) becomes the hand once a party is built on its page
+(`.claude/memory/probe-party-changes-dialog-cursor.md`).
+
+CSBWin's `_DoMenu` sets no cursor shape (`doc/CSBwin-src/Menu.cpp`), but its menu covers
+the viewport alone, where the zones still mean what they say. A dialog of the whole
+screen is the port's, and its cursor is the port's call: the arrow, always. Ranked in the
+middle of the list at the author's request.
+
+Paying it: while `ui.dialog` is up, `drawCursorItem` draws the arrow, the object in hand
+and the champion in hand (`d.Word23144`) included, at the pointer; a `tools/` check of the
+cursor over each dialog with a party and an object in hand, which fails before; the
+probe's KEYS frame taken with a party, if the frame is to show it.
 
 ---
 
