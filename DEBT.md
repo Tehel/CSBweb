@@ -295,7 +295,7 @@ S, before P8, whose endpoint it gates. Decided with the author:
 
 ### P8 ⏳ Publishing a local set, and moderating it
 
-L, after P9. Its first step writes the split.
+L, after P9, in five steps (below); none is taken yet.
 
 **The lifecycle.** A set is in one of four states, which its tile's name says (P9):
 
@@ -346,10 +346,49 @@ own route, which takes the files.
   sender, and never changes the folder after: `backup.ts` copies each owned set's folder
   once, the first night its row is in a snapshot (`doc/DEPLOYMENT.md` → "Backups").
 
-**Waiting on the author:** what PUBLISH leaves of the local record. (a) It stays as it
-is, a cyan tile beside the red one: its saves are filed under `local:<id>`, and the
-player can go on building it. (b) It is deleted once the set is approved, its saves
-moved to `<id>`. (a) is recommended: it moves nothing, and (b) can follow.
+**PUBLISH leaves the local record as it is** (decided with the author): a cyan tile
+beside the red one, its saves still filed under `local:<id>`, and the player can go on
+building it. Nothing is moved or deleted. Since its id is fixed in the form and taken on
+the server, a second PUBLISH of it is refused: a new version is a new local set, under a
+new id. Deleting the record once its set is approved, its saves moved to `<id>`, may
+follow as an item of its own.
+
+**The steps**, each a commit with its evidence:
+
+1. **The page's reader on the server.** `checkLocalDataSet` (`src/data/LocalDataSets.ts`)
+   and the loaders under it import without extensions and use enums, which Node's type
+   stripping cannot run, and the image copies only `src/data/DataSets.ts`. The build makes
+   the check a Node module (a second Vite build, SSR, of one entry, into `dist/server/`),
+   the image copies it, and `server.ts` hands it to the API in `ApiOptions` beside
+   `dataSets`, so a tool passes the source's function instead. Evidence:
+   `tools/dump-server.ts` checks a set through it, `tools/check-image.sh` that the image
+   runs it.
+2. **The publish route.** `POST api/data-sets`, a `multipart/form-data` body (Node's own
+   `Request.formData()`): the record's fields and files, and `X-Player-Id`. The rules
+   above, in that order, then: the flags follow from the files as `localDataSet`'s do;
+   a set without a `graphics.dat` has its base set's copied into its folder, so the folder
+   is a CSBWin directory like any other and the manifest needs no new field; the thumbnail,
+   which the page sends as a PNG, is `<id>-thumbnail.png` (`thumbnailPath`); the folder is
+   written as `gamefiles/.<id>.partial/` and renamed whole; the row goes last in `position`,
+   with two new columns for the description and the authors. The caps: 16 MiB a file
+   (Conflux's `CSBgraphics.dat` is 12 MB) and 32 MiB a request, and a few publishes per
+   address an hour (`RateLimit`, `server/events.ts`); `doc/DEPLOYMENT.md` gives nginx's
+   `client_max_body_size` for the route. Evidence: `tools/dump-server.ts`, a publish
+   accepted (the folder whole, the row pending and owned, seen by its owner and the
+   moderators only) and each refusal answered with nothing written.
+3. **PUBLISH in the form.** The pen's form (`src/ui/addDataSetForm.ts`) has PUBLISH,
+   enabled while the record is stored as the form shows it; it sends the record with the
+   `playerId` (`src/ui/gameEvents.ts`), says the server's refusal in the form, and on
+   success asks `api/data-sets` again, so the grid shows the red tile beside the cyan one.
+   The dev server (`vite.config.mts`) answers the route as `server/app.ts` does, into a
+   scratch folder. Evidence: a `tools/probe-frames.mjs` block, a publish and a refusal.
+4. **The moderation endpoint**, `POST api/data-sets/<id>`, as above: reject and withdraw
+   delete the row, then the folder (the backup keeps its copy). `doc/DEPLOYMENT.md` says
+   what is left to a moderator's hands. Evidence: `tools/dump-server.ts`, every action
+   and every 403, 404 and 409.
+5. **The tile's tick, cross and eye** (`src/ui/welcomePage.ts`), each shown only where its
+   transition is allowed to the viewer, then the grid redrawn from `api/data-sets`.
+   Evidence: a `tools/probe-frames.mjs` block.
 ---
 
 ## U — The interface in the canvas
