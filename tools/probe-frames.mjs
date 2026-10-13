@@ -229,28 +229,36 @@ const inventory = await shot('03-inventory');
 const hoverAt = (u, v) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   c.dispatchEvent(new PointerEvent('pointermove',{isPrimary:true,pointerType:'mouse',clientX:r.left+${u}*r.width,clientY:r.top+${v}*r.height,bubbles:true}));
   const p=window.__probe.screen.ui.hoverPoint; return p ? p.x+','+p.y : 'none';})()`);
-// DISPLAY's CRT (85,65), in the settings dialog: Esc opens it, the tab is DISPLAY
-// (120,45), and Esc closes it again over the inventory.
-const toggleCrt = async () => {
+// DISPLAY's SCANLINES (85,65) and SCREEN CURVE (236,65), in the settings dialog: Esc
+// opens it, the tab is DISPLAY (120,45), and Esc closes it again over the inventory.
+const SCANLINES = [85, 65];
+const CURVE = [236, 65];
+const toggleCrt = async ([x, y]) => {
   await key('Escape'); await wait(300);
   await canvasClick(120, 45, 0); await wait(300);
-  await canvasClick(85, 65, 0); await wait(300);
+  await canvasClick(x, y, 0); await wait(300);
   await key('Escape'); await wait(300);
   await evaluate(`document.getElementById('game-canvas').dispatchEvent(new PointerEvent('pointerleave',{isPrimary:true,pointerType:'mouse'})),1`);
   await wait(200);
 };
-await toggleCrt();
+await toggleCrt(SCANLINES);
 const crtInPlay = await crtEffect();
 check(crtInPlay !== 'unavailable', 'the CRT effect exists (without it this Chrome gives no WebGL context, and nothing below is checked)');
-check(crtInPlay === 'on', 'DISPLAY\'s CRT turns the effect on');
+check(crtInPlay === 'on', 'DISPLAY\'s SCANLINES turns the effect on');
 check(await canvasPixels() === inventory, 'CRT effect on: the game canvas keeps its pixels');
 const tubeSize = await evaluate(`(()=>{const t=document.getElementById('crt-canvas');return t.width+'x'+t.height;})()`);
 check(tubeSize === '960x600', `the effect is drawn at the size it is shown, 960x600 (${tubeSize})`);
-check(await hoverAt(0.5, 0.5) === '160,100', 'CRT effect on: the tube\'s middle is the screen\'s');
+check(await hoverAt(0.1, 0.1) === '32,20', 'the scanlines alone: the pointer is the plain scaling');
+await toggleCrt(CURVE);
+check(await hoverAt(0.5, 0.5) === '160,100', 'the curve on: the tube\'s middle is the screen\'s');
 const curved = (await hoverAt(0.1, 0.1)).split(',').map(Number);
-check(curved[0] < 32 && curved[1] < 20, `CRT effect on: the pointer at (32,20)'s place shows a pixel nearer the corner (${curved})`);
-check(await hoverAt(0.002, 0.002) === '0,0', 'CRT effect on: a point of the tube\'s black corner is the screen\'s corner');
-await toggleCrt();
+check(curved[0] < 32 && curved[1] < 20, `the curve on: the pointer at (32,20)'s place shows a pixel nearer the corner (${curved})`);
+check(await hoverAt(0.002, 0.002) === '0,0', 'the curve on: a point of the tube\'s black corner is the screen\'s corner');
+await toggleCrt(SCANLINES);
+check(await crtEffect() === 'on' && (await hoverAt(0.1, 0.1)).split(',').map(Number).join() === curved.join(),
+  'the curve alone: the effect stays on, the pointer curved');
+await toggleCrt(CURVE);
+check(await crtEffect() === 'off', 'neither: the effect is off');
 check(await hoverAt(0.1, 0.1) === '32,20', 'CRT effect off: the pointer is the plain scaling');
 await evaluate(`document.getElementById('game-canvas').dispatchEvent(new PointerEvent('pointerleave',{isPrimary:true,pointerType:'mouse'})),1`);
 // Take an item out of the inventory. (41,66) is button id 30, body slot 2, which the Hall
@@ -936,14 +944,14 @@ console.log('state: settings, GAME');    await shot('21-settings-game');
 await leaveCanvas(); await wait(200);
 await canvasClick(120, 45, 0); await wait(300);
 console.log('state: settings, DISPLAY'); await shot('22-settings-display');
-// DISPLAY's ASPECT RATIO (236,71): 4:3 shows the 320x200 canvas 960x720, a click still
+// DISPLAY's ASPECT RATIO (236,107): 4:3 shows the 320x200 canvas 960x720, a click still
 // landing on what it shows, and 16:10 again 960x600.
 const canvasSize = () => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   return [c.width,c.height,r.width,r.height].join('x');})()`);
-await canvasClick(236, 65, 0); await wait(300);
+await canvasClick(236, 107, 0); await wait(300);
 check((await settingsValues()).aspectRatio === '4:3' && await canvasSize() === '320x200x960x720',
   'ASPECT RATIO at 4:3 shows the 320x200 canvas 960x720');
-await canvasClick(236, 65, 0); await wait(300);
+await canvasClick(236, 107, 0); await wait(300);
 check((await settingsValues()).aspectRatio === '16:10' && await canvasSize() === '320x200x960x600',
   'a click on it there, where it is shown, makes it 16:10, 960x600');
 await canvasClick(197, 45, 0); await wait(300);
@@ -990,7 +998,7 @@ check(await evaluate(`window.__probe.screen.ui.settingsDialog.keys.scrollTop`) =
   'a notch of the wheel scrolls the keys three rows, drawn with the pointer still');
 await canvasClick(160, 100, 2); await wait(300);
 check(!(await settingsUp()), 'a right click closes the settings');
-// DISPLAY's LEFT HANDED (85,107), last on this page, as the party it builds would change
+// DISPLAY's LEFT HANDED (85,107), checked last, as the party it builds would change
 // the cursor of the dialogs above: the dialog closed and the party built, the panels are
 // on the left and the view on the right, each band's gap between them. A frame of it,
 // with the pointer at (84,100), on the right-hand column's (317,100): its arrow is drawn
@@ -1092,7 +1100,7 @@ check((await selected()) === 0 && (await championsUp()) === null, 'and at its re
 
 // Fullscreen (`src/lib/fullscreen.ts`), DISPLAY's FULLSCREEN. A finger's press is no
 // gesture a browser enters fullscreen at, only its lift: a tap enters it, on a page no
-// mouse has pressed yet. With the CRT effect on, a mouse's press leaves it and enters it
+// mouse has pressed yet. With the scanlines and the curve on, a mouse's press leaves it and enters it
 // again, on a 1920x1080 screen: `#game` is the fullscreen element, the game canvas the
 // largest whole multiple of 320x200 the screen holds, in device pixels, centred, and the
 // effect's canvas covers it exactly, drawn at its size; so again once the screen is
@@ -1118,6 +1126,7 @@ await touch('touchStart', 85, 86); await touch('touchEnd', 85, 86); await wait(8
 check((await screenLayout()).element === null, 'and a second tap leaves it');
 await send('Emulation.setTouchEmulationEnabled', { enabled: false });
 await canvasClick(85, 65, 0); await wait(300);
+await canvasClick(236, 65, 0); await wait(300);
 const screenSize = (width, height) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
 await screenSize(1920, 1080); await wait(300);
 await cdpMouse('mousePressed', 85, 86); await cdpMouse('mouseReleased', 85, 86); await wait(800);
@@ -1136,7 +1145,7 @@ for (const [width, height, expected] of [[1920, 1080, 5], [1366, 768, 3]]) {
     'and is drawn at its size');
 }
 // At 4:3, the largest whole multiple of 320x240 that fits, centred, the effect over it.
-await canvasClick(236, 65, 0); await wait(500);
+await canvasClick(236, 107, 0); await wait(500);
 {
   const full = await screenLayout();
   const scale = Math.floor(Math.min(full.w * full.ratio / 320, full.h * full.ratio / 240));
@@ -1146,7 +1155,7 @@ await canvasClick(236, 65, 0); await wait(500);
     `at 4:3, the game canvas is 3 times 320x240, centred, the effect over it`);
 }
 check(await hoverAt(0.5, 0.5) === '160,100', 'at 4:3, the tube\'s middle is the screen\'s');
-await canvasClick(236, 65, 0); await wait(500);
+await canvasClick(236, 107, 0); await wait(500);
 check((await screenLayout()).game[3] === 600, 'and at 16:10 again, 3 times 320x200');
 check(await hoverAt(0.5, 0.5) === '160,100', 'in fullscreen, the tube\'s middle is the screen\'s');
 check(await hoverAt(0.002, 0.002) === '0,0', 'and a point of its black corner is the screen\'s corner');
@@ -1167,7 +1176,8 @@ await screenSize(1600, 1000);
 // the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,
 // `src/renderer/intro/BootSequence.ts`), so it must let a click through. Boot with the
 // effect in the saved settings: the intro is drawn through it, and a real click on the
-// entrance's scroll brings up the credits, as the click for frame 08 did.
+// entrance's scroll brings up the credits, as the click for frame 08 did. The record's one
+// `crt`, from before the scanlines and the curve were apart, is both.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   try { localStorage.setItem('csbweb_settings_v2', JSON.stringify({ crt: true })); } catch (e) {}
 ` });

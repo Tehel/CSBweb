@@ -19,8 +19,13 @@ export interface SettingsValues {
   readonly sound: boolean;
   /** The sound's volume, 0 to 1. */
   readonly volume: number;
-  /** The CRT effect, where the browser gives WebGL (`src/lib/crt.ts`). */
-  readonly crt: boolean;
+  /**
+   * The CRT effect's two halves, where the browser gives WebGL (`src/lib/crt.ts`): the
+   * scanlines, and the tube's curve. A record from before they were apart has one `crt`,
+   * which is both.
+   */
+  readonly scanlines: boolean;
+  readonly curve: boolean;
   /**
    * The screen's shape: 16:10, its pixels square, or 4:3, as a monitor of the ST's showed
    * the 320x200 screen, its pixels taller than wide (`src/lib/fullscreen.ts`).
@@ -58,7 +63,8 @@ export type AspectRatio = (typeof ASPECT_RATIOS)[number];
 export const DEFAULT_SETTINGS: SettingsValues = {
   sound: true,
   volume: 0.8,
-  crt: false,
+  scanlines: false,
+  curve: false,
   aspectRatio: '16:10',
   leftHanded: false,
   startupAnimations: true,
@@ -157,7 +163,8 @@ export function parseSettings(raw: unknown): SettingsValues {
     sound: bool(record.sound, defaults.sound),
     volume: typeof record.volume === 'number' && Number.isFinite(record.volume)
       ? Math.max(0, Math.min(1, record.volume)) : defaults.volume,
-    crt: bool(record.crt, defaults.crt),
+    scanlines: bool(record.scanlines, bool(record.crt, defaults.scanlines)),
+    curve: bool(record.curve, bool(record.crt, defaults.curve)),
     aspectRatio: ASPECT_RATIOS.find((ratio) => ratio === record.aspectRatio) ?? defaults.aspectRatio,
     leftHanded: bool(record.leftHanded, defaults.leftHanded),
     startupAnimations: bool(record.startupAnimations, defaults.startupAnimations),

@@ -645,7 +645,7 @@ Paying it: the Oracle closes on its own error with a line in the message area, a
   not for a touch: `resume()` fails, the listener is gone, and only the settings'
   SOUND brings the sound back.
 - **A lost WebGL context keeps the curve.** On `webglcontextlost` the tube is hidden but
-  `curvedCanvas` stays set (`src/lib/crt.ts:227-241`), so `canvasPoint` warps clicks over a
+  `curvedCanvas` stays set (`src/lib/crt.ts:253-267`), so `canvasPoint` warps clicks over a
   flat picture, about 3 pixels near the edges.
 
 Paying it: the unlock on `pointerup`, `click` and `touchend`, its listeners removed once
@@ -1139,7 +1139,7 @@ Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the pa
 The screen is drawn by clocks that do not know each other: the engine's `setTimeout` VBL
 loop, and `requestAnimationFrame` loops for the chewing mouth
 (`src/renderer/ui/Feeding.ts:227-248`), a menu button's press (`SaveMenu.ts:997-1043`), the
-intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:208-223`).
+intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:232-249`).
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
   `refreshScreen`'s `setPartyState` and its `mainLoopHasReturned()` test

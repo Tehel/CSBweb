@@ -14,8 +14,8 @@
  *    help line.
  * 3. **The controls**: a tab, a setting's button, which a click turns over, a toggle, the
  *    slider clicked, dragged past the track's end and released; a click on the chosen side
- *    of a toggle changes nothing; the CRT effect's button dim without WebGL, taking no
- *    click, the help line saying why; ASPECT RATIO's button naming the shape chosen,
+ *    of a toggle changes nothing; SCANLINES' and SCREEN CURVE's buttons dim without WebGL,
+ *    taking no click, the help line saying why; ASPECT RATIO's button naming the shape chosen,
  *    raised at 16:10 and pressed at 4:3; FULLSCREEN asking the page, changing no setting,
  *    shown as the page says, its help line as Esc leaves it, and inert where the browser
  *    has none; Esc, CLOSE and a right click close it; the clock held while it is up.
@@ -251,12 +251,15 @@ console.log('\n=== 3. the controls ===');
   openSettingsDialog(noWebGL);
   noWebGL.settingsDialog!.tab = 'display';
   const names = settingsDialogButtons(noWebGL, noWebGL.settingsDialog!).map((b) => b.name);
-  check(!names.includes('settings.button0') && names.includes('settings.button3'),
-    'without WebGL, the CRT effect has no button in the list, and STARTUP ANIMATIONS has');
+  check(!names.includes('settings.button0') && !names.includes('settings.button1') && names.includes('settings.button3'),
+    'without WebGL, SCANLINES and SCREEN CURVE have no button in the list, and STARTUP ANIMATIONS has');
   click(noWebGL, settingButtonFrame(0));
-  check(!noWebGL.settings.values.crt, 'and a click on it does nothing');
+  click(noWebGL, settingButtonFrame(1));
+  check(!noWebGL.settings.values.scanlines && !noWebGL.settings.values.curve, 'and a click on either does nothing');
+  settingsDialogPointer(noWebGL, centre(settingButtonFrame(1)));
+  check(helpText(noWebGL, noWebGL.settingsDialog!) === 'THE SCREEN CURVE NEEDS WEBGL', 'the help line says why');
   settingsDialogPointer(noWebGL, centre(settingButtonFrame(0)));
-  check(helpText(noWebGL, noWebGL.settingsDialog!) === 'THE CRT EFFECT NEEDS WEBGL', 'the help line says why');
+  check(helpText(noWebGL, noWebGL.settingsDialog!) === 'THE SCANLINES NEED WEBGL', 'and of the scanlines');
   // Its label is grey, and not lit under the pointer; STARTUP ANIMATIONS', on, is lit.
   drawSettingsDialog(noWebGL);
   const colours = (r: Rect) => {
@@ -268,17 +271,17 @@ console.log('\n=== 3. the controls ===');
   };
   const crt = colours(settingButtonFrame(0));
   const startup = colours(settingButtonFrame(3));
-  check(crt.has(DIM_COLOR) && !crt.has(MENU_OPTION_COLOR) && !crt.has(LIT_COLOR), 'the CRT effect\'s label is dim, under the pointer');
+  check(crt.has(DIM_COLOR) && !crt.has(MENU_OPTION_COLOR) && !crt.has(LIT_COLOR), 'SCANLINES\' label is dim, under the pointer');
   check(startup.has(LIT_COLOR) && !startup.has(DIM_COLOR), 'STARTUP ANIMATIONS\', on, is pressed and lit');
 
-  // ASPECT RATIO, DISPLAY's second button: a choice of two, its button named for the one
+  // ASPECT RATIO, DISPLAY's last button: a choice of two, its button named for the one
   // chosen, raised at 16:10, the default, and pressed at 4:3; drawn as the kit draws a
   // button of that name and look.
   {
     const ui = freshUI();
     openSettingsDialog(ui);
     click(ui, TAB_FRAMES[1]);
-    const frame = settingButtonFrame(1);
+    const frame = settingButtonFrame(5);
     const face = (of: UIState) => {
       const r = buttonRect(frame);
       const buf = of.screenIndexBuffer;

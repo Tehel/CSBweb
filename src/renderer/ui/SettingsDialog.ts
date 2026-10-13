@@ -22,7 +22,7 @@
  *   (`SettingsKeys.ts`).
  * - **The help line**, at the foot (`helpText`).
  *
- * A setting that cannot work, the CRT effect where
+ * A setting that cannot work, SCANLINES and SCREEN CURVE where
  * the browser gives no WebGL (`UIState.isCrtAvailable`), FULLSCREEN where it gives no
  * fullscreen (`UIState.fullscreen`), or LEFT HANDED where the data set's buttons would be
  * cut by it (`leftHandedFits`, `src/renderer/LeftHanded.ts`), keeps its name: its button is raised, its label dim,
@@ -243,20 +243,20 @@ export const TABS: ReadonlyArray<{
     buttons: true,
     settings: [
       {
-        name: 'CRT EFFECT',
-        help: 'THE CURVE AND THE SCANLINES OF A TUBE',
-        unavailable: { when: (ui) => !ui.isCrtAvailable(), help: 'THE CRT EFFECT NEEDS WEBGL' },
+        name: 'SCANLINES',
+        help: 'THE LINES OF A TUBE, A DARK GAP BETWEEN THEM',
+        unavailable: { when: (ui) => !ui.isCrtAvailable(), help: 'THE SCANLINES NEED WEBGL' },
         kind: 'toggle',
-        get: (values) => values.crt,
-        set: (_values, on) => ({ crt: on }),
+        get: (values) => values.scanlines,
+        set: (_values, on) => ({ scanlines: on }),
       },
       {
-        name: 'ASPECT RATIO 16:10',
-        onName: 'ASPECT RATIO 4:3',
-        help: 'SQUARE PIXELS, OR 4:3 AS ON AN ST MONITOR',
+        name: 'SCREEN CURVE',
+        help: 'THE CURVED GLASS OF A TUBE',
+        unavailable: { when: (ui) => !ui.isCrtAvailable(), help: 'THE SCREEN CURVE NEEDS WEBGL' },
         kind: 'toggle',
-        get: (values) => values.aspectRatio === '4:3',
-        set: (_values, on) => ({ aspectRatio: on ? '4:3' : '16:10' }),
+        get: (values) => values.curve,
+        set: (_values, on) => ({ curve: on }),
       },
       {
         name: 'FULLSCREEN',
@@ -281,6 +281,14 @@ export const TABS: ReadonlyArray<{
         kind: 'toggle',
         get: (values) => values.leftHanded,
         set: (_values, on) => ({ leftHanded: on }),
+      },
+      {
+        name: 'ASPECT RATIO 16:10',
+        onName: 'ASPECT RATIO 4:3',
+        help: 'SQUARE PIXELS, OR 4:3 AS ON AN ST MONITOR',
+        kind: 'toggle',
+        get: (values) => values.aspectRatio === '4:3',
+        set: (_values, on) => ({ aspectRatio: on ? '4:3' : '16:10' }),
       },
     ],
   },

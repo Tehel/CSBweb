@@ -38,8 +38,8 @@ console.log('=== the defaults ===');
   const values = new Settings(new MapStorage()).values;
   console.log(JSON.stringify({ ...values, keyBindings: '…' }));
   check(JSON.stringify(values) === JSON.stringify(DEFAULT_SETTINGS), 'an empty storage gives the defaults');
-  check(values.sound && values.volume === 0.8 && !values.crt && values.aspectRatio === '16:10' && values.startupAnimations,
-    'sound on at 0.8, no CRT effect, the screen 16:10, the startup animations shown');
+  check(values.sound && values.volume === 0.8 && !values.scanlines && !values.curve && values.aspectRatio === '16:10' && values.startupAnimations,
+    'sound on at 0.8, no scanlines nor curve, the screen 16:10, the startup animations shown');
   check(values.statistics && !values.mapView && !values.championView,
     'the statistics sent; the map and the champions off');
   check(JSON.stringify(values.extras) === JSON.stringify(NO_EXTRAS), 'every extra off');
@@ -56,12 +56,13 @@ console.log('\n=== the earlier record, read once ===');
   }));
   const values = new Settings(storage).values;
   console.log(JSON.stringify({ ...values, keyBindings: '…' }));
-  check(!values.sound && values.volume === 0.25 && values.crt, 'the sound, its volume and the CRT effect carried over');
+  check(!values.sound && values.volume === 0.25 && values.scanlines && values.curve,
+    'the sound, its volume and the CRT effect carried over, as the scanlines and the curve');
   check(values.mapView && values.championView && !values.statistics && !('debug' in values),
     'the map, the champions and the statistics carried over, and its debug chrome dropped');
   check(Object.values(values.extras).every(Boolean), 'the one Extras flag turned every extra on');
   check(values.startupAnimations, 'the startup animations, which it did not have, are the default');
-  check(stored(storage)?.crt === true, 'it is written under the new key at once');
+  check(stored(storage)?.scanlines === true && stored(storage)?.curve === true, 'it is written under the new key at once');
   storage.reads.length = 0;
   new Settings(storage);
   check(!storage.reads.includes(OLD_SETTINGS_KEY), 'a second page reads the new key and not the old');
@@ -69,6 +70,21 @@ console.log('\n=== the earlier record, read once ===');
   const mapByDefault = new MapStorage();
   mapByDefault.items.set(OLD_SETTINGS_KEY, JSON.stringify({ crt: false }));
   check(new Settings(mapByDefault).values.mapView, 'an earlier record with no map field shows the map, as it did');
+}
+
+console.log('\n=== the CRT effect, in two ===');
+{
+  const both = new MapStorage();
+  both.items.set(SETTINGS_KEY, JSON.stringify({ crt: true }));
+  const values = new Settings(both).values;
+  check(values.scanlines && values.curve, 'a record\'s one CRT effect is both the scanlines and the curve');
+  const apart = new MapStorage();
+  apart.items.set(SETTINGS_KEY, JSON.stringify({ crt: true, curve: false }));
+  const flat = new Settings(apart).values;
+  check(flat.scanlines && !flat.curve, 'each of the two, where it is stored, is read before it');
+  const settings = new Settings(new MapStorage());
+  settings.update({ scanlines: true });
+  check(settings.values.scanlines && !settings.values.curve, 'the scanlines turn on alone');
 }
 
 console.log('\n=== fields of the wrong type ===');
@@ -81,7 +97,8 @@ console.log('\n=== fields of the wrong type ===');
   }));
   const values = new Settings(storage).values;
   console.log(JSON.stringify({ ...values, keyBindings: '…' }));
-  check(values.sound === true && values.crt === false && values.mapView === false, 'a field of the wrong type is its default');
+  check(values.sound === true && values.scanlines === false && values.curve === false && values.mapView === false,
+    'a field of the wrong type is its default');
   check(values.aspectRatio === '16:10', 'an aspect ratio of no known shape is 16:10');
   check(values.volume === 1, 'a volume past 1 is 1');
   check(values.startupAnimations === false, 'a field of the right type is kept beside them');

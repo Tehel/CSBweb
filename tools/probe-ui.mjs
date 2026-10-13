@@ -141,7 +141,7 @@ const boot = async () => {
     try {
       localStorage.clear();
       localStorage.setItem('csbweb_settings_v2', JSON.stringify({
-        mapView: true, crt: false, sound: false }));
+        mapView: true, scanlines: false, curve: false, sound: false }));
     } catch (e) {}
     let seed = 0x2545f491;
     Math.random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;

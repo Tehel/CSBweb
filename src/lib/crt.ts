@@ -1,6 +1,8 @@
 /**
  * The CRT effect: the game canvas as a colour monitor of the ST's showed it, a curved tube
- * whose beam draws each of the 200 lines with a dark gap between them.
+ * whose beam draws each of the 200 lines with a dark gap between them. The two are the
+ * player's to choose apart, the scanlines and the curve (`SettingsValues`), and the
+ * effect is off with neither.
  *
  * It is drawn on a canvas of its own laid over the game canvas (`#crt-canvas`, index.html),
  * at the size it is shown in device pixels, so the curve and the lines are drawn smooth and
@@ -9,7 +11,9 @@
  * the same curve (`canvasPoint`), so a click lands on what the player sees.
  *
  * The curve shrinks the picture into the glass rather than magnify it: every pixel of the
- * 320x200 screen stays in sight, and only the tube's corners are black.
+ * 320x200 screen stays in sight, and only the tube's corners are black. The glass darkens
+ * at its edges with it. Without the scanlines, a pixel's top and bottom edges are its
+ * left and right's sharpened blend.
  */
 
 /** How far the tube bends: the curve's strength across, and down. */
@@ -25,7 +29,7 @@ const GAIN = 1.3;
 /** How much the tube's edges darken. */
 const VIGNETTE = 0.12;
 
-/** The canvas the effect is shown over, while it is on: the one whose pointer is curved. */
+/** The canvas the effect is shown over, while its curve is on: the one whose pointer is curved. */
 let curvedCanvas: HTMLCanvasElement | null = null;
 
 /**
@@ -67,7 +71,9 @@ void main() {
 }`;
 
 // The scanlines are a beam per line, a gaussian across its centre, added up with the next
-// line's in linear light; a pixel's left and right edges are a sharpened blend.
+// line's in linear light; a pixel's left and right edges are a sharpened blend. Without
+// them, its top and bottom are blended alike. The curve is the warp, the vignette and the
+// tube's black corners.
 const FRAGMENT_SHADER = `
 #ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
@@ -77,6 +83,8 @@ precision mediump float;
 uniform sampler2D u_screen;
 uniform vec2 u_screenSize;
 uniform vec2 u_outputSize;
+uniform bool u_scanlines;
+uniform bool u_curve;
 varying vec2 v_uv;
 
 const vec2 CURVE = vec2(${CURVE_X}, ${CURVE_Y});
@@ -93,10 +101,12 @@ vec2 warp(vec2 uv) {
     return c * 0.5 + 0.5;
 }
 
+float sharp(float x) {
+    return floor(x - 0.5) + 0.5 + clamp((fract(x - 0.5) - 0.5) * SHARPNESS + 0.5, 0.0, 1.0);
+}
+
 vec3 line(float x, float y) {
-    float left = floor(x - 0.5);
-    float f = clamp((fract(x - 0.5) - 0.5) * SHARPNESS + 0.5, 0.0, 1.0);
-    return pow(texture2D(u_screen, vec2(left + 0.5 + f, y) / u_screenSize).rgb, GAMMA);
+    return pow(texture2D(u_screen, vec2(sharp(x), y) / u_screenSize).rgb, GAMMA);
 }
 
 float beam(float d, vec3 c) {
@@ -105,36 +115,47 @@ float beam(float d, vec3 c) {
 }
 
 void main() {
-    vec2 p = warp(v_uv);
+    vec2 p = u_curve ? warp(v_uv) : v_uv;
     vec2 pos = p * u_screenSize;
-    float y0 = floor(pos.y) + 0.5;
-    float dy = pos.y - y0;
-    float y1 = y0 + (dy < 0.0 ? -1.0 : 1.0);
-    vec3 c0 = line(pos.x, y0);
-    vec3 c = c0 * beam(dy, c0);
-    if (y1 > 0.0 && y1 < u_screenSize.y) {
-        vec3 c1 = line(pos.x, y1);
-        c += c1 * beam(1.0 - abs(dy), c1);
+    vec3 c;
+    if (u_scanlines) {
+        float y0 = floor(pos.y) + 0.5;
+        float dy = pos.y - y0;
+        float y1 = y0 + (dy < 0.0 ? -1.0 : 1.0);
+        vec3 c0 = line(pos.x, y0);
+        c = c0 * beam(dy, c0);
+        if (y1 > 0.0 && y1 < u_screenSize.y) {
+            vec3 c1 = line(pos.x, y1);
+            c += c1 * beam(1.0 - abs(dy), c1);
+        }
+        c *= GAIN;
+    } else {
+        c = line(pos.x, sharp(pos.y));
     }
-    vec2 e = p * 2.0 - 1.0;
-    c *= GAIN * (1.0 - VIGNETTE * dot(e, e));
-    vec2 inside = min(p, 1.0 - p) * u_outputSize;
-    float edge = clamp(min(inside.x, inside.y) + 0.5, 0.0, 1.0);
+    float edge = 1.0;
+    if (u_curve) {
+        vec2 e = p * 2.0 - 1.0;
+        c *= 1.0 - VIGNETTE * dot(e, e);
+        vec2 inside = min(p, 1.0 - p) * u_outputSize;
+        edge = clamp(min(inside.x, inside.y) + 0.5, 0.0, 1.0);
+    }
     gl_FragColor = vec4(pow(clamp(c, 0.0, 1.0), 1.0 / GAMMA) * edge, 1.0);
 }`;
 
 export interface CrtEffect {
     isAvailable: () => boolean;
-    isEnabled: () => boolean;
-    setEnabled: (enabled: boolean) => boolean;
+    /** The scanlines and the curve each on or off: the effect is shown with either. */
+    set: (scanlines: boolean, curve: boolean) => void;
 }
 
-const UNAVAILABLE: CrtEffect = { isAvailable: () => false, isEnabled: () => false, setEnabled: () => false };
+const UNAVAILABLE: CrtEffect = { isAvailable: () => false, set: () => {} };
 
 interface Pipeline {
     texture: WebGLTexture;
     screenSize: WebGLUniformLocation | null;
     outputSize: WebGLUniformLocation | null;
+    scanlines: WebGLUniformLocation | null;
+    curve: WebGLUniformLocation | null;
 }
 
 function compile(gl: WebGLRenderingContext, type: number, source: string): WebGLShader {
@@ -174,12 +195,14 @@ function buildPipeline(gl: WebGLRenderingContext): Pipeline {
         texture,
         screenSize: gl.getUniformLocation(program, 'u_screenSize'),
         outputSize: gl.getUniformLocation(program, 'u_outputSize'),
+        scanlines: gl.getUniformLocation(program, 'u_scanlines'),
+        curve: gl.getUniformLocation(program, 'u_curve'),
     };
 }
 
 /**
- * The effect over `canvas`, off until `setEnabled(true)`. Without WebGL it is unavailable,
- * and `setEnabled` reports it off.
+ * The effect over `canvas`, off until `set` turns on the scanlines or the curve. Without
+ * WebGL it is unavailable, and `set` does nothing.
  */
 export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
     const parent = canvas.parentNode;
@@ -199,7 +222,8 @@ export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
     tube.style.display = 'none';
     parent.appendChild(tube);
 
-    let enabled = false;
+    let scanlines = false;
+    let curve = false;
     let lost = false;
     let frame: number | null = null;
 
@@ -219,6 +243,8 @@ export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
         gl.uniform2f(pipeline.screenSize, canvas.width, canvas.height);
         gl.uniform2f(pipeline.outputSize, width, height);
+        gl.uniform1i(pipeline.scanlines, scanlines ? 1 : 0);
+        gl.uniform1i(pipeline.curve, curve ? 1 : 0);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
 
@@ -242,18 +268,18 @@ export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
 
     return {
         isAvailable: () => true,
-        isEnabled: () => enabled,
-        setEnabled: (next: boolean) => {
-            if (next === enabled) return enabled;
-            enabled = next;
-            tube.style.display = next ? '' : 'none';
-            curvedCanvas = next ? canvas : null;
-            if (next) draw();
-            else if (frame !== null) {
+        set: (nextScanlines: boolean, nextCurve: boolean) => {
+            const wasOn = scanlines || curve;
+            scanlines = nextScanlines;
+            curve = nextCurve;
+            const on = scanlines || curve;
+            tube.style.display = on ? '' : 'none';
+            curvedCanvas = curve ? canvas : null;
+            if (on && !wasOn) draw();
+            else if (!on && frame !== null) {
                 cancelAnimationFrame(frame);
                 frame = null;
             }
-            return enabled;
         },
     };
 }

@@ -90,9 +90,8 @@ function readKeyboardLayout(): void {
 }
 readKeyboardLayout();
 
-function setCrtEnabled(enabled: boolean): boolean {
-    if (!crtController) return false;
-    return crtController.setEnabled(enabled);
+function setCrt(scanlines: boolean, curve: boolean): void {
+    crtController?.set(scanlines, curve);
 }
 
 /**
@@ -443,7 +442,7 @@ function wonChampions(game: Game, screen: GameScreen): WonChampion[] {
     }));
 }
 
-/** The optional CRT effect over the canvas (`src/lib/crt.ts`). Without WebGL, the settings' CRT is inert. */
+/** The optional CRT effect over the canvas (`src/lib/crt.ts`). Without WebGL, the settings' SCANLINES and SCREEN CURVE are inert. */
 function createCrt(): void {
     crtController = createCrtEffect(gameCanvasEl);
 }
@@ -553,7 +552,7 @@ function wire({ game, screen, saves, messages, events }: Built): void {
  * the extras and the keys.
  */
 function applySettings({ game }: Built, sound: SoundManager, values: SettingsValues): void {
-    setCrtEnabled(values.crt);
+    setCrt(values.scanlines, values.curve);
     fullscreen.setAspect(values.aspectRatio);
     sound.setEnabled(values.sound);
     sound.setVolume(values.volume);
@@ -680,7 +679,7 @@ function logSave(message: string, error?: unknown): void {
 function reportError(error: unknown): void {
     console.error(error);
     game?.stop();
-    setCrtEnabled(false);
+    setCrt(false, false);
     showFatalMessage(gameCanvasEl, error instanceof Error ? error.message : String(error));
 }
 
