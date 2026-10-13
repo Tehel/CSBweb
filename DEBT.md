@@ -113,7 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P10 | A published set has no dungeon signature: its saves are refused | M | ⏳ |
+| P10 | A published set has no dungeon signature: its saves are refused | M | ⏳ step 1 of 2 next |
 | P8 | Publishing a local set, and moderating it | L | ⚠️ step 4 of 5 next |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
@@ -303,31 +303,36 @@ VPS, refuses the saves of its local twin, whose dungeon is the same.
 `src/data/DataSets.ts`'s comment on `dungeonSignature` ("A manifest set has none: its
 dungeon is in `KNOWN_DUNGEONS`") says the same, and is true only of the site's own sets.
 
-**What it takes** (the author's design):
+**What it takes**, in two steps (the author's design):
 
-- **The server keeps each published set's signature.** It computes the signature with
-  the page's own reader, which the publish route already runs, rather than trusting one
-  the sender uploads, and keeps it in the store (`server/dataSets.ts`), beside the row
-  or in a table of its own.
-- **A backfill** of the rows already published (Conflux 2 on the live site): the server
-  reads each owned set's `gamefiles/<id>/dungeon.dat` through the same bundled check, at
-  start-up or as a one-off script `doc/DEPLOYMENT.md` names.
-- **Served on demand.** A signature is one SHA-256 per level, up to 64 levels, so up to
-  2 KiB raw and about 4.2 KiB as the hex JSON the page uses. If it costs too much to send
-  in every `api/data-sets` answer, a dedicated endpoint can take a list of set ids and
-  answer their signatures. The page caches them in its IndexedDB store
-  (`BrowserDataSetStore`'s database, a `DB_VERSION` bump), asks for a set's signature
-  when it starts a set it has none for, and fills `DataSet.dungeonSignature` from it.
-  Which of the two is decided at the start of the item, from those sizes.
-- **Which rules a published set's import follows**, to settle with the author: a local
-  set's (checked against its own dungeon alone, never refused, anything but the whole a
-  `mismatch` to confirm), or a manifest set's (another known dungeon refused). A
-  published set's files never change (P8), so its own dungeon, whole, is the case that
-  matters.
+1. **The running set's own dungeon first.** An import happens in the save dialog, so a
+   set is always running, and its `dungeon.dat` is the page's already. The save's
+   signature is compared with the signature of that file, computed on the spot
+   (`dungeonSignature`). The comparison uses the file as read, not the live world,
+   whose walls a script may have moved. Whole, the save is the set's own and is stored,
+   and no catalogue is consulted. Only a save that is not the whole of it goes on to the
+   catalogue, and to step 2. This step alone fixes Conflux 2's case. Check first that the
+   page still has the set's `dungeon.dat` when the game was started from a save (CONTINUE,
+   a save's LOAD), since a save holds its own dungeon. Also settle with the author what
+   becomes of a save that is most of the set's dungeon but not the whole: a local set's
+   `mismatch` to confirm, or a manifest set's `modified`.
+2. **A signature database, to name another dungeon.** It is needed only for a save that
+   is not the running set's: to say which published set it is, and to offer "switch to
+   it". The server keeps each published set's signature. It computes it with the page's
+   own reader, which the publish route already runs, rather than trusting an uploaded one,
+   and keeps it in the store (`server/dataSets.ts`). A **backfill** covers the sets
+   already published, from each owned set's `gamefiles/<id>/dungeon.dat`, at start-up or
+   by a one-off script `doc/DEPLOYMENT.md` names. A signature is one SHA-256 per level,
+   up to 64 levels: up to 2 KiB raw, about 4.2 KiB as hex JSON. If that is too much to
+   send in every `api/data-sets` answer, a dedicated endpoint takes a list of set ids and
+   answers their signatures, which the page caches in IndexedDB (a `DB_VERSION` bump) and
+   asks for when it lacks one. Which of the two is decided at the start of the step, from
+   those sizes.
 
-Evidence: `tools/dump-server.ts` (the signature stored on publish, the backfill, the
-endpoint's answer), and an import check in `tools/dump-local-data-set.ts` or its
-neighbour: a published set's save stored, where it is refused today.
+Evidence: for step 1, an import check in `tools/dump-local-data-set.ts` or a neighbour,
+where a save of a set outside `KNOWN_DUNGEONS` is stored and is refused today; for step 2,
+`tools/dump-server.ts` (the signature stored on publish, the backfill, the endpoint's
+answer).
 
 ### P8 ⏳ Publishing a local set, and moderating it
 
