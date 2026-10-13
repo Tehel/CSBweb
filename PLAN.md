@@ -36,7 +36,7 @@ frames against CSBWin's own screenshots. The retail dungeon uses none of them. F
 
 ## Ground rules
 
-1. **The build must stay clean.** `npm run build` runs `tsc && vite build`; `tsc --noEmit`
+1. **The build must stay clean.** `npm run build` runs `tsc && vite build && vite build --ssr`; `tsc --noEmit`
    must pass with zero errors before any commit. Note that `vite build` alone will happily
    succeed on broken code — esbuild strips types without checking them — so `tsc` is the
    only real gate. (The project sat with a broken `tsc` and a genuine runtime bug hidden

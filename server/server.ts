@@ -5,7 +5,8 @@
  * statistics (`stats.ts`) and the data sets (`dataSets.ts`).
  *
  *   PORT            the port to listen on (8085; 0 picks a free one)
- *   DIST_DIR        the built page (the checkout's `dist/`)
+ *   DIST_DIR        the built page (the checkout's `dist/`), and the page's check built for
+ *                   Node, `server/LocalDataSets.js` under it (`npm run build`)
  *   GAMEFILES_DIR   the data sets (the checkout's `static/gamefiles/`)
  *   MANIFEST_FILE   their manifest, its folders relative to GAMEFILES_DIR (the checkout's
  *                   `tools/data-sets.json`; the image's `/data/gamefiles/manifest.json`),
@@ -17,9 +18,11 @@
  *                   included, and says they moderate (`manifestText`); unset or empty
  *                   for no moderator
  *
- * It opens the store and checks the files before it listens, and exits with 1 on an
- * entry of `MODERATOR_PLAYER_IDS` that is not a `playerId`, a store it cannot open, an empty table and
- * a manifest that is missing or does not parse, or a folder the sets name that is missing. It logs to stdout, and on SIGTERM or SIGINT stops
+ * It opens the store, checks the files and loads the page's check of a player's set
+ * (`loadCheckDataSet`) before it listens, and exits with 1 on an entry of
+ * `MODERATOR_PLAYER_IDS` that is not a `playerId`, a store it cannot open, an empty table and
+ * a manifest that is missing or does not parse, a folder the sets name that is missing, or
+ * a check that is not built. It logs to stdout, and on SIGTERM or SIGINT stops
  * listening, lets the requests in flight finish, closes the store, which checkpoints its
  * WAL, and exits with 0.
  */
@@ -27,7 +30,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import { checkFiles, createAppServer, type CheckedFiles, type ServerOptions } from './app.ts';
+import { checkFiles, createAppServer, loadCheckDataSet, type CheckDataSet, type CheckedFiles, type ServerOptions } from './app.ts';
 import { DataSetStore } from './dataSets.ts';
 import { isPlayerId, RateLimit } from './events.ts';
 import { StatsStore } from './stats.ts';
@@ -53,6 +56,7 @@ let db: DatabaseSync;
 let dataSets: DataSetStore;
 let store: StatsStore;
 let checked: CheckedFiles;
+let checkDataSet: CheckDataSet;
 try {
     if (!moderatorPlayerIds.every((id) => isPlayerId(id))) throw new Error('MODERATOR_PLAYER_IDS holds an entry that is not a playerId, a lowercase UUID');
     mkdirSync(dirname(statsDb), { recursive: true });
@@ -60,12 +64,14 @@ try {
     dataSets = new DataSetStore(db);
     store = new StatsStore(db);
     checked = checkFiles(options, dataSets);
+    checkDataSet = await loadCheckDataSet(options.distDir);
 } catch (error) {
     console.error(`Not starting: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
 }
 
 const server = createAppServer(options, {
+    checkDataSet,
     dataSets,
     moderatorPlayerIds,
     store,

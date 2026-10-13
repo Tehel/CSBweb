@@ -5,6 +5,9 @@
 # Builds the image with CSBWEB_PROBE=1 (the probes' handle, which a deployed image never
 # has) as csbweb:probe, runs it over the checkout's game files, their manifest
 # (`tools/data-sets.json`) and a throwaway stats folder, runs `check-frames.sh --url` against it, and removes the container.
+# Before the frames, it runs the server's check of a player's set (`dist/server/`,
+# `server/app.ts` → `CHECK_MODULE`) in the container, on DM's own files: the server loads
+# it at start-up, and the image's Node must also run it.
 #
 #   bash tools/check-image.sh
 #
@@ -34,4 +37,15 @@ until curl -sf -o /dev/null --max-time 1 "http://127.0.0.1:$port/api/health"; do
   sleep 0.2
 done
 docker logs "$name"
+docker exec "$name" node --input-type=module -e '
+  import { readFileSync } from "node:fs";
+  const { checkLocalDataSet } = await import("/app/dist/server/LocalDataSets.js");
+  const dir = "/data/gamefiles/dm-atari";
+  const blob = (name) => new Blob([readFileSync(`${dir}/${name}`)]);
+  const draft = { id: "dm", name: "DM", description: "", authors: [], dmRules: true, baseSet: "dm-atari",
+    files: { "dungeon.dat": blob("dungeon.dat"), "graphics.dat": blob("graphics.dat") } };
+  const { problems, record } = await checkLocalDataSet(draft, new Set(), () => null, 0);
+  if (!record) { console.error("the server'"'"'s check refused DM:", JSON.stringify(problems)); process.exit(1); }
+  console.log(`the server'"'"'s check: DM makes a record, signature ${record.dungeonSignature[0].slice(0, 12)}…`);
+' || exit 1
 bash "$root/tools/check-frames.sh" --url "http://localhost:$port/"

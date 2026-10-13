@@ -25,7 +25,8 @@ FROM node:24-alpine
 WORKDIR /app
 # No node_modules: the server has no dependency. `package.json` is there for its
 # `"type": "module"`, and `DataSets.ts` is the page's manifest parser, which the server
-# imports from `../src/data/`.
+# imports from `../src/data/`. `dist/server/` is the page's check of a player's set,
+# bundled for Node, which the server loads at start-up.
 COPY package.json ./
 COPY server/ server/
 COPY src/data/DataSets.ts src/data/DataSets.ts

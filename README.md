@@ -22,7 +22,7 @@ This port is based on the awesome CSBWin version by Paul R. Stevens, which was c
 ```bash
 npm install
 npm run dev            # Vite dev server on http://localhost:9000
-npm run build          # tsc, then vite build into dist/
+npm run build          # tsc, then vite build into dist/, and the server's module into dist/server/
 npm run preview        # serve the build
 npm test               # tsc and every asserting tool in tools/
 npm test -- --frames   # ...and the golden frames (needs google-chrome)

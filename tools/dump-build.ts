@@ -1,14 +1,20 @@
 /**
- * What a build ships (`doc/DEPLOYMENT.md`): the page, and none of `static/`.
+ * What a build ships (`doc/DEPLOYMENT.md`): the page, the server's check of a player's set,
+ * and none of `static/`.
  *
- * Builds with the project's own `vite.config.mts` (the CLI, as `npm run build` does) into a
- * scratch folder, lists every file,
+ * Builds with the project's own `vite.config.mts` (the CLI, as `npm run build` does: the
+ * page, then `--ssr`) into a scratch folder, lists every file,
  * and asserts:
- *   - every file is `index.html` or under `assets/`, of a type the page itself is made of:
- *     no `.dat`, no `.pdf`, nothing of `static/`;
+ *   - every file is `index.html`, under `assets/`, or the server's module (`CHECK_MODULE`),
+ *     of a type the page itself is made of: no `.dat`, no `.pdf`, nothing of `static/`;
  *   - every local `href` and `src` in `index.html` names a file the build holds;
  *   - the bundle hands the probes no `window.__probe`, which only a build made with
- *     `CSBWEB_PROBE=1` does (`vite.config.mts`): the image the golden frames check.
+ *     `CSBWEB_PROBE=1` does (`vite.config.mts`): the image the golden frames check;
+ *   - the server's module imports nothing, as the image has no `node_modules`, loads through
+ *     the server's own loader (`loadCheckDataSet`), and says of a set what the page's
+ *     `checkLocalDataSet` says, its problems, record and census: DM's `dungeon.dat` on its
+ *     base set's `graphics.dat`, read from the set's folder, the same with Chaos Strikes Back's
+ *     own `graphics.dat`, and a `dungeon.dat` that does not read.
  *
  * Usage: npx tsx tools/dump-build.ts
  */
@@ -17,6 +23,10 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 
+import { CHECK_MODULE, loadCheckDataSet, type DataSetDraft, type DataSetFolder } from '../server/app.ts';
+import { checkLocalDataSet } from '../src/data/LocalDataSets.ts';
+import { dataSetNamed } from './lib/dataSets.ts';
+
 const ROOT = resolve(import.meta.dirname, '..');
 const PAGE_TYPES = new Set(['.html', '.js', '.css', '.ico', '.jpg', '.png', '.ttf', '.woff2']);
 
@@ -24,6 +34,36 @@ let failures = 0;
 function check(ok: boolean, what: string): void {
     console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${what}`);
     if (!ok) failures++;
+}
+
+/** `vite build` with `args`, into `outDir`, as `npm run build` runs it. */
+function viteBuild(outDir: string, args: string[]): void {
+    const vite = spawnSync(resolve(ROOT, 'node_modules/.bin/vite'),
+        ['build', ...args, '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'],
+        { cwd: ROOT, encoding: 'utf8', env: { ...process.env, CSBWEB_PROBE: undefined } });
+    if (vite.status !== 0) throw new Error(`vite build ${args.join(' ')} failed:\n${vite.stdout}${vite.stderr}`);
+}
+
+/** The data set `id`'s folder on disk, as the server reads it. */
+function folder(id: string): DataSetFolder {
+    const dir = dataSetNamed(id).dir;
+    return {
+        async read(name) {
+            try {
+                return new Uint8Array(readFileSync(join(dir, name)));
+            } catch {
+                return null;
+            }
+        },
+        where: (name) => join(dir, name),
+    };
+}
+
+/** A draft of the files `names` of `set`'s folder, on base set `dm-atari` where it has no graphics.dat. */
+function draftOf(set: string, names: string[], replaced: Record<string, Blob> = {}): DataSetDraft {
+    const files: Record<string, Blob> = {};
+    for (const name of names) files[name] = new Blob([readFileSync(join(dataSetNamed(set).dir, name))]);
+    return { id: set, name: set, description: '', authors: [], dmRules: true, baseSet: 'dm-atari', files: { ...files, ...replaced } };
 }
 
 function listFiles(dir: string): string[] {
@@ -36,10 +76,8 @@ function listFiles(dir: string): string[] {
 async function main(): Promise<void> {
     const outDir = mkdtempSync(join(tmpdir(), 'csbweb-build-'));
     try {
-        const vite = spawnSync(resolve(ROOT, 'node_modules/.bin/vite'),
-            ['build', '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'],
-            { cwd: ROOT, encoding: 'utf8', env: { ...process.env, CSBWEB_PROBE: undefined } });
-        if (vite.status !== 0) throw new Error(`vite build failed:\n${vite.stdout}${vite.stderr}`);
+        viteBuild(outDir, []);
+        viteBuild(join(outDir, 'server'), ['--ssr']);
 
         const files = listFiles(outDir).map((f) => relative(outDir, f)).sort();
         let total = 0;
@@ -52,8 +90,8 @@ async function main(): Promise<void> {
         console.log(`  ${String(total).padStart(8)}  in all`);
 
         console.log('\nChecks:');
-        const strays = files.filter((f) => f !== 'index.html' && !f.startsWith('assets/'));
-        check(strays.length === 0, `every file is index.html or under assets/${strays.length ? `: not ${strays.join(', ')}` : ''}`);
+        const strays = files.filter((f) => f !== 'index.html' && !f.startsWith('assets/') && f !== CHECK_MODULE);
+        check(strays.length === 0, `every file is index.html, under assets/ or ${CHECK_MODULE}${strays.length ? `: not ${strays.join(', ')}` : ''}`);
         const foreign = files.filter((f) => !PAGE_TYPES.has(f.slice(f.lastIndexOf('.'))));
         check(foreign.length === 0, `every file is of the page's own types${foreign.length ? `: not ${foreign.join(', ')}` : ''}`);
         check(!files.some((f) => f.includes('gamefiles')), 'no game files');
@@ -67,6 +105,29 @@ async function main(): Promise<void> {
 
         const bundle = files.filter((f) => f.endsWith('.js')).map((f) => readFileSync(join(outDir, f), 'utf8')).join('');
         check(!bundle.includes('__probe'), 'the bundle hands the probes no handle');
+
+        console.log('\nThe server\'s check:');
+        const module = readFileSync(join(outDir, CHECK_MODULE), 'utf8');
+        const imports = module.match(/^\s*(?:import|export\s.*\sfrom)\s.*$|\bimport\(|\brequire\(/gm) ?? [];
+        check(imports.length === 0, `${CHECK_MODULE} imports nothing${imports.length ? `: not ${imports.join(', ')}` : ''}`);
+        const built = await loadCheckDataSet(outDir);
+        const base = (set: string): DataSetFolder | null => set === 'dm-atari' || set === 'csb' ? folder(set) : null;
+        const drafts: [string, DataSetDraft, boolean][] = [
+            ['DM, on its base set\'s graphics.dat', draftOf('dm-atari', ['dungeon.dat']), true],
+            ['CSB, with its own graphics.dat', draftOf('csb', ['dungeon.dat', 'graphics.dat']), true],
+            ['a dungeon.dat that does not read', draftOf('dm-atari', [], { 'dungeon.dat': new Blob([new Uint8Array(3)]) }), false],
+        ];
+        for (const [what, draft, makesRecord] of drafts) {
+            const said = async (check: typeof built) => {
+                const { problems, record, census } = await check(draft, new Set(), base, 0);
+                return JSON.stringify({ problems, record: record && { ...record, files: undefined }, census });
+            };
+            const fromBuild = await said(built), fromSource = await said(checkLocalDataSet);
+            const { problems, record } = JSON.parse(fromBuild);
+            console.log(`  ${what}: ${record ? `a record, signature ${record.dungeonSignature[0].slice(0, 12)}…` : problems.map((p: { about: string; text: string }) => `${p.about}: ${p.text}`).join('; ')}`);
+            check((record !== null) === makesRecord, `${what}: ${makesRecord ? 'a record' : 'no record'}`);
+            check(fromBuild === fromSource, `${what}: the built check says what the source's does`);
+        }
     } finally {
         rmSync(outDir, { recursive: true, force: true });
     }

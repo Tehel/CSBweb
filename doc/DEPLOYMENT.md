@@ -17,7 +17,8 @@ behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 ## What runs where
 
 ```
-image      dist/ (the built page) + server/ (run by Node 24 as is) + src/data/DataSets.ts
+image      dist/ (the built page, and the server's check in dist/server/) + server/ (run by
+           Node 24 as is) + src/data/DataSets.ts
 mounts     /data/gamefiles        the data sets, swoosh/, manifest.json, and players' uploads
            /data/stats            stats.db (SQLite, WAL: the statistics and the data sets), backups/
 env        PORT (8085), DIST_DIR, GAMEFILES_DIR, MANIFEST_FILE, STATS_DB, MODERATOR_PLAYER_IDS
@@ -139,13 +140,24 @@ needs no restart.
 
 ## The build
 
-`npm run build` is `tsc && vite build`. `static/` is Vite's `publicDir` for the dev server
+`npm run build` is `tsc && vite build && vite build --ssr`. `static/` is Vite's `publicDir` for the dev server
 only (`vite.config.mts`), so a build ships none of the game files, the manuals or anything
 else there. The page's own files are under `src/assets/`: `favicon.ico`, named by
 `index.html`, and the welcome page's logo, `csbweb-logo.jpg`, imported by
-`src/ui/welcomePage.ts`; the build hashes both. A build is `index.html` and `assets/`, under 1 MB.
-`tools/dump-build.ts` builds into a scratch folder and asserts it: only the page's own file
-types, nothing of `static/`, every file `index.html` names present, and no probe handle.
+`src/ui/welcomePage.ts`; the build hashes both. A build is `index.html` and `assets/`, under 1 MB, and the server's
+module.
+
+**The server's module** is the second build, `--ssr`: the page's check of a player's own
+set, `checkLocalDataSet` (`src/data/LocalDataSets.ts`) and every reader under it, bundled
+into one module that imports nothing, `dist/server/LocalDataSets.js` (`vite.config.mts`).
+The server cannot import the page's sources as it imports `DataSets.ts`, since they are not
+erasable syntax and the image has no `node_modules`, so it loads this module instead and
+reads a set with the page's own readers. It is never served.
+
+`tools/dump-build.ts` builds both into a scratch folder and asserts them: only the page's own file
+types, nothing of `static/`, every file `index.html` names present, no probe handle, and a
+server's module that imports nothing and says of DM's and CSB's files, and of a file that
+does not read, what the source's check says.
 
 **The probe handle** (`window.__probe`, `src/main.ts`), through which the CDP probes drive
 the page, is the dev server's, and a build's only with `CSBWEB_PROBE=1` (`__CSBWEB_PROBE__`,
@@ -174,6 +186,7 @@ every set (unset or empty, no one; an entry that is not a `playerId` stops the s
 | --- | --- | --- |
 | `/` | `dist/index.html` | `no-cache` |
 | `/assets/…` | `dist/assets/…`, hashed names | `immutable` |
+| `/server/…` | 404: `dist/server/` is the server's module | |
 | `/gamefiles/…` | `GAMEFILES_DIR/…`, but the manifest | `no-cache`, ETag and Last-Modified |
 | `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest | `no-store`, `Vary: X-Player-Id` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
@@ -187,7 +200,7 @@ decoded, is refused with 400 before it reaches the disk.
 **At start-up** it opens the store (making it, and its folder, when missing), checks
 that `index.html` is built, and that each folder the sets name exists: the table's, or,
 while the table is empty, those of the manifest, which must parse, and which then fills
-it. Any failure prints `Not starting: <why>` and exits with 1, so a bad mount fails
+it; then it loads the server's module (`loadCheckDataSet`, `server/app.ts`). Any failure prints `Not starting: <why>` and exits with 1, so a bad mount fails
 the container rather than the player's boot. On SIGTERM it stops listening, lets the
 requests in flight finish (5 s at most), closes the store, which checkpoints the WAL into
 the file, and exits with 0. It logs to stdout. `tools/dump-server.ts` asserts all of it,
@@ -202,7 +215,7 @@ the file, and exits with 0. It logs to stdout. `tools/dump-server.ts` asserts al
   checks beside them, and the package and build files. No game file, no `.git` and no
   `.env` can reach it, so the commit comes in as the build argument `CSBWEB_BUILD`.
 - **The runtime stage** has no `node_modules`: `package.json` (for `"type": "module"`),
-  `server/`, `src/data/DataSets.ts` and the built `dist/`. It runs as `USER node`, uid
+  `server/`, `src/data/DataSets.ts` and the built `dist/`, the server's module in it. It runs as `USER node`, uid
   1000, the VPS's `ubuntu`, so the mounted `stats/` is writable in the container and
   readable over SSH. The exec form makes Node PID 1, which receives SIGTERM, and
   `--disable-warning=ExperimentalWarning` silences `node:sqlite`'s warning.
@@ -270,8 +283,8 @@ answers 502.
 
 `tools/check-image.sh` builds the image with `CSBWEB_PROBE=1` as `csbweb:probe`, runs it over
 the checkout's game files, `tools/data-sets.json` as its `MANIFEST_FILE` and a throwaway
-stats folder, and runs
-`tools/check-frames.sh --url` against it: the twenty golden frames, drawn by the built
+stats folder, runs the server's module in it on DM's own files, and runs
+`tools/check-frames.sh --url` against it: the golden frames, drawn by the built
 page as the container serves it, must match the dev server's. The probe image is never
 deployed.
 

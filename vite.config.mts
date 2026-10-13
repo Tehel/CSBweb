@@ -43,7 +43,14 @@ function dataSetsRoute(): Plugin {
   };
 }
 
-export default defineConfig(({ command }) => ({
+/**
+ * The server's build of the page's check of a player's own set (`checkLocalDataSet`): `vite
+ * build --ssr`, after the page's, one self-contained module that the server, which has no
+ * `node_modules`, loads from `dist/server/` (`server/app.ts`, `CHECK_MODULE`).
+ */
+const SERVER_ENTRY = resolve(import.meta.dirname, 'src', 'data', 'LocalDataSets.ts');
+
+export default defineConfig(({ command, isSsrBuild }) => ({
   plugins: [dataSetsRoute()],
   root: '.',
   // Every URL relative to the page, so the game also runs under a sub-path.
@@ -59,10 +66,10 @@ export default defineConfig(({ command }) => ({
     __CSBWEB_PROBE__: JSON.stringify(command === 'serve' || process.env.CSBWEB_PROBE === '1'),
   },
   build: {
-    outDir: 'dist',
+    outDir: isSsrBuild ? 'dist/server' : 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      input: {
+      input: isSsrBuild ? SERVER_ENTRY : {
         main: resolve(import.meta.dirname, 'index.html')
       }
     }

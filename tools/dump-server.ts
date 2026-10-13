@@ -16,7 +16,8 @@
  *     moderators, and to nobody else; and the manifest not served as a file under
  *     `gamefiles/`;
  *   - `/` and `/assets/…`: the page, `no-cache`, and the hashed files, `immutable`, the
- *     fonts as `font/ttf` and `font/woff2`;
+ *     fonts as `font/ttf` and `font/woff2`; and `dist/server/`, the server's module, not
+ *     served;
  *   - `/gamefiles/…`: ETag and Last-Modified, a 304 for either precondition, HEAD without
  *     a body, and the query ignored;
  *   - no path leaves the two folders, `..` and `.` raw, percent-encoded or behind a
@@ -25,8 +26,10 @@
  *   - `/api/event`: POST only, an event stored (what is stored, `dump-stats` asserts), a bad
  *     one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
  *     forwarded address, 429; `/api/stats`: the store's aggregates, not cached;
- *   - `server.ts` itself, as Node runs it: a bad mount, a store it cannot open or an
- *     entry of `MODERATOR_PLAYER_IDS` that is not a `playerId` exits 1
+ *   - the API is handed the page's own `checkLocalDataSet`, which `tsc` holds to the
+ *     shape `server/app.ts` types it by (`CheckDataSet`);
+ *   - `server.ts` itself, as Node runs it: a bad mount, a store it cannot open, a page's
+ *     check that is not built, or an entry of `MODERATOR_PLAYER_IDS` that is not a `playerId` exits 1
  *     before it listens; a list of two, spaces around the comma, makes both moderators; and SIGTERM stops a listening server with 0, the store made, its
  *     table filled, and its WAL checkpointed; started again without a manifest, it plays
  *     from the table;
@@ -35,6 +38,9 @@
  *     missing store; the folder of a set with an owner copied whole into
  *     `backups/gamefiles/`, the site's not, kept by the next run rather than copied
  *     again, and exit 1 on an owned set whose folder is not there.
+ *
+ * The scratch build's check (`CHECK_MODULE`) is a stand-in that exports the function:
+ * `tools/dump-build.ts` builds the real one and checks sets through it.
  *
  * Usage: npx tsx tools/dump-server.ts
  */
@@ -46,12 +52,13 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { checkFiles, createAppServer, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
+import { CHECK_MODULE, checkFiles, createAppServer, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
 import { ANYONE, DataSetStore, manifestText } from '../server/dataSets.ts';
 import { RateLimit } from '../server/events.ts';
 import { StatsStore } from '../server/stats.ts';
 import { openStore } from '../server/store.ts';
 import { parseManifest, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
+import { checkLocalDataSet } from '../src/data/LocalDataSets.ts';
 import { GAMEFILES_DIR, MANIFEST_FILE } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -112,6 +119,8 @@ function scratchFiles(scratch: string): ServerOptions {
     writeFileSync(join(distDir, 'assets', 'index-AbC123.js'), 'console.log(1);');
     writeFileSync(join(distDir, 'assets', 'font-AbC123.ttf'), Buffer.from([0, 1, 0, 0]));
     writeFileSync(join(distDir, 'assets', 'font-AbC123.woff2'), Buffer.from([0x77, 0x4f, 0x46, 0x32]));
+    mkdirSync(join(distDir, 'server'));
+    writeFileSync(join(distDir, CHECK_MODULE), 'export function checkLocalDataSet() {}\n');
     writeFileSync(join(gamefilesDir, 'manifest.json'), JSON.stringify({
         default: 'a', swoosh: 'logo',
         dataSets: [{ id: 'a', name: 'A', dir: 'set-a' }],
@@ -188,6 +197,7 @@ async function checkAnswers(port: number, manifest: string): Promise<void> {
     check((await ask(port, '/index.html')).headers['cache-control'] === 'no-cache', '/index.html is no-cache too');
     check((await ask(port, '/assets/nothing.js')).status === 404, 'a missing file is 404');
     check((await ask(port, '/assets')).status === 404, 'a folder is 404, not a listing');
+    check((await ask(port, `/${CHECK_MODULE}`)).status === 404, `the server's module, ${CHECK_MODULE}, is not served`);
 
     console.log('\nThe game files:');
     const file = await ask(port, '/gamefiles/set-a/dungeon.dat');
@@ -373,6 +383,12 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     const badStore = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: options.distDir }));
     console.log(`  bad store: exit ${badStore.code}, ${firstLine(badStore.out).replace(scratch, '<scratch>')}`);
     check(badStore.code === 1 && badStore.out.includes('Not starting:'), 'a store it cannot open exits 1 before it listens');
+    const noCheck = join(scratch, 'dist-without-check');
+    mkdirSync(noCheck);
+    writeFileSync(join(noCheck, 'index.html'), '<!doctype html><title>page</title>');
+    const unbuilt = await finish(startEntry({ PORT: '0', DIST_DIR: noCheck, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: join(scratch, 'unbuilt', 'stats.db') }));
+    console.log(`  no check built: exit ${unbuilt.code}, ${firstLine(unbuilt.out).split(scratch).join('<scratch>').replace(/ \(.*\)/, ' (…)')}`);
+    check(unbuilt.code === 1 && unbuilt.out.includes(`${CHECK_MODULE} does not load`), 'a page\'s check that is not built exits 1 before it listens');
     const badModerator = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: join(scratch, 'moderator', 'stats.db'), MODERATOR_PLAYER_IDS: `${MODERATORS[0]},the-moderator` }));
     console.log(`  bad moderator: exit ${badModerator.code}, ${firstLine(badModerator.out)}`);
     check(badModerator.code === 1 && badModerator.out.includes('MODERATOR_PLAYER_IDS holds an entry that is not a playerId') && !existsSync(join(scratch, 'moderator')),
@@ -478,6 +494,7 @@ async function main(): Promise<void> {
         checkFiles(options, dataSets);
         const manifest = readFileSync(options.manifestFile, 'utf8');
         const api: ApiOptions = {
+            checkDataSet: checkLocalDataSet,
             dataSets,
             moderatorPlayerIds: MODERATORS,
             store,

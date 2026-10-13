@@ -8,6 +8,7 @@
  *
  *   /                 dist/index.html               no-cache
  *   /assets/…         dist/assets/…, hashed names   immutable
+ *   /server/…         404: the server's own module (`CHECK_MODULE`), never served
  *   /gamefiles/…      GAMEFILES_DIR/…               no-cache, with ETag and Last-Modified
  *   /api/data-sets    the page's list of sets, from the store's table (`dataSets.ts`), for
  *                     the player its `X-Player-Id` names
@@ -23,6 +24,7 @@
 import { createReadStream, readFileSync, statSync, type Stats } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, type DataSetManifest } from '../src/data/DataSets.ts';
 import { manifestText, samePlayerId, type DataSetStore, type DataSetViewer } from './dataSets.ts';
@@ -49,8 +51,70 @@ export interface CheckedFiles {
     filled: boolean;
 }
 
+/** The files of a set's folder, by name, as the page reads them (`DataSetFiles`, `src/data/DataSetFiles.ts`). */
+export interface DataSetFolder {
+    /** The file `name`'s bytes, or `null` where the set has none, or it cannot be read. */
+    read(name: string): Promise<Uint8Array | null>;
+    /** The file `name` as an error names it. */
+    where(name: string): string;
+}
+
+/** A player's set as the page's form gives it (`LocalDataSetDraft`, `src/data/LocalDataSets.ts`). */
+export interface DataSetDraft {
+    /** The `<id>` of `local:<id>`. */
+    id: string;
+    name: string;
+    description: string;
+    authors: string[];
+    dmRules: boolean;
+    /** The set whose `graphics.dat` it plays where `files` holds none. */
+    baseSet: string;
+    /** By the name the game reads them under, and `thumbnail`. */
+    files: Partial<Record<string, Blob>>;
+}
+
+/**
+ * The page's check of a player's own set, `checkLocalDataSet` (`src/data/LocalDataSets.ts`),
+ * which `npm run build` makes a Node module (`vite.config.mts`) and the server loads at
+ * start-up (`loadCheckDataSet`), so that the server reads a set with the page's own readers.
+ * It is typed here by its shape, since the page's sources are not erasable syntax and the
+ * server's `tsc` cannot follow them; a tool that hands the API the source's function proves
+ * that the two agree.
+ */
+export type CheckDataSet = (
+    draft: DataSetDraft,
+    takenIds: ReadonlySet<string>,
+    base: (set: string) => DataSetFolder | null,
+    createdAt: number,
+) => Promise<{
+    problems: { about: string; text: string }[];
+    record: { id: string; dungeonSignature: readonly string[] } | null;
+    census: unknown;
+}>;
+
+/** The folder of `distDir` that holds the server's own module, not the page's: never served. */
+const SERVER_DIR = 'server';
+
+/** The page's check built for Node (`CheckDataSet`), under `distDir`. */
+export const CHECK_MODULE = `${SERVER_DIR}/LocalDataSets.js`;
+
+/** The check `CHECK_MODULE` exports, loaded from `distDir`; throws, saying why, where it is not built. */
+export async function loadCheckDataSet(distDir: string): Promise<CheckDataSet> {
+    const file = join(distDir, CHECK_MODULE);
+    let module: { checkLocalDataSet?: unknown };
+    try {
+        module = await import(pathToFileURL(file).href);
+    } catch (error) {
+        throw new Error(`${file} does not load (${error instanceof Error ? error.message : String(error)}): is the server's module built?`);
+    }
+    if (typeof module.checkLocalDataSet !== 'function') throw new Error(`${file} exports no checkLocalDataSet`);
+    return module.checkLocalDataSet as CheckDataSet;
+}
+
 /** What the API needs beside the files. */
 export interface ApiOptions {
+    /** The page's check of a player's set (`CheckDataSet`). */
+    checkDataSet: CheckDataSet;
     /** `api/data-sets`'s sets, read at each request. */
     dataSets: DataSetStore;
     /** The moderators' `playerId`s, to whom `api/data-sets` offers every set: none, or several. */
@@ -163,6 +227,7 @@ function route({ distDir, gamefilesDir, manifestFile }: ServerOptions, api: ApiO
         return serveFile(req, res, path, NO_CACHE);
     }
     if (segments.length === 0) return serveFile(req, res, join(distDir, 'index.html'), NO_CACHE);
+    if (segments[0] === SERVER_DIR) return send(res, 404, 'Not found');
     return serveFile(req, res, join(distDir, ...segments), segments[0] === 'assets' ? IMMUTABLE : NO_CACHE);
 }
 

@@ -113,7 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P8 | Publishing a local set, and moderating it | L | ⏳ |
+| P8 | Publishing a local set, and moderating it | L | ⚠️ step 2 of 5 next |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
@@ -134,6 +134,7 @@ In payoff order: the first row is the next item.
 | W6 | Security headers | S | ⏳ |
 | W7 | The container, the deploy and the Node version | S | ⏳ |
 | R12 | Listing the saves reads every save's bytes | M | ⏳ |
+| R15 | A `dungeon.dat` of zeros reads as a dungeon with no level | S | ⏳ |
 | D17 | The screen keeps the party it last drew | S | ⏳ |
 | E23 | One game read, whole or not at all | L | ⏳ |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
@@ -191,7 +192,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C182 · D22 · E40 · F21 · G31 · P10 · R15 · U11 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E40 · F21 · G31 · P10 · R16 · U11 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -248,7 +249,14 @@ every set, told so (`"moderator": true`, `DataSetManifest.moderator`), and the w
 lists them the hidden sets too (`chooserSets`). A tile's name says its set's state: cyan
 local, red pending, purple hidden (the one colour of the page outside the UI palette),
 white otherwise. Its `gamefiles/` is mounted read-write, and `server/backup.ts` copies the folders
-of the sets with an owner beside the store's snapshots.
+of the sets with an owner beside the store's snapshots. It reads a set with the page's own
+check: `npm run build` bundles `checkLocalDataSet` and its readers for Node into
+`dist/server/LocalDataSets.js` (`vite.config.mts`, `doc/DEPLOYMENT.md` → "The build"),
+which `server.ts` loads at start-up and hands the API (`CheckDataSet`, `loadCheckDataSet`,
+`server/app.ts`), a tool the source's function instead; nothing calls it yet.
+`tools/dump-build.ts` proves the bundle says what the source says, `tools/dump-server.ts`
+that the server does not start without it, and `tools/check-image.sh` that the image's
+Node runs it.
 
 The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase letters, digits, `.`, `-` and
 `_`, at most 40), since P8 makes it the set's folder on the server. No shipped dungeon
@@ -274,7 +282,8 @@ A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more 
 
 ### P8 ⏳ Publishing a local set, and moderating it
 
-L, in five steps (below); none is taken yet.
+L, in five steps (below); the first, the page's reader on the server, stands (tier P's
+introduction), and step 2 is next.
 
 **The lifecycle.** A set is in one of four states, which its tile's name says (`src/ui/welcomePage.ts`):
 
@@ -320,7 +329,8 @@ own route, which takes the files.
 - refuses an id whose folder `gamefiles/<id>/` already exists (`swoosh/`, or a folder no
   row names) or that starts with `.` (the server serves no such segment);
 - caps each file's size and each player's rate;
-- parses `dungeon.dat` with the page's own reader;
+- checks the set with the page's own check (`ApiOptions.checkDataSet`), which reads every
+  file as the boot does (but R15);
 - writes the folder under `gamefiles/<id>/` whole, then the row as pending, owned by the
   sender, and never changes the folder after: `backup.ts` copies each owned set's folder
   once, the first night its row is in a snapshot (`doc/DEPLOYMENT.md` → "Backups").
@@ -334,14 +344,7 @@ follow as an item of its own.
 
 **The steps**, each a commit with its evidence:
 
-1. **The page's reader on the server.** `checkLocalDataSet` (`src/data/LocalDataSets.ts`)
-   and the loaders under it import without extensions and use enums, which Node's type
-   stripping cannot run, and the image copies only `src/data/DataSets.ts`. The build makes
-   the check a Node module (a second Vite build, SSR, of one entry, into `dist/server/`),
-   the image copies it, and `server.ts` hands it to the API in `ApiOptions` beside
-   `dataSets`, so a tool passes the source's function instead. Evidence:
-   `tools/dump-server.ts` checks a set through it, `tools/check-image.sh` that the image
-   runs it.
+1. **The page's reader on the server**: stands.
 2. **The publish route.** `POST api/data-sets`, a `multipart/form-data` body (Node's own
    `Request.formData()`): the record's fields and files, and `X-Player-Id`. The rules
    above, in that order, then: the flags follow from the files as `localDataSet`'s do;
@@ -607,6 +610,19 @@ and an enciphered save is deciphered twice (`loadCsbwinWorld` again after
 
 Paying it: the rows' fields and their files in two object stores, which bumps `DB_VERSION`.
 The deciphered data handed on by `loadSaveGameState`.
+
+### R15 ⏳ A `dungeon.dat` of zeros reads as a dungeon with no level
+
+`DungeonLoader.loadDungeonDat` reads 44 zero bytes or more as a dungeon of no level, and
+`checkLocalDataSet` (`src/data/LocalDataSets.ts`) makes a record of it, its
+`dungeonSignature` empty: the form stores it, and P8's publish route, which checks a set
+through it, would take it. Under 44 bytes it does not read. What the boot does with such a
+record is not checked.
+
+Paying it: read CSBWin's dungeon reader (`ReadDatabases`, `doc/CSBwin-src/SaveGame.cpp:2536`) for what it
+does with a header of zeros, mirror it where it refuses, and have the check refuse a
+dungeon the boot cannot start in (no level, the party's start square off the map), with a
+case in `tools/dump-local-data-set.ts`.
 
 ---
 
