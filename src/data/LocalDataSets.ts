@@ -128,7 +128,8 @@ export const LOCAL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;
  *
  * - The id is given, a folder's name (`LOCAL_ID_PATTERN`), and none of `takenIds`'.
  * - `dungeon.dat` is given and reads, enciphered or not (`DungeonLoader.loadDungeonDat`):
- *   where it does not, the boot dies (`Game.readDungeonDat`).
+ *   where it does not, the boot dies (`Game.readDungeonDat`). It has a level, and the
+ *   party's start square is on the first (`unstartableDungeon`).
  * - The `graphics.dat` it plays, its own or its base set's (`base`), gives the tables the
  *   boot builds from it (`extractGraphicsTables`, `buildGameTables`), and is the one the
  *   dungeon names, if it names one (`graphicsSignatureRefused`).
@@ -168,6 +169,8 @@ export async function checkLocalDataSet(
     if (!dungeonDat) problem('dungeon.dat', 'A dungeon.dat is needed.');
     else if (read!.error !== null) problem('dungeon.dat', `It does not read: ${read!.error}`);
     const dungeon = read?.dungeon ?? null;
+    const unstartable = dungeon && unstartableDungeon(dungeon);
+    if (unstartable) problem('dungeon.dat', unstartable);
     const runtime = dungeon && readRuntimeFileSignatures(dungeon);
 
     const ownGraphics = files['graphics.dat'];
@@ -224,6 +227,24 @@ export async function checkLocalDataSet(
             createdAt,
         },
     };
+}
+
+/**
+ * Why the party cannot start in `dungeon`, or `null` where it can. A new game puts the
+ * party on the header's square of level 0 (`ReadDatabases`,
+ * `doc/CSBwin-src/SaveGame.cpp:2613-2622`), and nothing in CSBWin checks either: a
+ * header of zeros reads as a dungeon of no level (`numLevel` 0 fetches no descriptor,
+ * `:2623-2639`), and a square past level 0's last column or row has no cell among the
+ * column pointers built for it (`:2881-2916`). The port's boot puts the party in a wall.
+ */
+function unstartableDungeon(dungeon: DungeonData): string | null {
+    const first = dungeon.maps[0]?.descriptor;
+    if (!first) return 'It has no level.';
+    const { x, y } = dungeon.header.startPosition;
+    if (x >= first.width || y >= first.height) {
+        return `The party starts at (${x}, ${y}), off the first level, which is ${first.width} by ${first.height}.`;
+    }
+    return null;
 }
 
 /**

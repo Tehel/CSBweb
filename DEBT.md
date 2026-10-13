@@ -134,7 +134,6 @@ In payoff order: the first row is the next item.
 | W6 | Security headers | S | ⏳ |
 | W7 | The container, the deploy and the Node version | S | ⏳ |
 | R12 | Listing the saves reads every save's bytes | M | ⏳ |
-| R15 | A `dungeon.dat` of zeros reads as a dungeon with no level | S | ⏳ |
 | D17 | The screen keeps the party it last drew | S | ⏳ |
 | E23 | One game read, whole or not at all | L | ⏳ |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
@@ -330,7 +329,7 @@ own route, which takes the files.
   row names) or that starts with `.` (the server serves no such segment);
 - caps each file's size and each player's rate;
 - checks the set with the page's own check (`ApiOptions.checkDataSet`), which reads every
-  file as the boot does (but R15);
+  file as the boot does, and refuses a dungeon the party cannot start in;
 - writes the folder under `gamefiles/<id>/` whole, then the row as pending, owned by the
   sender, and never changes the folder after: `backup.ts` copies each owned set's folder
   once, the first night its row is in a snapshot (`doc/DEPLOYMENT.md` → "Backups").
@@ -610,19 +609,6 @@ and an enciphered save is deciphered twice (`loadCsbwinWorld` again after
 
 Paying it: the rows' fields and their files in two object stores, which bumps `DB_VERSION`.
 The deciphered data handed on by `loadSaveGameState`.
-
-### R15 ⏳ A `dungeon.dat` of zeros reads as a dungeon with no level
-
-`DungeonLoader.loadDungeonDat` reads 44 zero bytes or more as a dungeon of no level, and
-`checkLocalDataSet` (`src/data/LocalDataSets.ts`) makes a record of it, its
-`dungeonSignature` empty: the form stores it, and P8's publish route, which checks a set
-through it, would take it. Under 44 bytes it does not read. What the boot does with such a
-record is not checked.
-
-Paying it: read CSBWin's dungeon reader (`ReadDatabases`, `doc/CSBwin-src/SaveGame.cpp:2536`) for what it
-does with a header of zeros, mirror it where it refuses, and have the check refuse a
-dungeon the boot cannot start in (no level, the party's start square off the map), with a
-case in `tools/dump-local-data-set.ts`.
 
 ---
 

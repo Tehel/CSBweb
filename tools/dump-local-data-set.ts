@@ -11,7 +11,8 @@
  *
  * Also: the id's prefix, which no manifest set may take; a set's flags from its files;
  * a record missing a file; and the form's check (`checkLocalDataSet`): the record it
- * writes is the one played here, and it refuses what the boot would die of, file by file;
+ * writes is the one played here, and it refuses what the boot would die of, file by file,
+ * and a dungeon it cannot start in;
  * which file a dropped one is, told by what it holds (`identifyLocalDataSetFile`);
  * a PC `dungeon.dat`, little-endian, taken as the Atari file it is the twin of (`recordFile`);
  * and what it shows the dungeon holds (`dungeonCensus`), every record in use counted
@@ -226,6 +227,25 @@ async function checkForm(): Promise<void> {
   check(notDungeon.length === 1 && notDungeon[0].startsWith('dungeon.dat: It does not read: '), 'a dungeon.dat that does not read is refused: the boot\'s die(0xbad)');
   const enciphered = await problemsOf('Conflux\'s enciphered dungeon.dat, with its files', await draftOf(conflux, 'cx', ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat']));
   check(enciphered.length === 0, 'an enciphered dungeon.dat reads');
+  // A dungeon the boot reads but cannot start in: a header of zeros, no level; and
+  // dm-windows' dungeon.dat with the party's start square moved off its first level.
+  check((await problemsOf('a dungeon.dat of 44 zeros', { ...good, files: { 'dungeon.dat': blobOf(new Uint8Array(44)) } })).join()
+    === 'dungeon.dat: It has no level.', 'a dungeon.dat of zeros reads as no level, and is refused');
+  const startingAt = (x: number, y: number): Blob => {
+    const file = new Uint8Array(readFileSync('static/gamefiles/dm-windows/dungeon.dat'));
+    const ef = readExtendedFeatures(file);
+    const data = new DungeonLoader().loadDungeonDat(file);
+    data.header.startPosition.x = x;
+    data.header.startPosition.y = y;
+    const image = buildDungeonImage(data, { bigActuators: ef.bigActuators, newScrolls: ef.version >= 0x42, indirectText: ef.indirectText });
+    return new Blob([file.slice(0, ef.offset), new Uint8Array(image), new Uint8Array(buildImageChecksum(image))]);
+  };
+  check((await problemsOf('a start on the first level\'s last square', { ...good, files: { 'dungeon.dat': startingAt(18, 18) } })).length === 0,
+    'a start on the first level\'s last column and row is taken');
+  check((await problemsOf('a start past its last column', { ...good, files: { 'dungeon.dat': startingAt(19, 3) } })).join()
+    === 'dungeon.dat: The party starts at (19, 3), off the first level, which is 19 by 19.', 'a start past its last column is refused');
+  check((await problemsOf('a start past its last row', { ...good, files: { 'dungeon.dat': startingAt(1, 19) } })).length === 1,
+    'and past its last row');
 
   const notGraphics = await problemsOf('a dungeon.dat as graphics.dat', { ...good, files: { ...good.files, 'graphics.dat': good.files['dungeon.dat']! } });
   check(notGraphics.length === 1 && notGraphics[0].startsWith('graphics.dat: It is not a graphics.dat: '), 'a graphics.dat that does not parse is refused');
