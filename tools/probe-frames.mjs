@@ -390,7 +390,8 @@ check(atWelcome.last === 'pick add +Add my own', 'the grid ends with "+ Add my o
 // checklist, a row each for the name, the id and the six files, crossed where needed and
 // missing or wrong, checked where right. CANCEL closes it. Then the player's own set
 // (`src/data/LocalDataSets.ts`) is made through it: DM's dungeon.dat dropped with CSB's
-// thumbnail, hcsb.hct, and a file none of a dungeon's; the id made from the name, then
+// thumbnail, hcsb.hct, and a file none of a dungeon's, the game files under names that
+// are not theirs; the id made from the name, then
 // written; hcsb.hct alone crossing hcsb.dat and holding CONFIRM, until it is removed; a
 // graphics.dat given turning off the choice of graphics; the thumbnail removed, and drawn
 // again by "Generate from data" from DM's graphics. What the dropped dungeon holds
@@ -427,8 +428,8 @@ check(opened.height <= 600, 'the form is on one screen');
 await inForm(`d.querySelector('#add-set-cancel').click()`);
 check(await form() === null, 'CANCEL closes it');
 await clickOn('.pick.add');
-await dropIn([['/gamefiles/dm-atari/dungeon.dat', 'DUNGEON.DAT'], ['/gamefiles/csb/csb-thumbnail.png', 'title.png'],
-  ['/gamefiles/csb/hcsb.hct', 'hcsb.hct'], ['/gamefiles/swoosh/swoosh.img', 'notes.txt']]);
+await dropIn([['/gamefiles/dm-atari/dungeon.dat', 'graphics.dat'], ['/gamefiles/csb/csb-thumbnail.png', 'title.png'],
+  ['/gamefiles/csb/hcsb.hct', 'hints'], ['/gamefiles/swoosh/swoosh.img', 'notes.txt']]);
 await typeIn('name', 'My Own Dungeon');
 await wait(1500);
 const filled = await form();
@@ -436,8 +437,8 @@ console.log('  form:', JSON.stringify(filled));
 check(filled.id === 'my-own-dungeon' && filled.rows === 'name+,id+,dungeon.dat+,graphics.dat+,CSBgraphics.dat,hcsb.hct+,hcsb.datx,thumbnail+'
   && filled.dropped === "Not one of a dungeon's files: notes.txt." && !filled.confirm
   && filled.problems.join() === 'The Hint Oracle needs hcsb.dat beside hcsb.hct.',
-  'dropped files go where their names say, whatever the case, an image to the thumbnail; the id is the name\'s; hcsb.hct alone crosses hcsb.dat and holds CONFIRM');
-await dropIn([['/gamefiles/dm-atari/graphics.dat', 'GRAPHICS.DAT']]);
+  'dropped files go where what they hold says, whatever their names, an image to the thumbnail; the id is the name\'s; hcsb.hct alone crosses hcsb.dat and holds CONFIRM');
+await dropIn([['/gamefiles/dm-atari/graphics.dat', 'GFX']]);
 await wait(1500);
 const ownGraphics = await form();
 await removeIn('graphics.dat');

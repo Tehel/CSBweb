@@ -8,9 +8,11 @@
  *   the authors, separated by commas, the reincarnation rule (`dmRules`, DM's at first), the graphics a
  *   dungeon without its own `graphics.dat` plays, DM's or CSB's, whichever the manifest
  *   has, and one area that takes the files: dropped there, several at once, or chosen in
- *   the picker a click on it opens. A file goes where its name says, whatever its case:
- *   `dungeon.dat`, `graphics.dat`, `CSBgraphics.dat`, the Hint Oracle's `hcsb.hct` and
- *   `hcsb.dat`; an image is the thumbnail. A file given again replaces the one before.
+ *   the picker a click on it opens. An image is the thumbnail. Any other file goes where
+ *   what it holds says, whatever its name (`identifyLocalDataSetFile`): `dungeon.dat`,
+ *   `graphics.dat`, `CSBgraphics.dat`, the Hint Oracle's `hcsb.hct` and `hcsb.dat`; one
+ *   that reads as none of them goes where its name says, whatever its case, so that a
+ *   broken file shows why on its row. A file given again replaces the one before.
  *   Without a thumbnail, its row offers "Generate from data", which draws the one the site's
  *   sets have, the last frame of the title (`TitleThumbnail.ts`), from the set's own
  *   `graphics.dat` or its base set's.
@@ -41,7 +43,7 @@ import { ITEM_KINDS, isIllegalSubcode, operationsUsed, type DungeonCensus } from
 import { StkOp } from '../engine/DsaSystem';
 import { lastTitleFrame, thumbnailPng } from '../renderer/intro/TitleThumbnail';
 import {
-    checkLocalDataSet,
+    checkLocalDataSet, identifyLocalDataSetFile,
     type LocalDataSetDraft, type LocalDataSetField, type LocalDataSetFile, type LocalDataSetProblem, type LocalDataSetRecord,
 } from '../data/LocalDataSets';
 
@@ -68,7 +70,7 @@ const CHECKLIST: readonly ChecklistRow[] = [
     { about: 'thumbnail', label: 'Thumbnail', needed: false, hint: "The welcome page's picture of it: an image, 320x200 at best, or the last frame of its title, drawn from its graphics." },
 ];
 
-/** The files the drop area takes, by the name the game reads them under. */
+/** The files the drop area takes by name, the name the game reads them under. */
 const NAMED_FILES: readonly LocalDataSetFile[] = ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat'];
 
 /** `doc/CSBwin-src/CSBCode.cpp:6796-6841`. */
@@ -272,11 +274,11 @@ export function openAddDataSetForm(
     const failure = text('p', 'add-set-problem add-set-failure', '');
     checklist.after(failure);
 
-    /** `list`'s files, each where its name says; the names of those that go nowhere are shown. */
-    function take(list: Iterable<File>): void {
+    /** `list`'s files, each where `fileRow` says, in turn; the names of those that go nowhere are shown. */
+    async function take(list: Iterable<File>): Promise<void> {
         const unknown: string[] = [];
-        for (const file of list) {
-            const where = fileRow(file);
+        for (const file of [...list]) {
+            const where = await fileRow(file);
             if (where) files[where] = file;
             else unknown.push(file.name);
             if (where === 'thumbnail') drawFailure = '';
@@ -293,7 +295,7 @@ export function openAddDataSetForm(
     dialog.addEventListener('drop', (event) => {
         event.preventDefault();
         drop.classList.remove('over');
-        take(event.dataTransfer?.files ?? []);
+        void take(event.dataTransfer?.files ?? []);
     });
     drop.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -302,7 +304,7 @@ export function openAddDataSetForm(
         }
     });
     picker.addEventListener('change', () => {
-        take(picker.files ?? []);
+        void take([...picker.files ?? []]);
         picker.value = '';
     });
 
@@ -480,11 +482,13 @@ function plural(n: number, word: string): string {
     return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
 
-/** Where a file goes: the file of its name, whatever its case, or the thumbnail for an image. */
-function fileRow(file: File): LocalDataSetFile | null {
-    const named = NAMED_FILES.find((name) => name.toLowerCase() === file.name.toLowerCase());
-    if (named) return named;
-    return file.type.startsWith('image/') ? 'thumbnail' : null;
+/**
+ * Where a file goes: the thumbnail for an image; else the file it reads as
+ * (`identifyLocalDataSetFile`), whatever its name; else the file of its name, whatever its case.
+ */
+async function fileRow(file: File): Promise<LocalDataSetFile | null> {
+    if (file.type.startsWith('image/')) return 'thumbnail';
+    return await identifyLocalDataSetFile(file) ?? NAMED_FILES.find((name) => name.toLowerCase() === file.name.toLowerCase()) ?? null;
 }
 
 /** An id made from `name`: lowercase, every run of other characters a '-', at most 40. */

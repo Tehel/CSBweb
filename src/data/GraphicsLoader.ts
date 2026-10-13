@@ -30,6 +30,9 @@ export interface GraphicsData {
     entries: GraphicEntry[];
 }
 
+/** The most items the loader takes a file's first word to count. */
+export const MAX_GRAPHICS_ITEMS = 1000;
+
 /**
  * Graphics.dat loader
  *
@@ -75,7 +78,7 @@ export class GraphicsLoader {
         this.file.seek(0);
         const itemCount = this.file.readU16();
 
-        if (itemCount === 0 || itemCount > 1000) {
+        if (itemCount === 0 || itemCount > MAX_GRAPHICS_ITEMS) {
             throw new Error(`Invalid graphics file: item count = ${itemCount}`);
         }
         this.fileSignature = Signature(this.file.read(0, this.file.length()));

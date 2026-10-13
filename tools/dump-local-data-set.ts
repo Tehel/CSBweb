@@ -12,6 +12,7 @@
  * Also: the id's prefix, which no manifest set may take; a set's flags from its files;
  * a record missing a file; and the form's check (`checkLocalDataSet`): the record it
  * writes is the one played here, and it refuses what the boot would die of, file by file;
+ * which file a dropped one is, told by what it holds (`identifyLocalDataSetFile`);
  * and what it shows the dungeon holds (`dungeonCensus`), every record in use counted
  * once, through a square's chain, a monster's possessions or a container. Node has no IndexedDB, so the store itself
  * (`BrowserDataSetStore`) is not run here.
@@ -19,7 +20,7 @@
  *   npx tsx tools/dump-local-data-set.ts
  */
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import { LOCAL_DATA_SET_PREFIX, parseManifest, type DataSet } from '../src/data/DataSets';
 import { loadGameFiles, type DataSetFiles, type GameFiles } from '../src/data/DataSetFiles';
@@ -30,7 +31,7 @@ import { dungeonSignature } from '../src/data/DungeonSignature';
 import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import { foldedSignature, Signature } from '../src/data/FileSignature';
 import {
-  checkLocalDataSet, isLocalDataSetId, localDataSet, recordFiles,
+  checkLocalDataSet, identifyLocalDataSetFile, isLocalDataSetId, localDataSet, recordFiles,
   type LocalDataSetDraft, type LocalDataSetFile, type LocalDataSetRecord,
 } from '../src/data/LocalDataSets';
 import type { DungeonData } from '../src/data/dungeonTypes';
@@ -38,7 +39,8 @@ import { dungeonCensus, ITEM_KINDS, operationsUsed, type DungeonCensus } from '.
 import type { Game } from '../src/engine/Game';
 import { csbGraphicsOpener } from '../src/engine/FileSignatures';
 import { check, finish } from './lib/check';
-import { dataSetNamed } from './lib/dataSets';
+import { DATA_SETS, dataSetNamed, GAMEFILES_DIR } from './lib/dataSets';
+import { genuineSaves } from './lib/saves';
 import { newGame, runVbl, TICK_DUE } from './lib/game';
 
 const SEED = 0x5eed1234;
@@ -309,6 +311,38 @@ function inUse(data: DungeonData): string {
   return [db.weapons, db.clothing, db.scrolls, db.potions, db.containers, db.misc, db.creatures].map((d) => used(d.records)).join();
 }
 
+/**
+ * The form tells a dropped file by what it holds (`identifyLocalDataSetFile`), whatever
+ * its name: every game file of every manifest set is the file it is, and a save, a sound,
+ * an image or a set's other files are none.
+ */
+async function checkIdentify(): Promise<void> {
+  console.log('=== a file told by what it holds ===');
+  const names: LocalDataSetFile[] = ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat'];
+  let told = 0, wrong: string[] = [];
+  for (const set of DATA_SETS) {
+    for (const name of names) {
+      const path = `${set.dir}/${name}`;
+      if (!existsSync(path)) continue;
+      const kind = await identifyLocalDataSetFile(blobOf(new Uint8Array(readFileSync(path))));
+      told++;
+      if (kind !== name) wrong.push(`${path}: ${kind}`);
+    }
+  }
+  console.log(`  ${told} game files of ${DATA_SETS.length} sets${wrong.length ? `, wrong: ${wrong.join(', ')}` : ', each the file it is'}`);
+  check(wrong.length === 0 && told >= DATA_SETS.length * 2, 'every game file of every set is told by what it holds');
+  const csb = dataSetNamed('csb').dir;
+  const others = [...genuineSaves(), `${csb}/mini.dat`, `${csb}/utility-portraits.dat`, `${csb}/csb-thumbnail.png`,
+    `${GAMEFILES_DIR}/swoosh/swoosh.img`, `${GAMEFILES_DIR}/swoosh/swoosh.wav`];
+  wrong = [];
+  for (const path of others) {
+    const kind = await identifyLocalDataSetFile(blobOf(new Uint8Array(readFileSync(path))));
+    if (kind !== null) wrong.push(`${path}: ${kind}`);
+  }
+  console.log(`  ${others.length} other files${wrong.length ? `, told: ${wrong.join(', ')}` : ', none of them told'}`);
+  check(wrong.length === 0, 'a save, the RISE dungeon, the utility\'s portraits, an image, the swoosh and a sound are none of them');
+}
+
 async function checkCensus(): Promise<void> {
   console.log('=== what the dungeon holds ===');
   const expected: Record<string, string> = {
@@ -373,6 +407,7 @@ async function main(): Promise<void> {
   const withThumbnail = { ...bare, files: { ...bare.files, thumbnail: blobOf(new Uint8Array([0x89, 0x50, 0x4e, 0x47])) } };
   check(await recordFiles(withThumbnail, diskFiles(dm)).read('thumbnail') === null, 'the thumbnail is not one of the game\'s files');
   await checkForm();
+  await checkIdentify();
   await checkCensus();
   finish();
 }

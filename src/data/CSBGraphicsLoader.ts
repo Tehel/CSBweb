@@ -60,7 +60,7 @@ interface SectionHeader {
   name: string;
 }
 
-const CSBGRAPHICS_SENTINEL = 'CSBg';
+export const CSBGRAPHICS_SENTINEL = 'CSBg';
 const SECTION_HEADER_SIZE = 36; // 5 * u32 + 16-byte name
 const WALL_DEC_MIN_SIZE = 92;
 const FLOOR_DEC_MIN_SIZE = 92;

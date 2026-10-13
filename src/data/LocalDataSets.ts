@@ -11,7 +11,7 @@
  * set's folder (`recordFiles`). The set has no `mini.dat`, so its entrance has no RISE, and
  * it sends no statistics (`GameEvents`).
  */
-import { CSBGraphicsLoader } from './CSBGraphicsLoader';
+import { CSBGraphicsLoader, CSBGRAPHICS_SENTINEL } from './CSBGraphicsLoader';
 import { readRuntimeFileSignatures } from './CsbwinExpool';
 import { csbGraphicsExpected, noExpectedSignatures, readExpectedSignatures } from './CsbwinExtendedFeatures';
 import { LOCAL_DATA_SET_PREFIX, type DataSet } from './DataSets';
@@ -20,8 +20,9 @@ import { DungeonLoader } from './DungeonLoader';
 import { dungeonSignature, type DungeonSignature } from './DungeonSignature';
 import type { DungeonData } from './dungeonTypes';
 import { csbGraphicsSignatureRefused, graphicsSignatureRefused, Signature, type FileSignature } from './FileSignature';
-import { GraphicsLoader } from './GraphicsLoader';
+import { GraphicsLoader, MAX_GRAPHICS_ITEMS } from './GraphicsLoader';
 import { extractGraphicsTables } from './tables/GraphicsTables';
+import { readU16BE } from '../core/bytes';
 import { dungeonCensus, type DungeonCensus } from '../engine/DungeonCensus';
 import { buildGameTables } from '../engine/GameTables';
 import { parseHcsbDat } from './HintOracleLoader';
@@ -222,6 +223,40 @@ export async function checkLocalDataSet(
             createdAt,
         },
     };
+}
+
+/**
+ * Which of a record's game files `file` is, told by what it holds, or `null` where it
+ * reads as none of them:
+ *
+ * - `CSBgraphics.dat` opens with `CSBg` (`CSBGraphicsLoader`), and a plain `hcsb.hct`
+ *   with the words 2 and 13 (`parseHintOracle`).
+ * - `graphics.dat` and `hcsb.dat` share `GraphicsLoader`'s format: a first word counting
+ *   the items, then their sizes, packed and unpacked, and the packed items, which the
+ *   file holds. In that shape it is `hcsb.dat` where `parseHcsbDat` reads it, and
+ *   `graphics.dat` where the boot's tables build from it.
+ * - `dungeon.dat` has no mark of its own: it opens with an Extended Features block, the
+ *   compressed image's 33028, or a header whose first word is a random seed, each of
+ *   them enciphered or not. It is one where `loadDungeonDat` reads it.
+ *
+ * An `hcsb.hct` enciphered with its dungeon's key is not told. Each reading is the
+ * check's own (`once`), so telling a file costs the check nothing.
+ */
+export async function identifyLocalDataSetFile(file: Blob): Promise<Exclude<LocalDataSetFile, 'thumbnail'> | null> {
+    const head = new Uint8Array(await file.slice(0, 2 + 2 * MAX_GRAPHICS_ITEMS).arrayBuffer());
+    const word = (at: number): number => at + 2 <= head.length ? readU16BE(head, at) : -1;
+    if (String.fromCharCode(...head.subarray(0, 4)) === CSBGRAPHICS_SENTINEL) return 'CSBgraphics.dat';
+    if (word(0) === 2 && word(2) === 13) return 'hcsb.hct';
+    const items = word(0);
+    if (items > 0 && items <= MAX_GRAPHICS_ITEMS && file.size >= 2 + 4 * items) {
+        let packed = 0;
+        for (let i = 0; i < items; i++) packed += word(2 + 2 * i);
+        if (2 + 4 * items + packed <= file.size) {
+            if (await readHcsbDat(file) === null) return 'hcsb.dat';
+            if ((await readGraphics(file)).error === null) return 'graphics.dat';
+        }
+    }
+    return (await readDungeon(file)).error === null ? 'dungeon.dat' : null;
 }
 
 /**
