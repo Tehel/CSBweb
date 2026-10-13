@@ -113,6 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| P10 | A published set has no dungeon signature: its saves are refused | M | ⏳ |
 | P8 | Publishing a local set, and moderating it | L | ⚠️ step 4 of 5 next |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
@@ -191,7 +192,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C182 · D22 · E40 · F21 · G31 · P10 · R16 · U11 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E40 · F21 · G31 · P11 · R16 · U11 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -281,6 +282,52 @@ Decisions taken with the author, for every row:
   (the manifest's, uploaded by hand) is the site's, not a moderator's.
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
+
+### P10 ⏳ A published set has no dungeon signature: its saves are refused
+
+A save imported into a set is checked against that set's own dungeon only when the set
+has its signature (`DataSet.dungeonSignature`, `checkDungeon`,
+`src/data/DungeonSignature.ts`; `doc/SAVES.md` → "An import is checked against the
+dungeon"). A local set has it, from its record. A published set has none: the publish
+route's check computes it (`record.dungeonSignature`, `CheckDataSet` in
+`server/publish.ts`), but the row it writes (`dataSets.publish`, same file) keeps only the
+id, name, description, authors, `csbGraphics`, `hintOracle` and `dmRules`, and
+`api/data-sets` serves no signature. So `GameSaves.importSave`
+(`src/engine/GameSaves.ts`) checks the save against `KNOWN_DUNGEONS` alone. That
+catalogue is committed and lists none of the players' dungeons, so a save of a published
+set is "THIS IS A SAVE OF AN UNKNOWN DUNGEON / NOT SUPPORTED YET". That includes a save
+exported from the local set the published one came from, which is the only way to move a
+playthrough from `local:<id>` to `<id>` (P8: PUBLISH moves no saves). This happens on
+the live site: Conflux 2, published from `local:conflux-2` and approved by hand on the
+VPS, refuses the saves of its local twin, whose dungeon is the same.
+`src/data/DataSets.ts`'s comment on `dungeonSignature` ("A manifest set has none: its
+dungeon is in `KNOWN_DUNGEONS`") says the same, and is true only of the site's own sets.
+
+**What it takes** (the author's design):
+
+- **The server keeps each published set's signature.** It computes the signature with
+  the page's own reader, which the publish route already runs, rather than trusting one
+  the sender uploads, and keeps it in the store (`server/dataSets.ts`), beside the row
+  or in a table of its own.
+- **A backfill** of the rows already published (Conflux 2 on the live site): the server
+  reads each owned set's `gamefiles/<id>/dungeon.dat` through the same bundled check, at
+  start-up or as a one-off script `doc/DEPLOYMENT.md` names.
+- **Served on demand.** A signature is one SHA-256 per level, up to 64 levels, so up to
+  2 KiB raw and about 4.2 KiB as the hex JSON the page uses. If it costs too much to send
+  in every `api/data-sets` answer, a dedicated endpoint can take a list of set ids and
+  answer their signatures. The page caches them in its IndexedDB store
+  (`BrowserDataSetStore`'s database, a `DB_VERSION` bump), asks for a set's signature
+  when it starts a set it has none for, and fills `DataSet.dungeonSignature` from it.
+  Which of the two is decided at the start of the item, from those sizes.
+- **Which rules a published set's import follows**, to settle with the author: a local
+  set's (checked against its own dungeon alone, never refused, anything but the whole a
+  `mismatch` to confirm), or a manifest set's (another known dungeon refused). A
+  published set's files never change (P8), so its own dungeon, whole, is the case that
+  matters.
+
+Evidence: `tools/dump-server.ts` (the signature stored on publish, the backfill, the
+endpoint's answer), and an import check in `tools/dump-local-data-set.ts` or its
+neighbour: a published set's save stored, where it is refused today.
 
 ### P8 ⏳ Publishing a local set, and moderating it
 
