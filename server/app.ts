@@ -288,12 +288,16 @@ async function receiveEvent(api: ApiOptions, req: IncomingMessage, res: ServerRe
     res.end();
 }
 
+/** What `receivePublish` needs of the API. */
+export type PublishApi = Pick<ApiOptions, 'checkDataSet' | 'dataSets' | 'publishRateLimit' | 'now'>;
+
 /**
  * `POST api/data-sets`: the rate limit first, then the player, a `multipart/form-data` body
  * of at most `MAX_PUBLISH_BYTES`, and its form, before `publishDataSet` decides. Every
- * answer is JSON (`PublishAnswer`).
+ * answer is JSON (`PublishAnswer`). The dev server answers the route with it too
+ * (`vite.config.mts`).
  */
-async function receivePublish(gamefilesDir: string, api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> {
+export async function receivePublish(gamefilesDir: string, api: PublishApi, req: IncomingMessage, res: ServerResponse): Promise<void> {
     const answer = (status: number, error: string): PublishAnswer => ({ status, body: { error } });
     const refused = (): PublishAnswer | null => {
         if (!api.publishRateLimit.allow(clientAddress(req), api.now())) return answer(429, 'Too many publishes from here: try again in an hour.');
@@ -323,7 +327,7 @@ async function receivePublish(gamefilesDir: string, api: ApiOptions, req: Incomi
  * Who asks `api/data-sets`: the `playerId` the page sends in `PLAYER_ID_HEADER`, where it
  * has a `playerId`'s form, and whether it is a moderator's. It is never logged.
  */
-function dataSetViewer(api: ApiOptions, req: IncomingMessage): DataSetViewer {
+export function dataSetViewer(api: Pick<ApiOptions, 'moderatorPlayerIds'>, req: IncomingMessage): DataSetViewer {
     const header = req.headers[PLAYER_ID_HEADER.toLowerCase()];
     const playerId = isPlayerId(header) ? header : null;
     const moderator = playerId !== null && api.moderatorPlayerIds.some((id) => samePlayerId(playerId, id));

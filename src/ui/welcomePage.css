@@ -259,8 +259,9 @@ body.welcome {
 .add-set-form { display: flex; flex-direction: column; gap: 18px; padding: 21px 24px 24px; }
 .add-set h2 { margin: 0; color: var(--p11); }
 .add-set-head { display: flex; justify-content: space-between; align-items: center; gap: 24px; }
-/* DELETE, beside the title of a set's form opened by its pen. */
-.add-set-delete {
+/* PUBLISH and DELETE, beside the title of a set's form opened by its pen. */
+.add-set-actions { display: flex; gap: 12px; }
+.add-set-publish, .add-set-delete {
     appearance: none;
     padding: 6px 9px;
     background: #0b0b16;
@@ -269,6 +270,8 @@ body.welcome {
     cursor: pointer;
 }
 .add-set-delete:hover { border-color: #fc2400; color: #fc2400; }
+.add-set-publish:hover:not(:disabled) { border-color: var(--p7); color: var(--p7); }
+.add-set-publish:disabled { color: var(--p1); cursor: default; }
 .add-set input[readonly] { color: var(--p2); }
 /* The confirmation DELETE opens. */
 .delete-set { width: min(560px, calc(100vw - 32px)); }

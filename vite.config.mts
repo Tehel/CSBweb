@@ -1,9 +1,16 @@
 import { defineConfig, type Plugin } from 'vite';
 import { resolve } from 'path';
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { createReadStream, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { DatabaseSync } from 'node:sqlite';
 
-import { DATA_SETS_ROUTE } from './src/data/DataSets';
+import { dataSetViewer, pathSegments, receivePublish } from './server/app';
+import { DataSetStore, manifestText, type PublishedDataSet } from './server/dataSets';
+import { RateLimit } from './server/events';
+import type { CheckDataSet } from './server/publish';
+import { DATA_SETS_ROUTE, PLAYER_ID_HEADER, parseManifest } from './src/data/DataSets';
 
 /**
  * The build the page's events name (`src/ui/gameEvents.ts`): `CSBWEB_BUILD` where the
@@ -19,25 +26,89 @@ function buildId(): string {
 }
 
 /**
- * The dev server's `api/data-sets` (`src/data/DataSets.ts`): the repository's manifest,
- * `tools/data-sets.json`, read at each request, every set in it offered to every player.
- * The deployed server answers the same route its own way (`server/app.ts`).
+ * The dev server's `api/data-sets` (`src/data/DataSets.ts`), answered as the deployed
+ * server answers it (`server/app.ts`), over a store made at each request: the repository's
+ * manifest, `tools/data-sets.json`, read then, its sets the site's, and the sets published
+ * since the dev server started. A GET gets `manifestText` for the player it names, a POST
+ * `receivePublish` with the page's own check, the source's (`ssrLoadModule`).
+ *
+ * A published set is written into a scratch folder, made at start and removed at the end,
+ * which holds a link to each entry of `static/gamefiles/`, so that a base set's
+ * `graphics.dat` and every folder name are where `publishDataSet` looks; its files are
+ * served from there under `gamefiles/<id>/`. The store is `node:sqlite`'s, in memory:
+ * on a Node without it, a GET answers the manifest and a POST 501.
  */
 function dataSetsRoute(): Plugin {
   const file = resolve(import.meta.dirname, 'tools', 'data-sets.json');
+  const gamefiles = resolve(import.meta.dirname, 'static', 'gamefiles');
   return {
     name: 'csbweb-data-sets',
-    configureServer(server) {
-      server.middlewares.use(`/${DATA_SETS_ROUTE}`, (req, res, next) => {
+    async configureServer(server) {
+      const sqlite = await import('node:sqlite').catch(() => null);
+      const scratch = mkdtempSync(join(tmpdir(), 'csbweb-published-'));
+      for (const entry of readdirSync(gamefiles)) symlinkSync(join(gamefiles, entry), join(scratch, entry));
+      server.httpServer?.once('close', () => rmSync(scratch, { recursive: true, force: true }));
+      const published: [PublishedDataSet, string][] = [];
+      const publishRateLimit = new RateLimit(1000, 60_000);
+      const checkDataSet: CheckDataSet = async (...args) =>
+        ((await server.ssrLoadModule('/src/data/LocalDataSets.ts')) as { checkLocalDataSet: CheckDataSet }).checkLocalDataSet(...args);
+
+      /** The store as it stands: the manifest's sets, then the published ones, a new one kept. */
+      const openStore = (db: DatabaseSync): DataSetStore => {
+        const store = new DataSetStore(db);
+        store.fill(parseManifest(readFileSync(file, 'utf8'), ''));
+        for (const [set, owner] of published) store.publish(set, owner);
+        const publish = store.publish.bind(store);
+        store.publish = (set, owner) => {
+          publish(set, owner);
+          published.push([set, owner]);
+        };
+        return store;
+      };
+
+      server.middlewares.use(`/${DATA_SETS_ROUTE}`, async (req, res, next) => {
         if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
-        if (req.method !== 'GET' && req.method !== 'HEAD') {
+        const json = (status: number, body: string) => {
+          res.statusCode = status;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          res.end(req.method === 'HEAD' ? undefined : body);
+        };
+        if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'POST') {
           res.statusCode = 405;
-          res.setHeader('Allow', 'GET, HEAD');
+          res.setHeader('Allow', 'GET, HEAD, POST');
           return res.end();
         }
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-store');
-        res.end(req.method === 'HEAD' ? undefined : readFileSync(file, 'utf8'));
+        if (!sqlite) {
+          if (req.method === 'POST') return json(501, JSON.stringify({ error: 'The dev server publishes on a Node with node:sqlite.' }));
+          return json(200, readFileSync(file, 'utf8'));
+        }
+        const db = new sqlite.DatabaseSync(':memory:');
+        try {
+          const dataSets = openStore(db);
+          if (req.method === 'POST') {
+            await receivePublish(scratch, { checkDataSet, dataSets, publishRateLimit, now: Date.now }, req, res);
+          } else {
+            res.setHeader('Vary', PLAYER_ID_HEADER);
+            json(200, manifestText(dataSets.read(), dataSetViewer({ moderatorPlayerIds: [] }, req)));
+          }
+        } catch (error) {
+          next(error);
+        } finally {
+          db.close();
+        }
+      });
+
+      // A published set's files, from the scratch folder.
+      server.middlewares.use('/gamefiles', (req, res, next) => {
+        const segments = pathSegments(req.url ?? '');
+        if (!segments || !published.some(([set]) => set.id === segments[0]) || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
+        const path = join(scratch, ...segments);
+        if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return next();
+        res.setHeader('Content-Type', path.endsWith('.png') ? 'image/png' : 'application/octet-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        if (req.method === 'HEAD') return res.end();
+        createReadStream(path).pipe(res);
       });
     },
   };

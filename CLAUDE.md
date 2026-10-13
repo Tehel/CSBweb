@@ -116,7 +116,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   by a tap and by a click, the screen and the effect sized and centred in it, at 16:10
   and at 4:3; and the welcome page's tiles, its fonts, its selection, where PLAY and
   CONTINUE lead, CONTINUE's save read straight into play, and the form that adds a set,
-  and edits and deletes one.
+  and edits, publishes and deletes one.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`
@@ -206,7 +206,7 @@ ui/         The page's DOM side: events (the canvas's and the keyboard's listene
             screen an error that ends the game leaves), and gameEvents (what the
             server's statistics are told: a game started, joined, won or lost), and
             welcomePage (the page without a known `?dungeon=`: the games and the saves)
-            and addDataSetForm (its form that adds, edits and deletes a player's own data set)
+            and addDataSetForm (its form that adds, edits, publishes and deletes a player's own data set)
 settings/   Settings: the player's settings, one model the page, the game and the dialogs
             read and change, kept in `localStorage`
 lib/        crt (the CRT effect: a WebGL tube over the canvas, and the pointer read through it),

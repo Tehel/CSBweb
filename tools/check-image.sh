@@ -5,6 +5,9 @@
 # Builds the image with CSBWEB_PROBE=1 (the probes' handle, which a deployed image never
 # has) as csbweb:probe, runs it over the checkout's game files, their manifest
 # (`tools/data-sets.json`) and a throwaway stats folder, runs `check-frames.sh --url` against it, and removes the container.
+# The game files' folder is throwaway too, each entry of `static/gamefiles/` mounted in it
+# read-only, so that the probe's publish (`server/publish.ts`) writes its set's folder
+# there and leaves the checkout as it was.
 # Before the frames, it runs the server's check of a player's set (`dist/server/`,
 # `server/app.ts` → `CHECK_MODULE`) in the container, on DM's own files: the server loads
 # it at start-up, and the image's Node must also run it.
@@ -18,17 +21,20 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 port="${IMAGE_PORT:-8088}"
 name="csbweb-check-$$"
 stats="$(mktemp -d)"
+gamefiles="$(mktemp -d)"
+mounts=()
+for entry in "$root"/static/gamefiles/*; do mounts+=(-v "$entry:/data/gamefiles/$(basename "$entry"):ro"); done
 
 cleanup() {
   docker rm -f "$name" >/dev/null 2>&1
-  rm -rf "$stats"
+  rm -rf "$stats" "$gamefiles"
 }
 trap cleanup EXIT
 
 echo "building csbweb:probe"
 docker build -q --build-arg CSBWEB_BUILD=check --build-arg CSBWEB_PROBE=1 -t csbweb:probe "$root" >/dev/null || exit 1
 docker run -d --name "$name" -p "127.0.0.1:$port:8085" \
-  -v "$root/static/gamefiles:/data/gamefiles:ro" -v "$root/tools/data-sets.json:/data/data-sets.json:ro" \
+  -v "$gamefiles:/data/gamefiles" "${mounts[@]}" -v "$root/tools/data-sets.json:/data/data-sets.json:ro" \
   -e MANIFEST_FILE=/data/data-sets.json -v "$stats:/data/stats" csbweb:probe >/dev/null || exit 1
 i=0
 until curl -sf -o /dev/null --max-time 1 "http://127.0.0.1:$port/api/health"; do

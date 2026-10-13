@@ -89,7 +89,9 @@ The repository's manifest is `tools/data-sets.json`, its folders under `static/g
 It keeps every set, because the tools need them all: they read it through
 `tools/lib/dataSets.ts`, and `tools/dump-data-sets.ts` asserts the parser's refusals and
 that every folder holds the files its flags promise. The dev server answers
-`api/data-sets` with it (`vite.config.mts`), and so does `npm start`. The deployed
+`api/data-sets` as the server does (`vite.config.mts`), from it, read at each request, and
+from the sets published to it since it started, which it writes in a scratch folder that
+goes when it stops. `npm start` fills its store from it. The deployed
 manifest is the author's own copy, `gamefiles/manifest.json`, uploaded with the files:
 which sets the site offers is the author's choice. Today it is the repository's, all nine
 sets.
@@ -131,7 +133,8 @@ otherwise. The page names its player in an `X-Player-Id` header, its kept `playe
 set in the table. Both read the table at each request, so a row added while the server
 runs is offered at once.
 
-**A player publishes their own set** by a `POST` to `api/data-sets` (`server/publish.ts`):
+**A player publishes their own set** by a `POST` to `api/data-sets` (`server/publish.ts`),
+which PUBLISH sends from the form the pen on its tile opens (`src/ui/addDataSetForm.ts`):
 its record's fields and files as a `multipart/form-data` body, the player named in
 `X-Player-Id`. The server reads it with the page's own check (`CheckDataSet`), writes its
 folder whole as `gamefiles/<id>/`, its id that of `local:<id>`, then its row, pending and
@@ -247,8 +250,8 @@ build.
 - `./gamefiles:/data/gamefiles` and `./stats:/data/stats`, bind mounts: the data lives
   on the host, and a deploy's `down` loses nothing. Both are read-write: a set a player
   publishes is written under `gamefiles/`, as its row is in the store, so both folders must
-  belong to uid 1000 on the host, as the login user's do. `tools/check-image.sh` mounts the
-  checkout's game files read-only, since nothing publishes there.
+  belong to uid 1000 on the host, as the login user's do. `tools/check-image.sh` mounts each
+  of the checkout's game folders read-only in a throwaway one, where the probe's publish writes.
 - `restart: unless-stopped`, a 10 s `stop_grace_period`, a healthcheck on `api/health`
   (busybox's `wget`), and `json-file` logs rotated at 3 × 10 MB.
 - `version: '3.8'`, for the VPS's Compose v1.

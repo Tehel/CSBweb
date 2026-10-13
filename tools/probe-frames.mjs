@@ -31,7 +31,7 @@
 // tap and a click, the screen and the effect sized and placed in it, at 16:10 and at 4:3,
 // in it and out of it, and the welcome
 // page: its tiles and their order, its fonts, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
-// straight into play, its form adding, editing and deleting a player's own set, and each
+// straight into play, its form adding, editing, publishing and deleting a player's own set, and each
 // tile's name in its set's state's colour, to a moderator. See `check` below.
 // A failure there exits 1.
 //
@@ -401,6 +401,9 @@ check(atWelcome.last === 'pick add +Add my own', 'the grid ends with "+ Add my o
 // again by "Generate from data" from DM's graphics. What the dropped dungeon holds
 // shows under the checklist, the form still on one screen. The record is stored, its
 // thumbnail the site's DM thumbnail pixel for pixel, and the page shows its tile selected. What the check refuses is `tools/dump-local-data-set.ts`'s.
+// The set's id is the run's own: a dev server or an image another run used still holds the
+// set that run published, and refuses its id.
+const MINE = `mine-${Date.now().toString(36)}`;
 const form = () => evaluate(`(()=>{const d=document.querySelector('dialog.add-set');
   return d && { open: d.open, id: d.querySelector('[name=id]').value,
     rows: [...d.querySelectorAll('.add-set-checklist li')].map(li=>li.dataset.about+({right:'+',wrong:'x'}[li.className]??'')).join(),
@@ -447,12 +450,12 @@ await wait(1500);
 const ownGraphics = await form();
 await removeIn('graphics.dat');
 await removeIn('hcsb.hct');
-await typeIn('id', 'mine');
+await typeIn('id', MINE);
 await wait(1500);
 const ready = await form();
 check(ownGraphics.base === 'dm-atari*-,csb-' && ownGraphics.dropped === '' && ready.base === 'dm-atari*,csb',
   'a graphics.dat given turns the choice of graphics off, and its removal on');
-check(ready.rows === 'name+,id+,dungeon.dat+,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail+' && ready.id === 'mine'
+check(ready.rows === 'name+,id+,dungeon.dat+,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail+' && ready.id === MINE
   && ready.confirm && ready.problems.length === 0,
   'a row\'s × takes its file back, and with nothing wrong CONFIRM is given');
 await removeIn('thumbnail');
@@ -472,7 +475,7 @@ await inForm(`d.querySelector('#add-set-confirm').click()`);
 await wait(2000);
 const stored = await evaluate(`(async()=>{const r = await new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
   open.onerror = () => reject(open.error);
-  open.onsuccess = () => { const get = open.result.transaction('dataSets').objectStore('dataSets').get('local:mine');
+  open.onsuccess = () => { const get = open.result.transaction('dataSets').objectStore('dataSets').get('local:${MINE}');
     get.onsuccess = () => { open.result.close(); resolve(get.result); }; }; });
   const pixels = async (blob) => { const bitmap = await createImageBitmap(blob), c = new OffscreenCanvas(bitmap.width, bitmap.height);
     const g = c.getContext('2d'); g.drawImage(bitmap, 0, 0); return [bitmap.width, bitmap.height, ...g.getImageData(0, 0, bitmap.width, bitmap.height).data]; };
@@ -488,7 +491,7 @@ check(await form() === null && stored?.name === 'My Own Dungeon' && stored.baseS
   'CONFIRM stores the record: its name, DM\'s graphics, its two files and its dungeon\'s signature, and closes the form');
 check(stored?.thumbnail === 'image/png' && stored.sameThumbnail,
   'the thumbnail drawn from DM\'s graphics is the site\'s DM thumbnail, pixel for pixel');
-check(afterAdd.tiles.includes('local:mine!') && /dungeon=local%3Amine/.test(afterAdd.play ?? ''), 'the page shows the new set, selected');
+check(afterAdd.tiles.includes(`local:${MINE}!`) && new RegExp(`dungeon=local%3A${MINE}(&|$)`).test(afterAdd.play ?? ''), 'the page shows the new set, selected');
 // A save filed under the new set's id, a copy of dm-atari's one save made a millisecond
 // older. Its tile is bright and second, its picture the record's image, and it counts its
 // save; selected, PLAY and CONTINUE lead to it. "+ Add my own" stays last, and a click on
@@ -508,20 +511,20 @@ const saveDatabase = (body) => evaluate(`(async()=>{${body.before ?? ''}
 await saveDatabase({
   write: `const all = saves.getAll();
     all.onsuccess = () => { const row = all.result[0];
-      saves.put({ ...row, id: 'probe-local-save', dataSet: 'local:mine', savedAt: row.savedAt - 1, usedAt: (row.usedAt ?? row.savedAt) - 1 }); };`,
+      saves.put({ ...row, id: 'probe-local-save', dataSet: 'local:${MINE}', savedAt: row.savedAt - 1, usedAt: (row.usedAt ?? row.savedAt) - 1 }); };`,
 });
 await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
 await wait(2500);
 const withLocal = await welcome();
 console.log('  local set:', JSON.stringify(withLocal));
-check(withLocal.tiles === 'dm-atari*,local:mine*,csb,conflux-3.5,kids-dungeon,towers-of-chaos'
+check(withLocal.tiles === `dm-atari*,local:${MINE}*,csb,conflux-3.5,kids-dungeon,towers-of-chaos`
   && withLocal.saves[1] === '1 save' && withLocal.pictures.length === 6 && withLocal.pictures.every(Boolean)
   && withLocal.gameFiles === 0 && withLocal.last === atWelcome.last,
   "a local set's tile: its save counted, bright, its picture the record's image, the add tile still last");
-await clickOn('.pick[data-set="local:mine"]');
+await clickOn(`.pick[data-set="local:${MINE}"]`);
 const atLocal = await welcome();
-check(atLocal.tiles.includes('local:mine*!') && /dungeon=local%3Amine/.test(atLocal.play ?? '')
-  && /dungeon=local%3Amine&.*save=probe-local-save/.test(atLocal.resume ?? '') && atLocal.preview[0] === 'My Own Dungeon',
+check(atLocal.tiles.includes(`local:${MINE}*!`) && new RegExp(`dungeon=local%3A${MINE}(&|$)`).test(atLocal.play ?? '')
+  && new RegExp(`dungeon=local%3A${MINE}&.*save=probe-local-save`).test(atLocal.resume ?? '') && atLocal.preview[0] === 'My Own Dungeon',
   'a local set selected: PLAY opens it, CONTINUE reads its save, the box names it');
 await clickOn('.pick.add');
 check((await welcome()).play === atLocal.play && (await form())?.open === true, 'a click on "+ Add my own" opens the form, and leaves the selection');
@@ -529,7 +532,7 @@ await inForm(`d.querySelector('#add-set-cancel').click()`);
 const readStore = () => evaluate(`new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
   open.onerror = () => reject(open.error);
   open.onsuccess = () => { const tx = open.result.transaction(['saves', 'dataSets']);
-    const set = tx.objectStore('dataSets').get('local:mine'), saves = tx.objectStore('saves').getAllKeys();
+    const set = tx.objectStore('dataSets').get('local:${MINE}'), saves = tx.objectStore('saves').getAllKeys();
     tx.oncomplete = () => { open.result.close(); resolve({ name: set.result?.name ?? null, createdAt: set.result?.createdAt ?? null, saves: saves.result.sort().join() }); }; }; })`);
 const pen = await evaluate(`(()=>{const pens=[...document.querySelectorAll('.pick-edit')], p=pens[0], a=p.getBoundingClientRect();
   const b=p.parentElement.querySelector('.pick[data-set] .pick-picture').getBoundingClientRect();
@@ -538,7 +541,7 @@ const pen = await evaluate(`(()=>{const pens=[...document.querySelectorAll('.pic
     rows: Object.values(Object.groupBy([...document.querySelectorAll('.pick')].map(t=>t.getBoundingClientRect()), r=>Math.round(r.top)))
       .map(row=>[...new Set(row.map(r=>Math.round(r.height)))].join('/')).join(),
     names: [...document.querySelectorAll('.pick[data-set]')].map(t=>t.dataset.set+' '+getComputedStyle(t.querySelector('.pick-name')).color).join('|') };})()`);
-check(pen.count === 1 && pen.of === 'local:mine' && pen.label === 'Edit My Own Dungeon' && pen.corner,
+check(pen.count === 1 && pen.of === `local:${MINE}` && pen.label === 'Edit My Own Dungeon' && pen.corner,
   "only a local set's tile has the pen, over its picture's top right corner");
 console.log('  tile heights by row:', pen.rows);
 check(pen.rows.split(',').every((row) => !row.includes('/')), "a local set's tile is as tall as the others on its row");
@@ -548,7 +551,7 @@ await clickOn('.pick-edit');
 await wait(1500);
 const editing = await form();
 console.log('  editing:', JSON.stringify(editing));
-check(editing?.open === true && editing.title === 'Edit my own dungeon' && editing.name === 'My Own Dungeon' && editing.id === 'mine'
+check(editing?.open === true && editing.title === 'Edit my own dungeon' && editing.name === 'My Own Dungeon' && editing.id === MINE
   && editing.fixedId && editing.deletable && editing.base === 'dm-atari*,csb' && editing.removable === 'thumbnail'
   && editing.rows === ready.rows && editing.thumbnail === 'title.png' && editing.confirm && editing.height <= 600,
   'the pen opens the form on the record: its fields and files, its id fixed, dungeon.dat not removable, DELETE offered');
@@ -559,8 +562,65 @@ await wait(2000);
 const edited = await readStore();
 const afterEdit = await welcome();
 check(await form() === null && edited.name === 'My Edited Dungeon' && edited.createdAt === stored.createdAt
-  && edited.saves === ['probe-local-save', decodeURIComponent(saveId)].sort().join() && afterEdit.tiles.includes('local:mine*!'),
+  && edited.saves === ['probe-local-save', decodeURIComponent(saveId)].sort().join() && afterEdit.tiles.includes(`local:${MINE}*!`),
   'CONFIRM stores the edited record over the old, when it was added kept, its save kept, and the page shows it selected');
+// PUBLISH, beside DELETE on the pen's form, offers the stored set to the site
+// (`server/publish.ts`), which the dev server answers as the deployed one does
+// (`vite.config.mts`). It is held while the form shows a change, and given again once the
+// change is undone. Published, the form closes and the page, asked for the sets anew, shows
+// the pending set's tile, its name red, its thumbnail served from its new folder, beside the
+// local one, which stays. A second PUBLISH of the id is refused, the server's answer said
+// under the checklist, and the form stays; a 422's problems, the server stood in for, go on
+// their rows.
+const publishState = () => evaluate(`(b=>b&&(b.hidden?'hidden':b.disabled?'off':'on'))(document.querySelector('dialog.add-set .add-set-publish'))`);
+const failureText = () => evaluate(`document.querySelector('dialog.add-set .add-set-failure')?.textContent`);
+await clickOn('.pick.add');
+const notOffered = await publishState();
+await inForm(`d.querySelector('#add-set-cancel').click()`);
+await clickOn('.pick-edit');
+await wait(1500);
+const offered = await publishState();
+await typeIn('name', 'My Changed Dungeon');
+await wait(1000);
+const whileChanged = await publishState();
+await typeIn('name', 'My Edited Dungeon');
+await wait(1000);
+const undone = await publishState();
+check(notOffered === 'hidden' && offered === 'on' && whileChanged === 'off' && undone === 'on',
+  'PUBLISH is on the pen\'s form alone, offered on the stored set, held while the form shows a change');
+await inForm(`d.querySelector('.add-set-publish').click()`);
+await wait(3000);
+const afterPublish = await welcome();
+const publishedTile = await evaluate(`(t=>t&&{ colour: getComputedStyle(t.querySelector('.pick-name')).color, name: t.querySelector('.pick-name').textContent })(document.querySelector('.pick[data-set="${MINE}"]'))`);
+const publishedRecord = await readStore();
+console.log('  published:', JSON.stringify({ tiles: afterPublish.tiles, tile: publishedTile }));
+const tilesOf = (page) => page.tiles.split(',');
+check(await form() === null && tilesOf(afterPublish).includes(`${MINE}!`) && tilesOf(afterPublish).includes(`local:${MINE}*`)
+  && publishedTile?.colour === 'rgb(252, 0, 0)' && publishedTile.name === 'My Edited Dungeon'
+  && afterPublish.pictures.every(Boolean) && publishedRecord.name === 'My Edited Dungeon' && publishedRecord.saves === edited.saves,
+  'PUBLISH sends the set: the form closes, the page shows it pending and selected, its thumbnail from its folder, beside the local set, which stays with its saves');
+await clickOn('.pick-edit');
+await wait(1500);
+await inForm(`d.querySelector('.add-set-publish').click()`);
+await wait(1500);
+const again = { form: await form(), failure: await failureText(), publish: await publishState() };
+console.log('  published again:', JSON.stringify({ failure: again.failure, publish: again.publish }));
+check(again.form?.open === true && again.failure === 'It could not be published: The site already has a set of this id.' && again.publish === 'on',
+  'a second PUBLISH of the id is refused, the server\'s answer said under the checklist, the form open');
+onPaused = ({ requestId }) => send('Fetch.fulfillRequest', { requestId, responseCode: 422,
+  responseHeaders: [{ name: 'Content-Type', value: 'application/json; charset=utf-8' }],
+  body: Buffer.from(JSON.stringify({ error: 'The set does not pass the check.', problems: [{ about: 'dungeon.dat', text: 'Its walls are wrong.' }] })).toString('base64') });
+await send('Fetch.enable', { patterns: [{ urlPattern: '*/api/data-sets*' }] });
+await inForm(`d.querySelector('.add-set-publish').click()`);
+await wait(1500);
+await send('Fetch.disable');
+onPaused = null;
+const unchecked = { form: await form(), failure: await failureText() };
+console.log('  refused:', JSON.stringify({ rows: unchecked.form?.rows, problems: unchecked.form?.problems }));
+check(unchecked.failure === 'It could not be published: The set does not pass the check.' && unchecked.form.rows.split(',').includes('dungeon.datx')
+  && unchecked.form.problems.includes('Its walls are wrong.') && unchecked.form.confirm,
+  "a 422's problems go on their rows, the server's check being the server's alone: CONFIRM stays");
+await inForm(`d.querySelector('#add-set-cancel').click()`);
 const confirmation = () => evaluate(`(()=>{const d=document.querySelector('dialog.delete-set');
   return d && { open: d.open, title: d.querySelector('h2').textContent, text: d.querySelector('p').textContent };})()`);
 await clickOn('.pick-edit');
@@ -579,8 +639,8 @@ await evaluate(`document.querySelector('#delete-set-confirm').click()`);
 await wait(1500);
 const deleted = { dialog: await confirmation(), form: await form(), store: await readStore(), page: await welcome() };
 check(deleted.dialog === null && deleted.form === null && deleted.store.name === null && deleted.store.saves === decodeURIComponent(saveId)
-  && deleted.page.tiles === atWelcome.tiles,
-  'its DELETE removes the record and every save filed under its id, and the page shows the sets without it');
+  && tilesOf(deleted.page).filter((tile) => tile !== MINE).join() === atWelcome.tiles && tilesOf(deleted.page).includes(MINE),
+  'its DELETE removes the record and every save filed under its id, and the page shows the sets without it, the published one kept');
 // A tile's name says its set's state, to a moderator (`server/dataSets.ts`), whose answer
 // the dev server's manifest stands in for here, with `"moderator": true`, kids-dungeon
 // pending and 3d2d1d, a hidden set, pending too: every set is listed, the hidden ones

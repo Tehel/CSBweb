@@ -119,13 +119,15 @@ const PAGE = `
 /**
  * Show the welcome page in `body`, in place of whatever it held, for the sets of
  * `manifest` and of `localSets`, and the saves of `store`, the set `select` names selected,
- * where it names one.
+ * where it names one. `loadManifest` asks the server for the manifest again, once a set is
+ * published.
  */
 export async function showWelcomePage(
     body: HTMLElement,
     manifest: DataSetManifest,
     store: Pick<SaveStore, 'list'>,
     localSets: Pick<BrowserDataSetStore, 'list' | 'put' | 'remove'>,
+    loadManifest: () => Promise<DataSetManifest>,
     select: string | null = null,
 ): Promise<void> {
     const records = await localSets.list().catch(() => [] as LocalDataSetRecord[]);
@@ -174,13 +176,19 @@ export async function showWelcomePage(
 
     /** The form that adds a set, or edits `edited`'s, with its `saves`; the page shown again after it. */
     function openForm(edited: { record: LocalDataSetRecord; saves: number } | null): void {
-        const again = (select: string | null): void => void showWelcomePage(body, manifest, store, localSets, select);
+        const again = (select: string | null, shown = manifest): void => void showWelcomePage(body, shown, store, localSets, loadManifest, select);
         openAddDataSetForm(
             manifest,
             new Set(records.map((record) => record.id).filter((id) => id !== edited?.record.id)),
             (record) => localSets.put(record),
             (record) => again(record.id),
-            edited && { ...edited, remove: () => localSets.remove(edited.record.id), removed: () => again(null) },
+            edited && {
+                ...edited,
+                remove: () => localSets.remove(edited.record.id),
+                removed: () => again(null),
+                // The page as it was, should the server not answer again.
+                published: (id) => void loadManifest().then((asked) => again(id, asked), () => again(id)),
+            },
         );
     }
 

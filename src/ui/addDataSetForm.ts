@@ -37,9 +37,19 @@
  * first: the confirmation says how many saves go with the set, where it has any, and
  * that the save menu's EXPORT keeps them. Its DELETE removes the record and every save
  * filed under its id; its CANCEL keeps both.
+ *
+ * PUBLISH, beside DELETE, offers the stored set to the site, pending a moderator's
+ * approval (`DEBT.md` P8). It is enabled while the form shows the record as it is stored:
+ * a change is CONFIRMed first. It sends the record to `api/data-sets` with the player's
+ * `playerId`, as `server/publish.ts` reads it, the thumbnail as a PNG, and leaves the
+ * record as it is. Once published, the form closes and the page shows the sets again,
+ * asked for anew; a refusal is said under the checklist, a problem of the server's check
+ * on its row, and the form stays.
  */
 import { folderFiles, type DataSetFiles } from '../data/DataSetFiles';
-import { dataSetNamed, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, type DataSetManifest } from '../data/DataSets';
+import {
+    DATA_SETS_ROUTE, dataSetNamed, LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, PLAYER_ID_HEADER, type DataSetManifest,
+} from '../data/DataSets';
 import { GraphicsLoader } from '../data/GraphicsLoader';
 import { ITEM_KINDS, isIllegalSubcode, operationsUsed, type DungeonCensus } from '../engine/DungeonCensus';
 import { StkOp } from '../engine/DsaSystem';
@@ -48,6 +58,7 @@ import {
     checkLocalDataSet, identifyLocalDataSetFile, recordFile,
     type LocalDataSetDraft, type LocalDataSetField, type LocalDataSetFile, type LocalDataSetProblem, type LocalDataSetRecord,
 } from '../data/LocalDataSets';
+import { playerId } from './gameEvents';
 
 /** The sets a record without a `graphics.dat` may play the graphics of. */
 const BASE_SETS = ['dm-atari', 'csb'];
@@ -83,7 +94,10 @@ const FORM = `
 <form class="add-set-form">
   <div class="add-set-head">
     <h2 class="px" id="add-set-title">Add my own dungeon</h2>
-    <button type="button" class="add-set-delete px px2" hidden>Delete</button>
+    <span class="add-set-actions">
+      <button type="button" class="add-set-publish px px2" hidden>Publish</button>
+      <button type="button" class="add-set-delete px px2" hidden>Delete</button>
+    </span>
   </div>
   <div class="add-set-columns">
     <div class="add-set-give">
@@ -137,6 +151,8 @@ export interface EditedDataSet {
     remove: () => Promise<void>;
     /** Called once `remove` has deleted them, the form closed. */
     removed: () => void;
+    /** Called once PUBLISH has published the set as `id`, the form closed. */
+    published: (id: string) => void;
 }
 
 /**
@@ -171,6 +187,10 @@ export function openAddDataSetForm(
     const editing = edited?.record ?? null;
     let idWritten = editing !== null;
     let record: LocalDataSetRecord | null = null;
+    /** The problems the server's check found in the set PUBLISH sent, shown until a change. */
+    let refused: LocalDataSetProblem[] = [];
+    /** The check's last verdict, which `draw` shows. */
+    let verdict: { draft: LocalDataSetDraft; problems: LocalDataSetProblem[]; census: DungeonCensus | null } | null = null;
     let generation = 0;
     /** Why the thumbnail could not be drawn, shown on its row until a thumbnail is given. */
     let drawFailure = '';
@@ -191,6 +211,8 @@ export function openAddDataSetForm(
             files[about] = blob instanceof File ? blob : new File([blob], about, { type: blob.type });
         }
     }
+    /** The record's files as the form holds them: unchanged while each is the same object. */
+    const storedFiles = { ...files };
     for (const set of bases) {
         const label = document.createElement('label');
         label.className = 'add-set-check';
@@ -340,6 +362,23 @@ export function openAddDataSetForm(
     });
     dialog.addEventListener('close', () => dialog.remove());
 
+    const publish = form.querySelector<HTMLButtonElement>('.add-set-publish')!;
+    publish.hidden = edited === null;
+    publish.addEventListener('click', async () => {
+        if (!edited || !publishable()) return;
+        publish.disabled = true;
+        failure.textContent = '';
+        const answer = await publishRecord(edited.record, baseSet);
+        if ('id' in answer) {
+            dialog.close();
+            edited.published(answer.id);
+            return;
+        }
+        failure.textContent = `It could not be published: ${answer.error}`;
+        refused = answer.problems ?? [];
+        draw();
+    });
+
     const deleteButton = form.querySelector<HTMLButtonElement>('.add-set-delete')!;
     deleteButton.hidden = edited === null;
     deleteButton.title = 'Delete this dungeon and its saves';
@@ -367,39 +406,107 @@ export function openAddDataSetForm(
         };
         const mine = ++generation;
         record = null;
+        refused = [];
         confirm.disabled = true;
+        publish.disabled = true;
         void checkLocalDataSet(draft, takenIds, base, editing?.createdAt ?? Date.now()).then(({ problems, record: made, census }) => {
             if (mine !== generation) return;
-            for (const { row, item, given, remove, problem } of rows.values()) {
-                // The graphics' problems are about the file or, without it, about the base set.
-                const own = problems.filter((p) => p.about === row.about || (row.about === 'graphics.dat' && p.about === 'baseSet'));
-                const value = valueOf(row.about, draft, files, bases.find((set) => set.id === baseSet)?.name ?? baseSet);
-                const state = own.length > 0 ? 'wrong' : value !== null ? 'right' : row.needed ? 'wrong' : 'absent';
-                item.className = state;
-                // The name and the id are in their fields beside it.
-                given.textContent = row.about === 'name' || row.about === 'id' ? '' : value ?? '';
-                // An edited set keeps a dungeon.dat: it can only be replaced.
-                remove.hidden = !(row.about in files) || (editing !== null && row.about === 'dungeon.dat');
-                // A needed field left empty is shown by its cross alone; anything else wrong says why.
-                problem.textContent = value !== null || !row.needed ? own.map((p) => p.text).join(' ') : '';
-                if (row.about === 'thumbnail' && value === null) {
-                    // Drawn from graphics that read.
-                    generate.disabled = drawing || problems.some((p) => p.about === 'graphics.dat' || p.about === 'baseSet');
-                    given.replaceChildren(generate);
-                    problem.textContent = drawFailure;
-                }
-                item.title = [row.hint, ...own.map((p: LocalDataSetProblem) => p.text)].join('\n');
-            }
-            holds.hidden = census === null;
-            holds.replaceChildren(...(census ? censusRows(census) : []));
+            verdict = { draft, problems, census };
             record = made;
-            confirm.disabled = made === null;
+            draw();
         });
+    }
+
+    /** The checklist, from the check's verdict and the server's refusal, and the buttons. */
+    function draw(): void {
+        if (!verdict) return;
+        const { draft, census } = verdict;
+        const problems = [...verdict.problems, ...refused];
+        for (const { row, item, given, remove, problem } of rows.values()) {
+            // The graphics' problems are about the file or, without it, about the base set.
+            const own = problems.filter((p) => p.about === row.about || (row.about === 'graphics.dat' && p.about === 'baseSet'));
+            const value = valueOf(row.about, draft, files, bases.find((set) => set.id === baseSet)?.name ?? baseSet);
+            const state = own.length > 0 ? 'wrong' : value !== null ? 'right' : row.needed ? 'wrong' : 'absent';
+            item.className = state;
+            // The name and the id are in their fields beside it.
+            given.textContent = row.about === 'name' || row.about === 'id' ? '' : value ?? '';
+            // An edited set keeps a dungeon.dat: it can only be replaced.
+            remove.hidden = !(row.about in files) || (editing !== null && row.about === 'dungeon.dat');
+            // A needed field left empty is shown by its cross alone; anything else wrong says why.
+            problem.textContent = value !== null || !row.needed ? own.map((p) => p.text).join(' ') : '';
+            if (row.about === 'thumbnail' && value === null) {
+                // Drawn from graphics that read.
+                generate.disabled = drawing || problems.some((p) => p.about === 'graphics.dat' || p.about === 'baseSet');
+                given.replaceChildren(generate);
+                problem.textContent = drawFailure;
+            }
+            item.title = [row.hint, ...own.map((p: LocalDataSetProblem) => p.text)].join('\n');
+        }
+        holds.hidden = census === null;
+        holds.replaceChildren(...(census ? censusRows(census) : []));
+        confirm.disabled = record === null;
+        publish.disabled = !publishable();
+        publish.title = publish.disabled ? 'CONFIRM the changes first: what is published is the set as it is stored'
+            : "Offer it to the site, pending a moderator's approval";
+    }
+
+    /** Whether the check passed, and the form shows the record as it is stored. */
+    function publishable(): boolean {
+        if (!editing || !record) return false;
+        const sameFiles = LOCAL_DATA_SET_FILES.every((about) => files[about] === storedFiles[about]);
+        return sameFiles && record.name === editing.name && record.description === editing.description
+            && record.authors.join('\n') === editing.authors.join('\n') && record.dmRules === editing.dmRules
+            && record.baseSet === editing.baseSet;
     }
 
     document.body.append(dialog);
     dialog.showModal();
     changed();
+}
+
+/** What the server answered a publish, as `server/publish.ts` says it, or why it could not be asked. */
+type PublishAnswer = { id: string } | { error: string; problems?: LocalDataSetProblem[] };
+
+/**
+ * `record` sent to `api/data-sets` as `server/publish.ts` reads it, by the player whose
+ * `playerId` this is: its fields, its files by the name the game reads them under, and
+ * its thumbnail as a PNG. `baseSet` is the form's, which the server takes whether or not
+ * the record has a `graphics.dat` of its own.
+ */
+async function publishRecord(record: LocalDataSetRecord, baseSet: string): Promise<PublishAnswer> {
+    const body = new FormData();
+    body.append('id', record.id);
+    body.append('name', record.name);
+    body.append('description', record.description);
+    for (const author of record.authors) body.append('authors', author);
+    body.append('dmRules', String(record.dmRules));
+    body.append('baseSet', record.baseSet ?? baseSet);
+    try {
+        for (const [about, blob] of Object.entries(record.files) as [LocalDataSetFile, Blob][]) {
+            body.append(about, about === 'thumbnail' ? await asPng(blob) : blob, about === 'thumbnail' ? 'thumbnail.png' : about);
+        }
+    } catch (error) {
+        return { error: `the thumbnail cannot be made a PNG (${error instanceof Error ? error.message : String(error)}).` };
+    }
+    const response = await fetch(DATA_SETS_ROUTE, { method: 'POST', headers: { [PLAYER_ID_HEADER]: playerId() }, body }).catch(() => null);
+    if (!response) return { error: 'the server cannot be reached.' };
+    const answer = await response.json().catch(() => null) as PublishAnswer | null;
+    if (response.status === 201 && answer && 'id' in answer) return answer;
+    return answer && 'error' in answer ? answer : { error: `the server answered HTTP ${response.status}.` };
+}
+
+/** A PNG's first eight bytes. */
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/** `image` as a PNG: itself where it is one, else drawn again and encoded. */
+async function asPng(image: Blob): Promise<Blob> {
+    const head = new Uint8Array(await image.slice(0, PNG_SIGNATURE.length).arrayBuffer());
+    if (PNG_SIGNATURE.every((byte, i) => head[i] === byte)) return image;
+    const bitmap = await createImageBitmap(image);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    return canvas.convertToBlob({ type: 'image/png' });
 }
 
 /**

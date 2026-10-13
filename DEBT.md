@@ -29,8 +29,8 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 (`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
-from their own files to the welcome page, plays it, edits it and deletes it; what is left
-is publishing it, and moderating what is published (P8). They are not CSBWin features but the page's, and come before every other
+from their own files to the welcome page, plays it, edits it, deletes it and publishes it;
+what is left is moderating what is published (P8). They are not CSBWin features but the page's, and come before every other
 tier.
 
 **Before the rest, at the author's request: U — the interface in the canvas.** The
@@ -113,7 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P8 | Publishing a local set, and moderating it | L | ⚠️ step 3 of 5 next |
+| P8 | Publishing a local set, and moderating it | L | ⚠️ step 4 of 5 next |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
@@ -236,9 +236,11 @@ under it, and its `dungeon.dat` replaceable but not removable; the record CONFIR
 keeps when it was added, and a new `dungeon.dat` gives it a new signature, which the
 saves already stored do not need. The form's DELETE asks first, counting the saves that
 go with the set and pointing to the save menu's EXPORT, then removes the record and
-those saves in one transaction (`BrowserDataSetStore.remove`).
+those saves in one transaction (`BrowserDataSetStore.remove`). Its PUBLISH, enabled while
+the form shows the record as stored, sends it to the server (below), and the page then
+asks `api/data-sets` again.
 `tools/dump-local-data-set.ts` proves the check, the record and the census,
-`tools/probe-frames.mjs` drives the form, adding, editing and deleting a set.
+`tools/probe-frames.mjs` drives the form, adding, editing, publishing and deleting a set.
 
 The server lists the site's sets from its store (`server/dataSets.ts`, `doc/DEPLOYMENT.md`
 → "The game files and the manifest"): each row approved or pending, with its owner's
@@ -282,8 +284,8 @@ A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more 
 
 ### P8 ⏳ Publishing a local set, and moderating it
 
-L, in five steps (below); the first two, the page's reader on the server (tier P's
-introduction) and the publish route, stand, and step 3 is next.
+L, in five steps (below); the first three, the page's reader on the server (tier P's
+introduction), the publish route and PUBLISH in the form, stand, and step 4 is next.
 
 **The lifecycle.** A set is in one of four states, which its tile's name says (`src/ui/welcomePage.ts`):
 
@@ -328,7 +330,14 @@ form's fields, the rules in their order and the answers; `doc/DEPLOYMENT.md` →
 files and the manifest"). It reads the set with the page's own check, writes its folder
 whole under `gamefiles/<id>/`, a base set's `graphics.dat` copied in where it has none,
 then its row, pending, owned by its sender, with its description and authors, and never
-changes the folder after.
+changes the folder after. The pen's form sends it (`publishRecord`,
+`src/ui/addDataSetForm.ts`), the thumbnail made a PNG, says a refusal under the
+checklist, a 422's problems on their rows, and on success closes and has the welcome page
+ask `api/data-sets` again, the new set selected. The dev server answers the route with
+the server's own `receivePublish` (`vite.config.mts`), over a store of the repository's
+manifest and what it has published, into a scratch folder. `tools/probe-frames.mjs`
+publishes a set, is refused it a second time, and stands in for a 422; its id is the
+run's own, since a dev server or an image another run used keeps what it published.
 
 **PUBLISH leaves the local record as it is** (decided with the author): a cyan tile
 beside the red one, its saves still filed under `local:<id>`, and the player can go on
@@ -341,14 +350,7 @@ follow as an item of its own.
 
 1. **The page's reader on the server**: stands.
 2. **The publish route**: stands.
-3. **PUBLISH in the form.** The pen's form (`src/ui/addDataSetForm.ts`) has PUBLISH,
-   enabled while the record is stored as the form shows it; it sends the record with the
-   `playerId` (`src/ui/gameEvents.ts`), its fields and files as `server/publish.ts` reads
-   them, the thumbnail as a PNG, says the server's refusal in the form, a 422's problems
-   on their rows, and on
-   success asks `api/data-sets` again, so the grid shows the red tile beside the cyan one.
-   The dev server (`vite.config.mts`) answers the route as `server/app.ts` does, into a
-   scratch folder. Evidence: a `tools/probe-frames.mjs` block, a publish and a refusal.
+3. **PUBLISH in the form**: stands.
 4. **The moderation endpoint**, `POST api/data-sets/<id>`, as above: reject and withdraw
    delete the row, then the folder (the backup keeps its copy). `doc/DEPLOYMENT.md` says
    what is left to a moderator's hands. Evidence: `tools/dump-server.ts`, every action
