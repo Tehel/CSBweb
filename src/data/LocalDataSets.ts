@@ -14,7 +14,7 @@
 import { CSBGraphicsLoader, CSBGRAPHICS_SENTINEL } from './CSBGraphicsLoader';
 import { readRuntimeFileSignatures } from './CsbwinExpool';
 import { csbGraphicsExpected, noExpectedSignatures, readExpectedSignatures } from './CsbwinExtendedFeatures';
-import { LOCAL_DATA_SET_PREFIX, type DataSet } from './DataSets';
+import { LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_ID_PATTERN, type DataSet } from './DataSets';
 import type { DataSetFiles } from './DataSetFiles';
 import { DungeonLoader } from './DungeonLoader';
 import { dungeonSignature, type DungeonSignature } from './DungeonSignature';
@@ -28,8 +28,8 @@ import { buildGameTables } from '../engine/GameTables';
 import { parseHcsbDat } from './HintOracleLoader';
 import { bigEndianDungeonDat } from './LittleEndianDungeon';
 
-/** The files a record may hold, by the name the game reads them under. */
-export type LocalDataSetFile = 'dungeon.dat' | 'graphics.dat' | 'CSBgraphics.dat' | 'hcsb.hct' | 'hcsb.dat' | 'thumbnail';
+/** The files a record may hold, by the name the game reads them under (`LOCAL_DATA_SET_FILES`). */
+export type LocalDataSetFile = (typeof LOCAL_DATA_SET_FILES)[number];
 
 /** A local set, as the store holds it. */
 export interface LocalDataSetRecord {
@@ -114,13 +114,6 @@ export interface LocalDataSetProblem {
     about: LocalDataSetField;
     text: string;
 }
-
-/**
- * The `<id>` a player may give: lowercase letters, digits, `.`, `-` and `_`, a letter or a
- * digit first, at most 40. A published set's id is its folder on the server (`DEBT.md`
- * P8), so it is a folder's name everywhere.
- */
-export const LOCAL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;
 
 /**
  * `draft` checked as the boot will read its files, and the record it makes where nothing

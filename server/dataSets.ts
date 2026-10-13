@@ -5,7 +5,8 @@
  * each request (`app.ts`), so a set added while the server runs is offered at once.
  *
  * A set is approved or pending. An approved set is offered to everyone; a pending one, a
- * player's upload, to its owner and the moderators only (`manifestText`). Ownership, and
+ * player's, published by `publish.ts` (`DataSetStore.publish`), to its owner and the
+ * moderators only (`manifestText`). Ownership, and
  * moderation, rest on the `playerId` alone, a secret (`src/ui/gameEvents.ts`), so no answer
  * holds one.
  *
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS data_sets (
     hint_oracle  INTEGER NOT NULL DEFAULT 0,
     dm_rules     INTEGER NOT NULL DEFAULT 0,
     hidden       INTEGER NOT NULL DEFAULT 0
+    -- and ADDED_COLUMNS
 );
 CREATE TABLE IF NOT EXISTS data_set_defaults (
     only         INTEGER PRIMARY KEY CHECK (only = 1),
@@ -38,6 +40,16 @@ CREATE TABLE IF NOT EXISTS data_set_defaults (
     swoosh       TEXT                  -- the FTL logo's folder, relative to GAMEFILES_DIR, or NULL
 );
 `;
+
+/**
+ * The columns `data_sets` gained after its first deployment, which a table made before
+ * them is altered to add (`ALTER TABLE … ADD COLUMN`), and a new one is too, so that both
+ * are the same table. A published set's (`server/publish.ts`); the site's are empty.
+ */
+const ADDED_COLUMNS: readonly (readonly [string, string])[] = [
+    ['description', "TEXT NOT NULL DEFAULT ''"],
+    ['authors', "TEXT NOT NULL DEFAULT '[]'"],  // a JSON list of strings
+];
 
 type Flag = 'csbGraphics' | 'miniDat' | 'hintOracle' | 'dmRules' | 'hidden';
 
@@ -63,6 +75,17 @@ export interface DataSetViewer {
     moderator: boolean;
 }
 
+/** A player's set, as `publish` stores it: its folder is its id. */
+export interface PublishedDataSet {
+    id: string;
+    name: string;
+    description: string;
+    authors: readonly string[];
+    csbGraphics: boolean;
+    hintOracle: boolean;
+    dmRules: boolean;
+}
+
 /** Everyone: no `playerId`, not a moderator. */
 export const ANYONE: DataSetViewer = { playerId: null, moderator: false };
 
@@ -82,10 +105,15 @@ export class DataSetStore {
     private readonly defaults: StatementSync;
     private readonly insert: StatementSync;
     private readonly insertDefaults: StatementSync;
+    private readonly insertPublished: StatementSync;
 
     constructor(db: DatabaseSync) {
         this.db = db;
         db.exec(SCHEMA);
+        const columns = new Set((db.prepare('PRAGMA table_info(data_sets)').all() as { name: string }[]).map((column) => column.name));
+        for (const [column, type] of ADDED_COLUMNS) {
+            if (!columns.has(column)) db.exec(`ALTER TABLE data_sets ADD COLUMN ${column} ${type}`);
+        }
         const flags = FLAG_COLUMNS.map(([, column]) => column);
         this.count = db.prepare('SELECT COUNT(*) AS n FROM data_sets');
         this.hasRow = db.prepare('SELECT 1 FROM data_sets WHERE id = ?');
@@ -94,6 +122,9 @@ export class DataSetStore {
         this.insert = db.prepare(
             `INSERT INTO data_sets (id, name, dir, position, status, owner, ${flags.join(', ')}) VALUES (?, ?, ?, ?, ?, NULL, ${flags.map(() => '?').join(', ')})`);
         this.insertDefaults = db.prepare('INSERT INTO data_set_defaults (only, default_set, swoosh) VALUES (1, ?, ?)');
+        this.insertPublished = db.prepare(
+            `INSERT INTO data_sets (id, name, dir, position, status, owner, description, authors, ${flags.join(', ')}) `
+            + `VALUES (?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM data_sets), 'pending', ?, ?, ?, ${flags.map(() => '?').join(', ')})`);
     }
 
     isEmpty(): boolean {
@@ -123,6 +154,16 @@ export class DataSetStore {
             this.db.exec('ROLLBACK');
             throw error;
         }
+    }
+
+    /**
+     * Adds `set`, published by `owner`, as a pending row last in the list, its folder its id,
+     * with no `mini.dat` and not hidden. Throws where the id is taken.
+     */
+    publish(set: PublishedDataSet, owner: string): void {
+        const flags: Record<Flag, boolean> = { csbGraphics: set.csbGraphics, miniDat: false, hintOracle: set.hintOracle, dmRules: set.dmRules, hidden: false };
+        this.insertPublished.run(set.id, set.name, set.id, owner, set.description, JSON.stringify(set.authors),
+            ...FLAG_COLUMNS.map(([flag]) => (flags[flag] ? 1 : 0)));
     }
 
     read(): StoredDataSets {

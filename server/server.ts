@@ -30,14 +30,18 @@ import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import { checkFiles, createAppServer, loadCheckDataSet, type CheckDataSet, type CheckedFiles, type ServerOptions } from './app.ts';
+import { checkFiles, createAppServer, loadCheckDataSet, type CheckedFiles, type ServerOptions } from './app.ts';
 import { DataSetStore } from './dataSets.ts';
 import { isPlayerId, RateLimit } from './events.ts';
 import { StatsStore } from './stats.ts';
+import type { CheckDataSet } from './publish.ts';
 import { openStore } from './store.ts';
 
 /** Events per address and minute: a game sends a few, a party's joins included. */
 const EVENTS_PER_MINUTE = 30;
+
+/** Publishes per address and hour, refused ones included: a player publishes a set now and then. */
+const PUBLISHES_PER_HOUR = 5;
 
 /** How long a shutdown waits for the requests in flight before it closes their sockets. */
 const SHUTDOWN_GRACE_MS = 5000;
@@ -77,6 +81,7 @@ const server = createAppServer(options, {
     store,
     rules: { hasSet: (id) => dataSets.hasSet(id) },
     rateLimit: new RateLimit(EVENTS_PER_MINUTE, 60_000),
+    publishRateLimit: new RateLimit(PUBLISHES_PER_HOUR, 3_600_000),
     now: Date.now,
 });
 server.listen(port, () => {

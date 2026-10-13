@@ -128,6 +128,26 @@ export interface DataSetManifest {
 export const LOCAL_DATA_SET_PREFIX = 'local:';
 
 /**
+ * The `<id>` of a player's own set's `local:<id>`: lowercase letters, digits, `.`, `-` and
+ * `_`, a letter or a digit first, at most 40. A published set's id is its folder on the
+ * server (`server/publish.ts`), so it is a folder's name everywhere.
+ */
+export const LOCAL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;
+
+/**
+ * The files a player's own set may hold, by the name the game reads them under, and
+ * `thumbnail`, an image (`LocalDataSetRecord`, `src/data/LocalDataSets.ts`).
+ */
+export const LOCAL_DATA_SET_FILES = ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat', 'thumbnail'] as const;
+
+/**
+ * The longest text the form that adds a set takes in each field, in characters
+ * (`src/ui/addDataSetForm.ts`), and the server publishes: the authors as the form's one
+ * line, joined by commas.
+ */
+export const LOCAL_DATA_SET_TEXT_LIMITS = { name: 60, description: 300, authors: 200 } as const;
+
+/**
  * Where the page asks for the manifest, relative to the page: the server's API, not a file
  * under `gamefiles/`, since a server chooses what each player is offered.
  */

@@ -11,7 +11,8 @@
  *   /server/…         404: the server's own module (`CHECK_MODULE`), never served
  *   /gamefiles/…      GAMEFILES_DIR/…               no-cache, with ETag and Last-Modified
  *   /api/data-sets    the page's list of sets, from the store's table (`dataSets.ts`), for
- *                     the player its `X-Player-Id` names
+ *                     the player its `X-Player-Id` names; POST: that player's own set
+ *                     published, pending (`publish.ts`)
  *   /api/health       200, for the compose healthcheck
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
  *   /api/stats        the store's aggregates, as JSON
@@ -29,6 +30,7 @@ import { pathToFileURL } from 'node:url';
 import { DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, type DataSetManifest } from '../src/data/DataSets.ts';
 import { manifestText, samePlayerId, type DataSetStore, type DataSetViewer } from './dataSets.ts';
 import { checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
+import { MAX_PUBLISH_BYTES, publishDataSet, type CheckDataSet, type PublishAnswer } from './publish.ts';
 import type { StatsStore } from './stats.ts';
 
 export interface ServerOptions {
@@ -51,51 +53,10 @@ export interface CheckedFiles {
     filled: boolean;
 }
 
-/** The files of a set's folder, by name, as the page reads them (`DataSetFiles`, `src/data/DataSetFiles.ts`). */
-export interface DataSetFolder {
-    /** The file `name`'s bytes, or `null` where the set has none, or it cannot be read. */
-    read(name: string): Promise<Uint8Array | null>;
-    /** The file `name` as an error names it. */
-    where(name: string): string;
-}
-
-/** A player's set as the page's form gives it (`LocalDataSetDraft`, `src/data/LocalDataSets.ts`). */
-export interface DataSetDraft {
-    /** The `<id>` of `local:<id>`. */
-    id: string;
-    name: string;
-    description: string;
-    authors: string[];
-    dmRules: boolean;
-    /** The set whose `graphics.dat` it plays where `files` holds none. */
-    baseSet: string;
-    /** By the name the game reads them under, and `thumbnail`. */
-    files: Partial<Record<string, Blob>>;
-}
-
-/**
- * The page's check of a player's own set, `checkLocalDataSet` (`src/data/LocalDataSets.ts`),
- * which `npm run build` makes a Node module (`vite.config.mts`) and the server loads at
- * start-up (`loadCheckDataSet`), so that the server reads a set with the page's own readers.
- * It is typed here by its shape, since the page's sources are not erasable syntax and the
- * server's `tsc` cannot follow them; a tool that hands the API the source's function proves
- * that the two agree.
- */
-export type CheckDataSet = (
-    draft: DataSetDraft,
-    takenIds: ReadonlySet<string>,
-    base: (set: string) => DataSetFolder | null,
-    createdAt: number,
-) => Promise<{
-    problems: { about: string; text: string }[];
-    record: { id: string; dungeonSignature: readonly string[] } | null;
-    census: unknown;
-}>;
-
 /** The folder of `distDir` that holds the server's own module, not the page's: never served. */
 const SERVER_DIR = 'server';
 
-/** The page's check built for Node (`CheckDataSet`), under `distDir`. */
+/** The page's check built for Node (`CheckDataSet`, `publish.ts`), under `distDir`. */
 export const CHECK_MODULE = `${SERVER_DIR}/LocalDataSets.js`;
 
 /** The check `CHECK_MODULE` exports, loaded from `distDir`; throws, saying why, where it is not built. */
@@ -123,6 +84,8 @@ export interface ApiOptions {
     rules: EventRules;
     /** Events per address. */
     rateLimit: RateLimit;
+    /** Publishes per address, refused ones included. */
+    publishRateLimit: RateLimit;
     /** The clock events are stored with. */
     now: () => number;
 }
@@ -201,7 +164,8 @@ function route({ distDir, gamefilesDir, manifestFile }: ServerOptions, api: ApiO
 
     if (segments[0] === 'api') {
         if (segments.join('/') === DATA_SETS_ROUTE) {
-            if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
+            if (req.method === 'POST') return receivePublish(gamefilesDir, api, req, res);
+            if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res, 'GET, HEAD, POST');
             res.setHeader('Cache-Control', 'no-store');
             res.setHeader('Vary', PLAYER_ID_HEADER);
             return send(res, 200, manifestText(api.dataSets.read(), dataSetViewer(api, req)), 'application/json; charset=utf-8');
@@ -317,11 +281,42 @@ async function receiveEvent(api: ApiOptions, req: IncomingMessage, res: ServerRe
     }
     const body = await readBody(req, MAX_EVENT_BYTES);
     if (body === null) return send(res, 413, 'Event too large');
-    const event = checkEvent(body, api.rules);
+    const event = checkEvent(body.toString('utf8'), api.rules);
     if (typeof event === 'string') return send(res, 400, `Bad event: ${event}`);
     api.store.record(event, api.now());
     res.statusCode = 204;
     res.end();
+}
+
+/**
+ * `POST api/data-sets`: the rate limit first, then the player, a `multipart/form-data` body
+ * of at most `MAX_PUBLISH_BYTES`, and its form, before `publishDataSet` decides. Every
+ * answer is JSON (`PublishAnswer`).
+ */
+async function receivePublish(gamefilesDir: string, api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const answer = (status: number, error: string): PublishAnswer => ({ status, body: { error } });
+    const refused = (): PublishAnswer | null => {
+        if (!api.publishRateLimit.allow(clientAddress(req), api.now())) return answer(429, 'Too many publishes from here: try again in an hour.');
+        if (!isPlayerId(req.headers[PLAYER_ID_HEADER.toLowerCase()])) return answer(400, `No player: ${PLAYER_ID_HEADER} is not a playerId.`);
+        if (!req.headers['content-type']?.startsWith('multipart/form-data')) return answer(400, 'The body is not multipart/form-data.');
+        return null;
+    };
+    let reply = refused();
+    if (reply !== null) req.resume();
+    else {
+        const playerId = req.headers[PLAYER_ID_HEADER.toLowerCase()] as string;
+        const body = await readBody(req, MAX_PUBLISH_BYTES);
+        let form: FormData | null = null;
+        if (body !== null) {
+            const request = new Request('http://localhost/', { method: 'POST', headers: { 'Content-Type': req.headers['content-type']! }, body: new Uint8Array(body) });
+            form = await request.formData().catch(() => null);
+        }
+        reply = body === null ? answer(413, `The request is larger than ${MAX_PUBLISH_BYTES / (1024 * 1024)} MiB.`)
+            : form === null ? answer(400, 'The body is not a form.')
+            : await publishDataSet(form, playerId, { checkDataSet: api.checkDataSet, dataSets: api.dataSets, gamefilesDir, now: api.now });
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
 }
 
 /**
@@ -346,8 +341,8 @@ function clientAddress(req: IncomingMessage): string {
     return req.socket.remoteAddress ?? '';
 }
 
-/** The request's body as text, or `null` past `limit` bytes, which is drained unread. */
-function readBody(req: IncomingMessage, limit: number): Promise<string | null> {
+/** The request's body, or `null` past `limit` bytes, which is drained unread. */
+function readBody(req: IncomingMessage, limit: number): Promise<Buffer | null> {
     if (Number(req.headers['content-length'] ?? 0) > limit) {
         req.resume();
         return Promise.resolve(null);
@@ -359,7 +354,7 @@ function readBody(req: IncomingMessage, limit: number): Promise<string | null> {
             size += chunk.length;
             if (size <= limit) chunks.push(chunk);
         });
-        req.on('end', () => done(size <= limit ? Buffer.concat(chunks).toString('utf8') : null));
+        req.on('end', () => done(size <= limit ? Buffer.concat(chunks) : null));
         req.on('error', fail);
     });
 }

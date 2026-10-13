@@ -39,7 +39,7 @@
  * filed under its id; its CANCEL keeps both.
  */
 import { folderFiles, type DataSetFiles } from '../data/DataSetFiles';
-import { dataSetNamed, LOCAL_DATA_SET_PREFIX, type DataSetManifest } from '../data/DataSets';
+import { dataSetNamed, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, type DataSetManifest } from '../data/DataSets';
 import { GraphicsLoader } from '../data/GraphicsLoader';
 import { ITEM_KINDS, isIllegalSubcode, operationsUsed, type DungeonCensus } from '../engine/DungeonCensus';
 import { StkOp } from '../engine/DsaSystem';
@@ -88,13 +88,13 @@ const FORM = `
   <div class="add-set-columns">
     <div class="add-set-give">
       <label class="add-set-field"><span class="px px2">Name</span>
-        <input name="name" maxlength="60" autocomplete="off"></label>
+        <input name="name" maxlength="${LOCAL_DATA_SET_TEXT_LIMITS.name}" autocomplete="off"></label>
       <label class="add-set-field"><span class="px px2">Id</span>
         <span class="add-set-id"><span class="px px2">local:</span><input name="id" maxlength="40" autocomplete="off" spellcheck="false"></span></label>
       <label class="add-set-field"><span class="px px2">Description</span>
-        <textarea name="description" rows="2" maxlength="300"></textarea></label>
+        <textarea name="description" rows="2" maxlength="${LOCAL_DATA_SET_TEXT_LIMITS.description}"></textarea></label>
       <label class="add-set-field"><span class="px px2">Authors</span>
-        <input name="authors" maxlength="200" placeholder="Separated by commas" autocomplete="off"></label>
+        <input name="authors" maxlength="${LOCAL_DATA_SET_TEXT_LIMITS.authors}" placeholder="Separated by commas" autocomplete="off"></label>
       <label class="add-set-check" title="${DM_RULES_HINT}"><input type="checkbox" name="dmRules" checked>
         <span>DM rules: reincarnation raises attributes</span></label>
       <fieldset class="add-set-base" title="The graphics a dungeon plays when it has no graphics.dat of its own">

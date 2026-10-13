@@ -113,7 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P8 | Publishing a local set, and moderating it | L | ⚠️ step 2 of 5 next |
+| P8 | Publishing a local set, and moderating it | L | ⚠️ step 3 of 5 next |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
@@ -252,7 +252,8 @@ of the sets with an owner beside the store's snapshots. It reads a set with the 
 check: `npm run build` bundles `checkLocalDataSet` and its readers for Node into
 `dist/server/LocalDataSets.js` (`vite.config.mts`, `doc/DEPLOYMENT.md` → "The build"),
 which `server.ts` loads at start-up and hands the API (`CheckDataSet`, `loadCheckDataSet`,
-`server/app.ts`), a tool the source's function instead; nothing calls it yet.
+`server/app.ts`), a tool the source's function instead, and the publish route reads a set
+with it (`server/publish.ts`).
 `tools/dump-build.ts` proves the bundle says what the source says, `tools/dump-server.ts`
 that the server does not start without it, and `tools/check-image.sh` that the image's
 Node runs it.
@@ -281,8 +282,8 @@ A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more 
 
 ### P8 ⏳ Publishing a local set, and moderating it
 
-L, in five steps (below); the first, the page's reader on the server, stands (tier P's
-introduction), and step 2 is next.
+L, in five steps (below); the first two, the page's reader on the server (tier P's
+introduction) and the publish route, stand, and step 3 is next.
 
 **The lifecycle.** A set is in one of four states, which its tile's name says (`src/ui/welcomePage.ts`):
 
@@ -322,17 +323,12 @@ moderator, or the owner rejecting their own pending set; 404 for an id not in th
 one). The page then asks `api/data-sets` again and redraws the grid. Publishing is its
 own route, which takes the files.
 
-**Publishing** (PUBLISH sends the record's files and fields with the `playerId`). The server:
-
-- drops `local:` and refuses an id already in the table;
-- refuses an id whose folder `gamefiles/<id>/` already exists (`swoosh/`, or a folder no
-  row names) or that starts with `.` (the server serves no such segment);
-- caps each file's size and each player's rate;
-- checks the set with the page's own check (`ApiOptions.checkDataSet`), which reads every
-  file as the boot does, and refuses a dungeon the party cannot start in;
-- writes the folder under `gamefiles/<id>/` whole, then the row as pending, owned by the
-  sender, and never changes the folder after: `backup.ts` copies each owned set's folder
-  once, the first night its row is in a snapshot (`doc/DEPLOYMENT.md` → "Backups").
+**Publishing** stands: `POST api/data-sets` (`server/publish.ts`, whose header lists the
+form's fields, the rules in their order and the answers; `doc/DEPLOYMENT.md` → "The game
+files and the manifest"). It reads the set with the page's own check, writes its folder
+whole under `gamefiles/<id>/`, a base set's `graphics.dat` copied in where it has none,
+then its row, pending, owned by its sender, with its description and authors, and never
+changes the folder after.
 
 **PUBLISH leaves the local record as it is** (decided with the author): a cyan tile
 beside the red one, its saves still filed under `local:<id>`, and the player can go on
@@ -344,22 +340,12 @@ follow as an item of its own.
 **The steps**, each a commit with its evidence:
 
 1. **The page's reader on the server**: stands.
-2. **The publish route.** `POST api/data-sets`, a `multipart/form-data` body (Node's own
-   `Request.formData()`): the record's fields and files, and `X-Player-Id`. The rules
-   above, in that order, then: the flags follow from the files as `localDataSet`'s do;
-   a set without a `graphics.dat` has its base set's copied into its folder, so the folder
-   is a CSBWin directory like any other and the manifest needs no new field; the thumbnail,
-   which the page sends as a PNG, is `<id>-thumbnail.png` (`thumbnailPath`); the folder is
-   written as `gamefiles/.<id>.partial/` and renamed whole; the row goes last in `position`,
-   with two new columns for the description and the authors. The caps: 16 MiB a file
-   (Conflux's `CSBgraphics.dat` is 12 MB) and 32 MiB a request, and a few publishes per
-   address an hour (`RateLimit`, `server/events.ts`); `doc/DEPLOYMENT.md` gives nginx's
-   `client_max_body_size` for the route. Evidence: `tools/dump-server.ts`, a publish
-   accepted (the folder whole, the row pending and owned, seen by its owner and the
-   moderators only) and each refusal answered with nothing written.
+2. **The publish route**: stands.
 3. **PUBLISH in the form.** The pen's form (`src/ui/addDataSetForm.ts`) has PUBLISH,
    enabled while the record is stored as the form shows it; it sends the record with the
-   `playerId` (`src/ui/gameEvents.ts`), says the server's refusal in the form, and on
+   `playerId` (`src/ui/gameEvents.ts`), its fields and files as `server/publish.ts` reads
+   them, the thumbnail as a PNG, says the server's refusal in the form, a 422's problems
+   on their rows, and on
    success asks `api/data-sets` again, so the grid shows the red tile beside the cyan one.
    The dev server (`vite.config.mts`) answers the route as `server/app.ts` does, into a
    scratch folder. Evidence: a `tools/probe-frames.mjs` block, a publish and a refusal.

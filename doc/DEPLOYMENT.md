@@ -62,10 +62,14 @@ location / {
     proxy_pass http://127.0.0.1:8085;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
+    client_max_body_size 32m;
 }
 ```
 
-`X-Real-IP` is what the rate limit of `api/event` counts. Without it, every player shares
+`client_max_body_size` lets a published set through: nginx's own default is 1 MB, and the
+server refuses a request over 32 MiB itself (`MAX_PUBLISH_BYTES`, `server/publish.ts`).
+
+`X-Real-IP` is what the rate limits of `api/event` and of a publish count. Without it, every player shares
 the one bucket of the proxy's address. The server trusts the header only because the
 container's port is published on loopback (`server/app.ts`, `clientAddress`).
 
@@ -126,6 +130,18 @@ otherwise. The page names its player in an `X-Player-Id` header, its kept `playe
 `MODERATOR_PLAYER_IDS` lists. `api/event` takes the events of any
 set in the table. Both read the table at each request, so a row added while the server
 runs is offered at once.
+
+**A player publishes their own set** by a `POST` to `api/data-sets` (`server/publish.ts`):
+its record's fields and files as a `multipart/form-data` body, the player named in
+`X-Player-Id`. The server reads it with the page's own check (`CheckDataSet`), writes its
+folder whole as `gamefiles/<id>/`, its id that of `local:<id>`, then its row, pending and
+owned by the player, last in the list, with its description and authors. A set without a
+`graphics.dat` gets a copy of its base set's, and its thumbnail is `<id>-thumbnail.png`,
+so its folder is like any other. The server never changes the folder after. It refuses an
+id the table or `gamefiles/` already holds, a file over 16 MiB, a request over 32 MiB, and
+more than five publishes an hour from one address, each answered with nothing written. A
+folder is written as `gamefiles/.<id>.<uuid>.partial/` and renamed when whole; one left by a
+crash mid-write is never served, and can be deleted by hand.
 
 To refill the table from a changed manifest, empty it and restart. This drops every row,
 a player's pending set included:
@@ -188,13 +204,13 @@ every set (unset or empty, no one; an entry that is not a `playerId` stops the s
 | `/assets/…` | `dist/assets/…`, hashed names | `immutable` |
 | `/server/…` | 404: `dist/server/` is the server's module | |
 | `/gamefiles/…` | `GAMEFILES_DIR/…`, but the manifest | `no-cache`, ETag and Last-Modified |
-| `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest | `no-store`, `Vary: X-Player-Id` |
+| `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest; POST: a set published | `no-store`, `Vary: X-Player-Id` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
 | `/api/stats` | the statistics' aggregates | `no-store` |
 
 Every file answers a conditional GET with 304, and only GET and HEAD are allowed, except on
-`api/event`. A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
+`api/event` and `api/data-sets`'s POST. A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
 decoded, is refused with 400 before it reaches the disk.
 
 **At start-up** it opens the store (making it, and its folder, when missing), checks

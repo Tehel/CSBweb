@@ -27,7 +27,17 @@
  *     one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
  *     forwarded address, 429; `/api/stats`: the store's aggregates, not cached;
  *   - the API is handed the page's own `checkLocalDataSet`, which `tsc` holds to the
- *     shape `server/app.ts` types it by (`CheckDataSet`);
+ *     shape `server/publish.ts` types it by (`CheckDataSet`);
+ *   - `POST /api/data-sets` (`server/publish.ts`), over DM's and CSB's real files: a set
+ *     published, its `local:` dropped, its folder written whole with its base set's
+ *     `graphics.dat` and its thumbnail, no `.partial` left, its row pending, last, owned by
+ *     its sender, its text and flags those of the page's record, and offered to its owner
+ *     and the moderators only; one with its own `graphics.dat` and the Hint Oracle; and
+ *     every refusal answered with nothing written: the rate limit, no player, not a form,
+ *     a field unknown, missing, twice or too long, a bad id, a file or a request too
+ *     large, an id the table or the folder holds, and a set the page's check refuses, a
+ *     thumbnail that is not a PNG and a base set that is not the site's; a table made
+ *     before the publish's columns gains them;
  *   - `server.ts` itself, as Node runs it: a bad mount, a store it cannot open, a page's
  *     check that is not built, or an entry of `MODERATOR_PLAYER_IDS` that is not a `playerId` exits 1
  *     before it listens; a list of two, spaces around the comma, makes both moderators; and SIGTERM stops a listening server with 0, the store made, its
@@ -45,7 +55,7 @@
  * Usage: npx tsx tools/dump-server.ts
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -55,11 +65,12 @@ import { DatabaseSync } from 'node:sqlite';
 import { CHECK_MODULE, checkFiles, createAppServer, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
 import { ANYONE, DataSetStore, manifestText } from '../server/dataSets.ts';
 import { RateLimit } from '../server/events.ts';
+import { MAX_PUBLISH_BYTES, MAX_PUBLISHED_FILE_BYTES } from '../server/publish.ts';
 import { StatsStore } from '../server/stats.ts';
 import { openStore } from '../server/store.ts';
-import { parseManifest, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
-import { checkLocalDataSet } from '../src/data/LocalDataSets.ts';
-import { GAMEFILES_DIR, MANIFEST_FILE } from './lib/dataSets.ts';
+import { DATA_SETS_ROUTE, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
+import { checkLocalDataSet, localDataSet } from '../src/data/LocalDataSets.ts';
+import { dataSetNamed, GAMEFILES_DIR, MANIFEST_FILE } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
 
@@ -76,7 +87,7 @@ interface Answer {
 }
 
 /** `path` sent as it is: `fetch` would resolve its `..` before the server saw it. */
-function ask(port: number, path: string, method = 'GET', headers: Record<string, string> = {}, body?: string): Promise<Answer> {
+function ask(port: number, path: string, method = 'GET', headers: Record<string, string> = {}, body?: string | Buffer): Promise<Answer> {
     return new Promise((done, fail) => {
         const req = request({ host: '127.0.0.1', port, path, method, headers }, (res) => {
             let body = '';
@@ -242,7 +253,8 @@ async function checkAnswers(port: number, manifest: string): Promise<void> {
     check(String(dataSets.headers['content-type']).startsWith('application/json') && dataSets.headers['cache-control'] === 'no-store',
         'as JSON, not cached');
     check((await ask(port, '/api/data-sets', 'HEAD')).body === '', 'HEAD /api/data-sets: no body');
-    check((await ask(port, '/api/data-sets', 'POST')).status === 405, 'POST on /api/data-sets: 405');
+    const put = await ask(port, '/api/data-sets', 'PUT');
+    check(put.status === 405 && put.headers.allow === 'GET, HEAD, POST', 'PUT on /api/data-sets: 405, with Allow: GET, HEAD, POST');
     check((await ask(port, '/api/nothing')).status === 404, 'an unknown API is 404');
     const post = await ask(port, '/', 'POST');
     check(post.status === 405 && post.headers.allow === 'GET, HEAD', 'POST on a file: 405, with Allow');
@@ -333,6 +345,176 @@ async function checkEvents(port: number, store: StatsStore): Promise<void> {
     check(answers.slice(0, -1).every((status) => status === 204) && answers[EVENTS_PER_WINDOW] === 429, `the rate limit: ${EVENTS_PER_WINDOW} an address, then 429`);
     check((await post(event(20), { 'X-Real-IP': '10.1.1.2' })).status === 204, 'another address is still heard');
     check((await ask(port, '/api/event', 'POST', {}, event(21))).status === 204, 'without X-Real-IP, the socket\'s address counts');
+}
+
+/** The scratch publish server's rate limit: publishes per address and window. */
+const PUBLISHES_PER_WINDOW = 3;
+
+/** `bytes` as the form sends a file. */
+function fileOf(bytes: Uint8Array<ArrayBuffer>, name: string, type = 'application/octet-stream'): File {
+    return new File([bytes], name, { type });
+}
+
+/** What the folder holds and the table says: compared before and after a refusal. */
+function written(gamefilesDir: string, dataSets: DataSetStore): string {
+    return `${readdirSync(gamefilesDir).sort().join()} | ${dataSets.read().dataSets.map((set) => set.id).join()}`;
+}
+
+/**
+ * `POST /api/data-sets`, on a server of its own over DM's and CSB's real files: `dm-atari`
+ * and `csb` the site's base sets, `conflux` a set whose folder is not its id, and `swoosh`
+ * a folder no row names.
+ */
+async function checkPublish(scratch: string): Promise<void> {
+    console.log('\nPublishing a set:');
+    const root = join(scratch, 'publish');
+    const distDir = join(root, 'dist');
+    const gamefilesDir = join(root, 'gamefiles');
+    mkdirSync(distDir, { recursive: true });
+    writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
+    const dm = dataSetNamed('dm-atari'), csb = dataSetNamed('csb');
+    for (const [folder, from] of [['dm-atari', dm.dir], ['csb', csb.dir]] as const) {
+        mkdirSync(join(gamefilesDir, folder), { recursive: true });
+        symlinkSync(resolve(from, 'graphics.dat'), join(gamefilesDir, folder, 'graphics.dat'));
+    }
+    mkdirSync(join(gamefilesDir, 'conflux-dir'));
+    mkdirSync(join(gamefilesDir, 'swoosh'));
+    const manifestFile = join(root, 'manifest.json');
+    writeFileSync(manifestFile, JSON.stringify({
+        default: 'dm-atari', swoosh: 'swoosh',
+        dataSets: [{ id: 'dm-atari', name: 'DM' }, { id: 'csb', name: 'CSB' }, { id: 'conflux', name: 'Conflux', dir: 'conflux-dir' }],
+    }));
+    const options: ServerOptions = { distDir, gamefilesDir, manifestFile };
+    const db = new DatabaseSync(':memory:');
+    const dataSets = new DataSetStore(db);
+    checkFiles(options, dataSets);
+    const server = createAppServer(options, {
+        checkDataSet: checkLocalDataSet, dataSets, moderatorPlayerIds: MODERATORS, store: new StatsStore(db),
+        rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
+        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    const port = (server.address() as AddressInfo).port;
+
+    try {
+        const dmDungeon = new Uint8Array(readFileSync(`${dm.dir}/dungeon.dat`));
+        const thumbnail = new Uint8Array(readFileSync(`${dm.dir}/dm-atari-thumbnail.png`));
+        const fields = (id: string, extra: Record<string, string | string[]> = {}): Record<string, string | string[]> => ({
+            id, name: '  My DM ', description: 'Mine. ', authors: ['A Player', ' ', 'Another '], dmRules: 'true', baseSet: 'dm-atari', ...extra,
+        });
+        const dmFiles = (): Record<string, File> => ({ 'dungeon.dat': fileOf(dmDungeon, 'dungeon.dat'), thumbnail: fileOf(thumbnail, 'thumbnail.png', 'image/png') });
+        let address = 0;
+        /** The form posted from an address of its own, as `player`, the page's `fetch` would send it. */
+        const publish = async (text: Record<string, string | string[]>, files: Record<string, File>, player: string | null = PLAYER, ip = `10.3.0.${++address}`) => {
+            const form = new FormData();
+            for (const [key, value] of Object.entries(text)) for (const one of [value].flat()) form.append(key, one);
+            for (const [key, file] of Object.entries(files)) form.append(key, file);
+            const headers: Record<string, string> = { 'X-Real-IP': ip };
+            if (player !== null) headers[PLAYER_ID_HEADER] = player;
+            const response = await fetch(`http://127.0.0.1:${port}/${DATA_SETS_ROUTE}`, { method: 'POST', headers, body: form });
+            const body = await response.text();
+            return { status: response.status, type: response.headers.get('content-type') ?? '', body, json: JSON.parse(body) as { id?: string; error?: string; problems?: { about: string; text: string }[] } };
+        };
+        const seen = async (player: string | null) => parseManifest((await ask(port, '/api/data-sets', 'GET', player === null ? {} : { [PLAYER_ID_HEADER]: player })).body, '')
+            .dataSets.map((set) => `${set.id}${set.pending ? ' pending' : ''}`).join();
+
+        const before = written(gamefilesDir, dataSets);
+        const accepted = await publish(fields('local:my-dm'), dmFiles());
+        console.log(`  published: ${accepted.status} ${accepted.body}`);
+        check(accepted.status === 201 && accepted.json.id === 'my-dm' && accepted.type.startsWith('application/json'), 'a set is published: 201, its id without local:, as JSON');
+        check(!accepted.body.includes(PLAYER), 'the answer names no playerId');
+        const folder = join(gamefilesDir, 'my-dm');
+        console.log(`  its folder: ${readdirSync(folder).sort().join(', ')}`);
+        check(readdirSync(folder).sort().join() === 'dungeon.dat,graphics.dat,my-dm-thumbnail.png', 'its folder holds its files, its base set\'s graphics.dat and its thumbnail, and nothing else');
+        check(readFileSync(join(folder, 'dungeon.dat')).equals(dmDungeon) && readFileSync(join(folder, 'graphics.dat')).equals(readFileSync(`${dm.dir}/graphics.dat`))
+            && readFileSync(join(folder, 'my-dm-thumbnail.png')).equals(thumbnail), 'each file as it was sent, the graphics.dat the base set\'s');
+        check(!readdirSync(gamefilesDir).some((name) => name.startsWith('.')), 'no .partial is left');
+        const row = db.prepare('SELECT * FROM data_sets WHERE id = ?').get('my-dm') as Record<string, unknown>;
+        console.log(`  its row: ${JSON.stringify({ ...row, owner: row.owner === PLAYER ? '<the player>' : row.owner })}`);
+        const dmFolder = { read: async (name: string) => new Uint8Array(readFileSync(`${dm.dir}/${name}`)), where: (name: string) => name };
+        const record = (await checkLocalDataSet({ id: 'my-dm', name: '  My DM ', description: 'Mine. ', authors: ['A Player', ' ', 'Another '], dmRules: true, baseSet: 'dm-atari', files: dmFiles() },
+            new Set(), (set) => (set === 'dm-atari' ? dmFolder : null), 0)).record!;
+        const flags = localDataSet(record);
+        const stored = dataSets.read().dataSets.find((set) => set.id === 'my-dm')!;
+        check(row.status === 'pending' && row.owner === PLAYER && row.dir === 'my-dm' && row.position === 3, 'its row is pending, owned by its sender, its folder its id, last in the list');
+        check(row.name === record.name && row.description === record.description && row.authors === JSON.stringify(record.authors) && record.authors.join() === 'A Player,Another',
+            'its name, description and authors are the page\'s record\'s, trimmed, the empty author dropped');
+        check((['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'hidden'] as const).every((flag) => stored[flag] === flags[flag]), 'its flags are those localDataSet gives the record');
+        check(await seen(PLAYER) === 'dm-atari,csb,conflux,my-dm pending' && await seen(MODERATORS[0]) === 'dm-atari,csb,conflux,my-dm pending',
+            'it is offered, pending, to its owner and the moderators');
+        check(await seen(null) === 'dm-atari,csb,conflux' && await seen(OTHER) === 'dm-atari,csb,conflux', 'and to nobody else');
+        check(before !== written(gamefilesDir, dataSets), 'the snapshot of the folder and the table sees a publish');
+
+        const csbFiles = Object.fromEntries(['dungeon.dat', 'graphics.dat', 'hcsb.hct', 'hcsb.dat'].map((name) => [name, fileOf(new Uint8Array(readFileSync(`${csb.dir}/${name}`)), name)]));
+        const own = await publish(fields('my-csb', { name: 'My CSB', dmRules: 'false' }), csbFiles, OTHER);
+        const ownSet = dataSets.read().dataSets.find((set) => set.id === 'my-csb');
+        console.log(`  with its own graphics: ${own.status} ${own.body}, ${readdirSync(join(gamefilesDir, 'my-csb')).sort().join(', ')}`);
+        check(own.status === 201 && readdirSync(join(gamefilesDir, 'my-csb')).sort().join() === 'dungeon.dat,graphics.dat,hcsb.dat,hcsb.hct'
+            && readFileSync(join(gamefilesDir, 'my-csb', 'graphics.dat')).equals(readFileSync(`${csb.dir}/graphics.dat`)),
+            'a set with its own graphics.dat keeps it, and has no thumbnail where it was given none');
+        check(ownSet?.hintOracle === true && !ownSet.csbGraphics && !ownSet.dmRules && ownSet.owner === OTHER, 'its flags follow from its files: the Hint Oracle, no DM rules');
+
+        console.log('  refusals:');
+        const refused = async (label: string, status: number, send: () => Promise<{ status: number; body: string }>, says = '') => {
+            const was = written(gamefilesDir, dataSets);
+            const answer = await send();
+            console.log(`    ${label}: ${answer.status} ${answer.body.length > 200 ? `${answer.body.slice(0, 200)}…` : answer.body}`);
+            check(answer.status === status && answer.body.includes(says) && written(gamefilesDir, dataSets) === was, `${label}: ${status}, nothing written`);
+        };
+        await refused('the id again', 409, () => publish(fields('my-dm'), dmFiles()), 'a set of this id');
+        await refused('a set\'s id whose folder is another', 409, () => publish(fields('conflux'), dmFiles()), 'a set of this id');
+        await refused('a folder no row names', 409, () => publish(fields('swoosh'), dmFiles()), 'a folder of this name');
+        await refused('an id that is not a folder\'s name', 400, () => publish(fields('.hidden'), dmFiles()), 'An id is');
+        await refused('an id with a slash', 400, () => publish(fields('local:a/b'), dmFiles()), 'An id is');
+        await refused('no player', 400, () => publish(fields('p1'), dmFiles(), null), 'No player');
+        await refused('a player that is not a playerId', 400, () => publish(fields('p1'), dmFiles(), 'me'), 'No player');
+        await refused('not a form', 400, () => ask(port, '/api/data-sets', 'POST', { [PLAYER_ID_HEADER]: PLAYER, 'Content-Type': 'application/json', 'X-Real-IP': '10.3.1.1' }, '{}'), 'not multipart');
+        await refused('a broken form', 400, () => ask(port, '/api/data-sets', 'POST', { [PLAYER_ID_HEADER]: PLAYER, 'Content-Type': 'multipart/form-data; boundary=x', 'X-Real-IP': '10.3.1.2' }, '--x\r\nnonsense'), 'not a form');
+        await refused('an unknown file', 400, () => publish(fields('p1'), { ...dmFiles(), 'run.sh': fileOf(new Uint8Array(4), 'run.sh') }), "field 'run.sh'");
+        await refused('a field missing', 400, () => { const text = fields('p1'); delete text.baseSet; return publish(text, dmFiles()); }, "'baseSet' is not one text");
+        await refused('a field twice', 400, () => publish(fields('p1', { name: ['A', 'B'] }), dmFiles()), "'name' is not one text");
+        await refused('a file sent as text', 400, () => publish({ ...fields('p1'), 'dungeon.dat': 'bytes' }, {}), "'dungeon.dat' is not one file");
+        await refused('dmRules neither true nor false', 400, () => publish(fields('p1', { dmRules: 'on' }), dmFiles()), "'dmRules'");
+        await refused('a name too long', 400, () => publish(fields('p1', { name: 'x'.repeat(LOCAL_DATA_SET_TEXT_LIMITS.name + 1) }), dmFiles()), 'name is longer');
+        await refused('authors too long', 400, () => publish(fields('p1', { authors: ['x'.repeat(100), 'y'.repeat(LOCAL_DATA_SET_TEXT_LIMITS.authors - 100)] }), dmFiles()), 'authors are longer');
+        await refused('a file too large', 413, () => publish(fields('p1'), { ...dmFiles(), 'CSBgraphics.dat': fileOf(new Uint8Array(MAX_PUBLISHED_FILE_BYTES + 1), 'CSBgraphics.dat') }), 'CSBgraphics.dat is larger');
+        await refused('a request too large', 413, () => ask(port, '/api/data-sets', 'POST',
+            { [PLAYER_ID_HEADER]: PLAYER, 'Content-Type': 'multipart/form-data; boundary=x', 'X-Real-IP': '10.3.1.3' }, Buffer.alloc(MAX_PUBLISH_BYTES + 1)), 'request is larger');
+        await refused('a dungeon.dat of zeros', 422, () => publish(fields('p1'), { ...dmFiles(), 'dungeon.dat': fileOf(new Uint8Array(64), 'dungeon.dat') }), '"about":"dungeon.dat"');
+        await refused('no dungeon.dat', 422, () => publish(fields('p1'), { thumbnail: dmFiles().thumbnail }), '"about":"dungeon.dat"');
+        await refused('a thumbnail that is not a PNG', 422, () => publish(fields('p1'), { ...dmFiles(), thumbnail: fileOf(new Uint8Array(64), 'thumbnail.png', 'image/png') }), '"about":"thumbnail","text":"It is not a PNG."');
+        await refused('a base set that is a player\'s', 422, () => publish(fields('p1', { baseSet: 'my-dm' }), { 'dungeon.dat': dmFiles()['dungeon.dat'] }), '"about":"baseSet"');
+        await refused('an empty name', 422, () => publish(fields('p1', { name: ' ' }), dmFiles()), '"about":"name"');
+
+        const statuses: number[] = [];
+        for (let i = 0; i <= PUBLISHES_PER_WINDOW; i++) statuses.push((await publish(fields('p1', { dmRules: 'on' }), dmFiles(), PLAYER, '10.3.2.1')).status);
+        console.log(`  ${PUBLISHES_PER_WINDOW + 1} publishes from one address: ${statuses.join(' ')}`);
+        check(statuses.slice(0, -1).every((status) => status === 400) && statuses.at(-1) === 429, `the rate limit counts refused publishes too: ${PUBLISHES_PER_WINDOW} an address, then 429`);
+        await refused('the rate limit', 429, () => publish(fields('p2'), dmFiles(), PLAYER, '10.3.2.1'), 'Too many publishes');
+        check((await publish(fields('p2'), dmFiles(), PLAYER, '10.3.2.2')).status === 201, 'another address is still heard');
+    } finally {
+        server.close();
+        db.close();
+    }
+}
+
+/** A table made before the publish's columns gains them, its rows kept, read as before. */
+function checkAddedColumns(): void {
+    const db = new DatabaseSync(':memory:');
+    db.exec(`CREATE TABLE data_sets (id TEXT PRIMARY KEY, name TEXT NOT NULL, dir TEXT NOT NULL, position INTEGER NOT NULL UNIQUE,
+        status TEXT NOT NULL CHECK (status IN ('approved', 'pending')), owner TEXT, csb_graphics INTEGER NOT NULL DEFAULT 0,
+        mini_dat INTEGER NOT NULL DEFAULT 0, hint_oracle INTEGER NOT NULL DEFAULT 0, dm_rules INTEGER NOT NULL DEFAULT 0, hidden INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE data_set_defaults (only INTEGER PRIMARY KEY CHECK (only = 1), default_set TEXT NOT NULL REFERENCES data_sets (id), swoosh TEXT);
+        INSERT INTO data_sets (id, name, dir, position, status) VALUES ('a', 'A', 'set-a', 0, 'approved');
+        INSERT INTO data_set_defaults VALUES (1, 'a', NULL);`);
+    const dataSets = new DataSetStore(db);
+    const columns = (db.prepare('PRAGMA table_info(data_sets)').all() as { name: string }[]).map((column) => column.name);
+    const row = db.prepare('SELECT description, authors FROM data_sets').get() as { description: string; authors: string };
+    dataSets.publish({ id: 'b', name: 'B', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false }, PLAYER);
+    console.log(`  an older table's columns: ${columns.join(', ')}`);
+    check(columns.includes('description') && columns.includes('authors') && row.description === '' && row.authors === '[]'
+        && dataSets.read().dataSets.map((set) => set.id).join() === 'a,b', 'a table made before them gains the description and authors, its rows kept');
+    db.close();
 }
 
 /** A script of `server/` run as Node runs it: on its own types where this Node strips them, through tsx otherwise. */
@@ -500,6 +682,7 @@ async function main(): Promise<void> {
             store,
             rules: { hasSet: (id) => dataSets.hasSet(id) },
             rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
+            publishRateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
             now: Date.now,
         };
         server = createAppServer(options, api);
@@ -508,6 +691,8 @@ async function main(): Promise<void> {
         await checkAnswers(port, manifest);
         await checkEvents(port, store);
         await checkTableRead(port, db, manifest);
+        await checkPublish(scratch);
+        checkAddedColumns();
 
         await checkEntry(scratch, options);
     } finally {

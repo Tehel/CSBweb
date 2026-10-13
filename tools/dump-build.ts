@@ -23,7 +23,8 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 
-import { CHECK_MODULE, loadCheckDataSet, type DataSetDraft, type DataSetFolder } from '../server/app.ts';
+import { CHECK_MODULE, loadCheckDataSet } from '../server/app.ts';
+import type { DataSetDraft, DataSetFolder } from '../server/publish.ts';
 import { checkLocalDataSet } from '../src/data/LocalDataSets.ts';
 import { dataSetNamed } from './lib/dataSets.ts';
 
