@@ -6907,7 +6907,15 @@ CSBWin's adventure screen is five regions, and its code, not its tables, puts th
   29 left of it and in the viewport (`CSBCode.cpp:2276-2279`), and a champion in hand is let
   go once the pointer is left of x 274 or below row 28 (`:948-955`).
 
-No button the game reads in play crosses from one region into another, in any data set
-under `static/gamefiles`; a list's click anywhere covers whole regions
-(`tools/dump-left-handed.ts`). The left-handed screen moves the regions on that ground
-(`src/renderer/LeftHanded.ts`).
+The blocks on the right start past a gap. The right-hand column's panels start at the pen
+x 0xe9, 233: the held object's name (`DrawNameOfHeldObject`, `Code11f52.cpp:101-109`) and
+the spell panel's first champion (`Magic.cpp:627`). The top view's squares start at
+`d.wRectPos1454`'s x (`Character.cpp:1470`), 281 in every data set's `0x232`. The gaps,
+x 224-232 and 274-280, are drawn only as part of an area that starts at the region's
+first column: the movement arrows' graphic 13, blitted into `d.Word28` (`Character.cpp:5126`), x 224-319, holds
+black there in DM and CSB, and a flame in Conflux (golden frame 18).
+
+No button the game reads in play crosses from one region into another, nor across a gap's
+edge but from its region's first column, in any data set under `static/gamefiles`; a
+list's click anywhere covers whole regions (`tools/dump-left-handed.ts`). The left-handed
+screen moves the regions and their gaps on that ground (`src/renderer/LeftHanded.ts`).

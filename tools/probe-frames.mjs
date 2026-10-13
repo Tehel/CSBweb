@@ -992,9 +992,9 @@ await canvasClick(160, 100, 2); await wait(300);
 check(!(await settingsUp()), 'a right click closes the settings');
 // DISPLAY's LEFT HANDED (85,107), last on this page, as the party it builds would change
 // the cursor of the dialogs above: the dialog closed and the party built, the panels are
-// on the left and the view on the right. A frame of it, with the pointer at (90,100), on
-// the right-hand column's (314,100): its arrow is drawn there, across the column's edge
-// into the view, not cut where the column ends on CSBWin's screen. A click where the
+// on the left and the view on the right, each band's gap between them. A frame of it,
+// with the pointer at (84,100), on the right-hand column's (317,100): its arrow is drawn
+// there, across the gap into the view, not cut where the column ends on CSBWin's screen. A click where the
 // turn-right arrow is shown, (80,135), turns the party. Under the dialog the screen is
 // CSBWin's again, so the clicks that turn it off land where they always do.
 const facing = () => evaluate(`window.__probe.screen.ui.partyState.facing`);
@@ -1004,10 +1004,10 @@ await canvasClick(85, 107, 0); await wait(300);
 check((await settingsValues()).leftHanded === true, 'LEFT HANDED turns the left-handed screen on');
 await key('Escape'); await wait(300);
 await evaluate(BUILD_PARTY); await wait(600);
-await pointerAt(90, 100); await wait(300);
+await pointerAt(84, 100); await wait(300);
 const leftHover = await evaluate(`(()=>{const p=window.__probe.screen.ui.hoverPoint;return Math.floor(p.x)+','+Math.floor(p.y);})()`);
-check(leftHover === '314,100',
-  `left-handed, the pointer at (90,100) is the column's (314,100) (${leftHover})`);
+check(leftHover === '317,100',
+  `left-handed, the pointer at (84,100) is the column's (317,100) (${leftHover})`);
 console.log('state: left-handed');       await shot('29-left-handed');
 await leaveCanvas(); await wait(300);
 const facingBefore = await facing();

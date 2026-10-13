@@ -44,7 +44,7 @@ import {
 } from './ViewportGraphics';
 import { Position } from '../core/types';
 import { ViewportRenderer } from './ViewportRenderer';
-import { LEFT_HANDED_VIEWPORT, leftHandedFits, leftHandedX, makeLeftHanded, rightHandedX } from './LeftHanded';
+import { LEFT_HANDED_VIEWPORT, leftHandedLayout, leftHandedX, makeLeftHanded, rightHandedX, type LeftHandedLayout } from './LeftHanded';
 import { createUIState, initializePlayState, UIMode, type ScreenIndexBuffer, type UIState } from './ui/UIState';
 import { drawStaticUIFrame } from './ui/Draw';
 import {
@@ -168,8 +168,11 @@ export class GameScreen {
   /** The wheel has changed the dialog since it was last drawn (`takeWheelTurned`). */
   private wheelTurned = false;
   private bootFrameRenderer: (() => void) | null = null;
-  /** The last frame presented was the left-handed screen (`LeftHanded.ts`), so the canvas's points are moved back (`screenPoint`). */
-  private shownLeftHanded = false;
+  /**
+   * The left-handed screen the last frame presented was (`LeftHanded.ts`), whose
+   * canvas's points are moved back (`screenPoint`), or `null` for CSBWin's.
+   */
+  private shownLeftHanded: LeftHandedLayout | null = null;
   /** A row of the screen, the room `makeLeftHanded` moves the regions through. */
   private readonly rowScratch = new Uint8Array(SCREEN_WIDTH);
 
@@ -248,15 +251,18 @@ export class GameScreen {
    * every pointer event's point through it, so the interface only ever sees CSBWin's.
    */
   screenPoint(x: number, y: number): { x: number; y: number } {
-    return this.shownLeftHanded ? { x: rightHandedX(x, y), y } : { x, y };
+    const layout = this.shownLeftHanded;
+    return layout ? { x: rightHandedX(layout, x, y), y } : { x, y };
   }
 
   /**
-   * Whether the screen is composed left-handed: the setting on, and the data set's tables
-   * fitting it (`leftHandedFits`), but not under a dialog, which takes the whole screen.
+   * The left-handed screen the screen is composed as, or `null`: the setting on, and the
+   * data set's tables fitting it (`leftHandedLayout`), but not under a dialog, which takes
+   * the whole screen.
    */
-  private isLeftHanded(): boolean {
-    return this.ui.settings.values.leftHanded && this.ui.dialog === null && leftHandedFits(this.ui.uiTables);
+  private leftHandedLayout(): LeftHandedLayout | null {
+    if (!this.ui.settings.values.leftHanded || this.ui.dialog !== null) return null;
+    return leftHandedLayout(this.ui.uiTables);
   }
 
   /* Mouse entry points for the host page; the work is in `ui/Mouse.ts`. */
@@ -727,11 +733,11 @@ export class GameScreen {
     if (flashed) vblFlashButn(this.screen, flashed);
     // The left-handed screen is CSBWin's with its regions moved, and the cursor drawn
     // over it where the pointer is on it.
-    const leftHanded = this.isLeftHanded();
-    if (leftHanded) makeLeftHanded(this.screen.pixels, this.rowScratch);
+    const leftHanded = this.leftHandedLayout();
+    if (leftHanded) makeLeftHanded(leftHanded, this.screen.pixels, this.rowScratch);
     this.shownLeftHanded = leftHanded;
     const viewportSpan = leftHanded ? LEFT_HANDED_VIEWPORT : VIEWPORT_SPAN;
-    drawCursorItem(this.ui, !inventoryOpen, leftHanded ? leftHandedX : undefined);
+    drawCursorItem(this.ui, !inventoryOpen, leftHanded ? (x, y) => leftHandedX(leftHanded, x, y) : undefined);
     this.cursorMoved = false;
 
     const uiPalette = this.uiPalette;
@@ -865,7 +871,7 @@ export class GameScreen {
     }
     this.presented.record(this.screen.pixels, palette, palette11946 ? { palette: palette11946, span: VIEWPORT_SPAN } : null, null, null, 12);
     this.screenCtx.putImageData(this.screenImageData, 0, 0);
-    this.shownLeftHanded = false;
+    this.shownLeftHanded = null;
   }
 
   /** The entrance's view through the doorway: `ViewportRenderer.renderPrisonInterior`. */
