@@ -1,8 +1,9 @@
 /**
  * The game's input path: where a pointer event or a key goes once the page has read it.
  *
- * The page's listeners (`src/ui/events.ts`) hand over a screen point and a button, or a
- * key press, and nothing else of the DOM. From here a click is the dialog's
+ * The page's listeners (`src/ui/events.ts`) hand over a point of the canvas and a button,
+ * or a key press, and nothing else of the DOM. The point is made CSBWin's screen's first,
+ * which it is but on the left-handed screen (`GameScreen.screenPoint`). From here a click is the dialog's
  * (`src/renderer/ui/Dialog.ts`), a modal screen's, or a button searched in the
  * interface's lists and queued on the game's one mouse queue; a key is the dialog's, a
  * modal screen's, a key table's button queued the same way (`TAG0196da`), a panel key
@@ -107,8 +108,9 @@ export class GameInput {
    * faster than the screen is composed, and a redraw for each leaves the browser no time
    * to show any.
    */
-  mouseMove(x: number, y: number): void {
+  mouseMove(canvasX: number, canvasY: number): void {
     if (this.ended() || this.oracleUp()) return;
+    const { x, y } = this.host.screen.screenPoint(canvasX, canvasY);
     this.host.screen.setHoverPoint({ x, y });
     if (this.dragging) this.host.screen.handleDialogDrag(x, y);
     if (this.messagePress !== null && !inMessageArea(x, y)) this.releaseMessagePress();
@@ -116,8 +118,9 @@ export class GameInput {
   }
 
   /** A button pressed: `button` is `MouseEvent.button`'s number. */
-  mouseDown(x: number, y: number, button: number): void {
+  mouseDown(canvasX: number, canvasY: number, button: number): void {
     if (this.ended() || this.oracleUp()) return;
+    const { x, y } = this.host.screen.screenPoint(canvasX, canvasY);
     const { game, screen } = this.host;
     const buttonMask = button === 2 ? 1 : button === 0 ? 2 : 0;
     // A dialog is modal, the way `_WaitForMenuSelect` is modal: it replaces every

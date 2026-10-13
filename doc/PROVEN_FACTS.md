@@ -6889,3 +6889,25 @@ when the party faces south (2). A record facing 1 seen by a party facing south i
 its second member (ordinal 2), whichever way that member faces; from any other facing it
 is drawn as its first.
 `tools/dump-monster-design-options.ts` checks it, transcribed as written.
+
+## The screen's five regions, as CSBWin's code places them
+
+CSBWin's adventure screen is five regions, and its code, not its tables, puts them there:
+
+- **The viewport**, 224x136 at (0, 33): `display`'s `0, 0x21, 0xe0, 0xa9-0x21`
+  (`doc/CSBwin-src/WinScreen.cpp:1517-1520`).
+- **The top of the screen**, rows 0-32, **the right side**, x 224-319 from row 33, and **the
+  scrolling text area**, rows 169-199: the three rectangles `TAG021028`
+  clears them by, `d.wRectPos1780`, `d.wRectPos1788` and `d.wRectPos1796`, so commented
+  (`doc/CSBwin-src/CSBCode.cpp:10666-10668`). In every data set's `0x232` they are
+  `(0,0)-(319,32)`, `(224,33)-(319,169)` and `(0,169)-(319,199)`: the right side's last row
+  is the scrolling text's first.
+- **The portraits** and **the top view of positions** split the top at x 274. The cursor is
+  the arrow from row 169 down and from x 274 right, the hand or the object in hand above row
+  29 left of it and in the viewport (`CSBCode.cpp:2276-2279`), and a champion in hand is let
+  go once the pointer is left of x 274 or below row 28 (`:948-955`).
+
+No button the game reads in play crosses from one region into another, in any data set
+under `static/gamefiles`; a list's click anywhere covers whole regions
+(`tools/dump-left-handed.ts`). The left-handed screen moves the regions on that ground
+(`src/renderer/LeftHanded.ts`).

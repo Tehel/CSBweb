@@ -206,6 +206,7 @@ console.log('\n=== 4. opening it ===');
   const events: string[] = [];
   const screen = {
     isDialogOpen: () => isDialogOpen(ui),
+    screenPoint: (x: number, y: number) => ({ x, y }),
     openSettings: () => openSettingsDialog(ui),
     openMap: () => openMapDialog(ui),
     // CHAMPION VIEW is off: no press is held back (`tools/dump-champion-dialog.ts`).

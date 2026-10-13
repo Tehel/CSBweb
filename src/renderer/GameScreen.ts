@@ -44,6 +44,7 @@ import {
 } from './ViewportGraphics';
 import { Position } from '../core/types';
 import { ViewportRenderer } from './ViewportRenderer';
+import { LEFT_HANDED_VIEWPORT, leftHandedFits, leftHandedX, makeLeftHanded, rightHandedX } from './LeftHanded';
 import { createUIState, initializePlayState, UIMode, type ScreenIndexBuffer, type UIState } from './ui/UIState';
 import { drawStaticUIFrame } from './ui/Draw';
 import {
@@ -167,6 +168,10 @@ export class GameScreen {
   /** The wheel has changed the dialog since it was last drawn (`takeWheelTurned`). */
   private wheelTurned = false;
   private bootFrameRenderer: (() => void) | null = null;
+  /** The last frame presented was the left-handed screen (`LeftHanded.ts`), so the canvas's points are moved back (`screenPoint`). */
+  private shownLeftHanded = false;
+  /** A row of the screen, the room `makeLeftHanded` moves the regions through. */
+  private readonly rowScratch = new Uint8Array(SCREEN_WIDTH);
 
   constructor(canvas: HTMLCanvasElement, deps: GameScreenDeps, hooks: GameScreenHooks) {
     const { graphicsLoader } = deps;
@@ -235,6 +240,23 @@ export class GameScreen {
 
   getUITables(): UITables {
     return this.ui.uiTables;
+  }
+
+  /**
+   * The point of CSBWin's screen a point of the canvas shows: itself, but on the
+   * left-handed screen, whose regions it moves back (`LeftHanded.ts`). The page hands
+   * every pointer event's point through it, so the interface only ever sees CSBWin's.
+   */
+  screenPoint(x: number, y: number): { x: number; y: number } {
+    return this.shownLeftHanded ? { x: rightHandedX(x, y), y } : { x, y };
+  }
+
+  /**
+   * Whether the screen is composed left-handed: the setting on, and the data set's tables
+   * fitting it (`leftHandedFits`), but not under a dialog, which takes the whole screen.
+   */
+  private isLeftHanded(): boolean {
+    return this.ui.settings.values.leftHanded && this.ui.dialog === null && leftHandedFits(this.ui.uiTables);
   }
 
   /* Mouse entry points for the host page; the work is in `ui/Mouse.ts`. */
@@ -703,7 +725,13 @@ export class GameScreen {
     // and draws it back after (`:1049-1052`).
     const flashed = flashedButton(this.ui.ctx);
     if (flashed) vblFlashButn(this.screen, flashed);
-    drawCursorItem(this.ui, !inventoryOpen);
+    // The left-handed screen is CSBWin's with its regions moved, and the cursor drawn
+    // over it where the pointer is on it.
+    const leftHanded = this.isLeftHanded();
+    if (leftHanded) makeLeftHanded(this.screen.pixels, this.rowScratch);
+    this.shownLeftHanded = leftHanded;
+    const viewportSpan = leftHanded ? LEFT_HANDED_VIEWPORT : VIEWPORT_SPAN;
+    drawCursorItem(this.ui, !inventoryOpen, leftHanded ? leftHandedX : undefined);
     this.cursorMoved = false;
 
     const uiPalette = this.uiPalette;
@@ -713,18 +741,18 @@ export class GameScreen {
     const footprint = this.ui.objectCursorFootprint;
     let throughViewportPalette = false;
     if (!inventoryOpen && viewportPalette !== uiPalette) {
-      updateImageDataFromIndexWithViewportPalette(this.screenImageData, this.screen, VIEWPORT_SPAN, viewportPalette, uiPalette);
+      updateImageDataFromIndexWithViewportPalette(this.screenImageData, this.screen, viewportSpan, viewportPalette, uiPalette);
       if (footprint) reconvertThroughPalette(this.screenImageData, this.screen, footprint, 12, uiPalette);
       throughViewportPalette = true;
     } else {
       updateImageDataFromIndex(this.screenImageData, this.screen, uiPalette);
     }
-    const overlaid = !uiPaletteOnly && this.isAdventureVideoMode() && this.drawViewportThroughOverlay(viewportPalette);
+    const overlaid = !uiPaletteOnly && this.isAdventureVideoMode() && this.drawViewportThroughOverlay(viewportPalette, viewportSpan.x1);
     this.presented.record(
       this.screen.pixels,
       uiPalette,
-      throughViewportPalette ? { palette: viewportPalette, span: VIEWPORT_SPAN } : null,
-      overlaid ? VIEWPORT_SPAN : null,
+      throughViewportPalette ? { palette: viewportPalette, span: viewportSpan } : null,
+      overlaid ? viewportSpan : null,
       throughViewportPalette || overlaid ? footprint : null,
       12,
     );
@@ -753,15 +781,16 @@ export class GameScreen {
    * `CreateOverlayTable` and `UpdateScreenArea` (`OverlayScreen.ts`), unless they would
    * draw the straight path's picture. `UpdateScreenArea` allocates the overlay's memory
    * first (`doc/CSBwin-src/WinScreen.cpp:1064`). The object in hand of the coloured cursor
-   * is shown through the interface palette after, as the straight path shows it.
+   * is shown through the interface palette after, as the straight path shows it. `x0` is
+   * the column the viewport is shown at.
    */
-  private drawViewportThroughOverlay(viewportPalette: number[]): boolean {
+  private drawViewportThroughOverlay(viewportPalette: number[], x0: number): boolean {
     const { overlay, overlayPalette, host } = this.ui.ctx;
     if (overlayDrawsNothing(overlay, overlayPalette)) return false;
     overlay.current.Allocate();
     CreateOverlayTable(this.overlayTable, viewportPalette, true, overlay, overlayPalette);
     UpdateViewportArea(this.screenImageData.data, this.screen.pixels, this.overlayTable, overlay, true,
-      (n) => die(host, n, `You have encountered code at relative address 0x${n.toString(16).padStart(6, '0')} that I thought was unused.`));
+      (n) => die(host, n, `You have encountered code at relative address 0x${n.toString(16).padStart(6, '0')} that I thought was unused.`), x0);
     if (this.ui.objectCursorFootprint) {
       reconvertThroughPalette(this.screenImageData, this.screen, this.ui.objectCursorFootprint, 12, this.uiPalette);
     }
@@ -836,6 +865,7 @@ export class GameScreen {
     }
     this.presented.record(this.screen.pixels, palette, palette11946 ? { palette: palette11946, span: VIEWPORT_SPAN } : null, null, null, 12);
     this.screenCtx.putImageData(this.screenImageData, 0, 0);
+    this.shownLeftHanded = false;
   }
 
   /** The entrance's view through the doorway: `ViewportRenderer.renderPrisonInterior`. */

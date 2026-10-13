@@ -446,6 +446,7 @@ console.log('\n=== 5. opening it ===');
   let reincarnate = false;
   const screen = {
     isDialogOpen: () => isDialogOpen(ui),
+    screenPoint: (x: number, y: number) => ({ x, y }),
     openSettings: () => openSettingsDialog(ui),
     // MAP VIEW is off: a press held on the message area opens nothing (`tools/dump-map-dialog.ts`).
     openMap: () => false,

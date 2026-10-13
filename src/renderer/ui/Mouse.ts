@@ -654,34 +654,44 @@ function drawMarchingOrderCursor(ui: UIState, x: number, y: number, dynamicPalet
   }
 }
 
-export function drawCursorItem(ui: UIState, dynamicPaletteSwitching: boolean): void {
+/**
+ * The cursor, drawn where the pointer is. Where it is is CSBWin's screen, which picks its
+ * shape; `placeX` moves the column it is drawn at, the left-handed screen's
+ * (`src/renderer/LeftHanded.ts`), whose regions are moved before the cursor goes on.
+ */
+export function drawCursorItem(
+  ui: UIState,
+  dynamicPaletteSwitching: boolean,
+  placeX: (x: number, y: number) => number = (x) => x,
+): void {
   ui.objectCursorFootprint = null;
   if (!ui.hoverPoint) return;
   // The held eye or mouth has hidden it (`stHideCursor`).
   if (ui.word23118 > 0) return;
+  const x = Math.floor(ui.hoverPoint.x);
+  const y = Math.floor(ui.hoverPoint.y);
+  const drawnX = placeX(x, y);
   if (ui.word23144 !== 0) {
     // `CreateCursorBitmap` asks before anything else (`doc/CSBwin-src/CSBCode.cpp:2267`).
-    drawMarchingOrderCursor(ui, Math.floor(ui.hoverPoint.x), Math.floor(ui.hoverPoint.y), dynamicPaletteSwitching);
+    drawMarchingOrderCursor(ui, drawnX, y, dynamicPaletteSwitching);
     return;
   }
   if (ui.arrowCursorShape) {
     // `tag02076e`'s `SetCursorShape(0)`: the arrow, and no object, until a `TAG002572`
     // (`doc/CSBwin-src/CSBCode.cpp:2059`) sets the cursor from the hand again.
     const arrow = getCursorArrowBitmap(ui);
-    if (arrow) drawCursorBitmap(ui, arrow, Math.floor(ui.hoverPoint.x), Math.floor(ui.hoverPoint.y), 12);
+    if (arrow) drawCursorBitmap(ui, arrow, drawnX, y, 12);
     return;
   }
   const objectId = ui.partyState.objectInHand;
   if (objectId === OBJECT_ID_NULL) {
-    drawEmptyCursor(ui);
+    drawEmptyCursor(ui, placeX);
     return;
   }
-  const x = Math.floor(ui.hoverPoint.x);
-  const y = Math.floor(ui.hoverPoint.y);
   if (!inCursorShapeZone(ui, x, y)) {
     // Outside the zone the cursor is the arrow, object in hand or not (`tag0029f8`).
     const arrow = getCursorArrowBitmap(ui);
-    if (arrow) drawCursorBitmap(ui, arrow, x, y, 12);
+    if (arrow) drawCursorBitmap(ui, arrow, drawnX, y, 12);
     return;
   }
   const cursor = createObjectCursor(ui, resolveObjectNameIndex(ui, objectId));
@@ -689,11 +699,11 @@ export function drawCursorItem(ui: UIState, dynamicPaletteSwitching: boolean): v
   if (ui.colouredObjectCursor && dynamicPaletteSwitching) {
     // The extra (`DEBT.md` H): the icon throughout, which the screen shows through the
     // interface palette, so the viewport's light and monster colours do not reach it.
-    drawObjectCursor(ui, cursor, x, y, false);
-    ui.objectCursorFootprint = { x: x - 8, y: y - 8, bitmap: cursor.pointer23186 };
+    drawObjectCursor(ui, cursor, drawnX, y, false);
+    ui.objectCursorFootprint = { x: drawnX - 8, y: y - 8, bitmap: cursor.pointer23186 };
     return;
   }
-  drawObjectCursor(ui, cursor, x, y, dynamicPaletteSwitching);
+  drawObjectCursor(ui, cursor, drawnX, y, dynamicPaletteSwitching);
 }
 
 /** `d.Byte23202` (`doc/CSBwin-src/CSBCode.cpp:451-454`): the object's shadow, two pixels down and right. */
@@ -753,7 +763,7 @@ function drawObjectCursor(ui: UIState, cursor: ObjectCursor, x: number, y: numbe
   }
 }
 
-export function drawEmptyCursor(ui: UIState): void {
+export function drawEmptyCursor(ui: UIState, placeX: (x: number, y: number) => number = (x) => x): void {
   if (!ui.hoverPoint) return;
   const x = Math.floor(ui.hoverPoint.x);
   const y = Math.floor(ui.hoverPoint.y);
@@ -761,7 +771,7 @@ export function drawEmptyCursor(ui: UIState): void {
   const bitmap = useHand ? getCursorHandBitmap(ui) : getCursorArrowBitmap(ui);
   if (!bitmap) return;
 
-  drawCursorBitmap(ui, bitmap, x, y, 12);
+  drawCursorBitmap(ui, bitmap, placeX(x, y), y, 12);
 }
 
 export function shouldUseHandCursor(ui: UIState, x: number, y: number): boolean {

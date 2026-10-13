@@ -247,6 +247,7 @@ console.log('\n=== 4. opening it ===');
     } as unknown as Game,
     screen: {
       isDialogOpen: () => isDialogOpen(ui),
+      screenPoint: (x: number, y: number) => ({ x, y }),
       openSettings: () => openSettingsDialog(ui),
       openMap: () => false,
       openChampions: (marked: number | null = null) => openChampionDialog(ui, marked),

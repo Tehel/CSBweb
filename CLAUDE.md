@@ -95,7 +95,7 @@ was hiding among the type errors.
 There is still **no test framework** (`PLAN.md` → "The evidence") — `npm test` is a runner
 (`tools/run-checks.mjs`) over two standing forms of evidence, and both must pass:
 
-- `tools/check-frames.sh` compares twenty-eight live screen states against `tools/frames/` — the
+- `tools/check-frames.sh` compares twenty-nine live screen states against `tools/frames/` — the
   cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
   server and headless Chrome, so it needs no setup (on Node 20 it turns on
   `--experimental-websocket` itself; `probe-ui.mjs` needs that flag, or Node 22). It is
@@ -110,7 +110,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   is down, and the eye let go by a mouse released off the canvas; and the settings dialog
   opened by Esc and by a double click, the clock held under it, a setting kept across a
   reload, its slider dragged off the canvas, and its EXIT leading to the welcome
-  page, the map dialog opened by a long
+  page, a click on the left-handed screen landing where it is shown, the map dialog opened by a long
   press, and only with MAP VIEW on, the champion dialog opened by a long press on
   the stat bars, where a tap opens the inventory at its release, and fullscreen, entered
   by a tap and by a click, the screen and the effect sized and centred in it, at 16:10
@@ -182,6 +182,7 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
             GameInput (where a click or a key goes once the page has read it),
+            LeftHanded (the left-handed screen: CSBWin's regions moved, a click moved back),
             ViewportRenderer (the dungeon view only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, ViewportDraw (what the drawing shares with it),
             DrawDecorations and DrawDoor (CSBCode.cpp's drawing), DrawRoomObjects

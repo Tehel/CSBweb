@@ -23,8 +23,9 @@
  * - **The help line**, at the foot (`helpText`).
  *
  * A setting that cannot work, the CRT effect where
- * the browser gives no WebGL (`UIState.isCrtAvailable`) or FULLSCREEN where it gives no
- * fullscreen (`UIState.fullscreen`), keeps its name: its button is raised, its label dim,
+ * the browser gives no WebGL (`UIState.isCrtAvailable`), FULLSCREEN where it gives no
+ * fullscreen (`UIState.fullscreen`), or LEFT HANDED where the data set's buttons would be
+ * cut by it (`leftHandedFits`, `src/renderer/LeftHanded.ts`), keeps its name: its button is raised, its label dim,
  * it takes no click, and the help line says why.
  *
  * Every change goes to the settings model at once, which saves it and tells its
@@ -80,6 +81,7 @@ import {
   keysTabWheel, newKeysTabState, type KeysArea, type KeysTabState,
 } from './SettingsKeys';
 import { nowMs, type UIState } from './UIState';
+import { leftHandedFits } from '../LeftHanded';
 import {
   BUTTON_GAP,
   LOW_BUTTON_HEIGHT,
@@ -271,6 +273,14 @@ export const TABS: ReadonlyArray<{
         kind: 'toggle',
         get: (values) => values.startupAnimations,
         set: (_values, on) => ({ startupAnimations: on }),
+      },
+      {
+        name: 'LEFT HANDED',
+        help: 'THE PANELS ON THE LEFT, THE VIEW ON THE RIGHT',
+        unavailable: { when: (ui) => !leftHandedFits(ui.uiTables), help: 'THIS GAME\'S SCREEN IS LAID OUT ANOTHER WAY' },
+        kind: 'toggle',
+        get: (values) => values.leftHanded,
+        set: (_values, on) => ({ leftHanded: on }),
       },
     ],
   },

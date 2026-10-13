@@ -27,6 +27,11 @@ export interface SettingsValues {
    */
   readonly aspectRatio: AspectRatio;
   /**
+   * The panels on the left and the dungeon view on the right, so a left hand on a touch
+   * screen leaves the view uncovered (`src/renderer/LeftHanded.ts`).
+   */
+  readonly leftHanded: boolean;
+  /**
    * The FTL logo and the title before the entrance. The entrance is shown either way, as
    * it is where a game is chosen.
    */
@@ -55,6 +60,7 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   volume: 0.8,
   crt: false,
   aspectRatio: '16:10',
+  leftHanded: false,
   startupAnimations: true,
   statistics: true,
   mapView: false,
@@ -153,6 +159,7 @@ export function parseSettings(raw: unknown): SettingsValues {
       ? Math.max(0, Math.min(1, record.volume)) : defaults.volume,
     crt: bool(record.crt, defaults.crt),
     aspectRatio: ASPECT_RATIOS.find((ratio) => ratio === record.aspectRatio) ?? defaults.aspectRatio,
+    leftHanded: bool(record.leftHanded, defaults.leftHanded),
     startupAnimations: bool(record.startupAnimations, defaults.startupAnimations),
     statistics: bool(record.statistics, defaults.statistics),
     mapView: bool(record.mapView, defaults.mapView),

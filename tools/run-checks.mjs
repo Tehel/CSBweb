@@ -54,6 +54,7 @@ const CHECKS = [
   { tool: 'dump-key-bindings.ts' },
   { tool: 'dump-settings.ts' },
   { tool: 'dump-settings-dialog.ts' },
+  { tool: 'dump-left-handed.ts' },
   { tool: 'dump-map-dialog.ts' },
   { tool: 'dump-champion-dialog.ts' },
   { tool: 'dump-attack-panel.ts' },

@@ -117,6 +117,9 @@ export function CreateOverlayTable(
  * `notImplemented` stands for. `yOverlayJitter` is read nowhere. A screen line past the
  * screen, which CSBWin would read on into memory, is colour 0, and a pixel past the
  * viewport, which it would write on into its bitmap, is not written.
+ *
+ * `x0` is the column the viewport is at, `display`'s 0 but on the left-handed screen
+ * (`src/renderer/LeftHanded.ts`), whose lines under the viewport are those under it there.
  */
 export function UpdateViewportArea(
   out: Uint8ClampedArray,
@@ -125,6 +128,7 @@ export function UpdateViewportArea(
   overlay: Overlay,
   useOverlay: boolean,
   notImplemented: (n: number) => never,
+  x0: number = X0,
 ): void {
   const firstNibble = [0, 0, 0, 0, 0, 0, 0];
   const firstOverlay = [0, 0, 0, 0, 0, 0, 0];
@@ -174,8 +178,8 @@ export function UpdateViewportArea(
   for (let line = 0; line < height; line++, currentGraphicLine++) {
     const black = currentGraphicLine < 0 || currentGraphicLine > lastGraphicLine;
     const screenY = Y0 + currentGraphicLine;
-    const pixels = black || screenY >= SCREEN_HEIGHT ? -1 : SCREEN_WIDTH * screenY + X0;
-    const outRow = SCREEN_WIDTH * (Y0 + line) + X0;
+    const pixels = black || screenY >= SCREEN_HEIGHT ? -1 : SCREEN_WIDTH * screenY + x0;
+    const outRow = SCREEN_WIDTH * (Y0 + line) + x0;
     let currentPixel = 0;
     for (let segment = 0; segment < 7; segment++) {
       const num = segWidth[segment]!;
