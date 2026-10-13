@@ -23,6 +23,9 @@
  * and the colours are converted (`GameScreen.presentViewport`). A point of the canvas is
  * moved back the other way before the interface sees it (`GameScreen.screenPoint`), so
  * every button list, the viewport's picking and the cursor's zones read CSBWin's screen.
+ * A gap's clicks are CSBWin's too: the top view's left squares reach into its gap from
+ * x 274, so on the left-handed screen a click on the black gap right of the right squares,
+ * x 39-45, is a left square's. It is left so, as nothing invites a click there.
  *
  * The regions are CSBWin's, from its code, since its code is what places them: the
  * viewport is 224x136 at (0, 33) (`VIEWPORT_X`, `VIEWPORT_Y`); the top of the screen is
