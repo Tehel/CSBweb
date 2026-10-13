@@ -12,7 +12,9 @@
  *   what it holds says, whatever its name (`identifyLocalDataSetFile`): `dungeon.dat`,
  *   `graphics.dat`, `CSBgraphics.dat`, the Hint Oracle's `hcsb.hct` and `hcsb.dat`; one
  *   that reads as none of them goes where its name says, whatever its case, so that a
- *   broken file shows why on its row. A file given again replaces the one before.
+ *   broken file shows why on its row. A file given again replaces the one before. A PC
+ *   `dungeon.dat`, little-endian, is taken as the Atari file it is the twin of
+ *   (`recordFile`), and that is the file the record keeps.
  *   Without a thumbnail, its row offers "Generate from data", which draws the one the site's
  *   sets have, the last frame of the title (`TitleThumbnail.ts`), from the set's own
  *   `graphics.dat` or its base set's.
@@ -43,7 +45,7 @@ import { ITEM_KINDS, isIllegalSubcode, operationsUsed, type DungeonCensus } from
 import { StkOp } from '../engine/DsaSystem';
 import { lastTitleFrame, thumbnailPng } from '../renderer/intro/TitleThumbnail';
 import {
-    checkLocalDataSet, identifyLocalDataSetFile,
+    checkLocalDataSet, identifyLocalDataSetFile, recordFile,
     type LocalDataSetDraft, type LocalDataSetField, type LocalDataSetFile, type LocalDataSetProblem, type LocalDataSetRecord,
 } from '../data/LocalDataSets';
 
@@ -277,7 +279,8 @@ export function openAddDataSetForm(
     /** `list`'s files, each where `fileRow` says, in turn; the names of those that go nowhere are shown. */
     async function take(list: Iterable<File>): Promise<void> {
         const unknown: string[] = [];
-        for (const file of [...list]) {
+        for (const given of [...list]) {
+            const file = await recordFile(given);
             const where = await fileRow(file);
             if (where) files[where] = file;
             else unknown.push(file.name);

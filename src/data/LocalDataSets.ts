@@ -26,6 +26,7 @@ import { readU16BE } from '../core/bytes';
 import { dungeonCensus, type DungeonCensus } from '../engine/DungeonCensus';
 import { buildGameTables } from '../engine/GameTables';
 import { parseHcsbDat } from './HintOracleLoader';
+import { bigEndianDungeonDat } from './LittleEndianDungeon';
 
 /** The files a record may hold, by the name the game reads them under. */
 export type LocalDataSetFile = 'dungeon.dat' | 'graphics.dat' | 'CSBgraphics.dat' | 'hcsb.hct' | 'hcsb.dat' | 'thumbnail';
@@ -257,6 +258,17 @@ export async function identifyLocalDataSetFile(file: Blob): Promise<Exclude<Loca
         }
     }
     return (await readDungeon(file)).error === null ? 'dungeon.dat' : null;
+}
+
+/**
+ * `file` as a record keeps it: a PC `dungeon.dat` as the Atari file it is the twin of
+ * (`bigEndianDungeonDat`), under its own name, and any other file as it is. A record
+ * holds only what CSBWin reads, so nothing that reads a record meets the PC's byte order.
+ */
+export async function recordFile(file: File): Promise<File> {
+    if (file.type.startsWith('image/')) return file;
+    const atari = bigEndianDungeonDat(new Uint8Array(await file.arrayBuffer()));
+    return atari ? new File([atari], file.name, { lastModified: file.lastModified }) : file;
 }
 
 /**

@@ -13,6 +13,7 @@
  * a record missing a file; and the form's check (`checkLocalDataSet`): the record it
  * writes is the one played here, and it refuses what the boot would die of, file by file;
  * which file a dropped one is, told by what it holds (`identifyLocalDataSetFile`);
+ * a PC `dungeon.dat`, little-endian, taken as the Atari file it is the twin of (`recordFile`);
  * and what it shows the dungeon holds (`dungeonCensus`), every record in use counted
  * once, through a square's chain, a monster's possessions or a container. Node has no IndexedDB, so the store itself
  * (`BrowserDataSetStore`) is not run here.
@@ -30,8 +31,9 @@ import { buildExtendedFeaturesPrefix, EF_FLAGS, readExtendedFeatures, type Exten
 import { dungeonSignature } from '../src/data/DungeonSignature';
 import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import { foldedSignature, Signature } from '../src/data/FileSignature';
+import { isLittleEndianDungeonDat, littleEndianDungeonDat } from '../src/data/LittleEndianDungeon';
 import {
-  checkLocalDataSet, identifyLocalDataSetFile, isLocalDataSetId, localDataSet, recordFiles,
+  checkLocalDataSet, identifyLocalDataSetFile, isLocalDataSetId, localDataSet, recordFile, recordFiles,
   type LocalDataSetDraft, type LocalDataSetFile, type LocalDataSetRecord,
 } from '../src/data/LocalDataSets';
 import type { DungeonData } from '../src/data/dungeonTypes';
@@ -343,6 +345,46 @@ async function checkIdentify(): Promise<void> {
   check(wrong.length === 0, 'a save, the RISE dungeon, the utility\'s portraits, an image, the swoosh and a sound are none of them');
 }
 
+/**
+ * A PC `dungeon.dat` is the Atari one with its words' bytes the other way round
+ * (`src/data/LittleEndianDungeon.ts`). The PC's own files are not the project's to ship,
+ * so the twin here is made from DM's, with and without the checksum word: the form takes
+ * it as DM's file, byte for byte, where it would not read as it is. Nothing else is told:
+ * no set's game file, and no save.
+ */
+async function checkPcDungeon(): Promise<void> {
+  console.log('=== a PC dungeon.dat ===');
+  const atari = new Uint8Array(readFileSync(`${dataSetNamed('dm-atari').dir}/dungeon.dat`));
+  let sum = 0;
+  for (const byte of atari) sum = (sum + byte) & 0xffff;
+  const summed = new Uint8Array([...atari, sum >> 8, sum & 0xff]);
+  check(new DungeonLoader().loadDungeonDat(summed) !== null, "DM's dungeon.dat with its checksum word reads");
+  for (const [label, image] of [['without a checksum', atari], ['with its checksum', summed]] as const) {
+    const pc = littleEndianDungeonDat(image)!;
+    const given = new File([pc.slice()], 'DUNGEON.DAT');
+    const kept = await recordFile(given);
+    const keptBytes = new Uint8Array(await kept.arrayBuffer());
+    console.log(`  ${label}: told ${isLittleEndianDungeonDat(pc)}, as given ${await identifyLocalDataSetFile(given)}, `
+      + `kept ${await identifyLocalDataSetFile(kept)} under ${kept.name}, ${same(keptBytes, image) ? "DM's bytes" : 'OTHER BYTES'}`);
+    check(pc !== null && isLittleEndianDungeonDat(pc) && !same(pc, image), `${label}: DM's PC twin is told`);
+    check(await identifyLocalDataSetFile(given) === null, `${label}: as it is, it reads as none of a set's files`);
+    check(kept.name === 'DUNGEON.DAT' && same(keptBytes, image) && await identifyLocalDataSetFile(kept) === 'dungeon.dat',
+      `${label}: the form keeps DM's dungeon.dat, byte for byte, under the name it was given`);
+  }
+  const broken = littleEndianDungeonDat(summed)!;
+  broken[100] ^= 1;
+  check(!isLittleEndianDungeonDat(broken), 'a PC twin whose checksum word is wrong is not told');
+  const others = [...DATA_SETS.flatMap((set) => ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.dat']
+    .map((name) => `${set.dir}/${name}`).filter((path) => existsSync(path))), ...genuineSaves()];
+  const told: string[] = [];
+  for (const path of others) {
+    const file = new File([readFileSync(path)], path);
+    if (isLittleEndianDungeonDat(new Uint8Array(await file.arrayBuffer())) || await recordFile(file) !== file) told.push(path);
+  }
+  console.log(`  ${others.length} game files and saves${told.length ? `, told: ${told.join(', ')}` : ', none of them told, each kept as it is'}`);
+  check(told.length === 0, 'no set\'s game file and no save is told a PC dungeon.dat, and each is kept as it is');
+}
+
 async function checkCensus(): Promise<void> {
   console.log('=== what the dungeon holds ===');
   const expected: Record<string, string> = {
@@ -408,6 +450,7 @@ async function main(): Promise<void> {
   check(await recordFiles(withThumbnail, diskFiles(dm)).read('thumbnail') === null, 'the thumbnail is not one of the game\'s files');
   await checkForm();
   await checkIdentify();
+  await checkPcDungeon();
   await checkCensus();
   finish();
 }

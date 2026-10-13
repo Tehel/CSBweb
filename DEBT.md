@@ -221,7 +221,9 @@ their saves; its last tile, "+ Add my own", opens the form that adds a set
 gives: the name, the id (made from the name until the player writes one), a description,
 the authors, the reincarnation rule (DM's at first), DM's or CSB's graphics for a set without a
 `graphics.dat`, and one area that takes the files, dropped or picked, each going where its
-name says. On its right, the checklist of the name, the id and the six files, crossed or
+name says; a PC `dungeon.dat`, little-endian, is kept as the Atari file it is the twin of
+(`src/data/LittleEndianDungeon.ts`, `doc/PROVEN_FACTS.md` → "A PC `dungeon.dat` is the
+Atari image, little-endian"), so the record holds only what CSBWin reads. On its right, the checklist of the name, the id and the six files, crossed or
 checked, a removable file on its row, and on the thumbnail's, while it has none, "Generate
 from data", which draws the site's sets' thumbnail, the title's last frame
 (`src/renderer/intro/TitleThumbnail.ts`, `tools/gen-thumbnails.ts`'s too), from the set's

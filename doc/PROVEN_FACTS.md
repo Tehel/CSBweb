@@ -3741,6 +3741,46 @@ mismatch returns 0, and `_ReadEntireGame` goes to `tag01efee` (`SaveGame.cpp:191
 throws "dungeon image checksum mismatch" from `DungeonLoader`
 (`tools/dump-image-checksum.ts`).
 
+## A PC `dungeon.dat` is the Atari image, little-endian
+
+CSBWin reads a `dungeon.dat` big-endian only: `ReadDatabases` passes every word it reads
+through `LE16` (`doc/CSBwin-src/SaveGame.cpp:2536`), a byte swap on its little-endian
+build (`CSBTypes.h:150-158`), and has no other path. The PC's Dungeon Master writes the
+same image little-endian. The 1992 European PC release's `DUNGEON.DAT`, `DUNGEONF.DAT`
+and `DUNGEONG.DAT` read, through `DungeonLoader` switched to little-endian, as one
+dungeon in English, French and German, laid out section for section as the Atari's:
+
+- **The words are the ones `ReadDatabases` swaps**, and the bytes the ones it does not:
+  the header's (`DUNGEONDATINDEX::Swap`, `data.cpp:1778`), a level descriptor's words 0,
+  8, 10, 12 and 14 (`swapLevelDescriptors`, `SaveGame.cpp:617`), the column index and the
+  object list (`swapPointer10454`, `swapPRN10464`, `:531-542`), the text (`ComputeTextLength`
+  reads it through `LE16`, `:2421`), and each record's words (`DATABASES::swap`,
+  `data.cpp:1166`, and each `DBn::swap`, `:1287-1492`): a monster's bytes 4 and 5, a
+  chest's 6 and 7 and a missile's 4 and 5 are bytes. The cell flags and each map's tables
+  after them are bytes, and the checksum after them, where there is one, a word.
+- **Except the header's bytes 4 and 5.** CSBWin swaps them as `word4`, whose high byte is
+  `NumLevel` (`CSB.h:2131`); the PC file holds them as the Atari file does, the level
+  count in byte 4.
+- **The checksum is the same sum, little-endian.** `DUNGEON.DAT` ends with the byte sum
+  of everything before it, `ReadDatabases`' comparison (`SaveGame.cpp:2866-2870`), as a
+  little-endian word; `DUNGEONF.DAT` and `DUNGEONG.DAT` have none.
+
+It is a later revision than the Atari disks': maps 0, 5 and 10 are one column narrower,
+the dropped column all rock; on map 5, the invisible teleporters at (18,5), (19,4), (19,5)
+and (19,6) are rock, six actuators changed and one added; and on map 7, actuator 565, the
+switch at (0,4) aimed at the false wall at (1,6), sets the wall where the Atari's toggles
+it. The Amiga 2.0 disk's `Dungeon.dat` holds that map-7 change alone: compressed, its
+image is the Atari 1.2 one but for that actuator's `word4` (0xb3c0 for 0xb3d0) and a
+big-endian checksum word after the cell flags.
+
+The form that adds a player's own set takes a PC file as the Atari file it is the twin
+of (`src/data/LittleEndianDungeon.ts`), told by its length: the image its header and
+level descriptors describe, read little-endian, ends where the file does, or two bytes
+before a correct little-endian checksum, and read big-endian it does not. The three PC
+files convert to images `DungeonLoader` reads, as it stands, into the world the
+little-endian reading gives; no shipped file and no save is told one
+(`tools/dump-local-data-set.ts`).
+
 ## "MAKE NEW ADVENTURE" copies a saved game's party into `mini.dat`, block by block
 
 The UTILITY's button 13 (`_TAG004518`, `doc/CSBwin-src/Chaos.cpp:4806-4833`) reads a saved
