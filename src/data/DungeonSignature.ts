@@ -52,12 +52,20 @@ export async function dungeonSignature(dungeon: DungeonData): Promise<string[]> 
     return signature;
 }
 
+/** Each level's `[width, height]`, in the levels' order. */
+export type DungeonShapes = readonly (readonly [number, number])[];
+
 /** A dungeon the port can name. */
 export interface KnownDungeon {
     name: string;
     /** The data sets that play it, their `DataSet.id`: none for a dungeon the port cannot play. */
     dataSets: readonly string[];
     signature: DungeonSignature;
+    /**
+     * Its levels' sizes, where they are known: a published set's (`parsePublishedDungeons`),
+     * not the catalogue's.
+     */
+    shapes?: DungeonShapes;
 }
 
 /**
@@ -295,20 +303,24 @@ export interface DungeonMatch {
 
 /**
  * The known dungeon most levels of `signature` match, and `null` when none of them
- * matches any. A dungeon the signature is the whole of comes before one it is the first
- * levels of.
+ * matches any. Among as many, a dungeon the signature is the whole of comes first, then
+ * one whose levels are `shapes` in number and size, where both are known, then the first.
  */
 export function identifyDungeon(
     signature: DungeonSignature,
     known: readonly KnownDungeon[] = KNOWN_DUNGEONS,
+    shapes?: DungeonShapes,
 ): DungeonMatch | null {
     let best: DungeonMatch | null = null;
+    let bestRank = 0;
     for (const dungeon of known) {
         const levels = dungeon.signature.filter((digest, level) => digest === signature[level]).length;
         const whole = levels === signature.length && levels === dungeon.signature.length;
         if (levels === 0) continue;
-        if (!best || levels > best.levels || (levels === best.levels && whole && !best.whole)) {
+        const rank = whole ? 2 : shapes && dungeon.shapes && sameShapes(dungeon.shapes, shapes) ? 1 : 0;
+        if (!best || levels > best.levels || (levels === best.levels && rank > bestRank)) {
             best = { dungeon, levels, whole };
+            bestRank = rank;
         }
     }
     return best;
@@ -320,8 +332,7 @@ export function identifyDungeon(
  * them, and the rules for the running set's own dungeon need them apart.
  */
 export interface DungeonWalls {
-    /** Each level's `[width, height]`, in the levels' order. */
-    shapes: readonly (readonly [number, number])[];
+    shapes: DungeonShapes;
     signature: DungeonSignature;
 }
 
@@ -334,9 +345,8 @@ export async function dungeonWalls(dungeon: DungeonData): Promise<DungeonWalls> 
 }
 
 /** Whether two dungeons have as many levels, each as wide and as high as the other's. */
-function sameShapes(a: DungeonWalls, b: DungeonWalls): boolean {
-    return a.shapes.length === b.shapes.length
-        && a.shapes.every(([width, height], level) => width === b.shapes[level][0] && height === b.shapes[level][1]);
+function sameShapes(a: DungeonShapes, b: DungeonShapes): boolean {
+    return a.length === b.length && a.every(([width, height], level) => width === b[level][0] && height === b[level][1]);
 }
 
 /**
@@ -353,16 +363,18 @@ export type DungeonCheck =
 
 /**
  * `save`'s walls against the data set `dataSet`, its `DataSet.id`, whose own dungeons,
- * as its files read, are `own`: its `dungeon.dat`, and CSB's `mini.dat`. The author's
- * rules:
+ * as its files read, are `own`: its `dungeon.dat`, and CSB's `mini.dat`; the other sets'
+ * are `known`, the catalogue and the published sets'. The author's rules:
  *
  * - A save whose levels are as many as an own dungeon's, each as wide and as high, is
  *   held against that dungeon alone: the set's `own` when every level's digest is the
  *   same, a slightly `different` dungeon when some are, and `unknown` when none is.
- * - Any other is not the set's, and goes on to the other sets: the known dungeon it
- *   looks like (`identifyDungeon`) among those that do not list the set, `other`, or
- *   `unknown` where there is none. So does a `different` one the player sends on, with
- *   `elsewhere`.
+ * - Any other is not the set's, and goes on to the other sets, those of `known` that do
+ *   not list the set: the known dungeon the save looks like (`identifyDungeon`), `other`,
+ *   or `unknown` where there is none. Between two that match as many of its levels, one
+ *   whose levels are the save's in number and size comes first, as an own dungeon
+ *   would; only a published set's sizes are known. So does a `different` one the player
+ *   sends on, with `elsewhere`.
  *
  * The catalogue alone never names the running set's dungeon, which its files say better.
  */
@@ -373,11 +385,44 @@ export function checkDungeon(
     elsewhere = false,
     known: readonly KnownDungeon[] = KNOWN_DUNGEONS,
 ): DungeonCheck {
-    const set = elsewhere ? undefined : own.find((dungeon) => sameShapes(dungeon, save));
+    const set = elsewhere ? undefined : own.find((dungeon) => sameShapes(dungeon.shapes, save.shapes));
     if (set) {
         const same = set.signature.filter((digest, level) => digest === save.signature[level]).length;
         return { kind: same === save.signature.length ? 'own' : same > 0 ? 'different' : 'unknown' };
     }
-    const match = identifyDungeon(save.signature, known.filter((dungeon) => !dungeon.dataSets.includes(dataSet)));
+    const others = known.filter((dungeon) => !dungeon.dataSets.includes(dataSet));
+    const match = identifyDungeon(save.signature, others, save.shapes);
     return match ? { kind: 'other', dungeon: match.dungeon } : { kind: 'unknown' };
+}
+
+/**
+ * The published sets' dungeons, from the server's `DATA_SET_WALLS_ROUTE` answer
+ * (`server/dataSets.ts`, `wallsText`): `{"dataSets": [{"id", "name", "shapes",
+ * "signature"}]}`, each the set that plays it. An answer that does not say that throws,
+ * saying why.
+ */
+export function parsePublishedDungeons(text: string): KnownDungeon[] {
+    const fail = (why: string): never => {
+        throw new Error(`The published sets' walls are not usable: ${why}.`);
+    };
+    let json: unknown;
+    try {
+        json = JSON.parse(text);
+    } catch (error) {
+        return fail(`they are not JSON (${error instanceof Error ? error.message : String(error)})`);
+    }
+    const list = (json as { dataSets?: unknown } | null)?.dataSets;
+    if (!Array.isArray(list)) return fail('"dataSets" is not a list');
+    return list.map((entry: unknown, i): KnownDungeon => {
+        const { id, name, shapes, signature } = (entry ?? {}) as Record<string, unknown>;
+        if (typeof id !== 'string' || typeof name !== 'string') return fail(`set ${i} has no "id" or "name"`);
+        if (!Array.isArray(signature) || !signature.every((digest) => typeof digest === 'string' && /^[0-9a-f]{64}$/.test(digest))) {
+            return fail(`set '${id}' has a "signature" that is not a list of SHA-256 digests`);
+        }
+        if (!Array.isArray(shapes) || shapes.length !== signature.length
+            || !shapes.every((shape) => Array.isArray(shape) && shape.length === 2 && shape.every((n) => Number.isInteger(n) && n > 0))) {
+            return fail(`set '${id}' has "shapes" that are not a width and a height for each level`);
+        }
+        return { name, dataSets: [id], signature: signature as string[], shapes: shapes as [number, number][] };
+    });
 }

@@ -138,13 +138,27 @@ which PUBLISH sends from the form the pen on its tile opens (`src/ui/addDataSetF
 its record's fields and files as a `multipart/form-data` body, the player named in
 `X-Player-Id`. The server reads it with the page's own check (`CheckDataSet`), writes its
 folder whole as `gamefiles/<id>/`, its id that of `local:<id>`, then its row, pending and
-owned by the player, last in the list, with its description and authors. A set without a
+owned by the player, last in the list, with its description and authors, and its
+`dungeon.dat`'s walls as the check read them (below). A set without a
 `graphics.dat` gets a copy of its base set's, and its thumbnail is `<id>-thumbnail.png`,
 so its folder is like any other. The server never changes the folder after. It refuses an
 id the table or `gamefiles/` already holds, a file over 16 MiB, a request over 32 MiB, and
 more than five publishes an hour from one address, each answered with nothing written. A
 folder is written as `gamefiles/.<id>.<uuid>.partial/` and renamed when whole; one left by a
 crash mid-write is never served, and can be deleted by hand.
+
+**A published set's row keeps its dungeon's walls**, the `walls` column: each level's
+width and height and its digest (`dungeonWalls`, `src/data/DungeonSignature.ts`), JSON,
+`NULL` for the site's sets, which the committed catalogue names. `api/data-set-walls`
+answers a player the walls of the sets `api/data-sets` offers them that keep some
+(`wallsText`), and the page asks for them only when an import is not the running set's
+save, so that the dialog can name the published set it is of (`doc/SAVES.md` → "An
+import is checked against the dungeon"). At start-up, before it listens, the server reads
+the walls of every set with an owner whose row keeps none from its folder's
+`dungeon.dat`, with the page's own reader (`fillWalls`, `server/app.ts`): a set
+published before the rows kept them. One whose `dungeon.dat` does not read is logged,
+`No walls for <id> (…)`, and left without, to be read again at the next start; the page
+then names no save after it.
 
 To refill the table from a changed manifest, empty it and restart. This drops every row,
 a player's pending set included:
@@ -208,6 +222,7 @@ every set (unset or empty, no one; an entry that is not a `playerId` stops the s
 | `/server/…` | 404: `dist/server/` is the server's module | |
 | `/gamefiles/…` | `GAMEFILES_DIR/…`, but the manifest | `no-cache`, ETag and Last-Modified |
 | `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest; POST: a set published | `no-store`, `Vary: X-Player-Id` |
+| `/api/data-set-walls` | the walls of those of the same sets that keep some: the published ones | `no-store`, `Vary: X-Player-Id` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
 | `/api/stats` | the statistics' aggregates | `no-store` |

@@ -22,7 +22,8 @@
  * publish of the id renamed first (409). A set without a `graphics.dat` has its base set's
  * copied in, so its folder is a CSBWin directory like any other; the thumbnail is
  * `<id>-thumbnail.png` (`thumbnailPath`). Then the row, pending and owned by the player
- * (`DataSetStore.publish`), its flags following from its files as `localDataSet`'s do.
+ * (`DataSetStore.publish`), its flags following from its files as `localDataSet`'s do,
+ * and its dungeon's walls the check's.
  * The folder is never changed after: `backup.ts` copies it once.
  *
  * 201 answers `{"id": "<id>"}`; a refusal `{"error": "<why>"}`, and a 422 the problems too,
@@ -35,7 +36,7 @@ import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promis
 import { join } from 'node:path';
 
 import { LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, LOCAL_ID_PATTERN } from '../src/data/DataSets.ts';
-import type { DataSetStore } from './dataSets.ts';
+import type { DataSetStore, DataSetWalls } from './dataSets.ts';
 
 /** The largest file a set may hold: Conflux's `CSBgraphics.dat` is 12 MB. */
 export const MAX_PUBLISHED_FILE_BYTES = 16 * 1024 * 1024;
@@ -83,7 +84,15 @@ export type CheckDataSet = (
     /** Its text trimmed, its empty authors dropped; `null` where there is a problem. */
     record: { id: string; name: string; description: string; authors: string[]; dmRules: boolean; dungeonSignature: readonly string[] } | null;
     census: unknown;
+    /** Its `dungeon.dat`'s walls, wherever it reads. */
+    walls: DataSetWalls | null;
 }>;
+
+/**
+ * The walls of a `dungeon.dat`, read as the check reads it: `readDungeonWalls`, beside
+ * `checkLocalDataSet` in the same module. Throws where it does not read.
+ */
+export type ReadDungeonWalls = (bytes: Uint8Array) => Promise<DataSetWalls>;
 
 /** What a problem of the check's is about, a field of the form or one of its files, and why. */
 interface Problem {
@@ -153,12 +162,12 @@ export async function publishDataSet(form: FormData, owner: string, { checkDataS
         return stored && diskFolder(join(gamefilesDir, stored.dir), stored.id);
     };
     const draft: DataSetDraft = { id, name, description, authors: authors as string[], dmRules: dmRules === 'true', baseSet, files };
-    const { problems, record } = await checkDataSet(draft, new Set(), base, now());
+    const { problems, record, walls } = await checkDataSet(draft, new Set(), base, now());
     const thumbnail = files.thumbnail;
     if (thumbnail && !isPng(new Uint8Array(await thumbnail.slice(0, PNG_SIGNATURE.length).arrayBuffer()))) {
         problems.push({ about: 'thumbnail', text: 'It is not a PNG.' });
     }
-    if (problems.length > 0 || !record) return refuse(422, 'The set does not pass the check.', problems);
+    if (problems.length > 0 || !record || !walls) return refuse(422, 'The set does not pass the check.', problems);
 
     const partial = join(gamefilesDir, `.${id}.${randomUUID()}.partial`);
     try {
@@ -187,6 +196,7 @@ export async function publishDataSet(form: FormData, owner: string, { checkDataS
             csbGraphics: files['CSBgraphics.dat'] !== undefined,
             hintOracle: files['hcsb.hct'] !== undefined && files['hcsb.dat'] !== undefined,
             dmRules: record.dmRules,
+            walls,
         }, owner);
     } catch (error) {
         await rm(folder, { recursive: true, force: true });

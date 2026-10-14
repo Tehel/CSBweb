@@ -18,8 +18,10 @@
  *                   included, and says they moderate (`manifestText`); unset or empty
  *                   for no moderator
  *
- * It opens the store, checks the files and loads the page's check of a player's set
- * (`loadCheckDataSet`) before it listens, and exits with 1 on an entry of
+ * It opens the store, checks the files and loads the page's check of a player's set and
+ * its reader of a dungeon's walls (`loadPageReaders`) before it listens, and reads the
+ * walls of a published set whose row keeps none (`fillWalls`), logging a `dungeon.dat`
+ * that does not read. It exits with 1 on an entry of
  * `MODERATOR_PLAYER_IDS` that is not a `playerId`, a store it cannot open, an empty table and
  * a manifest that is missing or does not parse, a folder the sets name that is missing, or
  * a check that is not built. It logs to stdout, and on SIGTERM or SIGINT stops
@@ -30,11 +32,10 @@ import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import { checkFiles, createAppServer, loadCheckDataSet, type CheckedFiles, type ServerOptions } from './app.ts';
+import { checkFiles, createAppServer, fillWalls, loadPageReaders, type CheckedFiles, type PageReaders, type ServerOptions } from './app.ts';
 import { DataSetStore } from './dataSets.ts';
 import { isPlayerId, RateLimit } from './events.ts';
 import { StatsStore } from './stats.ts';
-import type { CheckDataSet } from './publish.ts';
 import { openStore } from './store.ts';
 
 /** Events per address and minute: a game sends a few, a party's joins included. */
@@ -60,7 +61,7 @@ let db: DatabaseSync;
 let dataSets: DataSetStore;
 let store: StatsStore;
 let checked: CheckedFiles;
-let checkDataSet: CheckDataSet;
+let readers: PageReaders;
 try {
     if (!moderatorPlayerIds.every((id) => isPlayerId(id))) throw new Error('MODERATOR_PLAYER_IDS holds an entry that is not a playerId, a lowercase UUID');
     mkdirSync(dirname(statsDb), { recursive: true });
@@ -68,14 +69,18 @@ try {
     dataSets = new DataSetStore(db);
     store = new StatsStore(db);
     checked = checkFiles(options, dataSets);
-    checkDataSet = await loadCheckDataSet(options.distDir);
+    readers = await loadPageReaders(options.distDir);
 } catch (error) {
     console.error(`Not starting: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
 }
 
+const walls = await fillWalls(options.gamefilesDir, dataSets, readers.readDungeonWalls);
+if (walls.filled.length > 0) console.log(`Read the walls of ${walls.filled.join(', ')}`);
+if (walls.failed.length > 0) console.error(`No walls for ${walls.failed.join(', ')}: their dungeon.dat does not read`);
+
 const server = createAppServer(options, {
-    checkDataSet,
+    checkDataSet: readers.checkDataSet,
     dataSets,
     moderatorPlayerIds,
     store,

@@ -17,7 +17,7 @@ import { csbGraphicsExpected, noExpectedSignatures, readExpectedSignatures } fro
 import { LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_ID_PATTERN, type DataSet } from './DataSets';
 import type { DataSetFiles } from './DataSetFiles';
 import { DungeonLoader } from './DungeonLoader';
-import { dungeonSignature, type DungeonSignature } from './DungeonSignature';
+import { dungeonWalls, type DungeonSignature, type DungeonWalls } from './DungeonSignature';
 import type { DungeonData } from './dungeonTypes';
 import { csbGraphicsSignatureRefused, graphicsSignatureRefused, Signature, type FileSignature } from './FileSignature';
 import { GraphicsLoader, MAX_GRAPHICS_ITEMS } from './GraphicsLoader';
@@ -131,8 +131,9 @@ export interface LocalDataSetProblem {
  * - The Hint Oracle is both its files or neither, and `hcsb.dat` parses.
  * - The thumbnail is an image.
  *
- * With them, what the dungeon holds (`dungeonCensus`) wherever its `dungeon.dat` reads,
- * whatever else is wrong; `null` where it does not.
+ * With them, what the dungeon holds (`dungeonCensus`) and its walls (`dungeonWalls`),
+ * which the server keeps of a published set, wherever its `dungeon.dat` reads, whatever
+ * else is wrong; `null` where it does not.
  *
  * Each file is read, parsed and hashed once (`fileReads`), so that a check after a
  * field's change costs only the fields'.
@@ -142,7 +143,7 @@ export async function checkLocalDataSet(
     takenIds: ReadonlySet<string>,
     base: (set: string) => DataSetFiles | null,
     createdAt: number,
-): Promise<{ problems: LocalDataSetProblem[]; record: LocalDataSetRecord | null; census: DungeonCensus | null }> {
+): Promise<{ problems: LocalDataSetProblem[]; record: LocalDataSetRecord | null; census: DungeonCensus | null; walls: DungeonWalls | null }> {
     const problems: LocalDataSetProblem[] = [];
     const problem = (about: LocalDataSetField, text: string): void => {
         problems.push({ about, text });
@@ -202,10 +203,12 @@ export async function checkLocalDataSet(
     if (thumbnail && !thumbnail.type.startsWith('image/')) problem('thumbnail', 'It is not an image.');
 
     const census = read?.census ?? null;
-    if (problems.length > 0 || !dungeon) return { problems, record: null, census };
+    const walls = read?.walls ?? null;
+    if (problems.length > 0 || !dungeon) return { problems, record: null, census, walls };
     return {
         problems,
         census,
+        walls,
         record: {
             id,
             name: draft.name.trim(),
@@ -214,7 +217,7 @@ export async function checkLocalDataSet(
             dmRules: draft.dmRules,
             baseSet: ownGraphics ? null : draft.baseSet,
             files: { ...files },
-            dungeonSignature: read!.signature!,
+            dungeonSignature: walls!.signature,
             createdAt,
         },
     };
@@ -305,20 +308,29 @@ const bytesOf = async (file: Blob | Uint8Array): Promise<Uint8Array> =>
 
 /**
  * `file` read as a `dungeon.dat`, enciphered or not (`DungeonLoader.loadDungeonDat`): the
- * dungeon, what it holds (`dungeonCensus`) and its signature (`dungeonSignature`); or why
- * it does not read.
+ * dungeon, what it holds (`dungeonCensus`) and its walls (`dungeonWalls`); or why it does
+ * not read.
  */
-function readDungeon(file: Blob): Promise<{ dungeon: DungeonData | null; error: string | null; census: DungeonCensus | null; signature: DungeonSignature | null }> {
+function readDungeon(file: Blob): Promise<{ dungeon: DungeonData | null; error: string | null; census: DungeonCensus | null; walls: DungeonWalls | null }> {
     return once(file, 'dungeon.dat', async () => {
         let dungeon: DungeonData;
         try {
             dungeon = new DungeonLoader().loadDungeonDat(await bytesOf(file));
         } catch (error) {
-            return { dungeon: null, error: why(error), census: null, signature: null };
+            return { dungeon: null, error: why(error), census: null, walls: null };
         }
         const census = dungeonCensus(dungeon);
-        return { dungeon, error: null, census, signature: await dungeonSignature(dungeon) };
+        return { dungeon, error: null, census, walls: await dungeonWalls(dungeon) };
     });
+}
+
+/**
+ * The walls of a published set's `dungeon.dat`, `bytes`, read as the check reads it: what
+ * the server keeps of a set published before it kept them (`fillWalls`, `server/app.ts`).
+ * Throws where it does not read.
+ */
+export async function readDungeonWalls(bytes: Uint8Array): Promise<DungeonWalls> {
+    return dungeonWalls(new DungeonLoader().loadDungeonDat(bytes));
 }
 
 /** `file` read as a `graphics.dat`, its tables built as the boot builds them, and its signature; or why it does not read. */

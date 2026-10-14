@@ -147,6 +147,13 @@ export const LOCAL_DATA_SET_TEXT_LIMITS = { name: 60, description: 300, authors:
 export const DATA_SETS_ROUTE = 'api/data-sets';
 
 /**
+ * Where the page asks for the published sets' walls (`parsePublishedDungeons`,
+ * `src/data/DungeonSignature.ts`), relative to the page, naming its player as
+ * `DATA_SETS_ROUTE` does: only an import that is not the running set's needs them.
+ */
+export const DATA_SET_WALLS_ROUTE = 'api/data-set-walls';
+
+/**
  * The header in which the page names its player to `DATA_SETS_ROUTE`: their `playerId`
  * (`src/ui/gameEvents.ts`), a secret, which a URL's query would leak into logs.
  */

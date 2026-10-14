@@ -22,7 +22,9 @@
  *    dungeons, its `dungeon.dat` and CSB's `mini.dat`, where their levels' shapes are
  *    the same, the set's own, a slightly different dungeon, or another, refused; and
  *    otherwise against the catalogue's dungeons of the other sets, with a set the
- *    catalogue does not list, a player's own or a published one, among them.
+ *    catalogue does not list, a player's own or a published one, among them; the
+ *    published sets' dungeons, whose levels' sizes break a tie, and the server's answer
+ *    that gives them (`parsePublishedDungeons`).
  *
  * With a path, the digests of that file, a `dungeon.dat` or a save, are printed first,
  * as the catalogue lists them: that is how a dungeon is added to it.
@@ -37,7 +39,7 @@ import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { readCsbwinSaveInfo } from '../src/data/CsbwinSaveInfo';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import {
-  checkDungeon, dungeonSignature, dungeonWalls, identifyDungeon, KNOWN_DUNGEONS, levelWalls, type DungeonWalls, type KnownDungeon,
+  checkDungeon, dungeonSignature, dungeonWalls, identifyDungeon, KNOWN_DUNGEONS, levelWalls, parsePublishedDungeons, type DungeonWalls, type KnownDungeon,
 } from '../src/data/DungeonSignature';
 import type { DungeonData, MapData } from '../src/data/dungeonTypes';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
@@ -329,6 +331,38 @@ async function checkAgainstDataSet(): Promise<void> {
   check(say('a save of Dungeon Master, the set holding thirteen of its levels', save, SET, [most]) === 'different',
     'the other way round too: the set\'s dungeon moved since the save');
   check(say('mini.dat', mini, SET, [dm]) === `other, ${CSB}`, 'and a dungeon of other shapes goes on to the other sets');
+
+  // A published set's dungeon, whose levels' sizes the server keeps (`parsePublishedDungeons`).
+  const nothing = '0'.repeat(64);
+  const published = (...dungeons: KnownDungeon[]): KnownDungeon[] => [...KNOWN_DUNGEONS, ...dungeons];
+  const mod: KnownDungeon = { name: 'a published mod', dataSets: ['a-mod'], shapes, signature: [...signature.slice(0, 13), nothing] };
+  check(say('a save of Dungeon Master, a mod of it published', save, 'csb', csbOwn, false, published(mod)) === `other, ${DM}`
+    && say('thirteen of its levels, the mod published', most, 'csb', csbOwn, false, published(mod)) === 'other, a published mod',
+    'a published set is named where it matches the most levels: a save of Dungeon Master is still Dungeon Master\'s, and one of the mod\'s, the mod\'s');
+  const other = 'f'.repeat(64);
+  const tied: DungeonWalls = { shapes, signature: [...signature.slice(0, 12), other, other] };
+  const sizes = { ...mod, name: 'a mod of its sizes', dataSets: ['sized'], signature: [...signature.slice(0, 12), nothing, nothing] };
+  check(say('twelve of its levels, a mod of its sizes published', tied, 'csb', csbOwn, false, published(sizes)) === 'other, a mod of its sizes'
+    && say('the same, the mod\'s level 4 turned', tied, 'csb', csbOwn, false, published({ ...sizes, shapes: turned })) === `other, ${DM}`,
+    'between two that match as many levels, the one whose levels are the save\'s in number and size: as an own dungeon is, where the sizes are known');
+  check(say('in the mod itself, its dungeon.dat not read', most, 'a-mod', [], false, published(mod)) === `other, ${DM}`, 'and the running set\'s own entry is never named');
+  const parsed = parsePublishedDungeons(JSON.stringify({ dataSets: [{ id: 'a-mod', name: 'A mod', shapes, signature: mod.signature }] }));
+  check(parsed.length === 1 && parsed[0].name === 'A mod' && parsed[0].dataSets.join() === 'a-mod' && parsed[0].signature.join() === mod.signature.join()
+    && JSON.stringify(parsed[0].shapes) === JSON.stringify(shapes), 'the server\'s answer reads as the dungeons the sets play');
+  const refused = [
+    'nonsense', '{}', JSON.stringify({ dataSets: [{ name: 'x', shapes, signature }] }),
+    JSON.stringify({ dataSets: [{ id: 'x', name: 'x', shapes, signature: ['beef'] }] }),
+    JSON.stringify({ dataSets: [{ id: 'x', name: 'x', shapes: shapes.slice(1), signature }] }),
+    JSON.stringify({ dataSets: [{ id: 'x', name: 'x', shapes: [[0, 1], ...shapes.slice(1)], signature }] }),
+  ].filter((text) => {
+    try {
+      parsePublishedDungeons(text);
+      return false;
+    } catch {
+      return true;
+    }
+  });
+  check(refused.length === 6, 'one that is not JSON, has no list, a set without an id, a digest that is not one, or a size missing or of zero throws');
 }
 
 async function printFile(path: string): Promise<void> {

@@ -32,7 +32,7 @@ import { loadCsbwinWorld } from '../data/CsbwinDungeonImage';
 import type { DataSet } from '../data/DataSets';
 import type { DataSetFiles } from '../data/DataSetFiles';
 import { DungeonLoader } from '../data/DungeonLoader';
-import { checkDungeon, dungeonWalls, type DungeonCheck, type DungeonWalls } from '../data/DungeonSignature';
+import { checkDungeon, dungeonWalls, KNOWN_DUNGEONS, type DungeonCheck, type DungeonWalls, type KnownDungeon } from '../data/DungeonSignature';
 import { readsGameBlock1, stampRandomGameID } from '../data/SaveGameLoader';
 import type { UtilityPortraits } from '../data/UtilityPortraits';
 import {
@@ -223,6 +223,12 @@ export class GameSaves {
          * (`src/main.ts`).
          */
         private readonly fileRandom: CsbRandom = new CsbRandom(),
+        /**
+         * The published sets' dungeons, which an import that is not the running set's is
+         * held against beside the catalogue's (`checkDungeon`): the page asks the server
+         * (`src/main.ts`), and answers none where it cannot.
+         */
+        private readonly publishedDungeons: () => Promise<readonly KnownDungeon[]> = async () => [],
     ) {}
 
     /**
@@ -369,7 +375,8 @@ export class GameSaves {
      * save, which the list then shows and LOAD reads as any other. The game is left alone.
      *
      * The file names no dungeon but holds one, and its walls are held against the data
-     * set's own dungeons as its files read, then against the other sets' (`checkDungeon`
+     * set's own dungeons as its files read, then against the other sets', the catalogue's
+     * and the published ones' (`publishedDungeons`, asked for only then) (`checkDungeon`
      * over the walls of the file's world, `doc/SAVES.md` → "An import is checked against
      * the dungeon"):
      *
@@ -409,7 +416,13 @@ export class GameSaves {
         }
         const fields = readSaveFileFields(file.bytes);
         if (!fields) throw new SaveFileError(SAVED_GAME_DAMAGED);
-        const check = checkDungeon(walls, this.dataSet.id, await this.ownDungeons(), answer === 'elsewhere');
+        const own = await this.ownDungeons();
+        const elsewhere = answer === 'elsewhere';
+        let check = checkDungeon(walls, this.dataSet.id, own, elsewhere);
+        if (check.kind === 'other' || check.kind === 'unknown') {
+            // Gone on to the other sets: the published ones too, asked for only now.
+            check = checkDungeon(walls, this.dataSet.id, own, elsewhere, [...KNOWN_DUNGEONS, ...await this.publishedDungeons()]);
+        }
         if (check.kind === 'other' || check.kind === 'unknown') return check;
         if (check.kind === 'different' && answer !== 'anyway') return check;
 

@@ -38,18 +38,23 @@
  *     large, an id the table or the folder holds, and a set the page's check refuses, a
  *     thumbnail that is not a PNG and a base set that is not the site's; a table made
  *     before the publish's columns gains them;
+ *   - the walls a published set's row keeps, its `dungeon.dat`'s as the page reads them,
+ *     and `/api/data-set-walls`, which gives a player those of the sets `api/data-sets`
+ *     offers them, as the page parses them; and `fillWalls`, which reads those of the
+ *     rows that keep none from their folders, says a `dungeon.dat` that does not read and
+ *     reads none twice;
  *   - `server.ts` itself, as Node runs it: a bad mount, a store it cannot open, a page's
  *     check that is not built, or an entry of `MODERATOR_PLAYER_IDS` that is not a `playerId` exits 1
  *     before it listens; a list of two, spaces around the comma, makes both moderators; and SIGTERM stops a listening server with 0, the store made, its
  *     table filled, and its WAL checkpointed; started again without a manifest, it plays
- *     from the table;
+ *     from the table, and says a published set whose walls it cannot read;
  *   - `backup.ts`, run beside that server: a snapshot in `backups/` holding the events
  *     still in the WAL and the data sets, the server serving throughout, and exit 1 on a
  *     missing store; the folder of a set with an owner copied whole into
  *     `backups/gamefiles/`, the site's not, kept by the next run rather than copied
  *     again, and exit 1 on an owned set whose folder is not there.
  *
- * The scratch build's check (`CHECK_MODULE`) is a stand-in that exports the function:
+ * The scratch build's check (`CHECK_MODULE`) is a stand-in that exports the functions:
  * `tools/dump-build.ts` builds the real one and checks sets through it.
  *
  * Usage: npx tsx tools/dump-server.ts
@@ -62,14 +67,15 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { CHECK_MODULE, checkFiles, createAppServer, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
+import { CHECK_MODULE, checkFiles, createAppServer, fillWalls, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
 import { ANYONE, DataSetStore, manifestText } from '../server/dataSets.ts';
 import { RateLimit } from '../server/events.ts';
 import { MAX_PUBLISH_BYTES, MAX_PUBLISHED_FILE_BYTES } from '../server/publish.ts';
 import { StatsStore } from '../server/stats.ts';
 import { openStore } from '../server/store.ts';
-import { DATA_SETS_ROUTE, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
-import { checkLocalDataSet, localDataSet } from '../src/data/LocalDataSets.ts';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
+import { checkLocalDataSet, localDataSet, readDungeonWalls } from '../src/data/LocalDataSets.ts';
+import { parsePublishedDungeons } from '../src/data/DungeonSignature.ts';
 import { dataSetNamed, GAMEFILES_DIR, MANIFEST_FILE } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -131,7 +137,8 @@ function scratchFiles(scratch: string): ServerOptions {
     writeFileSync(join(distDir, 'assets', 'font-AbC123.ttf'), Buffer.from([0, 1, 0, 0]));
     writeFileSync(join(distDir, 'assets', 'font-AbC123.woff2'), Buffer.from([0x77, 0x4f, 0x46, 0x32]));
     mkdirSync(join(distDir, 'server'));
-    writeFileSync(join(distDir, CHECK_MODULE), 'export function checkLocalDataSet() {}\n');
+    writeFileSync(join(distDir, CHECK_MODULE), 'export function checkLocalDataSet() {}\n'
+        + 'export async function readDungeonWalls() { throw new Error("a stand-in"); }\n');
     writeFileSync(join(gamefilesDir, 'manifest.json'), JSON.stringify({
         default: 'a', swoosh: 'logo',
         dataSets: [{ id: 'a', name: 'A', dir: 'set-a' }],
@@ -430,7 +437,7 @@ async function checkPublish(scratch: string): Promise<void> {
             && readFileSync(join(folder, 'my-dm-thumbnail.png')).equals(thumbnail), 'each file as it was sent, the graphics.dat the base set\'s');
         check(!readdirSync(gamefilesDir).some((name) => name.startsWith('.')), 'no .partial is left');
         const row = db.prepare('SELECT * FROM data_sets WHERE id = ?').get('my-dm') as Record<string, unknown>;
-        console.log(`  its row: ${JSON.stringify({ ...row, owner: row.owner === PLAYER ? '<the player>' : row.owner })}`);
+        console.log(`  its row: ${JSON.stringify({ ...row, owner: row.owner === PLAYER ? '<the player>' : row.owner, walls: row.walls === null ? null : '<its walls>' })}`);
         const dmFolder = { read: async (name: string) => new Uint8Array(readFileSync(`${dm.dir}/${name}`)), where: (name: string) => name };
         const record = (await checkLocalDataSet({ id: 'my-dm', name: '  My DM ', description: 'Mine. ', authors: ['A Player', ' ', 'Another '], dmRules: true, baseSet: 'dm-atari', files: dmFiles() },
             new Set(), (set) => (set === 'dm-atari' ? dmFolder : null), 0)).record!;
@@ -453,6 +460,48 @@ async function checkPublish(scratch: string): Promise<void> {
             && readFileSync(join(gamefilesDir, 'my-csb', 'graphics.dat')).equals(readFileSync(`${csb.dir}/graphics.dat`)),
             'a set with its own graphics.dat keeps it, and has no thumbnail where it was given none');
         check(ownSet?.hintOracle === true && !ownSet.csbGraphics && !ownSet.dmRules && ownSet.owner === OTHER, 'its flags follow from its files: the Hint Oracle, no DM rules');
+
+        // The walls the rows keep, and api/data-set-walls.
+        const dmWalls = JSON.stringify(await readDungeonWalls(dmDungeon));
+        const csbWalls = JSON.stringify(await readDungeonWalls(new Uint8Array(readFileSync(`${csb.dir}/dungeon.dat`))));
+        const kept = () => [...dataSets.walls()].map(([id, walls]) => `${id} ${walls.signature.length} levels`).join(', ');
+        console.log(`  the walls kept: ${kept()}`);
+        check(JSON.stringify(dataSets.walls().get('my-dm')) === dmWalls && JSON.stringify(dataSets.walls().get('my-csb')) === csbWalls
+            && kept() === 'my-dm 14 levels, my-csb 2 levels', 'a published set\'s row keeps its dungeon.dat\'s walls, as the page reads them; the site\'s keep none');
+        const wallsSeen = async (player: string | null) => {
+            const answer = await ask(port, `/${DATA_SET_WALLS_ROUTE}`, 'GET', player === null ? {} : { [PLAYER_ID_HEADER]: player });
+            const dungeons = parsePublishedDungeons(answer.body);
+            return { answer, ids: dungeons.map((dungeon) => `${dungeon.dataSets.join()} (${dungeon.name})`).join(', '), dungeons };
+        };
+        const forOwner = await wallsSeen(PLAYER);
+        console.log(`  api/data-set-walls, to the owner of my-dm: ${forOwner.ids}`);
+        check(forOwner.answer.status === 200 && String(forOwner.answer.headers['content-type']).startsWith('application/json')
+            && forOwner.answer.headers['cache-control'] === 'no-store' && forOwner.answer.headers.vary === PLAYER_ID_HEADER,
+            'api/data-set-walls answers JSON, not cached, by player');
+        check(forOwner.ids === 'my-dm (My DM)' && JSON.stringify({ shapes: forOwner.dungeons[0].shapes, signature: forOwner.dungeons[0].signature }) === dmWalls,
+            'a player is given the walls of the sets api/data-sets offers them that keep some: their own pending one, as the page reads it');
+        check((await wallsSeen(MODERATORS[0])).ids === 'my-dm (My DM), my-csb (My CSB)' && (await wallsSeen(null)).ids === '',
+            'a moderator every published set\'s, and anyone else none while they are pending');
+        dataSets.publish({ id: 'approved', name: 'Approved', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false,
+            walls: JSON.parse(dmWalls) }, OTHER);
+        db.prepare("UPDATE data_sets SET status = 'approved' WHERE id = 'approved'").run();
+        check((await wallsSeen(null)).ids === 'approved (Approved)', 'an approved set\'s, to everyone');
+        check((await ask(port, `/${DATA_SET_WALLS_ROUTE}`, 'POST')).status === 405, 'and only to GET and HEAD');
+
+        // The walls of the sets published before the rows kept them, read at start-up.
+        db.prepare("UPDATE data_sets SET walls = NULL WHERE owner IS NOT NULL AND id <> 'approved'").run();
+        mkdirSync(join(gamefilesDir, 'broken'));
+        writeFileSync(join(gamefilesDir, 'broken', 'dungeon.dat'), new Uint8Array([1, 2, 3]));
+        db.prepare("INSERT INTO data_sets (id, name, dir, position, status, owner) VALUES ('broken', 'Broken', 'broken', 99, 'pending', ?)").run(OTHER);
+        const filled = await fillWalls(gamefilesDir, dataSets, readDungeonWalls);
+        console.log(`  the walls filled: ${filled.filled.join(', ')}; failed: ${filled.failed.join(', ')}`);
+        check(filled.filled.join() === 'my-dm,my-csb' && JSON.stringify(dataSets.walls().get('my-dm')) === dmWalls && JSON.stringify(dataSets.walls().get('my-csb')) === csbWalls,
+            'a published set whose row keeps no walls has them read from its folder\'s dungeon.dat, the same as on publish');
+        check(filled.failed.length === 1 && filled.failed[0].startsWith('broken (') && !dataSets.walls().has('broken') && dataSets.missingWalls().map((set) => set.id).join() === 'broken',
+            'one whose dungeon.dat does not read is said, and left without, to be read again at the next start');
+        check((await fillWalls(gamefilesDir, dataSets, async () => { throw new Error('not asked'); })).filled.length === 0, 'the others are not read again');
+        db.prepare("DELETE FROM data_sets WHERE id IN ('broken', 'approved')").run();
+        rmSync(join(gamefilesDir, 'broken'), { recursive: true });
 
         console.log('  refusals:');
         const refused = async (label: string, status: number, send: () => Promise<{ status: number; body: string }>, says = '') => {
@@ -509,11 +558,12 @@ function checkAddedColumns(): void {
         INSERT INTO data_set_defaults VALUES (1, 'a', NULL);`);
     const dataSets = new DataSetStore(db);
     const columns = (db.prepare('PRAGMA table_info(data_sets)').all() as { name: string }[]).map((column) => column.name);
-    const row = db.prepare('SELECT description, authors FROM data_sets').get() as { description: string; authors: string };
-    dataSets.publish({ id: 'b', name: 'B', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false }, PLAYER);
+    const row = db.prepare('SELECT description, authors, walls FROM data_sets').get() as { description: string; authors: string; walls: string | null };
+    dataSets.publish({ id: 'b', name: 'B', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, walls: { shapes: [[1, 1]], signature: ['0'.repeat(64)] } }, PLAYER);
     console.log(`  an older table's columns: ${columns.join(', ')}`);
-    check(columns.includes('description') && columns.includes('authors') && row.description === '' && row.authors === '[]'
-        && dataSets.read().dataSets.map((set) => set.id).join() === 'a,b', 'a table made before them gains the description and authors, its rows kept');
+    check(columns.includes('description') && columns.includes('authors') && columns.includes('walls') && row.description === '' && row.authors === '[]' && row.walls === null
+        && dataSets.read().dataSets.map((set) => set.id).join() === 'a,b' && dataSets.walls().get('b')?.shapes.join() === '1,1',
+        'a table made before them gains the description, authors and walls, its rows kept');
     db.close();
 }
 
@@ -660,6 +710,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     });
     console.log(`  restarted: ${restartLine}`);
     check(restarted.code === 0 && restartLine.includes('(a, b, from the data_sets table);'), 'started again without a manifest, it serves the table\'s sets');
+    check(restarted.out.includes('No walls for b (') , 'and reads the walls of the published set whose row keeps none, saying it where its dungeon.dat does not read');
 }
 
 async function main(): Promise<void> {

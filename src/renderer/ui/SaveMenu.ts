@@ -170,12 +170,14 @@ import { searchButtonList } from './HitTest';
 import {
   MENU_PRESS_PHASE_MS,
   MENU_TITLE1_COLOR,
+  MENU_TITLE_MAX_CHARS,
   doMenu,
   drawMenuPress,
   menuButtonList,
   menuButtonRect,
   menuHitTest,
   menuPressFinished,
+  splitLongLine,
   type MenuPress,
 } from './Menu';
 import { tag02076e, tag0207cc } from './Mouse';
@@ -328,6 +330,7 @@ export type ImportRefusal = Exclude<ImportResult, { kind: 'stored' }>;
  * save of a slightly different dungeon, whose options send it on to the other sets or
  * store it (`importAnswer`); or the refusal of another dungeon's save, which names the
  * dungeon and says whether a data set plays it, and of an unknown one's, under one option.
+ * A published set's name is a player's, and is cut to fit the title panel (`fittedTitle`).
  */
 export function importMenu(refusal: ImportRefusal): { title1: string; title2: string | null; options: string[] } {
   switch (refusal.kind) {
@@ -335,13 +338,31 @@ export function importMenu(refusal: ImportRefusal): { title1: string; title2: st
       return { title1: SAVE_MENU_DIFFERENT, title2: null, options: [ELSEWHERE_LABEL, ANYWAY_LABEL, CANCEL_LABEL] };
     case 'other':
       return {
-        title1: `THIS LOOKS LIKE A SAVE OF ${refusal.dungeon.name.toUpperCase()}`,
+        title1: fittedTitle('THIS LOOKS LIKE A SAVE OF ', refusal.dungeon.name.toUpperCase()),
         title2: refusal.dungeon.dataSets.length > 0 ? 'SWITCH TO IT TO IMPORT IT' : 'NOT SUPPORTED YET',
         options: [OK_LABEL],
       };
     case 'unknown':
       return { title1: 'THIS IS A SAVE OF AN UNKNOWN DUNGEON', title2: 'NOT SUPPORTED YET', options: [OK_LABEL] };
   }
+}
+
+/**
+ * `prefix` and `name`, where `_DoMenu` draws them within the title panel
+ * (`MENU_TITLE_MAX_CHARS`) once `splitLongLine` has split them; otherwise `name` cut short
+ * and ended by `...`, as many of its words as fit, or of its characters where no word does.
+ */
+function fittedTitle(prefix: string, name: string): string {
+  const fits = (title: string): boolean =>
+    (splitLongLine(title) ?? [title]).every((line) => line.length <= MENU_TITLE_MAX_CHARS);
+  if (fits(prefix + name)) return prefix + name;
+  const lengths = Array.from(name, (_, i) => name.length - 1 - i);
+  const wordEnds = lengths.filter((length) => name[length] === ' ' && name[length - 1] !== ' ');
+  for (const length of [...wordEnds, ...lengths]) {
+    const title = `${prefix}${name.slice(0, length).trimEnd()}...`;
+    if (length > 0 && fits(title)) return title;
+  }
+  return `${prefix}...`;
 }
 
 /** What option `choice` of `refusal`'s menu answers, 1-based: `null` for CANCEL and OK. */

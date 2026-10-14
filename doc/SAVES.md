@@ -178,11 +178,24 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   - **Any other**, a level more or less or a level of another size, is not the set's,
     and goes on to **the other sets**: the known dungeon most of its levels match
     (`identifyDungeon`), each level against the level of its own number, among the
-    catalogue's dungeons that do not list the running set. A save of another dungeon is
-    refused, the dungeon named, with "switch to it" where a data set plays it and "not
-    supported yet" where none does; a save that matches no level of any is an unknown
-    dungeon's, refused. The catalogue never names the running set's own dungeon, which
-    its files say better, so "switch to it" never names the set a save is refused in.
+    catalogue's dungeons and the published sets' that do not list the running set.
+    Between two that match as many, the one the save is the whole of comes first, then
+    one whose levels are the save's in number and size, as an own dungeon's are; only a
+    published set's sizes are known. A save of another dungeon is refused, the dungeon
+    named, with "switch to it" where a data set plays it and "not supported yet" where
+    none does; a save that matches no level of any is an unknown dungeon's, refused.
+    Neither list names the running set's own dungeon, which its files say better, so
+    "switch to it" never names the set a save is refused in.
+
+  The published sets' dungeons are the server's: each published set's row keeps its
+  `dungeon.dat`'s walls, which `api/data-set-walls` answers (`doc/DEPLOYMENT.md` → "The
+  game files and the manifest"). The page asks for them only when an import goes on to
+  the other sets (`publishedDungeons`, `src/main.ts`), and keeps the answer for the
+  session; where the server cannot answer, the console says why, that import is held
+  against the catalogue alone, and the next asks again. A published set's name is a
+  player's, up to 60 characters: where "THIS LOOKS LIKE A SAVE OF" and the name do not fit
+  the title panel's two lines of 33 characters, the name is cut at a word and ends in
+  `...` (`fittedTitle`, `src/renderer/ui/SaveMenu.ts`).
 
   This holds for every set, the site's and a player's own alike: a local set's author
   keeps their saves while they move its walls, by IMPORT ANYWAY, and a set the catalogue
@@ -196,7 +209,8 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   the set's `dungeon.dat`, both the `csb` set's; Kids dungeon 24; 3D2D1D; Conflux 3.5;
   and The Towers of Chaos 3.3. A dungeon is added from what
   `tools/dump-dungeon-signature.ts` prints when given its file: the digests as the
-  catalogue lists them. It names none of the players' dungeons, published or not.
+  catalogue lists them. It names none of the players' dungeons: the published ones are
+  the server's, and a player's own is not named in another set.
 - **A save is its own world.** A save, once stored, holds its dungeon and loads it,
   whatever the set's `dungeon.dat` has become since: a player who changes their local
   set's dungeon sees none of the changes in a game read from an older save. Deleting a

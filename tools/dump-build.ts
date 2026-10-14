@@ -11,8 +11,9 @@
  *   - the bundle hands the probes no `window.__probe`, which only a build made with
  *     `CSBWEB_PROBE=1` does (`vite.config.mts`): the image the golden frames check;
  *   - the server's module imports nothing, as the image has no `node_modules`, loads through
- *     the server's own loader (`loadCheckDataSet`), and says of a set what the page's
- *     `checkLocalDataSet` says, its problems, record and census: DM's `dungeon.dat` on its
+ *     the server's own loader (`loadPageReaders`), and says of a set what the page's
+ *     `checkLocalDataSet` says, its problems, record, census and walls, and of a
+ *     `dungeon.dat` what `readDungeonWalls` says: DM's `dungeon.dat` on its
  *     base set's `graphics.dat`, read from the set's folder, the same with Chaos Strikes Back's
  *     own `graphics.dat`, and a `dungeon.dat` that does not read.
  *
@@ -23,9 +24,9 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 
-import { CHECK_MODULE, loadCheckDataSet } from '../server/app.ts';
+import { CHECK_MODULE, loadPageReaders } from '../server/app.ts';
 import type { DataSetDraft, DataSetFolder } from '../server/publish.ts';
-import { checkLocalDataSet } from '../src/data/LocalDataSets.ts';
+import { checkLocalDataSet, readDungeonWalls } from '../src/data/LocalDataSets.ts';
 import { dataSetNamed } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -111,7 +112,7 @@ async function main(): Promise<void> {
         const module = readFileSync(join(outDir, CHECK_MODULE), 'utf8');
         const imports = module.match(/^\s*(?:import|export\s.*\sfrom)\s.*$|\bimport\(|\brequire\(/gm) ?? [];
         check(imports.length === 0, `${CHECK_MODULE} imports nothing${imports.length ? `: not ${imports.join(', ')}` : ''}`);
-        const built = await loadCheckDataSet(outDir);
+        const { checkDataSet: built, readDungeonWalls: builtWalls } = await loadPageReaders(outDir);
         const base = (set: string): DataSetFolder | null => set === 'dm-atari' || set === 'csb' ? folder(set) : null;
         const drafts: [string, DataSetDraft, boolean][] = [
             ['DM, on its base set\'s graphics.dat', draftOf('dm-atari', ['dungeon.dat']), true],
@@ -120,14 +121,17 @@ async function main(): Promise<void> {
         ];
         for (const [what, draft, makesRecord] of drafts) {
             const said = async (check: typeof built) => {
-                const { problems, record, census } = await check(draft, new Set(), base, 0);
-                return JSON.stringify({ problems, record: record && { ...record, files: undefined }, census });
+                const { problems, record, census, walls } = await check(draft, new Set(), base, 0);
+                return JSON.stringify({ problems, record: record && { ...record, files: undefined }, census, walls });
             };
             const fromBuild = await said(built), fromSource = await said(checkLocalDataSet);
             const { problems, record } = JSON.parse(fromBuild);
             console.log(`  ${what}: ${record ? `a record, signature ${record.dungeonSignature[0].slice(0, 12)}…` : problems.map((p: { about: string; text: string }) => `${p.about}: ${p.text}`).join('; ')}`);
             check((record !== null) === makesRecord, `${what}: ${makesRecord ? 'a record' : 'no record'}`);
             check(fromBuild === fromSource, `${what}: the built check says what the source's does`);
+            const bytes = new Uint8Array(await draft.files['dungeon.dat']!.arrayBuffer());
+            const wallsOf = (read: typeof builtWalls) => read(bytes).then((walls) => JSON.stringify(walls), (error: Error) => `throws: ${error.message}`);
+            check(await wallsOf(builtWalls) === await wallsOf(readDungeonWalls), `${what}: the built reader of its walls says what the source's does`);
         }
     } finally {
         rmSync(outDir, { recursive: true, force: true });

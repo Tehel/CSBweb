@@ -113,7 +113,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P10 | A save of another set's dungeon names only the catalogue's | M | ⚠️ step 2 of 2 next |
 | P8 | Publishing a local set, and moderating it | L | ⚠️ step 4 of 5 next |
 | P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
@@ -137,6 +136,7 @@ In payoff order: the first row is the next item.
 | W7 | The container, the deploy and the Node version | S | ⏳ |
 | R12 | Listing the saves reads every save's bytes | M | ⏳ |
 | U11 | The cursor over a dialog takes the game's shapes | S | ⏳ |
+| U12 | A text outside the game's font draws as other letters | S | ⏳ |
 | D17 | The screen keeps the party it last drew | S | ⏳ |
 | E23 | One game read, whole or not at all | L | ⏳ |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
@@ -194,7 +194,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C182 · D22 · E40 · F21 · G31 · P12 · R16 · U12 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E40 · F21 · G31 · P12 · R16 · U13 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -261,7 +261,10 @@ which `server.ts` loads at start-up and hands the API (`CheckDataSet`, `loadChec
 with it (`server/publish.ts`).
 `tools/dump-build.ts` proves the bundle says what the source says, `tools/dump-server.ts`
 that the server does not start without it, and `tools/check-image.sh` that the image's
-Node runs it.
+Node runs it. A published set's row keeps its dungeon's walls, read by the same module
+(`fillWalls` at start-up for a row that keeps none), which `api/data-set-walls` answers,
+so that an import in another set names it (`doc/SAVES.md` → "An import is checked against
+the dungeon").
 
 The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase letters, digits, `.`, `-` and
 `_`, at most 40), since P8 makes it the set's folder on the server. No shipped dungeon
@@ -284,39 +287,6 @@ Decisions taken with the author, for every row:
   (the manifest's, uploaded by hand) is the site's, not a moderator's.
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
-
-### P10 ⚠️ A save of another set's dungeon names only the catalogue's
-
-An imported save is held against the running set's own dungeons first, as its files read
-(`checkDungeon`, `GameSaves.ownDungeons`, `src/engine/GameSaves.ts`; `doc/SAVES.md` → "An
-import is checked against the dungeon"), so every set, a published one included, takes
-the saves of its own `dungeon.dat`, and asks about a slightly different one. A save that
-is not the running set's goes on to the other sets, and those are only the catalogue's
-(`KNOWN_DUNGEONS`, `src/data/DungeonSignature.ts`), committed, which lists none of the
-players' dungeons. So a save of a published set, dropped in another set, is "THIS IS A
-SAVE OF AN UNKNOWN DUNGEON / NOT SUPPORTED YET" where the port could name the set and
-say "switch to it". The publish route's check computes a set's signature
-(`record.dungeonSignature`, `CheckDataSet` in `server/publish.ts`), but the row it writes
-(`dataSets.publish`, same file) keeps only the id, name, description, authors,
-`csbGraphics`, `hintOracle` and `dmRules`, and `api/data-sets` serves no signature.
-
-M, in two steps (the author's design); the first, the running set's own dungeon, stands.
-
-**Step 2, a signature database, to name another dungeon.** The server keeps each
-published set's signature, and each level's width and height beside it, so that the
-other sets are held to the rules the running set is. It computes them with the page's
-own reader, which the publish route already runs, rather than trusting uploaded ones,
-and keeps them in the store (`server/dataSets.ts`). A **backfill** covers the sets
-already published, from each owned set's `gamefiles/<id>/dungeon.dat`, at start-up or by
-a one-off script `doc/DEPLOYMENT.md` names. A signature is one SHA-256 per level, up to
-64 levels: up to 2 KiB raw, about 4.2 KiB as hex JSON. If that is too much to send in
-every `api/data-sets` answer, a dedicated endpoint takes a list of set ids and answers
-their signatures, which the page caches in IndexedDB (a `DB_VERSION` bump) and asks for
-when it lacks one. Which of the two is decided at the start of the step, from those
-sizes. The other sets `checkDungeon` looks at are then the catalogue's and the
-published ones, and LOOK FOR A BETTER MATCH can name a published set. Evidence:
-`tools/dump-server.ts` (the signature stored on publish, the backfill, the endpoint's
-answer), and `tools/dump-save-menu.ts`'s import naming a published set.
 
 ### P8 ⏳ Publishing a local set, and moderating it
 
@@ -485,6 +455,19 @@ Paying it: while `ui.dialog` is up, `drawCursorItem` draws the arrow, the object
 and the champion in hand (`d.Word23144`) included, at the pointer; a `tools/` check of the
 cursor over each dialog with a party and an object in hand, which fails before; the
 probe's KEYS frame taken with a party, if the frame is to show it.
+
+### U12 ⏳ A text outside the game's font draws as other letters
+
+The canvas draws a text through the game's font, which holds ASCII alone:
+`drawTextLineIndexInternal` (`src/renderer/csbwin/TextRenderer.ts`) takes each character's
+code `& 0x7f`, so an accented capital draws as an unrelated letter (`É`, 0xC9, as `I`) and
+any other character outside ASCII as whatever its low seven bits name. The texts the port
+puts there that a player wrote are a save's name, an imported file's (`importedFileName`),
+and a published set's name in the import dialog's "THIS LOOKS LIKE A SAVE OF …"
+(`importMenu`, `src/renderer/ui/SaveMenu.ts`). CSBWin's own texts are ASCII. Paying it:
+such a text is folded to what the font holds before it is drawn (accents dropped through
+`normalize('NFD')`, and what is still outside the font replaced by a character it
+holds), in one helper the save menu calls; a `tools/dump-save-menu.ts` check of a name with accents, which fails before.
 
 ---
 

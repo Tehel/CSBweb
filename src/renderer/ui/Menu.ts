@@ -56,6 +56,11 @@ const TITLE_Y_SPLIT = 21;
 const TITLE_LINE_STEP = 8;
 /** Titles centre on 113, one pixel right of where the option labels centre. */
 const TITLE_CENTRE_X = 113;
+/**
+ * The most characters a line of the title panel holds, inside its edges: 200 pixels of
+ * six. CSBWin's own titles never need more; the port's names a dungeon (`importMenu`).
+ */
+export const MENU_TITLE_MAX_CHARS = 33;
 
 /** The option label positions, per layout, in menu coordinates (`Menu.cpp:302-346`). */
 const OPTION_POSITIONS: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [

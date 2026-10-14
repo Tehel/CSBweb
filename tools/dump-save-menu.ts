@@ -138,9 +138,10 @@ import {
   type StoredSaveRecord,
 } from '../src/data/saves/SaveStore';
 import { ROWS_UPGRADED_VERSION, stampBlock1Rows, stampSaveRecords, upgradeSaveRecords, upgradeStoredRows } from '../src/data/saves/legacyRows';
-import { KNOWN_DUNGEONS } from '../src/data/DungeonSignature';
+import { dungeonWalls, KNOWN_DUNGEONS, type KnownDungeon } from '../src/data/DungeonSignature';
 import type { DataSetFiles } from '../src/data/DataSetFiles';
-import type { DataSet } from '../src/data/DataSets';
+import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
+import { LOCAL_DATA_SET_TEXT_LIMITS, type DataSet } from '../src/data/DataSets';
 import { localDataSet, recordFiles, type LocalDataSetRecord } from '../src/data/LocalDataSets';
 import { Game } from '../src/engine/Game';
 import type { GameHost, MessageSink } from '../src/engine/GameHost';
@@ -160,6 +161,7 @@ import {
   MENU_OPTION_COLOR,
   MENU_PANEL_COLOR,
   MENU_TITLE1_COLOR,
+  MENU_TITLE_MAX_CHARS,
   MENU_PRESS_PHASE_MS,
   MENU_WIDTH,
   doMenu,
@@ -3063,6 +3065,30 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
     check(none.kind === 'unknown', 'a save of the set\'s levels, as large, and no level\'s walls its own, is another dungeon: not stored either');
     check((await rowsOf()) === stored, 'none of them has written a row');
 
+    // The published sets' dungeons, which the page asks the server for (`publishedDungeons`).
+    const keep: KnownDungeon = { name: 'Boris\'s keep', dataSets: ['boris-keep'], ...(await dungeonWalls(loadCsbwinWorld(unknown).dungeon)) };
+    const wuuf: KnownDungeon = { name: 'Wuuf', dataSets: ['wuuf'], ...(await dungeonWalls(loadCsbwinWorld(modified).dungeon)) };
+    let askedFor = 0;
+    const withPublished = (set: DataSet): GameSaves => new GameSaves(game, set, diskFiles(set), store, screen, log, new CsbRandom(SEED),
+      async () => { askedFor++; return [keep, wuuf]; });
+    const inDm = withPublished(DEFAULT_DATA_SET);
+    const unasked = await inDm.importSave({ name: 'modified.dat', bytes: modified });
+    check(unasked.kind === 'different' && askedFor === 0, 'an import held against the set\'s own dungeon does not ask for the published sets');
+    const named = [
+      await inDm.importSave({ name: 'modified.dat', bytes: modified }, 'elsewhere'),
+      await withPublished(dataSetNamed('csb')).importSave({ name: 'unknown.dat', bytes: unknown }),
+      await withPublished(dataSetNamed('csb')).importSave({ name: 'CSBGAME7.DAT', bytes: genuine }),
+    ];
+    console.log(`  with two sets published, the modified save looked for elsewhere, the unknown one and a save of Dungeon Master, in csb: ${named.map(refusal).join('; ')}`);
+    check(named.map(refusal).join('; ') === 'other (Wuuf; sets wuuf); other (Boris\'s keep; sets boris-keep); other (Dungeon Master; sets dm-atari dm-windows dm-atari-1.2 dm-atari-1.3-fr)'
+      && askedFor === 3, 'LOOK FOR A BETTER MATCH and the other sets name a published set, askedFor for at each import that goes on to them, and Dungeon Master is still the catalogue\'s');
+    const inKeep = await withPublished({ ...DEFAULT_DATA_SET, id: 'boris-keep', name: 'Boris\'s keep' }).importSave({ name: 'unknown.dat', bytes: unknown }, 'elsewhere');
+    console.log(`  the unknown save looked for elsewhere, in Boris's keep: ${refusal(inKeep)}`);
+    check(inKeep.kind === 'other' && inKeep.dungeon === wuuf, 'a published set\'s own entry never names it, in it: the set most of its levels match does');
+    const failing = await new GameSaves(game, dataSetNamed('csb'), diskFiles(dataSetNamed('csb')), store, screen, log, new CsbRandom(SEED),
+      async () => []).importSave({ name: 'unknown.dat', bytes: unknown });
+    check(failing.kind === 'unknown' && (await rowsOf()) === stored, 'with none published, it is unknown, and still nothing is stored');
+
     // What does not read: a save whose later blocks fail, and a file that is no save.
     const flipped = genuine.slice();
     flipped[flipped.length - 100] ^= 0x01;
@@ -3142,9 +3168,6 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
 
 /* ------------------------------------------------------------------ 19. the drop ---- */
 
-/** The most characters a line of `_DoMenu`'s title panel holds, inside its edges: 200 pixels of six. */
-const TITLE_MAX_CHARS = 33;
-
 /**
  * Files dropped on the dialog (`saveMenuDrop`), its hook the page's (`menuRig`): what is
  * listed, what is asked and what is refused, each menu against `_DoMenu`'s own drawing.
@@ -3176,23 +3199,33 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
   };
   const optionsFit = (options: string[]): boolean => options.every((option, i) => 6 * option.length < widthOf(options.length, i));
 
-  // Every menu a dropped file can bring up fits the title panel, and its options their buttons.
-  for (const dungeon of KNOWN_DUNGEONS) {
+  // Every menu a dropped file can bring up fits the title panel, and its options their buttons:
+  // a published set's name too, the longest the form takes, cut where it does not fit.
+  const longest = LOCAL_DATA_SET_TEXT_LIMITS.name;
+  const published = [
+    'A Dungeon Of Many Words, The Longest Name A Player Could Give',
+    'X'.repeat(longest),
+    'The Keep',
+  ].map((name): KnownDungeon => ({ name: name.slice(0, longest), dataSets: ['published'], signature: [] }));
+  for (const dungeon of [...KNOWN_DUNGEONS, ...published]) {
     const menu = SaveMenu.importMenu({ kind: 'other', dungeon });
     console.log(`  ${dungeon.name}: ${linesOf(menu).join(' / ')}  [${menu.options.join(', ')}]`);
-    check(linesOf(menu).length <= 4 && linesOf(menu).every((line) => line.length > 0 && line.length <= TITLE_MAX_CHARS) && optionsFit(menu.options),
+    check(linesOf(menu).length <= 4 && linesOf(menu).every((line) => line.length > 0 && line.length <= MENU_TITLE_MAX_CHARS) && optionsFit(menu.options),
       `${dungeon.name}: its menu is four lines at most, none wider than the title panel`);
   }
   for (const kind of ['different', 'unknown'] as const) {
     const menu = SaveMenu.importMenu({ kind });
     console.log(`  ${kind}: ${linesOf(menu).join(' / ')}  [${menu.options.join(', ')}]`);
-    check(linesOf(menu).length <= 4 && linesOf(menu).every((line) => line.length > 0 && line.length <= TITLE_MAX_CHARS) && optionsFit(menu.options),
+    check(linesOf(menu).length <= 4 && linesOf(menu).every((line) => line.length > 0 && line.length <= MENU_TITLE_MAX_CHARS) && optionsFit(menu.options),
       `nor is the ${kind} dungeon's, whose options fit their buttons, ${menu.options.map((_, i) => widthOf(menu.options.length, i)).join(', ')} pixels wide`);
   }
   const unplayed = SaveMenu.importMenu({ kind: 'other', dungeon: { name: 'Elsewhere', dataSets: [], signature: [] } });
   check(unplayed.title1 === 'THIS LOOKS LIKE A SAVE OF ELSEWHERE' && unplayed.title2 === 'NOT SUPPORTED YET' && unplayed.options.join() === 'OK',
     'a known dungeon no data set plays is "NOT SUPPORTED YET", where one that a set plays is "SWITCH TO IT TO IMPORT IT"');
   check(SaveMenu.importMenu({ kind: 'other', dungeon: KNOWN_DUNGEONS[1] }).title2 === 'SWITCH TO IT TO IMPORT IT', 'as Chaos Strikes Back is');
+  const titles = published.map((dungeon) => SaveMenu.importMenu({ kind: 'other', dungeon }).title1);
+  check(titles[0].endsWith('...') && titles[1].endsWith('...') && titles[2] === 'THIS LOOKS LIKE A SAVE OF THE KEEP',
+    'a name too long for the panel is cut and ends in "...", and a short one is whole');
 
   const realNow = Date.now;
   let now = new Date(2026, 9, 2, 10, 0, 0).getTime();

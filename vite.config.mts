@@ -7,10 +7,10 @@ import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
 import { dataSetViewer, pathSegments, receivePublish } from './server/app';
-import { DataSetStore, manifestText, type PublishedDataSet } from './server/dataSets';
+import { DataSetStore, manifestText, wallsText, type PublishedDataSet } from './server/dataSets';
 import { RateLimit } from './server/events';
 import type { CheckDataSet } from './server/publish';
-import { DATA_SETS_ROUTE, PLAYER_ID_HEADER, parseManifest } from './src/data/DataSets';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, PLAYER_ID_HEADER, parseManifest } from './src/data/DataSets';
 
 /**
  * The build the page's events name (`src/ui/gameEvents.ts`): `CSBWEB_BUILD` where the
@@ -31,6 +31,7 @@ function buildId(): string {
  * manifest, `tools/data-sets.json`, read then, its sets the site's, and the sets published
  * since the dev server started. A GET gets `manifestText` for the player it names, a POST
  * `receivePublish` with the page's own check, the source's (`ssrLoadModule`).
+ * `api/data-set-walls` answers `wallsText` over the same store: the published sets'.
  *
  * A published set is written into a scratch folder, made at start and removed at the end,
  * which holds a link to each entry of `static/gamefiles/`, so that a base set's
@@ -92,6 +93,28 @@ function dataSetsRoute(): Plugin {
             res.setHeader('Vary', PLAYER_ID_HEADER);
             json(200, manifestText(dataSets.read(), dataSetViewer({ moderatorPlayerIds: [] }, req)));
           }
+        } catch (error) {
+          next(error);
+        } finally {
+          db.close();
+        }
+      });
+
+      server.middlewares.use(`/${DATA_SET_WALLS_ROUTE}`, (req, res, next) => {
+        if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          res.statusCode = 405;
+          res.setHeader('Allow', 'GET, HEAD');
+          return res.end();
+        }
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Vary', PLAYER_ID_HEADER);
+        if (!sqlite) return res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ dataSets: [] }));
+        const db = new sqlite.DatabaseSync(':memory:');
+        try {
+          const dataSets = openStore(db);
+          res.end(req.method === 'HEAD' ? undefined : wallsText(dataSets.read(), dataSets.walls(), dataSetViewer({ moderatorPlayerIds: [] }, req)));
         } catch (error) {
           next(error);
         } finally {

@@ -6,7 +6,9 @@
  *
  * A set is approved or pending. An approved set is offered to everyone; a pending one, a
  * player's, published by `publish.ts` (`DataSetStore.publish`), to its owner and the
- * moderators only (`manifestText`). Ownership, and
+ * moderators only (`manifestText`). A published set's row keeps its dungeon's walls, which
+ * `api/data-set-walls` answers (`wallsText`), so that the page can name the set a save
+ * dropped in another is of. Ownership, and
  * moderation, rest on the `playerId` alone, a secret (`src/ui/gameEvents.ts`), so no answer
  * holds one.
  *
@@ -49,6 +51,7 @@ CREATE TABLE IF NOT EXISTS data_set_defaults (
 const ADDED_COLUMNS: readonly (readonly [string, string])[] = [
     ['description', "TEXT NOT NULL DEFAULT ''"],
     ['authors', "TEXT NOT NULL DEFAULT '[]'"],  // a JSON list of strings
+    ['walls', 'TEXT'],  // a JSON DataSetWalls, NULL for the site's and until `fillWalls` reads it
 ];
 
 type Flag = 'csbGraphics' | 'miniDat' | 'hintOracle' | 'dmRules' | 'hidden';
@@ -75,6 +78,15 @@ export interface DataSetViewer {
     moderator: boolean;
 }
 
+/**
+ * A dungeon's walls, as the page's check reads them from its `dungeon.dat` (`DungeonWalls`,
+ * `src/data/DungeonSignature.ts`): each level's width and height, and its digest.
+ */
+export interface DataSetWalls {
+    shapes: readonly (readonly [number, number])[];
+    signature: readonly string[];
+}
+
 /** A player's set, as `publish` stores it: its folder is its id. */
 export interface PublishedDataSet {
     id: string;
@@ -84,6 +96,7 @@ export interface PublishedDataSet {
     csbGraphics: boolean;
     hintOracle: boolean;
     dmRules: boolean;
+    walls: DataSetWalls;
 }
 
 /** Everyone: no `playerId`, not a moderator. */
@@ -106,6 +119,9 @@ export class DataSetStore {
     private readonly insert: StatementSync;
     private readonly insertDefaults: StatementSync;
     private readonly insertPublished: StatementSync;
+    private readonly wallsRows: StatementSync;
+    private readonly wallsMissing: StatementSync;
+    private readonly updateWalls: StatementSync;
 
     constructor(db: DatabaseSync) {
         this.db = db;
@@ -123,8 +139,11 @@ export class DataSetStore {
             `INSERT INTO data_sets (id, name, dir, position, status, owner, ${flags.join(', ')}) VALUES (?, ?, ?, ?, ?, NULL, ${flags.map(() => '?').join(', ')})`);
         this.insertDefaults = db.prepare('INSERT INTO data_set_defaults (only, default_set, swoosh) VALUES (1, ?, ?)');
         this.insertPublished = db.prepare(
-            `INSERT INTO data_sets (id, name, dir, position, status, owner, description, authors, ${flags.join(', ')}) `
-            + `VALUES (?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM data_sets), 'pending', ?, ?, ?, ${flags.map(() => '?').join(', ')})`);
+            `INSERT INTO data_sets (id, name, dir, position, status, owner, description, authors, walls, ${flags.join(', ')}) `
+            + `VALUES (?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM data_sets), 'pending', ?, ?, ?, ?, ${flags.map(() => '?').join(', ')})`);
+        this.wallsRows = db.prepare('SELECT id, walls FROM data_sets WHERE walls IS NOT NULL');
+        this.wallsMissing = db.prepare('SELECT id, dir FROM data_sets WHERE owner IS NOT NULL AND walls IS NULL ORDER BY position');
+        this.updateWalls = db.prepare('UPDATE data_sets SET walls = ? WHERE id = ?');
     }
 
     isEmpty(): boolean {
@@ -162,8 +181,23 @@ export class DataSetStore {
      */
     publish(set: PublishedDataSet, owner: string): void {
         const flags: Record<Flag, boolean> = { csbGraphics: set.csbGraphics, miniDat: false, hintOracle: set.hintOracle, dmRules: set.dmRules, hidden: false };
-        this.insertPublished.run(set.id, set.name, set.id, owner, set.description, JSON.stringify(set.authors),
+        this.insertPublished.run(set.id, set.name, set.id, owner, set.description, JSON.stringify(set.authors), wallsJson(set.walls),
             ...FLAG_COLUMNS.map(([flag]) => (flags[flag] ? 1 : 0)));
+    }
+
+    /** The walls each set keeps, by its id: the published sets', once read. */
+    walls(): Map<string, DataSetWalls> {
+        const rows = this.wallsRows.all() as { id: string; walls: string }[];
+        return new Map(rows.map((row) => [row.id, JSON.parse(row.walls) as DataSetWalls]));
+    }
+
+    /** The sets with an owner whose walls are not kept yet, in the list's order: what `fillWalls` reads. */
+    missingWalls(): { id: string; dir: string }[] {
+        return this.wallsMissing.all() as { id: string; dir: string }[];
+    }
+
+    setWalls(id: string, walls: DataSetWalls): void {
+        this.updateWalls.run(wallsJson(walls), id);
     }
 
     read(): StoredDataSets {
@@ -191,9 +225,7 @@ export class DataSetStore {
  * the page shows them the hidden sets too: it tells them nothing they do not hold.
  */
 export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): string {
-    const visible = (set: StoredDataSet) => !set.pending || viewer.moderator
-        || (viewer.playerId !== null && set.owner !== null && samePlayerId(set.owner, viewer.playerId));
-    const dataSets = stored.dataSets.filter(visible).map((set) => {
+    const dataSets = visibleSets(stored, viewer).map((set) => {
         const entry: Record<string, string | boolean> = { id: set.id, name: set.name };
         if (set.dir !== set.id) entry.dir = set.dir;
         for (const [flag] of FLAG_COLUMNS) if (set[flag]) entry[flag] = true;
@@ -201,6 +233,31 @@ export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): str
         return entry;
     });
     return JSON.stringify({ default: stored.defaultId, swoosh: stored.swooshDir, ...(viewer.moderator ? { moderator: true } : {}), dataSets });
+}
+
+/**
+ * The answer to `api/data-set-walls` for `viewer`: `{"dataSets": [{"id", "name", "shapes",
+ * "signature"}]}`, the walls of each set of `stored` they may see, as `manifestText` offers
+ * it, that keeps them (`walls`), in the table's order. The page reads it with
+ * `parsePublishedDungeons` (`src/data/DungeonSignature.ts`).
+ */
+export function wallsText(stored: StoredDataSets, walls: ReadonlyMap<string, DataSetWalls>, viewer: DataSetViewer): string {
+    const dataSets = visibleSets(stored, viewer).flatMap((set) => {
+        const kept = walls.get(set.id);
+        return kept ? [{ id: set.id, name: set.name, shapes: kept.shapes, signature: kept.signature }] : [];
+    });
+    return JSON.stringify({ dataSets });
+}
+
+/** The sets of `stored` that `viewer` may see: the approved ones, their own pending ones, and every one for a moderator. */
+function visibleSets(stored: StoredDataSets, viewer: DataSetViewer): StoredDataSet[] {
+    return stored.dataSets.filter((set) => !set.pending || viewer.moderator
+        || (viewer.playerId !== null && set.owner !== null && samePlayerId(set.owner, viewer.playerId)));
+}
+
+/** `walls` as its column keeps them: nothing but the shapes and the signature. */
+function wallsJson(walls: DataSetWalls): string {
+    return JSON.stringify({ shapes: walls.shapes, signature: walls.signature });
 }
 
 /** Whether two `playerId`s are the same, compared in a time that does not say how much of them matches. */

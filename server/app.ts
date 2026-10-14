@@ -13,6 +13,8 @@
  *   /api/data-sets    the page's list of sets, from the store's table (`dataSets.ts`), for
  *                     the player its `X-Player-Id` names; POST: that player's own set
  *                     published, pending (`publish.ts`)
+ *   /api/data-set-walls  the walls of the sets `api/data-sets` offers the same player
+ *                     that keep them, the published ones (`wallsText`)
  *   /api/health       200, for the compose healthcheck
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
  *   /api/stats        the store's aggregates, as JSON
@@ -23,14 +25,15 @@
  * `GAMEFILES_DIR`: the page asks `api/data-sets`.
  */
 import { createReadStream, readFileSync, statSync, type Stats } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, type DataSetManifest } from '../src/data/DataSets.ts';
-import { manifestText, samePlayerId, type DataSetStore, type DataSetViewer } from './dataSets.ts';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, type DataSetManifest } from '../src/data/DataSets.ts';
+import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer } from './dataSets.ts';
 import { checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
-import { MAX_PUBLISH_BYTES, publishDataSet, type CheckDataSet, type PublishAnswer } from './publish.ts';
+import { MAX_PUBLISH_BYTES, publishDataSet, type CheckDataSet, type PublishAnswer, type ReadDungeonWalls } from './publish.ts';
 import type { StatsStore } from './stats.ts';
 
 export interface ServerOptions {
@@ -59,17 +62,43 @@ const SERVER_DIR = 'server';
 /** The page's check built for Node (`CheckDataSet`, `publish.ts`), under `distDir`. */
 export const CHECK_MODULE = `${SERVER_DIR}/LocalDataSets.js`;
 
-/** The check `CHECK_MODULE` exports, loaded from `distDir`; throws, saying why, where it is not built. */
-export async function loadCheckDataSet(distDir: string): Promise<CheckDataSet> {
+/** What the server uses of `CHECK_MODULE`: the page's check of a set, and its reader of a dungeon's walls. */
+export interface PageReaders {
+    checkDataSet: CheckDataSet;
+    readDungeonWalls: ReadDungeonWalls;
+}
+
+/** What `CHECK_MODULE` exports, loaded from `distDir`; throws, saying why, where it is not built. */
+export async function loadPageReaders(distDir: string): Promise<PageReaders> {
     const file = join(distDir, CHECK_MODULE);
-    let module: { checkLocalDataSet?: unknown };
+    let module: { checkLocalDataSet?: unknown; readDungeonWalls?: unknown };
     try {
         module = await import(pathToFileURL(file).href);
     } catch (error) {
         throw new Error(`${file} does not load (${error instanceof Error ? error.message : String(error)}): is the server's module built?`);
     }
     if (typeof module.checkLocalDataSet !== 'function') throw new Error(`${file} exports no checkLocalDataSet`);
-    return module.checkLocalDataSet as CheckDataSet;
+    if (typeof module.readDungeonWalls !== 'function') throw new Error(`${file} exports no readDungeonWalls`);
+    return { checkDataSet: module.checkLocalDataSet as CheckDataSet, readDungeonWalls: module.readDungeonWalls as ReadDungeonWalls };
+}
+
+/**
+ * The walls of every set with an owner whose row keeps none, a set published before the
+ * rows kept them, read from its folder's `dungeon.dat` with the page's reader and kept
+ * (`DataSetStore.setWalls`). A `dungeon.dat` that does not read is left without, the
+ * page then naming no save after that set, and said in `failed`. Run at start-up.
+ */
+export async function fillWalls(gamefilesDir: string, dataSets: DataSetStore, readDungeonWalls: ReadDungeonWalls): Promise<{ filled: string[]; failed: string[] }> {
+    const filled: string[] = [], failed: string[] = [];
+    for (const { id, dir } of dataSets.missingWalls()) {
+        try {
+            dataSets.setWalls(id, await readDungeonWalls(new Uint8Array(await readFile(join(gamefilesDir, dir, 'dungeon.dat')))));
+            filled.push(id);
+        } catch (error) {
+            failed.push(`${id} (${error instanceof Error ? error.message : String(error)})`);
+        }
+    }
+    return { filled, failed };
 }
 
 /** What the API needs beside the files. */
@@ -169,6 +198,12 @@ function route({ distDir, gamefilesDir, manifestFile }: ServerOptions, api: ApiO
             res.setHeader('Cache-Control', 'no-store');
             res.setHeader('Vary', PLAYER_ID_HEADER);
             return send(res, 200, manifestText(api.dataSets.read(), dataSetViewer(api, req)), 'application/json; charset=utf-8');
+        }
+        if (segments.join('/') === DATA_SET_WALLS_ROUTE) {
+            if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
+            res.setHeader('Cache-Control', 'no-store');
+            res.setHeader('Vary', PLAYER_ID_HEADER);
+            return send(res, 200, wallsText(api.dataSets.read(), api.dataSets.walls(), dataSetViewer(api, req)), 'application/json; charset=utf-8');
         }
         const name = segments.length === 2 ? segments[1] : undefined;
         if (name === 'event') {

@@ -8,8 +8,9 @@ import { SoundManager } from './audio/SoundManager';
 import { CsbRandom } from './core/random';
 import { Position } from './core/types';
 import { extractPresetHeroes } from './data/HeroExtractor';
-import { DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, type DataSet, type DataSetManifest } from './data/DataSets';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, type DataSet, type DataSetManifest } from './data/DataSets';
 import { folderFiles, loadGameFiles, type DataSetFiles, type GameFiles } from './data/DataSetFiles';
+import { parsePublishedDungeons, type KnownDungeon } from './data/DungeonSignature';
 import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
@@ -294,7 +295,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         portraitOf: (champion) => screen?.portraitPixelsFor(champion),
         repackOpenChest: () => screen?.repackChest(),
         askBeginAdventure: (source) => screen?.askBeginAdventure(source),
-    }, logSave, storeRandom);
+    }, logSave, storeRandom, publishedDungeons);
 
     // The statistics' events: sent by a production build only, and shown on the console
     // otherwise; neither when the player has turned them off.
@@ -580,6 +581,31 @@ async function loadManifest(): Promise<DataSetManifest> {
     const response = await fetch(url, player === null ? undefined : { headers: { [PLAYER_ID_HEADER]: player } }).catch(() => null);
     if (!response?.ok) throw new Error(`Cannot read the data sets' manifest '${url}'${response ? ` (HTTP ${response.status})` : ''}.`);
     return parseManifest(await response.text(), GAMEFILES_DIR);
+}
+
+/** The published sets' dungeons, once the server has given them: kept for the session. */
+let published: Promise<KnownDungeon[]> | null = null;
+
+/**
+ * The published sets' dungeons (`parsePublishedDungeons`), the server's answer for the
+ * player whose kept `playerId` it is sent, as for the manifest: what an import that is
+ * not the running set's is held against beside the catalogue (`GameSaves.importSave`).
+ * Asked for at the first such import, and kept; where the server cannot answer, the
+ * console says why, the import is held against the catalogue alone, and the next asks
+ * again.
+ */
+function publishedDungeons(): Promise<KnownDungeon[]> {
+    published ??= (async () => {
+        const player = keptPlayerId();
+        const response = await fetch(DATA_SET_WALLS_ROUTE, player === null ? undefined : { headers: { [PLAYER_ID_HEADER]: player } });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return parsePublishedDungeons(await response.text());
+    })().catch((error: unknown) => {
+        console.warn(`Cannot read the published sets' walls '${DATA_SET_WALLS_ROUTE}': ${error instanceof Error ? error.message : String(error)}`);
+        published = null;
+        return [];
+    });
+    return published;
 }
 
 /**
