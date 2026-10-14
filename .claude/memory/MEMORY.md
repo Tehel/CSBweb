@@ -30,3 +30,7 @@ One line per memory in this directory. Committed with the project; never shared.
 - [CRT invisible to frames](crt-invisible-to-frames.md) — frames read palette slots, never `#crt-canvas`; see the shader with `probe-ui --shot` after `settings.update`
 - [Curve corner check is trivial](curve-corner-check-is-trivial.md) — `hoverAt(0.002,0.002)==='0,0'` passes flat too; `(0.1,0.1)` proves the curve
 - [Settings dialog reopens last tab](settings-dialog-reopens-last-tab.md) — GAME only on a page's first open; then its last tab and KEYS scroll: a step reopening it clicks its tab
+- [Forum dungeon sources](forum-dungeon-sources.md) — the forum's list (t=31516) is the authority; its shared OneDrive holds every dungeon and reads without logging in; the topics' links are mostly dead
+- [Custom dungeon archives](custom-dungeon-archives.md) — tell files by content (`identifyLocalDataSetFile`): odd names, PC twins, several versions, and saves that read as 0-level dungeons
+- [Test publish on a throwaway dev server](test-publish-on-throwaway-dev-server.md) — `npx vite --port 9100 --strictPort` takes `POST api/data-sets` into a scratch folder; never production, nor the author's :9000
+- [Instance scripts in utils/](instance-scripts-in-utils.md) — a durable tool that finds its own inputs, takes the instance and a `playerId`, asks a yes per item and downloads nothing before it
