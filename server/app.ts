@@ -25,10 +25,11 @@
  * a NUL, encoded or not, is refused before it reaches the disk, so no request leaves the
  * two folders.
  */
-import { createReadStream, statSync, type Stats } from 'node:fs';
+import { closeSync, createReadStream, fstatSync, openSync, statSync, type Stats } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, join } from 'node:path';
+import { pipeline } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 
 import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
@@ -230,20 +231,37 @@ export function pathSegments(url: string): string[] | null {
     return segments;
 }
 
+/**
+ * The file is opened once and its descriptor stated, so the headers describe the bytes
+ * sent even when a data set is replaced meanwhile. The descriptor is closed on every
+ * path: a 304, a HEAD, a download, and one the client abandons, which `pipeline` destroys
+ * (`pipe` alone would leave it open, and enough of them fail every open with `EMFILE`).
+ */
 function serveFile(req: IncomingMessage, res: ServerResponse, path: string, cacheControl: string): void {
+    let fd: number;
     let stats: Stats;
     try {
-        stats = statSync(path);
+        fd = openSync(path, 'r');
     } catch {
         return send(res, 404, 'Not found');
     }
-    if (!stats.isFile()) return send(res, 404, 'Not found');
+    try {
+        stats = fstatSync(fd);
+    } catch (error) {
+        closeSync(fd);
+        throw error;
+    }
+    if (!stats.isFile()) {
+        closeSync(fd);
+        return send(res, 404, 'Not found');
+    }
 
     const etag = `W/"${stats.size.toString(16)}-${Math.floor(stats.mtimeMs).toString(16)}"`;
     res.setHeader('Cache-Control', cacheControl);
     res.setHeader('ETag', etag);
     res.setHeader('Last-Modified', stats.mtime.toUTCString());
     if (isNotModified(req, etag, stats.mtime)) {
+        closeSync(fd);
         res.statusCode = 304;
         res.end();
         return;
@@ -253,15 +271,13 @@ function serveFile(req: IncomingMessage, res: ServerResponse, path: string, cach
     res.setHeader('Content-Length', stats.size);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     if (req.method === 'HEAD') {
+        closeSync(fd);
         res.end();
         return;
     }
-    const stream = createReadStream(path);
-    stream.on('error', (error) => {
-        console.error(`${req.method} ${req.url}:`, error);
-        res.destroy();
+    pipeline(createReadStream(path, { fd }), res, (error) => {
+        if (error && (error as NodeJS.ErrnoException).code !== 'ERR_STREAM_PREMATURE_CLOSE') console.error(`${req.method} ${req.url}:`, error);
     });
-    stream.pipe(res);
 }
 
 /**

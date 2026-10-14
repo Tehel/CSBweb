@@ -17,7 +17,8 @@
  *     fonts as `font/ttf` and `font/woff2`; and `dist/server/`, the server's module, not
  *     served;
  *   - `/gamefiles/…`: ETag and Last-Modified, a 304 for either precondition, HEAD without
- *     a body, and the query ignored;
+ *     a body, and the query ignored; and no descriptor left open on a large file after a
+ *     download, a 304, a HEAD, or downloads the client abandons after their first bytes;
  *   - no path leaves the two folders, `..` and `.` raw, percent-encoded or behind a
  *     backslash, and no dot-file is served;
  *   - `/api/health`, and a 405 for a method that is not GET or HEAD;
@@ -65,7 +66,7 @@
  * Usage: npm test -- --only=dump-server.ts
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -141,6 +142,42 @@ function refusal(options: ServerOptions, dataSets: DataSetStore): string {
     }
 }
 
+/** Larger than what the sockets buffer, so a download the client abandons is cut short. */
+const LARGE_FILE_BYTES = 16 << 20;
+
+/** The descriptors this process, the server, holds open on `path` (Linux's `/proc`). */
+function descriptorsOn(path: string): number {
+    let count = 0;
+    for (const fd of readdirSync('/proc/self/fd')) {
+        try {
+            if (readlinkSync(`/proc/self/fd/${fd}`) === path) count++;
+        } catch {
+            // The descriptor `readdirSync` read the folder through, closed since.
+        }
+    }
+    return count;
+}
+
+/** What `descriptorsOn` says once the server has let go, or after a second. */
+async function descriptorsSettledOn(path: string): Promise<number> {
+    for (let wait = 0; wait < 20 && descriptorsOn(path) > 0; wait++) await new Promise((done) => setTimeout(done, 50));
+    return descriptorsOn(path);
+}
+
+/** `path` asked for, and the connection closed at the first bytes of the answer. */
+function abandon(port: number, path: string): Promise<void> {
+    return new Promise((done, fail) => {
+        const req = request({ host: '127.0.0.1', port, path }, (res) => {
+            res.once('data', () => {
+                req.destroy();
+                done();
+            });
+        });
+        req.on('error', (error) => (req.destroyed ? done() : fail(error)));
+        req.end();
+    });
+}
+
 function scratchFiles(scratch: string): ServerOptions {
     const distDir = join(scratch, 'dist');
     const gamefilesDir = join(scratch, 'gamefiles');
@@ -154,6 +191,7 @@ function scratchFiles(scratch: string): ServerOptions {
     writeFileSync(join(distDir, CHECK_MODULE), 'export function checkLocalDataSet() {}\n'
         + 'export async function readDungeonWalls() { throw new Error("a stand-in"); }\n');
     writeFileSync(join(gamefilesDir, 'set-a', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
+    writeFileSync(join(gamefilesDir, 'set-a', 'large.dat'), Buffer.alloc(LARGE_FILE_BYTES));
     writeFileSync(join(gamefilesDir, 'set-a', '.hidden'), 'hidden');
     writeFileSync(join(scratch, 'secret.txt'), 'SECRET');
     return { distDir, gamefilesDir };
@@ -193,7 +231,7 @@ function checkStartUp(scratch: string, options: ServerOptions): void {
         'every folder the table names and the folder lacks is named');
 }
 
-async function checkAnswers(port: number, manifest: string): Promise<void> {
+async function checkAnswers(port: number, manifest: string, gamefilesDir: string): Promise<void> {
     console.log('\nThe page:');
     const page = await ask(port, '/?dungeon=csb');
     check(page.status === 200 && page.body.includes('<title>page</title>'), '/ is index.html, whatever the query');
@@ -232,6 +270,18 @@ async function checkAnswers(port: number, manifest: string): Promise<void> {
         'If-None-Match wins over If-Modified-Since');
     const head = await ask(port, '/gamefiles/set-a/dungeon.dat', 'HEAD');
     check(head.status === 200 && head.body === '' && head.headers['content-length'] === '4', 'HEAD: the headers, no body');
+
+    const large = '/gamefiles/set-a/large.dat';
+    const largePath = join(gamefilesDir, 'set-a', 'large.dat');
+    const whole = await ask(port, large);
+    check(whole.status === 200 && whole.body.length === LARGE_FILE_BYTES, `a large file is served whole (${whole.body.length} bytes)`);
+    await ask(port, large, 'GET', { 'If-None-Match': String(whole.headers.etag) });
+    await ask(port, large, 'HEAD');
+    check(await descriptorsSettledOn(largePath) === 0, 'and once it is, or answered 304 or to a HEAD, no descriptor is left open on it');
+    const ABANDONED = 20;
+    for (let i = 0; i < ABANDONED; i++) await abandon(port, large);
+    const left = await descriptorsSettledOn(largePath);
+    check(left === 0, `${ABANDONED} downloads of it abandoned at their first bytes leave no descriptor open on it (${left})`);
 
     console.log('\nPaths that would leave the folders:');
     for (const path of [
@@ -880,7 +930,7 @@ async function main(): Promise<void> {
         server = createAppServer(options, api);
         await new Promise<void>((done) => server!.listen(0, '127.0.0.1', done));
         const port = (server.address() as AddressInfo).port;
-        await checkAnswers(port, manifest);
+        await checkAnswers(port, manifest, options.gamefilesDir);
         await checkEvents(port, store);
         await checkTableRead(port, db, manifest);
         await checkPublish(scratch);

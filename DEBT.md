@@ -118,7 +118,6 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
-| W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
 | R3 | After a fatal error the page still saves | S | ⏳ |
 | R4 | F9 reads over a champion being chosen, and over a script that starts during its read | S | ⏳ |
@@ -607,24 +606,9 @@ client can make it hold, compute or keep. What holds already: paths (`..`, `%2e%
 only, errors that leak nothing. Each item ships with its check in `tools/dump-server.ts`
 or `tools/dump-stats.ts`.
 
-### W1 ⏳ An aborted download leaks a file descriptor
-
-`serveFile` ends in `createReadStream(path)` and `stream.pipe(res)`
-(`server/app.ts:175-180`). When the client goes away, `pipe` unpipes and never destroys the
-stream, so its descriptor stays open until the process ends: 200 downloads of Conflux's 12 MB
-`CSBgraphics.dat`, each closed after its first byte, left 200 descriptors open on it. Enough
-of them and `statSync`, `createReadStream` and SQLite fail with `EMFILE`: the site is down
-until a restart. A player closing the tab during the first load does the same, a few at a
-time.
-
-Paying it: `pipeline(stream, res, …)` from `node:stream`, or `res.once('close', () =>
-stream.destroy())`; better, `open` the file and `fstat` the descriptor, which also closes
-the window between the `stat` and the open when a data set is replaced live. `dump-server`
-aborts a large download and checks that the process's descriptors come back.
-
 ### W2 ⏳ `api/stats` is computed whole at every request
 
-Every `GET` or `HEAD` of `api/stats` runs `store.stats()` (`server/app.ts:110-114`): five
+Every `GET` or `HEAD` of `api/stats` runs `store.stats()` (`server/app.ts:192-196`): five
 aggregates over the whole events table through the synchronous `DatabaseSync`, with
 `json_each` over every payload and a correlated `MIN` for every win (`server/stats.ts:64-90`),
 returning every won game and every champion name ever. With 200,000 rows it takes 3.6 s,
