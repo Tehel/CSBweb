@@ -80,6 +80,13 @@ function checkParser(): void {
   console.log(`  status: ${statuses.dataSets.map((s) => `${s.id} ${s.pending ? 'pending' : 'approved'}`).join(', ')}`);
   check(statuses.dataSets.map((s) => s.pending).join() === 'false,true,false', '"status" is read as written, and left out it is "approved"');
 
+  // What the form that adds a set says of it: a description and the authors.
+  const described = parseManifest(manifest({ dataSets: [set({ description: 'A dungeon.', authors: ['One', 'Two'] }), set({ id: 'b' })] }), '');
+  const [told, untold] = described.dataSets as [DataSet, DataSet];
+  console.log(`  described: ${JSON.stringify(told.description)} by ${told.authors.join(' and ')}; left out: ${JSON.stringify(untold.description)}, [${untold.authors.join()}]`);
+  check(told.description === 'A dungeon.' && told.authors.join() === 'One,Two', '"description" and "authors" are read as written');
+  check(untold.description === '' && untold.authors.length === 0, 'left out, they are empty');
+
   const malformed: Array<[string, string]> = [
     ['{"default": "a", ', 'not JSON'],
     ['[]', 'not an object'],
@@ -93,6 +100,9 @@ function checkParser(): void {
     [manifest({ dataSets: [set({ dir: null })] }), `data set 'a' has no "dir"`],
     [manifest({ dataSets: [set({ hintOracle: 'yes' })] }), `data set 'a' has a "hintOracle" that is neither true nor false`],
     [manifest({ dataSets: [set({ hidden: 'yes' })] }), `data set 'a' has a "hidden" that is neither true nor false`],
+    [manifest({ dataSets: [set({ description: 7 })] }), `data set 'a' has a "description" that is not a text`],
+    [manifest({ dataSets: [set({ authors: 'One' })] }), `data set 'a' has "authors" that are not a list of texts`],
+    [manifest({ dataSets: [set({ authors: ['One', 2] })] }), `data set 'a' has "authors" that are not a list of texts`],
     [manifest({ dataSets: [set({ status: 'waiting' })] }), `data set 'a' has a "status" that is neither "approved" nor "pending"`],
     [manifest({ dataSets: [set(), set({ dir: 'b' })] }), `two data sets are 'a'`],
     [manifest({ moderator: 'yes' }), '"moderator" is neither true nor false'],

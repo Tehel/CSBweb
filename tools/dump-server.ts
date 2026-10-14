@@ -453,6 +453,12 @@ async function checkPublish(scratch: string): Promise<void> {
         check(row.status === 'pending' && row.owner === PLAYER && row.dir === 'my-dm' && row.position === 3, 'its row is pending, owned by its sender, its folder its id, last in the list');
         check(row.name === record.name && row.description === record.description && row.authors === JSON.stringify(record.authors) && record.authors.join() === 'A Player,Another',
             'its name, description and authors are the page\'s record\'s, trimmed, the empty author dropped');
+        const offered = parseManifest((await ask(port, '/api/data-sets', 'GET', { [PLAYER_ID_HEADER]: PLAYER })).body, '').dataSets;
+        const mine = offered.find((set) => set.id === 'my-dm')!;
+        console.log(`  api/data-sets says: ${JSON.stringify(mine.description)} by ${mine.authors.join(' and ')}`);
+        check(mine.description === record.description && mine.authors.join() === record.authors.join()
+            && offered.filter((set) => set.id !== 'my-dm').every((set) => set.description === '' && set.authors.length === 0),
+            'api/data-sets gives its description and authors, and empty ones to the sets without');
         check((['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'hidden'] as const).every((flag) => stored[flag] === flags[flag]), 'its flags are those localDataSet gives the record');
         check(await seen(PLAYER) === 'dm-atari,csb,conflux,my-dm pending' && await seen(MODERATORS[0]) === 'dm-atari,csb,conflux,my-dm pending',
             'it is offered, pending, to its owner and the moderators');

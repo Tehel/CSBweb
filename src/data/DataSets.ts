@@ -25,6 +25,9 @@
  * names one only where it is true. A set with `"hidden": true` is left out of the welcome
  * page's grid (`chooserSets`), but for a moderator, and plays all the same by its `?dungeon=`.
  *
+ * A set's `description`, a text, and its `authors`, a list of texts, may each be left out,
+ * for `''` and `[]`: what the form that adds a set says of it (`src/ui/addDataSetForm.ts`).
+ *
  * A set's `status` may be `"pending"`, for a set uploaded and not yet approved, which the
  * server offers its owner and the moderators only (`server/dataSets.ts`), or `"approved"`, or
  * be left out, for `"approved"`.
@@ -41,6 +44,10 @@ export interface DataSet {
     /** The page's `?dungeon=` value. */
     id: string;
     name: string;
+    /** What its author says of it, `''` for nothing. */
+    description: string;
+    /** Who made it, in the order they are named: none, or several. */
+    authors: readonly string[];
     /**
      * The folder that holds the files: the manifest's `dir`, under the manifest's folder.
      * A local set has none, and `''` here (`src/data/LocalDataSets.ts`).
@@ -194,6 +201,11 @@ export function parseManifest(text: string, base: string): DataSetManifest {
         if (!isText(name)) throw manifestError(`data set '${id}' has no "name"`);
         const dir = entry.dir === undefined ? id : entry.dir;
         if (!isFolder(dir)) throw manifestError(`data set '${id}' has no "dir", a folder relative to the manifest`);
+        const { description = '', authors = [] } = entry;
+        if (typeof description !== 'string') throw manifestError(`data set '${id}' has a "description" that is not a text`);
+        if (!Array.isArray(authors) || !authors.every((author) => typeof author === 'string')) {
+            throw manifestError(`data set '${id}' has "authors" that are not a list of texts`);
+        }
         const [csbGraphics, miniDat, hintOracle, dmRules, hidden] = FLAGS.map((flag) => {
             const value = entry[flag] ?? false;
             if (typeof value !== 'boolean') throw manifestError(`data set '${id}' has a "${flag}" that is neither true nor false`);
@@ -201,7 +213,7 @@ export function parseManifest(text: string, base: string): DataSetManifest {
         }) as [boolean, boolean, boolean, boolean, boolean];
         const status = entry.status ?? 'approved';
         if (status !== 'approved' && status !== 'pending') throw manifestError(`data set '${id}' has a "status" that is neither "approved" nor "pending"`);
-        return { id, name, dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, hidden, pending: status === 'pending' };
+        return { id, name, description, authors: authors as string[], dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, hidden, pending: status === 'pending' };
     });
     const twice = dataSets.find((set, i) => dataSets.findIndex((other) => other.id === set.id) !== i);
     if (twice) throw manifestError(`two data sets are '${twice.id}'`);

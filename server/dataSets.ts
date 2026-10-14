@@ -137,10 +137,10 @@ export class DataSetStore {
         const flags = FLAG_COLUMNS.map(([, column]) => column);
         this.count = db.prepare('SELECT COUNT(*) AS n FROM data_sets');
         this.hasRow = db.prepare('SELECT 1 FROM data_sets WHERE id = ?');
-        this.rows = db.prepare(`SELECT id, name, dir, status, owner, ${flags.join(', ')} FROM data_sets ORDER BY position`);
+        this.rows = db.prepare(`SELECT id, name, description, authors, dir, status, owner, ${flags.join(', ')} FROM data_sets ORDER BY position`);
         this.defaults = db.prepare('SELECT default_set, swoosh FROM data_set_defaults');
         this.insert = db.prepare(
-            `INSERT INTO data_sets (id, name, dir, position, status, owner, ${flags.join(', ')}) VALUES (?, ?, ?, ?, ?, NULL, ${flags.map(() => '?').join(', ')})`);
+            `INSERT INTO data_sets (id, name, description, authors, dir, position, status, owner, ${flags.join(', ')}) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ${flags.map(() => '?').join(', ')})`);
         this.insertDefaults = db.prepare('INSERT INTO data_set_defaults (only, default_set, swoosh) VALUES (1, ?, ?)');
         this.insertPublished = db.prepare(
             `INSERT INTO data_sets (id, name, dir, position, status, owner, description, authors, walls, ${flags.join(', ')}) `
@@ -172,7 +172,7 @@ export class DataSetStore {
         this.db.exec('BEGIN');
         try {
             manifest.dataSets.forEach((set, position) => {
-                this.insert.run(set.id, set.name, set.dir, position, set.pending ? 'pending' : 'approved', ...FLAG_COLUMNS.map(([flag]) => (set[flag] ? 1 : 0)));
+                this.insert.run(set.id, set.name, set.description, JSON.stringify(set.authors), set.dir, position, set.pending ? 'pending' : 'approved', ...FLAG_COLUMNS.map(([flag]) => (set[flag] ? 1 : 0)));
             });
             this.insertDefaults.run(manifest.defaultSet.id, manifest.swooshDir);
             this.db.exec('COMMIT');
@@ -227,7 +227,8 @@ export class DataSetStore {
         if (defaults === undefined) throw new Error('the data_set_defaults table names no default set');
         const dataSets = (this.rows.all() as Record<string, string | number | null>[]).map((row): StoredDataSet => {
             const set: StoredDataSet = {
-                id: row.id as string, name: row.name as string, dir: row.dir as string,
+                id: row.id as string, name: row.name as string, description: row.description as string,
+                authors: JSON.parse(row.authors as string) as string[], dir: row.dir as string,
                 csbGraphics: false, miniDat: false, hintOracle: false, dmRules: false, hidden: false,
                 pending: row.status === 'pending', owner: row.owner as string | null,
             };
@@ -242,13 +243,15 @@ export class DataSetStore {
  * The answer to `api/data-sets` for `viewer`: the sets of `stored` they may see, as a
  * manifest `parseManifest` reads. Everyone sees the approved sets, a player also their own
  * pending ones, and a moderator every set. A pending set says `"status": "pending"`, and no
- * set says its owner. A `dir` is left out where it is the id, and a flag where it is false,
- * as the repository's manifest does. A moderator's answer says `"moderator": true`, so that
+ * set says its owner. A `dir` is left out where it is the id, a flag where it is false, and
+ * the description and the authors where they are empty, as the repository's manifest does. A moderator's answer says `"moderator": true`, so that
  * the page shows them the hidden sets too: it tells them nothing they do not hold.
  */
 export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): string {
     const dataSets = visibleSets(stored, viewer).map((set) => {
-        const entry: Record<string, string | boolean> = { id: set.id, name: set.name };
+        const entry: Record<string, string | readonly string[] | boolean> = { id: set.id, name: set.name };
+        if (set.description !== '') entry.description = set.description;
+        if (set.authors.length > 0) entry.authors = set.authors;
         if (set.dir !== set.id) entry.dir = set.dir;
         for (const [flag] of FLAG_COLUMNS) if (set[flag]) entry[flag] = true;
         if (set.pending) entry.status = 'pending';

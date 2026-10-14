@@ -66,6 +66,8 @@ export function localDataSet(record: LocalDataSetRecord): DataSet {
     return {
         id: record.id,
         name: record.name,
+        description: record.description,
+        authors: record.authors,
         dir: '',
         csbGraphics: files['CSBgraphics.dat'] !== undefined,
         miniDat: false,
