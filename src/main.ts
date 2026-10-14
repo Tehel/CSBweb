@@ -522,11 +522,12 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
 }
 
 function start(game: Game): void {
-    game.start();
+    // The game is read, new or resumed: where CSBWin's boot forces DM rules, before
+    // `_TAG021028` and the party's entry (doc/CSBwin-src/CSBCode.cpp:10796-10806).
+    game.forceDMRulesAtBoot();
+    game.start(true);
     console.log('✓ Game engine started');
     console.log('✓ Starting position:', game.getPositionInfo());
-    // The game is read, new or resumed: where CSBWin's boot forces DM rules.
-    game.forceDMRulesAtBoot();
 }
 
 /**

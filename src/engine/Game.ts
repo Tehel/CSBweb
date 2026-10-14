@@ -220,9 +220,15 @@ export class Game implements MainLoop {
     }
 
     /**
-     * Start the game loop
+     * Start the game loop. `enterDungeon` is the boot's start, `_ShowPrisonDoor`
+     * (doc/CSBwin-src/CSBCode.cpp:10780-10811): a new game, not a resumed one, then takes
+     * the party onto its square, `MoveObject(RN(RNnul), -1, 0, d.partyX, d.partyY)`
+     * (`:10803-10806`), as a step onto it would: a teleporter there sends it on, a pad
+     * there is pressed. `_TAG021028` loaded the party's level before (`:10615`). The
+     * restart after a lost game calls `GameSetup` and `TAG021028` alone
+     * (`Code1f9e6.cpp:310-318`), and moves nothing.
      */
-    start(): void {
+    start(enterDungeon = false): void {
         if (this.running || this.dead) {
             return;
         }
@@ -230,6 +236,11 @@ export class Game implements MainLoop {
         // `_TAG021028` ends in `TAG0138ec()` and `d.ClockRunning = 1`, and `MainLoop` follows
         // (doc/CSBwin-src/CSBCode.cpp:10672-10673, `:11555`).
         this.tag0138ec();
+        if (enterDungeon && !this.resumedSavedGame) {
+            const { x, y } = this.ctx.party.state.position;
+            this.systems.monsters.loadPartyLevelIfChanged();
+            this.ctx.systems.worldMove.moveParty(-1, 0, x, y);
+        }
         this.running = true;
         this.vblClockStart = Date.now();
         this.vblsPaced = 0;

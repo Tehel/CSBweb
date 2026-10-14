@@ -1245,6 +1245,21 @@ Champions) is excluded in exactly these places:
   step is discarded (`:8399`), but without damage. A monster square does not stop it, and
   the step reaches `MoveObject`, which kills the group (next fact).
 
+## A new game's party enters its start square, as a step onto it would
+
+`_ShowPrisonDoor`, the boot, ends with
+`if (d.gameState != GAMESTATE_ResumeSavedGame) MoveObject(RN(RNnul), -1, 0, d.partyX, d.partyY)`
+(`doc/CSBwin-src/CSBCode.cpp:10803-10806`), after `TAG021028` has loaded the party's level
+(`:10615`) and run `TAG0138ec`. The start square's pads are pressed (the championless
+soul's, previous fact) and an active teleporter there sends the party on. A dungeon can be
+built on it: the Theron's Quest conversions start the party on a stone square whose
+invisible teleporter puts it in the first room, and Conflux's start square holds the
+type 1 pads that print its opening text. Only the boot does it: the restart after a lost
+game calls `GameSetup(_25_, 0)` and `TAG021028` alone (`Code1f9e6.cpp:310-318`), and a
+resumed game skips it. The port's is `Game.start(true)`, which `main.ts` calls once, after
+forcing DM rules as `_ShowPrisonDoor` does first (`:10796-10800`);
+`tools/dump-enter-dungeon.ts` asserts it.
+
 ## The party landing on a monster group kills it, champions or not
 
 At the end of `MoveObject` for the party (`object == RNnul`), once the party's final square

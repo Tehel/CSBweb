@@ -70,6 +70,7 @@ const CHECKS = [
   { tool: 'dump-show-credits.ts' },
   { tool: 'dump-loop-script.ts' },
   { tool: 'dump-new-game.ts' },
+  { tool: 'dump-enter-dungeon.ts' },
   { tool: 'dump-loop-die.ts' },
   { tool: 'dump-item-bonuses.ts' },
   { tool: 'dump-feeding.ts' },
