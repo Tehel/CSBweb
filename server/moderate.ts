@@ -1,6 +1,7 @@
 /**
- * `POST api/data-sets/<id>`: a set moderated (`DEBT.md` P8). `app.ts` takes the request,
- * names its asker (`dataSetViewer`) and reads its body; this module decides.
+ * `POST api/data-sets/<id>`: a set moderated, from its tile on the welcome page
+ * (`src/ui/welcomePage.ts`). `app.ts` takes the request, names its asker
+ * (`dataSetViewer`) and reads its body; this module decides.
  *
  * The body is JSON, `{"action": "approve" | "reject" | "hide" | "show"}`, and nothing else:
  *
@@ -40,13 +41,11 @@
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { MODERATION_ACTIONS as ACTIONS, type ModerationAction } from '../src/data/DataSets.ts';
 import { samePlayerId, type DataSetStore, type DataSetViewer } from './dataSets.ts';
 
 /** The largest body `api/data-sets/<id>` reads. */
 export const MAX_MODERATION_BYTES = 1024;
-
-const ACTIONS = ['approve', 'reject', 'hide', 'show'] as const;
-export type ModerationAction = (typeof ACTIONS)[number];
 
 /** The state of a set each action takes. */
 const TAKES: Record<ModerationAction, 'pending' | 'approved' | 'hidden'> = { approve: 'pending', reject: 'pending', hide: 'approved', show: 'hidden' };

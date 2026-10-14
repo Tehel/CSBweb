@@ -1,6 +1,6 @@
 /**
  * `POST api/data-sets`: a player's own set (`src/data/LocalDataSets.ts`) published to the
- * site, pending a moderator's approval (`DEBT.md` P8). `app.ts` takes the request, counts
+ * site, pending a moderator's approval (`moderate.ts`). `app.ts` takes the request, counts
  * it against the address's rate, names its player and reads its form; this module decides.
  *
  * The form's fields are the record's: `id`, `name`, `description`, `authors` once per

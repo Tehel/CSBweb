@@ -4,10 +4,11 @@ import { execSync } from 'node:child_process';
 import { createReadStream, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 
-import { dataSetViewer, pathSegments, receivePublish } from './server/app';
-import { DataSetStore, manifestText, wallsText, type PublishedDataSet } from './server/dataSets';
+import { dataSetViewer, pathSegments, receiveModeration, receivePublish } from './server/app';
+import { DataSetStore, manifestText, wallsText } from './server/dataSets';
 import { RateLimit } from './server/events';
 import type { CheckDataSet } from './server/publish';
 import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, PLAYER_ID_HEADER, parseManifest } from './src/data/DataSets';
@@ -26,11 +27,21 @@ function buildId(): string {
 }
 
 /**
+ * The dev server's one moderator, so that the welcome page's tick, cross and eye can be
+ * tried: whoever's `localStorage` keeps this as their `playerId` (`src/ui/gameEvents.ts`).
+ * `tools/probe-frames.mjs` is that player, and `tools/check-image.sh` gives the image the
+ * same id in `MODERATOR_PLAYER_IDS`.
+ */
+const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
+
+/**
  * The dev server's `api/data-sets` (`src/data/DataSets.ts`), answered as the deployed
- * server answers it (`server/app.ts`), over a store made at each request: the repository's
- * manifest, `tools/data-sets.json`, read then, its sets the site's, and the sets published
- * since the dev server started. A GET gets `manifestText` for the player it names, a POST
- * `receivePublish` with the page's own check, the source's (`ssrLoadModule`).
+ * server answers it (`server/app.ts`), with `DEV_MODERATOR_PLAYER_ID` its moderator, over
+ * a store made at each request: the repository's manifest, `tools/data-sets.json`, read
+ * then, its sets the site's, and every change made since the dev server started, the sets
+ * published and moderated, made again in their order. A GET gets `manifestText` for the
+ * player it names, a POST `receivePublish` with the page's own check, the source's
+ * (`ssrLoadModule`), and a POST to `api/data-sets/<id>` `receiveModeration`.
  * `api/data-set-walls` answers `wallsText` over the same store: the published sets'.
  *
  * A published set is written into a scratch folder, made at start and removed at the end,
@@ -49,25 +60,36 @@ function dataSetsRoute(): Plugin {
       const scratch = mkdtempSync(join(tmpdir(), 'csbweb-published-'));
       for (const entry of readdirSync(gamefiles)) symlinkSync(join(gamefiles, entry), join(scratch, entry));
       server.httpServer?.once('close', () => rmSync(scratch, { recursive: true, force: true }));
-      const published: [PublishedDataSet, string][] = [];
+      const changes: ((store: DataSetStore) => void)[] = [];
+      const published = new Set<string>();
+      const moderatorPlayerIds = [DEV_MODERATOR_PLAYER_ID];
       const publishRateLimit = new RateLimit(1000, 60_000);
       const checkDataSet: CheckDataSet = async (...args) =>
         ((await server.ssrLoadModule('/src/data/LocalDataSets.ts')) as { checkLocalDataSet: CheckDataSet }).checkLocalDataSet(...args);
 
-      /** The store as it stands: the manifest's sets, then the published ones, a new one kept. */
+      /** The store as it stands: the manifest's sets, then every change made since, a new one kept. */
       const openStore = (db: DatabaseSync): DataSetStore => {
         const store = new DataSetStore(db);
         store.fill(parseManifest(readFileSync(file, 'utf8'), ''));
-        for (const [set, owner] of published) store.publish(set, owner);
-        const publish = store.publish.bind(store);
-        store.publish = (set, owner) => {
-          publish(set, owner);
-          published.push([set, owner]);
+        for (const change of changes) change(store);
+        const keep = (change: (store: DataSetStore) => void) => {
+          change(store);
+          changes.push(change);
         };
+        const { publish, approve, setHidden, remove } = DataSetStore.prototype;
+        store.publish = (set, owner) => {
+          keep((kept) => publish.call(kept, set, owner));
+          published.add(set.id);
+        };
+        store.approve = (id) => keep((kept) => approve.call(kept, id));
+        store.setHidden = (id, hidden) => keep((kept) => setHidden.call(kept, id, hidden));
+        store.remove = (id) => keep((kept) => remove.call(kept, id));
         return store;
       };
 
       server.middlewares.use(`/${DATA_SETS_ROUTE}`, async (req, res, next) => {
+        const id = pathSegments(req.url ?? '');
+        if (id?.length === 1) return moderate(id[0]!, req, res, next);
         if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
         const json = (status: number, body: string) => {
           res.statusCode = status;
@@ -91,7 +113,7 @@ function dataSetsRoute(): Plugin {
             await receivePublish(scratch, { checkDataSet, dataSets, publishRateLimit, now: Date.now }, req, res);
           } else {
             res.setHeader('Vary', PLAYER_ID_HEADER);
-            json(200, manifestText(dataSets.read(), dataSetViewer({ moderatorPlayerIds: [] }, req)));
+            json(200, manifestText(dataSets.read(), dataSetViewer({ moderatorPlayerIds }, req)));
           }
         } catch (error) {
           next(error);
@@ -99,6 +121,23 @@ function dataSetsRoute(): Plugin {
           db.close();
         }
       });
+
+      /** `POST api/data-sets/<id>`: the set `id` moderated, as `server/app.ts` does it. */
+      const moderate = async (id: string, req: IncomingMessage, res: ServerResponse, next: (error?: unknown) => void) => {
+        if (req.method !== 'POST' || !sqlite) {
+          res.statusCode = req.method !== 'POST' ? 405 : 501;
+          if (req.method !== 'POST') res.setHeader('Allow', 'POST');
+          return res.end();
+        }
+        const db = new sqlite.DatabaseSync(':memory:');
+        try {
+          await receiveModeration(id, scratch, { dataSets: openStore(db), moderatorPlayerIds }, req, res);
+        } catch (error) {
+          next(error);
+        } finally {
+          db.close();
+        }
+      };
 
       server.middlewares.use(`/${DATA_SET_WALLS_ROUTE}`, (req, res, next) => {
         if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
@@ -114,7 +153,7 @@ function dataSetsRoute(): Plugin {
         const db = new sqlite.DatabaseSync(':memory:');
         try {
           const dataSets = openStore(db);
-          res.end(req.method === 'HEAD' ? undefined : wallsText(dataSets.read(), dataSets.walls(), dataSetViewer({ moderatorPlayerIds: [] }, req)));
+          res.end(req.method === 'HEAD' ? undefined : wallsText(dataSets.read(), dataSets.walls(), dataSetViewer({ moderatorPlayerIds }, req)));
         } catch (error) {
           next(error);
         } finally {
@@ -125,7 +164,7 @@ function dataSetsRoute(): Plugin {
       // A published set's files, from the scratch folder.
       server.middlewares.use('/gamefiles', (req, res, next) => {
         const segments = pathSegments(req.url ?? '');
-        if (!segments || !published.some(([set]) => set.id === segments[0]) || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
+        if (!segments || !published.has(segments[0]!) || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
         const path = join(scratch, ...segments);
         if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return next();
         res.setHeader('Content-Type', path.endsWith('.png') ? 'image/png' : 'application/octet-stream');

@@ -22,6 +22,16 @@
  * - **A local set's tile** has **the pen** on its picture, at its top right corner, which
  *   opens the same form on its record, to edit or delete it. The page then shows the set
  *   edited, selected, or none, for a set deleted.
+ * - **A published set's tile** has the moderation's controls there instead, each where the
+ *   viewer may use it (`server/moderate.ts`): to a moderator, **the tick** and **the
+ *   cross** on a pending set, which approve and reject it, and **the eye** on any other,
+ *   open on a set shown and shut on a hidden one, which hides or shows it; to the owner of
+ *   a pending set, the only player but the moderators it is offered to, the cross, which
+ *   withdraws it. The cross asks first, since the site then deletes the set's files. The
+ *   page is not told who owns a set, so a moderator is offered the cross on a site's own
+ *   pending set too, which the server refuses; never on the default set. The page then
+ *   asks for the sets anew and shows them, the selection kept but for a set gone. A
+ *   refusal is said in the box beside CONTINUE.
  * - **PLAY** opens the selected set (`?dungeon=<id>`): its title, then its entrance. With
  *   no set selected it is disabled.
  * - **CONTINUE** opens the last save used (`lastUsedSave`) of the selected set, or of every
@@ -45,9 +55,13 @@
  */
 import './welcomePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
-import { chooserSets, thumbnailPath, type DataSet, type DataSetManifest } from '../data/DataSets';
+import {
+    chooserSets, DATA_SETS_ROUTE, PLAYER_ID_HEADER, thumbnailPath,
+    type DataSet, type DataSetManifest, type ModerationAction,
+} from '../data/DataSets';
 import { localDataSet, type LocalDataSetRecord } from '../data/LocalDataSets';
 import { openAddDataSetForm } from './addDataSetForm';
+import { playerId } from './gameEvents';
 import {
     formatSaveDate, formatSaveTime, lastUsedSave,
     type BrowserDataSetStore, type SaveEntry, type SaveStore,
@@ -116,11 +130,25 @@ const PAGE = `
   </footer>
 </main>`;
 
+/** The confirmation the cross opens. */
+const CONFIRM_REJECT = `
+<form class="add-set-form">
+  <h2 class="px" id="reject-set-title"></h2>
+  <p class="delete-set-text"></p>
+  <div class="add-set-buttons">
+    <button type="button" class="btn px" id="reject-set-cancel">Cancel</button>
+    <button type="button" class="btn px" id="reject-set-confirm"></button>
+  </div>
+</form>`;
+
+/** Each action, done, as a refusal names it. */
+const DONE: Record<ModerationAction, string> = { approve: 'approved', reject: 'rejected', hide: 'hidden', show: 'shown' };
+
 /**
  * Show the welcome page in `body`, in place of whatever it held, for the sets of
  * `manifest` and of `localSets`, and the saves of `store`, the set `select` names selected,
  * where it names one. `loadManifest` asks the server for the manifest again, once a set is
- * published.
+ * published or moderated.
  */
 export async function showWelcomePage(
     body: HTMLElement,
@@ -169,14 +197,19 @@ export async function showWelcomePage(
         if (record) tile.classList.add('local');
         if (set.pending) tile.classList.add('pending');
         if (set.hidden) tile.classList.add('hidden');
-        grid.append(record ? penned(tile, record, saves) : tile);
+        const controls = record ? [control('pick-edit', `Edit ${record.name}`, PEN, () => openForm({ record, saves }))] : moderation(set);
+        grid.append(controls.length > 0 ? withControls(tile, controls) : tile);
         return { set, tile };
     });
     grid.append(addTile(() => openForm(null)));
 
+    /** The page shown again, `select` selected, for the manifest `shown`. */
+    function again(select: string | null, shown = manifest): void {
+        void showWelcomePage(body, shown, store, localSets, loadManifest, select);
+    }
+
     /** The form that adds a set, or edits `edited`'s, with its `saves`; the page shown again after it. */
     function openForm(edited: { record: LocalDataSetRecord; saves: number } | null): void {
-        const again = (select: string | null, shown = manifest): void => void showWelcomePage(body, shown, store, localSets, loadManifest, select);
         openAddDataSetForm(
             manifest,
             new Set(records.map((record) => record.id).filter((id) => id !== edited?.record.id)),
@@ -192,19 +225,36 @@ export async function showWelcomePage(
         );
     }
 
-    /** A local set's `tile` with the pen on its picture, which opens the form on `record`. */
-    function penned(tile: HTMLElement, record: LocalDataSetRecord, saves: number): HTMLElement {
-        const cell = document.createElement('div');
-        cell.className = 'pick-cell';
-        const pen = document.createElement('button');
-        pen.type = 'button';
-        pen.className = 'pick-edit';
-        pen.title = `Edit ${record.name}`;
-        pen.setAttribute('aria-label', pen.title);
-        pen.innerHTML = PEN;
-        pen.addEventListener('click', () => openForm({ record, saves }));
-        cell.append(tile, pen);
-        return cell;
+    /** The controls of a published `set` the viewer may use: the tick and the cross, or the eye. */
+    function moderation(set: DataSet): HTMLElement[] {
+        const { moderator } = manifest;
+        if (!set.pending) {
+            return !moderator ? [] : set.hidden
+                ? [control('pick-show', `Show ${set.name}`, EYE_SHUT, () => void moderate(set, 'show'))]
+                : [control('pick-hide', `Hide ${set.name}`, EYE_OPEN, () => void moderate(set, 'hide'))];
+        }
+        const withdraw = !moderator;
+        return [
+            ...(moderator ? [control('pick-approve', `Approve ${set.name}`, TICK, () => void moderate(set, 'approve'))] : []),
+            ...(set === manifest.defaultSet ? [] : [control('pick-reject', `${withdraw ? 'Withdraw' : 'Reject'} ${set.name}`, CROSS,
+                () => confirmReject(set, withdraw, () => moderate(set, 'reject')))]),
+        ];
+    }
+
+    /**
+     * `action` asked of the server on `set` (`server/moderate.ts`), then the page shown
+     * again as the server lists the sets, the selection kept but for a set rejected; or
+     * the refusal said in the box beside CONTINUE.
+     */
+    async function moderate(set: DataSet, action: ModerationAction): Promise<void> {
+        const error = await moderateDataSet(set.id, action);
+        if (error !== null) {
+            preview.replaceChildren(line('preview-failure', `${set.name} could not be ${DONE[action]}: ${error}`));
+            return;
+        }
+        const keep = action === 'reject' && selected === set ? null : selected?.id ?? null;
+        // The page as it was, should the server not answer again.
+        loadManifest().then((asked) => again(keep, asked), () => again(keep));
     }
 
     function update(): void {
@@ -224,6 +274,69 @@ export async function showWelcomePage(
     update();
 }
 
+/**
+ * `action` sent to `api/data-sets/<id>` about the set `id`, by the player whose `playerId`
+ * this is: `null` once done, else why not, as the server says it.
+ */
+async function moderateDataSet(id: string, action: ModerationAction): Promise<string | null> {
+    const response = await fetch(`${DATA_SETS_ROUTE}/${encodeURIComponent(id)}`, {
+        method: 'POST', headers: { [PLAYER_ID_HEADER]: playerId(), 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
+    }).catch(() => null);
+    if (!response) return 'the server cannot be reached.';
+    if (response.ok) return null;
+    const answer = await response.json().catch(() => null) as { error?: unknown } | null;
+    return typeof answer?.error === 'string' ? answer.error : `the server answered HTTP ${response.status}.`;
+}
+
+/**
+ * The confirmation the cross opens: the set's name, that the site deletes its files, and
+ * CANCEL and REJECT, or WITHDRAW for its owner, which closes it and calls `go`.
+ */
+function confirmReject(set: DataSet, withdraw: boolean, go: () => void): void {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'add-set delete-set reject-set';
+    dialog.setAttribute('aria-labelledby', 'reject-set-title');
+    dialog.innerHTML = CONFIRM_REJECT;
+    const verb = withdraw ? 'Withdraw' : 'Reject';
+    dialog.querySelector('#reject-set-title')!.textContent = `${verb} ${set.name}?`;
+    dialog.querySelector('.delete-set-text')!.textContent = withdraw
+        ? 'The site deletes the files you published. A set of yours kept in this browser stays.'
+        : 'The site deletes its files. Its owner may publish it again.';
+    const confirm = dialog.querySelector<HTMLButtonElement>('#reject-set-confirm')!;
+    confirm.textContent = verb;
+    dialog.querySelector('#reject-set-cancel')!.addEventListener('click', () => dialog.close());
+    confirm.addEventListener('click', () => {
+        dialog.close();
+        go();
+    });
+    dialog.addEventListener('close', () => dialog.remove());
+    document.body.append(dialog);
+    dialog.showModal();
+}
+
+/** `tile` with `controls` along its picture's top edge, from its top right corner. */
+function withControls(tile: HTMLElement, controls: HTMLElement[]): HTMLElement {
+    const cell = document.createElement('div');
+    cell.className = 'pick-cell';
+    const row = document.createElement('div');
+    row.className = 'pick-controls';
+    row.append(...controls);
+    cell.append(tile, row);
+    return cell;
+}
+
+/** A tile's control, `className` naming what it does, `label` saying it, its picture `svg`. */
+function control(className: string, label: string, svg: string, click: () => void): HTMLElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `pick-control ${className}`;
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.innerHTML = svg;
+    button.addEventListener('click', click);
+    return button;
+}
+
 /** The pen's pixels, 11 by 11, in the page's palette (`welcomePage.css`). */
 const PEN_PIXELS = [
     '.........ee',
@@ -238,14 +351,76 @@ const PEN_PIXELS = [
     'wwd........',
     'tw.........',
 ];
-const PEN_COLOURS: Record<string, string> = { e: 'p10', m: 'p13', B: 'p11', b: 'p9', d: 'p5', w: 'p13', t: 'p1' };
+const PEN = pixelArt(PEN_PIXELS, { e: 'p10', m: 'p13', B: 'p11', b: 'p9', d: 'p5', w: 'p13', t: 'p1' });
 
-/** The pen, an SVG of `PEN_PIXELS`, a path for each colour. */
-const PEN = `<svg viewBox="0 0 11 11" width="22" height="22" shape-rendering="crispEdges" aria-hidden="true">${
-    Object.entries(PEN_COLOURS).map(([key, colour]) => `<path fill="var(--${colour})" d="${
-        PEN_PIXELS.flatMap((row, y) => [...row].flatMap((pixel, x) => pixel === key ? [`M${x} ${y}h1v1h-1z`] : [])).join('')
-    }"/>`).join('')
-}</svg>`;
+/** The tick, which approves a pending set. */
+const TICK = pixelArt([
+    '...........',
+    '.........gg',
+    '........gg.',
+    '.......gg..',
+    '......gg...',
+    'gg...gg....',
+    '.gg.gg.....',
+    '..ggg......',
+    '...g.......',
+    '...........',
+    '...........',
+], { g: 'p7' });
+
+/** The cross, which rejects or withdraws a pending set. */
+const CROSS = pixelArt([
+    '...........',
+    '.rr.....rr.',
+    '..rr...rr..',
+    '...rr.rr...',
+    '....rrr....',
+    '...rr.rr...',
+    '..rr...rr..',
+    '.rr.....rr.',
+    '...........',
+    '...........',
+    '...........',
+], { r: 'p8' });
+
+/** The eye open, on a set shown, which hides it. */
+const EYE_OPEN = pixelArt([
+    '...........',
+    '...........',
+    '...wwwww...',
+    '..w.....w..',
+    '.w..ccc..w.',
+    'w...cbc...w',
+    '.w..ccc..w.',
+    '..w.....w..',
+    '...wwwww...',
+    '...........',
+    '...........',
+], { w: 'p15', c: 'p4', b: 'p0' });
+
+/** The eye shut, on a hidden set, which shows it. */
+const EYE_SHUT = pixelArt([
+    '...........',
+    '...........',
+    '...........',
+    '...........',
+    'w.........w',
+    '.w.......w.',
+    '..wwwwwww..',
+    '.w..w.w..w.',
+    '...w...w...',
+    '...........',
+    '...........',
+], { w: 'purple' });
+
+/** An SVG of `pixels`, 11 by 11, a path for each colour, `colours` naming the page's (`welcomePage.css`). */
+function pixelArt(pixels: string[], colours: Record<string, string>): string {
+    return `<svg viewBox="0 0 11 11" width="22" height="22" shape-rendering="crispEdges" aria-hidden="true">${
+        Object.entries(colours).map(([key, colour]) => `<path fill="var(--${colour})" d="${
+            pixels.flatMap((row, y) => [...row].flatMap((pixel, x) => pixel === key ? [`M${x} ${y}h1v1h-1z`] : [])).join('')
+        }"/>`).join('')
+    }</svg>`;
+}
 
 /**
  * `sets` in the grid's order: those `rows` holds a save of, the one with the latest save

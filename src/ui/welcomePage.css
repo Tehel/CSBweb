@@ -118,21 +118,20 @@ body.welcome {
 /* "+ Add my own", the grid's last tile, which opens the form that adds a set. */
 .pick.add .pick-picture { display: flex; align-items: center; justify-content: center; }
 .pick-plus { color: var(--p9); }
-/* A local set's tile, and the pen at its picture's top right corner, which edits it. */
+/* A tile's controls along its picture's top edge, from its top right corner: a local
+   set's pen, which edits it, and a published set's tick, cross and eye, which moderate it. */
 .pick-cell { position: relative; display: flex; }
-.pick-edit {
+.pick-controls { position: absolute; top: 0; right: 0; display: flex; gap: 3px; }
+.pick-control {
     appearance: none;
-    position: absolute;
-    top: 0;
-    right: 0;
     display: flex;
     padding: 4px;
     background: #0b0b16;
     border: 3px solid #1d1d30;
     cursor: pointer;
 }
-.pick-edit:hover { border-color: var(--p9); }
-.pick-edit:focus-visible { outline: 3px solid var(--p11); outline-offset: 3px; }
+.pick-control:hover { border-color: var(--p9); }
+.pick-control:focus-visible { outline: 3px solid var(--p11); outline-offset: 3px; }
 .pick-name { color: var(--p15); padding: 0 3px; }
 /* A tile's name says its set's state: a player's own in cyan, a hidden one (shown to a
    moderator) in purple, and a pending one in red, which wins over purple. */
@@ -190,6 +189,7 @@ body.welcome {
 .preview-party { color: var(--p9); }
 .preview-when { color: var(--p2); }
 .preview-none { color: var(--p1); }
+.preview-failure { color: var(--p8); }
 
 /* The bottom of the page: the line under the title, the four columns, the credits, and the
    footer. */

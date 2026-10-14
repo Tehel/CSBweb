@@ -27,7 +27,7 @@ rows**: the unported CSBWin features the default dungeon and Chaos Strikes Back 
 (`DEBT.md` → "Priority"). `DEBT.md` says how to work an item. **One item per commit, a few
 per session**, then `/clear`. Its index is the live status; its first row is the next item.
 At the author's request its P rows come first: a player's own data sets, added from local
-files on the welcome page, played, then published (`DEBT.md` → "P").
+files on the welcome page, played, then published and moderated (`DEBT.md` → "P").
 
 ⏸️ **Postponed until the default dungeon is validated**: a save of a dungeon the port does
 not know (`DEBT.md` G22), CSBWin's debugging features (G14, the ASCII dump), and comparing

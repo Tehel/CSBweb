@@ -31,8 +31,9 @@
 // tap and a click, the screen and the effect sized and placed in it, at 16:10 and at 4:3,
 // in it and out of it, and the welcome
 // page: its tiles and their order, its fonts, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
-// straight into play, its form adding, editing, publishing and deleting a player's own set, and each
-// tile's name in its set's state's colour, to a moderator. See `check` below.
+// straight into play, its form adding, editing, publishing and deleting a player's own set, the
+// tiles' controls moderating a published one, and each tile's name in its set's state's colour,
+// to a moderator. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -543,8 +544,8 @@ const readStore = () => evaluate(`new Promise((resolve, reject) => { const open 
     const set = tx.objectStore('dataSets').get('local:${MINE}'), saves = tx.objectStore('saves').getAllKeys();
     tx.oncomplete = () => { open.result.close(); resolve({ name: set.result?.name ?? null, createdAt: set.result?.createdAt ?? null, saves: saves.result.sort().join() }); }; }; })`);
 const pen = await evaluate(`(()=>{const pens=[...document.querySelectorAll('.pick-edit')], p=pens[0], a=p.getBoundingClientRect();
-  const b=p.parentElement.querySelector('.pick[data-set] .pick-picture').getBoundingClientRect();
-  return { count: pens.length, of: p.parentElement.querySelector('.pick').dataset.set, label: p.getAttribute('aria-label'),
+  const b=p.closest('.pick-cell').querySelector('.pick[data-set] .pick-picture').getBoundingClientRect();
+  return { count: pens.length, of: p.closest('.pick-cell').querySelector('.pick').dataset.set, label: p.getAttribute('aria-label'),
     corner: a.left < b.right && a.right >= b.right && a.top <= b.top && a.bottom > b.top && a.width < b.width / 2,
     rows: Object.values(Object.groupBy([...document.querySelectorAll('.pick')].map(t=>t.getBoundingClientRect()), r=>Math.round(r.top)))
       .map(row=>[...new Set(row.map(r=>Math.round(r.height)))].join('/')).join(),
@@ -607,6 +608,16 @@ check(await form() === null && tilesOf(afterPublish).includes(`${MINE}!`) && til
   && publishedTile?.colour === 'rgb(252, 0, 0)' && publishedTile.name === 'My Edited Dungeon'
   && afterPublish.pictures.every(Boolean) && publishedRecord.name === 'My Edited Dungeon' && publishedRecord.saves === edited.saves,
   'PUBLISH sends the set: the form closes, the page shows it pending and selected, its thumbnail from its folder, beside the local set, which stays with its saves');
+// A tile's controls (`src/ui/welcomePage.ts`): what each set's tile offers this viewer,
+// each control's class and label, by set.
+const controlsOf = () => evaluate(`Object.fromEntries([...document.querySelectorAll('.pick[data-set]')].map(t=>[t.dataset.set,
+  [...(t.closest('.pick-cell')?.querySelectorAll('.pick-control')??[])].map(b=>b.className.replace('pick-control ','')+':'+b.getAttribute('aria-label')).join()]))`);
+const owned = await controlsOf();
+const owner = await evaluate(`localStorage.getItem('csbweb_player_v1')`);
+console.log('  to its owner:', JSON.stringify(owned));
+check(owned[MINE] === 'pick-reject:Withdraw My Edited Dungeon' && owned[`local:${MINE}`] === 'pick-edit:Edit My Edited Dungeon'
+  && Object.entries(owned).every(([set, controls]) => set === MINE || set.startsWith('local:') || controls === ''),
+  'to its owner, the pending set has the cross alone, which withdraws it, and no other published set has a control');
 await clickOn('.pick-edit');
 await wait(1500);
 await inForm(`d.querySelector('.add-set-publish').click()`);
@@ -649,6 +660,81 @@ const deleted = { dialog: await confirmation(), form: await form(), store: await
 check(deleted.dialog === null && deleted.form === null && deleted.store.name === null && deleted.store.saves === decodeURIComponent(saveId)
   && tilesOf(deleted.page).filter((tile) => tile !== MINE).join() === atWelcome.tiles && tilesOf(deleted.page).includes(MINE),
   'its DELETE removes the record and every save filed under its id, and the page shows the sets without it, the published one kept');
+// The moderation (`server/moderate.ts`), from the tiles, as the dev server's moderator
+// (`DEV_MODERATOR_PLAYER_ID`, `vite.config.mts`; the image's in `tools/check-image.sh`), the
+// page reloaded with their `playerId` kept. The set published above, pending, has the tick
+// and the cross, every other the eye, open on a set shown, shut on a hidden one. The tick approves it, its name white and its
+// tile still selected, then the eye hides it, purple, and shows it again, white. A refusal,
+// the server stood in for, is said in the box beside CONTINUE. Then its owner, who sees no
+// control on the approved set, withdraws a second set of theirs, published by hand: the
+// cross asks first, and CANCEL keeps it.
+const MODERATOR = '00000000-0000-4000-8000-000000000001';
+const manifestRows = JSON.parse(readFileSync(new URL('data-sets.json', import.meta.url), 'utf8')).dataSets;
+const asPlayer = async (player) => {
+  await evaluate(`localStorage.setItem('csbweb_player_v1', ${JSON.stringify(player)}),1`);
+  await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves&keepsettings` });
+  await wait(2500);
+};
+const mineOf = async () => ({ ...(await evaluate(`(t=>({ colour: getComputedStyle(t.querySelector('.pick-name')).color, selected: t.getAttribute('aria-pressed') }))(document.querySelector('.pick[data-set="${MINE}"]'))`)),
+  controls: (await controlsOf())[MINE] });
+const onMine = (control) => clickOn(`.pick-cell:has(.pick[data-set="${MINE}"]) .${control}`);
+await asPlayer(MODERATOR);
+const moderating = await controlsOf();
+console.log('  to a moderator:', JSON.stringify(moderating));
+check(moderating[MINE] === 'pick-approve:Approve My Edited Dungeon,pick-reject:Reject My Edited Dungeon'
+  && Object.entries(moderating).every(([set, controls]) => set === MINE
+    || ((row) => controls === (row?.hidden ? `pick-show:Show ${row.name}` : `pick-hide:Hide ${row?.name}`))(manifestRows.find((row) => row.id === set))),
+  'to a moderator, the pending set has the tick and the cross, every other set the eye, open on a set shown, shut on a hidden one');
+await clickOn(`.pick[data-set="${MINE}"]`);
+await onMine('pick-approve');
+await wait(2000);
+const approved = await mineOf();
+await onMine('pick-hide');
+await wait(2000);
+const hidden = await mineOf();
+await onMine('pick-show');
+await wait(2000);
+const shown = await mineOf();
+console.log('  moderated:', JSON.stringify({ approved, hidden, shown }));
+check(approved.colour === 'rgb(252, 252, 252)' && approved.controls === 'pick-hide:Hide My Edited Dungeon' && approved.selected === 'true'
+  && hidden.colour === 'rgb(216, 0, 216)' && hidden.controls === 'pick-show:Show My Edited Dungeon' && hidden.selected === 'true'
+  && shown.colour === 'rgb(252, 252, 252)' && shown.controls === 'pick-hide:Hide My Edited Dungeon' && shown.selected === 'true',
+  'the tick approves the set, the shut eye hides it and the open eye shows it, the page asking for the sets anew, the set kept selected');
+onPaused = ({ requestId }) => send('Fetch.fulfillRequest', { requestId, responseCode: 409,
+  responseHeaders: [{ name: 'Content-Type', value: 'application/json; charset=utf-8' }],
+  body: Buffer.from(JSON.stringify({ error: 'The set is hidden.' })).toString('base64') });
+await send('Fetch.enable', { patterns: [{ urlPattern: '*/api/data-sets/*' }] });
+await onMine('pick-hide');
+await wait(1500);
+await send('Fetch.disable');
+onPaused = null;
+const moderationRefused = (await welcome()).preview.join();
+check(moderationRefused === 'My Edited Dungeon could not be hidden: The set is hidden.', 'a refusal is said beside CONTINUE');
+const SECOND = `${MINE}-b`;
+const secondPublished = await evaluate(`(async()=>{const f=new FormData(), file=async(path)=>(await fetch(path)).blob();
+  for (const [name, value] of [['id','${SECOND}'],['name','My Second Dungeon'],['description',''],['dmRules','true'],['baseSet','dm-atari']]) f.append(name, value);
+  f.append('dungeon.dat', await file('gamefiles/dm-atari/dungeon.dat'), 'dungeon.dat');
+  f.append('thumbnail', await file('gamefiles/dm-atari/dm-atari-thumbnail.png'), 'thumbnail.png');
+  return (await fetch('api/data-sets', { method: 'POST', headers: { 'X-Player-Id': ${JSON.stringify(owner)} }, body: f })).status;})()`);
+await asPlayer(owner);
+const ownerAgain = await controlsOf();
+const rejectDialog = () => evaluate(`(d=>d&&{ open: d.open, title: d.querySelector('h2').textContent, button: d.querySelector('#reject-set-confirm').textContent })(document.querySelector('dialog.reject-set'))`);
+await clickOn(`.pick-cell:has(.pick[data-set="${SECOND}"]) .pick-reject`);
+const askedWithdraw = await rejectDialog();
+await evaluate(`document.querySelector('#reject-set-cancel').click()`);
+await wait(300);
+const setsOf = (page) => tilesOf(page).map((tile) => tile.replace(/[*!]+$/, ''));
+const keptPending = { dialog: await rejectDialog(), tiles: setsOf(await welcome()) };
+await clickOn(`.pick-cell:has(.pick[data-set="${SECOND}"]) .pick-reject`);
+await evaluate(`document.querySelector('#reject-set-confirm').click()`);
+await wait(2000);
+const withdrawn = { dialog: await rejectDialog(), tiles: setsOf(await welcome()) };
+console.log('  withdrawn:', JSON.stringify({ published: secondPublished, controls: ownerAgain[SECOND], asked: askedWithdraw }));
+check(secondPublished === 201 && ownerAgain[SECOND] === 'pick-reject:Withdraw My Second Dungeon' && ownerAgain[MINE] === ''
+  && askedWithdraw?.open === true && askedWithdraw.title === 'Withdraw My Second Dungeon?' && askedWithdraw.button === 'Withdraw'
+  && keptPending.dialog === null && keptPending.tiles.includes(SECOND)
+  && withdrawn.dialog === null && !withdrawn.tiles.includes(SECOND) && withdrawn.tiles.includes(MINE),
+  'its owner withdraws a pending set by its cross, which asks first, CANCEL keeping it; the approved set offers them nothing');
 // A tile's name says its set's state, to a moderator (`server/dataSets.ts`), whose answer
 // the dev server's manifest stands in for here, with `"moderator": true`, kids-dungeon
 // pending and 3d2d1d, a hidden set, pending too: every set is listed, the hidden ones

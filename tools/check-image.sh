@@ -33,9 +33,12 @@ trap cleanup EXIT
 
 echo "building csbweb:probe"
 docker build -q --build-arg CSBWEB_BUILD=check --build-arg CSBWEB_PROBE=1 -t csbweb:probe "$root" >/dev/null || exit 1
+# The moderator is the dev server's own (`DEV_MODERATOR_PLAYER_ID`, `vite.config.mts`),
+# whom `probe-frames.mjs` plays to moderate the set it publishes.
 docker run -d --name "$name" -p "127.0.0.1:$port:8085" \
   -v "$gamefiles:/data/gamefiles" "${mounts[@]}" -v "$root/tools/data-sets.json:/data/data-sets.json:ro" \
-  -e MANIFEST_FILE=/data/data-sets.json -v "$stats:/data/stats" csbweb:probe >/dev/null || exit 1
+  -e MANIFEST_FILE=/data/data-sets.json -v "$stats:/data/stats" \
+  -e MODERATOR_PLAYER_IDS=00000000-0000-4000-8000-000000000001 csbweb:probe >/dev/null || exit 1
 i=0
 until curl -sf -o /dev/null --max-time 1 "http://127.0.0.1:$port/api/health"; do
   i=$((i + 1))

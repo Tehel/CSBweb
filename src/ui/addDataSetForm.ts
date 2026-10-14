@@ -39,7 +39,7 @@
  * filed under its id; its CANCEL keeps both.
  *
  * PUBLISH, beside DELETE, offers the stored set to the site, pending a moderator's
- * approval (`DEBT.md` P8). It is enabled while the form shows the record as it is stored:
+ * approval (the welcome page's tick). It is enabled while the form shows the record as it is stored:
  * a change is CONFIRMed first. It sends the record to `api/data-sets` with the player's
  * `playerId`, as `server/publish.ts` reads it, the thumbnail as a PNG, and leaves the
  * record as it is. Once published, the form closes and the page shows the sets again,

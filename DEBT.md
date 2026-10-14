@@ -29,8 +29,9 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 (`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
-from their own files to the welcome page, plays it, edits it, deletes it and publishes it;
-what is left is moderating what is published (P8). They are not CSBWin features but the page's, and come before every other
+from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
+and the moderators approve, hide and show what is published; what is left is P11, to
+design with the author. They are not CSBWin features but the page's, and come before every other
 tier.
 
 **Before the rest, at the author's request: U — the interface in the canvas.** The
@@ -113,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P8 | Publishing a local set, and moderating it | L | ⚠️ step 5 of 5 next |
 | P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
@@ -204,7 +204,8 @@ entry here, only its commit, so take the next ID from this line and move it on.
 At the author's request, from the forum: a player adds a dungeon from their own files, plays
 it like any other, and later offers it to the site. It mirrors CSBWin, which plays whatever
 its `directory=` holds (`src/data/DataSets.ts`), so the engine does not change and nothing
-goes in H. Two phases: a set kept in the player's browser, which stands, and P8, which publishes it.
+goes in H. A set is kept in the player's browser, then published to the site, where the
+moderators approve it.
 
 What stands: a local set is a record of the store's `dataSets` object store
 (`BrowserDataSetStore`, `src/data/saves/`), `LocalDataSetRecord` in
@@ -266,8 +267,19 @@ Node runs it. A published set's row keeps its dungeon's walls, read by the same 
 so that an import in another set names it (`doc/SAVES.md` → "An import is checked against
 the dungeon").
 
+A published set is moderated from its tile (`src/ui/welcomePage.ts`): the tick and the
+cross on a pending set, which approve and reject it, and the eye on any other, which hides
+and shows it, to a moderator; the cross alone to the owner of a pending set, which
+withdraws it. Each is a `POST api/data-sets/<id>` (`server/moderate.ts`, `doc/DEPLOYMENT.md`
+→ "Moderating the sets"), the page then asking for the sets anew. The dev server answers
+it too, replaying the changes made since it started over the store it makes at each
+request, and has one moderator, `DEV_MODERATOR_PLAYER_ID` (`vite.config.mts`), whom
+`tools/check-image.sh` makes the image's too. `tools/dump-server.ts` asserts every action
+and every refusal, and `tools/probe-frames.mjs` moderates the set it publishes, from the
+tiles, as that moderator and as its owner.
+
 The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase letters, digits, `.`, `-` and
-`_`, at most 40), since P8 makes it the set's folder on the server. No shipped dungeon
+`_`, at most 40), since publishing makes it the set's folder on the server. No shipped dungeon
 names its `graphics.dat` or `CSBgraphics.dat`, nor expects a `CSBgraphics.dat`, so the
 signature checks are proven on dungeons the tool builds.
 
@@ -275,7 +287,7 @@ Decisions taken with the author, for every row:
 
 - **A local set's id is `local:<id>`**, the `<id>` chosen by the player and unique among
   their local sets. No manifest id has the prefix, so a local set never shadows a site set.
-  Publishing (P8) drops the prefix and checks that the id is unique on the server.
+  Publishing drops the prefix and checks that the id is unique on the server.
 - **No `graphics.dat` given: the player chooses DM's or CSB's.** The set then reads that
   set's file (`dm-atari` or `csb`) from its folder.
 - **No statistics for a local set**: `GameEvents` sends nothing. The server's
@@ -285,91 +297,16 @@ Decisions taken with the author, for every row:
   query. A lost id is handled by hand on the forum for now.
 - **Moderators, not one author**, so that the burden can be shared. A set with no owner
   (the manifest's, uploaded by hand) is the site's, not a moderator's.
+- **PUBLISH leaves the local record as it is**: a cyan tile beside the published one, its
+  saves still filed under `local:<id>`, and the player can go on building it. A new
+  version is a new local set, under a new id. Deleting the record once its set is
+  approved, its saves moved to `<id>`, may follow as an item of its own.
+- **Moderation from the tiles, and nothing more**: deleting an approved set, changing a
+  published set's files, taking an approval back, and the sets' order and default are
+  left to a moderator's hands on the VPS (`doc/DEPLOYMENT.md` → "Moderating the sets").
+  Hiding answers a complaint without costing a player their saves.
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
-
-### P8 ⏳ Publishing a local set, and moderating it
-
-L, in five steps (below); the first four, the page's reader on the server (tier P's
-introduction), the publish route, PUBLISH in the form and the moderation endpoint, stand,
-and step 5, the tiles' controls, is next.
-
-**The lifecycle.** A set is in one of four states, which its tile's name says (`src/ui/welcomePage.ts`):
-
-| State | Kept | Seen by | Name |
-| --- | --- | --- | --- |
-| local | the player's browser, `local:<id>` (stands) | that player | cyan |
-| pending | the server: its folder `gamefiles/<id>/`, its row `pending`, owned by its uploader | its owner, the moderators | red |
-| approved | its row `approved` | everyone | white |
-| hidden | an approved row with `hidden` set | the moderators in the grid; anyone by `?dungeon=<id>` and CONTINUE | purple |
-
-The manifest's sets start approved, with no owner, and hidden where it says so.
-
-**The transitions needed**, each from a tile, as the pen is a local set's (it stays at the
-picture's top right, the others along the top edge beside it):
-
-| Transition | Who | Where | What the server does |
-| --- | --- | --- | --- |
-| local → pending: **publish** | the set's player | PUBLISH, in the form the pen opens | the checks below, the folder written whole, then the row |
-| pending → approved: **approve** | a moderator | a tick on a pending tile | `status` set to `approved` |
-| pending → gone: **reject**, or **withdraw** | a moderator, or the set's owner | a cross on a pending tile | the row deleted, then its folder |
-| approved ⇄ hidden: **hide**, **show** | a moderator | the eye on an approved tile, open or shut | `hidden` toggled |
-
-Not needed, and left to a moderator's hands on the VPS (`doc/DEPLOYMENT.md` →
-"Moderating the sets" says how):
-
-- **Deleting an approved set.** Hiding it is the answer to a complaint, since its players
-  keep their saves and their way back; a deletion makes their saves count for nothing.
-- **Changing a published set's files.** A folder never changes once written, which the
-  backup relies on (`server/backup.ts`); a new version is published as a new id.
-- **Taking an approval back.** Hiding does that job without losing anything.
-- **The order of the sets and the default set**, a row's `position` and
-  `data_set_defaults`.
-
-**The endpoint** stands: `POST api/data-sets/<id>` (`server/moderate.ts`, whose header
-lists the rules in their order and the answers; `doc/DEPLOYMENT.md` → "Moderating the
-sets"), a JSON body `{"action": "approve" | "reject" | "hide" | "show"}`, the `X-Player-Id`
-header naming the asker. 403 unless the asker is a moderator, or the owner rejecting their
-own pending set; 404 for an id not in the table; 409 for an action the set's state does not
-take (approve an approved set, hide a pending one), and for a reject of a site's set or the
-default, whose folders are the author's. A reject deletes the row, then the folder. The
-site's sets are hidden and shown like a player's. `tools/dump-server.ts` asserts every
-action and every refusal. The dev server does not answer the route yet (step 5).
-
-**Publishing** stands: `POST api/data-sets` (`server/publish.ts`, whose header lists the
-form's fields, the rules in their order and the answers; `doc/DEPLOYMENT.md` → "The game
-files and the manifest"). It reads the set with the page's own check, writes its folder
-whole under `gamefiles/<id>/`, a base set's `graphics.dat` copied in where it has none,
-then its row, pending, owned by its sender, with its description and authors, and never
-changes the folder after. The pen's form sends it (`publishRecord`,
-`src/ui/addDataSetForm.ts`), the thumbnail made a PNG, says a refusal under the
-checklist, a 422's problems on their rows, and on success closes and has the welcome page
-ask `api/data-sets` again, the new set selected. The dev server answers the route with
-the server's own `receivePublish` (`vite.config.mts`), over a store of the repository's
-manifest and what it has published, into a scratch folder. `tools/probe-frames.mjs`
-publishes a set, is refused it a second time, and stands in for a 422; its id is the
-run's own, since a dev server or an image another run used keeps what it published.
-
-**PUBLISH leaves the local record as it is** (decided with the author): a cyan tile
-beside the red one, its saves still filed under `local:<id>`, and the player can go on
-building it. Nothing is moved or deleted. Since its id is fixed in the form and taken on
-the server, a second PUBLISH of it is refused: a new version is a new local set, under a
-new id. Deleting the record once its set is approved, its saves moved to `<id>`, may
-follow as an item of its own.
-
-**The steps**, each a commit with its evidence:
-
-1. **The page's reader on the server**: stands.
-2. **The publish route**: stands.
-3. **PUBLISH in the form**: stands.
-4. **The moderation endpoint**: stands.
-5. **The tile's tick, cross and eye** (`src/ui/welcomePage.ts`), each shown only where its
-   transition is allowed to the viewer, then the grid redrawn from `api/data-sets`. The
-   dev server answers the route as it answers the publish (`vite.config.mts`): its store
-   is rebuilt at each request from the manifest and the sets published since it started,
-   so it must replay their moderation too, and it has no moderator yet
-   (`moderatorPlayerIds: []`), which the probe needs one of, a `playerId` of its own.
-   Evidence: a `tools/probe-frames.mjs` block.
 
 ### P11 ⏳ A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it
 
@@ -382,7 +319,8 @@ own world"). The same happens to any import the dialog stores as a slightly diff
 dungeon, on IMPORT ANYWAY. CSBWin behaves the same way: a save
 is the world. What the port should do is open: tell the player, refuse, or carry the
 party into the new dungeon (as Chaos's "MAKE NEW ADVENTURE" carries a party into
-`mini.dat`). A published set's files never change (P8), so this affects local sets only.
+`mini.dat`). A published set's files never change (`doc/DEPLOYMENT.md` → "Moderating the
+sets"), so this affects local sets only.
 
 ---
 

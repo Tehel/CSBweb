@@ -159,6 +159,13 @@ export const DATA_SET_WALLS_ROUTE = 'api/data-set-walls';
  */
 export const PLAYER_ID_HEADER = 'X-Player-Id';
 
+/**
+ * What `POST DATA_SETS_ROUTE/<id>` does to a set, its body's `{"action": …}`
+ * (`server/moderate.ts`): the welcome page's tick, cross and eye (`src/ui/welcomePage.ts`).
+ */
+export const MODERATION_ACTIONS = ['approve', 'reject', 'hide', 'show'] as const;
+export type ModerationAction = (typeof MODERATION_ACTIONS)[number];
+
 const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'hidden'] as const;
 
 /**

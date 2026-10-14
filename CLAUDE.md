@@ -116,7 +116,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   by a tap and by a click, the screen and the effect sized and centred in it, at 16:10
   and at 4:3; and the welcome page's tiles, its fonts, its selection, where PLAY and
   CONTINUE lead, CONTINUE's save read straight into play, and the form that adds a set,
-  and edits, publishes and deletes one.
+  and edits, publishes and deletes one, and the tiles that moderate a published one.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`

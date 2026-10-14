@@ -90,8 +90,9 @@ It keeps every set, because the tools need them all: they read it through
 `tools/lib/dataSets.ts`, and `tools/dump-data-sets.ts` asserts the parser's refusals and
 that every folder holds the files its flags promise. The dev server answers
 `api/data-sets` as the server does (`vite.config.mts`), from it, read at each request, and
-from the sets published to it since it started, which it writes in a scratch folder that
-goes when it stops. `npm start` fills its store from it. The deployed
+from the sets published and moderated since it started, the published ones written in a
+scratch folder that goes when it stops. Its one moderator is the `playerId`
+`DEV_MODERATOR_PLAYER_ID` holds, which `tools/probe-frames.mjs` plays. `npm start` fills its store from it. The deployed
 manifest is the author's own copy, `gamefiles/manifest.json`, uploaded with the files:
 which sets the site offers is the author's choice. Today it is the repository's, all nine
 sets.
@@ -162,8 +163,10 @@ then names no save after it.
 
 ### Moderating the sets
 
-A moderator approves, rejects, hides and shows a set by a `POST` to `api/data-sets/<id>`
-(`server/moderate.ts`), a JSON body `{"action": "approve" | "reject" | "hide" | "show"}`,
+A moderator approves, rejects, hides and shows a set from its tile on the welcome page,
+by the tick, the cross and the eye (`src/ui/welcomePage.ts`), each offered where it is
+allowed, and its owner withdraws it by the cross while it is pending. Each is a `POST`
+to `api/data-sets/<id>` (`server/moderate.ts`), a JSON body `{"action": "approve" | "reject" | "hide" | "show"}`,
 named in `X-Player-Id` as for `api/data-sets`. Approve makes a pending set approved,
 offered to everyone. Reject deletes a pending set's row, then its folder; its owner may
 send it too, to withdraw their own set while it is pending. Hide sets an approved set's
