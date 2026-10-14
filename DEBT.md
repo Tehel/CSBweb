@@ -308,15 +308,30 @@ dungeon is in `KNOWN_DUNGEONS`") says the same, and is true only of the site's o
 
 1. **The running set's own dungeon first.** An import happens in the save dialog, so a
    set is always running, and its `dungeon.dat` is the page's already. The save's
-   signature is compared with the signature of that file, computed on the spot
-   (`dungeonSignature`). The comparison uses the file as read, not the live world,
-   whose walls a script may have moved. Whole, the save is the set's own and is stored,
-   and no catalogue is consulted. Only a save that is not the whole of it goes on to the
-   catalogue, and to step 2. This step alone fixes Conflux 2's case. Check first that the
-   page still has the set's `dungeon.dat` when the game was started from a save (CONTINUE,
-   a save's LOAD), since a save holds its own dungeon. Also settle with the author what
-   becomes of a save that is most of the set's dungeon but not the whole: a local set's
-   `mismatch` to confirm, or a manifest set's `modified`.
+   dungeon is compared with that file, as read, not with the live world, whose walls a
+   script may have moved. Check first that the page still has the set's `dungeon.dat`
+   when the game was started from a save (CONTINUE, a save's LOAD), since a save holds
+   its own dungeon. The author's rules:
+   - **The number of levels, or any level's width or height, differs**: the save is not
+     the set's. It goes on to the other sets (the catalogue, and step 2), and is refused
+     where none is its dungeon. The dimensions are compared from the two dungeons' maps,
+     since a level's digest hides them (`levelWalls` hashes them with the walls).
+   - **Same levels, same dimensions, every digest the same**: the set's own. Stored, with
+     nothing else consulted. This alone fixes Conflux 2's case.
+   - **Same levels, same dimensions, some digests the same and not all**: a slightly
+     different dungeon. Ask "It seems this save is for a slightly different dungeon",
+     over three options: IMPORT ANYWAY (stored, unofficial, as `modified` and `mismatch`
+     are today), LOOK FOR A BETTER MATCH (on to the other sets, as above), and CANCEL.
+     The save menu's `importMenu` (`src/renderer/ui/SaveMenu.ts`) asks two-option
+     questions today, so check that its menu takes a third.
+   - **Same levels, same dimensions, no digest the same**: the author's rule names "some",
+     so this case goes on to the other sets, like a mismatch of dimensions. Confirm with
+     the author when the step is taken.
+
+   These rules hold for every set, local or not, so they replace the `modified` and
+   `mismatch` questions of `checkDungeon` for the running set. That changes
+   `doc/SAVES.md` → "A player's own set refuses no save": a save whose dimensions differ
+   is no longer stored in a local set. The document is rewritten with the step.
 2. **A signature database, to name another dungeon.** It is needed only for a save that
    is not the running set's: to say which published set it is, and to offer "switch to
    it". The server keeps each published set's signature. It computes it with the page's
