@@ -36,7 +36,7 @@ import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { applySaveBytes } from './engine/SaveGameFile';
 import { Settings, applyToGame, type SettingsValues } from './settings/Settings';
 import type { KeyboardLayoutMap } from './renderer/ui/KeyLabels';
-import { GameEvents, keptPlayerId, playerId, sendBeacon } from './ui/gameEvents';
+import { GameEvents, keptPlayerId, keptTeleportedPlaythroughs, playerId, sendBeacon } from './ui/gameEvents';
 
 console.log('Dungeon Master Web - Initializing...');
 
@@ -66,17 +66,20 @@ if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
 const fullscreen: PageFullscreen = gameCanvasEl.parentElement
     ? createFullscreen(gameCanvasEl.parentElement, gameCanvasEl, () => refreshScreen()) : { ...NO_FULLSCREEN, setAspect: () => {} };
 
-/**
- * The player's settings (`src/settings/Settings.ts`), kept in `localStorage`, or for this
- * page only where the browser forbids it.
- */
-const settings = new Settings((() => {
+/** `localStorage`, or `null` where the browser forbids it. */
+const pageStorage = (() => {
     try {
         return window.localStorage;
     } catch {
         return null;
     }
-})());
+})();
+
+/**
+ * The player's settings (`src/settings/Settings.ts`), kept in `localStorage`, or for this
+ * page only where the browser forbids it.
+ */
+const settings = new Settings(pageStorage);
 
 /**
  * What this keyboard prints on each key, where the browser says
@@ -305,6 +308,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         player: playerId,
         enabled: () => settings.values.statistics,
         send: import.meta.env.PROD ? sendBeacon : (event) => console.debug('Event, not sent:', event),
+        teleported: keptTeleportedPlaythroughs(pageStorage),
     });
     // RISE's new adventure, which a read then makes the running game.
     let adventure: OpenedSave | null = null;
@@ -364,10 +368,12 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         keyboardLayout: () => keyboardLayout,
         // A click on the map dialog's square moves the party there, on a page opened with
         // `?dev` alone. A script holding the loop (the fusion) runs on the party where it stands.
+        // The game sends no statistics from then on (`GameEvents.teleported`).
         onTeleport: new URLSearchParams(window.location.search).has('dev') ? (x, y) => {
             if (game.isRunningScript()) return;
             const state = game.ctx.party.state;
             game.setPartyState({ ...state, position: new Position(x, y, state.position.z) });
+            events.teleported();
         } : null,
         // The Hint Oracle's button: the screen has stopped the clock and shaded the
         // interface, and the Oracle has the canvas until it closes.

@@ -12,7 +12,8 @@
  *
  * The player can turn them off (`GameEventsDeps.enabled`): then nothing is read or sent,
  * the player's id not even drawn. Nor is anything for a player's own set
- * (`src/data/LocalDataSets.ts`), whose id the server would not take.
+ * (`src/data/LocalDataSets.ts`), whose id the server would not take, nor for a game a
+ * `?dev` teleport has touched (`GameEvents.teleported`).
  */
 
 import { isLocalDataSetId } from '../data/LocalDataSets';
@@ -89,6 +90,8 @@ export interface GameEventsDeps {
     enabled: () => boolean;
     /** Where an event goes: `sendBeacon` in a production build, nowhere otherwise. */
     send: (event: GameEvent) => void;
+    /** The playthroughs a teleport has touched, which send nothing (`keptTeleportedPlaythroughs`). */
+    teleported: TeleportedPlaythroughs;
 }
 
 export class GameEvents {
@@ -120,6 +123,18 @@ export class GameEvents {
     championJoined(joined: JoinedChampion): void {
         if (joined.reincarnated) this.reincarnated.add(joined.champion);
         this.emit('party', () => ({ champions: this.champions().map((c) => this.report(c)) }));
+    }
+
+    /**
+     * The map dialog's teleport, on a `?dev` page, has moved the party: the game's
+     * playthrough sends nothing more, in this page or a later one that reads a save of it.
+     */
+    teleported(): void {
+        try {
+            this.deps.teleported.add(this.deps.game.ctx.state.block1.randomGameID);
+        } catch {
+            // An event is never worth the game.
+        }
     }
 
     /** `showEndOfGame`: the game is won or lost, its party and clock read now. */
@@ -161,11 +176,50 @@ export class GameEvents {
             const { set, build } = this.deps;
             if (isLocalDataSetId(set) || !this.deps.enabled()) return;
             const playthrough = this.deps.game.ctx.state.block1.randomGameID;
+            if (this.deps.teleported.has(playthrough)) return;
             this.deps.send({ type, player: this.deps.player(), set, playthrough, build, payload: payload() });
         } catch {
             // An event is never worth the game.
         }
     }
+}
+
+/** The playthroughs a teleport has touched (`GameEvents.teleported`). */
+export interface TeleportedPlaythroughs {
+    has(playthrough: number): boolean;
+    add(playthrough: number): void;
+}
+
+const TELEPORTED_KEY = 'csbweb_teleported_v1';
+/** How many touched playthroughs are kept: the latest. */
+const TELEPORTED_KEPT = 64;
+
+/**
+ * The playthroughs a teleport has touched, kept in `storage` (`csbweb_teleported_v1`, the
+ * latest 64), so that a save of such a game sends nothing in a later page either; for
+ * this page alone where there is no `storage`, or it refuses.
+ */
+export function keptTeleportedPlaythroughs(storage: Storage | null): TeleportedPlaythroughs {
+    const page = new Set<number>();
+    const kept = (): number[] => {
+        try {
+            const list: unknown = JSON.parse(storage?.getItem(TELEPORTED_KEY) ?? '[]');
+            return Array.isArray(list) ? list.filter((p): p is number => typeof p === 'number') : [];
+        } catch {
+            return [];
+        }
+    };
+    return {
+        has: (playthrough) => page.has(playthrough) || kept().includes(playthrough),
+        add: (playthrough) => {
+            page.add(playthrough);
+            try {
+                storage?.setItem(TELEPORTED_KEY, JSON.stringify([...kept().filter((p) => p !== playthrough), playthrough].slice(-TELEPORTED_KEPT)));
+            } catch {
+                // This page's alone.
+            }
+        },
+    };
 }
 
 const PLAYER_ID_KEY = 'csbweb_player_v1';

@@ -3,8 +3,8 @@
 The deployed game counts games: games started, won and lost, the parties that played them,
 and where parties die (`doc/DEPLOYMENT.md` for where it runs). They serve three questions:
 whether the game is actually played, which champions players prefer, and where parties die
-most often. The page that shows them, and the FAQ that explains them to players, come with
-the page's redesign (`DEBT.md` E15).
+most often. The page that shows them, and the FAQ that explains them to players, are to be
+designed (`DEBT.md` E39).
 
 ## Anonymity is a rule of the code
 
@@ -59,10 +59,17 @@ in `localStorage` as `csbweb_settings_v2`) carry `statistics`, on by default: an
 next one, and with it off nothing is read or sent, the player id not even drawn. The
 settings dialog's GAME tab sets it, SEND STATISTICS (`src/renderer/ui/SettingsDialog.ts`).
 
+**A teleport silences a game.** On a page opened with `?dev`, a click on the map dialog's
+square moves the party there (`onTeleport`, `src/main.ts`), and a game played so counts
+for nothing. `GameEvents.teleported` marks its playthrough, kept in `localStorage`
+(`csbweb_teleported_v1`, the latest 64, or for the page alone where it cannot be kept),
+and no event of that playthrough is sent from then on, in that page or in a later one
+that reads a save of it.
+
 Events are sent with `navigator.sendBeacon` to `api/event`, and a failure is ignored:
 nothing an event does delays or breaks the game. Only a production build sends them; dev
 shows them on the console, and the tools never send. `tools/dump-game-events.ts` asserts all
-of it, the setting included, on the real engine, the Hall's joins and a genuine save included, and that the server
+of it, the setting and the teleport included, on the real engine, the Hall's joins and a genuine save included, and that the server
 takes every event the engine makes as the page sent it.
 
 ## What the server accepts

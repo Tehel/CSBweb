@@ -7,7 +7,8 @@
  * Asserts that an event holds the player id, the set, the playthrough, the build and its
  * payload, nothing more; that a champion goes by their name as it stands, the one typed
  * on the Reincarnate screen included, flagged, and by their portrait's `charID`, or `null`
- * for a save's; and that an event can fail without failing the game.
+ * for a save's; that an event can fail without failing the game; and that a game a `?dev`
+ * teleport touched sends nothing, in that page or a later one that reads a save of it.
  *
  * And that the server takes every event the engine made as it is (`server/events.ts`): the
  * page and the server agree on its shape, field for field.
@@ -24,7 +25,7 @@ import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import type { Game } from '../src/engine/Game';
 import type { JoinedChampion } from '../src/engine/GameHost';
 import { determineMastery } from '../src/engine/skills';
-import { GameEvents, type GameEvent, type LostPayload, type PartyPayload, type WonPayload } from '../src/ui/gameEvents';
+import { GameEvents, keptTeleportedPlaythroughs, type GameEvent, type TeleportedPlaythroughs, type LostPayload, type PartyPayload, type WonPayload } from '../src/ui/gameEvents';
 import { checkEvent } from '../server/events.ts';
 import { check, finish } from './lib/check';
 import { dataSetNamed } from './lib/dataSets';
@@ -57,7 +58,15 @@ interface Harness {
   sent: GameEvent[];
 }
 
-function harness(options: { send?: (event: GameEvent) => void; enabled?: () => boolean; player?: () => string; set?: string } = {}): Harness {
+interface HarnessOptions {
+  send?: (event: GameEvent) => void;
+  enabled?: () => boolean;
+  player?: () => string;
+  set?: string;
+  teleported?: TeleportedPlaythroughs;
+}
+
+function harness(options: HarnessOptions = {}): Harness {
   const sent: GameEvent[] = [];
   let events!: GameEvents;
   let reincarnating = -1;
@@ -73,6 +82,7 @@ function harness(options: { send?: (event: GameEvent) => void; enabled?: () => b
     player: options.player ?? (() => PLAYER),
     enabled: options.enabled ?? (() => true),
     send: options.send ?? ((event) => { sent.push(event); everySent.push(event); }),
+    teleported: options.teleported ?? keptTeleportedPlaythroughs(null),
   });
   reincarnatingOf.set(game, () => reincarnating);
   return { game, events, sent };
@@ -243,6 +253,43 @@ async function main(): Promise<void> {
     events.tick();
     events.ended(true);
     check(sent.length === 0 && !playerRead, "a player's own set sends nothing, the statistics on, and the player id is not read");
+  }
+
+  /* ------------------------------------------------- a teleport ----- */
+  {
+    // `localStorage` as two pages of one browser share it.
+    const items = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => items.get(key) ?? null,
+      setItem: (key: string, value: string) => { items.set(key, value); },
+    } as Storage;
+    const sent: GameEvent[] = [];
+    const send = (event: GameEvent): void => { sent.push(event); };
+    const first = harness({ send, teleported: keptTeleportedPlaythroughs(storage) });
+    join(first.game, heroNamed(first.game, 'HALK'), RESURRECT);
+    check(sent.length === 1, 'before a teleport, a join sends `party`');
+    first.events.teleported();
+    join(first.game, heroNamed(first.game, 'WU TSE'), RESURRECT);
+    first.events.ended(false);
+    console.log(`teleported ${first.game.ctx.state.block1.randomGameID}: ${sent.length} events, kept ${items.get('csbweb_teleported_v1')}`);
+    check(sent.length === 1, 'once teleported, the game sends nothing: neither a join nor its end');
+
+    const playthrough = first.game.ctx.state.block1.randomGameID;
+    const later = harness({ send, teleported: keptTeleportedPlaythroughs(storage) });
+    later.game.ctx.state.block1.randomGameID = playthrough;
+    later.events.ended(true);
+    check(sent.length === 1, "a later page, reading a save of that game, sends nothing either");
+    later.game.ctx.state.block1.randomGameID = (playthrough + 1) >>> 0;
+    later.events.ended(true);
+    check(sent.length === 2 && sent[1]!.type === 'won', 'another playthrough sends as before');
+
+    const forgetful = harness({ send, teleported: keptTeleportedPlaythroughs({
+      getItem: () => { throw new Error('denied'); },
+      setItem: () => { throw new Error('denied'); },
+    } as unknown as Storage) });
+    forgetful.events.teleported();
+    forgetful.events.ended(false);
+    check(sent.length === 2, 'where the storage refuses, the page itself still sends nothing for it');
   }
 
   /* ------------------------------------------------- the server's check ----- */
