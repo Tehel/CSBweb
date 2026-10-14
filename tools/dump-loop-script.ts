@@ -21,7 +21,7 @@
  *    by the stone-room timer that won (`Timer.cpp:2370-2371`), which `tools/dump-show-credits.ts`
  *    covers with a real type-18 actuator. Here `ProcessTimers` is made to report a win.
  *
- * Run: `npx tsx tools/dump-loop-script.ts`
+ * Run: `npm test -- --only=dump-loop-script.ts`
  */
 import { Position } from '../src/core/types';
 import type { MessageSink } from '../src/engine/GameHost';

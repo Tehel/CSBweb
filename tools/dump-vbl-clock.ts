@@ -18,7 +18,7 @@
  *   second, as a background tab's is, keeps the game at its pace, and a longer gap is not
  *   made up.
  *
- * Run: `npx tsx tools/dump-vbl-clock.ts`
+ * Run: `npm test -- --only=dump-vbl-clock.ts`
  */
 import type { Game } from '../src/engine/Game';
 import { freeze, thaw, VBL_PER_TICK, wakeUp, type LoopScript } from '../src/engine/LoopState';

@@ -21,7 +21,7 @@
  *    with them.
  * 9. **`&THISCELL` and `&NEIGHBORS`** (`ExamineCell`, `DSA.cpp:2201-2321`).
  *
- * Run: `npx tsx tools/dump-dsa-dungeon.ts`
+ * Run: `npm test -- --only=dump-dsa-dungeon.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType, locationRelToInteger, type ObjectID } from '../src/core/types';
 import type { DsaDefinition } from '../src/data/dungeonTypes';

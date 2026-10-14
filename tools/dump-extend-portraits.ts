@@ -16,7 +16,7 @@
  *   evidence.
  * - CSB's Atari-era saves have no block, so they would be cleaned; they hold no mirror.
  *
- * Run: `npx tsx tools/dump-extend-portraits.ts`
+ * Run: `npm test -- --only=dump-extend-portraits.ts`
  */
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';

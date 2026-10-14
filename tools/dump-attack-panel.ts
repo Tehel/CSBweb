@@ -15,7 +15,7 @@
  * The last block is `TAG01b29a`'s other job, the flinch, which it skips while a
  * candidate stands at a mirror as it does asleep (`CSBCode.cpp:8913-8921`).
  *
- * Run: `npx tsx tools/dump-attack-panel.ts`
+ * Run: `npm test -- --only=dump-attack-panel.ts`
  */
 import { Direction, Position } from '../src/core/types';
 import { Party } from '../src/engine/Party';

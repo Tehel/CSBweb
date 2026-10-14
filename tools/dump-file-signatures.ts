@@ -19,7 +19,7 @@
  *    Extended Features block expected one.
  * 5. **A `dungeon.dat` that does not read** is covered by `tools/dump-bad-saved-game.ts`.
  *
- * Run: `npx tsx tools/dump-file-signatures.ts`
+ * Run: `npm test -- --only=dump-file-signatures.ts`
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';

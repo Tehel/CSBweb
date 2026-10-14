@@ -15,7 +15,7 @@
  *     credited one champion instead of splitting, and an alcove's `RotateActuatorList`
  *     (`:3506-3560`) filtered by a position CSBWin never gives it.
  *
- * Run: `npx tsx tools/dump-local-action.ts`
+ * Run: `npm test -- --only=dump-local-action.ts`
  */
 import { DBType, Direction, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';

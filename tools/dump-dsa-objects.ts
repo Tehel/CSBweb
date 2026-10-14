@@ -17,7 +17,7 @@
  *    last champion, whose slot its search alone keeps; the port for every champion
  *    (`DEBT.md` H), so a curse laid and the weapon taken off leaves the Luck as it was.
  *
- * Run: `npx tsx tools/dump-dsa-objects.ts`
+ * Run: `npm test -- --only=dump-dsa-objects.ts`
  */
 import { type ObjectID } from '../src/core/types';
 import { StkOp } from '../src/engine/DsaSystem';

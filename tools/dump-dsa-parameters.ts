@@ -19,7 +19,7 @@
  *    `doc/CSBwin-src/DSA.cpp:2978`): on a count of 3, `&PARAM@ 5` reads variables
  *    3 and 4, and `NoValue` names them; variable 0 is not read.
  *
- * Run: `npx tsx tools/dump-dsa-parameters.ts`
+ * Run: `npm test -- --only=dump-dsa-parameters.ts`
  */
 import { messageParametersKey } from '../src/data/CsbwinExpool';
 import type { DungeonData } from '../src/data/dungeonTypes';

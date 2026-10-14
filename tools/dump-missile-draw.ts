@@ -18,7 +18,7 @@
  *  4. in the party's own cell (`RelativeCellNumber == 9`) a missile whose size does not
  *     follow its range is drawn at full size, not through `d.Byte5752` (`:2327-2336`).
  *
- * Run: `npx tsx tools/dump-missile-draw.ts`
+ * Run: `npm test -- --only=dump-missile-draw.ts`
  */
 import { DBType, OBJECT_ID_EOF, type ObjectID } from '../src/core/types';
 import { RN_FIREBALL, RN_LIGHTNING } from '../src/core/spellRn';

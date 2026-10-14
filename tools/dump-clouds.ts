@@ -24,7 +24,7 @@
  *    used to call `playSound(SoundIndex.SPELL_EXPLODE)` for the small case — a
  *    different sample entirely (ordinal 13's, not 20's).
  *
- * Run: `npx tsx tools/dump-clouds.ts`
+ * Run: `npm test -- --only=dump-clouds.ts`
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { Game } from '../src/engine/Game';

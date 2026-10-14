@@ -11,7 +11,7 @@
  * This finds an open square on a map's border, flies a fireball out of it over the edge,
  * and looks for the filter, the fireball's cloud in that square, and the missile gone.
  *
- * Run: `npx tsx tools/dump-missile-exterior.ts`
+ * Run: `npm test -- --only=dump-missile-exterior.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { RN_FIREBALL } from '../src/core/spellRn';

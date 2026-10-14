@@ -20,7 +20,7 @@
  * 6. **A door timer runs the square's DSAs before it looks at the square** (`:1563-1569`):
  *    on a bashed door, and on a square that is no door.
  *
- * Run: `npx tsx tools/dump-timer-modifier.ts`
+ * Run: `npm test -- --only=dump-timer-modifier.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { getActuatorValue, setActuatorValue } from '../src/data/actuatorHelpers';

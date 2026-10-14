@@ -14,7 +14,7 @@
  *    champion is touched (`:2601`): a count of 1 and the champion's index, with their HP
  *    still read through `&CHAR@`. The champion dies after it.
  *
- * Run: `npx tsx tools/dump-char-damage-filter.ts`
+ * Run: `npm test -- --only=dump-char-damage-filter.ts`
  */
 import { StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';

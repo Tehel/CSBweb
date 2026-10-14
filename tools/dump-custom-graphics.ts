@@ -30,7 +30,7 @@
  *    CSBWin's loop counts groups two at a time, so it draws the first group of each
  *    line, the next line's taken from where the last stopped.
  *
- * Run: `npx tsx tools/dump-custom-graphics.ts`
+ * Run: `npm test -- --only=dump-custom-graphics.ts`
  */
 import { readFileSync } from 'node:fs';
 

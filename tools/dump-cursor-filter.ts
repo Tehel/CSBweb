@@ -70,7 +70,7 @@
  * 18. **A save read in play**, which only the port has: `ResumeSavedGame` at once, once the
  *    read is in (`Game.savedGameRead`).
  *
- * Run: `npx tsx tools/dump-cursor-filter.ts`
+ * Run: `npm test -- --only=dump-cursor-filter.ts`
  */
 import { readFileSync } from 'node:fs';
 

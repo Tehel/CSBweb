@@ -3,7 +3,7 @@
  * set by the engine where the light changes, and a monster's sight shortened by it in the
  * dark (`Monster.cpp:577-581`).
  *
- *   npx tsx tools/dump-light-level.ts
+ *   npm test -- --only=dump-light-level.ts
  *
  * One champion, on the Atari DM dungeon. The palette a light should give is the first
  * `d.PaletteBrightness` entry at or below the total, 5 with no light at all, read from the

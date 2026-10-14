@@ -15,7 +15,7 @@
  *   group of four, and a size-1 group carried by another group. And the same world
  *   through `Game`'s constructor, which is where a new game runs `CheckMonsters`.
  *
- * Run: `npx tsx tools/dump-check-monsters.ts`
+ * Run: `npm test -- --only=dump-check-monsters.ts`
  */
 import { readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';

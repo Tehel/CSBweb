@@ -39,7 +39,7 @@
  * the renders with `--png`. The teleporter's shimmer draws from `GraphicRandom`, a stream
  * the interpreter keeps across calls, so the rows depend on the order they run in.
  *
- * Run: `npx tsx tools/dump-render-probe.ts [--update] [--png]`
+ * Run: `npm test -- --only=dump-render-probe.ts [--update] [--png]`
  *   --png     writes `tools/output/render-probe-<pass>.png`: a row a cell (F4L2 at the
  *             top, F0 at the bottom), a column a type, in the level's light-level-0
  *             viewport palette, with what a program left undrawn dark blue and a `NOP`

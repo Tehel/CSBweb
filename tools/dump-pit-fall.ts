@@ -15,7 +15,7 @@
  * This finds a real pit in the shipped dungeon, drops the party down it, and reads the
  * damage off the champions.
  *
- * Run: `npx tsx tools/dump-pit-fall.ts`
+ * Run: `npm test -- --only=dump-pit-fall.ts`
  */
 import { Position, RoomType } from '../src/core/types';
 import { Game } from '../src/engine/Game';

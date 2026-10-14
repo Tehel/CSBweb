@@ -12,7 +12,7 @@
  *
  * Needs no game files: it drives `TimerQueue` directly.
  *
- * Run: `npx tsx tools/dump-timer-dedupe.ts`
+ * Run: `npm test -- --only=dump-timer-dedupe.ts`
  */
 import { TimerFunction, TimerQueue, type TimerEntry } from '../src/engine/TimerQueue';
 import { check, finish } from './lib/check';

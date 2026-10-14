@@ -31,7 +31,7 @@
  * The store's upgrades, which stamp the rows it holds, are in `tools/dump-save-menu.ts`,
  * "the store's upgrade".
  *
- * Run: `npx tsx tools/dump-save-stamp.ts`
+ * Run: `npm test -- --only=dump-save-stamp.ts`
  */
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';

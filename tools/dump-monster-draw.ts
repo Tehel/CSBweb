@@ -24,7 +24,7 @@
  * Every drawn sprite's centre and bottom are read back from the blit rectangle and
  * matched against the real `d.s6982` entries.
  *
- * Run: `npx tsx tools/dump-monster-draw.ts`
+ * Run: `npm test -- --only=dump-monster-draw.ts`
  */
 import { applyLimits } from '../src/core/intCast';
 import { DBType, OBJECT_ID_EOF } from '../src/core/types';

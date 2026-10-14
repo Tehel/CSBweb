@@ -18,7 +18,7 @@
  * message area it is the arrow. With the extra, it is itself over the viewport too, in
  * the interface palette's colour 9 however the viewport palette changed it.
  *
- * Run: `npx tsx tools/dump-object-cursor.ts`
+ * Run: `npm test -- --only=dump-object-cursor.ts`
  */
 import { Direction, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import { Party } from '../src/engine/Party';

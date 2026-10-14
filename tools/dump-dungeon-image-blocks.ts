@@ -35,7 +35,7 @@
  * parser at all. Earlier, on blocks 7 and 8: `LEVELDESC.FILL2[4]`, the low byte of
  * `DUNGEONDATINDEX::word4`, and bits 8-11 of `LEVELDESC.word12`.
  *
- * Run: `npx tsx tools/dump-dungeon-image-blocks.ts [path-or-directory]`
+ * Run: `npm test -- --only=dump-dungeon-image-blocks.ts [path-or-directory]`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

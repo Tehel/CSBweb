@@ -25,7 +25,7 @@
  *
  * The stairs are real ones from `dungeon.dat`.
  *
- * Run: `npx tsx tools/dump-stairs-move.ts`
+ * Run: `npm test -- --only=dump-stairs-move.ts`
  */
 import {
   DBType, OBJECT_ID_EOF, Position, RoomType, locationRelToInteger,

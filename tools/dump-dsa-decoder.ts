@@ -17,7 +17,7 @@
  * No dungeon this project plays defines a DSA, so the tool builds one, `localState` 1,
  * whose state is the DSA's own `state`. Global variable 0 is what each program reports.
  *
- * Run: `npx tsx tools/dump-dsa-decoder.ts`
+ * Run: `npm test -- --only=dump-dsa-decoder.ts`
  */
 import { DBType, locationRelToInteger, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';

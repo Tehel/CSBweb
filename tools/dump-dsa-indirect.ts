@@ -22,7 +22,7 @@
  * `I_FilteredCast` has no case of its own (`tools/dump-dsa-census.ts`), and `I_Indirect`
  * would run its record as `FilteredCast`; no operation writes one.
  *
- * Run: `npx tsx tools/dump-dsa-indirect.ts`
+ * Run: `npm test -- --only=dump-dsa-indirect.ts`
  */
 import { Position, RoomType, locationRelToInteger } from '../src/core/types';
 import { messageParametersKey } from '../src/data/CsbwinExpool';

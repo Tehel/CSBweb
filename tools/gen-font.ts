@@ -26,7 +26,7 @@
  * Run:
  *
  *   npx tsx tools/gen-font.ts            # write it
- *   npx tsx tools/gen-font.ts --check    # check it (npm test)
+ *   npm test -- --only=gen-font.ts       # check it
  *   npx tsx tools/gen-font.ts --rows     # its characters, as JSON
  *
  * `--check` writes nothing: it asserts that the file holds the bytes this tool would

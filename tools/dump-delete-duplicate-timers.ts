@@ -13,7 +13,7 @@
  * on 3D2D1D keeps both, read or built at the boot, one on DM merges them, and so does a new game read after 3D2D1D's.
  * And a save of the 3D2D1D game, which writes the pool as it is, loads with the merge off.
  *
- * Run: `npx tsx tools/dump-delete-duplicate-timers.ts`
+ * Run: `npm test -- --only=dump-delete-duplicate-timers.ts`
  */
 import { readFileSync } from 'node:fs';
 

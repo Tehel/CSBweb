@@ -28,7 +28,7 @@
  *  8. a champion the fall kills leaves their bones on the square below, where the party
  *     is by then.
  *
- * Run: `npx tsx tools/dump-party-move.ts`
+ * Run: `npm test -- --only=dump-party-move.ts`
  */
 import {
   DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID,

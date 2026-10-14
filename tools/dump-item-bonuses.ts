@@ -4,7 +4,7 @@
  * `RemoveCharacterPossession` (`:1941-2042`, `:1827-1935`), the one pair every writer
  * goes through, do.
  *
- *   npx tsx tools/dump-item-bonuses.ts
+ *   npm test -- --only=dump-item-bonuses.ts
  *
  * 1. Every row of the table, against the real objects of the Atari DM data: the object
  *    is found through `ObjDesc` by the name index CSBWin tests, and its name in graphic

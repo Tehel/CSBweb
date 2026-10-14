@@ -10,7 +10,7 @@
  * 1. **As a filter's DSA**, it says it once.
  * 2. **As any other DSA**, it says nothing.
  *
- * Run: `npx tsx tools/dump-dsa-nofilter.ts`
+ * Run: `npm test -- --only=dump-dsa-nofilter.ts`
  */
 import { DBType, OBJECT_ID_NULL } from '../src/core/types';
 import { CursorFilterType, StkOp } from '../src/engine/DsaSystem';

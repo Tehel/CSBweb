@@ -13,7 +13,7 @@
  * `TAG004962` takes them, in the one ink item 0's word 8 names, and the backdrop's three
  * bottom buttons sit in `s20_16208`'s rectangles.
  *
- * Run: `npx tsx tools/dump-hint-oracle.ts`
+ * Run: `npm test -- --only=dump-hint-oracle.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

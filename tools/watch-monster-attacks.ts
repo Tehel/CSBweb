@@ -6,7 +6,7 @@
  * wounds taken, poison, death — and whether any missile-throwing monster launched
  * anything.
  *
- * Run: `npx tsx tools/watch-monster-attacks.ts [level] [partyX] [partyY] [ticks]`
+ * Run: `npm test -- --only=watch-monster-attacks.ts [level] [partyX] [partyY] [ticks]`
  */
 import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import type { Champion } from '../src/engine/gameTypes';

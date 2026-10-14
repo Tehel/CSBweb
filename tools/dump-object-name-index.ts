@@ -30,7 +30,7 @@
  * the table holds the plain one: `objNI_Storm_a` is `BOLT BLADE` and `objNI_RABlade_a`
  * is `FURY`, which is the same pairing Dungeon Master's manual prints.
  *
- * Run: `npx tsx tools/dump-object-name-index.ts`
+ * Run: `npm test -- --only=dump-object-name-index.ts`
  */
 import * as OBJNI from '../src/core/objectNameIndex';
 import { check, finish } from './lib/check';

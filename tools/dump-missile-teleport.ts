@@ -15,7 +15,7 @@
  * for each case, flies a fireball into it from the cell beside it, runs the one tick, and
  * compares the missile's cell, corner and direction with `TeleportMissile`'s.
  *
- * Run: `npx tsx tools/dump-missile-teleport.ts`
+ * Run: `npm test -- --only=dump-missile-teleport.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { RN_FIREBALL } from '../src/core/spellRn';

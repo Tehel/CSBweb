@@ -9,7 +9,7 @@
  * The attack names are the canary: if the graphic 0x230 offsets are right they read
  * as "BLOCK", "CHOP", "PUNCH", … in ATTACKTYPE order.
  *
- * Run: `npx tsx tools/dump-monster-tables.ts`
+ * Run: `npm test -- --only=dump-monster-tables.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

@@ -16,7 +16,7 @@
  *
  * The teleporter is a real record from `dungeon.dat`, rigged by `tools/lib/teleporter.ts`.
  *
- * Run: `npx tsx tools/dump-drop-move-object.ts`
+ * Run: `npm test -- --only=dump-drop-move-object.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';

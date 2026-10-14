@@ -32,7 +32,7 @@
  * `dungeon.dat` the game started on. A load that quietly did nothing would otherwise
  * pass everything above on an early save.
  *
- * Run: `npx tsx tools/dump-csbwin-load.ts [path-or-directory]`
+ * Run: `npm test -- --only=dump-csbwin-load.ts [path-or-directory]`
  */
 import { readFileSync } from 'node:fs';
 

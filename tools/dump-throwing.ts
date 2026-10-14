@@ -22,7 +22,7 @@
  *  - A shot's busy timer reloads the bow from the quiver, and a spell's busy timer after
  *    it does not: `EnableCharacterAction` forgets the attack (section 8).
  *
- * Run: `npx tsx tools/dump-throwing.ts`
+ * Run: `npm test -- --only=dump-throwing.ts`
  */
 import { CsbRandom } from '../src/core/random';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';

@@ -8,7 +8,7 @@
  *   3. A provisional Hall of Champions recruit is not counted: the loop runs over
  *      `d.NumCharacter`, less one while `d.PotentialCharacterOrdinal != 0`.
  *
- * Run: `npx tsx tools/dump-ninety-second-update.ts`
+ * Run: `npm test -- --only=dump-ninety-second-update.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position } from '../src/core/types';
 import type { WeaponRecord } from '../src/data/dungeonTypes';

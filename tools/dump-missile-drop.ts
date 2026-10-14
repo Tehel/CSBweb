@@ -44,7 +44,7 @@
  * scroll or piece of food played an explosion. This throws a weapon and a misc item at
  * the same closed door and checks the ordinal `queueSound` actually receives.
  *
- * Run: `npx tsx tools/dump-missile-drop.ts`
+ * Run: `npm test -- --only=dump-missile-drop.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType, rnEquals } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';

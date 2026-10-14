@@ -17,7 +17,7 @@
  * the port reads `dm-atari/`'s table unchanged, and that there the crack drawn after the
  * click lands where the one before it did.
  *
- * Run: `npx tsx tools/dump-crack-switch.ts`
+ * Run: `npm test -- --only=dump-crack-switch.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

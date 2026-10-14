@@ -9,7 +9,7 @@
  * of a save look at, so only the comparison can catch it: in the prison's expanded image,
  * in DM's `dungeon.dat` once a word follows its cell flags, and in every committed save.
  *
- * Run: `npx tsx tools/dump-image-checksum.ts`
+ * Run: `npm test -- --only=dump-image-checksum.ts`
  */
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';

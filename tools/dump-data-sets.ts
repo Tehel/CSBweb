@@ -10,7 +10,7 @@
  * are CSBWin's four word for word, so the long form's tail sits where `parseGraphic231`
  * reads it, after every table before it.
  *
- * Run: `npx tsx tools/dump-data-sets.ts`
+ * Run: `npm test -- --only=dump-data-sets.ts`
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

@@ -18,7 +18,7 @@
  * 5. **Closing**: a right click is still button 11 and closes the inventory, and without
  *    the files, as in DM, the close box is button 11 and closes it too.
  *
- * Run: `npx tsx tools/dump-hint-oracle-button.ts`
+ * Run: `npm test -- --only=dump-hint-oracle-button.ts`
  */
 import { readFileSync } from 'node:fs';
 

@@ -13,7 +13,7 @@
  * champion, the skill it credits and the old mastery (`Magic.cpp:236-253`): only the basic
  * skill's `skillNumber >= 4` test, the new mastery and `LevelUp` see the answer.
  *
- *   npx tsx tools/dump-adjust-skills.ts
+ *   npm test -- --only=dump-adjust-skills.ts
  */
 import { Position } from '../src/core/types';
 import type { Champion } from '../src/engine/gameTypes';

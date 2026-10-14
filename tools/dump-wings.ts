@@ -21,7 +21,7 @@
  *    talents and `&TALENTS!` saves a change back; `&CHARNAME@` names them; `&WHEREISCHAR`
  *    is 5.
  *
- * Run: `npx tsx tools/dump-wings.ts`
+ * Run: `npm test -- --only=dump-wings.ts`
  */
 import { readU32LE } from '../src/core/bytes';
 import { readCsbwinCharacter, writeCsbwinCharacter } from '../src/data/CsbwinCharacters';

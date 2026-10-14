@@ -26,7 +26,7 @@
  * The filter is stood in for at the DSA boundary, `DsaSystem.processMissileEncounterFilter`,
  * which records its parameters and answers 0, the default action.
  *
- * Run: `npx tsx tools/dump-move-from-missile.ts`
+ * Run: `npm test -- --only=dump-move-from-missile.ts`
  */
 import { MISSILE_FILTER_TIMER_INDEX, TimerFunction } from '../src/engine/TimerQueue';
 import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';

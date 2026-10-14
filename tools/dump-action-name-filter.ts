@@ -16,7 +16,7 @@
  *    the first menu does not move it.
  * 6. **The panel draws the names the filter chose**, not the attacks' (`:8884-8892`).
  *
- * Run: `npx tsx tools/dump-action-name-filter.ts`
+ * Run: `npm test -- --only=dump-action-name-filter.ts`
  */
 import { StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';

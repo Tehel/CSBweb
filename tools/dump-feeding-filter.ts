@@ -18,7 +18,7 @@
  * 7. **An empty waterskin emptied again holds 3**: `value(value() - 1)` sets two bits
  *    (`:4474-4477`, `CSB.h:1277`).
  *
- * Run: `npx tsx tools/dump-feeding-filter.ts`
+ * Run: `npm test -- --only=dump-feeding-filter.ts`
  */
 import { DBType, OBJECT_ID_EOF, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { OBJNI_APPLE, OBJNI_WATERSKIN } from '../src/core/objectNameIndex';

@@ -36,7 +36,7 @@
  *   first `NumTimer` mean anything; the rest are what a longer queue left behind. The
  *   live prefix is asserted.
  *
- * Run: `npx tsx tools/dump-save-blocks-vs-file.ts [path-or-directory]`
+ * Run: `npm test -- --only=dump-save-blocks-vs-file.ts [path-or-directory]`
  */
 import { readFileSync } from 'node:fs';
 

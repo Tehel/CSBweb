@@ -108,7 +108,7 @@
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
  *    frame in the second pass are read back here: both passes' edges must be up.
  *
- * Run: `npx tsx tools/dump-save-menu.ts`
+ * Run: `npm test -- --only=dump-save-menu.ts`
  */
 import { readFileSync, statSync } from 'node:fs';
 import { basename, resolve } from 'node:path';

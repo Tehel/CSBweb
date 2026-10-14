@@ -16,7 +16,7 @@
  * unsigned it is 4294967096, later than any `d.Time`, and `AdjustSkills` then takes
  * every skill gain for one made under attack: doubled, and never halved.
  *
- * Run: `npx tsx tools/dump-last-monster-attack.ts`
+ * Run: `npm test -- --only=dump-last-monster-attack.ts`
  */
 import { readFileSync } from 'node:fs';
 

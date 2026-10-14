@@ -33,7 +33,7 @@
  *    printed. `tools/dump-custom-graphics.ts` checks what `DrawCustomGraphic` draws, and
  *    `tools/dump-virtual-graphics.ts` what the virtual graphics make.
  *
- * Run: `npx tsx tools/dump-skin-programs.ts [--all]`.
+ * Run: `npm test -- --only=dump-skin-programs.ts [--all]`.
  */
 import { readFileSync } from 'node:fs';
 

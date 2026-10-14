@@ -24,7 +24,7 @@
  * - A load keeps the rows on screen and rebases their timeouts onto the loaded clock
  *   (`ResetTime`, `SaveGame.cpp:1747-1748`); CSBWin saves no message state.
  *
- * Run: `npx tsx tools/dump-sleep.ts`
+ * Run: `npm test -- --only=dump-sleep.ts`
  */
 import { Position } from '../src/core/types';
 import { createChampionFromPreset } from '../src/engine/AddCharacter';

@@ -25,7 +25,7 @@
  * None of that is visible in `tools/check-frames.sh` — the party either arrives in a
  * cell or does not, and until this was ported it always arrived.
  *
- * Run: `npx tsx tools/dump-party-collision.ts [level]`
+ * Run: `npm test -- --only=dump-party-collision.ts [level]`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { MovementAction } from '../src/engine/gameTypes';

@@ -36,7 +36,7 @@
  *    implies of its flags. `IC29to41_damageMonsterFailed` is never set: CSBWin tests a
  *    flag nothing sets (`Monster.cpp:2839-2840`).
  *
- * Run: `npx tsx tools/dump-monster-move-filter.ts`
+ * Run: `npm test -- --only=dump-monster-move-filter.ts`
  */
 import { readFileSync } from 'node:fs';
 

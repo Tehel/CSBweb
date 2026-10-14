@@ -20,7 +20,7 @@
  *   (`doc/CSBwin-src/data.cpp:613-701`). Those states are forced on real records, in
  *   memory, since the stock dungeon does not hold every one.
  *
- * Run: `npx tsx tools/dump-object-index.ts`
+ * Run: `npm test -- --only=dump-object-index.ts`
  */
 import * as OBJNI from '../src/core/objectNameIndex';
 import { RN_FFE4, RN_FIREBALL } from '../src/core/spellRn';

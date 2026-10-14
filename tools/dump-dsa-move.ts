@@ -24,7 +24,7 @@
  *  8. a monster moved onto the party's level gets an `ITEM16` and its first AI timers
  *     (`Code11f52.cpp:3398-3440`); the port gave it neither.
  *
- * Run: `npx tsx tools/dump-dsa-move.ts`
+ * Run: `npm test -- --only=dump-dsa-move.ts`
  */
 import {
   DBType, locationRelToInteger, OBJECT_ID_EOF, Position, RoomType, type ObjectID,

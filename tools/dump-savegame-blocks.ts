@@ -32,7 +32,7 @@
  * What to look for: the "differs at" column naming byte 21 for the low-byte case and
  * bytes 20+21 for the whole-word case.
  *
- * Run: `npx tsx tools/dump-savegame-blocks.ts`
+ * Run: `npm test -- --only=dump-savegame-blocks.ts`
  */
 import { loadSaveGameState, saveSaveGameState, type SaveGameState } from '../src/data/SaveGameLoader';
 import type { Item16Record, TimerRecord } from '../src/data/dungeonTypes';

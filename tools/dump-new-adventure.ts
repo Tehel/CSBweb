@@ -20,7 +20,7 @@
  *    missing or twice, `mini.dat` not a new adventure, either file damaged, and the
  *    port's own, a `mini.dat` with an Extended Features block (`DEBT.md` H).
  *
- * Run: `npx tsx tools/dump-new-adventure.ts`
+ * Run: `npm test -- --only=dump-new-adventure.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

@@ -11,7 +11,7 @@
  *   4. HP regenerates when `random112 < Vitality + 12`.
  *   5. A provisional Hall of Champions recruit is skipped entirely.
  *
- * Run: `npx tsx tools/dump-ten-second-update.ts`
+ * Run: `npm test -- --only=dump-ten-second-update.ts`
  */
 import { Position } from '../src/core/types';
 import { Game } from '../src/engine/Game';

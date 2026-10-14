@@ -11,7 +11,7 @@
  * with the map: a monster three cells down an open corridor sees the party, one
  * behind a stone wall does not, and no monster claims a move into a wall.
  *
- * Run: `npx tsx tools/dump-monster-perception.ts [level] [partyX] [partyY]`
+ * Run: `npm test -- --only=dump-monster-perception.ts [level] [partyX] [partyY]`
  */
 import { CsbRandom } from '../src/core/random';
 import { Position, RoomType } from '../src/core/types';

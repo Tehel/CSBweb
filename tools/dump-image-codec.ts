@@ -32,7 +32,7 @@
  *    short or overruns means a count is wrong somewhere, and this catches it across 538
  *    images rather than the six the golden frames happen to show.
  *
- * Run: `npx tsx tools/dump-image-codec.ts`
+ * Run: `npm test -- --only=dump-image-codec.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

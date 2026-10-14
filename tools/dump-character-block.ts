@@ -19,7 +19,7 @@
  * `dataTypeMap`/`dataIndexMap` that come with the dungeon image, which the writer does
  * not produce yet. Everything else is compared exactly as it stands.
  *
- * Run: `npx tsx tools/dump-character-block.ts [path-or-directory]`
+ * Run: `npm test -- --only=dump-character-block.ts [path-or-directory]`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

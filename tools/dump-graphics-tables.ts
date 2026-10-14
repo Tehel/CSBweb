@@ -34,7 +34,7 @@
  * `fitLayout` says: `0x231` lacks its last field where it is the short size, and the French
  * 1.3 file's `0x230` has longer attack names.
  *
- * Run: `npx tsx tools/dump-graphics-tables.ts`
+ * Run: `npm test -- --only=dump-graphics-tables.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

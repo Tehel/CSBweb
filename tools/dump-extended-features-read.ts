@@ -38,7 +38,7 @@
  *    it sets `simpleEncipher` in a game that had not, which a plain load then keeps
  *    (CSBWin never clears it). A save's `GAMEBLOCK1` stamped again stays enciphered.
  *
- * Run: `npx tsx tools/dump-extended-features-read.ts`
+ * Run: `npm test -- --only=dump-extended-features-read.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

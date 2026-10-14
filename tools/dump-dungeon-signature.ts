@@ -29,7 +29,7 @@
  * With a path, the digests of that file, a `dungeon.dat` or a save, are printed first,
  * as the catalogue lists them: that is how a dungeon is added to it.
  *
- * Run: `npx tsx tools/dump-dungeon-signature.ts [file]`
+ * Run: `npm test -- --only=dump-dungeon-signature.ts [file]`
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';

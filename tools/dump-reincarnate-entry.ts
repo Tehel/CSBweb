@@ -21,7 +21,7 @@
  * key centre in all three rows, read out in order, must spell the alphabet and then
  * the punctuation.
  *
- * Run: `npx tsx tools/dump-reincarnate-entry.ts`
+ * Run: `npm test -- --only=dump-reincarnate-entry.ts`
  */
 import { emptyDungeonData } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';

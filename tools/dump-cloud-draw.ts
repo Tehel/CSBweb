@@ -45,7 +45,7 @@
  *     0-2) and the two beside the party (13, 14), whose clouds `DrawRoomObjects` draws
  *     too (`:2768-2773`) — from the tables, and in whole frames of the real dungeon.
  *
- * Run: `npx tsx tools/dump-cloud-draw.ts`
+ * Run: `npm test -- --only=dump-cloud-draw.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { applyLimits } from '../src/core/intCast';

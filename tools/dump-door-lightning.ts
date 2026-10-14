@@ -20,7 +20,7 @@
  * only rectangle-pointer resolution, which is proven elsewhere) across many redraws of the same closed door and checks the drawn bitmap doesn't
  * sit at a single, frozen identity.
  *
- * Run: `npx tsx tools/dump-door-lightning.ts`
+ * Run: `npm test -- --only=dump-door-lightning.ts`
  */
 import { BytecodeInterpreter, type InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { Opcode } from '../src/renderer/bytecode/Opcodes';

@@ -31,7 +31,7 @@
  * - `vblFlashButn` flips bit plane 2 over the rectangle, corners included (`VBL.cpp:60-122`),
  *   which is bit 2 of the pixel's index (`WinScreen.cpp:314-330`).
  *
- * Run: `npx tsx tools/dump-button-flash.ts [level]`
+ * Run: `npm test -- --only=dump-button-flash.ts [level]`
  */
 import { OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { emptyPossessions, MovementAction, type Champion } from '../src/engine/gameTypes';

@@ -20,7 +20,7 @@
  * 7. **No champion**: stone refuses the move and keeps the input (`:8392-8395`).
  * 8. **The route's first shaft**, map 0 (7,7) down to map 1.
  *
- * Run: `npx tsx tools/watch-3d2d1d-vertical.ts`
+ * Run: `npm test -- --only=watch-3d2d1d-vertical.ts`
  */
 import { readFileSync } from 'node:fs';
 

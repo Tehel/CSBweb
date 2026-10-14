@@ -17,7 +17,7 @@
  * dispatch, not the renderer that sets `d.FacingWaterFountain`. The objects are real
  * records of `dungeon.dat`: its first empty flask and its first waterskin.
  *
- * Run: `npx tsx tools/dump-fountain.ts`
+ * Run: `npm test -- --only=dump-fountain.ts`
  */
 import { PotionType } from '../src/core/constants';
 import { OBJNI_WATERSKIN } from '../src/core/objectNameIndex';

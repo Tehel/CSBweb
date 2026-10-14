@@ -14,7 +14,7 @@
  *    level 0, two squares in front of the party): the deletions are printed, not judged.
  * 3. **Repeatable.** The same seed plays the same 600 ticks: the same trace, line for line.
  *
- * Run: `npx tsx tools/watch-conflux-start.ts [ticks]`
+ * Run: `npm test -- --only=watch-conflux-start.ts [ticks]`
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';

@@ -46,7 +46,7 @@
  * takes `LoadGame`'s branch for an Atari DM save, which no committed save does
  * (`doc/CSBwin-src/SaveGame.cpp:2065-2081`).
  *
- * Run: `npx tsx tools/dump-live-save-file.ts`
+ * Run: `npm test -- --only=dump-live-save-file.ts`
  */
 import { readFileSync } from 'node:fs';
 

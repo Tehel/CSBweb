@@ -22,7 +22,7 @@
  *    then. Queued at once, as with no CHAMPION VIEW: a press on the name and hands, a
  *    right press on the bars, the bars of an empty slot, a press asleep.
  *
- * Run: `npx tsx tools/dump-champion-dialog.ts`
+ * Run: `npm test -- --only=dump-champion-dialog.ts`
  */
 import { readFileSync } from 'node:fs';
 import type { Rect } from '../src/data/tables/UITables';

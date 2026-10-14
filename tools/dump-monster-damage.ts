@@ -11,7 +11,7 @@
  * go away, the record leaves the cell, and the droppings and possessions land on the
  * floor.
  *
- * Run: `npx tsx tools/dump-monster-damage.ts [level]`
+ * Run: `npm test -- --only=dump-monster-damage.ts [level]`
  */
 import { CsbRandom } from '../src/core/random';
 import { DBType, OBJECT_ID_EOF, Position } from '../src/core/types';

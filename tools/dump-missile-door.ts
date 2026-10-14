@@ -16,7 +16,7 @@
  * Each case calls the door arm directly on a real closed door, with the door's
  * `DoorTOC` and flags set for the case, and a missile sitting in the door's square.
  *
- * Run: `npx tsx tools/dump-missile-door.ts`
+ * Run: `npm test -- --only=dump-missile-door.ts`
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { OBJNI_FIRST_KEY, OBJNI_LAST_KEY } from '../src/core/objectNameIndex';

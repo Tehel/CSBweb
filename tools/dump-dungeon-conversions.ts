@@ -36,7 +36,7 @@
  * is checked directly: a save's index length, text size and scroll RNs must be exactly
  * what the file holds after `loadCsbwinWorld`, not a second generation of them.
  *
- * Run: `npx tsx tools/dump-dungeon-conversions.ts [path-or-directory]`
+ * Run: `npm test -- --only=dump-dungeon-conversions.ts [path-or-directory]`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

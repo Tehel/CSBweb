@@ -6,7 +6,7 @@
  * possession that is a chest (`objNI_Chest`, 0x90) has its `contents()` chain compared too.
  * Then a `goto` back into the loop does the same for `d.objectInHand`, whoever holds it.
  *
- * Run: `npx tsx tools/dump-does-party-have.ts`
+ * Run: `npm test -- --only=dump-does-party-have.ts`
  */
 import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';

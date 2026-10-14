@@ -20,7 +20,7 @@
  *    `:3339`), a group on a level its type may not live on (`DMW_Movement1`, at its old
  *    square, `:3186-3194`), and `MakeMoreRoomInDB` (`DMW_MakeRoom`, `Character.cpp:281`).
  *
- * Run: `npx tsx tools/dump-delete-monster-filter.ts`
+ * Run: `npm test -- --only=dump-delete-monster-filter.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { Expool } from '../src/data/CsbwinExpool';

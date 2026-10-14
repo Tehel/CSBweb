@@ -25,7 +25,7 @@
  * 10. **A gravity step** (`gravityMove` set, `:8128-8165`): `absDirection` stays -1 and the
  *    move history is left alone. A dungeon without `bGravityGame` never starts a slide.
  *
- * Run: `npx tsx tools/dump-party-move-filter.ts`
+ * Run: `npm test -- --only=dump-party-move-filter.ts`
  */
 import { readFileSync } from 'node:fs';
 

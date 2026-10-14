@@ -40,7 +40,7 @@
  *    is known by their portrait, and keeps the new name. The prison's four, CSB's own
  *    faces, keep their portraits either way.
  *
- * Run: `npx tsx tools/dump-rise.ts`
+ * Run: `npm test -- --only=dump-rise.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

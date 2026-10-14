@@ -37,7 +37,7 @@
  *   `Magic.cpp:567`), and a pass leaves it alone. A turn and a step set it to 1 before
  *   anything else, "Extra Ticks" being on (`CSBCode.cpp:7953-7956`, `:8171-8174`).
  *
- * Run: `npx tsx tools/dump-mouse-queue.ts [level]`
+ * Run: `npm test -- --only=dump-mouse-queue.ts [level]`
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { ActuatorAction, getActuatorAction, getActuatorType } from '../src/data/actuatorHelpers';

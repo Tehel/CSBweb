@@ -62,7 +62,7 @@
  * The scratch build's check (`CHECK_MODULE`) is a stand-in that exports the functions:
  * `tools/dump-build.ts` builds the real one and checks sets through it.
  *
- * Usage: npx tsx tools/dump-server.ts
+ * Usage: npm test -- --only=dump-server.ts
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';

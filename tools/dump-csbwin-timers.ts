@@ -35,7 +35,7 @@
  * and the other's must close, from the same starting state, driven by nothing but the
  * byte that differs.
  *
- * Run: `npx tsx tools/dump-csbwin-timers.ts`
+ * Run: `npm test -- --only=dump-csbwin-timers.ts`
  */
 import { readFileSync } from 'node:fs';
 

@@ -17,7 +17,7 @@
  * 5. **The ninth title**: no square of the retail file has more than seven hints, so the
  *    eight title lines of `s20_16208` are enough (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md`).
  *
- * Run: `npx tsx tools/dump-hint-oracle-screen.ts`
+ * Run: `npm test -- --only=dump-hint-oracle-screen.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

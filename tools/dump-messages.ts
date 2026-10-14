@@ -18,7 +18,7 @@
  * - A restart after a lost game empties the strip, and leaves `printQueue`
  *   (`ScrollingText.restart`).
  *
- * Run: `npx tsx tools/dump-messages.ts`
+ * Run: `npm test -- --only=dump-messages.ts`
  */
 import { Position } from '../src/core/types';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';

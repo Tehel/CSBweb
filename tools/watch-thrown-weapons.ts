@@ -27,7 +27,7 @@
  *     while that is free, then the club, which fits one quiver slot only, takes it, and
  *     the daggers fill the three small ones before the pack.
  *
- * Run: `npx tsx tools/watch-thrown-weapons.ts`
+ * Run: `npm test -- --only=watch-thrown-weapons.ts`
  */
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import type { Game } from '../src/engine/Game';

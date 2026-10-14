@@ -28,7 +28,7 @@
  * 24 squares walked, in order, the magic range slides down with them, and the ten-second
  * update's drop of the oldest print (`Code17818.cpp:181-195`) leaves the rest in place.
  *
- * Run: `npx tsx tools/dump-magic-footprints.ts`
+ * Run: `npm test -- --only=dump-magic-footprints.ts`
  */
 import { readFileSync } from 'node:fs';
 

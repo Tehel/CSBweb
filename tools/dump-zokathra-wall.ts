@@ -20,7 +20,7 @@
  *     `break`s out of the switch with its type unchanged (`Mouse.cpp:392`): it fires,
  *     takes the key, and stays to fire again.
  *
- * Run: `npx tsx tools/dump-zokathra-wall.ts`
+ * Run: `npm test -- --only=dump-zokathra-wall.ts`
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';

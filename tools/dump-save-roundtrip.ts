@@ -47,7 +47,7 @@
  * left after a load. Sections 1 to 5 leave those out by name; 6, 7 and 9 compare with
  * the game the save left, which has been through the same.
  *
- * Run: `npx tsx tools/dump-save-roundtrip.ts`
+ * Run: `npm test -- --only=dump-save-roundtrip.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

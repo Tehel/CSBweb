@@ -9,7 +9,7 @@
  * monster near the party should end up *closer* to it, one far away should wander,
  * and none should end up inside a wall.
  *
- * Run: `npx tsx tools/watch-monsters.ts [level] [partyX] [partyY] [ticks]`
+ * Run: `npm test -- --only=watch-monsters.ts [level] [partyX] [partyY] [ticks]`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';

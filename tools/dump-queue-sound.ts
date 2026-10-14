@@ -64,7 +64,7 @@
  * `[SND item, rate variant, highVolume]`, `QueueSound`'s `LOCAL_12` (1 loud, 0 quiet). The squares are real ones from `dungeon.dat`: the
  * first audible door button, wall switch, party pad and teleporter it holds.
  *
- * Run: `npx tsx tools/dump-queue-sound.ts`
+ * Run: `npm test -- --only=dump-queue-sound.ts`
  */
 import { PotionType } from '../src/core/constants';
 import { RN_FFE4, RN_FIREBALL } from '../src/core/spellRn';

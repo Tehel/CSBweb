@@ -16,7 +16,7 @@
  * tab's half (`SettingsKeys.ts`): the presets, a key rebound, and the labels, a row per
  * key of a US and a French keyboard.
  *
- * Run: `npx tsx tools/dump-key-bindings.ts`
+ * Run: `npm test -- --only=dump-key-bindings.ts`
  */
 import { setHandOwner } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';

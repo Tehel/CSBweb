@@ -33,7 +33,7 @@
  * And a new game's databases: the file's records and `d.Byte7302`'s spares behind them,
  * which a save of the game declares and carries.
  *
- * Run: `npx tsx tools/dump-new-game.ts`
+ * Run: `npm test -- --only=dump-new-game.ts`
  */
 import { createHash } from 'node:crypto';
 

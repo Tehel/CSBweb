@@ -20,7 +20,7 @@
  * Then the champion bones records, which are the ones play writes: one longword under
  * the bones' RN, and two records under one key.
  *
- * Run: `npx tsx tools/dump-expool.ts`
+ * Run: `npm test -- --only=dump-expool.ts`
  */
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';

@@ -28,7 +28,7 @@
  *    that will not open puts the overlay down, at its first failure only; a missing
  *    section first, and it never does.
  *
- * Run: `npx tsx tools/dump-dsa-overlay.ts`
+ * Run: `npm test -- --only=dump-dsa-overlay.ts`
  */
 import { readFileSync } from 'node:fs';
 

@@ -13,7 +13,7 @@
  * No dungeon this project loads defines a DSA, so the tool builds one: a single state
  * whose column-0 program is `LOAD objId, LOAD location, &DEL`.
  *
- * Run: `npx tsx tools/dump-dsa-delete.ts`
+ * Run: `npm test -- --only=dump-dsa-delete.ts`
  */
 import {
   DBType, locationRelToInteger, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID,

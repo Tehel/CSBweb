@@ -20,7 +20,7 @@
  * the specific failure mode directly: across 64 draws from the seed the module starts
  * at, `% 32` must not be the same value every time.
  *
- * Run: `npx tsx tools/dump-graphic-random.ts`
+ * Run: `npm test -- --only=dump-graphic-random.ts`
  */
 import { GraphicRandom, graphicRandomState } from '../src/renderer/bytecode/DrawDoor';
 import { check, finish } from './lib/check';

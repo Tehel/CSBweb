@@ -21,7 +21,7 @@
  * 6. **The portrait** of a champion carrying only `portraitGraphic` is the host's pixels.
  * 7. **A save carries it**: the party of three, the slot past it and the wings.
  *
- * Run: `npx tsx tools/dump-swap-character.ts`
+ * Run: `npm test -- --only=dump-swap-character.ts`
  */
 import { readCsbwinCharacter, writeCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';

@@ -22,7 +22,7 @@
  *    that cell. Every skin of the dungeon comes back, the new one with them: the cache
  *    is a new one with each world read, where CSBWin's `Cleanup` empties it.
  *
- * Run: `npx tsx tools/dump-skins.ts`
+ * Run: `npm test -- --only=dump-skins.ts`
  */
 import { readFileSync } from 'node:fs';
 

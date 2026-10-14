@@ -17,7 +17,7 @@
  *     set and week, the champions per set, the deaths per square, the won games with their
  *     wall time; and no player id or build in them.
  *
- * Usage: npx tsx tools/dump-stats.ts
+ * Usage: npm test -- --only=dump-stats.ts
  */
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

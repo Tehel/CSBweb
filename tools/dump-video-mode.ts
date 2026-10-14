@@ -16,7 +16,7 @@
  *   Closed, the mode stays until the next tick's top, or `TAG0207cc` shows the inventory
  *   that was open (`SaveGame.cpp:1375`).
  *
- * Run: `npx tsx tools/dump-video-mode.ts`
+ * Run: `npm test -- --only=dump-video-mode.ts`
  */
 import { Position } from '../src/core/types';
 import { wakeUp } from '../src/engine/LoopState';

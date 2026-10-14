@@ -31,7 +31,7 @@
  *    palette changed in play comes back from a save, and a world without all 24 records,
  *    `dungeon.dat`'s, reads as the identity.
  *
- * Run: `npx tsx tools/dump-dsa-save.ts`
+ * Run: `npm test -- --only=dump-dsa-save.ts`
  */
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';

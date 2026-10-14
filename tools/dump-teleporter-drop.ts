@@ -15,7 +15,7 @@
  * an object taken from the floor directly onto it, and checks it lands at the
  * teleporter's destination rather than staying put.
  *
- * Run: `npx tsx tools/dump-teleporter-drop.ts`
+ * Run: `npm test -- --only=dump-teleporter-drop.ts`
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';

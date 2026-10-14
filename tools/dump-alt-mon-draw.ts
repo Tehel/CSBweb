@@ -20,7 +20,7 @@
  * 5. **The default dungeon draws as before**: no group of DM's names an alternate graphic,
  *    no generator makes one, and no level maps one.
  *
- * Run: `npx tsx tools/dump-alt-mon-draw.ts`
+ * Run: `npm test -- --only=dump-alt-mon-draw.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

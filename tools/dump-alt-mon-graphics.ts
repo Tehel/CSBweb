@@ -18,7 +18,7 @@
  *    type's slots.
  * 4. **Every group of Conflux's dungeon** with an alternate graphic finds it on its level.
  *
- * Run: `npx tsx tools/dump-alt-mon-graphics.ts`
+ * Run: `npm test -- --only=dump-alt-mon-graphics.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

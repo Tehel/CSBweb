@@ -20,7 +20,7 @@
  * was clicked, both before and after the turn, and the other champions' slots must be
  * untouched.
  *
- * Run: `npx tsx tools/dump-inventory-routing.ts`
+ * Run: `npm test -- --only=dump-inventory-routing.ts`
  */
 import { Direction, OBJECT_ID_NULL, Position } from '../src/core/types';
 import { initialPartyState, setHandOwner, setPartyFacing } from '../src/engine/Party';

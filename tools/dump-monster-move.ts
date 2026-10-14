@@ -9,7 +9,7 @@
  * the group on an abeyance timer instead of losing it — up to 31 of them per square, past
  * which an ordinary group is deleted.
  *
- * Run: `npx tsx tools/dump-monster-move.ts [level]`
+ * Run: `npm test -- --only=dump-monster-move.ts [level]`
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
 import { TimerFunction } from '../src/engine/TimerQueue';

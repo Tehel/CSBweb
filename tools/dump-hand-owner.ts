@@ -12,7 +12,7 @@
  * champion joins, never -1 again while anyone lives, and the slot/hand pair swaps
  * cleanly in both directions.
  *
- * Run: `npx tsx tools/dump-hand-owner.ts`
+ * Run: `npm test -- --only=dump-hand-owner.ts`
  */
 import { DBType, Direction, OBJECT_ID_NULL, Position } from '../src/core/types';
 import { Party, ensureHandOwner, initialPartyState, setHandOwner } from '../src/engine/Party';

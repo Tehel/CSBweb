@@ -12,7 +12,7 @@
  * after it. The two that swap swap, and only the one put down turns to face the party's
  * way.
  *
- * Run: `npx tsx tools/dump-marching-order.ts`
+ * Run: `npm test -- --only=dump-marching-order.ts`
  */
 import { Direction, Position } from '../src/core/types';
 import { Party } from '../src/engine/Party';

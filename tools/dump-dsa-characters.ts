@@ -28,7 +28,7 @@
  * 9. **`&EXPERIENCE+`** adds `(UI16)experience` (`Magic.cpp:412`), and nothing to a dead
  *    champion; **`&CAUSEPOISON`** is `PoisonCharacter` (`CSBCode.cpp:7270`).
  *
- * Run: `npx tsx tools/dump-dsa-characters.ts`
+ * Run: `npm test -- --only=dump-dsa-characters.ts`
  */
 import { readFileSync } from 'node:fs';
 

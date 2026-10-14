@@ -15,7 +15,7 @@
  * 4. **Who asks for it**: the sleep icon, button 145, and the wake click, button 146,
  *    raise `UIState.sleepSaveNeeded`; a blow's `WakeUp` and a refused sleep do not.
  *
- * Run: `npx tsx tools/dump-sleep-save.ts`
+ * Run: `npm test -- --only=dump-sleep-save.ts`
  */
 import { readFileSync } from 'node:fs';
 

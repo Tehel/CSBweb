@@ -25,7 +25,7 @@
  *     as a group's is.
  *  5. The cloud database is never made room in.
  *
- * Run: `npx tsx tools/dump-make-more-room.ts`
+ * Run: `npm test -- --only=dump-make-more-room.ts`
  */
 
 import { DBType, getRoomType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';

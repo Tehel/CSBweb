@@ -30,7 +30,7 @@
  *    `m_maxTimers`, past every hole, and grows the table to `(m_maxTimers+10)*5/4`
  *    (`Timer.cpp:999-1008`); a delete below the cursor lowers it again (`:966-969`).
  *
- * Run: `npx tsx tools/dump-timer-heap.ts`
+ * Run: `npm test -- --only=dump-timer-heap.ts`
  */
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';

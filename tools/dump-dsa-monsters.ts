@@ -23,7 +23,7 @@
  * 6. **`&MONL&D`** (`DSA.cpp:4769-4791`) does nothing, not even pop, outside the monster
  *    move filter; in it, the group's location and distance from the filter's parameters.
  *
- * Run: `npx tsx tools/dump-dsa-monsters.ts`
+ * Run: `npm test -- --only=dump-dsa-monsters.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { StkOp } from '../src/engine/DsaSystem';

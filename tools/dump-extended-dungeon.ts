@@ -26,7 +26,7 @@
  * whose body starts at byte 8 of the file, inside the block, is transcribed but has no
  * file that exercises it.
  *
- * Run: `npx tsx tools/dump-extended-dungeon.ts`
+ * Run: `npm test -- --only=dump-extended-dungeon.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

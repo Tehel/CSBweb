@@ -27,7 +27,7 @@
  * (`Mouse.cpp:1166`), so before that false wall it takes the stone arm: the two near drop
  * areas and button 5, and no throw.
  *
- * Run: `npx tsx tools/dump-viewport-click.ts`
+ * Run: `npm test -- --only=dump-viewport-click.ts`
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import { RoomType } from '../src/renderer/bytecode/Types';

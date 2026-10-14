@@ -18,7 +18,7 @@
  *   `if (!DM_rules)` (`CSBCode.cpp:6799`, `:6820`); `dump-hall-of-champions.ts` shows
  *   both sides at a mirror.
  *
- * Run: `npx tsx tools/dump-dm-rules.ts`
+ * Run: `npm test -- --only=dump-dm-rules.ts`
  */
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';

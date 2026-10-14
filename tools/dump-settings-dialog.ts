@@ -36,7 +36,7 @@
  *    the list scrolled by the wheel, three rows a notch and a touchpad's small deltas
  *    added up, its arrows and the keys; the wheel's scroll says it is to be drawn. `tools/dump-key-bindings.ts` checks the tables and labels.
  *
- * Run: `npx tsx tools/dump-settings-dialog.ts`
+ * Run: `npm test -- --only=dump-settings-dialog.ts`
  */
 import { emptyDungeonData } from '../src/data/DungeonLoader';
 import type { Rect } from '../src/data/tables/UITables';

@@ -18,7 +18,7 @@
  * `word2Bit4` monster that finds no live champion gives up there (`:1096`): no missile,
  * no range drawn, and false.
  *
- * Run: `npx tsx tools/dump-monster-missile-type.ts`
+ * Run: `npm test -- --only=dump-monster-missile-type.ts`
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import {

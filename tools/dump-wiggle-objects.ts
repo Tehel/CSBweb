@@ -21,7 +21,7 @@
  * The teleporter and the pit are real ones from `dungeon.dat`, switched off and then
  * switched on by the `TT_TELEPORTER` / `TT_PIT` timer an actuator would queue.
  *
- * Run: `npx tsx tools/dump-wiggle-objects.ts`
+ * Run: `npm test -- --only=dump-wiggle-objects.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';

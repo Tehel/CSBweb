@@ -18,7 +18,7 @@
  *    adds a set shows): every program of the dungeon decodes to its exact length with
  *    CSBWin's operand layout. The default dungeon is Conflux 3.5's.
  *
- * Run: `npx tsx tools/dump-dsa-census.ts [dungeon.dat]`
+ * Run: `npm test -- --only=dump-dsa-census.ts [dungeon.dat]`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

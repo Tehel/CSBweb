@@ -6,7 +6,7 @@
  * and what AI timer each was given. Without this there is nothing to look at: a
  * monster with a slot renders exactly like one without.
  *
- * Run: `npx tsx tools/dump-monster-activation.ts [level]`  (default: level 3)
+ * Run: `npm test -- --only=dump-monster-activation.ts [level]`  (default: level 3)
  */
 import { Position } from '../src/core/types';
 import { DungeonState } from '../src/engine/DungeonState';

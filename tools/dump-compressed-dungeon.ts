@@ -14,7 +14,7 @@
  *
  * DM's `dungeon.dat` is plain: through the same entry it must read exactly as before.
  *
- * Run: `npx tsx tools/dump-compressed-dungeon.ts`
+ * Run: `npm test -- --only=dump-compressed-dungeon.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

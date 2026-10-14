@@ -40,7 +40,7 @@
  * nobody joins. One alive in the wings is refused at the drop, and a timer reads them out
  * of the wings for good.
  *
- * Run: `npx tsx tools/dump-vi-altar.ts`
+ * Run: `npm test -- --only=dump-vi-altar.ts`
  */
 import { MISC_BONES_OF_HERO } from '../src/core/constants';
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';

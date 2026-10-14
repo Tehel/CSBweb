@@ -15,7 +15,7 @@
  * Then the writer: block 14 built from the read levels (`buildCellFlagArray`) is the
  * file's own cell flag array byte for byte, at the size the file declares.
  *
- * Run: `npx tsx tools/dump-cell-offsets.ts`
+ * Run: `npm test -- --only=dump-cell-offsets.ts`
  */
 import { readFileSync } from 'node:fs';
 

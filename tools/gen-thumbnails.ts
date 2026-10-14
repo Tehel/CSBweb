@@ -15,7 +15,7 @@
  * Run:
  *
  *   npx tsx tools/gen-thumbnails.ts [<id>…]            # write them
- *   npx tsx tools/gen-thumbnails.ts --check [<id>…]    # check them (npm test)
+ *   npm test -- --only=gen-thumbnails.ts --check [<id>…]  # check them
  *
  * `--check` writes nothing: it asserts that every set's file holds the frame this tool
  * would write, pixel for pixel and colour for colour, that the PNG it would write decodes

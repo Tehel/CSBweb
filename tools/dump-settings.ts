@@ -8,7 +8,7 @@
  * `main.ts` applies it (`applyToGame`). The keys the game answers follow the table in
  * force (`keyAction`).
  *
- * Run: `npx tsx tools/dump-settings.ts`
+ * Run: `npm test -- --only=dump-settings.ts`
  */
 import { NO_EXTRAS, type Extras } from '../src/engine/GameContext';
 import { DEFAULT_KEY_BINDINGS, keyAction, type KeyBindings } from '../src/renderer/ui/Keyboard';

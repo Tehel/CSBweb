@@ -61,7 +61,10 @@ line that overwrote two earlier failures. A tool that cannot fail is not evidenc
 
 ## Shape
 
-Two naming conventions, both run with `npx tsx tools/<name>.ts [args]`:
+Two naming conventions, both run with `npm test -- --only=<name>.ts [args]` once the tool
+is listed in `run-checks.mjs`: the runner checks the types first, prints the tool's whole
+output, and hands it the arguments. `npx tsx tools/<name>.ts` runs a tool with type errors
+in it, or in what it imports, as if they were not there.
 
 - `dump-*.ts` — inspect and assert on a specific mechanism.
 - `watch-*.ts` — run the clock and report what emerged over time.
@@ -70,7 +73,7 @@ Two naming conventions, both run with `npx tsx tools/<name>.ts [args]`:
 /**
  * One paragraph: what is invisible without this, and what the reader should look for.
  *
- * Run: `npx tsx tools/dump-thing.ts [level]`
+ * Run: `npm test -- --only=dump-thing.ts [level]`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

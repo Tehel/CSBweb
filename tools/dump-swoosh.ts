@@ -19,7 +19,7 @@
  *    VBL the reference gives, the sound started before the first, then the hold, the fade
  *    and a black, cleared screen for the title.
  *
- * Run: `npx tsx tools/dump-swoosh.ts`
+ * Run: `npm test -- --only=dump-swoosh.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

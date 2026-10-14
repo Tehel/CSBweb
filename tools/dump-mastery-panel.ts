@@ -46,7 +46,7 @@
  * independently; nothing on those rows for a champion with no experience; and the rune
  * ranks differing from their upper-cased selves.
  *
- * Run: `npx tsx tools/dump-mastery-panel.ts`
+ * Run: `npm test -- --only=dump-mastery-panel.ts`
  */
 import { DBType, Direction, OBJECT_ID_NULL, Position, TilePosition, type ObjectID } from '../src/core/types';
 import { initialPartyState } from '../src/engine/Party';

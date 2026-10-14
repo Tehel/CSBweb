@@ -29,7 +29,7 @@
  * as palette indices): seven of the portrait sections of both `CSBgraphics.dat` files
  * here are cells of CSB's graphic 26, and must decode to them pixel for pixel.
  *
- * Run: `npx tsx tools/dump-portraits.ts [save]`
+ * Run: `npm test -- --only=dump-portraits.ts [save]`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

@@ -5,7 +5,7 @@
  * a pass, so a linefeed queued on its own would show the text a pass later. The
  * translation is `DEBT.md` G21's.
  *
- * Run: `npx tsx tools/dump-flip.ts`
+ * Run: `npm test -- --only=dump-flip.ts`
  */
 import { AttackType } from '../src/engine/monsterTypes';
 import { freshGame } from './lib/dsa';

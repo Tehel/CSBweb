@@ -28,7 +28,7 @@
  * print on the cell ahead differs from the frame without it, inside that cell's rectangle,
  * the trail having been round its ring of 24 and the party having walked on from the print.
  *
- * Run: `npx tsx tools/dump-footprint-decoration.ts`
+ * Run: `npm test -- --only=dump-footprint-decoration.ts`
  */
 import { Position } from '../src/core/types';
 import { DungeonState, extendedCellFlagsKey } from '../src/engine/DungeonState';

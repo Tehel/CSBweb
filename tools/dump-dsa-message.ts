@@ -22,7 +22,7 @@
  *    `Override_P` before every DSA it runs (`DSA.cpp:5417`), so the next run's `&MESSAGE`
  *    goes to the corner its location names.
  *
- * Run: `npx tsx tools/dump-dsa-message.ts`
+ * Run: `npm test -- --only=dump-dsa-message.ts`
  */
 import { Position, RoomType, locationRelToInteger } from '../src/core/types';
 import { messageParametersKey } from '../src/data/CsbwinExpool';

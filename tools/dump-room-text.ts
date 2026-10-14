@@ -11,7 +11,7 @@
  * level 0 at (9, 1). The tool lists every such text, then stands the party there and
  * reads what the square's pads queued.
  *
- * Run: `npx tsx tools/dump-room-text.ts`
+ * Run: `npm test -- --only=dump-room-text.ts`
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
 import { newGame, stockDungeon, stockGraphics } from './lib/game';

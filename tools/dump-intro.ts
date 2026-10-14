@@ -30,7 +30,7 @@
  * inspected pixel by pixel. Only `drawPrisonInterior` is stubbed, with a flat colour no
  * artwork uses, so "the doorway shows the dungeon" is a checkable claim.
  *
- * Run: `npx tsx tools/dump-intro.ts`
+ * Run: `npm test -- --only=dump-intro.ts`
  */
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { ratesDefault } from '../src/audio/soundsIndex';

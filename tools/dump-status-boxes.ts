@@ -23,7 +23,7 @@
  * `d.Word1406`, already extracted for the mouth-chew animation and the eye's hit box),
  * both graphics are measured, and every arm of both predicates is driven.
  *
- * Run: `npx tsx tools/dump-status-boxes.ts`
+ * Run: `npm test -- --only=dump-status-boxes.ts`
  */
 import { AttributeIndex, setAttributeCurrent } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';

@@ -18,7 +18,7 @@
  * Reincarnate wipes all twenty skills before charging the hero's own penalties, which
  * `DM_rules` waives.
  *
- * Run: `npx tsx tools/dump-hall-of-champions.ts`
+ * Run: `npm test -- --only=dump-hall-of-champions.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

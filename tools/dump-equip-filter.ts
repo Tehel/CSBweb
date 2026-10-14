@@ -14,7 +14,7 @@
  * 4. **`AddCharacterPossession`** runs the arriving half alone, on variables of its own,
  *    and the object is in the slot.
  *
- * Run: `npx tsx tools/dump-equip-filter.ts`
+ * Run: `npm test -- --only=dump-equip-filter.ts`
  */
 import { OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
 import { StkOp } from '../src/engine/DsaSystem';

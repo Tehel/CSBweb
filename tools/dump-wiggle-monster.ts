@@ -15,7 +15,7 @@
  * The teleporter is a real record from `dungeon.dat`, re-aimed onto a real open square,
  * switched off, and then switched on by the `TT_TELEPORTER` timer an actuator would queue.
  *
- * Run: `npx tsx tools/dump-wiggle-monster.ts`
+ * Run: `npm test -- --only=dump-wiggle-monster.ts`
  */
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { ActuatorAction } from '../src/data/actuatorHelpers';

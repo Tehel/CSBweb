@@ -21,7 +21,7 @@
  *     #550's ornament, an alcove. The port handed the local action the bits of #549's
  *     `localActionType` read as a target square, and never rotated after a stone timer.
  *
- * Run: `npx tsx tools/dump-hidden-alcove.ts`
+ * Run: `npm test -- --only=dump-hidden-alcove.ts`
  */
 import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';

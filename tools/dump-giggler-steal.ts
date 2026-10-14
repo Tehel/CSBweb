@@ -14,7 +14,7 @@
  * came out of a ready hand; and the giggler's chain is exactly those objects, in the
  * order they were taken.
  *
- * Run: `npx tsx tools/dump-giggler-steal.ts [ticks]`
+ * Run: `npm test -- --only=dump-giggler-steal.ts [ticks]`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import type { Game } from '../src/engine/Game';

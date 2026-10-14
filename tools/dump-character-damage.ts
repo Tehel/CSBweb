@@ -18,7 +18,7 @@
  *   3. The screen: `drawPartyStatus` with the real graphics and font — what the readout
  *      covers in each mode, and when it is dropped.
  *
- * Run: `npx tsx tools/dump-character-damage.ts`
+ * Run: `npm test -- --only=dump-character-damage.ts`
  */
 import { PotionType } from '../src/core/constants';
 import { CsbRandom } from '../src/core/random';

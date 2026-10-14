@@ -14,7 +14,7 @@
  * 3. **The input during a slide** is thrown away: a step queued mid-slide is never taken.
  * 4. **A game read** starts the gravity afresh, `{0,1,2,0}` and at rest (`DEBT.md` H).
  *
- * Run: `npx tsx tools/watch-3d2d1d-gravity.ts`
+ * Run: `npm test -- --only=watch-3d2d1d-gravity.ts`
  */
 import { readFileSync } from 'node:fs';
 

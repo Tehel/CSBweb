@@ -31,7 +31,7 @@
  * `tools/frames/20-conflux-bookshelf.png` shows two in a view: Conflux's wall decoration
  * 5, a bookshelf, as it stands at F1, and 11, a ladder, scaled at F2.
  *
- * Run: `npx tsx tools/dump-extended-decorations.ts`
+ * Run: `npm test -- --only=dump-extended-decorations.ts`
  */
 import { readFileSync } from 'node:fs';
 

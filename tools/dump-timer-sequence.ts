@@ -16,7 +16,7 @@
  * restored, as the runtime state and from a save file, into a fresh game: the stamps,
  * the order and the counter must come back, so the next timer lands where it would have.
  *
- * Run: `npx tsx tools/dump-timer-sequence.ts`
+ * Run: `npm test -- --only=dump-timer-sequence.ts`
  */
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import type { Game } from '../src/engine/Game';

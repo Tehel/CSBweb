@@ -26,7 +26,7 @@
  * The squares are real open squares of `dungeon.dat`; the teleporters are real teleporter
  * records moved onto them and re-aimed, and the pit is a real one.
  *
- * Run: `npx tsx tools/dump-monster-move-code.ts`
+ * Run: `npm test -- --only=dump-monster-move-code.ts`
  */
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { SMS_ATTACKING } from '../src/data/dungeonTypes';

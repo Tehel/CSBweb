@@ -21,7 +21,7 @@
  * 6. **The block outlives the attack**: `disableTime`, which `MonsterAttacks` never writes,
  *    is what the last filter left there.
  *
- * Run: `npx tsx tools/dump-monster-attack-filter.ts`
+ * Run: `npm test -- --only=dump-monster-attack-filter.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { RN_FIREBALL } from '../src/core/spellRn';

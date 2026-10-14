@@ -118,7 +118,6 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
-| F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
 | R1 | A game read in play leaves the screen on the old world | M | ⏳ |
 | R3 | After a fatal error the page still saves | S | ⏳ |
@@ -1659,24 +1658,6 @@ crash-loops the container; only the optional `tools/check-image.sh` would see it
 Paying it: the server on `module` and `moduleResolution` `"nodenext"`, an ES `lib` and
 Node's types; `src/` without Node's; `dump-server` running the server from a scratch
 folder laid out as the image is.
-
-### F20 ⏳ A tool is run without its types checked
-
-`tsx` strips types without checking them, as esbuild does for `vite build`, so a tool
-run on its own with `npx tsx tools/<name>.ts`, the way `CLAUDE.md`, the
-`verification-tools` skill and every tool's own header say to run it, passes with type
-errors in it or in what it imports. They come out only in `npm test`, whose `tsc
---noEmit` is the gate, and there late: the runner schedules `tsc` with every tool and
-prints a failure's output only after the whole run (`tools/run-checks.mjs`, "Failures
-print their whole output"), so a type error in a new tool is learnt ~150 s after the
-run started. `npm test -- --only=<name>` runs `tsc` and the tool in a few seconds, but
-nothing points to it for one tool.
-
-Paying it: one tool is run through the runner, `npm test -- --only=<name>`, in
-`CLAUDE.md`, the skill and the tools' `Run:` lines, so its types are checked every
-time; and the runner prints a failed `tsc`'s errors as soon as it ends, without waiting
-for the tools. The check: a tool with a planted type error fails `--only` on it, and the
-full run shows the error before its first tool result.
 
 ### F19 ⏳ The tools' screen is wired by hand, and has drifted
 

@@ -24,7 +24,7 @@
  *    past offsets it holds, so `CreateNewAffineMask`'s short move never shows. The programs draw with them: `DrawCustomGraphic` is asked for a
  *    virtual bitmap through a virtual mask, and finds both.
  *
- * Run: `npx tsx tools/dump-virtual-graphics.ts`.
+ * Run: `npm test -- --only=dump-virtual-graphics.ts`.
  */
 import { readFileSync } from 'node:fs';
 

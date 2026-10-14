@@ -17,7 +17,7 @@
  *     base set's `graphics.dat`, read from the set's folder, the same with Chaos Strikes Back's
  *     own `graphics.dat`, and a `dungeon.dat` that does not read.
  *
- * Usage: npx tsx tools/dump-build.ts
+ * Usage: npm test -- --only=dump-build.ts
  */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';

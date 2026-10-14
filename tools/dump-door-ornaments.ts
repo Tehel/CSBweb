@@ -16,7 +16,7 @@
  * And, for `dm-atari/dungeon.dat`, that no door names an ornament past its level's
  * `DoorDecorationTOC`, so no door reads a slot another level left behind.
  *
- * Run: `npx tsx tools/dump-door-ornaments.ts`
+ * Run: `npm test -- --only=dump-door-ornaments.ts`
  */
 import { OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { check, finish } from './lib/check';

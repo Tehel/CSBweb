@@ -6,7 +6,7 @@
  * `GameHost.die`, which the page reports. A host that leaves `die` out gets the error
  * thrown again, so nothing swallows it.
  *
- * Run: `npx tsx tools/dump-loop-die.ts`
+ * Run: `npm test -- --only=dump-loop-die.ts`
  */
 
 import { createGameHost } from '../src/engine/GameHost';

@@ -18,7 +18,7 @@
  *    left, a line from below the viewport down to line 136; an overlay jitter is
  *    `NotImplemented`.
  *
- * Run: `npx tsx tools/dump-overlay-screen.ts`
+ * Run: `npm test -- --only=dump-overlay-screen.ts`
  */
 import { readFileSync } from 'node:fs';
 

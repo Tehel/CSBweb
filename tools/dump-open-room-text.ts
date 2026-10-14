@@ -15,7 +15,7 @@
  * 3. A generator on level 9 at (5, 12) makes a group for a `TT_OPENROOM`, none for a
  *    `TT_DESSAGE`.
  *
- * Run: `npx tsx tools/dump-open-room-text.ts`
+ * Run: `npm test -- --only=dump-open-room-text.ts`
  */
 
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';

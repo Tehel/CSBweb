@@ -17,7 +17,7 @@
  * "fresh" column *differing* from both. That last one is the point — a fresh world
  * whose door is already open would make the whole test vacuous.
  *
- * Run: `npx tsx tools/dump-savegame.ts [level]`
+ * Run: `npm test -- --only=dump-savegame.ts [level]`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';

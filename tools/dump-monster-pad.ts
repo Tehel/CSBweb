@@ -26,7 +26,7 @@
  * The pad is a real one from `dungeon.dat`: the first actuator of type 1 (party,
  * monster or object) on an open square with an open neighbour.
  *
- * Run: `npx tsx tools/dump-monster-pad.ts`
+ * Run: `npm test -- --only=dump-monster-pad.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { getActuatorType } from '../src/data/actuatorHelpers';

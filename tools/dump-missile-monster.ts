@@ -34,7 +34,7 @@
  * (`:3896`, `:3974`). A lone monster spread over its cell (255), or one whose byte still
  * holds another member's corner, meets no missile at all.
  *
- * Run: `npx tsx tools/dump-missile-monster.ts`
+ * Run: `npm test -- --only=dump-missile-monster.ts`
  */
 import { PotionType } from '../src/core/constants';
 import { sw } from '../src/core/intCast';

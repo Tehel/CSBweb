@@ -24,7 +24,7 @@
  *    `GetWallDecorationID` and `GetCode`'s refusals, on sections made here, since no
  *    skin of these files has a decoration.
  *
- * Run: `npx tsx tools/dump-background-lib.ts`
+ * Run: `npm test -- --only=dump-background-lib.ts`
  */
 import { readFileSync } from 'node:fs';
 

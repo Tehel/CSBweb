@@ -19,7 +19,7 @@
  *     whose slot carries bit 0x80, is "Cloned!!!": deleting it changes nothing. Slot 0
  *     names door 0, so door 0 is such a record as soon as a cell's chain holds it.
  *
- * Run: `npx tsx tools/dump-db-reuse.ts`
+ * Run: `npm test -- --only=dump-db-reuse.ts`
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import type { DungeonState } from '../src/engine/DungeonState';

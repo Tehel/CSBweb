@@ -18,6 +18,11 @@
 //   npm test -- --only=ai        # just the tools whose name contains "ai" (and tsc)
 //   npm test -- --only=dsa,save  # …or any of several
 //   npm test -- --jobs=1         # one at a time; a tool's own time is then its own
+//
+// One tool on its own, its types checked: `npm test -- --only=dump-savegame.ts 3`. When
+// `--only` picks out a single tool, its whole output prints, pass or fail, and every
+// argument the runner does not know is the tool's, in place of the args pinned below.
+// `npx tsx tools/<name>.ts` strips the types without checking them, as `vite build` does.
 import { spawn, spawnSync } from 'node:child_process';
 import { availableParallelism } from 'node:os';
 import { existsSync } from 'node:fs';
@@ -370,14 +375,20 @@ const withFrames = argv.includes('--frames');
 const only = argv.find((a) => a.startsWith('--only='))?.slice('--only='.length).split(',').filter(Boolean);
 const jobsArg = argv.find((a) => a.startsWith('--jobs='))?.slice('--jobs='.length);
 const jobs = jobsArg ? Math.max(1, Number.parseInt(jobsArg, 10) || 1) : availableParallelism();
+const toolArgs = argv.filter((a) => a !== '--frames' && !a.startsWith('--only=') && !a.startsWith('--jobs='));
 
 const results = [];
 let failed = 0;
 
-function record(name, r, ms) {
+// `show` prints a job's output under its line rather than after the run: 'always', or
+// 'failure' (a type error is learnt before the tools' results, not ~150 s later).
+function record(name, r, ms, show) {
   const ok = r.status === 0 && !r.error;
   console.log(`  ${name.padEnd(34)}${ok ? 'ok  ' : 'FAIL'}  ${String(ms).padStart(6)} ms`);
-  results.push({ name, ok, out: (r.error ? `${r.error}\n` : '') + r.out, ms });
+  const out = (r.error ? `${r.error}\n` : '') + r.out;
+  const shown = show === 'always' || (show === 'failure' && !ok);
+  if (shown && out.trim()) console.log(`\n${out.trimEnd()}\n`);
+  results.push({ name, ok, out, ms, shown });
   if (!ok) failed++;
 }
 
@@ -399,15 +410,27 @@ if (!existsSync(TSX)) {
 }
 
 const wanted = ({ tool }) => !only || only.some((o) => tool.includes(o));
-const tool = ({ tool, args = [] }) => ({ name: tool, cmd: TSX, args: [resolve(ROOT, 'tools', tool), ...args] });
+const checks = CHECKS.filter(wanted);
+const smoke = SMOKE.filter(wanted);
+const single = only && checks.length + smoke.length === 1;
+if (toolArgs.length && !single) {
+  console.error(`${toolArgs.join(' ')}: a tool's arguments need --only to pick out one tool.`);
+  process.exit(1);
+}
+const tool = ({ tool, args = [] }) => ({
+  name: tool,
+  cmd: TSX,
+  args: [resolve(ROOT, 'tools', tool), ...(toolArgs.length ? toolArgs : args)],
+  show: single ? 'always' : undefined,
+});
 const sections = [
   ['types', [
-    { name: 'tsc --noEmit', cmd: TSC, args: ['--noEmit'] },
+    { name: 'tsc --noEmit', cmd: TSC, args: ['--noEmit'], show: 'failure' },
     // The server as Node strips it: erasable syntax only (server/tsconfig.json).
-    { name: 'tsc --noEmit -p server', cmd: TSC, args: ['--noEmit', '-p', 'server'] },
+    { name: 'tsc --noEmit -p server', cmd: TSC, args: ['--noEmit', '-p', 'server'], show: 'failure' },
   ]],
-  ['checks', CHECKS.filter(wanted).map(tool)],
-  ['smoke (crash only)', SMOKE.filter(wanted).map(tool)],
+  ['checks', checks.map(tool)],
+  ['smoke (crash only)', smoke.map(tool)],
 ];
 
 // Every job starts as soon as a worker is free; each result prints once the jobs listed
@@ -426,7 +449,7 @@ function flush() {
       sectionEnd += list.length;
     }
     const { job, result } = pending[printed++];
-    record(job.name, result, result.ms);
+    record(job.name, result, result.ms, job.show);
   }
 }
 async function worker() {
@@ -450,7 +473,7 @@ if (withFrames) {
 
 // Failures print their whole output: these tools are meant to be read, and the table
 // above the failed assertion is usually what tells you which way the port went wrong.
-for (const r of results.filter((x) => !x.ok)) {
+for (const r of results.filter((x) => !x.ok && !x.shown)) {
   console.log(`\n${'='.repeat(72)}\nFAILED: ${r.name}\n${'='.repeat(72)}`);
   console.log(r.out.trimEnd());
 }

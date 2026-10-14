@@ -19,7 +19,7 @@
  * - Asleep, `TAG02076e` does nothing and `TAG0207cc` only redraws the sleep screen
  *   (`Character.cpp:5136`, `CSBCode.cpp:10062-10066`): the thaw goes back to the sleep lists.
  *
- * Run: `npx tsx tools/dump-freeze.ts`
+ * Run: `npm test -- --only=dump-freeze.ts`
  */
 import { Position } from '../src/core/types';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';

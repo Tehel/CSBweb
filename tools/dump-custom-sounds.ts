@@ -17,7 +17,7 @@
  * 4. **The volume is `Decode`'s divisor**, 1 for a volume of 0 (`:1066`), and
  *    `soundDataDecode` its table (`:326-334`), wrapping to a byte as `(ui8)` does.
  *
- * Run: `npx tsx tools/dump-custom-sounds.ts`
+ * Run: `npm test -- --only=dump-custom-sounds.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

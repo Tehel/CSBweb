@@ -16,7 +16,7 @@
  * A later save must differ — that is the vacuity guard. If a fully-played dungeon also
  * matched `dungeon.dat`, the comparison would be reading the wrong bytes in both.
  *
- * Run: `npx tsx tools/dump-csbwin-world.ts [path-or-directory]`
+ * Run: `npm test -- --only=dump-csbwin-world.ts [path-or-directory]`
  */
 import { readFileSync } from 'node:fs';
 

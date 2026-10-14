@@ -15,7 +15,7 @@
  *  a. level 9 (5, 12), multiplier 3, with the party on level 3;
  *  b. level 3 (7, 23), multiplier 0 on a level of multiplier 2, with the party on its level.
  *
- * Run: `npx tsx tools/dump-monster-generator.ts`
+ * Run: `npm test -- --only=dump-monster-generator.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { ActuatorAction, getActuatorHitPointMultiplier, getActuatorType, getActuatorValue } from '../src/data/actuatorHelpers';

@@ -14,7 +14,7 @@
  *      and the magic tab move to a living champion, and `d.GameIsLost` is set when
  *      there is none.
  *
- * Run: `npx tsx tools/dump-champion-state.ts`
+ * Run: `npm test -- --only=dump-champion-state.ts`
  */
 import { Position } from '../src/core/types';
 import { Game } from '../src/engine/Game';

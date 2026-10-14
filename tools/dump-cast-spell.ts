@@ -17,7 +17,7 @@
  *   dropped in the party's cell with `MoveObject(obj_2, -1, 0, d.partyX, d.partyY)`
  *   (`:1362-1389`), so the pads there see it placed, with `unchangedRoom` true.
  *
- * Run: `npx tsx tools/dump-cast-spell.ts`
+ * Run: `npm test -- --only=dump-cast-spell.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';

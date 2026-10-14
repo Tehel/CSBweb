@@ -17,7 +17,7 @@
  *    a linefeed first, one queue entry, `@p`, `@N` and "HUH???", the colour as a word.
  * 6. **`&DISCARDTEXT`** (`DSA.cpp:3162-3168`) empties the strip.
  *
- * Run: `npx tsx tools/dump-dsa-text.ts`
+ * Run: `npm test -- --only=dump-dsa-text.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { EDT_GLOBAL_TEXT } from '../src/data/DecodeText';

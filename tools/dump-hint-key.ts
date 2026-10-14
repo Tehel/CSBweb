@@ -18,7 +18,7 @@
  *    no key it fails the first header check, and a key whose first byte is 0 reads the
  *    plain file plain.
  *
- * Run: `npx tsx tools/dump-hint-key.ts`
+ * Run: `npm test -- --only=dump-hint-key.ts`
  */
 import { readFileSync } from 'node:fs';
 

@@ -9,7 +9,7 @@
  * (`DSA.cpp:144`). Their bits therefore read back as set, as a stone wall's do through
  * `Var(i, Var(i) | bit)` (`:3705-3721`), though the DSA never set the variables itself.
  *
- * Run: `npx tsx tools/dump-dsa-cell-fetch.ts`
+ * Run: `npm test -- --only=dump-dsa-cell-fetch.ts`
  */
 import { OBJECT_ID_EOF, Position, RoomType, locationRelToInteger } from '../src/core/types';
 import { StkOp } from '../src/engine/DsaSystem';

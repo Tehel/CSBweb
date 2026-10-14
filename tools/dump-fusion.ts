@@ -33,7 +33,7 @@
  *    (`DEBT.md` H, "The ending's speech is shown whole").
  * 7. **A wall next door** blocks the square two away in that direction, open as it is.
  *
- * Run: `npx tsx tools/dump-fusion.ts`
+ * Run: `npm test -- --only=dump-fusion.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';

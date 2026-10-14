@@ -21,7 +21,7 @@
  * reaching 0 while the monster lives, and the party losing health rather than the
  * door quietly finishing its descent.
  *
- * Run: `npx tsx tools/dump-door-crush.ts [level]`
+ * Run: `npm test -- --only=dump-door-crush.ts [level]`
  */
 import { OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { TimerFunction } from '../src/engine/TimerQueue';

@@ -9,7 +9,7 @@
  * still live (the head of a chain of two or more in `dungeon.dat`) and checks that the
  * cell's chain is exactly what was there, then that object, then `RNeof`.
  *
- * Run: `npx tsx tools/dump-add-object-to-room.ts`
+ * Run: `npm test -- --only=dump-add-object-to-room.ts`
  */
 import { OBJECT_ID_EOF, Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';

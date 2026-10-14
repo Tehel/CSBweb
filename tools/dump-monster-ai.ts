@@ -8,7 +8,7 @@
  * zero HP being cleared out, FREEZE LIFE holding everything still, and a group off
  * the party's level taking its slow random walk.
  *
- * Run: `npx tsx tools/dump-monster-ai.ts [level] [ticks]`
+ * Run: `npm test -- --only=dump-monster-ai.ts [level] [ticks]`
  */
 import { Position } from '../src/core/types';
 import { TimerFunction } from '../src/engine/TimerQueue';

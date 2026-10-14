@@ -16,7 +16,7 @@
  *    but not one let go before, moved off the area, on the freeze's pixel, or with MAP VIEW
  *    off. A double click there still opens the settings.
  *
- * Run: `npx tsx tools/dump-map-dialog.ts`
+ * Run: `npm test -- --only=dump-map-dialog.ts`
  */
 import { getRoomType } from '../src/core/types';
 import type { Rect } from '../src/data/tables/UITables';

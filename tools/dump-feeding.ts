@@ -12,7 +12,7 @@
  * MaxHP; an Ee potion past the mana ceiling keeps only half the excess; a Ya potion
  * arms a TT_72 that takes the shield back off.
  *
- * Run: `npx tsx tools/dump-feeding.ts`
+ * Run: `npm test -- --only=dump-feeding.ts`
  */
 import { PotionType } from '../src/core/constants';
 import { Position } from '../src/core/types';

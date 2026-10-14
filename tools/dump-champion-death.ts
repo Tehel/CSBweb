@@ -32,7 +32,7 @@
  * rows. Anything that reads `false` in one row and `true` in the others is a path that
  * has slipped out of `KillCharacter` again.
  *
- * Run: `npx tsx tools/dump-champion-death.ts`
+ * Run: `npm test -- --only=dump-champion-death.ts`
  */
 import { MISC_BONES_OF_HERO } from '../src/core/constants';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';

@@ -15,7 +15,7 @@
  *     is drawn once, centred, as the member `DrawSize4Index` picks (`:323-348`, `:420-441`);
  *   - the missile half is in `tools/dump-missile-monster.ts`, scenario 2.
  *
- * Run: `npx tsx tools/dump-monster-design-options.ts`
+ * Run: `npm test -- --only=dump-monster-design-options.ts`
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';

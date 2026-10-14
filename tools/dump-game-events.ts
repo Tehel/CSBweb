@@ -13,7 +13,7 @@
  * And that the server takes every event the engine made as it is (`server/events.ts`): the
  * page and the server agree on its shape, field for field.
  *
- * Run: npx tsx tools/dump-game-events.ts
+ * Run: npm test -- --only=dump-game-events.ts
  */
 
 import { readFileSync } from 'node:fs';

@@ -33,7 +33,7 @@
  *    The tick ends there, and `MainLoop` waits 300 VBLs, their `vblInterrupt` and no pass,
  *    before `ShowCredits(1)` (`CSBCode.cpp:637-643`).
  *
- * Run: `npx tsx tools/dump-show-credits.ts`
+ * Run: `npm test -- --only=dump-show-credits.ts`
  */
 import { Position } from '../src/core/types';
 import type { Game } from '../src/engine/Game';

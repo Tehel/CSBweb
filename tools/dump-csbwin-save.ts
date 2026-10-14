@@ -22,7 +22,7 @@
  * The files live in `tools/fixtures/` (`tools/lib/saves.ts`), with Chaos Strikes Back's
  * two in its own folder, and are read-only inputs — the tool never writes to them.
  *
- * Run: `npx tsx tools/dump-csbwin-save.ts [path-or-directory]`
+ * Run: `npm test -- --only=dump-csbwin-save.ts [path-or-directory]`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

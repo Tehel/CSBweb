@@ -28,7 +28,7 @@
  *    the screen is cleared, and no click is waited for. A new game's hand-off draws
  *    nothing there.
  *
- * Run: `npx tsx tools/dump-bad-saved-game.ts`
+ * Run: `npm test -- --only=dump-bad-saved-game.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

@@ -14,7 +14,7 @@
  * The screen is drawn with the real graphics; each slot's box is read back from the ring
  * of pixels around its icon and named by the graphic whose ring it is.
  *
- * Run: `npx tsx tools/dump-hand-boxes.ts`
+ * Run: `npm test -- --only=dump-hand-boxes.ts`
  */
 import { Direction, Position } from '../src/core/types';
 import { Party } from '../src/engine/Party';

@@ -19,7 +19,7 @@
  *    `DisplayMagicSelection` from `D6W = 232` at `D6W += 9`, y 70
  *    (`doc/CSBwin-src/Magic.cpp:779-799`), a glyph starting at the pen.
  *
- * Run: `npx tsx tools/dump-magic-panel.ts`
+ * Run: `npm test -- --only=dump-magic-panel.ts`
  */
 import { type Champion } from '../src/engine/gameTypes';
 import { ensureSkills } from '../src/engine/skills';

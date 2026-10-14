@@ -14,7 +14,7 @@
  * 3. **The default dungeon** has no such text: every text decodes the same with the
  *    substitution as without it, at every type.
  *
- * Run: `npx tsx tools/dump-text-substitution.ts`
+ * Run: `npm test -- --only=dump-text-substitution.ts`
  */
 import { readFileSync } from 'node:fs';
 

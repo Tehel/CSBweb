@@ -66,7 +66,7 @@
  *    `:3313-3323`), and the release draws it again (`QuitPressingEye`,
  *    `doc/CSBwin-src/CSBCode.cpp:7468-7471`).
  *
- * Run: `npx tsx tools/dump-viewing-filter.ts`
+ * Run: `npm test -- --only=dump-viewing-filter.ts`
  */
 import { readFileSync } from 'node:fs';
 

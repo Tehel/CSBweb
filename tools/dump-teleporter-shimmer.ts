@@ -18,7 +18,7 @@
  * `GraphicRandom`'s two draws are taken right to left (`P7` first) by both sides: C++ leaves
  * the order unspecified, and that is the port's assumption (`DrawTeleporter`'s comment).
  *
- * Run: `npx tsx tools/dump-teleporter-shimmer.ts`
+ * Run: `npm test -- --only=dump-teleporter-shimmer.ts`
  */
 import type { RectPos } from '../src/data/tables/UITables';
 import type { InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';

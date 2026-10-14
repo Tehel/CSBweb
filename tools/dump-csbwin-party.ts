@@ -19,7 +19,7 @@
  *   as a packed RN it decodes to doors and teleporters with impossible indices;
  * - the champions found must be exactly `gb2.numcharacter` of them.
  *
- * Run: `npx tsx tools/dump-csbwin-party.ts [path-or-directory]`
+ * Run: `npm test -- --only=dump-csbwin-party.ts [path-or-directory]`
  */
 import { readFileSync } from 'node:fs';
 

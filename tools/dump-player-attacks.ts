@@ -21,7 +21,7 @@
  *     cancels the door's own timers. And the force it needs is `DoorTOC`'s, the
  *     level's own choice of door characteristics.
  *
- * Run: `npx tsx tools/dump-player-attacks.ts`
+ * Run: `npm test -- --only=dump-player-attacks.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';

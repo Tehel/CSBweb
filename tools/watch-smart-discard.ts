@@ -19,7 +19,7 @@
  *     discards bring the count under 6000, highest priority first, each lifted out of
  *     its cell and its record freed.
  *
- * Run: `npx tsx tools/watch-smart-discard.ts`
+ * Run: `npm test -- --only=watch-smart-discard.ts`
  */
 
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';

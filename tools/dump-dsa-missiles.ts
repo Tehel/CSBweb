@@ -17,7 +17,7 @@
  *    fourteen DSA parameters are the spell's, and the second runs them through the spell
  *    filter first, on a parameter array of its own, so the program's are as it left them.
  *
- * Run: `npx tsx tools/dump-dsa-missiles.ts`
+ * Run: `npm test -- --only=dump-dsa-missiles.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { RN_FIREBALL, RN_LIGHTNING } from '../src/core/spellRn';

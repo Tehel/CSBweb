@@ -26,7 +26,7 @@
  * And the control: a save CSBWin wrote carries its own size in the block, which the
  * fallback must not replace.
  *
- * Run: `npx tsx tools/dump-atari-saves.ts`
+ * Run: `npm test -- --only=dump-atari-saves.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

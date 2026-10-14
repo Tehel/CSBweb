@@ -12,7 +12,7 @@
  * poison cloud on it, queues the `TT_TELEPORTER` that switches it on, and follows the
  * cloud to the end of its life.
  *
- * Run: `npx tsx tools/dump-wiggle-cloud.ts`
+ * Run: `npm test -- --only=dump-wiggle-cloud.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';

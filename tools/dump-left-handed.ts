@@ -19,7 +19,7 @@
  * - a click on the left-handed screen, moved back, finds the button shown there: the
  *   arrows, the spell panel, the formation and the viewport.
  *
- * Run: `npx tsx tools/dump-left-handed.ts`
+ * Run: `npm test -- --only=dump-left-handed.ts`
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 

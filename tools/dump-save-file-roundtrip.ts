@@ -20,7 +20,7 @@
  * What it does **not** cover: the live path, a file written from a running game
  * (`buildSaveFile`). `tools/dump-live-save-file.ts` and `tools/dump-save-roundtrip.ts` do.
  *
- * Run: `npx tsx tools/dump-save-file-roundtrip.ts [path-or-directory]`
+ * Run: `npm test -- --only=dump-save-file-roundtrip.ts [path-or-directory]`
  */
 import { readFileSync } from 'node:fs';
 

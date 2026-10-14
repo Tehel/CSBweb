@@ -19,7 +19,7 @@
  * once, through a square's chain, a monster's possessions or a container. Node has no IndexedDB, so the store itself
  * (`BrowserDataSetStore`) is not run here.
  *
- *   npx tsx tools/dump-local-data-set.ts
+ *   npm test -- --only=dump-local-data-set.ts
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';

@@ -30,7 +30,7 @@
  *      the rectangles of its distance. Then a text of one, two or three lines draws the
  *      four-line plaque cut at that row, and nothing below it.
  *
- * Run: `npx tsx tools/dump-wall-text.ts`
+ * Run: `npm test -- --only=dump-wall-text.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

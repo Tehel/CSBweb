@@ -17,7 +17,7 @@
  * 6. **A sound queued while the DSAs run plays on** (`filterActive`, `:677-681`): the
  *    filter does not run for it.
  *
- * Run: `npx tsx tools/dump-sound-filter.ts`
+ * Run: `npm test -- --only=dump-sound-filter.ts`
  */
 import { StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
