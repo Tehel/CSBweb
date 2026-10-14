@@ -142,6 +142,8 @@ export class Game implements MainLoop {
     private loopTimer: ReturnType<typeof setTimeout> | null = null;
     /** `MainLoop` has returned, on the tick of a lost game (see `gameTick`), or won. */
     private mainLoopReturned = false;
+    /** An error has ended the game (`die`): it never runs again, and nothing saves it. */
+    private dead = false;
     /** The `LoopScript` the loop is held in, or `null` (`runScript`). */
     private script: LoopScript | null = null;
     /** The VBLs left of the `VBLDelay` the script is in. */
@@ -221,7 +223,7 @@ export class Game implements MainLoop {
      * Start the game loop
      */
     start(): void {
-        if (this.running) {
+        if (this.running || this.dead) {
             return;
         }
 
@@ -251,6 +253,22 @@ export class Game implements MainLoop {
             clearTimeout(this.loopTimer);
             this.loopTimer = null;
         }
+    }
+
+    /**
+     * An error has ended the game, CSBWin's `die` (`doc/CSBwin-src/CSBCode.cpp:96-122`),
+     * which quits: the loop stops for good, the page's input is dead (`GameInput`), and
+     * nothing saves the world the error left half-updated (`GameSaves.save`), which F5
+     * would write over the quick save that F9 reads after the reload the message asks for.
+     */
+    die(): void {
+        this.dead = true;
+        this.stop();
+    }
+
+    /** Whether an error has ended the game (`die`). */
+    isDead(): boolean {
+        return this.dead;
     }
 
     /** Whether `MainLoop` has returned: the game is over, and the page's input is dead. */
@@ -446,7 +464,7 @@ export class Game implements MainLoop {
      * (unlike `setTimeout`, which is only throttled), so an rAF-driven loop goes
      * completely idle exactly when a real VBL wouldn't.
      *
-     * A VBL that throws is CSBWin's `die`: the loop stops, and the host reports it.
+     * A VBL that throws is CSBWin's `die`: the game dies (`die`), and the host reports it.
      */
     private gameLoop = (): void => {
         if (!this.running) {
@@ -465,7 +483,7 @@ export class Game implements MainLoop {
         try {
             for (let n = 0; n < due && this.running; n++) this.runFrame();
         } catch (error) {
-            this.stop();
+            this.die();
             this.ctx.host.die(error);
             return;
         }

@@ -483,6 +483,7 @@ console.log('\n=== 5. opening it ===');
   const tableButtons: number[] = [];
   const game = {
     mainLoopHasReturned: () => false,
+    isDead: () => false,
     onMouseClick: (x: number, y: number) => queued.push({ x, y }),
     enqueueKeyButton: (button: number) => tableButtons.push(button),
     isPartySleeping: () => ui.uiMode === UIMode.Sleeping,

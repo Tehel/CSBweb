@@ -312,8 +312,12 @@ export class GameSaves {
      * row's as well, the game's count as the file is made (`Game.playTime`), and so is
      * whether the world is a modified dungeon's (`SaveEntry.unofficial`), which the game
      * has from the save it was read from.
+     *
+     * A game an error has ended (`Game.die`) is never saved, by the menu, F5 or the
+     * Sleepsave: the error may have left its world half-updated.
      */
     async save(clock: SaveClock, target: SaveTarget): Promise<SaveEntry> {
+        if (this.game.isDead()) throw new Error('an error has ended the game');
         if (clock === 'running') this.screen.repackOpenChest();
         const bytes = buildSaveFile(this.game, {
             portraitOf: (champion) => this.screen.portraitOf(champion),

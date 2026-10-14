@@ -70,10 +70,11 @@ export class GameInput {
   /**
    * Once `MainLoop` has returned, `_ShowCredits` has emptied every button list and key
    * table (`doc/CSBwin-src/Code1f9e6.cpp:116-121`) and owns the screen: the adventure's
-   * handlers neither act nor draw.
+   * handlers neither act nor draw. Nor once an error has ended the game (`Game.die`):
+   * F5 and F9 are the browser's again, a reload.
    */
   private ended(): boolean {
-    return this.host.game.mainLoopHasReturned();
+    return this.host.game.mainLoopHasReturned() || this.host.game.isDead();
   }
 
   /**

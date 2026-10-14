@@ -660,11 +660,12 @@ function logSave(message: string, error?: unknown): void {
 
 /**
  * An error that ends the page's game: `init`'s, or `die`'s (`Die`) wherever it comes from.
- * The game stops, and the message takes the screen's place (`showFatalMessage`).
+ * The game dies (`Game.die`): it stops, and neither takes a key nor saves. The message
+ * takes the screen's place (`showFatalMessage`).
  */
 function reportError(error: unknown): void {
     console.error(error);
-    game?.stop();
+    game?.die();
     setCrt(false, false);
     showFatalMessage(gameCanvasEl, error instanceof Error ? error.message : String(error));
 }

@@ -434,6 +434,12 @@ SAVED GAME!" (`:1710`) for a write that failed and for no save at all; a file th
 not read gives the line the dialog's message would be. Each outcome is also a line for
 the console, with the save's name, and with the error behind a failure.
 
+A game an error has ended (`Game.die`, the page's "The game has stopped.") saves nothing,
+by either key, the dialog or the Sleepsave (`GameSaves.save`): the error may have left
+the world half-updated, and F5 would write it over the quick save that F9 reads after the
+reload the message asks for. The page takes no key of it either (`GameInput`), so F5 and
+F9 are the browser's again: a reload. `tools/dump-fatal-error.ts` holds both.
+
 A save read in play, F9's, LOAD's or the prison's new adventure, has no CSBWin
 counterpart: CSBWin reads a game only after `d.Initialize()` has zeroed the whole of `d`
 (`doc/CSBwin-src/CSBCode.cpp:333-340`). So the screen's share of `d` is a new game's once

@@ -118,7 +118,6 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
-| R3 | After a fatal error the page still saves | S | ⏳ |
 | R4 | F9 reads over a champion being chosen, and over a script that starts during its read | S | ⏳ |
 | R5 | Another tab holds the store: the new build hangs at ENTER | S | ⏳ |
 | W2 | `api/stats` is computed whole at every request | S | ⏳ |
@@ -420,18 +419,6 @@ takes untrusted data. A file the player drops on the page and a custom dungeon a
 untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
-
-### R3 ⏳ After a fatal error the page still saves
-
-`reportError` (`src/main.ts:665`) stops the game and puts up the message, and nothing
-else. `GameInput` still takes the keys (its `ended()` is `mainLoopHasReturned()`, which
-`stop` does not set, `src/renderer/GameInput.ts:74-76`), `quickSave` does not ask whether
-the game runs (`src/engine/GameSaves.ts:510-531`). So F5 after a VBL that threw writes the
-half-updated world over the playthrough's quick save, the one F9 reads after the reload the
-message asks for.
-
-Paying it: a fatal error leaves the page dead: one flag that `GameInput` and the three save
-paths check.
 
 ### R4 ⏳ F9 reads over a champion being chosen, and over a script that starts during its read
 
@@ -796,7 +783,7 @@ against each other, and the file formats.
 
 ### E23 ⏳ One game read, whole or not at all
 
-What a read does is spread over `Game.ts:277-341`, `GameContext.ts:205-214`, `:260-308`,
+What a read does is spread over `Game.ts:295-359`, `GameContext.ts:205-214`, `:260-308`,
 `CsbwinSaveGame.ts:243-271`, `SaveGameFile.ts:275` and `GameSaves.read`:
 
 - **It is not atomic.** `installCsbwinWorld` sets `ctx.rules`, `ctx.signatures`, the
@@ -818,9 +805,9 @@ What a read does is spread over `Game.ts:277-341`, `GameContext.ts:205-214`, `:2
   same object. A save builds a throwaway `DungeonState` for `CheckMonsters` alone. The
   rules are read in two places, in two orders (`Game.readNewGameRules`,
   `installCsbwinWorld`); `deleteDuplicateTimers` is set twice (`GameContext.ts:208`,
-  `Game.ts:324`); the world has two routes, `GameState.dungeon` and
+  `Game.ts:342`); the world has two routes, `GameState.dungeon` and
   `DungeonState.getData()` (typed `Readonly`, written through), which `installWorld` keeps
-  in step (`Game.ts:320-321`).
+  in step (`Game.ts:338-339`).
 - **What `d.Initialize()` zeroes is reset nowhere** (C181).
 - **A read in play** drops no running script (`Game.applyRuntimeSaveState`) and does not
   empty the mouse queue, so clicks queued before F9 are translated against the loaded
@@ -893,7 +880,7 @@ C170 and C171 are copies that drifted. The copies left:
   `objectIndex.ts:86-94` and `MakeMoreRoomInDB.ts:95-98`, beside `DATABASE_KEY` (`:62`)
   and `getRecord` (`:688`).
 - **The global text's key**, `((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0`, at
-  `Game.ts:185`, `DsaSystem.ts:4098` and `:4113`, and its decode at `DsaSystem.ts:4100-4106`
+  `Game.ts:187`, `DsaSystem.ts:4098` and `:4113`, and its decode at `DsaSystem.ts:4100-4106`
   and `DecodeText.ts:269-272`; `EDT_SPECIAL_LOCATIONS` and `ESL_MONSTER_MOVE_FILTER` both in
   `CsbwinExpool.ts:40-44` and `DsaSystem.ts:329-351`, and the fifteen `ESL_*` loose
   constants.
@@ -1037,7 +1024,7 @@ controls again.
 
 - `Game`'s constructor wires callbacks into objects built before it:
   `DungeonState.makeMoreRoomInDB`, `textSubstitution` and `timerWord8Lookup`
-  (`DungeonState.ts:90`, `:95`, `:140`; `Game.ts:179-187`), and `SoundQueue.soundFilter`
+  (`DungeonState.ts:90`, `:95`, `:140`; `Game.ts:181-189`), and `SoundQueue.soundFilter`
   (`= () => 1`, `SoundQueue.ts:48`); `TimerSystem`'s constructor writes into `ctx.dungeon`
   (`:94`). A bare `createGameContext` gets, silently, a full database that refuses records,
   untranslated texts and no sound filter, and `systems: {} as GameSystems`
@@ -1116,7 +1103,7 @@ palette codes, so none moves.
   `MonsterSystem.detachedGroupIndexFor` (`:911`), `MonsterAI.clearAttacking` (`:1696`),
   `MonsterAttack`'s `RN_*` re-exports (`:39-49`), `BrowserSaveStore.remove` and
   `idbDelete`, `GraphicEntry.image`, `getCacheStats`, `clearCache`, `const result = 0; …
-  return result | 1` (`Game.ts:838`), `offset = offset;` (`SaveGameLoader.ts:619-621`),
+  return result | 1` (`Game.ts:856`), `offset = offset;` (`SaveGameLoader.ts:619-621`),
   `x !== -1 ? x : -1` (`MonsterDamage.ts:368`).
 - **Tool-only code in the engine**: `DungeonState.applyDoorActionAtPosition` and
   `applyDoorActionAt` (`:794`, `:937`), an instant door toggle CSBWin does not have, used
@@ -1554,7 +1541,7 @@ New verification debt goes here; it can be taken anywhere ("Priority", point 5).
 - `tools/dump-vbl-clock.ts`'s "MainLoop opens with a tick" check can fail under load and
   pass alone (it failed once in a full `npm test`, sixteen tools at a time). `Game.start`
   sets `vblClockStart = Date.now()` and calls `gameLoop()` at once, which reads
-  `Date.now()` again (`src/engine/Game.ts:228`, `:237`, `:449`), so a stall of 17 ms between
+  `Date.now()` again (`src/engine/Game.ts:234`, `:474`), so a stall of 17 ms between
   the two runs a VBL inside `start` and spends the opening tick. The tool pins `Date.now`
   for its pacing section (`:129-173`) and not for this one.
 - `tools/dump-loop-die.ts` waits `1000 / 60 * failOn + 150` real milliseconds, then checks
@@ -1722,7 +1709,7 @@ CSBWin can record a game and play it back:
 Conflux 3.5's Extended Features block sets `AutoRecord` (0x10), `RecordDesignOption`
 (`doc/CSBwin-src/SaveGame.cpp:403-404`): a game read from it records unless the command
 line or the menu says not to (`:2588-2603`). The port has neither, and no way to start either. It keeps only the recorder's count,
-`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:928-931`).
+`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:946-949`).
 `extraTicks` is always on (`src/engine/MovementSystem.ts:161-164`).
 
 Once ported, a recording made in CSBWin and played back in the port is an end-to-end test

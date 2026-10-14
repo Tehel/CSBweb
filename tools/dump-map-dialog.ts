@@ -223,6 +223,7 @@ console.log('\n=== 4. opening it ===');
   } as unknown as GameScreen;
   const fakeGame = {
     mainLoopHasReturned: () => false,
+    isDead: () => false,
     onMouseClick: () => events.push('click'),
     onMouseUnClick: () => events.push('unclick'),
     enqueueKeyButton: () => {},

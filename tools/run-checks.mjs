@@ -313,6 +313,9 @@ const CHECKS = [
   // The Sleepsave: a playthrough's slot apart from F5's, written when the party lies down
   // and when the player wakes it, never when a blow does; silent, and refused where F5 is.
   { tool: 'dump-sleep-save.ts' },
+  // A game an error has ended: the loop stops for good, and no key, click or save path
+  // touches the world it left half-updated.
+  { tool: 'dump-fatal-error.ts' },
   // A playthrough stamped into a save file that names none: six bytes of GAMEBLOCK1, in a
   // block that is scrambled and folded, over every genuine save.
   { tool: 'dump-save-stamp.ts' },

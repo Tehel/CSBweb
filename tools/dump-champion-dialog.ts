@@ -239,6 +239,7 @@ console.log('\n=== 4. opening it ===');
   const input = new GameInput({
     game: {
       mainLoopHasReturned: () => false,
+      isDead: () => false,
       onMouseClick: (x: number, y: number, b: number) => events.push(`click ${searchMouseButtons(ui, x, y, b)} at ${x},${y}`),
       onMouseUnClick: () => events.push('unclick'),
       enqueueKeyButton: () => {},
