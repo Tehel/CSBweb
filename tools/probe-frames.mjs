@@ -208,6 +208,30 @@ console.log('  ', JSON.stringify(firstVisit));
 check(firstVisit.tiles === 'csb,conflux-3.5,dm-atari!,kids-dungeon,towers-of-chaos' && /dungeon=dm-atari/.test(firstVisit.play ?? '')
   && firstVisit.resume === null && firstVisit.above,
   'no save: the tiles by name, dm-atari selected, PLAY opens it, CONTINUE disabled, the buttons above the grid');
+
+// A new server's answer, no set and no default: the grid holds only "+ Add my own", PLAY
+// and CONTINUE are disabled, and the form it opens has no base set to offer.
+onPaused = ({ requestId }) => send('Fetch.fulfillRequest', { requestId, responseCode: 200,
+  responseHeaders: [{ name: 'Content-Type', value: 'application/json; charset=utf-8' }],
+  body: Buffer.from(JSON.stringify({ default: null, swoosh: null, dataSets: [] })).toString('base64') });
+await send('Fetch.enable', { patterns: [{ urlPattern: '*/api/data-sets*' }] });
+await send('Page.navigate', { url: `${APP}?dungeon=nowhere` });
+await wait(2500);
+await send('Fetch.disable');
+onPaused = null;
+const noSet = await evaluate(`(() => {
+  const tiles = [...document.querySelectorAll('.welcome-grid .pick')].map(t=>t.classList.contains('add')?'add':t.dataset.set).join(',');
+  const play = document.getElementById('welcome-play'), resume = document.getElementById('welcome-continue');
+  document.querySelector('.pick.add').click();
+  const form = document.querySelector('dialog.add-set[open]');
+  return {tiles, play: play.getAttribute('href') ?? (play.getAttribute('aria-disabled') && 'disabled'),
+    resume: resume.getAttribute('href') ?? (resume.getAttribute('aria-disabled') && 'disabled'),
+    form: !!form, bases: form ? form.querySelectorAll('.add-set-base').length : -1};
+})()`);
+console.log('state: welcome page, no set');
+console.log('  ', JSON.stringify(noSet));
+check(noSet.tiles === 'add' && noSet.play === 'disabled' && noSet.resume === 'disabled' && noSet.form && noSet.bases === 0,
+  'no set: only "+ Add my own", PLAY and CONTINUE disabled, and its form offers no base set');
 // `?intro=0` skips the title animation and the dungeon entrance
 // (`src/renderer/intro/BootSequence.ts`), so the six frames below still open on the
 // adventure screen. The entrance gets frames of its own at the end.

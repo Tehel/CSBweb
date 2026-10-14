@@ -7,7 +7,7 @@
  *   `local:<id>`, made from the name until the player writes one), a short description,
  *   the authors, separated by commas, the reincarnation rule (`dmRules`, DM's at first), the graphics a
  *   dungeon without its own `graphics.dat` plays, DM's or CSB's, whichever the manifest
- *   has, and one area that takes the files: dropped there, several at once, or chosen in
+ *   has, and none where it has neither, which leaves a set its own to give, and one area that takes the files: dropped there, several at once, or chosen in
  *   the picker a click on it opens. An image is the thumbnail. Any other file goes where
  *   what it holds says, whatever its name (`identifyLocalDataSetFile`): `dungeon.dat`,
  *   `graphics.dat`, `CSBgraphics.dat`, the Hint Oracle's `hcsb.hct` and `hcsb.dat`; one
@@ -228,6 +228,7 @@ export function openAddDataSetForm(
         label.append(radio, text('span', '', set.name));
         baseBox.append(label);
     }
+    if (bases.length === 0) baseBox.remove();
     /** The base sets' files, each read once. */
     const baseReads = new Map<string, Promise<Uint8Array | null>>();
     const base = (set: string): DataSetFiles | null => {

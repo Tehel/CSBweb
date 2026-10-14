@@ -235,8 +235,12 @@ async function checkForm(): Promise<void> {
 
   const notGraphics = await problemsOf('a dungeon.dat as graphics.dat', { ...good, files: { ...good.files, 'graphics.dat': good.files['dungeon.dat']! } });
   check(notGraphics.length === 1 && notGraphics[0].startsWith('graphics.dat: It is not a graphics.dat: '), 'a graphics.dat that does not parse is refused');
-  check((await problemsOf('an unknown base set', { ...good, baseSet: 'nowhere' })).join() === "baseSet: The graphics.dat of 'nowhere' cannot be read.",
-    'without a graphics.dat, the base set\'s must read');
+  check((await problemsOf('an unknown base set', { ...good, baseSet: 'nowhere' })).join()
+    === "baseSet: The site has no 'nowhere' to lend its graphics.dat: give the set its own.",
+    'without a graphics.dat, a base set the site lacks is refused, saying the set needs its own');
+  const unread = await checkLocalDataSet({ ...good, baseSet: 'dm-atari' }, new Set(), () => ({ read: async () => null, where: (name) => name }), CREATED);
+  check(unread.problems.map(({ about, text }) => `${about}: ${text}`).join() === "baseSet: The graphics.dat of 'dm-atari' cannot be read.",
+    'and one whose graphics.dat does not read, saying so');
   check((await problemsOf('Conflux on DM\'s graphics.dat', await draftOf(conflux, 'cx', ['dungeon.dat', 'CSBgraphics.dat']))).length === 0,
     'a dungeon that names no graphics.dat plays any');
   check((await problemsOf('Conflux without its CSBgraphics.dat', await draftOf(conflux, 'cx', ['dungeon.dat', 'graphics.dat']))).length === 0,

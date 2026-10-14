@@ -165,7 +165,8 @@ export class DataSetStore {
     /**
      * Fills the empty tables from `manifest`, parsed with its folders relative to
      * `GAMEFILES_DIR` (`parseManifest(text, '')`): every set the site's, approved unless it
-     * says it is pending, in the manifest's order. All of it or nothing. The server never
+     * says it is pending, in the manifest's order, and `data_set_defaults` where it names a
+     * default (the FTL logo's folder is kept there too). All of it or nothing. The server never
      * calls it: the dev server's store (`vite.config.mts`) and `tools/fill-data-sets.ts` do.
      */
     fill(manifest: DataSetManifest): void {
@@ -175,7 +176,7 @@ export class DataSetStore {
             manifest.dataSets.forEach((set, position) => {
                 this.insert.run(set.id, set.name, set.description, JSON.stringify(set.authors), set.dir, position, set.pending ? 'pending' : 'approved', ...FLAG_COLUMNS.map(([flag]) => (set[flag] ? 1 : 0)));
             });
-            this.insertDefaults.run(manifest.defaultSet.id, manifest.swooshDir);
+            if (manifest.defaultSet) this.insertDefaults.run(manifest.defaultSet.id, manifest.swooshDir);
             this.db.exec('COMMIT');
         } catch (error) {
             this.db.exec('ROLLBACK');
@@ -246,7 +247,8 @@ export class DataSetStore {
  * set says its owner. A `dir` is left out where it is the id, a flag where it is false, and
  * the description and the authors where they are empty, as the repository's manifest does. A moderator's answer says `"moderator": true`, so that
  * the page shows them the hidden sets too: it tells them nothing they do not hold. A table
- * with no set, or no default, answers what the page refuses, saying why (`parseManifest`).
+ * with no set answers an empty list, and one with no `data_set_defaults` row `null` for the
+ * default and the FTL logo, which the page takes (`parseManifest`).
  */
 export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): string {
     const dataSets = visibleSets(stored, viewer).map((set) => {

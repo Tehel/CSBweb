@@ -21,7 +21,7 @@ export const MANIFEST_FILE = 'tools/data-sets.json';
 
 export const MANIFEST: DataSetManifest = parseManifest(readFileSync(MANIFEST_FILE, 'utf8'), GAMEFILES_DIR);
 export const DATA_SETS = MANIFEST.dataSets;
-export const DEFAULT_DATA_SET = MANIFEST.defaultSet;
+export const DEFAULT_DATA_SET: DataSet = MANIFEST.defaultSet ?? (() => { throw new Error(`${MANIFEST_FILE} names no default set`); })();
 
 /** The set `id` names. A tool asks for a set it needs, so an unknown one throws. */
 export function dataSetNamed(id: string): DataSet {

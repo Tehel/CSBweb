@@ -46,7 +46,7 @@ function checkParser(): void {
   const manifest = (fields: Record<string, unknown> = {}) => JSON.stringify({ default: 'a', dataSets: [set()], ...fields });
 
   const parsed = parseManifest(manifest({ swoosh: 'logo/st', dataSets: [set({ miniDat: true, hintOracle: false, dmRules: true }), set({ id: 'b', dir: 'b/c' })] }), 'gamefiles');
-  console.log(`  parsed: ${parsed.dataSets.map((s) => `${s.id} in ${s.dir}`).join(', ')}; default ${parsed.defaultSet.id}; FTL logo in ${parsed.swooshDir}`);
+  console.log(`  parsed: ${parsed.dataSets.map((s) => `${s.id} in ${s.dir}`).join(', ')}; default ${parsed.defaultSet?.id}; FTL logo in ${parsed.swooshDir}`);
   check(parsed.dataSets[1]!.dir === 'gamefiles/b/c' && parsed.swooshDir === 'gamefiles/logo/st' && parsed.defaultSet === parsed.dataSets[0],
     'a folder is resolved under the manifest\'s, and the default is one of the sets');
   check(parsed.dataSets[0]!.miniDat && !parsed.dataSets[0]!.hintOracle && parsed.dataSets[0]!.dmRules, 'the flags are read as written');
@@ -87,10 +87,19 @@ function checkParser(): void {
   check(told.description === 'A dungeon.' && told.authors.join() === 'One,Two', '"description" and "authors" are read as written');
   check(untold.description === '' && untold.authors.length === 0, 'left out, they are empty');
 
+  // A new server's answer: no set, and no default.
+  const none = parseManifest(JSON.stringify({ default: null, swoosh: null, dataSets: [] }), '');
+  console.log(`  no set: ${none.dataSets.length} sets, default ${none.defaultSet}, the welcome page lists ${chooserSets(none).length}`);
+  check(none.dataSets.length === 0 && none.defaultSet === null && none.swooshDir === null && chooserSets(none).length === 0,
+    'an empty list is a manifest of no set, with no default');
+  check(parseManifest(manifest({ default: undefined }), '').defaultSet === null && parseManifest(manifest({ default: null }), '').defaultSet === null,
+    '"default" left out, or null, names none');
+
   const malformed: Array<[string, string]> = [
     ['{"default": "a", ', 'not JSON'],
     ['[]', 'not an object'],
-    [manifest({ dataSets: [] }), '"dataSets" is not a list'],
+    [manifest({ dataSets: 'a' }), '"dataSets" is not a list'],
+    [manifest({ dataSets: undefined }), '"dataSets" is not a list'],
     [manifest({ dataSets: [set(), 'b'] }), 'data set 1 is not an object'],
     [manifest({ dataSets: [set({ id: '' })] }), 'data set 0 has no "id"'],
     [manifest({ dataSets: [set({ name: 7 })] }), `data set 'a' has no "name"`],
@@ -107,7 +116,7 @@ function checkParser(): void {
     [manifest({ dataSets: [set(), set({ dir: 'b' })] }), `two data sets are 'a'`],
     [manifest({ moderator: 'yes' }), '"moderator" is neither true nor false'],
     [manifest({ default: 'b' }), '"default" names none'],
-    [manifest({ default: undefined }), '"default" names none'],
+    [manifest({ default: 'b', dataSets: [] }), '"default" names none'],
     [manifest({ swoosh: '..' }), '"swoosh" is neither null nor a folder'],
   ];
   for (const [text, why] of malformed) {

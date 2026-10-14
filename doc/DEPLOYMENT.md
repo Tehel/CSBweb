@@ -75,8 +75,8 @@ The page ships as it is, debug chrome included. Every URL in it is relative to t
 
 ## The game files and the manifest
 
-A manifest lists each set (its `dir` relative to the game files' folder), the default
-set's id and the FTL logo's folder, or none. A set names only what differs from the defaults: `dir` left out is the set's `id`,
+A manifest lists each set (its `dir` relative to the game files' folder), none at all
+for a new server, the default set's id or none, and the FTL logo's folder or none. A set names only what differs from the defaults: `dir` left out is the set's `id`,
 each flag (`csbGraphics`, `miniDat`, `hintOracle`, `hidden`) left out is `false`,
 `description` and `authors` left out are `''` and `[]`, and `status` left out is
 `"approved"`. `src/data/DataSets.ts` parses it, for the page, the tools and the server. The page
@@ -121,8 +121,11 @@ them: a `data_sets` table, one row per set (its fields, flags and folder, its pl
 list, its status, `approved` or `pending`, and its owner's `playerId`, `NULL` for the
 site's, which the author uploads by hand), and `data_set_defaults`, one row naming the
 default set and the FTL logo's folder. A new server's tables are empty: it starts, and
-answers no set and no default, which the page refuses on `fatalMessage`, until the site's
-rows are written by hand (below). `api/data-sets` answers each player the sets they may see: the approved
+answers no set and no default. Its welcome page then holds only "+ Add my own", PLAY
+disabled: a player adds a set of their own, with its own `graphics.dat`, since the site has
+no DM or CSB to lend theirs, and publishes it, and a moderator's approval offers it to
+everyone. No hand on the server is needed. The site's own sets, and the default, which
+the welcome page selects on a first visit, are written by hand (below). `api/data-sets` answers each player the sets they may see: the approved
 ones to everyone, a pending one also to its owner, and every set to a moderator, a pending
 set saying `"status": "pending"` and none naming its owner. A moderator's answer also says
 `"moderator": true`, and the welcome page then lists the hidden sets too, each tile's name
@@ -198,8 +201,8 @@ through `node:sqlite` (as below, to add the site's sets), and in `gamefiles/`:
 The site's sets are rows written by hand, in the store through `node:sqlite`, once their
 folders are uploaded: a row with no `owner`, `approved`, its flags `0` or `1`, its
 `authors` a JSON list, and `data_set_defaults`'s one row, the default set and the FTL
-logo's folder, which the page needs before it plays anything. A set is added last in the
-list:
+logo's folder, without which the welcome page selects nothing on a first visit and no
+game shows the logo. A set is added last in the list:
 
 ```bash
 docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning -e "

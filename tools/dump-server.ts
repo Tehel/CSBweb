@@ -5,8 +5,8 @@
  *
  * Asserts:
  *   - the start-up check: the table the repository's manifest fills passes over its game
- *     files, and answers as that manifest; an empty table passes, and answers what the
- *     page refuses; a missing `index.html`, a missing game files' folder and a folder the
+ *     files, and answers as that manifest; an empty table passes, and answers no set and
+ *     no default, which the page reads; a missing `index.html`, a missing game files' folder and a folder the
  *     table names that is not there each stop it, saying why;
  *   - `/api/data-sets`: the table's approved sets, as a manifest the page's parser reads
  *     as the one that filled it, as JSON, not cached, read at each request; a pending set
@@ -176,13 +176,8 @@ function checkStartUp(scratch: string, options: ServerOptions): void {
     console.log(`  empty table    : ${JSON.stringify(checkFiles(options, empty))}, answering ${answer}`);
     check(checkFiles(options, empty).length === 0 && answer === '{"default":null,"swoosh":null,"dataSets":[]}',
         'an empty table passes, and answers no set and no default');
-    let refused = '';
-    try {
-        parseManifest(answer, '');
-    } catch (error) {
-        refused = error instanceof Error ? error.message : String(error);
-    }
-    check(refused.includes('"dataSets" is not a list of data sets'), 'which the page refuses, saying why');
+    const none = parseManifest(answer, '');
+    check(none.dataSets.length === 0 && none.defaultSet === null && none.swooshDir === null, 'which the page reads as no set, and no default');
 
     const noPage = refusal({ ...options, distDir: join(scratch, 'nowhere') }, filled);
     console.log(`  no page        : ${noPage.split(scratch).join('<scratch>')}`);

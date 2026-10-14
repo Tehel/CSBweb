@@ -10,8 +10,9 @@
  *   frame at half size; a local set's is its record's image. The sets the store holds a
  *   save of come first, drawn bright, the one saved last first; the others follow,
  *   dimmed, by name (`tileOrder`). A click selects a tile, and a click on the selected one
- *   leaves none selected. With no save at all, the manifest's default set is selected, so
- *   that PLAY is a first visit's way in.
+ *   leaves none selected. With no save at all, the manifest's default set is selected,
+ *   where it names one, so that PLAY is a first visit's way in. A manifest with no set
+ *   leaves the grid nothing but "+ Add my own", and PLAY disabled.
  * - **"+ Add my own"**, the grid's last tile, which is never selected. A click opens the
  *   form that adds a set (`src/ui/addDataSetForm.ts`); the set it adds is stored, and the
  *   page shows it, selected.
@@ -177,7 +178,7 @@ export async function showWelcomePage(
     ]);
     const sets = tileOrder([...thumbnails.keys()], rows);
     let selected: DataSet | null = sets.find((set) => set.id === select)
-        ?? (rows.length === 0 && sets.includes(manifest.defaultSet) ? manifest.defaultSet : null);
+        ?? (rows.length === 0 && manifest.defaultSet && sets.includes(manifest.defaultSet) ? manifest.defaultSet : null);
     const tiles = sets.map((set) => {
         const saves = rows.filter((row) => row.dataSet === set.id).length;
         const tile = document.createElement('button');

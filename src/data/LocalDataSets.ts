@@ -169,8 +169,12 @@ export async function checkLocalDataSet(
 
     const ownGraphics = files['graphics.dat'];
     const graphicsAbout: LocalDataSetField = ownGraphics ? 'graphics.dat' : 'baseSet';
-    const graphicsSource = ownGraphics ?? await base(draft.baseSet)?.read('graphics.dat') ?? null;
-    if (!graphicsSource) problem('baseSet', `The graphics.dat of '${draft.baseSet}' cannot be read.`);
+    const baseFiles = ownGraphics ? null : base(draft.baseSet);
+    const graphicsSource = ownGraphics ?? await baseFiles?.read('graphics.dat') ?? null;
+    if (!graphicsSource) {
+        problem('baseSet', baseFiles ? `The graphics.dat of '${draft.baseSet}' cannot be read.`
+            : `The site has no '${draft.baseSet}' to lend its graphics.dat: give the set its own.`);
+    }
     else {
         const graphics = await readGraphics(graphicsSource);
         if (graphics.error !== null) problem(graphicsAbout, `It is not a graphics.dat: ${graphics.error}`);
