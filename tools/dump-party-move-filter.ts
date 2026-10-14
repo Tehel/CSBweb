@@ -151,7 +151,7 @@ for (const file of [undefined, new Uint8Array(readFileSync(savePath('csbgame-ear
     'a count of 13, PM_ATTEMPTMOVE, flags 0, delay 0');
   check(block.slice(4, 8).every((s, i) => (i < champions ? s > 0 : s === -1)),
     `a stamina adjustment for each of ${champions} champions, -1 past the party`);
-  check(block[8] === 1 && block[9] === ((1 + (from >> 16)) & 3), 'relDirection 1, absDirection the facing plus 1');
+  check(block[8] === 4 && block[9] === ((1 + (from >> 16)) & 3), 'relDirection the button, 4, absDirection the facing plus 1 (CSBCode.cpp:8197-8198)');
   check(block[10] === from && block[11] === from, 'fromLocation and toLocation are both the party\'s square');
   check(block[12] === ((flags >> 5) & 7), 'fromLocationType is the party\'s room type');
   check(g[50] === UNSET && g[90] === 1, 'only the first DSA runs, once');

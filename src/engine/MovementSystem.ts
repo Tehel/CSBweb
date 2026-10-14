@@ -253,14 +253,15 @@ export class MovementSystem {
 
         // The party move filter, `PM_ATTEMPTMOVE` (doc/CSBwin-src/CSBCode.cpp:8191-8208),
         // whose `toLocation` is the party's square, as `fromLocation` is: `locr` is not
-        // moved between the two.
+        // moved between the two. `relDirection` is `button`, `MoveParty`'s argument, 3-6
+        // (`:8198`), not the 0-3 the struct's comment promises (`CSB.h:4354`).
         const location = partyLocation(position, party.facing);
         const pmd = this.ctx.systems.dsa.partyMoveFilter({
             moveType: PM_ATTEMPTMOVE,
             flags: 0,
             delay: 0,
             staminaAdjustment: this.staminaAdjustments(),
-            relDirection,
+            relDirection: relDirection + 3,
             absDirection: (relDirection + party.facing) & 3,
             fromLocation: location,
             toLocation: location,

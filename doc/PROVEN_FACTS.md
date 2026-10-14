@@ -4460,7 +4460,9 @@ each returns at once on `PM_INHIBITMOVE` (1):
   square's. The square's flags are read before the filter and decide what follows it.
 - `MoveParty`, `PM_ATTEMPTMOVE` (3, `:8191-8208`), after the stamina each champion would
   pay is worked out, `(unsigned)-1` for a slot past the party (`:8175-8188`), and before
-  anything else. `relDirection` is the button's 0-3, `absDirection` it plus the facing.
+  anything else. `relDirection` is `button`, the button `MoveParty` was called with, 3-6
+  (`:8198`), not the 0-3 the struct's comment says (`CSB.h:4354`); `absDirection` is the
+  move's 0-3 plus the facing.
   `toLocation` is the party's square, as `fromLocation` is: `locr` is not moved between
   the two. `toLocationType` is the destination's room type, read before the filter: the
   stairs for a step back out of a stairwell, stone off the map. Once through, a
