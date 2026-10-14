@@ -13,6 +13,8 @@
  *   /api/data-sets    the page's list of sets, from the store's table (`dataSets.ts`), for
  *                     the player its `X-Player-Id` names; POST: that player's own set
  *                     published, pending (`publish.ts`)
+ *   /api/data-sets/<id>  POST: the set approved, rejected, hidden or shown, by a moderator,
+ *                     or withdrawn by its owner (`moderate.ts`)
  *   /api/data-set-walls  the walls of the sets `api/data-sets` offers the same player
  *                     that keep them, the published ones (`wallsText`)
  *   /api/health       200, for the compose healthcheck
@@ -33,6 +35,7 @@ import { pathToFileURL } from 'node:url';
 import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, type DataSetManifest } from '../src/data/DataSets.ts';
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer } from './dataSets.ts';
 import { checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
+import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import { MAX_PUBLISH_BYTES, publishDataSet, type CheckDataSet, type PublishAnswer, type ReadDungeonWalls } from './publish.ts';
 import type { StatsStore } from './stats.ts';
 
@@ -205,6 +208,10 @@ function route({ distDir, gamefilesDir, manifestFile }: ServerOptions, api: ApiO
             res.setHeader('Vary', PLAYER_ID_HEADER);
             return send(res, 200, wallsText(api.dataSets.read(), api.dataSets.walls(), dataSetViewer(api, req)), 'application/json; charset=utf-8');
         }
+        if (segments.length === 3 && segments.slice(0, 2).join('/') === DATA_SETS_ROUTE) {
+            if (req.method !== 'POST') return refuseMethod(res, 'POST');
+            return receiveModeration(segments[2]!, gamefilesDir, api, req, res);
+        }
         const name = segments.length === 2 ? segments[1] : undefined;
         if (name === 'event') {
             if (req.method !== 'POST') return refuseMethod(res, 'POST');
@@ -354,6 +361,21 @@ export async function receivePublish(gamefilesDir: string, api: PublishApi, req:
             : form === null ? answer(400, 'The body is not a form.')
             : await publishDataSet(form, playerId, { checkDataSet: api.checkDataSet, dataSets: api.dataSets, gamefilesDir, now: api.now });
     }
+    res.setHeader('Cache-Control', 'no-store');
+    send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
+}
+
+/** What `receiveModeration` needs of the API. */
+export type ModerationApi = Pick<ApiOptions, 'dataSets' | 'moderatorPlayerIds'>;
+
+/**
+ * `POST api/data-sets/<id>`: its asker and a body of at most `MAX_MODERATION_BYTES`, before
+ * `moderateDataSet` decides. Every answer is JSON (`ModerationAnswer`).
+ */
+export async function receiveModeration(id: string, gamefilesDir: string, api: ModerationApi, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const body = await readBody(req, MAX_MODERATION_BYTES);
+    const reply: ModerationAnswer = body === null ? { status: 413, body: { error: `The body is larger than ${MAX_MODERATION_BYTES} bytes.` } }
+        : await moderateDataSet(id, body.toString('utf8'), dataSetViewer(api, req), { dataSets: api.dataSets, gamefilesDir });
     res.setHeader('Cache-Control', 'no-store');
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
 }

@@ -160,6 +160,39 @@ published before the rows kept them. One whose `dungeon.dat` does not read is lo
 `No walls for <id> (…)`, and left without, to be read again at the next start; the page
 then names no save after it.
 
+### Moderating the sets
+
+A moderator approves, rejects, hides and shows a set by a `POST` to `api/data-sets/<id>`
+(`server/moderate.ts`), a JSON body `{"action": "approve" | "reject" | "hide" | "show"}`,
+named in `X-Player-Id` as for `api/data-sets`. Approve makes a pending set approved,
+offered to everyone. Reject deletes a pending set's row, then its folder; its owner may
+send it too, to withdraw their own set while it is pending. Hide sets an approved set's
+`hidden`, which the welcome page's grid leaves out but for a moderator, while
+`?dungeon=<id>` and CONTINUE still play it; show clears it. The site's sets are hidden
+and shown like a player's, but never rejected, nor is the default set: their folders are
+the author's. Every other request is refused with nothing changed: 403 to an asker who
+may not, 404 for an id the table does not hold, 409 for an action the set's state does
+not take, such as approving an approved set. Each change is logged, `'<id>' approved`,
+never with the asker's id.
+
+A rejected set's folder was copied by the night's backup if it was published before it
+(below). One that will not go is logged, `'<id>' rejected, its folder left (…)`, and is a
+folder no row names, which refuses a new publish of its id until it is deleted by hand.
+
+What the endpoint does not do is left to a moderator's hands on the VPS, in the store
+through `node:sqlite` (as below, to refill the table), and in `gamefiles/`:
+
+- **Deleting an approved set.** Hiding it answers a complaint, and its players keep their
+  saves and their way back to it; a deletion makes their saves count for nothing. Its row
+  is deleted, then its folder; the backup keeps its copy.
+- **Changing a published set's files.** A folder never changes once written, which the
+  backup relies on: a new version is published under a new id.
+- **Taking an approval back.** Hiding does that job without losing anything.
+- **The order of the sets and the default set**: a row's `position`, and
+  `data_set_defaults`.
+
+### Refilling the table
+
 To refill the table from a changed manifest, empty it and restart. This drops every row,
 a player's pending set included:
 
@@ -222,13 +255,14 @@ every set (unset or empty, no one; an entry that is not a `playerId` stops the s
 | `/server/…` | 404: `dist/server/` is the server's module | |
 | `/gamefiles/…` | `GAMEFILES_DIR/…`, but the manifest | `no-cache`, ETag and Last-Modified |
 | `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest; POST: a set published | `no-store`, `Vary: X-Player-Id` |
+| `/api/data-sets/<id>` | POST: the set approved, rejected, hidden or shown by a moderator, or withdrawn by its owner | `no-store` |
 | `/api/data-set-walls` | the walls of those of the same sets that keep some: the published ones | `no-store`, `Vary: X-Player-Id` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
 | `/api/stats` | the statistics' aggregates | `no-store` |
 
 Every file answers a conditional GET with 304, and only GET and HEAD are allowed, except on
-`api/event` and `api/data-sets`'s POST. A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
+`api/event`, `api/data-sets`'s POST and `api/data-sets/<id>`, POST only. A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
 decoded, is refused with 400 before it reaches the disk.
 
 **At start-up** it opens the store (making it, and its folder, when missing), checks

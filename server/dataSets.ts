@@ -6,7 +6,8 @@
  *
  * A set is approved or pending. An approved set is offered to everyone; a pending one, a
  * player's, published by `publish.ts` (`DataSetStore.publish`), to its owner and the
- * moderators only (`manifestText`). A published set's row keeps its dungeon's walls, which
+ * moderators only (`manifestText`). A moderator approves, rejects, hides and shows a set
+ * (`moderate.ts`). A published set's row keeps its dungeon's walls, which
  * `api/data-set-walls` answers (`wallsText`), so that the page can name the set a save
  * dropped in another is of. Ownership, and
  * moderation, rest on the `playerId` alone, a secret (`src/ui/gameEvents.ts`), so no answer
@@ -122,6 +123,9 @@ export class DataSetStore {
     private readonly wallsRows: StatementSync;
     private readonly wallsMissing: StatementSync;
     private readonly updateWalls: StatementSync;
+    private readonly updateApproved: StatementSync;
+    private readonly updateHidden: StatementSync;
+    private readonly deleteRow: StatementSync;
 
     constructor(db: DatabaseSync) {
         this.db = db;
@@ -144,6 +148,9 @@ export class DataSetStore {
         this.wallsRows = db.prepare('SELECT id, walls FROM data_sets WHERE walls IS NOT NULL');
         this.wallsMissing = db.prepare('SELECT id, dir FROM data_sets WHERE owner IS NOT NULL AND walls IS NULL ORDER BY position');
         this.updateWalls = db.prepare('UPDATE data_sets SET walls = ? WHERE id = ?');
+        this.updateApproved = db.prepare("UPDATE data_sets SET status = 'approved' WHERE id = ?");
+        this.updateHidden = db.prepare('UPDATE data_sets SET hidden = ? WHERE id = ?');
+        this.deleteRow = db.prepare('DELETE FROM data_sets WHERE id = ?');
     }
 
     isEmpty(): boolean {
@@ -198,6 +205,21 @@ export class DataSetStore {
 
     setWalls(id: string, walls: DataSetWalls): void {
         this.updateWalls.run(wallsJson(walls), id);
+    }
+
+    /** `id`'s row made approved (`moderate.ts`). */
+    approve(id: string): void {
+        this.updateApproved.run(id);
+    }
+
+    /** `id`'s row hidden, or shown (`moderate.ts`). */
+    setHidden(id: string, hidden: boolean): void {
+        this.updateHidden.run(hidden ? 1 : 0, id);
+    }
+
+    /** `id`'s row deleted (`moderate.ts`, which deletes its folder after). */
+    remove(id: string): void {
+        this.deleteRow.run(id);
     }
 
     read(): StoredDataSets {

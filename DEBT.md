@@ -113,7 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P8 | Publishing a local set, and moderating it | L | ⚠️ step 4 of 5 next |
+| P8 | Publishing a local set, and moderating it | L | ⚠️ step 5 of 5 next |
 | P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
@@ -290,8 +290,9 @@ A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more 
 
 ### P8 ⏳ Publishing a local set, and moderating it
 
-L, in five steps (below); the first three, the page's reader on the server (tier P's
-introduction), the publish route and PUBLISH in the form, stand, and step 4 is next.
+L, in five steps (below); the first four, the page's reader on the server (tier P's
+introduction), the publish route, PUBLISH in the form and the moderation endpoint, stand,
+and step 5, the tiles' controls, is next.
 
 **The lifecycle.** A set is in one of four states, which its tile's name says (`src/ui/welcomePage.ts`):
 
@@ -314,7 +315,8 @@ picture's top right, the others along the top edge beside it):
 | pending → gone: **reject**, or **withdraw** | a moderator, or the set's owner | a cross on a pending tile | the row deleted, then its folder |
 | approved ⇄ hidden: **hide**, **show** | a moderator | the eye on an approved tile, open or shut | `hidden` toggled |
 
-Not needed, and left to a moderator's hands on the VPS (`doc/DEPLOYMENT.md` will say how):
+Not needed, and left to a moderator's hands on the VPS (`doc/DEPLOYMENT.md` →
+"Moderating the sets" says how):
 
 - **Deleting an approved set.** Hiding it is the answer to a complaint, since its players
   keep their saves and their way back; a deletion makes their saves count for nothing.
@@ -324,12 +326,15 @@ Not needed, and left to a moderator's hands on the VPS (`doc/DEPLOYMENT.md` will
 - **The order of the sets and the default set**, a row's `position` and
   `data_set_defaults`.
 
-**The endpoint**: `POST api/data-sets/<id>`, a JSON body `{"action": "approve" | "reject" |
-"hide" | "show"}`, the `X-Player-Id` header naming the asker. 403 unless the asker is a
-moderator, or the owner rejecting their own pending set; 404 for an id not in the table;
-409 for an action the set's state does not take (approve an approved set, hide a pending
-one). The page then asks `api/data-sets` again and redraws the grid. Publishing is its
-own route, which takes the files.
+**The endpoint** stands: `POST api/data-sets/<id>` (`server/moderate.ts`, whose header
+lists the rules in their order and the answers; `doc/DEPLOYMENT.md` → "Moderating the
+sets"), a JSON body `{"action": "approve" | "reject" | "hide" | "show"}`, the `X-Player-Id`
+header naming the asker. 403 unless the asker is a moderator, or the owner rejecting their
+own pending set; 404 for an id not in the table; 409 for an action the set's state does not
+take (approve an approved set, hide a pending one), and for a reject of a site's set or the
+default, whose folders are the author's. A reject deletes the row, then the folder. The
+site's sets are hidden and shown like a player's. `tools/dump-server.ts` asserts every
+action and every refusal. The dev server does not answer the route yet (step 5).
 
 **Publishing** stands: `POST api/data-sets` (`server/publish.ts`, whose header lists the
 form's fields, the rules in their order and the answers; `doc/DEPLOYMENT.md` → "The game
@@ -357,12 +362,13 @@ follow as an item of its own.
 1. **The page's reader on the server**: stands.
 2. **The publish route**: stands.
 3. **PUBLISH in the form**: stands.
-4. **The moderation endpoint**, `POST api/data-sets/<id>`, as above: reject and withdraw
-   delete the row, then the folder (the backup keeps its copy). `doc/DEPLOYMENT.md` says
-   what is left to a moderator's hands. Evidence: `tools/dump-server.ts`, every action
-   and every 403, 404 and 409.
+4. **The moderation endpoint**: stands.
 5. **The tile's tick, cross and eye** (`src/ui/welcomePage.ts`), each shown only where its
-   transition is allowed to the viewer, then the grid redrawn from `api/data-sets`.
+   transition is allowed to the viewer, then the grid redrawn from `api/data-sets`. The
+   dev server answers the route as it answers the publish (`vite.config.mts`): its store
+   is rebuilt at each request from the manifest and the sets published since it started,
+   so it must replay their moderation too, and it has no moderator yet
+   (`moderatorPlayerIds: []`), which the probe needs one of, a `playerId` of its own.
    Evidence: a `tools/probe-frames.mjs` block.
 
 ### P11 ⏳ A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it

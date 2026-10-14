@@ -38,6 +38,12 @@
  *     large, an id the table or the folder holds, and a set the page's check refuses, a
  *     thumbnail that is not a PNG and a base set that is not the site's; a table made
  *     before the publish's columns gains them;
+ *   - `POST /api/data-sets/<id>` (`server/moderate.ts`): a moderator approves, hides and
+ *     shows a set, a site's too, and rejects a pending one, its row then its folder gone,
+ *     and its owner withdraws it while it is pending; and every refusal answered with
+ *     nothing changed: a body that is not one action, or too large (400, 413), an id the
+ *     table does not hold (404), an asker who may not (403), an action the set's state
+ *     does not take, and a reject of a site's set or the default (409);
  *   - the walls a published set's row keeps, its `dungeon.dat`'s as the page reads them,
  *     and `/api/data-set-walls`, which gives a player those of the sets `api/data-sets`
  *     offers them, as the page parses them; and `fillWalls`, which reads those of the
@@ -70,6 +76,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { CHECK_MODULE, checkFiles, createAppServer, fillWalls, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
 import { ANYONE, DataSetStore, manifestText } from '../server/dataSets.ts';
 import { RateLimit } from '../server/events.ts';
+import { MAX_MODERATION_BYTES } from '../server/moderate.ts';
 import { MAX_PUBLISH_BYTES, MAX_PUBLISHED_FILE_BYTES } from '../server/publish.ts';
 import { StatsStore } from '../server/stats.ts';
 import { openStore } from '../server/store.ts';
@@ -269,7 +276,7 @@ async function checkAnswers(port: number, manifest: string): Promise<void> {
 }
 
 /**
- * Rows added to the table while the server runs, as P8's upload and approval will add them:
+ * Rows added to the table while the server runs, as a publish and an approval add them:
  * each request reads them.
  */
 async function checkTableRead(port: number, db: DatabaseSync, manifest: string): Promise<void> {
@@ -547,6 +554,120 @@ async function checkPublish(scratch: string): Promise<void> {
     }
 }
 
+/**
+ * `POST /api/data-sets/<id>` (`server/moderate.ts`), on a server of its own over a scratch
+ * table: the site's `dm-atari` (the default), a pending `site-pending` and a hidden
+ * `site-hidden`, and the players' sets, each with a folder of one file.
+ */
+async function checkModeration(scratch: string): Promise<void> {
+    console.log('\nModerating the sets:');
+    const root = join(scratch, 'moderate');
+    const distDir = join(root, 'dist');
+    const gamefilesDir = join(root, 'gamefiles');
+    mkdirSync(distDir, { recursive: true });
+    writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
+    const manifestFile = join(root, 'manifest.json');
+    writeFileSync(manifestFile, JSON.stringify({
+        default: 'dm-atari', swoosh: null,
+        dataSets: [{ id: 'dm-atari', name: 'DM' }, { id: 'site-pending', name: 'P', status: 'pending' }, { id: 'site-hidden', name: 'H', hidden: true }],
+    }));
+    for (const dir of ['dm-atari', 'site-pending', 'site-hidden']) mkdirSync(join(gamefilesDir, dir), { recursive: true });
+    const db = new DatabaseSync(':memory:');
+    const dataSets = new DataSetStore(db);
+    const options: ServerOptions = { distDir, gamefilesDir, manifestFile };
+    checkFiles(options, dataSets);
+    const players: [string, string][] = [['p1', PLAYER], ['p2', PLAYER], ['p3', OTHER], ['p4', PLAYER], ['p5', PLAYER]];
+    for (const [id, owner] of players) {
+        dataSets.publish({ id, name: id.toUpperCase(), description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false,
+            walls: { shapes: [[1, 1]], signature: ['0'.repeat(64)] } }, owner);
+        mkdirSync(join(gamefilesDir, id));
+        writeFileSync(join(gamefilesDir, id, 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
+    }
+    const server = createAppServer(options, {
+        checkDataSet: checkLocalDataSet, dataSets, moderatorPlayerIds: MODERATORS, store: new StatsStore(db),
+        rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
+        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    const port = (server.address() as AddressInfo).port;
+
+    try {
+        /** `body` posted about `id` as `player`, the page's `fetch` would send it. */
+        const moderate = (id: string, body: string, player: string | null) =>
+            ask(port, `/${DATA_SETS_ROUTE}/${encodeURIComponent(id)}`, 'POST', { 'Content-Type': 'application/json', ...(player === null ? {} : { [PLAYER_ID_HEADER]: player }) }, body);
+        const action = (name: string) => JSON.stringify({ action: name });
+        /** Each row's state, and the folders: compared before and after a refusal. */
+        const states = () => `${dataSets.read().dataSets.map((set) => `${set.id}:${set.pending ? 'pending' : set.hidden ? 'hidden' : 'approved'}`).join()} | ${readdirSync(gamefilesDir).sort().join()}`;
+        const seen = async (player: string | null) => parseManifest((await ask(port, '/api/data-sets', 'GET', player === null ? {} : { [PLAYER_ID_HEADER]: player })).body, '')
+            .dataSets.map((set) => `${set.id}${set.pending ? ' pending' : ''}${set.hidden ? ' hidden' : ''}`).join();
+        console.log(`  the table: ${states()}`);
+
+        const done = async (label: string, id: string, name: string, player: string, after: () => boolean) => {
+            const answer = await moderate(id, action(name), player);
+            console.log(`    ${label}: ${answer.status} ${answer.body}, ${states()}`);
+            check(answer.status === 200 && answer.body === JSON.stringify({ id }) && String(answer.headers['content-type']).startsWith('application/json')
+                && answer.headers['cache-control'] === 'no-store' && after(), `${label}: 200, done`);
+        };
+        const refused = async (label: string, status: number, send: () => Promise<Answer>, says: string) => {
+            const was = states();
+            const answer = await send();
+            console.log(`    ${label}: ${answer.status} ${answer.body}`);
+            check(answer.status === status && answer.body.includes(says) && String(answer.headers['content-type']).startsWith('application/json')
+                && !answer.body.includes(PLAYER) && !answer.body.includes(OTHER) && states() === was, `${label}: ${status}, nothing changed`);
+        };
+        const row = (id: string) => dataSets.read().dataSets.find((set) => set.id === id);
+        const [moderator1, moderator2] = MODERATORS;
+
+        console.log('  refusals:');
+        await refused('not JSON', 400, () => moderate('p1', 'approve', moderator1), 'The body is not');
+        await refused('an unknown action', 400, () => moderate('p1', action('delete'), moderator1), 'The body is not');
+        await refused('a key beside the action', 400, () => moderate('p1', JSON.stringify({ action: 'approve', id: 'p2' }), moderator1), 'The body is not');
+        await refused('a list', 400, () => moderate('p1', '["approve"]', moderator1), 'The body is not');
+        await refused('a body too large', 413, () => moderate('p1', ' '.repeat(MAX_MODERATION_BYTES + 1), moderator1), 'larger than');
+        await refused('an id the table does not hold', 404, () => moderate('nope', action('approve'), moderator1), 'no set of this id');
+        const below = await ask(port, `/${DATA_SETS_ROUTE}/p1/approve`, 'POST', { [PLAYER_ID_HEADER]: moderator1 }, action('approve'));
+        check(below.status === 404 && row('p1')?.pending === true, 'a path below a set is 404, nothing changed');
+        await refused('no player', 403, () => moderate('p1', action('approve'), null), 'Only a moderator');
+        await refused('a player that is not a playerId', 403, () => moderate('p1', action('approve'), 'me'), 'Only a moderator');
+        await refused('the owner approving their own set', 403, () => moderate('p1', action('approve'), PLAYER), 'Only a moderator');
+        await refused('the owner hiding it', 403, () => moderate('p1', action('hide'), PLAYER), 'Only a moderator');
+        await refused('another player rejecting it', 403, () => moderate('p1', action('reject'), OTHER), 'Only a moderator');
+        const get = await ask(port, `/${DATA_SETS_ROUTE}/p1`, 'GET', { [PLAYER_ID_HEADER]: moderator1 });
+        check(get.status === 405 && get.headers.allow === 'POST', 'a GET of a set is 405, POST only');
+
+        console.log('  the transitions:');
+        await done('a moderator approves a pending set', 'p1', 'approve', moderator1, () => row('p1')?.pending === false && row('p1')?.hidden === false);
+        check(await seen(null) === 'dm-atari,site-hidden hidden,p1', 'it is offered to everyone');
+        await refused('approve it again', 409, () => moderate('p1', action('approve'), moderator1), 'The set is approved: only a pending set is approved');
+        await refused('reject it, approved', 409, () => moderate('p1', action('reject'), moderator1), 'only a pending set is rejected');
+        await refused('show it, not hidden', 409, () => moderate('p1', action('show'), moderator1), 'only a hidden set is shown');
+        await refused('hide a pending set', 409, () => moderate('p2', action('hide'), moderator1), 'The set is pending: only an approved set is hidden');
+        await done('the other moderator hides it', 'p1', 'hide', moderator2, () => row('p1')?.hidden === true && row('p1')?.pending === false);
+        check(await seen(null) === 'dm-atari,site-hidden hidden,p1 hidden', 'it is offered hidden, the page\'s grid leaving it out but for a moderator');
+        await refused('hide it again', 409, () => moderate('p1', action('hide'), moderator1), 'The set is hidden');
+        await refused('approve it, hidden', 409, () => moderate('p1', action('approve'), moderator1), 'The set is hidden');
+        await done('a moderator shows it', 'p1', 'show', moderator1, () => row('p1')?.hidden === false);
+        await done('a site\'s set is hidden too', 'dm-atari', 'hide', moderator1, () => row('dm-atari')?.hidden === true);
+        await done('and shown', 'site-hidden', 'show', moderator1, () => row('site-hidden')?.hidden === false);
+        await done('a moderator approves a site\'s pending set', 'site-pending', 'approve', moderator1, () => row('site-pending')?.pending === false);
+        await done('a moderator rejects a pending set', 'p2', 'reject', moderator1,
+            () => row('p2') === undefined && !existsSync(join(gamefilesDir, 'p2')) && existsSync(join(gamefilesDir, 'p1', 'dungeon.dat')));
+        await refused('and it is gone', 404, () => moderate('p2', action('reject'), moderator1), 'no set of this id');
+        check(!(await seen(moderator1)).includes('p2') && !(await seen(PLAYER)).includes('p2'), 'it is offered to nobody, its owner included');
+        await done('the owner withdraws their own pending set', 'p3', 'reject', OTHER, () => row('p3') === undefined && !existsSync(join(gamefilesDir, 'p3')));
+        await done('a moderator approves another', 'p4', 'approve', moderator1, () => row('p4')?.pending === false);
+        await refused('whose owner may not withdraw it, approved', 403, () => moderate('p4', action('reject'), PLAYER), 'Only a moderator');
+        db.prepare("UPDATE data_sets SET status = 'pending' WHERE id = 'site-pending'").run();
+        await refused('a moderator rejecting a site\'s pending set', 409, () => moderate('site-pending', action('reject'), moderator1), 'by hand');
+        db.prepare("UPDATE data_set_defaults SET default_set = 'p5'").run();
+        await refused('or the default set, made a pending player\'s by hand', 409, () => moderate('p5', action('reject'), moderator1), 'by hand');
+        console.log(`  the table: ${states()}`);
+    } finally {
+        server.close();
+        db.close();
+    }
+}
+
 /** A table made before the publish's columns gains them, its rows kept, read as before. */
 function checkAddedColumns(): void {
     const db = new DatabaseSync(':memory:');
@@ -743,6 +864,7 @@ async function main(): Promise<void> {
         await checkEvents(port, store);
         await checkTableRead(port, db, manifest);
         await checkPublish(scratch);
+        await checkModeration(scratch);
         checkAddedColumns();
 
         await checkEntry(scratch, options);
