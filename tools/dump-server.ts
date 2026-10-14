@@ -118,7 +118,7 @@ function emptyTable(): DataSetStore {
 }
 
 /** The scratch game files' sets, as a manifest. */
-const SCRATCH_MANIFEST = JSON.stringify({ default: 'a', swoosh: 'logo', dataSets: [{ id: 'a', name: 'A', dir: 'set-a' }] });
+const SCRATCH_MANIFEST = JSON.stringify({ default: 'a', dataSets: [{ id: 'a', name: 'A', dir: 'set-a' }] });
 
 /** `dataSets`, filled from `manifest` as `tools/fill-data-sets.ts` fills a store. */
 function filledFrom(manifest: string, dataSets = emptyTable()): DataSetStore {
@@ -146,7 +146,6 @@ function scratchFiles(scratch: string): ServerOptions {
     const gamefilesDir = join(scratch, 'gamefiles');
     mkdirSync(join(distDir, 'assets'), { recursive: true });
     mkdirSync(join(gamefilesDir, 'set-a'), { recursive: true });
-    mkdirSync(join(gamefilesDir, 'logo'), { recursive: true });
     writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
     writeFileSync(join(distDir, 'assets', 'index-AbC123.js'), 'console.log(1);');
     writeFileSync(join(distDir, 'assets', 'font-AbC123.ttf'), Buffer.from([0, 1, 0, 0]));
@@ -174,10 +173,10 @@ function checkStartUp(scratch: string, options: ServerOptions): void {
     const empty = emptyTable();
     const answer = manifestText(empty.read(), ANYONE);
     console.log(`  empty table    : ${JSON.stringify(checkFiles(options, empty))}, answering ${answer}`);
-    check(checkFiles(options, empty).length === 0 && answer === '{"default":null,"swoosh":null,"dataSets":[]}',
+    check(checkFiles(options, empty).length === 0 && answer === '{"default":null,"dataSets":[]}',
         'an empty table passes, and answers no set and no default');
     const none = parseManifest(answer, '');
-    check(none.dataSets.length === 0 && none.defaultSet === null && none.swooshDir === null, 'which the page reads as no set, and no default');
+    check(none.dataSets.length === 0 && none.defaultSet === null, 'which the page reads as no set, and no default');
 
     const noPage = refusal({ ...options, distDir: join(scratch, 'nowhere') }, filled);
     console.log(`  no page        : ${noPage.split(scratch).join('<scratch>')}`);
@@ -190,7 +189,7 @@ function checkStartUp(scratch: string, options: ServerOptions): void {
     mkdirSync(bad);
     const tableMissing = refusal({ ...options, gamefilesDir: bad }, filled);
     console.log(`  table's folders: ${tableMissing.split(scratch).join('<scratch>')}`);
-    check(tableMissing.startsWith('the data_sets table names folders') && tableMissing.endsWith('does not hold: set-a, logo'),
+    check(tableMissing.startsWith('the data_sets table names folders') && tableMissing.endsWith('does not hold: set-a'),
         'every folder the table names and the folder lacks is named');
 }
 
@@ -364,7 +363,7 @@ function written(gamefilesDir: string, dataSets: DataSetStore): string {
 
 /**
  * `POST /api/data-sets`, on a server of its own over DM's and CSB's real files: `dm-atari`
- * and `csb` the site's base sets, `conflux` a set whose folder is not its id, and `swoosh`
+ * and `csb` the site's base sets, `conflux` a set whose folder is not its id, and `stray`
  * a folder no row names.
  */
 async function checkPublish(scratch: string): Promise<void> {
@@ -380,11 +379,11 @@ async function checkPublish(scratch: string): Promise<void> {
         symlinkSync(resolve(from, 'graphics.dat'), join(gamefilesDir, folder, 'graphics.dat'));
     }
     mkdirSync(join(gamefilesDir, 'conflux-dir'));
-    mkdirSync(join(gamefilesDir, 'swoosh'));
+    mkdirSync(join(gamefilesDir, 'stray'));
     const options: ServerOptions = { distDir, gamefilesDir };
     const db = new DatabaseSync(':memory:');
     const dataSets = filledFrom(JSON.stringify({
-        default: 'dm-atari', swoosh: 'swoosh',
+        default: 'dm-atari',
         dataSets: [{ id: 'dm-atari', name: 'DM' }, { id: 'csb', name: 'CSB' }, { id: 'conflux', name: 'Conflux', dir: 'conflux-dir' }],
     }), new DataSetStore(db));
     checkFiles(options, dataSets);
@@ -511,7 +510,7 @@ async function checkPublish(scratch: string): Promise<void> {
         };
         await refused('the id again', 409, () => publish(fields('my-dm'), dmFiles()), 'a set of this id');
         await refused('a set\'s id whose folder is another', 409, () => publish(fields('conflux'), dmFiles()), 'a set of this id');
-        await refused('a folder no row names', 409, () => publish(fields('swoosh'), dmFiles()), 'a folder of this name');
+        await refused('a folder no row names', 409, () => publish(fields('stray'), dmFiles()), 'a folder of this name');
         await refused('an id that is not a folder\'s name', 400, () => publish(fields('.hidden'), dmFiles()), 'An id is');
         await refused('an id with a slash', 400, () => publish(fields('local:a/b'), dmFiles()), 'An id is');
         await refused('no player', 400, () => publish(fields('p1'), dmFiles(), null), 'No player');
@@ -561,7 +560,7 @@ async function checkModeration(scratch: string): Promise<void> {
     for (const dir of ['dm-atari', 'site-pending', 'site-hidden']) mkdirSync(join(gamefilesDir, dir), { recursive: true });
     const db = new DatabaseSync(':memory:');
     const dataSets = filledFrom(JSON.stringify({
-        default: 'dm-atari', swoosh: null,
+        default: 'dm-atari',
         dataSets: [{ id: 'dm-atari', name: 'DM' }, { id: 'site-pending', name: 'P', status: 'pending' }, { id: 'site-hidden', name: 'H', hidden: true }],
     }), new DataSetStore(db));
     const options: ServerOptions = { distDir, gamefilesDir };
@@ -667,14 +666,18 @@ function checkAddedColumns(): void {
         CREATE TABLE data_set_defaults (only INTEGER PRIMARY KEY CHECK (only = 1), default_set TEXT NOT NULL REFERENCES data_sets (id), swoosh TEXT);
         INSERT INTO data_sets (id, name, dir, position, status) VALUES ('a', 'A', 'set-a', 0, 'approved');
         INSERT INTO data_set_defaults VALUES (1, 'a', NULL);`);
+    db.exec("UPDATE data_set_defaults SET swoosh = 'swoosh'");
     const dataSets = new DataSetStore(db);
     const columns = (db.prepare('PRAGMA table_info(data_sets)').all() as { name: string }[]).map((column) => column.name);
+    const defaults = (db.prepare('PRAGMA table_info(data_set_defaults)').all() as { name: string }[]).map((column) => column.name);
     const row = db.prepare('SELECT description, authors, walls FROM data_sets').get() as { description: string; authors: string; walls: string | null };
     dataSets.publish({ id: 'b', name: 'B', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, walls: { shapes: [[1, 1]], signature: ['0'.repeat(64)] } }, PLAYER);
     console.log(`  an older table's columns: ${columns.join(', ')}`);
     check(columns.includes('description') && columns.includes('authors') && columns.includes('walls') && row.description === '' && row.authors === '[]' && row.walls === null
         && dataSets.read().dataSets.map((set) => set.id).join() === 'a,b' && dataSets.walls().get('b')?.shapes.join() === '1,1',
         'a table made before them gains the description, authors and walls, its rows kept');
+    console.log(`  an older defaults' columns: ${defaults.join(', ')}`);
+    check(defaults.join() === 'only,default_set' && dataSets.read().defaultId === 'a', 'and the defaults lose the FTL logo\'s folder, their row kept');
     db.close();
 }
 
@@ -748,7 +751,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
         ask(Number(listening[1]), '/api/data-sets').then((answer) => (emptyAnswer = answer.body)).finally(() => fresh.kill('SIGTERM'));
     });
     console.log(`  new store: ${emptyLine}, answering ${emptyAnswer}`);
-    check(freshEnded.code === 0 && emptyLine.includes('(no set, from the data_sets table);') && emptyAnswer === '{"default":null,"swoosh":null,"dataSets":[]}',
+    check(freshEnded.code === 0 && emptyLine.includes('(no set, from the data_sets table);') && emptyAnswer === '{"default":null,"dataSets":[]}',
         'on a new store, it listens with no set, and answers none');
 
     // The store filled as `npm start`'s is, by tools/fill-data-sets.ts, which fills only an empty table.

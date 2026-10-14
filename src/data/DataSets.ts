@@ -14,14 +14,14 @@
  * repository's, `tools/data-sets.json` (`vite.config.mts`), which the tools read too. This module parses it, for the page and the
  * tools:
  *
- *     { "default": "dm-atari", "swoosh": "swoosh",
+ *     { "default": "dm-atari",
  *       "dataSets": [{ "id": "dm-atari", "name": "Dungeon Master", "csbGraphics": true },
  *                    { "id": "conflux", "name": "Conflux 3.5", "dir": "conflux-3.5-b8" }, …] }
  *
  * A folder is named relative to the manifest. The list may be empty: a new server's is,
  * until a player's set is published and approved, and the welcome page then offers only to
  * add one. `default` may be `null` or left out, for none. A set's `dir` may be left out, for its `id`.
- * `swoosh`, the FTL logo's folder, may be `null` or left out. The flags `csbGraphics`,
+ * The flags `csbGraphics`,
  * `miniDat`, `hintOracle`, `dmRules` and `hidden` may each be left out, for `false`, and the manifest
  * names one only where it is true. A set with `"hidden": true` is left out of the welcome
  * page's grid (`chooserSets`), but for a moderator, and plays all the same by its `?dungeon=`.
@@ -110,11 +110,6 @@ export interface DataSetManifest {
      */
     defaultSet: DataSet | null;
     /**
-     * The folder of the Atari ST disk's FTL logo and its sound, which every set shares
-     * (`src/data/SwooshLoader.ts`), or `null` where the manifest names none.
-     */
-    swooshDir: string | null;
-    /**
      * Whether the player asking is a moderator: the manifest's `"moderator": true`. The
      * welcome page then lists the hidden sets too (`chooserSets`).
      */
@@ -190,7 +185,7 @@ export function parseManifest(text: string, base: string): DataSetManifest {
         throw manifestError(`it is not JSON (${error instanceof Error ? error.message : String(error)})`);
     }
     if (!isRecord(json)) throw manifestError('it is not an object');
-    const { dataSets: list, default: defaultId, swoosh, moderator = false } = json;
+    const { dataSets: list, default: defaultId, moderator = false } = json;
     if (!Array.isArray(list)) throw manifestError('"dataSets" is not a list of data sets');
 
     const dataSets = list.map((entry: unknown, i): DataSet => {
@@ -221,11 +216,8 @@ export function parseManifest(text: string, base: string): DataSetManifest {
 
     const defaultSet = defaultId === undefined || defaultId === null ? null : dataSets.find((set) => set.id === defaultId);
     if (defaultSet === undefined) throw manifestError(`"default" names none of its data sets`);
-    if (swoosh !== undefined && swoosh !== null && !isFolder(swoosh)) {
-        throw manifestError('"swoosh" is neither null nor a folder relative to the manifest');
-    }
     if (typeof moderator !== 'boolean') throw manifestError('"moderator" is neither true nor false');
-    return { dataSets, defaultSet, swooshDir: isFolder(swoosh) ? under(base, swoosh) : null, moderator };
+    return { dataSets, defaultSet, moderator };
 }
 
 /**

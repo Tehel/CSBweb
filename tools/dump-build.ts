@@ -30,7 +30,9 @@ import { checkLocalDataSet, readDungeonWalls } from '../src/data/LocalDataSets.t
 import { dataSetNamed } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const PAGE_TYPES = new Set(['.html', '.js', '.css', '.ico', '.jpg', '.png', '.ttf', '.woff2']);
+const PAGE_TYPES = new Set(['.html', '.js', '.css', '.ico', '.jpg', '.png', '.ttf', '.woff2', '.img', '.wav']);
+/** The FTL logo, the page's own asset (`src/main.ts`, `loadSwooshFiles`). */
+const SWOOSH_IMAGE = 'src/assets/swoosh.img';
 
 let failures = 0;
 function check(ok: boolean, what: string): void {
@@ -107,6 +109,10 @@ async function main(): Promise<void> {
 
         const bundle = files.filter((f) => f.endsWith('.js')).map((f) => readFileSync(join(outDir, f), 'utf8')).join('');
         check(!bundle.includes('__probe'), 'the bundle hands the probes no handle');
+        // Vite inlines a file under its 4 KiB limit as a data: URL: swoosh.img is 3016 bytes.
+        const swoosh = readFileSync(SWOOSH_IMAGE).toString('base64');
+        check((bundle.includes(swoosh) || files.some((f) => /^assets\/swoosh-[^/]+\.img$/.test(f))) && files.some((f) => /^assets\/swoosh-[^/]+\.wav$/.test(f)),
+            'the FTL logo is in the build: swoosh.img, in the bundle or a file of its own, and swoosh.wav');
 
         console.log('\nThe server\'s check:');
         const module = readFileSync(join(outDir, CHECK_MODULE), 'utf8');

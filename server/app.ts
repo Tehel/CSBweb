@@ -139,9 +139,8 @@ const IMMUTABLE = 'public, max-age=31536000, immutable';
 export function checkFiles({ distDir, gamefilesDir }: ServerOptions, dataSets: DataSetStore): string[] {
     if (!isFile(join(distDir, 'index.html'))) throw new Error(`${distDir} holds no index.html: is the page built?`);
     if (!isDirectory(gamefilesDir)) throw new Error(`${gamefilesDir} is not a folder: are the game files mounted?`);
-    const { dataSets: sets, swooshDir } = dataSets.read();
-    const folders = [...sets.map((set) => set.dir), ...(swooshDir === null ? [] : [swooshDir])];
-    const missing = folders.filter((dir) => !isDirectory(join(gamefilesDir, dir)));
+    const sets = dataSets.read().dataSets;
+    const missing = sets.map((set) => set.dir).filter((dir) => !isDirectory(join(gamefilesDir, dir)));
     if (missing.length > 0) throw new Error(`the data_sets table names folders ${gamefilesDir} does not hold: ${missing.join(', ')}`);
     return sets.map((set) => set.id);
 }

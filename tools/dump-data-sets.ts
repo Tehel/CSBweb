@@ -45,16 +45,14 @@ function checkParser(): void {
     ({ id: 'a', name: 'A', ...fields });
   const manifest = (fields: Record<string, unknown> = {}) => JSON.stringify({ default: 'a', dataSets: [set()], ...fields });
 
-  const parsed = parseManifest(manifest({ swoosh: 'logo/st', dataSets: [set({ miniDat: true, hintOracle: false, dmRules: true }), set({ id: 'b', dir: 'b/c' })] }), 'gamefiles');
-  console.log(`  parsed: ${parsed.dataSets.map((s) => `${s.id} in ${s.dir}`).join(', ')}; default ${parsed.defaultSet?.id}; FTL logo in ${parsed.swooshDir}`);
-  check(parsed.dataSets[1]!.dir === 'gamefiles/b/c' && parsed.swooshDir === 'gamefiles/logo/st' && parsed.defaultSet === parsed.dataSets[0],
+  const parsed = parseManifest(manifest({ dataSets: [set({ miniDat: true, hintOracle: false, dmRules: true }), set({ id: 'b', dir: 'b/c' })] }), 'gamefiles');
+  console.log(`  parsed: ${parsed.dataSets.map((s) => `${s.id} in ${s.dir}`).join(', ')}; default ${parsed.defaultSet?.id}`);
+  check(parsed.dataSets[1]!.dir === 'gamefiles/b/c' && parsed.defaultSet === parsed.dataSets[0],
     'a folder is resolved under the manifest\'s, and the default is one of the sets');
   check(parsed.dataSets[0]!.miniDat && !parsed.dataSets[0]!.hintOracle && parsed.dataSets[0]!.dmRules, 'the flags are read as written');
   const bare = parsed.dataSets[1]!;
   check(parsed.dataSets[0]!.dir === 'gamefiles/a' && !bare.csbGraphics && !bare.miniDat && !bare.hintOracle && !bare.dmRules && !bare.hidden,
     'a set\'s "dir" left out is its "id", and a flag left out is false');
-  check(parseManifest(manifest(), '').swooshDir === null && parseManifest(manifest({ swoosh: null }), '').swooshDir === null,
-    'a manifest that names no FTL logo, or null, has none');
   check(dataSetNamed(parsed, null) === null && dataSetNamed(parsed, 'nowhere') === null
     && dataSetNamed(parsed, 'b') === parsed.dataSets[1], 'no ?dungeon=, or an unknown one, is the welcome page; a known one plays itself');
 
@@ -88,9 +86,9 @@ function checkParser(): void {
   check(untold.description === '' && untold.authors.length === 0, 'left out, they are empty');
 
   // A new server's answer: no set, and no default.
-  const none = parseManifest(JSON.stringify({ default: null, swoosh: null, dataSets: [] }), '');
+  const none = parseManifest(JSON.stringify({ default: null, dataSets: [] }), '');
   console.log(`  no set: ${none.dataSets.length} sets, default ${none.defaultSet}, the welcome page lists ${chooserSets(none).length}`);
-  check(none.dataSets.length === 0 && none.defaultSet === null && none.swooshDir === null && chooserSets(none).length === 0,
+  check(none.dataSets.length === 0 && none.defaultSet === null && chooserSets(none).length === 0,
     'an empty list is a manifest of no set, with no default');
   check(parseManifest(manifest({ default: undefined }), '').defaultSet === null && parseManifest(manifest({ default: null }), '').defaultSet === null,
     '"default" left out, or null, names none');
@@ -117,7 +115,6 @@ function checkParser(): void {
     [manifest({ moderator: 'yes' }), '"moderator" is neither true nor false'],
     [manifest({ default: 'b' }), '"default" names none'],
     [manifest({ default: 'b', dataSets: [] }), '"default" names none'],
-    [manifest({ swoosh: '..' }), '"swoosh" is neither null nor a folder'],
   ];
   for (const [text, why] of malformed) {
     const message = refusal(text);
@@ -133,10 +130,8 @@ function main(): void {
   console.log('== the manifest\'s parser ==');
   checkParser();
 
-  console.log(`== ${MANIFEST_FILE}: ${DATA_SETS.length} sets, default ${DEFAULT_DATA_SET.id}, FTL logo in ${MANIFEST.swooshDir} ==`);
+  console.log(`== ${MANIFEST_FILE}: ${DATA_SETS.length} sets, default ${DEFAULT_DATA_SET.id} ==`);
   check(DEFAULT_DATA_SET.id === 'dm-atari', 'the tools play dm-atari where they name no set');
-  check(MANIFEST.swooshDir !== null && existsSync(resolve(MANIFEST.swooshDir, 'swoosh.img')) && existsSync(resolve(MANIFEST.swooshDir, 'swoosh.wav')),
-    'the FTL logo\'s folder holds swoosh.img and swoosh.wav');
 
   const tablesOf = new Map<string, GameTables>();
   for (const set of DATA_SETS) {

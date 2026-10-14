@@ -1,7 +1,7 @@
 /**
  * The data sets the site offers (`doc/DEPLOYMENT.md` → "The game files and the
  * manifest"): the store's `data_sets` table (`store.ts`), one row per set, and
- * `data_set_defaults`, one row naming the default set and the FTL logo's folder. `api/data-sets` and `api/event` read them at
+ * `data_set_defaults`, one row naming the default set. `api/data-sets` and `api/event` read them at
  * each request (`app.ts`), so a set added while the server runs is offered at once.
  *
  * A set is approved or pending. An approved set is offered to everyone; a pending one, a
@@ -38,8 +38,7 @@ CREATE TABLE IF NOT EXISTS data_sets (
 );
 CREATE TABLE IF NOT EXISTS data_set_defaults (
     only         INTEGER PRIMARY KEY CHECK (only = 1),
-    default_set  TEXT    NOT NULL REFERENCES data_sets (id),
-    swoosh       TEXT                  -- the FTL logo's folder, relative to GAMEFILES_DIR, or NULL
+    default_set  TEXT    NOT NULL REFERENCES data_sets (id)
 );
 `;
 
@@ -108,7 +107,6 @@ export interface StoredDataSets {
     dataSets: StoredDataSet[];
     /** `data_set_defaults`'s default set, `null` while it has no row. */
     defaultId: string | null;
-    swooshDir: string | null;
 }
 
 export class DataSetStore {
@@ -134,14 +132,17 @@ export class DataSetStore {
         for (const [column, type] of ADDED_COLUMNS) {
             if (!columns.has(column)) db.exec(`ALTER TABLE data_sets ADD COLUMN ${column} ${type}`);
         }
+        // The FTL logo's folder, which the defaults named before the logo was the page's own (`src/assets/`).
+        const defaultsColumns = (db.prepare('PRAGMA table_info(data_set_defaults)').all() as { name: string }[]).map((column) => column.name);
+        if (defaultsColumns.includes('swoosh')) db.exec('ALTER TABLE data_set_defaults DROP COLUMN swoosh');
         const flags = FLAG_COLUMNS.map(([, column]) => column);
         this.count = db.prepare('SELECT COUNT(*) AS n FROM data_sets');
         this.hasRow = db.prepare('SELECT 1 FROM data_sets WHERE id = ?');
         this.rows = db.prepare(`SELECT id, name, description, authors, dir, status, owner, ${flags.join(', ')} FROM data_sets ORDER BY position`);
-        this.defaults = db.prepare('SELECT default_set, swoosh FROM data_set_defaults');
+        this.defaults = db.prepare('SELECT default_set FROM data_set_defaults');
         this.insert = db.prepare(
             `INSERT INTO data_sets (id, name, description, authors, dir, position, status, owner, ${flags.join(', ')}) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ${flags.map(() => '?').join(', ')})`);
-        this.insertDefaults = db.prepare('INSERT INTO data_set_defaults (only, default_set, swoosh) VALUES (1, ?, ?)');
+        this.insertDefaults = db.prepare('INSERT INTO data_set_defaults (only, default_set) VALUES (1, ?)');
         this.insertPublished = db.prepare(
             `INSERT INTO data_sets (id, name, dir, position, status, owner, description, authors, walls, ${flags.join(', ')}) `
             + `VALUES (?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM data_sets), 'pending', ?, ?, ?, ?, ${flags.map(() => '?').join(', ')})`);
@@ -166,7 +167,7 @@ export class DataSetStore {
      * Fills the empty tables from `manifest`, parsed with its folders relative to
      * `GAMEFILES_DIR` (`parseManifest(text, '')`): every set the site's, approved unless it
      * says it is pending, in the manifest's order, and `data_set_defaults` where it names a
-     * default (the FTL logo's folder is kept there too). All of it or nothing. The server never
+     * default. All of it or nothing. The server never
      * calls it: the dev server's store (`vite.config.mts`) and `tools/fill-data-sets.ts` do.
      */
     fill(manifest: DataSetManifest): void {
@@ -176,7 +177,7 @@ export class DataSetStore {
             manifest.dataSets.forEach((set, position) => {
                 this.insert.run(set.id, set.name, set.description, JSON.stringify(set.authors), set.dir, position, set.pending ? 'pending' : 'approved', ...FLAG_COLUMNS.map(([flag]) => (set[flag] ? 1 : 0)));
             });
-            if (manifest.defaultSet) this.insertDefaults.run(manifest.defaultSet.id, manifest.swooshDir);
+            if (manifest.defaultSet) this.insertDefaults.run(manifest.defaultSet.id);
             this.db.exec('COMMIT');
         } catch (error) {
             this.db.exec('ROLLBACK');
@@ -225,7 +226,7 @@ export class DataSetStore {
     }
 
     read(): StoredDataSets {
-        const defaults = this.defaults.get() as { default_set: string; swoosh: string | null } | undefined;
+        const defaults = this.defaults.get() as { default_set: string } | undefined;
         const dataSets = (this.rows.all() as Record<string, string | number | null>[]).map((row): StoredDataSet => {
             const set: StoredDataSet = {
                 id: row.id as string, name: row.name as string, description: row.description as string,
@@ -236,7 +237,7 @@ export class DataSetStore {
             for (const [flag, column] of FLAG_COLUMNS) set[flag] = row[column] === 1;
             return set;
         });
-        return { dataSets, defaultId: defaults?.default_set ?? null, swooshDir: defaults?.swoosh ?? null };
+        return { dataSets, defaultId: defaults?.default_set ?? null };
     }
 }
 
@@ -248,7 +249,7 @@ export class DataSetStore {
  * the description and the authors where they are empty, as the repository's manifest does. A moderator's answer says `"moderator": true`, so that
  * the page shows them the hidden sets too: it tells them nothing they do not hold. A table
  * with no set answers an empty list, and one with no `data_set_defaults` row `null` for the
- * default and the FTL logo, which the page takes (`parseManifest`).
+ * default, which the page takes (`parseManifest`).
  */
 export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): string {
     const dataSets = visibleSets(stored, viewer).map((set) => {
@@ -260,7 +261,7 @@ export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): str
         if (set.pending) entry.status = 'pending';
         return entry;
     });
-    return JSON.stringify({ default: stored.defaultId, swoosh: stored.swooshDir, ...(viewer.moderator ? { moderator: true } : {}), dataSets });
+    return JSON.stringify({ default: stored.defaultId, ...(viewer.moderator ? { moderator: true } : {}), dataSets });
 }
 
 /**

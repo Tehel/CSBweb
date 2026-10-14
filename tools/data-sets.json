@@ -1,6 +1,5 @@
 {
   "default": "dm-atari",
-  "swoosh": "swoosh",
   "dataSets": [
     { "id": "dm-atari", "name": "Dungeon Master", "dmRules": true },
     { "id": "dm-atari-1.2", "name": "Dungeon Master ST 1.2", "dmRules": true, "hidden": true },

@@ -42,7 +42,7 @@ import { dungeonCensus, ITEM_KINDS, operationsUsed, type DungeonCensus } from '.
 import type { Game } from '../src/engine/Game';
 import { csbGraphicsOpener } from '../src/engine/FileSignatures';
 import { check, finish } from './lib/check';
-import { DATA_SETS, dataSetNamed, diskFiles, GAMEFILES_DIR } from './lib/dataSets';
+import { DATA_SETS, dataSetNamed, diskFiles } from './lib/dataSets';
 import { genuineSaves } from './lib/saves';
 import { newGame, runVbl, TICK_DUE } from './lib/game';
 
@@ -345,7 +345,7 @@ async function checkIdentify(): Promise<void> {
   check(wrong.length === 0 && told >= DATA_SETS.length * 2, 'every game file of every set is told by what it holds');
   const csb = dataSetNamed('csb').dir;
   const others = [...genuineSaves(), `${csb}/mini.dat`, `${csb}/utility-portraits.dat`, `${csb}/csb-thumbnail.png`,
-    `${GAMEFILES_DIR}/swoosh/swoosh.img`, `${GAMEFILES_DIR}/swoosh/swoosh.wav`];
+    `src/assets/swoosh.img`, `src/assets/swoosh.wav`];
   wrong = [];
   for (const path of others) {
     const kind = await identifyLocalDataSetFile(blobOf(new Uint8Array(readFileSync(path))));

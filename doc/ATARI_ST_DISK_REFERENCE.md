@@ -33,9 +33,8 @@ a cluster, 16 root entries), and the root directory holds six files:
 | `DUNGEON.DAT` | 33442 | 1988-03-01 | `050fb2cf…` | The 1.2 dungeon. |
 
 Three of them are in the repository under lower-case names: `graphics.dat` and
-`dungeon.dat` in `static/gamefiles/dm-atari-1.2/`, and `swoosh.img` in
-`static/gamefiles/swoosh/`, which every version shares, with the swoosh's sound as PCM
-(below). The data files load: the graphics through
+`dungeon.dat` in `static/gamefiles/dm-atari-1.2/`, and `swoosh.img` in `src/assets/`, the
+page's own, which every version shares, with the swoosh's sound as PCM (below). The data files load: the graphics through
 `GraphicsLoader` and `extractGraphicsTables`, the dungeon through `tools/peek-dungeon.ts
 --file`.
 
@@ -196,7 +195,7 @@ rise of 0.396 s, the script's 20 ticks. It has decayed to nothing by 24.1 s. Und
 noise the signal's level drifts below zero, as far as −22 dBFS at 23.93 s, and comes back
 by 25.5 s, where the track is digital silence.
 
-`static/gamefiles/swoosh/swoosh.wav` (md5 `05e3dae57e71ac8d7ecbdc5575cba1d0`) is
+`src/assets/swoosh.wav` (md5 `05e3dae57e71ac8d7ecbdc5575cba1d0`) is
 23.260–25.500 s of that track, the two channels averaged: mono, 16-bit, 44.1 kHz, 2.24 s,
 the first 5 ms faded in and the peak scaled to −1 dBFS. Nothing is filtered, so the drift
 is in it; what is heard is the first 0.85 s.
@@ -222,12 +221,12 @@ them is not established, so that video does not give a hold time the port could 
 ### The logo in the port
 
 Not CSBWin's, and not an extra either (`DEBT.md` H): every boot shows the logo before the
-title animation, wherever the file is served. Only `?intro=0` skips it, with the rest of the
+title animation. Only `?intro=0` skips it, with the rest of the
 intro. There is no setting to turn it off yet.
 
-- `main.ts` fetches `swoosh.img` and `swoosh.wav` from the folder the data sets' manifest
-  names (`"swoosh"`, `src/data/DataSets.ts`), as it does a game's files. Without a folder or
-  the first file there is no logo; without the second it is silent.
+- `main.ts` imports `swoosh.img` and `swoosh.wav` from `src/assets/` as the page's own
+  assets, so every build holds them (`doc/DEPLOYMENT.md` → "The build"), and fetches them at
+  the boot. Without the first file there is no logo; without the second it is silent.
 - `loadSwoosh` (`src/data/SwooshLoader.ts`) reads the picture, the colour patterns and the
   palette script from the file. Only the decoder is code of the port's, a transcription of
   `$0070`–`$01d4`.
@@ -358,7 +357,7 @@ and a folder:
 | File | Size | md5 | What it is |
 | --- | --- | --- | --- |
 | `BOOTER` | 1024 | `fdb97f2e…` | Not examined. |
-| `SWOOSH.IMG` | 3016 | `57a685a0…` | The FTL logo, byte-identical to DM 1.2's (`static/gamefiles/swoosh/swoosh.img`). |
+| `SWOOSH.IMG` | 3016 | `57a685a0…` | The FTL logo, byte-identical to DM 1.2's (`src/assets/swoosh.img`). |
 | `START.PRG` | 8102 | `f7fbb342…` | A GEMDOS program. It holds the string `A:\FTLCODE`. Not examined. |
 | `FTLCODE` | 15080 | `4b21e2d5…` | An FTL module (below). It holds the string `A:\SWITCH.DAT`. Not examined. |
 | `SWITCH.DAT` | 7405 | `b1fc60f2…` | Not examined. |

@@ -31,7 +31,7 @@ import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasB
 import { showSwoosh, SWOOSH_HOLD_VBLS } from '../src/renderer/intro/Swoosh';
 import { check, finish } from './lib/check';
 
-const DIR = 'static/gamefiles/swoosh';
+const DIR = 'src/assets';
 const FIXTURES = 'tools/fixtures';
 const PATTERNS_OFFSET = 0x01d8;
 const PICTURE_OFFSET = 0x0258;

@@ -22,6 +22,8 @@ import { extractGraphicsTables, type GraphicsTables } from './data/tables/Graphi
 import { UtilityDiskMessages, UtilityError } from './engine/Chaos';
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
+import swooshImageUrl from './assets/swoosh.img?url';
+import swooshSoundUrl from './assets/swoosh.wav?url';
 import { createCrtEffect, type CrtEffect } from './lib/crt';
 import { NO_FULLSCREEN, createFullscreen, type PageFullscreen } from './lib/fullscreen';
 import { GameScreen } from './renderer/GameScreen';
@@ -54,8 +56,6 @@ const GAMEFILES_DIR = 'gamefiles';
 let dataSet!: DataSet;
 /** Where its files are read from: its folder, or a local set's record (`chooseDataSet`). */
 let setFiles!: DataSetFiles;
-/** The FTL logo's folder, the manifest's, or `null` where it names none. */
-let swooshDir: string | null = null;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
 /**
@@ -183,18 +183,16 @@ function createSoundManager(graphicsLoader: GraphicsLoader, tables: GameTables):
 const SWOOSH_RECORDING = 'swoosh';
 
 /**
- * The FTL logo for the boot, read from `swoosh.img` as any game file is, or `null`
- * where the file is not served. The boot always shows it when it is (`DEBT.md` H). Its
- * sound is `swoosh.wav`; the logo is shown silent without that file.
+ * The FTL logo for the boot, read from `swoosh.img`, the page's own asset, which every set
+ * shares, or `null` where it cannot be fetched. The boot always shows it when it can
+ * (`DEBT.md` H). Its sound is `swoosh.wav`; the logo is shown silent without that file.
  */
 async function loadSwooshFiles(sound: SoundManager): Promise<{ image: Swoosh; startSound: () => void } | null> {
-    if (swooshDir === null) return null;
-    const dir = swooshDir;
-    const fetchFile = async (name: string): Promise<ArrayBuffer | null> => {
-        const response = await fetch(`${dir}/${name}`).catch(() => null);
+    const fetchFile = async (url: string): Promise<ArrayBuffer | null> => {
+        const response = await fetch(url).catch(() => null);
         return response?.ok ? response.arrayBuffer() : null;
     };
-    const [img, wav] = await Promise.all([fetchFile('swoosh.img'), fetchFile('swoosh.wav')]);
+    const [img, wav] = await Promise.all([fetchFile(swooshImageUrl), fetchFile(swooshSoundUrl)]);
     if (!img) return null;
     let image: Swoosh;
     try {
@@ -610,7 +608,6 @@ async function init() {
         const chosen = await chooseDataSet(manifest);
         if (!chosen) return await openWelcomePage(manifest);
         ({ set: dataSet, files: setFiles } = chosen);
-        swooshDir = manifest.swooshDir;
         console.log(`Loading ${dataSet.name}...`);
         const files = await loadGameFiles(dataSet, setFiles);
         console.log(`✓ Loaded graphics: ${files.graphicsLoader.getItemCount()} items${dataSet.csbGraphics ? ', and the CSBgraphics.dat overlay' : ''}`);

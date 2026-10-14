@@ -213,7 +213,7 @@ check(firstVisit.tiles === 'csb,conflux-3.5,dm-atari!,kids-dungeon,towers-of-cha
 // and CONTINUE are disabled, and the form it opens has no base set to offer.
 onPaused = ({ requestId }) => send('Fetch.fulfillRequest', { requestId, responseCode: 200,
   responseHeaders: [{ name: 'Content-Type', value: 'application/json; charset=utf-8' }],
-  body: Buffer.from(JSON.stringify({ default: null, swoosh: null, dataSets: [] })).toString('base64') });
+  body: Buffer.from(JSON.stringify({ default: null, dataSets: [] })).toString('base64') });
 await send('Fetch.enable', { patterns: [{ urlPattern: '*/api/data-sets*' }] });
 await send('Page.navigate', { url: `${APP}?dungeon=nowhere` });
 await wait(2500);
@@ -469,7 +469,7 @@ await inForm(`d.querySelector('#add-set-cancel').click()`);
 check(await form() === null, 'CANCEL closes it');
 await clickOn('.pick.add');
 await dropIn([['/gamefiles/dm-atari/dungeon.dat', 'graphics.dat'], ['/gamefiles/csb/csb-thumbnail.png', 'title.png'],
-  ['/gamefiles/csb/hcsb.hct', 'hints'], ['/gamefiles/swoosh/swoosh.img', 'notes.txt']]);
+  ['/gamefiles/csb/hcsb.hct', 'hints'], ['/', 'notes.txt']]);
 await typeIn('name', 'My Own Dungeon');
 await wait(1500);
 const filled = await form();

@@ -2207,7 +2207,7 @@ Recorded so that nobody "fixes" them.
 - 🚫 **The boot shows the Atari ST disk's FTL logo before the title**, which CSBWin
   never had: `SWOOSH.IMG`'s picture, palette script and sound
   (`src/renderer/intro/Swoosh.ts`, `doc/ATARI_ST_DISK_REFERENCE.md` → "The logo in the
-  port"), whenever the manifest's `"swoosh"` folder serves `swoosh.img`. It is not an
+  port"), the page's own asset (`src/assets/swoosh.img`). It is not an
   extra: the author wants it on every boot. The player's startup animations
   (`SettingsValues.startupAnimations`, on by default) turn it off together with the title
   animation from `graphics.dat`; the entrance is then the first screen.

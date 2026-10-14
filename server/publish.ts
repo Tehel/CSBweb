@@ -13,7 +13,7 @@
  *        (`LOCAL_ID_PATTERN`) once its `local:` is dropped
  *   413  a file over `MAX_PUBLISHED_FILE_BYTES`
  *   409  an id the table holds, pending or not, or that `GAMEFILES_DIR` holds an entry of
- *        (`swoosh/`, or a folder no row names)
+ *        (a folder no row names)
  *   422  the page's own check (`CheckDataSet`) finds a problem, as the form would show it,
  *        or the thumbnail is not a PNG
  *

@@ -19,7 +19,7 @@ behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 ```
 image      dist/ (the built page, and the server's check in dist/server/) + server/ (run by
            Node 24 as is) + src/data/DataSets.ts
-mounts     /data/gamefiles        the data sets, swoosh/, and players' uploads
+mounts     /data/gamefiles        the data sets, and players' uploads
            /data/stats            stats.db (SQLite, WAL: the statistics and the data sets), backups/
 env        PORT (8085), DIST_DIR, GAMEFILES_DIR, STATS_DB, MODERATOR_PLAYER_IDS
 ```
@@ -32,7 +32,6 @@ On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
 ├── .env                  the stack's own, kept on the VPS (see below)
 ├── gamefiles/            uploaded by hand, and written by the container (uid 1000);
 │   │                     everything under it is public
-│   ├── swoosh/           the FTL logo, as `data_set_defaults` names it
 │   ├── dm-atari/, csb/, … one folder per site's set the `data_sets` table lists
 │   └── <id>/             one folder per set a player publishes, written by the server
 └── stats/                written by the container (uid 1000)
@@ -76,7 +75,7 @@ The page ships as it is, debug chrome included. Every URL in it is relative to t
 ## The game files and the manifest
 
 A manifest lists each set (its `dir` relative to the game files' folder), none at all
-for a new server, the default set's id or none, and the FTL logo's folder or none. A set names only what differs from the defaults: `dir` left out is the set's `id`,
+for a new server, and the default set's id or none. A set names only what differs from the defaults: `dir` left out is the set's `id`,
 each flag (`csbGraphics`, `miniDat`, `hintOracle`, `hidden`) left out is `false`,
 `description` and `authors` left out are `''` and `[]`, and `status` left out is
 `"approved"`. `src/data/DataSets.ts` parses it, for the page, the tools and the server. The page
@@ -120,7 +119,7 @@ keeps them in the store's SQLite file, beside the statistics, so the nightly bac
 them: a `data_sets` table, one row per set (its fields, flags and folder, its place in the
 list, its status, `approved` or `pending`, and its owner's `playerId`, `NULL` for the
 site's, which the author uploads by hand), and `data_set_defaults`, one row naming the
-default set and the FTL logo's folder. A new server's tables are empty: it starts, and
+default set. A new server's tables are empty: it starts, and
 answers no set and no default. Its welcome page then holds only "+ Add my own", PLAY
 disabled: a player adds a set of their own, with its own `graphics.dat`, since the site has
 no DM or CSB to lend theirs, and publishes it, and a moderator's approval offers it to
@@ -200,16 +199,15 @@ through `node:sqlite` (as below, to add the site's sets), and in `gamefiles/`:
 
 The site's sets are rows written by hand, in the store through `node:sqlite`, once their
 folders are uploaded: a row with no `owner`, `approved`, its flags `0` or `1`, its
-`authors` a JSON list, and `data_set_defaults`'s one row, the default set and the FTL
-logo's folder, without which the welcome page selects nothing on a first visit and no
-game shows the logo. A set is added last in the list:
+`authors` a JSON list, and `data_set_defaults`'s one row, the default set, without which
+the welcome page selects nothing on a first visit. A set is added last in the list:
 
 ```bash
 docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning -e "
 const db = new (require('node:sqlite').DatabaseSync)('/data/stats/stats.db');
 db.prepare(\"INSERT INTO data_sets (id, name, dir, position, status, csb_graphics, description, authors) VALUES (?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM data_sets), 'approved', ?, ?, ?)\")
   .run('dm-atari', 'Dungeon Master', 'dm-atari', 1, 'The original.', JSON.stringify(['FTL Games']));
-db.prepare('INSERT INTO data_set_defaults (only, default_set, swoosh) VALUES (1, ?, ?)').run('dm-atari', 'swoosh');
+db.prepare('INSERT INTO data_set_defaults (only, default_set) VALUES (1, ?)').run('dm-atari');
 " < /dev/null
 ```
 
@@ -230,9 +228,11 @@ needs no restart.
 `npm run build` is `tsc && vite build && vite build --ssr`. `static/` is Vite's `publicDir` for the dev server
 only (`vite.config.mts`), so a build ships none of the game files, the manuals or anything
 else there. The page's own files are under `src/assets/`: `favicon.ico`, named by
-`index.html`, and the welcome page's logo, `csbweb-logo.jpg`, imported by
-`src/ui/welcomePage.ts`; the build hashes both. A build is `index.html` and `assets/`, under 1 MB, and the server's
-module.
+`index.html`, the welcome page's logo, `csbweb-logo.jpg`, imported by
+`src/ui/welcomePage.ts`, and the Atari disk's FTL logo, `swoosh.img` and `swoosh.wav`,
+imported by `src/main.ts`, which every set shares, so that every install has it and no
+player uploads it; the build hashes them, and inlines `swoosh.img`, 3 KB, in the bundle. A
+build is `index.html` and `assets/`, about 1.1 MB, and the server's module.
 
 **The server's module** is the second build, `--ssr`: the page's check of a player's own
 set, `checkLocalDataSet` (`src/data/LocalDataSets.ts`) and every reader under it, bundled
