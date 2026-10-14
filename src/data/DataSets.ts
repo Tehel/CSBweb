@@ -10,10 +10,9 @@
  * the directory's `graphics.dat`, so everything the page builds comes from the set.
  *
  * The sets are listed by a manifest, which the page asks the server for (`DATA_SETS_ROUTE`):
- * the deployed server answers it from its store's table, which the `manifest.json` beside
- * the files it describes fills once (`server/dataSets.ts`), and the dev server from the
- * repository's, `tools/data-sets.json` (`vite.config.mts`), which the tools read too. This module parses it, for the page, the
- * tools and the server:
+ * the deployed server answers it from its store's table (`server/dataSets.ts`), and the dev server from the
+ * repository's, `tools/data-sets.json` (`vite.config.mts`), which the tools read too. This module parses it, for the page and the
+ * tools:
  *
  *     { "default": "dm-atari", "swoosh": "swoosh",
  *       "dataSets": [{ "id": "dm-atari", "name": "Dungeon Master", "csbGraphics": true },
@@ -98,7 +97,7 @@ export interface DataSet {
     pending: boolean;
 }
 
-/** What `manifest.json` says, its folders resolved. */
+/** What a manifest says, its folders resolved. */
 export interface DataSetManifest {
     /** In the manifest's order. */
     dataSets: readonly DataSet[];

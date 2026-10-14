@@ -13,9 +13,8 @@
  * moderation, rest on the `playerId` alone, a secret (`src/ui/gameEvents.ts`), so no answer
  * holds one.
  *
- * An empty table is filled once, at start-up, from the manifest (`checkFiles`, `app.ts`),
- * every set the site's, with no owner, and approved unless it says `"status": "pending"`. After that the
- * server reads no manifest file.
+ * A new server's tables are empty, and it answers no set until rows are written: the site's
+ * by hand (`doc/DEPLOYMENT.md`), a player's by a publish. The server reads no manifest.
  */
 import { timingSafeEqual } from 'node:crypto';
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
@@ -107,7 +106,8 @@ export const ANYONE: DataSetViewer = { playerId: null, moderator: false };
 export interface StoredDataSets {
     /** In the table's order. */
     dataSets: StoredDataSet[];
-    defaultId: string;
+    /** `data_set_defaults`'s default set, `null` while it has no row. */
+    defaultId: string | null;
     swooshDir: string | null;
 }
 
@@ -165,7 +165,8 @@ export class DataSetStore {
     /**
      * Fills the empty tables from `manifest`, parsed with its folders relative to
      * `GAMEFILES_DIR` (`parseManifest(text, '')`): every set the site's, approved unless it
-     * says it is pending, in the manifest's order. All of it or nothing.
+     * says it is pending, in the manifest's order. All of it or nothing. The server never
+     * calls it: the dev server's store (`vite.config.mts`) and `tools/fill-data-sets.ts` do.
      */
     fill(manifest: DataSetManifest): void {
         if (!this.isEmpty()) throw new Error('the data_sets table is not empty');
@@ -224,7 +225,6 @@ export class DataSetStore {
 
     read(): StoredDataSets {
         const defaults = this.defaults.get() as { default_set: string; swoosh: string | null } | undefined;
-        if (defaults === undefined) throw new Error('the data_set_defaults table names no default set');
         const dataSets = (this.rows.all() as Record<string, string | number | null>[]).map((row): StoredDataSet => {
             const set: StoredDataSet = {
                 id: row.id as string, name: row.name as string, description: row.description as string,
@@ -235,7 +235,7 @@ export class DataSetStore {
             for (const [flag, column] of FLAG_COLUMNS) set[flag] = row[column] === 1;
             return set;
         });
-        return { dataSets, defaultId: defaults.default_set, swooshDir: defaults.swoosh };
+        return { dataSets, defaultId: defaults?.default_set ?? null, swooshDir: defaults?.swoosh ?? null };
     }
 }
 
@@ -245,7 +245,8 @@ export class DataSetStore {
  * pending ones, and a moderator every set. A pending set says `"status": "pending"`, and no
  * set says its owner. A `dir` is left out where it is the id, a flag where it is false, and
  * the description and the authors where they are empty, as the repository's manifest does. A moderator's answer says `"moderator": true`, so that
- * the page shows them the hidden sets too: it tells them nothing they do not hold.
+ * the page shows them the hidden sets too: it tells them nothing they do not hold. A table
+ * with no set, or no default, answers what the page refuses, saying why (`parseManifest`).
  */
 export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): string {
     const dataSets = visibleSets(stored, viewer).map((set) => {

@@ -8,11 +8,9 @@
  *   DIST_DIR        the built page (the checkout's `dist/`), and the page's check built for
  *                   Node, `server/LocalDataSets.js` under it (`npm run build`)
  *   GAMEFILES_DIR   the data sets (the checkout's `static/gamefiles/`)
- *   MANIFEST_FILE   their manifest, its folders relative to GAMEFILES_DIR (the checkout's
- *                   `tools/data-sets.json`; the image's `/data/gamefiles/manifest.json`),
- *                   read only to fill an empty `data_sets` table
  *   STATS_DB        the store's SQLite file (the checkout's `stats/stats.db`), created
- *                   with its folder when missing
+ *                   with its folder when missing, its `data_sets` table then empty
+ *                   (`tools/fill-data-sets.ts` fills the checkout's)
  *   MODERATOR_PLAYER_IDS  the moderators' `playerId`s, comma-separated, spaces around a
  *                   comma ignored: to them `api/data-sets` offers every set, pending ones
  *                   included, and says they moderate (`manifestText`); unset or empty
@@ -22,9 +20,8 @@
  * its reader of a dungeon's walls (`loadPageReaders`) before it listens, and reads the
  * walls of a published set whose row keeps none (`fillWalls`), logging a `dungeon.dat`
  * that does not read. It exits with 1 on an entry of
- * `MODERATOR_PLAYER_IDS` that is not a `playerId`, a store it cannot open, an empty table and
- * a manifest that is missing or does not parse, a folder the sets name that is missing, or
- * a check that is not built. It logs to stdout, and on SIGTERM or SIGINT stops
+ * `MODERATOR_PLAYER_IDS` that is not a `playerId`, a store it cannot open, a game files'
+ * folder or a folder the sets name that is missing, or a check that is not built. It logs to stdout, and on SIGTERM or SIGINT stops
  * listening, lets the requests in flight finish, closes the store, which checkpoints its
  * WAL, and exits with 0.
  */
@@ -32,7 +29,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import { checkFiles, createAppServer, fillWalls, loadPageReaders, type CheckedFiles, type PageReaders, type ServerOptions } from './app.ts';
+import { checkFiles, createAppServer, fillWalls, loadPageReaders, type PageReaders, type ServerOptions } from './app.ts';
 import { DataSetStore } from './dataSets.ts';
 import { isPlayerId, RateLimit } from './events.ts';
 import { StatsStore } from './stats.ts';
@@ -51,7 +48,6 @@ const ROOT = join(import.meta.dirname, '..');
 const options: ServerOptions = {
     distDir: process.env.DIST_DIR ?? join(ROOT, 'dist'),
     gamefilesDir: process.env.GAMEFILES_DIR ?? join(ROOT, 'static', 'gamefiles'),
-    manifestFile: process.env.MANIFEST_FILE ?? join(ROOT, 'tools', 'data-sets.json'),
 };
 const port = Number(process.env.PORT ?? 8085);
 const statsDb = process.env.STATS_DB ?? join(ROOT, 'stats', 'stats.db');
@@ -60,7 +56,7 @@ const moderatorPlayerIds = (process.env.MODERATOR_PLAYER_IDS ?? '').split(',').m
 let db: DatabaseSync;
 let dataSets: DataSetStore;
 let store: StatsStore;
-let checked: CheckedFiles;
+let ids: string[];
 let readers: PageReaders;
 try {
     if (!moderatorPlayerIds.every((id) => isPlayerId(id))) throw new Error('MODERATOR_PLAYER_IDS holds an entry that is not a playerId, a lowercase UUID');
@@ -68,7 +64,7 @@ try {
     db = openStore(statsDb);
     dataSets = new DataSetStore(db);
     store = new StatsStore(db);
-    checked = checkFiles(options, dataSets);
+    ids = checkFiles(options, dataSets);
     readers = await loadPageReaders(options.distDir);
 } catch (error) {
     console.error(`Not starting: ${error instanceof Error ? error.message : String(error)}`);
@@ -92,8 +88,7 @@ const server = createAppServer(options, {
 server.listen(port, () => {
     const address = server.address();
     const bound = typeof address === 'object' && address !== null ? address.port : port;
-    const from = checked.filled ? `the data_sets table, filled from ${options.manifestFile}` : 'the data_sets table';
-    console.log(`Listening on port ${bound}: ${options.distDir}, and ${options.gamefilesDir} (${checked.ids.join(', ')}, from ${from}); store in ${statsDb}`);
+    console.log(`Listening on port ${bound}: ${options.distDir}, and ${options.gamefilesDir} (${ids.join(', ') || 'no set'}, from the data_sets table); store in ${statsDb}`);
 });
 
 function shutDown(signal: string): void {

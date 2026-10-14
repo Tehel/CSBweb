@@ -3,8 +3,8 @@
 # page, served by `server/` in its container, draws what the dev server draws.
 #
 # Builds the image with CSBWEB_PROBE=1 (the probes' handle, which a deployed image never
-# has) as csbweb:probe, runs it over the checkout's game files, their manifest
-# (`tools/data-sets.json`) and a throwaway stats folder, runs `check-frames.sh --url` against it, and removes the container.
+# has) as csbweb:probe, runs it over the checkout's game files and a throwaway stats folder,
+# its store filled from their manifest (`tools/data-sets.json`, by `tools/fill-data-sets.ts`), runs `check-frames.sh --url` against it, and removes the container.
 # The game files' folder is throwaway too, each entry of `static/gamefiles/` mounted in it
 # read-only, so that the probe's publish (`server/publish.ts`) writes its set's folder
 # there and leaves the checkout as it was.
@@ -35,9 +35,9 @@ echo "building csbweb:probe"
 docker build -q --build-arg CSBWEB_BUILD=check --build-arg CSBWEB_PROBE=1 -t csbweb:probe "$root" >/dev/null || exit 1
 # The moderator is the dev server's own (`DEV_MODERATOR_PLAYER_ID`, `vite.config.mts`),
 # whom `probe-frames.mjs` plays to moderate the set it publishes.
+(cd "$root" && npx tsx tools/fill-data-sets.ts "$stats/stats.db") || exit 1
 docker run -d --name "$name" -p "127.0.0.1:$port:8085" \
-  -v "$gamefiles:/data/gamefiles" "${mounts[@]}" -v "$root/tools/data-sets.json:/data/data-sets.json:ro" \
-  -e MANIFEST_FILE=/data/data-sets.json -v "$stats:/data/stats" \
+  -v "$gamefiles:/data/gamefiles" "${mounts[@]}" -v "$stats:/data/stats" \
   -e MODERATOR_PLAYER_IDS=00000000-0000-4000-8000-000000000001 csbweb:probe >/dev/null || exit 1
 i=0
 until curl -sf -o /dev/null --max-time 1 "http://127.0.0.1:$port/api/health"; do

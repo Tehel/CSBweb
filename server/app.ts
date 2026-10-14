@@ -23,16 +23,15 @@
  *
  * Every file answers a conditional GET with 304. A path with a `.` segment, a backslash or
  * a NUL, encoded or not, is refused before it reaches the disk, so no request leaves the
- * two folders. The manifest is not served as a file, even where it lies under
- * `GAMEFILES_DIR`: the page asks `api/data-sets`.
+ * two folders.
  */
-import { createReadStream, readFileSync, statSync, type Stats } from 'node:fs';
+import { createReadStream, statSync, type Stats } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { extname, join, resolve } from 'node:path';
+import { extname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, type DataSetManifest } from '../src/data/DataSets.ts';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer } from './dataSets.ts';
 import { checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
@@ -44,19 +43,6 @@ export interface ServerOptions {
     distDir: string;
     /** The data sets, served under `gamefiles/`. */
     gamefilesDir: string;
-    /**
-     * The data sets' manifest, its folders relative to `gamefilesDir`, which fills an empty
-     * `data_sets` table (`checkFiles`) and is read at no other time.
-     */
-    manifestFile: string;
-}
-
-/** What `checkFiles` found. */
-export interface CheckedFiles {
-    /** The table's sets' ids, in its order. */
-    ids: string[];
-    /** Whether the table was empty, and filled from the manifest. */
-    filled: boolean;
 }
 
 /** The folder of `distDir` that holds the server's own module, not the page's: never served. */
@@ -144,34 +130,20 @@ const NO_CACHE = 'no-cache';
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 
 /**
- * The page's `index.html` in `distDir`, and the data sets, every folder they name present
- * in `gamefilesDir`. An empty `data_sets` table is filled from the manifest, parsed by the
- * page's own parser, once its folders are found, so a manifest that names a missing one
- * leaves the table empty for the next start to read it again; a table that is not empty is
- * read instead, and the manifest is not. Throws an error that says what is missing, so a
- * bad mount stops the container rather than the player's boot.
+ * The page's `index.html` in `distDir`, `gamefilesDir`, and every folder the `data_sets`
+ * table names in it, which may name none: a new server's table is empty, and its rows are
+ * written by hand (`doc/DEPLOYMENT.md`) or published. The table's ids, in its order. Throws
+ * an error that says what is missing, so a bad mount stops the container rather than the
+ * player's boot.
  */
-export function checkFiles({ distDir, gamefilesDir, manifestFile }: ServerOptions, dataSets: DataSetStore): CheckedFiles {
+export function checkFiles({ distDir, gamefilesDir }: ServerOptions, dataSets: DataSetStore): string[] {
     if (!isFile(join(distDir, 'index.html'))) throw new Error(`${distDir} holds no index.html: is the page built?`);
-    const manifest = dataSets.isEmpty() ? readManifest(manifestFile) : null;
-    const { dataSets: sets, swooshDir } = manifest ?? dataSets.read();
+    if (!isDirectory(gamefilesDir)) throw new Error(`${gamefilesDir} is not a folder: are the game files mounted?`);
+    const { dataSets: sets, swooshDir } = dataSets.read();
     const folders = [...sets.map((set) => set.dir), ...(swooshDir === null ? [] : [swooshDir])];
     const missing = folders.filter((dir) => !isDirectory(join(gamefilesDir, dir)));
-    if (missing.length > 0) {
-        throw new Error(`${manifest ? manifestFile : 'the data_sets table'} names folders ${gamefilesDir} does not hold: ${missing.join(', ')}`);
-    }
-    if (manifest) dataSets.fill(manifest);
-    return { ids: dataSets.read().dataSets.map((set) => set.id), filled: manifest !== null };
-}
-
-function readManifest(manifestFile: string): DataSetManifest {
-    let text: string;
-    try {
-        text = readFileSync(manifestFile, 'utf8');
-    } catch {
-        throw new Error(`the data_sets table is empty, and there is no manifest ${manifestFile} to fill it`);
-    }
-    return parseManifest(text, '');
+    if (missing.length > 0) throw new Error(`the data_sets table names folders ${gamefilesDir} does not hold: ${missing.join(', ')}`);
+    return sets.map((set) => set.id);
 }
 
 /** The server, not yet listening. */
@@ -190,7 +162,7 @@ export function createAppServer(options: ServerOptions, api: ApiOptions): Server
     });
 }
 
-function route({ distDir, gamefilesDir, manifestFile }: ServerOptions, api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
+function route({ distDir, gamefilesDir }: ServerOptions, api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
     const segments = pathSegments(req.url ?? '');
     if (segments === null) return send(res, 400, 'Bad path');
 
@@ -228,9 +200,7 @@ function route({ distDir, gamefilesDir, manifestFile }: ServerOptions, api: ApiO
 
     if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
     if (segments[0] === GAMEFILES) {
-        const path = join(gamefilesDir, ...segments.slice(1));
-        if (resolve(path) === resolve(manifestFile)) return send(res, 404, 'Not found');
-        return serveFile(req, res, path, NO_CACHE);
+        return serveFile(req, res, join(gamefilesDir, ...segments.slice(1)), NO_CACHE);
     }
     if (segments.length === 0) return serveFile(req, res, join(distDir, 'index.html'), NO_CACHE);
     if (segments[0] === SERVER_DIR) return send(res, 404, 'Not found');

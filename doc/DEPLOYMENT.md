@@ -19,9 +19,9 @@ behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 ```
 image      dist/ (the built page, and the server's check in dist/server/) + server/ (run by
            Node 24 as is) + src/data/DataSets.ts
-mounts     /data/gamefiles        the data sets, swoosh/, manifest.json, and players' uploads
+mounts     /data/gamefiles        the data sets, swoosh/, and players' uploads
            /data/stats            stats.db (SQLite, WAL: the statistics and the data sets), backups/
-env        PORT (8085), DIST_DIR, GAMEFILES_DIR, MANIFEST_FILE, STATS_DB, MODERATOR_PLAYER_IDS
+env        PORT (8085), DIST_DIR, GAMEFILES_DIR, STATS_DB, MODERATOR_PLAYER_IDS
 ```
 
 On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
@@ -32,9 +32,8 @@ On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
 ├── .env                  the stack's own, kept on the VPS (see below)
 ├── gamefiles/            uploaded by hand, and written by the container (uid 1000);
 │   │                     everything under it is public
-│   ├── manifest.json     the data sets that fill the store's empty table
-│   ├── swoosh/           the FTL logo, as the manifest names it
-│   ├── dm-atari/, csb/, … one folder per data set the manifest lists
+│   ├── swoosh/           the FTL logo, as `data_set_defaults` names it
+│   ├── dm-atari/, csb/, … one folder per site's set the `data_sets` table lists
 │   └── <id>/             one folder per set a player publishes, written by the server
 └── stats/                written by the container (uid 1000)
     ├── stats.db, stats.db-wal, stats.db-shm
@@ -43,10 +42,8 @@ On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
     └── backup.log
 ```
 
-**The manifest is inside `gamefiles/`**, next to the folders it names. The server reads
-`/data/gamefiles/manifest.json` (the image's `MANIFEST_FILE`), and nothing outside the
-mounted folder is visible to it, only to fill the store's empty `data_sets` table (below),
-and does not serve it as a file.
+**The server reads no manifest**: the sets are the store's rows (below), and a new
+server's table is empty.
 
 ## The site
 
@@ -80,8 +77,9 @@ The page ships as it is, debug chrome included. Every URL in it is relative to t
 
 A manifest lists each set (its `dir` relative to the game files' folder), the default
 set's id and the FTL logo's folder, or none. A set names only what differs from the defaults: `dir` left out is the set's `id`,
-each flag (`csbGraphics`, `miniDat`, `hintOracle`, `hidden`) left out is `false`, and
-`status` left out is `"approved"`. `src/data/DataSets.ts` parses it, for the page, the tools and the server. The page
+each flag (`csbGraphics`, `miniDat`, `hintOracle`, `hidden`) left out is `false`,
+`description` and `authors` left out are `''` and `[]`, and `status` left out is
+`"approved"`. `src/data/DataSets.ts` parses it, for the page, the tools and the server. The page
 asks the server for it first, at `api/data-sets` (`loadManifest`, `src/main.ts`), and one
 that is missing or malformed ends the boot on `fatalMessage`, saying why.
 
@@ -92,38 +90,39 @@ that every folder holds the files its flags promise. The dev server answers
 `api/data-sets` as the server does (`vite.config.mts`), from it, read at each request, and
 from the sets published and moderated since it started, the published ones written in a
 scratch folder that goes when it stops. Its one moderator is the `playerId`
-`DEV_MODERATOR_PLAYER_ID` holds, which `tools/probe-frames.mjs` plays. `npm start` fills its store from it. The deployed
-manifest is the author's own copy, `gamefiles/manifest.json`, uploaded with the files:
-which sets the site offers is the author's choice. Today it is the repository's, all nine
-sets.
+`DEV_MODERATOR_PLAYER_ID` holds, which `tools/probe-frames.mjs` plays.
+`npx tsx tools/fill-data-sets.ts` fills `npm start`'s empty store (`stats/stats.db`) from
+it, and `tools/check-image.sh` the image's throwaway one. Which sets the deployed site
+offers is the author's choice, written in its table by hand (below).
 
-The manifest is strict JSON, read by `JSON.parse`: a comment makes it unreadable, and the
-server will not start on it. To take a set off the welcome page without deleting it, give it
-`"hidden": true`: its grid leaves it out (`chooserSets`, `src/data/DataSets.ts`), and
-`?dungeon=<id>` plays it all the same, as CONTINUE does a save of it. The server treats it as any other set: its folder is checked at start-up,
-its files are served, and its events are taken. Keys the parser does not know are
-ignored, so a note can go in a key of its own, such as `"_note"`.
+The manifest is strict JSON, read by `JSON.parse`: a comment makes it unreadable, and
+neither the dev server nor a tool runs on it. Keys the parser does not know are ignored,
+so a note can go in a key of its own, such as `"_note"`. A set with `"hidden": true` (a
+row's `hidden`, a moderator's eye) is left out of the welcome page's grid (`chooserSets`,
+`src/data/DataSets.ts`), and `?dungeon=<id>` plays it all the same, as CONTINUE does a save
+of it. The server treats it as any other set: its folder is checked at start-up, its files
+are served, and its events are taken.
 
 Each set's folder holds its thumbnail, `<id>-thumbnail.png` (`dm-atari/dm-atari-thumbnail.png`,
 `kids-dungeon-24/kids-dungeon-thumbnail.png`): the last frame of its title, which the
 welcome page's tile shows, so the page fetches no game file to draw its grid.
 `npx tsx tools/gen-thumbnails.ts` writes every set's from its `graphics.dat`, drawn as the form
 that adds a player's own set draws one (`src/renderer/intro/TitleThumbnail.ts`), and `npm test`
-checks the committed ones (`--check`). A set added to the manifest needs its thumbnail
+checks the committed ones (`--check`). A set added to the site needs its thumbnail
 written before it is uploaded; without one, its tile's picture is a blank box.
 
 The game files are not part of a deploy. They are uploaded once, and again when they
 change. **Everything in `gamefiles/` can be downloaded**, readmes and stray folders
-included, since the server serves the folder as it stands; only the manifest is not.
+included, since the server serves the folder as it stands.
 
-**The server lists the sets from its store, not from the manifest.** `server/dataSets.ts`
+**The server lists the sets from its store.** `server/dataSets.ts`
 keeps them in the store's SQLite file, beside the statistics, so the nightly backup covers
 them: a `data_sets` table, one row per set (its fields, flags and folder, its place in the
 list, its status, `approved` or `pending`, and its owner's `playerId`, `NULL` for the
 site's, which the author uploads by hand), and `data_set_defaults`, one row naming the
-default set and the FTL logo's folder. At start-up an empty table is filled from the
-manifest, every set the site's and approved, unless it says `"status": "pending"`, once its folders are found. After that the manifest is not read: changing it
-changes nothing. `api/data-sets` answers each player the sets they may see: the approved
+default set and the FTL logo's folder. A new server's tables are empty: it starts, and
+answers no set and no default, which the page refuses on `fatalMessage`, until the site's
+rows are written by hand (below). `api/data-sets` answers each player the sets they may see: the approved
 ones to everyone, a pending one also to its owner, and every set to a moderator, a pending
 set saying `"status": "pending"` and none naming its owner. A moderator's answer also says
 `"moderator": true`, and the welcome page then lists the hidden sets too, each tile's name
@@ -183,7 +182,7 @@ A rejected set's folder was copied by the night's backup if it was published bef
 folder no row names, which refuses a new publish of its id until it is deleted by hand.
 
 What the endpoint does not do is left to a moderator's hands on the VPS, in the store
-through `node:sqlite` (as below, to refill the table), and in `gamefiles/`:
+through `node:sqlite` (as below, to add the site's sets), and in `gamefiles/`:
 
 - **Deleting an approved set.** Hiding it answers a complaint, and its players keep their
   saves and their way back to it; a deletion makes their saves count for nothing. Its row
@@ -194,15 +193,31 @@ through `node:sqlite` (as below, to refill the table), and in `gamefiles/`:
 - **The order of the sets and the default set**: a row's `position`, and
   `data_set_defaults`.
 
-### Refilling the table
+### Writing the site's sets
 
-To refill the table from a changed manifest, empty it and restart. This drops every row,
-a player's pending set included:
+The site's sets are rows written by hand, in the store through `node:sqlite`, once their
+folders are uploaded: a row with no `owner`, `approved`, its flags `0` or `1`, its
+`authors` a JSON list, and `data_set_defaults`'s one row, the default set and the FTL
+logo's folder, which the page needs before it plays anything. A set is added last in the
+list:
 
 ```bash
-docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning -e "new (require('node:sqlite').DatabaseSync)('/data/stats/stats.db').exec('DELETE FROM data_set_defaults; DELETE FROM data_sets')" < /dev/null
-docker-compose restart
+docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning -e "
+const db = new (require('node:sqlite').DatabaseSync)('/data/stats/stats.db');
+db.prepare(\"INSERT INTO data_sets (id, name, dir, position, status, csb_graphics, description, authors) VALUES (?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM data_sets), 'approved', ?, ?, ?)\")
+  .run('dm-atari', 'Dungeon Master', 'dm-atari', 1, 'The original.', JSON.stringify(['FTL Games']));
+db.prepare('INSERT INTO data_set_defaults (only, default_set, swoosh) VALUES (1, ?, ?)').run('dm-atari', 'swoosh');
+" < /dev/null
 ```
+
+and a set's description and authors are changed in place:
+
+```bash
+docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning -e "new (require('node:sqlite').DatabaseSync)('/data/stats/stats.db').prepare('UPDATE data_sets SET description = ?, authors = ? WHERE id = ?').run('The original.', JSON.stringify(['FTL Games']), 'dm-atari')" < /dev/null
+```
+
+Each request reads the table, so a row is offered at once, with no restart; its folder is
+checked at the next start, which a folder that is not there stops.
 
 A file the page asks for is read when it is asked for, so replacing a data set's files
 needs no restart.
@@ -241,12 +256,11 @@ The build is named by `CSBWEB_BUILD` where it is given (the image's build stage 
 it is, stripping the types, so it uses only erasable syntax, marks its type-only imports
 and names its imports with `.ts`. `server/tsconfig.json` holds it to that, and `npm test`
 runs `tsc` on it beside the root project. The package is an ES module
-(`"type": "module"`), so that Node runs `server.ts` and the page's manifest parser, which
-the server imports from `../src/data/`. `npm start` runs it locally, on Node 22.18 or later.
+(`"type": "module"`), so that Node runs `server.ts` and the page's `DataSets.ts`, whose
+routes and limits the server imports from `../src/data/`. `npm start` runs it locally, on Node 22.18 or later.
 
 It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
-`static/gamefiles/`), `MANIFEST_FILE` (the checkout's `tools/data-sets.json`; the image's
-`/data/gamefiles/manifest.json`), read only to fill an empty table, and `STATS_DB` (the
+`static/gamefiles/`), and `STATS_DB` (the
 checkout's `stats/stats.db`, which git ignores), and `MODERATOR_PLAYER_IDS`, the moderators'
 `playerId`s, comma-separated, spaces around a comma ignored, to whom `api/data-sets` offers
 every set (unset or empty, no one; an entry that is not a `playerId` stops the start), and serves (`server/app.ts`):
@@ -256,7 +270,7 @@ every set (unset or empty, no one; an entry that is not a `playerId` stops the s
 | `/` | `dist/index.html` | `no-cache` |
 | `/assets/…` | `dist/assets/…`, hashed names | `immutable` |
 | `/server/…` | 404: `dist/server/` is the server's module | |
-| `/gamefiles/…` | `GAMEFILES_DIR/…`, but the manifest | `no-cache`, ETag and Last-Modified |
+| `/gamefiles/…` | `GAMEFILES_DIR/…` | `no-cache`, ETag and Last-Modified |
 | `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest; POST: a set published | `no-store`, `Vary: X-Player-Id` |
 | `/api/data-sets/<id>` | POST: the set approved, rejected, hidden or shown by a moderator, or withdrawn by its owner | `no-store` |
 | `/api/data-set-walls` | the walls of those of the same sets that keep some: the published ones | `no-store`, `Vary: X-Player-Id` |
@@ -269,9 +283,8 @@ Every file answers a conditional GET with 304, and only GET and HEAD are allowed
 decoded, is refused with 400 before it reaches the disk.
 
 **At start-up** it opens the store (making it, and its folder, when missing), checks
-that `index.html` is built, and that each folder the sets name exists: the table's, or,
-while the table is empty, those of the manifest, which must parse, and which then fills
-it; then it loads the server's module (`loadCheckDataSet`, `server/app.ts`). Any failure prints `Not starting: <why>` and exits with 1, so a bad mount fails
+that `index.html` is built, and that the game files' folder and each folder the table's
+sets name exist, which may be none; then it loads the server's module (`loadCheckDataSet`, `server/app.ts`). Any failure prints `Not starting: <why>` and exits with 1, so a bad mount fails
 the container rather than the player's boot. On SIGTERM it stops listening, lets the
 requests in flight finish (5 s at most), closes the store, which checkpoints the WAL into
 the file, and exits with 0. It logs to stdout. `tools/dump-server.ts` asserts all of it,
@@ -353,8 +366,8 @@ never takes that path, at the cost of a few seconds' outage per deploy, during w
 answers 502.
 
 `tools/check-image.sh` builds the image with `CSBWEB_PROBE=1` as `csbweb:probe`, runs it over
-the checkout's game files, `tools/data-sets.json` as its `MANIFEST_FILE` and a throwaway
-stats folder, runs the server's module in it on DM's own files, and runs
+the checkout's game files and a throwaway stats folder, whose store
+`tools/fill-data-sets.ts` fills from `tools/data-sets.json`, runs the server's module in it on DM's own files, and runs
 `tools/check-frames.sh --url` against it: the golden frames, drawn by the built
 page as the container serves it, must match the dev server's. The probe image is never
 deployed.
@@ -368,8 +381,8 @@ ssh <host> 'cd ~/csbweb && docker-compose ps && docker-compose logs --tail 20'
 ```
 
 A healthy start logs one line, `Listening on port 8085: /app/dist, and /data/gamefiles
-(<the sets>, from the data_sets table); store in /data/stats/stats.db`, with `, filled
-from /data/gamefiles/manifest.json` after the table's name on the start that filled it.
+(<the sets>, from the data_sets table); store in /data/stats/stats.db`, `no set` for the
+sets while the table is empty.
 
 **A container that fails to start is retried with a growing delay**: 13 s, 27 s, 51 s, then
 about a minute between attempts. While it waits, `docker-compose ps` says "Restarting", even
@@ -435,4 +448,3 @@ a restore that forgets the players' folders says so.
 - **The rate limit's counts are in memory**, so a restart resets them, which is harmless.
 - **Nothing is lost**: every event is in `stats.db` before `api/event` answers 204, and a
   SIGTERM checkpoints the WAL. A `down` loses only the container's log.
-- **The manifest is read** only at a start that finds the `data_sets` table empty.

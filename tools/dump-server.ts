@@ -4,17 +4,15 @@
  * curious visitor, the page's beacon and the compose healthcheck would ask.
  *
  * Asserts:
- *   - the start-up check: the repository's manifest passes, and fills an empty table; a
- *     missing `index.html`, a missing manifest, a manifest that does not parse and a folder
- *     it names that is not there each stop it, saying why, and leave the table empty; a
- *     table that is not empty is read, with no manifest, a changed one left unread, and a
- *     folder it names that is not there stops it too;
+ *   - the start-up check: the table the repository's manifest fills passes over its game
+ *     files, and answers as that manifest; an empty table passes, and answers what the
+ *     page refuses; a missing `index.html`, a missing game files' folder and a folder the
+ *     table names that is not there each stop it, saying why;
  *   - `/api/data-sets`: the table's approved sets, as a manifest the page's parser reads
  *     as the one that filled it, as JSON, not cached, read at each request; a pending set
  *     offered, as pending, to its owner and the moderators only, as the `X-Player-Id`
  *     header names them, and no owner named; `"moderator": true` said to each of two
- *     moderators, and to nobody else; and the manifest not served as a file under
- *     `gamefiles/`;
+ *     moderators, and to nobody else;
  *   - `/` and `/assets/…`: the page, `no-cache`, and the hashed files, `immutable`, the
  *     fonts as `font/ttf` and `font/woff2`; and `dist/server/`, the server's module, not
  *     served;
@@ -51,9 +49,10 @@
  *     reads none twice;
  *   - `server.ts` itself, as Node runs it: a bad mount, a store it cannot open, a page's
  *     check that is not built, or an entry of `MODERATOR_PLAYER_IDS` that is not a `playerId` exits 1
- *     before it listens; a list of two, spaces around the comma, makes both moderators; and SIGTERM stops a listening server with 0, the store made, its
- *     table filled, and its WAL checkpointed; started again without a manifest, it plays
- *     from the table, and says a published set whose walls it cannot read;
+ *     before it listens; on a new store, it listens with no set; a list of two, spaces around the comma, makes both moderators; and SIGTERM stops a listening server with 0, its
+ *     store filled by `tools/fill-data-sets.ts`, which then leaves it as it is, and its WAL
+ *     checkpointed; started again, it plays from the table, and says a published set whose
+ *     walls it cannot read;
  *   - `backup.ts`, run beside that server: a snapshot in `backups/` holding the events
  *     still in the WAL and the data sets, the server serving throughout, and exit 1 on a
  *     missing store; the folder of a set with an owner copied whole into
@@ -118,13 +117,22 @@ function emptyTable(): DataSetStore {
     return new DataSetStore(new DatabaseSync(':memory:'));
 }
 
+/** The scratch game files' sets, as a manifest. */
+const SCRATCH_MANIFEST = JSON.stringify({ default: 'a', swoosh: 'logo', dataSets: [{ id: 'a', name: 'A', dir: 'set-a' }] });
+
+/** `dataSets`, filled from `manifest` as `tools/fill-data-sets.ts` fills a store. */
+function filledFrom(manifest: string, dataSets = emptyTable()): DataSetStore {
+    dataSets.fill(parseManifest(manifest, ''));
+    return dataSets;
+}
+
 /** What `manifest` says, as the page's parser reads it, to compare. */
 function parsed(manifest: string): string {
     return JSON.stringify(parseManifest(manifest, ''));
 }
 
 /** The error `checkFiles` throws, or `''`. */
-function refusal(options: ServerOptions, dataSets = emptyTable()): string {
+function refusal(options: ServerOptions, dataSets: DataSetStore): string {
     try {
         checkFiles(options, dataSets);
         return '';
@@ -146,59 +154,45 @@ function scratchFiles(scratch: string): ServerOptions {
     mkdirSync(join(distDir, 'server'));
     writeFileSync(join(distDir, CHECK_MODULE), 'export function checkLocalDataSet() {}\n'
         + 'export async function readDungeonWalls() { throw new Error("a stand-in"); }\n');
-    writeFileSync(join(gamefilesDir, 'manifest.json'), JSON.stringify({
-        default: 'a', swoosh: 'logo',
-        dataSets: [{ id: 'a', name: 'A', dir: 'set-a' }],
-    }));
     writeFileSync(join(gamefilesDir, 'set-a', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
     writeFileSync(join(gamefilesDir, 'set-a', '.hidden'), 'hidden');
     writeFileSync(join(scratch, 'secret.txt'), 'SECRET');
-    return { distDir, gamefilesDir, manifestFile: join(gamefilesDir, 'manifest.json') };
+    return { distDir, gamefilesDir };
 }
 
 function checkStartUp(scratch: string, options: ServerOptions): void {
     console.log('Start-up check:');
-    const repository = emptyTable();
-    const real = checkFiles({ distDir: options.distDir, gamefilesDir: GAMEFILES_DIR, manifestFile: MANIFEST_FILE }, repository);
-    console.log(`  ${MANIFEST_FILE}: ${real.ids.join(', ')}`);
-    check(real.filled && real.ids.length > 0, `the repository's ${MANIFEST_FILE} passes over ${GAMEFILES_DIR}, and fills the table`);
+    const repository = filledFrom(readFileSync(MANIFEST_FILE, 'utf8'));
+    const real = checkFiles({ distDir: options.distDir, gamefilesDir: GAMEFILES_DIR }, repository);
+    console.log(`  ${MANIFEST_FILE}: ${real.join(', ')}`);
+    check(real.length > 0, `the table ${MANIFEST_FILE} fills passes over ${GAMEFILES_DIR}`);
     check(parsed(manifestText(repository.read(), ANYONE)) === parsed(readFileSync(MANIFEST_FILE, 'utf8')),
         'the table answers as the manifest that filled it, every set, flag and folder');
-    check(refusal(options) === '', 'the scratch files pass');
+    const filled = filledFrom(SCRATCH_MANIFEST);
+    check(refusal(options, filled) === '', 'the scratch files pass');
 
-    const noPage = refusal({ ...options, distDir: join(scratch, 'nowhere') });
+    const empty = emptyTable();
+    const answer = manifestText(empty.read(), ANYONE);
+    console.log(`  empty table    : ${JSON.stringify(checkFiles(options, empty))}, answering ${answer}`);
+    check(checkFiles(options, empty).length === 0 && answer === '{"default":null,"swoosh":null,"dataSets":[]}',
+        'an empty table passes, and answers no set and no default');
+    let refused = '';
+    try {
+        parseManifest(answer, '');
+    } catch (error) {
+        refused = error instanceof Error ? error.message : String(error);
+    }
+    check(refused.includes('"dataSets" is not a list of data sets'), 'which the page refuses, saying why');
+
+    const noPage = refusal({ ...options, distDir: join(scratch, 'nowhere') }, filled);
     console.log(`  no page        : ${noPage.split(scratch).join('<scratch>')}`);
     check(noPage.includes('no index.html'), 'a build without index.html is refused');
-    const noManifest = refusal({ ...options, manifestFile: join(scratch, 'nowhere.json') });
-    console.log(`  no manifest    : ${noManifest.split(scratch).join('<scratch>')}`);
-    check(noManifest.includes('there is no manifest'), 'a missing manifest is refused, while the table is empty');
+    const noGamefiles = refusal({ ...options, gamefilesDir: join(scratch, 'nowhere') }, emptyTable());
+    console.log(`  no game files  : ${noGamefiles.split(scratch).join('<scratch>')}`);
+    check(noGamefiles.includes('is not a folder'), 'a game files\' folder that is not there is refused, even with an empty table');
 
     const bad = join(scratch, 'bad');
     mkdirSync(bad);
-    writeFileSync(join(bad, 'manifest.json'), '{ "dataSets": ');
-    const badManifest = { ...options, gamefilesDir: bad, manifestFile: join(bad, 'manifest.json') };
-    const notJson = refusal(badManifest);
-    console.log(`  not JSON       : ${notJson}`);
-    check(notJson.includes('is not JSON'), 'a manifest that does not parse is refused, by the page\'s parser');
-    writeFileSync(join(bad, 'manifest.json'), JSON.stringify({
-        default: 'a', swoosh: 'gone-logo',
-        dataSets: [{ id: 'a', name: 'A', dir: 'gone' }],
-    }));
-    const unfilled = emptyTable();
-    const missing = refusal(badManifest, unfilled);
-    console.log(`  missing folders: ${missing.split(scratch).join('<scratch>')}`);
-    check(missing.endsWith('does not hold: gone, gone-logo'), 'every folder the manifest names and the folder lacks is named');
-    check(unfilled.isEmpty(), 'and the table is left empty, for the next start to read the manifest again');
-
-    const filled = emptyTable();
-    checkFiles(options, filled);
-    const before = manifestText(filled.read(), ANYONE);
-    const fromTable = checkFiles({ ...options, manifestFile: join(scratch, 'nowhere.json') }, filled);
-    check(!fromTable.filled && fromTable.ids.join() === 'a', 'a table that is not empty is read, and the manifest is not: none is needed');
-    const changed = join(scratch, 'changed.json');
-    writeFileSync(changed, JSON.stringify({ default: 'z', dataSets: [{ id: 'z', name: 'Z', dir: 'set-a' }] }));
-    check(refusal({ ...options, manifestFile: changed }, filled) === '' && manifestText(filled.read(), ANYONE) === before,
-        'a manifest changed since is not read, and the table keeps what it holds');
     const tableMissing = refusal({ ...options, gamefilesDir: bad }, filled);
     console.log(`  table's folders: ${tableMissing.split(scratch).join('<scratch>')}`);
     check(tableMissing.startsWith('the data_sets table names folders') && tableMissing.endsWith('does not hold: set-a, logo'),
@@ -244,7 +238,6 @@ async function checkAnswers(port: number, manifest: string): Promise<void> {
         'If-None-Match wins over If-Modified-Since');
     const head = await ask(port, '/gamefiles/set-a/dungeon.dat', 'HEAD');
     check(head.status === 200 && head.body === '' && head.headers['content-length'] === '4', 'HEAD: the headers, no body');
-    check((await ask(port, '/gamefiles/manifest.json')).status === 404, 'the manifest, in the folder, is not served as a file');
 
     console.log('\nPaths that would leave the folders:');
     for (const path of [
@@ -393,14 +386,12 @@ async function checkPublish(scratch: string): Promise<void> {
     }
     mkdirSync(join(gamefilesDir, 'conflux-dir'));
     mkdirSync(join(gamefilesDir, 'swoosh'));
-    const manifestFile = join(root, 'manifest.json');
-    writeFileSync(manifestFile, JSON.stringify({
+    const options: ServerOptions = { distDir, gamefilesDir };
+    const db = new DatabaseSync(':memory:');
+    const dataSets = filledFrom(JSON.stringify({
         default: 'dm-atari', swoosh: 'swoosh',
         dataSets: [{ id: 'dm-atari', name: 'DM' }, { id: 'csb', name: 'CSB' }, { id: 'conflux', name: 'Conflux', dir: 'conflux-dir' }],
-    }));
-    const options: ServerOptions = { distDir, gamefilesDir, manifestFile };
-    const db = new DatabaseSync(':memory:');
-    const dataSets = new DataSetStore(db);
+    }), new DataSetStore(db));
     checkFiles(options, dataSets);
     const server = createAppServer(options, {
         checkDataSet: checkLocalDataSet, dataSets, moderatorPlayerIds: MODERATORS, store: new StatsStore(db),
@@ -572,15 +563,13 @@ async function checkModeration(scratch: string): Promise<void> {
     const gamefilesDir = join(root, 'gamefiles');
     mkdirSync(distDir, { recursive: true });
     writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
-    const manifestFile = join(root, 'manifest.json');
-    writeFileSync(manifestFile, JSON.stringify({
-        default: 'dm-atari', swoosh: null,
-        dataSets: [{ id: 'dm-atari', name: 'DM' }, { id: 'site-pending', name: 'P', status: 'pending' }, { id: 'site-hidden', name: 'H', hidden: true }],
-    }));
     for (const dir of ['dm-atari', 'site-pending', 'site-hidden']) mkdirSync(join(gamefilesDir, dir), { recursive: true });
     const db = new DatabaseSync(':memory:');
-    const dataSets = new DataSetStore(db);
-    const options: ServerOptions = { distDir, gamefilesDir, manifestFile };
+    const dataSets = filledFrom(JSON.stringify({
+        default: 'dm-atari', swoosh: null,
+        dataSets: [{ id: 'dm-atari', name: 'DM' }, { id: 'site-pending', name: 'P', status: 'pending' }, { id: 'site-hidden', name: 'H', hidden: true }],
+    }), new DataSetStore(db));
+    const options: ServerOptions = { distDir, gamefilesDir };
     checkFiles(options, dataSets);
     const players: [string, string][] = [['p1', PLAYER], ['p2', PLAYER], ['p3', OTHER], ['p4', PLAYER], ['p5', PLAYER]];
     for (const [id, owner] of players) {
@@ -736,22 +725,49 @@ interface Backup {
 async function checkEntry(scratch: string, options: ServerOptions): Promise<void> {
     console.log('\nserver.ts:');
     const statsDb = join(scratch, 'stats', 'stats.db');
-    const badMount = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: join(scratch, 'nowhere'), MANIFEST_FILE: options.manifestFile, STATS_DB: statsDb }));
+    const badMount = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: join(scratch, 'nowhere'), STATS_DB: statsDb }));
     console.log(`  bad mount: exit ${badMount.code}, ${firstLine(badMount.out).split(scratch).join('<scratch>')}`);
     check(badMount.code === 1 && badMount.out.includes('Not starting:'), 'a bad mount exits 1 before it listens');
-    const badStore = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: options.distDir }));
+    const badStore = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: options.distDir }));
     console.log(`  bad store: exit ${badStore.code}, ${firstLine(badStore.out).replace(scratch, '<scratch>')}`);
     check(badStore.code === 1 && badStore.out.includes('Not starting:'), 'a store it cannot open exits 1 before it listens');
     const noCheck = join(scratch, 'dist-without-check');
     mkdirSync(noCheck);
     writeFileSync(join(noCheck, 'index.html'), '<!doctype html><title>page</title>');
-    const unbuilt = await finish(startEntry({ PORT: '0', DIST_DIR: noCheck, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: join(scratch, 'unbuilt', 'stats.db') }));
+    const unbuilt = await finish(startEntry({ PORT: '0', DIST_DIR: noCheck, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'unbuilt', 'stats.db') }));
     console.log(`  no check built: exit ${unbuilt.code}, ${firstLine(unbuilt.out).split(scratch).join('<scratch>').replace(/ \(.*\)/, ' (…)')}`);
     check(unbuilt.code === 1 && unbuilt.out.includes(`${CHECK_MODULE} does not load`), 'a page\'s check that is not built exits 1 before it listens');
-    const badModerator = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: join(scratch, 'moderator', 'stats.db'), MODERATOR_PLAYER_IDS: `${MODERATORS[0]},the-moderator` }));
+    const badModerator = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'moderator', 'stats.db'), MODERATOR_PLAYER_IDS: `${MODERATORS[0]},the-moderator` }));
     console.log(`  bad moderator: exit ${badModerator.code}, ${firstLine(badModerator.out)}`);
     check(badModerator.code === 1 && badModerator.out.includes('MODERATOR_PLAYER_IDS holds an entry that is not a playerId') && !existsSync(join(scratch, 'moderator')),
         'a MODERATOR_PLAYER_IDS entry that is not a playerId exits 1 before it opens the store');
+
+    // A new store: the server listens with no set, and answers none.
+    let emptyLine = '';
+    let emptyAnswer = '';
+    const fresh = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'fresh', 'stats.db') });
+    const freshEnded = await finish(fresh, (line) => {
+        const listening = /^Listening on port (\d+)/.exec(line);
+        if (!listening) return;
+        emptyLine = line.split(scratch).join('<scratch>').replace(/port \d+/, 'port <n>');
+        ask(Number(listening[1]), '/api/data-sets').then((answer) => (emptyAnswer = answer.body)).finally(() => fresh.kill('SIGTERM'));
+    });
+    console.log(`  new store: ${emptyLine}, answering ${emptyAnswer}`);
+    check(freshEnded.code === 0 && emptyLine.includes('(no set, from the data_sets table);') && emptyAnswer === '{"default":null,"swoosh":null,"dataSets":[]}',
+        'on a new store, it listens with no set, and answers none');
+
+    // The store filled as `npm start`'s is, by tools/fill-data-sets.ts, which fills only an empty table.
+    const manifestFile = join(scratch, 'manifest.json');
+    writeFileSync(manifestFile, SCRATCH_MANIFEST);
+    const fill = () => finish(spawn(process.execPath, ['--import', 'tsx', join(ROOT, 'tools', 'fill-data-sets.ts'), statsDb, manifestFile], {
+        cwd: ROOT, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
+    }));
+    const filled = await fill();
+    console.log(`  fill-data-sets: exit ${filled.code}, ${firstLine(filled.out).split(scratch).join('<scratch>')}`);
+    check(filled.code === 0 && firstLine(filled.out).endsWith(': a, from <scratch>/manifest.json'.replace('<scratch>', scratch)), 'tools/fill-data-sets.ts fills the store\'s empty table');
+    const refill = await fill();
+    console.log(`  again: exit ${refill.code}, ${firstLine(refill.out)}`);
+    check(refill.code === 1 && refill.out.includes('the data_sets table is not empty'), 'and refuses one that is not, leaving it as it is');
 
     let healthy = false;
     let walHeld = false;
@@ -759,7 +775,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     let again: { code: number | null; out: string } | null = null;
     let noFolder: { code: number | null; out: string } | null = null;
     let moderated = '';
-    const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: options.manifestFile, STATS_DB: statsDb,
+    const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: statsDb,
         MODERATOR_PLAYER_IDS: ` ${MODERATORS[0]} , ${MODERATORS[1]} ` });
     const ended = finish(child, (line) => {
         const listening = /^Listening on port (\d+)/.exec(line);
@@ -826,17 +842,17 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
         'backup.ts on a set with an owner whose folder is not there exits 1');
     check(code === 0 && out.includes('SIGTERM: shutting down') && out.includes('Stopped'), 'SIGTERM stops it, with 0');
     check(existsSync(statsDb) && !existsSync(`${statsDb}-wal`), 'the store was made, its folder too, and closed with its WAL checkpointed');
-    check(out.includes('(a, from the data_sets table, filled from <scratch>'.replace('<scratch>', scratch)), 'its table filled from the manifest');
+    check(out.includes('(a, from the data_sets table);'), 'it serves the sets of the table the tool filled');
 
     let restartLine = '';
-    const restart = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, MANIFEST_FILE: join(scratch, 'nowhere.json'), STATS_DB: statsDb });
+    const restart = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: statsDb });
     const restarted = await finish(restart, (line) => {
         if (!line.startsWith('Listening on port')) return;
         restartLine = line.split(scratch).join('<scratch>').replace(/port \d+/, 'port <n>');
         restart.kill('SIGTERM');
     });
     console.log(`  restarted: ${restartLine}`);
-    check(restarted.code === 0 && restartLine.includes('(a, b, from the data_sets table);'), 'started again without a manifest, it serves the table\'s sets');
+    check(restarted.code === 0 && restartLine.includes('(a, b, from the data_sets table);'), 'started again, it serves the table\'s sets, the published one too');
     check(restarted.out.includes('No walls for b (') , 'and reads the walls of the published set whose row keeps none, saying it where its dungeon.dat does not read');
 }
 
@@ -849,10 +865,10 @@ async function main(): Promise<void> {
         checkStartUp(scratch, options);
 
         db = openStore(join(scratch, 'scratch-stats.db'));
-        const dataSets = new DataSetStore(db);
+        const dataSets = filledFrom(SCRATCH_MANIFEST, new DataSetStore(db));
         const store = new StatsStore(db);
         checkFiles(options, dataSets);
-        const manifest = readFileSync(options.manifestFile, 'utf8');
+        const manifest = SCRATCH_MANIFEST;
         const api: ApiOptions = {
             checkDataSet: checkLocalDataSet,
             dataSets,
