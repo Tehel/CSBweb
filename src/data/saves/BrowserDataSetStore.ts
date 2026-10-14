@@ -3,7 +3,7 @@
  * database: one record each, its files as Blobs, keyed by its `local:<id>`.
  */
 import type { LocalDataSetRecord } from '../LocalDataSets';
-import { DATA_SETS_STORE, SAVES_STORE, idbDone, idbGet, idbGetAll, idbPut, openSaveDatabase } from './idb';
+import { DATA_SETS_STORE, SAVES_STORE, askToPersist, idbDone, idbGet, idbGetAll, idbPut, openSaveDatabase } from './idb';
 import type { DrawPlaythrough, StoredSaveRecord } from './SaveStore';
 
 export class BrowserDataSetStore {
@@ -28,6 +28,7 @@ export class BrowserDataSetStore {
     /** `record`, added or written over the one of its id. */
     async put(record: LocalDataSetRecord): Promise<void> {
         await idbPut(await this.db(), DATA_SETS_STORE, record);
+        askToPersist();
     }
 
     /** The set `id` names and every save filed under it, in one transaction: all of them, or none. */

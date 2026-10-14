@@ -3,7 +3,7 @@
  * picker. The player cannot see, copy or back up what is in it from outside the page:
  * the save menu's EXPORT is the way out, a save's file downloaded (`downloadSaveFile`).
  */
-import { SAVES_STORE, idbDelete, idbGet, idbGetAll, idbPut, openSaveDatabase } from './idb';
+import { SAVES_STORE, askToPersist, idbDelete, idbDone, idbGet, idbGetAll, idbPut, openSaveDatabase } from './idb';
 import {
     saveEntryOf, sortSaveEntries,
     type DrawPlaythrough, type SaveEntry, type SaveRecord, type SaveStore, type StoredSaveRecord,
@@ -41,12 +41,20 @@ export class BrowserSaveStore implements SaveStore {
             bytes: bytes.slice().buffer,
         };
         await idbPut(await this.db(), SAVES_STORE, record);
+        askToPersist();
     }
 
+    /** One transaction, so another tab's write between the read and the write is not lost. */
     async markUsed(id: string, usedAt: number): Promise<void> {
-        const db = await this.db();
-        const record = await idbGet<StoredSaveRecord>(db, SAVES_STORE, id);
-        if (record) await idbPut(db, SAVES_STORE, { ...record, usedAt });
+        const tx = (await this.db()).transaction(SAVES_STORE, 'readwrite');
+        const done = idbDone(tx);
+        const saves = tx.objectStore(SAVES_STORE);
+        const row = saves.get(id);
+        row.onsuccess = () => {
+            const record = row.result as StoredSaveRecord | undefined;
+            if (record) saves.put({ ...record, usedAt });
+        };
+        await done;
     }
 
     async remove(id: string): Promise<void> {

@@ -29,7 +29,7 @@
 // opened by a long press, but not with MAP VIEW off, the champion dialog opened by a
 // long press on the bars, where a tap opens the inventory, and fullscreen, entered by a
 // tap and a click, the screen and the effect sized and placed in it, at 16:10 and at 4:3,
-// in it and out of it, and the welcome
+// in it and out of it, the save store held by another tab, and the welcome
 // page: its tiles and their order, its fonts, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
 // straight into play, its form adding, editing, publishing and deleting a player's own set, the
 // tiles' controls moderating a published one, and each tile's name in its set's state's colour,
@@ -1161,6 +1161,47 @@ const left = await evaluate(`(()=>{const p=new URLSearchParams(location.search);
   return {search: location.search, welcome: document.querySelector('.welcome-page') !== null,
     query: !p.has('dungeon') && p.get('intro') === '0' && p.has('keepsaves') && p.has('keepsettings')};})()`);
 check(left.welcome && left.query, `the question's EXIT opens the welcome page, the other parameters kept (${left.search})`);
+
+// The store held by another tab (`openSaveDatabase`, `src/data/saves/idb.ts`). A newer
+// build's open, here a raw one at the next version, is not blocked: the game lets its
+// connection go, and its next open says the game was updated. An earlier build's tab,
+// here a raw connection at version 4 that never lets go, has the game's open refused at
+// once, asking for the other tabs to be closed, where it used to hang ENTER, F5, F9 and the
+// disk menu for ever; and so is the next, which would only queue behind it. Let go, the
+// open goes on, and the store lists.
+await send('Page.navigate', { url: `${APP}?intro=0&dungeon=dm-atari` });
+await wait(3500);
+const heldStore = await evaluate(`(async()=>{
+  // Every step bounded, so a store that hangs fails the checks instead of the run.
+  const within = (promise) => Promise.race([promise, new Promise((r) => setTimeout(() => r('hung'), 2000))]);
+  const list = () => within(window.__probe.saves.list().then(() => 'listed', (e) => e.message));
+  const opened = await list();
+  const version = await within(new Promise((r) => { const o = indexedDB.open('csbweb-saves');
+    o.onsuccess = () => { const v = o.result.version; o.result.close(); r(v); }; }));
+  const newer = await new Promise((resolve) => { let blocked = false; const o = indexedDB.open('csbweb-saves', version + 1);
+    o.onblocked = () => { blocked = true; };
+    o.onsuccess = () => { o.result.close(); resolve(blocked ? 'blocked, then opened' : 'opened'); };
+    o.onerror = () => resolve('error');
+    setTimeout(() => resolve(blocked ? 'blocked' : 'pending'), 2000); });
+  const updated = await list();
+  if (newer !== 'opened') return { opened, version, newer, updated };
+  await within(new Promise((r) => { const d = indexedDB.deleteDatabase('csbweb-saves'); d.onsuccess = d.onerror = r; }));
+  const older = await within(new Promise((r) => { const o = indexedDB.open('csbweb-saves', 4);
+    o.onupgradeneeded = () => o.result.createObjectStore('saves', { keyPath: 'id' }); o.onsuccess = () => r(o.result); }));
+  if (older === 'hung') return { opened, version, newer, updated, older };
+  const held = await list();
+  const again = await list();
+  older.close();
+  await new Promise((r) => setTimeout(r, 500));
+  const released = await list();
+  return { opened, version, newer, updated, held, again, released };})()`);
+console.log('  store held:', JSON.stringify(heldStore));
+check(heldStore.opened === 'listed' && heldStore.newer === 'opened'
+  && heldStore.updated === 'THE GAME WAS UPDATED IN ANOTHER TAB. RELOAD THIS PAGE',
+  'a newer build\'s open is not blocked: the game lets the store go, and then says it was updated');
+check(heldStore.held === 'CLOSE THE GAME IN YOUR OTHER TABS, THEN TRY AGAIN' && heldStore.again === heldStore.held
+  && heldStore.released === 'listed',
+  'an earlier build holding the store refuses the game\'s open at once, asking to close it; let go, the store lists');
 
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
 // where the save left it: a press held on the message area opens it, with MAP VIEW on

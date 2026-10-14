@@ -640,7 +640,7 @@ async function init() {
         if (__CSBWEB_PROBE__) {
             // `presetHeroes`: the heroes behind the dungeon's mirrors, for `tools/lib/buildParty.mjs`.
             const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);
-            (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView, refreshScreen, presetHeroes, applySaveBytes };
+            (window as unknown as Record<string, unknown>).__probe = { game, screen, saves: built.saves, renderView, refreshScreen, presetHeroes, applySaveBytes };
         }
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen);

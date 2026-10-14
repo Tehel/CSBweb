@@ -28,7 +28,22 @@ const DATA_SETS_VERSION = 5;
 /** Version 1's other store. */
 const HANDLES_STORE = 'handles';
 
+/**
+ * The open connection, or the open under way; `null` before the first and once one has
+ * failed or been let go (`onversionchange`), so the next call opens again.
+ */
 let dbPromise: Promise<IDBDatabase> | null = null;
+/**
+ * Whether an open is blocked: another tab holds the store at an earlier version and does
+ * not let go. The open stays pending until it does, and a second would only queue behind
+ * it, so none is made meanwhile.
+ */
+let blocked = false;
+
+/** What the store says while another tab holds it at an earlier version. */
+export const STORE_HELD_BY_ANOTHER_TAB = 'CLOSE THE GAME IN YOUR OTHER TABS, THEN TRY AGAIN';
+/** What it says once another tab's newer build has upgraded it. */
+export const STORE_UPGRADED_ELSEWHERE = 'THE GAME WAS UPDATED IN ANOTHER TAB. RELOAD THIS PAGE';
 
 /**
  * The set a version-1 row was saved in: version 1 played only `dm-atari`. A literal, not
@@ -60,10 +75,17 @@ function upgradeRows(db: IDBDatabase, tx: IDBTransaction, oldVersion: number, dr
 /**
  * The database, opened once and upgraded when it is an earlier version's. `draw` is the
  * upgrade's: the playthrough of a row that names none and joins no other's.
+ *
+ * Another tab's newer build lets the connection go (`onversionchange`), so its upgrade
+ * is never blocked by this tab; this tab's next open then fails with
+ * `STORE_UPGRADED_ELSEWHERE`. An open another tab blocks fails with
+ * `STORE_HELD_BY_ANOTHER_TAB` rather than waiting for it, and the open goes on behind: the
+ * tab let go, its connection is the store's.
  */
 export function openSaveDatabase(draw: DrawPlaythrough): Promise<IDBDatabase> {
     if (dbPromise) return dbPromise;
-    dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
+    if (blocked) return Promise.reject(new Error(STORE_HELD_BY_ANOTHER_TAB));
+    const opening = new Promise<IDBDatabase>((resolve, reject) => {
         if (typeof indexedDB === 'undefined') {
             reject(new Error('NO BROWSER STORAGE'));
             return;
@@ -77,14 +99,49 @@ export function openSaveDatabase(draw: DrawPlaythrough): Promise<IDBDatabase> {
                 db.createObjectStore(DATA_SETS_STORE, { keyPath: 'id' });
             }
         };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error ?? new Error('IndexedDB open failed'));
+        request.onblocked = () => {
+            blocked = true;
+            reject(new Error(STORE_HELD_BY_ANOTHER_TAB));
+        };
+        request.onsuccess = () => {
+            const db = request.result;
+            db.onversionchange = () => {
+                db.close();
+                dbPromise = null;
+            };
+            if (blocked) {
+                blocked = false;
+                dbPromise = Promise.resolve(db);
+            }
+            resolve(db);
+        };
+        request.onerror = () => {
+            blocked = false;
+            reject(request.error?.name === 'VersionError'
+                ? new Error(STORE_UPGRADED_ELSEWHERE)
+                : request.error ?? new Error('IndexedDB open failed'));
+        };
     });
+    dbPromise = opening;
     // A failed open must not be cached, or the store is dead for the session.
-    dbPromise.catch(() => {
-        dbPromise = null;
+    opening.catch(() => {
+        if (dbPromise === opening) dbPromise = null;
     });
-    return dbPromise;
+    return opening;
+}
+
+let persistAsked = false;
+
+/**
+ * Asks the browser, once a page, to keep the store: without it the store is "best
+ * effort", which the browser may evict under pressure, and it holds the only copy of the
+ * player's saves and sets. Asked at a write, a step the player took, where a browser that
+ * asks the player (Firefox) does. The answer changes nothing here.
+ */
+export function askToPersist(): void {
+    if (persistAsked) return;
+    persistAsked = true;
+    navigator.storage?.persist?.().catch(() => false);
 }
 
 function promisify<T>(request: IDBRequest<T>): Promise<T> {

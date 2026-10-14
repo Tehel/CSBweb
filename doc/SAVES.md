@@ -58,6 +58,18 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   Nothing else in `src/` reads JSON. A
   `.dmweb.json` file on disk is converted by hand, outside the engine;
   `tools/peek-dungeon.ts` reads one.
+- **Another tab** (`openSaveDatabase`, `src/data/saves/idb.ts`). A tab lets the store go
+  when another opens it at a later version (`onversionchange`), so a new build's upgrade
+  is never held up by an old build's tab, and the old tab's next open fails with "THE
+  GAME WAS UPDATED IN ANOTHER TAB. RELOAD THIS PAGE". A tab of a build from before that
+  rule does not let go: the new tab's open is then refused at once with "CLOSE THE GAME IN
+  YOUR OTHER TABS, THEN TRY AGAIN", and so is every open after it, until the other tab
+  lets go and the first goes on. Neither waits, so ENTER starts the game regardless (its
+  playthrough unchecked against the store's, `GameSaves.newGameRead`), and the save
+  menu, F5 and F9 show the message. A row written over (`markUsed`) is read and written
+  in one transaction. The first write of a page, a save or a data set, asks the browser
+  to keep the store (`navigator.storage.persist()`, `askToPersist`), which a store
+  "best effort" may lose under pressure.
 - **No store on disk.** IndexedDB (`BrowserSaveStore`) is the one store: a directory on
   disk needs `showDirectoryPicker`, which is Chromium's alone. **Export** downloads the
   selected save's bare `.dat`, which CSBWin opens: the row's bytes as the store holds
@@ -496,7 +508,8 @@ An unknown dungeon played from its save is `DEBT.md` G22.
 `tools/dump-save-menu.ts` drives `GameSaves` and the dialog over a store in memory; its
 sections are named below. Node has no IndexedDB, so no tool runs `BrowserSaveStore`
 itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
-`BrowserSaveStore.markUsed`, nor `BrowserDataSetStore`.
+`BrowserSaveStore.markUsed`, nor `BrowserDataSetStore`. `tools/probe-frames.mjs` checks
+the store held by another tab in a browser, both ways.
 
 - **RISE**: `tools/dump-rise.ts` (the row a new adventure is stored as, again, and a
   refusal; the chooser's `rise` mode over every set's saves, its LOAD and a refusal, and

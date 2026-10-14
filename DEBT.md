@@ -118,7 +118,6 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
-| R5 | Another tab holds the store: the new build hangs at ENTER | S | ⏳ |
 | W2 | `api/stats` is computed whole at every request | S | ⏳ |
 | W3 | `api/event` takes another site's posts, and any name | S | ⏳ |
 | R6 | A damaged file's counts size allocations and loops | M | ⏳ |
@@ -418,22 +417,6 @@ takes untrusted data. A file the player drops on the page and a custom dungeon a
 untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
-
-### R5 ⏳ Another tab holds the store: the new build hangs at ENTER
-
-`openSaveDatabase` (`src/data/saves/idb.ts:64-87`) sets no `onblocked`, and no connection
-closes on `versionchange`. An open tab of the build before a `DB_VERSION` bump keeps its
-connection, so a new tab's open never settles: ENTER awaits `readNewGame`, which awaits
-`saves.newGameRead()` and `list()` (`src/main.ts:126-134`), and the game never starts; F5,
-F9 and the disk menu wait for ever. Two more gaps in the store:
-
-- nothing asks `navigator.storage.persist()`, so the browser may evict the only copy of
-  the player's saves;
-- `markUsed` reads and writes a row in two transactions
-  (`src/data/saves/BrowserSaveStore.ts:157-161`), so two tabs can write a stale row back.
-
-Paying it: close on `versionchange`; on `blocked`, a message asking to close the other
-tabs; `persist()` at the first save; `markUsed` in one `readwrite` transaction.
 
 ### R6 ⏳ A damaged file's counts size allocations and loops
 
