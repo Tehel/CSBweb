@@ -630,7 +630,11 @@ export class GameSaves {
 
     /**
      * F9: the newest save of the game's playthrough, F5's, the Sleepsave or the menu's. Not while a
-     * script holds the loop: it would run on in the loaded world.
+     * script holds the loop: it would run on in the loaded world. Nor while a champion is
+     * still being chosen, where the disk icon does nothing
+     * (`doc/CSBwin-src/Mouse.cpp:1855-1857`), as F5 is refused (`quickSave`). Both are
+     * asked again once the store has answered, since the game runs on while it is asked:
+     * a mirror clicked, or a script started, in the meantime refuses the read then.
      *
      * A playthrough with no save is `_ReadEntireGame`'s "CAN'T FIND SAVED GAME!"
      * (`doc/CSBwin-src/SaveGame.cpp:1710`), whatever the data set's other playthroughs
@@ -638,11 +642,7 @@ export class GameSaves {
      * line, the one the disk menu shows.
      */
     async quickLoad(): Promise<void> {
-        if (this.game.isRunningScript()) {
-            this.tell('CANNOT LOAD NOW');
-            this.log('Quick-load refused: a script running');
-            return;
-        }
+        if (this.quickLoadRefused()) return;
         try {
             const playthrough = this.game.ctx.state.block1.randomGameID;
             const latest = (await this.list()).find((entry) => entry.playthrough === playthrough);
@@ -651,12 +651,22 @@ export class GameSaves {
                 this.log('Quick-load: no saved game found');
                 return;
             }
-            this.read(await this.open(latest));
+            const opened = await this.open(latest);
+            if (this.quickLoadRefused()) return;
+            this.read(opened);
             this.tell('GAME LOADED');
             this.log(`Quick-loaded ${latest.name}`);
         } catch (error) {
             this.tell(error instanceof SaveFileError ? error.message : 'UNABLE TO LOAD GAME!');
             this.log('Quick-load failed', error);
         }
+    }
+
+    /** Whether F9 is refused now (`quickLoad`), which it says. */
+    private quickLoadRefused(): boolean {
+        if (!this.game.isRunningScript() && this.game.ctx.party.state.potentialChampionIndex < 0) return false;
+        this.tell('CANNOT LOAD NOW');
+        this.log('Quick-load refused: a script running, or a champion being chosen');
+        return true;
     }
 }

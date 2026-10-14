@@ -426,7 +426,9 @@ its playthrough, F5's or the dialog's ("A playthrough"). Each key says what it d
 line of the message area, in white (`GameSaves.tell`; `doc/CSBWIN_MESSAGES_REFERENCE.md`):
 "GAME SAVED" or "GAME LOADED"; "CANNOT SAVE NOW" with no party, with a champion still
 being chosen, while a script holds the loop, or while the party slides in a gravity
-dungeon (`doc/3D2D1D.md`), and "CANNOT LOAD NOW" while a script holds the loop;
+dungeon (`doc/3D2D1D.md`), and "CANNOT LOAD NOW" while a script holds the loop or a
+champion is still being chosen, asked again once the store has answered, so neither a
+script nor a mirror clicked while it read meets the loaded world;
 CSBWin's disk menu's "SAVES ARE DISABLED" (`doc/CSBwin-src/SaveGame.cpp:856-873`) while a
 DSA has disabled saves (`&DISABLESAVES`);
 CSBWin's own "UNABLE TO SAVE GAME!" (`doc/CSBwin-src/SaveGame.cpp:1363`) and "CAN'T FIND

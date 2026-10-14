@@ -118,7 +118,6 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
-| R4 | F9 reads over a champion being chosen, and over a script that starts during its read | S | ⏳ |
 | R5 | Another tab holds the store: the new build hangs at ENTER | S | ⏳ |
 | W2 | `api/stats` is computed whole at every request | S | ⏳ |
 | W3 | `api/event` takes another site's posts, and any name | S | ⏳ |
@@ -419,20 +418,6 @@ takes untrusted data. A file the player drops on the page and a custom dungeon a
 untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
-
-### R4 ⏳ F9 reads over a champion being chosen, and over a script that starts during its read
-
-F5 and F9 go through `GameInput.keyDown`, so the save menu, the Reincarnate screen and the
-Hint Oracle take them first. Past them, `quickLoad` refuses only while a script runs
-(`GameSaves.ts:571-576`), not while a champion is being chosen
-(`potentialChampionIndex >= 0`, a mirror's champion shown before RESURRECT or
-REINCARNATE), as `quickSave` does.
-
-`quickLoad` also checks for a script before its two awaits (`list`, `open`) and not after,
-so a script that starts while IndexedDB answers runs on into the loaded world.
-
-Paying it: F9 refused while a champion is chosen; the script checked again after the
-awaits.
 
 ### R5 ⏳ Another tab holds the store: the new build hangs at ENTER
 

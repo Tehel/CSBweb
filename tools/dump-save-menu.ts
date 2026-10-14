@@ -1360,6 +1360,39 @@ async function checkSaveCall(): Promise<void> {
     check(strangerQuick.id !== dmNew.id && dmQuick.id === dmNew.id && shared.files.size === 6,
       'and each playthrough\'s F5 writes its own slot');
 
+    // F9 where the disk icon does nothing (`doc/CSBwin-src/Mouse.cpp:1855-1857`), as F5:
+    // a champion still being chosen. And asked again once the store has answered: a
+    // mirror clicked, or a script started, while it read refuses the read then.
+    const choosingLoad = await stage(false);
+    await choosingLoad.saves.save('stopped', 'new');
+    const party = choosingLoad.game.ctx.party.state;
+    party.champions[0]!.name = 'CHANGED';
+    party.potentialChampionIndex = 0;
+    const beforeChoosing = told.length;
+    await choosingLoad.saves.quickLoad();
+    const choosingName = choosingLoad.game.ctx.party.state.champions[0]!.name;
+    console.log(`  F9 with a champion being chosen: ${toldSince(beforeChoosing)}, party ${choosingName}`);
+    check(toldSince(beforeChoosing) === '/15:CANNOT LOAD NOW' && choosingName === 'CHANGED'
+      && reports[reports.length - 1]!.startsWith('Quick-load refused'), 'F9 loads nothing while a champion is being chosen, and says so');
+    for (const [what, during] of [
+      ['a mirror clicked', (game: Game) => { game.ctx.party.state.potentialChampionIndex = 0; }],
+      ['a script started', (game: Game) => { game.runScript(hold()); }],
+    ] as const) {
+      const racing = await stage(false);
+      const saved = await racing.saves.save('stopped', 'new');
+      racing.game.ctx.party.state.champions[0]!.name = 'CHANGED';
+      const slow = { ...racing.store, read: async (id: string) => { during(racing.game); return racing.store.read(id); } };
+      const racingSaves = new GameSaves(racing.game, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), slow,
+        { portraitOf: () => undefined, repackOpenChest: () => {} }, (message: string) => { reports.push(message); });
+      const beforeRace = told.length;
+      now += 60_000;
+      await racingSaves.quickLoad();
+      const row = (await racing.saves.list()).find((entry) => entry.id === saved.id);
+      console.log(`  F9 with ${what} while the store reads: ${toldSince(beforeRace)}, party ${racing.game.ctx.party.state.champions[0]!.name}`);
+      check(toldSince(beforeRace) === '/15:CANNOT LOAD NOW' && racing.game.ctx.party.state.champions[0]!.name === 'CHANGED'
+        && row?.usedAt === row?.savedAt, `F9 with ${what} while the store reads loads nothing, nor marks the save used, and says so`);
+    }
+
     const idOf = (of: { game: Game }): number => of.game.ctx.state.block1.randomGameID;
 
     // A drawn id is no stored save's. With the host's `rand()` pinned, every stream is
