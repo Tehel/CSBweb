@@ -37,7 +37,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { ImageFormat, decodeIMG } from '../src/core/imageDecoder';
+import { EXPAND_GRAPHIC_MAX_SIZE, ImageFormat, decodeIMG } from '../src/core/imageDecoder';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { readPng } from './lib/png';
 import { check, finish } from './lib/check';
@@ -237,10 +237,35 @@ function streamLength(raw: Uint8Array): number {
   return produced;
 }
 
+/* ------------------------------------ 4. a header asking for more than maxSize ---- */
+
+/**
+ * Sphenx's Theron's Quest `graphics.dat` held graphic 5 with a PC header, 320x200
+ * little-endian, read as 16385x51200: an 838 MB image. `ExpandGraphic` fills no more than
+ * `maxSize` bytes of destination (`CSBCode.cpp:11031`); the port stops at the whole lines
+ * that fit.
+ */
+function checkMaxSize(): void {
+  console.log('\n=== a header asking for more than maxSize ===');
+  const huge = decodeIMG(stream(0x4001, 0xc800, 0x74, 0x05));
+  const lines = Math.floor(EXPAND_GRAPHIC_MAX_SIZE * 2 / paddedStride(0x4001));
+  check(huge.width === 0x4001 && huge.height === lines,
+    `16385x51200 decodes to its width and the ${lines} lines maxSize holds (got ${huge.width}x${huge.height})`);
+  check(huge.pixels.length === huge.width * huge.height && huge.pixels.length <= EXPAND_GRAPHIC_MAX_SIZE * 2,
+    `its pixels are within maxSize's ${EXPAND_GRAPHIC_MAX_SIZE * 2} (${huge.pixels.length})`);
+  check(huge.pixels.slice(0, 9).join('') === '444444445',
+    'and the stream is decoded into them as into any other image');
+  check(decodeIMG(stream(32, 62499, 0x0f)).height === 62499,
+    'a header that fits, 32x62499 (999984 bytes), keeps every line');
+  check(decodeIMG(stream(32, 62500, 0x0f)).height === 62499,
+    'one line more, 32x62500 (1000000 bytes), loses that line');
+}
+
 function main(): void {
   checkAgainstReference();
   checkOpcodes();
   checkEveryImage();
+  checkMaxSize();
   finish();
 }
 

@@ -34,3 +34,4 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Custom dungeon archives](custom-dungeon-archives.md) — tell files by content (`identifyLocalDataSetFile`): odd names, PC twins, several versions, and saves that read as 0-level dungeons
 - [Test publish on a throwaway dev server](test-publish-on-throwaway-dev-server.md) — `npx vite --port 9100 --strictPort` takes `POST api/data-sets` into a scratch folder; never production, nor the author's :9000
 - [Instance scripts in utils/](instance-scripts-in-utils.md) — a durable tool that finds its own inputs, takes the instance and a `playerId`, asks a yes per item and downloads nothing before it
+- [Theron's Quest conversion](theron-quest-conversion.md) — one release in three formats; Theron unrecruitable and item 5 undecodable as published; patched copies in `archive/CustomDungeon-TheronsQuestConversion-csbweb/`

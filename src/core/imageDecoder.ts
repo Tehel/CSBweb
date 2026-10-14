@@ -24,6 +24,14 @@ export interface DecodedImage extends ImageDimensions {
 }
 
 /**
+ * `ExpandGraphic`'s `maxSize`, the bytes of destination it fills at most: `999999`, the
+ * default every call but three takes (`doc/CSBwin-src/CSB.h:4003`). No real image comes
+ * near it (320x200 is 32000); a header that asks for more, such as a PC item's
+ * little-endian 320x200 read as 16385x51200, decodes to the whole lines that fit.
+ */
+export const EXPAND_GRAPHIC_MAX_SIZE = 999999;
+
+/**
  * `ExpandGraphic` — the `graphics.dat` image codec.
  *
  * A transcription of `doc/CSBwin-src/CSBCode.cpp:10961`. The 68000 original writes into
@@ -74,7 +82,12 @@ export function decodeIMG(data: Uint8Array, format: ImageFormat = ImageFormat.IM
 
     // `destBytesPerLine = (I16)(((destBytesPerLine+15)>>1)&0x7ff8)` bytes per line; two pixels to the byte.
     const stride = ((((width + 15) >> 1) & 0x7ff8)) * 2;
-    const total = stride * height;
+    // `if (totalSize > maxSize) totalSize = maxSize;` (`CSBCode.cpp:11031`), kept to whole
+    // lines: CSBWin's end test is `A1 == endOfDestLine` (`:11077`, `:11160`), and `A1`
+    // moves in 8-byte groups, so a cap that is not a whole number of groups is never met
+    // and the decode runs on past it (`DEBT.md` H).
+    const lines = stride === 0 ? height : Math.min(height, Math.floor(EXPAND_GRAPHIC_MAX_SIZE * 2 / stride));
+    const total = stride * lines;
     const buffer = new Uint8Array(total);
 
     let off = 4;
@@ -136,12 +149,12 @@ export function decodeIMG(data: Uint8Array, format: ImageFormat = ImageFormat.IM
     const pixels = stride === width
         ? buffer
         : (() => {
-            const cropped = new Uint8Array(width * height);
-            for (let y = 0; y < height; y++) {
+            const cropped = new Uint8Array(width * lines);
+            for (let y = 0; y < lines; y++) {
                 cropped.set(buffer.subarray(y * stride, y * stride + width), y * width);
             }
             return cropped;
         })();
 
-    return { width, height, pixels };
+    return { width, height: lines, pixels };
 }

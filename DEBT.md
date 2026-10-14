@@ -2185,6 +2185,17 @@ Recorded so that nobody "fixes" them.
   screen (`w_4 = 1`, `doc/CSBwin-src/Hint.cpp:7375-7388`), whose floppy prompts and save
   chooser only lead to a square, and the port's Oracle has the party's
   (`HintOracleScreen.run`, `src/renderer/intro/HintOracle.ts`).
+- 🚫 **An image whose header asks for more than `maxSize` decodes to the lines that fit.**
+  `ExpandGraphic` caps the destination at `maxSize` bytes, 999999 by default
+  (`doc/CSBwin-src/CSBCode.cpp:11031`, `CSB.h:4003`), but its end test is
+  `A1 == endOfDestLine` (`:11034`, `:11077`, `:11160`), and `A1` moves in 8-byte groups,
+  so a cap that is not a whole number of groups is never met: the decode writes on past
+  the buffer, through the heap, until something breaks. Sphenx's Theron's Quest
+  `graphics.dat` has such an image, graphic 5 with a PC header (320x200 little-endian,
+  read as 16385x51200), and CSBWin shows its entrance scroll as an error and quits. The
+  port's `decodeIMG` stops at the whole lines `EXPAND_GRAPHIC_MAX_SIZE` holds
+  (`src/core/imageDecoder.ts`), 121 of them there, and returns that height. No real image
+  comes near the cap. `tools/dump-image-codec.ts` checks it.
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.
