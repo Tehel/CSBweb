@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luck in Dungeon Master</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #faf8f5;
+    --bg-raised: #ffffff;
+    --bg-sunken: #f1ede7;
+    --ink: #23201c;
+    --ink-soft: #5c554c;
+    --ink-faint: #8a8177;
+    --rule: #e0d9cf;
+    --accent: #8c3a1e;
+    --accent-bg: #f6ece7;
+    --mystery: #6b4423;
+    --mystery-bg: #f7f0e6;
+    --mystery-rule: #d9c4a3;
+    --measure: 40rem;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17161a;
+      --bg-raised: #1e1d22;
+      --bg-sunken: #131216;
+      --ink: #e6e2dc;
+      --ink-soft: #a9a49c;
+      --ink-faint: #7d786f;
+      --rule: #302e35;
+      --accent: #e8916a;
+      --accent-bg: #2a201c;
+      --mystery: #d8b78a;
+      --mystery-bg: #221d17;
+      --mystery-rule: #4a3d2c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17161a;
+    --bg-raised: #1e1d22;
+    --bg-sunken: #131216;
+    --ink: #e6e2dc;
+    --ink-soft: #a9a49c;
+    --ink-faint: #7d786f;
+    --rule: #302e35;
+    --accent: #e8916a;
+    --accent-bg: #2a201c;
+    --mystery: #d8b78a;
+    --mystery-bg: #221d17;
+    --mystery-rule: #4a3d2c;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.62;
+  }
+
+  .page { max-width: var(--measure); margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+
+  header.masthead { margin-bottom: 3rem; }
+  header.masthead h1 {
+    font-size: clamp(2rem, 5.5vw, 2.9rem);
+    line-height: 1.12;
+    margin: 0 0 .9rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+  .standfirst { color: var(--ink-soft); font-size: 1.05rem; margin: 0 0 1.4rem; }
+  .provenance {
+    font-family: var(--mono);
+    font-size: .74rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--rule);
+    padding-top: .9rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    line-height: 1.25;
+    margin: 3.4rem 0 1rem;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
+  h2::before {
+    content: "";
+    display: block;
+    width: 2.2rem;
+    height: 2px;
+    background: var(--accent);
+    margin-bottom: 1.1rem;
+    opacity: .8;
+  }
+  h3 {
+    font-size: 1.12rem;
+    margin: 2.2rem 0 .6rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  p { margin: 0 0 1.05rem; }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+  a { color: var(--accent); }
+
+  code {
+    font-family: var(--mono);
+    font-size: .84em;
+    background: var(--bg-sunken);
+    padding: .12em .38em;
+    border-radius: 3px;
+    border: 1px solid var(--rule);
+  }
+
+  ul, ol { margin: 0 0 1.05rem; padding-left: 1.3rem; }
+  li { margin-bottom: .5rem; }
+
+  /* --- The decision tree ------------------------------------------------ */
+  .tree {
+    font-family: var(--mono);
+    font-size: .78rem;
+    line-height: 1.55;
+    background: var(--bg-sunken);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 1.1rem 1.2rem;
+    margin: 0 0 1.4rem;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--ink);
+  }
+  .tree .q { color: var(--accent); }
+  .tree .act { font-weight: 600; }
+  .tree .dim { color: var(--ink-faint); }
+
+  /* --- Tables ---------------------------------------------------------- */
+  .table-wrap { overflow-x: auto; margin: 0 0 1.5rem; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: .88rem;
+    font-family: var(--serif);
+  }
+  caption {
+    caption-side: bottom;
+    text-align: left;
+    font-size: .82rem;
+    color: var(--ink-faint);
+    padding-top: .7rem;
+    font-style: italic;
+  }
+  th, td {
+    text-align: left;
+    padding: .5rem .7rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  thead th {
+    font-size: .72rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    border-bottom: 1.5px solid var(--rule);
+    white-space: nowrap;
+  }
+  thead th.num { text-align: right; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); font-size: .84em; text-align: right; white-space: nowrap; padding-left: .45rem; padding-right: .45rem; }
+  td.name { white-space: nowrap; font-weight: 600; }
+  td.why { color: var(--ink-soft); font-size: .92em; }
+  .dash { color: var(--ink-faint); }
+  tr.best td { background: var(--accent-bg); }
+  tr.best td.name { color: var(--accent); }
+  tr.flat td.num { color: var(--ink-faint); }
+
+  /* --- Callouts -------------------------------------------------------- */
+  .note {
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    margin: 0 0 1.4rem;
+    font-size: .95rem;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .label, .recipe .label {
+    display: block;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: .5rem;
+  }
+
+  .mystery {
+    background: var(--mystery-bg);
+    border: 1px solid var(--mystery-rule);
+    border-left: 3px solid var(--mystery);
+    border-radius: 4px;
+    padding: .95rem 1.15rem;
+    margin: 0 0 1.4rem;
+    font-size: .95rem;
+  }
+  .mystery h4 {
+    margin: 0 0 .45rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--mystery);
+    font-family: var(--serif);
+  }
+  .mystery p { margin-bottom: .6rem; }
+  .mystery p:last-child { margin-bottom: 0; }
+
+  .recipe {
+    background: var(--accent-bg);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: .95rem 1.15rem;
+    margin: 0 0 1.4rem;
+    font-size: .97rem;
+  }
+  .recipe p:last-child { margin-bottom: 0; }
+  .recipe .label { color: var(--accent); margin-bottom: .4rem; }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 3rem 0;
+  }
+
+  .lede {
+    font-size: 1.06rem;
+    color: var(--ink-soft);
+    border-left: 3px solid var(--rule);
+    padding-left: 1.1rem;
+    margin: 0 0 1.6rem;
+  }
+
+  .formula {
+    font-family: var(--mono);
+    font-size: .82rem;
+    background: var(--bg-sunken);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .8rem 1rem;
+    margin: 0 0 1.2rem;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  footer.colophon {
+    margin-top: 4rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--rule);
+    font-size: .84rem;
+    color: var(--ink-faint);
+  }
+  footer.colophon p { margin-bottom: .5rem; }
+
+  /* --- Luck page additions --------------------------------------------- */
+  .factors { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; margin: 0 0 1.6rem; }
+  .factor {
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .9rem 1rem;
+    font-size: .9rem;
+    line-height: 1.45;
+  }
+  .factor .big {
+    display: block;
+    font-family: var(--mono);
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: .3rem;
+    letter-spacing: -0.02em;
+  }
+  .factor .what { display: block; font-weight: 600; margin-bottom: .2rem; }
+
+  .never { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem 1.2rem; margin: 0; padding: 0; list-style: none; }
+  .never li { margin: 0; padding-left: 1.3rem; position: relative; }
+  .never li::before {
+    content: "✕";
+    position: absolute;
+    left: 0;
+    color: var(--ink-faint);
+    font-family: var(--mono);
+    font-size: .85em;
+  }
+
+  /* The starting-Luck bars. The scale runs from 0 to 80; the marker sits at 62,
+     the least Luck that gives the defence roll anything to do. */
+  .bars { --scale: 80; margin: 0 0 1.5rem; font-size: .86rem; }
+  .bar-row {
+    display: grid;
+    grid-template-columns: 5.6rem 1fr 2.4rem;
+    align-items: center;
+    gap: .7rem;
+    padding: .17rem 0;
+  }
+  .bar-row .who { font-family: var(--mono); font-size: .78rem; letter-spacing: .02em; white-space: nowrap; }
+  .bar-row .v { font-family: var(--mono); font-size: .8rem; text-align: right; color: var(--ink-soft); }
+  .track {
+    position: relative;
+    height: .62rem;
+    background: var(--bg-sunken);
+    border-radius: 2px;
+  }
+  .track::after {
+    content: "";
+    position: absolute;
+    top: -.22rem;
+    bottom: -.22rem;
+    left: calc(62 / var(--scale) * 100%);
+    border-left: 1.5px dashed var(--accent);
+    opacity: .75;
+  }
+  .fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: calc(var(--l) / var(--scale) * 100%);
+    background: color-mix(in srgb, var(--accent) 55%, transparent);
+    border-radius: 2px;
+  }
+  .fill.foot {
+    left: calc(var(--from) / var(--scale) * 100%);
+    width: calc((var(--l) - var(--from)) / var(--scale) * 100%);
+    background: repeating-linear-gradient(135deg,
+      color-mix(in srgb, var(--accent) 70%, transparent) 0 3px,
+      transparent 3px 6px);
+    border-radius: 0 2px 2px 0;
+  }
+  .bars-legend {
+    display: grid;
+    grid-template-columns: 5.6rem 1fr 2.4rem;
+    gap: .7rem;
+    font-family: var(--mono);
+    font-size: .7rem;
+    color: var(--ink-faint);
+    margin-top: .3rem;
+  }
+  .bars-legend .scale { position: relative; height: 1rem; }
+  .bars-legend .scale span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .bars-legend .scale .m { color: var(--accent); }
+
+  @media (max-width: 34rem) {
+    body { font-size: 17px; }
+    .page { padding: 2.5rem 1.1rem 4rem; }
+    .tree { font-size: .68rem; }
+    .factors { grid-template-columns: 1fr; }
+    .never { grid-template-columns: 1fr; }
+    .bar-row, .bars-legend { grid-template-columns: 4.6rem 1fr 2.2rem; gap: .5rem; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead">
+  <h1>Luck in Dungeon Master</h1>
+  <p class="standfirst">The hidden seventh attribute: what it does, what it doesn't, how
+  it gets spent and how it comes back. The Rabbit's Foot is worth less than its reputation
+  says, but it does help.</p>
+  <p class="provenance">Read from Paul R. Stevens' CSBWin C++ source · Thresholds read
+  from the Atari graphics.dat · Starting values from dungeon.dat</p>
+</header>
+
+<p class="lede">The short version: <strong>Luck is a last chance, not a modifier.</strong>
+It never changes how hard you hit, how hard you're hit, whether you're wounded or whether
+a spell works. It gives a champion one more roll when everything else has already failed,
+and only in three places in the whole game.</p>
+
+<hr>
+
+<h2>The roll</h2>
+
+<p>The whole mechanic is one routine, <code>IsCharacterLucky(champion, needed)</code>.
+Each caller passes a <em>needed</em> value, and the lower it is, the easier the roll.</p>
+
+<div class="tree"><span class="q">Coin flip, and a random 0–99 above <em>needed</em>?</span>
+├─ yes → <span class="act">LUCKY</span>          <span class="dim">Luck isn't read and doesn't change</span>
+└─ no  → <span class="q">random 0 … Luck−1 above <em>needed</em>?</span>
+         ├─ yes → <span class="act">LUCKY</span>,   Luck − 2
+         └─ no  → <span class="act">UNLUCKY</span>, Luck + 2   <span class="dim">never above the champion's maximum</span></div>
+
+<p>Two things follow from this.</p>
+
+<ul>
+  <li><strong>Everybody gets the free chance.</strong> The first step ignores Luck
+  completely: half of (99 − needed) in 100. A champion with no Luck at all still gets it.</li>
+  <li><strong>The second step only works above the threshold.</strong> If Luck is no
+  higher than <em>needed</em> + 1, no roll can beat it. Below that line, extra Luck does
+  nothing, not even a little.</li>
+</ul>
+
+<div class="formula">P(lucky) = ½·(99 − needed)/100  +  (rest) · (Luck − 1 − needed)/Luck</div>
+
+<hr>
+
+<h2>The three places it counts</h2>
+
+<div class="factors">
+  <div class="factor"><span class="big">60</span><span class="what">Dodging a blow</span>
+  When a monster's attack would land, a lucky roll cancels it outright.</div>
+  <div class="factor"><span class="big">5–57</span><span class="what">Landing a blow</span>
+  When a champion's attack would miss, a lucky roll makes it land. The threshold depends
+  on the attack.</div>
+  <div class="factor"><span class="big">100−Q</span><span class="what">Keeping your item</span>
+  When a Giggler steals, a lucky roll stops it. Quick champions need less luck.</div>
+</div>
+
+<div class="note">
+  <span class="label">What Luck never touches</span>
+  <ul class="never">
+    <li>Damage you deal</li>
+    <li>Damage you take, once a blow lands</li>
+    <li>The chance of a wound</li>
+    <li>Poison from a blow</li>
+    <li>Spell success and fizzles</li>
+    <li>Missiles, spells and clouds that hit you</li>
+    <li>Traps, pits and doors</li>
+    <li>Experience and level-ups</li>
+  </ul>
+</div>
+
+<hr>
+
+<h2>Dodging a monster's blow</h2>
+
+<p>Before a monster rolls any damage, the champion gets two chances to escape the blow
+completely: no damage, no wound, no poison.</p>
+
+<ol>
+  <li><strong>Quickness.</strong> If the champion is at least as quick as the monster's
+  dexterity plus a random 0–31 (adjusted by the level's difficulty), the blow misses three
+  times in four.</li>
+  <li><strong>Luck,</strong> with <em>needed</em> = 60.</li>
+</ol>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Luck</th><th class="num">Chance the luck roll saves you</th><th>Who has that</th></tr></thead>
+  <tbody>
+    <tr class="flat"><td class="name">25 – 61</td><td class="num">19.5 %</td><td class="why">Every champion in the Hall, as recruited</td></tr>
+    <tr><td class="name">70</td><td class="num">30 %</td><td class="why">WUUF (60) with a Rabbit's Foot</td></tr>
+    <tr><td class="name">100</td><td class="num">51 %</td><td class="why">Far beyond any recruit</td></tr>
+    <tr><td class="name">150</td><td class="num">67 %</td><td class="why"><span class="dash">—</span></td></tr>
+  </tbody>
+  <caption>Up to 61 every champion gets the same 19.5 % from the free step, whatever their
+  Luck. The second step starts at 62.</caption>
+</table>
+</div>
+
+<div class="mystery">
+  <h4>No champion in the Hall can use their Luck to dodge</h4>
+  <p>The highest starting Luck is WUUF's 60, and the dodge needs 62 before Luck counts at
+  all. For a recruited party, Luck makes no difference to the blows they take. Every
+  champion gets the same flat 19.5 %, from the step that doesn't read Luck. A Rabbit's
+  Foot only starts to matter on someone who already has 52 Luck or more.</p>
+</div>
+
+<hr>
+
+<h2>Landing a blow</h2>
+
+<p>A champion's physical attack first compares their Quickness against the monster's
+dexterity plus a random 0–31. If that fails, the blow gets two more chances: a flat
+<strong>1 in 4</strong> (CSBWin names it <code>luckyHit</code>, but it doesn't read Luck),
+then the luck roll. If all three fail, the blow misses, costs 2–3 stamina, and earns half
+the experience.</p>
+
+<p>Here, <em>needed</em> is 75 minus a per-attack value from graphics.dat, so some
+attacks need far less luck than others. Quick, precise attacks are the easiest to
+rescue.</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Attack</th><th class="num">Needed</th><th class="num">Luck 40</th><th class="num">Luck 60</th><th class="num">Luck 100</th></tr></thead>
+  <tbody>
+    <tr class="best"><td class="name">JAB</td><td class="num">5</td><td class="num">92 %</td><td class="num">95 %</td><td class="num">97 %</td></tr>
+    <tr class="best"><td class="name">MELEE</td><td class="num">11</td><td class="num">83 %</td><td class="num">89 %</td><td class="num">93 %</td></tr>
+    <tr><td class="name">THRUST</td><td class="num">18</td><td class="num">72 %</td><td class="num">81 %</td><td class="num">89 %</td></tr>
+    <tr><td class="name">STUN</td><td class="num">25</td><td class="num">59 %</td><td class="num">73 %</td><td class="num">84 %</td></tr>
+    <tr><td class="name">CHOP</td><td class="num">27</td><td class="num">55 %</td><td class="num">70 %</td><td class="num">82 %</td></tr>
+    <tr><td class="name">BERZERK, DISRUPT</td><td class="num">29</td><td class="num">51 %</td><td class="num">68 %</td><td class="num">81 %</td></tr>
+    <tr><td class="name">STAB <span class="dash">(atk_STAB2)</span></td><td class="num">33</td><td class="num">43 %</td><td class="num">62 %</td><td class="num">77 %</td></tr>
+    <tr><td class="name">CLEAVE</td><td class="num">35</td><td class="num">39 %</td><td class="num">59 %</td><td class="num">76 %</td></tr>
+    <tr><td class="name">PUNCH</td><td class="num">37</td><td class="num">34 %</td><td class="num">56 %</td><td class="num">74 %</td></tr>
+    <tr><td class="name">SWING, BASH</td><td class="num">43</td><td class="num">28 %</td><td class="num">47 %</td><td class="num">68 %</td></tr>
+    <tr><td class="name">STAB <span class="dash">(atk_STAB1)</span></td><td class="num">45</td><td class="num">27 %</td><td class="num">44 %</td><td class="num">66 %</td></tr>
+    <tr><td class="name">KICK</td><td class="num">47</td><td class="num">26 %</td><td class="num">41 %</td><td class="num">64 %</td></tr>
+    <tr><td class="name">HACK</td><td class="num">48</td><td class="num">26 %</td><td class="num">39 %</td><td class="num">63 %</td></tr>
+    <tr><td class="name">SLASH</td><td class="num">49</td><td class="num">25 %</td><td class="num">38 %</td><td class="num">63 %</td></tr>
+    <tr><td class="name">PARRY</td><td class="num">57</td><td class="num">21 %</td><td class="num">24 %</td><td class="num">54 %</td></tr>
+  </tbody>
+  <caption>The chance the luck roll rescues a blow that Quickness and the 1-in-4 have
+  already missed. Two different attacks are both called STAB. DISRUPT only ever strikes
+  non-material monsters.</caption>
+</table>
+</div>
+
+<p>On a fast weapon, Luck almost makes the Quickness check irrelevant: a JAB with Luck 40
+lands 1/4 + 3/4 × 92 % ≈ <strong>94 %</strong> of the times Quickness says it misses.
+On a heavy one it's a modest bonus.</p>
+
+<hr>
+
+<h2>Keeping your item from a Giggler</h2>
+
+<p>A Giggler's blow doesn't hurt. It steals instead. The game makes up to five tries,
+starting with <em>needed</em> = 100 − Quickness and lowering it by 20 each try, and the
+theft ends at the first lucky roll. Because of a quirk in the original code, every try
+looks at the <strong>ready hand</strong>, so whatever is held there goes on the first
+unlucky roll, and the backpack is never touched.</p>
+
+<div class="recipe">
+  <span class="label">In practice</span>
+  <p>Your ready-hand item survives only if the <strong>first</strong> roll is lucky, or if
+  the champion's Quickness is 100 or more. With Quickness 40 (needed 60), that's the same
+  19.5 % as the dodge for anyone below 62 Luck. Quickness helps more than Luck here.</p>
+</div>
+
+<hr>
+
+<h2>Spending it and getting it back</h2>
+
+<p>The second step of the roll pays for itself. Each time it saves you, Luck goes
+<strong>down 2</strong>. Each time it fails, Luck goes <strong>up 2</strong>, but never
+above the champion's maximum. A long fight against something that keeps hitting wears
+Luck down from its top.</p>
+
+<p>Luck also drifts back to its maximum, like every other attribute. Below the maximum it
+gains 1 every 256 ticks, about once a minute, or every 64 ticks while the party sleeps.
+Above the maximum it loses a little at the same rhythm.</p>
+
+<p>The <strong>maximum</strong> is what you actually build:</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Source</th><th class="num">Luck</th><th>How</th></tr></thead>
+  <tbody>
+    <tr class="best"><td class="name">Rabbit's Foot</td><td class="num">+10</td><td class="why">Anywhere in the champion's inventory, backpack and pouches included. It raises maximum, current and minimum together. Each foot counts.</td></tr>
+    <tr><td class="name">Cursed weapon or garment</td><td class="num">−3</td><td class="why">Each one, held, worn, or in a pouch or the quiver. The backpack is safe.</td></tr>
+    <tr><td class="name">Reincarnation</td><td class="num">≈ +1.7</td><td class="why">In the Hall of Champions, REINCARNATE hands out twelve +1s among the seven attributes at random. Luck is one of the seven.</td></tr>
+    <tr class="flat"><td class="name">Levelling up</td><td class="num">0</td><td class="why">Level-ups raise Strength, Dexterity, Wisdom, Vitality and the resistances, but never Luck.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>The minimum starts at 10 for every champion, and a drain can't take Luck below it.
+Curses lower that floor too.</p>
+
+<hr>
+
+<h2>Who starts lucky</h2>
+
+<p>The Hall of Champions' twenty-four, as recruited. The dashed line is 62, where Luck
+starts to help with dodging.</p>
+
+<div class="bars">
+  <div class="bar-row"><span class="who">WUUF</span><span class="track"><span class="fill" style="--l:60"></span></span><span class="v">60</span></div>
+  <div class="bar-row"><span class="who">ZED</span><span class="track"><span class="fill" style="--l:58"></span></span><span class="v">58</span></div>
+  <div class="bar-row"><span class="who">CHANI</span><span class="track"><span class="fill" style="--l:57"></span></span><span class="v">57</span></div>
+  <div class="bar-row"><span class="who">SYRA</span><span class="track"><span class="fill" style="--l:55"></span></span><span class="v">55</span></div>
+  <div class="bar-row"><span class="who">ELIJA</span><span class="track"><span class="fill" style="--l:50"></span></span><span class="v">50</span></div>
+  <div class="bar-row"><span class="who">GANDO</span><span class="track"><span class="fill" style="--l:50"></span></span><span class="v">50</span></div>
+  <div class="bar-row"><span class="who">LEYLA</span><span class="track"><span class="fill" style="--l:50"></span></span><span class="v">50</span></div>
+  <div class="bar-row"><span class="who">AZIZI</span><span class="track"><span class="fill" style="--l:47"></span></span><span class="v">47</span></div>
+  <div class="bar-row"><span class="who">ALEX</span><span class="track"><span class="fill" style="--l:47"></span></span><span class="v">47</span></div>
+  <div class="bar-row"><span class="who">TIGGY</span><span class="track"><span class="fill" style="--l:45"></span></span><span class="v">45</span></div>
+  <div class="bar-row"><span class="who">LINFLAS</span><span class="track"><span class="fill" style="--l:45"></span></span><span class="v">45</span></div>
+  <div class="bar-row"><span class="who">HALK</span><span class="track"><span class="fill" style="--l:40"></span></span><span class="v">40</span></div>
+  <div class="bar-row"><span class="who">WU TSE</span><span class="track"><span class="fill" style="--l:40"></span></span><span class="v">40</span></div>
+  <div class="bar-row"><span class="who">IAIDO</span><span class="track"><span class="fill" style="--l:40"></span></span><span class="v">40</span></div>
+  <div class="bar-row"><span class="who">MOPHUS</span><span class="track"><span class="fill" style="--l:40"></span></span><span class="v">40</span></div>
+  <div class="bar-row"><span class="who">SONJA</span><span class="track"><span class="fill" style="--l:40"></span></span><span class="v">40</span></div>
+  <div class="bar-row"><span class="who">HAWK</span><span class="track"><span class="fill" style="--l:40"></span></span><span class="v">40</span></div>
+  <div class="bar-row"><span class="who">HISSSSA</span><span class="track"><span class="fill" style="--l:40"></span></span><span class="v">40</span></div>
+  <div class="bar-row"><span class="who">NABI</span><span class="track"><span class="fill" style="--l:40"></span></span><span class="v">40</span></div>
+  <div class="bar-row"><span class="who">BORIS</span><span class="track"><span class="fill" style="--l:25"></span><span class="fill foot" style="--from:25;--l:35"></span></span><span class="v">35</span></div>
+  <div class="bar-row"><span class="who">DAROOU</span><span class="track"><span class="fill" style="--l:35"></span></span><span class="v">35</span></div>
+  <div class="bar-row"><span class="who">LEIF</span><span class="track"><span class="fill" style="--l:35"></span></span><span class="v">35</span></div>
+  <div class="bar-row"><span class="who">STAMM</span><span class="track"><span class="fill" style="--l:35"></span></span><span class="v">35</span></div>
+  <div class="bar-row"><span class="who">GOTHMOG</span><span class="track"><span class="fill" style="--l:30"></span></span><span class="v">30</span></div>
+  <div class="bars-legend">
+    <span></span>
+    <span class="scale"><span style="left:0">0</span><span style="left:25%">20</span><span style="left:50%">40</span><span class="m" style="left:77.5%">62</span></span>
+    <span></span>
+  </div>
+</div>
+
+<p>BORIS is the unluckiest at 25, but he carries a Rabbit's Foot, shown hatched,
+which brings him to 35. Move the foot to WUUF and she starts at 70, the only champion
+whose Luck works on the dodge from the start.</p>
+
+<div class="recipe">
+  <span class="label">What to do with it</span>
+  <p><strong>Give the Rabbit's Foot to your luckiest front-rank fighter</strong>, ideally
+  someone at 52 or more, so the foot lifts them past 61 and their Luck starts working on
+  dodges. Keep cursed items off that champion. Expect only a modest gain. Luck is a small
+  safety net, and Quickness does the real dodging and hitting.</p>
+</div>
+
+<footer class="colophon">
+  <p>Sources: <code>IsCharacterLucky</code> (Character.cpp:2170),
+  <code>DeterminePhysicalAttackDamage</code> (Attack.cpp:614),
+  <code>MonsterDamagesCharacter</code> (Monster.cpp:4558), <code>StealFromCharacter</code>
+  (Monster.cpp:252), the attribute drift (Code17818.cpp:393), <code>AdjustStatsForItemCarried</code>
+  (Character.cpp:1574), the level-up in Magic.cpp and REINCARNATE (CSBCode.cpp:6837). The
+  attack thresholds are <code>75 − Byte20002[attack]</code>, read from graphics.dat item
+  0x230; the starting values come from the Hall of Champions' texts in dungeon.dat.</p>
+  <p>The Giggler's ready-hand quirk and the item table are written up in
+  <code>doc/PROVEN_FACTS.md</code>.</p>
+</footer>
+
+</div>
+</body>
+</html>
