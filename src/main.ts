@@ -288,7 +288,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     // is the game's.
     const storeRandom = new CsbRandom();
     const saveStore = new BrowserSaveStore((rows) => drawPlaythrough(storeRandom, rows));
-    const saves = new GameSaves(game, dataSet, saveStore, {
+    const saves = new GameSaves(game, dataSet, setFiles, saveStore, {
         // A save packs a `CHARDESC`, and that needs graphic 26 for the champions who
         // carry only a portrait index.
         portraitOf: (champion) => screen?.portraitPixelsFor(champion),
@@ -337,7 +337,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // DELETE, which a long press on a save puts in EXPORT's place.
         onDeleteSave: (entry) => saves.remove(entry),
         // The import: a file dropped on the page (`bindSaveDrop`), held against the dungeon.
-        onImportSave: (file, confirmed) => saves.importSave(file, confirmed),
+        onImportSave: (file, answer) => saves.importSave(file, answer),
         onRestoreSave: (save) => {
             saves.read(save);
             if (save === adventure) events.newGameRead();

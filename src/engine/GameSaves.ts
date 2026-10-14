@@ -23,14 +23,16 @@
  * alone.
  *
  * A file from outside, CSBWin's or another browser's export, comes into the store through
- * `importSave`, once its dungeon has been held against the data set's
- * (`src/data/DungeonSignature.ts`). CSBWin has no such thing: a file put in the game's
+ * `importSave`, once its dungeon has been held against the data set's own, as its files
+ * read (`src/data/DungeonSignature.ts`). CSBWin has no such thing: a file put in the game's
  * directory under one of its four names is a save of that game.
  */
 import { CsbRandom } from '../core/random';
 import { loadCsbwinWorld } from '../data/CsbwinDungeonImage';
 import type { DataSet } from '../data/DataSets';
-import { checkDungeon, dungeonSignature, KNOWN_DUNGEONS, type DungeonCheck } from '../data/DungeonSignature';
+import type { DataSetFiles } from '../data/DataSetFiles';
+import { DungeonLoader } from '../data/DungeonLoader';
+import { checkDungeon, dungeonWalls, type DungeonCheck, type DungeonWalls } from '../data/DungeonSignature';
 import { readsGameBlock1, stampRandomGameID } from '../data/SaveGameLoader';
 import type { UtilityPortraits } from '../data/UtilityPortraits';
 import {
@@ -103,6 +105,13 @@ export interface ImportedFile {
      */
     modifiedAt?: number;
 }
+
+/**
+ * The player's answer to the question about a slightly different dungeon
+ * (`GameSaves.importSave`): store it all the same, or look for a better match among the
+ * other sets.
+ */
+export type ImportAnswer = 'anyway' | 'elsewhere';
 
 /**
  * How an import came out: the row the file was stored as, or what its dungeon is to the
@@ -190,11 +199,15 @@ export class GameSaves {
      * saves then carry. A new game's is the data set's own.
      */
     private unofficial = false;
+    /** The data set's own dungeons as its files read, once an import has asked (`ownDungeons`). */
+    private own: Promise<DungeonWalls[]> | null = null;
 
     constructor(
         private readonly game: Game,
         /** The game the page plays, whose files the running game was read from. */
         readonly dataSet: DataSet,
+        /** Its files, which an import reads its own dungeons from (`ownDungeons`). */
+        private readonly files: DataSetFiles,
         /** Where the saves are kept, every data set's. */
         private readonly store: SaveStore,
         private readonly screen: GameSavesScreen,
@@ -355,16 +368,16 @@ export class GameSaves {
      * Take a file from outside into the store, as a row of the game's data set: a CSBWin
      * save, which the list then shows and LOAD reads as any other. The game is left alone.
      *
-     * The file names no dungeon but holds one, and its walls are held against the known
-     * dungeons' (`checkDungeon` over the signature of the file's world, `doc/SAVES.md`
-     * → "An import is checked against the dungeon"), a local set's against its own alone
-     * (`DataSet.dungeonSignature`):
+     * The file names no dungeon but holds one, and its walls are held against the data
+     * set's own dungeons as its files read, then against the other sets' (`checkDungeon`
+     * over the walls of the file's world, `doc/SAVES.md` → "An import is checked against
+     * the dungeon"):
      *
      * - the data set's own dungeon, whole: stored;
-     * - most of the data set's own and not the whole, a modified version of it, or in a
-     *   local set anything but the whole of its own, a mismatch: stored only once the
-     *   player has `confirmed` it, and then marked `unofficial`;
-     * - in a manifest set, another dungeon's, or an unknown one's: never stored.
+     * - a slightly different version of it, its levels as many and as large and some of
+     *   their walls the same: stored only once the player has answered `anyway`, and then
+     *   marked `unofficial`; answered `elsewhere`, held against the other sets alone;
+     * - another set's dungeon, or an unknown one: never stored.
      *
      * What is not stored comes back as the check, for the dialog to say. A file with no
      * `GAMEBLOCK1` is no save at all, and throws a `SaveFileError` that says so; one whose
@@ -382,25 +395,23 @@ export class GameSaves {
      * one keeps it, a local playthrough's or not: nothing tells a save of this game from
      * a save of another that drew the same id.
      */
-    async importSave(file: ImportedFile, confirmed = false): Promise<ImportResult> {
+    async importSave(file: ImportedFile, answer: ImportAnswer | null = null): Promise<ImportResult> {
         if (!readsGameBlock1(file.bytes)) {
             this.log(`${file.name} has no GAMEBLOCK1: not a saved game`);
             throw new SaveFileError(NOT_A_SAVED_GAME);
         }
-        let signature: string[];
+        let walls: DungeonWalls;
         try {
-            signature = await dungeonSignature(loadCsbwinWorld(file.bytes).dungeon);
+            walls = await dungeonWalls(loadCsbwinWorld(file.bytes).dungeon);
         } catch (error) {
             this.log(`${file.name} does not read as a saved game`, error);
             throw new SaveFileError(SAVED_GAME_DAMAGED);
         }
         const fields = readSaveFileFields(file.bytes);
         if (!fields) throw new SaveFileError(SAVED_GAME_DAMAGED);
-        const set = this.dataSet;
-        const own = set.dungeonSignature ? { name: set.name, dataSets: [set.id], signature: set.dungeonSignature } : null;
-        const check = checkDungeon(signature, set.id, KNOWN_DUNGEONS, own);
+        const check = checkDungeon(walls, this.dataSet.id, await this.ownDungeons(), answer === 'elsewhere');
         if (check.kind === 'other' || check.kind === 'unknown') return check;
-        if ((check.kind === 'modified' || check.kind === 'mismatch') && !confirmed) return check;
+        if (check.kind === 'different' && answer !== 'anyway') return check;
 
         await this.marked;
         const rows = await this.store.list(null);
@@ -409,7 +420,7 @@ export class GameSaves {
         const entry: SaveEntry = {
             id: name, name, dataSet: this.dataSet.id, quick: false, sleep: false,
             savedAt: file.modifiedAt ?? now, usedAt: now, playTime: 0,
-            unofficial: check.kind !== 'own', ...fields,
+            unofficial: check.kind === 'different', ...fields,
         };
         let { bytes } = file;
         if (entry.playthrough === 0) {
@@ -419,6 +430,33 @@ export class GameSaves {
         }
         await this.store.write(entry, bytes);
         return { kind: 'stored', entry };
+    }
+
+    /**
+     * The data set's own dungeons, as its files read: its `dungeon.dat`, and CSB's
+     * `mini.dat`, whose save is the game (`doc/PROVEN_FACTS.md` → "A compressed
+     * `dungeon.dat`: CSB's prison"). Read from the files, never from the running world,
+     * which a save or a script may have changed, and once. A file that will not open or
+     * read is left out, and the console says why: the import then goes on to the other
+     * sets.
+     */
+    private ownDungeons(): Promise<DungeonWalls[]> {
+        this.own ??= (async () => {
+            const own: DungeonWalls[] = [];
+            const read = async (name: string, load: (bytes: Uint8Array) => Parameters<typeof dungeonWalls>[0]): Promise<void> => {
+                try {
+                    const bytes = await this.files.read(name);
+                    if (!bytes) throw new Error('not found');
+                    own.push(await dungeonWalls(load(bytes)));
+                } catch (error) {
+                    this.log(`${this.files.where(name)} does not read: an import is held against the other sets alone`, error);
+                }
+            };
+            await read('dungeon.dat', (bytes) => new DungeonLoader().loadDungeonDat(bytes));
+            if (this.dataSet.miniDat) await read('mini.dat', (bytes) => loadCsbwinWorld(bytes).dungeon);
+            return own;
+        })();
+        return this.own;
     }
 
     /**

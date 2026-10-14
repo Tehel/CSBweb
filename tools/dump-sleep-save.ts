@@ -28,7 +28,7 @@ import type { MessageSink } from '../src/engine/GameHost';
 import { GameSaves, PRISON_WORD22592 } from '../src/engine/GameSaves';
 import { wakeUp, type LoopScript } from '../src/engine/LoopState';
 import { handleMouseButton } from '../src/renderer/ui/Mouse';
-import { DEFAULT_DATA_SET, dataSetNamed } from './lib/dataSets';
+import { DEFAULT_DATA_SET, dataSetNamed, diskFiles } from './lib/dataSets';
 import { check, finish } from './lib/check';
 import { newGame } from './lib/game';
 import { memoryStore, savePath } from './lib/saves';
@@ -58,7 +58,7 @@ function stage(store = memoryStore(), dataSet = DEFAULT_DATA_SET) {
   const game: Game = newGame(dungeon, graphics, { messages });
   applyCsbwinSave(game, new Uint8Array(readFileSync(savePath('csbgame7.dat'))));
   const reports: string[] = [];
-  const saves = new GameSaves(game, dataSet, store, { portraitOf: () => undefined, repackOpenChest: () => {} },
+  const saves = new GameSaves(game, dataSet, diskFiles(dataSet), store, { portraitOf: () => undefined, repackOpenChest: () => {} },
     (message) => { reports.push(message); });
   return { game, store, saves, reports };
 }

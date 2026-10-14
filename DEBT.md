@@ -113,7 +113,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P10 | A published set has no dungeon signature: its saves are refused | M | ⏳ step 1 of 2 next |
+| P10 | A save of another set's dungeon names only the catalogue's | M | ⚠️ step 2 of 2 next |
 | P8 | Publishing a local set, and moderating it | L | ⚠️ step 4 of 5 next |
 | P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
@@ -212,10 +212,10 @@ What stands: a local set is a record of the store's `dataSets` object store
 `src/main.ts`): its `DataSet` follows from its files (`localDataSet`), and the boot reads
 them by name through `recordFiles`, its base set's folder giving a `graphics.dat` it does
 not have, as a manifest set's are read through `folderFiles` (`src/data/DataSetFiles.ts`).
-It sends no statistics. It refuses no imported save: one whose walls are not all its
-record's `dungeonSignature` is asked about and stored on CONFIRM (`DataSet.dungeonSignature`,
-`checkDungeon`, `doc/SAVES.md` → "A player's own set refuses no save"), so that a set
-being built keeps its saves as its walls move. `tools/dump-local-data-set.ts` plays such
+It sends no statistics. An imported save is held against its `dungeon.dat` as any set's
+is, and one whose walls moved is stored on IMPORT ANYWAY (`checkDungeon`, `doc/SAVES.md`
+→ "An import is checked against the dungeon"), so that a set being built keeps its saves
+as its walls move. `tools/dump-local-data-set.ts` plays such
 records against their manifest sets. The welcome page (`src/ui/welcomePage.ts`) shows the local sets beside the
 manifest's, under the same order, a record's thumbnail as its tile's picture, and counts
 their saves; its last tile, "+ Add my own", opens the form that adds a set
@@ -285,74 +285,38 @@ Decisions taken with the author, for every row:
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
 
-### P10 ⏳ A published set has no dungeon signature: its saves are refused
+### P10 ⚠️ A save of another set's dungeon names only the catalogue's
 
-A save imported into a set is checked against that set's own dungeon only when the set
-has its signature (`DataSet.dungeonSignature`, `checkDungeon`,
-`src/data/DungeonSignature.ts`; `doc/SAVES.md` → "An import is checked against the
-dungeon"). A local set has it, from its record. A published set has none: the publish
-route's check computes it (`record.dungeonSignature`, `CheckDataSet` in
-`server/publish.ts`), but the row it writes (`dataSets.publish`, same file) keeps only the
-id, name, description, authors, `csbGraphics`, `hintOracle` and `dmRules`, and
-`api/data-sets` serves no signature. So `GameSaves.importSave`
-(`src/engine/GameSaves.ts`) checks the save against `KNOWN_DUNGEONS` alone. That
-catalogue is committed and lists none of the players' dungeons, so a save of a published
-set is "THIS IS A SAVE OF AN UNKNOWN DUNGEON / NOT SUPPORTED YET". That includes a save
-exported from the local set the published one came from, which is the only way to move a
-playthrough from `local:<id>` to `<id>` (P8: PUBLISH moves no saves). This happens on
-the live site: Conflux 2, published from `local:conflux-2` and approved by hand on the
-VPS, refuses the saves of its local twin, whose dungeon is the same.
-`src/data/DataSets.ts`'s comment on `dungeonSignature` ("A manifest set has none: its
-dungeon is in `KNOWN_DUNGEONS`") says the same, and is true only of the site's own sets.
+An imported save is held against the running set's own dungeons first, as its files read
+(`checkDungeon`, `GameSaves.ownDungeons`, `src/engine/GameSaves.ts`; `doc/SAVES.md` → "An
+import is checked against the dungeon"), so every set, a published one included, takes
+the saves of its own `dungeon.dat`, and asks about a slightly different one. A save that
+is not the running set's goes on to the other sets, and those are only the catalogue's
+(`KNOWN_DUNGEONS`, `src/data/DungeonSignature.ts`), committed, which lists none of the
+players' dungeons. So a save of a published set, dropped in another set, is "THIS IS A
+SAVE OF AN UNKNOWN DUNGEON / NOT SUPPORTED YET" where the port could name the set and
+say "switch to it". The publish route's check computes a set's signature
+(`record.dungeonSignature`, `CheckDataSet` in `server/publish.ts`), but the row it writes
+(`dataSets.publish`, same file) keeps only the id, name, description, authors,
+`csbGraphics`, `hintOracle` and `dmRules`, and `api/data-sets` serves no signature.
 
-**What it takes**, in two steps (the author's design):
+M, in two steps (the author's design); the first, the running set's own dungeon, stands.
 
-1. **The running set's own dungeon first.** An import happens in the save dialog, so a
-   set is always running, and its `dungeon.dat` is the page's already. The save's
-   dungeon is compared with that file, as read, not with the live world, whose walls a
-   script may have moved. Check first that the page still has the set's `dungeon.dat`
-   when the game was started from a save (CONTINUE, a save's LOAD), since a save holds
-   its own dungeon. The author's rules:
-   - **The number of levels, or any level's width or height, differs**: the save is not
-     the set's. It goes on to the other sets (the catalogue, and step 2), and is refused
-     where none is its dungeon. The dimensions are compared from the two dungeons' maps,
-     since a level's digest hides them (`levelWalls` hashes them with the walls).
-   - **Same levels, same dimensions, every digest the same**: the set's own. Stored, with
-     nothing else consulted. This alone fixes Conflux 2's case.
-   - **Same levels, same dimensions, some digests the same and not all**: a slightly
-     different dungeon. Ask "It seems this save is for a slightly different dungeon",
-     over IMPORT ANYWAY (stored, unofficial, as `modified` and `mismatch` are today), LOOK
-     FOR A BETTER MATCH (on to the other sets, as above) and CANCEL. The save menu's
-     `importMenu` (`src/renderer/ui/SaveMenu.ts`) asks two-option questions today. The
-     author would rather have the three. If a third option is a real cost, the question
-     offers only the first two, since LOOK FOR A BETTER MATCH always leads to another
-     dialog, which offers CANCEL.
-   - **Same levels, same dimensions, no digest the same**: another dungeon. Refused.
-
-   This check is for imports only. A save already filed under the set is read without
-   it. A local set is no exception: a file whose levels differ in number or size is
-   refused there too. A save carries its own dungeon, which replaces the set's when it is
-   read, so a player who has changed the dungeon would not see the changes in that game.
-   That replaces `checkDungeon`'s `modified` and `mismatch` questions for the running set,
-   and `doc/SAVES.md` → "A player's own set refuses no save", which the step rewrites.
-   P11 is the wider form of the same problem.
-2. **A signature database, to name another dungeon.** It is needed only for a save that
-   is not the running set's: to say which published set it is, and to offer "switch to
-   it". The server keeps each published set's signature. It computes it with the page's
-   own reader, which the publish route already runs, rather than trusting an uploaded one,
-   and keeps it in the store (`server/dataSets.ts`). A **backfill** covers the sets
-   already published, from each owned set's `gamefiles/<id>/dungeon.dat`, at start-up or
-   by a one-off script `doc/DEPLOYMENT.md` names. A signature is one SHA-256 per level,
-   up to 64 levels: up to 2 KiB raw, about 4.2 KiB as hex JSON. If that is too much to
-   send in every `api/data-sets` answer, a dedicated endpoint takes a list of set ids and
-   answers their signatures, which the page caches in IndexedDB (a `DB_VERSION` bump) and
-   asks for when it lacks one. Which of the two is decided at the start of the step, from
-   those sizes.
-
-Evidence: for step 1, an import check in `tools/dump-local-data-set.ts` or a neighbour,
-where a save of a set outside `KNOWN_DUNGEONS` is stored and is refused today; for step 2,
+**Step 2, a signature database, to name another dungeon.** The server keeps each
+published set's signature, and each level's width and height beside it, so that the
+other sets are held to the rules the running set is. It computes them with the page's
+own reader, which the publish route already runs, rather than trusting uploaded ones,
+and keeps them in the store (`server/dataSets.ts`). A **backfill** covers the sets
+already published, from each owned set's `gamefiles/<id>/dungeon.dat`, at start-up or by
+a one-off script `doc/DEPLOYMENT.md` names. A signature is one SHA-256 per level, up to
+64 levels: up to 2 KiB raw, about 4.2 KiB as hex JSON. If that is too much to send in
+every `api/data-sets` answer, a dedicated endpoint takes a list of set ids and answers
+their signatures, which the page caches in IndexedDB (a `DB_VERSION` bump) and asks for
+when it lacks one. Which of the two is decided at the start of the step, from those
+sizes. The other sets `checkDungeon` looks at are then the catalogue's and the
+published ones, and LOOK FOR A BETTER MATCH can name a published set. Evidence:
 `tools/dump-server.ts` (the signature stored on publish, the backfill, the endpoint's
-answer).
+answer), and `tools/dump-save-menu.ts`'s import naming a published set.
 
 ### P8 ⏳ Publishing a local set, and moderating it
 
@@ -437,8 +401,9 @@ To design with the author, and complex. A CSBWin save holds the whole dungeon (b
 7-14), and a read installs it in place of the set's `dungeon.dat`. A local set's pen
 can replace its `dungeon.dat` (P, "What stands"), and the saves already stored keep the
 dungeon they were made in. So a player who changes their dungeon and loads an old save
-plays the old dungeon, and sees none of their changes. The same happens to any import the
-dialog accepts as a slightly different dungeon (P10). CSBWin behaves the same way: a save
+plays the old dungeon, and sees none of their changes (`doc/SAVES.md` → "A save is its
+own world"). The same happens to any import the dialog stores as a slightly different
+dungeon, on IMPORT ANYWAY. CSBWin behaves the same way: a save
 is the world. What the port should do is open: tell the player, refuse, or carry the
 party into the new dungeon (as Chaos's "MAKE NEW ADVENTURE" carries a party into
 `mini.dat`). A published set's files never change (P8), so this affects local sets only.

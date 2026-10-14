@@ -315,39 +315,69 @@ export function identifyDungeon(
 }
 
 /**
- * What a file's dungeon is to a data set, by its signature: the set's `own`, whole; a
- * `modified` version of the set's own, most of it and not the whole; an `other` known
- * dungeon's, the whole or most of one; or of an `unknown` dungeon, no level of any. To a
- * player's own set, a file that is not the whole of its dungeon is a `mismatch`, whatever
- * else it is.
+ * A dungeon's walls, what an import is told by: each level's width and height, and its
+ * signature. A level's digest takes its width and height in (`levelWalls`) but hides
+ * them, and the rules for the running set's own dungeon need them apart.
+ */
+export interface DungeonWalls {
+    /** Each level's `[width, height]`, in the levels' order. */
+    shapes: readonly (readonly [number, number])[];
+    signature: DungeonSignature;
+}
+
+/** `dungeon`'s walls, a `dungeon.dat`'s or a save's. */
+export async function dungeonWalls(dungeon: DungeonData): Promise<DungeonWalls> {
+    return {
+        shapes: dungeon.maps.map((map) => [map.descriptor.width, map.descriptor.height] as const),
+        signature: await dungeonSignature(dungeon),
+    };
+}
+
+/** Whether two dungeons have as many levels, each as wide and as high as the other's. */
+function sameShapes(a: DungeonWalls, b: DungeonWalls): boolean {
+    return a.shapes.length === b.shapes.length
+        && a.shapes.every(([width, height], level) => width === b.shapes[level][0] && height === b.shapes[level][1]);
+}
+
+/**
+ * What a save's dungeon is to the running data set (`doc/SAVES.md` → "An import is
+ * checked against the dungeon"): the set's `own`, whole; a slightly `different` version
+ * of the set's own; an `other` known dungeon's, the whole or most of one, which another
+ * set may play; or of an `unknown` dungeon.
  */
 export type DungeonCheck =
-    | { kind: 'own'; dungeon: KnownDungeon }
-    | { kind: 'modified'; dungeon: KnownDungeon }
-    | { kind: 'mismatch'; dungeon: KnownDungeon }
+    | { kind: 'own' }
+    | { kind: 'different' }
     | { kind: 'other'; dungeon: KnownDungeon }
     | { kind: 'unknown' };
 
 /**
- * `signature` against the data set `dataSet`, its `DataSet.id`: the dungeon it looks like
- * (`identifyDungeon`) is the set's when it lists the set, and a set may have two.
+ * `save`'s walls against the data set `dataSet`, its `DataSet.id`, whose own dungeons,
+ * as its files read, are `own`: its `dungeon.dat`, and CSB's `mini.dat`. The author's
+ * rules:
  *
- * A set with a dungeon of its own, `own`, a player's own set's (`DataSet.dungeonSignature`),
- * is checked against it alone: the whole of it is the set's `own`, and anything else a
- * `mismatch`, never refused. So a local set that holds a known dungeon, DM's `dungeon.dat`
- * with other graphics, takes that dungeon's saves, which the catalogue alone would call
- * another dungeon's. And a set its author is building, a few walls moved since a save,
- * takes that save, once the player has confirmed it.
+ * - A save whose levels are as many as an own dungeon's, each as wide and as high, is
+ *   held against that dungeon alone: the set's `own` when every level's digest is the
+ *   same, a slightly `different` dungeon when some are, and `unknown` when none is.
+ * - Any other is not the set's, and goes on to the other sets: the known dungeon it
+ *   looks like (`identifyDungeon`) among those that do not list the set, `other`, or
+ *   `unknown` where there is none. So does a `different` one the player sends on, with
+ *   `elsewhere`.
+ *
+ * The catalogue alone never names the running set's dungeon, which its files say better.
  */
 export function checkDungeon(
-    signature: DungeonSignature,
+    save: DungeonWalls,
     dataSet: string,
+    own: readonly DungeonWalls[],
+    elsewhere = false,
     known: readonly KnownDungeon[] = KNOWN_DUNGEONS,
-    own: KnownDungeon | null = null,
 ): DungeonCheck {
-    if (own) return { kind: identifyDungeon(signature, [own])?.whole ? 'own' : 'mismatch', dungeon: own };
-    const match = identifyDungeon(signature, known);
-    if (!match) return { kind: 'unknown' };
-    if (!match.dungeon.dataSets.includes(dataSet)) return { kind: 'other', dungeon: match.dungeon };
-    return { kind: match.whole ? 'own' : 'modified', dungeon: match.dungeon };
+    const set = elsewhere ? undefined : own.find((dungeon) => sameShapes(dungeon, save));
+    if (set) {
+        const same = set.signature.filter((digest, level) => digest === save.signature[level]).length;
+        return { kind: same === save.signature.length ? 'own' : same > 0 ? 'different' : 'unknown' };
+    }
+    const match = identifyDungeon(save.signature, known.filter((dungeon) => !dungeon.dataSets.includes(dataSet)));
+    return match ? { kind: 'other', dungeon: match.dungeon } : { kind: 'unknown' };
 }

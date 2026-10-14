@@ -138,10 +138,10 @@ import {
   type StoredSaveRecord,
 } from '../src/data/saves/SaveStore';
 import { ROWS_UPGRADED_VERSION, stampBlock1Rows, stampSaveRecords, upgradeSaveRecords, upgradeStoredRows } from '../src/data/saves/legacyRows';
-import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
-import { dungeonSignature, KNOWN_DUNGEONS } from '../src/data/DungeonSignature';
+import { KNOWN_DUNGEONS } from '../src/data/DungeonSignature';
+import type { DataSetFiles } from '../src/data/DataSetFiles';
 import type { DataSet } from '../src/data/DataSets';
-import { localDataSet } from '../src/data/LocalDataSets';
+import { localDataSet, recordFiles, type LocalDataSetRecord } from '../src/data/LocalDataSets';
 import { Game } from '../src/engine/Game';
 import type { GameHost, MessageSink } from '../src/engine/GameHost';
 import { freeze, thaw, type LoopScript } from '../src/engine/LoopState';
@@ -170,7 +170,7 @@ import {
 } from '../src/renderer/ui/Menu';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
-import { DEFAULT_DATA_SET, dataSetNamed } from './lib/dataSets';
+import { DEFAULT_DATA_SET, dataSetNamed, diskFiles } from './lib/dataSets';
 import { graphicsTablesOf, newGame, stockGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
@@ -911,7 +911,7 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
 
   // F5's save, to a store in memory instead of the page's.
   const store = memoryStore();
-  const saves = new GameSaves(game, DEFAULT_DATA_SET, store, {
+  const saves = new GameSaves(game, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), store, {
     portraitOf: () => undefined,
     repackOpenChest: () => Inventory.repackOpenChest(ui),
   }, () => {});
@@ -1034,7 +1034,7 @@ async function checkSaveCall(): Promise<void> {
     game.systems.hallOfChampions.addChampion(healthyChampion(name));
     let tailAtWrite: boolean | null = null;
     const store = shared ?? memoryStore(() => { tailAtWrite = game.canRestartFromSavegame(); }, fail);
-    const saves = new GameSaves(game, dataSet, store, { portraitOf: () => undefined, repackOpenChest: () => {} },
+    const saves = new GameSaves(game, dataSet, diskFiles(dataSet), store, { portraitOf: () => undefined, repackOpenChest: () => {} },
       (message: string) => { reports.push(message); });
     return { game, store, saves, tailAtWrite: (): boolean | null => tailAtWrite };
   };
@@ -1139,7 +1139,7 @@ async function checkSaveCall(): Promise<void> {
     const champion = slowGame.ctx.party.state.champions[0]!;
     const atTheKey = champion.attributes.health;
     const slow = memoryStore(() => {}, false, () => { champion.attributes.health = 1; });
-    const slowSaves = new GameSaves(slowGame, DEFAULT_DATA_SET, slow, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
+    const slowSaves = new GameSaves(slowGame, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), slow, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
     const late = await slowSaves.save('running', 'quick');
     const held = readCsbwinCharacter(loadSaveGameState(await slow.read(late.id)).characterBlock!, 0).champion.attributes.health;
     console.log(`  clock running, a champion hurt while the store is listed: health ${atTheKey} at the key, ${held} in the file`);
@@ -1301,7 +1301,7 @@ async function checkSaveCall(): Promise<void> {
     const fresh = async (store: SaveStore, dataSet = DEFAULT_DATA_SET) => {
       const game = await loadGame({ messages });
       const before = game.ctx.state.block1.randomGameID;
-      const saves = new GameSaves(game, dataSet, store, { portraitOf: () => undefined, repackOpenChest: () => {} },
+      const saves = new GameSaves(game, dataSet, diskFiles(dataSet), store, { portraitOf: () => undefined, repackOpenChest: () => {} },
         (message: string) => { reports.push(message); });
       await saves.newGameRead();
       return { game, saves, before };
@@ -1355,10 +1355,11 @@ async function menuRig(
   graphics: GraphicsLoader, store: SaveStore, champion: string,
   hooks: Partial<Pick<UIState, 'onHasNewFaces' | 'onMakeNewAdventure'>> = {},
   dataSet: DataSet = DEFAULT_DATA_SET,
+  files: DataSetFiles = diskFiles(dataSet),
 ) {
   const game = await loadGame();
   game.systems.hallOfChampions.addChampion(healthyChampion(champion));
-  const saves = new GameSaves(game, dataSet, store, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
+  const saves = new GameSaves(game, dataSet, files, store, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
   let drawsWithNoMenu = 0;
   const exported: { name: string; bytes: Uint8Array }[] = [];
   const ui: UIState = newUIState(graphics, game.ctx, {
@@ -1371,7 +1372,7 @@ async function menuRig(
     // As the page's, with the download kept instead of made.
     onExportSave: async (listed) => { exported.push({ name: listed.name, bytes: (await saves.open(listed)).bytes }); },
     onDeleteSave: (listed) => saves.remove(listed),
-    onImportSave: (file, confirmed) => saves.importSave(file, confirmed),
+    onImportSave: (file, answer) => saves.importSave(file, answer),
     onRestoreSave: (save) => saves.read(save),
     ...hooks,
   });
@@ -2925,8 +2926,8 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
   // The games' playthroughs are given, so that every line printed is the same at each run.
   game.ctx.state.block1.randomGameID = 0x0da200;
   const screen = { portraitOf: () => undefined, repackOpenChest: () => {} };
-  const saves = new GameSaves(game, DEFAULT_DATA_SET, store, screen, log, new CsbRandom(SEED));
-  const csbSaves = new GameSaves(game, dataSetNamed('csb'), store, screen, log, new CsbRandom(SEED));
+  const saves = new GameSaves(game, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), store, screen, log, new CsbRandom(SEED));
+  const csbSaves = new GameSaves(game, dataSetNamed('csb'), diskFiles(dataSetNamed('csb')), store, screen, log, new CsbRandom(SEED));
   const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));
   const same = (a: Uint8Array | undefined, b: Uint8Array | undefined): boolean =>
     a !== undefined && b !== undefined && a.length === b.length && a.every((byte, i) => byte === b[i]);
@@ -2939,8 +2940,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
   /** What an import that stored nothing came back with. */
   const refusal = (result: Awaited<ReturnType<GameSaves['importSave']>>): string =>
     result.kind === 'stored' ? `STORED ${result.entry.name}`
-      : result.kind === 'unknown' ? 'unknown'
-        : `${result.kind} (${result.dungeon.name}; sets ${result.dungeon.dataSets.join(' ')})`;
+      : result.kind === 'other' ? `other (${result.dungeon.name}; sets ${result.dungeon.dataSets.join(' ')})` : result.kind;
 
   // The name a file is stored under.
   check(importedFileName('CSBGAME.DAT', new Set()) === 'CSBGAME.DAT', 'a file keeps its name, in its own case');
@@ -2976,13 +2976,13 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
     now += 60_000;
 
     // The same file again, and with no date: a row of its own.
-    const again = await saves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine }, true);
+    const again = await saves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine }, 'anyway');
     if (again.kind !== 'stored') throw new Error('the second csbgame7.dat was not stored');
     show('the same file again, with no date', again.entry);
     check(again.entry.id === 'CSBGAME7-2.DAT' && again.entry.savedAt === now && same(store.files.get('CSBGAME7.DAT'), genuine),
       'a name a save has is numbered, the first row left as it was; a file with no date is saved now');
     check(again.entry.playthrough === own.entry.playthrough && !again.entry.unofficial,
-      'a file that names a playthrough keeps it, a stored save\'s or not; confirming a whole dungeon marks nothing');
+      'a file that names a playthrough keeps it, a stored save\'s or not; IMPORT ANYWAY on a whole dungeon marks nothing');
     now += 60_000;
 
     // A file that names no playthrough: its party's, or a new one.
@@ -3009,18 +3009,22 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
       && game.ctx.party.state.champions.map((c) => c.name).join() === 'DAROO', 'the game is left alone, its random stream included');
     now += 60_000;
 
-    // Most of the data set's dungeon and not the whole: a modified version of it.
+    // The data set's dungeon with a wall moved: a slightly different one.
     const modified = await saveOfDungeon('WUUF', 0x00f00f, (level, cellFlags) => { if (level === 3) openAWall(cellFlags); });
     const before = await rowsOf();
     const asked = await saves.importSave({ name: 'modified.dat', bytes: modified });
     console.log(`  a save of Dungeon Master with a wall of level 3 opened: ${refusal(asked)}`);
-    check(asked.kind === 'modified' && asked.dungeon.name === 'Dungeon Master' && (await rowsOf()) === before,
-      'most of the data set\'s dungeon and not the whole is a modified version of it: nothing is stored');
-    const confirmed = await saves.importSave({ name: 'modified.dat', bytes: modified }, true);
+    check(asked.kind === 'different' && (await rowsOf()) === before,
+      'the data set\'s levels, as large, and some of their walls not its own is a slightly different dungeon: nothing is stored');
+    const elsewhere = await saves.importSave({ name: 'modified.dat', bytes: modified }, 'elsewhere');
+    console.log(`  the same, a better match looked for: ${refusal(elsewhere)}`);
+    check(elsewhere.kind === 'unknown' && (await rowsOf()) === before,
+      'a better match looked for among the other sets: none has Dungeon Master, so it is unknown, and nothing is stored');
+    const confirmed = await saves.importSave({ name: 'modified.dat', bytes: modified }, 'anyway');
     if (confirmed.kind !== 'stored') throw new Error('modified.dat was not stored');
-    show('the same, confirmed', confirmed.entry);
+    show('the same, imported anyway', confirmed.entry);
     check(confirmed.entry.unofficial && confirmed.entry.dataSet === DEFAULT_DATA_SET.id && same(store.files.get('modified.dat'), modified),
-      'confirmed, it is stored as a row of the data set, marked unofficial');
+      'imported anyway, it is stored as a row of the data set, marked unofficial');
     now += 60_000;
 
     // The mark follows the game read from such a row.
@@ -3049,14 +3053,14 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
     // Another dungeon's, and an unknown one's.
     const stored = await rowsOf();
     const csb = read(CSB_SAVE);
-    const other = [await saves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }), await saves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }, true)];
+    const other = [await saves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }), await saves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }, 'anyway')];
     console.log(`  a save of Chaos Strikes Back, in Dungeon Master: ${refusal(other[0])}`);
     check(other.every((result) => result.kind === 'other' && result.dungeon.name === 'Chaos Strikes Back' && result.dungeon.dataSets.includes('csb')),
-      'a save of another dungeon is not stored, confirmed or not: the dungeon it is comes back, with the sets that play it');
+      'a save of another dungeon is not stored, IMPORT ANYWAY or not: the dungeon it is comes back, with the sets that play it');
     const unknown = await saveOfDungeon('BORIS', 0x0b0215, (_level, cellFlags) => openAWall(cellFlags));
-    const none = await saves.importSave({ name: 'unknown.dat', bytes: unknown }, true);
+    const none = await saves.importSave({ name: 'unknown.dat', bytes: unknown }, 'anyway');
     console.log(`  a save with a wall of every level opened: ${refusal(none)}`);
-    check(none.kind === 'unknown', 'a save no level of which is a known dungeon\'s is not stored either');
+    check(none.kind === 'unknown', 'a save of the set\'s levels, as large, and no level\'s walls its own, is another dungeon: not stored either');
     check((await rowsOf()) === stored, 'none of them has written a row');
 
     // What does not read: a save whose later blocks fail, and a file that is no save.
@@ -3075,7 +3079,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
     ];
     for (const [what, bytes, line] of unread) {
       const at = logged.length;
-      const outcome = await saves.importSave({ name: 'damaged.dat', bytes }, true).then(refusal, (error: Error) => `throws "${error.message}"`);
+      const outcome = await saves.importSave({ name: 'damaged.dat', bytes }, 'anyway').then(refusal, (error: Error) => `throws "${error.message}"`);
       console.log(`  ${what}: ${outcome}; logged "${logged.slice(at).join(' | ')}"`);
       check(outcome === `throws "${line}"` && logged.length === at + 1 && readsGameBlock1(bytes) === (line === SAVED_GAME_DAMAGED),
         line === SAVED_GAME_DAMAGED
@@ -3089,7 +3093,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
     for (const result of inCsb) if (result.kind === 'stored') show('in the csb set', result.entry);
     check(inCsb.every((result) => result.kind === 'stored' && result.entry.dataSet === 'csb' && !result.entry.unofficial),
       'in the csb set, a save of Chaos Strikes Back and mini.dat are stored, rows of that set');
-    const dmInCsb = await csbSaves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine }, true);
+    const dmInCsb = await csbSaves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine }, 'anyway');
     console.log(`  a save of Dungeon Master, in the csb set: ${refusal(dmInCsb)}`);
     check(dmInCsb.kind === 'other' && dmInCsb.dungeon.name === 'Dungeon Master' && dmInCsb.dungeon.dataSets.includes(DEFAULT_DATA_SET.id),
       'and a save of Dungeon Master is another dungeon\'s there');
@@ -3097,10 +3101,20 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
       'each game lists its own set\'s');
     now += 60_000;
 
-    // A player's own set that holds Dungeon Master's dungeon: its record's signature alone.
-    const record = { id: 'local:mine', name: 'My own', description: '', authors: [], dmRules: false, baseSet: 'dm-atari',
-      files: {}, dungeonSignature: await dungeonSignature(loadCsbwinWorld(genuine).dungeon), createdAt: 0 };
-    const localSaves = new GameSaves(game, localDataSet(record), store, screen, log, new CsbRandom(SEED));
+    // A set the catalogue does not list, a published one, that holds Dungeon Master's
+    // dungeon: its dungeon.dat says its saves, which the catalogue alone calls another's.
+    const published: DataSet = { ...DEFAULT_DATA_SET, id: 'published-dm', name: 'Published' };
+    const publishedSaves = new GameSaves(game, published, diskFiles(DEFAULT_DATA_SET), store, screen, log, new CsbRandom(SEED));
+    const inPublished = await publishedSaves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine });
+    if (inPublished.kind === 'stored') show('in a published set holding Dungeon Master', inPublished.entry);
+    check(inPublished.kind === 'stored' && inPublished.entry.dataSet === 'published-dm' && !inPublished.entry.unofficial,
+      'in a set the catalogue does not list, a save of its dungeon.dat\'s dungeon is its own, a row of that set');
+    now += 60_000;
+
+    // A player's own set that holds Dungeon Master's dungeon: its record's dungeon.dat.
+    const record: LocalDataSetRecord = { id: 'local:mine', name: 'My own', description: '', authors: [], dmRules: false, baseSet: 'dm-atari',
+      files: { 'dungeon.dat': new Blob([read(DUNGEON).slice()]) }, dungeonSignature: [], createdAt: 0 };
+    const localSaves = new GameSaves(game, localDataSet(record), recordFiles(record, null), store, screen, log, new CsbRandom(SEED));
     const inLocal = await localSaves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine });
     if (inLocal.kind === 'stored') show('in a local set holding Dungeon Master', inLocal.entry);
     check(inLocal.kind === 'stored' && inLocal.entry.dataSet === 'local:mine' && !inLocal.entry.unofficial
@@ -3108,17 +3122,19 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
       'in a local set that holds Dungeon Master\'s dungeon, a save of it is the set\'s own, a row of that set');
     const asks = [
       await localSaves.importSave({ name: 'modified.dat', bytes: modified }),
-      await localSaves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }),
-      await localSaves.importSave({ name: 'unknown.dat', bytes: unknown }),
+      await localSaves.importSave({ name: 'modified.dat', bytes: modified }, 'elsewhere'),
+      await localSaves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }, 'anyway'),
+      await localSaves.importSave({ name: 'unknown.dat', bytes: unknown }, 'anyway'),
     ];
-    console.log(`  in it, a modified save, a save of Chaos Strikes Back and an unknown one: ${asks.map(refusal).join('; ')}`);
-    check(asks.every((result) => result.kind === 'mismatch' && result.dungeon.name === 'My own' && result.dungeon.dataSets.join() === 'local:mine')
-      && (await localSaves.list()).length === 1,
-      'in it, a save that is not the whole of its dungeon is a mismatch, whatever dungeon it is, and is not stored unconfirmed');
-    const forced = await localSaves.importSave({ name: 'CSBGAME2.DAT', bytes: csb }, true);
-    if (forced.kind === 'stored') show('a save of Chaos Strikes Back, confirmed in it', forced.entry);
-    check(forced.kind === 'stored' && forced.entry.dataSet === 'local:mine' && forced.entry.unofficial && same(store.files.get(forced.entry.id), csb),
-      'confirmed, it is stored all the same, a row of the local set, unofficial');
+    console.log(`  in it, a modified save, the same looked for elsewhere, a save of Chaos Strikes Back and an unknown one: ${asks.map(refusal).join('; ')}`);
+    check(asks.map(refusal).join('; ') === 'different; other (Dungeon Master; sets dm-atari dm-windows dm-atari-1.2 dm-atari-1.3-fr); '
+      + 'other (Chaos Strikes Back; sets csb); unknown' && (await localSaves.list()).length === 1,
+      'in it, the same rules as in any set: a wall moved asks, and looked for elsewhere is Dungeon Master\'s; another shape is another set\'s; '
+      + 'nothing is refused for being a local set\'s, and nothing stored unasked');
+    const forced = await localSaves.importSave({ name: 'modified.dat', bytes: modified }, 'anyway');
+    if (forced.kind === 'stored') show('the modified save, imported anyway in it', forced.entry);
+    check(forced.kind === 'stored' && forced.entry.dataSet === 'local:mine' && forced.entry.unofficial && same(store.files.get(forced.entry.id), modified),
+      'imported anyway, it is stored, a row of the local set, unofficial');
   } finally {
     Date.now = realNow;
   }
@@ -3153,17 +3169,26 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
   const linesOf = (menu: { title1: string; title2: string | null }): string[] =>
     [menu.title1, menu.title2].flatMap((title) => (title === null ? [] : splitLongLine(title) ?? [title]));
 
-  // Every menu a known dungeon can bring up fits the title panel.
+  /** Whether each of a menu's options is narrower than its button in `_DoMenu`'s centred set, six pixels a character. */
+  const widthOf = (options: number, i: number): number => {
+    const rect = menuButtonRect(menuButtonList(ui, options, true), 210 + i)!;
+    return rect.x2 - rect.x1 + 1;
+  };
+  const optionsFit = (options: string[]): boolean => options.every((option, i) => 6 * option.length < widthOf(options.length, i));
+
+  // Every menu a dropped file can bring up fits the title panel, and its options their buttons.
   for (const dungeon of KNOWN_DUNGEONS) {
-    const menus = [SaveMenu.importMenu({ kind: 'modified', dungeon }), SaveMenu.importMenu({ kind: 'other', dungeon }),
-      SaveMenu.importMenu({ kind: 'mismatch', dungeon })];
-    for (const menu of menus) console.log(`  ${dungeon.name}: ${linesOf(menu).join(' / ')}  [${menu.options.join(', ')}]`);
-    check(menus.every((menu) => linesOf(menu).length <= 4 && linesOf(menu).every((line) => line.length > 0 && line.length <= TITLE_MAX_CHARS)),
-      `${dungeon.name}: its menus are four lines at most, none wider than the title panel`);
+    const menu = SaveMenu.importMenu({ kind: 'other', dungeon });
+    console.log(`  ${dungeon.name}: ${linesOf(menu).join(' / ')}  [${menu.options.join(', ')}]`);
+    check(linesOf(menu).length <= 4 && linesOf(menu).every((line) => line.length > 0 && line.length <= TITLE_MAX_CHARS) && optionsFit(menu.options),
+      `${dungeon.name}: its menu is four lines at most, none wider than the title panel`);
   }
-  const unknownMenu = SaveMenu.importMenu({ kind: 'unknown' });
-  console.log(`  an unknown dungeon: ${linesOf(unknownMenu).join(' / ')}  [${unknownMenu.options.join(', ')}]`);
-  check(linesOf(unknownMenu).every((line) => line.length <= TITLE_MAX_CHARS) && unknownMenu.options.join() === 'OK', 'nor is the unknown dungeon\'s');
+  for (const kind of ['different', 'unknown'] as const) {
+    const menu = SaveMenu.importMenu({ kind });
+    console.log(`  ${kind}: ${linesOf(menu).join(' / ')}  [${menu.options.join(', ')}]`);
+    check(linesOf(menu).length <= 4 && linesOf(menu).every((line) => line.length > 0 && line.length <= TITLE_MAX_CHARS) && optionsFit(menu.options),
+      `nor is the ${kind} dungeon's, whose options fit their buttons, ${menu.options.map((_, i) => widthOf(menu.options.length, i)).join(', ')} pixels wide`);
+  }
   const unplayed = SaveMenu.importMenu({ kind: 'other', dungeon: { name: 'Elsewhere', dataSets: [], signature: [] } });
   check(unplayed.title1 === 'THIS LOOKS LIKE A SAVE OF ELSEWHERE' && unplayed.title2 === 'NOT SUPPORTED YET' && unplayed.options.join() === 'OK',
     'a known dungeon no data set plays is "NOT SUPPORTED YET", where one that a set plays is "SWITCH TO IT TO IMPORT IT"');
@@ -3192,22 +3217,23 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
     check(wrapMessageFits(SaveMenu.SAVE_MENU_IMPORTED), 'the message fits the preview\'s panel');
     now += 60_000;
 
-    // A save of a modified version of it: the question.
+    // A save of a slightly different dungeon: the question.
+    const DIFFERENT_OPTIONS = ['LOOK FOR A BETTER MATCH', 'IMPORT ANYWAY', 'CANCEL'];
     const modified = await saveOfDungeon('WUUF', 0x00f00f, (level, cellFlags) => { if (level === 3) openAWall(cellFlags); });
     const before = await rowsOf();
     await daroo.drop('modified.dat', modified);
     console.log(`  a save with a wall of level 3 opened, dropped: ${state.dropped ? `asks (${state.dropped.refusal.kind})` : 'NO QUESTION'}`);
-    check(state.dropped?.refusal.kind === 'modified' && !state.busy && (await rowsOf()) === before,
-      'a save of a modified version of the dungeon is asked about, and nothing is stored');
-    check(isMenu(SaveMenu.SAVE_MENU_MODIFIED, 'DUNGEON MASTER', ['CONFIRM', 'CANCEL']),
-      `the question is _DoMenu's two-option menu, centred on the cleared screen: "${SaveMenu.SAVE_MENU_MODIFIED}" over "DUNGEON MASTER", CONFIRM, CANCEL`);
+    check(state.dropped?.refusal.kind === 'different' && !state.busy && (await rowsOf()) === before,
+      'a save of a slightly different dungeon is asked about, and nothing is stored');
+    check(isMenu(SaveMenu.SAVE_MENU_DIFFERENT, null, DIFFERENT_OPTIONS),
+      `the question is _DoMenu's three-option menu, centred on the cleared screen: "${SaveMenu.SAVE_MENU_DIFFERENT}", ${DIFFERENT_OPTIONS.join(', ')}`);
     SaveMenu.saveMenuClick(ui, VIEWPORT_X + 4, VIEWPORT_Y + 4, LEFT);
     SaveMenu.saveMenuKey(ui, 'Enter');
     SaveMenu.saveMenuWheel(ui, 100);
     const second = await daroo.drop('CSBGAME7.DAT', genuine);
-    check(state.dropped?.refusal.kind === 'modified' && state.press === null && state.scrollTop === 0 && !second && (await rowsOf()) === before,
+    check(state.dropped?.refusal.kind === 'different' && state.press === null && state.scrollTop === 0 && !second && (await rowsOf()) === before,
       'a click off its buttons, Enter, the wheel and another drop leave it up');
-    await daroo.click(211, 2);
+    await daroo.click(212, 3);
     check(state.dropped === null && SaveMenu.isSaveMenuOpen(ui) && state.message === '' && (await rowsOf()) === before
       && SaveMenu.selectedEntry(state)?.id === 'CSBGAME7.DAT', 'CANCEL brings the list back as it was, and stores nothing');
     await daroo.drop('modified.dat', modified);
@@ -3218,12 +3244,18 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
     check(afterEscape === null && state.dropped === null && SaveMenu.isSaveMenuOpen(ui) && (await rowsOf()) === before,
       'Esc and a right-click cancel the question, not the dialog');
     await daroo.drop('modified.dat', modified);
-    await daroo.click(210, 2);
+    await daroo.click(210, 3);
+    console.log(`  LOOK FOR A BETTER MATCH: ${state.dropped ? `refused (${state.dropped.refusal.kind})` : 'NO MENU'}`);
+    check(state.dropped?.refusal.kind === 'unknown' && isMenu('THIS IS A SAVE OF AN UNKNOWN DUNGEON', 'NOT SUPPORTED YET', ['OK'])
+      && (await rowsOf()) === before, 'LOOK FOR A BETTER MATCH holds it against the other sets: in Dungeon Master, none has it, and it is refused');
+    await daroo.click(210, 1);
+    await daroo.drop('modified.dat', modified);
+    await daroo.click(211, 3);
     const stored = (await store.list(null)).find((row) => row.id === 'modified.dat');
-    console.log(`  CONFIRM: "${state.message}", the row ${stored ? `of set ${stored.dataSet}${stored.unofficial ? ', unofficial' : ', OFFICIAL'}` : 'NOT STORED'}`);
+    console.log(`  IMPORT ANYWAY: "${state.message}", the row ${stored ? `of set ${stored.dataSet}${stored.unofficial ? ', unofficial' : ', OFFICIAL'}` : 'NOT STORED'}`);
     console.log(daroo.list());
     check(state.dropped === null && state.message === SaveMenu.SAVE_MENU_IMPORTED && stored?.unofficial === true && stored.dataSet === DEFAULT_DATA_SET.id,
-      'CONFIRM stores it, a row of the running data set, unofficial');
+      'IMPORT ANYWAY stores it, a row of the running data set, unofficial');
     check(SaveMenu.selectedEntry(state)?.id === 'modified.dat' && store.files.size === 3, 'and it is listed and selected');
     now += 60_000;
 
@@ -3262,22 +3294,27 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
     check(pressing && !duringPress && (await rowsOf()) === held, 'a drop while a button is pressed is not taken');
     SaveMenu.closeSaveMenu(ui);
 
-    // A player's own set, which holds Dungeon Master's dungeon: a save of another is asked
-    // about, never refused, and CONFIRM stores it.
-    const record = { id: 'local:mine', name: 'My own', description: '', authors: [], dmRules: false, baseSet: 'dm-atari',
-      files: {}, dungeonSignature: await dungeonSignature(loadCsbwinWorld(genuine).dungeon), createdAt: 0 };
-    const builder = await menuRig(graphics, store, 'HALK', {}, localDataSet(record));
+    // A player's own set, which holds Dungeon Master's dungeon: the same question, whose
+    // LOOK FOR A BETTER MATCH finds Dungeon Master among the other sets.
+    const record: LocalDataSetRecord = { id: 'local:mine', name: 'My own', description: '', authors: [], dmRules: false, baseSet: 'dm-atari',
+      files: { 'dungeon.dat': new Blob([read(DUNGEON).slice()]) }, dungeonSignature: [], createdAt: 0 };
+    const builder = await menuRig(graphics, store, 'HALK', {}, localDataSet(record), recordFiles(record, null));
     const inLocal = await builder.open();
-    await builder.drop('CSBGAME2.DAT', read(CSB_SAVE));
-    console.log(`  a Chaos Strikes Back save dropped in a local set: ${inLocal.dropped ? `asks (${inLocal.dropped.refusal.kind})` : 'NO QUESTION'}`);
-    check(inLocal.dropped?.refusal.kind === 'mismatch' && (await rowsOf()) === held
-      && isMenu(SaveMenu.SAVE_MENU_MISMATCH, SaveMenu.SAVE_MENU_ANYWAY, ['CONFIRM', 'CANCEL'], builder.ui),
-      `in a local set, a save that is not wholly its dungeon is asked about: "${SaveMenu.SAVE_MENU_MISMATCH}", "${SaveMenu.SAVE_MENU_ANYWAY}", CONFIRM, CANCEL`);
-    await builder.click(210, 2);
-    const forced = (await store.list('local:mine')).find((row) => row.id === 'CSBGAME2.DAT');
+    await builder.drop('modified.dat', modified);
+    check(inLocal.dropped?.refusal.kind === 'different' && isMenu(SaveMenu.SAVE_MENU_DIFFERENT, null, DIFFERENT_OPTIONS, builder.ui),
+      'in a local set, a save of a slightly different dungeon is asked about the same way');
+    await builder.click(210, 3);
+    console.log(`  in a local set, LOOK FOR A BETTER MATCH: ${inLocal.dropped ? `refused (${inLocal.dropped.refusal.kind})` : 'NO MENU'}`);
+    check(inLocal.dropped?.refusal.kind === 'other'
+      && isMenu('THIS LOOKS LIKE A SAVE OF DUNGEON MASTER', 'SWITCH TO IT TO IMPORT IT', ['OK'], builder.ui) && (await rowsOf()) === held,
+      'and LOOK FOR A BETTER MATCH names Dungeon Master, the other sets\' dungeon, in the menu that refuses it');
+    await builder.click(210, 1);
+    await builder.drop('modified.dat', modified);
+    await builder.click(211, 3);
+    const forced = (await store.list('local:mine')).find((row) => row.id === 'modified-2.dat');
     check(inLocal.dropped === null && inLocal.message === SaveMenu.SAVE_MENU_IMPORTED && forced?.unofficial === true
-      && SaveMenu.selectedEntry(inLocal)?.id === 'CSBGAME2.DAT',
-      'CONFIRM stores it, a row of the local set, unofficial, listed and selected');
+      && SaveMenu.selectedEntry(inLocal)?.id === 'modified-2.dat',
+      'IMPORT ANYWAY stores it, a row of the local set, unofficial, listed and selected');
     SaveMenu.closeSaveMenu(builder.ui);
 
     // The load-only chooser takes a drop as the disk menu does.

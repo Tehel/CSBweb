@@ -50,9 +50,9 @@ export interface SaveEntry {
     /** Champion names in party order, from the file's block 4. */
     champions: string[];
     /**
-     * Whether the save is of a modified version of its data set's dungeon: a file that was
-     * most of that dungeon and not the whole, imported once the player had confirmed it,
-     * or a save of a game read from such a row (`GameSaves.importSave`,
+     * Whether the save is of a modified version of its data set's dungeon: a file of a
+     * slightly different dungeon, imported on the player's IMPORT ANYWAY, or a save of a
+     * game read from such a row (`GameSaves.importSave`,
      * `src/engine/GameSaves.ts`). Nothing reads it yet.
      */
     unofficial: boolean;

@@ -45,7 +45,7 @@ export interface LocalDataSetRecord {
     baseSet: string | null;
     /** `dungeon.dat` always; the others where the player gave them. `thumbnail` is an image. */
     files: Partial<Record<LocalDataSetFile, Blob>>;
-    /** Its `dungeon.dat`'s signature (`dungeonSignature`), which tells its saves. */
+    /** Its `dungeon.dat`'s signature (`dungeonSignature`), as the form read it. */
     dungeonSignature: DungeonSignature;
     /** When it was added, in milliseconds since the epoch. */
     createdAt: number;
@@ -59,8 +59,7 @@ export function isLocalDataSetId(id: string | null): boolean {
 /**
  * The set `record` plays. Its flags follow from its files: a `CSBgraphics.dat` is an
  * overlay to open, and the two Oracle files are the Hint Oracle. It has no folder: its
- * files are read through `recordFiles`. Its dungeon is its record's, which its saves are
- * checked against (`checkDungeon`).
+ * files are read through `recordFiles`.
  */
 export function localDataSet(record: LocalDataSetRecord): DataSet {
     const { files } = record;
@@ -74,7 +73,6 @@ export function localDataSet(record: LocalDataSetRecord): DataSet {
         dmRules: record.dmRules,
         hidden: false,
         pending: false,
-        dungeonSignature: record.dungeonSignature,
     };
 }
 

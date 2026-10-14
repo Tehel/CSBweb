@@ -42,26 +42,12 @@ import { dungeonCensus, ITEM_KINDS, operationsUsed, type DungeonCensus } from '.
 import type { Game } from '../src/engine/Game';
 import { csbGraphicsOpener } from '../src/engine/FileSignatures';
 import { check, finish } from './lib/check';
-import { DATA_SETS, dataSetNamed, GAMEFILES_DIR } from './lib/dataSets';
+import { DATA_SETS, dataSetNamed, diskFiles, GAMEFILES_DIR } from './lib/dataSets';
 import { genuineSaves } from './lib/saves';
 import { newGame, runVbl, TICK_DUE } from './lib/game';
 
 const SEED = 0x5eed1234;
 const TICKS = 200;
-
-/** `set`'s folder on disk, as `folderFiles` serves it to the page. */
-function diskFiles(set: DataSet): DataSetFiles {
-  return {
-    async read(name) {
-      try {
-        return new Uint8Array(readFileSync(`${set.dir}/${name}`));
-      } catch {
-        return null;
-      }
-    },
-    where: (name) => `${set.dir}/${name}`,
-  };
-}
 
 const blobOf = (bytes: Uint8Array): Blob => new Blob([bytes.slice()]);
 const same = (a: Uint8Array | null, b: Uint8Array | null): boolean =>

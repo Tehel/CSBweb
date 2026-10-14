@@ -89,13 +89,6 @@ export interface DataSet {
      * server offers such a set to its owner and the moderators only. A local set is not.
      */
     pending: boolean;
-    /**
-     * A local set's `dungeon.dat`'s signature, its record's (`src/data/LocalDataSets.ts`),
-     * which a save imported into it is checked against before the known dungeons
-     * (`checkDungeon`). A manifest set has none: its dungeon is in `KNOWN_DUNGEONS`. A
-     * `DungeonSignature`, spelled out: the server compiles this file, and not that one's.
-     */
-    dungeonSignature?: readonly string[];
 }
 
 /** What `manifest.json` says, its folders resolved. */

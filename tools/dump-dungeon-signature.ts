@@ -18,9 +18,11 @@
  *    attributes and objects, and its type among those that are not stone, change
  *    nothing; a wall opened or a cell walled changes its level's digest alone, and the
  *    save is then most of Dungeon Master, not the whole of it.
- * 6. What a signature is to a data set (`checkDungeon`): the set's own dungeon, a
- *    modified version of it, another dungeon's, one the port cannot play, or none; and
- *    to a player's own set, whose own dungeon alone is checked, and refuses nothing.
+ * 6. What a save's walls are to a data set (`checkDungeon`): held against the set's own
+ *    dungeons, its `dungeon.dat` and CSB's `mini.dat`, where their levels' shapes are
+ *    the same, the set's own, a slightly different dungeon, or another, refused; and
+ *    otherwise against the catalogue's dungeons of the other sets, with a set the
+ *    catalogue does not list, a player's own or a published one, among them.
  *
  * With a path, the digests of that file, a `dungeon.dat` or a save, are printed first,
  * as the catalogue lists them: that is how a dungeon is added to it.
@@ -35,7 +37,7 @@ import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { readCsbwinSaveInfo } from '../src/data/CsbwinSaveInfo';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import {
-  checkDungeon, dungeonSignature, identifyDungeon, KNOWN_DUNGEONS, levelWalls, type KnownDungeon,
+  checkDungeon, dungeonSignature, dungeonWalls, identifyDungeon, KNOWN_DUNGEONS, levelWalls, type DungeonWalls, type KnownDungeon,
 } from '../src/data/DungeonSignature';
 import type { DungeonData, MapData } from '../src/data/dungeonTypes';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
@@ -271,52 +273,62 @@ async function checkCoarseness(): Promise<void> {
   check(only?.dungeon === longer && only.levels === 14 && !only.whole, 'which alone is what it looks like, and not its dungeon');
 }
 
-/* ------------------------------------------- 6. a signature and a data set --- */
+/* ------------------------------------------- 6. a save and a data set --- */
 
 async function checkAgainstDataSet(): Promise<void> {
-  console.log('\n=== 6. what a signature is to a data set (`checkDungeon`) ===');
-  const dm = known(DM);
-  const own = await dungeonSignature(loadCsbwinWorld(read(savePath('csbgame7.dat'))).dungeon);
-  const mini = await dungeonSignature(loadCsbwinWorld(read(MINI)).dungeon);
-  const prison = await dungeonSignature(dungeonDat('static/gamefiles/csb/dungeon.dat'));
-  const most = [...own.slice(0, 13), own[0]];
-  const say = (what: string, signature: readonly string[], set: string, known?: readonly KnownDungeon[], own?: KnownDungeon): string => {
-    const result = checkDungeon(signature, set, known, own);
-    const line = result.kind === 'unknown' ? 'unknown' : `${result.kind}, ${result.dungeon.name}`;
-    console.log(`  ${what}, in ${set}: ${line}`);
+  console.log('\n=== 6. what a save\'s walls are to a data set (`checkDungeon`) ===');
+  const save = await dungeonWalls(loadCsbwinWorld(read(savePath('csbgame7.dat'))).dungeon);
+  const dm = await dungeonWalls(dungeonDat('static/gamefiles/dm-atari/dungeon.dat'));
+  const mini = await dungeonWalls(loadCsbwinWorld(read(MINI)).dungeon);
+  const prison = await dungeonWalls(dungeonDat('static/gamefiles/csb/dungeon.dat'));
+  const csbOwn = [prison, mini];
+  const { shapes, signature } = save;
+  // Thirteen levels the same and one not: a wall moved on level 13, its shape kept.
+  const most: DungeonWalls = { shapes, signature: [...signature.slice(0, 13), signature[0]] };
+  const say = (what: string, walls: DungeonWalls, set: string, own: readonly DungeonWalls[], elsewhere = false,
+    known?: readonly KnownDungeon[]): string => {
+    const result = checkDungeon(walls, set, own, elsewhere, known);
+    const line = result.kind === 'other' ? `other, ${result.dungeon.name}` : result.kind;
+    console.log(`  ${what}, in ${set}${elsewhere ? ', elsewhere' : ''}: ${line}`);
     return line;
   };
-  for (const set of dm.dataSets) {
-    check(say('a save of Dungeon Master', own, set) === `own, ${DM}`, `in ${set}, a save of ${DM} is the set's own`);
+  check(dm.shapes.length === 14 && dm.shapes.every(([w, h], level) => w === shapes[level][0] && h === shapes[level][1]),
+    'a level\'s shape is its width and height: the save\'s are dungeon.dat\'s');
+  for (const set of known(DM).dataSets) {
+    check(say('a save of Dungeon Master', save, set, [dm]) === 'own', `in ${set}, a save of ${DM} is the set's own, against its dungeon.dat`);
   }
-  check(say('thirteen of its levels and one that is not', most, 'dm-atari') === `modified, ${DM}`,
-    'most of the set\'s dungeon and not the whole is a modified version of it');
-  check(say('one level of it', own.slice(0, 1), 'dm-atari') === `modified, ${DM}`, 'and so is one level of it: the player is asked');
-  check(say('a save of Dungeon Master', own, 'csb') === `other, ${DM}` && say('thirteen of its levels', most, 'csb') === `other, ${DM}`,
+  check(say('thirteen of its levels and one that is not', most, 'dm-atari', [dm]) === 'different',
+    'the same levels, the same shapes and some of the digests: a slightly different dungeon');
+  check(say('the same shapes, no digest the same', { shapes, signature: [signature[13], ...signature.slice(0, 13)] }, 'dm-atari', [dm]) === 'unknown',
+    'the same levels and shapes and no digest the same is another dungeon, refused');
+  const turned = shapes.map(([w, h], level) => (level === 4 ? [h, w] as const : [w, h] as const));
+  check(say('level 4 turned a quarter', { shapes: turned, signature }, 'dm-atari', [dm]) === 'unknown'
+    && say('one level of it', { shapes: shapes.slice(0, 1), signature: signature.slice(0, 1) }, 'dm-atari', [dm]) === 'unknown',
+    'a level of another shape, or another number of levels, is not the set\'s: the catalogue does not name the set\'s own dungeon');
+  check(say('the same, elsewhere', most, 'dm-atari', [dm], true) === 'unknown',
+    'nor does LOOK FOR A BETTER MATCH: the other sets alone are looked at');
+  check(say('a save of Dungeon Master', save, 'dm-atari', []) === 'unknown',
+    'a set whose dungeon.dat does not read has no own dungeon, and the catalogue still leaves its own out');
+  check(say('a save of Dungeon Master', save, 'csb', csbOwn) === `other, ${DM}` && say('thirteen of its levels', most, 'csb', csbOwn) === `other, ${DM}`,
     'in another set, the whole of it or most of it is another dungeon\'s');
-  check(say('mini.dat', mini, 'csb') === `own, ${CSB}` && say('the prison', prison, 'csb') === `own, ${CSB}, the prison`,
-    'the csb set has two dungeons of its own');
-  check(say('mini.dat', mini, 'dm-atari') === `other, ${CSB}`, `and in Dungeon Master ${CSB} is another dungeon's`);
-  check(say('each level one further down', [own[13], ...own.slice(0, 13)], 'dm-atari') === 'unknown', 'a signature no known dungeon has a level of is unknown');
-  const unplayed: KnownDungeon = { name: 'unplayed', dataSets: [], signature: own };
-  const result = checkDungeon(own, 'dm-atari', [unplayed]);
-  check(say('a dungeon no data set plays', own, 'dm-atari', [unplayed]) === 'other, unplayed'
+  check(say('mini.dat', mini, 'csb', csbOwn) === 'own' && say('the prison', prison, 'csb', csbOwn) === 'own',
+    'the csb set has two dungeons of its own, its dungeon.dat and mini.dat');
+  check(say('mini.dat', mini, 'dm-atari', [dm]) === `other, ${CSB}`, `and in Dungeon Master ${CSB} is another dungeon's`);
+  const unplayed: KnownDungeon = { name: 'unplayed', dataSets: [], signature };
+  const result = checkDungeon(save, 'local:x', [], false, [unplayed]);
+  check(say('a dungeon no data set plays', save, 'local:x', [], false, [unplayed]) === 'other, unplayed'
     && result.kind === 'other' && result.dungeon.dataSets.length === 0,
     'a known dungeon no data set plays is another dungeon\'s, with no set to switch to');
 
-  // A player's own set, its dungeon its record's (`DataSet.dungeonSignature`), checked alone.
-  const LOCAL = 'local:mine';
-  const holdsDm: KnownDungeon = { name: 'My own', dataSets: [LOCAL], signature: own };
-  const holdsModified: KnownDungeon = { name: 'My own', dataSets: [LOCAL], signature: most };
-  check(say('a save of Dungeon Master', own, LOCAL) === `other, ${DM}`
-    && say('a save of Dungeon Master, the set holding it', own, LOCAL, undefined, holdsDm) === 'own, My own',
-    'a local set that holds Dungeon Master\'s dungeon has its saves, which the catalogue alone calls another dungeon\'s');
-  check(say('thirteen of its levels', most, LOCAL, undefined, holdsDm) === 'mismatch, My own'
-    && say('a save of Dungeon Master, the set holding thirteen of its levels', own, LOCAL, undefined, holdsModified) === 'mismatch, My own',
-    'part of the set\'s own is a mismatch, even where the catalogue has the whole of another');
-  check(say('mini.dat', mini, LOCAL, undefined, holdsDm) === 'mismatch, My own'
-    && say('each level one further down', [own[13], ...own.slice(0, 13)], LOCAL, undefined, holdsDm) === 'mismatch, My own',
-    'and so is no level of it, another known dungeon\'s or none\'s: in a local set nothing is refused');
+  // A set the catalogue does not list: a player's own, or a published one.
+  const SET = 'conflux-2';
+  check(say('a save of Dungeon Master', save, SET, []) === `other, ${DM}` && say('a save of Dungeon Master, the set holding it', save, SET, [dm]) === 'own',
+    'a set that holds Dungeon Master\'s dungeon has its saves, which the catalogue alone calls another dungeon\'s');
+  check(say('thirteen of its levels', most, SET, [dm]) === 'different' && say('the same, elsewhere', most, SET, [dm], true) === `other, ${DM}`,
+    'part of it is a slightly different dungeon, and LOOK FOR A BETTER MATCH finds the catalogue\'s');
+  check(say('a save of Dungeon Master, the set holding thirteen of its levels', save, SET, [most]) === 'different',
+    'the other way round too: the set\'s dungeon moved since the save');
+  check(say('mini.dat', mini, SET, [dm]) === `other, ${CSB}`, 'and a dungeon of other shapes goes on to the other sets');
 }
 
 async function printFile(path: string): Promise<void> {

@@ -11,6 +11,7 @@
  */
 import { readFileSync } from 'node:fs';
 
+import type { DataSetFiles } from '../../src/data/DataSetFiles';
 import { parseManifest, type DataSet, type DataSetManifest } from '../../src/data/DataSets';
 
 /** The folder the page's `gamefiles/` is served from. */
@@ -27,4 +28,18 @@ export function dataSetNamed(id: string): DataSet {
   const set = DATA_SETS.find((s) => s.id === id);
   if (!set) throw new Error(`${MANIFEST_FILE} has no data set '${id}'`);
   return set;
+}
+
+/** `set`'s folder on disk, as `folderFiles` serves it to the page. */
+export function diskFiles(set: DataSet): DataSetFiles {
+  return {
+    async read(name) {
+      try {
+        return new Uint8Array(readFileSync(`${set.dir}/${name}`));
+      } catch {
+        return null;
+      }
+    },
+    where: (name) => `${set.dir}/${name}`,
+  };
 }

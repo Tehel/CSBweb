@@ -102,15 +102,14 @@
  * A file dropped on the page while the dialog is up is taken into the store
  * (`saveMenuDrop`, through `UIState.onImportSave` to `GameSaves.importSave`), in the disk
  * menu and in the load-only chooser alike. A save of the data set's dungeon is listed at
- * once, selected, and the dialog says "SAVE IMPORTED"; nothing is loaded. One that is
- * most of that dungeon and not the whole is asked about first, in `_DoMenu`'s two-option
- * menu in the dialog's place: "THIS LOOKS LIKE A SAVE FROM A MODIFIED VERSION OF" over
- * the dungeon's name, with CONFIRM and CANCEL (`importMenu`). In a player's own set, a save
- * that is not the whole of its dungeon is asked about in the same way, whatever dungeon it
- * is: "THE WALL MAP OF THIS SAVE DOES NOT FULLY MATCH THE DUNGEON", "IMPORT IT ANYWAY?",
- * so that its author keeps their saves while they build it. A save of another dungeon,
- * or of none the port knows, is refused in `_DoMenu`'s one-option menu, under OK, with
- * the dungeon named and whether a data set plays it. A file with no `GAMEBLOCK1` is the
+ * once, selected, and the dialog says "SAVE IMPORTED"; nothing is loaded. One of a
+ * slightly different dungeon, its levels the set's and some of their walls not, is asked
+ * about first, in `_DoMenu`'s three-option menu in the dialog's place: "IT SEEMS THIS
+ * SAVE IS FOR A SLIGHTLY DIFFERENT DUNGEON", over LOOK FOR A BETTER MATCH, IMPORT
+ * ANYWAY and CANCEL (`importMenu`), so that the author of a set keeps their saves while
+ * they build it. A save of another dungeon, or of none the port knows, is refused in
+ * `_DoMenu`'s one-option menu, under OK, with the dungeon named and whether a data set
+ * plays it. A file with no `GAMEBLOCK1` is the
  * dialog's message "NOT A SAVED GAME", and one that has it and does not read past it
  * CSBWin's "SAVED GAME DAMAGED!". CSBWin has no import: a file put in the game's
  * directory under one of its four names is a save of that game.
@@ -162,7 +161,7 @@
  * (`d.Time++` is the main loop's, `doc/CSBwin-src/CSBCode.cpp:670`).
  */
 import type { OpenedSave, Playthrough, SaveEntry } from '../../data/saves';
-import { SAVES_ARE_DISABLED, type ImportResult, type ImportedFile } from '../../engine/GameSaves';
+import { SAVES_ARE_DISABLED, type ImportAnswer, type ImportResult, type ImportedFile } from '../../engine/GameSaves';
 import { formatPlaythroughRow, formatSavePreview, formatSaveRow, lastUsedSave, playthroughsOf } from '../../data/saves';
 import { clearIndex } from '../csbwin/CanvasBlitter';
 import { closeDialog, openDialog, type Dialog } from './Dialog';
@@ -311,12 +310,14 @@ export const SAVE_MENU_DELETED = 'SAVE DELETED';
 /** The dialog's message once a dropped file is a save of the store. */
 export const SAVE_MENU_IMPORTED = 'SAVE IMPORTED';
 
-/** The question about a dropped save of a modified dungeon, over the dungeon's name. */
-export const SAVE_MENU_MODIFIED = 'THIS LOOKS LIKE A SAVE FROM A MODIFIED VERSION OF';
-/** The question about a dropped save that is not wholly a local set's dungeon, over `SAVE_MENU_ANYWAY`. */
-export const SAVE_MENU_MISMATCH = 'THE WALL MAP OF THIS SAVE DOES NOT FULLY MATCH THE DUNGEON';
-export const SAVE_MENU_ANYWAY = 'IMPORT IT ANYWAY?';
-const CONFIRM_LABEL = 'CONFIRM';
+/** The question about a dropped save of a slightly different dungeon. */
+export const SAVE_MENU_DIFFERENT = 'IT SEEMS THIS SAVE IS FOR A SLIGHTLY DIFFERENT DUNGEON';
+/**
+ * Its options, in `_DoMenu`'s three-option layout: the first is the wide button, which
+ * alone holds the longest label, and the two others share the row under it.
+ */
+const ELSEWHERE_LABEL = 'LOOK FOR A BETTER MATCH';
+const ANYWAY_LABEL = 'IMPORT ANYWAY';
 const OK_LABEL = 'OK';
 
 /** A dropped file that was not stored: what its dungeon is to the data set's. */
@@ -324,17 +325,14 @@ export type ImportRefusal = Exclude<ImportResult, { kind: 'stored' }>;
 
 /**
  * The menu about a dropped file that was not stored, `_DoMenu`'s: the question for a
- * save of a modified version of the data set's dungeon, or for one that is not wholly a
- * local set's, whose first option stores it (`importAsks`); or the refusal of another
- * dungeon's save, which names the dungeon and says whether a data set plays it, and of an
- * unknown one's, under one option.
+ * save of a slightly different dungeon, whose options send it on to the other sets or
+ * store it (`importAnswer`); or the refusal of another dungeon's save, which names the
+ * dungeon and says whether a data set plays it, and of an unknown one's, under one option.
  */
 export function importMenu(refusal: ImportRefusal): { title1: string; title2: string | null; options: string[] } {
   switch (refusal.kind) {
-    case 'modified':
-      return { title1: SAVE_MENU_MODIFIED, title2: refusal.dungeon.name.toUpperCase(), options: [CONFIRM_LABEL, CANCEL_LABEL] };
-    case 'mismatch':
-      return { title1: SAVE_MENU_MISMATCH, title2: SAVE_MENU_ANYWAY, options: [CONFIRM_LABEL, CANCEL_LABEL] };
+    case 'different':
+      return { title1: SAVE_MENU_DIFFERENT, title2: null, options: [ELSEWHERE_LABEL, ANYWAY_LABEL, CANCEL_LABEL] };
     case 'other':
       return {
         title1: `THIS LOOKS LIKE A SAVE OF ${refusal.dungeon.name.toUpperCase()}`,
@@ -346,9 +344,10 @@ export function importMenu(refusal: ImportRefusal): { title1: string; title2: st
   }
 }
 
-/** Whether `refusal`'s menu is a question, whose CONFIRM stores the file. */
-export function importAsks(refusal: ImportRefusal): boolean {
-  return refusal.kind === 'modified' || refusal.kind === 'mismatch';
+/** What option `choice` of `refusal`'s menu answers, 1-based: `null` for CANCEL and OK. */
+export function importAnswer(refusal: ImportRefusal, choice: number): ImportAnswer | null {
+  if (refusal.kind !== 'different') return null;
+  return choice === 1 ? 'elsewhere' : choice === 2 ? 'anyway' : null;
 }
 
 /** The prison's question (`askBeginAdventure`), and its two options. */
@@ -1033,14 +1032,16 @@ function answerQuestion(ui: UIState, state: SaveMenuState, action: SaveMenuQuest
 
 /**
  * A click on the menu about a dropped file, `choice` being `_WaitForMenuSelect`'s among
- * its `options`. The button flashes with the menu still up; then the list is back, and
- * the first of two options, CONFIRM, stores the file.
+ * its `options`. The button flashes with the menu still up; then the list is back, or the
+ * import goes on with the player's answer (`importAnswer`): LOOK FOR A BETTER MATCH to
+ * the other sets, which may bring up the menu again, IMPORT ANYWAY to the store.
  */
 function answerDropped(ui: UIState, state: SaveMenuState, dropped: NonNullable<SaveMenuState['dropped']>, options: number, choice: number): void {
   if (choice < 1 || choice > options) return;
   beginPress(ui, state, menuButtonList(ui, options, true), 209 + choice, () => {
     state.dropped = null;
-    if (importAsks(dropped.refusal) && choice === 1) void runImport(ui, dropped.file, true);
+    const answer = importAnswer(dropped.refusal, choice);
+    if (answer) void runImport(ui, dropped.file, answer);
     else ui.renderLastFrame();
   });
 }
@@ -1332,24 +1333,24 @@ export function saveMenuTakesDrops(ui: UIState): boolean {
 export function saveMenuDrop(ui: UIState, file: ImportedFile): boolean {
   const state = ui.saveMenu;
   if (!state || !saveMenuTakesDrops(ui) || state.busy || state.press || state.confirm || state.dropped || state.adventure) return false;
-  void runImport(ui, file, false);
+  void runImport(ui, file, null);
   return true;
 }
 
 /**
- * Take a dropped file into the store, `confirmed` once the player has answered CONFIRM
- * for a modified dungeon. Stored, it is listed and selected; not stored, the menu about
- * it comes up (`importMenu`). A file that does not read throws, and its line is the
- * dialog's message. Never throws.
+ * Take a dropped file into the store, with the player's `answer` once they have given one
+ * for a slightly different dungeon. Stored, it is listed and selected; not stored, the
+ * menu about it comes up (`importMenu`). A file that does not read throws, and its line
+ * is the dialog's message. Never throws.
  */
-async function runImport(ui: UIState, file: ImportedFile, confirmed: boolean): Promise<void> {
+async function runImport(ui: UIState, file: ImportedFile, answer: ImportAnswer | null): Promise<void> {
   const state = ui.saveMenu;
   if (!state) return;
   state.busy = true;
   state.message = '';
   ui.renderLastFrame();
   try {
-    const result = await ui.onImportSave(file, confirmed);
+    const result = await ui.onImportSave(file, answer);
     // A right-click closes the dialog whatever it is doing: the file is stored all the same.
     if (ui.saveMenu !== state) return;
     if (result.kind === 'stored') {

@@ -153,41 +153,56 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   digest is SHA-256, through `crypto.subtle`, which a browser and Node both have built
   in, a browser in a secure context alone. The author's decision: the page is served
   from localhost and will be hosted over https, so it is always there, and nothing
-  stands in for it. The file's signature is read from its world (`loadCsbwinWorld`), so
-  a file whose image is damaged is refused there. A save is its
-  dungeon's when every level matches, and the dungeon has no other level. A save of
-  another dungeon is refused, with the
-  dungeon it looks like named when the port knows it ("switch to it", or "not supported
-  yet"), which is the known dungeon most of its levels match (`identifyDungeon`), each
-  level against the level of its own number. **A save that is most of the running
-  set's own dungeon and not the whole is asked about**, the author's decision: "THIS
-  LOOKS LIKE A SAVE FROM A MODIFIED VERSION OF" and the dungeon's name, over CONFIRM
-  and CANCEL. Confirmed, it is stored as a row of the running data set, the set of the
-  dungeon it looks like, and the row is marked unofficial (`SaveEntry.unofficial`),
-  as are the saves of a game read from such a row; nothing reads the mark yet.
-  Cancelled, nothing is stored. So "switch to it" never names
-  the dungeon a save is refused in (`checkDungeon`). That takes a catalogue of
-  known dungeons' signatures (`KNOWN_DUNGEONS`), each with the data sets that play it,
-  which may list dungeons the port cannot play: so the digests are committed, not read
-  from the page's files, and a tool holds each to the file here. It lists seven: Dungeon
-  Master; Chaos Strikes Back, which is `mini.dat`'s, and its prison, the set's
-  `dungeon.dat`, both the `csb` set's; Kids dungeon 24; 3D2D1D; Conflux 3.5; and The
-  Towers of Chaos 3.3. A dungeon is added from what
+  stands in for it. The file's walls, each level's width and height beside the
+  signature (`dungeonWalls`), are read from its world (`loadCsbwinWorld`), so a file
+  whose image is damaged is refused there.
+
+  The file is held first against **the running set's own dungeons**, as its files read
+  (`GameSaves.ownDungeons`): its `dungeon.dat`, and the `csb` set's `mini.dat`, whose
+  save is the game. They are read from the set's files whatever the running game was
+  read from, a new game or a save, and never from the running world, whose walls a save
+  or a script may have changed. A file that will not open or read is left out, and the
+  console says why. The author's rules (`checkDungeon`):
+
+  - **The same number of levels, each as wide and as high**, as an own dungeon's: the
+    file is held against that dungeon alone. Every level's digest the same, it is the
+    set's own, and stored. Some the same and not all, it is a **slightly different
+    dungeon**, asked about in `_DoMenu`'s three-option menu: "IT SEEMS THIS SAVE IS FOR
+    A SLIGHTLY DIFFERENT DUNGEON", over LOOK FOR A BETTER MATCH, IMPORT ANYWAY and
+    CANCEL. The first option is the wide button of the layout, the only one that holds
+    its label. IMPORT ANYWAY stores it as a row of the running set, marked unofficial
+    (`SaveEntry.unofficial`), as are the saves of a game read from such a row; nothing
+    reads the mark yet. LOOK FOR A BETTER MATCH holds it against the other sets, as
+    below, and the dialog says what they make of it. None the same, it is another
+    dungeon, refused as an unknown one.
+  - **Any other**, a level more or less or a level of another size, is not the set's,
+    and goes on to **the other sets**: the known dungeon most of its levels match
+    (`identifyDungeon`), each level against the level of its own number, among the
+    catalogue's dungeons that do not list the running set. A save of another dungeon is
+    refused, the dungeon named, with "switch to it" where a data set plays it and "not
+    supported yet" where none does; a save that matches no level of any is an unknown
+    dungeon's, refused. The catalogue never names the running set's own dungeon, which
+    its files say better, so "switch to it" never names the set a save is refused in.
+
+  This holds for every set, the site's and a player's own alike: a local set's author
+  keeps their saves while they move its walls, by IMPORT ANYWAY, and a set the catalogue
+  does not list, a published one, takes the saves of its own `dungeon.dat`. The check is
+  for imports only: a save already filed under the set is read without it.
+
+  The catalogue of known dungeons' signatures (`KNOWN_DUNGEONS`) lists each with the data
+  sets that play it, and may list dungeons the port cannot play: so the digests are
+  committed, not read from the page's files, and a tool holds each to the file here. It
+  lists seven: Dungeon Master; Chaos Strikes Back, which is `mini.dat`'s, and its prison,
+  the set's `dungeon.dat`, both the `csb` set's; Kids dungeon 24; 3D2D1D; Conflux 3.5;
+  and The Towers of Chaos 3.3. A dungeon is added from what
   `tools/dump-dungeon-signature.ts` prints when given its file: the digests as the
-  catalogue lists them.
-- **A player's own set refuses no save**, the author's decision: such a set is mostly a
-  dungeon being built and tested, whose walls move between versions, and its author
-  keeps their saves across them. It is checked against its own dungeon alone, its
-  record's signature (`DataSet.dungeonSignature`), and not the catalogue. The whole of
-  it is the set's own, and stored. Anything else, a few walls moved or another dungeon
-  entirely, is a `mismatch`, asked about in the same two-option menu: "THE WALL MAP OF
-  THIS SAVE DOES NOT FULLY MATCH THE DUNGEON", "IMPORT IT ANYWAY?", over CONFIRM and
-  CANCEL. Confirmed, it is stored as a row of the set, unofficial. So a local set that
-  holds a known dungeon, DM's `dungeon.dat` with other graphics, takes that dungeon's
-  saves at once. A save, once stored, holds its own world and loads whatever the set's
-  `dungeon.dat` has become since. Deleting the set, from its form on the welcome page,
-  deletes every save filed under its id with the record, in one transaction
-  (`BrowserDataSetStore.remove`), once the confirmation has counted them.
+  catalogue lists them. It names none of the players' dungeons, published or not.
+- **A save is its own world.** A save, once stored, holds its dungeon and loads it,
+  whatever the set's `dungeon.dat` has become since: a player who changes their local
+  set's dungeon sees none of the changes in a game read from an older save. Deleting a
+  local set, from its form on the welcome page, deletes every save filed under its id
+  with the record, in one transaction (`BrowserDataSetStore.remove`), once the
+  confirmation has counted them.
 - **Play time is the player's**: wall-clock time in the game, the frozen game and the
   open dialog left out. The file's `d.Time` is not it (sleep runs it fast). The game
   counts it in VBLs, sixty a second (`Game.playTime`, `src/engine/Game.ts`): the wall
@@ -340,9 +355,10 @@ opens the same one, load-only.
   is loaded (`saveMenuDrop`, `src/renderer/ui/SaveMenu.ts`). The dialog takes no drop
   while it is working, pressing a button or asking. What is not stored is said in
   `_DoMenu`'s centred menu in the dialog's place (`importMenu`): the question for a
-  modified dungeon, "THIS LOOKS LIKE A SAVE FROM A MODIFIED VERSION OF" over the
-  dungeon's name, with CONFIRM and CANCEL; and under OK alone, "THIS LOOKS LIKE A SAVE
-  OF" the other dungeon, with "SWITCH TO IT TO IMPORT IT" or, for a dungeon no data set
+  slightly different dungeon, "IT SEEMS THIS SAVE IS FOR A SLIGHTLY DIFFERENT DUNGEON",
+  over LOOK FOR A BETTER MATCH, IMPORT ANYWAY and CANCEL, whose first option may bring up
+  the refusal that follows; and under OK alone, "THIS LOOKS LIKE A SAVE OF" the other
+  dungeon, with "SWITCH TO IT TO IMPORT IT" or, for a dungeon no data set
   plays, "NOT SUPPORTED YET", or "THIS IS A SAVE OF AN UNKNOWN DUNGEON". Esc and a
   right-click dismiss either. A file that is no save, or does not read, is the dialog's
   message.
@@ -548,26 +564,34 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
   world, a cell's attributes, objects and type among those not stone changing nothing, a
   wall opened or a cell walled changing its level's digest alone, the size in the
   digest, and a save of thirteen levels of the fourteen being most of Dungeon Master and
-  not the whole; `checkDungeon` in each of the four Dungeon Master sets and in `csb`,
-  one level of fourteen being a modified version, and a known dungeon no data set
-  plays).
+  not the whole; `checkDungeon` in each of the four Dungeon Master sets and in `csb`
+  against their own files, thirteen levels the same of fourteen being a slightly
+  different dungeon, the same shapes and no digest the same another, a level turned or
+  a level fewer going on to the other sets, which never name the set's own, LOOK FOR A
+  BETTER MATCH, a set whose `dungeon.dat` does not read, a known dungeon no data set
+  plays, and a set the catalogue does not list, holding Dungeon Master or most of it).
 - **The import**: "the import" (a genuine save stored under its file's name, date and
   playthrough, byte for byte, and again under a numbered name; a file that names no
   playthrough joined to its party's or given the first its stream draws, stamped, the
-  game's stream left alone; a save with one wall opened stored only once confirmed,
-  unofficial, and the saves of a game read from it unofficial too, SAVE's and F5's, but
-  not a new game's nor one written over the row by another game; a Chaos Strikes Back
-  save, a save with a wall of every level opened, and four files that do not read, none
-  stored; the `csb` set taking its two saves and refusing Dungeon Master's).
-- **The drop and the dialog's answers**: "the drop" (every known dungeon's two menus
-  within the title panel's four lines of 33 characters; no drop taken with no dialog up;
-  a genuine save listed, selected and previewed under "SAVE IMPORTED", nothing loaded; a
-  save with one wall opened asked about, the screen `_DoMenu`'s own drawing of the
-  question, which a click off its buttons, Enter, the wheel and another drop leave up,
-  CANCEL, Esc and a right-click take down with nothing stored, and CONFIRM answers with
-  an unofficial row; a Chaos Strikes Back save and one of an unknown dungeon refused
-  under OK; a text file as the dialog's message; no drop taken during a press; the
-  load-only chooser importing a genuine save, which LOAD then plays).
+  game's stream left alone; a save with one wall opened a slightly different dungeon,
+  unknown to the other sets, and stored only on IMPORT ANYWAY, unofficial, and the saves
+  of a game read from it unofficial too, SAVE's and F5's, but not a new game's nor one
+  written over the row by another game; a Chaos Strikes Back save, a save with a wall of
+  every level opened, and four files that do not read, none stored; the `csb` set taking
+  its two saves and refusing Dungeon Master's; a set the catalogue does not list taking a
+  save of its `dungeon.dat`; and a local set read through its record, under the same
+  rules, the slightly different save Dungeon Master's among the other sets).
+- **The drop and the dialog's answers**: "the drop" (every menu a drop brings up within
+  the title panel's four lines of 33 characters, and each option narrower than its
+  button; no drop taken with no dialog up; a genuine save listed, selected and previewed
+  under "SAVE IMPORTED", nothing loaded; a save with one wall opened asked about, the
+  screen `_DoMenu`'s own drawing of the three-option question, which a click off its
+  buttons, Enter, the wheel and another drop leave up, CANCEL, Esc and a right-click take
+  down with nothing stored, LOOK FOR A BETTER MATCH answers with the unknown dungeon's
+  refusal, and IMPORT ANYWAY with an unofficial row; in a local set, LOOK FOR A BETTER
+  MATCH naming Dungeon Master; a Chaos Strikes Back save and one of an unknown dungeon
+  refused under OK; a text file as the dialog's message; no drop taken during a press;
+  the load-only chooser importing a genuine save, which LOAD then plays).
 - **No "GAME LOADED, READY TO PLAY."**: `tools/dump-bad-saved-game.ts`, "a save read"
   (the hand-off after a load is one fade and four VBLs on a cleared screen, and waits
   for no click).
