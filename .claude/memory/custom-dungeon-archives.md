@@ -15,6 +15,7 @@ CSBWin directories:
 - Many pair a PC (little-endian) twin with the Atari file, and hold several versions in
   sibling folders (Imprisoned Again: v1.1 to v1.5a). Theron's Quest Conversion holds seven
   dungeons sharing one `graphics.dat`.
+- A `graphics.dat` is usually CSBWin's DM one edited, with its three flaws ([[csbwin-graphics-dat-flaws]]).
 - A CSBWin save, `csbgame.dat` (Mazarbul, Dungeon Master for CSBwin), reads as a dungeon
   of no level and cannot be a set.
 - The `.exe` files are CSBWin builds under the dungeon's name (`Maze.exe`,

@@ -1,0 +1,24 @@
+---
+name: csbwin-graphics-dat-flaws
+description: a graphics.dat derived from CSBWin's DM one inherits three flaws dm-atari fixes from the 1.2 disk (items 5, 232, 0x22e); repair only items still equal to CSBWin's
+metadata:
+  type: project
+---
+
+Custom dungeons' `graphics.dat` files are usually CSBWin's DM file (`dm-windows/`) edited, so
+they carry its three differences from the Atari 1.2 disk, which `dm-atari/` replaces
+(`doc/PROVEN_FACTS.md` → "`dm-atari/graphics.dat` is CSBWin's with three items from the 1.2
+disk"):
+
+- item 5, the credits scroll: four `0xA` opcodes, drawn wrong from "Dennis Walker" down;
+- item 232, Crack Switch (In)'s front view: an empty crack, no pushed button;
+- item `0x22e`, byte 3201 = `Byte4100[55]` 0: the pressed crack switch jumps to eye level.
+
+**Why:** the author sees the crack jump in every such set; Theron's Quest had all three.
+**How to apply:** for each of the three, replace the item with `dm-atari`'s only when the
+set's is still CSBWin's: compare `0x22e` decompressed (`getRawGraphic`) and 232 by pixels
+(`getImage`), since editors re-compress every item; an item the author changed is theirs.
+Leave every other item alone (portraits, entrance, object names). The Theron script,
+`archive/CustomDungeon-TheronsQuestConversion-csbweb/scripts/dm_items.py`, copies the three
+unconditionally after that check was made by hand. See [[theron-quest-conversion]],
+[[custom-dungeon-archives]].
