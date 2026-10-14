@@ -22,6 +22,8 @@
  * 9. **A move down** (`0x1124`, `:8091-8093`, `:8255-8308`) from a pit: `PM_ATTEMPTMOVE`
  *    sees the button, `absDirection` 4 and a stone destination; then `PM_STAIRWAY` sees
  *    `UpOrDown + 2`, 2, and the party keeps its facing.
+ * 10. **A gravity step** (`gravityMove` set, `:8128-8165`): `absDirection` stays -1 and the
+ *    move history is left alone. A dungeon without `bGravityGame` never starts a slide.
  *
  * Run: `npx tsx tools/dump-party-move-filter.ts`
  */
@@ -322,6 +324,25 @@ function onPit(game: Game): Position {
     'from the pit to the square below, a stairway\'s 3');
   check(result.success && game.ctx.loop.newPartyLevel === below.z && game.ctx.party.state.facing === 0,
     'the party goes down, still facing north (TraverseStairway(0, false))');
+}
+
+/* ------------------------------- 10. a gravity step ----------------------------- */
+{
+  const game = filtered(report(0));
+  face(game, RoomType.OPEN);
+  game.ctx.loop.gravityMove = true;
+  const history = [...game.ctx.loop.moveHistory];
+  move(game, MovementAction.MOVE_FORWARD);
+  const g = game.systems.dsa.getGlobalVariables();
+  console.log(`10. a step while gravityMove is set: relDirection ${g[8]}, absDirection ${g[9]}, history {${game.ctx.loop.moveHistory.join(',')}}`);
+  check(g[8] === 3 && g[9] === -1, 'relDirection the button, 3, absDirection -1 (CSBCode.cpp:8061)');
+  check(game.ctx.loop.moveHistory.join() === history.join(), 'the history is left alone');
+
+  const plain = filtered(report(0));
+  face(plain, RoomType.OPEN);
+  move(plain, MovementAction.MOVE_FORWARD);
+  console.log(`    the same step in csbgame7.dat: gravityMove ${plain.ctx.loop.gravityMove}, history {${plain.ctx.loop.moveHistory.join(',')}}`);
+  check(!plain.ctx.rules.bGravityGame && !plain.ctx.loop.gravityMove, 'without bGravityGame, a step starts no slide');
 }
 
 finish();

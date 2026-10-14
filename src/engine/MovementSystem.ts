@@ -78,6 +78,42 @@ export function partyMoveDataFromWords(word: (index: number) => number): PartyMo
  */
 const MOVE_BUTTON = [3, 4, 5, 6, 0x1124, 0x1125] as const;
 
+/**
+ * `MoveParty`'s `if (!gravityMove)` block (doc/CSBwin-src/CSBCode.cpp:8128-8164): the move
+ * along `absdir`, 0-3 north, east, south and west, 4 down and 5 up, recorded in
+ * `history` (`LoopFlags.moveHistory`).
+ *
+ *   //       n,e,s,w,u,d
+ *   //absdir 0,1,2,3,4,5
+ *   //axis   1,0,1,0,2,2
+ *   //delta  0,1,1,0,0,1
+ *
+ * (the comment's u and d are the wrong way round: 4 goes down, `UpdateXY`). Its axis's
+ * bit of `[3]` is set for a positive move and cleared for a negative one, and the axis
+ * moves to the front of `[0..2]`, one place at a time.
+ */
+export function recordMoveHistory(history: number[], absdir: number): void {
+    let axis: number;
+    let delta: number;
+    if (absdir <= 3) {
+        axis = (absdir + 1) & 1;
+        delta = ((absdir + 1) & 2) >> 1;
+    } else {
+        axis = 2;
+        delta = (absdir & 1) ^ 1;
+    }
+    history[3]! |= 1 << axis;
+    if (delta === 0) history[3]! ^= 1 << axis;
+    if (history[2] === axis) {
+        history[2] = history[1]!;
+        history[1] = axis;
+    }
+    if (history[1] === axis) {
+        history[1] = history[0]!;
+        history[0] = axis;
+    }
+}
+
 /** `locr.Integer()` of the party's `LOCATIONREL`: `position`, with `facing` as its position. */
 function partyLocation(position: Position, facing: number): number {
     return locationRelToInteger({ l: position.z, x: position.x, y: position.y, p: facing });
@@ -264,6 +300,21 @@ export class MovementSystem {
             }
         }
 
+        // `absdir` (`:8061`, `:8134-8146`): a step's direction plus the facing, and a move
+        // down or up's own 4 or 5; but -1 for a gravity step, which leaves the history alone.
+        const loop = this.ctx.loop;
+        let absDirection = -1;
+        if (!loop.gravityMove) {
+            absDirection = relDirection <= 3 ? (relDirection + party.facing) & 3 : relDirection;
+            recordMoveHistory(loop.moveHistory, absDirection);
+        }
+        // `if (bGravityGame) { gravityMove = true; nextGravityMoveTime = d.Time + 2; }`
+        // (`:8166-8170`): any move starts a slide, even one the filter or a wall refuses.
+        if (this.ctx.rules.bGravityGame) {
+            loop.gravityMove = true;
+            loop.nextGravityMoveTime = this.ctx.state.tickCount + 2;
+        }
+
         // The party move filter, `PM_ATTEMPTMOVE` (doc/CSBwin-src/CSBCode.cpp:8191-8208),
         // whose `toLocation` is the party's square, as `fromLocation` is: `locr` is not
         // moved between the two. `relDirection` is `button`, `MoveParty`'s argument, 3-6
@@ -275,9 +326,7 @@ export class MovementSystem {
             delay: 0,
             staminaAdjustment: this.staminaAdjustments(),
             relDirection: MOVE_BUTTON[relDirection]!,
-            // `absdir` (`:8134-8146`): a step's direction plus the facing, and a move down
-            // or up's own 4 or 5.
-            absDirection: relDirection <= 3 ? (relDirection + party.facing) & 3 : relDirection,
+            absDirection,
             fromLocation: location,
             toLocation: location,
             fromLocationType: roomTypeFrom,
@@ -495,6 +544,59 @@ export class MovementSystem {
         }
         if (this.party.state.champions.length === 0) return { success: false, blocked: true };
         return this.bumpWall(newPosition, direction);
+    }
+
+    /**
+     * `GravityMove` (doc/CSBwin-src/Mouse.cpp:1259-1370): the button of the party's next
+     * gravity step, or 0, when it is too soon (`d.Time < nextGravityMoveTime`) or when no
+     * axis lets it fall, which ends the slide (`gravityMove = false`). It tries the axes
+     * from the least recently moved along, `moveHistory[2]`, to the most, `[0]`, each one
+     * square the way the party last moved along it (`:1269-1301`):
+     *
+     * - the square must be on the map: a vertical axis is the map index above or below,
+     *   at the same x and y, not `IncrementLevel`'s (`:1280-1287`);
+     * - along the ground, the square must be open floor or a pit; down, the party's own
+     *   square must be a pit; up, the square above (`:1288-1310`);
+     * - and no monster may stand on it (`:1312`).
+     *
+     * The step is button 3-6 relative to the party's facing, or `0x1125` up and `0x1124`
+     * down (`:1312-1338`, `POST_TRANSLATE_CLICK`).
+     */
+    gravityMove(): number {
+        const loop = this.ctx.loop;
+        const party = this.party.state;
+        if (this.ctx.state.tickCount < loop.nextGravityMoveTime) return 0;
+        const history = loop.moveHistory;
+        const numLevels = this.dungeon.getData().maps.length;
+        for (let i = 2; i >= 0; i--) {
+            const axis = history[i]!;
+            const delta = (history[3]! & (1 << axis)) !== 0 ? 1 : -1;
+            let level = party.position.z;
+            let x = party.position.x;
+            let y = party.position.y;
+            if (axis === 0) x += delta;
+            else if (axis === 1) y += delta;
+            else level += delta;
+            if (x < 0 || y < 0 || level < 0 || level >= numLevels) continue;
+            const descriptor = this.dungeon.getMap(level)!.descriptor;
+            if (x > descriptor.width - 1 || y > descriptor.height - 1) continue;
+            const roomTypeHere = (this.dungeon.getCellFlag(party.position) >> 5) & 0x7;
+            const target = new Position(x, y, level);
+            const roomTypeThere = (this.dungeon.getCellFlag(target) >> 5) & 0x7;
+            if (axis !== 2) {
+                if (roomTypeThere !== RoomType.PIT && roomTypeThere !== RoomType.OPEN) continue;
+            } else if (delta === 1) {
+                if (roomTypeHere !== RoomType.PIT) continue;
+            } else if (roomTypeThere !== RoomType.PIT) {
+                continue;
+            }
+            if (this.dungeon.findFirstMonster(target) !== OBJECT_ID_EOF) continue;
+            if (axis === 2) return delta === 1 ? 0x1124 : 0x1125;
+            const absdir = axis === 0 ? (delta === 1 ? 1 : 3) : (delta === 1 ? 2 : 0);
+            return 3 + ((absdir - party.facing) & 3);
+        }
+        loop.gravityMove = false;
+        return 0;
     }
 
     private getRelativeDirection(action: MovementAction): number | null {

@@ -75,6 +75,29 @@ export interface LoopFlags {
    * closed shows the straight viewport until then.
    */
   videoMode: VideoMode;
+  /**
+   * `gravityMove` (a global of `data.cpp`, doc/CSBwin-src/data.cpp:247): the party is
+   * sliding. Every `MoveParty` of a dungeon that sets `bGravityGame` sets it
+   * (`CSBCode.cpp:8166-8170`), and `GravityMove` clears it when it finds no axis to fall
+   * along (`Mouse.cpp:1368`). While it is set, `HandleMouseEvents` throws the queue away
+   * on every call and takes `GravityMove`'s step instead (`:1482-1491`).
+   */
+  gravityMove: boolean;
+  /** `nextGravityMoveTime` (`data.cpp:245`, a global, so 0 at first): the `d.Time` before which no gravity step is taken. */
+  nextGravityMoveTime: number;
+  /**
+   * `moveHistory` (`data.cpp:246`), `{0,1,2,0}` at first: the three axes, 0 east-west, 1
+   * north-south and 2 vertical, from the one moved along last, then in bit `axis` of
+   * `[3]` whether the last move along it went the positive way, east, south or down
+   * (`MoveParty`, `CSBCode.cpp:8128-8164`). `GravityMove` tries the axes from the
+   * least recent (`Mouse.cpp:1269-1301`).
+   *
+   * The three are globals CSBWin never saves and never resets: a load keeps the last
+   * game's, a restart of the program starts from these. The port gives every game read
+   * the program's start (`Game.applyRuntimeSaveState`, `DEBT.md` H, "A game read starts
+   * the gravity afresh").
+   */
+  moveHistory: number[];
 }
 
 /**
@@ -122,7 +145,13 @@ export function createLoopFlags(): LoopFlags {
     clockTick: false, vblCount: 0, newPartyLevel: -1, clockRunning: true, gameFrozen: false,
     flashButnActive: false, flashButn: { x1: 0, x2: 0, y1: 0, y2: 0 }, word11776: false, flashChanged: false,
     videoMode: 'VM_DEFAULT',
+    ...createGravityState(),
   };
+}
+
+/** `gravityMove`, `nextGravityMoveTime` and `moveHistory` as the program starts (doc/CSBwin-src/data.cpp:245-247). */
+export function createGravityState(): Pick<LoopFlags, 'gravityMove' | 'nextGravityMoveTime' | 'moveHistory'> {
+  return { gravityMove: false, nextGravityMoveTime: 0, moveHistory: [0, 1, 2, 0] };
 }
 
 /**

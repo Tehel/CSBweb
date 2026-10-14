@@ -1,10 +1,10 @@
 /**
- * 3D2D1D's moves down and up (`DEBT.md` G30, step 1), on the real dungeon: buttons
+ * 3D2D1D's moves down and up, on the real dungeon: buttons
  * `0x1124` and `0x1125` queued as the `-` and `=` keys queue them (`TAG0196da`,
  * `doc/CSBwin-src/CSBCode.cpp:8575-8595`), taken by `HandleMouseEvents` with the other
  * moves (`Mouse.cpp:1695-1709`) and played by `MoveParty`'s `direction > 3` arm
  * (`CSBCode.cpp:8255-8308`). Gravity is off here (`bGravityGame`), so each move is
- * one move.
+ * one move: `tools/watch-3d2d1d-gravity.ts` has the slides.
  *
  * 1. **Down a shaft**: from map 1's fake pit (1,1) to (1,1) on map 2, the facing kept
  *    (`TraverseStairway(0, false)`), the step's stamina paid and nobody hurt. The new

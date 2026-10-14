@@ -425,7 +425,8 @@ F5 writes its playthrough's quick-save, over the last, and F9 loads the newest s
 its playthrough, F5's or the dialog's ("A playthrough"). Each key says what it did on a
 line of the message area, in white (`GameSaves.tell`; `doc/CSBWIN_MESSAGES_REFERENCE.md`):
 "GAME SAVED" or "GAME LOADED"; "CANNOT SAVE NOW" with no party, with a champion still
-being chosen, or while a script holds the loop, and "CANNOT LOAD NOW" for that last;
+being chosen, while a script holds the loop, or while the party slides in a gravity
+dungeon (`doc/3D2D1D.md`), and "CANNOT LOAD NOW" while a script holds the loop;
 CSBWin's disk menu's "SAVES ARE DISABLED" (`doc/CSBwin-src/SaveGame.cpp:856-873`) while a
 DSA has disabled saves (`&DISABLESAVES`);
 CSBWin's own "UNABLE TO SAVE GAME!" (`doc/CSBwin-src/SaveGame.cpp:1363`) and "CAN'T FIND

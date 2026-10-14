@@ -562,7 +562,9 @@ export class GameSaves {
      * nor while a champion is still being chosen: the disk icon does nothing then
      * (`doc/CSBwin-src/Mouse.cpp:1855-1857`), and a file has no place for
      * `d.PotentialCharacterOrdinal`, so the candidate would load as a member. Nor while a
-     * script holds the loop, which a save could not resume. The icon is silent then; a
+     * script holds the loop, which a save could not resume, nor while the party slides
+     * (`gravityMove`), when the queue throws the disk icon's click away
+     * (`doc/CSBwin-src/Mouse.cpp:1482-1491`). The icon is silent then; a
      * key that saved nothing says so. Nor while a DSA has disabled saves
      * (`DsaSystem.disableSaves`), when the key says what CSBWin's disk menu says
      * (`doc/CSBwin-src/SaveGame.cpp:856-873`).
@@ -573,9 +575,10 @@ export class GameSaves {
      */
     async quickSave(): Promise<void> {
         const { champions, potentialChampionIndex } = this.game.ctx.party.state;
-        if (champions.length === 0 || potentialChampionIndex >= 0 || this.game.isRunningScript()) {
+        if (champions.length === 0 || potentialChampionIndex >= 0 || this.game.isRunningScript()
+            || this.game.ctx.loop.gravityMove) {
             this.tell('CANNOT SAVE NOW');
-            this.log('Quick-save refused: no party, a champion being chosen, or a script running');
+            this.log('Quick-save refused: no party, a champion being chosen, a script running, or the party sliding');
             return;
         }
         if (this.game.ctx.systems.dsa.disableSaves) {

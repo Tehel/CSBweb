@@ -1211,6 +1211,16 @@ async function checkSaveCall(): Promise<void> {
       'F5 saves nothing while a DSA has disabled saves, and says "SAVES ARE DISABLED"');
     check(reports.length === 6 && reports[5] === 'Quick-save refused: a DSA has disabled saves', 'and that is a line for the console');
 
+    // F5 while the party slides, when the queue throws the disk icon's click away
+    // (`doc/CSBwin-src/Mouse.cpp:1482-1491`).
+    const sliding = await stage(false);
+    sliding.game.ctx.loop.gravityMove = true;
+    const beforeSlide = told.length;
+    await sliding.saves.quickSave();
+    console.log(`  F5 while the party slides: ${toldSince(beforeSlide)}`);
+    check(toldSince(beforeSlide) === '/15:CANNOT SAVE NOW' && !sliding.game.canRestartFromSavegame()
+      && reports.length === 7 && reports[6]!.startsWith('Quick-save refused'), 'F5 saves nothing while the party slides, and says so');
+
     // One store, two data sets: a game lists, and F9 loads, its own set's saves.
     console.log('');
     console.log('=== one store, two data sets ===');

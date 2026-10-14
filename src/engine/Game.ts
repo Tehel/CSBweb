@@ -34,7 +34,7 @@ import { CharacterSystem } from './CharacterSystem';
 import { MouseSystem } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK, UNTRANSLATED_CLICK, type MouseQueueEntry } from './MouseQueue';
-import { createLoopFlags, flashButton, vblFlashButton, vblInterrupt, waitForButtonFlash, type LoopScript, type MainLoop } from './LoopState';
+import { createGravityState, createLoopFlags, flashButton, vblFlashButton, vblInterrupt, waitForButtonFlash, type LoopScript, type MainLoop } from './LoopState';
 import { makeMoreRoomInDB } from './MakeMoreRoomInDB';
 import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
@@ -837,11 +837,21 @@ export class Game implements MainLoop {
      * (`:1433-1444`). `CauseFakeMouseClick`, which follows every take, replays a click
      * the port never defers.
      *
-     * Not ported: the gravity hook (`DEBT.md` G30).
+     * While the party slides (`gravityMove`), each call first throws the queue away, keys
+     * and clicks alike, and queues `GravityMove`'s step in their place, or returns with the
+     * queue empty when it has none (`Mouse.cpp:1482-1491`): CSBWin's
+     * `d.MouseQStart = d.MouseQEnd = 0` and `MouseQStart = 1` are a queue of one and an
+     * empty one.
      */
     private handleMouseEvents(delta: number): number {
         const result = 0;
         const queue = this.ctx.mouseQueue;
+        if (this.ctx.loop.gravityMove) {
+            queue.discardAllInput();
+            const step = this.systems.movement.gravityMove();
+            if (step === 0) return result;
+            queue.enqueueKey(step);
+        }
         for (;;) {
             if (queue.count() === 0) return result;
             if (this.translateMouseClick(queue.head())) break;
@@ -997,6 +1007,10 @@ export class Game implements MainLoop {
     applyRuntimeSaveState(save: RuntimeSaveState): void {
         applyRuntimeSaveState(this.ctx, save);
         this.lastInputTime = 0;
+        // CSBWin saves none of the gravity's globals, nor resets them: a game read starts
+        // from the program's start, `{0,1,2,0}` and at rest (`DEBT.md` H, "A game read
+        // starts the gravity afresh").
+        Object.assign(this.ctx.loop, createGravityState());
         smartDiscard(this.ctx, true);
         this.ctx.loop.clockTick = true;
     }

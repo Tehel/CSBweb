@@ -144,6 +144,7 @@ const CHECKS = [
   { tool: 'dump-virtual-graphics.ts' },
   { tool: 'watch-conflux-start.ts' },
   { tool: 'watch-3d2d1d-vertical.ts' },
+  { tool: 'watch-3d2d1d-gravity.ts' },
   { tool: 'dump-dsa-overlay.ts' },
   { tool: 'dump-overlay-screen.ts' },
   { tool: 'dump-video-mode.ts' },

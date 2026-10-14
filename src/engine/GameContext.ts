@@ -197,8 +197,8 @@ export interface RulesOptions {
   supressDSAWarningOption: boolean;
   /**
    * `bGravityGame` (`doc/CSBwin-src/data.cpp:241`): the party falls along the axes
-   * it last moved on (`CSBCode.cpp:8166`). Read from the dungeon; nothing plays it yet
-   * (`DEBT.md` G30).
+   * it last moved on (`CSBCode.cpp:8166`, `MovementSystem.gravityMove`). Read from the
+   * dungeon.
    */
   bGravityGame: boolean;
   /**

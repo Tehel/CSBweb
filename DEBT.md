@@ -176,7 +176,7 @@ In payoff order: the first row is the next item.
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
 | F19 | The tools' screen is wired by hand, and has drifted | S | ⏳ with E29 |
 | F17 | The frame pipeline and the runner are untyped | M | ⏳ |
-| G30 | 3D2D1D's vertical moves and gravity | L | ⏳ step 2 |
+| F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
@@ -194,7 +194,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C183 · D22 · E40 · F21 · G31 · P12 · R16 · U13 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C183 · D22 · E40 · F22 · G31 · P12 · R16 · U13 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -444,7 +444,7 @@ world's until the next `refreshScreen`, and what runs before it acts on them:
   `:474-481`; `src/renderer/ui/Mouse.ts:413`), which opens the old party's inventory
   again and leaves `ctx.loop.videoMode` at `'VM_INVENTORY'` while the loaded party has
   none open (`selectedCharacterIndex: -1`, `src/engine/CsbwinSaveGame.ts:111`). Nothing
-  puts it back until an inventory is toggled (`Game.ts:550` resets only the other modes),
+  puts it back until an inventory is toggled (`Game.ts:554` resets only the other modes),
   so `GameScreen.isAdventureVideoMode` is false and a dungeon's overlay is not drawn
   (Conflux). CSBWin's `TAG0207cc` runs on the world just read.
 - **A Reincarnate screen or an attack menu up at F9** acts on the loaded party's champion
@@ -472,7 +472,7 @@ paths check.
 
 F5 and F9 go through `GameInput.keyDown`, so the save menu, the Reincarnate screen and the
 Hint Oracle take them first. Past them, `quickLoad` refuses only while a script runs
-(`GameSaves.ts:569-574`), not while a champion is being chosen
+(`GameSaves.ts:571-576`), not while a champion is being chosen
 (`potentialChampionIndex >= 0`, a mirror's champion shown before RESURRECT or
 REINCARNATE), as `quickSave` does.
 
@@ -844,7 +844,7 @@ against each other, and the file formats.
 
 ### E23 ⏳ One game read, whole or not at all
 
-What a read does is spread over `Game.ts:273-337`, `GameContext.ts:206-215`, `:261-309`,
+What a read does is spread over `Game.ts:277-341`, `GameContext.ts:205-214`, `:260-308`,
 `CsbwinSaveGame.ts:243-271`, `SaveGameFile.ts:275` and `GameSaves.read`:
 
 - **It is not atomic.** `installCsbwinWorld` sets `ctx.rules`, `ctx.signatures`, the
@@ -1689,6 +1689,20 @@ and no CSB graphics.
 Paying it: one factory for both (E29); the tools whose output then changes checked against
 what the page draws.
 
+### F21 ⏳ 3D2D1D's walkthrough is not replayed through `Game`
+
+`static/gamefiles/3D2D1D/WALKTHROUGH.md` is a full route through 3D2D1D, computed by
+`tools/solve-3d2d1d.ts` from a model of CSBWin's moves, gravity, teleporters and four DSA
+commands, outside the engine. `tools/watch-3d2d1d-gravity.ts` replays its first two legs
+through `Game`, moves alone, and each comes to rest where the walkthrough says. The rest
+needs what those legs do not: the clicks on the mirror, the switches, the levers and the
+keyholes; the waits for a door, a false wall or a teleporter; the 1D corridor's DSA chain,
+which a hand probe ran correctly but no tool proves; and map 6's Screamers, which the model
+pins to one square where the engine moves them. Paying it: a `watch-*.ts` that reads the
+walkthrough's key blocks and its clicks, plays them through `Game` on the real files, and
+checks each resting square and the three gold keys, then the end. Size M; where the route
+and the engine part, CSBWin decides which is wrong.
+
 ---
 
 ## G — Unported CSBWin features
@@ -1775,68 +1789,13 @@ Conflux 3.5's Extended Features block sets `AutoRecord` (0x10), `RecordDesignOpt
 (`doc/CSBwin-src/SaveGame.cpp:403-404`): a game read from it records unless the command
 line or the menu says not to (`:2588-2603`). The port has neither, and no way to start either. It keeps only the recorder's count,
 `totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:873-876`).
-`extraTicks` is always on (`src/engine/MovementSystem.ts:119-122`).
+`extraTicks` is always on (`src/engine/MovementSystem.ts:161-164`).
 
 Once ported, a recording made in CSBWin and played back in the port is an end-to-end test
 of everything at once, and the first line whose `random` differs points at the first
 divergence. That needs the port's random numbers to follow CSBWin's draw for draw. A
 recording cannot be written by hand, nor by a solver such as `tools/solve-3d2d1d.ts`:
 every line needs its exact tick and random state.
-
-### G30 ⏳ 3D2D1D's vertical moves and gravity
-
-`doc/3D2D1D.md` has the whole account. The 3D2D1D dungeon (data set `3d2d1d`) turns on
-two CSBWin features, behind `bThreeDMovements` and `bGravityGame`, which start `false`
-(`doc/CSBwin-src/data.cpp:240-241`) and which the dungeon's `efb.extendedFlags` bits
-`0x400` and `0x200` set (`doc/CSBwin-src/SaveGame.cpp:427-430`). The port reads both into
-`ctx.rules` (`readRulesOptions`, `src/data/CsbwinExtendedFeatures.ts`), which a save writes
-back (H → "A save keeps the dungeon's three 2023 flags").
-
-The gate is the dungeon, as in CSBWin: no other dungeon here sets either bit, so DM and
-CSB are unchanged, and the keys cannot be used to cheat there.
-
-Two steps:
-
-1. **Vertical moves** — done. MOVE DOWN and MOVE UP (`-` and `=`) send the keyscans
-   `0x4900`/`0x4a00`, `translateKey` makes them buttons `0x1124`/`0x1125` when
-   `bThreeDMovements` is set (`TAG0196da`, `CSBCode.cpp:8575-8595`), and
-   `MovementSystem.moveVertically` is `MoveParty`'s `direction > 3` arm
-   (`CSBCode.cpp:8255-8377`). `tools/watch-3d2d1d-vertical.ts` proves it on the real files.
-2. **Gravity** (M), what is left. `moveHistory`, `gravityMove` and `nextGravityMoveTime`,
-   updated in `MoveParty` (`CSBCode.cpp:8128-8170`). While `gravityMove` is set,
-   `MoveParty`'s `absdir` stays -1, so the party move filter's `absDirection` is -1 for a
-   gravity step (`:8061`, `:8128-8164`, `:8197`). `GravityMove` (`Mouse.cpp:1259-1370`)
-   and its hook at the head of `_HandleMouseEvents` (`:1482-1491`), which empties the
-   queue while gravity runs. It tries a vertical axis on the map index above or below and
-   the same x and y, not through `IncrementLevel`. CSBWin does not save the three
-   variables (`data.cpp:246-248`), so neither does the port. Two consequences, both
-   CSBWin's own:
-
-   - **No save during a slide.** While `gravityMove` is set, `_HandleMouseEvents` empties
-     the queue each pass (`Mouse.cpp:1482-1491`), so the disk icon's click is lost and
-     CSBWin saves only at rest. The port's F5 does not go through the queue (`GameInput`,
-     `src/renderer/GameInput.ts`), so it must refuse during a slide: "CANNOT SAVE NOW", as
-     for a script holding the loop (`doc/SAVES.md` → "The two keys"). The Sleepsave comes
-     from a click, so the queue drops it as it drops the disk icon's.
-   - **The axis history is lost.** `moveHistory` holds the order of the last three axes
-     moved and the direction last moved along each (`MoveParty`,
-     `CSBCode.cpp:8128-8164`). `GravityMove` tries the axes in that order
-     (`Mouse.cpp:1269-1301`). It is initialised once, `{0,1,2,0}`, and never on a load, so
-     CSBWin starts from its default after a restart, or from the last game's history
-     after a load. The first slide after a load may take another way than it would have.
-     Three moves of the player's, one along each axis, restore it. The port starts every
-     loaded game from `{0,1,2,0}`, CSBWin's state after a restart. The 3D2D1D route tool
-     checks that the dungeon is still solvable from a save at each point of the route.
-
-   A `watch-*.ts` proves it on the real 3D2D1D files: a slide ending where `GravityMove`
-   finds no axis, input thrown away during it, and F5 refused. `tools/watch-3d2d1d-vertical.ts`
-   turns `bGravityGame` off, so that its moves stay single moves.
-
-3D2D1D's six DSAs use only MESSAGE, OVERRIDE, COPYTELEPORTER and GOSUB, and it has no
-party-move filter. A hand probe ran the 1D corridor's chain correctly in the engine
-(`doc/3D2D1D.md`), but no tool proves it yet. `static/gamefiles/3D2D1D/WALKTHROUGH.md` is
-a full route computed from CSBWin's rules by `tools/solve-3d2d1d.ts`, outside the engine.
-Once step 2 is in, a tool that replays it through `Game` is the end-to-end proof.
 
 ---
 
@@ -1978,6 +1937,17 @@ Recorded so that nobody "fixes" them.
   `src/data/CsbwinExtendedFeatures.ts`), and a CSBWin 20230608 reads them back.
   `tools/dump-extended-dungeon.ts` checks that a 3D2D1D save keeps both of its own. 3D2D1D
   is the only dungeon here that sets any of them.
+- 🚫 **A game read starts the gravity afresh.** CSBWin's gravity keeps three globals,
+  `nextGravityMoveTime`, `moveHistory` and `gravityMove` (`doc/CSBwin-src/data.cpp:245-247`),
+  which `SaveGame` does not write and nothing resets, so a load keeps the last game's
+  history, where a fresh program starts from `{0,1,2,0}`. `moveHistory` decides which way
+  a slide goes (`GravityMove`, `Mouse.cpp:1269-1301`), so in CSBWin the first slide after
+  a load depends on what was played before it. The port gives every game read the
+  program's start, `{0,1,2,0}` and at rest (`Game.applyRuntimeSaveState`): the same save
+  slides the same way whatever came before. Three moves of the player's, one along each
+  axis, give either the same history. F5 is refused during a slide ("CANNOT SAVE NOW"),
+  where CSBWin's queue throws the disk icon's click away (`:1482-1491`), so no save
+  holds a slide. `tools/watch-3d2d1d-gravity.ts` checks the read.
 - 🚫 **The data set chooses DM's rules, not the player.** CSBWin's "DM Rules" menu item
   toggles `DM_rules` at any time (`doc/CSBwin-src/CSBUI.cpp:933-935`), and its Linux build
   takes `--dmrules` at the launch (`LinCSBUI.cpp:677`). The port has no toggle: a file's
