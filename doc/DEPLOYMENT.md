@@ -223,6 +223,29 @@ checked at the next start, which a folder that is not there stops.
 A file the page asks for is read when it is asked for, so replacing a data set's files
 needs no restart.
 
+### The community's dungeons
+
+The community's CSBWin dungeons are offered to an instance by
+`utils/submit-forum-dungeons.ts`, which submits each as a player publishes their own set,
+pending a moderator's approval:
+
+```bash
+npx tsx utils/submit-forum-dungeons.ts --instance https://csbweb.example --player <playerId> [--dry-run]
+```
+
+It reads the Dungeon Master forum's list of custom dungeons (`viewtopic.php?t=31516`), keeps
+the entries whose engines name CSBWin and that the instance does not list by name, and asks,
+one at a time, with the list's authors and a description from the dungeon's topic, both
+editable. Only on a yes does it download the dungeon's files, from the forum's shared
+OneDrive, which keeps every dungeon of the list; it asks which archive and which of its
+dungeons where there are several, checks each with the form's check, draws its thumbnail,
+and skips one whose `dungeon.dat` is one of the instance's sets' (it asks again where only
+the walls are the same). A dungeon without a `graphics.dat` of its own plays DM's or CSB's,
+so it is refused by an instance that has neither. A RAR or 7z archive needs `7z`, `unrar`
+or `bsdtar` on the PATH. The rate limit allows five publishes an hour: the script stops at
+the sixth, and a run an hour later finds the first five listed, pending and the player's,
+and does not offer them again.
+
 ## The build
 
 `npm run build` is `tsc && vite build && vite build --ssr`. `static/` is Vite's `publicDir` for the dev server
