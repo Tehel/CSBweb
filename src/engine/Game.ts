@@ -83,7 +83,9 @@ const MAX_VBLS_PER_CALL = VBL_FREQUENCY;
  * The movement buttons, as `MoveParty` numbers them (doc/CSBwin-src/CSBCode.cpp:8033-8038):
  * 1-2 turn left and right; 3-6 step forward, right, backward, left, so `num - 3` is the
  * step's direction relative to the party's facing. The on-screen arrows are these
- * buttons (`buttons17304`), and so are the movement keys.
+ * buttons (`buttons17304`), and so are the movement keys. `0x1124` and `0x1125` go a
+ * level down and up, the two keys of a dungeon that sets `bThreeDMovements`
+ * (`:8039-8040`, `TAG0196da`).
  */
 const MOVEMENT_BUTTON: Record<MovementAction, number> = {
     [MovementAction.TURN_LEFT]: 1,
@@ -92,6 +94,8 @@ const MOVEMENT_BUTTON: Record<MovementAction, number> = {
     [MovementAction.STRAFE_RIGHT]: 4,
     [MovementAction.MOVE_BACKWARD]: 5,
     [MovementAction.STRAFE_LEFT]: 6,
+    [MovementAction.MOVE_DOWN]: 0x1124,
+    [MovementAction.MOVE_UP]: 0x1125,
 };
 const BUTTON_MOVEMENT: Record<number, MovementAction> = Object.fromEntries(
     Object.entries(MOVEMENT_BUTTON).map(([action, num]) => [num, Number(action) as MovementAction]),
@@ -821,8 +825,10 @@ export class Game implements MainLoop {
      *   step heads in direction `d.Word11714` (`:1619-1632`) — and everything queued
      *   behind it waits too.
      *
-     * The turns and steps are handled here (`TurnParty`, `MoveParty`, `:1689-1709`), the
-     * button-up and every other button by `mouseEventHandlers`. Every button stamps
+     * The turns, the steps and the moves down and up (`0x1124`/`0x1125`) are handled here
+     * (`TurnParty`, `MoveParty`, `:1689-1709`), the button-up and every other button by
+     * `mouseEventHandlers`. A move down or up waits for no move delay: the test above is
+     * for buttons 3-6 alone. Every button stamps
      * `lastTime`; the button-up does not, and lets the next entry follow (`:1662-1688`).
      * A handler that starts a script stamps it at once, not when the script ends
      * (`DEBT.md` H, "A script's caller finishes at once").
@@ -831,8 +837,7 @@ export class Game implements MainLoop {
      * (`:1433-1444`). `CauseFakeMouseClick`, which follows every take, replays a click
      * the port never defers.
      *
-     * Not ported: the vertical-move buttons `0x1124`/`0x1125` and the gravity hook
-     * (`DEBT.md` G30).
+     * Not ported: the gravity hook (`DEBT.md` G30).
      */
     private handleMouseEvents(delta: number): number {
         const result = 0;

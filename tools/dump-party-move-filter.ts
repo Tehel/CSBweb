@@ -19,6 +19,9 @@
  * 7. **`PM_STAIRWAY`** (`TraverseStairway`, `:7838-7858`): a step into stairs runs the
  *    filter twice, and the stairway's block has the stairs and the square past them.
  * 8. A filter that refuses only the stairway leaves the party on the stairs.
+ * 9. **A move down** (`0x1124`, `:8091-8093`, `:8255-8308`) from a pit: `PM_ATTEMPTMOVE`
+ *    sees the button, `absDirection` 4 and a stone destination; then `PM_STAIRWAY` sees
+ *    `UpOrDown + 2`, 2, and the party keeps its facing.
  *
  * Run: `npx tsx tools/dump-party-move-filter.ts`
  */
@@ -269,6 +272,56 @@ for (const [action, direction] of [[MovementAction.TURN_LEFT, 1], [MovementActio
   check(party.position.x === stairs.x && party.position.y === stairs.y && party.position.z === stairs.z, 'the party is left on the stairs');
   check(game.ctx.loop.newPartyLevel === -1, 'no new level');
   check(stamina(game).every((s, i) => s < before[i]!), 'the step was paid for');
+}
+
+/* ------------------------------- 9. a move down --------------------------------- */
+/** The party on the first pit with a level below, its level loaded, facing north. */
+function onPit(game: Game): Position {
+  const dungeon = game.ctx.dungeon;
+  for (let z = 0; dungeon.getMap(z); z++) {
+    const map = dungeon.getMap(z)!;
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        const pit = new Position(x, y, z);
+        if (roomAt(game, pit) !== RoomType.PIT || dungeon.incrementLevel(pit, 1) === null) continue;
+        game.ctx.party.state.position = pit;
+        game.systems.monsters.loadPartyLevel(z);
+        game.ctx.party.setFacing(0);
+        return pit;
+      }
+    }
+  }
+  throw new Error('no pit with a level below');
+}
+{
+  const game = filtered([...report(0), ...set(11, 1), ...store]);
+  const pit = onPit(game);
+  const from = here(game);
+  const result = move(game, MovementAction.MOVE_DOWN);
+  const g = game.systems.dsa.getGlobalVariables();
+  const block = g.slice(0, 1 + WORDS);
+  console.log(`9. a move down from the pit at ${at(pit)}, refused: ${g[90]} filter call, it saw [${block.join(', ')}]`);
+  check(g[90] === 1 && block[1] === 3 && result.refused === true, 'one call, PM_ATTEMPTMOVE, which refuses');
+  check(block[8] === 0x1124 && block[9] === 4, 'relDirection the button, 0x1124, absDirection 4 (CSBCode.cpp:8143, :8198)');
+  check(block[10] === from && block[11] === from && block[12] === RoomType.PIT && block[13] === RoomType.STONE,
+    'both locations the party\'s square, from a pit to stone (:8118-8122)');
+}
+{
+  const game = filtered(report(0));
+  const pit = onPit(game);
+  const below = game.ctx.dungeon.incrementLevel(pit, 1)!;
+  const result = move(game, MovementAction.MOVE_DOWN);
+  const g = game.systems.dsa.getGlobalVariables();
+  const block = g.slice(0, 1 + WORDS);
+  const from = locationRelToInteger({ l: pit.z, x: pit.x, y: pit.y, p: 0 });
+  const to = locationRelToInteger({ l: below.z, x: below.x, y: below.y, p: 0 });
+  console.log(`   let through: ${g[90]} filter calls, the last saw [${block.join(', ')}]; to level ${game.ctx.loop.newPartyLevel}, facing ${game.ctx.party.state.facing}`);
+  check(g[90] === 2 && block[1] === 2, 'the filter runs for the move, then PM_STAIRWAY');
+  check(block[8] === 2 && block[9] === 2, 'both directions are UpOrDown + 2: 2, down');
+  check(block[10] === from && block[11] === to && block[12] === RoomType.PIT && block[13] === RoomType.STAIRS,
+    'from the pit to the square below, a stairway\'s 3');
+  check(result.success && game.ctx.loop.newPartyLevel === below.z && game.ctx.party.state.facing === 0,
+    'the party goes down, still facing north (TraverseStairway(0, false))');
 }
 
 finish();

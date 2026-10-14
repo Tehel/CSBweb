@@ -51,12 +51,11 @@ The order, then:
 4. **G — Unported CSBWin features the default dungeon reaches**, in the index's order.
 5. **F — Verification debt** is independent of the rest. Interleave it anywhere.
 
-**Postponed (⏸️) until the default dungeon is validated.** These are not taken in order,
+**Postponed (⏸️).** The default dungeon is validated: the author has won it four times,
+once with a single champion on a tablet. These still wait: they are not taken in order,
 and no session picks one up unless the author names it:
 
 - **A save of a dungeon the port does not know** (G22).
-- **What only another dungeon reaches** of CSBWin 20230608's own: 3D2D1D's vertical moves
-  and gravity (G30), which its Extended Features block turns on.
 - **CSBWin's debugging features** that are not part of the game: the ASCII dump, and the
   DSA trace, whose flags `WriteDSAs` follows the DSAs with, an `EDBT_DSAtraces` record
   (`DSAIndex.WriteTracing()`, `doc/CSBwin-src/SaveGame.cpp:1014-1018`) that a read takes
@@ -177,11 +176,11 @@ In payoff order: the first row is the next item.
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
 | F19 | The tools' screen is wired by hand, and has drifted | S | ⏳ with E29 |
 | F17 | The frame pipeline and the runner are untyped | M | ⏳ |
+| G30 | 3D2D1D's vertical moves and gravity | L | ⏳ step 2 |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
-| G30 | 3D2D1D's vertical moves and gravity | L | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
@@ -1784,63 +1783,60 @@ divergence. That needs the port's random numbers to follow CSBWin's draw for dra
 recording cannot be written by hand, nor by a solver such as `tools/solve-3d2d1d.ts`:
 every line needs its exact tick and random state.
 
-### G30 ⏸️ 3D2D1D's vertical moves and gravity
+### G30 ⏳ 3D2D1D's vertical moves and gravity
 
-`doc/3D2D1D.md` has the whole account. The 3D2D1D dungeon (data set `3d2d1d`) loads but
-cannot be played as designed. It needs two CSBWin features the port has not ported,
-behind `bThreeDMovements` and `bGravityGame`, which start `false`
-(`doc/CSBwin-src/data.cpp:240-241`).
-
-CSBWin sets them from `efb.extendedFlags` bits `0x400` and `0x200`
-(`doc/CSBwin-src/SaveGame.cpp:427-430`), as the 2019 `CSBwin.exe` shipped with
-the dungeon does, and so does the port: `bThreeDMovements` and `bGravityGame` in
-`ctx.rules` (`readRulesOptions`, `src/data/CsbwinExtendedFeatures.ts`), which a save
-writes back (H → "A save keeps the dungeon's three 2023 flags"). Nothing reads them yet.
-Everything else is in CSBWin's source.
+`doc/3D2D1D.md` has the whole account. The 3D2D1D dungeon (data set `3d2d1d`) turns on
+two CSBWin features, behind `bThreeDMovements` and `bGravityGame`, which start `false`
+(`doc/CSBwin-src/data.cpp:240-241`) and which the dungeon's `efb.extendedFlags` bits
+`0x400` and `0x200` set (`doc/CSBwin-src/SaveGame.cpp:427-430`). The port reads both into
+`ctx.rules` (`readRulesOptions`, `src/data/CsbwinExtendedFeatures.ts`), which a save writes
+back (H → "A save keeps the dungeon's three 2023 flags").
 
 The gate is the dungeon, as in CSBWin: no other dungeon here sets either bit, so DM and
 CSB are unchanged, and the keys cannot be used to cheat there.
 
 Two steps:
 
-1. **Vertical moves** (M). Bind the PC keys `-` and
-   `=` (`KeyboardEvent.code` `Minus` and `Equal`, scancodes `0x0c`/`0x0d` in
-   `config.txt`) to keyscans `0x4900`/`0x4a00`. Queue them as buttons
-   `0x1124`/`0x1125` when `bThreeDMovements` is set (`TAG0196da`,
-   `doc/CSBwin-src/CSBCode.cpp:8575-8595`). Hand those two buttons to the move in
-   `Game.handleMouseEvents` (`Mouse.cpp:1695-1709`). Then port `MoveParty`'s
-   `direction > 3` arm (`CSBCode.cpp:8255-8377`) into `MovementSystem`: the pit rule,
-   `TraverseStairway(direction-4, false)`, and the wall bump.
-2. **Gravity** (M). `moveHistory`, `gravityMove` and `nextGravityMoveTime`, updated in
-   `MoveParty` (`CSBCode.cpp:8128-8170`). `GravityMove` (`Mouse.cpp:1259-1370`) and its
-   hook at the head of `_HandleMouseEvents` (`:1482-1491`), which empties the queue while
-   gravity runs. CSBWin does not save the three variables (`data.cpp:246-248`), so
-   neither does the port. Two consequences, both CSBWin's own:
+1. **Vertical moves** — done. MOVE DOWN and MOVE UP (`-` and `=`) send the keyscans
+   `0x4900`/`0x4a00`, `translateKey` makes them buttons `0x1124`/`0x1125` when
+   `bThreeDMovements` is set (`TAG0196da`, `CSBCode.cpp:8575-8595`), and
+   `MovementSystem.moveVertically` is `MoveParty`'s `direction > 3` arm
+   (`CSBCode.cpp:8255-8377`). `tools/watch-3d2d1d-vertical.ts` proves it on the real files.
+2. **Gravity** (M), what is left. `moveHistory`, `gravityMove` and `nextGravityMoveTime`,
+   updated in `MoveParty` (`CSBCode.cpp:8128-8170`). While `gravityMove` is set,
+   `MoveParty`'s `absdir` stays -1, so the party move filter's `absDirection` is -1 for a
+   gravity step (`:8061`, `:8128-8164`, `:8197`). `GravityMove` (`Mouse.cpp:1259-1370`)
+   and its hook at the head of `_HandleMouseEvents` (`:1482-1491`), which empties the
+   queue while gravity runs. It tries a vertical axis on the map index above or below and
+   the same x and y, not through `IncrementLevel`. CSBWin does not save the three
+   variables (`data.cpp:246-248`), so neither does the port. Two consequences, both
+   CSBWin's own:
 
    - **No save during a slide.** While `gravityMove` is set, `_HandleMouseEvents` empties
-     the queue each pass (`Mouse.cpp:1606-1625`), so the disk icon's click is lost and
+     the queue each pass (`Mouse.cpp:1482-1491`), so the disk icon's click is lost and
      CSBWin saves only at rest. The port's F5 does not go through the queue (`GameInput`,
      `src/renderer/GameInput.ts`), so it must refuse during a slide: "CANNOT SAVE NOW", as
      for a script holding the loop (`doc/SAVES.md` → "The two keys"). The Sleepsave comes
      from a click, so the queue drops it as it drops the disk icon's.
    - **The axis history is lost.** `moveHistory` holds the order of the last three axes
      moved and the direction last moved along each (`MoveParty`,
-     `CSBCode.cpp:8215-8250`). `GravityMove` tries the axes in that order
-     (`Mouse.cpp:1261-1301`). It is initialised once, `{0,1,2,0}`, and never on a load, so
+     `CSBCode.cpp:8128-8164`). `GravityMove` tries the axes in that order
+     (`Mouse.cpp:1269-1301`). It is initialised once, `{0,1,2,0}`, and never on a load, so
      CSBWin starts from its default after a restart, or from the last game's history
      after a load. The first slide after a load may take another way than it would have.
      Three moves of the player's, one along each axis, restore it. The port starts every
      loaded game from `{0,1,2,0}`, CSBWin's state after a restart. The 3D2D1D route tool
      checks that the dungeon is still solvable from a save at each point of the route.
 
-A `watch-*.ts` proves each step on the real 3D2D1D files: up and down through map 1's
-fake pits, a refused move into stone with its damage, and a gravity slide ending where
-`GravityMove` finds no axis. 3D2D1D's six DSAs use only MESSAGE, OVERRIDE,
-COPYTELEPORTER and GOSUB, and it has no party-move filter. A hand probe ran the 1D
-corridor's chain correctly in the engine (`doc/3D2D1D.md`), but no tool proves it yet.
-`static/gamefiles/3D2D1D/WALKTHROUGH.md` is a full route computed from CSBWin's rules
-by `tools/solve-3d2d1d.ts`, outside the engine. Once both steps are in, a tool that
-replays it through `Game` is the end-to-end proof.
+   A `watch-*.ts` proves it on the real 3D2D1D files: a slide ending where `GravityMove`
+   finds no axis, input thrown away during it, and F5 refused. `tools/watch-3d2d1d-vertical.ts`
+   turns `bGravityGame` off, so that its moves stay single moves.
+
+3D2D1D's six DSAs use only MESSAGE, OVERRIDE, COPYTELEPORTER and GOSUB, and it has no
+party-move filter. A hand probe ran the 1D corridor's chain correctly in the engine
+(`doc/3D2D1D.md`), but no tool proves it yet. `static/gamefiles/3D2D1D/WALKTHROUGH.md` is
+a full route computed from CSBWin's rules by `tools/solve-3d2d1d.ts`, outside the engine.
+Once step 2 is in, a tool that replays it through `Game` is the end-to-end proof.
 
 ---
 
@@ -2154,11 +2150,6 @@ Recorded so that nobody "fixes" them.
   length and `drawFoodWaterPanel` reads each label at its own width. Every other set gets
   CSBWin's numbers (`doc/PROVEN_FACTS.md` → "The French 1.3 `graphics.dat`: longer
   words").
-- 🚫 **The vertical-move guard** in `MoveParty` (`CSBCode.cpp:8287-8291`) is not ported,
-  because nothing in the port reaches it. Move Up / Down (`0x1124` / `0x1125`) come only
-  from the 3DMaze extension's `bThreeDMovements` keys and `GravityMove`, which G30 ports with
-  the guard. CSBWin reaches it only in a dungeon whose Extended Features block sets
-  `ThreeDMovements` (`doc/CSBwin-src/SaveGame.cpp:427-430`): 3D2D1D, here.
 - 🚫 **The main loop makes one pass a VBL, not one a message.** CSBWin's loop makes a pass
   for every message the UI hands it (`doc/CSBwin-src/CSBUI.cpp:1274-1293`): each VBL's
   `UIM_VBL` (`system.cpp:624-630`), and a mouse button going down, which pushes a message

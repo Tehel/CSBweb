@@ -65,7 +65,9 @@ type Champion = 0 | 1 | 2 | 3;
  * ASCII code in the low byte or, for a key with none, the scancode in the high byte
  * (`if ((key&0xffff) == 0) key >>= 8`, `doc/CSBwin-src/CSBCode.cpp:8525`). The moves are
  * the arrows', Insert's and Clr/Home's, the keyscans the file sends for K , J L M . and
- * the keypad.
+ * the keypad. Down and up are the keyscans 3D2D1D's `config.txt` sends for `-` and `=`
+ * (`scan 1 00000c 490000`, `scan 1 00000d 4a0000`), which no table binds: only a dungeon
+ * that sets `bThreeDMovements` answers them (`translateKey`).
  */
 const TABLE_KEYSCAN = {
   'move.forward': 0x4800,
@@ -74,6 +76,8 @@ const TABLE_KEYSCAN = {
   'move.turnRight': 0x4700,
   'move.strafeLeft': 0x4b00,
   'move.strafeRight': 0x4d00,
+  'move.down': 0x4900,
+  'move.up': 0x4a00,
   freeze: 0x1b,
   wake: 0x0d,
 } as const;
@@ -123,7 +127,8 @@ export type KeyBindings = Readonly<Record<KeyAction, KeySlots>>;
  * and 7-0 for the inventories. The attacks are a column per champion, one key per row.
  * The moves are K , J L M . and the keypad's 4-9 as the file's `scan` lines bind them,
  * which NumLock does not change: keypad 7 turns left, 9 right, 8 and 5 step forward and
- * back, 4 and 6 strafe. The arrows are not moves, where the file's scancodes make them
+ * back, 4 and 6 strafe. `-` and `=` go a level down and up, as 3D2D1D's `config.txt` binds
+ * them, in a dungeon that sets `bThreeDMovements`. The arrows are not moves, where the file's scancodes make them
  * keypad 8, 4 and 6 (`DEBT.md` H, "The keys are the port's table"). Pause freezes,
  * which the file's one other `KEY` line gives Esc: Esc opens the settings
  * (`GameInput.keyDown`, `DEBT.md` H). Return wakes no one, since the file has no line for
@@ -166,6 +171,8 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   'move.turnRight': ['KeyL', 'Numpad9'],
   'move.strafeLeft': ['KeyM', 'Numpad4'],
   'move.strafeRight': ['Period', 'Numpad6'],
+  'move.down': ['Minus', ''],
+  'move.up': ['Equal', ''],
   freeze: ['Pause', ''],
   wake: ['', ''],
   quickSave: ['F5', ''],
@@ -313,11 +320,20 @@ export function keyScanOf(code: string): number {
  * last match queued, over the entry queued before it (`:8533-8574`). No keyscan is bound
  * twice in either pair of tables (`tools/dump-key-bindings.ts`), so the first match is
  * what CSBWin queues.
+ *
+ * Then, `if (bThreeDMovements)`, the keyscan `0x4900` is button `0x1124`, a level down,
+ * and `0x4a00` is `0x1125`, up (`:8575-8595`), in every mode the tables answer, asleep
+ * too. Neither keyscan is in a table (`tools/dump-key-bindings.ts`), so neither is two
+ * matches.
  */
 export function translateKey(ui: UIState, keyscan: number): number {
   if (!ui.keyXlate2 || keyscan === 0) return 0;
   for (const entry of ui.keyXlate2) if (entry.keyscan === keyscan) return entry.mouse;
   for (const entry of ui.keyXlate1 ?? []) if (entry.keyscan === keyscan) return entry.mouse;
+  if (ui.ctx.rules.bThreeDMovements) {
+    if (keyscan === TABLE_KEYSCAN['move.up']) return 0x1125;
+    if (keyscan === TABLE_KEYSCAN['move.down']) return 0x1124;
+  }
   return 0;
 }
 

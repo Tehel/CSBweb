@@ -1,11 +1,11 @@
 /**
- * Solve 3D2D1D (`static/gamefiles/3D2D1D/`). This is a model of the CSBWin movement the port
- * does not have yet (vertical moves and gravity, `DEBT.md` G30), and a shortest-route search
+ * Solve 3D2D1D (`static/gamefiles/3D2D1D/`). This is a model of CSBWin's vertical moves and
+ * of its gravity, which the port does not have yet (`DEBT.md` G30), and a shortest-route search
  * over it. It computes the routes in `static/gamefiles/3D2D1D/WALKTHROUGH.md`, and it
  * checks that document against the model. `ANALYSIS.md` beside it explains the puzzles.
  *
  * Like `peek-dungeon.ts`, this is **not evidence** about the port. It models CSBWin itself,
- * outside the engine, because the engine cannot move vertically or fall yet. It is not in
+ * outside the engine, because the engine cannot fall yet. It is not in
  * `tools/run-checks.mjs`. Once G30 is paid, a `watch-*.ts` should replay the walkthrough
  * through the real `Game`.
  *

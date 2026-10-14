@@ -72,6 +72,12 @@ export function partyMoveDataFromWords(word: (index: number) => number): PartyMo
     };
 }
 
+/**
+ * `MoveParty`'s `button` for each of its `direction`s (doc/CSBwin-src/CSBCode.cpp:8091-8093):
+ * 3-6 for the steps, `0x1124` down and `0x1125` up.
+ */
+const MOVE_BUTTON = [3, 4, 5, 6, 0x1124, 0x1125] as const;
+
 /** `locr.Integer()` of the party's `LOCATIONREL`: `position`, with `facing` as its position. */
 function partyLocation(position: Position, facing: number): number {
     return locationRelToInteger({ l: position.z, x: position.x, y: position.y, p: facing });
@@ -203,7 +209,7 @@ export class MovementSystem {
         else flashButton(this.ctx, 0x123, 0x13e, 0x7d, 0x91);
 
         if (roomType === RoomType.STAIRS) {
-            return this.traverseStairway((cellFlags & 0x04) !== 0);
+            return this.traverseStairway(cellFlags & 0x04, true);
         }
 
         // `PlaceOrRemoveObjectInRoom(d.partyX, d.partyY, RN(RNnul), true, 0)`, then
@@ -224,31 +230,38 @@ export class MovementSystem {
     }
 
     /**
-     * `MoveParty`'s four moves (doc/CSBwin-src/CSBCode.cpp:8031-8439). The destination and
-     * its flags are read before the party move filter, and decide what follows it.
+     * `MoveParty`'s four steps and its moves down and up (doc/CSBwin-src/CSBCode.cpp:8031-8439).
+     * A step's destination and its flags are read before the party move filter, and decide
+     * what follows it; a move down or up is stone to the filter, and finds its square after.
      */
     private handleMovement(action: MovementAction): MovementResult {
         const party = this.party.state;
         const position = party.position;
         const cellFlagsFrom = this.dungeon.getCellFlag(position);
         const roomTypeFrom = (cellFlagsFrom >> 5) & 0x7;
-        // `move` sends only the four moves here, never a turn.
+        // `move` sends only the moves here, never a turn. `direction` is `MoveParty`'s:
+        // 0-3 a step relative to the facing, 4 down and 5 up (`:8091-8093`).
         const relDirection = this.getRelativeDirection(action)!;
         const startingInStairwell = roomTypeFrom === RoomType.STAIRS;
 
         // `rtTo` (doc/CSBwin-src/CSBCode.cpp:8102-8125): the stairs themselves for a step
         // back out of a stairwell, else the next square's. Off the map, `GetCellFlags`
         // answers a stone cell (`:4674`), so the party bumps the edge of the map as it
-        // bumps a wall.
+        // bumps a wall. A move down or up is stone, with flags 0, until `UpdateXY` below.
         let newPosition = position;
         let cellFlagsTo = cellFlagsFrom;
         let roomTypeTo: number = RoomType.STAIRS;
         if (!(startingInStairwell && relDirection === 2)) {
-            const { tables } = this.ctx;
-            const to = RelativeXY(tables, party.facing, tables.word18560[relDirection]!, tables.word18568[relDirection]!, position.x, position.y);
-            newPosition = new Position(to.x, to.y, position.z);
-            cellFlagsTo = this.dungeon.getCellFlag(newPosition);
-            roomTypeTo = (cellFlagsTo >> 5) & 0x7;
+            if (relDirection <= 3) {
+                const { tables } = this.ctx;
+                const to = RelativeXY(tables, party.facing, tables.word18560[relDirection]!, tables.word18568[relDirection]!, position.x, position.y);
+                newPosition = new Position(to.x, to.y, position.z);
+                cellFlagsTo = this.dungeon.getCellFlag(newPosition);
+                roomTypeTo = (cellFlagsTo >> 5) & 0x7;
+            } else {
+                cellFlagsTo = 0;
+                roomTypeTo = RoomType.STONE;
+            }
         }
 
         // The party move filter, `PM_ATTEMPTMOVE` (doc/CSBwin-src/CSBCode.cpp:8191-8208),
@@ -261,8 +274,10 @@ export class MovementSystem {
             flags: 0,
             delay: 0,
             staminaAdjustment: this.staminaAdjustments(),
-            relDirection: relDirection + 3,
-            absDirection: (relDirection + party.facing) & 3,
+            relDirection: MOVE_BUTTON[relDirection]!,
+            // `absdir` (`:8134-8146`): a step's direction plus the facing, and a move down
+            // or up's own 4 or 5.
+            absDirection: relDirection <= 3 ? (relDirection + party.facing) & 3 : relDirection,
             fromLocation: location,
             toLocation: location,
             fromLocationType: roomTypeFrom,
@@ -279,8 +294,10 @@ export class MovementSystem {
         this.chargeStamina(pmd.staminaAdjustment);
 
         if (startingInStairwell && relDirection === 2) {
-            return this.traverseStairway((cellFlagsFrom & 0x04) !== 0);
+            return this.traverseStairway(cellFlagsFrom & 0x04, true);
         }
+
+        if (relDirection > 3) return this.moveVertically(relDirection, newPosition);
 
         if (roomTypeTo === RoomType.STAIRS) {
             // `MoveObject(RN(RNnul), d.partyX, d.partyY, -1, 0)`, then the party stands on
@@ -288,7 +305,7 @@ export class MovementSystem {
             // (doc/CSBwin-src/CSBCode.cpp:8298-8303).
             this.ctx.systems.worldMove.moveParty(party.position.x, party.position.y, -1, 0);
             party.position = newPosition;
-            return this.traverseStairway((cellFlagsTo & 0x04) !== 0);
+            return this.traverseStairway(cellFlagsTo & 0x04, true);
         }
 
         // `D5W` — terrain inhibits the move for stone, a door whose state is not 0, 1 or 5,
@@ -328,15 +345,8 @@ export class MovementSystem {
         //   It pokes the group instead, so the monster gets a turn out of being bumped
         //   into. `TT_M1` is CSBWin's "monster attacked, or the party bumped into it".
         //
-        // Every `MovementAction` that reaches here is one of CSBWin's relative
-        // directions 0-3 (see `getRelativeDirection`), so the `direction <= 3` test is
-        // always true at this point. CSBWin's `direction > 3` arm — Move Up / Move
-        // Down, which refuse outright rather than poking the group (`:8287-8291`) — is
-        // unreachable here: only the 3DMaze flags `bThreeDMovements` and `bGravityGame`
-        // produce those moves (doc/CSBwin-src/data.cpp:240-241). CSBWin reads them from
-        // the dungeon's Extended Features (doc/CSBwin-src/SaveGame.cpp:427-430), as the
-        // port does (`ctx.rules.bThreeDMovements`, `bGravityGame`), and 3D2D1D sets both;
-        // nothing here produces those moves until `DEBT.md` G30.
+        // A move down or up never reaches here (`moveVertically`), so the `direction <= 3`
+        // test is always true at this point.
         if (this.party.state.champions.length !== 0) {
             if (this.dungeon.findFirstMonster(newPosition) !== OBJECT_ID_EOF) {
                 // `ProcessTimers29to41(newX, newY, TT_M1, 0)` (doc/CSBwin-src/CSBCode.cpp:8389).
@@ -448,32 +458,75 @@ export class MovementSystem {
         };
     }
 
+    /**
+     * `MoveParty`'s `direction > 3` arm (doc/CSBwin-src/CSBCode.cpp:8255-8291), once the
+     * filter has let the move through and the stamina is paid. `UpdateXY` (`:4661-4671`)
+     * keeps the party's square and asks `IncrementLevel` for the level below (4) or above
+     * (5), shifted by the two levels' offsets; with no such level, the party's own square
+     * is stone. Down takes the flags of the square the party stands on, up those of the
+     * square above, and only a pit, open or closed, real or fake, lets the party through:
+     * anything else is stone (`:8269-8284`).
+     *
+     * - Through, but a monster on the square: `return result`, `NULL`, and nothing else
+     *   (`:8286-8291`): no bump, no poke, the input kept.
+     * - Through: `TraverseStairway(direction-4, false)` (`:8307`), the party's facing
+     *   kept.
+     * - Stone, with champions: the wall bump (`bumpWall`), on the two champions whose side
+     *   faces `(direction + d.partyFacing + 2) & 3` and the next, and the input discarded
+     *   (`:8309-8401`). `GetCharacterToDamage` hurts no one when the square above or below
+     *   is more than a square from the party's x and y (`:6957-6959`).
+     * - Stone, with no champion: `if (direction > 3) return result;` (`:8395`).
+     */
+    private moveVertically(direction: number, partySquare: Position): MovementResult {
+        const position = this.party.state.position;
+        let newPosition = partySquare;
+        let roomTypeTo: number = RoomType.STONE;
+        const next = this.dungeon.incrementLevel(position, direction === 4 ? 1 : -1);
+        if (next !== null) {
+            newPosition = next;
+            const cellFlagsTo = this.dungeon.getCellFlag(direction === 5 ? next : position);
+            if (((cellFlagsTo >> 5) & 0x7) === RoomType.PIT) roomTypeTo = RoomType.PIT;
+        }
+        if (roomTypeTo !== RoomType.STONE) {
+            if (this.dungeon.findFirstMonster(newPosition) !== OBJECT_ID_EOF) {
+                return { success: false, blocked: true };
+            }
+            return this.traverseStairway(direction - 4, false);
+        }
+        if (this.party.state.champions.length === 0) return { success: false, blocked: true };
+        return this.bumpWall(newPosition, direction);
+    }
+
     private getRelativeDirection(action: MovementAction): number | null {
         switch (action) {
             case MovementAction.MOVE_FORWARD:  return 0;
             case MovementAction.STRAFE_RIGHT:  return 1;
             case MovementAction.MOVE_BACKWARD: return 2;
             case MovementAction.STRAFE_LEFT:   return 3;
+            case MovementAction.MOVE_DOWN:     return 4;
+            case MovementAction.MOVE_UP:       return 5;
             default: return null;
         }
     }
 
     /**
-     * `TraverseStairway(UpOrDown, true)` (doc/CSBwin-src/CSBCode.cpp:7820-7869) from the
-     * stairs the party stands on, up when `isUp`. Once the party move filter has let it
-     * through, the party is lifted off the stairs and put on the square below or above
-     * facing `ExitStairsDirection`, still on the level it left: the top of the next tick
-     * loads the new one and places the party there (`d.newPartyLevel`,
-     * `Game.loadNewPartyLevel`). A filter that refuses a step into the stairs leaves the
-     * party on them, lifted off the square it came from and not yet put down.
+     * `TraverseStairway(UpOrDown, setFacing)` (doc/CSBwin-src/CSBCode.cpp:7820-7869), up
+     * when `upOrDown` is not 0: from the stairs the party stands on, `cellFlags & 4` and
+     * `true`, or a move down or up's `direction - 4`, 0 or 1, and `false`. Once the party
+     * move filter has let it through, the party is lifted off its square and put on the
+     * one below or above, still on the level it left: the top of the next tick loads the
+     * new one and places the party there (`d.newPartyLevel`, `Game.loadNewPartyLevel`).
+     * With `setFacing` it faces `ExitStairsDirection`, else the way it did. A filter that
+     * refuses a step into the stairs leaves the party on them, lifted off the square it
+     * came from and not yet put down.
      *
      * A stairway to no level is a malformed dungeon, where CSBWin would `LoadLevel(-1)`;
-     * the party stays where it is.
+     * the party stays where it is. A move down or up has found its level already.
      */
-    private traverseStairway(isUp: boolean): MovementResult {
+    private traverseStairway(upOrDown: number, setFacing: boolean): MovementResult {
         const stairs = this.party.state.position;
         const facing = this.party.state.facing;
-        const next = this.dungeon.incrementLevel(stairs, isUp ? -1 : 1);
+        const next = this.dungeon.incrementLevel(stairs, upOrDown === 0 ? 1 : -1);
         if (!next) {
             return {
                 success: false,
@@ -483,10 +536,10 @@ export class MovementSystem {
         const newFacing = this.dungeon.getExitStairsDirection(next, facing, this.ctx.tables);
 
         // The party move filter, `PM_STAIRWAY` (doc/CSBwin-src/CSBCode.cpp:7838-7858). Both
-        // directions are `UpOrDown + 2`, and every caller passes `cellFlags & 4`, so they
-        // are 2 down and 6 up. `toLocation` faces the way the party does. CSBWin leaves
+        // directions are `UpOrDown + 2`: 2 down and 6 up from the stairs, 2 down and 3 up
+        // for a move down or up. `toLocation` faces the way the party does. CSBWin leaves
         // `delay` and the stamina adjustments unset; they are 0 here.
-        const direction = (isUp ? 4 : 0) + 2;
+        const direction = upOrDown + 2;
         const pmd = this.ctx.systems.dsa.partyMoveFilter({
             moveType: PM_STAIRWAY,
             flags: 0,
@@ -503,15 +556,15 @@ export class MovementSystem {
 
         this.ctx.systems.worldMove.moveParty(stairs.x, stairs.y, -1, 0);
         // `d.newPartyLevel = newPartyLevel; d.partyX = sw(x); d.partyY = sw(y);`, then
-        // `SetPartyFacing(newPartyFacing)` (doc/CSBwin-src/CSBCode.cpp:7862-7868).
+        // `if (setFacing) SetPartyFacing(newPartyFacing)` (doc/CSBwin-src/CSBCode.cpp:7862-7868).
         this.ctx.loop.newPartyLevel = next.z;
         this.party.state.position = new Position(next.x, next.y, stairs.z);
-        this.party.setFacing(newFacing);
+        if (setFacing) this.party.setFacing(newFacing);
 
         return {
             success: true,
             newPosition: next,
-            newFacing,
+            newFacing: this.party.state.facing,
         };
     }
 

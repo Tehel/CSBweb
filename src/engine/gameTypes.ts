@@ -335,6 +335,10 @@ export enum MovementAction {
     STRAFE_RIGHT = 3,
     TURN_LEFT = 4,
     TURN_RIGHT = 5,
+    /** Button `0x1124`, a level down: the 3DMaze extension's (`ctx.rules.bThreeDMovements`). */
+    MOVE_DOWN = 6,
+    /** Button `0x1125`, a level up. */
+    MOVE_UP = 7,
 }
 
 /**

@@ -67,6 +67,8 @@ export const KEY_ACTION_NAMES: ReadonlyArray<readonly [KeyAction, string]> = [
   ['move.turnRight', 'TURN RIGHT'],
   ['move.strafeLeft', 'STRAFE LEFT'],
   ['move.strafeRight', 'STRAFE RIGHT'],
+  ['move.down', 'MOVE DOWN'],
+  ['move.up', 'MOVE UP'],
   ...CHAMPIONS.flatMap((c) => ([0, 1, 2] as const).map((row): [KeyAction, string] => [`attack.${c}.${row}`, `CHAMPION ${c + 1} ATTACK ${row + 1}`])),
   ...CHAMPIONS.map((c): [KeyAction, string] => [`inventory.${c}`, `INVENTORY ${c + 1}`]),
   ...([0, 1, 2, 3, 4, 5] as const).map((n): [KeyAction, string] => [`rune.${n}`, `RUNE ${n + 1}`]),

@@ -408,6 +408,22 @@ async function main(): Promise<void> {
   check(buttonOf('Sleeping', 'Pause') === 147 && buttonOf('Sleeping', 'Enter') === 0
     && buttonOf('Sleeping', 'KeyK') === 0, 'asleep, Pause, the tables\' Esc, is 147, and Return and K nothing');
   check(buttonOf('Frozen', 'Pause') === 148 && buttonOf('Frozen', 'KeyK') === 0, 'frozen, Pause is 148, and K nothing');
+
+  // `-` and `=` send 0x4900 and 0x4a00, which no table binds (the tables above): nothing,
+  // until the dungeon sets `bThreeDMovements`, and then buttons 0x1124 and 0x1125 in every
+  // mode, asleep and frozen too (doc/CSBwin-src/CSBCode.cpp:8575-8595).
+  check(keyScanOf('Minus') === 0x4900 && keyScanOf('Equal') === 0x4a00, '- and = send the keyscans 0x4900 and 0x4a00');
+  for (const mode of ['Adventure', 'Sleeping', 'Frozen'] as const) {
+    check(buttonOf(mode, 'Minus') === 0 && buttonOf(mode, 'Equal') === 0, `${mode}: without bThreeDMovements, - and = are nothing`);
+  }
+  ctx.rules.bThreeDMovements = true;
+  for (const mode of ['Adventure', 'Sleeping', 'Frozen'] as const) {
+    check(buttonOf(mode, 'Minus') === 0x1124 && buttonOf(mode, 'Equal') === 0x1125,
+      `${mode}: with bThreeDMovements, - is 0x1124 and = 0x1125`);
+  }
+  check(buttonOf('Adventure', 'KeyK') === 3, 'with bThreeDMovements, the other keys are as they were');
+  ctx.rules.bThreeDMovements = false;
+  console.log('- and =: 0x1124 and 0x1125 with bThreeDMovements, nothing without');
   ui.uiMode = UIMode.Adventure;
   updateButtonLists(ui);
 

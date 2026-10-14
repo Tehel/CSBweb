@@ -203,8 +203,7 @@ export interface RulesOptions {
   bGravityGame: boolean;
   /**
    * `bThreeDMovements` (`doc/CSBwin-src/data.cpp:240`): the keys that move the party
-   * up and down a level (`CSBCode.cpp:8575`). Read from the dungeon; nothing plays it yet
-   * (`DEBT.md` G30).
+   * up and down a level (`CSBCode.cpp:8575`, `translateKey`). Read from the dungeon.
    */
   bThreeDMovements: boolean;
 }
