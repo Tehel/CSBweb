@@ -255,6 +255,15 @@ export class GameSaves {
     }
 
     /**
+     * Delete a listed save from the store: the save menu's DELETE. The running game is
+     * left alone, whichever save it came from.
+     */
+    async remove(entry: SaveEntry): Promise<void> {
+        await this.marked;
+        await this.store.remove(entry.id);
+    }
+
+    /**
      * Build a save and write it to the store, as a row of the game's data set. A `'new'`
      * one is a row of its own, under a name no save has in any set: a row's name is its
      * key. F5's (`'quick'`) is written over the playthrough's quick-save (`slotOf`),

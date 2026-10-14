@@ -84,5 +84,9 @@ export function memoryStore(
       const held = entries.get(id);
       if (held) entries.set(id, { ...held, usedAt });
     },
+    remove: async (id) => {
+      files.delete(id);
+      entries.delete(id);
+    },
   };
 }

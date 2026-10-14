@@ -312,6 +312,8 @@ export interface UIState {
    * downloads it (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`).
    */
   readonly onExportSave: (entry: SaveEntry) => Promise<void>;
+  /** Delete a listed save from the store (`GameSaves.remove`, `src/engine/GameSaves.ts`). */
+  readonly onDeleteSave: (entry: SaveEntry) => Promise<void>;
   /**
    * Take a file dropped on the save/load screen into the store, a modified dungeon's
    * once `confirmed`; resolves to the row it was stored as, or to why it was not
@@ -442,7 +444,7 @@ export type UISources = Pick<UIState,
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
-  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onHasNewFaces' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave' | 'onExit'
+  | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onHasNewFaces' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onDeleteSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave' | 'onExit'
   | 'settings' | 'isCrtAvailable' | 'fullscreen' | 'keyboardLayout' | 'onTeleport'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {

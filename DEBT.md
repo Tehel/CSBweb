@@ -698,7 +698,7 @@ Paying it: a right-click while `busy` does nothing.
 
 `BrowserSaveStore.list` is a `getAll` over whole rows, files included, and every F5,
 Sleepsave, menu save, F9, import and new game lists. A Conflux save is about 0.6 MB, and no
-row is ever deleted (the dialog has no delete). An import also parses its file three times,
+row leaves the store unless the player deletes it (the dialog's DELETE). An import also parses its file three times,
 and an enciphered save is deciphered twice (`loadCsbwinWorld` again after
 `loadSaveGameState`).
 

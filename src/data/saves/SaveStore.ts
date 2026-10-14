@@ -203,6 +203,8 @@ export interface SaveStore {
     write(entry: SaveEntry, bytes: Uint8Array): Promise<void>;
     /** Set a row's `usedAt`, and nothing else of it. Nothing for a row that is gone. */
     markUsed(id: string, usedAt: number): Promise<void>;
+    /** Delete a row. Nothing for a row that is gone. */
+    remove(id: string): Promise<void>;
 }
 
 /** `YYYY-MM-DD`, in the player's own timezone — the date they would call it. */

@@ -386,6 +386,7 @@ function checkLayout(graphics: GraphicsLoader): void {
   const blank: SaveMenu.SaveMenuState = {
     mode: 'full', entries: [], unfolded: new Set(), rows: [], selected: -1, scrollTop: 0, wheelDelta: 0, busy: true, message: '',
     press: null, pending: null, confirm: null, dropped: null, adventure: null, frameHandle: null, lastSaveClick: null, pointer: null, newFace: null,
+    deleteArmed: null, longPress: null,
   };
   ui.saveMenu = blank;
   ui.screenIndexBuffer!.pixels.fill(7);
@@ -1369,6 +1370,7 @@ async function menuRig(
     onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
     // As the page's, with the download kept instead of made.
     onExportSave: async (listed) => { exported.push({ name: listed.name, bytes: (await saves.open(listed)).bytes }); },
+    onDeleteSave: (listed) => saves.remove(listed),
     onImportSave: (file, confirmed) => saves.importSave(file, confirmed),
     onRestoreSave: (save) => saves.read(save),
     ...hooks,
@@ -1399,8 +1401,13 @@ async function menuRig(
       await this.settled();
       return taken;
     },
-    /** A click on row `row` of the list, which is in view. */
+    /** A click on row `row` of the list, which is in view: its press and its release. */
     clickRow(row: number): void {
+      this.pressRow(row);
+      ui.dialog?.release?.(ui);
+    },
+    /** A press on row `row` of the list, which is in view, held until `ui.dialog.release`. */
+    pressRow(row: number): void {
       const { rowFirstY } = SaveMenu.saveMenuList(ui.saveMenu!.mode);
       SaveMenu.saveMenuClick(ui, g.textX, rowFirstY + (row - ui.saveMenu!.scrollTop) * g.rowStep, LEFT);
     },
@@ -1566,14 +1573,14 @@ async function checkSelection(graphics: GraphicsLoader): Promise<void> {
     await rig.click(g.saveButtonId);
     check(store.files.size === 2 && SaveMenu.isSaveMenuOpen(ui), 'and its SAVE is inert');
 
-    // CANCEL is a button like the others: its press plays first.
-    const cancel = Widgets.buttonRect(g.buttonFrames.cancel);
+    // CLOSE is a button like the others: its press plays first.
+    const cancel = Widgets.buttonRect(g.buttonFrames.close);
     SaveMenu.saveMenuClick(ui, cancel.x1, cancel.y1, LEFT);
-    const pressed = chooser.press?.buttonId === g.cancelButtonId && SaveMenu.isSaveMenuOpen(ui);
+    const pressed = chooser.press?.buttonId === g.closeButtonId && SaveMenu.isSaveMenuOpen(ui);
     const drawsThen = rig.drawsWithNoMenu();
     await rig.settled();
-    console.log(`  CANCEL: ${pressed ? 'pressed' : 'NOT PRESSED'}, then ${SaveMenu.isSaveMenuOpen(ui) ? 'THE MENU' : 'the menu gone'}, the screen drawn ${rig.drawsWithNoMenu() - drawsThen} time(s) after it, party ${rig.party()}`);
-    check(pressed && !SaveMenu.isSaveMenuOpen(ui) && rig.party() === 'DAROO', 'CANCEL plays its press, then closes the chooser, and nothing is loaded');
+    console.log(`  CLOSE: ${pressed ? 'pressed' : 'NOT PRESSED'}, then ${SaveMenu.isSaveMenuOpen(ui) ? 'THE MENU' : 'the menu gone'}, the screen drawn ${rig.drawsWithNoMenu() - drawsThen} time(s) after it, party ${rig.party()}`);
+    check(pressed && !SaveMenu.isSaveMenuOpen(ui) && rig.party() === 'DAROO', 'CLOSE plays its press, then closes the chooser, and nothing is loaded');
     check(rig.drawsWithNoMenu() === drawsThen + 1, 'and the screen is drawn once more with the chooser gone, which the entrance waits on');
 
     // Saved over, the other save is the last one used.
@@ -2050,10 +2057,10 @@ async function checkPreview(graphics: GraphicsLoader): Promise<void> {
       "it stays from one corner of the panel to EXPORT's frame, and says nothing changed");
     const onList = SaveMenu.saveMenuPointer(ui, { x: panel.x1 - 1, y: panel.y1 + 60 });
     check(onList && inked() === offHint, 'a column left of the panel, it goes, and says so');
-    check(!SaveMenu.saveMenuPointer(ui, { x: g.buttonFrames.cancel.x1 + 4, y: g.buttonFrames.cancel.y1 + 4 })
+    check(!SaveMenu.saveMenuPointer(ui, { x: g.buttonFrames.close.x1 + 4, y: g.buttonFrames.close.y1 + 4 })
       && SaveMenu.saveMenuPointer(ui, { x: g.buttonFrames.export.x2, y: g.buttonFrames.export.y1 }) && inked() === expected(firstLines, hint.length)
       && SaveMenu.saveMenuPointer(ui, null) && inked() === offHint,
-      'not on CANCEL\'s frame; on EXPORT\'s, unlabelled or not; and off the canvas, gone');
+      'not on CLOSE\'s frame; on EXPORT\'s, unlabelled or not; and off the canvas, gone');
     SaveMenu.saveMenuPointer(ui, { x: panel.x1 + 30, y: panel.y1 + 60 });
     state2.message = SaveMenu.SAVE_MENU_EXPORTED;
     const messageOnly = inked();
@@ -2464,6 +2471,166 @@ async function checkExport(graphics: GraphicsLoader): Promise<void> {
       'the load-only chooser exports as the disk menu does');
     check(SaveMenu.isSaveMenuOpen(leyla.ui) && chooser.message === SaveMenu.SAVE_MENU_EXPORTED && leyla.party() === 'LEYLA',
       'and stays up, with nothing loaded');
+    SaveMenu.closeSaveMenu(leyla.ui);
+  } finally {
+    Date.now = realNow;
+  }
+}
+
+/* ---------------------------------------------------------------- 18. DELETE ---- */
+
+/**
+ * DELETE by the menu's own presses and keys (`menuRig`): what turns EXPORT into it and
+ * back, its question, and the store and the list after it.
+ */
+async function checkDelete(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== DELETE ===');
+  const store = memoryStore();
+  const daroo = await menuRig(graphics, store, 'DAROO');
+  const wuuf = await menuRig(graphics, store, 'WUUF');
+  const { ui } = daroo;
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
+  const idOf = (rig: { game: Game }): number => rig.game.ctx.state.block1.randomGameID;
+  const hold = (): Promise<void> => new Promise((done) => setTimeout(done, SaveMenu.SAVE_MENU_LONG_PRESS_MS + 60));
+  const release = (): void => ui.dialog?.release?.(ui);
+  /** What EXPORT's frame is now, by the button the dialog has there. */
+  const frame = (rig = daroo): string => {
+    const ids = SaveMenu.saveMenuButtons(rig.ui.saveMenu!).map((b) => b.word0);
+    return ids.includes(g.deleteButtonId) ? 'DELETE' : ids.includes(g.exportButtonId) ? 'EXPORT' : '?';
+  };
+  const stored = async (): Promise<string[]> => (await store.list(null)).map((e) => e.id);
+
+  const realNow = Date.now;
+  let now = new Date(2026, 8, 13, 14, 5, 6).getTime();
+  Date.now = () => now;
+  try {
+    const theirs = await wuuf.saves.save('stopped', 'new');
+    now += 60_000;
+    const oldest = await daroo.saves.save('stopped', 'new');
+    now += 60_000;
+    const middle = await daroo.saves.save('stopped', 'new');
+    now += 60_000;
+    const newest = await daroo.saves.save('stopped', 'new');
+    now += 60_000;
+    const state = await daroo.open();
+    console.log(daroo.list());
+
+    // What does not turn EXPORT into DELETE.
+    daroo.clickRow(daroo.rowOf(middle.id));
+    await hold();
+    const afterClick = frame();
+    daroo.pressRow(daroo.rowOf(oldest.id));
+    SaveMenu.saveMenuDrag(ui, g.textX, SaveMenu.saveMenuList('full').rowFirstY + daroo.rowOf(newest.id) * g.rowStep);
+    await hold();
+    release();
+    const afterDrag = frame();
+    daroo.pressRow(daroo.headingOf(idOf(daroo)));
+    await hold();
+    release();
+    const onHeading = frame();
+    SaveMenu.saveMenuKey(ui, 'Delete');
+    const keyOnHeading = state.deleteArmed;
+    console.log(`  EXPORT's frame after a click on a save and the delay: ${afterClick}; a press moved off its row: ${afterDrag}; a press on a heading, and Delete there: ${onHeading}, ${keyOnHeading ?? 'nothing armed'}`);
+    check(afterClick === 'EXPORT' && afterDrag === 'EXPORT', 'a click on a save, and a press moved off its row, leave EXPORT as it is');
+    check(onHeading === 'EXPORT' && keyOnHeading === null, 'so do a long press on a heading and the Delete key there');
+    daroo.clickRow(daroo.headingOf(idOf(daroo)));
+
+    // The long press, and what turns DELETE back.
+    daroo.pressRow(daroo.rowOf(middle.id));
+    const before = frame();
+    await hold();
+    const held = frame();
+    const label = labelOf(ui, g.buttonFrames.export);
+    release();
+    console.log(`  a press held on the middle save: ${before}, then ${held} (${label} pixels of label), selected ${SaveMenu.selectedEntry(state)?.id === middle.id ? 'it' : 'ANOTHER'}`);
+    check(before === 'EXPORT' && held === 'DELETE' && label > 0, `a press held ${SaveMenu.SAVE_MENU_LONG_PRESS_MS} ms on a save turns EXPORT into DELETE, labelled`);
+    check(SaveMenu.selectedEntry(state)?.id === middle.id && state.press === null && state.confirm === null, 'the save is selected, and nothing is pressed or asked');
+    daroo.clickRow(daroo.rowOf(middle.id));
+    const sameAgain = frame();
+    daroo.clickRow(daroo.rowOf(newest.id));
+    const other = frame();
+    daroo.clickRow(daroo.rowOf(middle.id));
+    const back = frame();
+    console.log(`  then a click on it again: ${sameAgain}; on another save: ${other}; on it once more: ${back}`);
+    check(sameAgain === 'DELETE' && other === 'EXPORT' && back === 'EXPORT', 'a click on the same save keeps DELETE, another selection turns it back for good');
+
+    // The Delete key.
+    await hold();
+    SaveMenu.saveMenuKey(ui, 'Delete');
+    const keyed = frame();
+    SaveMenu.saveMenuKey(ui, 'ArrowDown');
+    const moved = frame();
+    SaveMenu.saveMenuKey(ui, 'ArrowUp');
+    SaveMenu.saveMenuKey(ui, 'Backspace');
+    const backspace = frame();
+    console.log(`  Delete on a save: ${keyed}; the arrow down: ${moved}; up again and Backspace: ${backspace}`);
+    check(keyed === 'DELETE' && moved === 'EXPORT' && backspace === 'DELETE', 'Delete and Backspace turn EXPORT into DELETE, and a move of the selection turns it back');
+
+    // The question.
+    const rows = await stored();
+    await daroo.click(g.deleteButtonId);
+    const asked = state.confirm;
+    await daroo.click(211, 2);
+    const cancelled = await stored();
+    await daroo.click(g.deleteButtonId);
+    SaveMenu.saveMenuKey(ui, 'Escape');
+    const escaped = { confirm: state.confirm, open: SaveMenu.isSaveMenuOpen(ui), rows: (await stored()).length };
+    console.log(`  DELETE: asks (${asked}); CANCEL: ${cancelled.length} rows, ${frame()}; Esc: ${escaped.open ? 'the menu up' : 'THE MENU GONE'}, ${escaped.rows} rows`);
+    check(asked === 'delete' && cancelled.length === rows.length && rows.length === 4, 'DELETE asks first, and CANCEL deletes nothing');
+    check(escaped.confirm === null && escaped.open && escaped.rows === 4 && frame() === 'DELETE', 'Esc takes the question down, and leaves the menu up on DELETE');
+
+    // Deleted.
+    await daroo.click(g.deleteButtonId);
+    await daroo.click(210, 2);
+    const left = await stored();
+    console.log(daroo.list());
+    console.log(`  DELETE and its DELETE: ${left.length} rows, "${state.message}", selected ${SaveMenu.selectedEntry(state)?.id === oldest.id ? 'the older save' : 'ANOTHER ROW'}, ${frame()}`);
+    check(left.length === 3 && !left.includes(middle.id) && !store.files.has(middle.id), 'the save is deleted from the store, its file with it');
+    check(SaveMenu.isSaveMenuOpen(ui) && !state.busy && state.message === SaveMenu.SAVE_MENU_DELETED && daroo.rowOf(middle.id) < 0,
+      `the menu stays up, the list without it, and says "${SaveMenu.SAVE_MENU_DELETED}"`);
+    check(SaveMenu.selectedEntry(state)?.id === oldest.id && frame() === 'EXPORT', 'the save after it is selected, under EXPORT');
+    check(daroo.party() === 'DAROO', 'and the game is left alone');
+
+    // The newest's neighbour is the one before, and the last save of a playthrough takes its heading.
+    daroo.select(oldest.id);
+    SaveMenu.saveMenuKey(ui, 'Delete');
+    await daroo.click(g.deleteButtonId);
+    await daroo.click(210, 2);
+    const afterLast = SaveMenu.selectedEntry(state)?.id === newest.id;
+    daroo.select(theirs.id);
+    SaveMenu.saveMenuKey(ui, 'Delete');
+    await daroo.click(g.deleteButtonId);
+    await daroo.click(210, 2);
+    console.log(daroo.list());
+    check(afterLast, 'the last save of a playthrough deleted, the one before it is selected');
+    check(daroo.headingOf(idOf(wuuf)) < 0 && state.selected === state.rows.length - 1 && (await stored()).join() === newest.id,
+      'a playthrough\'s only save deleted, its heading goes, and the row in its place is selected');
+    SaveMenu.closeSaveMenu(ui);
+
+    // The load-only chooser has it; RISE's dialog does not.
+    const leyla = await menuRig(graphics, store, 'LEYLA');
+    // It opens on the save, the last used: a click on it now would be a double click.
+    await leyla.open('loadOnly');
+    leyla.pressRow(leyla.rowOf(newest.id));
+    await hold();
+    leyla.ui.dialog?.release?.(leyla.ui);
+    const chooser = frame(leyla);
+    await leyla.click(g.deleteButtonId);
+    await leyla.click(210, 2);
+    console.log(`  the load-only chooser: ${chooser}, then ${(await stored()).length} rows`);
+    check(chooser === 'DELETE' && (await stored()).length === 0 && SaveMenu.isSaveMenuOpen(leyla.ui), 'the load-only chooser deletes as the disk menu does');
+    SaveMenu.closeSaveMenu(leyla.ui);
+
+    await leyla.saves.save('stopped', 'new');
+    const rise = await leyla.open('rise');
+    leyla.pressRow(1);
+    await hold();
+    leyla.ui.dialog?.release?.(leyla.ui);
+    SaveMenu.saveMenuKey(leyla.ui, 'Delete');
+    const riseIds = SaveMenu.saveMenuButtons(rise).map((b) => b.word0);
+    console.log(`  RISE's dialog, a press held on a save and Delete: ${riseIds.includes(g.deleteButtonId) ? 'DELETE' : 'no DELETE'}`);
+    check(SaveMenu.selectedEntry(rise) !== null && rise.deleteArmed === null && !riseIds.includes(g.deleteButtonId), 'RISE\'s dialog has no DELETE');
     SaveMenu.closeSaveMenu(leyla.ui);
   } finally {
     Date.now = realNow;
@@ -3514,6 +3681,7 @@ async function main(): Promise<void> {
   await checkScrolling(graphics);
   await checkDoubleClick(graphics);
   await checkExport(graphics);
+  await checkDelete(graphics);
   await checkImport(graphics);
   await checkDrop(graphics);
   await checkPlayTime(graphics);

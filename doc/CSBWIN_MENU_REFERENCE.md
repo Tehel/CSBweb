@@ -373,7 +373,7 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    bitmap, nine pixels kept a side), the title panel ((10,10)-(213,51), two kept) and the
    left frame of the bottom pair ((10,99)-(107,125), six columns kept a side and every
    row). Two panels, the list's and the preview's, stand over four button frames: LOAD,
-   SAVE, EXPORT and CANCEL. A frame takes the rectangle CSBWin's table gives graphic 0's
+   SAVE, EXPORT and CLOSE. A frame takes the rectangle CSBWin's table gives graphic 0's
    own, the frame less six pixels a side, and its label where `_DoMenu` centres one
    (`buttonRect` and `buttonLabelAt`, `src/renderer/ui/Widgets.ts`); a button that can
    do nothing has no label, as CSBWin's empty slot has none (`CSBCode.cpp:9896`).
@@ -395,6 +395,10 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    there to be copied; the port's are rows of the browser's IndexedDB, which nothing
    outside the page reads. EXPORT downloads the selected save's file as the store holds
    it, the bare `.dat`, which CSBWin opens (`doExport`, `src/renderer/ui/SaveMenu.ts`).
+   **DELETE** has no counterpart either, for the same reason: a long press on a save, or
+   the Delete key, puts it in EXPORT's place, and it asks "DELETE THIS SAVE?" in a
+   two-option `_DoMenu` menu before the row goes (`doDelete`; `doc/SAVES.md` → "The
+   dialog").
 5. **An import**, which has none either: in CSBWin a file put in the game's directory
    under one of the four names is a save of that game. A file dropped on the page while
    the dialog is up, the disk menu's or the entrance's chooser, is held against the data
@@ -409,10 +413,11 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    (`SaveGame.cpp:2117`). The dialog says how to import, "DROP .DAT TO IMPORT", while
    the pointer is on the preview's panel or EXPORT's frame (`doc/SAVES.md` → "The
    import's hint").
-6. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
-   addition, not a changed behaviour, as are the list's other keys (the arrows, Home
-   and End, Page Up and Down, Enter for LOAD), the wheel, and a double click on a save,
-   which is LOAD. The entrance's chooser takes them as the disk menu does.
+6. **Esc and right-click close it**, or cancel a question. CSBWin's menus take no key
+   at all. This is an addition, not a changed behaviour, as are the list's other keys
+   (the arrows, Home and End, Page Up and Down, Enter for LOAD, Delete and Backspace for
+   DELETE), the wheel, a double click on a save, which is LOAD, and a long press on one,
+   which is DELETE. The entrance's chooser takes them as the disk menu does.
 7. **A question before a load or a save across playthroughs.** CSBWin's four slots are
    one directory's, and it tests `d.RandomGameID` only when a lost game is read again,
    where it refuses the save: "THAT'S NOT THE SAME GAME" (`SaveGame.cpp:1729-1731`). The

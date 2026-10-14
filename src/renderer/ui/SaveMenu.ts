@@ -9,8 +9,8 @@
  * dialog of its own over the screen, an unbounded scrolling list of the data set's saves
  * under their playthroughs' headings, a date per save and a roster per playthrough
  * instead of a filename and a recency letter, a preview of the save beside the list, an
- * export of a save's file and an import of one, no "save and quit", and Esc/right-click
- * to cancel.
+ * export of a save's file and an import of one, a delete behind a long press, no "save
+ * and quit", and Esc/right-click to close.
  *
  * ## The dialog
  *
@@ -20,7 +20,7 @@
  * cleared to black, and is drawn from the dialogs' widget kit (`Widgets.ts`), whose
  * widgets are pieces of graphic 0: the plate, two panels, a list and four buttons. Two
  * panels, the list's and the preview's, stand over a row of four buttons: LOAD, SAVE and
- * EXPORT under the list, CANCEL under the preview. The list's is 32 characters and its
+ * EXPORT under the list, CLOSE under the preview. The list's is 32 characters and its
  * scrollbar wide, and the preview's ten characters.
  *
  * A label sits in its frame where `_DoMenu` puts one, and a click and the press
@@ -83,6 +83,20 @@
  * save's playthrough, and the save is no more the last one used for it. The load-only
  * chooser has it as the disk menu does.
  *
+ * ## DELETE
+ *
+ * A save is deleted from EXPORT's frame, where nothing would put it by accident: a long
+ * press on a save's row (`SAVE_MENU_LONG_PRESS_MS`, held on the row), or the Delete key
+ * on a save selected, turns EXPORT into DELETE for that save (`deleteArmed`). Another
+ * selection, a heading's or another save's, turns it back, as does the list read again
+ * after a save, an import or the delete itself. DELETE asks first, always, in
+ * `_DoMenu`'s two-option menu in the dialog's place: "DELETE THIS SAVE?" over the save's
+ * row, with DELETE and CANCEL. Deleted, the row is gone from the store
+ * (`UIState.onDeleteSave`), the save after it in its playthrough is selected, or else the
+ * one before, and the dialog says "SAVE DELETED". The game is left alone, whichever save
+ * it came from. The load-only chooser has it as the disk menu does; RISE's dialog, which
+ * has no EXPORT, has no DELETE either.
+ *
  * ## The import
  *
  * A file dropped on the page while the dialog is up is taken into the store
@@ -103,7 +117,7 @@
  *
  * Nothing else on the dialog says a file is imported so: the message's place shows
  * "DROP .DAT TO IMPORT" while there is no message and the pointer is on the preview's
- * panel or EXPORT's frame (`saveMenuPointer`).
+ * panel or EXPORT's frame while it is not DELETE (`saveMenuPointer`).
  *
  * ## The question
  *
@@ -214,7 +228,7 @@ const BUTTON_FRAMES = {
   load: { x1: 18, y1: BUTTON_Y1, x2: 81, y2: BUTTON_Y2 },
   save: { x1: 91, y1: BUTTON_Y1, x2: 154, y2: BUTTON_Y2 },
   export: { x1: 164, y1: BUTTON_Y1, x2: 227, y2: BUTTON_Y2 },
-  cancel: { x1: 237, y1: BUTTON_Y1, x2: 301, y2: BUTTON_Y2 },
+  close: { x1: 237, y1: BUTTON_Y1, x2: 301, y2: BUTTON_Y2 },
 } as const;
 
 /**
@@ -264,6 +278,11 @@ export const SAVE_MENU_IMPORT_HINT = 'DROP .DAT TO IMPORT';
 
 /** How long after a click on a save a second one on it is LOAD, in milliseconds. */
 export const SAVE_MENU_DOUBLE_CLICK_MS = 500;
+/**
+ * How long a press on a save's row is held for EXPORT to become DELETE, in milliseconds:
+ * as long as the long presses on the message area and the stat bars (`GameInput`).
+ */
+export const SAVE_MENU_LONG_PRESS_MS = 500;
 
 /** The full menu's first row, for a game with no save yet: SAVE there makes its first. */
 const NEW_SAVE_LABEL = 'NEW SAVE';
@@ -271,7 +290,11 @@ const NEW_SAVE_LABEL = 'NEW SAVE';
 /** The question's title, and its two options: the action asked about, then this. */
 export const SAVE_MENU_QUESTION = 'THAT\'S NOT THE SAME GAME';
 const CANCEL_LABEL = 'CANCEL';
-const ACTION_LABELS = { load: 'LOAD', save: 'SAVE' } as const;
+const ACTION_LABELS = { load: 'LOAD', save: 'SAVE', delete: 'DELETE' } as const;
+/** The dialog's own button that takes it down: it undoes nothing. */
+const CLOSE_LABEL = 'CLOSE';
+/** DELETE's question, over the save's row. */
+export const SAVE_MENU_DELETE_QUESTION = 'DELETE THIS SAVE?';
 /** LOAD's label in RISE's dialog: the entrance's button that opened it. */
 const RISE_LABEL = 'RISE';
 /**
@@ -283,6 +306,8 @@ export const OLD_FACE_LABEL = 'OLD FACE';
 const EXPORT_LABEL = 'EXPORT';
 /** The dialog's message once a save's file has been handed to the player. */
 export const SAVE_MENU_EXPORTED = 'SAVE EXPORTED';
+/** The dialog's message once a save has been deleted. */
+export const SAVE_MENU_DELETED = 'SAVE DELETED';
 /** The dialog's message once a dropped file is a save of the store. */
 export const SAVE_MENU_IMPORTED = 'SAVE IMPORTED';
 
@@ -334,11 +359,12 @@ const NOT_YET_LABEL = 'NOT YET';
 /** The dialog's own buttons; the question's are CSBWin's 210 and 211. */
 const BTN_LOAD = 900;
 const BTN_SAVE = 901;
-const BTN_CANCEL = 902;
+const BTN_CLOSE = 902;
 const BTN_SCROLL_UP = 903;
 const BTN_SCROLL_DOWN = 904;
 const BTN_EXPORT = 905;
 const BTN_FACE = 906;
+const BTN_DELETE = 907;
 const BTN_ROW0 = 910;
 
 /**
@@ -371,7 +397,8 @@ export const SAVE_MENU_GEOMETRY = {
   saveButtonId: BTN_SAVE,
   exportButtonId: BTN_EXPORT,
   faceButtonId: BTN_FACE,
-  cancelButtonId: BTN_CANCEL,
+  deleteButtonId: BTN_DELETE,
+  closeButtonId: BTN_CLOSE,
 } as const;
 
 /* --------------------------------------------------------------------- state ---- */
@@ -387,6 +414,9 @@ export type SaveMenuMode = 'full' | 'loadOnly' | 'rise';
 
 /** What the bottom pair of buttons does. */
 export type SaveMenuAction = 'load' | 'save';
+
+/** What a question in the dialog's place asks about: LOAD or SAVE across playthroughs, or DELETE. */
+export type SaveMenuQuestion = SaveMenuAction | 'delete';
 
 /** A row of the list: the full menu's "new save", a playthrough's heading, or a save under one. */
 export type SaveMenuRow =
@@ -413,7 +443,7 @@ export interface SaveMenuState extends WheelTravel {
   /** What the press animation will do when it finishes. */
   pending: (() => void) | null;
   /** The action the question on screen asks about, in the dialog's place, or `null`. */
-  confirm: SaveMenuAction | null;
+  confirm: SaveMenuQuestion | null;
   /**
    * The dropped file that was not stored, while the menu about it is up in the dialog's
    * place (`importMenu`), or `null`.
@@ -432,6 +462,10 @@ export interface SaveMenuState extends WheelTravel {
   pointer: { x: number; y: number } | null;
   /** RISE's toggle, NEW FACE (`true`) or OLD FACE, or `null` where there is none (see "RISE"). */
   newFace: boolean | null;
+  /** The save whose long press turned EXPORT into DELETE, by its id, or `null` (see "DELETE"). */
+  deleteArmed: string | null;
+  /** A press on a save's row still held, and the timer that arms DELETE for it, or `null`. */
+  longPress: { row: number; timer: ReturnType<typeof setTimeout> } | null;
 }
 
 export function isSaveMenuOpen(ui: UIState): boolean {
@@ -449,6 +483,8 @@ const SAVE_MENU_DIALOG: Dialog = {
     return false;
   },
   pointer: (ui, point) => saveMenuPointer(ui, point),
+  drag: (ui, x, y) => saveMenuDrag(ui, x, y),
+  release: (ui) => releaseLongPress(ui.saveMenu),
 };
 
 /**
@@ -487,6 +523,8 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
     lastSaveClick: null,
     pointer: ui.hoverPoint,
     newFace: null,
+    deleteArmed: null,
+    longPress: null,
   };
   void refreshSaveMenu(ui);
 }
@@ -507,6 +545,7 @@ export function closeSaveMenu(ui: UIState): void {
   if (!ui.saveMenu) return;
   const { mode } = ui.saveMenu;
   if (ui.saveMenu.frameHandle !== null) cancelFrame(ui.saveMenu.frameHandle);
+  releaseLongPress(ui.saveMenu);
   ui.saveMenu = null;
   closeDialog(ui);
   if (mode === 'full') tag0207cc(ui);
@@ -520,6 +559,7 @@ export async function refreshSaveMenu(ui: UIState): Promise<void> {
   if (!state) return;
   state.busy = true;
   state.message = savesDisabled(ui, state) ? SAVES_ARE_DISABLED : '';
+  state.deleteArmed = null;
   ui.renderLastFrame();
   try {
     state.entries = await (state.mode === 'rise' ? ui.onListEverySave() : ui.onListSaves());
@@ -634,7 +674,16 @@ function canSave(ui: UIState, state: SaveMenuState): boolean {
  * dialog has no EXPORT: it raises a party, and hands nothing out.
  */
 function canExport(state: SaveMenuState): boolean {
-  return !state.busy && state.mode !== 'rise' && selectedEntry(state) !== null;
+  return !state.busy && state.mode !== 'rise' && selectedEntry(state) !== null && !deleteShown(state);
+}
+
+/** Whether EXPORT's frame is DELETE: a long press armed it for the save selected (see "DELETE"). */
+function deleteShown(state: SaveMenuState): boolean {
+  return state.mode !== 'rise' && state.deleteArmed !== null && state.deleteArmed === selectedEntry(state)?.id;
+}
+
+function canDelete(state: SaveMenuState): boolean {
+  return !state.busy && deleteShown(state);
 }
 
 /** RISE's NEW FACE / OLD FACE, in EXPORT's frame: a save need not be selected. */
@@ -757,7 +806,9 @@ export function drawSaveMenu(ui: UIState): void {
     return;
   }
   if (state.confirm) {
-    doMenu(ui, SAVE_MENU_QUESTION, null, [ACTION_LABELS[state.confirm], CANCEL_LABEL], true);
+    const deleted = state.confirm === 'delete' ? selectedEntry(state) : null;
+    doMenu(ui, deleted ? SAVE_MENU_DELETE_QUESTION : SAVE_MENU_QUESTION, deleted ? formatSaveRow(deleted, TEXT_MAX_CHARS).trim() : null,
+      [ACTION_LABELS[state.confirm], CANCEL_LABEL], true);
     if (state.press) drawMenuPress(ui, state.press, nowMs());
     return;
   }
@@ -802,8 +853,9 @@ export function drawSaveMenu(ui: UIState): void {
   if (canLoad(state)) drawButtonLabel(ui, BUTTON_FRAMES.load, state.mode === 'rise' ? RISE_LABEL : ACTION_LABELS.load);
   if (canSave(ui, state)) drawButtonLabel(ui, BUTTON_FRAMES.save, ACTION_LABELS.save);
   if (canExport(state)) drawButtonLabel(ui, BUTTON_FRAMES.export, EXPORT_LABEL);
+  if (canDelete(state)) drawButtonLabel(ui, BUTTON_FRAMES.export, ACTION_LABELS.delete);
   if (canToggleFace(state)) drawButtonLabel(ui, BUTTON_FRAMES.export, state.newFace ? NEW_FACE_LABEL : OLD_FACE_LABEL);
-  if (!state.busy) drawButtonLabel(ui, BUTTON_FRAMES.cancel, CANCEL_LABEL);
+  if (!state.busy) drawButtonLabel(ui, BUTTON_FRAMES.close, CLOSE_LABEL);
 
   if (state.press) drawMenuPress(ui, state.press, nowMs());
 }
@@ -817,13 +869,14 @@ function shownMessage(state: SaveMenuState): string {
 
 /**
  * Whether the pointer is where the import's hint shows: on the preview's panel, or on
- * EXPORT's frame, labelled or not. Nothing on the dialog says a dropped file is
- * imported, and a hint always up would take lines the preview needs. RISE's dialog
- * imports nothing (`saveMenuTakesDrops`), so it has no hint.
+ * EXPORT's frame, labelled or not, unless it is DELETE. Nothing on the dialog says a
+ * dropped file is imported, and a hint always up would take lines the preview needs.
+ * RISE's dialog imports nothing (`saveMenuTakesDrops`), so it has no hint.
  */
 function pointsAtImportHint(state: SaveMenuState): boolean {
   const at = state.pointer;
-  return state.mode !== 'rise' && at !== null && (contains(PREVIEW_PANEL, at) || contains(BUTTON_FRAMES.export, at));
+  return state.mode !== 'rise' && at !== null
+    && (contains(PREVIEW_PANEL, at) || (contains(BUTTON_FRAMES.export, at) && !deleteShown(state)));
 }
 
 /**
@@ -855,8 +908,10 @@ export function saveMenuButtons(state: SaveMenuState): UIButton[] {
     buttonOf(BUTTON_FRAMES.save, BTN_SAVE, 'saveMenu.save'),
     state.mode === 'rise'
       ? buttonOf(BUTTON_FRAMES.export, BTN_FACE, 'saveMenu.face')
-      : buttonOf(BUTTON_FRAMES.export, BTN_EXPORT, 'saveMenu.export'),
-    buttonOf(BUTTON_FRAMES.cancel, BTN_CANCEL, 'saveMenu.cancel'),
+      : deleteShown(state)
+        ? buttonOf(BUTTON_FRAMES.export, BTN_DELETE, 'saveMenu.delete')
+        : buttonOf(BUTTON_FRAMES.export, BTN_EXPORT, 'saveMenu.export'),
+    buttonOf(BUTTON_FRAMES.close, BTN_CLOSE, 'saveMenu.close'),
     ...listButtons(saveMenuList(state.mode), state.rows.length, state.scrollTop,
       { up: BTN_SCROLL_UP, down: BTN_SCROLL_DOWN, row0: BTN_ROW0 }, 'saveMenu'),
   ];
@@ -870,8 +925,8 @@ export function saveMenuButtons(state: SaveMenuState): UIButton[] {
 export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number): void {
   const state = ui.saveMenu;
   if (!state) return;
-  // Right-click cancels, the question when one is up. CSBWin has no such thing; see the
-  // divergence list.
+  // Right-click closes the dialog, or cancels the question when one is up. CSBWin has no
+  // such thing; see the divergence list.
   if ((buttons & 1) !== 0) {
     if ((state.confirm || state.dropped || state.adventure) && !state.press) cancelQuestion(ui, state);
     else closeSaveMenu(ui);
@@ -898,10 +953,10 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
   const id = searchButtonList(saveMenuButtons(state), x, y, buttons);
   if (id === 0) return;
 
-  if (id === BTN_CANCEL) {
+  if (id === BTN_CLOSE) {
     // The screen is drawn again once the dialog is gone: the entrance's chooser waits on
     // that draw to know it has closed (`openLoadMenu`, `src/renderer/intro/BootSequence.ts`).
-    beginPress(ui, state, saveMenuButtons(state), BTN_CANCEL, () => {
+    beginPress(ui, state, saveMenuButtons(state), BTN_CLOSE, () => {
       closeSaveMenu(ui);
       ui.renderLastFrame();
     });
@@ -920,8 +975,10 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
       const last = state.lastSaveClick;
       const second = row.kind === 'save' && last !== null && last.id === row.entry.id && now - last.atMs <= SAVE_MENU_DOUBLE_CLICK_MS;
       state.lastSaveClick = row.kind === 'save' && !second ? { id: row.entry.id, atMs: now } : null;
+      if (index !== state.selected) state.deleteArmed = null;
       // A heading keeps its place in the list whichever way its saves go.
       state.selected = index;
+      if (row.kind === 'save' && !second) holdLongPress(ui, state, index);
       if (row.kind === 'heading') setFolded(ui, state, row.playthrough, state.unfolded.has(row.playthrough.id));
       state.message = '';
       if (second && canLoad(state)) pressAction(ui, state, 'load');
@@ -933,6 +990,12 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
   if (id === BTN_SAVE && canSave(ui, state)) pressAction(ui, state, 'save');
   if (id === BTN_EXPORT && canExport(state)) {
     beginPress(ui, state, saveMenuButtons(state), BTN_EXPORT, () => void runPending(ui, 'export'));
+  }
+  if (id === BTN_DELETE && canDelete(state)) {
+    beginPress(ui, state, saveMenuButtons(state), BTN_DELETE, () => {
+      state.confirm = 'delete';
+      ui.renderLastFrame();
+    });
   }
   if (id === BTN_FACE && canToggleFace(state)) {
     beginPress(ui, state, saveMenuButtons(state), BTN_FACE, () => {
@@ -959,7 +1022,7 @@ function pressAction(ui: UIState, state: SaveMenuState, action: SaveMenuAction):
  * CANCEL, and 0 neither button. Either button flashes as any menu's does, with the
  * question still up; then the list is back, and the action runs from it.
  */
-function answerQuestion(ui: UIState, state: SaveMenuState, action: SaveMenuAction, choice: number): void {
+function answerQuestion(ui: UIState, state: SaveMenuState, action: SaveMenuQuestion, choice: number): void {
   if (choice !== 1 && choice !== 2) return;
   beginPress(ui, state, menuButtonList(ui, 2, true), 209 + choice, () => {
     state.confirm = null;
@@ -1010,6 +1073,51 @@ function cancelQuestion(ui: UIState, state: SaveMenuState): void {
   state.dropped = null;
   state.adventure = null;
   if (alone) closeSaveMenu(ui);
+  ui.renderLastFrame();
+}
+
+/* ------------------------------------------------------------ the long press ---- */
+
+/**
+ * A press on the save of row `row`: held `SAVE_MENU_LONG_PRESS_MS` on that row, it turns
+ * EXPORT into DELETE for that save (see "DELETE"). Released before, or moved off the
+ * row, it was a click.
+ */
+function holdLongPress(ui: UIState, state: SaveMenuState, row: number): void {
+  releaseLongPress(state);
+  if (state.mode === 'rise') return;
+  const timer = setTimeout(() => {
+    state.longPress = null;
+    if (ui.saveMenu === state) armDelete(ui, state);
+  }, SAVE_MENU_LONG_PRESS_MS);
+  state.longPress = { row, timer };
+}
+
+/** The press on a row let go of, or moved off it: no long press. */
+function releaseLongPress(state: SaveMenuState | null): void {
+  if (!state?.longPress) return;
+  clearTimeout(state.longPress.timer);
+  state.longPress = null;
+}
+
+/** The pointer moved with a press held: off the row pressed, it is no long press. */
+export function saveMenuDrag(ui: UIState, x: number, y: number): void {
+  const state = ui.saveMenu;
+  const press = state?.longPress;
+  if (!state || !press) return;
+  if (searchButtonList(saveMenuButtons(state), x, y, 2) !== BTN_ROW0 + press.row - state.scrollTop) releaseLongPress(state);
+}
+
+/**
+ * EXPORT turned into DELETE for the save selected: a long press's, or the Delete key's.
+ * Nothing while the dialog is working, pressing a button or asking.
+ */
+function armDelete(ui: UIState, state: SaveMenuState): void {
+  const entry = selectedEntry(state);
+  if (!entry || state.mode === 'rise' || state.busy || state.press || state.confirm || state.dropped || state.adventure) return;
+  state.deleteArmed = entry.id;
+  state.lastSaveClick = null;
+  state.message = '';
   ui.renderLastFrame();
 }
 
@@ -1067,7 +1175,7 @@ export const SAVE_MENU_PRESS_MS = MENU_PRESS_PHASE_MS * 2;
 
 /* -------------------------------------------------------------- the actions ---- */
 
-async function runPending(ui: UIState, action: SaveMenuAction | 'export'): Promise<void> {
+async function runPending(ui: UIState, action: SaveMenuQuestion | 'export'): Promise<void> {
   const state = ui.saveMenu;
   if (!state) return;
   state.busy = true;
@@ -1076,6 +1184,7 @@ async function runPending(ui: UIState, action: SaveMenuAction | 'export'): Promi
   try {
     if (action === 'load') await doLoad(ui, state);
     else if (action === 'save') await doSave(ui, state);
+    else if (action === 'delete') await doDelete(ui, state);
     else await doExport(ui, state);
   } catch (error) {
     state.busy = false;
@@ -1179,6 +1288,34 @@ async function doExport(ui: UIState, state: SaveMenuState): Promise<void> {
 }
 
 /**
+ * The selected save, deleted from the store, and the list read again: the save after it
+ * in its playthrough selected, or else the one before, or else the row that took its
+ * heading's place. The game stays as it is.
+ */
+async function doDelete(ui: UIState, state: SaveMenuState): Promise<void> {
+  const entry = selectedEntry(state);
+  if (entry) {
+    const siblings = playthroughsOf(state.entries).find((p) => p.id === entry.playthrough)?.saves ?? [];
+    const at = siblings.findIndex((e) => e.id === entry.id);
+    const neighbour = siblings[at + 1] ?? siblings[at - 1] ?? null;
+    const heading = state.rows.findIndex((row) => row.kind === 'heading' && row.playthrough.id === entry.playthrough);
+    await ui.onDeleteSave(entry);
+    state.entries = await ui.onListSaves();
+    if (neighbour && state.entries.some((e) => e.id === neighbour.id)) {
+      selectSave(ui, state, neighbour);
+    } else {
+      layoutRows(ui, state);
+      state.selected = Math.min(heading, state.rows.length - 1);
+      showSelection(state);
+    }
+    state.message = SAVE_MENU_DELETED;
+  }
+  state.deleteArmed = null;
+  state.busy = false;
+  ui.renderLastFrame();
+}
+
+/**
  * Whether a file dropped on the page is the dialog's import: in the disk menu and the
  * load-only chooser. RISE's dialog raises a party from a save already stored; a DM save
  * is imported in a DM set, and a CSB one through the entrance's RESUME.
@@ -1234,9 +1371,11 @@ async function runImport(ui: UIState, file: ImportedFile, confirmed: boolean): P
 
 /**
  * CSBWin's menus take no key (`doc/PROVEN_FACTS.md` → "A one-button menu takes no key").
- * A list needs arrows, and Esc is the cancel every player will try; both are additions,
+ * A list needs arrows, and Esc is the close every player will try; both are additions,
  * recorded as such. Up and down move the selection over the rows shown; right unfolds
  * the heading selected and left folds it, and from a save left goes to its heading.
+ * Delete, and Backspace, which a Mac's delete key is, turn EXPORT into DELETE for the
+ * save selected, as a long press on it does.
  *
  * Returns whether the key was taken, so the host can stop it reaching the movement keys
  * exactly as it does for the Reincarnate screen.
@@ -1282,6 +1421,10 @@ export function saveMenuKey(ui: UIState, key: string): boolean {
     case 'Enter':
       if (canLoad(state)) pressAction(ui, state, 'load');
       return true;
+    case 'Delete':
+    case 'Backspace':
+      armDelete(ui, state);
+      return true;
     default:
       return true;
   }
@@ -1290,6 +1433,7 @@ export function saveMenuKey(ui: UIState, key: string): boolean {
 function moveSelection(ui: UIState, state: SaveMenuState, delta: number): void {
   if (state.rows.length === 0) return;
   const next = Math.max(0, Math.min(state.rows.length - 1, (state.selected < 0 ? 0 : state.selected) + delta));
+  if (next !== state.selected) state.deleteArmed = null;
   state.selected = next;
   state.message = '';
   showSelection(state);
@@ -1303,6 +1447,7 @@ function foldSelection(ui: UIState, state: SaveMenuState, folded: boolean): void
     setFolded(ui, state, row.playthrough, folded);
   } else if (row?.kind === 'save' && folded) {
     state.selected = state.rows.findIndex((r) => r.kind === 'heading' && r.playthrough.id === row.entry.playthrough);
+    state.deleteArmed = null;
   } else {
     return;
   }

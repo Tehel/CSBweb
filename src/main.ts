@@ -334,6 +334,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         isPrison: () => saves.inPrison(),
         // EXPORT: the row's file as the store holds it, downloaded under the row's name.
         onExportSave: async (entry) => downloadSaveFile(entry.name, (await saves.open(entry)).bytes),
+        // DELETE, which a long press on a save puts in EXPORT's place.
+        onDeleteSave: (entry) => saves.remove(entry),
         // The import: a file dropped on the page (`bindSaveDrop`), held against the dungeon.
         onImportSave: (file, confirmed) => saves.importSave(file, confirmed),
         onRestoreSave: (save) => {

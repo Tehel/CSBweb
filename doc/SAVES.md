@@ -290,7 +290,7 @@ opens the same one, load-only.
   the grey frame, the sunken panel and a button frame. Two panels
   side by side, the list's (210 wide: 32 characters a row and the scrollbar) and
   the preview's (65 wide, 10 characters), over one row of four buttons: LOAD, SAVE and
-  EXPORT under the list, CANCEL under the preview. A button that can do nothing has no
+  EXPORT under the list, CLOSE under the preview. A button that can do nothing has no
   label, as CSBWin's empty slot has none. The labels' places in their frames, the
   rectangle a click takes and the press animation are `_DoMenu`'s. The question before
   a load or a save is `_DoMenu`'s centred menu, alone on the cleared screen.
@@ -334,8 +334,8 @@ opens the same one, load-only.
   VBL's frame a pointer move asks for draws it; at the entrance, whose chooser no VBL
   draws again, the move that brings it up or takes it down redraws the chooser
   (`GameScreen.moveDialogPointer`). RISE's dialog, which imports nothing, has no hint.
-- **LOAD, SAVE, EXPORT**, and a drop for the import. No delete, no quit and no "SAVE AND
-  QUIT": loading another playthrough's save is how a player leaves a game. **A dropped
+- **LOAD, SAVE, EXPORT**, DELETE in EXPORT's place, and a drop for the import. No quit
+  and no "SAVE AND QUIT": loading another playthrough's save is how a player leaves a game. **A dropped
   save of the dungeon is listed at once**, selected, under "SAVE IMPORTED", and nothing
   is loaded (`saveMenuDrop`, `src/renderer/ui/SaveMenu.ts`). The dialog takes no drop
   while it is working, pressing a button or asking. What is not stored is said in
@@ -356,7 +356,22 @@ opens the same one, load-only.
   click on a save is LOAD**: a second click on it within half a second of the first
   (`SAVE_MENU_DOUBLE_CLICK_MS`, `src/renderer/ui/SaveMenu.ts`), with the button's press
   and its question. Not on a heading, which a click folds.
-- **CANCEL, Esc and a right-click close it.**
+- **DELETE is behind a long press**, so that nothing deletes a save by accident: a press
+  held half a second on a save's row (`SAVE_MENU_LONG_PRESS_MS`, released early or
+  moved off the row it is a click), or Delete or Backspace on a save selected, turns
+  EXPORT into DELETE for that save (`deleteArmed`, `src/renderer/ui/SaveMenu.ts`).
+  Another selection turns it back, as does the list read again after a save, an import
+  or the delete; the import's hint is not shown over it. DELETE always asks, in
+  `_DoMenu`'s centred menu in the dialog's place: "DELETE THIS SAVE?" over the save's
+  row, with DELETE and CANCEL; Esc and a right-click cancel. Confirmed, the row is gone
+  from the store (`GameSaves.remove`, through `UIState.onDeleteSave`), the save after
+  it in its playthrough is selected, or else the one before, or the row in its
+  heading's place when it was the playthrough's last, and the dialog says "SAVE
+  DELETED". The game is left alone, whichever save it came from: F5 then writes a new
+  quick-save, and F9 loads the playthrough's newest save left. The load-only chooser
+  has it; RISE's dialog, with no EXPORT, has none.
+- **CLOSE, Esc and a right-click close it.** CLOSE undoes nothing, so it is not called
+  CANCEL; the questions' CANCEL is theirs.
 - **While a DSA has disabled saves** (`&DISABLESAVES`, `DsaSystem.disableSaves`), CSBWin's
   disk menu is only "SAVES ARE DISABLED" and OK (`doc/CSBwin-src/SaveGame.cpp:856-873`),
   since it did nothing but save. The dialog loads and exports too, so it opens as ever,
@@ -423,7 +438,6 @@ touches F5's or a dialog's save.
 
 None of these was in the dialog's scope, and none is debt:
 
-- **No delete.** `BrowserSaveStore.remove` has no caller.
 - **No file picker** for an import: the drop is the one way in.
 - **No "SAVE AND QUIT"** (`doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in
   this port").
@@ -488,7 +502,7 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
   art), "the dialog" (the margins, clean panel under every row and label, ten characters
   fitting the preview's panel, the scrollbar against the panel's edge), "the menu button
   sets" (a frame's rectangle and label against CSBWin's table) and "the menu's
-  selection" (CANCEL, the arrows).
+  selection" (CLOSE, the arrows).
 - **The two-level list**: "the list" (the playthroughs and their order, a heading's and
   a save's row) and "the two-level list" (three games' saves in one store: which heading
   is first and unfolded and which save selected; a click folding and unfolding; from a
@@ -518,6 +532,13 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
   store's bytes byte for byte, which read as a CSBWin save; no row written and the game
   left alone; another playthrough's save without a question; a read that fails; the
   load-only chooser).
+- **DELETE**: "DELETE" (a click, a press moved off its row, a long press on a heading and
+  Delete there leaving EXPORT; the long press turning it into DELETE, labelled, a click
+  on the same save keeping it and another selection turning it back; Delete, Backspace
+  and the arrows; the question, its CANCEL and Esc deleting nothing; the row and its
+  file gone, the menu up under "SAVE DELETED", the save after it selected, then the one
+  before, and the row in a heading's place, the game left alone; the load-only chooser
+  deleting, and RISE's dialog having no DELETE).
 - **A dungeon's signature, and the catalogue**: `tools/dump-dungeon-signature.ts` (the
   digest's input on a level made by hand, and the digest against `node:crypto`'s; every
   data set's `dungeon.dat` and CSB's `mini.dat` a catalogue dungeon that lists the set,
