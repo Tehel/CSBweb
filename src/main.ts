@@ -246,6 +246,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // `TAG02076e` / `TAG0207cc` from the engine: the Hall of Champions and `WakeUp`.
         tag02076e: () => screen?.tag02076e(),
         tag0207cc: () => screen?.tag0207cc(),
+        // A save read in play: the screen leaves the old world for the one read.
+        savedGameRead: () => screen?.savedGameRead(),
         // The prison's fourth champion asks whether the adventure begins, and every
         // champion is reported.
         championJoined: (joined) => {

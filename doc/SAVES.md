@@ -434,6 +434,14 @@ SAVED GAME!" (`:1710`) for a write that failed and for no save at all; a file th
 not read gives the line the dialog's message would be. Each outcome is also a line for
 the console, with the save's name, and with the error behind a failure.
 
+A save read in play, F9's, LOAD's or the prison's new adventure, has no CSBWin
+counterpart: CSBWin reads a game only after `d.Initialize()` has zeroed the whole of `d`
+(`doc/CSBwin-src/CSBCode.cpp:333-340`). So the screen's share of `d` is a new game's once
+the read is in, before anything runs on it (`GameHost.savedGameRead`): an open chest is
+dropped, never repacked into the world read, an open inventory closed, its video mode the
+adventure's again, and the attack menu, the Reincarnate screen, the eye and the mouth are
+gone. The disk menu's `TAG0207cc` then runs on the party read.
+
 ## CONTINUE
 
 The welcome page's CONTINUE (`src/ui/welcomePage.ts`) opens the game's page with the
@@ -512,6 +520,10 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
 - **F5's slot and F9's choice**: "the list" (which row is the slot), "the one save call"
   (a second F5 writes over the first, and SAVE does not) and "one store, two data sets"
   (F9 in its playthrough, and in one with no save).
+- **A read in play leaves the old world**: "a save read in play over an open chest and an
+  open inventory" (F9 and LOAD, with an object taken from an open chest into the hand: the
+  chest read whole, no inventory open, the attack menu, the Reincarnate screen and the eye
+  gone).
 - **SAVE over the selection**: "the one save call" (the row written over, F5's slot
   written over, another playthrough's save) and "the menu's selection, and what SAVE
   writes" (the dialog's own clicks and keys).

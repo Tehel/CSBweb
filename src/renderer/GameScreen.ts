@@ -45,7 +45,7 @@ import {
 import { Position } from '../core/types';
 import { ViewportRenderer } from './ViewportRenderer';
 import { LEFT_HANDED_VIEWPORT, leftHandedLayout, leftHandedX, makeLeftHanded, rightHandedX, type LeftHandedLayout } from './LeftHanded';
-import { createUIState, initializePlayState, UIMode, type ScreenIndexBuffer, type UIState } from './ui/UIState';
+import { createUIState, initializePlayState, savedGameRead, UIMode, type ScreenIndexBuffer, type UIState } from './ui/UIState';
 import { drawStaticUIFrame } from './ui/Draw';
 import {
   drawCursorItem,
@@ -349,6 +349,12 @@ export class GameScreen {
   /** `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:10058`) — the host's `tag0207cc`. */
   tag0207cc(): void {
     tag0207cc(this.ui);
+  }
+
+  /** A saved game read in play — the host's `savedGameRead`: the read party is awake. */
+  savedGameRead(): void {
+    savedGameRead(this.ui);
+    this.setUIMode(UIMode.Adventure);
   }
 
   /**

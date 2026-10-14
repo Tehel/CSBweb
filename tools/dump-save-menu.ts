@@ -29,6 +29,8 @@
  *    inventory, which is what puts its objects in the save; the second shows the
  *    inventory again and brings the attack buttons back. Run over a real chest, with a
  *    real save restored into a fresh game. The port's quick-save repacks the chest too.
+ *    A save read in play, F9 or LOAD, leaves the old world's open chest, inventory,
+ *    attack menu, Reincarnate screen and eye behind (`GameHost.savedGameRead`).
  * 8. **The one save call.** The disk menu's SAVE and F5 both go through `GameSaves.save`
  *    (`src/engine/GameSaves.ts`), which names the save and runs `SaveGame`'s tail: after
  *    the write for the menu, whose clock is stopped, and before it for F5, whose clock
@@ -170,7 +172,7 @@ import {
   menuButtonRect,
   splitLongLine,
 } from '../src/renderer/ui/Menu';
-import { type UIState } from '../src/renderer/ui/UIState';
+import { savedGameRead, type UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { DEFAULT_DATA_SET, dataSetNamed, diskFiles } from './lib/dataSets';
 import { graphicsTablesOf, newGame, stockGame, stockGraphics } from './lib/game';
@@ -925,6 +927,70 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
   check(saved === packed, 'the quick-save repacks the chest: the restored chest holds its objects');
   draw();
   check(ui.openChestId === chest && chestContents(game, chest) === 0, 'and the next draw opens the chest again');
+}
+
+/**
+ * A save read in play, F9 or the disk menu's LOAD, which CSBWin does not have
+ * (`GameHost.savedGameRead`): the screen leaves the old world before anything runs on
+ * the one read. Over the same chest, saved closed, then opened in the inventory and an
+ * object taken from it into the hand.
+ */
+async function checkReadInPlay(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== a save read in play over an open chest and an open inventory ===');
+  for (const how of ['F9', 'LOAD'] as const) {
+    let ui: UIState | null = null;
+    const game = await loadGame({ savedGameRead: () => { if (ui) savedGameRead(ui); } });
+    game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
+    const old = game.ctx.party.state;
+    const found = findChest(game);
+    if (!found) { check(false, 'dungeon.dat has a chest with two objects in it'); return; }
+    const { chest, cell } = found;
+    const packed = chestContents(game, chest);
+    game.ctx.dungeon.removeObjectFromCell(cell, chest);
+    old.champions[0]!.possessions[1] = chest;
+    const bytes = buildSaveFile(game);
+
+    ui = newUIState(graphics, game.ctx, { onRestoreSave: (save) => applySaveBytes(game, save.bytes) });
+    old.selectedCharacterIndex = 0;
+    game.ctx.loop.videoMode = 'VM_INVENTORY';
+    // `drawInventoryScreen`'s state half, as in `checkEnterAndLeave`.
+    Inventory.syncOpenChest(ui, Inventory.getActiveChestView(ui, old.champions[0]!));
+    ui.displayResurrectChestOrScroll = 4;
+    const taken = ui.openChestContents[0]!;
+    ui.openChestContents[0] = OBJECT_ID_NULL;
+    old.objectInHand = taken;
+    ui.attackingCharacterOrdinal = 1;
+    ui.reincarnate = { chIdx: 0, stage: 1, count: 0, name: '', title: '' };
+    ui.pressingEye = true;
+
+    game.start();
+    try {
+      if (how === 'F9') {
+        applySaveBytes(game, bytes);
+      } else {
+        // The disk menu's TAG02076e repacks the chest as it opens, before the LOAD.
+        ui.pressingEye = false;
+        SaveMenu.openSaveMenu(ui);
+        SaveMenu.restoreChosenSave(ui, { entry: entry({}), bytes });
+      }
+    } finally {
+      game.stop();
+    }
+    // The next compose (`refreshScreen`): the party the engine has, and the chest view
+    // dropped with no inventory open.
+    const party = game.ctx.party.state;
+    ui.partyState = party;
+    if (party.selectedCharacterIndex < 0) Inventory.syncOpenChest(ui, null);
+    const held = chestContents(game, chest);
+    const videoMode: string = game.ctx.loop.videoMode;
+    console.log(`  ${how}: the chest holds ${held} of ${packed}, inventory ${party.selectedCharacterIndex}, videoMode ${videoMode}, attack menu ${ui.attackingCharacterOrdinal}, reincarnate ${ui.reincarnate !== null}, eye ${ui.pressingEye}`);
+    check(held === packed, `${how}: the chest read keeps every object, the old world's open view never repacked into it`);
+    check(party.selectedCharacterIndex === -1 && videoMode === 'VM_ADVENTURE',
+      `${how}: no inventory is open, and the video mode is the adventure's`);
+    check(ui.attackingCharacterOrdinal === 0 && ui.word20252 === 1 && ui.reincarnate === null && !ui.pressingEye,
+      `${how}: the attack menu, the Reincarnate screen and the eye are the old world's, and gone`);
+  }
 }
 
 /* ----------------------------------------------------- 7. the press animation ---- */
@@ -3752,6 +3818,7 @@ async function main(): Promise<void> {
   checkCsbwinListing();
   await checkEnterAndLeave(graphics);
   await checkQuickSaveOverOpenChest(graphics);
+  await checkReadInPlay(graphics);
   checkPressAnimation(graphics);
   await checkSaveCall();
   await checkSelection(graphics);

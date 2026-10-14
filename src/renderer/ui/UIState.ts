@@ -69,7 +69,10 @@ export interface UIState {
   readonly uiTables: UITables;
   readonly objectTables: ObjectTables;
   readonly fontData: FontData;
-  /** The party the screen last drew (`GameScreen.setPartyState`), `ctx.party.state` at first. */
+  /**
+   * The party the screen last drew (`GameScreen.setPartyState`), `ctx.party.state` at first
+   * and after a read in play (`savedGameRead`).
+   */
   partyState: PartyState;
   uiMode: UIMode;
   /**
@@ -434,6 +437,21 @@ function initialPlayState(): PlayState {
  */
 export function initializePlayState(ui: UIState): void {
   Object.assign(ui, initialPlayState());
+}
+
+/**
+ * A saved game read in play (`GameHost.savedGameRead`), which only the port has: CSBWin
+ * reads a game only after `d.Initialize()` (`doc/CSBwin-src/CSBCode.cpp:333-340`), so the
+ * screen's share of `d` is a new game's, as `initializePlayState` leaves it, and the party
+ * is the one read. The old world's open chest is dropped, never repacked into the world
+ * read, and an open inventory is closed as `ShowHideInventory` closes one, its
+ * `videoMode = VM_ADVENTURE` (`:7512`): the party read has none open. The caller sets
+ * the button lists.
+ */
+export function savedGameRead(ui: UIState): void {
+  if (ui.partyState.selectedCharacterIndex >= 0) ui.ctx.loop.videoMode = 'VM_ADVENTURE';
+  initializePlayState(ui);
+  ui.partyState = ui.ctx.party.state;
 }
 
 /** What the interface reads, all of it there before the first frame. */

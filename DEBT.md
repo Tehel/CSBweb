@@ -118,7 +118,6 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
-| R1 | A game read in play leaves the screen on the old world | M | ⏳ |
 | R3 | After a fatal error the page still saves | S | ⏳ |
 | R4 | F9 reads over a champion being chosen, and over a script that starts during its read | S | ⏳ |
 | R5 | Another tab holds the store: the new build hangs at ENTER | S | ⏳ |
@@ -422,41 +421,9 @@ untrusted: they may stop the game with a message, as CSBWin dies, but never cras
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
 
-### R1 ⏳ A game read in play leaves the screen on the old world
-
-A read replaces `ctx.party.state` (`Party.setState`, `src/engine/Party.ts:118-126`) and the
-world, and tells the screen nothing. `ui.partyState` (`src/renderer/ui/UIState.ts:73`), the
-open chest (`ui.openChestId`, `ui.openChestContents`), the attack menu
-(`ui.possibleAttackTypes`) and the Reincarnate screen (`ui.reincarnate`) stay the old
-world's until the next `refreshScreen`, and what runs before it acts on them:
-
-- **F9 with a chest open loses an object.** The next compose's `syncOpenChest(ui, null)`
-  (`src/renderer/GameScreen.ts:650-653`) repacks the old world's open contents into the
-  loaded world's chest (`repackOpenChest`, `src/renderer/ui/Inventory.ts:376-399`). An
-  object taken from the chest into the hand before F9 is then in no chain of the loaded
-  world; one put into it is linked twice, which cuts the chain it lies in. F9 is taken
-  with an inventory open (`GameInput.keyDown`, `src/renderer/GameInput.ts:325-334`). The
-  disk menu's LOAD loses nothing: opening the menu runs `TAG02076e`, which repacks first.
-- **The disk menu's LOAD runs `TAG0207cc` on the old party.** `restoreChosenSave` reads,
-  then `closeSaveMenu` calls `tag0207cc(ui)` (`src/renderer/ui/SaveMenu.ts:1099-1112`,
-  `:474-481`; `src/renderer/ui/Mouse.ts:413`), which opens the old party's inventory
-  again and leaves `ctx.loop.videoMode` at `'VM_INVENTORY'` while the loaded party has
-  none open (`selectedCharacterIndex: -1`, `src/engine/CsbwinSaveGame.ts:111`). Nothing
-  puts it back until an inventory is toggled (`Game.ts:554` resets only the other modes),
-  so `GameScreen.isAdventureVideoMode` is false and a dungeon's overlay is not drawn
-  (Conflux). CSBWin's `TAG0207cc` runs on the world just read.
-- **A Reincarnate screen or an attack menu up at F9** acts on the loaded party's champion
-  of the same index (R4).
-
-Paying it: every read in play tells the screen (one `GameHost` notice from
-`applySaveBytes`), which drops the chest view without a repack, closes the attack menu,
-the Reincarnate screen, the eye and the mouth, and sets `ui.partyState` before `TAG0207cc`
-runs. A `tools/` check: a chest open, an object taken out, F9; and a LOAD from an open
-inventory. D17 and D18 then remove the cause, two owners of the same state.
-
 ### R3 ⏳ After a fatal error the page still saves
 
-`reportError` (`src/main.ts:677`) stops the game and puts up the message, and nothing
+`reportError` (`src/main.ts:665`) stops the game and puts up the message, and nothing
 else. `GameInput` still takes the keys (its `ended()` is `mainLoopHasReturned()`, which
 `stop` does not set, `src/renderer/GameInput.ts:74-76`), `quickSave` does not ask whether
 the game runs (`src/engine/GameSaves.ts:510-531`). So F5 after a VBL that threw writes the
@@ -549,7 +516,7 @@ with `npm test -- --frames`.
 
 ### R8 ⏳ An optional feature's failure ends the game, or the session
 
-- **The Hint Oracle** runs with `.catch(reportError)` (`src/main.ts:379`), so any error in
+- **The Hint Oracle** runs with `.catch(reportError)` (`src/main.ts:386`), so any error in
   it ends the game with whatever was not saved. `readHintOracle` throws for a world whose
   `hintKey` does not decipher `hcsb.hct`, such as an imported save of a modified CSB.
 - **RISE's NEW FACE**: `utilityPortraits ??=` caches a promise that rejects when
@@ -697,11 +664,12 @@ New state-representation debt goes here, and jumps the queue.
 ### D17 ⏳ The screen keeps the party it last drew
 
 `Party.setState` builds a new object (`src/engine/Party.ts:118-126`), and the screen keeps
-its own reference, `ui.partyState` (`src/renderer/ui/UIState.ts:73`, about 125 uses), set
-again only by `GameScreen.setPartyState` from `renderView` and `refreshScreen`
-(`src/main.ts:108`, `:115`). Whatever runs between a read and the next of those reads the old
-party (R1), and "another game" is detected by the object changing (`setPartyState`'s
-`state !== this.ui.partyState`). The freeze has two owners the same way:
+its own reference, `ui.partyState` (`src/renderer/ui/UIState.ts:76`, about 125 uses), set
+again by `GameScreen.setPartyState` from `renderView` and `refreshScreen`
+(`src/main.ts:111`, `:118`), and by a save read in play, which must tell the screen
+(`GameHost.savedGameRead`, `savedGameRead` in `UIState.ts`) or what runs before the next
+compose reads the old party. "Another game" is detected by the object changing
+(`setPartyState`'s `state !== this.ui.partyState`). The freeze has two owners the same way:
 `GameScreen.isFrozen()` reads `ui.uiMode`, `Game.isFrozen()` reads `ctx.loop.gameFrozen`.
 
 Paying it: `Party.state` restored in place, as `TimerQueue.restore` and the footprints'
@@ -713,23 +681,24 @@ generation count; one owner for the freeze.
 CSBWin's interface state is `d.`: the open chest and its contents, the attack menu
 (`d.AttackingCharacterOrdinal`, `Word20250`, `Word20252`), `PressingEye`, `PressingMouth`,
 `DisplayResurrectChestOrScroll`. The port keeps them in `UIState`
-(`src/renderer/ui/UIState.ts:202-242`), and the engine reads them back through `GameHost`
+(`src/renderer/ui/UIState.ts:210-253`), and the engine reads them back through `GameHost`
 queries (`pressingEye`, `pressingMouth`, `displayResurrectChestOrScroll`,
-`attackingCharacterOrdinal`, `src/engine/GameHost.ts:47-198`, answered as
+`attackingCharacterOrdinal`, `src/engine/GameHost.ts:47-207`, answered as
 `screen?.…() ?? 0` in `src/main.ts:239-242`), beside calls into the UI named by CSBWin
 address (`tag02076e`, `tag0207cc`, `tag01b29a`, `tag011366`). So:
 
 - **Composing the screen opens and repacks chests.** `presentViewport` runs
   `syncOpenChest(this.ui, null)` and zeroes `displayResurrectChestOrScroll`
-  (`src/renderer/GameScreen.ts:650-653`), and `drawInventoryScreen` opens the chest through
+  (`src/renderer/GameScreen.ts:698-701`), and `drawInventoryScreen` opens the chest through
   `syncOpenChest(ui, chestView)` (`src/renderer/ui/Inventory.ts:41`), which unlinks its
   objects from the database (`:363-368`). A compose runs at every refresh, up to 60 a
   second while the pointer moves, so what the engine finds in a chest depends on when the
   screen was last composed. The save repacks by hand first (`GameSaves.ts:289`), and the
   compose skips the inventory under the disk menu so as not to open it again
-  (`GameScreen.ts:661-665`). CSBWin opens the chest while drawing too, but only at events
+  (`GameScreen.ts:710-713`). CSBWin opens the chest while drawing too, but only at events
   (`TAG0189d4`).
-- A headless `Game` has none of this state, and a read does not reset it (R1).
+- A headless `Game` has none of this state, and a read in play resets it only through
+  the host (`GameHost.savedGameRead`), as the screen's.
 
 Paying it: the fields in an engine-owned `ctx.interface` beside `LoopState`, which both
 sides read; the chest opened and repacked at the events where CSBWin calls `TAG0189d4` and
@@ -1034,7 +1003,7 @@ the canvas's output (`putImageData`), the order of the compose, the palettes' ch
 façade over the UI and the boot (`getScreenBuffer`, `doMenu`, `setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can
 build one, and `tools/lib/ui.ts` copies its wiring (F19). Each page hook is named four
 times: in `UIState`, `UIHooks`, `GameScreenHooks` and the constructor's copy
-(`GameScreen.ts:97-119`, `:193-226`, `UIState.ts:432-435`).
+(`GameScreen.ts:97-119`, `:193-226`, `UIState.ts:435-438`).
 
 Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the palettes,
 `PresentedFrame`, `presentViewport`'s order) and a thin canvas presenter; one factory for the
@@ -1113,7 +1082,7 @@ loader's cache keyed by format, or the parameter dropped with the dead fallback.
   where a 16-entry `Uint32` table a palette, written through a `Uint32Array` view, takes
   0.14 ms (`updateImageDataFromIndex*`, `src/renderer/csbwin/CanvasBlitter.ts:409-483`). It
   always takes the two-palette path while adventuring: `viewportPalette !== uiPalette`
-  compares two separate copies (`GameScreen.ts:700-703`). Its body is written three times
+  compares two separate copies (`GameScreen.ts:754-757`). Its body is written three times
   in `CanvasBlitter`, and the cursor's footprint loop twice (`reconvertThroughPalette`,
   `PresentedFrame.capture`).
 - **Every monster turn allocates** an `MmRecord` and with it a `DsaVars` of two 100-entry
@@ -1753,7 +1722,7 @@ CSBWin can record a game and play it back:
 Conflux 3.5's Extended Features block sets `AutoRecord` (0x10), `RecordDesignOption`
 (`doc/CSBwin-src/SaveGame.cpp:403-404`): a game read from it records unless the command
 line or the menu says not to (`:2588-2603`). The port has neither, and no way to start either. It keeps only the recorder's count,
-`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:873-876`).
+`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:928-931`).
 `extraTicks` is always on (`src/engine/MovementSystem.ts:161-164`).
 
 Once ported, a recording made in CSBWin and played back in the port is an end-to-end test

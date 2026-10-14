@@ -131,6 +131,15 @@ export interface GameHost {
    */
   tag0207cc(): void;
   /**
+   * A saved game was read in play, which only the port has (`Game.savedGameRead`): F9,
+   * the disk menu's LOAD, or the prison's new adventure. CSBWin reads a game only after
+   * `d.Initialize()` has zeroed the whole of `d` (`doc/CSBwin-src/CSBCode.cpp:333-340`),
+   * so the screen's share of it, the open chest, the attack menu, the Reincarnate
+   * screen, the eye and the mouth, is the old world's and goes, and the screen takes
+   * the party read. Called before anything runs on the world read.
+   */
+  savedGameRead(): void;
+  /**
    * `ShowCredits(1)`, the end of the game, which the engine does not draw: from
    * `_StartCSB` once `MainLoop` has returned on a lost game
    * (`doc/CSBwin-src/CSBCode.cpp:11557-11561`), or from `MainLoop` 300 VBLs after
@@ -230,6 +239,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     repackChest: host.repackChest ?? (() => {}),
     tag02076e: host.tag02076e ?? (() => {}),
     tag0207cc: host.tag0207cc ?? (() => {}),
+    savedGameRead: host.savedGameRead ?? (() => {}),
     showCredits: host.showCredits ?? (() => {}),
     drawViewport: host.drawViewport ?? (() => {}),
     paint: host.paint ?? (() => {}),

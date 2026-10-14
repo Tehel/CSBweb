@@ -354,12 +354,15 @@ export class Game implements MainLoop {
      * The tail of `_ReadEntireGame` once a saved game is in: `d.CanRestartFromSavegame = 1`
      * (doc/CSBwin-src/SaveGame.cpp:2087). `applySaveBytes` calls it. A save read in play,
      * which only the port has, begins at once (`tag0138ec`), as one read at the entrance or
-     * after a lost game begins when the loop starts (`start`).
+     * after a lost game begins when the loop starts (`start`); the screen is told first,
+     * and leaves the old world (`GameHost.savedGameRead`).
      */
     savedGameRead(): void {
         this.canRestart = true;
         this.resumedSavedGame = true;
-        if (this.running) this.tag0138ec();
+        if (!this.running) return;
+        this.ctx.host.savedGameRead();
+        this.tag0138ec();
     }
 
     /**
