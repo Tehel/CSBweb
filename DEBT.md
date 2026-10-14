@@ -115,6 +115,7 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | P10 | A published set has no dungeon signature: its saves are refused | M | ⏳ step 1 of 2 next |
 | P8 | Publishing a local set, and moderating it | L | ⚠️ step 4 of 5 next |
+| P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E15 | The page shell | L | ⚠️ step 6 of 6 next |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
@@ -193,7 +194,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C182 · D22 · E40 · F21 · G31 · P11 · R16 · U12 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C182 · D22 · E40 · F21 · G31 · P12 · R16 · U12 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -320,18 +321,21 @@ dungeon is in `KNOWN_DUNGEONS`") says the same, and is true only of the site's o
      nothing else consulted. This alone fixes Conflux 2's case.
    - **Same levels, same dimensions, some digests the same and not all**: a slightly
      different dungeon. Ask "It seems this save is for a slightly different dungeon",
-     over three options: IMPORT ANYWAY (stored, unofficial, as `modified` and `mismatch`
-     are today), LOOK FOR A BETTER MATCH (on to the other sets, as above), and CANCEL.
-     The save menu's `importMenu` (`src/renderer/ui/SaveMenu.ts`) asks two-option
-     questions today, so check that its menu takes a third.
-   - **Same levels, same dimensions, no digest the same**: the author's rule names "some",
-     so this case goes on to the other sets, like a mismatch of dimensions. Confirm with
-     the author when the step is taken.
+     over IMPORT ANYWAY (stored, unofficial, as `modified` and `mismatch` are today), LOOK
+     FOR A BETTER MATCH (on to the other sets, as above) and CANCEL. The save menu's
+     `importMenu` (`src/renderer/ui/SaveMenu.ts`) asks two-option questions today. The
+     author would rather have the three. If a third option is a real cost, the question
+     offers only the first two, since LOOK FOR A BETTER MATCH always leads to another
+     dialog, which offers CANCEL.
+   - **Same levels, same dimensions, no digest the same**: another dungeon. Refused.
 
-   These rules hold for every set, local or not, so they replace the `modified` and
-   `mismatch` questions of `checkDungeon` for the running set. That changes
-   `doc/SAVES.md` → "A player's own set refuses no save": a save whose dimensions differ
-   is no longer stored in a local set. The document is rewritten with the step.
+   This check is for imports only. A save already filed under the set is read without
+   it. A local set is no exception: a file whose levels differ in number or size is
+   refused there too. A save carries its own dungeon, which replaces the set's when it is
+   read, so a player who has changed the dungeon would not see the changes in that game.
+   That replaces `checkDungeon`'s `modified` and `mismatch` questions for the running set,
+   and `doc/SAVES.md` → "A player's own set refuses no save", which the step rewrites.
+   P11 is the wider form of the same problem.
 2. **A signature database, to name another dungeon.** It is needed only for a save that
    is not the running set's: to say which published set it is, and to offer "switch to
    it". The server keeps each published set's signature. It computes it with the page's
@@ -426,6 +430,19 @@ follow as an item of its own.
 5. **The tile's tick, cross and eye** (`src/ui/welcomePage.ts`), each shown only where its
    transition is allowed to the viewer, then the grid redrawn from `api/data-sets`.
    Evidence: a `tools/probe-frames.mjs` block.
+
+### P11 ⏳ A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it
+
+To design with the author, and complex. A CSBWin save holds the whole dungeon (blocks
+7-14), and a read installs it in place of the set's `dungeon.dat`. A local set's pen
+can replace its `dungeon.dat` (P, "What stands"), and the saves already stored keep the
+dungeon they were made in. So a player who changes their dungeon and loads an old save
+plays the old dungeon, and sees none of their changes. The same happens to any import the
+dialog accepts as a slightly different dungeon (P10). CSBWin behaves the same way: a save
+is the world. What the port should do is open: tell the player, refuse, or carry the
+party into the new dungeon (as Chaos's "MAKE NEW ADVENTURE" carries a party into
+`mini.dat`). A published set's files never change (P8), so this affects local sets only.
+
 ---
 
 ## U — The interface in the canvas
