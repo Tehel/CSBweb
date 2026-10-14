@@ -20,7 +20,7 @@ of work follow it, the author's next challenges: a redesigned page, and a second
 (Chaos Strikes Back first). Tiers D and E hold what the
 code needs before them: a base solid enough to build them on. The page redesign has
 begun: the interface in the canvas (U) and the welcome page (`src/ui/welcomePage.ts`) are
-in, and E22 and E39 are what is left of it.
+in, and E39 is what is left of it.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, a data set
 (`conflux-3.5`) whose first ticks play (`tools/watch-conflux-start.ts`) and whose start is a
@@ -65,6 +65,8 @@ and no session picks one up unless the author names it:
   CSBWin, without cheats, costs more than it proves, and the golden frames and the render
   probe already catch any pixel that changes unintentionally. When it is taken, the
   canvas's colours go with it: an Atari intensity times 36, not CSBWin's RGB555 (H).
+- **Fullscreen filled by a fraction** (E22), until players ask for it: the author decides
+  then, from the analysis the item records.
 - **X — Extras**: gameplay features CSBWin does not have, wanted by the author once the
   faithful game is complete.
 
@@ -116,7 +118,6 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
-| E22 | The screen's ratio, and a fractional fill | M | ⏳ |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | F20 | A tool is run without its types checked | S | ⏳ |
 | W1 | An aborted download leaks a file descriptor | S | ⏳ |
@@ -183,6 +184,7 @@ In payoff order: the first row is the next item.
 | G30 | 3D2D1D's vertical moves and gravity | L | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
+| E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G29 are the active list. `E39` waits for the author's design: a session
@@ -834,7 +836,7 @@ view), shared by the loader, the writer, `Chaos`, `legacyRows` and `CsbwinSaveIn
 
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included. What the
-page redesign adds is the exception: E39's pages, and E22.
+page redesign adds is the exception: E39's pages, and E22's fill.
 
 The structure need no longer follow CSBWin's files (the author's decision): a module may
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
@@ -1078,8 +1080,7 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:232-249`).
 
 Paying it: one rAF presenter with a dirty flag that the VBL and the animations set, the CRT
 drawing only after a present; one input router, with a focus policy once the page has
-controls again. E22 builds
-on both: resizing, dialogs over the canvas.
+controls again.
 
 ### E31 ⏳ Late wiring with silent defaults, and long parameter lists
 
@@ -1269,44 +1270,73 @@ the author before any code. What they are to hold:
 - **CREDITS** is a block of the welcome page (`#credits`). It does not name the data sets'
   authors yet.
 
-### E22 ⏳ The screen's ratio, and a fractional fill
+### E22 ⏸️ Fullscreen filled by a fraction
 
-The screen is shown at one ratio. `.screen` (`index.html:57-68`) sizes both canvases from
-`#game`'s `--screen-width` and `--screen-height`: 960x600 in the page, and in fullscreen
-the largest whole multiple of 320x200 that fits (`src/lib/fullscreen.ts`), a 16/10
-picture of square pixels either way. The page will offer the player:
+Waits on the author: whole multiples satisfy them on the devices they tried, and the item
+is taken if players ask for a screen that fills theirs. Until then it records the
+analysis the decision needs.
 
-- **The ratio**: 16/10, as now, or 4/3, the ST's monitor, whose 320x200 picture has
-  pixels taller than wide.
-- **A fractional fill**: fullscreen filling the screen at the chosen ratio, rather than
-  the whole multiple.
+**Now.** In fullscreen the screen is the largest whole multiple that fits of 320x200 at
+16:10, or of 320x240 at 4:3 (DISPLAY's ASPECT RATIO), counted in device pixels and centred
+on black (`fit`, `src/lib/fullscreen.ts`). The fill would scale it by a fraction instead,
+to the screen's height or width, whichever is reached first.
 
-Both are DISPLAY's settings (`src/settings/Settings.ts`). What the change must look after:
+**What it would gain**, as the share of the limiting side the whole multiple leaves used:
 
-1. **One source for both canvases.** The CRT effect's canvas shares `#game`'s grid cell
+| Screen, device pixels | 16:10 | 4:3 |
+| --- | --- | --- |
+| 1366x768 | 3x, 78% | 3x, 94% |
+| 1280x800 | 4x, 100% | 3x, 90% |
+| 1920x1080, and 1536x864 at a device ratio of 1.25 | 5x, 93% | 4x, 89% |
+| 2048x1536 (a 4:3 tablet) | 6x, 94% | 6x, 94% |
+| 2560x1440 | 7x, 97% | 6x, 100% |
+| 2880x1800 (1440x900 at 2) | 9x, 100% | 7x, 93% |
+| 3840x2160 | 10x, 93% | 9x, 100% |
+
+Most screens lose under a tenth of a side. Small screens lose most, 1366x768 at 16:10
+above all, and 4:3 on a screen of 1080 lines.
+
+**What it would cost:**
+
+1. **Without the CRT effect, uneven pixels.** Under `image-rendering: pixelated`, a size
+   that is not a whole multiple draws some pixels a display pixel wider or taller than
+   others. 4:3 already accepts it vertically: each line is 6/5 of the multiple tall, so
+   lines are even only when the multiple is itself a multiple of five.
+2. **With the effect, no uneven pixels, but the scanlines.** The effect's canvas redraws
+   at whatever size it is shown, in device pixels, and its shader stretches to any ratio,
+   so a fill costs nothing there but this: the beam is sampled at each pixel's centre
+   (`line` and `beam` in the shader, `src/lib/crt.ts`), exact only at a whole number of
+   display pixels per line. At 3 per line every gap falls alike; at 3.6 or 5.4 each line
+   is sampled at another phase, a faint uneven banding, worst between two and four pixels
+   per line, and below two the lines are noise. The screen meets it already without a
+   fill: 3.6 pixels per line at 4:3 in the window (960x720), 4.8 at 4:3 in fullscreen on a
+   1080-line screen, and 3.75 at 16:10 in the window at a device ratio of 1.25, since the
+   window's 960x600 is counted in CSS pixels. Whether it shows has not been looked at. The
+   cure is the beam integrated over each pixel's height instead of sampled, and the
+   scanlines faded out below about 2.5 pixels per line.
+3. **One source for both canvases.** The CRT effect's canvas shares `#game`'s grid cell
    and the `.screen` class with the game canvas, so it covers it only while both take
-   their size from `#game`'s two variables. A size set inline on one canvas, or a class
-   changed on one (`createCrtEffect` copies the class once, `src/lib/crt.ts`), leaves the
-   effect off the game canvas, while the pointer, read from the game canvas's own rect
-   (`canvasPoint`), stays right: a picture off its clicks. The effect's canvas already
-   redraws at whatever size it is shown, in device pixels, and its shader stretches to any
-   ratio.
-2. **The scanlines are exact only at a whole number of screen pixels per line.** The beam
-   is sampled at each pixel's centre (`line` and `beam` in the shader, `src/lib/crt.ts`).
-   At 600 pixels, three per line, every gap falls alike; at 720 (3.6) or 1080 (5.4) each
-   line is sampled at another phase, a faint uneven banding, worst between two and four
-   pixels per line, and below two the lines are noise. The beam is integrated over each
-   pixel's height instead of sampled, and the scanlines fade out below about 2.5 pixels
-   per line.
-3. **Without the effect, a size that is not a whole multiple of 320x200 draws uneven
-   pixels** under `image-rendering: pixelated`, some a screen pixel wider than others,
-   which is why fullscreen fills by a whole multiple.
-4. **The probe pins the default.** `tools/probe-frames.mjs` checks that the effect is
-   drawn at 960x600 and maps its clicks through the canvas's rect in a 1600x1000 window,
-   and in fullscreen, on a 1920x1080 and a 1366x768 screen, the whole multiple, centred,
-   the effect's canvas over it and the pointer read through the curve. It also checks, at
-   4/3 and at a fractional fill, that the effect's canvas covers the game canvas exactly
-   and that the pointer is read through the curve.
+   their size from `#game`'s `--screen-width` and `--screen-height`, which `fit` sets. A
+   size set inline on one canvas, or a class changed on one (`createCrtEffect` copies the
+   class once), leaves the effect off the game canvas while the pointer, read from the
+   game canvas's own rect (`canvasPoint`), stays right: a picture off its clicks.
+4. **The probe.** `tools/probe-frames.mjs` pins the whole multiple, centred, at 16:10 on a
+   1920x1080 and a 1366x768 screen, and at 4:3 on the 1366x768 one. A fill adds the same checks at a fraction:
+   the effect's canvas over the game canvas exactly, and the pointer read through the
+   curve.
+
+**The choices**, cheapest first:
+
+- **Not at all**: the item is deleted. Item 2's banding stays a question of its own, for
+  the 4:3 and the window cases above.
+- **Filling only with the effect on**, where no pixel is uneven: item 2's cure first, then
+  `fit` takes the fraction when the effect is shown. No new setting.
+- **A DISPLAY setting, FILL**, off by default, with or without the effect: item 1's
+  uneven pixels are then the player's choice.
+
+The second is the recommended one if players ask: it fills the screens that lose most at
+no cost in pixels, and the scanline cure it needs is wanted for 4:3 anyway once it is
+seen to band.
 
 ---
 
