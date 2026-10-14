@@ -125,6 +125,7 @@ In payoff order: the first row is the next item.
 | R8 | An optional feature's failure ends the game, or the session | S | ⏳ |
 | R10 | Pointer, touch and WebGL | S | ⏳ |
 | R11 | Right-click closes the save menu while it saves or loads | S | ⏳ |
+| R16 | A save's DELETE is told done before its transaction commits | S | ⏳ |
 | W4 | The events table grows without bound | S | ⏳ |
 | W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
 | W6 | Security headers | S | ⏳ |
@@ -188,7 +189,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C183 · D22 · E40 · F22 · G31 · P12 · R16 · U13 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C183 · D22 · E40 · F22 · G31 · P12 · R17 · U13 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -505,6 +506,16 @@ after a save is the one a load of it gives back". A LOAD that answers after the 
 opened again restores into the new menu.
 
 Paying it: a right-click while `busy` does nothing.
+
+### R16 ⏳ A save's DELETE is told done before its transaction commits
+
+`idbDelete` (`src/data/saves/idb.ts:177-180`) awaits the delete request's success and
+not its transaction, where `idbPut` awaits both (`idbDone`). The request succeeds before
+the transaction commits, so `BrowserSaveStore.remove` resolves, and the menu says
+"SAVE DELETED" (`SAVE_MENU_DELETED`), for a delete whose transaction can still abort
+(a quota or I/O error), the row then still there at the next list. Paying it:
+`idbDelete` awaits `idbDone(tx)` as `idbPut` does. No Node tool runs IndexedDB, so its
+check is a save's DELETE in `tools/probe-frames.mjs`, which deletes none yet.
 
 ### R12 ⏳ Listing the saves reads every save's bytes
 
