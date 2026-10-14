@@ -28,12 +28,11 @@ import { GameScreen } from './renderer/GameScreen';
 import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
-import { runBootSequence, runHintOracle, runShowCredits } from './renderer/intro/BootSequence';
+import { runBootSequence, runHintOracle, type BootSequenceDeps } from './renderer/intro/BootSequence';
+import { showEndOfGame } from './renderer/intro/EndOfGame';
 import { Die } from './engine/Die';
 import { csbGraphicsOpener } from './engine/FileSignatures';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
-import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
-import { determineMastery } from './engine/skills';
 import { applySaveBytes } from './engine/SaveGameFile';
 import { Settings, applyToGame, type SettingsValues } from './settings/Settings';
 import type { KeyboardLayoutMap } from './renderer/ui/KeyLabels';
@@ -258,7 +257,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         die: reportError,
         showCredits: (word11694) => {
             events.ended(word11694);
-            if (screen) showEndOfGame({ game, screen, saves, messages, events }, sound, word11694).catch(reportError);
+            if (screen) showEndOfGame({ ...introDeps({ game, screen, saves, messages, events }, sound), game, messages }, word11694).catch(reportError);
         },
         // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself.
         drawViewport: () => renderView(),
@@ -393,56 +392,16 @@ interface Built {
     events: GameEvents;
 }
 
-/**
- * `_ShowCredits(1)`: the end of the game, lost or won, over the last frame the adventure
- * drew (`src/renderer/intro/ShowCredits.ts`). The adventure's cursor is drawn into the screen,
- * so it is lifted first, as `STHideCursor(HC50)` lifts CSBWin's.
- *
- * A game that was saved or loaded can be restarted from it. Then the chooser or the
- * entrance has set up the next game, and `_StartCSB` runs `MainLoop` again
- * (doc/CSBwin-src/CSBCode.cpp:11555-11562), on the same `Game` and the same screen.
- */
-async function showEndOfGame({ game, screen, saves, messages, events }: Built, sound: SoundManager, word11694: boolean): Promise<void> {
-    screen.setHoverPoint(null);
-    screen.refreshOverlay();
-    const { x, y, z } = game.ctx.party.state.position;
-    const end = await runShowCredits(
-        {
-            canvas: gameCanvasEl,
-            gameScreen: screen,
-            playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
-            consumeSavedGameRead: () => saves.consumeSavedGameRead(),
-            readNewGame: () => readNewGame(game, saves, events),
-            rise: dataSet.miniDat,
-        },
-        {
-            queueDyingSound: () => game.ctx.sounds.queueSound(SOUND_DYING, x, y, 0, z),
-            canRestartFromSavegame: game.canRestartFromSavegame(),
-            word11694,
-            champions: word11694 ? wonChampions(game, screen) : [],
-            // `_StartCSB` turns palette switching off before a lost game's credits
-            // (doc/CSBwin-src/CSBCode.cpp:11558); `MainLoop`'s won game leaves it as it was.
-            palette11946: word11694 ? screen.palette11946() : null,
-        },
-    );
-    if (end === 'terminate') return;
-    messages.restart();
-    screen.initializePlayState();
-    game.resumeMainLoop();
-    game.start();
-}
-
-/** `d.CH16482[0 … d.NumCharacter - 1]` as the won screen shows them (`Code1f9e6.cpp:176-215`). */
-function wonChampions(game: Game, screen: GameScreen): WonChampion[] {
-    const partySleeping = game.ctx.party.state.sleeping;
-    return game.ctx.party.state.champions.map((champion) => ({
-        name: champion.name,
-        title: champion.title,
-        // `*(name + 9)`: the title's second byte, its raw field's where there is one.
-        titleByte1: champion.titleField?.[1] ?? (champion.title.length > 1 ? champion.title.charCodeAt(1) : 0),
-        portrait: screen.championPortrait(champion),
-        masteries: [0, 1, 2, 3].map((skill) => determineMastery(champion, skill | 0xc000, { partySleeping })),
-    }));
+/** What the boot and the end of the game share: the canvas, the screen, the sound and the game's read. */
+function introDeps({ game, screen, saves, events }: Built, sound: SoundManager): Omit<BootSequenceDeps, 'skip' | 'title'> {
+    return {
+        canvas: gameCanvasEl,
+        gameScreen: screen,
+        playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
+        consumeSavedGameRead: () => saves.consumeSavedGameRead(),
+        readNewGame: () => readNewGame(game, saves, events),
+        rise: dataSet.miniDat,
+    };
 }
 
 /** The optional CRT effect over the canvas (`src/lib/crt.ts`). Without WebGL, the settings' SCANLINES and SCREEN CURVE are inert. */
@@ -464,19 +423,13 @@ function createCrt(): void {
  * the entrance. One that is not read leaves the entrance, without the logo or the title.
  */
 async function runIntro(built: Built, sound: SoundManager): Promise<PrisonDoorChoice> {
-    const { game, screen, saves, events } = built;
     const params = new URLSearchParams(window.location.search);
     const save = params.get('save');
     if (save !== null && await continueSave(built, save)) return 'resume';
     const skipIntro = params.get('intro') === '0';
     const animations = !skipIntro && save === null && settings.values.startupAnimations;
     return runBootSequence({
-        canvas: gameCanvasEl,
-        gameScreen: screen,
-        playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
-        consumeSavedGameRead: () => saves.consumeSavedGameRead(),
-        readNewGame: () => readNewGame(game, saves, events),
-        rise: dataSet.miniDat,
+        ...introDeps(built, sound),
         swoosh: animations ? await loadSwooshFiles(sound) : null,
         title: animations,
         skip: skipIntro,

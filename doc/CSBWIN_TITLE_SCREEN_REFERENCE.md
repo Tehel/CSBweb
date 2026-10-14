@@ -602,7 +602,7 @@ which runs its timers and ends the same way.
    (`CSBCode.cpp:10758-10765`, `SaveGame.cpp:1579-1594`). `ShowCredits` then returns, and
    `_StartCSB` runs `MainLoop` again (`CSBCode.cpp:11555-11562`). The port runs the
    chooser and the entrance over the end screen's host, then `showEndOfGame`
-   (`src/main.ts`) reads a new game with `Game.readNewGame` if the entrance was entered,
+   (`src/renderer/intro/EndOfGame.ts`) reads a new game with `Game.readNewGame` if the entrance was entered,
    puts the screen's play state back (`GameScreen.initializePlayState`) and starts the
    loop. Otherwise, after 899 VBLs, the fade to `LOCAL_110`, the dark blue (`:326`).
 7. Graphic 5 over the whole screen, faded to `d.Palette328`, and a wait of one VBL a poll

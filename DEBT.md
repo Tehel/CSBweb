@@ -1317,14 +1317,12 @@ The steps, one commit each:
    other parameters kept (`UIState.onExit`, `welcomePageQuery`). `tools/dump-settings-dialog.ts`
    checks the question and its answers, and `tools/probe-frames.mjs` that the question's
    EXIT opens the welcome page; the question is golden frame 28.
-6. ⏳ **What the shell leaves.**
-   - **`main.ts` holds the page's features**: the end-of-game flow.
-   - **A teleport sends events.** On a page opened with `?dev`, a click on the map
-     dialog's square teleports the party by replacing its state
-     (`setPartyState({ ...state, position })`, `onTeleport`, `src/main.ts`), with no
-     test of the square (into stone, if clicked there) and no `MoveObject`; the game it
-     plays reaches the statistics' "where parties die" like any other. A game a
-     teleport touched should send no events.
+6. ⏳ **A teleport sends events.** On a page opened with `?dev`, a click on the map
+   dialog's square teleports the party by replacing its state
+   (`setPartyState({ ...state, position })`, `onTeleport`, `src/main.ts`), with no test
+   of the square (into stone, if clicked there) and no `MoveObject`; the game it plays
+   reaches the statistics' "where parties die" like any other. A game a teleport
+   touched should send no events.
 
 The welcome page and the game are two loads of the page, so E30's two input stacks never
 meet the welcome page's controls: PLAY, CONTINUE and EXIT each load the page anew.
