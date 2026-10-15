@@ -19,7 +19,9 @@
  *   (`recordFile`), and that is the file the record keeps.
  *   Without a thumbnail, its row offers "Generate from data", which draws the one the site's
  *   sets have, the last frame of the title (`TitleThumbnail.ts`), from the set's own
- *   `graphics.dat` or its base set's.
+ *   `graphics.dat` or its base set's. With one, its row offers a checkbox in place of its
+ *   file's name, which its tooltip says: off at first, it shows the thumbnail in place of
+ *   the title's animation (`thumbnailAsTitle`).
  * - **The right column** is the checklist of everything the set has, `checkLocalDataSet`'s
  *   verdict on each, run at every change: a green check where it is given and right, a
  *   red cross where it is needed and missing, or wrong, and nothing where it is optional
@@ -88,6 +90,9 @@ const CHECKLIST: readonly ChecklistRow[] = [
 
 /** The files the drop area takes by name, the name the game reads them under. */
 const NAMED_FILES: readonly LocalDataSetFile[] = ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat'];
+
+/** The thumbnail's checkbox. */
+const AS_TITLE_HINT = "The game opens on this picture, faded in and out, in place of the title's animation.";
 
 /** `doc/CSBwin-src/CSBCode.cpp:6796-6841`. */
 const DM_RULES_HINT = 'Every reincarnation adds 12 random attribute points. Without DM rules, as in CSB, the '
@@ -179,6 +184,10 @@ export function openAddDataSetForm(
     const input = (name: string): HTMLInputElement => form.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
     const [name, id, authors, dmRules] = ['name', 'id', 'authors', 'dmRules'].map(input);
     const description = form.querySelector('textarea')!;
+    /** On the thumbnail's row, in place of its name: `thumbnailAsTitle`. */
+    const asTitle = document.createElement('input');
+    asTitle.type = 'checkbox';
+    asTitle.name = 'thumbnailAsTitle';
     const dropped = form.querySelector<HTMLElement>('.add-set-dropped')!;
     const confirm = form.querySelector<HTMLButtonElement>('#add-set-confirm')!;
     const baseBox = form.querySelector<HTMLFieldSetElement>('.add-set-base')!;
@@ -210,6 +219,7 @@ export function openAddDataSetForm(
         description.value = editing.description;
         authors.value = editing.authors.join(', ');
         dmRules.checked = editing.dmRules;
+        asTitle.checked = editing.thumbnailAsTitle;
         for (const [about, blob] of Object.entries(editing.files) as [LocalDataSetFile, Blob][]) {
             files[about] = blob instanceof File ? blob : new File([blob], about, { type: blob.type });
         }
@@ -271,6 +281,9 @@ export function openAddDataSetForm(
         checklist.append(item);
         return [row.about, { row, item, given, remove, problem }] as const;
     }));
+    const asTitleLabel = document.createElement('label');
+    asTitleLabel.className = 'add-set-check add-set-as-title';
+    asTitleLabel.append(asTitle, text('span', '', 'As the title'));
     const generate = document.createElement('button');
     generate.type = 'button';
     generate.className = 'add-set-generate';
@@ -349,7 +362,7 @@ export function openAddDataSetForm(
         idWritten = id.value !== '';
         changed();
     });
-    for (const field of [description, authors, dmRules]) field.addEventListener('input', changed);
+    for (const field of [description, authors, dmRules, asTitle]) field.addEventListener('input', changed);
 
     form.addEventListener('submit', (event) => event.preventDefault());
     form.querySelector('#add-set-cancel')!.addEventListener('click', () => dialog.close());
@@ -409,6 +422,7 @@ export function openAddDataSetForm(
             description: description.value,
             authors: authors.value.split(','),
             dmRules: dmRules.checked,
+            thumbnailAsTitle: asTitle.checked,
             baseSet,
             files: { ...files },
         };
@@ -447,6 +461,12 @@ export function openAddDataSetForm(
                 generate.disabled = drawing || problems.some((p) => p.about === 'graphics.dat' || p.about === 'baseSet');
                 given.replaceChildren(generate);
             }
+            // The checkbox needs the room: the file's name goes to the tooltip.
+            if (row.about === 'thumbnail' && value !== null) {
+                given.replaceChildren(asTitleLabel);
+                asTitleLabel.title = `${AS_TITLE_HINT}\nThe thumbnail: ${value}`;
+            }
+            if (row.about === 'thumbnail') given.title = value ?? '';
             if (row.about === 'thumbnail') problem.textContent = [problem.textContent, thumbnailRefused].filter((t) => t !== '').join(' ');
             item.title = [row.hint, ...own.map((p: LocalDataSetProblem) => p.text)].join('\n');
         }
@@ -464,6 +484,7 @@ export function openAddDataSetForm(
         const sameFiles = LOCAL_DATA_SET_FILES.every((about) => files[about] === storedFiles[about]);
         return sameFiles && record.name === editing.name && record.description === editing.description
             && record.authors.join('\n') === editing.authors.join('\n') && record.dmRules === editing.dmRules
+            && record.thumbnailAsTitle === editing.thumbnailAsTitle
             && record.baseSet === editing.baseSet;
     }
 
@@ -488,6 +509,7 @@ async function publishRecord(record: LocalDataSetRecord, baseSet: string): Promi
     body.append('description', record.description);
     for (const author of record.authors) body.append('authors', author);
     body.append('dmRules', String(record.dmRules));
+    body.append('thumbnailAsTitle', String(record.thumbnailAsTitle));
     body.append('baseSet', record.baseSet ?? baseSet);
     try {
         for (const [about, blob] of Object.entries(record.files) as [LocalDataSetFile, Blob][]) {

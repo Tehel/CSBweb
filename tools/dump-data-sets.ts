@@ -45,13 +45,13 @@ function checkParser(): void {
     ({ id: 'a', name: 'A', ...fields });
   const manifest = (fields: Record<string, unknown> = {}) => JSON.stringify({ default: 'a', dataSets: [set()], ...fields });
 
-  const parsed = parseManifest(manifest({ dataSets: [set({ miniDat: true, hintOracle: false, dmRules: true }), set({ id: 'b', dir: 'b/c' })] }), 'gamefiles');
+  const parsed = parseManifest(manifest({ dataSets: [set({ miniDat: true, hintOracle: false, dmRules: true, thumbnailAsTitle: true }), set({ id: 'b', dir: 'b/c' })] }), 'gamefiles');
   console.log(`  parsed: ${parsed.dataSets.map((s) => `${s.id} in ${s.dir}`).join(', ')}; default ${parsed.defaultSet?.id}`);
   check(parsed.dataSets[1]!.dir === 'gamefiles/b/c' && parsed.defaultSet === parsed.dataSets[0],
     'a folder is resolved under the manifest\'s, and the default is one of the sets');
-  check(parsed.dataSets[0]!.miniDat && !parsed.dataSets[0]!.hintOracle && parsed.dataSets[0]!.dmRules, 'the flags are read as written');
+  check(parsed.dataSets[0]!.miniDat && !parsed.dataSets[0]!.hintOracle && parsed.dataSets[0]!.dmRules && parsed.dataSets[0]!.thumbnailAsTitle, 'the flags are read as written');
   const bare = parsed.dataSets[1]!;
-  check(parsed.dataSets[0]!.dir === 'gamefiles/a' && !bare.csbGraphics && !bare.miniDat && !bare.hintOracle && !bare.dmRules && !bare.hidden,
+  check(parsed.dataSets[0]!.dir === 'gamefiles/a' && !bare.csbGraphics && !bare.miniDat && !bare.hintOracle && !bare.dmRules && !bare.thumbnailAsTitle && !bare.hidden,
     'a set\'s "dir" left out is its "id", and a flag left out is false');
   check(dataSetNamed(parsed, null) === null && dataSetNamed(parsed, 'nowhere') === null
     && dataSetNamed(parsed, 'b') === parsed.dataSets[1], 'no ?dungeon=, or an unknown one, is the welcome page; a known one plays itself');

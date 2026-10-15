@@ -76,7 +76,7 @@ The page ships as it is, debug chrome included. Every URL in it is relative to t
 
 A manifest lists each set (its `dir` relative to the game files' folder), none at all
 for a new server, and the default set's id or none. A set names only what differs from the defaults: `dir` left out is the set's `id`,
-each flag (`csbGraphics`, `miniDat`, `hintOracle`, `hidden`) left out is `false`,
+each flag (`csbGraphics`, `miniDat`, `hintOracle`, `dmRules`, `thumbnailAsTitle`, `hidden`) left out is `false`,
 `description` and `authors` left out are `''` and `[]`, and `status` left out is
 `"approved"`. `src/data/DataSets.ts` parses it, for the page, the tools and the server. The page
 asks the server for it first, at `api/data-sets` (`loadManifest`, `src/main.ts`), and one
@@ -104,7 +104,9 @@ are served, and its events are taken.
 
 Each set's folder holds its thumbnail, `<id>-thumbnail.png` (`dm-atari/dm-atari-thumbnail.png`,
 `kids-dungeon-24/kids-dungeon-thumbnail.png`): the last frame of its title, which the
-welcome page's tile shows, so the page fetches no game file to draw its grid.
+welcome page's tile shows, so the page fetches no game file to draw its grid. A set whose
+flag `thumbnailAsTitle` is true (a row's `thumbnail_as_title`) shows it in place of its
+title's animation too, its author's choice on the form that adds a set.
 `npx tsx tools/gen-thumbnails.ts` writes every set's from its `graphics.dat`, drawn as the form
 that adds a player's own set draws one (`src/renderer/intro/TitleThumbnail.ts`), and `npm test`
 checks the committed ones (`--check`). A set added to the site needs its thumbnail
@@ -144,7 +146,8 @@ owned by the player, last in the list, with its description and authors, and its
 `dungeon.dat`'s walls as the check read them (below). A set without a
 `graphics.dat` gets a copy of its base set's, and its thumbnail is `<id>-thumbnail.png`,
 so its folder is like any other: a PNG of 320x200, the screen's size, as the form takes no
-other (`THUMBNAIL_WIDTH`, `src/data/DataSets.ts`). The server never changes the folder after. It refuses an
+other (`THUMBNAIL_WIDTH`, `src/data/DataSets.ts`). The row's `thumbnail_as_title` is the
+form's checkbox, and is set only for a set with a thumbnail. The server never changes the folder after. It refuses an
 id the table or `gamefiles/` already holds, a file over 16 MiB, a request over 32 MiB, and
 more than five publishes an hour from one address, each answered with nothing written. A
 folder is written as `gamefiles/.<id>.<uuid>.partial/` and renamed when whole; one left by a

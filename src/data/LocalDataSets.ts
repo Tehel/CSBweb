@@ -41,6 +41,11 @@ export interface LocalDataSetRecord {
     authors: string[];
     /** `DataSet.dmRules`: whether a reincarnated champion keeps their attributes. */
     dmRules: boolean;
+    /**
+     * `DataSet.thumbnailAsTitle`: whether the boot shows its thumbnail in place of the
+     * title's animation. Never true without a thumbnail (`checkLocalDataSet`).
+     */
+    thumbnailAsTitle: boolean;
     /** The set whose `graphics.dat` it plays, `dm-atari` or `csb`, where it has none of its own; `null` where it has. */
     baseSet: string | null;
     /** `dungeon.dat` always; the others where the player gave them. `thumbnail` is an image. */
@@ -73,6 +78,7 @@ export function localDataSet(record: LocalDataSetRecord): DataSet {
         miniDat: false,
         hintOracle: files['hcsb.hct'] !== undefined && files['hcsb.dat'] !== undefined,
         dmRules: record.dmRules,
+        thumbnailAsTitle: record.thumbnailAsTitle,
         hidden: false,
         pending: false,
     };
@@ -102,6 +108,8 @@ export interface LocalDataSetDraft {
     description: string;
     authors: string[];
     dmRules: boolean;
+    /** The form's checkbox on the thumbnail's row, whether or not it holds a thumbnail. */
+    thumbnailAsTitle: boolean;
     /** The set whose `graphics.dat` it plays where `files` holds none: `dm-atari` or `csb`. */
     baseSet: string;
     files: Partial<Record<LocalDataSetFile, Blob>>;
@@ -131,7 +139,7 @@ export interface LocalDataSetProblem {
  *   does not expect one (`csbGraphicsExpected`). Either is the boot's death
  *   (`src/engine/FileSignatures.ts`).
  * - The Hint Oracle is both its files or neither, and `hcsb.dat` parses.
- * - The thumbnail is an image.
+ * - The thumbnail is an image. The record shows it as the title only where it has one.
  *
  * With them, what the dungeon holds (`dungeonCensus`) and its walls (`dungeonWalls`),
  * which the server keeps of a published set, wherever its `dungeon.dat` reads, whatever
@@ -221,6 +229,7 @@ export async function checkLocalDataSet(
             description: draft.description.trim(),
             authors: draft.authors.map((author) => author.trim()).filter((author) => author !== ''),
             dmRules: draft.dmRules,
+            thumbnailAsTitle: draft.thumbnailAsTitle && thumbnail !== undefined,
             baseSet: ownGraphics ? null : draft.baseSet,
             files: { ...files },
             dungeonSignature: walls!.signature,

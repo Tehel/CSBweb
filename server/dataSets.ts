@@ -51,13 +51,15 @@ const ADDED_COLUMNS: readonly (readonly [string, string])[] = [
     ['description', "TEXT NOT NULL DEFAULT ''"],
     ['authors', "TEXT NOT NULL DEFAULT '[]'"],  // a JSON list of strings
     ['walls', 'TEXT'],  // a JSON DataSetWalls, NULL for the site's and until `fillWalls` reads it
+    ['thumbnail_as_title', 'INTEGER NOT NULL DEFAULT 0'],  // DataSet's flag, 0 or 1
 ];
 
-type Flag = 'csbGraphics' | 'miniDat' | 'hintOracle' | 'dmRules' | 'hidden';
+type Flag = 'csbGraphics' | 'miniDat' | 'hintOracle' | 'dmRules' | 'thumbnailAsTitle' | 'hidden';
 
 /** `DataSet`'s flags and their columns, in the manifest's order. */
 const FLAG_COLUMNS: readonly (readonly [Flag, string])[] = [
-    ['csbGraphics', 'csb_graphics'], ['miniDat', 'mini_dat'], ['hintOracle', 'hint_oracle'], ['dmRules', 'dm_rules'], ['hidden', 'hidden'],
+    ['csbGraphics', 'csb_graphics'], ['miniDat', 'mini_dat'], ['hintOracle', 'hint_oracle'], ['dmRules', 'dm_rules'],
+    ['thumbnailAsTitle', 'thumbnail_as_title'], ['hidden', 'hidden'],
 ];
 
 /**
@@ -95,6 +97,7 @@ export interface PublishedDataSet {
     csbGraphics: boolean;
     hintOracle: boolean;
     dmRules: boolean;
+    thumbnailAsTitle: boolean;
     walls: DataSetWalls;
 }
 
@@ -190,7 +193,8 @@ export class DataSetStore {
      * with no `mini.dat` and not hidden. Throws where the id is taken.
      */
     publish(set: PublishedDataSet, owner: string): void {
-        const flags: Record<Flag, boolean> = { csbGraphics: set.csbGraphics, miniDat: false, hintOracle: set.hintOracle, dmRules: set.dmRules, hidden: false };
+        const flags: Record<Flag, boolean> = { csbGraphics: set.csbGraphics, miniDat: false, hintOracle: set.hintOracle, dmRules: set.dmRules,
+            thumbnailAsTitle: set.thumbnailAsTitle, hidden: false };
         this.insertPublished.run(set.id, set.name, set.id, owner, set.description, JSON.stringify(set.authors), wallsJson(set.walls),
             ...FLAG_COLUMNS.map(([flag]) => (flags[flag] ? 1 : 0)));
     }
@@ -231,7 +235,7 @@ export class DataSetStore {
             const set: StoredDataSet = {
                 id: row.id as string, name: row.name as string, description: row.description as string,
                 authors: JSON.parse(row.authors as string) as string[], dir: row.dir as string,
-                csbGraphics: false, miniDat: false, hintOracle: false, dmRules: false, hidden: false,
+                csbGraphics: false, miniDat: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, hidden: false,
                 pending: row.status === 'pending', owner: row.owner as string | null,
             };
             for (const [flag, column] of FLAG_COLUMNS) set[flag] = row[column] === 1;

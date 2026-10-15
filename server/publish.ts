@@ -4,7 +4,7 @@
  * it against the address's rate, names its player and reads its form; this module decides.
  *
  * The form's fields are the record's: `id`, `name`, `description`, `authors` once per
- * author, `dmRules` (`true` or `false`) and `baseSet`, each once, and its files by the
+ * author, `dmRules` and `thumbnailAsTitle` (`true` or `false`) and `baseSet`, each once, and its files by the
  * name the game reads them under, `thumbnail` a PNG of 320x200 (`LOCAL_DATA_SET_FILES`,
  * `THUMBNAIL_WIDTH`). Nothing else.
  * The rules, in order, each answered with nothing written:
@@ -63,6 +63,7 @@ export interface DataSetDraft {
     description: string;
     authors: string[];
     dmRules: boolean;
+    thumbnailAsTitle: boolean;
     /** The set whose `graphics.dat` it plays where `files` holds none. */
     baseSet: string;
     /** By the name the game reads them under, and `thumbnail`. */
@@ -85,7 +86,7 @@ export type CheckDataSet = (
 ) => Promise<{
     problems: Problem[];
     /** Its text trimmed, its empty authors dropped; `null` where there is a problem. */
-    record: { id: string; name: string; description: string; authors: string[]; dmRules: boolean; dungeonSignature: readonly string[] } | null;
+    record: { id: string; name: string; description: string; authors: string[]; dmRules: boolean; thumbnailAsTitle: boolean; dungeonSignature: readonly string[] } | null;
     census: unknown;
     /** Its `dungeon.dat`'s walls, wherever it reads. */
     walls: DataSetWalls | null;
@@ -117,7 +118,7 @@ export interface PublishAnswer {
     body: { id: string } | { error: string; problems?: Problem[] };
 }
 
-const TEXT_FIELDS = ['id', 'name', 'description', 'dmRules', 'baseSet'] as const;
+const TEXT_FIELDS = ['id', 'name', 'description', 'dmRules', 'thumbnailAsTitle', 'baseSet'] as const;
 
 /** `form`, sent by `owner`, a `playerId`, checked and, where it passes, published. */
 export async function publishDataSet(form: FormData, owner: string, { checkDataSet, dataSets, gamefilesDir, now }: PublishOptions): Promise<PublishAnswer> {
@@ -132,10 +133,12 @@ export async function publishDataSet(form: FormData, owner: string, { checkDataS
         if (values.length !== 1 || typeof values[0] !== 'string') return refuse(400, `The form's '${field}' is not one text.`);
         text[field] = values[0];
     }
-    const { name, description, dmRules, baseSet } = text as Record<(typeof TEXT_FIELDS)[number], string>;
+    const { name, description, dmRules, thumbnailAsTitle, baseSet } = text as Record<(typeof TEXT_FIELDS)[number], string>;
     const authors = form.getAll('authors');
     if (!authors.every((author) => typeof author === 'string')) return refuse(400, "The form's 'authors' are not texts.");
-    if (dmRules !== 'true' && dmRules !== 'false') return refuse(400, "The form's 'dmRules' is neither 'true' nor 'false'.");
+    for (const [field, value] of [['dmRules', dmRules], ['thumbnailAsTitle', thumbnailAsTitle]]) {
+        if (value !== 'true' && value !== 'false') return refuse(400, `The form's '${field}' is neither 'true' nor 'false'.`);
+    }
     const lengths = { name: name.length, description: description.length, authors: authors.join(',').length };
     const said = { name: 'The name is', description: 'The description is', authors: 'The authors are' };
     for (const field of ['name', 'description', 'authors'] as const) {
@@ -161,7 +164,8 @@ export async function publishDataSet(form: FormData, owner: string, { checkDataS
         const stored = siteSet(set);
         return stored && diskFolder(join(gamefilesDir, stored.dir), stored.id);
     };
-    const draft: DataSetDraft = { id, name, description, authors: authors as string[], dmRules: dmRules === 'true', baseSet, files };
+    const draft: DataSetDraft = { id, name, description, authors: authors as string[], dmRules: dmRules === 'true',
+        thumbnailAsTitle: thumbnailAsTitle === 'true', baseSet, files };
     const { problems, record, walls } = await checkDataSet(draft, new Set(), base, now());
     const thumbnail = files.thumbnail;
     const size = thumbnail && pngSize(new Uint8Array(await thumbnail.slice(0, PNG_HEAD_BYTES).arrayBuffer()));
@@ -198,6 +202,7 @@ export async function publishDataSet(form: FormData, owner: string, { checkDataS
             csbGraphics: files['CSBgraphics.dat'] !== undefined,
             hintOracle: files['hcsb.hct'] !== undefined && files['hcsb.dat'] !== undefined,
             dmRules: record.dmRules,
+            thumbnailAsTitle: record.thumbnailAsTitle,
             walls,
         }, owner);
     } catch (error) {

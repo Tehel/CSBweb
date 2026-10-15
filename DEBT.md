@@ -336,40 +336,40 @@ server stores as `<id>-thumbnail.png` (`thumbnailPath`, `src/data/DataSets.ts`).
 title from `displayChaosStrikesBack` (`src/renderer/intro/TitleSequence.ts`, called from
 `BootSequence.ts:560`).
 
+With a thumbnail, its row offers the checkbox "As the title" in place of the file's name
+(which its tooltip says), off at first, also for one drawn from the animation. It is the
+flag `thumbnailAsTitle`, carried wherever `dmRules` is: `LocalDataSetRecord` and
+`LocalDataSetDraft` (a record stored without it reads false, `BrowserDataSetStore`; the
+check makes it false without a thumbnail), the publish form's fields (`server/publish.ts`),
+the `data_sets` table's `thumbnail_as_title` (`server/dataSets.ts`, added to an older
+table), and the manifest's flags (`FLAGS`), on `DataSet`, where nothing reads it yet.
+`tools/dump-local-data-set.ts`, `tools/dump-server.ts`, `tools/dump-data-sets.ts` and
+`tools/probe-frames.mjs` check it.
+
 A thumbnail is 320x200, the screen's size (`THUMBNAIL_WIDTH`, `src/data/DataSets.ts`):
 the form takes no image of another, dropped or picked, saying so on the row and keeping
 the thumbnail before (`thumbnailRefusal`), and the server publishes none (`pngSize`). A
 record stored with a thumbnail of another size keeps it, and the form shows it as given;
-publishing it is refused on the row, and it is only refused as a title (point 3). The
+publishing it is refused on the row, and it is only refused as a title (below). The
 site's sets, shipped and drawn by `utils/submit-forum-dungeons.ts`, are all 320x200.
 
-To do:
+To do, the last step:
 
-2. **A checkbox on the thumbnail's row: use it as the title.** A boolean, carried wherever
-   `dmRules` is: `LocalDataSetRecord` and `LocalDataSetDraft` (`src/data/LocalDataSets.ts`;
-   a record without it reads false, no store version), the form's publish fields
-   (`TEXT_FIELDS`, `server/publish.ts`), the `data_sets` table (`server/dataSets.ts`, a new
-   column and its migration), the set's edit and moderation paths, and the manifest's
-   flags (`FLAGS`, `src/data/DataSets.ts`; `static/data-sets.json`, where no set sets it
-   today). Off by default, also for a thumbnail drawn from the animation, which may still
-   be checked.
-3. **The boot shows it, when checked,** in place of `displayChaosStrikesBack`: the
-   thumbnail reduced to sixteen colours of the Atari's 512 (each component 3 bits, shown
-   x36 as the canvas shows them), by median cut, no dithering (the author's diff found it
-   changes nothing on the cover), the same for every player; faded in over eight VBLs as
-   `_FadeToPalette` fades (`doc/CSBwin-src/Graphics.cpp:1625`), held about 90 VBLs (1.5 s),
-   faded out to black. A published or shipped set's comes from `<id>-thumbnail.png`, a
-   local one's from its record. The FTL swoosh before the title (`Swoosh`) is untouched.
-   Unchecked, or with no thumbnail, the animation plays from `graphics.dat` as now. The
-   welcome page goes on showing the thumbnail in full colour.
+- **The boot shows it, when checked,** in place of `displayChaosStrikesBack`: the
+  thumbnail reduced to sixteen colours of the Atari's 512 (each component 3 bits, shown
+  x36 as the canvas shows them), by median cut, no dithering (the author's diff found it
+  changes nothing on the cover), the same for every player; faded in over eight VBLs as
+  `_FadeToPalette` fades (`doc/CSBwin-src/Graphics.cpp:1625`), held about 90 VBLs (1.5 s),
+  faded out to black. A published or shipped set's comes from `<id>-thumbnail.png`, a
+  local one's from its record. The FTL swoosh before the title (`Swoosh`) is untouched.
+  Unchecked, or with no thumbnail, the animation plays from `graphics.dat` as now. The
+  welcome page goes on showing the thumbnail in full colour.
 
 Evidence: a tool for the reduction (at most sixteen colours, every one an Atari shade, the
 same output on every run, the Theron cover the case); the boot's picture and its VBLs
-(`tools/dump-intro.ts`); the form refusing a wrong size and carrying the checkbox
-(`tools/probe-frames.mjs`' form section, whose clicks the new row may move: `.claude/memory/
-dialog-layout-moves-probe-clicks.md`); the server refusing one (`tools/dump-server.ts`).
-Docs: `doc/DEPLOYMENT.md` for the manifest flag and publishing,
-`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` for the port's alternative to the animation.
+(`tools/dump-intro.ts`). Docs: `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` for the port's
+alternative to the animation, and `DataSet.thumbnailAsTitle`'s comment, which says what
+reads it.
 
 ---
 

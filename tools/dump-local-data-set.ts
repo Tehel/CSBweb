@@ -64,7 +64,7 @@ async function recordOf(from: DataSet, id: string, names: LocalDataSetFile[], ba
   signatureGame.readDungeonDat((await disk.read('dungeon.dat'))!);
   return {
     id: `${LOCAL_DATA_SET_PREFIX}${id}`, name: `My ${from.name}`, description: 'A test set.', authors: ['A Player'],
-    dmRules: from.dmRules, baseSet, files, dungeonSignature: await dungeonSignature(signatureGame.ctx.dungeon.getData()),
+    dmRules: from.dmRules, thumbnailAsTitle: false, baseSet, files, dungeonSignature: await dungeonSignature(signatureGame.ctx.dungeon.getData()),
     createdAt: 1_760_000_000_000,
   };
 }
@@ -135,7 +135,7 @@ async function draftOf(from: DataSet, id: string, names: LocalDataSetFile[], bas
   const disk = diskFiles(from);
   const files: Partial<Record<LocalDataSetFile, Blob>> = {};
   for (const name of names) files[name] = blobOf((await disk.read(name))!);
-  return { id, name: ` My ${from.name} `, description: 'A test set.', authors: ['A Player', ' ', ' Another '], dmRules: from.dmRules, baseSet, files };
+  return { id, name: ` My ${from.name} `, description: 'A test set.', authors: ['A Player', ' ', ' Another '], dmRules: from.dmRules, thumbnailAsTitle: false, baseSet, files };
 }
 
 /** `(EDT_Database << 24) + (edbt << 16) + i` (`doc/CSBwin-src/CSB.h:1555-1559`): the records `readRuntimeFileSignatures` reads. */
@@ -300,6 +300,11 @@ async function checkForm(): Promise<void> {
 
   const png = new Blob([readFileSync('static/gamefiles/csb/csb-thumbnail.png')], { type: 'image/png' });
   check((await problemsOf('a PNG thumbnail', { ...good, files: { ...good.files, thumbnail: png } })).length === 0, 'an image is a thumbnail');
+  const asTitle = async (draft: LocalDataSetDraft) => (await checkLocalDataSet(draft, new Set(), base, 0)).record?.thumbnailAsTitle;
+  const titled = { ...good, thumbnailAsTitle: true };
+  check(await asTitle({ ...titled, files: { ...good.files, thumbnail: png } }) === true && await asTitle({ ...good, files: { ...good.files, thumbnail: png } }) === false
+    && await asTitle({ ...titled, files: { ...good.files, thumbnail: undefined } }) === false,
+    'the record shows its thumbnail as the title where the form says so, and never without a thumbnail');
   check((await problemsOf('a .dat thumbnail', { ...good, files: { ...good.files, thumbnail: good.files['dungeon.dat']! } })).join() === 'thumbnail: It is not an image.',
     'a file that is not an image is no thumbnail');
 }

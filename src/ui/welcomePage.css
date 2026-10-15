@@ -358,6 +358,9 @@ body.welcome {
 .add-set-generate:hover:not(:disabled) { color: var(--p11); }
 .add-set-generate:disabled { color: var(--p1); text-decoration: none; cursor: default; }
 .add-set-checklist .add-set-problem { grid-column: 2 / -1; padding-bottom: 4px; }
+/* The thumbnail's row, with one: the checkbox that makes it the title. */
+.add-set-checklist .add-set-as-title { gap: 6px; font-size: 15px; color: var(--p13); cursor: pointer; }
+.add-set-checklist .add-set-as-title input { width: 15px; height: 15px; }
 .add-set-problem { font-size: 15px; line-height: 1.3; color: var(--p9); }
 .add-set-problem:empty { display: none; }
 /* What the dungeon holds, once its dungeon.dat reads: a term and its line, each; the

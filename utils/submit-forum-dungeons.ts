@@ -493,10 +493,10 @@ async function submit(found: Found, root: string, text: Submission, sets: DataSe
         return listedSet ? { read: (name) => instanceFile(listedSet, name), where: (name) => `${listedSet.dir}/${name}` } : null;
     };
     let baseSet = BASE_SETS[0];
-    let checked = await checkLocalDataSet({ id, ...text, dmRules: true, baseSet, files }, new Set(), base, Date.now());
+    let checked = await checkLocalDataSet({ id, ...text, dmRules: true, thumbnailAsTitle: false, baseSet, files }, new Set(), base, Date.now());
     if (!files['graphics.dat'] && checked.problems.some((problem) => problem.about === 'baseSet')) {
         baseSet = BASE_SETS[1];
-        checked = await checkLocalDataSet({ id, ...text, dmRules: true, baseSet, files }, new Set(), base, Date.now());
+        checked = await checkLocalDataSet({ id, ...text, dmRules: true, thumbnailAsTitle: false, baseSet, files }, new Set(), base, Date.now());
     }
     if (!checked.record) {
         console.log('  It does not pass the check:');
@@ -521,6 +521,7 @@ async function submit(found: Found, root: string, text: Submission, sets: DataSe
     body.append('description', text.description);
     for (const author of text.authors) body.append('authors', author);
     body.append('dmRules', 'true');
+    body.append('thumbnailAsTitle', 'false');
     body.append('baseSet', baseSet);
     for (const [kind, blob] of Object.entries(files)) body.append(kind, blob!, kind === 'thumbnail' ? 'thumbnail.png' : kind);
     const sent = Object.keys(files).filter((kind) => kind !== 'thumbnail').join(', ');

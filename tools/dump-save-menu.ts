@@ -3247,7 +3247,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
     now += 60_000;
 
     // A player's own set that holds Dungeon Master's dungeon: its record's dungeon.dat.
-    const record: LocalDataSetRecord = { id: 'local:mine', name: 'My own', description: '', authors: [], dmRules: false, baseSet: 'dm-atari',
+    const record: LocalDataSetRecord = { id: 'local:mine', name: 'My own', description: '', authors: [], dmRules: false, thumbnailAsTitle: false, baseSet: 'dm-atari',
       files: { 'dungeon.dat': new Blob([read(DUNGEON).slice()]) }, dungeonSignature: [], createdAt: 0 };
     const localSaves = new GameSaves(game, localDataSet(record), recordFiles(record, null), store, screen, log, new CsbRandom(SEED));
     const inLocal = await localSaves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine });
@@ -3438,7 +3438,7 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
 
     // A player's own set, which holds Dungeon Master's dungeon: the same question, whose
     // LOOK FOR A BETTER MATCH finds Dungeon Master among the other sets.
-    const record: LocalDataSetRecord = { id: 'local:mine', name: 'My own', description: '', authors: [], dmRules: false, baseSet: 'dm-atari',
+    const record: LocalDataSetRecord = { id: 'local:mine', name: 'My own', description: '', authors: [], dmRules: false, thumbnailAsTitle: false, baseSet: 'dm-atari',
       files: { 'dungeon.dat': new Blob([read(DUNGEON).slice()]) }, dungeonSignature: [], createdAt: 0 };
     const builder = await menuRig(graphics, store, 'HALK', {}, localDataSet(record), recordFiles(record, null));
     const inLocal = await builder.open();

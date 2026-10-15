@@ -22,7 +22,7 @@
  * until a player's set is published and approved, and the welcome page then offers only to
  * add one. `default` may be `null` or left out, for none. A set's `dir` may be left out, for its `id`.
  * The flags `csbGraphics`,
- * `miniDat`, `hintOracle`, `dmRules` and `hidden` may each be left out, for `false`, and the manifest
+ * `miniDat`, `hintOracle`, `dmRules`, `thumbnailAsTitle` and `hidden` may each be left out, for `false`, and the manifest
  * names one only where it is true. A set with `"hidden": true` is left out of the welcome
  * page's grid (`chooserSets`), but for a moderator, and plays all the same by its `?dungeon=`.
  *
@@ -87,6 +87,14 @@ export interface DataSet {
      * game of DM saved by the port, which writes the flag back.
      */
     dmRules: boolean;
+    /**
+     * Whether its thumbnail (`thumbnailPath`) is to be shown in place of the title's
+     * animation, a choice of its author's on the form that adds a set
+     * (`src/ui/addDataSetForm.ts`). CSBWin has no such picture: it always plays the
+     * animation from `graphics.dat` (`_DisplayChaosStrikesBack`,
+     * doc/CSBwin-src/CSBCode.cpp:9308). The boot does not read it yet (`DEBT.md` P12).
+     */
+    thumbnailAsTitle: boolean;
     /**
      * Whether the chooser leaves it out (`chooserSets`). It is played by its `?dungeon=` all
      * the same, and the server takes its events and serves its files as any other's.
@@ -169,7 +177,7 @@ export const PLAYER_ID_HEADER = 'X-Player-Id';
 export const MODERATION_ACTIONS = ['approve', 'reject', 'hide', 'show'] as const;
 export type ModerationAction = (typeof MODERATION_ACTIONS)[number];
 
-const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'hidden'] as const;
+const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'thumbnailAsTitle', 'hidden'] as const;
 
 /**
  * `text`, a manifest whose folders are relative to `base` (`gamefiles` for the page,
@@ -202,14 +210,14 @@ export function parseManifest(text: string, base: string): DataSetManifest {
         if (!Array.isArray(authors) || !authors.every((author) => typeof author === 'string')) {
             throw manifestError(`data set '${id}' has "authors" that are not a list of texts`);
         }
-        const [csbGraphics, miniDat, hintOracle, dmRules, hidden] = FLAGS.map((flag) => {
+        const [csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden] = FLAGS.map((flag) => {
             const value = entry[flag] ?? false;
             if (typeof value !== 'boolean') throw manifestError(`data set '${id}' has a "${flag}" that is neither true nor false`);
             return value;
-        }) as [boolean, boolean, boolean, boolean, boolean];
+        }) as [boolean, boolean, boolean, boolean, boolean, boolean];
         const status = entry.status ?? 'approved';
         if (status !== 'approved' && status !== 'pending') throw manifestError(`data set '${id}' has a "status" that is neither "approved" nor "pending"`);
-        return { id, name, description, authors: authors as string[], dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, hidden, pending: status === 'pending' };
+        return { id, name, description, authors: authors as string[], dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden, pending: status === 'pending' };
     });
     const twice = dataSets.find((set, i) => dataSets.findIndex((other) => other.id === set.id) !== i);
     if (twice) throw manifestError(`two data sets are '${twice.id}'`);
