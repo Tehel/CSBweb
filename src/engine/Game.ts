@@ -699,19 +699,28 @@ export class Game implements MainLoop {
 
     /**
      * A move a level down (`delta` 1) or up (-1) for the page's `?dev`, not CSBWin's: the
-     * party is lifted off its square and put on the dungeon's square below or above, the
-     * one `IncrementLevel` finds (doc/CSBwin-src/CSBCode.cpp:4782-4810), as
-     * `TraverseStairway` puts it down a stairway (`:7860-7868`): the next tick loads the
-     * level (`loadNewPartyLevel`). Whatever is there, a wall, a monster or no pit, and
-     * with no filter and no stamina: a way through a dungeon to debug it. False, and
-     * nothing done, where no level lies below or above, in a script, or with a level
-     * change already under way.
+     * party is lifted off its square and put on the map numbered one more or one less,
+     * as CSBWin's gravity counts its vertical axis (doc/CSBwin-src/Mouse.cpp:1280-1287),
+     * on the same square of the dungeon when that map holds it, else on that map's
+     * nearest square, as `TraverseStairway` puts it down a stairway (`CSBCode.cpp:7860-7868`):
+     * the next tick loads the level (`loadNewPartyLevel`). Whatever is there, a wall, a
+     * monster or no pit, and with no filter and no stamina: a way through a dungeon to
+     * debug it, where `IncrementLevel` finds a level only over the squares two levels
+     * share. False, and nothing done, above map 0 or below the last, in a script, or with
+     * a level change already under way.
      */
     devChangeLevel(delta: 1 | -1): boolean {
         if (this.isRunningScript() || this.ctx.loop.newPartyLevel !== -1) return false;
         const here = this.ctx.party.state.position;
-        const next = this.ctx.dungeon.incrementLevel(here, delta);
-        if (!next) return false;
+        const from = this.ctx.dungeon.getMap(here.z)?.descriptor;
+        const to = this.ctx.dungeon.getMap(here.z + delta)?.descriptor;
+        if (!from || !to) return false;
+        const clamp = (v: number, size: number): number => Math.min(Math.max(v, 0), size - 1);
+        const next = new Position(
+            clamp(from.offsetX + here.x - to.offsetX, to.width),
+            clamp(from.offsetY + here.y - to.offsetY, to.height),
+            here.z + delta,
+        );
         this.ctx.systems.worldMove.moveParty(here.x, here.y, -1, 0);
         this.ctx.loop.newPartyLevel = next.z;
         this.ctx.party.state.position = new Position(next.x, next.y, here.z);

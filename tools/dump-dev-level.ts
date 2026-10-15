@@ -1,12 +1,14 @@
 /**
  * The page's `?dev` move down and up (`Game.devChangeLevel`, `GameInputHost.onDevLevel`),
  * a debugging aid that is not CSBWin's: the move down and up keys take the party to the
- * dungeon's square below or above, `IncrementLevel`'s (doc/CSBwin-src/CSBCode.cpp:4782-4810),
- * whatever is there.
+ * map numbered one more or one less, on the same square of the dungeon when that map holds
+ * it, else on its nearest square, whatever is there; nowhere above map 0 or below the last.
  *
  * 1. On DM's level 0, from a square whose square below is a wall on level 1: down puts the
  *    party in that wall once the next tick has loaded the level, with no pit; up takes it
- *    back to the same square of level 0. Where no level lies below, nothing happens.
+ *    back to the same square of level 0. From a square of level 0 that level 1 does not
+ *    reach, where `IncrementLevel` finds nothing, down puts it on level 1's nearest
+ *    square. Nothing happens up from map 0 or down from map 13, the last.
  * 2. The keys: with the hook, Minus and Equal (`move.down`, `move.up`) call it with 1 and
  *    -1 and queue no button; without it, in a dungeon that does not set
  *    `bThreeDMovements`, they are nothing (`translateKey`).
@@ -58,12 +60,31 @@ function levels(): void {
   runVbl(game, TICK_DUE);
   console.log(`up: ${back}, ${party(game)}`);
   check(back && party(game) === `0:(${from.x},${from.y})`, 'and up takes it back to its square of level 0');
-  const map13 = dungeon.getMap(13)!.descriptor;
-  game.ctx.party.state.position = new Position(0, 0, 13);
-  const none = dungeon.incrementLevel(new Position(0, 0, 13), 1) === null && !game.devChangeLevel(1);
+
+  // A square of level 0 off level 1, which `IncrementLevel` leaves where it is.
+  const map1 = dungeon.getMap(1)!.descriptor;
+  let off: Position | null = null;
+  for (let x = 0; x < map0.width && !off; x++) {
+    for (let y = 0; y < map0.height && !off; y++) {
+      if (dungeon.incrementLevel(new Position(x, y, 0), 1) === null) off = new Position(x, y, 0);
+    }
+  }
+  if (!off) throw new Error('every square of level 0 is over level 1');
+  const clamp = (v: number, size: number): number => Math.min(Math.max(v, 0), size - 1);
+  const nearest = `1:(${clamp(map0.offsetX + off.x - map1.offsetX, map1.width)},${clamp(map0.offsetY + off.y - map1.offsetY, map1.height)})`;
+  game.ctx.party.state.position = off;
+  const fell = game.devChangeLevel(1);
   runVbl(game, TICK_DUE);
-  console.log(`level 13 is ${map13.width}x${map13.height}; down from it: ${party(game)}`);
-  check(none && party(game) === '13:(0,0)', 'where no level lies below, nothing happens');
+  console.log(`from 0:(${off.x},${off.y}), off level 1 (${map1.width}x${map1.height} at (${map1.offsetX},${map1.offsetY})), down: ${party(game)}`);
+  check(fell && party(game) === nearest, 'off the level below, down puts the party on its nearest square');
+
+  game.ctx.party.state.position = new Position(off.x, off.y, 0);
+  const above = game.devChangeLevel(-1);
+  game.ctx.party.state.position = new Position(0, 0, 13);
+  const pastLast = game.devChangeLevel(1);
+  runVbl(game, TICK_DUE);
+  console.log(`up from map 0: ${above}; down from map 13: ${pastLast}, ${party(game)}`);
+  check(!above && !pastLast && party(game) === '13:(0,0)', 'nothing above map 0, nothing below the last map');
   console.log('');
 }
 
