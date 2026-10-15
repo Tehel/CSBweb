@@ -14,6 +14,13 @@
  *     turns it only when `oldX != -1` (`:3035-3041`): a thrown object (`oldX` -2) turns,
  *     a dropped one keeps the corner it was dropped at.
  *
+ * A dead monster's remains go the same way: `CreateAndDropObject` puts each dropping down
+ * with `MoveObject(objD5, -1, 0, mapX, mapY)` (`Code11f52.cpp:832`), and
+ * `DropMonsterRemains` each possession (`:946`), so a monster that dies on an object
+ * teleporter sends what it leaves through it. Theron's Quest's village of thieves hangs its
+ * relic on that: Gigglers fall to their death on item teleporters, which carry their armour
+ * into a block of alcoves.
+ *
  * The teleporter is a real record from `dungeon.dat`, rigged by `tools/lib/teleporter.ts`.
  *
  * Run: `npm test -- --only=dump-drop-move-object.ts`
@@ -21,6 +28,7 @@
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { Game } from '../src/engine/Game';
+import { MonsterType } from '../src/engine/monsterTypes';
 import { MovementAction } from '../src/engine/gameTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import type { Champion } from '../src/engine/gameTypes';
@@ -117,6 +125,23 @@ function spy(game: Game): PadCall[] {
   });
   return calls;
 }
+
+/** A creature record of the dungeon's, made a lone `type` carrying `possession`. */
+function monster(game: Game, type: MonsterType, possession: ObjectID): ObjectID {
+  const record = game.ctx.dungeon.getData().databases.creatures.records[0]!;
+  record.creatureType = type;
+  record.numMonM1 = 0;
+  record.possession = possession;
+  return game.ctx.dungeon.rnMaps.rn(DBType.CREATURE, 0);
+}
+
+const countOf = (game: Game, at: Position, category: DBType): number => {
+  let n = 0;
+  for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
+    if (game.ctx.dungeon.rnMaps.dbType(rn) === category) n++;
+  }
+  return n;
+};
 
 const throwLands = (game: Game, rn: ObjectID, at: Position, corner: number): void =>
   game.systems.timer.dropMissileObject(rn, at, corner);
@@ -227,6 +252,36 @@ function main(): void {
     check(afterDrop, 'a drop runs no timer pass: the pad\'s timer waits for the tick');
     check(afterPickUp, 'a pick-up runs no timer pass');
     check(turned && afterTurn, 'a turn that went through runs no timer pass');
+  }
+
+  /* ------------- 6. a monster dies on an object teleporter: what it carried goes on ---- */
+  {
+    const game = makeGame();
+    const { front, dest } = stage(game, 0);
+    const rn = takeWeapon(game);
+    game.ctx.dungeon.setDBRecordLink(rn, OBJECT_ID_EOF);
+    const calls = spy(game);
+    game.systems.monsterDamage.dropMonsterRemains(0, front.x, front.y, monster(game, MonsterType.mon_Giggler, rn), 2, -1, true);
+    const there = find(game, dest, game.ctx.dungeon.rnMaps.idx(rn)) !== null;
+    const left = find(game, front, game.ctx.dungeon.rnMaps.idx(rn)) !== null;
+    console.log(`6. a Giggler carrying a weapon dies on the teleporter at (${front.x},${front.y}): at (${dest.x},${dest.y}) `
+      + `${there}, left on the teleporter ${left}, pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place]))}`);
+    check(there && !left, 'the possession is carried to the destination (DropMonsterRemains, Code11f52.cpp:946)');
+    check(calls.length === 1 && same(calls[0]!.at, dest) && calls[0]!.place, 'it is placed once, at the destination, pressing its pads');
+  }
+
+  /* ----------------- 7. a monster dies on an object teleporter: its droppings go on ---- */
+  {
+    const game = makeGame();
+    const { front, dest } = stage(game, 0);
+    const before = countOf(game, dest, DBType.MISC);
+    game.systems.monsterDamage.dropMonsterRemains(
+      0, front.x, front.y, monster(game, MonsterType.mon_Screamer, OBJECT_ID_EOF), 2, -1, true,
+    );
+    const arrived = countOf(game, dest, DBType.MISC) - before;
+    const left = countOf(game, front, DBType.MISC);
+    console.log(`7. a Screamer dies on the teleporter: ${arrived} slice(s) at the destination, ${left} on the teleporter`);
+    check(arrived > 0 && left === 0, 'the droppings are carried to the destination (CreateAndDropObject, Code11f52.cpp:832)');
   }
 
   finish();

@@ -19,6 +19,7 @@ import { DungeonState } from '../src/engine/DungeonState';
 import { MonsterSystem } from '../src/engine/MonsterSystem';
 import { MonsterDamage, MonsterDamageResult } from '../src/engine/MonsterDamage';
 import { TimerQueue, TimerFunction } from '../src/engine/TimerQueue';
+import { WorldMove } from '../src/engine/WorldMove';
 import type { MissileEncounter } from '../src/engine/MissileEncounter';
 import type { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import type { DsaSystem } from '../src/engine/DsaSystem';
@@ -60,9 +61,11 @@ async function main(): Promise<void> {
   const damage = new MonsterDamage(ctx);
   // The two systems under test, and stand-ins for the rest: the death cloud is only
   // counted, no missile waits in the cell a dead group is lifted from, no pad is there,
-  // and no delete monster filter runs.
+  // and no delete monster filter runs. What a dead monster leaves goes down through the
+  // real `MoveObject`.
   ctx.systems.monsters = monsters;
   ctx.systems.monsterDamage = damage;
+  ctx.systems.worldMove = new WorldMove(ctx);
   ctx.systems.missileEncounter = standInOf<MissileEncounter>({
     createDeathCloud: () => { clouds++; },
     checkMonsterMoveFromMissile: () => false,

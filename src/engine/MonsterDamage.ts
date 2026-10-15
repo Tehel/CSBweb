@@ -276,11 +276,9 @@ export class MonsterDamage {
 
       const posInCell =
         position === 255 || this.random.zeroTo3() === 0 ? this.random.zeroTo3() : position & 0x3;
-      const placed = this.dungeon.addObjectToCell(
-        new Position(mapX, mapY, level),
-        this.dungeon.rnMaps.setPos(rn, posInCell),
-      );
-      if (!placed) this.dungeon.deleteDBEntry(rn);
+      // `MoveObject(objD5, -1, 0, mapX, mapY)`: a teleporter, a pit or a pad under the
+      // square acts on it as on anything dropped there.
+      this.ctx.systems.worldMove.moveObject(this.dungeon.rnMaps.setPos(rn, posInCell), -1, 0, mapX, mapY, level);
     }
 
     this.ctx.sounds.queueSound(
@@ -384,13 +382,14 @@ export class MonsterDamage {
     let carried = monster.possession;
     if (carried === OBJECT_ID_EOF || carried === OBJECT_ID_NULL) return;
     let droppedWeapon = false;
-    const target = new Position(mapX, mapY, level);
+    // Each through `MoveObject(objD5, -1, 0, mapX, mapY)` (`:946`), so what a monster dies
+    // carrying on a teleporter goes where the teleporter sends it.
     while (carried !== OBJECT_ID_EOF && carried !== OBJECT_ID_NULL) {
       const next = this.dungeon.getDBRecordLink(carried);
       const category = this.dungeon.rnMaps.dbType(carried);
       if (category === DBType.WEAPON) droppedWeapon = true;
       const placed = this.dungeon.rnMaps.setPos(carried, this.random.zeroTo3());
-      this.dungeon.addObjectToCell(target, placed);
+      this.ctx.systems.worldMove.moveObject(placed, -1, 0, mapX, mapY, level);
       carried = next;
     }
     monster.possession = OBJECT_ID_EOF;

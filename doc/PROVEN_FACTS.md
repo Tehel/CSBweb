@@ -1282,6 +1282,12 @@ party arrives on its square:
 whose descriptor `leavesDroppings()` (`:887`), so a rock pile leaves boulders and a mummy
 nothing. Then it drops whatever the group was carrying (`:930`).
 
+Both drops put each object down with `MoveObject(obj, -1, 0, mapX, mapY)`: a dropping
+(`CreateAndDropObject`, `:832`) and a possession, at a random corner (`:943-946`). So an
+object teleporter under the square sends them on, an open pit takes them and a pad fires,
+as for anything dropped there. Theron's Quest's village of thieves depends on it: Gigglers
+fall to their death on item teleporters, which carry their armour into a block of alcoves.
+
 ## Monster AI timers are addressed by map square, and only a DSA move re-aims them all
 
 Timer types 29-41 are found by `uByte6`/`uByte7` (`doc/CSBwin-src/Monster.cpp:1324-1331`).

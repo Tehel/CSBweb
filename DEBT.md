@@ -158,7 +158,6 @@ In payoff order: the first row is the next item.
 | C168 | A monster north-west of the party never prefers west | S | ⏳ |
 | C169 | A monster's `timePerMove / 2` is not an integer division | S | ⏳ |
 | C170 | A blow at the party skips a living champion who shares a dead one's corner | S | ⏳ |
-| C172 | A dead monster's remains are linked onto the square, not moved there | S | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
 | C174 | DSA copies that are not whole | S | ⏳ |
 | C175 | The DSA's integer widths | S | ⏳ |
@@ -1366,19 +1365,6 @@ wall takes the same path (`MovementSystem.ts:436-438`).
 
 Paying it: `characterAtPosition(party.champions, pos)` (`AddCharacter.ts:84`); a check with a
 dead champion and a recruit in one corner.
-
-### C172 ⏳ A dead monster's remains are linked onto the square, not moved there
-
-`CreateAndDropObject` and `DropMonsterRemains` put each dropped object and each possession
-on the square with `MoveObject(obj, -1, 0, x, y)` (`doc/CSBwin-src/Code11f52.cpp:832`,
-`:943`), so a pad under it fires, an open pit takes it and an object teleporter sends it
-on. The port links them with `addObjectToCell` (`src/engine/MonsterDamage.ts:277-283`,
-`:388-393`), which does none of these. `killCharacter`, `dropAllPossessions` and
-Zokathra's drop already go through `worldMove.moveObject`.
-
-Paying it: `ctx.systems.worldMove.moveObject(rnMaps.setPos(rn, pos), -1, 0, x, y, level)`
-at both; a check of a monster killed on a pad that reacts to objects, and of one killed on
-an object teleporter.
 
 ### C173 ⏳ The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject`
 
