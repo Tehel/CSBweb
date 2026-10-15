@@ -424,22 +424,17 @@ export class WorldMove {
     return null;
   }
 
+  /**
+   * `newX = DB1A2->destX(); newY = DB1A2->destY(); curLevel = DB1A2->destLevel();
+   * LoadLevel(curLevel)` (`doc/CSBwin-src/Code11f52.cpp:2986-2990`): the teleporter names
+   * its map by number, not by depth, and the square by that map's own coordinates. A map
+   * the dungeon does not have, which CSBWin would load past its levels, leaves the object
+   * where it is.
+   */
   private getTeleporterDestination(teleporter: TeleporterRecord): Position | null {
-    const destLevel = teleporter.destMap & 0xff;
-    const destX = teleporter.destX & 0x1f;
-    const destY = teleporter.destY & 0x1f;
-
-    for (let idx = 0; idx < this.dungeon.getMapCount(); idx++) {
-      const map = this.dungeon.getMap(idx as number);
-      if (!map) continue;
-      const desc = map.descriptor;
-      if (desc.level !== destLevel) continue;
-      if (destX < 0 || destY < 0) continue;
-      if (destX >= desc.width || destY >= desc.height) continue;
-      return new Position(destX, destY, idx as number);
-    }
-
-    return null;
+    const map = teleporter.destMap & 0xff;
+    if (map >= this.dungeon.getMapCount()) return null;
+    return new Position(teleporter.destX & 0x1f, teleporter.destY & 0x1f, map);
   }
 
   private teleporterAllowsObject(teleporter: TeleporterRecord, objectType: number): boolean {

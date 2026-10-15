@@ -5746,6 +5746,16 @@ The door arm of `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1879-19
 
 Evidence: `tools/dump-missile-door.ts`.
 
+## A teleporter names its target map by number, not by depth
+
+`MoveObject` takes the teleporter's square and map as they stand: `newX = destX(); newY =
+destY(); curLevel = destLevel(); LoadLevel(curLevel)` (`doc/CSBwin-src/Code11f52.cpp:2986-2990`).
+`destLevel()` is `BITS8_15(word4)` (`CSB.h:873`), a map number, as `LoadLevel` takes one;
+the map's depth (`LEVELDESC` bits 0-5 of `word8`) plays no part, and neither do the
+other maps at that depth. Every dungeon the repository ships has each map at the depth
+of its number, so the two readings never differ there; a dungeon whose maps share a
+depth tells them apart (`tools/dump-teleporter-target.ts`).
+
 ## A teleporter that switches on under a cloud takes the cloud's timer along too
 
 `WiggleEverything` (`doc/CSBwin-src/Timer.cpp:2428-2512`) — run when a teleporter or pit
