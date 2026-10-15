@@ -150,7 +150,8 @@ core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             ApplyLimits), objectNameIndex (OBJNI_* constants)
 data/       DataSets (the manifest's sets), LocalDataSets (a player's own, a record of the
             store's), DataSetFiles (a set's files read by name, from its folder or its record),
-            DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor,
+            DungeonLoader, DungeonFileWriter (a `dungeon.dat` written, with its Extended
+            Features block), GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor,
             HintOracleLoader (CSB's `hcsb.hct`), SwooshLoader (the Atari disk's `swoosh.img`),
             UtilityPortraits (the CSB utility disk's faces, RISE's NEW FACE)
   saves/    The saves behind the disk icon: SaveStore (a save's row, the CSBWin file

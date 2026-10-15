@@ -3717,6 +3717,30 @@ The committed saves show which file their games were started from. All eight hav
 Windows package's file. A game started from `dm-atari`, cleaned by `ExtendPortraits`,
 holds mirrors with `word6` entirely zero.
 
+## A `dungeon.dat` with a block is a save's dungeon without the save
+
+For a new game, `ReadDatabases` calls `ReadExtendedFeatures`, which reads the block and
+the object index behind it and returns their size; if the next word is not 33028 it
+seeks back to that size and reads the image as it stands
+(`doc/CSBwin-src/SaveGame.cpp:2558-2566`), in the shapes the block declares, and only a
+version `'@'` file has its RNs renumbered (`:2927`). The image is a save's blocks 7-14
+and the byte-sum word that closes them (`:2868-2870`). So the port writes one with the
+save's own writers: `buildDungeonFile` (`src/data/DungeonFileWriter.ts`), the block
+`buildLiveExtendedFeatures` gives a save, the world's object index, the save-shaped
+image and its checksum.
+
+Read and written again, `dm-windows/dungeon.dat`, which CSBWin's side wrote, comes back
+with the same object index maps and the same 35,640-byte image, byte for byte, but for
+free scroll 33's text word (0x047B in the file, which the reader drops, "A free scroll's
+text in a CSBWin file") and the checksum. The block differs only in its game
+information, `editingOptions` 12 and the unnamed flag bit 0x02. A packed `dungeon.dat`
+and DM's and Theron's Quest's first dungeon written in this form read back as the same
+world and play the same new game, tick for tick (`tools/dump-dungeon-file.ts`).
+
+Nothing in this form caps a database at 1,024 records: an RN is a slot of the index, a
+word of its own, where the packed form's index is 10 bits. Conflux 3.5's file holds
+10,318 actuators.
+
 ## A compressed `dungeon.dat`: CSB's prison
 
 When the game is not a resumed one, `ReadDatabases` reads 8 bytes and, if their first word
