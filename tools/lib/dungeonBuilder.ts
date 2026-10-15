@@ -301,17 +301,21 @@ export interface ActuatorSpec {
   audible?: boolean;
   /** Ticks, 0-15. */
   delay?: number;
+  /** `wallGraphicOrdinal`: 1 and up, an entry of the level's wall decoration table. */
+  graphic?: number;
   target: { x: number; y: number; pos?: number };
 }
 
 /** A `DB3` (`doc/CSBwin-src/CSB.h:930-1078`) in its ten-byte form, aimed at a target. */
 export function actuator(spec: ActuatorSpec, pos = 0): BObject {
   if ((spec.delay ?? 0) > 15) throw new Error('actuator: a delay is four bits');
+  if ((spec.graphic ?? 0) > 15) throw new Error('actuator: a wall graphic ordinal is four bits');
   const record: ActuatorRecord = {
     nextObject: OBJECT_ID_EOF,
     word2: (spec.type & 0x7f) | ((spec.value ?? 0) << 7),
     word4: ((spec.once ? 1 : 0) << 2) | ((spec.action ?? ActuatorAction.SET) << 3) |
-      ((spec.normallyClosed ? 1 : 0) << 5) | ((spec.audible ? 1 : 0) << 6) | ((spec.delay ?? 0) << 7),
+      ((spec.normallyClosed ? 1 : 0) << 5) | ((spec.audible ? 1 : 0) << 6) | ((spec.delay ?? 0) << 7) |
+      ((spec.graphic ?? 0) << 12),
     word6: ((spec.target.pos ?? 0) << 4) | (spec.target.x << 6) | (spec.target.y << 11),
     word8: 0,
   };
@@ -347,8 +351,9 @@ export function textObject(words: number[], visible: boolean): BObject {
 /**
  * A message as `DecodeText` reads it back for a message (`typeOfText` 1,
  * `src/data/DecodeText.ts`): A-Z 0-25, space 26, `.` 27, then code 30 and the index of
- * the escape table entry (`byte10016`, 8 bytes each) holding the character, 31 to end,
- * three codes to a word from bit 10 down. Any other character is refused.
+ * the escape table entry (`byte10016`, 8 bytes each) holding the character, a line feed
+ * code 28, the line break of a wall's text, 31 to end, three codes to a word from bit 10
+ * down. Any other character is refused.
  */
 export function encodeMessage(text: string, escapes: Uint8Array): number[] {
   const codes: number[] = [];
@@ -356,6 +361,7 @@ export function encodeMessage(text: string, escapes: Uint8Array): number[] {
     if (char >= 'A' && char <= 'Z') codes.push(char.charCodeAt(0) - 65);
     else if (char === ' ') codes.push(26);
     else if (char === '.') codes.push(27);
+    else if (char === '\n') codes.push(28);
     else {
       const entry = Array.from({ length: escapes.length / 8 }, (_, i) => i)
         .find((i) => escapes[i * 8] === char.charCodeAt(0) && escapes[i * 8 + 1] === 0);
