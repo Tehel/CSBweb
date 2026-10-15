@@ -3,7 +3,7 @@ import { resolve } from 'path';
 import { execSync } from 'node:child_process';
 import { createReadStream, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 
@@ -177,6 +177,44 @@ function dataSetsRoute(): Plugin {
 }
 
 /**
+ * The web app manifest that makes the game installable (`src/assets/manifest.webmanifest`),
+ * named by `index.html` and served beside it as `manifest.webmanifest`, under a name that
+ * does not change, as a browser keeps an installed app's manifest URL. Its `start_url` and
+ * `scope`, `./`, are the page's folder, so it also installs under a sub-path. Its icons
+ * are named in the source as files beside it, and become the dev server's `src/assets/…`,
+ * or a build's hashed assets, emitted here, as Vite emits none of what a manifest names.
+ */
+function webAppManifest(): Plugin {
+  const SOURCE = resolve(import.meta.dirname, 'src', 'assets', 'manifest.webmanifest');
+  const FILE_NAME = 'manifest.webmanifest';
+  type Manifest = { icons: { src: string }[] };
+  /** The source, its icons' `src` each `iconSrc`'s. */
+  const manifestText = (iconSrc: (name: string) => string): string => {
+    const manifest = JSON.parse(readFileSync(SOURCE, 'utf8')) as Manifest;
+    for (const icon of manifest.icons) icon.src = iconSrc(icon.src);
+    return JSON.stringify(manifest, null, 2);
+  };
+  return {
+    name: 'csbweb-web-app-manifest',
+    transformIndexHtml: () => [{ tag: 'link', attrs: { rel: 'manifest', href: `./${FILE_NAME}` }, injectTo: 'head' }],
+    configureServer(server) {
+      server.middlewares.use(`/${FILE_NAME}`, (req, res, next) => {
+        if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
+        res.setHeader('Content-Type', 'application/manifest+json');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.end(manifestText((name) => `src/assets/${name}`));
+      });
+    },
+    generateBundle() {
+      const source = manifestText((name) => this.getFileName(this.emitFile({
+        type: 'asset', name, source: readFileSync(resolve(dirname(SOURCE), name)),
+      })));
+      this.emitFile({ type: 'asset', fileName: FILE_NAME, source });
+    },
+  };
+}
+
+/**
  * The server's build of the page's check of a player's own set (`checkLocalDataSet`): `vite
  * build --ssr`, after the page's, one self-contained module that the server, which has no
  * `node_modules`, loads from `dist/server/` (`server/app.ts`, `CHECK_MODULE`).
@@ -184,7 +222,8 @@ function dataSetsRoute(): Plugin {
 const SERVER_ENTRY = resolve(import.meta.dirname, 'src', 'data', 'LocalDataSets.ts');
 
 export default defineConfig(({ command, isSsrBuild }) => ({
-  plugins: [dataSetsRoute()],
+  // The server's module is no page, and has no manifest.
+  plugins: [dataSetsRoute(), ...(isSsrBuild ? [] : [webAppManifest()])],
   root: '.',
   // Every URL relative to the page, so the game also runs under a sub-path.
   base: './',

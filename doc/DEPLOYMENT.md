@@ -254,8 +254,12 @@ else there. The page's own files are under `src/assets/`: `favicon.ico`, named b
 `index.html`, the welcome page's logo, `csbweb-logo.jpg`, imported by
 `src/ui/welcomePage.ts`, and the Atari disk's FTL logo, `swoosh.img` and `swoosh.wav`,
 imported by `src/main.ts`, which every set shares, so that every install has it and no
-player uploads it; the build hashes them, and inlines `swoosh.img`, 3 KB, in the bundle. A
-build is `index.html` and `assets/`, about 1.1 MB, and the server's module.
+player uploads it, and the installed game's icons, named by its web app manifest,
+`manifest.webmanifest`; the build hashes them, and inlines `swoosh.img`, 3 KB, in the
+bundle. The manifest itself is built beside `index.html` under a name that does not change,
+as a browser keeps an installed app's manifest URL (`webAppManifest`, `vite.config.mts`). A
+build is `index.html`, `manifest.webmanifest` and `assets/`, about 1.4 MB, and the
+server's module.
 
 **The server's module** is the second build, `--ssr`: the page's check of a player's own
 set, `checkLocalDataSet` (`src/data/LocalDataSets.ts`) and every reader under it, bundled
@@ -265,7 +269,7 @@ erasable syntax and the image has no `node_modules`, so it loads this module ins
 reads a set with the page's own readers. It is never served.
 
 `tools/dump-build.ts` builds both into a scratch folder and asserts them: only the page's own file
-types, nothing of `static/`, every file `index.html` names present, no probe handle, and a
+types, nothing of `static/`, every file `index.html` names present, the manifest's icons too, no probe handle, and a
 server's module that imports nothing and says of DM's and CSB's files, and of a file that
 does not read, what the source's check says.
 
@@ -294,6 +298,7 @@ every set (unset or empty, no one; an entry that is not a `playerId` stops the s
 | Path | What | Caching |
 | --- | --- | --- |
 | `/` | `dist/index.html` | `no-cache` |
+| `/manifest.webmanifest` | `dist/manifest.webmanifest`, the installed game's | `no-cache` |
 | `/assets/…` | `dist/assets/…`, hashed names | `immutable` |
 | `/server/…` | 404: `dist/server/` is the server's module | |
 | `/gamefiles/…` | `GAMEFILES_DIR/…` | `no-cache`, ETag and Last-Modified |

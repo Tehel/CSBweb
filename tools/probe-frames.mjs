@@ -29,7 +29,7 @@
 // opened by a long press, but not with MAP VIEW off, the champion dialog opened by a
 // long press on the bars, where a tap opens the inventory, and fullscreen, entered by a
 // tap and a click, the screen and the effect sized and placed in it, at 16:10 and at 4:3,
-// in it and out of it, the save store held by another tab, and the welcome
+// in it and out of it, and in the installed app's window, the save store held by another tab, and the welcome
 // page: its tiles and their order, its fonts, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
 // straight into play, its form adding, editing, publishing and deleting a player's own set, the
 // tiles' controls moderating a published one, and each tile's name in its set's state's colour,
@@ -1321,6 +1321,27 @@ await cdpMouse('mousePressed', 85, 65); await cdpMouse('mouseReleased', 85, 65);
 const windowed = await screenLayout();
 check(windowed.element === null && windowed.game[2] === 960 && windowed.game[3] === 600 && windowed.tube.every((v, i) => v === windowed.game[i]),
   'FULLSCREEN again leaves it: the canvas and the effect\'s at 960x600');
+
+// The installed game's window (`src/assets/manifest.webmanifest`): `#game` fills it, the
+// screen sized in it as in fullscreen. CDP emulates no `display-mode`, but Chrome matches
+// `display-mode: fullscreen` while an element is in fullscreen, so `<html>` in fullscreen,
+// at a real click on the page's margin, lays the page out as the installed game. With
+// an element in fullscreen the page is not the installed game: FULLSCREEN still turns.
+await screenSize(1920, 1080); await wait(300);
+await evaluate(`addEventListener('pointerup', () => document.documentElement.requestFullscreen(), { once: true }), 1`);
+for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: 5, y: 5, button: 'left', clickCount: 1 });
+await wait(800);
+{
+  const app = await screenLayout();
+  const installed = await evaluate(`[matchMedia('(display-mode: fullscreen)').matches, window.__probe.screen.ui.fullscreen.isInstalled()]`);
+  console.log(`state: <html> in fullscreen, ${app.w}x${app.h}, the screen ${app.game.join(',')}`);
+  check(app.element === '' && installed[0] && !installed[1], 'with <html> in fullscreen, display-mode: fullscreen matches, and the page is not the installed game');
+  check(app.game[2] === 1600 && app.game[3] === 1000 && Math.abs(app.game[0] - 160) <= 0.5 && Math.abs(app.game[1] - 40) <= 0.5
+    && app.tube.every((v, i) => Math.abs(v - app.game[i]) < 0.01),
+    'the installed game\'s window: the screen 5 times 320x200 in 1920x1080, centred, the effect over it');
+}
+await evaluate(`document.exitFullscreen().then(() => 1)`); await wait(500);
+check((await screenLayout()).game[2] === 960, 'out of it, the screen is 960x600 again');
 await screenSize(1600, 1000);
 
 // The CRT effect's input surface. The effect's canvas is shown over the game canvas, and

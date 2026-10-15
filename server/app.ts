@@ -7,6 +7,7 @@
  * imports with their `.ts` extension (`server/tsconfig.json` holds it to that).
  *
  *   /                 dist/index.html               no-cache
+ *   /manifest.webmanifest  the installed game's     no-cache
  *   /assets/…         dist/assets/…, hashed names   immutable
  *   /server/…         404: the server's own module (`CHECK_MODULE`), never served
  *   /gamefiles/…      GAMEFILES_DIR/…               no-cache, with ETag and Last-Modified
@@ -124,6 +125,7 @@ const CONTENT_TYPES: Record<string, string> = {
     '.ttf': 'font/ttf',
     '.txt': 'text/plain; charset=utf-8',
     '.wav': 'audio/wav',
+    '.webmanifest': 'application/manifest+json',
     '.woff2': 'font/woff2',
 };
 

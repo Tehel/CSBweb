@@ -184,7 +184,7 @@ type Setting = {
   /** Where the help line says something else of it: fullscreen where Esc leaves it. */
   readonly variant?: { readonly when: (ui: UIState) => boolean; readonly help: string };
   /** Where its control is inert, and what the help line says instead: the CRT effect without WebGL. */
-  readonly unavailable?: { readonly when: (ui: UIState) => boolean; readonly help: string };
+  readonly unavailable?: { readonly when: (ui: UIState) => boolean; readonly help: string | ((ui: UIState) => string) };
 } & (
   | { readonly kind: 'toggle'; readonly get: (values: SettingsValues) => boolean; readonly set: (values: SettingsValues, on: boolean) => Partial<SettingsValues> }
   | { readonly kind: 'page'; readonly get: (ui: UIState) => boolean; readonly toggle: (ui: UIState) => void }
@@ -250,7 +250,10 @@ export const TABS: ReadonlyArray<{
         name: 'FULLSCREEN',
         help: 'THE WHOLE SCREEN: HOLD ESC DOWN TO LEAVE IT',
         variant: { when: (ui) => !ui.fullscreen.keepsEscape(), help: 'THE WHOLE SCREEN: ESC LEAVES IT' },
-        unavailable: { when: (ui) => !ui.fullscreen.isAvailable(), help: 'THE BROWSER GIVES NO FULLSCREEN' },
+        unavailable: {
+          when: (ui) => !ui.fullscreen.isAvailable() || ui.fullscreen.isInstalled(),
+          help: (ui) => ui.fullscreen.isInstalled() ? 'THE INSTALLED GAME IS ALWAYS FULLSCREEN' : 'THE BROWSER GIVES NO FULLSCREEN',
+        },
         kind: 'page',
         get: (ui) => ui.fullscreen.isOn(),
         toggle: (ui) => ui.fullscreen.toggle(),
@@ -497,7 +500,10 @@ export function helpText(ui: UIState, state: SettingsDialogState): string {
   if (id >= BTN_TAB0 && id < BTN_TAB0 + TABS.length) return TABS[id - BTN_TAB0].help;
   const setting = settingsOf(state)[lineOf(id)];
   if (!setting) return '';
-  if (inert(ui, setting)) return setting.unavailable?.help ?? '';
+  if (inert(ui, setting)) {
+    const help = setting.unavailable?.help ?? '';
+    return typeof help === 'function' ? help(ui) : help;
+  }
   return setting.variant?.when(ui) ? setting.variant.help : setting.help;
 }
 

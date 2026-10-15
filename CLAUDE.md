@@ -214,7 +214,8 @@ ui/         The page's DOM side: events (the canvas's and the keyboard's listene
 settings/   Settings: the player's settings, one model the page, the game and the dialogs
             read and change, kept in `localStorage`
 lib/        crt (the CRT effect: a WebGL tube over the canvas, and the pointer read through it),
-            fullscreen (`#game` at the largest whole multiple of 320x200, Esc locked)
+            fullscreen (`#game` at the largest whole multiple of 320x200, Esc locked, and in
+            the installed app's window: `src/assets/manifest.webmanifest`)
 main.ts     Bootstrap and wiring
 ```
 

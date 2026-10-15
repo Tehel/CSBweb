@@ -185,6 +185,7 @@ function scratchFiles(scratch: string): ServerOptions {
     mkdirSync(join(gamefilesDir, 'set-a'), { recursive: true });
     writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
     writeFileSync(join(distDir, 'assets', 'index-AbC123.js'), 'console.log(1);');
+    writeFileSync(join(distDir, 'manifest.webmanifest'), '{}');
     writeFileSync(join(distDir, 'assets', 'font-AbC123.ttf'), Buffer.from([0, 1, 0, 0]));
     writeFileSync(join(distDir, 'assets', 'font-AbC123.woff2'), Buffer.from([0x77, 0x4f, 0x46, 0x32]));
     mkdirSync(join(distDir, 'server'));
@@ -246,6 +247,9 @@ async function checkAnswers(port: number, manifest: string, gamefilesDir: string
         check(font.status === 200 && font.headers['content-type'] === type, `a font, as ${type} (${font.headers['content-type']})`);
     }
     check((await ask(port, '/index.html')).headers['cache-control'] === 'no-cache', '/index.html is no-cache too');
+    const webManifest = await ask(port, '/manifest.webmanifest');
+    check(webManifest.status === 200 && webManifest.headers['content-type'] === 'application/manifest+json' && webManifest.headers['cache-control'] === 'no-cache',
+        `the web app manifest, as application/manifest+json, no-cache (${webManifest.headers['content-type']}, ${webManifest.headers['cache-control']})`);
     check((await ask(port, '/assets/nothing.js')).status === 404, 'a missing file is 404');
     check((await ask(port, '/assets')).status === 404, 'a folder is 404, not a listing');
     check((await ask(port, `/${CHECK_MODULE}`)).status === 404, `the server's module, ${CHECK_MODULE}, is not served`);

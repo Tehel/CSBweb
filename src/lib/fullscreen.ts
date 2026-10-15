@@ -25,6 +25,14 @@
  * The request needs the player's gesture. A mouse's press is one, and the settings
  * dialog takes its clicks at the press; a finger's press is not, only its lift, so where
  * the browser says the page has no gesture yet the request waits for the lift.
+ *
+ * The installed game (`src/assets/manifest.webmanifest`) is its own window, which `#game`
+ * fills (index.html), and the screen is sized in it as in fullscreen: the manifest's
+ * `display: fullscreen`, and `standalone`, where a browser gives no fullscreen app. In the
+ * first, the whole screen is the game's from launch, with no gesture and no way out but
+ * the system's own, so there is no fullscreen to turn over. A browser matches the same
+ * `display-mode` in an element's fullscreen, so the installed game is told by the media
+ * query with no element in fullscreen.
  */
 
 import type { AspectRatio } from '../settings/Settings';
@@ -38,9 +46,12 @@ export interface Fullscreen {
     toggle: () => void;
     /** Whether Esc reaches the page in fullscreen: the browser can lock the key. */
     keepsEscape: () => boolean;
+    /** Whether the page is the installed game, on the whole screen by its manifest: no fullscreen to turn over. */
+    isInstalled: () => boolean;
 }
 
 export const NO_FULLSCREEN: Fullscreen = {
+    isInstalled: () => false,
     isAvailable: () => false,
     isOn: () => false,
     toggle: () => {},
@@ -55,6 +66,11 @@ export interface PageFullscreen extends Fullscreen {
 
 /** Out of fullscreen, screen pixels to one of the screen's, across. */
 const WINDOW_SCALE = 3;
+
+/** The installed game's window, which the page fills. */
+const APP_WINDOW = '(display-mode: fullscreen), (display-mode: standalone)';
+/** The installed game on the whole screen, or an element in fullscreen. */
+const APP_FULLSCREEN = '(display-mode: fullscreen)';
 
 /** The screen's height for its width, at each shape. */
 const HEIGHT_PER_WIDTH: Record<AspectRatio, number> = { '16:10': 10 / 16, '4:3': 3 / 4 };
@@ -75,6 +91,9 @@ function keyboardLock(): KeyboardLock | undefined {
 export function createFullscreen(host: HTMLElement, screen: HTMLCanvasElement, onChange: () => void): PageFullscreen {
     const enabled = document.fullscreenEnabled;
     const isOn = (): boolean => enabled && document.fullscreenElement === host;
+    const appWindow = matchMedia(APP_WINDOW);
+    const appFullscreen = matchMedia(APP_FULLSCREEN);
+    const isInstalled = (): boolean => appFullscreen.matches && !document.fullscreenElement;
     let heightPerWidth = HEIGHT_PER_WIDTH['16:10'];
 
     const fit = (): void => {
@@ -82,7 +101,7 @@ export function createFullscreen(host: HTMLElement, screen: HTMLCanvasElement, o
         const height = width * heightPerWidth;
         let scale = WINDOW_SCALE;
         let ratio = 1;
-        if (isOn()) {
+        if (isOn() || appWindow.matches) {
             ratio = devicePixelRatio;
             scale = Math.max(1, Math.min(
                 Math.floor(host.clientWidth * ratio / width),
@@ -95,7 +114,9 @@ export function createFullscreen(host: HTMLElement, screen: HTMLCanvasElement, o
         heightPerWidth = HEIGHT_PER_WIDTH[aspect];
         fit();
     };
-    if (!enabled) return { ...NO_FULLSCREEN, setAspect };
+    window.addEventListener('resize', fit);
+    appWindow.addEventListener('change', fit);
+    if (!enabled) return { ...NO_FULLSCREEN, setAspect, isInstalled };
 
     document.addEventListener('fullscreenchange', () => {
         fit();
@@ -104,7 +125,6 @@ export function createFullscreen(host: HTMLElement, screen: HTMLCanvasElement, o
         else keyboard?.unlock?.();
         onChange();
     });
-    window.addEventListener('resize', fit);
 
     const enter = (): void => {
         host.requestFullscreen().catch(() => {});
@@ -112,6 +132,7 @@ export function createFullscreen(host: HTMLElement, screen: HTMLCanvasElement, o
 
     return {
         setAspect,
+        isInstalled,
         isAvailable: () => true,
         isOn,
         toggle: () => {

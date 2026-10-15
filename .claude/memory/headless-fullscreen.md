@@ -1,6 +1,6 @@
 ---
 name: headless-fullscreen
-description: How headless Chrome behaves under the probe for fullscreen, Keyboard Lock and user activation: which CDP input counts as a gesture, and what cannot be proved there
+description: How headless Chrome behaves under the probe for fullscreen, Keyboard Lock, user activation and display-mode: which CDP input counts as a gesture, and what cannot be proved there
 metadata:
   type: project
 ---
@@ -18,6 +18,11 @@ Measured in headless Chrome (`--headless=new`) over CDP, for `src/lib/fullscreen
 - **`navigator.keyboard.lock(['Escape'])` resolves**, and a CDP Esc reaches the page. But a
   CDP Esc never leaves fullscreen there, lock or not, so headless cannot prove what Esc
   does without the lock: that half rests on the browsers' documented behaviour.
+
+- **CDP emulates no `display-mode`** (`Emulation.setEmulatedMedia` accepts it and changes
+  nothing), but **an element's fullscreen matches `(display-mode: fullscreen)`**, in headless
+  Chrome as in a tab. So `<html>` in fullscreen lays the page out as the installed app, and
+  the installed app is told by that query with no `document.fullscreenElement`.
 
 **Why:** a fullscreen check driven by synthetic events fails for want of activation, not
 for a bug; and a passing Esc check proves less than it seems.

@@ -42,6 +42,20 @@
             place-content: center;
             background-color: #000;
         }
+        /* The installed game (`src/assets/manifest.webmanifest`, linked here by vite.config.mts):
+           its window is the game's, `#game` fills it as it fills the screen in fullscreen,
+           and the screen is sized in it the same way (src/lib/fullscreen.ts). */
+        @media (display-mode: fullscreen), (display-mode: standalone) {
+            body:not(.welcome) {
+                padding: 0;
+            }
+            #game {
+                width: 100vw;
+                height: 100vh;
+                place-content: center;
+                background-color: #000;
+            }
+        }
         /* The CRT effect's canvas (`createCrtEffect`, src/lib/crt.ts) lets every click and
            move through to the game canvas. */
         #crt-canvas {

@@ -369,6 +369,16 @@ Lock API (Chromium's), Esc is locked in fullscreen and still opens the settings,
 held down leaves; elsewhere Esc leaves, and the double click on the message area opens
 them.
 
+The page installs as an app (`src/assets/manifest.webmanifest`, linked and built by
+`vite.config.mts`), with `display: fullscreen` and `orientation: landscape`: launched from
+the home screen, it is fullscreen in landscape from its first frame, without a gesture,
+Android's bars hidden too. `#game` fills the app's window (index.html), the screen sized
+in it as in fullscreen, and there DISPLAY's FULLSCREEN is dim, as there is nothing to turn
+over. A browser matches `display-mode: fullscreen` in an element's fullscreen as well, so
+the installed game is that media query with no element in fullscreen. An installed app
+keeps the `display` it was installed with until it is installed again. There is no
+service worker: the game is not playable offline.
+
 None of it changes the game: with every new setting at its default, every tool's output
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a
 golden frame for what it draws, and a probe or a `tools/` assertion for what it does.

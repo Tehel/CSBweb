@@ -5,9 +5,11 @@
  * Builds with the project's own `vite.config.mts` (the CLI, as `npm run build` does: the
  * page, then `--ssr`) into a scratch folder, lists every file,
  * and asserts:
- *   - every file is `index.html`, under `assets/`, or the server's module (`CHECK_MODULE`),
- *     of a type the page itself is made of: no `.dat`, no `.pdf`, nothing of `static/`;
- *   - every local `href` and `src` in `index.html` names a file the build holds;
+ *   - every file is `index.html`, the web app manifest, under `assets/`, or the server's
+ *     module (`CHECK_MODULE`), of a type the page itself is made of: no `.dat`, no `.pdf`,
+ *     nothing of `static/`;
+ *   - every local `href` and `src` in `index.html` names a file the build holds, the
+ *     manifest among them, and the manifest's icons are in it too, at the sizes it says;
  *   - the bundle hands the probes no `window.__probe`, which only a build made with
  *     `CSBWEB_PROBE=1` does (`vite.config.mts`): the image the golden frames check;
  *   - the server's module imports nothing, as the image has no `node_modules`, loads through
@@ -30,7 +32,9 @@ import { checkLocalDataSet, readDungeonWalls } from '../src/data/LocalDataSets.t
 import { dataSetNamed } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const PAGE_TYPES = new Set(['.html', '.js', '.css', '.ico', '.jpg', '.png', '.ttf', '.woff2', '.img', '.wav']);
+const PAGE_TYPES = new Set(['.html', '.js', '.css', '.ico', '.jpg', '.png', '.ttf', '.woff2', '.img', '.wav', '.webmanifest']);
+/** The web app manifest, beside `index.html` under a name that does not change (`vite.config.mts`). */
+const WEB_MANIFEST = 'manifest.webmanifest';
 /** The FTL logo, the page's own asset (`src/main.ts`, `loadSwooshFiles`). */
 const SWOOSH_IMAGE = 'src/assets/swoosh.img';
 
@@ -94,8 +98,8 @@ async function main(): Promise<void> {
         console.log(`  ${String(total).padStart(8)}  in all`);
 
         console.log('\nChecks:');
-        const strays = files.filter((f) => f !== 'index.html' && !f.startsWith('assets/') && f !== CHECK_MODULE);
-        check(strays.length === 0, `every file is index.html, under assets/ or ${CHECK_MODULE}${strays.length ? `: not ${strays.join(', ')}` : ''}`);
+        const strays = files.filter((f) => f !== 'index.html' && f !== WEB_MANIFEST && !f.startsWith('assets/') && f !== CHECK_MODULE);
+        check(strays.length === 0, `every file is index.html, ${WEB_MANIFEST}, under assets/ or ${CHECK_MODULE}${strays.length ? `: not ${strays.join(', ')}` : ''}`);
         const foreign = files.filter((f) => !PAGE_TYPES.has(f.slice(f.lastIndexOf('.'))));
         check(foreign.length === 0, `every file is of the page's own types${foreign.length ? `: not ${foreign.join(', ')}` : ''}`);
         check(!files.some((f) => f.includes('gamefiles')), 'no game files');
@@ -106,6 +110,17 @@ async function main(): Promise<void> {
         check(refs.length >= 2, `index.html names its script and its icon (${refs.join(', ')})`);
         const missing = refs.filter((u) => !files.includes(u.replace(/^\.\//, '')));
         check(missing.length === 0, `every file index.html names is in the build${missing.length ? `: not ${missing.join(', ')}` : ''}`);
+        check(/<link rel="manifest" href="\.\/manifest\.webmanifest">/.test(html), `index.html links ${WEB_MANIFEST}`);
+        const webManifest = JSON.parse(readFileSync(join(outDir, WEB_MANIFEST), 'utf8')) as
+            { start_url: string; scope: string; display: string; orientation: string; icons: { src: string; sizes: string; purpose: string }[] };
+        console.log(`  ${WEB_MANIFEST}: ${webManifest.display}, ${webManifest.orientation}, icons ${webManifest.icons.map((i) => `${i.src} ${i.sizes} ${i.purpose}`).join(', ')}`);
+        check(webManifest.start_url === './' && webManifest.scope === './' && webManifest.display === 'fullscreen' && webManifest.orientation === 'landscape',
+            'the manifest installs the page\'s folder, fullscreen and in landscape');
+        const pngSize = (f: string) => { const png = readFileSync(join(outDir, f)); return `${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`; };
+        const icons = webManifest.icons.filter((i) => /^assets\/[^/]+\.png$/.test(i.src) && files.includes(i.src) && pngSize(i.src) === i.sizes);
+        check(icons.length === webManifest.icons.length && ['192x192', '512x512'].every((s) => icons.some((i) => i.sizes === s && i.purpose === 'any'))
+            && icons.some((i) => i.purpose === 'maskable'),
+            'its icons are hashed assets the build holds, at the sizes it names: 192 and 512, and a maskable one');
 
         const bundle = files.filter((f) => f.endsWith('.js')).map((f) => readFileSync(join(outDir, f), 'utf8')).join('');
         check(!bundle.includes('__probe'), 'the bundle hands the probes no handle');

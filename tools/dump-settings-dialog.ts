@@ -18,7 +18,7 @@
  *    taking no click, the help line saying why; ASPECT RATIO's button naming the shape chosen,
  *    raised at 16:10 and pressed at 4:3; FULLSCREEN asking the page, changing no setting,
  *    shown as the page says, its help line as Esc leaves it, and inert where the browser
- *    has none; Esc, CLOSE and a right click close it; the clock held while it is up.
+ *    has none, or in the installed game, which is always fullscreen; Esc, CLOSE and a right click close it; the clock held while it is up.
  * 3b. **EXIT** asks first, `_DoMenu`'s centred two-option menu on black, which takes no
  *    key but Esc and no notch of the wheel; Esc, a right click and CANCEL put the
  *    dialog back, CANCEL and EXIT once their button has flashed, and only EXIT leaves
@@ -85,10 +85,11 @@ function freshUI(crt = true, layoutMap: ReadonlyMap<string, string> | null = nul
 }
 
 /** A page's fullscreen, which `toggle` turns over at once, as a browser does once it has. */
-function fakeFullscreen(keepsEscape: boolean): Fullscreen & { asked: number } {
+function fakeFullscreen(keepsEscape: boolean, installed = false): Fullscreen & { asked: number } {
   let on = false;
   const fullscreen = {
     asked: 0,
+    isInstalled: () => installed,
     isAvailable: () => true,
     isOn: () => on,
     toggle: () => { fullscreen.asked++; on = !on; },
@@ -329,6 +330,17 @@ console.log('\n=== 3. the controls ===');
   check(!names.includes('settings.button0'), 'where the browser has no fullscreen, FULLSCREEN has no button in the list');
   settingsDialogPointer(noWebGL, centre(settingButtonFrame(0)));
   check(helpText(noWebGL, noWebGL.settingsDialog!) === 'THE BROWSER GIVES NO FULLSCREEN', 'and the help line says why');
+  {
+    const page = fakeFullscreen(true, true);
+    const app = freshUI(true, null, page);
+    openSettingsDialog(app);
+    click(app, TAB_FRAMES[1]);
+    check(!settingsDialogButtons(app, app.settingsDialog!).some((b) => b.name === 'settings.button0'), 'in the installed game, FULLSCREEN has no button in the list');
+    click(app, settingButtonFrame(0));
+    settingsDialogPointer(app, centre(settingButtonFrame(0)));
+    check(page.asked === 0 && helpText(app, app.settingsDialog!) === 'THE INSTALLED GAME IS ALWAYS FULLSCREEN',
+      'a click on it asks the page nothing, and the help line says the game is always fullscreen');
+  }
   for (const keepsEscape of [true, false]) {
     const page = fakeFullscreen(keepsEscape);
     const full = freshUI(true, null, page);
