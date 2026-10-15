@@ -31,8 +31,8 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
-and the moderators approve, hide and show what is published; what is left is P11, to
-design with the author. They are not CSBWin features but the page's, and come before every other
+and the moderators approve, hide and show what is published; what is left is P12, a
+set's thumbnail as its title, the next item of all, and P11, to design with the author. They are not CSBWin features but the page's, and come before every other
 tier.
 
 **Before the rest, at the author's request: U — the interface in the canvas.** The
@@ -116,6 +116,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| P12 | A set's thumbnail, 320x200 always, can be its title | M | ⏳ first, at the author's request |
 | W2 | `api/stats` is computed whole at every request | S | ⏳ |
 | W3 | `api/event` takes another site's posts, and any name | S | ⏳ |
 | R6 | A damaged file's counts size allocations and loops | M | ⏳ |
@@ -189,7 +190,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C183 · D22 · E40 · F22 · G31 · P12 · R17 · U13 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C183 · D22 · E40 · F22 · G31 · P13 · R17 · U13 · W8 · X11. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -316,6 +317,59 @@ is the world. What the port should do is open: tell the player, refuse, or carry
 party into the new dungeon (as Chaos's "MAKE NEW ADVENTURE" carries a party into
 `mini.dat`). A published set's files never change (`doc/DEPLOYMENT.md` → "Moderating the
 sets"), so this affects local sets only.
+
+### P12 ⏳ A set's thumbnail, 320x200 always, can be its title
+
+First, at the author's request, and designed with them. A player's own set may show its
+thumbnail in place of the title animation: Theron's Quest's cover art instead of
+"Dungeon Master" zooming in (`archive/CustomDungeon-TheronsQuestConversion-csbweb/
+dungeon-master-theron-s-quest-cropped.png`, 320x200, 42,418 colours, the first case).
+CSBWin cannot: `_DisplayChaosStrikesBack` (`doc/CSBwin-src/CSBCode.cpp:9308`) draws
+`graphics.dat` item 1 through a palette set in its code, eight of sixteen registers
+(`:9439-9476`), so the picture is the port's own feature, like the thumbnail, and nothing
+goes in H; CSBWin plays its animation for such a set.
+
+What stands: the form's thumbnail row (`src/ui/addDataSetForm.ts`, `ROWS`, "an image,
+320x200 at best, or the last frame of its title") takes an image of any size, or draws
+one from the set's graphics (`lastTitleFrame`, `src/renderer/intro/TitleThumbnail.ts`,
+320x200); publishing makes it a PNG (`asPng`), and the server checks only that it is one
+(`server/publish.ts`, `isPng`), storing `<id>-thumbnail.png` (`thumbnailPath`,
+`src/data/DataSets.ts`). The welcome page shows it, in full colour. The boot plays the
+title from `displayChaosStrikesBack` (`src/renderer/intro/TitleSequence.ts`, called from
+`BootSequence.ts:560`).
+
+To do:
+
+1. **A thumbnail is 320x200, always.** The form refuses an image of any other size,
+   dropped or picked, saying so on the thumbnail's row; the server refuses one too
+   (`server/publish.ts`). A drawn one is 320x200 already. Look first at what the
+   browser's store and the published sets hold today: an older thumbnail of another size
+   is kept as it is, and only refused as a title (point 3).
+2. **A checkbox on the thumbnail's row: use it as the title.** A boolean, carried wherever
+   `dmRules` is: `LocalDataSetRecord` and `LocalDataSetDraft` (`src/data/LocalDataSets.ts`;
+   a record without it reads false, no store version), the form's publish fields
+   (`TEXT_FIELDS`, `server/publish.ts`), the `data_sets` table (`server/dataSets.ts`, a new
+   column and its migration), the set's edit and moderation paths, and the manifest's
+   flags (`FLAGS`, `src/data/DataSets.ts`; `static/data-sets.json`, where no set sets it
+   today). Off by default, also for a thumbnail drawn from the animation, which may still
+   be checked.
+3. **The boot shows it, when checked,** in place of `displayChaosStrikesBack`: the
+   thumbnail reduced to sixteen colours of the Atari's 512 (each component 3 bits, shown
+   x36 as the canvas shows them), by median cut, no dithering (the author's diff found it
+   changes nothing on the cover), the same for every player; faded in over eight VBLs as
+   `_FadeToPalette` fades (`doc/CSBwin-src/Graphics.cpp:1625`), held about 90 VBLs (1.5 s),
+   faded out to black. A published or shipped set's comes from `<id>-thumbnail.png`, a
+   local one's from its record. The FTL swoosh before the title (`Swoosh`) is untouched.
+   Unchecked, or with no thumbnail, the animation plays from `graphics.dat` as now. The
+   welcome page goes on showing the thumbnail in full colour.
+
+Evidence: a tool for the reduction (at most sixteen colours, every one an Atari shade, the
+same output on every run, the Theron cover the case); the boot's picture and its VBLs
+(`tools/dump-intro.ts`); the form refusing a wrong size and carrying the checkbox
+(`tools/probe-frames.mjs`' form section, whose clicks the new row may move: `.claude/memory/
+dialog-layout-moves-probe-clicks.md`); the server refusing one (`tools/dump-server.ts`).
+Docs: `doc/DEPLOYMENT.md` for the manifest flag and publishing,
+`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` for the port's alternative to the animation.
 
 ---
 
