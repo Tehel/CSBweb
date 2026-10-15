@@ -143,7 +143,8 @@ folder whole as `gamefiles/<id>/`, its id that of `local:<id>`, then its row, pe
 owned by the player, last in the list, with its description and authors, and its
 `dungeon.dat`'s walls as the check read them (below). A set without a
 `graphics.dat` gets a copy of its base set's, and its thumbnail is `<id>-thumbnail.png`,
-so its folder is like any other. The server never changes the folder after. It refuses an
+so its folder is like any other: a PNG of 320x200, the screen's size, as the form takes no
+other (`THUMBNAIL_WIDTH`, `src/data/DataSets.ts`). The server never changes the folder after. It refuses an
 id the table or `gamefiles/` already holds, a file over 16 MiB, a request over 32 MiB, and
 more than five publishes an hour from one address, each answered with nothing written. A
 folder is written as `gamefiles/.<id>.<uuid>.partial/` and renamed when whole; one left by a

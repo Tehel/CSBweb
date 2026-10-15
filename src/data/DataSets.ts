@@ -234,6 +234,30 @@ export function thumbnailPath(set: DataSet): string {
 }
 
 /**
+ * A thumbnail's size, the screen's: the form takes no image of another
+ * (`src/ui/addDataSetForm.ts`), and the server publishes none (`server/publish.ts`).
+ */
+export const THUMBNAIL_WIDTH = 320;
+export const THUMBNAIL_HEIGHT = 200;
+
+/** A PNG's first eight bytes. */
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/** The bytes `pngSize` reads: the signature, and the `IHDR` chunk's length, type, width and height. */
+export const PNG_HEAD_BYTES = 24;
+
+/**
+ * The width and height of the PNG whose first bytes, `PNG_HEAD_BYTES` of them, are `head`,
+ * read from its `IHDR`, the first chunk, 13 bytes long; `null` where they are not a PNG's.
+ */
+export function pngSize(head: Uint8Array): { width: number; height: number } | null {
+    if (head.length < PNG_HEAD_BYTES || !PNG_SIGNATURE.every((byte, i) => head[i] === byte)) return null;
+    const view = new DataView(head.buffer, head.byteOffset, PNG_HEAD_BYTES);
+    if (view.getUint32(8) !== 13 || String.fromCharCode(...head.subarray(12, 16)) !== 'IHDR') return null;
+    return { width: view.getUint32(16), height: view.getUint32(20) };
+}
+
+/**
  * The set `?dungeon=<id>` names, hidden or not, or `null` when it names none or an
  * unknown one: the welcome page then, where the player chooses one.
  */

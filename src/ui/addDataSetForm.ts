@@ -8,7 +8,9 @@
  *   the authors, separated by commas, the reincarnation rule (`dmRules`, DM's at first), the graphics a
  *   dungeon without its own `graphics.dat` plays, DM's or CSB's, whichever the manifest
  *   has, and none where it has neither, which leaves a set its own to give, and one area that takes the files: dropped there, several at once, or chosen in
- *   the picker a click on it opens. An image is the thumbnail. Any other file goes where
+ *   the picker a click on it opens. An image is the thumbnail, if it is 320x200, the
+ *   screen's size (`THUMBNAIL_WIDTH`): one of another size, or that does not read, is not
+ *   taken, its row saying why, and any thumbnail given before stays. Any other file goes where
  *   what it holds says, whatever its name (`identifyLocalDataSetFile`): `dungeon.dat`,
  *   `graphics.dat`, `CSBgraphics.dat`, the Hint Oracle's `hcsb.hct` and `hcsb.dat`; one
  *   that reads as none of them goes where its name says, whatever its case, so that a
@@ -48,7 +50,8 @@
  */
 import { folderFiles, type DataSetFiles } from '../data/DataSetFiles';
 import {
-    DATA_SETS_ROUTE, dataSetNamed, LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, PLAYER_ID_HEADER, type DataSetManifest,
+    DATA_SETS_ROUTE, dataSetNamed, LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
+    THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, type DataSetManifest,
 } from '../data/DataSets';
 import { GraphicsLoader } from '../data/GraphicsLoader';
 import { ITEM_KINDS, isIllegalSubcode, operationsUsed, type DungeonCensus } from '../engine/DungeonCensus';
@@ -80,7 +83,7 @@ const CHECKLIST: readonly ChecklistRow[] = [
     { about: 'CSBgraphics.dat', label: 'CSBgraphics.dat', needed: false, hint: "CSBWin's extra graphics, for a dungeon made with them." },
     { about: 'hcsb.hct', label: 'hcsb.hct', needed: false, hint: "The Hint Oracle's hints, with hcsb.dat." },
     { about: 'hcsb.dat', label: 'hcsb.dat', needed: false, hint: "The Hint Oracle's program, with hcsb.hct." },
-    { about: 'thumbnail', label: 'Thumbnail', needed: false, hint: "The welcome page's picture of it: an image, 320x200 at best, or the last frame of its title, drawn from its graphics." },
+    { about: 'thumbnail', label: 'Thumbnail', needed: false, hint: `The welcome page's picture of it: an image of ${THUMBNAIL_WIDTH}x${THUMBNAIL_HEIGHT}, the screen's size, or the last frame of its title, drawn from its graphics.` },
 ];
 
 /** The files the drop area takes by name, the name the game reads them under. */
@@ -192,8 +195,8 @@ export function openAddDataSetForm(
     /** The check's last verdict, which `draw` shows. */
     let verdict: { draft: LocalDataSetDraft; problems: LocalDataSetProblem[]; census: DungeonCensus | null } | null = null;
     let generation = 0;
-    /** Why the thumbnail could not be drawn, shown on its row until a thumbnail is given. */
-    let drawFailure = '';
+    /** Why the last thumbnail given or drawn was not taken, shown on its row until one is taken or removed. */
+    let thumbnailRefused = '';
     let drawing = false;
 
     const bases = BASE_SETS.flatMap((set) => dataSetNamed(manifest, set) ?? []);
@@ -260,6 +263,7 @@ export function openAddDataSetForm(
         remove.setAttribute('aria-label', remove.title);
         remove.addEventListener('click', () => {
             delete files[row.about as LocalDataSetFile];
+            if (row.about === 'thumbnail') thumbnailRefused = '';
             changed();
         });
         const problem = text('span', 'add-set-problem', '');
@@ -276,7 +280,7 @@ export function openAddDataSetForm(
         const own = files['graphics.dat'];
         const set = baseSet;
         drawing = true;
-        drawFailure = '';
+        thumbnailRefused = '';
         changed();
         try {
             const bytes = own ? new Uint8Array(await own.arrayBuffer()) : await base(set)?.read('graphics.dat');
@@ -289,7 +293,7 @@ export function openAddDataSetForm(
                 files.thumbnail = new File([png], 'title.png', { type: 'image/png' });
             }
         } catch (error) {
-            drawFailure = `It could not be drawn: ${error instanceof Error ? error.message : String(error)}`;
+            thumbnailRefused = `It could not be drawn: ${error instanceof Error ? error.message : String(error)}`;
         }
         drawing = false;
         changed();
@@ -305,9 +309,12 @@ export function openAddDataSetForm(
         for (const given of [...list]) {
             const file = await recordFile(given);
             const where = await fileRow(file);
-            if (where) files[where] = file;
+            if (where === 'thumbnail') {
+                thumbnailRefused = await thumbnailRefusal(file) ?? '';
+                if (thumbnailRefused === '') files.thumbnail = file;
+            }
+            else if (where) files[where] = file;
             else unknown.push(file.name);
-            if (where === 'thumbnail') drawFailure = '';
         }
         dropped.textContent = unknown.length > 0 ? `Not one of a dungeon's files: ${unknown.join(', ')}.` : '';
         changed();
@@ -439,8 +446,8 @@ export function openAddDataSetForm(
                 // Drawn from graphics that read.
                 generate.disabled = drawing || problems.some((p) => p.about === 'graphics.dat' || p.about === 'baseSet');
                 given.replaceChildren(generate);
-                problem.textContent = drawFailure;
             }
+            if (row.about === 'thumbnail') problem.textContent = [problem.textContent, thumbnailRefused].filter((t) => t !== '').join(' ');
             item.title = [row.hint, ...own.map((p: LocalDataSetProblem) => p.text)].join('\n');
         }
         holds.hidden = census === null;
@@ -496,13 +503,26 @@ async function publishRecord(record: LocalDataSetRecord, baseSet: string): Promi
     return answer && 'error' in answer ? answer : { error: `the server answered HTTP ${response.status}.` };
 }
 
-/** A PNG's first eight bytes. */
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+/**
+ * Why `image` is not taken as a thumbnail: it does not read as an image, or is not
+ * `THUMBNAIL_WIDTH`x`THUMBNAIL_HEIGHT`; `null` where it is taken.
+ */
+async function thumbnailRefusal(image: Blob): Promise<string | null> {
+    let bitmap: ImageBitmap;
+    try {
+        bitmap = await createImageBitmap(image);
+    } catch {
+        return 'It does not read as an image.';
+    }
+    const { width, height } = bitmap;
+    bitmap.close();
+    return width === THUMBNAIL_WIDTH && height === THUMBNAIL_HEIGHT ? null
+        : `It is ${width}x${height}, not ${THUMBNAIL_WIDTH}x${THUMBNAIL_HEIGHT}.`;
+}
 
 /** `image` as a PNG: itself where it is one, else drawn again and encoded. */
 async function asPng(image: Blob): Promise<Blob> {
-    const head = new Uint8Array(await image.slice(0, PNG_SIGNATURE.length).arrayBuffer());
-    if (PNG_SIGNATURE.every((byte, i) => head[i] === byte)) return image;
+    if (pngSize(new Uint8Array(await image.slice(0, PNG_HEAD_BYTES).arrayBuffer())) !== null) return image;
     const bitmap = await createImageBitmap(image);
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
     canvas.getContext('2d')!.drawImage(bitmap, 0, 0);

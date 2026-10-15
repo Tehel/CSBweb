@@ -5,7 +5,8 @@
  *
  * The form's fields are the record's: `id`, `name`, `description`, `authors` once per
  * author, `dmRules` (`true` or `false`) and `baseSet`, each once, and its files by the
- * name the game reads them under, `thumbnail` a PNG (`LOCAL_DATA_SET_FILES`). Nothing else.
+ * name the game reads them under, `thumbnail` a PNG of 320x200 (`LOCAL_DATA_SET_FILES`,
+ * `THUMBNAIL_WIDTH`). Nothing else.
  * The rules, in order, each answered with nothing written:
  *
  *   400  a field missing, twice, of the wrong kind, unknown or longer than the form takes
@@ -15,7 +16,7 @@
  *   409  an id the table holds, pending or not, or that `GAMEFILES_DIR` holds an entry of
  *        (a folder no row names)
  *   422  the page's own check (`CheckDataSet`) finds a problem, as the form would show it,
- *        or the thumbnail is not a PNG
+ *        or the thumbnail is not a PNG, or one of another size than 320x200
  *
  * Then the folder: written whole as `GAMEFILES_DIR/.<id>.<uuid>.partial/`, which the server
  * never serves (`pathSegments`), and renamed `GAMEFILES_DIR/<id>/`, which fails where another
@@ -35,7 +36,9 @@ import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, LOCAL_ID_PATTERN } from '../src/data/DataSets.ts';
+import {
+    LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, LOCAL_ID_PATTERN, PNG_HEAD_BYTES, pngSize, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
+} from '../src/data/DataSets.ts';
 import type { DataSetStore, DataSetWalls } from './dataSets.ts';
 
 /** The largest file a set may hold: Conflux's `CSBgraphics.dat` is 12 MB. */
@@ -114,9 +117,6 @@ export interface PublishAnswer {
     body: { id: string } | { error: string; problems?: Problem[] };
 }
 
-/** A PNG's first eight bytes. */
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-
 const TEXT_FIELDS = ['id', 'name', 'description', 'dmRules', 'baseSet'] as const;
 
 /** `form`, sent by `owner`, a `playerId`, checked and, where it passes, published. */
@@ -164,8 +164,10 @@ export async function publishDataSet(form: FormData, owner: string, { checkDataS
     const draft: DataSetDraft = { id, name, description, authors: authors as string[], dmRules: dmRules === 'true', baseSet, files };
     const { problems, record, walls } = await checkDataSet(draft, new Set(), base, now());
     const thumbnail = files.thumbnail;
-    if (thumbnail && !isPng(new Uint8Array(await thumbnail.slice(0, PNG_SIGNATURE.length).arrayBuffer()))) {
-        problems.push({ about: 'thumbnail', text: 'It is not a PNG.' });
+    const size = thumbnail && pngSize(new Uint8Array(await thumbnail.slice(0, PNG_HEAD_BYTES).arrayBuffer()));
+    if (thumbnail && !size) problems.push({ about: 'thumbnail', text: 'It is not a PNG.' });
+    else if (size && (size.width !== THUMBNAIL_WIDTH || size.height !== THUMBNAIL_HEIGHT)) {
+        problems.push({ about: 'thumbnail', text: `It is ${size.width}x${size.height}, not ${THUMBNAIL_WIDTH}x${THUMBNAIL_HEIGHT}.` });
     }
     if (problems.length > 0 || !record || !walls) return refuse(422, 'The set does not pass the check.', problems);
 
@@ -212,8 +214,4 @@ function diskFolder(dir: string, set: string): DataSetFolder {
         read: (name) => readFile(join(dir, name)).then((bytes) => new Uint8Array(bytes), () => null),
         where: (name) => `${set}/${name}`,
     };
-}
-
-function isPng(bytes: Uint8Array): boolean {
-    return PNG_SIGNATURE.every((byte, i) => bytes[i] === byte);
 }

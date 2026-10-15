@@ -35,7 +35,7 @@
  *     every refusal answered with nothing written: the rate limit, no player, not a form,
  *     a field unknown, missing, twice or too long, a bad id, a file or a request too
  *     large, an id the table or the folder holds, and a set the page's check refuses, a
- *     thumbnail that is not a PNG and a base set that is not the site's; a table made
+ *     thumbnail that is not a PNG or not 320x200, and a base set that is not the site's; a table made
  *     before the publish's columns gains them;
  *   - `POST /api/data-sets/<id>` (`server/moderate.ts`): a moderator approves, hides and
  *     shows a set, a site's too, and rejects a pending one, its row then its folder gone,
@@ -72,6 +72,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { deflateSync } from 'node:zlib';
 
 import { CHECK_MODULE, checkFiles, createAppServer, fillWalls, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
 import { ANYONE, DataSetStore, manifestText } from '../server/dataSets.ts';
@@ -83,6 +84,7 @@ import { openStore } from '../server/store.ts';
 import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
 import { checkLocalDataSet, localDataSet, readDungeonWalls } from '../src/data/LocalDataSets.ts';
 import { parsePublishedDungeons } from '../src/data/DungeonSignature.ts';
+import { indexedPng, indexedPngRows } from '../src/core/png.ts';
 import { dataSetNamed, GAMEFILES_DIR, MANIFEST_FILE } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -584,6 +586,9 @@ async function checkPublish(scratch: string): Promise<void> {
         await refused('a dungeon.dat of zeros', 422, () => publish(fields('p1'), { ...dmFiles(), 'dungeon.dat': fileOf(new Uint8Array(64), 'dungeon.dat') }), '"about":"dungeon.dat"');
         await refused('no dungeon.dat', 422, () => publish(fields('p1'), { thumbnail: dmFiles().thumbnail }), '"about":"dungeon.dat"');
         await refused('a thumbnail that is not a PNG', 422, () => publish(fields('p1'), { ...dmFiles(), thumbnail: fileOf(new Uint8Array(64), 'thumbnail.png', 'image/png') }), '"about":"thumbnail","text":"It is not a PNG."');
+        const large = indexedPng(640, 400, [[0, 0, 0]], deflateSync(indexedPngRows(640, 400, new Uint8Array(640 * 400))));
+        await refused('a thumbnail of 640x400', 422, () => publish(fields('p1'), { ...dmFiles(), thumbnail: fileOf(large, 'thumbnail.png', 'image/png') }),
+            '"about":"thumbnail","text":"It is 640x400, not 320x200."');
         await refused('a base set that is a player\'s', 422, () => publish(fields('p1', { baseSet: 'my-dm' }), { 'dungeon.dat': dmFiles()['dungeon.dat'] }), '"about":"baseSet"');
         await refused('an empty name', 422, () => publish(fields('p1', { name: ' ' }), dmFiles()), '"about":"name"');
 

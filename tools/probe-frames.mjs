@@ -430,7 +430,8 @@ check(atWelcome.last === 'pick add +Add my own', 'the grid ends with "+ Add my o
 // thumbnail, hcsb.hct, and a file none of a dungeon's, the game files under names that
 // are not theirs; the id made from the name, then
 // written; hcsb.hct alone crossing hcsb.dat and holding CONFIRM, until it is removed; a
-// graphics.dat given turning off the choice of graphics; the thumbnail removed, and drawn
+// graphics.dat given turning off the choice of graphics; an image of 640x400 refused as
+// the thumbnail, its row saying so, the one before kept; the thumbnail removed, and drawn
 // again by "Generate from data" from DM's graphics. What the dropped dungeon holds
 // shows under the checklist, the form still on one screen. The record is stored, its
 // thumbnail the site's DM thumbnail pixel for pixel, and the page shows its tile selected. What the check refuses is `tools/dump-local-data-set.ts`'s.
@@ -491,6 +492,15 @@ check(ownGraphics.base === 'dm-atari*-,csb-' && ownGraphics.dropped === '' && re
 check(ready.rows === 'name+,id+,dungeon.dat+,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail+' && ready.id === MINE
   && ready.confirm && ready.problems.length === 0,
   'a row\'s × takes its file back, and with nothing wrong CONFIRM is given');
+await inForm(`const c=new OffscreenCanvas(640,400);c.getContext('2d').fillRect(0,0,640,400);
+  const dt=new DataTransfer();dt.items.add(new File([await c.convertToBlob({type:'image/png'})],'large.png',{type:'image/png'}));
+  d.querySelector('.add-set-drop').dispatchEvent(new DragEvent('drop',{dataTransfer:dt,bubbles:true,cancelable:true}))`);
+await wait(1000);
+const large = await form();
+console.log('  large:', JSON.stringify(large));
+check(large.rows === ready.rows && large.thumbnail === 'title.png' && large.confirm
+  && large.problems.join() === 'It is 640x400, not 320x200.' && large.height <= 600,
+  'an image of 640x400 is not taken as the thumbnail, its row saying why, and the one before stays');
 await removeIn('thumbnail');
 await wait(500);
 const unthumbed = await form();
@@ -498,9 +508,9 @@ await inForm(`d.querySelector('.add-set-generate').click()`);
 await wait(3000);
 const generated = await form();
 console.log('  generated:', JSON.stringify(generated));
-check(unthumbed.rows.endsWith(',thumbnail') && unthumbed.generate === 'on' && unthumbed.confirm
+check(unthumbed.rows.endsWith(',thumbnail') && unthumbed.generate === 'on' && unthumbed.confirm && unthumbed.problems.length === 0
   && generated.rows === ready.rows && generated.thumbnail === 'title.png' && generated.generate === '' && generated.confirm,
-  'without a thumbnail its row offers "Generate from data", which gives it title.png');
+  'without a thumbnail, its refusal gone with it, its row offers "Generate from data", which gives it title.png');
 check(filled.holds === '14 | Weapons 106Clothing 121Scrolls 34Potions 55Containers 12Misc 278 | 303 in 182 groups, of 25 kinds | None'
   && ready.holds === filled.holds && ready.height <= 600,
   'what the dungeon holds shows under the checklist, whatever else is wrong, and the form stays on one screen');

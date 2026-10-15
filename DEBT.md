@@ -329,22 +329,22 @@ CSBWin cannot: `_DisplayChaosStrikesBack` (`doc/CSBwin-src/CSBCode.cpp:9308`) dr
 (`:9439-9476`), so the picture is the port's own feature, like the thumbnail, and nothing
 goes in H; CSBWin plays its animation for such a set.
 
-What stands: the form's thumbnail row (`src/ui/addDataSetForm.ts`, `ROWS`, "an image,
-320x200 at best, or the last frame of its title") takes an image of any size, or draws
-one from the set's graphics (`lastTitleFrame`, `src/renderer/intro/TitleThumbnail.ts`,
-320x200); publishing makes it a PNG (`asPng`), and the server checks only that it is one
-(`server/publish.ts`, `isPng`), storing `<id>-thumbnail.png` (`thumbnailPath`,
-`src/data/DataSets.ts`). The welcome page shows it, in full colour. The boot plays the
+What stands: the form's thumbnail row (`src/ui/addDataSetForm.ts`, `CHECKLIST`) takes an
+image, or draws one from the set's graphics (`lastTitleFrame`,
+`src/renderer/intro/TitleThumbnail.ts`); publishing makes it a PNG (`asPng`), which the
+server stores as `<id>-thumbnail.png` (`thumbnailPath`, `src/data/DataSets.ts`). The welcome page shows it, in full colour. The boot plays the
 title from `displayChaosStrikesBack` (`src/renderer/intro/TitleSequence.ts`, called from
 `BootSequence.ts:560`).
 
+A thumbnail is 320x200, the screen's size (`THUMBNAIL_WIDTH`, `src/data/DataSets.ts`):
+the form takes no image of another, dropped or picked, saying so on the row and keeping
+the thumbnail before (`thumbnailRefusal`), and the server publishes none (`pngSize`). A
+record stored with a thumbnail of another size keeps it, and the form shows it as given;
+publishing it is refused on the row, and it is only refused as a title (point 3). The
+site's sets, shipped and drawn by `utils/submit-forum-dungeons.ts`, are all 320x200.
+
 To do:
 
-1. **A thumbnail is 320x200, always.** The form refuses an image of any other size,
-   dropped or picked, saying so on the thumbnail's row; the server refuses one too
-   (`server/publish.ts`). A drawn one is 320x200 already. Look first at what the
-   browser's store and the published sets hold today: an older thumbnail of another size
-   is kept as it is, and only refused as a title (point 3).
 2. **A checkbox on the thumbnail's row: use it as the title.** A boolean, carried wherever
    `dmRules` is: `LocalDataSetRecord` and `LocalDataSetDraft` (`src/data/LocalDataSets.ts`;
    a record without it reads false, no store version), the form's publish fields
