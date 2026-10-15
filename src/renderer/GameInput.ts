@@ -17,7 +17,7 @@
 import type { Game } from '../engine/Game';
 import type { GameScreen } from './GameScreen';
 import { MESSAGE_AREA } from './csbwin/ScrollingText';
-import { portKeyAction } from './ui/Keyboard';
+import { keyAction, portKeyAction } from './ui/Keyboard';
 import { nowMs } from './ui/UIState';
 
 /** How soon after a click on the message area a second one opens the settings, in milliseconds. */
@@ -38,6 +38,12 @@ export interface GameInputHost {
   refreshScreen(): void;
   onQuickSave(): void;
   onQuickLoad(): void;
+  /**
+   * The page's `?dev`: the move down and up keys take the party a level down (1) or up
+   * (-1) whatever is there (`Game.devChangeLevel`), in any dungeon. Absent, they are the
+   * 3D movement's, in a dungeon that sets it (`translateKey`).
+   */
+  onDevLevel?: ((delta: 1 | -1) => void) | null;
 }
 
 /**
@@ -305,6 +311,13 @@ export class GameInput {
     if (code === 'Escape') {
       screen.openSettings();
       this.host.refreshScreen();
+      return true;
+    }
+    // `?dev`'s move down and up, before the tables, awake (`GameInputHost.onDevLevel`).
+    const vertical = keyAction(code);
+    if (this.host.onDevLevel && (vertical === 'move.down' || vertical === 'move.up') &&
+      !game.isPartySleeping() && !game.isFrozen()) {
+      this.host.onDevLevel(vertical === 'move.down' ? 1 : -1);
       return true;
     }
     // The key tables first, `TAG0196da` (doc/CSBwin-src/CSBCode.cpp:8515), for a key

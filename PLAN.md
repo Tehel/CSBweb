@@ -83,7 +83,7 @@ frames against CSBWin's own screenshots. The retail dungeon uses none of them. F
 - The game's page holds nothing beside the canvas (`index.html`): the settings, the map
   and the champions are dialogs drawn in it (`DEBT.md` U). Without a known `?dungeon=`
   the page is the welcome page (`src/ui/welcomePage.ts`), which lists the
-  player's own data sets beside the manifest's (`DEBT.md` P). The map dialog's teleport is behind `?dev`. The page has no log of its
+  player's own data sets beside the manifest's (`DEBT.md` P). The map dialog's teleport is behind `?dev`, and so is a move down or up a level whatever is there (`Game.devChangeLevel`). The page has no log of its
   own: what it reports goes to the console, a move's position at debug level, what F5,
   F9 or the Sleepsave did at info level.
 

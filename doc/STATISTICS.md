@@ -60,8 +60,9 @@ next one, and with it off nothing is read or sent, the player id not even drawn.
 settings dialog's GAME tab sets it, SEND STATISTICS (`src/renderer/ui/SettingsDialog.ts`).
 
 **A teleport silences a game.** On a page opened with `?dev`, a click on the map dialog's
-square moves the party there (`onTeleport`, `src/main.ts`), and a game played so counts
-for nothing. `GameEvents.teleported` marks its playthrough, kept in `localStorage`
+square moves the party there (`onTeleport`, `src/main.ts`), and the move down and up keys
+take it a level down or up whatever is there (`onDevLevel`, `Game.devChangeLevel`); a
+game played so counts for nothing. `GameEvents.teleported` marks its playthrough, kept in `localStorage`
 (`csbweb_teleported_v1`, the latest 64, or for the page alone where it cannot be kept),
 and no event of that playthrough is sent from then on, in that page or in a later one
 that reads a save of it.

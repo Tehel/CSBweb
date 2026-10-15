@@ -474,6 +474,11 @@ function wire({ game, screen, saves, messages, events }: Built): void {
         refreshScreen,
         onQuickSave: () => { void saves.quickSave(); },
         onQuickLoad: () => { void saves.quickLoad(); },
+        // On a page opened with `?dev`, the move down and up keys go a level down and up
+        // whatever is there; the game then sends no statistics (`GameEvents.teleported`).
+        onDevLevel: new URLSearchParams(window.location.search).has('dev') ? (delta) => {
+            if (game.devChangeLevel(delta)) events.teleported();
+        } : null,
     });
 
     game.onMove((success) => {

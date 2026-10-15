@@ -108,6 +108,7 @@ const CHECKS = [
   { tool: 'dump-pit-fall.ts' },
   { tool: 'dump-teleporter-drop.ts' },
   { tool: 'dump-teleporter-target.ts' },
+  { tool: 'dump-dev-level.ts' },
   { tool: 'dump-wiggle-cloud.ts' },
   { tool: 'dump-wiggle-objects.ts' },
   { tool: 'dump-wiggle-monster.ts' },
