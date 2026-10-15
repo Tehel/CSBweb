@@ -19,8 +19,9 @@
  * This module is the two ends of that: it builds the `IntroHost` the screens draw through —
  * the screen buffer, the colour registers, the VBL clock, the sound and the input queue —
  * and it runs `displayChaosStrikesBack` then `showPrisonDoor`. The screens themselves are
- * `TitleSequence.ts` and `PrisonDoor.ts`. Before them, the Atari ST disk's FTL logo
- * (`Swoosh.ts`), which is not CSBWin's (`DEBT.md` H).
+ * `TitleSequence.ts` and `PrisonDoor.ts`; a set's thumbnail may stand in the animation's
+ * place (`TitlePicture.ts`), which CSBWin never shows. Before them, the Atari ST disk's
+ * FTL logo (`Swoosh.ts`), which is not CSBWin's (`DEBT.md` H).
  *
  * The launcher menu is deliberately absent. CSBWin needs it because one binary runs the
  * dungeon, the utility and the hint oracle; this one runs the dungeon.
@@ -40,6 +41,8 @@ import { MISSING_PRISON_DOOR_BUTTONS, showPrisonDoor, type PrisonDoorChoice } fr
 import { showCredits, type ShowCreditsHooks } from './ShowCredits';
 import { showSwoosh } from './Swoosh';
 import { displayChaosStrikesBack } from './TitleSequence';
+import { showTitlePicture } from './TitlePicture';
+import type { TitleFrame } from './TitleThumbnail';
 
 /** 60 Hz. `wvbl()` is one of these; `VBLDelay(n)` is n. */
 const VBL_MS = 1000 / 60;
@@ -75,6 +78,12 @@ export interface BootSequenceDeps {
    * animations (`src/settings/Settings.ts`). Off, the entrance is the first screen.
    */
   title: boolean;
+  /**
+   * The data set's thumbnail, reduced to the screen's sixteen registers, to show in the
+   * animation's place (`TitlePicture.ts`), where its author asked for it
+   * (`DataSet.thumbnailAsTitle`). Absent, the animation plays.
+   */
+  titlePicture?: TitleFrame | null;
   /** Skip the logo, the title animation and the entrance and boot straight into the dungeon. */
   skip: boolean;
 }
@@ -557,7 +566,10 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
     if (deps.swoosh) await showSwoosh(host, deps.swoosh.image, deps.swoosh.startSound);
     for (;;) {
       try {
-        if (deps.title) await displayChaosStrikesBack(host);
+        if (deps.title) {
+          if (deps.titlePicture) await showTitlePicture(host, deps.titlePicture);
+          else await displayChaosStrikesBack(host);
+        }
         const choice = await showPrisonDoor(host, prisonDoorButtons(host), async (c) => {
           if (!(await readGame(c))) return false;
           read = c;

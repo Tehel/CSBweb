@@ -31,9 +31,9 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
-and the moderators approve, hide and show what is published; what is left is P12, a
-set's thumbnail as its title, the next item of all, and P11, to design with the author. They are not CSBWin features but the page's, and come before every other
-tier.
+and the moderators approve, hide and show what is published; what is left is P11, to
+design with the author. They are not CSBWin features but the page's, and come before
+every other tier.
 
 **Before the rest, at the author's request: U — the interface in the canvas.** The
 page's settings, map and champion views become dialogs drawn in the game's own screen,
@@ -116,7 +116,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P12 | A set's thumbnail, 320x200 always, can be its title | M | ⏳ first, at the author's request |
 | W2 | `api/stats` is computed whole at every request | S | ⏳ |
 | W3 | `api/event` takes another site's posts, and any name | S | ⏳ |
 | R6 | A damaged file's counts size allocations and loops | M | ⏳ |
@@ -226,7 +225,9 @@ Atari image, little-endian"), so the record holds only what CSBWin reads. On its
 checked, a removable file on its row, and on the thumbnail's, while it has none, "Generate
 from data", which draws the site's sets' thumbnail, the title's last frame
 (`src/renderer/intro/TitleThumbnail.ts`, `tools/gen-thumbnails.ts`'s too), from the set's
-`graphics.dat` or its base set's; under it, what the dungeon holds once its
+`graphics.dat` or its base set's, and once it has one, the checkbox "As the title", which
+the boot reads to show it, reduced to sixteen Atari colours, in the title animation's place
+(`src/renderer/intro/TitlePicture.ts`); under it, what the dungeon holds once its
 `dungeon.dat` reads (`dungeonCensus`, `src/engine/DungeonCensus.ts`, whose DSA half
 `tools/dump-dsa-census.ts` checks); and CANCEL and CONFIRM. `checkLocalDataSet` runs at
 every change with the boot's own readers, each file read, parsed and hashed once and `src/engine/FileSignatures.ts`'s rules, and
@@ -317,59 +318,6 @@ is the world. What the port should do is open: tell the player, refuse, or carry
 party into the new dungeon (as Chaos's "MAKE NEW ADVENTURE" carries a party into
 `mini.dat`). A published set's files never change (`doc/DEPLOYMENT.md` → "Moderating the
 sets"), so this affects local sets only.
-
-### P12 ⏳ A set's thumbnail, 320x200 always, can be its title
-
-First, at the author's request, and designed with them. A player's own set may show its
-thumbnail in place of the title animation: Theron's Quest's cover art instead of
-"Dungeon Master" zooming in (`archive/CustomDungeon-TheronsQuestConversion-csbweb/
-dungeon-master-theron-s-quest-cropped.png`, 320x200, 42,418 colours, the first case).
-CSBWin cannot: `_DisplayChaosStrikesBack` (`doc/CSBwin-src/CSBCode.cpp:9308`) draws
-`graphics.dat` item 1 through a palette set in its code, eight of sixteen registers
-(`:9439-9476`), so the picture is the port's own feature, like the thumbnail, and nothing
-goes in H; CSBWin plays its animation for such a set.
-
-What stands: the form's thumbnail row (`src/ui/addDataSetForm.ts`, `CHECKLIST`) takes an
-image, or draws one from the set's graphics (`lastTitleFrame`,
-`src/renderer/intro/TitleThumbnail.ts`); publishing makes it a PNG (`asPng`), which the
-server stores as `<id>-thumbnail.png` (`thumbnailPath`, `src/data/DataSets.ts`). The welcome page shows it, in full colour. The boot plays the
-title from `displayChaosStrikesBack` (`src/renderer/intro/TitleSequence.ts`, called from
-`BootSequence.ts:560`).
-
-With a thumbnail, its row offers the checkbox "As the title" in place of the file's name
-(which its tooltip says), off at first, also for one drawn from the animation. It is the
-flag `thumbnailAsTitle`, carried wherever `dmRules` is: `LocalDataSetRecord` and
-`LocalDataSetDraft` (a record stored without it reads false, `BrowserDataSetStore`; the
-check makes it false without a thumbnail), the publish form's fields (`server/publish.ts`),
-the `data_sets` table's `thumbnail_as_title` (`server/dataSets.ts`, added to an older
-table), and the manifest's flags (`FLAGS`), on `DataSet`, where nothing reads it yet.
-`tools/dump-local-data-set.ts`, `tools/dump-server.ts`, `tools/dump-data-sets.ts` and
-`tools/probe-frames.mjs` check it.
-
-A thumbnail is 320x200, the screen's size (`THUMBNAIL_WIDTH`, `src/data/DataSets.ts`):
-the form takes no image of another, dropped or picked, saying so on the row and keeping
-the thumbnail before (`thumbnailRefusal`), and the server publishes none (`pngSize`). A
-record stored with a thumbnail of another size keeps it, and the form shows it as given;
-publishing it is refused on the row, and it is only refused as a title (below). The
-site's sets, shipped and drawn by `utils/submit-forum-dungeons.ts`, are all 320x200.
-
-To do, the last step:
-
-- **The boot shows it, when checked,** in place of `displayChaosStrikesBack`: the
-  thumbnail reduced to sixteen colours of the Atari's 512 (each component 3 bits, shown
-  x36 as the canvas shows them), by median cut, no dithering (the author's diff found it
-  changes nothing on the cover), the same for every player; faded in over eight VBLs as
-  `_FadeToPalette` fades (`doc/CSBwin-src/Graphics.cpp:1625`), held about 90 VBLs (1.5 s),
-  faded out to black. A published or shipped set's comes from `<id>-thumbnail.png`, a
-  local one's from its record. The FTL swoosh before the title (`Swoosh`) is untouched.
-  Unchecked, or with no thumbnail, the animation plays from `graphics.dat` as now. The
-  welcome page goes on showing the thumbnail in full colour.
-
-Evidence: a tool for the reduction (at most sixteen colours, every one an Atari shade, the
-same output on every run, the Theron cover the case); the boot's picture and its VBLs
-(`tools/dump-intro.ts`). Docs: `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` for the port's
-alternative to the animation, and `DataSet.thumbnailAsTitle`'s comment, which says what
-reads it.
 
 ---
 

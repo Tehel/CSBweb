@@ -8,7 +8,7 @@ import { SoundManager } from './audio/SoundManager';
 import { CsbRandom } from './core/random';
 import { Position } from './core/types';
 import { extractPresetHeroes } from './data/HeroExtractor';
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, type DataSet, type DataSetManifest } from './data/DataSets';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, thumbnailPath, type DataSet, type DataSetManifest } from './data/DataSets';
 import { folderFiles, loadGameFiles, type DataSetFiles, type GameFiles } from './data/DataSetFiles';
 import { parsePublishedDungeons, type KnownDungeon } from './data/DungeonSignature';
 import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
@@ -31,6 +31,8 @@ import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage, welcomeP
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { runBootSequence, runHintOracle, type BootSequenceDeps } from './renderer/intro/BootSequence';
+import { reduceTitlePicture } from './renderer/intro/TitlePicture';
+import type { TitleFrame } from './renderer/intro/TitleThumbnail';
 import { showEndOfGame } from './renderer/intro/EndOfGame';
 import { Die } from './engine/Die';
 import { csbGraphicsOpener } from './engine/FileSignatures';
@@ -56,6 +58,8 @@ const GAMEFILES_DIR = 'gamefiles';
 let dataSet!: DataSet;
 /** Where its files are read from: its folder, or a local set's record (`chooseDataSet`). */
 let setFiles!: DataSetFiles;
+/** Its thumbnail, `null` where it has none: from its folder, or a local set's record (`chooseDataSet`). */
+let setThumbnail!: () => Promise<Blob | null>;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
 /**
@@ -203,6 +207,38 @@ async function loadSwooshFiles(sound: SoundManager): Promise<{ image: Swoosh; st
     }
     if (wav) await sound.loadRecording(SWOOSH_RECORDING, wav).catch(() => console.warn('No swoosh: swoosh.wav is not a sound'));
     return { image, startSound: () => sound.playRecording(SWOOSH_RECORDING) };
+}
+
+/**
+ * The set's thumbnail as the boot shows it in the title's place (`DataSet.thumbnailAsTitle`):
+ * reduced to sixteen registers (`reduceTitlePicture`), or `null` where there is none to
+ * show, and the title animation plays. A thumbnail not `THUMBNAIL_WIDTH`x`THUMBNAIL_HEIGHT`,
+ * which a record stored before the form refused one may hold, is not shown. The image is
+ * read without colour management, so a PNG gives every player the same screen.
+ */
+async function loadTitlePicture(): Promise<TitleFrame | null> {
+    try {
+        const thumbnail = await setThumbnail();
+        if (!thumbnail) {
+            console.warn(`No title picture: ${dataSet.id} has no thumbnail`);
+            return null;
+        }
+        const bitmap = await createImageBitmap(thumbnail, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+        const { width, height } = bitmap;
+        if (width !== THUMBNAIL_WIDTH || height !== THUMBNAIL_HEIGHT) {
+            bitmap.close();
+            console.warn(`No title picture: the thumbnail is ${width}x${height}, not ${THUMBNAIL_WIDTH}x${THUMBNAIL_HEIGHT}`);
+            return null;
+        }
+        const canvas = new OffscreenCanvas(width, height);
+        const context = canvas.getContext('2d')!;
+        context.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        return reduceTitlePicture(context.getImageData(0, 0, width, height).data, width, height);
+    } catch (error) {
+        console.warn('No title picture:', error);
+        return null;
+    }
 }
 
 /**
@@ -438,6 +474,7 @@ async function runIntro(built: Built, sound: SoundManager): Promise<PrisonDoorCh
         ...introDeps(built, sound),
         swoosh: animations ? await loadSwooshFiles(sound) : null,
         title: animations,
+        titlePicture: animations && dataSet.thumbnailAsTitle ? await loadTitlePicture() : null,
         skip: skipIntro,
     });
 }
@@ -579,7 +616,7 @@ function publishedDungeons(): Promise<KnownDungeon[]> {
  * (`src/data/LocalDataSets.ts`), which plays its base set's `graphics.dat` where it has
  * none; any other is the manifest's, read from its folder.
  */
-async function chooseDataSet(manifest: DataSetManifest): Promise<{ set: DataSet; files: DataSetFiles } | null> {
+async function chooseDataSet(manifest: DataSetManifest): Promise<{ set: DataSet; files: DataSetFiles; thumbnail: () => Promise<Blob | null> } | null> {
     const id = new URLSearchParams(window.location.search).get('dungeon');
     if (isLocalDataSetId(id)) {
         const storeRandom = new CsbRandom();
@@ -592,11 +629,17 @@ async function chooseDataSet(manifest: DataSetManifest): Promise<{ set: DataSet;
             return null;
         }
         const base = record.baseSet === null ? null : dataSetNamed(manifest, record.baseSet);
-        return { set: localDataSet(record), files: recordFiles(record, base && folderFiles(base.dir)) };
+        return { set: localDataSet(record), files: recordFiles(record, base && folderFiles(base.dir)), thumbnail: () => Promise.resolve(record.files.thumbnail ?? null) };
     }
     const set = dataSetNamed(manifest, id);
     if (id !== null && !set) console.warn(`Unknown data set '${id}'`);
-    return set && { set, files: folderFiles(set.dir) };
+    return set && { set, files: folderFiles(set.dir), thumbnail: () => fetchThumbnail(set) };
+}
+
+/** `set`'s thumbnail from its folder (`thumbnailPath`), or `null` where it cannot be fetched. */
+async function fetchThumbnail(set: DataSet): Promise<Blob | null> {
+    const response = await fetch(thumbnailPath(set)).catch(() => null);
+    return response?.ok ? response.blob() : null;
 }
 
 /**
@@ -615,7 +658,7 @@ async function init() {
         const manifest = await loadManifest();
         const chosen = await chooseDataSet(manifest);
         if (!chosen) return await openWelcomePage(manifest);
-        ({ set: dataSet, files: setFiles } = chosen);
+        ({ set: dataSet, files: setFiles, thumbnail: setThumbnail } = chosen);
         console.log(`Loading ${dataSet.name}...`);
         const files = await loadGameFiles(dataSet, setFiles);
         console.log(`✓ Loaded graphics: ${files.graphicsLoader.getItemCount()} items${dataSet.csbGraphics ? ', and the CSBgraphics.dat overlay' : ''}`);

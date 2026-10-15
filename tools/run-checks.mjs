@@ -335,6 +335,9 @@ const CHECKS = [
   // The welcome page's thumbnails, each set's `<id>-thumbnail.png`: the title's last frame,
   // played from the set's graphics.dat, pixel for pixel and colour for colour.
   { tool: 'gen-thumbnails.ts', args: ['--check'] },
+  // A thumbnail in the title's place: reduced to sixteen Atari shades by median cut, the
+  // Theron cover pinned, a picture already of sixteen shades given back exactly.
+  { tool: 'dump-title-picture.ts' },
   // The welcome page's font, `src/assets/dm-screen.ttf`: dm-atari's graphics.dat font as a
   // TrueType font, byte for byte what the tool writes. That the browser draws it as the
   // game does is the frames' check.

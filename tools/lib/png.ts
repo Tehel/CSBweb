@@ -21,6 +21,8 @@ export interface PngImage {
   indices: Uint8Array;
   /** The PLTE entries as `[r, g, b]`, empty when the image is not paletted. */
   palette: number[][];
+  /** Every pixel as four bytes, red, green, blue and alpha; a paletted pixel opaque. Not for grey under 8 bits. */
+  rgba: Uint8Array;
 }
 
 /** Read a PNG. Paletted images come back as indices into `palette`. */
@@ -83,7 +85,19 @@ export function decodePng(bytes: Uint8Array): PngImage {
   }
   const palette: number[][] = [];
   if (plte) for (let i = 0; i < plte.length; i += 3) palette.push([plte[i], plte[i + 1], plte[i + 2]]);
-  return { width, height, depth, ctype, indices, palette };
+  const rgba = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const p = y * width + x, at = y * stride + x * channels;
+      const [r, g, b, a] = ctype === 3 ? [...(palette[indices[p]] ?? [0, 0, 0]), 255]
+        : ctype === 2 ? [out[at], out[at + 1], out[at + 2], 255]
+        : ctype === 6 ? [out[at], out[at + 1], out[at + 2], out[at + 3]]
+        : ctype === 4 ? [out[at], out[at], out[at], out[at + 1]]
+        : [indices[p], indices[p], indices[p], 255];
+      rgba.set([r, g, b, a], p * 4);
+    }
+  }
+  return { width, height, depth, ctype, indices, palette, rgba };
 }
 
 /** Write `indices` (one byte a pixel) as an 8-bit paletted PNG over `palette`'s `[r, g, b]` (`src/core/png.ts`). */

@@ -92,7 +92,9 @@ export interface DataSet {
      * animation, a choice of its author's on the form that adds a set
      * (`src/ui/addDataSetForm.ts`). CSBWin has no such picture: it always plays the
      * animation from `graphics.dat` (`_DisplayChaosStrikesBack`,
-     * doc/CSBwin-src/CSBCode.cpp:9308). The boot does not read it yet (`DEBT.md` P12).
+     * doc/CSBwin-src/CSBCode.cpp:9308). The page reads it to give the boot the thumbnail,
+     * reduced to sixteen registers (`loadTitlePicture`, `src/main.ts`;
+     * `src/renderer/intro/TitlePicture.ts`), in the animation's place.
      */
     thumbnailAsTitle: boolean;
     /**

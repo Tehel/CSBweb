@@ -166,6 +166,30 @@ Total ≈ 5×8 + 18×3 + 30 ≈ 116 vertical blanks, near enough two seconds.
 **Guard not ported:** `:9327` `if (d.iAvailableMemory < 138060) RETURN;` silently skips the
 whole sequence on a machine that cannot spare 133 KB for the frames.
 
+### A thumbnail in place of the animation (the port's, not CSBWin's)
+
+A set whose author checked "As the title" on the form that adds it (`DataSet.thumbnailAsTitle`,
+`src/ui/addDataSetForm.ts`) shows its thumbnail, `<id>-thumbnail.png` or a local record's image,
+where the animation would play (`src/renderer/intro/TitlePicture.ts`). CSBWin cannot: it always
+plays the animation above, from graphic 1, through registers its code sets. Nothing goes in
+`DEBT.md` H, as with the thumbnail itself: CSBWin plays its animation for such a set.
+
+- **The reduction** (`reduceTitlePicture`): the 320x200 image, a pixel short of opaque taken
+  over black, cut by median cut into at most sixteen boxes, the box of the widest channel
+  cut first, at its pixels' median. Each box's register is its mean colour, each component the
+  nearest of the Atari's eight levels shown x36 (`atariToRGB`); each pixel takes the register
+  nearest its colour as the canvas shows it. No dithering. The page reads the image without
+  colour management (`createImageBitmap`, `colorSpaceConversion: 'none'`), so a PNG gives
+  every player the same screen, the tool's (`tools/dump-title-picture.ts`, the Theron cover
+  pinned).
+- **The showing** (`showTitlePicture`): a fade to black, as the animation's first; the picture
+  put up under black registers; `_FadeToPalette` to its registers (eight VBLs, which from black
+  reach any shade); `TITLE_PICTURE_HOLD_VBLS`, 90, the author's choice; a fade to black, and the
+  screen cleared. 114 VBLs in all (`tools/dump-intro.ts`).
+- The FTL logo before it is untouched, and the startup animations setting turns both off. A
+  set without a thumbnail, or with one of another size than 320x200 (an older record's), plays
+  the animation. The welcome page goes on showing the thumbnail in full colour.
+
 ### `ShrinkBLT` — Graphics.cpp:381
 
 A nearest-neighbour minifier walking the source with a 16.16 fixed-point accumulator:

@@ -73,6 +73,7 @@ import {
   ZOOM_HEIGHT_STEP,
   ZOOM_WIDTH_STEP,
 } from '../src/renderer/intro/TitleSequence';
+import { showTitlePicture, TITLE_PICTURE_HOLD_VBLS } from '../src/renderer/intro/TitlePicture';
 import {
   PRISON_LEVEL_INDEX,
   PRISON_LEVEL_SIZE,
@@ -527,6 +528,43 @@ async function checkFade(): Promise<void> {
     'the widest legal jump, 0 to 7 in every component, finishes inside the eight steps');
 }
 
+/* ------------------------------------------------------ the title picture ---- */
+
+/**
+ * A set's thumbnail in the title's place (`showTitlePicture`): the screen darkened, the
+ * picture faded in over eight VBLs, held, faded out over eight, and the screen left black.
+ */
+async function checkTitlePicture(): Promise<void> {
+  console.log('\n=== The thumbnail as the title ===');
+  const host = makeHost(loadGraphics(), graphicsTablesOf(loadGraphics()).ui);
+  const registers = [0x000, 0x777, 0x700, 0x070, 0x007, 0x770, 0x077, 0x707, 0x123, 0x456, 0x765, 0x321, 0x135, 0x642, 0x214, 0x553];
+  const pixels = Uint8Array.from({ length: SCREEN_WIDTH * SCREEN_HEIGHT }, (_, p) => p % 16);
+  // Where the picture was at each blank: whether the screen held it, and the registers.
+  const seen: { shown: boolean; palette: number[] }[] = [];
+  host.vbl = (count: number) => {
+    for (let i = 0; i < count; i++) {
+      seen.push({ shown: host.screen.pixels.every((pixel, p) => pixel === pixels[p]), palette: host.globalPalette.slice(0, 16) });
+    }
+    return Promise.resolve();
+  };
+  host.globalPalette.splice(0, 16, ...registers.map((register) => register ^ 0x777));
+  host.screen.pixels.fill(3);
+  await showTitlePicture(host, { pixels, registers });
+
+  const black = (palette: number[]): boolean => palette.every((register) => register === 0);
+  const same = (palette: number[]): boolean => palette.every((register, i) => register === registers[i]);
+  console.log(`${seen.length} VBLs`);
+  check(seen.length === 8 + 8 + TITLE_PICTURE_HOLD_VBLS + 8, `8 to darken, 8 to fade in, ${TITLE_PICTURE_HOLD_VBLS} held, 8 to fade out`);
+  check(seen.slice(0, 8).every((v) => !v.shown), 'the picture is not put up while the screen darkens');
+  check(seen[8].shown && black(seen[8].palette), 'it is put up under black registers');
+  check(seen.slice(8).every((v) => v.shown), 'and stays up to the last fade\'s last blank');
+  // A blank is seen before the fade's step on it, and a shade is at most seven steps from
+  // black, so the eighth blank of the fade-in already sees the picture's registers.
+  check(seen.slice(15, 16 + TITLE_PICTURE_HOLD_VBLS + 1).every((v) => same(v.palette)), 'its registers reached in the fade-in, and held');
+  check(!same(seen[14].palette), 'not before its seventh step: 0x777 rises a level a blank');
+  check(black(host.globalPalette.slice(0, 16)) && host.screen.pixels.every((pixel) => pixel === 0), 'faded out to black, and the screen cleared');
+}
+
 async function main(): Promise<void> {
   const graphics = loadGraphics();
   const ui = graphicsTablesOf(graphics).ui;
@@ -539,6 +577,7 @@ async function main(): Promise<void> {
   checkShrinkBlt(graphics);
   checkSoundPitches(ui);
   await checkFade();
+  await checkTitlePicture();
 
   finish();
 }
