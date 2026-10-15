@@ -14,6 +14,7 @@ import type { TimerEntry } from '../../src/engine/TimerQueue';
 import { newGame, stockGraphics } from './game';
 import { savePath } from './saves';
 
+const NOOP = 3;
 const LOAD = 6;
 const AMPERSAND = 11;
 const VARIABLEFETCH = 17;
@@ -25,6 +26,8 @@ const AMPERSAND2 = 21;
 export const int = (value: number): number[] => [LOAD | (30 << 6), value & 0xffff, (value >>> 16) & 0xffff];
 export const op = (subcode: number): number =>
   subcode < 128 ? AMPERSAND | (subcode << 6) : AMPERSAND2 | ((subcode - 128) << 6);
+/** `NOOP` (`EX_NOOP`, `DSA.cpp:575-592`): the next state, `relState` from the current one, -511 to 511. */
+export const next = (relState: number): number => NOOP | ((relState & 0x3ff) << 6);
 export const varFetch = (index: number): number => VARIABLEFETCH | (index << 6);
 export const varStore = (index: number): number => VARIABLESTORE | (index << 6);
 export const globalStore = (index: number): number => GLOBALSTORE | (index << 6);

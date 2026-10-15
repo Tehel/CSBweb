@@ -19,7 +19,13 @@
  * records are not carried: the new game gives every database its spares
  * (`DungeonState.addNewGameSpares`).
  *
- * What it does not know about is refused rather than dropped: a DSA, an `EXPOOL` record.
+ * The DSAs travel as they are: the world's `DSAIndex` (`dsas`) and each level's row of
+ * `DSALevelIndex` (`dsaSelectors`), which a type 47 actuator's selector reads
+ * (`ProcessDSATimer6`, `doc/CSBwin-src/DSA.cpp:5395`; `SummarizeRoomInfo`,
+ * `Codea59a.cpp:115-128`). A DSA's program names levels by number, so a caller that
+ * renumbers levels mends its programs itself.
+ *
+ * What it does not know about is refused rather than dropped: an `EXPOOL` record.
  */
 import { RnMaps } from '../../src/core/RnMaps';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../../src/core/types';
@@ -28,7 +34,7 @@ import { ActuatorAction, getActuatorType, isActuatorLocalActionOnly } from '../.
 import { ComputeTextLength, textStart } from '../../src/data/CsbwinDungeonConversions';
 import { databaseRecords, rnMapsOf } from '../../src/data/CsbwinObjectIndex';
 import type {
-  ActuatorRecord, DatabaseRecord, Databases, DungeonData, MapDescriptor, ScrollRecord, TeleporterRecord, TextRecord,
+  ActuatorRecord, DatabaseRecord, Databases, DsaDefinition, DungeonData, MapDescriptor, ScrollRecord, TeleporterRecord, TextRecord,
 } from '../../src/data/dungeonTypes';
 
 /** One object on a square, or held by another. */
@@ -57,13 +63,32 @@ export interface BLevel {
   wallDecorationTOC: number[];
   floorDecorationTOC: number[];
   doorDecorationTOC: number[];
+  /**
+   * The level's row of `DSALevelIndex` (`doc/CSBwin-src/data.cpp:100`), 32 selectors:
+   * the number of a DSA of `BWorld.dsas`, `DSA_GRAPHIC` for a wall decoration of
+   * `CSBgraphics.dat`, `DSA_NONE` for nothing. Absent when it names nothing.
+   */
+  dsaSelectors?: number[];
 }
+
+/** A `DSALevelIndex` entry naming nothing, as `ClearDSALevelIndex` leaves them (`SaveGame.cpp:273-284`). */
+export const DSA_NONE = 0xffff;
+/**
+ * A `DSALevelIndex` entry that makes a type 47 actuator in a wall a `CSBgraphics.dat` wall
+ * decoration, its `ParameterA` the section (`SummarizeRoomInfo`, `doc/CSBwin-src/Codea59a.cpp:115-128`).
+ */
+export const DSA_GRAPHIC = 255;
+/** `DSALevelIndex`'s size (`doc/CSBwin-src/data.cpp:100`). */
+const DSA_LEVELS = 64;
+const DSA_SELECTORS = 32;
 
 export interface BWorld {
   randomSeed: number;
   /** On level 0. */
   start: { x: number; y: number; facing: Direction };
   levels: BLevel[];
+  /** `DSAIndex`, the DSAs by number. Absent when there are none. */
+  dsas?: Array<DsaDefinition | null>;
 }
 
 const KEYS: Partial<Record<DBType, keyof Databases>> = {
@@ -85,7 +110,6 @@ function contentsField(db: DBType): 'possession' | 'containedObject' | 'projecti
 
 /** A world read by `DungeonLoader`, taken apart. */
 export function decompose(data: DungeonData): BWorld {
-  if (data.dsaIndex?.entries.some((e) => e)) throw new Error('decompose: the dungeon has DSAs');
   if ((data.header.objectCounts[DBType.EXPOOL] ?? 0) !== 0) throw new Error('decompose: the dungeon has EXPOOL records');
   if (!data.indirectText || !data.newScrolls || !data.bigActuators) throw new Error('decompose: the world is not converted');
 
@@ -122,6 +146,7 @@ export function decompose(data: DungeonData): BWorld {
 
   const levels = data.maps.map((map, z): BLevel => {
     const { width, height } = map.descriptor;
+    const selectors = data.dsaLevelIndex?.[z];
     const cells: BObject[][][] = [];
     for (let x = 0; x < width; x++) {
       cells[x] = [];
@@ -138,10 +163,16 @@ export function decompose(data: DungeonData): BWorld {
       wallDecorationTOC: [...(map.wallDecorationTOC ?? [])],
       floorDecorationTOC: [...(map.floorDecorationTOC ?? [])],
       doorDecorationTOC: [...(map.doorDecorationTOC ?? [])],
+      ...(selectors?.some((dsa) => dsa !== DSA_NONE) ? { dsaSelectors: [...selectors] } : {}),
     };
   });
   const { startPosition, facing, randomSeed } = data.header;
-  return { randomSeed, start: { x: startPosition.x, y: startPosition.y, facing }, levels };
+  // `DSAIndex` up to its last DSA: a read gives all 256 entries.
+  const entries = data.dsaIndex?.entries ?? [];
+  let count = entries.length;
+  while (count > 0 && !entries[count - 1]) count--;
+  const dsas = count > 0 ? { dsas: clone(entries.slice(0, count)) } : {};
+  return { randomSeed, start: { x: startPosition.x, y: startPosition.y, facing }, levels, ...dsas };
 }
 
 /** The world `decompose` took apart, or one built from levels of several, numbered again. */
@@ -277,6 +308,19 @@ export function compose(world: BWorld): DungeonData {
     indirectText: true,
     newScrolls: true,
   };
+  if (world.dsas) data.dsaIndex = { entries: clone(world.dsas) };
+  if (world.levels.some((level) => level.dsaSelectors)) {
+    if (world.levels.length > DSA_LEVELS) throw new Error(`compose: DSALevelIndex holds ${DSA_LEVELS} levels, not ${world.levels.length}`);
+    data.dsaLevelIndex = Array.from({ length: DSA_LEVELS }, (_, z) => {
+      const selectors = world.levels[z]?.dsaSelectors ?? new Array<number>(DSA_SELECTORS).fill(DSA_NONE);
+      if (selectors.length !== DSA_SELECTORS) throw new Error(`compose: map ${z} has ${selectors.length} DSA selectors`);
+      for (const dsa of selectors) {
+        if (dsa === DSA_NONE || dsa === DSA_GRAPHIC) continue;
+        if (!world.dsas?.[dsa]) throw new Error(`compose: map ${z} names DSA ${dsa}, which is missing`);
+      }
+      return [...selectors];
+    });
+  }
   data.rnMaps = rnMapsOf(() => data.databases, {
     length: typeMap.length, typeMap: Uint8Array.from(typeMap), indexMap: Uint16Array.from(indexMap),
   });
@@ -318,6 +362,37 @@ export function actuator(spec: ActuatorSpec, pos = 0): BObject {
       ((spec.graphic ?? 0) << 12),
     word6: ((spec.target.pos ?? 0) << 4) | (spec.target.x << 6) | (spec.target.y << 11),
     word8: 0,
+  };
+  return { db: DBType.ACTUATOR, pos, record, contents: [] };
+}
+
+export interface DsaActuatorSpec {
+  /** Bits 7-11 of `word2`: the entry of the level's `dsaSelectors`. */
+  selector: number;
+  /** `DSAstate`, bits 12-15 of `word2`: the state of a DSA whose `localState` is 0. */
+  state?: number;
+  /** `ParameterA`: `word4` and bits 0-1 of `word8`. A wall decoration's section. */
+  parameterA?: number;
+  /** `ParameterB`: `word6` and bits 2-3 of `word8`. */
+  parameterB?: number;
+}
+
+/**
+ * A type 47 `DB3`, a DSA's actuator (`doc/CSBwin-src/CSB.h:1051-1057`, its parameters
+ * `data.cpp:1338-1358`), in its ten-byte form.
+ */
+export function dsaActuator(spec: DsaActuatorSpec, pos = 0): BObject {
+  const a = spec.parameterA ?? 0;
+  const b = spec.parameterB ?? 0;
+  if (spec.selector < 0 || spec.selector >= DSA_SELECTORS) throw new Error('dsaActuator: a selector is five bits');
+  if ((spec.state ?? 0) > 15) throw new Error('dsaActuator: a state is four bits');
+  if (a < 0 || a >= 1 << 18 || b < 0 || b >= 1 << 18) throw new Error('dsaActuator: a parameter is 18 bits');
+  const record: ActuatorRecord = {
+    nextObject: OBJECT_ID_EOF,
+    word2: 47 | (spec.selector << 7) | ((spec.state ?? 0) << 12),
+    word4: a & 0xffff,
+    word6: b & 0xffff,
+    word8: ((a >> 16) & 3) | (((b >> 16) & 3) << 2),
   };
   return { db: DBType.ACTUATOR, pos, record, contents: [] };
 }

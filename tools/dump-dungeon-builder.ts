@@ -12,10 +12,16 @@
  * 3. A level grown on its north and west sides (`growLevel`): each square keeps its place
  *    in the dungeon, every actuator aimed on the level and every teleporter aimed into it
  *    follows, and a party set down on the same square of the dungeon walks the same way.
+ * 4. DSAs (`BWorld.dsas`, `BLevel.dsaSelectors`, `dsaActuator`): DM's dungeon given a DSA
+ *    and a wall decoration of `CSBgraphics.dat`, written and read back, is the same world,
+ *    `DSAIndex`, `DSALevelIndex`, the actuators' selectors, states and parameters. In
+ *    play, a pad aimed at the DSA's square runs it at each step on, which flips the DSA's
+ *    state, kept by its actuator (local state 0), from 0 to 1 and back.
  *
  * Run: `npm test -- --only=dump-dungeon-builder.ts`
  */
-import { Position } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
+import { ActuatorAction } from '../src/data/actuatorHelpers';
 import { buildDungeonFile } from '../src/data/DungeonFileWriter';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { ActuatorRecord, DungeonData, TeleporterRecord } from '../src/data/dungeonTypes';
@@ -23,7 +29,10 @@ import type { Game } from '../src/engine/Game';
 import { MovementAction } from '../src/engine/gameTypes';
 import { check, finish } from './lib/check';
 import { testChampion } from './lib/champion';
-import { actuatorAims, canonical, compose, decompose, growLevel, squaresOf, type BWorld } from './lib/dungeonBuilder';
+import { next } from './lib/dsa';
+import {
+  actuator, actuatorAims, canonical, compose, decompose, DSA_GRAPHIC, DSA_NONE, dsaActuator, growLevel, squaresOf, type BWorld,
+} from './lib/dungeonBuilder';
 import { newGame, runVbl, stockDungeon, stockGraphics, TICK_DUE } from './lib/game';
 
 const reread = (data: DungeonData): DungeonData =>
@@ -143,9 +152,86 @@ function grown(): void {
   console.log('');
 }
 
+function withDsas(): void {
+  console.log('=== DM with a DSA and a wall decoration of CSBgraphics.dat ===');
+  const world = decompose(stockDungeon());
+  const level = world.levels[0];
+  const DX = [0, 1, 0, -1];
+  const DY = [-1, 0, 1, 0];
+  const empty = (x: number, y: number): boolean =>
+    level.cellFlags[x]?.[y] !== undefined && level.cellFlags[x][y] >> 5 === RoomType.OPEN && level.cells[x][y].length === 0;
+  // Two squares of empty floor side by side, the party on the first facing the second,
+  // the pad and the DSA on the second, and a wall beside the first.
+  let found: { sx: number; sy: number; facing: Direction } | null = null;
+  for (const [sx, sy] of squaresOf(level)) {
+    if (found || !empty(sx, sy)) continue;
+    const facing = [0, 1, 2, 3].find((d) => empty(sx + DX[d], sy + DY[d]));
+    const walled = [0, 1, 2, 3].some((d) => level.cellFlags[sx + DX[d]]?.[sy + DY[d]] !== undefined &&
+      level.cellFlags[sx + DX[d]][sy + DY[d]] >> 5 === RoomType.STONE);
+    if (facing !== undefined && walled) found = { sx, sy, facing };
+  }
+  if (!found) throw new Error('no two squares of empty floor beside a wall on level 0');
+  const { sx, sy, facing } = found;
+  const ahead = { x: sx + DX[facing], y: sy + DY[facing] };
+  // The wall, for the decoration: the first stone square round the party.
+  const wall = [Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST]
+    .map((d) => ({ x: sx + DX[d], y: sy + DY[d], face: (d + 2) % 4 }))
+    .find(({ x, y }) => level.cellFlags[x][y] >> 5 === RoomType.STONE);
+  if (!wall) throw new Error('no wall beside the party');
+  world.dsas = [];
+  world.dsas[3] = {
+    description: 'flips at each run', state: 0, localState: 0, groupId: 0, numStates: 2, firstDisplayedState: 0,
+    states: [
+      { actions: [{ column: 0, program: Uint16Array.from([next(1)]) }] },
+      { actions: [{ column: 0, program: Uint16Array.from([next(-1)]) }] },
+    ],
+  };
+  level.dsaSelectors = new Array<number>(32).fill(DSA_NONE);
+  level.dsaSelectors[5] = 3;
+  level.dsaSelectors[9] = DSA_GRAPHIC;
+  level.cells[ahead.x][ahead.y].push(
+    actuator({ type: 3, action: ActuatorAction.SET, target: ahead }),
+    dsaActuator({ selector: 5, parameterB: 0x2abcd }),
+  );
+  level.cells[wall.x][wall.y].push(dsaActuator({ selector: 9, parameterA: 0x30007 }, wall.face));
+
+  const back = decompose(reread(compose(world)));
+  const records = back.levels[0].cells[ahead.x][ahead.y].map((o) => o.record as ActuatorRecord);
+  const decoration = back.levels[0].cells[wall.x][wall.y].map((o) => o.record as ActuatorRecord);
+  console.log(['DSAs', back.dsas?.map((dsa, i) => (dsa ? i : null)).filter((i) => i !== null).join(','),
+    'selectors', back.levels[0].dsaSelectors?.map((dsa, i) => (dsa !== DSA_NONE ? `${i}:${dsa}` : null)).filter(Boolean).join(' '),
+    'DSA actuator', records.map((r) => `${r.word2.toString(16)}/${r.word4.toString(16)}/${r.word6.toString(16)}/${r.word8 ?? 0}`).join(' '),
+    'decoration', decoration.map((r) => `${r.word2.toString(16)}/${r.word4.toString(16)}/${r.word8 ?? 0}`).join(' ')].join(' '));
+  check(canonical(back) === canonical(world), 'written and read back, the DSA, the selectors and the actuators are the same');
+  check(back.levels.slice(1).every((l) => !l.dsaSelectors), 'and the other levels name no DSA');
+
+  const game = newGame(reread(compose(world)), stockGraphics());
+  game.systems.hallOfChampions.addChampion(testChampion(0));
+  game.ctx.party.state.position = new Position(sx, sy, 0);
+  game.ctx.party.state.facing = facing;
+  const states: number[] = [];
+  const stateOf = (): number => {
+    const dungeon = game.ctx.dungeon;
+    for (let rn = dungeon.findFirstObject(new Position(ahead.x, ahead.y, 0)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+      const record = dungeon.rnMaps.dbType(rn) === DBType.ACTUATOR ? dungeon.getActuatorRecord(rn) : null;
+      if (record && (record.word2 & 0x7f) === 47) return (record.word2 >> 12) & 15;
+    }
+    throw new Error('the DSA actuator is gone');
+  };
+  for (const move of [MovementAction.MOVE_FORWARD, MovementAction.MOVE_BACKWARD, MovementAction.MOVE_FORWARD, MovementAction.MOVE_BACKWARD]) {
+    game.enqueueMovement(move);
+    for (let n = 0; n < 24; n++) runVbl(game, TICK_DUE);
+    states.push(stateOf());
+  }
+  console.log(`  its state after each move, on and off the pad: ${states.join(' ')}`);
+  check(states.join(' ') === '1 1 0 0', 'a pad aimed at its square runs it at each step on, and its state flips');
+  console.log('');
+}
+
 function main(): void {
   rebuilt();
   grown();
+  withDsas();
   finish();
 }
 
