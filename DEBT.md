@@ -116,8 +116,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
-| E39 | The About and Credits pages | M | ⏳ to design with the author |
 | W2 | `api/stats` is computed whole at every request | S | ⏳ |
 | W3 | `api/event` takes another site's posts, and any name | S | ⏳ |
 | R6 | A damaged file's counts size allocations and loops | M | ⏳ |
@@ -130,6 +128,8 @@ In payoff order: the first row is the next item.
 | W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
 | W6 | Security headers | S | ⏳ |
 | W7 | The container, the deploy and the Node version | S | ⏳ |
+| P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
+| E39 | The About and Credits pages | M | ⏳ to design with the author |
 | R12 | Listing the saves reads every save's bytes | M | ⏳ |
 | U11 | The cursor over a dialog takes the game's shapes | S | ⏳ |
 | U12 | A text outside the game's font draws as other letters | S | ⏳ |
