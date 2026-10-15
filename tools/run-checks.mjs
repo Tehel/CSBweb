@@ -270,6 +270,7 @@ const CHECKS = [
   // block's shape it is DM's dungeon converted, and a new game takes the block's rules.
   { tool: 'dump-extended-dungeon.ts' },
   { tool: 'dump-dungeon-file.ts' },
+  { tool: 'dump-dungeon-builder.ts' },
   // `ReadExtendedFeatures` without a plain sentinel: the "simple" encipherment's stream,
   // RC4.cpp's own, against the compiled C++ and Conflux's enciphered dungeon.dat. And a
   // block it gives up on (checksum, terminator, flag) is no block: the file is read from 0.
