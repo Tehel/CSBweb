@@ -79,6 +79,8 @@ This document captures verified DSA behavior from the CSBWin C++ source under `d
 
 - `ProcessDSATimer6` resolves the slave DSA by mapping `DB3::DSAselector()` through `DSALevelIndex[level][selector]`, computes `inputMsgType = 3 * timerPosition + timerTypeModifier[timerUByte9]`, executes the DSA, and writes the resulting state back via `GetState`/`PutState` (`doc/CSBwin-src/DSA.cpp`).
 - CSBWin implements no slave DSA. `FindMaster` returns the DSA's own actuator as its master when `IsMaster()`, that is when `LocalState()` is not 3 (`doc/CSBwin-src/Data.h:2479-2482`); for a local state of 3 it warns "Slave DSA Not Implemented" and returns the slave all the same, leaving the master's x and y unset (`doc/CSBwin-src/DSA.cpp:535-548`), and `GetState` and `PutState` then find local state 3 illegal (`:550-572`). No dungeon here has such a DSA: Conflux 3.5's local states are 0 and 1, and 3D2D1D's are 0.
+- A run's next state is that of its first command, not its last: `DSA::Execute` keeps the first `m_nextState` that is not negative (`doc/CSBwin-src/DSA.cpp:5274-5283`), and every command sets one from its own relative-state field. A program that changes its DSA's state does it in its first word, a `NOOP` with the change (`EX_NOOP`, `:575-592`).
+- A selector mapped to 255 names no DSA. In a wall, the type 47 actuator is a wall decoration of `CSBgraphics.dat` (`doc/CSBWIN_DECORATIONS_REFERENCE.md` → "A wall decoration of `CSBgraphics.dat`"); a timer that reaches it says "Undefined Master DSA" and runs nothing (`DSA.cpp:5395-5410`).
 - `QueueDSASwitchAction` maps target room type via `Byte1596` and queues `TT_DESSAGE` when `MorD != 'M'`; non-stone/falsewall targets force `targetPos = 0` (`doc/CSBwin-src/DSA.cpp`).
 
 ## STKOP cell operations

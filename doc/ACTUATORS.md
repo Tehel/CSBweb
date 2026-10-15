@@ -66,7 +66,13 @@ High-level behavior:
   - Example cases (all from `PressurePadOrAlcove()`):
     - Type 1: "anything" pad, ignores if object/monster already present.
     - Type 2: party or monsters only.
-    - Type 3: party only, with optional facing constraint when `value != 0`.
+    - Type 3: party only, with optional facing constraint when `value != 0`: then it is
+      pressed when the party is placed on it facing `value - 1`, and never by a remove
+      (`doc/CSBwin-src/Code11f52.cpp:3791-3818`). A turn on its square is a remove, then a
+      place at the new facing (`_TurnParty`, `doc/CSBwin-src/CSBCode.cpp:7999-8019`), so a
+      type 3 held (`CONSTPRESSURE`, `:3882-3895`) sends a set exactly when the party comes
+      to face `value - 1` on it, by a step or a turn, and a clear at every other step on,
+      step off or turn: a turn to that facing sends a clear, then a set.
     - Type 4: requires object type match (`value` vs moved object basic type).
     - Type 7: monsters only.
     - Type 8: checks party possession (calls `DoesPartyHave()`).

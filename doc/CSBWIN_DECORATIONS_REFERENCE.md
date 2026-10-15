@@ -63,6 +63,28 @@ the reversed image ends up `ceil16(w) - w` pixels from the left and the offset t
 back. A port that mirrors the exact `finalBitmapWidth + 1` bitmap has no such padding and
 must **not** apply it.
 
+## A wall decoration of `CSBgraphics.dat`
+
+A type 47 actuator on a wall whose selector the level's `DSALevelIndex` maps to 255 is
+summarized as `0x10000 | ParameterA()` (`doc/CSBwin-src/Codea59a.cpp:115-128`), and
+`DrawWallDecoration` draws it from section `ParameterA()` of `CGT_WallDecoration`
+(`doc/CSBwin-src/CSBCode.cpp:3240-3266`), not through the level's table: the section
+carries its own 13 rectangles, one per position above, then the side view and the front
+view (`doc/PROVEN_FACTS.md` → "A `CSBgraphics.dat` wall or floor decoration's bitmaps are
+Atari bitplanes"). Entry 11 is the side view's size and entry 12 the front's.
+
+- At **10, 11 and 12** the bitmap is drawn as it stands, in entry `p`'s rectangle with
+  entry `p`'s width as its line: the side view at 10, mirrored at 11 (`MakeMirror` to
+  entry 11's width and height), the front view at 12 (`:3384-3405`). So these three
+  entries are the bitmaps' sizes.
+- Farther, the side view (positions 0, 1, 5, 6, `relativePosition % 5` under 2) or the
+  front view (2-4, 7-9) is shrunk by `ShrinkBLT` from its size, entry 11's or 12's
+  rounded up to 16 pixels and kept within entry 10's (0, 5), 11's (1, 6) or 12's (front)
+  width and height, to `x2 - x1 + 1` of entry `p`, entry 8's for 7 and 9, by entry `p`'s
+  height (`:3408-3519`, `:3546-3580`), and drawn in entry `p` as the table's decorations
+  are, mirrored at 1 and 6 (`:3596-3621`). The shrunk bitmap is kept under
+  `(index & 0xffff) | (position << 16)`, one at a time (`WALL_DEC_CACHE`, `:3148-3176`, `:3508`).
+
 ## Hall of Champions portraits
 
 The mirror is two independent things drawn by the same call: a wall decoration (the
