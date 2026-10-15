@@ -149,6 +149,7 @@ const CHECKS = [
   { tool: 'dump-skin-programs.ts' },
   { tool: 'dump-custom-graphics.ts' },
   { tool: 'dump-extended-decorations.ts' },
+  { tool: 'dump-csbgraphics-writer.ts' },
   { tool: 'dump-virtual-graphics.ts' },
   { tool: 'watch-conflux-start.ts' },
   { tool: 'watch-3d2d1d-vertical.ts' },

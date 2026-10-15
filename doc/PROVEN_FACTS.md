@@ -2910,6 +2910,31 @@ is this port's shortcut and not a CSBWin field. A champion out of a genuine save
 pixels and no index at all, which is why a loaded party once showed four empty boxes.
 
 
+## A `CSBgraphics.dat` section is LZW without a clear code, in little-endian 32-bit words
+
+`ReadCSBgraphic` (`doc/CSBwin-src/Graphics.cpp:3228-3306`) reads the sentinel `CSBg`, a
+version word it never looks at (1 in both shipped files), the section count, the
+36-byte `SECTIONHEADER`s (`CSB.h:254-263`), and takes the first whose id and type match.
+`OVLDECODE::GetBytes` (`Graphics.cpp:3157-3221`) inflates exactly `uncompressedSize`
+bytes from its words: codes start 9 bits wide, taken from a word's low bits up, a code
+that runs past a word's end its high bits from that word and its low bits from the
+next; 0-255 are bytes; each code adds the string of the code before and its own first
+byte, from entry 255, which no code can name; a code past the table, but
+`maxTableLen - 1`, is the string before and its first byte; `maxTableLen - 1`, 511 at
+first, read past the table, widens the codes by a bit and doubles `maxTableLen`. The table
+holds `maxTableLen` entries, so a widening must come before entry `maxTableLen - 1`
+is added. Its stack is 1,024 bytes, and `EnlargeStack` is `NotImplemented(0xf864)`
+(`:3143-3146`), so no code may stand for more than 1,023 bytes.
+
+The tool that made Conflux 3.5's and Towers of Chaos 3.3's files widens when the table
+has `maxTableLen - 4` entries, and ends a section whose last code fills a word with a
+word of nothing. `src/data/CSBGraphicsWriter.ts` does both: of their 1,283 sections it
+writes 1,282 in the code words shipped (`tools/dump-csbgraphics-writer.ts`). The other,
+Conflux's sound 365, is the tool's own slip: from code 14,334 its codes leave the table
+the decoder keeps, literal bytes for strings it holds since entry 2134, then codes past
+its end (15360 with entry 14587 next), read as the code one past it. The writer gives the
+bytes CSBWin reads from it back in other codes.
+
 ## A `CSBgraphics.dat` portrait is a bare 16-colour bitmap whose nibbles are palette indices
 
 `ImportBitmap(ui32 index, …)` reads a `CGT_Portrait` section (`doc/CSBwin-src/Bitmaps.cpp:246-435`)
