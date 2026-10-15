@@ -5746,6 +5746,18 @@ The door arm of `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1879-19
 
 Evidence: `tools/dump-missile-door.ts`.
 
+## A floor text is read out on every step onto its square, a shown one once
+
+Two ways print a text that lies on an open square. `PlaceOrRemoveObjectInRoom` decodes
+every text on the square the party steps onto, from another square, and queues it
+(`doc/CSBwin-src/Code11f52.cpp:3985-4002`); `DecodeText` gives nothing for a hidden one,
+so a visible text is read out at each step onto it. And `ProcessTT_OPENROOM` reads out a
+text that a timer turns from hidden to shown with the party on its square
+(`doc/CSBwin-src/Timer.cpp:1720-1743`), once per showing. So a text that should speak
+only under a condition is shown or hidden from the square before it, as the merged
+Theron's Quest's corridors do (`tools/build-theron-quest.ts`); shown from its own square,
+it speaks twice when the step finds it already visible.
+
 ## A teleporter names its target map by number, not by depth
 
 `MoveObject` takes the teleporter's square and map as they stand: `newX = destX(); newY =
