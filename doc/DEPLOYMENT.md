@@ -21,7 +21,8 @@ image      dist/ (the built page, and the server's check in dist/server/) + serv
            Node 24 as is) + src/data/DataSets.ts
 mounts     /data/gamefiles        the data sets, and players' uploads
            /data/stats            stats.db (SQLite, WAL: the statistics and the data sets), backups/
-env        PORT (8085), DIST_DIR, GAMEFILES_DIR, STATS_DB, MODERATOR_PLAYER_IDS
+           /data/files            the files shared by link (below), read-only
+env        PORT (8085), DIST_DIR, GAMEFILES_DIR, FILES_DIR, STATS_DB, MODERATOR_PLAYER_IDS
 ```
 
 On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
@@ -34,6 +35,7 @@ On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
 │   │                     everything under it is public
 │   ├── dm-atari/, csb/, … one folder per site's set the `data_sets` table lists
 │   └── <id>/             one folder per set a player publishes, written by the server
+├── files/                the files shared by link, uploaded by hand; all public
 └── stats/                written by the container (uid 1000)
     ├── stats.db, stats.db-wal, stats.db-shm
     ├── backups/          the nightly snapshots, 14 days of them, and gamefiles/: the
@@ -250,6 +252,26 @@ or `bsdtar` on the PATH. The rate limit allows five publishes an hour: the scrip
 the sixth, and a run an hour later finds the first five listed, pending and the player's,
 and does not offer them again.
 
+## The files shared by link
+
+`files/` beside the compose file holds what the author shares with a link, and
+`https://csbweb.looten.net/files/<path>` downloads `files/<path>`, sub-folders included:
+
+```bash
+scp manual.pdf <vps>:csbweb/files/      # https://csbweb.looten.net/files/manual.pdf
+```
+
+A file is served as the game files are (`server/app.ts`), its type read from its extension
+in any case (`CONTENT_TYPES`), `application/octet-stream` for one the table does not name,
+which a browser downloads rather than shows. A missing file and a folder are 404: there is
+no listing, so a link is the only way to a file, but **anyone who has the link has the
+file**. A dot-file is never served. The container mounts the folder read-only, and the
+server does not check it at start-up: a folder that is not there serves nothing. It is not
+in the backups.
+
+It is the game's origin: an `.html` or `.svg` put there runs its scripts beside the page,
+with the players' saves in reach. Share those zipped.
+
 ## The build
 
 `npm run build` is `tsc && vite build && vite build --ssr`. `static/` is Vite's `publicDir` for the dev server
@@ -294,7 +316,7 @@ runs `tsc` on it beside the root project. The package is an ES module
 routes and limits the server imports from `../src/data/`. `npm start` runs it locally, on Node 22.18 or later.
 
 It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
-`static/gamefiles/`), and `STATS_DB` (the
+`static/gamefiles/`), `FILES_DIR` (the checkout's `files/`, which git ignores), and `STATS_DB` (the
 checkout's `stats/stats.db`, which git ignores), and `MODERATOR_PLAYER_IDS`, the moderators'
 `playerId`s, comma-separated, spaces around a comma ignored, to whom `api/data-sets` offers
 every set (unset or empty, no one; an entry that is not a `playerId` stops the start), and serves (`server/app.ts`):
@@ -306,6 +328,7 @@ every set (unset or empty, no one; an entry that is not a `playerId` stops the s
 | `/assets/…` | `dist/assets/…`, hashed names | `immutable` |
 | `/server/…` | 404: `dist/server/` is the server's module | |
 | `/gamefiles/…` | `GAMEFILES_DIR/…` | `no-cache`, ETag and Last-Modified |
+| `/files/…` | `FILES_DIR/…`, the files shared by link | `no-cache`, ETag and Last-Modified |
 | `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest; POST: a set published | `no-store`, `Vary: X-Player-Id` |
 | `/api/data-sets/<id>` | POST: the set approved, rejected, hidden or shown by a moderator, or withdrawn by its owner | `no-store` |
 | `/api/data-set-walls` | the walls of those of the same sets that keep some: the published ones | `no-store`, `Vary: X-Player-Id` |
@@ -315,7 +338,7 @@ every set (unset or empty, no one; an entry that is not a `playerId` stops the s
 
 Every file answers a conditional GET with 304, and only GET and HEAD are allowed, except on
 `api/event`, `api/data-sets`'s POST and `api/data-sets/<id>`, POST only. A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
-decoded, is refused with 400 before it reaches the disk.
+decoded, is refused with 400 before it reaches the disk. A folder is 404, never a listing.
 
 **At start-up** it opens the store (making it, and its folder, when missing), checks
 that `index.html` is built, and that the game files' folder and each folder the table's
@@ -347,6 +370,7 @@ build.
 - **`127.0.0.1:${CSBWEB_PORT:-8085}:8085`, loopback only.** A port published on `0.0.0.0`
   answers the whole internet whatever `ufw` says: Docker's published ports are rewritten in
   the `nat` table before `ufw`'s filter rules are consulted.
+- `./files:/data/files:ro`, the files shared by link, below.
 - `./gamefiles:/data/gamefiles` and `./stats:/data/stats`, bind mounts: the data lives
   on the host, and a deploy's `down` loses nothing. Both are read-write: a set a player
   publishes is written under `gamefiles/`, as its row is in the store, so both folders must
@@ -360,7 +384,7 @@ build.
 it. Compose reads it twice over: for `${CSBWEB_PORT}` in the compose file, and as the
 container's `env_file`. So it must exist, even empty, or Compose refuses to start the
 stack; and every variable in it reaches the container's environment, where it overrides
-the image's own `PORT`, `DIST_DIR`, `GAMEFILES_DIR` and `STATS_DB`. It holds
+the image's own `PORT`, `DIST_DIR`, `GAMEFILES_DIR`, `FILES_DIR` and `STATS_DB`. It holds
 `MODERATOR_PLAYER_IDS`, the moderators' `playerId`s (each the browser's `localStorage`
 key `csbweb_player_v1`, on the site), comma-separated, secrets: whoever sends one sees
 every pending and hidden set. A

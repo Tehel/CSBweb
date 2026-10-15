@@ -4,6 +4,7 @@
 #   /data/gamefiles   the data sets, and the folders players' sets are uploaded to, written here
 #   /data/stats       stats.db: the statistics, and the data sets, written by hand or published;
 #                     backups/: its snapshots and the uploaded folders' copies
+#   /data/files       the files shared by link, under `files/`, read-only
 #
 #   docker build --build-arg CSBWEB_BUILD=$(git rev-parse --short HEAD) -t csbweb .
 #
@@ -33,6 +34,7 @@ COPY --from=build /app/dist/ dist/
 ENV PORT=8085 \
     DIST_DIR=/app/dist \
     GAMEFILES_DIR=/data/gamefiles \
+    FILES_DIR=/data/files \
     STATS_DB=/data/stats/stats.db
 EXPOSE 8085
 # uid 1000, the VPS's own user, so the mounted folders are writable here and readable

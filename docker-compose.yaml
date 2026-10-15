@@ -8,6 +8,8 @@
 #                            container (uid 1000), hence read-write
 #   <DEPLOY_DIR>/stats/      stats.db, the statistics and the data sets (their rows written
 #                            by hand, or published), which a deploy's `down` leaves alone
+#   <DEPLOY_DIR>/files/      the files shared by link, served under `files/`, put there by
+#                            hand; read-only in the container
 #
 # The VPS runs Compose v1, hence the `version` key.
 version: '3.8'
@@ -22,6 +24,7 @@ services:
     volumes:
       - ./gamefiles:/data/gamefiles
       - ./stats:/data/stats
+      - ./files:/data/files:ro
     restart: unless-stopped
     # The server lets the requests in flight finish for 5 s, then closes the store.
     stop_grace_period: 10s

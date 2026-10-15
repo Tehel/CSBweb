@@ -19,7 +19,11 @@
  *   - `/gamefiles/…`: ETag and Last-Modified, a 304 for either precondition, HEAD without
  *     a body, and the query ignored; and no descriptor left open on a large file after a
  *     download, a 304, a HEAD, or downloads the client abandons after their first bytes;
- *   - no path leaves the two folders, `..` and `.` raw, percent-encoded or behind a
+ *   - `/files/…`: a shared file, in a sub-folder too, its type by its extension in any
+ *     case, `application/octet-stream` for one it does not name; a missing file and a
+ *     folder 404, never a listing; POST 405; and, with no shared folder, or one that is not
+ *     there, every path 404;
+ *   - no path leaves the three folders, `..` and `.` raw, percent-encoded or behind a
  *     backslash, and no dot-file is served;
  *   - `/api/health`, and a 405 for a method that is not GET or HEAD;
  *   - `/api/event`: POST only, an event stored (what is stored, `dump-stats` asserts), a bad
@@ -183,8 +187,10 @@ function abandon(port: number, path: string): Promise<void> {
 function scratchFiles(scratch: string): ServerOptions {
     const distDir = join(scratch, 'dist');
     const gamefilesDir = join(scratch, 'gamefiles');
+    const filesDir = join(scratch, 'files');
     mkdirSync(join(distDir, 'assets'), { recursive: true });
     mkdirSync(join(gamefilesDir, 'set-a'), { recursive: true });
+    mkdirSync(join(filesDir, 'sub'), { recursive: true });
     writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
     writeFileSync(join(distDir, 'assets', 'index-AbC123.js'), 'console.log(1);');
     writeFileSync(join(distDir, 'manifest.webmanifest'), '{}');
@@ -196,8 +202,13 @@ function scratchFiles(scratch: string): ServerOptions {
     writeFileSync(join(gamefilesDir, 'set-a', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
     writeFileSync(join(gamefilesDir, 'set-a', 'large.dat'), Buffer.alloc(LARGE_FILE_BYTES));
     writeFileSync(join(gamefilesDir, 'set-a', '.hidden'), 'hidden');
+    writeFileSync(join(filesDir, 'notes.txt'), 'NOTES');
+    writeFileSync(join(filesDir, 'Manual.PDF'), '%PDF-1.4');
+    writeFileSync(join(filesDir, 'disk.st'), Buffer.from([0, 1, 2]));
+    writeFileSync(join(filesDir, 'sub', 'saves.zip'), Buffer.from([0x50, 0x4b, 3, 4]));
+    writeFileSync(join(filesDir, '.hidden'), 'hidden');
     writeFileSync(join(scratch, 'secret.txt'), 'SECRET');
-    return { distDir, gamefilesDir };
+    return { distDir, gamefilesDir, filesDir };
 }
 
 function checkStartUp(scratch: string, options: ServerOptions): void {
@@ -289,8 +300,28 @@ async function checkAnswers(port: number, manifest: string, gamefilesDir: string
     const left = await descriptorsSettledOn(largePath);
     check(left === 0, `${ABANDONED} downloads of it abandoned at their first bytes leave no descriptor open on it (${left})`);
 
+    console.log('\nThe shared files:');
+    for (const [path, type, body] of [
+        ['/files/notes.txt', 'text/plain; charset=utf-8', 'NOTES'],
+        ['/files/Manual.PDF', 'application/pdf', '%PDF-1.4'],
+        ['/files/sub/saves.zip', 'application/zip', 'PK\x03\x04'],
+        ['/files/disk.st', 'application/octet-stream', '\x00\x01\x02'],
+    ]) {
+        const shared = await ask(port, path!);
+        check(shared.status === 200 && shared.body === body && shared.headers['content-type'] === type,
+            `${path}: ${shared.status}, as ${shared.headers['content-type']}`);
+    }
+    const sharedFile = await ask(port, '/files/notes.txt');
+    check(sharedFile.headers['cache-control'] === 'no-cache' && (await ask(port, '/files/notes.txt', 'GET', { 'If-None-Match': String(sharedFile.headers.etag) })).status === 304,
+        'no-cache, and a 304 for its ETag');
+    for (const path of ['/files/nothing.txt', '/files', '/files/', '/files/sub', '/files/sub/']) {
+        check((await ask(port, path)).status === 404, `${path}: 404, not a listing`);
+    }
+    check((await ask(port, '/files/notes.txt', 'POST')).status === 405, 'POST: 405');
+
     console.log('\nPaths that would leave the folders:');
     for (const path of [
+        '/files/../secret.txt', '/files/%2e%2e/secret.txt', '/files/sub/..%2f..%2fsecret.txt', '/files/.hidden',
         '/gamefiles/../secret.txt', '/gamefiles/%2e%2e/secret.txt', '/gamefiles/%2E%2E%2Fsecret.txt',
         '/gamefiles/..%2fsecret.txt', '/gamefiles/..%5csecret.txt', '/gamefiles/set-a/..', '/../secret.txt',
         '/gamefiles/./manifest.json', '/gamefiles/set-a/.hidden', '/gamefiles/set-a/%00dungeon.dat', '/gamefiles/%zz', 'secret.txt',
@@ -643,6 +674,7 @@ async function checkModeration(scratch: string): Promise<void> {
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
+    check((await ask(port, '/files/dm-atari')).status === 404, 'a server with no shared files\' folder answers 404 under files/');
 
     try {
         /** `body` posted about `id` as `player`, the page's `fetch` would send it. */
@@ -808,16 +840,21 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     // A new store: the server listens with no set, and answers none.
     let emptyLine = '';
     let emptyAnswer = '';
-    const fresh = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'fresh', 'stats.db') });
+    let noFiles = 0;
+    const fresh = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'fresh', 'stats.db'), FILES_DIR: join(scratch, 'nowhere') });
     const freshEnded = await finish(fresh, (line) => {
         const listening = /^Listening on port (\d+)/.exec(line);
         if (!listening) return;
         emptyLine = line.split(scratch).join('<scratch>').replace(/port \d+/, 'port <n>');
-        ask(Number(listening[1]), '/api/data-sets').then((answer) => (emptyAnswer = answer.body)).finally(() => fresh.kill('SIGTERM'));
+        const port = Number(listening[1]);
+        ask(port, '/api/data-sets').then((answer) => (emptyAnswer = answer.body))
+            .then(() => ask(port, '/files/notes.txt')).then((answer) => (noFiles = answer.status))
+            .finally(() => fresh.kill('SIGTERM'));
     });
     console.log(`  new store: ${emptyLine}, answering ${emptyAnswer}`);
     check(freshEnded.code === 0 && emptyLine.includes('(no set, from the data_sets table);') && emptyAnswer === '{"default":null,"dataSets":[]}',
         'on a new store, it listens with no set, and answers none');
+    check(noFiles === 404, `a shared files' folder that is not there does not stop it, and serves nothing (${noFiles})`);
 
     // The store filled as `npm start`'s is, by tools/fill-data-sets.ts, which fills only an empty table.
     const manifestFile = join(scratch, 'manifest.json');

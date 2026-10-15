@@ -20,5 +20,8 @@ static/backstory
 # the server statistics of `npm start`
 /stats/
 
+# the files `npm start` shares by link, under `files/`
+/files/
+
 # the deploy target (utils/deploy.sh)
 .env

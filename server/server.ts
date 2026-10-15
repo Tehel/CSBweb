@@ -8,6 +8,8 @@
  *   DIST_DIR        the built page (the checkout's `dist/`), and the page's check built for
  *                   Node, `server/LocalDataSets.js` under it (`npm run build`)
  *   GAMEFILES_DIR   the data sets (the checkout's `static/gamefiles/`)
+ *   FILES_DIR       the files shared by link, under `files/` (the checkout's `files/`, which
+ *                   git ignores): a folder that is not there is not checked, and serves nothing
  *   STATS_DB        the store's SQLite file (the checkout's `stats/stats.db`), created
  *                   with its folder when missing, its `data_sets` table then empty
  *                   (`tools/fill-data-sets.ts` fills the checkout's)
@@ -48,6 +50,7 @@ const ROOT = join(import.meta.dirname, '..');
 const options: ServerOptions = {
     distDir: process.env.DIST_DIR ?? join(ROOT, 'dist'),
     gamefilesDir: process.env.GAMEFILES_DIR ?? join(ROOT, 'static', 'gamefiles'),
+    filesDir: process.env.FILES_DIR ?? join(ROOT, 'files'),
 };
 const port = Number(process.env.PORT ?? 8085);
 const statsDb = process.env.STATS_DB ?? join(ROOT, 'stats', 'stats.db');
@@ -88,7 +91,7 @@ const server = createAppServer(options, {
 server.listen(port, () => {
     const address = server.address();
     const bound = typeof address === 'object' && address !== null ? address.port : port;
-    console.log(`Listening on port ${bound}: ${options.distDir}, and ${options.gamefilesDir} (${ids.join(', ') || 'no set'}, from the data_sets table); store in ${statsDb}`);
+    console.log(`Listening on port ${bound}: ${options.distDir}, and ${options.gamefilesDir} (${ids.join(', ') || 'no set'}, from the data_sets table); store in ${statsDb}; shared files in ${options.filesDir}`);
 });
 
 function shutDown(signal: string): void {

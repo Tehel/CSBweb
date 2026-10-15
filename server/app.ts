@@ -11,6 +11,8 @@
  *   /assets/…         dist/assets/…, hashed names   immutable
  *   /server/…         404: the server's own module (`CHECK_MODULE`), never served
  *   /gamefiles/…      GAMEFILES_DIR/…               no-cache, with ETag and Last-Modified
+ *   /files/…          FILES_DIR/…, the author's files shared by link, as the game files are;
+ *                     404 everywhere when there is no such folder
  *   /api/data-sets    the page's list of sets, from the store's table (`dataSets.ts`), for
  *                     the player its `X-Player-Id` names; POST: that player's own set
  *                     published, pending (`publish.ts`)
@@ -24,7 +26,7 @@
  *
  * Every file answers a conditional GET with 304. A path with a `.` segment, a backslash or
  * a NUL, encoded or not, is refused before it reaches the disk, so no request leaves the
- * two folders.
+ * three folders. A folder is 404, never a listing.
  */
 import { closeSync, createReadStream, fstatSync, openSync, statSync, type Stats } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -45,6 +47,8 @@ export interface ServerOptions {
     distDir: string;
     /** The data sets, served under `gamefiles/`. */
     gamefilesDir: string;
+    /** The files shared by link, served under `files/`: none, every `files/` path then 404. */
+    filesDir?: string;
 }
 
 /** The folder of `distDir` that holds the server's own module, not the page's: never served. */
@@ -113,20 +117,42 @@ export interface ApiOptions {
 /** The URL prefix of the game files: the page's `GAMEFILES_DIR` (`src/main.ts`). */
 const GAMEFILES = 'gamefiles';
 
+/** The URL prefix of the files shared by link (`ServerOptions.filesDir`). */
+const FILES = 'files';
+
+/** A file's type by its extension, in any case; any other is `application/octet-stream`. */
 const CONTENT_TYPES: Record<string, string> = {
-    '.html': 'text/html; charset=utf-8',
-    '.js': 'text/javascript; charset=utf-8',
+    '.7z': 'application/x-7z-compressed',
     '.css': 'text/css; charset=utf-8',
-    '.json': 'application/json; charset=utf-8',
+    '.csv': 'text/csv; charset=utf-8',
+    '.gif': 'image/gif',
+    '.gz': 'application/gzip',
+    '.htm': 'text/html; charset=utf-8',
+    '.html': 'text/html; charset=utf-8',
     '.ico': 'image/x-icon',
+    '.jpeg': 'image/jpeg',
     '.jpg': 'image/jpeg',
+    '.js': 'text/javascript; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.lzh': 'application/x-lzh-compressed',
+    '.md': 'text/markdown; charset=utf-8',
+    '.mp3': 'audio/mpeg',
+    '.mp4': 'video/mp4',
+    '.ogg': 'audio/ogg',
+    '.pdf': 'application/pdf',
     '.png': 'image/png',
+    '.rar': 'application/vnd.rar',
     '.svg': 'image/svg+xml',
+    '.tar': 'application/x-tar',
     '.ttf': 'font/ttf',
     '.txt': 'text/plain; charset=utf-8',
     '.wav': 'audio/wav',
     '.webmanifest': 'application/manifest+json',
+    '.webm': 'video/webm',
+    '.webp': 'image/webp',
     '.woff2': 'font/woff2',
+    '.xml': 'application/xml; charset=utf-8',
+    '.zip': 'application/zip',
 };
 
 const NO_CACHE = 'no-cache';
@@ -164,7 +190,7 @@ export function createAppServer(options: ServerOptions, api: ApiOptions): Server
     });
 }
 
-function route({ distDir, gamefilesDir }: ServerOptions, api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
+function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
     const segments = pathSegments(req.url ?? '');
     if (segments === null) return send(res, 400, 'Bad path');
 
@@ -203,6 +229,10 @@ function route({ distDir, gamefilesDir }: ServerOptions, api: ApiOptions, req: I
     if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
     if (segments[0] === GAMEFILES) {
         return serveFile(req, res, join(gamefilesDir, ...segments.slice(1)), NO_CACHE);
+    }
+    if (segments[0] === FILES) {
+        if (filesDir === undefined) return send(res, 404, 'Not found');
+        return serveFile(req, res, join(filesDir, ...segments.slice(1)), NO_CACHE);
     }
     if (segments.length === 0) return serveFile(req, res, join(distDir, 'index.html'), NO_CACHE);
     if (segments[0] === SERVER_DIR) return send(res, 404, 'Not found');
