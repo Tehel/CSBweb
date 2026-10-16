@@ -54,7 +54,7 @@
  *     reads none twice;
  *   - `server.ts` itself, as Node runs it: a bad mount, a store it cannot open, a page's
  *     check that is not built, or an entry of `MODERATOR_PLAYER_IDS` that is not a `playerId` exits 1
- *     before it listens; on a new store, it listens with no set; a list of two, spaces around the comma, makes both moderators; and SIGTERM stops a listening server with 0, its
+ *     before it listens; on a new store, it listens with no set; a list of two, one with an alias, spaces around the comma and the `=`, makes both moderators; and SIGTERM stops a listening server with 0, its
  *     store filled by `tools/fill-data-sets.ts`, which then leaves it as it is, and its WAL
  *     checkpointed; started again, it plays from the table, and says a published set whose
  *     walls it cannot read;
@@ -79,8 +79,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { deflateSync } from 'node:zlib';
 
 import { CHECK_MODULE, checkFiles, createAppServer, fillWalls, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
-import { ANYONE, DataSetStore, manifestText } from '../server/dataSets.ts';
+import { ANYONE, DataSetStore, manifestText, parseModerators } from '../server/dataSets.ts';
 import { RateLimit } from '../server/events.ts';
+import { NOBODY } from '../server/notify.ts';
 import { MAX_MODERATION_BYTES } from '../server/moderate.ts';
 import { MAX_PUBLISH_BYTES, MAX_PUBLISHED_FILE_BYTES } from '../server/publish.ts';
 import { StatsStore } from '../server/stats.ts';
@@ -475,7 +476,7 @@ async function checkPublish(scratch: string): Promise<void> {
     }), new DataSetStore(db));
     checkFiles(options, dataSets);
     const server = createAppServer(options, {
-        checkDataSet: checkLocalDataSet, dataSets, moderatorPlayerIds: MODERATORS, store: new StatsStore(db),
+        checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), notify: NOBODY, store: new StatsStore(db),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
     });
@@ -668,7 +669,7 @@ async function checkModeration(scratch: string): Promise<void> {
         writeFileSync(join(gamefilesDir, id, 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
     }
     const server = createAppServer(options, {
-        checkDataSet: checkLocalDataSet, dataSets, moderatorPlayerIds: MODERATORS, store: new StatsStore(db),
+        checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), notify: NOBODY, store: new StatsStore(db),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
     });
@@ -876,7 +877,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     let noFolder: { code: number | null; out: string } | null = null;
     let moderated = '';
     const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: statsDb,
-        MODERATOR_PLAYER_IDS: ` ${MODERATORS[0]} , ${MODERATORS[1]} ` });
+        MODERATOR_PLAYER_IDS: ` ${MODERATORS[0]} = Alice , ${MODERATORS[1]} ` });
     const ended = finish(child, (line) => {
         const listening = /^Listening on port (\d+)/.exec(line);
         if (!listening) return;
@@ -918,7 +919,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     }
     check(healthy, 'it listens on the PORT given, 0 for a free one, and answers /api/health');
     console.log(`  moderator, as the two and a player: ${moderated}`);
-    check(moderated === 'true,true,false', 'MODERATOR_PLAYER_IDS, two ids and spaces around the comma, makes both moderators, and nobody else');
+    check(moderated === 'true,true,false', 'MODERATOR_PLAYER_IDS, two ids, one with an alias, and spaces around the comma and the =, makes both moderators, and nobody else');
     const backup = backedUp as Backup | null;
     const shown = (run: { code: number | null; out: string } | null) => `exit ${run?.code}, ${firstLine(run?.out ?? '').split(scratch).join('<scratch>').replace(/stats-[\dTZ-]+\.db/, 'stats-<date>.db').replace(/"bytes":\d+/, '"bytes":<n>')}`;
     console.log(`  backup.ts: ${shown(backup)}`);
@@ -972,7 +973,7 @@ async function main(): Promise<void> {
         const api: ApiOptions = {
             checkDataSet: checkLocalDataSet,
             dataSets,
-            moderatorPlayerIds: MODERATORS,
+            moderators: parseModerators(MODERATORS.join()), notify: NOBODY,
             store,
             rules: { hasSet: (id) => dataSets.hasSet(id) },
             rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),

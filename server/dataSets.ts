@@ -20,6 +20,7 @@ import { timingSafeEqual } from 'node:crypto';
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 
 import type { DataSet, DataSetManifest } from '../src/data/DataSets.ts';
+import { isPlayerId } from './events.ts';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS data_sets (
@@ -75,8 +76,32 @@ export interface StoredDataSet extends DataSet {
 export interface DataSetViewer {
     /** Their `playerId`, from the request's `PLAYER_ID_HEADER`, or `null` for none or a malformed one. */
     playerId: string | null;
-    /** Whether that id is a moderator's, one of the server's `MODERATOR_PLAYER_IDS`. */
-    moderator: boolean;
+    /** The moderator that id is, one of the server's `MODERATOR_PLAYER_IDS`, or `null`. */
+    moderator: Moderator | null;
+}
+
+/** A moderator: their `playerId`, and the name a notification gives them (`notify.ts`). */
+export interface Moderator {
+    playerId: string;
+    /** Their alias, or `moderator <n>`, their place in the list, for one without. */
+    name: string;
+}
+
+/**
+ * The moderators `MODERATOR_PLAYER_IDS` lists: `<playerId>[=<alias>]`, comma-separated,
+ * spaces around a comma or the `=` ignored, an empty entry skipped. Throws on an entry
+ * whose `playerId` is not one, or whose alias is empty.
+ */
+export function parseModerators(text: string): Moderator[] {
+    const entries = text.split(',').map((entry) => entry.trim()).filter((entry) => entry !== '');
+    return entries.map((entry, i) => {
+        const equals = entry.indexOf('=');
+        const playerId = (equals < 0 ? entry : entry.slice(0, equals)).trim();
+        const alias = equals < 0 ? null : entry.slice(equals + 1).trim();
+        if (!isPlayerId(playerId)) throw new Error('MODERATOR_PLAYER_IDS holds an entry that is not a playerId, a lowercase UUID');
+        if (alias === '') throw new Error('MODERATOR_PLAYER_IDS holds an entry whose alias is empty');
+        return { playerId, name: alias ?? `moderator ${i + 1}` };
+    });
 }
 
 /**
@@ -102,7 +127,7 @@ export interface PublishedDataSet {
 }
 
 /** Everyone: no `playerId`, not a moderator. */
-export const ANYONE: DataSetViewer = { playerId: null, moderator: false };
+export const ANYONE: DataSetViewer = { playerId: null, moderator: null };
 
 /** Both tables, read. */
 export interface StoredDataSets {
@@ -265,7 +290,7 @@ export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): str
         if (set.pending) entry.status = 'pending';
         return entry;
     });
-    return JSON.stringify({ default: stored.defaultId, ...(viewer.moderator ? { moderator: true } : {}), dataSets });
+    return JSON.stringify({ default: stored.defaultId, ...(viewer.moderator !== null ? { moderator: true } : {}), dataSets });
 }
 
 /**
@@ -284,7 +309,7 @@ export function wallsText(stored: StoredDataSets, walls: ReadonlyMap<string, Dat
 
 /** The sets of `stored` that `viewer` may see: the approved ones, their own pending ones, and every one for a moderator. */
 function visibleSets(stored: StoredDataSets, viewer: DataSetViewer): StoredDataSet[] {
-    return stored.dataSets.filter((set) => !set.pending || viewer.moderator
+    return stored.dataSets.filter((set) => !set.pending || viewer.moderator !== null
         || (viewer.playerId !== null && set.owner !== null && samePlayerId(set.owner, viewer.playerId)));
 }
 

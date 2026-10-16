@@ -22,7 +22,8 @@ image      dist/ (the built page, and the server's check in dist/server/) + serv
 mounts     /data/gamefiles        the data sets, and players' uploads
            /data/stats            stats.db (SQLite, WAL: the statistics and the data sets), backups/
            /data/files            the files shared by link (below), read-only
-env        PORT (8085), DIST_DIR, GAMEFILES_DIR, FILES_DIR, STATS_DB, MODERATOR_PLAYER_IDS
+env        PORT (8085), DIST_DIR, GAMEFILES_DIR, FILES_DIR, STATS_DB, MODERATOR_PLAYER_IDS,
+           NTFY_URL, NTFY_USER, NTFY_PASS, TZ
 ```
 
 On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
@@ -183,7 +184,7 @@ and shown like a player's, but never rejected, nor is the default set: their fol
 the author's. Every other request is refused with nothing changed: 403 to an asker who
 may not, 404 for an id the table does not hold, 409 for an action the set's state does
 not take, such as approving an approved set. Each change is logged, `'<id>' approved`,
-never with the asker's id.
+never with the asker's id, and notified (below).
 
 A rejected set's folder was copied by the night's backup if it was published before it
 (below). One that will not go is logged, `'<id>' rejected, its folder left (…)`, and is a
@@ -200,6 +201,29 @@ through `node:sqlite` (as below, to add the site's sets), and in `gamefiles/`:
 - **Taking an approval back.** Hiding does that job without losing anything.
 - **The order of the sets and the default set**: a row's `position`, and
   `data_set_defaults`.
+
+### Notifications
+
+Each change to the sets is a message to the VPS's ntfy (`server/notify.ts`): a set
+published, approved, rejected, withdrawn by its owner, hidden or shown. It is two lines:
+
+```
+Dataset <name>: <added | approved | rejected | withdrawn | shown | hidden>
+By <who> at YYYYMMDD HH:mm
+```
+
+`<name>` is the set's name, not its id. `<who>` is the moderator's alias from
+`MODERATOR_PLAYER_IDS`, or `moderator <n>`, their place in that list, for one without;
+`its owner` for a set withdrawn; `a player` for a set published by someone who does not
+moderate. A `playerId` is never sent. The time is the server's local time: the container's
+is UTC unless `.env` sets `TZ` (`TZ=Europe/Paris`).
+
+The server posts to `NTFY_URL`, the topic's whole URL (`https://<host>/<topic>`), with
+Basic authentication where `NTFY_USER` is set (`NTFY_PASS` its password). Without
+`NTFY_URL`, nothing is sent; one that is not an http(s) URL stops the start. A message is
+sent and forgotten: no request waits on it, and one that ntfy refuses, or does not answer
+within 10 s, is logged (`ntfy: '<name>' approved, answered 401`) and dropped. The dev
+server sends none.
 
 ### Writing the site's sets
 
@@ -317,9 +341,11 @@ routes and limits the server imports from `../src/data/`. `npm start` runs it lo
 
 It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
 `static/gamefiles/`), `FILES_DIR` (the checkout's `files/`, which git ignores), and `STATS_DB` (the
-checkout's `stats/stats.db`, which git ignores), and `MODERATOR_PLAYER_IDS`, the moderators'
-`playerId`s, comma-separated, spaces around a comma ignored, to whom `api/data-sets` offers
-every set (unset or empty, no one; an entry that is not a `playerId` stops the start), and serves (`server/app.ts`):
+checkout's `stats/stats.db`, which git ignores), `MODERATOR_PLAYER_IDS`, the moderators,
+comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored, to whom
+`api/data-sets` offers every set (unset or empty, no one; an entry that is not a
+`playerId`, or whose alias is empty, stops the start), and `NTFY_URL`, `NTFY_USER`,
+`NTFY_PASS` and `TZ`, for the notifications ("Notifications", above), and serves (`server/app.ts`):
 
 | Path | What | Caching |
 | --- | --- | --- |
@@ -386,8 +412,11 @@ container's `env_file`. So it must exist, even empty, or Compose refuses to star
 stack; and every variable in it reaches the container's environment, where it overrides
 the image's own `PORT`, `DIST_DIR`, `GAMEFILES_DIR`, `FILES_DIR` and `STATS_DB`. It holds
 `MODERATOR_PLAYER_IDS`, the moderators' `playerId`s (each the browser's `localStorage`
-key `csbweb_player_v1`, on the site), comma-separated, secrets: whoever sends one sees
-every pending and hidden set. A
+key `csbweb_player_v1`, on the site), each with an optional `=<alias>` that notifications
+name them by (`<id>=Alice,<id>`), comma-separated, secrets: whoever sends one sees
+every pending and hidden set. It holds `NTFY_URL`, `NTFY_USER` and `NTFY_PASS`, the ntfy
+topic and its login, also secrets, and `TZ`, the time zone the notifications are dated in
+("Notifications", above). A
 change to it needs the
 container recreated (a deploy, or `down && up -d`): `docker-compose restart` keeps the old
 environment.

@@ -36,9 +36,10 @@ import { pipeline } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 
 import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
-import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer } from './dataSets.ts';
+import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer, type Moderator } from './dataSets.ts';
 import { checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
+import type { Notify } from './notify.ts';
 import { MAX_PUBLISH_BYTES, publishDataSet, type CheckDataSet, type PublishAnswer, type ReadDungeonWalls } from './publish.ts';
 import type { StatsStore } from './stats.ts';
 
@@ -102,16 +103,18 @@ export interface ApiOptions {
     checkDataSet: CheckDataSet;
     /** `api/data-sets`'s sets, read at each request. */
     dataSets: DataSetStore;
-    /** The moderators' `playerId`s, to whom `api/data-sets` offers every set: none, or several. */
-    moderatorPlayerIds: readonly string[];
+    /** The moderators, to whom `api/data-sets` offers every set: none, or several. */
+    moderators: readonly Moderator[];
     store: StatsStore;
     rules: EventRules;
     /** Events per address. */
     rateLimit: RateLimit;
     /** Publishes per address, refused ones included. */
     publishRateLimit: RateLimit;
-    /** The clock events are stored with. */
+    /** The clock events are stored and notifications dated with. */
     now: () => number;
+    /** Who is told of each change to the sets (`notify.ts`). */
+    notify: Notify;
 }
 
 /** The URL prefix of the game files: the page's `GAMEFILES_DIR` (`src/main.ts`). */
@@ -348,7 +351,7 @@ async function receiveEvent(api: ApiOptions, req: IncomingMessage, res: ServerRe
 }
 
 /** What `receivePublish` needs of the API. */
-export type PublishApi = Pick<ApiOptions, 'checkDataSet' | 'dataSets' | 'publishRateLimit' | 'now'>;
+export type PublishApi = Pick<ApiOptions, 'checkDataSet' | 'dataSets' | 'moderators' | 'publishRateLimit' | 'now' | 'notify'>;
 
 /**
  * `POST api/data-sets`: the rate limit first, then the player, a `multipart/form-data` body
@@ -376,14 +379,17 @@ export async function receivePublish(gamefilesDir: string, api: PublishApi, req:
         }
         reply = body === null ? answer(413, `The request is larger than ${MAX_PUBLISH_BYTES / (1024 * 1024)} MiB.`)
             : form === null ? answer(400, 'The body is not a form.')
-            : await publishDataSet(form, playerId, { checkDataSet: api.checkDataSet, dataSets: api.dataSets, gamefilesDir, now: api.now });
+            : await publishDataSet(form, playerId, {
+                checkDataSet: api.checkDataSet, dataSets: api.dataSets, gamefilesDir, now: api.now,
+                notify: api.notify, publisher: dataSetViewer(api, req).moderator?.name ?? 'a player',
+            });
     }
     res.setHeader('Cache-Control', 'no-store');
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
 }
 
 /** What `receiveModeration` needs of the API. */
-export type ModerationApi = Pick<ApiOptions, 'dataSets' | 'moderatorPlayerIds'>;
+export type ModerationApi = Pick<ApiOptions, 'dataSets' | 'moderators' | 'now' | 'notify'>;
 
 /**
  * `POST api/data-sets/<id>`: its asker and a body of at most `MAX_MODERATION_BYTES`, before
@@ -392,19 +398,19 @@ export type ModerationApi = Pick<ApiOptions, 'dataSets' | 'moderatorPlayerIds'>;
 export async function receiveModeration(id: string, gamefilesDir: string, api: ModerationApi, req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await readBody(req, MAX_MODERATION_BYTES);
     const reply: ModerationAnswer = body === null ? { status: 413, body: { error: `The body is larger than ${MAX_MODERATION_BYTES} bytes.` } }
-        : await moderateDataSet(id, body.toString('utf8'), dataSetViewer(api, req), { dataSets: api.dataSets, gamefilesDir });
+        : await moderateDataSet(id, body.toString('utf8'), dataSetViewer(api, req), { dataSets: api.dataSets, gamefilesDir, notify: api.notify, now: api.now });
     res.setHeader('Cache-Control', 'no-store');
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
 }
 
 /**
  * Who asks `api/data-sets`: the `playerId` the page sends in `PLAYER_ID_HEADER`, where it
- * has a `playerId`'s form, and whether it is a moderator's. It is never logged.
+ * has a `playerId`'s form, and the moderator it is, if any. It is never logged.
  */
-export function dataSetViewer(api: Pick<ApiOptions, 'moderatorPlayerIds'>, req: IncomingMessage): DataSetViewer {
+export function dataSetViewer(api: Pick<ApiOptions, 'moderators'>, req: IncomingMessage): DataSetViewer {
     const header = req.headers[PLAYER_ID_HEADER.toLowerCase()];
     const playerId = isPlayerId(header) ? header : null;
-    const moderator = playerId !== null && api.moderatorPlayerIds.some((id) => samePlayerId(playerId, id));
+    const moderator = playerId === null ? null : api.moderators.find((one) => samePlayerId(playerId, one.playerId)) ?? null;
     return { playerId, moderator };
 }
 

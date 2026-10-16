@@ -8,8 +8,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 
 import { dataSetViewer, pathSegments, receiveModeration, receivePublish } from './server/app';
-import { DataSetStore, manifestText, wallsText } from './server/dataSets';
+import { DataSetStore, manifestText, parseModerators, wallsText } from './server/dataSets';
 import { RateLimit } from './server/events';
+import { NOBODY } from './server/notify';
 import type { CheckDataSet } from './server/publish';
 import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, PLAYER_ID_HEADER, parseManifest } from './src/data/DataSets';
 
@@ -62,7 +63,7 @@ function dataSetsRoute(): Plugin {
       server.httpServer?.once('close', () => rmSync(scratch, { recursive: true, force: true }));
       const changes: ((store: DataSetStore) => void)[] = [];
       const published = new Set<string>();
-      const moderatorPlayerIds = [DEV_MODERATOR_PLAYER_ID];
+      const moderators = parseModerators(`${DEV_MODERATOR_PLAYER_ID}=the dev moderator`);
       const publishRateLimit = new RateLimit(1000, 60_000);
       const checkDataSet: CheckDataSet = async (...args) =>
         ((await server.ssrLoadModule('/src/data/LocalDataSets.ts')) as { checkLocalDataSet: CheckDataSet }).checkLocalDataSet(...args);
@@ -110,10 +111,10 @@ function dataSetsRoute(): Plugin {
         try {
           const dataSets = openStore(db);
           if (req.method === 'POST') {
-            await receivePublish(scratch, { checkDataSet, dataSets, publishRateLimit, now: Date.now }, req, res);
+            await receivePublish(scratch, { checkDataSet, dataSets, moderators, publishRateLimit, now: Date.now, notify: NOBODY }, req, res);
           } else {
             res.setHeader('Vary', PLAYER_ID_HEADER);
-            json(200, manifestText(dataSets.read(), dataSetViewer({ moderatorPlayerIds }, req)));
+            json(200, manifestText(dataSets.read(), dataSetViewer({ moderators }, req)));
           }
         } catch (error) {
           next(error);
@@ -131,7 +132,7 @@ function dataSetsRoute(): Plugin {
         }
         const db = new sqlite.DatabaseSync(':memory:');
         try {
-          await receiveModeration(id, scratch, { dataSets: openStore(db), moderatorPlayerIds }, req, res);
+          await receiveModeration(id, scratch, { dataSets: openStore(db), moderators, now: Date.now, notify: NOBODY }, req, res);
         } catch (error) {
           next(error);
         } finally {
@@ -153,7 +154,7 @@ function dataSetsRoute(): Plugin {
         const db = new sqlite.DatabaseSync(':memory:');
         try {
           const dataSets = openStore(db);
-          res.end(req.method === 'HEAD' ? undefined : wallsText(dataSets.read(), dataSets.walls(), dataSetViewer({ moderatorPlayerIds }, req)));
+          res.end(req.method === 'HEAD' ? undefined : wallsText(dataSets.read(), dataSets.walls(), dataSetViewer({ moderators }, req)));
         } catch (error) {
           next(error);
         } finally {

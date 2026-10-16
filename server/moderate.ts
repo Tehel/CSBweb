@@ -34,7 +34,8 @@
  * `backup.ts` has copied it already, unless it was published since the last night.
  *
  * 200 answers `{"id": "<id>"}`; a refusal `{"error": "<why>"}`. No answer, and no log,
- * holds the `playerId`. The page cannot be made to send one by another site's form: the
+ * holds the `playerId`. Each change is notified (`notify.ts`), by the moderator's name, or as
+ * withdrawn by its owner, a folder left or not. The page cannot be made to send one by another site's form: the
  * `X-Player-Id` header is not one a form sets, and a `fetch` that sets it is preflighted,
  * which the server answers 405, granting nothing.
  */
@@ -43,6 +44,7 @@ import { join } from 'node:path';
 
 import { MODERATION_ACTIONS as ACTIONS, type ModerationAction } from '../src/data/DataSets.ts';
 import { samePlayerId, type DataSetStore, type DataSetViewer } from './dataSets.ts';
+import type { DataSetActivity, Notify } from './notify.ts';
 
 /** The largest body `api/data-sets/<id>` reads. */
 export const MAX_MODERATION_BYTES = 1024;
@@ -51,7 +53,7 @@ export const MAX_MODERATION_BYTES = 1024;
 const TAKES: Record<ModerationAction, 'pending' | 'approved' | 'hidden'> = { approve: 'pending', reject: 'pending', hide: 'approved', show: 'hidden' };
 
 /** Each action, done. */
-const DONE: Record<ModerationAction, string> = { approve: 'approved', reject: 'rejected', hide: 'hidden', show: 'shown' };
+const DONE: Record<ModerationAction, DataSetActivity> = { approve: 'approved', reject: 'rejected', hide: 'hidden', show: 'shown' };
 
 /** The status and the JSON body `api/data-sets/<id>` answers with. */
 export interface ModerationAnswer {
@@ -63,6 +65,9 @@ export interface ModerationAnswer {
 export interface ModerationOptions {
     dataSets: DataSetStore;
     gamefilesDir: string;
+    notify: Notify;
+    /** The clock a notification is dated by. */
+    now: () => number;
 }
 
 /** The action `body` names, or `null` where it is not `{"action": <one of ACTIONS>}` alone. */
@@ -80,7 +85,7 @@ export function moderationAction(body: string): ModerationAction | null {
 }
 
 /** `body`, sent by `viewer` about the set `id`, checked and, where it passes, done. */
-export async function moderateDataSet(id: string, body: string, viewer: DataSetViewer, { dataSets, gamefilesDir }: ModerationOptions): Promise<ModerationAnswer> {
+export async function moderateDataSet(id: string, body: string, viewer: DataSetViewer, { dataSets, gamefilesDir, notify, now }: ModerationOptions): Promise<ModerationAnswer> {
     const refuse = (status: number, error: string): ModerationAnswer => ({ status, body: { error } });
 
     const action = moderationAction(body);
@@ -95,6 +100,9 @@ export async function moderateDataSet(id: string, body: string, viewer: DataSetV
     if (TAKES[action] !== state) return refuse(409, `The set is ${state}: only ${TAKES[action] === 'approved' ? 'an' : 'a'} ${TAKES[action]} set is ${DONE[action]}.`);
     if (action === 'reject' && (set.owner === null || set.id === stored.defaultId)) return refuse(409, 'The site\'s own sets are removed by hand.');
 
+    const withdrawn = viewer.moderator === null;
+    const activity = withdrawn ? 'withdrawn' : DONE[action];
+    const notified = () => notify({ name: set.name, activity, by: viewer.moderator?.name ?? 'its owner', at: now() });
     if (action === 'approve') dataSets.approve(id);
     else if (action === 'hide' || action === 'show') dataSets.setHidden(id, action === 'hide');
     else {
@@ -102,10 +110,12 @@ export async function moderateDataSet(id: string, body: string, viewer: DataSetV
         try {
             await rm(join(gamefilesDir, set.dir), { recursive: true, force: true });
         } catch (error) {
-            console.error(`'${id}' ${owns && !viewer.moderator ? 'withdrawn' : 'rejected'}, its folder left (${error instanceof Error ? error.message : String(error)})`);
+            console.error(`'${id}' ${activity}, its folder left (${error instanceof Error ? error.message : String(error)})`);
+            notified();
             return { status: 200, body: { id } };
         }
     }
-    console.log(`'${id}' ${owns && !viewer.moderator ? 'withdrawn' : DONE[action]}`);
+    console.log(`'${id}' ${activity}`);
+    notified();
     return { status: 200, body: { id } };
 }

@@ -29,7 +29,7 @@
  *
  * 201 answers `{"id": "<id>"}`; a refusal `{"error": "<why>"}`, and a 422 the problems too,
  * `[{"about": "<field or file>", "text": "<why>"}]`. No answer, and no log, holds the
- * `playerId`.
+ * `playerId`. A set published is notified (`notify.ts`), as added by `publisher`.
  */
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -40,6 +40,7 @@ import {
     LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, LOCAL_ID_PATTERN, PNG_HEAD_BYTES, pngSize, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
 } from '../src/data/DataSets.ts';
 import type { DataSetStore, DataSetWalls } from './dataSets.ts';
+import type { Notify } from './notify.ts';
 
 /** The largest file a set may hold: Conflux's `CSBgraphics.dat` is 12 MB. */
 export const MAX_PUBLISHED_FILE_BYTES = 16 * 1024 * 1024;
@@ -110,6 +111,9 @@ export interface PublishOptions {
     dataSets: DataSetStore;
     gamefilesDir: string;
     now: () => number;
+    notify: Notify;
+    /** Who the notification says published it: the sender's name where they moderate, `a player` otherwise. */
+    publisher: string;
 }
 
 /** The status and the JSON body `api/data-sets` answers a publish with. */
@@ -121,7 +125,7 @@ export interface PublishAnswer {
 const TEXT_FIELDS = ['id', 'name', 'description', 'dmRules', 'thumbnailAsTitle', 'baseSet'] as const;
 
 /** `form`, sent by `owner`, a `playerId`, checked and, where it passes, published. */
-export async function publishDataSet(form: FormData, owner: string, { checkDataSet, dataSets, gamefilesDir, now }: PublishOptions): Promise<PublishAnswer> {
+export async function publishDataSet(form: FormData, owner: string, { checkDataSet, dataSets, gamefilesDir, now, notify, publisher }: PublishOptions): Promise<PublishAnswer> {
     const refuse = (status: number, error: string, problems?: Problem[]): PublishAnswer => ({ status, body: problems ? { error, problems } : { error } });
 
     const known = new Set<string>([...TEXT_FIELDS, 'authors', ...LOCAL_DATA_SET_FILES]);
@@ -210,6 +214,7 @@ export async function publishDataSet(form: FormData, owner: string, { checkDataS
         throw error;
     }
     console.log(`Published '${id}', pending`);
+    notify({ name: record.name, activity: 'added', by: publisher, at: now() });
     return { status: 201, body: { id } };
 }
 

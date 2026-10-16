@@ -13,16 +13,21 @@
  *   STATS_DB        the store's SQLite file (the checkout's `stats/stats.db`), created
  *                   with its folder when missing, its `data_sets` table then empty
  *                   (`tools/fill-data-sets.ts` fills the checkout's)
- *   MODERATOR_PLAYER_IDS  the moderators' `playerId`s, comma-separated, spaces around a
- *                   comma ignored: to them `api/data-sets` offers every set, pending ones
- *                   included, and says they moderate (`manifestText`); unset or empty
- *                   for no moderator
+ *   MODERATOR_PLAYER_IDS  the moderators, comma-separated `<playerId>[=<alias>]`, spaces
+ *                   around a comma or the `=` ignored (`parseModerators`): to them
+ *                   `api/data-sets` offers every set, pending ones included, and says they
+ *                   moderate (`manifestText`); a notification names them by their alias,
+ *                   `moderator <n>` without one; unset or empty for no moderator
+ *   NTFY_URL        the ntfy topic told of each change to the sets (`notify.ts`): unset or
+ *                   empty for none
+ *   NTFY_USER, NTFY_PASS  its Basic authentication, where NTFY_USER is set
+ *   TZ              the time zone a notification is dated in (the container's is UTC)
  *
  * It opens the store, checks the files and loads the page's check of a player's set and
  * its reader of a dungeon's walls (`loadPageReaders`) before it listens, and reads the
  * walls of a published set whose row keeps none (`fillWalls`), logging a `dungeon.dat`
  * that does not read. It exits with 1 on an entry of
- * `MODERATOR_PLAYER_IDS` that is not a `playerId`, a store it cannot open, a game files'
+ * `MODERATOR_PLAYER_IDS` that is not a `playerId` or has an empty alias, an `NTFY_URL` that is not an http(s) URL, a store it cannot open, a game files'
  * folder or a folder the sets name that is missing, or a check that is not built. It logs to stdout, and on SIGTERM or SIGINT stops
  * listening, lets the requests in flight finish, closes the store, which checkpoints its
  * WAL, and exits with 0.
@@ -32,8 +37,9 @@ import { dirname, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
 import { checkFiles, createAppServer, fillWalls, loadPageReaders, type PageReaders, type ServerOptions } from './app.ts';
-import { DataSetStore } from './dataSets.ts';
-import { isPlayerId, RateLimit } from './events.ts';
+import { DataSetStore, parseModerators, type Moderator } from './dataSets.ts';
+import { RateLimit } from './events.ts';
+import { NOBODY, ntfyNotifier, type Notify } from './notify.ts';
 import { StatsStore } from './stats.ts';
 import { openStore } from './store.ts';
 
@@ -54,15 +60,19 @@ const options: ServerOptions = {
 };
 const port = Number(process.env.PORT ?? 8085);
 const statsDb = process.env.STATS_DB ?? join(ROOT, 'stats', 'stats.db');
-const moderatorPlayerIds = (process.env.MODERATOR_PLAYER_IDS ?? '').split(',').map((id) => id.trim()).filter((id) => id !== '');
+const ntfyUrl = process.env.NTFY_URL ?? '';
 
 let db: DatabaseSync;
 let dataSets: DataSetStore;
 let store: StatsStore;
 let ids: string[];
 let readers: PageReaders;
+let moderators: Moderator[];
+let notify: Notify;
 try {
-    if (!moderatorPlayerIds.every((id) => isPlayerId(id))) throw new Error('MODERATOR_PLAYER_IDS holds an entry that is not a playerId, a lowercase UUID');
+    moderators = parseModerators(process.env.MODERATOR_PLAYER_IDS ?? '');
+    if (ntfyUrl !== '' && !/^https?:$/.test(URL.parse(ntfyUrl)?.protocol ?? '')) throw new Error('NTFY_URL is not an http(s) URL');
+    notify = ntfyUrl === '' ? NOBODY : ntfyNotifier(ntfyUrl, process.env.NTFY_USER || null, process.env.NTFY_PASS || null);
     mkdirSync(dirname(statsDb), { recursive: true });
     db = openStore(statsDb);
     dataSets = new DataSetStore(db);
@@ -81,12 +91,13 @@ if (walls.failed.length > 0) console.error(`No walls for ${walls.failed.join(', 
 const server = createAppServer(options, {
     checkDataSet: readers.checkDataSet,
     dataSets,
-    moderatorPlayerIds,
+    moderators,
     store,
     rules: { hasSet: (id) => dataSets.hasSet(id) },
     rateLimit: new RateLimit(EVENTS_PER_MINUTE, 60_000),
     publishRateLimit: new RateLimit(PUBLISHES_PER_HOUR, 3_600_000),
     now: Date.now,
+    notify,
 });
 server.listen(port, () => {
     const address = server.address();
