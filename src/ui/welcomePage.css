@@ -138,9 +138,7 @@ body.welcome {
 .pick.local .pick-name { color: var(--p4); }
 .pick.hidden .pick-name { color: var(--purple); }
 .pick.pending .pick-name { color: var(--p8); }
-.pick-saves { padding: 0 3px 3px; }
-.pick-saves { color: var(--p2); }
-.pick:not(.dim) .pick-saves { color: var(--p7); }
+.pick-saves { color: var(--p7); padding: 0 3px 3px; }
 
 /* PLAY and CONTINUE, and the save CONTINUE reads, above the grid. */
 .welcome-actions {

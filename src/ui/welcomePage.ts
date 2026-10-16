@@ -189,11 +189,8 @@ export async function showWelcomePage(
         tile.type = 'button';
         tile.className = saves > 0 ? 'pick' : 'pick dim';
         tile.dataset.set = set.id;
-        tile.append(
-            picture(thumbnails.get(set) ?? null),
-            line('pick-name px px2', set.name),
-            line('pick-saves px px2', saves === 0 ? 'No saves' : saves === 1 ? '1 save' : `${saves} saves`),
-        );
+        tile.append(picture(thumbnails.get(set) ?? null), line('pick-name px px2', set.name));
+        if (saves > 0) tile.append(line('pick-saves px px2', saves === 1 ? '1 save' : `${saves} saves`));
         tile.addEventListener('click', () => {
             selected = selected === set ? null : set;
             update();

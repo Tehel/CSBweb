@@ -361,7 +361,7 @@ const welcome = () => evaluate(`(()=>{const q=(s)=>[...document.querySelectorAll
     pictures: q('.pick[data-set]').map(t=>{const i=t.querySelector('.pick-picture img');
       return i && i.complete && i.naturalWidth===320 && i.naturalHeight===200
         && (i.src.endsWith('/'+t.dataset.set+'-thumbnail.png') || t.dataset.set.startsWith('local:') && i.src.startsWith('blob:'));}),
-    saves: q('.pick[data-set]').map(t=>t.querySelector('.pick-saves').textContent),
+    saves: q('.pick[data-set]').map(t=>t.querySelector('.pick-saves')?.textContent ?? ''),
     last: (()=>{const t=document.querySelector('.welcome-grid').lastElementChild;
       return t.className+(t.disabled?' disabled':'')+(t.hasAttribute('aria-pressed')?' pressed':'')+' '+t.textContent;})(),
     gameFiles: performance.getEntriesByType('resource').map(e=>e.name).filter(n=>/\.dat$/i.test(n)).length };})()`);
