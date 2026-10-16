@@ -49,10 +49,20 @@
  * record as it is. Once published, the form closes and the page shows the sets again,
  * asked for anew; a refusal is said under the checklist, a problem of the server's check
  * on its row, and the form stays.
+ *
+ * A moderator's pen on a published set's tile opens the form on the set as the site holds
+ * it (`openPublishedSetForm`): its text, and the files of its folder, read by the welcome
+ * page. The id is shown without `local:`, and cannot be changed, since its players' saves
+ * are filed under it; `dungeon.dat` can only be replaced; there is no DELETE nor PUBLISH.
+ * CONFIRM, enabled once something is changed and nothing is wrong, sends the edit to
+ * `api/data-sets/<id>` (`server/edit.ts`): the text, the files that changed, and the names
+ * of those removed. A new `dungeon.dat` is said under the checklist to reach no saved game
+ * (`DEBT.md` P11). Once edited, the form closes and the page shows the sets again, asked
+ * for anew; a refusal is said as PUBLISH's is, and the form stays.
  */
 import { folderFiles, type DataSetFiles } from '../data/DataSetFiles';
 import {
-    DATA_SETS_ROUTE, dataSetNamed, LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
+    DATA_SETS_ROUTE, dataSetNamed, EDIT_REMOVE_FIELD, LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
     THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, type DataSetManifest,
 } from '../data/DataSets';
 import { GraphicsLoader } from '../data/GraphicsLoader';
@@ -93,6 +103,10 @@ const NAMED_FILES: readonly LocalDataSetFile[] = ['dungeon.dat', 'graphics.dat',
 
 /** The thumbnail's checkbox. */
 const AS_TITLE_HINT = "The game opens on this picture, faded in and out, in place of the title's animation.";
+
+/** Under the checklist, where a published set's `dungeon.dat` is replaced. */
+const NEW_DUNGEON_NOTE = 'Saved games keep the dungeon they were made in: the new dungeon.dat reaches new games only, '
+    + 'and a save of the old one is no longer recognised as this dungeon\'s.';
 
 /** `doc/CSBwin-src/CSBCode.cpp:6796-6841`. */
 const DM_RULES_HINT = 'Every reincarnation adds 12 random attribute points. Without DM rules, as in CSB, the '
@@ -163,6 +177,26 @@ export interface EditedDataSet {
     published: (id: string) => void;
 }
 
+/** A record as the form edits it: a local set's, or a published set's, which has neither. */
+type FormRecord = Omit<LocalDataSetRecord, 'dungeonSignature' | 'createdAt'> & { createdAt?: number };
+
+/** A published set the form is opened on, by a moderator, to edit it on the site (`server/edit.ts`). */
+export interface EditedPublishedSet {
+    /**
+     * Its text and the files of its folder, its id as the site's is, without `local:`, and
+     * its `baseSet` `null` where the folder holds a `graphics.dat`.
+     */
+    record: FormRecord;
+    /** Called once the site has taken the edit, the form closed. */
+    edited: (id: string) => void;
+}
+
+/** Why a set was not stored, published or edited, and the problems the server's check found. */
+interface Refusal {
+    error: string;
+    problems?: LocalDataSetProblem[];
+}
+
 /**
  * Open the form over the welcome page, on `edited`'s record where it is given. `takenIds`
  * are the player's other sets' ids, which a new one may not take. CONFIRM calls `store`
@@ -176,6 +210,38 @@ export function openAddDataSetForm(
     added: (record: LocalDataSetRecord) => void,
     edited: EditedDataSet | null = null,
 ): void {
+    const save = async (record: LocalDataSetRecord): Promise<Refusal | null> => {
+        try {
+            await store(record);
+            return null;
+        } catch (error) {
+            return { error: `It could not be stored: ${error instanceof Error ? error.message : String(error)}` };
+        }
+    };
+    openForm(manifest, takenIds, save, added, edited);
+}
+
+/** Open the form over the welcome page on `published`, a set of the site's a moderator edits. */
+export function openPublishedSetForm(manifest: DataSetManifest, published: EditedPublishedSet): void {
+    openForm(manifest, new Set(), null, () => {}, published);
+}
+
+/**
+ * The form, adding a set or editing `edited`'s. CONFIRM calls `save` with the record, which
+ * says why it was not saved, or `null`, and once it is, closes the form and calls `added`;
+ * on a published set, `save` is `null`, and CONFIRM sends the edit to the site.
+ */
+function openForm(
+    manifest: DataSetManifest,
+    takenIds: ReadonlySet<string>,
+    save: ((record: LocalDataSetRecord) => Promise<Refusal | null>) | null,
+    added: (record: LocalDataSetRecord) => void,
+    edited: EditedDataSet | EditedPublishedSet | null,
+): void {
+    /** The local set edited, its saves and actions. */
+    const local = edited && 'remove' in edited ? edited : null;
+    /** The published set edited. */
+    const site = edited && !('remove' in edited) ? edited : null;
     const dialog = document.createElement('dialog');
     dialog.className = 'add-set';
     dialog.setAttribute('aria-labelledby', 'add-set-title');
@@ -196,7 +262,7 @@ export function openAddDataSetForm(
     const holds = form.querySelector<HTMLElement>('.add-set-holds')!;
 
     const files: Partial<Record<LocalDataSetFile, File>> = {};
-    const editing = edited?.record ?? null;
+    const editing: FormRecord | null = edited?.record ?? null;
     let idWritten = editing !== null;
     let record: LocalDataSetRecord | null = null;
     /** The problems the server's check found in the set PUBLISH sent, shown until a change. */
@@ -211,11 +277,12 @@ export function openAddDataSetForm(
     const bases = BASE_SETS.flatMap((set) => dataSetNamed(manifest, set) ?? []);
     let baseSet = editing?.baseSet ?? bases[0]?.id ?? BASE_SETS[0];
     if (editing) {
-        form.querySelector('#add-set-title')!.textContent = 'Edit my own dungeon';
+        form.querySelector('#add-set-title')!.textContent = site ? 'Edit the published dungeon' : 'Edit my own dungeon';
         name.value = editing.name;
-        id.value = editing.id.slice(LOCAL_DATA_SET_PREFIX.length);
+        id.value = site ? editing.id : editing.id.slice(LOCAL_DATA_SET_PREFIX.length);
         id.readOnly = true;
-        id.title = 'The id stays: its saves are filed under it.';
+        id.title = site ? "The id stays: its players' saves are filed under it." : 'The id stays: its saves are filed under it.';
+        if (site) form.querySelector<HTMLElement>('.add-set-id > span')!.hidden = true;
         description.value = editing.description;
         authors.value = editing.authors.join(', ');
         dmRules.checked = editing.dmRules;
@@ -312,9 +379,11 @@ export function openAddDataSetForm(
         changed();
     });
 
-    /** The global line under the checklist: what `store` threw. */
+    /** The global line under the checklist: why the set was not stored, published or edited. */
     const failure = text('p', 'add-set-problem add-set-failure', '');
-    checklist.after(failure);
+    /** Under it, a published set's: what an edit does to its saved games. */
+    const note = text('p', 'add-set-note', '');
+    checklist.after(failure, note);
 
     /** `list`'s files, each where `fileRow` says, in turn; the names of those that go nowhere are shown. */
     async function take(list: Iterable<File>): Promise<void> {
@@ -371,10 +440,21 @@ export function openAddDataSetForm(
         if (!made) return;
         confirm.disabled = true;
         failure.textContent = '';
-        try {
-            await store(made);
-        } catch (error) {
-            failure.textContent = `It could not be stored: ${error instanceof Error ? error.message : String(error)}`;
+        if (site) {
+            const answer = await editRecord(site.record.id, made, baseSet, storedFiles);
+            if ('id' in answer) {
+                dialog.close();
+                site.edited(answer.id);
+                return;
+            }
+            failure.textContent = `It could not be edited: ${answer.error}`;
+            refused = answer.problems ?? [];
+            draw();
+            return;
+        }
+        const refusal = await save!(made);
+        if (refusal) {
+            failure.textContent = refusal.error;
             confirm.disabled = false;
             return;
         }
@@ -384,15 +464,15 @@ export function openAddDataSetForm(
     dialog.addEventListener('close', () => dialog.remove());
 
     const publish = form.querySelector<HTMLButtonElement>('.add-set-publish')!;
-    publish.hidden = edited === null;
+    publish.hidden = local === null;
     publish.addEventListener('click', async () => {
-        if (!edited || !publishable()) return;
+        if (!local || !publishable()) return;
         publish.disabled = true;
         failure.textContent = '';
-        const answer = await publishRecord(edited.record, baseSet);
+        const answer = await publishRecord(local.record, baseSet);
         if ('id' in answer) {
             dialog.close();
-            edited.published(answer.id);
+            local.published(answer.id);
             return;
         }
         failure.textContent = `It could not be published: ${answer.error}`;
@@ -401,12 +481,12 @@ export function openAddDataSetForm(
     });
 
     const deleteButton = form.querySelector<HTMLButtonElement>('.add-set-delete')!;
-    deleteButton.hidden = edited === null;
+    deleteButton.hidden = local === null;
     deleteButton.title = 'Delete this dungeon and its saves';
     deleteButton.addEventListener('click', () => {
-        if (!edited) return;
+        if (!local) return;
         failure.textContent = '';
-        confirmDelete(edited, dialog, (error) => {
+        confirmDelete(local, dialog, (error) => {
             failure.textContent = `It could not be deleted: ${error instanceof Error ? error.message : String(error)}`;
         });
     });
@@ -472,14 +552,21 @@ export function openAddDataSetForm(
         }
         holds.hidden = census === null;
         holds.replaceChildren(...(census ? censusRows(census) : []));
-        confirm.disabled = record === null;
+        // A published set is sent only once changed: every edit is notified.
+        confirm.disabled = record === null || (site !== null && asStored());
+        note.textContent = site && files['dungeon.dat'] !== storedFiles['dungeon.dat'] ? NEW_DUNGEON_NOTE : '';
         publish.disabled = !publishable();
         publish.title = publish.disabled ? 'CONFIRM the changes first: what is published is the set as it is stored'
             : "Offer it to the site, pending a moderator's approval";
     }
 
-    /** Whether the check passed, and the form shows the record as it is stored. */
+    /** Whether the check passed, and the form shows a local record as it is stored. */
     function publishable(): boolean {
+        return local !== null && asStored();
+    }
+
+    /** Whether the check passed, and the form shows the record it was opened on as it is. */
+    function asStored(): boolean {
         if (!editing || !record) return false;
         const sameFiles = LOCAL_DATA_SET_FILES.every((about) => files[about] === storedFiles[about]);
         return sameFiles && record.name === editing.name && record.description === editing.description
@@ -493,18 +580,37 @@ export function openAddDataSetForm(
     changed();
 }
 
-/** What the server answered a publish, as `server/publish.ts` says it, or why it could not be asked. */
-type PublishAnswer = { id: string } | { error: string; problems?: LocalDataSetProblem[] };
+/** What the server answered a publish or an edit, as `server/publish.ts` says it, or why it could not be asked. */
+type PublishAnswer = { id: string } | Refusal;
+
+/** `record` sent to `api/data-sets` as `server/publish.ts` reads it, by the player whose `playerId` this is (`recordForm`). */
+async function publishRecord(record: LocalDataSetRecord, baseSet: string): Promise<PublishAnswer> {
+    const body = await recordForm(record, baseSet, {});
+    if (!(body instanceof FormData)) return body;
+    body.append('id', record.id);
+    return post(DATA_SETS_ROUTE, body, 201);
+}
 
 /**
- * `record` sent to `api/data-sets` as `server/publish.ts` reads it, by the player whose
- * `playerId` this is: its fields, its files by the name the game reads them under, and
- * its thumbnail as a PNG. `baseSet` is the form's, which the server takes whether or not
- * the record has a `graphics.dat` of its own.
+ * `record`, the published set `id` edited, sent to `api/data-sets/<id>` as
+ * `server/edit.ts` reads it, by the moderator whose `playerId` this is: its fields, the
+ * files that are not `stored`'s, and `remove` for each of `stored`'s it no longer has.
  */
-async function publishRecord(record: LocalDataSetRecord, baseSet: string): Promise<PublishAnswer> {
+async function editRecord(id: string, record: LocalDataSetRecord, baseSet: string, stored: Partial<Record<LocalDataSetFile, Blob>>): Promise<PublishAnswer> {
+    const body = await recordForm(record, baseSet, stored);
+    if (!(body instanceof FormData)) return body;
+    for (const about of LOCAL_DATA_SET_FILES) if (stored[about] && !record.files[about]) body.append(EDIT_REMOVE_FIELD, about);
+    return post(`${DATA_SETS_ROUTE}/${encodeURIComponent(id)}`, body, 200);
+}
+
+/**
+ * `record`'s fields but its id, as the server reads a set's form, its files but those of
+ * `unchanged`, by the name the game reads them under, and its thumbnail as a PNG. `baseSet`
+ * is the form's, which the server takes whether or not the record has a `graphics.dat` of
+ * its own.
+ */
+async function recordForm(record: LocalDataSetRecord, baseSet: string, unchanged: Partial<Record<LocalDataSetFile, Blob>>): Promise<FormData | PublishAnswer> {
     const body = new FormData();
-    body.append('id', record.id);
     body.append('name', record.name);
     body.append('description', record.description);
     for (const author of record.authors) body.append('authors', author);
@@ -513,15 +619,21 @@ async function publishRecord(record: LocalDataSetRecord, baseSet: string): Promi
     body.append('baseSet', record.baseSet ?? baseSet);
     try {
         for (const [about, blob] of Object.entries(record.files) as [LocalDataSetFile, Blob][]) {
+            if (blob === unchanged[about]) continue;
             body.append(about, about === 'thumbnail' ? await asPng(blob) : blob, about === 'thumbnail' ? 'thumbnail.png' : about);
         }
     } catch (error) {
         return { error: `the thumbnail cannot be made a PNG (${error instanceof Error ? error.message : String(error)}).` };
     }
-    const response = await fetch(DATA_SETS_ROUTE, { method: 'POST', headers: { [PLAYER_ID_HEADER]: playerId() }, body }).catch(() => null);
+    return body;
+}
+
+/** `body` posted to `route` by the player whose `playerId` this is, and what the server answered, `status` meaning done. */
+async function post(route: string, body: FormData, status: number): Promise<PublishAnswer> {
+    const response = await fetch(route, { method: 'POST', headers: { [PLAYER_ID_HEADER]: playerId() }, body }).catch(() => null);
     if (!response) return { error: 'the server cannot be reached.' };
     const answer = await response.json().catch(() => null) as PublishAnswer | null;
-    if (response.status === 201 && answer && 'id' in answer) return answer;
+    if (response.status === status && answer && 'id' in answer) return answer;
     return answer && 'error' in answer ? answer : { error: `the server answered HTTP ${response.status}.` };
 }
 

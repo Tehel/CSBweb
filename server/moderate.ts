@@ -24,9 +24,9 @@
  *        reject of a set with no owner, the site's, or of the default set, whose folders
  *        are the author's, uploaded by hand
  *
- * Deleting an approved set, changing a set's files, taking an approval back, and the
- * order of the sets and the default are left to a moderator's hands on the VPS
- * (`doc/DEPLOYMENT.md` → "Moderating the sets").
+ * The same route with a form edits a set's text and files (`edit.ts`). Deleting an
+ * approved set, taking an approval back, and the order of the sets and the default are
+ * left to a moderator's hands on the VPS (`doc/DEPLOYMENT.md` → "Moderating the sets").
  *
  * A reject deletes the row first, so the set is offered to nobody before its folder goes;
  * a folder that will not go is logged and left, a folder no row names, which the next

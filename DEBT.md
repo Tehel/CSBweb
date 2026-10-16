@@ -31,7 +31,7 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
-and the moderators approve, hide and show what is published; what is left is P11, to
+and the moderators approve, hide, show and edit what is published; what is left is P11, to
 design with the author. They are not CSBWin features but the page's, and come before
 every other tier.
 
@@ -128,7 +128,7 @@ In payoff order: the first row is the next item.
 | W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
 | W6 | Security headers | S | ⏳ |
 | W7 | The container, the deploy and the Node version | S | ⏳ |
-| P11 | A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
+| P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | R12 | Listing the saves reads every save's bytes | M | ⏳ |
 | U11 | The cursor over a dialog takes the game's shapes | S | ⏳ |
@@ -250,7 +250,7 @@ every set, told so (`"moderator": true`, `DataSetManifest.moderator`), and the w
 lists them the hidden sets too (`chooserSets`). A tile's name says its set's state: cyan
 local, red pending, purple hidden (the one colour of the page outside the UI palette),
 white otherwise. Its `gamefiles/` is mounted read-write, and `server/backup.ts` copies the folders
-of the sets with an owner beside the store's snapshots. It reads a set with the page's own
+of the sets beside the store's snapshots. It reads a set with the page's own
 check: `npm run build` bundles `checkLocalDataSet` and its readers for Node into
 `dist/server/LocalDataSets.js` (`vite.config.mts`, `doc/DEPLOYMENT.md` → "The build"),
 which `server.ts` loads at start-up and hands the API (`CheckDataSet`, `loadCheckDataSet`,
@@ -266,13 +266,16 @@ the dungeon").
 A published set is moderated from its tile (`src/ui/welcomePage.ts`): the tick and the
 cross on a pending set, which approve and reject it, and the eye on any other, which hides
 and shows it, to a moderator; the cross alone to the owner of a pending set, which
-withdraws it. Each is a `POST api/data-sets/<id>` (`server/moderate.ts`, `doc/DEPLOYMENT.md`
+withdraws it. And the pen, first, on every published set, to a moderator, which opens the
+form on the set as the site holds it, to edit its text and files: its CONFIRM sends the
+edit as a form (`server/edit.ts`), and a change of files writes the set a new folder,
+`<dir>@<n>`. Each is a `POST api/data-sets/<id>` (`server/moderate.ts`, `doc/DEPLOYMENT.md`
 → "Moderating the sets"), the page then asking for the sets anew. The dev server answers
 it too, replaying the changes made since it started over the store it makes at each
 request, and has one moderator, `DEV_MODERATOR_PLAYER_ID` (`vite.config.mts`), whom
-`tools/check-image.sh` makes the image's too. `tools/dump-server.ts` asserts every action
-and every refusal, and `tools/probe-frames.mjs` moderates the set it publishes, from the
-tiles, as that moderator and as its owner.
+`tools/check-image.sh` makes the image's too. `tools/dump-server.ts` asserts every action,
+edit and refusal, and `tools/probe-frames.mjs` moderates and edits the set it publishes,
+from the tiles, as that moderator and as its owner.
 
 The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase letters, digits, `.`, `-` and
 `_`, at most 40), since publishing makes it the set's folder on the server. No shipped dungeon
@@ -297,14 +300,18 @@ Decisions taken with the author, for every row:
   saves still filed under `local:<id>`, and the player can go on building it. A new
   version is a new local set, under a new id. Deleting the record once its set is
   approved, its saves moved to `<id>`, may follow as an item of its own.
-- **Moderation from the tiles, and nothing more**: deleting an approved set, changing a
-  published set's files, taking an approval back, and the sets' order and default are
-  left to a moderator's hands on the VPS (`doc/DEPLOYMENT.md` → "Moderating the sets").
-  Hiding answers a complaint without costing a player their saves.
+- **Moderation from the tiles, and nothing more**: deleting an approved set, taking an
+  approval back, and the sets' order and default are left to a moderator's hands on the
+  VPS (`doc/DEPLOYMENT.md` → "Moderating the sets"). Hiding answers a complaint without
+  costing a player their saves.
+- **A moderator edits any set, the site's too, from its pen**: its text, a thumbnail, a
+  description, and rarely a `.dat`. A folder never changes once written, which the backup
+  relies on, so a change of files is a new folder, `<dir>@<n>`, and the backup copies every
+  set's folder. A new `dungeon.dat` reaches no save already made (P11), which the form says.
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
 
-### P11 ⏳ A save keeps its own dungeon, so a local set's new `dungeon.dat` does not reach it
+### P11 ⏳ A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it
 
 To design with the author, and complex. A CSBWin save holds the whole dungeon (blocks
 7-14), and a read installs it in place of the set's `dungeon.dat`. A local set's pen
@@ -315,8 +322,8 @@ own world"). The same happens to any import the dialog stores as a slightly diff
 dungeon, on IMPORT ANYWAY. CSBWin behaves the same way: a save
 is the world. What the port should do is open: tell the player, refuse, or carry the
 party into the new dungeon (as Chaos's "MAKE NEW ADVENTURE" carries a party into
-`mini.dat`). A published set's files never change (`doc/DEPLOYMENT.md` → "Moderating the
-sets"), so this affects local sets only.
+`mini.dat`). A moderator's new `dungeon.dat` for a published set does the same to its
+players' saves (`doc/DEPLOYMENT.md` → "Moderating the sets"), the form saying so.
 
 ---
 

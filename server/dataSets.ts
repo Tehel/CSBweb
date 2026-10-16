@@ -7,7 +7,7 @@
  * A set is approved or pending. An approved set is offered to everyone; a pending one, a
  * player's, published by `publish.ts` (`DataSetStore.publish`), to its owner and the
  * moderators only (`manifestText`). A moderator approves, rejects, hides and shows a set
- * (`moderate.ts`). A published set's row keeps its dungeon's walls, which
+ * (`moderate.ts`), and edits its text and files (`edit.ts`). A published set's row keeps its dungeon's walls, which
  * `api/data-set-walls` answers (`wallsText`), so that the page can name the set a save
  * dropped in another is of. Ownership, and
  * moderation, rest on the `playerId` alone, a secret (`src/ui/gameEvents.ts`), so no answer
@@ -126,6 +126,22 @@ export interface PublishedDataSet {
     walls: DataSetWalls;
 }
 
+/**
+ * A set as a moderator's edit leaves it (`edit.ts`): its text and flags, its folder, and its
+ * dungeon's walls where its `dungeon.dat` was replaced, `null` to keep those its row has.
+ */
+export interface EditedDataSet {
+    name: string;
+    description: string;
+    authors: readonly string[];
+    dir: string;
+    csbGraphics: boolean;
+    hintOracle: boolean;
+    dmRules: boolean;
+    thumbnailAsTitle: boolean;
+    walls: DataSetWalls | null;
+}
+
 /** Everyone: no `playerId`, not a moderator. */
 export const ANYONE: DataSetViewer = { playerId: null, moderator: null };
 
@@ -151,6 +167,7 @@ export class DataSetStore {
     private readonly updateWalls: StatementSync;
     private readonly updateApproved: StatementSync;
     private readonly updateHidden: StatementSync;
+    private readonly updateEdited: StatementSync;
     private readonly deleteRow: StatementSync;
 
     constructor(db: DatabaseSync) {
@@ -180,6 +197,8 @@ export class DataSetStore {
         this.updateApproved = db.prepare("UPDATE data_sets SET status = 'approved' WHERE id = ?");
         this.updateHidden = db.prepare('UPDATE data_sets SET hidden = ? WHERE id = ?');
         this.deleteRow = db.prepare('DELETE FROM data_sets WHERE id = ?');
+        this.updateEdited = db.prepare('UPDATE data_sets SET name = ?, description = ?, authors = ?, dir = ?, csb_graphics = ?, hint_oracle = ?, '
+            + 'dm_rules = ?, thumbnail_as_title = ?, walls = COALESCE(?, walls) WHERE id = ?');
     }
 
     isEmpty(): boolean {
@@ -247,6 +266,12 @@ export class DataSetStore {
     /** `id`'s row hidden, or shown (`moderate.ts`). */
     setHidden(id: string, hidden: boolean): void {
         this.updateHidden.run(hidden ? 1 : 0, id);
+    }
+
+    /** `id`'s row as `set` says, edited by a moderator (`edit.ts`); its state, owner, place and `mini.dat` kept. */
+    edit(id: string, set: EditedDataSet): void {
+        this.updateEdited.run(set.name, set.description, JSON.stringify(set.authors), set.dir, set.csbGraphics ? 1 : 0, set.hintOracle ? 1 : 0,
+            set.dmRules ? 1 : 0, set.thumbnailAsTitle ? 1 : 0, set.walls && wallsJson(set.walls), id);
     }
 
     /** `id`'s row deleted (`moderate.ts`, which deletes its folder after). */

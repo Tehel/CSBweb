@@ -25,7 +25,8 @@
  * `<id>-thumbnail.png` (`thumbnailPath`). Then the row, pending and owned by the player
  * (`DataSetStore.publish`), its flags following from its files as `localDataSet`'s do,
  * and its dungeon's walls the check's.
- * The folder is never changed after: `backup.ts` copies it once.
+ * The folder is never changed after: `backup.ts` copies it once, and a moderator's edit of
+ * the set's files writes a new one (`edit.ts`).
  *
  * 201 answers `{"id": "<id>"}`; a refusal `{"error": "<why>"}`, and a 422 the problems too,
  * `[{"about": "<field or file>", "text": "<why>"}]`. No answer, and no log, holds the
@@ -37,9 +38,9 @@ import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promis
 import { join } from 'node:path';
 
 import {
-    LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, LOCAL_ID_PATTERN, PNG_HEAD_BYTES, pngSize, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
+    EDIT_REMOVE_FIELD, LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, LOCAL_ID_PATTERN, PNG_HEAD_BYTES, pngSize, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
 } from '../src/data/DataSets.ts';
-import type { DataSetStore, DataSetWalls } from './dataSets.ts';
+import type { DataSetStore, DataSetWalls, StoredDataSet } from './dataSets.ts';
 import type { Notify } from './notify.ts';
 
 /** The largest file a set may hold: Conflux's `CSBgraphics.dat` is 12 MB. */
@@ -122,17 +123,29 @@ export interface PublishAnswer {
     body: { id: string } | { error: string; problems?: Problem[] };
 }
 
+/** The text fields of a publish's form; an edit's are the same but `id`, its URL's. */
 const TEXT_FIELDS = ['id', 'name', 'description', 'dmRules', 'thumbnailAsTitle', 'baseSet'] as const;
 
-/** `form`, sent by `owner`, a `playerId`, checked and, where it passes, published. */
-export async function publishDataSet(form: FormData, owner: string, { checkDataSet, dataSets, gamefilesDir, now, notify, publisher }: PublishOptions): Promise<PublishAnswer> {
-    const refuse = (status: number, error: string, problems?: Problem[]): PublishAnswer => ({ status, body: problems ? { error, problems } : { error } });
+/** A set's form, read: a draft, the `id` `''` for an edit's, and the files an edit removes. */
+export interface SetForm extends DataSetDraft {
+    files: Partial<Record<string, File>>;
+    remove: string[];
+}
 
-    const known = new Set<string>([...TEXT_FIELDS, 'authors', ...LOCAL_DATA_SET_FILES]);
+/**
+ * `form` read as a publish's, or as an edit's (`edit.ts`): its fields, each as `publishDataSet`
+ * says, and an edit's `remove`s, each a file of `LOCAL_DATA_SET_FILES` once, and none given
+ * too; or the refusal, a 400 or a 413.
+ */
+export function readSetForm(form: FormData, edit: boolean): SetForm | PublishAnswer {
+    const refuse = (status: number, error: string): PublishAnswer => ({ status, body: { error } });
+
+    const fields = edit ? TEXT_FIELDS.filter((field) => field !== 'id') : TEXT_FIELDS;
+    const known = new Set<string>([...fields, 'authors', ...LOCAL_DATA_SET_FILES, ...(edit ? [EDIT_REMOVE_FIELD] : [])]);
     const unknown = [...new Set(form.keys())].find((key) => !known.has(key));
     if (unknown !== undefined) return refuse(400, `The form has a field '${unknown}' a set does not.`);
-    const text: Partial<Record<(typeof TEXT_FIELDS)[number], string>> = {};
-    for (const field of TEXT_FIELDS) {
+    const text: Partial<Record<(typeof TEXT_FIELDS)[number], string>> = { id: '' };
+    for (const field of fields) {
         const values = form.getAll(field);
         if (values.length !== 1 || typeof values[0] !== 'string') return refuse(400, `The form's '${field}' is not one text.`);
         text[field] = values[0];
@@ -149,7 +162,7 @@ export async function publishDataSet(form: FormData, owner: string, { checkDataS
         if (lengths[field] > LOCAL_DATA_SET_TEXT_LIMITS[field]) return refuse(400, `${said[field]} longer than ${LOCAL_DATA_SET_TEXT_LIMITS[field]} characters.`);
     }
     const id = text.id!.startsWith(LOCAL_DATA_SET_PREFIX) ? text.id!.slice(LOCAL_DATA_SET_PREFIX.length) : text.id!;
-    if (!LOCAL_ID_PATTERN.test(id)) return refuse(400, "An id is lowercase letters, digits, '.', '-' and '_', a letter or a digit first, at most 40.");
+    if (!edit && !LOCAL_ID_PATTERN.test(id)) return refuse(400, "An id is lowercase letters, digits, '.', '-' and '_', a letter or a digit first, at most 40.");
     const files: Partial<Record<string, File>> = {};
     for (const file of LOCAL_DATA_SET_FILES) {
         const values = form.getAll(file);
@@ -158,39 +171,82 @@ export async function publishDataSet(form: FormData, owner: string, { checkDataS
         if (values[0].size > MAX_PUBLISHED_FILE_BYTES) return refuse(413, `${file} is larger than ${MAX_PUBLISHED_FILE_BYTES / (1024 * 1024)} MiB.`);
         files[file] = values[0];
     }
+    const remove = form.getAll(EDIT_REMOVE_FIELD);
+    for (const file of remove) {
+        if (typeof file !== 'string' || !(LOCAL_DATA_SET_FILES as readonly string[]).includes(file)) return refuse(400, `The form's '${EDIT_REMOVE_FIELD}' names no file of a set.`);
+        if (remove.indexOf(file) !== remove.lastIndexOf(file) || files[file]) return refuse(400, `The form removes ${file} twice, or gives it too.`);
+    }
+    return { id, name, description, authors: authors as string[], dmRules: dmRules === 'true', thumbnailAsTitle: thumbnailAsTitle === 'true', baseSet, files, remove: remove as string[] };
+}
 
-    if (dataSets.hasSet(id)) return refuse(409, 'The site already has a set of this id.');
-    const folder = join(gamefilesDir, id);
-    if (existsSync(folder)) return refuse(409, 'The site already has a folder of this name.');
+/** What `checkSet` makes of a set that passes. */
+type Checked = { record: NonNullable<Awaited<ReturnType<CheckDataSet>>['record']>; walls: DataSetWalls };
 
-    const siteSet = (set: string) => dataSets.read().dataSets.find((stored) => stored.id === set && stored.owner === null) ?? null;
-    const base = (set: string): DataSetFolder | null => {
-        const stored = siteSet(set);
-        return stored && diskFolder(join(gamefilesDir, stored.dir), stored.id);
-    };
-    const draft: DataSetDraft = { id, name, description, authors: authors as string[], dmRules: dmRules === 'true',
-        thumbnailAsTitle: thumbnailAsTitle === 'true', baseSet, files };
-    const { problems, record, walls } = await checkDataSet(draft, new Set(), base, now());
-    const thumbnail = files.thumbnail;
+/**
+ * `draft` read by the page's check, with `gamefilesDir`'s site's sets its base sets, and its
+ * thumbnail, if any, a PNG of 320x200; or the refusal, a 422 with the problems.
+ */
+export async function checkSet(draft: DataSetDraft, checkDataSet: CheckDataSet, dataSets: DataSetStore, gamefilesDir: string, now: number): Promise<Checked | PublishAnswer> {
+    const { problems, record, walls } = await checkDataSet(draft, new Set(), (set) => baseFolder(dataSets, gamefilesDir, set), now);
+    const thumbnail = draft.files.thumbnail;
     const size = thumbnail && pngSize(new Uint8Array(await thumbnail.slice(0, PNG_HEAD_BYTES).arrayBuffer()));
     if (thumbnail && !size) problems.push({ about: 'thumbnail', text: 'It is not a PNG.' });
     else if (size && (size.width !== THUMBNAIL_WIDTH || size.height !== THUMBNAIL_HEIGHT)) {
         problems.push({ about: 'thumbnail', text: `It is ${size.width}x${size.height}, not ${THUMBNAIL_WIDTH}x${THUMBNAIL_HEIGHT}.` });
     }
-    if (problems.length > 0 || !record || !walls) return refuse(422, 'The set does not pass the check.', problems);
+    if (problems.length > 0 || !record || !walls) return { status: 422, body: { error: 'The set does not pass the check.', problems } };
+    return { record, walls };
+}
+
+/** The site's set `set`, one with no owner, whose `graphics.dat` a set without one plays. */
+function siteSet(dataSets: DataSetStore, set: string): StoredDataSet | null {
+    return dataSets.read().dataSets.find((stored) => stored.id === set && stored.owner === null) ?? null;
+}
+
+function baseFolder(dataSets: DataSetStore, gamefilesDir: string, set: string): DataSetFolder | null {
+    const stored = siteSet(dataSets, set);
+    return stored && diskFolder(join(gamefilesDir, stored.dir), stored.id);
+}
+
+/**
+ * The folder `partial` given `set`'s `files`, each by the name the game reads it under,
+ * the thumbnail `<id>-thumbnail.png` (`thumbnailPath`, which needs a whole `DataSet`),
+ * and, where it has no `graphics.dat` once they are written, its base set's.
+ */
+export async function writeSetFiles(partial: string, id: string, files: Partial<Record<string, Blob>>, baseSet: string, dataSets: DataSetStore, gamefilesDir: string): Promise<void> {
+    for (const [file, blob] of Object.entries(files)) {
+        await writeFile(join(partial, file === 'thumbnail' ? thumbnailFile(id) : file), new Uint8Array(await blob!.arrayBuffer()));
+    }
+    if (!existsSync(join(partial, 'graphics.dat'))) {
+        await copyFile(join(gamefilesDir, siteSet(dataSets, baseSet)!.dir, 'graphics.dat'), join(partial, 'graphics.dat'));
+    }
+}
+
+/** The name of the thumbnail of the set `id` in its folder (`thumbnailPath`). */
+export function thumbnailFile(id: string): string {
+    return `${id}-thumbnail.png`;
+}
+
+/** `form`, sent by `owner`, a `playerId`, checked and, where it passes, published. */
+export async function publishDataSet(form: FormData, owner: string, { checkDataSet, dataSets, gamefilesDir, now, notify, publisher }: PublishOptions): Promise<PublishAnswer> {
+    const refuse = (status: number, error: string): PublishAnswer => ({ status, body: { error } });
+
+    const draft = readSetForm(form, false);
+    if ('status' in draft) return draft;
+    const { id, files, baseSet } = draft;
+
+    if (dataSets.hasSet(id)) return refuse(409, 'The site already has a set of this id.');
+    const folder = join(gamefilesDir, id);
+    if (existsSync(folder)) return refuse(409, 'The site already has a folder of this name.');
+
+    const checked = await checkSet(draft, checkDataSet, dataSets, gamefilesDir, now());
+    if ('status' in checked) return checked;
+    const { record, walls } = checked;
 
     const partial = join(gamefilesDir, `.${id}.${randomUUID()}.partial`);
     try {
         await mkdir(partial);
-        for (const [file, blob] of Object.entries(files)) {
-            // `thumbnailPath`'s name, which needs a whole `DataSet`.
-            const written = join(partial, file === 'thumbnail' ? `${id}-thumbnail.png` : file);
-            await writeFile(written, new Uint8Array(await blob!.arrayBuffer()));
-        }
-        if (!files['graphics.dat']) {
-            const stored = siteSet(baseSet)!;
-            await copyFile(join(gamefilesDir, stored.dir, 'graphics.dat'), join(partial, 'graphics.dat'));
-        }
+        await writeSetFiles(partial, id, files, baseSet, dataSets, gamefilesDir);
         try {
             await rename(partial, folder);
         } catch {
@@ -219,7 +275,7 @@ export async function publishDataSet(form: FormData, owner: string, { checkDataS
 }
 
 /** The files of `dir` on disk, `set`'s folder. */
-function diskFolder(dir: string, set: string): DataSetFolder {
+export function diskFolder(dir: string, set: string): DataSetFolder {
     return {
         read: (name) => readFile(join(dir, name)).then((bytes) => new Uint8Array(bytes), () => null),
         where: (name) => `${set}/${name}`,

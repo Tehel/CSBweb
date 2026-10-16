@@ -28,7 +28,10 @@
  *   cross** on a pending set, which approve and reject it, and **the eye** on any other,
  *   open on a set shown and shut on a hidden one, which hides or shows it; to the owner of
  *   a pending set, the only player but the moderators it is offered to, the cross, which
- *   withdraws it. The cross asks first, since the site then deletes the set's files. The
+ *   withdraws it. And to a moderator, **the pen** on every published set, first, which
+ *   opens the form on the set as the site holds it, its files read from its folder, to
+ *   edit its text and files (`openPublishedSetForm`); the preview box says the set is
+ *   read meanwhile. The cross asks first, since the site then deletes the set's files. The
  *   page is not told who owns a set, so a moderator is offered the cross on a site's own
  *   pending set too, which the server refuses; never on the default set. The page then
  *   asks for the sets anew and shows them, the selection kept but for a set gone. A
@@ -56,12 +59,13 @@
  */
 import './welcomePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
+import { folderFiles } from '../data/DataSetFiles';
 import {
-    chooserSets, DATA_SETS_ROUTE, PLAYER_ID_HEADER, thumbnailPath,
+    chooserSets, DATA_SETS_ROUTE, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize, thumbnailPath,
     type DataSet, type DataSetManifest, type ModerationAction,
 } from '../data/DataSets';
-import { localDataSet, type LocalDataSetRecord } from '../data/LocalDataSets';
-import { openAddDataSetForm } from './addDataSetForm';
+import { localDataSet, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
+import { openAddDataSetForm, openPublishedSetForm, type EditedPublishedSet } from './addDataSetForm';
 import { playerId } from './gameEvents';
 import {
     formatSaveDate, formatSaveTime, lastUsedSave,
@@ -226,20 +230,45 @@ export async function showWelcomePage(
         );
     }
 
-    /** The controls of a published `set` the viewer may use: the tick and the cross, or the eye. */
+    /** The controls of a published `set` the viewer may use: the pen, and the tick and the cross, or the eye. */
     function moderation(set: DataSet): HTMLElement[] {
         const { moderator } = manifest;
+        const pen = moderator ? [control('pick-edit', `Edit ${set.name}`, PEN, () => void editPublished(set))] : [];
         if (!set.pending) {
             return !moderator ? [] : set.hidden
-                ? [control('pick-show', `Show ${set.name}`, EYE_SHUT, () => void moderate(set, 'show'))]
-                : [control('pick-hide', `Hide ${set.name}`, EYE_OPEN, () => void moderate(set, 'hide'))];
+                ? [...pen, control('pick-show', `Show ${set.name}`, EYE_SHUT, () => void moderate(set, 'show'))]
+                : [...pen, control('pick-hide', `Hide ${set.name}`, EYE_OPEN, () => void moderate(set, 'hide'))];
         }
         const withdraw = !moderator;
         return [
+            ...pen,
             ...(moderator ? [control('pick-approve', `Approve ${set.name}`, TICK, () => void moderate(set, 'approve'))] : []),
             ...(set === manifest.defaultSet ? [] : [control('pick-reject', `${withdraw ? 'Withdraw' : 'Reject'} ${set.name}`, CROSS,
                 () => confirmReject(set, withdraw, () => moderate(set, 'reject')))]),
         ];
+    }
+
+    /**
+     * The form opened on the published `set` as the site holds it, once its files are read,
+     * the box beside CONTINUE saying so meanwhile, or why they were not; the page shown
+     * again as the server lists the sets once it is edited, the selection kept.
+     */
+    async function editPublished(set: DataSet): Promise<void> {
+        preview.replaceChildren(line('preview-none', `Reading ${set.name}…`));
+        let record: EditedPublishedSet['record'];
+        try {
+            record = await publishedRecord(set);
+        } catch (error) {
+            preview.replaceChildren(line('preview-failure', `${set.name} could not be read: ${error instanceof Error ? error.message : String(error)}`));
+            return;
+        }
+        update();
+        const keep = selected?.id ?? null;
+        openPublishedSetForm(manifest, {
+            record,
+            // The page as it was, should the server not answer again.
+            edited: () => void loadManifest().then((asked) => again(keep, asked), () => again(keep)),
+        });
     }
 
     /**
@@ -287,6 +316,32 @@ async function moderateDataSet(id: string, action: ModerationAction): Promise<st
     if (response.ok) return null;
     const answer = await response.json().catch(() => null) as { error?: unknown } | null;
     return typeof answer?.error === 'string' ? answer.error : `the server answered HTTP ${response.status}.`;
+}
+
+/**
+ * The published `set` as the form edits it: its text, and the files of its folder the form
+ * knows, `dungeon.dat` and `graphics.dat`, the `CSBgraphics.dat` and the Hint Oracle its
+ * flags say it has, and its thumbnail where it is served as a PNG. Throws where one of its
+ * files cannot be read, but the thumbnail.
+ */
+async function publishedRecord(set: DataSet): Promise<EditedPublishedSet['record']> {
+    const folder = folderFiles(set.dir);
+    const names: Exclude<LocalDataSetFile, 'thumbnail'>[] = ['dungeon.dat', 'graphics.dat',
+        ...(set.csbGraphics ? ['CSBgraphics.dat' as const] : []), ...(set.hintOracle ? ['hcsb.hct' as const, 'hcsb.dat' as const] : [])];
+    const files: Partial<Record<LocalDataSetFile, File>> = {};
+    await Promise.all(names.map(async (name) => {
+        const bytes = await folder.read(name);
+        if (!bytes) throw new Error(`${folder.where(name)} cannot be read.`);
+        files[name] = new File([bytes as Uint8Array<ArrayBuffer>], name);
+    }));
+    const thumbnail = await fetch(thumbnailPath(set)).then((response) => (response.ok ? response.blob() : null), () => null);
+    if (thumbnail && pngSize(new Uint8Array(await thumbnail.slice(0, PNG_HEAD_BYTES).arrayBuffer()))) {
+        files.thumbnail = new File([thumbnail], 'thumbnail.png', { type: 'image/png' });
+    }
+    return {
+        id: set.id, name: set.name, description: set.description, authors: [...set.authors], dmRules: set.dmRules,
+        thumbnailAsTitle: set.thumbnailAsTitle, baseSet: null, files,
+    };
 }
 
 /**

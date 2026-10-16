@@ -147,6 +147,12 @@ export const LOCAL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;
 export const LOCAL_DATA_SET_FILES = ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat', 'thumbnail'] as const;
 
 /**
+ * The field of a moderator's edit of a published set that names a file of
+ * `LOCAL_DATA_SET_FILES` the set no longer has, once per file (`server/edit.ts`).
+ */
+export const EDIT_REMOVE_FIELD = 'remove';
+
+/**
  * The longest text the form that adds a set takes in each field, in characters
  * (`src/ui/addDataSetForm.ts`), and the server publishes: the authors as the form's one
  * line, joined by commas.

@@ -150,7 +150,8 @@ owned by the player, last in the list, with its description and authors, and its
 `graphics.dat` gets a copy of its base set's, and its thumbnail is `<id>-thumbnail.png`,
 so its folder is like any other: a PNG of 320x200, the screen's size, as the form takes no
 other (`THUMBNAIL_WIDTH`, `src/data/DataSets.ts`). The row's `thumbnail_as_title` is the
-form's checkbox, and is set only for a set with a thumbnail. The server never changes the folder after. It refuses an
+form's checkbox, and is set only for a set with a thumbnail. The server never changes the folder after: a moderator's
+edit of the set's files writes it a new one (below). It refuses an
 id the table or `gamefiles/` already holds, a file over 16 MiB, a request over 32 MiB, and
 more than five publishes an hour from one address, each answered with nothing written. A
 folder is written as `gamefiles/.<id>.<uuid>.partial/` and renamed when whole; one left by a
@@ -186,6 +187,27 @@ may not, 404 for an id the table does not hold, 409 for an action the set's stat
 not take, such as approving an approved set. Each change is logged, `'<id>' approved`,
 never with the asker's id, and notified (below).
 
+A moderator also edits a set, any set, from the pen on its tile, which opens the form that
+adds a player's own set on the set as the site holds it, its files read from its folder.
+CONFIRM sends the same route a `multipart/form-data` body (`server/edit.ts`): a publish's
+fields but the id, the files that changed, and `remove` once per file the set no longer
+has. The server reads the set as it would be, its folder's files and the form's, with the
+page's check, as a publish does. An edit of the text alone changes the row. One that
+changes a file writes a new folder, since a folder never changes once written: the old one
+copied whole, every file the form does not know kept (CSB's `mini.dat`, a readme), the
+form's written over it and its removed ones deleted, as `gamefiles/<dir>@<n>/`, `<n>` 2
+then one more at each edit, a name no id can take. The row then names it, its flags follow
+from its files, and its walls are the new `dungeon.dat`'s where one is given; the old
+folder is deleted, the night's backup keeping its copy. A player who loaded the set before
+plays the old files until they load it again. A new `dungeon.dat` reaches no saved game,
+since a save holds its dungeon (`DEBT.md` P11), and an import of a save of the old one is
+no longer named after the set; the form says so before CONFIRM. The server refuses an
+asker who does not moderate with 403 before it reads the body, a form it cannot read or
+that a publish would refuse with 400 or 413, an unknown id with 404, a set the check
+refuses with 422, and another edit of the set that wrote its folder first with 409, each
+with nothing changed. Each edit is logged, `'<id>' edited, its files now in <dir>`, and
+notified.
+
 A rejected set's folder was copied by the night's backup if it was published before it
 (below). One that will not go is logged, `'<id>' rejected, its folder left (…)`, and is a
 folder no row names, which refuses a new publish of its id until it is deleted by hand.
@@ -196,8 +218,6 @@ through `node:sqlite` (as below, to add the site's sets), and in `gamefiles/`:
 - **Deleting an approved set.** Hiding it answers a complaint, and its players keep their
   saves and their way back to it; a deletion makes their saves count for nothing. Its row
   is deleted, then its folder; the backup keeps its copy.
-- **Changing a published set's files.** A folder never changes once written, which the
-  backup relies on: a new version is published under a new id.
 - **Taking an approval back.** Hiding does that job without losing anything.
 - **The order of the sets and the default set**: a row's `position`, and
   `data_set_defaults`.
@@ -205,10 +225,11 @@ through `node:sqlite` (as below, to add the site's sets), and in `gamefiles/`:
 ### Notifications
 
 Each change to the sets is a message to the VPS's ntfy (`server/notify.ts`): a set
-published, approved, rejected, withdrawn by its owner, hidden or shown. It is two lines:
+published, approved, rejected, withdrawn by its owner, hidden, shown or edited. It is two
+lines:
 
 ```
-Dataset <name>: <added | approved | rejected | withdrawn | shown | hidden>
+Dataset <name>: <added | approved | rejected | withdrawn | shown | hidden | edited>
 By <who> at YYYYMMDD HH:mm
 ```
 
@@ -356,7 +377,7 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | `/gamefiles/…` | `GAMEFILES_DIR/…` | `no-cache`, ETag and Last-Modified |
 | `/files/…` | `FILES_DIR/…`, the files shared by link | `no-cache`, ETag and Last-Modified |
 | `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest; POST: a set published | `no-store`, `Vary: X-Player-Id` |
-| `/api/data-sets/<id>` | POST: the set approved, rejected, hidden or shown by a moderator, or withdrawn by its owner | `no-store` |
+| `/api/data-sets/<id>` | POST: the set approved, rejected, hidden or shown by a moderator, or withdrawn by its owner; with a form, edited by a moderator | `no-store` |
 | `/api/data-set-walls` | the walls of those of the same sets that keep some: the published ones | `no-store`, `Vary: X-Player-Id` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
@@ -490,12 +511,11 @@ self-contained file, `stats/backups/stats-<date>.db`, the data sets' tables with
 events. A `cp` of the live file would be unsafe: its WAL holds events the main file does
 not have yet.
 
-It then copies the folders the snapshot's sets with an owner live in, the sets players
-published, into `stats/backups/gamefiles/<dir>/`. The site's folders, with no owner, are not
-copied: the author uploads them by hand, from their own copy. A player's folder is whole before
-its row is written and never changes after, so each is copied once, through a `.partial`
-name renamed when whole, and kept for good, a deleted set's included, since a snapshot
-still names it. It prints one JSON line, `backup_ok` with the folders copied and the
+It then copies the folders the snapshot's sets live in, every set's, into
+`stats/backups/gamefiles/<dir>/`: a moderator's edit writes any set a new folder, the site's
+too. A folder is whole before a row names it and never changes after, so each is copied
+once, through a `.partial` name renamed when whole, and kept for good, a deleted set's and
+an edited set's old one included, since a snapshot still names it. It prints one JSON line, `backup_ok` with the folders copied and the
 number kept, and exits with 1 when the store cannot be read or a folder cannot be copied
 (`backup_failed`). The crontab line deletes the snapshots older than 14 days, and only
 them:

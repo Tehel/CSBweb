@@ -13,11 +13,11 @@
  * and `node:alpine` has no `sqlite3`. `node:sqlite`'s `backup` copies the database as a
  * connection sees it, WAL included, into one self-contained file.
  *
- * The folders are those of the snapshot's sets that have an owner: the site's are
- * uploaded by hand, and kept where they came from. A set's folder is complete before its row
- * is written, and never changes after, so each is copied once, into `gamefiles/<dir>/` under
+ * The folders are those of every set of the snapshot's, the site's too, since a moderator's
+ * edit writes a set a new one (`edit.ts`). A set's folder is complete before its row names
+ * it, and never changes after, so each is copied once, into `gamefiles/<dir>/` under
  * `BACKUP_DIR`, through a `.partial` name renamed when whole, and kept: an older snapshot
- * needs the folders of its rows, a deleted set's included.
+ * needs the folders of its rows, a deleted set's and an edited set's old one included.
  *
  * It prints one JSON line, and exits with 1 when the store cannot be read or a folder
  * cannot be copied.
@@ -53,7 +53,7 @@ try {
     const snapshot = new DatabaseSync(target, { readOnly: true });
     let uploaded: string[];
     try {
-        uploaded = (snapshot.prepare('SELECT dir FROM data_sets WHERE owner IS NOT NULL ORDER BY position').all() as { dir: string }[]).map((row) => row.dir);
+        uploaded = (snapshot.prepare('SELECT dir FROM data_sets ORDER BY position').all() as { dir: string }[]).map((row) => row.dir);
     } finally {
         snapshot.close();
     }

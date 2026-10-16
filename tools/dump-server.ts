@@ -41,6 +41,15 @@
  *     large, an id the table or the folder holds, and a set the page's check refuses, a
  *     thumbnail that is not a PNG or not 320x200, and a base set that is not the site's; a table made
  *     before the publish's columns gains them;
+ *   - `POST /api/data-sets/<id>` with a form (`server/edit.ts`): a moderator edits a set's
+ *     text, its row changed and its folder not, and its files, each change a new folder,
+ *     `<id>@2` then `<id>@3`, a file the form does not know carried over, the old folder
+ *     deleted, its flags following from its files and its walls the new `dungeon.dat`'s; a
+ *     site's set too, whose folder is a link, the folder it leads to left as it was; each
+ *     edit notified; and every refusal answered with nothing changed: an asker who is not a
+ *     moderator (403, a body too large too, unread), a body too large or not a form, an id
+ *     in the form, a field missing, a `remove` of no file, twice or of a file given (400), an
+ *     unknown id (404), and a set the page's check refuses (422);
  *   - `POST /api/data-sets/<id>` (`server/moderate.ts`): a moderator approves, hides and
  *     shows a set, a site's too, and rejects a pending one, its row then its folder gone,
  *     and its owner withdraws it while it is pending; and every refusal answered with
@@ -60,9 +69,9 @@
  *     walls it cannot read;
  *   - `backup.ts`, run beside that server: a snapshot in `backups/` holding the events
  *     still in the WAL and the data sets, the server serving throughout, and exit 1 on a
- *     missing store; the folder of a set with an owner copied whole into
- *     `backups/gamefiles/`, the site's not, kept by the next run rather than copied
- *     again, and exit 1 on an owned set whose folder is not there.
+ *     missing store; the folder of every set, with an owner or not, copied whole into
+ *     `backups/gamefiles/`, kept by the next run rather than copied again, and exit 1 on
+ *     a set whose folder is not there.
  *
  * The scratch build's check (`CHECK_MODULE`) is a stand-in that exports the functions:
  * `tools/dump-build.ts` builds the real one and checks sets through it.
@@ -470,13 +479,16 @@ async function checkPublish(scratch: string): Promise<void> {
     mkdirSync(join(gamefilesDir, 'stray'));
     const options: ServerOptions = { distDir, gamefilesDir };
     const db = new DatabaseSync(':memory:');
+    /** What the server notified. */
+    const told: string[] = [];
     const dataSets = filledFrom(JSON.stringify({
         default: 'dm-atari',
         dataSets: [{ id: 'dm-atari', name: 'DM' }, { id: 'csb', name: 'CSB' }, { id: 'conflux', name: 'Conflux', dir: 'conflux-dir' }],
     }), new DataSetStore(db));
     checkFiles(options, dataSets);
     const server = createAppServer(options, {
-        checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), notify: NOBODY, store: new StatsStore(db),
+        checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), store: new StatsStore(db),
+        notify: (event) => told.push(`${event.name}: ${event.activity} by ${event.by}`),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
     });
@@ -635,6 +647,101 @@ async function checkPublish(scratch: string): Promise<void> {
         const titled = parseManifest((await ask(port, '/api/data-sets', 'GET', { [PLAYER_ID_HEADER]: PLAYER })).body, '').dataSets;
         check(titled.find((set) => set.id === 'p2')?.thumbnailAsTitle === true && titled.filter((set) => set.id !== 'p2').every((set) => !set.thumbnailAsTitle),
             'a set published with its thumbnail as the title says so in api/data-sets, and the others do not');
+
+        // A moderator's edit (`server/edit.ts`): the moderation's route, with a form.
+        console.log('\nEditing a set:');
+        const edit = async (id: string, text: Record<string, string | string[]>, files: Record<string, File> = {}, player: string | null = MODERATORS[0]) => {
+            const form = new FormData();
+            for (const [key, value] of Object.entries(text)) for (const one of [value].flat()) form.append(key, one);
+            for (const [key, file] of Object.entries(files)) form.append(key, file);
+            const response = await fetch(`http://127.0.0.1:${port}/${DATA_SETS_ROUTE}/${id}`, { method: 'POST', headers: player === null ? {} : { [PLAYER_ID_HEADER]: player }, body: form });
+            return { status: response.status, body: await response.text() };
+        };
+        const editFields = (extra: Record<string, string | string[]> = {}) => {
+            const text = fields('', extra);
+            delete text.id;
+            return text;
+        };
+        const rowOf = (id: string) => dataSets.read().dataSets.find((set) => set.id === id)!;
+        const listing = (dir: string) => readdirSync(join(gamefilesDir, dir)).sort().join();
+        const black = indexedPng(320, 200, [[0, 0, 0]], deflateSync(indexedPngRows(320, 200, new Uint8Array(320 * 200))));
+        told.length = 0;
+
+        const textOnly = await edit('my-dm', editFields({ name: 'My Edited DM', description: 'Edited.', authors: ['Someone'] }));
+        const edited = rowOf('my-dm');
+        console.log(`  its text: ${textOnly.status} ${textOnly.body}, ${JSON.stringify({ name: edited.name, description: edited.description, authors: edited.authors, dir: edited.dir })}`);
+        check(textOnly.status === 200 && textOnly.body === '{"id":"my-dm"}' && edited.name === 'My Edited DM' && edited.description === 'Edited.' && edited.authors.join() === 'Someone',
+            'a moderator edits a set\'s text: 200, its row says it');
+        check(edited.pending && edited.owner === PLAYER && edited.dir === 'my-dm' && listing('my-dm') === 'dungeon.dat,graphics.dat,my-dm-thumbnail.png'
+            && readFileSync(join(gamefilesDir, 'my-dm', 'my-dm-thumbnail.png')).equals(thumbnail), 'its state and owner kept, and its folder untouched: no file changed');
+        check(told.join() === 'My Edited DM: edited by moderator 1', 'the edit is notified, by the moderator\'s name');
+
+        const newThumbnail = await edit('my-dm', editFields({ name: 'My Edited DM' }), { thumbnail: fileOf(black, 'thumbnail.png', 'image/png') });
+        console.log(`  a new thumbnail: ${newThumbnail.status}, ${rowOf('my-dm').dir}: ${listing(rowOf('my-dm').dir)}`);
+        check(newThumbnail.status === 200 && rowOf('my-dm').dir === 'my-dm@2' && listing('my-dm@2') === 'dungeon.dat,graphics.dat,my-dm-thumbnail.png'
+            && readFileSync(join(gamefilesDir, 'my-dm@2', 'my-dm-thumbnail.png')).equals(black) && readFileSync(join(gamefilesDir, 'my-dm@2', 'dungeon.dat')).equals(dmDungeon),
+            'a file changed writes the set a new folder, <id>@2, the new file in it and its others copied');
+        check(!existsSync(join(gamefilesDir, 'my-dm')) && !readdirSync(gamefilesDir).some((name) => name.startsWith('.')), 'and deletes the old one, no .partial left');
+        const editedSeen = parseManifest((await ask(port, '/api/data-sets', 'GET', { [PLAYER_ID_HEADER]: PLAYER })).body, '').dataSets.find((set) => set.id === 'my-dm');
+        check(editedSeen?.dir === 'my-dm@2' && editedSeen.name === 'My Edited DM' && JSON.stringify(dataSets.walls().get('my-dm')) === dmWalls,
+            'api/data-sets names the new folder, and the row keeps its walls: its dungeon.dat is the same');
+
+        const noThumbnail = await edit('my-dm', editFields({ name: 'My Edited DM', thumbnailAsTitle: 'true', remove: 'thumbnail' }));
+        console.log(`  the thumbnail removed: ${noThumbnail.status}, ${rowOf('my-dm').dir}: ${listing(rowOf('my-dm').dir)}`);
+        check(noThumbnail.status === 200 && rowOf('my-dm').dir === 'my-dm@3' && listing('my-dm@3') === 'dungeon.dat,graphics.dat' && !existsSync(join(gamefilesDir, 'my-dm@2'))
+            && !rowOf('my-dm').thumbnailAsTitle, 'a file removed is a new folder too, <id>@3, without it, and no thumbnail as the title without a thumbnail');
+
+        writeFileSync(join(gamefilesDir, 'my-csb', 'readme.txt'), 'Read me.');
+        const newDungeon = await edit('my-csb', editFields({ name: 'My CSB', remove: ['hcsb.hct', 'hcsb.dat'] }), { 'dungeon.dat': fileOf(dmDungeon, 'dungeon.dat') });
+        const csbEdited = rowOf('my-csb');
+        console.log(`  a new dungeon.dat, the Hint Oracle removed: ${newDungeon.status} ${newDungeon.body.slice(0, 200)}, ${csbEdited.dir}: ${listing(csbEdited.dir)}`);
+        check(newDungeon.status === 200 && csbEdited.dir === 'my-csb@2' && listing('my-csb@2') === 'dungeon.dat,graphics.dat,readme.txt'
+            && readFileSync(join(gamefilesDir, 'my-csb@2', 'graphics.dat')).equals(readFileSync(`${csb.dir}/graphics.dat`)),
+            'a file the form does not know is carried over, the removed ones are not, and the graphics.dat is kept');
+        check(!csbEdited.hintOracle && csbEdited.owner === OTHER && JSON.stringify(dataSets.walls().get('my-csb')) === dmWalls,
+            'its flags follow from its files, and its walls are the new dungeon.dat\'s');
+
+        // A site's set whose folder is a link, as the dev server's are (`vite.config.mts`).
+        const outside = join(root, 'outside', 'linked');
+        mkdirSync(outside, { recursive: true });
+        writeFileSync(join(outside, 'dungeon.dat'), dmDungeon);
+        writeFileSync(join(outside, 'graphics.dat'), readFileSync(`${dm.dir}/graphics.dat`));
+        symlinkSync(outside, join(gamefilesDir, 'linked'));
+        db.prepare("INSERT INTO data_sets (id, name, dir, position, status) VALUES ('linked', 'Linked', 'linked', 50, 'approved')").run();
+        const linked = await edit('linked', editFields({ name: 'Linked' }), { thumbnail: fileOf(black, 'thumbnail.png', 'image/png') });
+        console.log(`  a site's set, its folder a link: ${linked.status}, ${rowOf('linked').dir}: ${listing(rowOf('linked').dir)}; the link's folder: ${readdirSync(outside).sort().join()}`);
+        check(linked.status === 200 && rowOf('linked').dir === 'linked@2' && listing('linked@2') === 'dungeon.dat,graphics.dat,linked-thumbnail.png'
+            && rowOf('linked').owner === null && !rowOf('linked').pending, 'a site\'s set is edited too, its state kept');
+        check(!existsSync(join(gamefilesDir, 'linked')) && readdirSync(outside).sort().join() === 'dungeon.dat,graphics.dat'
+            && readFileSync(join(outside, 'dungeon.dat')).equals(dmDungeon), 'its link is deleted, and the folder it led to left as it was');
+
+        console.log('  refusals:');
+        const sent = told.length;
+        const editRefused = async (label: string, status: number, send: () => Promise<{ status: number; body: string }>, says = '') => {
+            const was = `${written(gamefilesDir, dataSets)} ${JSON.stringify(dataSets.read())}`;
+            const answer = await send();
+            console.log(`    ${label}: ${answer.status} ${answer.body.length > 200 ? `${answer.body.slice(0, 200)}…` : answer.body}`);
+            check(answer.status === status && answer.body.includes(says) && `${written(gamefilesDir, dataSets)} ${JSON.stringify(dataSets.read())}` === was,
+                `${label}: ${status}, nothing changed`);
+        };
+        await editRefused('its owner', 403, () => edit('my-dm', editFields(), {}, PLAYER), 'Only a moderator');
+        await editRefused('no player', 403, () => edit('my-dm', editFields(), {}, null), 'Only a moderator');
+        await editRefused('a request too large, from a player', 403, () => ask(port, `/${DATA_SETS_ROUTE}/my-dm`, 'POST',
+            { [PLAYER_ID_HEADER]: PLAYER, 'Content-Type': 'multipart/form-data; boundary=x' }, Buffer.alloc(MAX_PUBLISH_BYTES + 1)), 'Only a moderator');
+        await editRefused('a request too large', 413, () => ask(port, `/${DATA_SETS_ROUTE}/my-dm`, 'POST',
+            { [PLAYER_ID_HEADER]: MODERATORS[0], 'Content-Type': 'multipart/form-data; boundary=x' }, Buffer.alloc(MAX_PUBLISH_BYTES + 1)), 'request is larger');
+        await editRefused('a broken form', 400, () => ask(port, `/${DATA_SETS_ROUTE}/my-dm`, 'POST',
+            { [PLAYER_ID_HEADER]: MODERATORS[0], 'Content-Type': 'multipart/form-data; boundary=x' }, '--x\r\nnonsense'), 'not a form');
+        await editRefused('an id the table does not hold', 404, () => edit('nope', editFields()), 'no set of this id');
+        await editRefused('an id in the form', 400, () => edit('my-dm', fields('my-dm')), "field 'id'");
+        await editRefused('a field missing', 400, () => { const text = editFields(); delete text.name; return edit('my-dm', text); }, "'name' is not one text");
+        await editRefused('a remove that names no file', 400, () => edit('my-dm', editFields({ remove: 'run.sh' })), "'remove' names no file");
+        await editRefused('a file removed twice', 400, () => edit('my-dm', editFields({ remove: ['graphics.dat', 'graphics.dat'] })), 'twice, or gives it too');
+        await editRefused('a file removed and given', 400, () => edit('my-dm', editFields({ remove: 'dungeon.dat' }), { 'dungeon.dat': fileOf(dmDungeon, 'dungeon.dat') }), 'twice, or gives it too');
+        await editRefused('dungeon.dat removed', 422, () => edit('my-dm', editFields({ remove: 'dungeon.dat' })), '"about":"dungeon.dat"');
+        await editRefused('a thumbnail that is not a PNG', 422, () => edit('my-dm', editFields(), { thumbnail: fileOf(new Uint8Array(64), 'thumbnail.png', 'image/png') }), 'It is not a PNG.');
+        await editRefused('an empty name', 422, () => edit('my-dm', editFields({ name: ' ' })), '"about":"name"');
+        check(told.length === sent, 'and nothing is notified');
     } finally {
         server.close();
         db.close();
@@ -930,17 +1037,18 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     check(backup?.answering === true, 'the server kept serving through the backup');
     const folders = join(scratch, 'stats', 'backups', 'gamefiles');
     const copy = join(folders, 'set-b', 'sub', 'dungeon.dat');
-    check((backup?.out ?? '').includes('"copied":["set-b"],"kept":0') && existsSync(copy) && readFileSync(copy).equals(Buffer.from([5, 6, 7])),
+    check((backup?.out ?? '').includes('"copied":["set-a","set-b"],"kept":0') && existsSync(copy) && readFileSync(copy).equals(Buffer.from([5, 6, 7])),
         'the folder of the set with an owner is copied whole into backups/gamefiles/');
-    check(!existsSync(join(folders, 'set-a')) && !existsSync(join(folders, 'set-b.partial')), 'the site\'s is not, and no .partial is left');
+    check(readFileSync(join(folders, 'set-a', 'dungeon.dat')).equals(Buffer.from([1, 2, 3, 4])) && !existsSync(join(folders, 'set-b.partial')),
+        'the site\'s too, since an edit writes it a new one, and no .partial is left');
     const second = again as { code: number | null; out: string } | null;
     console.log(`  backup.ts again: ${shown(second)}`);
-    check(second?.code === 0 && second.out.includes('"copied":[],"kept":1'), 'the next backup keeps that copy rather than copying it again');
+    check(second?.code === 0 && second.out.includes('"copied":[],"kept":2'), 'the next backup keeps those copies rather than copying them again');
     const noStore = await finish(startEntry({ STATS_DB: join(scratch, 'nowhere', 'stats.db') }, 'backup.ts'));
     check(noStore.code === 1 && noStore.out.includes('backup_failed'), 'backup.ts on a store that is not there exits 1');
     const missing = noFolder as { code: number | null; out: string } | null;
     check(missing?.code === 1 && missing.out.includes('backup_failed') && !existsSync(join(scratch, 'backups-elsewhere', 'gamefiles', 'set-b')),
-        'backup.ts on a set with an owner whose folder is not there exits 1');
+        'backup.ts on a set whose folder is not there exits 1');
     check(code === 0 && out.includes('SIGTERM: shutting down') && out.includes('Stopped'), 'SIGTERM stops it, with 0');
     check(existsSync(statsDb) && !existsSync(`${statsDb}-wal`), 'the store was made, its folder too, and closed with its WAL checkpointed');
     check(out.includes('(a, from the data_sets table);'), 'it serves the sets of the table the tool filled');

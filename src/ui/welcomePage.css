@@ -363,6 +363,9 @@ body.welcome {
 .add-set-checklist .add-set-as-title input { width: 15px; height: 15px; }
 .add-set-problem { font-size: 15px; line-height: 1.3; color: var(--p9); }
 .add-set-problem:empty { display: none; }
+/* A published set's: what its edit does to its saved games. */
+.add-set-note { margin: 0; font-size: 15px; line-height: 1.3; color: var(--p13); }
+.add-set-note:empty { display: none; }
 /* What the dungeon holds, once its dungeon.dat reads: a term and its line, each; the
    items a kind and its count to a cell, two to a line. */
 .add-set-holds {

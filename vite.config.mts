@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 
-import { dataSetViewer, pathSegments, receiveModeration, receivePublish } from './server/app';
+import { dataSetViewer, pathSegments, receiveEdit, receiveModeration, receivePublish } from './server/app';
 import { DataSetStore, manifestText, parseModerators, wallsText } from './server/dataSets';
 import { RateLimit } from './server/events';
 import { NOBODY } from './server/notify';
@@ -42,13 +42,16 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  * then, its sets the site's, and every change made since the dev server started, the sets
  * published and moderated, made again in their order. A GET gets `manifestText` for the
  * player it names, a POST `receivePublish` with the page's own check, the source's
- * (`ssrLoadModule`), and a POST to `api/data-sets/<id>` `receiveModeration`.
- * `api/data-set-walls` answers `wallsText` over the same store: the published sets'.
+ * (`ssrLoadModule`), and a POST to `api/data-sets/<id>` `receiveModeration`, or
+ * `receiveEdit` for a form. `api/data-set-walls` answers `wallsText` over the same store:
+ * the published sets'.
  *
  * A published set is written into a scratch folder, made at start and removed at the end,
  * which holds a link to each entry of `static/gamefiles/`, so that a base set's
  * `graphics.dat` and every folder name are where `publishDataSet` looks; its files are
- * served from there under `gamefiles/<id>/`. The store is `node:sqlite`'s, in memory:
+ * served from there under `gamefiles/<id>/`, and an edited set's under its new folder's
+ * name. An edit copies a site's folder through its link, and deletes the link, never
+ * `static/gamefiles/`. The store is `node:sqlite`'s, in memory:
  * on a Node without it, a GET answers the manifest and a POST 501.
  */
 function dataSetsRoute(): Plugin {
@@ -77,10 +80,14 @@ function dataSetsRoute(): Plugin {
           change(store);
           changes.push(change);
         };
-        const { publish, approve, setHidden, remove } = DataSetStore.prototype;
+        const { publish, approve, setHidden, remove, edit } = DataSetStore.prototype;
         store.publish = (set, owner) => {
           keep((kept) => publish.call(kept, set, owner));
           published.add(set.id);
+        };
+        store.edit = (id, set) => {
+          keep((kept) => edit.call(kept, id, set));
+          published.add(set.dir);
         };
         store.approve = (id) => keep((kept) => approve.call(kept, id));
         store.setHidden = (id, hidden) => keep((kept) => setHidden.call(kept, id, hidden));
@@ -123,7 +130,7 @@ function dataSetsRoute(): Plugin {
         }
       });
 
-      /** `POST api/data-sets/<id>`: the set `id` moderated, as `server/app.ts` does it. */
+      /** `POST api/data-sets/<id>`: the set `id` moderated, or edited, as `server/app.ts` does it. */
       const moderate = async (id: string, req: IncomingMessage, res: ServerResponse, next: (error?: unknown) => void) => {
         if (req.method !== 'POST' || !sqlite) {
           res.statusCode = req.method !== 'POST' ? 405 : 501;
@@ -132,7 +139,9 @@ function dataSetsRoute(): Plugin {
         }
         const db = new sqlite.DatabaseSync(':memory:');
         try {
-          await receiveModeration(id, scratch, { dataSets: openStore(db), moderators, now: Date.now, notify: NOBODY }, req, res);
+          const api = { checkDataSet, dataSets: openStore(db), moderators, now: Date.now, notify: NOBODY };
+          if (req.headers['content-type']?.startsWith('multipart/form-data')) await receiveEdit(id, scratch, api, req, res);
+          else await receiveModeration(id, scratch, api, req, res);
         } catch (error) {
           next(error);
         } finally {

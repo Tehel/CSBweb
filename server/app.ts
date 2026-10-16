@@ -17,7 +17,8 @@
  *                     the player its `X-Player-Id` names; POST: that player's own set
  *                     published, pending (`publish.ts`)
  *   /api/data-sets/<id>  POST: the set approved, rejected, hidden or shown, by a moderator,
- *                     or withdrawn by its owner (`moderate.ts`)
+ *                     or withdrawn by its owner (`moderate.ts`); with a form, its text and
+ *                     files edited by a moderator (`edit.ts`)
  *   /api/data-set-walls  the walls of the sets `api/data-sets` offers the same player
  *                     that keep them, the published ones (`wallsText`)
  *   /api/health       200, for the compose healthcheck
@@ -37,6 +38,7 @@ import { pathToFileURL } from 'node:url';
 
 import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer, type Moderator } from './dataSets.ts';
+import { editDataSet } from './edit.ts';
 import { checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import type { Notify } from './notify.ts';
@@ -213,6 +215,7 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
         }
         if (segments.length === 3 && segments.slice(0, 2).join('/') === DATA_SETS_ROUTE) {
             if (req.method !== 'POST') return refuseMethod(res, 'POST');
+            if (isForm(req)) return receiveEdit(segments[2]!, gamefilesDir, api, req, res);
             return receiveModeration(segments[2]!, gamefilesDir, api, req, res);
         }
         const name = segments.length === 2 ? segments[1] : undefined;
@@ -364,25 +367,59 @@ export async function receivePublish(gamefilesDir: string, api: PublishApi, req:
     const refused = (): PublishAnswer | null => {
         if (!api.publishRateLimit.allow(clientAddress(req), api.now())) return answer(429, 'Too many publishes from here: try again in an hour.');
         if (!isPlayerId(req.headers[PLAYER_ID_HEADER.toLowerCase()])) return answer(400, `No player: ${PLAYER_ID_HEADER} is not a playerId.`);
-        if (!req.headers['content-type']?.startsWith('multipart/form-data')) return answer(400, 'The body is not multipart/form-data.');
+        if (!isForm(req)) return answer(400, 'The body is not multipart/form-data.');
         return null;
     };
     let reply = refused();
     if (reply !== null) req.resume();
     else {
         const playerId = req.headers[PLAYER_ID_HEADER.toLowerCase()] as string;
-        const body = await readBody(req, MAX_PUBLISH_BYTES);
-        let form: FormData | null = null;
-        if (body !== null) {
-            const request = new Request('http://localhost/', { method: 'POST', headers: { 'Content-Type': req.headers['content-type']! }, body: new Uint8Array(body) });
-            form = await request.formData().catch(() => null);
-        }
-        reply = body === null ? answer(413, `The request is larger than ${MAX_PUBLISH_BYTES / (1024 * 1024)} MiB.`)
-            : form === null ? answer(400, 'The body is not a form.')
+        const form = await readForm(req);
+        reply = typeof form === 'string' ? answer(form === 'large' ? 413 : 400, FORM_REFUSALS[form])
             : await publishDataSet(form, playerId, {
                 checkDataSet: api.checkDataSet, dataSets: api.dataSets, gamefilesDir, now: api.now,
                 notify: api.notify, publisher: dataSetViewer(api, req).moderator?.name ?? 'a player',
             });
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
+}
+
+/** Whether `req`'s body says it is a form, as a publish and an edit are sent. */
+function isForm(req: IncomingMessage): boolean {
+    return req.headers['content-type']?.startsWith('multipart/form-data') ?? false;
+}
+
+/** Why a form was not read. */
+const FORM_REFUSALS = { large: `The request is larger than ${MAX_PUBLISH_BYTES / (1024 * 1024)} MiB.`, broken: 'The body is not a form.' };
+
+/** `req`'s form, a body of at most `MAX_PUBLISH_BYTES`, or why not. */
+async function readForm(req: IncomingMessage): Promise<FormData | keyof typeof FORM_REFUSALS> {
+    const body = await readBody(req, MAX_PUBLISH_BYTES);
+    if (body === null) return 'large';
+    const request = new Request('http://localhost/', { method: 'POST', headers: { 'Content-Type': req.headers['content-type']! }, body: new Uint8Array(body) });
+    return await request.formData().catch(() => null) ?? 'broken';
+}
+
+/** What `receiveEdit` needs of the API. */
+export type EditApi = Pick<ApiOptions, 'checkDataSet' | 'dataSets' | 'moderators' | 'now' | 'notify'>;
+
+/**
+ * `POST api/data-sets/<id>` with a form: its asker, refused unless they moderate before the
+ * body is read, so that nobody else can make the server read `MAX_PUBLISH_BYTES`, then the
+ * form, before `editDataSet` decides. Every answer is JSON (`PublishAnswer`). The dev
+ * server answers the route with it too (`vite.config.mts`).
+ */
+export async function receiveEdit(id: string, gamefilesDir: string, api: EditApi, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const viewer = dataSetViewer(api, req);
+    let reply: PublishAnswer;
+    if (!viewer.moderator) {
+        req.resume();
+        reply = { status: 403, body: { error: 'Only a moderator may edit a set.' } };
+    } else {
+        const form = await readForm(req);
+        reply = typeof form === 'string' ? { status: form === 'large' ? 413 : 400, body: { error: FORM_REFUSALS[form] } }
+            : await editDataSet(id, form, viewer, { checkDataSet: api.checkDataSet, dataSets: api.dataSets, gamefilesDir, notify: api.notify, now: api.now });
     }
     res.setHeader('Cache-Control', 'no-store');
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');

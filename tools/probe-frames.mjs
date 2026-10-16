@@ -704,7 +704,8 @@ check(deleted.dialog === null && deleted.form === null && deleted.store.name ===
   'its DELETE removes the record and every save filed under its id, and the page shows the sets without it, the published one kept');
 // The moderation (`server/moderate.ts`), from the tiles, as the dev server's moderator
 // (`DEV_MODERATOR_PLAYER_ID`, `vite.config.mts`; the image's in `tools/check-image.sh`), the
-// page reloaded with their `playerId` kept. The set published above, pending, has the tick
+// page reloaded with their `playerId` kept. Every published set has the pen first; the set
+// published above, pending, then the tick
 // and the cross, every other the eye, open on a set shown, shut on a hidden one. The tick approves it, its name white and its
 // tile still selected, then the eye hides it, purple, and shows it again, white. A refusal,
 // the server stood in for, is said in the box beside CONTINUE. Then its owner, who sees no
@@ -723,10 +724,10 @@ const onMine = (control) => clickOn(`.pick-cell:has(.pick[data-set="${MINE}"]) .
 await asPlayer(MODERATOR);
 const moderating = await controlsOf();
 console.log('  to a moderator:', JSON.stringify(moderating));
-check(moderating[MINE] === 'pick-approve:Approve My Edited Dungeon,pick-reject:Reject My Edited Dungeon'
+check(moderating[MINE] === 'pick-edit:Edit My Edited Dungeon,pick-approve:Approve My Edited Dungeon,pick-reject:Reject My Edited Dungeon'
   && Object.entries(moderating).every(([set, controls]) => set === MINE
-    || ((row) => controls === (row?.hidden ? `pick-show:Show ${row.name}` : `pick-hide:Hide ${row?.name}`))(manifestRows.find((row) => row.id === set))),
-  'to a moderator, the pending set has the tick and the cross, every other set the eye, open on a set shown, shut on a hidden one');
+    || ((row) => controls === `pick-edit:Edit ${row?.name},${row?.hidden ? `pick-show:Show ${row.name}` : `pick-hide:Hide ${row?.name}`}`)(manifestRows.find((row) => row.id === set))),
+  'to a moderator, every set has the pen, the pending set then the tick and the cross, every other set the eye, open on a set shown, shut on a hidden one');
 await clickOn(`.pick[data-set="${MINE}"]`);
 await onMine('pick-approve');
 await wait(2000);
@@ -738,9 +739,9 @@ await onMine('pick-show');
 await wait(2000);
 const shown = await mineOf();
 console.log('  moderated:', JSON.stringify({ approved, hidden, shown }));
-check(approved.colour === 'rgb(252, 252, 252)' && approved.controls === 'pick-hide:Hide My Edited Dungeon' && approved.selected === 'true'
-  && hidden.colour === 'rgb(216, 0, 216)' && hidden.controls === 'pick-show:Show My Edited Dungeon' && hidden.selected === 'true'
-  && shown.colour === 'rgb(252, 252, 252)' && shown.controls === 'pick-hide:Hide My Edited Dungeon' && shown.selected === 'true',
+check(approved.colour === 'rgb(252, 252, 252)' && approved.controls === 'pick-edit:Edit My Edited Dungeon,pick-hide:Hide My Edited Dungeon' && approved.selected === 'true'
+  && hidden.colour === 'rgb(216, 0, 216)' && hidden.controls === 'pick-edit:Edit My Edited Dungeon,pick-show:Show My Edited Dungeon' && hidden.selected === 'true'
+  && shown.colour === 'rgb(252, 252, 252)' && shown.controls === 'pick-edit:Edit My Edited Dungeon,pick-hide:Hide My Edited Dungeon' && shown.selected === 'true',
   'the tick approves the set, the shut eye hides it and the open eye shows it, the page asking for the sets anew, the set kept selected');
 onPaused = ({ requestId }) => send('Fetch.fulfillRequest', { requestId, responseCode: 409,
   responseHeaders: [{ name: 'Content-Type', value: 'application/json; charset=utf-8' }],
@@ -752,6 +753,40 @@ await send('Fetch.disable');
 onPaused = null;
 const moderationRefused = (await welcome()).preview.join();
 check(moderationRefused === 'My Edited Dungeon could not be hidden: The set is hidden.', 'a refusal is said beside CONTINUE');
+// The pen, to a moderator (`server/edit.ts`): the form on the set as the site holds it, its
+// files read from its folder, its id without local: and fixed, no PUBLISH nor DELETE,
+// dungeon.dat not removable, and CONFIRM held until a change. A new description, then a new
+// dungeon.dat, which the note under the checklist says reaches no saved game; CONFIRM sends
+// the edit, and the page, asked for the sets anew, shows the set from its new folder,
+// still selected.
+const noteText = () => evaluate(`document.querySelector('dialog.add-set .add-set-note')?.textContent`);
+await onMine('pick-edit');
+await wait(3000);
+const siteForm = { ...(await form()), publish: await publishState(), note: await noteText(),
+  prefix: await evaluate(`document.querySelector('dialog.add-set .add-set-id > span').hidden`) };
+console.log('  the pen, to a moderator:', JSON.stringify(siteForm));
+check(siteForm.open === true && siteForm.title === 'Edit the published dungeon' && siteForm.name === 'My Edited Dungeon' && siteForm.id === MINE
+  && siteForm.fixedId && siteForm.prefix === true && !siteForm.deletable && siteForm.publish === 'hidden' && siteForm.removable === 'graphics.dat,thumbnail'
+  && !siteForm.rows.includes('x') && siteForm.rows.includes('dungeon.dat+') && siteForm.thumbnail === 'thumbnail.png' && !siteForm.confirm && siteForm.note === '',
+  'the pen opens the form on the published set, its files the folder\'s, its id fixed, no PUBLISH nor DELETE, CONFIRM held until a change');
+await typeIn('description', 'Edited by a moderator.');
+await wait(1500);
+const describedConfirm = (await form())?.confirm;
+await dropIn([['gamefiles/dm-atari/dungeon.dat', 'dungeon.dat']]);
+await wait(2500);
+const newDungeonNote = await noteText();
+await inForm(`d.querySelector('#add-set-confirm').click()`);
+await wait(3000);
+const siteEdited = await evaluate(`fetch('api/data-sets', { headers: { 'X-Player-Id': ${JSON.stringify(MODERATOR)} } }).then(r=>r.json())
+  .then(m=>(s=>s&&{ dir: s.dir, description: s.description })(m.dataSets.find(s=>s.id===${JSON.stringify(MINE)})))`);
+const afterSiteEdit = { form: await form(), page: await welcome(), mine: await mineOf(),
+  picture: await evaluate(`document.querySelector('.pick[data-set="${MINE}"] img')?.getAttribute('src')`) };
+console.log('  edited by a moderator:', JSON.stringify({ describedConfirm, newDungeonNote, siteEdited, picture: afterSiteEdit.picture }));
+check(describedConfirm === true && newDungeonNote.startsWith('Saved games keep the dungeon they were made in'),
+  'a change enables CONFIRM, and a new dungeon.dat is said to reach no saved game');
+check(afterSiteEdit.form === null && siteEdited?.dir === `${MINE}@2` && siteEdited.description === 'Edited by a moderator.'
+  && afterSiteEdit.picture === `gamefiles/${MINE}@2/${MINE}-thumbnail.png` && afterSiteEdit.page.pictures.every(Boolean) && afterSiteEdit.mine.selected === 'true',
+  'CONFIRM edits the set on the site: the form closes, its text changed, its files in a new folder, whose thumbnail the page shows, the set still selected');
 const SECOND = `${MINE}-b`;
 const secondPublished = await evaluate(`(async()=>{const f=new FormData(), file=async(path)=>(await fetch(path)).blob();
   for (const [name, value] of [['id','${SECOND}'],['name','My Second Dungeon'],['description',''],['dmRules','true'],['thumbnailAsTitle','false'],['baseSet','dm-atari']]) f.append(name, value);

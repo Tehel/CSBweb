@@ -1,9 +1,10 @@
 /**
  * What the server tells the author's phone: each change to the sets, through the VPS's ntfy
  * (`doc/DEPLOYMENT.md` → "Notifications"). A set published (`publish.ts`), approved,
- * rejected, withdrawn, hidden or shown (`moderate.ts`) is one message of two lines:
+ * rejected, withdrawn, hidden or shown (`moderate.ts`), or edited (`edit.ts`) is one message
+ * of two lines:
  *
- *   Dataset <name>: <added | approved | rejected | withdrawn | shown | hidden>
+ *   Dataset <name>: <added | approved | rejected | withdrawn | shown | hidden | edited>
  *   By <who> at YYYYMMDD HH:mm
  *
  * <who> is a moderator's name (`Moderator`, `dataSets.ts`), `its owner` for a set withdrawn,
@@ -15,7 +16,7 @@
  */
 
 /** What became of a set. */
-export type DataSetActivity = 'added' | 'approved' | 'rejected' | 'withdrawn' | 'shown' | 'hidden';
+export type DataSetActivity = 'added' | 'approved' | 'rejected' | 'withdrawn' | 'shown' | 'hidden' | 'edited';
 
 /** A change to a set, as a notification says it. */
 export interface DataSetEvent {
