@@ -20,5 +20,9 @@ Paul Stevens' `http://dianneandpaul.net/CSBwin/Games/` still serves a few archiv
 directly, but older versions than the port ships: Towers of Chaos 3.0 (ours is 3.3),
 Conflux WIP006 (ours is 3.5 beta 8).
 
+The `@content.downloadUrl` a listing gives takes HTTP Range requests: a file's first bytes,
+or a zip's central directory and then an entry's first deflated bytes, read without
+downloading the archive (how `doc/RTC/README.md`'s survey of the RTC modules was read).
+
 **How to apply:** for any dungeon's files, list its OneDrive folder before chasing a
 topic's links. See [[custom-dungeon-archives]].
