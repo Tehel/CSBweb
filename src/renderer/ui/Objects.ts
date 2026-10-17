@@ -139,7 +139,14 @@ export function getObjectWeightForRecord(ui: UIState, rn: ObjectID, visited: Set
   return ui.ctx.systems.characterStats.getObjectWeight(rn, visited);
 }
 
-export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objectNameIndex: number): ItemDescriptionLine[] {
+/**
+ * The lines `DescribeObject` draws under an object's name, and whether a viewing filter
+ * rewrote them: a DSA's `&DESCRIBE` changed the mask, a phrase's text or a colour. A
+ * filter that ran no `&DESCRIBE` let the object through.
+ */
+export type ObjectDescription = { lines: ItemDescriptionLine[]; rewritten: boolean };
+
+export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objectNameIndex: number): ObjectDescription {
   const lines: ItemDescriptionLine[] = [];
   const { category } = ui.ctx.dungeon.rnMaps.decode(objectId);
   const phrases = ['CONSUMABLE', 'POISONED', 'BROKEN', 'CURSED', '', '', '', ''];
@@ -210,6 +217,9 @@ export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objec
   phrases[6] = formatWeightText(weight);
 
   const filter = applyViewingFilter(ui, ViewingFilterSite.DESCRIPTION, objectId, phraseMask);
+  const rewritten = filter !== null && (filter.phraseMask !== phraseMask
+    || filter.phraseTextOverrides.some((text) => text !== null)
+    || filter.phraseColorOverrides.some((color) => color !== null));
   if (filter) {
     phraseMask = filter.phraseMask;
     for (let i = 0; i < filter.phraseTextOverrides.length; i++) {
@@ -230,7 +240,7 @@ export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objec
   if ((phraseMask & 0x80) !== 0 && phrases[7]) {
     lines.push({ text: phrases[7], color: phraseColors[7] ?? 13 });
   }
-  return lines;
+  return { lines, rewritten };
 }
 
 export function buildPhraseSummary(mask: number, phrases: string[], colors: number[]): ItemDescriptionLine | null {
@@ -265,22 +275,67 @@ export function applyViewingFilter(
   });
 }
 
-export function drawItemDescriptionLine(ui: UIState, text: string, color: number, state: { x: number; y: number }): void {
+/** The eye's description: its first line's viewport row, a line's height, and its width in characters. */
+export const ITEM_DESCRIPTION_Y = 87;
+export const ITEM_LINE_STEP = 7;
+export const ITEM_LINE_CHARS = 18;
+/** The last row the eye panel holds a line at: its frame's inner edge is y 123. */
+export const ITEM_PROPERTY_Y = 122;
+
+/** A description line as the eye draws it, cut into rows of at most 18 characters. */
+export function wrapItemDescriptionLine(text: string): string[] {
+  const rows: string[] = [];
   let remaining = text;
   while (remaining.length > 0) {
     let line = remaining;
     let next = '';
-    if (line.length > 18) {
-      let cut = 17;
+    if (line.length > ITEM_LINE_CHARS) {
+      let cut = ITEM_LINE_CHARS - 1;
       while (cut > 2 && line[cut] !== ' ') cut--;
-      if (cut === 2) cut = 17;
+      if (cut === 2) cut = ITEM_LINE_CHARS - 1;
       next = remaining.slice(cut + 1);
       line = remaining.slice(0, cut);
     }
-    drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, state.x, state.y, color, null, line);
-    state.y += 7;
+    rows.push(line);
     remaining = next;
   }
+  return rows;
+}
+
+export function drawItemDescriptionLine(ui: UIState, text: string, color: number, state: { x: number; y: number }): void {
+  for (const line of wrapItemDescriptionLine(text)) {
+    drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, state.x, state.y, color, null, line);
+    state.y += ITEM_LINE_STEP;
+  }
+}
+
+/**
+ * The extra's lines for an object (`showItemProperties`, `DEBT.md` X), in their priority
+ * order, each one labelled figure of at most 18 characters, from the set's own tables.
+ * The weapons', the garments' and the food's, water's and potions' lines are still to come.
+ */
+export function getItemPropertyLines(ui: UIState, objectId: ObjectID): string[] {
+  switch (ui.ctx.dungeon.rnMaps.dbType(objectId)) {
+    default:
+      return [];
+  }
+}
+
+/**
+ * Where the extra's lines go under the description's: anchored at the bottom, the first
+ * at viewport y 122, the next 7 rows up, and so on. A line whose row would be at or above
+ * the description's last row is dropped, and every line after it.
+ */
+export function placeItemPropertyLines(description: ItemDescriptionLine[], properties: string[]): Array<{ text: string; y: number }> {
+  const rows = description.reduce((n, line) => n + wrapItemDescriptionLine(line.text).length, 0);
+  const lastY = ITEM_DESCRIPTION_Y + (rows - 1) * ITEM_LINE_STEP;
+  const placed: Array<{ text: string; y: number }> = [];
+  for (const text of properties) {
+    const y = ITEM_PROPERTY_Y - placed.length * ITEM_LINE_STEP;
+    if (y <= lastY) break;
+    placed.push({ text, y });
+  }
+  return placed;
 }
 
 export function getInventoryPlaceholderIndex(champion: Champion, slot: number): number {

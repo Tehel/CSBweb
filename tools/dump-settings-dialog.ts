@@ -199,18 +199,21 @@ console.log('\n=== 3. the controls ===');
   click(ui, settingButtonFrame(2));
   check(updates === 2 && !values().extras.gatherThrownWeapons, 'a click on it pressed turns it off');
   click(ui, settingButtonFrame(3));
-  check(values().mapView, 'MAP VIEW\'s button, below COLOUR NEW MASTERY\'s, turns the map on');
+  check(values().extras.showItemProperties && !values().extras.gatherThrownWeapons,
+    'SHOW ITEM PROPERTIES\', below HIGHLIGHT NEW MASTERY\'s, turns that extra on, alone');
   click(ui, settingButtonFrame(4));
-  check(!values().statistics, 'SEND STATISTICS\', pressed, turns them off');
+  check(values().mapView, 'MAP VIEW\'s, on the third line, turns the map on');
   click(ui, settingButtonFrame(5));
   check(values().championView, 'CHAMPION VIEW\'s, beside it, turns the champions on');
+  click(ui, settingButtonFrame(6));
+  check(!values().statistics, 'SEND STATISTICS\', pressed, alone on the fourth line, turns them off');
   const gaps = [
     { x: settingButtonFrame(0).x2 + 4, y: centre(settingButtonFrame(0)).y },
-    { x: centre(settingButtonFrame(6)).x, y: centre(settingButtonFrame(6)).y },
+    { x: centre(settingButtonFrame(7)).x, y: centre(settingButtonFrame(7)).y },
   ];
   updates = 0;
   for (const at of gaps) settingsDialogClick(ui, at.x, at.y, 2);
-  check(updates === 0, 'a click between two buttons, or where no seventh setting is, changes nothing');
+  check(updates === 0, 'a click between two buttons, or where no eighth setting is, changes nothing');
 
   click(ui, TAB_FRAMES[2]);
   check(state.tab === 'sound', 'SOUND\'s tab selects it');
@@ -446,8 +449,8 @@ console.log('\n=== 4. the help line ===');
   check(settingsDialogPointer(ui, { x: settingButtonFrame(0).x1 + 2, y: centre(settingButtonFrame(0)).y }),
     'onto its bevel, it changes: the button is no longer lit');
   check(helpText(ui, state) === TABS[0].settings[0].help, 'and the help line still names the setting');
-  check(settingsDialogPointer(ui, centre(settingButtonFrame(4))), 'onto the third line\'s button, it changes');
-  check(helpText(ui, state) === TABS[0].settings[4].help, 'and names SEND STATISTICS');
+  check(settingsDialogPointer(ui, centre(settingButtonFrame(6))), 'onto the fourth line\'s button, it changes');
+  check(helpText(ui, state) === TABS[0].settings[6].help, 'and names SEND STATISTICS');
   state.tab = 'sound';
   settingsDialogPointer(ui, { x: 40, y: centre(toggleFrames(0)[0]).y });
   check(helpText(ui, state) === TABS[2].settings[0].help, 'on SOUND, a line\'s name names its setting');

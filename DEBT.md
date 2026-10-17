@@ -177,10 +177,9 @@ In payoff order: the first row is the next item.
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
-| X11 | The eye shows an item's properties: the setting, the room and the check | S | ⏸️ |
-| X12 | The eye shows a weapon's properties | M | ⏸️ after X11 |
-| X13 | The eye shows a garment's properties | S | ⏸️ after X11 |
-| X14 | The eye shows what food, water and potions give | S | ⏸️ after X11 |
+| X12 | The eye shows a weapon's properties | M | ⏸️ |
+| X13 | The eye shows a garment's properties | S | ⏸️ |
+| X14 | The eye shows what food, water and potions give | S | ⏸️ |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -1732,7 +1731,18 @@ Rules for all of them:
     the party arrives on the square it lies on, never what the cursor threw: into the
     slot it left, else the quiver, its small-weapon slots first and the object fewest
     slots take first, so a club gathered with daggers keeps slot 12, then the pack
-    (`src/engine/ThrownWeapons.ts`, checked by `tools/watch-thrown-weapons.ts`).
+    (`src/engine/ThrownWeapons.ts`, checked by `tools/watch-thrown-weapons.ts`);
+  - `showItemProperties`: an item's figures in the eye panel, under CSBWin's description
+    (`getItemPropertyLines` and `placeItemPropertyLines`, `src/renderer/ui/Objects.ts`,
+    checked by `tools/dump-item-properties.ts`). Its lines come in a fixed priority order,
+    anchored at the bottom: the first at viewport y 122, the next 7 rows up, a line whose
+    row would be at or above CSBWin's last dropped with every line after it, so each line
+    of an item type keeps its row. CSBWin's lines never move. A line is one labelled
+    figure, at most 18 characters so it never wraps (`DAMAGE 10`, `ARMOUR 9  SHARP 2`,
+    `FOOD 500`): the item's own value from the set's own tables (`ObjectTables`), not a
+    figure worked out for the selected champion, and a rule CSBWin keeps in code is
+    called, not copied. An object whose description a viewing filter's `&DESCRIBE`
+    rewrote shows none. No item type has lines yet: X12 to X14 give them.
 
   The coloured object cursor, RISE's NEW FACE and the FTL logo are the exceptions: the
   author wants them on by default, so they are recorded under H.
@@ -1803,65 +1813,9 @@ drawing a map from them is a separate item, entered when the author names it.
   pit seen as floor, saves, loads, and compares every code. The same file with the
   records deleted loads with every cell unknown.
 
-### X11 ⏸️ The eye shows an item's properties: the setting, the room and the check
-
-The eye panel (`drawObjectInfoPanel`, `src/renderer/ui/Inventory.ts`) shows only what
-CSBWin's `DescribeObject` does (`doc/CSBwin-src/Character.cpp:3424`): the name, a state
-line, the phrases and the weight. A weapon's damage, a garment's armour and a food's value
-are nowhere on screen. X11 to X14 add them as lines under CSBWin's, from the same tables
-the engine plays by. X11 is the frame. The lines themselves are X12 (weapons), X13
-(garments) and X14 (food, water and potions).
-
-- **The setting**: `showItemProperties`, a flag of `Extras`, set the way the three
-  shipped extras are (the rules above), with the old boolean `extras` mapped to it
-  (`src/settings/Settings.ts:192`). Its button is SHOW ITEM PROPERTIES, on the settings
-  dialog's GAME tab, which regroups its buttons so that the extras come first:
-  DRINK AT FOUNTAINS and HIGHLIGHT NEW MASTERY, GATHER THROWN WEAPONS and SHOW ITEM
-  PROPERTIES, MAP VIEW and CHAMPION VIEW, then SEND STATISTICS alone on the fourth row.
-  The page has five lines of two buttons (`SETTING_LINES`,
-  `src/renderer/ui/SettingsDialog.ts:137`), so the geometry stays. MAP VIEW, SEND
-  STATISTICS and CHAMPION VIEW move, which moves `probe-frames.mjs`'s hard-coded clicks
-  (`.claude/memory/dialog-layout-moves-probe-clicks.md`) and changes the GAME tab's
-  golden frames (`--update`).
-- **The room**: the panel is graphic 20 at viewport (80, 52)-(223, 124) (`wRectPos926`),
-  its frame's inner edge ending at y 123. A line drawn at y covers rows y-4 to y+1
-  (`TextRenderer.ts`). CSBWin's lines start at viewport (108, 87), 7 pixels apart, and a
-  line wraps at 18 characters (`drawItemDescriptionLine`, `src/renderer/ui/Objects.ts:268`).
-  So six lines fit, at y 87, 94, 101, 108, 115 and 122. CSBWin's own take one to four:
-  the state line ((BURNT OUT), (FULL), PARTY FACING…), the phrases, which wrap to two
-  ("(POISONED, BROKEN AND CURSED)"), and the weight. A DSA viewing filter can add
-  phrase 7 too, for five.
-- **The block**: the extra's lines are anchored at the bottom. An item's lines come in a
-  fixed priority order: the first is drawn at y 122, the next at y 115, and so on up. A
-  line whose row would be at or above CSBWin's last is dropped, and every line after it.
-  Each line of an item type therefore keeps its row on screen. No blank line is needed
-  between the two groups: an item with only its weight has five rows for the extra, the
-  longest CSBWin text two, or one with phrase 7. CSBWin's lines stay where they are,
-  setting on or off. The lines are drawn in colour 13, as CSBWin's are.
-- **One function**: `getItemPropertyLines(ui, objectId)`, beside
-  `getObjectDescriptionLines`. It returns the lines in priority order without drawing
-  them, so the tool can read them. Every figure comes from the set's own tables
-  (`ObjectTables`, read from its `graphics.dat`), so a custom set shows its own values. A
-  rule that CSBWin keeps in code rather than in a table is called, not copied (X13).
-- **What a figure is**: the item's own value from its table, not a figure worked out for
-  the selected champion. CSBWin's results draw randoms and depend on the champion. One
-  labelled figure a line, at most 18 characters so it never wraps: `DAMAGE 10`,
-  `THROWN 19`, `SHOOTS ARROWS`, `CHARGES 3`, `MANA +4 HELD`, `ARMOUR 9  SHARP 2`,
-  `FOOD 500`, `WATER 1600`.
-- **A viewing filter**: the extra shows nothing for an object whose description a
-  dungeon's viewing filter rewrote (`applyViewingFilter`, `ViewingFilterSite.DESCRIPTION`).
-  A designer who hides what an item is does not want its figures shown. The session reads
-  what `processViewingFilter` returns (`src/engine/DsaSystem.ts`) to tell a rewrite from
-  a filter that let the object through.
-- **The check**: a new `tools/dump-item-properties.ts` prints every object type's lines on
-  the default dungeon. It asserts that no line is over 18 characters, that the first line
-  is at y 122, and that, under every count of CSBWin's lines from one to five, no line of
-  the extra reaches CSBWin's. With the setting off, it asserts that the lines are exactly
-  CSBWin's. X11 draws no line yet, so its golden frame waits for X12.
-
 ### X12 ⏸️ The eye shows a weapon's properties
 
-After X11. A weapon's `WEAPONDESC` is in `ObjectTables.weaponDesc`
+A weapon's `WEAPONDESC` is in `ObjectTables.weaponDesc`
 (`doc/CSBwin-src/CSB.h:1352`). Each field is used as follows:
 
 - `uByte2`, the strength it adds. It is added to `DetermineThrowingDistance`
@@ -1893,7 +1847,7 @@ type. A golden frame shows the eye on a weapon with the setting on. It needs `--
 
 ### X13 ⏸️ The eye shows a garment's properties
 
-After X11. A garment's row of `ClothingDesc` is `ObjectTables.clothingArmour` and
+A garment's row of `ClothingDesc` is `ObjectTables.clothingArmour` and
 `clothingFlags`:
 
 - `uByte1`, its armour, and `uByte2 & 7`, its resistance to sharp blows
@@ -1915,8 +1869,6 @@ After X11. A garment's row of `ClothingDesc` is `ObjectTables.clothingArmour` an
 gives what the engine applies.
 
 ### X14 ⏸️ The eye shows what food, water and potions give
-
-After X11.
 
 - **Food**: `d.FoodValue[nameIndex - objNI_Apple]` (`ObjectTables.foodValue`,
   `Character.cpp:4290-4299`), against a champion's food, which `LIMIT`s it to 2048

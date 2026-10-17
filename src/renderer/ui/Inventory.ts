@@ -18,7 +18,7 @@ import { Rect } from '../../data/tables/UITables';
 import { drawAttributePanel, drawFoodWaterPanel, drawVitalsAndLoad, getInventoryItemIndex } from './Character';
 import { BOX_GRAPHIC_MARKED, BOX_GRAPHIC_PLAIN, blitBasicGraphicToViewport, drawObjectIcon, drawPossessionBox, possessionBoxGraphic } from './Draw';
 import { drawMouthChewAnimation } from './Feeding';
-import { applyViewingFilter, drawItemDescriptionLine, getInventoryPlaceholderIndex, getObjectDescriptionLines, getObjectDisplayName, isChestRecord, resolveObjectNameIndex } from './Objects';
+import { ITEM_DESCRIPTION_Y, applyViewingFilter, drawItemDescriptionLine, getInventoryPlaceholderIndex, getItemPropertyLines, getObjectDescriptionLines, getObjectDisplayName, isChestRecord, placeItemPropertyLines, resolveObjectNameIndex, type ItemDescriptionLine } from './Objects';
 import { DescribedObject, UIState, emptyChestContents } from './UIState';
 
 const MAX_LINES_IN_SCROLL = 9;
@@ -431,10 +431,10 @@ export function drawInspectArrow(ui: UIState, fromEye: boolean): void {
 export function describeObject(ui: UIState, objectId: ObjectID): DescribedObject {
   if (ui.ctx.dungeon.rnMaps.dbType(objectId) === DBType.SCROLL) {
     const scrollId = applyViewingFilter(ui, ViewingFilterSite.SCROLL, objectId, 0)?.objectId ?? objectId;
-    return { objectId, scrollId, lines: [] };
+    return { objectId, scrollId, lines: [], rewritten: false };
   }
-  const lines = getObjectDescriptionLines(ui, objectId, resolveObjectNameIndex(ui, objectId));
-  return { objectId, scrollId: OBJECT_ID_NULL, lines };
+  const { lines, rewritten } = getObjectDescriptionLines(ui, objectId, resolveObjectNameIndex(ui, objectId));
+  return { objectId, scrollId: OBJECT_ID_NULL, lines, rewritten };
 }
 
 /**
@@ -477,11 +477,21 @@ export function drawObjectInfoPanel(ui: UIState, objectId: ObjectID): void {
     }
   }
 
-  const textState = { x: VIEWPORT_X + 108, y: VIEWPORT_Y + 87 };
+  const textState = { x: VIEWPORT_X + 108, y: VIEWPORT_Y + ITEM_DESCRIPTION_Y };
   for (const line of described.lines) {
     drawItemDescriptionLine(ui, line.text, line.color, textState);
   }
+  if (ui.ctx.extras.showItemProperties && !described.rewritten) {
+    drawItemPropertyLines(ui, described.lines, getItemPropertyLines(ui, objectId));
+  }
   drawInspectArrow(ui, ui.pressingEye);
+}
+
+/** The extra's lines under the description's (`placeItemPropertyLines`), in colour 13 as CSBWin's. */
+export function drawItemPropertyLines(ui: UIState, description: ItemDescriptionLine[], properties: string[]): void {
+  for (const { text, y } of placeItemPropertyLines(description, properties)) {
+    drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, VIEWPORT_X + 108, VIEWPORT_Y + y, 13, null, text);
+  }
 }
 
 export function drawEyeIcon(ui: UIState): void {

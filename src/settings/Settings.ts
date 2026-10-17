@@ -71,7 +71,7 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   statistics: true,
   mapView: false,
   championView: false,
-  extras: { gatherThrownWeapons: false, drinkAtFountain: false, colourNewMastery: false },
+  extras: { gatherThrownWeapons: false, drinkAtFountain: false, colourNewMastery: false, showItemProperties: false },
   keyPreset: 'csbwin',
   keyBindings: KEY_PRESETS.csbwin,
   keyLabels: 'qwerty',
@@ -175,6 +175,7 @@ export function parseSettings(raw: unknown): SettingsValues {
       gatherThrownWeapons: bool(extras.gatherThrownWeapons, defaults.extras.gatherThrownWeapons),
       drinkAtFountain: bool(extras.drinkAtFountain, defaults.extras.drinkAtFountain),
       colourNewMastery: bool(extras.colourNewMastery, defaults.extras.colourNewMastery),
+      showItemProperties: bool(extras.showItemProperties, defaults.extras.showItemProperties),
     },
     keyPreset: typeof preset === 'string' && (preset === 'custom' || preset in KEY_PRESETS)
       ? preset as KeyPreset : defaults.keyPreset,
@@ -190,7 +191,7 @@ export function parseSettings(raw: unknown): SettingsValues {
 export function fromOldSettings(raw: unknown): Record<string, unknown> {
   const old = asRecord(raw);
   const extras = typeof old.extras === 'boolean'
-    ? { gatherThrownWeapons: old.extras, drinkAtFountain: old.extras, colourNewMastery: old.extras }
+    ? { gatherThrownWeapons: old.extras, drinkAtFountain: old.extras, colourNewMastery: old.extras, showItemProperties: old.extras }
     : undefined;
   return {
     sound: old.soundEnabled,

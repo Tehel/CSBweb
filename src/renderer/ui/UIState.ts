@@ -51,6 +51,8 @@ export interface DescribedObject {
   scrollId: ObjectID;
   /** Anything else's: the lines under the name. */
   lines: ItemDescriptionLine[];
+  /** Anything else's: whether a viewing filter rewrote those lines, which hides the item's properties. */
+  rewritten: boolean;
 }
 
 export interface UIState {

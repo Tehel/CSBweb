@@ -86,10 +86,14 @@ export interface Extras {
   readonly drinkAtFountain: boolean;
   /** A mastery just gained drawn in colour 7 on the attribute panel (`MasteryGains.ts`). */
   readonly colourNewMastery: boolean;
+  /** An item's figures under the eye's description (`getItemPropertyLines`). */
+  readonly showItemProperties: boolean;
 }
 
 /** Every extra off: the game is CSBWin's. */
-export const NO_EXTRAS: Extras = { gatherThrownWeapons: false, drinkAtFountain: false, colourNewMastery: false };
+export const NO_EXTRAS: Extras = {
+  gatherThrownWeapons: false, drinkAtFountain: false, colourNewMastery: false, showItemProperties: false,
+};
 
 export interface GameContext {
   /** The level data: the dungeon half of `d.`. */
