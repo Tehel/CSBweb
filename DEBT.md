@@ -177,6 +177,10 @@ In payoff order: the first row is the next item.
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
+| X11 | The eye shows an item's properties: the setting, the room and the check | S | ⏸️ |
+| X12 | The eye shows a weapon's properties | M | ⏸️ after X11 |
+| X13 | The eye shows a garment's properties | S | ⏸️ after X11 |
+| X14 | The eye shows what food, water and potions give | S | ⏸️ after X11 |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -188,7 +192,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C183 · D22 · E40 · F22 · G31 · P13 · R17 · U13 · W8 · X11. An ID recorded and paid in one commit has no
+Next free IDs: C183 · D22 · E40 · F22 · G31 · P13 · R17 · U13 · W8 · X15. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -1798,6 +1802,121 @@ drawing a map from them is a separate item, entered when the author names it.
   prints each level's codes as a map. It asserts a fake wall seen as stone and a hidden
   pit seen as floor, saves, loads, and compares every code. The same file with the
   records deleted loads with every cell unknown.
+
+### X11 ⏸️ The eye shows an item's properties: the setting, the room and the check
+
+The eye panel (`drawObjectInfoPanel`, `src/renderer/ui/Inventory.ts`) shows only what
+CSBWin's `DescribeObject` does (`doc/CSBwin-src/Character.cpp:3424`): the name, a state
+line, the phrases and the weight. A weapon's damage, a garment's armour and a food's value
+are nowhere on screen. X11 to X14 add them as lines under CSBWin's, from the same tables
+the engine plays by. X11 is the frame. The lines themselves are X12 (weapons), X13
+(garments) and X14 (food, water and potions).
+
+- **The setting**: `showItemProperties`, a flag of `Extras`, set the way the three
+  shipped extras are (the rules above), with the old boolean `extras` mapped to it
+  (`src/settings/Settings.ts:192`). It needs a button on the settings dialog's GAME tab. The
+  tab's grid is full: two columns and three rows hold six buttons
+  (`src/renderer/ui/SettingsDialog.ts:211-235`). A seventh needs a fourth row or a new
+  layout, and that moves `probe-frames.mjs`'s hard-coded clicks
+  (`.claude/memory/dialog-layout-moves-probe-clicks.md`).
+- **The room**: CSBWin's lines start at viewport (108, 87), 7 pixels apart, and a line
+  wraps at 18 characters (`drawItemDescriptionLine`, `src/renderer/ui/Objects.ts:268`).
+  CSBWin's own take one to four lines: the state line ((BURNT OUT), (FULL), PARTY
+  FACING…), the phrases, which wrap to two ("(POISONED, BROKEN AND CURSED)"), and the
+  weight. A DSA viewing filter can add phrase 7 too. The author's estimate is four free
+  lines, or five if CSBWin's lines start a few pixels higher. The first step measures
+  this on a screenshot of the panel (graphic 20). The extra's lines take what is left.
+  Each item's lines come in a fixed priority order, and those that do not fit are
+  dropped. With the setting off, CSBWin's lines stay where they are.
+- **One function**: `getItemPropertyLines(ui, objectId)`, beside
+  `getObjectDescriptionLines`. It returns the lines without drawing them, so the tool can
+  read them. Every figure comes from the set's own tables (`ObjectTables`, read from its
+  `graphics.dat`), so a custom set shows its own values. A rule that CSBWin keeps in code
+  rather than in a table is called, not copied (X13).
+- **What a figure is**: the item's own value from its table, not a figure worked out for
+  the selected champion. CSBWin's results draw randoms and depend on the champion. The
+  author settles the wording; the font and 18 characters set the limit ("DAMAGE +12").
+- **To settle with the author**: an object that a dungeon's viewing filter rewrote
+  (`applyViewingFilter`, `ViewingFilterSite.DESCRIPTION`). A designer who hides what an
+  item is may not want its figures shown. The recommendation is that the extra stays silent
+  for such an object.
+- **The check**: a new `tools/dump-item-properties.ts` prints every object type's lines on
+  the default dungeon. It asserts that no line is over 18 characters and that, under the
+  most lines CSBWin's own description can take, the lines that fit stay inside the panel.
+  With the setting off, it asserts that the lines are exactly CSBWin's. A golden frame
+  shows the eye on a weapon with the setting on. It needs `--update`
+  (`.claude/memory/new-golden-frame-needs-update.md`).
+
+### X12 ⏸️ The eye shows a weapon's properties
+
+After X11. A weapon's `WEAPONDESC` is in `ObjectTables.weaponDesc`
+(`doc/CSBwin-src/CSB.h:1352`). Each field is used as follows:
+
+- `uByte2`, the strength it adds. It is added to `DetermineThrowingDistance`
+  (`Character.cpp:2323-2325`), and a melee blow starts from that value
+  (`DeterminePhysicalAttackDamage`, `Attack.cpp:652`).
+- `uByte3`, its energy as a missile. A thrown weapon of class 12 or below takes it
+  (`Mouse.cpp:728-737`). The impact is `uByte3` plus half the weight
+  (`Code11f52.cpp:1606-1617`). A shot's range is the two weapons' `uByte3`s
+  (`Attack.cpp:1903`).
+- `uByte1`, its class. Ammunition of class 16-31 is shot from a launcher of class 10, and
+  32-47 from one of class 11 (`Attack.cpp:1872-1897`, `TAG0153c2`,
+  `Character.cpp:1527-1566`). The class also picks the skill a throw draws on
+  (`Character.cpp:2330-2350`). One line can say which launcher an ammunition needs, or
+  what a launcher shoots, by class. Which class is the bow's and which the sling's is
+  read from the set's weapons, not written in.
+- `word4`. Its bits 8-12 are the missile's picture (`Code51a4.cpp:2861`). A shot's damage
+  uses its value (`Attack.cpp:1904`). The session reads what the low byte holds there
+  before it shows that byte.
+- The record's `charges`: a staff's or a wand's charges, and a torch's fuel. A torch's
+  light is `d.Word1074[charges]` (`CSBCode.cpp:7320-7364`, `UITables.word1074`).
+- What it gives while held: mana for the staffs and wands, strength for the Mace of
+  Order, and the rest of `AdjustStatsForItemCarried`'s weapons
+  (`Character.cpp:1574-1785`), through X13's shared rule.
+
+The order to settle is damage, missile, class/ammunition, charges or light, then what it
+gives while held. `tools/dump-item-properties.ts` checks every weapon type.
+
+### X13 ⏸️ The eye shows a garment's properties
+
+After X11. A garment's row of `ClothingDesc` is `ObjectTables.clothingArmour` and
+`clothingFlags`:
+
+- `uByte1`, its armour, and `uByte2 & 7`, its resistance to sharp blows
+  (`TAG009470`, `Character.cpp:168-176`, the port's `clothingArmourValue`,
+  `src/engine/MonsterAttack.ts:861`).
+- `uByte2` bit 7: a shield. A shield in either hand adds to every part's defence,
+  weighted by `d.Byte1412` (`TAG01680a`, `Character.cpp:2395-2432`,
+  `MonsterAttack.ts:817`).
+- What it gives while worn. The luck, dexterity, wisdom, vitality, anti-magic, anti-fire
+  and mana of `AdjustStatsForItemCarried` (`Character.cpp:1574-1785`,
+  `src/engine/AdjustStatsForItemCarried.ts`) are code, not a table. The extra and the
+  engine therefore share one exported rule that gives the attribute and the amount. It is
+  split out of `AdjustStatsForItemCarried` in a behaviour-neutral commit first. The Elven
+  Boots' extra sixteenth of the maximum load (`src/engine/CharacterStats.ts:130`) and the
+  Boots of Speed's tick off the move delay (`CharacterStats.ts:161`) come out of that
+  file the same way.
+
+`tools/dump-item-properties.ts` checks every garment type, and checks that the shared rule
+gives what the engine applies.
+
+### X14 ⏸️ The eye shows what food, water and potions give
+
+After X11.
+
+- **Food**: `d.FoodValue[nameIndex - objNI_Apple]` (`ObjectTables.foodValue`,
+  `Character.cpp:4290-4299`), against a champion's food, which `LIMIT`s it to 2048
+  (`Character.cpp:4440-4443`).
+- **Water**: a gulp from a waterskin gives 800 (`Character.cpp:4121-4127`), and a water
+  flask gives 1600 (`:4281`). A champion's water is capped at 2048 as well (`:4443`).
+- **Potions**: the record's power, and what its type does with it
+  (`switch (fp.potionType)`, `Character.cpp:4166-4285`).
+  CSBWin shows a potion's power only as the rune before its name, and only to a champion
+  with a priest mastery above 1 (`getObjectDisplayName`, `src/renderer/ui/Objects.ts`).
+  To settle with the author: the recommendation is that the extra keeps that gate.
+
+`tools/dump-item-properties.ts` checks every food, the water containers and every potion
+type.
 
 ---
 
