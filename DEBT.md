@@ -1857,8 +1857,7 @@ the engine plays by. X11 is the frame. The lines themselves are X12 (weapons), X
   the default dungeon. It asserts that no line is over 18 characters, that the first line
   is at y 122, and that, under every count of CSBWin's lines from one to five, no line of
   the extra reaches CSBWin's. With the setting off, it asserts that the lines are exactly
-  CSBWin's. A golden frame shows the eye on a weapon with the setting on. It needs
-  `--update` (`.claude/memory/new-golden-frame-needs-update.md`).
+  CSBWin's. X11 draws no line yet, so its golden frame waits for X12.
 
 ### X12 ⏸️ The eye shows a weapon's properties
 
@@ -1889,7 +1888,8 @@ After X11. A weapon's `WEAPONDESC` is in `ObjectTables.weaponDesc`
 
 The priority order is damage, what it gives while held, the missile, the class or
 ammunition, then charges or light. `tools/dump-item-properties.ts` checks every weapon
-type.
+type. A golden frame shows the eye on a weapon with the setting on. It needs `--update`
+(`.claude/memory/new-golden-frame-needs-update.md`).
 
 ### X13 ⏸️ The eye shows a garment's properties
 
