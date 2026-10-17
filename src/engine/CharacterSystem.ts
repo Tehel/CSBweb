@@ -64,10 +64,10 @@ export class CharacterSystem {
     const objNID5 = nameIndexOf(this.ctx, objRemoved);
     this.adjustStatsForItemCarried(champion, slot, -1, objRemoved);
     if (slot === 10) {
-      if (objNID5 >= OBJNI_ILLUMULET_A && objNID5 <= OBJNI_ILLUMULET_B) {
+      if (isIllumulet(objNID5)) {
         this.ctx.dungeon.getMiscRecord(objRemoved)!.specialState = 0; // Of no use anymore.
         const party = this.ctx.party.state;
-        party.brightness = sw(party.brightness - this.ctx.tables.word1074[2]!);
+        party.brightness = sw(party.brightness - illumuletLight(this.ctx.tables.word1074));
         selectPaletteForLightLevel(this.ctx);
       } else if (objNID5 >= OBJNI_JEWEL_SYMAL_A && objNID5 <= OBJNI_JEWEL_SYMAL_B) {
         this.ctx.dungeon.getMiscRecord(objRemoved)!.specialState = 0; // Of no use anymore.
@@ -139,10 +139,10 @@ export class CharacterSystem {
         champion.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
       }
     } else if (place === 10) {
-      if (objNID4 >= OBJNI_ILLUMULET_A && objNID4 <= OBJNI_ILLUMULET_B) {
+      if (isIllumulet(objNID4)) {
         this.ctx.dungeon.getMiscRecord(object)!.specialState = 1;
         const party = this.ctx.party.state;
-        party.brightness = sw(party.brightness + this.ctx.tables.word1074[2]!);
+        party.brightness = sw(party.brightness + illumuletLight(this.ctx.tables.word1074));
         selectPaletteForLightLevel(this.ctx);
       } else if (objNID4 >= OBJNI_JEWEL_SYMAL_A && objNID4 <= OBJNI_JEWEL_SYMAL_B) {
         this.ctx.dungeon.getMiscRecord(object)!.specialState = 1;
@@ -303,4 +303,17 @@ export function ammunitionClassFor(launcherClass: number): number {
   if (launcherClass >= 16 && launcherClass <= 31) return 10;
   if (launcherClass >= 32 && launcherClass <= 47) return 11;
   return -1;
+}
+
+/**
+ * Whether round the neck the object lights the party: an Illumulet, worn (`_b`) or not
+ * (`doc/CSBwin-src/Character.cpp:1866-1867`, `:2014-2015`).
+ */
+export function isIllumulet(nameIndex: number): boolean {
+  return nameIndex >= OBJNI_ILLUMULET_A && nameIndex <= OBJNI_ILLUMULET_B;
+}
+
+/** What an Illumulet round the neck adds to `d.Brightness`, `d.Word1074[2]` (`Character.cpp:1871`, `:2021`). */
+export function illumuletLight(word1074: readonly number[]): number {
+  return word1074[2]!;
 }

@@ -37,10 +37,16 @@
  *    as a fraction of the maximum and the wounds it heals, the shield or the mana. To a
  *    champion of priest mastery 1, or with none selected, no potion has a line. The misc
  *    objects that give while carried give what `AdjustStatsForItemCarried` applies.
+ * 7. **What an object adds to the masteries, and an Illumulet's light**: every weapon,
+ *    garment and misc type, in the weapon hand and round the neck, adds to each of the
+ *    20 skills what `determineMastery` counts beyond the champion's own, `ALL SKILLS +n`
+ *    what it adds to every one, then each skill it adds more to. An Illumulet's `LIGHT`
+ *    is what `addCharacterPossession` round the neck adds to the party's brightness, and
+ *    `removeCharacterPossession` takes off.
  *
  * Run: `npm test -- --only=dump-item-properties.ts`
  */
-import { OBJNI_STAFF, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATERSKIN } from '../src/core/objectNameIndex';
+import { OBJNI_ILLUMULET_A, OBJNI_STAFF, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATERSKIN } from '../src/core/objectNameIndex';
 import { PotionType } from '../src/core/constants';
 import { applyFeedParameters, clearFeedParameters, type FeedParameters } from '../src/engine/Feeding';
 import { computeFeedParameters } from '../src/renderer/ui/Feeding';
@@ -48,6 +54,8 @@ import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../src/cor
 import { AdjustStatsForItemCarried } from '../src/engine/AdjustStatsForItemCarried';
 import { attributeCurrent, attributeMaximum, attributeMinimum } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
+import { determineMastery } from '../src/engine/skills';
+import { CLASS_NAMES, SUBSKILL_NAMES } from '../src/renderer/ui/ChampionDialog';
 import { getAttackClass } from '../src/renderer/ui/Objects';
 import { getLegalAttackTypes } from '../src/renderer/ui/Attack';
 import { NO_EXTRAS, nameIndexOf, type GameContext } from '../src/engine/GameContext';
@@ -186,6 +194,7 @@ function garmentLineRank(line: string): number {
   if (line.startsWith('ARMOUR ')) return 0;
   if (line === 'SHIELDS ALL PARTS') return 1;
   if (isCarriedLine(line)) return 2;
+  if (isMasteryLine(line)) return 2.5;
   if (line.startsWith('MAX LOAD ') || line.startsWith('MOVE TIME ')) return 3;
   return -1;
 }
@@ -194,6 +203,7 @@ function garmentLineRank(line: string): number {
 const ATTRIBUTE_NAMES = ['LUCK', 'STRENGTH', 'DEXTERITY', 'WISDOM', 'VITALITY', 'ANTI-MAGIC', 'ANTI-FIRE'];
 const isCarriedLine = (line: string): boolean => /^[A-Z-]+ [+-]\d+$/.test(line)
   && [...ATTRIBUTE_NAMES, 'MANA'].includes(line.split(' ')[0]!);
+const isMasteryLine = (line: string): boolean => /^(ALL SKILLS|[A-Z]+ SKILL) \+\d+$/.test(line);
 const sameLines = (a: string[], b: string[]): boolean => JSON.stringify(a) === JSON.stringify(b);
 const signed = (n: number): string => `${n > 0 ? '+' : ''}${n}`;
 
@@ -221,6 +231,26 @@ function engineCarriedLines(game: Game, rn: ObjectID): string[] {
     if (champion.attributes.maxMana !== maxMana) moved.push(`MANA ${signed(champion.attributes.maxMana - maxMana)}`);
     for (const line of moved) if (!lines.includes(line)) lines.push(line);
   }
+  return lines;
+}
+
+/**
+ * What `determineMastery` counts for `rn` in `slot` beyond an empty-handed champion's own
+ * mastery, skill by skill, read as the extra's lines: what it adds to every skill, then
+ * each skill it adds more to.
+ */
+function engineMasteryLines(game: Game, rn: ObjectID): string[] {
+  const names = [...CLASS_NAMES, ...SUBSKILL_NAMES];
+  const options = { getObjectNameIndex: (object: ObjectID) => nameIndexOf(game.ctx, object) };
+  const added = names.map((_, skill) => Math.max(...[1, 10].map((slot) => {
+    const champion = testChampion(0);
+    const own = determineMastery(champion, skill, options);
+    champion.possessions[slot] = rn;
+    return determineMastery(champion, skill, options) - own;
+  })));
+  const all = Math.min(...added);
+  const lines = all > 0 ? [`ALL SKILLS +${all}`] : [];
+  added.forEach((n, skill) => { if (n > all) lines.push(`${names[skill]} SKILL +${n - all}`); });
   return lines;
 }
 
@@ -253,6 +283,7 @@ function optionsHeld(ui: UIState, champion: Champion, rn: ObjectID): number {
 function weaponLineRank(line: string): number {
   if (line.startsWith('DAMAGE ')) return 0;
   if (isCarriedLine(line)) return 1;
+  if (isMasteryLine(line)) return 1.5;
   if (line.startsWith('MISSILE ')) return 2;
   if (line.startsWith('SHOOTS ') || line.startsWith('AMMO FOR ')) return 3;
   if (line.startsWith('LIGHT ') || line.startsWith('CHARGES ')) return 4;
@@ -631,6 +662,59 @@ console.log('\n=== 6. every food, the water containers and every potion type ===
   const gated = ['-', '-', 'WATER 1600 OF 2048', '-'].join();
   check(toNovice.join() === gated && toNobody.join() === gated,
     'to a priest of mastery 1, or no one, a potion has no line, but a water flask its water');
+}
+
+console.log("\n=== 7. what an object adds to the masteries, and an Illumulet's light ===");
+{
+  const game = stockGame();
+  const ui = uiFor(game);
+  const ot = ui.objectTables.objDescObjectType;
+  const makers: Array<[string, number, (type: number) => ObjectID]> = [
+    ['weapon', ui.objectTables.weaponDesc.length, (type) => newWeapon(game, type, 0)],
+    ['garment', ui.objectTables.clothingArmour.length, (type) => newGarment(game, type)],
+    ['misc', ot.length - OBJDI_COMPASS, (type) => newMisc(game, type, 0)],
+  ];
+  let givers = 0;
+  let wrongMastery = 0;
+  let tooLong = 0;
+  for (const [kind, count, make] of makers) {
+    for (let type = 0; type < count; type++) {
+      const rn = make(type);
+      const nameIndex = resolveObjectNameIndex(ui, rn);
+      if (nameIndex < 0) continue;
+      const lines = getItemPropertyLines(ui, rn).filter(isMasteryLine);
+      const engine = engineMasteryLines(game, rn);
+      tooLong += lines.filter((line) => line.length > ITEM_LINE_CHARS).length;
+      if (engine.length === 0 && lines.length === 0) continue;
+      givers++;
+      console.log(`${kind.padEnd(7)} ${getObjectDisplayName(ui, rn, nameIndex).padEnd(16)} ${lines.join(' / ')}`);
+      if (!sameLines(lines, engine)) {
+        wrongMastery++;
+        console.log(`    the engine ${engine.join(' / ')}`);
+      }
+    }
+  }
+  check(givers === 7 && wrongMastery === 0,
+    "the 7 objects that add to a mastery: what determineMastery counts in the weapon hand or round the neck");
+  check(tooLong === 0, `every mastery line: no more than ${ITEM_LINE_CHARS} characters`);
+
+  // The Illumulet, put on and taken off round the neck.
+  const wearer = testChampion(0);
+  game.ctx.party.addChampion(wearer);
+  const party = game.ctx.party.state;
+  const illumuletType = Array.from({ length: ot.length - OBJDI_COMPASS }, (_, t) => t)
+    .find((t) => resolveObjectNameIndex(ui, newMisc(game, t, 0)) === OBJNI_ILLUMULET_A)!;
+  const illumulet = newMisc(game, illumuletType, 0);
+  const light = getItemPropertyLines(ui, illumulet).find((line) => line.startsWith('LIGHT '));
+  const before = party.brightness;
+  game.ctx.systems.character.addCharacterPossession(0, illumulet, 10);
+  const worn = party.brightness - before;
+  const wornLight = getItemPropertyLines(ui, illumulet).find((line) => line.startsWith('LIGHT '));
+  game.ctx.systems.character.removeCharacterPossession(0, 10);
+  const off = party.brightness - before;
+  console.log(`an Illumulet: ${light}, worn ${wornLight}; round the neck the brightness +${worn}, taken off ${off}`);
+  check(worn > 0 && light === `LIGHT ${worn}` && wornLight === light && off === 0,
+    "an Illumulet, worn or not: LIGHT what addCharacterPossession round the neck adds, and removeCharacterPossession takes off");
 }
 
 finish();

@@ -148,33 +148,49 @@ export function determineMastery(
   }
 
   if (!ignorePossessions && options.getObjectNameIndex) {
-    const weaponNameIndex = getPossessionNameIndex(champion, 1, options.getObjectNameIndex);
-    if (weaponNameIndex === OBJNI_THE_FIRESTAFF_A) {
-      mastery++;
-    } else if (weaponNameIndex === OBJNI_THE_FIRESTAFF_B) {
-      mastery += 2;
-    }
-
-    const neckNameIndex = getPossessionNameIndex(champion, 10, options.getObjectNameIndex);
-    switch (skillIndex) {
-      case 3:
-        if (neckNameIndex === OBJNI_PENDANT_FERAL) mastery++;
-        break;
-      case 15:
-        if (neckNameIndex === OBJNI_EKKHARD_CROSS) mastery++;
-        break;
-      case 13:
-        if (neckNameIndex === OBJNI_GEM_OF_AGES || weaponNameIndex === OBJNI_SCEPTRE_OF_LYF) {
-          mastery++;
-        }
-        break;
-      case 14:
-        if (neckNameIndex === OBJNI_MOONSTONE) mastery++;
-        break;
-    }
+    mastery += possessionMasteryBonus(
+      skillIndex,
+      getPossessionNameIndex(champion, 1, options.getObjectNameIndex),
+      getPossessionNameIndex(champion, 10, options.getObjectNameIndex),
+    );
   }
 
   return mastery;
+}
+
+/**
+ * What `DetermineMastery` adds to skill `skillIndex`'s mastery for the weapon hand's
+ * object and the neck's (`doc/CSBwin-src/Code17818.cpp:73-147`), by name index: the
+ * Firestaff +1 to every skill and the complete one +2; the Pendant Feral +1 to the
+ * wizard's, the Ekkhard Cross to defend, the Gem of Ages or the Sceptre of Lyf in hand
+ * to heal, the Moonstone to influence.
+ */
+export function possessionMasteryBonus(
+  skillIndex: number,
+  weaponNameIndex: number | null,
+  neckNameIndex: number | null,
+): number {
+  let bonus = 0;
+  if (weaponNameIndex === OBJNI_THE_FIRESTAFF_A) {
+    bonus++;
+  } else if (weaponNameIndex === OBJNI_THE_FIRESTAFF_B) {
+    bonus += 2;
+  }
+  switch (skillIndex) {
+    case 3:
+      if (neckNameIndex === OBJNI_PENDANT_FERAL) bonus++;
+      break;
+    case 15:
+      if (neckNameIndex === OBJNI_EKKHARD_CROSS) bonus++;
+      break;
+    case 13:
+      if (neckNameIndex === OBJNI_GEM_OF_AGES || weaponNameIndex === OBJNI_SCEPTRE_OF_LYF) bonus++;
+      break;
+    case 14:
+      if (neckNameIndex === OBJNI_MOONSTONE) bonus++;
+      break;
+  }
+  return bonus;
 }
 
 /**

@@ -177,7 +177,6 @@ In payoff order: the first row is the next item.
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
-| X15 | The eye shows what else an item gives | S | ⏸️ |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -1743,7 +1742,9 @@ Rules for all of them:
     rewrote shows none. A weapon's lines are `DAMAGE` its `WEAPONDESC.uByte2`; what
     carrying it gives in any slot, from the rule `AdjustStatsForItemCarried` applies
     (`itemCarriedAdjustment`, `src/engine/AdjustStatsForItemCarried.ts`), so a cursed
-    one gives `LUCK -3`; `MISSILE` its `uByte3`, unless 0; what a launcher shoots or
+    one gives `LUCK -3`, then what it adds to the masteries in the weapon hand or round
+    the neck, from `DetermineMastery`'s (`possessionMasteryBonus`, `src/engine/skills.ts`):
+    `ALL SKILLS +1` for the Firestaff, `HEAL SKILL +1` for the Sceptre of Lyf; `MISSILE` its `uByte3`, unless 0; what a launcher shoots or
     what an ammunition is for (`ammunitionClassFor`, `src/engine/CharacterSystem.ts`: a
     launcher of class 16-31 fires class 10, one of 32-47 class 11), named by the set's
     first weapon of the class; then a torch's `LIGHT`, `d.Word1074[charges]`, or the
@@ -1759,7 +1760,10 @@ Rules for all of them:
     eating food gives, `FOOD` its `d.FoodValue`, or a gulp from a waterskin that is not
     empty, `WATER 800` (`WATERSKIN_GULP`, `src/engine/Feeding.ts`), each `OF 2048`, the
     cap of a champion's food and water; then what carrying it gives (the Rabbit's Foot,
-    a Jewel Symal, the Moonstone). A potion's are `POWER` its power, then what drinking
+    a Jewel Symal, the Moonstone) and what it adds to the masteries round the neck (the
+    Pendant Feral, the Ekkhard Cross, the Gem of Ages, the Moonstone); then an
+    Illumulet's `LIGHT`, the `d.Word1074[2]` it adds to the party's brightness round the
+    neck (`isIllumulet` and `illumuletLight`, `src/engine/CharacterSystem.ts`). A potion's are `POWER` its power, then what drinking
     it does, from `potionEffect` (`src/engine/Feeding.ts`), the half of CSBWin's switch
     that reads the potion alone: the attribute it raises, `CURES POISON`, the stamina or
     the health it gives back as a fraction of the maximum (`STAMINA +MAX/3`),
@@ -1767,7 +1771,7 @@ Rules for all of them:
     it gives below the maximum. Only where the eye shows a potion's power as a rune
     (`showsPotionPower`: to a selected champion of priest mastery above 1); to anyone
     else a potion has no line. A water flask has no rune, and gives its
-    `WATER 1600 OF 2048` to all. What X15 lists is not shown yet.
+    `WATER 1600 OF 2048` to all.
 
   The coloured object cursor, RISE's NEW FACE and the FTL logo are the exceptions: the
   author wants them on by default, so they are recorded under H.
@@ -1837,20 +1841,6 @@ drawing a map from them is a separate item, entered when the author names it.
   prints each level's codes as a map. It asserts a fake wall seen as stone and a hidden
   pit seen as floor, saves, loads, and compares every code. The same file with the
   records deleted loads with every cell unknown.
-
-### X15 ⏸️ The eye shows what else an item gives
-
-What `showItemProperties` does not show yet, each a rule CSBWin keeps in code that the
-extra must call, as it calls `itemCarriedAdjustment`:
-
-- The masteries an item gives in `DetermineMastery` (`doc/CSBwin-src/Code17818.cpp:13`):
-  the Firestaff in the weapon hand +1 to every skill and the complete Firestaff +2, and
-  round the neck the Pendant Feral, the Ekkhard Cross, the Gem of Ages and the Moonstone
-  +1 to one skill, the Sceptre of Lyf in the hand too (`src/engine/skills.ts`).
-- The light of an Illumulet worn round the neck, `d.Word1074[2]`
-  (`src/engine/CharacterSystem.ts`).
-
-`tools/dump-item-properties.ts` checks each against what the engine applies.
 
 ---
 

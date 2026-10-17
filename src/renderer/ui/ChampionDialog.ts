@@ -127,11 +127,11 @@ export function barRect(chIdx: number, y: number): Rect {
 export const PARTY_SIZE = 4;
 
 /** `d.Pointer16596` (`doc/CSBwin-src/CSBCode.cpp:373-376`), the four classes. */
-const CLASS_NAMES = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
+export const CLASS_NAMES = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 /** The inventory's attribute names (`Character.ts`), and Luck, attribute 0 (`doc/CSBwin-src/CSB.h:631-637`). */
 const ATTRIBUTE_NAMES = ['LUCK', 'STRENGTH', 'DEXTERITY', 'WISDOM', 'VITALITY', 'ANTI-MAGIC', 'ANTI-FIRE'];
 /** Skills 4 to 19, four to a class (`doc/TRAINING.md`). */
-const SUBSKILL_NAMES = [
+export const SUBSKILL_NAMES = [
   'SWING', 'THRUST', 'CLUB', 'PARRY',
   'STEAL', 'FIGHT', 'THROW', 'SHOOT',
   'IDENTIFY', 'HEAL', 'INFLUENCE', 'DEFEND',

@@ -10,7 +10,7 @@ import {
   adjustAntiFire, adjustAntiMagic, adjustDexterity, adjustLuck, adjustMaxMana, adjustStrength, adjustVitality,
   adjustWisdom, itemCarriedAdjustment,
 } from '../../engine/AdjustStatsForItemCarried';
-import { ammunitionClassFor } from '../../engine/CharacterSystem';
+import { ammunitionClassFor, illumuletLight, isIllumulet } from '../../engine/CharacterSystem';
 import { feetMaxLoadShift, feetMoveTimeBonus } from '../../engine/CharacterStats';
 import { FOOD_WATER_MAX, WATERSKIN_GULP, potionEffect } from '../../engine/Feeding';
 import { DescIndex, GetBasicObjectType, NameIndex, OBJDI_EYE_OF_TIME } from '../../engine/objectIndex';
@@ -18,7 +18,8 @@ import { DBType, ObjectID } from '../../core/types';
 import { ViewingFilterResult, ViewingFilterSite } from '../../engine/DsaSystem';
 import { Champion } from '../../engine/gameTypes';
 import { copyCharacter } from '../../engine/Party';
-import { determineMastery as determineMasteryEngine } from '../../engine/skills';
+import { determineMastery as determineMasteryEngine, possessionMasteryBonus } from '../../engine/skills';
+import { CLASS_NAMES, SUBSKILL_NAMES } from './ChampionDialog';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { UIState } from './UIState';
 export type ItemDescriptionLine = { text: string; color: number };
@@ -397,7 +398,8 @@ const foodWaterLine = (what: 'FOOD' | 'WATER', value: number): string => `${what
 
 /**
  * A misc object's lines: what eating food gives (`d.FoodValue`, `Character.cpp:4290-4299`)
- * or a gulp from a waterskin that is not empty (`:4116-4128`), then what carrying it gives.
+ * or a gulp from a waterskin that is not empty (`:4116-4128`), then what carrying it gives,
+ * then an Illumulet's light round the neck.
  */
 function miscPropertyLines(ui: UIState, objectId: ObjectID): string[] {
   const lines: string[] = [];
@@ -408,6 +410,7 @@ function miscPropertyLines(ui: UIState, objectId: ObjectID): string[] {
     if ((ui.ctx.dungeon.getMiscRecord(objectId)?.specialState ?? 0) !== 0) lines.push(foodWaterLine('WATER', WATERSKIN_GULP));
   }
   lines.push(...carriedPropertyLines(ui, objectId));
+  if (isIllumulet(nameIndex)) lines.push(`LIGHT ${illumuletLight(ui.uiTables.graphic232.word1074)}`);
   return lines;
 }
 
@@ -453,7 +456,8 @@ const CARRIED_ATTRIBUTE_NAMES: Readonly<Record<number, string>> = {
 
 /**
  * What carrying the object gives, in any of a champion's 30 slots: each adjustment
- * `AdjustStatsForItemCarried` makes for it (`itemCarriedAdjustment`), once.
+ * `AdjustStatsForItemCarried` makes for it (`itemCarriedAdjustment`), once; then what it
+ * adds to the masteries.
  */
 function carriedPropertyLines(ui: UIState, objectId: ObjectID): string[] {
   const lines: string[] = [];
@@ -464,6 +468,26 @@ function carriedPropertyLines(ui: UIState, objectId: ObjectID): string[] {
     const line = `${name} ${amount > 0 ? '+' : ''}${amount}`;
     if (!lines.includes(line)) lines.push(line);
   }
+  lines.push(...masteryPropertyLines(resolveObjectNameIndex(ui, objectId)));
+  return lines;
+}
+
+/** The 20 skills by number: the four classes (`skillNames`, `doc/CSBwin-src/CSB.h:2504-2509`), then their sub-skills, four to a class. */
+const SKILL_NAMES = [...CLASS_NAMES, ...SUBSKILL_NAMES];
+
+/**
+ * What the object adds to a champion's masteries in the weapon hand or round the neck
+ * (`possessionMasteryBonus`): `ALL SKILLS +n` what it adds to every skill, then each skill
+ * it adds more to, `HEAL SKILL +1`.
+ */
+function masteryPropertyLines(nameIndex: number): string[] {
+  const bonuses = SKILL_NAMES.map((_, skill) =>
+    Math.max(possessionMasteryBonus(skill, nameIndex, null), possessionMasteryBonus(skill, null, nameIndex)));
+  const all = Math.min(...bonuses);
+  const lines = all > 0 ? [`ALL SKILLS +${all}`] : [];
+  bonuses.forEach((bonus, skill) => {
+    if (bonus > all) lines.push(`${SKILL_NAMES[skill]} SKILL +${bonus - all}`);
+  });
   return lines;
 }
 
