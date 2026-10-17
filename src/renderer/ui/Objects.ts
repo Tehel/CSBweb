@@ -5,13 +5,14 @@
  * `doc/CSBwin-src/Code17818.cpp`): resolving an object reference to its `OBJNI_*` name
  * index, the phrase/attribute lines the eye shows, carried weight, and `DetermineMastery`.
  */
-import { OBJNI_BONES_A, OBJNI_COMPASS_N, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJNI_SPECIAL_F, OBJNI_SPECIAL_J, OBJNI_SPECIAL_N, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATER, OBJNI_WATERSKIN, OBJNI_WATER_FLASK } from '../../core/objectNameIndex';
+import { OBJNI_APPLE, OBJNI_BONES_A, OBJNI_COMPASS_N, OBJNI_DRAGON_STEAK, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJNI_SPECIAL_F, OBJNI_SPECIAL_J, OBJNI_SPECIAL_N, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATER, OBJNI_WATERSKIN, OBJNI_WATER_FLASK } from '../../core/objectNameIndex';
 import {
   adjustAntiFire, adjustAntiMagic, adjustDexterity, adjustLuck, adjustMaxMana, adjustStrength, adjustVitality,
   adjustWisdom, itemCarriedAdjustment,
 } from '../../engine/AdjustStatsForItemCarried';
 import { ammunitionClassFor } from '../../engine/CharacterSystem';
 import { feetMaxLoadShift, feetMoveTimeBonus } from '../../engine/CharacterStats';
+import { FOOD_WATER_MAX, WATERSKIN_GULP, potionEffect } from '../../engine/Feeding';
 import { DescIndex, GetBasicObjectType, NameIndex, OBJDI_EYE_OF_TIME } from '../../engine/objectIndex';
 import { DBType, ObjectID } from '../../core/types';
 import { ViewingFilterResult, ViewingFilterSite } from '../../engine/DsaSystem';
@@ -324,7 +325,6 @@ export function drawItemDescriptionLine(ui: UIState, text: string, color: number
 /**
  * The extra's lines for an object (`showItemProperties`, `DEBT.md` X), in their priority
  * order, each one labelled figure of at most 18 characters, from the set's own tables.
- * The food's, water's and potions' lines are still to come.
  */
 export function getItemPropertyLines(ui: UIState, objectId: ObjectID): string[] {
   switch (ui.ctx.dungeon.rnMaps.dbType(objectId)) {
@@ -332,6 +332,10 @@ export function getItemPropertyLines(ui: UIState, objectId: ObjectID): string[] 
       return weaponPropertyLines(ui, objectId);
     case DBType.CLOTHING:
       return garmentPropertyLines(ui, objectId);
+    case DBType.POTION:
+      return potionPropertyLines(ui, objectId);
+    case DBType.MISC:
+      return miscPropertyLines(ui, objectId);
     default:
       return [];
   }
@@ -385,6 +389,53 @@ function garmentPropertyLines(ui: UIState, objectId: ObjectID): string[] {
   if (loadShift !== 0) lines.push(`MAX LOAD +1/${1 << loadShift}`);
   const moveTime = feetMoveTimeBonus(nameIndex);
   if (moveTime !== 0) lines.push(`MOVE TIME -${moveTime}`);
+  return lines;
+}
+
+/** A figure of food or water, against the 2048 a champion's are capped at (`LIMIT`, `doc/CSBwin-src/Character.cpp:4442-4443`). */
+const foodWaterLine = (what: 'FOOD' | 'WATER', value: number): string => `${what} ${value} OF ${FOOD_WATER_MAX}`;
+
+/**
+ * A misc object's lines: what eating food gives (`d.FoodValue`, `Character.cpp:4290-4299`)
+ * or a gulp from a waterskin that is not empty (`:4116-4128`), then what carrying it gives.
+ */
+function miscPropertyLines(ui: UIState, objectId: ObjectID): string[] {
+  const lines: string[] = [];
+  const nameIndex = resolveObjectNameIndex(ui, objectId);
+  if (nameIndex >= OBJNI_APPLE && nameIndex <= OBJNI_DRAGON_STEAK) {
+    lines.push(foodWaterLine('FOOD', ui.objectTables.foodValue[nameIndex - OBJNI_APPLE] ?? 0));
+  } else if (nameIndex >= OBJNI_WATERSKIN && nameIndex <= OBJNI_WATER) {
+    if ((ui.ctx.dungeon.getMiscRecord(objectId)?.specialState ?? 0) !== 0) lines.push(foodWaterLine('WATER', WATERSKIN_GULP));
+  }
+  lines.push(...carriedPropertyLines(ui, objectId));
+  return lines;
+}
+
+/**
+ * A potion's lines: its power, then what drinking it does (`potionEffect`). Only where
+ * the eye shows its power as a rune (`showsPotionPower`): to anyone else, it has none.
+ * A water flask, which has no rune, gives its water to all.
+ */
+function potionPropertyLines(ui: UIState, objectId: ObjectID): string[] {
+  const rec = ui.ctx.dungeon.getPotionRecord(objectId);
+  if (!rec) return [];
+  const effect = potionEffect(rec.potionType, rec.power);
+  if (effect.waterValue !== 0) return [foodWaterLine('WATER', effect.waterValue)];
+  if (!showsPotionPower(ui, resolveObjectNameIndex(ui, objectId))) return [];
+  const lines = [`POWER ${rec.power}`];
+  const add = (name: string, amount: number): void => {
+    if (amount !== 0) lines.push(`${name} ${amount > 0 ? '+' : ''}${amount}`);
+  };
+  add('STRENGTH', effect.strengthAdjust);
+  add('DEXTERITY', effect.dexterityAdjust);
+  add('WISDOM', effect.wisdomAdjust);
+  add('VITALITY', effect.vitalityAdjust);
+  if (effect.antiVenin) lines.push('CURES POISON');
+  if (effect.staminaDivisor !== 0) lines.push(`STAMINA +MAX/${effect.staminaDivisor}`);
+  if (effect.hitpointDivisor !== 0) lines.push(`HEALTH +MAX/${effect.hitpointDivisor}`);
+  if (effect.healCount !== 0) lines.push('HEALS WOUNDS');
+  add('SHIELD', effect.shieldStrength);
+  add('MANA', effect.mana);
   return lines;
 }
 

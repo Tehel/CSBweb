@@ -177,7 +177,7 @@ In payoff order: the first row is the next item.
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
-| X14 | The eye shows what food, water and potions give | S | ⏸️ |
+| X15 | The eye shows what else an item gives | S | ⏸️ |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -189,7 +189,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C183 · D22 · E40 · F22 · G31 · P13 · R17 · U13 · W8 · X15. An ID recorded and paid in one commit has no
+Next free IDs: C183 · D22 · E40 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -1736,8 +1736,8 @@ Rules for all of them:
     anchored at the bottom: the first at viewport y 122, the next 7 rows up, a line whose
     row would be at or above CSBWin's last dropped with every line after it, so each line
     of an item type keeps its row. CSBWin's lines never move. A line is one labelled
-    figure, at most 18 characters so it never wraps (`DAMAGE 10`, `ARMOUR 9  SHARP 2`,
-    `FOOD 500`): the item's own value from the set's own tables (`ObjectTables`), not a
+    figure, at most 18 characters so it never wraps (`DAMAGE 10`, `ARMOUR 9 SHARP 2`,
+    `FOOD 500 OF 2048`): the item's own value from the set's own tables (`ObjectTables`), not a
     figure worked out for the selected champion, and a rule CSBWin keeps in code is
     called, not copied. An object whose description a viewing filter's `&DESCRIBE`
     rewrote shows none. A weapon's lines are `DAMAGE` its `WEAPONDESC.uByte2`; what
@@ -1755,8 +1755,19 @@ Rules for all of them:
     apart (the Plate of Darc's armour is 160); `SHIELDS ALL PARTS` for one whose `uByte2`
     bit 7 is set (`TAG01680a`); what wearing it gives, from the same rule as a weapon's;
     then what boots give on the feet, `MAX LOAD +1/16` and `MOVE TIME -1` (`feetMaxLoadShift`
-    and `feetMoveTimeBonus`, `src/engine/CharacterStats.ts`). Food, water and potions have
-    no lines yet: X14 gives them.
+    and `feetMoveTimeBonus`, `src/engine/CharacterStats.ts`). A misc object's are what
+    eating food gives, `FOOD` its `d.FoodValue`, or a gulp from a waterskin that is not
+    empty, `WATER 800` (`WATERSKIN_GULP`, `src/engine/Feeding.ts`), each `OF 2048`, the
+    cap of a champion's food and water; then what carrying it gives (the Rabbit's Foot,
+    a Jewel Symal, the Moonstone). A potion's are `POWER` its power, then what drinking
+    it does, from `potionEffect` (`src/engine/Feeding.ts`), the half of CSBWin's switch
+    that reads the potion alone: the attribute it raises, `CURES POISON`, the stamina or
+    the health it gives back as a fraction of the maximum (`STAMINA +MAX/3`),
+    `HEALS WOUNDS`, the shield it gives a champion shielded at 50 or less, or the mana
+    it gives below the maximum. Only where the eye shows a potion's power as a rune
+    (`showsPotionPower`: to a selected champion of priest mastery above 1); to anyone
+    else a potion has no line. A water flask has no rune, and gives its
+    `WATER 1600 OF 2048` to all. What X15 lists is not shown yet.
 
   The coloured object cursor, RISE's NEW FACE and the FTL logo are the exceptions: the
   author wants them on by default, so they are recorded under H.
@@ -1827,21 +1838,19 @@ drawing a map from them is a separate item, entered when the author names it.
   pit seen as floor, saves, loads, and compares every code. The same file with the
   records deleted loads with every cell unknown.
 
-### X14 ⏸️ The eye shows what food, water and potions give
+### X15 ⏸️ The eye shows what else an item gives
 
-- **Food**: `d.FoodValue[nameIndex - objNI_Apple]` (`ObjectTables.foodValue`,
-  `Character.cpp:4290-4299`), against a champion's food, which `LIMIT`s it to 2048
-  (`Character.cpp:4440-4443`).
-- **Water**: a gulp from a waterskin gives 800 (`Character.cpp:4121-4127`), and a water
-  flask gives 1600 (`:4281`). A champion's water is capped at 2048 as well (`:4443`).
-- **Potions**: the record's power, and what its type does with it
-  (`switch (fp.potionType)`, `Character.cpp:4166-4285`).
-  CSBWin shows a potion's power only as the rune before its name, and only to a champion
-  with a priest mastery above 1 (`getObjectDisplayName`, `src/renderer/ui/Objects.ts`).
-  The extra keeps that gate: below it, a potion has no line at all.
+What `showItemProperties` does not show yet, each a rule CSBWin keeps in code that the
+extra must call, as it calls `itemCarriedAdjustment`:
 
-`tools/dump-item-properties.ts` checks every food, the water containers and every potion
-type.
+- The masteries an item gives in `DetermineMastery` (`doc/CSBwin-src/Code17818.cpp:13`):
+  the Firestaff in the weapon hand +1 to every skill and the complete Firestaff +2, and
+  round the neck the Pendant Feral, the Ekkhard Cross, the Gem of Ages and the Moonstone
+  +1 to one skill, the Sceptre of Lyf in the hand too (`src/engine/skills.ts`).
+- The light of an Illumulet worn round the neck, `d.Word1074[2]`
+  (`src/engine/CharacterSystem.ts`).
+
+`tools/dump-item-properties.ts` checks each against what the engine applies.
 
 ---
 

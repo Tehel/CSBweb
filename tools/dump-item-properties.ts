@@ -28,10 +28,22 @@
  *    wearing it gives, which is what `AdjustStatsForItemCarried` applies, then the Elven
  *    Boots' sixteenth of the maximum load and the Boots of Speed's tick, what `maxLoad`
  *    and `timeToMove` add with them on the feet and with no other garment.
+ * 6. **Every food, the water containers and every potion type**, against the feeding
+ *    parameters `computeFeedParameters` works out: `FOOD` its `foodValue`, `WATER` a
+ *    waterskin's gulp unless it is empty, and a water flask's to anyone, each `OF 2048`,
+ *    which is where `applyFeedParameters` stops a champion's food and water. A potion,
+ *    at four powers, to a champion of priest mastery above 1: `POWER` its power, then the
+ *    attribute it raises, the poison it cures, the stamina or the health it gives back
+ *    as a fraction of the maximum and the wounds it heals, the shield or the mana. To a
+ *    champion of priest mastery 1, or with none selected, no potion has a line. The misc
+ *    objects that give while carried give what `AdjustStatsForItemCarried` applies.
  *
  * Run: `npm test -- --only=dump-item-properties.ts`
  */
-import { OBJNI_STAFF, OBJNI_TORCH_A, OBJNI_TORCH_D } from '../src/core/objectNameIndex';
+import { OBJNI_STAFF, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATERSKIN } from '../src/core/objectNameIndex';
+import { PotionType } from '../src/core/constants';
+import { applyFeedParameters, clearFeedParameters, type FeedParameters } from '../src/engine/Feeding';
+import { computeFeedParameters } from '../src/renderer/ui/Feeding';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
 import { AdjustStatsForItemCarried } from '../src/engine/AdjustStatsForItemCarried';
 import { attributeCurrent, attributeMaximum, attributeMinimum } from '../src/engine/attributes';
@@ -39,7 +51,7 @@ import type { Champion } from '../src/engine/gameTypes';
 import { getAttackClass } from '../src/renderer/ui/Objects';
 import { getLegalAttackTypes } from '../src/renderer/ui/Attack';
 import { NO_EXTRAS, nameIndexOf, type GameContext } from '../src/engine/GameContext';
-import { OBJDI_EYE_OF_TIME } from '../src/engine/objectIndex';
+import { OBJDI_COMPASS, OBJDI_EYE_OF_TIME } from '../src/engine/objectIndex';
 import { StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
 import { describeObject, drawItemPropertyLines, drawObjectInfoPanel } from '../src/renderer/ui/Inventory';
@@ -127,6 +139,46 @@ function newGarment(game: Game, type: number): ObjectID {
   db.records.push({ nextObject: OBJECT_ID_EOF, important: false, cursed: false, broken: false, charges: 0, clothingType: type });
   db.count++;
   return game.ctx.dungeon.rnMaps.rn(DBType.CLOTHING, db.records.length - 1);
+}
+
+/** A misc record of `type`, holding `value`, on no square. */
+function newMisc(game: Game, type: number, value: number): ObjectID {
+  const db = game.ctx.dungeon.getData().databases.misc;
+  db.records.push({ nextObject: OBJECT_ID_EOF, important: false, cursed: false, specialState: value, miscType: type });
+  db.count++;
+  return game.ctx.dungeon.rnMaps.rn(DBType.MISC, db.records.length - 1);
+}
+
+/** A potion record of `type` and `power`, on no square. */
+function newPotion(game: Game, type: number, power: number): ObjectID {
+  const db = game.ctx.dungeon.getData().databases.potions;
+  db.records.push({ ...db.records[0]!, nextObject: OBJECT_ID_EOF, potionType: type, power });
+  db.count++;
+  return game.ctx.dungeon.rnMaps.rn(DBType.POTION, db.records.length - 1);
+}
+
+/**
+ * A potion's lines read off the feeding parameters `computeFeedParameters` gave a priest
+ * of 1 stamina and health out of 1000, no mana out of 900, and no shield: what each
+ * gives is then the whole figure, and a fraction of 1000 names its divisor.
+ */
+function expectedPotionLines(type: number, power: number, fp: FeedParameters): string[] {
+  if (fp.waterValue !== 0) return [`WATER ${fp.waterValue} OF 2048`];
+  if (type === PotionType.EMPTY_FLASK) return [];
+  const lines = [`POWER ${power}`];
+  const add = (name: string, n: number): void => { if (n !== 0) lines.push(`${name} ${signed(n)}`); };
+  add('STRENGTH', fp.strengthAdjust);
+  add('DEXTERITY', fp.dexterityAdjust);
+  add('WISDOM', fp.wisdomAdjust);
+  add('VITALITY', fp.vitalityAdjust);
+  if (fp.antiVenin) lines.push('CURES POISON');
+  const divisor = (gain: number): number => [2, 3, 4, 5, 6, 7].find((d) => Math.trunc(1000 / d) === gain) ?? 0;
+  if (fp.staminaAdjust !== 0) lines.push(`STAMINA +MAX/${divisor(fp.staminaAdjust)}`);
+  if (fp.hitpointAdjust !== 0) lines.push(`HEALTH +MAX/${divisor(fp.hitpointAdjust)}`);
+  if (fp.healCount !== 0) lines.push('HEALS WOUNDS');
+  add('SHIELD', fp.shieldStrengthAdjust);
+  add('MANA', fp.manaAdjust);
+  return lines;
 }
 
 /** A garment line's place in the priority order, -1 for a line of no kind. */
@@ -485,6 +537,100 @@ console.log('\n=== 5. every garment type ===');
   check(feet === 2 && wrongFeet === 0, 'the Elven Boots and the Boots of Speed: what maxLoad and timeToMove give with them on the feet');
   check(wrongOrder === 0, 'every garment type: armour, shield, carried, then the feet');
   check(tooLong === 0, `every garment type: no line over ${ITEM_LINE_CHARS} characters`);
+}
+
+console.log('\n=== 6. every food, the water containers and every potion type ===');
+{
+  const game = stockGame();
+  const ui = uiFor(game);
+  const drinker = masterChampion();
+  game.ctx.party.addChampion(drinker);
+  const party = game.ctx.party.state;
+  party.selectedCharacterIndex = 0;
+  const feed = (rn: ObjectID): FeedParameters => computeFeedParameters(ui, 0, rn)!;
+
+  // The food and the waterskins, and the misc objects that give while carried.
+  const ot = ui.objectTables.objDescObjectType;
+  const miscTypes = ot.length - OBJDI_COMPASS;
+  let foods = 0;
+  let wrongFood = 0;
+  let wrongCarried = 0;
+  let carried = 0;
+  for (let type = 0; type < miscTypes; type++) {
+    const rn = newMisc(game, type, 0);
+    const nameIndex = resolveObjectNameIndex(ui, rn);
+    if (nameIndex < 0) continue;
+    const lines = getItemPropertyLines(ui, rn);
+    const engine = engineCarriedLines(game, rn);
+    if (engine.length > 0) carried++;
+    if (!sameLines(lines.filter(isCarriedLine), engine)) wrongCarried++;
+    const fp = feed(rn);
+    if (fp.foodValue === 0) continue;
+    foods++;
+    console.log(`${getObjectDisplayName(ui, rn, nameIndex).padEnd(16)} ${lines.join(' / ')}`);
+    if (lines.join() !== `FOOD ${fp.foodValue} OF 2048`) wrongFood++;
+  }
+  const skins: string[] = [];
+  let wrongWater = 0;
+  const skinType = Array.from({ length: miscTypes }, (_, t) => t)
+    .find((t) => resolveObjectNameIndex(ui, newMisc(game, t, 0)) === OBJNI_WATERSKIN)!;
+  for (let gulps = 0; gulps <= 3; gulps++) {
+    const rn = newMisc(game, skinType, gulps);
+    const lines = getItemPropertyLines(ui, rn);
+    skins.push(`${gulps}: ${lines.join(' / ') || '-'}`);
+    if (lines.join() !== (feed(rn).waterValue !== 0 ? `WATER ${feed(rn).waterValue} OF 2048` : '')) wrongWater++;
+  }
+  console.log(`a waterskin with 0 to 3 gulps: ${skins.join(', ')}`);
+
+  // 2048: where a champion's food and water stop.
+  drinker.food = 2040; drinker.water = 2040;
+  const capped = clearFeedParameters();
+  capped.performFeeding = true; capped.foodValue = 500; capped.waterValue = 800;
+  applyFeedParameters(game.ctx, 0, capped);
+  const cap = [drinker.food, drinker.water];
+
+  // Every potion type, at four powers.
+  const potionLines = (type: number, power: number): string[] => getItemPropertyLines(ui, newPotion(game, type, power));
+  let potions = 0;
+  let wrongPotion = 0;
+  let flaskTo = '';
+  for (let type = 0; type <= PotionType.EMPTY_FLASK; type++) {
+    for (const power of [0, 40, 150, 255]) {
+      const rn = newPotion(game, type, power);
+      const nameIndex = resolveObjectNameIndex(ui, rn);
+      Object.assign(drinker.attributes, { stamina: 1, maxStamina: 1000, health: 1, maxHealth: 1000, mana: 0, maxMana: 900 });
+      drinker.shieldStrength = 0;
+      const fp = feed(rn);
+      const lines = getItemPropertyLines(ui, rn);
+      if (power === 150) console.log(`${getObjectDisplayName(ui, rn, nameIndex).padEnd(16)} ${lines.join(' / ') || '-'}`);
+      potions++;
+      if (!sameLines(lines, expectedPotionLines(type, power, fp))) {
+        wrongPotion++;
+        console.log(`    the extra ${lines.join(' / ')}, the feeding ${expectedPotionLines(type, power, fp).join(' / ')}`);
+      }
+    }
+  }
+  // The gate: a priest of mastery 1, then no champion selected.
+  const novice = testChampion(1);
+  game.ctx.party.addChampion(novice);
+  const shown = (): string[] => [PotionType.KU_POTION, PotionType.VI_POTION, PotionType.WATER_FLASK, PotionType.EMPTY_FLASK]
+    .map((type) => potionLines(type, 150).join(' / ') || '-');
+  party.selectedCharacterIndex = 1;
+  const toNovice = shown();
+  party.selectedCharacterIndex = -1;
+  const toNobody = shown();
+  flaskTo = `${toNovice.join(', ')}; ${toNobody.join(', ')}`;
+  console.log(`Ku, Vi, a water flask and an empty one, to a priest of mastery 1 then to no one: ${flaskTo}`);
+
+  console.log(`${foods} foods, ${carried} misc objects that give while carried, ${potions} potions`);
+  check(foods === 8 && wrongFood === 0, 'the 8 foods: FOOD what the feeding gives, OF 2048');
+  check(wrongWater === 0 && skins[0] === '0: -', 'a waterskin: WATER what a gulp gives, OF 2048, and nothing when it is empty');
+  check(cap.join() === '2048,2048', 'applyFeedParameters stops food and water at 2048');
+  check(wrongPotion === 0, 'every potion type, at four powers, to a priest: POWER, then what the feeding gives');
+  check(carried > 0 && wrongCarried === 0, 'every misc type: what carrying it gives is what AdjustStatsForItemCarried applies');
+  const gated = ['-', '-', 'WATER 1600 OF 2048', '-'].join();
+  check(toNovice.join() === gated && toNobody.join() === gated,
+    'to a priest of mastery 1, or no one, a potion has no line, but a water flask its water');
 }
 
 finish();

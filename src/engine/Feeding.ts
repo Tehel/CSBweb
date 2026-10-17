@@ -189,8 +189,10 @@ export interface PotionEffect {
   wisdomAdjust: number;
   vitalityAdjust: number;
   antiVenin: boolean;
-  /** Mon B's and Vi's `w_14`: they give back `1 / w_14` of the maximum stamina or hit points. */
-  maxDivisor: number;
+  /** Mon B's `w_14`: it gives back `1 / w_14` of the maximum stamina. */
+  staminaDivisor: number;
+  /** Vi's `w_14`: it gives back `1 / w_14` of the maximum hit points. */
+  hitpointDivisor: number;
   /** Ya's shield, quartered for a champion already shielded past 50. */
   shieldStrength: number;
   /** EE's `w_12 + w_12 - 8`, added to the mana before the 900 cap and the halving past MaxMana. */
@@ -206,7 +208,7 @@ export function potionEffect(potionType: number, strength: number): PotionEffect
   const w12 = Math.trunc(strength / 25) + 8;
   const effect: PotionEffect = {
     drinkable: false, dexterityAdjust: 0, strengthAdjust: 0, wisdomAdjust: 0, vitalityAdjust: 0,
-    antiVenin: false, maxDivisor: 0, shieldStrength: 0, mana: 0, healCount: 0, waterValue: 0,
+    antiVenin: false, staminaDivisor: 0, hitpointDivisor: 0, shieldStrength: 0, mana: 0, healCount: 0, waterValue: 0,
   };
 
   switch (potionType) {
@@ -231,7 +233,7 @@ export function potionEffect(potionType: number, strength: number): PotionEffect
       effect.drinkable = true;
       break;
     case PotionType.MON_POTION_B:
-      effect.maxDivisor = w14;
+      effect.staminaDivisor = w14;
       effect.drinkable = true;
       break;
     case PotionType.YA_POTION:
@@ -243,7 +245,7 @@ export function potionEffect(potionType: number, strength: number): PotionEffect
       effect.drinkable = true;
       break;
     case PotionType.VI_POTION:
-      effect.maxDivisor = w14;
+      effect.hitpointDivisor = w14;
       effect.healCount = Math.max(Math.trunc(strength / 42), 1);
       effect.drinkable = true;
       break;
@@ -295,7 +297,7 @@ export function derivePotionFeeding(
     case PotionType.MON_POTION_B: {
       const maxStamina = champ.attributes.maxStamina | 0;
       const stamina = champ.attributes.stamina | 0;
-      fp.staminaAdjust = Math.min(maxStamina - stamina, Math.trunc(maxStamina / effect.maxDivisor));
+      fp.staminaAdjust = Math.min(maxStamina - stamina, Math.trunc(maxStamina / effect.staminaDivisor));
       break;
     }
     case PotionType.YA_POTION: {
@@ -322,7 +324,7 @@ export function derivePotionFeeding(
     case PotionType.VI_POTION: {
       const maxHealth = champ.attributes.maxHealth | 0;
       const health = champ.attributes.health | 0;
-      const healed = Math.min(health + Math.trunc(maxHealth / effect.maxDivisor), maxHealth);
+      const healed = Math.min(health + Math.trunc(maxHealth / effect.hitpointDivisor), maxHealth);
       fp.hitpointAdjust = healed - health;
       fp.healCount = effect.healCount;
       break;
