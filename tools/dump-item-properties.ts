@@ -15,11 +15,25 @@
  * 3. **A viewing filter that rewrites the description hides the extra**: a DSA's
  *    `&DESCRIBE` marks the description rewritten, one that runs none does not, and a
  *    dungeon with no filter neither (`processViewingFilter`, `src/engine/DsaSystem.ts`).
+ * 4. **Every weapon type**, on a record of its own: `DAMAGE` its `uByte2` first, then what
+ *    carrying it gives, which is what `AdjustStatsForItemCarried` applies in each of the
+ *    30 slots, then `MISSILE` its `uByte3` unless 0, then the ammunition a launcher
+ *    shoots or the launcher an ammunition needs, a pair `matchingAmmunition` accepts,
+ *    then a torch's light, `d.Word1074[charges]` at every charge, or the charges of a
+ *    weapon one of whose attacks `GetLegalAttackTypes` withdraws once they are spent. A
+ *    cursed staff gives -3 Luck and no mana.
  *
  * Run: `npm test -- --only=dump-item-properties.ts`
  */
-import { DBType, OBJECT_ID_NULL } from '../src/core/types';
-import { NO_EXTRAS, type GameContext } from '../src/engine/GameContext';
+import { OBJNI_STAFF, OBJNI_TORCH_A, OBJNI_TORCH_D } from '../src/core/objectNameIndex';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
+import { AdjustStatsForItemCarried } from '../src/engine/AdjustStatsForItemCarried';
+import { attributeCurrent, attributeMaximum, attributeMinimum } from '../src/engine/attributes';
+import type { Champion } from '../src/engine/gameTypes';
+import { getAttackClass } from '../src/renderer/ui/Objects';
+import { getLegalAttackTypes } from '../src/renderer/ui/Attack';
+import { NO_EXTRAS, nameIndexOf, type GameContext } from '../src/engine/GameContext';
+import { OBJDI_EYE_OF_TIME } from '../src/engine/objectIndex';
 import { StkOp } from '../src/engine/DsaSystem';
 import type { Game } from '../src/engine/Game';
 import { describeObject, drawItemPropertyLines, drawObjectInfoPanel } from '../src/renderer/ui/Inventory';
@@ -35,6 +49,7 @@ import { check, finish } from './lib/check';
 import { globalStore, int, op, varFetch, withFilterDsas } from './lib/dsa';
 import { stockGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
+import { testChampion } from './lib/champion';
 
 /** The eye panel, graphic 20 at viewport (80, 52)-(223, 124), its frame's inner edge at y 123. */
 const PANEL = { x1: 80, y1: 52, x2: 223, y2: 123 };
@@ -84,6 +99,90 @@ const lastRowY = (lines: ItemDescriptionLine[]): number => ITEM_DESCRIPTION_Y + 
 const DATABASES: Array<[DBType, 'weapons' | 'clothing' | 'potions' | 'misc']> = [
   [DBType.WEAPON, 'weapons'], [DBType.CLOTHING, 'clothing'], [DBType.POTION, 'potions'], [DBType.MISC, 'misc'],
 ];
+
+/** A champion who masters every skill, so that only charges withdraw an attack. */
+function masterChampion(): Champion {
+  return testChampion(0, { skills: Array.from({ length: 20 }, () => ({ experience: 1 << 22, tempAdjust: 0 })) });
+}
+
+/** A weapon record of `type`, on no square. */
+function newWeapon(game: Game, type: number, charges: number, cursed = false): ObjectID {
+  const db = game.ctx.dungeon.getData().databases.weapons;
+  db.records.push({
+    nextObject: OBJECT_ID_EOF, important: false, cursed, broken: false, charges, litTorch: false, poisoned: false, weaponType: type,
+  });
+  db.count++;
+  return game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, db.records.length - 1);
+}
+
+/** The attribute names a carried line starts with, in `AttributeIndex` order, then the mana. */
+const ATTRIBUTE_NAMES = ['LUCK', 'STRENGTH', 'DEXTERITY', 'WISDOM', 'VITALITY', 'ANTI-MAGIC', 'ANTI-FIRE'];
+const isCarriedLine = (line: string): boolean => /^[A-Z-]+ [+-]\d+$/.test(line)
+  && [...ATTRIBUTE_NAMES, 'MANA'].includes(line.split(' ')[0]!);
+const sameLines = (a: string[], b: string[]): boolean => JSON.stringify(a) === JSON.stringify(b);
+const signed = (n: number): string => `${n > 0 ? '+' : ''}${n}`;
+
+/**
+ * What `AdjustStatsForItemCarried` does with `rn` in each of a champion's 30 slots, as the
+ * extra's lines: the attribute whose maximum, current and minimum all moved, or the
+ * maximum mana, by how much, each change once.
+ */
+function engineCarriedLines(game: Game, rn: ObjectID): string[] {
+  const lines: string[] = [];
+  const nameIndex = (object: ObjectID): number => nameIndexOf(game.ctx, object);
+  for (let slot = 0; slot < 30; slot++) {
+    const champion = testChampion(0);
+    const before = champion.attributes.stats.map((a) => [attributeMaximum(a), attributeCurrent(a), attributeMinimum(a)]);
+    const maxMana = champion.attributes.maxMana;
+    AdjustStatsForItemCarried(champion, slot, 1, rn, game.ctx.dungeon, nameIndex);
+    const moved: string[] = [];
+    champion.attributes.stats.forEach((a, i) => {
+      const [max, current, min] = before[i]!;
+      const delta = attributeMaximum(a) - max!;
+      if (delta !== 0 && attributeCurrent(a) - current! === delta && attributeMinimum(a) - min! === delta) {
+        moved.push(`${ATTRIBUTE_NAMES[i]} ${signed(delta)}`);
+      }
+    });
+    if (champion.attributes.maxMana !== maxMana) moved.push(`MANA ${signed(champion.attributes.maxMana - maxMana)}`);
+    for (const line of moved) if (!lines.includes(line)) lines.push(line);
+  }
+  return lines;
+}
+
+/** Whether `matchingAmmunition` takes ammunition of `ammunitionType` in the off hand for a launcher of `launcherType`. */
+function matches(game: Game, champion: Champion, launcherType: number, ammunitionType: number): boolean {
+  if (launcherType < 0 || ammunitionType < 0) return false;
+  champion.possessions[1] = newWeapon(game, launcherType, 0);
+  champion.possessions[0] = newWeapon(game, ammunitionType, 0);
+  const ok = game.ctx.systems.character.matchingAmmunition(champion, 0);
+  champion.possessions[0] = OBJECT_ID_NULL;
+  champion.possessions[1] = OBJECT_ID_NULL;
+  return ok;
+}
+
+/** The first weapon type named `name`. */
+function weaponTypeNamed(ui: UIState, name: string): number {
+  const ot = ui.objectTables.objDescObjectType;
+  return ui.objectTables.weaponDesc.findIndex((_, type) => ui.objectTables.objectNames[ot[OBJDI_EYE_OF_TIME + type]!] === name);
+}
+
+/** How many attacks `GetLegalAttackTypes` offers the party's champion 0 with `rn` in the weapon hand. */
+function optionsHeld(ui: UIState, champion: Champion, rn: ObjectID): number {
+  champion.possessions[1] = rn;
+  getLegalAttackTypes(ui, 0, ui.uiTables.graphic230.legalAttacks[getAttackClass(ui, rn)] ?? []);
+  champion.possessions[1] = OBJECT_ID_NULL;
+  return ui.word20248;
+}
+
+/** A weapon line's place in the priority order, -1 for a line of no kind. */
+function weaponLineRank(line: string): number {
+  if (line.startsWith('DAMAGE ')) return 0;
+  if (isCarriedLine(line)) return 1;
+  if (line.startsWith('MISSILE ')) return 2;
+  if (line.startsWith('SHOOTS ') || line.startsWith('AMMO FOR ')) return 3;
+  if (line.startsWith('LIGHT ') || line.startsWith('CHARGES ')) return 4;
+  return -1;
+}
 
 console.log('=== 1. every object type of the default dungeon ===');
 {
@@ -210,6 +309,93 @@ console.log('\n=== 3. a viewing filter that rewrites the description ===');
     console.log(`${what}: ${got ? 'rewritten, the extra hidden' : 'let through, the extra shown'}`);
     check(got === want, `${what}: ${want ? 'rewritten' : 'let through'}`);
   }
+}
+
+console.log('\n=== 4. every weapon type ===');
+{
+  const game = stockGame();
+  const ui = uiFor(game);
+  const holder = masterChampion();
+  game.ctx.party.addChampion(holder);
+  const weapons = ui.objectTables.weaponDesc;
+  let wrongDamage = 0;
+  let wrongCarried = 0;
+  let wrongMissile = 0;
+  let wrongShot = 0;
+  let wrongCharges = 0;
+  let wrongOrder = 0;
+  let tooLong = 0;
+  let shots = 0;
+  let torches = 0;
+  let charged = 0;
+  for (let type = 0; type < weapons.length; type++) {
+    const desc = weapons[type]!;
+    const rn = newWeapon(game, type, 9);
+    const nameIndex = resolveObjectNameIndex(ui, rn);
+    const lines = getItemPropertyLines(ui, rn);
+    console.log(`${String(type).padStart(2)} ${getObjectDisplayName(ui, rn, nameIndex).padEnd(16)} class ${String(desc.uByte1).padStart(3)}  ${lines.join(' / ')}`);
+    tooLong += lines.filter((line) => line.length > ITEM_LINE_CHARS).length;
+
+    if (lines[0] !== `DAMAGE ${desc.uByte2}`) wrongDamage++;
+    if (!sameLines(lines.filter(isCarriedLine), engineCarriedLines(game, rn))) {
+      wrongCarried++;
+      console.log(`    carried: the extra ${lines.filter(isCarriedLine).join(', ')}, the engine ${engineCarriedLines(game, rn).join(', ')}`);
+    }
+    const missile = lines.filter((line) => line.startsWith('MISSILE '));
+    if (missile.join() !== (desc.uByte3 !== 0 ? `MISSILE ${desc.uByte3}` : '')) wrongMissile++;
+
+    // The pair a shot line names, put in the hands, is one `matchingAmmunition` accepts.
+    const shot = lines.find((line) => line.startsWith('SHOOTS ') || line.startsWith('AMMO FOR '));
+    const fires = weapons.some((other) => matches(game, holder, type, weapons.indexOf(other)));
+    const fired = weapons.some((other) => matches(game, holder, weapons.indexOf(other), type));
+    if (shot) {
+      shots++;
+      const other = weaponTypeNamed(ui, shot.replace(/^(SHOOTS|AMMO FOR) /, ''));
+      const ok = shot.startsWith('SHOOTS ') ? matches(game, holder, type, other) : matches(game, holder, other, type);
+      if (!ok) wrongShot++;
+    } else if (fires || fired) {
+      wrongShot++;
+    }
+
+    // A torch's light at every charge; any other weapon's charges, shown when spending them
+    // withdraws an attack.
+    if (nameIndex >= OBJNI_TORCH_A && nameIndex <= OBJNI_TORCH_D) {
+      torches++;
+      for (let charges = 0; charges < 16; charges++) {
+        const torch = newWeapon(game, type, charges);
+        const light = getItemPropertyLines(ui, torch).at(-1);
+        if (light !== `LIGHT ${ui.uiTables.graphic232.word1074[charges]}`) wrongCharges++;
+      }
+    } else {
+      const withdrawn = optionsHeld(ui, holder, newWeapon(game, type, 0)) < optionsHeld(ui, holder, rn);
+      const line = lines.find((l) => l.startsWith('CHARGES '));
+      if (withdrawn) charged++;
+      if ((line ?? '') !== (withdrawn ? 'CHARGES 9' : '')) {
+        wrongCharges++;
+        console.log(`    charges: the extra "${line ?? ''}", an attack withdrawn at 0: ${withdrawn}`);
+      }
+    }
+
+    const ranks = lines.map(weaponLineRank);
+    if (ranks.some((rank, i) => rank < 0 || (i > 0 && rank < ranks[i - 1]!))) wrongOrder++;
+  }
+  console.log(`${weapons.length} weapon types: ${shots} launchers and ammunitions, ${torches} torch, ${charged} with charges`);
+  check(wrongDamage === 0, 'every weapon type: DAMAGE its uByte2, first');
+  check(wrongCarried === 0, 'every weapon type: what carrying it gives is what AdjustStatsForItemCarried applies');
+  check(wrongMissile === 0, 'every weapon type: MISSILE its uByte3, unless 0');
+  check(shots === 7 && wrongShot === 0, 'the 7 launchers and ammunitions: each names a pair matchingAmmunition accepts, and nothing else shoots');
+  check(torches === 1 && charged > 0 && wrongCharges === 0,
+    "a torch: LIGHT d.Word1074[charges] at every charge; any other weapon: its CHARGES when spending them withdraws an attack");
+  check(wrongOrder === 0, 'every weapon type: damage, carried, missile, shot, then light or charges');
+  check(tooLong === 0, `every weapon type: no line over ${ITEM_LINE_CHARS} characters`);
+
+  const staffType = weapons.findIndex((_, type) => resolveObjectNameIndex(ui, newWeapon(game, type, 0)) === OBJNI_STAFF);
+  const cursed = newWeapon(game, staffType, 0, true);
+  const cursedLines = getItemPropertyLines(ui, cursed);
+  console.log(`a cursed staff: ${cursedLines.join(' / ')}`);
+  check(cursedLines.includes('LUCK -3') && !cursedLines.some((line) => line.startsWith('MANA')),
+    'a cursed staff: LUCK -3, and no mana');
+  check(sameLines(cursedLines.filter(isCarriedLine), engineCarriedLines(game, cursed)), 'a cursed staff: what AdjustStatsForItemCarried applies');
 }
 
 finish();

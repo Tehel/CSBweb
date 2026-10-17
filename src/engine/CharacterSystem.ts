@@ -207,10 +207,8 @@ export class CharacterSystem {
     if (launcher === OBJECT_ID_NULL || this.ctx.dungeon.rnMaps.dbType(launcher) !== DBType.WEAPON) return false;
     const launcherDesc = this.ctx.systems.characterStats.weaponDescFor(launcher);
     if (!launcherDesc) return false;
-    let wanted: number;
-    if (launcherDesc.uByte1 >= 16 && launcherDesc.uByte1 <= 31) wanted = 10;
-    else if (launcherDesc.uByte1 >= 32 && launcherDesc.uByte1 <= 47) wanted = 11;
-    else return false;
+    const wanted = ammunitionClassFor(launcherDesc.uByte1);
+    if (wanted < 0) return false;
 
     const candidate = getChampionPossession(champion, slot);
     if (candidate === OBJECT_ID_NULL || this.ctx.dungeon.rnMaps.dbType(candidate) !== DBType.WEAPON) return false;
@@ -292,4 +290,17 @@ export class CharacterSystem {
     const raw = this.ctx.tables.byte20090[attackType] ?? 0;
     return (raw << 24) >> 24;
   }
+}
+
+/**
+ * `TAG0153c2`'s classes (`doc/CSBwin-src/Character.cpp:1539-1552`), which `atk_SHOOT`
+ * checks too (`doc/CSBwin-src/Attack.cpp:1871-1897`): a launcher of weapon class 16-31
+ * fires ammunition of class 10, one of 32-47 class 11. -1 for a weapon that is no
+ * launcher. Its own function so that the eye's item properties show the pairing
+ * (`getItemPropertyLines`, `src/renderer/ui/Objects.ts`).
+ */
+export function ammunitionClassFor(launcherClass: number): number {
+  if (launcherClass >= 16 && launcherClass <= 31) return 10;
+  if (launcherClass >= 32 && launcherClass <= 47) return 11;
+  return -1;
 }

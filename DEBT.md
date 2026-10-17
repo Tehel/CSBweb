@@ -177,7 +177,6 @@ In payoff order: the first row is the next item.
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
-| X12 | The eye shows a weapon's properties | M | ⏸️ |
 | X13 | The eye shows a garment's properties | S | ⏸️ |
 | X14 | The eye shows what food, water and potions give | S | ⏸️ |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
@@ -1742,7 +1741,18 @@ Rules for all of them:
     `FOOD 500`): the item's own value from the set's own tables (`ObjectTables`), not a
     figure worked out for the selected champion, and a rule CSBWin keeps in code is
     called, not copied. An object whose description a viewing filter's `&DESCRIBE`
-    rewrote shows none. No item type has lines yet: X12 to X14 give them.
+    rewrote shows none. A weapon's lines are `DAMAGE` its `WEAPONDESC.uByte2`; what
+    carrying it gives in any slot, from the rule `AdjustStatsForItemCarried` applies
+    (`itemCarriedAdjustment`, `src/engine/AdjustStatsForItemCarried.ts`), so a cursed
+    one gives `LUCK -3`; `MISSILE` its `uByte3`, unless 0; what a launcher shoots or
+    what an ammunition is for (`ammunitionClassFor`, `src/engine/CharacterSystem.ts`: a
+    launcher of class 16-31 fires class 10, one of 32-47 class 11), named by the set's
+    first weapon of the class; then a torch's `LIGHT`, `d.Word1074[charges]`, or the
+    `CHARGES` of a weapon whose `legalAttacks` row withdraws an attack once they are
+    spent. `word4`'s low byte gets no line: the one figure made from it, a shot's damage,
+    is overwritten on the next line (`doc/PROVEN_FACTS.md` → "`atk_SHOOT` throws away the
+    damage it computes"). Golden frame 30 shows the eye on HALK's weapon. Garments, food,
+    water and potions have no lines yet: X13 and X14 give them.
 
   The coloured object cursor, RISE's NEW FACE and the FTL logo are the exceptions: the
   author wants them on by default, so they are recorded under H.
@@ -1813,38 +1823,6 @@ drawing a map from them is a separate item, entered when the author names it.
   pit seen as floor, saves, loads, and compares every code. The same file with the
   records deleted loads with every cell unknown.
 
-### X12 ⏸️ The eye shows a weapon's properties
-
-A weapon's `WEAPONDESC` is in `ObjectTables.weaponDesc`
-(`doc/CSBwin-src/CSB.h:1352`). Each field is used as follows:
-
-- `uByte2`, the strength it adds. It is added to `DetermineThrowingDistance`
-  (`Character.cpp:2323-2325`), and a melee blow starts from that value
-  (`DeterminePhysicalAttackDamage`, `Attack.cpp:652`).
-- `uByte3`, its energy as a missile. A thrown weapon of class 12 or below takes it
-  (`Mouse.cpp:728-737`). The impact is `uByte3` plus half the weight
-  (`Code11f52.cpp:1606-1617`). A shot's range is the two weapons' `uByte3`s
-  (`Attack.cpp:1903`).
-- `uByte1`, its class. Ammunition of class 16-31 is shot from a launcher of class 10, and
-  32-47 from one of class 11 (`Attack.cpp:1872-1897`, `TAG0153c2`,
-  `Character.cpp:1527-1566`). The class also picks the skill a throw draws on
-  (`Character.cpp:2330-2350`). One line can say which launcher an ammunition needs, or
-  what a launcher shoots, by class. Which class is the bow's and which the sling's is
-  read from the set's weapons, not written in.
-- `word4`. Its bits 8-12 are the missile's picture (`Code51a4.cpp:2861`). A shot's damage
-  uses its value (`Attack.cpp:1904`). The session reads what the low byte holds there
-  before it shows that byte.
-- The record's `charges`: a staff's or a wand's charges, and a torch's fuel. A torch's
-  light is `d.Word1074[charges]` (`CSBCode.cpp:7320-7364`, `UITables.word1074`).
-- What it gives while held: mana for the staffs and wands, strength for the Mace of
-  Order, and the rest of `AdjustStatsForItemCarried`'s weapons
-  (`Character.cpp:1574-1785`), through X13's shared rule.
-
-The priority order is damage, what it gives while held, the missile, the class or
-ammunition, then charges or light. `tools/dump-item-properties.ts` checks every weapon
-type. A golden frame shows the eye on a weapon with the setting on. It needs `--update`
-(`.claude/memory/new-golden-frame-needs-update.md`).
-
 ### X13 ⏸️ The eye shows a garment's properties
 
 A garment's row of `ClothingDesc` is `ObjectTables.clothingArmour` and
@@ -1858,12 +1836,10 @@ A garment's row of `ClothingDesc` is `ObjectTables.clothingArmour` and
   `MonsterAttack.ts:817`).
 - What it gives while worn. The luck, dexterity, wisdom, vitality, anti-magic, anti-fire
   and mana of `AdjustStatsForItemCarried` (`Character.cpp:1574-1785`,
-  `src/engine/AdjustStatsForItemCarried.ts`) are code, not a table. The extra and the
-  engine therefore share one exported rule that gives the attribute and the amount. It is
-  split out of `AdjustStatsForItemCarried` in a behaviour-neutral commit first. The Elven
-  Boots' extra sixteenth of the maximum load (`src/engine/CharacterStats.ts:130`) and the
-  Boots of Speed's tick off the move delay (`CharacterStats.ts:161`) come out of that
-  file the same way.
+  `src/engine/AdjustStatsForItemCarried.ts`) are code, not a table, which the extra and
+  the engine share: `itemCarriedAdjustment`. The Elven Boots' extra sixteenth of the
+  maximum load and the Boots of Speed's tick off the move delay are
+  `feetMaxLoadShift` and `feetMoveTimeBonus` (`src/engine/CharacterStats.ts`).
 
 `tools/dump-item-properties.ts` checks every garment type, and checks that the shared rule
 gives what the engine applies.

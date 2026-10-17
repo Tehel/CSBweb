@@ -1397,6 +1397,21 @@ await evaluate(`document.exitFullscreen().then(() => 1)`); await wait(500);
 check((await screenLayout()).game[2] === 960, 'out of it, the screen is 960x600 again');
 await screenSize(1600, 1000);
 
+// The eye on a weapon, with the eye's item properties on (`showItemProperties`,
+// `getItemPropertyLines`, `src/renderer/ui/Objects.ts`): a new game's HALK, as in frame 03,
+// his weapon taken from his weapon hand (62-77 x 86-101) into the cursor, and the eye
+// (12-27 x 46-61) held on it. Under CSBWin's description, the extra's lines, from the
+// panel's foot up.
+await send('Page.navigate', { url: `${APP}?intro=0&dungeon=dm-atari` });
+await wait(3500);
+await evaluate(BUILD_PARTY); await wait(600);
+await canvasClick(15, 15, 2); await wait(700);
+await evaluate(`(()=>{const s=window.__probe.screen.ui.settings;s.update({ extras: { ...s.values.extras, showItemProperties: true } });return 1;})()`);
+await canvasClick(69, 93, 0); await wait(400);
+await realMouse('mousePressed', 19, 53); await wait(400);
+console.log('state: eye on a weapon');   await shot('30-eye-weapon');
+await realMouse('mouseReleased', 19, 53); await wait(300);
+
 // The CRT effect's input surface. The effect's canvas is shown over the game canvas, and
 // the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,
 // `src/renderer/intro/BootSequence.ts`), so it must let a click through. Boot with the

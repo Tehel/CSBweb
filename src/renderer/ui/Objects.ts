@@ -6,7 +6,12 @@
  * index, the phrase/attribute lines the eye shows, carried weight, and `DetermineMastery`.
  */
 import { OBJNI_BONES_A, OBJNI_COMPASS_N, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJNI_SPECIAL_F, OBJNI_SPECIAL_J, OBJNI_SPECIAL_N, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATER, OBJNI_WATERSKIN, OBJNI_WATER_FLASK } from '../../core/objectNameIndex';
-import { DescIndex, GetBasicObjectType, NameIndex } from '../../engine/objectIndex';
+import {
+  adjustAntiFire, adjustAntiMagic, adjustDexterity, adjustLuck, adjustMaxMana, adjustStrength, adjustVitality,
+  adjustWisdom, itemCarriedAdjustment,
+} from '../../engine/AdjustStatsForItemCarried';
+import { ammunitionClassFor } from '../../engine/CharacterSystem';
+import { DescIndex, GetBasicObjectType, NameIndex, OBJDI_EYE_OF_TIME } from '../../engine/objectIndex';
 import { DBType, ObjectID } from '../../core/types';
 import { ViewingFilterResult, ViewingFilterSite } from '../../engine/DsaSystem';
 import { Champion } from '../../engine/gameTypes';
@@ -318,13 +323,98 @@ export function drawItemDescriptionLine(ui: UIState, text: string, color: number
 /**
  * The extra's lines for an object (`showItemProperties`, `DEBT.md` X), in their priority
  * order, each one labelled figure of at most 18 characters, from the set's own tables.
- * The weapons', the garments' and the food's, water's and potions' lines are still to come.
+ * The garments' and the food's, water's and potions' lines are still to come.
  */
 export function getItemPropertyLines(ui: UIState, objectId: ObjectID): string[] {
   switch (ui.ctx.dungeon.rnMaps.dbType(objectId)) {
+    case DBType.WEAPON:
+      return weaponPropertyLines(ui, objectId);
     default:
       return [];
   }
+}
+
+/**
+ * A weapon's lines: its damage, what it gives while carried, its energy as a missile,
+ * the ammunition a launcher fires or the launcher an ammunition needs, then a torch's
+ * light or the charges its attacks spend.
+ */
+function weaponPropertyLines(ui: UIState, objectId: ObjectID): string[] {
+  const rec = ui.ctx.dungeon.getWeaponRecord(objectId);
+  const desc = rec ? ui.objectTables.weaponDesc[rec.weaponType] : undefined;
+  if (!rec || !desc) return [];
+  // `uByte2`: what a melee blow starts from (`DeterminePhysicalAttackDamage`,
+  // `doc/CSBwin-src/Attack.cpp:652`) and what a throw adds (`Character.cpp:2323-2325`).
+  const lines = [`DAMAGE ${desc.uByte2}`, ...carriedPropertyLines(ui, objectId)];
+  // `uByte3`: a missile's impact (`Code11f52.cpp:1606-1617`), a throw's energy
+  // (`Mouse.cpp:728-737`) and a shot's range (`Attack.cpp:1903`).
+  if (desc.uByte3 !== 0) lines.push(`MISSILE ${desc.uByte3}`);
+  const shot = shotPropertyLine(ui, desc.uByte1);
+  if (shot) lines.push(shot);
+  const nameIndex = resolveObjectNameIndex(ui, objectId);
+  if (nameIndex >= OBJNI_TORCH_A && nameIndex <= OBJNI_TORCH_D) {
+    // A torch in hand lights the party by `d.Word1074[charges]` (`CSBCode.cpp:7320-7364`).
+    lines.push(`LIGHT ${ui.uiTables.graphic232.word1074[rec.charges] ?? 0}`);
+  } else if (spendsCharges(ui, objectId)) {
+    lines.push(`CHARGES ${rec.charges}`);
+  }
+  return lines;
+}
+
+/** The attributes `itemCarriedAdjustment` names, as the attribute panel and the mana bar do. */
+const CARRIED_ATTRIBUTE_NAMES: Readonly<Record<number, string>> = {
+  [adjustLuck]: 'LUCK',
+  [adjustStrength]: 'STRENGTH',
+  [adjustDexterity]: 'DEXTERITY',
+  [adjustWisdom]: 'WISDOM',
+  [adjustVitality]: 'VITALITY',
+  [adjustAntiMagic]: 'ANTI-MAGIC',
+  [adjustAntiFire]: 'ANTI-FIRE',
+  [adjustMaxMana]: 'MANA',
+};
+
+/**
+ * What carrying the object gives, in any of a champion's 30 slots: each adjustment
+ * `AdjustStatsForItemCarried` makes for it (`itemCarriedAdjustment`), once.
+ */
+function carriedPropertyLines(ui: UIState, objectId: ObjectID): string[] {
+  const lines: string[] = [];
+  for (let slot = 0; slot < 30; slot++) {
+    const { whatToAdjust, amount } = itemCarriedAdjustment(slot, objectId, ui.ctx.dungeon, (rn) => resolveObjectNameIndex(ui, rn));
+    const name = CARRIED_ATTRIBUTE_NAMES[whatToAdjust];
+    if (amount === 0 || !name) continue;
+    const line = `${name} ${amount > 0 ? '+' : ''}${amount}`;
+    if (!lines.includes(line)) lines.push(line);
+  }
+  return lines;
+}
+
+/**
+ * A launcher's ammunition, or an ammunition's launcher (`ammunitionClassFor`), named by
+ * the set's first weapon type of that class. Nothing for any other weapon, or a set with
+ * no weapon of the class wanted.
+ */
+function shotPropertyLine(ui: UIState, weaponClass: number): string | null {
+  const weapons = ui.objectTables.weaponDesc;
+  const nameOf = (weaponType: number): string =>
+    getObjectName(ui, ui.objectTables.objDescObjectType[OBJDI_EYE_OF_TIME + weaponType] ?? -1);
+  const ammunitionClass = ammunitionClassFor(weaponClass);
+  if (ammunitionClass >= 0) {
+    const ammunition = weapons.findIndex((desc) => desc.uByte1 === ammunitionClass);
+    return ammunition >= 0 ? `SHOOTS ${nameOf(ammunition)}` : null;
+  }
+  const launcher = weapons.findIndex((desc) => ammunitionClassFor(desc.uByte1) === weaponClass);
+  return launcher >= 0 ? `AMMO FOR ${nameOf(launcher)}` : null;
+}
+
+/**
+ * Whether an object's attacks spend its charges: its `legalAttacks` row asks for charges
+ * left (bit 7 of a mastery byte) for one of its options, which `GetLegalAttackTypes`
+ * offers only while `ItemHasChargesLeft` (`doc/CSBwin-src/Character.cpp:4805-4808`).
+ */
+function spendsCharges(ui: UIState, objectId: ObjectID): boolean {
+  const row = ui.uiTables.graphic230.legalAttacks[getAttackClass(ui, objectId)];
+  return !!row && (((row[4] ?? 0) | (row[5] ?? 0)) & 128) !== 0;
 }
 
 /**
