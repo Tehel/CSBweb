@@ -11,6 +11,7 @@ import {
   adjustWisdom, itemCarriedAdjustment,
 } from '../../engine/AdjustStatsForItemCarried';
 import { ammunitionClassFor } from '../../engine/CharacterSystem';
+import { feetMaxLoadShift, feetMoveTimeBonus } from '../../engine/CharacterStats';
 import { DescIndex, GetBasicObjectType, NameIndex, OBJDI_EYE_OF_TIME } from '../../engine/objectIndex';
 import { DBType, ObjectID } from '../../core/types';
 import { ViewingFilterResult, ViewingFilterSite } from '../../engine/DsaSystem';
@@ -323,12 +324,14 @@ export function drawItemDescriptionLine(ui: UIState, text: string, color: number
 /**
  * The extra's lines for an object (`showItemProperties`, `DEBT.md` X), in their priority
  * order, each one labelled figure of at most 18 characters, from the set's own tables.
- * The garments' and the food's, water's and potions' lines are still to come.
+ * The food's, water's and potions' lines are still to come.
  */
 export function getItemPropertyLines(ui: UIState, objectId: ObjectID): string[] {
   switch (ui.ctx.dungeon.rnMaps.dbType(objectId)) {
     case DBType.WEAPON:
       return weaponPropertyLines(ui, objectId);
+    case DBType.CLOTHING:
+      return garmentPropertyLines(ui, objectId);
     default:
       return [];
   }
@@ -358,6 +361,30 @@ function weaponPropertyLines(ui: UIState, objectId: ObjectID): string[] {
   } else if (spendsCharges(ui, objectId)) {
     lines.push(`CHARGES ${rec.charges}`);
   }
+  return lines;
+}
+
+/**
+ * A garment's lines: its armour and its resistance to sharp blows, whether it is a
+ * shield, what wearing it gives, then what it gives on the feet.
+ */
+function garmentPropertyLines(ui: UIState, objectId: ObjectID): string[] {
+  const rec = ui.ctx.dungeon.getClothingRecord(objectId);
+  if (!rec) return [];
+  const armour = ui.objectTables.clothingArmour[rec.clothingType] ?? 0;
+  const flags = ui.objectTables.clothingFlags[rec.clothingType] ?? 0;
+  // `uByte1` and `uByte2 & 7`, `TAG009470`'s figures (`doc/CSBwin-src/Character.cpp:168-176`).
+  // One space between them: the Plate of Darc's armour is 160.
+  const lines = [`ARMOUR ${armour} SHARP ${flags & 7}`];
+  // `uByte2` bit 7: in either hand, it adds to every part's defence (`TAG01680a`,
+  // `Character.cpp:2396-2432`).
+  if ((flags & 0x80) !== 0) lines.push('SHIELDS ALL PARTS');
+  lines.push(...carriedPropertyLines(ui, objectId));
+  const nameIndex = resolveObjectNameIndex(ui, objectId);
+  const loadShift = feetMaxLoadShift(nameIndex);
+  if (loadShift !== 0) lines.push(`MAX LOAD +1/${1 << loadShift}`);
+  const moveTime = feetMoveTimeBonus(nameIndex);
+  if (moveTime !== 0) lines.push(`MOVE TIME -${moveTime}`);
   return lines;
 }
 

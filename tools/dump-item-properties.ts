@@ -22,6 +22,12 @@
  *    then a torch's light, `d.Word1074[charges]` at every charge, or the charges of a
  *    weapon one of whose attacks `GetLegalAttackTypes` withdraws once they are spent. A
  *    cursed staff gives -3 Luck and no mana.
+ * 5. **Every garment type**: `ARMOUR` its `uByte1` and `SHARP` its `uByte2 & 7` first, then
+ *    `SHIELDS ALL PARTS` for the garments whose bit 7 is set, which in a hand change the
+ *    armour `armourStrength` gives a part and the others leave as it was, then what
+ *    wearing it gives, which is what `AdjustStatsForItemCarried` applies, then the Elven
+ *    Boots' sixteenth of the maximum load and the Boots of Speed's tick, what `maxLoad`
+ *    and `timeToMove` add with them on the feet and with no other garment.
  *
  * Run: `npm test -- --only=dump-item-properties.ts`
  */
@@ -113,6 +119,23 @@ function newWeapon(game: Game, type: number, charges: number, cursed = false): O
   });
   db.count++;
   return game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, db.records.length - 1);
+}
+
+/** A garment record of `type`, on no square. */
+function newGarment(game: Game, type: number): ObjectID {
+  const db = game.ctx.dungeon.getData().databases.clothing;
+  db.records.push({ nextObject: OBJECT_ID_EOF, important: false, cursed: false, broken: false, charges: 0, clothingType: type });
+  db.count++;
+  return game.ctx.dungeon.rnMaps.rn(DBType.CLOTHING, db.records.length - 1);
+}
+
+/** A garment line's place in the priority order, -1 for a line of no kind. */
+function garmentLineRank(line: string): number {
+  if (line.startsWith('ARMOUR ')) return 0;
+  if (line === 'SHIELDS ALL PARTS') return 1;
+  if (isCarriedLine(line)) return 2;
+  if (line.startsWith('MAX LOAD ') || line.startsWith('MOVE TIME ')) return 3;
+  return -1;
 }
 
 /** The attribute names a carried line starts with, in `AttributeIndex` order, then the mana. */
@@ -396,6 +419,72 @@ console.log('\n=== 4. every weapon type ===');
   check(cursedLines.includes('LUCK -3') && !cursedLines.some((line) => line.startsWith('MANA')),
     'a cursed staff: LUCK -3, and no mana');
   check(sameLines(cursedLines.filter(isCarriedLine), engineCarriedLines(game, cursed)), 'a cursed staff: what AdjustStatsForItemCarried applies');
+}
+
+console.log('\n=== 5. every garment type ===');
+{
+  const game = stockGame();
+  const ui = uiFor(game);
+  const stats = game.ctx.systems.characterStats;
+  const clothingTypes = ui.objectTables.clothingArmour.length;
+  let wrongArmour = 0;
+  let wrongShield = 0;
+  let wrongCarried = 0;
+  let wrongFeet = 0;
+  let wrongOrder = 0;
+  let tooLong = 0;
+  let shields = 0;
+  let carried = 0;
+  let feet = 0;
+  for (let type = 0; type < clothingTypes; type++) {
+    const rn = newGarment(game, type);
+    const lines = getItemPropertyLines(ui, rn);
+    const flags = ui.objectTables.clothingFlags[type]!;
+    console.log(`${String(type).padStart(2)} ${getObjectDisplayName(ui, rn, resolveObjectNameIndex(ui, rn)).padEnd(16)} ${lines.join(' / ')}`);
+    tooLong += lines.filter((line) => line.length > ITEM_LINE_CHARS).length;
+    if (lines[0] !== `ARMOUR ${ui.objectTables.clothingArmour[type]} SHARP ${flags & 7}`) wrongArmour++;
+
+    // In the off hand, a shield changes the armour of the head, and nothing else does.
+    const armourWith = (inHand: ObjectID): number => {
+      const champion = testChampion(0);
+      champion.possessions[0] = inHand;
+      game.setRandomSeed(0x2468ace);
+      return game.ctx.systems.monsterAttack.armourStrength(champion, 2, false);
+    };
+    const shield = armourWith(rn) !== armourWith(OBJECT_ID_NULL);
+    if (shield) shields++;
+    if (lines.includes('SHIELDS ALL PARTS') !== shield || ((flags & 0x80) !== 0) !== shield) wrongShield++;
+
+    const engine = engineCarriedLines(game, rn);
+    if (engine.length > 0) carried++;
+    if (!sameLines(lines.filter(isCarriedLine), engine)) {
+      wrongCarried++;
+      console.log(`    carried: the extra ${lines.filter(isCarriedLine).join(', ')}, the engine ${engine.join(', ')}`);
+    }
+
+    // On the feet of a champion who wears nothing else.
+    const onFeet = testChampion(0);
+    const bare = testChampion(0);
+    onFeet.possessions[5] = rn;
+    const load = lines.find((line) => line.startsWith('MAX LOAD '));
+    const move = lines.find((line) => line.startsWith('MOVE TIME '));
+    const loadGain = stats.maxLoad(onFeet) - stats.maxLoad(bare);
+    const moveGain = stats.timeToMove(bare) - stats.timeToMove(onFeet);
+    if (load || move) feet++;
+    const share = load ? Number(load.split('/')[1]) : 0;
+    if (load ? Math.abs(loadGain - stats.maxLoad(bare) / share) >= 10 : loadGain !== 0) wrongFeet++;
+    if ((move ?? '') !== (moveGain !== 0 ? `MOVE TIME -${moveGain}` : '')) wrongFeet++;
+
+    const ranks = lines.map(garmentLineRank);
+    if (ranks.some((rank, i) => rank < 0 || (i > 0 && rank < ranks[i - 1]!))) wrongOrder++;
+  }
+  console.log(`${clothingTypes} garment types: ${shields} shields, ${carried} that give while worn, ${feet} boots that give on the feet`);
+  check(wrongArmour === 0, 'every garment type: ARMOUR its uByte1 and SHARP its uByte2 & 7, first');
+  check(shields === 7 && wrongShield === 0, "the 7 shields: SHIELDS ALL PARTS, bit 7, and in a hand they change a part's armour; no other garment does");
+  check(carried > 0 && wrongCarried === 0, 'every garment type: what wearing it gives is what AdjustStatsForItemCarried applies');
+  check(feet === 2 && wrongFeet === 0, 'the Elven Boots and the Boots of Speed: what maxLoad and timeToMove give with them on the feet');
+  check(wrongOrder === 0, 'every garment type: armour, shield, carried, then the feet');
+  check(tooLong === 0, `every garment type: no line over ${ITEM_LINE_CHARS} characters`);
 }
 
 finish();

@@ -177,7 +177,6 @@ In payoff order: the first row is the next item.
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
-| X13 | The eye shows a garment's properties | S | ⏸️ |
 | X14 | The eye shows what food, water and potions give | S | ⏸️ |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
@@ -1751,8 +1750,13 @@ Rules for all of them:
     `CHARGES` of a weapon whose `legalAttacks` row withdraws an attack once they are
     spent. `word4`'s low byte gets no line: the one figure made from it, a shot's damage,
     is overwritten on the next line (`doc/PROVEN_FACTS.md` → "`atk_SHOOT` throws away the
-    damage it computes"). Golden frame 30 shows the eye on HALK's weapon. Garments, food,
-    water and potions have no lines yet: X13 and X14 give them.
+    damage it computes"). Golden frame 30 shows the eye on HALK's weapon. A garment's
+    lines are `ARMOUR` its `ClothingDesc.uByte1` and `SHARP` its `uByte2 & 7`, one space
+    apart (the Plate of Darc's armour is 160); `SHIELDS ALL PARTS` for one whose `uByte2`
+    bit 7 is set (`TAG01680a`); what wearing it gives, from the same rule as a weapon's;
+    then what boots give on the feet, `MAX LOAD +1/16` and `MOVE TIME -1` (`feetMaxLoadShift`
+    and `feetMoveTimeBonus`, `src/engine/CharacterStats.ts`). Food, water and potions have
+    no lines yet: X14 gives them.
 
   The coloured object cursor, RISE's NEW FACE and the FTL logo are the exceptions: the
   author wants them on by default, so they are recorded under H.
@@ -1822,27 +1826,6 @@ drawing a map from them is a separate item, entered when the author names it.
   prints each level's codes as a map. It asserts a fake wall seen as stone and a hidden
   pit seen as floor, saves, loads, and compares every code. The same file with the
   records deleted loads with every cell unknown.
-
-### X13 ⏸️ The eye shows a garment's properties
-
-A garment's row of `ClothingDesc` is `ObjectTables.clothingArmour` and
-`clothingFlags`:
-
-- `uByte1`, its armour, and `uByte2 & 7`, its resistance to sharp blows
-  (`TAG009470`, `Character.cpp:168-176`, the port's `clothingArmourValue`,
-  `src/engine/MonsterAttack.ts:861`).
-- `uByte2` bit 7: a shield. A shield in either hand adds to every part's defence,
-  weighted by `d.Byte1412` (`TAG01680a`, `Character.cpp:2395-2432`,
-  `MonsterAttack.ts:817`).
-- What it gives while worn. The luck, dexterity, wisdom, vitality, anti-magic, anti-fire
-  and mana of `AdjustStatsForItemCarried` (`Character.cpp:1574-1785`,
-  `src/engine/AdjustStatsForItemCarried.ts`) are code, not a table, which the extra and
-  the engine share: `itemCarriedAdjustment`. The Elven Boots' extra sixteenth of the
-  maximum load and the Boots of Speed's tick off the move delay are
-  `feetMaxLoadShift` and `feetMoveTimeBonus` (`src/engine/CharacterStats.ts`).
-
-`tools/dump-item-properties.ts` checks every garment type, and checks that the shared rule
-gives what the engine applies.
 
 ### X14 ⏸️ The eye shows what food, water and potions give
 
