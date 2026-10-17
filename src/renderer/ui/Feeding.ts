@@ -8,7 +8,7 @@
 import { OBJNI_APPLE, OBJNI_DRAGON_STEAK, OBJNI_SPECIAL_G, OBJNI_SPECIAL_H, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
 import { PotionType } from '../../core/constants';
 import { CursorFilterType } from '../../engine/DsaSystem';
-import { applyFeedParameters, clearFeedParameters, derivePotionFeeding, type FeedParameters } from '../../engine/Feeding';
+import { WATERSKIN_GULP, applyFeedParameters, clearFeedParameters, derivePotionFeeding, type FeedParameters } from '../../engine/Feeding';
 import { CHARFLAG_CHEST_OR_SCROLL } from '../../engine/gameTypes';
 import { drawCharacterState } from '../../engine/Party';
 import { DBType, OBJECT_ID_NULL, ObjectID, locationRelToInteger } from '../../core/types';
@@ -68,7 +68,7 @@ export function computeFeedParameters(
       fp.waterValue = 0;
       fp.emptyFlask = false;
     } else {
-      fp.waterValue = 800;
+      fp.waterValue = WATERSKIN_GULP;
       fp.gulp = SOUND_GULP;
       fp.emptyFlask = true;
     }
@@ -182,7 +182,7 @@ export function drinkAtWaterFountain(ui: UIState): void {
   if (!champ || (champ.attributes.health | 0) === 0) return;
   const fp = clearFeedParameters();
   fp.characterIndex = chIdx;
-  fp.waterValue = 800;
+  fp.waterValue = WATERSKIN_GULP;
   fp.gulp = SOUND_GULP;
   fp.performFeeding = true;
   if (!applyFeedParameters(ui.ctx, chIdx, fp)) return;

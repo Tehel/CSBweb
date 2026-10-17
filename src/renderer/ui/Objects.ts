@@ -108,21 +108,27 @@ export function getObjectDisplayName(ui: UIState, objectId: ObjectID, objectName
   const owner = getBonesChampion(ui, objectId, objectNameIndex);
   if (owner?.name) name = describeChampionBones(owner.name, name);
 
-  if (category === DBType.POTION) {
-    if (objectNameIndex !== OBJNI_WATER_FLASK && objectNameIndex !== OBJNI_EMPTY_FLASK) {
-      const selected = ui.partyState.selectedCharacterIndex;
-      if (selected >= 0 && ui.partyState) {
-        const champ = ui.partyState.champions[selected];
-        if (champ && determineMastery(ui, champ, 2) > 1) {
-          const potion = ui.ctx.dungeon.getPotionRecord(objectId);
-          const prefix = 95 + Math.floor((potion?.power ?? 0) / 40);
-          name = `${String.fromCharCode(prefix)} ${name}`;
-        }
-      }
-    }
+  if (category === DBType.POTION && showsPotionPower(ui, objectNameIndex)) {
+    const potion = ui.ctx.dungeon.getPotionRecord(objectId);
+    const prefix = 95 + Math.floor((potion?.power ?? 0) / 40);
+    name = `${String.fromCharCode(prefix)} ${name}`;
   }
 
   return name;
+}
+
+/**
+ * Whether the eye shows a potion's power (`doc/CSBwin-src/Character.cpp:3608-3611`): as the
+ * rune before its name, for a potion that is not a water flask nor an empty one, to a
+ * selected champion of priest mastery above 1. The eye's item properties keep the gate
+ * (`getItemPropertyLines`).
+ */
+export function showsPotionPower(ui: UIState, objectNameIndex: number): boolean {
+  if (objectNameIndex === OBJNI_WATER_FLASK || objectNameIndex === OBJNI_EMPTY_FLASK) return false;
+  const selected = ui.partyState.selectedCharacterIndex;
+  if (selected < 0) return false;
+  const champ = ui.partyState.champions[selected];
+  return !!champ && determineMastery(ui, champ, 2) > 1;
 }
 
 export function formatWeightText(weight: number): string {

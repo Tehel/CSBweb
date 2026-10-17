@@ -43,27 +43,34 @@ import type { DungeonState } from './DungeonState';
 import { CHARFLAG_CHEST_OR_SCROLL, type Champion } from './gameTypes';
 
 // `whatToAdjust` (`:1586-1597`) — the first seven are `Attributes[]` indices.
-const adjustLuck = 0;
-const adjustStrength = 1;
-const adjustDexterity = 2;
-const adjustWisdom = 3;
-const adjustAntiMagic = 5;
-const adjustAntiFire = 6;
-const adjustMaxMana = 8;
-const adjustIllegal = 99;
+export const adjustLuck = 0;
+export const adjustStrength = 1;
+export const adjustDexterity = 2;
+export const adjustWisdom = 3;
+export const adjustVitality = 4;
+export const adjustAntiMagic = 5;
+export const adjustAntiFire = 6;
+export const adjustMaxMana = 8;
+export const adjustIllegal = 99;
+
+/** What carrying an object adjusts, and by how much: `whatToAdjust` and `D4W`. */
+export interface ItemCarriedAdjustment {
+  whatToAdjust: number;
+  amount: number;
+}
 
 /**
- * `nameIndex` is `RN::NameIndex` with the caller's tables (`src/engine/objectIndex.ts`);
- * `dungeon` is where the `cursed()` bit is read.
+ * `AdjustStatsForItemCarried`'s fake loop (`:1600-1767`): what carrying `item` in
+ * `possessionIndex` adjusts, and by how much, before the sign of the change. An amount
+ * of 0 adjusts nothing. Its own function so that the eye's item properties
+ * (`getItemPropertyLines`, `src/renderer/ui/Objects.ts`) show what the engine applies.
  */
-export function AdjustStatsForItemCarried(
-  pChar: Champion,
+export function itemCarriedAdjustment(
   possessionIndex: number,
-  addOrRemove: number,
   item: ObjectID,
   dungeon: DungeonState,
   nameIndex: (rn: ObjectID) => number,
-): void {
+): ItemCarriedAdjustment {
   let whatToAdjust = adjustIllegal;
   const objNI = nameIndex(item);
   let D4W = 0; // Assume no adjustment to Luck
@@ -167,6 +174,24 @@ export function AdjustStatsForItemCarried(
     D4W = 3;
     break;
   }
+  return { whatToAdjust, amount: D4W };
+}
+
+/**
+ * `nameIndex` is `RN::NameIndex` with the caller's tables (`src/engine/objectIndex.ts`);
+ * `dungeon` is where the `cursed()` bit is read.
+ */
+export function AdjustStatsForItemCarried(
+  pChar: Champion,
+  possessionIndex: number,
+  addOrRemove: number,
+  item: ObjectID,
+  dungeon: DungeonState,
+  nameIndex: (rn: ObjectID) => number,
+): void {
+  const adjustment = itemCarriedAdjustment(possessionIndex, item, dungeon, nameIndex);
+  const whatToAdjust = adjustment.whatToAdjust;
+  let D4W = adjustment.amount;
   if (D4W === 0) return;
   if (whatToAdjust === adjustIllegal) throw new Error('AdjustStatsForItemCarried: Illegal adjust');
   D4W = sw(D4W * addOrRemove); // Increment or decrement

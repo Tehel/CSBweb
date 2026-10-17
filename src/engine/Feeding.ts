@@ -29,7 +29,9 @@ import { drawCharacterState } from './Party';
 const MAX_MANA = 900;
 /** `LIMIT(-1023, …, 2048)` on food and water (`doc/CSBwin-src/Character.cpp:4440`). */
 const FOOD_WATER_MIN = -1023;
-const FOOD_WATER_MAX = 2048;
+export const FOOD_WATER_MAX = 2048;
+/** What a gulp from a waterskin gives (`doc/CSBwin-src/Character.cpp:4127`). */
+export const WATERSKIN_GULP = 800;
 
 /**
  * `FEEDPARAMETERS` (`doc/CSBwin-src/Character.cpp:3956-3983`).
@@ -164,7 +166,10 @@ export function feedParametersFromWords(word: (index: number) => number): FeedPa
 }
 
 /**
- * What a potion is worth (`doc/CSBwin-src/Character.cpp:4159-4285`).
+ * What a potion does before the drinker is looked at: the half of `_FeedCharacter`'s
+ * `switch (fp.potionType)` (`doc/CSBwin-src/Character.cpp:4159-4285`) that reads the
+ * potion alone. `derivePotionFeeding` finishes it on the champion, and the eye's item
+ * properties show it (`getItemPropertyLines`, `src/renderer/ui/Objects.ts`).
  *
  * The three derived terms come straight from the record's `strength`, and each potion
  * uses a different one, so they are computed up front exactly as CSBWin does:
@@ -173,6 +178,88 @@ export function feedParametersFromWords(word: (index: number) => number): FeedPa
  * - `w_14 = ((511 - strength) / w_30) / 2` — the *divisor* for the healing potions, so
  *   a stronger Vi potion (smaller `w_14`) restores a larger fraction of MaxHP;
  * - `w_12 = strength / 25 + 8` — the flat attribute bump.
+ *
+ * `drinkable` is the switch's `fp.performFeeding = true`: a type with no case of its own
+ * leaves it as it was.
+ */
+export interface PotionEffect {
+  drinkable: boolean;
+  dexterityAdjust: number;
+  strengthAdjust: number;
+  wisdomAdjust: number;
+  vitalityAdjust: number;
+  antiVenin: boolean;
+  /** Mon B's and Vi's `w_14`: they give back `1 / w_14` of the maximum stamina or hit points. */
+  maxDivisor: number;
+  /** Ya's shield, quartered for a champion already shielded past 50. */
+  shieldStrength: number;
+  /** EE's `w_12 + w_12 - 8`, added to the mana before the 900 cap and the halving past MaxMana. */
+  mana: number;
+  /** Vi's wound heals. */
+  healCount: number;
+  waterValue: number;
+}
+
+export function potionEffect(potionType: number, strength: number): PotionEffect {
+  const w30 = 32 + Math.trunc((strength + 1) / 8);
+  const w14 = Math.trunc(Math.trunc((511 - strength) / w30) / 2);
+  const w12 = Math.trunc(strength / 25) + 8;
+  const effect: PotionEffect = {
+    drinkable: false, dexterityAdjust: 0, strengthAdjust: 0, wisdomAdjust: 0, vitalityAdjust: 0,
+    antiVenin: false, maxDivisor: 0, shieldStrength: 0, mana: 0, healCount: 0, waterValue: 0,
+  };
+
+  switch (potionType) {
+    case PotionType.ROS_POTION:
+      effect.dexterityAdjust = w12;
+      effect.drinkable = true;
+      break;
+    case PotionType.KU_POTION:
+      effect.strengthAdjust = Math.trunc(strength / 35) + 5;
+      effect.drinkable = true;
+      break;
+    case PotionType.DANE_POTION:
+      effect.wisdomAdjust = w12;
+      effect.drinkable = true;
+      break;
+    case PotionType.NETA_POTION:
+      effect.vitalityAdjust = w12;
+      effect.drinkable = true;
+      break;
+    case PotionType.ANTI_VENIN:
+      effect.antiVenin = true;
+      effect.drinkable = true;
+      break;
+    case PotionType.MON_POTION_B:
+      effect.maxDivisor = w14;
+      effect.drinkable = true;
+      break;
+    case PotionType.YA_POTION:
+      effect.shieldStrength = w12 + Math.trunc(w12 / 2);
+      effect.drinkable = true;
+      break;
+    case PotionType.EE_POTION:
+      effect.mana = w12 + w12 - 8;
+      effect.drinkable = true;
+      break;
+    case PotionType.VI_POTION:
+      effect.maxDivisor = w14;
+      effect.healCount = Math.max(Math.trunc(strength / 42), 1);
+      effect.drinkable = true;
+      break;
+    case PotionType.WATER_FLASK:
+      effect.waterValue = 1600;
+      effect.drinkable = true;
+      break;
+    default:
+      break;
+  }
+  return effect;
+}
+
+/**
+ * What a potion is worth to `champ` (`doc/CSBwin-src/Character.cpp:4159-4285`):
+ * `potionEffect`, finished on the champion.
  *
  * Every branch ends with `emptyFlask = true`, including the potion types with no case
  * of their own — but nothing happens for those, because the apply step is gated on
@@ -184,54 +271,45 @@ export function derivePotionFeeding(
   potionType: number,
   strength: number,
 ): void {
-  const w30 = 32 + Math.trunc((strength + 1) / 8);
-  const w14 = Math.trunc(Math.trunc((511 - strength) / w30) / 2);
-  const w12 = Math.trunc(strength / 25) + 8;
+  const effect = potionEffect(potionType, strength);
 
   fp.potionStrength = strength;
   fp.potionType = potionType;
 
   switch (potionType) {
     case PotionType.ROS_POTION:
-      fp.dexterityAdjust = w12;
-      fp.performFeeding = true;
+      fp.dexterityAdjust = effect.dexterityAdjust;
       break;
     case PotionType.KU_POTION:
-      fp.strengthAdjust = Math.trunc(strength / 35) + 5;
-      fp.performFeeding = true;
+      fp.strengthAdjust = effect.strengthAdjust;
       break;
     case PotionType.DANE_POTION:
-      fp.wisdomAdjust = w12;
-      fp.performFeeding = true;
+      fp.wisdomAdjust = effect.wisdomAdjust;
       break;
     case PotionType.NETA_POTION:
-      fp.vitalityAdjust = w12;
-      fp.performFeeding = true;
+      fp.vitalityAdjust = effect.vitalityAdjust;
       break;
     case PotionType.ANTI_VENIN:
-      fp.antiVenin = true;
-      fp.performFeeding = true;
+      fp.antiVenin = effect.antiVenin;
       break;
     case PotionType.MON_POTION_B: {
       const maxStamina = champ.attributes.maxStamina | 0;
       const stamina = champ.attributes.stamina | 0;
-      fp.staminaAdjust = Math.min(maxStamina - stamina, Math.trunc(maxStamina / w14));
-      fp.performFeeding = true;
+      fp.staminaAdjust = Math.min(maxStamina - stamina, Math.trunc(maxStamina / effect.maxDivisor));
       break;
     }
     case PotionType.YA_POTION: {
       // A champion already well shielded gets a quarter of the benefit.
-      let amount = w12 + Math.trunc(w12 / 2);
+      let amount = effect.shieldStrength;
       if (champ.shieldStrength > 50) amount = Math.trunc(amount / 4);
       fp.shieldStrengthAdjust = amount;
       fp.shieldDuration = amount * amount;
-      fp.performFeeding = true;
       break;
     }
     case PotionType.EE_POTION: {
       const mana = champ.attributes.mana | 0;
       const maxMana = champ.attributes.maxMana | 0;
-      let target = Math.min(900, mana + w12 + w12 - 8);
+      let target = Math.min(MAX_MANA, mana + effect.mana);
       if (target > maxMana) {
         // Past the ceiling only half the excess is kept, measured from whichever of
         // the current and maximum mana is already higher.
@@ -239,25 +317,23 @@ export function derivePotionFeeding(
         target -= Math.trunc((target - from) / 2);
       }
       fp.manaAdjust = target - mana;
-      fp.performFeeding = true;
       break;
     }
     case PotionType.VI_POTION: {
       const maxHealth = champ.attributes.maxHealth | 0;
       const health = champ.attributes.health | 0;
-      const healed = Math.min(health + Math.trunc(maxHealth / w14), maxHealth);
+      const healed = Math.min(health + Math.trunc(maxHealth / effect.maxDivisor), maxHealth);
       fp.hitpointAdjust = healed - health;
-      fp.healCount = Math.max(Math.trunc(strength / 42), 1);
-      fp.performFeeding = true;
+      fp.healCount = effect.healCount;
       break;
     }
     case PotionType.WATER_FLASK:
-      fp.waterValue = 1600;
-      fp.performFeeding = true;
+      fp.waterValue = effect.waterValue;
       break;
     default:
       break;
   }
+  if (effect.drinkable) fp.performFeeding = true;
   fp.emptyFlask = true;
 }
 

@@ -127,9 +127,8 @@ export class CharacterStats {
     }
 
     const feet = getChampionPossession(champ, 5);
-    if (feet !== OBJECT_ID_NULL && nameIndexOf(this.ctx, feet) === OBJNI_ELVEN_BOOTS) {
-      maxLoad = sw(maxLoad + (maxLoad >> 4));
-    }
+    const loadShift = feet !== OBJECT_ID_NULL ? feetMaxLoadShift(nameIndexOf(this.ctx, feet)) : 0;
+    if (loadShift !== 0) maxLoad = sw(maxLoad + (maxLoad >> loadShift));
 
     maxLoad += 9;
     maxLoad = sw(maxLoad - ((maxLoad & 0xffff) % 10));
@@ -158,7 +157,7 @@ export class CharacterStats {
     }
     if ((champ.wounds & 32) !== 0) time = sw(time + footPenalty);
     const feet = getChampionPossession(champ, 5);
-    if (feet !== OBJECT_ID_NULL && nameIndexOf(this.ctx, feet) === OBJNI_BOOTS_OF_SPEED) time--;
+    if (feet !== OBJECT_ID_NULL) time = sw(time - feetMoveTimeBonus(nameIndexOf(this.ctx, feet)));
     return time;
   }
 
@@ -252,6 +251,24 @@ export class CharacterStats {
       getObjectNameIndex: (objectId: ObjectID) => nameIndexOf(this.ctx, objectId),
     });
   }
+}
+
+/**
+ * `MaxLoad`'s feet (`doc/CSBwin-src/Code11f52.cpp:4342-4346`): Elven Boots add a
+ * sixteenth of the maximum load, `maxLoad >> 4`. The shift, or 0 for nothing. Its own
+ * function, as `feetMoveTimeBonus`, so that the eye's item properties show what the
+ * engine applies (`getItemPropertyLines`, `src/renderer/ui/Objects.ts`).
+ */
+export function feetMaxLoadShift(feetNameIndex: number): number {
+  return feetNameIndex === OBJNI_ELVEN_BOOTS ? 4 : 0;
+}
+
+/**
+ * `TimeToMove`'s feet (`doc/CSBwin-src/CSBCode.cpp:7094-7098`): Boots of Speed take a
+ * tick off the time between steps.
+ */
+export function feetMoveTimeBonus(feetNameIndex: number): number {
+  return feetNameIndex === OBJNI_BOOTS_OF_SPEED ? 1 : 0;
 }
 
 /**
