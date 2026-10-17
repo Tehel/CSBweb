@@ -1814,38 +1814,51 @@ the engine plays by. X11 is the frame. The lines themselves are X12 (weapons), X
 
 - **The setting**: `showItemProperties`, a flag of `Extras`, set the way the three
   shipped extras are (the rules above), with the old boolean `extras` mapped to it
-  (`src/settings/Settings.ts:192`). It needs a button on the settings dialog's GAME tab. The
-  tab's grid is full: two columns and three rows hold six buttons
-  (`src/renderer/ui/SettingsDialog.ts:211-235`). A seventh needs a fourth row or a new
-  layout, and that moves `probe-frames.mjs`'s hard-coded clicks
-  (`.claude/memory/dialog-layout-moves-probe-clicks.md`).
-- **The room**: CSBWin's lines start at viewport (108, 87), 7 pixels apart, and a line
-  wraps at 18 characters (`drawItemDescriptionLine`, `src/renderer/ui/Objects.ts:268`).
-  CSBWin's own take one to four lines: the state line ((BURNT OUT), (FULL), PARTY
-  FACING…), the phrases, which wrap to two ("(POISONED, BROKEN AND CURSED)"), and the
-  weight. A DSA viewing filter can add phrase 7 too. The author's estimate is four free
-  lines, or five if CSBWin's lines start a few pixels higher. The first step measures
-  this on a screenshot of the panel (graphic 20). The extra's lines take what is left.
-  Each item's lines come in a fixed priority order, and those that do not fit are
-  dropped. With the setting off, CSBWin's lines stay where they are.
+  (`src/settings/Settings.ts:192`). Its button is SHOW ITEM PROPERTIES, on the settings
+  dialog's GAME tab, which regroups its buttons so that the extras come first:
+  DRINK AT FOUNTAINS and HIGHLIGHT NEW MASTERY, GATHER THROWN WEAPONS and SHOW ITEM
+  PROPERTIES, MAP VIEW and CHAMPION VIEW, then SEND STATISTICS alone on the fourth row.
+  The page has five lines of two buttons (`SETTING_LINES`,
+  `src/renderer/ui/SettingsDialog.ts:137`), so the geometry stays. MAP VIEW, SEND
+  STATISTICS and CHAMPION VIEW move, which moves `probe-frames.mjs`'s hard-coded clicks
+  (`.claude/memory/dialog-layout-moves-probe-clicks.md`) and changes the GAME tab's
+  golden frames (`--update`).
+- **The room**: the panel is graphic 20 at viewport (80, 52)-(223, 124) (`wRectPos926`),
+  its frame's inner edge ending at y 123. A line drawn at y covers rows y-4 to y+1
+  (`TextRenderer.ts`). CSBWin's lines start at viewport (108, 87), 7 pixels apart, and a
+  line wraps at 18 characters (`drawItemDescriptionLine`, `src/renderer/ui/Objects.ts:268`).
+  So six lines fit, at y 87, 94, 101, 108, 115 and 122. CSBWin's own take one to four:
+  the state line ((BURNT OUT), (FULL), PARTY FACING…), the phrases, which wrap to two
+  ("(POISONED, BROKEN AND CURSED)"), and the weight. A DSA viewing filter can add
+  phrase 7 too, for five.
+- **The block**: the extra's lines are anchored at the bottom. An item's lines come in a
+  fixed priority order: the first is drawn at y 122, the next at y 115, and so on up. A
+  line whose row would be at or above CSBWin's last is dropped, and every line after it.
+  Each line of an item type therefore keeps its row on screen. No blank line is needed
+  between the two groups: an item with only its weight has five rows for the extra, the
+  longest CSBWin text two, or one with phrase 7. CSBWin's lines stay where they are,
+  setting on or off. The lines are drawn in colour 13, as CSBWin's are.
 - **One function**: `getItemPropertyLines(ui, objectId)`, beside
-  `getObjectDescriptionLines`. It returns the lines without drawing them, so the tool can
-  read them. Every figure comes from the set's own tables (`ObjectTables`, read from its
-  `graphics.dat`), so a custom set shows its own values. A rule that CSBWin keeps in code
-  rather than in a table is called, not copied (X13).
+  `getObjectDescriptionLines`. It returns the lines in priority order without drawing
+  them, so the tool can read them. Every figure comes from the set's own tables
+  (`ObjectTables`, read from its `graphics.dat`), so a custom set shows its own values. A
+  rule that CSBWin keeps in code rather than in a table is called, not copied (X13).
 - **What a figure is**: the item's own value from its table, not a figure worked out for
-  the selected champion. CSBWin's results draw randoms and depend on the champion. The
-  author settles the wording; the font and 18 characters set the limit ("DAMAGE +12").
-- **To settle with the author**: an object that a dungeon's viewing filter rewrote
-  (`applyViewingFilter`, `ViewingFilterSite.DESCRIPTION`). A designer who hides what an
-  item is may not want its figures shown. The recommendation is that the extra stays silent
-  for such an object.
+  the selected champion. CSBWin's results draw randoms and depend on the champion. One
+  labelled figure a line, at most 18 characters so it never wraps: `DAMAGE 10`,
+  `THROWN 19`, `SHOOTS ARROWS`, `CHARGES 3`, `MANA +4 HELD`, `ARMOUR 9  SHARP 2`,
+  `FOOD 500`, `WATER 1600`.
+- **A viewing filter**: the extra shows nothing for an object whose description a
+  dungeon's viewing filter rewrote (`applyViewingFilter`, `ViewingFilterSite.DESCRIPTION`).
+  A designer who hides what an item is does not want its figures shown. The session reads
+  what `processViewingFilter` returns (`src/engine/DsaSystem.ts`) to tell a rewrite from
+  a filter that let the object through.
 - **The check**: a new `tools/dump-item-properties.ts` prints every object type's lines on
-  the default dungeon. It asserts that no line is over 18 characters and that, under the
-  most lines CSBWin's own description can take, the lines that fit stay inside the panel.
-  With the setting off, it asserts that the lines are exactly CSBWin's. A golden frame
-  shows the eye on a weapon with the setting on. It needs `--update`
-  (`.claude/memory/new-golden-frame-needs-update.md`).
+  the default dungeon. It asserts that no line is over 18 characters, that the first line
+  is at y 122, and that, under every count of CSBWin's lines from one to five, no line of
+  the extra reaches CSBWin's. With the setting off, it asserts that the lines are exactly
+  CSBWin's. A golden frame shows the eye on a weapon with the setting on. It needs
+  `--update` (`.claude/memory/new-golden-frame-needs-update.md`).
 
 ### X12 ⏸️ The eye shows a weapon's properties
 
@@ -1874,8 +1887,9 @@ After X11. A weapon's `WEAPONDESC` is in `ObjectTables.weaponDesc`
   Order, and the rest of `AdjustStatsForItemCarried`'s weapons
   (`Character.cpp:1574-1785`), through X13's shared rule.
 
-The order to settle is damage, missile, class/ammunition, charges or light, then what it
-gives while held. `tools/dump-item-properties.ts` checks every weapon type.
+The priority order is damage, what it gives while held, the missile, the class or
+ammunition, then charges or light. `tools/dump-item-properties.ts` checks every weapon
+type.
 
 ### X13 ⏸️ The eye shows a garment's properties
 
@@ -1913,7 +1927,7 @@ After X11.
   (`switch (fp.potionType)`, `Character.cpp:4166-4285`).
   CSBWin shows a potion's power only as the rune before its name, and only to a champion
   with a priest mastery above 1 (`getObjectDisplayName`, `src/renderer/ui/Objects.ts`).
-  To settle with the author: the recommendation is that the extra keeps that gate.
+  The extra keeps that gate: below it, a potion has no line at all.
 
 `tools/dump-item-properties.ts` checks every food, the water containers and every potion
 type.
