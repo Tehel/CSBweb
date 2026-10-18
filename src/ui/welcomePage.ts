@@ -4,16 +4,19 @@
  * of the game built: PLAY and CONTINUE are links that load the page again, with the
  * data set, and CONTINUE's save, in its query.
  *
- * - **The grid**: a tile for each set `chooserSets` lists and each of the player's own
+ * - **The grids**: a tile for each set `chooserSets` lists and each of the player's own
  *   (`src/data/LocalDataSets.ts`), its picture the set's thumbnail, or a blank box where
  *   it has none. A manifest set's is in its folder (`thumbnailPath`), its title's last
- *   frame at half size; a local set's is its record's image. The sets the store holds a
- *   save of come first, drawn bright, the one saved last first; the others follow,
- *   dimmed, by name (`tileOrder`). A click selects a tile, and a click on the selected one
+ *   frame at half size; a local set's is its record's image. Two sections hold them, each
+ *   under its title: first **the official games**, FTL's own (`DataSet.official`), in the
+ *   manifest's order, then the player's own; then **the fan-made dungeons**, every other
+ *   set, those the store holds a save of first, the one saved last first, the others
+ *   following by name (`tileOrder`). A set the store holds a save of is drawn bright, any
+ *   other dimmed. A section of no official game is not shown. A click selects a tile, and a click on the selected one
  *   leaves none selected. With no save at all, the manifest's default set is selected,
  *   where it names one, so that PLAY is a first visit's way in. A manifest with no set
- *   leaves the grid nothing but "+ Add my own", and PLAY disabled.
- * - **"+ Add my own"**, the grid's last tile, which is never selected. A click opens the
+ *   leaves the page nothing but "+ Add my own", and PLAY disabled.
+ * - **"+ Add my own"**, the fan-made dungeons' last tile, which is never selected. A click opens the
  *   form that adds a set (`src/ui/addDataSetForm.ts`); the set it adds is stored, and the
  *   page shows it, selected.
  * - **A tile's name says its set's state**: cyan for a local set, red for a pending one,
@@ -63,7 +66,7 @@
  *   disabled. The box beside it shows that save: its set, its party, its level, and when
  *   it was saved.
  *
- * The buttons and the box sit above the grid, which grows with the sets, so that they
+ * The buttons and the box sit above the grids, which grow with the sets, so that they
  * stay on the first screen.
  *
  * A save of a set neither the manifest nor the player's own sets name cannot be played,
@@ -102,7 +105,16 @@ const PAGE = `
     <a class="btn px" id="welcome-continue">Continue</a>
     <div class="welcome-preview px px2" aria-live="polite"></div>
   </div>
-  <div class="welcome-grid" role="group" aria-label="Dungeons"></div>
+  <section class="welcome-sets welcome-official" aria-labelledby="welcome-official-title">
+    <h2 class="px" id="welcome-official-title">Official games</h2>
+    <p class="welcome-sets-lead">Dungeon Master and Chaos Strikes Back, as FTL Games released them.</p>
+    <div class="welcome-grid" role="group" aria-labelledby="welcome-official-title"></div>
+  </section>
+  <section class="welcome-sets welcome-custom" aria-labelledby="welcome-custom-title">
+    <h2 class="px" id="welcome-custom-title">Fan-made dungeons</h2>
+    <p class="welcome-sets-lead">Custom dungeons built by the community, played on the same engine.</p>
+    <div class="welcome-grid" role="group" aria-labelledby="welcome-custom-title"></div>
+  </section>
   <section class="welcome-about" id="about">
     <p class="welcome-lead">The 1987 dungeon, rebuilt one function at a time from CSBWin. There is nothing to install: open the page and go down the stairs.</p>
     <div class="welcome-columns">
@@ -217,7 +229,9 @@ export async function showWelcomePage(
 
     body.classList.add('welcome');
     body.innerHTML = PAGE;
-    const grid = body.querySelector<HTMLElement>('.welcome-grid')!;
+    const officialSection = body.querySelector<HTMLElement>('.welcome-official')!;
+    const officialGrid = officialSection.querySelector<HTMLElement>('.welcome-grid')!;
+    const customGrid = body.querySelector<HTMLElement>('.welcome-custom .welcome-grid')!;
     const play = body.querySelector<HTMLAnchorElement>('#welcome-play')!;
     const resume = body.querySelector<HTMLAnchorElement>('#welcome-continue')!;
     const preview = body.querySelector<HTMLElement>('.welcome-preview')!;
@@ -226,7 +240,10 @@ export async function showWelcomePage(
         ...chooserSets(viewed).map((set) => [set, thumbnailPath(set)] as const),
         ...local.map(({ set, thumbnail }) => [set, thumbnail] as const),
     ]);
-    const sets = tileOrder([...thumbnails.keys()], rows);
+    const listed = [...thumbnails.keys()];
+    const official = listed.filter((set) => set.official);
+    const sets = [...official, ...tileOrder(listed.filter((set) => !set.official), rows)];
+    officialSection.hidden = official.length === 0;
     let selected: DataSet | null = sets.find((set) => set.id === select)
         ?? (rows.length === 0 && viewed.defaultSet && sets.includes(viewed.defaultSet) ? viewed.defaultSet : null);
     const tiles = sets.map((set) => {
@@ -247,10 +264,10 @@ export async function showWelcomePage(
         if (set.hidden) tile.classList.add('hidden');
         const controls = record ? [control('pick-edit', `Edit ${record.name}`, PEN, () => openForm({ record, saves }))]
             : [control('pick-documents', `Documents of ${set.name}`, BOOK, () => openDocuments(set)), ...moderation(set)];
-        grid.append(withControls(tile, [playControl(set), ...controls]));
+        (set.official ? officialGrid : customGrid).append(withControls(tile, [playControl(set), ...controls]));
         return { set, tile };
     });
-    grid.append(addTile(() => openForm(null)));
+    customGrid.append(addTile(() => openForm(null)));
     if (manifest.moderator) {
         body.querySelector('.welcome-page')!.prepend(moderationSwitch(moderating, () => {
             keepModeration(!moderating);
@@ -448,7 +465,7 @@ async function publishedRecord(set: DataSet): Promise<EditedPublishedSet['record
     }
     return {
         id: set.id, name: set.name, description: set.description, authors: [...set.authors], dmRules: set.dmRules,
-        thumbnailAsTitle: set.thumbnailAsTitle, baseSet: null, files,
+        thumbnailAsTitle: set.thumbnailAsTitle, official: set.official, baseSet: null, files,
     };
 }
 

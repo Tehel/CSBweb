@@ -386,11 +386,12 @@ export async function receivePublish(gamefilesDir: string, api: PublishApi, req:
     if (reply !== null) req.resume();
     else {
         const playerId = req.headers[PLAYER_ID_HEADER.toLowerCase()] as string;
+        const { moderator } = dataSetViewer(api, req);
         const form = await readForm(req);
         reply = typeof form === 'string' ? answer(form === 'large' ? 413 : 400, FORM_REFUSALS[form])
             : await publishDataSet(form, playerId, {
                 checkDataSet: api.checkDataSet, dataSets: api.dataSets, gamefilesDir, now: api.now,
-                notify: api.notify, publisher: dataSetViewer(api, req).moderator?.name ?? 'a player',
+                notify: api.notify, publisher: moderator?.name ?? 'a player', moderates: moderator !== null,
             });
     }
     res.setHeader('Cache-Control', 'no-store');

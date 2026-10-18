@@ -60,14 +60,15 @@ const ADDED_COLUMNS: readonly (readonly [string, string])[] = [
     ['authors', "TEXT NOT NULL DEFAULT '[]'"],  // a JSON list of strings
     ['walls', 'TEXT'],  // a JSON DataSetWalls, NULL for the site's and until `fillWalls` reads it
     ['thumbnail_as_title', 'INTEGER NOT NULL DEFAULT 0'],  // DataSet's flag, 0 or 1
+    ['official', 'INTEGER NOT NULL DEFAULT 0'],  // DataSet's flag, 0 or 1
 ];
 
-type Flag = 'csbGraphics' | 'miniDat' | 'hintOracle' | 'dmRules' | 'thumbnailAsTitle' | 'hidden';
+type Flag = 'csbGraphics' | 'miniDat' | 'hintOracle' | 'dmRules' | 'thumbnailAsTitle' | 'hidden' | 'official';
 
 /** `DataSet`'s flags and their columns, in the manifest's order. */
 const FLAG_COLUMNS: readonly (readonly [Flag, string])[] = [
     ['csbGraphics', 'csb_graphics'], ['miniDat', 'mini_dat'], ['hintOracle', 'hint_oracle'], ['dmRules', 'dm_rules'],
-    ['thumbnailAsTitle', 'thumbnail_as_title'], ['hidden', 'hidden'],
+    ['thumbnailAsTitle', 'thumbnail_as_title'], ['hidden', 'hidden'], ['official', 'official'],
 ];
 
 /**
@@ -130,6 +131,8 @@ export interface PublishedDataSet {
     hintOracle: boolean;
     dmRules: boolean;
     thumbnailAsTitle: boolean;
+    /** Only where a moderator published it (`publish.ts`). */
+    official: boolean;
     walls: DataSetWalls;
 }
 
@@ -146,6 +149,7 @@ export interface EditedDataSet {
     hintOracle: boolean;
     dmRules: boolean;
     thumbnailAsTitle: boolean;
+    official: boolean;
     walls: DataSetWalls | null;
 }
 
@@ -215,7 +219,7 @@ export class DataSetStore {
         this.deleteDocuments = db.prepare('DELETE FROM data_set_documents WHERE data_set = ?');
         this.updateDir = db.prepare('UPDATE data_sets SET dir = ? WHERE id = ?');
         this.updateEdited = db.prepare('UPDATE data_sets SET name = ?, description = ?, authors = ?, dir = ?, csb_graphics = ?, hint_oracle = ?, '
-            + 'dm_rules = ?, thumbnail_as_title = ?, walls = COALESCE(?, walls) WHERE id = ?');
+            + 'dm_rules = ?, thumbnail_as_title = ?, official = ?, walls = COALESCE(?, walls) WHERE id = ?');
     }
 
     isEmpty(): boolean {
@@ -251,7 +255,7 @@ export class DataSetStore {
      */
     publish(set: PublishedDataSet, owner: string): void {
         const flags: Record<Flag, boolean> = { csbGraphics: set.csbGraphics, miniDat: false, hintOracle: set.hintOracle, dmRules: set.dmRules,
-            thumbnailAsTitle: set.thumbnailAsTitle, hidden: false };
+            thumbnailAsTitle: set.thumbnailAsTitle, hidden: false, official: set.official };
         this.insertPublished.run(set.id, set.name, set.id, owner, set.description, JSON.stringify(set.authors), wallsJson(set.walls),
             ...FLAG_COLUMNS.map(([flag]) => (flags[flag] ? 1 : 0)));
     }
@@ -284,7 +288,7 @@ export class DataSetStore {
     /** `id`'s row as `set` says, edited by a moderator (`edit.ts`); its state, owner, place and `mini.dat` kept. */
     edit(id: string, set: EditedDataSet): void {
         this.updateEdited.run(set.name, set.description, JSON.stringify(set.authors), set.dir, set.csbGraphics ? 1 : 0, set.hintOracle ? 1 : 0,
-            set.dmRules ? 1 : 0, set.thumbnailAsTitle ? 1 : 0, set.walls && wallsJson(set.walls), id);
+            set.dmRules ? 1 : 0, set.thumbnailAsTitle ? 1 : 0, set.official ? 1 : 0, set.walls && wallsJson(set.walls), id);
     }
 
     /** `id`'s row deleted, and its documents' (`moderate.ts`, which deletes its folder after). */
@@ -336,7 +340,7 @@ export class DataSetStore {
             const set: StoredDataSet = {
                 id: row.id as string, name: row.name as string, description: row.description as string,
                 authors: JSON.parse(row.authors as string) as string[], dir: row.dir as string,
-                csbGraphics: false, miniDat: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, hidden: false,
+                csbGraphics: false, miniDat: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, hidden: false, official: false,
                 pending: row.status === 'pending', documents: documents.get(row.id as string) ?? [], owner: row.owner as string | null,
             };
             for (const [flag, column] of FLAG_COLUMNS) set[flag] = row[column] === 1;

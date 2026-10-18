@@ -4,7 +4,7 @@
  * it against the address's rate, names its player and reads its form; this module decides.
  *
  * The form's fields are the record's: `id`, `name`, `description`, `authors` once per
- * author, `dmRules` and `thumbnailAsTitle` (`true` or `false`) and `baseSet`, each once, and its files by the
+ * author, `dmRules`, `thumbnailAsTitle` and `official` (`true` or `false`) and `baseSet`, each once, and its files by the
  * name the game reads them under, `thumbnail` a PNG of 320x200 (`LOCAL_DATA_SET_FILES`,
  * `THUMBNAIL_WIDTH`). Nothing else.
  * The rules, in order, each answered with nothing written:
@@ -12,6 +12,8 @@
  *   400  a field missing, twice, of the wrong kind, unknown or longer than the form takes
  *        (`LOCAL_DATA_SET_TEXT_LIMITS`), or an id that is not a folder's name
  *        (`LOCAL_ID_PATTERN`) once its `local:` is dropped
+ *   403  `official` true from a player who does not moderate: only a moderator says a set
+ *        is one of FTL's own games
  *   413  a file over `MAX_PUBLISHED_FILE_BYTES`
  *   409  an id the table holds, pending or not, or that `GAMEFILES_DIR` holds an entry of
  *        (a folder no row names)
@@ -66,6 +68,7 @@ export interface DataSetDraft {
     authors: string[];
     dmRules: boolean;
     thumbnailAsTitle: boolean;
+    official: boolean;
     /** The set whose `graphics.dat` it plays where `files` holds none. */
     baseSet: string;
     /** By the name the game reads them under, and `thumbnail`. */
@@ -88,7 +91,7 @@ export type CheckDataSet = (
 ) => Promise<{
     problems: Problem[];
     /** Its text trimmed, its empty authors dropped; `null` where there is a problem. */
-    record: { id: string; name: string; description: string; authors: string[]; dmRules: boolean; thumbnailAsTitle: boolean; dungeonSignature: readonly string[] } | null;
+    record: { id: string; name: string; description: string; authors: string[]; dmRules: boolean; thumbnailAsTitle: boolean; official: boolean; dungeonSignature: readonly string[] } | null;
     census: unknown;
     /** Its `dungeon.dat`'s walls, wherever it reads. */
     walls: DataSetWalls | null;
@@ -115,6 +118,8 @@ export interface PublishOptions {
     notify: Notify;
     /** Who the notification says published it: the sender's name where they moderate, `a player` otherwise. */
     publisher: string;
+    /** Whether the sender moderates, and so may publish an official set. */
+    moderates: boolean;
 }
 
 /** The status and the JSON body `api/data-sets` answers a publish with. */
@@ -124,7 +129,7 @@ export interface PublishAnswer {
 }
 
 /** The text fields of a publish's form; an edit's are the same but `id`, its URL's. */
-const TEXT_FIELDS = ['id', 'name', 'description', 'dmRules', 'thumbnailAsTitle', 'baseSet'] as const;
+const TEXT_FIELDS = ['id', 'name', 'description', 'dmRules', 'thumbnailAsTitle', 'official', 'baseSet'] as const;
 
 /** A set's form, read: a draft, the `id` `''` for an edit's, and the files an edit removes. */
 export interface SetForm extends DataSetDraft {
@@ -150,10 +155,10 @@ export function readSetForm(form: FormData, edit: boolean): SetForm | PublishAns
         if (values.length !== 1 || typeof values[0] !== 'string') return refuse(400, `The form's '${field}' is not one text.`);
         text[field] = values[0];
     }
-    const { name, description, dmRules, thumbnailAsTitle, baseSet } = text as Record<(typeof TEXT_FIELDS)[number], string>;
+    const { name, description, dmRules, thumbnailAsTitle, official, baseSet } = text as Record<(typeof TEXT_FIELDS)[number], string>;
     const authors = form.getAll('authors');
     if (!authors.every((author) => typeof author === 'string')) return refuse(400, "The form's 'authors' are not texts.");
-    for (const [field, value] of [['dmRules', dmRules], ['thumbnailAsTitle', thumbnailAsTitle]]) {
+    for (const [field, value] of [['dmRules', dmRules], ['thumbnailAsTitle', thumbnailAsTitle], ['official', official]]) {
         if (value !== 'true' && value !== 'false') return refuse(400, `The form's '${field}' is neither 'true' nor 'false'.`);
     }
     const lengths = { name: name.length, description: description.length, authors: authors.join(',').length };
@@ -176,7 +181,8 @@ export function readSetForm(form: FormData, edit: boolean): SetForm | PublishAns
         if (typeof file !== 'string' || !(LOCAL_DATA_SET_FILES as readonly string[]).includes(file)) return refuse(400, `The form's '${EDIT_REMOVE_FIELD}' names no file of a set.`);
         if (remove.indexOf(file) !== remove.lastIndexOf(file) || files[file]) return refuse(400, `The form removes ${file} twice, or gives it too.`);
     }
-    return { id, name, description, authors: authors as string[], dmRules: dmRules === 'true', thumbnailAsTitle: thumbnailAsTitle === 'true', baseSet, files, remove: remove as string[] };
+    return { id, name, description, authors: authors as string[], dmRules: dmRules === 'true', thumbnailAsTitle: thumbnailAsTitle === 'true',
+        official: official === 'true', baseSet, files, remove: remove as string[] };
 }
 
 /** What `checkSet` makes of a set that passes. */
@@ -228,12 +234,13 @@ export function thumbnailFile(id: string): string {
 }
 
 /** `form`, sent by `owner`, a `playerId`, checked and, where it passes, published. */
-export async function publishDataSet(form: FormData, owner: string, { checkDataSet, dataSets, gamefilesDir, now, notify, publisher }: PublishOptions): Promise<PublishAnswer> {
+export async function publishDataSet(form: FormData, owner: string, { checkDataSet, dataSets, gamefilesDir, now, notify, publisher, moderates }: PublishOptions): Promise<PublishAnswer> {
     const refuse = (status: number, error: string): PublishAnswer => ({ status, body: { error } });
 
     const draft = readSetForm(form, false);
     if ('status' in draft) return draft;
     const { id, files, baseSet } = draft;
+    if (draft.official && !moderates) return refuse(403, 'Only a moderator may publish an official game.');
 
     if (dataSets.hasSet(id)) return refuse(409, 'The site already has a set of this id.');
     const folder = join(gamefilesDir, id);
@@ -263,6 +270,7 @@ export async function publishDataSet(form: FormData, owner: string, { checkDataS
             hintOracle: files['hcsb.hct'] !== undefined && files['hcsb.dat'] !== undefined,
             dmRules: record.dmRules,
             thumbnailAsTitle: record.thumbnailAsTitle,
+            official: record.official,
             walls,
         }, owner);
     } catch (error) {

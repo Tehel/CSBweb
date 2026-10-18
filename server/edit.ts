@@ -7,7 +7,7 @@
  *
  * The form is a publish's (`publish.ts`) but for the id, the URL's: every text field, the
  * files that change, by the name the game reads them under, and `remove` (`EDIT_REMOVE_FIELD`)
- * once per file the set no longer has. Every other file of its folder stays as it is, those
+ * once per file the set no longer has, and `official`, which only a moderator sets. Every other file of its folder stays as it is, those
  * the form does not know too (CSB's `mini.dat`, a readme). Any set is edited, pending,
  * approved or hidden, with an owner or none.
  *
@@ -103,6 +103,7 @@ export async function editDataSet(id: string, form: FormData, viewer: DataSetVie
             hintOracle: files['hcsb.hct'] !== undefined && files['hcsb.dat'] !== undefined,
             dmRules: record.dmRules,
             thumbnailAsTitle: record.thumbnailAsTitle,
+            official: record.official,
             walls: edit.files['dungeon.dat'] ? walls : null,
         });
     } catch (error) {

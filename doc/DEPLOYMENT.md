@@ -142,6 +142,13 @@ moderation's controls, until it is turned on again (kept in `localStorage`). The
 set in the table. Both read the table at each request, so a row added while the server
 runs is offered at once.
 
+**The official games come first.** A row whose `official` is `1` is one of FTL's own
+games: Dungeon Master in any of its versions, its Kid's dungeon, Chaos Strikes Back. The
+welcome page lists those under "Official games", in the table's `position` order, then
+every other set under "Fan-made dungeons". Only a moderator says a set is official: the
+form offers its checkbox to a moderator alone, and the server refuses it from anyone else
+(`server/publish.ts`, `server/edit.ts`). The site's own rows are marked by hand (below).
+
 **A player publishes their own set** by a `POST` to `api/data-sets` (`server/publish.ts`),
 which PUBLISH sends from the form the pen on its tile opens (`src/ui/addDataSetForm.ts`):
 its record's fields and files as a `multipart/form-data` body, the player named in
@@ -326,6 +333,23 @@ const db = new (require('node:sqlite').DatabaseSync)('/data/stats/stats.db');
 const dir = db.prepare('SELECT dir FROM data_sets WHERE id = ?').get('towers-of-chaos').dir;
 const size = require('node:fs').statSync('/data/gamefiles/' + dir + '/Readme.txt').size;
 db.prepare('INSERT INTO data_set_documents (data_set, file, size) VALUES (?, ?, ?)').run('towers-of-chaos', 'Readme.txt', size);
+" < /dev/null
+```
+
+The official games are marked, and put in their order, by giving them the places they
+already hold, in the order wanted, through negative ones, since `position` is unique. The
+column exists once the server has run a version that has it:
+
+```bash
+docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning -e "
+const db = new (require('node:sqlite').DatabaseSync)('/data/stats/stats.db');
+const ids = ['dm-atari', 'kids-dungeon', 'csb'];  // the official games, in their order
+const positions = ids.map((id) => db.prepare('SELECT position FROM data_sets WHERE id = ?').get(id).position).sort((a, b) => a - b);
+const place = db.prepare('UPDATE data_sets SET position = ?, official = 1 WHERE id = ?');
+db.exec('BEGIN');
+ids.forEach((id, i) => place.run(-1 - i, id));
+ids.forEach((id, i) => place.run(positions[i], id));
+db.exec('COMMIT');
 " < /dev/null
 ```
 

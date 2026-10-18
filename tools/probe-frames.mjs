@@ -203,12 +203,15 @@ await wait(2500);
 const firstVisit = await evaluate(`({tiles: [...document.querySelectorAll('.pick[data-set]')].map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
   play: document.getElementById('welcome-play').getAttribute('href'),
   resume: document.getElementById('welcome-continue').getAttribute('href'),
-  above: !!(document.querySelector('.welcome-actions').compareDocumentPosition(document.querySelector('.welcome-grid')) & Node.DOCUMENT_POSITION_FOLLOWING)})`);
+  above: !!(document.querySelector('.welcome-actions').compareDocumentPosition(document.querySelector('.welcome-grid')) & Node.DOCUMENT_POSITION_FOLLOWING),
+  sections: [...document.querySelectorAll('.welcome-sets')].map(s=>s.querySelector('h2').textContent+':'+[...s.querySelectorAll('.pick')].map(t=>t.dataset.set??'add').join('/')).join('|')})`);
 console.log('state: welcome page, no save');
 console.log('  ', JSON.stringify(firstVisit));
-check(firstVisit.tiles === 'csb,conflux-3.5,dm-atari!,kids-dungeon,towers-of-chaos' && /dungeon=dm-atari/.test(firstVisit.play ?? '')
+check(firstVisit.tiles === 'dm-atari!,kids-dungeon,csb,conflux-3.5,towers-of-chaos' && /dungeon=dm-atari/.test(firstVisit.play ?? '')
   && firstVisit.resume === null && firstVisit.above,
-  'no save: the tiles by name, dm-atari selected, PLAY opens it, CONTINUE disabled, the buttons above the grid');
+  'no save: the official games in the manifest\'s order, then the others by name, dm-atari selected, PLAY opens it, CONTINUE disabled, the buttons above the grids');
+check(firstVisit.sections === 'Official games:dm-atari/kids-dungeon/csb|Fan-made dungeons:conflux-3.5/towers-of-chaos/add',
+  'two sections, each under its title: the official games, then the fan-made dungeons, "+ Add my own" last');
 
 // A new server's answer, no set and no default: the grid holds only "+ Add my own", PLAY
 // and CONTINUE are disabled, and the form it opens has no base set to offer.
@@ -222,17 +225,18 @@ await send('Fetch.disable');
 onPaused = null;
 const noSet = await evaluate(`(() => {
   const tiles = [...document.querySelectorAll('.welcome-grid .pick')].map(t=>t.classList.contains('add')?'add':t.dataset.set).join(',');
+  const official = document.querySelector('.welcome-official').checkVisibility();
   const play = document.getElementById('welcome-play'), resume = document.getElementById('welcome-continue');
   document.querySelector('.pick.add').click();
   const form = document.querySelector('dialog.add-set[open]');
   return {tiles, play: play.getAttribute('href') ?? (play.getAttribute('aria-disabled') && 'disabled'),
     resume: resume.getAttribute('href') ?? (resume.getAttribute('aria-disabled') && 'disabled'),
-    form: !!form, bases: form ? form.querySelectorAll('.add-set-base').length : -1};
+    form: !!form, bases: form ? form.querySelectorAll('.add-set-base').length : -1, official};
 })()`);
 console.log('state: welcome page, no set');
 console.log('  ', JSON.stringify(noSet));
-check(noSet.tiles === 'add' && noSet.play === 'disabled' && noSet.resume === 'disabled' && noSet.form && noSet.bases === 0,
-  'no set: only "+ Add my own", PLAY and CONTINUE disabled, and its form offers no base set');
+check(noSet.tiles === 'add' && noSet.play === 'disabled' && noSet.resume === 'disabled' && noSet.form && noSet.bases === 0 && !noSet.official,
+  'no set: only "+ Add my own", PLAY and CONTINUE disabled, no section of official games, and its form offers no base set');
 // `?intro=0` skips the title animation and the dungeon entrance
 // (`src/renderer/intro/BootSequence.ts`), so the six frames below still open on the
 // adventure screen. The entrance gets frames of its own at the end.
@@ -363,7 +367,7 @@ const welcome = () => evaluate(`(()=>{const q=(s)=>[...document.querySelectorAll
       return i && i.complete && i.naturalWidth===320 && i.naturalHeight===200
         && (i.src.endsWith('/'+t.dataset.set+'-thumbnail.png') || t.dataset.set.startsWith('local:') && i.src.startsWith('blob:'));}),
     saves: q('.pick[data-set]').map(t=>t.querySelector('.pick-saves')?.textContent ?? ''),
-    last: (()=>{const t=document.querySelector('.welcome-grid').lastElementChild;
+    last: (()=>{const t=document.querySelector('.welcome-custom .welcome-grid').lastElementChild;
       return t.className+(t.disabled?' disabled':'')+(t.hasAttribute('aria-pressed')?' pressed':'')+' '+t.textContent;})(),
     gameFiles: performance.getEntriesByType('resource').map(e=>e.name).filter(n=>/\.dat$/i.test(n)).length };})()`);
 const clickOn = async (selector) => {
@@ -377,7 +381,7 @@ console.log('state: welcome page');
 const atWelcome = await welcome();
 console.log('  ', JSON.stringify(atWelcome));
 const saveId = /[?&]save=([^&]+)/.exec(atWelcome.resume ?? '')?.[1];
-check(!atWelcome.canvas && atWelcome.tiles === 'dm-atari*,csb,conflux-3.5,kids-dungeon,towers-of-chaos',
+check(!atWelcome.canvas && atWelcome.tiles === 'dm-atari*,kids-dungeon,csb,conflux-3.5,towers-of-chaos',
   'an unknown ?dungeon= is the welcome page, no game canvas, its tiles the sets not hidden, the one with a save bright and first, the others by name, none selected');
 check(atWelcome.pictures.length === 5 && atWelcome.pictures.every(Boolean) && atWelcome.gameFiles === 0,
   'each tile shows its set\'s 320x200 thumbnail, <id>-thumbnail.png, and the page fetches no .dat');
@@ -423,7 +427,7 @@ check((await welcome()).play === null, 'a click on the selected tile selects non
 await clickOn('.pick[data-set="dm-atari"]');
 const atDm = await welcome();
 check(atDm.tiles.startsWith('dm-atari*!') && atDm.resume === atWelcome.resume, 'dm-atari selected: CONTINUE reads its last save');
-check(atWelcome.last === 'pick add +Add my own', 'the grid ends with "+ Add my own", never selected');
+check(atWelcome.last === 'pick add +Add my own', 'the fan-made dungeons end with "+ Add my own", never selected');
 // The form that adds a set (`src/ui/addDataSetForm.ts`), which "+ Add my own" opens: its
 // checklist, a row each for the name, the id and the six files, crossed where needed and
 // missing or wrong, checked where right. CANCEL closes it. Then the player's own set
@@ -452,6 +456,7 @@ const form = () => evaluate(`(()=>{const d=document.querySelector('dialog.add-se
     asTitle: (l=>!l?'':l.querySelector('input').checked?'on':'off')(d.querySelector('.add-set-checklist .add-set-as-title')),
     title: d.querySelector('#add-set-title').textContent, name: d.querySelector('[name=name]').value,
     fixedId: d.querySelector('[name=id]').readOnly, dmRules: d.querySelector('[name=dmRules]').checked, deletable: !d.querySelector('.add-set-delete').hidden,
+    official: (c=>c.closest('label').checkVisibility()?(c.checked?'on':'off'):'hidden')(d.querySelector('[name=official]')),
     removable: [...d.querySelectorAll('.add-set-checklist li')].filter(li=>!li.querySelector('.add-set-remove').hidden).map(li=>li.dataset.about).join(),
     height: d.getBoundingClientRect().height };})()`);
 const inForm = (body) => evaluate(`(async()=>{const d=document.querySelector('dialog.add-set');${body};return 1;})()`);
@@ -466,8 +471,8 @@ const opened = await form();
 console.log('  form:', JSON.stringify(opened));
 check(opened?.open === true && !opened.confirm && opened.title === 'Add my own dungeon' && !opened.fixedId && !opened.deletable && opened.dmRules && opened.base === 'dm-atari*,csb' && opened.problems.length === 0 && opened.holds === ''
   && opened.rows === 'namex,idx,dungeon.datx,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail'
-  && opened.generate === 'on' && opened.thumbnail === 'Generate from data' && opened.asTitle === '',
-  '"+ Add my own" opens the form, DM rules checked: the name, the id and dungeon.dat crossed, DM\'s graphics.dat checked, the thumbnail offered from it, CONFIRM held');
+  && opened.generate === 'on' && opened.thumbnail === 'Generate from data' && opened.asTitle === '' && opened.official === 'hidden',
+  '"+ Add my own" opens the form, DM rules checked, no official game\'s checkbox to a player: the name, the id and dungeon.dat crossed, DM\'s graphics.dat checked, the thumbnail offered from it, CONFIRM held');
 check(opened.height <= 600, 'the form is on one screen');
 await inForm(`d.querySelector('#add-set-cancel').click()`);
 check(await form() === null, 'CANCEL closes it');
@@ -569,8 +574,8 @@ await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
 await wait(2500);
 const withLocal = await welcome();
 console.log('  local set:', JSON.stringify(withLocal));
-check(withLocal.tiles === `dm-atari*,local:${MINE}*,csb,conflux-3.5,kids-dungeon,towers-of-chaos`
-  && withLocal.saves[1] === '1 save' && withLocal.pictures.length === 6 && withLocal.pictures.every(Boolean)
+check(withLocal.tiles === `dm-atari*,kids-dungeon,csb,local:${MINE}*,conflux-3.5,towers-of-chaos`
+  && withLocal.saves[3] === '1 save' && withLocal.pictures.length === 6 && withLocal.pictures.every(Boolean)
   && withLocal.gameFiles === 0 && withLocal.last === atWelcome.last,
   "a local set's tile: its save counted, bright, its picture the record's image, the add tile still last");
 await clickOn(`.pick[data-set="local:${MINE}"]`);
@@ -805,8 +810,9 @@ const siteForm = { ...(await form()), publish: await publishState(), note: await
 console.log('  the pen, to a moderator:', JSON.stringify(siteForm));
 check(siteForm.open === true && siteForm.title === 'Edit the published dungeon' && siteForm.name === 'My Edited Dungeon' && siteForm.id === MINE
   && siteForm.fixedId && siteForm.prefix === true && !siteForm.deletable && siteForm.publish === 'hidden' && siteForm.removable === 'graphics.dat,thumbnail'
-  && !siteForm.rows.includes('x') && siteForm.rows.includes('dungeon.dat+') && siteForm.thumbnail === 'thumbnail.png' && !siteForm.confirm && siteForm.note === '',
-  'the pen opens the form on the published set, its files the folder\'s, its id fixed, no PUBLISH nor DELETE, CONFIRM held until a change');
+  && !siteForm.rows.includes('x') && siteForm.rows.includes('dungeon.dat+') && siteForm.thumbnail === 'thumbnail.png' && !siteForm.confirm && siteForm.note === ''
+  && siteForm.official === 'off',
+  'the pen opens the form on the published set, its files the folder\'s, its id fixed, no PUBLISH nor DELETE, CONFIRM held until a change, the official game\'s checkbox offered, off');
 await typeIn('description', 'Edited by a moderator.');
 await wait(1500);
 const describedConfirm = (await form())?.confirm;
@@ -879,7 +885,7 @@ check(afterDocuments.dialog === null && afterDocuments.mine.selected === 'true' 
   'CLOSE shows the page anew, the set still selected, the book on its tile');
 const SECOND = `${MINE}-b`;
 const secondPublished = await evaluate(`(async()=>{const f=new FormData(), file=async(path)=>(await fetch(path)).blob();
-  for (const [name, value] of [['id','${SECOND}'],['name','My Second Dungeon'],['description',''],['dmRules','true'],['thumbnailAsTitle','false'],['baseSet','dm-atari']]) f.append(name, value);
+  for (const [name, value] of [['id','${SECOND}'],['name','My Second Dungeon'],['description',''],['dmRules','true'],['thumbnailAsTitle','false'],['official','false'],['baseSet','dm-atari']]) f.append(name, value);
   f.append('dungeon.dat', await file('gamefiles/dm-atari/dungeon.dat'), 'dungeon.dat');
   f.append('thumbnail', await file('gamefiles/dm-atari/dm-atari-thumbnail.png'), 'thumbnail.png');
   return (await fetch('api/data-sets', { method: 'POST', headers: { 'X-Player-Id': ${JSON.stringify(owner)} }, body: f })).status;})()`);

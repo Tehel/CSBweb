@@ -512,7 +512,7 @@ async function checkPublish(scratch: string): Promise<void> {
         const dmDungeon = new Uint8Array(readFileSync(`${dm.dir}/dungeon.dat`));
         const thumbnail = new Uint8Array(readFileSync(`${dm.dir}/dm-atari-thumbnail.png`));
         const fields = (id: string, extra: Record<string, string | string[]> = {}): Record<string, string | string[]> => ({
-            id, name: '  My DM ', description: 'Mine. ', authors: ['A Player', ' ', 'Another '], dmRules: 'true', thumbnailAsTitle: 'false', baseSet: 'dm-atari', ...extra,
+            id, name: '  My DM ', description: 'Mine. ', authors: ['A Player', ' ', 'Another '], dmRules: 'true', thumbnailAsTitle: 'false', official: 'false', baseSet: 'dm-atari', ...extra,
         });
         const dmFiles = (): Record<string, File> => ({ 'dungeon.dat': fileOf(dmDungeon, 'dungeon.dat'), thumbnail: fileOf(thumbnail, 'thumbnail.png', 'image/png') });
         let address = 0;
@@ -544,7 +544,7 @@ async function checkPublish(scratch: string): Promise<void> {
         const row = db.prepare('SELECT * FROM data_sets WHERE id = ?').get('my-dm') as Record<string, unknown>;
         console.log(`  its row: ${JSON.stringify({ ...row, owner: row.owner === PLAYER ? '<the player>' : row.owner, walls: row.walls === null ? null : '<its walls>' })}`);
         const dmFolder = { read: async (name: string) => new Uint8Array(readFileSync(`${dm.dir}/${name}`)), where: (name: string) => name };
-        const record = (await checkLocalDataSet({ id: 'my-dm', name: '  My DM ', description: 'Mine. ', authors: ['A Player', ' ', 'Another '], dmRules: true, thumbnailAsTitle: false, baseSet: 'dm-atari', files: dmFiles() },
+        const record = (await checkLocalDataSet({ id: 'my-dm', name: '  My DM ', description: 'Mine. ', authors: ['A Player', ' ', 'Another '], dmRules: true, thumbnailAsTitle: false, official: false, baseSet: 'dm-atari', files: dmFiles() },
             new Set(), (set) => (set === 'dm-atari' ? dmFolder : null), 0)).record!;
         const flags = localDataSet(record);
         const stored = dataSets.read().dataSets.find((set) => set.id === 'my-dm')!;
@@ -557,7 +557,7 @@ async function checkPublish(scratch: string): Promise<void> {
         check(mine.description === record.description && mine.authors.join() === record.authors.join()
             && offered.filter((set) => set.id !== 'my-dm').every((set) => set.description === '' && set.authors.length === 0),
             'api/data-sets gives its description and authors, and empty ones to the sets without');
-        check((['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'thumbnailAsTitle', 'hidden'] as const).every((flag) => stored[flag] === flags[flag]), 'its flags are those localDataSet gives the record');
+        check((['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'thumbnailAsTitle', 'hidden', 'official'] as const).every((flag) => stored[flag] === flags[flag]), 'its flags are those localDataSet gives the record');
         check(await seen(PLAYER) === 'dm-atari,csb,conflux,my-dm pending' && await seen(MODERATORS[0]) === 'dm-atari,csb,conflux,my-dm pending',
             'it is offered, pending, to its owner and the moderators');
         check(await seen(null) === 'dm-atari,csb,conflux' && await seen(OTHER) === 'dm-atari,csb,conflux', 'and to nobody else');
@@ -594,7 +594,7 @@ async function checkPublish(scratch: string): Promise<void> {
             'a player is given the walls of the sets api/data-sets offers them that keep some: their own pending one, as the page reads it');
         check((await wallsSeen(MODERATORS[0])).ids === 'my-dm (My DM), my-csb (My CSB)' && (await wallsSeen(null)).ids === '',
             'a moderator every published set\'s, and anyone else none while they are pending');
-        dataSets.publish({ id: 'approved', name: 'Approved', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false,
+        dataSets.publish({ id: 'approved', name: 'Approved', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, official: false,
             walls: JSON.parse(dmWalls) }, OTHER);
         db.prepare("UPDATE data_sets SET status = 'approved' WHERE id = 'approved'").run();
         check((await wallsSeen(null)).ids === 'approved (Approved)', 'an approved set\'s, to everyone');
@@ -637,6 +637,8 @@ async function checkPublish(scratch: string): Promise<void> {
         await refused('a file sent as text', 400, () => publish({ ...fields('p1'), 'dungeon.dat': 'bytes' }, {}), "'dungeon.dat' is not one file");
         await refused('dmRules neither true nor false', 400, () => publish(fields('p1', { dmRules: 'on' }), dmFiles()), "'dmRules'");
         await refused('thumbnailAsTitle neither true nor false', 400, () => publish(fields('p1', { thumbnailAsTitle: 'on' }), dmFiles()), "'thumbnailAsTitle'");
+        await refused('official neither true nor false', 400, () => publish(fields('p1', { official: 'on' }), dmFiles()), "'official'");
+        await refused('official from a player who does not moderate', 403, () => publish(fields('p1', { official: 'true' }), dmFiles()), 'Only a moderator');
         await refused('a name too long', 400, () => publish(fields('p1', { name: 'x'.repeat(LOCAL_DATA_SET_TEXT_LIMITS.name + 1) }), dmFiles()), 'name is longer');
         await refused('authors too long', 400, () => publish(fields('p1', { authors: ['x'.repeat(100), 'y'.repeat(LOCAL_DATA_SET_TEXT_LIMITS.authors - 100)] }), dmFiles()), 'authors are longer');
         await refused('a file too large', 413, () => publish(fields('p1'), { ...dmFiles(), 'CSBgraphics.dat': fileOf(new Uint8Array(MAX_PUBLISHED_FILE_BYTES + 1), 'CSBgraphics.dat') }), 'CSBgraphics.dat is larger');
@@ -660,6 +662,11 @@ async function checkPublish(scratch: string): Promise<void> {
         const titled = parseManifest((await ask(port, '/api/data-sets', 'GET', { [PLAYER_ID_HEADER]: PLAYER })).body, '').dataSets;
         check(titled.find((set) => set.id === 'p2')?.thumbnailAsTitle === true && titled.filter((set) => set.id !== 'p2').every((set) => !set.thumbnailAsTitle),
             'a set published with its thumbnail as the title says so in api/data-sets, and the others do not');
+        const officialPublished = await publish(fields('p3', { official: 'true' }), dmFiles(), MODERATORS[0]);
+        const offeredOfficial = parseManifest((await ask(port, '/api/data-sets', 'GET', { [PLAYER_ID_HEADER]: MODERATORS[0] })).body, '').dataSets;
+        console.log(`  an official game, published by a moderator: ${officialPublished.status} ${officialPublished.body}`);
+        check(officialPublished.status === 201 && offeredOfficial.find((set) => set.id === 'p3')?.official === true
+            && offeredOfficial.filter((set) => set.id !== 'p3').every((set) => !set.official), 'a moderator publishes an official game, which api/data-sets says, and of no other set');
 
         // A moderator's edit (`server/edit.ts`): the moderation's route, with a form.
         console.log('\nEditing a set:');
@@ -680,11 +687,13 @@ async function checkPublish(scratch: string): Promise<void> {
         const black = indexedPng(320, 200, [[0, 0, 0]], deflateSync(indexedPngRows(320, 200, new Uint8Array(320 * 200))));
         told.length = 0;
 
-        const textOnly = await edit('my-dm', editFields({ name: 'My Edited DM', description: 'Edited.', authors: ['Someone'] }));
+        const textOnly = await edit('my-dm', editFields({ name: 'My Edited DM', description: 'Edited.', authors: ['Someone'], official: 'true' }));
         const edited = rowOf('my-dm');
         console.log(`  its text: ${textOnly.status} ${textOnly.body}, ${JSON.stringify({ name: edited.name, description: edited.description, authors: edited.authors, dir: edited.dir })}`);
         check(textOnly.status === 200 && textOnly.body === '{"id":"my-dm"}' && edited.name === 'My Edited DM' && edited.description === 'Edited.' && edited.authors.join() === 'Someone',
             'a moderator edits a set\'s text: 200, its row says it');
+        check(edited.official && parseManifest((await ask(port, '/api/data-sets', 'GET', { [PLAYER_ID_HEADER]: PLAYER })).body, '').dataSets.find((set) => set.id === 'my-dm')?.official === true,
+            'and makes it an official game, which api/data-sets says');
         check(edited.pending && edited.owner === PLAYER && edited.dir === 'my-dm' && listing('my-dm') === 'dungeon.dat,graphics.dat,my-dm-thumbnail.png'
             && readFileSync(join(gamefilesDir, 'my-dm', 'my-dm-thumbnail.png')).equals(thumbnail), 'its state and owner kept, and its folder untouched: no file changed');
         check(told.join() === 'My Edited DM: edited by moderator 1', 'the edit is notified, by the moderator\'s name');
@@ -783,7 +792,7 @@ async function checkModeration(scratch: string): Promise<void> {
     checkFiles(options, dataSets);
     const players: [string, string][] = [['p1', PLAYER], ['p2', PLAYER], ['p3', OTHER], ['p4', PLAYER], ['p5', PLAYER]];
     for (const [id, owner] of players) {
-        dataSets.publish({ id, name: id.toUpperCase(), description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false,
+        dataSets.publish({ id, name: id.toUpperCase(), description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, official: false,
             walls: { shapes: [[1, 1]], signature: ['0'.repeat(64)] } }, owner);
         mkdirSync(join(gamefilesDir, id));
         writeFileSync(join(gamefilesDir, id, 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
@@ -894,7 +903,7 @@ async function checkDocuments(scratch: string): Promise<void> {
     const db = new DatabaseSync(':memory:');
     const told: string[] = [];
     const dataSets = filledFrom(JSON.stringify({ default: 'dm-atari', dataSets: [{ id: 'dm-atari', name: 'DM' }] }), new DataSetStore(db));
-    dataSets.publish({ id: 'p1', name: 'P1', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false,
+    dataSets.publish({ id: 'p1', name: 'P1', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, official: false,
         walls: { shapes: [[1, 1]], signature: ['0'.repeat(64)] } }, PLAYER);
     mkdirSync(join(gamefilesDir, 'p1'));
     writeFileSync(join(gamefilesDir, 'p1', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
@@ -1027,7 +1036,7 @@ function checkAddedColumns(): void {
     const columns = (db.prepare('PRAGMA table_info(data_sets)').all() as { name: string }[]).map((column) => column.name);
     const defaults = (db.prepare('PRAGMA table_info(data_set_defaults)').all() as { name: string }[]).map((column) => column.name);
     const row = db.prepare('SELECT description, authors, walls, thumbnail_as_title FROM data_sets').get() as { description: string; authors: string; walls: string | null; thumbnail_as_title: number };
-    dataSets.publish({ id: 'b', name: 'B', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, walls: { shapes: [[1, 1]], signature: ['0'.repeat(64)] } }, PLAYER);
+    dataSets.publish({ id: 'b', name: 'B', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, official: false, walls: { shapes: [[1, 1]], signature: ['0'.repeat(64)] } }, PLAYER);
     console.log(`  an older table's columns: ${columns.join(', ')}`);
     check(columns.includes('description') && columns.includes('authors') && columns.includes('walls') && row.description === '' && row.authors === '[]' && row.walls === null
         && columns.includes('thumbnail_as_title') && row.thumbnail_as_title === 0 && !dataSets.read().dataSets[0].thumbnailAsTitle

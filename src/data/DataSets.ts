@@ -22,9 +22,11 @@
  * until a player's set is published and approved, and the welcome page then offers only to
  * add one. `default` may be `null` or left out, for none. A set's `dir` may be left out, for its `id`.
  * The flags `csbGraphics`,
- * `miniDat`, `hintOracle`, `dmRules`, `thumbnailAsTitle` and `hidden` may each be left out, for `false`, and the manifest
+ * `miniDat`, `hintOracle`, `dmRules`, `thumbnailAsTitle`, `hidden` and `official` may each be left out, for `false`, and the manifest
  * names one only where it is true. A set with `"hidden": true` is left out of the welcome
  * page's grid (`chooserSets`), but for a moderator, and plays all the same by its `?dungeon=`.
+ * A set with `"official": true` is one of FTL's own games, which the welcome page lists in
+ * a section of their own, before the fans' dungeons.
  *
  * A set's `description`, a text, and its `authors`, a list of texts, may each be left out,
  * for `''` and `[]`: what the form that adds a set says of it (`src/ui/addDataSetForm.ts`).
@@ -106,6 +108,13 @@ export interface DataSet {
      * the same, and the server takes its events and serves its files as any other's.
      */
     hidden: boolean;
+    /**
+     * Whether it is one of FTL's own games, Dungeon Master in any of its versions, its Kid's
+     * dungeon and Chaos Strikes Back, rather than a fan's: the welcome page lists those first,
+     * in a section of their own, in the manifest's order (`src/ui/welcomePage.ts`). Only a
+     * moderator says so (`server/publish.ts`, `server/edit.ts`).
+     */
+    official: boolean;
     /**
      * Whether it awaits a moderator's approval: the manifest's `"status": "pending"`. The
      * server offers such a set to its owner and the moderators only. A local set is not.
@@ -237,7 +246,7 @@ export function documentPath(set: DataSet, file: string): string {
     return `${set.dir}/${encodeURIComponent(file)}`;
 }
 
-const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'thumbnailAsTitle', 'hidden'] as const;
+const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'thumbnailAsTitle', 'hidden', 'official'] as const;
 
 /**
  * `text`, a manifest whose folders are relative to `base` (`gamefiles` for the page,
@@ -270,11 +279,11 @@ export function parseManifest(text: string, base: string): DataSetManifest {
         if (!Array.isArray(authors) || !authors.every((author) => typeof author === 'string')) {
             throw manifestError(`data set '${id}' has "authors" that are not a list of texts`);
         }
-        const [csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden] = FLAGS.map((flag) => {
+        const [csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden, official] = FLAGS.map((flag) => {
             const value = entry[flag] ?? false;
             if (typeof value !== 'boolean') throw manifestError(`data set '${id}' has a "${flag}" that is neither true nor false`);
             return value;
-        }) as [boolean, boolean, boolean, boolean, boolean, boolean];
+        }) as [boolean, boolean, boolean, boolean, boolean, boolean, boolean];
         const status = entry.status ?? 'approved';
         if (status !== 'approved' && status !== 'pending') throw manifestError(`data set '${id}' has a "status" that is neither "approved" nor "pending"`);
         const { documents = [] } = entry;
@@ -285,7 +294,7 @@ export function parseManifest(text: string, base: string): DataSetManifest {
         const files = documents.map((document) => (document as Record<string, unknown>).file as string);
         if (new Set(files).size !== files.length) throw manifestError(`data set '${id}' names a document twice`);
         return {
-            id, name, description, authors: authors as string[], dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden,
+            id, name, description, authors: authors as string[], dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden, official,
             pending: status === 'pending', documents: documents.map((document) => ({ file: document.file as string, size: document.size as number })),
         };
     });

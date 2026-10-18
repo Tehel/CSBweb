@@ -46,6 +46,8 @@ export interface LocalDataSetRecord {
      * title's animation. Never true without a thumbnail (`checkLocalDataSet`).
      */
     thumbnailAsTitle: boolean;
+    /** `DataSet.official`: whether it is one of FTL's own games, which only a moderator's form says. */
+    official: boolean;
     /** The set whose `graphics.dat` it plays, `dm-atari` or `csb`, where it has none of its own; `null` where it has. */
     baseSet: string | null;
     /** `dungeon.dat` always; the others where the player gave them. `thumbnail` is an image. */
@@ -80,6 +82,7 @@ export function localDataSet(record: LocalDataSetRecord): DataSet {
         dmRules: record.dmRules,
         thumbnailAsTitle: record.thumbnailAsTitle,
         hidden: false,
+        official: record.official,
         pending: false,
         documents: [],
     };
@@ -111,6 +114,8 @@ export interface LocalDataSetDraft {
     dmRules: boolean;
     /** The form's checkbox on the thumbnail's row, whether or not it holds a thumbnail. */
     thumbnailAsTitle: boolean;
+    /** The form's checkbox, a moderator's alone: `DataSet.official`. */
+    official: boolean;
     /** The set whose `graphics.dat` it plays where `files` holds none: `dm-atari` or `csb`. */
     baseSet: string;
     files: Partial<Record<LocalDataSetFile, Blob>>;
@@ -231,6 +236,7 @@ export async function checkLocalDataSet(
             authors: draft.authors.map((author) => author.trim()).filter((author) => author !== ''),
             dmRules: draft.dmRules,
             thumbnailAsTitle: draft.thumbnailAsTitle && thumbnail !== undefined,
+            official: draft.official,
             baseSet: ownGraphics ? null : draft.baseSet,
             files: { ...files },
             dungeonSignature: walls!.signature,

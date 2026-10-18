@@ -64,7 +64,7 @@ async function recordOf(from: DataSet, id: string, names: LocalDataSetFile[], ba
   signatureGame.readDungeonDat((await disk.read('dungeon.dat'))!);
   return {
     id: `${LOCAL_DATA_SET_PREFIX}${id}`, name: `My ${from.name}`, description: 'A test set.', authors: ['A Player'],
-    dmRules: from.dmRules, thumbnailAsTitle: false, baseSet, files, dungeonSignature: await dungeonSignature(signatureGame.ctx.dungeon.getData()),
+    dmRules: from.dmRules, thumbnailAsTitle: false, official: false, baseSet, files, dungeonSignature: await dungeonSignature(signatureGame.ctx.dungeon.getData()),
     createdAt: 1_760_000_000_000,
   };
 }
@@ -135,7 +135,7 @@ async function draftOf(from: DataSet, id: string, names: LocalDataSetFile[], bas
   const disk = diskFiles(from);
   const files: Partial<Record<LocalDataSetFile, Blob>> = {};
   for (const name of names) files[name] = blobOf((await disk.read(name))!);
-  return { id, name: ` My ${from.name} `, description: 'A test set.', authors: ['A Player', ' ', ' Another '], dmRules: from.dmRules, thumbnailAsTitle: false, baseSet, files };
+  return { id, name: ` My ${from.name} `, description: 'A test set.', authors: ['A Player', ' ', ' Another '], dmRules: from.dmRules, thumbnailAsTitle: false, official: false, baseSet, files };
 }
 
 /** `(EDT_Database << 24) + (edbt << 16) + i` (`doc/CSBwin-src/CSB.h:1555-1559`): the records `readRuntimeFileSignatures` reads. */

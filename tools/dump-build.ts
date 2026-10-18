@@ -71,7 +71,7 @@ function folder(id: string): DataSetFolder {
 function draftOf(set: string, names: string[], replaced: Record<string, Blob> = {}): DataSetDraft {
     const files: Record<string, Blob> = {};
     for (const name of names) files[name] = new Blob([readFileSync(join(dataSetNamed(set).dir, name))]);
-    return { id: set, name: set, description: '', authors: [], dmRules: true, thumbnailAsTitle: false, baseSet: 'dm-atari', files: { ...files, ...replaced } };
+    return { id: set, name: set, description: '', authors: [], dmRules: true, thumbnailAsTitle: false, official: false, baseSet: 'dm-atari', files: { ...files, ...replaced } };
 }
 
 function listFiles(dir: string): string[] {

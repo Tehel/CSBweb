@@ -80,14 +80,26 @@ body.welcome {
     margin: 0 auto;
 }
 
-/* The data sets, a tile each, its picture 320x200 at half size, the rows centred, under
-   the buttons. */
+/* The data sets in two sections under the buttons, the official games and the fans'
+   dungeons, each a title, a line, and a grid: a tile each, its picture 320x200 at half
+   size, the rows centred. */
+.welcome-sets {
+    margin-top: 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+.welcome-sets[hidden] { display: none; }
+.welcome-sets > h2 { margin: 0; color: var(--p11); text-align: center; }
+.welcome-sets-lead { margin: 0; font-size: 18px; line-height: 1.55; font-style: italic; color: #bdbac8; text-align: center; }
 .welcome-grid {
+    align-self: stretch;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 12px;
-    margin-top: 36px;
+    margin-top: 12px;
 }
 .pick {
     appearance: none;
@@ -324,6 +336,7 @@ body.welcome {
 .add-set-id { display: flex; align-items: center; gap: 6px; }
 .add-set-id .px { color: var(--p2); }
 .add-set-check { display: flex; align-items: center; gap: 9px; font-size: 17px; }
+.add-set-check[hidden] { display: none; }
 .add-set-check input { accent-color: var(--p9); width: 18px; height: 18px; margin: 0; flex: none; }
 .add-set-base { margin: 0; padding: 6px 12px 9px; border: 3px solid #1d1d30; display: flex; flex-wrap: wrap; gap: 6px 24px; }
 .add-set-base.disabled { opacity: 0.4; }
