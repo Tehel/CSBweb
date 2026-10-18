@@ -42,8 +42,8 @@
  *   pending set too, which the server refuses; never on the default set. The page then
  *   asks for the sets anew and shows them, the selection kept but for a set gone. A
  *   refusal is said in the box beside CONTINUE.
- * - **The book** is on every published set's tile, after the triangle. It opens a dialog that offers the
- *   set's files as one zip, `<name>.zip`, made in the page from the files the server serves
+ * - **The book** is on every published set's tile, after the triangle. It opens a dialog that says the
+ *   set's description, under its title, if it has one, and offers the set's files as one zip, `<name>.zip`, made in the page from the files the server serves
  *   (`src/data/DataSetArchive.ts`), so that the set can be played in CSBWin; then its
  *   documents, the files its folder holds for its players (`DataSetDocument`), each a link
  *   that the browser opens in a new tab, a PDF, a text or a picture, or downloads, a word
@@ -179,10 +179,11 @@ const CONFIRMATION = (prefix: string) => `
   </div>
 </form>`;
 
-/** The dialog the book opens: the documents, then a moderator's ADD, and CLOSE. */
+/** The dialog the book opens: the set's description, the documents, then a moderator's ADD, and CLOSE. */
 const DOCUMENTS = `
 <form class="add-set-form">
   <h2 class="px" id="documents-title"></h2>
+  <p class="documents-description"></p>
   <ul class="documents-list"></ul>
   <p class="documents-status" aria-live="polite"></p>
   <div class="add-set-buttons">
@@ -525,7 +526,9 @@ function showDocuments(shown: DataSet, moderator: boolean, loadManifest: () => P
     const input = dialog.querySelector<HTMLInputElement>('#documents-file')!;
     const route = `${DATA_SETS_ROUTE}/${encodeURIComponent(set.id)}/${DOCUMENTS_SEGMENT}`;
 
+    const description = dialog.querySelector<HTMLElement>('.documents-description')!;
     const render = () => {
+        description.textContent = set.description;
         const archive = document.createElement('li');
         archive.className = 'documents-archive';
         const name = `${archiveName(set)}.zip`;
