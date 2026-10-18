@@ -7,7 +7,8 @@
  * A set is approved or pending. An approved set is offered to everyone; a pending one, a
  * player's, published by `publish.ts` (`DataSetStore.publish`), to its owner and the
  * moderators only (`manifestText`). A moderator approves, rejects, hides and shows a set
- * (`moderate.ts`), and edits its text and files (`edit.ts`). A published set's row keeps its dungeon's walls, which
+ * (`moderate.ts`), edits its text and files (`edit.ts`), and adds and removes its documents
+ * (`documents.ts`), one row each of `data_set_documents`. A published set's row keeps its dungeon's walls, which
  * `api/data-set-walls` answers (`wallsText`), so that the page can name the set a save
  * dropped in another is of. Ownership, and
  * moderation, rest on the `playerId` alone, a secret (`src/ui/gameEvents.ts`), so no answer
@@ -19,7 +20,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 
-import type { DataSet, DataSetManifest } from '../src/data/DataSets.ts';
+import type { DataSet, DataSetDocument, DataSetManifest } from '../src/data/DataSets.ts';
 import { isPlayerId } from './events.ts';
 
 const SCHEMA = `
@@ -40,6 +41,12 @@ CREATE TABLE IF NOT EXISTS data_sets (
 CREATE TABLE IF NOT EXISTS data_set_defaults (
     only         INTEGER PRIMARY KEY CHECK (only = 1),
     default_set  TEXT    NOT NULL REFERENCES data_sets (id)
+);
+CREATE TABLE IF NOT EXISTS data_set_documents (
+    data_set     TEXT    NOT NULL REFERENCES data_sets (id),
+    file         TEXT    NOT NULL,     -- its name in the set's folder (isDocumentName)
+    size         INTEGER NOT NULL,     -- in bytes
+    PRIMARY KEY (data_set, file)
 );
 `;
 
@@ -169,6 +176,11 @@ export class DataSetStore {
     private readonly updateHidden: StatementSync;
     private readonly updateEdited: StatementSync;
     private readonly deleteRow: StatementSync;
+    private readonly documentRows: StatementSync;
+    private readonly insertDocument: StatementSync;
+    private readonly deleteDocument: StatementSync;
+    private readonly deleteDocuments: StatementSync;
+    private readonly updateDir: StatementSync;
 
     constructor(db: DatabaseSync) {
         this.db = db;
@@ -197,6 +209,11 @@ export class DataSetStore {
         this.updateApproved = db.prepare("UPDATE data_sets SET status = 'approved' WHERE id = ?");
         this.updateHidden = db.prepare('UPDATE data_sets SET hidden = ? WHERE id = ?');
         this.deleteRow = db.prepare('DELETE FROM data_sets WHERE id = ?');
+        this.documentRows = db.prepare('SELECT data_set, file, size FROM data_set_documents ORDER BY file COLLATE NOCASE, file');
+        this.insertDocument = db.prepare('INSERT INTO data_set_documents (data_set, file, size) VALUES (?, ?, ?)');
+        this.deleteDocument = db.prepare('DELETE FROM data_set_documents WHERE data_set = ? AND file = ?');
+        this.deleteDocuments = db.prepare('DELETE FROM data_set_documents WHERE data_set = ?');
+        this.updateDir = db.prepare('UPDATE data_sets SET dir = ? WHERE id = ?');
         this.updateEdited = db.prepare('UPDATE data_sets SET name = ?, description = ?, authors = ?, dir = ?, csb_graphics = ?, hint_oracle = ?, '
             + 'dm_rules = ?, thumbnail_as_title = ?, walls = COALESCE(?, walls) WHERE id = ?');
     }
@@ -213,23 +230,19 @@ export class DataSetStore {
     /**
      * Fills the empty tables from `manifest`, parsed with its folders relative to
      * `GAMEFILES_DIR` (`parseManifest(text, '')`): every set the site's, approved unless it
-     * says it is pending, in the manifest's order, and `data_set_defaults` where it names a
-     * default. All of it or nothing. The server never
+     * says it is pending, in the manifest's order, with its documents, and `data_set_defaults`
+     * where it names a default. All of it or nothing. The server never
      * calls it: the dev server's store (`vite.config.mts`) and `tools/fill-data-sets.ts` do.
      */
     fill(manifest: DataSetManifest): void {
         if (!this.isEmpty()) throw new Error('the data_sets table is not empty');
-        this.db.exec('BEGIN');
-        try {
+        this.transaction(() => {
             manifest.dataSets.forEach((set, position) => {
                 this.insert.run(set.id, set.name, set.description, JSON.stringify(set.authors), set.dir, position, set.pending ? 'pending' : 'approved', ...FLAG_COLUMNS.map(([flag]) => (set[flag] ? 1 : 0)));
+                for (const document of set.documents) this.insertDocument.run(set.id, document.file, document.size);
             });
             if (manifest.defaultSet) this.insertDefaults.run(manifest.defaultSet.id);
-            this.db.exec('COMMIT');
-        } catch (error) {
-            this.db.exec('ROLLBACK');
-            throw error;
-        }
+        });
     }
 
     /**
@@ -274,19 +287,57 @@ export class DataSetStore {
             set.dmRules ? 1 : 0, set.thumbnailAsTitle ? 1 : 0, set.walls && wallsJson(set.walls), id);
     }
 
-    /** `id`'s row deleted (`moderate.ts`, which deletes its folder after). */
+    /** `id`'s row deleted, and its documents' (`moderate.ts`, which deletes its folder after). */
     remove(id: string): void {
-        this.deleteRow.run(id);
+        this.transaction(() => {
+            this.deleteDocuments.run(id);
+            this.deleteRow.run(id);
+        });
+    }
+
+    /**
+     * `document` added to `id`'s, its folder now `dir`, which holds it (`documents.ts`). Throws
+     * where the set has a document of its name already, nothing changed.
+     */
+    addDocument(id: string, dir: string, document: DataSetDocument): void {
+        this.transaction(() => {
+            this.insertDocument.run(id, document.file, document.size);
+            this.updateDir.run(dir, id);
+        });
+    }
+
+    /** `id`'s document `file` removed, its folder now `dir`, which no longer holds it (`documents.ts`). */
+    removeDocument(id: string, dir: string, file: string): void {
+        this.transaction(() => {
+            this.deleteDocument.run(id, file);
+            this.updateDir.run(dir, id);
+        });
+    }
+
+    /** `change` done whole, or not at all where it throws. */
+    private transaction(change: () => void): void {
+        this.db.exec('BEGIN');
+        try {
+            change();
+            this.db.exec('COMMIT');
+        } catch (error) {
+            this.db.exec('ROLLBACK');
+            throw error;
+        }
     }
 
     read(): StoredDataSets {
         const defaults = this.defaults.get() as { default_set: string } | undefined;
+        const documents = new Map<string, DataSetDocument[]>();
+        for (const row of this.documentRows.all() as { data_set: string; file: string; size: number }[]) {
+            documents.set(row.data_set, [...documents.get(row.data_set) ?? [], { file: row.file, size: row.size }]);
+        }
         const dataSets = (this.rows.all() as Record<string, string | number | null>[]).map((row): StoredDataSet => {
             const set: StoredDataSet = {
                 id: row.id as string, name: row.name as string, description: row.description as string,
                 authors: JSON.parse(row.authors as string) as string[], dir: row.dir as string,
                 csbGraphics: false, miniDat: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, hidden: false,
-                pending: row.status === 'pending', owner: row.owner as string | null,
+                pending: row.status === 'pending', documents: documents.get(row.id as string) ?? [], owner: row.owner as string | null,
             };
             for (const [flag, column] of FLAG_COLUMNS) set[flag] = row[column] === 1;
             return set;
@@ -300,19 +351,20 @@ export class DataSetStore {
  * manifest `parseManifest` reads. Everyone sees the approved sets, a player also their own
  * pending ones, and a moderator every set. A pending set says `"status": "pending"`, and no
  * set says its owner. A `dir` is left out where it is the id, a flag where it is false, and
- * the description and the authors where they are empty, as the repository's manifest does. A moderator's answer says `"moderator": true`, so that
+ * the description, the authors and the documents where they are empty, as the repository's manifest does. A moderator's answer says `"moderator": true`, so that
  * the page shows them the hidden sets too: it tells them nothing they do not hold. A table
  * with no set answers an empty list, and one with no `data_set_defaults` row `null` for the
  * default, which the page takes (`parseManifest`).
  */
 export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): string {
     const dataSets = visibleSets(stored, viewer).map((set) => {
-        const entry: Record<string, string | readonly string[] | boolean> = { id: set.id, name: set.name };
+        const entry: Record<string, string | readonly string[] | boolean | readonly DataSetDocument[]> = { id: set.id, name: set.name };
         if (set.description !== '') entry.description = set.description;
         if (set.authors.length > 0) entry.authors = set.authors;
         if (set.dir !== set.id) entry.dir = set.dir;
         for (const [flag] of FLAG_COLUMNS) if (set[flag]) entry[flag] = true;
         if (set.pending) entry.status = 'pending';
+        if (set.documents.length > 0) entry.documents = set.documents;
         return entry;
     });
     return JSON.stringify({ default: stored.defaultId, ...(viewer.moderator !== null ? { moderator: true } : {}), dataSets });

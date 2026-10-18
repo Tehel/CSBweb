@@ -19,6 +19,8 @@
  *   /api/data-sets/<id>  POST: the set approved, rejected, hidden or shown, by a moderator,
  *                     or withdrawn by its owner (`moderate.ts`); with a form, its text and
  *                     files edited by a moderator (`edit.ts`)
+ *   /api/data-sets/<id>/documents  POST: a document added to the set by a moderator, with a
+ *                     form, or removed, with JSON (`documents.ts`)
  *   /api/data-set-walls  the walls of the sets `api/data-sets` offers the same player
  *                     that keep them, the published ones (`wallsText`)
  *   /api/health       200, for the compose healthcheck
@@ -36,8 +38,9 @@ import { extname, join } from 'node:path';
 import { pipeline } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer, type Moderator } from './dataSets.ts';
+import { addDocument, removeDocument } from './documents.ts';
 import { editDataSet } from './edit.ts';
 import { checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
@@ -125,7 +128,7 @@ const GAMEFILES = 'gamefiles';
 /** The URL prefix of the files shared by link (`ServerOptions.filesDir`). */
 const FILES = 'files';
 
-/** A file's type by its extension, in any case; any other is `application/octet-stream`. */
+/** A file's type by its extension, in any case (`contentType`); any other is `application/octet-stream`. */
 const CONTENT_TYPES: Record<string, string> = {
     '.7z': 'application/x-7z-compressed',
     '.css': 'text/css; charset=utf-8',
@@ -159,6 +162,11 @@ const CONTENT_TYPES: Record<string, string> = {
     '.xml': 'application/xml; charset=utf-8',
     '.zip': 'application/zip',
 };
+
+/** The type `path` is served as, by its extension (`CONTENT_TYPES`): the dev server serves a published set's files by it too. */
+export function contentType(path: string): string {
+    return CONTENT_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream';
+}
 
 const NO_CACHE = 'no-cache';
 const IMMUTABLE = 'public, max-age=31536000, immutable';
@@ -217,6 +225,10 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
             if (req.method !== 'POST') return refuseMethod(res, 'POST');
             if (isForm(req)) return receiveEdit(segments[2]!, gamefilesDir, api, req, res);
             return receiveModeration(segments[2]!, gamefilesDir, api, req, res);
+        }
+        if (segments.length === 4 && segments.slice(0, 2).join('/') === DATA_SETS_ROUTE && segments[3] === DOCUMENTS_SEGMENT) {
+            if (req.method !== 'POST') return refuseMethod(res, 'POST');
+            return receiveDocument(segments[2]!, gamefilesDir, api, req, res);
         }
         const name = segments.length === 2 ? segments[1] : undefined;
         if (name === 'event') {
@@ -305,7 +317,7 @@ function serveFile(req: IncomingMessage, res: ServerResponse, path: string, cach
         return;
     }
 
-    res.setHeader('Content-Type', CONTENT_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream');
+    res.setHeader('Content-Type', contentType(path));
     res.setHeader('Content-Length', stats.size);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     if (req.method === 'HEAD') {
@@ -420,6 +432,36 @@ export async function receiveEdit(id: string, gamefilesDir: string, api: EditApi
         const form = await readForm(req);
         reply = typeof form === 'string' ? { status: form === 'large' ? 413 : 400, body: { error: FORM_REFUSALS[form] } }
             : await editDataSet(id, form, viewer, { checkDataSet: api.checkDataSet, dataSets: api.dataSets, gamefilesDir, notify: api.notify, now: api.now });
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
+}
+
+/** What `receiveDocument` needs of the API. */
+export type DocumentApi = Pick<ApiOptions, 'dataSets' | 'moderators' | 'now' | 'notify'>;
+
+/**
+ * `POST api/data-sets/<id>/documents`: its asker, refused unless they moderate before the
+ * body is read, then a form of at most `MAX_PUBLISH_BYTES`, a document added, or a JSON body
+ * of at most `MAX_MODERATION_BYTES`, one removed, before `documents.ts` decides. Every
+ * answer is JSON (`ModerationAnswer`). The dev server answers the route with it too
+ * (`vite.config.mts`).
+ */
+export async function receiveDocument(id: string, gamefilesDir: string, api: DocumentApi, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const viewer = dataSetViewer(api, req);
+    const options = { dataSets: api.dataSets, gamefilesDir, notify: api.notify, now: api.now };
+    let reply: ModerationAnswer;
+    if (!viewer.moderator) {
+        req.resume();
+        reply = { status: 403, body: { error: 'Only a moderator may change a set\'s documents.' } };
+    } else if (isForm(req)) {
+        const form = await readForm(req);
+        reply = typeof form === 'string' ? { status: form === 'large' ? 413 : 400, body: { error: FORM_REFUSALS[form] } }
+            : await addDocument(id, form, viewer, options);
+    } else {
+        const body = await readBody(req, MAX_MODERATION_BYTES);
+        reply = body === null ? { status: 413, body: { error: `The body is larger than ${MAX_MODERATION_BYTES} bytes.` } }
+            : await removeDocument(id, body.toString('utf8'), viewer, options);
     }
     res.setHeader('Cache-Control', 'no-store');
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');

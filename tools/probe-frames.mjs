@@ -32,7 +32,8 @@
 // in it and out of it, and in the installed app's window, the save store held by another tab, and the welcome
 // page: its tiles and their order, its fonts, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
 // straight into play, its form adding, editing, publishing and deleting a player's own set, the
-// tiles' controls moderating a published one, and each tile's name in its set's state's colour,
+// tiles' controls moderating a published one, the book listing its documents, a moderator adding
+// and removing them, and each tile's name in its set's state's colour,
 // to a moderator. See `check` below.
 // A failure there exits 1.
 //
@@ -704,8 +705,8 @@ check(deleted.dialog === null && deleted.form === null && deleted.store.name ===
   'its DELETE removes the record and every save filed under its id, and the page shows the sets without it, the published one kept');
 // The moderation (`server/moderate.ts`), from the tiles, as the dev server's moderator
 // (`DEV_MODERATOR_PLAYER_ID`, `vite.config.mts`; the image's in `tools/check-image.sh`), the
-// page reloaded with their `playerId` kept. Every published set has the pen first; the set
-// published above, pending, then the tick
+// page reloaded with their `playerId` kept. Every published set has the book first, then the
+// pen; the set published above, pending, then the tick
 // and the cross, every other the eye, open on a set shown, shut on a hidden one. The tick approves it, its name white and its
 // tile still selected, then the eye hides it, purple, and shows it again, white. A refusal,
 // the server stood in for, is said in the box beside CONTINUE. Then its owner, who sees no
@@ -724,10 +725,10 @@ const onMine = (control) => clickOn(`.pick-cell:has(.pick[data-set="${MINE}"]) .
 await asPlayer(MODERATOR);
 const moderating = await controlsOf();
 console.log('  to a moderator:', JSON.stringify(moderating));
-check(moderating[MINE] === 'pick-edit:Edit My Edited Dungeon,pick-approve:Approve My Edited Dungeon,pick-reject:Reject My Edited Dungeon'
+check(moderating[MINE] === 'pick-documents:Documents of My Edited Dungeon,pick-edit:Edit My Edited Dungeon,pick-approve:Approve My Edited Dungeon,pick-reject:Reject My Edited Dungeon'
   && Object.entries(moderating).every(([set, controls]) => set === MINE
-    || ((row) => controls === `pick-edit:Edit ${row?.name},${row?.hidden ? `pick-show:Show ${row.name}` : `pick-hide:Hide ${row?.name}`}`)(manifestRows.find((row) => row.id === set))),
-  'to a moderator, every set has the pen, the pending set then the tick and the cross, every other set the eye, open on a set shown, shut on a hidden one');
+    || ((row) => controls === `pick-documents:Documents of ${row?.name},pick-edit:Edit ${row?.name},${row?.hidden ? `pick-show:Show ${row.name}` : `pick-hide:Hide ${row?.name}`}`)(manifestRows.find((row) => row.id === set))),
+  'to a moderator, every set has the book and the pen, the pending set then the tick and the cross, every other set the eye, open on a set shown, shut on a hidden one');
 await clickOn(`.pick[data-set="${MINE}"]`);
 await onMine('pick-approve');
 await wait(2000);
@@ -739,9 +740,10 @@ await onMine('pick-show');
 await wait(2000);
 const shown = await mineOf();
 console.log('  moderated:', JSON.stringify({ approved, hidden, shown }));
-check(approved.colour === 'rgb(252, 252, 252)' && approved.controls === 'pick-edit:Edit My Edited Dungeon,pick-hide:Hide My Edited Dungeon' && approved.selected === 'true'
-  && hidden.colour === 'rgb(216, 0, 216)' && hidden.controls === 'pick-edit:Edit My Edited Dungeon,pick-show:Show My Edited Dungeon' && hidden.selected === 'true'
-  && shown.colour === 'rgb(252, 252, 252)' && shown.controls === 'pick-edit:Edit My Edited Dungeon,pick-hide:Hide My Edited Dungeon' && shown.selected === 'true',
+const BOOK_OF_MINE = 'pick-documents:Documents of My Edited Dungeon';
+check(approved.colour === 'rgb(252, 252, 252)' && approved.controls === `${BOOK_OF_MINE},pick-edit:Edit My Edited Dungeon,pick-hide:Hide My Edited Dungeon` && approved.selected === 'true'
+  && hidden.colour === 'rgb(216, 0, 216)' && hidden.controls === `${BOOK_OF_MINE},pick-edit:Edit My Edited Dungeon,pick-show:Show My Edited Dungeon` && hidden.selected === 'true'
+  && shown.colour === 'rgb(252, 252, 252)' && shown.controls === `${BOOK_OF_MINE},pick-edit:Edit My Edited Dungeon,pick-hide:Hide My Edited Dungeon` && shown.selected === 'true',
   'the tick approves the set, the shut eye hides it and the open eye shows it, the page asking for the sets anew, the set kept selected');
 onPaused = ({ requestId }) => send('Fetch.fulfillRequest', { requestId, responseCode: 409,
   responseHeaders: [{ name: 'Content-Type', value: 'application/json; charset=utf-8' }],
@@ -787,6 +789,51 @@ check(describedConfirm === true && newDungeonNote.startsWith('Saved games keep t
 check(afterSiteEdit.form === null && siteEdited?.dir === `${MINE}@2` && siteEdited.description === 'Edited by a moderator.'
   && afterSiteEdit.picture === `gamefiles/${MINE}@2/${MINE}-thumbnail.png` && afterSiteEdit.page.pictures.every(Boolean) && afterSiteEdit.mine.selected === 'true',
   'CONFIRM edits the set on the site: the form closes, its text changed, its files in a new folder, whose thumbnail the page shows, the set still selected');
+// The book, to a moderator (`server/documents.ts`): the set has no document yet, which its
+// dialog says, with ADD. A text chosen is added, a link that opens in a new tab, served from
+// the set's new folder; a name that is not a document's is refused in the dialog, nothing
+// sent; a .doc is a link that downloads. The text's cross asks first, then removes it.
+// CLOSE shows the page anew, the book on the set. Its owner, below, has the book, which
+// offers neither ADD nor a cross.
+const documentsDialog = () => evaluate(`(d=>d&&{ open: d.open, title: d.querySelector('h2').textContent,
+  items: [...d.querySelectorAll('.documents-list li')].map(li=>{const a=li.querySelector('a');
+    return a ? [a.textContent, a.getAttribute('href'), a.target || (a.hasAttribute('download') ? 'download' : ''), li.querySelector('.documents-size').textContent,
+      li.querySelector('.documents-remove')?.getAttribute('aria-label') ?? ''].join('|') : li.textContent;}),
+  add: !!d.querySelector('#documents-add'), status: d.querySelector('.documents-status').textContent })(document.querySelector('dialog.documents'))`);
+const chooseDocument = (name, text) => evaluate(`(()=>{const input=document.querySelector('#documents-file'), t=new DataTransfer();
+  t.items.add(new File([${JSON.stringify(text)}], ${JSON.stringify(name)})); input.files=t.files; input.dispatchEvent(new Event('change')); return 1;})()`);
+await onMine('pick-documents');
+const noDocument = await documentsDialog();
+await chooseDocument('Notes.txt', 'Read me first.');
+await wait(2500);
+const oneDocument = await documentsDialog();
+const servedDocument = await evaluate(`fetch(document.querySelector('dialog.documents .documents-list a').getAttribute('href')).then(r=>r.text())`);
+await chooseDocument('page.html', '<p>no</p>');
+await wait(500);
+const refusedDocument = await documentsDialog();
+await chooseDocument('Solution.doc', 'The answer.');
+await wait(2500);
+const twoDocuments = await documentsDialog();
+await clickOn('dialog.documents .documents-remove[aria-label="Remove Notes.txt"]');
+const askedRemoval = await evaluate(`(d=>d&&{ title: d.querySelector('h2').textContent, button: d.querySelector('#remove-document-confirm').textContent })(document.querySelector('dialog.remove-document'))`);
+await evaluate(`document.querySelector('#remove-document-confirm').click()`);
+await wait(2500);
+const afterRemoval = await documentsDialog();
+await clickOn('#documents-close');
+await wait(2000);
+const afterDocuments = { dialog: await documentsDialog(), mine: await mineOf() };
+console.log('  the book:', JSON.stringify({ noDocument, oneDocument, refusedDocument: refusedDocument?.status, twoDocuments, askedRemoval, afterRemoval }));
+check(noDocument?.open === true && noDocument.title === 'My Edited Dungeon: documents' && noDocument.items.join() === 'No document yet.' && noDocument.add,
+  'to a moderator, the book opens the set\'s documents, none yet, with ADD');
+check(oneDocument?.items.join() === `Notes.txt|gamefiles/${MINE}@3/Notes.txt|_blank|14 B|Remove Notes.txt` && oneDocument.status === '' && servedDocument === 'Read me first.',
+  'a text chosen is added: a link that opens in a new tab, from the set\'s new folder, its size, and a cross');
+check(refusedDocument?.status.startsWith('page.html cannot be a document') && refusedDocument.items.length === 1, 'a file whose name is not a document\'s is refused in the dialog, nothing sent');
+check(twoDocuments?.items.join() === `Notes.txt|gamefiles/${MINE}@4/Notes.txt|_blank|14 B|Remove Notes.txt,Solution.doc|gamefiles/${MINE}@4/Solution.doc|download|11 B|Remove Solution.doc`,
+  'a .doc is a link that downloads, the documents listed by name');
+check(askedRemoval?.title === 'Remove Notes.txt?' && askedRemoval.button === 'Remove'
+  && afterRemoval?.items.join() === `Solution.doc|gamefiles/${MINE}@5/Solution.doc|download|11 B|Remove Solution.doc`, 'its cross asks first, then removes it');
+check(afterDocuments.dialog === null && afterDocuments.mine.selected === 'true' && afterDocuments.mine.controls.startsWith(BOOK_OF_MINE),
+  'CLOSE shows the page anew, the set still selected, the book on its tile');
 const SECOND = `${MINE}-b`;
 const secondPublished = await evaluate(`(async()=>{const f=new FormData(), file=async(path)=>(await fetch(path)).blob();
   for (const [name, value] of [['id','${SECOND}'],['name','My Second Dungeon'],['description',''],['dmRules','true'],['thumbnailAsTitle','false'],['baseSet','dm-atari']]) f.append(name, value);
@@ -806,12 +853,17 @@ await clickOn(`.pick-cell:has(.pick[data-set="${SECOND}"]) .pick-reject`);
 await evaluate(`document.querySelector('#reject-set-confirm').click()`);
 await wait(2000);
 const withdrawn = { dialog: await rejectDialog(), tiles: setsOf(await welcome()) };
+await clickOn(`.pick-cell:has(.pick[data-set="${MINE}"]) .pick-documents`);
+const ownersDocuments = await documentsDialog();
+await clickOn('#documents-close');
 console.log('  withdrawn:', JSON.stringify({ published: secondPublished, controls: ownerAgain[SECOND], asked: askedWithdraw }));
-check(secondPublished === 201 && ownerAgain[SECOND] === 'pick-reject:Withdraw My Second Dungeon' && ownerAgain[MINE] === ''
+check(secondPublished === 201 && ownerAgain[SECOND] === 'pick-reject:Withdraw My Second Dungeon' && ownerAgain[MINE] === BOOK_OF_MINE
   && askedWithdraw?.open === true && askedWithdraw.title === 'Withdraw My Second Dungeon?' && askedWithdraw.button === 'Withdraw'
   && keptPending.dialog === null && keptPending.tiles.includes(SECOND)
   && withdrawn.dialog === null && !withdrawn.tiles.includes(SECOND) && withdrawn.tiles.includes(MINE),
-  'its owner withdraws a pending set by its cross, which asks first, CANCEL keeping it; the approved set offers them nothing');
+  'its owner withdraws a pending set by its cross, which asks first, CANCEL keeping it; the approved set offers them its book alone');
+check(ownersDocuments?.items.join() === `Solution.doc|gamefiles/${MINE}@5/Solution.doc|download|11 B|` && !ownersDocuments.add,
+  'to a player, the book lists the documents, with no cross and no ADD');
 // A tile's name says its set's state, to a moderator (`server/dataSets.ts`), whose answer
 // the dev server's manifest stands in for here, with `"moderator": true`, kids-dungeon
 // pending and 3d2d1d, a hidden set, pending too: every set is listed, the hidden ones

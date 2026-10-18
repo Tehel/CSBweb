@@ -81,6 +81,7 @@ export function localDataSet(record: LocalDataSetRecord): DataSet {
         thumbnailAsTitle: record.thumbnailAsTitle,
         hidden: false,
         pending: false,
+        documents: [],
     };
 }
 

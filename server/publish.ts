@@ -26,7 +26,7 @@
  * (`DataSetStore.publish`), its flags following from its files as `localDataSet`'s do,
  * and its dungeon's walls the check's.
  * The folder is never changed after: `backup.ts` copies it once, and a moderator's edit of
- * the set's files writes a new one (`edit.ts`).
+ * the set's files writes a new one (`edit.ts`), as does a document added or removed (`documents.ts`).
  *
  * 201 answers `{"id": "<id>"}`; a refusal `{"error": "<why>"}`, and a 422 the problems too,
  * `[{"about": "<field or file>", "text": "<why>"}]`. No answer, and no log, holds the

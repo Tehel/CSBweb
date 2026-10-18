@@ -1,11 +1,13 @@
 /**
  * What the server tells the author's phone: each change to the sets, through the VPS's ntfy
  * (`doc/DEPLOYMENT.md` → "Notifications"). A set published (`publish.ts`), approved,
- * rejected, withdrawn, hidden or shown (`moderate.ts`), or edited (`edit.ts`) is one message
- * of two lines:
+ * rejected, withdrawn, hidden or shown (`moderate.ts`), edited (`edit.ts`), or given or
+ * relieved of a document (`documents.ts`) is one message of two lines:
  *
  *   Dataset <name>: <added | approved | rejected | withdrawn | shown | hidden | edited>
  *   By <who> at YYYYMMDD HH:mm
+ *
+ * or, for a document, `Dataset <name>: document <added | removed> (<file>)` first.
  *
  * <who> is a moderator's name (`Moderator`, `dataSets.ts`), `its owner` for a set withdrawn,
  * and `a player` for a set published by one who does not moderate: never a `playerId`. The
@@ -16,13 +18,15 @@
  */
 
 /** What became of a set. */
-export type DataSetActivity = 'added' | 'approved' | 'rejected' | 'withdrawn' | 'shown' | 'hidden' | 'edited';
+export type DataSetActivity = 'added' | 'approved' | 'rejected' | 'withdrawn' | 'shown' | 'hidden' | 'edited' | 'document added' | 'document removed';
 
 /** A change to a set, as a notification says it. */
 export interface DataSetEvent {
     /** The set's name, not its id. */
     name: string;
     activity: DataSetActivity;
+    /** The document's file, for a document added or removed. */
+    document?: string;
     /** Who did it: a moderator's name, `its owner` or `a player`. */
     by: string;
     /** When, as `Date.now()` gives it. */
@@ -39,11 +43,11 @@ export const NOBODY: Notify = () => {};
 const TIMEOUT_MS = 10_000;
 
 /** The message `event` is. */
-export function notificationText({ name, activity, by, at }: DataSetEvent): string {
+export function notificationText({ name, activity, document, by, at }: DataSetEvent): string {
     const date = new Date(at);
     const two = (value: number) => String(value).padStart(2, '0');
     const stamp = `${date.getFullYear()}${two(date.getMonth() + 1)}${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
-    return `Dataset ${name}: ${activity}\nBy ${by} at ${stamp}`;
+    return `Dataset ${name}: ${activity}${document === undefined ? '' : ` (${document})`}\nBy ${by} at ${stamp}`;
 }
 
 /**

@@ -119,7 +119,8 @@ body.welcome {
 .pick.add .pick-picture { display: flex; align-items: center; justify-content: center; }
 .pick-plus { color: var(--p9); }
 /* A tile's controls along its picture's top edge, from its top right corner: a local
-   set's pen, which edits it, and a published set's tick, cross and eye, which moderate it. */
+   set's pen, which edits it, and a published set's book, which lists its documents, and
+   its pen, tick, cross and eye, which moderate it. */
 .pick-cell { position: relative; display: flex; }
 .pick-controls { position: absolute; top: 0; right: 0; display: flex; gap: 3px; }
 .pick-control {
@@ -274,6 +275,16 @@ body.welcome {
 /* The confirmation DELETE opens. */
 .delete-set { width: min(560px, calc(100vw - 32px)); }
 .delete-set-text { margin: 0; font-size: 18px; line-height: 1.5; }
+/* The dialog a tile's book opens (`showDocuments`): a set's documents, a link each, its
+   size, and a moderator's cross. */
+.documents-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; font-size: 18px; }
+.documents-list li { display: flex; align-items: center; gap: 12px; min-height: 36px; }
+.documents-list a { color: var(--p11); overflow-wrap: anywhere; }
+.documents-list a:hover { color: var(--p9); }
+.documents-size { margin-left: auto; font-size: 15px; color: var(--p2); white-space: nowrap; }
+.documents-none { color: var(--p2); }
+.documents-status { margin: 0; font-size: 15px; color: var(--p9); }
+.documents-status:empty { display: none; }
 .add-set-columns { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; }
 .add-set-give { display: flex; flex-direction: column; gap: 10px; }
 .add-set-field { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; }

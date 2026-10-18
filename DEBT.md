@@ -277,6 +277,14 @@ request, and has one moderator, `DEV_MODERATOR_PLAYER_ID` (`vite.config.mts`), w
 edit and refusal, and `tools/probe-frames.mjs` moderates and edits the set it publishes,
 from the tiles, as that moderator and as its owner.
 
+A published set's documents, the manuals and solutions its folder holds for its players,
+are listed by the book on its tile, which opens a dialog of links; to a moderator, on every
+published set, where it adds a file chosen on the drive and removes one
+(`server/documents.ts`, `doc/DEPLOYMENT.md` → "A set's documents"). The store lists them in
+`data_set_documents`, and each change writes the set a new folder, as an edit of its files
+does. `tools/dump-server.ts` asserts each change and refusal, and `tools/probe-frames.mjs`
+adds and removes them from the book, as the moderator, and reads them as the owner.
+
 The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase letters, digits, `.`, `-` and
 `_`, at most 40), since publishing makes it the set's folder on the server. No shipped dungeon
 names its `graphics.dat` or `CSBgraphics.dat`, nor expects a `CSBgraphics.dat`, so the
@@ -308,6 +316,9 @@ Decisions taken with the author, for every row:
   description, and rarely a `.dat`. A folder never changes once written, which the backup
   relies on, so a change of files is a new folder, `<dir>@<n>`, and the backup copies every
   set's folder. A new `dungeon.dat` reaches no save already made (P11), which the form says.
+- **Documents are files of the set's folder**, one row each of `data_set_documents`, so a
+  document belongs to one set and the backup copies it with the folder. A moderator adds
+  and removes them, on any published set; a local set has none, and the game reads none.
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
 

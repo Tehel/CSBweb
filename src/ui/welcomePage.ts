@@ -36,6 +36,14 @@
  *   pending set too, which the server refuses; never on the default set. The page then
  *   asks for the sets anew and shows them, the selection kept but for a set gone. A
  *   refusal is said in the box beside CONTINUE.
+ * - **The book** is on a published set's tile that has documents, the files its folder holds
+ *   for its players (`DataSetDocument`), and to a moderator on every published set's, first.
+ *   It opens a dialog that lists them, each a link that the browser opens in a new tab, a
+ *   PDF, a text or a picture, or downloads, a word processor's file or an archive. To a
+ *   moderator, each has a cross that removes it, once confirmed, and ADD offers to choose
+ *   a file on the drive to add (`server/documents.ts`); the list then shows the set as the
+ *   server lists it anew, and so does the page once the dialog is closed. A refusal is said
+ *   in the dialog. A local set has none.
  * - **PLAY** opens the selected set (`?dungeon=<id>`): its title, then its entrance. With
  *   no set selected it is disabled.
  * - **CONTINUE** opens the last save used (`lastUsedSave`) of the selected set, or of every
@@ -61,7 +69,7 @@ import './welcomePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
 import { folderFiles } from '../data/DataSetFiles';
 import {
-    chooserSets, DATA_SETS_ROUTE, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize, thumbnailPath,
+    chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize, thumbnailPath,
     type DataSet, type DataSetManifest, type ModerationAction,
 } from '../data/DataSets';
 import { localDataSet, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
@@ -135,16 +143,35 @@ const PAGE = `
   </footer>
 </main>`;
 
-/** The confirmation the cross opens. */
-const CONFIRM_REJECT = `
+/** A confirmation, the cross's on a tile or on a document, its ids each `<prefix>-title`, `-cancel` and `-confirm`. */
+const CONFIRMATION = (prefix: string) => `
 <form class="add-set-form">
-  <h2 class="px" id="reject-set-title"></h2>
+  <h2 class="px" id="${prefix}-title"></h2>
   <p class="delete-set-text"></p>
   <div class="add-set-buttons">
-    <button type="button" class="btn px" id="reject-set-cancel">Cancel</button>
-    <button type="button" class="btn px" id="reject-set-confirm"></button>
+    <button type="button" class="btn px" id="${prefix}-cancel">Cancel</button>
+    <button type="button" class="btn px" id="${prefix}-confirm"></button>
   </div>
 </form>`;
+
+/** The dialog the book opens: the documents, then a moderator's ADD, and CLOSE. */
+const DOCUMENTS = `
+<form class="add-set-form">
+  <h2 class="px" id="documents-title"></h2>
+  <ul class="documents-list"></ul>
+  <p class="documents-status" aria-live="polite"></p>
+  <div class="add-set-buttons">
+    <button type="button" class="btn px" id="documents-close">Close</button>
+    <button type="button" class="btn px" id="documents-add">Add</button>
+  </div>
+  <input type="file" id="documents-file" hidden>
+</form>`;
+
+/**
+ * The extensions of the documents a browser shows, which a link opens in a new tab; any
+ * other is downloaded (`DOCUMENT_EXTENSIONS`).
+ */
+const SHOWN_DOCUMENTS = ['.pdf', '.txt', '.md', '.jpg', '.jpeg', '.png', '.gif', '.webp'];
 
 /** Each action, done, as a refusal names it. */
 const DONE: Record<ModerationAction, string> = { approve: 'approved', reject: 'rejected', hide: 'hidden', show: 'shown' };
@@ -199,7 +226,8 @@ export async function showWelcomePage(
         if (record) tile.classList.add('local');
         if (set.pending) tile.classList.add('pending');
         if (set.hidden) tile.classList.add('hidden');
-        const controls = record ? [control('pick-edit', `Edit ${record.name}`, PEN, () => openForm({ record, saves }))] : moderation(set);
+        const controls = record ? [control('pick-edit', `Edit ${record.name}`, PEN, () => openForm({ record, saves }))]
+            : [...(set.documents.length > 0 || manifest.moderator ? [control('pick-documents', `Documents of ${set.name}`, BOOK, () => openDocuments(set))] : []), ...moderation(set)];
         grid.append(controls.length > 0 ? withControls(tile, controls) : tile);
         return { set, tile };
     });
@@ -225,6 +253,17 @@ export async function showWelcomePage(
                 published: (id) => void loadManifest().then((asked) => again(id, asked), () => again(id)),
             },
         );
+    }
+
+    /**
+     * The dialog the book opens on `set`'s documents; the page shown again as the server
+     * lists the sets once it is closed, where a document was added or removed, the selection kept.
+     */
+    function openDocuments(set: DataSet): void {
+        const keep = selected?.id ?? null;
+        showDocuments(set, manifest.moderator, loadManifest, (asked) => {
+            if (asked) again(keep, asked);
+        });
     }
 
     /** The controls of a published `set` the viewer may use: the pen, and the tick and the cross, or the eye. */
@@ -305,10 +344,17 @@ export async function showWelcomePage(
  * `action` sent to `api/data-sets/<id>` about the set `id`, by the player whose `playerId`
  * this is: `null` once done, else why not, as the server says it.
  */
-async function moderateDataSet(id: string, action: ModerationAction): Promise<string | null> {
-    const response = await fetch(`${DATA_SETS_ROUTE}/${encodeURIComponent(id)}`, {
-        method: 'POST', headers: { [PLAYER_ID_HEADER]: playerId(), 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
-    }).catch(() => null);
+function moderateDataSet(id: string, action: ModerationAction): Promise<string | null> {
+    return postToSet(`${DATA_SETS_ROUTE}/${encodeURIComponent(id)}`, { 'Content-Type': 'application/json' }, JSON.stringify({ action }));
+}
+
+/**
+ * `body` posted to `route`, a set's (`server/moderate.ts`, `server/documents.ts`), by the
+ * player whose `playerId` this is, with `headers`: `null` once done, else why not, as the
+ * server says it.
+ */
+async function postToSet(route: string, headers: Record<string, string>, body: string | FormData): Promise<string | null> {
+    const response = await fetch(route, { method: 'POST', headers: { [PLAYER_ID_HEADER]: playerId(), ...headers }, body }).catch(() => null);
     if (!response) return 'the server cannot be reached.';
     if (response.ok) return null;
     const answer = await response.json().catch(() => null) as { error?: unknown } | null;
@@ -346,18 +392,26 @@ async function publishedRecord(set: DataSet): Promise<EditedPublishedSet['record
  * CANCEL and REJECT, or WITHDRAW for its owner, which closes it and calls `go`.
  */
 function confirmReject(set: DataSet, withdraw: boolean, go: () => void): void {
-    const dialog = document.createElement('dialog');
-    dialog.className = 'add-set delete-set reject-set';
-    dialog.setAttribute('aria-labelledby', 'reject-set-title');
-    dialog.innerHTML = CONFIRM_REJECT;
     const verb = withdraw ? 'Withdraw' : 'Reject';
-    dialog.querySelector('#reject-set-title')!.textContent = `${verb} ${set.name}?`;
-    dialog.querySelector('.delete-set-text')!.textContent = withdraw
+    confirmation('reject-set', `${verb} ${set.name}?`, withdraw
         ? 'The site deletes the files you published. A set of yours kept in this browser stays.'
-        : 'The site deletes its files. Its owner may publish it again.';
-    const confirm = dialog.querySelector<HTMLButtonElement>('#reject-set-confirm')!;
+        : 'The site deletes its files. Its owner may publish it again.', verb, go);
+}
+
+/**
+ * A confirmation, its ids prefixed with `prefix` and its dialog of that class: `title`,
+ * `text`, and CANCEL and `verb`, which closes it and calls `go`.
+ */
+function confirmation(prefix: string, title: string, text: string, verb: string, go: () => void): void {
+    const dialog = document.createElement('dialog');
+    dialog.className = `add-set delete-set ${prefix}`;
+    dialog.setAttribute('aria-labelledby', `${prefix}-title`);
+    dialog.innerHTML = CONFIRMATION(prefix);
+    dialog.querySelector(`#${prefix}-title`)!.textContent = title;
+    dialog.querySelector('.delete-set-text')!.textContent = text;
+    const confirm = dialog.querySelector<HTMLButtonElement>(`#${prefix}-confirm`)!;
     confirm.textContent = verb;
-    dialog.querySelector('#reject-set-cancel')!.addEventListener('click', () => dialog.close());
+    dialog.querySelector(`#${prefix}-cancel`)!.addEventListener('click', () => dialog.close());
     confirm.addEventListener('click', () => {
         dialog.close();
         go();
@@ -365,6 +419,104 @@ function confirmReject(set: DataSet, withdraw: boolean, go: () => void): void {
     dialog.addEventListener('close', () => dialog.remove());
     document.body.append(dialog);
     dialog.showModal();
+}
+
+/**
+ * The dialog the book opens on `set`'s documents, each a link, with its size; to a
+ * `moderator`, a cross on each, which removes it once confirmed, and ADD, which sends the
+ * file chosen on the drive. After a change, the list is the set as `loadManifest` gives it
+ * anew, its folder a new one. `closed` is called once it is closed, with the last manifest
+ * asked for, or `null` where nothing changed.
+ */
+function showDocuments(shown: DataSet, moderator: boolean, loadManifest: () => Promise<DataSetManifest>, closed: (asked: DataSetManifest | null) => void): void {
+    let set = shown;
+    let asked: DataSetManifest | null = null;
+    const dialog = document.createElement('dialog');
+    dialog.className = 'add-set delete-set documents';
+    dialog.setAttribute('aria-labelledby', 'documents-title');
+    dialog.innerHTML = DOCUMENTS;
+    dialog.querySelector('#documents-title')!.textContent = `${set.name}: documents`;
+    const list = dialog.querySelector<HTMLElement>('.documents-list')!;
+    const status = dialog.querySelector<HTMLElement>('.documents-status')!;
+    const add = dialog.querySelector<HTMLButtonElement>('#documents-add')!;
+    const input = dialog.querySelector<HTMLInputElement>('#documents-file')!;
+    const route = `${DATA_SETS_ROUTE}/${encodeURIComponent(set.id)}/${DOCUMENTS_SEGMENT}`;
+
+    const render = () => {
+        list.replaceChildren(...set.documents.map(({ file, size }) => {
+            const item = document.createElement('li');
+            const link = document.createElement('a');
+            link.href = documentPath(set, file);
+            link.textContent = file;
+            if (SHOWN_DOCUMENTS.includes(file.slice(file.lastIndexOf('.')).toLowerCase())) {
+                link.target = '_blank';
+                link.rel = 'noopener';
+            } else {
+                link.download = file;
+            }
+            item.append(link, line('documents-size', formatSize(size)));
+            if (moderator) item.append(control('documents-remove', `Remove ${file}`, CROSS, () => confirmation('remove-document', `Remove ${file}?`,
+                'The site deletes the file. The night\'s backup keeps a copy.', 'Remove', () => void change(`Removing ${file}…`,
+                    () => postToSet(route, { 'Content-Type': 'application/json' }, JSON.stringify({ remove: file }))))));
+            return item;
+        }));
+        if (set.documents.length === 0) {
+            const none = document.createElement('li');
+            none.className = 'documents-none';
+            none.textContent = 'No document yet.';
+            list.append(none);
+        }
+    };
+
+    /** `send` done, `doing` said meanwhile, then the list as the server gives it anew; or the refusal said. */
+    const change = async (doing: string, send: () => Promise<string | null>) => {
+        status.textContent = doing;
+        for (const button of dialog.querySelectorAll<HTMLButtonElement>('.documents-remove, #documents-add')) button.disabled = true;
+        const error = await send();
+        if (error === null) {
+            try {
+                asked = await loadManifest();
+                set = asked.dataSets.find((one) => one.id === set.id) ?? set;
+                status.textContent = '';
+            } catch {
+                status.textContent = 'Done, but the site does not list the sets anew.';
+            }
+        } else {
+            status.textContent = `${doing.slice(0, -1)} failed: ${error}`;
+        }
+        render();
+        add.disabled = false;
+    };
+
+    if (!moderator) add.remove();
+    add.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        input.value = '';
+        if (!file) return;
+        if (!isDocumentName(file.name)) {
+            status.textContent = `${file.name} cannot be a document: a document's name ends in ${DOCUMENT_EXTENSIONS.join(', ')}, and starts with no '.'.`;
+            return;
+        }
+        const form = new FormData();
+        form.append('file', file);
+        void change(`Sending ${file.name}…`, () => postToSet(route, {}, form));
+    });
+    dialog.querySelector('#documents-close')!.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('close', () => {
+        dialog.remove();
+        closed(asked);
+    });
+    render();
+    document.body.append(dialog);
+    dialog.showModal();
+}
+
+/** `bytes` as a document's size: `512 B`, `40 KB`, `3.2 MB`. */
+function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /** `tile` with `controls` along its picture's top edge, from its top right corner. */
@@ -405,6 +557,21 @@ const PEN_PIXELS = [
     'tw.........',
 ];
 const PEN = pixelArt(PEN_PIXELS, { e: 'p10', m: 'p13', B: 'p11', b: 'p9', d: 'p5', w: 'p13', t: 'p1' });
+
+/** The book, which opens a set's documents. */
+const BOOK = pixelArt([
+    '...........',
+    '..cccccccc.',
+    '.dcccccccc.',
+    '.dcyyyyycc.',
+    '.dcccccccc.',
+    '.dcccccccc.',
+    '.dcccccccc.',
+    '.dcccccccc.',
+    '.dcccccccc.',
+    '.dwwwwwwww.',
+    '..dddddddd.',
+], { d: 'p3', c: 'p5', y: 'p9', w: 'p13' });
 
 /** The tick, which approves a pending set. */
 const TICK = pixelArt([

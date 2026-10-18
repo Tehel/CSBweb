@@ -50,6 +50,18 @@
  *     moderator (403, a body too large too, unread), a body too large or not a form, an id
  *     in the form, a field missing, a `remove` of no file, twice or of a file given (400), an
  *     unknown id (404), and a set the page's check refuses (422);
+ *   - `POST /api/data-sets/<id>/documents` (`server/documents.ts`): a moderator adds a document
+ *     to a set, a site's whose folder is a link and a pending player's, and removes one,
+ *     each change a new folder, `<id>@2` and on, every other file carried over, the old
+ *     folder deleted and the link's left as it was; `api/data-sets` gives everyone the
+ *     documents, listed by name, with their size, and each is served where `documentPath`
+ *     says, by its type, `nosniff`; each change notified, the file named; every refusal
+ *     answered with nothing changed: an asker who is not a moderator (403, a body too
+ *     large too, unread), a body too large (413), a form that is not one file, a name that
+ *     is not a document's or is the thumbnail's (400), a name the folder holds already, a
+ *     readme or a document (409), an unknown id, and a removal of a file that is not one of
+ *     the set's documents, one that would leave the folder included (404); and a set
+ *     rejected takes its documents with it;
  *   - `POST /api/data-sets/<id>` (`server/moderate.ts`): a moderator approves, hides and
  *     shows a set, a site's too, and rejects a pending one, its row then its folder gone,
  *     and its owner withdraws it while it is pending; and every refusal answered with
@@ -90,12 +102,13 @@ import { deflateSync } from 'node:zlib';
 import { CHECK_MODULE, checkFiles, createAppServer, fillWalls, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
 import { ANYONE, DataSetStore, manifestText, parseModerators } from '../server/dataSets.ts';
 import { RateLimit } from '../server/events.ts';
-import { NOBODY } from '../server/notify.ts';
+import { NOBODY, notificationText } from '../server/notify.ts';
+import { DOCUMENT_FIELD } from '../server/documents.ts';
 import { MAX_MODERATION_BYTES } from '../server/moderate.ts';
 import { MAX_PUBLISH_BYTES, MAX_PUBLISHED_FILE_BYTES } from '../server/publish.ts';
 import { StatsStore } from '../server/stats.ts';
 import { openStore } from '../server/store.ts';
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, documentPath, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
 import { checkLocalDataSet, localDataSet, readDungeonWalls } from '../src/data/LocalDataSets.ts';
 import { parsePublishedDungeons } from '../src/data/DungeonSignature.ts';
 import { indexedPng, indexedPngRows } from '../src/core/png.ts';
@@ -861,6 +874,145 @@ async function checkModeration(scratch: string): Promise<void> {
     }
 }
 
+/**
+ * `POST /api/data-sets/<id>/documents` (`server/documents.ts`), on a server of its own over a
+ * scratch table: the site's `dm-atari` (the default), its folder a link, as the dev server's
+ * are, and a player's pending `p1`.
+ */
+async function checkDocuments(scratch: string): Promise<void> {
+    console.log('\nA set\'s documents:');
+    const root = join(scratch, 'documents');
+    const distDir = join(root, 'dist');
+    const gamefilesDir = join(root, 'gamefiles');
+    const outside = join(root, 'outside', 'dm');
+    mkdirSync(distDir, { recursive: true });
+    writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
+    mkdirSync(outside, { recursive: true });
+    mkdirSync(gamefilesDir);
+    for (const file of ['dungeon.dat', 'dm-atari-thumbnail.png', 'readme.txt']) writeFileSync(join(outside, file), Buffer.from(file));
+    symlinkSync(outside, join(gamefilesDir, 'dm-atari'));
+    const db = new DatabaseSync(':memory:');
+    const told: string[] = [];
+    const dataSets = filledFrom(JSON.stringify({ default: 'dm-atari', dataSets: [{ id: 'dm-atari', name: 'DM' }] }), new DataSetStore(db));
+    dataSets.publish({ id: 'p1', name: 'P1', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false,
+        walls: { shapes: [[1, 1]], signature: ['0'.repeat(64)] } }, PLAYER);
+    mkdirSync(join(gamefilesDir, 'p1'));
+    writeFileSync(join(gamefilesDir, 'p1', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
+    const options: ServerOptions = { distDir, gamefilesDir };
+    checkFiles(options, dataSets);
+    const server = createAppServer(options, {
+        checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), store: new StatsStore(db),
+        notify: (event) => told.push(notificationText({ ...event, at: 0 }).split('\n')[0]!),
+        rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
+        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    const port = (server.address() as AddressInfo).port;
+
+    try {
+        const route = (id: string) => `/${DATA_SETS_ROUTE}/${encodeURIComponent(id)}/${DOCUMENTS_SEGMENT}`;
+        /** `files` posted as the form's fields, as the page's `fetch` sends a document. */
+        const add = async (id: string, files: [string, File | string][], player: string | null = MODERATORS[0]) => {
+            const form = new FormData();
+            for (const [key, value] of files) form.append(key, value);
+            const response = await fetch(`http://127.0.0.1:${port}${route(id)}`, { method: 'POST', headers: player === null ? {} : { [PLAYER_ID_HEADER]: player }, body: form });
+            return { status: response.status, body: await response.text() };
+        };
+        const addFile = (id: string, name: string, bytes = Buffer.from(`the bytes of ${name}`), player: string | null = MODERATORS[0]) =>
+            add(id, [[DOCUMENT_FIELD, new File([new Uint8Array(bytes)], name)]], player);
+        const remove = (id: string, body: string, player: string | null = MODERATORS[0]) =>
+            ask(port, route(id), 'POST', { 'Content-Type': 'application/json', ...(player === null ? {} : { [PLAYER_ID_HEADER]: player }) }, body);
+        const rowOf = (id: string) => dataSets.read().dataSets.find((set) => set.id === id)!;
+        const listing = (dir: string) => readdirSync(join(gamefilesDir, dir)).sort().join();
+        const documentsOf = (id: string) => rowOf(id).documents.map((document) => `${document.file}:${document.size}`).join();
+        /** The rows, their folders and documents, the folders on the disk and what the link leads to: compared before and after a refusal. */
+        const states = () => `${dataSets.read().dataSets.map((set) => `${set.id}@${set.dir}[${documentsOf(set.id)}]`).join()} | ${readdirSync(gamefilesDir).sort().join()} | ${readdirSync(outside).sort().join()}`;
+        const seen = async (player: string | null) => parseManifest((await ask(port, '/api/data-sets', 'GET', player === null ? {} : { [PLAYER_ID_HEADER]: player })).body, 'gamefiles')
+            .dataSets.find((set) => set.id === 'dm-atari')!;
+
+        const manual = Buffer.alloc(3000, 7);
+        const added = await addFile('dm-atari', 'Manual.pdf', manual);
+        console.log(`  Manual.pdf added: ${added.status} ${added.body}, ${states()}`);
+        check(added.status === 200 && added.body === '{"id":"dm-atari"}', 'a moderator adds a document: 200');
+        check(rowOf('dm-atari').dir === 'dm-atari@2' && listing('dm-atari@2') === 'Manual.pdf,dm-atari-thumbnail.png,dungeon.dat,readme.txt'
+            && readFileSync(join(gamefilesDir, 'dm-atari@2', 'Manual.pdf')).equals(manual),
+            'it writes the set a new folder, <id>@2, the document in it beside every file of the old one');
+        check(!existsSync(join(gamefilesDir, 'dm-atari')) && readdirSync(outside).sort().join() === 'dm-atari-thumbnail.png,dungeon.dat,readme.txt'
+            && !readdirSync(gamefilesDir).some((name) => name.startsWith('.')), 'the old folder\'s link is deleted, the folder it led to left as it was, and no .partial left');
+        const offered = await seen(null);
+        check(offered.dir === 'gamefiles/dm-atari@2' && JSON.stringify(offered.documents) === '[{"file":"Manual.pdf","size":3000}]',
+            'api/data-sets gives everyone the set\'s new folder and its document, with its size');
+        const served = await ask(port, `/${documentPath(offered, 'Manual.pdf')}`);
+        check(served.status === 200 && served.headers['content-type'] === 'application/pdf' && served.headers['x-content-type-options'] === 'nosniff',
+            `the document is served where documentPath says, as application/pdf (${served.status} ${served.headers['content-type']})`);
+        check(told.join() === 'Dataset DM: document added (Manual.pdf)', `the addition is notified, the file named (${told.join()})`);
+
+        const notes = await addFile('dm-atari', "Kid's notes (2).txt");
+        check(notes.status === 200 && rowOf('dm-atari').dir === 'dm-atari@3' && documentsOf('dm-atari') === `Kid's notes (2).txt:${"the bytes of Kid's notes (2).txt".length},Manual.pdf:3000`
+            && !existsSync(join(gamefilesDir, 'dm-atari@2')), 'a second one, its name with spaces, an apostrophe and brackets: <id>@3, the documents listed by name');
+        const encoded = await ask(port, `/${documentPath(await seen(null), "Kid's notes (2).txt")}`);
+        check(encoded.status === 200 && encoded.body === "the bytes of Kid's notes (2).txt" && String(encoded.headers['content-type']).startsWith('text/plain'),
+            'it is served by its encoded name, as text/plain');
+        check((await addFile('p1', 'Solution.doc')).status === 200 && documentsOf('p1') === `Solution.doc:${'the bytes of Solution.doc'.length}`
+            && rowOf('p1').pending && rowOf('p1').dir === 'p1@2', 'a pending player\'s set takes one too, its state kept');
+        check((await seen(PLAYER)).documents.length === 2, 'and a player is given the documents too');
+
+        const removed = await remove('dm-atari', JSON.stringify({ remove: "Kid's notes (2).txt" }));
+        console.log(`  Kid's notes removed: ${removed.status} ${removed.body}, ${states()}`);
+        check(removed.status === 200 && removed.body === '{"id":"dm-atari"}' && rowOf('dm-atari').dir === 'dm-atari@4' && documentsOf('dm-atari') === 'Manual.pdf:3000'
+            && listing('dm-atari@4') === 'Manual.pdf,dm-atari-thumbnail.png,dungeon.dat,readme.txt' && !existsSync(join(gamefilesDir, 'dm-atari@3')),
+            'a moderator removes a document: a new folder, <id>@4, without its file, the old one deleted');
+        check(told.at(-1) === "Dataset DM: document removed (Kid's notes (2).txt)", 'the removal is notified');
+
+        console.log('  refusals:');
+        const sent = told.length;
+        const refused = async (label: string, status: number, send: () => Promise<{ status: number; body: string }>, says: string) => {
+            const was = states();
+            const answer = await send();
+            console.log(`    ${label}: ${answer.status} ${answer.body}`);
+            check(answer.status === status && answer.body.includes(says) && !answer.body.includes(PLAYER) && states() === was, `${label}: ${status}, nothing changed`);
+        };
+        await refused('the set\'s owner adding one', 403, () => addFile('p1', 'mine.pdf', undefined, PLAYER), 'Only a moderator');
+        await refused('no player', 403, () => addFile('dm-atari', 'a.pdf', undefined, null), 'Only a moderator');
+        await refused('a request too large, from a player', 403, () => ask(port, route('dm-atari'), 'POST',
+            { [PLAYER_ID_HEADER]: PLAYER, 'Content-Type': 'multipart/form-data; boundary=x' }, Buffer.alloc(MAX_PUBLISH_BYTES + 1)), 'Only a moderator');
+        await refused('a player removing one', 403, () => remove('dm-atari', JSON.stringify({ remove: 'Manual.pdf' }), PLAYER), 'Only a moderator');
+        await refused('a request too large', 413, () => ask(port, route('dm-atari'), 'POST',
+            { [PLAYER_ID_HEADER]: MODERATORS[0], 'Content-Type': 'multipart/form-data; boundary=x' }, Buffer.alloc(MAX_PUBLISH_BYTES + 1)), 'request is larger');
+        await refused('a removal too large', 413, () => remove('dm-atari', ' '.repeat(MAX_MODERATION_BYTES + 1)), 'larger than');
+        await refused('a broken form', 400, () => ask(port, route('dm-atari'), 'POST',
+            { [PLAYER_ID_HEADER]: MODERATORS[0], 'Content-Type': 'multipart/form-data; boundary=x' }, '--x\r\nnonsense'), 'not a form');
+        const pdf = (name: string) => new File([new Uint8Array(4)], name);
+        await refused('two files', 400, () => add('dm-atari', [[DOCUMENT_FIELD, pdf('a.pdf')], [DOCUMENT_FIELD, pdf('b.pdf')]]), 'not one file');
+        await refused('a field beside the file', 400, () => add('dm-atari', [[DOCUMENT_FIELD, pdf('a.pdf')], ['name', 'A']]), 'not one file');
+        await refused('a text for the file', 400, () => add('dm-atari', [[DOCUMENT_FIELD, 'a.pdf']]), 'not one file');
+        await refused('no file', 400, () => add('dm-atari', [['other', pdf('a.pdf')]]), 'not one file');
+        for (const name of ['page.html', '.hidden.pdf', 'noext', `${'x'.repeat(97)}.pdf`]) {
+            await refused(`a file named ${name.length > 20 ? `${name.slice(0, 8)}… (${name.length})` : name}`, 400, () => addFile('dm-atari', name), 'A document\'s name ends in');
+        }
+        await refused('the set\'s thumbnail\'s name', 400, () => addFile('dm-atari', 'dm-atari-thumbnail.png'), 'thumbnail');
+        await refused('a file of its folder that is no document', 409, () => addFile('dm-atari', 'readme.txt'), 'holds a file of this name');
+        await refused('a document it has', 409, () => addFile('dm-atari', 'Manual.pdf'), 'holds a file of this name');
+        await refused('an id the table does not hold', 404, () => addFile('nope', 'a.pdf'), 'no set of this id');
+        await refused('a removal that is not JSON', 400, () => remove('dm-atari', 'Manual.pdf'), 'The body is not');
+        await refused('a removal with a key beside', 400, () => remove('dm-atari', JSON.stringify({ remove: 'Manual.pdf', id: 'p1' })), 'The body is not');
+        await refused('a removal of a file that is no document', 404, () => remove('dm-atari', JSON.stringify({ remove: 'readme.txt' })), 'no document of this name');
+        await refused('a removal of another set\'s document', 404, () => remove('dm-atari', JSON.stringify({ remove: 'Solution.doc' })), 'no document of this name');
+        await refused('a removal that leaves the folder', 404, () => remove('dm-atari', JSON.stringify({ remove: '../p1@2/dungeon.dat' })), 'no document of this name');
+        await refused('a removal from an unknown set', 404, () => remove('nope', JSON.stringify({ remove: 'Manual.pdf' })), 'no set of this id');
+        const get = await ask(port, route('dm-atari'), 'GET', { [PLAYER_ID_HEADER]: MODERATORS[0] });
+        check(get.status === 405 && get.headers.allow === 'POST', 'a GET of the documents is 405, POST only');
+        check(told.length === sent, 'and nothing is notified');
+
+        const rejected = await ask(port, `/${DATA_SETS_ROUTE}/p1`, 'POST', { 'Content-Type': 'application/json', [PLAYER_ID_HEADER]: MODERATORS[0] }, JSON.stringify({ action: 'reject' }));
+        const left = (db.prepare("SELECT COUNT(*) AS n FROM data_set_documents WHERE data_set = 'p1'").get() as { n: number }).n;
+        check(rejected.status === 200 && left === 0 && !existsSync(join(gamefilesDir, 'p1@2')), 'a set rejected takes its documents with it, rows and files');
+    } finally {
+        server.close();
+        db.close();
+    }
+}
+
 /** A table made before the publish's columns gains them, its rows kept, read as before. */
 function checkAddedColumns(): void {
     const db = new DatabaseSync(':memory:');
@@ -1096,6 +1248,7 @@ async function main(): Promise<void> {
         await checkTableRead(port, db, manifest);
         await checkPublish(scratch);
         await checkModeration(scratch);
+        await checkDocuments(scratch);
         checkAddedColumns();
 
         await checkEntry(scratch, options);
