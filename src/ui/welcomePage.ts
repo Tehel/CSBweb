@@ -46,6 +46,13 @@
  *   a file on the drive to add (`server/documents.ts`); the list then shows the set as the
  *   server lists it anew, and so does the page once the dialog is closed. A refusal is said
  *   in the dialog. A local set has none.
+ * - **The moderator's switch**, at the page's top right corner, is offered to a moderator
+ *   alone. Off, the page is the one a player sees (`playerView`): neither a hidden set nor
+ *   a pending one, the moderator's own pending sets included since the page is not told
+ *   who owns a set, and no control a player is not offered. The page is shown again, the
+ *   selection kept but for a set no longer listed, and the switch kept in `localStorage`
+ *   (`MODERATION_KEY`), on until it is turned off. The form a set's pen opens is the
+ *   same either way.
  * - **PLAY** opens the selected set (`?dungeon=<id>`): its title, then its entrance. With
  *   no set selected it is disabled.
  * - **CONTINUE** opens the last save used (`lastUsedSave`) of the selected set, or of every
@@ -176,6 +183,9 @@ const DOCUMENTS = `
  */
 const SHOWN_DOCUMENTS = ['.pdf', '.txt', '.md', '.jpg', '.jpeg', '.png', '.gif', '.webp'];
 
+/** Where the moderator's switch is kept: `'off'` once turned off, else on. */
+const MODERATION_KEY = 'csbweb_moderation_v1';
+
 /** Each action, done, as a refusal names it. */
 const DONE: Record<ModerationAction, string> = { approve: 'approved', reject: 'rejected', hide: 'hidden', show: 'shown' };
 
@@ -195,7 +205,10 @@ export async function showWelcomePage(
 ): Promise<void> {
     const records = await localSets.list().catch(() => [] as LocalDataSetRecord[]);
     const local = records.map((record) => ({ set: localDataSet(record), record, thumbnail: record.files.thumbnail ?? null }));
-    const allSets = [...manifest.dataSets, ...local.map(({ set }) => set)];
+    const moderating = manifest.moderator && moderationOn();
+    // The manifest the page shows: a player's, but where a moderator moderates.
+    const viewed = manifest.moderator && !moderating ? playerView(manifest) : manifest;
+    const allSets = [...viewed.dataSets, ...local.map(({ set }) => set)];
     const known = new Set(allSets.map((set) => set.id));
     const rows = (await store.list(null).catch(() => [] as SaveEntry[])).filter((row) => known.has(row.dataSet));
 
@@ -207,12 +220,12 @@ export async function showWelcomePage(
     const preview = body.querySelector<HTMLElement>('.welcome-preview')!;
 
     const thumbnails = new Map<DataSet, string | Blob | null>([
-        ...chooserSets(manifest).map((set) => [set, thumbnailPath(set)] as const),
+        ...chooserSets(viewed).map((set) => [set, thumbnailPath(set)] as const),
         ...local.map(({ set, thumbnail }) => [set, thumbnail] as const),
     ]);
     const sets = tileOrder([...thumbnails.keys()], rows);
     let selected: DataSet | null = sets.find((set) => set.id === select)
-        ?? (rows.length === 0 && manifest.defaultSet && sets.includes(manifest.defaultSet) ? manifest.defaultSet : null);
+        ?? (rows.length === 0 && viewed.defaultSet && sets.includes(viewed.defaultSet) ? viewed.defaultSet : null);
     const tiles = sets.map((set) => {
         const saves = rows.filter((row) => row.dataSet === set.id).length;
         const tile = document.createElement('button');
@@ -235,6 +248,12 @@ export async function showWelcomePage(
         return { set, tile };
     });
     grid.append(addTile(() => openForm(null)));
+    if (manifest.moderator) {
+        body.querySelector('.welcome-page')!.prepend(moderationSwitch(moderating, () => {
+            keepModeration(!moderating);
+            again(selected?.id ?? null);
+        }));
+    }
 
     /** The page shown again, `select` selected, for the manifest `shown`. */
     function again(select: string | null, shown = manifest): void {
@@ -264,14 +283,14 @@ export async function showWelcomePage(
      */
     function openDocuments(set: DataSet): void {
         const keep = selected?.id ?? null;
-        showDocuments(set, manifest.moderator, loadManifest, (asked) => {
+        showDocuments(set, viewed.moderator, loadManifest, (asked) => {
             if (asked) again(keep, asked);
         });
     }
 
     /** The controls of a published `set` the viewer may use: the pen, and the tick and the cross, or the eye. */
     function moderation(set: DataSet): HTMLElement[] {
-        const { moderator } = manifest;
+        const { moderator } = viewed;
         const pen = moderator ? [control('pick-edit', `Edit ${set.name}`, PEN, () => void editPublished(set))] : [];
         if (!set.pending) {
             return !moderator ? [] : set.hidden
@@ -341,6 +360,46 @@ export async function showWelcomePage(
         ]));
     }
     update();
+}
+
+/** Whether the moderator's switch is on: on but where it was turned off, or `localStorage` cannot be read. */
+function moderationOn(): boolean {
+    try {
+        return localStorage.getItem(MODERATION_KEY) !== 'off';
+    } catch {
+        return true;
+    }
+}
+
+/** The moderator's switch kept `on` or off, where `localStorage` keeps it. */
+function keepModeration(on: boolean): void {
+    try {
+        if (on) localStorage.removeItem(MODERATION_KEY);
+        else localStorage.setItem(MODERATION_KEY, 'off');
+    } catch {
+        // The switch then holds for this page alone.
+    }
+}
+
+/**
+ * The moderator's `manifest` as a player is answered it (`server/dataSets.ts`): without the
+ * pending sets, which the page cannot tell the moderator's own from, and not a moderator's,
+ * so without the hidden sets either (`chooserSets`).
+ */
+function playerView(manifest: DataSetManifest): DataSetManifest {
+    return { ...manifest, dataSets: manifest.dataSets.filter((set) => !set.pending), moderator: false };
+}
+
+/** The moderator's switch, `on` or off, which calls `toggle` once clicked. */
+function moderationSwitch(on: boolean, toggle: () => void): HTMLElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'welcome-moderation px px2';
+    button.setAttribute('role', 'switch');
+    button.setAttribute('aria-checked', String(on));
+    button.textContent = on ? 'Moderator on' : 'Moderator off';
+    button.addEventListener('click', toggle);
+    return button;
 }
 
 /**

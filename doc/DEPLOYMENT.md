@@ -134,7 +134,9 @@ ones to everyone, a pending one also to its owner, and every set to a moderator,
 set saying `"status": "pending"` and none naming its owner. A moderator's answer also says
 `"moderator": true`, and the welcome page then lists the hidden sets too, each tile's name
 in its set's state's colour: red pending, purple hidden, cyan a player's own, white
-otherwise. The page names its player in an `X-Player-Id` header, its kept `playerId`
+otherwise. A switch at the page's top right corner, offered to a moderator alone, turns
+that off: the page is then a player's, without the hidden sets, the pending ones or the
+moderation's controls, until it is turned on again (kept in `localStorage`). The page names its player in an `X-Player-Id` header, its kept `playerId`
 (`keptPlayerId`, `src/ui/gameEvents.ts`), and the moderators are those whose ids
 `MODERATOR_PLAYER_IDS` lists. `api/event` takes the events of any
 set in the table. Both read the table at each request, so a row added while the server

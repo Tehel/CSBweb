@@ -141,6 +141,23 @@ body.welcome {
 .pick.pending .pick-name { color: var(--p8); }
 .pick-saves { color: var(--p7); padding: 0 3px 3px; }
 
+/* The moderator's switch, at the window's top right corner, outside the page's column:
+   gold on, grey off. */
+.welcome-moderation {
+    appearance: none;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 6px 9px;
+    background: #0b0b16;
+    border: 3px solid #1d1d30;
+    color: var(--p9);
+    cursor: pointer;
+}
+.welcome-moderation[aria-checked="false"] { color: var(--p1); }
+.welcome-moderation:hover { border-color: var(--p9); }
+.welcome-moderation:focus-visible { outline: 3px solid var(--p11); outline-offset: 3px; }
+
 /* PLAY and CONTINUE, and the save CONTINUE reads, above the grid. */
 .welcome-actions {
     display: flex;
@@ -400,6 +417,8 @@ body.welcome {
 @media (max-width: 640px) {
     .welcome-page { padding: 24px 16px 0; }
     .welcome-logo { margin-bottom: 24px; }
+    /* Above the logo, which a phone's width leaves no room beside. */
+    .welcome-moderation { position: static; align-self: flex-end; margin-bottom: 12px; }
     .welcome-preview { min-width: 0; width: 100%; }
     .welcome-lead { font-size: 22px; }
     .add-set-form { padding: 16px; }

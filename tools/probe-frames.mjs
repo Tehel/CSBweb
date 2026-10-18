@@ -730,6 +730,30 @@ check(moderating[MINE] === 'pick-documents:Documents of My Edited Dungeon,pick-e
   && Object.entries(moderating).every(([set, controls]) => set === MINE
     || ((row) => controls === `pick-documents:Documents of ${row?.name},pick-edit:Edit ${row?.name},${row?.hidden ? `pick-show:Show ${row.name}` : `pick-hide:Hide ${row?.name}`}`)(manifestRows.find((row) => row.id === set))),
   'to a moderator, every set has the book and the pen, the pending set then the tick and the cross, every other set the eye, open on a set shown, shut on a hidden one');
+// The moderator's switch, at the page's top right corner, to a moderator alone: off, the
+// page is a player's, neither a hidden set nor a pending one listed, and every published
+// set the book alone; it stays off across a reload, and turned on again, the page is the
+// moderator's.
+const moderationSwitch = () => evaluate(`(b=>b&&{ checked: b.getAttribute('aria-checked'), text: b.textContent,
+  corner: (r=>Math.round(document.documentElement.clientWidth-r.right)+','+Math.round(r.top))(b.getBoundingClientRect()) })(document.querySelector('.welcome-moderation'))`);
+const switchedOn = await moderationSwitch();
+await clickOn('.welcome-moderation');
+await wait(1000);
+const switchedOff = { switch: await moderationSwitch(), controls: await controlsOf() };
+await asPlayer(MODERATOR);
+const offReloaded = { switch: await moderationSwitch(), controls: await controlsOf() };
+await clickOn('.welcome-moderation');
+await wait(1000);
+const switchedBack = { switch: await moderationSwitch(), controls: await controlsOf() };
+console.log("  the moderator's switch:", JSON.stringify({ switchedOn, off: switchedOff.switch, reloaded: offReloaded.switch, back: switchedBack.switch }));
+const asAPlayer = Object.keys(moderating).filter((set) => set !== MINE && !manifestRows.find((row) => row.id === set)?.hidden);
+const playerControls = (controls) => Object.keys(controls).join() === asAPlayer.join() && Object.entries(controls).every(([set, controls]) => set.startsWith('local:')
+  || controls === `pick-documents:Documents of ${manifestRows.find((row) => row.id === set)?.name}`);
+check(switchedOn?.checked === 'true' && switchedOn.text === 'Moderator on' && switchedOn.corner === '12,12'
+  && switchedOff.switch?.checked === 'false' && switchedOff.switch.text === 'Moderator off' && playerControls(switchedOff.controls)
+  && offReloaded.switch?.checked === 'false' && playerControls(offReloaded.controls)
+  && switchedBack.switch?.checked === 'true' && JSON.stringify(switchedBack.controls) === JSON.stringify(moderating),
+  "the moderator's switch, at the top right corner, on: off, the page is a player's, no hidden nor pending set, the book alone, kept across a reload; on again, the moderator's");
 await clickOn(`.pick[data-set="${MINE}"]`);
 await onMine('pick-approve');
 await wait(2000);
@@ -850,6 +874,7 @@ const secondPublished = await evaluate(`(async()=>{const f=new FormData(), file=
   return (await fetch('api/data-sets', { method: 'POST', headers: { 'X-Player-Id': ${JSON.stringify(owner)} }, body: f })).status;})()`);
 await asPlayer(owner);
 const ownerAgain = await controlsOf();
+const ownersSwitch = await moderationSwitch();
 const rejectDialog = () => evaluate(`(d=>d&&{ open: d.open, title: d.querySelector('h2').textContent, button: d.querySelector('#reject-set-confirm').textContent })(document.querySelector('dialog.reject-set'))`);
 await clickOn(`.pick-cell:has(.pick[data-set="${SECOND}"]) .pick-reject`);
 const askedWithdraw = await rejectDialog();
@@ -865,6 +890,7 @@ await clickOn(`.pick-cell:has(.pick[data-set="${MINE}"]) .pick-documents`);
 const ownersDocuments = await documentsDialog();
 await clickOn('#documents-close');
 console.log('  withdrawn:', JSON.stringify({ published: secondPublished, controls: ownerAgain[SECOND], asked: askedWithdraw }));
+check(ownersSwitch === null, "to a player, no moderator's switch");
 check(secondPublished === 201 && ownerAgain[SECOND] === 'pick-documents:Documents of My Second Dungeon,pick-reject:Withdraw My Second Dungeon' && ownerAgain[MINE] === BOOK_OF_MINE
   && askedWithdraw?.open === true && askedWithdraw.title === 'Withdraw My Second Dungeon?' && askedWithdraw.button === 'Withdraw'
   && keptPending.dialog === null && keptPending.tiles.includes(SECOND)
