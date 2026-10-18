@@ -658,9 +658,11 @@ const controlsOf = () => evaluate(`Object.fromEntries([...document.querySelector
 const owned = await controlsOf();
 const owner = await evaluate(`localStorage.getItem('csbweb_player_v1')`);
 console.log('  to its owner:', JSON.stringify(owned));
-check(owned[MINE] === 'pick-reject:Withdraw My Edited Dungeon' && owned[`local:${MINE}`] === 'pick-edit:Edit My Edited Dungeon'
-  && Object.entries(owned).every(([set, controls]) => set === MINE || set.startsWith('local:') || controls === ''),
-  'to its owner, the pending set has the cross alone, which withdraws it, and no other published set has a control');
+const manifestRows = JSON.parse(readFileSync(new URL('data-sets.json', import.meta.url), 'utf8')).dataSets;
+check(owned[MINE] === 'pick-documents:Documents of My Edited Dungeon,pick-reject:Withdraw My Edited Dungeon' && owned[`local:${MINE}`] === 'pick-edit:Edit My Edited Dungeon'
+  && Object.entries(owned).every(([set, controls]) => set === MINE || set.startsWith('local:')
+    || controls === `pick-documents:Documents of ${manifestRows.find((row) => row.id === set)?.name}`),
+  'to its owner, the pending set has the book and the cross, which withdraws it, every other published set the book alone, and a local set the pen');
 await clickOn('.pick-edit');
 await wait(1500);
 await inForm(`d.querySelector('.add-set-publish').click()`);
@@ -713,7 +715,6 @@ check(deleted.dialog === null && deleted.form === null && deleted.store.name ===
 // control on the approved set, withdraws a second set of theirs, published by hand: the
 // cross asks first, and CANCEL keeps it.
 const MODERATOR = '00000000-0000-4000-8000-000000000001';
-const manifestRows = JSON.parse(readFileSync(new URL('data-sets.json', import.meta.url), 'utf8')).dataSets;
 const asPlayer = async (player) => {
   await evaluate(`localStorage.setItem('csbweb_player_v1', ${JSON.stringify(player)}),1`);
   await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves&keepsettings` });
@@ -789,21 +790,26 @@ check(describedConfirm === true && newDungeonNote.startsWith('Saved games keep t
 check(afterSiteEdit.form === null && siteEdited?.dir === `${MINE}@2` && siteEdited.description === 'Edited by a moderator.'
   && afterSiteEdit.picture === `gamefiles/${MINE}@2/${MINE}-thumbnail.png` && afterSiteEdit.page.pictures.every(Boolean) && afterSiteEdit.mine.selected === 'true',
   'CONFIRM edits the set on the site: the form closes, its text changed, its files in a new folder, whose thumbnail the page shows, the set still selected');
-// The book, to a moderator (`server/documents.ts`): the set has no document yet, which its
-// dialog says, with ADD. A text chosen is added, a link that opens in a new tab, served from
+// The book, to a moderator (`server/documents.ts`): first the set's archive, which is made
+// in the page and downloaded as `<name>.zip` (`src/data/DataSetArchive.ts`); the set has no
+// document yet, which its dialog says, with ADD. A text chosen is added, a link that opens in a new tab, served from
 // the set's new folder; a name that is not a document's is refused in the dialog, nothing
 // sent; a .doc is a link that downloads. The text's cross asks first, then removes it.
 // CLOSE shows the page anew, the book on the set. Its owner, below, has the book, which
 // offers neither ADD nor a cross.
 const documentsDialog = () => evaluate(`(d=>d&&{ open: d.open, title: d.querySelector('h2').textContent,
-  items: [...d.querySelectorAll('.documents-list li')].map(li=>{const a=li.querySelector('a');
-    return a ? [a.textContent, a.getAttribute('href'), a.target || (a.hasAttribute('download') ? 'download' : ''), li.querySelector('.documents-size').textContent,
+  items: [...d.querySelectorAll('.documents-list li')].map(li=>{const a=li.querySelector('a'), pack=li.querySelector('.documents-pack');
+    return pack ? pack.textContent+'|'+li.querySelector('.documents-size').textContent : a ? [a.textContent, a.getAttribute('href'), a.target || (a.hasAttribute('download') ? 'download' : ''), li.querySelector('.documents-size').textContent,
       li.querySelector('.documents-remove')?.getAttribute('aria-label') ?? ''].join('|') : li.textContent;}),
   add: !!d.querySelector('#documents-add'), status: d.querySelector('.documents-status').textContent })(document.querySelector('dialog.documents'))`);
 const chooseDocument = (name, text) => evaluate(`(()=>{const input=document.querySelector('#documents-file'), t=new DataTransfer();
   t.items.add(new File([${JSON.stringify(text)}], ${JSON.stringify(name)})); input.files=t.files; input.dispatchEvent(new Event('change')); return 1;})()`);
 await onMine('pick-documents');
 const noDocument = await documentsDialog();
+const downloadsBefore = downloads.length;
+await clickOn('dialog.documents .documents-pack');
+await wait(2500);
+const packed = { downloaded: downloads.slice(downloadsBefore), status: (await documentsDialog())?.status };
 await chooseDocument('Notes.txt', 'Read me first.');
 await wait(2500);
 const oneDocument = await documentsDialog();
@@ -822,16 +828,18 @@ const afterRemoval = await documentsDialog();
 await clickOn('#documents-close');
 await wait(2000);
 const afterDocuments = { dialog: await documentsDialog(), mine: await mineOf() };
-console.log('  the book:', JSON.stringify({ noDocument, oneDocument, refusedDocument: refusedDocument?.status, twoDocuments, askedRemoval, afterRemoval }));
-check(noDocument?.open === true && noDocument.title === 'My Edited Dungeon: documents' && noDocument.items.join() === 'No document yet.' && noDocument.add,
-  'to a moderator, the book opens the set\'s documents, none yet, with ADD');
-check(oneDocument?.items.join() === `Notes.txt|gamefiles/${MINE}@3/Notes.txt|_blank|14 B|Remove Notes.txt` && oneDocument.status === '' && servedDocument === 'Read me first.',
+const ARCHIVE = 'My Edited Dungeon.zip|every file';
+console.log('  the book:', JSON.stringify({ noDocument, packed, oneDocument, refusedDocument: refusedDocument?.status, twoDocuments, askedRemoval, afterRemoval }));
+check(noDocument?.open === true && noDocument.title === 'My Edited Dungeon: documents' && noDocument.items.join() === `${ARCHIVE},No document yet.` && noDocument.add,
+  'to a moderator, the book opens the set\'s archive, then its documents, none yet, with ADD');
+check(packed.downloaded.join() === 'My Edited Dungeon.zip' && packed.status === '', 'the archive, clicked, is made and downloaded as <name>.zip');
+check(oneDocument?.items.join() === `${ARCHIVE},Notes.txt|gamefiles/${MINE}@3/Notes.txt|_blank|14 B|Remove Notes.txt` && oneDocument.status === '' && servedDocument === 'Read me first.',
   'a text chosen is added: a link that opens in a new tab, from the set\'s new folder, its size, and a cross');
-check(refusedDocument?.status.startsWith('page.html cannot be a document') && refusedDocument.items.length === 1, 'a file whose name is not a document\'s is refused in the dialog, nothing sent');
-check(twoDocuments?.items.join() === `Notes.txt|gamefiles/${MINE}@4/Notes.txt|_blank|14 B|Remove Notes.txt,Solution.doc|gamefiles/${MINE}@4/Solution.doc|download|11 B|Remove Solution.doc`,
+check(refusedDocument?.status.startsWith('page.html cannot be a document') && refusedDocument.items.length === 2, 'a file whose name is not a document\'s is refused in the dialog, nothing sent');
+check(twoDocuments?.items.join() === `${ARCHIVE},Notes.txt|gamefiles/${MINE}@4/Notes.txt|_blank|14 B|Remove Notes.txt,Solution.doc|gamefiles/${MINE}@4/Solution.doc|download|11 B|Remove Solution.doc`,
   'a .doc is a link that downloads, the documents listed by name');
 check(askedRemoval?.title === 'Remove Notes.txt?' && askedRemoval.button === 'Remove'
-  && afterRemoval?.items.join() === `Solution.doc|gamefiles/${MINE}@5/Solution.doc|download|11 B|Remove Solution.doc`, 'its cross asks first, then removes it');
+  && afterRemoval?.items.join() === `${ARCHIVE},Solution.doc|gamefiles/${MINE}@5/Solution.doc|download|11 B|Remove Solution.doc`, 'its cross asks first, then removes it');
 check(afterDocuments.dialog === null && afterDocuments.mine.selected === 'true' && afterDocuments.mine.controls.startsWith(BOOK_OF_MINE),
   'CLOSE shows the page anew, the set still selected, the book on its tile');
 const SECOND = `${MINE}-b`;
@@ -857,13 +865,13 @@ await clickOn(`.pick-cell:has(.pick[data-set="${MINE}"]) .pick-documents`);
 const ownersDocuments = await documentsDialog();
 await clickOn('#documents-close');
 console.log('  withdrawn:', JSON.stringify({ published: secondPublished, controls: ownerAgain[SECOND], asked: askedWithdraw }));
-check(secondPublished === 201 && ownerAgain[SECOND] === 'pick-reject:Withdraw My Second Dungeon' && ownerAgain[MINE] === BOOK_OF_MINE
+check(secondPublished === 201 && ownerAgain[SECOND] === 'pick-documents:Documents of My Second Dungeon,pick-reject:Withdraw My Second Dungeon' && ownerAgain[MINE] === BOOK_OF_MINE
   && askedWithdraw?.open === true && askedWithdraw.title === 'Withdraw My Second Dungeon?' && askedWithdraw.button === 'Withdraw'
   && keptPending.dialog === null && keptPending.tiles.includes(SECOND)
   && withdrawn.dialog === null && !withdrawn.tiles.includes(SECOND) && withdrawn.tiles.includes(MINE),
-  'its owner withdraws a pending set by its cross, which asks first, CANCEL keeping it; the approved set offers them its book alone');
-check(ownersDocuments?.items.join() === `Solution.doc|gamefiles/${MINE}@5/Solution.doc|download|11 B|` && !ownersDocuments.add,
-  'to a player, the book lists the documents, with no cross and no ADD');
+  'its owner withdraws a pending set by its cross, which asks first, CANCEL keeping it; the approved set offers them the book alone');
+check(ownersDocuments?.items.join() === `${ARCHIVE},Solution.doc|gamefiles/${MINE}@5/Solution.doc|download|11 B|` && !ownersDocuments.add,
+  'to a player, the book offers the archive and lists the documents, with no cross and no ADD');
 // A tile's name says its set's state, to a moderator (`server/dataSets.ts`), whose answer
 // the dev server's manifest stands in for here, with `"moderator": true`, kids-dungeon
 // pending and 3d2d1d, a hidden set, pending too: every set is listed, the hidden ones
@@ -926,9 +934,12 @@ check(onHeading !== chooserUp && onHeading !== entrance && (await canvasPixels()
 // EXPORT (x 170..220, y 161..174) on that save: the page's own download
 // (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`), which no Node tool can run.
 // What the file holds is `tools/dump-save-menu.ts`'s to show.
+// The welcome page's archive was downloaded before it.
+const exportedFrom = downloads.length;
 await canvasClick(195, 168, 0); await wait(1000);
-console.log('  downloads:', downloads.join(', ') || 'none');
-check(downloads.length === 1 && /^csbweb-\d{8}-\d{6}\.dat$/.test(downloads[0]),
+const exported = downloads.slice(exportedFrom);
+console.log('  downloads:', exported.join(', ') || 'none');
+check(exported.length === 1 && /^csbweb-\d{8}-\d{6}\.dat$/.test(exported[0]),
   'EXPORT in the chooser starts one download, a .dat under the save\'s name');
 // A file dropped on the page while the chooser is up: the page's own listener
 // (`bindSaveDrop`, `src/ui/saveDrop.ts`), which no Node tool can run either. The file is

@@ -219,11 +219,23 @@ name in the folder and its size, and `api/data-sets` gives each set's, by name, 
 `.png`, `.gif`, `.webp` or `.zip` (`isDocumentName`): what a browser shows or downloads,
 never HTML or SVG, which it would run as the page's own. So no game file is a document.
 
-On the welcome page, the book on a set's tile opens a dialog that lists them, each a link
-to the file in the set's folder: a PDF, a text or a picture opens in a new tab, any other
-is downloaded. The book is on every set with documents, and to a moderator on every
-published set, where the dialog adds a document by ADD, a file chosen on the drive, and
-removes one by its cross, once confirmed. Each is a `POST` to
+On the welcome page, the book is on every published set's tile. It opens a dialog that
+offers first the set's files as one zip, `<name>.zip`, then lists its documents, each a
+link to the file in the set's folder: a PDF, a text or a picture opens in a new tab, any
+other is downloaded. To a moderator, the dialog adds a document by ADD, a file chosen on
+the drive, and removes one by its cross, once confirmed.
+
+**The archive** is made in the page, from the files the server serves under `gamefiles/`,
+one by one: the server builds nothing, and lists no folder (`src/data/DataSetArchive.ts`,
+`src/core/zip.ts`). It holds what the set says its folder holds, its `dungeon.dat` and
+`graphics.dat`, the `CSBgraphics.dat`, `mini.dat` and Hint Oracle its flags name, its
+thumbnail and its documents, stored uncompressed in one folder of the set's name, each
+dated by its `Last-Modified`: a folder CSBWin plays as its `directory=`, so that a set
+published here can be played elsewhere. A file of the folder the set does not name is left
+out: a readme that is no document, and the port's own files (CSB's `utility-portraits.dat`).
+A file the set is not whole without that does not load leaves no archive, which the dialog
+says. `tools/dump-data-set-archive.ts` checks the zip with a reader of its own and with
+`unzip`, over every set of the repository's manifest. Each is a `POST` to
 `api/data-sets/<id>/documents` (`server/documents.ts`), named in `X-Player-Id`: a
 `multipart/form-data` body of one file, `file`, added under its own name, or a JSON body
 `{"remove": "<file>"}`. Any set of the table takes them, pending or approved, the site's
@@ -238,8 +250,8 @@ name the folder holds already, a readme or a document, or another change of the 
 wrote its folder first, with 409, each with nothing changed. Each change is logged, `'<id>'
 given the document '<file>', its files now in <dir>`, and notified.
 
-A file already in a set's folder, a readme uploaded with it, is made a document by its row
-alone, written by hand as the site's sets are (below). A file copied into a folder by hand
+A file already in a set's folder, a readme uploaded with it, is made a document, and so goes
+in its archive, by its row alone, written by hand as the site's sets are (below). A file copied into a folder by hand
 reaches no backup, which copies each folder once; ADD writes a new folder, which it copies.
 
 A rejected set's folder was copied by the night's backup if it was published before it

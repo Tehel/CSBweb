@@ -36,10 +36,12 @@
  *   pending set too, which the server refuses; never on the default set. The page then
  *   asks for the sets anew and shows them, the selection kept but for a set gone. A
  *   refusal is said in the box beside CONTINUE.
- * - **The book** is on a published set's tile that has documents, the files its folder holds
- *   for its players (`DataSetDocument`), and to a moderator on every published set's, first.
- *   It opens a dialog that lists them, each a link that the browser opens in a new tab, a
- *   PDF, a text or a picture, or downloads, a word processor's file or an archive. To a
+ * - **The book** is on every published set's tile, first. It opens a dialog that offers the
+ *   set's files as one zip, `<name>.zip`, made in the page from the files the server serves
+ *   (`src/data/DataSetArchive.ts`), so that the set can be played in CSBWin; then its
+ *   documents, the files its folder holds for its players (`DataSetDocument`), each a link
+ *   that the browser opens in a new tab, a PDF, a text or a picture, or downloads, a word
+ *   processor's file or an archive. To a
  *   moderator, each has a cross that removes it, once confirmed, and ADD offers to choose
  *   a file on the drive to add (`server/documents.ts`); the list then shows the set as the
  *   server lists it anew, and so does the page once the dialog is closed. A refusal is said
@@ -67,6 +69,7 @@
  */
 import './welcomePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
+import { archiveName, dataSetArchive, type ReadArchiveFile } from '../data/DataSetArchive';
 import { folderFiles } from '../data/DataSetFiles';
 import {
     chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize, thumbnailPath,
@@ -227,7 +230,7 @@ export async function showWelcomePage(
         if (set.pending) tile.classList.add('pending');
         if (set.hidden) tile.classList.add('hidden');
         const controls = record ? [control('pick-edit', `Edit ${record.name}`, PEN, () => openForm({ record, saves }))]
-            : [...(set.documents.length > 0 || manifest.moderator ? [control('pick-documents', `Documents of ${set.name}`, BOOK, () => openDocuments(set))] : []), ...moderation(set)];
+            : [control('pick-documents', `Documents of ${set.name}`, BOOK, () => openDocuments(set)), ...moderation(set)];
         grid.append(controls.length > 0 ? withControls(tile, controls) : tile);
         return { set, tile };
     });
@@ -422,7 +425,8 @@ function confirmation(prefix: string, title: string, text: string, verb: string,
 }
 
 /**
- * The dialog the book opens on `set`'s documents, each a link, with its size; to a
+ * The dialog the book opens on `set`'s files: first its archive, `<name>.zip`, which is
+ * made and downloaded once clicked, then its documents, each a link, with its size; to a
  * `moderator`, a cross on each, which removes it once confirmed, and ADD, which sends the
  * file chosen on the drive. After a change, the list is the set as `loadManifest` gives it
  * anew, its folder a new one. `closed` is called once it is closed, with the last manifest
@@ -443,7 +447,26 @@ function showDocuments(shown: DataSet, moderator: boolean, loadManifest: () => P
     const route = `${DATA_SETS_ROUTE}/${encodeURIComponent(set.id)}/${DOCUMENTS_SEGMENT}`;
 
     const render = () => {
-        list.replaceChildren(...set.documents.map(({ file, size }) => {
+        const archive = document.createElement('li');
+        archive.className = 'documents-archive';
+        const name = `${archiveName(set)}.zip`;
+        const pack = document.createElement('button');
+        pack.type = 'button';
+        pack.className = 'documents-pack';
+        pack.textContent = name;
+        pack.addEventListener('click', () => void (async () => {
+            status.textContent = `Packing ${name}…`;
+            pack.disabled = true;
+            try {
+                downloadFile(name, await dataSetArchive(set, servedFile(set)));
+                status.textContent = '';
+            } catch (error) {
+                status.textContent = `${name} could not be made: ${error instanceof Error ? error.message : String(error)}`;
+            }
+            pack.disabled = false;
+        })());
+        archive.append(pack, line('documents-size', 'every file'));
+        list.replaceChildren(archive, ...set.documents.map(({ file, size }) => {
             const item = document.createElement('li');
             const link = document.createElement('a');
             link.href = documentPath(set, file);
@@ -460,7 +483,7 @@ function showDocuments(shown: DataSet, moderator: boolean, loadManifest: () => P
                     () => postToSet(route, { 'Content-Type': 'application/json' }, JSON.stringify({ remove: file }))))));
             return item;
         }));
-        if (set.documents.length === 0) {
+        if (set.documents.length === 0 && moderator) {
             const none = document.createElement('li');
             none.className = 'documents-none';
             none.textContent = 'No document yet.';
@@ -510,6 +533,26 @@ function showDocuments(shown: DataSet, moderator: boolean, loadManifest: () => P
     render();
     document.body.append(dialog);
     dialog.showModal();
+}
+
+/** The files of the published `set`'s folder as the server serves them, each with its date, its `Last-Modified`, or now. */
+function servedFile(set: DataSet): ReadArchiveFile {
+    return async (file) => {
+        const response = await fetch(documentPath(set, file)).catch(() => null);
+        if (!response?.ok) return null;
+        const modified = new Date(response.headers.get('Last-Modified') ?? Date.now());
+        return { bytes: new Uint8Array(await response.arrayBuffer()), modified: Number.isNaN(modified.getTime()) ? new Date() : modified };
+    };
+}
+
+/** `bytes` downloaded as the browser does its downloads, under `name`: a link to them, clicked (`downloadSaveFile`). */
+function downloadFile(name: string, bytes: Uint8Array<ArrayBuffer>): void {
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /** `bytes` as a document's size: `512 B`, `40 KB`, `3.2 MB`. */

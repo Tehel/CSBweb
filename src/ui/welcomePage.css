@@ -275,12 +275,16 @@ body.welcome {
 /* The confirmation DELETE opens. */
 .delete-set { width: min(560px, calc(100vw - 32px)); }
 .delete-set-text { margin: 0; font-size: 18px; line-height: 1.5; }
-/* The dialog a tile's book opens (`showDocuments`): a set's documents, a link each, its
-   size, and a moderator's cross. */
+/* The dialog a tile's book opens (`showDocuments`): a set's archive, then its documents, a
+   link each, its size, and a moderator's cross. */
 .documents-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; font-size: 18px; }
 .documents-list li { display: flex; align-items: center; gap: 12px; min-height: 36px; }
 .documents-list a { color: var(--p11); overflow-wrap: anywhere; }
 .documents-list a:hover { color: var(--p9); }
+/* The set's archive, first: a button that reads as a link. */
+.documents-pack { appearance: none; padding: 0; background: none; border: 0; font: inherit; color: var(--p11); text-decoration: underline; cursor: pointer; text-align: left; overflow-wrap: anywhere; }
+.documents-pack:hover { color: var(--p9); }
+.documents-pack:disabled { color: var(--p1); cursor: default; }
 .documents-size { margin-left: auto; font-size: 15px; color: var(--p2); white-space: nowrap; }
 .documents-none { color: var(--p2); }
 .documents-status { margin: 0; font-size: 15px; color: var(--p9); }
