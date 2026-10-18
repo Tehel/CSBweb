@@ -118,9 +118,9 @@ body.welcome {
 /* "+ Add my own", the grid's last tile, which opens the form that adds a set. */
 .pick.add .pick-picture { display: flex; align-items: center; justify-content: center; }
 .pick-plus { color: var(--p9); }
-/* A tile's controls along its picture's top edge, from its top right corner: a local
-   set's pen, which edits it, and a published set's book, which lists its documents, and
-   its pen, tick, cross and eye, which moderate it. */
+/* A tile's controls along its picture's top edge, from its top right corner: every set's
+   triangle, which plays it, then a local set's pen, which edits it, and a published set's
+   book, which lists its documents, and its pen, tick, cross and eye, which moderate it. */
 .pick-cell { position: relative; display: flex; }
 .pick-controls { position: absolute; top: 0; right: 0; display: flex; gap: 3px; }
 .pick-control {

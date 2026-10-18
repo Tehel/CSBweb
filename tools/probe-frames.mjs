@@ -652,10 +652,21 @@ check(await form() === null && tilesOf(afterPublish).includes(`${MINE}!`) && til
   && afterPublish.pictures.every(Boolean) && publishedRecord.name === 'My Edited Dungeon' && publishedRecord.saves === edited.saves,
   'PUBLISH sends the set: the form closes, the page shows it pending and selected, its thumbnail from its folder, beside the local set, which stays with its saves');
 // A tile's controls (`src/ui/welcomePage.ts`): what each set's tile offers this viewer,
-// each control's class and label, by set.
+// each control's class and label, by set, but the triangle, which every tile has first: a
+// link to the set as PLAY's, its save none, labelled with its name. The triangles are
+// checked once, here; the "+ Add my own" tile has none.
 const controlsOf = () => evaluate(`Object.fromEntries([...document.querySelectorAll('.pick[data-set]')].map(t=>[t.dataset.set,
-  [...(t.closest('.pick-cell')?.querySelectorAll('.pick-control')??[])].map(b=>b.className.replace('pick-control ','')+':'+b.getAttribute('aria-label')).join()]))`);
+  [...(t.closest('.pick-cell')?.querySelectorAll('.pick-control:not(.pick-play)')??[])].map(b=>b.className.replace('pick-control ','')+':'+b.getAttribute('aria-label')).join()]))`);
+const triangles = await evaluate(`(()=>{const query=(id)=>{const p=new URLSearchParams(location.search); p.set('dungeon', id); p.delete('save'); return '?'+p;};
+  const picks=[...document.querySelectorAll('.pick[data-set]')];
+  return { tiles: picks.length, wrong: picks.filter(t=>{const a=t.closest('.pick-cell')?.querySelector('.pick-control');
+      return !(a && a.tagName === 'A' && a.classList.contains('pick-play') && a.getAttribute('href') === query(t.dataset.set)
+        && a.getAttribute('aria-label') === 'Play '+t.querySelector('.pick-name').textContent);}).map(t=>t.dataset.set),
+    add: !!document.querySelector('.pick.add').closest('.pick-cell') };})()`);
 const owned = await controlsOf();
+console.log('  triangles:', JSON.stringify(triangles));
+check(triangles.tiles > 2 && triangles.wrong.length === 0 && !triangles.add,
+  'every tile, a local set\'s too, has the triangle first, a link to its set without a save, labelled with its name; "+ Add my own" has none');
 const owner = await evaluate(`localStorage.getItem('csbweb_player_v1')`);
 console.log('  to its owner:', JSON.stringify(owned));
 const manifestRows = JSON.parse(readFileSync(new URL('data-sets.json', import.meta.url), 'utf8')).dataSets;

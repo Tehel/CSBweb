@@ -20,6 +20,9 @@
  *   which awaits a moderator (to its owner and the moderators, the only ones it is
  *   offered), purple for a hidden one (to a moderator, the only one it is listed for), and
  *   white otherwise. Red wins over purple.
+ * - **The triangle** is on every tile, first among the controls along its picture's top
+ *   edge. It is a link that opens the set as PLAY does, without selecting it: its title,
+ *   then its entrance, and never a save, which only CONTINUE opens.
  * - **A local set's tile** has **the pen** on its picture, at its top right corner, which
  *   opens the same form on its record, to edit or delete it. The page then shows the set
  *   edited, selected, or none, for a set deleted.
@@ -36,7 +39,7 @@
  *   pending set too, which the server refuses; never on the default set. The page then
  *   asks for the sets anew and shows them, the selection kept but for a set gone. A
  *   refusal is said in the box beside CONTINUE.
- * - **The book** is on every published set's tile, first. It opens a dialog that offers the
+ * - **The book** is on every published set's tile, after the triangle. It opens a dialog that offers the
  *   set's files as one zip, `<name>.zip`, made in the page from the files the server serves
  *   (`src/data/DataSetArchive.ts`), so that the set can be played in CSBWin; then its
  *   documents, the files its folder holds for its players (`DataSetDocument`), each a link
@@ -244,7 +247,7 @@ export async function showWelcomePage(
         if (set.hidden) tile.classList.add('hidden');
         const controls = record ? [control('pick-edit', `Edit ${record.name}`, PEN, () => openForm({ record, saves }))]
             : [control('pick-documents', `Documents of ${set.name}`, BOOK, () => openDocuments(set)), ...moderation(set)];
-        grid.append(controls.length > 0 ? withControls(tile, controls) : tile);
+        grid.append(withControls(tile, [playControl(set), ...controls]));
         return { set, tile };
     });
     grid.append(addTile(() => openForm(null)));
@@ -644,6 +647,17 @@ function control(className: string, label: string, svg: string, click: () => voi
     return button;
 }
 
+/** The triangle on `set`'s tile: a link to the set, as PLAY's (`pageQuery`), its save none. */
+function playControl(set: DataSet): HTMLElement {
+    const anchor = document.createElement('a');
+    anchor.className = 'pick-control pick-play';
+    anchor.href = pageQuery(set.id, null);
+    anchor.title = `Play ${set.name}`;
+    anchor.setAttribute('aria-label', anchor.title);
+    anchor.innerHTML = PLAY;
+    return anchor;
+}
+
 /** The pen's pixels, 11 by 11, in the page's palette (`welcomePage.css`). */
 const PEN_PIXELS = [
     '.........ee',
@@ -659,6 +673,21 @@ const PEN_PIXELS = [
     'tw.........',
 ];
 const PEN = pixelArt(PEN_PIXELS, { e: 'p10', m: 'p13', B: 'p11', b: 'p9', d: 'p5', w: 'p13', t: 'p1' });
+
+/** The triangle, which plays a set. */
+const PLAY = pixelArt([
+    '...y.......',
+    '...yy......',
+    '...yyy.....',
+    '...yyyy....',
+    '...yyyyy...',
+    '...yyyyyy..',
+    '...yyyyy...',
+    '...yyyy....',
+    '...yyy.....',
+    '...yy......',
+    '...y.......',
+], { y: 'p9' });
 
 /** The book, which opens a set's documents. */
 const BOOK = pixelArt([
