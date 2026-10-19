@@ -25,6 +25,17 @@ services:
       - ./gamefiles:/data/gamefiles
       - ./stats:/data/stats
       - ./files:/data/files:ro
+    # On a VPS other projects share: what the container may take, and what it may do.
+    # The server writes only to the mounted /data/gamefiles and /data/stats, so the rest is
+    # read-only; it needs no capability, its port being above 1024 and its folders its
+    # uid's; and nothing in it gains a privilege. `tools/check-image.sh` runs the image so.
+    mem_limit: 512m
+    pids_limit: 100
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     # The server lets the requests in flight finish for 5 s, then closes the store.
     stop_grace_period: 10s

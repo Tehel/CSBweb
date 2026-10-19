@@ -125,7 +125,6 @@ In payoff order: the first row is the next item.
 | R16 | A save's DELETE is told done before its transaction commits | S | ⏳ |
 | W4 | The events table grows without bound | S | ⏳ |
 | W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
-| W7 | The container, the deploy and the Node version | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | R12 | Listing the saves reads every save's bytes | M | ⏳ |
@@ -570,7 +569,8 @@ open internet behind the VPS's nginx. Its weak point is availability: what an an
 client can make it hold, compute or keep. What holds already: paths (`..`, `%2e%2e`,
 `%00`, dotfiles all refused), the body's size limit, events rebuilt from checked fields
 only, a champion's name of the game's characters, a POST from another site's page
-refused, a content security policy and `nosniff` on every answer, errors that leak nothing. Each item ships with its check in `tools/dump-server.ts`
+refused, a content security policy and `nosniff` on every answer, errors that leak nothing, and a
+container held to a memory, process and privilege budget, read-only but for its data. Each item ships with its check in `tools/dump-server.ts`
 or `tools/dump-stats.ts`.
 
 ### W2 ⏳ `api/stats` is computed whole at every request
@@ -609,25 +609,6 @@ Paying it: `access_log off` (or a format without the address) for `location =
 /api/event`, in `doc/DEPLOYMENT.md` and on the VPS (the author's); the time stored to the
 minute or coarser; a retention period; the FAQ saying "pseudonymous", and how to reset the
 id.
-
-### W7 ⏳ The container, the deploy and the Node version
-
-- `docker-compose.yaml` sets no `mem_limit`, `pids_limit`, `read_only`, `cap_drop` or
-  `no-new-privileges`, on a VPS shared with other projects (W2 can push the process to
-  hundreds of MB).
-- `utils/deploy.sh` builds and ships a working tree that differs from its commit, only
-  tagging the build `-dirty` (`:28-32`), and runs no check.
-- One Node version is not settled: the image is `node:24-alpine`, a floating tag
-  (`Dockerfile:13`, `:22`); `package.json` has no `engines` and `@types/node` `^22`; there
-  is no `.nvmrc`; `doc/DEPLOYMENT.md` says 22.18 or later; `CLAUDE.md` and
-  `tools/check-frames.sh:117-121` keep a Node 20 workaround, though `npm test` cannot pass
-  on Node 20 (`dump-server` runs `node server/server.ts`, type stripping from 22.18, and
-  `backup.ts` needs `node:sqlite`'s `backup`). The server is tested on Node 22 and runs on
-  24.
-
-Paying it: the limits in the compose file; `deploy.sh` refusing a dirty tree unless forced;
-one Node version (`engines`, `.nvmrc`, `@types/node`, the image pinned to a digest), the
-Node 20 notes gone.
 
 ---
 

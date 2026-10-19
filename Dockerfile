@@ -12,7 +12,12 @@
 # CSBWEB_PROBE=1 builds the page with the probes' handle, for the golden frames
 # (`tools/check-frames.sh --url`), and is never deployed.
 
-FROM node:24-alpine AS build
+# One Node, the project's (`.nvmrc`, `package.json`'s `engines` and `@types/node`): 24, its
+# image pinned by the digest of its multi-platform index, so that a rebuild takes the same
+# bytes. Moving it on (`doc/DEPLOYMENT.md`) moves those three with it.
+ARG NODE_IMAGE=node:24.22.0-alpine3.24@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+
+FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -21,7 +26,7 @@ ARG CSBWEB_BUILD=unknown
 ARG CSBWEB_PROBE=
 RUN CSBWEB_BUILD="$CSBWEB_BUILD" CSBWEB_PROBE="$CSBWEB_PROBE" npm run build
 
-FROM node:24-alpine
+FROM ${NODE_IMAGE}
 WORKDIR /app
 # No node_modules: the server has no dependency. `package.json` is there for its
 # `"type": "module"`, and `DataSets.ts` is the page's, whose routes and limits the server

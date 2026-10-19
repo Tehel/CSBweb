@@ -36,7 +36,10 @@ docker build -q --build-arg CSBWEB_BUILD=check --build-arg CSBWEB_PROBE=1 -t csb
 # The moderator is the dev server's own (`DEV_MODERATOR_PLAYER_ID`, `vite.config.mts`),
 # whom `probe-frames.mjs` plays to moderate the set it publishes.
 (cd "$root" && npx tsx tools/fill-data-sets.ts "$stats/stats.db") || exit 1
+# With the limits `docker-compose.yaml` sets, so that the frames, and the probe's publish,
+# run as the deployed container does.
 docker run -d --name "$name" -p "127.0.0.1:$port:8085" \
+  --memory 512m --pids-limit 100 --read-only --cap-drop ALL --security-opt no-new-privileges:true \
   -v "$gamefiles:/data/gamefiles" "${mounts[@]}" -v "$stats:/data/stats" \
   -e MODERATOR_PLAYER_IDS=00000000-0000-4000-8000-000000000001 csbweb:probe >/dev/null || exit 1
 i=0

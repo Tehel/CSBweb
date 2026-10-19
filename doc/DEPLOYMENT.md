@@ -11,7 +11,7 @@ the game files and the statistics' API (`doc/STATISTICS.md`). There are no login
 files are mounted from the host, never part of the image.
 
 The setup follows the author's other projects on the same VPS (`linkedin-games/player`
-above all): a two-stage `node:24-alpine` image with no `node_modules`, a loopback-only port
+above all): a two-stage Node 24 Alpine image with no `node_modules`, a loopback-only port
 behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 
 ## What runs where
@@ -443,7 +443,7 @@ it is, stripping the types, so it uses only erasable syntax, marks its type-only
 and names its imports with `.ts`. `server/tsconfig.json` holds it to that, and `npm test`
 runs `tsc` on it beside the root project. The package is an ES module
 (`"type": "module"`), so that Node runs `server.ts` and the page's `DataSets.ts`, whose
-routes and limits the server imports from `../src/data/`. `npm start` runs it locally, on Node 22.18 or later.
+routes and limits the server imports from `../src/data/`. `npm start` runs it locally, on the project's Node (below).
 
 It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
 `static/gamefiles/`), `FILES_DIR` (the checkout's `files/`, which git ignores), and `STATS_DB` (the
@@ -504,7 +504,8 @@ the file, and exits with 0. It logs to stdout. `tools/dump-server.ts` asserts al
 
 ## The image and the stack
 
-`Dockerfile`, two stages on `node:24-alpine`:
+`Dockerfile`, two stages on `NODE_IMAGE`, `node:24.22.0-alpine3.24` pinned by the digest
+of its multi-platform index, so that a rebuild takes the same bytes:
 
 - **The build stage** runs `npm ci && npm run build`, `tsc` included. Its context is an
   allowlist (`.dockerignore`): the page's sources, `server/`, the tools' `.ts` that `tsc`
@@ -519,6 +520,13 @@ the file, and exits with 0. It logs to stdout. `tools/dump-server.ts` asserts al
 `npm test` needs the game files, so it is the gate before a commit, not part of the image's
 build.
 
+**One Node, 24** (the current LTS), everywhere: the image's, `.nvmrc`'s, `package.json`'s
+`engines` (`^24`) and `@types/node`'s (`^24`). `npm test` runs on it: `dump-server` runs
+`server.ts` as Node does, types stripped, and `backup.ts` uses `node:sqlite`'s `backup`.
+Moving it on moves all four at once. The digest is the index's, which
+`docker buildx imagetools inspect node:<version>-alpine<release>` prints as `Digest:`;
+`.nvmrc` names the major, which `nvm use` picks in the checkout.
+
 `docker-compose.yaml` runs `csbweb:latest` as the container `csbweb`:
 
 - **`127.0.0.1:${CSBWEB_PORT:-8085}:8085`, loopback only.** A port published on `0.0.0.0`
@@ -530,6 +538,11 @@ build.
   publishes is written under `gamefiles/`, as its row is in the store, so both folders must
   belong to uid 1000 on the host, as the login user's do. `tools/check-image.sh` mounts each
   of the checkout's game folders read-only in a throwaway one, where the probe's publish writes.
+- **Limits**, on a VPS other projects share: `mem_limit: 512m` and `pids_limit: 100`, what
+  it may take; `read_only: true`, the server writing only to the two mounted folders;
+  `cap_drop: [ALL]`, as it needs no capability (its port is above 1024, its folders its
+  uid's); and `no-new-privileges`. Compose v1 takes them under `version: '3.8'`.
+  `tools/check-image.sh` runs the image with the same, the probe's publish included.
 - `restart: unless-stopped`, a 10 s `stop_grace_period`, a healthcheck on `api/health`
   (busybox's `wget`), and `json-file` logs rotated at 3 × 10 MB.
 - `version: '3.8'`, for the VPS's Compose v1.
@@ -563,13 +576,17 @@ the file, and quoted in the remote command anyway.
 ## Deploying
 
 ```bash
-npm test                       # the gate
+npm test                       # the gate, before the commit
 bash tools/check-image.sh      # optional: the golden frames against the image (Docker, Chrome)
 npm run deploy                 # utils/deploy.sh
 ```
 
-`utils/deploy.sh` builds `csbweb:latest`, with the commit as `CSBWEB_BUILD` (`-dirty` when
-tracked files differ from it), `docker save | gzip`s it, makes `stats/` over SSH as the
+`utils/deploy.sh` deploys a commit: it refuses a working tree that differs from it in what
+the image is built from, the build context (`.dockerignore`'s allowlist, untracked files
+included), the `Dockerfile` or the compose file, and says what differs. A commit has passed
+`npm test`, so a clean tree is a checked one; `NOTES.md` or a document changed beside it
+does not stop a deploy. `npm run deploy -- --dirty` deploys such a tree anyway. It builds
+`csbweb:latest`, with the commit as `CSBWEB_BUILD` (`-dirty` under `--dirty`), `docker save | gzip`s it, makes `stats/` over SSH as the
 login user (so that uid 1000 can write it), `scp`s the image and `docker-compose.yaml` into
 `DEPLOY_DIR`, then loads the image and runs `docker-compose down && docker-compose up -d`.
 

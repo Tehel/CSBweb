@@ -69,6 +69,8 @@ keeps what it has, and nothing new goes in.
 ## Tech stack
 
 Vanilla TypeScript (strict, `noUnusedLocals`/`noUnusedParameters`) + Vite. No framework.
+One Node, 24, everywhere: `.nvmrc`, `engines`, `@types/node` and the image's, pinned
+(`doc/DEPLOYMENT.md` → "The image and the stack").
 A single 320×200 `<canvas>` is the whole screen, CSS-scaled to 960×600 with
 `image-rendering: pixelated`. Everything — viewport, inventory, panels, cursor, messages —
 is blitted into one palette-index buffer and converted to RGBA at present time, as CSBWin
@@ -82,8 +84,8 @@ npm run build          # tsc && vite build, and the server's module (--ssr)
 npm test               # the gate: tsc + every asserting tool  (~75s, a worker per core)
 npm test -- --only=dsa,save  # tsc + the tools whose name holds any of these
 npm test -- --frames   # …and the golden frames               (~40s more)
-npm start              # the deployed server, server/, over dist/  (Node >= 22.18)
-bash tools/check-image.sh  # the golden frames against the Docker image (Docker, ~2 min)
+npm start              # the deployed server, server/, over dist/
+bash tools/check-image.sh  # the golden frames against the Docker image (Docker, ~4 min)
 ```
 
 **Build hygiene (non-negotiable):** `npm test` must pass before any commit. It runs
@@ -97,8 +99,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
 
 - `tools/check-frames.sh` compares thirty live screen states against `tools/frames/` — the
   cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
-  server and headless Chrome, so it needs no setup (on Node 20 it turns on
-  `--experimental-websocket` itself; `probe-ui.mjs` needs that flag, or Node 22). It is
+  server and headless Chrome, so it needs no setup. It is
   out of the default run only because it costs a browser and ~40s. Run it before any renderer or UI commit. A frame is
   the 320x200 screen as CSBWin draws it, its palette slots and the palettes they were shown
   through (`tools/lib/frames.mjs`), not the canvas's colours: a slot drawn for another of

@@ -97,10 +97,6 @@ if (!(await up(CDP, '/json/version'))) {
 // --- CDP ---------------------------------------------------------------------
 const page = (await (await fetch(`http://127.0.0.1:${CDP}/json/list`)).json()).find((t) => t.type === 'page');
 if (!page) throw new Error('no page target; try --stop and run again');
-if (typeof WebSocket === 'undefined') {
-  console.error('probe-ui needs the global WebSocket: Node 22+, or NODE_OPTIONS=--experimental-websocket on Node 20-21');
-  process.exit(1);
-}
 const ws = new WebSocket(page.webSocketDebuggerUrl);
 let id = 0;
 const pending = new Map();
