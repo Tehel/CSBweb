@@ -333,7 +333,10 @@ older entry saying doors sound wrong — that entry is stale.)
 `graphics.dat` CSBWin's DM package ships (`dm-windows/`, md5
 `0b5e042f2c7f2752bac78292cc6bb07e`) with the compressed bytes of three items, 5, 232 and
 `0x22e`, taken from the English Atari ST 1.2 disk's (`dm-atari-1.2/`, md5
-`9ce2eaf7a9e78620e3f17594437caffa`), both size tables following. Each donated item
+`9ce2eaf7a9e78620e3f17594437caffa`), both size tables following. CSBWin's file is the
+first 1.0 disk's (8 December 1987) with its credits corrupted, and the second 1.0 disk
+(11 December) already has 1.2's items 232 and `0x22e`
+(`doc/ATARI_ST_DISK_REFERENCE.md` → "What each version changes", "CSBWin's files"). Each donated item
 differs from CSBWin's only where said below, and every other item is CSBWin's byte for
 byte. `tools/dump-dm-atari-graphics.ts` proves all of it and rebuilds the file
 (`--write`). `graphics.dat` carries no checksum, and CSBWin's graphics signature, an MD5 of
@@ -346,6 +349,8 @@ the port writes none (`src/data/CsbwinExtendedFeatures.ts`).
 opcodes, `0xA` in CSBWin's and `0xB` in 1.2's, and CSBWin's stream draws four lines of the
 text wrong from "Dennis Walker" down, then stops four pixels short of the picture; 1.2's
 fills it exactly (`tools/dump-image-codec.ts`). Golden frame `08-credits` shows 1.2's.
+Every original disk's item 5 is 1.2's, the 8 December one included: the corruption came
+with a copy.
 
 **Item `0x22e`, `Byte4100[55]`: Crack Switch (In) placement.** Each wall ornament is drawn
 through one of eight coordinate sets (`d.wallDecorationPosition[8][13]`), chosen per global
@@ -368,8 +373,9 @@ opens the grid at (13,28)) second. A wall shows its last actuator's ornament
 (`doc/CSBwin-src/Codea59a.cpp:136-139`), so 50 is shown until the click; local action 1
 is `RotateActuatorList` (`doc/CSBwin-src/Mouse.cpp:250-253`,
 `doc/CSBwin-src/Code11f52.cpp:3500`), which moves #601 last, so 55 is shown after it. With
-CSBWin's file the pressed crack jumps to eye level; with 1.2's, as on the Atari ST the
-author played, it stays where the Out crack was. The port reads the table as it stands,
+CSBWin's file the pressed crack jumps to eye level, as on the first 1.0 disk; with 1.2's,
+as on every disk from the second 1.0 on and the Atari ST the author played, it stays where
+the Out crack was. The port reads the table as it stands,
 as CSBWin does, so the `dm-windows` set shows CSBWin's behaviour and `dm-atari` the
 original's. `tools/dump-crack-switch.ts` asserts both, and golden frame `09-crack-switch`
 shows the pressed switch. Do not put CSBWin's items back into `dm-atari/`.
@@ -3702,7 +3708,10 @@ where those files have 1946. The texts the slots name are the same
 Extended Features block, 8-byte actuators, 4-byte scrolls, raw text. The DM Windows
 package's (`static/gamefiles/dm-windows/dungeon.dat`, 42025 bytes, the `dm-windows` data
 set) is **the same dungeon re-saved by CSBWin** in the shape a save is written in.
-Its `graphics.dat` is byte-identical to `dm-atari`'s.
+`dm-atari/dungeon.dat` is the 1.1 disk's `DUNGEON.DAT`, byte for byte
+(`doc/ATARI_ST_DISK_REFERENCE.md` → "CSBWin's files"). The set's `graphics.dat` is
+CSBWin's, which `dm-atari`'s is with three items of the 1.2 disk's (see
+"`dm-atari/graphics.dat` is CSBWin's with three items from the 1.2 disk").
 
 Read through its block by `DungeonLoader.loadDungeonDat` (the image with `bigActuators`,
 `newScrolls`, `indirectText`, `expool` and the file's object map as its `RnMaps`), and

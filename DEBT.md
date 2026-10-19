@@ -1662,10 +1662,10 @@ seen working ("good"), which were never seen, and which do not match the English
 those two first. The author reviews the file before it ships.
 
 The French 1.3 program's own strings are the faithful source where they exist. The disk
-image is `archive/DungeonMaster1v3Fr.stx` (gitignored; `doc/ATARI_ST_DISK_REFERENCE.md`
-→ "The French 1.3 disk"). The program is presumably `START.PAK`, packed and not yet
-examined, whose 1.3 differs from 1.2's, so it must be unpacked before its strings can be
-read. It holds only what the 1988 program printed: the CSBWin-only messages (the save
+image is the collection's `Floppy Disks STX/Dungeon Master for Atati ST v1.3 (French).stx`
+(gitignored; `doc/ATARI_ST_DISK_REFERENCE.md` → "The disks", "The French 1.3 disk"). The
+program is presumably `START.PAK`, packed and not yet examined, whose 1.3 differs from
+1.2's, so it must be unpacked before its strings can be read. It holds only what the 1988 program printed: the CSBWin-only messages (the save
 dialog's file menus, DSA texts, the utility, the Hint Oracle) have no French original and
 come from the file above or from the author. Some French words are not strings at all,
 but pictures in `graphics.dat` already drawn in French (RESSUSCITER / RÉINCARNER /

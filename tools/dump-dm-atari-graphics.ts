@@ -2,9 +2,9 @@
  * `static/gamefiles/dm-atari/graphics.dat` is CSBWin's `graphics.dat` with two items taken
  * from the Atari ST 1.2 disk's, and nothing else changed.
  *
- * CSBWin's DM package ships a later revision of the file than the English 1.2 disk (kept
- * pristine in `dm-windows/`). Two of its items are worse than 1.2's
- * (`doc/ATARI_ST_DISK_REFERENCE.md` → "The 1.2 data files against `dm-atari/`"):
+ * CSBWin's DM package ships the first 1.0 disk's file (8 December 1987), with its credits
+ * corrupted by a copy (kept pristine in `dm-windows/`). Three of its items are worse than
+ * 1.2's (`doc/ATARI_ST_DISK_REFERENCE.md` → "CSBWin's files"):
  *
  * - **item 5, the credits scroll**, where four bytes corrupt four lines of the text;
  * - **item `0x22e`**, whose `Byte4100[55]` puts the pressed Crack Switch at eye level;
