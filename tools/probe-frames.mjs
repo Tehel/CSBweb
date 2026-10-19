@@ -376,8 +376,9 @@ const welcome = () => evaluate(`(()=>{const q=(s)=>[...document.querySelectorAll
     last: (()=>{const t=document.querySelector('.welcome-custom .welcome-grid').lastElementChild;
       return t.className+(t.disabled?' disabled':'')+(t.hasAttribute('aria-pressed')?' pressed':'')+' '+t.textContent;})(),
     gameFiles: performance.getEntriesByType('resource').map(e=>e.name).filter(n=>/\.dat$/i.test(n)).length };})()`);
+// The element scrolled into view first, should the page have grown under it.
 const clickOn = async (selector) => {
-  const p = await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
+  const p = await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.scrollIntoView({block:'nearest'});const r=e.getBoundingClientRect();
     return {x:r.left+r.width/2, y:r.top+r.height/2};})()`);
   for (const type of ['mousePressed', 'mouseReleased'])
     await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
@@ -426,7 +427,7 @@ check(fonts.spectral && fonts.google === 0, 'the prose is in Spectral, regular a
 await clickOn('.pick[data-set="csb"]');
 const atCsb = await welcome();
 check(atCsb.tiles.includes('csb!') && /dungeon=csb/.test(atCsb.play ?? '') && !/save=/.test(atCsb.play ?? '')
-  && atCsb.resume === null && atCsb.preview.join() === 'No saved game of this dungeon',
+  && atCsb.resume === null && atCsb.preview.join() === 'No saved game here yet',
   'a set with no save selected: PLAY opens it, CONTINUE is disabled');
 await clickOn('.pick[data-set="csb"]');
 check((await welcome()).play === null, 'a click on the selected tile selects none');

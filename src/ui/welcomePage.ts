@@ -102,10 +102,14 @@ const PAGE = `
 <main class="welcome-page">
   <h1 class="welcome-logo"><img src="${logoUrl}" alt="CSBweb" width="550" height="307"></h1>
   <div class="welcome-actions">
-    <a class="btn px" id="welcome-play">Play</a>
-    <a class="btn px" id="welcome-continue">Continue</a>
-    <div class="welcome-preview px px2" aria-live="polite"></div>
-    <button type="button" class="btn px" id="welcome-help">How to play</button>
+    <div class="welcome-actions-row">
+      <a class="btn px" id="welcome-play">Play</a>
+      <button type="button" class="btn px" id="welcome-help">How to play</button>
+    </div>
+    <div class="welcome-actions-row">
+      <a class="btn px" id="welcome-continue">Continue</a>
+      <div class="welcome-preview px px2" aria-live="polite"></div>
+    </div>
   </div>
   <section class="welcome-sets welcome-official" aria-labelledby="welcome-official-title">
     <h2 class="px" id="welcome-official-title">Official games</h2>
@@ -382,7 +386,7 @@ export async function showWelcomePage(
             line('preview-party', save.champions.map((name) => name.trim()).filter((name) => name !== '').join(' · ')),
             line('preview-when', `Level ${save.level} · ${formatSaveDate(save.savedAt)} ${formatSaveTime(save.savedAt)}`),
         ] : [
-            line('preview-none', set ? 'No saved game of this dungeon' : 'No saved game yet'),
+            line('preview-none', set ? 'No saved game here yet' : 'No saved game yet'),
         ]));
     }
     update();

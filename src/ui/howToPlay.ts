@@ -5,7 +5,8 @@
  * labels them (`keyLabel`), with a chooser between the three presets' moves, since
  * CSBWin's K J L M are no one's first guess and its letters attack. Then the runes, which
  * the scrolls name in words and the magic panel shows only as glyphs, then the first
- * steps and the mouse.
+ * steps and the mouse. Above the chooser, and only in the dialog, a line says the game
+ * needs no key at all.
  *
  * The runes are drawn in the page's font, `dm-screen.ttf`, where `tools/gen-font.ts`
  * puts graphics.dat's 24 rune glyphs at U+E060 to U+E077. Their names, and the names of
@@ -86,6 +87,7 @@ const DIALOG = `
     <h2 class="px" id="how-title">How to play</h2>
     <button type="button" class="btn px" id="how-close">Close</button>
   </div>
+  <p class="how-intro">The whole game plays with the mouse alone, a stylus or a finger on a touch screen, but a few keys make it much better.</p>
   <fieldset class="how-chooser">
     <legend class="px px2">Move with</legend>
   </fieldset>
@@ -197,19 +199,19 @@ export function helpSheet(bindings: KeyBindings, label: (code: string) => string
         names.forEach((name, n) => table.append(cell('how-rune', text('how-glyph px', runeGlyph(r, n)), text('how-rune-name px px2', name))));
     });
     runes.append(
-        para('A spell is a rune from each row, in order: the panel at the top right shows the next row\'s six after each one. The keys above each column pick that rune of the row shown.'),
+        para('A spell is up to four runes, the power first, then at most one of each next row, in order: four spells are two runes, many three. The panel at the top right shows the next row\'s six after each one. The keys above each column pick that rune of the row shown.'),
         table,
         list([
             'Scrolls leave out the power: start with one, LO the weakest, MON the strongest and the costliest in mana.',
-            'Then the scroll\'s runes, then cast: "Invoke FUL for a magic torch" is LO FUL, then cast.',
+            ['Then the scroll\'s runes, then cast: "Invoke FUL for a magic torch" is LO FUL, ', text('how-glyph-inline px', runeGlyph(0, 0) + runeGlyph(1, 3)), ', then cast.'],
         ]),
     );
 
     const start = section('how-start', 'First steps');
     start.append(list([
         'The game begins in the Hall of Champions. Walk up to a mirror and click it to meet the champion inside.',
-        'RESURRECT takes them as they are. REINCARNATE gives them a new name, wipes every skill they had and adds twelve points to their attributes.',
-        'Take up to four. Click a champion\'s name at the top of the screen to open their inventory.',
+        'RESURRECT takes them as they are. REINCARNATE gives them a new name, wipes every skill they had and adds a total of twelve points to their attributes.',
+        'Take up to four. To open a champion\'s inventory, right-click anywhere in their frame at the top of the screen, or click their coloured bars.',
         'Drop food or water on the mouth in the inventory to eat or drink, as the food and water bars there run low.',
         'Keep a lit torch in a hand: the dungeon is dark.',
         'At the top of an inventory, the disk icon saves and ZZZ rests the party; a click wakes it. Save often.',
@@ -279,11 +281,12 @@ function para(content: string, className = ''): HTMLElement {
     return element;
 }
 
-function list(items: string[]): HTMLElement {
+/** A list of `items`, each a text or a line of texts and elements. */
+function list(items: Array<string | Array<string | HTMLElement>>): HTMLElement {
     const element = document.createElement('ul');
     for (const item of items) {
         const entry = document.createElement('li');
-        entry.textContent = item;
+        entry.append(...[item].flat());
         element.append(entry);
     }
     return element;

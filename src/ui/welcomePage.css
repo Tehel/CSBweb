@@ -170,8 +170,14 @@ body.welcome {
 .welcome-moderation:hover { border-color: var(--p9); }
 .welcome-moderation:focus-visible { outline: 3px solid var(--p11); outline-offset: 3px; }
 
-/* PLAY and CONTINUE, and the save CONTINUE reads, above the grid. */
+/* PLAY and HOW TO PLAY, then CONTINUE and the save it reads, above the grid. */
 .welcome-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+.welcome-actions-row {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -483,7 +489,9 @@ body.welcome {
 .how-rune-table { display: grid; grid-template-columns: auto repeat(6, minmax(0, 1fr)); gap: 6px 9px; align-items: center; justify-items: center; }
 .how-rune { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .how-glyph { font-size: 32px; line-height: 32px; color: var(--p15); }
+.how-glyph-inline { font-size: 24px; line-height: 0; letter-spacing: 0.25em; color: var(--p15); }
 .how-rune-name { color: var(--p9); }
+.how-intro { margin: 0; color: var(--p2); }
 .how-print-head { display: none; }
 .how-downloads { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; font-size: 16px; }
 .how-downloads .px { color: var(--p9); }
@@ -499,12 +507,12 @@ body.welcome {
     .how-to-play { position: static; width: auto; max-width: none; max-height: none; overflow: visible; margin: 0; border: 0; background: #fff; color: #000; }
     .how-to-play::backdrop { display: none; }
     .how-form { padding: 0; gap: 6px; }
-    .how-chooser, #how-close, .how-downloads { display: none; }
+    .how-intro, .how-chooser, #how-close, .how-downloads { display: none; }
     .how-to-play h2 { color: #000; font-size: 16px; line-height: 16px; }
     .how-print-head { display: block; margin: 0; font-size: 12px; }
     .how-sheet {
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        grid-template-areas: "move fight fight magic" "runes runes party party" "start start mouse mouse";
+        grid-template-areas: "move fight fight magic" "runes runes party party" "runes runes mouse mouse" "start start start start";
         gap: 6px 10px;
         font-size: 12px;
         line-height: 1.3;
@@ -517,6 +525,7 @@ body.welcome {
     .how-key { padding: 1px 3px; background: #fff; color: #000; border: 1px solid #000; font-size: 8px; line-height: 8px; }
     .how-pad, .how-attacks, .how-list, .how-rune-table { gap: 3px 6px; }
     .how-glyph { font-size: 24px; line-height: 24px; }
+    .how-glyph-inline { font-size: 16px; color: #000; }
     .how-rune-name { font-size: 16px; line-height: 16px; }
 }
 @media screen and (max-width: 900px) {
