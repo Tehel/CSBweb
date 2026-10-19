@@ -651,7 +651,8 @@ async function fetchThumbnail(set: DataSet): Promise<Blob | null> {
 function openWelcomePage(manifest: DataSetManifest): Promise<void> {
     const storeRandom = new CsbRandom();
     const draw: DrawPlaythrough = (rows) => drawPlaythrough(storeRandom, rows);
-    return showWelcomePage(document.body, manifest, new BrowserSaveStore(draw), new BrowserDataSetStore(draw), loadManifest);
+    return showWelcomePage(document.body, manifest, new BrowserSaveStore(draw), new BrowserDataSetStore(draw), loadManifest,
+        { settings, keyboardLayout: () => keyboardLayout });
 }
 
 async function init() {

@@ -429,6 +429,77 @@ body.welcome {
 .add-set .btn { min-width: 0; width: 162px; padding: 0; font: inherit; }
 .add-set .btn.px { font-family: 'DM Screen', monospace; font-size: 24px; line-height: 24px; }
 
+/* HOW TO PLAY (`src/ui/howToPlay.ts`): the chooser of the moves' keys, then the sheet, its
+   sections on a grid. A key is a cap in the game's font, a rune its glyph in the same font
+   over its name. */
+.how-to-play { width: min(1180px, calc(100vw - 32px)); }
+.how-chooser { margin: 0; padding: 6px 12px 9px; border: 3px solid #1d1d30; display: flex; flex-wrap: wrap; align-items: center; gap: 9px 24px; }
+.how-chooser legend { color: var(--p9); padding: 0 6px; }
+.how-choice { display: flex; align-items: center; gap: 9px; color: var(--p15); cursor: pointer; }
+.how-choice input { accent-color: var(--p9); width: 18px; height: 18px; margin: 0; }
+.how-custom { margin: 0; flex-basis: 100%; font-size: 15px; color: var(--p9); }
+.how-custom[hidden] { display: none; }
+.how-sheet {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas: "move fight magic" "runes runes party" "start start mouse";
+    gap: 18px 24px;
+    font-size: 16px;
+    line-height: 1.4;
+}
+.how-move { grid-area: move; }
+.how-fight { grid-area: fight; }
+.how-magic { grid-area: magic; }
+.how-party { grid-area: party; }
+.how-runes { grid-area: runes; }
+.how-start { grid-area: start; }
+.how-mouse { grid-area: mouse; }
+.how-section { display: flex; flex-direction: column; gap: 9px; padding: 9px 12px 12px; border: 3px solid #1d1d30; }
+.how-section h3 { margin: 0; color: var(--p11); }
+.how-section p { margin: 0; }
+.how-section ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.how-warn { color: var(--p9); }
+.how-keys { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.how-key {
+    display: inline-block;
+    min-width: 16px;
+    padding: 3px 5px;
+    background: var(--p5);
+    color: var(--p9);
+    border: 3px solid;
+    border-color: var(--p10) var(--p3) var(--p3) var(--p10);
+    text-align: center;
+    white-space: nowrap;
+}
+.how-pad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.how-pad-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.how-what { font-size: 14px; color: var(--p2); }
+.how-attacks { display: grid; grid-template-columns: auto repeat(4, minmax(0, 1fr)); gap: 6px 9px; align-items: center; justify-items: center; }
+.how-head { color: var(--p15); }
+.how-row { justify-self: start; color: var(--p2); font-size: 14px; }
+.how-list { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; align-items: center; }
+.how-list dt { display: flex; flex-wrap: wrap; gap: 4px; }
+.how-list dd { margin: 0; }
+.how-rune-table { display: grid; grid-template-columns: auto repeat(6, minmax(0, 1fr)); gap: 6px 9px; align-items: center; justify-items: center; }
+.how-rune { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.how-glyph { font-size: 32px; line-height: 32px; color: var(--p15); }
+.how-rune-name { color: var(--p9); }
+@media (max-width: 900px) {
+    .how-sheet { grid-template-columns: minmax(0, 1fr); grid-template-areas: "move" "fight" "magic" "party" "runes" "start" "mouse"; }
+}
+/* A phone's: each row of runes under its name, the six across the width. */
+@media (max-width: 640px) {
+    .how-to-play { width: calc(100% - 16px); max-width: none; max-height: calc(100% - 16px); }
+    .how-form { padding: 12px 6px; }
+    .how-section { padding: 9px 6px 12px; }
+    .how-rune-table { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px 2px; }
+    .how-rune-table .how-corner { display: none; }
+    .how-rune-table .how-row { grid-column: 1 / -1; margin-top: 6px; }
+    /* The font's blank column between letters is two pixels at this size: one is enough. */
+    .how-rune-name { letter-spacing: -1px; }
+    .how-attacks { gap: 6px 4px; }
+}
+
 @media (max-width: 640px) {
     .welcome-page { padding: 24px 16px 0; }
     .welcome-logo { margin-bottom: 24px; }

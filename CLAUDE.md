@@ -115,7 +115,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   press, and only with MAP VIEW on, the champion dialog opened by a long press on
   the stat bars, where a tap opens the inventory at its release, and fullscreen, entered
   by a tap and by a click, the screen and the effect sized and centred in it, at 16:10
-  and at 4:3; the save store held by another tab; and the welcome page's tiles, its fonts, its selection, where PLAY and
+  and at 4:3; the save store held by another tab; and the welcome page's tiles, its fonts, its selection, its HOW TO PLAY, where PLAY and
   CONTINUE lead, CONTINUE's save read straight into play, and the form that adds a set,
   and edits, publishes and deletes one, the tiles that moderate a published one, and the book that
   downloads a set's archive and lists its documents, where a moderator adds and removes them;
@@ -213,8 +213,9 @@ ui/         The page's DOM side: events (the canvas's and the keyboard's listene
             (the save menu's import: a file dropped on the page), fatalMessage (the
             screen an error that ends the game leaves), and gameEvents (what the
             server's statistics are told: a game started, joined, won or lost), and
-            welcomePage (the page without a known `?dungeon=`: the games and the saves)
-            and addDataSetForm (its form that adds, edits, publishes and deletes a player's own data set)
+            welcomePage (the page without a known `?dungeon=`: the games and the saves),
+            addDataSetForm (its form that adds, edits, publishes and deletes a player's own data set)
+            and howToPlay (its HOW TO PLAY: the keys, the runes, the first steps)
 stats/      statsPage: the statistics page, `/stats` (`stats.html`, Vite's second entry): what
             `api/stats` answers, in the welcome page's look, and none of the game's code
 settings/   Settings: the player's settings, one model the page, the game and the dialogs

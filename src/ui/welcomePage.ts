@@ -90,6 +90,7 @@ import {
 } from '../data/DataSets';
 import { localDataSet, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
 import { openAddDataSetForm, openPublishedSetForm, type EditedPublishedSet } from './addDataSetForm';
+import { HOW_TO_PLAY_HASH, openHowToPlay, type HowToPlayHost } from './howToPlay';
 import { playerId } from './gameEvents';
 import {
     formatSaveDate, formatSaveTime, lastUsedSave,
@@ -104,6 +105,7 @@ const PAGE = `
     <a class="btn px" id="welcome-play">Play</a>
     <a class="btn px" id="welcome-continue">Continue</a>
     <div class="welcome-preview px px2" aria-live="polite"></div>
+    <button type="button" class="btn px" id="welcome-help">How to play</button>
   </div>
   <section class="welcome-sets welcome-official" aria-labelledby="welcome-official-title">
     <h2 class="px" id="welcome-official-title">Official games</h2>
@@ -209,7 +211,8 @@ const DONE: Record<ModerationAction, string> = { approve: 'approved', reject: 'r
  * Show the welcome page in `body`, in place of whatever it held, for the sets of
  * `manifest` and of `localSets`, and the saves of `store`, the set `select` names selected,
  * where it names one. `loadManifest` asks the server for the manifest again, once a set is
- * published or moderated.
+ * published or moderated. HOW TO PLAY opens its dialog on `help` (`src/ui/howToPlay.ts`),
+ * as the page does where its address ends in `#how-to-play`.
  */
 export async function showWelcomePage(
     body: HTMLElement,
@@ -217,6 +220,7 @@ export async function showWelcomePage(
     store: Pick<SaveStore, 'list'>,
     localSets: Pick<BrowserDataSetStore, 'list' | 'put' | 'remove'>,
     loadManifest: () => Promise<DataSetManifest>,
+    help: HowToPlayHost,
     select: string | null = null,
 ): Promise<void> {
     const records = await localSets.list().catch(() => [] as LocalDataSetRecord[]);
@@ -236,6 +240,7 @@ export async function showWelcomePage(
     const play = body.querySelector<HTMLAnchorElement>('#welcome-play')!;
     const resume = body.querySelector<HTMLAnchorElement>('#welcome-continue')!;
     const preview = body.querySelector<HTMLElement>('.welcome-preview')!;
+    body.querySelector('#welcome-help')!.addEventListener('click', () => openHowToPlay(help));
 
     const thumbnails = new Map<DataSet, string | Blob | null>([
         ...chooserSets(viewed).map((set) => [set, thumbnailPath(set)] as const),
@@ -278,7 +283,7 @@ export async function showWelcomePage(
 
     /** The page shown again, `select` selected, for the manifest `shown`. */
     function again(select: string | null, shown = manifest): void {
-        void showWelcomePage(body, shown, store, localSets, loadManifest, select);
+        void showWelcomePage(body, shown, store, localSets, loadManifest, help, select);
     }
 
     /** The form that adds a set, or edits `edited`'s, with its `saves`; the page shown again after it. */
@@ -381,6 +386,13 @@ export async function showWelcomePage(
         ]));
     }
     update();
+    // The address at `#how-to-play` opens HOW TO PLAY, as the page is shown and as the
+    // fragment changes on it. One handler, the last page's: the page is shown anew often.
+    const helpAsked = () => {
+        if (window.location.hash === HOW_TO_PLAY_HASH && !document.querySelector('dialog.how-to-play')) openHowToPlay(help);
+    };
+    window.onhashchange = helpAsked;
+    helpAsked();
 }
 
 /** Whether the moderator's switch is on: on but where it was turned off, or `localStorage` cannot be read. */
