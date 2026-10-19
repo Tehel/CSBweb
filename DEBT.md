@@ -116,7 +116,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E40 | The statistics page | M | ⏳ |
+| E40 | The statistics page's heat map | M | ⏳ |
 | R6 | A damaged file's counts size allocations and loops | M | ⏳ |
 | R7 | An index from a custom data set can throw | S | ⏳ |
 | R8 | An optional feature's failure ends the game, or the session | S | ⏳ |
@@ -1161,44 +1161,25 @@ the author before any code. What they are to hold:
   It insists that the statistics are anonymous: no player's name, no IP address, no
   browser profiling. A random id, drawn in the browser, is used only for counting
   players. Champions go by the names they carry, which a player can type.
-- **The public statistics** are a page of their own, E40; ABOUT links to it.
+- **The public statistics** are a page of their own, `/stats` (`doc/STATISTICS.md` → "The page"); ABOUT links to it.
 - **CREDITS** is a block of the welcome page (`#credits`). It does not name the data sets'
   authors yet.
 
-### E40 ⏳ The statistics page
+### E40 ⏳ The statistics page's heat map
 
-Designed with the author; the page is not built. The server answers all it shows
-(`doc/STATISTICS.md` → "`api/stats`"), the time played that ranks the sets included, as
-`playTime` in ms (the `session` event); nothing in the page reads it yet.
+The statistics page is built (`doc/STATISTICS.md` → "The page"), all but a level's heat
+map, as designed with the author:
 
-**Where**: a second Vite entry, `stats.html` with `src/stats/statsPage.ts`, at `/stats`, so
-that none of the game's bundle loads; `server/app.ts` serves it, and the welcome page's
-footer links to it (STATISTICS). The welcome page's look (`welcomePage.css`). The selected
-set is in the URL, `/stats?set=<id>`; with none, the column's first. Charts are inline SVG
-or CSS bars, no library (the content security policy, `server/app.ts`).
+- **A click on a level's row** of the selected set's deaths per level draws the level from
+  the set's `dungeon.dat` (`DungeonLoader`, rooms in `MapDialog.ts`'s `ROOM_COLORS` as CSS),
+  each square shaded by its deaths (`api/stats/<id>/<level>`), the count on hover. The rows
+  are not clickable yet (`deathsPerLevel`, `src/stats/statsPage.ts`), and the page loads
+  none of the game's code (`tools/dump-build.ts`): the reader of a `dungeon.dat` it needs
+  must stay out of the game's chunk, or the bound there be raised knowingly.
 
-**The page**:
-
-- **A band across the top, all sets**: players, hours played, games started and won
-  (`api/stats`), and sessions per week, all sets together, as bars.
-- **A column at the left, the sets** in `api/stats`'s order, by hours played, decreasing,
-  each its name, hours and games started. A click selects the set: the rest of the page is its own, as a
-  champion's choice only means something within a set (Theron's Quest has its own).
-- **The selected set** (`api/stats/<id>`): its figures (hours played, games started and
-  won, deaths, players); its ten fastest wins by game clock, each its rank, game time as h:mm:ss of the
-  clock, play time, party (a reincarnated champion marked, a solo win badged) and day,
-  every win for now, a player's best only being a later second board; deaths per level, a
-  row a level as the dungeon descends (LEVEL 1 its first, as `mapTitle` counts) with its
-  bar and count; its preferred champions, their share of the games with a party, and their
-  win rate from 10 games; sessions, games started and games won per week.
-- **A level's heat map**: a click on a level's row draws it from the set's `dungeon.dat`
-  (`DungeonLoader`, rooms in `MapDialog.ts`'s `ROOM_COLORS` as CSS), each square shaded by
-  its deaths (`api/stats/<id>/<level>`), the count on hover.
-
-Paying it: two commits, the page without the heat map, then the heat map. The page's are each checked in
-`tools/probe-frames.mjs`'s welcome section (the page loads, a click selects a set, a level
-opens its map) and by a screenshot over a store seeded with `dump-stats`' fortnight. E39's
-ABOUT then links to it.
+Paying it: the heat map, checked in `tools/probe-frames.mjs`'s statistics block (a level
+opens its map) and by a screenshot over the dev server's fortnight. E39's ABOUT then links
+to the page.
 
 ### E22 ⏸️ Fullscreen filled by a fraction
 

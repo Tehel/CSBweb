@@ -7,6 +7,7 @@
  * imports with their `.ts` extension (`server/tsconfig.json` holds it to that).
  *
  *   /                 dist/index.html               no-cache
+ *   /stats            dist/stats.html, the statistics page, whatever the query  no-cache
  *   /manifest.webmanifest  the installed game's     no-cache
  *   /assets/…         dist/assets/…, hashed names   immutable
  *   /server/…         404: the server's own module (`CHECK_MODULE`), never served
@@ -134,6 +135,9 @@ const FILES = 'files';
 
 /** The API's statistics: `api/stats`, `api/stats/<id>` and `api/stats/<id>/<level>`, the level as its decimal number. */
 const STATS = 'stats';
+
+/** The statistics page, `/stats`: `distDir`'s `stats.html` (`src/stats/statsPage.ts`). */
+const STATS_PAGE = 'stats';
 
 /** The sets the statistics answer for: the approved ones that are not hidden, in the table's order. */
 function publicSets(dataSets: DataSetStore): StatsSet[] {
@@ -274,19 +278,7 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
             res.setHeader('Cache-Control', 'no-store');
             return send(res, 200, '{"ok":true}', 'application/json; charset=utf-8');
         }
-        if (segments[1] === STATS && segments.length <= 4) {
-            if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
-            const sets = publicSets(api.dataSets);
-            const [, , id, levelSegment] = segments;
-            const set = sets.find((known) => known.id === id);
-            const level = levelSegment === undefined ? undefined : Number(levelSegment);
-            if (id !== undefined && set === undefined) return send(res, 404, 'Not found');
-            if (level !== undefined && !(/^(0|[1-9]\d{0,2})$/.test(levelSegment!) && level < LEVELS)) return send(res, 404, 'Not found');
-            res.setHeader('Cache-Control', `public, max-age=${STATS_CACHE_MS / 1000}`);
-            const body = statsCache.get(segments.slice(2).join('/'), () => JSON.stringify(
-                set === undefined ? api.store.summary(sets) : level === undefined ? api.store.setStats(set) : api.store.levelStats(set, level)));
-            return send(res, 200, body, 'application/json; charset=utf-8');
-        }
+        if (segments[1] === STATS) return answerStats(segments.slice(2), api, statsCache, req, res);
         return send(res, 404, 'Not found');
     }
 
@@ -299,8 +291,33 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
         return serveFile(req, res, join(filesDir, ...segments.slice(1)), NO_CACHE);
     }
     if (segments.length === 0) return serveFile(req, res, join(distDir, 'index.html'), NO_CACHE);
+    if (segments.length === 1 && segments[0] === STATS_PAGE) return serveFile(req, res, join(distDir, `${STATS_PAGE}.html`), NO_CACHE);
     if (segments[0] === SERVER_DIR) return send(res, 404, 'Not found');
     return serveFile(req, res, join(distDir, ...segments), segments[0] === 'assets' ? IMMUTABLE : NO_CACHE);
+}
+
+/** What `answerStats` needs of the API. */
+export type StatsApi = Pick<ApiOptions, 'dataSets' | 'store'>;
+
+/**
+ * `api/stats/<path>`: the summary for an empty `path`, a public set's for its id, and its
+ * level's for its id and the level, from `statsCache`, which keeps each for `STATS_CACHE_MS`
+ * and says so; 404 for any other. The dev server answers the route with it too
+ * (`vite.config.mts`).
+ */
+export function answerStats(path: string[], api: StatsApi, statsCache: AnswerCache, req: IncomingMessage, res: ServerResponse): void {
+    if (path.length > 2) return send(res, 404, 'Not found');
+    if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
+    const sets = publicSets(api.dataSets);
+    const [id, levelSegment] = path;
+    const set = sets.find((known) => known.id === id);
+    const level = levelSegment === undefined ? undefined : Number(levelSegment);
+    if (id !== undefined && set === undefined) return send(res, 404, 'Not found');
+    if (level !== undefined && !(/^(0|[1-9]\d{0,2})$/.test(levelSegment!) && level < LEVELS)) return send(res, 404, 'Not found');
+    res.setHeader('Cache-Control', `public, max-age=${STATS_CACHE_MS / 1000}`);
+    const body = statsCache.get(path.join('/'), () => JSON.stringify(
+        set === undefined ? api.store.summary(sets) : level === undefined ? api.store.setStats(set) : api.store.levelStats(set, level)));
+    send(res, 200, body, 'application/json; charset=utf-8');
 }
 
 /**

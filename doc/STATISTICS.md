@@ -3,7 +3,7 @@
 The deployed game counts games: games started, won and lost, the time played in them, the
 parties that played them, and where parties die (`doc/DEPLOYMENT.md` for where it runs).
 They serve three questions: whether the game is actually played, which champions players
-prefer, and where parties die most often. The page that shows them is designed and not built (`DEBT.md` E40), and the FAQ
+prefer, and where parties die most often. The statistics page shows them ("The page", below), and the FAQ
 that explains them to players is to be designed (E39).
 
 ## Anonymity is a rule of the code
@@ -169,3 +169,31 @@ save, which sent no `started` and carries no play time, is a win and is not rank
 its sessions in no row of the log or of `games`, the same but the sessions' made from the
 log alone and for a store made before the sessions, the cache, and every answer's time and size over 200,000
 events; `tools/dump-server.ts` the API over HTTP and the store's life in `server.ts`.
+
+## The page
+
+`/stats` (`stats.html`, Vite's second entry, `src/stats/statsPage.ts`), linked from the
+welcome page's footer (STATS): HTML in the welcome page's look, and none of the game's
+code (`tools/dump-build.ts` holds it to a few KB of script). Its charts are CSS bars, the
+count of each on hover. Everything it shows is `api/stats`'s:
+
+- **A band across the top**, every set together: players, hours played, games started and
+  won, and the sessions per week.
+- **A column of the sets**, in `api/stats`'s order, each its name, its hours and its games
+  started. A click selects one, `?set=<id>` in the URL (the column's first without it),
+  and the rest of the page is that set's (`api/stats/<id>`):
+- **The selected set**: its hours played, games started and won, deaths and players; its
+  fastest wins, each its rank, its game time as `H:MM:SS` of the game clock (a tick 15
+  VBLs, as the game runs awake), its play time, its party, a champion who joined by
+  REINCARNATE marked `*`, a solo win badged, and its day; its deaths per level, a row a
+  level from LEVEL 1 to the deepest died on, as the map dialog numbers them; its preferred
+  champions, each their share of the games with a party, and their win rate once in 10
+  games; and its sessions, games started and games won per week.
+
+A chart of weeks runs from the first week answered to the current one, the weeks without
+one at zero, the latest 52 at most.
+
+What is left of it is the heat map (`DEBT.md` E40). The dev server answers `api/stats`
+over the scripted fortnight of `tools/dump-stats.ts` (`tools/lib/statsFortnight.ts`), so
+that the page has something to show; `tools/probe-frames.mjs` checks the page against what
+`api/stats` answers, whatever the store holds.

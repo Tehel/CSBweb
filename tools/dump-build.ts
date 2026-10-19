@@ -5,11 +5,13 @@
  * Builds with the project's own `vite.config.mts` (the CLI, as `npm run build` does: the
  * page, then `--ssr`) into a scratch folder, lists every file,
  * and asserts:
- *   - every file is `index.html`, the web app manifest, under `assets/`, or the server's
+ *   - every file is `index.html`, `stats.html`, the web app manifest, under `assets/`, or the server's
  *     module (`CHECK_MODULE`), of a type the page itself is made of: no `.dat`, no `.pdf`,
  *     nothing of `static/`;
  *   - every local `href` and `src` in `index.html` names a file the build holds, the
  *     manifest among them, and the manifest's icons are in it too, at the sizes it says;
+ *   - so does every one in `stats.html`, which links no manifest, and loads none of the
+ *     game's code: not its entry, and a few KB of script, followed through their imports;
  *   - the bundle hands the probes no `window.__probe`, which only a build made with
  *     `CSBWEB_PROBE=1` does (`vite.config.mts`): the image the golden frames check;
  *   - the server's module imports nothing, as the image has no `node_modules`, loads through
@@ -33,6 +35,10 @@ import { dataSetNamed } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const PAGE_TYPES = new Set(['.html', '.js', '.css', '.ico', '.jpg', '.png', '.ttf', '.woff2', '.img', '.wav', '.webmanifest']);
+/** The statistics page, Vite's second entry (`vite.config.mts`), and a bound on the script it loads. */
+const STATS_PAGE = 'stats.html';
+const STATS_PAGE_BYTES = 32 * 1024;
+
 /** The web app manifest, beside `index.html` under a name that does not change (`vite.config.mts`). */
 const WEB_MANIFEST = 'manifest.webmanifest';
 /** The FTL logo, the page's own asset (`src/main.ts`, `loadSwooshFiles`). */
@@ -98,8 +104,8 @@ async function main(): Promise<void> {
         console.log(`  ${String(total).padStart(8)}  in all`);
 
         console.log('\nChecks:');
-        const strays = files.filter((f) => f !== 'index.html' && f !== WEB_MANIFEST && !f.startsWith('assets/') && f !== CHECK_MODULE);
-        check(strays.length === 0, `every file is index.html, ${WEB_MANIFEST}, under assets/ or ${CHECK_MODULE}${strays.length ? `: not ${strays.join(', ')}` : ''}`);
+        const strays = files.filter((f) => f !== 'index.html' && f !== STATS_PAGE && f !== WEB_MANIFEST && !f.startsWith('assets/') && f !== CHECK_MODULE);
+        check(strays.length === 0, `every file is index.html, ${STATS_PAGE}, ${WEB_MANIFEST}, under assets/ or ${CHECK_MODULE}${strays.length ? `: not ${strays.join(', ')}` : ''}`);
         const foreign = files.filter((f) => !PAGE_TYPES.has(f.slice(f.lastIndexOf('.'))));
         check(foreign.length === 0, `every file is of the page's own types${foreign.length ? `: not ${foreign.join(', ')}` : ''}`);
         check(!files.some((f) => f.includes('gamefiles')), 'no game files');
@@ -111,6 +117,17 @@ async function main(): Promise<void> {
         const missing = refs.filter((u) => !files.includes(u.replace(/^\.\//, '')));
         check(missing.length === 0, `every file index.html names is in the build${missing.length ? `: not ${missing.join(', ')}` : ''}`);
         check(/<link rel="manifest" href="\.\/manifest\.webmanifest">/.test(html), `index.html links ${WEB_MANIFEST}`);
+        const statsHtml = readFileSync(join(outDir, STATS_PAGE), 'utf8');
+        const statsRefs = [...statsHtml.matchAll(/\b(?:href|src)="([^"]+)"/g)].map((m) => m[1]!.replace(/^\.\//, ''));
+        // The scripts the statistics page loads: those it names, and every one they import.
+        const loaded = new Set(statsRefs.filter((f) => f.endsWith('.js')));
+        for (const f of loaded) for (const m of readFileSync(join(outDir, f), 'utf8').matchAll(/from\s*"\.\/([^"]+\.js)"/g)) loaded.add(`assets/${m[1]}`);
+        const loadedBytes = [...loaded].reduce((sum, f) => sum + (files.includes(f) ? statSync(join(outDir, f)).size : 0), 0);
+        console.log(`  ${STATS_PAGE} loads ${[...loaded].join(', ')}: ${loadedBytes} bytes`);
+        check(statsRefs.every((f) => files.includes(f)) && !statsHtml.includes(WEB_MANIFEST),
+            `every file ${STATS_PAGE} names is in the build, and not ${WEB_MANIFEST}: the statistics page is no app`);
+        check(loaded.size >= 1 && ![...loaded].some((f) => /\/main-[^/]+\.js$/.test(f)) && loadedBytes < STATS_PAGE_BYTES,
+            `${STATS_PAGE} loads none of the game's code: not its entry, and ${loadedBytes} bytes of script in all, under ${STATS_PAGE_BYTES}`);
         const webManifest = JSON.parse(readFileSync(join(outDir, WEB_MANIFEST), 'utf8')) as
             { start_url: string; scope: string; display: string; orientation: string; icons: { src: string; sizes: string; purpose: string }[] };
         console.log(`  ${WEB_MANIFEST}: ${webManifest.display}, ${webManifest.orientation}, icons ${webManifest.icons.map((i) => `${i.src} ${i.sizes} ${i.purpose}`).join(', ')}`);

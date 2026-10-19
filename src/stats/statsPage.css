@@ -1,0 +1,119 @@
+/* The statistics page (`src/stats/statsPage.ts`), over the welcome page's look
+   (`src/ui/welcomePage.css`): its palette, its faces and its boxes. A bar is the
+   buttons' gold, a death's the game's red, on the boxes' dark track. */
+
+.stats-head {
+    display: flex;
+    align-items: center;
+    gap: 36px;
+}
+.stats-logo img { display: block; width: 220px; height: auto; }
+.stats-head h1 { margin: 0; color: var(--p11); font-weight: 400; }
+
+/* Every set's figures and sessions, across the page. */
+.stats-band {
+    margin-top: 36px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 24px 48px;
+    align-items: end;
+    padding: 18px 24px;
+    background: #0b0b16;
+    border: 3px solid #1d1d30;
+}
+
+.stats-figures {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px 36px;
+}
+.stats-figures dt { color: var(--p9); }
+.stats-figures dd { margin: 9px 0 0; color: var(--p15); }
+
+.stats-body {
+    margin-top: 36px;
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: 48px;
+    align-items: start;
+}
+
+/* The sets, a box each, the selected one's gold as a selected tile's. */
+.stats-sets { display: flex; flex-direction: column; gap: 9px; }
+.stats-pick {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 9px 12px;
+    background: #0b0b16;
+    border: 3px solid #1d1d30;
+    text-decoration: none;
+}
+.stats-pick:hover { border-color: var(--p1); }
+.stats-pick[aria-current="true"] { border-color: var(--p9); background: #1a1106; }
+.stats-pick:focus-visible { outline: 3px solid var(--p11); outline-offset: 3px; }
+.stats-pick-name { color: var(--p15); }
+.stats-pick-figures { color: var(--p2); }
+
+.stats-set { display: flex; flex-direction: column; gap: 36px; min-width: 0; }
+.stats-set > h2 { margin: 0; color: var(--p11); }
+.stats-section { display: flex; flex-direction: column; gap: 15px; }
+.stats-section > h3 { margin: 0; color: var(--p9); font-size: 24px; }
+.stats-none { color: var(--p2); font-size: 18px; font-style: italic; }
+.stats-key { color: var(--p2); font-size: 15px; }
+
+/* The fastest wins. */
+.stats-table { border-collapse: collapse; width: 100%; }
+.stats-table th, .stats-table td { padding: 6px 12px 6px 0; text-align: left; vertical-align: baseline; }
+.stats-table th { color: var(--p2); font-weight: 400; }
+.stats-table td { color: var(--p13); border-top: 3px solid #0e0e1e; }
+.stats-table td:first-child { color: var(--p9); }
+.stats-party { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 15px; }
+.stats-champion { color: var(--p15); }
+.stats-reincarnated { color: var(--p4); }
+.stats-solo { padding: 3px 6px; color: var(--p0); background: var(--p9); }
+
+/* A list of bars: a label, its bar on the track, and its value, and a champion's win rate. */
+.stats-rows { display: flex; flex-direction: column; gap: 6px; }
+.stats-row {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr) 72px;
+    align-items: center;
+    gap: 15px;
+}
+.stats-champions .stats-row { grid-template-columns: 120px minmax(0, 1fr) 72px 72px; }
+.stats-row-head { color: var(--p2); }
+.stats-row-label { color: var(--p13); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats-row-value, .stats-row-rate { color: var(--p15); text-align: right; }
+.stats-track { height: 15px; background: #0b0b16; border: 3px solid #1d1d30; }
+.stats-bar { display: block; height: 100%; background: var(--p9); }
+.stats-bar-death { background: var(--p8); }
+.stats-row:hover .stats-row-label { color: var(--p11); }
+
+/* A chart of weeks: a bar a week, from the bottom, a caption over it and its range under it. */
+.stats-weeks { margin: 0; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.stats-weeks figcaption { color: var(--p9); }
+.stats-bars {
+    height: 96px;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    border-bottom: 3px solid var(--p12);
+}
+.stats-week { flex: 1 1 0; max-width: 24px; height: 100%; display: flex; align-items: flex-end; }
+.stats-week .stats-bar { width: 100%; height: 0; }
+.stats-week:hover .stats-bar { background: var(--p11); }
+.stats-axis { display: flex; justify-content: space-between; gap: 12px; color: var(--p2); }
+
+@media (max-width: 900px) {
+    .stats-band { grid-template-columns: minmax(0, 1fr); }
+    .stats-body { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+    .stats-head { flex-direction: column; gap: 18px; }
+    .stats-band { padding: 12px; }
+    .stats-row { grid-template-columns: 96px minmax(0, 1fr) 48px; gap: 9px; }
+    .stats-champions .stats-row { grid-template-columns: 96px minmax(0, 1fr) 48px 48px; }
+    .stats-table th, .stats-table td { padding-right: 6px; }
+}

@@ -7,12 +7,14 @@ import { dirname, join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 
-import { contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration, receivePublish } from './server/app';
+import { answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration, receivePublish } from './server/app';
 import { DataSetStore, manifestText, parseModerators, wallsText } from './server/dataSets';
 import { RateLimit } from './server/events';
 import { NOBODY } from './server/notify';
 import type { CheckDataSet } from './server/publish';
+import { AnswerCache, StatsStore } from './server/stats';
 import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, parseManifest } from './src/data/DataSets';
+import { fillFortnight } from './tools/lib/statsFortnight';
 
 /**
  * The build the page's events name (`src/ui/gameEvents.ts`): `CSBWEB_BUILD` where the
@@ -53,6 +55,12 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  * name. An edit, and a document added or removed, copies a site's folder through its link,
  * and deletes the link, never `static/gamefiles/`. The store is `node:sqlite`'s, in memory:
  * on a Node without it, a GET answers the manifest and a POST 501.
+ *
+ * `api/stats` is `answerStats` over the same store's public sets, and over statistics made
+ * once, at start, of `dump-stats`' fortnight (`tools/lib/statsFortnight.ts`), which names
+ * `dm-atari` and `csb`: the dev page sends no event, and the statistics page then has
+ * something to show. Nothing is cached, so that a set published shows at once. Without
+ * `node:sqlite`, it is 501.
  */
 function dataSetsRoute(): Plugin {
   const file = resolve(import.meta.dirname, 'tools', 'data-sets.json');
@@ -159,6 +167,28 @@ function dataSetsRoute(): Plugin {
         }
       };
 
+      const statsDb = sqlite ? new sqlite.DatabaseSync(':memory:') : null;
+      const stats = statsDb ? new StatsStore(statsDb) : null;
+      if (stats) fillFortnight(stats);
+      server.httpServer?.once('close', () => statsDb?.close());
+      const statsCache = new AnswerCache(0, Date.now);
+      server.middlewares.use('/api/stats', (req, res, next) => {
+        const path = pathSegments(req.url ?? '');
+        if (path === null) return next();
+        if (!sqlite || !stats) {
+          res.statusCode = 501;
+          return res.end();
+        }
+        const db = new sqlite.DatabaseSync(':memory:');
+        try {
+          answerStats(path, { dataSets: openStore(db), store: stats }, statsCache, req, res);
+        } catch (error) {
+          next(error);
+        } finally {
+          db.close();
+        }
+      });
+
       server.middlewares.use(`/${DATA_SET_WALLS_ROUTE}`, (req, res, next) => {
         if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
         if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -217,7 +247,9 @@ function webAppManifest(): Plugin {
   };
   return {
     name: 'csbweb-web-app-manifest',
-    transformIndexHtml: () => [{ tag: 'link', attrs: { rel: 'manifest', href: `./${FILE_NAME}` }, injectTo: 'head' }],
+    // The game's page alone: the statistics page is no app.
+    transformIndexHtml: (_html, { filename }) => filename.endsWith('stats.html') ? []
+      : [{ tag: 'link', attrs: { rel: 'manifest', href: `./${FILE_NAME}` }, injectTo: 'head' }],
     configureServer(server) {
       server.middlewares.use(`/${FILE_NAME}`, (req, res, next) => {
         if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
@@ -263,7 +295,9 @@ export default defineConfig(({ command, isSsrBuild }) => ({
     emptyOutDir: true,
     rollupOptions: {
       input: isSsrBuild ? SERVER_ENTRY : {
-        main: resolve(import.meta.dirname, 'index.html')
+        main: resolve(import.meta.dirname, 'index.html'),
+        // The statistics page, `/stats` (`server/app.ts`): none of the game's code.
+        stats: resolve(import.meta.dirname, 'stats.html'),
       }
     }
   },

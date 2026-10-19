@@ -14,8 +14,8 @@
  *     header names them, and no owner named; `"moderator": true` said to each of two
  *     moderators, and to nobody else;
  *   - `/` and `/assets/…`: the page, `no-cache`, and the hashed files, `immutable`, the
- *     fonts as `font/ttf` and `font/woff2`; and `dist/server/`, the server's module, not
- *     served;
+ *     fonts as `font/ttf` and `font/woff2`; `/stats`, the statistics page, `no-cache`; and
+ *     `dist/server/`, the server's module, not served;
  *   - `/gamefiles/…`: ETag and Last-Modified, a 304 for either precondition, HEAD without
  *     a body, and the query ignored; and no descriptor left open on a large file after a
  *     download, a 304, a HEAD, or downloads the client abandons after their first bytes;
@@ -221,6 +221,7 @@ function scratchFiles(scratch: string): ServerOptions {
     mkdirSync(join(gamefilesDir, 'set-a'), { recursive: true });
     mkdirSync(join(filesDir, 'sub'), { recursive: true });
     writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
+    writeFileSync(join(distDir, 'stats.html'), '<!doctype html><title>statistics</title>');
     writeFileSync(join(distDir, 'assets', 'index-AbC123.js'), 'console.log(1);');
     writeFileSync(join(distDir, 'manifest.webmanifest'), '{}');
     writeFileSync(join(distDir, 'assets', 'font-AbC123.ttf'), Buffer.from([0, 1, 0, 0]));
@@ -289,6 +290,10 @@ async function checkAnswers(port: number, manifest: string, gamefilesDir: string
         check(font.status === 200 && font.headers['content-type'] === type, `a font, as ${type} (${font.headers['content-type']})`);
     }
     check((await ask(port, '/index.html')).headers['cache-control'] === 'no-cache', '/index.html is no-cache too');
+    const statsPage = await ask(port, '/stats?set=csb');
+    check(statsPage.status === 200 && statsPage.body.includes('<title>statistics</title>') && statsPage.headers['cache-control'] === 'no-cache'
+        && String(statsPage.headers['content-type']).startsWith('text/html'), '/stats is stats.html, the statistics page, whatever the query, no-cache');
+    check((await ask(port, '/stats/csb')).status === 404, 'and nothing under it');
     const webManifest = await ask(port, '/manifest.webmanifest');
     check(webManifest.status === 200 && webManifest.headers['content-type'] === 'application/manifest+json' && webManifest.headers['cache-control'] === 'no-cache',
         `the web app manifest, as application/manifest+json, no-cache (${webManifest.headers['content-type']}, ${webManifest.headers['cache-control']})`);

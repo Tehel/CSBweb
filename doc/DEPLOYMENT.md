@@ -413,9 +413,10 @@ imported by `src/main.ts`, which every set shares, so that every install has it 
 player uploads it, and the installed game's icons, named by its web app manifest,
 `manifest.webmanifest`; the build hashes them, and inlines `swoosh.img`, 3 KB, in the
 bundle. The manifest itself is built beside `index.html` under a name that does not change,
-as a browser keeps an installed app's manifest URL (`webAppManifest`, `vite.config.mts`). A
-build is `index.html`, `manifest.webmanifest` and `assets/`, about 1.4 MB, and the
-server's module.
+as a browser keeps an installed app's manifest URL (`webAppManifest`, `vite.config.mts`).
+The statistics page, `stats.html`, is the page's second entry, which shares none of the
+game's modules and links no manifest. A build is `index.html`, `stats.html`,
+`manifest.webmanifest` and `assets/`, about 1.4 MB, and the server's module.
 
 **The server's module** is the second build, `--ssr`: the page's check of a player's own
 set, `checkLocalDataSet` (`src/data/LocalDataSets.ts`) and every reader under it, bundled
@@ -425,7 +426,8 @@ erasable syntax and the image has no `node_modules`, so it loads this module ins
 reads a set with the page's own readers. It is never served.
 
 `tools/dump-build.ts` builds both into a scratch folder and asserts them: only the page's own file
-types, nothing of `static/`, every file `index.html` names present, the manifest's icons too, no probe handle, and a
+types, nothing of `static/`, every file `index.html` and `stats.html` name present, the manifest's icons too, the
+statistics page loading a few KB of script and none of the game's, no probe handle, and a
 server's module that imports nothing and says of DM's and CSB's files, and of a file that
 does not read, what the source's check says.
 
@@ -456,6 +458,7 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | Path | What | Caching |
 | --- | --- | --- |
 | `/` | `dist/index.html` | `no-cache` |
+| `/stats` | `dist/stats.html`, the statistics page (`doc/STATISTICS.md`) | `no-cache` |
 | `/manifest.webmanifest` | `dist/manifest.webmanifest`, the installed game's | `no-cache` |
 | `/assets/…` | `dist/assets/…`, hashed names | `immutable` |
 | `/server/…` | 404: `dist/server/` is the server's module | |

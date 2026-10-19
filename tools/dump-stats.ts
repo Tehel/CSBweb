@@ -39,21 +39,9 @@ import { checkEvent, RateLimit, type CheckedEvent, type EventRules } from '../se
 import { AnswerCache, DEATH_SQUARES, StatsStore, type LevelStats, type SetStats, type StatsSet, type StatsSummary } from '../server/stats.ts';
 import { openStore } from '../server/store.ts';
 import { check, finish } from './lib/check';
-
-const P1 = '11111111-1111-4111-8111-111111111111';
-const P2 = '22222222-2222-4222-8222-222222222222';
-const P3 = '33333333-3333-4333-8333-333333333333';
-
-const P4 = '44444444-4444-4444-8444-444444444444';
+import { ch, day, event, FORTNIGHT, P1, P2, P3, P4, session, winner } from './lib/statsFortnight';
 
 const RULES: EventRules = { hasSet: (id) => ['dm-atari', 'csb', 'conflux', 'secret'].includes(id) };
-
-/** A champion as the page reports one: its id a cell of graphic 26, or `null` from a save. */
-const ch = (name: string, id: number | null = 0, more: object = {}) => ({ name, id, ...more });
-
-function event(type: string, player: string, set: string, playthrough: number, payload: object, extra: object = {}): string {
-    return JSON.stringify({ type, player, set, playthrough, build: 'abc1234', payload, ...extra });
-}
 
 function accepted(body: string): CheckedEvent {
     const checked = checkEvent(body, RULES);
@@ -147,62 +135,6 @@ function checkTheChecks(): void {
     check(limit.allow('a', 61_000), 'and a new window starts the count again');
 }
 
-const day = (date: string, hour = 10) => Date.parse(`${date}T${String(hour).padStart(2, '0')}:00:00Z`);
-
-/** A won game's champion: its masteries are its event's. */
-const winner = (name: string, id: number | null = 0) => ch(name, id, { masteries: [1, 2, 3, 4] });
-const won = (player: string, playthrough: number, gameTime: number, playTime: number, champions: object[]) =>
-    event('won', player, 'dm-atari', playthrough, { gameTime, playTime, champions });
-const session = (player: string, set: string, playthrough: number, playTime: number) =>
-    event('session', player, set, playthrough, { playTime });
-
-/** A fortnight of four players, scripted: see the expected aggregates below. */
-const FORTNIGHT: [number, string][] = [
-    [day('2026-10-05'), event('started', P1, 'dm-atari', 1, {})],
-    [day('2026-10-05'), session(P1, 'dm-atari', 1, 0)],
-    // A save continued: its play time is under its game's win, which counts.
-    [day('2026-10-06', 9), session(P1, 'dm-atari', 1, 200_000)],
-    [day('2026-10-05', 11), event('party', P1, 'dm-atari', 1, { champions: [ch('HALK', 3)] })],
-    [day('2026-10-05', 12), event('party', P1, 'dm-atari', 1, { champions: [ch('HALK', 3), ch('WU TSE', 9)] })],
-    // 1,000 ticks in 5 minutes: 18,000 VBLs.
-    [day('2026-10-07'), won(P1, 1, 1000, 300_000, [winner('HALK', 3), winner('WU TSE', 9)])],
-    [day('2026-10-08', 9), event('started', P1, 'dm-atari', 1, {})],
-    [day('2026-10-06'), event('started', P2, 'dm-atari', 2, {})],
-    [day('2026-10-06', 11), event('party', P2, 'dm-atari', 2, { champions: [ch('HALK', 3), ch('BOB', 1, { reincarnated: true })] })],
-    [day('2026-10-06', 12), event('lost', P2, 'dm-atari', 2, { gameTime: 50, playTime: 60, champions: [ch('HALK', null)], level: 1, x: 2, y: 3 })],
-    [day('2026-10-06', 13), event('lost', P2, 'dm-atari', 2, { gameTime: 50, playTime: 90, champions: [ch('HALK', null)], level: 1, x: 2, y: 3 })],
-    [day('2026-10-06', 14), event('lost', P2, 'dm-atari', 2, { gameTime: 70, playTime: 99, champions: [ch('HALK', null)], level: 1, x: 4, y: 3 })],
-    [day('2026-10-08'), event('started', P3, 'dm-atari', 6, {})],
-    [day('2026-10-08', 12), won(P3, 6, 500, 60_000, [winner('ROSE')])],
-    [day('2026-10-09'), event('started', P1, 'dm-atari', 7, {})],
-    [day('2026-10-09', 11), won(P1, 7, 500, 600_000, [winner('HALK', 3)])],
-    // A game's second win, from an earlier save: its first is kept, its party a pick of the game.
-    [day('2026-10-09', 12), won(P1, 7, 1, 600_000, [winner('SYRA')])],
-    // 121 ticks in a second's 60 VBLs, beyond the second's slack: a win, not ranked.
-    [day('2026-10-10'), event('started', P2, 'dm-atari', 8, {})],
-    [day('2026-10-10', 11), won(P2, 8, 121, 1000, [winner('BOB', 1)])],
-    // 120: just possible.
-    [day('2026-10-10', 12), event('started', P2, 'dm-atari', 9, {})],
-    [day('2026-10-10', 13), won(P2, 9, 120, 1000, [winner('BOB', 1)])],
-    [day('2026-10-11'), event('started', P2, 'csb', 3, {})],
-    [day('2026-10-12'), event('started', P1, 'dm-atari', 4, {})],
-    [day('2026-10-12'), session(P1, 'dm-atari', 4, 0)],
-    // A game's play time is the largest a session reported, an earlier save's read after.
-    [day('2026-10-13', 9), session(P1, 'dm-atari', 4, 3_600_000)],
-    [day('2026-10-13', 20), session(P1, 'dm-atari', 4, 1_000_000)],
-    // A win whose start never came, as an imported CSBWin save's: a win, not ranked.
-    [day('2026-10-13'), won(P1, 5, 9, 8, [winner('SYRA', null)])],
-    [day('2026-10-14'), event('lost', P3, 'csb', 3, { gameTime: 7, playTime: 6, champions: [ch('GOTHMOG', null)], level: 0, x: 5, y: 5 })],
-    // Hours rank the sets: CSB's one game outplays DM's.
-    [day('2026-10-14', 12), session(P3, 'csb', 3, 9_000_000)],
-    // A session of a game the store has no row of, an imported save's: its week counts, and
-    // neither its play time nor its player, of whom no row is made.
-    [day('2026-10-14', 13), session(P4, 'dm-atari', 11, 7_200_000)],
-    // A set that is not public: in none of the answers.
-    [day('2026-10-06'), event('started', P4, 'secret', 10, {})],
-    [day('2026-10-06', 11), event('lost', P4, 'secret', 10, { gameTime: 7, playTime: 6, champions: [ch('GOTHMOG')], level: 0, x: 5, y: 5 })],
-    [day('2026-10-06', 12), session(P4, 'secret', 10, 50)],
-];
 const SESSIONS = FORTNIGHT.filter(([, body]) => body.includes('"type":"session"')).length;
 
 const DM: StatsSet = { id: 'dm-atari', name: 'Dungeon Master' };
@@ -234,7 +166,7 @@ const EXPECTED_SETS: SetStats[] = [{
         { day: '2026-10-10', gameTime: 120, playTime: 1000, champions: [winner('BOB', 1)] },
         { day: '2026-10-08', gameTime: 500, playTime: 60_000, champions: [winner('ROSE')] },
         { day: '2026-10-09', gameTime: 500, playTime: 600_000, champions: [winner('HALK', 3)] },
-        { day: '2026-10-07', gameTime: 1000, playTime: 300_000, champions: [winner('HALK', 3), winner('WU TSE', 9)] },
+        { day: '2026-10-07', gameTime: 1000, playTime: 300_000, champions: [winner('HALK', 3), winner('WU TSE', 9, true)] },
     ] as SetStats['fastest'],
     levels: [{ level: 1, count: 3 }],
     champions: [

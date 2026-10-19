@@ -161,7 +161,7 @@ const PAGE = `
     <p>Dungeon Master © 1987 and Chaos Strikes Back © 1989 FTL Games, Software Heaven, Inc. Their names, pictures, sounds and data files belong to their rights holders, and are served here only to be played. The other dungeons belong to their authors. The engine is a port of CSBWin by Paul R. Stevens. CSBweb is a free, non-commercial fan project, not affiliated with or endorsed by any of them. Rights holders: write to csbweb[at]looten.net, and whatever you ask is taken down.</p>
     <nav class="px px2" aria-label="Footer">
       <a aria-disabled="true" href="#about">About</a>
-      <a aria-disabled="true">Stats</a>
+      <a href="stats">Stats</a>
       <a aria-disabled="true">Source</a>
       <a href="#credits">Credits</a>
     </nav>

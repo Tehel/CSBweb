@@ -34,7 +34,7 @@
 // straight into play, its form adding, editing, publishing and deleting a player's own set, the
 // tiles' controls moderating a published one, the book listing its documents, a moderator adding
 // and removing them, and each tile's name in its set's state's colour,
-// to a moderator, and, against a page whose server sends a content security policy
+// to a moderator, the statistics page its footer links to, and, against a page whose server sends a content security policy
 // (`check-image.sh`), nothing it refuses. See `check` below.
 // A failure there exits 1.
 //
@@ -922,6 +922,68 @@ check(secondPublished === 201 && ownerAgain[SECOND] === 'pick-documents:Document
   'its owner withdraws a pending set by its cross, which asks first, CANCEL keeping it; the approved set offers them the book alone');
 check(ownersDocuments?.items.join() === `${ARCHIVE},Solution.doc|gamefiles/${MINE}@5/Solution.doc|download|11 B|` && !ownersDocuments.add,
   'to a player, the book offers the archive and lists the documents, with no cross and no ADD');
+// The statistics page (`src/stats/statsPage.ts`), which the welcome page's footer links
+// to, at `/stats`, none of the game's code loaded: its band, its column of sets and the
+// selected set's figures, wins, levels and champions, each as `api/stats` answers them,
+// whatever the store holds (the dev server's fortnight, `tools/lib/statsFortnight.ts`, or
+// the image's empty one). With no `?set=`, the column's first is selected; a click selects
+// another, in the URL, the page's other parameters kept, and back selects the first again.
+const statsLink = await evaluate(`[...document.querySelectorAll('.welcome-footer nav a')].find(a=>a.textContent==='Stats')?.getAttribute('href')`);
+await send('Page.navigate', { url: `${APP}stats?keepsaves&keepsettings` });
+await wait(2500);
+const statsPage = () => evaluate(`(async()=>{const q=(s,r=document)=>[...r.querySelectorAll(s)];const text=(e)=>e?.textContent;
+  const panel=document.querySelector('.stats-set');
+  for(let i=0;i<50&&!panel.querySelector('h2');i++) await new Promise(r=>setTimeout(r,100));
+  const summary=await (await fetch('api/stats')).json();
+  const id=q('.stats-pick[aria-current="true"]').map(p=>p.dataset.set).join();
+  const set=id?await (await fetch('api/stats/'+encodeURIComponent(id))).json():null;
+  const hours=(ms)=>{const h=ms/3600000;return h<10?h.toFixed(1):Math.round(h).toLocaleString('en-US');};
+  const sections=Object.fromEntries(q('.stats-section',panel).map(s=>[text(s.querySelector('h3')),s]));
+  const wins=q('tbody tr',sections['Fastest wins']);
+  return { search: location.search,
+    band: q('.stats-band dd').map(text).join('|'),
+    expectedBand: [summary.players, hours(summary.playTime), summary.started, summary.won].map(String).join('|'),
+    weeks: q('.stats-band .stats-week').length,
+    picks: q('.stats-pick').map(p=>p.dataset.set).join(), expectedPicks: summary.sets.map(s=>s.id).join(),
+    selected: id, name: text(panel.querySelector('h2')),
+    figures: q('.stats-figures dd',panel).map(text).join('|'),
+    expectedFigures: set&&[hours(set.playTime), set.started, set.won, set.died, set.players].map(String).join('|'),
+    expectedName: set?.name, sets: summary.sets.length,
+    wins: wins.length, solos: q('.stats-solo',panel).length, reincarnated: q('.stats-reincarnated',panel).length,
+    expectedWins: set?.fastest.length, expectedSolos: set?.fastest.filter(w=>w.champions.length===1).length,
+    expectedReincarnated: set?.fastest.flatMap(w=>w.champions).filter(c=>c.reincarnated).length,
+    levels: q('.stats-levels .stats-row',panel).map(r=>text(r.querySelector('.stats-row-label'))+'='+text(r.querySelector('.stats-row-value'))).join(),
+    expectedLevels: set&&(set.levels.length===0?'':Array.from({length:Math.max(...set.levels.map(l=>l.level))+1},(_,l)=>'Level '+(l+1)+'='+(set.levels.find(r=>r.level===l)?.count??0)).join()),
+    champions: q('.stats-champions .stats-row:not(.stats-row-head) .stats-row-label',panel).map(text).join(),
+    expectedChampions: set?.champions.map(c=>c.name).join(),
+    gameCode: performance.getEntriesByType('resource').map(e=>e.name).filter(n=>/\\/main(-[\\w-]+)?\\.(ts|js)(\\?|$)|\\.dat$/i.test(n)) };})()`);
+const statsFirst = await statsPage();
+console.log('state: statistics page');
+console.log('  ', JSON.stringify(statsFirst));
+const statsMatch = (page) => page.band === page.expectedBand && page.picks === page.expectedPicks && page.name === page.expectedName
+  && page.figures === page.expectedFigures && page.wins === page.expectedWins && page.solos === page.expectedSolos
+  && page.reincarnated === page.expectedReincarnated && page.levels === page.expectedLevels && page.champions === page.expectedChampions;
+check(statsLink === 'stats' && statsFirst.gameCode.length === 0 && statsFirst.weeks > 0,
+  'the welcome page\'s footer links to the statistics page, which loads none of the game\'s code, and charts the weeks');
+check(statsFirst.sets > 1 && statsFirst.selected === statsFirst.expectedPicks.split(',')[0] && statsMatch(statsFirst),
+  'with no ?set=, the column\'s first is selected, and the band, the column and its figures, wins, levels and champions are api/stats\'s');
+const secondSet = statsFirst.expectedPicks.split(',')[1];
+await clickOn(`.stats-pick[data-set="${secondSet}"]`);
+await wait(700);
+const statsSecond = await statsPage();
+console.log('  ', JSON.stringify(statsSecond));
+check(statsSecond.selected === secondSet && new URLSearchParams(statsSecond.search).get('set') === secondSet
+  && statsSecond.search.includes('keepsaves') && statsMatch(statsSecond),
+  'a click selects a set, in the URL, the other parameters kept, and the page is its own');
+await evaluate(`history.back(),1`);
+await wait(700);
+const statsBack = await statsPage();
+check(statsBack.selected === statsFirst.selected && statsMatch(statsBack), 'back selects the first again');
+await send('Page.navigate', { url: `${APP}stats?set=dm-atari&keepsaves&keepsettings` });
+await wait(2500);
+const statsDm = await statsPage();
+console.log('  ', JSON.stringify(statsDm));
+check(statsDm.selected === 'dm-atari' && statsMatch(statsDm), '?set=dm-atari selects it');
 // A tile's name says its set's state, to a moderator (`server/dataSets.ts`), whose answer
 // the dev server's manifest stands in for here, with `"moderator": true`, kids-dungeon
 // pending and 3d2d1d, a hidden set, pending too: every set is listed, the hidden ones
