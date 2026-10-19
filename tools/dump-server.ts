@@ -32,7 +32,9 @@
  *     one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
  *     forwarded address, 429; a POST a browser says another site's page sent, by its
  *     `Sec-Fetch-Site` or its `Origin`, 403, there and on every other POST route, and one
- *     from the page's own origin heard; `/api/stats`: the store's aggregates, not cached;
+ *     from the page's own origin heard; `/api/stats`, `/api/stats/<set>` and
+ *     `/api/stats/<set>/<level>`: the store's answers for the public sets, kept 30 s, 404
+ *     for a set not public or a level out of range or not written as its number;
  *   - the API is handed the page's own `checkLocalDataSet`, which `tsc` holds to the
  *     shape `server/publish.ts` types it by (`CheckDataSet`);
  *   - `POST /api/data-sets` (`server/publish.ts`), over DM's and CSB's real files: a set
@@ -460,14 +462,27 @@ async function checkEvents(port: number, store: StatsStore): Promise<void> {
         ask(port, '/api/event', 'POST', { 'Content-Type': 'text/plain;charset=UTF-8', 'X-Real-IP': `10.0.0.${++address}`, ...headers }, body);
     const event = (playthrough: number) => JSON.stringify({ type: 'started', player: PLAYER, set: 'a', playthrough, build: 'test', payload: {} });
 
+    /** The scratch server's one set, public. */
+    const A = { id: 'a', name: 'A' };
+    const started = () => store.summary([A]).started;
     const stored = await post(event(1));
     check(stored.status === 204 && stored.body === '', 'an event: 204, no body');
     const stats = await ask(port, '/api/stats');
     console.log(`  /api/stats: ${stats.body.replace(/"week":"[^"]+"/g, '"week":<this week>')}`);
-    check(stats.status === 200 && String(stats.headers['content-type']).startsWith('application/json') && stats.headers['cache-control'] === 'no-store',
-        '/api/stats: JSON, not cached');
-    check(JSON.stringify(JSON.parse(stats.body)) === JSON.stringify(store.stats()) && store.stats().players === 1, 'the store\'s aggregates, the event in them');
+    check(stats.status === 200 && String(stats.headers['content-type']).startsWith('application/json') && stats.headers['cache-control'] === 'public, max-age=30',
+        '/api/stats: JSON, cached for 30 s');
+    check(stats.body === JSON.stringify(store.summary([A])) && started() === 1, 'the store\'s summary of the public sets, the event in it');
+    const set = await ask(port, '/api/stats/a');
+    const level = await ask(port, '/api/stats/a/0');
+    check(set.status === 200 && set.body === JSON.stringify(store.setStats(A)) && set.headers['cache-control'] === 'public, max-age=30',
+        '/api/stats/a: the set\'s, cached for 30 s');
+    check(level.status === 200 && level.body === JSON.stringify(store.levelStats(A, 0)), '/api/stats/a/0: its level\'s');
+    const unknown = ['/api/stats/b', '/api/stats/a/256', '/api/stats/a/007', '/api/stats/a/-1', '/api/stats/a/x', '/api/stats/a/0/0'];
+    const notFound = await Promise.all(unknown.map((path) => ask(port, path)));
+    check(notFound.every((answer) => answer.status === 404), `an unknown set or level: ${notFound.map((answer) => answer.status).join(' ')}`);
     check((await ask(port, '/api/stats', 'HEAD')).body === '', 'HEAD /api/stats: no body');
+    const posted = await ask(port, '/api/stats', 'POST', {}, '{}');
+    check(posted.status === 405, `POST /api/stats: ${posted.status}`);
 
     const bad = await post(event(-1));
     check(bad.status === 400 && bad.body === 'Bad event: bad playthrough', `a bad event: ${bad.status}, ${bad.body}`);
@@ -476,7 +491,7 @@ async function checkEvents(port: number, store: StatsStore): Promise<void> {
     check((await post(big, { 'Transfer-Encoding': 'chunked' })).status === 413, 'a body over 4 KB, chunked: 413');
     const get = await ask(port, '/api/event');
     check(get.status === 405 && get.headers.allow === 'POST', 'GET on /api/event: 405, with Allow: POST');
-    check(store.stats().players === 1, 'and none of those was stored');
+    check(started() === 1, 'and none of those was stored');
 
     const host = `127.0.0.1:${port}`;
     const crossSite: Record<string, string>[] = [
@@ -494,9 +509,11 @@ async function checkEvents(port: number, store: StatsStore): Promise<void> {
     const routes = [DATA_SETS_ROUTE, `${DATA_SETS_ROUTE}/a`, `${DATA_SETS_ROUTE}/a/${DOCUMENTS_SEGMENT}`];
     const elsewhere = await Promise.all(routes.map((route) => ask(port, `/${route}`, 'POST', { 'Sec-Fetch-Site': 'cross-site', [PLAYER_ID_HEADER]: MODERATORS[0] }, '{}')));
     check(elsewhere.every((answer) => answer.status === 403), `and on ${routes.join(', ')}: ${elsewhere.map((answer) => answer.status).join(' ')}`);
-    check(store.stats().players === 1, 'none of them stored');
+    check(started() === 1, 'none of them stored');
     const own = await post(event(31), { 'Sec-Fetch-Site': 'same-origin', Origin: `http://${host}` });
     check(own.status === 204, `a POST from the page's own origin: ${own.status}`);
+    const cached = JSON.parse((await ask(port, '/api/stats')).body) as { started: number };
+    check(started() === 2 && cached.started === 1, `an answer kept for its 30 s: ${cached.started} game started, where the store has ${started()}`);
 
     const answers: number[] = [];
     for (let i = 0; i <= EVENTS_PER_WINDOW; i++) answers.push((await post(event(10 + i), { 'X-Real-IP': '10.1.1.1' })).status);
@@ -864,6 +881,10 @@ async function checkModeration(scratch: string): Promise<void> {
         const seen = async (player: string | null) => parseManifest((await ask(port, '/api/data-sets', 'GET', player === null ? {} : { [PLAYER_ID_HEADER]: player })).body, '')
             .dataSets.map((set) => `${set.id}${set.pending ? ' pending' : ''}${set.hidden ? ' hidden' : ''}`).join();
         console.log(`  the table: ${states()}`);
+        const statsSets = (JSON.parse((await ask(port, '/api/stats')).body) as { sets: { id: string }[] }).sets.map((set) => set.id).join();
+        const notPublic = await Promise.all(['site-pending', 'site-hidden', 'p1'].map((id) => ask(port, `/api/stats/${id}`)));
+        check(statsSets === 'dm-atari' && notPublic.every((answer) => answer.status === 404),
+            `the statistics: of the approved sets not hidden alone (${statsSets}), 404 for a pending or hidden one`);
 
         const done = async (label: string, id: string, name: string, player: string, after: () => boolean) => {
             const answer = await moderate(id, action(name), player);

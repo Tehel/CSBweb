@@ -25,7 +25,9 @@
  *                     that keep them, the published ones (`wallsText`)
  *   /api/health       200, for the compose healthcheck
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
- *   /api/stats        the store's aggregates, as JSON
+ *   /api/stats        the public sets' statistics, as JSON (`StatsStore.summary`)  max-age 30 s
+ *   /api/stats/<id>   a public set's (`StatsStore.setStats`), 404 for any other    max-age 30 s
+ *   /api/stats/<id>/<level>  the deaths on its level's squares (`levelStats`)     max-age 30 s
  *
  * Every answer, the API's and every error's as a file's, carries `SECURITY_HEADERS`. A POST a
  * browser says another site's page sent is refused with 403 (`isCrossSite`).
@@ -48,7 +50,7 @@ import { checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimi
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import type { Notify } from './notify.ts';
 import { MAX_PUBLISH_BYTES, publishDataSet, type CheckDataSet, type PublishAnswer, type ReadDungeonWalls } from './publish.ts';
-import type { StatsStore } from './stats.ts';
+import { AnswerCache, LEVELS, STATS_CACHE_MS, type StatsSet, type StatsStore } from './stats.ts';
 
 export interface ServerOptions {
     /** The built page: `index.html` and `assets/`. */
@@ -130,6 +132,14 @@ const GAMEFILES = 'gamefiles';
 /** The URL prefix of the files shared by link (`ServerOptions.filesDir`). */
 const FILES = 'files';
 
+/** The API's statistics: `api/stats`, `api/stats/<id>` and `api/stats/<id>/<level>`, the level as its decimal number. */
+const STATS = 'stats';
+
+/** The sets the statistics answer for: the approved ones that are not hidden, in the table's order. */
+function publicSets(dataSets: DataSetStore): StatsSet[] {
+    return dataSets.read().dataSets.filter((set) => !set.pending && !set.hidden).map(({ id, name }) => ({ id, name }));
+}
+
 /** A file's type by its extension, in any case (`contentType`); any other is `application/octet-stream`. */
 const CONTENT_TYPES: Record<string, string> = {
     '.7z': 'application/x-7z-compressed',
@@ -207,6 +217,7 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
 
 /** The server, not yet listening. */
 export function createAppServer(options: ServerOptions, api: ApiOptions): Server {
+    const statsCache = new AnswerCache(STATS_CACHE_MS, api.now);
     return createServer((req, res) => {
         for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
         const fail = (error: unknown) => {
@@ -215,14 +226,14 @@ export function createAppServer(options: ServerOptions, api: ApiOptions): Server
             else res.destroy();
         };
         try {
-            route(options, api, req, res)?.catch(fail);
+            route(options, api, statsCache, req, res)?.catch(fail);
         } catch (error) {
             fail(error);
         }
     });
 }
 
-function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
+function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptions, statsCache: AnswerCache, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
     const segments = pathSegments(req.url ?? '');
     if (segments === null) return send(res, 400, 'Bad path');
 
@@ -258,10 +269,22 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
             if (req.method !== 'POST') return refuseMethod(res, 'POST');
             return receiveEvent(api, req, res);
         }
-        if (name === 'health' || name === 'stats') {
+        if (name === 'health') {
             if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
             res.setHeader('Cache-Control', 'no-store');
-            const body = name === 'health' ? '{"ok":true}' : JSON.stringify(api.store.stats());
+            return send(res, 200, '{"ok":true}', 'application/json; charset=utf-8');
+        }
+        if (segments[1] === STATS && segments.length <= 4) {
+            if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
+            const sets = publicSets(api.dataSets);
+            const [, , id, levelSegment] = segments;
+            const set = sets.find((known) => known.id === id);
+            const level = levelSegment === undefined ? undefined : Number(levelSegment);
+            if (id !== undefined && set === undefined) return send(res, 404, 'Not found');
+            if (level !== undefined && !(/^(0|[1-9]\d{0,2})$/.test(levelSegment!) && level < LEVELS)) return send(res, 404, 'Not found');
+            res.setHeader('Cache-Control', `public, max-age=${STATS_CACHE_MS / 1000}`);
+            const body = statsCache.get(segments.slice(2).join('/'), () => JSON.stringify(
+                set === undefined ? api.store.summary(sets) : level === undefined ? api.store.setStats(set) : api.store.levelStats(set, level)));
             return send(res, 200, body, 'application/json; charset=utf-8');
         }
         return send(res, 404, 'Not found');

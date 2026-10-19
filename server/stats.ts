@@ -1,13 +1,19 @@
 /**
  * The statistics (`doc/STATISTICS.md`): the store's `events` table (`store.ts`), and the
- * aggregates `api/stats` makes of it. No address and nothing the server has not checked is
- * stored (`events.ts`). A store without the table is given it.
+ * aggregates `api/stats` answers. No address and nothing the server has not checked is
+ * stored (`events.ts`).
+ *
+ * The aggregates are kept as the events arrive, in three tables beside the log, so that an
+ * answer is a few indexed queries rather than a pass over every event: `games`, a row per
+ * game (a set's playthrough), `deaths`, the lost games per square, and `picks`, the names
+ * of each game's champions. A store without them is given them, filled once from its
+ * `events`. The answers are cached (`AnswerCache`).
  */
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 
 import type { CheckedChampion, CheckedEvent } from './events.ts';
 
-const SCHEMA = `
+const EVENTS_SCHEMA = `
 CREATE TABLE IF NOT EXISTS events (
     id          INTEGER PRIMARY KEY,
     time        INTEGER NOT NULL,  -- ms since the epoch, the server's clock
@@ -21,67 +27,273 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS events_by_type ON events (type, data_set, playthrough);
 `;
 
+const AGGREGATES_SCHEMA = `
+CREATE TABLE games (
+    data_set    TEXT    NOT NULL,
+    playthrough INTEGER NOT NULL,
+    player      TEXT    NOT NULL,  -- its first event's, for counting: never answered
+    started     INTEGER,           -- its first started's time
+    won         INTEGER,           -- its first won's time, and that won's:
+    game_time   INTEGER,           --   game clock, in ticks
+    play_time   INTEGER,           --   play time, in ms
+    champions   TEXT,              --   party, JSON
+    PRIMARY KEY (data_set, playthrough)
+);
+CREATE INDEX games_by_game_time ON games (data_set, game_time) WHERE won IS NOT NULL;
+CREATE TABLE deaths (
+    data_set TEXT    NOT NULL,
+    level    INTEGER NOT NULL,
+    x        INTEGER NOT NULL,
+    y        INTEGER NOT NULL,
+    count    INTEGER NOT NULL,
+    PRIMARY KEY (data_set, level, x, y)
+) WITHOUT ROWID;
+CREATE TABLE picks (
+    data_set    TEXT    NOT NULL,
+    playthrough INTEGER NOT NULL,
+    name        TEXT    NOT NULL,
+    PRIMARY KEY (data_set, playthrough, name)
+) WITHOUT ROWID;
+`;
+
 /** The Monday that starts the week of `time`, a column, as `YYYY-MM-DD`, UTC. */
 const week = (time: string) => `date(${time} / 1000, 'unixepoch', 'weekday 0', '-6 days')`;
 
-/** What `api/stats` answers: aggregates only, never an event, a player or a playthrough. */
-export interface Stats {
-    /** Distinct players, ever. */
+/**
+ * The page's VBLs a second, `VBL_FREQUENCY` (`src/core/constants.ts`): not imported, as the
+ * server's image holds only `src/data/DataSets.ts` of the page's modules (`Dockerfile`).
+ */
+const VBL_FREQUENCY = 60;
+/** The fastest wins a set's answer lists. */
+export const FASTEST_WINS = 10;
+/** The champions a set's answer lists. */
+export const TOP_CHAMPIONS = 20;
+/**
+ * The squares a level's answer lists, the most died on first: a whole level of 32x32, where
+ * parties die on far fewer, and a bound on the answer wherever `lost` events placed them.
+ */
+export const DEATH_SQUARES = 1024;
+/** The levels a `lost` event can name (`events.ts`), and so the level answers there can be. */
+export const LEVELS = 256;
+/**
+ * The ticks a won game's clock may run past its play time's VBLs. A tick falls due at most
+ * once a VBL, asleep (`d.Speed` 0, `LoopState.speed`), and every 15 awake; the game's
+ * opening tick comes before its first VBL, and a due tick waits while the game is frozen,
+ * which the play time leaves out (`Game.playTime`). A second's slack holds them.
+ */
+const CLOCK_SLACK_TICKS = VBL_FREQUENCY;
+
+/** A set as the answers name it: the `data_sets` table's id and name. */
+export interface StatsSet {
+    id: string;
+    name: string;
+}
+
+/** `api/stats`: every public set, and their totals. Aggregates only. */
+export interface StatsSummary {
+    /** Distinct players of the sets' games, ever. */
     players: number;
-    /** Per set and week: distinct players, and games started and won. */
-    weeks: { set: string; week: string; players: number; started: number; won: number }[];
-    /** Per set: the games a champion of each name was in a party of. */
-    champions: { set: string; name: string; games: number }[];
-    /** Per set: the lost games on each square. */
-    deaths: { set: string; level: number; x: number; y: number; count: number }[];
+    started: number;
+    won: number;
+    /** Games started per week (from Monday, UTC), all sets together, the weeks with one. */
+    weeks: { week: string; started: number }[];
+    /** Each set, by games started, decreasing, then by name. */
+    sets: (StatsSet & { started: number; won: number; deaths: number })[];
+}
+
+/** A won game as a set's answer lists it. */
+export interface Win {
+    /** Its day, `YYYY-MM-DD`, UTC. */
+    day: string;
+    /** The game clock, in ticks, and the play time, in ms, the page sent. */
+    gameTime: number;
+    playTime: number;
+    champions: CheckedChampion[];
+}
+
+/** `api/stats/<set>/<level>`: the lost games on each of a set's level's squares. */
+export interface LevelStats extends StatsSet {
+    level: number;
+    /** The most first, at most `DEATH_SQUARES`, then by x and y. */
+    deaths: { x: number; y: number; count: number }[];
+}
+
+/** `api/stats/<set>`: one set's aggregates. Never an event, a player or a playthrough. */
+export interface SetStats extends StatsSet {
+    players: number;
+    started: number;
+    won: number;
+    /** The games a champion was ever in a party of. */
+    parties: number;
+    /** The lost games, every one: a party may die several times in a game. */
+    died: number;
     /**
-     * Every won game: its week, the game time (ticks) and the play time (ms) the page sent,
-     * the wall time since its `started` (ms, `null` when none was received), and its party.
+     * The fastest wins by game clock, then the earlier, of the games whose start was received
+     * and whose clock its play time could have run (`CLOCK_SLACK_TICKS`).
      */
-    wins: { set: string; week: string; gameTime: number; playTime: number; wallTime: number | null; champions: CheckedChampion[] }[];
+    fastest: Win[];
+    /** The lost games on each level, by level: its squares are the level's answer. */
+    levels: { level: number; count: number }[];
+    /** The games a champion of each name was in a party of, and won, the most first. */
+    champions: { name: string; games: number; won: number }[];
+    /** Games started and won per week, the weeks with one. */
+    weeks: { week: string; started: number; won: number }[];
 }
 
 export class StatsStore {
     private readonly db: DatabaseSync;
     private readonly insert: StatementSync;
+    private readonly addGame: StatementSync;
+    private readonly start: StatementSync;
+    private readonly win: StatementSync;
+    private readonly die: StatementSync;
+    private readonly pick: StatementSync;
 
     constructor(db: DatabaseSync) {
         this.db = db;
-        this.db.exec(SCHEMA);
+        this.db.exec(EVENTS_SCHEMA);
+        const kept = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'games'").get() !== undefined;
+        if (!kept) this.db.exec(AGGREGATES_SCHEMA);
         this.insert = this.db.prepare(
             'INSERT INTO events (time, player, type, data_set, playthrough, build, payload) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        this.addGame = this.db.prepare('INSERT INTO games (data_set, playthrough, player) VALUES (?, ?, ?) ON CONFLICT DO NOTHING');
+        this.start = this.db.prepare('UPDATE games SET started = MIN(IFNULL(started, ?1), ?1) WHERE data_set = ?2 AND playthrough = ?3');
+        this.win = this.db.prepare(
+            'UPDATE games SET won = ?, game_time = ?, play_time = ?, champions = ? WHERE data_set = ? AND playthrough = ? AND won IS NULL');
+        this.die = this.db.prepare(
+            'INSERT INTO deaths (data_set, level, x, y, count) VALUES (?, ?, ?, ?, 1) ON CONFLICT DO UPDATE SET count = count + 1');
+        this.pick = this.db.prepare('INSERT INTO picks (data_set, playthrough, name) VALUES (?, ?, ?) ON CONFLICT DO NOTHING');
+        if (!kept) this.fillAggregates();
     }
 
     record(event: CheckedEvent, time: number): void {
-        this.insert.run(time, event.player, event.type, event.set, event.playthrough, event.build, JSON.stringify(event.payload));
+        this.transaction(() => {
+            this.insert.run(time, event.player, event.type, event.set, event.playthrough, event.build, JSON.stringify(event.payload));
+            this.keep(event, time);
+        });
     }
 
-    stats(): Stats {
-        const all = (sql: string) => this.db.prepare(sql).all() as Record<string, unknown>[];
-        const { players } = this.db.prepare('SELECT COUNT(DISTINCT player) AS players FROM events').get() as { players: number };
-        const weeks = all(`
-            SELECT data_set AS "set", ${week('time')} AS week,
-                   COUNT(DISTINCT player) AS players,
-                   COUNT(DISTINCT CASE WHEN type = 'started' THEN playthrough END) AS started,
-                   COUNT(DISTINCT CASE WHEN type = 'won' THEN playthrough END) AS won
-            FROM events GROUP BY 1, 2 ORDER BY 2, 1`) as Stats['weeks'];
-        const champions = all(`
-            SELECT e.data_set AS "set", json_extract(c.value, '$.name') AS name, COUNT(DISTINCT e.playthrough) AS games
-            FROM events e, json_each(e.payload, '$.champions') c
-            WHERE e.type IN ('party', 'won', 'lost')
-            GROUP BY 1, 2 ORDER BY 1, 3 DESC, 2`) as Stats['champions'];
-        const deaths = all(`
-            SELECT data_set AS "set", json_extract(payload, '$.level') AS level,
-                   json_extract(payload, '$.x') AS x, json_extract(payload, '$.y') AS y, COUNT(*) AS count
-            FROM events WHERE type = 'lost' GROUP BY 1, 2, 3, 4 ORDER BY 1, 5 DESC, 2, 3, 4`) as Stats['deaths'];
-        const wins = all(`
-            SELECT w.data_set AS "set", ${week('w.time')} AS week, w.payload AS payload,
-                   w.time - (SELECT MIN(s.time) FROM events s
-                             WHERE s.type = 'started' AND s.data_set = w.data_set AND s.playthrough = w.playthrough) AS wallTime
-            FROM events w WHERE w.type = 'won' ORDER BY w.time`).map((row) => {
-            const { gameTime, playTime, champions } = JSON.parse(row.payload as string) as { gameTime: number; playTime: number; champions: CheckedChampion[] };
-            return { set: row.set as string, week: row.week as string, gameTime, playTime, wallTime: row.wallTime as number | null, champions };
+    /** The answer to `api/stats` for `sets`, the public ones: nothing of any other set. */
+    summary(sets: readonly StatsSet[]): StatsSummary {
+        const ids = JSON.stringify(sets.map((set) => set.id));
+        const of = 'data_set IN (SELECT value FROM json_each(?))';
+        const totals = this.db.prepare(`
+            SELECT COUNT(DISTINCT player) AS players, COUNT(started) AS started, COUNT(won) AS won FROM games WHERE ${of}`)
+            .get(ids) as { players: number; started: number; won: number };
+        const weeks = this.db.prepare(`
+            SELECT ${week('started')} AS week, COUNT(*) AS started FROM games
+            WHERE ${of} AND started IS NOT NULL GROUP BY 1 ORDER BY 1`).all(ids) as StatsSummary['weeks'];
+        const games = new Map((this.db.prepare(`
+            SELECT data_set AS id, COUNT(started) AS started, COUNT(won) AS won FROM games WHERE ${of} GROUP BY 1`)
+            .all(ids) as { id: string; started: number; won: number }[]).map((row) => [row.id, row]));
+        const deaths = new Map((this.db.prepare(`SELECT data_set AS id, SUM(count) AS deaths FROM deaths WHERE ${of} GROUP BY 1`)
+            .all(ids) as { id: string; deaths: number }[]).map((row) => [row.id, row.deaths]));
+        const rows = sets.map(({ id, name }) => ({
+            id, name, started: games.get(id)?.started ?? 0, won: games.get(id)?.won ?? 0, deaths: deaths.get(id) ?? 0,
+        }));
+        rows.sort((a, b) => b.started - a.started || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+        return { players: totals.players, started: totals.started, won: totals.won, weeks, sets: rows };
+    }
+
+    /** The answer to `api/stats/<set>`. */
+    setStats({ id, name }: StatsSet): SetStats {
+        const totals = this.db.prepare(`
+            SELECT COUNT(DISTINCT player) AS players, COUNT(started) AS started, COUNT(won) AS won FROM games WHERE data_set = ?`)
+            .get(id) as { players: number; started: number; won: number };
+        const { parties } = this.db.prepare('SELECT COUNT(DISTINCT playthrough) AS parties FROM picks WHERE data_set = ?').get(id) as { parties: number };
+        const levels = this.db.prepare('SELECT level, SUM(count) AS count FROM deaths WHERE data_set = ? GROUP BY 1 ORDER BY 1')
+            .all(id) as SetStats['levels'];
+        const fastest = this.db.prepare(`
+            SELECT date(won / 1000, 'unixepoch') AS day, game_time AS gameTime, play_time AS playTime, champions FROM games
+            WHERE data_set = ? AND won IS NOT NULL AND started IS NOT NULL
+              AND game_time * 1000 <= play_time * ${VBL_FREQUENCY} + ${CLOCK_SLACK_TICKS * 1000}
+            ORDER BY game_time, won LIMIT ${FASTEST_WINS}`).all(id).map((row) => ({
+            day: row.day as string, gameTime: row.gameTime as number, playTime: row.playTime as number,
+            champions: JSON.parse(row.champions as string) as CheckedChampion[],
+        }));
+        const champions = this.db.prepare(`
+            SELECT p.name AS name, COUNT(*) AS games, COUNT(g.won) AS won FROM picks p
+            JOIN games g ON g.data_set = p.data_set AND g.playthrough = p.playthrough
+            WHERE p.data_set = ? GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT ${TOP_CHAMPIONS}`).all(id) as SetStats['champions'];
+        const weeks = this.db.prepare(`
+            SELECT week, SUM(started) AS started, SUM(won) AS won FROM (
+                SELECT ${week('started')} AS week, 1 AS started, 0 AS won FROM games WHERE data_set = ?1 AND started IS NOT NULL
+                UNION ALL
+                SELECT ${week('won')}, 0, 1 FROM games WHERE data_set = ?1 AND won IS NOT NULL)
+            GROUP BY 1 ORDER BY 1`).all(id) as SetStats['weeks'];
+        const died = levels.reduce((sum, level) => sum + level.count, 0);
+        return { id, name, ...totals, parties, died, fastest, levels, champions, weeks };
+    }
+
+    /** The answer to `api/stats/<set>/<level>`. */
+    levelStats({ id, name }: StatsSet, level: number): LevelStats {
+        const deaths = this.db.prepare(`SELECT x, y, count FROM deaths WHERE data_set = ? AND level = ? ORDER BY count DESC, x, y LIMIT ${DEATH_SQUARES}`)
+            .all(id, level) as LevelStats['deaths'];
+        return { id, name, level, deaths };
+    }
+
+    /** The aggregates `event` adds to. */
+    private keep(event: Pick<CheckedEvent, 'type' | 'player' | 'set' | 'playthrough' | 'payload'>, time: number): void {
+        const { set, playthrough, payload } = event;
+        this.addGame.run(set, playthrough, event.player);
+        if (event.type === 'started') {
+            this.start.run(time, set, playthrough);
+            return;
+        }
+        const champions = payload.champions as CheckedChampion[];
+        for (const champion of champions) this.pick.run(set, playthrough, champion.name);
+        if (event.type === 'won') this.win.run(time, payload.gameTime as number, payload.playTime as number, JSON.stringify(champions), set, playthrough);
+        if (event.type === 'lost') this.die.run(set, payload.level as number, payload.x as number, payload.y as number);
+    }
+
+    /** The new tables filled from the log, in the order its events arrived. */
+    private fillAggregates(): void {
+        this.transaction(() => {
+            for (const row of this.db.prepare('SELECT time, player, type, data_set, playthrough, payload FROM events ORDER BY id').iterate()) {
+                this.keep({
+                    type: row.type as CheckedEvent['type'], player: row.player as string, set: row.data_set as string,
+                    playthrough: row.playthrough as number, payload: JSON.parse(row.payload as string) as CheckedEvent['payload'],
+                }, row.time as number);
+            }
         });
-        return { players, weeks, champions, deaths, wins };
+    }
+
+    private transaction(change: () => void): void {
+        this.db.exec('BEGIN');
+        try {
+            change();
+            this.db.exec('COMMIT');
+        } catch (error) {
+            this.db.exec('ROLLBACK');
+            throw error;
+        }
+    }
+}
+
+/** How long `api/stats`'s answers are kept, and what their `Cache-Control` says. */
+export const STATS_CACHE_MS = 30_000;
+
+/**
+ * Answers kept for `lifetime` ms by key, so that a loop of requests costs a lookup: the
+ * summary's, and each public set's and its `LEVELS` levels'. Each miss drops the expired ones.
+ */
+export class AnswerCache {
+    private readonly answers = new Map<string, { body: string; expires: number }>();
+    private readonly lifetime: number;
+    private readonly now: () => number;
+
+    constructor(lifetime: number, now: () => number) {
+        this.lifetime = lifetime;
+        this.now = now;
+    }
+
+    get(key: string, make: () => string): string {
+        const now = this.now();
+        const kept = this.answers.get(key);
+        if (kept !== undefined && kept.expires > now) return kept.body;
+        for (const [other, answer] of this.answers) if (answer.expires <= now) this.answers.delete(other);
+        const body = make();
+        this.answers.set(key, { body, expires: now + this.lifetime });
+        return body;
     }
 }

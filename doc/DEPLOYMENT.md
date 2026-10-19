@@ -467,7 +467,9 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | `/api/data-set-walls` | the walls of those of the same sets that keep some: the published ones | `no-store`, `Vary: X-Player-Id` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
-| `/api/stats` | the statistics' aggregates | `no-store` |
+| `/api/stats` | the public sets' statistics (`doc/STATISTICS.md`) | `public, max-age=30`, kept as long |
+| `/api/stats/<id>` | a public set's | `public, max-age=30`, kept as long |
+| `/api/stats/<id>/<level>` | the deaths on its level's squares | `public, max-age=30`, kept as long |
 
 Every file answers a conditional GET with 304, and only GET and HEAD are allowed, except on
 `api/event`, `api/data-sets`'s POST, `api/data-sets/<id>` and `api/data-sets/<id>/documents`, POST only. A POST a

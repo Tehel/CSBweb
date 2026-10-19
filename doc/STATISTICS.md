@@ -3,8 +3,8 @@
 The deployed game counts games: games started, won and lost, the parties that played them,
 and where parties die (`doc/DEPLOYMENT.md` for where it runs). They serve three questions:
 whether the game is actually played, which champions players prefer, and where parties die
-most often. The page that shows them, and the FAQ that explains them to players, are to be
-designed (`DEBT.md` E39).
+most often. The page that shows them is designed and not built (`DEBT.md` E40), and the FAQ
+that explains them to players is to be designed (E39).
 
 ## Anonymity is a rule of the code
 
@@ -108,18 +108,44 @@ container's writable layer, which every deploy's `down` loses. It runs in WAL mo
 server closes it on SIGTERM, which checkpoints the WAL into the file. A store that cannot be
 opened stops the server before it listens. Its nightly backup is `doc/DEPLOYMENT.md`'s.
 
+The `events` table is the log. What `api/stats` answers is kept beside it as the events
+arrive, in the event's own transaction, so that no answer reads the log:
+
+- `games`, a row per set and playthrough: its first event's player (for counting, never
+  answered), its first `started`'s time, and its first `won`'s time, game clock, play time
+  and party. A later `won` of the same game, from an earlier save, changes nothing.
+- `deaths`, the `lost` events per set and square: every one, as a party that dies, reloads
+  and dies again shows where the dungeon is hard.
+- `picks`, the names of the champions ever in a game's party, from its `party`, `won` and
+  `lost` events.
+
+A store without these tables is given them, filled once from its `events`, in the order
+they arrived.
+
 ## `api/stats`
 
-Public, not cached, and aggregates only: never an event, a player or a playthrough.
+Public and aggregates only: never an event, a player or a playthrough, and nothing of a set
+that is pending or hidden. Every answer is kept 30 s and says so (`Cache-Control: public,
+max-age=30`, `AnswerCache`), so that a loop of requests costs a lookup; making one again is
+a few indexed queries, about 0.1 s at 200,000 events.
 
-- **Use**: players ever, and per set and week (from Monday, UTC) the players and the games
-  started and won (distinct playthroughs).
-- **Preferred champions**: per set, the games a champion of each name was in a party of
-  (`party`, `won` and `lost` events).
-- **Where parties die**: lost games per set, level and square, which is enough for a heat
-  map on `peek-dungeon`'s map.
-- **Games won**: each one's week, game time, play time and wall time since its `started`
-  (`null` when none came), and its party with their masteries.
+- **`api/stats`**, the public sets: players ever, games started and won, games started per
+  week (from Monday, UTC), and each set's games started and won and deaths, by games
+  started, decreasing, then by name.
+- **`api/stats/<id>`**, a public set (404 for any other): its players, games started and
+  won, games with a party and deaths; its ten fastest wins by game clock, then the earlier,
+  each its day, game clock, play time and party with their masteries; its deaths per level;
+  its twenty most picked champions, with the games they were in and won; its games started
+  and won per week.
+- **`api/stats/<id>/<level>`**, the level as its decimal number below 256: the deaths on
+  each of its squares, the most first, at most 1,024, which is enough for a heat map on
+  `peek-dungeon`'s map.
 
-`tools/dump-stats.ts` asserts the checks and the store's aggregates over a scripted
-fortnight, and `tools/dump-server.ts` the API over HTTP and the store's life in `server.ts`.
+A win is ranked among the fastest only if its game's `started` came, and its game clock is
+one its play time could run: a tick at most each VBL, which sleep reaches, at 60 VBLs a
+second, and a second's slack (`CLOCK_SLACK_TICKS`). A game read from an imported CSBWin
+save, which sent no `started` and carries no play time, is a win and is not ranked.
+
+`tools/dump-stats.ts` asserts the checks, the store's aggregates over a scripted fortnight,
+the same made from the log alone, the cache, and every answer's time and size over 200,000
+events; `tools/dump-server.ts` the API over HTTP and the store's life in `server.ts`.

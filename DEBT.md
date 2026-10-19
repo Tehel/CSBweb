@@ -116,7 +116,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| W2 | `api/stats` is computed whole at every request | S | ⏳ |
+| E40 | The statistics page | M | ⏳ |
 | R6 | A damaged file's counts size allocations and loops | M | ⏳ |
 | R7 | An index from a custom data set can throw | S | ⏳ |
 | R8 | An optional feature's failure ends the game, or the session | S | ⏳ |
@@ -185,7 +185,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C183 · D22 · E40 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
+Next free IDs: C183 · D22 · E41 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -569,21 +569,10 @@ open internet behind the VPS's nginx. Its weak point is availability: what an an
 client can make it hold, compute or keep. What holds already: paths (`..`, `%2e%2e`,
 `%00`, dotfiles all refused), the body's size limit, events rebuilt from checked fields
 only, a champion's name of the game's characters, a POST from another site's page
-refused, a content security policy and `nosniff` on every answer, errors that leak nothing, and a
-container held to a memory, process and privilege budget, read-only but for its data. Each item ships with its check in `tools/dump-server.ts`
+refused, a content security policy and `nosniff` on every answer, errors that leak nothing, a
+container held to a memory, process and privilege budget, read-only but for its data, and
+statistics aggregated as the events arrive, each answer capped and cached 30 s. Each item ships with its check in `tools/dump-server.ts`
 or `tools/dump-stats.ts`.
-
-### W2 ⏳ `api/stats` is computed whole at every request
-
-Every `GET` or `HEAD` of `api/stats` runs `store.stats()` (`server/app.ts:192-196`): five
-aggregates over the whole events table through the synchronous `DatabaseSync`, with
-`json_each` over every payload and a correlated `MIN` for every win (`server/stats.ts:64-90`),
-returning every won game and every champion name ever. With 200,000 rows it takes 3.6 s,
-during which the server answers nothing, and returns 32 MB. A loop of requests is a denial
-of service.
-
-Paying it: the answer cached for a minute (or computed on a timer), the lists capped (the
-latest or best N wins a set, the top N champions), `api/stats` under a rate limit.
 
 ### W4 ⏳ The events table grows without bound
 
@@ -593,8 +582,9 @@ a second `won` of the same playthrough, no retention, and an IPv6 client has a /
 addresses. One address can add 43,200 rows a day, about 10 MB, on a disk the VPS shares,
 and SQLite never shrinks.
 
-Paying it: a global budget a day; `started`, `won` and `lost` unique by type, data set and
-playthrough (`INSERT OR IGNORE`); IPv6 counted by its /64; a size check.
+Paying it: a global budget a day; `started` and `won` unique by type, data set and
+playthrough (`INSERT OR IGNORE`), but not `lost`, as every death counts where parties die
+(`doc/STATISTICS.md`); IPv6 counted by its /64; a size check.
 
 ### W5 ⏳ The statistics are pseudonymous, not anonymous
 
@@ -1171,10 +1161,43 @@ the author before any code. What they are to hold:
   It insists that the statistics are anonymous: no player's name, no IP address, no
   browser profiling. A random id, drawn in the browser, is used only for counting
   players. Champions go by the names they carry, which a player can type.
-- **The public statistics**, drawn from the server's `api/stats`, on ABOUT or a page of
-  their own.
+- **The public statistics** are a page of their own, E40; ABOUT links to it.
 - **CREDITS** is a block of the welcome page (`#credits`). It does not name the data sets'
   authors yet.
+
+### E40 ⏳ The statistics page
+
+Designed with the author; nothing of it is built. The server's answers are
+(`doc/STATISTICS.md` → "`api/stats`"); nothing in the page reads them yet.
+
+**Where**: a second Vite entry, `stats.html` with `src/stats/statsPage.ts`, at `/stats`, so
+that none of the game's bundle loads; `server/app.ts` serves it, and the welcome page's
+footer links to it (STATISTICS). The welcome page's look (`welcomePage.css`). The selected
+set is in the URL, `/stats?set=<id>`; with none, the column's first. Charts are inline SVG
+or CSS bars, no library (the content security policy, `server/app.ts`).
+
+**The page**:
+
+- **A band across the top, all sets**: players, games started and won (`api/stats`), and
+  games started per week, all sets together, as bars.
+- **A column at the left, the sets** in `api/stats`'s order, by games started, decreasing,
+  each its name and count. A click selects the set: the rest of the page is its own, as a
+  champion's choice only means something within a set (Theron's Quest has its own).
+- **The selected set** (`api/stats/<id>`): its figures (games started and won, deaths,
+  players); its ten fastest wins by game clock, each its rank, game time as h:mm:ss of the
+  clock, play time, party (a reincarnated champion marked, a solo win badged) and day,
+  every win for now, a player's best only being a later second board; deaths per level, a
+  row a level as the dungeon descends (LEVEL 1 its first, as `mapTitle` counts) with its
+  bar and count; its preferred champions, their share of the games with a party, and their
+  win rate from 10 games; games started and won per week.
+- **A level's heat map**: a click on a level's row draws it from the set's `dungeon.dat`
+  (`DungeonLoader`, rooms in `MapDialog.ts`'s `ROOM_COLORS` as CSS), each square shaded by
+  its deaths (`api/stats/<id>/<level>`), the count on hover.
+
+Paying it: two commits, the page without the heat map, then the heat map; each checked in
+`tools/probe-frames.mjs`'s welcome section (the page loads, a click selects a set, a level
+opens its map) and by a screenshot over a store seeded with `dump-stats`' fortnight. E39's
+ABOUT then links to it.
 
 ### E22 ⏸️ Fullscreen filled by a fraction
 
